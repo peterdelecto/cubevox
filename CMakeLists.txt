@@ -1,0 +1,80 @@
+cmake_minimum_required(VERSION 3.20)
+project(cubevox CXX OBJCXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(glfw3 QUIET)
+if(NOT glfw3_FOUND)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(GLFW REQUIRED glfw3)
+endif()
+
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
+
+# engine: header-only, firmware-portable. The flags are the contract in
+# docs/specs: the same headers compile on the H7 unchanged.
+add_library(engine INTERFACE)
+target_include_directories(engine INTERFACE ${CMAKE_SOURCE_DIR})
+target_compile_options(engine INTERFACE -Wall -Wextra -Werror)
+
+function(cubevox_gui_target name)
+  add_executable(${name}
+    ${ARGN}
+    emulator/open_panel.mm
+    tools/miniaudio_impl.cpp
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+  )
+  target_include_directories(${name} PRIVATE ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+  target_compile_definitions(${name} PRIVATE GL_SILENCE_DEPRECATION)
+  target_link_libraries(${name} PRIVATE engine
+    ${COCOA_FRAMEWORK} ${OPENGL_FRAMEWORK} ${IOKIT_FRAMEWORK}
+    ${COREAUDIO_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK}
+    ${AUDIOTOOLBOX_FRAMEWORK} ${AUDIOUNIT_FRAMEWORK})
+  if(glfw3_FOUND)
+    target_link_libraries(${name} PRIVATE glfw)
+  else()
+    target_include_directories(${name} PRIVATE ${GLFW_INCLUDE_DIRS})
+    target_link_directories(${name} PRIVATE ${GLFW_LIBRARY_DIRS})
+    target_link_libraries(${name} PRIVATE ${GLFW_LIBRARIES})
+  endif()
+  set_target_properties(${name} PROPERTIES
+    OUTPUT_NAME "${name}"
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME "${name}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.peterdelecto.${name}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "1"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/emulator/Info.plist.in")
+endfunction()
+
+find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+find_library(OPENGL_FRAMEWORK OpenGL REQUIRED)
+find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
+find_library(COREAUDIO_FRAMEWORK CoreAudio REQUIRED)
+find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+find_library(AUDIOTOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
+find_library(AUDIOUNIT_FRAMEWORK AudioUnit REQUIRED)
+
+# cubevox-proto: the prototype face. Finder-launchable at build/cubevox-proto.app.
+cubevox_gui_target(cubevox-proto emulator/main.cpp)
+
+# cubevox-render: loop in, WAV out, no window.
+add_executable(cubevox-render tools/render.cpp tools/miniaudio_impl.cpp)
+target_link_libraries(cubevox-render PRIVATE engine
+  ${COREAUDIO_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK}
+  ${AUDIOTOOLBOX_FRAMEWORK} ${AUDIOUNIT_FRAMEWORK})
+
+# tests
+enable_testing()
+add_executable(unison_test test/unison_test.cpp)
+target_link_libraries(unison_test PRIVATE engine)
+add_test(NAME unison COMMAND unison_test)
+add_test(NAME proto_layout
+  COMMAND $<TARGET_FILE:cubevox-proto> --layout)
