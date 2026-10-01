@@ -64,8 +64,13 @@ find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
 find_library(AUDIOTOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
 find_library(AUDIOUNIT_FRAMEWORK AudioUnit REQUIRED)
 
-# cubevox-proto: the prototype face. Finder-launchable at build/cubevox-proto.app.
+# cubevox-proto: the prototype face. The bundle builds under build/ and a
+# symlink at the project root keeps it Finder-launchable across rebuilds.
 cubevox_gui_target(cubevox-proto emulator/main.cpp)
+add_custom_command(TARGET cubevox-proto POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E create_symlink
+          ${CMAKE_BINARY_DIR}/cubevox-proto.app ${CMAKE_SOURCE_DIR}/cubevox-proto.app
+  VERBATIM)
 
 # cubevox-render: loop in, WAV out, no window.
 add_executable(cubevox-render tools/render.cpp tools/miniaudio_impl.cpp)
