@@ -190,10 +190,10 @@ const char* baseName(const std::string& path) {
 
 void printTuning(const cv::UnisonTuning& t) {
   std::printf(
-      "// {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, swingMaxMs, wetMaxDb\n"
-      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff}\n",
+      "// {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
+      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n",
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
-      t.swingMaxMs, t.wetMaxDb);
+      t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs);
   std::fflush(stdout);
 }
 
@@ -206,6 +206,9 @@ void drawTuning(cv::UnisonTuning& t) {
   ImGui::SliderFloat("Swing at depth 0", &t.swingMinMs, 0.0f, 1.0f, "%.2f ms");
   ImGui::SliderFloat("Swing at depth 1", &t.swingMaxMs, 0.5f, 6.0f, "%.2f ms");
   ImGui::SliderFloat("Wet level at depth 1", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("DETUNE 0", &t.detuneCents[0], -30.0f, 30.0f, "%.1f cents");
+  ImGui::SliderFloat("DETUNE 1", &t.detuneCents[1], -30.0f, 30.0f, "%.1f cents");
+  ImGui::SliderFloat("WINDOW", &t.windowMs, 5.0f, 30.0f, "%.0f ms");
   if (ImGui::Button("Reset to defaults")) t = cv::UnisonTuning{};
   ImGui::SameLine();
   if (ImGui::Button("Print tuning")) printTuning(t);

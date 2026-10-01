@@ -30,7 +30,8 @@ Full panel (for context; only UNISON is built here):
 1. Shared portable engine. Effect code lives in `engine/*.h`, plain C++17, and the H7
    firmware includes the same files unchanged. What is tuned on the Mac is what ships.
 2. Unison is chorus-style (owner pick B): two detuned copies whose detune wobbles with
-   a slow LFO. A plain doubler (no LFO) is a later menu option, not built now.
+   a slow LFO. Owner 2026-10-01: a fixed per-voice detune (the doubler flavour) is also
+   in the tuning set so the two can be blended; defaults 0 cents keep the pure chorus.
 3. One panel knob, DEPTH, drives swing, wet level, and therefore detune together.
    The constants behind that mapping are exposed in the emulator's Tuning section so
    the knob can be tuned by ear against real loops, then baked back as defaults.
@@ -70,6 +71,8 @@ struct UnisonTuning {            // defaults = the shipped mapping
   float swingMinMs     = 0.2f;   // modulation swing (peak) at DEPTH 0
   float swingMaxMs     = 2.5f;   // modulation swing (peak) at DEPTH 1
   float wetMaxDb       = -6.0f;  // per-voice level at DEPTH 1 (two voices sum ~0 dB)
+  float detuneCents[2] = {0.0f, 0.0f};  // fixed per-voice detune at DEPTH 1
+  float windowMs       = 20.0f;  // crossfade window of the dual-tap shifter (5–30)
 };
 
 struct UnisonParams {
@@ -89,10 +92,15 @@ class Unison {
 
 ### Behaviour
 
-1. Two voices. Each is a delay line of `kDelayMs = 50` ms (2400 samples) in a
-   `std::array<float, 2400>`, read at `baseDelayMs[v] + swing * sin(phase_v)` with
-   cubic (4-point Lagrange/Hermite) interpolation. Each voice has its own phase
-   accumulator at `lfoHz[v]`; the two rates differ so the voices never lock.
+1. Two voices reading one shared delay line of `kDelayMs = 80` ms in a `std::array`.
+   Each voice's centre is `baseDelayMs[v] + swing * sin(phase_v)` with cubic
+   (Catmull-Rom) interpolation. Each voice has its own LFO phase at `lfoHz[v]`; the two
+   rates differ so the voices never lock.
+1a. Fixed detune per voice is a crossfaded dual-tap sawtooth shifter around that centre:
+   two taps half a window apart at `centre + window * (p - 0.5)`, Hann gains summing
+   to 1, sawtooth phase advancing `(1 - ratio) / windowSamples` per sample with
+   `ratio = 2^(detuneCents[v] * depth / 1200)`. Phase parked at 0 puts the live tap
+   exactly at centre, so 0 cents is the plain chorus read.
 2. `swing = lerp(swingMinMs, swingMaxMs, depth)` ms. `wetGain = depth *
    dbToLin(wetMaxDb)` per voice. Dry gain is 1.0 always.
 3. `out = in + wetGain * (voice0 + voice1)`.
@@ -117,7 +125,8 @@ Layout, top to bottom:
    shown as `%.0f %%`.
 3. Collapsible `Tuning` (default collapsed, dev only): sliders in real units for
    `baseDelayMs[0..1]` (5–40 ms), `lfoHz[0..1]` (0.1–3 Hz), `swingMinMs` (0–1 ms),
-   `swingMaxMs` (0.5–6 ms), `wetMaxDb` (-24–0 dB). `Reset to defaults` button.
+   `swingMaxMs` (0.5–6 ms), `wetMaxDb` (-24–0 dB), `detuneCents[0..1]` (±30 cents),
+   `windowMs` (5–30 ms). `Reset to defaults` button.
    `Print tuning` button writes the current `UnisonTuning` initialiser to stdout in a
    form that pastes straight into `unison.h`.
 
@@ -161,6 +170,10 @@ No window, no audio device.
    measured over 4 s.
 4. No allocation. `operator new` / `delete` replaced in the test binary with versions
    that `abort()` while a global `gInProcess` flag is set around `process()`.
+5. Fixed detune. Depth 1, voice 1 only, swing 0, `detuneCents[1] = 10`, 440 Hz sine:
+   mean detune over seconds 1–4 from zero-crossing periods lands in 10 ± 2 cents.
+   (Measures ~9.3; the Hann crossfade blends tap phases and biases zero-crossing
+   frequency low, so the band is deliberately loose.)
 
 Also in ctest: `cubevox-proto --layout` exits 0.
 
@@ -178,7 +191,7 @@ CoreFoundation, AudioToolbox, AudioUnit. GLFW via pkg-config/`find_package(glfw3
 
 ## Out of scope for this step
 
-Live mic input in the emulator, the other nine stages, presets, the doubler mode, a
+Live mic input in the emulator, the other nine stages, presets, a
 high-pass on the wet path, stereo output from the engine. Each is a later addition
 that fits the structure above without redesign.
 

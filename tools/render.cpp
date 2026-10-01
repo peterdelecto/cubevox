@@ -19,7 +19,7 @@ int usage() {
                "usage: cubevox-render <in> <out.wav> --depth <0..1> [--on 0|1] "
                "[--tuning k=v ...]\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
-               "wetMaxDb\n");
+               "wetMaxDb detuneCents0 detuneCents1 windowMs\n");
   return 2;
 }
 
@@ -35,6 +35,8 @@ bool applyTuning(cv::UnisonTuning& t, const char* kv) {
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
       {"swingMinMs", &t.swingMinMs},       {"swingMaxMs", &t.swingMaxMs},
       {"wetMaxDb", &t.wetMaxDb},
+      {"detuneCents0", &t.detuneCents[0]}, {"detuneCents1", &t.detuneCents[1]},
+      {"windowMs", &t.windowMs},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;

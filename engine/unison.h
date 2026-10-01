@@ -5,8 +5,10 @@
 
 #include "engine/common.h"
 
-// Chorus-style unison: two detuned copies whose delay wobbles with a slow LFO.
-// One DEPTH knob drives swing, wet level, and therefore detune together.
+// Unison: two copies of the voice, each with a slow LFO wobble on its delay
+// (chorus) and a fixed detune from a crossfaded dual-tap shifter (doubler).
+// One DEPTH knob scales swing, fixed detune, and wet level together, so the
+// two flavours blend through the tuning constants, not separate controls.
 
 namespace cv {
 
@@ -16,6 +18,8 @@ struct UnisonTuning {
   float swingMinMs = 0.2f;   // modulation swing (peak) at DEPTH 0
   float swingMaxMs = 2.5f;   // modulation swing (peak) at DEPTH 1
   float wetMaxDb = -6.0f;    // per-voice level at DEPTH 1
+  float detuneCents[2] = {0.0f, 0.0f};  // fixed per-voice detune at DEPTH 1
+  float windowMs = 20.0f;    // crossfade window of the dual-tap shifter
 };
 
 struct UnisonParams {
@@ -29,6 +33,7 @@ class Unison {
   void reset() {
     line_.fill(0.0f);
     phase_ = {0.0f, 0.0f};
+    shiftPhase_ = {0.0f, 0.0f};
     depth_ = 0.0f;
     writePos_ = 0;
   }
@@ -41,6 +46,7 @@ class Unison {
     const float target = p.on ? clamp01(p.depth) : 0.0f;
     const float wetMax = powf(10.0f, t.wetMaxDb / 20.0f);
     const float smooth = 1.0f - expf(-1.0f / (kSmoothSec * kSampleRate));
+    const float windowSmp = clampWindow(t.windowMs) * kSmpPerMs;
     float inc[2];
     for (int v = 0; v < 2; ++v) inc[v] = kTwoPi * t.lfoHz[v] / kSampleRate;
 
@@ -53,11 +59,16 @@ class Unison {
 
       float wet = 0.0f;
       for (int v = 0; v < 2; ++v) {
-        const float delayMs = t.baseDelayMs[v] + swing * sinf(phase_[v]);
-        const float s = readCubic(delayMs * (kSampleRate / 1000.0f));
+        const float centre = t.baseDelayMs[v] * kSmpPerMs + swing * kSmpPerMs * sinf(phase_[v]);
+        const float s = readShifted(v, centre, windowSmp);
         if (enabled_[v]) wet += s;
         phase_[v] += inc[v];
         if (phase_[v] >= kTwoPi) phase_[v] -= kTwoPi;
+        // Pitch ratio r moves the read head at r x write speed, so the tap's
+        // delay drifts by (1 - r) per sample; the sawtooth is that drift
+        // normalised to the window.
+        const float ratio = powf(2.0f, t.detuneCents[v] * depth_ / 1200.0f);
+        shiftPhase_[v] = frac(shiftPhase_[v] + (1.0f - ratio) / windowSmp);
       }
 
       out[i] = in[i] + wetGain * wet;
@@ -66,13 +77,38 @@ class Unison {
   }
 
  private:
-  static constexpr int kDelayMs = 50;
+  static constexpr int kDelayMs = 80;
   static constexpr int kLen = kDelayMs * kSampleRate / 1000;
+  static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
+  static constexpr float kWindowMinMs = 5.0f;
+  static constexpr float kWindowMaxMs = 30.0f;
   static constexpr float kTwoPi = 6.28318530717958647692f;
   static constexpr float kSmoothSec = 0.020f;
   static constexpr float kSnapBelow = 1e-6f;
 
   static float clamp01(float x) { return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); }
+  static float clampWindow(float ms) {
+    return ms < kWindowMinMs ? kWindowMinMs : (ms > kWindowMaxMs ? kWindowMaxMs : ms);
+  }
+  static float frac(float x) {
+    x -= floorf(x);
+    return x < 0.0f ? x + 1.0f : x;
+  }
+
+  // Two taps half a window apart on a sawtooth, Hann-crossfaded so the sum
+  // of the gains is always 1. Taps sit at centre + window * (p - 0.5), so
+  // with the phase parked at 0 the live tap is exactly at centre and the
+  // output matches a plain single-tap read.
+  float readShifted(int v, float centre, float windowSmp) const {
+    float sum = 0.0f;
+    for (int k = 0; k < 2; ++k) {
+      const float p = frac(shiftPhase_[v] + 0.5f * k);
+      const float gain = 0.5f * (1.0f - cosf(kTwoPi * p));
+      if (gain <= 0.0f) continue;
+      sum += gain * readCubic(centre + windowSmp * (p - 0.5f));
+    }
+    return sum;
+  }
 
   // One-pole toward target; snaps to exact 0 so settled depth 0 adds nothing.
   void stepDepth(float target, float a) {
@@ -107,6 +143,7 @@ class Unison {
   // Both voices read the same input, so one delay line serves both.
   std::array<float, kLen> line_{};
   std::array<float, 2> phase_{{0.0f, 0.0f}};
+  std::array<float, 2> shiftPhase_{{0.0f, 0.0f}};
   std::array<bool, 2> enabled_{{true, true}};
   float depth_ = 0.0f;
   int writePos_ = 0;

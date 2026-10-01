@@ -137,6 +137,44 @@ bool testDetune() {
                 "peak=%.2f cents (15..30)", cents);
 }
 
+// Mean signed cents from upward zero-crossing periods, linearly interpolated.
+float meanCents(const std::vector<float>& x, int skip) {
+  double sum = 0.0;
+  int count = 0;
+  float prevCross = -1.0f;
+  for (size_t i = static_cast<size_t>(skip); i + 1 < x.size(); ++i) {
+    if (!(x[i] < 0.0f && x[i + 1] >= 0.0f)) continue;
+    const float cross = static_cast<float>(i) + (-x[i]) / (x[i + 1] - x[i]);
+    if (prevCross >= 0.0f) {
+      const float hz = cv::kSampleRate / (cross - prevCross);
+      sum += 1200.0f * log2f(hz / kFreq);
+      ++count;
+    }
+    prevCross = cross;
+  }
+  return count ? static_cast<float>(sum / count) : 0.0f;
+}
+
+bool testFixedDetune() {
+  const int n = 4 * cv::kSampleRate;
+  const std::vector<float> in = sine(n);
+  cv::UnisonParams p = params(1.0f);
+  p.tuning.swingMinMs = 0.0f;
+  p.tuning.swingMaxMs = 0.0f;
+  p.tuning.detuneCents[1] = 10.0f;
+  p.tuning.windowMs = 20.0f;
+  gUnison.reset();
+  gUnison.setVoiceEnabled(0, false);
+  const std::vector<float> out = run(gUnison, in, p);
+  gUnison.setVoiceEnabled(0, true);
+
+  std::vector<float> wet(in.size());
+  for (size_t i = 0; i < in.size(); ++i) wet[i] = out[i] - in[i];
+  const float cents = meanCents(wet, cv::kSampleRate);
+  return report("fixed detune", cents >= 8.0f && cents <= 12.0f,
+                "mean=%.2f cents (10 +-2)", cents);
+}
+
 bool testLevel() {
   const int n = 4 * cv::kSampleRate;
   const std::vector<float> in = sine(n);
@@ -161,5 +199,6 @@ int main() {
   ok &= testDetune();
   ok &= testLevel();
   ok &= testNoAlloc();
+  ok &= testFixedDetune();
   return ok ? 0 : 1;
 }
