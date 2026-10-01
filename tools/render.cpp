@@ -46,14 +46,15 @@ int usage() {
                "usage: cubevox-render <in> <out.wav> [--depth <0..1>] [--on 0|1] "
                "[--tuning k=v ...]\n"
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
-               "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
+               "[--voice lower|low|fixed|high|higher=<0..3>[:<formant -12..12>] ...]\n"
+               "       [--hengine 0|1|2] [--chromatic]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm|parker] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
                "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
-               "  pitch front end runs with --harmony or --octave\n"
+               "  pitch front end runs with --harmony or --octave; formant applies on --hengine 1\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb or --spring\n"
                "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, eq\n"
@@ -61,6 +62,8 @@ int usage() {
                "  eq runs only with --eq\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
+               "     harChromLower harChromLow harChromHigh harChromHigher (-12..12) harTrimDbA harTrimDbB harTrimDbC\n"
+               "     harGrainPeriods harEpochSearch harEpochLpHz harGrainWindowMs harGrainCount (2|4)\n"
                "     octGrainPeriods octEpochSearch octEpochLpHz octTrimDbA octTrimDbB octGrainWindowMs octGrainCount octTrimDbC eqTrimDb\n"
                "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distStackBassHz\n"
@@ -110,6 +113,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
   cv::SpringCTuning& pk = rp.reverb.parker.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
+  cv::HarmonyTuning& ht = rp.pitchFx.harmony.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
@@ -120,6 +124,11 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   float prkMHigh = static_cast<float>(pk.mHigh);
   float prkSprings = static_cast<float>(pk.springs);
   float octGrains = static_cast<float>(ot.grainCount);
+  float harGrains = static_cast<float>(ht.shifter.grainCount);
+  // Chromatic rows by HarmonyVoice: Lower, Low, High, Higher (Fixed is unused).
+  constexpr int kChromVoice[4] = {0, 1, 3, 4};
+  float harChrom[4];
+  for (int i = 0; i < 4; ++i) harChrom[i] = static_cast<float>(ht.chromaticSemis[kChromVoice[i]]);
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -132,6 +141,12 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"octTrimDbA", &ot.trimDbA}, {"octTrimDbB", &ot.trimDbB},
       {"octGrainWindowMs", &ot.grainWindowMs}, {"octGrainCount", &octGrains},
       {"octTrimDbC", &ot.trimDbC},
+      {"harChromLower", &harChrom[0]}, {"harChromLow", &harChrom[1]},
+      {"harChromHigh", &harChrom[2]}, {"harChromHigher", &harChrom[3]},
+      {"harTrimDbA", &ht.trimDb[0]}, {"harTrimDbB", &ht.trimDb[1]}, {"harTrimDbC", &ht.trimDb[2]},
+      {"harGrainPeriods", &ht.shifter.grainPeriods}, {"harEpochSearch", &ht.shifter.epochSearch},
+      {"harEpochLpHz", &ht.shifter.epochLpHz}, {"harGrainWindowMs", &ht.shifter.grainWindowMs},
+      {"harGrainCount", &harGrains},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
@@ -207,6 +222,13 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       return false;
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
+    if (harGrains != 2.0f && harGrains != 4.0f) return false;
+    ht.shifter.grainCount = static_cast<int>(harGrains);
+    for (int i = 0; i < 4; ++i) {
+      if (harChrom[i] < -12.0f || harChrom[i] > 12.0f || harChrom[i] != std::floor(harChrom[i]))
+        return false;
+      ht.chromaticSemis[kChromVoice[i]] = static_cast<int8_t>(harChrom[i]);
+    }
     pk.mLow = static_cast<int>(prkMLow);
     pk.mHigh = static_cast<int>(prkMHigh);
     pk.springs = static_cast<int>(prkSprings);
@@ -227,12 +249,16 @@ bool parseVoice(const char* kv, cv::HarmonySlot& slot) {
       {"higher", cv::HarmonyVoice::Higher},
   };
   const char* eq = std::strchr(kv, '=');
-  if (!eq || eq[1] < '0' || eq[1] > '3' || eq[2] != '\0') return false;
-  const size_t keyLen = static_cast<size_t>(eq - kv);
+  if (!eq || eq[1] < '0' || eq[1] > '3' || (eq[2] != '\0' && eq[2] != ':')) return false;
+  float formant = 0.0f;
+  if (eq[2] == ':' && (!parseFloat(eq + 3, &formant) || formant < -12.0f || formant > 12.0f))
+    return false;
+  const size_t nameLen = static_cast<size_t>(eq - kv);
   for (const auto& n : names) {
-    if (std::strlen(n.name) == keyLen && std::strncmp(n.name, kv, keyLen) == 0) {
+    if (std::strlen(n.name) == nameLen && std::strncmp(n.name, kv, nameLen) == 0) {
       slot.voice = n.voice;
       slot.level = eq[1] - '0';
+      slot.formant = formant;
       return true;
     }
   }
@@ -333,6 +359,13 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       rp.reverb.parker.dwell = s.dwell;
     } else if (std::strcmp(a, "--harmony") == 0) {
       haveHarmony = true;
+    } else if (std::strcmp(a, "--hengine") == 0 && i + 1 < argc) {
+      const char* v = argv[++i];
+      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0)
+        return false;
+      hp.engine = v[0] - '0';
+    } else if (std::strcmp(a, "--chromatic") == 0) {
+      hp.chromatic = true;
     } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
       float k = 0.0f;
       if (!parseFloat(argv[++i], &k) || k < 0.0f || k > 11.0f || k != std::floor(k))

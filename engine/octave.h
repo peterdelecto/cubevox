@@ -5,6 +5,7 @@
 #include "engine/common.h"
 #include "engine/pitch.h"
 #include "engine/psola.h"
+#include "engine/shifters.h"
 #include "engine/smooth.h"
 
 // Octave: one voice a fixed number of semitones from the sung pitch.
@@ -18,17 +19,17 @@ struct OctaveTuning {
   bool muteUnvoiced = false;
 
   // Option B
-  float grainPeriods = 2.0f;     // grain length in sung periods, 1.5..3
-  float epochSearch = 0.25f;     // peak search half-width, fraction of a period
-  float epochLpHz = 1000.0f;     // low-pass used to find the peak
+  float grainPeriods = ShifterTuning{}.grainPeriods;  // grain length in sung periods, 1.5..3
+  float epochSearch = ShifterTuning{}.epochSearch;    // peak search half-width, fraction of a period
+  float epochLpHz = ShifterTuning{}.epochLpHz;        // low-pass used to find the peak
 
   // Per-engine output trims; level rule at mix 0.5, on top of levelDb.
   float trimDbA = -5.3f;
   float trimDbB = 6.2f;
 
   // Option C
-  float grainWindowMs = 40.0f;  // 20..80
-  int grainCount = 2;           // 2 or 4
+  float grainWindowMs = ShifterTuning{}.grainWindowMs;  // 20..80
+  int grainCount = ShifterTuning{}.grainCount;          // 2 or 4
   float trimDbC = 2.6f;
 };
 

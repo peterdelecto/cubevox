@@ -37,6 +37,8 @@ class PitchFx {
     octaveC_.reset();
     lp_.fill(0.0f);
     lpZ_ = 0.0f;
+    harmonyLp_.fill(0.0f);
+    harmonyLpZ_ = 0.0f;
     engine_ = 0;
     mix_.fill(0.0f);
     active_.fill(0.0f);
@@ -55,9 +57,8 @@ class PitchFx {
       if (engine != 2) octaveC_.reset();
       engine_ = engine;
     }
-    float lpHz = p.octave.tuning.epochLpHz;
-    lpHz = lpHz < kMinLpHz ? kMinLpHz : (lpHz > kMaxLpHz ? kMaxLpHz : lpHz);
-    const float lpA = 1.0f - expf(-kTwoPi * lpHz / static_cast<float>(kSampleRate));
+    const float lpA = lpCoef(p.octave.tuning.epochLpHz);
+    const float harmonyLpA = lpCoef(p.harmony.tuning.shifter.epochLpHz);
 
     const std::array<float, kStages> mixT = {smooth::clamp01(p.harmony.mix),
                                              smooth::clamp01(p.octave.mix)};
@@ -76,7 +77,9 @@ class PitchFx {
       ring_[writeCount_] = in[i];
       lpZ_ += lpA * (in[i] - lpZ_);
       lp_[writeCount_] = lpZ_;
-      const float harm = harmony_.tick(ring_, writeCount_, pr.period);
+      harmonyLpZ_ += harmonyLpA * (in[i] - harmonyLpZ_);
+      harmonyLp_[writeCount_] = harmonyLpZ_;
+      const float harm = harmony_.tick(ring_, harmonyLp_, writeCount_, pr.period);
       const float oct = tickOctave(pr.period);
       float dry = 1.0f;
       std::array<float, kStages> wet{};
@@ -95,6 +98,12 @@ class PitchFx {
   const PitchResult& pitch() const { return tracker_.result(); }
 
  private:
+  // One-pole coefficient for an option B peak-search low-pass.
+  static float lpCoef(float hz) {
+    hz = hz < kMinLpHz ? kMinLpHz : (hz > kMaxLpHz ? kMaxLpHz : hz);
+    return 1.0f - expf(-kTwoPi * hz / static_cast<float>(kSampleRate));
+  }
+
   bool prepareOctave(const PitchResult& pr, const OctaveParams& o) {
     if (engine_ == 1) return octaveB_.prepare(pr, o);
     if (engine_ == 2) return octaveC_.prepare(pr, o);
@@ -119,8 +128,10 @@ class PitchFx {
   OctaveVoice octaveA_;
   OctaveVoiceB octaveB_;
   OctaveVoiceC octaveC_;
-  VoiceRing lp_{};  // ring_ low-passed for option B's peak search
+  VoiceRing lp_{};  // ring_ low-passed for Octave B's peak search
   float lpZ_ = 0.0f;
+  VoiceRing harmonyLp_{};  // the same at Harmony's own cutoff, for Harmony B
+  float harmonyLpZ_ = 0.0f;
   int engine_ = 0;
   std::array<float, kStages> mix_{};
   std::array<float, kStages> active_{};

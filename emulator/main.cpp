@@ -39,6 +39,9 @@ constexpr int kWindowW = 1440;
 constexpr int kWindowH = 840;  // owner's laptop shows ~847 px of window
 constexpr float kHarmonyColumnW = 592.0f;  // Harmony column width
 constexpr float kLabelW = 175.0f;          // room right of each slider for its label
+constexpr float kHarmonyEngineX = 140.0f;  // Engine radios beside the HARMONY checkbox
+constexpr float kHarmonyKeyW = 200.0f;     // KEY combo, leaves room for Chromatic
+constexpr float kFormantW = 150.0f;        // FORMANT slider at the end of each Menu row
 constexpr float kMeterW = 240.0f;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
@@ -290,7 +293,12 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
     len += std::snprintf(line + len, sizeof(line) - len, ", {%d, %d, %d, %d, %d, %d, %d}",
                          row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
   }
-  std::snprintf(line + len, sizeof(line) - len, ", %.1ff}", h.trimDb);
+  const int8_t* cs = h.chromaticSemis;
+  const cv::ShifterTuning& sh = h.shifter;
+  std::snprintf(line + len, sizeof(line) - len,
+                ", {%d, %d, %d, %d, %d}, {%.1ff, %.1ff, %.1ff}, {%.2ff, %.2ff, %.0ff, %.0ff, %d}}",
+                cs[0], cs[1], cs[2], cs[3], cs[4], h.trimDb[0], h.trimDb[1], h.trimDb[2],
+                sh.grainPeriods, sh.epochSearch, sh.epochLpHz, sh.grainWindowMs, sh.grainCount);
   std::snprintf(
       gTuningText, sizeof(gTuningText),
       "%s\n"
@@ -341,7 +349,8 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
   std::printf(
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
-      "lower, low, high, higher, trimDb\n"
+      "lower, low, high, higher, chromaticSemis, trimDb[A, B, C], "
+      "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
       "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz, trimDbA, trimDbB, grainWindowMs, grainCount, trimDbC\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
@@ -423,15 +432,46 @@ bool tuningLeaf(const char* probeName, const char* label) {
 // Long tuning sections split into sub-nodes so no column ever needs a scroll bar.
 void drawHarmonyTuning(cv::HarmonyTuning& h) {
   if (!tuningHeader("harmony")) return;
-  if (tuningNode("Voices & tracking")) {
+  if (tuningNode("Levels & trims")) {
     ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
     ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
     ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
-    ImGui::SliderFloat("Trim (all levels)", &h.trimDb, -12.0f, 18.0f, "%.1f dB");
+    ImGui::SliderFloat("Trim A", &h.trimDb[0], -12.0f, 18.0f, "%.1f dB");
+    ImGui::SliderFloat("Trim B", &h.trimDb[1], -12.0f, 18.0f, "%.1f dB");
+    ImGui::SliderFloat("Trim C", &h.trimDb[2], -12.0f, 18.0f, "%.1f dB");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Tracking")) {
     ImGui::SliderFloat("Tracking speed (ms)", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
     ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
-    ImGui::Checkbox("Mute unvoiced", &h.muteUnvoiced);
+    ImGui::Checkbox("Mute unvoiced (A, B)", &h.muteUnvoiced);
     ImGui::Checkbox("Snap to scale", &h.snapToScale);
+    ImGui::TreePop();
+  }
+  if (tuningNode("Chromatic intervals")) {
+    // Rows follow HarmonyVoice; Fixed (index 2) is unused in chromatic mode.
+    static const char* const kName[5] = {"Lower", "Low", nullptr, "High", "Higher"};
+    for (int v = 0; v < 5; ++v) {
+      if (kName[v] == nullptr) continue;
+      int semis = h.chromaticSemis[v];
+      if (ImGui::SliderInt(kName[v], &semis, -12, 12, "%+d st"))
+        h.chromaticSemis[v] = static_cast<int8_t>(semis);
+    }
+    ImGui::TreePop();
+  }
+  if (tuningNode("Shifter B/C")) {
+    cv::ShifterTuning& s = h.shifter;
+    ImGui::SliderFloat("Grain length (B)", &s.grainPeriods, 1.5f, 3.0f, "%.2f periods");
+    ImGui::SliderFloat("Epoch search (B)", &s.epochSearch, 0.0f, 0.3f, "%.2f period");
+    ImGui::SliderFloat("Epoch low-pass (B)", &s.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Grain window (C)", &s.grainWindowMs, 20.0f, 80.0f, "%.0f ms");
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Grains (C)");
+    ImGui::SameLine();
+    ImGui::RadioButton("2", &s.grainCount, 2);
+    ImGui::SameLine();
+    ImGui::RadioButton("4", &s.grainCount, 4);
     ImGui::TreePop();
   }
 }
@@ -716,6 +756,7 @@ constexpr int kMaxActiveVoices = 2;
 
 struct HarmonyMenu {
   std::array<int, kVoiceRows> level{};      // 0 off, 1 low, 2 med, 3 high
+  std::array<int, kVoiceRows> formant{};    // engine B formant, semitones
   std::array<int, kMaxActiveVoices> order{};  // active rows, earliest first
   int activeCount = 0;
 };
@@ -750,10 +791,12 @@ void syncSlots(const HarmonyMenu& m, cv::HarmonyParams& h) {
     if (i < m.activeCount) {
       h.slots[i].voice = static_cast<cv::HarmonyVoice>(m.order[i]);
       h.slots[i].level = m.level[m.order[i]];
+      h.slots[i].formant = static_cast<float>(m.formant[m.order[i]]);
     }
   }
 }
 
+// Each row: name, level radios, then FORMANT (engine B, active rows only).
 void drawHarmonyMenu(cv::HarmonyParams& h) {
   if (!ImGui::CollapsingHeader("Menu", ImGuiTreeNodeFlags_DefaultOpen)) return;
   static const char* const kRowName[kVoiceRows] = {"Lower", "Low", "Fixed", "High", "Higher"};
@@ -769,6 +812,11 @@ void drawHarmonyMenu(cv::HarmonyParams& h) {
       int shown = gMenu.level[row];
       if (ImGui::RadioButton(kLevelName[level], &shown, level)) setRowLevel(gMenu, row, level);
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(h.engine != 1 || gMenu.level[row] == 0);
+    ImGui::SetNextItemWidth(kFormantW);
+    ImGui::SliderInt("Formant", &gMenu.formant[row], -12, 12, "%+d st");
+    ImGui::EndDisabled();
     ImGui::PopID();
   }
   syncSlots(gMenu, h);
@@ -783,7 +831,20 @@ void percentSlider(const char* label, float& value) {
 void drawHarmonyBlock(cv::HarmonyParams& h, const ProtoState& state) {
   ImGui::PushID("harmony");
   ImGui::Checkbox("HARMONY", &h.on);
+  ImGui::SameLine(kHarmonyEngineX);
+  ImGui::TextUnformatted("Engine");
+  ImGui::SameLine();
+  ImGui::RadioButton("A", &h.engine, 0);
+  ImGui::SameLine();
+  ImGui::RadioButton("B", &h.engine, 1);
+  ImGui::SameLine();
+  ImGui::RadioButton("C", &h.engine, 2);
+  ImGui::BeginDisabled(h.chromatic);
+  ImGui::SetNextItemWidth(kHarmonyKeyW);
   ImGui::Combo("KEY", &h.key, cv::kKeyName, 12);
+  ImGui::EndDisabled();
+  ImGui::SameLine();
+  ImGui::Checkbox("Chromatic", &h.chromatic);
   percentSlider("MIX", h.mix);
   drawHarmonyMenu(h);
   drawHarmonyTuning(h.tuning);
@@ -989,7 +1050,8 @@ int runLayoutProbe() {
   // All headers closed, then each Tuning header open, then each sub-node open alone.
   static const ProbeOpen kScenarios[] = {
       {true, nullptr, nullptr},          {true, "harmony", nullptr},
-      {true, "harmony", "Voices & tracking"},
+      {true, "harmony", "Levels & trims"},      {true, "harmony", "Tracking"},
+      {true, "harmony", "Chromatic intervals"}, {true, "harmony", "Shifter B/C"},
       {true, "octave", nullptr},         {true, "unison", nullptr},
       {true, "unison", "Chorus (LFO-wobbled delay)"},
       {true, "unison", "Doubler (fixed detune, TC-Helicon style)"},

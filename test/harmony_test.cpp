@@ -1,4 +1,5 @@
-// Harmony checks: tracker, shift, diatonic intervals, bypass, no-alloc.
+// Harmony checks: tracker, shift, diatonic intervals, bypass, no-alloc, then
+// engines B and C, formant, chromatic intervals, and C on noise.
 // No window, no audio device.
 
 #include <algorithm>
@@ -154,11 +155,9 @@ cv::HarmonyParams highVoice() {
   return p;
 }
 
-// Median f0 of the output over seconds 1..2, measured by a fresh tracker.
-double outputHz(double inHz) {
-  gFx.reset();
-  const std::vector<float> out = run(gFx, tone(inHz, 2 * cv::kSampleRate), highVoice());
-  const std::vector<Frame> f = track(out, kThreshold);
+// Median f0 of a signal over seconds 1..2, measured by a fresh tracker.
+double medianHz(const std::vector<float>& x) {
+  const std::vector<Frame> f = track(x, kThreshold);
   std::vector<double> hz;
   for (const Frame& fr : f)
     if (fr.end > cv::kSampleRate && fr.r.voiced) hz.push_back(fr.r.hz);
@@ -166,6 +165,13 @@ double outputHz(double inHz) {
   std::sort(hz.begin(), hz.end());
   return hz[hz.size() / 2];
 }
+
+double outputHz(double inHz, const cv::HarmonyParams& p) {
+  gFx.reset();
+  return medianHz(run(gFx, tone(inHz, 2 * cv::kSampleRate), p));
+}
+
+double outputHz(double inHz) { return outputHz(inHz, highVoice()); }
 
 bool testShift() {
   const double expect = 261.63;
@@ -231,6 +237,120 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
+
+// Engines B and C, formant, chromatic.
+
+cv::HarmonyParams highOn(int engine) {
+  cv::HarmonyParams p = highVoice();
+  p.engine = engine;
+  return p;
+}
+
+bool checkHz(const char* name, const cv::HarmonyParams& p, double inHz, double expect,
+             double tol) {
+  const double got = outputHz(inHz, p);
+  const double err = got > 0.0 ? cents(got, expect) : 9999.0;
+  return report(name, std::fabs(err) <= tol,
+                "out=%.2f Hz, expect %.2f, err=%.2f cents (+-%.0f)", got, expect, err, tol);
+}
+
+bool testPitchBC() {
+  bool ok = true;
+  ok &= checkHz("B shift", highOn(1), 220.0, 261.63, 10.0);
+  ok &= checkHz("C shift", highOn(2), 220.0, 261.63, 15.0);
+  return ok;
+}
+
+// Goertzel magnitude of x at hz.
+double goertzel(const float* x, int n, double hz) {
+  const double w = 2.0 * kPi * hz / cv::kSampleRate;
+  const double c = 2.0 * std::cos(w);
+  double s1 = 0.0;
+  double s2 = 0.0;
+  for (int i = 0; i < n; ++i) {
+    const double s0 = x[i] + c * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  return std::sqrt(s1 * s1 + s2 * s2 - c * s1 * s2);
+}
+
+// Root-sum-square Goertzel magnitude within +-halfHz of hz over second 1..2,
+// as in octave_test.
+double bandAmp(const std::vector<float>& x, double hz, double halfHz) {
+  double e = 0.0;
+  const int steps = static_cast<int>(halfHz / 2.0);
+  for (int d = -steps; d <= steps; ++d) {
+    const double a = goertzel(&x[cv::kSampleRate], cv::kSampleRate, hz + 2.0 * d);
+    e += a * a;
+  }
+  return std::sqrt(e);
+}
+
+// Amplitude-weighted mean harmonic number over harmonics 1..10 of f0.
+double centroidRel(const std::vector<float>& x, double f0) {
+  double num = 0.0;
+  double den = 0.0;
+  for (int k = 1; k <= 10; ++k) {
+    const double a = bandAmp(x, f0 * k, 0.45 * f0);
+    num += k * a;
+    den += a;
+  }
+  return den > 0.0 ? num / den : 0.0;
+}
+
+bool testFormantB() {
+  const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
+  double hz[2] = {0.0, 0.0};
+  double rel[2] = {0.0, 0.0};
+  const float formant[2] = {0.0f, 12.0f};
+  for (int i = 0; i < 2; ++i) {
+    cv::HarmonyParams p = highOn(1);
+    p.slots[0].formant = formant[i];
+    gFx.reset();
+    const std::vector<float> out = run(gFx, in, p);
+    hz[i] = medianHz(out);
+    rel[i] = hz[i] > 0.0 ? centroidRel(out, hz[i]) : 0.0;
+  }
+  const double err = hz[1] > 0.0 ? cents(hz[1], 261.63) : 9999.0;
+  const double ratio = rel[0] > 0.0 ? rel[1] / rel[0] : 0.0;
+  return report("B formant", std::fabs(err) <= 10.0 && ratio >= 1.2,
+                "+12: out=%.2f Hz err=%.2f cents (+-10), centroid/f0 x%.3f of formant 0 "
+                "(>=1.2, base %.3f)",
+                hz[1], err, ratio, rel[0]);
+}
+
+bool testChromatic() {
+  cv::HarmonyParams high = highVoice();
+  high.chromatic = true;
+  cv::HarmonyParams lower = high;
+  lower.slots[0].voice = cv::HarmonyVoice::Lower;
+  bool ok = true;
+  ok &= checkHz("chromatic High +4", high, 220.0, 220.0 * std::pow(2.0, 4.0 / 12.0), 10.0);
+  ok &= checkHz("chromatic Lower -7", lower, 220.0, 220.0 * std::pow(2.0, -7.0 / 12.0), 10.0);
+  return ok;
+}
+
+// White noise leaves the tracker unvoiced; chromatic keeps the interval at
+// +4 so C actually shifts.
+bool testNoiseC() {
+  const std::vector<float> in = noise(2 * cv::kSampleRate);
+  cv::HarmonyParams p = highOn(2);
+  p.chromatic = true;
+  gFx.reset();
+  const std::vector<float> out = run(gFx, in, p);
+  double ri = 0.0;
+  double ro = 0.0;
+  for (size_t i = cv::kSampleRate; i < in.size(); ++i) {
+    ri += static_cast<double>(in[i]) * in[i];
+    ro += static_cast<double>(out[i]) * out[i];
+  }
+  const double gainDb = 10.0 * std::log10(ro / ri);
+  const double wantDb = p.tuning.levelDb[2] + p.tuning.trimDb[2];
+  return report("C noise level", std::fabs(gainDb - wantDb) <= 3.0,
+                "out/in %+.2f dB, expect %+.2f dB (+-3)", gainDb, wantDb);
+}
+
 }  // namespace
 
 int main() {
@@ -240,5 +360,9 @@ int main() {
   ok &= testDiatonic();
   ok &= testBypass();
   ok &= testNoAlloc();
+  ok &= testPitchBC();
+  ok &= testFormantB();
+  ok &= testChromatic();
+  ok &= testNoiseC();
   return ok ? 0 : 1;
 }

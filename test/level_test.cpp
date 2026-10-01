@@ -164,7 +164,15 @@ int main() {
   cv::PitchFxParams harmony = pitchOff();
   harmony.harmony.on = true;
   harmony.harmony.slots[0] = {cv::HarmonyVoice::High, 2};
-  ok &= simple<cv::PitchFx>("harmony C high L2 mix .5", in, harmony);
+  ok &= simple<cv::PitchFx>("harmony A High L2 mix .5", in, harmony);
+
+  cv::PitchFxParams harmonyB = harmony;
+  harmonyB.harmony.engine = 1;
+  ok &= simple<cv::PitchFx>("harmony B High L2 mix .5", in, harmonyB);
+
+  cv::PitchFxParams harmonyC = harmony;
+  harmonyC.harmony.engine = 2;
+  ok &= simple<cv::PitchFx>("harmony C High L2 mix .5", in, harmonyC);
 
   cv::PitchFxParams octA = pitchOff();
   octA.octave.on = true;
