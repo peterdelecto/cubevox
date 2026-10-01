@@ -7,9 +7,11 @@
 #include "engine/common.h"
 #include "engine/pitch.h"
 #include "engine/psola.h"
+#include "engine/smooth.h"
 
 // Harmony, modelled on the Zoom V3: up to two diatonic voices parallel to the
 // sung pitch, a KEY that picks the scale, and MIX between dry and harmony.
+// PitchFx owns the ring, the tracker, and the mix.
 
 namespace cv {
 
@@ -47,62 +49,54 @@ constexpr const char* kKeyName[12] = {"C / Am", "G / Em", "D / Bm", "A / F#m",
   "E / C#m", "B / G#m", "F# / D#m", "Db / Bbm", "Ab / Fm", "Eb / Cm", "Bb / Gm",
   "F / Dm"};
 
-class Harmony {
+// Both harmony voices for one block at a time. The caller owns the ring, the
+// tracker, and the dry/wet mix.
+class HarmonyVoices {
  public:
-  Harmony() { reset(); }
+  HarmonyVoices() { reset(); }
 
   void reset() {
-    ring_.fill(0.0f);
-    writeCount_ = 0;
-    tracker_.reset();
     for (PsolaVoice& v : voices_) v.reset();
     semis_.fill(0.0f);
     gain_.fill(0.0f);
-    mix_ = 0.0f;
-    active_ = 0.0f;
+    semisT_.fill(0.0f);
+    gainT_.fill(0.0f);
+    aGlide_ = 1.0f;
     fresh_ = true;
   }
 
-  void process(const float* in, float* out, int n, const HarmonyParams& p) {
+  // Called once per block before ticking. Sets per-voice target semitones and
+  // gains; returns true if any slot is on.
+  bool prepare(const PitchResult& pr, const HarmonyParams& p) {
     const HarmonyTuning& t = p.tuning;
-    tracker_.push(in, n, t.voicedThreshold);
-    const PitchResult& pr = tracker_.result();
-
-    std::array<float, 2> semisT{};
-    std::array<float, 2> gainT{};
     bool any = false;
     for (int v = 0; v < 2; ++v) {
-      semisT[v] = targetSemis(p.slots[v].voice, pr.hz, p.key, t);
-      gainT[v] = targetGain(p.slots[v].level, pr.voiced, t);
+      semisT_[v] = targetSemis(p.slots[v].voice, pr.hz, p.key, t);
+      gainT_[v] = targetGain(p.slots[v].level, pr.voiced, t);
       any = any || p.slots[v].level > 0;
+      // Smoothers start on target after reset; silent voices jump to their
+      // new interval instead of gliding in from a stale one.
+      if (fresh_ || gain_[v] == 0.0f) semis_[v] = semisT_[v];
+      if (fresh_) gain_[v] = gainT_[v];
     }
-    const float mixT = clamp01(p.mix);
-    const float activeT = any ? 1.0f : 0.0f;
-    settle(semisT, gainT, mixT, activeT);
-
-    const float aSmooth = coef(kSmoothSec);
-    const float aGlide = coef(t.glideMs * 0.001f);
-    for (int i = 0; i < n; ++i) {
-      ring_[writeCount_] = in[i];
-      float wet = 0.0f;
-      for (int v = 0; v < 2; ++v) {
-        gain_[v] = step(gain_[v], gainT[v], aSmooth);
-        semis_[v] = step(semis_[v], semisT[v], aGlide);
-        if (gain_[v] == 0.0f) continue;
-        const float ratio = exp2f(semis_[v] / 12.0f);
-        wet += gain_[v] * voices_[v].tick(ring_, writeCount_, pr.period, ratio);
-      }
-      mix_ = step(mix_, mixT, aSmooth);
-      active_ = step(active_, activeT, aSmooth);
-      const float dry = 1.0f + (cosf(mix_ * kHalfPi) - 1.0f) * active_;
-      const float wetGain = sinf(mix_ * kHalfPi) * active_;
-      out[i] = dry * in[i] + wetGain * wet;
-      // Voices only use writeCount modulo the ring, so wrapping here is exact.
-      writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1;
-    }
+    fresh_ = false;
+    aGlide_ = smooth::coef(t.glideMs * 0.001f);
+    return any;
   }
 
-  const PitchResult& pitch() const { return tracker_.result(); }
+  // One sample of both voices summed, gains and glide applied.
+  float tick(const VoiceRing& ring, long writeCount, float period) {
+    const float aSmooth = smooth::coef(smooth::kSmoothSec);
+    float wet = 0.0f;
+    for (int v = 0; v < 2; ++v) {
+      gain_[v] = smooth::step(gain_[v], gainT_[v], aSmooth);
+      semis_[v] = smooth::step(semis_[v], semisT_[v], aGlide_);
+      if (gain_[v] == 0.0f) continue;
+      const float ratio = exp2f(semis_[v] / 12.0f);
+      wet += gain_[v] * voices_[v].tick(ring, writeCount, period, ratio);
+    }
+    return wet;
+  }
 
  private:
   struct Degree {
@@ -111,37 +105,7 @@ class Harmony {
   };
 
   static constexpr int kMajor[7] = {0, 2, 4, 5, 7, 9, 11};
-  static constexpr float kHalfPi = 1.57079632679489661923f;
-  static constexpr float kSmoothSec = 0.020f;
-  static constexpr float kSnap = 1e-6f;
   static constexpr float kTieEps = 1e-4f;
-
-  static float clamp01(float x) { return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); }
-
-  static float coef(float sec) {
-    return sec <= 0.0f ? 1.0f : 1.0f - expf(-1.0f / (sec * kSampleRate));
-  }
-
-  // One-pole that lands exactly on its target, so settled bypass is bit-exact.
-  static float step(float x, float target, float a) {
-    x += a * (target - x);
-    return fabsf(target - x) < kSnap ? target : x;
-  }
-
-  // Smoothers start on target after reset; silent voices jump to their new
-  // interval instead of gliding in from a stale one.
-  void settle(const std::array<float, 2>& semisT, const std::array<float, 2>& gainT,
-              float mixT, float activeT) {
-    for (int v = 0; v < 2; ++v) {
-      if (fresh_ || gain_[v] == 0.0f) semis_[v] = semisT[v];
-      if (fresh_) gain_[v] = gainT[v];
-    }
-    if (fresh_) {
-      mix_ = mixT;
-      active_ = activeT;
-      fresh_ = false;
-    }
-  }
 
   // Nearest major-scale degree by circular distance; ties snap down.
   static Degree degreeOf(float hz, int key) {
@@ -185,14 +149,12 @@ class Harmony {
     return powf(10.0f, t.levelDb[idx] / 20.0f);
   }
 
-  VoiceRing ring_{};
-  PitchTracker tracker_;
   std::array<PsolaVoice, 2> voices_{};
   std::array<float, 2> semis_{};
   std::array<float, 2> gain_{};
-  float mix_ = 0.0f;
-  float active_ = 0.0f;
-  long writeCount_ = 0;
+  std::array<float, 2> semisT_{};
+  std::array<float, 2> gainT_{};
+  float aGlide_ = 1.0f;
   bool fresh_ = true;
 };
 

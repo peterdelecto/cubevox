@@ -10,7 +10,7 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - The emulator mirrors the panel exactly. Dev-only controls live under a collapsed
   `Tuning` header. Never invent panel controls.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
-- Specs live in `docs/specs/`. Current: `2026-10-01-unison-emulator-design.md`.
+- Specs live in `docs/specs/`. Current: `2026-10-01-octave-pitchfx-design.md` (harmony + unison specs still apply).
 
 ## Build / run
 ```
@@ -20,7 +20,7 @@ build/cubevox-render in.wav out.wav --depth 0.7
 ```
 
 ## Panel (planned)
-Input Gain · Soft gate (menu) · Harmony Key (detented encoder)+Mix (voices in menu) ·
+Input Gain · Soft gate (menu) · Harmony Key (detented encoder)+Mix (voices in menu; tracking speed in tuning) ·
 Octave Semitones+Mix ·
 Unison Depth · Slapback Intensity · Distortion Drive · Gate Threshold ·
 Spring Tension+Dwell · Output (menu)

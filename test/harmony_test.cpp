@@ -10,7 +10,7 @@
 #include <new>
 #include <vector>
 
-#include "engine/harmony.h"
+#include "engine/pitch_fx.h"
 
 namespace {
 
@@ -89,7 +89,11 @@ std::vector<Frame> track(const std::vector<float>& x, float threshold) {
   return frames;
 }
 
-std::vector<float> run(cv::Harmony& h, const std::vector<float>& in, const cv::HarmonyParams& p) {
+// Harmony through the shared front end with Octave off.
+std::vector<float> run(cv::PitchFx& h, const std::vector<float>& in, const cv::HarmonyParams& hp) {
+  cv::PitchFxParams p;
+  p.harmony = hp;
+  p.octave.semitones = 0;
   std::vector<float> out(in.size());
   const int total = static_cast<int>(in.size());
   for (int i = 0; i < total; i += cv::kBlock) {
@@ -140,7 +144,7 @@ bool testTracker() {
   return ok;
 }
 
-static cv::Harmony gHarmony;
+static cv::PitchFx gFx;
 
 cv::HarmonyParams highVoice() {
   cv::HarmonyParams p;
@@ -152,8 +156,8 @@ cv::HarmonyParams highVoice() {
 
 // Median f0 of the output over seconds 1..2, measured by a fresh tracker.
 double outputHz(double inHz) {
-  gHarmony.reset();
-  const std::vector<float> out = run(gHarmony, tone(inHz, 2 * cv::kSampleRate), highVoice());
+  gFx.reset();
+  const std::vector<float> out = run(gFx, tone(inHz, 2 * cv::kSampleRate), highVoice());
   const std::vector<Frame> f = track(out, kThreshold);
   std::vector<double> hz;
   for (const Frame& fr : f)
@@ -199,13 +203,13 @@ bool testBypass() {
   cv::HarmonyParams dryMix = highVoice();
   dryMix.mix = 0.0f;
   dryMix.slots[1] = {cv::HarmonyVoice::Low, 3};
-  gHarmony.reset();
-  const float a = maxDiffAfterSettle(in, run(gHarmony, in, dryMix));
+  gFx.reset();
+  const float a = maxDiffAfterSettle(in, run(gFx, in, dryMix));
 
   cv::HarmonyParams noVoices;
   noVoices.mix = 0.7f;
-  gHarmony.reset();
-  const float b = maxDiffAfterSettle(in, run(gHarmony, in, noVoices));
+  gFx.reset();
+  const float b = maxDiffAfterSettle(in, run(gFx, in, noVoices));
 
   return report("bypass", a < 1e-6f && b < 1e-6f,
                 "mix 0 max|out-in|=%.3g, no voices max|out-in|=%.3g (<1e-6)", a, b);
@@ -216,8 +220,8 @@ bool testNoAlloc() {
   p.slots[1] = {cv::HarmonyVoice::Lower, 2};
   p.mix = 0.5f;
   const std::vector<float> in = tone(220.0, cv::kBlock * 64);
-  gHarmony.reset();
-  run(gHarmony, in, p);  // aborts on any new/delete inside process()
+  gFx.reset();
+  run(gFx, in, p);  // aborts on any new/delete inside process()
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 

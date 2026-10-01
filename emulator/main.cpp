@@ -24,13 +24,13 @@
 
 #include "../emulator/open_panel.h"
 #include "engine/common.h"
-#include "engine/harmony.h"
+#include "engine/pitch_fx.h"
 #include "engine/unison.h"
 
 namespace {
 
 constexpr int kWindowW = 900;
-constexpr int kWindowH = 680;
+constexpr int kWindowH = 800;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
@@ -42,7 +42,7 @@ constexpr float kStartDepth = 0.8f;
 
 struct ProtoParams {
   bool playing = false;
-  cv::HarmonyParams harmony;
+  cv::PitchFxParams pitchFx;
   cv::UnisonParams unison{false, kStartDepth, {}};
 };
 
@@ -79,7 +79,7 @@ int gStateWriteIndex = 1;  // audio-thread-only
 std::string gLoopPath;  // UI-thread-only
 
 // Audio-thread-only.
-cv::Harmony gHarmony;
+cv::PitchFx gPitchFx;
 cv::Unison gUnison;
 LoopBuffer* gLastLoop = nullptr;
 size_t gReadPos = 0;
@@ -141,8 +141,8 @@ void readLoop(const LoopBuffer& loop, float* dst, int n) {
 void publishState(float peak, const LoopBuffer* loop) {
   ProtoState& s = gStateBuf[gStateWriteIndex];
   s.peakDb = peak > 1e-6f ? 20.0f * std::log10(peak) : kSilenceDb;
-  s.pitchHz = gHarmony.pitch().hz;
-  s.voiced = gHarmony.pitch().voiced;
+  s.pitchHz = gPitchFx.pitch().hz;
+  s.voiced = gPitchFx.pitch().voiced;
   s.playheadNorm = (loop != nullptr && !loop->samples.empty())
                        ? static_cast<float>(gReadPos) / static_cast<float>(loop->samples.size())
                        : 0.0f;
@@ -160,7 +160,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   if (loop != gLastLoop) {
     gLastLoop = loop;
     gReadPos = 0;
-    gHarmony.reset();
+    gPitchFx.reset();
     gUnison.reset();
   }
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
@@ -177,7 +177,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   while (done < frameCount) {
     const int n = static_cast<int>(std::min<ma_uint32>(cv::kBlock, frameCount - done));
     readLoop(*loop, in.data(), n);
-    gHarmony.process(in.data(), tmp.data(), n, params.harmony);
+    gPitchFx.process(in.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
     for (int i = 0; i < n; ++i) {
       out[2 * (done + i)] = mono[i];
@@ -206,7 +206,8 @@ char gTuningText[1024];  // last Print tuning output, shown on the face
 
 // Finder launches have no stdout, so the text also goes to the clipboard
 // and into a read-only field under the button.
-void printTuning(const cv::HarmonyTuning& h, const cv::UnisonTuning& t) {
+void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
+                 const cv::UnisonTuning& t) {
   char line[512];
   int len = std::snprintf(
       line, sizeof(line),
@@ -222,12 +223,14 @@ void printTuning(const cv::HarmonyTuning& h, const cv::UnisonTuning& t) {
   std::snprintf(
       gTuningText, sizeof(gTuningText),
       "%s\n"
+      "OctaveTuning{%.1ff, %.1ff, %s}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}",
-      line, t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
+      line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs);
   std::printf(
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher\n"
+      "// OctaveTuning: levelDb, glideMs, muteUnvoiced\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n%s\n", gTuningText);
   std::fflush(stdout);
@@ -273,7 +276,7 @@ void drawHarmonyTuning(cv::HarmonyTuning& h, const ProtoState& state) {
   ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
   ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
   ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
-  ImGui::SliderFloat("Glide", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
+  ImGui::SliderFloat("Tracking speed (ms)", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
   ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
   ImGui::Checkbox("Mute unvoiced", &h.muteUnvoiced);
   ImGui::Checkbox("Snap to scale", &h.snapToScale);
@@ -281,6 +284,14 @@ void drawHarmonyTuning(cv::HarmonyTuning& h, const ProtoState& state) {
   drawIntervalRow("Low", h.low);
   drawIntervalRow("High", h.high);
   drawIntervalRow("Higher", h.higher);
+  ImGui::TreePop();
+}
+
+void drawOctaveTuning(cv::OctaveTuning& o) {
+  if (!ImGui::TreeNode("Octave")) return;
+  ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
+  ImGui::Checkbox("Mute unvoiced", &o.muteUnvoiced);
   ImGui::TreePop();
 }
 
@@ -301,14 +312,18 @@ void drawUnisonTuning(cv::UnisonTuning& t) {
 
 void drawTuning(ProtoParams& params, const ProtoState& state) {
   if (!ImGui::CollapsingHeader("Tuning")) return;
-  drawHarmonyTuning(params.harmony.tuning, state);
+  cv::HarmonyTuning& ht = params.pitchFx.harmony.tuning;
+  cv::OctaveTuning& ot = params.pitchFx.octave.tuning;
+  drawHarmonyTuning(ht, state);
+  drawOctaveTuning(ot);
   drawUnisonTuning(params.unison.tuning);
   if (ImGui::Button("Reset to defaults")) {
-    params.harmony.tuning = cv::HarmonyTuning{};
+    ht = cv::HarmonyTuning{};
+    ot = cv::OctaveTuning{};
     params.unison.tuning = cv::UnisonTuning{};
   }
   ImGui::SameLine();
-  if (ImGui::Button("Print tuning")) printTuning(params.harmony.tuning, params.unison.tuning);
+  if (ImGui::Button("Print tuning")) printTuning(ht, ot, params.unison.tuning);
   if (gTuningText[0] != '\0') {
     ImGui::SameLine();
     ImGui::TextUnformatted("copied to clipboard");
@@ -399,7 +414,8 @@ void drawHarmonyMenu(cv::HarmonyParams& h) {
 }
 
 void drawPanelMirror(ProtoParams& params) {
-  cv::HarmonyParams& h = params.harmony;
+  cv::HarmonyParams& h = params.pitchFx.harmony;
+  cv::OctaveParams& o = params.pitchFx.octave;
   cv::UnisonParams& u = params.unison;
   ImGui::TextUnformatted("HARMONY");
   ImGui::Combo("KEY", &h.key, cv::kKeyName, 12);
@@ -408,6 +424,13 @@ void drawPanelMirror(ProtoParams& params) {
     h.mix = mixPercent / 100.0f;
   }
   drawHarmonyMenu(h);
+  ImGui::Separator();
+  ImGui::TextUnformatted("OCTAVE");
+  ImGui::SliderInt("SEMITONES", &o.semitones, -12, 12, "%+d st");
+  float octMixPercent = o.mix * 100.0f;
+  if (ImGui::SliderFloat("MIX##octave", &octMixPercent, 0.0f, 100.0f, "%.0f %%")) {
+    o.mix = octMixPercent / 100.0f;
+  }
   ImGui::Separator();
   ImGui::Checkbox("UNISON", &u.on);
   float percent = u.depth * 100.0f;

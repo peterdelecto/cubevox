@@ -1,4 +1,4 @@
-// cubevox-render: loop in, harmony + unison processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, harmony + octave + unison processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -6,7 +6,7 @@
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
-#include "engine/harmony.h"
+#include "engine/pitch_fx.h"
 #include "engine/unison.h"
 
 namespace {
@@ -17,9 +17,9 @@ struct TuningField {
 };
 
 struct RenderParams {
-  bool harmonyOn = false;
+  bool pitchOn = false;
   bool unisonOn = false;
-  cv::HarmonyParams harmony;
+  cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;
 };
 
@@ -29,6 +29,8 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
+               "       [--octave <-12..12>] [--omix <0..1>]\n"
+               "  pitch front end runs with --harmony or --octave\n"
                "  unison runs only with --on 1 or --depth; at least one stage must run\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n");
@@ -85,6 +87,10 @@ bool parseVoice(const char* kv, cv::HarmonySlot& slot) {
 bool parseArgs(int argc, char** argv, const char** in, const char** out,
                RenderParams& rp) {
   cv::UnisonParams& p = rp.unison;
+  cv::HarmonyParams& hp = rp.pitchFx.harmony;
+  cv::OctaveParams& op = rp.pitchFx.octave;
+  bool haveHarmony = false;
+  bool haveOctave = false;
   bool haveDepth = false;
   bool haveOn = false;
   int voices = 0;
@@ -101,18 +107,24 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       p.on = v[0] == '1';
       haveOn = true;
     } else if (std::strcmp(a, "--harmony") == 0) {
-      rp.harmonyOn = true;
+      haveHarmony = true;
     } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
       float k = 0.0f;
       if (!parseFloat(argv[++i], &k) || k < 0.0f || k > 11.0f || k != std::floor(k))
         return false;
-      rp.harmony.key = static_cast<int>(k);
+      hp.key = static_cast<int>(k);
     } else if (std::strcmp(a, "--mix") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.harmony.mix) || rp.harmony.mix < 0.0f ||
-          rp.harmony.mix > 1.0f)
+      if (!parseFloat(argv[++i], &hp.mix) || hp.mix < 0.0f || hp.mix > 1.0f) return false;
+    } else if (std::strcmp(a, "--octave") == 0 && i + 1 < argc) {
+      float s = 0.0f;
+      if (!parseFloat(argv[++i], &s) || s < -12.0f || s > 12.0f || s != std::floor(s))
         return false;
+      op.semitones = static_cast<int>(s);
+      haveOctave = true;
+    } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
     } else if (std::strcmp(a, "--voice") == 0 && i + 1 < argc) {
-      if (voices >= 2 || !parseVoice(argv[++i], rp.harmony.slots[voices])) return false;
+      if (voices >= 2 || !parseVoice(argv[++i], hp.slots[voices])) return false;
       ++voices;
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
@@ -128,11 +140,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     }
   }
   if (positional != 2) return false;
-  if (voices > 0 && !rp.harmonyOn) return false;
+  if (voices > 0 && !haveHarmony) return false;
+  rp.pitchOn = haveHarmony || haveOctave;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
-  return rp.harmonyOn || rp.unisonOn;
+  return rp.pitchOn || rp.unisonOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -152,9 +165,9 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
-  static cv::Harmony harmony;
+  static cv::PitchFx pitchFx;
   static cv::Unison unison;
-  harmony.reset();
+  pitchFx.reset();
   unison.reset();
 
   float inBuf[cv::kBlock];
@@ -167,8 +180,8 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     if (got > 0) {
       const int n = static_cast<int>(got);
       const float* src = inBuf;
-      if (rp.harmonyOn) {
-        harmony.process(src, midBuf, n, rp.harmony);
+      if (rp.pitchOn) {
+        pitchFx.process(src, midBuf, n, rp.pitchFx);
         src = midBuf;
       }
       if (rp.unisonOn) {
