@@ -25,6 +25,7 @@
 #include "../emulator/open_panel.h"
 #include "engine/common.h"
 #include "engine/distortion.h"
+#include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
 #include "engine/polish.h"
@@ -49,9 +50,13 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 constexpr float kStartDepth = 0.8f;
 constexpr float kStartIntensity = 0.5f;
 constexpr float kStartDrive = 0.3f;
+constexpr float kInputGateThresholdDb = -55.0f;
+constexpr float kInputGateRangeDb = -12.0f;
 
 struct ProtoParams {
   bool playing = false;
+  cv::GateParams inputGate;
+  cv::GateParams gate;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartIntensity, {}};
@@ -61,6 +66,10 @@ struct ProtoParams {
 
   // Every effect opens off; engine defaults stay on for the firmware.
   ProtoParams() {
+    inputGate.on = false;
+    inputGate.thresholdDb = kInputGateThresholdDb;
+    inputGate.tuning.rangeDb = kInputGateRangeDb;
+    gate.on = false;
     pitchFx.harmony.on = false;
     pitchFx.octave.on = false;
     unison.on = false;
@@ -76,6 +85,8 @@ struct ProtoState {
   float playheadNorm = 0.0f;
   float pitchHz = 0.0f;
   bool voiced = false;
+  float inGateDb = 0.0f;
+  float gateDb = 0.0f;
 };
 
 struct LoopBuffer {
@@ -104,6 +115,8 @@ int gStateWriteIndex = 1;  // audio-thread-only
 std::string gLoopPath;  // UI-thread-only
 
 // Audio-thread-only.
+cv::Gate gInputGate;
+cv::Gate gGate;
 cv::PitchFx gPitchFx;
 cv::Unison gUnison;
 cv::Slapback gSlapback;
@@ -172,6 +185,8 @@ void publishState(float peak, const LoopBuffer* loop) {
   s.peakDb = peak > 1e-6f ? 20.0f * std::log10(peak) : kSilenceDb;
   s.pitchHz = gPitchFx.pitch().hz;
   s.voiced = gPitchFx.pitch().voiced;
+  s.inGateDb = gInputGate.gainDb();
+  s.gateDb = gGate.gainDb();
   s.playheadNorm = (loop != nullptr && !loop->samples.empty())
                        ? static_cast<float>(gReadPos) / static_cast<float>(loop->samples.size())
                        : 0.0f;
@@ -189,6 +204,8 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   if (loop != gLastLoop) {
     gLastLoop = loop;
     gReadPos = 0;
+    gInputGate.reset();
+    gGate.reset();
     gPitchFx.reset();
     gUnison.reset();
     gSlapback.reset();
@@ -210,16 +227,18 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   while (done < frameCount) {
     const int n = static_cast<int>(std::min<ma_uint32>(cv::kBlock, frameCount - done));
     readLoop(*loop, in.data(), n);
-    gPitchFx.process(in.data(), tmp.data(), n, params.pitchFx);
+    gInputGate.process(in.data(), mono.data(), n, params.inputGate);
+    gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
-    gReverb.process(mono.data(), tmp.data(), n, params.reverb);
-    gPolish.process(tmp.data(), mono.data(), n, params.eq);
+    gGate.process(mono.data(), tmp.data(), n, params.gate);
+    gReverb.process(tmp.data(), mono.data(), n, params.reverb);
+    gPolish.process(mono.data(), tmp.data(), n, params.eq);
     for (int i = 0; i < n; ++i) {
-      out[2 * (done + i)] = mono[i];
-      out[2 * (done + i) + 1] = mono[i];
-      peak = std::max(peak, std::fabs(mono[i]));
+      out[2 * (done + i)] = tmp[i];
+      out[2 * (done + i) + 1] = tmp[i];
+      peak = std::max(peak, std::fabs(tmp[i]));
     }
     done += n;
   }
@@ -248,7 +267,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
                  const cv::DistortionTuning& d, const cv::SpringTuning& sp,
                  const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
-                 const cv::PolishParams& e) {
+                 const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g) {
   char line[512];
   int len = std::snprintf(
       line, sizeof(line),
@@ -300,7 +319,15 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       pk.modDepth, pk.modPole, pk.springs, pk.tdFactor[0], pk.tdFactor[1], pk.tdFactor[2],
       pk.fcFactor[0], pk.fcFactor[1], pk.fcFactor[2], pk.hpHz, pk.lpHz, pk.dwellDrive,
       pk.dwellComp, pk.presenceHz, pk.presenceDb, pk.presenceQ, pk.tankTrim, pk.wetDb);
+  used = std::strlen(gTuningText);
+  std::snprintf(
+      gTuningText + used, sizeof(gTuningText) - used,
+      "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
+      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}",
+      ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
+      g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb);
   std::printf(
+      "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher\n"
       "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz\n"
@@ -482,6 +509,18 @@ void drawDistortionTuning(cv::DistortionTuning& t) {
   }
 }
 
+void drawGateTuning(cv::GateTuning& t, const char* block) {
+  if (!tuningHeader(block)) return;
+  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
+  ImGui::SliderFloat("Attack", &t.attackMs, 0.1f, 50.0f, "%.1f ms", log);
+  ImGui::SliderFloat("Hold", &t.holdMs, 0.0f, 500.0f, "%.0f ms");
+  ImGui::SliderFloat("Release", &t.releaseMs, 5.0f, 1000.0f, "%.0f ms", log);
+  ImGui::SliderFloat("Range", &t.rangeDb, -80.0f, 0.0f, "%.0f dB");
+  ImGui::SliderFloat("Knee", &t.kneeDb, 0.0f, 20.0f, "%.1f dB");
+  ImGui::SliderFloat("Detector high-pass", &t.detectorHpHz, 20.0f, 500.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Hysteresis", &t.hysteresisDb, 0.0f, 12.0f, "%.1f dB");
+}
+
 void drawPolishTuning(cv::PolishTuning& t) {
   if (!tuningHeader("eq")) return;
   ImGui::SliderFloat("Low-mid Q", &t.dipQ, 0.3f, 3.0f, "%.2f");
@@ -612,12 +651,16 @@ void drawTuningButtons(ProtoParams& params) {
     params.reverb.chasm.tuning = cv::ChasmTuning{};
     params.reverb.parker.tuning = cv::SpringCTuning{};
     params.eq.tuning = cv::PolishTuning{};
+    params.inputGate.tuning = cv::GateTuning{};
+    params.inputGate.tuning.rangeDb = kInputGateRangeDb;
+    params.gate.tuning = cv::GateTuning{};
   }
   ImGui::SameLine();
   if (ImGui::Button("Print tuning")) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
                 params.distortion.tuning, params.reverb.spring.tuning,
-                params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq);
+                params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq, params.inputGate.tuning,
+                params.gate.tuning);
     // One line for the field; the clipboard keeps the line breaks.
     std::snprintf(gTuningLine, sizeof(gTuningLine), "%s", gTuningText);
     std::replace(gTuningLine, gTuningLine + sizeof(gTuningLine), '\n', ' ');
@@ -748,6 +791,16 @@ void drawOctaveBlock(cv::OctaveParams& o) {
   ImGui::PopID();
 }
 
+// One gate instance: id keys the widgets and the probe's Tuning header.
+void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float gainDb) {
+  ImGui::PushID(id);
+  ImGui::Checkbox(label, &g.on);
+  ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
+  ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
+  drawGateTuning(g.tuning, id);
+  ImGui::PopID();
+}
+
 void drawUnisonBlock(cv::UnisonParams& u) {
   ImGui::PushID("unison");
   ImGui::Checkbox("UNISON", &u.on);
@@ -823,7 +876,7 @@ void drawEqBlock(cv::PolishParams& e) {
 }
 
 constexpr float kModulePad = 14.0f;  // inner padding of a module box, px
-constexpr float kModuleGap = 40.0f;  // vertical gap between module boxes, px
+constexpr float kModuleGap = 37.0f;  // vertical gap between module boxes, px
 constexpr float kColumnGap = 32.0f;  // horizontal gap between columns, px
 constexpr float kTopGap = 16.0f;     // gap between the transport row and the columns, px
 
@@ -879,7 +932,9 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   // Signal order runs down each column, then left to right.
   const float colW = (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 2.0f * kColumnGap) / 2.0f;
   column(0, kHarmonyColumnW, [&] {
-    moduleBox("harmonyBox", true, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
+    moduleBox("ingateBox", true,
+              [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
+    moduleBox("harmonyBox", false, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
     moduleBox("octaveBox", false, [&] { drawOctaveBlock(params.pitchFx.octave); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
@@ -887,6 +942,7 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
     moduleBox("unisonBox", true, [&] { drawUnisonBlock(params.unison); });
     moduleBox("slapbackBox", false, [&] { drawSlapbackBlock(params.slapback); });
     moduleBox("distortionBox", false, [&] { drawDistortionBlock(params.distortion); });
+    moduleBox("gateBox", false, [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
   column(2, colW, [&] {
@@ -925,7 +981,8 @@ int runLayoutProbe() {
       {true, "reverb", "Parker tank"},   {true, "reverb", "Parker taps"},
       {true, "reverb", "Parker high band"},
       {true, "reverb", "Parker springs"}, {true, "reverb", "Parker drive"},
-      {true, "eq", nullptr},
+      {true, "eq", nullptr},             {true, "ingate", nullptr},
+      {true, "gate", nullptr},
   };
 
   ProtoParams params;

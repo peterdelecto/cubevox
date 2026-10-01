@@ -1,4 +1,4 @@
-// cubevox-render: loop in, harmony + octave + unison + slapback + distortion + reverb + eq processed
+// cubevox-render: loop in, gates + harmony + octave + unison + slapback + distortion + reverb + eq processed
 // mono 48 kHz f32 WAV out.
 
 #include <cmath>
@@ -8,6 +8,7 @@
 
 #include "../third_party/miniaudio.h"
 #include "engine/distortion.h"
+#include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
 #include "engine/reverb.h"
@@ -22,12 +23,16 @@ struct TuningField {
 };
 
 struct RenderParams {
+  bool inGateOn = false;
+  bool gateOn = false;
   bool pitchOn = false;
   bool unisonOn = false;
   bool slapOn = false;
   bool distOn = false;
   bool reverbOn = false;
   bool eqOn = false;
+  cv::GateParams inGate;
+  cv::GateParams gate;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
@@ -46,11 +51,13 @@ int usage() {
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm|parker] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
                "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
+               "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony or --octave\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb or --spring\n"
-               "  at least one stage must run; order is pitch, unison, slapback, distortion, reverb, eq\n"
+               "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, eq\n"
+               "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  eq runs only with --eq\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
@@ -75,6 +82,8 @@ int usage() {
                "     prkFcFactor0/1/2 prkHpHz prkLpHz prkDwellDrive prkDwellComp prkPresenceHz\n"
                "     prkPresenceDb prkPresenceQ prkTankTrim prkWetDb\n"
                "     eqDipQ eqPresenceQ eqAirHz\n"
+               "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
+               "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
                "  --tension and --dwell apply to spring and parker\n");
   return 2;
 }
@@ -102,6 +111,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringCTuning& pk = rp.reverb.parker.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
+  cv::GateTuning& ig = rp.inGate.tuning;
+  cv::GateTuning& gt = rp.gate.tuning;
   float oversample = dt.oversample ? 1.0f : 0.0f;
   float hfSections = static_cast<float>(sp.hfSections);
   float springs = static_cast<float>(sp.springs);
@@ -167,6 +178,14 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"prkPresenceQ", &pk.presenceQ},        {"prkTankTrim", &pk.tankTrim},
       {"prkWetDb", &pk.wetDb},
       {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz},
+      {"ingAttackMs", &ig.attackMs},          {"ingHoldMs", &ig.holdMs},
+      {"ingReleaseMs", &ig.releaseMs},        {"ingRangeDb", &ig.rangeDb},
+      {"ingKneeDb", &ig.kneeDb},              {"ingDetectorHpHz", &ig.detectorHpHz},
+      {"ingHysteresisDb", &ig.hysteresisDb},
+      {"gtAttackMs", &gt.attackMs},           {"gtHoldMs", &gt.holdMs},
+      {"gtReleaseMs", &gt.releaseMs},         {"gtRangeDb", &gt.rangeDb},
+      {"gtKneeDb", &gt.kneeDb},               {"gtDetectorHpHz", &gt.detectorHpHz},
+      {"gtHysteresisDb", &gt.hysteresisDb},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
@@ -227,6 +246,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveDrive = false;
   bool haveReverb = false;
   bool haveEq = false;
+  bool haveInGate = false;
+  bool haveGate = false;
   int voices = 0;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
@@ -255,6 +276,16 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--rmix") == 0 && i + 1 < argc) {
       cv::ReverbParams& r = rp.reverb;
       if (!parseFloat(argv[++i], &r.mix) || r.mix < 0.0f || r.mix > 1.0f) return false;
+    } else if (std::strcmp(a, "--ingate") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.inGate.thresholdDb) || rp.inGate.thresholdDb < -70.0f ||
+          rp.inGate.thresholdDb > -10.0f)
+        return false;
+      haveInGate = true;
+    } else if (std::strcmp(a, "--gate") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.gate.thresholdDb) || rp.gate.thresholdDb < -70.0f ||
+          rp.gate.thresholdDb > -10.0f)
+        return false;
+      haveGate = true;
     } else if (std::strcmp(a, "--eq") == 0) {
       haveEq = true;
     } else if (std::strcmp(a, "--eqhp") == 0 && i + 1 < argc) {
@@ -345,7 +376,11 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.reverb.on = haveReverb;
   rp.eqOn = haveEq;
   rp.eq.on = haveEq;
-  return rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.reverbOn || rp.eqOn;
+  rp.inGateOn = haveInGate;
+  rp.inGate.on = haveInGate;
+  rp.gateOn = haveGate;
+  rp.gate.on = haveGate;
+  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.reverbOn || rp.eqOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -365,12 +400,16 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
+  static cv::Gate inGate;
+  static cv::Gate gate;
   static cv::PitchFx pitchFx;
   static cv::Unison unison;
   static cv::Slapback slapback;
   static cv::Distortion distortion;
   static cv::Reverb reverb;
   static cv::Polish polish;
+  inGate.reset();
+  gate.reset();
   pitchFx.reset();
   unison.reset();
   slapback.reset();
@@ -391,6 +430,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       // Each stage writes the scratch buffer the previous stage did not.
       const float* src = inBuf;
       int next = 0;
+      if (rp.inGateOn) {
+        inGate.process(src, scratch[next], n, rp.inGate);
+        src = scratch[next];
+        next ^= 1;
+      }
       if (rp.pitchOn) {
         pitchFx.process(src, scratch[next], n, rp.pitchFx);
         src = scratch[next];
@@ -408,6 +452,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.distOn) {
         distortion.process(src, scratch[next], n, rp.distortion);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.gateOn) {
+        gate.process(src, scratch[next], n, rp.gate);
         src = scratch[next];
         next ^= 1;
       }
@@ -447,6 +496,7 @@ int main(int argc, char** argv) {
   const char* in = nullptr;
   const char* out = nullptr;
   RenderParams rp;
+  rp.inGate.tuning.rangeDb = -12.0f;  // soft gate
   if (!parseArgs(argc, argv, &in, &out, rp)) return usage();
   return render(in, out, rp);
 }
