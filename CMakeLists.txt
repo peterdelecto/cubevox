@@ -107,3 +107,8 @@ target_link_libraries(spring_test PRIVATE engine)
 add_test(NAME spring COMMAND spring_test)
 add_test(NAME proto_layout
   COMMAND $<TARGET_FILE:cubevox-proto> --layout)
+
+add_executable(chasm_test test/chasm_test.cpp)
+target_compile_options(chasm_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(chasm_test PRIVATE engine)
+add_test(NAME chasm COMMAND chasm_test)
