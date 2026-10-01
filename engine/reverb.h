@@ -7,8 +7,9 @@
 #include "engine/common.h"
 #include "engine/smooth.h"
 #include "engine/spring.h"
+#include "engine/spring_c.h"
 
-// Reverb block: SPRING or CHASM behind one on/off smoother.
+// Reverb block: SPRING, CHASM or PARKER behind one on/off smoother.
 // The selected engine runs; the engine left behind is cleared on a switch.
 // While settled off, neither engine runs and the block is a bit-exact copy.
 // Each engine keeps its own wetDb, a level trim. MIX is an equal-power crossfade
@@ -18,12 +19,14 @@ namespace cv {
 
 constexpr int kReverbSpring = 0;
 constexpr int kReverbChasm = 1;
+constexpr int kReverbParker = 2;
 
 struct ReverbParams {
   bool on = true;
   int engine = kReverbSpring;
   SpringParams spring;  // spring.on is ignored; ReverbParams::on rules
   ChasmParams chasm;
+  SpringCParams parker;
   float mix = 0.5f;  // panel knob 0 dry .. 1 wet
 };
 
@@ -34,6 +37,7 @@ class Reverb {
   void reset() {
     spring_.reset();
     chasm_.reset();
+    parker_.reset();
     active_ = 0.0f;
     mix_ = 0.0f;
     dryGain_ = 1.0f;
@@ -44,7 +48,8 @@ class Reverb {
   }
 
   void process(const float* in, float* out, int n, const ReverbParams& p) {
-    const int engine = p.engine == kReverbChasm ? kReverbChasm : kReverbSpring;
+    const int engine =
+        p.engine == kReverbChasm || p.engine == kReverbParker ? p.engine : kReverbSpring;
     const float target = p.on ? 1.0f : 0.0f;
     const float mixTarget = smooth::clamp01(p.mix);
     if (!valid_) {
@@ -69,6 +74,8 @@ class Reverb {
 
     if (engine_ == kReverbChasm) {
       chasm_.process(in, wet_.data(), n, p.chasm);
+    } else if (engine_ == kReverbParker) {
+      parker_.process(in, wet_.data(), n, p.parker);
     } else {
       SpringParams sp = p.spring;
       sp.on = true;
@@ -89,6 +96,7 @@ class Reverb {
   // Test hooks.
   Spring& spring() { return spring_; }
   Chasm& chasm() { return chasm_; }
+  SpringC& parker() { return parker_; }
 
  private:
   static constexpr float kHalfPi = 1.57079632679489661923f;
@@ -101,12 +109,15 @@ class Reverb {
   void clear(int engine) {
     if (engine == kReverbChasm)
       chasm_.reset();
+    else if (engine == kReverbParker)
+      parker_.reset();
     else
       spring_.reset();
   }
 
   Spring spring_;
   Chasm chasm_;
+  SpringC parker_;
   std::array<float, kBlock> wet_{};
   float active_ = 0.0f;
   float mix_ = 0.0f;

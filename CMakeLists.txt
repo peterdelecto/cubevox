@@ -117,3 +117,8 @@ add_executable(polish_test test/polish_test.cpp)
 target_compile_options(polish_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(polish_test PRIVATE engine)
 add_test(NAME polish COMMAND polish_test)
+
+add_executable(spring_c_test test/spring_c_test.cpp)
+target_compile_options(spring_c_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(spring_c_test PRIVATE engine)
+add_test(NAME spring_c COMMAND spring_c_test)

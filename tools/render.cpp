@@ -44,7 +44,7 @@ int usage() {
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|chasm] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
+               "       [--reverb spring|chasm|parker] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
                "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony or --octave\n"
@@ -69,7 +69,13 @@ int usage() {
                "chmBassCutHz\n"
                "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
                "     chmWobbleLevelDb chmWetDb\n"
-               "     eqDipQ eqPresenceQ eqAirHz\n");
+               "     prkTdMs prkFcLfHz prkMLow (1..100) prkALf prkGLo prkGHi prkGComp prkHfRatio\n"
+               "     prkMHigh (0..200) prkAHf prkHfMixDb prkCross prkEqPeakHz prkEqBwHz prkEchoGain\n"
+               "     prkRippleGain prkModDepth prkModPole prkSprings (1..3) prkTdFactor0/1/2\n"
+               "     prkFcFactor0/1/2 prkHpHz prkLpHz prkDwellDrive prkDwellComp prkPresenceHz\n"
+               "     prkPresenceDb prkPresenceQ prkTankTrim prkWetDb\n"
+               "     eqDipQ eqPresenceQ eqAirHz\n"
+               "  --tension and --dwell apply to spring and parker\n");
   return 2;
 }
 
@@ -93,11 +99,15 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::DistortionTuning& dt = rp.distortion.tuning;
   cv::SpringTuning& sp = rp.reverb.spring.tuning;
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
+  cv::SpringCTuning& pk = rp.reverb.parker.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   float oversample = dt.oversample ? 1.0f : 0.0f;
   float hfSections = static_cast<float>(sp.hfSections);
   float springs = static_cast<float>(sp.springs);
+  float prkMLow = static_cast<float>(pk.mLow);
+  float prkMHigh = static_cast<float>(pk.mHigh);
+  float prkSprings = static_cast<float>(pk.springs);
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -137,6 +147,25 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"chmWobbleRateLo", &ch.wobbleRateLo},  {"chmWobbleRateHi", &ch.wobbleRateHi},
       {"chmInputTrim", &ch.inputTrim},        {"chmWobbleLevelDb", &ch.wobbleLevelDb},
       {"chmWetDb", &ch.wetDb},
+      {"prkTdMs", &pk.tdMs},                  {"prkFcLfHz", &pk.fcLfHz},
+      {"prkMLow", &prkMLow},                  {"prkALf", &pk.aLf},
+      {"prkGLo", &pk.gLo},                    {"prkGHi", &pk.gHi},
+      {"prkGComp", &pk.gComp},                {"prkHfRatio", &pk.hfRatio},
+      {"prkMHigh", &prkMHigh},                {"prkAHf", &pk.aHf},
+      {"prkHfMixDb", &pk.hfMixDb},            {"prkCross", &pk.cross},
+      {"prkEqPeakHz", &pk.eqPeakHz},          {"prkEqBwHz", &pk.eqBwHz},
+      {"prkEchoGain", &pk.echoGain},          {"prkRippleGain", &pk.rippleGain},
+      {"prkModDepth", &pk.modDepth},          {"prkModPole", &pk.modPole},
+      {"prkSprings", &prkSprings},
+      {"prkTdFactor0", &pk.tdFactor[0]},      {"prkTdFactor1", &pk.tdFactor[1]},
+      {"prkTdFactor2", &pk.tdFactor[2]},
+      {"prkFcFactor0", &pk.fcFactor[0]},      {"prkFcFactor1", &pk.fcFactor[1]},
+      {"prkFcFactor2", &pk.fcFactor[2]},
+      {"prkHpHz", &pk.hpHz},                  {"prkLpHz", &pk.lpHz},
+      {"prkDwellDrive", &pk.dwellDrive},      {"prkDwellComp", &pk.dwellComp},
+      {"prkPresenceHz", &pk.presenceHz},      {"prkPresenceDb", &pk.presenceDb},
+      {"prkPresenceQ", &pk.presenceQ},        {"prkTankTrim", &pk.tankTrim},
+      {"prkWetDb", &pk.wetDb},
       {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz},
   };
   const char* eq = std::strchr(kv, '=');
@@ -149,6 +178,13 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (hfSections < 0.0f || hfSections > 200.0f || hfSections != std::floor(hfSections))
       return false;
     if (springs != 2.0f && springs != 3.0f) return false;
+    if (prkMLow < 1.0f || prkMLow > 100.0f || prkMLow != std::floor(prkMLow)) return false;
+    if (prkMHigh < 0.0f || prkMHigh > 200.0f || prkMHigh != std::floor(prkMHigh)) return false;
+    if (prkSprings < 1.0f || prkSprings > 3.0f || prkSprings != std::floor(prkSprings))
+      return false;
+    pk.mLow = static_cast<int>(prkMLow);
+    pk.mHigh = static_cast<int>(prkMHigh);
+    pk.springs = static_cast<int>(prkSprings);
     sp.hfSections = static_cast<int>(hfSections);
     sp.springs = static_cast<int>(springs);
     return true;
@@ -238,6 +274,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         rp.reverb.engine = cv::kReverbSpring;
       else if (std::strcmp(v, "chasm") == 0)
         rp.reverb.engine = cv::kReverbChasm;
+      else if (std::strcmp(v, "parker") == 0)
+        rp.reverb.engine = cv::kReverbParker;
       else
         return false;
       haveReverb = true;
@@ -250,9 +288,11 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--tension") == 0 && i + 1 < argc) {
       cv::SpringParams& s = rp.reverb.spring;
       if (!parseFloat(argv[++i], &s.tension) || s.tension < 0.0f || s.tension > 1.0f) return false;
+      rp.reverb.parker.tension = s.tension;
     } else if (std::strcmp(a, "--dwell") == 0 && i + 1 < argc) {
       cv::SpringParams& s = rp.reverb.spring;
       if (!parseFloat(argv[++i], &s.dwell) || s.dwell < 0.0f || s.dwell > 1.0f) return false;
+      rp.reverb.parker.dwell = s.dwell;
     } else if (std::strcmp(a, "--harmony") == 0) {
       haveHarmony = true;
     } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
