@@ -496,7 +496,9 @@ int main(int argc, char** argv) {
   const char* in = nullptr;
   const char* out = nullptr;
   RenderParams rp;
-  rp.inGate.tuning.rangeDb = -12.0f;  // soft gate
+  rp.inGate.tuning.rangeDb = -12.0f;    // soft gate: live-stage defaults as in the emulator
+  rp.inGate.tuning.holdMs = 100.0f;
+  rp.inGate.tuning.releaseMs = 25.0f;
   if (!parseArgs(argc, argv, &in, &out, rp)) return usage();
   return render(in, out, rp);
 }

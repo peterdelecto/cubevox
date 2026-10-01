@@ -36,7 +36,7 @@
 namespace {
 
 constexpr int kWindowW = 1440;
-constexpr int kWindowH = 880;
+constexpr int kWindowH = 840;  // owner's laptop shows ~847 px of window
 constexpr float kHarmonyColumnW = 592.0f;  // Harmony column width
 constexpr float kLabelW = 175.0f;          // room right of each slider for its label
 constexpr float kMeterW = 240.0f;
@@ -50,8 +50,20 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 constexpr float kStartDepth = 0.8f;
 constexpr float kStartIntensity = 0.5f;
 constexpr float kStartDrive = 0.3f;
-constexpr float kInputGateThresholdDb = -55.0f;
+// Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
+// mis-trigger never reads as a dropout; release is short by owner choice.
+constexpr float kInputGateThresholdDb = -40.0f;
 constexpr float kInputGateRangeDb = -12.0f;
+constexpr float kInputGateHoldMs = 100.0f;
+constexpr float kInputGateReleaseMs = 25.0f;
+
+void applyInputGateDefaults(cv::GateParams& g) {
+  g.thresholdDb = kInputGateThresholdDb;
+  g.tuning = cv::GateTuning{};
+  g.tuning.rangeDb = kInputGateRangeDb;
+  g.tuning.holdMs = kInputGateHoldMs;
+  g.tuning.releaseMs = kInputGateReleaseMs;
+}
 
 struct ProtoParams {
   bool playing = false;
@@ -67,8 +79,7 @@ struct ProtoParams {
   // Every effect opens off; engine defaults stay on for the firmware.
   ProtoParams() {
     inputGate.on = false;
-    inputGate.thresholdDb = kInputGateThresholdDb;
-    inputGate.tuning.rangeDb = kInputGateRangeDb;
+    applyInputGateDefaults(inputGate);
     gate.on = false;
     pitchFx.harmony.on = false;
     pitchFx.octave.on = false;
@@ -353,22 +364,6 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
   ImGui::SetClipboardText(gTuningText);
 }
 
-// "A3 +4 cents voiced" from a tracker frequency; "--" before the first pitch.
-void formatDetected(float hz, bool voiced, char* dst, size_t size) {
-  static const char* const kNote[12] = {"C", "C#", "D", "D#", "E", "F",
-                                        "F#", "G", "G#", "A", "A#", "B"};
-  if (hz <= 0.0f) {
-    std::snprintf(dst, size, "Detected: --");
-    return;
-  }
-  const float midi = 69.0f + 12.0f * std::log2(hz / 440.0f);
-  const int note = static_cast<int>(std::lround(midi));
-  const int cents = static_cast<int>(std::lround((midi - static_cast<float>(note)) * 100.0f));
-  const int pitchClass = ((note % 12) + 12) % 12;
-  std::snprintf(dst, size, "Detected: %s%d %+d cents %s", kNote[pitchClass],
-                (note - pitchClass) / 12 - 1, cents, voiced ? "voiced" : "unvoiced");
-}
-
 // Probe scenario: which Tuning header and sub-node are forced open. Null block = live UI.
 struct ProbeOpen {
   bool active = false;
@@ -381,10 +376,26 @@ bool probeMatch(const char* want, const char* name) {
   return want != nullptr && std::strcmp(want, name) == 0;
 }
 
+// One Tuning header open per column at a time (accordion), so the face never grows
+// past what the probe checked: the probe opens exactly one header per scenario.
+constexpr int kColumnCount = 3;
+int gCurrentColumn = 0;
+std::array<const char*, kColumnCount> gOpenTuning{};
+
 // Collapsed Tuning header under one effect block.
 bool tuningHeader(const char* block) {
-  if (gProbeOpen.active) ImGui::SetNextItemOpen(probeMatch(gProbeOpen.block, block));
-  return ImGui::CollapsingHeader("Tuning");
+  const char*& openInColumn = gOpenTuning[static_cast<size_t>(gCurrentColumn)];
+  if (gProbeOpen.active) {
+    ImGui::SetNextItemOpen(probeMatch(gProbeOpen.block, block));
+  } else if (openInColumn != nullptr && std::strcmp(openInColumn, block) != 0) {
+    ImGui::SetNextItemOpen(false);
+  }
+  const bool open = ImGui::CollapsingHeader("Tuning");
+  if (!gProbeOpen.active) {
+    if (open) openInColumn = block;
+    else if (openInColumn != nullptr && std::strcmp(openInColumn, block) == 0) openInColumn = nullptr;
+  }
+  return open;
 }
 
 // Sub-node inside a Tuning header; caller pops with TreePop.
@@ -653,6 +664,8 @@ void drawTuningButtons(ProtoParams& params) {
     params.eq.tuning = cv::PolishTuning{};
     params.inputGate.tuning = cv::GateTuning{};
     params.inputGate.tuning.rangeDb = kInputGateRangeDb;
+    params.inputGate.tuning.holdMs = kInputGateHoldMs;
+    params.inputGate.tuning.releaseMs = kInputGateReleaseMs;
     params.gate.tuning = cv::GateTuning{};
   }
   ImGui::SameLine();
@@ -740,6 +753,8 @@ void drawHarmonyMenu(cv::HarmonyParams& h) {
   static const char* const kRowName[kVoiceRows] = {"Lower", "Low", "Fixed", "High", "Higher"};
   static const char* const kLevelName[4] = {"Off", "Low", "Med", "High"};
   for (int row = 0; row < kVoiceRows; ++row) {
+    // Fixed (key-root drone) is off the face (owner 2026-10-01); the engine keeps it.
+    if (row == static_cast<int>(cv::HarmonyVoice::Fixed)) continue;
     ImGui::PushID(row);
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(kRowName[row]);
@@ -766,9 +781,7 @@ void drawHarmonyBlock(cv::HarmonyParams& h, const ProtoState& state) {
   percentSlider("MIX", h.mix);
   drawHarmonyMenu(h);
   drawHarmonyTuning(h.tuning);
-  char detected[64];
-  formatDetected(state.pitchHz, state.voiced, detected, sizeof(detected));
-  ImGui::TextUnformatted(detected);
+  (void)state;
   ImGui::PopID();
 }
 
@@ -875,10 +888,10 @@ void drawEqBlock(cv::PolishParams& e) {
   ImGui::PopID();
 }
 
-constexpr float kModulePad = 14.0f;  // inner padding of a module box, px
-constexpr float kModuleGap = 37.0f;  // vertical gap between module boxes, px
+constexpr float kModulePad = 10.0f;  // inner padding of a module box, px
+constexpr float kModuleGap = 24.0f;  // vertical gap between module boxes, px
 constexpr float kColumnGap = 32.0f;  // horizontal gap between columns, px
-constexpr float kTopGap = 16.0f;     // gap between the transport row and the columns, px
+constexpr float kTopGap = 10.0f;     // gap between the transport row and the columns, px
 
 // Border around one effect module, sized to its content (open Tuning included).
 template <class F>
@@ -902,6 +915,7 @@ float gColumnAvail = 0.0f;                  // column height, px
 // One face column. Columns never scroll; the probe fails on any overrun.
 template <class F>
 void column(int index, float width, const F& draw) {
+  gCurrentColumn = index;
   ImGui::PushID(index);
   ImGui::BeginChild("column", ImVec2(width, 0.0f), ImGuiChildFlags_None,
                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);

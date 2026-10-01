@@ -10,8 +10,10 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - The emulator mirrors the panel exactly. Dev-only controls live under a collapsed
   `Tuning` header. Never invent panel controls. Exception (owner 2026-10-01): every
   effect block carries an on/off checkbox in the prototype so stages can be A/B'd.
-- Face layout (owner 2026-10-01): three columns, no scroll bar, fits one laptop
-  screen. Each effect block has its own collapsed `Tuning` header directly below it.
+- Face layout (owner 2026-10-01): three columns, no scroll bar, window 1440x840 (the
+  owner's laptop shows ~847 px of window). Each effect block has its own collapsed
+  `Tuning` header directly below it; one Tuning header open per column at a time
+  (accordion), which is the invariant the `--layout` probe checks.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
 - Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply.
 
