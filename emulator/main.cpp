@@ -410,19 +410,25 @@ void drawOctaveTuning(cv::OctaveTuning& o) {
 void drawUnisonTuning(cv::UnisonTuning& t) {
   if (!tuningHeader("unison")) return;
   ImGui::TextDisabled("DEPTH scales both methods; the blend lives in these constants.");
-  ImGui::SeparatorText("Chorus (LFO-wobbled delay)");
-  ImGui::SliderFloat("Base delay 1", &t.baseDelayMs[0], 5.0f, 40.0f, "%.1f ms");
-  ImGui::SliderFloat("Base delay 2", &t.baseDelayMs[1], 5.0f, 40.0f, "%.1f ms");
-  ImGui::SliderFloat("LFO rate 1", &t.lfoHz[0], 0.1f, 3.0f, "%.2f Hz");
-  ImGui::SliderFloat("LFO rate 2", &t.lfoHz[1], 0.1f, 3.0f, "%.2f Hz");
-  ImGui::SliderFloat("Swing at depth 0", &t.swingMinMs, 0.0f, 1.0f, "%.2f ms");
-  ImGui::SliderFloat("Swing at depth 1", &t.swingMaxMs, 0.5f, 6.0f, "%.2f ms");
-  ImGui::SeparatorText("Doubler (fixed detune, TC-Helicon style)");
-  ImGui::SliderFloat("DETUNE 0", &t.detuneCents[0], -30.0f, 30.0f, "%.1f cents");
-  ImGui::SliderFloat("DETUNE 1", &t.detuneCents[1], -30.0f, 30.0f, "%.1f cents");
-  ImGui::SliderFloat("WINDOW", &t.windowMs, 5.0f, 30.0f, "%.0f ms");
-  ImGui::SeparatorText("Shared");
-  ImGui::SliderFloat("Wet level at depth 1", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
+  if (tuningNode("Chorus (LFO-wobbled delay)")) {
+    ImGui::SliderFloat("Base delay 1", &t.baseDelayMs[0], 5.0f, 40.0f, "%.1f ms");
+    ImGui::SliderFloat("Base delay 2", &t.baseDelayMs[1], 5.0f, 40.0f, "%.1f ms");
+    ImGui::SliderFloat("LFO rate 1", &t.lfoHz[0], 0.1f, 3.0f, "%.2f Hz");
+    ImGui::SliderFloat("LFO rate 2", &t.lfoHz[1], 0.1f, 3.0f, "%.2f Hz");
+    ImGui::SliderFloat("Swing at depth 0", &t.swingMinMs, 0.0f, 1.0f, "%.2f ms");
+    ImGui::SliderFloat("Swing at depth 1", &t.swingMaxMs, 0.5f, 6.0f, "%.2f ms");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Doubler (fixed detune, TC-Helicon style)")) {
+    ImGui::SliderFloat("DETUNE 0", &t.detuneCents[0], -30.0f, 30.0f, "%.1f cents");
+    ImGui::SliderFloat("DETUNE 1", &t.detuneCents[1], -30.0f, 30.0f, "%.1f cents");
+    ImGui::SliderFloat("WINDOW", &t.windowMs, 5.0f, 30.0f, "%.0f ms");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Shared")) {
+    ImGui::SliderFloat("Wet level at depth 1", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
+    ImGui::TreePop();
+  }
 }
 
 void drawSlapbackTuning(cv::SlapbackTuning& t) {
@@ -794,17 +800,24 @@ void drawEqBlock(cv::PolishParams& e) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   ImGui::PushID("eq");
   ImGui::Checkbox("Output EQ", &e.on);
-  // Four bands, low to high, each with its own heading like a channel strip.
-  ImGui::SeparatorText("LOW CUT  (12 dB/oct)");
-  ImGui::SliderFloat("Frequency##hp", &e.hpHz, 40.0f, 200.0f, "%.0f Hz", log);
+  // Four bands, low to high. The two peaking bands put frequency and gain on one row.
+  const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+  auto pair = [&](const char* id, float* hz, float hzLo, float hzHi, float* db, float dbLo,
+                  float dbHi) {
+    ImGui::PushID(id);
+    ImGui::PushItemWidth(half - kLabelW * 0.35f);
+    ImGui::SliderFloat("Hz", hz, hzLo, hzHi, "%.0f", log);
+    ImGui::SameLine(half + ImGui::GetStyle().ItemSpacing.x);
+    ImGui::SliderFloat("dB", db, dbLo, dbHi, "%+.1f");
+    ImGui::PopItemWidth();
+    ImGui::PopID();
+  };
+  ImGui::SliderFloat("LOW CUT (12 dB/oct)", &e.hpHz, 40.0f, 200.0f, "%.0f Hz", log);
   ImGui::SeparatorText("LOW-MID DIP");
-  ImGui::SliderFloat("Frequency##dip", &e.dipHz, 150.0f, 600.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Gain##dip", &e.dipDb, -6.0f, 0.0f, "%+.1f dB");
+  pair("dip", &e.dipHz, 150.0f, 600.0f, &e.dipDb, -6.0f, 0.0f);
   ImGui::SeparatorText("PRESENCE");
-  ImGui::SliderFloat("Frequency##pres", &e.presenceHz, 2000.0f, 6000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Gain##pres", &e.presenceDb, 0.0f, 6.0f, "%+.1f dB");
-  ImGui::SeparatorText("AIR  (shelf above 10 kHz)");
-  ImGui::SliderFloat("Gain##air", &e.airDb, 0.0f, 4.0f, "%+.1f dB");
+  pair("pres", &e.presenceHz, 2000.0f, 6000.0f, &e.presenceDb, 0.0f, 6.0f);
+  ImGui::SliderFloat("AIR (shelf above 10 kHz)", &e.airDb, 0.0f, 4.0f, "%+.1f dB");
   drawPolishTuning(e.tuning);
   ImGui::PopID();
 }
@@ -900,6 +913,9 @@ int runLayoutProbe() {
       {true, nullptr, nullptr},          {true, "harmony", nullptr},
       {true, "harmony", "Voices & tracking"},
       {true, "octave", nullptr},         {true, "unison", nullptr},
+      {true, "unison", "Chorus (LFO-wobbled delay)"},
+      {true, "unison", "Doubler (fixed detune, TC-Helicon style)"},
+      {true, "unison", "Shared"},
       {true, "slapback", nullptr},       {true, "distortion", nullptr},
       {true, "distortion", "Stage 1"},   {true, "distortion", "Tone stack"},
       {true, "distortion", "Stage 2"},   {true, "distortion", "Post"},
