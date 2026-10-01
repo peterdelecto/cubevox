@@ -7,6 +7,7 @@
 #include "engine/harmony.h"
 #include "engine/octave.h"
 #include "engine/octave_b.h"
+#include "engine/octave_c.h"
 #include "engine/pitch.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
@@ -33,9 +34,10 @@ class PitchFx {
     harmony_.reset();
     octaveA_.reset();
     octaveB_.reset();
+    octaveC_.reset();
     lp_.fill(0.0f);
     lpZ_ = 0.0f;
-    useB_ = false;
+    engine_ = 0;
     mix_.fill(0.0f);
     active_.fill(0.0f);
     fresh_ = true;
@@ -46,14 +48,12 @@ class PitchFx {
     const PitchResult& pr = tracker_.result();
 
     // Switching engines resets the one left behind so it starts clean next time.
-    const bool useB = p.octave.engine == 1;
-    if (useB != useB_) {
-      if (useB) {
-        octaveA_.reset();
-      } else {
-        octaveB_.reset();
-      }
-      useB_ = useB;
+    const int engine = p.octave.engine == 1 || p.octave.engine == 2 ? p.octave.engine : 0;
+    if (engine != engine_) {
+      if (engine != 0) octaveA_.reset();
+      if (engine != 1) octaveB_.reset();
+      if (engine != 2) octaveC_.reset();
+      engine_ = engine;
     }
     float lpHz = p.octave.tuning.epochLpHz;
     lpHz = lpHz < kMinLpHz ? kMinLpHz : (lpHz > kMaxLpHz ? kMaxLpHz : lpHz);
@@ -62,8 +62,7 @@ class PitchFx {
     const std::array<float, kStages> mixT = {smooth::clamp01(p.harmony.mix),
                                              smooth::clamp01(p.octave.mix)};
     const std::array<float, kStages> activeT = {harmony_.prepare(pr, p.harmony) ? 1.0f : 0.0f,
-                                                (useB ? octaveB_.prepare(pr, p.octave)
-                                                      : octaveA_.prepare(pr, p.octave))
+                                                (prepareOctave(pr, p.octave))
                                                     ? 1.0f
                                                     : 0.0f};
     if (fresh_) {
@@ -78,8 +77,7 @@ class PitchFx {
       lpZ_ += lpA * (in[i] - lpZ_);
       lp_[writeCount_] = lpZ_;
       const float harm = harmony_.tick(ring_, writeCount_, pr.period);
-      const float oct = useB ? octaveB_.tick(ring_, lp_, writeCount_, pr.period)
-                             : octaveA_.tick(ring_, writeCount_, pr.period);
+      const float oct = tickOctave(pr.period);
       float dry = 1.0f;
       std::array<float, kStages> wet{};
       for (int s = 0; s < kStages; ++s) {
@@ -97,6 +95,18 @@ class PitchFx {
   const PitchResult& pitch() const { return tracker_.result(); }
 
  private:
+  bool prepareOctave(const PitchResult& pr, const OctaveParams& o) {
+    if (engine_ == 1) return octaveB_.prepare(pr, o);
+    if (engine_ == 2) return octaveC_.prepare(pr, o);
+    return octaveA_.prepare(pr, o);
+  }
+
+  float tickOctave(float period) {
+    if (engine_ == 1) return octaveB_.tick(ring_, lp_, writeCount_, period);
+    if (engine_ == 2) return octaveC_.tick(ring_, writeCount_);
+    return octaveA_.tick(ring_, writeCount_, period);
+  }
+
   static constexpr int kStages = 2;  // 0 harmony, 1 octave
   static constexpr float kHalfPi = 1.57079632679489661923f;
   static constexpr float kTwoPi = 6.28318530717958647692f;
@@ -108,9 +118,10 @@ class PitchFx {
   HarmonyVoices harmony_;
   OctaveVoice octaveA_;
   OctaveVoiceB octaveB_;
+  OctaveVoiceC octaveC_;
   VoiceRing lp_{};  // ring_ low-passed for option B's peak search
   float lpZ_ = 0.0f;
-  bool useB_ = false;
+  int engine_ = 0;
   std::array<float, kStages> mix_{};
   std::array<float, kStages> active_{};
   long writeCount_ = 0;

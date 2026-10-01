@@ -178,6 +178,12 @@ int main() {
   octB.octave.semitones = 12;
   ok &= simple<cv::PitchFx>("octave B +12 mix .5", in, octB);
 
+  cv::PitchFxParams octC = pitchOff();
+  octC.octave.on = true;
+  octC.octave.engine = 2;
+  octC.octave.semitones = -12;
+  ok &= simple<cv::PitchFx>("octave C -12 mix .5", in, octC);
+
   cv::UnisonParams unison;
   unison.on = true;
   unison.depth = 0.8f;

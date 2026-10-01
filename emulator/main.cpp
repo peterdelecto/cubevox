@@ -294,7 +294,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
   std::snprintf(
       gTuningText, sizeof(gTuningText),
       "%s\n"
-      "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff}\n"
+      "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
@@ -306,7 +306,8 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "PolishTuning{%.2ff, %.2ff, %.0ff, %.1ff}\n"
       "// PolishParams: hpHz %.0f, dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB, air %.1f dB",
       line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", o.grainPeriods,
-      o.epochSearch, o.epochLpHz, o.trimDbA, o.trimDbB, t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
+      o.epochSearch, o.epochLpHz, o.trimDbA, o.trimDbB, o.grainWindowMs, o.grainCount, o.trimDbC,
+      t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
@@ -341,7 +342,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher, trimDb\n"
-      "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz, trimDbA, trimDbB\n"
+      "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz, trimDbA, trimDbB, grainWindowMs, grainCount, trimDbC\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n"
@@ -440,6 +441,7 @@ void drawOctaveTuning(cv::OctaveTuning& o) {
   ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
   ImGui::SliderFloat("Trim A", &o.trimDbA, -12.0f, 12.0f, "%.1f dB");
   ImGui::SliderFloat("Trim B", &o.trimDbB, -12.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Trim C", &o.trimDbC, -12.0f, 12.0f, "%.1f dB");
   ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
   ImGui::Checkbox("Mute unvoiced", &o.muteUnvoiced);
   ImGui::SliderFloat("Grain length (B)", &o.grainPeriods, 1.5f, 3.0f, "%.2f periods");
@@ -798,8 +800,10 @@ void drawOctaveBlock(cv::OctaveParams& o) {
   ImGui::RadioButton("A", &o.engine, 0);
   ImGui::SameLine();
   ImGui::RadioButton("B", &o.engine, 1);
+  ImGui::SameLine();
+  ImGui::RadioButton("C", &o.engine, 2);
   ImGui::SliderInt("SEMITONES", &o.semitones, -12, 12, "%+d st");
-  ImGui::BeginDisabled(o.engine == 0);
+  ImGui::BeginDisabled(o.engine != 1);
   int formant = static_cast<int>(std::lround(o.formant));
   if (ImGui::SliderInt("FORMANT", &formant, -12, 12, "%+d st")) o.formant = static_cast<float>(formant);
   ImGui::EndDisabled();

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <new>
@@ -288,6 +289,125 @@ bool testBypassB() {
   return report("B bypass", worst == 0.0f, "semitones 0 mix 0/0.5/1 max|out-in|=%.3g (0)", worst);
 }
 
+// Option C checks.
+
+cv::PitchFxParams octaveC(int semis) {
+  cv::PitchFxParams p = octaveOnly(semis);
+  p.octave.engine = 2;
+  return p;
+}
+
+bool testPitchC() {
+  bool ok = true;
+  for (int semis : {12, -12}) {
+    const double expect = semis > 0 ? 440.0 : 110.0;
+    const double got = outputHz(220.0, octaveC(semis));
+    const double err = got > 0.0 ? cents(got, expect) : 9999.0;
+    ok &= report(semis > 0 ? "C octave up" : "C octave down", std::fabs(err) <= 15.0,
+                 "out=%.2f Hz, expect %.2f, err=%.2f cents (+-15)", got, expect, err);
+  }
+  return ok;
+}
+
+// Root-sum-square Goertzel magnitude within +-halfHz of hz over second 1..2.
+// A granular shifter spreads each harmonic into window-rate sidebands, so a
+// single bin at the harmonic would read the comb ripple, not the envelope.
+double bandAmp(const std::vector<float>& x, double hz, double halfHz) {
+  double e = 0.0;
+  const int steps = static_cast<int>(halfHz / 2.0);
+  for (int d = -steps; d <= steps; ++d) {
+    const double a = goertzel(&x[cv::kSampleRate], cv::kSampleRate, hz + 2.0 * d);
+    e += a * a;
+  }
+  return std::sqrt(e);
+}
+
+// Amplitude-weighted mean frequency over the given harmonic numbers of f0.
+double centroidHz(const std::vector<float>& x, double f0, int first, int last, int step) {
+  double num = 0.0;
+  double den = 0.0;
+  for (int k = first; k <= last; k += step) {
+    const double a = bandAmp(x, f0 * k, 0.45 * f0 * step);
+    num += f0 * k * a;
+    den += a;
+  }
+  return den > 0.0 ? num / den : 0.0;
+}
+
+// Median f0 of a signal over seconds 1..2, from a fresh tracker.
+double medianHz(const std::vector<float>& x) {
+  cv::PitchTracker t;
+  std::vector<double> hz;
+  const int total = static_cast<int>(x.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    const int n = std::min(cv::kBlock, total - i);
+    t.push(&x[static_cast<size_t>(i)], n, kThreshold);
+    if (i + n > cv::kSampleRate && t.result().voiced) hz.push_back(t.result().hz);
+  }
+  if (hz.empty()) return 0.0;
+  std::sort(hz.begin(), hz.end());
+  return hz[hz.size() / 2];
+}
+
+// C moves the envelope with the pitch: the centroid in harmonics of its own
+// f0 matches the input's. A keeps the envelope in place: its output harmonics
+// 2, 4, .. 10 sit on the input's 220..1100 Hz grid, so those centroids match.
+bool testFormantMovesC() {
+  const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
+  const double inRel = centroidHz(in, 220.0, 1, 10, 1) / 220.0;
+  const double inAbs = centroidHz(in, 220.0, 1, 5, 1);
+
+  gFx.reset();
+  const std::vector<float> c = run(gFx, in, octaveC(-12));
+  const double fC = medianHz(c);
+  const double rC = centroidHz(c, fC, 1, 10, 1) / fC / inRel;
+
+  gFx.reset();
+  const std::vector<float> a = run(gFx, in, octaveOnly(-12));
+  const double fA = medianHz(a);
+  const double rA = centroidHz(a, fA, 2, 10, 2) / inAbs;
+  return report("C formants move", std::fabs(rC - 1.0) <= 0.10 && std::fabs(rA - 1.0) <= 0.10,
+                "C centroid/f0 x%.3f of input (+-10%%), A absolute centroid x%.3f (+-10%%), "
+                "C f0=%.1f",
+                rC, rA, fC);
+}
+
+bool testBypassC() {
+  const std::vector<float> in = tone(220.0, cv::kSampleRate);
+  float worst = 0.0f;
+  for (float mix : {0.0f, 0.5f, 1.0f}) {
+    cv::PitchFxParams p = octaveC(0);
+    p.octave.mix = mix;
+    gFx.reset();
+    const std::vector<float> out = run(gFx, in, p);
+    for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
+  }
+  return report("C bypass", worst == 0.0f, "semitones 0 mix 0/0.5/1 max|out-in|=%.3g (0)", worst);
+}
+
+bool testNoiseC() {
+  const int n = 2 * cv::kSampleRate;
+  std::vector<float> in(static_cast<size_t>(n));
+  uint64_t s = 0x9E3779B97F4A7C15ULL;
+  for (float& v : in) {
+    s = s * 6364136223846793005ULL + 1442695040888963407ULL;
+    v = 0.25f * (static_cast<float>(s >> 40) / 8388608.0f - 1.0f);
+  }
+  const cv::PitchFxParams p = octaveC(-12);
+  gFx.reset();
+  const std::vector<float> out = run(gFx, in, p);
+  double ri = 0.0;
+  double ro = 0.0;
+  for (int i = cv::kSampleRate; i < n; ++i) {
+    ri += static_cast<double>(in[static_cast<size_t>(i)]) * in[static_cast<size_t>(i)];
+    ro += static_cast<double>(out[static_cast<size_t>(i)]) * out[static_cast<size_t>(i)];
+  }
+  const double gainDb = 10.0 * std::log10(ro / ri);
+  const double wantDb = p.octave.tuning.levelDb + p.octave.tuning.trimDbC;
+  return report("C noise level", std::fabs(gainDb - wantDb) <= 3.0,
+                "out/in %+.2f dB, expect %+.2f dB (+-3)", gainDb, wantDb);
+}
+
 }  // namespace
 
 int main() {
@@ -302,5 +422,9 @@ int main() {
   ok &= testFormantEnvelopeB();
   ok &= testFormantLevelB();
   ok &= testBypassB();
+  ok &= testPitchC();
+  ok &= testFormantMovesC();
+  ok &= testBypassC();
+  ok &= testNoiseC();
   return ok ? 0 : 1;
 }

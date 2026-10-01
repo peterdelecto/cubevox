@@ -47,7 +47,7 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
-               "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1] [--formant <-12..12>]\n"
+               "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm|parker] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
                "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
@@ -61,7 +61,7 @@ int usage() {
                "  eq runs only with --eq\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
-               "     octGrainPeriods octEpochSearch octEpochLpHz octTrimDbA octTrimDbB eqTrimDb\n"
+               "     octGrainPeriods octEpochSearch octEpochLpHz octTrimDbA octTrimDbB octGrainWindowMs octGrainCount octTrimDbC eqTrimDb\n"
                "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
@@ -119,6 +119,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   float prkMLow = static_cast<float>(pk.mLow);
   float prkMHigh = static_cast<float>(pk.mHigh);
   float prkSprings = static_cast<float>(pk.springs);
+  float octGrains = static_cast<float>(ot.grainCount);
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -129,6 +130,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"octGrainPeriods", &ot.grainPeriods}, {"octEpochSearch", &ot.epochSearch},
       {"octEpochLpHz", &ot.epochLpHz},
       {"octTrimDbA", &ot.trimDbA}, {"octTrimDbB", &ot.trimDbB},
+      {"octGrainWindowMs", &ot.grainWindowMs}, {"octGrainCount", &octGrains},
+      {"octTrimDbC", &ot.trimDbC},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
@@ -202,6 +205,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (prkMHigh < 0.0f || prkMHigh > 200.0f || prkMHigh != std::floor(prkMHigh)) return false;
     if (prkSprings < 1.0f || prkSprings > 3.0f || prkSprings != std::floor(prkSprings))
       return false;
+    if (octGrains != 2.0f && octGrains != 4.0f) return false;
+    ot.grainCount = static_cast<int>(octGrains);
     pk.mLow = static_cast<int>(prkMLow);
     pk.mHigh = static_cast<int>(prkMHigh);
     pk.springs = static_cast<int>(prkSprings);
@@ -259,7 +264,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveDepth = true;
     } else if (std::strcmp(a, "--on") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
-      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
+      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0)
+        return false;
       p.on = v[0] == '1';
       haveOn = true;
     } else if (std::strcmp(a, "--slap") == 0 && i + 1 < argc) {
@@ -342,7 +348,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOctave = true;
     } else if (std::strcmp(a, "--oengine") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
-      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
+      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0)
+        return false;
       op.engine = v[0] - '0';
     } else if (std::strcmp(a, "--formant") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &op.formant) || op.formant < -12.0f || op.formant > 12.0f)

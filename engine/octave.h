@@ -25,11 +25,16 @@ struct OctaveTuning {
   // Per-engine output trims; level rule at mix 0.5, on top of levelDb.
   float trimDbA = -5.3f;
   float trimDbB = 6.2f;
+
+  // Option C
+  float grainWindowMs = 40.0f;  // 20..80
+  int grainCount = 2;           // 2 or 4
+  float trimDbC = 2.6f;
 };
 
 struct OctaveParams {
   bool on = true;                // panel toggle; off fades the stage out
-  int engine = 0;                // 0 = A (grid PSOLA), 1 = B (epoch PSOLA + formant)
+  int engine = 0;                // 0 = A (grid PSOLA), 1 = B (epoch PSOLA + formant), 2 = C (granular)
   int semitones = 0;             // panel knob, -12..12, 0 = off
   float formant = 0.0f;          // option B, -12..12 semitones, 0 = preserved
   float mix = 0.5f;              // panel knob
