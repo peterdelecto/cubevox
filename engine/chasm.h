@@ -54,8 +54,8 @@ struct ChasmTuning {
 };
 
 struct ChasmParams {
-  float decay = 0.5f;   // knob 1
-  float wobble = 0.3f;  // knob 2
+  float decay = 0.45f;  // knob 1; vocal default
+  float wobble = 0.25f; // knob 2; vocal default
   ChasmTuning tuning;
 };
 
