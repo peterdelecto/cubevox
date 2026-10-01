@@ -50,7 +50,7 @@ struct ChasmTuning {
   float wobbleRateLo = 0.5f, wobbleRateHi = 7.0f;
   float inputTrim = 0.5f;
   float wobbleLevelDb = 2.0f;            // wet lift, ramps in over WOBBLE 0..0.25
-  float wetDb = -6.0f;
+  float wetDb = 0.0f;  // trim; MIX sets the blend
 };
 
 struct ChasmParams {

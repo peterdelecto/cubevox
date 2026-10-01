@@ -34,7 +34,8 @@ struct DistortionTuning {
   // post
   float trebleCutHz = 1000.0f;    // fixed high shelf cut
   float trebleCutDb = -6.0f;
-  float toneDb = 0.0f;            // TONE at noon = 0; +/- shelf above 1 kHz
+  float toneMinDb = -12.0f;       // TONE fully down: extra shelf gain above trebleCutHz
+  float toneMaxDb = 6.0f;         // TONE fully up
   float bassPeakHz = 120.0f;      // gyrator bump
   float bassPeakDb = 6.0f;
   float bassPeakQ = 1.0f;
@@ -46,6 +47,7 @@ struct DistortionTuning {
 struct DistortionParams {
   bool on = true;       // menu bypass
   float drive = 0.0f;   // panel knob 0..1
+  float tone = 0.5f;    // panel knob 0..1; noon is flat
   DistortionTuning tuning;
 };
 
@@ -54,6 +56,7 @@ class Distortion {
   void reset() {
     clearChain();
     drive_ = 0.0f;
+    tone_ = 0.5f;
   }
 
   void process(const float* in, float* out, int n, const DistortionParams& p) {
@@ -69,6 +72,8 @@ class Distortion {
     dirty_ = true;
 
     const float aDrive = smooth::coef(kDriveSec);
+    const float toneTarget = smooth::clamp01(p.tone);
+    setTrebleShelf(t);
     inHp_.set(t.inputHpHz);
     s1Lp_.set(t.s1LpHz);
     s2Hp_.set(t.s2HpHz);
@@ -77,7 +82,6 @@ class Distortion {
     s1Bass_.setLowShelf(t.s1BassHz, t.s1BassDb);
     stackBass_.setLowShelf(t.stackBassHz, t.stackBassDb);
     stackTreble_.setHighShelf(t.stackTrebleHz, t.stackTrebleDb);
-    trebleCut_.setHighShelf(t.trebleCutHz, t.trebleCutDb + t.toneDb);
     bassPeak_.setPeak(t.bassPeakHz, t.bassPeakDb, t.bassPeakQ);
     const Rail rail{1.0f - clampf(t.railAsym, 0.0f, 0.5f), clampf(t.railSoft, 0.01f, 1.0f)};
     const float stackLoss = dbToLin(t.stackLossDb);
@@ -88,6 +92,9 @@ class Distortion {
 
     for (int i = 0; i < n; ++i) {
       drive_ = smooth::step(drive_, target, aDrive);
+      const float prevTone = tone_;
+      tone_ = smooth::step(tone_, toneTarget, aDrive);
+      if (tone_ != prevTone) setTrebleShelf(t);
       const float g1 = expf(logG1 * drive_);
       const float g2 = expf(logG2 * drive_);
 
@@ -142,6 +149,14 @@ class Distortion {
 
   static float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
   static float dbToLin(float db) { return powf(10.0f, db / 20.0f); }
+  // TONE maps min..0 dB over the lower half and 0..max dB over the upper half, so
+  // noon adds nothing.
+  static float toneDb(const DistortionTuning& t, float tone) {
+    return tone < 0.5f ? t.toneMinDb * (1.0f - 2.0f * tone) : t.toneMaxDb * (2.0f * tone - 1.0f);
+  }
+  void setTrebleShelf(const DistortionTuning& t) {
+    trebleCut_.setHighShelf(t.trebleCutHz, t.trebleCutDb + toneDb(t, tone_));
+  }
 
   // 1-pole; hp is the input minus its low-pass.
   struct Pole {
@@ -266,6 +281,7 @@ class Distortion {
   Biquad s1Bass_, stackBass_, stackTreble_, trebleCut_, bassPeak_;
   Oversampler os1_, os2_;
   float drive_ = 0.0f;
+  float tone_ = 0.5f;
   bool dirty_ = false;
 };
 

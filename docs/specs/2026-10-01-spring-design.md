@@ -49,8 +49,9 @@ DWELL. DrumSynthV3 keeps all three modest (C_hf at −22…−14 dB, ripple 0.1,
    BW 130 Hz resonator on the output, default 0 (off) because the high-pass sits
    above it; lower `hpHz` first if trying it.
 8. `modDepth / modRateHz` — wander, default 8 samples / 3 Hz.
-9. `wetDb` — wet level, default −3.1 dB (0.70, DSV3; no mix knob on the panel).
-   Dry passes at unity.
+9. `wetDb` — wet level trim, default 0 dB. DSV3's 0.70 wet (−3.1 dB) is now the
+   reverb MIX knob's job. Dry passes at unity inside the engine; the Reverb block
+   applies MIX.
 10. `inputGain` — default 0.5, applied ahead of the high-pass and clip (DSV3
     springSendAmp). `tankTrim` — default 1.5, applied after the clip.
 
@@ -102,7 +103,7 @@ struct SpringTuning {
   int   springs = 2;                            // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float wetDb = -3.1f;
+  float wetDb = 0.0f;
   float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 
@@ -195,7 +196,7 @@ A/B on 2026-10-01 (white noise, −20 dBFS rms, same input amplitude) found the
 algorithm a faithful port. The difference was the gain structure and the spec's
 splash tuning.
 
-1. DSV3 gain chain: ×0.5 → high-pass → clip → ×1.5 → tank → ×0.5 sum → ×0.70 wet.
+1. DSV3 gain chain: ×0.5 → high-pass → clip → ×1.5 → tank → ×0.5 sum → ×0.70 wet (that 0.70 is now the MIX knob's job; `wetDb` defaults to 0).
 2. The port had ×1.0 → clip → ×0.375 → tank → ×0.5 → ×0.50, which put the tank
    input 6 dB low (−8.9 dB over the whole chain) and the clip at twice DSV3's level.
 3. The port also ran the high band 4 to 6 dB hotter, doubled the ripple gain

@@ -22,7 +22,8 @@ breadboard analysis of the BD-2 / Cobalt circuit (numbers below come from it).
 4. Gain stage 2: same discrete op-amp, max gain just under 40 dB, flat 100 Hz to
    about 6 kHz. Both GAIN gangs turn together (audio taper, dual A250K).
 5. Fixed treble cut: −6 dB above 1 kHz.
-6. TONE: acts above 1 kHz, flat at noon. We have no TONE knob, so it sits at noon.
+6. TONE: acts above 1 kHz, flat at noon. The panel TONE knob maps to the treble
+   shelf gain, noon 0 dB, fully down `toneMinDb`, fully up `toneMaxDb`.
 7. LEVEL, then a gyrator (32 H) resonating with C17 for a +6 dB bump at 120 Hz.
 8. Max end-to-end gain 52 dB. Distortion fades out abruptly as a note decays, which
    is the signature of rail saturation rather than a soft knee.
@@ -33,7 +34,7 @@ Notes from the same author's Boneyard / BD-2w mod write-up (part 4):
    signals when GAIN is above noon", then stage 2 clips hard anyway).
 2. BD-2w S/C switch = TIGHT (extra bass cut at the stage-2 input, about 2 dB more
    with 3.3 kΩ than 10 kΩ) + FAT (more capacitance in the TONE network, more treble
-   cut). In this model TIGHT is `s2HpHz` raised, FAT is `toneDb` negative. Measured
+   cut). In this model TIGHT is `s2HpHz` raised, FAT is TONE turned down. Measured
    on the -2w (part 2): C position is 4.5 dB weaker at 50 Hz and 1 dB stronger at
    500 Hz at the stage-2 input; overall S vs C differs little, "a little louder in
    C". Owner 2026-10-01: Adam's BD-2 is stock, not modded, not a Waza. The notes
@@ -86,7 +87,8 @@ struct DistortionTuning {
   // post
   float trebleCutHz = 1000.0f;    // fixed -6 dB high shelf
   float trebleCutDb = -6.0f;
-  float toneDb = 0.0f;            // TONE at noon = 0; +/- shelf above 1 kHz
+  float toneMinDb = -12.0f;       // TONE fully down: shelf gain added above trebleCutHz
+  float toneMaxDb = 6.0f;         // TONE fully up; noon adds 0 dB
   float bassPeakHz = 120.0f;      // gyrator bump
   float bassPeakDb = 6.0f;
   float bassPeakQ = 1.0f;
@@ -98,6 +100,7 @@ struct DistortionTuning {
 struct DistortionParams {
   bool on = true;                 // menu bypass
   float drive = 0.0f;             // panel knob 0..1
+  float tone = 0.5f;              // panel knob 0..1; noon is flat
   DistortionTuning tuning;
 };
 
@@ -118,7 +121,9 @@ Behaviour per sample (coefficients recomputed per block):
 3. Tone stack: `x = lowShelf(x, stackBassHz, stackBassDb)`;
    `x = highShelf(x, stackTrebleHz, stackTrebleDb)`; `x *= dbToLin(stackLossDb)`.
 4. Stage 2: `x = hp1(x, s2HpHz)`; `x = lp1(x, s2LpHz)`; `x *= g2`; `x = rail(x)`.
-5. Post: `x = highShelf(x, trebleCutHz, trebleCutDb + toneDb)`;
+5. Post: `x = highShelf(x, trebleCutHz, trebleCutDb + toneShelfDb)`, where `toneShelfDb` runs
+   `toneMinDb`..0 over tone 0..0.5 and 0..`toneMaxDb` over 0.5..1 (`tone` smoothed with the same
+   20 ms one-pole as `drive`; settled tone 0.5 equals the pre-TONE sound exactly);
    `x = peakEq(x, bassPeakHz, bassPeakDb, bassPeakQ)`; DC blocker `hp1` at 10 Hz.
 6. `rail(x)`: clamp to `[-(1 - railAsym), 1]` with a `tanh` soft edge over the last
    `railSoft` fraction before each rail. Steps 2 and 4 saturators run inside the 2×
@@ -137,16 +142,16 @@ Behaviour per sample (coefficients recomputed per block):
 ## Emulator
 
 `DISTORTION` checkbox block under SLAPBACK with a `DRIVE` slider `%.0f %%`, opens
-at 30 %. Tuning node `Distortion` with every field above in real units (log sliders
+at 30 %, then a `TONE` slider `%.0f %%` opening at 50 %. Tuning node `Distortion` with every field above in real units (log sliders
 for Hz spanning decades). Reset / Print cover it. `ProtoParams` gains
 `cv::DistortionParams distortion`; callback order PitchFx, Unison, Slapback,
 Distortion.
 
 ## Render CLI
 
-`--drive <0..1>` enables the stage. Tuning keys via `--tuning k=v`, named
+`--drive <0..1>` enables the stage; `--tone <0..1>` sets TONE (default 0.5). Tuning keys via `--tuning k=v`, named
 `dist` + field name in lowerCamel (e.g. `distS1BassHz`, `distGain1Max`,
-`distRailAsym`, `distToneDb`, `distTrimDb`, `distOversample`).
+`distRailAsym`, `distToneMinDb`, `distToneMaxDb`, `distTrimDb`, `distOversample`).
 
 ## Tests (`test/distortion_test.cpp`, ctest `distortion`)
 
@@ -168,7 +173,10 @@ over seconds 1–2.
    is ≥ −42 dB relative to the fundamental (measured −39 dB); with `railAsym = 0`
    it is ≤ −55 dB.
 6. DC: `|mean(out)|` over seconds 1–2 at drive 1 is < 1e-3.
-7. No allocation inside `process()`.
+7. Tone: 8 kHz sine at −12 dBFS, drive 0.5. Output RMS at tone 1 exceeds tone 0 by
+   ≥ 12 dB (measured 18 dB), and tone 0.5 is within 0.5 dB of the result with
+   `toneMinDb = toneMaxDb = 0` (the pre-TONE sound).
+8. No allocation inside `process()`.
 
 ## Done when
 

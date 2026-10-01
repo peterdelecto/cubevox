@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cmath>
 
 #include "engine/chasm.h"
 #include "engine/common.h"
@@ -10,7 +11,8 @@
 // Reverb block: SPRING or CHASM behind one on/off smoother.
 // The selected engine runs; the engine left behind is cleared on a switch.
 // While settled off, neither engine runs and the block is a bit-exact copy.
-// Each engine keeps its own wetDb.
+// Each engine keeps its own wetDb, a level trim. MIX is an equal-power crossfade
+// from dry (0) to wet only (1), smoothed over 20 ms.
 
 namespace cv {
 
@@ -22,6 +24,7 @@ struct ReverbParams {
   int engine = kReverbSpring;
   SpringParams spring;  // spring.on is ignored; ReverbParams::on rules
   ChasmParams chasm;
+  float mix = 0.5f;  // panel knob 0 dry .. 1 wet
 };
 
 class Reverb {
@@ -32,6 +35,9 @@ class Reverb {
     spring_.reset();
     chasm_.reset();
     active_ = 0.0f;
+    mix_ = 0.0f;
+    dryGain_ = 1.0f;
+    wetGain_ = 0.0f;
     engine_ = kReverbSpring;
     idle_ = false;
     valid_ = false;
@@ -40,8 +46,11 @@ class Reverb {
   void process(const float* in, float* out, int n, const ReverbParams& p) {
     const int engine = p.engine == kReverbChasm ? kReverbChasm : kReverbSpring;
     const float target = p.on ? 1.0f : 0.0f;
+    const float mixTarget = smooth::clamp01(p.mix);
     if (!valid_) {
       active_ = target;
+      mix_ = mixTarget;
+      setMixGains();
       engine_ = engine;
       valid_ = true;
     }
@@ -70,7 +79,10 @@ class Reverb {
     const float a = smooth::coef(smooth::kSmoothSec);
     for (int i = 0; i < n; ++i) {
       active_ = smooth::step(active_, target, a);
-      out[i] = in[i] + active_ * wet_[static_cast<size_t>(i)];
+      const float prevMix = mix_;
+      mix_ = smooth::step(mix_, mixTarget, a);
+      if (mix_ != prevMix) setMixGains();
+      out[i] = in[i] + active_ * ((dryGain_ - 1.0f) * in[i] + wetGain_ * wet_[static_cast<size_t>(i)]);
     }
   }
 
@@ -79,6 +91,13 @@ class Reverb {
   Chasm& chasm() { return chasm_; }
 
  private:
+  static constexpr float kHalfPi = 1.57079632679489661923f;
+
+  void setMixGains() {
+    dryGain_ = mix_ <= 0.0f ? 1.0f : cosf(mix_ * kHalfPi);
+    wetGain_ = mix_ <= 0.0f ? 0.0f : sinf(mix_ * kHalfPi);
+  }
+
   void clear(int engine) {
     if (engine == kReverbChasm)
       chasm_.reset();
@@ -90,6 +109,9 @@ class Reverb {
   Chasm chasm_;
   std::array<float, kBlock> wet_{};
   float active_ = 0.0f;
+  float mix_ = 0.0f;
+  float dryGain_ = 1.0f;
+  float wetGain_ = 0.0f;
   int engine_ = kReverbSpring;
   bool idle_ = false;
   bool valid_ = false;

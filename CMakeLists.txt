@@ -112,3 +112,8 @@ add_executable(chasm_test test/chasm_test.cpp)
 target_compile_options(chasm_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(chasm_test PRIVATE engine)
 add_test(NAME chasm COMMAND chasm_test)
+
+add_executable(polish_test test/polish_test.cpp)
+target_compile_options(polish_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(polish_test PRIVATE engine)
+add_test(NAME polish COMMAND polish_test)

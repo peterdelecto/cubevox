@@ -14,7 +14,8 @@
 // TENSION sets the loop feedback; DWELL drives the soft clip and raises the splash.
 // Dry passes at unity; the wet sum is added at wetDb.
 //
-// Defaults match DrumSynthV3 (verified by A/B 2026-10-01). The splash levers
+// Defaults match DrumSynthV3 (verified by A/B 2026-10-01) except wetDb. DSV3's 0.70
+// wet is now the reverb MIX knob's job, so wetDb is a 0 dB trim. The splash levers
 // (hfMixDb, rippleGain, splashDiffuse, tankTrim, wetDb) are the departure points.
 
 namespace cv {
@@ -31,7 +32,7 @@ struct SpringTuning {
   int springs = 2;                              // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float wetDb = -3.1f;
+  float wetDb = 0.0f;                           // trim; MIX sets the blend
   float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 

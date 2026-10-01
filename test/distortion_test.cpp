@@ -179,6 +179,26 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
+bool testTone() {
+  std::vector<float> in(static_cast<size_t>(2 * kSecond));
+  for (size_t i = 0; i < in.size(); ++i)
+    in[i] = kAmp * static_cast<float>(std::sin(2.0 * kPi * 8000.0 * static_cast<double>(i) / cv::kSampleRate));
+  auto wetRms = [&](float tone, bool flatTuning) {
+    cv::DistortionParams p = params(0.5f);
+    p.tone = tone;
+    if (flatTuning) p.tuning.toneMinDb = p.tuning.toneMaxDb = 0.0f;
+    gDist.reset();
+    return rmsOf(run(gDist, in, p), kSecond, 2 * kSecond);
+  };
+  const double lo = wetRms(0.0f, false), mid = wetRms(0.5f, false), hi = wetRms(1.0f, false);
+  const double base = wetRms(0.5f, true);
+  const double spanDb = 20.0 * std::log10(hi / lo);
+  const double midDb = 20.0 * std::log10(mid / base);
+  return report("tone", spanDb >= 12.0 && std::fabs(midDb) <= 0.5,
+                "8 kHz at drive 0.5: tone 1 vs 0 = %.1f dB (>=12), tone 0.5 vs old default = %.2f dB (+-0.5)",
+                spanDb, midDb);
+}
+
 }  // namespace
 
 int main() {
@@ -189,6 +209,7 @@ int main() {
   ok &= testLevel();
   ok &= testAsymmetry();
   ok &= testDc();
+  ok &= testTone();
   ok &= testNoAlloc();
   return ok ? 0 : 1;
 }

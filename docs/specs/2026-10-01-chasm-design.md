@@ -102,28 +102,33 @@ class Reverb {
 };
 ```
 
-`out = in + active · wet_engine`. Spring's own on/active path is bypassed by
+`out = in + active · ((dry − 1) · in + wetG · wet_engine)` with `dry = cos(mix·π/2)`,
+`wetG = sin(mix·π/2)`, `mix` a panel knob 0..1 smoothed 20 ms (default 0.5).
+Mix 0 is a bit-exact copy even while an engine runs. Spring's own on/active path is bypassed by
 driving it with `on = true` and gating at this level, so there is one smoother.
-Spring's `wetDb` and Chasm's `wetDb` stay separate so each is tuned by ear.
+Spring's `wetDb` and Chasm's `wetDb` stay separate, both default 0 dB, and act as
+level trims behind MIX.
 
 ## Emulator
 
 The SPRING block becomes **REVERB**: checkbox `REVERB`, radio `SPRING | CHASM`,
 knob 1 labelled `TENSION` or `DECAY`, knob 2 `DWELL` or `WOBBLE` by engine, both
-`%.0f %%`. Tuning header under it has `Spring` and `Chasm` sub-tree-nodes (Spring's
+`%.0f %%`, then `MIX` `%.0f %%` opening at 50 %, shared by both engines. Tuning header under it has `Spring` and `Chasm` sub-tree-nodes (Spring's
 split further as already specified). `ProtoParams.spring` is replaced by
 `ProtoParams.reverb` (`cv::ReverbParams`).
 
 ## Render CLI
 
 `--reverb <spring|chasm>` selects and enables; `--tension/--dwell` keep working
-for spring; `--decay <0..1>`, `--wobble <0..1>` for chasm. Tuning keys `chm` +
+for spring; `--decay <0..1>`, `--wobble <0..1>` for chasm; `--rmix <0..1>` sets MIX
+(default 0.5). Tuning keys `chm` +
 field name (`chmTimeLo`, `chmWobbleDepthMax`, `chmWetDb`, …).
 
 ## Tests (`test/chasm_test.cpp`, ctest `chasm`)
 
 1. Passthrough: `Reverb` with `on = false` → bit-exact after 100 ms; engine 1,
-   `on = true`, silence in → silence out.
+   `on = true`, silence in → silence out; `mix = 0`, `on = true`, engine 1 running →
+   bit-exact after 100 ms.
 2. Decay tracks DECAY: impulse through Chasm wet; RMS 1.0–1.5 s re 0–0.5 s at
    decay 1 exceeds that at decay 0 by ≥ 15 dB.
 3. Chirp runs DOWN (this is what distinguishes it from Spring): band-pass the

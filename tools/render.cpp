@@ -1,4 +1,4 @@
-// cubevox-render: loop in, harmony + octave + unison + slapback + distortion + reverb processed
+// cubevox-render: loop in, harmony + octave + unison + slapback + distortion + reverb + eq processed
 // mono 48 kHz f32 WAV out.
 
 #include <cmath>
@@ -9,6 +9,7 @@
 #include "../third_party/miniaudio.h"
 #include "engine/distortion.h"
 #include "engine/pitch_fx.h"
+#include "engine/polish.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -26,11 +27,13 @@ struct RenderParams {
   bool slapOn = false;
   bool distOn = false;
   bool reverbOn = false;
+  bool eqOn = false;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
   cv::ReverbParams reverb;
+  cv::PolishParams eq;
 };
 
 int usage() {
@@ -40,13 +43,15 @@ int usage() {
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1] [--formant <-12..12>]\n"
-               "       [--slap <0..1>] [--drive <0..1>]\n"
+               "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
-               "       [--decay <0..1>] [--wobble <0..1>]\n"
+               "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
+               "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony or --octave\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb or --spring\n"
-               "  at least one stage must run; order is pitch, unison, slapback, distortion, reverb\n"
+               "  at least one stage must run; order is pitch, unison, slapback, distortion, reverb, eq\n"
+               "  eq runs only with --eq\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
                "     octGrainPeriods octEpochSearch octEpochLpHz\n"
@@ -55,7 +60,7 @@ int usage() {
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
                "     distS2LpHz distGain2Max distRailAsym distRailSoft distTrebleCutHz "
                "distTrebleCutDb\n"
-               "     distToneDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
+               "     distToneMinDb distToneMaxDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
                "distFadeDrive distOversample (0|1)\n"
                "     sprInputGain sprHpHz sprTensionLo sprTensionHi sprDwellDrive sprDwellComp sprHfMixDbLo\n"
                "     sprHfMixDbHi sprRippleGain sprSplashDiffuse sprHfSections sprSprings (2|3)\n"
@@ -63,7 +68,8 @@ int usage() {
                "     chmTimeLo chmTimeHi chmTrebleLossHz chmLoopTrebleCut chmInputTrebleCut "
                "chmBassCutHz\n"
                "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
-               "     chmWobbleLevelDb chmWetDb\n");
+               "     chmWobbleLevelDb chmWetDb\n"
+               "     eqDipQ eqPresenceQ eqAirHz\n");
   return 2;
 }
 
@@ -73,6 +79,14 @@ bool parseFloat(const char* s, float* out) {
   return end != s && *end == '\0';
 }
 
+// "hz,db"
+bool parsePair(const char* s, float* hz, float* db) {
+  char* end = nullptr;
+  *hz = std::strtof(s, &end);
+  if (end == s || *end != ',') return false;
+  return parseFloat(end + 1, db);
+}
+
 bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
@@ -80,6 +94,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringTuning& sp = rp.reverb.spring.tuning;
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
+  cv::PolishTuning& et = rp.eq.tuning;
   float oversample = dt.oversample ? 1.0f : 0.0f;
   float hfSections = static_cast<float>(sp.hfSections);
   float springs = static_cast<float>(sp.springs);
@@ -102,7 +117,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"distS2HpHz", &dt.s2HpHz},             {"distS2LpHz", &dt.s2LpHz},
       {"distGain2Max", &dt.gain2Max},         {"distRailAsym", &dt.railAsym},
       {"distRailSoft", &dt.railSoft},         {"distTrebleCutHz", &dt.trebleCutHz},
-      {"distTrebleCutDb", &dt.trebleCutDb},   {"distToneDb", &dt.toneDb},
+      {"distTrebleCutDb", &dt.trebleCutDb},   {"distToneMinDb", &dt.toneMinDb}, {"distToneMaxDb", &dt.toneMaxDb},
       {"distBassPeakHz", &dt.bassPeakHz},     {"distBassPeakDb", &dt.bassPeakDb},
       {"distBassPeakQ", &dt.bassPeakQ},       {"distTrimDb", &dt.trimDb},
       {"distFadeDrive", &dt.fadeDrive},
@@ -122,6 +137,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"chmWobbleRateLo", &ch.wobbleRateLo},  {"chmWobbleRateHi", &ch.wobbleRateHi},
       {"chmInputTrim", &ch.inputTrim},        {"chmWobbleLevelDb", &ch.wobbleLevelDb},
       {"chmWetDb", &ch.wetDb},
+      {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
@@ -174,6 +190,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveSlap = false;
   bool haveDrive = false;
   bool haveReverb = false;
+  bool haveEq = false;
   int voices = 0;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
@@ -196,6 +213,22 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       cv::DistortionParams& dp = rp.distortion;
       if (!parseFloat(argv[++i], &dp.drive) || dp.drive < 0.0f || dp.drive > 1.0f) return false;
       haveDrive = true;
+    } else if (std::strcmp(a, "--tone") == 0 && i + 1 < argc) {
+      cv::DistortionParams& dp = rp.distortion;
+      if (!parseFloat(argv[++i], &dp.tone) || dp.tone < 0.0f || dp.tone > 1.0f) return false;
+    } else if (std::strcmp(a, "--rmix") == 0 && i + 1 < argc) {
+      cv::ReverbParams& r = rp.reverb;
+      if (!parseFloat(argv[++i], &r.mix) || r.mix < 0.0f || r.mix > 1.0f) return false;
+    } else if (std::strcmp(a, "--eq") == 0) {
+      haveEq = true;
+    } else if (std::strcmp(a, "--eqhp") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.eq.hpHz)) return false;
+    } else if (std::strcmp(a, "--eqdip") == 0 && i + 1 < argc) {
+      if (!parsePair(argv[++i], &rp.eq.dipHz, &rp.eq.dipDb)) return false;
+    } else if (std::strcmp(a, "--eqpres") == 0 && i + 1 < argc) {
+      if (!parsePair(argv[++i], &rp.eq.presenceHz, &rp.eq.presenceDb)) return false;
+    } else if (std::strcmp(a, "--eqair") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.eq.airDb)) return false;
     } else if (std::strcmp(a, "--spring") == 0) {
       rp.reverb.engine = cv::kReverbSpring;
       haveReverb = true;
@@ -270,7 +303,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.distOn = haveDrive;
   rp.reverbOn = haveReverb;
   rp.reverb.on = haveReverb;
-  return rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.reverbOn;
+  rp.eqOn = haveEq;
+  rp.eq.on = haveEq;
+  return rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.reverbOn || rp.eqOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -295,11 +330,13 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Slapback slapback;
   static cv::Distortion distortion;
   static cv::Reverb reverb;
+  static cv::Polish polish;
   pitchFx.reset();
   unison.reset();
   slapback.reset();
   distortion.reset();
   reverb.reset();
+  polish.reset();
 
   float inBuf[cv::kBlock];
   float bufA[cv::kBlock];
@@ -336,6 +373,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.reverbOn) {
         reverb.process(src, scratch[next], n, rp.reverb);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.eqOn) {
+        polish.process(src, scratch[next], n, rp.eq);
         src = scratch[next];
       }
       ma_uint64 wrote = 0;

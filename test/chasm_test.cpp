@@ -215,9 +215,22 @@ bool testPassthrough() {
   const Signal out = run(gReverb, Signal(at(kSr / 2), 0.0f), p);
   float maxSilent = 0.0f;
   for (float v : out) maxSilent = std::fabs(v) > maxSilent ? std::fabs(v) : maxSilent;
-  return report("passthrough", maxDiff == 0.0f && maxSilent == 0.0f,
-                "off max|out-in| %.3g after 100 ms, chasm on silence max|out| %.3g (both 0)",
-                maxDiff, maxSilent);
+
+  // Mix 0 with the block on and chasm running is a bit-exact copy once settled.
+  cv::ReverbParams m;
+  m.engine = cv::kReverbChasm;
+  m.chasm = params(1.0f, 1.0f);
+  m.mix = 0.0f;
+  gReverb.reset();
+  const Signal mixOut = run(gReverb, in, m);
+  float maxMix = 0.0f;
+  for (int i = ms(100); i < static_cast<int>(in.size()); ++i) {
+    const float d = std::fabs(mixOut[at(i)] - in[at(i)]);
+    maxMix = d > maxMix ? d : maxMix;
+  }
+  return report("passthrough", maxDiff == 0.0f && maxSilent == 0.0f && maxMix == 0.0f,
+                "off max|out-in| %.3g, chasm on silence max|out| %.3g, mix 0 max|out-in| %.3g (all 0)",
+                maxDiff, maxSilent, maxMix);
 }
 
 bool testDecay() {
