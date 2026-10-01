@@ -10,8 +10,10 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - The emulator mirrors the panel exactly. Dev-only controls live under a collapsed
   `Tuning` header. Never invent panel controls. Exception (owner 2026-10-01): every
   effect block carries an on/off checkbox in the prototype so stages can be A/B'd.
+- Face layout (owner 2026-10-01): three columns, no scroll bar, fits one laptop
+  screen. Each effect block has its own collapsed `Tuning` header directly below it.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
-- Specs live in `docs/specs/`. Current: `2026-10-01-distortion-design.md` (earlier stage specs still apply).
+- Specs live in `docs/specs/`. Current: `2026-10-01-spring-design.md`, `2026-10-01-octave-b-design.md` (earlier stage specs still apply).
 
 ## Build / run
 ```

@@ -27,12 +27,16 @@
 #include "engine/distortion.h"
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
+#include "engine/spring.h"
 #include "engine/unison.h"
 
 namespace {
 
-constexpr int kWindowW = 900;
-constexpr int kWindowH = 910;
+constexpr int kWindowW = 1440;
+constexpr int kWindowH = 880;
+constexpr float kHarmonyColumnW = 592.0f;  // fits the Harmony interval rows
+constexpr float kLabelW = 175.0f;          // room right of each slider for its label
+constexpr float kMeterW = 240.0f;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
@@ -43,6 +47,8 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 constexpr float kStartDepth = 0.8f;
 constexpr float kStartIntensity = 0.5f;
 constexpr float kStartDrive = 0.3f;
+constexpr float kStartTension = 0.5f;
+constexpr float kStartDwell = 0.5f;
 
 struct ProtoParams {
   bool playing = false;
@@ -50,6 +56,7 @@ struct ProtoParams {
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartIntensity, {}};
   cv::DistortionParams distortion{true, kStartDrive, {}};
+  cv::SpringParams spring{true, kStartTension, kStartDwell, {}};
 };
 
 struct ProtoState {
@@ -89,6 +96,7 @@ cv::PitchFx gPitchFx;
 cv::Unison gUnison;
 cv::Slapback gSlapback;
 cv::Distortion gDistortion;
+cv::Spring gSpring;
 LoopBuffer* gLastLoop = nullptr;
 size_t gReadPos = 0;
 
@@ -172,6 +180,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gUnison.reset();
     gSlapback.reset();
     gDistortion.reset();
+    gSpring.reset();
   }
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
     std::memset(out, 0, sizeof(float) * 2 * frameCount);
@@ -191,10 +200,11 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
+    gSpring.process(mono.data(), tmp.data(), n, params.spring);
     for (int i = 0; i < n; ++i) {
-      out[2 * (done + i)] = mono[i];
-      out[2 * (done + i) + 1] = mono[i];
-      peak = std::max(peak, std::fabs(mono[i]));
+      out[2 * (done + i)] = tmp[i];
+      out[2 * (done + i) + 1] = tmp[i];
+      peak = std::max(peak, std::fabs(tmp[i]));
     }
     done += n;
   }
@@ -214,13 +224,14 @@ const char* baseName(const std::string& path) {
   return path.c_str() + (slash == std::string::npos ? 0 : slash + 1);
 }
 
-char gTuningText[2048];  // last Print tuning output, shown on the face
+char gTuningText[2560];  // last Print tuning output
+char gTuningLine[2560];  // the same text on one line, shown on the face
 
 // Finder launches have no stdout, so the text also goes to the clipboard
-// and into a read-only field under the button.
+// and into a read-only field beside the button.
 void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
-                 const cv::DistortionTuning& d) {
+                 const cv::DistortionTuning& d, const cv::SpringTuning& sp) {
   char line[512];
   int len = std::snprintf(
       line, sizeof(line),
@@ -236,28 +247,37 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
   std::snprintf(
       gTuningText, sizeof(gTuningText),
       "%s\n"
-      "OctaveTuning{%.1ff, %.1ff, %s}\n"
+      "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
-      "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}",
-      line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
+      "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}\n"
+      "SpringTuning{%.0ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff, %.1ff, %.2ff, %.2ff, %d, %d, %.1ff, "
+      "%.2ff, %.1ff, %.1ff, %.3ff}",
+      line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", o.grainPeriods,
+      o.epochSearch, o.epochLpHz, t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneDb, d.bassPeakHz,
-      d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false");
+      d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false",
+      sp.hpHz, sp.tensionLo, sp.tensionHi, sp.dwellDrive, sp.dwellComp, sp.hfMixDbLo,
+      sp.hfMixDbHi, sp.rippleGain, sp.splashDiffuse, sp.hfSections, sp.springs, sp.modDepth,
+      sp.modRateHz, sp.boingDb, sp.wetDb, sp.tankTrim);
   std::printf(
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher\n"
-      "// OctaveTuning: levelDb, glideMs, muteUnvoiced\n"
+      "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n"
       "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, stackBassHz, "
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneDb, bassPeakHz, bassPeakDb, "
-      "bassPeakQ, trimDb, fadeDrive, oversample\n%s\n",
+      "bassPeakQ, trimDb, fadeDrive, oversample\n"
+      "// SpringTuning: hpHz, tensionLo, tensionHi, dwellDrive, dwellComp, hfMixDbLo, "
+      "hfMixDbHi, rippleGain, splashDiffuse, hfSections, springs, modDepth, modRateHz, "
+      "boingDb, wetDb, tankTrim\n%s\n",
       gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
@@ -294,35 +314,65 @@ void drawIntervalRow(const char* name, int8_t (&row)[7]) {
   ImGui::PopID();
 }
 
-void drawHarmonyTuning(cv::HarmonyTuning& h, const ProtoState& state) {
-  if (!ImGui::TreeNode("Harmony")) return;
-  char detected[64];
-  formatDetected(state.pitchHz, state.voiced, detected, sizeof(detected));
-  ImGui::TextUnformatted(detected);
-  ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
-  ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
-  ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
-  ImGui::SliderFloat("Tracking speed (ms)", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
-  ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
-  ImGui::Checkbox("Mute unvoiced", &h.muteUnvoiced);
-  ImGui::Checkbox("Snap to scale", &h.snapToScale);
-  drawIntervalRow("Lower", h.lower);
-  drawIntervalRow("Low", h.low);
-  drawIntervalRow("High", h.high);
-  drawIntervalRow("Higher", h.higher);
-  ImGui::TreePop();
+// Probe scenario: which Tuning header and sub-node are forced open. Null block = live UI.
+struct ProbeOpen {
+  bool active = false;
+  const char* block = nullptr;
+  const char* node = nullptr;
+};
+ProbeOpen gProbeOpen;
+
+bool probeMatch(const char* want, const char* name) {
+  return want != nullptr && std::strcmp(want, name) == 0;
+}
+
+// Collapsed Tuning header under one effect block.
+bool tuningHeader(const char* block) {
+  if (gProbeOpen.active) ImGui::SetNextItemOpen(probeMatch(gProbeOpen.block, block));
+  return ImGui::CollapsingHeader("Tuning");
+}
+
+// Sub-node inside a Tuning header; caller pops with TreePop.
+bool tuningNode(const char* name) {
+  if (gProbeOpen.active) ImGui::SetNextItemOpen(probeMatch(gProbeOpen.node, name));
+  return ImGui::TreeNode(name);
+}
+
+// Long tuning sections split into sub-nodes so no column ever needs a scroll bar.
+void drawHarmonyTuning(cv::HarmonyTuning& h) {
+  if (!tuningHeader("harmony")) return;
+  if (tuningNode("Voices & tracking")) {
+    ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
+    ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
+    ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
+    ImGui::SliderFloat("Tracking speed (ms)", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
+    ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
+    ImGui::Checkbox("Mute unvoiced", &h.muteUnvoiced);
+    ImGui::Checkbox("Snap to scale", &h.snapToScale);
+    ImGui::TreePop();
+  }
+  if (tuningNode("Intervals")) {
+    drawIntervalRow("Lower", h.lower);
+    drawIntervalRow("Low", h.low);
+    drawIntervalRow("High", h.high);
+    drawIntervalRow("Higher", h.higher);
+    ImGui::TreePop();
+  }
 }
 
 void drawOctaveTuning(cv::OctaveTuning& o) {
-  if (!ImGui::TreeNode("Octave")) return;
+  if (!tuningHeader("octave")) return;
   ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
   ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
   ImGui::Checkbox("Mute unvoiced", &o.muteUnvoiced);
-  ImGui::TreePop();
+  ImGui::SliderFloat("Grain length (B)", &o.grainPeriods, 1.5f, 3.0f, "%.2f periods");
+  ImGui::SliderFloat("Epoch search (B)", &o.epochSearch, 0.0f, 0.3f, "%.2f period");
+  ImGui::SliderFloat("Epoch low-pass (B)", &o.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
+                     ImGuiSliderFlags_Logarithmic);
 }
 
 void drawUnisonTuning(cv::UnisonTuning& t) {
-  if (!ImGui::TreeNode("Unison")) return;
+  if (!tuningHeader("unison")) return;
   ImGui::SliderFloat("Base delay 1", &t.baseDelayMs[0], 5.0f, 40.0f, "%.1f ms");
   ImGui::SliderFloat("Base delay 2", &t.baseDelayMs[1], 5.0f, 40.0f, "%.1f ms");
   ImGui::SliderFloat("LFO rate 1", &t.lfoHz[0], 0.1f, 3.0f, "%.2f Hz");
@@ -333,76 +383,112 @@ void drawUnisonTuning(cv::UnisonTuning& t) {
   ImGui::SliderFloat("DETUNE 0", &t.detuneCents[0], -30.0f, 30.0f, "%.1f cents");
   ImGui::SliderFloat("DETUNE 1", &t.detuneCents[1], -30.0f, 30.0f, "%.1f cents");
   ImGui::SliderFloat("WINDOW", &t.windowMs, 5.0f, 30.0f, "%.0f ms");
-  ImGui::TreePop();
 }
 
 void drawSlapbackTuning(cv::SlapbackTuning& t) {
-  if (!ImGui::TreeNode("Slapback")) return;
+  if (!tuningHeader("slapback")) return;
   ImGui::SliderFloat("Time", &t.timeMs, 30.0f, 120.0f, "%.0f ms");
   ImGui::SliderFloat("Lowpass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
   ImGui::SliderFloat("Feedback", &t.feedback, 0.0f, 0.5f, "%.2f");
   ImGui::SliderFloat("Wet level at full", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
-  ImGui::TreePop();
 }
 
 void drawDistortionTuning(cv::DistortionTuning& t) {
-  if (!ImGui::TreeNode("Distortion")) return;
+  if (!tuningHeader("distortion")) return;
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
-  ImGui::SliderFloat("Input high-pass", &t.inputHpHz, 10.0f, 200.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stage 1 bass cut corner", &t.s1BassHz, 100.0f, 2000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stage 1 bass cut depth", &t.s1BassDb, -24.0f, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("Stage 1 top roll-off", &t.s1LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stage 1 gain at full", &t.gain1Max, 1.0f, 300.0f, "%.1f x", log);
-  ImGui::SliderFloat("Stack bass corner", &t.stackBassHz, 100.0f, 1000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stack bass boost", &t.stackBassDb, 0.0f, 20.0f, "%.1f dB");
-  ImGui::SliderFloat("Stack treble corner", &t.stackTrebleHz, 500.0f, 8000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stack treble cut", &t.stackTrebleDb, -20.0f, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("Stack insertion loss", &t.stackLossDb, -40.0f, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("Stage 2 high-pass", &t.s2HpHz, 20.0f, 500.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stage 2 low-pass", &t.s2LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Stage 2 gain at full", &t.gain2Max, 1.0f, 300.0f, "%.1f x", log);
-  ImGui::SliderFloat("Rail asymmetry", &t.railAsym, 0.0f, 0.5f, "%.2f");
-  ImGui::SliderFloat("Rail soft edge", &t.railSoft, 0.01f, 0.5f, "%.2f");
-  ImGui::SliderFloat("Treble cut corner", &t.trebleCutHz, 300.0f, 5000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Treble cut", &t.trebleCutDb, -12.0f, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("Tone", &t.toneDb, -9.0f, 9.0f, "%.1f dB");
-  ImGui::SliderFloat("Bass peak centre", &t.bassPeakHz, 60.0f, 400.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("Bass peak gain", &t.bassPeakDb, 0.0f, 12.0f, "%.1f dB");
-  ImGui::SliderFloat("Bass peak Q", &t.bassPeakQ, 0.3f, 3.0f, "%.2f");
-  ImGui::SliderFloat("Output trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
-  ImGui::SliderFloat("Fade-in span", &t.fadeDrive, 0.01f, 0.3f, "%.2f");
-  ImGui::Checkbox("2x oversampling", &t.oversample);
-  ImGui::TreePop();
+  if (tuningNode("Stage 1")) {
+    ImGui::SliderFloat("Input high-pass", &t.inputHpHz, 10.0f, 200.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Bass cut corner", &t.s1BassHz, 100.0f, 2000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Bass cut depth", &t.s1BassDb, -24.0f, 0.0f, "%.1f dB");
+    ImGui::SliderFloat("Top roll-off", &t.s1LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Gain at full", &t.gain1Max, 1.0f, 300.0f, "%.1f x", log);
+    ImGui::TreePop();
+  }
+  if (tuningNode("Tone stack")) {
+    ImGui::SliderFloat("Bass corner", &t.stackBassHz, 100.0f, 1000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Bass boost", &t.stackBassDb, 0.0f, 20.0f, "%.1f dB");
+    ImGui::SliderFloat("Treble corner", &t.stackTrebleHz, 500.0f, 8000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Treble cut", &t.stackTrebleDb, -20.0f, 0.0f, "%.1f dB");
+    ImGui::SliderFloat("Insertion loss", &t.stackLossDb, -40.0f, 0.0f, "%.1f dB");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Stage 2")) {
+    ImGui::SliderFloat("High-pass", &t.s2HpHz, 20.0f, 500.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Low-pass", &t.s2LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Gain at full", &t.gain2Max, 1.0f, 300.0f, "%.1f x", log);
+    ImGui::SliderFloat("Rail asymmetry", &t.railAsym, 0.0f, 0.5f, "%.2f");
+    ImGui::SliderFloat("Rail soft edge", &t.railSoft, 0.01f, 0.5f, "%.2f");
+    ImGui::Checkbox("2x oversampling", &t.oversample);
+    ImGui::TreePop();
+  }
+  if (tuningNode("Post")) {
+    ImGui::SliderFloat("Treble cut corner", &t.trebleCutHz, 300.0f, 5000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Treble cut", &t.trebleCutDb, -12.0f, 0.0f, "%.1f dB");
+    ImGui::SliderFloat("Tone", &t.toneDb, -9.0f, 9.0f, "%.1f dB");
+    ImGui::SliderFloat("Bass peak centre", &t.bassPeakHz, 60.0f, 400.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Bass peak gain", &t.bassPeakDb, 0.0f, 12.0f, "%.1f dB");
+    ImGui::SliderFloat("Bass peak Q", &t.bassPeakQ, 0.3f, 3.0f, "%.2f");
+    ImGui::SliderFloat("Output trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
+    ImGui::SliderFloat("Fade-in span", &t.fadeDrive, 0.01f, 0.3f, "%.2f");
+    ImGui::TreePop();
+  }
 }
 
-void drawTuning(ProtoParams& params, const ProtoState& state) {
-  if (!ImGui::CollapsingHeader("Tuning")) return;
+void drawSpringTuning(cv::SpringTuning& t) {
+  if (!tuningHeader("spring")) return;
+  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
+  if (tuningNode("Tank")) {
+    ImGui::SliderFloat("Feedback at tension 0", &t.tensionLo, 0.3f, 0.95f, "%.2f");
+    ImGui::SliderFloat("Feedback at tension 1", &t.tensionHi, 0.6f, 0.995f, "%.3f");
+    ImGui::SliderFloat("Pre-echo ripple", &t.rippleGain, 0.0f, 0.5f, "%.2f");
+    ImGui::SliderInt("Springs", &t.springs, 2, 3);
+    ImGui::SliderFloat("Wander depth", &t.modDepth, 0.0f, 24.0f, "%.1f samples");
+    ImGui::SliderFloat("Wander rate", &t.modRateHz, 0.1f, 10.0f, "%.2f Hz", log);
+    ImGui::TreePop();
+  }
+  if (tuningNode("Splash")) {
+    ImGui::SliderFloat("Level at dwell 0", &t.hfMixDbLo, -40.0f, 0.0f, "%.1f dB");
+    ImGui::SliderFloat("Level at dwell 1", &t.hfMixDbHi, -40.0f, 0.0f, "%.1f dB");
+    ImGui::SliderFloat("Diffusion", &t.splashDiffuse, 0.0f, 0.9f, "%.2f");
+    ImGui::SliderInt("Allpass sections", &t.hfSections, 0, 200);
+    ImGui::TreePop();
+  }
+  if (tuningNode("Levels")) {
+    ImGui::SliderFloat("Input high-pass", &t.hpHz, 20.0f, 1000.0f, "%.0f Hz", log);
+    ImGui::SliderFloat("Drive at dwell 1", &t.dwellDrive, 1.0f, 100.0f, "%.1f x", log);
+    ImGui::SliderFloat("Drive compensation", &t.dwellComp, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Tank input trim", &t.tankTrim, 0.05f, 1.5f, "%.3f", log);
+    ImGui::SliderFloat("Boing 95 Hz", &t.boingDb, -12.0f, 12.0f, "%.1f dB");
+    ImGui::SliderFloat("Wet level", &t.wetDb, -24.0f, 6.0f, "%.1f dB");
+    ImGui::TreePop();
+  }
+}
+
+// Reset and Print cover every effect's tuning.
+void drawTuningButtons(ProtoParams& params) {
   cv::HarmonyTuning& ht = params.pitchFx.harmony.tuning;
   cv::OctaveTuning& ot = params.pitchFx.octave.tuning;
-  drawHarmonyTuning(ht, state);
-  drawOctaveTuning(ot);
-  drawUnisonTuning(params.unison.tuning);
-  drawSlapbackTuning(params.slapback.tuning);
-  drawDistortionTuning(params.distortion.tuning);
   if (ImGui::Button("Reset to defaults")) {
     ht = cv::HarmonyTuning{};
     ot = cv::OctaveTuning{};
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
     params.distortion.tuning = cv::DistortionTuning{};
+    params.spring.tuning = cv::SpringTuning{};
   }
   ImGui::SameLine();
-  if (ImGui::Button("Print tuning"))
+  if (ImGui::Button("Print tuning")) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
-                params.distortion.tuning);
-  if (gTuningText[0] != '\0') {
-    ImGui::SameLine();
-    ImGui::TextUnformatted("copied to clipboard");
-    ImGui::InputTextMultiline("##tuning", gTuningText, sizeof(gTuningText),
-                              ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f),
-                              ImGuiInputTextFlags_ReadOnly);
+                params.distortion.tuning, params.spring.tuning);
+    // One line for the field; the clipboard keeps the line breaks.
+    std::snprintf(gTuningLine, sizeof(gTuningLine), "%s", gTuningText);
+    std::replace(gTuningLine, gTuningLine + sizeof(gTuningLine), '\n', ' ');
   }
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(-1.0f);
+  ImGui::InputTextWithHint("##tuning", "printed tuning, also copied to clipboard", gTuningLine,
+                           sizeof(gTuningLine), ImGuiInputTextFlags_ReadOnly);
 }
 
 void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
@@ -419,7 +505,9 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   const float frac = std::clamp((meterDb - kMeterFloorDb) / -kMeterFloorDb, 0.0f, 1.0f);
   char label[32];
   std::snprintf(label, sizeof(label), "%.1f dBFS", meterDb);
-  ImGui::ProgressBar(frac, ImVec2(-1.0f, 0.0f), label);
+  ImGui::ProgressBar(frac, ImVec2(kMeterW, 0.0f), label);
+  ImGui::SameLine();
+  drawTuningButtons(params);
 }
 
 // ---- Harmony menu: five voice rows, at most two non-off ----------------------
@@ -485,42 +573,94 @@ void drawHarmonyMenu(cv::HarmonyParams& h) {
   syncSlots(gMenu, h);
 }
 
-void drawPanelMirror(ProtoParams& params) {
-  cv::HarmonyParams& h = params.pitchFx.harmony;
-  cv::OctaveParams& o = params.pitchFx.octave;
-  cv::UnisonParams& u = params.unison;
+// Panel knob shown in percent.
+void percentSlider(const char* label, float& value) {
+  float percent = value * 100.0f;
+  if (ImGui::SliderFloat(label, &percent, 0.0f, 100.0f, "%.0f %%")) value = percent / 100.0f;
+}
+
+void drawHarmonyBlock(cv::HarmonyParams& h, const ProtoState& state) {
+  ImGui::PushID("harmony");
   ImGui::Checkbox("HARMONY", &h.on);
   ImGui::Combo("KEY", &h.key, cv::kKeyName, 12);
-  float mixPercent = h.mix * 100.0f;
-  if (ImGui::SliderFloat("MIX", &mixPercent, 0.0f, 100.0f, "%.0f %%")) {
-    h.mix = mixPercent / 100.0f;
-  }
+  percentSlider("MIX", h.mix);
   drawHarmonyMenu(h);
-  ImGui::Separator();
+  drawHarmonyTuning(h.tuning);
+  char detected[64];
+  formatDetected(state.pitchHz, state.voiced, detected, sizeof(detected));
+  ImGui::TextUnformatted(detected);
+  ImGui::PopID();
+}
+
+void drawOctaveBlock(cv::OctaveParams& o) {
+  ImGui::PushID("octave");
   ImGui::Checkbox("OCTAVE", &o.on);
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted("Engine");
+  ImGui::SameLine();
+  ImGui::RadioButton("A", &o.engine, 0);
+  ImGui::SameLine();
+  ImGui::RadioButton("B", &o.engine, 1);
   ImGui::SliderInt("SEMITONES", &o.semitones, -12, 12, "%+d st");
-  float octMixPercent = o.mix * 100.0f;
-  if (ImGui::SliderFloat("MIX##octave", &octMixPercent, 0.0f, 100.0f, "%.0f %%")) {
-    o.mix = octMixPercent / 100.0f;
-  }
-  ImGui::Separator();
+  ImGui::BeginDisabled(o.engine == 0);
+  int formant = static_cast<int>(std::lround(o.formant));
+  if (ImGui::SliderInt("FORMANT", &formant, -12, 12, "%+d st")) o.formant = static_cast<float>(formant);
+  ImGui::EndDisabled();
+  percentSlider("MIX", o.mix);
+  drawOctaveTuning(o.tuning);
+  ImGui::PopID();
+}
+
+void drawUnisonBlock(cv::UnisonParams& u) {
+  ImGui::PushID("unison");
   ImGui::Checkbox("UNISON", &u.on);
-  float percent = u.depth * 100.0f;
-  if (ImGui::SliderFloat("DEPTH", &percent, 0.0f, 100.0f, "%.0f %%")) {
-    u.depth = percent / 100.0f;
-  }
-  ImGui::Separator();
-  ImGui::Checkbox("SLAPBACK", &params.slapback.on);
-  float slapPercent = params.slapback.intensity * 100.0f;
-  if (ImGui::SliderFloat("INTENSITY", &slapPercent, 0.0f, 100.0f, "%.0f %%")) {
-    params.slapback.intensity = slapPercent / 100.0f;
-  }
-  ImGui::Separator();
-  ImGui::Checkbox("DISTORTION", &params.distortion.on);
-  float drivePercent = params.distortion.drive * 100.0f;
-  if (ImGui::SliderFloat("DRIVE", &drivePercent, 0.0f, 100.0f, "%.0f %%")) {
-    params.distortion.drive = drivePercent / 100.0f;
-  }
+  percentSlider("DEPTH", u.depth);
+  drawUnisonTuning(u.tuning);
+  ImGui::PopID();
+}
+
+void drawSlapbackBlock(cv::SlapbackParams& s) {
+  ImGui::PushID("slapback");
+  ImGui::Checkbox("SLAPBACK", &s.on);
+  percentSlider("INTENSITY", s.intensity);
+  drawSlapbackTuning(s.tuning);
+  ImGui::PopID();
+}
+
+void drawDistortionBlock(cv::DistortionParams& d) {
+  ImGui::PushID("distortion");
+  ImGui::Checkbox("DISTORTION", &d.on);
+  percentSlider("DRIVE", d.drive);
+  drawDistortionTuning(d.tuning);
+  ImGui::PopID();
+}
+
+void drawSpringBlock(cv::SpringParams& s) {
+  ImGui::PushID("spring");
+  ImGui::Checkbox("SPRING", &s.on);
+  percentSlider("TENSION", s.tension);
+  percentSlider("DWELL", s.dwell);
+  drawSpringTuning(s.tuning);
+  ImGui::PopID();
+}
+
+constexpr int kColumns = 3;
+std::array<float, kColumns> gColumnUsed{};  // content height per column this frame, px
+float gColumnAvail = 0.0f;                  // column height, px
+
+// One face column. Columns never scroll; the probe fails on any overrun.
+template <class F>
+void column(int index, float width, const F& draw) {
+  ImGui::PushID(index);
+  ImGui::BeginChild("column", ImVec2(width, 0.0f), ImGuiChildFlags_None,
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+  ImGui::PushItemWidth(-kLabelW);
+  draw();
+  ImGui::PopItemWidth();
+  gColumnUsed[index] = ImGui::GetCursorPosY();
+  gColumnAvail = ImGui::GetWindowHeight();
+  ImGui::EndChild();
+  ImGui::PopID();
 }
 
 void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, bool probe) {
@@ -531,13 +671,32 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
   const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                                  ImGuiWindowFlags_NoSavedSettings |
+                                 ImGuiWindowFlags_NoScrollbar |
                                  ImGuiWindowFlags_NoScrollWithMouse;
   ImGui::Begin("cubevox", nullptr, flags);
   drawTransportRow(params, meterDb, probe);
   ImGui::Separator();
-  drawPanelMirror(params);
-  ImGui::Separator();
-  drawTuning(params, state);
+
+  // Signal order runs down each column, then left to right.
+  const float spacing = ImGui::GetStyle().ItemSpacing.x;
+  const float colW = (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 2.0f * spacing) / 2.0f;
+  column(0, kHarmonyColumnW, [&] {
+    drawHarmonyBlock(params.pitchFx.harmony, state);
+    ImGui::Separator();
+    drawOctaveBlock(params.pitchFx.octave);
+  });
+  ImGui::SameLine();
+  column(1, colW, [&] {
+    drawUnisonBlock(params.unison);
+    ImGui::Separator();
+    drawSlapbackBlock(params.slapback);
+  });
+  ImGui::SameLine();
+  column(2, colW, [&] {
+    drawDistortionBlock(params.distortion);
+    ImGui::Separator();
+    drawSpringBlock(params.spring);
+  });
   ImGui::End();
 }
 
@@ -553,17 +712,43 @@ int runLayoutProbe() {
   io.DeltaTime = 1.0f / 60.0f;
   io.Fonts->Build();
 
+  // All headers closed, then each Tuning header open, then each sub-node open alone.
+  static const ProbeOpen kScenarios[] = {
+      {true, nullptr, nullptr},          {true, "harmony", nullptr},
+      {true, "harmony", "Voices & tracking"}, {true, "harmony", "Intervals"},
+      {true, "octave", nullptr},         {true, "unison", nullptr},
+      {true, "slapback", nullptr},       {true, "distortion", nullptr},
+      {true, "distortion", "Stage 1"},   {true, "distortion", "Tone stack"},
+      {true, "distortion", "Stage 2"},   {true, "distortion", "Post"},
+      {true, "spring", nullptr},         {true, "spring", "Tank"},
+      {true, "spring", "Splash"},        {true, "spring", "Levels"},
+  };
+
   ProtoParams params;
   ProtoState state;
   float meterDb = kSilenceDb;
-  for (int frame = 0; frame < kProbeFrames; ++frame) {
-    ImGui::NewFrame();
-    drawFrame(params, state, meterDb, true);
-    ImGui::Render();
+  bool fits = true;
+  for (const ProbeOpen& s : kScenarios) {
+    gProbeOpen = s;
+    for (int frame = 0; frame < kProbeFrames; ++frame) {
+      ImGui::NewFrame();
+      drawFrame(params, state, meterDb, true);
+      ImGui::Render();
+    }
+    char name[48];
+    std::snprintf(name, sizeof(name), "%s%s%s", s.block ? s.block : "all closed",
+                  s.node ? " / " : "", s.node ? s.node : "");
+    const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
+    const bool ok = worst <= gColumnAvail;
+    fits = fits && ok;
+    std::printf("%-30s col1 %4.0f  col2 %4.0f  col3 %4.0f  of %.0f px%s\n", name, gColumnUsed[0],
+                gColumnUsed[1], gColumnUsed[2], gColumnAvail, ok ? "" : "  OVERRUN");
   }
-  std::printf("layout %dx%d: ok\n", kWindowW, kWindowH);
+  gProbeOpen = ProbeOpen{};
   ImGui::DestroyContext();
-  return 0;
+
+  std::printf("layout %dx%d: %s\n", kWindowW, kWindowH, fits ? "ok" : "column overrun");
+  return fits ? 0 : 1;
 }
 
 // ---- Window ----------------------------------------------------------------------

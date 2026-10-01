@@ -1,4 +1,5 @@
-// cubevox-render: loop in, harmony + octave + unison + slapback + distortion processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, harmony + octave + unison + slapback + distortion + spring processed
+// mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -9,6 +10,7 @@
 #include "engine/distortion.h"
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
+#include "engine/spring.h"
 #include "engine/unison.h"
 
 namespace {
@@ -23,10 +25,12 @@ struct RenderParams {
   bool unisonOn = false;
   bool slapOn = false;
   bool distOn = false;
+  bool springOn = false;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
+  cv::SpringParams spring;
 };
 
 int usage() {
@@ -35,20 +39,26 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
-               "       [--octave <-12..12>] [--omix <0..1>] [--slap <0..1>] [--drive <0..1>]\n"
+               "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1] [--formant <-12..12>]\n"
+               "       [--slap <0..1>] [--drive <0..1>]\n"
+               "       [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
                "  pitch front end runs with --harmony or --octave\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
-               "  distortion runs only with --drive\n"
-               "  at least one stage must run; order is pitch, unison, slapback, distortion\n"
+               "  distortion runs only with --drive; spring runs only with --spring\n"
+               "  at least one stage must run; order is pitch, unison, slapback, distortion, spring\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
+               "     octGrainPeriods octEpochSearch octEpochLpHz\n"
                "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
                "     distS2LpHz distGain2Max distRailAsym distRailSoft distTrebleCutHz "
                "distTrebleCutDb\n"
                "     distToneDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
-               "distFadeDrive distOversample (0|1)\n");
+               "distFadeDrive distOversample (0|1)\n"
+               "     sprHpHz sprTensionLo sprTensionHi sprDwellDrive sprDwellComp sprHfMixDbLo\n"
+               "     sprHfMixDbHi sprRippleGain sprSplashDiffuse sprHfSections sprSprings (2|3)\n"
+               "     sprModDepth sprModRateHz sprBoingDb sprWetDb sprTankTrim\n");
   return 2;
 }
 
@@ -62,7 +72,11 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
   cv::DistortionTuning& dt = rp.distortion.tuning;
+  cv::SpringTuning& sp = rp.spring.tuning;
+  cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   float oversample = dt.oversample ? 1.0f : 0.0f;
+  float hfSections = static_cast<float>(sp.hfSections);
+  float springs = static_cast<float>(sp.springs);
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -70,6 +84,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"wetMaxDb", &t.wetMaxDb},
       {"detuneCents0", &t.detuneCents[0]}, {"detuneCents1", &t.detuneCents[1]},
       {"windowMs", &t.windowMs},
+      {"octGrainPeriods", &ot.grainPeriods}, {"octEpochSearch", &ot.epochSearch},
+      {"octEpochLpHz", &ot.epochLpHz},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
@@ -85,6 +101,14 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"distBassPeakQ", &dt.bassPeakQ},       {"distTrimDb", &dt.trimDb},
       {"distFadeDrive", &dt.fadeDrive},
       {"distOversample", &oversample},
+      {"sprHpHz", &sp.hpHz},                  {"sprTensionLo", &sp.tensionLo},
+      {"sprTensionHi", &sp.tensionHi},        {"sprDwellDrive", &sp.dwellDrive},
+      {"sprDwellComp", &sp.dwellComp},        {"sprHfMixDbLo", &sp.hfMixDbLo},
+      {"sprHfMixDbHi", &sp.hfMixDbHi},        {"sprRippleGain", &sp.rippleGain},
+      {"sprSplashDiffuse", &sp.splashDiffuse}, {"sprHfSections", &hfSections},
+      {"sprSprings", &springs},               {"sprModDepth", &sp.modDepth},
+      {"sprModRateHz", &sp.modRateHz},        {"sprBoingDb", &sp.boingDb},
+      {"sprWetDb", &sp.wetDb},                {"sprTankTrim", &sp.tankTrim},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
@@ -93,6 +117,11 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (std::strlen(f.name) != keyLen || std::strncmp(f.name, kv, keyLen) != 0) continue;
     if (!parseFloat(eq + 1, f.value)) return false;
     dt.oversample = oversample != 0.0f;
+    if (hfSections < 0.0f || hfSections > 200.0f || hfSections != std::floor(hfSections))
+      return false;
+    if (springs != 2.0f && springs != 3.0f) return false;
+    sp.hfSections = static_cast<int>(hfSections);
+    sp.springs = static_cast<int>(springs);
     return true;
   }
   return false;
@@ -131,6 +160,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveOn = false;
   bool haveSlap = false;
   bool haveDrive = false;
+  bool haveSpring = false;
   int voices = 0;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
@@ -153,6 +183,14 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       cv::DistortionParams& dp = rp.distortion;
       if (!parseFloat(argv[++i], &dp.drive) || dp.drive < 0.0f || dp.drive > 1.0f) return false;
       haveDrive = true;
+    } else if (std::strcmp(a, "--spring") == 0) {
+      haveSpring = true;
+    } else if (std::strcmp(a, "--tension") == 0 && i + 1 < argc) {
+      cv::SpringParams& s = rp.spring;
+      if (!parseFloat(argv[++i], &s.tension) || s.tension < 0.0f || s.tension > 1.0f) return false;
+    } else if (std::strcmp(a, "--dwell") == 0 && i + 1 < argc) {
+      cv::SpringParams& s = rp.spring;
+      if (!parseFloat(argv[++i], &s.dwell) || s.dwell < 0.0f || s.dwell > 1.0f) return false;
     } else if (std::strcmp(a, "--harmony") == 0) {
       haveHarmony = true;
     } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
@@ -168,6 +206,13 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         return false;
       op.semitones = static_cast<int>(s);
       haveOctave = true;
+    } else if (std::strcmp(a, "--oengine") == 0 && i + 1 < argc) {
+      const char* v = argv[++i];
+      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
+      op.engine = v[0] - '0';
+    } else if (std::strcmp(a, "--formant") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &op.formant) || op.formant < -12.0f || op.formant > 12.0f)
+        return false;
     } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
     } else if (std::strcmp(a, "--voice") == 0 && i + 1 < argc) {
@@ -194,7 +239,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   p.on = rp.unisonOn;
   rp.slapOn = haveSlap;
   rp.distOn = haveDrive;
-  return rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn;
+  rp.springOn = haveSpring;
+  return rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.springOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -218,10 +264,12 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Unison unison;
   static cv::Slapback slapback;
   static cv::Distortion distortion;
+  static cv::Spring spring;
   pitchFx.reset();
   unison.reset();
   slapback.reset();
   distortion.reset();
+  spring.reset();
 
   float inBuf[cv::kBlock];
   float bufA[cv::kBlock];
@@ -253,6 +301,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.distOn) {
         distortion.process(src, scratch[next], n, rp.distortion);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.springOn) {
+        spring.process(src, scratch[next], n, rp.spring);
         src = scratch[next];
       }
       ma_uint64 wrote = 0;

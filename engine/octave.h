@@ -16,11 +16,18 @@ struct OctaveTuning {
   float levelDb = 0.0f;
   float glideMs = 15.0f;
   bool muteUnvoiced = false;
+
+  // Option B
+  float grainPeriods = 2.0f;     // grain length in sung periods, 1.5..3
+  float epochSearch = 0.25f;     // peak search half-width, fraction of a period
+  float epochLpHz = 1000.0f;     // low-pass used to find the peak
 };
 
 struct OctaveParams {
   bool on = true;                // panel toggle; off fades the stage out
+  int engine = 0;                // 0 = A (grid PSOLA), 1 = B (epoch PSOLA + formant)
   int semitones = 0;             // panel knob, -12..12, 0 = off
+  float formant = 0.0f;          // option B, -12..12 semitones, 0 = preserved
   float mix = 0.5f;              // panel knob
   OctaveTuning tuning;
 };

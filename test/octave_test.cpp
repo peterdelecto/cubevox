@@ -1,4 +1,5 @@
-// Octave checks: shift up/down, fifth, bypass, shared-tracker wiring, no-alloc.
+// Octave checks: shift up/down, fifth, bypass, shared-tracker wiring, no-alloc,
+// then option B pitch, formant-vs-pitch, formant envelope and level, bypass.
 // No window, no audio device.
 
 #include <algorithm>
@@ -189,6 +190,103 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
+// Option B checks.
+
+cv::PitchFxParams octaveB(int semis, float formant) {
+  cv::PitchFxParams p = octaveOnly(semis);
+  p.octave.engine = 1;
+  p.octave.formant = formant;
+  return p;
+}
+
+bool checkShiftB(const char* name, int semis, float formant, double expect) {
+  const double got = outputHz(220.0, octaveB(semis, formant));
+  const double err = got > 0.0 ? cents(got, expect) : 9999.0;
+  return report(name, std::fabs(err) <= 10.0, "out=%.2f Hz, expect %.2f, err=%.2f cents (+-10)",
+                got, expect, err);
+}
+
+bool testOctaveB() {
+  bool ok = true;
+  ok &= checkShiftB("B octave up", 12, 0.0f, 440.0);
+  ok &= checkShiftB("B octave down", -12, 0.0f, 110.0);
+  return ok;
+}
+
+bool testFormantKeepsPitchB() { return checkShiftB("B formant pitch", 7, 12.0f, 329.63); }
+
+// Goertzel magnitude of x at hz.
+double goertzel(const float* x, int n, double hz) {
+  const double w = 2.0 * kPi * hz / cv::kSampleRate;
+  const double c = 2.0 * std::cos(w);
+  double s1 = 0.0;
+  double s2 = 0.0;
+  for (int i = 0; i < n; ++i) {
+    const double s0 = x[i] + c * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  return std::sqrt(s1 * s1 + s2 * s2 - c * s1 * s2);
+}
+
+// Amplitude-weighted mean harmonic number over harmonics 1..10 of 220 Hz,
+// measured on second 1..2 (exactly 220 cycles, so no leakage).
+double centroidB(float formant) {
+  gFx.reset();
+  const std::vector<float> out = run(gFx, tone(220.0, 2 * cv::kSampleRate), octaveB(0, formant));
+  double num = 0.0;
+  double den = 0.0;
+  for (int k = 1; k <= 10; ++k) {
+    const double a = goertzel(&out[cv::kSampleRate], cv::kSampleRate, 220.0 * k);
+    num += k * a;
+    den += a;
+  }
+  return den > 0.0 ? num / den : 0.0;
+}
+
+bool testFormantEnvelopeB() {
+  const double flat = centroidB(0.0f);
+  const double up = centroidB(12.0f);
+  const double down = centroidB(-12.0f);
+  const double rUp = up / flat;
+  const double rDown = down / flat;
+  return report("B formant envelope", rUp >= 1.2 && rDown <= 0.8,
+                "centroid 0 st=%.3f, +12 x%.3f (>=1.2), -12 x%.3f (<=0.8)", flat, rUp, rDown);
+}
+
+// Goertzel magnitude of harmonic k of 220 Hz over second 1..2.
+double harmonic(const std::vector<float>& x, int k) {
+  return goertzel(&x[cv::kSampleRate], cv::kSampleRate, 220.0 * k);
+}
+
+// Formant shift moves the envelope, so the level is checked where it is
+// defined: an output harmonic against the input harmonic it maps from.
+bool testFormantLevelB() {
+  const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
+  gFx.reset();
+  const std::vector<float> up = run(gFx, in, octaveB(0, 12.0f));
+  gFx.reset();
+  const std::vector<float> down = run(gFx, in, octaveB(0, -12.0f));
+  const double upDb = 20.0 * std::log10(harmonic(up, 2) / harmonic(in, 1));
+  const double downDb = 20.0 * std::log10(harmonic(down, 1) / harmonic(in, 2));
+  return report("B formant level", std::fabs(upDb) <= 0.2 && std::fabs(downDb) <= 0.2,
+                "+12 out h2 vs in h1 %+.3f dB, -12 out h1 vs in h2 %+.3f dB (+-0.2)", upDb,
+                downDb);
+}
+
+bool testBypassB() {
+  const std::vector<float> in = tone(220.0, cv::kSampleRate);
+  float worst = 0.0f;
+  for (float mix : {0.0f, 0.5f, 1.0f}) {
+    cv::PitchFxParams p = octaveB(0, 0.0f);
+    p.octave.mix = mix;
+    gFx.reset();
+    const std::vector<float> out = run(gFx, in, p);
+    for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
+  }
+  return report("B bypass", worst == 0.0f, "semitones 0 mix 0/0.5/1 max|out-in|=%.3g (0)", worst);
+}
+
 }  // namespace
 
 int main() {
@@ -198,5 +296,10 @@ int main() {
   ok &= testBypass();
   ok &= testWiring();
   ok &= testNoAlloc();
+  ok &= testOctaveB();
+  ok &= testFormantKeepsPitchB();
+  ok &= testFormantEnvelopeB();
+  ok &= testFormantLevelB();
+  ok &= testBypassB();
   return ok ? 0 : 1;
 }
