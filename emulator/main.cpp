@@ -35,9 +35,13 @@ constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
 constexpr float kMeterDecayDbPerFrame = 0.6f;
 
+// The emulator opens with the knob where the owner left it; on the box the
+// pot decides (owner 2026-10-01: DEPTH 80 %).
+constexpr float kStartDepth = 0.8f;
+
 struct ProtoParams {
   bool playing = false;
-  cv::UnisonParams unison;
+  cv::UnisonParams unison{false, kStartDepth, {}};
 };
 
 struct ProtoState {
