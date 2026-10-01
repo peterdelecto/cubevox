@@ -682,8 +682,10 @@ void drawReverbBlock(cv::ReverbParams& r) {
   ImGui::PopID();
 }
 
-constexpr float kModulePad = 6.0f;  // inner padding of a module box, px
-constexpr float kModuleGap = 8.0f;  // vertical gap between module boxes, px
+constexpr float kModulePad = 14.0f;  // inner padding of a module box, px
+constexpr float kModuleGap = 40.0f;  // vertical gap between module boxes, px
+constexpr float kColumnGap = 32.0f;  // horizontal gap between columns, px
+constexpr float kTopGap = 16.0f;     // gap between the transport row and the columns, px
 
 // Border around one effect module, sized to its content (open Tuning included).
 template <class F>
@@ -732,20 +734,20 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   ImGui::Begin("cubevox", nullptr, flags);
   drawTransportRow(params, meterDb, probe);
   ImGui::Separator();
+  ImGui::Dummy(ImVec2(0.0f, kTopGap));
 
   // Signal order runs down each column, then left to right.
-  const float spacing = ImGui::GetStyle().ItemSpacing.x;
-  const float colW = (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 2.0f * spacing) / 2.0f;
+  const float colW = (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 2.0f * kColumnGap) / 2.0f;
   column(0, kHarmonyColumnW, [&] {
     moduleBox("harmonyBox", true, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
     moduleBox("octaveBox", false, [&] { drawOctaveBlock(params.pitchFx.octave); });
   });
-  ImGui::SameLine();
+  ImGui::SameLine(0.0f, kColumnGap);
   column(1, colW, [&] {
     moduleBox("unisonBox", true, [&] { drawUnisonBlock(params.unison); });
     moduleBox("slapbackBox", false, [&] { drawSlapbackBlock(params.slapback); });
   });
-  ImGui::SameLine();
+  ImGui::SameLine(0.0f, kColumnGap);
   column(2, colW, [&] {
     moduleBox("distortionBox", true, [&] { drawDistortionBlock(params.distortion); });
     moduleBox("reverbBox", false, [&] { drawReverbBlock(params.reverb); });
