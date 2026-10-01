@@ -53,6 +53,7 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 constexpr float kStartDepth = 0.8f;
 constexpr float kStartIntensity = 0.5f;
 constexpr float kStartDrive = 0.3f;
+constexpr float kStartTone = 0.5f;   // BD-2 TONE at noon is flat
 // Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
 // mis-trigger never reads as a dropout; release is short by owner choice.
 constexpr float kInputGateThresholdDb = -40.0f;
@@ -75,7 +76,7 @@ struct ProtoParams {
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartIntensity, {}};
-  cv::DistortionParams distortion{true, kStartDrive, {}};
+  cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
   cv::PolishParams eq;
 
