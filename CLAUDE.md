@@ -13,7 +13,7 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - Face layout (owner 2026-10-01): three columns, no scroll bar, fits one laptop
   screen. Each effect block has its own collapsed `Tuning` header directly below it.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
-- Specs live in `docs/specs/`. Current: `2026-10-01-chasm-design.md` (reverb block = Spring | Chasm; earlier stage specs still apply).
+- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply.
 
 ## Build / run
 ```
