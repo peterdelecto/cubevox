@@ -21,6 +21,10 @@ struct OctaveTuning {
   float grainPeriods = 2.0f;     // grain length in sung periods, 1.5..3
   float epochSearch = 0.25f;     // peak search half-width, fraction of a period
   float epochLpHz = 1000.0f;     // low-pass used to find the peak
+
+  // Per-engine output trims; level rule at mix 0.5, on top of levelDb.
+  float trimDbA = -5.3f;
+  float trimDbB = 6.2f;
 };
 
 struct OctaveParams {
@@ -55,7 +59,7 @@ class OctaveVoice {
     const OctaveTuning& t = p.tuning;
     const bool on = p.on && s != 0;
     semisT_ = static_cast<float>(s);
-    gainT_ = (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, t.levelDb / 20.0f);
+    gainT_ = (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, (t.levelDb + t.trimDbA) / 20.0f);
     // Smoothers start on target after reset; a silent voice jumps to its new
     // interval instead of gliding in from a stale one.
     if (fresh_ || gain_ == 0.0f) semis_ = semisT_;

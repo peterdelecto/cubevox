@@ -15,6 +15,7 @@ struct PolishTuning {
   float dipQ = 1.0f;
   float presenceQ = 0.7f;
   float airHz = 10000.0f;
+  float trimDb = 1.6f;  // active path only; level rule on program material
 };
 
 struct PolishParams {
@@ -55,12 +56,13 @@ class Polish {
     air_.setHighShelf(t.airHz, p.airDb);
 
     const float a = smooth::coef(smooth::kSmoothSec);
+    const float trim = powf(10.0f, t.trimDb / 20.0f);
     for (int i = 0; i < n; ++i) {
       active_ = smooth::step(active_, target, a);
       float x = hp_.run(in[i]);
       x = dip_.run(x);
       x = presence_.run(x);
-      x = air_.run(x);
+      x = air_.run(x) * trim;
       out[i] = in[i] + active_ * (x - in[i]);
     }
   }

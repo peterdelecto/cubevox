@@ -290,11 +290,11 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
     len += std::snprintf(line + len, sizeof(line) - len, ", {%d, %d, %d, %d, %d, %d, %d}",
                          row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
   }
-  std::snprintf(line + len, sizeof(line) - len, "}");
+  std::snprintf(line + len, sizeof(line) - len, ", %.1ff}", h.trimDb);
   std::snprintf(
       gTuningText, sizeof(gTuningText),
       "%s\n"
-      "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff}\n"
+      "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
@@ -303,10 +303,10 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "%.2ff, %.1ff, %.1ff, %.3ff}\n"
       "ChasmTuning{%.2ff, %.2ff, %.0ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.2ff, "
       "%.1ff, %.1ff}\n"
-      "PolishTuning{%.2ff, %.2ff, %.0ff}\n"
+      "PolishTuning{%.2ff, %.2ff, %.0ff, %.1ff}\n"
       "// PolishParams: hpHz %.0f, dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB, air %.1f dB",
       line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", o.grainPeriods,
-      o.epochSearch, o.epochLpHz, t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
+      o.epochSearch, o.epochLpHz, o.trimDbA, o.trimDbB, t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
@@ -317,7 +317,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       sp.modRateHz, sp.boingDb, sp.wetDb, sp.tankTrim, c.timeLo, c.timeHi, c.trebleLossHz,
       c.loopTrebleCut, c.inputTrebleCut, c.bassCutHz, c.bassCutHzTop, c.wobbleDepthMax,
       c.wobbleRateLo, c.wobbleRateHi, c.inputTrim, c.wobbleLevelDb, c.wetDb, e.tuning.dipQ,
-      e.tuning.presenceQ, e.tuning.airHz, e.hpHz, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb,
+      e.tuning.presenceQ, e.tuning.airHz, e.tuning.trimDb, e.hpHz, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb,
       e.airDb);
   size_t used = std::strlen(gTuningText);
   std::snprintf(
@@ -340,8 +340,8 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
   std::printf(
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
-      "lower, low, high, higher\n"
-      "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz\n"
+      "lower, low, high, higher, trimDb\n"
+      "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz, trimDbA, trimDbB\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n"
@@ -354,7 +354,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "boingDb, wetDb, tankTrim\n"
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
-      "wetDb\n// PolishTuning: dipQ, presenceQ, airHz\n"
+      "wetDb\n// PolishTuning: dipQ, presenceQ, airHz, trimDb\n"
       "// SpringCTuning: tdMs, fcLfHz, mLow, aLf, gLo, gHi, gComp, hfRatio, mHigh, aHf, hfMixDb, "
       "cross, eqPeakHz, eqBwHz, lowHz, echoGain, rippleGain, modDepth, modPole, springs, "
       "{tdFactor[3]}, {fcFactor[3]}, hpHz, lpHz, dwellDrive, dwellComp, presenceHz, presenceDb, "
@@ -426,6 +426,7 @@ void drawHarmonyTuning(cv::HarmonyTuning& h) {
     ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
     ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
     ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
+    ImGui::SliderFloat("Trim (all levels)", &h.trimDb, -12.0f, 18.0f, "%.1f dB");
     ImGui::SliderFloat("Tracking speed (ms)", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
     ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
     ImGui::Checkbox("Mute unvoiced", &h.muteUnvoiced);
@@ -437,6 +438,8 @@ void drawHarmonyTuning(cv::HarmonyTuning& h) {
 void drawOctaveTuning(cv::OctaveTuning& o) {
   if (!tuningHeader("octave")) return;
   ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Trim A", &o.trimDbA, -12.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Trim B", &o.trimDbB, -12.0f, 12.0f, "%.1f dB");
   ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
   ImGui::Checkbox("Mute unvoiced", &o.muteUnvoiced);
   ImGui::SliderFloat("Grain length (B)", &o.grainPeriods, 1.5f, 3.0f, "%.2f periods");
@@ -475,7 +478,7 @@ void drawSlapbackTuning(cv::SlapbackTuning& t) {
   ImGui::SliderFloat("Lowpass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
   ImGui::SliderFloat("Feedback", &t.feedback, 0.0f, 0.5f, "%.2f");
-  ImGui::SliderFloat("Wet level at full", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Wet level at full", &t.wetMaxDb, -24.0f, 12.0f, "%.1f dB");
 }
 
 void drawDistortionTuning(cv::DistortionTuning& t) {
@@ -538,6 +541,7 @@ void drawPolishTuning(cv::PolishTuning& t) {
   ImGui::SliderFloat("Presence Q", &t.presenceQ, 0.3f, 3.0f, "%.2f");
   ImGui::SliderFloat("Air corner", &t.airHz, 4000.0f, 16000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
+  ImGui::SliderFloat("Output trim", &t.trimDb, -6.0f, 6.0f, "%.1f dB");
 }
 
 void drawParkerTuning(cv::SpringCTuning& p) {
@@ -626,7 +630,7 @@ void drawReverbTuning(cv::SpringTuning& t, cv::ChasmTuning& c, cv::SpringCTuning
     ImGui::SliderFloat("Drive compensation", &t.dwellComp, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Tank input trim", &t.tankTrim, 0.05f, 1.5f, "%.3f", log);
     ImGui::SliderFloat("Boing 95 Hz", &t.boingDb, -12.0f, 12.0f, "%.1f dB");
-    ImGui::SliderFloat("Wet level", &t.wetDb, -24.0f, 6.0f, "%.1f dB");
+    ImGui::SliderFloat("Wet level", &t.wetDb, -24.0f, 18.0f, "%.1f dB");
     ImGui::TreePop();
   }
   if (tuningNode("Chasm")) {
@@ -642,7 +646,7 @@ void drawReverbTuning(cv::SpringTuning& t, cv::ChasmTuning& c, cv::SpringCTuning
     ImGui::SliderFloat("Wobble rate at 1", &c.wobbleRateHi, 0.1f, 10.0f, "%.2f Hz", log);
     ImGui::SliderFloat("Input trim", &c.inputTrim, 0.05f, 1.5f, "%.2f", log);
     ImGui::SliderFloat("Wobble level lift", &c.wobbleLevelDb, 0.0f, 6.0f, "%.1f dB");
-    ImGui::SliderFloat("Wet level", &c.wetDb, -24.0f, 6.0f, "%.1f dB");
+    ImGui::SliderFloat("Wet level", &c.wetDb, -24.0f, 24.0f, "%.1f dB");
     ImGui::TreePop();
   }
   drawParkerTuning(p);

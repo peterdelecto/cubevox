@@ -14,6 +14,10 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
   owner's laptop shows ~847 px of window). Each effect block has its own collapsed
   `Tuning` header directly below it; one Tuning header open per column at a time
   (accordion), which is the invariant the `--layout` probe checks.
+- Level rule (owner 2026-10-01): every stage engaged at its default setting outputs
+  near unity, 0 to +0.5 dB RMS over its input on program material. The trim that
+  gets a stage there lives in its tuning (wetDb / trimDb); the panel knobs never
+  carry a hidden level offset. `level_test` enforces it.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
 - Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply.
 

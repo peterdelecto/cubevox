@@ -100,7 +100,9 @@ bool testPassthrough() {
 }
 
 bool testResponse() {
-  const cv::PolishParams p;
+  // The shape is pinned without the level-rule trim.
+  cv::PolishParams p;
+  p.tuning.trimDb = 0.0f;
   const double g50 = gainDb(50.0, p), g300 = gainDb(300.0, p), g1k = gainDb(1000.0, p);
   const double g35 = gainDb(3500.0, p), g12 = gainDb(12000.0, p);
   const bool ok = g50 <= -8.0 && std::fabs(g300 + 2.5) <= 0.4 && std::fabs(g1k) <= 0.4 &&
@@ -116,6 +118,7 @@ bool testFlat() {
   p.dipDb = 0.0f;
   p.presenceDb = 0.0f;
   p.airDb = 0.0f;
+  p.tuning.trimDb = 0.0f;
   const double g = gainDb(1000.0, p);
   return report("flat", std::fabs(g) <= 0.1, "all gains 0, hp 40 Hz: 1 kHz = %.3f dB (+-0.1)", g);
 }

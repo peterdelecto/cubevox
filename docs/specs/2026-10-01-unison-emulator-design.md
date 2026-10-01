@@ -203,3 +203,5 @@ that fits the structure above without redesign.
    the dry loop.
 3. The owner has listened and either accepted the default knob mapping or produced a
    new `UnisonTuning` via `Print tuning` that is then baked into `unison.h`.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetMaxDb` default is now -12.4 dB (was 0), set so DEPTH 0.8 reads +0.25 dB out/in.

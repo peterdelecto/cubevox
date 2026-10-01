@@ -210,3 +210,5 @@ splash tuning.
 
 `ctest` passes all stages; face shows SPRING under DISTORTION; owner listens and
 reports whether it is sploshy enough, then the levers get baked.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetDb` default is now 1.3 dB (was 0), set so SPRING at MIX 0.5 reads +0.24 dB out/in.

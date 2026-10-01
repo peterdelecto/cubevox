@@ -120,3 +120,5 @@ three option-B fields.
 
 `ctest` passes; OCTAVE block shows A/B and FORMANT; owner listens to A vs B on
 octave down and up with a vocal loop.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `OctaveTuning::trimDbB` (new, default 6.2 dB) adds to `levelDb` for engine B; B +12 at MIX 0.5 reads +0.23 dB out/in.

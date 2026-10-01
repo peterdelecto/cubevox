@@ -196,6 +196,7 @@ cv::PitchFxParams octaveB(int semis, float formant) {
   cv::PitchFxParams p = octaveOnly(semis);
   p.octave.engine = 1;
   p.octave.formant = formant;
+  p.octave.tuning.trimDbB = 0.0f;  // level checks here are against unity, not the level-rule trim
   return p;
 }
 

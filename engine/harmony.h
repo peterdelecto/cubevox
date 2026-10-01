@@ -34,6 +34,7 @@ struct HarmonyTuning {
   int8_t low[7]    = {-3, -3, -4, -3, -3, -4, -4};
   int8_t high[7]   = { 4,  3,  3,  4,  4,  3,  3};
   int8_t higher[7] = { 7,  7,  7,  7,  7,  7,  6};
+  float trimDb = 8.4f;  // on top of levelDb; level rule at mix 0.5
 };
 
 struct HarmonyParams {
@@ -147,7 +148,7 @@ class HarmonyVoices {
   static float targetGain(int level, bool voiced, const HarmonyTuning& t) {
     if (level <= 0 || (t.muteUnvoiced && !voiced)) return 0.0f;
     const int idx = level > 3 ? 2 : level - 1;
-    return powf(10.0f, t.levelDb[idx] / 20.0f);
+    return powf(10.0f, (t.levelDb[idx] + t.trimDb) / 20.0f);
   }
 
   std::array<PsolaVoice, 2> voices_{};

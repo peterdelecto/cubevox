@@ -167,3 +167,5 @@ in. Handover §9.3 validation, made executable:
 
 `ctest` passes; REVERB offers three engines; owner A/Bs SPRING vs PARKER on a vocal
 loop.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetDb` default is now 10.4 dB (was 0), superseding the 0 dB ruling above, set so PARKER at MIX 0.5 reads +0.26 dB out/in.

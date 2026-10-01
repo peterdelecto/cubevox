@@ -139,3 +139,5 @@ checks unchanged. New `test/octave_test.cpp` (ctest `octave`):
 
 1. `ctest` passes `unison`, `harmony`, `octave`, `proto_layout`; output pasted.
 2. Emulator face shows Harmony, Octave, Unison in that order; owner listens.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `OctaveTuning::trimDbA` (new, default -5.3 dB) adds to `levelDb` for engine A; A -12 at MIX 0.5 reads +0.26 dB out/in.

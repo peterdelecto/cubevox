@@ -253,3 +253,5 @@ stereo spread of the two voices, live mic input.
 2. `cubevox-proto.app` loads a vocal loop, KEY and MIX and the menu voices behave as
    above, and the owner has listened.
 3. Owner either accepts the defaults or pastes a `Print tuning` block to bake.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `HarmonyTuning::trimDb` (new, default 8.4 dB, last field) adds to `levelDb[]` for every voice; Harmony High level 2 at MIX 0.5 reads +0.23 dB out/in.

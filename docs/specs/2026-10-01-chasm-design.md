@@ -149,3 +149,5 @@ Spring's test file is unchanged; it keeps driving `Spring` directly.
 
 `ctest` passes; REVERB block switches engines with relabelled knobs; owner A/Bs
 Spring and Chasm on a vocal loop.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetDb` default is now 17.4 dB (was 0), set so CHASM at MIX 0.5 reads +0.26 dB out/in.

@@ -237,7 +237,7 @@ class OctaveVoiceB {
     const bool on = p.on && (s != 0 || fm != 0.0f);
     semisT_ = static_cast<float>(s);
     formantT_ = fm;
-    gainT_ = (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, t.levelDb / 20.0f);
+    gainT_ = (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, (t.levelDb + t.trimDbB) / 20.0f);
     if (fresh_ || gain_ == 0.0f) {
       semis_ = semisT_;
       formant_ = formantT_;

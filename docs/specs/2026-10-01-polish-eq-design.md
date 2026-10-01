@@ -74,3 +74,5 @@ Tuning keys `eqDipQ`, `eqPresenceQ`, `eqAirHz`.
 ## Done when
 
 `ctest` passes; EQ module shows after REVERB; owner listens and adjusts the defaults.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `PolishTuning::trimDb` (new, default 1.6 dB) scales the active path only; program material has no content near the presence and air bands, so the boosts do not lift it and the level rule is met by the trim (EQ shape unchanged, off stays a bit-exact copy). Reads +0.30 dB out/in.

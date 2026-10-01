@@ -82,3 +82,5 @@ Wet level at full (−24–0 dB). Reset / Print cover it. `ProtoParams` gains
 
 `ctest` passes `unison`, `harmony`, `octave`, `slapback`, `proto_layout`; face shows
 SLAPBACK under UNISON; owner listens.
+
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetMaxDb` default is now 4.9 dB (was 0), set so INTENSITY 0.5 reads +0.27 dB out/in.

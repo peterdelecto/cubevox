@@ -15,7 +15,7 @@ struct SlapbackTuning {
   float timeMs = 70.0f;       // 30..120
   float lowpassHz = 4000.0f;  // 500..12000
   float feedback = 0.2f;      // 0..0.5
-  float wetMaxDb = 0.0f;      // wet level at INTENSITY 1
+  float wetMaxDb = 4.9f;      // wet level at INTENSITY 1; level rule at 0.5
 };
 
 struct SlapbackParams {

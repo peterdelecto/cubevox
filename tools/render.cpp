@@ -61,7 +61,7 @@ int usage() {
                "  eq runs only with --eq\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
-               "     octGrainPeriods octEpochSearch octEpochLpHz\n"
+               "     octGrainPeriods octEpochSearch octEpochLpHz octTrimDbA octTrimDbB eqTrimDb\n"
                "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
@@ -128,6 +128,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"windowMs", &t.windowMs},
       {"octGrainPeriods", &ot.grainPeriods}, {"octEpochSearch", &ot.epochSearch},
       {"octEpochLpHz", &ot.epochLpHz},
+      {"octTrimDbA", &ot.trimDbA}, {"octTrimDbB", &ot.trimDbB},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
@@ -177,7 +178,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"prkPresenceHz", &pk.presenceHz},      {"prkPresenceDb", &pk.presenceDb},
       {"prkPresenceQ", &pk.presenceQ},        {"prkTankTrim", &pk.tankTrim},
       {"prkWetDb", &pk.wetDb},
-      {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz},
+      {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz}, {"eqTrimDb", &et.trimDb},
       {"ingAttackMs", &ig.attackMs},          {"ingHoldMs", &ig.holdMs},
       {"ingReleaseMs", &ig.releaseMs},        {"ingRangeDb", &ig.rangeDb},
       {"ingKneeDb", &ig.kneeDb},              {"ingDetectorHpHz", &ig.detectorHpHz},
