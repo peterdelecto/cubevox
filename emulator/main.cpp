@@ -188,13 +188,21 @@ const char* baseName(const std::string& path) {
   return path.c_str() + (slash == std::string::npos ? 0 : slash + 1);
 }
 
+char gTuningText[256];  // last Print tuning output, shown on the face
+
+// Finder launches have no stdout, so the line also goes to the clipboard
+// and into a read-only field under the button.
 void printTuning(const cv::UnisonTuning& t) {
-  std::printf(
-      "// {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
-      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n",
+  std::snprintf(
+      gTuningText, sizeof(gTuningText),
+      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}",
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs);
+  std::printf(
+      "// {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, swingMaxMs, "
+      "wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n%s\n", gTuningText);
   std::fflush(stdout);
+  ImGui::SetClipboardText(gTuningText);
 }
 
 void drawTuning(cv::UnisonTuning& t) {
@@ -212,6 +220,12 @@ void drawTuning(cv::UnisonTuning& t) {
   if (ImGui::Button("Reset to defaults")) t = cv::UnisonTuning{};
   ImGui::SameLine();
   if (ImGui::Button("Print tuning")) printTuning(t);
+  if (gTuningText[0] != '\0') {
+    ImGui::SameLine();
+    ImGui::TextUnformatted("copied to clipboard");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputText("##tuning", gTuningText, sizeof(gTuningText), ImGuiInputTextFlags_ReadOnly);
+  }
 }
 
 void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
