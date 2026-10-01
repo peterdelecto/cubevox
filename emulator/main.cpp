@@ -1018,8 +1018,8 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   column(0, kHarmonyColumnW, [&] {
     moduleBox("ingateBox", true,
               [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
-    moduleBox("harmonyBox", false, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
     moduleBox("octaveBox", false, [&] { drawOctaveBlock(params.pitchFx.octave); });
+    moduleBox("harmonyBox", false, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
   column(1, colW, [&] {
