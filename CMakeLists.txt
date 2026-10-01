@@ -3,6 +3,7 @@ project(cubevox CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(glfw3 QUIET)
 if(NOT glfw3_FOUND)
@@ -12,11 +13,12 @@ endif()
 
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
 
-# engine: header-only, firmware-portable. The flags are the contract in
-# docs/specs: the same headers compile on the H7 unchanged.
+# engine: header-only, firmware-portable. The contract flags below are applied
+# to the targets that compile only engine code (test, render); the GUI target
+# carries vendored ImGui and ObjC that are not held to them.
 add_library(engine INTERFACE)
 target_include_directories(engine INTERFACE ${CMAKE_SOURCE_DIR})
-target_compile_options(engine INTERFACE -Wall -Wextra -Werror)
+set(CUBEVOX_ENGINE_FLAGS -Wall -Wextra -Werror -fno-exceptions -fno-rtti)
 
 function(cubevox_gui_target name)
   add_executable(${name}
@@ -67,6 +69,7 @@ cubevox_gui_target(cubevox-proto emulator/main.cpp)
 
 # cubevox-render: loop in, WAV out, no window.
 add_executable(cubevox-render tools/render.cpp tools/miniaudio_impl.cpp)
+set_source_files_properties(tools/render.cpp PROPERTIES COMPILE_OPTIONS "${CUBEVOX_ENGINE_FLAGS}")
 target_link_libraries(cubevox-render PRIVATE engine
   ${COREAUDIO_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK}
   ${AUDIOTOOLBOX_FRAMEWORK} ${AUDIOUNIT_FRAMEWORK})
@@ -74,6 +77,7 @@ target_link_libraries(cubevox-render PRIVATE engine
 # tests
 enable_testing()
 add_executable(unison_test test/unison_test.cpp)
+target_compile_options(unison_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(unison_test PRIVATE engine)
 add_test(NAME unison COMMAND unison_test)
 add_test(NAME proto_layout
