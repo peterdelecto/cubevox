@@ -3,3 +3,5 @@ imgui.ini
 .DS_Store
 *.png
 cubevox-proto.app
+.cache/
+.claude/

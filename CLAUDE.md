@@ -20,6 +20,7 @@ build/cubevox-render in.wav out.wav --depth 0.7
 ```
 
 ## Panel (planned)
-Input Gain · Soft gate (menu) · Autotune Key+Correction · Octave Semitones+Mix ·
+Input Gain · Soft gate (menu) · Harmony Key (detented encoder)+Mix (voices in menu) ·
+Octave Semitones+Mix ·
 Unison Depth · Slapback Intensity · Distortion Drive · Gate Threshold ·
 Spring Tension+Dwell · Output (menu)

@@ -24,12 +24,13 @@
 
 #include "../emulator/open_panel.h"
 #include "engine/common.h"
+#include "engine/harmony.h"
 #include "engine/unison.h"
 
 namespace {
 
 constexpr int kWindowW = 900;
-constexpr int kWindowH = 520;
+constexpr int kWindowH = 680;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
@@ -41,12 +42,15 @@ constexpr float kStartDepth = 0.8f;
 
 struct ProtoParams {
   bool playing = false;
+  cv::HarmonyParams harmony;
   cv::UnisonParams unison{false, kStartDepth, {}};
 };
 
 struct ProtoState {
   float peakDb = kSilenceDb;
   float playheadNorm = 0.0f;
+  float pitchHz = 0.0f;
+  bool voiced = false;
 };
 
 struct LoopBuffer {
@@ -75,6 +79,7 @@ int gStateWriteIndex = 1;  // audio-thread-only
 std::string gLoopPath;  // UI-thread-only
 
 // Audio-thread-only.
+cv::Harmony gHarmony;
 cv::Unison gUnison;
 LoopBuffer* gLastLoop = nullptr;
 size_t gReadPos = 0;
@@ -136,6 +141,8 @@ void readLoop(const LoopBuffer& loop, float* dst, int n) {
 void publishState(float peak, const LoopBuffer* loop) {
   ProtoState& s = gStateBuf[gStateWriteIndex];
   s.peakDb = peak > 1e-6f ? 20.0f * std::log10(peak) : kSilenceDb;
+  s.pitchHz = gHarmony.pitch().hz;
+  s.voiced = gHarmony.pitch().voiced;
   s.playheadNorm = (loop != nullptr && !loop->samples.empty())
                        ? static_cast<float>(gReadPos) / static_cast<float>(loop->samples.size())
                        : 0.0f;
@@ -153,6 +160,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   if (loop != gLastLoop) {
     gLastLoop = loop;
     gReadPos = 0;
+    gHarmony.reset();
     gUnison.reset();
   }
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
@@ -162,13 +170,15 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   }
 
   std::array<float, cv::kBlock> in;
+  std::array<float, cv::kBlock> tmp;
   std::array<float, cv::kBlock> mono;
   float peak = 0.0f;
   ma_uint32 done = 0;
   while (done < frameCount) {
     const int n = static_cast<int>(std::min<ma_uint32>(cv::kBlock, frameCount - done));
     readLoop(*loop, in.data(), n);
-    gUnison.process(in.data(), mono.data(), n, params.unison);
+    gHarmony.process(in.data(), tmp.data(), n, params.harmony);
+    gUnison.process(tmp.data(), mono.data(), n, params.unison);
     for (int i = 0; i < n; ++i) {
       out[2 * (done + i)] = mono[i];
       out[2 * (done + i) + 1] = mono[i];
@@ -192,25 +202,90 @@ const char* baseName(const std::string& path) {
   return path.c_str() + (slash == std::string::npos ? 0 : slash + 1);
 }
 
-char gTuningText[256];  // last Print tuning output, shown on the face
+char gTuningText[1024];  // last Print tuning output, shown on the face
 
-// Finder launches have no stdout, so the line also goes to the clipboard
+// Finder launches have no stdout, so the text also goes to the clipboard
 // and into a read-only field under the button.
-void printTuning(const cv::UnisonTuning& t) {
+void printTuning(const cv::HarmonyTuning& h, const cv::UnisonTuning& t) {
+  char line[512];
+  int len = std::snprintf(
+      line, sizeof(line),
+      "HarmonyTuning{{%.1ff, %.1ff, %.1ff}, %.1ff, %.2ff, %s, %s",
+      h.levelDb[0], h.levelDb[1], h.levelDb[2], h.glideMs, h.voicedThreshold,
+      h.muteUnvoiced ? "true" : "false", h.snapToScale ? "true" : "false");
+  const int8_t* tables[] = {h.lower, h.low, h.high, h.higher};
+  for (const int8_t* row : tables) {
+    len += std::snprintf(line + len, sizeof(line) - len, ", {%d, %d, %d, %d, %d, %d, %d}",
+                         row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
+  }
+  std::snprintf(line + len, sizeof(line) - len, "}");
   std::snprintf(
       gTuningText, sizeof(gTuningText),
+      "%s\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}",
-      t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
+      line, t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs);
   std::printf(
-      "// {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, swingMaxMs, "
-      "wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n%s\n", gTuningText);
+      "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
+      "lower, low, high, higher\n"
+      "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
+      "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n%s\n", gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
 }
 
-void drawTuning(cv::UnisonTuning& t) {
-  if (!ImGui::CollapsingHeader("Tuning")) return;
+// "A3 +4 cents voiced" from a tracker frequency; "--" before the first pitch.
+void formatDetected(float hz, bool voiced, char* dst, size_t size) {
+  static const char* const kNote[12] = {"C", "C#", "D", "D#", "E", "F",
+                                        "F#", "G", "G#", "A", "A#", "B"};
+  if (hz <= 0.0f) {
+    std::snprintf(dst, size, "Detected: --");
+    return;
+  }
+  const float midi = 69.0f + 12.0f * std::log2(hz / 440.0f);
+  const int note = static_cast<int>(std::lround(midi));
+  const int cents = static_cast<int>(std::lround((midi - static_cast<float>(note)) * 100.0f));
+  const int pitchClass = ((note % 12) + 12) % 12;
+  std::snprintf(dst, size, "Detected: %s%d %+d cents %s", kNote[pitchClass],
+                (note - pitchClass) / 12 - 1, cents, voiced ? "voiced" : "unvoiced");
+}
+
+// One 7-entry interval table: semitones per scale degree, Do..Ti.
+void drawIntervalRow(const char* name, int8_t (&row)[7]) {
+  static const char* const kDegree[7] = {"Do", "Re", "Mi", "Fa", "Sol", "La", "Ti"};
+  ImGui::PushID(name);
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted(name);
+  for (int d = 0; d < 7; ++d) {
+    ImGui::SameLine(d == 0 ? 80.0f : 0.0f);
+    ImGui::SetNextItemWidth(44.0f);
+    int v = row[d];
+    if (ImGui::InputInt(kDegree[d], &v, 0, 0)) row[d] = static_cast<int8_t>(std::clamp(v, -12, 12));
+  }
+  ImGui::PopID();
+}
+
+void drawHarmonyTuning(cv::HarmonyTuning& h, const ProtoState& state) {
+  if (!ImGui::TreeNode("Harmony")) return;
+  char detected[64];
+  formatDetected(state.pitchHz, state.voiced, detected, sizeof(detected));
+  ImGui::TextUnformatted(detected);
+  ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
+  ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
+  ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
+  ImGui::SliderFloat("Glide", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
+  ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
+  ImGui::Checkbox("Mute unvoiced", &h.muteUnvoiced);
+  ImGui::Checkbox("Snap to scale", &h.snapToScale);
+  drawIntervalRow("Lower", h.lower);
+  drawIntervalRow("Low", h.low);
+  drawIntervalRow("High", h.high);
+  drawIntervalRow("Higher", h.higher);
+  ImGui::TreePop();
+}
+
+void drawUnisonTuning(cv::UnisonTuning& t) {
+  if (!ImGui::TreeNode("Unison")) return;
   ImGui::SliderFloat("Base delay 1", &t.baseDelayMs[0], 5.0f, 40.0f, "%.1f ms");
   ImGui::SliderFloat("Base delay 2", &t.baseDelayMs[1], 5.0f, 40.0f, "%.1f ms");
   ImGui::SliderFloat("LFO rate 1", &t.lfoHz[0], 0.1f, 3.0f, "%.2f Hz");
@@ -221,14 +296,25 @@ void drawTuning(cv::UnisonTuning& t) {
   ImGui::SliderFloat("DETUNE 0", &t.detuneCents[0], -30.0f, 30.0f, "%.1f cents");
   ImGui::SliderFloat("DETUNE 1", &t.detuneCents[1], -30.0f, 30.0f, "%.1f cents");
   ImGui::SliderFloat("WINDOW", &t.windowMs, 5.0f, 30.0f, "%.0f ms");
-  if (ImGui::Button("Reset to defaults")) t = cv::UnisonTuning{};
+  ImGui::TreePop();
+}
+
+void drawTuning(ProtoParams& params, const ProtoState& state) {
+  if (!ImGui::CollapsingHeader("Tuning")) return;
+  drawHarmonyTuning(params.harmony.tuning, state);
+  drawUnisonTuning(params.unison.tuning);
+  if (ImGui::Button("Reset to defaults")) {
+    params.harmony.tuning = cv::HarmonyTuning{};
+    params.unison.tuning = cv::UnisonTuning{};
+  }
   ImGui::SameLine();
-  if (ImGui::Button("Print tuning")) printTuning(t);
+  if (ImGui::Button("Print tuning")) printTuning(params.harmony.tuning, params.unison.tuning);
   if (gTuningText[0] != '\0') {
     ImGui::SameLine();
     ImGui::TextUnformatted("copied to clipboard");
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputText("##tuning", gTuningText, sizeof(gTuningText), ImGuiInputTextFlags_ReadOnly);
+    ImGui::InputTextMultiline("##tuning", gTuningText, sizeof(gTuningText),
+                              ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f),
+                              ImGuiInputTextFlags_ReadOnly);
   }
 }
 
@@ -249,7 +335,80 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   ImGui::ProgressBar(frac, ImVec2(-1.0f, 0.0f), label);
 }
 
-void drawPanelMirror(cv::UnisonParams& u) {
+// ---- Harmony menu: five voice rows, at most two non-off ----------------------
+
+constexpr int kVoiceRows = 5;
+constexpr int kMaxActiveVoices = 2;
+
+struct HarmonyMenu {
+  std::array<int, kVoiceRows> level{};      // 0 off, 1 low, 2 med, 3 high
+  std::array<int, kMaxActiveVoices> order{};  // active rows, earliest first
+  int activeCount = 0;
+};
+HarmonyMenu gMenu;  // UI-thread-only
+
+void deactivate(HarmonyMenu& m, int row) {
+  m.level[row] = 0;
+  for (int i = 0; i < m.activeCount; ++i) {
+    if (m.order[i] != row) continue;
+    for (int k = i; k + 1 < m.activeCount; ++k) m.order[k] = m.order[k + 1];
+    --m.activeCount;
+    return;
+  }
+}
+
+// Sets a row's level; a third active row turns the earliest one off.
+void setRowLevel(HarmonyMenu& m, int row, int level) {
+  if (level == 0) {
+    deactivate(m, row);
+    return;
+  }
+  if (m.level[row] == 0) {
+    if (m.activeCount == kMaxActiveVoices) deactivate(m, m.order[0]);
+    m.order[m.activeCount++] = row;
+  }
+  m.level[row] = level;
+}
+
+void syncSlots(const HarmonyMenu& m, cv::HarmonyParams& h) {
+  for (int i = 0; i < kMaxActiveVoices; ++i) {
+    h.slots[i] = cv::HarmonySlot{};
+    if (i < m.activeCount) {
+      h.slots[i].voice = static_cast<cv::HarmonyVoice>(m.order[i]);
+      h.slots[i].level = m.level[m.order[i]];
+    }
+  }
+}
+
+void drawHarmonyMenu(cv::HarmonyParams& h) {
+  if (!ImGui::CollapsingHeader("Menu", ImGuiTreeNodeFlags_DefaultOpen)) return;
+  static const char* const kRowName[kVoiceRows] = {"Lower", "Low", "Fixed", "High", "Higher"};
+  static const char* const kLevelName[4] = {"Off", "Low", "Med", "High"};
+  for (int row = 0; row < kVoiceRows; ++row) {
+    ImGui::PushID(row);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(kRowName[row]);
+    for (int level = 0; level < 4; ++level) {
+      ImGui::SameLine(level == 0 ? 80.0f : 0.0f);
+      int shown = gMenu.level[row];
+      if (ImGui::RadioButton(kLevelName[level], &shown, level)) setRowLevel(gMenu, row, level);
+    }
+    ImGui::PopID();
+  }
+  syncSlots(gMenu, h);
+}
+
+void drawPanelMirror(ProtoParams& params) {
+  cv::HarmonyParams& h = params.harmony;
+  cv::UnisonParams& u = params.unison;
+  ImGui::TextUnformatted("HARMONY");
+  ImGui::Combo("KEY", &h.key, cv::kKeyName, 12);
+  float mixPercent = h.mix * 100.0f;
+  if (ImGui::SliderFloat("MIX", &mixPercent, 0.0f, 100.0f, "%.0f %%")) {
+    h.mix = mixPercent / 100.0f;
+  }
+  drawHarmonyMenu(h);
+  ImGui::Separator();
   ImGui::Checkbox("UNISON", &u.on);
   float percent = u.depth * 100.0f;
   if (ImGui::SliderFloat("DEPTH", &percent, 0.0f, 100.0f, "%.0f %%")) {
@@ -269,9 +428,9 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   ImGui::Begin("cubevox", nullptr, flags);
   drawTransportRow(params, meterDb, probe);
   ImGui::Separator();
-  drawPanelMirror(params.unison);
+  drawPanelMirror(params);
   ImGui::Separator();
-  drawTuning(params.unison.tuning);
+  drawTuning(params, state);
   ImGui::End();
 }
 

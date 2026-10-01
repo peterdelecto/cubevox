@@ -1,10 +1,12 @@
-// cubevox-render: loop in, unison-processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, harmony + unison processed mono 48 kHz f32 WAV out.
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
+#include "engine/harmony.h"
 #include "engine/unison.h"
 
 namespace {
@@ -14,10 +16,20 @@ struct TuningField {
   float* value;
 };
 
+struct RenderParams {
+  bool harmonyOn = false;
+  bool unisonOn = false;
+  cv::HarmonyParams harmony;
+  cv::UnisonParams unison;
+};
+
 int usage() {
   std::fprintf(stderr,
-               "usage: cubevox-render <in> <out.wav> --depth <0..1> [--on 0|1] "
+               "usage: cubevox-render <in> <out.wav> [--depth <0..1>] [--on 0|1] "
                "[--tuning k=v ...]\n"
+               "       [--harmony] [--key <0..11>] [--mix <0..1>] "
+               "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
+               "  unison runs only with --on 1 or --depth; at least one stage must run\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n");
   return 2;
@@ -48,11 +60,35 @@ bool applyTuning(cv::UnisonTuning& t, const char* kv) {
   return false;
 }
 
+bool parseVoice(const char* kv, cv::HarmonySlot& slot) {
+  const struct {
+    const char* name;
+    cv::HarmonyVoice voice;
+  } names[] = {
+      {"lower", cv::HarmonyVoice::Lower}, {"low", cv::HarmonyVoice::Low},
+      {"fixed", cv::HarmonyVoice::Fixed}, {"high", cv::HarmonyVoice::High},
+      {"higher", cv::HarmonyVoice::Higher},
+  };
+  const char* eq = std::strchr(kv, '=');
+  if (!eq || eq[1] < '0' || eq[1] > '3' || eq[2] != '\0') return false;
+  const size_t keyLen = static_cast<size_t>(eq - kv);
+  for (const auto& n : names) {
+    if (std::strlen(n.name) == keyLen && std::strncmp(n.name, kv, keyLen) == 0) {
+      slot.voice = n.voice;
+      slot.level = eq[1] - '0';
+      return true;
+    }
+  }
+  return false;
+}
+
 bool parseArgs(int argc, char** argv, const char** in, const char** out,
-               cv::UnisonParams& p) {
+               RenderParams& rp) {
+  cv::UnisonParams& p = rp.unison;
   bool haveDepth = false;
+  bool haveOn = false;
+  int voices = 0;
   int positional = 0;
-  p.on = true;
   for (int i = 1; i < argc; ++i) {
     const char* a = argv[i];
     if (std::strcmp(a, "--depth") == 0 && i + 1 < argc) {
@@ -63,6 +99,21 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       const char* v = argv[++i];
       if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
       p.on = v[0] == '1';
+      haveOn = true;
+    } else if (std::strcmp(a, "--harmony") == 0) {
+      rp.harmonyOn = true;
+    } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
+      float k = 0.0f;
+      if (!parseFloat(argv[++i], &k) || k < 0.0f || k > 11.0f || k != std::floor(k))
+        return false;
+      rp.harmony.key = static_cast<int>(k);
+    } else if (std::strcmp(a, "--mix") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.harmony.mix) || rp.harmony.mix < 0.0f ||
+          rp.harmony.mix > 1.0f)
+        return false;
+    } else if (std::strcmp(a, "--voice") == 0 && i + 1 < argc) {
+      if (voices >= 2 || !parseVoice(argv[++i], rp.harmony.slots[voices])) return false;
+      ++voices;
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
       while (i + 1 < argc && argv[i + 1][0] != '-' && std::strchr(argv[i + 1], '=')) {
@@ -76,10 +127,15 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       return false;
     }
   }
-  return positional == 2 && haveDepth;
+  if (positional != 2) return false;
+  if (voices > 0 && !rp.harmonyOn) return false;
+  // Unison runs only when asked for; --on 0 with --depth keeps it off.
+  rp.unisonOn = haveOn ? p.on : haveDepth;
+  p.on = rp.unisonOn;
+  return rp.harmonyOn || rp.unisonOn;
 }
 
-int render(const char* inPath, const char* outPath, const cv::UnisonParams& p) {
+int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   ma_decoder dec;
   const ma_decoder_config dcfg = ma_decoder_config_init(ma_format_f32, 1, cv::kSampleRate);
   if (ma_decoder_init_file(inPath, &dcfg, &dec) != MA_SUCCESS) {
@@ -96,17 +152,30 @@ int render(const char* inPath, const char* outPath, const cv::UnisonParams& p) {
     return 1;
   }
 
+  static cv::Harmony harmony;
   static cv::Unison unison;
+  harmony.reset();
   unison.reset();
 
   float inBuf[cv::kBlock];
+  float midBuf[cv::kBlock];
   float outBuf[cv::kBlock];
   int rc = 0;
   for (;;) {
     ma_uint64 got = 0;
     const ma_result r = ma_decoder_read_pcm_frames(&dec, inBuf, cv::kBlock, &got);
     if (got > 0) {
-      unison.process(inBuf, outBuf, static_cast<int>(got), p);
+      const int n = static_cast<int>(got);
+      const float* src = inBuf;
+      if (rp.harmonyOn) {
+        harmony.process(src, midBuf, n, rp.harmony);
+        src = midBuf;
+      }
+      if (rp.unisonOn) {
+        unison.process(src, outBuf, n, rp.unison);
+      } else {
+        std::memcpy(outBuf, src, sizeof(float) * static_cast<size_t>(n));
+      }
       ma_uint64 wrote = 0;
       if (ma_encoder_write_pcm_frames(&enc, outBuf, got, &wrote) != MA_SUCCESS ||
           wrote != got) {
@@ -133,7 +202,7 @@ int render(const char* inPath, const char* outPath, const cv::UnisonParams& p) {
 int main(int argc, char** argv) {
   const char* in = nullptr;
   const char* out = nullptr;
-  cv::UnisonParams p;
-  if (!parseArgs(argc, argv, &in, &out, p)) return usage();
-  return render(in, out, p);
+  RenderParams rp;
+  if (!parseArgs(argc, argv, &in, &out, rp)) return usage();
+  return render(in, out, rp);
 }
