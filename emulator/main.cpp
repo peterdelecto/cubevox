@@ -794,12 +794,17 @@ void drawEqBlock(cv::PolishParams& e) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   ImGui::PushID("eq");
   ImGui::Checkbox("Output EQ", &e.on);
-  ImGui::SliderFloat("HPF", &e.hpHz, 40.0f, 200.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("LOW-MID FREQ", &e.dipHz, 150.0f, 600.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("LOW-MID GAIN", &e.dipDb, -6.0f, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("PRESENCE FREQ", &e.presenceHz, 2000.0f, 6000.0f, "%.0f Hz", log);
-  ImGui::SliderFloat("PRESENCE GAIN", &e.presenceDb, 0.0f, 6.0f, "%.1f dB");
-  ImGui::SliderFloat("AIR", &e.airDb, 0.0f, 4.0f, "%.1f dB");
+  // Four bands, low to high, each with its own heading like a channel strip.
+  ImGui::SeparatorText("LOW CUT  (12 dB/oct)");
+  ImGui::SliderFloat("Frequency##hp", &e.hpHz, 40.0f, 200.0f, "%.0f Hz", log);
+  ImGui::SeparatorText("LOW-MID DIP");
+  ImGui::SliderFloat("Frequency##dip", &e.dipHz, 150.0f, 600.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Gain##dip", &e.dipDb, -6.0f, 0.0f, "%+.1f dB");
+  ImGui::SeparatorText("PRESENCE");
+  ImGui::SliderFloat("Frequency##pres", &e.presenceHz, 2000.0f, 6000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Gain##pres", &e.presenceDb, 0.0f, 6.0f, "%+.1f dB");
+  ImGui::SeparatorText("AIR  (shelf above 10 kHz)");
+  ImGui::SliderFloat("Gain##air", &e.airDb, 0.0f, 4.0f, "%+.1f dB");
   drawPolishTuning(e.tuning);
   ImGui::PopID();
 }
