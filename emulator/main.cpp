@@ -875,8 +875,28 @@ void drawOctaveBlock(cv::OctaveParams& o) {
 }
 
 // One gate instance: id keys the widgets and the probe's Tuning header.
+// Panel-style LED: green open (gain within 1 dB of unity), amber in the knee,
+// dark red closed. Off = unlit.
+void gateLed(bool on, float gainDb) {
+  const float r = ImGui::GetFrameHeight() * 0.32f;
+  const ImVec2 c(ImGui::GetCursorScreenPos().x + r + 2.0f,
+                 ImGui::GetCursorScreenPos().y + ImGui::GetFrameHeight() * 0.5f);
+  ImU32 fill = IM_COL32(60, 60, 60, 255);
+  if (on) {
+    if (gainDb > -1.0f) fill = IM_COL32(60, 220, 80, 255);
+    else if (gainDb > -12.0f) fill = IM_COL32(235, 170, 40, 255);
+    else fill = IM_COL32(140, 30, 30, 255);
+  }
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  dl->AddCircleFilled(c, r, fill, 16);
+  dl->AddCircle(c, r, IM_COL32(20, 20, 20, 255), 16, 1.0f);
+  ImGui::Dummy(ImVec2(2.0f * r + 6.0f, ImGui::GetFrameHeight()));
+  ImGui::SameLine();
+}
+
 void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float gainDb) {
   ImGui::PushID(id);
+  gateLed(g.on, gainDb);
   ImGui::Checkbox(label, &g.on);
   ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
   ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
