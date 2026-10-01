@@ -75,9 +75,10 @@ float rms(const std::vector<float>& x) {
   return static_cast<float>(std::sqrt(s / static_cast<double>(x.size())));
 }
 
-bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0) {
+bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0,
+            double c = 0.0) {
   char detail[160];
-  std::snprintf(detail, sizeof detail, fmt, a, b);
+  std::snprintf(detail, sizeof detail, fmt, a, b, c);
   std::printf("%s %s  %s\n", ok ? "PASS" : "FAIL", name, detail);
   return ok;
 }
@@ -133,8 +134,15 @@ bool testDetune() {
   std::vector<float> wet(in.size());
   for (size_t i = 0; i < in.size(); ++i) wet[i] = out[i] - in[i];
   const float cents = peakCents(wet, cv::kSampleRate / 2);
-  return report("detune", cents >= 15.0f && cents <= 30.0f,
-                "peak=%.2f cents (15..30)", cents);
+  // Expected peak follows the shipped tuning: LFO swing detune plus the
+  // fixed offset, so retuning by ear moves the band instead of breaking it.
+  const cv::UnisonTuning t;
+  const float swingSec = t.swingMaxMs * 0.001f;
+  const float lfoCents = 1200.0f * std::log2(1.0f + 2.0f * kPi * t.lfoHz[1] * swingSec);
+  const float expect = lfoCents + std::fabs(t.detuneCents[1]);
+  const float tol = 0.15f * expect;
+  return report("detune", std::fabs(cents - expect) <= tol,
+                "peak=%.2f cents (expect %.1f +-%.1f)", cents, expect, tol);
 }
 
 // Mean signed cents from upward zero-crossing periods, linearly interpolated.

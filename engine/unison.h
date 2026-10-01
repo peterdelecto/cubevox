@@ -13,12 +13,13 @@
 namespace cv {
 
 struct UnisonTuning {
-  float baseDelayMs[2] = {15.0f, 22.0f};
-  float lfoHz[2] = {0.60f, 0.83f};
-  float swingMinMs = 0.2f;   // modulation swing (peak) at DEPTH 0
-  float swingMaxMs = 2.5f;   // modulation swing (peak) at DEPTH 1
-  float wetMaxDb = -6.0f;    // per-voice level at DEPTH 1
-  float detuneCents[2] = {0.0f, 0.0f};  // fixed per-voice detune at DEPTH 1
+  // Owner-tuned by ear 2026-10-01 against dry vocal loops.
+  float baseDelayMs[2] = {20.0f, 15.0f};
+  float lfoHz[2] = {0.60f, 0.90f};
+  float swingMinMs = 0.5f;   // modulation swing (peak) at DEPTH 0
+  float swingMaxMs = 3.0f;   // modulation swing (peak) at DEPTH 1
+  float wetMaxDb = -4.0f;    // per-voice level at DEPTH 1
+  float detuneCents[2] = {2.0f, -2.0f};  // fixed per-voice detune at DEPTH 1
   float windowMs = 20.0f;    // crossfade window of the dual-tap shifter
 };
 
