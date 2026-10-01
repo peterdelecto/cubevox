@@ -136,6 +136,7 @@ bool testTime() {
     const std::vector<float> in = impulse(cv::kSampleRate);
     cv::SlapbackParams p = params(1.0f);
     p.tuning.timeMs = ms;
+    p.tuning.feedback = 0.0f;
     p.tuning.lowpassHz = 12000.0f;
     gSlap.reset();
     const std::vector<float> wet = wetOf(run(gSlap, in, p), in);
@@ -151,6 +152,7 @@ bool testLowpass() {
   const int n = 2 * cv::kSampleRate;
   cv::SlapbackParams p = params(1.0f);
   p.tuning.lowpassHz = 4000.0f;
+  p.tuning.feedback = 0.0f;
   const size_t skip = static_cast<size_t>(cv::kSampleRate / 2);
 
   const std::vector<float> lo = sine(500.0f, n);
@@ -170,6 +172,7 @@ bool testFeedback() {
   const std::vector<float> in = impulse(cv::kSampleRate);
   cv::SlapbackParams p = params(1.0f);
   p.tuning.lowpassHz = 12000.0f;
+  p.tuning.timeMs = 80.0f;
   p.tuning.feedback = 0.5f;
   gSlap.reset();
   const std::vector<float> wet = wetOf(run(gSlap, in, p), in);

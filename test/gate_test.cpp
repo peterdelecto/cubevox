@@ -67,6 +67,17 @@ class Rig {
   }
 };
 
+// The physics checks run on fixed tuning so they do not follow default changes.
+cv::GateParams fixedParams() {
+  cv::GateParams p;
+  p.tuning.holdMs = 60.0f;
+  p.tuning.releaseMs = 120.0f;
+  p.tuning.rangeDb = -80.0f;
+  p.tuning.kneeDb = 6.0f;
+  p.tuning.hysteresisDb = 3.0f;
+  return p;
+}
+
 bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0, double c = 0.0,
             double d = 0.0, double e = 0.0) {
   char detail[220];
@@ -101,7 +112,7 @@ bool testPassthrough() {
 }
 
 bool testCloses() {
-  cv::GateParams p;
+  cv::GateParams p = fixedParams();
   Rig r;
   r.gate.reset();
   const std::vector<float> g = r.feed(2 * cv::kSampleRate, 1000.0, dbfs(-60.0), p);
@@ -118,7 +129,7 @@ int firstWhere(const std::vector<float>& g, int from, F pred) {
 }
 
 bool testTiming() {
-  cv::GateParams p;
+  cv::GateParams p = fixedParams();
   const cv::GateTuning& t = p.tuning;
   Rig r;
   r.gate.reset();
@@ -150,7 +161,7 @@ bool testTiming() {
 }
 
 bool testHysteresis() {
-  cv::GateParams p;  // threshold -40, hysteresis 3
+  cv::GateParams p = fixedParams();  // threshold -40, hysteresis 3
   Rig r;
   r.gate.reset();
   r.feed(500 * kMs, 1000.0, dbfs(-20.0), p);  // open

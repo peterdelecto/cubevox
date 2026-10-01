@@ -38,7 +38,7 @@ stays a later step. The Mac prototype runs full rate.
   `g_lf` and `g_hf = 1.3·g_lf` are both railed at |g| ≤ 0.97.
 - DWELL → drive, same law as A: `drive = dwellDrive^x`, `comp = drive^-dwellComp`.
 - MIX → handled by `Reverb` (equal-power dry/wet). The engine outputs wet only,
-  trimmed by `wetDb` (+9 dB puts PARKER near option A's level at defaults).
+  trimmed by `wetDb` (0 dB by owner ruling 2026-10-01: wet at full is 0 dB for every effect).
 
 ## Engine (`engine/spring_c.h`)
 
@@ -66,7 +66,7 @@ struct SpringCTuning {
   float dwellDrive = 32.0f, dwellComp = 0.80f;
   float presenceHz = 3000.0f, presenceDb = 3.0f, presenceQ = 1.0f;
   float tankTrim = 0.75f;        // into the tank, after the clip
-  float wetDb = 9.0f;            // output level trim
+  float wetDb = 0.0f;            // output level trim
 };
 
 struct SpringCParams {

@@ -21,9 +21,9 @@ skeleton, threading unchanged.
 namespace cv {
 
 struct SlapbackTuning {
-  float timeMs = 80.0f;        // 30..120
+  float timeMs = 70.0f;        // 30..120
   float lowpassHz = 4000.0f;   // 500..12000
-  float feedback = 0.0f;       // 0..0.5
+  float feedback = 0.2f;       // 0..0.5 (owner 2026-10-01: a few repeats by default)
   float wetMaxDb = 0.0f;       // wet level at INTENSITY 1
 };
 
@@ -69,7 +69,7 @@ Wet level at full (−24–0 dB). Reset / Print cover it. `ProtoParams` gains
 
 1. Passthrough: 1 s 440 Hz sine, intensity 0 → after 100 ms `|out - in| < 1e-6`.
 2. Time: unit impulse at t = 0.5 s, intensity 1, lowpass 12 kHz, feedback 0 → wet
-   peak (`out - in`) lands within ±2 samples of 80 ms after the impulse; with
+   peak (`out - in`) lands within ±2 samples of 80 ms (test sets timeMs 80 and feedback 0 explicitly) after the impulse; with
    `timeMs = 30` and `120` the same holds for those times (fresh reset each run).
 3. Lowpass: 2 s sines at 500 Hz and 8 kHz, intensity 1, cutoff 4 kHz, feedback 0 →
    wet RMS at 8 kHz is 9–15 dB below wet RMS at 500 Hz (one octave above a 2-pole

@@ -12,9 +12,9 @@
 namespace cv {
 
 struct SlapbackTuning {
-  float timeMs = 80.0f;       // 30..120
+  float timeMs = 70.0f;       // 30..120
   float lowpassHz = 4000.0f;  // 500..12000
-  float feedback = 0.0f;      // 0..0.5
+  float feedback = 0.2f;      // 0..0.5
   float wetMaxDb = 0.0f;      // wet level at INTENSITY 1
 };
 

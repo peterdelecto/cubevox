@@ -70,7 +70,7 @@ struct UnisonTuning {            // defaults = the shipped mapping
   float lfoHz[2]       = {0.60f, 0.83f};
   float swingMinMs     = 0.2f;   // modulation swing (peak) at DEPTH 0
   float swingMaxMs     = 2.5f;   // modulation swing (peak) at DEPTH 1
-  float wetMaxDb       = -6.0f;  // per-voice level at DEPTH 1 (two voices sum ~0 dB)
+  float wetMaxDb       = 0.0f;   // per-voice level at DEPTH 1 (owner 2026-10-01: wet at full is 0 dB)
   float detuneCents[2] = {0.0f, 0.0f};  // fixed per-voice detune at DEPTH 1
   float windowMs       = 20.0f;  // crossfade window of the dual-tap shifter (5–30)
 };

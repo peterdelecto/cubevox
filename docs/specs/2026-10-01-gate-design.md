@@ -15,12 +15,12 @@ So: one engine, two instances.
 ```
 struct GateTuning {
   float attackMs = 1.0f;
-  float holdMs = 60.0f;
-  float releaseMs = 120.0f;
-  float rangeDb = -80.0f;      // attenuation when closed (soft gate uses -12)
-  float kneeDb = 6.0f;         // soft knee width around threshold
+  float holdMs = 150.0f;
+  float releaseMs = 250.0f;
+  float rangeDb = -40.0f;      // attenuation when closed (soft gate uses -12)
+  float kneeDb = 12.0f;        // soft knee width around threshold
   float detectorHpHz = 120.0f; // detector side-chain high-pass
-  float hysteresisDb = 3.0f;   // close threshold = open threshold - hysteresis
+  float hysteresisDb = 6.0f;   // close threshold = open threshold - hysteresis
 };
 
 struct GateParams {
@@ -91,3 +91,8 @@ distorted loop and listens for chatter.
 
 Module gap trimmed 40 → 37 px so column 2 (Unison, Slapback, Distortion, Gate) fits
 with Distortion › Post open (814 of 816 px).
+
+Defaults changed 2026-10-01 (owner: panel GATE too aggressive): hold 60 to 150 ms,
+release 120 to 250 ms, range -80 to -40 dB, knee 6 to 12 dB, hysteresis 3 to 6 dB.
+The input gate keeps its own range, hold and release overrides. gate_test fixes the
+old values explicitly so its timing and closing checks keep the same physics.

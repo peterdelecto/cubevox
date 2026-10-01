@@ -18,7 +18,7 @@ struct UnisonTuning {
   float lfoHz[2] = {0.60f, 0.90f};
   float swingMinMs = 0.5f;   // modulation swing (peak) at DEPTH 0
   float swingMaxMs = 3.0f;   // modulation swing (peak) at DEPTH 1
-  float wetMaxDb = -4.0f;    // per-voice level at DEPTH 1
+  float wetMaxDb = 0.0f;    // per-voice level at DEPTH 1
   float detuneCents[2] = {2.0f, -2.0f};  // fixed per-voice detune at DEPTH 1
   float windowMs = 20.0f;    // crossfade window of the dual-tap shifter
 };

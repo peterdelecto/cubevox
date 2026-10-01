@@ -189,7 +189,9 @@ bool testLevel() {
   gUnison.reset();
   const std::vector<float> out = run(gUnison, in, params(1.0f));
   const float db = 20.0f * log10f(rms(out) / rms(in));
-  return report("level", std::fabs(db) <= 3.0f, "out/in=%.2f dB (+-3)", db);
+  // Owner set wet to 0 dB at full DEPTH, so two voices sum above the input.
+  // Measured 4.08 dB; band is that +-1.5.
+  return report("level", std::fabs(db - 4.08f) <= 1.5f, "out/in=%.2f dB (4.08 +-1.5)", db);
 }
 
 bool testNoAlloc() {
