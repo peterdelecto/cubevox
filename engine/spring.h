@@ -13,22 +13,26 @@
 // high-band splash loop (high-pass at F_C, diffusers, own feedback delay).
 // TENSION sets the loop feedback; DWELL drives the soft clip and raises the splash.
 // Dry passes at unity; the wet sum is added at wetDb.
+//
+// Defaults match DrumSynthV3 (verified by A/B 2026-10-01). The splash levers
+// (hfMixDb, rippleGain, splashDiffuse, tankTrim, wetDb) are the departure points.
 
 namespace cv {
 
 struct SpringTuning {
+  float inputGain = 0.5f;                       // ahead of the high-pass and clip
   float hpHz = 300.0f;
   float tensionLo = 0.60f, tensionHi = 0.97f;   // |g| at TENSION 0 / 1
   float dwellDrive = 32.0f, dwellComp = 0.80f;
-  float hfMixDbLo = -18.0f, hfMixDbHi = -8.0f;  // C_hf mix at DWELL 0 / 1
-  float rippleGain = 0.20f;                     // pre-echo taps, paper 0.1
-  float splashDiffuse = 0.50f;                  // 0 off .. 0.9
+  float hfMixDbLo = -22.0f, hfMixDbHi = -14.0f;  // C_hf mix at DWELL 0 / 1
+  float rippleGain = 0.10f;                     // pre-echo taps, paper 0.1
+  float splashDiffuse = 0.0f;                   // 0 off .. 0.9
   int hfSections = 0;                           // 0..200
   int springs = 2;                              // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float wetDb = -6.0f;
-  float tankTrim = 0.375f;                      // DSV3: inTrim 0.25 x tankTrim 1.5
+  float wetDb = -3.1f;
+  float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 
 struct SpringParams {
@@ -60,22 +64,27 @@ constexpr float kClipMax = 3.0f;
 
 using Sos = std::array<std::array<float, 5>, 3>;  // rows {b0, b1, b2, a1, a2}
 
-// scipy.signal.ellip(6, 0.5, 60, fs / 2K, fs=48000, output='sos')
+// K = 5: 4410 Hz. scipy.signal.ellip(6, 0.5, 60, 4410, fs=48000, output='sos')
 constexpr Sos kEllipK5 = {{
-    {3.170187928e-03f, 2.448448052e-03f, 3.170187928e-03f, -1.574285048e+00f, 6.496029638e-01f},
-    {1.000000000e+00f, -9.573141810e-01f, 1.000000000e+00f, -1.551997326e+00f, 7.965495053e-01f},
-    {1.000000000e+00f, -1.285106260e+00f, 1.000000000e+00f, -1.562862547e+00f, 9.396148292e-01f},
+    {2.757369397e-03f, 1.692833440e-03f, 2.757369397e-03f, -1.609791940e+00f, 6.738565362e-01f},
+    {1.000000000e+00f, -1.090135675e+00f, 1.000000000e+00f, -1.602356743e+00f, 8.105071259e-01f},
+    {1.000000000e+00f, -1.384857719e+00f, 1.000000000e+00f, -1.623358987e+00f, 9.437983877e-01f},
 }};
+// K = 6: 3675 Hz. scipy.signal.ellip(6, 0.5, 60, 3675, fs=48000, output='sos')
 constexpr Sos kEllipK6 = {{
-    {2.383943886e-03f, 1.007344239e-03f, 2.383943886e-03f, -1.646843207e+00f, 7.000183821e-01f},
-    {1.000000000e+00f, -1.226384803e+00f, 1.000000000e+00f, -1.652930569e+00f, 8.257039330e-01f},
-    {1.000000000e+00f, -1.484337949e+00f, 1.000000000e+00f, -1.682745577e+00f, 9.483735958e-01f},
+    {2.127500724e-03f, 5.337154957e-04f, 2.127500724e-03f, -1.676034779e+00f, 7.212632737e-01f},
+    {1.000000000e+00f, -1.330788759e+00f, 1.000000000e+00f, -1.691241982e+00f, 8.381251860e-01f},
+    {1.000000000e+00f, -1.558691268e+00f, 1.000000000e+00f, -1.726625177e+00f, 9.521221121e-01f},
 }};
+// K = 7: 3150 Hz. scipy.signal.ellip(6, 0.5, 60, 3150, fs=48000, output='sos')
 constexpr Sos kEllipK7 = {{
-    {1.954320361e-03f, 2.113410835e-04f, 1.954320361e-03f, -1.698075320e+00f, 7.376835735e-01f},
-    {1.000000000e+00f, -1.407211516e+00f, 1.000000000e+00f, -1.719214914e+00f, 8.477613502e-01f},
-    {1.000000000e+00f, -1.612118776e+00f, 1.000000000e+00f, -1.757949845e+00f, 9.550323535e-01f},
+    {1.779006601e-03f, -1.184125190e-04f, 1.779006601e-03f, -1.722903271e+00f, 7.565815228e-01f},
+    {1.000000000e+00f, -1.490176721e+00f, 1.000000000e+00f, -1.749691841e+00f, 8.588777226e-01f},
+    {1.000000000e+00f, -1.669190079e+00f, 1.000000000e+00f, -1.791283871e+00f, 9.583891602e-01f},
 }};
+
+// Split frequency per K, shared by the elliptic low-pass and the C_hf high-pass.
+constexpr float cutoffHz(int k) { return k == 5 ? 4410.0f : (k == 6 ? 3675.0f : 3150.0f); }
 
 inline float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
 
@@ -178,7 +187,7 @@ struct Frame {
 
 inline const Sos& ellipFor(int k) { return k == 5 ? kEllipK5 : (k == 6 ? kEllipK6 : kEllipK7); }
 
-// One spring. K stretches the allpasses (F_C = fs / 2K); L is the delay lap.
+// One spring. K stretches the allpasses; F_C = cutoffHz(K); L is the delay lap.
 template <int K, int L>
 class Tank {
  public:
@@ -186,7 +195,7 @@ class Tank {
 
   void init(uint32_t seed) {
     seed_ = seed | 1u;
-    hfHp_.setHighPass(static_cast<float>(kSampleRate) / (2.0f * K), 0.70710678f);
+    hfHp_.setHighPass(cutoffHz(K), 0.70710678f);
     const Sos& e = ellipFor(K);
     for (int s = 0; s < 3; ++s) lp_[s].set(e[s]);
     clear();
@@ -379,8 +388,9 @@ class Spring {
         f.hfMix = dbToLin(t.hfMixDbLo + dwell_ * (t.hfMixDbHi - t.hfMixDbLo));
       }
 
-      hp_ += (in[i] - hp_) * hpCoef;
-      const float x = softClip((in[i] - hp_) * drive) * driveComp;
+      const float xin = in[i] * t.inputGain;
+      hp_ += (xin - hp_) * hpCoef;
+      const float x = softClip((xin - hp_) * drive) * driveComp;
       float sum = 0.0f;
       if (use[0]) sum += a_.process(x, f);
       if (use[1]) sum += b_.process(x, f);
@@ -402,9 +412,9 @@ class Spring {
     return sqrtf((kRef / (2.0f - kRef)) * ((2.0f - c) / c));
   }
 
-  spring_detail::Tank<5, 1827> a_;
-  spring_detail::Tank<6, 2001> b_;
-  spring_detail::Tank<7, 2174> c_;
+  spring_detail::Tank<5, 1905> a_;
+  spring_detail::Tank<6, 2094> b_;
+  spring_detail::Tank<7, 2265> c_;
   spring_detail::Biquad boing_;
   std::array<bool, 3> live_{};
   float hp_ = 0.0f;

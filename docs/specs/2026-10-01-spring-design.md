@@ -32,53 +32,57 @@ plus the pre-echo ripple ahead of each chirp, plus driver saturation at high
 DWELL. DrumSynthV3 keeps all three modest (C_hf at −22…−14 dB, ripple 0.1, drive
 32×). Levers, all tuning items here:
 
-1. `hfMixDbLo / hfMixDbHi` — C_hf level at DWELL 0 / 1. Default −18 / −8 (was
-   −22 / −14).
-2. `rippleGain` — pre-echo tap gain r. Default 0.2 (paper 0.1).
+1. `hfMixDbLo / hfMixDbHi` — C_hf level at DWELL 0 / 1. Default −22 / −14
+   (DSV3). Push toward −18 / −8 for more splash.
+2. `rippleGain` — pre-echo tap gain r. Default 0.1 (DSV3, paper). 0.2 is
+   splashier.
 3. `splashDiffuse` — two short Schroeder allpasses (3.1 ms and 7.3 ms, both
    coefficient `splashDiffuse`) on the C_hf path before its delay, so the bright
-   attack smears into a splash instead of a slap. 0 = off. Default 0.5.
+   attack smears into a splash instead of a slap. 0 = off. Default 0 (DSV3 has
+   none); 0.5 is a good starting push.
 4. `dwellDrive / dwellComp` — DWELL law `drive = dwellDrive^x`, out × `drive^-comp`.
    Default 32 / 0.8.
 5. `hfSections` — C_hf allpass cascade length (paper 200, DSV3 0). Default 0;
    range 0–200, adds top-octave dispersion to the splash at ~1 MAC/section.
-6. `springs` — 2 or 3. Third spring K = 7 (F_C 3.43 kHz, lap 48 ms). Default 2.
+6. `springs` — 2 or 3. Third spring K = 7 (F_C 3.15 kHz, lap 49.9 ms). Default 2.
 7. `hpHz` — front-end high-pass, default 300. `boingDb` — the paper's 95 Hz /
    BW 130 Hz resonator on the output, default 0 (off) because the high-pass sits
    above it; lower `hpHz` first if trying it.
 8. `modDepth / modRateHz` — wander, default 8 samples / 3 Hz.
-9. `wetDb` — wet level, default −6 dB (no mix knob on the panel). Dry passes at
-   unity.
+9. `wetDb` — wet level, default −3.1 dB (0.70, DSV3; no mix knob on the panel).
+   Dry passes at unity.
+10. `inputGain` — default 0.5, applied ahead of the high-pass and clip (DSV3
+    springSendAmp). `tankTrim` — default 1.5, applied after the clip.
 
 ## Geometry at 48 kHz
 
 Lap the ear hears = L + cascade low-band group delay `M·K·(1−a)/(1+a) = M·K/7`.
 
-| Spring | K | F_C | lap | L = lap − M·K/7 |
+| Spring | K | F_C | heard lap | L = lap − M·K/7 |
 |---|---|---|---|---|
-| A | 5 | 4800 Hz | 40 ms = 1920 | 1827 |
-| B | 6 | 4000 Hz | 44 ms = 2112 | 2001 |
-| C | 7 | 3429 Hz | 48 ms = 2304 | 2174 |
+| A | 5 | 4410 Hz | 41.6 ms | 1905 |
+| B | 6 | 3675 Hz | 45.9 ms | 2094 |
+| C | 7 | 3150 Hz | 49.9 ms | 2265 |
 
 Guard 32 samples on each delay for the wander. Pre-echo tap at L/5, ripple +48
 samples (1 ms). C_hf delay L/2.3.
 
-Elliptic band-limit tables (SOS rows `{b0, b1, b2, a1, a2}`, a0 = 1; the
-normalised cutoff is fs-independent so K = 5, 6 match DSV3's):
+Elliptic band-limit tables (SOS rows `{b0, b1, b2, a1, a2}`, a0 = 1). The C_hf
+Butterworth high-pass uses the same cutoff per spring.
 
 ```
-// K = 5: scipy.signal.ellip(6, 0.5, 60, 4800, fs=48000, output='sos')
-{3.170187928e-03f, 2.448448052e-03f, 3.170187928e-03f, -1.574285048e+00f, 6.496029638e-01f},
-{1.000000000e+00f, -9.573141810e-01f, 1.000000000e+00f, -1.551997326e+00f, 7.965495053e-01f},
-{1.000000000e+00f, -1.285106260e+00f, 1.000000000e+00f, -1.562862547e+00f, 9.396148292e-01f},
-// K = 6: scipy.signal.ellip(6, 0.5, 60, 4000, fs=48000, output='sos')
-{2.383943886e-03f, 1.007344239e-03f, 2.383943886e-03f, -1.646843207e+00f, 7.000183821e-01f},
-{1.000000000e+00f, -1.226384803e+00f, 1.000000000e+00f, -1.652930569e+00f, 8.257039330e-01f},
-{1.000000000e+00f, -1.484337949e+00f, 1.000000000e+00f, -1.682745577e+00f, 9.483735958e-01f},
-// K = 7: scipy.signal.ellip(6, 0.5, 60, 3429, fs=48000, output='sos')
-{1.954320361e-03f, 2.113410835e-04f, 1.954320361e-03f, -1.698075320e+00f, 7.376835735e-01f},
-{1.000000000e+00f, -1.407211516e+00f, 1.000000000e+00f, -1.719214914e+00f, 8.477613502e-01f},
-{1.000000000e+00f, -1.612118776e+00f, 1.000000000e+00f, -1.757949845e+00f, 9.550323535e-01f},
+// K = 5: 4410 Hz. scipy.signal.ellip(6, 0.5, 60, 4410, fs=48000, output='sos')
+{2.757369397e-03f, 1.692833440e-03f, 2.757369397e-03f, -1.609791940e+00f, 6.738565362e-01f},
+{1.000000000e+00f, -1.090135675e+00f, 1.000000000e+00f, -1.602356743e+00f, 8.105071259e-01f},
+{1.000000000e+00f, -1.384857719e+00f, 1.000000000e+00f, -1.623358987e+00f, 9.437983877e-01f},
+// K = 6: 3675 Hz. scipy.signal.ellip(6, 0.5, 60, 3675, fs=48000, output='sos')
+{2.127500724e-03f, 5.337154957e-04f, 2.127500724e-03f, -1.676034779e+00f, 7.212632737e-01f},
+{1.000000000e+00f, -1.330788759e+00f, 1.000000000e+00f, -1.691241982e+00f, 8.381251860e-01f},
+{1.000000000e+00f, -1.558691268e+00f, 1.000000000e+00f, -1.726625177e+00f, 9.521221121e-01f},
+// K = 7: 3150 Hz. scipy.signal.ellip(6, 0.5, 60, 3150, fs=48000, output='sos')
+{1.779006601e-03f, -1.184125190e-04f, 1.779006601e-03f, -1.722903271e+00f, 7.565815228e-01f},
+{1.000000000e+00f, -1.490176721e+00f, 1.000000000e+00f, -1.749691841e+00f, 8.588777226e-01f},
+{1.000000000e+00f, -1.669190079e+00f, 1.000000000e+00f, -1.791283871e+00f, 9.583891602e-01f},
 ```
 
 ## Engine (`engine/spring.h`)
@@ -87,18 +91,19 @@ normalised cutoff is fs-independent so K = 5, 6 match DSV3's):
 namespace cv {
 
 struct SpringTuning {
+  float inputGain = 0.5f;                       // ahead of the high-pass and clip
   float hpHz = 300.0f;
   float tensionLo = 0.60f, tensionHi = 0.97f;   // |g| at TENSION 0 / 1
   float dwellDrive = 32.0f, dwellComp = 0.80f;
-  float hfMixDbLo = -18.0f, hfMixDbHi = -8.0f;  // C_hf mix at DWELL 0 / 1
-  float rippleGain = 0.20f;                     // pre-echo taps, paper 0.1
-  float splashDiffuse = 0.50f;                  // 0 off .. 0.9
+  float hfMixDbLo = -22.0f, hfMixDbHi = -14.0f; // C_hf mix at DWELL 0 / 1
+  float rippleGain = 0.10f;                     // pre-echo taps
+  float splashDiffuse = 0.0f;                   // 0 off .. 0.9
   int   hfSections = 0;                         // 0..200
   int   springs = 2;                            // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float wetDb = -6.0f;
-  float tankTrim = 0.375f;                      // DSV3: inTrim 0.25 x tankTrim 1.5
+  float wetDb = -3.1f;
+  float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 
 struct SpringParams {
@@ -183,6 +188,22 @@ use `setModEnabled(false)`, `setSolo(0)`, tension 0.5, dwell 0.
    3 s silence; no NaN/inf, |out| < 4 throughout, RMS of the last 0.5 s below
    RMS of the first 0.5 s of silence.
 8. No allocation inside `process()`.
+
+## Parity with DrumSynthV3
+
+A/B on 2026-10-01 (white noise, −20 dBFS rms, same input amplitude) found the
+algorithm a faithful port. The difference was the gain structure and the spec's
+splash tuning.
+
+1. DSV3 gain chain: ×0.5 → high-pass → clip → ×1.5 → tank → ×0.5 sum → ×0.70 wet.
+2. The port had ×1.0 → clip → ×0.375 → tank → ×0.5 → ×0.50, which put the tank
+   input 6 dB low (−8.9 dB over the whole chain) and the clip at twice DSV3's level.
+3. The port also ran the high band 4 to 6 dB hotter, doubled the ripple gain
+   and added diffusers on the high band, so it sounded 5 to 6 dB brighter.
+4. Laps were 4 percent short and cutoffs 8.8 percent high (4800 / 4000 vs
+   4410 / 3675).
+5. With the defaults above the port matches DSV3 wet level to 0.1 dB at dwell
+   0, 0.5 and 1, and the high-to-low band ratio within 1.6 dB.
 
 ## Done when
 

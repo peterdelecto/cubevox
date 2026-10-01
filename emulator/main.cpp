@@ -252,7 +252,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}\n"
-      "SpringTuning{%.0ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff, %.1ff, %.2ff, %.2ff, %d, %d, %.1ff, "
+      "SpringTuning{%.2ff, %.0ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff, %.1ff, %.2ff, %.2ff, %d, %d, %.1ff, "
       "%.2ff, %.1ff, %.1ff, %.3ff}\n"
       "ChasmTuning{%.2ff, %.2ff, %.0ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.2ff, "
       "%.1ff, %.1ff}",
@@ -263,7 +263,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneDb, d.bassPeakHz,
       d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false",
-      sp.hpHz, sp.tensionLo, sp.tensionHi, sp.dwellDrive, sp.dwellComp, sp.hfMixDbLo,
+      sp.inputGain, sp.hpHz, sp.tensionLo, sp.tensionHi, sp.dwellDrive, sp.dwellComp, sp.hfMixDbLo,
       sp.hfMixDbHi, sp.rippleGain, sp.splashDiffuse, sp.hfSections, sp.springs, sp.modDepth,
       sp.modRateHz, sp.boingDb, sp.wetDb, sp.tankTrim, c.timeLo, c.timeHi, c.trebleLossHz,
       c.loopTrebleCut, c.inputTrebleCut, c.bassCutHz, c.bassCutHzTop, c.wobbleDepthMax,
@@ -279,7 +279,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneDb, bassPeakHz, bassPeakDb, "
       "bassPeakQ, trimDb, fadeDrive, oversample\n"
-      "// SpringTuning: hpHz, tensionLo, tensionHi, dwellDrive, dwellComp, hfMixDbLo, "
+      "// SpringTuning: inputGain, hpHz, tensionLo, tensionHi, dwellDrive, dwellComp, hfMixDbLo, "
       "hfMixDbHi, rippleGain, splashDiffuse, hfSections, springs, modDepth, modRateHz, "
       "boingDb, wetDb, tankTrim\n"
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
@@ -466,6 +466,7 @@ void drawReverbTuning(cv::SpringTuning& t, cv::ChasmTuning& c) {
     ImGui::TreePop();
   }
   if (tuningNode("Levels")) {
+    ImGui::SliderFloat("Input gain", &t.inputGain, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Input high-pass", &t.hpHz, 20.0f, 1000.0f, "%.0f Hz", log);
     ImGui::SliderFloat("Drive at dwell 1", &t.dwellDrive, 1.0f, 100.0f, "%.1f x", log);
     ImGui::SliderFloat("Drive compensation", &t.dwellComp, 0.0f, 1.0f, "%.2f");

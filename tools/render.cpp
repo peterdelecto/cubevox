@@ -57,7 +57,7 @@ int usage() {
                "distTrebleCutDb\n"
                "     distToneDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
                "distFadeDrive distOversample (0|1)\n"
-               "     sprHpHz sprTensionLo sprTensionHi sprDwellDrive sprDwellComp sprHfMixDbLo\n"
+               "     sprInputGain sprHpHz sprTensionLo sprTensionHi sprDwellDrive sprDwellComp sprHfMixDbLo\n"
                "     sprHfMixDbHi sprRippleGain sprSplashDiffuse sprHfSections sprSprings (2|3)\n"
                "     sprModDepth sprModRateHz sprBoingDb sprWetDb sprTankTrim\n"
                "     chmTimeLo chmTimeHi chmTrebleLossHz chmLoopTrebleCut chmInputTrebleCut "
@@ -107,7 +107,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"distBassPeakQ", &dt.bassPeakQ},       {"distTrimDb", &dt.trimDb},
       {"distFadeDrive", &dt.fadeDrive},
       {"distOversample", &oversample},
-      {"sprHpHz", &sp.hpHz},                  {"sprTensionLo", &sp.tensionLo},
+      {"sprInputGain", &sp.inputGain}, {"sprHpHz", &sp.hpHz},                  {"sprTensionLo", &sp.tensionLo},
       {"sprTensionHi", &sp.tensionHi},        {"sprDwellDrive", &sp.dwellDrive},
       {"sprDwellComp", &sp.dwellComp},        {"sprHfMixDbLo", &sp.hfMixDbLo},
       {"sprHfMixDbHi", &sp.hfMixDbHi},        {"sprRippleGain", &sp.rippleGain},
