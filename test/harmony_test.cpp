@@ -211,8 +211,14 @@ bool testBypass() {
   gFx.reset();
   const float b = maxDiffAfterSettle(in, run(gFx, in, noVoices));
 
-  return report("bypass", a < 1e-6f && b < 1e-6f,
-                "mix 0 max|out-in|=%.3g, no voices max|out-in|=%.3g (<1e-6)", a, b);
+  cv::HarmonyParams off = highVoice();
+  off.mix = 0.5f;
+  off.on = false;
+  gFx.reset();
+  const float c = maxDiffAfterSettle(in, run(gFx, in, off));
+
+  return report("bypass", a < 1e-6f && b < 1e-6f && c < 1e-6f,
+                "mix 0 max|out-in|=%.3g, no voices %.3g, on=false %.3g (<1e-6)", a, b, c);
 }
 
 bool testNoAlloc() {

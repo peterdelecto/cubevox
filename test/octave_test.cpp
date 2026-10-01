@@ -142,7 +142,13 @@ bool testBypass() {
     const std::vector<float> out = run(gFx, in, p);
     for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
   }
-  return report("bypass", worst < 1e-6f, "mix 0/0.5/1 max|out-in|=%.3g (<1e-6)", worst);
+  cv::PitchFxParams off = octaveOnly(12);
+  off.octave.mix = 0.5f;
+  off.octave.on = false;
+  gFx.reset();
+  const std::vector<float> offOut = run(gFx, in, off);
+  for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(offOut[i] - in[i]));
+  return report("bypass", worst < 1e-6f, "mix 0/0.5/1 and on=false max|out-in|=%.3g (<1e-6)", worst);
 }
 
 // Octave and Harmony on together; the tracker must still hear only the dry tone.

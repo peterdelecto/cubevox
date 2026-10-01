@@ -1,4 +1,4 @@
-// cubevox-render: loop in, harmony + octave + unison processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, harmony + octave + unison + slapback processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -7,6 +7,7 @@
 
 #include "../third_party/miniaudio.h"
 #include "engine/pitch_fx.h"
+#include "engine/slapback.h"
 #include "engine/unison.h"
 
 namespace {
@@ -19,8 +20,10 @@ struct TuningField {
 struct RenderParams {
   bool pitchOn = false;
   bool unisonOn = false;
+  bool slapOn = false;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;
+  cv::SlapbackParams slapback;
 };
 
 int usage() {
@@ -29,11 +32,13 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
-               "       [--octave <-12..12>] [--omix <0..1>]\n"
+               "       [--octave <-12..12>] [--omix <0..1>] [--slap <0..1>]\n"
                "  pitch front end runs with --harmony or --octave\n"
-               "  unison runs only with --on 1 or --depth; at least one stage must run\n"
+               "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
+               "  at least one stage must run; order is pitch, unison, slapback\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
-               "wetMaxDb detuneCents0 detuneCents1 windowMs\n");
+               "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
+               "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n");
   return 2;
 }
 
@@ -43,7 +48,9 @@ bool parseFloat(const char* s, float* out) {
   return end != s && *end == '\0';
 }
 
-bool applyTuning(cv::UnisonTuning& t, const char* kv) {
+bool applyTuning(RenderParams& rp, const char* kv) {
+  cv::UnisonTuning& t = rp.unison.tuning;
+  cv::SlapbackTuning& st = rp.slapback.tuning;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -51,6 +58,8 @@ bool applyTuning(cv::UnisonTuning& t, const char* kv) {
       {"wetMaxDb", &t.wetMaxDb},
       {"detuneCents0", &t.detuneCents[0]}, {"detuneCents1", &t.detuneCents[1]},
       {"windowMs", &t.windowMs},
+      {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
+      {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
@@ -93,6 +102,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveOctave = false;
   bool haveDepth = false;
   bool haveOn = false;
+  bool haveSlap = false;
   int voices = 0;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
@@ -106,6 +116,11 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
       p.on = v[0] == '1';
       haveOn = true;
+    } else if (std::strcmp(a, "--slap") == 0 && i + 1 < argc) {
+      cv::SlapbackParams& sp = rp.slapback;
+      if (!parseFloat(argv[++i], &sp.intensity) || sp.intensity < 0.0f || sp.intensity > 1.0f)
+        return false;
+      haveSlap = true;
     } else if (std::strcmp(a, "--harmony") == 0) {
       haveHarmony = true;
     } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
@@ -129,7 +144,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
       while (i + 1 < argc && argv[i + 1][0] != '-' && std::strchr(argv[i + 1], '=')) {
-        if (!applyTuning(p.tuning, argv[++i])) return false;
+        if (!applyTuning(rp, argv[++i])) return false;
         ++taken;
       }
       if (taken == 0) return false;
@@ -145,7 +160,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
-  return rp.pitchOn || rp.unisonOn;
+  rp.slapOn = haveSlap;
+  return rp.pitchOn || rp.unisonOn || rp.slapOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -167,30 +183,40 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
 
   static cv::PitchFx pitchFx;
   static cv::Unison unison;
+  static cv::Slapback slapback;
   pitchFx.reset();
   unison.reset();
+  slapback.reset();
 
   float inBuf[cv::kBlock];
-  float midBuf[cv::kBlock];
-  float outBuf[cv::kBlock];
+  float bufA[cv::kBlock];
+  float bufB[cv::kBlock];
+  float* const scratch[2] = {bufA, bufB};
   int rc = 0;
   for (;;) {
     ma_uint64 got = 0;
     const ma_result r = ma_decoder_read_pcm_frames(&dec, inBuf, cv::kBlock, &got);
     if (got > 0) {
       const int n = static_cast<int>(got);
+      // Each stage writes the scratch buffer the previous stage did not.
       const float* src = inBuf;
+      int next = 0;
       if (rp.pitchOn) {
-        pitchFx.process(src, midBuf, n, rp.pitchFx);
-        src = midBuf;
+        pitchFx.process(src, scratch[next], n, rp.pitchFx);
+        src = scratch[next];
+        next ^= 1;
       }
       if (rp.unisonOn) {
-        unison.process(src, outBuf, n, rp.unison);
-      } else {
-        std::memcpy(outBuf, src, sizeof(float) * static_cast<size_t>(n));
+        unison.process(src, scratch[next], n, rp.unison);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.slapOn) {
+        slapback.process(src, scratch[next], n, rp.slapback);
+        src = scratch[next];
       }
       ma_uint64 wrote = 0;
-      if (ma_encoder_write_pcm_frames(&enc, outBuf, got, &wrote) != MA_SUCCESS ||
+      if (ma_encoder_write_pcm_frames(&enc, src, got, &wrote) != MA_SUCCESS ||
           wrote != got) {
         std::fprintf(stderr, "cubevox-render: write failed on '%s'\n", outPath);
         rc = 1;

@@ -37,6 +37,7 @@ struct HarmonyTuning {
 };
 
 struct HarmonyParams {
+  bool on = true;                // panel toggle; off fades the stage out
   int key = 0;                   // encoder index 0..11, see kKeyRoot / kKeyName
   float mix = 0.5f;              // 0 dry .. 1 harmony only
   std::array<HarmonySlot, 2> slots{};
@@ -72,8 +73,8 @@ class HarmonyVoices {
     bool any = false;
     for (int v = 0; v < 2; ++v) {
       semisT_[v] = targetSemis(p.slots[v].voice, pr.hz, p.key, t);
-      gainT_[v] = targetGain(p.slots[v].level, pr.voiced, t);
-      any = any || p.slots[v].level > 0;
+      gainT_[v] = p.on ? targetGain(p.slots[v].level, pr.voiced, t) : 0.0f;
+      any = any || (p.on && p.slots[v].level > 0);
       // Smoothers start on target after reset; silent voices jump to their
       // new interval instead of gliding in from a stale one.
       if (fresh_ || gain_[v] == 0.0f) semis_[v] = semisT_[v];

@@ -19,6 +19,7 @@ struct OctaveTuning {
 };
 
 struct OctaveParams {
+  bool on = true;                // panel toggle; off fades the stage out
   int semitones = 0;             // panel knob, -12..12, 0 = off
   float mix = 0.5f;              // panel knob
   OctaveTuning tuning;
@@ -45,7 +46,7 @@ class OctaveVoice {
     const int s = p.semitones < -kMaxSemis ? -kMaxSemis
                                            : (p.semitones > kMaxSemis ? kMaxSemis : p.semitones);
     const OctaveTuning& t = p.tuning;
-    const bool on = s != 0;
+    const bool on = p.on && s != 0;
     semisT_ = static_cast<float>(s);
     gainT_ = (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, t.levelDb / 20.0f);
     // Smoothers start on target after reset; a silent voice jumps to its new

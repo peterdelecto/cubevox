@@ -25,12 +25,13 @@
 #include "../emulator/open_panel.h"
 #include "engine/common.h"
 #include "engine/pitch_fx.h"
+#include "engine/slapback.h"
 #include "engine/unison.h"
 
 namespace {
 
 constexpr int kWindowW = 900;
-constexpr int kWindowH = 800;
+constexpr int kWindowH = 860;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
@@ -39,11 +40,13 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 // The emulator opens with the knob where the owner left it; on the box the
 // pot decides (owner 2026-10-01: DEPTH 80 %).
 constexpr float kStartDepth = 0.8f;
+constexpr float kStartIntensity = 0.5f;
 
 struct ProtoParams {
   bool playing = false;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison{false, kStartDepth, {}};
+  cv::SlapbackParams slapback{true, kStartIntensity, {}};
 };
 
 struct ProtoState {
@@ -81,6 +84,7 @@ std::string gLoopPath;  // UI-thread-only
 // Audio-thread-only.
 cv::PitchFx gPitchFx;
 cv::Unison gUnison;
+cv::Slapback gSlapback;
 LoopBuffer* gLastLoop = nullptr;
 size_t gReadPos = 0;
 
@@ -162,6 +166,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gReadPos = 0;
     gPitchFx.reset();
     gUnison.reset();
+    gSlapback.reset();
   }
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
     std::memset(out, 0, sizeof(float) * 2 * frameCount);
@@ -179,10 +184,11 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     readLoop(*loop, in.data(), n);
     gPitchFx.process(in.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
+    gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
     for (int i = 0; i < n; ++i) {
-      out[2 * (done + i)] = mono[i];
-      out[2 * (done + i) + 1] = mono[i];
-      peak = std::max(peak, std::fabs(mono[i]));
+      out[2 * (done + i)] = tmp[i];
+      out[2 * (done + i) + 1] = tmp[i];
+      peak = std::max(peak, std::fabs(tmp[i]));
     }
     done += n;
   }
@@ -207,7 +213,7 @@ char gTuningText[1024];  // last Print tuning output, shown on the face
 // Finder launches have no stdout, so the text also goes to the clipboard
 // and into a read-only field under the button.
 void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
-                 const cv::UnisonTuning& t) {
+                 const cv::UnisonTuning& t, const cv::SlapbackTuning& s) {
   char line[512];
   int len = std::snprintf(
       line, sizeof(line),
@@ -224,15 +230,18 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       gTuningText, sizeof(gTuningText),
       "%s\n"
       "OctaveTuning{%.1ff, %.1ff, %s}\n"
-      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}",
+      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
+      "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}",
       line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
-      t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs);
+      t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
+      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb);
   std::printf(
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher\n"
       "// OctaveTuning: levelDb, glideMs, muteUnvoiced\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
-      "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n%s\n", gTuningText);
+      "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
+      "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n%s\n", gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
 }
@@ -310,6 +319,16 @@ void drawUnisonTuning(cv::UnisonTuning& t) {
   ImGui::TreePop();
 }
 
+void drawSlapbackTuning(cv::SlapbackTuning& t) {
+  if (!ImGui::TreeNode("Slapback")) return;
+  ImGui::SliderFloat("Time", &t.timeMs, 30.0f, 120.0f, "%.0f ms");
+  ImGui::SliderFloat("Lowpass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
+                     ImGuiSliderFlags_Logarithmic);
+  ImGui::SliderFloat("Feedback", &t.feedback, 0.0f, 0.5f, "%.2f");
+  ImGui::SliderFloat("Wet level at full", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
+  ImGui::TreePop();
+}
+
 void drawTuning(ProtoParams& params, const ProtoState& state) {
   if (!ImGui::CollapsingHeader("Tuning")) return;
   cv::HarmonyTuning& ht = params.pitchFx.harmony.tuning;
@@ -317,13 +336,16 @@ void drawTuning(ProtoParams& params, const ProtoState& state) {
   drawHarmonyTuning(ht, state);
   drawOctaveTuning(ot);
   drawUnisonTuning(params.unison.tuning);
+  drawSlapbackTuning(params.slapback.tuning);
   if (ImGui::Button("Reset to defaults")) {
     ht = cv::HarmonyTuning{};
     ot = cv::OctaveTuning{};
     params.unison.tuning = cv::UnisonTuning{};
+    params.slapback.tuning = cv::SlapbackTuning{};
   }
   ImGui::SameLine();
-  if (ImGui::Button("Print tuning")) printTuning(ht, ot, params.unison.tuning);
+  if (ImGui::Button("Print tuning"))
+    printTuning(ht, ot, params.unison.tuning, params.slapback.tuning);
   if (gTuningText[0] != '\0') {
     ImGui::SameLine();
     ImGui::TextUnformatted("copied to clipboard");
@@ -417,7 +439,7 @@ void drawPanelMirror(ProtoParams& params) {
   cv::HarmonyParams& h = params.pitchFx.harmony;
   cv::OctaveParams& o = params.pitchFx.octave;
   cv::UnisonParams& u = params.unison;
-  ImGui::TextUnformatted("HARMONY");
+  ImGui::Checkbox("HARMONY", &h.on);
   ImGui::Combo("KEY", &h.key, cv::kKeyName, 12);
   float mixPercent = h.mix * 100.0f;
   if (ImGui::SliderFloat("MIX", &mixPercent, 0.0f, 100.0f, "%.0f %%")) {
@@ -425,7 +447,7 @@ void drawPanelMirror(ProtoParams& params) {
   }
   drawHarmonyMenu(h);
   ImGui::Separator();
-  ImGui::TextUnformatted("OCTAVE");
+  ImGui::Checkbox("OCTAVE", &o.on);
   ImGui::SliderInt("SEMITONES", &o.semitones, -12, 12, "%+d st");
   float octMixPercent = o.mix * 100.0f;
   if (ImGui::SliderFloat("MIX##octave", &octMixPercent, 0.0f, 100.0f, "%.0f %%")) {
@@ -436,6 +458,12 @@ void drawPanelMirror(ProtoParams& params) {
   float percent = u.depth * 100.0f;
   if (ImGui::SliderFloat("DEPTH", &percent, 0.0f, 100.0f, "%.0f %%")) {
     u.depth = percent / 100.0f;
+  }
+  ImGui::Separator();
+  ImGui::Checkbox("SLAPBACK", &params.slapback.on);
+  float slapPercent = params.slapback.intensity * 100.0f;
+  if (ImGui::SliderFloat("INTENSITY", &slapPercent, 0.0f, 100.0f, "%.0f %%")) {
+    params.slapback.intensity = slapPercent / 100.0f;
   }
 }
 

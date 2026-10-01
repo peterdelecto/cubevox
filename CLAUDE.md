@@ -8,9 +8,10 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - `engine/*.h` is firmware code. Float only, `std::array` state, no heap / no I/O in
   `process()`, builds with `-Wall -Wextra -Werror`. The H7 includes these files unchanged.
 - The emulator mirrors the panel exactly. Dev-only controls live under a collapsed
-  `Tuning` header. Never invent panel controls.
+  `Tuning` header. Never invent panel controls. Exception (owner 2026-10-01): every
+  effect block carries an on/off checkbox in the prototype so stages can be A/B'd.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
-- Specs live in `docs/specs/`. Current: `2026-10-01-octave-pitchfx-design.md` (harmony + unison specs still apply).
+- Specs live in `docs/specs/`. Current: `2026-10-01-slapback-design.md` (earlier stage specs still apply).
 
 ## Build / run
 ```
