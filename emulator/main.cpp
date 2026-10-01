@@ -24,6 +24,7 @@
 
 #include "../emulator/open_panel.h"
 #include "engine/common.h"
+#include "engine/distortion.h"
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -31,7 +32,7 @@
 namespace {
 
 constexpr int kWindowW = 900;
-constexpr int kWindowH = 860;
+constexpr int kWindowH = 910;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
@@ -41,12 +42,14 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 // pot decides (owner 2026-10-01: DEPTH 80 %).
 constexpr float kStartDepth = 0.8f;
 constexpr float kStartIntensity = 0.5f;
+constexpr float kStartDrive = 0.3f;
 
 struct ProtoParams {
   bool playing = false;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartIntensity, {}};
+  cv::DistortionParams distortion{true, kStartDrive, {}};
 };
 
 struct ProtoState {
@@ -85,6 +88,7 @@ std::string gLoopPath;  // UI-thread-only
 cv::PitchFx gPitchFx;
 cv::Unison gUnison;
 cv::Slapback gSlapback;
+cv::Distortion gDistortion;
 LoopBuffer* gLastLoop = nullptr;
 size_t gReadPos = 0;
 
@@ -167,6 +171,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gPitchFx.reset();
     gUnison.reset();
     gSlapback.reset();
+    gDistortion.reset();
   }
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
     std::memset(out, 0, sizeof(float) * 2 * frameCount);
@@ -185,10 +190,11 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gPitchFx.process(in.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
+    gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
     for (int i = 0; i < n; ++i) {
-      out[2 * (done + i)] = tmp[i];
-      out[2 * (done + i) + 1] = tmp[i];
-      peak = std::max(peak, std::fabs(tmp[i]));
+      out[2 * (done + i)] = mono[i];
+      out[2 * (done + i) + 1] = mono[i];
+      peak = std::max(peak, std::fabs(mono[i]));
     }
     done += n;
   }
@@ -208,12 +214,13 @@ const char* baseName(const std::string& path) {
   return path.c_str() + (slash == std::string::npos ? 0 : slash + 1);
 }
 
-char gTuningText[1024];  // last Print tuning output, shown on the face
+char gTuningText[2048];  // last Print tuning output, shown on the face
 
 // Finder launches have no stdout, so the text also goes to the clipboard
 // and into a read-only field under the button.
 void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
-                 const cv::UnisonTuning& t, const cv::SlapbackTuning& s) {
+                 const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
+                 const cv::DistortionTuning& d) {
   char line[512];
   int len = std::snprintf(
       line, sizeof(line),
@@ -231,17 +238,27 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "%s\n"
       "OctaveTuning{%.1ff, %.1ff, %s}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
-      "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}",
+      "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}\n"
+      "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
+      "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}",
       line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
-      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb);
+      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
+      d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
+      d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneDb, d.bassPeakHz,
+      d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false");
   std::printf(
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher\n"
       "// OctaveTuning: levelDb, glideMs, muteUnvoiced\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
-      "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n%s\n", gTuningText);
+      "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n"
+      "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, stackBassHz, "
+      "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
+      "railAsym, railSoft, trebleCutHz, trebleCutDb, toneDb, bassPeakHz, bassPeakDb, "
+      "bassPeakQ, trimDb, fadeDrive, oversample\n%s\n",
+      gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
 }
@@ -329,6 +346,36 @@ void drawSlapbackTuning(cv::SlapbackTuning& t) {
   ImGui::TreePop();
 }
 
+void drawDistortionTuning(cv::DistortionTuning& t) {
+  if (!ImGui::TreeNode("Distortion")) return;
+  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
+  ImGui::SliderFloat("Input high-pass", &t.inputHpHz, 10.0f, 200.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stage 1 bass cut corner", &t.s1BassHz, 100.0f, 2000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stage 1 bass cut depth", &t.s1BassDb, -24.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Stage 1 top roll-off", &t.s1LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stage 1 gain at full", &t.gain1Max, 1.0f, 300.0f, "%.1f x", log);
+  ImGui::SliderFloat("Stack bass corner", &t.stackBassHz, 100.0f, 1000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stack bass boost", &t.stackBassDb, 0.0f, 20.0f, "%.1f dB");
+  ImGui::SliderFloat("Stack treble corner", &t.stackTrebleHz, 500.0f, 8000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stack treble cut", &t.stackTrebleDb, -20.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Stack insertion loss", &t.stackLossDb, -40.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Stage 2 high-pass", &t.s2HpHz, 20.0f, 500.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stage 2 low-pass", &t.s2LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Stage 2 gain at full", &t.gain2Max, 1.0f, 300.0f, "%.1f x", log);
+  ImGui::SliderFloat("Rail asymmetry", &t.railAsym, 0.0f, 0.5f, "%.2f");
+  ImGui::SliderFloat("Rail soft edge", &t.railSoft, 0.01f, 0.5f, "%.2f");
+  ImGui::SliderFloat("Treble cut corner", &t.trebleCutHz, 300.0f, 5000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Treble cut", &t.trebleCutDb, -12.0f, 0.0f, "%.1f dB");
+  ImGui::SliderFloat("Tone", &t.toneDb, -9.0f, 9.0f, "%.1f dB");
+  ImGui::SliderFloat("Bass peak centre", &t.bassPeakHz, 60.0f, 400.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Bass peak gain", &t.bassPeakDb, 0.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Bass peak Q", &t.bassPeakQ, 0.3f, 3.0f, "%.2f");
+  ImGui::SliderFloat("Output trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Fade-in span", &t.fadeDrive, 0.01f, 0.3f, "%.2f");
+  ImGui::Checkbox("2x oversampling", &t.oversample);
+  ImGui::TreePop();
+}
+
 void drawTuning(ProtoParams& params, const ProtoState& state) {
   if (!ImGui::CollapsingHeader("Tuning")) return;
   cv::HarmonyTuning& ht = params.pitchFx.harmony.tuning;
@@ -337,15 +384,18 @@ void drawTuning(ProtoParams& params, const ProtoState& state) {
   drawOctaveTuning(ot);
   drawUnisonTuning(params.unison.tuning);
   drawSlapbackTuning(params.slapback.tuning);
+  drawDistortionTuning(params.distortion.tuning);
   if (ImGui::Button("Reset to defaults")) {
     ht = cv::HarmonyTuning{};
     ot = cv::OctaveTuning{};
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
+    params.distortion.tuning = cv::DistortionTuning{};
   }
   ImGui::SameLine();
   if (ImGui::Button("Print tuning"))
-    printTuning(ht, ot, params.unison.tuning, params.slapback.tuning);
+    printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
+                params.distortion.tuning);
   if (gTuningText[0] != '\0') {
     ImGui::SameLine();
     ImGui::TextUnformatted("copied to clipboard");
@@ -464,6 +514,12 @@ void drawPanelMirror(ProtoParams& params) {
   float slapPercent = params.slapback.intensity * 100.0f;
   if (ImGui::SliderFloat("INTENSITY", &slapPercent, 0.0f, 100.0f, "%.0f %%")) {
     params.slapback.intensity = slapPercent / 100.0f;
+  }
+  ImGui::Separator();
+  ImGui::Checkbox("DISTORTION", &params.distortion.on);
+  float drivePercent = params.distortion.drive * 100.0f;
+  if (ImGui::SliderFloat("DRIVE", &drivePercent, 0.0f, 100.0f, "%.0f %%")) {
+    params.distortion.drive = drivePercent / 100.0f;
   }
 }
 

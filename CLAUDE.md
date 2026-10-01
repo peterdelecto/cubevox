@@ -11,7 +11,7 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
   `Tuning` header. Never invent panel controls. Exception (owner 2026-10-01): every
   effect block carries an on/off checkbox in the prototype so stages can be A/B'd.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
-- Specs live in `docs/specs/`. Current: `2026-10-01-slapback-design.md` (earlier stage specs still apply).
+- Specs live in `docs/specs/`. Current: `2026-10-01-distortion-design.md` (earlier stage specs still apply).
 
 ## Build / run
 ```

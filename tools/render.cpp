@@ -1,4 +1,4 @@
-// cubevox-render: loop in, harmony + octave + unison + slapback processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, harmony + octave + unison + slapback + distortion processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
+#include "engine/distortion.h"
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -21,9 +22,11 @@ struct RenderParams {
   bool pitchOn = false;
   bool unisonOn = false;
   bool slapOn = false;
+  bool distOn = false;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
+  cv::DistortionParams distortion;
 };
 
 int usage() {
@@ -32,13 +35,20 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3> ...]\n"
-               "       [--octave <-12..12>] [--omix <0..1>] [--slap <0..1>]\n"
+               "       [--octave <-12..12>] [--omix <0..1>] [--slap <0..1>] [--drive <0..1>]\n"
                "  pitch front end runs with --harmony or --octave\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
-               "  at least one stage must run; order is pitch, unison, slapback\n"
+               "  distortion runs only with --drive\n"
+               "  at least one stage must run; order is pitch, unison, slapback, distortion\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
-               "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n");
+               "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
+               "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distStackBassHz\n"
+               "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
+               "     distS2LpHz distGain2Max distRailAsym distRailSoft distTrebleCutHz "
+               "distTrebleCutDb\n"
+               "     distToneDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
+               "distFadeDrive distOversample (0|1)\n");
   return 2;
 }
 
@@ -51,6 +61,8 @@ bool parseFloat(const char* s, float* out) {
 bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
+  cv::DistortionTuning& dt = rp.distortion.tuning;
+  float oversample = dt.oversample ? 1.0f : 0.0f;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -60,13 +72,28 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"windowMs", &t.windowMs},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
+      {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
+      {"distS1BassDb", &dt.s1BassDb},         {"distS1LpHz", &dt.s1LpHz},
+      {"distGain1Max", &dt.gain1Max},         {"distStackBassHz", &dt.stackBassHz},
+      {"distStackBassDb", &dt.stackBassDb},   {"distStackTrebleHz", &dt.stackTrebleHz},
+      {"distStackTrebleDb", &dt.stackTrebleDb}, {"distStackLossDb", &dt.stackLossDb},
+      {"distS2HpHz", &dt.s2HpHz},             {"distS2LpHz", &dt.s2LpHz},
+      {"distGain2Max", &dt.gain2Max},         {"distRailAsym", &dt.railAsym},
+      {"distRailSoft", &dt.railSoft},         {"distTrebleCutHz", &dt.trebleCutHz},
+      {"distTrebleCutDb", &dt.trebleCutDb},   {"distToneDb", &dt.toneDb},
+      {"distBassPeakHz", &dt.bassPeakHz},     {"distBassPeakDb", &dt.bassPeakDb},
+      {"distBassPeakQ", &dt.bassPeakQ},       {"distTrimDb", &dt.trimDb},
+      {"distFadeDrive", &dt.fadeDrive},
+      {"distOversample", &oversample},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
   const size_t keyLen = static_cast<size_t>(eq - kv);
   for (const TuningField& f : fields) {
-    if (std::strlen(f.name) == keyLen && std::strncmp(f.name, kv, keyLen) == 0)
-      return parseFloat(eq + 1, f.value);
+    if (std::strlen(f.name) != keyLen || std::strncmp(f.name, kv, keyLen) != 0) continue;
+    if (!parseFloat(eq + 1, f.value)) return false;
+    dt.oversample = oversample != 0.0f;
+    return true;
   }
   return false;
 }
@@ -103,6 +130,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveDepth = false;
   bool haveOn = false;
   bool haveSlap = false;
+  bool haveDrive = false;
   int voices = 0;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
@@ -121,6 +149,10 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (!parseFloat(argv[++i], &sp.intensity) || sp.intensity < 0.0f || sp.intensity > 1.0f)
         return false;
       haveSlap = true;
+    } else if (std::strcmp(a, "--drive") == 0 && i + 1 < argc) {
+      cv::DistortionParams& dp = rp.distortion;
+      if (!parseFloat(argv[++i], &dp.drive) || dp.drive < 0.0f || dp.drive > 1.0f) return false;
+      haveDrive = true;
     } else if (std::strcmp(a, "--harmony") == 0) {
       haveHarmony = true;
     } else if (std::strcmp(a, "--key") == 0 && i + 1 < argc) {
@@ -161,7 +193,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
   rp.slapOn = haveSlap;
-  return rp.pitchOn || rp.unisonOn || rp.slapOn;
+  rp.distOn = haveDrive;
+  return rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -184,9 +217,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::PitchFx pitchFx;
   static cv::Unison unison;
   static cv::Slapback slapback;
+  static cv::Distortion distortion;
   pitchFx.reset();
   unison.reset();
   slapback.reset();
+  distortion.reset();
 
   float inBuf[cv::kBlock];
   float bufA[cv::kBlock];
@@ -213,6 +248,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.slapOn) {
         slapback.process(src, scratch[next], n, rp.slapback);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.distOn) {
+        distortion.process(src, scratch[next], n, rp.distortion);
         src = scratch[next];
       }
       ma_uint64 wrote = 0;
