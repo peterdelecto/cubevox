@@ -312,9 +312,9 @@
     {
       "ref": "ENC101",
       "x": 173.942,
-      "y": 78.0,
+      "y": 75.5,
       "rotation": 180.0,
-      "reason": "menu encoder beside the OLED, owner 2026-10-02"
+      "reason": "menu encoder beside the OLED; owner 2026-10-02 render review: 2.5 mm north with the OLED"
     },
     {
       "ref": "SWBYPASS1",
@@ -333,9 +333,9 @@
     {
       "ref": "J117",
       "x": 135.785,
-      "y": 80.0,
+      "y": 77.5,
       "rotation": 0.0,
-      "reason": "1.3 in OLED header, window position chosen by the owner, owner 2026-10-02"
+      "reason": "1.3 in OLED header, window position chosen by the owner; owner 2026-10-02 render review: 2.5 mm north for the codec gap (2.6 -> 5.1 mm)"
     },
     {
       "ref": "J1",
@@ -354,9 +354,9 @@
     {
       "ref": "J108",
       "x": 72.5,
-      "y": 37.0,
+      "y": 40.0,
       "rotation": 90.0,
-      "reason": "1/4 in output jack on the rear edge, B.Cu hand-soldered; owner column, shifted by the layout lead for the console rear plate (spec item 27, 2026-10-02)"
+      "reason": "1/4 in output jack on the rear edge, B.Cu hand-soldered; owner 2026-10-02 render review: moved 3 mm rearward so the housing face sits at the edge (STEP: face was 2.6 mm proud, bushing 3.9 mm beyond) and pads 3/6 clear the 0.5 mm edge rule"
     },
     {
       "ref": "J106",
@@ -1416,8 +1416,8 @@
       "mating_axis": "+x",
       "mating_axis_confirmed": false,
       "overhang_mm": {
-        "value": 6.565,
-        "source": "courtyard top y 23.435 against the outline y 30.0; NMJ6HCD2 nose and nut proud through the rear plate"
+        "value": 3.565,
+        "source": "courtyard top y 26.435 against the outline y 30.0 after the 3 mm move; housing face at the edge, NMJ6HCD2 bushing proud through the rear plate"
       },
       "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
     }

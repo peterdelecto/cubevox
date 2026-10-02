@@ -1,0 +1,63 @@
+{
+ "declaration": "D0030",
+ "ledger": "0046",
+ "baseline": "0045",
+ "board_sha256": "5bf0b82e49f5e0dabba5797b7c5fd57e07b5c5d568e408b496edc82c3deb2302",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0046.json",
+ "intended": [
+  {
+   "measure": "airline:/h7core_block/VCAP1",
+   "why": "declared",
+   "before": 155.242,
+   "after": 2.57,
+   "delta": -152.672,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 10727.8,
+   "after": 10566.9,
+   "delta": -160.9,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C3",
+   "why": "declared",
+   "before": 133.96,
+   "after": 4.09,
+   "delta": -129.87,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C5",
+   "why": "declared",
+   "before": 132.86,
+   "after": 6.74,
+   "delta": -126.12,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C58",
+   "why": "declared",
+   "before": 138.73,
+   "after": 2.5,
+   "delta": -136.23,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C61",
+   "why": "declared",
+   "before": 136.25,
+   "after": 3.86,
+   "delta": -132.39,
+   "direction": "better"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

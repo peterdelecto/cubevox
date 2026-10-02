@@ -1,0 +1,87 @@
+{
+ "declaration": "D0021",
+ "ledger": "0037",
+ "baseline": "0036",
+ "board_sha256": "724cfaa71ec7a177132301f459c22d63de6a31d4659a97bc4c2d05ba65ef1bef",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0037.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 12702.2,
+   "after": 12697.2,
+   "delta": -5.0,
+   "direction": "better"
+  },
+  {
+   "measure": "body_gap_min_mm",
+   "why": "declared",
+   "before": -0.37,
+   "after": -1.01,
+   "delta": -0.64,
+   "direction": "n/a"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 2,
+   "after": 3,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "drc_board_errors",
+   "why": "declared",
+   "before": 8,
+   "after": 13,
+   "delta": 5,
+   "direction": "worse"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 108,
+   "after": 117,
+   "delta": 9,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C4",
+   "why": "declared",
+   "before": 12.69,
+   "after": 2.53,
+   "delta": -10.16,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C59",
+   "why": "declared",
+   "before": 29.82,
+   "after": 2.21,
+   "delta": -27.61,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C7",
+   "why": "declared",
+   "before": 26.04,
+   "after": 7.19,
+   "delta": -18.85,
+   "direction": "better"
+  },
+  {
+   "measure": "shorting_items",
+   "why": "declared",
+   "before": 0,
+   "after": 2,
+   "delta": 2,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
