@@ -184,6 +184,13 @@ constexpr const char* kPrintName[kCount] = {
     "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "Drip",
     "PARKER Flutter", "PARKER Brightness"};
 
+// Keys for the saved-state file; one word each, stable across builds.
+constexpr const char* kStateKey[kCount] = {
+    "OctaveSlide",    "HarmonyTracking", "UnisonBlend",   "UnisonMotion",  "DistBody",
+    "DistBite",       "DistGrit",        "SpringSplash",  "SpringFlutter", "SpringLowEnd",
+    "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "ParkerSplash",  "ParkerDrip",
+    "ParkerFlutter",  "ParkerBrightness"};
+
 struct State {
   std::array<float, kCount> pos;
   State() { pos.fill(kCenter); }

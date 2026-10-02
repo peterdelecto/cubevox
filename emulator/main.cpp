@@ -7,9 +7,13 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
+#include <type_traits>
 #include <vector>
+
+#include <sys/stat.h>
 
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
@@ -85,6 +89,8 @@ struct ProtoParams {
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
   cv::PolishParams eq;
+  // Cmd+Shift+D shows our test controls: Advanced, stage feedback, input gate tuning.
+  bool dev = false;
   // Advanced swaps the musician sliders for the raw tuning nodes.
   bool advanced = false;
   cv::macros::State macros;
@@ -475,6 +481,7 @@ struct ProbeOpen {
   int reverbEngine = -1;   // forced reverb engine, -1 keeps the live one
 };
 bool gAdvanced = false;  // UI-thread-only; mirrors ProtoParams::advanced
+bool gDev = false;       // UI-thread-only; mirrors ProtoParams::dev
 ProbeOpen gProbeOpen;
 
 bool probeMatch(const char* want, const char* name) {
@@ -851,20 +858,22 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   std::snprintf(label, sizeof(label), "%.1f dBFS", meterDb);
   ImGui::ProgressBar(frac, ImVec2(kMeterW, 0.0f), label);
   ImGui::SameLine();
-  ImGui::Checkbox("Advanced", &params.advanced);
-  ImGui::SameLine();
-  ImGui::Checkbox("STAGE FEEDBACK", &params.stageFeedback);
-  ImGui::BeginDisabled(!params.stageFeedback);
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(kFeedbackSliderW);
-  ImGui::SliderFloat("Amount", &params.feedbackAmount, 0.0f, 100.0f, "%.0f%%",
-                     ImGuiSliderFlags_NoRoundToFormat);
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(kFeedbackSliderW);
-  ImGui::SliderFloat("Movement", &params.feedbackMovement, 0.0f, 100.0f, "%.0f%%",
-                     ImGuiSliderFlags_NoRoundToFormat);
-  ImGui::EndDisabled();
-  ImGui::SameLine();
+  if (params.dev) {
+    ImGui::Checkbox("Advanced", &params.advanced);
+    ImGui::SameLine();
+    ImGui::Checkbox("STAGE FEEDBACK", &params.stageFeedback);
+    ImGui::BeginDisabled(!params.stageFeedback);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(kFeedbackSliderW);
+    ImGui::SliderFloat("Amount", &params.feedbackAmount, 0.0f, 100.0f, "%.0f%%",
+                       ImGuiSliderFlags_NoRoundToFormat);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(kFeedbackSliderW);
+    ImGui::SliderFloat("Movement", &params.feedbackMovement, 0.0f, 100.0f, "%.0f%%",
+                       ImGuiSliderFlags_NoRoundToFormat);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+  }
   drawTuningButtons(params);
 }
 
@@ -887,6 +896,221 @@ void syncSlots(const HarmonyMenu& m, cv::HarmonyParams& h) {
     h.slots[i].level = m.level[i];
     h.slots[i].formant = static_cast<float>(m.formant[i]);
   }
+}
+
+// ---- Saved state: the face as Adam left it ----------------------------------------
+//
+// Plain "key value" lines. Unknown keys are skipped and missing keys keep their
+// defaults, so a new build reads an old file. Raw Advanced edits are not saved;
+// the macros rewrite those fields on load.
+
+struct StateField {
+  std::string key;
+  char kind;  // 'f' float, 'i' int, 'b' bool
+  void* ptr;
+};
+
+std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
+  std::vector<StateField> f;
+  const auto add = [&](const char* key, auto* ptr) {
+    using T = std::remove_pointer_t<decltype(ptr)>;
+    const char kind = std::is_same_v<T, bool> ? 'b' : (std::is_same_v<T, int> ? 'i' : 'f');
+    f.push_back({key, kind, ptr});
+  };
+  const auto gate = [&](const char* name, cv::GateParams& g) {
+    const std::string n = name;
+    f.push_back({n + ".on", 'b', &g.on});
+    f.push_back({n + ".threshold", 'f', &g.thresholdDb});
+    f.push_back({n + ".range", 'f', &g.tuning.rangeDb});
+    f.push_back({n + ".attack", 'f', &g.tuning.attackMs});
+    f.push_back({n + ".hold", 'f', &g.tuning.holdMs});
+    f.push_back({n + ".release", 'f', &g.tuning.releaseMs});
+  };
+  gate("ingate", p.inputGate);
+  gate("gate", p.gate);
+  cv::AutotuneParams& at = p.pitchFx.autotune;
+  add("autotune.on", &at.on);
+  add("autotune.engine", &at.engine);
+  add("autotune.key", &at.key);
+  add("autotune.chromatic", &at.chromatic);
+  add("autotune.response", &at.responseMs);
+  add("autotune.pull", &at.tuning.maxCorrectSemis);
+  add("autotune.link", &p.linkAutotuneKey);
+  cv::OctaveParams& o = p.pitchFx.octave;
+  add("octave.on", &o.on);
+  add("octave.engine", &o.engine);
+  add("octave.semitones", &o.semitones);
+  add("octave.formant", &o.formant);
+  add("octave.mix", &o.mix);
+  cv::HarmonyParams& h = p.pitchFx.harmony;
+  add("harmony.on", &h.on);
+  add("harmony.engine", &h.engine);
+  add("harmony.key", &h.key);
+  add("harmony.chromatic", &h.chromatic);
+  add("harmony.mix", &h.mix);
+  add("harmony.snap", &h.tuning.snapToScale);
+  add("harmony.breaths", &h.tuning.muteUnvoiced);
+  for (int i = 0; i < kVoiceRows; ++i) {
+    const std::string n = "harmony.voice" + std::to_string(i);
+    f.push_back({n + ".level", 'i', &m.level[static_cast<size_t>(i)]});
+    f.push_back({n + ".formant", 'i', &m.formant[static_cast<size_t>(i)]});
+  }
+  add("unison.on", &p.unison.on);
+  add("unison.depth", &p.unison.depth);
+  add("slapback.on", &p.slapback.on);
+  add("slapback.intensity", &p.slapback.intensity);
+  add("slapback.time", &p.slapback.tuning.timeMs);
+  add("slapback.repeats", &p.slapback.tuning.feedback);
+  add("slapback.lowpass", &p.slapback.tuning.lowpassHz);
+  add("distortion.on", &p.distortion.on);
+  add("distortion.drive", &p.distortion.drive);
+  add("distortion.tone", &p.distortion.tone);
+  cv::ReverbParams& r = p.reverb;
+  add("reverb.on", &r.on);
+  add("reverb.engine", &r.engine);
+  add("reverb.mix", &r.mix);
+  add("reverb.spring.decay", &r.spring.tension);
+  add("reverb.spring.dwell", &r.spring.dwell);
+  add("reverb.chasm.decay", &r.chasm.decay);
+  add("reverb.chasm.dwell", &r.chasm.dwell);
+  add("reverb.parker.decay", &r.parker.tension);
+  add("reverb.parker.dwell", &r.parker.dwell);
+  add("eq.on", &p.eq.on);
+  add("eq.lowcut", &p.eq.hpHz);
+  add("eq.dipHz", &p.eq.dipHz);
+  add("eq.dipDb", &p.eq.dipDb);
+  add("eq.presenceHz", &p.eq.presenceHz);
+  add("eq.presenceDb", &p.eq.presenceDb);
+  add("eq.air", &p.eq.airDb);
+  for (int i = 0; i < cv::macros::kCount; ++i)
+    f.push_back({std::string("macro.") + cv::macros::kStateKey[i], 'f',
+                 &p.macros.pos[static_cast<size_t>(i)]});
+  add("dev", &p.dev);
+  add("advanced", &p.advanced);
+  add("feedback.on", &p.stageFeedback);
+  add("feedback.amount", &p.feedbackAmount);
+  add("feedback.movement", &p.feedbackMovement);
+  return f;
+}
+
+std::string stateText(ProtoParams& p, HarmonyMenu& m, const std::string& loop) {
+  std::string out = "loop " + loop + "\n";
+  char line[160];
+  for (const StateField& f : stateFields(p, m)) {
+    if (f.kind == 'f')
+      std::snprintf(line, sizeof(line), "%s %.9g\n", f.key.c_str(),
+                    static_cast<double>(*static_cast<float*>(f.ptr)));
+    else if (f.kind == 'i')
+      std::snprintf(line, sizeof(line), "%s %d\n", f.key.c_str(), *static_cast<int*>(f.ptr));
+    else
+      std::snprintf(line, sizeof(line), "%s %d\n", f.key.c_str(), *static_cast<bool*>(f.ptr) ? 1 : 0);
+    out += line;
+  }
+  return out;
+}
+
+// Parses stateText output into p, m and loop. Returns the number of fields set.
+int parseStateText(const std::string& text, ProtoParams& p, HarmonyMenu& m, std::string& loop) {
+  const std::vector<StateField> fields = stateFields(p, m);
+  int set = 0;
+  size_t pos = 0;
+  while (pos < text.size()) {
+    size_t end = text.find('\n', pos);
+    if (end == std::string::npos) end = text.size();
+    const std::string line = text.substr(pos, end - pos);
+    pos = end + 1;
+    const size_t space = line.find(' ');
+    if (space == std::string::npos) continue;
+    const std::string key = line.substr(0, space);
+    const std::string value = line.substr(space + 1);
+    if (key == "loop") {
+      loop = value;
+      continue;
+    }
+    for (const StateField& f : fields) {
+      if (f.key != key) continue;
+      char* tail = nullptr;
+      if (f.kind == 'f') {
+        const float v = std::strtof(value.c_str(), &tail);
+        if (tail != value.c_str() && std::isfinite(v)) {
+          *static_cast<float*>(f.ptr) = v;
+          ++set;
+        }
+      } else {
+        const long v = std::strtol(value.c_str(), &tail, 10);
+        if (tail == value.c_str()) break;
+        if (f.kind == 'i') *static_cast<int*>(f.ptr) = static_cast<int>(v);
+        else *static_cast<bool*>(f.ptr) = v != 0;
+        ++set;
+      }
+      break;
+    }
+  }
+  return set;
+}
+
+// Macros own the raw fields they map to; re-applying every one restores those fields.
+void applyMacros(ProtoParams& p) {
+  namespace mc = cv::macros;
+  const auto& m = p.macros.pos;
+  cv::ReverbParams& r = p.reverb;
+  mc::octaveSlide(p.pitchFx.octave.tuning, m[mc::OctaveSlide]);
+  mc::harmonyTracking(p.pitchFx.harmony.tuning, m[mc::HarmonyTracking]);
+  mc::unisonBlend(p.unison.tuning, m[mc::UnisonBlend]);
+  mc::unisonMotion(p.unison.tuning, m[mc::UnisonMotion]);
+  mc::distBody(p.distortion.tuning, m[mc::DistBody]);
+  mc::distBite(p.distortion.tuning, m[mc::DistBite]);
+  mc::distGrit(p.distortion.tuning, m[mc::DistGrit]);
+  mc::springSplash(r.spring.tuning, m[mc::SpringSplash]);
+  mc::springFlutter(r.spring.tuning, m[mc::SpringFlutter]);
+  mc::springLowEnd(r.spring.tuning, m[mc::SpringLowEnd]);
+  mc::chasmWobble(r.chasm, m[mc::ChasmWobble]);
+  mc::chasmBrightness(r.chasm.tuning, m[mc::ChasmBrightness]);
+  mc::chasmBass(r.chasm.tuning, m[mc::ChasmBass]);
+  mc::parkerSplash(r.parker.tuning, m[mc::ParkerSplash]);
+  mc::parkerDrip(r.parker.tuning, m[mc::ParkerDrip]);
+  mc::parkerFlutter(r.parker.tuning, m[mc::ParkerFlutter]);
+  mc::parkerBrightness(r.parker.tuning, m[mc::ParkerBrightness]);
+}
+
+// ~/Library/Application Support/cubevox-proto/state.txt; empty if HOME is unset.
+std::string statePath() {
+  const char* home = std::getenv("HOME");
+  if (home == nullptr) return {};
+  const std::string dir = std::string(home) + "/Library/Application Support/cubevox-proto";
+  mkdir(dir.c_str(), 0755);  // EEXIST is the normal case
+  return dir + "/state.txt";
+}
+
+void loadState(const std::string& path, ProtoParams& p, HarmonyMenu& m) {
+  std::FILE* f = path.empty() ? nullptr : std::fopen(path.c_str(), "rb");
+  if (f == nullptr) return;  // first launch
+  std::string text;
+  char buf[4096];
+  size_t n = 0;
+  while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n);
+  std::fclose(f);
+  std::string loop;
+  if (parseStateText(text, p, m, loop) == 0)
+    std::fprintf(stderr, "[WARN] %s has no readable settings\n", path.c_str());
+  applyMacros(p);
+  p.playing = false;
+  if (!loop.empty()) loadLoop(loop);
+}
+
+// Writes through a temp file so a crash mid-write never leaves half a file.
+void saveState(const std::string& path, const std::string& text) {
+  if (path.empty()) return;
+  const std::string tmp = path + ".tmp";
+  std::FILE* f = std::fopen(tmp.c_str(), "wb");
+  if (f == nullptr || std::fwrite(text.data(), 1, text.size(), f) != text.size()) {
+    std::fprintf(stderr, "[ERROR] could not write %s\n", tmp.c_str());
+    if (f != nullptr) std::fclose(f);
+    return;
+  }
+  std::fclose(f);
+  if (std::rename(tmp.c_str(), path.c_str()) != 0)
+    std::fprintf(stderr, "[ERROR] could not replace %s\n", path.c_str());
 }
 
 // Each row: name, level radios, then FORMANT (engine B, voice on).
@@ -913,9 +1137,13 @@ void drawHarmonyVoices(const cv::HarmonyParams& h) {
 
 // ---- Tuning headers: macro view by default, raw nodes under Advanced --------------
 
+// One plain line under a tuning control: what it does, the technical term last.
+void hint(const char* text) { ImGui::TextDisabled("%s", text); }
+
 template <class F>
-void macroSlider(const char* label, float& pos, const F& apply) {
+void macroSlider(const char* label, const char* help, float& pos, const F& apply) {
   if (ImGui::SliderFloat(label, &pos, 0.0f, 100.0f, "%.0f %%")) apply(pos);
+  hint(help);
 }
 
 void drawHarmonyTuning(cv::HarmonyParams& h, cv::macros::State& m) {
@@ -925,11 +1153,14 @@ void drawHarmonyTuning(cv::HarmonyParams& h, cv::macros::State& m) {
     drawHarmonyRaw(h.tuning);
     return;
   }
-  macroSlider("Tracking speed", m.pos[cv::macros::HarmonyTracking],
+  macroSlider("Tracking speed", "how fast the voices catch a new note",
+              m.pos[cv::macros::HarmonyTracking],
               [&](float p) { cv::macros::harmonyTracking(h.tuning, p); });
   bool follow = !h.tuning.snapToScale;
   if (ImGui::Checkbox("Follow my bends", &follow)) h.tuning.snapToScale = !follow;
+  hint("voices bend with you; off snaps them to the key");
   ImGui::Checkbox("Drop out on breaths", &h.tuning.muteUnvoiced);
+  hint("voices go quiet on breaths and s / t sounds");
 }
 
 void drawOctaveTuning(cv::OctaveParams& o, cv::macros::State& m) {
@@ -938,7 +1169,7 @@ void drawOctaveTuning(cv::OctaveParams& o, cv::macros::State& m) {
     drawOctaveRaw(o.tuning);
     return;
   }
-  macroSlider("Slide", m.pos[cv::macros::OctaveSlide],
+  macroSlider("Slide", "how slowly it glides to a new note", m.pos[cv::macros::OctaveSlide],
               [&](float p) { cv::macros::octaveSlide(o.tuning, p); });
 }
 
@@ -947,7 +1178,9 @@ void drawOctaveTuning(cv::OctaveParams& o, cv::macros::State& m) {
 void drawAutotuneTuning(cv::AutotuneParams& a) {
   if (!tuningHeader("autotune")) return;
   ImGui::SliderFloat("Pull range", &a.tuning.maxCorrectSemis, 0.5f, 6.0f, "%.1f st");
+  hint("how far off a note it will still fix");
   ImGui::Checkbox("Correct to every note", &a.chromatic);
+  hint("ignores KEY, snaps to the nearest note");
   if (gAdvanced) drawAutotuneRaw(a.tuning);
 }
 
@@ -957,9 +1190,9 @@ void drawUnisonTuning(cv::UnisonTuning& t, cv::macros::State& m) {
     drawUnisonRaw(t);
     return;
   }
-  macroSlider("Chorus \u2194 Double", m.pos[cv::macros::UnisonBlend],
-              [&](float p) { cv::macros::unisonBlend(t, p); });
-  macroSlider("Motion speed", m.pos[cv::macros::UnisonMotion],
+  macroSlider("Chorus \u2194 Double", "left a wobbly chorus, right a tight double",
+              m.pos[cv::macros::UnisonBlend], [&](float p) { cv::macros::unisonBlend(t, p); });
+  macroSlider("Motion speed", "how fast the chorus wobbles", m.pos[cv::macros::UnisonMotion],
               [&](float p) { cv::macros::unisonMotion(t, p); });
 }
 
@@ -970,9 +1203,12 @@ void drawSlapbackTuning(cv::SlapbackTuning& t) {
     return;
   }
   ImGui::SliderFloat("Time", &t.timeMs, 30.0f, 120.0f, "%.0f ms");
+  hint("gap between your voice and the echo");
   ImGui::SliderFloat("Repeats", &t.feedback, 0.0f, 0.5f, "%.2f");
+  hint("how many echoes follow the first");
   ImGui::SliderFloat("Low pass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
+  hint("lower makes the echoes darker");
 }
 
 void drawDistortionTuning(cv::DistortionTuning& t, cv::macros::State& m) {
@@ -981,49 +1217,58 @@ void drawDistortionTuning(cv::DistortionTuning& t, cv::macros::State& m) {
     drawDistortionRaw(t);
     return;
   }
-  macroSlider("Body", m.pos[cv::macros::DistBody], [&](float p) { cv::macros::distBody(t, p); });
-  macroSlider("Bite", m.pos[cv::macros::DistBite], [&](float p) { cv::macros::distBite(t, p); });
-  macroSlider("Grit", m.pos[cv::macros::DistGrit], [&](float p) { cv::macros::distGrit(t, p); });
+  namespace mc = cv::macros;
+  macroSlider("Body", "more low end going into the drive", m.pos[mc::DistBody],
+              [&](float p) { mc::distBody(t, p); });
+  macroSlider("Bite", "more top end and edge", m.pos[mc::DistBite],
+              [&](float p) { mc::distBite(t, p); });
+  macroSlider("Grit", "rougher, raspier breakup", m.pos[mc::DistGrit],
+              [&](float p) { mc::distGrit(t, p); });
 }
 
-// Input gate carries its threshold here; the GATE module keeps THRESHOLD on its face.
+// Plain names, technical term in the hint. The input gate carries its threshold here;
+// the GATE module keeps THRESHOLD on its face. Mute amount runs right = more muting.
 void drawGateTuning(cv::GateParams& g, const char* block, bool withThreshold) {
   if (!tuningHeader(block)) return;
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   cv::GateTuning& t = g.tuning;
-  if (withThreshold) ImGui::SliderFloat("Threshold", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
+  if (withThreshold) {
+    ImGui::SliderFloat("Opens at", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
+    hint("sing louder than this to open (threshold)");
+  }
   if (gAdvanced) {
     drawGateRaw(t);
     return;
   }
-  ImGui::SliderFloat("Range", &t.rangeDb, -80.0f, 0.0f, "%.0f dB");
-  ImGui::SliderFloat("Attack", &t.attackMs, 0.1f, 50.0f, "%.1f ms", log);
-  ImGui::SliderFloat("Hold", &t.holdMs, 0.0f, 500.0f, "%.0f ms");
-  ImGui::SliderFloat("Release", &t.releaseMs, 5.0f, 1000.0f, "%.0f ms", log);
+  float mute = -t.rangeDb;
+  if (ImGui::SliderFloat("Mute amount", &mute, 0.0f, 80.0f, "%.0f dB")) t.rangeDb = -mute;
+  hint("how far it turns down when shut (range)");
+  ImGui::SliderFloat("Fade in", &t.attackMs, 0.1f, 50.0f, "%.1f ms", log);
+  hint("how fast it opens when you sing (attack)");
+  ImGui::SliderFloat("Stay open", &t.holdMs, 0.0f, 500.0f, "%.0f ms");
+  hint("wait after you stop before shutting (hold)");
+  ImGui::SliderFloat("Fade out", &t.releaseMs, 5.0f, 1000.0f, "%.0f ms", log);
+  hint("how slowly it fades shut (release)");
 }
 
+// Four plain controls; the band frequencies live under Advanced. Mud cut runs
+// right = more cut.
 void drawEqTuning(cv::PolishParams& e) {
   if (!tuningHeader("eq")) return;
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
-  // The two peaking bands put frequency and gain on one row.
-  const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-  auto pair = [&](const char* id, float* hz, float hzLo, float hzHi, float* db, float dbLo,
-                  float dbHi) {
-    ImGui::PushID(id);
-    ImGui::PushItemWidth(half - kLabelW * 0.35f);
-    ImGui::SliderFloat("Hz", hz, hzLo, hzHi, "%.0f", log);
-    ImGui::SameLine(half + ImGui::GetStyle().ItemSpacing.x);
-    ImGui::SliderFloat("dB", db, dbLo, dbHi, "%+.1f");
-    ImGui::PopItemWidth();
-    ImGui::PopID();
-  };
   ImGui::SliderFloat("Low cut", &e.hpHz, 40.0f, 200.0f, "%.0f Hz", log);
-  ImGui::SeparatorText("Low-mid dip");
-  pair("dip", &e.dipHz, 150.0f, 600.0f, &e.dipDb, -6.0f, 0.0f);
-  ImGui::SeparatorText("Presence");
-  pair("pres", &e.presenceHz, 2000.0f, 6000.0f, &e.presenceDb, 0.0f, 6.0f);
+  hint("removes boom and handling thumps");
+  float cut = -e.dipDb;
+  if (ImGui::SliderFloat("Mud cut", &cut, 0.0f, 6.0f, "%.1f dB")) e.dipDb = -cut;
+  hint("scoops out boxy low-mids");
+  ImGui::SliderFloat("Presence", &e.presenceDb, 0.0f, 6.0f, "%+.1f dB");
+  hint("pushes the words forward");
   ImGui::SliderFloat("Air", &e.airDb, 0.0f, 4.0f, "%+.1f dB");
-  if (gAdvanced) drawPolishRaw(e.tuning);
+  hint("breathy sparkle on top");
+  if (!gAdvanced) return;
+  ImGui::SliderFloat("Mud cut centre", &e.dipHz, 150.0f, 600.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Presence centre", &e.presenceHz, 2000.0f, 6000.0f, "%.0f Hz", log);
+  drawPolishRaw(e.tuning);
 }
 
 void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
@@ -1034,22 +1279,30 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
   }
   namespace mc = cv::macros;
   if (r.engine == cv::kReverbChasm) {
-    macroSlider("Wobble", m.pos[mc::ChasmWobble], [&](float p) { mc::chasmWobble(r.chasm, p); });
-    macroSlider("Brightness", m.pos[mc::ChasmBrightness],
+    macroSlider("Wobble", "pitch wobble in the tail", m.pos[mc::ChasmWobble],
+                [&](float p) { mc::chasmWobble(r.chasm, p); });
+    macroSlider("Brightness", "brighter tail", m.pos[mc::ChasmBrightness],
                 [&](float p) { mc::chasmBrightness(r.chasm.tuning, p); });
-    macroSlider("Bass", m.pos[mc::ChasmBass], [&](float p) { mc::chasmBass(r.chasm.tuning, p); });
+    macroSlider("Bass", "more low end in the tail", m.pos[mc::ChasmBass],
+                [&](float p) { mc::chasmBass(r.chasm.tuning, p); });
   } else if (r.engine == cv::kReverbParker) {
     cv::SpringCTuning& t = r.parker.tuning;
-    macroSlider("Splash", m.pos[mc::ParkerSplash], [&](float p) { mc::parkerSplash(t, p); });
-    macroSlider("Drip", m.pos[mc::ParkerDrip], [&](float p) { mc::parkerDrip(t, p); });
-    macroSlider("Flutter", m.pos[mc::ParkerFlutter], [&](float p) { mc::parkerFlutter(t, p); });
-    macroSlider("Brightness", m.pos[mc::ParkerBrightness],
+    macroSlider("Splash", "bright crash on loud notes", m.pos[mc::ParkerSplash],
+                [&](float p) { mc::parkerSplash(t, p); });
+    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::ParkerDrip],
+                [&](float p) { mc::parkerDrip(t, p); });
+    macroSlider("Flutter", "springs drift apart, more shimmer", m.pos[mc::ParkerFlutter],
+                [&](float p) { mc::parkerFlutter(t, p); });
+    macroSlider("Brightness", "brighter tail", m.pos[mc::ParkerBrightness],
                 [&](float p) { mc::parkerBrightness(t, p); });
   } else {
     cv::SpringTuning& t = r.spring.tuning;
-    macroSlider("Splash", m.pos[mc::SpringSplash], [&](float p) { mc::springSplash(t, p); });
-    macroSlider("Flutter", m.pos[mc::SpringFlutter], [&](float p) { mc::springFlutter(t, p); });
-    macroSlider("Low end", m.pos[mc::SpringLowEnd], [&](float p) { mc::springLowEnd(t, p); });
+    macroSlider("Splash", "bright crash on loud notes", m.pos[mc::SpringSplash],
+                [&](float p) { mc::springSplash(t, p); });
+    macroSlider("Flutter", "wobble and shimmer in the tail", m.pos[mc::SpringFlutter],
+                [&](float p) { mc::springFlutter(t, p); });
+    macroSlider("Low end", "more boom from the springs", m.pos[mc::SpringLowEnd],
+                [&](float p) { mc::springLowEnd(t, p); });
   }
 }
 
@@ -1162,7 +1415,8 @@ void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float g
   if (!alwaysOn)
     ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
   ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
-  drawGateTuning(g, id, alwaysOn);
+  // The input gate is fixed on the box; its tuning is ours, not Adam's.
+  if (!alwaysOn || gDev) drawGateTuning(g, id, alwaysOn);
   ImGui::PopID();
 }
 
@@ -1264,6 +1518,14 @@ void column(int index, float width, const F& draw) {
 void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, bool probe) {
   // Hold-and-decay so short peaks stay readable at 60 fps.
   meterDb = std::max(state.peakDb, meterDb - kMeterDecayDbPerFrame);
+  if (!probe && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_D))
+    params.dev = !params.dev;  // Cmd+Shift+D on the Mac
+  // Hidden test controls never stay active.
+  if (!params.dev) {
+    params.advanced = false;
+    params.stageFeedback = false;
+  }
+  gDev = params.dev;
   gAdvanced = params.advanced;
   // Harmony chromatic and the key link are Advanced-only; the plain face keeps them at default.
   if (!params.advanced) {
@@ -1379,6 +1641,7 @@ int runLayoutProbe() {
   };
 
   ProtoParams params;
+  params.dev = true;  // the dev face is the superset; Adam's face is a subset of it
   ProtoState state;
   float meterDb = kSilenceDb;
   bool fits = true;
@@ -1410,6 +1673,44 @@ int runLayoutProbe() {
   const size_t snapLen = snapshotLines(ProtoParams{}, snap, sizeof(snap));
   std::printf("%s", snap);
   if (snapLen == 0 || snapLen >= sizeof(snap) - 1) fits = false;
+
+  // Saved state: move every field off its default, write, read into a fresh face, compare.
+  ProtoParams moved;
+  HarmonyMenu movedMenu;
+  for (const StateField& f : stateFields(moved, movedMenu)) {
+    if (f.kind == 'f') *static_cast<float*>(f.ptr) += 0.37f;
+    else if (f.kind == 'i') *static_cast<int*>(f.ptr) += 1;
+    else *static_cast<bool*>(f.ptr) = !*static_cast<bool*>(f.ptr);
+  }
+  const std::string text = stateText(moved, movedMenu, "/tmp/a loop.wav");
+  ProtoParams back;
+  HarmonyMenu backMenu;
+  std::string backLoop;
+  const int set = parseStateText(text, back, backMenu, backLoop);
+  // The file path: write, read back, and the face must match the parsed one.
+  const std::string probeFile = "/tmp/cubevox-proto-probe-state.txt";
+  saveState(probeFile, text);
+  ProtoParams fromFile;
+  HarmonyMenu fromFileMenu;
+  loadState(probeFile, fromFile, fromFileMenu);
+  std::remove(probeFile.c_str());
+  applyMacros(back);  // loadState re-applies macros; match that before comparing
+  const bool fileOk = stateText(fromFile, fromFileMenu, gLoopPath) == stateText(back, backMenu, gLoopPath) &&
+                      fromFile.reverb.spring.tuning.hpHz == back.reverb.spring.tuning.hpHz;
+  const std::vector<StateField> want = stateFields(moved, movedMenu);
+  const std::vector<StateField> got = stateFields(back, backMenu);
+  int mismatches = 0;
+  for (size_t i = 0; i < want.size(); ++i) {
+    const size_t bytes = want[i].kind == 'f' ? sizeof(float) : (want[i].kind == 'i' ? sizeof(int) : sizeof(bool));
+    if (std::memcmp(want[i].ptr, got[i].ptr, bytes) != 0) {
+      std::printf("state round trip: %s differs\n", want[i].key.c_str());
+      ++mismatches;
+    }
+  }
+  const bool stateOk = fileOk && mismatches == 0 && set == static_cast<int>(want.size()) &&
+                       backLoop == "/tmp/a loop.wav";
+  std::printf("state round trip: %d fields, %s\n", set, stateOk ? "ok" : "FAILED");
+  if (!stateOk) fits = false;
 
   std::printf("layout %dx%d: %s\n", kWindowW, kWindowH, fits ? "ok" : "column overrun");
   return fits ? 0 : 1;
@@ -1444,9 +1745,14 @@ int runWindow() {
   ImGui_ImplOpenGL3_Init("#version 150");
 
   ProtoParams params;
+  const std::string stateFile = statePath();
+  loadState(stateFile, params, gMenu);
   gParamsBuf[0] = params;
   gParamsBuf[1] = params;
   float meterDb = kSilenceDb;
+  std::string savedText = stateText(params, gMenu, gLoopPath);
+  double lastSaveCheck = glfwGetTime();
+  constexpr double kSaveEverySec = 1.0;  // a crash loses at most this much
 
   ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
   deviceConfig.playback.format = ma_format_f32;
@@ -1471,6 +1777,14 @@ int runWindow() {
         gStateBuf[gStatePublishIndex.load(std::memory_order_acquire)];
     drawFrame(params, state, meterDb, false);
     publishParams(params);
+    if (glfwGetTime() - lastSaveCheck >= kSaveEverySec) {
+      lastSaveCheck = glfwGetTime();
+      const std::string text = stateText(params, gMenu, gLoopPath);
+      if (text != savedText) {
+        saveState(stateFile, text);
+        savedText = text;
+      }
+    }
 
     ImGui::Render();
     int w = 0, h = 0;
@@ -1482,6 +1796,7 @@ int runWindow() {
     glfwSwapBuffers(window);
   }
 
+  saveState(stateFile, stateText(params, gMenu, gLoopPath));
   ma_device_uninit(&device);
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();

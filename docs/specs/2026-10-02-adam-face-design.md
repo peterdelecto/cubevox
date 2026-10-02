@@ -115,3 +115,22 @@ each Off / Low / Med / High (no cap on how many are on), with a Formant slider p
 
 ctest passes; `--layout` passes in macro and Advanced views; the face shows only the
 table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, then the raw initialisers.
+
+## Hand-off polish (owner 2026-10-02)
+
+1. **Saved state.** The face is saved to `~/Library/Application Support/cubevox-proto/state.txt`
+   once a second when something changed, and on close; it is read on launch, loop included,
+   with playback stopped. Format is `key value` lines; unknown keys are skipped and missing
+   keys keep defaults, so a new build reads an old file. Saved are knobs, choices, voice menu,
+   macro positions, the gate / slapback / EQ / autotune sliders, and the dev settings. Raw
+   Advanced edits are not saved; macros re-apply on load. The `--layout` probe round-trips
+   every field through the file.
+2. **Hint line** under every tuning control: what it does, technical term last.
+3. **Plain gate names** (owner choice): Opens at (threshold), Mute amount (range, shown
+   positive, right = more), Fade in (attack), Stay open (hold), Fade out (release).
+   Slapback keeps the owner's name Low pass.
+4. **Output EQ face:** Low cut, Mud cut (shown positive), Presence, Air. Band centres move
+   under Advanced.
+5. **Test controls hidden.** Cmd+Shift+D toggles them: Advanced, STAGE FEEDBACK with
+   Amount and Movement, and the input gate's Tuning. Hidden means off. The probe runs with
+   them shown, the superset of Adam's face.
