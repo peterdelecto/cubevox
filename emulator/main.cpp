@@ -1557,7 +1557,8 @@ void moduleBox(const char* id, bool first, const F& draw) {
   ImGui::EndChild();
 }
 
-constexpr float kFooterH = 34.0f;  // strip under the columns for the mode button, px
+constexpr float kFooterH = 52.0f;  // strip under the columns for the mode button, px
+constexpr ImVec2 kModeButtonPadding = ImVec2(18.0f, 10.0f);  // mode button frame padding, px
 
 // ---- Pedal mode: each effect drawn as a stompbox -----------------------------------
 
@@ -1690,7 +1691,7 @@ void pedal(const char* name, bool& on, float width, const F& knobs) {
 
 // Panel knobs only, signal order left to right. Encoders sit below the knobs.
 void drawPedals(ProtoParams& params) {
-  constexpr int kPedals = 9;
+  constexpr int kPedals = 8;
   const float w = (ImGui::GetContentRegionAvail().x - (kPedals - 1) * kPedalGap) / kPedals;
   gPedalRight = 0.0f;
   gPedalBottom = 0.0f;
@@ -1747,7 +1748,7 @@ void drawPedals(ProtoParams& params) {
   });
   next();
   cv::ReverbParams& r = params.reverb;
-  pedal("REVERB", r.on, w, [&] {
+  pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
     float& decay = r.engine == cv::kReverbChasm ? r.chasm.decay
                    : r.engine == cv::kReverbParker ? r.parker.tension : r.spring.tension;
     float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell
@@ -1756,8 +1757,6 @@ void drawPedals(ProtoParams& params) {
     pedalPercent("DWELL", dwell);
     pedalPercent("MIX", r.mix);
   });
-  next();
-  pedal("OUTPUT EQ", params.eq.on, w, [&] { ImGui::TextDisabled("set in the menu"); });
 }
 
 void drawPedals(ProtoParams& params);
@@ -1816,14 +1815,18 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   ImGui::End();
 }
 
-// Bottom-right switch between the full face and pedal mode.
+// Bottom-right switch between the full face and pedal mode, at headline size.
 void drawModeButton(ProtoParams& params) {
+  ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kHeaderScale);
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, kModeButtonPadding);
   const char* label = params.pedalMode ? "Full view###mode" : "Pedal mode###mode";
-  const float w = ImGui::CalcTextSize("Pedal mode").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+  const float w = ImGui::CalcTextSize("Pedal mode").x + 2.0f * kModeButtonPadding.x;
   ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y -
                        ImGui::GetFrameHeight());
   ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w);
   if (ImGui::Button(label, ImVec2(w, 0.0f))) params.pedalMode = !params.pedalMode;
+  ImGui::PopStyleVar();
+  ImGui::PopFont();
 }
 
 void drawColumns(ProtoParams& params, const ProtoState& state) {

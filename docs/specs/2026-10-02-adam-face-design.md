@@ -140,10 +140,10 @@ table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, t
    is renamed Copy settings to clipboard; the text box beside it is gone and the button
    reads Copied for 1.5 s instead. The probe fails if the row runs past the window width,
    checked with a long real file name.
-7. **Pedal mode** (owner 2026-10-02): bottom-right button flips the face to a row of nine
+7. **Pedal mode** (owner 2026-10-02): headline-size bottom-right button flips the face to a row of eight
    stompboxes in signal order, panel knobs only: AUTOTUNE (RESPONSE, KEY encoder), OCTAVE
    (MIX, SEMITONES encoder), HARMONY (MIX, KEY encoder), UNISON (DEPTH, RATE), SLAPBACK
    (INTENSITY, TIME), DISTORTION (DRIVE, TONE), GATE (THRESHOLD, DECAY), REVERB (DECAY,
-   DWELL, MIX on the selected engine), OUTPUT EQ (menu only). Knobs drag vertically or
+   DWELL, MIX on the selected engine). Output EQ has no pedal; it lives in the menu. Knobs drag vertically or
    scroll; encoders step one detent per 14 px or scroll notch. The foot strip toggles the
    effect and lights its LED. The input gate is not shown (not exposed on the box).
