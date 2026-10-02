@@ -204,6 +204,13 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
 25. Enclosure is 3D printed around the board: about 12 mm above the board
     for the controls, 1.6 mm board, about 29 mm below for the combo jack,
     plus walls. No footswitch.
+26. Mounting (owner 2026-10-02, option A): four M3 holes H101-H104 at 5 mm
+    in from each edge (53.5/243.5 x 35/175), each with a 7 mm "m3seat"
+    copper keep-out, plus two unscrewed rest bosses under the board at
+    (100, 100) and (197, 100) with 8 mm "rest_boss" keep-outs on both
+    copper layers. No centre screw. The panel toggles' nuts tie the panel
+    to the board. Panel grid: eight stage columns at 24 mm pitch centred on
+    the board (x 64.5 .. 232.5), rows y 115 (toggles), 142, 164/168.
 
 ## 3D model rule (owner 2026-10-02)
 
