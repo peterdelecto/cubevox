@@ -28,7 +28,29 @@ struct ReverbParams {
   ChasmParams chasm;
   SpringCParams parker;
   float mix = 0.15f;  // panel knob 0 dry .. 1 wet; vocal default (owner 2026-10-01)
+  float intensity = 0.5f;  // panel knob; sets every engine's decay and dwell
 };
+
+// INTENSITY drives decay and dwell together, piecewise linear through
+// 0 / 0.5 / 1. 0.5 lands on each engine's default decay and dwell.
+struct IntensityCurve {
+  float lo, mid, hi;
+  float at(float t) const {
+    t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+    return t < 0.5f ? lo + (mid - lo) * 2.0f * t : mid + (hi - mid) * (2.0f * t - 1.0f);
+  }
+};
+constexpr IntensityCurve kSpringDecay{0.30f, 0.55f, 0.85f};
+constexpr IntensityCurve kChasmDecay{0.10f, 0.30f, 0.70f};
+constexpr IntensityCurve kParkerDecay{0.25f, 0.50f, 0.85f};
+constexpr IntensityCurve kReverbDwell{0.0f, 0.20f, 0.55f};  // harsh above 0.55
+
+inline void applyIntensity(ReverbParams& r) {
+  r.spring.tension = kSpringDecay.at(r.intensity);
+  r.chasm.decay = kChasmDecay.at(r.intensity);
+  r.parker.tension = kParkerDecay.at(r.intensity);
+  r.spring.dwell = r.chasm.dwell = r.parker.dwell = kReverbDwell.at(r.intensity);
+}
 
 class Reverb {
  public:
