@@ -332,15 +332,19 @@ bool testBandLimit() {
                 "300 Hz-4 kHz over >7 kHz = %.1f dB (>=45)", gap);
 }
 
-// 7. Three springs: distinct |ACF| local maxima near each T_D in 45-65 ms.
+// 7. Three springs: distinct |ACF| local maxima near each T_D, searched 5 ms
+// either side of the shortest and longest spring.
 bool testDetune() {
   cv::SpringCParams p = params(0.5f, 0.0f);
   p.tuning.springs = 3;
   const Signal ir = impulse(p, ms(300), -1);
-  const std::vector<double> r = autocorr(ir, ms(300), ms(70));
+  const auto& f = p.tuning.tdFactor;
+  const double lo = p.tuning.tdMs * std::fmin(f[0], std::fmin(f[1], f[2])) - 5.0;
+  const double hi = p.tuning.tdMs * std::fmax(f[0], std::fmax(f[1], f[2])) + 5.0;
+  const std::vector<double> r = autocorr(ir, ms(300), ms(static_cast<int>(hi) + 2));
   std::vector<int> peaks;
   double top = 0.0;
-  for (int l = ms(45); l <= ms(65); ++l) {
+  for (int l = ms(static_cast<int>(lo)); l <= ms(static_cast<int>(hi)); ++l) {
     const double v = std::fabs(r[at(l)]);
     if (v >= std::fabs(r[at(l - 1)]) && v > std::fabs(r[at(l + 1)])) {
       peaks.push_back(l);

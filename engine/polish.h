@@ -20,7 +20,7 @@ struct PolishTuning {
 
 struct PolishParams {
   bool on = true;
-  float hpHz = 90.0f;          // 40..200
+  float hpHz = 110.0f;         // 40..200
   float dipHz = 300.0f;        // 150..600
   float dipDb = -2.5f;         // -6..0
   float presenceHz = 3500.0f;  // 2000..6000

@@ -120,46 +120,8 @@ constexpr Anchor kPrkModDepth{2.0f, 8.0f, 16.0f};
 constexpr Anchor kPrkLp{5000.0f, 9000.0f, 14000.0f, I::Log};
 constexpr Anchor kPrkPresenceHz{2500.0f, 3000.0f, 4000.0f, I::Log};
 
-// The middle anchors are today's defaults; a drift fails the build.
-static_assert(kOctSlide.mid == OctaveTuning{}.glideMs, "octave slide");
-static_assert(kHarGlide.mid == HarmonyTuning{}.glideMs, "harmony glide");
-static_assert(kUniDetune.mid == UnisonTuning{}.detuneCents[0], "unison detune");
-static_assert(kDisInputHp.mid == DistortionTuning{}.inputHpHz, "dist input hp");
-static_assert(kDisS1BassDb.mid == DistortionTuning{}.s1BassDb, "dist s1 bass");
-static_assert(kDisStackBassDb.mid == DistortionTuning{}.stackBassDb, "dist stack bass");
-static_assert(kDisBassPeakDb.mid == DistortionTuning{}.bassPeakDb, "dist bass peak");
-static_assert(kDisS1Lp.mid == DistortionTuning{}.s1LpHz, "dist s1 lp");
-static_assert(kDisStackTrebleDb.mid == DistortionTuning{}.stackTrebleDb, "dist stack treble");
-static_assert(kDisS2Lp.mid == DistortionTuning{}.s2LpHz, "dist s2 lp");
-static_assert(kDisTrebleCutDb.mid == DistortionTuning{}.trebleCutDb, "dist treble cut");
-static_assert(kDisRailAsym.mid == DistortionTuning{}.railAsym, "dist rail asym");
-static_assert(kDisRailSoft.mid == DistortionTuning{}.railSoft, "dist rail soft");
-static_assert(kSprHfMixDbLo.mid == SpringTuning{}.hfMixDbLo, "spring hf lo");
-static_assert(kSprHfMixDbHi.mid == SpringTuning{}.hfMixDbHi, "spring hf hi");
-static_assert(kSprRipple.mid == SpringTuning{}.rippleGain, "spring ripple");
-static_assert(kSprDiffuse.mid == SpringTuning{}.splashDiffuse, "spring diffuse");
-static_assert(kSprHfSections.mid == static_cast<float>(SpringTuning{}.hfSections), "spring sections");
-static_assert(kSprModDepth.mid == SpringTuning{}.modDepth, "spring mod depth");
-static_assert(kSprModRate.mid == SpringTuning{}.modRateHz, "spring mod rate");
-static_assert(kSprSprings.mid == static_cast<float>(SpringTuning{}.springs), "spring springs");
-static_assert(kSprHp.mid == SpringTuning{}.hpHz, "spring hp");
-static_assert(kSprBoingDb.mid == SpringTuning{}.boingDb, "spring boing");
-static_assert(kSprDripA.mid == SpringTuning{}.dripA, "spring drip a");
-static_assert(kSprDripSections.mid == static_cast<float>(SpringTuning{}.dripSections), "spring drip m");
-static_assert(kChmWobble.mid == ChasmParams{}.wobble, "chasm wobble");
-static_assert(kChmTrebleLoss.mid == ChasmTuning{}.trebleLossHz, "chasm treble loss");
-static_assert(kChmInputTrebleCut.mid == ChasmTuning{}.inputTrebleCut, "chasm input cut");
-static_assert(kChmBassCut.mid == ChasmTuning{}.bassCutHz, "chasm bass cut");
-static_assert(kChmBassCutTop.mid == ChasmTuning{}.bassCutHzTop, "chasm bass cut top");
-static_assert(kPrkHfMixDb.mid == SpringCTuning{}.hfMixDb, "parker hf mix");
-static_assert(kPrkEcho.mid == SpringCTuning{}.echoGain, "parker echo");
-static_assert(kPrkRipple.mid == SpringCTuning{}.rippleGain, "parker ripple");
-static_assert(kPrkPresenceDb.mid == SpringCTuning{}.presenceDb, "parker presence db");
-static_assert(kPrkALf.mid == SpringCTuning{}.aLf, "parker aLf");
-static_assert(kPrkMLow.mid == static_cast<float>(SpringCTuning{}.mLow), "parker mLow");
-static_assert(kPrkModDepth.mid == SpringCTuning{}.modDepth, "parker mod depth");
-static_assert(kPrkLp.mid == SpringCTuning{}.lpHz, "parker lp");
-static_assert(kPrkPresenceHz.mid == SpringCTuning{}.presenceHz, "parker presence hz");
+// The default positions reproduce the engine tuning defaults; the --layout
+// probe fails when they drift apart.
 
 // ---- Macro positions ---------------------------------------------------------
 
@@ -200,9 +162,14 @@ constexpr const char* kStateKey[kCount] = {
     "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "ParkerSplash",  "ParkerDrip",
     "ParkerFlutter",  "ParkerBrightness", "SpringDrip"};
 
+// Adam's starting positions (owner 2026-10-02), in Id order.
+constexpr std::array<float, kCount> kDefaultPos = {
+    50.0f, 50.0f, 0.0f,  0.0f,  50.0f, 60.0f, 50.0f, 65.0f, 29.0f,
+    63.0f, 85.0f, 85.0f, 50.0f, 41.0f, 90.0f, 89.0f, 100.0f, 30.0f};
+
 struct State {
   std::array<float, kCount> pos;
-  State() { pos.fill(kCenter); }
+  State() : pos(kDefaultPos) {}
 };
 
 // "Macros: Slide 50 %, Tracking speed 50 %, ..." with every macro, moved or not.
@@ -227,13 +194,19 @@ inline void harmonyTracking(HarmonyTuning& t, float pos) { t.glideMs = at(kHarGl
 // Chorus <-> Double (blend) and RATE (rate) both shape the sweep, so one function
 // writes every field they touch. Blend: detune grows and the swing shrinks.
 // Rate: the LFOs speed up; past today's rate the swing narrows to cap the pitch swing.
+// Unison at Chorus-Double 50 % and RATE 50 %; the macro scales from here.
+struct UnisonBase {
+  float lfoHz[2] = {0.60f, 0.90f};
+  float swingMinMs = 0.5f, swingMaxMs = 3.0f;
+};
+
 inline void unison(UnisonTuning& t, float blendPos, float ratePos) {
-  const UnisonTuning base;
+  const UnisonBase base;
   const float d = at(kUniDetune, blendPos);
   const float m = at(kUniLfoScale, ratePos);
   const float swing = at(kUniSwingScale, blendPos) * (m > kUniMaxSwingGrowth ? kUniMaxSwingGrowth / m : 1.0f);
   t.detuneCents[0] = d;
-  t.detuneCents[1] = -d;
+  t.detuneCents[1] = 0.0f - d;  // +0, not -0, at no detune
   t.swingMinMs = base.swingMinMs * swing;
   t.swingMaxMs = base.swingMaxMs * swing;
   t.lfoHz[0] = base.lfoHz[0] * m;

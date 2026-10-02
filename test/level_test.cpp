@@ -217,8 +217,8 @@ int main() {
 
   cv::UnisonParams unison;
   unison.on = true;
-  unison.depth = 0.8f;
-  ok &= simple<cv::Unison>("unison depth .8", in, unison);
+  unison.depth = 0.5f;  // Adam default
+  ok &= simple<cv::Unison>("unison depth .5", in, unison);
 
   cv::SlapbackParams slap;
   slap.on = true;

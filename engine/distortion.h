@@ -17,25 +17,25 @@ struct DistortionTuning {
   // stage 1 shaping, before its saturator
   float s1BassHz = 700.0f;        // low shelf cut corner
   float s1BassDb = -12.0f;        // low shelf depth below s1BassHz
-  float s1LpHz = 6000.0f;         // top roll-off
+  float s1LpHz = 6892.0f;         // top roll-off
   float gain1Min = 16.0f;         // stage gain at DRIVE 0
   float gain1Max = 45.0f;         // stage gain at DRIVE 1
   // tone stack between the stages (bass 10 / mid 6 / treble 0)
   float stackBassHz = 400.0f;     // low shelf boost corner
   float stackBassDb = 10.0f;
   float stackTrebleHz = 2000.0f;  // high shelf cut corner
-  float stackTrebleDb = -5.0f;
+  float stackTrebleDb = -4.0f;
   float stackLossDb = -20.0f;     // insertion loss
   // stage 2
   float s2HpHz = 100.0f;
-  float s2LpHz = 6000.0f;
+  float s2LpHz = 6645.0f;
   float gain2Min = 2.0f;
   float gain2Max = 7.5f;
   float railAsym = 0.05f;         // 0..0.5; positive rail 1, negative -(1 - asym)
   float railSoft = 0.1f;          // soft edge as a fraction of the rail
   // post
   float trebleCutHz = 1000.0f;    // fixed high shelf cut
-  float trebleCutDb = -6.0f;
+  float trebleCutDb = -5.4f;
   float toneMinDb = -12.0f;       // TONE fully down: extra shelf gain above trebleCutHz
   float toneMaxDb = 6.0f;         // TONE fully up
   float bassPeakHz = 120.0f;      // gyrator bump

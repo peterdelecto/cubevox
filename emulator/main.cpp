@@ -62,10 +62,11 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 
 // The emulator opens with the knob where the owner left it; on the box the
 // pot decides (owner 2026-10-01: DEPTH 80 %).
-constexpr float kStartDepth = 0.8f;
+constexpr float kStartDepth = 0.5f;
+constexpr int kStartKey = 11;  // F / Dm (kKeyName runs round the circle of fifths)
 constexpr float kStartIntensity = 0.25f;
-constexpr float kStartDrive = 0.2f;
-constexpr float kStartTone = 0.5f;   // BD-2 TONE at noon is flat
+constexpr float kStartDrive = 0.65f;
+constexpr float kStartTone = 1.0f;
 // Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
 // mis-trigger never reads as a dropout; release is short by owner choice.
 constexpr float kInputGateThresholdDb = -12.0f;
@@ -120,10 +121,18 @@ struct ProtoParams {
     pitchFx.harmony.slots[2] = {cv::HarmonyVoice::Low, 0, 0.0f};
     pitchFx.octave.on = false;
     unison.on = false;
-    slapback.on = false;
     distortion.on = false;
     reverb.on = false;
-    eq.on = false;
+    // Adam's starting point (owner 2026-10-02).
+    slapback.on = true;
+    eq.on = true;
+    pitchFx.harmony.key = kStartKey;  // Autotune follows through the shared KEY
+    pitchFx.autotune.key = kStartKey;
+    pitchFx.octave.engine = 2;
+    pitchFx.octave.mix = 0.10f;
+    reverb.engine = cv::kReverbParker;
+    reverb.intensity = 1.0f;
+    cv::applyIntensity(reverb);
   }
 };
 
@@ -375,12 +384,13 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
 
 // Finder launches have no stdout, so the text also goes to the clipboard
 // and into a read-only field beside the button.
-void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
-                 const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
-                 const cv::DistortionTuning& d, const cv::SpringTuning& sp,
-                 const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
-                 const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
-                 const cv::AutotuneTuning& at, const ProtoParams& params) {
+// Fills gTuningText with the copied-settings text.
+void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
+                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
+                  const cv::DistortionTuning& d, const cv::SpringTuning& sp,
+                  const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
+                  const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
+                  const cv::AutotuneTuning& at, const ProtoParams& params) {
   const int prefix = static_cast<int>(snapshotLines(params, gTuningText, sizeof(gTuningText)));
   char line[512];
   int len = std::snprintf(
@@ -449,6 +459,15 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
       at.trimDb, at.maxCorrectSemis, at.shifter.grainPeriods, at.shifter.epochSearch,
       at.shifter.epochLpHz, at.shifter.grainWindowMs, at.shifter.grainCount);
+}
+
+void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
+                 const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
+                 const cv::DistortionTuning& d, const cv::SpringTuning& sp,
+                 const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
+                 const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
+                 const cv::AutotuneTuning& at, const ProtoParams& params) {
+  formatTuning(h, o, t, s, d, sp, c, pk, e, ig, g, at, params);
   std::printf(
       "// AutotuneTuning: trimDb, maxCorrectSemis, "
       "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
@@ -2100,6 +2119,27 @@ int runLayoutProbe() {
   std::printf("state round trip: %d fields, %s\n", set, stateOk ? "ok" : "FAILED");
   if (!stateOk) fits = false;
 
+  // Default macro positions must reproduce the engine tuning defaults (the firmware's).
+  const auto tuningText = [](const ProtoParams& q) {
+    formatTuning(q.pitchFx.harmony.tuning, q.pitchFx.octave.tuning, q.unison.tuning,
+                 q.slapback.tuning, q.distortion.tuning, q.reverb.spring.tuning,
+                 q.reverb.chasm.tuning, q.reverb.parker.tuning, q.eq, q.inputGate.tuning,
+                 q.gate.tuning, q.pitchFx.autotune.tuning, q);
+    return std::string(gTuningText);
+  };
+  ProtoParams engineDefaults;
+  ProtoParams viaMacros;
+  applyMacros(viaMacros);
+  const bool defaultsOk =
+      tuningText(engineDefaults) == tuningText(viaMacros) &&
+      std::fabs(engineDefaults.reverb.chasm.wobble - viaMacros.reverb.chasm.wobble) < 0.001f;
+  std::printf("default macros match engine defaults: %s\n", defaultsOk ? "ok" : "FAILED");
+  if (!defaultsOk) {
+    std::printf("engine:\n%s\nmacros:\n", tuningText(engineDefaults).c_str());
+    std::printf("%s\n", tuningText(viaMacros).c_str());
+    fits = false;
+  }
+
   std::printf("layout %dx%d: %s\n", kWindowW, kWindowH, fits ? "ok" : "column overrun");
   return fits ? 0 : 1;
 }
@@ -2194,12 +2234,26 @@ int runWindow() {
   return 0;
 }
 
+// Prints the copied-settings text of a fresh app, no window.
+int printDefaults() {
+  ImGui::CreateContext();
+  ProtoParams params;
+  applyMacros(params);
+  printTuning(params.pitchFx.harmony.tuning, params.pitchFx.octave.tuning, params.unison.tuning,
+              params.slapback.tuning, params.distortion.tuning, params.reverb.spring.tuning,
+              params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq,
+              params.inputGate.tuning, params.gate.tuning, params.pitchFx.autotune.tuning, params);
+  ImGui::DestroyContext();
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     if (std::strcmp(argv[i], "--layout") == 0) return runLayoutProbe();
-    std::fprintf(stderr, "usage: cubevox-proto [--layout]\n");
+    if (std::strcmp(argv[i], "--print-defaults") == 0) return printDefaults();
+    std::fprintf(stderr, "usage: cubevox-proto [--layout | --print-defaults]\n");
     return 2;
   }
   return runWindow();

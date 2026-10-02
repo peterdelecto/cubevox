@@ -22,19 +22,19 @@ namespace cv {
 
 struct SpringTuning {
   float inputGain = 0.5f;                       // ahead of the high-pass and clip
-  float hpHz = 300.0f;
+  float hpHz = 236.0f;
   float tensionLo = 0.60f, tensionHi = 0.97f;   // |g| at TENSION 0 / 1
   float dwellDrive = 32.0f, dwellComp = 0.80f;
-  float hfMixDbLo = -22.0f, hfMixDbHi = -14.0f;  // C_hf mix at DWELL 0 / 1
-  float rippleGain = 0.10f;                     // pre-echo taps, paper 0.1
-  float splashDiffuse = 0.0f;                   // 0 off .. 0.9
-  int hfSections = 0;                           // 0..200
+  float hfMixDbLo = -18.4f, hfMixDbHi = -11.0f;  // C_hf mix at DWELL 0 / 1
+  float rippleGain = 0.16f;                     // pre-echo taps, paper 0.1
+  float splashDiffuse = 0.21f;                  // 0 off .. 0.9
+  int hfSections = 36;                          // 0..200
   int springs = 2;                              // 2 or 3
-  float modDepth = 8.0f, modRateHz = 3.0f;
-  float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float dripA = 0.75f;                          // C_lf allpass coefficient; higher = longer drip
-  int dripSections = 130;                       // C_lf sections, 1..130
-  float wetDb = 3.1f;                           // trim; level rule at MIX 1 (wet only)
+  float modDepth = 5.5f, modRateHz = 2.24f;
+  float boingDb = 1.6f;                         // 95 Hz resonator, 0 = off
+  float dripA = 0.69f;                          // C_lf allpass coefficient; higher = longer drip
+  int dripSections = 110;                       // C_lf sections, 1..130
+  float wetDb = 1.95f;                          // trim; level rule at MIX 1 (wet only)
   float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 

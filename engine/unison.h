@@ -15,11 +15,11 @@ namespace cv {
 struct UnisonTuning {
   // Owner-tuned by ear 2026-10-01 against dry vocal loops.
   float baseDelayMs[2] = {20.0f, 15.0f};
-  float lfoHz[2] = {0.60f, 0.90f};
-  float swingMinMs = 0.5f;   // modulation swing (peak) at DEPTH 0
-  float swingMaxMs = 3.0f;   // modulation swing (peak) at DEPTH 1
+  float lfoHz[2] = {0.20f, 0.30f};
+  float swingMinMs = 1.0f;   // modulation swing (peak) at DEPTH 0
+  float swingMaxMs = 6.0f;   // modulation swing (peak) at DEPTH 1
   float wetMaxDb = -4.0f;   // per-voice level at DEPTH 1
-  float detuneCents[2] = {2.0f, -2.0f};  // fixed per-voice detune at DEPTH 1
+  float detuneCents[2] = {0.0f, 0.0f};  // fixed per-voice detune at DEPTH 1
   float windowMs = 20.0f;    // crossfade window of the dual-tap shifter
   // Whole-output gain (dry + wet) at DEPTH 1, scaled by depth in dB; level rule at DEPTH 0.8.
   float trimDb = -1.4f;

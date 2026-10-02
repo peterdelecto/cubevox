@@ -44,9 +44,9 @@ namespace cv {
 
 struct ChasmTuning {
   float timeLo = 0.35f, timeHi = 0.86f;  // feedback at DECAY 0 / 1
-  float trebleLossHz = 3000.0f;
+  float trebleLossHz = 5429.0f;
   float loopTrebleCut = 1.0f;            // 1 = off
-  float inputTrebleCut = 0.95f;
+  float inputTrebleCut = 0.99f;
   float bassCutHz = 200.0f, bassCutHzTop = 100.0f;
   float wobbleDepthMax = 64.0f;          // samples
   float wobbleRateLo = 0.5f, wobbleRateHi = 7.0f;
@@ -58,7 +58,7 @@ struct ChasmTuning {
 
 struct ChasmParams {
   float decay = 0.30f;  // knob 1; vocal default
-  float wobble = 0.15f; // tuning; vocal default
+  float wobble = 0.626f; // tuning; Adam default (Wobble 85 %)
   float dwell = 0.20f;  // knob 2; input drive
   ChasmTuning tuning;
 };
