@@ -160,6 +160,17 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
     wall. All panel jacks are THT so they cannot be pulled off the board.
 25. Enclosure is 3D printed around the board. No footswitch.
 
+## 3D model rule (owner 2026-10-02)
+
+Every part that reaches the panel or a wall (pots, encoders, toggles, jacks,
+USB-C, barrel) needs a 3D model whose height matches its datasheet before the
+enclosure is designed. EasyEDA/JLC models are often the family's generic body:
+the EC11N model is the 20-code shaft (24.5 mm tip, ours is 19.5) and the RK09D
+model measured 34.8 mm. Procedure: fetch the manufacturer STEP for the exact
+MPN; if none, build a simplified model from the drawing; in both cases measure
+the STEP's z extent against the datasheet and record it in PARTS.md. The
+toggle's EasyEDA STEP measured 23.6 mm and matches.
+
 ## Datasheet findings (2026-10-02)
 
 - PJ-002A: centre pin Ø2.0 mm (datasheet), pin 1 = centre; pins 2/3 are a
