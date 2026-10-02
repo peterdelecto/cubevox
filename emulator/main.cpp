@@ -1696,7 +1696,7 @@ void pedal(const char* name, bool& on, float width, const F& knobs) {
 
 // Panel knobs only, signal order left to right. Encoders sit below the knobs.
 void drawPedals(ProtoParams& params) {
-  constexpr int kPedals = 9;
+  constexpr int kPedals = 8;
   const float w = (ImGui::GetContentRegionAvail().x - (kPedals - 1) * kPedalGap) / kPedals;
   gPedalRight = 0.0f;
   gPedalBottom = 0.0f;
@@ -1723,6 +1723,7 @@ void drawPedals(ProtoParams& params) {
       at.chromatic = false;  // picking a key leaves every-note mode, as on the full face
       if (params.linkAutotuneKey) h.key = at.key;
     }
+    toggleButton("AUTOTUNE", at.on);
   });
   next();
   pedal("OCTAVE", o.on, w, [&] {
