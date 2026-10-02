@@ -46,6 +46,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 | 14 | Top face | Signal-flow row like the pedal view, about 230 × 110 mm, provisional. Arrangement is decided at the PCB step, not now |
 | 15 | Gain structure | Two stages, 20 dB fixed + 0–40 dB on the pot. 1/4" contacts carry a 20 dB pad; menu item 1/4" INPUT: PEDAL / MIC adds 20 dB in firmware for a mic on a TRS cable; the combo's normalling contact tells the MCU a 1/4" plug is in |
 | 16 | Power ground | Centre pin straight to GND, +9 V sleeve through a series Schottky and TVS. fxbox's either-polarity FET bridge is dropped because the Boss daisy chain and the audio cable share ground with the BD-2 |
+| 17 | Toggle switch | Yuen Fung ST-0-102-A01-T000-LF (C1788487), the only ON-ON bat toggle on JLC whose bushing spans the 11.8 mm panel plane; lever tip 3.6 mm above the knobs |
 
 ## Decisions
 
@@ -135,11 +136,16 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
     ø6 D-cut with a 4.5 mm flat, so one knob fits all. The 20-code EC11N
     parts are 5 mm too tall. Pot bushing figure read from a scanned drawing,
     ±0.2 mm.
-21. Toggles. One switch part for every toggled control; owner picks. Eight
-    inputs TOGGLE1..8 (TOGGLE1 = autotune; the bypass toggle is in the relay
-    block, item 7), each 10 kΩ pull-up to 3V3, 100 nF to GND, GPIO. Until the
-    part is chosen each toggle is drawn as a 1×3 THT header; the footprint is
-    swapped at layout. No LEDs on toggles; the lever shows the state.
+21. Toggles (owner 2026-10-02): Yuen Fung ST-0-102-A01-T000-LF, LCSC
+    C1788487, mini bat lever, SPDT ON-ON, vertical THT, 2.54 mm pitch, body
+    8.6 mm, M5 bushing 8.6–14.2 mm above the board (spans the 11.8 mm panel
+    plane; the printed panel hole captures it, no nut), lever tip 23.6 mm.
+    Nine per board: eight inputs TOGGLE1..8 (TOGGLE1 = autotune) each with
+    the common pin to GPIO, 10 kΩ pull-up to 3V3, 100 nF to GND, one throw to
+    GND and the other no-connect; plus the bypass toggle in the relay block
+    (item 7), common to the coil, one throw to 5V, the other no-connect. No
+    LEDs on toggles; the lever shows the state. Datasheet gives AC ratings
+    only; 5 V DC at 21 mA is far inside them.
 22. OLED. 1.3" SH1106, I2C 400 kHz on an MCU I2C peripheral with free pins,
     4.7 kΩ pull-ups, 4-pin header C2691448 (3V3, GND, SCL, SDA). Module is
     hand-plugged; the header is assembled.
@@ -172,7 +178,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 
 ## Recommended next steps
 
-1. Owner reports: toggle switch part, Adam's list of toggled stages.
+1. Owner reports: Adam's list of toggled stages (which of TOGGLE2..8 are populated).
 2. Library: drop NE5532DR and the probe headers, import OPA1678IDR and SS34,
    NCJ6FA-H part card + import, passives with Basic codes; PARTS.md.
 3. JSON block spec from the Decisions above; `foreman schematic`; ERC 0;
