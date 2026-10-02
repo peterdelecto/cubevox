@@ -250,7 +250,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "0531e557-b259-4e31-a70b-3c7005a88d1b")
-		(at 101.333333 136 180)
+		(at 120 136 180)
 		(property "Reference" "RV104"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -555,7 +555,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "0562204c-8b2a-4fb2-97eb-9223462ba932")
-		(at 135.333333 102 180)
+		(at 154 102 180)
 		(property "Reference" "SW109"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -3210,7 +3210,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "0f5a8019-947b-4b67-9537-2494f12bf2bf")
-		(at 141.333333 136 180)
+		(at 160 136 180)
 		(property "Reference" "RV102"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -3515,7 +3515,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "107b59ff-e555-4e3e-9f75-2ad7efdb1333")
-		(at 81.333333 116 180)
+		(at 100 116 180)
 		(property "Reference" "RV114"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -7404,7 +7404,7 @@
 	(footprint "cubevox:SW-TH_EC11NXXXX"
 		(layer "F.Cu")
 		(uuid "2b135c6e-fbdd-437a-99d7-9110d5075df7")
-		(at 41.333333 116 180)
+		(at 60 116 180)
 		(property "Reference" "SW105"
 			(at 0 -11.25 180)
 			(layer "F.SilkS")
@@ -8171,7 +8171,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "2f425449-5cd6-4b54-aecd-1584d380fb04")
-		(at 83.333333 102 180)
+		(at 102 102 180)
 		(property "Reference" "SW113"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -10314,7 +10314,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "36ba59e5-5221-4261-93f8-bc30fe828d14")
-		(at 61.333333 136 180)
+		(at 80 136 180)
 		(property "Reference" "RV106"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -15669,7 +15669,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "5c1da98c-5148-4531-99ad-acfebb167ceb")
-		(at 41.333333 136 180)
+		(at 60 136 180)
 		(property "Reference" "RV107"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -17278,7 +17278,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "63f72cc4-e1a5-47e7-b7ce-e85500affd41")
-		(at 57.333333 102 180)
+		(at 76 102 180)
 		(property "Reference" "SW115"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -19888,7 +19888,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "6ef74d06-b151-4e6f-8981-8fb9b2ab2733")
-		(at 141.333333 116 180)
+		(at 160 116 180)
 		(property "Reference" "RV111"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -20193,7 +20193,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "7030a6ee-6ebd-471a-bbf2-3ab2fb48e19e")
-		(at 121.333333 136 180)
+		(at 140 136 180)
 		(property "Reference" "RV103"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -21370,7 +21370,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "7379f20f-2309-420b-97eb-0f78c124a779")
-		(at 21.333333 136 180)
+		(at 40 136 180)
 		(property "Reference" "RV108"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -24114,7 +24114,7 @@
 	(footprint "cubevox:SW-TH_EC11NXXXX"
 		(layer "F.Cu")
 		(uuid "806dac34-7d42-4ff3-a779-b757f7024e3b")
-		(at 61.333333 116 180)
+		(at 80 116 180)
 		(property "Reference" "SW104"
 			(at 0 -11.25 180)
 			(layer "F.SilkS")
@@ -25972,7 +25972,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "856dc8c7-1c56-4708-901c-c859291bb99f")
-		(at 148.333333 102 180)
+		(at 167 102 180)
 		(property "Reference" "SW108"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -28458,7 +28458,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "8f382ba2-b242-47c4-8389-921656123dc5")
-		(at 161.333333 136 180)
+		(at 180 136 180)
 		(property "Reference" "RV101"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -28763,7 +28763,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "8f6c5724-9f5f-484a-839d-1011b1ece052")
-		(at 121.333333 116 180)
+		(at 140 116 180)
 		(property "Reference" "RV112"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -32089,7 +32089,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "a1a6c87d-3409-40b0-96e0-1d015f12f10f")
-		(at 122.333333 102 180)
+		(at 141 102 180)
 		(property "Reference" "SW110"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -32327,7 +32327,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "a243daef-8869-483d-8a1f-5afaf8bb7a63")
-		(at 1.333333 116 180)
+		(at 20 116 180)
 		(property "Reference" "RV115"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -32790,7 +32790,7 @@
 	(footprint "cubevox:SW-TH_EC11NXXXX"
 		(layer "F.Cu")
 		(uuid "a5709ba1-9cef-40be-8b72-6f3408c8ab5b")
-		(at 21.333333 116 180)
+		(at 40 116 180)
 		(property "Reference" "SW106"
 			(at 0 -11.25 180)
 			(layer "F.SilkS")
@@ -35889,7 +35889,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "b53ffc13-0d99-4d0d-bbe8-74da15c15725")
-		(at 70.333333 102 180)
+		(at 89 102 180)
 		(property "Reference" "SW114"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -36127,7 +36127,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "b6d9d2ab-e6f2-4816-a9ff-6b744beb9f11")
-		(at 101.333333 116 180)
+		(at 120 116 180)
 		(property "Reference" "RV113"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -37456,7 +37456,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "ba3fa748-3b37-4ffd-8976-8f1821b15749")
-		(at 109.333333 102 180)
+		(at 128 102 180)
 		(property "Reference" "SW111"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -40323,7 +40323,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "c6e5dfee-d0ab-4b8c-a7a5-514cc7b4cca5")
-		(at 1.333333 136 180)
+		(at 20 136 180)
 		(property "Reference" "RV109"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -42000,7 +42000,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "cc7e03e1-4607-4b8c-abce-07c0622c7a9f")
-		(at 161.333333 102 180)
+		(at 180 102 180)
 		(property "Reference" "SW107"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -43424,7 +43424,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "d4d11c6f-8104-4a0d-a448-614c20b8394f")
-		(at 96.333333 102 180)
+		(at 115 102 180)
 		(property "Reference" "SW112"
 			(at 0 -4 180)
 			(layer "F.SilkS")
@@ -44084,7 +44084,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "df15d5bf-a3ef-41fd-b9a6-d4ac3ba838b8")
-		(at 81.333333 136 180)
+		(at 100 136 180)
 		(property "Reference" "RV105"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
@@ -49561,7 +49561,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "f4d1b207-7d14-415b-b620-d401b43ef8a9")
-		(at 161.333333 116 180)
+		(at 180 116 180)
 		(property "Reference" "RV110"
 			(at 0 -7.5 180)
 			(layer "F.SilkS")
