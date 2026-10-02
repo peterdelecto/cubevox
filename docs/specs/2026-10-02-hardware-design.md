@@ -67,7 +67,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
    A2 non-inverting with Rf 4.7 kΩ each and RG 1 kΩ between inverting inputs,
    G = 1 + 2·4.7k/1k = 10.4 (20.3 dB). Difference amp A3 with four 10 kΩ, gain
    1, reference VREF. 47 pF across each Rf. Output PRE1.
-4. Stage 2, 0–40 dB on the Input Gain pot (RK09D1130C2P 10 kΩ linear, wired
+4. Stage 2, 0–40 dB on the Input Gain pot (RK09D1130C1B 10 kΩ linear, wired
    as a variable resistor, wiper tied to one end). Non-inverting on A4:
    feedback = pot + 100 Ω end-stop, 100 Ω from inverting input to VREF,
    47 pF across the feedback. G = 1 + (Rpot + 100)/100 = 2 .. 102, so the
@@ -123,11 +123,16 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 
 ### Panel
 
-19. 14 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part (owner
-    2026-10-02): Alps RK09D1130C2P, LCSC C361173, 10 kΩ THT, Extended tier,
-    taller shaft than recent builds. Same part for the analog Input Gain pot,
-    15 in total. Catalog stock 174; a build of N units needs 15 N, so
-    `jlc_stock_check` before ordering.
+19. 14 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part: Alps
+    RK09D1130C1B, LCSC C470304, 10 kΩ linear, THT, Extended, $0.84 at 10+,
+    stock 986 live 2026-10-02. Alps's own STEP (file RK09D1130-F20) measures
+    shaft tip 20.0 mm and collar top 11.85 mm above the mounting surface,
+    ø6 D-shaft with 4.5 mm flat, matching the encoder (19.5 / 11.5). Same
+    part for the analog Input Gain pot, 15 in total; a build of N units needs
+    15 N. Supersedes RK09D1130C2P (C361173, owner pick earlier the same day):
+    Alps's F25 model shows a 25 mm shaft and the owner measured 13.5 mm on a
+    sample, so that code is not trusted. Measure one C470304 sample before
+    ordering fifteen.
 20. Three encoders on direct GPIO (owner 2026-10-02): MENU with push switch,
     KEY and SEMITONES without. Alps EC11N, shaft code 15: EC11N1525404
     (C470748, with switch) and EC11N1520401 (C470703, no switch), THT with
