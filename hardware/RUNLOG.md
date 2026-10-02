@@ -9,3 +9,4 @@ placement skeleton | D0002, ledger 0018, commit 7fb2764 | U1 (106,84,0) SAI pins
 placement usb_esd | D0003, ledger 0019, commit 1fed204 | intended 6, unintended 0; airline USB_DM 48.95>53.67 (budget 50, EXCEEDED), USB_DP 48.16>54.69 (budget 50, EXCEEDED), reach C18 5.68>3.93, body_tight 8>7, drc 92>88. Engine row at y 39.05 x 116-134.
 placement input_9v | D0004, ledger 0020, commit a9ead93bea4d | intended 4, unintended 0; airline_total_mm 13886.2>13897.4; reach:D105 123.95>134.79; reach:D106 124.92>139.62; 
 placement buck5_in | D0005, ledger 0021, commit 25a1a75168c1 | intended 4, unintended 0; airline_total_mm 13897.4>13913.9; reach:C112 5.27>8.39; reach:C113 1.99>8.03; 
+placement buck33_out | D0006, ledger 0022, commit 7de04acd3295 | intended 5, unintended 0; airline:/h7core_block/BUCK_SW 8.985>11.829; airline_total_mm 13913.9>13915.8; reach:C21 10.46>8.88; reach:C22 12.53>8.85; 
