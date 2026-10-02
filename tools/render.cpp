@@ -58,7 +58,7 @@ int usage() {
                "  pitch front end runs with --harmony, --octave or --autotune; formant applies on --hengine 1\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb or --spring\n"
-               "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, eq\n"
+               "  at least one stage must run; order is ingate, pitch, unison, slapback, gate, distortion, reverb, eq\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  eq runs only with --eq\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
@@ -538,13 +538,14 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         src = scratch[next];
         next ^= 1;
       }
-      if (rp.distOn) {
-        distortion.process(src, scratch[next], n, rp.distortion);
+      // Gate before the drive, as in Adam's rig.
+      if (rp.gateOn) {
+        gate.process(src, scratch[next], n, rp.gate);
         src = scratch[next];
         next ^= 1;
       }
-      if (rp.gateOn) {
-        gate.process(src, scratch[next], n, rp.gate);
+      if (rp.distOn) {
+        distortion.process(src, scratch[next], n, rp.distortion);
         src = scratch[next];
         next ^= 1;
       }
