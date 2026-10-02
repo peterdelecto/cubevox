@@ -541,10 +541,13 @@ bool tuningLeaf(const char* probeName, const char* label) {
 
 // Long tuning sections split into sub-nodes so no column ever needs a scroll bar.
 void drawHarmonyRaw(cv::HarmonyTuning& h) {
-  if (tuningNode("Levels & trims")) {
+  if (tuningNode("Levels")) {
     ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
     ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
     ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Trims")) {
     ImGui::SliderFloat("Trim A", &h.trimDb[0], -12.0f, 18.0f, "%.1f dB");
     ImGui::SliderFloat("Trim B", &h.trimDb[1], -12.0f, 18.0f, "%.1f dB");
     ImGui::SliderFloat("Trim C", &h.trimDb[2], -12.0f, 18.0f, "%.1f dB");
@@ -1711,15 +1714,15 @@ void drawPedals(ProtoParams& params) {
     }
   });
   next();
-  pedal("OCTAVE", o.on, w, [&] {
-    pedalPercent("MIX", o.mix);
-    pedalEncoder("SEMITONES", o.semitones, -12, 12, semis);
-  });
-  next();
   pedal("HARMONY", h.on, w, [&] {
     pedalPercent("MIX", h.mix);
     if (pedalEncoder("KEY", h.key, 0, 11, cv::kKeyName[h.key]) && params.linkAutotuneKey)
       at.key = h.key;
+  });
+  next();
+  pedal("OCTAVE", o.on, w, [&] {
+    pedalPercent("MIX", o.mix);
+    pedalEncoder("SEMITONES", o.semitones, -12, 12, semis);
   });
   next();
   pedal("UNISON", params.unison.on, w, [&] {
@@ -1840,13 +1843,14 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
       drawAutotuneBlock(params.pitchFx.autotune, params.linkAutotuneKey,
                         params.pitchFx.harmony.key, state);
     });
-    moduleBox("octaveBox", false,
-              [&] { drawOctaveBlock(params.pitchFx.octave, params.macros); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
+  // Autotune and Harmony share the KEY encoder, so Harmony follows Autotune.
   column(1, kHarmonyColumnW, [&] {
     moduleBox("harmonyBox", true,
               [&] { drawHarmonyBlock(params.pitchFx.harmony, params.macros); });
+    moduleBox("octaveBox", false,
+              [&] { drawOctaveBlock(params.pitchFx.octave, params.macros); });
     moduleBox("unisonBox", false, [&] { drawUnisonBlock(params.unison, params.macros); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
@@ -1904,7 +1908,7 @@ int runLayoutProbe() {
       {true, "gate", nullptr},
       {true, nullptr, nullptr, true},
       {true, "harmony", nullptr, true},
-      {true, "harmony", "Levels & trims", true}, {true, "harmony", "Tracking", true},
+      {true, "harmony", "Levels", true}, {true, "harmony", "Trims", true}, {true, "harmony", "Tracking", true},
       {true, "harmony", "Chromatic intervals", true}, {true, "harmony", "Shifter B/C", true},
       {true, "octave", nullptr, true},          {true, "unison", nullptr, true},
       {true, "unison", "Chorus (LFO-wobbled delay)", true},

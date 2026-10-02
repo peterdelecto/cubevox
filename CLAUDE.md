@@ -37,7 +37,7 @@ build/cubevox-render in.wav out.wav --depth 0.7
 ```
 
 ## Panel (planned)
-Input Gain · Soft gate (fixed, not exposed anywhere) · Autotune Key (shared encoder)+Response · Octave Semitones+Mix ·
-Harmony Key (detented encoder)+Mix (voices in menu; tracking speed in tuning) ·
+Input Gain · Soft gate (fixed, not exposed anywhere) · Autotune Key (shared encoder)+Response · Harmony Key (detented encoder)+Mix (voices in menu; tracking speed in tuning) ·
+Octave Semitones+Mix ·
 Unison Depth+Rate · Slapback Intensity (level + repeats)+Time (30..150 ms) · Distortion Drive+Tone · Gate Threshold+Decay ·
 Reverb Tension+Dwell+Mix (engine SPRING / CHASM / PARKER SPRING in menu) · EQ (menu) · Output (menu)
