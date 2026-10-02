@@ -174,7 +174,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"sprDwellComp", &sp.dwellComp},        {"sprHfMixDbLo", &sp.hfMixDbLo},
       {"sprHfMixDbHi", &sp.hfMixDbHi},        {"sprRippleGain", &sp.rippleGain},
       {"sprSplashDiffuse", &sp.splashDiffuse}, {"sprHfSections", &hfSections},
-      {"sprSprings", &springs},               {"sprModDepth", &sp.modDepth},
+      {"sprSprings", &springs},               {"sprModDepth", &sp.modDepth}, {"sprDripA", &sp.dripA},
       {"sprModRateHz", &sp.modRateHz},        {"sprBoingDb", &sp.boingDb},
       {"sprWetDb", &sp.wetDb},                {"sprTankTrim", &sp.tankTrim},
       {"chmTimeLo", &ch.timeLo},              {"chmTimeHi", &ch.timeHi},

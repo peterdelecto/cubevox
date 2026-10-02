@@ -1147,6 +1147,7 @@ void applyMacros(ProtoParams& p) {
   mc::springSplash(r.spring.tuning, m[mc::SpringSplash]);
   mc::springFlutter(r.spring.tuning, m[mc::SpringFlutter]);
   mc::springLowEnd(r.spring.tuning, m[mc::SpringLowEnd]);
+  mc::springDrip(r.spring.tuning, m[mc::SpringDrip]);
   mc::chasmWobble(r.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(r.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(r.chasm.tuning, m[mc::ChasmBass]);
@@ -1375,6 +1376,8 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
                 [&](float p) { mc::springFlutter(t, p); });
     macroSlider("Low end", "more boom from the springs", m.pos[mc::SpringLowEnd],
                 [&](float p) { mc::springLowEnd(t, p); });
+    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::SpringDrip],
+                [&](float p) { mc::springDrip(t, p); });
   }
 }
 

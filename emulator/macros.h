@@ -98,6 +98,8 @@ constexpr Anchor kSprModRate{1.5f, 3.0f, 5.0f, I::Log};
 constexpr Anchor kSprSprings{2.0f, 2.0f, 3.0f, I::Step};
 constexpr Anchor kSprHp{600.0f, 300.0f, 120.0f, I::Log};
 constexpr Anchor kSprBoingDb{0.0f, 0.0f, 6.0f};
+constexpr Anchor kSprDripA{0.60f, 0.75f, 0.85f};                     // PARKER's Drip shape
+constexpr Anchor kSprDripSections{80.0f, 130.0f, 130.0f, I::Round};
 
 // CHASM
 constexpr Anchor kChmWobble{0.0f, 0.15f, 0.83f};                    // 100 % = the old 90 % (owner 2026-10-02)
@@ -142,6 +144,8 @@ static_assert(kSprModRate.mid == SpringTuning{}.modRateHz, "spring mod rate");
 static_assert(kSprSprings.mid == static_cast<float>(SpringTuning{}.springs), "spring springs");
 static_assert(kSprHp.mid == SpringTuning{}.hpHz, "spring hp");
 static_assert(kSprBoingDb.mid == SpringTuning{}.boingDb, "spring boing");
+static_assert(kSprDripA.mid == SpringTuning{}.dripA, "spring drip a");
+static_assert(kSprDripSections.mid == static_cast<float>(SpringTuning{}.dripSections), "spring drip m");
 static_assert(kChmWobble.mid == ChasmParams{}.wobble, "chasm wobble");
 static_assert(kChmTrebleLoss.mid == ChasmTuning{}.trebleLossHz, "chasm treble loss");
 static_assert(kChmInputTrebleCut.mid == ChasmTuning{}.inputTrebleCut, "chasm input cut");
@@ -177,6 +181,7 @@ enum Id : int {
   ParkerDrip,
   ParkerFlutter,
   ParkerBrightness,
+  SpringDrip,
   kCount
 };
 
@@ -185,15 +190,15 @@ enum Id : int {
 constexpr const char* kPrintName[kCount] = {
     "Slide",          nullptr,"Chorus-Double", nullptr,       "Body",
     "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
-    "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "Drip",
-    "PARKER Flutter", "PARKER Brightness"};
+    "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "PARKER Drip",
+    "PARKER Flutter", "PARKER Brightness", "SPRING Drip"};
 
 // Keys for the saved-state file; one word each, stable across builds.
 constexpr const char* kStateKey[kCount] = {
     "OctaveSlide",    "HarmonyTracking", "UnisonBlend",   "UnisonMotion",  "DistBody",
     "DistBite",       "DistGrit",        "SpringSplash",  "SpringFlutter", "SpringLowEnd",
     "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "ParkerSplash",  "ParkerDrip",
-    "ParkerFlutter",  "ParkerBrightness"};
+    "ParkerFlutter",  "ParkerBrightness", "SpringDrip"};
 
 struct State {
   std::array<float, kCount> pos;
@@ -266,6 +271,11 @@ inline void springFlutter(SpringTuning& t, float pos) {
   t.modDepth = at(kSprModDepth, pos);
   t.modRateHz = at(kSprModRate, pos);
   t.springs = atInt(kSprSprings, pos);
+}
+
+inline void springDrip(SpringTuning& t, float pos) {
+  t.dripA = at(kSprDripA, pos);
+  t.dripSections = atInt(kSprDripSections, pos);
 }
 
 inline void springLowEnd(SpringTuning& t, float pos) {

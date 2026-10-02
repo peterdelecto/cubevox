@@ -32,6 +32,8 @@ struct SpringTuning {
   int springs = 2;                              // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
+  float dripA = 0.75f;                          // C_lf allpass coefficient; higher = longer drip
+  int dripSections = 130;                       // C_lf sections, 1..130
   float wetDb = 3.1f;                           // trim; level rule at MIX 1 (wet only)
   float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
@@ -192,6 +194,8 @@ struct Frame {
   float hfMix;
   float diffuse;
   int hfSections;
+  float dripA;
+  int dripSections;
   bool wander;
   float wanderCoef, wanderScale;
   float dcCoef;
@@ -253,9 +257,9 @@ class Tank {
     dc_ += (v - dc_) * f.dcCoef;
     v -= dc_;
     float* b = &ap_[static_cast<size_t>(apPos_)];
-    for (int s = 0; s < kSections; ++s) {
-      const float y = kA * v + *b;
-      *b = v - kA * y;
+    for (int s = 0; s < f.dripSections; ++s) {
+      const float y = f.dripA * v + *b;
+      *b = v - f.dripA * y;
       v = y;
       b += K;
     }
@@ -364,6 +368,8 @@ class Spring {
     Frame f{};
     f.diffuse = clampf(t.splashDiffuse, 0.0f, 0.9f);
     f.hfSections = t.hfSections < 0 ? 0 : (t.hfSections > kHfMaxSections ? kHfMaxSections : t.hfSections);
+    f.dripA = clampf(t.dripA, 0.3f, 0.9f);
+    f.dripSections = t.dripSections < 1 ? 1 : (t.dripSections > kSections ? kSections : t.dripSections);
     f.wander = modOn_ && t.modDepth > 0.0f;
     f.wanderCoef = onePole(clampf(t.modRateHz, 0.01f, 100.0f));
     f.wanderScale = t.modDepth * wanderNorm(f.wanderCoef);
