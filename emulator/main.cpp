@@ -345,7 +345,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Knobs: Input gate threshold %.0f dB; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f ms, Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
       "voice formants Low %+d / High %+d / Higher %+d st; Unison DEPTH "
-      "%.0f %%, CHARACTER %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
+      "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
       p.linkAutotuneKey ? "linked to Harmony" : "own", onOff(at.chromatic), onOff(o.on),
@@ -362,7 +362,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<int>(std::lround(h.slots[1].formant)),
       static_cast<int>(std::lround(h.slots[2].formant)),
       static_cast<double>(p.unison.depth * 100.0f),
-      static_cast<double>(p.macros.pos[cv::macros::UnisonBlend]),
+      static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.intensity * 100.0f),
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
@@ -1098,8 +1098,7 @@ void applyMacros(ProtoParams& p) {
   cv::ReverbParams& r = p.reverb;
   mc::octaveSlide(p.pitchFx.octave.tuning, m[mc::OctaveSlide]);
   mc::harmonyTracking(p.pitchFx.harmony.tuning, m[mc::HarmonyTracking]);
-  mc::unisonBlend(p.unison.tuning, m[mc::UnisonBlend]);
-  mc::unisonMotion(p.unison.tuning, m[mc::UnisonMotion]);
+  mc::unison(p.unison.tuning, m[mc::UnisonBlend], m[mc::UnisonMotion]);
   mc::distBody(p.distortion.tuning, m[mc::DistBody]);
   mc::distBite(p.distortion.tuning, m[mc::DistBite]);
   mc::distGrit(p.distortion.tuning, m[mc::DistGrit]);
@@ -1232,8 +1231,9 @@ void drawUnisonTuning(cv::UnisonTuning& t, cv::macros::State& m) {
     drawUnisonRaw(t);
     return;
   }
-  macroSlider("Motion speed", "how fast the chorus wobbles", m.pos[cv::macros::UnisonMotion],
-              [&](float p) { cv::macros::unisonMotion(t, p); });
+  macroSlider("Chorus ↔ Double", "left more swirl, right a tighter double",
+              m.pos[cv::macros::UnisonBlend],
+              [&](float p) { cv::macros::unison(t, p, m.pos[cv::macros::UnisonMotion]); });
 }
 
 void drawSlapbackTuning(cv::SlapbackTuning& t) {
@@ -1476,20 +1476,10 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
   ImGui::PushID("unison");
   ImGui::Checkbox("UNISON", &u.on);
   percentSlider("DEPTH", u.depth);
-  // CHARACTER: panel knob with its two ends printed beside it, CHORUS left, DOUBLE right.
-  float& pos = macros.pos[cv::macros::UnisonBlend];
-  const float spacing = ImGui::GetStyle().ItemSpacing.x;
-  const float ends = ImGui::CalcTextSize("CHORUS").x + ImGui::CalcTextSize("DOUBLE").x + 2.0f * spacing;
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("CHORUS");
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(ImGui::CalcItemWidth() - ends);
-  if (ImGui::SliderFloat("##character", &pos, 0.0f, 100.0f, "%.0f %%"))
-    cv::macros::unisonBlend(u.tuning, pos);
-  ImGui::SameLine();
-  ImGui::TextUnformatted("DOUBLE");
-  ImGui::SameLine();
-  ImGui::TextUnformatted("CHARACTER");
+  // RATE: chorus speed. Faster also deepens the swirl, up to a capped pitch swing.
+  float& rate = macros.pos[cv::macros::UnisonMotion];
+  if (ImGui::SliderFloat("RATE", &rate, 0.0f, 100.0f, "%.0f %%"))
+    cv::macros::unison(u.tuning, macros.pos[cv::macros::UnisonBlend], rate);
   drawUnisonTuning(u.tuning, macros);
   ImGui::PopID();
 }

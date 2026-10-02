@@ -33,7 +33,7 @@ sliders, then report numbers we bake in.
 | 3 | Autotune | KEY (linked to Harmony) · RESPONSE | Pull range (0.5–6 st, `maxCorrectSemis`) · Correct to every note (`chromatic`, default off) |
 | 4 | Octave | SEMITONES · FORMANT (engine B) · MIX | Slide |
 | 5 | Harmony | KEY · MIX | Voices · Tracking speed · Follow my bends · Drop out on breaths |
-| 6 | Unison | DEPTH · CHARACTER (Chorus ↔ Double, CHORUS / DOUBLE printed at the ends) | Motion speed |
+| 6 | Unison | DEPTH · RATE (chorus speed, ~0.2–6 Hz; past today's rate the sweep narrows so the pitch swing caps near 2x today's) | Chorus ↔ Double |
 | 7 | Slapback | INTENSITY (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
 | 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM / PARKER SPRING = menu) | per engine, below |
@@ -53,7 +53,7 @@ they are what Adam is choosing between.
 | Harmony Tracking speed | glideMs | 120 | 30 | 5 |
 | Unison Chorus ↔ Double | detuneCents (±) | 0 | 2 | 6 |
 | | swingMinMs / swingMaxMs | ×1 | ×1 (0.5 / 3.0) | ×0.2 |
-| Unison Motion speed | lfoHz both | ×0.5 | ×1 (0.60 / 0.90) | ×2 |
+| Unison RATE | lfoHz both | ×0.33 | ×1 (0.60 / 0.90) | ×7 (swing × 2/m above ×2) |
 | Distortion Body | inputHpHz | 160 | 90 | 40 |
 | | s1BassDb | −18 | −12 | −6 |
 | | stackBassDb | 6 | 10 | 14 |

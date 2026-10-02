@@ -70,7 +70,10 @@ constexpr Anchor kHarGlide{120.0f, 30.0f, 5.0f, I::Log};              // glideMs
 // owner's tuning. Chorus end: 6 ms swing, no fixed detune. Double end: 15 cents, near-still.
 constexpr Anchor kUniDetune{0.0f, 2.0f, 15.0f};                       // |detuneCents|
 constexpr Anchor kUniSwingScale{2.0f, 1.0f, 0.1f};                    // x swingMin/MaxMs
-constexpr Anchor kUniLfoScale{0.25f, 1.0f, 3.0f, I::Log};             // x lfoHz both
+constexpr Anchor kUniLfoScale{0.33f, 1.0f, 7.0f, I::Log};             // x lfoHz both: ~0.2..6 Hz
+// Above today's rate the sweep narrows so the pitch swing stays within about twice
+// today's (RATE 100 %: ~60 cents peak instead of ~200).
+constexpr float kUniMaxSwingGrowth = 2.0f;
 
 // Distortion
 constexpr Anchor kDisInputHp{160.0f, 90.0f, 40.0f, I::Log};
@@ -180,7 +183,7 @@ enum Id : int {
 // Names for the Print tuning line; reverb names carry the engine where two share one.
 // nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
-    "Slide",          "Tracking speed", nullptr,    "Motion speed",   "Body",
+    "Slide",          "Tracking speed", "Chorus-Double", nullptr,       "Body",
     "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
     "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "Drip",
     "PARKER Flutter", "PARKER Brightness"};
@@ -216,20 +219,18 @@ inline void octaveSlide(OctaveTuning& t, float pos) { t.glideMs = at(kOctSlide, 
 
 inline void harmonyTracking(HarmonyTuning& t, float pos) { t.glideMs = at(kHarGlide, pos); }
 
-// Chorus <-> Double: detune grows and the chorus swing shrinks.
-inline void unisonBlend(UnisonTuning& t, float pos) {
+// Chorus <-> Double (blend) and RATE (rate) both shape the sweep, so one function
+// writes every field they touch. Blend: detune grows and the swing shrinks.
+// Rate: the LFOs speed up; past today's rate the swing narrows to cap the pitch swing.
+inline void unison(UnisonTuning& t, float blendPos, float ratePos) {
   const UnisonTuning base;
-  const float d = at(kUniDetune, pos);
-  const float swing = at(kUniSwingScale, pos);
+  const float d = at(kUniDetune, blendPos);
+  const float m = at(kUniLfoScale, ratePos);
+  const float swing = at(kUniSwingScale, blendPos) * (m > kUniMaxSwingGrowth ? kUniMaxSwingGrowth / m : 1.0f);
   t.detuneCents[0] = d;
   t.detuneCents[1] = -d;
   t.swingMinMs = base.swingMinMs * swing;
   t.swingMaxMs = base.swingMaxMs * swing;
-}
-
-inline void unisonMotion(UnisonTuning& t, float pos) {
-  const UnisonTuning base;
-  const float m = at(kUniLfoScale, pos);
   t.lfoHz[0] = base.lfoHz[0] * m;
   t.lfoHz[1] = base.lfoHz[1] * m;
 }
