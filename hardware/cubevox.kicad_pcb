@@ -19761,7 +19761,7 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "71daaa7a-8022-4597-8584-1d8344753640")
-		(at 94.5 101 -90)
+		(at 79 97 -90)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C14"
@@ -39187,7 +39187,7 @@
 	(footprint "cubevox_h7core:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5"
 		(layer "F.Cu")
 		(uuid "c109752f-d964-4a60-ac9f-18f485223109")
-		(at 89.5 94)
+		(at 84 97)
 		(property "Reference" "SWBOOT1"
 			(at 0 3.995 180)
 			(layer "F.SilkS")
@@ -42205,7 +42205,7 @@
 	(footprint "cubevox_h7core:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5"
 		(layer "F.Cu")
 		(uuid "ca257f4e-3e7c-4390-9ea6-2b610347078d")
-		(at 89.5 101)
+		(at 74 97)
 		(property "Reference" "SWRESET1"
 			(at -4.895 0 90)
 			(layer "F.SilkS")
