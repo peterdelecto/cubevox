@@ -131,6 +131,6 @@ table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, t
    Slapback keeps the owner's name Low pass.
 4. **Output EQ face:** Low cut, Mud cut (shown positive), Presence, Air. Band centres move
    under Advanced.
-5. **Test controls hidden.** Cmd+Shift+D toggles them: Advanced, STAGE FEEDBACK with
-   Amount and Movement, and the input gate's Tuning. Hidden means off. The probe runs with
+5. **Test controls hidden.** Cmd+Shift+D toggles Advanced and the input gate's Tuning.
+   Hidden means off. STAGE FEEDBACK with Amount and Movement stays on the face (owner). The probe runs with
    them shown, the superset of Adam's face.

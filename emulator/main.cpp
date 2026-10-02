@@ -89,7 +89,7 @@ struct ProtoParams {
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
   cv::PolishParams eq;
-  // Cmd+Shift+D shows our test controls: Advanced, stage feedback, input gate tuning.
+  // Cmd+Shift+D shows our test controls: Advanced and the input gate tuning.
   bool dev = false;
   // Advanced swaps the musician sliders for the raw tuning nodes.
   bool advanced = false;
@@ -861,19 +861,19 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   if (params.dev) {
     ImGui::Checkbox("Advanced", &params.advanced);
     ImGui::SameLine();
-    ImGui::Checkbox("STAGE FEEDBACK", &params.stageFeedback);
-    ImGui::BeginDisabled(!params.stageFeedback);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(kFeedbackSliderW);
-    ImGui::SliderFloat("Amount", &params.feedbackAmount, 0.0f, 100.0f, "%.0f%%",
-                       ImGuiSliderFlags_NoRoundToFormat);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(kFeedbackSliderW);
-    ImGui::SliderFloat("Movement", &params.feedbackMovement, 0.0f, 100.0f, "%.0f%%",
-                       ImGuiSliderFlags_NoRoundToFormat);
-    ImGui::EndDisabled();
-    ImGui::SameLine();
   }
+  ImGui::Checkbox("STAGE FEEDBACK", &params.stageFeedback);
+  ImGui::BeginDisabled(!params.stageFeedback);
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(kFeedbackSliderW);
+  ImGui::SliderFloat("Amount", &params.feedbackAmount, 0.0f, 100.0f, "%.0f%%",
+                     ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(kFeedbackSliderW);
+  ImGui::SliderFloat("Movement", &params.feedbackMovement, 0.0f, 100.0f, "%.0f%%",
+                     ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::EndDisabled();
+  ImGui::SameLine();
   drawTuningButtons(params);
 }
 
@@ -1528,11 +1528,8 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   meterDb = std::max(state.peakDb, meterDb - kMeterDecayDbPerFrame);
   if (!probe && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_D))
     params.dev = !params.dev;  // Cmd+Shift+D on the Mac
-  // Hidden test controls never stay active.
-  if (!params.dev) {
-    params.advanced = false;
-    params.stageFeedback = false;
-  }
+  // Advanced never stays on while hidden.
+  if (!params.dev) params.advanced = false;
   gDev = params.dev;
   gAdvanced = params.advanced;
   // Harmony chromatic and the key link are Advanced-only; the plain face keeps them at default.
