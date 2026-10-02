@@ -34,6 +34,7 @@ a part without a code is not a part).
 | 10 | Bypass actuator | Panel toggle, same switch part as 9. No footswitch (tabletop, printed box) |
 | 11 | Board arrangement | One board; controls up through the top, jacks right-angle out the rear |
 | 12 | 1/4" half of the combo | Mic or pedal, never both inputs at once. No pad; shared 0–60 dB preamp, ~20 kΩ input |
+| 13 | Which H7 | Bare STM32H743VIT6 soldered on the product board, as fxbox. Not the WeAct module |
 
 ## Decisions
 
@@ -82,8 +83,11 @@ a part without a code is not a part).
 
 ### Panel
 
-16. 15 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part is a
-    taller shaft type than recent builds; owner picks.
+16. 15 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part (owner
+    2026-10-02): Alps RK09D1130C2P, LCSC C361173, 10 kΩ THT, Extended tier,
+    taller shaft than recent builds. Same part for the analog Input Gain pot,
+    16 in total. Catalog stock 174; a build of N units needs 16 N, so
+    `jlc_stock_check` before ordering.
 17. KEY encoder with push, direct GPIO.
 18. Toggles. One switch part for every toggled control; owner picks. Up to
     8 GPIOs reserved (autotune certain, bypass certain, others pending Adam).
@@ -112,7 +116,7 @@ a part without a code is not a part).
 
 ## Recommended next steps
 
-1. Owner reports: pot part, toggle switch part, Adam's list of toggled stages.
+1. Owner reports: toggle switch part, Adam's list of toggled stages.
 2. Write the purpose line and `foreman brief` for the board.
 3. Copy h7core/fxbox libs and spec into `hardware/`, run
    `assign_pin_types.py`, start PARTS.md.
