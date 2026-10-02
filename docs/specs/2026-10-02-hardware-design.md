@@ -52,49 +52,77 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 
 ### Signal chain
 
+Revision 2 (2026-10-02 pm, after `hardware/SCHEMATIC-AUDIT.md`): op-amp,
+bias, DC gain, reference, coupling, DAC filter and clock items below replace
+revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`.
+
 1. Combo jack NCJ6FA-H. XLR pin 2 → MIC_P, pin 3 → MIC_N, pin 1 and G to
    GND at the jack. TRS T → LINE_P, R → LINE_N through the 20 dB pad into the
-   same preamp nodes, S to GND. The second T hole is the normalling contact;
-   it goes to an MCU GPIO (JACK_TRS_N, pulled up, low when a plug is in).
-   A TS plug shorts ring to sleeve, which grounds the cold input.
-2. Input network, per leg (P and N identical). XLR leg: 47 Ω series,
-   BAT54S clamps to 5V/GND after it, 100 pF to GND, 10 µF DC block into
-   node IN_x. TRS leg: 10 µF DC block, 10 kΩ series into node IN_x. Node IN_x:
-   1.2 kΩ to VREF. The 1.2 kΩ is both the mic bias path and the pad shunt:
-   pad = 1.2/(10+1.2) = −19.4 dB (firmware MIC trim is +19.4 dB), mic input
-   impedance 2.4 kΩ differential, pedal input impedance about 11 kΩ.
-3. Stage 1, fixed 20 dB. Instrumentation amp on OPA1678IDR (C192421): A1 and
-   A2 non-inverting with Rf 4.7 kΩ each and RG 1 kΩ between inverting inputs,
-   G = 1 + 2·4.7k/1k = 10.4 (20.3 dB). Difference amp A3 with four 10 kΩ, gain
-   1, reference VREF. 47 pF across each Rf. Output PRE1.
-4. Stage 2, 0–40 dB on the Input Gain pot (RK09D1130C1B 10 kΩ linear, wired
-   as a variable resistor, wiper tied to one end). Non-inverting on A4:
-   feedback = pot + 100 Ω end-stop, 100 Ω from inverting input to VREF,
-   47 pF across the feedback. G = 1 + (Rpot + 100)/100 = 2 .. 102, so the
-   stage runs 6 to 40 dB and the chain 26 to 60 dB on XLR, 6.6 to 40.6 dB on
-   the 1/4". Output PRE_OUT, DC at VREF. Max swing about 1.4 Vrms on 5 V.
-5. VREF. 5V through 10 kΩ / 10 kΩ, 10 µF, buffered by one OPA1678 half, 100 nF
-   at each load. Three OPA1678 duals in total (A1–A4, buffer, VREF).
-6. ADC feed. PRE_OUT → 100 Ω → 10 µF → PCM1808 VINL, 2.2 nF after the 100 Ω
-   (anti-alias corner ~720 kHz is fine with the ADC's oversampling). ADC is
-   always fed, so firmware can meter in bypass. VINR follows fxbox's unused-
-   channel treatment.
+   same preamp nodes, S to GND. BOTH T holes are the tip (Neutrik electrical
+   diagram: one tip circuit, no switch; audit A01); both go to TRS_T. There is
+   no plug detection; the 1/4" PEDAL / MIC menu item is a manual setting.
+   JACK_TRS_N and R107 are deleted, PB11 is free. A TS plug shorts ring to
+   sleeve, which grounds the cold input.
+2. Input network, per leg (P and N identical). XLR leg: 47 Ω series, BAT54S
+   clamps to 5VA/GND after it, 100 pF to GND, 100 kΩ to GND (defines 0 V on
+   the jack side of the coupling cap), 10 µF 25 V electrolytic DC block (+ on
+   the IN_x side, which sits at VREF) into node IN_x. TRS leg: 10 µF
+   electrolytic (+ on the resistor side), 10 kΩ series into node IN_x. Node
+   IN_x: 1.2 kΩ to VREF. The 1.2 kΩ is both the mic bias path and the pad
+   shunt: pad = 1.2/(10+1.2) = −19.4 dB (firmware MIC trim is +19.4 dB), mic
+   input impedance 2.4 kΩ differential, pedal input impedance about 11 kΩ.
+   Electrolytics, not X7R, in every audio coupling position (audit A07).
+3. Stage 1, fixed 26 dB. Instrumentation amp on OPA2197IDR (C139363,
+   rail-to-rail input and output, 5.5 nV/√Hz, 25 µV offset; replaces OPA1678
+   whose input range stops 2 V below V+, audit A02): A1 and A2 non-inverting
+   with Rf 9.53 kΩ each and RG 1 kΩ + 22 µF 16 V electrolytic in series
+   between the inverting inputs, so DC gain is 1 and AC gain
+   G = 1 + 2·9.53k/1k = 20.1 (26.0 dB), corner 7 Hz (audit A04). 47 pF across
+   each Rf. Difference amp A3 with four 10 kΩ 0.1 % (audit A08), gain 1,
+   reference VREF. Output PRE1, DC within a few mV of VREF.
+4. Stage 2, 0–34 dB on the Input Gain pot (RK09D1130C1B 10 kΩ linear, wired
+   as a variable resistor, wiper tied to one end, no end-stop). Non-inverting
+   on A4 (OPA2197): the pot is the feedback resistor; R116 = 200 Ω from the
+   inverting input to GND through 100 µF 10 V (DC gain 1, corner 8 Hz; the
+   feedback current returns to ground, never into VREF, audit A03/A05).
+   47 pF across the pot. G = 1 + Rpot/200 = 1 .. 51, so the stage runs 0 to
+   34.2 dB and the chain 26.0 to 60.2 dB on XLR, 6.6 to 40.8 dB on the 1/4".
+   At minimum gain the 200 Ω network loads the op-amp with 7 mA rms at
+   1.4 Vrms, inside the OPA2197's 65 mA. Output PRE_OUT, DC at VREF.
+5. VREF. 5VA through 10 kΩ / 10 kΩ, 10 µF at the divider, follower on one
+   OPA2197 half, then 22 Ω into the VREF node with one 10 µF (the follower
+   never sees the capacitance directly, audit A03). No per-load 100 nF caps.
+   VREF carries bias only: the 1.2 kΩ input bias legs, the difference amp's
+   reference resistor and the DAC attenuator's bottom resistor.
+   Three OPA2197 duals in total (A1–A4, VREF follower, output buffer).
+6. ADC feed. PRE_OUT → 100 Ω → 2.2 nF to GND → 10 µF X7R (C14860; both
+   sides sit near 2.5 V so it carries no DC bias, and the AC across it is
+   under 1 % of the signal against the ADC's 60 kΩ) → PCM1808 VINL, which is internally biased at VCC/2
+   through 60 kΩ (datasheet). ADC is always fed, so firmware can meter in
+   bypass. VINR: 10 µF to GND (datasheet figure 26 AC-couples both inputs).
 7. Bypass relay G6K-2F-Y DPDT 5 V (C47190). Both poles wired in parallel for
    contact reliability: COM (3, 6) = BUF_IN, NC (2, 7) = PRE_OUT, NO (4, 5) =
    DAC_ATT. Coil + (1) from 5V through the bypass toggle, coil − (8) to GND,
    1N4148W (C81598) flyback across the coil. Coil energised = effect on.
    FX_ON_SENSE: coil + node through 10 kΩ / 18 kΩ to GND into an MCU GPIO
    (3.2 V when on). No MCU in the switching path.
-8. DAC. PCM5102APWR (C107671) as fxbox, output ground-centred ±3 V. DAC_ATT:
-   OUTL → 10 µF → 10 kΩ / 15 kΩ divider to VREF (×0.6, 1.27 Vrms max) so the
-   single-rail buffer never clips. Firmware LINE / INSTRUMENT menu scales
-   digitally below that.
-9. Output buffer. A5 (OPA1678) unity, input BUF_IN, output → 100 Ω → 10 µF →
-   100 kΩ to GND → OUT_TIP. Jack: NMJ6HCD2 (C368502) T to OUT_TIP, S to GND,
-   switch contacts no-connect. PJ-611E is dropped.
-10. ADC/DAC clocks as fxbox: SAI1 BCLK PE5 (33 Ω), LRCLK PE4, DAC SD PE6,
-    ADC SD PE3, ADC SCKI PD14 at 12.288 MHz for 48 kHz (PLL3 recomputed in
-    firmware; no schematic change).
+8. DAC. PCM5102APWR (C107671) as fxbox, output ground-centred ±3 V. OUTL →
+   470 Ω → 2.2 nF to GND (TI figure 33 reconstruction filter, ~154 kHz, audit
+   A09) → 10 µF 25 V electrolytic (+ on the divider side) → 10 kΩ / 15 kΩ
+   divider to VREF (×0.6, 1.27 Vrms max) = DAC_ATT. Firmware LINE /
+   INSTRUMENT menu scales digitally below that.
+9. Output buffer. A5 (OPA2197) unity, input BUF_IN, output → 100 Ω → 10 µF
+   25 V electrolytic (+ on the buffer side) → 100 kΩ to GND → OUT_TIP. Jack:
+   NMJ6HCD2 (C368502) T to OUT_TIP, S to GND, switch contacts no-connect.
+10. ADC/DAC clocks: SAI1 BCLK PE5 (33 Ω), LRCLK PE4, DAC SD PE6, ADC SD PE3.
+    ADC SCKI comes from an SAI master clock coherent with BCLK/LRCLK, not a
+    timer (audit I01): SAI1_MCLK_A on PE2 at 12.288 MHz for 48 kHz, which
+    moves QSPI to bank 2; pins per `hardware/PINMAP.md` "ADC master clock
+    (I01)". PD14 is freed. Firmware: SAI1 master, PLL3 feeds the SAI1 kernel
+    clock; mux settling ≥ 0.5 ms before reading a pot channel (audit I02);
+    mute while VBUS-only (item 12) and across the bypass transition where it
+    can (audit I03; the relay switches on its own, the preamp path is alive
+    only while analog power is).
 
 ### Power
 
@@ -104,11 +132,15 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
     (C8678) → 9V_IN; SMBJ15CA (C19077570) from 9V_IN to GND; 22 µF 25 V.
     fxbox's AO4606 bridge, SMBJ70CA and PE_SW/PE_BST nodes are dropped.
 12. 9V_IN → AP63205 5 V buck (C2071056, L ANR5040T4R7M C7427135) → 5V_PRODUCT
-    → TPS2116 (C3235557) with VBUS → 5V. 5V → AP63203 3V3 buck (C780769,
-    L ANR5040T3R9M C7427132) and TLV75533 3V3A LDO (C404027). VDDA/VREF+
-    through BLM18PG121SN1D ferrite, as fxbox.
-13. Analog on 5V: OPA1678s, PCM1808 VCC through 10 Ω, relay coil. 3V3A: codec
-    digital-analog, pots. USB firmware-only, DFU via BOOT0 button.
+    → TPS2116 (C3235557) with VBUS → 5V. TPS2116 PR1 divider R8 = 36 kΩ /
+    R9 = 10 kΩ so the 9 V-derived rail is preferred down to about 4.6 V
+    (audit A06; the analog chain needs ≥ 4.61 V at 5VA). 5V → AP63203 3V3
+    buck (C780769, L ANR5040T3R9M C7427132) and TLV75533 3V3A LDO (C404027).
+    VDDA/VREF+ through BLM18PG121SN1D ferrite, as fxbox.
+13. Analog on 5VA (5V through the ferrite): OPA2197s, PCM1808 VCC through
+    10 Ω, relay coil on 5V. 3V3A: codec digital-analog, pots. USB
+    firmware-only, DFU via BOOT0 button; firmware mutes audio whenever
+    VBUS_SENSE shows USB-only power, because 5VA is not guaranteed then.
 
 ### Digital core (from fxbox)
 
@@ -183,6 +215,16 @@ model measured 34.8 mm. Procedure: fetch the manufacturer STEP for the exact
 MPN; if none, build a simplified model from the drawing; in both cases measure
 the STEP's z extent against the datasheet and record it in PARTS.md. The
 toggle's EasyEDA STEP measured 23.6 mm and matches.
+
+## Revision 2 parts (2026-10-02 pm)
+
+OPA2197IDR C139363 ×3 (Extended, $1.26, 19.8 k stock live). 10 kΩ 0.1 % 25 ppm
+Viking ARG03BTC1002 C309083 ×4. Electrolytics ROQANG 105 °C: 10 µF 25 V
+RVT1E100M0405 C72484 (4×5.4) ×7, 100 µF 10 V VT1A101M0505 C191859 (5×5.4)
+×1, 22 µF 16 V RVT1C220M0405 C72502 (4×5.4) ×1. Resistors 0603: 470 Ω C23179,
+200 Ω C8218, 22 Ω C23345 (Basic), 36 kΩ C23147 (Preferred), 9.53 kΩ C23127
+(Extended). OPA1678 C192421 and the X7R coupling caps in the audio path are
+superseded. TLV9062 C398356 stays the fallback op-amp.
 
 ## Datasheet findings (2026-10-02)
 
