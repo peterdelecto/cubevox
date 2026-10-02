@@ -5,6 +5,14 @@ schematic. Parts are LCSC codes from the 2026-10-02 search; stock and pin
 maps are re-verified live before the schematic is drawn (ClaudeRouter rule:
 a part without a code is not a part).
 
+## Purpose line (owner confirmed 2026-10-02)
+
+cubevox: a tabletop vocal effects board for Adam Keith. One SM58 or pedal in
+on a combo jack, through an analog preamp into an STM32H743 at 48 kHz, out a
+buffered 1/4" jack, with a relay bypass that keeps the preamp path alive when
+the digital is off. 9 V Boss supply, USB-C for firmware only, 15 pots, 3
+encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
+
 ## Plan
 
 1. Clone the Teensy-H7-Port fxbox / h7core design into `cubevox/hardware/`
@@ -83,12 +91,19 @@ a part without a code is not a part).
 
 ### Panel
 
-16. 15 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part (owner
+16. 14 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part (owner
     2026-10-02): Alps RK09D1130C2P, LCSC C361173, 10 kΩ THT, Extended tier,
     taller shaft than recent builds. Same part for the analog Input Gain pot,
-    16 in total. Catalog stock 174; a build of N units needs 16 N, so
+    15 in total. Catalog stock 174; a build of N units needs 15 N, so
     `jlc_stock_check` before ordering.
-17. KEY encoder with push, direct GPIO.
+17. Three encoders on direct GPIO (owner 2026-10-02): MENU with push switch,
+    KEY and SEMITONES without. Alps EC11N, shaft code 15: EC11N1525404
+    (C470748, with switch) and EC11N1520401 (C470703, no switch), THT with
+    side anchor legs, 30 detents. Datasheet heights: encoder tip 19.5 mm,
+    bushing top 11.5 mm; pot tip 20.0 mm, bushing top 11.8 mm. Both shafts
+    ø6 D-cut with a 4.5 mm flat, so one knob fits all. The 20-code EC11N
+    parts are 5 mm too tall. Pot bushing figure read from a scanned drawing,
+    ±0.2 mm.
 18. Toggles. One switch part for every toggled control; owner picks. Up to
     8 GPIOs reserved (autotune certain, bypass certain, others pending Adam).
     No LEDs on toggles; the lever shows the state.
