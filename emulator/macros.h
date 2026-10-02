@@ -107,7 +107,7 @@ constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
 constexpr Anchor kChmBassCutTop{200.0f, 100.0f, 40.0f, I::Log};
 
 // PARKER SPRING
-constexpr Anchor kPrkHfMixDb{-40.0f, -22.0f, -8.0f};
+constexpr Anchor kPrkHfMixDb{-30.0f, -10.0f, -4.0f};
 constexpr Anchor kPrkEcho{0.05f, 0.2f, 0.3f};
 constexpr Anchor kPrkRipple{0.05f, 0.2f, 0.3f};
 constexpr Anchor kPrkPresenceDb{1.0f, 5.0f, 8.0f};

@@ -27,12 +27,12 @@ struct SpringCTuning {
   float hfRatio = 1.3f;                        // g_hf / g_lf
   int mHigh = 189;                             // 0..200, 0 disables C_hf
   float aHf = -0.34f;
-  float hfMixDb = -22.0f;                      // g_high re g_low
+  float hfMixDb = -10.0f;                      // g_high re g_low; the top end above H_low
   float cross = 0.1f;                          // c1, C_hf into the C_lf summer
   float eqPeakHz = 183.0f, eqBwHz = 0.0f;      // chirp EQ (DAFx-11), bw 0 = off
   float lowHz = 4750.0f;                       // H_low cutoff; the table is fixed
   float echoGain = 0.2f, rippleGain = 0.2f;    // multitap e, r
-  float modDepth = 8.0f, modPole = 0.93f;      // Gajarsky read modulation
+  float modDepth = 8.0f, modPole = 0.998f;     // read modulation; a faster pole hisses above 4 kHz
   int springs = 3;                             // 1..3
   std::array<float, 3> tdFactor = {1.0f, 1.15f, 0.88f};
   std::array<float, 3> fcFactor = {1.0f, 0.98f, 1.02f};
@@ -40,7 +40,7 @@ struct SpringCTuning {
   float dwellDrive = 32.0f, dwellComp = 0.80f;
   float presenceHz = 3000.0f, presenceDb = 5.0f, presenceQ = 1.0f;
   float tankTrim = 0.75f;                      // into the tank, after the clip
-  float wetDb = 1.8f;                         // output trim; level rule at MIX 1 (wet only)
+  float wetDb = 0.25f;                        // output trim; level rule at MIX 1 (wet only)
 };
 
 struct SpringCParams {

@@ -182,9 +182,11 @@ int acfPeak(const std::vector<double>& r, int lo, int hi) {
 }
 
 // 1. Echo spacing: |ACF| maximum away from zero lag. 20 ms clears the zero-lag
-// lobe and the L/5 pre-echo.
+// lobe and the L/5 pre-echo. C_hf runs its own echo period, so it is muted here.
 bool testEchoSpacing() {
-  const Signal ir = impulse(params(0.5f, 0.0f), ms(300), 0);
+  cv::SpringCParams p = params(0.5f, 0.0f);
+  p.tuning.hfMixDb = -60.0f;
+  const Signal ir = impulse(p, ms(300), 0);
   const std::vector<double> r = autocorr(ir, ms(300), ms(150));
   const int lag = acfPeak(r, ms(20), ms(150));
   const double m = toMs(lag);
