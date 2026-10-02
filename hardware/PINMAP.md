@@ -20,15 +20,12 @@ DS12110 itself was not fetched. LQFP-100 pins 1-25 face east, 26-50 north,
 | 15 | PC0 | MUX1_SIG_ADC | ADC1/2/3_INP10 | analog, reused as POT_MUX_OUT |
 | 22 | PA0 | CC1 | USB-C CC sense | avoid |
 | 25 | PA3 | CC2 | USB-C CC sense | avoid |
-| 36 | PB2 | QSPI_CLK_SRC | QUADSPI_CLK (shared by both banks) | AF9 |
-| 37-40 | PE7/PE8/PE9/PE10 | QSPI_IO0/IO1/IO2/IO3 | QUADSPI_BK2_IO0..3 | AF10 |
 | 58 | PD11 | TOGGLE7 | GPIO (moved from PE8) | |
 | 68 | PA9 | VBUS_SENSE | GPIO | |
 | 70/71 | PA11/PA12 | USB_DM/DP | OTG_FS | |
 | 72 | PA13 | SWDIO | SWD | avoid |
 | 76 | PA14 | SWCLK | SWD | avoid |
 | 89 | PB3 | SWO | SWO | avoid |
-| 79 | PC11 | QSPI_NCS | QUADSPI_BK2_NCS | AF9 |
 | 92 | PB6 | ENC_MENU_A | GPIO, EXTI6 (moved from PE9) | |
 | 94 | BOOT0 | BOOT0 | DFU button | |
 | 88 | PD7 | USER_LED | GPIO | |
@@ -40,7 +37,7 @@ DS12110 itself was not fetched. LQFP-100 pins 1-25 face east, 26-50 north,
 fxbox-only pins cubevox frees (all are no_connect or deleted at the top):
 PC1, PC4, PC5 (MUX2-4), PC2_C, PC3_C, PE10, PE12 (SYNC), PD8, PD9 (MIDI), PE0, PE1 (UART8),
 PD5 (WS2812), PC10, PC12, PD0-2 (SPI OLED), PE14, PA15, PB5 (SPARE_*).
-PE7, PE10 and PC11 are now QSPI bank 2 (section 5). PD12, PD13 and PD14 are free.
+PB2 (36), PE7-PE10 (37-40), PC11 (79), PD13 and PD14 are free (PD12 is MUTE_N) (no external flash, section 5).
 Keep them unassigned. Keep PE13 (HP_EN) only if the TPA6132A2 stays in the child.
 
 ## 2. New assignments (free pins)
@@ -66,11 +63,15 @@ Lines taken: 6, 11, 15 (MENU encoder). New encoders use 10, 12, 13, 14.
 | TOGGLE7 | 58 | PD11 | GPIO | moved PE8 to PD11 (I01) |
 | TOGGLE8 | 46 | PB10 | GPIO | free |
 | (JACK_TRS_N, deleted rev 2) | 47 | PB11 | none | freed: the 1/4 in detect is gone (audit A01), pin is no-connect |
-| FX_ON_SENSE | 63 | PC6 | GPIO, 3.2 V in | free |
+| FX_ON_SENSE | 63 | PC6 | GPIO, active low | K101 pole B NO contact to GND; 10 kΩ pull-up to 3V3, 100 nF to GND |
+| VBUS_SENSE | 68 | PA9 | GPIO input | R6 33 kΩ / R7 82 kΩ divider, 3.6 V at 5 V VBUS. Native OTG VBUS sensing disabled (AN4879) |
+| MUTE_N | 59 | PD12 | GPIO output | high pulls in K102 through Q101 (output connected, tip ungrounded); R153 100 kΩ base pull-down keeps it off at reset |
+| VA_SENSE | 32 | PC4 | ADC12_INP4 | 5VA through 10 kΩ / 10 kΩ, 100 nF; reads 2.5 V at 5.0 V |
+| XSMT | 45 | PE15 | GPIO output | existing; PCM5102A XSMT with 10 kΩ pull-down (R16), unchanged |
 | OLED_SCL | 95 | PB8 | I2C1_SCL AF4 | existing I2C1_SCL port |
 | OLED_SDA | 96 | PB9 | I2C1_SDA AF4 | existing I2C1_SDA port |
 
-Remaining free after this: PD12, PD13, PD14, PA1, PC13-15 (weak drivers), PA2, PB7, PB15, PC7-9, PA8, PA10.
+Remaining free after this: PD13, PD14, PC5, PA1, PC13-15 (weak drivers), PA2, PB7, PB15, PC7-9, PA8, PA10.
 Toggles use PA4-PA7, PB0, PB1 although they are ADC-capable. The pull-ups to 3V3 make them
 safe as digital inputs, and 8 contiguous north-side pins keep the routing short.
 PB15 is skipped because EXTI15 belongs to PD15. PA10 is OTG_FS_ID and is left alone.
@@ -124,8 +125,8 @@ R41/R42/C70-C73 (ADC driver), U10 TPS63070, U11 LP5912 and their passives
 (ADC_PRE/ADC_VAUX/ADC_BB_*), U7 TPA6132A2 (Section=hp_out), and the OLED SPI,
 MIDI, SYNC, UART8, MUX2-4 and WS2812 ports.
 
-New blocks connect to: 5V (preamp, relay coil, PCM1808 VCC through 10 R), 5V_PRODUCT
-(buck output, TPS2116 input), 3V3 and 3V3A (pots, mux, pull-ups), GND, VBUS (TPS2116 pin 6),
+New blocks connect to: 5V (preamp, relay coil, PCM1808 VCC through 10 R, buck
+output), 3V3 and 3V3A (pots, mux, pull-ups), GND,
 ADC_VINL / ADC_VINR (PCM1808 pins 13 and 14, currently internal to the child, so add ports),
 DAC_OUTL (PCM5102A pin 6; the child already exposes LINE_L after a 470 R / 2.2 nF filter,
 so decide whether the item-8 coupling cap hangs on LINE_L or on a new DAC_OUTL port).
@@ -137,12 +138,12 @@ one GND plane, matching the spec and canon 27.
 
 ## 5. ADC master clock (I01)
 
-Sources. Net, pin and QUADSPI rows come from `h7core_block.json` and the local STM32duino
-`PeripheralPins_WeActMiniH7xx.c`, which lists QUADSPI but no SAI. The datasheet PDF could
+Sources. Net and pin rows come from `h7core_block.json` and the local STM32duino
+`PeripheralPins_WeActMiniH7xx.c`, which lists no SAI. The datasheet PDF could
 not be fetched (timeout), so every SAI alternate function below is from memory and is
 NOT VERIFIED against DS12110.
 
-### Choice: option (a), SAI1_MCLK_A on PE2, QSPI moves to bank 2
+### Choice: option (a), SAI1_MCLK_A on PE2
 
 Why. PCM1808 slave mode needs SCKI synchronous with LRCK/BCK (256/384/512 fs). SAI1 block A
 generates BCLK, LRCLK and MCLK from one kernel clock and one MCKDIV divider, so all three are
@@ -160,32 +161,26 @@ Alternatives.
    as slaves, and to the PCM5102A. It also puts a new part and new nets on the board.
    Rejected for cost.
 
-QSPI. QUADSPI_BK1_IO2 exists only on PE2 (AF9) in the local file, so QSPI cannot stay on
-bank 1 once PE2 is taken. Bank 2 is fully available on LQFP-100: BK2_IO0 PE7, IO1 PE8,
-IO2 PE9, IO3 PE10 (all AF10), BK2_NCS PC11 (AF9, only BK2 NCS in the file). QUADSPI_CLK on
-PB2 (AF9) is shared by both banks. PB6 (BK1_NCS) cannot select bank 2, so NCS moves to PC11.
+External flash. PE2 was QUADSPI_BK1_IO2 in fxbox. The QSPI flash (U5, IS25LP064A) and its
+pull-ups, clock series resistor and decoupling are removed (owner 2026-10-02). Settings live in
+internal flash bank 2. The earlier plan to move QSPI to bank 2 pins (PE7-PE10, PC11, PB2 clock)
+is superseded.
 
-### Before / after
+### Pin changes
 
-| Pin | Port | Old net (AF) | New net (AF) |
+| Pin | Port | fxbox net (AF) | cubevox net |
 |---|---|---|---|
 | 1 | PE2 | QSPI_IO2 (AF9) | ADC_SCKI_SRC, SAI1_MCLK_A (AF6) |
-| 37 | PE7 | unassigned | QSPI_IO0, BK2_IO0 (AF10) |
-| 38 | PE8 | TOGGLE7 (GPIO) | QSPI_IO1, BK2_IO1 (AF10) |
-| 39 | PE9 | ENC_MENU_A (GPIO, EXTI9) | QSPI_IO2, BK2_IO2 (AF10) |
-| 40 | PE10 | unassigned | QSPI_IO3, BK2_IO3 (AF10) |
+| 36 | PB2 | QSPI_CLK_SRC | free (NC) |
+| 37-40 | PE7-PE10 | unassigned / SYNC / SPARE | free (NC) |
 | 58 | PD11 | QSPI_IO0 (AF9) | TOGGLE7 (GPIO) |
-| 59 | PD12 | QSPI_IO1 (AF9) | unassigned |
-| 60 | PD13 | QSPI_IO3 (AF9) | unassigned |
-| 61 | PD14 | ADC_SCKI_SRC (SAI3_MCLK_B, fxbox) | unassigned |
-| 79 | PC11 | unassigned | QSPI_NCS, BK2_NCS (AF9) |
+| 59 | PD12 | QSPI_IO1 (AF9) | MUTE_N (GPIO) |
+| 60 | PD13 | QSPI_IO3 (AF9) | free |
+| 61 | PD14 | ADC_SCKI_SRC (SAI3_MCLK_B, fxbox) | free |
+| 79 | PC11 | unassigned | free (NC) |
 | 92 | PB6 | QSPI_NCS (BK1_NCS AF10) | ENC_MENU_A (GPIO, EXTI6) |
-| 36 | PB2 | QSPI_CLK_SRC (AF9) | unchanged |
 
-ENC_MENU_A takes EXTI6, which no other input uses (taken: 6, 10-15). Schematic work: swap the
-U1 pin numbers on the QSPI nets and the SCKI net, keep net names, and rewire the flash pads
-to the same net names (IO0..IO3 keep their roles, so the flash symbol does not change).
-The old PD11-13 routes to the flash are replaced by PE7-PE10 and PC11.
+ENC_MENU_A takes EXTI6, which no other input uses (taken: 6, 10-15).
 
 ### PCM1808 straps
 
@@ -202,9 +197,8 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
 3. SAI1 block B is slave receiver (ADC, SD_B on PE3), SYNCEN = synchronous with block A.
 4. Enable block A (starts MCLK) before the PCM1808 leaves power-down or reset, and keep MCLK
    running whenever PCM1808 is powered.
-5. QUADSPI runs in single-flash mode with FSEL = 1 (flash 2) on bank 2 pins.
+5. Settings are written to internal flash bank 2 while the code runs from bank 1 (dual bank, no stall).
 
-NOT VERIFIED: every AF number in this section that is not a QUADSPI row of the local file
-(SAI1_MCLK_A on PE2 AF6, SAI3_MCLK_B on PD14, PF7, SAI2 pins), the PC11-only BK2_NCS claim
-against DS12110, the PE2 AF6 and PC11 AF9 assignments (the pin numbers 1, 37-40, 58-61, 79 and 92 were
+NOT VERIFIED: every AF number in this section
+(SAI1_MCLK_A on PE2 AF6, SAI3_MCLK_B on PD14, PF7, SAI2 pins), the PE2 AF6 assignment (the pin numbers 1, 58-61 and 92 were
 checked against the pin names in cubevox_h7core.kicad_sym and are correct), PLL3 settings, and the MCKDIV value.

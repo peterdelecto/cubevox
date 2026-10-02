@@ -4436,6 +4436,244 @@
       )
     )
   )
+		(symbol "cubevox:RVT1E470M0605"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "C"
+      (id 0)
+      (at 0 5.08 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "RVT1E470M0605"
+      (id 1)
+      (at 0 -5.08 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
+      (id 2)
+      (at 0 -7.62 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "https://lcsc.com/product-detail/Aluminum-Electrolytic-Capacitors-SMD_47uF-25V-20_C72521.html"
+      (id 3)
+      (at 0 -10.16 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "ROQANG(容强)"
+      (id 4)
+      (at 0 -12.70 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "RVT1E470M0605"
+      (id 5)
+      (at 0 -15.24 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "C72521"
+      (id 6)
+      (at 0 -17.78 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "Aluminum Electrolytic Capacitors - SMD"
+      (id 8)
+      (at 0 -20.32 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_description"
+      "47uF 25V ±20%"
+      (id 9)
+      (at 0 -22.86 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "RVT1E470M0605_0_1"
+      (arc
+        (start 1.21 -1.83)
+        (mid 0.51 0.09)
+        (end 1.33 1.95)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -0.51 2.03) (xy -0.51 -2.03)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -1.27 -0.00) (xy -0.51 -0.00)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.51 -0.00) (xy 1.27 -0.00)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -2.54 0.76) (xy -1.52 0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -2.03 1.27) (xy -2.03 0.25)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin input line
+        (at -3.81 -0.00 0)
+        (length 2.54)
+        (name "1" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin input line
+        (at 3.81 -0.00 180)
+        (length 2.54)
+        (name "2" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
+		(symbol "cubevox:MMBT3904-C20526"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "Q"
+      (id 0)
+      (at 0 10.16 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "MMBT3904-C20526"
+      (id 1)
+      (at 0 -10.16 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
+      (id 2)
+      (at 0 -12.70 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "https://lcsc.com/product-detail/_MMBT3904-1AM-100-300_C20526.html"
+      (id 3)
+      (at 0 -15.24 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "CJ(江苏长电/长晶)"
+      (id 4)
+      (at 0 -17.78 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "MMBT3904(RANGE:100-300)"
+      (id 5)
+      (at 0 -20.32 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "C20526"
+      (id 6)
+      (at 0 -22.86 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "Bipolar Transistors - BJT"
+      (id 8)
+      (at 0 -25.40 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_description"
+      "MMBT3904 1AM 100-300"
+      (id 9)
+      (at 0 -27.94 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "MMBT3904-C20526_0_1"
+      (polyline
+        (pts
+          (xy 2.54 2.54) (xy 0.00 0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.00 -0.76) (xy 2.54 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.00 2.29) (xy 0.00 -2.29)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 2.54 -2.54) (xy 1.78 -1.27) (xy 1.02 -2.29) (xy 2.54 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (pin passive line
+        (at 2.54 5.08 270)
+        (length 2.54)
+        (name "C" (effects (font (size 1.27 1.27))))
+        (number "3" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -2.54 -0.00 0)
+        (length 2.54)
+        (name "B" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at 2.54 -5.08 90)
+        (length 2.54)
+        (name "E" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
 		(symbol "Device:FerriteBead"
 		(pin_numbers
 			(hide yes)
@@ -5514,7 +5752,7 @@
 		)
 		(uuid "1cbad842-02e4-52fb-a486-b20be7e6f5a8")
 	)
-	(label "5V_PRODUCT"
+	(label "5V"
 		(at 148.59 139.7 180)
 		(fields_autoplaced yes)
 		(effects
@@ -5848,7 +6086,7 @@
 		)
 		(uuid "9e6315fc-3207-5d5f-ae83-f2f617ab4c56")
 	)
-	(label "5V_PRODUCT"
+	(label "5V"
 		(at 265.43 142.24 0)
 		(fields_autoplaced yes)
 		(effects
@@ -5938,7 +6176,7 @@
 		)
 		(uuid "78ca9ff5-3fca-5004-92e6-f5f4c7e413a8")
 	)
-	(label "5V_PRODUCT"
+	(label "5V"
 		(at 292.1 135.89 90)
 		(fields_autoplaced yes)
 		(effects
@@ -6049,7 +6287,7 @@
 		)
 		(uuid "61212b64-21c4-5609-a27c-4a2955ee7e80")
 	)
-	(label "5V_PRODUCT"
+	(label "5V"
 		(at 304.8 135.89 90)
 		(fields_autoplaced yes)
 		(effects
@@ -7050,7 +7288,7 @@
 		(uuid "2ad54a8c-b67e-5e9e-9ade-e388b15e994d")
 	)
 	(symbol
-		(lib_id "cubevox:RVT1E100M0405-C72484")
+		(lib_id "cubevox:RVT1E470M0605")
 		(at 508 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -7059,24 +7297,22 @@
 		(dnp no)
 		(uuid "56bd3f75-f5b9-52d2-b799-1b803c3f6096")
 		(property "Reference" "C120"
-			(at 511.81 82.55 0)
+			(at 508 77.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
-		(property "Value" "10uF 25V"
-			(at 511.81 85.09 0)
+		(property "Value" "47uF 25V"
+			(at 508 80.01 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
+		(property "Footprint" "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
 			(at 508 83.82 0)
 			(hide yes)
 			(effects
@@ -7094,7 +7330,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C72484"
+		(property "LCSC" "C72521"
 			(at 508 83.82 0)
 			(hide yes)
 			(effects
@@ -7103,7 +7339,7 @@
 				)
 			)
 		)
-		(property "MPN" "RVT1E100M0405"
+		(property "MPN" "RVT1E470M0605"
 			(at 508 83.82 0)
 			(hide yes)
 			(effects
@@ -7129,7 +7365,7 @@
 	)
 	(wire
 		(pts
-			(xy 508 80.01) (xy 508 77.47)
+			(xy 504.19 83.82) (xy 504.19 81.28)
 		)
 		(stroke
 			(width 0)
@@ -7138,7 +7374,7 @@
 		(uuid "65b211a4-943f-5e0c-8e57-1c53484604b6")
 	)
 	(label "IN_P"
-		(at 508 77.47 90)
+		(at 504.19 81.28 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7150,7 +7386,7 @@
 	)
 	(wire
 		(pts
-			(xy 508 87.63) (xy 508 90.17)
+			(xy 511.81 83.82) (xy 511.81 86.36)
 		)
 		(stroke
 			(width 0)
@@ -7159,7 +7395,7 @@
 		(uuid "641e0e74-4f54-52b6-8ca1-6ceab6ca2701")
 	)
 	(label "MIC_P"
-		(at 508 90.17 270)
+		(at 511.81 86.36 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7307,7 +7543,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "22k"
 			(at 551.18 85.09 0)
 			(effects
 				(font
@@ -7334,7 +7570,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25804"
+		(property "LCSC" "C31850"
 			(at 548.64 83.82 0)
 			(hide yes)
 			(effects
@@ -7621,6 +7857,117 @@
 			(justify right bottom)
 		)
 		(uuid "beecc58e-60d7-5611-8de8-cc0b447c8577")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 594.36 101.6 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "0ddab1b2-8dd4-57f7-89aa-417fac0721ad")
+		(property "Reference" "R148"
+			(at 596.9 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 596.9 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 594.36 101.6 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 594.36 101.6 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25803"
+			(at 594.36 101.6 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "f190813c-2613-5f38-9674-29163688548a")
+		)
+		(pin "2"
+			(uuid "3b12ea6f-b072-54c6-bfcb-0b23b96ec6e3")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R148")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 594.36 97.79) (xy 594.36 95.25)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ec598375-5ee9-5c94-a210-f036cd6f8524")
+	)
+	(label "TRS_T"
+		(at 594.36 95.25 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "320c1349-ae11-5118-8111-b8f8ec480e79")
+	)
+	(wire
+		(pts
+			(xy 594.36 105.41) (xy 594.36 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "21752197-1a37-576e-a773-cd7f870cff77")
+	)
+	(label "GND"
+		(at 594.36 107.95 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "87300fa4-f490-5ef2-9680-14d243fef15d")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -7987,7 +8334,7 @@
 		(uuid "114c8c6d-b459-58f4-81d7-caf7d90c8534")
 	)
 	(symbol
-		(lib_id "cubevox:RVT1E100M0405-C72484")
+		(lib_id "cubevox:RVT1E470M0605")
 		(at 508 177.8 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -7996,24 +8343,22 @@
 		(dnp no)
 		(uuid "64c806e7-e468-53f8-a544-e82c88e13c40")
 		(property "Reference" "C124"
-			(at 511.81 176.53 0)
+			(at 508 171.45 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
-		(property "Value" "10uF 25V"
-			(at 511.81 179.07 0)
+		(property "Value" "47uF 25V"
+			(at 508 173.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
+		(property "Footprint" "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
 			(at 508 177.8 0)
 			(hide yes)
 			(effects
@@ -8031,7 +8376,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C72484"
+		(property "LCSC" "C72521"
 			(at 508 177.8 0)
 			(hide yes)
 			(effects
@@ -8040,7 +8385,7 @@
 				)
 			)
 		)
-		(property "MPN" "RVT1E100M0405"
+		(property "MPN" "RVT1E470M0605"
 			(at 508 177.8 0)
 			(hide yes)
 			(effects
@@ -8066,7 +8411,7 @@
 	)
 	(wire
 		(pts
-			(xy 508 173.99) (xy 508 171.45)
+			(xy 504.19 177.8) (xy 504.19 175.26)
 		)
 		(stroke
 			(width 0)
@@ -8075,7 +8420,7 @@
 		(uuid "328eb8f5-dec8-5f6b-a8cc-05b337c2b26a")
 	)
 	(label "IN_N"
-		(at 508 171.45 90)
+		(at 504.19 175.26 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8087,7 +8432,7 @@
 	)
 	(wire
 		(pts
-			(xy 508 181.61) (xy 508 184.15)
+			(xy 511.81 177.8) (xy 511.81 180.34)
 		)
 		(stroke
 			(width 0)
@@ -8096,7 +8441,7 @@
 		(uuid "736ed569-615c-56c3-943d-f8d6a54392e2")
 	)
 	(label "MIC_N"
-		(at 508 184.15 270)
+		(at 511.81 180.34 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8244,7 +8589,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "22k"
 			(at 551.18 179.07 0)
 			(effects
 				(font
@@ -8271,7 +8616,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25804"
+		(property "LCSC" "C31850"
 			(at 548.64 177.8 0)
 			(hide yes)
 			(effects
@@ -8558,6 +8903,117 @@
 			(justify right bottom)
 		)
 		(uuid "e334bb86-ab81-5a22-932b-efdf2969747e")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 594.36 195.58 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "b5391e71-582a-5398-9ba4-2e38813b81de")
+		(property "Reference" "R149"
+			(at 596.9 194.31 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 596.9 196.85 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 594.36 195.58 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 594.36 195.58 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25803"
+			(at 594.36 195.58 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1966324a-00d9-5b2d-9654-57fdfc6e10e3")
+		)
+		(pin "2"
+			(uuid "a8a37d91-839f-501b-ae67-4709a1be91e1")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R149")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 594.36 191.77) (xy 594.36 189.23)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7671cc5c-ba7a-5a89-ba97-0e044a72b957")
+	)
+	(label "TRS_R"
+		(at 594.36 189.23 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "fbc532cf-d3e2-5980-80b9-a303663af5a8")
+	)
+	(wire
+		(pts
+			(xy 594.36 199.39) (xy 594.36 201.93)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "03821e08-ce17-55cc-b1b1-3230457dfddd")
+	)
+	(label "GND"
+		(at 594.36 201.93 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "03ae1729-5a1d-5ee4-87ce-21e8037122a7")
 	)
 	(symbol
 		(lib_id "cubevox:OPA2197IDR")
@@ -8950,7 +9406,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "9.53k"
+		(property "Value" "4.53k"
 			(at 703.58 92.71 0)
 			(effects
 				(font
@@ -8977,7 +9433,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C23127"
+		(property "LCSC" "C25971"
 			(at 701.04 91.44 0)
 			(hide yes)
 			(effects
@@ -9283,7 +9739,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "9.53k"
+		(property "Value" "4.53k"
 			(at 749.3 92.71 0)
 			(effects
 				(font
@@ -9310,7 +9766,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C23127"
+		(property "LCSC" "C25971"
 			(at 746.76 91.44 0)
 			(hide yes)
 			(effects
@@ -9488,7 +9944,7 @@
 		(uuid "060d22d9-3ce5-544b-a3b6-7cde7d97e247")
 	)
 	(symbol
-		(lib_id "cubevox:RVT1C220M0405")
+		(lib_id "Device:C")
 		(at 777.24 91.44 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -9497,22 +9953,24 @@
 		(dnp no)
 		(uuid "98c48b3a-6d64-5e07-aba8-b0a4d6a18008")
 		(property "Reference" "C158"
-			(at 777.24 85.09 0)
+			(at 781.05 90.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Value" "22uF 16V"
-			(at 777.24 87.63 0)
+		(property "Value" "22uF 25V NP"
+			(at 781.05 92.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD"
+		(property "Footprint" "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-FD"
 			(at 777.24 91.44 0)
 			(hide yes)
 			(effects
@@ -9530,7 +9988,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C72502"
+		(property "LCSC" "C413679"
 			(at 777.24 91.44 0)
 			(hide yes)
 			(effects
@@ -9539,7 +9997,7 @@
 				)
 			)
 		)
-		(property "MPN" "RVT1C220M0405"
+		(property "MPN" "EEEHP1E220P"
 			(at 777.24 91.44 0)
 			(hide yes)
 			(effects
@@ -9565,7 +10023,7 @@
 	)
 	(wire
 		(pts
-			(xy 773.43 91.44) (xy 773.43 88.9)
+			(xy 777.24 87.63) (xy 777.24 85.09)
 		)
 		(stroke
 			(width 0)
@@ -9574,7 +10032,7 @@
 		(uuid "a7147e10-e851-57b3-8c13-c46cbf041a8d")
 	)
 	(label "A1_FB"
-		(at 773.43 88.9 90)
+		(at 777.24 85.09 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -9586,7 +10044,7 @@
 	)
 	(wire
 		(pts
-			(xy 781.05 91.44) (xy 781.05 93.98)
+			(xy 777.24 95.25) (xy 777.24 97.79)
 		)
 		(stroke
 			(width 0)
@@ -9595,7 +10053,7 @@
 		(uuid "38b7c5ba-a436-5845-b75a-d9ea7fc9c29c")
 	)
 	(label "RG_MID"
-		(at 781.05 93.98 270)
+		(at 777.24 97.79 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10632,7 +11090,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "200R"
+		(property "Value" "330R"
 			(at 708.66 321.31 0)
 			(effects
 				(font
@@ -10659,7 +11117,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C8218"
+		(property "LCSC" "C23138"
 			(at 706.12 320.04 0)
 			(hide yes)
 			(effects
@@ -12527,7 +12985,7 @@
 		)
 		(uuid "f709322c-3f4f-5dcc-8153-90aff620c14b")
 	)
-	(label "DAC_ATT"
+	(label "FX_ON_SENSE"
 		(at 962.66 74.93 90)
 		(fields_autoplaced yes)
 		(effects
@@ -12548,7 +13006,7 @@
 		)
 		(uuid "852d7783-65f2-5d27-b7d6-22b2bbe1412f")
 	)
-	(label "BUF_IN"
+	(label "GND"
 		(at 955.04 77.47 90)
 		(fields_autoplaced yes)
 		(effects
@@ -12559,26 +13017,9 @@
 		)
 		(uuid "de0727c0-4de0-5457-9963-e7e21a869cbc")
 	)
-	(wire
-		(pts
-			(xy 947.42 87.63) (xy 947.42 80.01)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9ed00e03-37d5-5973-854b-c7b0c94a592b")
-	)
-	(label "PRE_OUT"
-		(at 947.42 80.01 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "58c8dd22-645c-55c9-8156-76686c02110d")
+	(no_connect
+		(at 947.42 87.63)
+		(uuid "e04d061b-27bd-5105-9a84-b1caaebc97f9")
 	)
 	(wire
 		(pts
@@ -12923,7 +13364,7 @@
 		)
 		(uuid "208b930b-aefb-5ddc-8a7d-3e3369188909")
 	)
-	(label "SW_BYPASS"
+	(label "3V3"
 		(at 1031.24 222.25 90)
 		(fields_autoplaced yes)
 		(effects
@@ -12956,16 +13397,16 @@
 		(uuid "7fe8d766-c15b-58f0-b128-a910cb9bd0e7")
 	)
 	(symbol
-		(lib_id "Device:R")
+		(lib_id "Device:C")
 		(at 1046.48 228.6 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "10f2c6ea-c09c-53ab-8026-20e4b0c8649f")
-		(property "Reference" "R121"
-			(at 1049.02 227.33 0)
+		(uuid "71ce4f03-6104-51bd-a3f2-fff717b12506")
+		(property "Reference" "C162"
+			(at 1050.29 227.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12973,8 +13414,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "18k"
-			(at 1049.02 229.87 0)
+		(property "Value" "100nF"
+			(at 1050.29 229.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12982,7 +13423,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:R0603"
+		(property "Footprint" "cubevox:C0603"
 			(at 1046.48 228.6 0)
 			(hide yes)
 			(effects
@@ -13000,7 +13441,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25810"
+		(property "LCSC" "C14663"
 			(at 1046.48 228.6 0)
 			(hide yes)
 			(effects
@@ -13010,15 +13451,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "2df4c833-11e5-5a65-8092-fb26fe0bfc6a")
+			(uuid "00fb422b-5a6d-5212-b58a-45bd11f22897")
 		)
 		(pin "2"
-			(uuid "4f0ead5f-8990-5444-b37d-dc8fe72f74d4")
+			(uuid "94154123-f842-568d-83e1-319350e66679")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "R121")
+					(reference "C162")
 					(unit 1)
 				)
 			)
@@ -13032,7 +13473,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "9c7a038b-dd7c-5387-a0ee-f3e73af7c5ff")
+		(uuid "60451bd7-c445-5cd8-bb56-c81f12075db2")
 	)
 	(label "FX_ON_SENSE"
 		(at 1046.48 222.25 90)
@@ -13043,7 +13484,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "6b61880d-fc74-5731-85bb-6fa3fd03da39")
+		(uuid "ebb20229-40a7-54fa-bb7b-b589131444d4")
 	)
 	(wire
 		(pts
@@ -13053,7 +13494,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "2b352e55-b29f-5c14-a2b0-7c76efa4b1ca")
+		(uuid "bf0dbe80-bf95-5007-b411-3e520e9b2b70")
 	)
 	(label "GND"
 		(at 1046.48 234.95 270)
@@ -13064,7 +13505,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "0b704062-03c2-5ee7-a24c-46f07cf67850")
+		(uuid "0369167d-67fd-5379-80b5-026c7a4539a5")
 	)
 	(symbol
 		(lib_id "cubevox:RVT1E100M0405-C72484")
@@ -13850,7 +14291,7 @@
 		)
 		(uuid "45cef616-38a5-59b8-9226-af0dff66145e")
 	)
-	(label "OUT_TIP"
+	(label "OUT_AC"
 		(at 1087.12 184.15 270)
 		(fields_autoplaced yes)
 		(effects
@@ -13940,7 +14381,7 @@
 		)
 		(uuid "6ddb89db-b113-5cd3-9ad7-b68793e2e30a")
 	)
-	(label "OUT_TIP"
+	(label "OUT_AC"
 		(at 1102.36 171.45 90)
 		(fields_autoplaced yes)
 		(effects
@@ -14117,6 +14558,1053 @@
 	(no_connect
 		(at 1098.55 251.46)
 		(uuid "7ea03f81-b6f3-5677-8ee9-43caab9947b2")
+	)
+	(symbol
+		(lib_id "cubevox:G6K-2F-Y-DC5")
+		(at 975.36 447.04 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "57c1bdfe-f93f-5787-8c74-6ab969dce768")
+		(property "Reference" "K102"
+			(at 989.33 447.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "G6K-2F-Y DC5"
+			(at 989.33 449.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:RELAY-SMD_G6K-2F-X-XX"
+			(at 975.36 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 975.36 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C47190"
+			(at 975.36 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "G6K-2F-Y-TR DC5"
+			(at 975.36 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fefbedbe-e815-552d-85ee-eb548c834c45")
+		)
+		(pin "2"
+			(uuid "311124ae-07f7-566e-b95a-4f69d53a85c8")
+		)
+		(pin "3"
+			(uuid "eb9de576-fa39-51dc-a8b0-2e1f594fadc9")
+		)
+		(pin "4"
+			(uuid "289db127-d678-53f1-8c54-ea2bda89d072")
+		)
+		(pin "5"
+			(uuid "a1c24091-9717-5a50-84be-961bc9e5963d")
+		)
+		(pin "6"
+			(uuid "51d93445-31cb-588d-8105-554e8bf8f8d5")
+		)
+		(pin "7"
+			(uuid "568a43df-9f73-5860-8f52-88da7f74ecb0")
+		)
+		(pin "8"
+			(uuid "12e60e55-84ed-557f-ae27-250633b1edc9")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "K102")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 967.74 457.2) (xy 967.74 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0820e212-5dcf-56b9-918e-a8834768027f")
+	)
+	(label "5V"
+		(at 967.74 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "642eaf1c-55ee-5fab-83a5-45ca31927723")
+	)
+	(no_connect
+		(at 970.28 457.2)
+		(uuid "7bc07a31-ef2f-500f-b75f-98dc0aa3f39a")
+	)
+	(wire
+		(pts
+			(xy 977.9 457.2) (xy 977.9 467.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "acbda227-96ae-5d6b-9c77-9d4c5d257e9c")
+	)
+	(label "OUT_AC"
+		(at 977.9 467.36 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "3c857166-3c7d-5aec-98b8-4a5cb34beaf4")
+	)
+	(wire
+		(pts
+			(xy 985.52 457.2) (xy 985.52 469.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "af0871c4-d2cd-5556-88f3-6591bdec8794")
+	)
+	(label "OUT_TIP"
+		(at 985.52 469.9 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "705fcb11-f0f9-56bc-8292-f693ac187504")
+	)
+	(no_connect
+		(at 985.52 438.15)
+		(uuid "23b3428d-a779-5f0f-932c-4bf0dc13d6c4")
+	)
+	(wire
+		(pts
+			(xy 977.9 438.15) (xy 977.9 427.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "03fc9124-a4b3-5a40-9d52-291574c4ead9")
+	)
+	(label "OUT_TIP"
+		(at 977.9 427.99 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6e9ca45e-4d62-5b2b-9b9d-37dc6cdb6412")
+	)
+	(wire
+		(pts
+			(xy 970.28 438.15) (xy 970.28 430.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9a57648e-b67f-5594-a89e-454bbff64dea")
+	)
+	(label "GND"
+		(at 970.28 430.53 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "5e38460b-6095-5b51-a0e9-80719825524c")
+	)
+	(wire
+		(pts
+			(xy 967.74 438.15) (xy 967.74 433.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "692f084e-eff1-52b0-9b33-ab16189df36c")
+	)
+	(label "MUTE_COIL"
+		(at 967.74 433.07 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "ca3431a2-7087-5f01-bd69-c1750a2c1505")
+	)
+	(symbol
+		(lib_id "cubevox:1N4148W_C81598")
+		(at 1054.1 447.04 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "6c084109-54df-512d-abe1-8372e9c717f7")
+		(property "Reference" "D109"
+			(at 1054.1 443.23 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "1N4148W"
+			(at 1054.1 450.85 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD"
+			(at 1054.1 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 1054.1 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C81598"
+			(at 1054.1 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "1N4148W"
+			(at 1054.1 447.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "45a1be11-1d75-5599-bf23-3c52f3d6d70f")
+		)
+		(pin "2"
+			(uuid "6dc4365c-ba14-529a-a47e-a59e1cd63942")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "D109")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 1049.02 447.04) (xy 1046.48 447.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "86e98f03-c549-5649-9b1c-65c8c8eb756b")
+	)
+	(label "5V"
+		(at 1046.48 447.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "f3cc34d5-5745-51c2-a863-0c5e5819a048")
+	)
+	(wire
+		(pts
+			(xy 1059.18 447.04) (xy 1061.72 447.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "631af005-941f-5763-a7f3-3fe5af90edb7")
+	)
+	(label "MUTE_COIL"
+		(at 1061.72 447.04 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "04b5c3af-9aa1-5e3b-88db-c46c8dcf0231")
+	)
+	(symbol
+		(lib_id "cubevox:MMBT3904-C20526")
+		(at 1016 508 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2566ce90-3bd4-59ae-997e-75aa744c3632")
+		(property "Reference" "Q101"
+			(at 1019.81 506.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MMBT3904"
+			(at 1019.81 509.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
+			(at 1016 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 1016 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C20526"
+			(at 1016 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MMBT3904"
+			(at 1016 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a64c0e75-5ad4-55d9-89f9-a25203e15290")
+		)
+		(pin "2"
+			(uuid "d4ead69a-6547-5760-bfb8-b69c2da18e46")
+		)
+		(pin "3"
+			(uuid "dcce64df-5378-5ef1-bed8-83f6b4f6077e")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "Q101")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 1013.46 508) (xy 1010.92 508)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a3231649-54f5-54c5-918a-e1ed865805ec")
+	)
+	(label "MUTE_BASE"
+		(at 1010.92 508 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "1a6fb0d9-f3c3-5481-b00e-413d9040ab69")
+	)
+	(wire
+		(pts
+			(xy 1018.54 513.08) (xy 1018.54 515.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "80781367-d9ea-5ca3-a244-fd124977e979")
+	)
+	(label "GND"
+		(at 1018.54 515.62 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "a218ef87-d251-5d6d-a951-9b9b0d038a7e")
+	)
+	(wire
+		(pts
+			(xy 1018.54 502.92) (xy 1018.54 500.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8b5a1fe8-fc05-59c3-b3dd-fa3a411ec2b9")
+	)
+	(label "MUTE_COIL"
+		(at 1018.54 500.38 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "52141eda-0bd0-5b3c-8b1e-6c32b3a72621")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 990.6 508 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "bf27ca84-7957-5cbf-873f-41e86fb1b17b")
+		(property "Reference" "R150"
+			(at 993.14 506.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 993.14 509.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 990.6 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 990.6 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C21190"
+			(at 990.6 508 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fec5f723-2418-5999-8005-98ebea2532a1")
+		)
+		(pin "2"
+			(uuid "8970e718-8550-519a-8473-015807751c5f")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R150")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 990.6 504.19) (xy 990.6 501.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dd9bcf71-c721-54d9-a33b-bb330a563ea2")
+	)
+	(label "MUTE_N"
+		(at 990.6 501.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1d59d086-cf24-5bbe-b7ed-c05fb454f3df")
+	)
+	(wire
+		(pts
+			(xy 990.6 511.81) (xy 990.6 514.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f905ab6e-367c-5b0c-ba5a-a943092dc912")
+	)
+	(label "MUTE_BASE"
+		(at 990.6 514.35 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "ea9d296f-4e02-58d0-a1bb-3e5752b86955")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 990.6 533.4 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "477b8b35-67cf-5529-859b-48da17365785")
+		(property "Reference" "R153"
+			(at 993.14 532.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 993.14 534.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 990.6 533.4 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 990.6 533.4 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25803"
+			(at 990.6 533.4 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4e00702d-1a7b-51bb-a6e0-3105cc217721")
+		)
+		(pin "2"
+			(uuid "01ba5d46-13ab-5c6e-b0d1-21c92465c8bc")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R153")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 990.6 529.59) (xy 990.6 527.05)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3ece33fb-2110-5351-bbde-a86364abc390")
+	)
+	(label "MUTE_BASE"
+		(at 990.6 527.05 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "c8266650-e16c-5439-b6dc-5630c72204af")
+	)
+	(wire
+		(pts
+			(xy 990.6 537.21) (xy 990.6 539.75)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4b1b7b6a-7a2f-5dc7-b5b7-e1a53fe2115e")
+	)
+	(label "GND"
+		(at 990.6 539.75 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "66b9ce59-72a6-58cf-93d0-cc24fbb0ac86")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 142.24 271.78 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "0cff73d3-c3a5-5511-976b-0721a252b514")
+		(property "Reference" "R151"
+			(at 144.78 270.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10k"
+			(at 144.78 273.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 142.24 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 142.24 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25804"
+			(at 142.24 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c58eb634-0457-53db-a478-fecaeabc04a3")
+		)
+		(pin "2"
+			(uuid "06a36153-b994-5b27-b8c7-06a855fbb4e0")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R151")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 142.24 267.97) (xy 142.24 265.43)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4c8065ed-5a2e-5b4c-82a7-e4508abeb17a")
+	)
+	(label "5VA"
+		(at 142.24 265.43 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "371e44d9-b849-598d-88bc-fc9104624120")
+	)
+	(wire
+		(pts
+			(xy 142.24 275.59) (xy 142.24 278.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c7c5a733-584a-5022-b5b0-d2ebb793837a")
+	)
+	(label "VA_SENSE"
+		(at 142.24 278.13 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "b74e15dc-633f-520f-87df-e915c3d5e733")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 157.48 271.78 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "69cc07b2-c03b-56db-a89c-1ca44ad87dec")
+		(property "Reference" "R152"
+			(at 160.02 270.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10k"
+			(at 160.02 273.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 157.48 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 157.48 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25804"
+			(at 157.48 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a4af496e-3725-5160-b7d7-9c1df55a0fa0")
+		)
+		(pin "2"
+			(uuid "43d3accb-8223-52a9-bd73-734cc6d0bc73")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R152")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 157.48 267.97) (xy 157.48 265.43)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b454217b-f1c5-5c66-b0ce-b9ecb56b4725")
+	)
+	(label "VA_SENSE"
+		(at 157.48 265.43 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "fae50a41-a22c-51d0-9984-2a635818debd")
+	)
+	(wire
+		(pts
+			(xy 157.48 275.59) (xy 157.48 278.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0d3b4295-72b1-5988-814d-c4720264dde4")
+	)
+	(label "GND"
+		(at 157.48 278.13 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "94e699fd-8077-53a4-9562-6e06e9e3b32b")
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 172.72 271.78 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2cb7064c-4425-566a-b2c9-f565cf5c8b95")
+		(property "Reference" "C163"
+			(at 176.53 270.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 176.53 273.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:C0603"
+			(at 172.72 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 172.72 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C14663"
+			(at 172.72 271.78 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9cd7e341-e191-5f53-a809-d265cb36fb61")
+		)
+		(pin "2"
+			(uuid "8c5d0efa-7d37-543d-aba4-2a3dfd6e9762")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C163")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 172.72 267.97) (xy 172.72 265.43)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a5032449-49a5-5279-8e4b-5c1fc6de3dd9")
+	)
+	(label "VA_SENSE"
+		(at 172.72 265.43 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1a7585f3-f756-5d7b-887d-c4f8a726d58e")
+	)
+	(wire
+		(pts
+			(xy 172.72 275.59) (xy 172.72 278.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fb4ed657-246a-5441-8c58-9a838420fc25")
+	)
+	(label "GND"
+		(at 172.72 278.13 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "f52164f2-6a9a-57f6-a170-444901884083")
 	)
 	(symbol
 		(lib_id "cubevox:CD74HC4067SM96")
@@ -22903,218 +24391,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 218.44 812.8 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(dnp no)
-		(uuid "fe4a7a11-3ad0-55c8-a4fa-07a94d44ceca")
-		(property "Reference" "H105"
-			(at 218.44 810.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M2 OLED"
-			(at 218.44 815.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_2.2mm_M2"
-			(at 218.44 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 218.44 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "H105")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 238.76 812.8 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(dnp no)
-		(uuid "527f0715-3921-56a5-ae60-f944e3f98ad2")
-		(property "Reference" "H106"
-			(at 238.76 810.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M2 OLED"
-			(at 238.76 815.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_2.2mm_M2"
-			(at 238.76 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 238.76 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "H106")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 259.08 812.8 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(dnp no)
-		(uuid "2cf5fd1d-7332-596c-a79b-4e8a7d3df71e")
-		(property "Reference" "H107"
-			(at 259.08 810.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M2 OLED"
-			(at 259.08 815.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_2.2mm_M2"
-			(at 259.08 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 259.08 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "H107")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 279.4 812.8 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(dnp no)
-		(uuid "3d399ce0-2a0d-5496-bbff-92e660736468")
-		(property "Reference" "H108"
-			(at 279.4 810.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M2 OLED"
-			(at 279.4 815.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_2.2mm_M2"
-			(at 279.4 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 279.4 812.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "H108")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:PWR_FLAG")
 		(at 251.46 203.2 0)
 		(unit 1)
@@ -23257,7 +24533,7 @@
 		)
 		(uuid "eab008b2-0d83-5d42-b614-76438ec37516")
 	)
-	(label "5V_PRODUCT"
+	(label "5V"
 		(at 276.86 200.66 90)
 		(fields_autoplaced yes)
 		(effects
@@ -23385,7 +24661,7 @@
 		)
 		(uuid "60f3d797-e694-5404-a823-c2b8fb644864")
 	)
-	(text "XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 10uF + IN_x. TRS leg 10uF + LINE_x, 10k pad. 1.2k bias to VREF"
+	(text "XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 47uF + IN_x. TRS leg 10uF + LINE_x, 22k pad, 100k to GND. 1.2k bias to VREF"
 		(at 381 35.56 0)
 		(effects
 			(font
@@ -23393,7 +24669,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "bdc4bcc6-9fc7-52f1-abb1-8c51ebcddf74")
+		(uuid "2db37f53-6497-5f01-abd9-3ad3452f564f")
 	)
 	(text "Both T holes are the tip (Neutrik: one tip circuit, no switch). No plug detection"
 		(at 386.08 190.5 0)
@@ -23415,7 +24691,7 @@
 		)
 		(uuid "58da9ecc-55f8-5f90-9117-19ec0da171fb")
 	)
-	(text "Stage 1 INA 26 dB (U104, U105A). Stage 2 0-34.2 dB on Input Gain pot (U105B)"
+	(text "Stage 1 INA 20.05 dB (U104, U105A). Stage 2 0-29.9 dB on Input Gain pot (U105B)"
 		(at 594.36 35.56 0)
 		(effects
 			(font
@@ -23423,9 +24699,9 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "d0efbcc8-919f-51c1-8999-76f873c625f3")
+		(uuid "975b7b29-e514-5b91-9f3d-27fa4a29c035")
 	)
-	(text "Stage 1 26.0 dB, stage 2 0-34.2 dB, chain 26-60 dB XLR / 6.6-40.8 dB TRS; DC gain 1 (AC-coupled legs)"
+	(text "Chain 20-50 dB XLR / -5.6 to +24.3 dB TRS; DC gain 1 (AC-coupled legs)"
 		(at 594.36 40.64 0)
 		(effects
 			(font
@@ -23433,9 +24709,9 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "a80b9613-f8ce-5285-873a-5bf8746b6f58")
+		(uuid "2d6ec1f2-bc24-5939-a358-3f4ebef70e0a")
 	)
-	(text "RG = R109 1k + C158 22uF in series, DC gain 1. Gain 1 + 2 x 9.53k / 1k = 20.1"
+	(text "RG = R109 1k + C158 22uF bipolar in series, DC gain 1. Gain 1 + 2 x 4.53k / 1k = 10.06"
 		(at 701.04 66.04 0)
 		(effects
 			(font
@@ -23443,9 +24719,9 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "1c492b74-e4a6-5b85-ab8b-d58acef9343c")
+		(uuid "e6f3058f-2427-5328-bee8-df9760f1a384")
 	)
-	(text "Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/200"
+	(text "Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/330"
 		(at 594.36 294.64 0)
 		(effects
 			(font
@@ -23453,7 +24729,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "b9fa549c-6f6a-51b2-9fb0-0bbaaa3f15d7")
+		(uuid "578861e8-04b8-5d93-a7c7-f0b83d949bf1")
 	)
 	(text "VREF: 5VA divided 10k/10k, 10 uF, follower U106A, 22R into VREF with 10 uF. U106B drives block 6"
 		(at 594.36 370.84 0)
@@ -23505,7 +24781,7 @@
 		)
 		(uuid "0d3fa2d0-4cd3-5467-afc6-07d2d4b17eac")
 	)
-	(text "COM BUF_IN, NC PRE_OUT, NO DAC_ATT. Coil on = effect on"
+	(text "Pole A COM BUF_IN, NC PRE_OUT, NO DAC_ATT. Pole B COM GND, NO FX_ON_SENSE (low = effect on). Coil on = effect on"
 		(at 916.94 35.56 0)
 		(effects
 			(font
@@ -23513,7 +24789,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "dd753de9-f73b-5573-9089-fe90f9237a0e")
+		(uuid "42125f18-8a1e-5ab2-a5e5-d2b6d558bcf0")
 	)
 	(text "Bypass toggle. Common to the coil, one throw to 5V"
 		(at 1038.86 165.1 0)
@@ -23555,6 +24831,46 @@
 		)
 		(uuid "03575960-56df-5064-a060-67b7d78105bd")
 	)
+	(text "OUT_TIP via K102 (section 8)"
+		(at 1112.52 254 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "f191eb0d-d354-5b2b-8f69-03b385b4ca3c")
+	)
+	(text "8. OUTPUT MUTE"
+		(at 939.8 381 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "0c5cd349-4b5a-5414-b612-17976c46d3c5")
+	)
+	(text "K102 closes OUT_AC to OUT_TIP when MUTE_N is high, else OUT_TIP is grounded"
+		(at 939.8 386.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "be6c84b2-d50b-527c-954a-be41972d12b3")
+	)
+	(text "5VA SENSE"
+		(at 137.16 241.3 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "ecb9b045-81d9-5292-bed7-8797ae24712d")
+	)
 	(text "7. PANEL"
 		(at 137.16 355.6 0)
 		(effects
@@ -23577,7 +24893,7 @@
 	)
 	(sheet
 		(at 25.4 50.8)
-		(size 58.42 148.59)
+		(size 58.42 152.4)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
@@ -23600,7 +24916,7 @@
 			)
 		)
 		(property "Sheetfile" "h7core_block.kicad_sch"
-			(at 25.4 200.66 0)
+			(at 25.4 204.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23608,7 +24924,7 @@
 				(justify left top)
 			)
 		)
-		(pin "5V" output
+		(pin "5V" input
 			(at 83.82 55.88 0)
 			(effects
 				(font
@@ -23618,18 +24934,8 @@
 			)
 			(uuid "11908451-aecd-5a00-be3f-cf9473a2e734")
 		)
-		(pin "5V_PRODUCT" input
-			(at 83.82 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-			(uuid "02a21c06-1e2d-54e1-83d2-40efe3067a4b")
-		)
 		(pin "5VA" input
-			(at 83.82 63.5 0)
+			(at 83.82 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23639,7 +24945,7 @@
 			(uuid "68982b6d-6e7e-5465-a87f-789d3a5ab88a")
 		)
 		(pin "3V3" output
-			(at 83.82 67.31 0)
+			(at 83.82 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23649,7 +24955,7 @@
 			(uuid "4a489acf-9061-5495-b363-da1bbde73a75")
 		)
 		(pin "3V3A" output
-			(at 83.82 71.12 0)
+			(at 83.82 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23659,7 +24965,7 @@
 			(uuid "12812343-0d39-57d6-aacd-473e296ebbc1")
 		)
 		(pin "GND" passive
-			(at 83.82 74.93 0)
+			(at 83.82 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23669,7 +24975,7 @@
 			(uuid "46fa21c1-4fc1-5428-b370-ba60fbc065d0")
 		)
 		(pin "ADC_VINL" input
-			(at 83.82 78.74 0)
+			(at 83.82 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23679,7 +24985,7 @@
 			(uuid "281afbc2-8417-5e5c-9e5b-7724cda73e8e")
 		)
 		(pin "ADC_VINR" input
-			(at 83.82 82.55 0)
+			(at 83.82 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23689,7 +24995,7 @@
 			(uuid "42e08982-8142-5fc6-8907-54710c8f24ce")
 		)
 		(pin "DAC_OUTL" output
-			(at 83.82 86.36 0)
+			(at 83.82 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23699,7 +25005,7 @@
 			(uuid "340e9414-935a-5bf9-a048-331fdb049252")
 		)
 		(pin "SWDIO" bidirectional
-			(at 83.82 90.17 0)
+			(at 83.82 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23709,7 +25015,7 @@
 			(uuid "65135331-9878-5860-ad1c-d0b2b165e676")
 		)
 		(pin "SWCLK" input
-			(at 83.82 93.98 0)
+			(at 83.82 90.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23719,7 +25025,7 @@
 			(uuid "6f8deb7a-93c0-5a1e-ad46-d2215487e83d")
 		)
 		(pin "SWO" output
-			(at 83.82 97.79 0)
+			(at 83.82 93.98 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23729,7 +25035,7 @@
 			(uuid "bb6e5da1-b0b5-5bda-b6ff-1bd665a13cb5")
 		)
 		(pin "NRST" bidirectional
-			(at 83.82 101.6 0)
+			(at 83.82 97.79 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23739,7 +25045,7 @@
 			(uuid "7a32dd03-9f30-562d-a798-94fded848931")
 		)
 		(pin "BOOT0" input
-			(at 83.82 105.41 0)
+			(at 83.82 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23749,7 +25055,7 @@
 			(uuid "938e9eeb-1b9d-5432-bd45-90f6f2ef48f4")
 		)
 		(pin "I2C1_SCL" bidirectional
-			(at 83.82 109.22 0)
+			(at 83.82 105.41 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23759,7 +25065,7 @@
 			(uuid "f1c4a0a3-174e-55ab-a9a0-e54eeb091805")
 		)
 		(pin "I2C1_SDA" bidirectional
-			(at 83.82 113.03 0)
+			(at 83.82 109.22 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23769,7 +25075,7 @@
 			(uuid "490dac17-8c34-5160-8c91-a7c000745810")
 		)
 		(pin "MUX_S0" output
-			(at 83.82 116.84 0)
+			(at 83.82 113.03 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23779,7 +25085,7 @@
 			(uuid "ee1f4d12-2636-54c2-8b31-86285686d3c1")
 		)
 		(pin "MUX_S1" output
-			(at 83.82 120.65 0)
+			(at 83.82 116.84 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23789,7 +25095,7 @@
 			(uuid "7ea6c9e1-b000-54e7-964f-3a27bd3d2077")
 		)
 		(pin "MUX_S2" output
-			(at 83.82 124.46 0)
+			(at 83.82 120.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23799,7 +25105,7 @@
 			(uuid "43c3cf35-9986-595a-b0ac-d2cbeefe2cfd")
 		)
 		(pin "MUX_S3" output
-			(at 83.82 128.27 0)
+			(at 83.82 124.46 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23809,7 +25115,7 @@
 			(uuid "21cfb7eb-f938-5549-82a1-ec8f0018d7de")
 		)
 		(pin "POT_MUX_OUT" input
-			(at 83.82 132.08 0)
+			(at 83.82 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23819,7 +25125,7 @@
 			(uuid "e924568b-ef8e-5404-a3e7-4610a4a43e22")
 		)
 		(pin "ENC_MENU_A" input
-			(at 83.82 135.89 0)
+			(at 83.82 132.08 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23829,7 +25135,7 @@
 			(uuid "44de7c62-a810-5ae7-9d8b-890f63af246f")
 		)
 		(pin "ENC_MENU_B" input
-			(at 83.82 139.7 0)
+			(at 83.82 135.89 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23839,7 +25145,7 @@
 			(uuid "b7a250bb-81ef-5206-ab23-29b9dd143cee")
 		)
 		(pin "ENC_MENU_SW" input
-			(at 83.82 143.51 0)
+			(at 83.82 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23849,7 +25155,7 @@
 			(uuid "01c61fa3-ab78-5a18-8dcf-5d89cb2ec81d")
 		)
 		(pin "ENC_KEY_A" input
-			(at 83.82 147.32 0)
+			(at 83.82 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23859,7 +25165,7 @@
 			(uuid "df4d6f89-efa7-56aa-ace5-3a52c91dff6b")
 		)
 		(pin "ENC_KEY_B" input
-			(at 83.82 151.13 0)
+			(at 83.82 147.32 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23869,7 +25175,7 @@
 			(uuid "f460fcc1-a51e-54a4-ba15-529c44c8bf0a")
 		)
 		(pin "ENC_SEMI_A" input
-			(at 83.82 154.94 0)
+			(at 83.82 151.13 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23879,7 +25185,7 @@
 			(uuid "3c20eb31-756d-555e-82af-72a4819a4520")
 		)
 		(pin "ENC_SEMI_B" input
-			(at 83.82 158.75 0)
+			(at 83.82 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23889,7 +25195,7 @@
 			(uuid "263a99c2-0593-5ea3-a868-b8461d504286")
 		)
 		(pin "TOGGLE1" input
-			(at 83.82 162.56 0)
+			(at 83.82 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23899,7 +25205,7 @@
 			(uuid "b2b3b7b7-98f5-5ac2-b944-166953def105")
 		)
 		(pin "TOGGLE2" input
-			(at 83.82 166.37 0)
+			(at 83.82 162.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23909,7 +25215,7 @@
 			(uuid "6f1f561f-df6c-512f-b285-ce42f8cf65fe")
 		)
 		(pin "TOGGLE3" input
-			(at 83.82 170.18 0)
+			(at 83.82 166.37 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23919,7 +25225,7 @@
 			(uuid "e84cdcca-b749-584d-8596-06ab52093d9c")
 		)
 		(pin "TOGGLE4" input
-			(at 83.82 173.99 0)
+			(at 83.82 170.18 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23929,7 +25235,7 @@
 			(uuid "2c842117-caa1-5280-95ce-8a4b2196a411")
 		)
 		(pin "TOGGLE5" input
-			(at 83.82 177.8 0)
+			(at 83.82 173.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23939,7 +25245,7 @@
 			(uuid "7547e80e-bae5-5be5-80b3-2b8e29cab718")
 		)
 		(pin "TOGGLE6" input
-			(at 83.82 181.61 0)
+			(at 83.82 177.8 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23949,7 +25255,7 @@
 			(uuid "6bc3461d-442c-52d9-8ea9-511ad043d1ed")
 		)
 		(pin "TOGGLE7" input
-			(at 83.82 185.42 0)
+			(at 83.82 181.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23959,7 +25265,7 @@
 			(uuid "f67efb5f-6bbf-594f-948c-cfb47669f71b")
 		)
 		(pin "TOGGLE8" input
-			(at 83.82 189.23 0)
+			(at 83.82 185.42 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23969,7 +25275,7 @@
 			(uuid "98fab25c-e671-5608-8435-559c6d516b63")
 		)
 		(pin "FX_ON_SENSE" input
-			(at 83.82 193.04 0)
+			(at 83.82 189.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23977,6 +25283,26 @@
 				(justify right)
 			)
 			(uuid "9cf200d7-fb79-5019-b73e-509a36178b5a")
+		)
+		(pin "MUTE_N" output
+			(at 83.82 193.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "bef151c7-ca10-51ac-b7db-ca77dc8a2db2")
+		)
+		(pin "VA_SENSE" input
+			(at 83.82 196.85 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "ba2ff853-dc2a-5c78-9f0a-90a0157084a9")
 		)
 		(instances
 			(project "cubevox"
@@ -23987,23 +25313,23 @@
 		)
 	)
 	(no_connect
-		(at 83.82 90.17)
+		(at 83.82 86.36)
 		(uuid "5ffe8b88-7a91-5ab0-b5f6-290434af4c17")
 	)
 	(no_connect
-		(at 83.82 93.98)
+		(at 83.82 90.17)
 		(uuid "9060dbce-a953-5140-aeea-c782d4517530")
 	)
 	(no_connect
-		(at 83.82 97.79)
+		(at 83.82 93.98)
 		(uuid "bc117a17-8520-51e2-b1c8-ad7e85dbc0c3")
 	)
 	(no_connect
-		(at 83.82 101.6)
+		(at 83.82 97.79)
 		(uuid "d8b8e425-99ff-5192-9203-caff658390dd")
 	)
 	(no_connect
-		(at 83.82 105.41)
+		(at 83.82 101.6)
 		(uuid "a07dbdd2-99ff-5cbf-b9a1-1fd34d19e99c")
 	)
 	(wire
@@ -24035,31 +25361,10 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "9b74692a-8410-5fbd-8786-39d896ef15bc")
-	)
-	(label "5V_PRODUCT"
-		(at 86.36 59.69 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "fb5ff1bd-9a44-58b8-879a-f623eacf9e2e")
-	)
-	(wire
-		(pts
-			(xy 83.82 63.5) (xy 86.36 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
 		(uuid "82b7ddce-6526-577d-825f-c8425e9d0aa8")
 	)
 	(label "5VA"
-		(at 86.36 63.5 0)
+		(at 86.36 59.69 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24071,7 +25376,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 67.31) (xy 86.36 67.31)
+			(xy 83.82 63.5) (xy 86.36 63.5)
 		)
 		(stroke
 			(width 0)
@@ -24080,7 +25385,7 @@
 		(uuid "19c7a25e-7644-5f20-9b37-7df3cea5b597")
 	)
 	(label "3V3"
-		(at 86.36 67.31 0)
+		(at 86.36 63.5 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24092,7 +25397,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 71.12) (xy 86.36 71.12)
+			(xy 83.82 67.31) (xy 86.36 67.31)
 		)
 		(stroke
 			(width 0)
@@ -24101,7 +25406,7 @@
 		(uuid "f7e4bb4f-4497-5af3-b6b9-2a0ab7ccdbd6")
 	)
 	(label "3V3A"
-		(at 86.36 71.12 0)
+		(at 86.36 67.31 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24113,7 +25418,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 74.93) (xy 86.36 74.93)
+			(xy 83.82 71.12) (xy 86.36 71.12)
 		)
 		(stroke
 			(width 0)
@@ -24122,7 +25427,7 @@
 		(uuid "770780b0-ee95-58e4-97f1-0d89bbddcda4")
 	)
 	(label "GND"
-		(at 86.36 74.93 0)
+		(at 86.36 71.12 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24134,7 +25439,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 78.74) (xy 86.36 78.74)
+			(xy 83.82 74.93) (xy 86.36 74.93)
 		)
 		(stroke
 			(width 0)
@@ -24143,7 +25448,7 @@
 		(uuid "2ae3630e-0eef-576d-bbfd-09b9e4a2cf68")
 	)
 	(label "ADC_VINL"
-		(at 86.36 78.74 0)
+		(at 86.36 74.93 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24155,7 +25460,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 82.55) (xy 86.36 82.55)
+			(xy 83.82 78.74) (xy 86.36 78.74)
 		)
 		(stroke
 			(width 0)
@@ -24164,7 +25469,7 @@
 		(uuid "2caa130f-5312-5938-8584-74a412cae461")
 	)
 	(label "ADC_VINR"
-		(at 86.36 82.55 0)
+		(at 86.36 78.74 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24176,7 +25481,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 86.36) (xy 86.36 86.36)
+			(xy 83.82 82.55) (xy 86.36 82.55)
 		)
 		(stroke
 			(width 0)
@@ -24185,7 +25490,7 @@
 		(uuid "a1b49704-40ce-5780-bab5-c758a5eb03b4")
 	)
 	(label "DAC_OUTL"
-		(at 86.36 86.36 0)
+		(at 86.36 82.55 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24197,7 +25502,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 109.22) (xy 86.36 109.22)
+			(xy 83.82 105.41) (xy 86.36 105.41)
 		)
 		(stroke
 			(width 0)
@@ -24206,7 +25511,7 @@
 		(uuid "a9299b5e-b6ec-5fe9-bb33-6000180fd086")
 	)
 	(label "I2C1_SCL"
-		(at 86.36 109.22 0)
+		(at 86.36 105.41 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24218,7 +25523,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 113.03) (xy 86.36 113.03)
+			(xy 83.82 109.22) (xy 86.36 109.22)
 		)
 		(stroke
 			(width 0)
@@ -24227,7 +25532,7 @@
 		(uuid "997bf832-a45f-50ac-a74f-7ba32588ea5c")
 	)
 	(label "I2C1_SDA"
-		(at 86.36 113.03 0)
+		(at 86.36 109.22 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24239,7 +25544,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 116.84) (xy 86.36 116.84)
+			(xy 83.82 113.03) (xy 86.36 113.03)
 		)
 		(stroke
 			(width 0)
@@ -24248,7 +25553,7 @@
 		(uuid "e0a3e6f5-e6a2-5bd7-83ae-133340f1cada")
 	)
 	(label "MUX_S0"
-		(at 86.36 116.84 0)
+		(at 86.36 113.03 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24260,7 +25565,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 120.65) (xy 86.36 120.65)
+			(xy 83.82 116.84) (xy 86.36 116.84)
 		)
 		(stroke
 			(width 0)
@@ -24269,7 +25574,7 @@
 		(uuid "21846b5f-984e-5c28-870a-f1d0989e76f3")
 	)
 	(label "MUX_S1"
-		(at 86.36 120.65 0)
+		(at 86.36 116.84 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24281,7 +25586,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 124.46) (xy 86.36 124.46)
+			(xy 83.82 120.65) (xy 86.36 120.65)
 		)
 		(stroke
 			(width 0)
@@ -24290,7 +25595,7 @@
 		(uuid "32f001f9-c650-5a0b-8af4-6d64c6048252")
 	)
 	(label "MUX_S2"
-		(at 86.36 124.46 0)
+		(at 86.36 120.65 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24302,7 +25607,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 128.27) (xy 86.36 128.27)
+			(xy 83.82 124.46) (xy 86.36 124.46)
 		)
 		(stroke
 			(width 0)
@@ -24311,7 +25616,7 @@
 		(uuid "ed2c71a8-6bde-5a74-9ebe-9401cb17295e")
 	)
 	(label "MUX_S3"
-		(at 86.36 128.27 0)
+		(at 86.36 124.46 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24323,7 +25628,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 132.08) (xy 86.36 132.08)
+			(xy 83.82 128.27) (xy 86.36 128.27)
 		)
 		(stroke
 			(width 0)
@@ -24332,7 +25637,7 @@
 		(uuid "25ad8448-b975-5251-a55e-62dcb19ac3c5")
 	)
 	(label "POT_MUX_OUT"
-		(at 86.36 132.08 0)
+		(at 86.36 128.27 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24344,7 +25649,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 135.89) (xy 86.36 135.89)
+			(xy 83.82 132.08) (xy 86.36 132.08)
 		)
 		(stroke
 			(width 0)
@@ -24353,7 +25658,7 @@
 		(uuid "fe694093-deeb-5f29-b80a-653e7a9c4075")
 	)
 	(label "ENC_MENU_A"
-		(at 86.36 135.89 0)
+		(at 86.36 132.08 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24365,7 +25670,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 139.7) (xy 86.36 139.7)
+			(xy 83.82 135.89) (xy 86.36 135.89)
 		)
 		(stroke
 			(width 0)
@@ -24374,7 +25679,7 @@
 		(uuid "c756599c-4bc2-508a-add8-7106cd79baa5")
 	)
 	(label "ENC_MENU_B"
-		(at 86.36 139.7 0)
+		(at 86.36 135.89 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24386,7 +25691,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 143.51) (xy 86.36 143.51)
+			(xy 83.82 139.7) (xy 86.36 139.7)
 		)
 		(stroke
 			(width 0)
@@ -24395,7 +25700,7 @@
 		(uuid "b54aa9b5-84f8-5294-916f-ea06f029968f")
 	)
 	(label "ENC_MENU_SW"
-		(at 86.36 143.51 0)
+		(at 86.36 139.7 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24407,7 +25712,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 147.32) (xy 86.36 147.32)
+			(xy 83.82 143.51) (xy 86.36 143.51)
 		)
 		(stroke
 			(width 0)
@@ -24416,7 +25721,7 @@
 		(uuid "856dd862-f413-565c-a7bd-127d2e6a9b5c")
 	)
 	(label "ENC_KEY_A"
-		(at 86.36 147.32 0)
+		(at 86.36 143.51 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24428,7 +25733,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 151.13) (xy 86.36 151.13)
+			(xy 83.82 147.32) (xy 86.36 147.32)
 		)
 		(stroke
 			(width 0)
@@ -24437,7 +25742,7 @@
 		(uuid "87e834da-62cc-564c-ac9b-ade30419739d")
 	)
 	(label "ENC_KEY_B"
-		(at 86.36 151.13 0)
+		(at 86.36 147.32 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24449,7 +25754,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 154.94) (xy 86.36 154.94)
+			(xy 83.82 151.13) (xy 86.36 151.13)
 		)
 		(stroke
 			(width 0)
@@ -24458,7 +25763,7 @@
 		(uuid "670a3bea-ccf7-57ca-828e-e8bca00a80b4")
 	)
 	(label "ENC_SEMI_A"
-		(at 86.36 154.94 0)
+		(at 86.36 151.13 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24470,7 +25775,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 158.75) (xy 86.36 158.75)
+			(xy 83.82 154.94) (xy 86.36 154.94)
 		)
 		(stroke
 			(width 0)
@@ -24479,7 +25784,7 @@
 		(uuid "6747fd23-6d63-5a3d-b9b5-7f962501384a")
 	)
 	(label "ENC_SEMI_B"
-		(at 86.36 158.75 0)
+		(at 86.36 154.94 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24491,7 +25796,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 162.56) (xy 86.36 162.56)
+			(xy 83.82 158.75) (xy 86.36 158.75)
 		)
 		(stroke
 			(width 0)
@@ -24500,7 +25805,7 @@
 		(uuid "5a4d9db6-ce71-5c20-95b3-0d41cbc03e13")
 	)
 	(label "TOGGLE1"
-		(at 86.36 162.56 0)
+		(at 86.36 158.75 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24512,7 +25817,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 166.37) (xy 86.36 166.37)
+			(xy 83.82 162.56) (xy 86.36 162.56)
 		)
 		(stroke
 			(width 0)
@@ -24521,7 +25826,7 @@
 		(uuid "2ab09c7f-9530-58e5-a531-329a7a363071")
 	)
 	(label "TOGGLE2"
-		(at 86.36 166.37 0)
+		(at 86.36 162.56 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24533,7 +25838,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 170.18) (xy 86.36 170.18)
+			(xy 83.82 166.37) (xy 86.36 166.37)
 		)
 		(stroke
 			(width 0)
@@ -24542,7 +25847,7 @@
 		(uuid "8e0e4147-5192-5628-a9c4-8d2984e23961")
 	)
 	(label "TOGGLE3"
-		(at 86.36 170.18 0)
+		(at 86.36 166.37 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24554,7 +25859,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 173.99) (xy 86.36 173.99)
+			(xy 83.82 170.18) (xy 86.36 170.18)
 		)
 		(stroke
 			(width 0)
@@ -24563,7 +25868,7 @@
 		(uuid "f49c9fc4-1c4a-5c4b-a6ed-cf40d795f909")
 	)
 	(label "TOGGLE4"
-		(at 86.36 173.99 0)
+		(at 86.36 170.18 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24575,7 +25880,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 177.8) (xy 86.36 177.8)
+			(xy 83.82 173.99) (xy 86.36 173.99)
 		)
 		(stroke
 			(width 0)
@@ -24584,7 +25889,7 @@
 		(uuid "a8a6a033-c8ae-57b2-ac3a-514d266b6af8")
 	)
 	(label "TOGGLE5"
-		(at 86.36 177.8 0)
+		(at 86.36 173.99 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24596,7 +25901,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 181.61) (xy 86.36 181.61)
+			(xy 83.82 177.8) (xy 86.36 177.8)
 		)
 		(stroke
 			(width 0)
@@ -24605,7 +25910,7 @@
 		(uuid "f8cedcac-1f2f-5c24-a87b-dc71e609c170")
 	)
 	(label "TOGGLE6"
-		(at 86.36 181.61 0)
+		(at 86.36 177.8 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24617,7 +25922,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 185.42) (xy 86.36 185.42)
+			(xy 83.82 181.61) (xy 86.36 181.61)
 		)
 		(stroke
 			(width 0)
@@ -24626,7 +25931,7 @@
 		(uuid "26b71331-408a-504a-a9b8-49e49ff2eeea")
 	)
 	(label "TOGGLE7"
-		(at 86.36 185.42 0)
+		(at 86.36 181.61 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24638,7 +25943,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 189.23) (xy 86.36 189.23)
+			(xy 83.82 185.42) (xy 86.36 185.42)
 		)
 		(stroke
 			(width 0)
@@ -24647,7 +25952,7 @@
 		(uuid "135cd876-8669-50b2-a575-fecf8c1b81db")
 	)
 	(label "TOGGLE8"
-		(at 86.36 189.23 0)
+		(at 86.36 185.42 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24659,7 +25964,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 193.04) (xy 86.36 193.04)
+			(xy 83.82 189.23) (xy 86.36 189.23)
 		)
 		(stroke
 			(width 0)
@@ -24668,7 +25973,7 @@
 		(uuid "40b4ce26-d2ce-52ea-8e34-ccb5cdc7670e")
 	)
 	(label "FX_ON_SENSE"
-		(at 86.36 193.04 0)
+		(at 86.36 189.23 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24677,6 +25982,48 @@
 			(justify left bottom)
 		)
 		(uuid "497f17c0-06f6-5754-b640-f48b02489a40")
+	)
+	(wire
+		(pts
+			(xy 83.82 193.04) (xy 86.36 193.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "19d6794b-7dc6-51bf-a00f-24750765a9f7")
+	)
+	(label "MUTE_N"
+		(at 86.36 193.04 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "836e127e-04ad-5a5e-95e6-9dcafd4daf26")
+	)
+	(wire
+		(pts
+			(xy 83.82 196.85) (xy 86.36 196.85)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b4fac6cb-42aa-59c5-9dac-a8a1734ccf3b")
+	)
+	(label "VA_SENSE"
+		(at 86.36 196.85 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "9889dffc-ee03-52c2-8a28-254a11305014")
 	)
 	(sheet_instances
 		(path "/"

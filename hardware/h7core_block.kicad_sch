@@ -3827,268 +3827,6 @@
 		)
 		(embedded_fonts no)
 	)
-		(symbol "cubevox_h7core:TPS2116DRLR"
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(duplicate_pin_numbers_are_jumpers no)
-		(property "Reference" "U"
-			(at 0 8.89 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TPS2116DRLR"
-			(at 0 -8.89 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "cubevox_h7core:SOT-583-8_L2.1-W1.6-P0.50-LS1.6-BL"
-			(at 0 -11.43 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C3235557.pdf"
-			(at 0 -13.97 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 0 0 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "TI(德州仪器)"
-			(at 0 -16.51 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "TPS2116DRLR"
-			(at 0 -19.05 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C3235557"
-			(at 0 -21.59 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(symbol "TPS2116DRLR_0_1"
-			(rectangle
-				(start -8.89 6.35)
-				(end 8.89 -6.35)
-				(stroke
-					(width 0)
-					(type default)
-				)
-				(fill
-					(type background)
-				)
-			)
-			(circle
-				(center -7.62 5.08)
-				(radius 0.38)
-				(stroke
-					(width 0)
-					(type default)
-				)
-				(fill
-					(type none)
-				)
-			)
-			(pin power_in line
-				(at -11.43 3.81 0)
-				(length 2.54)
-				(name "GND"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin power_out line
-				(at -11.43 1.27 0)
-				(length 2.54)
-				(name "VOUT"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin power_in line
-				(at -11.43 -1.27 0)
-				(length 2.54)
-				(name "VIN1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin input line
-				(at -11.43 -3.81 0)
-				(length 2.54)
-				(name "PR1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "4"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin input line
-				(at 11.43 -3.81 180)
-				(length 2.54)
-				(name "MODE"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "5"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin power_in line
-				(at 11.43 -1.27 180)
-				(length 2.54)
-				(name "VIN2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "6"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 11.43 1.27 180)
-				(length 2.54)
-				(name "VOUT"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "7"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin open_collector line
-				(at 11.43 3.81 180)
-				(length 2.54)
-				(name "ST"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "8"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-		)
-		(embedded_fonts no)
-	)
 		(symbol "cubevox_h7core:AP63203WU-7"
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4903,279 +4641,6 @@
 					)
 				)
 				(number "2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-		)
-		(embedded_fonts no)
-	)
-		(symbol "cubevox_h7core:IS25LP064A-JBLE-TR"
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(duplicate_pin_numbers_are_jumpers no)
-		(property "Reference" "U"
-			(at 0 8.89 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "IS25LP064A-JBLE-TR"
-			(at 0 -8.89 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "cubevox_h7core:SOIC-8_L5.3-W5.3-P1.27-LS7.9-BL"
-			(at 0 -11.43 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C2841348.pdf"
-			(at 0 -13.97 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 0 0 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "ISSI(北京矽成)"
-			(at 0 -16.51 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "IS25LP064A-JBLE-TR"
-			(at 0 -19.05 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C2841348"
-			(at 0 -21.59 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "ki_keywords" "NOR FLASH"
-			(at 0 0 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(symbol "IS25LP064A-JBLE-TR_0_1"
-			(rectangle
-				(start -17.78 6.35)
-				(end 17.78 -6.35)
-				(stroke
-					(width 0)
-					(type default)
-				)
-				(fill
-					(type background)
-				)
-			)
-			(circle
-				(center -16.51 5.08)
-				(radius 0.38)
-				(stroke
-					(width 0)
-					(type default)
-				)
-				(fill
-					(type none)
-				)
-			)
-			(pin input line
-				(at -20.32 3.81 0)
-				(length 2.54)
-				(name "~{CE}"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin bidirectional line
-				(at -20.32 1.27 0)
-				(length 2.54)
-				(name "SO(IO1)"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin bidirectional line
-				(at -20.32 -1.27 0)
-				(length 2.54)
-				(name "WP#(IO2)"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin power_in line
-				(at -20.32 -3.81 0)
-				(length 2.54)
-				(name "GND"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "4"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin bidirectional line
-				(at 20.32 -3.81 180)
-				(length 2.54)
-				(name "SI(IO0)"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "5"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin input line
-				(at 20.32 -1.27 180)
-				(length 2.54)
-				(name "SCK"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "6"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin bidirectional line
-				(at 20.32 1.27 180)
-				(length 2.54)
-				(name "HOLD#(IO3)"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "7"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin power_in line
-				(at 20.32 3.81 180)
-				(length 2.54)
-				(name "Vcc"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "8"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -7299,9 +6764,27 @@
 		)
 		(uuid "0ad746bd-8038-5ae6-8257-2a6109a54c40")
 	)
-	(no_connect
-		(at 54.61 156.21)
-		(uuid "e6a80d3a-7cf4-54a0-aa6d-a70e0738ce2b")
+	(wire
+		(pts
+			(xy 54.61 156.21) (xy 41.91 156.21)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fd2fca7b-4af3-5ac0-8559-773012d69df5")
+	)
+	(hierarchical_label "VA_SENSE"
+		(shape input)
+		(at 41.91 156.21 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "17fb5f2b-36db-5bd9-9748-ebc264fbe1e4")
 	)
 	(no_connect
 		(at 54.61 158.75)
@@ -7351,110 +6834,25 @@
 		)
 		(uuid "8256c21f-adca-52d0-a614-ac1d67d8d301")
 	)
-	(wire
-		(pts
-			(xy 54.61 166.37) (xy 39.37 166.37)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e20ebbb8-e1e4-5939-9d5c-75b7ab4c8142")
+	(no_connect
+		(at 54.61 166.37)
+		(uuid "9ba46bac-ec59-5cbe-af93-1f90abe47aea")
 	)
-	(label "QSPI_CLK_SRC"
-		(at 39.37 166.37 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "27047ab1-280f-5ab4-9455-029dbd023174")
+	(no_connect
+		(at 54.61 168.91)
+		(uuid "e6f32c22-dbe8-5259-9a75-3684193d5bd8")
 	)
-	(wire
-		(pts
-			(xy 54.61 168.91) (xy 44.45 168.91)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7bcc9ff3-99d4-502b-9c99-6fe973f6cc60")
+	(no_connect
+		(at 54.61 171.45)
+		(uuid "65c41061-ee62-55c8-8fb1-c4cf4ae35657")
 	)
-	(label "QSPI_IO0"
-		(at 44.45 168.91 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "0282f773-cc14-590d-ba60-0bc5da553d0b")
+	(no_connect
+		(at 54.61 173.99)
+		(uuid "eb51e353-7991-5646-96e0-255c1c7acdf1")
 	)
-	(wire
-		(pts
-			(xy 54.61 171.45) (xy 41.91 171.45)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a8f0d3d8-3653-55cd-81b1-05bde7dd0d5a")
-	)
-	(label "QSPI_IO1"
-		(at 41.91 171.45 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "0b8d69ba-cb71-532f-9d53-f455bffa84c2")
-	)
-	(wire
-		(pts
-			(xy 54.61 173.99) (xy 39.37 173.99)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9d48f80b-e79c-566b-b13a-f3840f8fcdaf")
-	)
-	(label "QSPI_IO2"
-		(at 39.37 173.99 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "62032f4e-96c2-58fd-9388-663731e2f55c")
-	)
-	(wire
-		(pts
-			(xy 54.61 176.53) (xy 36.83 176.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2c889028-bd37-5262-8722-52ad8cc2b8b6")
-	)
-	(label "QSPI_IO3"
-		(at 36.83 176.53 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "7f36a1f4-82cf-5f3a-a580-a4b8896789cb")
+	(no_connect
+		(at 54.61 176.53)
+		(uuid "0682466a-c124-51d3-8955-eeb496cc2798")
 	)
 	(wire
 		(pts
@@ -7724,9 +7122,27 @@
 		)
 		(uuid "6938b105-db88-5086-a402-c98790964b81")
 	)
-	(no_connect
-		(at 95.25 181.61)
-		(uuid "6dd7e2e9-de2e-568b-9f43-bdf3ddac0e78")
+	(wire
+		(pts
+			(xy 95.25 181.61) (xy 107.95 181.61)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4dcfac85-6cd7-5e10-9a4e-2395c38434dc")
+	)
+	(hierarchical_label "MUTE_N"
+		(shape output)
+		(at 107.95 181.61 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "f30040f6-006e-5f1e-899f-27af0e929643")
 	)
 	(no_connect
 		(at 95.25 179.07)
@@ -7980,26 +7396,9 @@
 		(at 95.25 133.35)
 		(uuid "9f8a32ad-57f5-5d41-8840-0f1723d1ac21")
 	)
-	(wire
-		(pts
-			(xy 95.25 130.81) (xy 97.79 130.81)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "65896fa5-f7aa-55b8-88db-a727db72e040")
-	)
-	(label "QSPI_NCS"
-		(at 97.79 130.81 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "fbbb439b-c994-57f6-8913-3893d58d6d5e")
+	(no_connect
+		(at 95.25 130.81)
+		(uuid "fb21ca0c-708f-557d-85cc-0c17d53d38cb")
 	)
 	(no_connect
 		(at 95.25 128.27)
@@ -11816,256 +11215,6 @@
 		(uuid "ac6e8f29-f0ae-508d-a7e6-86947ea88f4c")
 	)
 	(symbol
-		(lib_id "cubevox_h7core:TPS2116DRLR")
-		(at 298.45 57.15 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "70777da1-a14f-5b1b-8c43-69f63482608c")
-		(property "Reference" "U2"
-			(at 298.45 49.53 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TPS2116DRLR"
-			(at 298.45 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "cubevox_h7core:SOT-583-8_L2.1-W1.6-P0.50-LS1.6-BL"
-			(at 298.45 57.15 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 298.45 57.15 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C3235557"
-			(at 298.45 57.15 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "TPS2116DRLR"
-			(at 298.45 57.15 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a3d4dc28-4b86-5e83-8faa-1c4528970bd5")
-		)
-		(pin "2"
-			(uuid "9278bcf7-d44a-59fa-8870-61a5dd194c5e")
-		)
-		(pin "3"
-			(uuid "64e4931b-6bc2-5443-b26b-e09fd2986442")
-		)
-		(pin "4"
-			(uuid "efdd011b-2802-5be3-a481-5511f8327407")
-		)
-		(pin "5"
-			(uuid "faa2f412-bd51-5a3b-a671-74db0316e18f")
-		)
-		(pin "6"
-			(uuid "25a9fa88-b59c-5dff-b5f2-9df0aa6539cc")
-		)
-		(pin "7"
-			(uuid "9cf737c1-b199-569f-b94d-1b47db2a00fa")
-		)
-		(pin "8"
-			(uuid "1a52d7ec-032c-5c0e-9fef-d8197697510a")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "U2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 287.02 53.34) (xy 280.67 53.34)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "de011abf-f6c1-5e2b-ac20-7e1b154bc426")
-	)
-	(hierarchical_label "GND"
-		(shape passive)
-		(at 280.67 53.34 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "14140368-b0d2-54c7-bc15-b2a15abdcc69")
-	)
-	(wire
-		(pts
-			(xy 287.02 55.88) (xy 281.94 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0d71a298-fceb-5568-92d8-b74d2135c9a7")
-	)
-	(hierarchical_label "5V"
-		(shape output)
-		(at 281.94 55.88 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "a16380b6-d0ba-5974-b6cb-7f1aa6eeb0e1")
-	)
-	(wire
-		(pts
-			(xy 287.02 58.42) (xy 269.24 58.42)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2a3864a7-eaae-51aa-9989-2f696bff32d3")
-	)
-	(hierarchical_label "5V_PRODUCT"
-		(shape input)
-		(at 269.24 58.42 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "4da20ef7-fbfe-50c5-9c31-4d93861e102a")
-	)
-	(wire
-		(pts
-			(xy 287.02 60.96) (xy 280.67 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "46b33d18-4897-5b4b-a8cc-d86584e2b9bf")
-	)
-	(label "PR1"
-		(at 280.67 60.96 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "0179fc82-478a-5d25-8f42-504502977183")
-	)
-	(wire
-		(pts
-			(xy 309.88 60.96) (xy 312.42 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "57a991a4-3fb4-5796-b10a-3b45ecaf8ae6")
-	)
-	(hierarchical_label "5V_PRODUCT"
-		(shape input)
-		(at 312.42 60.96 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "ada7bc35-a9b0-52c3-803d-c1398baaedd1")
-	)
-	(wire
-		(pts
-			(xy 309.88 58.42) (xy 312.42 58.42)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "371535d9-ee01-559f-be10-e4f4b8301d42")
-	)
-	(label "VBUS"
-		(at 312.42 58.42 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "8e777bf0-74ec-525b-b762-c01476bc6b09")
-	)
-	(wire
-		(pts
-			(xy 309.88 55.88) (xy 312.42 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "be3f0688-24ba-52b0-943e-00c37d9a59f9")
-	)
-	(hierarchical_label "5V"
-		(shape output)
-		(at 312.42 55.88 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "463dde25-8c65-59f5-943e-93843f931656")
-	)
-	(no_connect
-		(at 309.88 53.34)
-		(uuid "9123ee41-8739-56f0-99cc-3889f85fce3b")
-	)
-	(symbol
 		(lib_id "cubevox_h7core:AP63203WU-7")
 		(at 234.95 101.6 0)
 		(unit 1)
@@ -12186,7 +11335,7 @@
 		(uuid "d9d2da1b-6d3c-53ae-87fa-6d70dee088b0")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 220.98 101.6 180)
 		(fields_autoplaced yes)
 		(effects
@@ -12208,7 +11357,7 @@
 		(uuid "45ac7250-df73-5167-b4d4-bc8d9f44652a")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 220.98 104.14 180)
 		(fields_autoplaced yes)
 		(effects
@@ -12379,7 +11528,7 @@
 		(uuid "949b0936-6b03-5b5b-92dd-c0791f67c6ba")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 284.48 99.06 180)
 		(fields_autoplaced yes)
 		(effects
@@ -12423,7 +11572,7 @@
 		(uuid "c855daf5-88e8-55c0-8006-ed55fa52347d")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 284.48 104.14 180)
 		(fields_autoplaced yes)
 		(effects
@@ -12940,7 +12089,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "27k"
+		(property "Value" "33k"
 			(at 189.23 160.02 0)
 			(effects
 				(font
@@ -12967,7 +12116,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C22967"
+		(property "LCSC" "C4216"
 			(at 186.69 158.75 0)
 			(hide yes)
 			(effects
@@ -13051,7 +12200,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "33k"
+		(property "Value" "82k"
 			(at 210.82 160.02 0)
 			(effects
 				(font
@@ -13078,7 +12227,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C4216"
+		(property "LCSC" "C23254"
 			(at 208.28 158.75 0)
 			(hide yes)
 			(effects
@@ -13146,345 +12295,8 @@
 		(uuid "18fcaa8a-efbf-50e2-901a-6ac1e028380f")
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 229.87 158.75 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "b53f8aa3-75f3-5f1f-b400-8bbc50fb6725")
-		(property "Reference" "R8"
-			(at 232.41 157.48 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "36k"
-			(at 232.41 160.02 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 229.87 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 229.87 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C23147"
-			(at 229.87 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "cd9fe4dc-69c5-5b1a-9ba4-681e708efac1")
-		)
-		(pin "2"
-			(uuid "f3f5a1da-ad3d-5b9d-8857-11753c22e0fb")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "R8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 229.87 154.94) (xy 229.87 152.4)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "cdd11149-0f31-5fe7-8adc-b02ff4a66ef3")
-	)
-	(hierarchical_label "5V_PRODUCT"
-		(shape input)
-		(at 229.87 152.4 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "05bf9e97-7d59-5bf5-9200-a90e2cda90c4")
-	)
-	(wire
-		(pts
-			(xy 229.87 162.56) (xy 229.87 165.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "fd7f799b-0eda-587f-8a64-06c0c2d2d71f")
-	)
-	(label "PR1"
-		(at 229.87 165.1 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "7a8d7535-87f4-5a08-b1d0-0535f8528441")
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 251.46 158.75 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "d7d27e9b-c777-540d-b8ef-76b1ff3309c2")
-		(property "Reference" "R9"
-			(at 254 157.48 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "10k"
-			(at 254 160.02 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 251.46 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 251.46 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C25744"
-			(at 251.46 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "7faf7f41-60d7-5f7f-91e4-0293eebe706a")
-		)
-		(pin "2"
-			(uuid "c9f70495-891b-5a3d-a70e-07e7568a164d")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "R9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 251.46 154.94) (xy 251.46 152.4)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "383ff36b-befd-581b-9468-239d0e102241")
-	)
-	(label "PR1"
-		(at 251.46 152.4 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "7570a306-9d0a-54a2-9f43-0f978effd7e8")
-	)
-	(wire
-		(pts
-			(xy 251.46 162.56) (xy 251.46 165.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "950563ff-f7db-5d00-961a-d5f203b6972f")
-	)
-	(hierarchical_label "GND"
-		(shape passive)
-		(at 251.46 165.1 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "8792293c-daf7-5488-ad2a-e9a3c4dd28eb")
-	)
-	(symbol
 		(lib_id "Device:C")
-		(at 264.16 158.75 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "90ad0705-7fe5-59f2-a010-53841e114694")
-		(property "Reference" "C17"
-			(at 267.97 157.48 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "1uF"
-			(at 267.97 160.02 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 264.16 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 264.16 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C15849"
-			(at 264.16 158.75 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "0e549dc9-f345-5dc9-9bea-0f2c5be43125")
-		)
-		(pin "2"
-			(uuid "1efd8630-5cbd-504c-8497-71a91f6294e7")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "C17")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 264.16 154.94) (xy 264.16 152.4)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "adfb5454-6243-5756-b7a4-1ac73cc14978")
-	)
-	(hierarchical_label "5V_PRODUCT"
-		(shape input)
-		(at 264.16 152.4 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "c6d27de6-e41b-532e-b095-b741f14cf8ca")
-	)
-	(wire
-		(pts
-			(xy 264.16 162.56) (xy 264.16 165.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "02832983-5f9c-5c93-a791-8cb7a9d77962")
-	)
-	(hierarchical_label "GND"
-		(shape passive)
-		(at 264.16 165.1 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "e42e2fe5-b27b-5f5d-862b-ab00addc4183")
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 285.75 158.75 0)
+		(at 260.35 57.15 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -13492,7 +12304,7 @@
 		(dnp no)
 		(uuid "63d2dd58-960e-5348-8959-05d1a56c1b66")
 		(property "Reference" "C18"
-			(at 289.56 157.48 0)
+			(at 264.16 55.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13501,7 +12313,7 @@
 			)
 		)
 		(property "Value" "1uF"
-			(at 289.56 160.02 0)
+			(at 264.16 58.42 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13510,7 +12322,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 285.75 158.75 0)
+			(at 260.35 57.15 0)
 			(hide yes)
 			(effects
 				(font
@@ -13519,7 +12331,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 285.75 158.75 0)
+			(at 260.35 57.15 0)
 			(hide yes)
 			(effects
 				(font
@@ -13527,8 +12339,8 @@
 				)
 			)
 		)
-		(property "LCSC" "C15849"
-			(at 285.75 158.75 0)
+		(property "LCSC" "C90540"
+			(at 260.35 57.15 0)
 			(hide yes)
 			(effects
 				(font
@@ -13553,7 +12365,7 @@
 	)
 	(wire
 		(pts
-			(xy 285.75 154.94) (xy 285.75 152.4)
+			(xy 260.35 53.34) (xy 260.35 50.8)
 		)
 		(stroke
 			(width 0)
@@ -13562,7 +12374,7 @@
 		(uuid "a2e81085-40f8-5c10-8792-0573bd93c714")
 	)
 	(label "VBUS"
-		(at 285.75 152.4 90)
+		(at 260.35 50.8 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13574,7 +12386,7 @@
 	)
 	(wire
 		(pts
-			(xy 285.75 162.56) (xy 285.75 165.1)
+			(xy 260.35 60.96) (xy 260.35 63.5)
 		)
 		(stroke
 			(width 0)
@@ -13584,7 +12396,7 @@
 	)
 	(hierarchical_label "GND"
 		(shape passive)
-		(at 285.75 165.1 270)
+		(at 260.35 63.5 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13786,7 +12598,7 @@
 		(uuid "0fc26970-7450-5024-ad5c-e99c2d0bdd7b")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 158.75 184.15 90)
 		(fields_autoplaced yes)
 		(effects
@@ -13899,7 +12711,7 @@
 		(uuid "a5103b87-7b7c-58fb-a58a-c40c4b2a8fa1")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 180.34 184.15 90)
 		(fields_autoplaced yes)
 		(effects
@@ -14349,7 +13161,7 @@
 		(uuid "2cb0dbbb-ccb0-5f15-86ce-8ca7833b5eca")
 	)
 	(hierarchical_label "5V"
-		(shape output)
+		(shape input)
 		(at 241.3 184.15 90)
 		(fields_autoplaced yes)
 		(effects
@@ -14494,719 +13306,6 @@
 			(justify right bottom)
 		)
 		(uuid "bb8dd591-98dd-5409-9d3e-32354add8e62")
-	)
-	(symbol
-		(lib_id "cubevox_h7core:IS25LP064A-JBLE-TR")
-		(at 260.35 234.95 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "1136508e-6825-55db-9520-c0a6baa3feb2")
-		(property "Reference" "U5"
-			(at 260.35 227.33 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "IS25LP064A"
-			(at 260.35 242.57 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "cubevox_h7core:SOIC-8_L5.3-W5.3-P1.27-LS7.9-BL"
-			(at 260.35 234.95 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 260.35 234.95 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C2841348"
-			(at 260.35 234.95 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "IS25LP064A-JBLE-TR"
-			(at 260.35 234.95 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c7543323-b1ef-5340-8832-4adce21bce52")
-		)
-		(pin "2"
-			(uuid "2ffc5c2a-e50e-5bba-92b5-c41bae4493aa")
-		)
-		(pin "3"
-			(uuid "d345b53b-2a59-584d-97ff-4ab78ff566d3")
-		)
-		(pin "4"
-			(uuid "4083ff6d-cff0-5f0a-812f-b192ef1524c0")
-		)
-		(pin "5"
-			(uuid "c138b233-899f-50aa-9704-82e9b905f458")
-		)
-		(pin "6"
-			(uuid "8ee9b4f1-1520-5ad3-96d6-4fb89b2dada4")
-		)
-		(pin "7"
-			(uuid "6f0d022f-bb8b-5242-8944-7ba8f726c3de")
-		)
-		(pin "8"
-			(uuid "35d12bcd-3718-52d9-b89c-55a037e10410")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "U5")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 240.03 231.14) (xy 224.79 231.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "fb64ad07-d31e-5273-8052-da26419d0ff4")
-	)
-	(label "QSPI_NCS"
-		(at 224.79 231.14 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "a5a7ee96-b178-54af-a6ac-76943e8a49f5")
-	)
-	(wire
-		(pts
-			(xy 240.03 233.68) (xy 224.79 233.68)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "43b70dfa-d787-5fdb-ad51-e523d5aa350d")
-	)
-	(label "QSPI_IO1"
-		(at 224.79 233.68 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "ad395205-ea28-51a1-9145-1a323f6c4479")
-	)
-	(wire
-		(pts
-			(xy 240.03 236.22) (xy 224.79 236.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ca5c4b62-85eb-5a23-8190-b001b802e933")
-	)
-	(label "QSPI_IO2"
-		(at 224.79 236.22 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "66e80cf6-babf-5b66-be87-2f0610d8ae2f")
-	)
-	(wire
-		(pts
-			(xy 240.03 238.76) (xy 233.68 238.76)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4323a4bf-b55d-59ec-b35e-698441b87c65")
-	)
-	(hierarchical_label "GND"
-		(shape passive)
-		(at 233.68 238.76 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "204a6d68-e5c7-510f-ae70-ff1325e8ece2")
-	)
-	(wire
-		(pts
-			(xy 280.67 238.76) (xy 283.21 238.76)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4305c58e-56fe-5655-829c-6b9746583f48")
-	)
-	(label "QSPI_IO0"
-		(at 283.21 238.76 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "28a2722f-eed8-5d7b-b78a-0dd7191f3f2b")
-	)
-	(wire
-		(pts
-			(xy 280.67 236.22) (xy 283.21 236.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1549f7b1-f459-5ada-9362-072a9c7cb4d3")
-	)
-	(label "QSPI_CLK"
-		(at 283.21 236.22 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f0dc9782-e96a-57e7-93c6-7cdae7adf131")
-	)
-	(wire
-		(pts
-			(xy 280.67 233.68) (xy 283.21 233.68)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d7521808-d8aa-52a7-81e1-742576173b03")
-	)
-	(label "QSPI_IO3"
-		(at 283.21 233.68 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "707efa08-9e8d-5db0-aa1e-8f4be510a67f")
-	)
-	(wire
-		(pts
-			(xy 280.67 231.14) (xy 283.21 231.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1d9a0021-aaea-5200-a87c-39f1f336bd3c")
-	)
-	(hierarchical_label "3V3"
-		(shape output)
-		(at 283.21 231.14 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "c25c5223-544f-5516-8ced-e61190943038")
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 234.95 266.7 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "15b19100-13d8-59a6-8d7f-4ae2ec593f32")
-		(property "Reference" "R11"
-			(at 237.49 265.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "10k"
-			(at 237.49 267.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 234.95 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 234.95 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C25744"
-			(at 234.95 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "2d7a313c-66f5-5fcb-a728-261e0f72c5db")
-		)
-		(pin "2"
-			(uuid "0d5d3fb0-e546-585c-94e4-123ad56959d9")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "R11")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 234.95 262.89) (xy 234.95 260.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6a157414-b0bf-5512-8854-bf6cc311ad57")
-	)
-	(hierarchical_label "3V3"
-		(shape output)
-		(at 234.95 260.35 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f7a677e9-f6b0-570e-a761-6bcc0930e433")
-	)
-	(wire
-		(pts
-			(xy 234.95 270.51) (xy 234.95 273.05)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c6936294-96b2-5718-b95a-2bbf59819ae2")
-	)
-	(label "QSPI_NCS"
-		(at 234.95 273.05 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "68080ce3-2e11-5e51-a45e-8d629a94d673")
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 254 266.7 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "1a4bd10c-7945-5eb0-a317-13eec5e7e40a")
-		(property "Reference" "R12"
-			(at 256.54 265.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "10k"
-			(at 256.54 267.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 254 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 254 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C25804"
-			(at 254 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "33e952c8-8c80-5b6d-bb74-854f0ec314f1")
-		)
-		(pin "2"
-			(uuid "da2cacfb-f704-59d2-82b9-bfb6177a5566")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "R12")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 254 262.89) (xy 254 260.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "35563e23-2ade-58c1-a910-a38451f0377f")
-	)
-	(hierarchical_label "3V3"
-		(shape output)
-		(at 254 260.35 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "e69db7b3-bda2-5935-a614-8b9008cd83a3")
-	)
-	(wire
-		(pts
-			(xy 254 270.51) (xy 254 273.05)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "214b9a4b-42c9-5662-81b5-098fcedee292")
-	)
-	(label "QSPI_IO2"
-		(at 254 273.05 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "921ab446-6e3e-5a98-9c8a-9947992d90ef")
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 273.05 266.7 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "54b76d16-845a-5ae6-ae1f-c6f2430e3c97")
-		(property "Reference" "R13"
-			(at 275.59 265.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "10k"
-			(at 275.59 267.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 273.05 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 273.05 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C25744"
-			(at 273.05 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "45c066c3-3ea4-5322-b7bc-95181a4e905f")
-		)
-		(pin "2"
-			(uuid "4a96ca98-1aa1-5eef-997d-89463913c748")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "R13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 273.05 262.89) (xy 273.05 260.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d93513a4-8de5-565c-97c1-a8f02b845c9e")
-	)
-	(hierarchical_label "3V3"
-		(shape output)
-		(at 273.05 260.35 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "bac41915-d823-5b57-8a87-d0252ac3fea7")
-	)
-	(wire
-		(pts
-			(xy 273.05 270.51) (xy 273.05 273.05)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "aa3dc08a-6604-545a-9dcf-6b709a947617")
-	)
-	(label "QSPI_IO3"
-		(at 273.05 273.05 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "6c5212b6-9891-5356-8d54-29178c04746b")
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 292.1 266.7 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "309c5541-3110-5faa-84f3-bcd51ecfca94")
-		(property "Reference" "C26"
-			(at 295.91 265.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "100nF"
-			(at 295.91 267.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 292.1 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 292.1 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C14663"
-			(at 292.1 266.7 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "ee0c94a9-f840-5c85-80aa-23b4eadca4ec")
-		)
-		(pin "2"
-			(uuid "c3fbc085-e317-558e-9815-90b8dfc05103")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "C26")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 292.1 262.89) (xy 292.1 260.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "fd2ef3bb-6fe1-5ff4-a241-4791660c21c3")
-	)
-	(hierarchical_label "3V3"
-		(shape output)
-		(at 292.1 260.35 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "25c138d2-fb05-5ded-b8c2-160b75bb2bd6")
-	)
-	(wire
-		(pts
-			(xy 292.1 270.51) (xy 292.1 273.05)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ecc0b025-d3d8-5f10-b1da-a7fe160aad4d")
-	)
-	(hierarchical_label "GND"
-		(shape passive)
-		(at 292.1 273.05 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "6b7053db-781c-57be-82e8-27f481e3fce8")
 	)
 	(symbol
 		(lib_id "cubevox_h7core:PCM5102APWR")
@@ -18894,7 +16993,7 @@
 				)
 			)
 		)
-		(property "Group" "stitch QSPI_IO1 hop, ADC_SCKI via A"
+		(property "Group" "stitch ADC_SCKI via A"
 			(at 464.82 304.8 0)
 			(hide yes)
 			(effects
@@ -18961,128 +17060,6 @@
 			(justify right bottom)
 		)
 		(uuid "6fe935a1-c8f6-5c44-90b6-1781a9f5758a")
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 480.06 304.8 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "adcdc3bc-b0bd-529e-b994-8df9201e519d")
-		(property "Reference" "C60"
-			(at 483.87 303.53 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "10nF"
-			(at 483.87 306.07 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
-			(at 480.06 304.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 480.06 304.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C15195"
-			(at 480.06 304.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Group" "stitch QSPI_IO1, IO2, NCS hops, flash end"
-			(at 480.06 304.8 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "d4f00157-3c29-57ad-9bce-bed62ddf91e9")
-		)
-		(pin "2"
-			(uuid "2e5ea2f5-8209-5ed1-92a4-5d9f2396ab76")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "C60")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 480.06 300.99) (xy 480.06 298.45)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e4721b71-f24a-5995-901f-b17f60960e3f")
-	)
-	(hierarchical_label "3V3"
-		(shape output)
-		(at 480.06 298.45 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "6461df77-b6c3-52ad-a6c0-ba8941f26da7")
-	)
-	(wire
-		(pts
-			(xy 480.06 308.61) (xy 480.06 311.15)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "29f79ae5-a269-5c82-90e8-c09738bcb269")
-	)
-	(hierarchical_label "GND"
-		(shape passive)
-		(at 480.06 311.15 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "024b2d4e-b8a7-5e06-820a-24f172299fbe")
 	)
 	(symbol
 		(lib_id "Device:C")
@@ -19325,126 +17302,6 @@
 			(justify right bottom)
 		)
 		(uuid "52e7a958-e4fd-5d7c-a5ac-73d1da0bda7b")
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 127 95.25 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "60a8fa57-bf5b-5f39-8929-6b66c4b1fd3e")
-		(property "Reference" "R28"
-			(at 129.54 93.98 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "22R"
-			(at 129.54 96.52 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 127 95.25 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 127 95.25 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C23345"
-			(at 127 95.25 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Note" "33R is the tuning alternative"
-			(at 127 95.25 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "be3c61d1-8955-5fe3-b0f4-b91ae8a7bcf2")
-		)
-		(pin "2"
-			(uuid "25a84869-e463-55e2-a732-e15b519a0a1a")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "R28")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 127 91.44) (xy 127 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "859fd343-b415-5e65-927d-295b59ddcd5b")
-	)
-	(label "QSPI_CLK_SRC"
-		(at 127 88.9 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "e94c7985-1641-5ec9-a835-ddd0d4bf1e84")
-	)
-	(wire
-		(pts
-			(xy 127 99.06) (xy 127 101.6)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5f554b49-9c9f-512c-a052-9f518b608683")
-	)
-	(label "QSPI_CLK"
-		(at 127 101.6 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "20a25f06-7dbb-5b07-ba64-92629ed72c47")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -20075,7 +17932,7 @@
 		)
 		(uuid "e8325aff-0aa1-57a8-93b0-79836e0da7c4")
 	)
-	(text "B. Power entry: USB-C, ESD, 5 V mux, 3V3 buck, 3V3A LDO, VBUS sense, power LED"
+	(text "B. Power entry: USB-C data and ESD, 3V3 buck, 3V3A LDO, VBUS sense, power LED. 5V comes from the 9 V buck on the top sheet"
 		(at 152.4 25.4 0)
 		(effects
 			(font
@@ -20083,17 +17940,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "a86b1368-6cf9-5dbd-9c5c-dff6159260a1")
-	)
-	(text "C. Settings store: QSPI NOR for the EEPROM emulation"
-		(at 209.55 215.9 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "07c47f72-b3ad-5b71-9113-4ecc6edefbba")
+		(uuid "b0f55e23-b66e-5460-98ce-32f3db7c8d78")
 	)
 	(text "D. Audio out: PCM5102A, OUTL leaves on DAC_OUTL, OUTR unused"
 		(at 355.6 25.4 0)
@@ -20115,7 +17962,7 @@
 		)
 		(uuid "5eac0d29-5057-5cae-b3d5-0ca06160974b")
 	)
-	(text "QSPI on bank 2 (FSEL=1); SAI1 block A master, MCLK=256fs on PE2"
+	(text "SAI1 block A master, MCLK=256fs on PE2. Settings live in internal flash bank 2"
 		(at 209.55 223.52 0)
 		(effects
 			(font
@@ -20123,7 +17970,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "8be63003-5dca-5f5c-b3f8-c5ee70c8c09e")
+		(uuid "f589e21e-0d5f-5031-86d9-858616ae0d36")
 	)
 	(text "SWD on Tag-Connect pads J3"
 		(at 152.4 289.56 0)
@@ -20185,16 +18032,6 @@
 		)
 		(uuid "6f7c0de6-4fd9-5192-b789-aaabe35fd4ea")
 	)
-	(text "R28 22R, 33R to tune"
-		(at 120.65 82.55 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "6b0cf2a1-8b54-52cf-a15c-b1e7fd960832")
-	)
 	(text "G. Reference-transition stitching, 10 nF 3V3-GND, one per via group:"
 		(at 406.4 281.94 0)
 		(effects
@@ -20215,7 +18052,7 @@
 		)
 		(uuid "017bbc68-3246-5818-80c5-3ece463f258c")
 	)
-	(text "C59 QSPI_IO1 hop, ADC_SCKI via A; C60 QSPI_IO1, IO2, NCS hops, flash end; C61 ADC_SCKI via B"
+	(text "C59 ADC_SCKI via A; C61 ADC_SCKI via B"
 		(at 406.4 289.56 0)
 		(effects
 			(font
@@ -20223,7 +18060,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "6af02b61-87e0-5c8d-b7f6-527712405ff7")
+		(uuid "4fc97203-a6e3-511c-9223-5bb4214207a3")
 	)
 	(sheet_instances
 		(path "/"

@@ -106,6 +106,14 @@
    "RVT1C220M0405"
   ],
   [
+   "cubevox",
+   "RVT1E470M0605"
+  ],
+  [
+   "cubevox",
+   "MMBT3904-C20526"
+  ],
+  [
    "Device",
    "FerriteBead"
   ],
@@ -128,7 +136,7 @@
    ],
    "size": [
     46,
-    117
+    120
    ],
    "pins": [
     {
@@ -138,219 +146,225 @@
      "len": 2
     },
     {
-     "name": "5V_PRODUCT",
+     "name": "5VA",
      "side": "right",
      "offset": 7,
      "len": 2
     },
     {
-     "name": "5VA",
+     "name": "3V3",
      "side": "right",
      "offset": 10,
      "len": 2
     },
     {
-     "name": "3V3",
+     "name": "3V3A",
      "side": "right",
      "offset": 13,
      "len": 2
     },
     {
-     "name": "3V3A",
+     "name": "GND",
      "side": "right",
      "offset": 16,
      "len": 2
     },
     {
-     "name": "GND",
+     "name": "ADC_VINL",
      "side": "right",
      "offset": 19,
      "len": 2
     },
     {
-     "name": "ADC_VINL",
+     "name": "ADC_VINR",
      "side": "right",
      "offset": 22,
      "len": 2
     },
     {
-     "name": "ADC_VINR",
+     "name": "DAC_OUTL",
      "side": "right",
      "offset": 25,
      "len": 2
     },
     {
-     "name": "DAC_OUTL",
-     "side": "right",
-     "offset": 28,
-     "len": 2
-    },
-    {
      "name": "SWDIO",
      "side": "right",
-     "offset": 31,
+     "offset": 28,
      "no_connect": true
     },
     {
      "name": "SWCLK",
      "side": "right",
-     "offset": 34,
+     "offset": 31,
      "no_connect": true
     },
     {
      "name": "SWO",
      "side": "right",
-     "offset": 37,
+     "offset": 34,
      "no_connect": true
     },
     {
      "name": "NRST",
      "side": "right",
-     "offset": 40,
+     "offset": 37,
      "no_connect": true
     },
     {
      "name": "BOOT0",
      "side": "right",
-     "offset": 43,
+     "offset": 40,
      "no_connect": true
     },
     {
      "name": "I2C1_SCL",
      "side": "right",
-     "offset": 46,
+     "offset": 43,
      "len": 2
     },
     {
      "name": "I2C1_SDA",
      "side": "right",
-     "offset": 49,
+     "offset": 46,
      "len": 2
     },
     {
      "name": "MUX_S0",
      "side": "right",
-     "offset": 52,
+     "offset": 49,
      "len": 2
     },
     {
      "name": "MUX_S1",
      "side": "right",
-     "offset": 55,
+     "offset": 52,
      "len": 2
     },
     {
      "name": "MUX_S2",
      "side": "right",
-     "offset": 58,
+     "offset": 55,
      "len": 2
     },
     {
      "name": "MUX_S3",
      "side": "right",
-     "offset": 61,
+     "offset": 58,
      "len": 2
     },
     {
      "name": "POT_MUX_OUT",
      "side": "right",
-     "offset": 64,
+     "offset": 61,
      "len": 2
     },
     {
      "name": "ENC_MENU_A",
      "side": "right",
-     "offset": 67,
+     "offset": 64,
      "len": 2
     },
     {
      "name": "ENC_MENU_B",
      "side": "right",
-     "offset": 70,
+     "offset": 67,
      "len": 2
     },
     {
      "name": "ENC_MENU_SW",
      "side": "right",
-     "offset": 73,
+     "offset": 70,
      "len": 2
     },
     {
      "name": "ENC_KEY_A",
      "side": "right",
-     "offset": 76,
+     "offset": 73,
      "len": 2
     },
     {
      "name": "ENC_KEY_B",
      "side": "right",
-     "offset": 79,
+     "offset": 76,
      "len": 2
     },
     {
      "name": "ENC_SEMI_A",
      "side": "right",
-     "offset": 82,
+     "offset": 79,
      "len": 2
     },
     {
      "name": "ENC_SEMI_B",
      "side": "right",
-     "offset": 85,
+     "offset": 82,
      "len": 2
     },
     {
      "name": "TOGGLE1",
      "side": "right",
-     "offset": 88,
+     "offset": 85,
      "len": 2
     },
     {
      "name": "TOGGLE2",
      "side": "right",
-     "offset": 91,
+     "offset": 88,
      "len": 2
     },
     {
      "name": "TOGGLE3",
      "side": "right",
-     "offset": 94,
+     "offset": 91,
      "len": 2
     },
     {
      "name": "TOGGLE4",
      "side": "right",
-     "offset": 97,
+     "offset": 94,
      "len": 2
     },
     {
      "name": "TOGGLE5",
      "side": "right",
-     "offset": 100,
+     "offset": 97,
      "len": 2
     },
     {
      "name": "TOGGLE6",
      "side": "right",
-     "offset": 103,
+     "offset": 100,
      "len": 2
     },
     {
      "name": "TOGGLE7",
      "side": "right",
-     "offset": 106,
+     "offset": 103,
      "len": 2
     },
     {
      "name": "TOGGLE8",
      "side": "right",
-     "offset": 109,
+     "offset": 106,
      "len": 2
     },
     {
      "name": "FX_ON_SENSE",
      "side": "right",
+     "offset": 109,
+     "len": 2
+    },
+    {
+     "name": "MUTE_N",
+     "side": "right",
      "offset": 112,
+     "len": 2
+    },
+    {
+     "name": "VA_SENSE",
+     "side": "right",
+     "offset": 115,
      "len": 2
     }
    ]
@@ -557,7 +571,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "5V_PRODUCT",
+     "net": "5V",
      "dir": [
       -1,
       0
@@ -672,7 +686,7 @@
     },
     {
      "pin": "2",
-     "net": "5V_PRODUCT",
+     "net": "5V",
      "dir": [
       1,
       0
@@ -701,7 +715,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "5V_PRODUCT",
+     "net": "5V",
      "dir": [
       0,
       -1
@@ -734,7 +748,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "5V_PRODUCT",
+     "net": "5V",
      "dir": [
       0,
       -1
@@ -1059,18 +1073,18 @@
   },
   {
    "ref": "C120",
-   "lib_id": "cubevox:RVT1E100M0405-C72484",
-   "value": "10uF 25V",
+   "lib_id": "cubevox:RVT1E470M0605",
+   "value": "47uF 25V",
    "at": [
     400,
     66
    ],
    "angle": 0,
-   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
-   "lcsc": "C72484",
+   "footprint": "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD",
+   "lcsc": "C72521",
    "rest": "no_connect",
    "fields": {
-    "MPN": "RVT1E100M0405"
+    "MPN": "RVT1E470M0605"
    },
    "pins": [
     {
@@ -1132,14 +1146,14 @@
   {
    "ref": "R102",
    "lib_id": "Device:R",
-   "value": "10k",
+   "value": "22k",
    "at": [
     432,
     66
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
+   "lcsc": "C31850",
    "rest": "no_connect",
    "pins": [
     {
@@ -1211,6 +1225,39 @@
     {
      "pin": "1",
      "net": "MIC_P",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R148",
+   "lib_id": "Device:R",
+   "value": "100k",
+   "at": [
+    468,
+    80
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25803",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TRS_T",
      "dir": [
       0,
       -1
@@ -1342,18 +1389,18 @@
   },
   {
    "ref": "C124",
-   "lib_id": "cubevox:RVT1E100M0405-C72484",
-   "value": "10uF 25V",
+   "lib_id": "cubevox:RVT1E470M0605",
+   "value": "47uF 25V",
    "at": [
     400,
     140
    ],
    "angle": 0,
-   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
-   "lcsc": "C72484",
+   "footprint": "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD",
+   "lcsc": "C72521",
    "rest": "no_connect",
    "fields": {
-    "MPN": "RVT1E100M0405"
+    "MPN": "RVT1E470M0605"
    },
    "pins": [
     {
@@ -1415,14 +1462,14 @@
   {
    "ref": "R105",
    "lib_id": "Device:R",
-   "value": "10k",
+   "value": "22k",
    "at": [
     432,
     140
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
+   "lcsc": "C31850",
    "rest": "no_connect",
    "pins": [
     {
@@ -1494,6 +1541,39 @@
     {
      "pin": "1",
      "net": "MIC_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R149",
+   "lib_id": "Device:R",
+   "value": "100k",
+   "at": [
+    468,
+    154
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25803",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TRS_R",
      "dir": [
       0,
       -1
@@ -1638,14 +1718,14 @@
   {
    "ref": "R108",
    "lib_id": "Device:R",
-   "value": "9.53k",
+   "value": "4.53k",
    "at": [
     552,
     72
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C23127",
+   "lcsc": "C25971",
    "rest": "no_connect",
    "pins": [
     {
@@ -1737,14 +1817,14 @@
   {
    "ref": "R110",
    "lib_id": "Device:R",
-   "value": "9.53k",
+   "value": "4.53k",
    "at": [
     588,
     72
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C23127",
+   "lcsc": "C25971",
    "rest": "no_connect",
    "pins": [
     {
@@ -1802,19 +1882,16 @@
   },
   {
    "ref": "C158",
-   "lib_id": "cubevox:RVT1C220M0405",
-   "value": "22uF 16V",
+   "lib_id": "Device:C",
+   "value": "22uF 25V NP",
    "at": [
     612,
     72
    ],
    "angle": 0,
-   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD",
-   "lcsc": "C72502",
+   "footprint": "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-FD",
+   "lcsc": "C413679",
    "rest": "no_connect",
-   "fields": {
-    "MPN": "RVT1C220M0405"
-   },
    "pins": [
     {
      "pin": "1",
@@ -1834,7 +1911,10 @@
      ],
      "len": 2
     }
-   ]
+   ],
+   "fields": {
+    "MPN": "EEEHP1E220P"
+   }
   },
   {
    "ref": "U105",
@@ -2153,14 +2233,14 @@
   {
    "ref": "R116",
    "lib_id": "Device:R",
-   "value": "200R",
+   "value": "330R",
    "at": [
     556,
     252
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C8218",
+   "lcsc": "C23138",
    "rest": "no_connect",
    "pins": [
     {
@@ -2726,7 +2806,7 @@
     },
     {
      "pin": "5",
-     "net": "DAC_ATT",
+     "net": "FX_ON_SENSE",
      "dir": [
       0,
       -1
@@ -2735,21 +2815,12 @@
     },
     {
      "pin": "6",
-     "net": "BUF_IN",
+     "net": "GND",
      "dir": [
       0,
       -1
      ],
      "len": 8
-    },
-    {
-     "pin": "7",
-     "net": "PRE_OUT",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 6
     },
     {
      "pin": "8",
@@ -2856,7 +2927,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "SW_BYPASS",
+     "net": "3V3",
      "dir": [
       0,
       -1
@@ -2875,16 +2946,16 @@
    ]
   },
   {
-   "ref": "R121",
-   "lib_id": "Device:R",
-   "value": "18k",
+   "ref": "C162",
+   "lib_id": "Device:C",
+   "value": "100nF",
    "at": [
     824,
     180
    ],
    "angle": 0,
-   "footprint": "cubevox:R0603",
-   "lcsc": "C25810",
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
    "rest": "no_connect",
    "pins": [
     {
@@ -3135,7 +3206,7 @@
     },
     {
      "pin": "2",
-     "net": "OUT_TIP",
+     "net": "OUT_AC",
      "dir": [
       0,
       1
@@ -3159,7 +3230,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "OUT_TIP",
+     "net": "OUT_AC",
      "dir": [
       0,
       -1
@@ -3209,6 +3280,327 @@
      "dir": [
       -1,
       0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "K102",
+   "lib_id": "cubevox:G6K-2F-Y-DC5",
+   "value": "G6K-2F-Y DC5",
+   "at": [
+    768,
+    352
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RELAY-SMD_G6K-2F-X-XX",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 4
+    },
+    {
+     "pin": "3",
+     "net": "OUT_AC",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "4",
+     "net": "OUT_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 10
+    },
+    {
+     "pin": "6",
+     "net": "OUT_TIP",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "7",
+     "net": "GND",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 6
+    },
+    {
+     "pin": "8",
+     "net": "MUTE_COIL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 4
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C47190",
+   "fields": {
+    "MPN": "G6K-2F-Y-TR DC5"
+   }
+  },
+  {
+   "ref": "D109",
+   "lib_id": "cubevox:1N4148W_C81598",
+   "value": "1N4148W",
+   "at": [
+    830,
+    352
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "MUTE_COIL",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C81598",
+   "fields": {
+    "MPN": "1N4148W"
+   }
+  },
+  {
+   "ref": "Q101",
+   "lib_id": "cubevox:MMBT3904-C20526",
+   "value": "MMBT3904",
+   "at": [
+    800,
+    400
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
+   "lcsc": "C20526",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "MMBT3904"
+   },
+   "pins": [
+    {
+     "pin": "3",
+     "net": "MUTE_COIL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "MUTE_BASE",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R150",
+   "lib_id": "Device:R",
+   "value": "1k",
+   "at": [
+    780,
+    400
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C21190",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MUTE_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "MUTE_BASE",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R153",
+   "lib_id": "Device:R",
+   "value": "100k",
+   "at": [
+    780,
+    420
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25803",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MUTE_BASE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R151",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    112,
+    214
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VA_SENSE",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R152",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    124,
+    214
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VA_SENSE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C163",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    136,
+    214
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VA_SENSE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
      ],
      "len": 2
     }
@@ -5870,62 +6262,6 @@
    "rest": "no_connect",
    "pins": [],
    "footprint": "MountingHole:MountingHole_3.2mm_M3"
-  },
-  {
-   "ref": "H105",
-   "lib_id": "Mechanical:MountingHole",
-   "value": "M2 OLED",
-   "at": [
-    172,
-    640
-   ],
-   "angle": 0,
-   "in_bom": false,
-   "rest": "no_connect",
-   "pins": [],
-   "footprint": "MountingHole:MountingHole_2.2mm_M2"
-  },
-  {
-   "ref": "H106",
-   "lib_id": "Mechanical:MountingHole",
-   "value": "M2 OLED",
-   "at": [
-    188,
-    640
-   ],
-   "angle": 0,
-   "in_bom": false,
-   "rest": "no_connect",
-   "pins": [],
-   "footprint": "MountingHole:MountingHole_2.2mm_M2"
-  },
-  {
-   "ref": "H107",
-   "lib_id": "Mechanical:MountingHole",
-   "value": "M2 OLED",
-   "at": [
-    204,
-    640
-   ],
-   "angle": 0,
-   "in_bom": false,
-   "rest": "no_connect",
-   "pins": [],
-   "footprint": "MountingHole:MountingHole_2.2mm_M2"
-  },
-  {
-   "ref": "H108",
-   "lib_id": "Mechanical:MountingHole",
-   "value": "M2 OLED",
-   "at": [
-    220,
-    640
-   ],
-   "angle": 0,
-   "in_bom": false,
-   "rest": "no_connect",
-   "pins": [],
-   "footprint": "MountingHole:MountingHole_2.2mm_M2"
   }
  ],
  "power_symbols": [
@@ -5955,7 +6291,7 @@
     160
    ],
    "stub": {
-    "net": "5V_PRODUCT",
+    "net": "5V",
     "dir": [
      0,
      -1
@@ -6011,7 +6347,7 @@
    ]
   },
   {
-   "text": "XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 10uF + IN_x. TRS leg 10uF + LINE_x, 10k pad. 1.2k bias to VREF",
+   "text": "XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 47uF + IN_x. TRS leg 10uF + LINE_x, 22k pad, 100k to GND. 1.2k bias to VREF",
    "at": [
     300,
     28
@@ -6032,28 +6368,28 @@
    ]
   },
   {
-   "text": "Stage 1 INA 26 dB (U104, U105A). Stage 2 0-34.2 dB on Input Gain pot (U105B)",
+   "text": "Stage 1 INA 20.05 dB (U104, U105A). Stage 2 0-29.9 dB on Input Gain pot (U105B)",
    "at": [
     468,
     28
    ]
   },
   {
-   "text": "Stage 1 26.0 dB, stage 2 0-34.2 dB, chain 26-60 dB XLR / 6.6-40.8 dB TRS; DC gain 1 (AC-coupled legs)",
+   "text": "Chain 20-50 dB XLR / -5.6 to +24.3 dB TRS; DC gain 1 (AC-coupled legs)",
    "at": [
     468,
     32
    ]
   },
   {
-   "text": "RG = R109 1k + C158 22uF in series, DC gain 1. Gain 1 + 2 x 9.53k / 1k = 20.1",
+   "text": "RG = R109 1k + C158 22uF bipolar in series, DC gain 1. Gain 1 + 2 x 4.53k / 1k = 10.06",
    "at": [
     552,
     52
    ]
   },
   {
-   "text": "Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/200",
+   "text": "Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/330",
    "at": [
     468,
     232
@@ -6095,7 +6431,7 @@
    ]
   },
   {
-   "text": "COM BUF_IN, NC PRE_OUT, NO DAC_ATT. Coil on = effect on",
+   "text": "Pole A COM BUF_IN, NC PRE_OUT, NO DAC_ATT. Pole B COM GND, NO FX_ON_SENSE (low = effect on). Coil on = effect on",
    "at": [
     722,
     28
@@ -6127,6 +6463,34 @@
    "at": [
     840,
     32
+   ]
+  },
+  {
+   "text": "OUT_TIP via K102 (section 8)",
+   "at": [
+    876,
+    200
+   ]
+  },
+  {
+   "text": "8. OUTPUT MUTE",
+   "at": [
+    740,
+    300
+   ]
+  },
+  {
+   "text": "K102 closes OUT_AC to OUT_TIP when MUTE_N is high, else OUT_TIP is grounded",
+   "at": [
+    740,
+    304
+   ]
+  },
+  {
+   "text": "5VA SENSE",
+   "at": [
+    108,
+    190
    ]
   },
   {

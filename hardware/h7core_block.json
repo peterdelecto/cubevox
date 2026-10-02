@@ -8,10 +8,6 @@
  "ports": [
   {
    "name": "5V",
-   "shape": "output"
-  },
-  {
-   "name": "5V_PRODUCT",
    "shape": "input"
   },
   {
@@ -153,6 +149,14 @@
   {
    "name": "FX_ON_SENSE",
    "shape": "input"
+  },
+  {
+   "name": "MUTE_N",
+   "shape": "output"
+  },
+  {
+   "name": "VA_SENSE",
+   "shape": "input"
   }
  ],
  "libraries": {
@@ -201,10 +205,6 @@
   ],
   [
    "cubevox_h7core",
-   "TPS2116DRLR"
-  ],
-  [
-   "cubevox_h7core",
    "AP63203WU-7"
   ],
   [
@@ -218,10 +218,6 @@
   [
    "Device",
    "C_Polarized"
-  ],
-  [
-   "cubevox_h7core",
-   "IS25LP064A-JBLE-TR"
   ],
   [
    "cubevox_h7core",
@@ -332,11 +328,6 @@
      "pin": "3",
      "net": "I2S_LRCLK",
      "len": 13
-    },
-    {
-     "pin": "36",
-     "net": "QSPI_CLK_SRC",
-     "len": 12
     },
     {
      "pin": "4",
@@ -515,37 +506,23 @@
      "len": 2
     },
     {
-     "pin": "1",
-     "net": "ADC_SCKI_SRC",
-     "len": 12
-    },
-    {
-     "pin": "37",
-     "net": "QSPI_IO0",
-     "len": 8
-    },
-    {
-     "pin": "38",
-     "net": "QSPI_IO1",
+     "pin": "32",
+     "net": "VA_SENSE",
      "len": 10
     },
     {
-     "pin": "39",
-     "net": "QSPI_IO2",
+     "pin": "1",
+     "net": "ADC_SCKI_SRC",
      "len": 12
-    },
-    {
-     "pin": "40",
-     "net": "QSPI_IO3",
-     "len": 14
     },
     {
      "pin": "58",
      "net": "TOGGLE7"
     },
     {
-     "pin": "79",
-     "net": "QSPI_NCS"
+     "pin": "59",
+     "net": "MUTE_N",
+     "len": 10
     },
     {
      "pin": "92",
@@ -1506,59 +1483,6 @@
    }
   },
   {
-   "ref": "U2",
-   "lib_id": "cubevox_h7core:TPS2116DRLR",
-   "value": "TPS2116DRLR",
-   "at": [
-    235,
-    45
-   ],
-   "angle": 0,
-   "footprint": "cubevox_h7core:SOT-583-8_L2.1-W1.6-P0.50-LS1.6-BL",
-   "dir": "away",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "GND",
-     "len": 5
-    },
-    {
-     "pin": "2",
-     "net": "5V",
-     "len": 4
-    },
-    {
-     "pin": "3",
-     "net": "5V_PRODUCT",
-     "len": 14
-    },
-    {
-     "pin": "4",
-     "net": "PR1",
-     "len": 5
-    },
-    {
-     "pin": "5",
-     "net": "5V_PRODUCT"
-    },
-    {
-     "pin": "6",
-     "net": "VBUS"
-    },
-    {
-     "pin": "7",
-     "net": "5V"
-    }
-   ],
-   "in_bom": true,
-   "on_board": true,
-   "lcsc": "C3235557",
-   "fields": {
-    "MPN": "TPS2116DRLR"
-   }
-  },
-  {
    "ref": "U3",
    "lib_id": "cubevox_h7core:AP63203WU-7",
    "value": "AP63203WU-7",
@@ -1775,14 +1699,14 @@
   {
    "ref": "R6",
    "lib_id": "Device:R",
-   "value": "27k",
+   "value": "33k",
    "at": [
     147,
     125
    ],
    "angle": 0,
    "footprint": "Resistor_SMD:R_0603_1608Metric",
-   "lcsc": "C22967",
+   "lcsc": "C4216",
    "rest": "no_connect",
    "pins": [
     {
@@ -1808,14 +1732,14 @@
   {
    "ref": "R7",
    "lib_id": "Device:R",
-   "value": "33k",
+   "value": "82k",
    "at": [
     164,
     125
    ],
    "angle": 0,
    "footprint": "Resistor_SMD:R_0603_1608Metric",
-   "lcsc": "C4216",
+   "lcsc": "C23254",
    "rest": "no_connect",
    "pins": [
     {
@@ -1839,115 +1763,16 @@
    ]
   },
   {
-   "ref": "R8",
-   "lib_id": "Device:R",
-   "value": "36k",
-   "at": [
-    181,
-    125
-   ],
-   "angle": 0,
-   "footprint": "Resistor_SMD:R_0603_1608Metric",
-   "lcsc": "C23147",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "5V_PRODUCT",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "PR1",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "R9",
-   "lib_id": "Device:R",
-   "value": "10k",
-   "at": [
-    198,
-    125
-   ],
-   "angle": 0,
-   "footprint": "Resistor_SMD:R_0402_1005Metric",
-   "lcsc": "C25744",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "PR1",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "GND",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "C17",
-   "lib_id": "Device:C",
-   "value": "1uF",
-   "at": [
-    208,
-    125
-   ],
-   "angle": 0,
-   "footprint": "Capacitor_SMD:C_0603_1608Metric",
-   "lcsc": "C15849",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "5V_PRODUCT",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "GND",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
    "ref": "C18",
    "lib_id": "Device:C",
    "value": "1uF",
    "at": [
-    225,
-    125
+    205,
+    45
    ],
    "angle": 0,
    "footprint": "Capacitor_SMD:C_0603_1608Metric",
-   "lcsc": "C15849",
+   "lcsc": "C90540",
    "rest": "no_connect",
    "pins": [
     {
@@ -2217,195 +2042,6 @@
     {
      "pin": "1",
      "net": "3V3A",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "GND",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "U5",
-   "lib_id": "cubevox_h7core:IS25LP064A-JBLE-TR",
-   "value": "IS25LP064A",
-   "at": [
-    205,
-    185
-   ],
-   "angle": 0,
-   "footprint": "cubevox_h7core:SOIC-8_L5.3-W5.3-P1.27-LS7.9-BL",
-   "dir": "away",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "QSPI_NCS",
-     "len": 12
-    },
-    {
-     "pin": "2",
-     "net": "QSPI_IO1",
-     "len": 12
-    },
-    {
-     "pin": "3",
-     "net": "QSPI_IO2",
-     "len": 12
-    },
-    {
-     "pin": "4",
-     "net": "GND",
-     "len": 5
-    },
-    {
-     "pin": "5",
-     "net": "QSPI_IO0"
-    },
-    {
-     "pin": "6",
-     "net": "QSPI_CLK"
-    },
-    {
-     "pin": "7",
-     "net": "QSPI_IO3"
-    },
-    {
-     "pin": "8",
-     "net": "3V3"
-    }
-   ],
-   "in_bom": true,
-   "on_board": true,
-   "lcsc": "C2841348",
-   "fields": {
-    "MPN": "IS25LP064A-JBLE-TR"
-   }
-  },
-  {
-   "ref": "R11",
-   "lib_id": "Device:R",
-   "value": "10k",
-   "at": [
-    185,
-    210
-   ],
-   "angle": 0,
-   "footprint": "Resistor_SMD:R_0402_1005Metric",
-   "lcsc": "C25744",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "3V3",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "QSPI_NCS",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "R12",
-   "lib_id": "Device:R",
-   "value": "10k",
-   "at": [
-    200,
-    210
-   ],
-   "angle": 0,
-   "footprint": "Resistor_SMD:R_0603_1608Metric",
-   "lcsc": "C25804",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "3V3",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "QSPI_IO2",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "R13",
-   "lib_id": "Device:R",
-   "value": "10k",
-   "at": [
-    215,
-    210
-   ],
-   "angle": 0,
-   "footprint": "Resistor_SMD:R_0402_1005Metric",
-   "lcsc": "C25744",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "3V3",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "QSPI_IO3",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "C26",
-   "lib_id": "Device:C",
-   "value": "100nF",
-   "at": [
-    230,
-    210
-   ],
-   "angle": 0,
-   "footprint": "Capacitor_SMD:C_0603_1608Metric",
-   "lcsc": "C14663",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "3V3",
      "dir": [
       0,
       -1
@@ -3442,43 +3078,7 @@
     }
    ],
    "fields": {
-    "Group": "stitch QSPI_IO1 hop, ADC_SCKI via A"
-   }
-  },
-  {
-   "ref": "C60",
-   "lib_id": "Device:C",
-   "value": "10nF",
-   "at": [
-    378,
-    240
-   ],
-   "angle": 0,
-   "footprint": "Capacitor_SMD:C_0402_1005Metric",
-   "lcsc": "C15195",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "3V3",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "GND",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ],
-   "fields": {
-    "Group": "stitch QSPI_IO1, IO2, NCS hops, flash end"
+    "Group": "stitch ADC_SCKI via A"
    }
   },
   {
@@ -3551,42 +3151,6 @@
    ],
    "fields": {
     "Section": "audio_in"
-   }
-  },
-  {
-   "ref": "R28",
-   "lib_id": "Device:R",
-   "value": "22R",
-   "at": [
-    100,
-    75
-   ],
-   "angle": 0,
-   "footprint": "Resistor_SMD:R_0603_1608Metric",
-   "lcsc": "C23345",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "QSPI_CLK_SRC",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "QSPI_CLK",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ],
-   "fields": {
-    "Note": "33R is the tuning alternative"
    }
   },
   {
@@ -3755,17 +3319,10 @@
    ]
   },
   {
-   "text": "B. Power entry: USB-C, ESD, 5 V mux, 3V3 buck, 3V3A LDO, VBUS sense, power LED",
+   "text": "B. Power entry: USB-C data and ESD, 3V3 buck, 3V3A LDO, VBUS sense, power LED. 5V comes from the 9 V buck on the top sheet",
    "at": [
     120,
     20
-   ]
-  },
-  {
-   "text": "C. Settings store: QSPI NOR for the EEPROM emulation",
-   "at": [
-    165,
-    170
    ]
   },
   {
@@ -3783,7 +3340,7 @@
    ]
   },
   {
-   "text": "QSPI on bank 2 (FSEL=1); SAI1 block A master, MCLK=256fs on PE2",
+   "text": "SAI1 block A master, MCLK=256fs on PE2. Settings live in internal flash bank 2",
    "at": [
     165,
     176
@@ -3832,13 +3389,6 @@
    ]
   },
   {
-   "text": "R28 22R, 33R to tune",
-   "at": [
-    95,
-    65
-   ]
-  },
-  {
    "text": "G. Reference-transition stitching, 10 nF 3V3-GND, one per via group:",
    "at": [
     320,
@@ -3853,7 +3403,7 @@
    ]
   },
   {
-   "text": "C59 QSPI_IO1 hop, ADC_SCKI via A; C60 QSPI_IO1, IO2, NCS hops, flash end; C61 ADC_SCKI via B",
+   "text": "C59 ADC_SCKI via A; C61 ADC_SCKI via B",
    "at": [
     320,
     228
