@@ -32,7 +32,7 @@ struct SpringTuning {
   int springs = 2;                              // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float wetDb = 4.1f;                           // trim; level rule at MIX 1 (wet only)
+  float wetDb = 3.1f;                           // trim; level rule at MIX 1 (wet only)
   float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 
@@ -103,6 +103,17 @@ inline float softClip(float x) {
   const float x2 = x * x;
   return x * (27.0f + x2) / (27.0f + 9.0f * x2);
 }
+
+// The same curve with headroom h: unity gain below the knee, which sits h times
+// higher. DWELL then saturates only near the top of its travel (owner 2026-10-02:
+// the default DWELL was audibly distorting the voice).
+inline float softClipHeadroom(float x, float h) { return h * softClip(x / h); }
+
+// Headroom per engine, set so a 0 dBFS voice at DWELL 0.2 enters the curve at
+// about a third of its knee (< 0.3 % THD).
+constexpr float kSpringClipHeadroom = 3.0f;  // inputGain 0.5 x drive 2.0 = 1.0
+constexpr float kParkerClipHeadroom = 6.0f;  // no input gain; drive 2.0
+constexpr float kChasmClipHeadroom = 4.5f;   // drive 1.5
 
 // Transposed direct form II.
 struct Biquad {
@@ -391,7 +402,7 @@ class Spring {
 
       const float xin = in[i] * t.inputGain;
       hp_ += (xin - hp_) * hpCoef;
-      const float x = softClip((xin - hp_) * drive) * driveComp;
+      const float x = softClipHeadroom((xin - hp_) * drive, kSpringClipHeadroom) * driveComp;
       float sum = 0.0f;
       if (use[0]) sum += a_.process(x, f);
       if (use[1]) sum += b_.process(x, f);

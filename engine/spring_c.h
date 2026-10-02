@@ -40,7 +40,7 @@ struct SpringCTuning {
   float dwellDrive = 32.0f, dwellComp = 0.80f;
   float presenceHz = 3000.0f, presenceDb = 5.0f, presenceQ = 1.0f;
   float tankTrim = 0.75f;                      // into the tank, after the clip
-  float wetDb = 5.1f;                         // output trim; level rule at MIX 1 (wet only)
+  float wetDb = 1.8f;                         // output trim; level rule at MIX 1 (wet only)
 };
 
 struct SpringCParams {
@@ -55,7 +55,8 @@ using spring_detail::Biquad;
 using spring_detail::clampf;
 using spring_detail::dbToLin;
 using spring_detail::onePole;
-using spring_detail::softClip;
+using spring_detail::softClipHeadroom;
+using spring_detail::kParkerClipHeadroom;
 
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kFs = static_cast<float>(kSampleRate);
@@ -320,7 +321,7 @@ class SpringC {
       // Drive/recovery front end (§7): hp1 → drive → soft clip → comp → lp1.
       const float xin = in[i];
       hp_ += (xin - hp_) * hpCoef;
-      const float clipped = softClip((xin - hp_) * drive) * comp;
+      const float clipped = softClipHeadroom((xin - hp_) * drive, kParkerClipHeadroom) * comp;
       lp_ += (clipped - lp_) * lpCoef;
       const float x = lp_ * trim;
 

@@ -53,7 +53,7 @@ struct ChasmTuning {
   float inputTrim = 0.5f;
   float wobbleLevelDb = 2.0f;            // wet lift, ramps in over WOBBLE 0..0.25
   float dwellDrive = 8.0f, dwellComp = 0.8f;  // input drive at DWELL 1; level comp exponent
-  float wetDb = 19.0f;  // trim; level rule at MIX 1 (wet only)
+  float wetDb = 17.3f;  // trim; level rule at MIX 1 (wet only), bottom of the window (owner: a tad hot)
 };
 
 struct ChasmParams {
@@ -248,7 +248,7 @@ class Chasm {
       lfoAcc_ += static_cast<uint32_t>((rateLo + wobble_ * rateSpan) * kPhasePerHz);
       inputGain_ += (gainFor(time) - inputGain_) * 0.25f;
 
-      const float x = shelf(spring_detail::softClip(in[i] * drive) * comp * trim * inputGain_, lpIn_, lpF, inCut);
+      const float x = shelf(spring_detail::softClipHeadroom(in[i] * drive, spring_detail::kChasmClipHeadroom) * comp * trim * inputGain_, lpIn_, lpF, inCut);
       const float adv1 = lfo(0u) * depth;
       const float adv2 = lfo(64u) * depth;
 
