@@ -178,8 +178,9 @@ enum Id : int {
 };
 
 // Names for the Print tuning line; reverb names carry the engine where two share one.
+// nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
-    "Slide",          "Tracking speed", "Chorus-Double",    "Motion speed",   "Body",
+    "Slide",          "Tracking speed", nullptr,    "Motion speed",   "Body",
     "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
     "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "Drip",
     "PARKER Flutter", "PARKER Brightness"};
@@ -199,10 +200,14 @@ struct State {
 // "Macros: Slide 50 %, Tracking speed 50 %, ..." with every macro, moved or not.
 inline void formatAll(const State& s, char* buf, size_t size) {
   size_t used = static_cast<size_t>(std::snprintf(buf, size, "Macros:"));
-  for (int i = 0; i < kCount && used < size; ++i)
+  bool first = true;
+  for (int i = 0; i < kCount && used < size; ++i) {
+    if (kPrintName[i] == nullptr) continue;
     used += static_cast<size_t>(std::snprintf(buf + used, size - used, "%s %s %.0f %%",
-                                              i == 0 ? "" : ",", kPrintName[i],
+                                              first ? "" : ",", kPrintName[i],
                                               static_cast<double>(s.pos[static_cast<size_t>(i)])));
+    first = false;
+  }
 }
 
 // ---- Apply: one function per macro -------------------------------------------

@@ -29,11 +29,11 @@ sliders, then report numbers we bake in.
 | # | Module | Hardware knobs | Tuning sliders |
 |---|---|---|---|
 | 1 | Input gate | none (no checkbox either; always on in the face) | Threshold, Range, Attack, Hold, Release (raw) |
-| 2 | Gate | THRESHOLD | Range, Attack, Hold, Release (raw) |
+| 2 | Gate | THRESHOLD · DECAY (release) | Range, Attack, Hold (raw) |
 | 3 | Autotune | KEY (linked to Harmony) · RESPONSE | Pull range (0.5–6 st, `maxCorrectSemis`) · Correct to every note (`chromatic`, default off) |
 | 4 | Octave | SEMITONES · FORMANT (engine B) · MIX | Slide |
 | 5 | Harmony | KEY · MIX | Voices · Tracking speed · Follow my bends · Drop out on breaths |
-| 6 | Unison | DEPTH | Chorus ↔ Double · Motion speed |
+| 6 | Unison | DEPTH · CHARACTER (Chorus ↔ Double, CHORUS / DOUBLE printed at the ends) | Motion speed |
 | 7 | Slapback | INTENSITY | Time · Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
 | 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM / PARKER SPRING = menu) | per engine, below |

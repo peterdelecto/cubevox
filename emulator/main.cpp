@@ -340,10 +340,10 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Octave %s, engine %c; Harmony %s, engine %c, chromatic %s, voices Low %s / High %s / "
       "Higher %s, Follow my bends %s, Drop out on breaths %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
-      "Knobs: Input gate threshold %.0f dB; Gate THRESHOLD %.0f dB; Autotune KEY %s, RESPONSE "
+      "Knobs: Input gate threshold %.0f dB; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f ms, Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
       "voice formants Low %+d / High %+d / Higher %+d st; Unison DEPTH "
-      "%.0f %%; Slapback INTENSITY %.0f %%; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
+      "%.0f %%, CHARACTER %.0f %%; Slapback INTENSITY %.0f %%; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
       p.linkAutotuneKey ? "linked to Harmony" : "own", onOff(at.chromatic), onOff(o.on),
@@ -351,6 +351,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       onOff(!h.tuning.snapToScale), onOff(h.tuning.muteUnvoiced), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
       static_cast<double>(p.inputGate.thresholdDb), static_cast<double>(p.gate.thresholdDb),
+      static_cast<double>(p.gate.tuning.releaseMs),
       cv::kKeyName[atKey], static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
       static_cast<int>(std::lround(o.formant)), static_cast<double>(o.mix * 100.0f),
@@ -359,6 +360,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<int>(std::lround(h.slots[1].formant)),
       static_cast<int>(std::lround(h.slots[2].formant)),
       static_cast<double>(p.unison.depth * 100.0f),
+      static_cast<double>(p.macros.pos[cv::macros::UnisonBlend]),
       static_cast<double>(p.slapback.intensity * 100.0f),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(decay * 100.0f),
@@ -1190,8 +1192,6 @@ void drawUnisonTuning(cv::UnisonTuning& t, cv::macros::State& m) {
     drawUnisonRaw(t);
     return;
   }
-  macroSlider("Chorus \u2194 Double", "left a wobbly chorus, right a tight double",
-              m.pos[cv::macros::UnisonBlend], [&](float p) { cv::macros::unisonBlend(t, p); });
   macroSlider("Motion speed", "how fast the chorus wobbles", m.pos[cv::macros::UnisonMotion],
               [&](float p) { cv::macros::unisonMotion(t, p); });
 }
@@ -1247,8 +1247,11 @@ void drawGateTuning(cv::GateParams& g, const char* block, bool withThreshold) {
   hint("how fast it opens when you sing (attack)");
   ImGui::SliderFloat("Stay open", &t.holdMs, 0.0f, 500.0f, "%.0f ms");
   hint("wait after you stop before shutting (hold)");
-  ImGui::SliderFloat("Fade out", &t.releaseMs, 5.0f, 1000.0f, "%.0f ms", log);
-  hint("how slowly it fades shut (release)");
+  // The GATE module has release on its face as DECAY.
+  if (withThreshold) {
+    ImGui::SliderFloat("Fade out", &t.releaseMs, 5.0f, 1000.0f, "%.0f ms", log);
+    hint("how slowly it fades shut (release)");
+  }
 }
 
 // Four plain controls; the band frequencies live under Advanced. Mud cut runs
@@ -1420,8 +1423,11 @@ void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float g
   // The input gate has no panel switch on the box; the prototype toggle exists to
   // A/B it against the stage feedback simulator (owner 2026-10-02).
   ImGui::Checkbox(label, &g.on);
-  if (!alwaysOn)
+  if (!alwaysOn) {
     ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
+    ImGui::SliderFloat("DECAY", &g.tuning.releaseMs, 5.0f, 1000.0f, "%.0f ms",
+                       ImGuiSliderFlags_Logarithmic);
+  }
   ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
   // The input gate is fixed on the box; its tuning is ours, not Adam's.
   if (!alwaysOn || gDev) drawGateTuning(g, id, alwaysOn);
@@ -1432,6 +1438,20 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
   ImGui::PushID("unison");
   ImGui::Checkbox("UNISON", &u.on);
   percentSlider("DEPTH", u.depth);
+  // CHARACTER: panel knob with its two ends printed beside it, CHORUS left, DOUBLE right.
+  float& pos = macros.pos[cv::macros::UnisonBlend];
+  const float spacing = ImGui::GetStyle().ItemSpacing.x;
+  const float ends = ImGui::CalcTextSize("CHORUS").x + ImGui::CalcTextSize("DOUBLE").x + 2.0f * spacing;
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted("CHORUS");
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(ImGui::CalcItemWidth() - ends);
+  if (ImGui::SliderFloat("##character", &pos, 0.0f, 100.0f, "%.0f %%"))
+    cv::macros::unisonBlend(u.tuning, pos);
+  ImGui::SameLine();
+  ImGui::TextUnformatted("DOUBLE");
+  ImGui::SameLine();
+  ImGui::TextUnformatted("CHARACTER");
   drawUnisonTuning(u.tuning, macros);
   ImGui::PopID();
 }
