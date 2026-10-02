@@ -387,10 +387,46 @@ bool testThreeVoices() {
   return ok;
 }
 
+double rmsAfterSettle(const std::vector<float>& x) {
+  double s = 0.0;
+  size_t n = 0;
+  for (size_t i = static_cast<size_t>(cv::kSampleRate); i < x.size(); ++i, ++n)
+    s += static_cast<double>(x[i]) * x[i];
+  return std::sqrt(s / static_cast<double>(n));
+}
+
+// Three voices at High, mix 1, land within +-1.5 dB of one voice (1/sqrt(N) sum).
+bool testVoiceCountLevel() {
+  const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
+  bool ok = true;
+  for (int engine = 0; engine < 3; ++engine) {
+    cv::HarmonyParams one;
+    one.engine = engine;
+    one.mix = 1.0f;
+    one.slots[0] = {cv::HarmonyVoice::High, 3};
+    one.slots[1].level = 0;
+    one.slots[2].level = 0;
+    cv::HarmonyParams three = one;
+    three.slots[0] = {cv::HarmonyVoice::Low, 3};
+    three.slots[1] = {cv::HarmonyVoice::High, 3};
+    three.slots[2] = {cv::HarmonyVoice::Higher, 3};
+    gFx.reset();
+    const double r1 = rmsAfterSettle(run(gFx, in, one));
+    gFx.reset();
+    const double r3 = rmsAfterSettle(run(gFx, in, three));
+    const double db = 20.0 * std::log10(r3 / r1);
+    char name[32];
+    std::snprintf(name, sizeof name, "voice-count level %c", 'A' + engine);
+    ok &= report(name, std::fabs(db) <= 1.5, "3 voices vs 1: %+.2f dB (+-1.5)", db);
+  }
+  return ok;
+}
+
 }  // namespace
 
 int main() {
   bool ok = true;
+  ok &= testVoiceCountLevel();
   ok &= testTracker();
   ok &= testShift();
   ok &= testDiatonic();

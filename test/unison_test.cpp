@@ -69,6 +69,13 @@ cv::UnisonParams params(float depth) {
   return p;
 }
 
+// Pitch checks subtract the dry signal, so they run without the level trim.
+cv::UnisonParams untrimmed(float depth) {
+  cv::UnisonParams p = params(depth);
+  p.tuning.trimDb = 0.0f;
+  return p;
+}
+
 float rms(const std::vector<float>& x) {
   double s = 0.0;
   for (float v : x) s += static_cast<double>(v) * v;
@@ -128,7 +135,7 @@ bool testDetune() {
   const std::vector<float> in = sine(n);
   gUnison.reset();
   gUnison.setVoiceEnabled(0, false);
-  const std::vector<float> out = run(gUnison, in, params(1.0f));
+  const std::vector<float> out = run(gUnison, in, untrimmed(1.0f));
   gUnison.setVoiceEnabled(0, true);
 
   std::vector<float> wet(in.size());
@@ -166,7 +173,7 @@ float meanCents(const std::vector<float>& x, int skip) {
 bool testFixedDetune() {
   const int n = 4 * cv::kSampleRate;
   const std::vector<float> in = sine(n);
-  cv::UnisonParams p = params(1.0f);
+  cv::UnisonParams p = untrimmed(1.0f);
   p.tuning.swingMinMs = 0.0f;
   p.tuning.swingMaxMs = 0.0f;
   p.tuning.detuneCents[1] = 10.0f;
@@ -189,9 +196,10 @@ bool testLevel() {
   gUnison.reset();
   const std::vector<float> out = run(gUnison, in, params(1.0f));
   const float db = 20.0f * log10f(rms(out) / rms(in));
-  // Default wetMaxDb is -12.4 dB (level rule, set at DEPTH 0.8). At DEPTH 1 on this
-  // sine the two voices measure 0.61 dB; band is that +-1.5.
-  return report("level", std::fabs(db - 0.61f) <= 1.5f, "out/in=%.2f dB (0.61 +-1.5)", db);
+  // Default wetMaxDb is -4.0 dB (owner ear tuning) and trimDb -1.4 dB scales with depth
+  // (level rule, set at DEPTH 0.8). At DEPTH 1 on this sine the output measures 0.91 dB;
+  // band is that +-1.5.
+  return report("level", std::fabs(db - 0.91f) <= 1.5f, "out/in=%.2f dB (0.91 +-1.5)", db);
 }
 
 bool testNoAlloc() {

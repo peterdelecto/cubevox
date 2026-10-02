@@ -24,6 +24,7 @@
 
 #include "../emulator/macros.h"
 #include "../emulator/open_panel.h"
+#include "../emulator/stage_feedback.h"
 #include "engine/common.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
@@ -87,6 +88,10 @@ struct ProtoParams {
   // Advanced swaps the musician sliders for the raw tuning nodes.
   bool advanced = false;
   cv::macros::State macros;
+  // Prototype-only test signal. Not a panel control, not in Print tuning.
+  bool stageFeedback = false;
+  float feedbackAmount = 50.0f;    // percent
+  float feedbackMovement = 40.0f;  // percent
 
   // Every effect opens off except the input gate, which has no switch on the
   // face. Engine defaults stay on for the firmware.
@@ -95,6 +100,10 @@ struct ProtoParams {
     applyInputGateDefaults(inputGate);
     gate.on = false;
     pitchFx.harmony.on = false;
+    // Owner default voices: Low loud, High louder, Higher louder (matches HarmonyMenu).
+    pitchFx.harmony.slots[0] = {cv::HarmonyVoice::Low, 2, 0.0f};
+    pitchFx.harmony.slots[1] = {cv::HarmonyVoice::High, 3, 0.0f};
+    pitchFx.harmony.slots[2] = {cv::HarmonyVoice::Higher, 3, 0.0f};
     pitchFx.octave.on = false;
     unison.on = false;
     slapback.on = false;
@@ -148,6 +157,7 @@ cv::Slapback gSlapback;
 cv::Distortion gDistortion;
 cv::Reverb gReverb;
 cv::Polish gPolish;
+cv::stagefb::StageFeedback gStageFeedback;
 LoopBuffer* gLastLoop = nullptr;
 size_t gReadPos = 0;
 
@@ -238,7 +248,10 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gDistortion.reset();
     gReverb.reset();
     gPolish.reset();
+    gStageFeedback.reset(1u);
   }
+  gStageFeedback.configure(params.stageFeedback && params.playing, 0.01f * params.feedbackAmount,
+                           0.01f * params.feedbackMovement);
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
     std::memset(out, 0, sizeof(float) * 2 * frameCount);
     publishState(0.0f, loop);
@@ -253,6 +266,10 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   while (done < frameCount) {
     const int n = static_cast<int>(std::min<ma_uint32>(cv::kBlock, frameCount - done));
     readLoop(*loop, in.data(), n);
+    const bool feedback = gStageFeedback.enabled();
+    if (feedback) {
+      for (int i = 0; i < n; ++i) in[i] += gStageFeedback.returnSample(in[i]);
+    }
     gInputGate.process(in.data(), mono.data(), n, params.inputGate);
     gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
@@ -261,6 +278,9 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
     gPolish.process(mono.data(), tmp.data(), n, params.eq);
+    if (feedback) {
+      for (int i = 0; i < n; ++i) gStageFeedback.push(tmp[i]);
+    }
     for (int i = 0; i < n; ++i) {
       out[2 * (done + i)] = tmp[i];
       out[2 * (done + i) + 1] = tmp[i];
@@ -291,7 +311,7 @@ char gTuningLine[8192];  // the same text on one line, shown on the face
 // Returns the bytes written, newline included.
 size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const auto onOff = [](bool b) { return b ? "on" : "off"; };
-  static const char* const kLevel[4] = {"Off", "Low", "Med", "High"};
+  static const char* const kLevel[4] = {"Off", "Quiet", "Loud", "Louder"};
   static const char* const kReverb[3] = {"SPRING", "CHASM", "PARKER SPRING"};
   const cv::HarmonyParams& h = p.pitchFx.harmony;
   const cv::AutotuneParams& at = p.pitchFx.autotune;
@@ -810,6 +830,8 @@ void drawTuningButtons(ProtoParams& params) {
                            sizeof(gTuningLine), ImGuiInputTextFlags_ReadOnly);
 }
 
+constexpr float kFeedbackSliderW = 70.0f;  // px
+
 void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   if (ImGui::Button("Load loop") && !probe) {
     const std::string path = openFilePanel();
@@ -828,17 +850,30 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   ImGui::SameLine();
   ImGui::Checkbox("Advanced", &params.advanced);
   ImGui::SameLine();
+  ImGui::Checkbox("STAGE FEEDBACK", &params.stageFeedback);
+  ImGui::BeginDisabled(!params.stageFeedback);
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(kFeedbackSliderW);
+  ImGui::SliderFloat("Amount", &params.feedbackAmount, 0.0f, 100.0f, "%.0f%%",
+                     ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(kFeedbackSliderW);
+  ImGui::SliderFloat("Movement", &params.feedbackMovement, 0.0f, 100.0f, "%.0f%%",
+                     ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::EndDisabled();
+  ImGui::SameLine();
   drawTuningButtons(params);
 }
 
-// ---- Harmony voices: Low / High / Higher, each Off / Low / Med / High -------------
+// ---- Harmony voices: Low / High / Higher, each Off / Quiet / Loud / Louder ---------
 
 constexpr int kVoiceRows = 3;
 constexpr cv::HarmonyVoice kVoiceOf[kVoiceRows] = {cv::HarmonyVoice::Low, cv::HarmonyVoice::High,
                                                    cv::HarmonyVoice::Higher};
 
 struct HarmonyMenu {
-  std::array<int, kVoiceRows> level{};    // 0 off, 1 low, 2 med, 3 high
+  // 0 off, 1 quiet, 2 loud, 3 louder. Owner default: Low loud, High and Higher louder.
+  std::array<int, kVoiceRows> level{{2, 3, 3}};
   std::array<int, kVoiceRows> formant{};  // engine B formant, semitones
 };
 HarmonyMenu gMenu;  // UI-thread-only
@@ -854,7 +889,7 @@ void syncSlots(const HarmonyMenu& m, cv::HarmonyParams& h) {
 // Each row: name, level radios, then FORMANT (engine B, voice on).
 void drawHarmonyVoices(const cv::HarmonyParams& h) {
   static const char* const kRowName[kVoiceRows] = {"Low", "High", "Higher"};
-  static const char* const kLevelName[4] = {"Off", "Low", "Med", "High"};
+  static const char* const kLevelName[4] = {"Off", "Quiet", "Loud", "Louder"};
   ImGui::TextUnformatted("Voices");
   for (int row = 0; row < kVoiceRows; ++row) {
     ImGui::PushID(row);

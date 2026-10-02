@@ -48,9 +48,12 @@ Notes from the same author's Boneyard / BD-2w mod write-up (part 4):
 ## Decisions
 
 1. Behavioural model, one cheap block per stage above, every constant a tuning item.
-2. DRIVE is the dual audio-taper GAIN pot: `g1 = gain1Max^d`, `g2 = gain2Max^d`
-   (1× at DRIVE 0, full at DRIVE 1). DRIVE 0 is sample-exact passthrough so the
-   always-on stage is transparent at zero.
+2. DRIVE sweeps both stage gains exponentially: `gN = gainNMin * (gainNMax / gainNMin)^d`.
+   Owner 2026-10-02: the knob was dead until 50-60 % and far too saturated at 100 %.
+   Each stage now starts with its gain near clipping (defaults 16 to 45 and 2 to 7.5),
+   so the 3rd harmonic of a -12 dBFS 220 Hz sine runs about -41, -29, -21, -15, -12 dB at
+   DRIVE 0.1, 0.3, 0.5, 0.7, 1 (old: nothing below 0.45, -11.4 at 0.7, -11.2 at 1).
+   DRIVE 0 is sample-exact passthrough so the always-on stage is transparent at zero.
 3. The only nonlinearity is rail saturation, applied after stage 1 and after stage 2,
    as a clamp with a short soft edge. A small tunable rail asymmetry stands in for
    imperfect biasing (default 0.05).
@@ -71,7 +74,8 @@ struct DistortionTuning {
   float s1BassHz = 700.0f;        // low shelf cut corner
   float s1BassDb = -12.0f;        // low shelf depth below s1BassHz
   float s1LpHz = 6000.0f;         // top roll-off (C5)
-  float gain1Max = 100.0f;        // 40 dB
+  float gain1Min = 16.0f;         // stage gain at DRIVE 0
+  float gain1Max = 45.0f;         // stage gain at DRIVE 1
   // tone stack between the stages (bass 10 / mid 6 / treble 0)
   float stackBassHz = 400.0f;     // low shelf boost corner
   float stackBassDb = 10.0f;
@@ -81,7 +85,8 @@ struct DistortionTuning {
   // stage 2
   float s2HpHz = 100.0f;
   float s2LpHz = 6000.0f;
-  float gain2Max = 90.0f;         // just under 40 dB
+  float gain2Min = 2.0f;
+  float gain2Max = 7.5f;
   float railAsym = 0.05f;         // 0..0.5; positive rail 1, negative -(1 - asym)
   float railSoft = 0.1f;          // soft edge as a fraction of the rail
   // post
@@ -117,7 +122,7 @@ Behaviour per sample (coefficients recomputed per block):
 
 1. `x = hp1(in, inputHpHz)`.
 2. Stage 1 shaping: `x = lowShelf(x, s1BassHz, s1BassDb)`; `x = lp1(x, s1LpHz)`;
-   `x *= g1`; `x = rail(x)`.
+   `x *= g1`; `x = rail(x)`, with `g1 = gain1Min * (gain1Max / gain1Min)^drive`.
 3. Tone stack: `x = lowShelf(x, stackBassHz, stackBassDb)`;
    `x = highShelf(x, stackTrebleHz, stackTrebleDb)`; `x *= dbToLin(stackLossDb)`.
 4. Stage 2: `x = hp1(x, s2HpHz)`; `x = lp1(x, s2LpHz)`; `x *= g2`; `x = rail(x)`.
@@ -129,8 +134,10 @@ Behaviour per sample (coefficients recomputed per block):
    `railSoft` fraction before each rail. Steps 2 and 4 saturators run inside the 2×
    oversampler when `oversample` is on (upsample before `*= g1`, downsample after the
    stage-2 rail; the linear filters in between may run at 2× too, simplest wins).
-7. Makeup: `x *= dbToLin(trimDb) / makeup(d)`; implementer picks `makeup(d)` so test 4
-   passes and documents the law in a one-line comment.
+7. Makeup: `x *= dbToLin(trimDb) / makeup(g1 * g2)` with
+   `makeup(g) = a*g / sqrt(1 + (a*g / s)^2)`, a = 0.06, s = 10.3. Fitted so a -18 dBFS RMS
+   synthetic vocal (180 Hz, 10 harmonics at 1/k, 5 Hz +-20 cent vibrato) stays within
+   0.1 dB of input from DRIVE 0.1 to 1 at trim 2.9 dB.
 8. `drive_` one-pole smoothed (20 ms) with snap to exact 0; `on == false` → drive 0.
    Settled drive 0 skips the whole chain and copies input to output exactly. The
    chain's fixed EQ fades in rather than jumping: `out = lerp(in, chain, f)` with
@@ -160,17 +167,17 @@ over seconds 1–2.
 
 1. Passthrough: drive 0, and `on = false` with drive 1 → after 100 ms
    `|out - in| < 1e-6`.
-2. Harmonics grow with drive: 3rd harmonic relative to the fundamental at drive 1 is
-   ≥ −15 dB, and strictly greater than at drive 0.5, which is greater than at
-   drive 0.2.
-3. Clean at low drive: at drive 0.15 the 3rd harmonic is ≤ −40 dB relative to the
-   fundamental (the pedal "plays clean at low GAIN settings").
+2. Harmonics grow evenly with drive: 3rd harmonic relative to the fundamental at drive
+   0.1 / 0.3 / 0.5 / 0.7 / 1 is within ±3 dB of −40 / −28 / −20 / −15 / −11.4 and strictly
+   rising. (Old band: drive 1 ≥ −15 and 0.2 < 0.5 < 1; changed on the owner's taper report.)
+3. Clean at low drive: at drive 0.1 the 3rd harmonic is ≤ −38 dB relative to the
+   fundamental. (Old: drive 0.15 ≤ −40.)
 4. Level: output RMS within ±4 dB of input RMS at drive 0.15, 0.5, 1.
-5. Asymmetry, measured just past the stage-1 clipping onset (about drive 0.45 with
+5. Asymmetry, measured just past the stage-1 clipping onset (about drive 0.1 with
    the defaults), where one rail clips before the other. At full drive the wave is
    a near-symmetric square and the DC blocker removes the only difference; below
-   onset nothing clips. At drive 0.5 with default `railAsym` 0.05 the 2nd harmonic
-   is ≥ −42 dB relative to the fundamental (measured −39 dB); with `railAsym = 0`
+   onset nothing clips. At drive 0.2 with default `railAsym` 0.05 the 2nd harmonic
+   is ≥ −46 dB relative to the fundamental (measured −43 dB); with `railAsym = 0`
    it is ≤ −55 dB.
 6. DC: `|mean(out)|` over seconds 1–2 at drive 1 is < 1e-3.
 7. Tone: 8 kHz sine at −12 dBFS, drive 0.5. Output RMS at tone 1 exceeds tone 0 by

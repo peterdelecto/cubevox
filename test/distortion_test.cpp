@@ -128,18 +128,31 @@ bool testPassthrough() {
                 maxDiff);
 }
 
+// DRIVE taper (owner 2026-10-02: dead until 50-60 %, too saturated at 100 %). Each
+// drive has a 3rd-harmonic target and a +-3 dB band; drive 1 matches the old drive 0.7.
 bool testHarmonics() {
-  const double h2 = harmonicDb(render(params(0.2f)), 3);
-  const double h5 = harmonicDb(render(params(0.5f)), 3);
-  const double h10 = harmonicDb(render(params(1.0f)), 3);
-  const bool ok = h10 >= -15.0 && h10 > h5 && h5 > h2;
-  return report("harmonics", ok, "3rd at drive 0.2/0.5/1 = %.1f / %.1f / %.1f dB (drive 1 >= -15, rising)",
-                h2, h5, h10);
+  constexpr int kPoints = 5;
+  const float drives[kPoints] = {0.1f, 0.3f, 0.5f, 0.7f, 1.0f};
+  const double target[kPoints] = {-40.0, -28.0, -20.0, -15.0, -11.4};
+  double h[kPoints];
+  bool ok = true;
+  for (int k = 0; k < kPoints; ++k) {
+    h[k] = harmonicDb(render(params(drives[k])), 3);
+    if (std::fabs(h[k] - target[k]) > 3.0) ok = false;
+    if (k > 0 && h[k] <= h[k - 1]) ok = false;
+  }
+  char detail[160];
+  std::snprintf(detail, sizeof detail,
+                "3rd at drive 0.1/0.3/0.5/0.7/1 = %.1f / %.1f / %.1f / %.1f / %.1f dB (targets -40/-28/-20/-15/-11.4 +-3, rising)",
+                h[0], h[1], h[2], h[3], h[4]);
+  std::printf("%s harmonics  %s\n", ok ? "PASS" : "FAIL", detail);
+  return ok;
 }
 
+// Old band: 3rd <= -40 dB at drive 0.15. New: just breaking up at drive 0.1.
 bool testClean() {
-  const double h3 = harmonicDb(render(params(0.15f)), 3);
-  return report("clean", h3 <= -40.0, "3rd at drive 0.15 = %.1f dB (<=-40)", h3);
+  const double h3 = harmonicDb(render(params(0.1f)), 3);
+  return report("clean", h3 <= -38.0, "3rd at drive 0.1 = %.1f dB (<=-38)", h3);
 }
 
 bool testLevel() {
@@ -155,13 +168,14 @@ bool testLevel() {
                 db[0], db[1], db[2]);
 }
 
+// Drive 0.2 sits just past the clipping onset (about 0.1), where one rail clips first.
 bool testAsymmetry() {
-  const double asym = harmonicDb(render(params(0.5f)), 2);
-  cv::DistortionParams sym = params(0.5f);
+  const double asym = harmonicDb(render(params(0.2f)), 2);
+  cv::DistortionParams sym = params(0.2f);
   sym.tuning.railAsym = 0.0f;
   const double flat = harmonicDb(render(sym), 2);
-  return report("asymmetry", asym >= -42.0 && flat <= -55.0,
-                "2nd at drive 0.5: default %.1f dB (>=-42), railAsym 0 %.1f dB (<=-55)", asym, flat);
+  return report("asymmetry", asym >= -46.0 && flat <= -55.0,
+                "2nd at drive 0.2: default %.1f dB (>=-46), railAsym 0 %.1f dB (<=-55)", asym, flat);
 }
 
 bool testDc() {

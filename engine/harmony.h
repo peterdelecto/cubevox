@@ -40,8 +40,8 @@ struct HarmonyTuning {
   int8_t higher[7] = { 7,  7,  7,  7,  7,  7,  6};
   // Chromatic intervals, indexed by voice; Fixed is unused.
   int8_t chromaticSemis[5] = {-7, -4, 0, 4, 7};
-  // Per-engine trims on top of levelDb; level rule at mix 0.5.
-  float trimDb[3] = {8.4f, 7.7f, 8.5f};
+  // Per-engine trims on top of levelDb; level rule at mix 1 (wet only), one High voice.
+  float trimDb[3] = {2.2f, 1.4f, 2.2f};
   ShifterTuning shifter;         // engines B and C
 };
 
@@ -97,12 +97,17 @@ class HarmonyVoices {
     const bool voiced = pr.voiced || engine_ == 2;
     const float hz = pr.hz * exp2f(corrOffset / 12.0f);
     bool any = false;
+    // Summed voices scale by 1/sqrt(active count) so stacking voices does not add level.
+    int active = 0;
+    for (int v = 0; v < kSlots; ++v)
+      if (p.on && targetGain(p.slots[v].level, voiced, 0.0f, t) > 0.0f) ++active;
+    const float norm = active > 1 ? 1.0f / sqrtf(static_cast<float>(active)) : 1.0f;
     for (int v = 0; v < kSlots; ++v) {
       const HarmonySlot& slot = p.slots[v];
       semisT_[v] = (p.chromatic ? chromaticSemis(slot.voice, t)
                                 : targetSemis(slot.voice, hz, p.key, t)) +
                    corrOffset;
-      gainT_[v] = p.on ? targetGain(slot.level, voiced, t.trimDb[engine_], t) : 0.0f;
+      gainT_[v] = p.on ? norm * targetGain(slot.level, voiced, t.trimDb[engine_], t) : 0.0f;
       any = any || (p.on && slot.level > 0);
       if (engine_ == 1) {
         const float fm = slot.formant < -kMaxFormantSemis

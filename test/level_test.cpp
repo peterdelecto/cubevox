@@ -142,7 +142,7 @@ cv::ReverbParams reverbParams(int engine) {
   cv::ReverbParams p;
   p.on = true;
   p.engine = engine;
-  p.mix = 0.5f;
+  p.mix = 1.0f;
   p.spring.tension = p.spring.dwell = 0.5f;
   p.parker.tension = p.parker.dwell = 0.5f;
   p.chasm.decay = 0.5f;
@@ -164,16 +164,31 @@ int main() {
 
   cv::PitchFxParams harmony = pitchOff();
   harmony.harmony.on = true;
-  harmony.harmony.slots[0] = {cv::HarmonyVoice::High, 2};
-  ok &= simple<cv::PitchFx>("harmony A High L2 mix .5", in, harmony);
+  harmony.harmony.mix = 1.0f;
+  harmony.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
+  ok &= simple<cv::PitchFx>("harmony A High L3 mix 1", in, harmony);
 
   cv::PitchFxParams harmonyB = harmony;
   harmonyB.harmony.engine = 1;
-  ok &= simple<cv::PitchFx>("harmony B High L2 mix .5", in, harmonyB);
+  ok &= simple<cv::PitchFx>("harmony B High L3 mix 1", in, harmonyB);
 
   cv::PitchFxParams harmonyC = harmony;
   harmonyC.harmony.engine = 2;
-  ok &= simple<cv::PitchFx>("harmony C High L2 mix .5", in, harmonyC);
+  ok &= simple<cv::PitchFx>("harmony C High L3 mix 1", in, harmonyC);
+
+  // Equal-power middle: reported against a looser band, no trim chasing.
+  cv::PitchFxParams harmonyMid = harmony;
+  harmonyMid.harmony.mix = 0.5f;
+  {
+    auto s = std::make_unique<Stage<cv::PitchFx>>();
+    const double db = gainDb(in, run(in, [&](const float* i, float* o, int n) {
+                               s->fx.process(i, o, n, harmonyMid);
+                             }));
+    const bool midOk = db >= -1.5 && db <= 1.0;
+    std::printf("%s %-26s %+6.2f dB  (want -1.5..+1.0)\n", midOk ? "PASS" : "FAIL",
+                "harmony A mix .5", db);
+    ok &= midOk;
+  }
 
   cv::PitchFxParams autotune = pitchOff();
   autotune.autotune.on = true;
@@ -181,21 +196,24 @@ int main() {
 
   cv::PitchFxParams octA = pitchOff();
   octA.octave.on = true;
+  octA.octave.mix = 1.0f;
   octA.octave.engine = 0;
   octA.octave.semitones = -12;
-  ok &= simple<cv::PitchFx>("octave A -12 mix .5", in, octA);
+  ok &= simple<cv::PitchFx>("octave A -12 mix 1", in, octA);
 
   cv::PitchFxParams octB = pitchOff();
   octB.octave.on = true;
+  octB.octave.mix = 1.0f;
   octB.octave.engine = 1;
   octB.octave.semitones = 12;
-  ok &= simple<cv::PitchFx>("octave B +12 mix .5", in, octB);
+  ok &= simple<cv::PitchFx>("octave B +12 mix 1", in, octB);
 
   cv::PitchFxParams octC = pitchOff();
   octC.octave.on = true;
+  octC.octave.mix = 1.0f;
   octC.octave.engine = 2;
   octC.octave.semitones = -12;
-  ok &= simple<cv::PitchFx>("octave C -12 mix .5", in, octC);
+  ok &= simple<cv::PitchFx>("octave C -12 mix 1", in, octC);
 
   cv::UnisonParams unison;
   unison.on = true;
@@ -213,9 +231,9 @@ int main() {
   dist.tone = 0.5f;
   ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
 
-  ok &= simple<cv::Reverb>("reverb SPRING mix .5", in, reverbParams(cv::kReverbSpring));
-  ok &= simple<cv::Reverb>("reverb CHASM mix .5", in, reverbParams(cv::kReverbChasm));
-  ok &= simple<cv::Reverb>("reverb PARKER mix .5", in, reverbParams(cv::kReverbParker));
+  ok &= simple<cv::Reverb>("reverb SPRING mix 1", in, reverbParams(cv::kReverbSpring));
+  ok &= simple<cv::Reverb>("reverb CHASM mix 1", in, reverbParams(cv::kReverbChasm));
+  ok &= simple<cv::Reverb>("reverb PARKER mix 1", in, reverbParams(cv::kReverbParker));
 
   cv::PolishParams eq;
   eq.on = true;

@@ -451,6 +451,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   if (voices > 0 && !haveHarmony) return false;
   // Autotune shares Harmony's key unless --atkey sets its own.
   if (!haveAtKey) ap.key = hp.key;
+  // Each pitch stage runs only when asked for.
+  hp.on = haveHarmony;
+  op.on = haveOctave;
   rp.pitchOn = haveHarmony || haveOctave || ap.on;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;

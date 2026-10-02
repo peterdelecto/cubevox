@@ -32,7 +32,7 @@ struct SpringTuning {
   int springs = 2;                              // 2 or 3
   float modDepth = 8.0f, modRateHz = 3.0f;
   float boingDb = 0.0f;                         // 95 Hz resonator, 0 = off
-  float wetDb = 1.3f;                           // trim; level rule at MIX 0.5
+  float wetDb = 4.1f;                           // trim; level rule at MIX 1 (wet only)
   float tankTrim = 1.5f;                        // DSV3 kSprTankTrim
 };
 

@@ -136,3 +136,8 @@ add_executable(level_test test/level_test.cpp)
 target_compile_options(level_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(level_test PRIVATE engine)
 add_test(NAME level COMMAND level_test)
+
+add_executable(stage_feedback_test test/stage_feedback_test.cpp)
+target_compile_options(stage_feedback_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(stage_feedback_test PRIVATE engine)
+add_test(NAME stage_feedback COMMAND stage_feedback_test)

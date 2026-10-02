@@ -40,7 +40,7 @@ struct SpringCTuning {
   float dwellDrive = 32.0f, dwellComp = 0.80f;
   float presenceHz = 3000.0f, presenceDb = 5.0f, presenceQ = 1.0f;
   float tankTrim = 0.75f;                      // into the tank, after the clip
-  float wetDb = 6.8f;                         // output trim; level rule at MIX 0.5
+  float wetDb = 5.1f;                         // output trim; level rule at MIX 1 (wet only)
 };
 
 struct SpringCParams {

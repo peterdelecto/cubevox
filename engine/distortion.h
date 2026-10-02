@@ -8,7 +8,7 @@
 
 // Distortion: behavioural Boss BD-2 model. Stage 1 (bass cut, top roll-off, gain,
 // rail), tone stack, stage 2 (band limit, gain, rail), fixed post shaping, DC block.
-// DRIVE is the dual audio-taper GAIN pot. The two rail saturators run 2x oversampled.
+// DRIVE sweeps both stage gains exponentially from gainNMin to gainNMax. The two rail saturators run 2x oversampled.
 
 namespace cv {
 
@@ -18,7 +18,8 @@ struct DistortionTuning {
   float s1BassHz = 700.0f;        // low shelf cut corner
   float s1BassDb = -12.0f;        // low shelf depth below s1BassHz
   float s1LpHz = 6000.0f;         // top roll-off
-  float gain1Max = 100.0f;        // 40 dB
+  float gain1Min = 16.0f;         // stage gain at DRIVE 0
+  float gain1Max = 45.0f;         // stage gain at DRIVE 1
   // tone stack between the stages (bass 10 / mid 6 / treble 0)
   float stackBassHz = 400.0f;     // low shelf boost corner
   float stackBassDb = 10.0f;
@@ -28,7 +29,8 @@ struct DistortionTuning {
   // stage 2
   float s2HpHz = 100.0f;
   float s2LpHz = 6000.0f;
-  float gain2Max = 90.0f;         // just under 40 dB
+  float gain2Min = 2.0f;
+  float gain2Max = 7.5f;
   float railAsym = 0.05f;         // 0..0.5; positive rail 1, negative -(1 - asym)
   float railSoft = 0.1f;          // soft edge as a fraction of the rail
   // post
@@ -39,7 +41,7 @@ struct DistortionTuning {
   float bassPeakHz = 120.0f;      // gyrator bump
   float bassPeakDb = 2.0f;
   float bassPeakQ = 1.0f;
-  float trimDb = 2.9f;            // on top of the makeup law; level rule
+  float trimDb = 3.3f;            // on top of the makeup law; level rule
   float fadeDrive = 0.05f;        // dry-to-chain crossfade span from DRIVE 0
   bool oversample = true;
 };
@@ -86,17 +88,19 @@ class Distortion {
     const Rail rail{1.0f - clampf(t.railAsym, 0.0f, 0.5f), clampf(t.railSoft, 0.01f, 1.0f)};
     const float stackLoss = dbToLin(t.stackLossDb);
     const float trim = dbToLin(t.trimDb);
-    const float logG1 = logf(t.gain1Max < 1.0f ? 1.0f : t.gain1Max);
+    const float g1Min = t.gain1Min < kMinGain ? kMinGain : t.gain1Min;
+    const float g2Min = t.gain2Min < kMinGain ? kMinGain : t.gain2Min;
+    const float logR1 = logf((t.gain1Max < g1Min ? g1Min : t.gain1Max) / g1Min);
+    const float logR2 = logf((t.gain2Max < g2Min ? g2Min : t.gain2Max) / g2Min);
     const float fadeSpan = t.fadeDrive < kMinFade ? kMinFade : t.fadeDrive;
-    const float logG2 = logf(t.gain2Max < 1.0f ? 1.0f : t.gain2Max);
 
     for (int i = 0; i < n; ++i) {
       drive_ = smooth::step(drive_, target, aDrive);
       const float prevTone = tone_;
       tone_ = smooth::step(tone_, toneTarget, aDrive);
       if (tone_ != prevTone) setTrebleShelf(t);
-      const float g1 = expf(logG1 * drive_);
-      const float g2 = expf(logG2 * drive_);
+      const float g1 = g1Min * expf(logR1 * drive_);
+      const float g2 = g2Min * expf(logR2 * drive_);
 
       float x = inHp_.hp(in[i]);
       x = s1Bass_.run(x);
@@ -125,19 +129,20 @@ class Distortion {
   static constexpr float kDriveSec = 0.020f;
   static constexpr float kDcBlockHz = 10.0f;
   static constexpr float kMinFade = 1e-4f;
+  static constexpr float kMinGain = 0.1f;
   static constexpr float kMinHz = 20.0f;
   static constexpr float kMaxHz = 0.45f * kSampleRate;
   static constexpr float kHalfPi = 1.57079632679489661923f;
 
-  // makeup(g) = a*g / sqrt(1 + (a*g / s)^2): follows the linear stage gain (a = 0.082)
-  // and flattens at the saturated level (s = 6.6) so a -12 dBFS 220 Hz sine holds level.
+  // makeup(g) = a*g / sqrt(1 + (a*g / s)^2): follows the linear stage gain (a = 0.06)
+  // and flattens at the saturated level (s = 10.3) so a -18 dBFS RMS vocal holds level.
   static float makeup(float gain) {
     const float lin = kMakeupLinear * gain;
     const float r = lin / kMakeupSat;
     return lin / sqrtf(1.0f + r * r);
   }
-  static constexpr float kMakeupLinear = 0.082f;
-  static constexpr float kMakeupSat = 6.6f;
+  static constexpr float kMakeupLinear = 0.06f;
+  static constexpr float kMakeupSat = 10.3f;
 
   // Half-band FIR, 15 taps, Hamming window. Taps at even offsets are zero and the
   // centre is 0.5, so each phase needs only the few taps below.

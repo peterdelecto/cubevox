@@ -53,7 +53,7 @@ struct ChasmTuning {
   float inputTrim = 0.5f;
   float wobbleLevelDb = 2.0f;            // wet lift, ramps in over WOBBLE 0..0.25
   float dwellDrive = 8.0f, dwellComp = 0.8f;  // input drive at DWELL 1; level comp exponent
-  float wetDb = 17.4f;  // trim; level rule at MIX 0.5
+  float wetDb = 19.0f;  // trim; level rule at MIX 1 (wet only)
 };
 
 struct ChasmParams {

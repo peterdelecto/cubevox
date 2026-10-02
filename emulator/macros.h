@@ -66,9 +66,11 @@ constexpr Anchor kOctSlide{2.0f, 15.0f, 120.0f, I::Log};              // glideMs
 constexpr Anchor kHarGlide{120.0f, 30.0f, 5.0f, I::Log};              // glideMs
 
 // Unison
-constexpr Anchor kUniDetune{0.0f, 2.0f, 6.0f};                        // |detuneCents|
-constexpr Anchor kUniSwingScale{1.0f, 1.0f, 0.2f};                    // x swingMin/MaxMs
-constexpr Anchor kUniLfoScale{0.5f, 1.0f, 2.0f, I::Log};              // x lfoHz both
+// Ends are wide so each slider is clearly audible (owner 2026-10-02); 50 % is the
+// owner's tuning. Chorus end: 6 ms swing, no fixed detune. Double end: 15 cents, near-still.
+constexpr Anchor kUniDetune{0.0f, 2.0f, 15.0f};                       // |detuneCents|
+constexpr Anchor kUniSwingScale{2.0f, 1.0f, 0.1f};                    // x swingMin/MaxMs
+constexpr Anchor kUniLfoScale{0.25f, 1.0f, 3.0f, I::Log};             // x lfoHz both
 
 // Distortion
 constexpr Anchor kDisInputHp{160.0f, 90.0f, 40.0f, I::Log};

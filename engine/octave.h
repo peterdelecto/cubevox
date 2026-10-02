@@ -23,14 +23,14 @@ struct OctaveTuning {
   float epochSearch = ShifterTuning{}.epochSearch;    // peak search half-width, fraction of a period
   float epochLpHz = ShifterTuning{}.epochLpHz;        // low-pass used to find the peak
 
-  // Per-engine output trims; level rule at mix 0.5, on top of levelDb.
-  float trimDbA = -5.3f;
-  float trimDbB = 6.2f;
+  // Per-engine output trims; level rule at mix 1 (wet only), on top of levelDb.
+  float trimDbA = -1.7f;
+  float trimDbB = 6.5f;
 
   // Option C
   float grainWindowMs = ShifterTuning{}.grainWindowMs;  // 20..80
   int grainCount = ShifterTuning{}.grainCount;          // 2 or 4
-  float trimDbC = 2.6f;
+  float trimDbC = 2.2f;
 };
 
 struct OctaveParams {
