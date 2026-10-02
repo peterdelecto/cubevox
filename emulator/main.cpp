@@ -90,8 +90,8 @@ struct ProtoParams {
   cv::macros::State macros;
   // Prototype-only test signal. Not a panel control, not in Print tuning.
   bool stageFeedback = false;
-  float feedbackAmount = 50.0f;    // percent
-  float feedbackMovement = 40.0f;  // percent
+  float feedbackAmount = 67.0f;    // percent of the capped range (= 50 % of the old one)
+  float feedbackMovement = 53.0f;  // percent of the capped range (= 40 % of the old one)
 
   // Every effect opens off except the input gate, which has no switch on the
   // face. Engine defaults stay on for the firmware.
@@ -250,8 +250,11 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gPolish.reset();
     gStageFeedback.reset(1u);
   }
-  gStageFeedback.configure(params.stageFeedback && params.playing, 0.01f * params.feedbackAmount,
-                           0.01f * params.feedbackMovement);
+  // Slider 100 % = 75 % of the simulator's range (owner 2026-10-02: full was too much).
+  constexpr float kFeedbackCap = 0.75f;
+  gStageFeedback.configure(params.stageFeedback && params.playing,
+                           kFeedbackCap * 0.01f * params.feedbackAmount,
+                           kFeedbackCap * 0.01f * params.feedbackMovement);
   if (!params.playing || loop == nullptr || loop->samples.empty()) {
     std::memset(out, 0, sizeof(float) * 2 * frameCount);
     publishState(0.0f, loop);
