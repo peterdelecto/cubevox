@@ -100,7 +100,7 @@ constexpr Anchor kSprHp{600.0f, 300.0f, 120.0f, I::Log};
 constexpr Anchor kSprBoingDb{0.0f, 0.0f, 6.0f};
 
 // CHASM
-constexpr Anchor kChmWobble{0.0f, 0.15f, 1.0f};                     // 100 % = full engine range, as the old WOBBLE knob
+constexpr Anchor kChmWobble{0.0f, 0.15f, 0.83f};                    // 100 % = the old 90 % (owner 2026-10-02)
 constexpr Anchor kChmTrebleLoss{1500.0f, 3000.0f, 7000.0f, I::Log};
 constexpr Anchor kChmInputTrebleCut{0.85f, 0.95f, 1.0f};
 constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
