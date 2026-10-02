@@ -160,10 +160,18 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 
 ### Mechanical
 
-24. One board. Pots, encoder, toggles and OLED header stand up through the
-    top; combo jack, 1/4" out, barrel and USB-C are right-angle out the rear
-    wall. All panel jacks are THT so they cannot be pulled off the board.
-25. Enclosure is 3D printed around the board. No footswitch.
+24. One board. Pots, encoders, toggles and OLED header stand up through the
+    top panel, which sits about 11.8 mm above the board. The combo jack
+    (25 mm flange, 29 mm tall with its latch), the 1/4" out and the barrel
+    jack hang from the UNDERSIDE (B.Cu) and face the rear wall, because on
+    top they would come up through the panel (owner 2026-10-02). These three
+    are through-hole and the owner hand-solders them; JLC's job stays
+    single-sided Economic. USB-C (1.6 mm, SMD) stays on top and is
+    JLC-assembled, so the rear wall has holes at two heights. All panel jacks
+    are THT so they cannot be pulled off the board.
+25. Enclosure is 3D printed around the board: about 12 mm above the board
+    for the controls, 1.6 mm board, about 29 mm below for the combo jack,
+    plus walls. No footswitch.
 
 ## 3D model rule (owner 2026-10-02)
 
@@ -189,7 +197,9 @@ toggle's EasyEDA STEP measured 23.6 mm and matches.
 - G6K-2F-Y: coil 1 (+) / 8 (−), 237 Ω, 21 mA. Pole A COM 3, NC 2, NO 4.
   Pole B COM 6, NC 7, NO 5. NC/NO read from the drawn blade position.
 - All jacks right-angle, mouth axis parallel to the board.
-- NCJ6FA-H stock 111; re-check at order time, fallback NCJ6FA-V (C368485).
+- NCJ6FA-H stock 385 (2026-10-02 pm); re-check at order time. NCJ6FA-V
+  (C368485) is NOT a fallback: it is the vertical version, wrong mounting
+  angle for a rear-wall jack (owner 2026-10-02).
 - Every jack, pot and encoder is Extended tier (~$3 each per unique part).
 
 ## Recommended next steps
