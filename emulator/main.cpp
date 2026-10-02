@@ -1153,14 +1153,11 @@ void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float g
                    bool alwaysOn) {
   ImGui::PushID(id);
   gateLed(g.on, gainDb);
-  if (alwaysOn) {
-    g.on = true;
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(label);
-  } else {
-    ImGui::Checkbox(label, &g.on);
+  // The input gate has no panel switch on the box; the prototype toggle exists to
+  // A/B it against the stage feedback simulator (owner 2026-10-02).
+  ImGui::Checkbox(label, &g.on);
+  if (!alwaysOn)
     ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
-  }
   ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
   drawGateTuning(g, id, alwaysOn);
   ImGui::PopID();
@@ -1270,7 +1267,6 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
     params.linkAutotuneKey = true;
     params.pitchFx.harmony.chromatic = false;
   }
-  params.inputGate.on = true;
   if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
 
   ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
