@@ -2101,7 +2101,7 @@
    ]
   },
   {
-   "ref": "RV115",
+   "ref": "RVGAIN",
    "lib_id": "cubevox:RK09D1130C1B",
    "value": "10k GAIN",
    "at": [
@@ -2762,7 +2762,7 @@
    }
   },
   {
-   "ref": "SW115",
+   "ref": "SWBYPASS",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -4144,7 +4144,7 @@
    ]
   },
   {
-   "ref": "SW104",
+   "ref": "ENC101",
    "lib_id": "cubevox:EC11N1525404",
    "value": "EC11N1525404",
    "at": [
@@ -4217,7 +4217,7 @@
    ]
   },
   {
-   "ref": "SW105",
+   "ref": "ENC102",
    "lib_id": "cubevox:EC11N1520401",
    "value": "EC11N1520401",
    "at": [
@@ -4272,7 +4272,7 @@
    ]
   },
   {
-   "ref": "SW106",
+   "ref": "ENC103",
    "lib_id": "cubevox:EC11N1520401",
    "value": "EC11N1520401",
    "at": [

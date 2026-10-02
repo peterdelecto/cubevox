@@ -10741,8 +10741,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "2f026916-9942-5d5d-baaf-a0ab1ae2a268")
-		(property "Reference" "SW1"
+		(uuid "cd16ddc4-9b06-5019-b884-1fefad3773f8")
+		(property "Reference" "SWRESET"
 			(at 82.55 299.72 0)
 			(effects
 				(font
@@ -10795,21 +10795,21 @@
 			)
 		)
 		(pin "1"
-			(uuid "e2e72bb3-6e98-5c71-becf-48215890b6bb")
+			(uuid "7400dfde-56df-5ce1-a3b5-a3ca393af970")
 		)
 		(pin "2"
-			(uuid "c7863229-d677-5fe1-a538-859c0bc581cc")
+			(uuid "e92a60e7-cf92-5f29-8231-dac210c04ce3")
 		)
 		(pin "3"
-			(uuid "ab36ddb0-4e28-5c8f-9868-96eb2fe0ba4b")
+			(uuid "53dc2054-eeb1-54ab-a2e7-a7f788430626")
 		)
 		(pin "4"
-			(uuid "0d91008e-b732-5157-8d14-08a9e431a44a")
+			(uuid "27f52b32-91f1-51bb-8a79-b8f2fc399941")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "SW1")
+					(reference "SWRESET")
 					(unit 1)
 				)
 			)
@@ -10823,7 +10823,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "1ee3f6f0-f2d6-5b99-b3f6-72e4018690f7")
+		(uuid "f6a94131-0eba-5d55-b923-d55f37a39d36")
 	)
 	(hierarchical_label "NRST"
 		(shape bidirectional)
@@ -10835,7 +10835,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "66943fa3-e725-58dc-a264-8e28abba74e5")
+		(uuid "4d0268cb-b215-55fc-93a2-83a028a2820c")
 	)
 	(wire
 		(pts
@@ -10845,7 +10845,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "c98d5c54-e63a-5ecb-9809-1706a1d23a06")
+		(uuid "4773608b-5ac5-5a78-ac9e-55310f15d0b7")
 	)
 	(hierarchical_label "NRST"
 		(shape bidirectional)
@@ -10857,7 +10857,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "0fd8f04d-405e-5ca2-b7a5-0143f3b6542e")
+		(uuid "c8a13a0a-7a42-5694-a101-efbbb6d80cd6")
 	)
 	(wire
 		(pts
@@ -10867,7 +10867,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "e0e58683-e122-56dc-bacf-985d3dbbdc79")
+		(uuid "958bae29-1ccd-544f-8eb5-84904c4e89dc")
 	)
 	(hierarchical_label "GND"
 		(shape passive)
@@ -10879,7 +10879,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "1aeff50f-5a4d-5f3a-970b-591ecf630b74")
+		(uuid "9bbe4f17-2311-5c9e-9f2e-bfb3cda5c19d")
 	)
 	(wire
 		(pts
@@ -10889,7 +10889,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "47e5b17f-bd28-5af9-938e-4e0a4ca4de4d")
+		(uuid "42cfaf08-c05f-5bff-9e75-af77f0666ac9")
 	)
 	(hierarchical_label "GND"
 		(shape passive)
@@ -10901,7 +10901,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "42cb6575-dbca-546f-ae04-b8a4db6f2692")
+		(uuid "95698043-78c7-5870-9d27-622dc752ad07")
 	)
 	(symbol
 		(lib_id "cubevox_h7core:TS-1187A-B-A-B")
@@ -10911,8 +10911,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "d95ac4e1-6d16-5812-ac12-ca61da79d5a6")
-		(property "Reference" "SW2"
+		(uuid "5fd15784-0ce5-52bf-8b09-ac5bced7662b")
+		(property "Reference" "SWBOOT"
 			(at 114.3 299.72 0)
 			(effects
 				(font
@@ -10965,21 +10965,21 @@
 			)
 		)
 		(pin "1"
-			(uuid "fe5e12eb-e4ed-53c2-965a-2f6b60c61917")
+			(uuid "a5aba4e1-6061-54f6-956d-6b888d2a3aa3")
 		)
 		(pin "2"
-			(uuid "949aa0b6-bd3e-58d2-bb80-4a2d1dc9fe32")
+			(uuid "239d8ae2-5e9e-5385-a496-81defb8e3b30")
 		)
 		(pin "3"
-			(uuid "98cdeb32-b7f6-5a68-89dc-6dc2e3ad90d9")
+			(uuid "5a402512-d334-55a6-834d-16905048597c")
 		)
 		(pin "4"
-			(uuid "e8187240-cd8f-5a38-8ead-966b402220ce")
+			(uuid "95226577-bfa9-58e9-81c3-3b3449d5a485")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
-					(reference "SW2")
+					(reference "SWBOOT")
 					(unit 1)
 				)
 			)
@@ -10993,7 +10993,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "653fc46f-42d5-599c-8cdb-9e5cf344e62c")
+		(uuid "d4909c93-0062-5399-a3eb-a5d4872e22cd")
 	)
 	(hierarchical_label "BOOT0"
 		(shape input)
@@ -11005,7 +11005,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "715bc09c-25c1-5ea5-92ec-957e36cd2012")
+		(uuid "e4599a13-ce3e-5932-bd07-d2bad1612287")
 	)
 	(wire
 		(pts
@@ -11015,7 +11015,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "2a6f3b2b-bc5f-51cf-b1b7-d65b8a31adf9")
+		(uuid "47cd299b-437c-5b61-a9ea-3d39f7a08f9b")
 	)
 	(hierarchical_label "BOOT0"
 		(shape input)
@@ -11027,7 +11027,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "c791986f-8337-5122-9c2f-633abf52e591")
+		(uuid "29bef2e3-3ac0-5964-b076-fae9dee1a3c2")
 	)
 	(wire
 		(pts
@@ -11037,7 +11037,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "c0064b42-1395-5be8-a884-bc4bce2495f1")
+		(uuid "0c1c4181-a3d4-5e9e-b891-63adc55bc818")
 	)
 	(hierarchical_label "3V3"
 		(shape output)
@@ -11049,7 +11049,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "4edaccbf-38f1-5f77-8829-52f77b4cdb0e")
+		(uuid "e614e7cd-35a3-5716-b0f0-acbc926e1e60")
 	)
 	(wire
 		(pts
@@ -11059,7 +11059,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "980863db-331f-55bb-a690-e74ed86ebbf0")
+		(uuid "e572f408-69cb-50bd-a3d9-2418f1c0caf6")
 	)
 	(hierarchical_label "3V3"
 		(shape output)
@@ -11071,7 +11071,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "591440ff-4e56-53f6-bf4e-acee069d8ebe")
+		(uuid "8326bcd8-762b-56e0-a99a-22d4ea238567")
 	)
 	(symbol
 		(lib_id "cubevox_h7core:KT-0603R")

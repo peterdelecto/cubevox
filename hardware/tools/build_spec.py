@@ -128,6 +128,9 @@ NET_RENAME = {"ENC_A": "ENC_MENU_A", "ENC_B": "ENC_MENU_B", "ENC_SW": "ENC_MENU_
               "MUX1_SIG": "POT_MUX_OUT", "LINE_L": "DAC_OUTL"}
 
 
+CHILD_REF_RENAME = {"SW1": "SWRESET", "SW2": "SWBOOT"}   # SW1 on NRST, SW2 on BOOT0
+
+
 def build_child():
     d = json.load(open(os.path.join(SRC, "fxbox_h7core.json")))
     d["project"] = "cubevox"
@@ -157,6 +160,7 @@ def build_child():
             p["pins"][0]["net"] = "POT_MUX_OUT"
         for r in p.get("pins", []):
             r["net"] = NET_RENAME.get(r.get("net"), r.get("net")) if r.get("net") else r.get("net")
+        p["ref"] = CHILD_REF_RENAME.get(p["ref"], p["ref"])
         parts.append(p)
     d["parts"] = parts
     d["ports"] = [{"name": n, "shape": s} for n, s in CHILD_PORTS]
@@ -273,7 +277,7 @@ def build_top():
     add(R("10k", "INA_O1", "DA_P", xs, 172), R("10k", "DA_P", "VREF", xs + 12, 172),
         R("10k", "INA_O2", "DA_N", xs + 24, 172), R("10k", "DA_N", "PRE1", xs + 36, 172),
         C("100nF", "VREF", "GND", xs + 48, 172))
-    add(pot("RV115", X2 + 40, 252, "PRE_OUT", "G2_FB", "G2_FB", "10k GAIN"))
+    add(pot("RVGAIN", X2 + 40, 252, "PRE_OUT", "G2_FB", "G2_FB", "10k GAIN"))
     add(R("100R", "G2_FB", "G2_INV", xs + 4, 252), R("100R", "G2_INV", "VREF", xs + 16, 252),
         C("47pF", "PRE_OUT", "G2_INV", xs + 28, 252), C("100nF", "VREF", "GND", xs + 40, 252))
     note("Input Gain pot in the A4 feedback leg, wiper tied to end 3", X2, 232)
@@ -303,7 +307,7 @@ def build_top():
     d104 = copy.deepcopy(keep["D104"]); d104.update(at=[X4 + 90, 76])
     d104["pins"] = [row("1", "SW_BYPASS", LF), row("2", "GND", RT)]
     add(d104)
-    add(toggle("SW115", X4 + 80, 130, "SW_BYPASS", "5V"))
+    add(toggle("SWBYPASS", X4 + 80, 130, "SW_BYPASS", "5V"))
     note("Bypass toggle. Common to the coil, one throw to 5V", X4 + 96, 130)
     add(R("10k", "SW_BYPASS", "FX_ON_SENSE", X4 + 90, 180), R("18k", "FX_ON_SENSE", "GND", X4 + 102, 180))
 
@@ -343,9 +347,9 @@ def build_top():
 
     # encoders
     enc_y = 470
-    add(dict(_enc("SW104", "EC11N1525404", "C470748", X6 + 20, enc_y, "ENC_MENU_A", "ENC_MENU_B", "ENC_MENU_SW")))
-    add(dict(_enc("SW105", "EC11N1520401", "C470703", X6 + 160, enc_y, "ENC_KEY_A", "ENC_KEY_B", None)))
-    add(dict(_enc("SW106", "EC11N1520401", "C470703", X6 + 300, enc_y, "ENC_SEMI_A", "ENC_SEMI_B", None)))
+    add(dict(_enc("ENC101", "EC11N1525404", "C470748", X6 + 20, enc_y, "ENC_MENU_A", "ENC_MENU_B", "ENC_MENU_SW")))
+    add(dict(_enc("ENC102", "EC11N1520401", "C470703", X6 + 160, enc_y, "ENC_KEY_A", "ENC_KEY_B", None)))
+    add(dict(_enc("ENC103", "EC11N1520401", "C470703", X6 + 300, enc_y, "ENC_SEMI_A", "ENC_SEMI_B", None)))
     xe = X6 + 30
     for sigs, base in ((["ENC_MENU_A", "ENC_MENU_B", "ENC_MENU_SW"], X6 + 20),
                        (["ENC_KEY_A", "ENC_KEY_B"], X6 + 160), (["ENC_SEMI_A", "ENC_SEMI_B"], X6 + 300)):
