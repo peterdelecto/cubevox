@@ -28,7 +28,7 @@ struct HarmonySlot {
 
 struct HarmonyTuning {
   float levelDb[3] = {-12.0f, -6.0f, 0.0f};   // low / medium / high
-  float glideMs = 15.0f;                      // interval change glide
+  float glideMs = 30.0f;                      // interval change glide
   float voicedThreshold = 0.15f;
   bool muteUnvoiced = false;                  // ignored on engine C
   bool snapToScale = false;
@@ -50,7 +50,7 @@ struct HarmonyParams {
   int engine = 0;                // 0 = A (grid PSOLA), 1 = B (epoch PSOLA + formant), 2 = C (granular)
   bool chromatic = false;        // fixed intervals from tuning.chromaticSemis; key ignored
   int key = 0;                   // encoder index 0..11, see kKeyRoot / kKeyName
-  float mix = 0.5f;              // 0 dry .. 1 harmony only
+  float mix = 0.25f;             // 0 dry .. 1 harmony only
   std::array<HarmonySlot, 2> slots{};
   HarmonyTuning tuning;
 };

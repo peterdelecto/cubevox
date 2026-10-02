@@ -36,9 +36,9 @@ struct OctaveTuning {
 struct OctaveParams {
   bool on = true;                // panel toggle; off fades the stage out
   int engine = 0;                // 0 = A (grid PSOLA), 1 = B (epoch PSOLA + formant), 2 = C (granular)
-  int semitones = 0;             // panel knob, -12..12, 0 = off
+  int semitones = 12;            // panel knob, -12..12, 0 = off; Adam mainly uses up
   float formant = 0.0f;          // option B, -12..12 semitones, 0 = preserved
-  float mix = 0.5f;              // panel knob
+  float mix = 0.15f;             // panel knob
   OctaveTuning tuning;
 };
 

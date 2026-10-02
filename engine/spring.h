@@ -39,7 +39,7 @@ struct SpringTuning {
 struct SpringParams {
   bool on = true;
   float tension = 0.55f; // panel knob 0..1; vocal default (~1.2 s tail)
-  float dwell = 0.35f;   // panel knob 0..1; light splash
+  float dwell = 0.20f;   // panel knob 0..1; light splash
   SpringTuning tuning;
 };
 

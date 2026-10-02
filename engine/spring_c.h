@@ -45,7 +45,7 @@ struct SpringCTuning {
 
 struct SpringCParams {
   float tension = 0.5f;  // panel knob 0..1; vocal default
-  float dwell = 0.3f;    // panel knob 0..1; light drive
+  float dwell = 0.2f;     // panel knob 0..1; light drive
   SpringCTuning tuning;
 };
 

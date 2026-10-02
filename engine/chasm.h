@@ -46,7 +46,7 @@ struct ChasmTuning {
   float loopTrebleCut = 1.0f;            // 1 = off
   float inputTrebleCut = 0.95f;
   float bassCutHz = 200.0f, bassCutHzTop = 100.0f;
-  float wobbleDepthMax = 192.0f;         // samples
+  float wobbleDepthMax = 64.0f;          // samples
   float wobbleRateLo = 0.5f, wobbleRateHi = 7.0f;
   float inputTrim = 0.5f;
   float wobbleLevelDb = 2.0f;            // wet lift, ramps in over WOBBLE 0..0.25
@@ -54,8 +54,8 @@ struct ChasmTuning {
 };
 
 struct ChasmParams {
-  float decay = 0.45f;  // knob 1; vocal default
-  float wobble = 0.25f; // knob 2; vocal default
+  float decay = 0.30f;  // knob 1; vocal default
+  float wobble = 0.15f; // knob 2; vocal default
   ChasmTuning tuning;
 };
 

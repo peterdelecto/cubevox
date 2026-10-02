@@ -27,7 +27,7 @@ struct ReverbParams {
   SpringParams spring;  // spring.on is ignored; ReverbParams::on rules
   ChasmParams chasm;
   SpringCParams parker;
-  float mix = 0.3f;  // panel knob 0 dry .. 1 wet; vocal default (owner 2026-10-01)
+  float mix = 0.15f;  // panel knob 0 dry .. 1 wet; vocal default (owner 2026-10-01)
 };
 
 class Reverb {

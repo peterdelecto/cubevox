@@ -53,8 +53,8 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 // The emulator opens with the knob where the owner left it; on the box the
 // pot decides (owner 2026-10-01: DEPTH 80 %).
 constexpr float kStartDepth = 0.8f;
-constexpr float kStartIntensity = 0.5f;
-constexpr float kStartDrive = 0.3f;
+constexpr float kStartIntensity = 0.25f;
+constexpr float kStartDrive = 0.2f;
 constexpr float kStartTone = 0.5f;   // BD-2 TONE at noon is flat
 // Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
 // mis-trigger never reads as a dropout; release is short by owner choice.

@@ -27,7 +27,7 @@ struct AutotuneParams {
   int engine = 1;                 // 0 A grid PSOLA, 1 B epoch PSOLA
   bool chromatic = false;         // nearest semitone; key ignored
   int key = 0;                    // kKeyRoot index, as Harmony
-  float responseMs = 60.0f;       // panel knob, 5..500
+  float responseMs = 100.0f;       // panel knob, 5..500
   AutotuneTuning tuning;
 };
 

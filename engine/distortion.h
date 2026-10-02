@@ -13,7 +13,7 @@
 namespace cv {
 
 struct DistortionTuning {
-  float inputHpHz = 20.0f;        // input cap
+  float inputHpHz = 90.0f;        // input cap
   // stage 1 shaping, before its saturator
   float s1BassHz = 700.0f;        // low shelf cut corner
   float s1BassDb = -12.0f;        // low shelf depth below s1BassHz
@@ -37,9 +37,9 @@ struct DistortionTuning {
   float toneMinDb = -12.0f;       // TONE fully down: extra shelf gain above trebleCutHz
   float toneMaxDb = 6.0f;         // TONE fully up
   float bassPeakHz = 120.0f;      // gyrator bump
-  float bassPeakDb = 6.0f;
+  float bassPeakDb = 2.0f;
   float bassPeakQ = 1.0f;
-  float trimDb = 0.0f;            // on top of the makeup law
+  float trimDb = 2.9f;            // on top of the makeup law; level rule
   float fadeDrive = 0.05f;        // dry-to-chain crossfade span from DRIVE 0
   bool oversample = true;
 };
