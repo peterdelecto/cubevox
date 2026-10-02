@@ -128,7 +128,7 @@ NET_RENAME = {"ENC_A": "ENC_MENU_A", "ENC_B": "ENC_MENU_B", "ENC_SW": "ENC_MENU_
               "MUX1_SIG": "POT_MUX_OUT", "LINE_L": "DAC_OUTL"}
 
 
-CHILD_REF_RENAME = {"SW1": "SWRESET", "SW2": "SWBOOT"}   # SW1 on NRST, SW2 on BOOT0
+CHILD_REF_RENAME = {"SW1": "SWRESET1", "SW2": "SWBOOT1"}   # SW1 on NRST, SW2 on BOOT0
 
 
 def build_child():
@@ -277,7 +277,7 @@ def build_top():
     add(R("10k", "INA_O1", "DA_P", xs, 172), R("10k", "DA_P", "VREF", xs + 12, 172),
         R("10k", "INA_O2", "DA_N", xs + 24, 172), R("10k", "DA_N", "PRE1", xs + 36, 172),
         C("100nF", "VREF", "GND", xs + 48, 172))
-    add(pot("RVGAIN", X2 + 40, 252, "PRE_OUT", "G2_FB", "G2_FB", "10k GAIN"))
+    add(pot("RVGAIN1", X2 + 40, 252, "PRE_OUT", "G2_FB", "G2_FB", "10k GAIN"))
     add(R("100R", "G2_FB", "G2_INV", xs + 4, 252), R("100R", "G2_INV", "VREF", xs + 16, 252),
         C("47pF", "PRE_OUT", "G2_INV", xs + 28, 252), C("100nF", "VREF", "GND", xs + 40, 252))
     note("Input Gain pot in the A4 feedback leg, wiper tied to end 3", X2, 232)
@@ -307,7 +307,7 @@ def build_top():
     d104 = copy.deepcopy(keep["D104"]); d104.update(at=[X4 + 90, 76])
     d104["pins"] = [row("1", "SW_BYPASS", LF), row("2", "GND", RT)]
     add(d104)
-    add(toggle("SWBYPASS", X4 + 80, 130, "SW_BYPASS", "5V"))
+    add(toggle("SWBYPASS1", X4 + 80, 130, "SW_BYPASS", "5V"))
     note("Bypass toggle. Common to the coil, one throw to 5V", X4 + 96, 130)
     add(R("10k", "SW_BYPASS", "FX_ON_SENSE", X4 + 90, 180), R("18k", "FX_ON_SENSE", "GND", X4 + 102, 180))
 
@@ -362,10 +362,10 @@ def build_top():
         add(R("10k", "3V3", "TOGGLE%d" % (i + 1), tx, ty), C("100nF", "TOGGLE%d" % (i + 1), "GND", tx + 12, ty))
         add(toggle("SW%d" % (107 + i), tx + 36, ty, "TOGGLE%d" % (i + 1), "GND"))
     # OLED
-    oled = {"ref": "J117", "lib_id": "cubevox:PZ254V-11-04P_C2691448", "value": "OLED SH1106",
-            "at": [X6 + 520, 470], "angle": 0, "footprint": "cubevox:HDR-TH_4P-P2.54-V-M",
-            "lcsc": "C2691448", "rest": "no_connect", "in_bom": True, "fields": {"MPN": "PZ254V-11-04P"},
-            "pins": [row("1", "3V3", LF), row("2", "GND", LF), row("3", "I2C1_SCL", LF), row("4", "I2C1_SDA", LF)]}
+    oled = {"ref": "J117", "lib_id": "cubevox:OLED-1.3-SH1106-I2C-4P", "value": "OLED SH1106",
+            "at": [X6 + 520, 470], "angle": 0, "footprint": "cubevox:OLED-1.3-SH1106-I2C-4P",
+            "lcsc": "owner-supplied module, hand-plugged", "rest": "no_connect", "in_bom": True, "fields": {"MPN": "SH1106 1.3in I2C 128x64"},
+            "pins": [row("1", "GND", LF), row("2", "3V3", LF), row("3", "I2C1_SCL", LF), row("4", "I2C1_SDA", LF)]}
     add(oled)
     add(R("4.7k", "3V3", "I2C1_SCL", X6 + 560, 470), R("4.7k", "3V3", "I2C1_SDA", X6 + 572, 470))
 
@@ -381,7 +381,7 @@ def build_top():
     top["lib_symbols"] = [
         ["cubevox", "OPA1678IDR"], ["cubevox", "SS34_C8678"], ["cubevox", "SMBJ15CA_C19077570"],
         ["cubevox", "PJ-002A"], ["cubevox", "AP63205WU-7"], ["cubevox", "ANR5040T4R7M"],
-        ["cubevox", TOGGLE_SYM], ["cubevox", "PZ254V-11-04P_C2691448"],
+        ["cubevox", TOGGLE_SYM], ["cubevox", "PZ254V-11-04P_C2691448"], ["cubevox", "OLED-1.3-SH1106-I2C-4P"],
         ["cubevox", "NMJ6HCD2"], ["cubevox", "NCJ6FA-H"], ["cubevox", "G6K-2F-Y-DC5"], ["cubevox", "1N4148W_C81598"],
         ["cubevox", "CD74HC4067SM96"], ["cubevox", "RK09D1130C1B"], ["cubevox", "EC11N1525404"],
         ["cubevox", "EC11N1520401"], ["cubevox_h7core", "BAT54SLT1G"],

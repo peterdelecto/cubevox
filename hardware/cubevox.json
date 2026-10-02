@@ -47,6 +47,10 @@
   ],
   [
    "cubevox",
+   "OLED-1.3-SH1106-I2C-4P"
+  ],
+  [
+   "cubevox",
    "NMJ6HCD2"
   ],
   [
@@ -2101,7 +2105,7 @@
    ]
   },
   {
-   "ref": "RVGAIN",
+   "ref": "RVGAIN1",
    "lib_id": "cubevox:RK09D1130C1B",
    "value": "10k GAIN",
    "at": [
@@ -2762,7 +2766,7 @@
    }
   },
   {
-   "ref": "SWBYPASS",
+   "ref": "SWBYPASS1",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5614,24 +5618,24 @@
   },
   {
    "ref": "J117",
-   "lib_id": "cubevox:PZ254V-11-04P_C2691448",
+   "lib_id": "cubevox:OLED-1.3-SH1106-I2C-4P",
    "value": "OLED SH1106",
    "at": [
     628,
     470
    ],
    "angle": 0,
-   "footprint": "cubevox:HDR-TH_4P-P2.54-V-M",
-   "lcsc": "C2691448",
+   "footprint": "cubevox:OLED-1.3-SH1106-I2C-4P",
+   "lcsc": "owner-supplied module, hand-plugged",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "PZ254V-11-04P"
+    "MPN": "SH1106 1.3in I2C 128x64"
    },
    "pins": [
     {
      "pin": "1",
-     "net": "3V3",
+     "net": "GND",
      "dir": [
       -1,
       0
@@ -5640,7 +5644,7 @@
     },
     {
      "pin": "2",
-     "net": "GND",
+     "net": "3V3",
      "dir": [
       -1,
       0

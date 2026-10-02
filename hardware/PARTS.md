@@ -34,7 +34,8 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 24 | C19726 | BAT54SLT1G | preamp input clamps | Extended | 256249 | 0.019 | SOT-23 (h7core) | 2 (est.) | inherited |
 | 25 | C318884 | TS-1187A-B-A-B | BOOT0, NRST tact | Basic | 473784 | 0.016 | SW-SMD_4P 5.1x5.1 (h7core) | 2 (est.) | inherited |
 | 26 | C2841348 | IS25LP064A-JBLE-TR | QSPI flash | Extended | 2146 | 2.068 | SOIC-8-208 (h7core) | 1 | inherited |
-| 28 | C2691448 | PZ254V-11-04P | OLED header and SWD header, 1x4 2.54 mm | Extended | 979885 | 0.021 | HDR-TH_4P-P2.54-V-M (cubevox) | 2 | IMPORTED, clean |
+| 28 | C2691448 | PZ254V-11-04P | spare 1x4 header 2.54 mm (OLED moved to row 28b; no schematic part uses it now) | Extended | 979885 | 0.021 | HDR-TH_4P-P2.54-V-M (cubevox) | 0 | IMPORTED, clean |
+| 28b | none (owner-supplied) | SH1106 1.3in I2C 128x64 | J117 OLED module, 4-pin I2C, hand-plugged by the owner, not on the JLC BOM | n/a | n/a | n/a | OLED-1.3-SH1106-I2C-4P (cubevox, hand-written) | 1 | Module PCB 35.4x33.5x1.2, pins GND/VCC/SCL/SDA, 4x NPTH 3.2 on a 30.4x28.5 grid. Buy 4x M3 x 8 mm standoffs (plus 4 screws). Model assumes 8.0 mm standoffs: module PCB bottom at z 8.0, glass top at z 10.7, pins down to z -3.0. The 11.8 mm panel plane needs about 9.1 mm standoffs. |
 | 29 | C192421 | OPA1678IDR | A1-A5 + VREF buffer (3 duals) | Extended | 3309 | 0.774 | SOIC-8_L5.0-W4.0 (cubevox) | 3 | IMPORTED with --repair-courtyard |
 | 30 | C8678 | SS34 | 9V_JACK to VIN_9V Schottky | Basic | 3557042 | 0.030 | SMA_L4.3-W2.6 (cubevox) | 1 | IMPORTED with --repair-courtyard |
 | 31 | C2937625 | PZ254V-11-03P | 1x3 header, unused since the toggle part was chosen | Extended | 1200838 | 0.020 | HDR-TH_3P-P2.54-V-M (cubevox) | 0 | IMPORTED with --repair-courtyard |

@@ -1308,6 +1308,104 @@
       )
     )
   )
+		(symbol "cubevox:OLED-1.3-SH1106-I2C-4P"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "J"
+      (id 0)
+      (at 0 8.89 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "OLED-1.3-SH1106-I2C-4P"
+      (id 1)
+      (at 0 -8.89 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "cubevox:OLED-1.3-SH1106-I2C-4P"
+      (id 2)
+      (at 0 -11.43 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      ""
+      (id 3)
+      (at 0 -13.97 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "owner-supplied"
+      (id 4)
+      (at 0 -16.51 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "SH1106 1.3in I2C 128x64"
+      (id 5)
+      (at 0 -19.05 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "owner-supplied module, hand-plugged"
+      (id 6)
+      (at 0 -21.59 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "OLED SH1106 I2C module"
+      (id 8)
+      (at 0 -24.13 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "OLED-1.3-SH1106-I2C-4P_0_1"
+      (rectangle
+        (start -1.27 6.35)
+        (end 3.81 -6.35)
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (circle
+        (center 0.00 5.08)
+        (radius 0.38)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin passive line
+        (at -3.81 3.81 0)
+        (length 2.54)
+        (name "GND" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -3.81 1.27 0)
+        (length 2.54)
+        (name "VCC" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -3.81 -1.27 0)
+        (length 2.54)
+        (name "SCL" (effects (font (size 1.27 1.27))))
+        (number "3" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -3.81 -3.81 0)
+        (length 2.54)
+        (name "SDA" (effects (font (size 1.27 1.27))))
+        (number "4" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
 		(symbol "cubevox:NMJ6HCD2"
     (in_bom yes)
     (on_board yes)
@@ -10041,8 +10139,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "7d617e73-94d0-5779-ab73-0002f7a461f8")
-		(property "Reference" "RVGAIN"
+		(uuid "32fd39ac-2107-5816-910f-fa91253b4911")
+		(property "Reference" "RVGAIN1"
 			(at 645.16 326.39 0)
 			(effects
 				(font
@@ -10095,24 +10193,24 @@
 			)
 		)
 		(pin "1"
-			(uuid "9e24e288-8419-59ff-bc20-c36c13e32270")
+			(uuid "fd83aba6-5e8b-5025-95c4-1755b2d22401")
 		)
 		(pin "2"
-			(uuid "88233338-5a23-5d04-b6ee-08f71f704dff")
+			(uuid "9d9f8953-5805-5297-b553-4fa843f7a3e9")
 		)
 		(pin "3"
-			(uuid "7596bc89-1a9e-582c-8054-02581182daed")
+			(uuid "8e2cd6ad-60d3-573b-aea4-f0a7ccf0400e")
 		)
 		(pin "4"
-			(uuid "345cd8f5-ca65-5ff6-a9ef-26019896ff33")
+			(uuid "c0d1d3df-9735-573d-b405-f1b239b1c491")
 		)
 		(pin "5"
-			(uuid "ee8fad71-8c73-5b1c-a6ce-7918924e12d2")
+			(uuid "80201727-7cc3-58c8-9c10-6607ad0500ad")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "RVGAIN")
+					(reference "RVGAIN1")
 					(unit 1)
 				)
 			)
@@ -10126,7 +10224,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "c08167d4-6c5f-56d1-8df1-ccd88c3d533d")
+		(uuid "9f7c40ae-173f-55f0-8dab-14e0de5fa115")
 	)
 	(label "PRE_OUT"
 		(at 637.54 321.31 180)
@@ -10137,7 +10235,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "30841975-268d-5001-b3ec-5c7b00e0e8f8")
+		(uuid "0d149742-3b56-5a6e-83e3-b28df3b51a5c")
 	)
 	(wire
 		(pts
@@ -10147,7 +10245,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "0f7036de-1d71-5de9-9776-11b9e44b0f66")
+		(uuid "4c2cea5c-8012-5ff3-88e4-60ff25154fe8")
 	)
 	(label "G2_FB"
 		(at 645.16 313.69 90)
@@ -10158,7 +10256,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "4405e9f2-c51e-5043-b644-95ed35d7955b")
+		(uuid "0f648dfd-d853-513a-9dad-3b83c2303271")
 	)
 	(wire
 		(pts
@@ -10168,7 +10266,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "b1acabb9-8682-531a-8925-bf2e03e5a8b0")
+		(uuid "6985781d-a6f4-5c0d-b857-5b80f9a3107c")
 	)
 	(label "G2_FB"
 		(at 652.78 321.31 0)
@@ -10179,15 +10277,15 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "3d17cb74-b200-5476-b36e-d5880cc20951")
+		(uuid "05af7a4a-1f68-5eaf-9d7b-223de14d264f")
 	)
 	(no_connect
 		(at 640.08 323.85)
-		(uuid "dba5a49e-5e2b-5ea1-9326-e3085344ff4f")
+		(uuid "2c275a70-69e2-56f0-aac6-2b2a1412bd21")
 	)
 	(no_connect
 		(at 650.24 323.85)
-		(uuid "0cdcf925-59ea-5d53-84f5-dcc029cf577a")
+		(uuid "ac656def-61f6-565a-8a62-8a40a6abdcf9")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -12173,8 +12271,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "da1c3aef-9930-5418-80d6-f298c2774f19")
-		(property "Reference" "SWBYPASS"
+		(uuid "4e44fc2f-d654-58ff-8461-ecc1658c9a26")
+		(property "Reference" "SWBYPASS1"
 			(at 1018.54 162.56 0)
 			(effects
 				(font
@@ -12227,18 +12325,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "b7dbf374-5bfd-5f35-a3fe-764c936c5511")
+			(uuid "2d46a136-f3c3-548c-94f2-c693fe4c3304")
 		)
 		(pin "2"
-			(uuid "d04c01d1-3914-5760-81bc-fdb3925a8df2")
+			(uuid "1366f415-4fc9-586d-ba1c-a11dfd1d3955")
 		)
 		(pin "3"
-			(uuid "6c82fdcb-58ee-544c-a195-711fe544ce9b")
+			(uuid "925f7537-90b2-5bfd-84a7-72f113c58cf0")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SWBYPASS")
+					(reference "SWBYPASS1")
 					(unit 1)
 				)
 			)
@@ -12252,7 +12350,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "49d2bdb8-b693-561d-b2d6-23b329efcb3f")
+		(uuid "a4965cdc-4595-534f-8c42-d20cf9f47b02")
 	)
 	(label "5V"
 		(at 1029.97 167.64 0)
@@ -12263,7 +12361,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "bb81525b-c530-526f-8e4d-82ad89cf3620")
+		(uuid "63dd5456-be1f-59aa-81d0-26478ca5995a")
 	)
 	(wire
 		(pts
@@ -12273,7 +12371,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "cb42d81a-f7fa-54a6-8ded-eeffbcc063a1")
+		(uuid "e3d82f67-5919-5fc4-a405-a6ebff76c80e")
 	)
 	(label "SW_BYPASS"
 		(at 1007.11 166.37 180)
@@ -12284,11 +12382,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "9d45c274-1003-5e16-bcc6-ba043fe1bdb5")
+		(uuid "ede84283-0fcb-5829-8799-08fd63e8ea48")
 	)
 	(no_connect
 		(at 1027.43 165.1)
-		(uuid "53f9b804-b262-52f4-93d7-16340947f7f4")
+		(uuid "918955a3-9046-5b52-8e6a-4d56ed604a00")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -21620,7 +21718,7 @@
 		(uuid "28aa9e06-ec3b-59a1-a412-75752eed01ed")
 	)
 	(symbol
-		(lib_id "cubevox:PZ254V-11-04P_C2691448")
+		(lib_id "cubevox:OLED-1.3-SH1106-I2C-4P")
 		(at 797.56 596.9 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -21644,7 +21742,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:HDR-TH_4P-P2.54-V-M"
+		(property "Footprint" "cubevox:OLED-1.3-SH1106-I2C-4P"
 			(at 797.56 596.9 0)
 			(hide yes)
 			(effects
@@ -21662,7 +21760,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C2691448"
+		(property "LCSC" "owner-supplied module, hand-plugged"
 			(at 797.56 596.9 0)
 			(hide yes)
 			(effects
@@ -21671,7 +21769,7 @@
 				)
 			)
 		)
-		(property "MPN" "PZ254V-11-04P"
+		(property "MPN" "SH1106 1.3in I2C 128x64"
 			(at 797.56 596.9 0)
 			(hide yes)
 			(effects
@@ -21711,7 +21809,7 @@
 		)
 		(uuid "d6bda3ed-cbb6-5ad9-ba17-4a370a0a7075")
 	)
-	(label "3V3"
+	(label "GND"
 		(at 791.21 593.09 180)
 		(fields_autoplaced yes)
 		(effects
@@ -21732,7 +21830,7 @@
 		)
 		(uuid "b449e30b-d103-5f63-bd9a-2e514682d425")
 	)
-	(label "GND"
+	(label "3V3"
 		(at 791.21 595.63 180)
 		(fields_autoplaced yes)
 		(effects

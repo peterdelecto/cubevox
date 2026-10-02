@@ -1266,7 +1266,7 @@
    }
   },
   {
-   "ref": "SWRESET",
+   "ref": "SWRESET1",
    "lib_id": "cubevox_h7core:TS-1187A-B-A-B",
    "value": "RESET",
    "at": [
@@ -1305,7 +1305,7 @@
    }
   },
   {
-   "ref": "SWBOOT",
+   "ref": "SWBOOT1",
    "lib_id": "cubevox_h7core:TS-1187A-B-A-B",
    "value": "BOOT0",
    "at": [
