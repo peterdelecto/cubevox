@@ -19171,8 +19171,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "cde2341e-f98d-5646-9d6f-f090328ecfbc")
-		(property "Reference" "SW107"
+		(uuid "ca7c9ce2-f301-5fb8-bd82-2e4a70cd9815")
+		(property "Reference" "SW101"
 			(at 233.68 708.66 0)
 			(effects
 				(font
@@ -19225,18 +19225,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "905f4588-6f54-50a3-bd5f-5d7828ce51d3")
+			(uuid "3a482dcd-b767-555a-83ce-3e70ebaffa0a")
 		)
 		(pin "2"
-			(uuid "c23c92f2-df9d-5e72-ae91-2b1097cb3a9c")
+			(uuid "39735d8e-6372-57e3-a5a8-0810046dd50d")
 		)
 		(pin "3"
-			(uuid "9c68ca8e-4e3a-5701-aae8-50c7b98fcbb7")
+			(uuid "c817263a-0e1d-51b0-b892-da3519a373c4")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW107")
+					(reference "SW101")
 					(unit 1)
 				)
 			)
@@ -19250,7 +19250,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "d7364386-d109-5935-a9a9-a6155ae69819")
+		(uuid "45bd77d1-88a3-55dc-a907-f4954a279046")
 	)
 	(label "GND"
 		(at 245.11 713.74 0)
@@ -19261,7 +19261,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "75b1870f-4439-505f-a382-6d23f7d4f5db")
+		(uuid "701901b0-1953-5b58-98b8-074bdac3c803")
 	)
 	(wire
 		(pts
@@ -19271,7 +19271,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "a388f41e-cf1e-5fd5-ac89-14aa20236c8f")
+		(uuid "765ec061-4385-52c3-9c91-2c23279c855b")
 	)
 	(label "TOGGLE1"
 		(at 222.25 712.47 180)
@@ -19282,11 +19282,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "c27965bd-ec5e-52d1-ae69-985b162cc566")
+		(uuid "e0180120-16e0-584c-bdfe-a94cc33f173e")
 	)
 	(no_connect
 		(at 242.57 711.2)
-		(uuid "6e08fb68-f0d4-53b3-ac27-0b3a5299bd69")
+		(uuid "a5e5f99e-7c46-5500-b62c-b403c3b6bdec")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -19518,8 +19518,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "34c957d5-f8c9-538e-bc27-97f2048a1a78")
-		(property "Reference" "SW108"
+		(uuid "dbece7cb-5745-5dc2-879a-68cd590458a2")
+		(property "Reference" "SW102"
 			(at 373.38 708.66 0)
 			(effects
 				(font
@@ -19572,18 +19572,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "5c23f6c1-9597-5713-a0a3-c903c5c8c650")
+			(uuid "94f29b43-eac2-53a6-8340-5ffeb71ca11b")
 		)
 		(pin "2"
-			(uuid "39436d4b-73c6-5d78-b80e-4fd4b31c6e36")
+			(uuid "fa73463d-c345-5244-b643-a576b4868da3")
 		)
 		(pin "3"
-			(uuid "779f8a7e-0a72-56a0-9207-3b8a0469b03b")
+			(uuid "77ed2dd5-e59d-57ad-a2f5-17123a6cb1ef")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW108")
+					(reference "SW102")
 					(unit 1)
 				)
 			)
@@ -19597,7 +19597,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "d70ab0e7-172a-5540-ae8c-2b56fc64db42")
+		(uuid "ec67fb8f-6372-5774-b5d8-e6891c2d6958")
 	)
 	(label "GND"
 		(at 384.81 713.74 0)
@@ -19608,7 +19608,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "b840862a-ddf8-5be2-aeed-c7d3759b477e")
+		(uuid "35e0d833-c767-5318-a2b5-f3ae9c930e40")
 	)
 	(wire
 		(pts
@@ -19618,7 +19618,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "ab2a6f71-7da4-5c55-a49a-aa5f5ccd6d3e")
+		(uuid "b159d4c4-1d76-5550-9418-c1d207d21a9a")
 	)
 	(label "TOGGLE2"
 		(at 361.95 712.47 180)
@@ -19629,11 +19629,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "c306355b-bd6b-5540-abf5-acfca50bbebf")
+		(uuid "38710da2-77da-58c2-bcf4-53a7c873cb90")
 	)
 	(no_connect
 		(at 382.27 711.2)
-		(uuid "fa97a787-a081-55e9-b179-549886aee484")
+		(uuid "e7a2456c-49e1-57c2-a396-e7b231322694")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -19865,8 +19865,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "157b6bd9-7f48-512a-b160-e714fb1579dc")
-		(property "Reference" "SW109"
+		(uuid "9cc956fb-e66a-54ed-8a0e-a147acdf583a")
+		(property "Reference" "SW103"
 			(at 513.08 708.66 0)
 			(effects
 				(font
@@ -19919,18 +19919,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "953442ab-c071-5243-a990-96fd642a1353")
+			(uuid "104f88ae-6c2a-51f6-8b5e-20de62ee058a")
 		)
 		(pin "2"
-			(uuid "d4526d1e-1456-5431-95a6-dede105e92f6")
+			(uuid "ccfe8a11-c2c6-508c-ab36-f36dd6a7687f")
 		)
 		(pin "3"
-			(uuid "f0fa7a2c-f4de-59e8-a58c-199a6af33eeb")
+			(uuid "bc020a1f-aa2c-5f7b-bbf4-f081a5a362ef")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW109")
+					(reference "SW103")
 					(unit 1)
 				)
 			)
@@ -19944,7 +19944,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "37e791b6-3da7-528a-a2b8-f709e8aa0009")
+		(uuid "f19ae96d-33a9-538d-8219-e22bc81054e3")
 	)
 	(label "GND"
 		(at 524.51 713.74 0)
@@ -19955,7 +19955,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "4ad46b50-7fc8-58ef-86ba-4938b4704f05")
+		(uuid "851c8245-d98a-5bca-a5b0-a83ce81b2534")
 	)
 	(wire
 		(pts
@@ -19965,7 +19965,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "6a15571f-22cd-5f06-a916-5224e19848cf")
+		(uuid "42a56a33-0253-53f0-a1bc-5491d9137384")
 	)
 	(label "TOGGLE3"
 		(at 501.65 712.47 180)
@@ -19976,11 +19976,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "b18104a0-39b4-5c5d-bdaa-361b95441679")
+		(uuid "d01b5705-3794-5fec-86f1-c6dfd3dc43ea")
 	)
 	(no_connect
 		(at 521.97 711.2)
-		(uuid "a93635fa-ad1a-5797-ba4d-cc33f81486fb")
+		(uuid "022ef00a-b9e8-5236-86de-fa96bfa7a25d")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -20212,8 +20212,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "863262d9-cfae-5af8-8a75-4ff403b53ae9")
-		(property "Reference" "SW110"
+		(uuid "e0ad133d-6e19-51f6-bbe8-718036befb41")
+		(property "Reference" "SW104"
 			(at 652.78 708.66 0)
 			(effects
 				(font
@@ -20266,18 +20266,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "813320b5-7b6a-5819-9cd2-e0b5b52c01dd")
+			(uuid "139e33e3-3c55-5314-a53e-c2bfa6956bb1")
 		)
 		(pin "2"
-			(uuid "cff39bdd-35f9-557c-bda8-09c2d0a1f7b0")
+			(uuid "fbb55108-196d-5b10-a359-c0414b4f3afe")
 		)
 		(pin "3"
-			(uuid "bfb30f2c-c07b-5dad-ba89-4316c7d32a4e")
+			(uuid "d26daded-0e78-5988-a641-2c65f8bf4273")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW110")
+					(reference "SW104")
 					(unit 1)
 				)
 			)
@@ -20291,7 +20291,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "57d3ac02-71c9-5b30-8748-fe1a785f3d1b")
+		(uuid "bf46e424-10df-5416-8f3c-fbb6730f43cf")
 	)
 	(label "GND"
 		(at 664.21 713.74 0)
@@ -20302,7 +20302,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "ae0a63b4-1720-556b-b2f8-9d44aa42266d")
+		(uuid "4f8c5d35-a05e-5af4-8794-58e637092450")
 	)
 	(wire
 		(pts
@@ -20312,7 +20312,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "6b1412e0-b1c4-5cba-8c83-d79ac106b008")
+		(uuid "e645402a-d467-5373-9efd-1ca9dac96910")
 	)
 	(label "TOGGLE4"
 		(at 641.35 712.47 180)
@@ -20323,11 +20323,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "4a1135ba-c6ee-5a44-a0fd-6115c582e606")
+		(uuid "05b93bd5-1fe4-5388-ae64-d8ddbbeffd78")
 	)
 	(no_connect
 		(at 661.67 711.2)
-		(uuid "1b11772c-4bde-57ec-8fa7-bf088023ab15")
+		(uuid "2d8f1d3d-b88c-5c64-9e58-cc3ab3e81a63")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -20559,8 +20559,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "8ebaeaa6-deb6-5c9b-a115-b42a9ec802fb")
-		(property "Reference" "SW111"
+		(uuid "fe53b7e3-6cb4-5a01-85ed-8bc6c42eff97")
+		(property "Reference" "SW105"
 			(at 233.68 772.16 0)
 			(effects
 				(font
@@ -20613,18 +20613,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "db7a60b9-c27e-5fbc-88f0-73b31e20c285")
+			(uuid "d93f82c3-03a3-5b46-b4d4-ffc641c152c6")
 		)
 		(pin "2"
-			(uuid "0d6ad13d-c1f8-55e8-aa48-0b94d79bdb4d")
+			(uuid "d9c8a446-54b4-5d3a-ac9e-72b33b9a2b39")
 		)
 		(pin "3"
-			(uuid "9045f2fa-af0e-53ba-a7b3-67ba0468dc75")
+			(uuid "a8e2ace5-480d-5a16-a847-5cc8fc09346c")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW111")
+					(reference "SW105")
 					(unit 1)
 				)
 			)
@@ -20638,7 +20638,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "2c376690-c2ad-5d22-bac3-fb929341bad1")
+		(uuid "f607be64-6544-577e-bcb6-0a8f17fc8673")
 	)
 	(label "GND"
 		(at 245.11 777.24 0)
@@ -20649,7 +20649,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "fe501691-2819-5b94-a30e-eac9333627a3")
+		(uuid "e2e6b65c-3da4-5e83-b869-b4a479b0b89b")
 	)
 	(wire
 		(pts
@@ -20659,7 +20659,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "1234e8e5-c8b9-5658-a295-727a8cf993f3")
+		(uuid "b0b33f6e-fadb-5f18-8eb7-3ffaedf372e3")
 	)
 	(label "TOGGLE5"
 		(at 222.25 775.97 180)
@@ -20670,11 +20670,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "2a13dbb7-6242-5247-a6ea-f88737c9f4f7")
+		(uuid "32015bb4-7b08-549b-9181-3eb266096714")
 	)
 	(no_connect
 		(at 242.57 774.7)
-		(uuid "46a0defe-6a7a-5647-85dc-057107e69cad")
+		(uuid "e1cde7ca-e824-58fb-8c8d-d0e9d3d8e929")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -20906,8 +20906,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "3caddd74-03a3-5262-82ee-749e9d549799")
-		(property "Reference" "SW112"
+		(uuid "7df1249f-870d-5873-ba71-22622ee2b8ab")
+		(property "Reference" "SW106"
 			(at 373.38 772.16 0)
 			(effects
 				(font
@@ -20960,18 +20960,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "eeeda1a2-0ccd-5479-a921-4342fbecff04")
+			(uuid "abd6ebf9-28e5-57de-9715-b9c2c4f53b79")
 		)
 		(pin "2"
-			(uuid "cfc3dfa3-b136-5999-bfaa-06770783ceeb")
+			(uuid "9520cce6-ded7-5a51-b92d-950b91ada0ab")
 		)
 		(pin "3"
-			(uuid "4761927a-4682-53cf-9685-3ad30304a3ad")
+			(uuid "877dc0d4-f53a-51e4-8f49-de1d74ef5eb8")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW112")
+					(reference "SW106")
 					(unit 1)
 				)
 			)
@@ -20985,7 +20985,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "f8dc02a2-f7e1-5649-a601-f894765889b7")
+		(uuid "3036205d-64a8-51d1-a42e-190a0f7d2d64")
 	)
 	(label "GND"
 		(at 384.81 777.24 0)
@@ -20996,7 +20996,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "90cba0e8-9342-52ee-8f5a-db7eeeb263f0")
+		(uuid "2abf4505-598b-5171-9458-ef4cafee5ff2")
 	)
 	(wire
 		(pts
@@ -21006,7 +21006,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "f9f8df89-6a97-5cdd-ae50-ab8d576f5232")
+		(uuid "4e69de21-5b4a-5398-aa21-b42815df0337")
 	)
 	(label "TOGGLE6"
 		(at 361.95 775.97 180)
@@ -21017,11 +21017,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "74124d6d-6786-5744-872d-332c00899596")
+		(uuid "d8db132c-13f4-5fc5-8964-57ddd60d3585")
 	)
 	(no_connect
 		(at 382.27 774.7)
-		(uuid "4cc9c0a4-1819-5bcf-bbde-c911d4ec51cd")
+		(uuid "5dd93c89-96eb-5de6-b072-c540ad944921")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -21253,8 +21253,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "c8c4cf75-d4eb-5601-ac06-d4bffa9c3f9a")
-		(property "Reference" "SW113"
+		(uuid "cde2341e-f98d-5646-9d6f-f090328ecfbc")
+		(property "Reference" "SW107"
 			(at 513.08 772.16 0)
 			(effects
 				(font
@@ -21307,18 +21307,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "2a40a813-3344-5831-9758-f589987e84d5")
+			(uuid "905f4588-6f54-50a3-bd5f-5d7828ce51d3")
 		)
 		(pin "2"
-			(uuid "a09a5ead-c6cf-59b3-b64e-ebee855f40ca")
+			(uuid "c23c92f2-df9d-5e72-ae91-2b1097cb3a9c")
 		)
 		(pin "3"
-			(uuid "d9b189e4-30e6-58e6-96b1-837cea2051fc")
+			(uuid "9c68ca8e-4e3a-5701-aae8-50c7b98fcbb7")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW113")
+					(reference "SW107")
 					(unit 1)
 				)
 			)
@@ -21332,7 +21332,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "135a04a2-47b2-5474-a26d-1c8961eed7d2")
+		(uuid "d7364386-d109-5935-a9a9-a6155ae69819")
 	)
 	(label "GND"
 		(at 524.51 777.24 0)
@@ -21343,7 +21343,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "74995a92-d859-5d1e-a0c0-cbb7396da96e")
+		(uuid "75b1870f-4439-505f-a382-6d23f7d4f5db")
 	)
 	(wire
 		(pts
@@ -21353,7 +21353,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "6149b442-824a-53cb-98ea-d0f2cb61d1d0")
+		(uuid "a388f41e-cf1e-5fd5-ac89-14aa20236c8f")
 	)
 	(label "TOGGLE7"
 		(at 501.65 775.97 180)
@@ -21364,11 +21364,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "6a60871d-ef53-5ceb-bb68-f04f9e187ff2")
+		(uuid "c27965bd-ec5e-52d1-ae69-985b162cc566")
 	)
 	(no_connect
 		(at 521.97 774.7)
-		(uuid "181ae1f4-4750-5543-8ba3-23aabc30756e")
+		(uuid "6e08fb68-f0d4-53b3-ac27-0b3a5299bd69")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -21600,8 +21600,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "3c65a5ac-abd7-5c3b-af31-c00de420f017")
-		(property "Reference" "SW114"
+		(uuid "34c957d5-f8c9-538e-bc27-97f2048a1a78")
+		(property "Reference" "SW108"
 			(at 652.78 772.16 0)
 			(effects
 				(font
@@ -21654,18 +21654,18 @@
 			)
 		)
 		(pin "1"
-			(uuid "c21aee7a-530b-52ad-b79c-1d3e6fb8a0f7")
+			(uuid "5c23f6c1-9597-5713-a0a3-c903c5c8c650")
 		)
 		(pin "2"
-			(uuid "7a0afea2-c0e4-5c9d-830e-3a8a6af663b0")
+			(uuid "39436d4b-73c6-5d78-b80e-4fd4b31c6e36")
 		)
 		(pin "3"
-			(uuid "4baad2b1-f0c3-5cac-a878-ff49fdd61fb0")
+			(uuid "779f8a7e-0a72-56a0-9207-3b8a0469b03b")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "SW114")
+					(reference "SW108")
 					(unit 1)
 				)
 			)
@@ -21679,7 +21679,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "be1b30cc-7de6-5246-a468-f7ee6b06cf6f")
+		(uuid "d70ab0e7-172a-5540-ae8c-2b56fc64db42")
 	)
 	(label "GND"
 		(at 664.21 777.24 0)
@@ -21690,7 +21690,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "459c87c3-e451-58e2-9adf-64a1ce0ae11b")
+		(uuid "b840862a-ddf8-5be2-aeed-c7d3759b477e")
 	)
 	(wire
 		(pts
@@ -21700,7 +21700,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "d0f5883d-575a-5c36-a5d4-537c960def45")
+		(uuid "ab2a6f71-7da4-5c55-a49a-aa5f5ccd6d3e")
 	)
 	(label "TOGGLE8"
 		(at 641.35 775.97 180)
@@ -21711,11 +21711,11 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "0beeb6ee-6397-5a55-9f8c-d6b61962d256")
+		(uuid "c306355b-bd6b-5540-abf5-acfca50bbebf")
 	)
 	(no_connect
 		(at 661.67 774.7)
-		(uuid "28aa9e06-ec3b-59a1-a412-75752eed01ed")
+		(uuid "fa97a787-a081-55e9-b179-549886aee484")
 	)
 	(symbol
 		(lib_id "cubevox:OLED-1.3-SH1106-I2C-4P")

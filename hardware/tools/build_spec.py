@@ -360,7 +360,7 @@ def build_top():
         tx = X6 + 40 + (i % 4) * 110
         ty = 560 + (i // 4) * 50
         add(R("10k", "3V3", "TOGGLE%d" % (i + 1), tx, ty), C("100nF", "TOGGLE%d" % (i + 1), "GND", tx + 12, ty))
-        add(toggle("SW%d" % (107 + i), tx + 36, ty, "TOGGLE%d" % (i + 1), "GND"))
+        add(toggle("SW%d" % (101 + i), tx + 36, ty, "TOGGLE%d" % (i + 1), "GND"))
     # OLED
     oled = {"ref": "J117", "lib_id": "cubevox:OLED-1.3-SH1106-I2C-4P", "value": "OLED SH1106",
             "at": [X6 + 520, 470], "angle": 0, "footprint": "cubevox:OLED-1.3-SH1106-I2C-4P",

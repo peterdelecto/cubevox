@@ -4859,7 +4859,7 @@
    ]
   },
   {
-   "ref": "SW107",
+   "ref": "SW101",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -4962,7 +4962,7 @@
    ]
   },
   {
-   "ref": "SW108",
+   "ref": "SW102",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5065,7 +5065,7 @@
    ]
   },
   {
-   "ref": "SW109",
+   "ref": "SW103",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5168,7 +5168,7 @@
    ]
   },
   {
-   "ref": "SW110",
+   "ref": "SW104",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5271,7 +5271,7 @@
    ]
   },
   {
-   "ref": "SW111",
+   "ref": "SW105",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5374,7 +5374,7 @@
    ]
   },
   {
-   "ref": "SW112",
+   "ref": "SW106",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5477,7 +5477,7 @@
    ]
   },
   {
-   "ref": "SW113",
+   "ref": "SW107",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [
@@ -5580,7 +5580,7 @@
    ]
   },
   {
-   "ref": "SW114",
+   "ref": "SW108",
    "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
    "value": "ST-0-102 bat toggle",
    "at": [

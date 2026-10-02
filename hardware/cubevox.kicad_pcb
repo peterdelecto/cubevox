@@ -560,8 +560,8 @@
 		(layer "F.Cu")
 		(uuid "0562204c-8b2a-4fb2-97eb-9223462ba932")
 		(at 84.93 115 90)
-		(property "Reference" "SW109"
-			(at 0.65 -6.895001 90)
+		(property "Reference" "SW102"
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "2c8728d9-7390-47f3-9aef-0206bcd263a3")
 			(effects
@@ -770,7 +770,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE3")
+			(net "/TOGGLE2")
 			(uuid "2a46d130-4a98-42c6-bd6b-3dbb156b6673")
 		)
 		(pad "3" thru_hole oval
@@ -779,7 +779,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW109-T3-Pad3)")
+			(net "unconnected-(SW102-T3-Pad3)")
 			(uuid "79f8cbc7-8e0a-495c-a568-fac57ed2f1d8")
 		)
 		(embedded_fonts no)
@@ -7442,7 +7442,7 @@
 		(uuid "2b135c6e-fbdd-437a-99d7-9110d5075df7")
 		(at 59.5 164 180)
 		(property "Reference" "ENC102"
-			(at 0 -9.395 0)
+			(at 0 9.395 0)
 			(layer "F.SilkS")
 			(uuid "9b507f95-a6bd-407b-bd9a-80b143779a82")
 			(effects
@@ -8211,8 +8211,8 @@
 		(layer "F.Cu")
 		(uuid "2f425449-5cd6-4b54-aecd-1584d380fb04")
 		(at 186.64 115 90)
-		(property "Reference" "SW113"
-			(at 0.65 -6.895001 90)
+		(property "Reference" "SW106"
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "17179734-3765-41d8-9f9b-7acc05dae6b2")
 			(effects
@@ -8421,7 +8421,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE7")
+			(net "/TOGGLE6")
 			(uuid "b781ebfa-9b76-4e5d-8438-15bcfc3c5732")
 		)
 		(pad "3" thru_hole oval
@@ -8430,7 +8430,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW113-T3-Pad3)")
+			(net "unconnected-(SW106-T3-Pad3)")
 			(uuid "edca06a4-f263-4c0b-abd6-a4c4eb3184aa")
 		)
 		(embedded_fonts no)
@@ -17366,7 +17366,7 @@
 		(uuid "63f72cc4-e1a5-47e7-b7ce-e85500affd41")
 		(at 59.5 72 90)
 		(property "Reference" "SWBYPASS1"
-			(at 0.65 -6.895001 90)
+			(at 8.195001 0 0)
 			(layer "F.SilkS")
 			(uuid "467d59f7-dc2d-4ce2-bc09-f377692622ea")
 			(effects
@@ -24238,7 +24238,7 @@
 		(uuid "806dac34-7d42-4ff3-a779-b757f7024e3b")
 		(at 173.9425 78 180)
 		(property "Reference" "ENC101"
-			(at 0 -9.395001 0)
+			(at 0 9.395001 0)
 			(layer "F.SilkS")
 			(uuid "4bcd709f-e588-482f-9236-891497081312")
 			(effects
@@ -26104,7 +26104,7 @@
 		(uuid "856dc8c7-1c56-4708-901c-c859291bb99f")
 		(at 237.5 115 90)
 		(property "Reference" "SW108"
-			(at 0.65 -6.895001 90)
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "c2eb3fe9-090c-48d3-8f09-296aa6983665")
 			(effects
@@ -26313,7 +26313,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE2")
+			(net "/TOGGLE8")
 			(uuid "e5a8e565-5c95-44eb-b638-59f0641f8ba6")
 		)
 		(pad "3" thru_hole oval
@@ -32253,8 +32253,8 @@
 		(layer "F.Cu")
 		(uuid "a1a6c87d-3409-40b0-96e0-1d015f12f10f")
 		(at 110.36 115 90)
-		(property "Reference" "SW110"
-			(at 0.649999 -6.895001 90)
+		(property "Reference" "SW103"
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "b8cc030c-d023-4fca-a1c8-5fd2ba5865c5")
 			(effects
@@ -32463,7 +32463,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE4")
+			(net "/TOGGLE3")
 			(uuid "be82e5c8-5cd2-4f8c-9728-6c68d624118a")
 		)
 		(pad "3" thru_hole oval
@@ -32472,7 +32472,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW110-T3-Pad3)")
+			(net "unconnected-(SW103-T3-Pad3)")
 			(uuid "f080fc95-19e2-465d-ac93-4157e92a668b")
 		)
 		(embedded_fonts no)
@@ -32960,7 +32960,7 @@
 		(uuid "a5709ba1-9cef-40be-8b72-6f3408c8ab5b")
 		(at 84.93 164 180)
 		(property "Reference" "ENC103"
-			(at 0 -9.395 0)
+			(at 0 9.395 0)
 			(layer "F.SilkS")
 			(uuid "4097f50d-5e92-42d1-915a-839ec3ef41c3")
 			(effects
@@ -35825,8 +35825,8 @@
 		(layer "F.Cu")
 		(uuid "b53ffc13-0d99-4d0d-bbe8-74da15c15725")
 		(at 212.07 115 90)
-		(property "Reference" "SW114"
-			(at 0.65 -6.895001 90)
+		(property "Reference" "SW107"
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "5b8fae03-4fa8-473e-9385-9be918a21fc1")
 			(effects
@@ -36035,7 +36035,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE8")
+			(net "/TOGGLE7")
 			(uuid "15e5649c-0ab0-475f-baba-ed186f75cfa6")
 		)
 		(pad "3" thru_hole oval
@@ -36044,7 +36044,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW114-T3-Pad3)")
+			(net "unconnected-(SW107-T3-Pad3)")
 			(uuid "1305225d-0969-4c72-af6a-40489d27d089")
 		)
 		(embedded_fonts no)
@@ -37134,7 +37134,7 @@
 		(descr "1.3in SH1106 OLED module, 4-pin I2C, 35.4x33.5 mm PCB, 4x M3 holes, 2.54 mm header")
 		(tags "oled sh1106 i2c module")
 		(property "Reference" "J117"
-			(at 0 -18.145001 0)
+			(at 0 -18.145 0)
 			(layer "F.SilkS")
 			(uuid "298f6dcf-161e-49bd-b199-f9f9f15e8feb")
 			(effects
@@ -37868,8 +37868,8 @@
 		(layer "F.Cu")
 		(uuid "ba3fa748-3b37-4ffd-8976-8f1821b15749")
 		(at 135.79 115 90)
-		(property "Reference" "SW111"
-			(at 0.65 -6.895001 90)
+		(property "Reference" "SW104"
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "f4374334-06cc-408c-825b-781197019876")
 			(effects
@@ -38078,7 +38078,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE5")
+			(net "/TOGGLE4")
 			(uuid "d76300ee-e3b4-4293-a596-9282c71816ed")
 		)
 		(pad "3" thru_hole oval
@@ -38087,7 +38087,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW111-T3-Pad3)")
+			(net "unconnected-(SW104-T3-Pad3)")
 			(uuid "b106634d-3f17-447b-aeb4-45d7b85e4142")
 		)
 		(embedded_fonts no)
@@ -38104,7 +38104,6 @@
 		)
 	)
 	(footprint "cubevox_h7core:USB-C-SMD_TYPE-C16PIN"
-		(locked yes)
 		(layer "F.Cu")
 		(uuid "bc74aa0e-7613-478f-b165-1bd751e65bbe")
 		(at 125.39 33.71 180)
@@ -42432,8 +42431,8 @@
 		(layer "F.Cu")
 		(uuid "cc7e03e1-4607-4b8c-abce-07c0622c7a9f")
 		(at 59.5 115 90)
-		(property "Reference" "SW107"
-			(at 0.65 -6.895001 90)
+		(property "Reference" "SW101"
+			(at 8.195 0 0)
 			(layer "F.SilkS")
 			(uuid "3b5861cd-748d-4d77-95ef-500b856baf6e")
 			(effects
@@ -42651,7 +42650,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW107-T3-Pad3)")
+			(net "unconnected-(SW101-T3-Pad3)")
 			(uuid "d0774b48-535f-4e79-8544-29ecc3be4caa")
 		)
 		(embedded_fonts no)
@@ -43862,8 +43861,8 @@
 		(layer "F.Cu")
 		(uuid "d4d11c6f-8104-4a0d-a448-614c20b8394f")
 		(at 161.21 115 90)
-		(property "Reference" "SW112"
-			(at 0.65 -6.895001 90)
+		(property "Reference" "SW105"
+			(at 8.195 -0.000001 0)
 			(layer "F.SilkS")
 			(uuid "5212ced0-7b04-4e46-9cfc-8edd87c1c5a3")
 			(effects
@@ -44072,7 +44071,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "/TOGGLE6")
+			(net "/TOGGLE5")
 			(uuid "9708b21d-76ab-4e8c-99f1-bc17cf4391b2")
 		)
 		(pad "3" thru_hole oval
@@ -44081,7 +44080,7 @@
 			(drill oval 0.999998 1.999996)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "unconnected-(SW112-T3-Pad3)")
+			(net "unconnected-(SW105-T3-Pad3)")
 			(uuid "c70f5736-f0e7-47ee-ac28-334cdec83579")
 		)
 		(embedded_fonts no)
