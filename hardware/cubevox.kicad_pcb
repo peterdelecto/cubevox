@@ -45986,11 +45986,11 @@
 	(footprint "Connector:Tag-Connect_TC2030-IDC-NL_2x03_P1.27mm_Vertical"
 		(layer "F.Cu")
 		(uuid "df28d3bf-3f31-4b9a-9e70-ee891bad980d")
-		(at 280 47)
+		(at 95 81 -90)
 		(descr "Tag-Connect programming header; http://www.tag-connect.com/Materials/TC2030-IDC-NL.pdf")
 		(tags "tag connect programming header pogo pins")
 		(property "Reference" "J3"
-			(at -4.645001 0 90)
+			(at -4.645001 0 0)
 			(layer "F.SilkS")
 			(uuid "123ab14d-ec30-4309-b066-e7545fae5dc2")
 			(effects
@@ -46001,7 +46001,7 @@
 			)
 		)
 		(property "Value" "TC2030-NL SWD"
-			(at 0 -2.3 0)
+			(at 0 -2.3 270)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c4d7c363-05c4-4ba9-9476-97b3a0485ddd")
@@ -46013,7 +46013,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
@@ -46026,7 +46026,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
@@ -46061,16 +46061,6 @@
 			(uuid "a758643b-a363-4134-adf2-d31be46a110b")
 		)
 		(fp_line
-			(start -3.5 -2)
-			(end 3.5 -2)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "70292adb-0f14-409a-a216-e26e3276e9e3")
-		)
-		(fp_line
 			(start -3.5 2)
 			(end -3.5 -2)
 			(stroke
@@ -46079,16 +46069,6 @@
 			)
 			(layer "F.CrtYd")
 			(uuid "caa18615-9edf-4156-9042-60087e54654e")
-		)
-		(fp_line
-			(start 3.5 -2)
-			(end 3.5 2)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "64b041df-2189-4a87-b369-99a6577ec176")
 		)
 		(fp_line
 			(start 3.5 2)
@@ -46100,8 +46080,28 @@
 			(layer "F.CrtYd")
 			(uuid "70ef1e10-abbf-40ca-80a9-be8c5d64f3c7")
 		)
+		(fp_line
+			(start -3.5 -2)
+			(end 3.5 -2)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(layer "F.CrtYd")
+			(uuid "70292adb-0f14-409a-a216-e26e3276e9e3")
+		)
+		(fp_line
+			(start 3.5 -2)
+			(end 3.5 2)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(layer "F.CrtYd")
+			(uuid "64b041df-2189-4a87-b369-99a6577ec176")
+		)
 		(fp_text user "KEEPOUT"
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "Cmts.User")
 			(uuid "1e92c177-97da-4788-8f80-211e5f2bd398")
 			(effects
@@ -46112,7 +46112,7 @@
 			)
 		)
 		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "F.Fab")
 			(uuid "8fc12d60-1a59-4942-a2b7-ae35c2d616e1")
 			(effects
@@ -46123,63 +46123,63 @@
 			)
 		)
 		(pad "" np_thru_hole circle
-			(at -2.54 0)
+			(at -2.54 0 270)
 			(size 0.9906 0.9906)
 			(drill 0.9906)
 			(layers "*.Cu" "*.Mask")
 			(uuid "a69e6ce9-8eb4-4a97-84a9-751fa640e982")
 		)
 		(pad "" np_thru_hole circle
-			(at 2.54 -1.016)
+			(at 2.54 -1.016 270)
 			(size 0.9906 0.9906)
 			(drill 0.9906)
 			(layers "*.Cu" "*.Mask")
 			(uuid "df07f6d6-6c64-4ccb-87d0-b625bf9922cb")
 		)
 		(pad "" np_thru_hole circle
-			(at 2.54 1.016)
+			(at 2.54 1.016 270)
 			(size 0.9906 0.9906)
 			(drill 0.9906)
 			(layers "*.Cu" "*.Mask")
 			(uuid "10a5e6f3-2ef9-4f00-a8c9-7fd50c020af7")
 		)
 		(pad "1" connect circle
-			(at -1.27 0.635)
+			(at -1.27 0.635 270)
 			(size 0.7874 0.7874)
 			(layers "F.Cu" "F.Mask")
 			(net "/3V3")
 			(uuid "7efc0695-2707-4ac0-924e-53e4ffde5c48")
 		)
 		(pad "2" connect circle
-			(at -1.27 -0.635)
+			(at -1.27 -0.635 270)
 			(size 0.7874 0.7874)
 			(layers "F.Cu" "F.Mask")
 			(net "/h7core_block/SWDIO")
 			(uuid "c87c04ff-fa9d-4c60-bed3-1fc65d626b2a")
 		)
 		(pad "3" connect circle
-			(at 0 0.635)
+			(at 0 0.635 270)
 			(size 0.7874 0.7874)
 			(layers "F.Cu" "F.Mask")
 			(net "/h7core_block/NRST")
 			(uuid "46f237fd-c3d7-4a2e-8dd8-4657f359f39f")
 		)
 		(pad "4" connect circle
-			(at 0 -0.635)
+			(at 0 -0.635 270)
 			(size 0.7874 0.7874)
 			(layers "F.Cu" "F.Mask")
 			(net "/h7core_block/SWCLK")
 			(uuid "d133afde-ab8b-4526-bbbc-999f6432db33")
 		)
 		(pad "5" connect circle
-			(at 1.27 0.635)
+			(at 1.27 0.635 270)
 			(size 0.7874 0.7874)
 			(layers "F.Cu" "F.Mask")
 			(net "/GND")
 			(uuid "61f3c679-638d-407f-bc0c-7210b2fa0f01")
 		)
 		(pad "6" connect circle
-			(at 1.27 -0.635)
+			(at 1.27 -0.635 270)
 			(size 0.7874 0.7874)
 			(layers "F.Cu" "F.Mask")
 			(net "/h7core_block/SWO")
@@ -46211,7 +46211,7 @@
 			)
 			(polygon
 				(pts
-					(xy 281.27 46.365) (xy 278.73 46.365) (xy 278.73 47.635) (xy 281.27 47.635)
+					(xy 95.635 82.27) (xy 95.635 79.73) (xy 94.365 79.73) (xy 94.365 82.27)
 				)
 			)
 		)
