@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "cubevox")(type "KiCad")(uri "${KIPRJMOD}/cubevox.kicad_sym")(options "")(descr "JLC parts, cloned from fxbox"))
+  (lib (name "cubevox_h7core")(type "KiCad")(uri "${KIPRJMOD}/cubevox_h7core.kicad_sym")(options "")(descr "H7 block parts, cloned from h7core"))
+)

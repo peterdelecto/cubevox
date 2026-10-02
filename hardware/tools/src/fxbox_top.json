@@ -1,0 +1,4071 @@
+{
+ "project": "cubevox",
+ "title": "H7 effects box",
+ "date": "2026-09-25",
+ "rev": "1",
+ "uuid_namespace": "5b7e2c90-1d4a-5f36-9e8b-3a6c0d2f4e71",
+ "paper": "A1",
+ "sheets": [
+  {
+   "name": "h7core_block",
+   "spec": "h7core_block.json",
+   "at": [
+    30,
+    30
+   ],
+   "size": [
+    45,
+    102
+   ],
+   "pins": [
+    {
+     "name": "5V",
+     "side": "right",
+     "offset": 2,
+     "len": 2
+    },
+    {
+     "name": "5V_PRODUCT",
+     "side": "right",
+     "offset": 4,
+     "len": 2
+    },
+    {
+     "name": "3V3",
+     "side": "right",
+     "offset": 6,
+     "len": 2
+    },
+    {
+     "name": "3V3A",
+     "side": "right",
+     "offset": 8,
+     "len": 2
+    },
+    {
+     "name": "GND",
+     "side": "right",
+     "offset": 10,
+     "len": 2
+    },
+    {
+     "name": "LINE_L",
+     "side": "right",
+     "offset": 14,
+     "len": 2
+    },
+    {
+     "name": "LINE_R",
+     "side": "right",
+     "offset": 16,
+     "len": 2
+    },
+    {
+     "name": "HP_L",
+     "side": "right",
+     "offset": 18,
+     "no_connect": true
+    },
+    {
+     "name": "HP_R",
+     "side": "right",
+     "offset": 20,
+     "no_connect": true
+    },
+    {
+     "name": "SGND",
+     "side": "right",
+     "offset": 22,
+     "len": 2
+    },
+    {
+     "name": "SWDIO",
+     "side": "right",
+     "offset": 24,
+     "no_connect": true
+    },
+    {
+     "name": "SWCLK",
+     "side": "right",
+     "offset": 26,
+     "no_connect": true
+    },
+    {
+     "name": "SWO",
+     "side": "right",
+     "offset": 28,
+     "no_connect": true
+    },
+    {
+     "name": "NRST",
+     "side": "right",
+     "offset": 30,
+     "no_connect": true
+    },
+    {
+     "name": "BOOT0",
+     "side": "right",
+     "offset": 32,
+     "no_connect": true
+    },
+    {
+     "name": "OLED_SCK",
+     "side": "right",
+     "offset": 34,
+     "len": 2
+    },
+    {
+     "name": "OLED_MOSI",
+     "side": "right",
+     "offset": 36,
+     "len": 2
+    },
+    {
+     "name": "OLED_CS",
+     "side": "right",
+     "offset": 38,
+     "len": 2
+    },
+    {
+     "name": "OLED_DC",
+     "side": "right",
+     "offset": 40,
+     "len": 2
+    },
+    {
+     "name": "OLED_RST",
+     "side": "right",
+     "offset": 42,
+     "len": 2
+    },
+    {
+     "name": "MUX_S0",
+     "side": "right",
+     "offset": 44,
+     "len": 2
+    },
+    {
+     "name": "MUX_S1",
+     "side": "right",
+     "offset": 46,
+     "len": 2
+    },
+    {
+     "name": "MUX_S2",
+     "side": "right",
+     "offset": 48,
+     "len": 2
+    },
+    {
+     "name": "MUX_S3",
+     "side": "right",
+     "offset": 50,
+     "len": 2
+    },
+    {
+     "name": "MUX1_SIG",
+     "side": "right",
+     "offset": 52,
+     "len": 2
+    },
+    {
+     "name": "MUX2_SIG",
+     "side": "right",
+     "offset": 54,
+     "no_connect": true
+    },
+    {
+     "name": "MUX3_SIG",
+     "side": "right",
+     "offset": 56,
+     "no_connect": true
+    },
+    {
+     "name": "MUX4_SIG",
+     "side": "right",
+     "offset": 58,
+     "no_connect": true
+    },
+    {
+     "name": "ENC_A",
+     "side": "right",
+     "offset": 60,
+     "len": 2
+    },
+    {
+     "name": "ENC_B",
+     "side": "right",
+     "offset": 62,
+     "len": 2
+    },
+    {
+     "name": "ENC_SW",
+     "side": "right",
+     "offset": 64,
+     "len": 2
+    },
+    {
+     "name": "MIDI_IN",
+     "side": "right",
+     "offset": 66,
+     "no_connect": true
+    },
+    {
+     "name": "WS2812_DATA",
+     "side": "right",
+     "offset": 68,
+     "len": 2
+    },
+    {
+     "name": "SYNC_OUT",
+     "side": "right",
+     "offset": 70,
+     "no_connect": true
+    },
+    {
+     "name": "SYNC_IN",
+     "side": "right",
+     "offset": 72,
+     "no_connect": true
+    },
+    {
+     "name": "UART8_TX",
+     "side": "right",
+     "offset": 74,
+     "len": 2
+    },
+    {
+     "name": "UART8_RX",
+     "side": "right",
+     "offset": 76,
+     "len": 2
+    },
+    {
+     "name": "I2C1_SCL",
+     "side": "right",
+     "offset": 78,
+     "no_connect": true
+    },
+    {
+     "name": "I2C1_SDA",
+     "side": "right",
+     "offset": 80,
+     "no_connect": true
+    },
+    {
+     "name": "MIDI_OUT",
+     "side": "right",
+     "offset": 82,
+     "no_connect": true
+    },
+    {
+     "name": "SPARE_PC11",
+     "side": "right",
+     "offset": 84,
+     "no_connect": true
+    },
+    {
+     "name": "SPARE_PA15",
+     "side": "right",
+     "offset": 86,
+     "no_connect": true
+    },
+    {
+     "name": "SPARE_PE7",
+     "side": "right",
+     "offset": 88,
+     "no_connect": true
+    },
+    {
+     "name": "SPARE_PE14",
+     "side": "right",
+     "offset": 90,
+     "len": 2
+    },
+    {
+     "name": "LINE_INL",
+     "side": "right",
+     "offset": 92,
+     "len": 2
+    },
+    {
+     "name": "LINE_INR",
+     "side": "right",
+     "offset": 94,
+     "len": 2
+    },
+    {
+     "name": "ADC_PC2C",
+     "side": "right",
+     "offset": 96,
+     "no_connect": true
+    },
+    {
+     "name": "ADC_PC3C",
+     "side": "right",
+     "offset": 98,
+     "no_connect": true
+    },
+    {
+     "name": "SPARE_PB5",
+     "side": "right",
+     "offset": 100,
+     "net": "RELAY_DRV",
+     "len": 2
+    }
+   ]
+  }
+ ],
+ "libraries": {
+  "Connector": "${KICAD_SYMBOLS}/Connector.kicad_sym",
+  "Connector_Generic": "${KICAD_SYMBOLS}/Connector_Generic.kicad_sym",
+  "Device": "${KICAD_SYMBOLS}/Device.kicad_sym",
+  "Mechanical": "${KICAD_SYMBOLS}/Mechanical.kicad_sym",
+  "cubevox": "${BOARD_DIR}/cubevox.kicad_sym",
+  "power": "${KICAD_SYMBOLS}/power.kicad_sym"
+ },
+ "lib_symbols": [
+  [
+   "cubevox",
+   "PJ-325M"
+  ],
+  [
+   "cubevox",
+   "PJ-611E"
+  ],
+  [
+   "Device",
+   "R"
+  ],
+  [
+   "cubevox",
+   "G6K-2F-Y-DC5"
+  ],
+  [
+   "cubevox",
+   "1N4148W_C81598"
+  ],
+  [
+   "cubevox",
+   "2N7002"
+  ],
+  [
+   "cubevox",
+   "CD74HC4067SM96"
+  ],
+  [
+   "cubevox",
+   "RK09K1130A5R"
+  ],
+  [
+   "cubevox",
+   "RK09K1130081"
+  ],
+  [
+   "Device",
+   "C"
+  ],
+  [
+   "Device",
+   "NetTie_2"
+  ],
+  [
+   "cubevox",
+   "B3F-4055"
+  ],
+  [
+   "cubevox",
+   "WS2812B-2020-V6"
+  ],
+  [
+   "cubevox",
+   "SN74AHCT1G125DBVR"
+  ],
+  [
+   "cubevox",
+   "EC11N1525404"
+  ],
+  [
+   "Connector_Generic",
+   "Conn_01x07"
+  ],
+  [
+   "Mechanical",
+   "MountingHole"
+  ],
+  [
+   "power",
+   "PWR_FLAG"
+  ],
+  [
+   "cubevox",
+   "H5VUD5BB"
+  ],
+  [
+   "cubevox",
+   "SMBJ70CA_C224026"
+  ],
+  [
+   "cubevox",
+   "SMBJ15CA_C19077570"
+  ],
+  [
+   "cubevox",
+   "AO4606_C2944311"
+  ],
+  [
+   "cubevox",
+   "BZT52C15_C19077412"
+  ],
+  [
+   "cubevox",
+   "AP63205WU-7"
+  ],
+  [
+   "cubevox",
+   "ANR5040T4R7M"
+  ],
+  [
+   "cubevox",
+   "PJ-002A"
+  ]
+ ],
+ "parts": [
+  {
+   "ref": "J102",
+   "lib_id": "cubevox:PJ-325M",
+   "value": "IN 3.5mm",
+   "at": [
+    120,
+    60
+   ],
+   "angle": 0,
+   "footprint": "cubevox:AUDIO-TH_PJ-325M",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "IN35_RING",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "IN35_TIP",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C2884942",
+   "fields": {
+    "MPN": "PJ-325M"
+   }
+  },
+  {
+   "ref": "J104",
+   "lib_id": "cubevox:PJ-611E",
+   "value": "IN 6.35mm",
+   "at": [
+    120,
+    120
+   ],
+   "angle": 0,
+   "footprint": "cubevox:AUDIO-TH_PJ-611E_1",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "IN_RING",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "IN35_RING",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "IN_TIP",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "IN35_TIP",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C309282",
+   "fields": {
+    "MPN": "PJ-611E"
+   }
+  },
+  {
+   "ref": "R101",
+   "lib_id": "Device:R",
+   "value": "3.3k",
+   "at": [
+    145,
+    85
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C22978",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_TIP",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "LINE_INL",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R102",
+   "lib_id": "Device:R",
+   "value": "3.3k",
+   "at": [
+    160,
+    85
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C22978",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_RING",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "LINE_INR",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R103",
+   "lib_id": "Device:R",
+   "value": "0R DNP",
+   "at": [
+    175,
+    85
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LINE_INL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "LINE_INR",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": false,
+   "lcsc": "C21189",
+   "fields": {
+    "DNP": "yes, fit to sum in hardware (01 section 2)"
+   }
+  },
+  {
+   "ref": "K101",
+   "lib_id": "cubevox:G6K-2F-Y-DC5",
+   "value": "G6K-2F-Y DC5",
+   "at": [
+    270,
+    60
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RELAY-SMD_G6K-2F-X-XX",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "BYP_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 5
+    },
+    {
+     "pin": "3",
+     "net": "OUT_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "4",
+     "net": "EFF_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 11
+    },
+    {
+     "pin": "5",
+     "net": "EFF_RING",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 11
+    },
+    {
+     "pin": "6",
+     "net": "OUT_RING",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "7",
+     "net": "BYP_RING",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 5
+    },
+    {
+     "pin": "8",
+     "net": "RLY_COIL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C47190",
+   "fields": {
+    "MPN": "G6K-2F-Y-TR DC5"
+   }
+  },
+  {
+   "ref": "J103",
+   "lib_id": "cubevox:PJ-325M",
+   "value": "OUT 3.5mm",
+   "at": [
+    330,
+    60
+   ],
+   "angle": 0,
+   "footprint": "cubevox:AUDIO-TH_PJ-325M",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "SGND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "OUT_RING",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "OUT_TIP",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C2884942",
+   "fields": {
+    "MPN": "PJ-325M"
+   }
+  },
+  {
+   "ref": "J105",
+   "lib_id": "cubevox:PJ-611E",
+   "value": "OUT 6.35mm",
+   "at": [
+    390,
+    60
+   ],
+   "angle": 0,
+   "footprint": "cubevox:AUDIO-TH_PJ-611E_1",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "2",
+     "net": "SGND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "J105_RING",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "J105_TIP",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C309282",
+   "fields": {
+    "MPN": "PJ-611E"
+   }
+  },
+  {
+   "ref": "NT101",
+   "lib_id": "Device:NetTie_2",
+   "value": "SGND-GND sense",
+   "at": [
+    360,
+    85
+   ],
+   "angle": 0,
+   "footprint": "NetTie:NetTie-2_SMD_Pad0.5mm",
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "SGND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "D104",
+   "lib_id": "cubevox:1N4148W_C81598",
+   "value": "1N4148W",
+   "at": [
+    245,
+    105
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    },
+    {
+     "pin": "2",
+     "net": "RLY_COIL",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C81598",
+   "fields": {
+    "MPN": "1N4148W"
+   }
+  },
+  {
+   "ref": "Q101",
+   "lib_id": "cubevox:2N7002",
+   "value": "AO3400A",
+   "at": [
+    300,
+    110
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "RLY_GATE",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "RLY_COIL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C20917",
+   "fields": {
+    "MPN": "AO3400A"
+   }
+  },
+  {
+   "ref": "R111",
+   "lib_id": "Device:R",
+   "value": "470R",
+   "at": [
+    240,
+    140
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C23179",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "RELAY_DRV",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "RLY_GATE",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R112",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    255,
+    140
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "RLY_GATE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R113",
+   "lib_id": "Device:R",
+   "value": "100R",
+   "at": [
+    205,
+    60
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0805_2012Metric",
+   "lcsc": "C17408",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_TIP",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "BYP_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R114",
+   "lib_id": "Device:R",
+   "value": "1k",
+   "at": [
+    220,
+    60
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0805_2012Metric",
+   "lcsc": "C17513",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_TIP",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "BYP_RING",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U101",
+   "lib_id": "cubevox:CD74HC4067SM96",
+   "value": "CD74HC4067",
+   "at": [
+    150,
+    215
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SSOP-24_L8.1-W5.3-P0.65-LS7.8-BL",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MUX1_SIG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    },
+    {
+     "pin": "10",
+     "net": "MUX_S2",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "11",
+     "net": "MUX_S3",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "12",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "13",
+     "net": "MUX_S1",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "14",
+     "net": "MUX_S0",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "15",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "16",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "17",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "18",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "19",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "20",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "21",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "22",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "23",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "24",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "5",
+     "net": "POT_MIX",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 10
+    },
+    {
+     "pin": "6",
+     "net": "POT_POSITION",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 17
+    },
+    {
+     "pin": "7",
+     "net": "POT_DENSITY",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 15
+    },
+    {
+     "pin": "8",
+     "net": "POT_PITCH",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 13
+    },
+    {
+     "pin": "9",
+     "net": "POT_SIZE",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C98457",
+   "fields": {
+    "MPN": "CD74HC4067SM96"
+   }
+  },
+  {
+   "ref": "RV101",
+   "lib_id": "cubevox:RK09K1130A5R",
+   "value": "10k SIZE",
+   "at": [
+    115,
+    270
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09K1130A5R",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT_SIZE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 7
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C209779",
+   "fields": {
+    "MPN": "RK09K1130A5R"
+   }
+  },
+  {
+   "ref": "RV102",
+   "lib_id": "cubevox:RK09K1130081",
+   "value": "10k PITCH detent",
+   "at": [
+    151,
+    270
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-TH_RK09K1130AAU",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "2",
+     "net": "POT_PITCH",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C470311",
+   "fields": {
+    "MPN": "RK09K1130081"
+   }
+  },
+  {
+   "ref": "RV103",
+   "lib_id": "cubevox:RK09K1130A5R",
+   "value": "10k DENSITY",
+   "at": [
+    187,
+    270
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09K1130A5R",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT_DENSITY",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 7
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C209779",
+   "fields": {
+    "MPN": "RK09K1130A5R"
+   }
+  },
+  {
+   "ref": "RV104",
+   "lib_id": "cubevox:RK09K1130A5R",
+   "value": "10k POSITION",
+   "at": [
+    223,
+    270
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09K1130A5R",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT_POSITION",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 7
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C209779",
+   "fields": {
+    "MPN": "RK09K1130A5R"
+   }
+  },
+  {
+   "ref": "RV105",
+   "lib_id": "cubevox:RK09K1130A5R",
+   "value": "10k MIX",
+   "at": [
+    259,
+    270
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09K1130A5R",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT_MIX",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 7
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C209779",
+   "fields": {
+    "MPN": "RK09K1130A5R"
+   }
+  },
+  {
+   "ref": "C101",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    115,
+    300
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW101",
+   "lib_id": "cubevox:B3F-4055",
+   "value": "TAP",
+   "at": [
+    300,
+    215
+   ],
+   "angle": 0,
+   "footprint": "cubevox:KEY-TH_4P-L12.0-W12.0-P5.00-LS13.4-EH",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "3",
+     "net": "SPARE_PE14",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "SPARE_PE14",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 14
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C84931",
+   "fields": {
+    "MPN": "B3F-4055"
+   }
+  },
+  {
+   "ref": "D101",
+   "lib_id": "cubevox:WS2812B-2020-V6",
+   "value": "TAP LED",
+   "at": [
+    300,
+    245
+   ],
+   "angle": 0,
+   "footprint": "cubevox:LED-SMD_4P-L2.2-W2.0-P1.00_WS2815C-2020-4P",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LED_D1",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "LED_D0",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "4",
+     "net": "5V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C52917434",
+   "fields": {
+    "MPN": "WS2812B-2020-V6"
+   }
+  },
+  {
+   "ref": "SW102",
+   "lib_id": "cubevox:B3F-4055",
+   "value": "FREEZE",
+   "at": [
+    340,
+    215
+   ],
+   "angle": 0,
+   "footprint": "cubevox:KEY-TH_4P-L12.0-W12.0-P5.00-LS13.4-EH",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "3",
+     "net": "UART8_TX",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "UART8_TX",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C84931",
+   "fields": {
+    "MPN": "B3F-4055"
+   }
+  },
+  {
+   "ref": "D102",
+   "lib_id": "cubevox:WS2812B-2020-V6",
+   "value": "FREEZE LED",
+   "at": [
+    340,
+    245
+   ],
+   "angle": 0,
+   "footprint": "cubevox:LED-SMD_4P-L2.2-W2.0-P1.00_WS2815C-2020-4P",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LED_D2",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "LED_D1",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "4",
+     "net": "5V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C52917434",
+   "fields": {
+    "MPN": "WS2812B-2020-V6"
+   }
+  },
+  {
+   "ref": "SW103",
+   "lib_id": "cubevox:B3F-4055",
+   "value": "BYPASS",
+   "at": [
+    380,
+    215
+   ],
+   "angle": 0,
+   "footprint": "cubevox:KEY-TH_4P-L12.0-W12.0-P5.00-LS13.4-EH",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "3",
+     "net": "UART8_RX",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "UART8_RX",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C84931",
+   "fields": {
+    "MPN": "B3F-4055"
+   }
+  },
+  {
+   "ref": "D103",
+   "lib_id": "cubevox:WS2812B-2020-V6",
+   "value": "BYPASS LED",
+   "at": [
+    380,
+    245
+   ],
+   "angle": 0,
+   "footprint": "cubevox:LED-SMD_4P-L2.2-W2.0-P1.00_WS2815C-2020-4P",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "LED_D2",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "4",
+     "net": "5V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C52917434",
+   "fields": {
+    "MPN": "WS2812B-2020-V6"
+   }
+  },
+  {
+   "ref": "U102",
+   "lib_id": "cubevox:SN74AHCT1G125DBVR",
+   "value": "SN74AHCT1G125",
+   "at": [
+    320,
+    285
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "2",
+     "net": "WS2812_DATA",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 15
+    },
+    {
+     "pin": "3",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "4",
+     "net": "LED_BUF",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "5V",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C7484",
+   "fields": {
+    "MPN": "SN74AHCT1G125DBVR"
+   }
+  },
+  {
+   "ref": "R104",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    290,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "SPARE_PE14",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R105",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    307,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "UART8_TX",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R106",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    322,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "UART8_RX",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R109",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    337,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "WS2812_DATA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R110",
+   "lib_id": "Device:R",
+   "value": "470R",
+   "at": [
+    355,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C23179",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LED_BUF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "LED_D0",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C106",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    125,
+    245
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "in_bom": true,
+   "pins": [
+    {
+     "pin": "1",
+     "net": "POT_SIZE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C107",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    161,
+    245
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "in_bom": true,
+   "pins": [
+    {
+     "pin": "1",
+     "net": "POT_PITCH",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C108",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    197,
+    245
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "in_bom": true,
+   "pins": [
+    {
+     "pin": "1",
+     "net": "POT_DENSITY",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C109",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    233,
+    245
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "in_bom": true,
+   "pins": [
+    {
+     "pin": "1",
+     "net": "POT_POSITION",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C110",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    269,
+    245
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "in_bom": true,
+   "pins": [
+    {
+     "pin": "1",
+     "net": "POT_MIX",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C111",
+   "lib_id": "Device:C",
+   "value": "2.2uF",
+   "at": [
+    127,
+    300
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C23630",
+   "rest": "no_connect",
+   "in_bom": true,
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C102",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    368,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C103",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    380,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C104",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    392,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C105",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    404,
+    310
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW104",
+   "lib_id": "cubevox:EC11N1525404",
+   "value": "EC11 encoder",
+   "at": [
+    470,
+    215
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_EC11NXXXX",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "A",
+     "net": "ENC_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "B",
+     "net": "ENC_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "C",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 5
+    },
+    {
+     "pin": "D",
+     "net": "ENC_SW",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "E",
+     "net": "GND",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 5
+    },
+    {
+     "pin": "EH",
+     "net": "GND",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 8
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C470748",
+   "fields": {
+    "MPN": "EC11N1525404"
+   }
+  },
+  {
+   "ref": "R107",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    460,
+    250
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R108",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    471,
+    250
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "J101",
+   "lib_id": "Connector_Generic:Conn_01x07",
+   "value": "OLED SSD1309",
+   "at": [
+    530,
+    215
+   ],
+   "angle": 0,
+   "footprint": "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Vertical",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 5
+    },
+    {
+     "pin": "2",
+     "net": "5V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    },
+    {
+     "pin": "3",
+     "net": "OLED_SCK",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    },
+    {
+     "pin": "4",
+     "net": "OLED_MOSI",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 13
+    },
+    {
+     "pin": "5",
+     "net": "OLED_RST",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    },
+    {
+     "pin": "6",
+     "net": "OLED_DC",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 10
+    },
+    {
+     "pin": "7",
+     "net": "OLED_CS",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 10
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C27985232",
+   "fields": {
+    "MPN": "HC-PM254-5.0H-1X7PZ"
+   }
+  },
+  {
+   "ref": "H101",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    115,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H102",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    131,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H103",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    147,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H104",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    163,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H105",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    179,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "H106",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    195,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "H107",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    211,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "H108",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    227,
+    395
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "R121",
+   "lib_id": "Device:R",
+   "value": "100R",
+   "at": [
+    205,
+    85
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C22775",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LINE_L",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "EFF_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R122",
+   "lib_id": "Device:R",
+   "value": "560R",
+   "at": [
+    220,
+    85
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C23204",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LINE_R",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "EFF_RING",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "J106",
+   "lib_id": "cubevox:PJ-002A",
+   "value": "DC 9-12V",
+   "at": [
+    440,
+    75
+   ],
+   "angle": 0,
+   "footprint": "cubevox:DC-IN-TH_PJ-002A",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C3096082",
+   "fields": {
+    "MPN": "PJ-002A"
+   }
+  },
+  {
+   "ref": "D105",
+   "lib_id": "cubevox:SMBJ15CA_C19077570",
+   "value": "SMBJ15CA",
+   "at": [
+    462,
+    100
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_A",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "2",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C19077570",
+   "fields": {
+    "MPN": "SMBJ15CA"
+   }
+  },
+  {
+   "ref": "Q102",
+   "lib_id": "cubevox:AO4606_C2944311",
+   "value": "AO4606",
+   "at": [
+    495,
+    65
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOP-8_L4.9-W3.9-P1.27-LS6.0-BL",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 7
+    },
+    {
+     "pin": "2",
+     "net": "Q102_NG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "3",
+     "net": "BAR_VIN",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "4",
+     "net": "Q102_PG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "5",
+     "net": "BAR_A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "BAR_A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "BAR_A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "BAR_A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C2944311",
+   "fields": {
+    "MPN": "AO4606"
+   }
+  },
+  {
+   "ref": "Q103",
+   "lib_id": "cubevox:AO4606_C2944311",
+   "value": "AO4606",
+   "at": [
+    495,
+    120
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOP-8_L4.9-W3.9-P1.27-LS6.0-BL",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 7
+    },
+    {
+     "pin": "2",
+     "net": "Q103_NG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "3",
+     "net": "BAR_VIN",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "4",
+     "net": "Q103_PG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "5",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "BAR_B",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C2944311",
+   "fields": {
+    "MPN": "AO4606"
+   }
+  },
+  {
+   "ref": "R115",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    525,
+    55
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_B",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "Q102_PG",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R116",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    537,
+    55
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_B",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "Q102_NG",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R117",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    525,
+    110
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "Q103_PG",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R118",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    537,
+    110
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "Q103_NG",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "D106",
+   "lib_id": "cubevox:BZT52C15_C19077412",
+   "value": "BZT52C15",
+   "at": [
+    562,
+    48
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123_L2.7-W1.6-LS3.7-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_VIN",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "Q102_PG",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C19077412",
+   "fields": {
+    "MPN": "BZT52C15"
+   }
+  },
+  {
+   "ref": "D107",
+   "lib_id": "cubevox:BZT52C15_C19077412",
+   "value": "BZT52C15",
+   "at": [
+    562,
+    68
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123_L2.7-W1.6-LS3.7-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "Q102_NG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C19077412",
+   "fields": {
+    "MPN": "BZT52C15"
+   }
+  },
+  {
+   "ref": "D108",
+   "lib_id": "cubevox:BZT52C15_C19077412",
+   "value": "BZT52C15",
+   "at": [
+    562,
+    103
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123_L2.7-W1.6-LS3.7-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_VIN",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "Q103_PG",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C19077412",
+   "fields": {
+    "MPN": "BZT52C15"
+   }
+  },
+  {
+   "ref": "D109",
+   "lib_id": "cubevox:BZT52C15_C19077412",
+   "value": "BZT52C15",
+   "at": [
+    562,
+    123
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123_L2.7-W1.6-LS3.7-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "Q103_NG",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C19077412",
+   "fields": {
+    "MPN": "BZT52C15"
+   }
+  },
+  {
+   "ref": "C112",
+   "lib_id": "Device:C",
+   "value": "22uF",
+   "at": [
+    590,
+    65
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_1206_3216Metric",
+   "lcsc": "C12891",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_VIN",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C113",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    602,
+    65
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BAR_VIN",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U103",
+   "lib_id": "cubevox:AP63205WU-7",
+   "value": "AP63205WU-7",
+   "at": [
+    470,
+    145
+   ],
+   "angle": 0,
+   "footprint": "cubevox:TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V_PRODUCT",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 14
+    },
+    {
+     "pin": "2",
+     "net": "BAR_VIN",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "3",
+     "net": "BAR_VIN",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "PE_SW",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "PE_BST",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C2071056",
+   "fields": {
+    "MPN": "AP63205WU-7"
+   }
+  },
+  {
+   "ref": "C116",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    492,
+    158
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "PE_BST",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "PE_SW",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "L101",
+   "lib_id": "cubevox:ANR5040T4R7M",
+   "value": "4.7uH",
+   "at": [
+    512,
+    145
+   ],
+   "angle": 0,
+   "footprint": "cubevox:IND-SMD_L5.0-W5.0_ANR5040T",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "PE_SW",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 9
+    },
+    {
+     "pin": "2",
+     "net": "5V_PRODUCT",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C7427135",
+   "fields": {
+    "MPN": "ANR5040T4R7M"
+   }
+  },
+  {
+   "ref": "C114",
+   "lib_id": "Device:C",
+   "value": "22uF",
+   "at": [
+    532,
+    145
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_1206_3216Metric",
+   "lcsc": "C12891",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V_PRODUCT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C115",
+   "lib_id": "Device:C",
+   "value": "22uF",
+   "at": [
+    544,
+    145
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_1206_3216Metric",
+   "lcsc": "C12891",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V_PRODUCT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "D110",
+   "lib_id": "cubevox:H5VUD5BB",
+   "value": "H5VUD5BB",
+   "at": [
+    205,
+    110
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-523_L1.2-W0.8-LS1.6-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "EFF_TIP",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C20615820",
+   "fields": {
+    "MPN": "H5VUD5BB"
+   }
+  },
+  {
+   "ref": "D111",
+   "lib_id": "cubevox:H5VUD5BB",
+   "value": "H5VUD5BB",
+   "at": [
+    205,
+    125
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-523_L1.2-W0.8-LS1.6-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "EFF_RING",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C20615820",
+   "fields": {
+    "MPN": "H5VUD5BB"
+   }
+  },
+  {
+   "ref": "D112",
+   "lib_id": "cubevox:SMBJ70CA_C224026",
+   "value": "SMBJ70CA",
+   "at": [
+    170,
+    137
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_TIP",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 10
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C224026",
+   "fields": {
+    "MPN": "SMBJ70CA"
+   }
+  },
+  {
+   "ref": "D113",
+   "lib_id": "cubevox:SMBJ70CA_C224026",
+   "value": "SMBJ70CA",
+   "at": [
+    170,
+    152
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_RING",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C224026",
+   "fields": {
+    "MPN": "SMBJ70CA"
+   }
+  },
+  {
+   "ref": "D114",
+   "lib_id": "cubevox:SMBJ70CA_C224026",
+   "value": "SMBJ70CA",
+   "at": [
+    350,
+    105
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "OUT_TIP",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 11
+    },
+    {
+     "pin": "2",
+     "net": "SGND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C224026",
+   "fields": {
+    "MPN": "SMBJ70CA"
+   }
+  },
+  {
+   "ref": "D115",
+   "lib_id": "cubevox:SMBJ70CA_C224026",
+   "value": "SMBJ70CA",
+   "at": [
+    350,
+    120
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "OUT_RING",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 12
+    },
+    {
+     "pin": "2",
+     "net": "SGND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C224026",
+   "fields": {
+    "MPN": "SMBJ70CA"
+   }
+  },
+  {
+   "ref": "R119",
+   "lib_id": "Device:R",
+   "value": "47R",
+   "at": [
+    405,
+    90
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C23182",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "OUT_TIP",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "J105_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R120",
+   "lib_id": "Device:R",
+   "value": "620R",
+   "at": [
+    420,
+    90
+   ],
+   "angle": 0,
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "lcsc": "C23220",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "J105_RING",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "SGND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  }
+ ],
+ "power_symbols": [
+  {
+   "lib_id": "power:PWR_FLAG",
+   "value": "PWR_FLAG",
+   "prefix": "#FLG1",
+   "at": [
+    300,
+    395
+   ],
+   "stub": {
+    "net": "5V_PRODUCT",
+    "dir": [
+     0,
+     -1
+    ],
+    "len": 2
+   }
+  },
+  {
+   "lib_id": "power:PWR_FLAG",
+   "value": "PWR_FLAG",
+   "prefix": "#FLG2",
+   "at": [
+    602,
+    48
+   ],
+   "stub": {
+    "net": "BAR_VIN",
+    "dir": [
+     0,
+     -1
+    ],
+    "len": 2
+   }
+  }
+ ],
+ "texts": [
+  {
+   "text": "H. H7 core block with audio in fitted; every port leaves on the right",
+   "at": [
+    20,
+    18
+   ]
+  },
+  {
+   "text": "I. Input: 6.35 mm springs to the ADC through 3.3k; 3.5 mm via its NC contacts; R103 DNP",
+   "at": [
+    110,
+    18
+   ]
+  },
+  {
+   "text": "R. Bypass: rest passes IN_TIP through R113 100R / R114 1k; energised LINE_L via R121 100R to the tips, LINE_R via R122 560R to the 3.5 mm ring; U7 (Section=hp_out) DNP",
+   "at": [
+    230,
+    18
+   ]
+  },
+  {
+   "text": "P. Pot scan: U101 channels 0-4 SIZE, PITCH, DENSITY, POSITION, MIX into PC0; 5-15 tied to GND; U101 on 3V3A with 100 nF and 2.2 uF; 100 nF at each wiper",
+   "at": [
+    110,
+    180
+   ]
+  },
+  {
+   "text": "B. TAP, FREEZE, BYPASS buttons, each lit; chain TAP-FREEZE-BYPASS",
+   "at": [
+    290,
+    180
+   ]
+  },
+  {
+   "text": "E. Encoder and D. display socket",
+   "at": [
+    450,
+    180
+   ]
+  },
+  {
+   "text": "5V_PRODUCT: barrel J106 via U103; the block's U2 prefers it over USB.",
+   "at": [
+    250,
+    388
+   ]
+  },
+  {
+   "text": "W. Barrel 9-12 V either polarity: D105 SMBJ15CA, Q102/Q103 AO4606 bridge (R115-R118, D106-D109), U103 AP63205 5.0 V",
+   "at": [
+    430,
+    30
+   ]
+  },
+  {
+   "text": "S. ESD: D110/D111 on EFF, D112/D113 on IN at J104, D114/D115 on OUT at J103/J105. J105 balanced: R119 47R, R120 620R",
+   "at": [
+    180,
+    168
+   ]
+  }
+ ]
+}

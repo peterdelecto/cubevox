@@ -7,3 +7,4 @@ cubevox-proto.app
 .claude/
 dist/
 build-release/
+.history/

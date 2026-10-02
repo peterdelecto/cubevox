@@ -1,0 +1,6044 @@
+{
+ "project": "cubevox",
+ "uuid_namespace": "5b7e2c90-1d4a-5f36-9e8b-3a6c0d2f4e71",
+ "paper": "A0",
+ "libraries": {
+  "Device": "${KICAD_SYMBOLS}/Device.kicad_sym",
+  "Mechanical": "${KICAD_SYMBOLS}/Mechanical.kicad_sym",
+  "cubevox": "${BOARD_DIR}/cubevox.kicad_sym",
+  "power": "${KICAD_SYMBOLS}/power.kicad_sym",
+  "cubevox_h7core": "${BOARD_DIR}/cubevox_h7core.kicad_sym"
+ },
+ "title": "cubevox vocal FX box",
+ "date": "2026-10-02",
+ "rev": "1",
+ "lib_symbols": [
+  [
+   "cubevox",
+   "OPA1678IDR"
+  ],
+  [
+   "cubevox",
+   "SS34_C8678"
+  ],
+  [
+   "cubevox",
+   "SMBJ15CA_C19077570"
+  ],
+  [
+   "cubevox",
+   "PJ-002A"
+  ],
+  [
+   "cubevox",
+   "AP63205WU-7"
+  ],
+  [
+   "cubevox",
+   "ANR5040T4R7M"
+  ],
+  [
+   "cubevox",
+   "ST-0-102-A01-T000-LF+PJ"
+  ],
+  [
+   "cubevox",
+   "PZ254V-11-04P_C2691448"
+  ],
+  [
+   "cubevox",
+   "NMJ6HCD2"
+  ],
+  [
+   "cubevox",
+   "NCJ6FA-H"
+  ],
+  [
+   "cubevox",
+   "G6K-2F-Y-DC5"
+  ],
+  [
+   "cubevox",
+   "1N4148W_C81598"
+  ],
+  [
+   "cubevox",
+   "CD74HC4067SM96"
+  ],
+  [
+   "cubevox",
+   "RK09D1130C1B"
+  ],
+  [
+   "cubevox",
+   "EC11N1525404"
+  ],
+  [
+   "cubevox",
+   "EC11N1520401"
+  ],
+  [
+   "cubevox_h7core",
+   "BAT54SLT1G"
+  ],
+  [
+   "Device",
+   "R"
+  ],
+  [
+   "Device",
+   "C"
+  ],
+  [
+   "Device",
+   "FerriteBead"
+  ],
+  [
+   "Mechanical",
+   "MountingHole"
+  ],
+  [
+   "power",
+   "PWR_FLAG"
+  ]
+ ],
+ "sheets": [
+  {
+   "name": "h7core_block",
+   "spec": "h7core_block.json",
+   "at": [
+    20,
+    40
+   ],
+   "size": [
+    46,
+    120
+   ],
+   "pins": [
+    {
+     "name": "5V",
+     "side": "right",
+     "offset": 4,
+     "len": 2
+    },
+    {
+     "name": "5V_PRODUCT",
+     "side": "right",
+     "offset": 7,
+     "len": 2
+    },
+    {
+     "name": "5VA",
+     "side": "right",
+     "offset": 10,
+     "len": 2
+    },
+    {
+     "name": "3V3",
+     "side": "right",
+     "offset": 13,
+     "len": 2
+    },
+    {
+     "name": "3V3A",
+     "side": "right",
+     "offset": 16,
+     "len": 2
+    },
+    {
+     "name": "GND",
+     "side": "right",
+     "offset": 19,
+     "len": 2
+    },
+    {
+     "name": "ADC_VINL",
+     "side": "right",
+     "offset": 22,
+     "len": 2
+    },
+    {
+     "name": "ADC_VINR",
+     "side": "right",
+     "offset": 25,
+     "len": 2
+    },
+    {
+     "name": "DAC_OUTL",
+     "side": "right",
+     "offset": 28,
+     "len": 2
+    },
+    {
+     "name": "SWDIO",
+     "side": "right",
+     "offset": 31,
+     "no_connect": true
+    },
+    {
+     "name": "SWCLK",
+     "side": "right",
+     "offset": 34,
+     "no_connect": true
+    },
+    {
+     "name": "SWO",
+     "side": "right",
+     "offset": 37,
+     "no_connect": true
+    },
+    {
+     "name": "NRST",
+     "side": "right",
+     "offset": 40,
+     "no_connect": true
+    },
+    {
+     "name": "BOOT0",
+     "side": "right",
+     "offset": 43,
+     "no_connect": true
+    },
+    {
+     "name": "I2C1_SCL",
+     "side": "right",
+     "offset": 46,
+     "len": 2
+    },
+    {
+     "name": "I2C1_SDA",
+     "side": "right",
+     "offset": 49,
+     "len": 2
+    },
+    {
+     "name": "MUX_S0",
+     "side": "right",
+     "offset": 52,
+     "len": 2
+    },
+    {
+     "name": "MUX_S1",
+     "side": "right",
+     "offset": 55,
+     "len": 2
+    },
+    {
+     "name": "MUX_S2",
+     "side": "right",
+     "offset": 58,
+     "len": 2
+    },
+    {
+     "name": "MUX_S3",
+     "side": "right",
+     "offset": 61,
+     "len": 2
+    },
+    {
+     "name": "POT_MUX_OUT",
+     "side": "right",
+     "offset": 64,
+     "len": 2
+    },
+    {
+     "name": "ENC_MENU_A",
+     "side": "right",
+     "offset": 67,
+     "len": 2
+    },
+    {
+     "name": "ENC_MENU_B",
+     "side": "right",
+     "offset": 70,
+     "len": 2
+    },
+    {
+     "name": "ENC_MENU_SW",
+     "side": "right",
+     "offset": 73,
+     "len": 2
+    },
+    {
+     "name": "ENC_KEY_A",
+     "side": "right",
+     "offset": 76,
+     "len": 2
+    },
+    {
+     "name": "ENC_KEY_B",
+     "side": "right",
+     "offset": 79,
+     "len": 2
+    },
+    {
+     "name": "ENC_SEMI_A",
+     "side": "right",
+     "offset": 82,
+     "len": 2
+    },
+    {
+     "name": "ENC_SEMI_B",
+     "side": "right",
+     "offset": 85,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE1",
+     "side": "right",
+     "offset": 88,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE2",
+     "side": "right",
+     "offset": 91,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE3",
+     "side": "right",
+     "offset": 94,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE4",
+     "side": "right",
+     "offset": 97,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE5",
+     "side": "right",
+     "offset": 100,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE6",
+     "side": "right",
+     "offset": 103,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE7",
+     "side": "right",
+     "offset": 106,
+     "len": 2
+    },
+    {
+     "name": "TOGGLE8",
+     "side": "right",
+     "offset": 109,
+     "len": 2
+    },
+    {
+     "name": "JACK_TRS_N",
+     "side": "right",
+     "offset": 112,
+     "len": 2
+    },
+    {
+     "name": "FX_ON_SENSE",
+     "side": "right",
+     "offset": 115,
+     "len": 2
+    }
+   ]
+  }
+ ],
+ "parts": [
+  {
+   "ref": "J106",
+   "lib_id": "cubevox:PJ-002A",
+   "value": "DC 9V",
+   "at": [
+    118,
+    62
+   ],
+   "angle": 0,
+   "footprint": "cubevox:DC-IN-TH_PJ-002A",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "9V_JACK",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "9V_JACK",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C3096082",
+   "fields": {
+    "MPN": "PJ-002A"
+   }
+  },
+  {
+   "ref": "D106",
+   "lib_id": "cubevox:SS34_C8678",
+   "value": "SS34",
+   "at": [
+    160,
+    62
+   ],
+   "angle": 180,
+   "footprint": "cubevox:SMA_L4.3-W2.6-LS5.2-RD",
+   "lcsc": "C8678",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "SS34"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "9V_JACK",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "VIN_9V",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "D105",
+   "lib_id": "cubevox:SMBJ15CA_C19077570",
+   "value": "SMBJ15CA",
+   "at": [
+    208,
+    62
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VIN_9V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C19077570",
+   "fields": {
+    "MPN": "SMBJ15CA"
+   }
+  },
+  {
+   "ref": "C112",
+   "lib_id": "Device:C",
+   "value": "22uF",
+   "at": [
+    230,
+    62
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C12891",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VIN_9V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C113",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    240,
+    62
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VIN_9V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U103",
+   "lib_id": "cubevox:AP63205WU-7",
+   "value": "AP63205WU-7",
+   "at": [
+    128,
+    112
+   ],
+   "angle": 0,
+   "footprint": "cubevox:TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V_PRODUCT",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    },
+    {
+     "pin": "2",
+     "net": "VIN_9V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    },
+    {
+     "pin": "3",
+     "net": "VIN_9V",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 4
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "BUCK5_SW",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "BUCK5_BST",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C2071056",
+   "fields": {
+    "MPN": "AP63205WU-7"
+   }
+  },
+  {
+   "ref": "C116",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    170,
+    112
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BUCK5_BST",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "BUCK5_SW",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "L101",
+   "lib_id": "cubevox:ANR5040T4R7M",
+   "value": "4.7uH",
+   "at": [
+    203,
+    112
+   ],
+   "angle": 0,
+   "footprint": "cubevox:IND-SMD_L5.0-W5.0_ANR5040T",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BUCK5_SW",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "5V_PRODUCT",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C7427135",
+   "fields": {
+    "MPN": "ANR5040T4R7M"
+   }
+  },
+  {
+   "ref": "C114",
+   "lib_id": "Device:C",
+   "value": "22uF",
+   "at": [
+    230,
+    112
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C12891",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V_PRODUCT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C115",
+   "lib_id": "Device:C",
+   "value": "22uF",
+   "at": [
+    240,
+    112
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C12891",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V_PRODUCT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "FB101",
+   "lib_id": "Device:FerriteBead",
+   "value": "120R@100MHz",
+   "at": [
+    118,
+    162
+   ],
+   "angle": 0,
+   "footprint": "Inductor_SMD:L_0603_1608Metric",
+   "lcsc": "C14709",
+   "rest": "no_connect",
+   "fields": {
+    "MPN": "BLM18PG121SN1D"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "5VA",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C117",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    138,
+    162
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C118",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    150,
+    162
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "J101",
+   "lib_id": "cubevox:NCJ6FA-H",
+   "value": "J_IN NCJ6FA-H",
+   "at": [
+    312,
+    120
+   ],
+   "angle": 180,
+   "footprint": "cubevox:CONN-TH_NCJ6FA-H",
+   "lcsc": "C368458",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "NCJ6FA-H"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "XLR_2",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "XLR_3",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "TRS_R",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "TRS_T",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "JACK_TRS_N",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R101",
+   "lib_id": "Device:R",
+   "value": "47R",
+   "at": [
+    340,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23182",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "XLR_2",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "MIC_P",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "D107",
+   "lib_id": "cubevox_h7core:BAT54SLT1G",
+   "value": "BAT54S",
+   "at": [
+    362,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox_h7core:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",
+   "lcsc": "C19726",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "BAT54SLT1G"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "5VA",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "MIC_P",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C119",
+   "lib_id": "Device:C",
+   "value": "100pF",
+   "at": [
+    388,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14858",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MIC_P",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C120",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    400,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MIC_P",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "IN_P",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C121",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    420,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TRS_T",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "LINE_P",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R102",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    432,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LINE_P",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "IN_P",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R103",
+   "lib_id": "Device:R",
+   "value": "1.2k",
+   "at": [
+    444,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22765",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_P",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C122",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    456,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R104",
+   "lib_id": "Device:R",
+   "value": "47R",
+   "at": [
+    340,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23182",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "XLR_3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "MIC_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "D108",
+   "lib_id": "cubevox_h7core:BAT54SLT1G",
+   "value": "BAT54S",
+   "at": [
+    362,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox_h7core:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",
+   "lcsc": "C19726",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "BAT54SLT1G"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "5VA",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "MIC_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C123",
+   "lib_id": "Device:C",
+   "value": "100pF",
+   "at": [
+    388,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14858",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MIC_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C124",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    400,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MIC_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "IN_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C125",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    420,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TRS_R",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "LINE_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R105",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    432,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "LINE_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "IN_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R106",
+   "lib_id": "Device:R",
+   "value": "1.2k",
+   "at": [
+    444,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22765",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "IN_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C126",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    456,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R107",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    340,
+    190
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "JACK_TRS_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U104",
+   "lib_id": "cubevox:OPA1678IDR",
+   "value": "OPA1678IDR",
+   "at": [
+    498,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
+   "lcsc": "C192421",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "OPA1678IDR"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O1",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "A1_FB",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "IN_P",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "IN_N",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "A2_FB",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "INA_O2",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "5VA",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C127",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    530,
+    80
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R108",
+   "lib_id": "Device:R",
+   "value": "4.7k",
+   "at": [
+    552,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23162",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O1",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "A1_FB",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C128",
+   "lib_id": "Device:C",
+   "value": "47pF",
+   "at": [
+    564,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C1671",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O1",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "A1_FB",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R109",
+   "lib_id": "Device:R",
+   "value": "1k",
+   "at": [
+    576,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C21190",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "A1_FB",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "A2_FB",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R110",
+   "lib_id": "Device:R",
+   "value": "4.7k",
+   "at": [
+    588,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23162",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O2",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "A2_FB",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C129",
+   "lib_id": "Device:C",
+   "value": "47pF",
+   "at": [
+    600,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C1671",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O2",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "A2_FB",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U105",
+   "lib_id": "cubevox:OPA1678IDR",
+   "value": "OPA1678IDR",
+   "at": [
+    498,
+    172
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
+   "lcsc": "C192421",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "OPA1678IDR"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "PRE1",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "DA_N",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "DA_P",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "PRE1",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "G2_INV",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "PRE_OUT",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "5VA",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C130",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    530,
+    180
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R111",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    552,
+    172
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O1",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "DA_P",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R112",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    564,
+    172
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "DA_P",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R113",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    576,
+    172
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "INA_O2",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "DA_N",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R114",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    588,
+    172
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "DA_N",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "PRE1",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C131",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    600,
+    172
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV115",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k GAIN",
+   "at": [
+    508,
+    252
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "PRE_OUT",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "G2_FB",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "G2_FB",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R115",
+   "lib_id": "Device:R",
+   "value": "100R",
+   "at": [
+    556,
+    252
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22775",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "G2_FB",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "G2_INV",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R116",
+   "lib_id": "Device:R",
+   "value": "100R",
+   "at": [
+    568,
+    252
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22775",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "G2_INV",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C132",
+   "lib_id": "Device:C",
+   "value": "47pF",
+   "at": [
+    580,
+    252
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C1671",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "PRE_OUT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "G2_INV",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C133",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    592,
+    252
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U106",
+   "lib_id": "cubevox:OPA1678IDR",
+   "value": "OPA1678IDR",
+   "at": [
+    498,
+    322
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
+   "lcsc": "C192421",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "OPA1678IDR"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "VREF_DIV",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "BUF_IN",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "BUF_OUT",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "BUF_OUT",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "5VA",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C134",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    530,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R117",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    552,
+    322
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "5VA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF_DIV",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R118",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    564,
+    322
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF_DIV",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C135",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    576,
+    322
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF_DIV",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R119",
+   "lib_id": "Device:R",
+   "value": "100R",
+   "at": [
+    644,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22775",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "PRE_OUT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ADC_RC",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C136",
+   "lib_id": "Device:C",
+   "value": "2.2nF",
+   "at": [
+    656,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C2991172",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ADC_RC",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C137",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    668,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ADC_RC",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ADC_VINL",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C138",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    668,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ADC_VINR",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "K101",
+   "lib_id": "cubevox:G6K-2F-Y-DC5",
+   "value": "G6K-2F-Y DC5",
+   "at": [
+    750,
+    76
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RELAY-SMD_G6K-2F-X-XX",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "SW_BYPASS",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 4
+    },
+    {
+     "pin": "2",
+     "net": "PRE_OUT",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 6
+    },
+    {
+     "pin": "3",
+     "net": "BUF_IN",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "4",
+     "net": "DAC_ATT",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 10
+    },
+    {
+     "pin": "5",
+     "net": "DAC_ATT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 10
+    },
+    {
+     "pin": "6",
+     "net": "BUF_IN",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 8
+    },
+    {
+     "pin": "7",
+     "net": "PRE_OUT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 6
+    },
+    {
+     "pin": "8",
+     "net": "GND",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 4
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C47190",
+   "fields": {
+    "MPN": "G6K-2F-Y-TR DC5"
+   }
+  },
+  {
+   "ref": "D104",
+   "lib_id": "cubevox:1N4148W_C81598",
+   "value": "1N4148W",
+   "at": [
+    812,
+    76
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "SW_BYPASS",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C81598",
+   "fields": {
+    "MPN": "1N4148W"
+   }
+  },
+  {
+   "ref": "SW115",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    802,
+    130
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "SW_BYPASS",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "5V",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R120",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    812,
+    180
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "SW_BYPASS",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "FX_ON_SENSE",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R121",
+   "lib_id": "Device:R",
+   "value": "18k",
+   "at": [
+    824,
+    180
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25810",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "FX_ON_SENSE",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C139",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    844,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "DAC_OUTL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "DAC_AC",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R122",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    856,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "DAC_AC",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "DAC_ATT",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R123",
+   "lib_id": "Device:R",
+   "value": "15k",
+   "at": [
+    868,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22809",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "DAC_ATT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C140",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    880,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R124",
+   "lib_id": "Device:R",
+   "value": "100R",
+   "at": [
+    844,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C22775",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BUF_OUT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "BUF_R",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C141",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    856,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C1206",
+   "lcsc": "C14860",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "BUF_R",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "OUT_TIP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R125",
+   "lib_id": "Device:R",
+   "value": "100k",
+   "at": [
+    868,
+    140
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25803",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "OUT_TIP",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "J108",
+   "lib_id": "cubevox:NMJ6HCD2",
+   "value": "OUT 6.35mm",
+   "at": [
+    860,
+    200
+   ],
+   "angle": 0,
+   "footprint": "cubevox:AUDIO-TH_NMJ6HCD2",
+   "lcsc": "C368502",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "NMJ6HCD2"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "OUT_TIP",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "U101",
+   "lib_id": "cubevox:CD74HC4067SM96",
+   "value": "CD74HC4067",
+   "at": [
+    148,
+    340
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SSOP-24_L8.1-W5.3-P0.65-LS7.8-BL",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "9",
+     "net": "POT01",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "8",
+     "net": "POT02",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "7",
+     "net": "POT03",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "6",
+     "net": "POT04",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "5",
+     "net": "POT05",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "POT06",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "POT07",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT08",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "23",
+     "net": "POT09",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "22",
+     "net": "POT10",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "21",
+     "net": "POT11",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "20",
+     "net": "POT12",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "19",
+     "net": "POT13",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "18",
+     "net": "POT14",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "17",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "16",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "MUX_COM",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "10",
+     "net": "MUX_S0",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "11",
+     "net": "MUX_S1",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "12",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "13",
+     "net": "MUX_S3",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "14",
+     "net": "MUX_S2",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "15",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "24",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ],
+   "in_bom": true,
+   "lcsc": "C98457",
+   "fields": {
+    "MPN": "CD74HC4067SM96"
+   }
+  },
+  {
+   "ref": "R126",
+   "lib_id": "Device:R",
+   "value": "1k",
+   "at": [
+    114,
+    400
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C21190",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "MUX_COM",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT_MUX_OUT",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C142",
+   "lib_id": "Device:C",
+   "value": "10nF",
+   "at": [
+    126,
+    400
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C57112",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "POT_MUX_OUT",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C101",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    158,
+    400
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C111",
+   "lib_id": "Device:C",
+   "value": "2.2uF",
+   "at": [
+    170,
+    400
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C23630",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV101",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    228,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT01",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV102",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    268,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT02",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV103",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    308,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT03",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV104",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    348,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT04",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV105",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    388,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT05",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV106",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    428,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT06",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV107",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    468,
+    330
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT07",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV108",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    228,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT08",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV109",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    268,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT09",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV110",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    308,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT10",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV111",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    348,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT11",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV112",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    388,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT12",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV113",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    428,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT13",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "RV114",
+   "lib_id": "cubevox:RK09D1130C1B",
+   "value": "10k",
+   "at": [
+    468,
+    390
+   ],
+   "angle": 0,
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+   "lcsc": "C470304",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "RK09D1130C1B"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "POT14",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "3V3A",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW104",
+   "lib_id": "cubevox:EC11N1525404",
+   "value": "EC11N1525404",
+   "at": [
+    128,
+    470
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_EC11NXXXX",
+   "lcsc": "C470748",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "EC11N1525404"
+   },
+   "pins": [
+    {
+     "pin": "A",
+     "net": "ENC_MENU_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "B",
+     "net": "ENC_MENU_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "C",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "EH",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "D",
+     "net": "ENC_MENU_SW",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "E",
+     "net": "GND",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW105",
+   "lib_id": "cubevox:EC11N1520401",
+   "value": "EC11N1520401",
+   "at": [
+    268,
+    470
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_EC11NXXXX",
+   "lcsc": "C470703",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "EC11N1520401"
+   },
+   "pins": [
+    {
+     "pin": "A",
+     "net": "ENC_KEY_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "B",
+     "net": "ENC_KEY_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "C",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "EH",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW106",
+   "lib_id": "cubevox:EC11N1520401",
+   "value": "EC11N1520401",
+   "at": [
+    408,
+    470
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_EC11NXXXX",
+   "lcsc": "C470703",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "EC11N1520401"
+   },
+   "pins": [
+    {
+     "pin": "A",
+     "net": "ENC_SEMI_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "B",
+     "net": "ENC_SEMI_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "C",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "EH",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R127",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    168,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_MENU_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C143",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    178,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_MENU_A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R128",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    192,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_MENU_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C144",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    202,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_MENU_B",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R129",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    216,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_MENU_SW",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C145",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    226,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_MENU_SW",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R130",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    308,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_KEY_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C146",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    318,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_KEY_A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R131",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    332,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_KEY_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C147",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    342,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_KEY_B",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R132",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    448,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_SEMI_A",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C148",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    458,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_SEMI_A",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R133",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    472,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "ENC_SEMI_B",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C149",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    482,
+    474
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "ENC_SEMI_B",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R134",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    148,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE1",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C150",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    160,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE1",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW107",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    184,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE1",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R135",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    258,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE2",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C151",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    270,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE2",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW108",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    294,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE2",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R136",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    368,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE3",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C152",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    380,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW109",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    404,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE3",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R137",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    478,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE4",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C153",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    490,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE4",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW110",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    514,
+    560
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE4",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R138",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    148,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE5",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C154",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    160,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE5",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW111",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    184,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE5",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R139",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    258,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE6",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C155",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    270,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE6",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW112",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    294,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE6",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R140",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    368,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE7",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C156",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    380,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE7",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW113",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    404,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE7",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R141",
+   "lib_id": "Device:R",
+   "value": "10k",
+   "at": [
+    478,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25804",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "TOGGLE8",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C157",
+   "lib_id": "Device:C",
+   "value": "100nF",
+   "at": [
+    490,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C14663",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "TOGGLE8",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "SW114",
+   "lib_id": "cubevox:ST-0-102-A01-T000-LF+PJ",
+   "value": "ST-0-102 bat toggle",
+   "at": [
+    514,
+    610
+   ],
+   "angle": 0,
+   "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+   "lcsc": "C1788487",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "ST-0-102-A01-T000-LF"
+   },
+   "pins": [
+    {
+     "pin": "2",
+     "net": "TOGGLE8",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "GND",
+     "dir": [
+      1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "J117",
+   "lib_id": "cubevox:PZ254V-11-04P_C2691448",
+   "value": "OLED SH1106",
+   "at": [
+    628,
+    470
+   ],
+   "angle": 0,
+   "footprint": "cubevox:HDR-TH_4P-P2.54-V-M",
+   "lcsc": "C2691448",
+   "rest": "no_connect",
+   "in_bom": true,
+   "fields": {
+    "MPN": "PZ254V-11-04P"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "3",
+     "net": "I2C1_SCL",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    },
+    {
+     "pin": "4",
+     "net": "I2C1_SDA",
+     "dir": [
+      -1,
+      0
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R142",
+   "lib_id": "Device:R",
+   "value": "4.7k",
+   "at": [
+    668,
+    470
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23162",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "I2C1_SCL",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R143",
+   "lib_id": "Device:R",
+   "value": "4.7k",
+   "at": [
+    680,
+    470
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23162",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "3V3",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "I2C1_SDA",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "H101",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    108,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H102",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    124,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H103",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    140,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H104",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M3 shell",
+   "at": [
+    156,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_3.2mm_M3"
+  },
+  {
+   "ref": "H105",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    172,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "H106",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    188,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "H107",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    204,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  },
+  {
+   "ref": "H108",
+   "lib_id": "Mechanical:MountingHole",
+   "value": "M2 OLED",
+   "at": [
+    220,
+    640
+   ],
+   "angle": 0,
+   "in_bom": false,
+   "rest": "no_connect",
+   "pins": [],
+   "footprint": "MountingHole:MountingHole_2.2mm_M2"
+  }
+ ],
+ "power_symbols": [
+  {
+   "lib_id": "power:PWR_FLAG",
+   "value": "PWR_FLAG",
+   "prefix": "#FLG1",
+   "at": [
+    198,
+    160
+   ],
+   "stub": {
+    "net": "VIN_9V",
+    "dir": [
+     0,
+     -1
+    ],
+    "len": 2
+   }
+  },
+  {
+   "lib_id": "power:PWR_FLAG",
+   "value": "PWR_FLAG",
+   "prefix": "#FLG2",
+   "at": [
+    218,
+    160
+   ],
+   "stub": {
+    "net": "5V_PRODUCT",
+    "dir": [
+     0,
+     -1
+    ],
+    "len": 2
+   }
+  },
+  {
+   "lib_id": "power:PWR_FLAG",
+   "value": "PWR_FLAG",
+   "prefix": "#FLG3",
+   "at": [
+    238,
+    160
+   ],
+   "stub": {
+    "net": "5VA",
+    "dir": [
+     0,
+     -1
+    ],
+    "len": 2
+   }
+  }
+ ],
+ "texts": [
+  {
+   "text": "1. POWER IN",
+   "at": [
+    108,
+    24
+   ]
+  },
+  {
+   "text": "9 V Boss supply, centre pin GND, SS34, TVS, 5 V buck, 5VA rail",
+   "at": [
+    108,
+    28
+   ]
+  },
+  {
+   "text": "5VA analog rail from 5V through FB101",
+   "at": [
+    108,
+    150
+   ]
+  },
+  {
+   "text": "2. MIC / LINE INPUT",
+   "at": [
+    300,
+    24
+   ]
+  },
+  {
+   "text": "XLR leg 47R, BAT54S clamp, 100pF, 10uF. TRS leg 10uF, 10k pad. 1.2k bias to VREF",
+   "at": [
+    300,
+    28
+   ]
+  },
+  {
+   "text": "JACK_TRS_N low when a 1/4 in plug is in",
+   "at": [
+    352,
+    188
+   ]
+  },
+  {
+   "text": "3. PREAMP",
+   "at": [
+    468,
+    24
+   ]
+  },
+  {
+   "text": "Stage 1 INA 20 dB (U104, U105A). Stage 2 0-40 dB on Input Gain pot (U105B)",
+   "at": [
+    468,
+    28
+   ]
+  },
+  {
+   "text": "Input Gain pot in the A4 feedback leg, wiper tied to end 3",
+   "at": [
+    468,
+    232
+   ]
+  },
+  {
+   "text": "VREF: 5VA divided 10k/10k, 10 uF, buffered by U106A. U106B drives block 6",
+   "at": [
+    468,
+    292
+   ]
+  },
+  {
+   "text": "4. ADC FEED",
+   "at": [
+    640,
+    24
+   ]
+  },
+  {
+   "text": "PRE_OUT always feeds the ADC",
+   "at": [
+    640,
+    28
+   ]
+  },
+  {
+   "text": "VINR unused, AC-coupled to GND",
+   "at": [
+    644,
+    170
+   ]
+  },
+  {
+   "text": "5. BYPASS",
+   "at": [
+    722,
+    24
+   ]
+  },
+  {
+   "text": "COM BUF_IN, NC PRE_OUT, NO DAC_ATT. Coil on = effect on",
+   "at": [
+    722,
+    28
+   ]
+  },
+  {
+   "text": "Bypass toggle. Common to the coil, one throw to 5V",
+   "at": [
+    818,
+    130
+   ]
+  },
+  {
+   "text": "6. DAC / OUTPUT",
+   "at": [
+    840,
+    24
+   ]
+  },
+  {
+   "text": "DAC_ATT = 0.6 x DAC about VREF. U106B buffers to the jack",
+   "at": [
+    840,
+    28
+   ]
+  },
+  {
+   "text": "7. PANEL",
+   "at": [
+    108,
+    280
+   ]
+  },
+  {
+   "text": "14 pots to U101 (C14, C15 on GND), 3 encoders, 8 toggles, OLED header",
+   "at": [
+    108,
+    284
+   ]
+  }
+ ]
+}

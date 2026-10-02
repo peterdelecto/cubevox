@@ -1,0 +1,463 @@
+{
+ "purpose": "cubevox: a tabletop vocal effects board for Adam Keith. One SM58 or pedal in on a combo jack, through an analog preamp into an STM32H743 at 48 kHz, out a buffered 1/4\" jack, with a relay bypass that keeps the preamp path alive when the digital is off. 9 V Boss supply, USB-C for firmware only, 15 pots, 3 encoders, toggles and an OLED on one JLC-assembled board inside a printed box.",
+ "classification": {
+  "critical": [
+   {
+    "net": "/h7core_block/USB_DP",
+    "max_length_mm": 50,
+    "max_vias": 2,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1."
+   },
+   {
+    "net": "/h7core_block/USB_DM",
+    "max_length_mm": 50,
+    "max_vias": 2,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP."
+   },
+   {
+    "net": "/h7core_block/HSE_IN",
+    "max_length_mm": 8,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 06 obligation: Y1, C15, C16, R1 within a few mm of U1 pins 12-13 (AN2867, secondhand). Run lead 2026-09-25: routed 8.31 mm against 8 is accepted; its airline 8.154 mm is the stage-1 pose accepted in E0047, and no route can be shorter than its airline."
+   },
+   {
+    "net": "/h7core_block/HSE_XTAL_OUT",
+    "max_length_mm": 8,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as HSE_IN."
+   },
+   {
+    "net": "/h7core_block/HSE_OUT",
+    "max_length_mm": 5,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. R1 sits at U1 pin 13."
+   },
+   {
+    "net": "/h7core_block/BUCK_SW",
+    "max_length_mm": 6,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation)."
+   },
+   {
+    "net": "/h7core_block/VCAP1",
+    "max_length_mm": 5,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. DS12110 p102/p106: VCAP caps on or under the pins."
+   },
+   {
+    "net": "/h7core_block/VCAP2",
+    "max_length_mm": 5,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as VCAP1."
+   },
+   {
+    "net": "/h7core_block/I2S_BCLK",
+    "max_length_mm": 60,
+    "max_vias": 2,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 03 names BCLK the critical I2S net; 2.8224 MHz, fast GPIO edges."
+   },
+   {
+    "net": "/h7core_block/QSPI_CLK",
+    "max_length_mm": 25,
+    "max_vias": 1,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 06 obligation: U5 inside the A+C placement, short CLK, no series R (NOT VERIFIED)."
+   },
+   {
+    "net": "/h7core_block/ADC_SCKI",
+    "max_length_mm": 90,
+    "max_vias": 2,
+    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25, rank 1: SCKI is source-terminated by R27 (33 ohm at U1 pin 61), so an 80 mm run is under 0.4 ns of propagation against the 2-3 ns edge of the 11.2896 MHz clock; 1 via. Replaces the 20 mm run default, which only an ADC beside the MCU could meet (A6: SAI3 MCLK on PD14, away from the input RC, SLES177B 10.1.6 p21). Run lead 2026-09-26: vias 1 -> 2 so R27 can sit within 3 mm of U1.61 (clock_source_termination) and SCKI takes one F-B-F hop with a qualifying reference_transition cap; a 14.7 mm unterminated source leg defeats the resistor. Codex: a source-damped, reference-clean 80 mm clock beats a shorter one with a broken reference. Run lead 2026-09-26: 80 -> 90 after (iv) F.Cu north measured 85.8/0 and closes the QSPI escapes, and (ii) east B.Cu measured 70.9/2 but breaks crystal_keepout (0.723 mm) and SW1's lane; the north B.Cu hop measures 86.3/2. Physics: 86 mm is about 0.55-0.6 ns one-way on FR4 against the 2-3 ns edge, source-terminated by R27 33 R at 2.3 mm from U1.61, both transitions capped (C62 at via A, C61 at via B); the 80 figure was a placement-fitted lead number, not a vendor limit. PCM1808 SCKI duty and thresholds verified at bring-up per clock_source_termination."
+   },
+   {
+    "net": "/h7core_block/ADC_DOUT",
+    "max_length_mm": 45,
+    "max_vias": 2,
+    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25: 2 vias, 45 mm. The channel east of U6 is reserved for U6's charge pump, AVDD and AGND pins, so DOUT hops on B.Cu from TP9 and lands beside the channel, moving its AGND crossing from 11.6 mm to about 4.5 mm from NT1. Before that: Run lead 2026-09-25, rank 1: the 40 mm route passed 0.88 mm from C51's VINL pad, digital data beside the analog input; 45 mm lets DOUT run north of U6, clear of the input network. Before that: DOUT is 2.8 MHz data received at the MCU, and 34 mm is a small fraction of its edge; 40 mm, 1 via. Replaces the 25 mm run default (A6: ADC_DOUT short, SLES177B 10.1.5 p21)."
+   },
+   {
+    "net": "/h7core_block/I2S_LRCLK",
+    "max_length_mm": 60,
+    "max_vias": 4,
+    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25, D0085: F.Cu-only entry into the 3V3A island (Astra review rule). LRCLK is the 48 kHz frame clock; the two extra vias sit outside the analog area and its B.Cu run stays over one In2 region. Length 60 mm as before."
+   },
+   {
+    "net": "/h7core_block/I2S_BCLK_SRC",
+    "max_length_mm": 3.0,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-26 (cd33d57d), brief clock_source_termination: the source leg U1.4 to R29 carries at most 3 mm of routed copper (preferably 1 mm), F.Cu, no via."
+   },
+   {
+    "net": "/h7core_block/QSPI_CLK_SRC",
+    "max_length_mm": 3.0,
+    "max_vias": 0,
+    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-26 (cd33d57d), brief clock_source_termination: the source leg U1.36 to R28 carries at most 3 mm of routed copper (preferably 1 mm), F.Cu, no via."
+   },
+   {
+    "net": "/MIC_P",
+    "max_length_mm": null,
+    "max_vias": null,
+    "source": "Provisional until the schematic exists: mic preamp input, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 1-2."
+   },
+   {
+    "net": "/MIC_N",
+    "max_length_mm": null,
+    "max_vias": null,
+    "source": "Provisional until the schematic exists: mic preamp input, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 1-2."
+   },
+   {
+    "net": "/PRE_OUT",
+    "max_length_mm": null,
+    "max_vias": null,
+    "source": "Provisional until the schematic exists: preamp output to the relay pole A, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 2-3."
+   }
+  ],
+  "pairs": [
+   {
+    "name": "USB",
+    "legs": [
+     "/h7core_block/USB_DP",
+     "/h7core_block/USB_DM"
+    ],
+    "max_mismatch_mm": 5.9,
+    "width_mm": null,
+    "gap_mm": null,
+    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 03 rule 9 and 05 section 6: D2 at J1 before any stub, TP1/TP2 on the pair without stubs. Width and gap come from the stackup at the rules pass; no impedance target (out of scope, and not needed at this length). Run lead 2026-09-26 (db0ea1dd, Codex audit 6), E0093: accepted connector-to-MCU path skew 5.9 mm (DP 41.95, DM 36.06 mm), F.Cu, 0 vias, no serpentine; the 2.0 mm field is retired."
+   }
+  ],
+  "power": [
+   "/GND",
+   "/5V",
+   "/5V_PRODUCT",
+   "/h7core_block/VBUS",
+   "/3V3",
+   "/3V3A",
+   "/h7core_block/VDDA",
+   "/h7core_block/ADC_VCC",
+   "/VIN_9V",
+   "/5VA",
+   "/VREF"
+  ],
+  "layers": {
+   "F.Cu": "signal, every part (owner-confirmed 2026-09-24)",
+   "In1.Cu": "ground: one solid GND plane (owner 2026-09-25, option A, Astra review)",
+   "In2.Cu": "power: 3V3 pour with a 3V3A island and 5V (owner-confirmed 2026-09-24)",
+   "B.Cu": "signal, no parts (owner-confirmed 2026-09-24)"
+  },
+  "ground": "/GND",
+  "source": "fxbox brief <commit 48f1e82> for critical (those cubevox keeps), pairs, layers and the fxbox power names. Power names follow the real schematic nets (owner rulings 2026-10-02, spec 2026-10-02-hardware-design.md items 11-13, 16): one ground plane so no AGND or SGND; the 9 V net is /VIN_9V (after the SS34; /9V_JACK is before it); fxbox's ADC_5V0, ADC_PRE and ADC_BIAS supply is dropped; /5VA is 5V through a ferrite feeding the OPA1678s, PCM1808 VCC (via 10 ohm to /h7core_block/ADC_VCC) and the /VREF divider. Mic nets are provisional. NOT owner-confirmed for cubevox."
+ },
+ "fixed_parts": null,
+ "parts": null,
+ "clusters": null,
+ "sections": null,
+ "flow": null,
+ "grids": null,
+ "currents": {
+  "/VIN_9V": 0.27,
+  "/5V": 0.43,
+  "/5V_PRODUCT": 0.43,
+  "/h7core_block/VBUS": 0.43,
+  "/GND": 0.43,
+  "/3V3": 0.41,
+  "/3V3A": 0.06,
+  "/h7core_block/VDDA": 0.01,
+  "/h7core_block/ADC_VCC": 0.02,
+  "/5VA": 0.08,
+  "/VREF": 0.001
+ },
+ "fab": {
+  "vendor": "JLCPCB",
+  "table": {
+   "min_track_mm": 0.15,
+   "min_clearance_mm": 0.15,
+   "min_via_mm": 0.6,
+   "min_drill_mm": 0.3,
+   "min_annular_mm": 0.15,
+   "edge_clearance_mm": 0.5,
+   "hole_clearance_mm": 0.25,
+   "pth_annular_mm": 0.2
+  },
+  "layers": 4,
+  "source": "fxbox brief <commit 48f1e82>; foreman/fab/jlcpcb.json, 4-layer recommended set (fetched 2026-09-02 from jlcpcb.com/capabilities). 1 oz outer copper; the AP63203 \"2 oz suggested\" is not taken.",
+  "layers_source": "4 copper layers, owner-confirmed 2026-09-24. Board written by foreman board init --layers 4 (foreman 0.2.15, ClaudeRouter main 675150a, register E0012); copper layer list read back in facts ledger 0014.",
+  "stackup": {
+   "assumed": "JLC04161H-7628 (1.6 mm, 7628 prepreg ~0.2 mm outer-to-plane, ~1.065 mm core)",
+   "status": "NOT VERIFIED; confirm the ordered stackup before any impedance width is set",
+   "source": "Codex outside review 2026-09-26, /Users/j/Documents/Claude/Projects/Teensy-H7-Port/hardware/fxbox/docs/FXBOX_PCB_ROUTING_RULES_2026-09-26.md; premises checked against the netlist by the run lead 2026-09-26."
+  }
+ },
+ "assembly": {
+  "sides": "top",
+  "min_stock": null,
+  "source": "fxbox brief <commit 48f1e82>; fxbox 01 section 5; top only constrains parts, never copper. Owner 2026-10-02: JLC assembles the top side only (single-sided Economic). J101 combo jack, J108 1/4in out and J106 barrel jack sit on B.Cu, hand-soldered by the owner, excluded from JLC BOM/CPL; the combo jack's 25 mm flange cannot clear the 11.8 mm top panel on F.Cu. USB-C J1 stays F.Cu, JLC-assembled."
+ },
+ "board": {
+  "width_mm": 230,
+  "height_mm": 110,
+  "outline_source": "owner 2026-10-02, question 14a: signal-flow row like the pedal view, about 230 x 110 mm, PROVISIONAL. Arrangement and final outline are decided at the PCB step, not the schematic."
+ },
+ "enclosure": {
+  "notes": "Spec: one board inside a 3D printed box; pots, encoders, toggles and OLED header stand up through the top; combo jack, 1/4in out jack, barrel and USB-C are right-angle THT out the rear wall. Connector positions, holes, height limits: OWNER.",
+  "walls": {
+   "back": "through"
+  },
+  "openings": null,
+  "screws": null,
+  "print": null
+ },
+ "barriers": null,
+ "thermal": null,
+ "test_points": null,
+ "fiducials": {
+  "count": null,
+  "placement": null
+ },
+ "silk": {
+  "refdes": null
+ },
+ "budgets": {
+  "gap_minutes": {
+   "value": 10,
+   "source": "step8 defaults (owner 2026-09-05)"
+  },
+  "declarations_per_accept": {
+   "value": 2,
+   "source": "step8 defaults (owner 2026-09-05)"
+  },
+  "python_lines_outside_tool": {
+   "value": 200,
+   "source": "step8 defaults (owner 2026-09-05)"
+  },
+  "runlog_bytes": {
+   "value": null,
+   "source": "step8 defaults (owner 2026-09-05)"
+  },
+  "pass_minutes": {
+   "value": null,
+   "source": "step8 defaults (owner 2026-09-05)"
+  }
+ },
+ "schema": 2,
+ "edge_connectors": null,
+ "floors": {
+  "body_gap_mm": {
+   "value": 0.3,
+   "source": "fxbox brief <commit 48f1e82>; run default (h7core 2026-09-24), no owner number given; same value as the noisemaker brief"
+  },
+  "cluster_link_cost_mm": {
+   "value": 5.0,
+   "source": "fxbox brief <commit 48f1e82>; run default (h7core 2026-09-24), no owner number given; placement-engine weight, not a dimension"
+  },
+  "section_gap_mm": {
+   "value": 1.5,
+   "source": "fxbox brief <commit 48f1e82>; run default (fxbox 2026-09-24), no owner number given; larger than body_gap_mm 0.3 (canon 106); small because the block region is 30 mm deep"
+  }
+ },
+ "questions": [
+  {
+   "field": "purpose",
+   "required": true,
+   "shape": "str",
+   "question": "What is the board for? One sentence, written before any part is chosen: what it does, what plugs into it, what powers it."
+  },
+  {
+   "field": "classification.critical",
+   "required": true,
+   "shape": "list",
+   "question": "Which nets are critical, and what numeric gate does each carry (max_length_mm, max_vias)?"
+  },
+  {
+   "field": "classification.pairs",
+   "required": true,
+   "shape": "list",
+   "question": "Which differential pairs exist: name, two leg nets, max_mismatch_mm, and width_mm/gap_mm if known?"
+  },
+  {
+   "field": "classification.power",
+   "required": true,
+   "shape": "list",
+   "question": "Which nets are power or ground?"
+  },
+  {
+   "field": "classification.layers",
+   "required": true,
+   "shape": "dict",
+   "question": "What role does each copper layer play: signal, ground, power, mixed?"
+  },
+  {
+   "field": "fixed_parts",
+   "required": false,
+   "shape": "list",
+   "question": "Which parts are fixed by the enclosure or the owner: ref, x, y, rotation, reason?"
+  },
+  {
+   "field": "parts",
+   "required": false,
+   "shape": "list",
+   "question": "The part rows (canon 102): ref, function, and attributes {pins, gangs, lugs, value, taper, mounting (smd|tht), pin_diameter_mm} as the brief specifies them. The parts pass compares the chosen part's catalogue attributes and vendor pad count against each row; a pad-count mismatch blocks placement."
+  },
+  {
+   "field": "clusters",
+   "required": false,
+   "shape": "list",
+   "question": "Which clusters do you already want: name, members, the rule that places them?"
+  },
+  {
+   "field": "sections",
+   "required": false,
+   "shape": "list",
+   "question": "Which functional sections does the board divide into (canon 104): name, function, anchor (the section's immovable ref), the clusters it owns, extra members, and grid_mm if the block grid differs from grids.block_mm?"
+  },
+  {
+   "field": "flow",
+   "required": false,
+   "shape": "dict",
+   "question": "Signal-flow order across sections (canon 107): axis (+x/-x/+y/-y) and order (section names, first to last)?"
+  },
+  {
+   "field": "grids",
+   "required": false,
+   "shape": "dict",
+   "question": "The grid hierarchy (canon 105), each {value, source}: board_mm (section anchors sit on it) and block_mm (the default part grid inside a section)?"
+  },
+  {
+   "field": "currents",
+   "required": true,
+   "shape": "dict",
+   "question": "What current does each power net carry, in amps?"
+  },
+  {
+   "field": "fab.vendor",
+   "required": true,
+   "shape": "str",
+   "question": "Which fab and assembler? (JLCPCB is the default)"
+  },
+  {
+   "field": "fab.table",
+   "required": true,
+   "shape": "dict",
+   "question": "Confirm the capability table: min_track_mm, min_clearance_mm, min_via_mm, min_drill_mm, min_annular_mm, edge_clearance_mm, hole_clearance_mm."
+  },
+  {
+   "field": "assembly.sides",
+   "required": true,
+   "shape": "str",
+   "question": "Parts on top only, or both sides? (top is the default)"
+  },
+  {
+   "field": "assembly.min_stock",
+   "required": false,
+   "shape": "num",
+   "question": "The assembler stock floor per part: a part whose catalogue stock is under it is flagged out_of_stock. A whole number, default 1 (only zero stock is flagged)."
+  },
+  {
+   "field": "board.width_mm",
+   "required": true,
+   "shape": "num",
+   "question": "Board width in mm?"
+  },
+  {
+   "field": "board.height_mm",
+   "required": true,
+   "shape": "num",
+   "question": "Board height in mm?"
+  },
+  {
+   "field": "board.outline_source",
+   "required": false,
+   "shape": "str",
+   "question": "Where does the outline come from: enclosure drawing, a size target, existing Edge.Cuts?"
+  },
+  {
+   "field": "enclosure.notes",
+   "required": false,
+   "shape": "str",
+   "question": "Enclosure facts: connector positions, holes, LED windows, height limits?"
+  },
+  {
+   "field": "enclosure.walls",
+   "required": false,
+   "shape": "dict",
+   "question": "Which walls carry connectors (canon 113): left, right, front, back, each through (bisected at the seam, half-cradle), window (recessed part, closed opening) or blank?"
+  },
+  {
+   "field": "enclosure.openings",
+   "required": false,
+   "shape": "list",
+   "question": "Openings beyond the connectors (canon 119): ref, kind (button_pin|led_window|slot), why. An empty list means none; nothing is opened without a row."
+  },
+  {
+   "field": "enclosure.screws",
+   "required": false,
+   "shape": "dict",
+   "question": "Screw scheme (recipe 4): size (M3), scheme (sandwich|board_only), insert (heat_set|thread_forming)?"
+  },
+  {
+   "field": "enclosure.print",
+   "required": false,
+   "shape": "dict",
+   "question": "Printer floor (recipe 6): nozzle_mm, layer_mm, filament, bed_mm [x, y]?"
+  },
+  {
+   "field": "barriers",
+   "required": false,
+   "shape": "list",
+   "question": "Isolation barriers: name, nets on side A, nets on side B, gap_mm?"
+  },
+  {
+   "field": "thermal",
+   "required": false,
+   "shape": "list",
+   "question": "Parts that dissipate: ref, watts, note?"
+  },
+  {
+   "field": "test_points",
+   "required": false,
+   "shape": "list",
+   "question": "Nets that need test access?"
+  },
+  {
+   "field": "fiducials.count",
+   "required": false,
+   "shape": "num",
+   "question": "How many fiducials, if the assembler wants them?"
+  },
+  {
+   "field": "fiducials.placement",
+   "required": false,
+   "shape": "str",
+   "question": "Where: corners, diagonal, none?"
+  },
+  {
+   "field": "silk.refdes",
+   "required": false,
+   "shape": "bool",
+   "question": "Reference designators on the silkscreen?"
+  },
+  {
+   "field": "budgets",
+   "required": false,
+   "shape": "dict",
+   "question": "Per-pass budgets in minutes and tokens, if you want limits?"
+  },
+  {
+   "field": "schema",
+   "required": false,
+   "shape": "num",
+   "question": "Brief schema version: 2 opts into the placement engine's strict validation."
+  },
+  {
+   "field": "edge_connectors",
+   "required": false,
+   "shape": "list",
+   "question": "Edge connectors: ref, edge, mating_axis (the FOOTPRINT'S LOCAL axis of the mouth, +x/-x/+y/-y, verified against the physical part), overhang_mm {value, source}, mouth_tolerance_mm (optional, default 0.5mm -- how far the model's mouth face may sit off the declared edge before gate edge_connector_mouth_at_edge fails), and along_mm {value, source} when two parts share an edge?"
+  },
+  {
+   "field": "floors",
+   "required": false,
+   "shape": "dict",
+   "question": "Placement floors, each {value, source}: body_gap_mm, cluster_link_cost_mm, fastener_clear_mm, section_gap_mm, edge_clear_mm (optional, default 0.0mm -- how far a courtyard must clear the outline for the enclosure wall; gate courtyard_inside_outline reads it). A floor cites a fab field, an assembler minimum, or an owner decision verbatim."
+  }
+ ],
+ "currents_source": "All estimates, not measured. 3V3 0.41 A: H7 ~350 mA at 480 MHz (STM32H743 datasheet typical) + OLED 25 mA + flash 20 mA + mux and logic 10 mA = 405 mA, estimate. 3V3A 0.06 A: codecs ~60 mA, pots negligible, estimate. 5V 0.43 A: relay coil 21 mA (5 V / 237 ohm) + op-amps ~20 mA + PCM1808 VCC ~15 mA + 3V3 buck input (0.405 A x 3.3 V / 0.85 / 5 V = 314 mA) + 3V3A LDO input 60 mA, estimate. VIN_9V 0.27 A: 5 V rail 0.43 A x 5 V / 0.90 buck efficiency / 9 V = 0.265 A, estimate. 5V_PRODUCT and VBUS follow the 5V figure (same rail or the DFU-only USB source through the TPS2116), GND takes the largest rail return (5V), all estimates. 5VA 0.08 A: 3 OPA1678 at 2 mA each (6 mA) + PCM1808 VCC 15 mA + margin, estimate; the relay coil is on 5V, not 5VA. VREF 0.001 A: divider bias only, estimate. VDDA 0.01 and ADC_VCC 0.02 A copied from fxbox brief <commit 48f1e82> (its estimates)."
+}

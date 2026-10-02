@@ -1,0 +1,71 @@
+{
+ "code": "C368458",
+ "written": "2026-10-02",
+ "note": "hand-written; one reader, no readings ledger. Re-run foreman parts card with --datasheet to get the two-reader record.",
+ "fields": {
+  "contact_count": {
+   "value": 8,
+   "source": {
+    "kind": "datasheet",
+    "path": "datasheets/C368458.pdf",
+    "page": "1 (Neutrik ST-NCJFAH drawing, PCB-layout view)",
+    "sha256": "00aaf4d022e27a79492c8e6b474801552fc318e7024e72eac8f2bfe200525db0",
+    "readers": [
+     "single manual read by build agent, not the two-reader ledger"
+    ]
+   }
+  },
+  "mechanical_pads": {
+   "value": [],
+   "source": {
+    "kind": "datasheet",
+    "path": "datasheets/C368458.pdf",
+    "page": "1 (Neutrik ST-NCJFAH drawing, PCB-layout view)",
+    "sha256": "00aaf4d022e27a79492c8e6b474801552fc318e7024e72eac8f2bfe200525db0",
+    "readers": [
+     "single manual read by build agent, not the two-reader ledger"
+    ]
+   }
+  },
+  "body_mm": {
+   "value": [
+    25.0,
+    24.5,
+    25.0
+   ],
+   "source": {
+    "kind": "datasheet",
+    "path": "datasheets/C368458.pdf",
+    "page": "1 (Neutrik ST-NCJFAH drawing, PCB-layout view)",
+    "sha256": "00aaf4d022e27a79492c8e6b474801552fc318e7024e72eac8f2bfe200525db0",
+    "readers": [
+     "single manual read by build agent, not the two-reader ledger"
+    ]
+   }
+  },
+  "mounting": {
+   "value": "through-hole",
+   "source": {
+    "kind": "datasheet",
+    "path": "datasheets/C368458.pdf",
+    "page": "1 (Neutrik ST-NCJFAH drawing, PCB-layout view)",
+    "sha256": "00aaf4d022e27a79492c8e6b474801552fc318e7024e72eac8f2bfe200525db0",
+    "readers": [
+     "single manual read by build agent, not the two-reader ledger"
+    ]
+   }
+  },
+  "axis": {
+   "value": "none",
+   "source": {
+    "kind": "datasheet",
+    "path": "datasheets/C368458.pdf",
+    "page": "1 (Neutrik ST-NCJFAH drawing, PCB-layout view)",
+    "sha256": "00aaf4d022e27a79492c8e6b474801552fc318e7024e72eac8f2bfe200525db0",
+    "readers": [
+     "single manual read by build agent, not the two-reader ledger"
+    ]
+   }
+  }
+ }
+}
