@@ -291,9 +291,8 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
-    // Gate before the drive, as in Adam's rig: SM58, V3, gate, BD-2, spring.
-    gGate.process(tmp.data(), mono.data(), n, params.gate);
-    gDistortion.process(mono.data(), tmp.data(), n, params.distortion);
+    gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
+    gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
     gPolish.process(mono.data(), tmp.data(), n, params.eq);
     // Bypass: the dry input (feedback return included) goes out, so the wedge loop
@@ -1748,14 +1747,14 @@ void drawPedals(ProtoParams& params) {
     pedalRange("TIME", params.slapback.tuning.timeMs, 30.0f, 150.0f, false, "%.0f ms");
   });
   next();
-  pedal("GATE", params.gate.on, w, [&] {
-    pedalRange("THRESHOLD", params.gate.thresholdDb, -70.0f, -10.0f, false, "%.0f dB");
-    pedalRange("DECAY", params.gate.tuning.releaseMs, 5.0f, 1000.0f, true, "%.0f ms");
-  });
-  next();
   pedal("DISTORTION", params.distortion.on, w, [&] {
     pedalPercent("DRIVE", params.distortion.drive);
     pedalPercent("TONE", params.distortion.tone);
+  });
+  next();
+  pedal("GATE", params.gate.on, w, [&] {
+    pedalRange("THRESHOLD", params.gate.thresholdDb, -70.0f, -10.0f, false, "%.0f dB");
+    pedalRange("DECAY", params.gate.tuning.releaseMs, 5.0f, 1000.0f, true, "%.0f ms");
   });
   next();
   cv::ReverbParams& r = params.reverb;
@@ -1882,9 +1881,9 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
   ImGui::SameLine(0.0f, kColumnGap);
   column(2, colW, [&] {
     moduleBox("slapbackBox", true, [&] { drawSlapbackBlock(params.slapback); });
+    moduleBox("distortionBox", false, [&] { drawDistortionBlock(params.distortion, params.macros); });
     moduleBox("gateBox", false,
               [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb); });
-    moduleBox("distortionBox", false, [&] { drawDistortionBlock(params.distortion, params.macros); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
   column(3, colW, [&] {
