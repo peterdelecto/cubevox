@@ -44,6 +44,8 @@ class PitchFx {
     lpZ_ = 0.0f;
     harmonyLp_.fill(0.0f);
     harmonyLpZ_ = 0.0f;
+    autotuneLp_.fill(0.0f);
+    autotuneLpZ_ = 0.0f;
     engine_ = 0;
     mix_.fill(0.0f);
     active_.fill(0.0f);
@@ -63,12 +65,12 @@ class PitchFx {
       if (engine != 2) octaveC_.reset();
       engine_ = engine;
     }
-    autotune_.prepare(pr, p.autotune, p.harmony.key);
-    const float corr = p.autotune.on ? autotune_.correctionSemis() : 0.0f;
+    const float corr = autotune_.prepare(pr, p.autotune);
     const float activeAtT = p.autotune.on ? 1.0f : 0.0f;
 
     const float lpA = lpCoef(p.octave.tuning.epochLpHz);
     const float harmonyLpA = lpCoef(p.harmony.tuning.shifter.epochLpHz);
+    const float autotuneLpA = lpCoef(p.autotune.tuning.shifter.epochLpHz);
 
     const std::array<float, kStages> mixT = {smooth::clamp01(p.harmony.mix),
                                              smooth::clamp01(p.octave.mix)};
@@ -90,12 +92,14 @@ class PitchFx {
       lp_[writeCount_] = lpZ_;
       harmonyLpZ_ += harmonyLpA * (in[i] - harmonyLpZ_);
       harmonyLp_[writeCount_] = harmonyLpZ_;
+      autotuneLpZ_ += autotuneLpA * (in[i] - autotuneLpZ_);
+      autotuneLp_[writeCount_] = autotuneLpZ_;
       const float harm = harmony_.tick(ring_, harmonyLp_, writeCount_, pr.period);
       const float oct = tickOctave(pr.period);
       activeAt_ = smooth::step(activeAt_, activeAtT, a);
-      const float dryIn =
+      const float base =
           activeAt_ > 0.0f
-              ? activeAt_ * autotune_.tick(ring_, harmonyLp_, writeCount_, pr.period) +
+              ? activeAt_ * autotune_.tick(ring_, autotuneLp_, writeCount_, pr.period) +
                     (1.0f - activeAt_) * in[i]
               : in[i];
       float dry = 1.0f;
@@ -106,13 +110,16 @@ class PitchFx {
         dry *= 1.0f + (cosf(mix_[s] * kHalfPi) - 1.0f) * active_[s];
         wet[s] = sinf(mix_[s] * kHalfPi) * active_[s];
       }
-      out[i] = dry * dryIn + wet[0] * harm + wet[1] * oct;
+      out[i] = dry * base + wet[0] * harm + wet[1] * oct;
       // Voices only use writeCount modulo the ring, so wrapping here is exact.
       writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1;
     }
   }
 
   const PitchResult& pitch() const { return tracker_.result(); }
+
+  // Autotune's smoothed correction in semitones.
+  float correctionSemis() const { return autotune_.correctionSemis(); }
 
  private:
   // One-pole coefficient for an option B peak-search low-pass.
@@ -141,7 +148,7 @@ class PitchFx {
 
   VoiceRing ring_{};
   PitchTracker tracker_;
-  Autotune autotune_;
+  AutotuneVoice autotune_;
   HarmonyVoices harmony_;
   OctaveVoice octaveA_;
   OctaveVoiceB octaveB_;
@@ -150,6 +157,8 @@ class PitchFx {
   float lpZ_ = 0.0f;
   VoiceRing harmonyLp_{};  // the same at Harmony's own cutoff, for Harmony B
   float harmonyLpZ_ = 0.0f;
+  VoiceRing autotuneLp_{};  // the same at Autotune's cutoff, for Autotune B
+  float autotuneLpZ_ = 0.0f;
   int engine_ = 0;
   std::array<float, kStages> mix_{};
   std::array<float, kStages> active_{};

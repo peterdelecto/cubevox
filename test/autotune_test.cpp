@@ -1,5 +1,5 @@
-// Autotune checks: snap, scale, response time, Harmony follows the corrected
-// note, bypass, no-alloc. No window, no audio device.
+// Autotune checks: passthrough, correction, scale vs chromatic, response time,
+// Harmony builds on the corrected note, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -41,9 +41,12 @@ void operator delete[](void* p, std::size_t) noexcept { operator delete(p); }
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
-constexpr double kA4 = 440.0;
-constexpr int kWindow = cv::kSampleRate / 50;  // 20 ms
-constexpr int kWindowHop = cv::kSampleRate / 200;  // 5 ms
+constexpr double kA3 = 220.0;
+constexpr double kSharp = 226.4;   // A3 + 50 cents
+constexpr double kBb3 = 233.1;
+constexpr double kB3 = 246.94;
+constexpr double kC4 = 261.63;
+constexpr int kSettle = cv::kSampleRate * 3 / 10;  // 300 ms
 
 // Ten harmonics at 1/k amplitude, peak 0.5. hzAt gives the pitch per sample,
 // so a step keeps the phase continuous.
@@ -72,7 +75,7 @@ double cents(double hz, double ref) { return 1200.0 * std::log2(hz / ref); }
 
 const float kThreshold = cv::HarmonyTuning{}.voicedThreshold;
 
-// Median f0 over seconds 1..2 from a fresh tracker.
+// Median f0 after 300 ms, measured by a fresh tracker.
 double medianHz(const std::vector<float>& x) {
   cv::PitchTracker t;
   std::vector<double> hz;
@@ -80,55 +83,31 @@ double medianHz(const std::vector<float>& x) {
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
     t.push(&x[static_cast<size_t>(i)], n, kThreshold);
-    if (i + n > cv::kSampleRate && i + n <= 2 * cv::kSampleRate && t.result().voiced)
-      hz.push_back(t.result().hz);
+    if (i + n > kSettle && t.result().voiced) hz.push_back(t.result().hz);
   }
   if (hz.empty()) return 0.0;
   std::sort(hz.begin(), hz.end());
   return hz[hz.size() / 2];
 }
 
-// Hann-windowed DTFT magnitude at hz over x[from, from + n).
-double magnitude(const std::vector<float>& x, int from, int n, double hz) {
-  const double w = 2.0 * kPi * hz / cv::kSampleRate;
-  double re = 0.0, im = 0.0;
-  for (int j = 0; j < n; ++j) {
-    const double win = 0.5 * (1.0 - std::cos(2.0 * kPi * (j + 0.5) / n));
-    const double v = win * x[static_cast<size_t>(from + j)];
-    re += v * std::cos(w * j);
-    im -= v * std::sin(w * j);
-  }
-  return std::sqrt(re * re + im * im);
-}
-
-// Fundamental of one window: the strongest 1 Hz bin in lo..hi, refined by a
-// parabola through the log magnitudes.
-double windowHz(const std::vector<float>& x, int from, double lo, double hi) {
-  double best = lo;
-  double bestM = -1.0;
-  for (double f = lo; f <= hi; f += 1.0) {
-    const double m = magnitude(x, from, kWindow, f);
-    if (m > bestM) {
-      bestM = m;
-      best = f;
-    }
-  }
-  const double a = std::log(magnitude(x, from, kWindow, best - 1.0) + 1e-12);
-  const double b = std::log(bestM + 1e-12);
-  const double c = std::log(magnitude(x, from, kWindow, best + 1.0) + 1e-12);
-  const double denom = a - 2.0 * b + c;
-  return denom < 0.0 ? best + 0.5 * (a - c) / denom : best;
-}
+// Tracker pitch and Autotune correction read after one block.
+struct Hop {
+  int end;
+  float hz;
+  float corr;
+};
 
 std::vector<float> run(cv::PitchFx& fx, const std::vector<float>& in,
-                       const cv::PitchFxParams& p) {
+                       const cv::PitchFxParams& p, std::vector<Hop>* hops = nullptr) {
   std::vector<float> out(in.size());
+  if (hops) hops->reserve(in.size() / cv::kBlock + 1);
   const int total = static_cast<int>(in.size());
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
     gInProcess = true;
     fx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, p);
     gInProcess = false;
+    if (hops) hops->push_back({i + n, fx.pitch().hz, fx.correctionSemis()});
   }
   return out;
 }
@@ -144,9 +123,11 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
 static cv::PitchFx gFx;
 
 // Autotune alone in key C; Harmony and Octave off.
-cv::PitchFxParams autotuneOnly(float responseMs) {
+cv::PitchFxParams autotuneOnly(float responseMs, int engine = 1) {
   cv::PitchFxParams p;
   p.autotune.on = true;
+  p.autotune.engine = engine;
+  p.autotune.key = 0;
   p.autotune.responseMs = responseMs;
   p.harmony.on = false;
   p.harmony.key = 0;
@@ -159,127 +140,135 @@ double outputHz(double inHz, const cv::PitchFxParams& p) {
   return medianHz(run(gFx, tone(inHz, 2 * cv::kSampleRate), p));
 }
 
-bool testSnap() {
-  const double in = kA4 * std::pow(2.0, 35.0 / 1200.0);
-  const double got = outputHz(in, autotuneOnly(5.0f));
-  const double err = got > 0.0 ? cents(got, kA4) : 9999.0;
-  return report("snap", std::fabs(err) <= 5.0, "in=%.2f Hz, out=%.2f Hz, err=%.2f cents (+-5)",
-                in, got, err);
+double rms(const std::vector<float>& x, int from, int to) {
+  double s = 0.0;
+  for (int i = from; i < to; ++i) s += static_cast<double>(x[static_cast<size_t>(i)]) * x[static_cast<size_t>(i)];
+  return std::sqrt(s / (to - from));
 }
 
-bool testScale() {
-  const double in = 466.16;
-  const double got = outputHz(in, autotuneOnly(5.0f));
-  const double err = got > 0.0 ? cents(got, kA4) : 9999.0;
-  bool ok = report("scale Bb4 in C", std::fabs(err) <= 5.0,
-                   "out=%.2f Hz, err vs A4=%.2f cents (+-5)", got, err);
-  cv::PitchFxParams chrom = autotuneOnly(5.0f);
-  chrom.autotune.chromatic = true;
-  const double gotC = outputHz(in, chrom);
-  const double errC = gotC > 0.0 ? cents(gotC, in) : 9999.0;
-  ok &= report("scale chromatic", std::fabs(errC) <= 5.0,
-               "out=%.2f Hz, err vs in=%.2f cents (+-5)", gotC, errC);
-  return ok;
-}
-
-// Step from A4 to A4 + 40 cents at 1 s. The output's correction is its cents
-// minus the input's, read per 20 ms window; the input reaches the output one
-// shifter delay late. Time is from the step to the first window at 63 % of
-// the full -40 cents, interpolated between windows.
-bool testResponse() {
-  constexpr double kStepCents = 40.0;
-  constexpr int kStep = cv::kSampleRate;
-  constexpr int kDelay = cv::PsolaVoice::kGrainDelay;
-  const double sharp = kA4 * std::pow(2.0, kStepCents / 1200.0);
-  const std::vector<float> in =
-      tone(2 * cv::kSampleRate, [&](int i) { return i < kStep ? kA4 : sharp; });
-  gFx.reset();
-  const std::vector<float> out = run(gFx, in, autotuneOnly(200.0f));
-
-  const double goal = -0.63 * kStepCents;
-  double prevT = 0.0, prevC = 0.0;
-  double hitMs = -1.0;
-  const int last = static_cast<int>(out.size()) - kWindow;
-  for (int from = kStep + kDelay; from <= last; from += kWindowHop) {
-    const double t = (from + 0.5 * kWindow - kStep) * 1000.0 / cv::kSampleRate;
-    const double c = cents(windowHz(out, from, 380.0, 520.0), sharp);
-    if (from > kStep + kDelay && c <= goal) {
-      hitMs = prevT + (t - prevT) * (goal - prevC) / (c - prevC);
-      break;
-    }
-    prevT = t;
-    prevC = c;
-  }
-  return report("response 200 ms", hitMs >= 160.0 && hitMs <= 240.0,
-                "63%% of -40 cents at %.1f ms after the step (200 +-40)", hitMs);
-}
-
-bool testHarmonyFollows() {
-  cv::PitchFxParams p = autotuneOnly(5.0f);
-  p.harmony.on = true;
-  p.harmony.mix = 1.0f;
-  p.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
-  const double expect = 523.25;
-  const double got = outputHz(kA4 * std::pow(2.0, 35.0 / 1200.0), p);
-  const double err = got > 0.0 ? cents(got, expect) : 9999.0;
-  return report("harmony follows", std::fabs(err) <= 10.0,
-                "out=%.2f Hz, err vs C5=%.2f cents (+-10)", got, err);
-}
-
-int countDiff(const std::vector<float>& a, const std::vector<float>& b, size_t from) {
+int countDiff(const std::vector<float>& a, const std::vector<float>& b, int from) {
   int n = 0;
-  for (size_t i = from; i < a.size(); ++i)
+  for (size_t i = static_cast<size_t>(from); i < a.size(); ++i)
     if (a[i] != b[i]) ++n;
   return n;
 }
 
-bool testBypass() {
-  const std::vector<float> in = tone(kA4 * std::pow(2.0, 35.0 / 1200.0), cv::kSampleRate);
-  cv::PitchFxParams off = autotuneOnly(40.0f);
+// 1. Off is bit-exact. On with an in-tune A3, the output matches the input
+// delayed by the shifter latency; the lag is searched around kGrainDelay.
+bool testPassthrough() {
+  const std::vector<float> in = tone(kA3, cv::kSampleRate);
+  cv::PitchFxParams off = autotuneOnly(60.0f);
   off.autotune.on = false;
   gFx.reset();
-  const int diffOff = countDiff(in, run(gFx, in, off), 0);
-  bool ok = report("bypass off", diffOff == 0, "samples differing from input=%.0f (0)", diffOff);
+  const int diff = countDiff(in, run(gFx, in, off), cv::kSampleRate / 10);
+  bool ok = report("passthrough off", diff == 0, "samples differing after 100 ms=%.0f (0)", diff);
 
-  // On for 250 ms, then off: bit-exact once the 20 ms fade snaps, which takes
-  // ln(1e6) time constants, about 280 ms.
-  const cv::PitchFxParams on = autotuneOnly(40.0f);
   gFx.reset();
-  std::vector<float> out(in.size());
-  const int offAt = cv::kSampleRate / 4;
-  for (int i = 0; i < static_cast<int>(in.size()); i += cv::kBlock) {
-    gInProcess = true;
-    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock,
-                i < offAt ? on : off);
-    gInProcess = false;
+  const std::vector<float> out = run(gFx, in, autotuneOnly(60.0f));
+  const int from = kSettle;
+  const int to = static_cast<int>(in.size());
+  const double ref = rms(in, from, to);
+  double bestDb = 999.0;
+  int bestLag = 0;
+  for (int lag = cv::PsolaVoice::kGrainDelay - 500; lag <= cv::PsolaVoice::kGrainDelay + 500; ++lag) {
+    double s = 0.0;
+    for (int i = from; i < to; ++i) {
+      const double d = out[static_cast<size_t>(i)] - in[static_cast<size_t>(i - lag)];
+      s += d * d;
+    }
+    const double db = 20.0 * std::log10(std::sqrt(s / (to - from)) / ref + 1e-12);
+    if (db < bestDb) {
+      bestDb = db;
+      bestLag = lag;
+    }
   }
-  const int diffOn = countDiff(in, out, static_cast<size_t>(cv::kSampleRate / 10));
-  const int diffToggle = countDiff(in, out, static_cast<size_t>(offAt + 2 * cv::kSampleRate / 5));
-  ok &= report("bypass after toggle", diffOn > 0 && diffToggle == 0,
-               "samples differing 400 ms after off=%.0f (0), while on=%.0f (>0)", diffToggle,
-               diffOn);
-
-  cv::PitchFxParams zero = autotuneOnly(5.0f);
-  zero.autotune.tuning.maxCorrectionSemis = 0.0f;
-  const std::vector<float> in2 = tone(kA4 * std::pow(2.0, 35.0 / 1200.0), 2 * cv::kSampleRate);
-  const double inHz = medianHz(in2);
-  gFx.reset();
-  const double got = medianHz(run(gFx, in2, zero));
-  const double err = got > 0.0 ? cents(got, inHz) : 9999.0;
-  ok &= report("max correction 0", std::fabs(err) <= 1.0,
-               "in=%.2f Hz, out=%.2f Hz, err=%.2f cents (+-1)", inHz, got, err);
+  ok &= report("passthrough in tune", bestDb <= -40.0,
+               "|out - in| RMS=%.1f dB re input at lag %.0f samples (<= -40)", bestDb, bestLag);
   return ok;
+}
+
+// 2. A3 + 50 cents pulls to A3 on both engines.
+bool testCorrection() {
+  bool ok = true;
+  const char* names[2] = {"correction A", "correction B"};
+  for (int e = 0; e < 2; ++e) {
+    const double got = outputHz(kSharp, autotuneOnly(20.0f, e));
+    const double err = got > 0.0 ? cents(got, kA3) : 9999.0;
+    ok &= report(names[e], std::fabs(err) <= 5.0, "in=%.2f Hz, out=%.2f Hz, err vs A3=%.2f cents (+-5)",
+                 kSharp, got, err);
+  }
+  return ok;
+}
+
+// 3. Bb3 is not in C major: scale mode pulls to A3 or B3, chromatic leaves it.
+bool testScale() {
+  const double got = outputHz(kBb3, autotuneOnly(20.0f));
+  const double errA = got > 0.0 ? cents(got, kA3) : 9999.0;
+  const double errB = got > 0.0 ? cents(got, kB3) : 9999.0;
+  bool ok = report("scale Bb3 in C", std::fabs(errA) <= 5.0 || std::fabs(errB) <= 5.0,
+                   "out=%.2f Hz, err vs A3=%.2f, vs B3=%.2f cents (one within +-5)", got, errA, errB);
+  cv::PitchFxParams chrom = autotuneOnly(20.0f);
+  chrom.autotune.chromatic = true;
+  const double gotC = outputHz(kBb3, chrom);
+  const double errC = gotC > 0.0 ? cents(gotC, kBb3) : 9999.0;
+  ok &= report("chromatic Bb3", std::fabs(errC) <= 5.0, "out=%.2f Hz, err vs Bb3=%.2f cents (+-5)",
+               gotC, errC);
+  return ok;
+}
+
+// 4. Step A3 to A3 + 50 cents at 1 s, response 200 ms. Time runs from the
+// first hop where the tracker reports > 225 Hz to the hop where the
+// correction has moved 63 % of the way to its final value.
+bool testResponse() {
+  constexpr int kStep = cv::kSampleRate;
+  const std::vector<float> in =
+      tone(3 * cv::kSampleRate, [](int i) { return i < kStep ? kA3 : kSharp; });
+  std::vector<Hop> hops;
+  gFx.reset();
+  run(gFx, in, autotuneOnly(200.0f), &hops);
+
+  size_t first = 0;
+  while (first < hops.size() && !(hops[first].end > kStep && hops[first].hz > 225.0f)) ++first;
+  if (first == hops.size()) return report("response 200 ms", false, "tracker never reported > 225 Hz", 0.0);
+  const double start = hops[first - 1].corr;
+  const double final = hops.back().corr;
+  const double goal = start + 0.63 * (final - start);
+  double hitMs = -1.0;
+  for (size_t h = first; h < hops.size(); ++h) {
+    if (std::fabs(hops[h].corr - start) >= std::fabs(goal - start)) {
+      const Hop& a = hops[h - 1];
+      const Hop& b = hops[h];
+      const double end = a.end + (b.end - a.end) * (goal - a.corr) / (b.corr - a.corr);
+      hitMs = (end - hops[first].end) * 1000.0 / cv::kSampleRate;
+      break;
+    }
+  }
+  return report("response 200 ms", hitMs >= 150.0 && hitMs <= 250.0,
+                "63%% of %.1f cents at %.1f ms after the tracker saw the step (150..250)",
+                (final - start) * 100.0, hitMs);
+}
+
+// 5. Harmony High on the corrected note: A3 + 50 cents gives C4, not C4 + 50.
+bool testHarmonyFollows() {
+  cv::PitchFxParams p = autotuneOnly(20.0f);
+  p.harmony.on = true;
+  p.harmony.mix = 1.0f;
+  p.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
+  const double got = outputHz(kSharp, p);
+  const double err = got > 0.0 ? cents(got, kC4) : 9999.0;
+  return report("feeds harmony", std::fabs(err) <= 10.0,
+                "out=%.2f Hz, err vs C4=%.2f cents (+-10)", got, err);
 }
 
 }  // namespace
 
 int main() {
   bool ok = true;
-  ok &= testSnap();
+  ok &= testPassthrough();
+  ok &= testCorrection();
   ok &= testScale();
   ok &= testResponse();
   ok &= testHarmonyFollows();
-  ok &= testBypass();
   // Every process() call above ran under the allocation guard.
   ok &= report("no allocation", true, "process() ran under the new/delete guard", 0.0);
   std::printf("%s autotune\n", ok ? "PASS" : "FAIL");

@@ -48,7 +48,7 @@ int usage() {
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3>[:<formant -12..12>] ...]\n"
                "       [--hengine 0|1|2] [--chromatic]\n"
-               "       [--autotune] [--atkey <0..11>] [--atchrom] [--response <1..300 ms>]\n"
+               "       [--autotune] [--atkey <0..11>] [--atchromatic] [--atengine 0|1] [--response <5..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm|parker|parkerspring] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
@@ -86,7 +86,7 @@ int usage() {
                "     prkFcFactor0/1/2 prkHpHz prkLpHz prkDwellDrive prkDwellComp prkPresenceHz\n"
                "     prkPresenceDb prkPresenceQ prkTankTrim prkWetDb\n"
                "     eqDipQ eqPresenceQ eqAirHz\n"
-               "     atMaxCorrectionSemis (0..12) atFormant (-12..12) atTrimDb atEngine (0|1)\n"
+               "     atTrimDb atMaxCorrectSemis (0..12) atGrainPeriods atEpochSearch atEpochLpHz\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
                "  --tension and --dwell apply to spring and parker\n");
@@ -128,7 +128,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   float prkSprings = static_cast<float>(pk.springs);
   float octGrains = static_cast<float>(ot.grainCount);
   float harGrains = static_cast<float>(ht.shifter.grainCount);
-  float atEngine = static_cast<float>(at.engine);
   // Chromatic rows by HarmonyVoice: Lower, Low, High, Higher (Fixed is unused).
   constexpr int kChromVoice[4] = {0, 1, 3, 4};
   float harChrom[4];
@@ -151,8 +150,9 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"harGrainPeriods", &ht.shifter.grainPeriods}, {"harEpochSearch", &ht.shifter.epochSearch},
       {"harEpochLpHz", &ht.shifter.epochLpHz}, {"harGrainWindowMs", &ht.shifter.grainWindowMs},
       {"harGrainCount", &harGrains},
-      {"atMaxCorrectionSemis", &at.maxCorrectionSemis}, {"atFormant", &at.formant},
-      {"atTrimDb", &at.trimDb}, {"atEngine", &atEngine},
+      {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
+      {"atGrainPeriods", &at.shifter.grainPeriods}, {"atEpochSearch", &at.shifter.epochSearch},
+      {"atEpochLpHz", &at.shifter.epochLpHz},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
@@ -229,10 +229,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (harGrains != 2.0f && harGrains != 4.0f) return false;
-    if (atEngine != 0.0f && atEngine != 1.0f) return false;
-    at.engine = static_cast<int>(atEngine);
-    if (at.maxCorrectionSemis < 0.0f || at.maxCorrectionSemis > 12.0f) return false;
-    if (at.formant < -12.0f || at.formant > 12.0f) return false;
+    if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
     ht.shifter.grainCount = static_cast<int>(harGrains);
     for (int i = 0; i < 4; ++i) {
       if (harChrom[i] < -12.0f || harChrom[i] > 12.0f || harChrom[i] != std::floor(harChrom[i]))
@@ -282,6 +279,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   cv::OctaveParams& op = rp.pitchFx.octave;
   cv::AutotuneParams& ap = rp.pitchFx.autotune;
   bool haveHarmony = false;
+  bool haveAtKey = false;
   bool haveOctave = false;
   bool haveDepth = false;
   bool haveOn = false;
@@ -372,17 +370,22 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveHarmony = true;
     } else if (std::strcmp(a, "--autotune") == 0) {
       ap.on = true;
-    } else if (std::strcmp(a, "--atchrom") == 0) {
+    } else if (std::strcmp(a, "--atchromatic") == 0) {
       ap.chromatic = true;
+    } else if (std::strcmp(a, "--atengine") == 0 && i + 1 < argc) {
+      const char* v = argv[++i];
+      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
+      ap.engine = v[0] - '0';
     } else if (std::strcmp(a, "--atkey") == 0 && i + 1 < argc) {
       float k = 0.0f;
       if (!parseFloat(argv[++i], &k) || k < 0.0f || k > 11.0f || k != std::floor(k))
         return false;
       ap.key = static_cast<int>(k);
-      ap.followHarmonyKey = false;
+      haveAtKey = true;
     } else if (std::strcmp(a, "--response") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &ap.responseMs) || ap.responseMs < cv::Autotune::kMinResponseMs ||
-          ap.responseMs > cv::Autotune::kMaxResponseMs)
+      if (!parseFloat(argv[++i], &ap.responseMs) ||
+          ap.responseMs < cv::AutotuneVoice::kMinResponseMs ||
+          ap.responseMs > cv::AutotuneVoice::kMaxResponseMs)
         return false;
     } else if (std::strcmp(a, "--hengine") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
@@ -432,6 +435,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   }
   if (positional != 2) return false;
   if (voices > 0 && !haveHarmony) return false;
+  // Autotune shares Harmony's key unless --atkey sets its own.
+  if (!haveAtKey) ap.key = hp.key;
   rp.pitchOn = haveHarmony || haveOctave || ap.on;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;

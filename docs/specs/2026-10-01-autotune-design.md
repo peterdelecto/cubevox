@@ -1,26 +1,31 @@
-# cubevox — Autotune (pitch correction) module
+# cubevox — Autotune (pitch correction) + four-column face
 
 Date 2026-10-01. Owner: "add a simple autotune module with key selection and response
-time parameter." Adam (text exchange): "U can set the general key and the sensitivity"
-= "how corrective". On the Zoom V3 the one KEY knob serves harmony and pitch correct.
+time parameter." Adam on the V3's: "U can set the general key and the sensitivity ...
+I mean how corrective." Panel: KEY (the box's one key encoder, shared with Harmony)
+and RESPONSE. In the prototype Autotune has its own KEY combo plus a `Link key to
+Harmony` checkbox (default on).
 
 ## Decisions
 
-1. Lives on the shared pitch front end (`PitchFx`): the tracker already gives the sung
-   pitch; correction = nearest scale note (key's major scale = relative minor's notes,
-   as Harmony) or nearest semitone when `chromatic`.
-2. RESPONSE (ms) is the one-pole time constant on the correction in semitones. Short
-   (≤ 10 ms) snaps hard; long (100–300 ms) nudges. Default 40 ms.
-3. The corrected voice is produced by an `EpochShifter` (formant preserved, formant
-   0) and REPLACES the dry voice at PitchFx's output while the module is on. Octave
-   and Harmony add the same correction to their own targets so they build on the
-   corrected note. Their shifters still read the raw ring (one shift each, no
-   cascade).
-4. KEY: `AutotuneParams::key` with `followHarmonyKey = true` by default (the panel has
-   one encoder for both; the prototype shows a combo greyed while following).
-5. Unvoiced frames: correction target holds; the shifter keeps the last period as
-   elsewhere. `muteUnvoiced` not offered.
-6. Level rule row "autotune key C response 40" with its own `trimDb`.
+1. Correction runs inside `PitchFx` on the shared tracker and ring. It REPLACES the
+   dry path (corrected voice out, dry crossfaded away by the active smoother) and its
+   offset in semitones is added to every Harmony and Octave target, so their voices
+   are built on the corrected note.
+2. Target note = nearest note of the key's major scale (relative minor shares it) to
+   the sung pitch; `chromatic` = nearest semitone. Correction `c = target − sung`
+   (semitones, continuous), one-pole smoothed with time constant RESPONSE
+   (5–500 ms, log slider, default 60). RESPONSE 5 ms is the hard "mechanical" snap;
+   200+ ms is a gentle lean.
+3. Shifter: engine A (grid PSOLA) or B (epoch PSOLA, formant preserved, formant 0),
+   reusing `engine/shifters.h`. Default B. No granular option (C can't hold a steady
+   pitch within a cent).
+4. Unvoiced frames: correction holds its last value and the shifter keeps the last
+   period, as Harmony does; `muteUnvoiced` not offered.
+5. Latency equals the other pitch voices (kGrainDelay + period); the corrected voice
+   replaces the dry, so the whole box gains ~25–35 ms when Autotune is on. This is
+   inherent to pitch correction and matches the V3.
+6. Level rule: `AutotuneTuning::trimDb` set by `level_test` row "autotune key C".
 
 ## Engine
 
@@ -28,54 +33,42 @@ time parameter." Adam (text exchange): "U can set the general key and the sensit
 
 ```
 struct AutotuneTuning {
-  float maxCorrectionSemis = 2.0f;   // never pull more than this (owner may widen)
-  float formant = 0.0f;              // semitones, 0 = same singer
-  float trimDb = 0.0f;               // level rule
-  int   engine = 1;                  // 0 grid PSOLA, 1 epoch PSOLA (default)
+  float trimDb = 0.0f;
+  float maxCorrectSemis = 6.0f;   // never pull more than this (tracker glitch guard)
+  ShifterTuning shifter;          // grainPeriods / epochSearch / epochLpHz (B)
 };
 
 struct AutotuneParams {
   bool on = true;
-  bool followHarmonyKey = true;
-  int key = 0;                       // kKeyRoot index, used when !followHarmonyKey
+  int engine = 1;          // 0 A, 1 B
   bool chromatic = false;
-  float responseMs = 40.0f;          // panel knob, 1..300 (log slider)
+  int key = 0;             // kKeyRoot index, as Harmony
+  float responseMs = 60.0f;
   AutotuneTuning tuning;
 };
 
-class Autotune {
+class AutotuneVoice {
  public:
   void reset();
-  // Per block: computes the target correction from the tracker result.
-  void prepare(const PitchResult& pr, const AutotuneParams& p, int harmonyKey);
-  float correctionSemis() const;     // smoothed, for Octave/Harmony to add
-  // Per sample: the corrected voice (wet only).
+  // Computes the correction from pr; returns it in semitones (0 when inactive).
+  float prepare(const PitchResult& pr, const AutotuneParams& p);
   float tick(const VoiceRing& ring, const VoiceRing& lpRing, long writeCount, float period);
+  float correctionSemis() const;
 };
 ```
 
-Behaviour:
-
-1. `midi = 69 + 12 log2(hz/440)`; target note = nearest scale note (circular distance,
-   ties down, as Harmony's degreeOf) or `round(midi)` if chromatic; `corr = target −
-   midi` clamped to ±maxCorrectionSemis. Smoothed per sample by a one-pole with
-   `responseMs`; snaps to the target on the first voiced frame after reset.
-2. Shifter target semis = smoothed corr; gain = dbToLin(trimDb).
-3. Float only, `std::array`, no heap/I/O.
-
 ### `engine/pitch_fx.h`
 
-`PitchFxParams` gains `AutotuneParams autotune`. Per block: `autotune.prepare(pr, p,
-p.harmony.key)`; Harmony and Octave `prepare` receive `corrOffset = autotune.on ?
-autotune.correctionSemis() : 0` and add it to their targets. Per sample: `dryOut =
-active_at · at.tick(...) + (1 − active_at) · in` (20 ms smoother with snap, so off is
-bit-exact) and the existing mix maths uses `dryOut` where it used `in`.
+`PitchFxParams` gains `AutotuneParams autotune`. Per block: `c = autotune_.prepare(...)`;
+Harmony `prepare` and Octave `prepare` receive `c` and add it to their semitone
+targets (new optional argument, default 0 so existing tests hold). Per sample:
+`corrected = autotune_.tick(...)`; `base = lerp(in, corrected, activeAt)` (20 ms
+smoother, snap); then the existing Harmony/Octave mix uses `base` where it used `in`.
+Both-off and Autotune-off paths stay sample-exact.
 
-## Emulator (four columns)
+## Emulator: four columns
 
-Eleven modules no longer fit three columns with any Tuning open. Face becomes FOUR
-columns at 1440×840 (Harmony no longer needs the wide interval rows). Signal order
-down then across:
+Window 1500×840, four columns, label room 150 px:
 
 | Col 1 | Col 2 | Col 3 | Col 4 |
 |---|---|---|---|
@@ -83,32 +76,39 @@ down then across:
 | AUTOTUNE | UNISON | DISTORTION | OUTPUT EQ |
 | OCTAVE | | GATE | |
 
-AUTOTUNE block: checkbox, `KEY` combo + `Follow Harmony` checkbox (combo greyed when
-following), `Chromatic` checkbox, `RESPONSE` log slider 1–300 ms "%.0f ms". Tuning:
-max correction, formant, engine A|B, trim. Reverb's Chasm and Parker Drive nodes split
-in two if column 4 overruns. `--layout` probe: four columns, scenarios for the new
-nodes, accordion per column unchanged. CLAUDE.md face rule → four columns.
+Signal order still reads down then across (Autotune → Octave → Harmony is the
+pitch block's internal order; Octave is drawn before Harmony per owner). Column 2
+is wider (Harmony menu rows). The accordion rule and the `--layout` probe stay;
+probe scenarios gain `autotune`.
+
+AUTOTUNE block: checkbox, `Engine` A | B radio, `KEY` combo (disabled when
+`Link key to Harmony` is checked, which copies Harmony's key each frame),
+`Chromatic` checkbox, `RESPONSE` slider 5–500 ms log "%.0f ms", readout
+`Correction: %+.2f st`. Tuning node: trim, max correction, shifter B fields. Off on
+open. Reset/Print cover the tuning.
 
 ## Render CLI
 
-`--autotune` enables; `--atkey <0..11>` (implies not following), `--atchrom`,
-`--response <ms>`; keys `atMaxCorrectionSemis`, `atFormant`, `atTrimDb`, `atEngine`.
+`--autotune`, `--atkey <0..11>`, `--response <ms>`, `--atchromatic`, `--atengine 0|1`;
+keys `atTrimDb`, `atMaxCorrectSemis`, `atGrainPeriods`, `atEpochSearch`, `atEpochLpHz`.
 
 ## Tests (`test/autotune_test.cpp`, ctest `autotune`)
 
-1. Snap: 440 Hz × 2^(+35/1200) (35 cents sharp of A4), key C, response 5 ms → output
-   f0 (fresh tracker, seconds 1–2) within ±5 cents of 440.00.
-2. Scale: 466.16 Hz (B♭4, not in C major) key C → output within ±5 cents of either
-   440 (A) or 493.88 (B), and specifically 440 (ties snap down / nearest is A at
-   −100 cents vs B at +100: equidistant → down → A). Chromatic → stays 466.16 ± 5 cents.
-3. Response: step from 440 to 440×2^(+40/1200) at t = 1 s, response 200 ms: measured
-   correction (output cents vs input cents over 20 ms windows) reaches 63 % of −40
-   cents at 200 ± 40 ms after the step.
-4. Harmony follows: autotune on + Harmony High in C on the 35-cents-sharp A4 → harmony
-   voice lands on C5 (523.25) ± 10 cents, not on C5 + 35 cents.
-5. Bypass: `on = false` → bit-exact; max correction 0 → output f0 equals input.
-6. No allocation. `level_test` row.
+1. Passthrough: off → bit-exact after 100 ms; on with the ten-harmonic tone exactly on
+   A3 (220 Hz, key C) → after 300 ms `|out − in|` RMS ≤ −40 dB re input (in-tune input
+   is left nearly alone; PSOLA at ratio 1 is not bit-exact but must be close).
+2. Correction: tone at 226.4 Hz (A3 + 50 cents), key C, response 20 ms → output f0
+   220 Hz ± 5 cents after 300 ms (engine A and B).
+3. Chromatic vs scale: tone at 233.1 Hz (B♭3) in key C: scale mode pulls to 220 or
+   246.9 (nearest scale note, ±5 cents); chromatic leaves it at 233.1 ± 5 cents.
+4. Response time: step from 220 Hz to 226.4 Hz at t = 1 s, response 200 ms → the
+   correction reaches 63 % of −50 cents between 150 and 250 ms after the tracker
+   first reports the new pitch.
+5. Feeds harmony: autotune on, Harmony High level 3 mix 1, tone at A3 + 50 cents → the
+   harmony voice lands on C4 (261.6 Hz ± 10 cents), not C4 + 50 cents.
+6. No allocation; `level_test` row "autotune key C" in 0..+0.5 dB.
 
 ## Done when
 
-`ctest` passes; four-column face; owner tries RESPONSE from 1 ms (robot) to 300 ms.
+`ctest` passes; four-column face with AUTOTUNE below INPUT GATE; owner sings a loop
+through it at RESPONSE 5 ms and 200 ms.

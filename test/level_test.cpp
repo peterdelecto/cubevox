@@ -176,8 +176,7 @@ int main() {
 
   cv::PitchFxParams autotune = pitchOff();
   autotune.autotune.on = true;
-  autotune.autotune.responseMs = 40.0f;
-  ok &= simple<cv::PitchFx>("autotune key C response 40", in, autotune);
+  ok &= simple<cv::PitchFx>("autotune key C", in, autotune);
 
   cv::PitchFxParams octA = pitchOff();
   octA.octave.on = true;

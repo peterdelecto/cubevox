@@ -43,7 +43,7 @@ constexpr float kHarmonyEngineX = 140.0f;  // Engine radios beside the HARMONY c
 constexpr float kHarmonyKeyW = 200.0f;     // KEY combo, leaves room for Chromatic
 constexpr float kFormantW = 60.0f;         // FORMANT slider at the end of each Menu row
 constexpr float kMenuRadioX = 52.0f;       // Menu row: radios start after the voice name
-constexpr float kAutotuneKeyW = 80.0f;     // KEY combo beside Follow Harmony
+constexpr float kAutotuneKeyW = 80.0f;     // KEY combo beside Link key to Harmony
 constexpr float kMeterW = 240.0f;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
@@ -76,6 +76,8 @@ struct ProtoParams {
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
+  // The box has one KEY encoder; linked, Autotune copies Harmony's key.
+  bool linkAutotuneKey = true;
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartIntensity, {}};
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
@@ -102,6 +104,7 @@ struct ProtoState {
   float playheadNorm = 0.0f;
   float pitchHz = 0.0f;
   bool voiced = false;
+  float correctionSemis = 0.0f;
   float inGateDb = 0.0f;
   float gateDb = 0.0f;
 };
@@ -202,6 +205,7 @@ void publishState(float peak, const LoopBuffer* loop) {
   s.peakDb = peak > 1e-6f ? 20.0f * std::log10(peak) : kSilenceDb;
   s.pitchHz = gPitchFx.pitch().hz;
   s.voiced = gPitchFx.pitch().voiced;
+  s.correctionSemis = gPitchFx.correctionSemis();
   s.inGateDb = gInputGate.gainDb();
   s.gateDb = gGate.gainDb();
   s.playheadNorm = (loop != nullptr && !loop->samples.empty())
@@ -348,12 +352,14 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       gTuningText + used, sizeof(gTuningText) - used,
       "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
       "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
-      "\nAutotuneTuning{%.1ff, %.1ff, %.1ff, %d}",
+      "\nAutotuneTuning{%.1ff, %.1ff, {%.2ff, %.2ff, %.0ff, %.0ff, %d}}",
       ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
       g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
-      at.maxCorrectionSemis, at.formant, at.trimDb, at.engine);
+      at.trimDb, at.maxCorrectSemis, at.shifter.grainPeriods, at.shifter.epochSearch,
+      at.shifter.epochLpHz, at.shifter.grainWindowMs, at.shifter.grainCount);
   std::printf(
-      "// AutotuneTuning: maxCorrectionSemis, formant, trimDb, engine\n"
+      "// AutotuneTuning: trimDb, maxCorrectSemis, "
+      "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher, chromaticSemis, trimDb[A, B, C], "
@@ -499,16 +505,12 @@ void drawOctaveTuning(cv::OctaveTuning& o) {
 
 void drawAutotuneTuning(cv::AutotuneTuning& t) {
   if (!tuningHeader("autotune")) return;
-  ImGui::SliderFloat("Max correction", &t.maxCorrectionSemis, 0.0f, 12.0f, "%.1f st");
-  ImGui::SliderFloat("Formant", &t.formant, -cv::Autotune::kMaxFormantSemis,
-                     cv::Autotune::kMaxFormantSemis, "%+.1f st");
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("Engine");
-  ImGui::SameLine();
-  ImGui::RadioButton("A", &t.engine, 0);
-  ImGui::SameLine();
-  ImGui::RadioButton("B", &t.engine, 1);
   ImGui::SliderFloat("Trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Max correction", &t.maxCorrectSemis, 0.0f, 12.0f, "%.1f st");
+  ImGui::SliderFloat("Grain length (B)", &t.shifter.grainPeriods, 1.5f, 3.0f, "%.2f periods");
+  ImGui::SliderFloat("Epoch search (B)", &t.shifter.epochSearch, 0.0f, 0.3f, "%.2f period");
+  ImGui::SliderFloat("Epoch low-pass (B)", &t.shifter.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
+                     ImGuiSliderFlags_Logarithmic);
 }
 
 void drawUnisonTuning(cv::UnisonTuning& t) {
@@ -874,18 +876,24 @@ void drawHarmonyBlock(cv::HarmonyParams& h, const ProtoState& state) {
   ImGui::PopID();
 }
 
-void drawAutotuneBlock(cv::AutotuneParams& a) {
+void drawAutotuneBlock(cv::AutotuneParams& a, bool& linkKey, const ProtoState& state) {
   ImGui::PushID("autotune");
   ImGui::Checkbox("AUTOTUNE", &a.on);
-  ImGui::BeginDisabled(a.followHarmonyKey || a.chromatic);
+  ImGui::SameLine(kHarmonyEngineX);
+  ImGui::RadioButton("A", &a.engine, 0);
+  ImGui::SameLine();
+  ImGui::RadioButton("B", &a.engine, 1);
+  ImGui::BeginDisabled(linkKey || a.chromatic);
   ImGui::SetNextItemWidth(kAutotuneKeyW);
   ImGui::Combo("KEY", &a.key, cv::kKeyName, 12);
   ImGui::EndDisabled();
   ImGui::SameLine();
-  ImGui::Checkbox("Follow Harmony", &a.followHarmonyKey);
+  ImGui::Checkbox("Link key to Harmony", &linkKey);
   ImGui::Checkbox("Chromatic", &a.chromatic);
-  ImGui::SliderFloat("RESPONSE", &a.responseMs, cv::Autotune::kMinResponseMs,
-                     cv::Autotune::kMaxResponseMs, "%.0f ms", ImGuiSliderFlags_Logarithmic);
+  ImGui::SameLine();
+  ImGui::Text("Correction: %+.2f st", a.on ? state.correctionSemis : 0.0f);
+  ImGui::SliderFloat("RESPONSE", &a.responseMs, cv::AutotuneVoice::kMinResponseMs,
+                     cv::AutotuneVoice::kMaxResponseMs, "%.0f ms", ImGuiSliderFlags_Logarithmic);
   drawAutotuneTuning(a.tuning);
   ImGui::PopID();
 }
@@ -1057,6 +1065,7 @@ void column(int index, float width, const F& draw) {
 void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, bool probe) {
   // Hold-and-decay so short peaks stay readable at 60 fps.
   meterDb = std::max(state.peakDb, meterDb - kMeterDecayDbPerFrame);
+  if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
 
   ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -1075,7 +1084,9 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   column(0, colW, [&] {
     moduleBox("ingateBox", true,
               [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
-    moduleBox("autotuneBox", false, [&] { drawAutotuneBlock(params.pitchFx.autotune); });
+    moduleBox("autotuneBox", false, [&] {
+      drawAutotuneBlock(params.pitchFx.autotune, params.linkAutotuneKey, state);
+    });
     moduleBox("octaveBox", false, [&] { drawOctaveBlock(params.pitchFx.octave); });
   });
   ImGui::SameLine(0.0f, kColumnGap);

@@ -169,7 +169,14 @@ class EpochPsolaVoice {
         best = d;
       }
     }
-    return static_cast<float>(best);
+    // Parabola through the peak and its neighbours places the epoch between
+    // samples, so grains track a fractional period without jitter.
+    if (best <= lo || best >= hi) return static_cast<float>(best);
+    const float ym = lp[wrap(head - best + 1)];
+    const float yp = lp[wrap(head - best - 1)];
+    const float den = ym - 2.0f * bestV + yp;
+    return den < 0.0f ? static_cast<float>(best) + 0.5f * (ym - yp) / den
+                      : static_cast<float>(best);
   }
 
   float play(const VoiceRing& ring, int head, Grain& g) const {
