@@ -183,7 +183,7 @@ enum Id : int {
 // Names for the Print tuning line; reverb names carry the engine where two share one.
 // nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
-    "Slide",          "Tracking speed", "Chorus-Double", nullptr,       "Body",
+    "Slide",          nullptr,"Chorus-Double", nullptr,       "Body",
     "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
     "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "Drip",
     "PARKER Flutter", "PARKER Brightness"};

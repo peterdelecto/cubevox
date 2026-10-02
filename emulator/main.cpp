@@ -330,7 +330,6 @@ char gTuningText[8192];  // last copied settings text
 // Returns the bytes written, newline included.
 size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const auto onOff = [](bool b) { return b ? "on" : "off"; };
-  static const char* const kLevel[4] = {"Off", "Quiet", "Loud", "Louder"};
   static const char* const kReverb[3] = {"SPRING", "CHASM", "PARKER SPRING"};
   const cv::HarmonyParams& h = p.pitchFx.harmony;
   const cv::AutotuneParams& at = p.pitchFx.autotune;
@@ -338,7 +337,6 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const cv::ReverbParams& r = p.reverb;
   const int re = r.engine == cv::kReverbChasm ? 1 : (r.engine == cv::kReverbParker ? 2 : 0);
   const int atKey = p.linkAutotuneKey ? h.key : at.key;
-  const auto lvl = [&](int i) { return kLevel[h.slots[static_cast<size_t>(i)].level & 3]; };
   const float decay = re == 1 ? r.chasm.decay : (re == 2 ? r.parker.tension : r.spring.tension);
   const float dwell = re == 1 ? r.chasm.dwell : (re == 2 ? r.parker.dwell : r.spring.dwell);
   char macros[640];
@@ -346,19 +344,15 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const int n = std::snprintf(
       buf, size,
       "%s\n"
-      "Choices: Input gate on; Gate %s; Autotune %s, engine %c, key %s, chromatic %s; "
-      "Octave %s, engine %c; Harmony %s, engine %c, chromatic %s, voices High %s / "
-      "Higher %s, Follow my bends %s; Unison %s; Slapback %s; "
+      "Choices: Input gate on; Gate %s; Autotune %s, engine %c, chromatic %s; "
+      "Octave %s, engine %c; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
-      "voice formants High %+d / Higher %+d st; Unison DEPTH "
+      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
-      p.linkAutotuneKey ? "linked to Harmony" : "own", onOff(at.chromatic), onOff(o.on),
-      'A' + o.engine, onOff(h.on), 'A' + h.engine, onOff(h.chromatic), lvl(0), lvl(1),
-      onOff(!h.tuning.snapToScale), onOff(p.unison.on),
+      onOff(at.chromatic), onOff(o.on), 'A' + o.engine, onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
       static_cast<double>(p.inputGate.thresholdDb),
       static_cast<double>(p.inputGate.tuning.releaseMs), static_cast<double>(p.gate.thresholdDb),
@@ -368,9 +362,6 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
       static_cast<int>(std::lround(o.formant)), static_cast<double>(o.mix * 100.0f),
-      cv::kKeyName[h.key], static_cast<double>(h.mix * 100.0f),
-      static_cast<int>(std::lround(h.slots[0].formant)),
-      static_cast<int>(std::lround(h.slots[1].formant)),
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.intensity * 100.0f),
@@ -1423,8 +1414,6 @@ void drawAutotuneBlock(cv::AutotuneParams& a, bool& linkKey, int& sharedKey,
   }
   if (gAdvanced) {
     ImGui::SameLine();
-    ImGui::Checkbox("Link key to Harmony", &linkKey);
-    ImGui::SameLine();
     ImGui::Text("Correction: %+.2f st", a.on ? state.correctionSemis : 0.0f);
   }
   const float mechanical = cv::AutotuneVoice::mechanicalOf(a.responseMs);
@@ -1736,12 +1725,6 @@ void drawPedals(ProtoParams& params) {
     }
   });
   next();
-  pedal("HARMONY", h.on, w, [&] {
-    pedalPercent("MIX", h.mix);
-    if (pedalEncoder("KEY", h.key, 0, 11, cv::kKeyName[h.key]) && params.linkAutotuneKey)
-      at.key = h.key;
-  });
-  next();
   pedal("OCTAVE", o.on, w, [&] {
     pedalPercent("MIX", o.mix);
     pedalEncoder("SEMITONES", o.semitones, -12, 12, semis);
@@ -1819,11 +1802,10 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   if (!params.dev) params.advanced = false;
   gDev = params.dev;
   gAdvanced = params.advanced;
-  // Harmony chromatic and the key link are Advanced-only; the plain face keeps them at default.
-  if (!params.advanced) {
-    params.linkAutotuneKey = true;
-    params.pitchFx.harmony.chromatic = false;
-  }
+  // Harmony is off the face (owner 2026-10-02). It stays off and only carries the shared KEY.
+  params.pitchFx.harmony.on = false;
+  params.pitchFx.harmony.chromatic = false;
+  params.linkAutotuneKey = true;
   if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
 
   ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
@@ -1885,11 +1867,8 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
     });
   });
   ImGui::SameLine(0.0f, kColumnGap);
-  // Autotune and Harmony share the KEY encoder, so Harmony follows Autotune.
   column(1, kHarmonyColumnW, [&] {
-    moduleBox("harmonyBox", true,
-              [&] { drawHarmonyBlock(params.pitchFx.harmony, params.macros); });
-    moduleBox("octaveBox", false,
+    moduleBox("octaveBox", true,
               [&] { drawOctaveBlock(params.pitchFx.octave, params.macros); });
     moduleBox("unisonBox", false, [&] { drawUnisonBlock(params.unison, params.macros); });
   });
@@ -1939,7 +1918,7 @@ int runLayoutProbe() {
   constexpr int kSpring = cv::kReverbSpring, kChasm = cv::kReverbChasm, kParker = cv::kReverbParker;
   static const ProbeOpen kScenarios[] = {
       {true, nullptr, nullptr},
-      {true, "harmony", nullptr},    {true, "octave", nullptr},
+      {true, "octave", nullptr},
       {true, "autotune", nullptr},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr}, {true, "reverb", nullptr, false, kSpring},
@@ -1947,9 +1926,6 @@ int runLayoutProbe() {
       {true, "eq", nullptr},         {true, "ingate", nullptr},
       {true, "gate", nullptr},
       {true, nullptr, nullptr, true},
-      {true, "harmony", nullptr, true},
-      {true, "harmony", "Levels", true}, {true, "harmony", "Trims", true}, {true, "harmony", "Tracking", true},
-      {true, "harmony", "Chromatic intervals", true}, {true, "harmony", "Shifter B/C", true},
       {true, "octave", nullptr, true},          {true, "unison", nullptr, true},
       {true, "unison", "Chorus (LFO-wobbled delay)", true},
       {true, "unison", "Doubler (fixed detune, TC-Helicon style)", true},
