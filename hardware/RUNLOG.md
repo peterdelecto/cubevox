@@ -10,3 +10,4 @@ placement usb_esd | D0003, ledger 0019, commit 1fed204 | intended 6, unintended 
 placement input_9v | D0004, ledger 0020, commit a9ead93bea4d | intended 4, unintended 0; airline_total_mm 13886.2>13897.4; reach:D105 123.95>134.79; reach:D106 124.92>139.62; 
 placement buck5_in | D0005, ledger 0021, commit 25a1a75168c1 | intended 4, unintended 0; airline_total_mm 13897.4>13913.9; reach:C112 5.27>8.39; reach:C113 1.99>8.03; 
 placement buck33_out | D0006, ledger 0022, commit 7de04acd3295 | intended 5, unintended 0; airline:/h7core_block/BUCK_SW 8.985>11.829; airline_total_mm 13913.9>13915.8; reach:C21 10.46>8.88; reach:C22 12.53>8.85; 
+placement buck33_in | D0007, ledger 0023, commit cc7880faa219 | intended 3, unintended 0; airline:/h7core_block/BUCK_SW 11.829>11.861; airline_total_mm 13915.8>13920.3; reach:C20 2.48>5.45; 
