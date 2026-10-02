@@ -96,6 +96,8 @@ struct ProtoParams {
   bool dev = false;
   // Advanced swaps the musician sliders for the raw tuning nodes.
   bool advanced = false;
+  // Pedal mode shows each effect as a stompbox with only its panel knobs.
+  bool pedalMode = false;
   cv::macros::State macros;
   // Prototype-only test signal. Not a panel control, not in Print tuning.
   bool stageFeedback = false;
@@ -484,6 +486,7 @@ struct ProbeOpen {
   const char* node = nullptr;
   bool advanced = false;   // Advanced view instead of the macro view
   int reverbEngine = -1;   // forced reverb engine, -1 keeps the live one
+  bool pedal = false;      // pedal mode instead of the full face
 };
 bool gAdvanced = false;  // UI-thread-only; mirrors ProtoParams::advanced
 bool gDev = false;       // UI-thread-only; mirrors ProtoParams::dev
@@ -1028,6 +1031,7 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
     f.push_back({std::string("macro.") + cv::macros::kStateKey[i], 'f',
                  &p.macros.pos[static_cast<size_t>(i)]});
   add("dev", &p.dev);
+  add("pedal", &p.pedalMode);
   add("advanced", &p.advanced);
   add("feedback.on", &p.stageFeedback);
   add("feedback.amount", &p.feedbackAmount);
@@ -1553,6 +1557,213 @@ void moduleBox(const char* id, bool first, const F& draw) {
   ImGui::EndChild();
 }
 
+constexpr float kFooterH = 34.0f;  // strip under the columns for the mode button, px
+
+// ---- Pedal mode: each effect drawn as a stompbox -----------------------------------
+
+constexpr float kKnobR = 20.0f;          // knob radius, px
+constexpr float kKnobDragPx = 200.0f;    // vertical drag for the full knob travel, px
+constexpr float kKnobWheelStep = 0.02f;  // knob travel per scroll notch
+constexpr float kEncoderStepPx = 14.0f;  // vertical drag per encoder detent, px
+constexpr float kKnobGapY = 16.0f;       // space between knobs, px
+constexpr float kPedalGap = 12.0f;       // space between pedals, px
+constexpr float kPedalH = 420.0f;        // pedal height, px
+constexpr float kFootH = 64.0f;          // footswitch strip at the pedal's foot, px
+constexpr float kPedalNameScale = 1.3f;  // pedal name type size vs the face
+constexpr float kPiF = 3.14159265f;
+
+float gPedalRight = 0.0f;   // right edge of the pedal row this frame, px
+float gPedalBottom = 0.0f;  // bottom edge of the pedal row this frame, px
+
+// 7 o'clock at 0, 5 o'clock at 1; screen y points down.
+float knobAngle(float v01) { return kPiF * (0.75f + 1.5f * v01); }
+
+// Knob body, travel arc and pointer; an encoder shows its detents as ticks.
+void drawKnobFace(ImVec2 c, float v01, int detents) {
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  const ImU32 body = IM_COL32(45, 45, 50, 255);
+  const ImU32 rim = IM_COL32(150, 150, 160, 255);
+  const ImU32 lit = IM_COL32(230, 180, 60, 255);
+  dl->PathArcTo(c, kKnobR + 5.0f, knobAngle(0.0f), knobAngle(1.0f), 32);
+  dl->PathStroke(IM_COL32(70, 70, 75, 255), 0, 3.0f);
+  if (detents == 0 && v01 > 0.0f) {
+    dl->PathArcTo(c, kKnobR + 5.0f, knobAngle(0.0f), knobAngle(v01), 32);
+    dl->PathStroke(lit, 0, 3.0f);
+  }
+  for (int i = 0; i < detents; ++i) {
+    const float a = knobAngle(static_cast<float>(i) / static_cast<float>(detents - 1));
+    dl->AddLine(ImVec2(c.x + (kKnobR + 3.0f) * cosf(a), c.y + (kKnobR + 3.0f) * sinf(a)),
+                ImVec2(c.x + (kKnobR + 7.0f) * cosf(a), c.y + (kKnobR + 7.0f) * sinf(a)), rim, 1.5f);
+  }
+  dl->AddCircleFilled(c, kKnobR, body, 32);
+  dl->AddCircle(c, kKnobR, rim, 32, 1.5f);
+  const float a = knobAngle(v01);
+  dl->AddLine(ImVec2(c.x + 0.25f * kKnobR * cosf(a), c.y + 0.25f * kKnobR * sinf(a)),
+              ImVec2(c.x + 0.9f * kKnobR * cosf(a), c.y + 0.9f * kKnobR * sinf(a)), lit, 3.0f);
+}
+
+// Knob on the left, label and value on the right. Drag up/down or scroll.
+// Returns true when v01 changed.
+bool pedalKnobRaw(const char* label, float& v01, const char* valueText, int detents) {
+  ImGui::PushID(label);
+  const ImVec2 at = ImGui::GetCursorScreenPos();
+  const float span = 2.0f * (kKnobR + 7.0f);
+  ImGui::InvisibleButton("knob", ImVec2(span, span));
+  float v = v01;
+  if (ImGui::IsItemActive()) v -= ImGui::GetIO().MouseDelta.y / kKnobDragPx;
+  if (ImGui::IsItemHovered()) v += ImGui::GetIO().MouseWheel * kKnobWheelStep;
+  v = std::clamp(v, 0.0f, 1.0f);
+  const bool changed = v != v01;
+  v01 = v;
+  drawKnobFace(ImVec2(at.x + 0.5f * span, at.y + 0.5f * span), v01, detents);
+  ImGui::SameLine();
+  ImGui::BeginGroup();
+  ImGui::Dummy(ImVec2(0.0f, 0.5f * span - ImGui::GetTextLineHeightWithSpacing()));
+  ImGui::TextUnformatted(label);
+  ImGui::TextDisabled("%s", valueText);
+  ImGui::EndGroup();
+  ImGui::Dummy(ImVec2(0.0f, kKnobGapY));
+  ImGui::PopID();
+  return changed;
+}
+
+bool pedalPercent(const char* label, float& value) {
+  char text[16];
+  std::snprintf(text, sizeof(text), "%.0f %%", static_cast<double>(value * 100.0f));
+  return pedalKnobRaw(label, value, text, 0);
+}
+
+// A knob over [lo, hi], log-tapered for times.
+bool pedalRange(const char* label, float& value, float lo, float hi, bool logTaper,
+                const char* fmt) {
+  float v01 = logTaper ? logf(value / lo) / logf(hi / lo) : (value - lo) / (hi - lo);
+  char text[24];
+  std::snprintf(text, sizeof(text), fmt, static_cast<double>(value));
+  if (!pedalKnobRaw(label, v01, text, 0)) return false;
+  value = logTaper ? lo * powf(hi / lo, v01) : lo + v01 * (hi - lo);
+  return true;
+}
+
+// Detented encoder over [lo, hi]: one step per kEncoderStepPx of drag or per scroll notch.
+bool pedalEncoder(const char* label, int& value, int lo, int hi, const char* text) {
+  ImGui::PushID(label);
+  float& acc = *ImGui::GetStateStorage()->GetFloatRef(ImGui::GetID("acc"), 0.0f);
+  ImGui::PopID();
+  float v01 = static_cast<float>(value - lo) / static_cast<float>(hi - lo);
+  const float before = v01;
+  pedalKnobRaw(label, v01, text, hi - lo + 1);
+  // The raw knob moved v01 by drag or wheel; convert that travel into whole detents.
+  acc += (v01 - before) * kKnobDragPx / kEncoderStepPx;
+  if (ImGui::GetIO().MouseWheel != 0.0f && v01 != before)
+    acc = ImGui::GetIO().MouseWheel > 0.0f ? 1.0f : -1.0f;
+  int steps = static_cast<int>(acc);
+  acc -= static_cast<float>(steps);
+  const int next = std::clamp(value + steps, lo, hi);
+  const bool changed = next != value;
+  value = next;
+  return changed;
+}
+
+// One stompbox: knobs from the top, footswitch with LED and name at the foot.
+template <class F>
+void pedal(const char* name, bool& on, float width, const F& knobs) {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kModulePad, kModulePad + 4.0f));
+  ImGui::BeginChild(name, ImVec2(width, kPedalH), ImGuiChildFlags_Borders,
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+  ImGui::PopStyleVar();
+  knobs();
+  ImGui::SetCursorPosY(kPedalH - kFootH);
+  const ImVec2 at = ImGui::GetCursorScreenPos();
+  const float footW = ImGui::GetContentRegionAvail().x;
+  if (ImGui::InvisibleButton("foot", ImVec2(footW, kFootH - kModulePad))) on = !on;
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  const ImVec2 led(at.x + 0.5f * footW, at.y + 8.0f);
+  dl->AddCircleFilled(led, 6.0f, on ? IM_COL32(230, 40, 40, 255) : IM_COL32(70, 25, 25, 255), 16);
+  ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kPedalNameScale);
+  const ImVec2 size = ImGui::CalcTextSize(name);
+  dl->AddText(ImVec2(at.x + 0.5f * (footW - size.x), at.y + 22.0f), IM_COL32(230, 230, 235, 255), name);
+  ImGui::PopFont();
+  ImGui::EndChild();
+  gPedalRight = std::max(gPedalRight, ImGui::GetItemRectMax().x);
+  gPedalBottom = std::max(gPedalBottom, ImGui::GetItemRectMax().y);
+}
+
+// Panel knobs only, signal order left to right. Encoders sit below the knobs.
+void drawPedals(ProtoParams& params) {
+  constexpr int kPedals = 9;
+  const float w = (ImGui::GetContentRegionAvail().x - (kPedals - 1) * kPedalGap) / kPedals;
+  gPedalRight = 0.0f;
+  gPedalBottom = 0.0f;
+  const auto next = [] { ImGui::SameLine(0.0f, kPedalGap); };
+  cv::AutotuneParams& at = params.pitchFx.autotune;
+  cv::HarmonyParams& h = params.pitchFx.harmony;
+  cv::OctaveParams& o = params.pitchFx.octave;
+  char semis[16];
+  std::snprintf(semis, sizeof(semis), "%+d st", o.semitones);
+
+  pedal("AUTOTUNE", at.on, w, [&] {
+    pedalRange("RESPONSE", at.responseMs, cv::AutotuneVoice::kMinResponseMs,
+               cv::AutotuneVoice::kMaxResponseMs, true, "%.0f ms");
+    if (pedalEncoder("KEY", at.key, 0, 11, at.chromatic ? "Every note" : cv::kKeyName[at.key])) {
+      at.chromatic = false;  // picking a key leaves every-note mode, as on the full face
+      if (params.linkAutotuneKey) h.key = at.key;
+    }
+  });
+  next();
+  pedal("OCTAVE", o.on, w, [&] {
+    pedalPercent("MIX", o.mix);
+    pedalEncoder("SEMITONES", o.semitones, -12, 12, semis);
+  });
+  next();
+  pedal("HARMONY", h.on, w, [&] {
+    pedalPercent("MIX", h.mix);
+    if (pedalEncoder("KEY", h.key, 0, 11, cv::kKeyName[h.key]) && params.linkAutotuneKey)
+      at.key = h.key;
+  });
+  next();
+  pedal("UNISON", params.unison.on, w, [&] {
+    pedalPercent("DEPTH", params.unison.depth);
+    float rate = 0.01f * params.macros.pos[cv::macros::UnisonMotion];
+    if (pedalPercent("RATE", rate)) {
+      params.macros.pos[cv::macros::UnisonMotion] = 100.0f * rate;
+      cv::macros::unison(params.unison.tuning, params.macros.pos[cv::macros::UnisonBlend],
+                         params.macros.pos[cv::macros::UnisonMotion]);
+    }
+  });
+  next();
+  pedal("SLAPBACK", params.slapback.on, w, [&] {
+    pedalPercent("INTENSITY", params.slapback.intensity);
+    pedalRange("TIME", params.slapback.tuning.timeMs, 30.0f, 150.0f, false, "%.0f ms");
+  });
+  next();
+  pedal("DISTORTION", params.distortion.on, w, [&] {
+    pedalPercent("DRIVE", params.distortion.drive);
+    pedalPercent("TONE", params.distortion.tone);
+  });
+  next();
+  pedal("GATE", params.gate.on, w, [&] {
+    pedalRange("THRESHOLD", params.gate.thresholdDb, -70.0f, -10.0f, false, "%.0f dB");
+    pedalRange("DECAY", params.gate.tuning.releaseMs, 5.0f, 1000.0f, true, "%.0f ms");
+  });
+  next();
+  cv::ReverbParams& r = params.reverb;
+  pedal("REVERB", r.on, w, [&] {
+    float& decay = r.engine == cv::kReverbChasm ? r.chasm.decay
+                   : r.engine == cv::kReverbParker ? r.parker.tension : r.spring.tension;
+    float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell
+                   : r.engine == cv::kReverbParker ? r.parker.dwell : r.spring.dwell;
+    pedalPercent("DECAY", decay);
+    pedalPercent("DWELL", dwell);
+    pedalPercent("MIX", r.mix);
+  });
+  next();
+  pedal("OUTPUT EQ", params.eq.on, w, [&] { ImGui::TextDisabled("set in the menu"); });
+}
+
+void drawPedals(ProtoParams& params);
+void drawColumns(ProtoParams& params, const ProtoState& state);
+void drawModeButton(ProtoParams& params);
+
 std::array<float, kColumnCount> gColumnUsed{};  // content height per column this frame, px
 float gColumnAvail = 0.0f;                  // column height, px
 
@@ -1561,7 +1772,8 @@ template <class F>
 void column(int index, float width, const F& draw) {
   gCurrentColumn = index;
   ImGui::PushID(index);
-  ImGui::BeginChild("column", ImVec2(width, 0.0f), ImGuiChildFlags_None,
+  // The footer strip below the columns holds the mode button.
+  ImGui::BeginChild("column", ImVec2(width, -kFooterH), ImGuiChildFlags_None,
                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   ImGui::PushItemWidth(-kLabelW);
   draw();
@@ -1598,7 +1810,23 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   drawTransportRow(params, meterDb, probe);
   ImGui::Separator();
   ImGui::Dummy(ImVec2(0.0f, kTopGap));
+  if (params.pedalMode) drawPedals(params);
+  else drawColumns(params, state);
+  drawModeButton(params);
+  ImGui::End();
+}
 
+// Bottom-right switch between the full face and pedal mode.
+void drawModeButton(ProtoParams& params) {
+  const char* label = params.pedalMode ? "Full view###mode" : "Pedal mode###mode";
+  const float w = ImGui::CalcTextSize("Pedal mode").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+  ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y -
+                       ImGui::GetFrameHeight());
+  ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w);
+  if (ImGui::Button(label, ImVec2(w, 0.0f))) params.pedalMode = !params.pedalMode;
+}
+
+void drawColumns(ProtoParams& params, const ProtoState& state) {
   // Signal order runs down each column, then left to right.
   const float colW =
       (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 3.0f * kColumnGap) / 3.0f;
@@ -1630,7 +1858,6 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
     moduleBox("reverbBox", true, [&] { drawReverbBlock(params.reverb, params.macros); });
     moduleBox("eqBox", false, [&] { drawEqBlock(params.eq); });
   });
-  ImGui::End();
 }
 
 // ImGui's built-in font has no arrows. The system Unicode font fills in "Chorus \u2194 Double"
@@ -1692,6 +1919,7 @@ int runLayoutProbe() {
       {true, "reverb", "Parker springs", true}, {true, "reverb", "Parker drive", true},
       {true, "eq", nullptr, true},              {true, "ingate", nullptr, true},
       {true, "autotune", nullptr, true},        {true, "gate", nullptr, true},
+      {true, nullptr, nullptr, false, -1, true},
   };
 
   ProtoParams params;
@@ -1703,6 +1931,7 @@ int runLayoutProbe() {
   for (const ProbeOpen& s : kScenarios) {
     gProbeOpen = s;
     params.advanced = s.advanced;
+    params.pedalMode = s.pedal;
     if (s.reverbEngine >= 0) params.reverb.engine = s.reverbEngine;
     for (int frame = 0; frame < kProbeFrames; ++frame) {
       ImGui::NewFrame();
@@ -1712,11 +1941,15 @@ int runLayoutProbe() {
     char name[64];
     std::snprintf(name, sizeof(name), "%s %s%s%s%s", s.advanced ? "adv  " : "macro",
                   s.block ? s.block : "all closed", s.node ? " / " : "", s.node ? s.node : "",
-                  s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kParker ? " (PARKER)" : ""));
+                  s.pedal ? " (PEDAL MODE)" : s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kParker ? " (PARKER)" : ""));
     const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
     const bool headerFits = gHeaderRight <= static_cast<float>(kWindowW);
     if (!headerFits) std::printf("header row runs to %.0f px of %d\n", gHeaderRight, kWindowW);
-    const bool ok = worst <= gColumnAvail && headerFits;
+    const bool pedalFits = gPedalRight <= static_cast<float>(kWindowW) &&
+                           gPedalBottom <= static_cast<float>(kWindowH) - kFooterH;
+    const bool ok = (s.pedal ? pedalFits : worst <= gColumnAvail) && headerFits;
+    if (s.pedal) std::printf("pedal row: right %.0f of %d px, bottom %.0f of %.0f px\n", gPedalRight,
+                             kWindowW, gPedalBottom, static_cast<float>(kWindowH) - kFooterH);
     fits = fits && ok;
     std::printf("%-44s col1 %4.0f  col2 %4.0f  col3 %4.0f  col4 %4.0f  of %.0f px%s\n", name,
                 gColumnUsed[0], gColumnUsed[1], gColumnUsed[2], gColumnUsed[3], gColumnAvail,

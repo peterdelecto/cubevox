@@ -13,7 +13,9 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - Face layout (owner 2026-10-01): four columns, no scroll bar, window 1440x840 (the
   owner's laptop shows ~847 px of window). Each effect block has its own collapsed
   `Tuning` header directly below it; one Tuning header open per column at a time
-  (accordion), which is the invariant the `--layout` probe checks.
+  (accordion), which is the invariant the `--layout` probe checks. A footer strip holds the bottom-right "Pedal mode"
+  button (owner 2026-10-02): pedal mode draws each effect as a stompbox with only its
+  panel knobs (encoders below knobs), name and on/off LED at the foot; the probe checks it fits.
 - Level rule (owner 2026-10-01): every stage engaged at its default setting outputs
   near unity, 0 to +0.5 dB RMS over its input on program material. The trim that
   gets a stage there lives in its tuning (wetDb / trimDb); the panel knobs never
