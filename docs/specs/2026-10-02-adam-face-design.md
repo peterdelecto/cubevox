@@ -74,7 +74,7 @@ they are what Adam is choosing between.
 | | springs | 2 | 2 | 3 (≥ 75 %) |
 | SPRING Low end | hpHz | 600 | 300 | 120 |
 | | boingDb | 0 | 0 | 6 |
-| CHASM Wobble | wobble (param) | 0 | 0.15 | 0.6 |
+| CHASM Wobble | wobble (param) | 0 | 0.15 | 1.0 |
 | CHASM Brightness | trebleLossHz | 1500 | 3000 | 7000 |
 | | inputTrebleCut | 0.85 | 0.95 | 1.0 |
 | CHASM Bass | bassCutHz | 400 | 200 | 80 |
