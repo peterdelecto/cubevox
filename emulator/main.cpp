@@ -351,7 +351,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Higher %s, Follow my bends %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f ms, Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
+      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
       "voice formants High %+d / Higher %+d st; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
@@ -363,7 +363,9 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(p.inputGate.thresholdDb),
       static_cast<double>(p.inputGate.tuning.releaseMs), static_cast<double>(p.gate.thresholdDb),
       static_cast<double>(p.gate.tuning.releaseMs),
-      cv::kKeyName[atKey], static_cast<double>(at.responseMs),
+      cv::kKeyName[atKey],
+      static_cast<double>(cv::AutotuneVoice::mechanicalOf(at.responseMs) * 100.0f),
+      static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
       static_cast<int>(std::lround(o.formant)), static_cast<double>(o.mix * 100.0f),
       cv::kKeyName[h.key], static_cast<double>(h.mix * 100.0f),
@@ -1365,6 +1367,13 @@ void percentSlider(const char* label, float& value) {
   if (ImGui::SliderFloat(label, &percent, 0.0f, 100.0f, "%.0f %%")) value = percent / 100.0f;
 }
 
+// Autotune RESPONSE readout: the ends name the V3's NATURAL and MECHANICAL.
+const char* responseFormat(float mechanical) {
+  if (mechanical <= 0.005f) return "NATURAL";
+  if (mechanical >= 0.995f) return "MECHANICAL";
+  return "%.0f %%";
+}
+
 void drawHarmonyBlock(cv::HarmonyParams& h, cv::macros::State& macros) {
   ImGui::PushID("harmony");
   ImGui::Checkbox("HARMONY", &h.on);
@@ -1418,8 +1427,10 @@ void drawAutotuneBlock(cv::AutotuneParams& a, bool& linkKey, int& sharedKey,
     ImGui::SameLine();
     ImGui::Text("Correction: %+.2f st", a.on ? state.correctionSemis : 0.0f);
   }
-  ImGui::SliderFloat("RESPONSE", &a.responseMs, cv::AutotuneVoice::kMinResponseMs,
-                     cv::AutotuneVoice::kMaxResponseMs, "%.0f ms", ImGuiSliderFlags_Logarithmic);
+  const float mechanical = cv::AutotuneVoice::mechanicalOf(a.responseMs);
+  float percent = mechanical * 100.0f;
+  if (ImGui::SliderFloat("RESPONSE", &percent, 0.0f, 100.0f, responseFormat(mechanical)))
+    a.responseMs = cv::AutotuneVoice::responseMsAt(percent / 100.0f);
   drawAutotuneTuning(a);
   ImGui::PopID();
 }
@@ -1713,8 +1724,12 @@ void drawPedals(ProtoParams& params) {
   });
   next();
   pedal("AUTOTUNE", at.on, w, [&] {
-    pedalRange("RESPONSE", at.responseMs, cv::AutotuneVoice::kMinResponseMs,
-               cv::AutotuneVoice::kMaxResponseMs, true, "%.0f ms");
+    float mechanical = cv::AutotuneVoice::mechanicalOf(at.responseMs);
+    char text[16];
+    std::snprintf(text, sizeof(text), responseFormat(mechanical),
+                  static_cast<double>(mechanical * 100.0f));
+    if (pedalKnobRaw("RESPONSE", mechanical, text, 0))
+      at.responseMs = cv::AutotuneVoice::responseMsAt(mechanical);
     if (pedalEncoder("KEY", at.key, 0, 11, at.chromatic ? "Every note" : cv::kKeyName[at.key])) {
       at.chromatic = false;  // picking a key leaves every-note mode, as on the full face
       if (params.linkAutotuneKey) h.key = at.key;

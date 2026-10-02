@@ -129,6 +129,9 @@ He sings near-monotone and lets the box hold him on the note, artifacts included
    glitches the median guarded against do not change the correction, since the scale
    repeats every octave.
 2. RESPONSE runs 1..500 ms, default 1 ms (hard tune). Slower settings add natural wobble back.
+   The knob reads like the V3 (owner 2026-10-02): NATURAL (500 ms) on the left to MECHANICAL
+   (1 ms) on the right, log taper, `AutotuneVoice::responseMsAt` / `mechanicalOf`. No MIX knob;
+   the footswitch turns it on or off.
 3. Default engine A. Engine B drops the share of frames a tracker reads as voiced from 33 %
    to 20 % on Adam's dry loop, i.e. it roughens the voice; A keeps it at 33 %.
 4. `autotune_test` hard-tune check: 5 Hz, +-30 cent vibrato on A3 at the defaults must come

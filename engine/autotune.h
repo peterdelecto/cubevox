@@ -37,6 +37,15 @@ class AutotuneVoice {
   static constexpr float kMinResponseMs = 1.0f;
   static constexpr float kMaxResponseMs = 500.0f;
 
+  // The RESPONSE knob runs NATURAL (0, slow glide) to MECHANICAL (1, hard tune), log taper.
+  static float responseMsAt(float mechanical) {
+    return kMaxResponseMs * powf(kMinResponseMs / kMaxResponseMs, clampf(mechanical, 0.0f, 1.0f));
+  }
+  static float mechanicalOf(float responseMs) {
+    const float ms = clampf(responseMs, kMinResponseMs, kMaxResponseMs);
+    return logf(kMaxResponseMs / ms) / logf(kMaxResponseMs / kMinResponseMs);
+  }
+
   AutotuneVoice() { reset(); }
 
   void reset() {
