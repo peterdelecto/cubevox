@@ -16860,7 +16860,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "63f72cc4-e1a5-47e7-b7ce-e85500affd41")
-		(at 59.5 72 90)
+		(at 64.5 70 90)
 		(property "Reference" "SWBYPASS1"
 			(at 8.195001 0 0)
 			(layer "F.SilkS")
@@ -32381,7 +32381,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "a243daef-8869-483d-8a1f-5afaf8bb7a63")
-		(at 237.5 72)
+		(at 232.5 72)
 		(property "Reference" "RVGAIN1"
 			(at 0 -10.445 0)
 			(layer "F.SilkS")
@@ -37686,6 +37686,146 @@
 			(remove_unused_layers no)
 			(net "/I2C1_SDA")
 			(uuid "954ca7d2-1caa-467a-9874-1d1f970cd552")
+		)
+		(zone
+			(layers "F.Cu" "B.Cu")
+			(uuid "7d772051-c6ff-4c06-95e5-ee8d058298da")
+			(name "m3seat")
+			(hatch edge 0.5)
+			(connect_pads
+				(clearance 0)
+			)
+			(min_thickness 0.25)
+			(keepout
+				(tracks not_allowed)
+				(vias not_allowed)
+				(pads allowed)
+				(copperpour not_allowed)
+				(footprints allowed)
+			)
+			(placement
+				(enabled no)
+				(sheetname "")
+			)
+			(fill
+				(thermal_gap 0.5)
+				(thermal_bridge_width 0.5)
+				(island_removal_mode 0)
+			)
+			(polygon
+				(pts
+					(xy 122.835 65.75) (xy 122.7583 66.3323) (xy 122.5336 66.875) (xy 122.176 67.341) (xy 121.71 67.6986)
+					(xy 121.1673 67.9233) (xy 120.585 68) (xy 120.0027 67.9233) (xy 119.46 67.6986) (xy 118.994 67.341)
+					(xy 118.6364 66.875) (xy 118.4117 66.3323) (xy 118.335 65.75) (xy 118.4117 65.1677) (xy 118.6364 64.625)
+					(xy 118.994 64.159) (xy 119.46 63.8014) (xy 120.0027 63.5767) (xy 120.585 63.5) (xy 121.1673 63.5767)
+					(xy 121.71 63.8014) (xy 122.176 64.159) (xy 122.5336 64.625) (xy 122.7583 65.1677)
+				)
+			)
+		)
+		(zone
+			(layers "F.Cu" "B.Cu")
+			(uuid "00b4550f-d15e-48b2-886c-e9ae405834d8")
+			(name "m3seat")
+			(hatch edge 0.5)
+			(connect_pads
+				(clearance 0)
+			)
+			(min_thickness 0.25)
+			(keepout
+				(tracks not_allowed)
+				(vias not_allowed)
+				(pads allowed)
+				(copperpour not_allowed)
+				(footprints allowed)
+			)
+			(placement
+				(enabled no)
+				(sheetname "")
+			)
+			(fill
+				(thermal_gap 0.5)
+				(thermal_bridge_width 0.5)
+				(island_removal_mode 0)
+			)
+			(polygon
+				(pts
+					(xy 122.835 94.25) (xy 122.7583 94.8323) (xy 122.5336 95.375) (xy 122.176 95.841) (xy 121.71 96.1986)
+					(xy 121.1673 96.4233) (xy 120.585 96.5) (xy 120.0027 96.4233) (xy 119.46 96.1986) (xy 118.994 95.841)
+					(xy 118.6364 95.375) (xy 118.4117 94.8323) (xy 118.335 94.25) (xy 118.4117 93.6677) (xy 118.6364 93.125)
+					(xy 118.994 92.659) (xy 119.46 92.3014) (xy 120.0027 92.0767) (xy 120.585 92) (xy 121.1673 92.0767)
+					(xy 121.71 92.3014) (xy 122.176 92.659) (xy 122.5336 93.125) (xy 122.7583 93.6677)
+				)
+			)
+		)
+		(zone
+			(layers "F.Cu" "B.Cu")
+			(uuid "9b6ccafb-f9f1-4782-ade2-74a2fc1a4523")
+			(name "m3seat")
+			(hatch edge 0.5)
+			(connect_pads
+				(clearance 0)
+			)
+			(min_thickness 0.25)
+			(keepout
+				(tracks not_allowed)
+				(vias not_allowed)
+				(pads allowed)
+				(copperpour not_allowed)
+				(footprints allowed)
+			)
+			(placement
+				(enabled no)
+				(sheetname "")
+			)
+			(fill
+				(thermal_gap 0.5)
+				(thermal_bridge_width 0.5)
+				(island_removal_mode 0)
+			)
+			(polygon
+				(pts
+					(xy 153.235 65.75) (xy 153.1583 66.3323) (xy 152.9336 66.875) (xy 152.576 67.341) (xy 152.11 67.6986)
+					(xy 151.5673 67.9233) (xy 150.985 68) (xy 150.4027 67.9233) (xy 149.86 67.6986) (xy 149.394 67.341)
+					(xy 149.0364 66.875) (xy 148.8117 66.3323) (xy 148.735 65.75) (xy 148.8117 65.1677) (xy 149.0364 64.625)
+					(xy 149.394 64.159) (xy 149.86 63.8014) (xy 150.4027 63.5767) (xy 150.985 63.5) (xy 151.5673 63.5767)
+					(xy 152.11 63.8014) (xy 152.576 64.159) (xy 152.9336 64.625) (xy 153.1583 65.1677)
+				)
+			)
+		)
+		(zone
+			(layers "F.Cu" "B.Cu")
+			(uuid "e0611319-33c6-4a14-b4f1-d067e90e0c71")
+			(name "m3seat")
+			(hatch edge 0.5)
+			(connect_pads
+				(clearance 0)
+			)
+			(min_thickness 0.25)
+			(keepout
+				(tracks not_allowed)
+				(vias not_allowed)
+				(pads allowed)
+				(copperpour not_allowed)
+				(footprints allowed)
+			)
+			(placement
+				(enabled no)
+				(sheetname "")
+			)
+			(fill
+				(thermal_gap 0.5)
+				(thermal_bridge_width 0.5)
+				(island_removal_mode 0)
+			)
+			(polygon
+				(pts
+					(xy 153.235 94.25) (xy 153.1583 94.8323) (xy 152.9336 95.375) (xy 152.576 95.841) (xy 152.11 96.1986)
+					(xy 151.5673 96.4233) (xy 150.985 96.5) (xy 150.4027 96.4233) (xy 149.86 96.1986) (xy 149.394 95.841)
+					(xy 149.0364 95.375) (xy 148.8117 94.8323) (xy 148.735 94.25) (xy 148.8117 93.6677) (xy 149.0364 93.125)
+					(xy 149.394 92.659) (xy 149.86 92.3014) (xy 150.4027 92.0767) (xy 150.985 92) (xy 151.5673 92.0767)
+					(xy 152.11 92.3014) (xy 152.576 92.659) (xy 152.9336 93.125) (xy 153.1583 93.6677)
+				)
+			)
 		)
 		(embedded_fonts no)
 		(model "${KIPRJMOD}/cubevox.3dshapes/OLED-1.3-SH1106-I2C-4P.step"
@@ -45641,6 +45781,36 @@
 			(net "/h7core_block/SWO")
 			(uuid "a667961b-0d77-49ce-a0d7-cf7a6afa4169")
 		)
+		(zone
+			(layer "F.Cu")
+			(uuid "8cde9313-c627-45e7-a290-874e81cc0cd4")
+			(hatch full 0.508)
+			(connect_pads
+				(clearance 0)
+			)
+			(min_thickness 0.254)
+			(keepout
+				(tracks allowed)
+				(vias not_allowed)
+				(pads allowed)
+				(copperpour not_allowed)
+				(footprints not_allowed)
+			)
+			(placement
+				(enabled no)
+				(sheetname "")
+			)
+			(fill
+				(thermal_gap 0.508)
+				(thermal_bridge_width 0.508)
+				(island_removal_mode 0)
+			)
+			(polygon
+				(pts
+					(xy 284.135 111.27) (xy 284.135 108.73) (xy 282.865 108.73) (xy 282.865 111.27)
+				)
+			)
+		)
 		(embedded_fonts no)
 	)
 	(footprint "cubevox:RELAY-SMD_G6K-2F-X-XX"
@@ -53328,190 +53498,4 @@
 		(uuid "5a0b18c2-e15c-47ce-acc4-3ae9874dff33")
 	)
 	(embedded_fonts no)
-		(zone
-			(layers "F.Cu" "B.Cu")
-			(uuid "acc8b82c-8114-4fb2-80a1-dedb55e78e27")
-			(name "m3seat")
-			(hatch edge 0.5)
-			(connect_pads
-				(clearance 0)
-			)
-			(min_thickness 0.25)
-			(keepout
-				(tracks not_allowed)
-				(vias not_allowed)
-				(pads allowed)
-				(copperpour not_allowed)
-				(footprints allowed)
-			)
-			(placement
-				(enabled no)
-				(sheetname "")
-			)
-			(fill
-				(thermal_gap 0.5)
-				(thermal_bridge_width 0.5)
-				(island_removal_mode 0)
-			)
-			(polygon
-				(pts
-					(xy 57.0000 35.0000) (xy 56.8807 35.9059) (xy 56.5311 36.7500) (xy 55.9749 37.4749) (xy 55.2500 38.0311) (xy 54.4059 38.3807) (xy 53.5000 38.5000) (xy 52.5941 38.3807) (xy 51.7500 38.0311) (xy 51.0251 37.4749) (xy 50.4689 36.7500) (xy 50.1193 35.9059) (xy 50.0000 35.0000) (xy 50.1193 34.0941) (xy 50.4689 33.2500) (xy 51.0251 32.5251) (xy 51.7500 31.9689) (xy 52.5941 31.6193) (xy 53.5000 31.5000) (xy 54.4059 31.6193) (xy 55.2500 31.9689) (xy 55.9749 32.5251) (xy 56.5311 33.2500) (xy 56.8807 34.0941)
-				)
-			)
-		)
-		(zone
-			(layers "F.Cu" "B.Cu")
-			(uuid "d4162d79-b0e7-4c71-aee2-28f392f3c10d")
-			(name "m3seat")
-			(hatch edge 0.5)
-			(connect_pads
-				(clearance 0)
-			)
-			(min_thickness 0.25)
-			(keepout
-				(tracks not_allowed)
-				(vias not_allowed)
-				(pads allowed)
-				(copperpour not_allowed)
-				(footprints allowed)
-			)
-			(placement
-				(enabled no)
-				(sheetname "")
-			)
-			(fill
-				(thermal_gap 0.5)
-				(thermal_bridge_width 0.5)
-				(island_removal_mode 0)
-			)
-			(polygon
-				(pts
-					(xy 247.0000 35.0000) (xy 246.8807 35.9059) (xy 246.5311 36.7500) (xy 245.9749 37.4749) (xy 245.2500 38.0311) (xy 244.4059 38.3807) (xy 243.5000 38.5000) (xy 242.5941 38.3807) (xy 241.7500 38.0311) (xy 241.0251 37.4749) (xy 240.4689 36.7500) (xy 240.1193 35.9059) (xy 240.0000 35.0000) (xy 240.1193 34.0941) (xy 240.4689 33.2500) (xy 241.0251 32.5251) (xy 241.7500 31.9689) (xy 242.5941 31.6193) (xy 243.5000 31.5000) (xy 244.4059 31.6193) (xy 245.2500 31.9689) (xy 245.9749 32.5251) (xy 246.5311 33.2500) (xy 246.8807 34.0941)
-				)
-			)
-		)
-		(zone
-			(layers "F.Cu" "B.Cu")
-			(uuid "c63093ec-7c2e-4dc2-88d3-f216f969529a")
-			(name "m3seat")
-			(hatch edge 0.5)
-			(connect_pads
-				(clearance 0)
-			)
-			(min_thickness 0.25)
-			(keepout
-				(tracks not_allowed)
-				(vias not_allowed)
-				(pads allowed)
-				(copperpour not_allowed)
-				(footprints allowed)
-			)
-			(placement
-				(enabled no)
-				(sheetname "")
-			)
-			(fill
-				(thermal_gap 0.5)
-				(thermal_bridge_width 0.5)
-				(island_removal_mode 0)
-			)
-			(polygon
-				(pts
-					(xy 57.0000 175.0000) (xy 56.8807 175.9059) (xy 56.5311 176.7500) (xy 55.9749 177.4749) (xy 55.2500 178.0311) (xy 54.4059 178.3807) (xy 53.5000 178.5000) (xy 52.5941 178.3807) (xy 51.7500 178.0311) (xy 51.0251 177.4749) (xy 50.4689 176.7500) (xy 50.1193 175.9059) (xy 50.0000 175.0000) (xy 50.1193 174.0941) (xy 50.4689 173.2500) (xy 51.0251 172.5251) (xy 51.7500 171.9689) (xy 52.5941 171.6193) (xy 53.5000 171.5000) (xy 54.4059 171.6193) (xy 55.2500 171.9689) (xy 55.9749 172.5251) (xy 56.5311 173.2500) (xy 56.8807 174.0941)
-				)
-			)
-		)
-		(zone
-			(layers "F.Cu" "B.Cu")
-			(uuid "bd11dbad-65f2-43ab-b4b5-2fcb9c80227b")
-			(name "m3seat")
-			(hatch edge 0.5)
-			(connect_pads
-				(clearance 0)
-			)
-			(min_thickness 0.25)
-			(keepout
-				(tracks not_allowed)
-				(vias not_allowed)
-				(pads allowed)
-				(copperpour not_allowed)
-				(footprints allowed)
-			)
-			(placement
-				(enabled no)
-				(sheetname "")
-			)
-			(fill
-				(thermal_gap 0.5)
-				(thermal_bridge_width 0.5)
-				(island_removal_mode 0)
-			)
-			(polygon
-				(pts
-					(xy 247.0000 175.0000) (xy 246.8807 175.9059) (xy 246.5311 176.7500) (xy 245.9749 177.4749) (xy 245.2500 178.0311) (xy 244.4059 178.3807) (xy 243.5000 178.5000) (xy 242.5941 178.3807) (xy 241.7500 178.0311) (xy 241.0251 177.4749) (xy 240.4689 176.7500) (xy 240.1193 175.9059) (xy 240.0000 175.0000) (xy 240.1193 174.0941) (xy 240.4689 173.2500) (xy 241.0251 172.5251) (xy 241.7500 171.9689) (xy 242.5941 171.6193) (xy 243.5000 171.5000) (xy 244.4059 171.6193) (xy 245.2500 171.9689) (xy 245.9749 172.5251) (xy 246.5311 173.2500) (xy 246.8807 174.0941)
-				)
-			)
-		)
-		(zone
-			(layers "F.Cu" "B.Cu")
-			(uuid "7be7b918-5c49-48ef-9048-3ed221c3cfb6")
-			(name "rest_boss")
-			(hatch edge 0.5)
-			(connect_pads
-				(clearance 0)
-			)
-			(min_thickness 0.25)
-			(keepout
-				(tracks not_allowed)
-				(vias not_allowed)
-				(pads not_allowed)
-				(copperpour not_allowed)
-				(footprints not_allowed)
-			)
-			(placement
-				(enabled no)
-				(sheetname "")
-			)
-			(fill
-				(thermal_gap 0.5)
-				(thermal_bridge_width 0.5)
-				(island_removal_mode 0)
-			)
-			(polygon
-				(pts
-					(xy 104.0000 100.0000) (xy 103.8637 101.0353) (xy 103.4641 102.0000) (xy 102.8284 102.8284) (xy 102.0000 103.4641) (xy 101.0353 103.8637) (xy 100.0000 104.0000) (xy 98.9647 103.8637) (xy 98.0000 103.4641) (xy 97.1716 102.8284) (xy 96.5359 102.0000) (xy 96.1363 101.0353) (xy 96.0000 100.0000) (xy 96.1363 98.9647) (xy 96.5359 98.0000) (xy 97.1716 97.1716) (xy 98.0000 96.5359) (xy 98.9647 96.1363) (xy 100.0000 96.0000) (xy 101.0353 96.1363) (xy 102.0000 96.5359) (xy 102.8284 97.1716) (xy 103.4641 98.0000) (xy 103.8637 98.9647)
-				)
-			)
-		)
-		(zone
-			(layers "F.Cu" "B.Cu")
-			(uuid "305412fd-8e42-4a7c-9f54-98de381a9c35")
-			(name "rest_boss")
-			(hatch edge 0.5)
-			(connect_pads
-				(clearance 0)
-			)
-			(min_thickness 0.25)
-			(keepout
-				(tracks not_allowed)
-				(vias not_allowed)
-				(pads not_allowed)
-				(copperpour not_allowed)
-				(footprints not_allowed)
-			)
-			(placement
-				(enabled no)
-				(sheetname "")
-			)
-			(fill
-				(thermal_gap 0.5)
-				(thermal_bridge_width 0.5)
-				(island_removal_mode 0)
-			)
-			(polygon
-				(pts
-					(xy 201.0000 100.0000) (xy 200.8637 101.0353) (xy 200.4641 102.0000) (xy 199.8284 102.8284) (xy 199.0000 103.4641) (xy 198.0353 103.8637) (xy 197.0000 104.0000) (xy 195.9647 103.8637) (xy 195.0000 103.4641) (xy 194.1716 102.8284) (xy 193.5359 102.0000) (xy 193.1363 101.0353) (xy 193.0000 100.0000) (xy 193.1363 98.9647) (xy 193.5359 98.0000) (xy 194.1716 97.1716) (xy 195.0000 96.5359) (xy 195.9647 96.1363) (xy 197.0000 96.0000) (xy 198.0353 96.1363) (xy 199.0000 96.5359) (xy 199.8284 97.1716) (xy 200.4641 98.0000) (xy 200.8637 98.9647)
-				)
-			)
-		)
 )
