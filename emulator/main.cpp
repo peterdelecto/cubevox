@@ -811,10 +811,10 @@ void drawReverbRaw(cv::SpringTuning& t, cv::ChasmTuning& c, cv::SpringCTuning& p
 }
 
 // Reset and Print cover every effect's tuning.
-void drawTuningButtons(ProtoParams& params) {
+void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
   cv::HarmonyTuning& ht = params.pitchFx.harmony.tuning;
   cv::OctaveTuning& ot = params.pitchFx.octave.tuning;
-  if (ImGui::Button("Reset to defaults")) {
+  if (ImGui::Button("Reset to defaults", ImVec2(resetW, 0.0f))) {
     ht = cv::HarmonyTuning{};
     ot = cv::OctaveTuning{};
     params.pitchFx.autotune.tuning = cv::AutotuneTuning{};
@@ -833,11 +833,7 @@ void drawTuningButtons(ProtoParams& params) {
     params.reverb.chasm.wobble = cv::ChasmParams{}.wobble;  // the CHASM Wobble macro writes it
     params.macros = cv::macros::State{};
   }
-  // Right-justified at the full label's width, so "Copied" never moves it.
-  constexpr const char* kCopyLabel = "Copy settings to clipboard";
-  const float copyW = ImGui::CalcTextSize(kCopyLabel).x + 2.0f * ImGui::GetStyle().FramePadding.x;
   ImGui::SameLine();
-  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - copyW));
   // The label confirms the copy for a moment; the ### id keeps the button the same widget.
   static double copiedAt = -10.0;
   constexpr double kCopiedShowSec = 1.5;
@@ -873,27 +869,55 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
 // Last drawn rect per toggle, for the probe's click test.
 std::map<std::string, std::pair<ImVec2, ImVec2>> gToggleRects;
 
-void toggleButton(const char* name, bool& on, bool withState = true) {
+void toggleButton(const char* name, bool& on, bool withState = true, float width = 0.0f) {
   char label[64];
   if (withState) std::snprintf(label, sizeof(label), "%s: %s###%s", name, on ? "ON" : "OFF", name);
   else std::snprintf(label, sizeof(label), "%s", name);
   // Push and pop follow the state at draw time; the click flips on in between.
   const bool lit = on;
   if (lit) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-  if (ImGui::Button(label)) on = !on;
+  if (ImGui::Button(label, ImVec2(width, 0.0f))) on = !on;
   if (lit) ImGui::PopStyleColor();
   gToggleRects[name] = {ImGui::GetItemRectMin(), ImGui::GetItemRectMax()};
 }
 
+// Header items in order, each at its natural width plus an equal share of the
+// spare row width, so the row spans the window.
+struct HeaderWidths {
+  float load, name, play, meter, advanced, feedback, amount, movement, reset, copy;
+};
+
+HeaderWidths headerWidths(bool dev) {
+  const ImGuiStyle& st = ImGui::GetStyle();
+  const auto button = [&](const char* t) { return ImGui::CalcTextSize(t).x + 2.0f * st.FramePadding.x; };
+  const auto slider = [&](const char* t) {
+    return kFeedbackSliderW + st.ItemInnerSpacing.x + ImGui::CalcTextSize(t).x;
+  };
+  HeaderWidths w{button("Load loop"), kLoopNameW,     button("Stop"),
+                 kMeterW,             dev ? button("Advanced") : 0.0f,
+                 button("STAGE FEEDBACK: OFF"), slider("Amount"), slider("Movement"),
+                 button("Reset to defaults"),   button("Copy settings to clipboard")};
+  float* const items[] = {&w.load, &w.name,   &w.play,     &w.meter, &w.advanced,
+                          &w.feedback, &w.amount, &w.movement, &w.reset, &w.copy};
+  const int count = dev ? 10 : 9;
+  float used = st.ItemSpacing.x * static_cast<float>(count - 1);
+  for (float* v : items) used += *v;
+  const float extra = std::max(0.0f, ImGui::GetContentRegionAvail().x - used) / static_cast<float>(count);
+  for (float* v : items)
+    if (*v > 0.0f) *v += extra;
+  return w;
+}
+
 void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
-  if (ImGui::Button("Load loop") && !probe) {
+  const HeaderWidths hw = headerWidths(params.dev);
+  if (ImGui::Button("Load loop", ImVec2(hw.load, 0.0f)) && !probe) {
     const std::string path = openFilePanel();
     if (!path.empty()) loadLoop(path);
   }
   ImGui::SameLine();
   // Fixed-width name slot so a long file name never pushes the row off screen.
   std::string name = gLoopPath.empty() ? "(no loop)" : baseName(gLoopPath);
-  const float maxW = kLoopNameW;
+  const float maxW = hw.name;
   if (ImGui::CalcTextSize(name.c_str()).x > maxW) {
     while (!name.empty() && ImGui::CalcTextSize((name + "...").c_str()).x > maxW) name.pop_back();
     name += "...";
@@ -903,31 +927,33 @@ void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   ImGui::SameLine(0.0f, 0.0f);
   ImGui::Dummy(ImVec2(std::max(0.0f, maxW - ImGui::GetItemRectSize().x), 0.0f));
   ImGui::SameLine();
-  if (ImGui::Button(params.playing ? "Stop" : "Play")) params.playing = !params.playing;
+  if (ImGui::Button(params.playing ? "Stop###play" : "Play###play", ImVec2(hw.play, 0.0f)))
+    params.playing = !params.playing;
   ImGui::SameLine();
 
   const float frac = std::clamp((meterDb - kMeterFloorDb) / -kMeterFloorDb, 0.0f, 1.0f);
   char label[32];
   std::snprintf(label, sizeof(label), "%.1f dBFS", meterDb);
-  ImGui::ProgressBar(frac, ImVec2(kMeterW, 0.0f), label);
+  ImGui::ProgressBar(frac, ImVec2(hw.meter, 0.0f), label);
   ImGui::SameLine();
   if (params.dev) {
-    toggleButton("Advanced", params.advanced, false);  // dev only; lit when on
+    toggleButton("Advanced", params.advanced, false, hw.advanced);  // dev only; lit when on
     ImGui::SameLine();
   }
-  toggleButton("STAGE FEEDBACK", params.stageFeedback);
+  toggleButton("STAGE FEEDBACK", params.stageFeedback, true, hw.feedback);
   ImGui::BeginDisabled(!params.stageFeedback);
   ImGui::SameLine();
-  ImGui::SetNextItemWidth(kFeedbackSliderW);
+  const float labelGap = ImGui::GetStyle().ItemInnerSpacing.x;
+  ImGui::SetNextItemWidth(hw.amount - labelGap - ImGui::CalcTextSize("Amount").x);
   ImGui::SliderFloat("Amount", &params.feedbackAmount, 0.0f, 100.0f, "%.0f%%",
                      ImGuiSliderFlags_NoRoundToFormat);
   ImGui::SameLine();
-  ImGui::SetNextItemWidth(kFeedbackSliderW);
+  ImGui::SetNextItemWidth(hw.movement - labelGap - ImGui::CalcTextSize("Movement").x);
   ImGui::SliderFloat("Movement", &params.feedbackMovement, 0.0f, 100.0f, "%.0f%%",
                      ImGuiSliderFlags_NoRoundToFormat);
   ImGui::EndDisabled();
   ImGui::SameLine();
-  drawTuningButtons(params);
+  drawTuningButtons(params, hw.reset, hw.copy);
 }
 
 // ---- Harmony voices: High / Higher, each Off / Quiet / Loud / Louder ----------------
@@ -1576,6 +1602,7 @@ constexpr float kPedalGap = 12.0f;       // space between pedals, px
 constexpr float kPedalH = 420.0f;        // pedal height, px
 constexpr float kFootH = 64.0f;          // footswitch strip at the pedal's foot, px
 constexpr float kPedalNameScale = 1.3f;  // pedal name type size vs the face
+constexpr ImVec2 kSwitchSize = ImVec2(96.0f, 44.0f);  // slide switch track, px
 constexpr float kPiF = 3.14159265f;
 
 float gPedalRight = 0.0f;   // right edge of the pedal row this frame, px
@@ -1606,6 +1633,27 @@ void drawKnobFace(ImVec2 c, float v01, int detents) {
   const float a = knobAngle(v01);
   dl->AddLine(ImVec2(c.x + 0.25f * kKnobR * cosf(a), c.y + 0.25f * kKnobR * sinf(a)),
               ImVec2(c.x + 0.9f * kKnobR * cosf(a), c.y + 0.9f * kKnobR * sinf(a)), lit, 3.0f);
+}
+
+// Slide switch centred in the pedal; the thumb sits right and lights when on.
+void pedalSwitch(const char* id, bool& on) {
+  ImGui::Dummy(ImVec2(0.0f, kKnobGapY));
+  ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                       0.5f * std::max(0.0f, ImGui::GetContentRegionAvail().x - kSwitchSize.x));
+  if (ImGui::InvisibleButton(id, kSwitchSize)) on = !on;
+  const ImVec2 lo = ImGui::GetItemRectMin();
+  const ImVec2 hi = ImGui::GetItemRectMax();
+  const float r = 0.5f * kSwitchSize.y;
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  dl->AddRectFilled(lo, hi, on ? IM_COL32(230, 180, 60, 255) : IM_COL32(45, 45, 50, 255), r);
+  dl->AddRect(lo, hi, IM_COL32(150, 150, 160, 255), r, 0, 1.5f);
+  const ImVec2 thumb(on ? hi.x - r : lo.x + r, lo.y + r);
+  dl->AddCircleFilled(thumb, r - 4.0f, IM_COL32(230, 230, 235, 255), 32);
+  const char* text = on ? "ON" : "OFF";
+  const ImVec2 size = ImGui::CalcTextSize(text);
+  const float textX = on ? lo.x + r - 0.5f * size.x + 4.0f : hi.x - r - 0.5f * size.x - 4.0f;
+  dl->AddText(ImVec2(textX, lo.y + r - 0.5f * size.y),
+              on ? IM_COL32(30, 30, 30, 255) : IM_COL32(200, 200, 205, 255), text);
 }
 
 // Knob on the left, label and value on the right. Drag up/down or scroll.
@@ -1723,7 +1771,7 @@ void drawPedals(ProtoParams& params) {
       at.chromatic = false;  // picking a key leaves every-note mode, as on the full face
       if (params.linkAutotuneKey) h.key = at.key;
     }
-    toggleButton("AUTOTUNE", at.on);
+    pedalSwitch("autotuneSwitch", at.on);
   });
   next();
   pedal("OCTAVE", o.on, w, [&] {
@@ -1969,6 +2017,7 @@ int runLayoutProbe() {
     const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
     const bool headerFits = gHeaderRight <= static_cast<float>(kWindowW);
     if (!headerFits) std::printf("header row runs to %.0f px of %d\n", gHeaderRight, kWindowW);
+    else std::printf("header row ends at %.0f px of %d\n", gHeaderRight, kWindowW);
     const bool pedalFits = gPedalRight <= static_cast<float>(kWindowW) &&
                            gPedalBottom <= static_cast<float>(kWindowH) - kFooterH;
     bool columnsFit = true;
