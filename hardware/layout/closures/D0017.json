@@ -1,0 +1,55 @@
+{
+ "declaration": "D0017",
+ "ledger": "0033",
+ "baseline": "0032",
+ "board_sha256": "2c6b9049aa13ef130bf25127b8ded30859a6a23b6938e286dab5df3e7ccebc1b",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0033.json",
+ "intended": [
+  {
+   "measure": "airline:/h7core_block/USB_DM",
+   "why": "declared",
+   "before": 53.666,
+   "after": 48.84,
+   "delta": -4.826,
+   "direction": "better"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DP",
+   "why": "declared",
+   "before": 54.692,
+   "after": 48.049,
+   "delta": -6.643,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 13794.6,
+   "after": 13776.5,
+   "delta": -18.1,
+   "direction": "better"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 101,
+   "after": 106,
+   "delta": 5,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C18",
+   "why": "declared",
+   "before": 3.93,
+   "after": 3.02,
+   "delta": -0.91,
+   "direction": "better"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

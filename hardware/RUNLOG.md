@@ -12,3 +12,13 @@ placement buck5_in | D0005, ledger 0021, commit 25a1a75168c1 | intended 4, unint
 placement buck33_out | D0006, ledger 0022, commit 7de04acd3295 | intended 5, unintended 0; airline:/h7core_block/BUCK_SW 8.985>11.829; airline_total_mm 13913.9>13915.8; reach:C21 10.46>8.88; reach:C22 12.53>8.85; 
 placement buck33_in | D0007, ledger 0023, commit cc7880faa219 | intended 3, unintended 0; airline:/h7core_block/BUCK_SW 11.829>11.861; airline_total_mm 13915.8>13920.3; reach:C20 2.48>5.45; 
 placement ldo_3v3a | D0008, ledger 0024, commit c64e513ed873 | intended 3, unintended 0; airline_total_mm 13920.3>13919.8; reach:C24 2.81>3.56; reach:C25 4.66>4.53; 
+placement review | ledger 0024 state | cluster-pass agent stopped: D0003 usb_esd put USB_DP/DM airlines 53.7/54.7 over the 50 budget (canon 29 placement_gate) and D0005/D0007 raised buck input cap reach 2.0->8.0 and 2.5->5.5 (canon 36), accepted under canon:31 (tier 2 excusing tier 1). Power and USB clusters re-placed by hand from the pin map.
+placement buck5_out | D0009, ledger 0025, commit 7d85575 | L101 (96,46,0) SW pad on pin 5 line, C114/C115 (100.5/103.5,46,270), C19 (109,46,0); reach up (instrument reads the 5V pin, not L101) declared.
+placement buck5_in | D0010, ledger 0026, commit a36a9e9 | C113 (97,53,90), C112 (99.5,53,90) on U103 east flank, C116 (93.5,50,0); reach C112 8.39->4.58, C113 8.03->2.09; airline_total -22.7.
+placement buck33_in | D0011, ledger 0027, commit 859d652 | C20 (92,60.9,270) west flank, C23 (96,64,180); reach C20 5.45->2.58; BUCK_SW airline 11.86->8.28.
+placement i2c_pullups | D0012, ledger 0028, commit 025b569 | R142/R143 (137/139.5,60.5,270) north of J117 pins; airline_total -29.8.
+placement buck33_out | D0013, ledger 0029, commit 7359655 | L1 (97.5,68,180) SW pad under pin 5, C21/C22 (102.5/105.5,68,270); BUCK_SW airline 8.28->6.03 (budget 6, trial route decides); reach C21/C22 9.05/11.28 (reads U1/U4 pins).
+placement ldo_3v3a | D0014, ledger 0030, commit 740c9ca | C24 (102.5,63.5,270), C25 (109.5,63.5,270); reach C24 2.33, C25 4.86.
+placement pwr_led | D0015/D0018, ledger 0031/0034, commit f6281e8/02f7096 | R10 (109,68,0), D3 (112.5,68,180) east of C22.
+placement analog_rail | D0016/D0018, ledger 0032/0034, commit f09063f/02f7096 | FB101 (107,51.5,270) under C19 5V pad, C117 (109.5,51.5,90), R151/R152/C163 (112/114/116,51.5); airline_total -36.1. First pass left C117-R151 at 0.09 and C22-R10 at 0.28 (floor 0.3); D0018 re-spaced both, body_tight 4->2.
+placement usb_esd | D0017, ledger 0033, commit 2cb6ede | row y 40.5 under J1: R5 C18 D2 R4 R6 R7 (120.5..132.5), D2 rot 0 flow-through; USB_DM 53.67->48.84, USB_DP 54.69->48.05 (budget 50); reach C18 3.02. Brief side=bottom not followed (register entry).
