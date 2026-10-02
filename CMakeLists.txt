@@ -5,10 +5,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(glfw3 QUIET)
-if(NOT glfw3_FOUND)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(GLFW REQUIRED glfw3)
+# Release builds compile GLFW in statically so the app runs on a Mac without
+# Homebrew (tools/package.sh). Dev builds use the installed GLFW.
+option(CUBEVOX_BUNDLE_GLFW "Build GLFW from source and link it statically" OFF)
+if(CUBEVOX_BUNDLE_GLFW)
+  include(FetchContent)
+  set(GLFW_BUILD_SHARED_LIBRARY OFF CACHE BOOL "" FORCE)
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+  set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+  set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(glfw GIT_REPOSITORY https://github.com/glfw/glfw.git GIT_TAG 3.4)
+  FetchContent_MakeAvailable(glfw)
+  set(glfw3_FOUND TRUE)
+else()
+  find_package(glfw3 QUIET)
+  if(NOT glfw3_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GLFW REQUIRED glfw3)
+  endif()
 endif()
 
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
@@ -71,10 +87,12 @@ cubevox_gui_target(cubevox-proto emulator/main.cpp)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/VERSION.txt)
 file(STRINGS ${CMAKE_SOURCE_DIR}/VERSION.txt CUBEVOX_VERSION LIMIT_COUNT 1)
 target_compile_definitions(cubevox-proto PRIVATE CUBEVOX_VERSION="v${CUBEVOX_VERSION}")
-add_custom_command(TARGET cubevox-proto POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E create_symlink
-          ${CMAKE_BINARY_DIR}/cubevox-proto.app ${CMAKE_SOURCE_DIR}/cubevox-proto.app
-  VERBATIM)
+if(NOT CUBEVOX_BUNDLE_GLFW)
+  add_custom_command(TARGET cubevox-proto POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_BINARY_DIR}/cubevox-proto.app ${CMAKE_SOURCE_DIR}/cubevox-proto.app
+    VERBATIM)
+endif()
 
 # cubevox-render: loop in, WAV out, no window.
 add_executable(cubevox-render tools/render.cpp tools/miniaudio_impl.cpp)
