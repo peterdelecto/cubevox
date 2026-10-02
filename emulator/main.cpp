@@ -828,12 +828,17 @@ void drawTuningButtons(ProtoParams& params) {
     params.reverb.chasm.wobble = cv::ChasmParams{}.wobble;  // the CHASM Wobble macro writes it
     params.macros = cv::macros::State{};
   }
+  // Right-justified at the full label's width, so "Copied" never moves it.
+  constexpr const char* kCopyLabel = "Copy settings to clipboard";
+  const float copyW = ImGui::CalcTextSize(kCopyLabel).x + 2.0f * ImGui::GetStyle().FramePadding.x;
   ImGui::SameLine();
+  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - copyW));
   // The label confirms the copy for a moment; the ### id keeps the button the same widget.
   static double copiedAt = -10.0;
   constexpr double kCopiedShowSec = 1.5;
   const bool justCopied = ImGui::GetTime() - copiedAt < kCopiedShowSec;
-  if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings to clipboard###copy")) {
+  if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings to clipboard###copy",
+                    ImVec2(copyW, 0.0f))) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
                 params.distortion.tuning, params.reverb.spring.tuning,
                 params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq, params.inputGate.tuning,
@@ -856,6 +861,17 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
   gHeaderRight = ImGui::GetItemRectMax().x;
   ImGui::PopStyleVar();
   ImGui::PopFont();
+}
+
+// Header on/off switch. A checkbox square at headline size reads as an empty tile,
+// so the state is in the label and the button lights when on.
+void toggleButton(const char* name, bool& on, bool withState = true) {
+  char label[64];
+  if (withState) std::snprintf(label, sizeof(label), "%s: %s###%s", name, on ? "ON" : "OFF", name);
+  else std::snprintf(label, sizeof(label), "%s", name);
+  if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+  if (ImGui::Button(label)) on = !on;
+  if (on) ImGui::PopStyleColor();
 }
 
 void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
@@ -885,10 +901,10 @@ void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   ImGui::ProgressBar(frac, ImVec2(kMeterW, 0.0f), label);
   ImGui::SameLine();
   if (params.dev) {
-    ImGui::Checkbox("Advanced", &params.advanced);
+    toggleButton("Advanced", params.advanced, false);  // dev only; lit when on
     ImGui::SameLine();
   }
-  ImGui::Checkbox("STAGE FEEDBACK", &params.stageFeedback);
+  toggleButton("STAGE FEEDBACK", params.stageFeedback);
   ImGui::BeginDisabled(!params.stageFeedback);
   ImGui::SameLine();
   ImGui::SetNextItemWidth(kFeedbackSliderW);
