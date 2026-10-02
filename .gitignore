@@ -8,3 +8,4 @@ cubevox-proto.app
 dist/
 build-release/
 .history/
+~*.lck
