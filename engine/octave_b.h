@@ -22,8 +22,9 @@ class OctaveVoiceB {
   void reset() { shifter_.reset(); }
 
   // Called once per block before ticking. Returns true if the stage is on;
-  // a formant shift alone keeps it on at 0 semitones.
-  bool prepare(const PitchResult& pr, const OctaveParams& p) {
+  // a formant shift alone keeps it on at 0 semitones. corrOffset is Autotune's
+  // correction in semitones.
+  bool prepare(const PitchResult& pr, const OctaveParams& p, float corrOffset = 0.0f) {
     const int s = p.semitones < -kMaxSemis ? -kMaxSemis
                                            : (p.semitones > kMaxSemis ? kMaxSemis : p.semitones);
     const float fm = p.formant < -kMaxFormantSemis
@@ -33,7 +34,7 @@ class OctaveVoiceB {
     const bool on = p.on && (s != 0 || fm != 0.0f);
     const float gain =
         (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, (t.levelDb + t.trimDbB) / 20.0f);
-    shifter_.prepare(static_cast<float>(s), fm, gain, t.glideMs, t.grainPeriods, t.epochSearch);
+    shifter_.prepare(static_cast<float>(s) + corrOffset, fm, gain, t.glideMs, t.grainPeriods, t.epochSearch);
     return on;
   }
 

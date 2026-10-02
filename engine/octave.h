@@ -59,12 +59,13 @@ class OctaveVoice {
   }
 
   // Called once per block before ticking. Returns true if the stage is on.
-  bool prepare(const PitchResult& pr, const OctaveParams& p) {
+  // corrOffset is Autotune's correction in semitones.
+  bool prepare(const PitchResult& pr, const OctaveParams& p, float corrOffset = 0.0f) {
     const int s = p.semitones < -kMaxSemis ? -kMaxSemis
                                            : (p.semitones > kMaxSemis ? kMaxSemis : p.semitones);
     const OctaveTuning& t = p.tuning;
     const bool on = p.on && s != 0;
-    semisT_ = static_cast<float>(s);
+    semisT_ = static_cast<float>(s) + corrOffset;
     gainT_ = (!on || (t.muteUnvoiced && !pr.voiced)) ? 0.0f : powf(10.0f, (t.levelDb + t.trimDbA) / 20.0f);
     // Smoothers start on target after reset; a silent voice jumps to its new
     // interval instead of gliding in from a stale one.

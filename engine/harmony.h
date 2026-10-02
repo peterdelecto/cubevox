@@ -78,8 +78,9 @@ class HarmonyVoices {
 
   // Called once per block before ticking. Sets the selected engine's targets;
   // returns true if any slot is on. Switching engines resets the ones left
-  // behind so they start clean next time.
-  bool prepare(const PitchResult& pr, const HarmonyParams& p) {
+  // behind so they start clean next time. corrOffset is Autotune's correction
+  // in semitones; the voices build on the corrected note.
+  bool prepare(const PitchResult& pr, const HarmonyParams& p, float corrOffset = 0.0f) {
     const int engine = p.engine == 1 || p.engine == 2 ? p.engine : 0;
     if (engine != engine_) {
       if (engine != 0) resetA();
@@ -93,11 +94,13 @@ class HarmonyVoices {
     const ShifterTuning& st = t.shifter;
     // C needs no pitch, so unvoiced input never mutes it.
     const bool voiced = pr.voiced || engine_ == 2;
+    const float hz = pr.hz * exp2f(corrOffset / 12.0f);
     bool any = false;
     for (int v = 0; v < 2; ++v) {
       const HarmonySlot& slot = p.slots[v];
-      semisT_[v] = p.chromatic ? chromaticSemis(slot.voice, t)
-                               : targetSemis(slot.voice, pr.hz, p.key, t);
+      semisT_[v] = (p.chromatic ? chromaticSemis(slot.voice, t)
+                                : targetSemis(slot.voice, hz, p.key, t)) +
+                   corrOffset;
       gainT_[v] = p.on ? targetGain(slot.level, voiced, t.trimDb[engine_], t) : 0.0f;
       any = any || (p.on && slot.level > 0);
       if (engine_ == 1) {
@@ -138,16 +141,13 @@ class HarmonyVoices {
     return wet;
   }
 
- private:
   struct Degree {
     int index;
     float dev;  // sung pitch minus the scale note, semitones
   };
 
-  static constexpr int kMajor[7] = {0, 2, 4, 5, 7, 9, 11};
-  static constexpr float kTieEps = 1e-4f;
-
   // Nearest major-scale degree by circular distance; ties snap down.
+  // Autotune shares it.
   static Degree degreeOf(float hz, int key) {
     const int k = ((key % 12) + 12) % 12;
     const float midi = 69.0f + 12.0f * log2f(hz / 440.0f);
@@ -168,6 +168,10 @@ class HarmonyVoices {
     }
     return best;
   }
+
+ private:
+  static constexpr int kMajor[7] = {0, 2, 4, 5, 7, 9, 11};
+  static constexpr float kTieEps = 1e-4f;
 
   static float targetSemis(HarmonyVoice voice, float hz, int key, const HarmonyTuning& t) {
     if (hz <= 0.0f) return 0.0f;
