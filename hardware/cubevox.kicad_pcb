@@ -33875,7 +33875,7 @@
 	(footprint "cubevox:HDR-TH_4P-P2.54-V-M"
 		(layer "F.Cu")
 		(uuid "a797d828-1904-4b47-9637-6722211d8534")
-		(at 337.5 99)
+		(at 148.5 100)
 		(property "Reference" "J117"
 			(at 0 -4 0)
 			(layer "F.SilkS")
