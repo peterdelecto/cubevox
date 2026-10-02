@@ -348,7 +348,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Octave %s, engine %c; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Unison DEPTH "
+      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
@@ -361,7 +361,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(cv::AutotuneVoice::mechanicalOf(at.responseMs) * 100.0f),
       static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
-      static_cast<int>(std::lround(o.formant)), static_cast<double>(o.mix * 100.0f),
+      static_cast<double>(o.mix * 100.0f),
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.intensity * 100.0f),
@@ -1458,14 +1458,8 @@ void drawOctaveBlock(cv::OctaveParams& o, cv::macros::State& macros) {
   ImGui::SameLine();
   ImGui::RadioButton("A", &o.engine, 0);
   ImGui::SameLine();
-  ImGui::RadioButton("B", &o.engine, 1);
-  ImGui::SameLine();
   ImGui::RadioButton("C", &o.engine, 2);
   ImGui::SliderInt("SEMITONES", &o.semitones, -12, 12, "%+d st");
-  ImGui::BeginDisabled(o.engine != 1);
-  int formant = static_cast<int>(std::lround(o.formant));
-  if (ImGui::SliderInt("FORMANT", &formant, -12, 12, "%+d st")) o.formant = static_cast<float>(formant);
-  ImGui::EndDisabled();
   percentSlider("MIX", o.mix);
   drawOctaveTuning(o, macros);
   ImGui::PopID();
@@ -1855,6 +1849,9 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   params.pitchFx.harmony.on = false;
   params.pitchFx.harmony.chromatic = false;
   params.linkAutotuneKey = true;
+  // Octave engine B is off the face too; its formant shift goes with it.
+  if (params.pitchFx.octave.engine == 1) params.pitchFx.octave.engine = 0;
+  params.pitchFx.octave.formant = 0.0f;
   if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
 
   ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
