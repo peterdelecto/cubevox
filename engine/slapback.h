@@ -7,14 +7,16 @@
 #include "engine/smooth.h"
 
 // Slapback: one delayed repeat of the voice through a 2-pole lowpass.
-// INTENSITY sets the wet level. Time, cutoff and feedback are tuning items.
+// INTENSITY sets the wet level and the repeats together; TIME is the second
+// panel knob. Repeats land on the tuned feedback at the panel's default
+// INTENSITY and grow as sqrt(intensity), capped at kFeedbackMax.
 
 namespace cv {
 
 struct SlapbackTuning {
-  float timeMs = 70.0f;       // 30..120
+  float timeMs = 70.0f;       // panel TIME, 30..150
   float lowpassHz = 4000.0f;  // 500..12000
-  float feedback = 0.35f;     // 0..0.5; ~2.5 audible repeats (3rd at about -20 dB)
+  float feedback = 0.35f;     // at INTENSITY 25 %: ~2.5 audible repeats (3rd at about -20 dB)
   float wetMaxDb = 4.9f;      // wet level at INTENSITY 1; level rule at 0.5
 };
 
@@ -41,7 +43,7 @@ class Slapback {
     const float target = p.on ? smooth::clamp01(p.intensity) : 0.0f;
     const float wetMax = powf(10.0f, t.wetMaxDb / 20.0f);
     const float timeTarget = clampf(t.timeMs, kTimeMinMs, kTimeMaxMs) * kSmpPerMs;
-    const float feedback = clampf(t.feedback, 0.0f, kFeedbackMax);
+    const float feedbackRef = clampf(t.feedback, 0.0f, kFeedbackMax);
     const float aInt = smooth::coef(kIntensitySec);
     const float aTime = smooth::coef(kTimeSec);
     setLowpass(t.lowpassHz);
@@ -56,6 +58,8 @@ class Slapback {
       intensity_ = smooth::step(intensity_, target, aInt);
       timeSmp_ += aTime * (timeTarget - timeSmp_);
 
+      const float feedback =
+          fminf(kFeedbackMax, feedbackRef * sqrtf(intensity_ / kFeedbackRefIntensity));
       const float lp = filter(readCubic(timeSmp_));
       line_[writePos_] = in[i] + feedback * lp;
       out[i] = in[i] + intensity_ * wetMax * lp;
@@ -64,13 +68,14 @@ class Slapback {
   }
 
  private:
-  static constexpr int kLen = 130 * kSampleRate / 1000;
+  static constexpr int kLen = 160 * kSampleRate / 1000;
   static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
   static constexpr float kTimeMinMs = 30.0f;
-  static constexpr float kTimeMaxMs = 120.0f;
+  static constexpr float kTimeMaxMs = 150.0f;
   static constexpr float kCutoffMinHz = 500.0f;
   static constexpr float kCutoffMaxHz = 12000.0f;
   static constexpr float kFeedbackMax = 0.5f;
+  static constexpr float kFeedbackRefIntensity = 0.25f;  // panel default; tuned feedback applies here
   static constexpr float kQ = 0.70710678f;
   static constexpr float kTwoPi = 6.28318530717958647692f;
   static constexpr float kIntensitySec = 0.020f;

@@ -50,7 +50,10 @@ constexpr float kHarmonyKeyW = 200.0f;     // KEY combo, leaves room for Chromat
 constexpr float kFormantW = 60.0f;         // FORMANT slider at the end of each Menu row
 constexpr float kMenuRadioX = 52.0f;       // Menu row: radios start after the voice name
 constexpr float kAutotuneKeyW = 80.0f;     // KEY combo beside Link key to Harmony
-constexpr float kMeterW = 240.0f;
+constexpr float kMeterW = 100.0f;
+constexpr float kLoopNameW = 110.0f;                 // loop file name slot in the header, px
+constexpr float kHeaderScale = 1.4f;                  // transport row type size vs the face
+constexpr ImVec2 kHeaderPadding = ImVec2(6.0f, 6.0f);  // transport row frame padding, px
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
 constexpr float kSilenceDb = -120.0f;
@@ -313,8 +316,7 @@ const char* baseName(const std::string& path) {
   return path.c_str() + (slash == std::string::npos ? 0 : slash + 1);
 }
 
-char gTuningText[8192];  // last Print tuning output
-char gTuningLine[8192];  // the same text on one line, shown on the face
+char gTuningText[8192];  // last copied settings text
 
 // Plain-text snapshot a person can paste into a message: Macros, Choices, Knobs.
 // Returns the bytes written, newline included.
@@ -343,7 +345,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Knobs: Input gate threshold %.0f dB; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f ms, Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
       "voice formants Low %+d / High %+d / Higher %+d st; Unison DEPTH "
-      "%.0f %%, CHARACTER %.0f %%; Slapback INTENSITY %.0f %%; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
+      "%.0f %%, CHARACTER %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
       p.linkAutotuneKey ? "linked to Harmony" : "own", onOff(at.chromatic), onOff(o.on),
@@ -362,6 +364,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonBlend]),
       static_cast<double>(p.slapback.intensity * 100.0f),
+      static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(decay * 100.0f),
       static_cast<double>(dwell * 100.0f), static_cast<double>(r.mix * 100.0f));
@@ -624,7 +627,6 @@ void drawUnisonRaw(cv::UnisonTuning& t) {
 }
 
 void drawSlapbackRaw(cv::SlapbackTuning& t) {
-  ImGui::SliderFloat("Time", &t.timeMs, 30.0f, 120.0f, "%.0f ms");
   ImGui::SliderFloat("Lowpass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
   ImGui::SliderFloat("Feedback", &t.feedback, 0.0f, 0.5f, "%.2f");
@@ -827,30 +829,52 @@ void drawTuningButtons(ProtoParams& params) {
     params.macros = cv::macros::State{};
   }
   ImGui::SameLine();
-  if (ImGui::Button("Print tuning")) {
+  // The label confirms the copy for a moment; the ### id keeps the button the same widget.
+  static double copiedAt = -10.0;
+  constexpr double kCopiedShowSec = 1.5;
+  const bool justCopied = ImGui::GetTime() - copiedAt < kCopiedShowSec;
+  if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings to clipboard###copy")) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
                 params.distortion.tuning, params.reverb.spring.tuning,
                 params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq, params.inputGate.tuning,
                 params.gate.tuning, params.pitchFx.autotune.tuning, params);
-    // One line for the field; the clipboard keeps the line breaks.
-    std::snprintf(gTuningLine, sizeof(gTuningLine), "%s", gTuningText);
-    std::replace(gTuningLine, gTuningLine + sizeof(gTuningLine), '\n', ' ');
+    copiedAt = ImGui::GetTime();
   }
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(-1.0f);
-  ImGui::InputTextWithHint("##tuning", "printed tuning, also copied to clipboard", gTuningLine,
-                           sizeof(gTuningLine), ImGuiInputTextFlags_ReadOnly);
 }
 
-constexpr float kFeedbackSliderW = 70.0f;  // px
+constexpr float kFeedbackSliderW = 60.0f;  // px
 
+float gHeaderRight = 0.0f;  // right edge of the transport row this frame, px
+
+void drawTransportItems(ProtoParams& params, float& meterDb, bool probe);
+
+// The transport row reads as the headline: larger type, taller controls.
 void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
+  ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kHeaderScale);
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, kHeaderPadding);
+  drawTransportItems(params, meterDb, probe);
+  gHeaderRight = ImGui::GetItemRectMax().x;
+  ImGui::PopStyleVar();
+  ImGui::PopFont();
+}
+
+void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   if (ImGui::Button("Load loop") && !probe) {
     const std::string path = openFilePanel();
     if (!path.empty()) loadLoop(path);
   }
   ImGui::SameLine();
-  ImGui::TextUnformatted(gLoopPath.empty() ? "(no loop)" : baseName(gLoopPath));
+  // Fixed-width name slot so a long file name never pushes the row off screen.
+  std::string name = gLoopPath.empty() ? "(no loop)" : baseName(gLoopPath);
+  const float maxW = kLoopNameW;
+  if (ImGui::CalcTextSize(name.c_str()).x > maxW) {
+    while (!name.empty() && ImGui::CalcTextSize((name + "...").c_str()).x > maxW) name.pop_back();
+    name += "...";
+  }
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted(name.c_str());
+  ImGui::SameLine(0.0f, 0.0f);
+  ImGui::Dummy(ImVec2(std::max(0.0f, maxW - ImGui::GetItemRectSize().x), 0.0f));
   ImGui::SameLine();
   if (ImGui::Button(params.playing ? "Stop" : "Play")) params.playing = !params.playing;
   ImGui::SameLine();
@@ -1202,10 +1226,8 @@ void drawSlapbackTuning(cv::SlapbackTuning& t) {
     drawSlapbackRaw(t);
     return;
   }
-  ImGui::SliderFloat("Time", &t.timeMs, 30.0f, 120.0f, "%.0f ms");
-  hint("gap between your voice and the echo");
   ImGui::SliderFloat("Repeats", &t.feedback, 0.0f, 0.5f, "%.2f");
-  hint("how many echoes follow the first");
+  hint("echoes after the first; INTENSITY raises them too");
   ImGui::SliderFloat("Low pass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
   hint("lower makes the echoes darker");
@@ -1460,6 +1482,7 @@ void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
   percentSlider("INTENSITY", s.intensity);
+  ImGui::SliderFloat("TIME", &s.tuning.timeMs, 30.0f, 150.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
 }
@@ -1667,6 +1690,7 @@ int runLayoutProbe() {
 
   ProtoParams params;
   params.dev = true;  // the dev face is the superset; Adam's face is a subset of it
+  gLoopPath = "/samples/Adam Vox C-sharp Autotune.wav";  // a long real name for the header
   ProtoState state;
   float meterDb = kSilenceDb;
   bool fits = true;
@@ -1684,7 +1708,9 @@ int runLayoutProbe() {
                   s.block ? s.block : "all closed", s.node ? " / " : "", s.node ? s.node : "",
                   s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kParker ? " (PARKER)" : ""));
     const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
-    const bool ok = worst <= gColumnAvail;
+    const bool headerFits = gHeaderRight <= static_cast<float>(kWindowW);
+    if (!headerFits) std::printf("header row runs to %.0f px of %d\n", gHeaderRight, kWindowW);
+    const bool ok = worst <= gColumnAvail && headerFits;
     fits = fits && ok;
     std::printf("%-44s col1 %4.0f  col2 %4.0f  col3 %4.0f  col4 %4.0f  of %.0f px%s\n", name,
                 gColumnUsed[0], gColumnUsed[1], gColumnUsed[2], gColumnUsed[3], gColumnAvail,

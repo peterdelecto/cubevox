@@ -34,7 +34,7 @@ sliders, then report numbers we bake in.
 | 4 | Octave | SEMITONES · FORMANT (engine B) · MIX | Slide |
 | 5 | Harmony | KEY · MIX | Voices · Tracking speed · Follow my bends · Drop out on breaths |
 | 6 | Unison | DEPTH · CHARACTER (Chorus ↔ Double, CHORUS / DOUBLE printed at the ends) | Motion speed |
-| 7 | Slapback | INTENSITY | Time · Repeats · Low pass (raw) |
+| 7 | Slapback | INTENSITY (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
 | 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM / PARKER SPRING = menu) | per engine, below |
 | 9a | SPRING | | Splash · Flutter · Low end |
@@ -134,3 +134,9 @@ table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, t
 5. **Test controls hidden.** Cmd+Shift+D toggles Advanced and the input gate's Tuning.
    Hidden means off. STAGE FEEDBACK with Amount and Movement stays on the face (owner). The probe runs with
    them shown, the superset of Adam's face.
+6. **Headline transport row** (owner 2026-10-02): Load, file name, Play, meter, STAGE
+   FEEDBACK, Reset and Copy settings to clipboard at 1.4x type with taller controls. The
+   meter is 100 px and the file name has a fixed 110 px slot with an ellipsis. Print tuning
+   is renamed Copy settings to clipboard; the text box beside it is gone and the button
+   reads Copied for 1.5 s instead. The probe fails if the row runs past the window width,
+   checked with a long real file name.

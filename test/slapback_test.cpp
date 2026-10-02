@@ -1,6 +1,7 @@
 // Slapback checks: passthrough, time, lowpass, feedback, no-alloc. No window, no audio device.
 
 #include <atomic>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -128,7 +129,7 @@ bool testPassthrough() {
 }
 
 bool testTime() {
-  const float times[3] = {30.0f, 80.0f, 120.0f};
+  const float times[4] = {30.0f, 80.0f, 120.0f, 150.0f};
   bool ok = true;
   int worst = 0;
   for (float ms : times) {
@@ -145,7 +146,7 @@ bool testTime() {
     if (err > worst) worst = err;
     if (err > 2) ok = false;
   }
-  return report("time", ok, "worst peak error over 30/80/120 ms=%.0f samples (<=2)", worst);
+  return report("time", ok, "worst peak error over 30/80/120/150 ms=%.0f samples (<=2)", worst);
 }
 
 bool testLowpass() {
@@ -168,21 +169,33 @@ bool testLowpass() {
                 "8 kHz wet vs 500 Hz wet=%.2f dB (-15..-9)", db);
 }
 
+// INTENSITY drives the repeats: tuned 0.35 at 25 %, sqrt growth, capped at 0.5.
+// The lowpass softens the second peak by a fixed factor, so the law is checked as
+// ratios to the full-INTENSITY repeat; that one keeps the 0.5 +-0.1 window.
 bool testFeedback() {
-  const std::vector<float> in = impulse(cv::kSampleRate);
-  cv::SlapbackParams p = params(1.0f);
-  p.tuning.lowpassHz = 12000.0f;
-  p.tuning.timeMs = 80.0f;
-  p.tuning.feedback = 0.5f;
-  gSlap.reset();
-  const std::vector<float> wet = wetOf(run(gSlap, in, p), in);
-  const int first = kImpulseAt + 80 * cv::kSampleRate / 1000;
-  const int second = kImpulseAt + 160 * cv::kSampleRate / 1000;
-  const float p1 = std::fabs(wet[static_cast<size_t>(peakIndex(wet, first - 10, first + 10))]);
-  const float p2 = std::fabs(wet[static_cast<size_t>(peakIndex(wet, second - 10, second + 10))]);
-  const float ratio = p2 / p1;
-  return report("feedback", ratio >= 0.4f && ratio <= 0.6f,
-                "repeat 2 / repeat 1=%.3f (0.5 +-0.1), peaks %.3f %.3f", ratio, p1, p2);
+  const float intensity[3] = {0.0625f, 0.25f, 1.0f};
+  std::array<float, 3> ratio{};
+  for (int k = 0; k < 3; ++k) {
+    const std::vector<float> in = impulse(cv::kSampleRate);
+    cv::SlapbackParams p = params(intensity[k]);
+    p.tuning.lowpassHz = 12000.0f;
+    p.tuning.timeMs = 80.0f;
+    p.tuning.feedback = 0.35f;
+    gSlap.reset();
+    const std::vector<float> wet = wetOf(run(gSlap, in, p), in);
+    const int first = kImpulseAt + 80 * cv::kSampleRate / 1000;
+    const int second = kImpulseAt + 160 * cv::kSampleRate / 1000;
+    const float p1 = std::fabs(wet[static_cast<size_t>(peakIndex(wet, first - 10, first + 10))]);
+    const float p2 = std::fabs(wet[static_cast<size_t>(peakIndex(wet, second - 10, second + 10))]);
+    ratio[static_cast<size_t>(k)] = p2 / p1;
+  }
+  const float low = ratio[0] / ratio[2];   // expect 0.175 / 0.5 = 0.35
+  const float mid = ratio[1] / ratio[2];   // expect 0.35 / 0.5 = 0.70
+  const bool ok = ratio[2] >= 0.4f && ratio[2] <= 0.6f && std::fabs(low - 0.35f) <= 0.03f &&
+                  std::fabs(mid - 0.70f) <= 0.03f;
+  return report("feedback", ok,
+                "full-INTENSITY repeat ratio=%.3f (0.4..0.6); 6 %% and 25 %% vs full=%.3f, %.3f (0.35, 0.70 +-0.03)",
+                ratio[2], low, mid);
 }
 
 bool testNoAlloc() {

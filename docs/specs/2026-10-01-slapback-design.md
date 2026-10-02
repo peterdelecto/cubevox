@@ -84,3 +84,12 @@ Wet level at full (−24–0 dB). Reset / Print cover it. `ProtoParams` gains
 SLAPBACK under UNISON; owner listens.
 
 Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetMaxDb` default is now 4.9 dB (was 0), set so INTENSITY 0.5 reads +0.27 dB out/in.
+
+## INTENSITY and TIME on the panel (owner 2026-10-02)
+
+1. INTENSITY sets the wet level and the repeats together. Feedback =
+   min(0.5, tuned feedback x sqrt(INTENSITY / 0.25)): the owner's 0.35 (about 2.5 repeats)
+   lands at the default 25 %, grows with the knob and caps at 0.5 from about 51 %.
+2. TIME is the second panel knob, 30..150 ms (default 70). The delay line holds 160 ms.
+3. `slapback_test` checks the repeat ratio at 6 / 25 / 100 % against the law and peak
+   timing at 30 / 80 / 120 / 150 ms.
