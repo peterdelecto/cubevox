@@ -1180,7 +1180,7 @@ void drawAutotuneTuning(cv::AutotuneParams& a) {
   ImGui::SliderFloat("Pull range", &a.tuning.maxCorrectSemis, 0.5f, 6.0f, "%.1f st");
   hint("how far off a note it will still fix");
   ImGui::Checkbox("Correct to every note", &a.chromatic);
-  hint("ignores KEY, snaps to the nearest note");
+  hint("snaps to the nearest note; picking a KEY turns this off");
   if (gAdvanced) drawAutotuneRaw(a.tuning);
 }
 
@@ -1347,10 +1347,18 @@ void drawAutotuneBlock(cv::AutotuneParams& a, bool& linkKey, int& sharedKey,
   ImGui::RadioButton("A", &a.engine, 0);
   ImGui::SameLine();
   ImGui::RadioButton("B", &a.engine, 1);
-  ImGui::BeginDisabled(a.chromatic);
+  // KEY stays live; picking a key leaves "Correct to every note" mode.
   ImGui::SetNextItemWidth(kAutotuneKeyW);
-  if (ImGui::Combo("KEY", &a.key, cv::kKeyName, 12) && linkKey) sharedKey = a.key;
-  ImGui::EndDisabled();
+  if (ImGui::BeginCombo("KEY", a.chromatic ? "Every note" : cv::kKeyName[a.key])) {
+    for (int k = 0; k < 12; ++k) {
+      if (ImGui::Selectable(cv::kKeyName[k], !a.chromatic && k == a.key)) {
+        a.key = k;
+        a.chromatic = false;
+        if (linkKey) sharedKey = k;
+      }
+    }
+    ImGui::EndCombo();
+  }
   if (gAdvanced) {
     ImGui::SameLine();
     ImGui::Checkbox("Link key to Harmony", &linkKey);
