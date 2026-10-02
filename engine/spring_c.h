@@ -21,26 +21,26 @@ struct SpringCTuning {
   float tdMs = 56.0f;                          // T_D, spring 1
   float fcLfHz = 4275.0f;                      // F_c,lf, sets K (fractional)
   int mLow = 100;                              // 1..100
-  float aLf = 0.63f;
-  float gLo = 0.45f, gHi = 0.90f;              // |g_lf| at TENSION 0 / 1, before gComp
+  float aLf = 0.70f;
+  float gLo = 0.35f, gHi = 0.82f;              // |g_lf| at TENSION 0 / 1, before gComp
   float gComp = 1.0f;                          // DAFx-11 uses 1.2 for loss this loop lacks
   float hfRatio = 1.3f;                        // g_hf / g_lf
   int mHigh = 189;                             // 0..200, 0 disables C_hf
   float aHf = -0.34f;
-  float hfMixDb = -60.0f;                      // g_high re g_low
+  float hfMixDb = -22.0f;                      // g_high re g_low
   float cross = 0.1f;                          // c1, C_hf into the C_lf summer
-  float eqPeakHz = 183.0f, eqBwHz = 146.0f;    // chirp EQ (DAFx-11), bw 0 = off
+  float eqPeakHz = 183.0f, eqBwHz = 0.0f;      // chirp EQ (DAFx-11), bw 0 = off
   float lowHz = 4750.0f;                       // H_low cutoff; the table is fixed
-  float echoGain = 0.1f, rippleGain = 0.1f;    // multitap e, r
+  float echoGain = 0.2f, rippleGain = 0.2f;    // multitap e, r
   float modDepth = 8.0f, modPole = 0.93f;      // Gajarsky read modulation
   int springs = 3;                             // 1..3
-  std::array<float, 3> tdFactor = {1.0f, 1.09f, 0.94f};
+  std::array<float, 3> tdFactor = {1.0f, 1.15f, 0.88f};
   std::array<float, 3> fcFactor = {1.0f, 0.98f, 1.02f};
-  float hpHz = 150.0f, lpHz = 6000.0f;         // drive/recovery wrapper
+  float hpHz = 150.0f, lpHz = 9000.0f;         // drive/recovery wrapper
   float dwellDrive = 32.0f, dwellComp = 0.80f;
-  float presenceHz = 3000.0f, presenceDb = 3.0f, presenceQ = 1.0f;
+  float presenceHz = 3000.0f, presenceDb = 5.0f, presenceQ = 1.0f;
   float tankTrim = 0.75f;                      // into the tank, after the clip
-  float wetDb = 10.4f;                         // output trim; level rule at MIX 0.5
+  float wetDb = 6.8f;                         // output trim; level rule at MIX 0.5
 };
 
 struct SpringCParams {

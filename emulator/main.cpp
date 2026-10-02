@@ -936,7 +936,7 @@ void drawReverbBlock(cv::ReverbParams& r) {
   ImGui::SameLine();
   ImGui::RadioButton("CHASM", &r.engine, cv::kReverbChasm);
   ImGui::SameLine();
-  ImGui::RadioButton("PARKER", &r.engine, cv::kReverbParker);
+  ImGui::RadioButton("PARKER SPRING", &r.engine, cv::kReverbParker);
   if (r.engine == cv::kReverbChasm) {
     percentSlider("DECAY", r.chasm.decay);
     percentSlider("WOBBLE", r.chasm.wobble);

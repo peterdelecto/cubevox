@@ -18,14 +18,14 @@ Each trim was solved by bisection to land near +0.25 dB, then rounded to 0.1 dB.
 | Input gate -40 | +0.00 | +0.00 | none | none |
 | Panel gate -40 | +0.00 | +0.00 | none | none |
 | Harmony C, High, level 2, mix 0.5 | -2.38 | +0.23 | HarmonyTuning.trimDb (new) | +8.4 |
-| Octave A -12, mix 0.5 | +2.77 | +0.26 | OctaveTuning.trimDbA (new) | -5.3 |
+| Octave A -12, mix 0.5 | +2.77 | +0.32 | OctaveTuning.trimDbA (new) | -5.3 |
 | Octave B +12, formant 0, mix 0.5 | -1.89 | +0.23 | OctaveTuning.trimDbB (new) | +6.2 |
 | Unison depth 0.8 | +2.84 | +0.25 | UnisonTuning.wetMaxDb | -12.4 |
 | Slapback intensity 0.5 | -0.62 | +0.27 | SlapbackTuning.wetMaxDb | +4.9 |
 | Distortion drive 0.3, tone 0.5 | +0.19 | +0.19 | DistortionTuning.trimDb | 0.0 |
 | Reverb SPRING, mix 0.5 | -0.24 | +0.24 | SpringTuning.wetDb | +1.3 |
-| Reverb CHASM, mix 0.5 | -2.76 | +0.26 | ChasmTuning.wetDb | +17.4 |
-| Reverb PARKER, mix 0.5 | -3.59 | +0.26 | SpringCTuning.wetDb | +10.4 |
+| Reverb CHASM, mix 0.5 | -2.76 | +0.32 | ChasmTuning.wetDb | +17.4 |
+| Reverb PARKER, mix 0.5 | -3.59 | +0.32 | SpringCTuning.wetDb | +6.8 |
 | Polish EQ defaults | -1.30 | +0.30 | PolishTuning.trimDb (new) | +1.6 |
 
 ## Notes

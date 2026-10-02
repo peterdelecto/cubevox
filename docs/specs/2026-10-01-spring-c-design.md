@@ -2,7 +2,7 @@
 
 Date 2026-10-01. Owner: "we will build one more option for reverb, C, from this spec"
 (`docs/reference/spring-reverb-research.md`). Reverb block gains a third engine,
-labelled **PARKER** in the prototype (SPRING = DrumSynthV3 port, CHASM = hexefx port).
+labelled **PARKER SPRING** in the prototype (SPRING = DrumSynthV3 port, CHASM = hexefx port).
 Panel knobs TENSION / DWELL / MIX apply to all three.
 
 ## What C is, and how it differs from A
@@ -47,26 +47,26 @@ struct SpringCTuning {
   float tdMs = 56.0f;            // T_D, spring 1
   float fcLfHz = 4275.0f;        // F_c,lf, sets K (fractional)
   int   mLow = 100;              // 50..100 (array sized 100)
-  float aLf = 0.63f;
-  float gLo = 0.45f, gHi = 0.90f;      // |g_lf| at TENSION 0 / 1, before gComp
+  float aLf = 0.70f;
+  float gLo = 0.35f, gHi = 0.82f;      // |g_lf| at TENSION 0 / 1, before gComp
   float gComp = 1.0f;                  // DAFx-11 uses 1.2 for loss this loop lacks
   float hfRatio = 1.3f;                // g_hf / g_lf
   int   mHigh = 189;             // 0..200 (0 disables C_hf)
   float aHf = -0.34f;
-  float hfMixDb = -60.0f;        // g_high re g_low; A uses -22
+  float hfMixDb = -22.0f;        // g_high re g_low
   float cross = 0.1f;            // c1
-  float eqPeakHz = 183.0f, eqBwHz = 146.0f;   // chirp EQ (DAFx-11); 0 bw = off
+  float eqPeakHz = 183.0f, eqBwHz = 0.0f;     // chirp EQ (DAFx-11); 0 bw = off
   float lowHz = 4750.0f;         // H_low cutoff (table is fixed; field documents it)
-  float echoGain = 0.1f, rippleGain = 0.1f;  // taps 1 : r : e : r·e at L0+{echo,ripple}
+  float echoGain = 0.2f, rippleGain = 0.2f;  // taps 1 : r : e : r·e at L0+{echo,ripple}
   float modDepth = 8.0f, modPole = 0.93f;    // Gajarsky
   int   springs = 3;             // 1..3
-  std::array<float, 3> tdFactor = {1.0f, 1.09f, 0.94f};   // ÆLAPSE-style detune (milder)
+  std::array<float, 3> tdFactor = {1.0f, 1.15f, 0.88f};   // ÆLAPSE-style detune
   std::array<float, 3> fcFactor = {1.0f, 0.98f, 1.02f};
-  float hpHz = 150.0f, lpHz = 6000.0f;       // drive/recovery wrapper
+  float hpHz = 150.0f, lpHz = 9000.0f;       // drive/recovery wrapper
   float dwellDrive = 32.0f, dwellComp = 0.80f;
-  float presenceHz = 3000.0f, presenceDb = 3.0f, presenceQ = 1.0f;
+  float presenceHz = 3000.0f, presenceDb = 5.0f, presenceQ = 1.0f;
   float tankTrim = 0.75f;        // into the tank, after the clip
-  float wetDb = 0.0f;            // output level trim
+  float wetDb = 6.8f;            // output level trim
 };
 
 struct SpringCParams {
@@ -146,7 +146,9 @@ in. Handover §9.3 validation, made executable:
 1. T_D: autocorrelation of the wet IR (0–300 ms) has its largest |peak| over lags
    20–150 ms at 56 ± 1 ms. 20 ms clears the zero-lag lobe and the L/5 pre-echo.
 2. First echo polarity: the normalised cross-correlation of the 0–40 ms window with
-   the window one T_D later is < −0.5. The largest-sample signs are printed but do not
+   the window one T_D later is < −0.5, with both windows low-passed below 400 Hz
+   (2-pole Butterworth). The low band is the least dispersed, so the loop sign shows
+   there whatever the chirp EQ or brightness. The unfiltered value is printed. The largest-sample signs are printed but do not
    decide, because the echo's peak lands ~0.7 ms past T_D on a neighbouring lobe.
 3. F_c: chain group delay from the chain-alone impulse response (expose a test hook
    `chainImpulse(spring, buf, n)`), measured as the frequency of the latest-arriving
@@ -168,4 +170,22 @@ in. Handover §9.3 validation, made executable:
 `ctest` passes; REVERB offers three engines; owner A/Bs SPRING vs PARKER on a vocal
 loop.
 
-Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetDb` default is now 10.4 dB (was 0), superseding the 0 dB ruling above, set so PARKER at MIX 0.5 reads +0.26 dB out/in.
+Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetDb` default is now 6.8 dB after the 2026-10-01 voicing (was 10.4, originally 0), superseding the 0 dB ruling above, set so PARKER at MIX 0.5 reads +0.32 dB out/in.
+
+## Voicing 2026-10-01
+
+Owner: "quite dark, not very splashy, and has too much sustain ... I want the spring effect more exaggerated but more decay".
+
+Changes: lpHz 6000 to 9000, eqBwHz 146 to 0 (chirp EQ off), hfMixDb -60 to -22, presenceDb 3 to 5, echoGain and rippleGain 0.1 to 0.2, gLo 0.45 to 0.35, gHi 0.90 to 0.82, aLf 0.63 to 0.70, tdFactor {1, 1.09, 0.94} to {1, 1.15, 0.88}, wetDb 10.4 to 6.8.
+
+Measured on spring 0 impulse at tension 0.5, dwell 0.3, modulation off, and on white noise through all three springs.
+
+| Measure | Before | After |
+|---|---|---|
+| Schroeder EDC -20 dB | 286 ms | 186 ms |
+| Schroeder EDC -40 dB | 731 ms | 426 ms |
+| Late/early RMS (1.0-1.5 s vs 0-0.5 s) | -49.8 dB | -82.3 dB |
+| >5 kHz vs 300 Hz-4 kHz, dwell 0.3 | -38.2 dB | -16.0 dB |
+| >5 kHz vs 300 Hz-4 kHz, dwell 1.0 | -38.2 dB | -16.0 dB |
+| Chirp lag, 4 kHz after 500 Hz | 40.7 ms | 48.0 ms |
+| PARKER at MIX 0.5, out/in | +0.26 dB at wetDb 10.4 (+2.97 dB with the new voicing, untrimmed) | +0.32 dB at wetDb 6.8 |

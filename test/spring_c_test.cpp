@@ -193,27 +193,49 @@ bool testEchoSpacing() {
 }
 
 // 2. First echo inverted against the direct path, judged by the normalised
-// cross-correlation of the 0-40 ms window with the window one T_D later. The
-// largest-sample signs are printed too; the echo's peak lands ~0.7 ms past T_D on
-// a neighbouring lobe, so the sample comparison alone does not decide polarity.
-bool testPolarity() {
-  const Signal ir = impulse(params(0.5f, 0.0f), ms(100), 0);
-  const int td = ms(56), win = ms(40);
+// cross-correlation of the 0-40 ms window with the window one T_D later. Both
+// windows are low-passed below 400 Hz (2-pole Butterworth) first, because the low
+// band is the least dispersed and shows the loop sign whatever the chirp EQ or
+// brightness. The unfiltered value and largest-sample signs are printed for reference.
+Signal lowpass400(const Signal& x) {
+  const double w = std::tan(kPi * 400.0 / kSr), k = std::sqrt(2.0);
+  const double n = 1.0 / (1.0 + k * w + w * w);
+  const double b0 = w * w * n, b1 = 2.0 * b0;
+  const double a1 = 2.0 * (w * w - 1.0) * n, a2 = (1.0 - k * w + w * w) * n;
+  Signal y(x.size());
+  double z1 = 0.0, z2 = 0.0;
+  for (size_t i = 0; i < x.size(); ++i) {
+    const double o = b0 * x[i] + z1;
+    z1 = b1 * x[i] - a1 * o + z2;
+    z2 = b0 * x[i] - a2 * o;
+    y[i] = static_cast<float>(o);
+  }
+  return y;
+}
+
+double windowCorr(const Signal& ir, int td, int win) {
   double xc = 0.0, e0 = 0.0, e1 = 0.0;
   for (int i = 0; i < win; ++i) {
     xc += static_cast<double>(ir[at(i)]) * ir[at(i + td)];
     e0 += static_cast<double>(ir[at(i)]) * ir[at(i)];
     e1 += static_cast<double>(ir[at(i + td)]) * ir[at(i + td)];
   }
-  const double corr = xc / std::sqrt(e0 * e1);
+  return xc / std::sqrt(e0 * e1);
+}
+
+bool testPolarity() {
+  const Signal ir = impulse(params(0.5f, 0.0f), ms(100), 0);
+  const int td = ms(56), win = ms(40);
+  const double corr = windowCorr(lowpass400(ir), td, win);
+  const double raw = windowCorr(ir, td, win);
   int direct = 0, echo = ms(40);
   for (int i = 0; i < ms(10); ++i)
     if (std::fabs(ir[at(i)]) > std::fabs(ir[at(direct)])) direct = i;
   for (int i = ms(40); i < ms(70); ++i)
     if (std::fabs(ir[at(i)]) > std::fabs(ir[at(echo)])) echo = i;
   return report("first-echo-polarity", corr < -0.5,
-                "corr(direct, +T_D) %.3f (< -0.5); largest samples %.4f at %.2f ms, %.4f at %.2f ms",
-                corr, ir[at(direct)], toMs(direct), ir[at(echo)], toMs(echo));
+                "corr(direct, +T_D) below 400 Hz %.3f (< -0.5); unfiltered %.3f; largest samples %.4f (direct), %.4f (echo)",
+                corr, raw, ir[at(direct)], ir[at(echo)]);
 }
 
 // 3. F_c: frequency of the latest-arriving energy in the chain IR (2048-point
@@ -338,7 +360,7 @@ bool testDetune() {
     ok = ok && hit;
   }
   return report("three-springs", ok && found[0] != found[1] && found[1] != found[2],
-                "|ACF| peaks at %.2f / %.2f / %.2f ms (52.64 / 56.00 / 61.04 +-1), %.0f maxima",
+                "|ACF| peaks at %.2f / %.2f / %.2f ms (tdMs * tdFactor[2] / [0] / [1], +-1), %.0f maxima",
                 found[2], found[0], found[1], static_cast<double>(peaks.size()));
 }
 

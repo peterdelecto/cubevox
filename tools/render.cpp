@@ -50,7 +50,7 @@ int usage() {
                "       [--hengine 0|1|2] [--chromatic]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|chasm|parker] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
+               "       [--reverb spring|chasm|parker|parkerspring] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
                "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
@@ -338,7 +338,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         rp.reverb.engine = cv::kReverbSpring;
       else if (std::strcmp(v, "chasm") == 0)
         rp.reverb.engine = cv::kReverbChasm;
-      else if (std::strcmp(v, "parker") == 0)
+      else if (std::strcmp(v, "parker") == 0 || std::strcmp(v, "parkerspring") == 0)
         rp.reverb.engine = cv::kReverbParker;
       else
         return false;
