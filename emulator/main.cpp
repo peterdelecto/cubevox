@@ -111,10 +111,10 @@ struct ProtoParams {
     applyInputGateDefaults(inputGate);
     gate.on = false;
     pitchFx.harmony.on = false;
-    // Owner default voices: Low loud, High louder, Higher louder (matches HarmonyMenu).
-    pitchFx.harmony.slots[0] = {cv::HarmonyVoice::Low, 2, 0.0f};
-    pitchFx.harmony.slots[1] = {cv::HarmonyVoice::High, 3, 0.0f};
-    pitchFx.harmony.slots[2] = {cv::HarmonyVoice::Higher, 3, 0.0f};
+    // Owner default voices: High louder, Higher loud; third slot unused (matches HarmonyMenu).
+    pitchFx.harmony.slots[0] = {cv::HarmonyVoice::High, 3, 0.0f};
+    pitchFx.harmony.slots[1] = {cv::HarmonyVoice::Higher, 2, 0.0f};
+    pitchFx.harmony.slots[2] = {cv::HarmonyVoice::Low, 0, 0.0f};
     pitchFx.octave.on = false;
     unison.on = false;
     slapback.on = false;
@@ -341,18 +341,18 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       buf, size,
       "%s\n"
       "Choices: Input gate on; Gate %s; Autotune %s, engine %c, key %s, chromatic %s; "
-      "Octave %s, engine %c; Harmony %s, engine %c, chromatic %s, voices Low %s / High %s / "
-      "Higher %s, Follow my bends %s, Drop out on breaths %s; Unison %s; Slapback %s; "
+      "Octave %s, engine %c; Harmony %s, engine %c, chromatic %s, voices High %s / "
+      "Higher %s, Follow my bends %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate threshold %.0f dB; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f ms, Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
-      "voice formants Low %+d / High %+d / Higher %+d st; Unison DEPTH "
+      "voice formants High %+d / Higher %+d st; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
       "%.0f %%, DWELL %.0f %%, MIX %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
       p.linkAutotuneKey ? "linked to Harmony" : "own", onOff(at.chromatic), onOff(o.on),
-      'A' + o.engine, onOff(h.on), 'A' + h.engine, onOff(h.chromatic), lvl(0), lvl(1), lvl(2),
-      onOff(!h.tuning.snapToScale), onOff(h.tuning.muteUnvoiced), onOff(p.unison.on),
+      'A' + o.engine, onOff(h.on), 'A' + h.engine, onOff(h.chromatic), lvl(0), lvl(1),
+      onOff(!h.tuning.snapToScale), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
       static_cast<double>(p.inputGate.thresholdDb), static_cast<double>(p.gate.thresholdDb),
       static_cast<double>(p.gate.tuning.releaseMs),
@@ -362,7 +362,6 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       cv::kKeyName[h.key], static_cast<double>(h.mix * 100.0f),
       static_cast<int>(std::lround(h.slots[0].formant)),
       static_cast<int>(std::lround(h.slots[1].formant)),
-      static_cast<int>(std::lround(h.slots[2].formant)),
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.intensity * 100.0f),
@@ -925,15 +924,18 @@ void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   drawTuningButtons(params);
 }
 
-// ---- Harmony voices: Low / High / Higher, each Off / Quiet / Loud / Louder ---------
+// ---- Harmony voices: High / Higher, each Off / Quiet / Loud / Louder ----------------
+//
+// Adam has no harmony of his own to match, so the face offers the two voices above
+// him (owner 2026-10-02). The engine's third slot stays off.
 
-constexpr int kVoiceRows = 3;
-constexpr cv::HarmonyVoice kVoiceOf[kVoiceRows] = {cv::HarmonyVoice::Low, cv::HarmonyVoice::High,
-                                                   cv::HarmonyVoice::Higher};
+constexpr int kVoiceRows = 2;
+constexpr cv::HarmonyVoice kVoiceOf[kVoiceRows] = {cv::HarmonyVoice::High, cv::HarmonyVoice::Higher};
+constexpr const char* kVoiceKey[kVoiceRows] = {"high", "higher"};  // saved-state names
 
 struct HarmonyMenu {
-  // 0 off, 1 quiet, 2 loud, 3 louder. Owner default: Low loud, High and Higher louder.
-  std::array<int, kVoiceRows> level{{2, 3, 3}};
+  // 0 off, 1 quiet, 2 loud, 3 louder. Owner default: High louder, Higher loud.
+  std::array<int, kVoiceRows> level{{3, 2}};
   std::array<int, kVoiceRows> formant{};  // engine B formant, semitones
 };
 HarmonyMenu gMenu;  // UI-thread-only
@@ -944,6 +946,7 @@ void syncSlots(const HarmonyMenu& m, cv::HarmonyParams& h) {
     h.slots[i].level = m.level[i];
     h.slots[i].formant = static_cast<float>(m.formant[i]);
   }
+  for (size_t i = kVoiceRows; i < h.slots.size(); ++i) h.slots[i].level = 0;
 }
 
 // ---- Saved state: the face as Adam left it ----------------------------------------
@@ -997,9 +1000,8 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   add("harmony.chromatic", &h.chromatic);
   add("harmony.mix", &h.mix);
   add("harmony.snap", &h.tuning.snapToScale);
-  add("harmony.breaths", &h.tuning.muteUnvoiced);
   for (int i = 0; i < kVoiceRows; ++i) {
-    const std::string n = "harmony.voice" + std::to_string(i);
+    const std::string n = std::string("harmony.") + kVoiceKey[i];
     f.push_back({n + ".level", 'i', &m.level[static_cast<size_t>(i)]});
     f.push_back({n + ".formant", 'i', &m.formant[static_cast<size_t>(i)]});
   }
@@ -1163,7 +1165,7 @@ void saveState(const std::string& path, const std::string& text) {
 
 // Each row: name, level radios, then FORMANT (engine B, voice on).
 void drawHarmonyVoices(const cv::HarmonyParams& h) {
-  static const char* const kRowName[kVoiceRows] = {"Low", "High", "Higher"};
+  static const char* const kRowName[kVoiceRows] = {"High", "Higher"};
   static const char* const kLevelName[4] = {"Off", "Quiet", "Loud", "Louder"};
   ImGui::TextUnformatted("Voices");
   for (int row = 0; row < kVoiceRows; ++row) {
@@ -1207,8 +1209,6 @@ void drawHarmonyTuning(cv::HarmonyParams& h, cv::macros::State& m) {
   bool follow = !h.tuning.snapToScale;
   if (ImGui::Checkbox("Follow my bends", &follow)) h.tuning.snapToScale = !follow;
   hint("voices bend with you; off snaps them to the key");
-  ImGui::Checkbox("Drop out on breaths", &h.tuning.muteUnvoiced);
-  hint("voices go quiet on breaths and s / t sounds");
 }
 
 void drawOctaveTuning(cv::OctaveParams& o, cv::macros::State& m) {

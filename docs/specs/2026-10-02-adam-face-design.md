@@ -32,7 +32,7 @@ sliders, then report numbers we bake in.
 | 2 | Gate | THRESHOLD · DECAY (release) | Range, Attack, Hold (raw) |
 | 3 | Autotune | KEY (linked to Harmony) · RESPONSE | Pull range (0.5–6 st, `maxCorrectSemis`) · Correct to every note (`chromatic`, default off) |
 | 4 | Octave | SEMITONES · FORMANT (engine B) · MIX | Slide |
-| 5 | Harmony | KEY · MIX | Voices · Tracking speed · Follow my bends · Drop out on breaths |
+| 5 | Harmony | KEY · MIX | Voices (High, Higher) · Tracking speed · Follow my bends |
 | 6 | Unison | DEPTH · RATE (chorus speed, ~0.2–6 Hz; past today's rate the sweep narrows so the pitch swing caps near 2x today's) | Chorus ↔ Double |
 | 7 | Slapback | INTENSITY (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
@@ -147,3 +147,6 @@ table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, t
    DWELL, MIX on the selected engine). Output EQ has no pedal; it lives in the menu. Knobs drag vertically or
    scroll; encoders step one detent per 14 px or scroll notch. The foot strip toggles the
    effect and lights its LED. The input gate is not shown (not exposed on the box).
+8. **Two harmony voices** (owner 2026-10-02): Adam has no harmony of his own to match, so
+   the face offers High (default Louder) and Higher (default Loud); the engine's third slot
+   stays off. Drop out on breaths is removed from the face and stays off.
