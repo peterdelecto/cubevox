@@ -13,6 +13,7 @@ namespace cv {
 struct PitchResult {
   float period = 0.0f;   // samples at kSampleRate; 0 until first voiced frame
   float hz = 0.0f;
+  float rawHz = 0.0f;    // newest frame before the median; one hop fresher than hz
   bool voiced = false;
 };
 
@@ -193,6 +194,7 @@ class PitchTracker {
     }
     result_.period = p;
     result_.hz = kSampleRate / p;
+    result_.rawHz = kSampleRate / period;
     result_.voiced = true;
   }
 

@@ -112,3 +112,24 @@ keys `atTrimDb`, `atMaxCorrectSemis`, `atGrainPeriods`, `atEpochSearch`, `atEpoc
 
 `ctest` passes; four-column face with AUTOTUNE below INPUT GATE; owner sings a loop
 through it at RESPONSE 5 ms and 200 ms.
+
+## Matched to Adam's box (owner 2026-10-02)
+
+Reference: two clips of Adam through his own autotune (one held note each, A#2 and C#3).
+He sings near-monotone and lets the box hold him on the note, artifacts included.
+
+| Source | median off note | 90th pct | wobble on held note (sd) |
+|---|---|---|---|
+| His box | 2.1-2.3 cents | 6.5-9.6 | 2.7-5.3 |
+| Ours before (B, 100 ms) | 24 | 45 | 10 |
+| Ours now (A, 1 ms) | 2.4 | 10.6 | 1.7 |
+
+1. Correction reads `PitchResult::rawHz`, the newest frame before the tracker's
+   median-of-three. The median cost one hop of lag, about 7 cents on vibrato. Octave
+   glitches the median guarded against do not change the correction, since the scale
+   repeats every octave.
+2. RESPONSE runs 1..500 ms, default 1 ms (hard tune). Slower settings add natural wobble back.
+3. Default engine A. Engine B drops the share of frames a tracker reads as voiced from 33 %
+   to 20 % on Adam's dry loop, i.e. it roughens the voice; A keeps it at 33 %.
+4. `autotune_test` hard-tune check: 5 Hz, +-30 cent vibrato on A3 at the defaults must come
+   out within 4 cents RMS (3.8 now; 7.3 with the median pitch).

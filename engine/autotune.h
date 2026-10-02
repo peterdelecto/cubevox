@@ -24,16 +24,16 @@ struct AutotuneTuning {
 
 struct AutotuneParams {
   bool on = false;                // panel toggle
-  int engine = 1;                 // 0 A grid PSOLA, 1 B epoch PSOLA
+  int engine = 0;                 // 0 A grid PSOLA, 1 B epoch PSOLA
   bool chromatic = false;         // nearest semitone; key ignored
   int key = 0;                    // kKeyRoot index, as Harmony
-  float responseMs = 100.0f;       // panel knob, 5..500
+  float responseMs = 1.0f;        // panel knob, 1..500; 1 = hard tune
   AutotuneTuning tuning;
 };
 
 class AutotuneVoice {
  public:
-  static constexpr float kMinResponseMs = 5.0f;
+  static constexpr float kMinResponseMs = 1.0f;
   static constexpr float kMaxResponseMs = 500.0f;
 
   AutotuneVoice() { reset(); }
@@ -72,7 +72,7 @@ class AutotuneVoice {
     }
     if (pr.voiced && pr.hz > 0.0f) {
       const float maxC = t.maxCorrectSemis > 0.0f ? t.maxCorrectSemis : 0.0f;
-      target_ = clampf(correction(pr.hz, p.key, p.chromatic), -maxC, maxC);
+      target_ = clampf(correction(pr.rawHz, p.key, p.chromatic), -maxC, maxC);
       if (fresh_) corr_ = target_;
       fresh_ = false;
     }

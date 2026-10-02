@@ -260,6 +260,32 @@ bool testHarmonyFollows() {
                 "out=%.2f Hz, err vs C4=%.2f cents (+-10)", got, err);
 }
 
+// 6. Hard tune at the shipped defaults: A3 with a 5 Hz, +-30 cent vibrato comes
+// out held on A3. Adam's own box measures about 2 cents median off the note.
+bool testHardTune() {
+  const std::vector<float> in = tone(3 * cv::kSampleRate, [](int i) {
+    return kA3 * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * 5.0 * i / cv::kSampleRate));
+  });
+  cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs, cv::AutotuneParams{}.engine);
+  gFx.reset();
+  const std::vector<float> out = run(gFx, in, p);
+  cv::PitchTracker t;
+  double sum = 0.0;
+  int n = 0;
+  const int total = static_cast<int>(out.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    t.push(&out[static_cast<size_t>(i)], std::min(cv::kBlock, total - i), kThreshold);
+    if (i > kSettle && t.result().voiced) {
+      const double c = cents(t.result().rawHz, kA3);
+      sum += c * c;
+      ++n;
+    }
+  }
+  const double rmsCents = n > 0 ? std::sqrt(sum / n) : 9999.0;
+  return report("hard tune holds vibrato", rmsCents <= 4.0,
+                "+-30 cent vibrato in, %.2f cents RMS off A3 out (<= 4)", rmsCents);
+}
+
 }  // namespace
 
 int main() {
@@ -269,6 +295,7 @@ int main() {
   ok &= testScale();
   ok &= testResponse();
   ok &= testHarmonyFollows();
+  ok &= testHardTune();
   // Every process() call above ran under the allocation guard.
   ok &= report("no allocation", true, "process() ran under the new/delete guard", 0.0);
   std::printf("%s autotune\n", ok ? "PASS" : "FAIL");

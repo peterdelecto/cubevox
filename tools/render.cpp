@@ -48,7 +48,7 @@ int usage() {
                "       [--harmony] [--key <0..11>] [--mix <0..1>] "
                "[--voice lower|low|fixed|high|higher=<0..3>[:<formant -12..12>] ...]\n"
                "       [--hengine 0|1|2] [--chromatic]\n"
-               "       [--autotune] [--atkey <0..11>] [--atchromatic] [--atengine 0|1] [--response <5..500 ms>]\n"
+               "       [--autotune] [--atkey <0..11>] [--atchromatic] [--atengine 0|1] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm|parker|parkerspring] [--spring] [--decay <0..1>] [--dwell <0..1>]\n"
