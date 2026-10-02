@@ -350,7 +350,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb INTENSITY "
-      "%.0f %% (DECAY %.0f %%, DWELL %.0f %%), MIX %.0f %%\n",
+      "%.0f %% (MIX %.0f %%, DECAY %.0f %%), DWELL %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
       onOff(at.chromatic), onOff(o.on), 'A' + o.engine, onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
@@ -368,8 +368,8 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.intensity * 100.0f),
-      static_cast<double>(decay * 100.0f), static_cast<double>(dwell * 100.0f),
-      static_cast<double>(r.mix * 100.0f));
+      static_cast<double>(r.mix * 100.0f), static_cast<double>(decay * 100.0f),
+      static_cast<double>(dwell * 100.0f));
   return n < 0 ? 0 : std::min(static_cast<size_t>(n), size - 1);
 }
 
@@ -1543,8 +1543,12 @@ void drawReverbBlock(cv::ReverbParams& r, cv::macros::State& macros) {
   ImGui::RadioButton("CHASM", &r.engine, cv::kReverbChasm);
   ImGui::SameLine();
   ImGui::RadioButton("PARKER SPRING", &r.engine, cv::kReverbParker);
+  // DWELL binds to whichever engine is selected.
+  float& dwell = r.engine == cv::kReverbChasm    ? r.chasm.dwell
+                 : r.engine == cv::kReverbParker ? r.parker.dwell
+                                                 : r.spring.dwell;
   percentSlider("INTENSITY", r.intensity);
-  percentSlider("MIX", r.mix);
+  percentSlider("DWELL", dwell);
   drawReverbTuning(r, macros);
   ImGui::PopID();
 }
@@ -1795,8 +1799,11 @@ void drawPedals(ProtoParams& params) {
   next();
   cv::ReverbParams& r = params.reverb;
   pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
+    float& dwell = r.engine == cv::kReverbChasm    ? r.chasm.dwell
+                   : r.engine == cv::kReverbParker ? r.parker.dwell
+                                                   : r.spring.dwell;
     pedalPercent("INTENSITY", r.intensity);
-    pedalPercent("MIX", r.mix);
+    pedalPercent("DWELL", dwell);
   });
 }
 
