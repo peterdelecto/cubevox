@@ -15,7 +15,7 @@
  "lib_symbols": [
   [
    "cubevox",
-   "OPA1678IDR"
+   "OPA2197IDR"
   ],
   [
    "cubevox",
@@ -94,6 +94,18 @@
    "C"
   ],
   [
+   "cubevox",
+   "RVT1E100M0405-C72484"
+  ],
+  [
+   "cubevox",
+   "VT1A101M0505"
+  ],
+  [
+   "cubevox",
+   "RVT1C220M0405"
+  ],
+  [
    "Device",
    "FerriteBead"
   ],
@@ -116,7 +128,7 @@
    ],
    "size": [
     46,
-    120
+    117
    ],
    "pins": [
     {
@@ -336,15 +348,9 @@
      "len": 2
     },
     {
-     "name": "JACK_TRS_N",
-     "side": "right",
-     "offset": 112,
-     "len": 2
-    },
-    {
      "name": "FX_ON_SENSE",
      "side": "right",
-     "offset": 115,
+     "offset": 112,
      "len": 2
     }
    ]
@@ -921,7 +927,7 @@
     },
     {
      "pin": "7",
-     "net": "JACK_TRS_N",
+     "net": "TRS_T",
      "dir": [
       1,
       0
@@ -1053,20 +1059,23 @@
   },
   {
    "ref": "C120",
-   "lib_id": "Device:C",
-   "value": "10uF",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
    "at": [
     400,
     66
    ],
    "angle": 0,
-   "footprint": "cubevox:C1206",
-   "lcsc": "C14860",
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
    "pins": [
     {
      "pin": "1",
-     "net": "MIC_P",
+     "net": "IN_P",
      "dir": [
       0,
       -1
@@ -1075,7 +1084,7 @@
     },
     {
      "pin": "2",
-     "net": "IN_P",
+     "net": "MIC_P",
      "dir": [
       0,
       1
@@ -1086,20 +1095,23 @@
   },
   {
    "ref": "C121",
-   "lib_id": "Device:C",
-   "value": "10uF",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
    "at": [
     420,
     66
    ],
    "angle": 0,
-   "footprint": "cubevox:C1206",
-   "lcsc": "C14860",
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
    "pins": [
     {
      "pin": "1",
-     "net": "TRS_T",
+     "net": "LINE_P",
      "dir": [
       0,
       -1
@@ -1108,7 +1120,7 @@
     },
     {
      "pin": "2",
-     "net": "LINE_P",
+     "net": "TRS_T",
      "dir": [
       0,
       1
@@ -1184,21 +1196,21 @@
    ]
   },
   {
-   "ref": "C122",
-   "lib_id": "Device:C",
-   "value": "100nF",
+   "ref": "R144",
+   "lib_id": "Device:R",
+   "value": "100k",
    "at": [
     456,
     66
    ],
    "angle": 0,
-   "footprint": "cubevox:C0603",
-   "lcsc": "C14663",
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25803",
    "rest": "no_connect",
    "pins": [
     {
      "pin": "1",
-     "net": "VREF",
+     "net": "MIC_P",
      "dir": [
       0,
       -1
@@ -1330,20 +1342,23 @@
   },
   {
    "ref": "C124",
-   "lib_id": "Device:C",
-   "value": "10uF",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
    "at": [
     400,
     140
    ],
    "angle": 0,
-   "footprint": "cubevox:C1206",
-   "lcsc": "C14860",
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
    "pins": [
     {
      "pin": "1",
-     "net": "MIC_N",
+     "net": "IN_N",
      "dir": [
       0,
       -1
@@ -1352,7 +1367,7 @@
     },
     {
      "pin": "2",
-     "net": "IN_N",
+     "net": "MIC_N",
      "dir": [
       0,
       1
@@ -1363,20 +1378,23 @@
   },
   {
    "ref": "C125",
-   "lib_id": "Device:C",
-   "value": "10uF",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
    "at": [
     420,
     140
    ],
    "angle": 0,
-   "footprint": "cubevox:C1206",
-   "lcsc": "C14860",
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
    "pins": [
     {
      "pin": "1",
-     "net": "TRS_R",
+     "net": "LINE_N",
      "dir": [
       0,
       -1
@@ -1385,7 +1403,7 @@
     },
     {
      "pin": "2",
-     "net": "LINE_N",
+     "net": "TRS_R",
      "dir": [
       0,
       1
@@ -1461,21 +1479,21 @@
    ]
   },
   {
-   "ref": "C126",
-   "lib_id": "Device:C",
-   "value": "100nF",
+   "ref": "R145",
+   "lib_id": "Device:R",
+   "value": "100k",
    "at": [
     456,
     140
    ],
    "angle": 0,
-   "footprint": "cubevox:C0603",
-   "lcsc": "C14663",
+   "footprint": "cubevox:R0603",
+   "lcsc": "C25803",
    "rest": "no_connect",
    "pins": [
     {
      "pin": "1",
-     "net": "VREF",
+     "net": "MIC_N",
      "dir": [
       0,
       -1
@@ -1494,53 +1512,20 @@
    ]
   },
   {
-   "ref": "R107",
-   "lib_id": "Device:R",
-   "value": "10k",
-   "at": [
-    340,
-    190
-   ],
-   "angle": 0,
-   "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "3V3",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "JACK_TRS_N",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
    "ref": "U104",
-   "lib_id": "cubevox:OPA1678IDR",
-   "value": "OPA1678IDR",
+   "lib_id": "cubevox:OPA2197IDR",
+   "value": "OPA2197IDR",
    "at": [
     498,
     72
    ],
    "angle": 0,
-   "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
-   "lcsc": "C192421",
+   "footprint": "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL",
+   "lcsc": "C139363",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "OPA1678IDR"
+    "MPN": "OPA2197IDR"
    },
    "pins": [
     {
@@ -1653,14 +1638,14 @@
   {
    "ref": "R108",
    "lib_id": "Device:R",
-   "value": "4.7k",
+   "value": "9.53k",
    "at": [
     552,
     72
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C23162",
+   "lcsc": "C23127",
    "rest": "no_connect",
    "pins": [
     {
@@ -1731,7 +1716,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "A1_FB",
+     "net": "RG_MID",
      "dir": [
       0,
       -1
@@ -1752,14 +1737,14 @@
   {
    "ref": "R110",
    "lib_id": "Device:R",
-   "value": "4.7k",
+   "value": "9.53k",
    "at": [
     588,
     72
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C23162",
+   "lcsc": "C23127",
    "rest": "no_connect",
    "pins": [
     {
@@ -1816,20 +1801,56 @@
    ]
   },
   {
+   "ref": "C158",
+   "lib_id": "cubevox:RVT1C220M0405",
+   "value": "22uF 16V",
+   "at": [
+    612,
+    72
+   ],
+   "angle": 0,
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD",
+   "lcsc": "C72502",
+   "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1C220M0405"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "A1_FB",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "RG_MID",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
    "ref": "U105",
-   "lib_id": "cubevox:OPA1678IDR",
-   "value": "OPA1678IDR",
+   "lib_id": "cubevox:OPA2197IDR",
+   "value": "OPA2197IDR",
    "at": [
     498,
     172
    ],
    "angle": 0,
-   "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
-   "lcsc": "C192421",
+   "footprint": "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL",
+   "lcsc": "C139363",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "OPA1678IDR"
+    "MPN": "OPA2197IDR"
    },
    "pins": [
     {
@@ -1942,15 +1963,18 @@
   {
    "ref": "R111",
    "lib_id": "Device:R",
-   "value": "10k",
+   "value": "10k 0.1%",
    "at": [
     552,
     172
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
+   "lcsc": "C309083",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "ARG03BTC1002"
+   },
    "pins": [
     {
      "pin": "1",
@@ -1975,15 +1999,18 @@
   {
    "ref": "R112",
    "lib_id": "Device:R",
-   "value": "10k",
+   "value": "10k 0.1%",
    "at": [
     564,
     172
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
+   "lcsc": "C309083",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "ARG03BTC1002"
+   },
    "pins": [
     {
      "pin": "1",
@@ -2008,15 +2035,18 @@
   {
    "ref": "R113",
    "lib_id": "Device:R",
-   "value": "10k",
+   "value": "10k 0.1%",
    "at": [
     576,
     172
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
+   "lcsc": "C309083",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "ARG03BTC1002"
+   },
    "pins": [
     {
      "pin": "1",
@@ -2041,15 +2071,18 @@
   {
    "ref": "R114",
    "lib_id": "Device:R",
-   "value": "10k",
+   "value": "10k 0.1%",
    "at": [
     588,
     172
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C25804",
+   "lcsc": "C309083",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "ARG03BTC1002"
+   },
    "pins": [
     {
      "pin": "1",
@@ -2063,39 +2096,6 @@
     {
      "pin": "2",
      "net": "PRE1",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "C131",
-   "lib_id": "Device:C",
-   "value": "100nF",
-   "at": [
-    600,
-    172
-   ],
-   "angle": 0,
-   "footprint": "cubevox:C0603",
-   "lcsc": "C14663",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "VREF",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "GND",
      "dir": [
       0,
       1
@@ -2132,7 +2132,7 @@
     },
     {
      "pin": "2",
-     "net": "G2_FB",
+     "net": "G2_INV",
      "dir": [
       0,
       -1
@@ -2141,7 +2141,7 @@
     },
     {
      "pin": "3",
-     "net": "G2_FB",
+     "net": "G2_INV",
      "dir": [
       1,
       0
@@ -2151,49 +2151,16 @@
    ]
   },
   {
-   "ref": "R115",
+   "ref": "R116",
    "lib_id": "Device:R",
-   "value": "100R",
+   "value": "200R",
    "at": [
     556,
     252
    ],
    "angle": 0,
    "footprint": "cubevox:R0603",
-   "lcsc": "C22775",
-   "rest": "no_connect",
-   "pins": [
-    {
-     "pin": "1",
-     "net": "G2_FB",
-     "dir": [
-      0,
-      -1
-     ],
-     "len": 2
-    },
-    {
-     "pin": "2",
-     "net": "G2_INV",
-     "dir": [
-      0,
-      1
-     ],
-     "len": 2
-    }
-   ]
-  },
-  {
-   "ref": "R116",
-   "lib_id": "Device:R",
-   "value": "100R",
-   "at": [
-    568,
-    252
-   ],
-   "angle": 0,
-   "footprint": "cubevox:R0603",
-   "lcsc": "C22775",
+   "lcsc": "C8218",
    "rest": "no_connect",
    "pins": [
     {
@@ -2207,7 +2174,7 @@
     },
     {
      "pin": "2",
-     "net": "VREF",
+     "net": "G2_RG",
      "dir": [
       0,
       1
@@ -2250,21 +2217,24 @@
    ]
   },
   {
-   "ref": "C133",
-   "lib_id": "Device:C",
-   "value": "100nF",
+   "ref": "C159",
+   "lib_id": "cubevox:VT1A101M0505",
+   "value": "100uF 10V",
    "at": [
     592,
     252
    ],
    "angle": 0,
-   "footprint": "cubevox:C0603",
-   "lcsc": "C14663",
+   "footprint": "cubevox:CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD",
+   "lcsc": "C191859",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "VT1A101M0505"
+   },
    "pins": [
     {
      "pin": "1",
-     "net": "VREF",
+     "net": "G2_RG",
      "dir": [
       0,
       -1
@@ -2284,24 +2254,24 @@
   },
   {
    "ref": "U106",
-   "lib_id": "cubevox:OPA1678IDR",
-   "value": "OPA1678IDR",
+   "lib_id": "cubevox:OPA2197IDR",
+   "value": "OPA2197IDR",
    "at": [
     498,
     322
    ],
    "angle": 0,
-   "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
-   "lcsc": "C192421",
+   "footprint": "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL",
+   "lcsc": "C139363",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "OPA1678IDR"
+    "MPN": "OPA2197IDR"
    },
    "pins": [
     {
      "pin": "1",
-     "net": "VREF",
+     "net": "VREF_BUF",
      "dir": [
       -1,
       0
@@ -2310,7 +2280,7 @@
     },
     {
      "pin": "2",
-     "net": "VREF",
+     "net": "VREF_BUF",
      "dir": [
       -1,
       0
@@ -2488,6 +2458,75 @@
     {
      "pin": "1",
      "net": "VREF_DIV",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "R146",
+   "lib_id": "Device:R",
+   "value": "22R",
+   "at": [
+    588,
+    322
+   ],
+   "angle": 0,
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23345",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF_BUF",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "VREF",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C160",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
+   "at": [
+    600,
+    322
+   ],
+   "angle": 0,
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
+   "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VREF",
      "dir": [
       0,
       -1
@@ -2870,20 +2909,23 @@
   },
   {
    "ref": "C139",
-   "lib_id": "Device:C",
-   "value": "10uF",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
    "at": [
     844,
     66
    ],
    "angle": 0,
-   "footprint": "cubevox:C1206",
-   "lcsc": "C14860",
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
    "pins": [
     {
      "pin": "1",
-     "net": "DAC_OUTL",
+     "net": "DAC_AC",
      "dir": [
       0,
       -1
@@ -2892,7 +2934,7 @@
     },
     {
      "pin": "2",
-     "net": "DAC_AC",
+     "net": "DAC_LP",
      "dir": [
       0,
       1
@@ -2968,21 +3010,54 @@
    ]
   },
   {
-   "ref": "C140",
-   "lib_id": "Device:C",
-   "value": "100nF",
+   "ref": "R147",
+   "lib_id": "Device:R",
+   "value": "470R",
    "at": [
     880,
     66
    ],
    "angle": 0,
-   "footprint": "cubevox:C0603",
-   "lcsc": "C14663",
+   "footprint": "cubevox:R0603",
+   "lcsc": "C23179",
    "rest": "no_connect",
    "pins": [
     {
      "pin": "1",
-     "net": "VREF",
+     "net": "DAC_OUTL",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "DAC_LP",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
+  },
+  {
+   "ref": "C161",
+   "lib_id": "Device:C",
+   "value": "2.2nF",
+   "at": [
+    892,
+    66
+   ],
+   "angle": 0,
+   "footprint": "cubevox:C0603",
+   "lcsc": "C2991172",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "DAC_LP",
      "dir": [
       0,
       -1
@@ -3035,16 +3110,19 @@
   },
   {
    "ref": "C141",
-   "lib_id": "Device:C",
-   "value": "10uF",
+   "lib_id": "cubevox:RVT1E100M0405-C72484",
+   "value": "10uF 25V",
    "at": [
     856,
     140
    ],
    "angle": 0,
-   "footprint": "cubevox:C1206",
-   "lcsc": "C14860",
+   "footprint": "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD",
+   "lcsc": "C72484",
    "rest": "no_connect",
+   "fields": {
+    "MPN": "RVT1E100M0405"
+   },
    "pins": [
     {
      "pin": "1",
@@ -5933,17 +6011,17 @@
    ]
   },
   {
-   "text": "XLR leg 47R, BAT54S clamp, 100pF, 10uF. TRS leg 10uF, 10k pad. 1.2k bias to VREF",
+   "text": "XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 10uF + IN_x. TRS leg 10uF + LINE_x, 10k pad. 1.2k bias to VREF",
    "at": [
     300,
     28
    ]
   },
   {
-   "text": "JACK_TRS_N low when a 1/4 in plug is in",
+   "text": "Both T holes are the tip (Neutrik: one tip circuit, no switch). No plug detection",
    "at": [
-    352,
-    188
+    304,
+    150
    ]
   },
   {
@@ -5954,21 +6032,35 @@
    ]
   },
   {
-   "text": "Stage 1 INA 20 dB (U104, U105A). Stage 2 0-40 dB on Input Gain pot (U105B)",
+   "text": "Stage 1 INA 26 dB (U104, U105A). Stage 2 0-34.2 dB on Input Gain pot (U105B)",
    "at": [
     468,
     28
    ]
   },
   {
-   "text": "Input Gain pot in the A4 feedback leg, wiper tied to end 3",
+   "text": "Stage 1 26.0 dB, stage 2 0-34.2 dB, chain 26-60 dB XLR / 6.6-40.8 dB TRS; DC gain 1 (AC-coupled legs)",
+   "at": [
+    468,
+    32
+   ]
+  },
+  {
+   "text": "RG = R109 1k + C158 22uF in series, DC gain 1. Gain 1 + 2 x 9.53k / 1k = 20.1",
+   "at": [
+    552,
+    52
+   ]
+  },
+  {
+   "text": "Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/200",
    "at": [
     468,
     232
    ]
   },
   {
-   "text": "VREF: 5VA divided 10k/10k, 10 uF, buffered by U106A. U106B drives block 6",
+   "text": "VREF: 5VA divided 10k/10k, 10 uF, follower U106A, 22R into VREF with 10 uF. U106B drives block 6",
    "at": [
     468,
     292
@@ -6024,10 +6116,17 @@
    ]
   },
   {
-   "text": "DAC_ATT = 0.6 x DAC about VREF. U106B buffers to the jack",
+   "text": "470R / 2.2nF filter, 10uF, DAC_ATT = 0.6 x DAC about VREF",
    "at": [
     840,
     28
+   ]
+  },
+  {
+   "text": "U106B buffers to the jack",
+   "at": [
+    840,
+    32
    ]
   },
   {

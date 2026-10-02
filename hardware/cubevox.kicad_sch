@@ -10,7 +10,7 @@
 		(rev "1")
 	)
 	(lib_symbols
-		(symbol "cubevox:OPA1678IDR"
+		(symbol "cubevox:OPA2197IDR"
     (in_bom yes)
     (on_board yes)
     (property
@@ -22,21 +22,21 @@
     )
     (property
       "Value"
-      "OPA1678IDR"
+      "OPA2197IDR"
       (id 1)
       (at 0 -8.89 0)
       (effects (font (size 1.27 1.27) ) )
     )
     (property
       "Footprint"
-      "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL"
+      "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
       (id 2)
       (at 0 -11.43 0)
       (effects (font (size 1.27 1.27) ) hide)
     )
     (property
       "Datasheet"
-      "https://lcsc.com/product-detail/Others_Texas-Instruments_OPA1678IDR_Texas-Instruments-TI-OPA1678IDR_C192421.html"
+      "https://lcsc.com/product-detail/Precision-OpAmps_TI_OPA2197IDR_OPA2197IDR_C139363.html"
       (id 3)
       (at 0 -13.97 0)
       (effects (font (size 1.27 1.27) ) hide)
@@ -50,34 +50,40 @@
     )
     (property
       "MPN"
-      "OPA1678IDR"
+      "OPA2197IDR"
       (id 5)
       (at 0 -19.05 0)
       (effects (font (size 1.27 1.27) ) hide)
     )
     (property
       "LCSC Part"
-      "C192421"
+      "C139363"
       (id 6)
       (at 0 -21.59 0)
       (effects (font (size 1.27 1.27) ) hide)
     )
     (property
       "ki_keywords"
-      "Operational Amplifier"
+      "Precision OpAmps"
       (id 8)
       (at 0 -24.13 0)
       (effects (font (size 1.27 1.27) ) hide)
     )
-    (symbol "OPA1678IDR_0_1"
+    (symbol "OPA2197IDR_0_1"
       (rectangle
-        (start -12.70 6.35)
-        (end 12.70 -6.35)
+        (start -12.70 6.86)
+        (end 12.70 -6.86)
         (stroke (width 0) (type default))
         (fill (type background))
       )
       (circle
-        (center -11.43 5.08)
+        (center -11.43 5.59)
+        (radius 0.38)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (circle
+        (center -11.43 5.59)
         (radius 0.38)
         (stroke (width 0) (type default))
         (fill (type none))
@@ -85,49 +91,49 @@
       (pin output line
         (at -15.24 3.81 0)
         (length 2.54)
-        (name "OUTA" (effects (font (size 1.27 1.27))))
+        (name "OUT/A" (effects (font (size 1.27 1.27))))
         (number "1" (effects (font (size 1.27 1.27))))
       )
       (pin input line
         (at -15.24 1.27 0)
         (length 2.54)
-        (name "INA-" (effects (font (size 1.27 1.27))))
+        (name "-IN/A" (effects (font (size 1.27 1.27))))
         (number "2" (effects (font (size 1.27 1.27))))
       )
       (pin input line
         (at -15.24 -1.27 0)
         (length 2.54)
-        (name "INA+" (effects (font (size 1.27 1.27))))
+        (name "+IN/A" (effects (font (size 1.27 1.27))))
         (number "3" (effects (font (size 1.27 1.27))))
       )
       (pin power_in line
         (at -15.24 -3.81 0)
         (length 2.54)
-        (name "V-" (effects (font (size 1.27 1.27))))
+        (name "-VS" (effects (font (size 1.27 1.27))))
         (number "4" (effects (font (size 1.27 1.27))))
       )
       (pin input line
         (at 15.24 -3.81 180)
         (length 2.54)
-        (name "INB+" (effects (font (size 1.27 1.27))))
+        (name "+IN/B" (effects (font (size 1.27 1.27))))
         (number "5" (effects (font (size 1.27 1.27))))
       )
       (pin input line
         (at 15.24 -1.27 180)
         (length 2.54)
-        (name "INB-" (effects (font (size 1.27 1.27))))
+        (name "-IN/B" (effects (font (size 1.27 1.27))))
         (number "6" (effects (font (size 1.27 1.27))))
       )
       (pin output line
         (at 15.24 1.27 180)
         (length 2.54)
-        (name "OUTB" (effects (font (size 1.27 1.27))))
+        (name "OUT/B" (effects (font (size 1.27 1.27))))
         (number "7" (effects (font (size 1.27 1.27))))
       )
       (pin power_in line
         (at 15.24 3.81 180)
         (length 2.54)
-        (name "V+" (effects (font (size 1.27 1.27))))
+        (name "+VS" (effects (font (size 1.27 1.27))))
         (number "8" (effects (font (size 1.27 1.27))))
       )
     )
@@ -4077,6 +4083,359 @@
 		)
 		(embedded_fonts no)
 	)
+		(symbol "cubevox:RVT1E100M0405-C72484"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "C"
+      (id 0)
+      (at 0 8.89 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "RVT1E100M0405-C72484"
+      (id 1)
+      (at 0 -8.89 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
+      (id 2)
+      (at 0 -11.43 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "https://lcsc.com/product-detail/Aluminum-Electrolytic-Capacitors-SMD_10uF-25V-20_C72484.html"
+      (id 3)
+      (at 0 -13.97 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "ROQANG(容强)"
+      (id 4)
+      (at 0 -16.51 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "RVT1E100M0405"
+      (id 5)
+      (at 0 -19.05 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "C72484"
+      (id 6)
+      (at 0 -21.59 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "Aluminum Electrolytic Capacitors - SMD"
+      (id 8)
+      (at 0 -24.13 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_description"
+      "10uF 25V ±20%"
+      (id 9)
+      (at 0 -26.67 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "RVT1E100M0405-C72484_0_1"
+      (arc
+        (start -1.83 -1.21)
+        (mid 0.09 -0.51)
+        (end 1.95 -1.33)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 2.03 0.51) (xy -2.03 0.51)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.00 1.27) (xy 0.00 0.51)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.00 -0.51) (xy 0.00 -1.27)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.76 2.54) (xy 0.76 1.52)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 1.27 2.03) (xy 0.25 2.03)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin passive line
+        (at 0.00 3.81 270)
+        (length 2.54)
+        (name "1" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at 0.00 -3.81 90)
+        (length 2.54)
+        (name "2" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
+		(symbol "cubevox:VT1A101M0505"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "C"
+      (id 0)
+      (at 0 10.16 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "VT1A101M0505"
+      (id 1)
+      (at 0 -10.16 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "cubevox:CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD"
+      (id 2)
+      (at 0 -12.70 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "https://lcsc.com/product-detail/Others_ROQANG-VT1A101M0505_C191859.html"
+      (id 3)
+      (at 0 -15.24 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "ROQANG(容强)"
+      (id 4)
+      (at 0 -17.78 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "VT1A101M0505"
+      (id 5)
+      (at 0 -20.32 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "C191859"
+      (id 6)
+      (at 0 -22.86 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "Aluminum Electrolytic Capacitors - SMD"
+      (id 8)
+      (at 0 -25.40 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "VT1A101M0505_0_1"
+      (rectangle
+        (start -2.54 1.52)
+        (end -1.52 1.50)
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (rectangle
+        (start -2.03 2.03)
+        (end -2.01 1.02)
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (arc
+        (start 2.54 -1.02)
+        (mid 1.33 -0.42)
+        (end 0.00 -0.25)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (arc
+        (start 0.00 -0.25)
+        (mid -1.33 -0.43)
+        (end -2.54 -1.02)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -2.54 0.76) (xy 2.54 0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin passive line
+        (at 0.00 5.08 90)
+        (length 3.81)
+        (name "1" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at 0.00 -5.08 270)
+        (length 5.08)
+        (name "2" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
+		(symbol "cubevox:RVT1C220M0405"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "C"
+      (id 0)
+      (at 0 5.08 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "RVT1C220M0405"
+      (id 1)
+      (at 0 -5.08 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD"
+      (id 2)
+      (at 0 -7.62 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "https://lcsc.com/product-detail/Aluminum-Electrolytic-Capacitors-SMD_22uF-16V-20_C72502.html"
+      (id 3)
+      (at 0 -10.16 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "ROQANG(容强)"
+      (id 4)
+      (at 0 -12.70 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "RVT1C220M0405"
+      (id 5)
+      (at 0 -15.24 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "C72502"
+      (id 6)
+      (at 0 -17.78 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "Aluminum Electrolytic Capacitors - SMD"
+      (id 8)
+      (at 0 -20.32 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_description"
+      "22uF 16V ±20%"
+      (id 9)
+      (at 0 -22.86 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "RVT1C220M0405_0_1"
+      (arc
+        (start 1.21 -1.83)
+        (mid 0.51 0.09)
+        (end 1.33 1.95)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -0.51 2.03) (xy -0.51 -2.03)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -1.27 -0.00) (xy -0.51 -0.00)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.51 -0.00) (xy 1.27 -0.00)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -2.54 0.76) (xy -1.52 0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -2.03 1.27) (xy -2.03 0.25)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin passive line
+        (at -3.81 -0.00 0)
+        (length 2.54)
+        (name "1" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at 3.81 -0.00 180)
+        (length 2.54)
+        (name "2" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
 		(symbol "Device:FerriteBead"
 		(pin_numbers
 			(hide yes)
@@ -6294,7 +6653,7 @@
 		)
 		(uuid "5c8e9175-0e39-5db2-a5de-735c8586b2bf")
 	)
-	(label "JACK_TRS_N"
+	(label "TRS_T"
 		(at 402.59 146.05 0)
 		(fields_autoplaced yes)
 		(effects
@@ -6691,7 +7050,7 @@
 		(uuid "2ad54a8c-b67e-5e9e-9ade-e388b15e994d")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:RVT1E100M0405-C72484")
 		(at 508 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -6708,7 +7067,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF"
+		(property "Value" "10uF 25V"
 			(at 511.81 85.09 0)
 			(effects
 				(font
@@ -6717,7 +7076,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C1206"
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 			(at 508 83.82 0)
 			(hide yes)
 			(effects
@@ -6735,7 +7094,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14860"
+		(property "LCSC" "C72484"
+			(at 508 83.82 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
 			(at 508 83.82 0)
 			(hide yes)
 			(effects
@@ -6769,7 +7137,7 @@
 		)
 		(uuid "65b211a4-943f-5e0c-8e57-1c53484604b6")
 	)
-	(label "MIC_P"
+	(label "IN_P"
 		(at 508 77.47 90)
 		(fields_autoplaced yes)
 		(effects
@@ -6790,7 +7158,7 @@
 		)
 		(uuid "641e0e74-4f54-52b6-8ca1-6ceab6ca2701")
 	)
-	(label "IN_P"
+	(label "MIC_P"
 		(at 508 90.17 270)
 		(fields_autoplaced yes)
 		(effects
@@ -6802,7 +7170,7 @@
 		(uuid "32346da7-c49a-5d2b-9c03-64e05cf4caa3")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:RVT1E100M0405-C72484")
 		(at 533.4 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -6819,7 +7187,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF"
+		(property "Value" "10uF 25V"
 			(at 537.21 85.09 0)
 			(effects
 				(font
@@ -6828,7 +7196,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C1206"
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 			(at 533.4 83.82 0)
 			(hide yes)
 			(effects
@@ -6846,7 +7214,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14860"
+		(property "LCSC" "C72484"
+			(at 533.4 83.82 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
 			(at 533.4 83.82 0)
 			(hide yes)
 			(effects
@@ -6880,7 +7257,7 @@
 		)
 		(uuid "9bd76805-0fc1-5372-b5a4-6858d035f95b")
 	)
-	(label "TRS_T"
+	(label "LINE_P"
 		(at 533.4 77.47 90)
 		(fields_autoplaced yes)
 		(effects
@@ -6901,7 +7278,7 @@
 		)
 		(uuid "d5abd3c8-610d-5f72-a7d1-4120f159d5ef")
 	)
-	(label "LINE_P"
+	(label "TRS_T"
 		(at 533.4 90.17 270)
 		(fields_autoplaced yes)
 		(effects
@@ -7135,16 +7512,16 @@
 		(uuid "74a0b922-e4e1-571b-a9b7-f912a55c4627")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "Device:R")
 		(at 579.12 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "8155e8b4-cbaa-5d6b-af92-b8e84f9c099a")
-		(property "Reference" "C122"
-			(at 582.93 82.55 0)
+		(uuid "7b556107-aa70-5b4c-a0d2-b756edc63ac4")
+		(property "Reference" "R144"
+			(at 581.66 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7152,8 +7529,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100nF"
-			(at 582.93 85.09 0)
+		(property "Value" "100k"
+			(at 581.66 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7161,7 +7538,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C0603"
+		(property "Footprint" "cubevox:R0603"
 			(at 579.12 83.82 0)
 			(hide yes)
 			(effects
@@ -7179,7 +7556,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C14663"
+		(property "LCSC" "C25803"
 			(at 579.12 83.82 0)
 			(hide yes)
 			(effects
@@ -7189,15 +7566,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "a72dd97c-aa20-51c8-9790-388063fb6681")
+			(uuid "7d03a111-a10a-56fc-8a87-24b869d24072")
 		)
 		(pin "2"
-			(uuid "2b29fbb3-29e7-5ce1-b530-07c8e734857e")
+			(uuid "f1fd2a9c-9686-56b9-8c6b-e040382a94bd")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "C122")
+					(reference "R144")
 					(unit 1)
 				)
 			)
@@ -7211,9 +7588,9 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "b6d7735a-9436-54a8-88a0-dbc09b4dbeb7")
+		(uuid "2596341b-be70-52a8-8c49-8b5368f68879")
 	)
-	(label "VREF"
+	(label "MIC_P"
 		(at 579.12 77.47 90)
 		(fields_autoplaced yes)
 		(effects
@@ -7222,7 +7599,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "c51c6bde-975b-5e8d-a7c6-b70a9e2c571f")
+		(uuid "84f40231-32fe-56ee-8339-281deac388c8")
 	)
 	(wire
 		(pts
@@ -7232,7 +7609,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "54e74017-76e0-5294-bf42-e46e027e427d")
+		(uuid "2d2ef9ad-b061-5631-94ae-60b3f966ba79")
 	)
 	(label "GND"
 		(at 579.12 90.17 270)
@@ -7243,7 +7620,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "77bb7af6-1244-504f-b043-d85e621ca531")
+		(uuid "beecc58e-60d7-5611-8de8-cc0b447c8577")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -7610,7 +7987,7 @@
 		(uuid "114c8c6d-b459-58f4-81d7-caf7d90c8534")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:RVT1E100M0405-C72484")
 		(at 508 177.8 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -7627,7 +8004,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF"
+		(property "Value" "10uF 25V"
 			(at 511.81 179.07 0)
 			(effects
 				(font
@@ -7636,7 +8013,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C1206"
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 			(at 508 177.8 0)
 			(hide yes)
 			(effects
@@ -7654,7 +8031,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14860"
+		(property "LCSC" "C72484"
+			(at 508 177.8 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
 			(at 508 177.8 0)
 			(hide yes)
 			(effects
@@ -7688,7 +8074,7 @@
 		)
 		(uuid "328eb8f5-dec8-5f6b-a8cc-05b337c2b26a")
 	)
-	(label "MIC_N"
+	(label "IN_N"
 		(at 508 171.45 90)
 		(fields_autoplaced yes)
 		(effects
@@ -7709,7 +8095,7 @@
 		)
 		(uuid "736ed569-615c-56c3-943d-f8d6a54392e2")
 	)
-	(label "IN_N"
+	(label "MIC_N"
 		(at 508 184.15 270)
 		(fields_autoplaced yes)
 		(effects
@@ -7721,7 +8107,7 @@
 		(uuid "07db3452-6f07-5c03-858f-439cb60e6e05")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:RVT1E100M0405-C72484")
 		(at 533.4 177.8 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -7738,7 +8124,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF"
+		(property "Value" "10uF 25V"
 			(at 537.21 179.07 0)
 			(effects
 				(font
@@ -7747,7 +8133,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C1206"
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 			(at 533.4 177.8 0)
 			(hide yes)
 			(effects
@@ -7765,7 +8151,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14860"
+		(property "LCSC" "C72484"
+			(at 533.4 177.8 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
 			(at 533.4 177.8 0)
 			(hide yes)
 			(effects
@@ -7799,7 +8194,7 @@
 		)
 		(uuid "d68558af-6fd8-5b8f-80a7-fc49a493beac")
 	)
-	(label "TRS_R"
+	(label "LINE_N"
 		(at 533.4 171.45 90)
 		(fields_autoplaced yes)
 		(effects
@@ -7820,7 +8215,7 @@
 		)
 		(uuid "cb169e5f-7b12-5b2a-aa8d-e07aa33d71db")
 	)
-	(label "LINE_N"
+	(label "TRS_R"
 		(at 533.4 184.15 270)
 		(fields_autoplaced yes)
 		(effects
@@ -8054,16 +8449,16 @@
 		(uuid "9b08065c-c04f-525c-9d72-3ab4f213ccba")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "Device:R")
 		(at 579.12 177.8 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "5672a21b-6d8e-550d-8dc2-119027108343")
-		(property "Reference" "C126"
-			(at 582.93 176.53 0)
+		(uuid "cb8a1061-8829-54a8-8606-a52db4f33815")
+		(property "Reference" "R145"
+			(at 581.66 176.53 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8071,8 +8466,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100nF"
-			(at 582.93 179.07 0)
+		(property "Value" "100k"
+			(at 581.66 179.07 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8080,7 +8475,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C0603"
+		(property "Footprint" "cubevox:R0603"
 			(at 579.12 177.8 0)
 			(hide yes)
 			(effects
@@ -8098,7 +8493,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C14663"
+		(property "LCSC" "C25803"
 			(at 579.12 177.8 0)
 			(hide yes)
 			(effects
@@ -8108,15 +8503,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "e6ff9487-a72b-5a71-9263-6f48507345b7")
+			(uuid "6ea759b2-17cc-5c13-9603-c80a9abf88dd")
 		)
 		(pin "2"
-			(uuid "1209b3fb-4232-57a2-8ff7-82834fdf1786")
+			(uuid "e702809e-e613-5a06-9187-7039672e4efc")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "C126")
+					(reference "R145")
 					(unit 1)
 				)
 			)
@@ -8130,9 +8525,9 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "79322041-3c79-5df0-976f-7ddeb3e54584")
+		(uuid "88ead180-65f1-5c1c-a7d4-01ee6c0037bb")
 	)
-	(label "VREF"
+	(label "MIC_N"
 		(at 579.12 171.45 90)
 		(fields_autoplaced yes)
 		(effects
@@ -8141,7 +8536,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "00e3eb8c-b062-5f4a-8667-b53e7dce7bb7")
+		(uuid "513eec6e-48bc-56dd-8efd-1a62e64fe4f5")
 	)
 	(wire
 		(pts
@@ -8151,7 +8546,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "d0e1e41b-ff06-548d-a1f5-ee6852ad1704")
+		(uuid "ef78731f-56ba-514c-814c-75035d5e847e")
 	)
 	(label "GND"
 		(at 579.12 184.15 270)
@@ -8162,121 +8557,10 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "a39abbac-e246-5516-b4b8-98882aaceeec")
+		(uuid "e334bb86-ab81-5a22-932b-efdf2969747e")
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 431.8 241.3 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "3b670bdb-ed32-56d1-8faf-f30b775caa73")
-		(property "Reference" "R107"
-			(at 434.34 240.03 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "10k"
-			(at 434.34 242.57 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "cubevox:R0603"
-			(at 431.8 241.3 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 431.8 241.3 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C25804"
-			(at 431.8 241.3 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "848043dc-9cbd-55c7-8a98-efe53fdf8f21")
-		)
-		(pin "2"
-			(uuid "5e36fd2c-98c6-5acc-8ad6-a786d814d87e")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "R107")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 431.8 237.49) (xy 431.8 234.95)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c04b2b28-7c5a-5e30-8dc2-b4332013e28f")
-	)
-	(label "3V3"
-		(at 431.8 234.95 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "ba41d9b4-b7e6-532d-a77f-838048d5f7ec")
-	)
-	(wire
-		(pts
-			(xy 431.8 245.11) (xy 431.8 247.65)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "94db1245-259f-5715-bb3d-26b1a9069890")
-	)
-	(label "JACK_TRS_N"
-		(at 431.8 247.65 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "c4a7300a-eb59-5400-9890-7224c6974f22")
-	)
-	(symbol
-		(lib_id "cubevox:OPA1678IDR")
+		(lib_id "cubevox:OPA2197IDR")
 		(at 632.46 91.44 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -8285,22 +8569,22 @@
 		(dnp no)
 		(uuid "686ec9b9-8665-5d05-b183-cfd956db5111")
 		(property "Reference" "U104"
-			(at 632.46 83.82 0)
+			(at 632.46 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "OPA1678IDR"
-			(at 632.46 99.06 0)
+		(property "Value" "OPA2197IDR"
+			(at 632.46 100.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Footprint" "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL"
+		(property "Footprint" "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 			(at 632.46 91.44 0)
 			(hide yes)
 			(effects
@@ -8318,7 +8602,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C192421"
+		(property "LCSC" "C139363"
 			(at 632.46 91.44 0)
 			(hide yes)
 			(effects
@@ -8327,7 +8611,7 @@
 				)
 			)
 		)
-		(property "MPN" "OPA1678IDR"
+		(property "MPN" "OPA2197IDR"
 			(at 632.46 91.44 0)
 			(hide yes)
 			(effects
@@ -8666,7 +8950,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "4.7k"
+		(property "Value" "9.53k"
 			(at 703.58 92.71 0)
 			(effects
 				(font
@@ -8693,7 +8977,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C23162"
+		(property "LCSC" "C23127"
 			(at 701.04 91.44 0)
 			(hide yes)
 			(effects
@@ -8949,7 +9233,7 @@
 		)
 		(uuid "67296745-955b-5e20-9a7d-81285c16f2fe")
 	)
-	(label "A1_FB"
+	(label "RG_MID"
 		(at 731.52 85.09 90)
 		(fields_autoplaced yes)
 		(effects
@@ -8999,7 +9283,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "4.7k"
+		(property "Value" "9.53k"
 			(at 749.3 92.71 0)
 			(effects
 				(font
@@ -9026,7 +9310,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C23162"
+		(property "LCSC" "C23127"
 			(at 746.76 91.44 0)
 			(hide yes)
 			(effects
@@ -9204,7 +9488,125 @@
 		(uuid "060d22d9-3ce5-544b-a3b6-7cde7d97e247")
 	)
 	(symbol
-		(lib_id "cubevox:OPA1678IDR")
+		(lib_id "cubevox:RVT1C220M0405")
+		(at 777.24 91.44 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "98c48b3a-6d64-5e07-aba8-b0a4d6a18008")
+		(property "Reference" "C158"
+			(at 777.24 85.09 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "22uF 16V"
+			(at 777.24 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD"
+			(at 777.24 91.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 777.24 91.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C72502"
+			(at 777.24 91.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1C220M0405"
+			(at 777.24 91.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "f89a8e9f-9ce6-5b5f-a341-109dfef12ab8")
+		)
+		(pin "2"
+			(uuid "f7116d4d-f0fc-5d7a-97a0-ed4ccd7375a7")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C158")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 773.43 91.44) (xy 773.43 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a7147e10-e851-57b3-8c13-c46cbf041a8d")
+	)
+	(label "A1_FB"
+		(at 773.43 88.9 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "b9a16054-b1a5-5ec2-9d34-35e6ac31fe0c")
+	)
+	(wire
+		(pts
+			(xy 781.05 91.44) (xy 781.05 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "38b7c5ba-a436-5845-b75a-d9ea7fc9c29c")
+	)
+	(label "RG_MID"
+		(at 781.05 93.98 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "5d44e955-05e0-5077-830d-2b218d48d8b4")
+	)
+	(symbol
+		(lib_id "cubevox:OPA2197IDR")
 		(at 632.46 218.44 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -9213,22 +9615,22 @@
 		(dnp no)
 		(uuid "8dc91e32-4661-5c16-948d-ad66bca02c03")
 		(property "Reference" "U105"
-			(at 632.46 210.82 0)
+			(at 632.46 209.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "OPA1678IDR"
-			(at 632.46 226.06 0)
+		(property "Value" "OPA2197IDR"
+			(at 632.46 227.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Footprint" "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL"
+		(property "Footprint" "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 			(at 632.46 218.44 0)
 			(hide yes)
 			(effects
@@ -9246,7 +9648,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C192421"
+		(property "LCSC" "C139363"
 			(at 632.46 218.44 0)
 			(hide yes)
 			(effects
@@ -9255,7 +9657,7 @@
 				)
 			)
 		)
-		(property "MPN" "OPA1678IDR"
+		(property "MPN" "OPA2197IDR"
 			(at 632.46 218.44 0)
 			(hide yes)
 			(effects
@@ -9594,7 +9996,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "10k 0.1%"
 			(at 703.58 219.71 0)
 			(effects
 				(font
@@ -9621,7 +10023,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C25804"
+		(property "LCSC" "C309083"
+			(at 701.04 218.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "ARG03BTC1002"
 			(at 701.04 218.44 0)
 			(hide yes)
 			(effects
@@ -9705,7 +10116,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "10k 0.1%"
 			(at 718.82 219.71 0)
 			(effects
 				(font
@@ -9732,7 +10143,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C25804"
+		(property "LCSC" "C309083"
+			(at 716.28 218.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "ARG03BTC1002"
 			(at 716.28 218.44 0)
 			(hide yes)
 			(effects
@@ -9816,7 +10236,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "10k 0.1%"
 			(at 734.06 219.71 0)
 			(effects
 				(font
@@ -9843,7 +10263,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C25804"
+		(property "LCSC" "C309083"
+			(at 731.52 218.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "ARG03BTC1002"
 			(at 731.52 218.44 0)
 			(hide yes)
 			(effects
@@ -9927,7 +10356,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "10k 0.1%"
 			(at 749.3 219.71 0)
 			(effects
 				(font
@@ -9954,7 +10383,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C25804"
+		(property "LCSC" "C309083"
+			(at 746.76 218.44 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "ARG03BTC1002"
 			(at 746.76 218.44 0)
 			(hide yes)
 			(effects
@@ -10019,117 +10457,6 @@
 			(justify right bottom)
 		)
 		(uuid "774bf3e3-d9c6-5a93-83b2-1e3ca16d6a0d")
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 762 218.44 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "52e56861-bc4d-516d-9f91-25844b406a58")
-		(property "Reference" "C131"
-			(at 765.81 217.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "100nF"
-			(at 765.81 219.71 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "cubevox:C0603"
-			(at 762 218.44 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 762 218.44 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C14663"
-			(at 762 218.44 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "f5a5da80-1c73-591c-bfb5-6ec227c8c888")
-		)
-		(pin "2"
-			(uuid "ef09f451-4dcb-51f9-8e1f-1de7a93acc6d")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "C131")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 762 214.63) (xy 762 212.09)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "134bc7aa-b02f-529b-a35f-47ef18a4fe26")
-	)
-	(label "VREF"
-		(at 762 212.09 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "c13ea7a3-f039-5585-80b6-c58ae0a134f9")
-	)
-	(wire
-		(pts
-			(xy 762 222.25) (xy 762 224.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1662ff6e-1351-52b1-9dc8-61e58d37bf5c")
-	)
-	(label "GND"
-		(at 762 224.79 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "99afa654-65b4-52ba-9df0-ae2563ffe455")
 	)
 	(symbol
 		(lib_id "cubevox:RK09D1130C1B")
@@ -10247,7 +10574,7 @@
 		)
 		(uuid "4c2cea5c-8012-5ff3-88e4-60ff25154fe8")
 	)
-	(label "G2_FB"
+	(label "G2_INV"
 		(at 645.16 313.69 90)
 		(fields_autoplaced yes)
 		(effects
@@ -10268,7 +10595,7 @@
 		)
 		(uuid "6985781d-a6f4-5c0d-b857-5b80f9a3107c")
 	)
-	(label "G2_FB"
+	(label "G2_INV"
 		(at 652.78 321.31 0)
 		(fields_autoplaced yes)
 		(effects
@@ -10295,8 +10622,8 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "ead70e25-3661-545e-83a9-d280f96aab36")
-		(property "Reference" "R115"
+		(uuid "e6e27886-1c22-538f-9049-013cb9145b39")
+		(property "Reference" "R116"
 			(at 708.66 318.77 0)
 			(effects
 				(font
@@ -10305,7 +10632,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100R"
+		(property "Value" "200R"
 			(at 708.66 321.31 0)
 			(effects
 				(font
@@ -10332,119 +10659,8 @@
 				)
 			)
 		)
-		(property "LCSC" "C22775"
+		(property "LCSC" "C8218"
 			(at 706.12 320.04 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "1e479439-a074-52f5-b72b-ee4d9f498169")
-		)
-		(pin "2"
-			(uuid "fad0c28b-d7c2-5b70-953a-0418daa59d4b")
-		)
-		(instances
-			(project "cubevox"
-				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "R115")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(wire
-		(pts
-			(xy 706.12 316.23) (xy 706.12 313.69)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a2c4a28c-7772-5695-a9b0-2d721fad336e")
-	)
-	(label "G2_FB"
-		(at 706.12 313.69 90)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "977da288-adfd-50ab-92ba-583c77082691")
-	)
-	(wire
-		(pts
-			(xy 706.12 323.85) (xy 706.12 326.39)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f746b90c-de6e-5da4-b874-53f410ea7d04")
-	)
-	(label "G2_INV"
-		(at 706.12 326.39 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "162cc919-2790-5e41-ae55-6b4518ef1fb3")
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 721.36 320.04 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "e6e27886-1c22-538f-9049-013cb9145b39")
-		(property "Reference" "R116"
-			(at 723.9 318.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "100R"
-			(at 723.9 321.31 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "cubevox:R0603"
-			(at 721.36 320.04 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 721.36 320.04 0)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC" "C22775"
-			(at 721.36 320.04 0)
 			(hide yes)
 			(effects
 				(font
@@ -10469,7 +10685,7 @@
 	)
 	(wire
 		(pts
-			(xy 721.36 316.23) (xy 721.36 313.69)
+			(xy 706.12 316.23) (xy 706.12 313.69)
 		)
 		(stroke
 			(width 0)
@@ -10478,7 +10694,7 @@
 		(uuid "4c104922-47bd-58c5-a90c-676ac432ffbc")
 	)
 	(label "G2_INV"
-		(at 721.36 313.69 90)
+		(at 706.12 313.69 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10490,7 +10706,7 @@
 	)
 	(wire
 		(pts
-			(xy 721.36 323.85) (xy 721.36 326.39)
+			(xy 706.12 323.85) (xy 706.12 326.39)
 		)
 		(stroke
 			(width 0)
@@ -10498,8 +10714,8 @@
 		)
 		(uuid "54e2acef-fe8d-5625-b0f0-48f31a46a41b")
 	)
-	(label "VREF"
-		(at 721.36 326.39 270)
+	(label "G2_RG"
+		(at 706.12 326.39 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10621,16 +10837,16 @@
 		(uuid "b396cbbb-4bf3-5716-ac10-848cae5ebfd5")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:VT1A101M0505")
 		(at 751.84 320.04 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "6a76236f-e845-5717-8bd9-0d4192da7353")
-		(property "Reference" "C133"
-			(at 755.65 318.77 0)
+		(uuid "23914136-ae33-58d7-ae23-baf9ef2d0bf5")
+		(property "Reference" "C159"
+			(at 755.65 320.04 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10638,8 +10854,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100nF"
-			(at 755.65 321.31 0)
+		(property "Value" "100uF 10V"
+			(at 755.65 322.58 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10647,7 +10863,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C0603"
+		(property "Footprint" "cubevox:CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD"
 			(at 751.84 320.04 0)
 			(hide yes)
 			(effects
@@ -10665,7 +10881,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14663"
+		(property "LCSC" "C191859"
+			(at 751.84 320.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "VT1A101M0505"
 			(at 751.84 320.04 0)
 			(hide yes)
 			(effects
@@ -10675,15 +10900,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "49174479-c2fa-5bbc-84dc-729a7afeb0b8")
+			(uuid "4221d8a1-ddb9-584d-ad9c-5ce5aec3ec5c")
 		)
 		(pin "2"
-			(uuid "763fb3ed-22ff-5c09-86eb-0eb3c1fa492e")
+			(uuid "2c9fd8c9-8295-5ebe-b48d-7b679163f9e1")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "C133")
+					(reference "C159")
 					(unit 1)
 				)
 			)
@@ -10691,16 +10916,16 @@
 	)
 	(wire
 		(pts
-			(xy 751.84 316.23) (xy 751.84 313.69)
+			(xy 751.84 314.96) (xy 751.84 312.42)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "efdaa3f4-f6b0-5828-8503-c88155595dd2")
+		(uuid "9b326b19-2aca-5ce6-b35b-9d426c694f14")
 	)
-	(label "VREF"
-		(at 751.84 313.69 90)
+	(label "G2_RG"
+		(at 751.84 312.42 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10708,20 +10933,20 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "f95ce7b9-55b9-59a0-bfc4-828a39389636")
+		(uuid "df3f6a27-c3ab-5118-a638-c70c56eb1a54")
 	)
 	(wire
 		(pts
-			(xy 751.84 323.85) (xy 751.84 326.39)
+			(xy 751.84 325.12) (xy 751.84 327.66)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "653bf552-85a4-5ff1-8b00-4fa99d93db5e")
+		(uuid "d7389fb8-abe8-51fc-89ba-ec05c7fc94bd")
 	)
 	(label "GND"
-		(at 751.84 326.39 270)
+		(at 751.84 327.66 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10729,10 +10954,10 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "50e79daa-d4c4-5c78-a469-fd45af350a4f")
+		(uuid "6e6651ee-2f46-5891-8f93-d4a871c25776")
 	)
 	(symbol
-		(lib_id "cubevox:OPA1678IDR")
+		(lib_id "cubevox:OPA2197IDR")
 		(at 632.46 408.94 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -10741,22 +10966,22 @@
 		(dnp no)
 		(uuid "b151354f-1d64-574c-b66b-006a8a34cd6f")
 		(property "Reference" "U106"
-			(at 632.46 401.32 0)
+			(at 632.46 400.05 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "OPA1678IDR"
-			(at 632.46 416.56 0)
+		(property "Value" "OPA2197IDR"
+			(at 632.46 417.83 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Footprint" "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL"
+		(property "Footprint" "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 			(at 632.46 408.94 0)
 			(hide yes)
 			(effects
@@ -10774,7 +10999,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C192421"
+		(property "LCSC" "C139363"
 			(at 632.46 408.94 0)
 			(hide yes)
 			(effects
@@ -10783,7 +11008,7 @@
 				)
 			)
 		)
-		(property "MPN" "OPA1678IDR"
+		(property "MPN" "OPA2197IDR"
 			(at 632.46 408.94 0)
 			(hide yes)
 			(effects
@@ -10835,7 +11060,7 @@
 		)
 		(uuid "7a897eee-674a-5438-97c6-d0328fd096ba")
 	)
-	(label "VREF"
+	(label "VREF_BUF"
 		(at 614.68 405.13 180)
 		(fields_autoplaced yes)
 		(effects
@@ -10856,7 +11081,7 @@
 		)
 		(uuid "234ca45c-fe43-5a63-af72-b6b2d4acca12")
 	)
-	(label "VREF"
+	(label "VREF_BUF"
 		(at 614.68 407.67 180)
 		(fields_autoplaced yes)
 		(effects
@@ -11436,6 +11661,237 @@
 			(justify right bottom)
 		)
 		(uuid "5dd1a341-50ff-5df4-a38c-1b7f101c984f")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 746.76 408.94 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "1524892b-87cd-59c7-acf0-e1a286d773d0")
+		(property "Reference" "R146"
+			(at 749.3 407.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "22R"
+			(at 749.3 410.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 746.76 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 746.76 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C23345"
+			(at 746.76 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2643ea41-545e-5c16-80d7-43006917a7a0")
+		)
+		(pin "2"
+			(uuid "af566e8a-f645-5d7e-919d-1a415620592e")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R146")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 746.76 405.13) (xy 746.76 402.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b3c7b091-7150-5854-b227-26eb72740622")
+	)
+	(label "VREF_BUF"
+		(at 746.76 402.59 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "658ee7d8-d421-5f26-9bf4-f1dad3eb7f0d")
+	)
+	(wire
+		(pts
+			(xy 746.76 412.75) (xy 746.76 415.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ab93e1ce-1909-519d-92ac-69f8e239216c")
+	)
+	(label "VREF"
+		(at 746.76 415.29 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "8649f537-72be-56ed-ae49-76de67907720")
+	)
+	(symbol
+		(lib_id "cubevox:RVT1E100M0405-C72484")
+		(at 762 408.94 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "6344295d-12a7-52dc-af4e-d30c6757cf9e")
+		(property "Reference" "C160"
+			(at 765.81 407.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10uF 25V"
+			(at 765.81 410.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
+			(at 762 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 762 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C72484"
+			(at 762 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
+			(at 762 408.94 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "67460d5c-0cab-5613-ae8c-ebda886b0608")
+		)
+		(pin "2"
+			(uuid "7e27d07c-61f5-5c90-84d8-ee7f640a4ff8")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C160")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 762 405.13) (xy 762 402.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "af2fd142-41e9-50ce-bf0c-49ab50940698")
+	)
+	(label "VREF"
+		(at 762 402.59 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "3f1c6072-1369-5802-839a-16bd9ceba4f6")
+	)
+	(wire
+		(pts
+			(xy 762 412.75) (xy 762 415.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c30bb903-7af0-5a65-b863-5d63f8e82408")
+	)
+	(label "GND"
+		(at 762 415.29 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "190d320a-a873-5fe2-a391-234458bca37f")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -12611,7 +13067,7 @@
 		(uuid "0b704062-03c2-5ee7-a24c-46f07cf67850")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:RVT1E100M0405-C72484")
 		(at 1071.88 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -12628,7 +13084,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF"
+		(property "Value" "10uF 25V"
 			(at 1075.69 85.09 0)
 			(effects
 				(font
@@ -12637,7 +13093,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C1206"
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 			(at 1071.88 83.82 0)
 			(hide yes)
 			(effects
@@ -12655,7 +13111,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14860"
+		(property "LCSC" "C72484"
+			(at 1071.88 83.82 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
 			(at 1071.88 83.82 0)
 			(hide yes)
 			(effects
@@ -12689,7 +13154,7 @@
 		)
 		(uuid "55a68d95-9c53-5c6a-aa34-6c2ec31ebf9d")
 	)
-	(label "DAC_OUTL"
+	(label "DAC_AC"
 		(at 1071.88 77.47 90)
 		(fields_autoplaced yes)
 		(effects
@@ -12710,7 +13175,7 @@
 		)
 		(uuid "0e431f16-fa82-5334-a481-ecca0a537075")
 	)
-	(label "DAC_AC"
+	(label "DAC_LP"
 		(at 1071.88 90.17 270)
 		(fields_autoplaced yes)
 		(effects
@@ -12944,16 +13409,16 @@
 		(uuid "82f15b62-564e-5074-823a-bbd1ac13f56e")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "Device:R")
 		(at 1117.6 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "66cbca14-bf74-5869-8b39-d736112cd58a")
-		(property "Reference" "C140"
-			(at 1121.41 82.55 0)
+		(uuid "37a0e0c6-3ae8-556e-b0d4-d38855c0aa63")
+		(property "Reference" "R147"
+			(at 1120.14 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12961,8 +13426,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100nF"
-			(at 1121.41 85.09 0)
+		(property "Value" "470R"
+			(at 1120.14 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12970,7 +13435,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C0603"
+		(property "Footprint" "cubevox:R0603"
 			(at 1117.6 83.82 0)
 			(hide yes)
 			(effects
@@ -12988,7 +13453,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C14663"
+		(property "LCSC" "C23179"
 			(at 1117.6 83.82 0)
 			(hide yes)
 			(effects
@@ -12998,15 +13463,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "267426b3-4712-5243-a904-c49aef5e3ba3")
+			(uuid "c1b34e9e-ca78-5e6d-8757-805a335f0636")
 		)
 		(pin "2"
-			(uuid "4b5aecb9-e84e-5401-8f08-cad3bea7660c")
+			(uuid "f9395fbf-245d-575b-934a-8908b4be530a")
 		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
-					(reference "C140")
+					(reference "R147")
 					(unit 1)
 				)
 			)
@@ -13020,9 +13485,9 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "55f8ef4c-62c9-5f8d-998b-5eb8c9ba5160")
+		(uuid "eb7d5043-0cf1-506d-a5c4-7b5998ba72bc")
 	)
-	(label "VREF"
+	(label "DAC_OUTL"
 		(at 1117.6 77.47 90)
 		(fields_autoplaced yes)
 		(effects
@@ -13031,7 +13496,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "9a48d64c-b987-5acb-9bde-c3bca8bf3185")
+		(uuid "43139ee3-16dc-5a6c-83b3-5c5cf532cd89")
 	)
 	(wire
 		(pts
@@ -13041,9 +13506,9 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "074a4bfe-a2fd-54e2-886f-7eae6b21dfe1")
+		(uuid "0167189e-6890-5852-8ac4-932fa3c46ab9")
 	)
-	(label "GND"
+	(label "DAC_LP"
 		(at 1117.6 90.17 270)
 		(fields_autoplaced yes)
 		(effects
@@ -13052,7 +13517,118 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "c5656c77-4e55-53b7-8da5-5f0870200007")
+		(uuid "52e1b732-32e5-5539-a9c2-a67146401cd2")
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 1132.84 83.82 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "12af2f57-bd07-5242-bc8e-93b4ed198049")
+		(property "Reference" "C161"
+			(at 1136.65 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "2.2nF"
+			(at 1136.65 85.09 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:C0603"
+			(at 1132.84 83.82 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 1132.84 83.82 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C2991172"
+			(at 1132.84 83.82 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8913ad76-008e-5bb7-8c8d-b7b3dc7c6940")
+		)
+		(pin "2"
+			(uuid "a3dbcffa-c33b-5754-bed3-29ed573d21a5")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C161")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 1132.84 80.01) (xy 1132.84 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "53b532f1-df07-50ff-96ce-57ddd2c60872")
+	)
+	(label "DAC_LP"
+		(at 1132.84 77.47 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "9ff1eccb-1314-5e7a-8d96-647fd6e6ad03")
+	)
+	(wire
+		(pts
+			(xy 1132.84 87.63) (xy 1132.84 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "62cfd4b3-b52d-535f-804e-aae2f9389b59")
+	)
+	(label "GND"
+		(at 1132.84 90.17 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "91e68f52-a9dc-5e3f-9683-f4d4b36c8e26")
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -13166,7 +13742,7 @@
 		(uuid "38e2e886-9113-51f0-907f-11583bbf1f5a")
 	)
 	(symbol
-		(lib_id "Device:C")
+		(lib_id "cubevox:RVT1E100M0405-C72484")
 		(at 1087.12 177.8 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -13183,7 +13759,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF"
+		(property "Value" "10uF 25V"
 			(at 1090.93 179.07 0)
 			(effects
 				(font
@@ -13192,7 +13768,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "cubevox:C1206"
+		(property "Footprint" "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 			(at 1087.12 177.8 0)
 			(hide yes)
 			(effects
@@ -13210,7 +13786,16 @@
 				)
 			)
 		)
-		(property "LCSC" "C14860"
+		(property "LCSC" "C72484"
+			(at 1087.12 177.8 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "RVT1E100M0405"
 			(at 1087.12 177.8 0)
 			(hide yes)
 			(effects
@@ -22800,7 +23385,7 @@
 		)
 		(uuid "60f3d797-e694-5404-a823-c2b8fb644864")
 	)
-	(text "XLR leg 47R, BAT54S clamp, 100pF, 10uF. TRS leg 10uF, 10k pad. 1.2k bias to VREF"
+	(text "XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 10uF + IN_x. TRS leg 10uF + LINE_x, 10k pad. 1.2k bias to VREF"
 		(at 381 35.56 0)
 		(effects
 			(font
@@ -22808,17 +23393,17 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "f1e46fa5-5bf4-5417-b7cc-eeb7499bc37d")
+		(uuid "bdc4bcc6-9fc7-52f1-abb1-8c51ebcddf74")
 	)
-	(text "JACK_TRS_N low when a 1/4 in plug is in"
-		(at 447.04 238.76 0)
+	(text "Both T holes are the tip (Neutrik: one tip circuit, no switch). No plug detection"
+		(at 386.08 190.5 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "c3423e22-285e-561f-8059-c6341a083f00")
+		(uuid "e2eb225f-b2f4-5157-9bda-c808c8c8bfc2")
 	)
 	(text "3. PREAMP"
 		(at 594.36 30.48 0)
@@ -22830,7 +23415,7 @@
 		)
 		(uuid "58da9ecc-55f8-5f90-9117-19ec0da171fb")
 	)
-	(text "Stage 1 INA 20 dB (U104, U105A). Stage 2 0-40 dB on Input Gain pot (U105B)"
+	(text "Stage 1 INA 26 dB (U104, U105A). Stage 2 0-34.2 dB on Input Gain pot (U105B)"
 		(at 594.36 35.56 0)
 		(effects
 			(font
@@ -22838,9 +23423,29 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "c8524825-4766-520c-a615-e0c8d589af54")
+		(uuid "d0efbcc8-919f-51c1-8999-76f873c625f3")
 	)
-	(text "Input Gain pot in the A4 feedback leg, wiper tied to end 3"
+	(text "Stage 1 26.0 dB, stage 2 0-34.2 dB, chain 26-60 dB XLR / 6.6-40.8 dB TRS; DC gain 1 (AC-coupled legs)"
+		(at 594.36 40.64 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "a80b9613-f8ce-5285-873a-5bf8746b6f58")
+	)
+	(text "RG = R109 1k + C158 22uF in series, DC gain 1. Gain 1 + 2 x 9.53k / 1k = 20.1"
+		(at 701.04 66.04 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1c492b74-e4a6-5b85-ab8b-d58acef9343c")
+	)
+	(text "Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/200"
 		(at 594.36 294.64 0)
 		(effects
 			(font
@@ -22848,9 +23453,9 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "7caae140-a1ad-51ec-9faf-54d0bed6e42f")
+		(uuid "b9fa549c-6f6a-51b2-9fb0-0bbaaa3f15d7")
 	)
-	(text "VREF: 5VA divided 10k/10k, 10 uF, buffered by U106A. U106B drives block 6"
+	(text "VREF: 5VA divided 10k/10k, 10 uF, follower U106A, 22R into VREF with 10 uF. U106B drives block 6"
 		(at 594.36 370.84 0)
 		(effects
 			(font
@@ -22858,7 +23463,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "33e4ffa9-b5a6-572f-ac91-75a2a7cbf51a")
+		(uuid "4c9247d6-e3b1-5c0a-ba2b-9aab16ba3ad3")
 	)
 	(text "4. ADC FEED"
 		(at 812.8 30.48 0)
@@ -22930,7 +23535,7 @@
 		)
 		(uuid "d60fc63a-1564-584d-9293-855f82009d7f")
 	)
-	(text "DAC_ATT = 0.6 x DAC about VREF. U106B buffers to the jack"
+	(text "470R / 2.2nF filter, 10uF, DAC_ATT = 0.6 x DAC about VREF"
 		(at 1066.8 35.56 0)
 		(effects
 			(font
@@ -22938,7 +23543,17 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "ab0267c4-e8d5-5b4c-b96f-6a55a0e3c39f")
+		(uuid "d6f5f6c8-30df-5660-af7e-ffb4f68e9f2d")
+	)
+	(text "U106B buffers to the jack"
+		(at 1066.8 40.64 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "03575960-56df-5064-a060-67b7d78105bd")
 	)
 	(text "7. PANEL"
 		(at 137.16 355.6 0)
@@ -22962,7 +23577,7 @@
 	)
 	(sheet
 		(at 25.4 50.8)
-		(size 58.42 152.4)
+		(size 58.42 148.59)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
@@ -22985,7 +23600,7 @@
 			)
 		)
 		(property "Sheetfile" "h7core_block.kicad_sch"
-			(at 25.4 204.47 0)
+			(at 25.4 200.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -23353,18 +23968,8 @@
 			)
 			(uuid "98fab25c-e671-5608-8435-559c6d516b63")
 		)
-		(pin "JACK_TRS_N" input
-			(at 83.82 193.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-			(uuid "2313ca0a-ee42-5689-a86d-567183c7c89b")
-		)
 		(pin "FX_ON_SENSE" input
-			(at 83.82 196.85 0)
+			(at 83.82 193.04 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -24060,31 +24665,10 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "d59ffd21-efa4-58f1-a2e6-0f68aae8b060")
-	)
-	(label "JACK_TRS_N"
-		(at 86.36 193.04 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "42100661-ad12-5954-90ee-9d184aaeb298")
-	)
-	(wire
-		(pts
-			(xy 83.82 196.85) (xy 86.36 196.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
 		(uuid "40b4ce26-d2ce-52ea-8e34-ccb5cdc7670e")
 	)
 	(label "FX_ON_SENSE"
-		(at 86.36 196.85 0)
+		(at 86.36 193.04 0)
 		(fields_autoplaced yes)
 		(effects
 			(font

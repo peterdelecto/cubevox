@@ -15,7 +15,9 @@ DATE = "2026-10-02"
 # --------------------------------------------------------------------------- codes
 R_LCSC = {"10R": "C22859", "33R": "C23140", "47R": "C23182", "100R": "C22775",
           "1k": "C21190", "1.2k": "C22765", "4.7k": "C23162", "10k": "C25804",
-          "15k": "C22809", "18k": "C25810", "100k": "C25803"}
+          "15k": "C22809", "18k": "C25810", "100k": "C25803",
+          "470R": "C23179", "200R": "C8218", "22R": "C23345", "36k": "C23147",
+          "9.53k": "C23127", "10k 0.1%": "C309083"}
 C_LCSC = {"47pF": ("C1671", "C0603"), "100pF": ("C14858", "C0603"),
           "2.2nF": ("C2991172", "C0603"), "100nF": ("C14663", "C0603"),
           "10nF": ("C57112", "C0603"), "10uF": ("C14860", "C1206"),
@@ -31,9 +33,11 @@ def nxt(prefix, start):
 
 
 def R(val, a, b, x, y, ref=None):
+    mpn = {"10k 0.1%": "ARG03BTC1002"}.get(val)
     return {"ref": ref or nxt("R", 101), "lib_id": "Device:R", "value": val,
             "at": [x, y], "angle": 0, "footprint": "cubevox:R0603",
             "lcsc": R_LCSC[val], "rest": "no_connect",
+            **({"fields": {"MPN": mpn}} if mpn else {}),
             "pins": [{"pin": "1", "net": a, "dir": [0, -1], "len": 2},
                      {"pin": "2", "net": b, "dir": [0, 1], "len": 2}]}
 
@@ -47,6 +51,21 @@ def C(val, a, b, x, y, ref=None):
                      {"pin": "2", "net": b, "dir": [0, 1], "len": 2}]}
 
 
+# Aluminium electrolytics (ROQANG 105 C). Pin 1 = +, pin 2 = -.
+ELEC = {"10uF": ("C72484", "CAP-SMD_BD4.0-L4.3-W4.3-FD", "RVT1E100M0405", "10uF 25V", "RVT1E100M0405-C72484"),
+        "100uF": ("C191859", "CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD", "VT1A101M0505", "100uF 10V", "VT1A101M0505"),
+        "22uF": ("C72502", "CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD", "RVT1C220M0405", "22uF 16V", "RVT1C220M0405")}
+
+
+def CE(val, plus, minus, x, y, ref):
+    code, fp, mpn, label, sym = ELEC[val]
+    return {"ref": ref, "lib_id": "cubevox:" + sym, "value": label, "at": [x, y], "angle": 0,
+            "footprint": "cubevox:" + fp, "lcsc": code, "rest": "no_connect",
+            "fields": {"MPN": mpn},
+            "pins": [{"pin": "1", "net": plus, "dir": [0, -1], "len": 2},
+                     {"pin": "2", "net": minus, "dir": [0, 1], "len": 2}]}
+
+
 def row(pin, net, d, ln=2):
     return {"pin": pin, "net": net, "dir": d, "len": ln}
 
@@ -55,14 +74,14 @@ UP, DN, LF, RT = [0, -1], [0, 1], [-1, 0], [1, 0]
 
 
 def opamp(ref, x, y, nets):
-    """nets: pin -> net for the 8 OPA1678 pins. Left pins stub left, right pins right."""
+    """nets: pin -> net for the 8 OPA2197 pins. Left pins stub left, right pins right."""
     rows = []
     for p in "12345678":
         rows.append(row(p, nets[p], LF if p in "1234" else RT, 2))
-    return {"ref": ref, "lib_id": "cubevox:OPA1678IDR", "value": "OPA1678IDR",
+    return {"ref": ref, "lib_id": "cubevox:OPA2197IDR", "value": "OPA2197IDR",
             "at": [x, y], "angle": 0,
-            "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL", "lcsc": "C192421",
-            "rest": "no_connect", "in_bom": True, "fields": {"MPN": "OPA1678IDR"},
+            "footprint": "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL", "lcsc": "C139363",
+            "rest": "no_connect", "in_bom": True, "fields": {"MPN": "OPA2197IDR"},
             "pins": rows}
 
 
@@ -107,7 +126,7 @@ U1_DROP_NETS = {"MUX2_SIG", "ADC_PC2C", "ADC_PC3C", "MUX3_SIG", "MUX4_SIG", "SPA
 # pin -> (net, stub len)   (left-side pins 1-50 stub left, right-side 51-100 stub right)
 U1_ADD = {"28": ("TOGGLE1", 10), "29": ("TOGGLE2", 12), "30": ("TOGGLE3", 10),
           "31": ("TOGGLE4", 12), "34": ("TOGGLE5", 10), "35": ("TOGGLE6", 12),
-          "38": ("TOGGLE7", 10), "46": ("TOGGLE8", 10), "47": ("JACK_TRS_N", 12),
+          "46": ("TOGGLE8", 10),
           "51": ("ENC_KEY_A", 2), "52": ("ENC_KEY_B", 2), "53": ("ENC_SEMI_A", 2),
           "57": ("ENC_SEMI_B", 2), "63": ("FX_ON_SENSE", 2)}
 CHILD_PORTS = [
@@ -123,7 +142,16 @@ CHILD_PORTS = [
     ("ENC_KEY_A", "input"), ("ENC_KEY_B", "input"),
     ("ENC_SEMI_A", "input"), ("ENC_SEMI_B", "input"),
 ] + [("TOGGLE%d" % i, "input") for i in range(1, 9)] + [
-    ("JACK_TRS_N", "input"), ("FX_ON_SENSE", "input")]
+    ("FX_ON_SENSE", "input")]
+# I01 (PINMAP.md section 5): SCKI from SAI1_MCLK_A on PE2, QSPI on bank 2, pins by symbol name.
+# Net per pin number (names resolved from cubevox_h7core.kicad_sym); None deletes the row.
+U1_REMAP = {"1": ("ADC_SCKI_SRC", 12),                 # PE2 SAI1_MCLK_A
+            "37": ("QSPI_IO0", 8), "38": ("QSPI_IO1", 10),   # PE7, PE8
+            "39": ("QSPI_IO2", 12), "40": ("QSPI_IO3", 14),  # PE9, PE10
+            "58": ("TOGGLE7", None),                    # PD11
+            "59": None, "60": None, "61": None,         # PD12, PD13, PD14 free
+            "79": ("QSPI_NCS", None),                   # PC11 BK2_NCS
+            "92": ("ENC_MENU_A", None)}                 # PB6
 NET_RENAME = {"ENC_A": "ENC_MENU_A", "ENC_B": "ENC_MENU_B", "ENC_SW": "ENC_MENU_SW",
               "MUX1_SIG": "POT_MUX_OUT", "LINE_L": "DAC_OUTL"}
 
@@ -147,6 +175,10 @@ def build_child():
                 r["net"] = NET_RENAME.get(r["net"], r["net"])
             for pin, (net, ln) in U1_ADD.items():
                 rows.append({"pin": pin, "net": net, "len": ln})
+            rows = [r for r in rows if r["pin"] not in U1_REMAP]
+            for pin, v in U1_REMAP.items():
+                if v:
+                    rows.append({"pin": pin, "net": v[0], **({"len": v[1]} if v[1] else {})})
             p["pins"] = rows
         if p["ref"] == "U6":     # OUTL leaves on DAC_OUTL, OUTR unused
             p["pins"] = [r for r in p["pins"] if r["pin"] != "7"]
@@ -156,6 +188,8 @@ def build_child():
         if p["ref"] == "R20":    # PCM1808 VCC from 5VA through 10 R
             p["value"], p["lcsc"] = "10R", "C22859"
             p["pins"][0]["net"] = "5VA"
+        if p["ref"] == "R8":     # TPS2116 PR1 divider, audit A06
+            p["value"], p["lcsc"] = "36k", "C23147"
         if p["ref"] == "R30":
             p["pins"][0]["net"] = "POT_MUX_OUT"
         for r in p.get("pins", []):
@@ -172,6 +206,7 @@ def build_child():
         {"text": "C. Settings store: QSPI NOR for the EEPROM emulation", "at": [165, 170]},
         {"text": "D. Audio out: PCM5102A, OUTL leaves on DAC_OUTL, OUTR unused", "at": [280, 20]},
         {"text": "One ground, GND.", "at": [285, 160]},
+        {"text": "QSPI on bank 2 (FSEL=1); SAI1 block A master, MCLK=256fs on PE2", "at": [165, 176]},
         {"text": "SWD on Tag-Connect pads J3", "at": [120, 228]},
         {"text": "Supply flags: nets fed through passives or from the connector", "at": [285, 190]},
         {"text": "F. Audio in: PCM1808 on SAI1 block B, slave on BCLK/LRCLK. VINL/VINR arrive AC-coupled from the top sheet", "at": [12, 254]},
@@ -234,66 +269,74 @@ def build_top():
 
     # ------------------------------------------------------------------ MIC / LINE INPUT
     X1, Y1 = 300, 24
-    note("2. MIC / LINE INPUT", X1, Y1); note("XLR leg 47R, BAT54S clamp, 100pF, 10uF. TRS leg 10uF, 10k pad. 1.2k bias to VREF", X1, Y1 + 4)
+    note("2. MIC / LINE INPUT", X1, Y1)
+    note("XLR leg 47R, BAT54S clamp, 100pF, 100k to GND, 10uF + IN_x. TRS leg 10uF + LINE_x, 10k pad. 1.2k bias to VREF", X1, Y1 + 4)
     jin = {"ref": "J106A", "lib_id": "cubevox:NCJ6FA-H", "value": "J_IN NCJ6FA-H", "at": [X1 + 12, 120],
            "angle": 180, "footprint": "cubevox:CONN-TH_NCJ6FA-H", "lcsc": "C368458",
            "rest": "no_connect", "in_bom": True, "fields": {"MPN": "NCJ6FA-H"},
            "pins": [row("1", "GND", RT), row("2", "XLR_2", RT), row("3", "XLR_3", RT),
                     row("4", "GND", RT), row("5", "TRS_R", RT), row("6", "TRS_T", RT),
-                    row("7", "JACK_TRS_N", RT), row("8", "GND", RT)]}
+                    row("7", "TRS_T", RT), row("8", "GND", RT)]}
     jin["ref"] = "J101"
     add(jin)
-    for leg, (xlr, trs, tag, ya) in {"P": ("XLR_2", "TRS_T", "P", 66), "N": ("XLR_3", "TRS_R", "N", 140)}.items():
+    note("Both T holes are the tip (Neutrik: one tip circuit, no switch). No plug detection", X1 + 4, 150)
+    legs = {"P": ("XLR_2", "TRS_T", 66, ["R101", "C119", "C120", "C121", "R102", "R103", "R144"]),
+            "N": ("XLR_3", "TRS_R", 140, ["R104", "C123", "C124", "C125", "R105", "R106", "R145"])}
+    for tag, (xlr, trs, ya, (rs, cs, cx, ct, rp, rb, rl)) in legs.items():
         x = X1 + 40
-        add(R("47R", xlr, "MIC_" + tag, x, ya))
+        add(R("47R", xlr, "MIC_" + tag, x, ya, rs))
         bat = {"ref": nxt("D", 107), "lib_id": "cubevox_h7core:BAT54SLT1G", "value": "BAT54S",
                "at": [x + 22, ya], "angle": 0,
                "footprint": "cubevox_h7core:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR", "lcsc": "C19726",
                "rest": "no_connect", "in_bom": True, "fields": {"MPN": "BAT54SLT1G"},
                "pins": [row("1", "GND", LF), row("2", "5VA", RT), row("3", "MIC_" + tag, DN)]}
         add(bat)
-        add(C("100pF", "MIC_" + tag, "GND", x + 48, ya))
-        add(C("10uF", "MIC_" + tag, "IN_" + tag, x + 60, ya))
-        add(C("10uF", trs, "LINE_" + tag, x + 80, ya))
-        add(R("10k", "LINE_" + tag, "IN_" + tag, x + 92, ya))
-        add(R("1.2k", "IN_" + tag, "VREF", x + 104, ya))
-        add(C("100nF", "VREF", "GND", x + 116, ya))
-    add(R("10k", "3V3", "JACK_TRS_N", X1 + 40, 190))
-    note("JACK_TRS_N low when a 1/4 in plug is in", X1 + 52, 188)
+        add(C("100pF", "MIC_" + tag, "GND", x + 48, ya, cs))
+        add(CE("10uF", "IN_" + tag, "MIC_" + tag, x + 60, ya, cx))     # + on the IN_x side (VREF)
+        add(CE("10uF", "LINE_" + tag, trs, x + 80, ya, ct))            # + on the resistor side
+        add(R("10k", "LINE_" + tag, "IN_" + tag, x + 92, ya, rp))
+        add(R("1.2k", "IN_" + tag, "VREF", x + 104, ya, rb))
+        add(R("100k", "MIC_" + tag, "GND", x + 116, ya, rl))           # defines 0 V on the jack side
 
     # ------------------------------------------------------------------ PREAMP
     X2, Y2 = 468, 24
-    note("3. PREAMP", X2, Y2); note("Stage 1 INA 20 dB (U104, U105A). Stage 2 0-40 dB on Input Gain pot (U105B)", X2, Y2 + 4)
+    note("3. PREAMP", X2, Y2)
+    note("Stage 1 INA 26 dB (U104, U105A). Stage 2 0-34.2 dB on Input Gain pot (U105B)", X2, Y2 + 4)
+    note("Stage 1 26.0 dB, stage 2 0-34.2 dB, chain 26-60 dB XLR / 6.6-40.8 dB TRS; DC gain 1 (AC-coupled legs)", X2, Y2 + 8)
     add(opamp("U104", X2 + 30, 72, {"1": "INA_O1", "2": "A1_FB", "3": "IN_P", "4": "GND",
                                     "5": "IN_N", "6": "A2_FB", "7": "INA_O2", "8": "5VA"}))
-    add(C("100nF", "5VA", "GND", X2 + 62, 80))
+    add(C("100nF", "5VA", "GND", X2 + 62, 80, "C127"))
     xs = X2 + 84
-    add(R("4.7k", "INA_O1", "A1_FB", xs, 72), C("47pF", "INA_O1", "A1_FB", xs + 12, 72),
-        R("1k", "A1_FB", "A2_FB", xs + 24, 72),
-        R("4.7k", "INA_O2", "A2_FB", xs + 36, 72), C("47pF", "INA_O2", "A2_FB", xs + 48, 72))
+    add(R("9.53k", "INA_O1", "A1_FB", xs, 72, "R108"), C("47pF", "INA_O1", "A1_FB", xs + 12, 72, "C128"),
+        R("1k", "RG_MID", "A2_FB", xs + 24, 72, "R109"),
+        R("9.53k", "INA_O2", "A2_FB", xs + 36, 72, "R110"), C("47pF", "INA_O2", "A2_FB", xs + 48, 72, "C129"))
+    add(CE("22uF", "A1_FB", "RG_MID", xs + 60, 72, "C158"))       # + toward A1's node (both sit at VREF)
+    note("RG = R109 1k + C158 22uF in series, DC gain 1. Gain 1 + 2 x 9.53k / 1k = 20.1", xs, 52)
     add(opamp("U105", X2 + 30, 172, {"1": "PRE1", "2": "DA_N", "3": "DA_P", "4": "GND",
                                      "5": "PRE1", "6": "G2_INV", "7": "PRE_OUT", "8": "5VA"}))
-    add(C("100nF", "5VA", "GND", X2 + 62, 180))
-    add(R("10k", "INA_O1", "DA_P", xs, 172), R("10k", "DA_P", "VREF", xs + 12, 172),
-        R("10k", "INA_O2", "DA_N", xs + 24, 172), R("10k", "DA_N", "PRE1", xs + 36, 172),
-        C("100nF", "VREF", "GND", xs + 48, 172))
-    add(pot("RVGAIN1", X2 + 40, 252, "PRE_OUT", "G2_FB", "G2_FB", "10k GAIN"))
-    add(R("100R", "G2_FB", "G2_INV", xs + 4, 252), R("100R", "G2_INV", "VREF", xs + 16, 252),
-        C("47pF", "PRE_OUT", "G2_INV", xs + 28, 252), C("100nF", "VREF", "GND", xs + 40, 252))
-    note("Input Gain pot in the A4 feedback leg, wiper tied to end 3", X2, 232)
-    add(opamp("U106", X2 + 30, 322, {"1": "VREF", "2": "VREF", "3": "VREF_DIV", "4": "GND",
+    add(C("100nF", "5VA", "GND", X2 + 62, 180, "C130"))
+    add(R("10k 0.1%", "INA_O1", "DA_P", xs, 172, "R111"), R("10k 0.1%", "DA_P", "VREF", xs + 12, 172, "R112"),
+        R("10k 0.1%", "INA_O2", "DA_N", xs + 24, 172, "R113"), R("10k 0.1%", "DA_N", "PRE1", xs + 36, 172, "R114"))
+    add(pot("RVGAIN1", X2 + 40, 252, "PRE_OUT", "G2_INV", "G2_INV", "10k GAIN"))
+    add(R("200R", "G2_INV", "G2_RG", xs + 4, 252, "R116"),
+        C("47pF", "PRE_OUT", "G2_INV", xs + 28, 252, "C132"),
+        CE("100uF", "G2_RG", "GND", xs + 40, 252, "C159"))        # + on the R116 side
+    note("Input Gain pot is the A4 feedback resistor, wiper tied to end 3. G = 1 + Rpot/200", X2, 232)
+    add(opamp("U106", X2 + 30, 322, {"1": "VREF_BUF", "2": "VREF_BUF", "3": "VREF_DIV", "4": "GND",
                                      "5": "BUF_IN", "6": "BUF_OUT", "7": "BUF_OUT", "8": "5VA"}))
-    add(C("100nF", "5VA", "GND", X2 + 62, 330))
-    add(R("10k", "5VA", "VREF_DIV", xs, 322), R("10k", "VREF_DIV", "GND", xs + 12, 322),
-        C("10uF", "VREF_DIV", "GND", xs + 24, 322))
-    note("VREF: 5VA divided 10k/10k, 10 uF, buffered by U106A. U106B drives block 6", X2, 292)
+    add(C("100nF", "5VA", "GND", X2 + 62, 330, "C134"))
+    add(R("10k", "5VA", "VREF_DIV", xs, 322, "R117"), R("10k", "VREF_DIV", "GND", xs + 12, 322, "R118"),
+        C("10uF", "VREF_DIV", "GND", xs + 24, 322, "C135"),
+        R("22R", "VREF_BUF", "VREF", xs + 36, 322, "R146"),
+        CE("10uF", "VREF", "GND", xs + 48, 322, "C160"))
+    note("VREF: 5VA divided 10k/10k, 10 uF, follower U106A, 22R into VREF with 10 uF. U106B drives block 6", X2, 292)
 
     # ------------------------------------------------------------------ ADC FEED
     X3, Y3 = 640, 24
     note("4. ADC FEED", X3, Y3); note("PRE_OUT always feeds the ADC", X3, Y3 + 4)
-    add(R("100R", "PRE_OUT", "ADC_RC", X3 + 4, 66), C("2.2nF", "ADC_RC", "GND", X3 + 16, 66),
-        C("10uF", "ADC_RC", "ADC_VINL", X3 + 28, 66))
-    add(C("10uF", "ADC_VINR", "GND", X3 + 28, 140))
+    add(R("100R", "PRE_OUT", "ADC_RC", X3 + 4, 66, "R119"), C("2.2nF", "ADC_RC", "GND", X3 + 16, 66, "C136"),
+        C("10uF", "ADC_RC", "ADC_VINL", X3 + 28, 66, "C137"))
+    add(C("10uF", "ADC_VINR", "GND", X3 + 28, 140, "C138"))
     note("VINR unused, AC-coupled to GND", X3 + 4, 170)
 
     # ------------------------------------------------------------------ BYPASS
@@ -309,15 +352,17 @@ def build_top():
     add(d104)
     add(toggle("SWBYPASS1", X4 + 80, 130, "SW_BYPASS", "5V"))
     note("Bypass toggle. Common to the coil, one throw to 5V", X4 + 96, 130)
-    add(R("10k", "SW_BYPASS", "FX_ON_SENSE", X4 + 90, 180), R("18k", "FX_ON_SENSE", "GND", X4 + 102, 180))
+    add(R("10k", "SW_BYPASS", "FX_ON_SENSE", X4 + 90, 180, "R120"), R("18k", "FX_ON_SENSE", "GND", X4 + 102, 180, "R121"))
 
     # ------------------------------------------------------------------ DAC / OUTPUT
     X5, Y5 = 840, 24
-    note("6. DAC / OUTPUT", X5, Y5); note("DAC_ATT = 0.6 x DAC about VREF. U106B buffers to the jack", X5, Y5 + 4)
-    add(C("10uF", "DAC_OUTL", "DAC_AC", X5 + 4, 66), R("10k", "DAC_AC", "DAC_ATT", X5 + 16, 66),
-        R("15k", "DAC_ATT", "VREF", X5 + 28, 66), C("100nF", "VREF", "GND", X5 + 40, 66))
-    add(R("100R", "BUF_OUT", "BUF_R", X5 + 4, 140), C("10uF", "BUF_R", "OUT_TIP", X5 + 16, 140),
-        R("100k", "OUT_TIP", "GND", X5 + 28, 140))
+    note("6. DAC / OUTPUT", X5, Y5); note("470R / 2.2nF filter, 10uF, DAC_ATT = 0.6 x DAC about VREF", X5, Y5 + 4)
+    note("U106B buffers to the jack", X5, Y5 + 8)
+    add(CE("10uF", "DAC_AC", "DAC_LP", X5 + 4, 66, "C139"),          # + on the divider side
+        R("10k", "DAC_AC", "DAC_ATT", X5 + 16, 66, "R122"), R("15k", "DAC_ATT", "VREF", X5 + 28, 66, "R123"),
+        R("470R", "DAC_OUTL", "DAC_LP", X5 + 40, 66, "R147"), C("2.2nF", "DAC_LP", "GND", X5 + 52, 66, "C161"))
+    add(R("100R", "BUF_OUT", "BUF_R", X5 + 4, 140, "R124"), CE("10uF", "BUF_R", "OUT_TIP", X5 + 16, 140, "C141"),
+        R("100k", "OUT_TIP", "GND", X5 + 28, 140, "R125"))
     nmj = {"ref": "J108", "lib_id": "cubevox:NMJ6HCD2", "value": "OUT 6.35mm",
            "at": [X5 + 20, 200], "angle": 0, "footprint": "cubevox:AUDIO-TH_NMJ6HCD2",
            "lcsc": "C368502", "rest": "no_connect", "in_bom": True, "fields": {"MPN": "NMJ6HCD2"},
@@ -326,6 +371,7 @@ def build_top():
 
     # ------------------------------------------------------------------ PANEL
     X6, Y6 = 108, 280
+    _counters["R"], _counters["C"] = 126, 142   # panel refs stay as in revision 1; new analog refs are R144+, C158+
     note("7. PANEL", X6, Y6); note("14 pots to U101 (C14, C15 on GND), 3 encoders, 8 toggles, OLED header", X6, Y6 + 4)
     u101 = copy.deepcopy(keep["U101"]); u101.update(at=[X6 + 40, 340])
     ch = {0: "9", 1: "8", 2: "7", 3: "6", 4: "5", 5: "4", 6: "3", 7: "2",
@@ -379,13 +425,14 @@ def build_top():
     top["paper"] = "A0"
     top["libraries"]["cubevox_h7core"] = "${BOARD_DIR}/cubevox_h7core.kicad_sym"
     top["lib_symbols"] = [
-        ["cubevox", "OPA1678IDR"], ["cubevox", "SS34_C8678"], ["cubevox", "SMBJ15CA_C19077570"],
+        ["cubevox", "OPA2197IDR"], ["cubevox", "SS34_C8678"], ["cubevox", "SMBJ15CA_C19077570"],
         ["cubevox", "PJ-002A"], ["cubevox", "AP63205WU-7"], ["cubevox", "ANR5040T4R7M"],
         ["cubevox", TOGGLE_SYM], ["cubevox", "PZ254V-11-04P_C2691448"], ["cubevox", "OLED-1.3-SH1106-I2C-4P"],
         ["cubevox", "NMJ6HCD2"], ["cubevox", "NCJ6FA-H"], ["cubevox", "G6K-2F-Y-DC5"], ["cubevox", "1N4148W_C81598"],
         ["cubevox", "CD74HC4067SM96"], ["cubevox", "RK09D1130C1B"], ["cubevox", "EC11N1525404"],
         ["cubevox", "EC11N1520401"], ["cubevox_h7core", "BAT54SLT1G"],
-        ["Device", "R"], ["Device", "C"], ["Device", "FerriteBead"],
+        ["Device", "R"], ["Device", "C"],
+        ["cubevox", "RVT1E100M0405-C72484"], ["cubevox", "VT1A101M0505"], ["cubevox", "RVT1C220M0405"], ["Device", "FerriteBead"],
         ["Mechanical", "MountingHole"], ["power", "PWR_FLAG"]]
     top["libraries"].pop("Connector", None)
     top["libraries"].pop("Connector_Generic", None)

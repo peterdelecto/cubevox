@@ -1,0 +1,6202 @@
+{
+  "source_sha256": {
+    "hardware/cubevox.kicad_sch": "0b5b2ec9da33dca491b8c1fe5a90ae45559f3db9ff63749cbda87963c18fe71c",
+    "hardware/h7core_block.kicad_sch": "2045456922a9430141d277d2a24ded3c223142eca1002d0c8e7b72db1ca78a20",
+    "hardware/cubevox.json": "e17939dd2cf25a5d9c91849c301ca91ab026fb89a53652b7bef34aafbe0b79ff",
+    "hardware/h7core_block.json": "564dec99ebe7c1b27f9dbb2210e21f94cc1c743c52a33323cab2b9efd5e8c740",
+    "hardware/cubevox.kicad_sym": "03a788b55b3b33566bdcc633b699b9a804572dc555db85ca0c3b2361b41bb948",
+    "hardware/cubevox_h7core.kicad_sym": "92dc8a0da8682aece6e6b209ae0ce53125a6dfa0cd6cf731799da217c7e6648f",
+    "hardware/cubevox.kicad_pro": "42b1c8a6bcd3352341e19da11e7818300128a66fba7b7137c29a83f38f1875de"
+  },
+  "component_count": 227,
+  "net_count": 214,
+  "erc_violation_count": 0,
+  "verification": {
+    "U106 VREF feedback direct": true,
+    "VREF five direct 100nF caps": true,
+    "J101 sense terminal GPIO connection": true,
+    "J101 audio tip distinct in schematic": true,
+    "R116 100ohm VREF leg": true,
+    "R20 ADC supply drop": true,
+    "K101 pin connections": true,
+    "J108 TS contact assignments": true,
+    "ERC zero violations": true,
+    "explicit_json_net_comparison": true
+  },
+  "calculated": {
+    "vref_direct_capacitance_nF": 500,
+    "stage1_gain": 10.4,
+    "stage2_gain_min": 2,
+    "stage2_gain_max": 102,
+    "input_pad": 0.10714285714285714,
+    "buffer_symmetric_input_limit_Vrms_at_5V": 0.35355339059327373,
+    "dac_attenuated_fullscale_Vrms": 1.26,
+    "offset_bound_V": 4.8552,
+    "nominal_PR1_supply_threshold_V": 4.3,
+    "ADC_max_R20_drop_V": 0.10999999999999999
+  },
+  "components": {
+    "C101": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C111": {
+      "value": "2.2uF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C23630",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C112": {
+      "value": "22uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C12891",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VIN_9V"
+        }
+      }
+    },
+    "C113": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VIN_9V"
+        }
+      }
+    },
+    "C114": {
+      "value": "22uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C12891",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V_PRODUCT"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C115": {
+      "value": "22uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C12891",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V_PRODUCT"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C116": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/BUCK5_BST"
+        },
+        "2": {
+          "function": null,
+          "net": "/BUCK5_SW"
+        }
+      }
+    },
+    "C117": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C118": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C119": {
+      "value": "100pF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14858",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/MIC_P"
+        }
+      }
+    },
+    "C120": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/IN_P"
+        },
+        "1": {
+          "function": null,
+          "net": "/MIC_P"
+        }
+      }
+    },
+    "C121": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/LINE_P"
+        },
+        "1": {
+          "function": null,
+          "net": "/TRS_T"
+        }
+      }
+    },
+    "C122": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "C123": {
+      "value": "100pF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14858",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/MIC_N"
+        }
+      }
+    },
+    "C124": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/IN_N"
+        },
+        "1": {
+          "function": null,
+          "net": "/MIC_N"
+        }
+      }
+    },
+    "C125": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/LINE_N"
+        },
+        "1": {
+          "function": null,
+          "net": "/TRS_R"
+        }
+      }
+    },
+    "C126": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "C127": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C128": {
+      "value": "47pF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C1671",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/A1_FB"
+        },
+        "1": {
+          "function": null,
+          "net": "/INA_O1"
+        }
+      }
+    },
+    "C129": {
+      "value": "47pF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C1671",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/A2_FB"
+        },
+        "1": {
+          "function": null,
+          "net": "/INA_O2"
+        }
+      }
+    },
+    "C130": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C131": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "C132": {
+      "value": "47pF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C1671",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/G2_INV"
+        },
+        "1": {
+          "function": null,
+          "net": "/PRE_OUT"
+        }
+      }
+    },
+    "C133": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "C134": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C135": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF_DIV"
+        }
+      }
+    },
+    "C136": {
+      "value": "2.2nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C2991172",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ADC_RC"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C137": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ADC_RC"
+        },
+        "2": {
+          "function": null,
+          "net": "/ADC_VINL"
+        }
+      }
+    },
+    "C138": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ADC_VINR"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C139": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/DAC_AC"
+        },
+        "1": {
+          "function": null,
+          "net": "/DAC_OUTL"
+        }
+      }
+    },
+    "C140": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "C141": {
+      "value": "10uF",
+      "sheet": "/",
+      "footprint": "cubevox:C1206",
+      "properties": {
+        "LCSC": "C14860",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/BUF_R"
+        },
+        "2": {
+          "function": null,
+          "net": "/OUT_TIP"
+        }
+      }
+    },
+    "C142": {
+      "value": "10nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C57112",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/POT_MUX_OUT"
+        }
+      }
+    },
+    "C143": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_MENU_A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C144": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_MENU_B"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C145": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_MENU_SW"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C146": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_KEY_A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C147": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_KEY_B"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C148": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_SEMI_A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C149": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/ENC_SEMI_B"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C150": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE1"
+        }
+      }
+    },
+    "C151": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE2"
+        }
+      }
+    },
+    "C152": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE3"
+        }
+      }
+    },
+    "C153": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE4"
+        }
+      }
+    },
+    "C154": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE5"
+        }
+      }
+    },
+    "C155": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE6"
+        }
+      }
+    },
+    "C156": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE7"
+        }
+      }
+    },
+    "C157": {
+      "value": "100nF",
+      "sheet": "/",
+      "footprint": "cubevox:C0603",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/TOGGLE8"
+        }
+      }
+    },
+    "D104": {
+      "value": "1N4148W",
+      "sheet": "/",
+      "footprint": "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD",
+      "properties": {
+        "LCSC": "C81598",
+        "MPN": "1N4148W",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Switching Diode"
+      },
+      "pins": {
+        "2": {
+          "function": "A_2",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "K_1",
+          "net": "/SW_BYPASS"
+        }
+      }
+    },
+    "D105": {
+      "value": "SMBJ15CA",
+      "sheet": "/",
+      "footprint": "cubevox:SMB_L4.4-W3.6-LS5.4-BI",
+      "properties": {
+        "LCSC": "C19077570",
+        "MPN": "SMBJ15CA",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "TVS"
+      },
+      "pins": {
+        "2": {
+          "function": "2_2",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/VIN_9V"
+        }
+      }
+    },
+    "D106": {
+      "value": "SS34",
+      "sheet": "/",
+      "footprint": "cubevox:SMA_L4.3-W2.6-LS5.2-RD",
+      "properties": {
+        "LCSC": "C8678",
+        "MPN": "SS34",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Schottky Barrier Diodes (SBD)"
+      },
+      "pins": {
+        "2": {
+          "function": "A_2",
+          "net": "/9V_JACK"
+        },
+        "1": {
+          "function": "K_1",
+          "net": "/VIN_9V"
+        }
+      }
+    },
+    "D107": {
+      "value": "BAT54S",
+      "sheet": "/",
+      "footprint": "cubevox_h7core:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",
+      "properties": {
+        "LCSC": "C19726",
+        "MPN": "BAT54SLT1G",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Schottky Barrier Diodes (SBD)"
+      },
+      "pins": {
+        "2": {
+          "function": "C_2",
+          "net": "/5VA"
+        },
+        "1": {
+          "function": "A_1",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "A/C_3",
+          "net": "/MIC_P"
+        }
+      }
+    },
+    "D108": {
+      "value": "BAT54S",
+      "sheet": "/",
+      "footprint": "cubevox_h7core:SOT-23_L2.9-W1.3-P1.90-LS2.4-BR",
+      "properties": {
+        "LCSC": "C19726",
+        "MPN": "BAT54SLT1G",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Schottky Barrier Diodes (SBD)"
+      },
+      "pins": {
+        "2": {
+          "function": "C_2",
+          "net": "/5VA"
+        },
+        "1": {
+          "function": "A_1",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "A/C_3",
+          "net": "/MIC_N"
+        }
+      }
+    },
+    "ENC101": {
+      "value": "EC11N1525404",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_EC11NXXXX",
+      "properties": {
+        "LCSC": "C470748",
+        "MPN": "EC11N1525404",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Rotary Encoders"
+      },
+      "pins": {
+        "A": {
+          "function": "A_A",
+          "net": "/ENC_MENU_A"
+        },
+        "B": {
+          "function": "B_B",
+          "net": "/ENC_MENU_B"
+        },
+        "D": {
+          "function": "D_D",
+          "net": "/ENC_MENU_SW"
+        },
+        "C": {
+          "function": "C_C",
+          "net": "/GND"
+        },
+        "E": {
+          "function": "E_E",
+          "net": "/GND"
+        },
+        "EH": {
+          "function": "EH_EH",
+          "net": "/GND"
+        }
+      }
+    },
+    "ENC102": {
+      "value": "EC11N1520401",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_EC11NXXXX",
+      "properties": {
+        "LCSC": "C470703",
+        "MPN": "EC11N1520401",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Rotary Encoders"
+      },
+      "pins": {
+        "A": {
+          "function": "A_A",
+          "net": "/ENC_KEY_A"
+        },
+        "B": {
+          "function": "B_B",
+          "net": "/ENC_KEY_B"
+        },
+        "C": {
+          "function": "C_C",
+          "net": "/GND"
+        },
+        "EH": {
+          "function": "EH_EH",
+          "net": "/GND"
+        },
+        "D": {
+          "function": "D_D",
+          "net": "unconnected-(ENC102-PadD)"
+        },
+        "E": {
+          "function": "E_E",
+          "net": "unconnected-(ENC102-PadE)"
+        }
+      }
+    },
+    "ENC103": {
+      "value": "EC11N1520401",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_EC11NXXXX",
+      "properties": {
+        "LCSC": "C470703",
+        "MPN": "EC11N1520401",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Rotary Encoders"
+      },
+      "pins": {
+        "A": {
+          "function": "A_A",
+          "net": "/ENC_SEMI_A"
+        },
+        "B": {
+          "function": "B_B",
+          "net": "/ENC_SEMI_B"
+        },
+        "C": {
+          "function": "C_C",
+          "net": "/GND"
+        },
+        "EH": {
+          "function": "EH_EH",
+          "net": "/GND"
+        },
+        "D": {
+          "function": "D_D",
+          "net": "unconnected-(ENC103-PadD)"
+        },
+        "E": {
+          "function": "E_E",
+          "net": "unconnected-(ENC103-PadE)"
+        }
+      }
+    },
+    "FB101": {
+      "value": "120R@100MHz",
+      "sheet": "/",
+      "footprint": "Inductor_SMD:L_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14709",
+        "MPN": "BLM18PG121SN1D",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "L ferrite bead inductor filter",
+        "ki_fp_filters": "Inductor_* L_* *Ferrite*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V"
+        },
+        "2": {
+          "function": null,
+          "net": "/5VA"
+        }
+      }
+    },
+    "H101": {
+      "value": "M3 shell",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_3.2mm_M3",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H102": {
+      "value": "M3 shell",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_3.2mm_M3",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H103": {
+      "value": "M3 shell",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_3.2mm_M3",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H104": {
+      "value": "M3 shell",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_3.2mm_M3",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H105": {
+      "value": "M2 OLED",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_2.2mm_M2",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H106": {
+      "value": "M2 OLED",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_2.2mm_M2",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H107": {
+      "value": "M2 OLED",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_2.2mm_M2",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "H108": {
+      "value": "M2 OLED",
+      "sheet": "/",
+      "footprint": "MountingHole:MountingHole_2.2mm_M2",
+      "properties": {
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "mounting hole",
+        "ki_fp_filters": "MountingHole*"
+      },
+      "pins": {}
+    },
+    "J101": {
+      "value": "J_IN NCJ6FA-H",
+      "sheet": "/",
+      "footprint": "cubevox:CONN-TH_NCJ6FA-H",
+      "properties": {
+        "LCSC": "C368458",
+        "MPN": "NCJ6FA-H",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Circular Connectors & Cable Connectors"
+      },
+      "pins": {
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "S_4",
+          "net": "/GND"
+        },
+        "8": {
+          "function": "G_8",
+          "net": "/GND"
+        },
+        "7": {
+          "function": "T_SW_7",
+          "net": "/JACK_TRS_N"
+        },
+        "5": {
+          "function": "R_5",
+          "net": "/TRS_R"
+        },
+        "6": {
+          "function": "T_6",
+          "net": "/TRS_T"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/XLR_2"
+        },
+        "3": {
+          "function": "3_3",
+          "net": "/XLR_3"
+        }
+      }
+    },
+    "J106": {
+      "value": "DC 9V",
+      "sheet": "/",
+      "footprint": "cubevox:DC-IN-TH_PJ-002A",
+      "properties": {
+        "LCSC": "C3096082",
+        "MPN": "PJ-002A",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch"
+      },
+      "pins": {
+        "2": {
+          "function": "2_2",
+          "net": "/9V_JACK"
+        },
+        "3": {
+          "function": "3_3",
+          "net": "/9V_JACK"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        }
+      }
+    },
+    "J108": {
+      "value": "OUT 6.35mm",
+      "sheet": "/",
+      "footprint": "cubevox:AUDIO-TH_NMJ6HCD2",
+      "properties": {
+        "LCSC": "C368502",
+        "MPN": "NMJ6HCD2",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Audio Connectors"
+      },
+      "pins": {
+        "3": {
+          "function": "S_3",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "T_1",
+          "net": "/OUT_TIP"
+        },
+        "2": {
+          "function": "R_2",
+          "net": "unconnected-(J108-R-Pad2)"
+        },
+        "5": {
+          "function": "RN_5",
+          "net": "unconnected-(J108-RN-Pad5)"
+        },
+        "6": {
+          "function": "SN_6",
+          "net": "unconnected-(J108-SN-Pad6)"
+        },
+        "4": {
+          "function": "TN_4",
+          "net": "unconnected-(J108-TN-Pad4)"
+        }
+      }
+    },
+    "J117": {
+      "value": "OLED SH1106",
+      "sheet": "/",
+      "footprint": "cubevox:OLED-1.3-SH1106-I2C-4P",
+      "properties": {
+        "LCSC": "owner-supplied module, hand-plugged",
+        "MPN": "SH1106 1.3in I2C 128x64",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "OLED SH1106 I2C module"
+      },
+      "pins": {
+        "2": {
+          "function": "VCC_2",
+          "net": "/3V3"
+        },
+        "1": {
+          "function": "GND_1",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "SCL_3",
+          "net": "/I2C1_SCL"
+        },
+        "4": {
+          "function": "SDA_4",
+          "net": "/I2C1_SDA"
+        }
+      }
+    },
+    "K101": {
+      "value": "G6K-2F-Y DC5",
+      "sheet": "/",
+      "footprint": "cubevox:RELAY-SMD_G6K-2F-X-XX",
+      "properties": {
+        "LCSC": "C47190",
+        "MPN": "G6K-2F-Y-TR DC5",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Power Relays"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/BUF_IN"
+        },
+        "6": {
+          "function": "6_6",
+          "net": "/BUF_IN"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "/DAC_ATT"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "/DAC_ATT"
+        },
+        "8": {
+          "function": "8_8",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/PRE_OUT"
+        },
+        "7": {
+          "function": "7_7",
+          "net": "/PRE_OUT"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/SW_BYPASS"
+        }
+      }
+    },
+    "L101": {
+      "value": "4.7uH",
+      "sheet": "/",
+      "footprint": "cubevox:IND-SMD_L5.0-W5.0_ANR5040T",
+      "properties": {
+        "LCSC": "C7427135",
+        "MPN": "ANR5040T4R7M",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch"
+      },
+      "pins": {
+        "2": {
+          "function": "2_2",
+          "net": "/5V_PRODUCT"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/BUCK5_SW"
+        }
+      }
+    },
+    "R101": {
+      "value": "47R",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C23182",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/MIC_P"
+        },
+        "1": {
+          "function": null,
+          "net": "/XLR_2"
+        }
+      }
+    },
+    "R102": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/IN_P"
+        },
+        "1": {
+          "function": null,
+          "net": "/LINE_P"
+        }
+      }
+    },
+    "R103": {
+      "value": "1.2k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22765",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/IN_P"
+        },
+        "2": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "R104": {
+      "value": "47R",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C23182",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/MIC_N"
+        },
+        "1": {
+          "function": null,
+          "net": "/XLR_3"
+        }
+      }
+    },
+    "R105": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/IN_N"
+        },
+        "1": {
+          "function": null,
+          "net": "/LINE_N"
+        }
+      }
+    },
+    "R106": {
+      "value": "1.2k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22765",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/IN_N"
+        },
+        "2": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "R107": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/JACK_TRS_N"
+        }
+      }
+    },
+    "R108": {
+      "value": "4.7k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C23162",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/A1_FB"
+        },
+        "1": {
+          "function": null,
+          "net": "/INA_O1"
+        }
+      }
+    },
+    "R109": {
+      "value": "1k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C21190",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/A1_FB"
+        },
+        "2": {
+          "function": null,
+          "net": "/A2_FB"
+        }
+      }
+    },
+    "R110": {
+      "value": "4.7k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C23162",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/A2_FB"
+        },
+        "1": {
+          "function": null,
+          "net": "/INA_O2"
+        }
+      }
+    },
+    "R111": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/DA_P"
+        },
+        "1": {
+          "function": null,
+          "net": "/INA_O1"
+        }
+      }
+    },
+    "R112": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/DA_P"
+        },
+        "2": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "R113": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/DA_N"
+        },
+        "1": {
+          "function": null,
+          "net": "/INA_O2"
+        }
+      }
+    },
+    "R114": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/DA_N"
+        },
+        "2": {
+          "function": null,
+          "net": "/PRE1"
+        }
+      }
+    },
+    "R115": {
+      "value": "100R",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22775",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/G2_FB"
+        },
+        "2": {
+          "function": null,
+          "net": "/G2_INV"
+        }
+      }
+    },
+    "R116": {
+      "value": "100R",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22775",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/G2_INV"
+        },
+        "2": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "R117": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/VREF_DIV"
+        }
+      }
+    },
+    "R118": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/VREF_DIV"
+        }
+      }
+    },
+    "R119": {
+      "value": "100R",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22775",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/ADC_RC"
+        },
+        "1": {
+          "function": null,
+          "net": "/PRE_OUT"
+        }
+      }
+    },
+    "R120": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/FX_ON_SENSE"
+        },
+        "1": {
+          "function": null,
+          "net": "/SW_BYPASS"
+        }
+      }
+    },
+    "R121": {
+      "value": "18k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25810",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/FX_ON_SENSE"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "R122": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/DAC_AC"
+        },
+        "2": {
+          "function": null,
+          "net": "/DAC_ATT"
+        }
+      }
+    },
+    "R123": {
+      "value": "15k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22809",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/DAC_ATT"
+        },
+        "2": {
+          "function": null,
+          "net": "/VREF"
+        }
+      }
+    },
+    "R124": {
+      "value": "100R",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C22775",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/BUF_OUT"
+        },
+        "2": {
+          "function": null,
+          "net": "/BUF_R"
+        }
+      }
+    },
+    "R125": {
+      "value": "100k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25803",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/OUT_TIP"
+        }
+      }
+    },
+    "R126": {
+      "value": "1k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C21190",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/MUX_COM"
+        },
+        "2": {
+          "function": null,
+          "net": "/POT_MUX_OUT"
+        }
+      }
+    },
+    "R127": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_MENU_A"
+        }
+      }
+    },
+    "R128": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_MENU_B"
+        }
+      }
+    },
+    "R129": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_MENU_SW"
+        }
+      }
+    },
+    "R130": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_KEY_A"
+        }
+      }
+    },
+    "R131": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_KEY_B"
+        }
+      }
+    },
+    "R132": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_SEMI_A"
+        }
+      }
+    },
+    "R133": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/ENC_SEMI_B"
+        }
+      }
+    },
+    "R134": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE1"
+        }
+      }
+    },
+    "R135": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE2"
+        }
+      }
+    },
+    "R136": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE3"
+        }
+      }
+    },
+    "R137": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE4"
+        }
+      }
+    },
+    "R138": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE5"
+        }
+      }
+    },
+    "R139": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE6"
+        }
+      }
+    },
+    "R140": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE7"
+        }
+      }
+    },
+    "R141": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/TOGGLE8"
+        }
+      }
+    },
+    "R142": {
+      "value": "4.7k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C23162",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/I2C1_SCL"
+        }
+      }
+    },
+    "R143": {
+      "value": "4.7k",
+      "sheet": "/",
+      "footprint": "cubevox:R0603",
+      "properties": {
+        "LCSC": "C23162",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/I2C1_SDA"
+        }
+      }
+    },
+    "RV101": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT01"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV101-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV101-Pad5)"
+        }
+      }
+    },
+    "RV102": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT02"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV102-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV102-Pad5)"
+        }
+      }
+    },
+    "RV103": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT03"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV103-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV103-Pad5)"
+        }
+      }
+    },
+    "RV104": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT04"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV104-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV104-Pad5)"
+        }
+      }
+    },
+    "RV105": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT05"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV105-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV105-Pad5)"
+        }
+      }
+    },
+    "RV106": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT06"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV106-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV106-Pad5)"
+        }
+      }
+    },
+    "RV107": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT07"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV107-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV107-Pad5)"
+        }
+      }
+    },
+    "RV108": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT08"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV108-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV108-Pad5)"
+        }
+      }
+    },
+    "RV109": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT09"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV109-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV109-Pad5)"
+        }
+      }
+    },
+    "RV110": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT10"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV110-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV110-Pad5)"
+        }
+      }
+    },
+    "RV111": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT11"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV111-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV111-Pad5)"
+        }
+      }
+    },
+    "RV112": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT12"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV112-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV112-Pad5)"
+        }
+      }
+    },
+    "RV113": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT13"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV113-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV113-Pad5)"
+        }
+      }
+    },
+    "RV114": {
+      "value": "10k",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "3": {
+          "function": "3_3",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "2_2",
+          "net": "/POT14"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RV114-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RV114-Pad5)"
+        }
+      }
+    },
+    "RVGAIN1": {
+      "value": "10k GAIN",
+      "sheet": "/",
+      "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
+      "properties": {
+        "LCSC": "C470304",
+        "MPN": "RK09D1130C1B",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Variable Resistors/Potentiometers"
+      },
+      "pins": {
+        "2": {
+          "function": "2_2",
+          "net": "/G2_FB"
+        },
+        "3": {
+          "function": "3_3",
+          "net": "/G2_FB"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/PRE_OUT"
+        },
+        "4": {
+          "function": "4_4",
+          "net": "unconnected-(RVGAIN1-Pad4)"
+        },
+        "5": {
+          "function": "5_5",
+          "net": "unconnected-(RVGAIN1-Pad5)"
+        }
+      }
+    },
+    "SW101": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE1"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW101-T3-Pad3)"
+        }
+      }
+    },
+    "SW102": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE2"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW102-T3-Pad3)"
+        }
+      }
+    },
+    "SW103": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE3"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW103-T3-Pad3)"
+        }
+      }
+    },
+    "SW104": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE4"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW104-T3-Pad3)"
+        }
+      }
+    },
+    "SW105": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE5"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW105-T3-Pad3)"
+        }
+      }
+    },
+    "SW106": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE6"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW106-T3-Pad3)"
+        }
+      }
+    },
+    "SW107": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE7"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW107-T3-Pad3)"
+        }
+      }
+    },
+    "SW108": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/TOGGLE8"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SW108-T3-Pad3)"
+        }
+      }
+    },
+    "SWBYPASS1": {
+      "value": "ST-0-102 bat toggle",
+      "sheet": "/",
+      "footprint": "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000",
+      "properties": {
+        "LCSC": "C1788487",
+        "MPN": "ST-0-102-A01-T000-LF",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Toggle Switches"
+      },
+      "pins": {
+        "1": {
+          "function": "T1_1",
+          "net": "/5V"
+        },
+        "2": {
+          "function": "COM_2",
+          "net": "/SW_BYPASS"
+        },
+        "3": {
+          "function": "T3_3",
+          "net": "unconnected-(SWBYPASS1-T3-Pad3)"
+        }
+      }
+    },
+    "U101": {
+      "value": "CD74HC4067",
+      "sheet": "/",
+      "footprint": "cubevox:SSOP-24_L8.1-W5.3-P0.65-LS7.8-BL",
+      "properties": {
+        "LCSC": "C98457",
+        "MPN": "CD74HC4067SM96",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Analog Switches / Multiplexers"
+      },
+      "pins": {
+        "24": {
+          "function": "VCC_24",
+          "net": "/3V3A"
+        },
+        "12": {
+          "function": "GND_12",
+          "net": "/GND"
+        },
+        "15": {
+          "function": "~{E}_15",
+          "net": "/GND"
+        },
+        "16": {
+          "function": "I15_16",
+          "net": "/GND"
+        },
+        "17": {
+          "function": "I14_17",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "COMMONINOUT/OUTPUT_1",
+          "net": "/MUX_COM"
+        },
+        "10": {
+          "function": "S0_10",
+          "net": "/MUX_S0"
+        },
+        "11": {
+          "function": "S1_11",
+          "net": "/MUX_S1"
+        },
+        "14": {
+          "function": "S2_14",
+          "net": "/MUX_S2"
+        },
+        "13": {
+          "function": "S3_13",
+          "net": "/MUX_S3"
+        },
+        "9": {
+          "function": "I0_9",
+          "net": "/POT01"
+        },
+        "8": {
+          "function": "I1_8",
+          "net": "/POT02"
+        },
+        "7": {
+          "function": "I2_7",
+          "net": "/POT03"
+        },
+        "6": {
+          "function": "I3_6",
+          "net": "/POT04"
+        },
+        "5": {
+          "function": "I4_5",
+          "net": "/POT05"
+        },
+        "4": {
+          "function": "I5_4",
+          "net": "/POT06"
+        },
+        "3": {
+          "function": "I6_3",
+          "net": "/POT07"
+        },
+        "2": {
+          "function": "I7_2",
+          "net": "/POT08"
+        },
+        "23": {
+          "function": "I8_23",
+          "net": "/POT09"
+        },
+        "22": {
+          "function": "I9_22",
+          "net": "/POT10"
+        },
+        "21": {
+          "function": "I10_21",
+          "net": "/POT11"
+        },
+        "20": {
+          "function": "I11_20",
+          "net": "/POT12"
+        },
+        "19": {
+          "function": "I12_19",
+          "net": "/POT13"
+        },
+        "18": {
+          "function": "I13_18",
+          "net": "/POT14"
+        }
+      }
+    },
+    "U103": {
+      "value": "AP63205WU-7",
+      "sheet": "/",
+      "footprint": "cubevox:TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+      "properties": {
+        "LCSC": "C2071056",
+        "MPN": "AP63205WU-7",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "DC-DC Converters"
+      },
+      "pins": {
+        "1": {
+          "function": "FB_1",
+          "net": "/5V_PRODUCT"
+        },
+        "6": {
+          "function": "BST_6",
+          "net": "/BUCK5_BST"
+        },
+        "5": {
+          "function": "SW_5",
+          "net": "/BUCK5_SW"
+        },
+        "4": {
+          "function": "GND_4",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "EN_2",
+          "net": "/VIN_9V"
+        },
+        "3": {
+          "function": "VIN_3",
+          "net": "/VIN_9V"
+        }
+      }
+    },
+    "U104": {
+      "value": "OPA1678IDR",
+      "sheet": "/",
+      "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
+      "properties": {
+        "LCSC": "C192421",
+        "MPN": "OPA1678IDR",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Operational Amplifier"
+      },
+      "pins": {
+        "8": {
+          "function": "V+_8",
+          "net": "/5VA"
+        },
+        "2": {
+          "function": "INA-_2",
+          "net": "/A1_FB"
+        },
+        "6": {
+          "function": "INB-_6",
+          "net": "/A2_FB"
+        },
+        "4": {
+          "function": "V-_4",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "OUTA_1",
+          "net": "/INA_O1"
+        },
+        "7": {
+          "function": "OUTB_7",
+          "net": "/INA_O2"
+        },
+        "5": {
+          "function": "INB+_5",
+          "net": "/IN_N"
+        },
+        "3": {
+          "function": "INA+_3",
+          "net": "/IN_P"
+        }
+      }
+    },
+    "U105": {
+      "value": "OPA1678IDR",
+      "sheet": "/",
+      "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
+      "properties": {
+        "LCSC": "C192421",
+        "MPN": "OPA1678IDR",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Operational Amplifier"
+      },
+      "pins": {
+        "8": {
+          "function": "V+_8",
+          "net": "/5VA"
+        },
+        "2": {
+          "function": "INA-_2",
+          "net": "/DA_N"
+        },
+        "3": {
+          "function": "INA+_3",
+          "net": "/DA_P"
+        },
+        "6": {
+          "function": "INB-_6",
+          "net": "/G2_INV"
+        },
+        "4": {
+          "function": "V-_4",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "OUTA_1",
+          "net": "/PRE1"
+        },
+        "5": {
+          "function": "INB+_5",
+          "net": "/PRE1"
+        },
+        "7": {
+          "function": "OUTB_7",
+          "net": "/PRE_OUT"
+        }
+      }
+    },
+    "U106": {
+      "value": "OPA1678IDR",
+      "sheet": "/",
+      "footprint": "cubevox:SOIC-8_L5.0-W4.0-P1.27-LS6.0-BL",
+      "properties": {
+        "LCSC": "C192421",
+        "MPN": "OPA1678IDR",
+        "Sheetname": "cubevox",
+        "Sheetfile": "cubevox.kicad_sch",
+        "ki_keywords": "Operational Amplifier"
+      },
+      "pins": {
+        "8": {
+          "function": "V+_8",
+          "net": "/5VA"
+        },
+        "5": {
+          "function": "INB+_5",
+          "net": "/BUF_IN"
+        },
+        "6": {
+          "function": "INB-_6",
+          "net": "/BUF_OUT"
+        },
+        "7": {
+          "function": "OUTB_7",
+          "net": "/BUF_OUT"
+        },
+        "4": {
+          "function": "V-_4",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "OUTA_1",
+          "net": "/VREF"
+        },
+        "2": {
+          "function": "INA-_2",
+          "net": "/VREF"
+        },
+        "3": {
+          "function": "INA+_3",
+          "net": "/VREF_DIV"
+        }
+      }
+    },
+    "C1": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C2": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C3": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C4": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C5": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C6": {
+      "value": "4.7uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C19666",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C7": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C8": {
+      "value": "1uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C15849",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VDDA"
+        }
+      }
+    },
+    "C9": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VDDA"
+        }
+      }
+    },
+    "C10": {
+      "value": "1uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C15849",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VDDA"
+        }
+      }
+    },
+    "C11": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VDDA"
+        }
+      }
+    },
+    "C12": {
+      "value": "2.2uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23630",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VCAP1"
+        }
+      }
+    },
+    "C13": {
+      "value": "2.2uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23630",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VCAP2"
+        }
+      }
+    },
+    "C14": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/NRST"
+        }
+      }
+    },
+    "C15": {
+      "value": "15pF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C1644",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/HSE_IN"
+        }
+      }
+    },
+    "C16": {
+      "value": "15pF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C1644",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/HSE_XTAL_OUT"
+        }
+      }
+    },
+    "C17": {
+      "value": "1uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C15849",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V_PRODUCT"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C18": {
+      "value": "1uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C15849",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VBUS"
+        }
+      }
+    },
+    "C19": {
+      "value": "100uF 10V",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_Tantalum_SMD:CP_EIA-6032-28_Kemet-C",
+      "properties": {
+        "LCSC": "C8649",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "CP_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C20": {
+      "value": "22uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_1206_3216Metric",
+      "properties": {
+        "LCSC": "C12891",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C21": {
+      "value": "22uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_1206_3216Metric",
+      "properties": {
+        "LCSC": "C12891",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C22": {
+      "value": "22uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_1206_3216Metric",
+      "properties": {
+        "LCSC": "C12891",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C23": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/h7core_block/BUCK_BST"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/BUCK_SW"
+        }
+      }
+    },
+    "C24": {
+      "value": "1uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C15849",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C25": {
+      "value": "2.2uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23630",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C26": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C27": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C28": {
+      "value": "10uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C19702",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C29": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C30": {
+      "value": "10uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C19702",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C31": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C32": {
+      "value": "10uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C19702",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C33": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/LDOO"
+        }
+      }
+    },
+    "C34": {
+      "value": "2.2uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23630",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/h7core_block/CAPM"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/CAPP"
+        }
+      }
+    },
+    "C35": {
+      "value": "2.2uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23630",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VNEG"
+        }
+      }
+    },
+    "C44": {
+      "value": "22uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_1206_3216Metric",
+      "properties": {
+        "LCSC": "C12891",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/ADC_VCC"
+        }
+      }
+    },
+    "C45": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/ADC_VCC"
+        }
+      }
+    },
+    "C46": {
+      "value": "10uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C19702",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C47": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C48": {
+      "value": "10uF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C19702",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/ADC_VREF"
+        }
+      }
+    },
+    "C49": {
+      "value": "100nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14663",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/ADC_VREF"
+        }
+      }
+    },
+    "C55": {
+      "value": "1nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "properties": {
+        "LCSC": "C1588",
+        "Section": "adc_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/MUX1_SIG_ADC"
+        }
+      }
+    },
+    "C56": {
+      "value": "10nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "properties": {
+        "LCSC": "C15195",
+        "Group": "stitch U1-east I2S escapes",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C57": {
+      "value": "10nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "properties": {
+        "LCSC": "C15195",
+        "Group": "stitch U6-west I2S rises",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C58": {
+      "value": "10nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "properties": {
+        "LCSC": "C15195",
+        "Group": "stitch ADC_DOUT rise",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C59": {
+      "value": "10nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "properties": {
+        "LCSC": "C15195",
+        "Group": "stitch QSPI_IO1 hop, ADC_SCKI via A",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C60": {
+      "value": "10nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "properties": {
+        "LCSC": "C15195",
+        "Group": "stitch QSPI_IO1, IO2, NCS hops, flash end",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "C61": {
+      "value": "10nF",
+      "sheet": "/h7core_block/",
+      "footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "properties": {
+        "LCSC": "C15195",
+        "Group": "stitch ADC_SCKI via B",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "cap capacitor",
+        "ki_fp_filters": "C_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/GND"
+        }
+      }
+    },
+    "D1": {
+      "value": "USER red",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:LED-SMD_L1.6-W0.8-R-RD",
+      "properties": {
+        "LCSC": "C2286",
+        "MPN": "KT-0603R",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Light Emitting Diodes (LED)"
+      },
+      "pins": {
+        "2": {
+          "function": "K_2",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "A_1",
+          "net": "/h7core_block/USER_LED_A"
+        }
+      }
+    },
+    "D2": {
+      "value": "USBLC6-2SC6",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+      "properties": {
+        "LCSC": "C2687116",
+        "MPN": "USBLC6-2SC6",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "ESD Protection Devices"
+      },
+      "pins": {
+        "2": {
+          "function": "GND_2",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "I/O2_3",
+          "net": "/h7core_block/USB_DM"
+        },
+        "4": {
+          "function": "I/O2_4",
+          "net": "/h7core_block/USB_DM"
+        },
+        "1": {
+          "function": "I/O1_1",
+          "net": "/h7core_block/USB_DP"
+        },
+        "6": {
+          "function": "I/O1_6",
+          "net": "/h7core_block/USB_DP"
+        },
+        "5": {
+          "function": "VBUS_5",
+          "net": "/h7core_block/VBUS"
+        }
+      }
+    },
+    "D3": {
+      "value": "PWR red",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:LED-SMD_L1.6-W0.8-R-RD",
+      "properties": {
+        "LCSC": "C2286",
+        "MPN": "KT-0603R",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Light Emitting Diodes (LED)"
+      },
+      "pins": {
+        "2": {
+          "function": "K_2",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "A_1",
+          "net": "/h7core_block/PWR_LED_A"
+        }
+      }
+    },
+    "FB1": {
+      "value": "120R@100MHz",
+      "sheet": "/h7core_block/",
+      "footprint": "Inductor_SMD:L_0603_1608Metric",
+      "properties": {
+        "LCSC": "C14709",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "L ferrite bead inductor filter",
+        "ki_fp_filters": "Inductor_* L_* *Ferrite*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3A"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/VDDA"
+        }
+      }
+    },
+    "J1": {
+      "value": "USB-C",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:USB-C-SMD_TYPE-C16PIN",
+      "properties": {
+        "LCSC": "C393939",
+        "MPN": "TYPE-C16PIN",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "USB Connectors"
+      },
+      "pins": {
+        "1": {
+          "function": "SHELL_1",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "SHELL_2",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "SHELL_3",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "SHELL_4",
+          "net": "/GND"
+        },
+        "A1B12": {
+          "function": "GND_A1B12",
+          "net": "/GND"
+        },
+        "B1A12": {
+          "function": "GND_B1A12",
+          "net": "/GND"
+        },
+        "A5": {
+          "function": "CC1_A5",
+          "net": "/h7core_block/CC1"
+        },
+        "B5": {
+          "function": "CC2_B5",
+          "net": "/h7core_block/CC2"
+        },
+        "A7": {
+          "function": "DN1_A7",
+          "net": "/h7core_block/USB_DM"
+        },
+        "B7": {
+          "function": "DN2_B7",
+          "net": "/h7core_block/USB_DM"
+        },
+        "A6": {
+          "function": "DP1_A6",
+          "net": "/h7core_block/USB_DP"
+        },
+        "B6": {
+          "function": "DP2_B6",
+          "net": "/h7core_block/USB_DP"
+        },
+        "A4B9": {
+          "function": "VBUS_A4B9",
+          "net": "/h7core_block/VBUS"
+        },
+        "B4A9": {
+          "function": "VBUS_B4A9",
+          "net": "/h7core_block/VBUS"
+        },
+        "A8": {
+          "function": "SBU1_A8",
+          "net": "unconnected-(J1-SBU1-PadA8)"
+        },
+        "B8": {
+          "function": "SBU2_B8",
+          "net": "unconnected-(J1-SBU2-PadB8)"
+        }
+      }
+    },
+    "J3": {
+      "value": "TC2030-NL SWD",
+      "sheet": "/h7core_block/",
+      "footprint": "Connector:Tag-Connect_TC2030-IDC-NL_2x03_P1.27mm_Vertical",
+      "properties": {
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "exclude_from_bom": null,
+        "ki_keywords": "Cortex Debug Connector ARM SWD JTAG",
+        "ki_fp_filters": "*TC2030*"
+      },
+      "pins": {
+        "1": {
+          "function": "VCC_1",
+          "net": "/3V3"
+        },
+        "5": {
+          "function": "GND_5",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "~{RESET}_3",
+          "net": "/h7core_block/NRST"
+        },
+        "4": {
+          "function": "SWCLK_4",
+          "net": "/h7core_block/SWCLK"
+        },
+        "2": {
+          "function": "SWDIO_2",
+          "net": "/h7core_block/SWDIO"
+        },
+        "6": {
+          "function": "SWO_6",
+          "net": "/h7core_block/SWO"
+        }
+      }
+    },
+    "L1": {
+      "value": "3.9uH",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:IND-SMD_L5.0-W5.0",
+      "properties": {
+        "LCSC": "C7427132",
+        "MPN": "ANR5040T3R9M",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Power Inductors"
+      },
+      "pins": {
+        "2": {
+          "function": "2_2",
+          "net": "/3V3"
+        },
+        "1": {
+          "function": "1_1",
+          "net": "/h7core_block/BUCK_SW"
+        }
+      }
+    },
+    "R1": {
+      "value": "0R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C21189",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/h7core_block/HSE_OUT"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/HSE_XTAL_OUT"
+        }
+      }
+    },
+    "R2": {
+      "value": "10k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/BOOT0"
+        }
+      }
+    },
+    "R3": {
+      "value": "680R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23228",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/h7core_block/USER_LED"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/USER_LED_A"
+        }
+      }
+    },
+    "R4": {
+      "value": "5.1k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23186",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/CC1"
+        }
+      }
+    },
+    "R5": {
+      "value": "5.1k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23186",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/CC2"
+        }
+      }
+    },
+    "R6": {
+      "value": "27k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C22967",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VBUS"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/VBUS_SENSE"
+        }
+      }
+    },
+    "R7": {
+      "value": "33k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C4216",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/VBUS_SENSE"
+        }
+      }
+    },
+    "R8": {
+      "value": "33k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C4216",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5V_PRODUCT"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/PR1"
+        }
+      }
+    },
+    "R9": {
+      "value": "10k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0402_1005Metric",
+      "properties": {
+        "LCSC": "C25744",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/PR1"
+        }
+      }
+    },
+    "R10": {
+      "value": "680R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23228",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/PWR_LED_A"
+        }
+      }
+    },
+    "R11": {
+      "value": "10k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0402_1005Metric",
+      "properties": {
+        "LCSC": "C25744",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/QSPI_NCS"
+        }
+      }
+    },
+    "R12": {
+      "value": "10k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/QSPI_IO2"
+        }
+      }
+    },
+    "R13": {
+      "value": "10k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0402_1005Metric",
+      "properties": {
+        "LCSC": "C25744",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/3V3"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/QSPI_IO3"
+        }
+      }
+    },
+    "R16": {
+      "value": "10k",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C25804",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/GND"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/XSMT"
+        }
+      }
+    },
+    "R20": {
+      "value": "10R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C22859",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/5VA"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/ADC_VCC"
+        }
+      }
+    },
+    "R27": {
+      "value": "33R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0402_1005Metric",
+      "properties": {
+        "LCSC": "C25105",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/h7core_block/ADC_SCKI"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/ADC_SCKI_SRC"
+        }
+      }
+    },
+    "R28": {
+      "value": "22R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23345",
+        "Note": "33R is the tuning alternative",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/h7core_block/QSPI_CLK"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/QSPI_CLK_SRC"
+        }
+      }
+    },
+    "R29": {
+      "value": "33R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C23140",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "2": {
+          "function": null,
+          "net": "/h7core_block/I2S_BCLK"
+        },
+        "1": {
+          "function": null,
+          "net": "/h7core_block/I2S_BCLK_SRC"
+        }
+      }
+    },
+    "R30": {
+      "value": "100R",
+      "sheet": "/h7core_block/",
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "properties": {
+        "LCSC": "C22775",
+        "Section": "adc_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "R res resistor",
+        "ki_fp_filters": "R_*"
+      },
+      "pins": {
+        "1": {
+          "function": null,
+          "net": "/POT_MUX_OUT"
+        },
+        "2": {
+          "function": null,
+          "net": "/h7core_block/MUX1_SIG_ADC"
+        }
+      }
+    },
+    "SWBOOT1": {
+      "value": "BOOT0",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5",
+      "properties": {
+        "LCSC": "C318884",
+        "MPN": "TS-1187A-B-A-B",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Tactile Switches"
+      },
+      "pins": {
+        "3": {
+          "function": "C_3",
+          "net": "/3V3"
+        },
+        "4": {
+          "function": "D_4",
+          "net": "/3V3"
+        },
+        "1": {
+          "function": "A_1",
+          "net": "/h7core_block/BOOT0"
+        },
+        "2": {
+          "function": "B_2",
+          "net": "/h7core_block/BOOT0"
+        }
+      }
+    },
+    "SWRESET1": {
+      "value": "RESET",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5",
+      "properties": {
+        "LCSC": "C318884",
+        "MPN": "TS-1187A-B-A-B",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Tactile Switches"
+      },
+      "pins": {
+        "3": {
+          "function": "C_3",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "D_4",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "A_1",
+          "net": "/h7core_block/NRST"
+        },
+        "2": {
+          "function": "B_2",
+          "net": "/h7core_block/NRST"
+        }
+      }
+    },
+    "U1": {
+      "value": "STM32H743VIT6",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:LQFP-100_L14.0-W14.0-P0.50-LS16.0-BL",
+      "properties": {
+        "LCSC": "C114409",
+        "MPN": "STM32H743VIT6",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "ST Microelectronics"
+      },
+      "pins": {
+        "100": {
+          "function": "VDD_100",
+          "net": "/3V3"
+        },
+        "11": {
+          "function": "VDD_11",
+          "net": "/3V3"
+        },
+        "27": {
+          "function": "VDD_27",
+          "net": "/3V3"
+        },
+        "50": {
+          "function": "VDD_50",
+          "net": "/3V3"
+        },
+        "6": {
+          "function": "VBAT_6",
+          "net": "/3V3"
+        },
+        "75": {
+          "function": "VDD_75",
+          "net": "/3V3"
+        },
+        "51": {
+          "function": "PB12_51",
+          "net": "/ENC_KEY_A"
+        },
+        "52": {
+          "function": "PB13_52",
+          "net": "/ENC_KEY_B"
+        },
+        "39": {
+          "function": "PE9_39",
+          "net": "/ENC_MENU_A"
+        },
+        "41": {
+          "function": "PE11_41",
+          "net": "/ENC_MENU_B"
+        },
+        "62": {
+          "function": "PD15_62",
+          "net": "/ENC_MENU_SW"
+        },
+        "53": {
+          "function": "PB14_53",
+          "net": "/ENC_SEMI_A"
+        },
+        "57": {
+          "function": "PD10_57",
+          "net": "/ENC_SEMI_B"
+        },
+        "63": {
+          "function": "PC6_63",
+          "net": "/FX_ON_SENSE"
+        },
+        "10": {
+          "function": "VSS_10",
+          "net": "/GND"
+        },
+        "19": {
+          "function": "VSSA_19",
+          "net": "/GND"
+        },
+        "26": {
+          "function": "VSS_26",
+          "net": "/GND"
+        },
+        "49": {
+          "function": "VSS_49",
+          "net": "/GND"
+        },
+        "74": {
+          "function": "VSS_74",
+          "net": "/GND"
+        },
+        "99": {
+          "function": "VSS_99",
+          "net": "/GND"
+        },
+        "95": {
+          "function": "PB8_95",
+          "net": "/I2C1_SCL"
+        },
+        "96": {
+          "function": "PB9_96",
+          "net": "/I2C1_SDA"
+        },
+        "47": {
+          "function": "PB11_47",
+          "net": "/JACK_TRS_N"
+        },
+        "84": {
+          "function": "PD3_84",
+          "net": "/MUX_S0"
+        },
+        "85": {
+          "function": "PD4_85",
+          "net": "/MUX_S1"
+        },
+        "87": {
+          "function": "PD6_87",
+          "net": "/MUX_S2"
+        },
+        "90": {
+          "function": "PB4_90",
+          "net": "/MUX_S3"
+        },
+        "28": {
+          "function": "PA4_28",
+          "net": "/TOGGLE1"
+        },
+        "29": {
+          "function": "PA5_29",
+          "net": "/TOGGLE2"
+        },
+        "30": {
+          "function": "PA6_30",
+          "net": "/TOGGLE3"
+        },
+        "31": {
+          "function": "PA7_31",
+          "net": "/TOGGLE4"
+        },
+        "34": {
+          "function": "PB0_34",
+          "net": "/TOGGLE5"
+        },
+        "35": {
+          "function": "PB1_35",
+          "net": "/TOGGLE6"
+        },
+        "38": {
+          "function": "PE8_38",
+          "net": "/TOGGLE7"
+        },
+        "46": {
+          "function": "PB10_46",
+          "net": "/TOGGLE8"
+        },
+        "2": {
+          "function": "PE3_2",
+          "net": "/h7core_block/ADC_DOUT"
+        },
+        "61": {
+          "function": "PD14_61",
+          "net": "/h7core_block/ADC_SCKI_SRC"
+        },
+        "94": {
+          "function": "BOOT0_94",
+          "net": "/h7core_block/BOOT0"
+        },
+        "22": {
+          "function": "PA0_22",
+          "net": "/h7core_block/CC1"
+        },
+        "25": {
+          "function": "PA3_25",
+          "net": "/h7core_block/CC2"
+        },
+        "12": {
+          "function": "PH0-OSC_IN_12",
+          "net": "/h7core_block/HSE_IN"
+        },
+        "13": {
+          "function": "PH1-OSC_OUT_13",
+          "net": "/h7core_block/HSE_OUT"
+        },
+        "4": {
+          "function": "PE5_4",
+          "net": "/h7core_block/I2S_BCLK_SRC"
+        },
+        "5": {
+          "function": "PE6_5",
+          "net": "/h7core_block/I2S_DATA"
+        },
+        "3": {
+          "function": "PE4_3",
+          "net": "/h7core_block/I2S_LRCLK"
+        },
+        "15": {
+          "function": "PC0_15",
+          "net": "/h7core_block/MUX1_SIG_ADC"
+        },
+        "14": {
+          "function": "NRST_14",
+          "net": "/h7core_block/NRST"
+        },
+        "36": {
+          "function": "PB2_36",
+          "net": "/h7core_block/QSPI_CLK_SRC"
+        },
+        "58": {
+          "function": "PD11_58",
+          "net": "/h7core_block/QSPI_IO0"
+        },
+        "59": {
+          "function": "PD12_59",
+          "net": "/h7core_block/QSPI_IO1"
+        },
+        "1": {
+          "function": "PE2_1",
+          "net": "/h7core_block/QSPI_IO2"
+        },
+        "60": {
+          "function": "PD13_60",
+          "net": "/h7core_block/QSPI_IO3"
+        },
+        "92": {
+          "function": "PB6_92",
+          "net": "/h7core_block/QSPI_NCS"
+        },
+        "76": {
+          "function": "PA14_76",
+          "net": "/h7core_block/SWCLK"
+        },
+        "72": {
+          "function": "PA13_72",
+          "net": "/h7core_block/SWDIO"
+        },
+        "89": {
+          "function": "PB3_89",
+          "net": "/h7core_block/SWO"
+        },
+        "70": {
+          "function": "PA11_70",
+          "net": "/h7core_block/USB_DM"
+        },
+        "71": {
+          "function": "PA12_71",
+          "net": "/h7core_block/USB_DP"
+        },
+        "88": {
+          "function": "PD7_88",
+          "net": "/h7core_block/USER_LED"
+        },
+        "68": {
+          "function": "PA9_68",
+          "net": "/h7core_block/VBUS_SENSE"
+        },
+        "48": {
+          "function": "VCAP_48",
+          "net": "/h7core_block/VCAP1"
+        },
+        "73": {
+          "function": "VCAP_73",
+          "net": "/h7core_block/VCAP2"
+        },
+        "20": {
+          "function": "VREF+_20",
+          "net": "/h7core_block/VDDA"
+        },
+        "21": {
+          "function": "VDDA_21",
+          "net": "/h7core_block/VDDA"
+        },
+        "45": {
+          "function": "PE15_45",
+          "net": "/h7core_block/XSMT"
+        },
+        "23": {
+          "function": "PA1_23",
+          "net": "unconnected-(U1-PA1-Pad23)"
+        },
+        "24": {
+          "function": "PA2_24",
+          "net": "unconnected-(U1-PA2-Pad24)"
+        },
+        "67": {
+          "function": "PA8_67",
+          "net": "unconnected-(U1-PA8-Pad67)"
+        },
+        "69": {
+          "function": "PA10_69",
+          "net": "unconnected-(U1-PA10-Pad69)"
+        },
+        "77": {
+          "function": "PA15_77",
+          "net": "unconnected-(U1-PA15-Pad77)"
+        },
+        "91": {
+          "function": "PB5_91",
+          "net": "unconnected-(U1-PB5-Pad91)"
+        },
+        "93": {
+          "function": "PB7_93",
+          "net": "unconnected-(U1-PB7-Pad93)"
+        },
+        "54": {
+          "function": "PB15_54",
+          "net": "unconnected-(U1-PB15-Pad54)"
+        },
+        "16": {
+          "function": "PC1_16",
+          "net": "unconnected-(U1-PC1-Pad16)"
+        },
+        "17": {
+          "function": "PC2_C_17",
+          "net": "unconnected-(U1-PC2_C-Pad17)"
+        },
+        "18": {
+          "function": "PC3_C_18",
+          "net": "unconnected-(U1-PC3_C-Pad18)"
+        },
+        "32": {
+          "function": "PC4_32",
+          "net": "unconnected-(U1-PC4-Pad32)"
+        },
+        "33": {
+          "function": "PC5_33",
+          "net": "unconnected-(U1-PC5-Pad33)"
+        },
+        "64": {
+          "function": "PC7_64",
+          "net": "unconnected-(U1-PC7-Pad64)"
+        },
+        "65": {
+          "function": "PC8_65",
+          "net": "unconnected-(U1-PC8-Pad65)"
+        },
+        "66": {
+          "function": "PC9_66",
+          "net": "unconnected-(U1-PC9-Pad66)"
+        },
+        "78": {
+          "function": "PC10_78",
+          "net": "unconnected-(U1-PC10-Pad78)"
+        },
+        "79": {
+          "function": "PC11_79",
+          "net": "unconnected-(U1-PC11-Pad79)"
+        },
+        "80": {
+          "function": "PC12_80",
+          "net": "unconnected-(U1-PC12-Pad80)"
+        },
+        "7": {
+          "function": "PC13_7",
+          "net": "unconnected-(U1-PC13-Pad7)"
+        },
+        "8": {
+          "function": "PC14-OSC32_IN_8",
+          "net": "unconnected-(U1-PC14-OSC32_IN-Pad8)"
+        },
+        "9": {
+          "function": "PC15-OSC32_OUT_9",
+          "net": "unconnected-(U1-PC15-OSC32_OUT-Pad9)"
+        },
+        "81": {
+          "function": "PD0_81",
+          "net": "unconnected-(U1-PD0-Pad81)"
+        },
+        "82": {
+          "function": "PD1_82",
+          "net": "unconnected-(U1-PD1-Pad82)"
+        },
+        "83": {
+          "function": "PD2_83",
+          "net": "unconnected-(U1-PD2-Pad83)"
+        },
+        "86": {
+          "function": "PD5_86",
+          "net": "unconnected-(U1-PD5-Pad86)"
+        },
+        "55": {
+          "function": "PD8_55",
+          "net": "unconnected-(U1-PD8-Pad55)"
+        },
+        "56": {
+          "function": "PD9_56",
+          "net": "unconnected-(U1-PD9-Pad56)"
+        },
+        "97": {
+          "function": "PE0_97",
+          "net": "unconnected-(U1-PE0-Pad97)"
+        },
+        "98": {
+          "function": "PE1_98",
+          "net": "unconnected-(U1-PE1-Pad98)"
+        },
+        "37": {
+          "function": "PE7_37",
+          "net": "unconnected-(U1-PE7-Pad37)"
+        },
+        "40": {
+          "function": "PE10_40",
+          "net": "unconnected-(U1-PE10-Pad40)"
+        },
+        "42": {
+          "function": "PE12_42",
+          "net": "unconnected-(U1-PE12-Pad42)"
+        },
+        "43": {
+          "function": "PE13_43",
+          "net": "unconnected-(U1-PE13-Pad43)"
+        },
+        "44": {
+          "function": "PE14_44",
+          "net": "unconnected-(U1-PE14-Pad44)"
+        }
+      }
+    },
+    "U2": {
+      "value": "TPS2116DRLR",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:SOT-583-8_L2.1-W1.6-P0.50-LS1.6-BL",
+      "properties": {
+        "LCSC": "C3235557",
+        "MPN": "TPS2116DRLR",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch"
+      },
+      "pins": {
+        "2": {
+          "function": "VOUT_2",
+          "net": "/5V"
+        },
+        "7": {
+          "function": "VOUT_7",
+          "net": "/5V"
+        },
+        "3": {
+          "function": "VIN1_3",
+          "net": "/5V_PRODUCT"
+        },
+        "5": {
+          "function": "MODE_5",
+          "net": "/5V_PRODUCT"
+        },
+        "1": {
+          "function": "GND_1",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "PR1_4",
+          "net": "/h7core_block/PR1"
+        },
+        "6": {
+          "function": "VIN2_6",
+          "net": "/h7core_block/VBUS"
+        },
+        "8": {
+          "function": "ST_8",
+          "net": "unconnected-(U2-ST-Pad8)"
+        }
+      }
+    },
+    "U3": {
+      "value": "AP63203WU-7",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL",
+      "properties": {
+        "LCSC": "C780769",
+        "MPN": "AP63203WU-7",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "AC-DC Controllers & Regulators"
+      },
+      "pins": {
+        "1": {
+          "function": "FB_1",
+          "net": "/3V3"
+        },
+        "2": {
+          "function": "EN_2",
+          "net": "/5V"
+        },
+        "3": {
+          "function": "VIN_3",
+          "net": "/5V"
+        },
+        "4": {
+          "function": "GND_4",
+          "net": "/GND"
+        },
+        "6": {
+          "function": "BST_6",
+          "net": "/h7core_block/BUCK_BST"
+        },
+        "5": {
+          "function": "SW_5",
+          "net": "/h7core_block/BUCK_SW"
+        }
+      }
+    },
+    "U4": {
+      "value": "TLV75533PDBVR",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR",
+      "properties": {
+        "LCSC": "C404027",
+        "MPN": "TLV75533PDBVR",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Linear Voltage Regulators (LDO)"
+      },
+      "pins": {
+        "5": {
+          "function": "OUT_5",
+          "net": "/3V3A"
+        },
+        "1": {
+          "function": "IN_1",
+          "net": "/5V"
+        },
+        "3": {
+          "function": "EN_3",
+          "net": "/5V"
+        },
+        "2": {
+          "function": "GND_2",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "NC_4",
+          "net": "unconnected-(U4-NC-Pad4)"
+        }
+      }
+    },
+    "U5": {
+      "value": "IS25LP064A",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:SOIC-8_L5.3-W5.3-P1.27-LS7.9-BL",
+      "properties": {
+        "LCSC": "C2841348",
+        "MPN": "IS25LP064A-JBLE-TR",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "NOR FLASH"
+      },
+      "pins": {
+        "8": {
+          "function": "Vcc_8",
+          "net": "/3V3"
+        },
+        "4": {
+          "function": "GND_4",
+          "net": "/GND"
+        },
+        "6": {
+          "function": "SCK_6",
+          "net": "/h7core_block/QSPI_CLK"
+        },
+        "5": {
+          "function": "SI(IO0)_5",
+          "net": "/h7core_block/QSPI_IO0"
+        },
+        "2": {
+          "function": "SO(IO1)_2",
+          "net": "/h7core_block/QSPI_IO1"
+        },
+        "3": {
+          "function": "WP#(IO2)_3",
+          "net": "/h7core_block/QSPI_IO2"
+        },
+        "7": {
+          "function": "HOLD#(IO3)_7",
+          "net": "/h7core_block/QSPI_IO3"
+        },
+        "1": {
+          "function": "~{CE}_1",
+          "net": "/h7core_block/QSPI_NCS"
+        }
+      }
+    },
+    "U6": {
+      "value": "PCM5102APWR",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL",
+      "properties": {
+        "LCSC": "C107671",
+        "MPN": "PCM5102APWR",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Digital To Analog Converters (DACs)"
+      },
+      "pins": {
+        "20": {
+          "function": "DVDD_20",
+          "net": "/3V3"
+        },
+        "1": {
+          "function": "CPVDD_1",
+          "net": "/3V3A"
+        },
+        "8": {
+          "function": "AVDD_8",
+          "net": "/3V3A"
+        },
+        "6": {
+          "function": "OUTL_6",
+          "net": "/DAC_OUTL"
+        },
+        "10": {
+          "function": "DEMP_10",
+          "net": "/GND"
+        },
+        "11": {
+          "function": "FLT_11",
+          "net": "/GND"
+        },
+        "12": {
+          "function": "SCK_12",
+          "net": "/GND"
+        },
+        "16": {
+          "function": "FMT_16",
+          "net": "/GND"
+        },
+        "19": {
+          "function": "DGND_19",
+          "net": "/GND"
+        },
+        "3": {
+          "function": "CPGND_3",
+          "net": "/GND"
+        },
+        "9": {
+          "function": "AGND_9",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "CAPM_4",
+          "net": "/h7core_block/CAPM"
+        },
+        "2": {
+          "function": "CAPP_2",
+          "net": "/h7core_block/CAPP"
+        },
+        "13": {
+          "function": "BCK_13",
+          "net": "/h7core_block/I2S_BCLK"
+        },
+        "14": {
+          "function": "DIN_14",
+          "net": "/h7core_block/I2S_DATA"
+        },
+        "15": {
+          "function": "LRCK_15",
+          "net": "/h7core_block/I2S_LRCLK"
+        },
+        "18": {
+          "function": "LDOO_18",
+          "net": "/h7core_block/LDOO"
+        },
+        "5": {
+          "function": "VNEG_5",
+          "net": "/h7core_block/VNEG"
+        },
+        "17": {
+          "function": "XSMT_17",
+          "net": "/h7core_block/XSMT"
+        },
+        "7": {
+          "function": "OUTR_7",
+          "net": "unconnected-(U6-OUTR-Pad7)"
+        }
+      }
+    },
+    "U8": {
+      "value": "PCM1808PWR",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:TSSOP-14_L5.0-W4.4-P0.65-LS6.4-BL",
+      "properties": {
+        "LCSC": "C55513",
+        "MPN": "PCM1808PWR",
+        "Section": "audio_in",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Analog To Digital Converters (ADCs)"
+      },
+      "pins": {
+        "4": {
+          "function": "VDD_4",
+          "net": "/3V3"
+        },
+        "13": {
+          "function": "VINL_13",
+          "net": "/ADC_VINL"
+        },
+        "14": {
+          "function": "VINR_14",
+          "net": "/ADC_VINR"
+        },
+        "10": {
+          "function": "MD0_10",
+          "net": "/GND"
+        },
+        "11": {
+          "function": "MD1_11",
+          "net": "/GND"
+        },
+        "12": {
+          "function": "FMT_12",
+          "net": "/GND"
+        },
+        "2": {
+          "function": "AGND_2",
+          "net": "/GND"
+        },
+        "5": {
+          "function": "DGND_5",
+          "net": "/GND"
+        },
+        "9": {
+          "function": "DOUT_9",
+          "net": "/h7core_block/ADC_DOUT"
+        },
+        "6": {
+          "function": "SCKI_6",
+          "net": "/h7core_block/ADC_SCKI"
+        },
+        "3": {
+          "function": "VCC_3",
+          "net": "/h7core_block/ADC_VCC"
+        },
+        "1": {
+          "function": "VREF_1",
+          "net": "/h7core_block/ADC_VREF"
+        },
+        "8": {
+          "function": "BCK_8",
+          "net": "/h7core_block/I2S_BCLK"
+        },
+        "7": {
+          "function": "LRCK_7",
+          "net": "/h7core_block/I2S_LRCLK"
+        }
+      }
+    },
+    "Y1": {
+      "value": "25MHz 12pF",
+      "sheet": "/h7core_block/",
+      "footprint": "cubevox_h7core:CRYSTAL-SMD_4P-L3.2-W2.5-BL",
+      "properties": {
+        "LCSC": "C9006",
+        "MPN": "X322525MOB4SI",
+        "Sheetname": "h7core_block",
+        "Sheetfile": "h7core_block.kicad_sch",
+        "ki_keywords": "Crystals"
+      },
+      "pins": {
+        "2": {
+          "function": "GND_2",
+          "net": "/GND"
+        },
+        "4": {
+          "function": "GND_4",
+          "net": "/GND"
+        },
+        "1": {
+          "function": "OSC1_1",
+          "net": "/h7core_block/HSE_IN"
+        },
+        "3": {
+          "function": "OSC2_3",
+          "net": "/h7core_block/HSE_XTAL_OUT"
+        }
+      }
+    }
+  }
+}

@@ -36,7 +36,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 26 | C2841348 | IS25LP064A-JBLE-TR | QSPI flash | Extended | 2146 | 2.068 | SOIC-8-208 (h7core) | 1 | inherited |
 | 28 | C2691448 | PZ254V-11-04P | spare 1x4 header 2.54 mm (OLED moved to row 28b; no schematic part uses it now) | Extended | 979885 | 0.021 | HDR-TH_4P-P2.54-V-M (cubevox) | 0 | IMPORTED, clean |
 | 28b | none (owner-supplied) | SH1106 1.3in I2C 128x64 | J117 OLED module, 4-pin I2C, hand-plugged by the owner, not on the JLC BOM | n/a | n/a | n/a | OLED-1.3-SH1106-I2C-4P (cubevox, hand-written) | 1 | Module PCB 35.4x33.5x1.2, pins GND/VCC/SCL/SDA, 4x NPTH 3.2 on a 30.4x28.5 grid. Buy 4x M3 x 8 mm standoffs (plus 4 screws). Model assumes 8.0 mm standoffs: module PCB bottom at z 8.0, glass top at z 10.7, pins down to z -3.0. The 11.8 mm panel plane needs about 9.1 mm standoffs. |
-| 29 | C192421 | OPA1678IDR | A1-A5 + VREF buffer (3 duals) | Extended | 3309 | 0.774 | SOIC-8_L5.0-W4.0 (cubevox) | 3 | IMPORTED with --repair-courtyard |
+| 29 | C192421 | OPA1678IDR | SUPERSEDED by row 50 (revision 2, audit A02: input range stops 2 V below V+). Do not order | Extended | 3309 | 0.774 | SOIC-8_L5.0-W4.0 (cubevox) | 0 | footprint kept in cubevox.pretty, unused |
 | 30 | C8678 | SS34 | 9V_JACK to VIN_9V Schottky | Basic | 3557042 | 0.030 | SMA_L4.3-W2.6 (cubevox) | 1 | IMPORTED with --repair-courtyard |
 | 31 | C2937625 | PZ254V-11-03P | 1x3 header, unused since the toggle part was chosen | Extended | 1200838 | 0.020 | HDR-TH_3P-P2.54-V-M (cubevox) | 0 | IMPORTED with --repair-courtyard |
 | 32 | C81598 | 1N4148W | relay flyback | Basic | 5171770 | 0.012 | SOD-123F (cubevox) | 1 | inherited |
@@ -56,29 +56,51 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 45 | C2991172 | 0603CG222J500NT | C 2.2 nF C0G 50 V (no Basic exists) | Extended | 80127 | 0.030 | C0603 | by schematic | IMPORTED |
 | 46 | C14663 | CC0603KRX7R9BB104 | C 100 nF X7R 50 V | Basic | 12618106 | 0.011 | C0603 | by schematic | IMPORTED |
 | 47 | C57112 | 0603B103K500NT | C 10 nF X7R 50 V | Basic | 2155057 | 0.020 | C0603 | by schematic | IMPORTED |
-| 48 | C14860 | CL31B106KAHNNNE | C 10 uF X7R 25 V 1206 (DC blocks, VREF; no Basic X7R exists) | Extended | 917604 (LIVE) | 0.169 | C1206 (cubevox) | by schematic | IMPORTED |
+| 48 | C14860 | CL31B106KAHNNNE | C 10 uF X7R 25 V 1206. Revision 2: stays only at C137 (ADC feed), C138 (VINR), plus C117 (5VA bypass) and C135 (VREF divider), none a coupling position. Superseded as audio coupling cap by row 52 (audit A07) | Extended | 917604 (LIVE) | 0.169 | C1206 (cubevox) | 4 | IMPORTED |
 | 49 | C12891 | CL31A226KAHNNNE | C 22 uF X5R 25 V 1206, 9V_IN | Basic | 574332 | 0.180 | C1206 | by schematic | IMPORTED; X5R loses capacitance under DC bias |
+| 50 | C139363 | OPA2197IDR | A1-A4 (U104, U105), VREF follower + output buffer (U106): 3 duals | Extended | 9501 (import 2026-10-02; spec quotes 19.8 k live) | 0.8265 (import; spec quotes 1.26) | SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL (cubevox) | 3 | IMPORTED with --repair-courtyard (4.99x3.99 -> 5.50x7.50 mm); model offset clean, no --accept-mismatch. Pin types by hand like OPA1678 (1,7 output; 2,3,5,6 input; 4,8 power_in); 0 unspecified |
+| 51 | C309083 | ARG03BTC1002 | R111-R114, difference amp, 10 k 0.1 % 25 ppm | Extended | 59843 | 0.0214 | R0603 (cubevox) | 4 | IMPORTED with --repair-courtyard; same R0603 footprint as the other 0603 resistors |
+| 52 | C72484 | RVT1E100M0405 | 10 uF 25 V electrolytic 4x5.4 (ROQANG, 105 C): C120, C121, C124, C125 coupling, C139 DAC, C141 output, C160 VREF node | Extended | 32285 | 0.0217 | CAP-SMD_BD4.0-L4.3-W4.3-FD (cubevox) | 7 | IMPORTED with --repair-courtyard (4.39x4.39 -> 6.62x4.90 mm). Symbol polarised, pin 1 = +. Footprint pad 1 = + (see WARNINGS 12) |
+| 53 | C191859 | VT1A101M0505 | 100 uF 10 V electrolytic 5x5.4: C159 (stage 2 R116 leg) | Extended | 26521 | 0.0256 | CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD (cubevox) | 1 | IMPORTED with --repair-courtyard (5.39x5.39 -> 8.00x5.90 mm). Pin 1 = + |
+| 54 | C72502 | RVT1C220M0405 | 22 uF 16 V electrolytic 4x5.4: C158 (stage 1 RG leg) | Extended | 57055 | 0.0215 | CAP-SMD_BD4.0-L4.3-W4.3-LS5.3-FD (cubevox) | 1 | IMPORTED with --repair-courtyard (4.39x4.39 -> 7.00x4.90 mm). Pin 1 = + |
+| 55 | C23179 | 0603WAF4700T5E | R 470 ohm: R147, DAC reconstruction filter | Basic | 1899614 | 0.0016 | R0603 | 1 | IMPORTED, courtyard repaired (same footprint) |
+| 56 | C8218 | 0603WAF2000T5E | R 200 ohm: R116, stage 2 gain leg | Basic | 1461682 | 0.0016 | R0603 | 1 | IMPORTED, courtyard repaired |
+| 57 | C23345 | 0603WAF220JT5E | R 22 ohm: R146, VREF follower isolation | Basic | 2657294 | 0.0017 | R0603 | 1 | IMPORTED, courtyard repaired |
+| 58 | C23147 | 0603WAF3602T5E | R 36 k: R8, TPS2116 PR1 divider (replaces 33 k C4216, audit A06) | Extended (Preferred) | 303 | 0.0017 | R0603 | 1 | IMPORTED, courtyard repaired |
+| 59 | C23127 | 0603WAF9531T5E | R 9.53 k: R108, R110, stage 1 feedback | Extended | 90 | 0.0019 | R0603 | 2 | IMPORTED, courtyard repaired. Stock 90 is thin; re-check at order time |
 
 ## Counts
 
-1. Unique part numbers: 46 (19 Basic, 1 Preferred, 26 Extended). Row numbers are not contiguous (15, 23, 27 removed).
-2. Fee estimate: 26 Extended x ~$3 = ~$78 per order. NCJ6FA-H is counted although it is not in the library yet.
-3. Per-board quantities fixed: 3x OPA1678, 15 pots, 3 encoders, 9 bat toggles, 1 header 1x4, 1 relay, 1 SS34. Passive quantities come from the schematic.
+1. Unique part numbers: 55 (22 Basic, 2 Preferred, 31 Extended). Row 29 (OPA1678) is superseded and not counted. Row numbers are not contiguous (15, 23, 27 removed).
+2. Fee estimate: 31 Extended x ~$3 = ~$93 per order. NCJ6FA-H is counted although it is not in the library yet.
+3. Per-board quantities fixed: 3x OPA2197, 15 pots, 3 encoders, 9 bat toggles, 1 header 1x4, 1 relay, 1 SS34. Passive quantities come from the schematic.
 4. Not yet coded (spec items): 10 ohm PCM1808 VCC resistor, 2.2 uF VCAP caps, CC 5.1 k C23186, BLM18PG121SN1D ferrite, the toggle switch itself (header placeholders only), clamp C27675.
+
+## Assembly
+
+| Ref | Part | Assembled by |
+|-----|------|--------------|
+| J101 | NCJ6FA-H combo input (B.Cu) | owner, excluded from JLC BOM/CPL |
+| J106 | PJ-002A barrel (B.Cu) | owner, excluded |
+| J108 | NMJ6HCD2 1/4 in output (B.Cu) | owner, excluded |
+| J117 | SH1106 OLED module and header | owner, excluded |
+| all other refs | | JLC (top side, Economic) |
 
 ## WARNINGS
 
-1. C368458 NCJ6FA-H is imported. ClaudeRouter `pad_roles` now takes the card branch when `mechanical_pads` is present, even empty (uncommitted R change, awaiting owner review), so 8 numbered pads resolve as contacts. `pin_count_mismatch` (catalogue 3 vs 8) is accepted with the reason "catalogue 3P is the XLR pin count; footprint has 8 contacts per Neutrik ST-NCJ6FAH". `--model-offset -1.24 -11.46 0` clears the model overhang. Symbol pins are named 1, 2, 3, S, R, T, T_SW, G (pads 1-8), all passive. Which of pads 6 and 7 is T_SW is NOT VERIFIED. Stock 385 live 2026-10-02 pm. NCJ6FA-V C368485 is NOT a fallback (vertical mount, wrong angle; owner 2026-10-02). ASSEMBLY: J101 (combo), J108 (1/4" out) and J106 (barrel) sit on B.Cu and are hand-soldered by the owner; exclude them from JLC's BOM/CPL. USB-C J1 stays top, JLC-assembled.
-2. Pad map from the Neutrik drawing ST-NCJ6FAH, matched by position (footprint x is mirrored against the component-side drawing): pad 1 = 1, 2 = 2, 3 = 3, 4 = S, 5 = R, 6 = T, 7 = T_SW (single reading), 8 = G. Which T is the normalling contact (T_SW) is NOT VERIFIED; the drawing does not say. Check by continuity before ordering.
+1. C368458 NCJ6FA-H is imported. ClaudeRouter `pad_roles` now takes the card branch when `mechanical_pads` is present, even empty (uncommitted R change, awaiting owner review), so 8 numbered pads resolve as contacts. `pin_count_mismatch` (catalogue 3 vs 8) is accepted with the reason "catalogue 3P is the XLR pin count; footprint has 8 contacts per Neutrik ST-NCJ6FAH". `--model-offset -1.24 -11.46 0` clears the model overhang. Symbol pins are named 1, 2, 3, S, R, T, T_SW, G (pads 1-8), all passive. Revision 2: pads 6 and 7 are both the tip (Neutrik electrical diagram, audit A01); both go to TRS_T and there is no plug detection. Stock 385 live 2026-10-02 pm. NCJ6FA-V C368485 is NOT a fallback (vertical mount, wrong angle; owner 2026-10-02). ASSEMBLY: J101 (combo), J108 (1/4" out) and J106 (barrel) sit on B.Cu and are hand-soldered by the owner; exclude them from JLC's BOM/CPL. USB-C J1 stays top, JLC-assembled.
+2. Pad map from the Neutrik drawing ST-NCJ6FAH, matched by position (footprint x is mirrored against the component-side drawing): pad 1 = 1, 2 = 2, 3 = 3, 4 = S, 5 = R, 6 = T, 7 = T_SW (single reading), 8 = G. Revision 2 wires both T pads to TRS_T, so which one the drawing calls T_SW no longer matters. Check the two T pads read as one node by continuity on the first sample.
 3. Courtyards repaired with `--repair-courtyard` (vendor courtyard excluded the pads): NMJ6HCD2 26.61x18.29 -> 27.12x19.24 mm; OPA1678IDR 5.09x4.09 -> 5.60x7.88 mm; SS34 4.41x2.69 -> 6.90x3.20 mm; R0603 1.69x0.89 -> 2.82x1.40; C0603 1.69x0.89 -> 2.70x1.40; C1206 3.29x1.69 -> 5.18x2.24; HDR 1x3 repaired the same way.
 4. SWD header C52016392 was refused (`no_courtyard`); C2691448 serves both OLED and SWD. No Basic 1x4 header exists on JLC. Spec item 14/16 note this.
 5. AO4606 (C2944311) and SMBJ70CA (C224026) are dropped by the spec but still sit in cubevox.kicad_sym; remove with the schematic spec edit if wanted. cubevox.json still references PJ-611E and must be rewritten.
-6. OPA1678IDR: pin types set by hand from the TI SOIC-8 pinout (1,7 output; 2,3,5,6 input; 4,8 power_in); symbol names/numbers matched the pinout; `assign_pin_types.py` now leaves 0 unspecified. Single-supply 5 V, rail-to-rail output; datasheet not read here.
+6. OPA2197IDR: pin types set by hand like OPA1678 (1,7 output; 2,3,5,6 input; 4,8 power_in); `assign_pin_types.py` leaves 0 unspecified. Pin order matches the OPA1678 symbol (1 OUTA, 2 -INA, 3 +INA, 4 V-, 5 +INB, 6 -INB, 7 OUTB, 8 V+). Datasheet not re-read in this pass.
 7. Pin maps NOT VERIFIED: PJ-002A, NMJ6HCD2, OPA1678IDR symbol pin order. Axis candidates printed by the import are unverified.
 8. Stocks: RK09D1130C1B 986 (15 per board), NCJ6FA-H 111. The local foreman catalogue shows C25804 at stock 0; live check shows 23,056,985 (catalogue stale).
 9. Qty for BAT54S (2) and tact switches (2) are estimates until the schematic exists.
 10. Pot and encoder shaft heights (spec item 17) are datasheet figures, not checked against the imported models. 22 uF is X5R (Basic); an X7R 22 uF would be Extended.
 11. C1788487 ST-0-102-A01-T000-LF: import refused with model_courtyard_mismatch (left 1.30, top 2.85, right 2.60, bottom 2.85 mm). Cause: the .wrl holds the M5 hex nut, the dia 11 lock washer with its 12.3 mm tab, the lever (23.6 mm high) and the pins, so its plan extent is x -5.50..6.80, y +-5.49 mm against the 8.3 x 5.2 body courtyard. Body, pads (2.54 pitch) and model alignment match the datasheet; no offset or rotation was applied. Fix: imported with --accept-mismatch, then the four F.CrtYd lines were edited to x -5.75..7.05, y -5.75..5.75 (model plan + 0.25 mm). The silk outline (8.3 x 5.2) is unchanged. The footprint carries the washer tab on the +X side; the physical orientation of the tab is not set by the datasheet. Pin names COM/T1/T3 are mine (symbol was 1/2/3); pad 2 is the centre common. The symbol is stored as ST-0-102-A01-T000-LF+PJ.
+12. Electrolytic polarity (revision 2). The three ROQANG footprints (EasyEDA C72484, C191859, C72502) put pad 1 on the -X side and mark that side with a plus-sign glyph, the chamfered body corners and a dot on F.SilkS, with a bare minus bar on the +X side. So pad 1 = +. The symbols draw the plus at the pin 1 end and pin 1 is the + pin, so the schematic and board agree. The 3D models were not checked for orientation.
+13. Assembly (revision 2). J101 (combo in), J106 (barrel), J108 (1/4 in out) and J117 (OLED header and module) are owner-assembled and must be excluded from the JLC BOM and CPL. USB-C J1 is JLC-assembled. J117's LCSC field holds the text "owner-supplied module, hand-plugged", not an LCSC code, so a BOM export must filter it by reference.
 
 ## Dropped from fxbox
 

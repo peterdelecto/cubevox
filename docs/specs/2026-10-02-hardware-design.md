@@ -151,7 +151,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     courtyard and failed import), NRST + SWO pads.
 17. QSPI flash IS25LP064A (C2841348) for settings.
 18. SAI1 pins as fxbox: BCLK PE5 (33 Ω series), LRCLK PE4, DAC SD PE6,
-    ADC SD PE3, ADC SCKI PD14.
+    ADC SD PE3. ADC SCKI is SAI1_MCLK_A on PE2 (item 10, audit I01); PD14 is free.
 
 ### Panel
 
@@ -187,8 +187,8 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     4.7 kΩ pull-ups, 4-pin header C2691448 (3V3, GND, SCL, SDA). Module is
     hand-plugged; the header is assembled.
 23. Input Gain pot is analog, in the preamp gain leg (item 4), not read by
-    the MCU. JACK_TRS_N (item 1) and FX_ON_SENSE (item 7) are the two sense
-    GPIOs.
+    the MCU. FX_ON_SENSE (item 7) is the only sense GPIO; JACK_TRS_N was
+    deleted in revision 2 (item 1).
 
 ### Mechanical
 

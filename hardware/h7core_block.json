@@ -151,10 +151,6 @@
    "shape": "input"
   },
   {
-   "name": "JACK_TRS_N",
-   "shape": "input"
-  },
-  {
    "name": "FX_ON_SENSE",
    "shape": "input"
   }
@@ -259,11 +255,6 @@
    "rest": "no_connect",
    "pins": [
     {
-     "pin": "1",
-     "net": "QSPI_IO2",
-     "len": 12
-    },
-    {
      "pin": "10",
      "net": "GND",
      "len": 5
@@ -348,11 +339,6 @@
      "len": 12
     },
     {
-     "pin": "39",
-     "net": "ENC_MENU_A",
-     "len": 8
-    },
-    {
      "pin": "4",
      "net": "I2S_BCLK_SRC",
      "len": 12
@@ -392,21 +378,9 @@
      "net": "MUX_S2"
     },
     {
-     "pin": "58",
-     "net": "QSPI_IO0"
-    },
-    {
-     "pin": "59",
-     "net": "QSPI_IO1"
-    },
-    {
      "pin": "6",
      "net": "3V3",
      "len": 5
-    },
-    {
-     "pin": "60",
-     "net": "QSPI_IO3"
     },
     {
      "pin": "62",
@@ -461,10 +435,6 @@
      "net": "MUX_S3"
     },
     {
-     "pin": "92",
-     "net": "QSPI_NCS"
-    },
-    {
      "pin": "94",
      "net": "BOOT0"
     },
@@ -479,10 +449,6 @@
     {
      "pin": "99",
      "net": "GND"
-    },
-    {
-     "pin": "61",
-     "net": "ADC_SCKI_SRC"
     },
     {
      "pin": "88",
@@ -519,19 +485,9 @@
      "len": 12
     },
     {
-     "pin": "38",
-     "net": "TOGGLE7",
-     "len": 10
-    },
-    {
      "pin": "46",
      "net": "TOGGLE8",
      "len": 10
-    },
-    {
-     "pin": "47",
-     "net": "JACK_TRS_N",
-     "len": 12
     },
     {
      "pin": "51",
@@ -557,6 +513,43 @@
      "pin": "63",
      "net": "FX_ON_SENSE",
      "len": 2
+    },
+    {
+     "pin": "1",
+     "net": "ADC_SCKI_SRC",
+     "len": 12
+    },
+    {
+     "pin": "37",
+     "net": "QSPI_IO0",
+     "len": 8
+    },
+    {
+     "pin": "38",
+     "net": "QSPI_IO1",
+     "len": 10
+    },
+    {
+     "pin": "39",
+     "net": "QSPI_IO2",
+     "len": 12
+    },
+    {
+     "pin": "40",
+     "net": "QSPI_IO3",
+     "len": 14
+    },
+    {
+     "pin": "58",
+     "net": "TOGGLE7"
+    },
+    {
+     "pin": "79",
+     "net": "QSPI_NCS"
+    },
+    {
+     "pin": "92",
+     "net": "ENC_MENU_A"
     }
    ],
    "in_bom": true,
@@ -1848,14 +1841,14 @@
   {
    "ref": "R8",
    "lib_id": "Device:R",
-   "value": "33k",
+   "value": "36k",
    "at": [
     181,
     125
    ],
    "angle": 0,
    "footprint": "Resistor_SMD:R_0603_1608Metric",
-   "lcsc": "C4216",
+   "lcsc": "C23147",
    "rest": "no_connect",
    "pins": [
     {
@@ -3787,6 +3780,13 @@
    "at": [
     285,
     160
+   ]
+  },
+  {
+   "text": "QSPI on bank 2 (FSEL=1); SAI1 block A master, MCLK=256fs on PE2",
+   "at": [
+    165,
+    176
    ]
   },
   {

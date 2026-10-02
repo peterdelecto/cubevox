@@ -6783,7 +6783,7 @@
 		)
 		(uuid "32b18e8b-b450-5d06-817f-150ca17f00e3")
 	)
-	(label "QSPI_IO2"
+	(label "ADC_SCKI_SRC"
 		(at 39.37 77.47 180)
 		(fields_autoplaced yes)
 		(effects
@@ -7372,9 +7372,26 @@
 		)
 		(uuid "27047ab1-280f-5ab4-9455-029dbd023174")
 	)
-	(no_connect
-		(at 54.61 168.91)
-		(uuid "e6f32c22-dbe8-5259-9a75-3684193d5bd8")
+	(wire
+		(pts
+			(xy 54.61 168.91) (xy 44.45 168.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7bcc9ff3-99d4-502b-9c99-6fe973f6cc60")
+	)
+	(label "QSPI_IO0"
+		(at 44.45 168.91 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "0282f773-cc14-590d-ba60-0bc5da553d0b")
 	)
 	(wire
 		(pts
@@ -7386,8 +7403,7 @@
 		)
 		(uuid "a8f0d3d8-3653-55cd-81b1-05bde7dd0d5a")
 	)
-	(hierarchical_label "TOGGLE7"
-		(shape input)
+	(label "QSPI_IO1"
 		(at 41.91 171.45 180)
 		(fields_autoplaced yes)
 		(effects
@@ -7400,7 +7416,7 @@
 	)
 	(wire
 		(pts
-			(xy 54.61 173.99) (xy 44.45 173.99)
+			(xy 54.61 173.99) (xy 39.37 173.99)
 		)
 		(stroke
 			(width 0)
@@ -7408,9 +7424,8 @@
 		)
 		(uuid "9d48f80b-e79c-566b-b13a-f3840f8fcdaf")
 	)
-	(hierarchical_label "ENC_MENU_A"
-		(shape input)
-		(at 44.45 173.99 180)
+	(label "QSPI_IO2"
+		(at 39.37 173.99 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7420,9 +7435,26 @@
 		)
 		(uuid "62032f4e-96c2-58fd-9388-663731e2f55c")
 	)
-	(no_connect
-		(at 54.61 176.53)
-		(uuid "0682466a-c124-51d3-8955-eeb496cc2798")
+	(wire
+		(pts
+			(xy 54.61 176.53) (xy 36.83 176.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2c889028-bd37-5262-8722-52ad8cc2b8b6")
+	)
+	(label "QSPI_IO3"
+		(at 36.83 176.53 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "7f36a1f4-82cf-5f3a-a580-a4b8896789cb")
 	)
 	(wire
 		(pts
@@ -7501,27 +7533,9 @@
 		)
 		(uuid "eab76da6-7372-54fa-b3b6-18d83f21c076")
 	)
-	(wire
-		(pts
-			(xy 54.61 194.31) (xy 39.37 194.31)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4a2f27ba-5de2-5d5d-891a-725c70968af9")
-	)
-	(hierarchical_label "JACK_TRS_N"
-		(shape input)
-		(at 39.37 194.31 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d9de3157-3707-5a67-b1d6-677465ab9de5")
+	(no_connect
+		(at 54.61 194.31)
+		(uuid "d43e9872-1876-5fca-91b1-7bac4cd0fca1")
 	)
 	(wire
 		(pts
@@ -7698,7 +7712,8 @@
 		)
 		(uuid "9876997e-5cd1-55dc-ae80-6b1469440beb")
 	)
-	(label "QSPI_IO0"
+	(hierarchical_label "TOGGLE7"
+		(shape input)
 		(at 97.79 184.15 0)
 		(fields_autoplaced yes)
 		(effects
@@ -7709,68 +7724,17 @@
 		)
 		(uuid "6938b105-db88-5086-a402-c98790964b81")
 	)
-	(wire
-		(pts
-			(xy 95.25 181.61) (xy 97.79 181.61)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4dcfac85-6cd7-5e10-9a4e-2395c38434dc")
+	(no_connect
+		(at 95.25 181.61)
+		(uuid "6dd7e2e9-de2e-568b-9f43-bdf3ddac0e78")
 	)
-	(label "QSPI_IO1"
-		(at 97.79 181.61 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f30040f6-006e-5f1e-899f-27af0e929643")
+	(no_connect
+		(at 95.25 179.07)
+		(uuid "9de6f3b8-29c6-5b47-8085-c7e0b52847d8")
 	)
-	(wire
-		(pts
-			(xy 95.25 179.07) (xy 97.79 179.07)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "235a1058-1b1a-540e-abf4-5a70e04e02d7")
-	)
-	(label "QSPI_IO3"
-		(at 97.79 179.07 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "a9d3c83b-96a4-5e2c-9a7d-13001b9d142e")
-	)
-	(wire
-		(pts
-			(xy 95.25 176.53) (xy 97.79 176.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "89d6bb88-abc6-508b-8dbb-2765147dec8a")
-	)
-	(label "ADC_SCKI_SRC"
-		(at 97.79 176.53 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "efb2b83d-6d66-5b0c-b9bf-f192b6700369")
+	(no_connect
+		(at 95.25 176.53)
+		(uuid "ea844a99-ad40-5c34-96ad-e0e78c392d11")
 	)
 	(wire
 		(pts
@@ -8016,9 +7980,26 @@
 		(at 95.25 133.35)
 		(uuid "9f8a32ad-57f5-5d41-8840-0f1723d1ac21")
 	)
-	(no_connect
-		(at 95.25 130.81)
-		(uuid "fb21ca0c-708f-557d-85cc-0c17d53d38cb")
+	(wire
+		(pts
+			(xy 95.25 130.81) (xy 97.79 130.81)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "65896fa5-f7aa-55b8-88db-a727db72e040")
+	)
+	(label "QSPI_NCS"
+		(at 97.79 130.81 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "fbbb439b-c994-57f6-8913-3893d58d6d5e")
 	)
 	(no_connect
 		(at 95.25 128.27)
@@ -8185,7 +8166,8 @@
 		)
 		(uuid "5c04f559-de1d-5cb0-bf0a-02374bec8482")
 	)
-	(label "QSPI_NCS"
+	(hierarchical_label "ENC_MENU_A"
+		(shape input)
 		(at 97.79 97.79 0)
 		(fields_autoplaced yes)
 		(effects
@@ -13181,7 +13163,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "33k"
+		(property "Value" "36k"
 			(at 232.41 160.02 0)
 			(effects
 				(font
@@ -13208,7 +13190,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C4216"
+		(property "LCSC" "C23147"
 			(at 229.87 158.75 0)
 			(hide yes)
 			(effects
@@ -20132,6 +20114,16 @@
 			(justify left bottom)
 		)
 		(uuid "5eac0d29-5057-5cae-b3d5-0ca06160974b")
+	)
+	(text "QSPI on bank 2 (FSEL=1); SAI1 block A master, MCLK=256fs on PE2"
+		(at 209.55 223.52 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "8be63003-5dca-5f5c-b3f8-c5ee70c8c09e")
 	)
 	(text "SWD on Tag-Connect pads J3"
 		(at 152.4 289.56 0)
