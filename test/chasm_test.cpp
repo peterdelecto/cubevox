@@ -1,5 +1,5 @@
 // CHASM checks: passthrough, decay, chirp direction, wobble, wobble level,
-// stability, no-alloc. No window, no audio device.
+// dwell drive, stability, no-alloc. No window, no audio device.
 
 #include <atomic>
 #include <cmath>
@@ -296,6 +296,31 @@ bool testWobbleLevel() {
                 d[2], d[3]);
 }
 
+// Magnitude of a sine's third harmonic re its fundamental, in dB, at one dwell.
+double thirdHarmonicDb(float dwell) {
+  constexpr int kSize = 32768;
+  const Signal in = sine(2 * kSr, 220.0, 0.25f);
+  cv::ChasmParams p = params(0.5f, 0.0f);
+  p.dwell = dwell;
+  const std::vector<double> sp = spectrum(wet(in, p), kSr / 2, 2 * kSr, kSize);
+  const auto band = [&](double hz) {
+    double e = 0.0;
+    for (size_t k = 0; k < sp.size(); ++k) {
+      const double f = static_cast<double>(k) * kSr / kSize;
+      if (std::fabs(f - hz) <= 20.0) e += sp[k];
+    }
+    return e;
+  };
+  return db(band(660.0) / band(220.0));
+}
+
+bool testDwell() {
+  const double lo = thirdHarmonicDb(0.0f), hi = thirdHarmonicDb(1.0f);
+  return report("dwell-drive", hi - lo >= 6.0,
+                "3rd/1st harmonic: dwell 0 %.1f dB, dwell 1 %.1f dB, rise %.1f (>=6)", lo, hi,
+                hi - lo);
+}
+
 bool testStable() {
   Signal in = noise(3 * kSr, 0.5f);
   in.resize(at(6 * kSr), 0.0f);
@@ -335,6 +360,7 @@ int main() {
   ok &= testChirp();
   ok &= testWobble();
   ok &= testWobbleLevel();
+  ok &= testDwell();
   ok &= testStable();
   ok &= testNoAlloc();
   std::printf("sizeof(cv::Chasm) = %zu bytes, sizeof(cv::Reverb) = %zu bytes\n", sizeof(cv::Chasm),

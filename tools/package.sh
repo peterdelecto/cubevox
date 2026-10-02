@@ -4,7 +4,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-build="$root/build"
+build="$root/build-release"  # separate dir so the dev build keeps asserts on
 dist="$root/dist"
 app="$dist/cubevox-proto.app"
 zip="$dist/cubevox-proto.zip"

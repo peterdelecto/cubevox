@@ -6,6 +6,7 @@
 
 #include "engine/common.h"
 #include "engine/smooth.h"
+#include "engine/spring.h"
 
 // CHASM reverb: one diffuse allpass feedback loop with a downward chirp on its
 // output. Float port of DrumSynthV3 AudioEffectCavernV3, the mono port of
@@ -35,6 +36,7 @@
 // allpasses each; lows take longest through them, so the boing runs down.
 // DECAY sets the feedback and slides the bass cut down over its upper half.
 // WOBBLE moves both delay read heads with a sine LFO, 90 degrees apart.
+// DWELL drives a soft clip ahead of the loop, level-compensated as in SPRING.
 // Delay and allpass lengths are the 44.1 kHz originals scaled to 48 kHz;
 // chirp lengths are not scaled. Output is wet only, at wetDb.
 
@@ -50,12 +52,14 @@ struct ChasmTuning {
   float wobbleRateLo = 0.5f, wobbleRateHi = 7.0f;
   float inputTrim = 0.5f;
   float wobbleLevelDb = 2.0f;            // wet lift, ramps in over WOBBLE 0..0.25
+  float dwellDrive = 8.0f, dwellComp = 0.8f;  // input drive at DWELL 1; level comp exponent
   float wetDb = 17.4f;  // trim; level rule at MIX 0.5
 };
 
 struct ChasmParams {
   float decay = 0.30f;  // knob 1; vocal default
-  float wobble = 0.15f; // knob 2; vocal default
+  float wobble = 0.15f; // tuning; vocal default
+  float dwell = 0.20f;  // knob 2; input drive
   ChasmTuning tuning;
 };
 
@@ -187,7 +191,7 @@ class Chasm {
     c4_.clear();
     lpIn_ = lp1_ = lp2_ = hp1_ = hp2_ = 0.0f;
     lfoAcc_ = 0u;
-    decay_ = wobble_ = inputGain_ = 0.0f;
+    decay_ = wobble_ = dwell_ = inputGain_ = 0.0f;
     valid_ = false;
   }
 
@@ -197,9 +201,11 @@ class Chasm {
     const ChasmTuning& t = p.tuning;
     const float decayTarget = smooth::clamp01(p.decay);
     const float wobbleTarget = smooth::clamp01(p.wobble);
+    const float dwellTarget = smooth::clamp01(p.dwell);
     if (!valid_) {
       decay_ = decayTarget;
       wobble_ = wobbleTarget;
+      dwell_ = dwellTarget;
     }
 
     // Block constants. Bass cut and wobble level follow the knobs per block.
@@ -215,6 +221,8 @@ class Chasm {
     const float depthMax = clampf(t.wobbleDepthMax, 0.0f, kWobbleCap);
     const float rateLo = t.wobbleRateLo, rateSpan = t.wobbleRateHi - t.wobbleRateLo;
     const float trim = t.inputTrim;
+    const float logDrive = logf(t.dwellDrive < 1.0f ? 1.0f : t.dwellDrive);
+    float lastDwell = -1.0f, drive = 1.0f, comp = 1.0f;
     // Interpolated reads dull the tail once WOBBLE moves; the lift restores its level.
     const float lift = t.wobbleLevelDb * (wobble_ < 0.25f ? wobble_ * 4.0f : 1.0f);
     const float wetGain = powf(10.0f, (t.wetDb + lift) / 20.0f);
@@ -229,12 +237,18 @@ class Chasm {
     for (int i = 0; i < n; ++i) {
       decay_ = smooth::step(decay_, decayTarget, a);
       wobble_ = smooth::step(wobble_, wobbleTarget, a);
+      dwell_ = smooth::step(dwell_, dwellTarget, a);
+      if (dwell_ != lastDwell) {
+        lastDwell = dwell_;
+        drive = expf(logDrive * dwell_);
+        comp = expf(-t.dwellComp * logDrive * dwell_);
+      }
       const float time = timeLo + decay_ * (timeHi - timeLo);
       const float depth = wobble_ * wobble_ * depthMax;
       lfoAcc_ += static_cast<uint32_t>((rateLo + wobble_ * rateSpan) * kPhasePerHz);
       inputGain_ += (gainFor(time) - inputGain_) * 0.25f;
 
-      const float x = shelf(in[i] * trim * inputGain_, lpIn_, lpF, inCut);
+      const float x = shelf(spring_detail::softClip(in[i] * drive) * comp * trim * inputGain_, lpIn_, lpF, inCut);
       const float adv1 = lfo(0u) * depth;
       const float adv2 = lfo(64u) * depth;
 
@@ -290,7 +304,7 @@ class Chasm {
   std::array<float, 257> sine_{};
   float lpIn_ = 0.0f, lp1_ = 0.0f, lp2_ = 0.0f, hp1_ = 0.0f, hp2_ = 0.0f;
   uint32_t lfoAcc_ = 0u;
-  float decay_ = 0.0f, wobble_ = 0.0f, inputGain_ = 0.0f;
+  float decay_ = 0.0f, wobble_ = 0.0f, dwell_ = 0.0f, inputGain_ = 0.0f;
   bool valid_ = false;
 };
 

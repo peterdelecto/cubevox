@@ -6,3 +6,4 @@ cubevox-proto.app
 .cache/
 .claude/
 dist/
+build-release/

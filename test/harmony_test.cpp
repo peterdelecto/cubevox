@@ -351,6 +351,42 @@ bool testNoiseC() {
                 "out/in %+.2f dB, expect %+.2f dB (+-3)", gainDb, wantDb);
 }
 
+// Peak Goertzel magnitude within +-centsTol of hz over second 1..2, 1 Hz steps.
+double peakAmp(const std::vector<float>& x, double hz, double centsTol) {
+  const double span = hz * (std::pow(2.0, centsTol / 1200.0) - 1.0);
+  double m = 0.0;
+  for (double f = hz - span; f <= hz + span + 1e-9; f += 1.0)
+    m = std::max(m, goertzel(&x[cv::kSampleRate], cv::kSampleRate, f));
+  return m;
+}
+
+// Low, High and Higher all on, A3 in C. Each diatonic target must stand well
+// above the amplitude at off-target notes.
+bool testThreeVoices() {
+  cv::HarmonyParams p;
+  p.key = 0;
+  p.mix = 1.0f;
+  p.slots[0] = {cv::HarmonyVoice::Low, 3};
+  p.slots[1] = {cv::HarmonyVoice::High, 3};
+  p.slots[2] = {cv::HarmonyVoice::Higher, 3};
+  gFx.reset();
+  const std::vector<float> out = run(gFx, tone(220.0, 2 * cv::kSampleRate), p);
+  const double targets[3] = {220.0 * std::pow(2.0, -4.0 / 12.0), 220.0 * std::pow(2.0, 3.0 / 12.0),
+                             220.0 * std::pow(2.0, 7.0 / 12.0)};
+  const double controls[3] = {196.0, 220.0, 293.66};
+  double floorAmp = 0.0;
+  for (double c : controls) floorAmp = std::max(floorAmp, peakAmp(out, c, 10.0));
+  bool ok = true;
+  const char* names[3] = {"3-voice Low", "3-voice High", "3-voice Higher"};
+  for (int i = 0; i < 3; ++i) {
+    const double a = peakAmp(out, targets[i], 10.0);
+    const double ratio = floorAmp > 0.0 ? a / floorAmp : 9999.0;
+    ok &= report(names[i], ratio >= 3.0, "partial at %.2f Hz is x%.1f of off-target floor (>=3)",
+                 targets[i], ratio);
+  }
+  return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -364,5 +400,6 @@ int main() {
   ok &= testFormantB();
   ok &= testChromatic();
   ok &= testNoiseC();
+  ok &= testThreeVoices();
   return ok ? 0 : 1;
 }

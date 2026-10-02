@@ -10,9 +10,9 @@
 #include "engine/shifters.h"
 #include "engine/smooth.h"
 
-// Harmony, modelled on the Zoom V3: up to two diatonic voices parallel to the
+// Harmony, modelled on the Zoom V3: up to three diatonic voices parallel to the
 // sung pitch, a KEY that picks the scale, and MIX between dry and harmony.
-// Chromatic mode swaps the key for fixed intervals. Both voices run on one
+// Chromatic mode swaps the key for fixed intervals. All voices run on one
 // shifter engine: A grid PSOLA, B epoch PSOLA + formant, C granular.
 // PitchFx owns the ring, the tracker, and the mix.
 
@@ -51,7 +51,7 @@ struct HarmonyParams {
   bool chromatic = false;        // fixed intervals from tuning.chromaticSemis; key ignored
   int key = 0;                   // encoder index 0..11, see kKeyRoot / kKeyName
   float mix = 0.25f;             // 0 dry .. 1 harmony only
-  std::array<HarmonySlot, 2> slots{};
+  std::array<HarmonySlot, 3> slots{};
   HarmonyTuning tuning;
 };
 
@@ -61,10 +61,11 @@ constexpr const char* kKeyName[12] = {"C / Am", "G / Em", "D / Bm", "A / F#m",
   "E / C#m", "B / G#m", "F# / D#m", "Db / Bbm", "Ab / Fm", "Eb / Cm", "Bb / Gm",
   "F / Dm"};
 
-// Both harmony voices for one block at a time. The caller owns the ring, the
+// All harmony voices for one block at a time. The caller owns the ring, the
 // tracker, and the dry/wet mix.
 class HarmonyVoices {
  public:
+  static constexpr int kSlots = 3;
   static constexpr float kMaxFormantSemis = 12.0f;
 
   HarmonyVoices() { reset(); }
@@ -96,7 +97,7 @@ class HarmonyVoices {
     const bool voiced = pr.voiced || engine_ == 2;
     const float hz = pr.hz * exp2f(corrOffset / 12.0f);
     bool any = false;
-    for (int v = 0; v < 2; ++v) {
+    for (int v = 0; v < kSlots; ++v) {
       const HarmonySlot& slot = p.slots[v];
       semisT_[v] = (p.chromatic ? chromaticSemis(slot.voice, t)
                                 : targetSemis(slot.voice, hz, p.key, t)) +
@@ -122,16 +123,22 @@ class HarmonyVoices {
     return any;
   }
 
-  // One sample of both voices summed, gains and glide applied. lp is the ring
+  // One sample of all voices summed, gains and glide applied. lp is the ring
   // low-passed for engine B's peak search.
   float tick(const VoiceRing& ring, const VoiceRing& lp, long writeCount, float period) {
-    if (engine_ == 1)
-      return epoch_[0].tick(ring, lp, writeCount, period) +
-             epoch_[1].tick(ring, lp, writeCount, period);
-    if (engine_ == 2) return grain_[0].tick(ring, writeCount) + grain_[1].tick(ring, writeCount);
+    if (engine_ == 1) {
+      float wet = 0.0f;
+      for (EpochShifter& v : epoch_) wet += v.tick(ring, lp, writeCount, period);
+      return wet;
+    }
+    if (engine_ == 2) {
+      float wet = 0.0f;
+      for (GrainShifter& v : grain_) wet += v.tick(ring, writeCount);
+      return wet;
+    }
     const float aSmooth = smooth::coef(smooth::kSmoothSec);
     float wet = 0.0f;
-    for (int v = 0; v < 2; ++v) {
+    for (int v = 0; v < kSlots; ++v) {
       gain_[v] = smooth::step(gain_[v], gainT_[v], aSmooth);
       semis_[v] = smooth::step(semis_[v], semisT_[v], aGlide_);
       if (gain_[v] == 0.0f) continue;
@@ -209,13 +216,13 @@ class HarmonyVoices {
     fresh_ = true;
   }
 
-  std::array<PsolaVoice, 2> voices_{};
-  std::array<EpochShifter, 2> epoch_{};
-  std::array<GrainShifter, 2> grain_{};
-  std::array<float, 2> semis_{};
-  std::array<float, 2> gain_{};
-  std::array<float, 2> semisT_{};
-  std::array<float, 2> gainT_{};
+  std::array<PsolaVoice, kSlots> voices_{};
+  std::array<EpochShifter, kSlots> epoch_{};
+  std::array<GrainShifter, kSlots> grain_{};
+  std::array<float, kSlots> semis_{};
+  std::array<float, kSlots> gain_{};
+  std::array<float, kSlots> semisT_{};
+  std::array<float, kSlots> gainT_{};
   float aGlide_ = 1.0f;
   int engine_ = 0;
   bool fresh_ = true;

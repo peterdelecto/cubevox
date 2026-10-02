@@ -51,8 +51,8 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--atchromatic] [--atengine 0|1] [--response <5..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|chasm|parker|parkerspring] [--spring] [--tension <0..1>] [--dwell <0..1>]\n"
-               "       [--decay <0..1>] [--wobble <0..1>] [--rmix <0..1>]\n"
+               "       [--reverb spring|chasm|parker|parkerspring] [--spring] [--decay <0..1>] [--dwell <0..1>]\n"
+               "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony, --octave or --autotune; formant applies on --hengine 1\n"
@@ -79,7 +79,7 @@ int usage() {
                "     chmTimeLo chmTimeHi chmTrebleLossHz chmLoopTrebleCut chmInputTrebleCut "
                "chmBassCutHz\n"
                "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
-               "     chmWobbleLevelDb chmWetDb\n"
+               "     chmWobbleLevelDb chmDwellDrive chmDwellComp chmWetDb\n"
                "     prkTdMs prkFcLfHz prkMLow (1..100) prkALf prkGLo prkGHi prkGComp prkHfRatio\n"
                "     prkMHigh (0..200) prkAHf prkHfMixDb prkCross prkEqPeakHz prkEqBwHz prkEchoGain\n"
                "     prkRippleGain prkModDepth prkModPole prkSprings (1..3) prkTdFactor0/1/2\n"
@@ -89,7 +89,7 @@ int usage() {
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainPeriods atEpochSearch atEpochLpHz\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
-               "  --tension and --dwell apply to spring and parker\n");
+               "  --decay and --dwell apply to the selected reverb engine\n");
   return 2;
 }
 
@@ -182,6 +182,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"chmBassCutHzTop", &ch.bassCutHzTop},  {"chmWobbleDepthMax", &ch.wobbleDepthMax},
       {"chmWobbleRateLo", &ch.wobbleRateLo},  {"chmWobbleRateHi", &ch.wobbleRateHi},
       {"chmInputTrim", &ch.inputTrim},        {"chmWobbleLevelDb", &ch.wobbleLevelDb},
+      {"chmDwellDrive", &ch.dwellDrive}, {"chmDwellComp", &ch.dwellComp},
       {"chmWetDb", &ch.wetDb},
       {"prkTdMs", &pk.tdMs},                  {"prkFcLfHz", &pk.fcLfHz},
       {"prkMLow", &prkMLow},                  {"prkALf", &pk.aLf},
@@ -289,6 +290,10 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveEq = false;
   bool haveInGate = false;
   bool haveGate = false;
+  bool haveDecay = false;
+  bool haveDwell = false;
+  float decay = 0.0f;
+  float dwell = 0.0f;
   int voices = 0;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
@@ -352,20 +357,16 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       else
         return false;
       haveReverb = true;
-    } else if (std::strcmp(a, "--decay") == 0 && i + 1 < argc) {
-      cv::ChasmParams& c = rp.reverb.chasm;
-      if (!parseFloat(argv[++i], &c.decay) || c.decay < 0.0f || c.decay > 1.0f) return false;
+    } else if ((std::strcmp(a, "--decay") == 0 || std::strcmp(a, "--tension") == 0) &&
+               i + 1 < argc) {
+      if (!parseFloat(argv[++i], &decay) || decay < 0.0f || decay > 1.0f) return false;
+      haveDecay = true;
     } else if (std::strcmp(a, "--wobble") == 0 && i + 1 < argc) {
       cv::ChasmParams& c = rp.reverb.chasm;
       if (!parseFloat(argv[++i], &c.wobble) || c.wobble < 0.0f || c.wobble > 1.0f) return false;
-    } else if (std::strcmp(a, "--tension") == 0 && i + 1 < argc) {
-      cv::SpringParams& s = rp.reverb.spring;
-      if (!parseFloat(argv[++i], &s.tension) || s.tension < 0.0f || s.tension > 1.0f) return false;
-      rp.reverb.parker.tension = s.tension;
     } else if (std::strcmp(a, "--dwell") == 0 && i + 1 < argc) {
-      cv::SpringParams& s = rp.reverb.spring;
-      if (!parseFloat(argv[++i], &s.dwell) || s.dwell < 0.0f || s.dwell > 1.0f) return false;
-      rp.reverb.parker.dwell = s.dwell;
+      if (!parseFloat(argv[++i], &dwell) || dwell < 0.0f || dwell > 1.0f) return false;
+      haveDwell = true;
     } else if (std::strcmp(a, "--harmony") == 0) {
       haveHarmony = true;
     } else if (std::strcmp(a, "--autotune") == 0) {
@@ -418,7 +419,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
     } else if (std::strcmp(a, "--voice") == 0 && i + 1 < argc) {
-      if (voices >= 2 || !parseVoice(argv[++i], hp.slots[voices])) return false;
+      if (voices >= 3 || !parseVoice(argv[++i], hp.slots[voices])) return false;
       ++voices;
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
@@ -434,6 +435,19 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     }
   }
   if (positional != 2) return false;
+  // DECAY and DWELL drive whichever engine is selected.
+  if (haveDecay) {
+    float& d = rp.reverb.engine == cv::kReverbChasm    ? rp.reverb.chasm.decay
+               : rp.reverb.engine == cv::kReverbParker ? rp.reverb.parker.tension
+                                                       : rp.reverb.spring.tension;
+    d = decay;
+  }
+  if (haveDwell) {
+    float& d = rp.reverb.engine == cv::kReverbChasm    ? rp.reverb.chasm.dwell
+               : rp.reverb.engine == cv::kReverbParker ? rp.reverb.parker.dwell
+                                                       : rp.reverb.spring.dwell;
+    d = dwell;
+  }
   if (voices > 0 && !haveHarmony) return false;
   // Autotune shares Harmony's key unless --atkey sets its own.
   if (!haveAtKey) ap.key = hp.key;

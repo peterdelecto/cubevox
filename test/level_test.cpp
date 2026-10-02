@@ -147,6 +147,7 @@ cv::ReverbParams reverbParams(int engine) {
   p.parker.tension = p.parker.dwell = 0.5f;
   p.chasm.decay = 0.5f;
   p.chasm.wobble = 0.3f;
+  p.chasm.dwell = 0.5f;
   return p;
 }
 
