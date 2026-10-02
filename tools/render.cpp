@@ -153,6 +153,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
       {"atGrainPeriods", &at.shifter.grainPeriods}, {"atEpochSearch", &at.shifter.epochSearch},
       {"atEpochLpHz", &at.shifter.epochLpHz},
+      {"atGrainDelay", &at.grainDelay},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},

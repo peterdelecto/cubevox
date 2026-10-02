@@ -21,9 +21,15 @@ class PsolaVoice {
 
   void reset() {
     grains_.fill(Grain{});
-    markDelay_ = static_cast<float>(kGrainDelay);
+    markDelay_ = grainDelay_;
     countdown_ = 0.0f;
   }
+
+  // Output latency in samples. Each grain reads the input at a fixed delay, so
+  // grid PSOLA only needs that delay to stay positive; the default suits every
+  // caller that shares the ring with engine B's look-ahead.
+  void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinDelay + 1.0f, kGrainDelay); }
+  float grainDelay() const { return grainDelay_; }
 
   // One output sample. writeCount is the absolute index of the sample just
   // written at ring[writeCount % kVoiceRingLen]. period is the sung period in
@@ -73,13 +79,13 @@ class PsolaVoice {
   // before kGrainDelay.
   void advanceMarks(float p) {
     markDelay_ += 1.0f;
-    while (markDelay_ - p >= kGrainDelay) markDelay_ -= p;
+    while (markDelay_ - p >= grainDelay_) markDelay_ -= p;
   }
 
   // lead is how far past the ideal launch instant this tick already is.
   void launch(float p, float lead) {
     float centre = markDelay_;
-    if (centre - kGrainDelay > 0.5f * p) centre -= p;
+    if (centre - grainDelay_ > 0.5f * p) centre -= p;
     Grain* slot = &grains_[0];
     for (Grain& g : grains_) {
       if (!g.active) {
@@ -127,6 +133,7 @@ class PsolaVoice {
   }
 
   std::array<Grain, kMaxGrains> grains_{};
+  float grainDelay_ = static_cast<float>(kGrainDelay);
   float markDelay_ = static_cast<float>(kGrainDelay);
   float countdown_ = 0.0f;
 };

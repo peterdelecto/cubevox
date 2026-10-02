@@ -19,6 +19,7 @@ namespace cv {
 struct AutotuneTuning {
   float trimDb = 0.0f;            // level rule
   float maxCorrectSemis = 6.0f;   // never pull more than this (tracker glitch guard)
+  float grainDelay = 1040.0f;     // engine A output latency, samples
   ShifterTuning shifter;          // grainPeriods / epochSearch / epochLpHz (B)
 };
 
@@ -64,6 +65,7 @@ class AutotuneVoice {
     }
     a_ = smooth::coef(clampf(p.responseMs, kMinResponseMs, kMaxResponseMs) * 0.001f);
     gain_ = powf(10.0f, t.trimDb / 20.0f);
+    psola_.setGrainDelay(t.grainDelay);
     grainPeriods_ = t.shifter.grainPeriods;
     search_ = t.shifter.epochSearch;
     if (!p.on) {
@@ -86,7 +88,7 @@ class AutotuneVoice {
     corr_ = smooth::step(corr_, target_, a_);
     if (period <= 0.0f) {
       const int head = static_cast<int>(writeCount % kVoiceRingLen);
-      const int i = head - PsolaVoice::kGrainDelay;
+      const int i = head - static_cast<int>(engine_ == 0 ? psola_.grainDelay() : PsolaVoice::kGrainDelay);
       return gain_ * ring[i < 0 ? i + kVoiceRingLen : i];
     }
     const float ratio = exp2f(corr_ / 12.0f);
