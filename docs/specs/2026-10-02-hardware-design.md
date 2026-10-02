@@ -211,6 +211,21 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     copper layers. No centre screw. The panel toggles' nuts tie the panel
     to the board. Panel grid: eight stage columns at 24 mm pitch centred on
     the board (x 64.5 .. 232.5), rows y 115 (toggles), 142, 164/168.
+27. Enclosure (owner 2026-10-02, option 1 = Hammond-1456-style console):
+    three printed parts, modelled in Fusion from `hardware/exports/
+    cubevox-board.step`. The board tilts 10 deg, rear up; the floor is
+    horizontal and the front face vertical, so the box is 25 mm tall at the
+    front and 53 mm at the rear, 213 x 157 in plan. The rear plate stays
+    square to the board (leans back 10 deg) so every jack is square to it;
+    it slides on over the proud jacks after the board is in and screws into
+    corner blocks. The lid is 2 mm, underside 11.9 mm above the board (pot
+    collar 11.85), with a 3.1 mm trough along the toggle row so the nuts
+    get 3.4 mm of thread, an OLED window with a glass pocket, and four
+    corner posts; one M3 x 20 per corner through lid, board and a heat-set
+    insert in the tray boss. Board changes it asks for: J101 0.8 mm
+    rearward (flange face 1 mm past the plate inner face), J108 2 mm
+    rearward or keep the 1 mm nut pocket, OLED standoffs 9 mm. Pot shafts
+    show 6.1 mm above the lid; a 1.5 mm lid or 25 mm pots would add more.
 
 ## 3D model rule (owner 2026-10-02)
 
