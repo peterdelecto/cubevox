@@ -37,11 +37,13 @@ namespace {
 
 constexpr int kWindowW = 1440;
 constexpr int kWindowH = 840;  // owner's laptop shows ~847 px of window
-constexpr float kHarmonyColumnW = 592.0f;  // Harmony column width
+constexpr float kHarmonyColumnW = 400.0f;  // Harmony column width
 constexpr float kLabelW = 175.0f;          // room right of each slider for its label
 constexpr float kHarmonyEngineX = 140.0f;  // Engine radios beside the HARMONY checkbox
 constexpr float kHarmonyKeyW = 200.0f;     // KEY combo, leaves room for Chromatic
-constexpr float kFormantW = 150.0f;        // FORMANT slider at the end of each Menu row
+constexpr float kFormantW = 60.0f;         // FORMANT slider at the end of each Menu row
+constexpr float kMenuRadioX = 52.0f;       // Menu row: radios start after the voice name
+constexpr float kAutotuneKeyW = 80.0f;     // KEY combo beside Follow Harmony
 constexpr float kMeterW = 240.0f;
 constexpr int kProbeFrames = 4;
 constexpr float kMeterFloorDb = -60.0f;
@@ -282,7 +284,8 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
                  const cv::DistortionTuning& d, const cv::SpringTuning& sp,
                  const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
-                 const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g) {
+                 const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
+                 const cv::AutotuneTuning& at) {
   char line[512];
   int len = std::snprintf(
       line, sizeof(line),
@@ -344,10 +347,13 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
       "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
-      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}",
+      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
+      "\nAutotuneTuning{%.1ff, %.1ff, %.1ff, %d}",
       ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
-      g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb);
+      g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
+      at.maxCorrectionSemis, at.formant, at.trimDb, at.engine);
   std::printf(
+      "// AutotuneTuning: maxCorrectionSemis, formant, trimDb, engine\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
       "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
       "lower, low, high, higher, chromaticSemis, trimDb[A, B, C], "
@@ -389,7 +395,7 @@ bool probeMatch(const char* want, const char* name) {
 
 // One Tuning header open per column at a time (accordion), so the face never grows
 // past what the probe checked: the probe opens exactly one header per scenario.
-constexpr int kColumnCount = 3;
+constexpr int kColumnCount = 4;
 int gCurrentColumn = 0;
 std::array<const char*, kColumnCount> gOpenTuning{};
 
@@ -489,6 +495,20 @@ void drawOctaveTuning(cv::OctaveTuning& o) {
   ImGui::SliderFloat("Epoch search (B)", &o.epochSearch, 0.0f, 0.3f, "%.2f period");
   ImGui::SliderFloat("Epoch low-pass (B)", &o.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
+}
+
+void drawAutotuneTuning(cv::AutotuneTuning& t) {
+  if (!tuningHeader("autotune")) return;
+  ImGui::SliderFloat("Max correction", &t.maxCorrectionSemis, 0.0f, 12.0f, "%.1f st");
+  ImGui::SliderFloat("Formant", &t.formant, -cv::Autotune::kMaxFormantSemis,
+                     cv::Autotune::kMaxFormantSemis, "%+.1f st");
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted("Engine");
+  ImGui::SameLine();
+  ImGui::RadioButton("A", &t.engine, 0);
+  ImGui::SameLine();
+  ImGui::RadioButton("B", &t.engine, 1);
+  ImGui::SliderFloat("Trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
 }
 
 void drawUnisonTuning(cv::UnisonTuning& t) {
@@ -702,6 +722,7 @@ void drawTuningButtons(ProtoParams& params) {
   if (ImGui::Button("Reset to defaults")) {
     ht = cv::HarmonyTuning{};
     ot = cv::OctaveTuning{};
+    params.pitchFx.autotune.tuning = cv::AutotuneTuning{};
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
     params.distortion.tuning = cv::DistortionTuning{};
@@ -720,7 +741,7 @@ void drawTuningButtons(ProtoParams& params) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
                 params.distortion.tuning, params.reverb.spring.tuning,
                 params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq, params.inputGate.tuning,
-                params.gate.tuning);
+                params.gate.tuning, params.pitchFx.autotune.tuning);
     // One line for the field; the clipboard keeps the line breaks.
     std::snprintf(gTuningLine, sizeof(gTuningLine), "%s", gTuningText);
     std::replace(gTuningLine, gTuningLine + sizeof(gTuningLine), '\n', ' ');
@@ -809,7 +830,7 @@ void drawHarmonyMenu(cv::HarmonyParams& h) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(kRowName[row]);
     for (int level = 0; level < 4; ++level) {
-      ImGui::SameLine(level == 0 ? 80.0f : 0.0f);
+      ImGui::SameLine(level == 0 ? kMenuRadioX : 0.0f);
       int shown = gMenu.level[row];
       if (ImGui::RadioButton(kLevelName[level], &shown, level)) setRowLevel(gMenu, row, level);
     }
@@ -850,6 +871,22 @@ void drawHarmonyBlock(cv::HarmonyParams& h, const ProtoState& state) {
   drawHarmonyMenu(h);
   drawHarmonyTuning(h.tuning);
   (void)state;
+  ImGui::PopID();
+}
+
+void drawAutotuneBlock(cv::AutotuneParams& a) {
+  ImGui::PushID("autotune");
+  ImGui::Checkbox("AUTOTUNE", &a.on);
+  ImGui::BeginDisabled(a.followHarmonyKey || a.chromatic);
+  ImGui::SetNextItemWidth(kAutotuneKeyW);
+  ImGui::Combo("KEY", &a.key, cv::kKeyName, 12);
+  ImGui::EndDisabled();
+  ImGui::SameLine();
+  ImGui::Checkbox("Follow Harmony", &a.followHarmonyKey);
+  ImGui::Checkbox("Chromatic", &a.chromatic);
+  ImGui::SliderFloat("RESPONSE", &a.responseMs, cv::Autotune::kMinResponseMs,
+                     cv::Autotune::kMaxResponseMs, "%.0f ms", ImGuiSliderFlags_Logarithmic);
+  drawAutotuneTuning(a.tuning);
   ImGui::PopID();
 }
 
@@ -998,8 +1035,7 @@ void moduleBox(const char* id, bool first, const F& draw) {
   ImGui::EndChild();
 }
 
-constexpr int kColumns = 3;
-std::array<float, kColumns> gColumnUsed{};  // content height per column this frame, px
+std::array<float, kColumnCount> gColumnUsed{};  // content height per column this frame, px
 float gColumnAvail = 0.0f;                  // column height, px
 
 // One face column. Columns never scroll; the probe fails on any overrun.
@@ -1034,22 +1070,27 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   ImGui::Dummy(ImVec2(0.0f, kTopGap));
 
   // Signal order runs down each column, then left to right.
-  const float colW = (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 2.0f * kColumnGap) / 2.0f;
-  column(0, kHarmonyColumnW, [&] {
+  const float colW =
+      (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 3.0f * kColumnGap) / 3.0f;
+  column(0, colW, [&] {
     moduleBox("ingateBox", true,
               [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
+    moduleBox("autotuneBox", false, [&] { drawAutotuneBlock(params.pitchFx.autotune); });
     moduleBox("octaveBox", false, [&] { drawOctaveBlock(params.pitchFx.octave); });
-    moduleBox("harmonyBox", false, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
-  column(1, colW, [&] {
-    moduleBox("unisonBox", true, [&] { drawUnisonBlock(params.unison); });
-    moduleBox("slapbackBox", false, [&] { drawSlapbackBlock(params.slapback); });
+  column(1, kHarmonyColumnW, [&] {
+    moduleBox("harmonyBox", true, [&] { drawHarmonyBlock(params.pitchFx.harmony, state); });
+    moduleBox("unisonBox", false, [&] { drawUnisonBlock(params.unison); });
+  });
+  ImGui::SameLine(0.0f, kColumnGap);
+  column(2, colW, [&] {
+    moduleBox("slapbackBox", true, [&] { drawSlapbackBlock(params.slapback); });
     moduleBox("distortionBox", false, [&] { drawDistortionBlock(params.distortion); });
     moduleBox("gateBox", false, [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
-  column(2, colW, [&] {
+  column(3, colW, [&] {
     moduleBox("reverbBox", true, [&] { drawReverbBlock(params.reverb); });
     moduleBox("eqBox", false, [&] { drawEqBlock(params.eq); });
   });
@@ -1087,6 +1128,7 @@ int runLayoutProbe() {
       {true, "reverb", "Parker high band"},
       {true, "reverb", "Parker springs"}, {true, "reverb", "Parker drive"},
       {true, "eq", nullptr},             {true, "ingate", nullptr},
+      {true, "autotune", nullptr},
       {true, "gate", nullptr},
   };
 
@@ -1107,8 +1149,9 @@ int runLayoutProbe() {
     const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
     const bool ok = worst <= gColumnAvail;
     fits = fits && ok;
-    std::printf("%-30s col1 %4.0f  col2 %4.0f  col3 %4.0f  of %.0f px%s\n", name, gColumnUsed[0],
-                gColumnUsed[1], gColumnUsed[2], gColumnAvail, ok ? "" : "  OVERRUN");
+    std::printf("%-30s col1 %4.0f  col2 %4.0f  col3 %4.0f  col4 %4.0f  of %.0f px%s\n", name,
+                gColumnUsed[0], gColumnUsed[1], gColumnUsed[2], gColumnUsed[3], gColumnAvail,
+                ok ? "" : "  OVERRUN");
   }
   gProbeOpen = ProbeOpen{};
   ImGui::DestroyContext();

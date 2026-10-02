@@ -10,7 +10,7 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - The emulator mirrors the panel exactly. Dev-only controls live under a collapsed
   `Tuning` header. Never invent panel controls. Exception (owner 2026-10-01): every
   effect block carries an on/off checkbox in the prototype so stages can be A/B'd.
-- Face layout (owner 2026-10-01): three columns, no scroll bar, window 1440x840 (the
+- Face layout (owner 2026-10-01): four columns, no scroll bar, window 1440x840 (the
   owner's laptop shows ~847 px of window). Each effect block has its own collapsed
   `Tuning` header directly below it; one Tuning header open per column at a time
   (accordion), which is the invariant the `--layout` probe checks.
@@ -29,7 +29,7 @@ build/cubevox-render in.wav out.wav --depth 0.7
 ```
 
 ## Panel (planned)
-Input Gain · Soft gate (menu) · Octave Semitones+Mix ·
+Input Gain · Soft gate (menu) · Autotune Key (shared encoder)+Response · Octave Semitones+Mix ·
 Harmony Key (detented encoder)+Mix (voices in menu; tracking speed in tuning) ·
 Unison Depth · Slapback Intensity · Distortion Drive+Tone · Gate Threshold ·
 Reverb Tension+Dwell+Mix (engine SPRING / CHASM / PARKER SPRING in menu) · EQ (menu) · Output (menu)
