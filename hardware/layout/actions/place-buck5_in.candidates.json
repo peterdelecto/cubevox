@@ -1,0 +1,29 @@
+[
+ {
+  "score": [
+   Infinity,
+   Infinity
+  ],
+  "moves": [
+   {
+    "ref": "C116",
+    "x": 89.27,
+    "y": 50.19,
+    "rot": 0
+   },
+   {
+    "ref": "C112",
+    "x": 89.27,
+    "y": 53.0,
+    "rot": 180
+   },
+   {
+    "ref": "C113",
+    "x": 89.27,
+    "y": 55.81,
+    "rot": 180
+   }
+  ],
+  "verdict": "not routed in budget"
+ }
+]
