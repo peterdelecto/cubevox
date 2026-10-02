@@ -35339,7 +35339,7 @@
 	(footprint "RELAY-SMD_G6K-2F-X-XX"
 		(layer "F.Cu")
 		(uuid "b0b0698d-f024-4095-90ac-59577a003cc6")
-		(at 78 56.5)
+		(at 76 70)
 		(descr "G6K-2F-Y-DC5")
 		(property "Reference" "K102"
 			(at 0 -7.51 0)
@@ -46220,7 +46220,7 @@
 	(footprint "cubevox:RELAY-SMD_G6K-2F-X-XX"
 		(layer "F.Cu")
 		(uuid "dfdbf99d-3d95-44ab-8a39-9123ec2e4380")
-		(at 66 56.5)
+		(at 76 59)
 		(descr "G6K-2F-Y-DC5")
 		(property "Reference" "K101"
 			(at 0 -7.51 180)
