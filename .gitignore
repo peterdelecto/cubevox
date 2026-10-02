@@ -5,3 +5,4 @@ imgui.ini
 cubevox-proto.app
 .cache/
 .claude/
+dist/
