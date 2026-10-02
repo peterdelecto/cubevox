@@ -28,7 +28,7 @@ sliders, then report numbers we bake in.
 
 | # | Module | Hardware knobs | Tuning sliders |
 |---|---|---|---|
-| 1 | Input gate | none (no checkbox either; always on in the face) | Threshold, Range, Attack, Hold, Release (raw) |
+| 1 | Input gate | THRESHOLD · DECAY (release), as Gate (owner 2026-10-02) | Range, Attack, Hold (raw) |
 | 2 | Gate | THRESHOLD · DECAY (release) | Range, Attack, Hold (raw) |
 | 3 | Autotune | KEY (linked to Harmony) · RESPONSE | Pull range (0.5–6 st, `maxCorrectSemis`) · Correct to every note (`chromatic`, default off) |
 | 4 | Octave | SEMITONES · FORMANT (engine B) · MIX | Slide |
@@ -150,3 +150,6 @@ table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, t
 8. **Two harmony voices** (owner 2026-10-02): Adam has no harmony of his own to match, so
    the face offers High (default Louder) and Higher (default Loud); the engine's third slot
    stays off. Drop out on breaths is removed from the face and stays off.
+9. **BYPASS** (owner 2026-10-02): above Pedal mode, same size, red while on. The dry input
+   (stage-feedback return included) goes out and the chain keeps running underneath. The
+   last column leaves room for it. Input gate shows the same controls as Gate, in both views.

@@ -93,12 +93,14 @@ struct ProtoParams {
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
   cv::PolishParams eq;
-  // Cmd+Shift+D shows our test controls: Advanced and the input gate tuning.
+  // Cmd+Shift+D shows our test control: Advanced.
   bool dev = false;
   // Advanced swaps the musician sliders for the raw tuning nodes.
   bool advanced = false;
   // Pedal mode shows each effect as a stompbox with only its panel knobs.
   bool pedalMode = false;
+  // Bypass sends the input straight out; the chain keeps running underneath.
+  bool bypass = false;
   cv::macros::State macros;
   // Prototype-only test signal. Not a panel control, not in Print tuning.
   bool stageFeedback = false;
@@ -293,6 +295,9 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
     gPolish.process(mono.data(), tmp.data(), n, params.eq);
+    // Bypass: the dry input (feedback return included) goes out, so the wedge loop
+    // hears exactly what a bypassed box would send.
+    if (params.bypass) std::copy(in.begin(), in.begin() + n, tmp.begin());
     if (feedback) {
       for (int i = 0; i < n; ++i) gStageFeedback.push(tmp[i]);
     }
@@ -345,7 +350,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Octave %s, engine %c; Harmony %s, engine %c, chromatic %s, voices High %s / "
       "Higher %s, Follow my bends %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
-      "Knobs: Input gate threshold %.0f dB; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
+      "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f ms, Pull range %.1f st; Octave SEMITONES %+d, FORMANT %+d st, MIX %.0f %%; Harmony KEY %s, MIX %.0f %%, "
       "voice formants High %+d / Higher %+d st; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb DECAY "
@@ -355,7 +360,8 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       'A' + o.engine, onOff(h.on), 'A' + h.engine, onOff(h.chromatic), lvl(0), lvl(1),
       onOff(!h.tuning.snapToScale), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
-      static_cast<double>(p.inputGate.thresholdDb), static_cast<double>(p.gate.thresholdDb),
+      static_cast<double>(p.inputGate.thresholdDb),
+      static_cast<double>(p.inputGate.tuning.releaseMs), static_cast<double>(p.gate.thresholdDb),
       static_cast<double>(p.gate.tuning.releaseMs),
       cv::kKeyName[atKey], static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
@@ -1044,6 +1050,7 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
                  &p.macros.pos[static_cast<size_t>(i)]});
   add("dev", &p.dev);
   add("pedal", &p.pedalMode);
+  add("bypass", &p.bypass);
   add("advanced", &p.advanced);
   add("feedback.on", &p.stageFeedback);
   add("feedback.amount", &p.feedbackAmount);
@@ -1280,14 +1287,10 @@ void drawDistortionTuning(cv::DistortionTuning& t, cv::macros::State& m) {
 
 // Plain names, technical term in the hint. The input gate carries its threshold here;
 // the GATE module keeps THRESHOLD on its face. Mute amount runs right = more muting.
-void drawGateTuning(cv::GateParams& g, const char* block, bool withThreshold) {
+void drawGateTuning(cv::GateParams& g, const char* block) {
   if (!tuningHeader(block)) return;
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   cv::GateTuning& t = g.tuning;
-  if (withThreshold) {
-    ImGui::SliderFloat("Opens at", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
-    hint("sing louder than this to open (threshold)");
-  }
   if (gAdvanced) {
     drawGateRaw(t);
     return;
@@ -1299,11 +1302,6 @@ void drawGateTuning(cv::GateParams& g, const char* block, bool withThreshold) {
   hint("how fast it opens when you sing (attack)");
   ImGui::SliderFloat("Stay open", &t.holdMs, 0.0f, 500.0f, "%.0f ms");
   hint("wait after you stop before shutting (hold)");
-  // The GATE module has release on its face as DECAY.
-  if (withThreshold) {
-    ImGui::SliderFloat("Fade out", &t.releaseMs, 5.0f, 1000.0f, "%.0f ms", log);
-    hint("how slowly it fades shut (release)");
-  }
 }
 
 // Four plain controls; the band frequencies live under Advanced. Mud cut runs
@@ -1468,21 +1466,17 @@ void gateLed(bool on, float gainDb) {
 }
 
 // The input gate is always on and keeps its threshold under Tuning.
-void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float gainDb,
-                   bool alwaysOn) {
+// Both gates carry the same controls (owner 2026-10-02): THRESHOLD and DECAY on the
+// face, Mute amount / Fade in / Stay open under Tuning.
+void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float gainDb) {
   ImGui::PushID(id);
   gateLed(g.on, gainDb);
-  // The input gate has no panel switch on the box; the prototype toggle exists to
-  // A/B it against the stage feedback simulator (owner 2026-10-02).
   ImGui::Checkbox(label, &g.on);
-  if (!alwaysOn) {
-    ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
-    ImGui::SliderFloat("DECAY", &g.tuning.releaseMs, 5.0f, 1000.0f, "%.0f ms",
-                       ImGuiSliderFlags_Logarithmic);
-  }
+  ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
+  ImGui::SliderFloat("DECAY", &g.tuning.releaseMs, 5.0f, 1000.0f, "%.0f ms",
+                     ImGuiSliderFlags_Logarithmic);
   ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
-  // The input gate is fixed on the box; its tuning is ours, not Adam's.
-  if (!alwaysOn || gDev) drawGateTuning(g, id, alwaysOn);
+  drawGateTuning(g, id);
   ImGui::PopID();
 }
 
@@ -1567,7 +1561,8 @@ void moduleBox(const char* id, bool first, const F& draw) {
   ImGui::EndChild();
 }
 
-constexpr float kFooterH = 52.0f;  // strip under the columns for the mode button, px
+constexpr float kFooterH = 52.0f;    // strip under the columns for the mode button, px
+constexpr float kBypassRowH = 46.0f;  // BYPASS above the mode button, under the last column, px
 constexpr ImVec2 kModeButtonPadding = ImVec2(18.0f, 10.0f);  // mode button frame padding, px
 
 // ---- Pedal mode: each effect drawn as a stompbox -----------------------------------
@@ -1701,7 +1696,7 @@ void pedal(const char* name, bool& on, float width, const F& knobs) {
 
 // Panel knobs only, signal order left to right. Encoders sit below the knobs.
 void drawPedals(ProtoParams& params) {
-  constexpr int kPedals = 8;
+  constexpr int kPedals = 9;
   const float w = (ImGui::GetContentRegionAvail().x - (kPedals - 1) * kPedalGap) / kPedals;
   gPedalRight = 0.0f;
   gPedalBottom = 0.0f;
@@ -1712,6 +1707,11 @@ void drawPedals(ProtoParams& params) {
   char semis[16];
   std::snprintf(semis, sizeof(semis), "%+d st", o.semitones);
 
+  pedal("INPUT GATE", params.inputGate.on, w, [&] {
+    pedalRange("THRESHOLD", params.inputGate.thresholdDb, -70.0f, -10.0f, false, "%.0f dB");
+    pedalRange("DECAY", params.inputGate.tuning.releaseMs, 5.0f, 1000.0f, true, "%.0f ms");
+  });
+  next();
   pedal("AUTOTUNE", at.on, w, [&] {
     pedalRange("RESPONSE", at.responseMs, cv::AutotuneVoice::kMinResponseMs,
                cv::AutotuneVoice::kMaxResponseMs, true, "%.0f ms");
@@ -1774,21 +1774,23 @@ void drawColumns(ProtoParams& params, const ProtoState& state);
 void drawModeButton(ProtoParams& params);
 
 std::array<float, kColumnCount> gColumnUsed{};  // content height per column this frame, px
-float gColumnAvail = 0.0f;                  // column height, px
+std::array<float, kColumnCount> gColumnAvail{};  // column height per column, px
 
 // One face column. Columns never scroll; the probe fails on any overrun.
 template <class F>
 void column(int index, float width, const F& draw) {
   gCurrentColumn = index;
   ImGui::PushID(index);
-  // The footer strip below the columns holds the mode button.
-  ImGui::BeginChild("column", ImVec2(width, -kFooterH), ImGuiChildFlags_None,
+  // The footer strip below the columns holds the mode button; the last column also
+  // leaves room for BYPASS above it.
+  const float reserve = index == kColumnCount - 1 ? kFooterH + kBypassRowH : kFooterH;
+  ImGui::BeginChild("column", ImVec2(width, -reserve), ImGuiChildFlags_None,
                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   ImGui::PushItemWidth(-kLabelW);
   draw();
   ImGui::PopItemWidth();
   gColumnUsed[index] = ImGui::GetCursorPosY();
-  gColumnAvail = ImGui::GetWindowHeight();
+  gColumnAvail[index] = ImGui::GetWindowHeight();
   ImGui::EndChild();
   ImGui::PopID();
 }
@@ -1830,11 +1832,22 @@ void drawModeButton(ProtoParams& params) {
   ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kHeaderScale);
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, kModeButtonPadding);
   const char* label = params.pedalMode ? "Full view###mode" : "Pedal mode###mode";
-  const float w = ImGui::CalcTextSize("Pedal mode").x + 2.0f * kModeButtonPadding.x;
+  const float w = ImGui::CalcTextSize("BYPASSED").x + 2.0f * kModeButtonPadding.x;
   ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y -
                        ImGui::GetFrameHeight());
   ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w);
   if (ImGui::Button(label, ImVec2(w, 0.0f))) params.pedalMode = !params.pedalMode;
+  const float modeTop = ImGui::GetItemRectMin().y - ImGui::GetWindowPos().y;
+  // BYPASS above it, same size, lit red while bypassed.
+  ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w,
+                             modeTop - ImGui::GetStyle().ItemSpacing.y - ImGui::GetFrameHeight()));
+  const bool lit = params.bypass;
+  if (lit) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(170, 40, 40, 255));
+  if (ImGui::Button(params.bypass ? "BYPASSED###bypass" : "Bypass###bypass", ImVec2(w, 0.0f)))
+    params.bypass = !params.bypass;
+  if (lit) ImGui::PopStyleColor();
+  gToggleRects["BYPASS"] = {ImGui::GetItemRectMin(), ImGui::GetItemRectMax()};
+  ImGui::SetCursorPosY(modeTop);
   // Build version, bottom left at the button's size; tools/bump_version.sh per change.
   ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetItemRectMin().y -
                                                                     ImGui::GetWindowPos().y));
@@ -1850,7 +1863,7 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
       (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 3.0f * kColumnGap) / 3.0f;
   column(0, colW, [&] {
     moduleBox("ingateBox", true,
-              [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb, true); });
+              [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
     moduleBox("autotuneBox", false, [&] {
       drawAutotuneBlock(params.pitchFx.autotune, params.linkAutotuneKey,
                         params.pitchFx.harmony.key, state);
@@ -1870,7 +1883,7 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
     moduleBox("slapbackBox", true, [&] { drawSlapbackBlock(params.slapback); });
     moduleBox("distortionBox", false, [&] { drawDistortionBlock(params.distortion, params.macros); });
     moduleBox("gateBox", false,
-              [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb, false); });
+              [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
   column(3, colW, [&] {
@@ -1966,12 +1979,14 @@ int runLayoutProbe() {
     if (!headerFits) std::printf("header row runs to %.0f px of %d\n", gHeaderRight, kWindowW);
     const bool pedalFits = gPedalRight <= static_cast<float>(kWindowW) &&
                            gPedalBottom <= static_cast<float>(kWindowH) - kFooterH;
-    const bool ok = (s.pedal ? pedalFits : worst <= gColumnAvail) && headerFits;
+    bool columnsFit = true;
+    for (int c = 0; c < kColumnCount; ++c) columnsFit = columnsFit && gColumnUsed[c] <= gColumnAvail[c];
+    const bool ok = (s.pedal ? pedalFits : columnsFit) && headerFits;
     if (s.pedal) std::printf("pedal row: right %.0f of %d px, bottom %.0f of %.0f px\n", gPedalRight,
                              kWindowW, gPedalBottom, static_cast<float>(kWindowH) - kFooterH);
     fits = fits && ok;
     std::printf("%-44s col1 %4.0f  col2 %4.0f  col3 %4.0f  col4 %4.0f  of %.0f px%s\n", name,
-                gColumnUsed[0], gColumnUsed[1], gColumnUsed[2], gColumnUsed[3], gColumnAvail,
+                gColumnUsed[0], gColumnUsed[1], gColumnUsed[2], gColumnUsed[3], gColumnAvail[3],
                 ok ? "" : "  OVERRUN");
   }
   // Click each header toggle on, then off, through ImGui's input queue. A style-stack
@@ -1979,9 +1994,9 @@ int runLayoutProbe() {
   gProbeOpen = ProbeOpen{};
   ProtoParams clicked;
   clicked.dev = true;
-  bool* const targets[2] = {&clicked.stageFeedback, &clicked.advanced};
-  const char* const names[2] = {"STAGE FEEDBACK", "Advanced"};
-  for (int t = 0; t < 2; ++t) {
+  bool* const targets[3] = {&clicked.stageFeedback, &clicked.advanced, &clicked.bypass};
+  const char* const names[3] = {"STAGE FEEDBACK", "Advanced", "BYPASS"};
+  for (int t = 0; t < 3; ++t) {
     bool flips = true;
     for (int c = 0; c < 2; ++c) {
       const bool before = *targets[t];
