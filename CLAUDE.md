@@ -24,6 +24,9 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
   (Harmony: one voice at High); the equal-power crossfade then stays near unity at
   every MIX. Trimming at MIX 50 % instead pushed the wet +8 dB and clipped at full mix
   (owner 2026-10-02).
+- Version (owner 2026-10-02): the face shows `VERSION.txt` bottom left (started v0.01.00).
+  Every change that rebuilds the app bumps it first with `tools/bump_version.sh`, in the
+  same commit. Not named `VERSION`: the Mac's case-insensitive disk lets `<version>` find it.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
 - Stage feedback simulator is prototype-only test signal. It is calibrated so a bypassed
   box does not feed back at default Amount; DRIVE causes it.

@@ -67,6 +67,10 @@ find_library(AUDIOUNIT_FRAMEWORK AudioUnit REQUIRED)
 # cubevox-proto: the prototype face. The bundle builds under build/ and a
 # symlink at the project root keeps it Finder-launchable across rebuilds.
 cubevox_gui_target(cubevox-proto emulator/main.cpp)
+# The face shows VERSION.txt bottom left; editing the file re-runs configure.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/VERSION.txt)
+file(STRINGS ${CMAKE_SOURCE_DIR}/VERSION.txt CUBEVOX_VERSION LIMIT_COUNT 1)
+target_compile_definitions(cubevox-proto PRIVATE CUBEVOX_VERSION="v${CUBEVOX_VERSION}")
 add_custom_command(TARGET cubevox-proto POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E create_symlink
           ${CMAKE_BINARY_DIR}/cubevox-proto.app ${CMAKE_SOURCE_DIR}/cubevox-proto.app

@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -870,13 +871,19 @@ void drawTransportRow(ProtoParams& params, float& meterDb, bool probe) {
 
 // Header on/off switch. A checkbox square at headline size reads as an empty tile,
 // so the state is in the label and the button lights when on.
+// Last drawn rect per toggle, for the probe's click test.
+std::map<std::string, std::pair<ImVec2, ImVec2>> gToggleRects;
+
 void toggleButton(const char* name, bool& on, bool withState = true) {
   char label[64];
   if (withState) std::snprintf(label, sizeof(label), "%s: %s###%s", name, on ? "ON" : "OFF", name);
   else std::snprintf(label, sizeof(label), "%s", name);
-  if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+  // Push and pop follow the state at draw time; the click flips on in between.
+  const bool lit = on;
+  if (lit) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
   if (ImGui::Button(label)) on = !on;
-  if (on) ImGui::PopStyleColor();
+  if (lit) ImGui::PopStyleColor();
+  gToggleRects[name] = {ImGui::GetItemRectMin(), ImGui::GetItemRectMax()};
 }
 
 void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
@@ -1828,6 +1835,11 @@ void drawModeButton(ProtoParams& params) {
                        ImGui::GetFrameHeight());
   ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w);
   if (ImGui::Button(label, ImVec2(w, 0.0f))) params.pedalMode = !params.pedalMode;
+  // Build version, bottom left at the button's size; tools/bump_version.sh per change.
+  ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetItemRectMin().y -
+                                                                    ImGui::GetWindowPos().y));
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextDisabled("%s", CUBEVOX_VERSION);
   ImGui::PopStyleVar();
   ImGui::PopFont();
 }
@@ -1962,7 +1974,35 @@ int runLayoutProbe() {
                 gColumnUsed[0], gColumnUsed[1], gColumnUsed[2], gColumnUsed[3], gColumnAvail,
                 ok ? "" : "  OVERRUN");
   }
+  // Click each header toggle on, then off, through ImGui's input queue. A style-stack
+  // imbalance asserts inside EndFrame, so surviving both clicks is the check.
   gProbeOpen = ProbeOpen{};
+  ProtoParams clicked;
+  clicked.dev = true;
+  bool* const targets[2] = {&clicked.stageFeedback, &clicked.advanced};
+  const char* const names[2] = {"STAGE FEEDBACK", "Advanced"};
+  for (int t = 0; t < 2; ++t) {
+    bool flips = true;
+    for (int c = 0; c < 2; ++c) {
+      const bool before = *targets[t];
+      ImGui::NewFrame();
+      drawFrame(clicked, state, meterDb, true);
+      ImGui::Render();
+      const auto& r = gToggleRects[names[t]];
+      const ImVec2 mid((r.first.x + r.second.x) * 0.5f, (r.first.y + r.second.y) * 0.5f);
+      for (int phase = 0; phase < 3; ++phase) {
+        io.AddMousePosEvent(mid.x, mid.y);
+        if (phase == 1) io.AddMouseButtonEvent(0, true);
+        if (phase == 2) io.AddMouseButtonEvent(0, false);
+        ImGui::NewFrame();
+        drawFrame(clicked, state, meterDb, true);
+        ImGui::Render();
+      }
+      flips = flips && *targets[t] != before;
+    }
+    std::printf("toggle %s on and off: %s\n", names[t], flips ? "ok" : "FAILED");
+    if (!flips) fits = false;
+  }
   ImGui::DestroyContext();
 
   // Print tuning's snapshot lines must render whole at the defaults.
