@@ -14,7 +14,7 @@ namespace cv {
 struct GateTuning {
   float attackMs = 1.0f;
   float holdMs = 150.0f;
-  float releaseMs = 250.0f;
+  float releaseMs = 20.0f;
   float rangeDb = -40.0f;       // attenuation when closed
   float kneeDb = 12.0f;         // soft knee width below the threshold
   float detectorHpHz = 120.0f;  // detector side-chain highpass
@@ -23,7 +23,7 @@ struct GateTuning {
 
 struct GateParams {
   bool on = true;
-  float thresholdDb = -40.0f;  // panel knob -70..-10
+  float thresholdDb = -20.0f;  // panel knob -70..-10
   GateTuning tuning;
 };
 

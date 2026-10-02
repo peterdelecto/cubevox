@@ -70,6 +70,7 @@ class Rig {
 // The physics checks run on fixed tuning so they do not follow default changes.
 cv::GateParams fixedParams() {
   cv::GateParams p;
+  p.thresholdDb = -40.0f;
   p.tuning.holdMs = 60.0f;
   p.tuning.releaseMs = 120.0f;
   p.tuning.rangeDb = -80.0f;
@@ -97,7 +98,8 @@ bool testPassthrough() {
   for (size_t i = static_cast<size_t>(100 * kMs); i < in.size(); ++i)
     offDiff = std::fmax(offDiff, std::fabs(out[i] - in[i]));
 
-  cv::GateParams on;  // threshold -40
+  cv::GateParams on;
+  on.thresholdDb = -40.0f;
   Rig b;
   b.gate.reset();
   in.clear();

@@ -68,10 +68,10 @@ constexpr float kStartDrive = 0.2f;
 constexpr float kStartTone = 0.5f;   // BD-2 TONE at noon is flat
 // Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
 // mis-trigger never reads as a dropout; release is short by owner choice.
-constexpr float kInputGateThresholdDb = -40.0f;
+constexpr float kInputGateThresholdDb = -12.0f;
 constexpr float kInputGateRangeDb = -12.0f;
 constexpr float kInputGateHoldMs = 100.0f;
-constexpr float kInputGateReleaseMs = 25.0f;
+constexpr float kInputGateReleaseMs = 10.0f;
 
 void applyInputGateDefaults(cv::GateParams& g) {
   g.thresholdDb = kInputGateThresholdDb;
@@ -104,8 +104,8 @@ struct ProtoParams {
   cv::macros::State macros;
   // Prototype-only test signal. Not a panel control, not in Print tuning.
   bool stageFeedback = false;
-  float feedbackAmount = 50.0f;    // percent of the simulator range
-  float feedbackMovement = 53.0f;  // percent of the capped range (= 40 % of the old one)
+  float feedbackAmount = 70.0f;    // percent of the simulator range
+  float feedbackMovement = 50.0f;  // percent of the capped range
 
   // Every effect opens off except the input gate, which has no switch on the
   // face. Engine defaults stay on for the firmware.
