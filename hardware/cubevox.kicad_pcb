@@ -1350,7 +1350,7 @@
 	(footprint "cubevox:SMB_L4.4-W3.6-LS5.4-BI"
 		(layer "F.Cu")
 		(uuid "096d5d83-eba6-4cc2-8a75-cb03edc64ff5")
-		(at 229.59 45.22 90)
+		(at 229.59 49 90)
 		(property "Reference" "D105"
 			(at 0 -4 0)
 			(layer "F.SilkS")
@@ -6912,7 +6912,7 @@
 	(footprint "cubevox:SMA_L4.3-W2.6-LS5.2-RD"
 		(layer "F.Cu")
 		(uuid "2c5d865e-2d1a-4d67-9290-47813d6da96e")
-		(at 234.41 45.22 90)
+		(at 234.41 49 90)
 		(descr "SS34")
 		(property "Reference" "D106"
 			(at 0 -4 90)
