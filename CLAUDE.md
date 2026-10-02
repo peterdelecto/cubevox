@@ -1,8 +1,9 @@
 # cubevox
 
 Live vocal effects box for Adam Keith. Tabletop, SM58 in, one knob per parameter.
-Final target: STM32H7 (H7 VIT6 board). Effects are prototyped one at a time in a
-Mac emulator that plays a loaded loop through the effect while the knob is tweaked.
+Final target: STM32H7 (H7 VIT6 board). Hardware spec: `docs/specs/2026-10-02-hardware-design.md`;
+the schematic follows ClaudeRouter's board recipe and canon §XIV. Effects are prototyped one
+at a time in a Mac emulator that plays a loaded loop through the effect while the knob is tweaked.
 
 ## Rules
 - `engine/*.h` is firmware code. Float only, `std::array` state, no heap / no I/O in
@@ -31,7 +32,9 @@ Mac emulator that plays a loaded loop through the effect while the knob is tweak
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
 - Stage feedback simulator is prototype-only test signal. It is calibrated so a bypassed
   box does not feed back at default Amount; DRIVE causes it.
-- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply.
+- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply. `2026-10-02-hardware-design.md` is the board.
+- `hardware/` holds the KiCad project. Teensy-H7-Port and DrumSynthV3 are read-only sources
+  to copy from, never to edit.
 
 ## Build / run
 ```
