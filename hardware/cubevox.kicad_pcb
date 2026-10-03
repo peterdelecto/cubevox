@@ -38417,7 +38417,7 @@
 	(footprint "cubevox_h7core:USB-C-SMD_TYPE-C16PIN"
 		(layer "F.Cu")
 		(uuid "bc74aa0e-7613-478f-b165-1bd751e65bbe")
-		(at 125.39 33.71 180)
+		(at 125.39 33.76 180)
 		(property "Reference" "J1"
 			(at 6.015 1.06 0)
 			(layer "F.SilkS")
