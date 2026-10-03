@@ -1,0 +1,126 @@
+[
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 99.0,
+"y": 96.0125
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 95.425,
+"y": 95.325
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 94.925,
+"y": 96.225
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 94.05,
+"y": 96.65
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 93.175,
+"y": 97.075
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 92.75,
+"y": 97.75
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 98.45,
+"y": 96.75
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 97.65,
+"y": 97.55
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 97.85,
+"y": 98.35
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 98.4,
+"y": 98.6
+},
+{
+"op": "track",
+"net": "/h7core_block/HSE_IN",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+94.8,
+96.25
+],
+[
+94.1,
+96.25
+],
+[
+93.15,
+97.2
+],
+[
+93.15,
+97.6
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/HSE_XTAL_OUT",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+98.6,
+96.15
+],
+[
+98.6,
+96.55
+],
+[
+98.0,
+97.15
+],
+[
+97.6,
+97.15
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/HSE_XTAL_OUT",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+97.6,
+97.85
+],
+[
+98.6,
+97.85
+]
+]
+}
+]

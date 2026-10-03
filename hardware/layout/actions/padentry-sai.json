@@ -1,0 +1,38 @@
+[
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 89.355,
+"y": 92.845
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 88.23,
+"y": 93.49
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_SCKI_SRC",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+89.9,
+92.3
+],
+[
+89.4,
+92.3
+],
+[
+88.4,
+93.3
+],
+[
+88.0,
+93.3
+]
+]
+}
+]

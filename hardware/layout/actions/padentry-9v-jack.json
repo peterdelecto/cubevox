@@ -1,0 +1,40 @@
+[
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 233.95,
+"y": 36.6
+},
+{
+"op": "track",
+"net": "/9V_JACK",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+234.35,
+37.0
+],
+[
+234.35,
+36.2
+]
+]
+},
+{
+"op": "track",
+"net": "/9V_JACK",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+234.35,
+36.2
+],
+[
+233.55,
+36.2
+]
+]
+}
+]
