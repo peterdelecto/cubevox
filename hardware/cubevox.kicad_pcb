@@ -30525,7 +30525,7 @@
 	(footprint "Resistor_SMD:R_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "996a02c1-d6fd-46f8-adce-7bdaad09e699")
-		(at 120.5 40.5 -90)
+		(at 120.4 40.5 -90)
 		(descr "Resistor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 72, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "resistor")
 		(property "Reference" "R5"
@@ -55166,6 +55166,14 @@
 		(uuid "d4f83b0a-a4eb-4421-818f-20b35a43616d")
 	)
 	(segment
+		(start 120.4 41.325)
+		(end 120.4 42.125)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/GND")
+		(uuid "db0e4cb7-41bc-41e6-bcad-02bfab7e8c0f")
+	)
+	(segment
 		(start 133.9 103.6)
 		(end 133.9 103.05)
 		(width 0.3)
@@ -55716,6 +55724,14 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/GND")
 		(uuid "bbf8007b-cbc8-466a-98b7-bc5519aad134")
+	)
+	(via
+		(at 120.4 42.125)
+		(size 0.6)
+		(drill 0.3)
+		(layers "F.Cu" "B.Cu")
+		(net "/GND")
+		(uuid "bfbb72fa-469b-4087-a721-b55907fefb8b")
 	)
 	(via
 		(at 102.05 94.9)
@@ -56526,14 +56542,6 @@
 		(uuid "fb3769d5-0d08-41e5-99e9-787cc61c4bba")
 	)
 	(segment
-		(start 120.5 38.2)
-		(end 120.5 39.675)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/h7core_block/CC2")
-		(uuid "1dbe28ad-edc7-488b-9ed3-9a4b72429235")
-	)
-	(segment
 		(start 123.64 36.12)
 		(end 123.64 37.2)
 		(width 0.2)
@@ -56541,13 +56549,21 @@
 		(net "/h7core_block/CC2")
 		(uuid "7ad14f70-fe14-41d7-8555-57aba0ce6f21")
 	)
+	(segment
+		(start 120.4 38.3)
+		(end 120.4 39.675)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/h7core_block/CC2")
+		(uuid "8711f688-ac07-4104-ae2a-5a934c19413f")
+	)
 	(via
-		(at 120.5 38.2)
+		(at 120.4 38.3)
 		(size 0.6)
 		(drill 0.3)
 		(layers "F.Cu" "B.Cu")
 		(net "/h7core_block/CC2")
-		(uuid "0c989a55-f0bd-49c8-b7e3-2d01769db1d0")
+		(uuid "7cbea55e-75dc-415e-a786-f69f504f4792")
 	)
 	(via
 		(at 123.64 37.2)
@@ -56558,20 +56574,20 @@
 		(uuid "88622810-447d-4547-9da6-82887ac29ec6")
 	)
 	(segment
+		(start 121.5 37.2)
+		(end 120.4 38.3)
+		(width 0.2)
+		(layer "B.Cu")
+		(net "/h7core_block/CC2")
+		(uuid "75a12904-164d-4c53-ae97-8b1f62a10dfe")
+	)
+	(segment
 		(start 123.64 37.2)
 		(end 121.5 37.2)
 		(width 0.2)
 		(layer "B.Cu")
 		(net "/h7core_block/CC2")
 		(uuid "e8f56902-735e-401f-8cae-843f71951d4c")
-	)
-	(segment
-		(start 121.5 37.2)
-		(end 120.5 38.2)
-		(width 0.2)
-		(layer "B.Cu")
-		(net "/h7core_block/CC2")
-		(uuid "f0bafefb-6586-4427-ac27-d1334598034f")
 	)
 	(segment
 		(start 171.442 60.5)
