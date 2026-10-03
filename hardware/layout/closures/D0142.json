@@ -1,0 +1,143 @@
+{
+ "declaration": "D0142",
+ "ledger": "0173",
+ "baseline": "0172",
+ "board_sha256": "1e8bca13665c21454fe8440f3dda4ee00f9489957969872e62c688d31895e024",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0173.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6985.5,
+   "after": 7048.3,
+   "delta": 62.8,
+   "direction": "worse"
+  },
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "declared",
+   "before": 5318.4,
+   "after": 5333.4,
+   "delta": 15.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/5V:In2.Cu",
+   "why": "declared",
+   "before": 3807.8,
+   "after": 3811.7,
+   "delta": 3.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "declared",
+   "before": 28595.5,
+   "after": 28596.6,
+   "delta": 1.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 4,
+   "after": 5,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2114.6,
+   "after": 1776.9,
+   "delta": -337.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 45,
+   "after": 44,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C101",
+   "why": "declared",
+   "before": 3.84,
+   "after": 3.88,
+   "delta": 0.04,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C111",
+   "why": "declared",
+   "before": 4.07,
+   "after": 4.04,
+   "delta": -0.03,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C21",
+   "why": "declared",
+   "before": 9.05,
+   "after": 9.09,
+   "delta": 0.04,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C24",
+   "why": "declared",
+   "before": 2.33,
+   "after": 2.28,
+   "delta": -0.05,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C25",
+   "why": "declared",
+   "before": 4.86,
+   "after": 4.84,
+   "delta": -0.02,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:FB1",
+   "why": "declared",
+   "before": 36.78,
+   "after": 43.92,
+   "delta": 7.14,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 652,
+   "after": 577,
+   "delta": -75,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 248,
+   "after": 246,
+   "delta": -2,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 146,
+   "after": 145,
+   "delta": -1,
+   "direction": "better"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
