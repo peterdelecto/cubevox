@@ -1,0 +1,119 @@
+{
+ "declaration": "D0144",
+ "ledger": "0175",
+ "baseline": "0174",
+ "board_sha256": "9ca868f997ca0451359f36edd09b9a7f89d6d00fe04886096be83225ab03c36f",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0175.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 7048.3,
+   "after": 7044.4,
+   "delta": -3.9,
+   "direction": "better"
+  },
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "declared",
+   "before": 5333.4,
+   "after": 5469.8,
+   "delta": 136.4,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/5V:In2.Cu",
+   "why": "declared",
+   "before": 3811.7,
+   "after": 3860.3,
+   "delta": 48.6,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/5VA:In2.Cu",
+   "why": "declared",
+   "before": 4211.4,
+   "after": 4202.1,
+   "delta": -9.3,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "declared",
+   "before": 28595.6,
+   "after": 28589.9,
+   "delta": -5.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1777.4,
+   "after": 1558.4,
+   "delta": -219.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "no_region:/GND",
+   "why": "declared",
+   "before": 67,
+   "after": 69,
+   "delta": 2,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C117",
+   "why": "declared",
+   "before": 59.2,
+   "after": 18.56,
+   "delta": -40.64,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:FB101",
+   "why": "declared",
+   "before": 61.73,
+   "after": 23.89,
+   "delta": -37.84,
+   "direction": "better"
+  },
+  {
+   "measure": "regions:/5V:In2.Cu",
+   "why": "declared",
+   "before": 1,
+   "after": 2,
+   "delta": 1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 578,
+   "after": 551,
+   "delta": -27,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 246,
+   "after": 245,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 146,
+   "after": 154,
+   "delta": 8,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

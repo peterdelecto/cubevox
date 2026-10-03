@@ -1,0 +1,135 @@
+{
+ "declaration": "D0153",
+ "ledger": "0184",
+ "baseline": "0183",
+ "board_sha256": "06816599ee7fcb0f8ea3c34c22aa7b1840ab7c737755b0cd78357a423bd0070b",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0184.json",
+ "intended": [
+  {
+   "measure": "abs_mismatch:USB",
+   "why": "declared",
+   "before": 2.08,
+   "after": 0.44,
+   "delta": -1.64,
+   "direction": "better"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DM",
+   "why": "declared",
+   "before": 55.162,
+   "after": 54.655,
+   "delta": -0.507,
+   "direction": "better"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DP",
+   "why": "declared",
+   "before": 54.181,
+   "after": 53.743,
+   "delta": -0.438,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 7000.1,
+   "after": 6998.4,
+   "delta": -1.7,
+   "direction": "better"
+  },
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "declared",
+   "before": 5617.0,
+   "after": 5618.9,
+   "delta": 1.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/5V:In2.Cu",
+   "why": "declared",
+   "before": 3713.2,
+   "after": 3716.1,
+   "delta": 2.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "declared",
+   "before": 28581.4,
+   "after": 28585.2,
+   "delta": 3.8,
+   "direction": "n/a"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 4,
+   "after": 5,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1163.4,
+   "after": 1152.7,
+   "delta": -10.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "no_region:/GND",
+   "why": "declared",
+   "before": 73,
+   "after": 72,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "pair_vias:USB",
+   "why": "declared",
+   "before": 4,
+   "after": 0,
+   "delta": -4,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C32",
+   "why": "declared",
+   "before": 6.64,
+   "after": 5.78,
+   "delta": -0.86,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 447,
+   "after": 425,
+   "delta": -22,
+   "direction": "n/a"
+  },
+  {
+   "measure": "signal_t",
+   "why": "declared",
+   "before": 0,
+   "after": 1,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 167,
+   "after": 162,
+   "delta": -5,
+   "direction": "better"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

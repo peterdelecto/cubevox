@@ -1,0 +1,95 @@
+{
+ "declaration": "D0149",
+ "ledger": "0180",
+ "baseline": "0179",
+ "board_sha256": "01b4459eb81a4c175d5f5631d2a072d15629404cca4d7add3ee2dd3071d9de53",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0180.json",
+ "intended": [
+  {
+   "measure": "airline:/h7core_block/BUCK_SW",
+   "why": "declared",
+   "before": 6.0,
+   "after": 5.8,
+   "delta": -0.2,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6999.6,
+   "after": 7000.3,
+   "delta": 0.7,
+   "direction": "worse"
+  },
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "declared",
+   "before": 5616.8,
+   "after": 5617.0,
+   "delta": 0.2,
+   "direction": "n/a"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 9,
+   "after": 5,
+   "delta": -4,
+   "direction": "better"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1163.3,
+   "after": 1163.5,
+   "delta": 0.2,
+   "direction": "n/a"
+  },
+  {
+   "measure": "reach:C21",
+   "why": "declared",
+   "before": 9.17,
+   "after": 9.59,
+   "delta": 0.42,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C22",
+   "why": "declared",
+   "before": 8.52,
+   "after": 8.76,
+   "delta": 0.24,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C3",
+   "why": "declared",
+   "before": 4.09,
+   "after": 4.33,
+   "delta": 0.24,
+   "direction": "worse"
+  },
+  {
+   "measure": "right_angles",
+   "why": "declared",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 446,
+   "after": 447,
+   "delta": 1,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

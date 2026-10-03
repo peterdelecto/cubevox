@@ -1,0 +1,95 @@
+[
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 95.5,
+"y": 63
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 95.5,
+"y": 65.9
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 97.05,
+"y": 63.65
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 96.75,
+"y": 63.0
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 96.45,
+"y": 62.35
+},
+{
+"op": "move",
+"ref": "C23",
+"x": 96.275,
+"y": 63.85,
+"rot": 180
+},
+{
+"op": "track",
+"net": "/h7core_block/BUCK_SW",
+"layer": "F.Cu",
+"width_mm": 0.5,
+"points": [
+[
+95.5,
+62
+],
+[
+95.5,
+63.85
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/BUCK_SW",
+"layer": "F.Cu",
+"width_mm": 0.5,
+"points": [
+[
+95.5,
+63.85
+],
+[
+95.5,
+67.8
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/BUCK_BST",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+96.45,
+62
+],
+[
+96.45,
+62.6
+],
+[
+97.05,
+63.2
+],
+[
+97.05,
+63.85
+]
+]
+}
+]

@@ -1,0 +1,213 @@
+[
+{
+"op": "remove_net_tracks",
+"net": "/9V_JACK"
+},
+{
+"op": "remove_via",
+"x": 98.15,
+"y": 55.0
+},
+{
+"op": "remove_via",
+"x": 101.75,
+"y": 53.65
+},
+{
+"op": "remove_via",
+"x": 103.25,
+"y": 53.65
+},
+{
+"op": "remove_via",
+"x": 228.0,
+"y": 50.45
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 102.5,
+"y": 53.65
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 108.575,
+"y": 51.15
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 169.35,
+"y": 55.0
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 225.725,
+"y": 52.725
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 104.5,
+"y": 52.4
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 101.075,
+"y": 54.325
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 113.325,
+"y": 53.075
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 99.275,
+"y": 55.0
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 228.275,
+"y": 50.45
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 98.425,
+"y": 55
+},
+{
+"op": "move",
+"ref": "D106",
+"x": 234.35,
+"y": 49.0,
+"rot": 90
+},
+{
+"op": "track",
+"net": "/9V_JACK",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+229.65,
+34
+],
+[
+233.35,
+34
+],
+[
+234.35,
+35
+],
+[
+234.35,
+37
+]
+]
+},
+{
+"op": "track",
+"net": "/9V_JACK",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+234.35,
+37
+],
+[
+234.35,
+46.8
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+229.59,
+51.45
+],
+[
+229.59,
+53.3
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 229.59,
+"y": 53.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "B.Cu",
+"width_mm": 0.4,
+"points": [
+[
+229.59,
+53.3
+],
+[
+229.59,
+55.5
+],
+[
+138,
+55.5
+],
+[
+138,
+41.9
+],
+[
+100.75,
+41.9
+],
+[
+100.75,
+55.9
+],
+[
+99.5,
+55.9
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 99.5,
+"y": 55.9
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+99.5,
+55.9
+],
+[
+99.5,
+54.59
+]
+]
+}
+]
