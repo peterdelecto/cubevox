@@ -42068,7 +42068,7 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "c9a8bf14-801b-4740-87c3-beafe38e500a")
-		(at 96.275 63.85 180)
+		(at 96.275 63.875 180)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C23"
@@ -58518,28 +58518,28 @@
 		(uuid "fbbcbb73-1006-417c-a00b-fe70a39d0739")
 	)
 	(segment
-		(start 95.5 63.85)
+		(start 95.5 63.875)
 		(end 95.5 67.8)
 		(width 0.5)
 		(layer "F.Cu")
 		(net "/h7core_block/BUCK_SW")
-		(uuid "21ed552d-80e3-420b-ae51-10a96c0fed88")
+		(uuid "90345f76-67cd-4bb9-80be-d4a679b2573e")
 	)
 	(segment
 		(start 95.5 62)
-		(end 95.5 63.85)
+		(end 95.5 63.875)
 		(width 0.5)
 		(layer "F.Cu")
 		(net "/h7core_block/BUCK_SW")
-		(uuid "aa6d9bc5-be34-428f-a408-cc9da830e195")
+		(uuid "a66a686d-a5f6-4692-aad7-d4b38b98203e")
 	)
 	(segment
 		(start 97.05 63.2)
-		(end 97.05 63.85)
+		(end 97.05 63.875)
 		(width 0.2)
 		(layer "F.Cu")
 		(net "/h7core_block/BUCK_BST")
-		(uuid "a06a5834-452d-4c6e-8ca9-732590cb1c0f")
+		(uuid "32de80fb-4be8-4118-8464-f5dfb6cef0c3")
 	)
 	(segment
 		(start 96.45 62.6)
@@ -58547,7 +58547,7 @@
 		(width 0.2)
 		(layer "F.Cu")
 		(net "/h7core_block/BUCK_BST")
-		(uuid "d03f47b9-7a05-480a-9aa9-554771f38a75")
+		(uuid "65e13967-3329-42b7-92a6-98ab26c3f671")
 	)
 	(segment
 		(start 96.45 62)
@@ -58555,7 +58555,7 @@
 		(width 0.2)
 		(layer "F.Cu")
 		(net "/h7core_block/BUCK_BST")
-		(uuid "e84cdd6f-0d90-4ec5-a8d1-62136699b31e")
+		(uuid "b91db7b3-d36e-4ff6-9c17-17e8f02d36cb")
 	)
 	(segment
 		(start 207 52.1)
