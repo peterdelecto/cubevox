@@ -1,0 +1,1238 @@
+[
+{
+"op": "move",
+"ref": "J1",
+"x": 115.0,
+"y": 33.76,
+"rot": 180.0
+},
+{
+"op": "move",
+"ref": "D2",
+"x": 114.8,
+"y": 39.5,
+"rot": 0.0
+},
+{
+"op": "move",
+"ref": "C18",
+"x": 111.91,
+"y": 40.775,
+"rot": -90.0
+},
+{
+"op": "move",
+"ref": "R4",
+"x": 118.11,
+"y": 40.5,
+"rot": -90.0
+},
+{
+"op": "move",
+"ref": "R5",
+"x": 110.01,
+"y": 40.5,
+"rot": -90.0
+},
+{
+"op": "move",
+"ref": "R6",
+"x": 120.11,
+"y": 40.5,
+"rot": -90.0
+},
+{
+"op": "move",
+"ref": "R7",
+"x": 122.11,
+"y": 40.5,
+"rot": 90.0
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 120.4,
+"y": 41.725
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 132.5,
+"y": 39.275
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 121.2237,
+"y": 36.0113
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 122.7375,
+"y": 41.55
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 129.74,
+"y": 36.165
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 128.5,
+"y": 41.725
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.19,
+"y": 41.118
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 121.07,
+"y": 35.7037
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 121.7837,
+"y": 36.165
+},
+{
+"op": "remove_via",
+"x": 128.5,
+"y": 42.125
+},
+{
+"op": "remove_via",
+"x": 123.175,
+"y": 41.55
+},
+{
+"op": "remove_via",
+"x": 120.4,
+"y": 42.125
+},
+{
+"op": "remove_via",
+"x": 125.19,
+"y": 41.586
+},
+{
+"op": "remove_via",
+"x": 130.89,
+"y": 36.165
+},
+{
+"op": "remove_via",
+"x": 132.5,
+"y": 38.875
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 128.5,
+"y": 39.2175
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 126.64,
+"y": 36.485
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 127.57,
+"y": 37.83
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 123.64,
+"y": 36.66
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 120.4,
+"y": 38.9875
+},
+{
+"op": "remove_via",
+"x": 120.4,
+"y": 38.3
+},
+{
+"op": "remove_via",
+"x": 123.64,
+"y": 37.2
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 120.4,
+"y": 37.95
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 120.6,
+"y": 37.4
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 122.22,
+"y": 37.2
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 126.14,
+"y": 39.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 126.14,
+"y": 37.235
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 126.14,
+"y": 41.155
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.29,
+"y": 37.1
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.79,
+"y": 37.25
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.14,
+"y": 36.535
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 109.32,
+"y": 58.48
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.14,
+"y": 35.1
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.74,
+"y": 35.2
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 108.12,
+"y": 59.11
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.64,
+"y": 36.485
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.54,
+"y": 35.2
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.64,
+"y": 35.71
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.24,
+"y": 39.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.24,
+"y": 37.8
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.64,
+"y": 35.71
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.44,
+"y": 37.05
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 124.24,
+"y": 41.82
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 121.9,
+"y": 40.0
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 128.025,
+"y": 37.125
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 122.99,
+"y": 36.5575
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 122.3,
+"y": 38.845
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 129.85,
+"y": 38.7
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 130.1,
+"y": 39.15
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 129.0,
+"y": 37.85
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.19,
+"y": 38.925
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 127.9,
+"y": 36.8
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 122.645,
+"y": 37.345
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 128.275,
+"y": 37.25
+},
+{
+"op": "remove_via",
+"x": 121.5,
+"y": 40.0
+},
+{
+"op": "remove_via",
+"x": 129.6,
+"y": 38.45
+},
+{
+"op": "remove_via",
+"x": 125.19,
+"y": 39.5
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 129.075,
+"y": 38.975
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 123.595,
+"y": 39.5
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 121.75,
+"y": 39.75
+},
+{
+"op": "remove_track",
+"layer": "B.Cu",
+"x": 126.87,
+"y": 39.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 92.5,
+"y": 75.875
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 92.0,
+"y": 75.84
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+110.01,
+41.325
+],
+[
+110.01,
+42.125
+]
+]
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+122.11,
+39.675
+],
+[
+122.11,
+38.875
+]
+]
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+111.91,
+41.55
+],
+[
+112.785,
+41.55
+]
+]
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+118.2,
+36.165
+],
+[
+120.5,
+36.165
+]
+]
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+118.11,
+41.325
+],
+[
+118.11,
+42.125
+]
+]
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+114.8,
+40.65
+],
+[
+114.8,
+41.586
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 118.11,
+"y": 42.125,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 112.785,
+"y": 41.55,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 110.01,
+"y": 42.125,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 114.8,
+"y": 41.586,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 120.5,
+"y": 36.165,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 122.11,
+"y": 38.875,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/CC1",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+118.11,
+38.76
+],
+[
+118.11,
+39.675
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/CC1",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+116.25,
+36.07
+],
+[
+116.25,
+36.9
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/CC1",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+116.25,
+36.9
+],
+[
+118.11,
+38.76
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/CC2",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+113.25,
+36.12
+],
+[
+113.25,
+37.2
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/CC2",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+110.01,
+38.3
+],
+[
+110.01,
+39.675
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/CC2",
+"x": 110.01,
+"y": 38.3,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/h7core_block/CC2",
+"x": 113.25,
+"y": 37.2,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/CC2",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+110.01,
+37.6
+],
+[
+110.01,
+38.3
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/CC2",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+110.41,
+37.2
+],
+[
+110.01,
+37.6
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/CC2",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+113.25,
+37.2
+],
+[
+110.41,
+37.2
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DM",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.75,
+38.35
+],
+[
+115.75,
+40.65
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DM",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.75,
+36.12
+],
+[
+115.75,
+38.35
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DM",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+114.75,
+36.95
+],
+[
+115.05,
+37.25
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DM",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.05,
+37.25
+],
+[
+115.75,
+37.25
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DM",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+114.75,
+36.12
+],
+[
+114.75,
+36.95
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.05,
+35.1
+],
+[
+114.45,
+35.1
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+114.45,
+35.1
+],
+[
+114.25,
+35.3
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+114.25,
+36.12
+],
+[
+114.25,
+36.85
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.25,
+35.3
+],
+[
+115.05,
+35.1
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.25,
+36.12
+],
+[
+115.25,
+35.3
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+113.85,
+38.35
+],
+[
+113.85,
+40.65
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+113.85,
+37.25
+],
+[
+113.85,
+38.35
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+114.25,
+35.3
+],
+[
+114.25,
+36.12
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+114.25,
+36.85
+],
+[
+113.85,
+37.25
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+111.11,
+40.0
+],
+[
+111.91,
+40.0
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+112.6,
+36.115
+],
+[
+112.6,
+37.0
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+111.91,
+37.69
+],
+[
+111.91,
+40.0
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+114.8,
+38.35
+],
+[
+114.8,
+39.5
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+112.6,
+37.0
+],
+[
+111.91,
+37.69
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/VBUS",
+"x": 114.8,
+"y": 39.5,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/h7core_block/VBUS",
+"x": 111.11,
+"y": 40.0,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/h7core_block/VBUS",
+"x": 119.21,
+"y": 37.25,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "B.Cu",
+"width_mm": 0.3,
+"points": [
+[
+114.8,
+39.5
+],
+[
+112.61,
+39.5
+],
+[
+112.11,
+40.0
+],
+[
+111.11,
+40.0
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "B.Cu",
+"width_mm": 0.3,
+"points": [
+[
+114.8,
+39.5
+],
+[
+117.96,
+39.5
+],
+[
+119.21,
+38.25
+],
+[
+119.21,
+37.25
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+119.21,
+37.25
+],
+[
+120.11,
+37.25
+],
+[
+120.11,
+39.675
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DP",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+113.85,
+40.65
+],
+[
+113.85,
+47.8
+],
+[
+109.65,
+52.0
+],
+[
+106.0,
+52.0
+],
+[
+104.0,
+54.0
+],
+[
+104.0,
+68.25
+],
+[
+102.0,
+70.25
+],
+[
+96.2,
+70.25
+],
+[
+92.0,
+74.45
+],
+[
+92.0,
+76.45
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/USB_DM",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+115.75,
+40.65
+],
+[
+115.75,
+48.3
+],
+[
+111.55,
+52.5
+],
+[
+106.21,
+52.5
+],
+[
+104.5,
+54.21
+],
+[
+104.5,
+68.457
+],
+[
+102.207,
+70.75
+],
+[
+96.41,
+70.75
+],
+[
+92.5,
+74.66
+],
+[
+92.5,
+76.45
+]
+]
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+111.8,
+36.165
+],
+[
+110.68,
+36.165
+],
+[
+110.68,
+35.55
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/VBUS",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+117.4,
+36.165
+],
+[
+117.4,
+37.25
+],
+[
+119.21,
+37.25
+]
+]
+}
+]

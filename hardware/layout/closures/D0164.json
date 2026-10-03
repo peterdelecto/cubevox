@@ -1,0 +1,79 @@
+{
+ "declaration": "D0164",
+ "ledger": "0196",
+ "baseline": "0195",
+ "board_sha256": "df13247e5134b999d3d5608cc7bd5470cc957852946d7e787e0be609f3ded07d",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0196.json",
+ "intended": [
+  {
+   "measure": "abs_mismatch:USB",
+   "why": "declared",
+   "before": 0.44,
+   "after": 0.55,
+   "delta": 0.11,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DM",
+   "why": "declared",
+   "before": 54.655,
+   "after": 48.217,
+   "delta": -6.438,
+   "direction": "better"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DP",
+   "why": "declared",
+   "before": 53.743,
+   "after": 47.507,
+   "delta": -6.236,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6998.0,
+   "after": 6966.7,
+   "delta": -31.3,
+   "direction": "better"
+  },
+  {
+   "measure": "area:/5V:In2.Cu",
+   "why": "declared",
+   "before": 3705.6,
+   "after": 3705.7,
+   "delta": 0.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "declared",
+   "before": 28572.8,
+   "after": 28572.7,
+   "delta": -0.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1541.9,
+   "after": 1548.2,
+   "delta": 6.3,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 568,
+   "after": 582,
+   "delta": 14,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
