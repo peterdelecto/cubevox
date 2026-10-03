@@ -59192,14 +59192,6 @@
 		(uuid "e2c49399-0fa0-4e72-aa9f-df16485144de")
 	)
 	(segment
-		(start 228.9 81.05)
-		(end 228.9 80.55)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/5VA")
-		(uuid "eca41612-263b-494b-b83d-4c44942398b9")
-	)
-	(segment
 		(start 226.45 78.1)
 		(end 226.45 77.6)
 		(width 0.3)
@@ -59230,14 +59222,6 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/5VA")
 		(uuid "373296bb-9182-45ce-8f59-09ae2634f6da")
-	)
-	(via
-		(at 228.9 80.55)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "/5VA")
-		(uuid "378aeb2e-0dbe-4126-8613-f0fa58a4329c")
 	)
 	(via
 		(at 116.95 62)
@@ -59318,14 +59302,6 @@
 		(layer "In2.Cu")
 		(net "/5VA")
 		(uuid "01a04fb1-605d-4418-b349-d781c7f7e7e0")
-	)
-	(segment
-		(start 226.95 80.55)
-		(end 228.9 80.55)
-		(width 0.3)
-		(layer "In2.Cu")
-		(net "/5VA")
-		(uuid "17ee9a54-a104-4530-b6d5-c403a1b7811c")
 	)
 	(segment
 		(start 118.6 63.65)
@@ -59478,22 +59454,6 @@
 		(layer "In2.Cu")
 		(net "/5VA")
 		(uuid "e8b40185-ada1-481a-a23a-b34ea7ddaa4b")
-	)
-	(segment
-		(start 226.45 77.6)
-		(end 226.45 80.05)
-		(width 0.3)
-		(layer "In2.Cu")
-		(net "/5VA")
-		(uuid "e9ec8ecf-bdbc-4d24-9f7f-e7a6c35bea3a")
-	)
-	(segment
-		(start 226.45 80.05)
-		(end 226.95 80.55)
-		(width 0.3)
-		(layer "In2.Cu")
-		(net "/5VA")
-		(uuid "ecc266c0-ae7d-4d39-9af2-138a3b863ab6")
 	)
 	(segment
 		(start 155.65 83.9)
