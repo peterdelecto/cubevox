@@ -30366,7 +30366,7 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "98bb7f9c-2523-4662-bb5d-e989cae9e655")
-		(at 148 102.5)
+		(at 148 102.82)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C35"
@@ -56486,6 +56486,14 @@
 		(uuid "39ac4964-2568-4255-9e73-026584c7c3e8")
 	)
 	(segment
+		(start 144.87 105.43)
+		(end 144.87 106.012)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/3V3A")
+		(uuid "4481e319-020d-46a1-a97c-554ab266434a")
+	)
+	(segment
 		(start 189.225 152.5)
 		(end 188.375 152.5)
 		(width 0.3)
@@ -56628,6 +56636,14 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/3V3A")
 		(uuid "af1e64c5-b168-47d8-a3f0-254642e68a65")
+	)
+	(via
+		(at 144.87 106.012)
+		(size 0.6)
+		(drill 0.3)
+		(layers "F.Cu" "B.Cu")
+		(net "/3V3A")
+		(uuid "b20dcbb6-ecc7-49bb-9d10-69397178aa20")
 	)
 	(via
 		(at 147.3 106.28)
