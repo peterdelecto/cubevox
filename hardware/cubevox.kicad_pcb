@@ -2727,7 +2727,7 @@
 	(footprint "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD"
 		(layer "F.Cu")
 		(uuid "0f14be19-2686-4928-975a-ad0bb3067eea")
-		(at 74 53.6)
+		(at 77 53.6)
 		(descr "1N4148W")
 		(property "Reference" "D104"
 			(at 0 -4 270)
@@ -9295,7 +9295,7 @@
 	(footprint "SOD-123F_L2.7-W1.6-LS3.8-RD"
 		(layer "F.Cu")
 		(uuid "35279949-4a7d-4e4a-8eee-89e6c5490623")
-		(at 71.5 77.5)
+		(at 74.5 77.5)
 		(descr "1N4148W")
 		(property "Reference" "D109"
 			(at 0 -4 0)
@@ -27003,7 +27003,7 @@
 	(footprint "R0603"
 		(layer "F.Cu")
 		(uuid "8cc6a4f7-e4f3-457a-b145-5f87f7a57261")
-		(at 80.5 78.5 180)
+		(at 79.5 80.75 180)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R150"
 			(at 0 -4 0)
@@ -28925,7 +28925,7 @@
 	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "939e2389-d947-4fce-af5d-592cf9f70b21")
-		(at 83.5 57 -90)
+		(at 86.5 57 -90)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R120"
 			(at 0 -4 0)
@@ -29374,7 +29374,7 @@
 	(footprint "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
 		(layer "F.Cu")
 		(uuid "959b37cd-8872-4496-8c20-a56ad0500e9d")
-		(at 76.5 77.5)
+		(at 79.5 77.5)
 		(descr "MMBT3904 1AM 100-300")
 		(property "Reference" "Q101"
 			(at 0 -4.95 0)
@@ -35358,7 +35358,7 @@
 	(footprint "RELAY-SMD_G6K-2F-X-XX"
 		(layer "F.Cu")
 		(uuid "b0b0698d-f024-4095-90ac-59577a003cc6")
-		(at 76 70.5)
+		(at 79 70.5)
 		(descr "G6K-2F-Y-DC5")
 		(property "Reference" "K102"
 			(at 0 -7.51 0)
@@ -38998,7 +38998,7 @@
 	(footprint "R0603"
 		(layer "F.Cu")
 		(uuid "c0853f9e-b242-4294-88a7-557ea612d8c8")
-		(at 80.5 80.5 180)
+		(at 79.5 82.75 180)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R153"
 			(at 0 -4 0)
@@ -45064,7 +45064,7 @@
 	(footprint "C0603"
 		(layer "F.Cu")
 		(uuid "dd561b6a-4959-4f66-a060-ceea9415ab30")
-		(at 83.5 60.5 -90)
+		(at 86.5 60.5 -90)
 		(descr "10nF (103) ±10% 50V")
 		(property "Reference" "C162"
 			(at 0 -4 0)
@@ -46247,7 +46247,7 @@
 	(footprint "cubevox:RELAY-SMD_G6K-2F-X-XX"
 		(layer "F.Cu")
 		(uuid "dfdbf99d-3d95-44ab-8a39-9123ec2e4380")
-		(at 76 60)
+		(at 79 60)
 		(descr "G6K-2F-Y-DC5")
 		(property "Reference" "K101"
 			(at 0 -7.51 0)
