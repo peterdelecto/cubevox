@@ -1,0 +1,88 @@
+[
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 186.2,
+"y": 144.75
+},
+{
+"op": "via",
+"net": "/3V3A",
+"x": 186.15,
+"y": 144.7,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/3V3A",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+186.2,
+144.7
+],
+[
+186.15,
+144.7
+]
+]
+},
+{
+"op": "track",
+"net": "/3V3A",
+"layer": "In2.Cu",
+"width_mm": 0.3,
+"points": [
+[
+185.45,
+144.0
+],
+[
+186.15,
+144.7
+]
+]
+},
+{
+"op": "track",
+"net": "/3V3A",
+"layer": "In2.Cu",
+"width_mm": 0.3,
+"points": [
+[
+186.15,
+144.7
+],
+[
+186.95,
+145.5
+]
+]
+},
+{
+"op": "via",
+"net": "/9V_JACK",
+"x": 233.55,
+"y": 35.25,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/9V_JACK",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+233.6,
+35.25
+],
+[
+233.55,
+35.25
+]
+]
+}
+]
