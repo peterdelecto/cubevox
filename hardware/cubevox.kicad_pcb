@@ -25745,7 +25745,7 @@
 	(footprint "SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 		(layer "F.Cu")
 		(uuid "88cfb5c3-88f1-45ac-af54-6af41e7bc2ea")
-		(at 196 62.5 90)
+		(at 200 79.5 90)
 		(property "Reference" "U104"
 			(at 0 -6.705 0)
 			(layer "F.SilkS")
