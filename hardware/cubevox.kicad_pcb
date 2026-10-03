@@ -530,7 +530,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "0531e557-b259-4e31-a70b-3c7005a88d1b")
 		(at 88.5 142)
@@ -579,7 +579,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
@@ -591,7 +591,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -603,7 +603,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -826,7 +826,7 @@
 			(uuid "e4a24751-3e7f-4798-89ac-12601bd93602")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2963,7 +2963,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "0f5a8019-947b-4b67-9537-2494f12bf2bf")
 		(at 232.5 168)
@@ -3012,7 +3012,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
@@ -3024,7 +3024,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -3036,7 +3036,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -3259,7 +3259,7 @@
 			(uuid "82b1b4dc-7394-4e77-816e-fee70986ba5c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3271,7 +3271,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "107b59ff-e555-4e3e-9f75-2ad7efdb1333")
 		(at 208.5 168)
@@ -3320,7 +3320,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -3332,7 +3332,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -3344,7 +3344,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -3567,7 +3567,7 @@
 			(uuid "5a6c792d-4283-423b-96f7-3e63d51b2778")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -6539,7 +6539,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:SW-TH_EC11NXXXX"
+	(footprint "cubevox:SW-TH_EC11E"
 		(layer "F.Cu")
 		(uuid "2b135c6e-fbdd-437a-99d7-9110d5075df7")
 		(at 64.5 164 180)
@@ -6554,7 +6554,7 @@
 				)
 			)
 		)
-		(property "Value" "EC11N1520401"
+		(property "Value" "EC11E15204A3"
 			(at 0 11.25 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -6588,7 +6588,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470703"
+		(property "LCSC Part" "C470710"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -6600,7 +6600,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470703"
+		(property "LCSC" "C470710"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -6609,6 +6609,17 @@
 				(font
 					(size 1.27 1.27)
 					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "EC11E15204A3"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "aa9322ba-eb90-45ce-89c6-f380c996f3d0")
+			(effects
+				(font
+					(size 1.27 1.27)
 				)
 			)
 		)
@@ -6897,7 +6908,7 @@
 			(uuid "d7790a3d-30be-488a-9f63-b11b1a1ac5dc")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/EC11N1520401_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/EC11E15204A3_from_alps_ec11n.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -10050,7 +10061,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "36ba59e5-5221-4261-93f8-bc30fe828d14")
 		(at 112.5 168)
@@ -10099,7 +10110,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -10111,7 +10122,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -10123,7 +10134,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -10346,7 +10357,7 @@
 			(uuid "19ed86de-045d-4b1c-8de1-ce65f61fb2cc")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -15287,7 +15298,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "5c1da98c-5148-4531-99ad-acfebb167ceb")
 		(at 136.5 142)
@@ -15336,7 +15347,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -15348,7 +15359,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -15360,7 +15371,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -15583,7 +15594,7 @@
 			(uuid "36b783b2-7e5f-4714-abbd-2f338e6f8546")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -19308,7 +19319,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "6ef74d06-b151-4e6f-8981-8fb9b2ab2733")
 		(at 184.5 142)
@@ -19357,7 +19368,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -19369,7 +19380,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -19381,7 +19392,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -19604,7 +19615,7 @@
 			(uuid "ee44bc06-4fa4-4446-8bb2-9f45241c6446")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -19616,7 +19627,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "7030a6ee-6ebd-471a-bbf2-3ab2fb48e19e")
 		(at 64.5 142)
@@ -19665,7 +19676,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
@@ -19677,7 +19688,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -19689,7 +19700,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -19912,7 +19923,7 @@
 			(uuid "6750ff91-1df9-43dc-8113-95adc9e1fa83")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -20242,7 +20253,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "7379f20f-2309-420b-97eb-0f78c124a779")
 		(at 136.5 168)
@@ -20291,7 +20302,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -20303,7 +20314,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -20315,7 +20326,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -20538,7 +20549,7 @@
 			(uuid "b2d859a0-3e1b-452f-a1cd-08555f7c827a")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -23418,7 +23429,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:SW-TH_EC11NXXXX"
+	(footprint "cubevox:SW-TH_EC11E"
 		(layer "F.Cu")
 		(uuid "806dac34-7d42-4ff3-a779-b757f7024e3b")
 		(at 173.942 70.5 180)
@@ -23433,7 +23444,7 @@
 				)
 			)
 		)
-		(property "Value" "EC11N1525404"
+		(property "Value" "EC11E15244B2"
 			(at 0 11.25 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -23467,7 +23478,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470703"
+		(property "LCSC Part" "C470754"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -23479,7 +23490,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470748"
+		(property "LCSC" "C470754"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -23488,6 +23499,17 @@
 				(font
 					(size 1.27 1.27)
 					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "EC11E15244B2"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "e93423a6-f141-4b20-b1dd-8d6691d904a3")
+			(effects
+				(font
+					(size 1.27 1.27)
 				)
 			)
 		)
@@ -23776,7 +23798,7 @@
 			(uuid "f8a3f25b-fd66-4b1e-a18c-3c7455f6a168")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/EC11N1525404_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/EC11E15244B2_from_alps_ec11n.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -28079,7 +28101,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "8f382ba2-b242-47c4-8389-921656123dc5")
 		(at 232.5 142)
@@ -28128,7 +28150,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
@@ -28140,7 +28162,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -28152,7 +28174,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
 			(layer "F.SilkS")
 			(hide yes)
@@ -28375,7 +28397,7 @@
 			(uuid "e9a4282c-80fb-426b-957b-cccf435992ac")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -28387,7 +28409,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "8f6c5724-9f5f-484a-839d-1011b1ece052")
 		(at 184.5 168)
@@ -28436,7 +28458,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -28448,7 +28470,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -28460,7 +28482,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -28683,7 +28705,7 @@
 			(uuid "97b4d3e2-1b48-457c-ac7a-ebbbda990866")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -32204,7 +32226,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "a243daef-8869-483d-8a1f-5afaf8bb7a63")
 		(at 232.5 65)
@@ -32253,7 +32275,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -32265,7 +32287,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -32277,7 +32299,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -32500,7 +32522,7 @@
 			(uuid "f0baf448-3580-4869-bc3d-adba0b9081f6")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -32671,7 +32693,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:SW-TH_EC11NXXXX"
+	(footprint "cubevox:SW-TH_EC11E"
 		(layer "F.Cu")
 		(uuid "a5709ba1-9cef-40be-8b72-6f3408c8ab5b")
 		(at 88.5 164 180)
@@ -32686,7 +32708,7 @@
 				)
 			)
 		)
-		(property "Value" "EC11N1520401"
+		(property "Value" "EC11E15204A3"
 			(at 0 11.25 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -32720,7 +32742,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470703"
+		(property "LCSC Part" "C470710"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -32732,7 +32754,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470703"
+		(property "LCSC" "C470710"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -32741,6 +32763,17 @@
 				(font
 					(size 1.27 1.27)
 					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "EC11E15204A3"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "575c0716-9fc3-49ea-a78b-7e07bfefaf49")
+			(effects
+				(font
+					(size 1.27 1.27)
 				)
 			)
 		)
@@ -33029,7 +33062,7 @@
 			(uuid "cc972cf0-99b1-4b79-835e-aa1bbcfa680a")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/EC11N1520401_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/EC11E15204A3_from_alps_ec11n.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -36571,7 +36604,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "b6d9d2ab-e6f2-4816-a9ff-6b744beb9f11")
 		(at 208.5 142)
@@ -36620,7 +36653,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -36632,7 +36665,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -36644,7 +36677,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -36867,7 +36900,7 @@
 			(uuid "b7139515-b772-4f83-b58d-1e079c57121c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -41422,7 +41455,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "c6e5dfee-d0ab-4b8c-a7a5-514cc7b4cca5")
 		(at 160.5 142)
@@ -41471,7 +41504,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -41483,7 +41516,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -41495,7 +41528,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -41718,7 +41751,7 @@
 			(uuid "33641cd9-c907-4307-9e7e-02c6dfa98c2d")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -45859,7 +45892,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "df15d5bf-a3ef-41fd-b9a6-d4ac3ba838b8")
 		(at 112.5 142)
@@ -45908,7 +45941,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -45920,7 +45953,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -45932,7 +45965,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -46155,7 +46188,7 @@
 			(uuid "e57a9859-bab4-409d-9899-25df6fac9e23")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -50591,7 +50624,7 @@
 			)
 		)
 	)
-	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
+	(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P"
 		(layer "F.Cu")
 		(uuid "f4d1b207-7d14-415b-b620-d401b43ef8a9")
 		(at 160.5 168)
@@ -50640,7 +50673,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470304"
+		(property "LCSC Part" "C361173"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -50652,7 +50685,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -50664,7 +50697,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -50887,7 +50920,7 @@
 			(uuid "5aa9a9ec-99b9-4128-8728-dc6bee79576f")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C1B_alps_aligned.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/RK09D1130C2P_from_alps_c1b.step"
 			(offset
 				(xyz 0 0 0)
 			)
