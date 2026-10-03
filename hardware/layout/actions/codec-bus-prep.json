@@ -1,0 +1,229 @@
+[
+{
+"op": "move",
+"ref": "C44",
+"x": 134.525,
+"y": 101.5,
+"rot": 180
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 92.5,
+"y": 92.15
+},
+{
+"op": "remove_via",
+"x": 92.5,
+"y": 92.75
+},
+{
+"op": "remove_via",
+"x": 93.35,
+"y": 92.875
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 93.35,
+"y": 93.3
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 95.0,
+"y": 92.1
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 94.8875,
+"y": 92.7625
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 94.0625,
+"y": 92.875
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 92.75,
+"y": 99.95
+},
+{
+"op": "remove_via",
+"x": 92.75,
+"y": 100.375
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 94.75,
+"y": 102.2
+},
+{
+"op": "remove_via",
+"x": 94.75,
+"y": 102.625
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.0,
+"y": 94.0
+},
+{
+"op": "remove_via",
+"x": 106.0,
+"y": 94.425
+},
+{
+"op": "remove_net_tracks",
+"net": "/h7core_block/ADC_VCC"
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 120.575,
+"y": 101.85
+},
+{
+"op": "remove_via",
+"x": 119.95,
+"y": 101.85
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 120.575,
+"y": 102.5
+},
+{
+"op": "remove_via",
+"x": 119.95,
+"y": 102.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 120.575,
+"y": 103.15
+},
+{
+"op": "remove_via",
+"x": 119.95,
+"y": 103.15
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 126.175,
+"y": 101.85
+},
+{
+"op": "remove_via",
+"x": 125.55,
+"y": 101.85
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 125.875,
+"y": 103.8
+},
+{
+"op": "remove_via",
+"x": 124.95,
+"y": 103.8
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 127.425,
+"y": 102.5
+},
+{
+"op": "remove_via",
+"x": 128.05,
+"y": 102.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 128.8,
+"y": 101.5
+},
+{
+"op": "remove_via",
+"x": 128.375,
+"y": 101.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 136.4625,
+"y": 101.5
+},
+{
+"op": "remove_via",
+"x": 136.95,
+"y": 101.5
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 138.4945,
+"y": 100.22
+},
+{
+"op": "remove_via",
+"x": 137.859,
+"y": 100.22
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 138.4945,
+"y": 102.82
+},
+{
+"op": "remove_via",
+"x": 137.859,
+"y": 102.82
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 138.4945,
+"y": 104.78
+},
+{
+"op": "remove_via",
+"x": 137.859,
+"y": 104.78
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 145.5055,
+"y": 100.22
+},
+{
+"op": "remove_via",
+"x": 146.141,
+"y": 100.22
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 145.5055,
+"y": 104.13
+},
+{
+"op": "remove_via",
+"x": 146.141,
+"y": 104.13
+}
+]

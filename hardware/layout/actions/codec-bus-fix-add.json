@@ -1,0 +1,740 @@
+[
+{
+"op": "via",
+"net": "/GND",
+"x": 90.6,
+"y": 97.3,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 88.15,
+"y": 103.3,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 89.1,
+"y": 95.2,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 118.7,
+"y": 99.6,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 127.6,
+"y": 99.5,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 136.4,
+"y": 100.1,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+134.275,
+104.0
+],
+[
+135.5,
+104.0
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 135.5,
+"y": 104.0,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+99.0,
+99.775
+],
+[
+99.9,
+99.775
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 99.9,
+"y": 99.775,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+106.0,
+93.575
+],
+[
+106.0,
+95.6
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 106.0,
+"y": 95.6,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+132.7,
+101.5
+],
+[
+132.7,
+100.1
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 132.7,
+"y": 100.1,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/5VA",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+135.65,
+97.175
+],
+[
+135.65,
+96.375
+]
+]
+},
+{
+"op": "via",
+"net": "/5VA",
+"x": 135.65,
+"y": 96.375,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_BCLK_SRC",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+91.5,
+91.55
+],
+[
+91.5,
+94.425
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_VCC",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+135.65,
+98.825
+],
+[
+135.65,
+101.5
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_VCC",
+"layer": "F.Cu",
+"width_mm": 0.15,
+"points": [
+[
+135.65,
+101.5
+],
+[
+135.65,
+102.7125
+],
+[
+129.225,
+102.7125
+],
+[
+129.225,
+103.5
+]
+],
+"mitre_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_VCC",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+129.225,
+103.5
+],
+[
+128.4,
+103.5
+],
+[
+128.05,
+103.15
+],
+[
+126.8,
+103.15
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_DOUT",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+90.5,
+91.55
+],
+[
+90.5,
+92.75
+],
+[
+89.8,
+93.45
+],
+[
+89.8,
+94.5
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_DOUT",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+89.8,
+94.5
+],
+[
+89.8,
+101.2
+],
+[
+119.7,
+101.2
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/ADC_DOUT",
+"x": 119.7,
+"y": 101.2,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_DOUT",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+119.7,
+101.2
+],
+[
+121.2,
+101.2
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_SCKI",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+88.15,
+94.51
+],
+[
+88.15,
+102.3
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/ADC_SCKI",
+"x": 88.15,
+"y": 102.3,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_SCKI",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+88.15,
+102.3
+],
+[
+128.25,
+102.3
+],
+[
+128.25,
+100.5
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/ADC_SCKI",
+"x": 128.25,
+"y": 100.5,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/ADC_SCKI",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+128.25,
+100.5
+],
+[
+128.25,
+101.2
+],
+[
+126.8,
+101.2
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_LRCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+91.0,
+91.55
+],
+[
+91.0,
+92.9
+],
+[
+90.5,
+93.4
+],
+[
+90.5,
+93.9
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_LRCLK",
+"x": 90.5,
+"y": 93.9,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_LRCLK",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+90.5,
+93.9
+],
+[
+90.5,
+94.65
+],
+[
+126.8,
+94.65
+],
+[
+126.8,
+98.0
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_LRCLK",
+"x": 126.8,
+"y": 98.0,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_LRCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+126.8,
+98.0
+],
+[
+126.8,
+100.55
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_LRCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+126.8,
+100.55
+],
+[
+124.9,
+100.55
+],
+[
+124.9,
+97.3
+],
+[
+131.0,
+97.3
+],
+[
+131.0,
+100.1
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_LRCLK",
+"x": 131.0,
+"y": 100.1,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_LRCLK",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+131.0,
+100.1
+],
+[
+131.0,
+102.4
+],
+[
+137.1,
+102.4
+],
+[
+137.1,
+103.1
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_LRCLK",
+"x": 137.1,
+"y": 103.1,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_LRCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+137.1,
+103.1
+],
+[
+137.1,
+102.17
+],
+[
+139.13,
+102.17
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_BCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+91.5,
+96.075
+],
+[
+91.5,
+98.2
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_BCLK",
+"x": 91.5,
+"y": 98.2,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_BCLK",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+91.5,
+98.2
+],
+[
+91.5,
+98.6
+],
+[
+93.45,
+100.55
+],
+[
+118.9,
+100.55
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_BCLK",
+"x": 118.9,
+"y": 100.55,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_BCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+118.9,
+100.55
+],
+[
+121.2,
+100.55
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_BCLK",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+121.2,
+100.55
+],
+[
+121.2,
+95.5
+],
+[
+137.85,
+95.5
+],
+[
+137.85,
+100.87
+],
+[
+139.13,
+100.87
+]
+],
+"mitre_mm": 0.4
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_DATA",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+92.0,
+91.55
+],
+[
+92.0,
+92.8
+],
+[
+92.25,
+93.05
+],
+[
+92.25,
+93.45
+]
+]
+},
+{
+"op": "via",
+"net": "/h7core_block/I2S_DATA",
+"x": 92.25,
+"y": 93.45,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_DATA",
+"layer": "B.Cu",
+"width_mm": 0.2,
+"points": [
+[
+92.25,
+93.45
+],
+[
+92.25,
+94.15
+],
+[
+130.0,
+94.15
+],
+[
+130.0,
+99.4
+],
+[
+137.1,
+99.4
+],
+[
+137.1,
+101.52
+]
+]
+},
+{
+"op": "track",
+"net": "/h7core_block/I2S_DATA",
+"layer": "F.Cu",
+"width_mm": 0.2,
+"points": [
+[
+137.1,
+101.52
+],
+[
+139.13,
+101.52
+]
+]
+}
+]
