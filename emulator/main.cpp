@@ -130,7 +130,7 @@ struct ProtoParams {
     pitchFx.autotune.key = kStartKey;
     pitchFx.octave.engine = 2;
     pitchFx.octave.mix = 0.10f;
-    reverb.engine = cv::kReverbChasm;
+    reverb.engine = cv::kReverbSpringB;
     reverb.intensity = 1.0f;
     cv::applyIntensity(reverb);
   }
@@ -791,7 +791,8 @@ void drawPolishRaw(cv::PolishTuning& t) {
   ImGui::TreePop();
 }
 
-void drawReverbRaw(cv::SpringTuning& t, cv::ChasmTuning& c, cv::SpringBTuning& b) {
+// SPRING is off the face (owner 2026-10-03); its engine and tuning stay in the code.
+[[maybe_unused]] void drawSpringRaw(cv::SpringTuning& t) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   if (tuningNode("Tank")) {
     ImGui::SliderFloat("Feedback at tension 0", &t.tensionLo, 0.3f, 0.95f, "%.2f");
@@ -819,6 +820,10 @@ void drawReverbRaw(cv::SpringTuning& t, cv::ChasmTuning& c, cv::SpringBTuning& b
     ImGui::SliderFloat("Wet level", &t.wetDb, -24.0f, 18.0f, "%.1f dB");
     ImGui::TreePop();
   }
+}
+
+void drawReverbRaw(cv::ChasmTuning& c, cv::SpringBTuning& b) {
+  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   if (tuningNode("Chasm")) {
     ImGui::SliderFloat("Feedback at decay 0", &c.timeLo, 0.1f, 0.95f, "%.2f");
     ImGui::SliderFloat("Feedback at decay 1", &c.timeHi, 0.5f, 0.98f, "%.3f");
@@ -1407,7 +1412,7 @@ void drawEqTuning(cv::PolishParams& e) {
 void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
   if (!tuningHeader("reverb")) return;
   if (gAdvanced) {
-    drawReverbRaw(r.spring.tuning, r.chasm.tuning, r.springB.tuning);
+    drawReverbRaw(r.chasm.tuning, r.springB.tuning);
     return;
   }
   namespace mc = cv::macros;
@@ -1604,15 +1609,11 @@ void drawDistortionBlock(cv::DistortionParams& d, cv::macros::State& macros) {
 void drawReverbBlock(cv::ReverbParams& r, cv::macros::State& macros) {
   ImGui::PushID("reverb");
   ImGui::Checkbox("REVERB", &r.on);
-  ImGui::RadioButton("SPRING", &r.engine, cv::kReverbSpring);
-  ImGui::SameLine();
   ImGui::RadioButton("CHASM", &r.engine, cv::kReverbChasm);
   ImGui::SameLine();
   ImGui::RadioButton("SPRING B", &r.engine, cv::kReverbSpringB);
   // DWELL binds to whichever engine is selected.
-  float& dwell = r.engine == cv::kReverbChasm     ? r.chasm.dwell
-                 : r.engine == cv::kReverbSpringB ? r.springB.dwell
-                                                  : r.spring.dwell;
+  float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.springB.dwell;
   percentSlider("INTENSITY", r.intensity);
   percentSlider("DWELL", dwell);
   drawReverbTuning(r, macros);
@@ -1865,9 +1866,7 @@ void drawPedals(ProtoParams& params) {
   next();
   cv::ReverbParams& r = params.reverb;
   pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
-    float& dwell = r.engine == cv::kReverbChasm     ? r.chasm.dwell
-                   : r.engine == cv::kReverbSpringB ? r.springB.dwell
-                                                    : r.spring.dwell;
+    float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.springB.dwell;
     pedalPercent("INTENSITY", r.intensity);
     pedalPercent("DWELL", dwell);
   });
@@ -1914,8 +1913,8 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   params.linkAutotuneKey = true;
   // Octave engine B is off the face too; its formant shift goes with it.
   if (params.pitchFx.octave.engine == 1) params.pitchFx.octave.engine = 0;
-  // PARKER is off the face; a saved state that picked it loads as CHASM.
-  if (params.reverb.engine == cv::kReverbParker) params.reverb.engine = cv::kReverbChasm;
+  // SPRING and PARKER are off the face; a saved state that picked either loads as SPRING B.
+  if (params.reverb.engine != cv::kReverbChasm) params.reverb.engine = cv::kReverbSpringB;
   params.pitchFx.octave.formant = 0.0f;
   cv::applyIntensity(params.reverb);
   if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
@@ -2027,13 +2026,13 @@ int runLayoutProbe() {
 
   // Macro view: all headers closed, then each Tuning header open (reverb once per engine).
   // Advanced view: the same, plus each raw sub-node open alone.
-  constexpr int kSpring = cv::kReverbSpring, kChasm = cv::kReverbChasm, kSpringB = cv::kReverbSpringB;
+  constexpr int kChasm = cv::kReverbChasm, kSpringB = cv::kReverbSpringB;
   static const ProbeOpen kScenarios[] = {
       {true, nullptr, nullptr},
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
-      {true, "distortion", nullptr}, {true, "reverb", nullptr, false, kSpring},
+      {true, "distortion", nullptr},
       {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpringB},
       {true, "eq", nullptr},         {true, "ingate", nullptr},
       {true, "gate", nullptr},
@@ -2045,8 +2044,7 @@ int runLayoutProbe() {
       {true, "slapback", nullptr, true},        {true, "distortion", nullptr, true},
       {true, "distortion", "Stage 1", true},    {true, "distortion", "Tone stack", true},
       {true, "distortion", "Stage 2", true},    {true, "distortion", "Post", true},
-      {true, "reverb", nullptr, true},          {true, "reverb", "Tank", true},
-      {true, "reverb", "Splash", true},         {true, "reverb", "Levels", true},
+      {true, "reverb", nullptr, true},
       {true, "reverb", "Chasm", true},          {true, "reverb", "Chasm levels", true},
       {true, "reverb", "Spring B", true},       {true, "reverb", "Spring B levels", true},
       {true, "eq", nullptr, true},              {true, "ingate", nullptr, true},

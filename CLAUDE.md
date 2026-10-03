@@ -47,4 +47,4 @@ build/cubevox-render in.wav out.wav --depth 0.7
 Input Gain · Input gate Threshold+Decay (same controls as Gate) · Autotune Key (shared encoder)+Response (NATURAL → MECHANICAL, no mix) · Harmony: off the face, forced off; engine code kept (owner 2026-10-02) ·
 Octave Semitones+Mix ·
 Unison Depth+Rate · Slapback Intensity (level + repeats)+Time (30..150 ms) · Distortion Drive+Tone · Gate Threshold+Decay ·
-Reverb Intensity (mix + decay)+Dwell (engine SPRING / CHASM / SPRING B in menu; PARKER SPRING engine code kept, off the face — owner 2026-10-03) · EQ (menu) · Output (menu)
+Reverb Intensity (mix + decay)+Dwell (engine CHASM / SPRING B in menu, SPRING B default; SPRING and PARKER SPRING engine code kept, off the face — owner 2026-10-03) · EQ (menu) · Output (menu)
