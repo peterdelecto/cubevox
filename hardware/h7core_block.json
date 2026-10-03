@@ -914,7 +914,7 @@
    "pins": [
     {
      "pin": "1",
-     "net": "3V3A",
+     "net": "3V3",
      "dir": [
       0,
       -1
@@ -3221,6 +3221,39 @@
    "fields": {
     "Section": "adc_in"
    }
+  },
+  {
+   "ref": "C164",
+   "lib_id": "Device:C",
+   "value": "10uF",
+   "at": [
+    155,
+    185
+   ],
+   "angle": 0,
+   "footprint": "Capacitor_SMD:C_0805_2012Metric",
+   "lcsc": "C15850",
+   "rest": "no_connect",
+   "pins": [
+    {
+     "pin": "1",
+     "net": "VDDA",
+     "dir": [
+      0,
+      -1
+     ],
+     "len": 2
+    },
+    {
+     "pin": "2",
+     "net": "GND",
+     "dir": [
+      0,
+      1
+     ],
+     "len": 2
+    }
+   ]
   }
  ],
  "power_symbols": [

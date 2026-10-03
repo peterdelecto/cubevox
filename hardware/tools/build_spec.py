@@ -200,10 +200,15 @@ def build_child():
             p["fields"]["Group"] = "stitch ADC_SCKI via A"
         if p["ref"] == "R30":
             p["pins"][0]["net"] = "POT_MUX_OUT"
+        if p["ref"] == "FB1":    # VDDA from VDD through the ferrite, so VDDA cannot lead VDD (AN4938 2.1.2)
+            p["pins"][0]["net"] = "3V3"
         for r in p.get("pins", []):
             r["net"] = NET_RENAME.get(r.get("net"), r.get("net")) if r.get("net") else r.get("net")
         p["ref"] = CHILD_REF_RENAME.get(p["ref"], p["ref"])
         parts.append(p)
+    c164 = C("10uF", "VDDA", "GND", 155, 185, "C164")   # damps the FB1 LC and lowers its corner
+    c164.update(footprint="Capacitor_SMD:C_0805_2012Metric", lcsc="C15850")   # CL21A106KAYNNNE 25 V X5R
+    parts.append(c164)
     d["parts"] = parts
     d["ports"] = [{"name": n, "shape": s} for n, s in CHILD_PORTS]
     used = {p["lib_id"] for p in parts} | {r["lib_id"] for r in d["power_symbols"]}
@@ -373,11 +378,11 @@ def build_top():
         R("470R", "DAC_OUTL", "DAC_LP", X5 + 40, 66, "R147"), C("2.2nF", "DAC_LP", "GND", X5 + 52, 66, "C161"))
     add(R("100R", "BUF_OUT", "BUF_R", X5 + 4, 140, "R124"), CE("10uF", "BUF_R", "OUT_AC", X5 + 16, 140, "C141"),
         R("100k", "OUT_AC", "GND", X5 + 28, 140, "R125"))
-    nmj = {"ref": "J108", "lib_id": "cubevox:NMJ6HCD2", "value": "OUT 6.35mm",
-           "at": [X5 + 20, 200], "angle": 0, "footprint": "cubevox:AUDIO-TH_NMJ6HCD2",
-           "lcsc": "C368502", "rest": "no_connect", "in_bom": True, "fields": {"MPN": "NMJ6HCD2"},
-           "pins": [row("1", "OUT_TIP", LF), row("3", "GND", LF)]}
-    add(nmj)
+    jout = {"ref": "J108", "lib_id": "cubevox:PJ-611E", "value": "OUT 6.35mm",     # HOOYA PJ-611E (owner 2026-10-02)
+            "at": [X5 + 20, 200], "angle": 0, "footprint": "cubevox:AUDIO-TH_PJ-611E_1",
+            "lcsc": "C309282", "rest": "no_connect", "in_bom": True, "fields": {"MPN": "PJ-611E"},
+            "pins": [row("6", "OUT_TIP", RT), row("2", "GND", RT)]}
+    add(jout)
     note("OUT_TIP via K102 (section 8)", X5 + 36, 200)
 
     # ------------------------------------------------------------------ MUTE / 5VA SENSE
@@ -463,13 +468,13 @@ def build_top():
         ["cubevox", "OPA2197IDR"], ["cubevox", "SS34_C8678"], ["cubevox", "SMBJ15CA_C19077570"],
         ["cubevox", "PJ-002A"], ["cubevox", "AP63205WU-7"], ["cubevox", "ANR5040T4R7M"],
         ["cubevox", TOGGLE_SYM], ["cubevox", "PZ254V-11-04P_C2691448"], ["cubevox", "OLED-1.3-SH1106-I2C-4P"],
-        ["cubevox", "NMJ6HCD2"], ["cubevox", "NCJ6FA-H"], ["cubevox", "G6K-2F-Y-DC5"], ["cubevox", "1N4148W_C81598"],
+        ["cubevox", "NCJ6FA-H"], ["cubevox", "G6K-2F-Y-DC5"], ["cubevox", "1N4148W_C81598"],
         ["cubevox", "CD74HC4067SM96"], ["cubevox", "RK09D1130C1B"], ["cubevox", "EC11N1525404"],
         ["cubevox", "EC11N1520401"], ["cubevox_h7core", "BAT54SLT1G"],
         ["Device", "R"], ["Device", "C"],
         ["cubevox", "RVT1E100M0405-C72484"], ["cubevox", "VT1A101M0505"], ["cubevox", "RVT1C220M0405"],
         ["cubevox", "RVT1E470M0605"], ["cubevox", "MMBT3904-C20526"], ["Device", "FerriteBead"],
-        ["Mechanical", "MountingHole"], ["power", "PWR_FLAG"]]
+        ["Mechanical", "MountingHole"], ["power", "PWR_FLAG"], ["cubevox", "PJ-611E"]]
     top["libraries"].pop("Connector", None)
     top["libraries"].pop("Connector_Generic", None)
 

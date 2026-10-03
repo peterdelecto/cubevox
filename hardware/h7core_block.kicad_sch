@@ -9017,7 +9017,7 @@
 		)
 		(uuid "3df1af9f-715b-5a4b-b2a7-01f70b7f652a")
 	)
-	(hierarchical_label "3V3A"
+	(hierarchical_label "3V3"
 		(shape output)
 		(at 181.61 228.6 90)
 		(fields_autoplaced yes)
@@ -17534,6 +17534,118 @@
 			(justify right bottom)
 		)
 		(uuid "1ddc3f1d-c887-579c-be66-7e10afc0a8f2")
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 196.85 234.95 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "463e16bf-9892-54d0-9517-c990337d72cb")
+		(property "Reference" "C164"
+			(at 200.66 233.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10uF"
+			(at 200.66 236.22 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+			(at 196.85 234.95 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 196.85 234.95 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C15850"
+			(at 196.85 234.95 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4cad01bc-8b1e-586b-91ed-ea17ac442c70")
+		)
+		(pin "2"
+			(uuid "1d979faf-f4cc-50b9-a705-5fd5b71c8918")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
+					(reference "C164")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 196.85 231.14) (xy 196.85 228.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "88a8a192-2720-53ab-b592-23e72cfcd4c6")
+	)
+	(label "VDDA"
+		(at 196.85 228.6 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "4b106fcc-0d27-5694-ba93-e1d9ae434d2b")
+	)
+	(wire
+		(pts
+			(xy 196.85 238.76) (xy 196.85 241.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0dadcf7b-4c0a-5acc-95c0-06303fb26c5a")
+	)
+	(hierarchical_label "GND"
+		(shape passive)
+		(at 196.85 241.3 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "37f3f4d9-d1c3-52dd-9b2a-405331c2c2d9")
 	)
 	(symbol
 		(lib_id "power:PWR_FLAG")
