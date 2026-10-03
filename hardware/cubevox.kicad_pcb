@@ -27201,11 +27201,11 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "8cd55c7f-1a43-4420-9c43-767c20ac7c6c")
-		(at 268 149)
+		(at 151 104 90)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C34"
-			(at 0 -1.43 0)
+			(at 0 -1.43 90)
 			(layer "F.Fab")
 			(uuid "a0c7cb11-d2a7-40ec-aa6b-6574adca9a9f")
 			(effects
@@ -27216,7 +27216,7 @@
 			)
 		)
 		(property "Value" "2.2uF"
-			(at 0 1.43 0)
+			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "93370667-f4e2-46a1-8ed3-ac34b61f57dd")
@@ -27228,7 +27228,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "7a95f451-325a-4707-baf0-229d224eefbb")
@@ -27239,7 +27239,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c34aabfa-3253-443d-912e-bd03cdcf4fc8")
@@ -27250,7 +27250,7 @@
 			)
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "41e3f452-0934-4ed4-97be-5b7f2c86b5c2")
@@ -27262,7 +27262,7 @@
 			)
 		)
 		(property "LCSC" "C23630"
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "ccb4e405-6a95-4793-b326-e39aac1452c3")
@@ -27318,7 +27318,7 @@
 			(uuid "aa151697-6efc-42f4-a3fd-46e0df1c349f")
 		)
 		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(uuid "f8adc79c-c5f4-4a9f-87ad-9d6ea09c3d0a")
 			(effects
@@ -27329,7 +27329,7 @@
 			)
 		)
 		(pad "1" smd roundrect
-			(at -0.775 0)
+			(at -0.775 0 90)
 			(size 0.9 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -27337,7 +27337,7 @@
 			(uuid "79adb318-d959-444b-bf2a-0def260f86db")
 		)
 		(pad "2" smd roundrect
-			(at 0.775 0)
+			(at 0.775 0 90)
 			(size 0.9 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -30085,11 +30085,11 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "97ca9503-0c1a-4cdf-8f71-d1b825111a4f")
-		(at 268 143)
+		(at 136.5 105 -90)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C33"
-			(at 0 -1.43 270)
+			(at 0 -1.43 180)
 			(layer "F.Fab")
 			(uuid "9fb847ce-2c0a-42fb-86e0-d913112dc5cb")
 			(effects
@@ -30100,7 +30100,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 0 1.43 0)
+			(at 0 1.43 270)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4172b670-c502-4f08-a6ef-d051b42e6941")
@@ -30112,7 +30112,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ff04efe4-3dec-4229-9355-58eb4d4015c6")
@@ -30123,7 +30123,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "5d4e9b7a-26bf-4b49-a769-63120ca30820")
@@ -30134,7 +30134,7 @@
 			)
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "fb349762-da9e-4618-91b7-0f918afd0e2b")
@@ -30146,7 +30146,7 @@
 			)
 		)
 		(property "LCSC" "C14663"
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "b4468ce8-a27b-4cc5-8c73-3ac7ace1147e")
@@ -30160,16 +30160,6 @@
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
-			(start -0.14058 -0.51)
-			(end 0.14058 -0.51)
-			(stroke
-				(width 0.12)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "723b9058-9453-48cd-82a2-60a145aa35d6")
-		)
-		(fp_line
 			(start -0.14058 0.51)
 			(end 0.14058 0.51)
 			(stroke
@@ -30178,6 +30168,16 @@
 			)
 			(layer "F.SilkS")
 			(uuid "34cdbc85-f101-4dd8-8e02-3dfbd972b469")
+		)
+		(fp_line
+			(start -0.14058 -0.51)
+			(end 0.14058 -0.51)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "723b9058-9453-48cd-82a2-60a145aa35d6")
 		)
 		(fp_rect
 			(start -1.48 -0.73)
@@ -30202,7 +30202,7 @@
 			(uuid "17a34ca8-a3fb-4ae6-aaed-690242c73ef8")
 		)
 		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
+			(at 0 0 270)
 			(layer "F.Fab")
 			(uuid "55efe8f7-3fb7-4e1f-a794-941104bf3766")
 			(effects
@@ -30213,7 +30213,7 @@
 			)
 		)
 		(pad "1" smd roundrect
-			(at -0.775 0)
+			(at -0.775 0 270)
 			(size 0.9 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -30221,7 +30221,7 @@
 			(uuid "6b26f8d9-345e-42ef-b9d3-dbd430fb6119")
 		)
 		(pad "2" smd roundrect
-			(at 0.775 0)
+			(at 0.775 0 270)
 			(size 0.9 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -30351,7 +30351,7 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "98bb7f9c-2523-4662-bb5d-e989cae9e655")
-		(at 268 155)
+		(at 148 102.5)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C35"
@@ -37886,7 +37886,7 @@
 	(footprint "cubevox:C0603"
 		(layer "F.Cu")
 		(uuid "ba25a35b-7e64-48ce-91fa-3ec8df2411b2")
-		(at 274 95)
+		(at 148 105.5)
 		(descr "10nF (103) ±10% 50V")
 		(property "Reference" "C111"
 			(at 0 -4 0)
@@ -47717,7 +47717,7 @@
 	(footprint "Resistor_SMD:R_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "e312570b-9ad9-42e0-8b40-338fcc301491")
-		(at 280 77)
+		(at 148 98.5)
 		(descr "Resistor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 72, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "resistor")
 		(property "Reference" "R16"
@@ -49712,7 +49712,7 @@
 	(footprint "cubevox:C0603"
 		(layer "F.Cu")
 		(uuid "f07bf61b-729f-49c7-a3bd-5c925c819ba5")
-		(at 274 89)
+		(at 148 100.5)
 		(descr "10nF (103) ±10% 50V")
 		(property "Reference" "C101"
 			(at 0 -4 0)
