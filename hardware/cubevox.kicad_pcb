@@ -20656,7 +20656,7 @@
 	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "75569820-c224-4614-b2e2-f84921ae6ca9")
-		(at 233 90 -90)
+		(at 233 90.5 -90)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R112"
 			(at 0 -4 90)
@@ -21424,7 +21424,7 @@
 	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "7b8e9094-4c57-440d-bc2d-1202f667e6cb")
-		(at 231 90 90)
+		(at 231 90.5 90)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R111"
 			(at 0 -4 270)
@@ -23027,7 +23027,7 @@
 	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "806554ef-d9bc-46bc-be39-e85a2b8e8603")
-		(at 229 90 90)
+		(at 229 90.5 90)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R113"
 			(at 0 -4 270)
@@ -24465,7 +24465,7 @@
 	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "822d897f-a1c5-48fe-b0f1-bd406093710c")
-		(at 227 90 -90)
+		(at 227 90.5 -90)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R114"
 			(at 0 -4 90)
