@@ -56784,14 +56784,6 @@
 		(uuid "3e944bc3-a871-4ffa-a3e9-672cd98cfb90")
 	)
 	(segment
-		(start 186.2 144.7)
-		(end 186.15 144.7)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/3V3A")
-		(uuid "495fa656-14bf-43c7-b186-1c53aa059db0")
-	)
-	(segment
 		(start 107.8 62.3)
 		(end 108.3 62.3)
 		(width 0.3)
@@ -56982,14 +56974,6 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/3V3A")
 		(uuid "afd4ad59-bc21-4f0a-9813-35a0ae9c6504")
-	)
-	(via
-		(at 186.15 144.7)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "/3V3A")
-		(uuid "bdd2aa3a-bd85-47ca-958a-2b841ee0c643")
 	)
 	(via
 		(at 196.3 152.1)
@@ -57192,20 +57176,20 @@
 		(uuid "25f68e7d-ca01-4bfb-a0b9-8c4d288b68df")
 	)
 	(segment
-		(start 185.45 144)
-		(end 186.15 144.7)
-		(width 0.3)
-		(layer "In2.Cu")
-		(net "/3V3A")
-		(uuid "267bcfcc-6498-44ef-884d-50cf11057b6f")
-	)
-	(segment
 		(start 188.3 146.8)
 		(end 188.3 152.1)
 		(width 0.3)
 		(layer "In2.Cu")
 		(net "/3V3A")
 		(uuid "29e9d5b6-dc90-44f7-a531-faf0e97660c5")
+	)
+	(segment
+		(start 185.45 144)
+		(end 186.95 145.5)
+		(width 0.3)
+		(layer "In2.Cu")
+		(net "/3V3A")
+		(uuid "2fb3a27a-0aed-4d78-9cb4-dcc764405341")
 	)
 	(segment
 		(start 139 145.5)
@@ -57358,14 +57342,6 @@
 		(layer "In2.Cu")
 		(net "/3V3A")
 		(uuid "603fa4a2-322a-4243-9180-a46ab04a475a")
-	)
-	(segment
-		(start 186.15 144.7)
-		(end 186.95 145.5)
-		(width 0.3)
-		(layer "In2.Cu")
-		(net "/3V3A")
-		(uuid "62cb47af-74aa-476f-98ad-be41ec1fcebc")
 	)
 	(segment
 		(start 211 171.5)
@@ -59632,14 +59608,6 @@
 		(uuid "f0659224-7715-4d6c-8fb4-0fb1d3e007fb")
 	)
 	(segment
-		(start 233.6 35.25)
-		(end 233.55 35.25)
-		(width 0.4)
-		(layer "F.Cu")
-		(net "/9V_JACK")
-		(uuid "387c3c74-2551-4084-84a6-c8a39212b9a4")
-	)
-	(segment
 		(start 233.5 47.75)
 		(end 233.5 48.25)
 		(width 0.4)
@@ -59654,14 +59622,6 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/9V_JACK")
 		(uuid "b1e20b5c-abed-4bf1-b9b2-3ffdd20c9002")
-	)
-	(via
-		(at 233.55 35.25)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "/9V_JACK")
-		(uuid "f09454ae-c110-4fac-9f50-77a2d547dc0e")
 	)
 	(segment
 		(start 234.35 47.4)
