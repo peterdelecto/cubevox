@@ -2727,10 +2727,10 @@
 	(footprint "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD"
 		(layer "F.Cu")
 		(uuid "0f14be19-2686-4928-975a-ad0bb3067eea")
-		(at 69 60 90)
+		(at 74 53.6)
 		(descr "1N4148W")
 		(property "Reference" "D104"
-			(at 0 -4 0)
+			(at 0 -4 270)
 			(layer "F.Fab")
 			(uuid "8fb559f3-274e-47a4-b2d4-a12dc3abc27a")
 			(effects
@@ -2741,7 +2741,7 @@
 			)
 		)
 		(property "Value" "1N4148W"
-			(at 0 4 90)
+			(at 0 4 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ffa3a52d-e380-4a00-be7b-2029d3e817fb")
@@ -2753,7 +2753,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 90)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0809dd06-56e5-4e03-abf1-b9a95b3f9514")
@@ -2764,7 +2764,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 90)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "8d648716-5ad4-4f53-aef4-bcdd0767967b")
@@ -2775,7 +2775,7 @@
 			)
 		)
 		(property "LCSC Part" "C81598"
-			(at 0 0 90)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "85f5c7ff-05e5-490c-b539-0d87ee1e08ba")
@@ -2787,7 +2787,7 @@
 			)
 		)
 		(property "LCSC" "C81598"
-			(at 0 0 90)
+			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "020fd598-04c0-4f8b-b623-4fd86409423c")
@@ -2801,16 +2801,6 @@
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
-			(start 1.38 -0.93)
-			(end 1.38 -0.73)
-			(stroke
-				(width 0.15)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "fd9342ce-f69a-4c49-87d4-38d6e27ab7a0")
-		)
-		(fp_line
 			(start -1.38 -0.93)
 			(end 1.38 -0.93)
 			(stroke
@@ -2819,6 +2809,16 @@
 			)
 			(layer "F.SilkS")
 			(uuid "79445e73-f7f8-4f1f-9817-2b57df761216")
+		)
+		(fp_line
+			(start -1.38 0.93)
+			(end 1.38 0.93)
+			(stroke
+				(width 0.15)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "3c65450b-5d4c-4e41-9925-1e6603b99355")
 		)
 		(fp_line
 			(start -0.92 -0.88)
@@ -2831,6 +2831,16 @@
 			(uuid "ff1a8a83-8d34-41df-8cdf-8a61ef678c3c")
 		)
 		(fp_line
+			(start 1.38 -0.93)
+			(end 1.38 -0.73)
+			(stroke
+				(width 0.15)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "fd9342ce-f69a-4c49-87d4-38d6e27ab7a0")
+		)
+		(fp_line
 			(start 1.38 0.93)
 			(end 1.38 0.73)
 			(stroke
@@ -2839,16 +2849,6 @@
 			)
 			(layer "F.SilkS")
 			(uuid "69f25ed7-84f5-404c-bd47-45528623b3e8")
-		)
-		(fp_line
-			(start -1.38 0.93)
-			(end 1.38 0.93)
-			(stroke
-				(width 0.15)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "3c65450b-5d4c-4e41-9925-1e6603b99355")
 		)
 		(fp_circle
 			(center -1.9 0.8)
@@ -2888,16 +2888,6 @@
 			(uuid "40acabce-db42-4fc7-a90a-6292dbe71420")
 		)
 		(fp_line
-			(start 2.53 -1.1)
-			(end 2.53 1.1)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "4091cb76-3d08-47ee-a430-a30972b72e14")
-		)
-		(fp_line
 			(start -2.53 -1.1)
 			(end 2.53 -1.1)
 			(stroke
@@ -2906,16 +2896,6 @@
 			)
 			(layer "F.CrtYd")
 			(uuid "6ec61626-58ec-486f-83e7-9aed460d4af4")
-		)
-		(fp_line
-			(start 2.53 1.1)
-			(end -2.53 1.1)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "b4be0ada-69b0-4bd2-9f1f-70ad8a8305a8")
 		)
 		(fp_line
 			(start -2.53 1.1)
@@ -2927,8 +2907,28 @@
 			(layer "F.CrtYd")
 			(uuid "93b18e22-4be5-4ed0-9efb-4a66d62b1256")
 		)
+		(fp_line
+			(start 2.53 -1.1)
+			(end 2.53 1.1)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(layer "F.CrtYd")
+			(uuid "4091cb76-3d08-47ee-a430-a30972b72e14")
+		)
+		(fp_line
+			(start 2.53 1.1)
+			(end -2.53 1.1)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(layer "F.CrtYd")
+			(uuid "b4be0ada-69b0-4bd2-9f1f-70ad8a8305a8")
+		)
 		(fp_text user "${REFERENCE}"
-			(at 0 0 90)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(uuid "007365d2-1331-4dde-9ce9-f72c28622b7d")
 			(effects
@@ -2939,14 +2939,14 @@
 			)
 		)
 		(pad "1" smd rect
-			(at -1.73 0 90)
+			(at -1.73 0)
 			(size 1.1 1)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(net "/SW_BYPASS")
 			(uuid "fde54176-e7c5-45f2-ba94-64ac0279757d")
 		)
 		(pad "2" smd rect
-			(at 1.73 0 90)
+			(at 1.73 0)
 			(size 1.1 1)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(net "/GND")
