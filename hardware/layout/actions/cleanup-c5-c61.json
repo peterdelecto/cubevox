@@ -1,0 +1,206 @@
+[
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 105.325,
+"y": 73.4
+},
+{
+"op": "remove_via",
+"x": 105.05,
+"y": 73.4
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.4,
+"y": 74.425
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.575,
+"y": 74.875
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.75,
+"y": 75.525
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.75,
+"y": 76.075
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.7,
+"y": 76.2
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 106.45,
+"y": 76.25
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 105.475,
+"y": 76.25
+},
+{
+"op": "remove_via",
+"x": 105.2,
+"y": 76.25
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 104.25,
+"y": 77.7
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 104.8,
+"y": 76.95
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 105.55,
+"y": 76.4
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 104.525,
+"y": 76.25
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 104.775,
+"y": 75.925
+},
+{
+"op": "via",
+"net": "/3V3",
+"x": 105.2,
+"y": 76.5,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/3V3",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+105.2,
+76.5
+],
+[
+105.75,
+76.5
+]
+]
+},
+{
+"op": "track",
+"net": "/3V3",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+104.25,
+77.9
+],
+[
+104.25,
+77.45
+],
+[
+105.2,
+76.5
+]
+]
+},
+{
+"op": "track",
+"net": "/3V3",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+106.4,
+73.8
+],
+[
+106.8,
+73.8
+],
+[
+107.2,
+74.2
+],
+[
+107.2,
+75.9
+],
+[
+106.6,
+76.5
+],
+[
+106.2,
+76.5
+]
+]
+},
+{
+"op": "track",
+"net": "/3V3",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+103.95,
+76.25
+],
+[
+104.2,
+76.5
+],
+[
+105.2,
+76.5
+]
+]
+},
+{
+"op": "track",
+"net": "/3V3",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+104.45,
+75.6
+],
+[
+104.45,
+75.75
+],
+[
+105.2,
+76.5
+]
+]
+}
+]

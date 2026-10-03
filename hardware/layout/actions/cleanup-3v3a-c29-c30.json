@@ -1,0 +1,26 @@
+[
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 189.15,
+"y": 152.1
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 190.075,
+"y": 152.175
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 193.15,
+"y": 152.25
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 196.225,
+"y": 152.175
+}
+]

@@ -1,0 +1,39 @@
+{
+ "declaration": "D0115",
+ "ledger": "0144",
+ "baseline": "0143",
+ "board_sha256": "dac690b1fed7bbd985dabbdf20a80473531a0dd1e4588d8e7c9931c385a72216",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0144.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2015.7,
+   "after": 2011.7,
+   "delta": -4.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 677,
+   "after": 673,
+   "delta": -4,
+   "direction": "n/a"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 178,
+   "after": 176,
+   "delta": -2,
+   "direction": "better"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

@@ -1,0 +1,74 @@
+[
+{
+"op": "remove_via",
+"x": 161.1,
+"y": 94.4
+},
+{
+"op": "remove_via",
+"x": 156.35,
+"y": 84.6
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 161.375,
+"y": 94.4
+},
+{
+"op": "remove_track",
+"layer": "F.Cu",
+"x": 156.35,
+"y": 84.85
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 160.0,
+"y": 85.15
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 161.1,
+"y": 90.325
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 156.0,
+"y": 84.25
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 156.625,
+"y": 84.325
+},
+{
+"op": "remove_track",
+"layer": "In2.Cu",
+"x": 157.9,
+"y": 84.05
+},
+{
+"op": "track",
+"net": "/5VA",
+"layer": "In2.Cu",
+"width_mm": 0.3,
+"points": [
+[
+155.65,
+83.9
+],
+[
+155.8,
+84.05
+],
+[
+158.9,
+84.05
+]
+]
+}
+]
