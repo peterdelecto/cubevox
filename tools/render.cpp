@@ -51,7 +51,7 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--atchromatic] [--atengine 0|1] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|chasm|parker|parkerspring] [--spring] [--decay <0..1>] [--dwell <0..1>]\n"
+               "       [--reverb spring|chasm|parker|parkerspring|springb] [--spring] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
@@ -85,6 +85,9 @@ int usage() {
                "     prkRippleGain prkModDepth prkModPole prkSprings (1..3) prkTdFactor0/1/2\n"
                "     prkFcFactor0/1/2 prkHpHz prkLpHz prkDwellDrive prkDwellComp prkPresenceHz\n"
                "     prkPresenceDb prkPresenceQ prkTankTrim prkWetDb\n"
+               "     sbHalfMs1 sbHalfMs2 sbTimeLo sbTimeHi sbDiffuse sbChirpSections (0..32) sbChirpA\n"
+               "     sbTrebleLossHz sbBassCutHz sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive\n"
+               "     sbDwellComp sbWetDb\n"
                "     eqDipQ eqPresenceQ eqAirHz\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainPeriods atEpochSearch atEpochLpHz\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
@@ -114,6 +117,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringTuning& sp = rp.reverb.spring.tuning;
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
   cv::SpringCTuning& pk = rp.reverb.parker.tuning;
+  cv::SpringBTuning& sb = rp.reverb.springB.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::HarmonyTuning& ht = rp.pitchFx.harmony.tuning;
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
@@ -126,6 +130,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   float prkMLow = static_cast<float>(pk.mLow);
   float prkMHigh = static_cast<float>(pk.mHigh);
   float prkSprings = static_cast<float>(pk.springs);
+  float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
   float harGrains = static_cast<float>(ht.shifter.grainCount);
   // Chromatic rows by HarmonyVoice: Lower, Low, High, Higher (Fixed is unused).
@@ -204,6 +209,14 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"prkPresenceHz", &pk.presenceHz},      {"prkPresenceDb", &pk.presenceDb},
       {"prkPresenceQ", &pk.presenceQ},        {"prkTankTrim", &pk.tankTrim},
       {"prkWetDb", &pk.wetDb},
+      {"sbHalfMs1", &sb.halfMs1},             {"sbHalfMs2", &sb.halfMs2},
+      {"sbTimeLo", &sb.timeLo},               {"sbTimeHi", &sb.timeHi},
+      {"sbDiffuse", &sb.diffuse},             {"sbChirpSections", &sbSections},
+      {"sbChirpA", &sb.chirpA},               {"sbTrebleLossHz", &sb.trebleLossHz},
+      {"sbBassCutHz", &sb.bassCutHz},         {"sbWobbleDepth", &sb.wobbleDepth},
+      {"sbWobbleRateHz", &sb.wobbleRateHz},   {"sbInputTrim", &sb.inputTrim},
+      {"sbDwellDrive", &sb.dwellDrive},       {"sbDwellComp", &sb.dwellComp},
+      {"sbWetDb", &sb.wetDb},
       {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz}, {"eqTrimDb", &et.trimDb},
       {"ingAttackMs", &ig.attackMs},          {"ingHoldMs", &ig.holdMs},
       {"ingReleaseMs", &ig.releaseMs},        {"ingRangeDb", &ig.rangeDb},
@@ -228,6 +241,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (prkMHigh < 0.0f || prkMHigh > 200.0f || prkMHigh != std::floor(prkMHigh)) return false;
     if (prkSprings < 1.0f || prkSprings > 3.0f || prkSprings != std::floor(prkSprings))
       return false;
+    if (sbSections < 0.0f || sbSections > 32.0f || sbSections != std::floor(sbSections)) return false;
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (harGrains != 2.0f && harGrains != 4.0f) return false;
@@ -241,6 +255,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     pk.mLow = static_cast<int>(prkMLow);
     pk.mHigh = static_cast<int>(prkMHigh);
     pk.springs = static_cast<int>(prkSprings);
+    sb.chirpSections = static_cast<int>(sbSections);
     sp.hfSections = static_cast<int>(hfSections);
     sp.springs = static_cast<int>(springs);
     return true;
@@ -355,6 +370,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         rp.reverb.engine = cv::kReverbChasm;
       else if (std::strcmp(v, "parker") == 0 || std::strcmp(v, "parkerspring") == 0)
         rp.reverb.engine = cv::kReverbParker;
+      else if (std::strcmp(v, "springb") == 0)
+        rp.reverb.engine = cv::kReverbSpringB;
       else
         return false;
       haveReverb = true;
@@ -438,15 +455,17 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   if (positional != 2) return false;
   // DECAY and DWELL drive whichever engine is selected.
   if (haveDecay) {
-    float& d = rp.reverb.engine == cv::kReverbChasm    ? rp.reverb.chasm.decay
-               : rp.reverb.engine == cv::kReverbParker ? rp.reverb.parker.tension
-                                                       : rp.reverb.spring.tension;
+    float& d = rp.reverb.engine == cv::kReverbChasm     ? rp.reverb.chasm.decay
+               : rp.reverb.engine == cv::kReverbParker  ? rp.reverb.parker.tension
+               : rp.reverb.engine == cv::kReverbSpringB ? rp.reverb.springB.decay
+                                                        : rp.reverb.spring.tension;
     d = decay;
   }
   if (haveDwell) {
-    float& d = rp.reverb.engine == cv::kReverbChasm    ? rp.reverb.chasm.dwell
-               : rp.reverb.engine == cv::kReverbParker ? rp.reverb.parker.dwell
-                                                       : rp.reverb.spring.dwell;
+    float& d = rp.reverb.engine == cv::kReverbChasm     ? rp.reverb.chasm.dwell
+               : rp.reverb.engine == cv::kReverbParker  ? rp.reverb.parker.dwell
+               : rp.reverb.engine == cv::kReverbSpringB ? rp.reverb.springB.dwell
+                                                        : rp.reverb.spring.dwell;
     d = dwell;
   }
   if (voices > 0 && !haveHarmony) return false;

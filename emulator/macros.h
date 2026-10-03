@@ -16,6 +16,7 @@
 #include "engine/harmony.h"
 #include "engine/octave.h"
 #include "engine/spring.h"
+#include "engine/spring_b.h"
 #include "engine/spring_c.h"
 #include "engine/unison.h"
 
@@ -120,6 +121,14 @@ constexpr Anchor kPrkModDepth{2.0f, 8.0f, 16.0f};
 constexpr Anchor kPrkLp{5000.0f, 9000.0f, 14000.0f, I::Log};
 constexpr Anchor kPrkPresenceHz{2500.0f, 3000.0f, 4000.0f, I::Log};
 
+// SPRING B
+constexpr Anchor kSbChirpA{0.55f, 0.70f, 0.85f};
+constexpr Anchor kSbChirpSections{12.0f, 24.0f, 32.0f, I::Round};
+constexpr Anchor kSbWobbleDepth{2.0f, 8.0f, 24.0f};
+constexpr Anchor kSbWobbleRate{1.5f, 3.0f, 5.0f, I::Log};
+constexpr Anchor kSbDiffuse{0.45f, 0.30f, 0.15f};                    // less diffusion = crisper repeats
+constexpr Anchor kSbTrebleLoss{3000.0f, 6000.0f, 10000.0f, I::Log};
+
 // The default positions reproduce the engine tuning defaults; the --layout
 // probe fails when they drift apart.
 
@@ -144,6 +153,9 @@ enum Id : int {
   ParkerFlutter,
   ParkerBrightness,
   SpringDrip,
+  SpringBDrip,
+  SpringBFlutter,
+  SpringBBrightness,
   kCount
 };
 
@@ -153,19 +165,21 @@ constexpr const char* kPrintName[kCount] = {
     "Slide",          nullptr,"Chorus-Double", nullptr,       "Body",
     "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
     "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "PARKER Drip",
-    "PARKER Flutter", "PARKER Brightness", "SPRING Drip"};
+    "PARKER Flutter", "PARKER Brightness", "SPRING Drip",   "SPRING B Drip",  "SPRING B Flutter",
+    "SPRING B Brightness"};
 
 // Keys for the saved-state file; one word each, stable across builds.
 constexpr const char* kStateKey[kCount] = {
     "OctaveSlide",    "HarmonyTracking", "UnisonBlend",   "UnisonMotion",  "DistBody",
     "DistBite",       "DistGrit",        "SpringSplash",  "SpringFlutter", "SpringLowEnd",
     "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "ParkerSplash",  "ParkerDrip",
-    "ParkerFlutter",  "ParkerBrightness", "SpringDrip"};
+    "ParkerFlutter",  "ParkerBrightness", "SpringDrip",   "SpringBDrip",   "SpringBFlutter",
+    "SpringBBrightness"};
 
 // Adam's starting positions (owner 2026-10-02), in Id order.
 constexpr std::array<float, kCount> kDefaultPos = {
     50.0f, 50.0f, 0.0f,  0.0f,  50.0f, 60.0f, 50.0f, 65.0f, 29.0f,
-    63.0f, 85.0f, 85.0f, 50.0f, 41.0f, 90.0f, 89.0f, 100.0f, 30.0f};
+    63.0f, 85.0f, 85.0f, 50.0f, 41.0f, 90.0f, 89.0f, 100.0f, 30.0f, 50.0f, 50.0f, 50.0f};
 
 struct State {
   std::array<float, kCount> pos;
@@ -291,5 +305,18 @@ inline void parkerBrightness(SpringCTuning& t, float pos) {
   t.lpHz = at(kPrkLp, pos);
   t.presenceHz = at(kPrkPresenceHz, pos);
 }
+
+inline void springBDrip(SpringBTuning& t, float pos) {
+  t.chirpA = at(kSbChirpA, pos);
+  t.chirpSections = atInt(kSbChirpSections, pos);
+}
+
+inline void springBFlutter(SpringBTuning& t, float pos) {
+  t.wobbleDepth = at(kSbWobbleDepth, pos);
+  t.wobbleRateHz = at(kSbWobbleRate, pos);
+  t.diffuse = at(kSbDiffuse, pos);
+}
+
+inline void springBBrightness(SpringBTuning& t, float pos) { t.trebleLossHz = at(kSbTrebleLoss, pos); }
 
 }  // namespace cv::macros

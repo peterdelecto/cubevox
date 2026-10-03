@@ -153,6 +153,11 @@ target_compile_options(spring_c_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(spring_c_test PRIVATE engine)
 add_test(NAME spring_c COMMAND spring_c_test)
 
+add_executable(spring_b_test test/spring_b_test.cpp)
+target_compile_options(spring_b_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(spring_b_test PRIVATE engine)
+add_test(NAME spring_b COMMAND spring_b_test)
+
 add_executable(gate_test test/gate_test.cpp)
 target_compile_options(gate_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(gate_test PRIVATE engine)

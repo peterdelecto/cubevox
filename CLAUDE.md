@@ -32,7 +32,7 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
 - Stage feedback simulator is prototype-only test signal. It is calibrated so a bypassed
   box does not feed back at default Amount; DRIVE causes it.
-- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply. `2026-10-02-hardware-design.md` is the board.
+- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply. `2026-10-02-hardware-design.md` is the board. `2026-10-03-spring-b-design.md` is SPRING B.
 - `hardware/` holds the KiCad project. Teensy-H7-Port and DrumSynthV3 are read-only sources
   to copy from, never to edit.
 
@@ -47,4 +47,4 @@ build/cubevox-render in.wav out.wav --depth 0.7
 Input Gain · Input gate Threshold+Decay (same controls as Gate) · Autotune Key (shared encoder)+Response (NATURAL → MECHANICAL, no mix) · Harmony: off the face, forced off; engine code kept (owner 2026-10-02) ·
 Octave Semitones+Mix ·
 Unison Depth+Rate · Slapback Intensity (level + repeats)+Time (30..150 ms) · Distortion Drive+Tone · Gate Threshold+Decay ·
-Reverb Intensity (mix + decay)+Dwell (engine SPRING / CHASM / PARKER SPRING in menu) · EQ (menu) · Output (menu)
+Reverb Intensity (mix + decay)+Dwell (engine SPRING / CHASM / SPRING B in menu; PARKER SPRING engine code kept, off the face — owner 2026-10-03) · EQ (menu) · Output (menu)
