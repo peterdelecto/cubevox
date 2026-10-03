@@ -59288,12 +59288,12 @@
 		(uuid "2bde66d9-b918-48b5-9c45-626d4dd7a54d")
 	)
 	(segment
-		(start 125.2 103.2)
+		(start 126.8 103.2)
 		(end 128.85 103.2)
 		(width 0.3)
 		(layer "F.Cu")
 		(net "/h7core_block/ADC_VCC")
-		(uuid "2d4d469a-fd6a-41b0-8efc-995a2953e06b")
+		(uuid "3686e96b-ca1f-4df4-ad77-3b435de689a5")
 	)
 	(segment
 		(start 125.9 99.85)
@@ -59342,6 +59342,14 @@
 		(layer "F.Cu")
 		(net "/h7core_block/ADC_VCC")
 		(uuid "bafa7a1e-d985-4c7f-9350-ee1555ef72be")
+	)
+	(segment
+		(start 125.2 103.2)
+		(end 126.8 103.2)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/h7core_block/ADC_VCC")
+		(uuid "ddb36204-158e-40ad-adbd-f089b38de200")
 	)
 	(segment
 		(start 192.4 77.15)
