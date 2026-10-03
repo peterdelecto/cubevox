@@ -53021,7 +53021,7 @@
 	(footprint "cubevox:CONN-TH_NCJ6FA-H"
 		(layer "B.Cu")
 		(uuid "e79fe81f-f036-405a-b580-c1ec487e3e38")
-		(at 190 44.2)
+		(at 190 45.2)
 		(property "Reference" "J101"
 			(at -0.68 10.595 0)
 			(layer "B.SilkS")
