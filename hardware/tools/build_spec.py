@@ -120,24 +120,31 @@ CHILD_DROP = (
     + ["C%d" % i for i in list(range(38, 44)) + [17, 26, 36, 37, 50, 51, 52, 53, 60] + list(range(63, 74))]
     + ["R%d" % i for i in [8, 9, 11, 12, 13, 14, 15, 17, 18, 19, 21, 22, 23, 24, 25, 26, 28] + list(range(31, 43))]
 )
-U1_DROP_NETS = {"QSPI_CLK_SRC", "MUX2_SIG", "ADC_PC2C", "ADC_PC3C", "MUX3_SIG", "MUX4_SIG", "SPARE_PE7",
+U1_DROP_NETS = {"CC1", "CC2",                 # USB-C is data only; the 5.1k Rd alone make it a sink
+                "QSPI_CLK_SRC", "MUX2_SIG", "ADC_PC2C", "ADC_PC3C", "MUX3_SIG", "MUX4_SIG", "SPARE_PE7",
                 "SYNC_OUT", "SYNC_IN", "HP_EN", "SPARE_PE14", "MIDI_OUT", "MIDI_IN",
                 "SPARE_PC11", "OLED_SCK", "OLED_CS", "OLED_MOSI", "OLED_RST", "OLED_DC",
                 "SPARE_PA15", "WS2812_DATA", "SPARE_PB5", "UART8_RX", "UART8_TX"}
-# pin -> (net, stub len)   (left-side pins 1-50 stub left, right-side 51-100 stub right)
-U1_ADD = {"28": ("TOGGLE1", 10), "29": ("TOGGLE2", 12), "30": ("TOGGLE3", 10),
-          "31": ("TOGGLE4", 12), "34": ("TOGGLE5", 10), "35": ("TOGGLE6", 12),
-          "46": ("TOGGLE8", 10),
-          "51": ("ENC_KEY_A", 2), "52": ("ENC_KEY_B", 2), "53": ("ENC_SEMI_A", 2),
-          "57": ("ENC_SEMI_B", 2), "63": ("FX_ON_SENSE", 2),
-          "32": ("VA_SENSE", 10)}                        # PC4 ADC12_INP4
+# pin -> (net, stub len). Every movable net sits on the U1 edge facing its destination, in the
+# order that lets the fan-out leave without crossings (PINMAP.md section 2). Left-side pins
+# 1-50 stub left, right-side pins 51-100 stub right.
+U1_PINS = {"28": ("TOGGLE3", 10), "29": ("TOGGLE4", 12), "30": ("MUX_S2", 10), "31": ("MUX_S3", 12),
+           "32": ("MUX_S1", 10), "33": ("MUX_S0", 12), "34": ("TOGGLE5", 10),
+           "35": ("VA_SENSE", 12),                     # PB1 ADC12_INP5
+           "36": ("TOGGLE6", 10), "37": ("TOGGLE7", 12), "38": ("TOGGLE8", 10), "39": ("XSMT", 12),
+           "43": ("ENC_MENU_SW", 10), "44": ("ENC_MENU_B", 12), "45": ("ENC_MENU_A", 10),
+           "46": ("I2C_SCL", 12), "47": ("I2C_SDA", 10),  # PB10/PB11 I2C2 AF4
+           "63": ("FX_ON_SENSE", 2),
+           "90": ("USER_LED", None), "91": ("MUTE_N", None),   # not PB4: NJTRST pulls up at reset
+           "92": ("TOGGLE1", None), "93": ("ENC_KEY_B", None), "95": ("ENC_KEY_A", None),
+           "96": ("ENC_SEMI_B", None), "97": ("ENC_SEMI_A", None), "98": ("TOGGLE2", None)}
 CHILD_PORTS = [
     ("5V", "input"), ("5VA", "input"), ("3V3", "output"),
     ("3V3A", "output"), ("GND", "passive"),
     ("ADC_VINL", "input"), ("ADC_VINR", "input"), ("DAC_OUTL", "output"),
     ("SWDIO", "bidirectional"), ("SWCLK", "input"), ("SWO", "output"),
     ("NRST", "bidirectional"), ("BOOT0", "input"),
-    ("I2C1_SCL", "bidirectional"), ("I2C1_SDA", "bidirectional"),
+    ("I2C_SCL", "bidirectional"), ("I2C_SDA", "bidirectional"),
     ("MUX_S0", "output"), ("MUX_S1", "output"), ("MUX_S2", "output"),
     ("MUX_S3", "output"), ("POT_MUX_OUT", "input"),
     ("ENC_MENU_A", "input"), ("ENC_MENU_B", "input"), ("ENC_MENU_SW", "input"),
@@ -148,14 +155,11 @@ CHILD_PORTS = [
 # I01 (PINMAP.md section 5): SCKI from SAI1_MCLK_A on PE2. No external flash.
 # Net per pin number (names resolved from cubevox_h7core.kicad_sym); None leaves the pin NC.
 U1_REMAP = {"1": ("ADC_SCKI_SRC", 12),                 # PE2 SAI1_MCLK_A
-            "37": None, "38": None, "39": None, "40": None,  # PE7-PE10 free
-            "58": ("TOGGLE7", None),                    # PD11
-            "59": ("MUTE_N", 10),                       # PD12
-            "60": None, "61": None,                     # PD13, PD14 free
-            "79": None,                                 # PC11 free
-            "92": ("ENC_MENU_A", None)}                 # PB6
+            "40": None, "58": None, "59": None,        # fxbox QSPI / spare rows freed
+            "60": None, "61": None, "79": None}
 NET_RENAME = {"ENC_A": "ENC_MENU_A", "ENC_B": "ENC_MENU_B", "ENC_SW": "ENC_MENU_SW",
-              "MUX1_SIG": "POT_MUX_OUT", "LINE_L": "DAC_OUTL"}
+              "MUX1_SIG": "POT_MUX_OUT", "LINE_L": "DAC_OUTL",
+              "I2C1_SCL": "I2C_SCL", "I2C1_SDA": "I2C_SDA"}
 
 
 CHILD_REF_RENAME = {"SW1": "SWRESET1", "SW2": "SWBOOT1"}   # SW1 on NRST, SW2 on BOOT0
@@ -175,9 +179,11 @@ def build_child():
             rows = [r for r in p["pins"] if r.get("net") not in U1_DROP_NETS]
             for r in rows:
                 r["net"] = NET_RENAME.get(r["net"], r["net"])
-            for pin, (net, ln) in U1_ADD.items():
-                rows.append({"pin": pin, "net": net, "len": ln})
-            rows = [r for r in rows if r["pin"] not in U1_REMAP]
+            placed = {net for net, _ in U1_PINS.values()}
+            rows = [r for r in rows if r["pin"] not in U1_PINS and r.get("net") not in placed
+                    and r["pin"] not in U1_REMAP]
+            for pin, (net, ln) in U1_PINS.items():
+                rows.append({"pin": pin, "net": net, **({"len": ln} if ln else {})})
             for pin, v in U1_REMAP.items():
                 if v:
                     rows.append({"pin": pin, "net": v[0], **({"len": v[1]} if v[1] else {})})
@@ -451,9 +457,9 @@ def build_top():
     oled = {"ref": "J117", "lib_id": "cubevox:OLED-1.3-SH1106-I2C-4P", "value": "OLED SH1106",
             "at": [X6 + 520, 470], "angle": 0, "footprint": "cubevox:OLED-1.3-SH1106-I2C-4P",
             "lcsc": "owner-supplied module, hand-plugged", "rest": "no_connect", "in_bom": True, "fields": {"MPN": "SH1106 1.3in I2C 128x64"},
-            "pins": [row("1", "GND", LF), row("2", "3V3", LF), row("3", "I2C1_SCL", LF), row("4", "I2C1_SDA", LF)]}
+            "pins": [row("1", "GND", LF), row("2", "3V3", LF), row("3", "I2C_SCL", LF), row("4", "I2C_SDA", LF)]}
     add(oled)
-    add(R("4.7k", "3V3", "I2C1_SCL", X6 + 560, 470), R("4.7k", "3V3", "I2C1_SDA", X6 + 572, 470))
+    add(R("4.7k", "3V3", "I2C_SCL", X6 + 560, 470), R("4.7k", "3V3", "I2C_SDA", X6 + 572, 470))
 
     # mounting holes kept from fxbox
     for i, r in enumerate(["H101", "H102", "H103", "H104"]):

@@ -1,0 +1,32 @@
+{
+ "declaration": "D0186",
+ "ledger": "0227",
+ "baseline": "0225",
+ "board_sha256": "be4e61bf003d09bbe52701a3534edd26aa51af9b3557f7087761b5e29d3253d7",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0227.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6978.4,
+   "after": 6662.7,
+   "delta": -315.7,
+   "direction": "better"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 153,
+   "after": 151,
+   "delta": -2,
+   "direction": "better"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

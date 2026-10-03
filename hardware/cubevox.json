@@ -218,13 +218,13 @@
      "no_connect": true
     },
     {
-     "name": "I2C1_SCL",
+     "name": "I2C_SCL",
      "side": "right",
      "offset": 43,
      "len": 2
     },
     {
-     "name": "I2C1_SDA",
+     "name": "I2C_SDA",
      "side": "right",
      "offset": 46,
      "len": 2
@@ -6123,7 +6123,7 @@
     },
     {
      "pin": "3",
-     "net": "I2C1_SCL",
+     "net": "I2C_SCL",
      "dir": [
       -1,
       0
@@ -6132,7 +6132,7 @@
     },
     {
      "pin": "4",
-     "net": "I2C1_SDA",
+     "net": "I2C_SDA",
      "dir": [
       -1,
       0
@@ -6165,7 +6165,7 @@
     },
     {
      "pin": "2",
-     "net": "I2C1_SCL",
+     "net": "I2C_SCL",
      "dir": [
       0,
       1
@@ -6198,7 +6198,7 @@
     },
     {
      "pin": "2",
-     "net": "I2C1_SDA",
+     "net": "I2C_SDA",
      "dir": [
       0,
       1

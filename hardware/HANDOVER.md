@@ -50,3 +50,12 @@ $KICAD_PY -m foreman <cmd>` from `hardware/`; filter stderr for swig/wxApp/asser
 4. Foreman defects filed in ClaudeRouter docs/QUEUE.md B187-B190 (edit segfault, gate 28 antipads, gate 49 stitch vias, mitre clamp vs gate 132). Gate 63/71 readings on trace-only rails and TH pads are B179/B185.
 5. Gates at ledger 0195: 17, 45, 133, 134 pass; 63 27 legs (trace-only rails and diodes, B179/B185 class); 71 6 pins (U1.6 2.25, U1.27 2.54, U8.4 2.28, U6.8 2.57 all pin > cap > via; U3.1 is a sense pin; U4.5 is the LDO output into a trace); 136 14 (none on the bus nets); 49 7 (six stitch vias, B189, plus INA_O1 dangling at 231.0,90.8 from the owner's hand routing).
 6. Next: VREF B.Cu split crossing, D0134 still open, the remaining 159 unconnected (MCU local nets, codec analog, front end, then the panel after Adam's column count), geometry cleanup of the owner's front-end routing (gate 132: 98 ends, gate 136: 14), ground pass, power-up order of 3V3 vs 3V3A (owner decision pending the STM32H7 injection limit).
+
+## Update 2026-10-03 (night, cubevox lead)
+1. MCU pin study landed (D0186, D0194). Map, reasons and the firmware delta are in `PINMAP.md` section 2; render `renders/cubevox-mcu-pinmap.png`.
+2. Routing consequences the pass must honour:
+   a. VA_SENSE crosses TOGGLE6-8 and XSMT once on B.Cu near x 110, over the 3V3 island.
+   b. BOOT0 and NRST reach SWBOOT1, SWRESET1 and J3 on B.Cu.
+   c. The west group runs between J3 and R3/D1; R3/D1 and R2 may need nudges.
+3. Pots RK09D1130C2P and encoders EC11E landed (D0184, c1aec73). Shafts stand 5 mm taller than the enclosure drawing.
+4. Next: MCU local nets, then the panel after Adam's column count, then the ground pass.

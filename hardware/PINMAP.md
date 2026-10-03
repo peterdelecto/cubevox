@@ -3,79 +3,111 @@
 Source of used pins: `h7core_block.json` U1 rows, names cross-checked against
 `cubevox_h7core.kicad_sym`. AF numbers come from STM32duino
 `PeripheralPins_WeActMiniH7xx.c` (H743 V-I package set, local Arduino15 install).
-DS12110 itself was not fetched. LQFP-100 pins 1-25 face east, 26-50 north,
-51-75 west, 76-100 south (Teensy-H7-Port `pin-audit-2026-09-25.md`).
+DS12110 itself was not fetched. On this board (U1 at 96, 84, rotation 0) pins 1-25 face
+south, 26-50 east, 51-75 north and 76-100 west, measured from the pad positions.
 
-## 1. Pins already used by h7core (do not reuse)
+## 1. Fixed pins
 
-| Pin | Port | Net | Function | AF / note |
-|---|---|---|---|---|
-| 1 | PE2 | ADC_SCKI_SRC | SAI1_MCLK_A (PCM1808 SCKI, see section 5) | AF6 |
-| 2 | PE3 | ADC_DOUT | SAI1_SD_B (PCM1808 data) | AF6 |
-| 3 | PE4 | I2S_LRCLK | SAI1_FS_A | AF6 |
-| 4 | PE5 | I2S_BCLK_SRC | SAI1_SCK_A (33 R) | AF6 |
-| 5 | PE6 | I2S_DATA | SAI1_SD_A (DAC) | AF6 |
-| 12/13 | PH0/PH1 | HSE_IN/OUT | 25 MHz crystal | |
-| 14 | NRST | NRST | reset, SWD | |
-| 15 | PC0 | MUX1_SIG_ADC | ADC1/2/3_INP10 | analog, reused as POT_MUX_OUT |
-| 22 | PA0 | CC1 | USB-C CC sense | avoid |
-| 25 | PA3 | CC2 | USB-C CC sense | avoid |
-| 58 | PD11 | TOGGLE7 | GPIO (moved from PE8) | |
-| 68 | PA9 | VBUS_SENSE | GPIO | |
-| 70/71 | PA11/PA12 | USB_DM/DP | OTG_FS | |
-| 72 | PA13 | SWDIO | SWD | avoid |
-| 76 | PA14 | SWCLK | SWD | avoid |
-| 89 | PB3 | SWO | SWO | avoid |
-| 92 | PB6 | ENC_MENU_A | GPIO, EXTI6 (moved from PE9) | |
-| 94 | BOOT0 | BOOT0 | DFU button | |
-| 88 | PD7 | USER_LED | GPIO | |
-| 43, 45 | PE13, PE15 | HP_EN, XSMT | GPIO (XSMT feeds PCM5102A, keep) | |
-| 84, 85, 87, 90 | PD3, PD4, PD6, PB4 | MUX_S0..S3 | GPIO | reused as is |
-| 95, 96 | PB8, PB9 | I2C1_SCL, SDA | I2C1 | AF4, reused for OLED |
-| 92, 41, 62 | PB6, PE11, PD15 | ENC_A, ENC_B, ENC_SW | GPIO | EXTI6, 11, 15; reused for MENU |
+These nets are tied to a peripheral or to parts already placed at the pin.
 
-fxbox-only pins cubevox frees (all are no_connect or deleted at the top):
-PC1, PC4, PC5 (MUX2-4), PC2_C, PC3_C, PE10, PE12 (SYNC), PD8, PD9 (MIDI), PE0, PE1 (UART8),
-PD5 (WS2812), PC10, PC12, PD0-2 (SPI OLED), PE14, PA15, PB5 (SPARE_*).
-PB2 (36), PE7-PE10 (37-40), PC11 (79), PD13 and PD14 are free (PD12 is MUTE_N) (no external flash, section 5).
-Keep them unassigned. Keep PE13 (HP_EN) only if the TPA6132A2 stays in the child.
+| Pin | Port | Net | Why fixed |
+|---|---|---|---|
+| 1 | PE2 | ADC_SCKI_SRC | SAI1_MCLK_A AF6 (section 5) |
+| 2-5 | PE3-PE6 | ADC_DOUT, I2S_LRCLK, I2S_BCLK_SRC, I2S_DATA | SAI1 AF6 |
+| 12/13 | PH0/PH1 | HSE_IN/OUT | 25 MHz crystal |
+| 14 | NRST | NRST | reset |
+| 15 | PC0 | MUX1_SIG_ADC (POT_MUX_OUT) | ADC1/2/3_INP10 |
+| 63 | PC6 | FX_ON_SENSE | R120/C162 sit at the pin (D0169) |
+| 68 | PA9 | VBUS_SENSE | R6/R7 divider, native sensing off (AN4879) |
+| 70/71 | PA11/PA12 | USB_DM/DP | OTG_FS |
+| 72, 76, 89 | PA13, PA14, PB3 | SWDIO, SWCLK, SWO | SWD/SWO |
+| 94 | BOOT0 | BOOT0 | DFU button |
 
-## 2. New assignments (free pins)
+## 2. Pin study (2026-10-03, D0186 and D0194)
 
-EXTI line n is shared across ports, so each EXTI input needs its own pin number.
-Lines taken: 6, 11, 15 (MENU encoder). New encoders use 10, 12, 13, 14.
+Every movable net leaves the U1 edge that faces its destination. Along an edge the pins
+follow the order the nets fan out in, so neighbours never cross on F.Cu. The render is
+`renders/cubevox-mcu-pinmap.png`.
 
-| Net | Pin | Port | Capability | Reason |
-|---|---|---|---|---|
-| POT_MUX_OUT | 15 | PC0 | ADC1/2/3_INP10 | existing MUX1_SIG_ADC; rename net |
-| MUX_S0..S3 | 84, 85, 87, 90 | PD3, PD4, PD6, PB4 | GPIO | existing |
-| ENC_MENU_A / B / SW | 92, 41, 62 | PB6, PE11, PD15 | GPIO, EXTI6/11/15 | ENC_A moved PE9 to PB6 (I01) |
-| ENC_KEY_A | 51 | PB12 | GPIO, EXTI12 | free, west side |
-| ENC_KEY_B | 52 | PB13 | GPIO, EXTI13 | free |
-| ENC_SEMI_A | 53 | PB14 | GPIO, EXTI14 | free |
-| ENC_SEMI_B | 57 | PD10 | GPIO, EXTI10 | free |
-| TOGGLE1 | 28 | PA4 | GPIO | free, north cluster |
-| TOGGLE2 | 29 | PA5 | GPIO | free |
-| TOGGLE3 | 30 | PA6 | GPIO | free |
-| TOGGLE4 | 31 | PA7 | GPIO | free |
-| TOGGLE5 | 34 | PB0 | GPIO | free |
-| TOGGLE6 | 35 | PB1 | GPIO | free |
-| TOGGLE7 | 58 | PD11 | GPIO | moved PE8 to PD11 (I01) |
-| TOGGLE8 | 46 | PB10 | GPIO | free |
-| (JACK_TRS_N, deleted rev 2) | 47 | PB11 | none | freed: the 1/4 in detect is gone (audit A01), pin is no-connect |
-| FX_ON_SENSE | 63 | PC6 | GPIO, active low | K101 pole B NO contact to GND; 10 kΩ pull-up to 3V3, 100 nF to GND |
-| VBUS_SENSE | 68 | PA9 | GPIO input | R6 33 kΩ / R7 82 kΩ divider, 3.6 V at 5 V VBUS. Native OTG VBUS sensing disabled (AN4879) |
-| MUTE_N | 59 | PD12 | GPIO output | high pulls in K102 through Q101 (output connected, tip ungrounded); R153 100 kΩ base pull-down keeps it off at reset |
-| VA_SENSE | 32 | PC4 | ADC12_INP4 | 5VA through 10 kΩ / 10 kΩ, 100 nF; reads 2.5 V at 5.0 V |
-| XSMT | 45 | PE15 | GPIO output | existing; PCM5102A XSMT with 10 kΩ pull-down (R16), unchanged |
-| OLED_SCL | 95 | PB8 | I2C1_SCL AF4 | existing I2C1_SCL port |
-| OLED_SDA | 96 | PB9 | I2C1_SDA AF4 | existing I2C1_SDA port |
+The board decides the ports:
+1. South edge. The SAI stubs, the crystal and the VDDA cluster wall it, so only its fixed nets use it.
+2. West edge. SWCLK (76) and SWO (89) both run into J3's east pad column, which traps pins
+   77-88. Those stay NC. Pins 90-98 run west under J3 and R3/D1, then south through the open gap west of the crystal.
+3. East edge. It opens onto the OLED shadow. The codec band (y 93-107, x 88-170) blocks the
+   south, so south-panel nets turn down the channel at x 108-112 between U1's decoupling and U8.
+   North-east nets run to the OLED and ENC101.
+4. North edge. The decoupling row C6/C31/C59/C32 walls pins 51-62, so it carries only FX_ON_SENSE, VBUS, USB and SWDIO.
 
-Remaining free after this: PD13, PD14, PC5, PA1, PC13-15 (weak drivers), PA2, PB7, PB15, PC7-9, PA8, PA10.
-Toggles use PA4-PA7, PB0, PB1 although they are ADC-capable. The pull-ups to 3V3 make them
-safe as digital inputs, and 8 contiguous north-side pins keep the routing short.
-PB15 is skipped because EXTI15 belongs to PD15. PA10 is OTG_FS_ID and is left alone.
-PB8/PB9 are 5 V tolerant FT_fa pins (from memory, DS12110 not read); pull-ups go to 3V3 anyway.
+### East edge, pin 47 (north) to 28 (south)
+
+| Pin | Port | Net | Note |
+|---|---|---|---|
+| 47 | PB11 | I2C_SDA | I2C2_SDA AF4 |
+| 46 | PB10 | I2C_SCL | I2C2_SCL AF4 |
+| 45 | PE15 | ENC_MENU_A | EXTI15 |
+| 44 | PE14 | ENC_MENU_B | EXTI14 |
+| 43 | PE13 | ENC_MENU_SW | EXTI13 |
+| 40-42 | PE10-PE12 | spare | |
+| 39 | PE9 | XSMT | output, R16 pull-down |
+| 38 | PE8 | TOGGLE8 | |
+| 37 | PE7 | TOGGLE7 | |
+| 36 | PB2 | TOGGLE6 | |
+| 35 | PB1 | VA_SENSE | ADC12_INP5 |
+| 34 | PB0 | TOGGLE5 | |
+| 33 | PC5 | MUX_S0 | |
+| 32 | PC4 | MUX_S1 | |
+| 31 | PA7 | MUX_S3 | |
+| 30 | PA6 | MUX_S2 | |
+| 29 | PA5 | TOGGLE4 | |
+| 28 | PA4 | TOGGLE3 | |
+
+### West edge, pin 90 (north) to 98 (south)
+
+| Pin | Port | Net | Note |
+|---|---|---|---|
+| 90 | PB4 | USER_LED | NJTRST pull-up lights the LED faintly until init |
+| 91 | PB5 | MUTE_N | |
+| 92 | PB6 | TOGGLE1 | |
+| 93 | PB7 | ENC_KEY_B | EXTI7 |
+| 94 | BOOT0 | BOOT0 | fixed |
+| 95 | PB8 | ENC_KEY_A | EXTI8 |
+| 96 | PB9 | ENC_SEMI_B | EXTI9 |
+| 97 | PE0 | ENC_SEMI_A | EXTI0 |
+| 98 | PE1 | TOGGLE2 | |
+
+### Why this order
+
+1. The I2C pair reaches the OLED from the north, SDA passing R142 on its way to R143, so SDA is the north pin. I2C2 is the only I2C on that corner.
+2. MENU_A and MENU_B approach R127/R128 from the north, A outermost. MENU_SW runs flat east to R129.
+3. In the south-turning group the southmost pin takes the westmost destination. The MUX
+   selects go S2, S3 into U101's west column and S1, S0 into its east column. XSMT is the
+   northmost because it leaves the group first, north into U6 pin 17 under the SAI entries.
+4. ADC pins exist only at 28-35 on this edge, so VA_SENSE sits at 35 and crosses TOGGLE6-8 and XSMT once on B.Cu, a two-via hop over the 3V3 island. Its divider R151/R152 moved beside U106's 5VA pin so the run is flat east. C163 sits at the MCU end (114.5, 87.2) as the ADC's local reservoir (D0188-D0190).
+5. The west group exits west, then turns south. North pins peel off west (TOGGLE1, KEY_B, KEY_A), south pins peel off east (TOGGLE2, SEMI_A), and SEMI_B runs straight down.
+6. BOOT0 (94) sits inside the west group and NRST (14) wraps the south-west corner, so both reach SWBOOT1, SWRESET1 and J3 on B.Cu.
+7. MUTE_N avoids PB4 and PA15. Their JTAG pull-ups are on at reset and would turn Q101 on, unmuting the output before firmware runs.
+8. CC1/CC2 are off PA0/PA3. USB-C carries data only (spec item 12), and R4/R5 make it a sink without the MCU.
+
+EXTI lines in use: 0, 7, 8, 9, 13, 14, 15, one per input.
+
+Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 40-42 (PE10-PE12),
+51-62 (PB12-PB15, PD8-PD15), 64-67 (PC7-PC9, PA8), 69 (PA10), 77-88 (PA15-PD7, the SWD pocket).
+
+### Firmware changes from the previous map
+
+| Net | Was | Now |
+|---|---|---|
+| ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 |
+| ENC_KEY_A / B | PB12 / PB13 | PB8 / PB7 |
+| ENC_SEMI_A / B | PB14 / PD10 | PE0 / PB9 |
+| TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PB6, PE1, PA4, PA5, PB0, PB2, PE7, PE8 |
+| MUX_S0-S3 | PD3, PD4, PD6, PB4 | PC5, PC4, PA6, PA7 |
+| XSMT | PE15 | PE9 |
+| VA_SENSE | PC4 (ADC12_INP4) | PB1 (ADC12_INP5) |
+| MUTE_N | PD12 | PB5 |
+| USER_LED | PD7 | PB4 |
+| OLED I2C | I2C1 PB8/PB9 (I2C1_SCL/SDA) | I2C2 PB10/PB11 (I2C_SCL/SDA) |
+| CC1 / CC2 | PA0 / PA3 | not connected |
 
 ## 3. How fxbox joins top and h7core
 
@@ -173,14 +205,13 @@ is superseded.
 | 1 | PE2 | QSPI_IO2 (AF9) | ADC_SCKI_SRC, SAI1_MCLK_A (AF6) |
 | 36 | PB2 | QSPI_CLK_SRC | free (NC) |
 | 37-40 | PE7-PE10 | unassigned / SYNC / SPARE | free (NC) |
-| 58 | PD11 | QSPI_IO0 (AF9) | TOGGLE7 (GPIO) |
-| 59 | PD12 | QSPI_IO1 (AF9) | MUTE_N (GPIO) |
+| 58 | PD11 | QSPI_IO0 (AF9) | free (section 2) |
+| 59 | PD12 | QSPI_IO1 (AF9) | free (section 2) |
 | 60 | PD13 | QSPI_IO3 (AF9) | free |
 | 61 | PD14 | ADC_SCKI_SRC (SAI3_MCLK_B, fxbox) | free |
 | 79 | PC11 | unassigned | free (NC) |
-| 92 | PB6 | QSPI_NCS (BK1_NCS AF10) | ENC_MENU_A (GPIO, EXTI6) |
+| 92 | PB6 | QSPI_NCS (BK1_NCS AF10) | TOGGLE1 (section 2) |
 
-ENC_MENU_A takes EXTI6, which no other input uses (taken: 6, 10-15).
 
 ### PCM1808 straps
 

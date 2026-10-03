@@ -1,0 +1,11 @@
+[
+{"op": "remove_track", "layer": "F.Cu", "x": 160.8, "y": 64.65},
+{"op": "remove_via", "x": 160.8, "y": 65.05},
+{"op": "remove_track", "layer": "F.Cu", "x": 162.8, "y": 64.6},
+{"op": "remove_via", "x": 162.8, "y": 65.0},
+{"op": "remove_track", "layer": "F.Cu", "x": 158.8, "y": 64.65},
+{"op": "remove_via", "x": 158.8, "y": 65.05},
+{"op": "move", "ref": "R151", "x": 155.95, "y": 87.35, "rot": 180},
+{"op": "move", "ref": "R152", "x": 155.95, "y": 89.13, "rot": 0},
+{"op": "move", "ref": "C163", "x": 155.9, "y": 90.91, "rot": 0}
+]

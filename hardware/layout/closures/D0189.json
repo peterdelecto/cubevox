@@ -1,0 +1,98 @@
+{
+ "declaration": "D0189",
+ "ledger": "0230",
+ "baseline": "0229",
+ "board_sha256": "a3c3ba9085e82d1fd88249ad569348bfc33f796b2754fc62d6d221169bf99ecc",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0230.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1563.7,
+   "after": 1562.0,
+   "delta": -1.7,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 5572.9,
+   "after": 5571.9,
+   "delta": -1.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/5VA:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 5220.0,
+   "after": 5221.0,
+   "delta": 1.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 600,
+   "after": 599,
+   "delta": -1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 149,
+   "after": 150,
+   "delta": 1,
+   "direction": "n/a",
+   "note": "not a pass/fail input while shorting_items > 0"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "undeclared",
+   "before": 6656.6,
+   "after": 6662.0,
+   "delta": 5.4,
+   "direction": "worse"
+  },
+  {
+   "measure": "body_tight",
+   "why": "undeclared",
+   "before": 6,
+   "after": 5,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "drc_board_errors",
+   "why": "undeclared",
+   "before": 4,
+   "after": 0,
+   "delta": -4,
+   "direction": "better"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 51,
+   "after": 47,
+   "delta": -4,
+   "direction": "better"
+  },
+  {
+   "measure": "shorting_items",
+   "why": "undeclared",
+   "before": 2,
+   "after": 0,
+   "delta": -2,
+   "direction": "better"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "46afd2f07324"
+}

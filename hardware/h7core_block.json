@@ -59,11 +59,11 @@
    "shape": "input"
   },
   {
-   "name": "I2C1_SCL",
+   "name": "I2C_SCL",
    "shape": "bidirectional"
   },
   {
-   "name": "I2C1_SDA",
+   "name": "I2C_SDA",
    "shape": "bidirectional"
   },
   {
@@ -305,16 +305,6 @@
      "len": 7
     },
     {
-     "pin": "22",
-     "net": "CC1",
-     "len": 5
-    },
-    {
-     "pin": "25",
-     "net": "CC2",
-     "len": 5
-    },
-    {
      "pin": "26",
      "net": "GND",
      "len": 5
@@ -333,16 +323,6 @@
      "pin": "4",
      "net": "I2S_BCLK_SRC",
      "len": 12
-    },
-    {
-     "pin": "41",
-     "net": "ENC_MENU_B",
-     "len": 8
-    },
-    {
-     "pin": "45",
-     "net": "XSMT",
-     "len": 7
     },
     {
      "pin": "48",
@@ -365,17 +345,9 @@
      "len": 5
     },
     {
-     "pin": "87",
-     "net": "MUX_S2"
-    },
-    {
      "pin": "6",
      "net": "3V3",
      "len": 5
-    },
-    {
-     "pin": "62",
-     "net": "ENC_MENU_SW"
     },
     {
      "pin": "68",
@@ -410,59 +382,45 @@
      "net": "SWCLK"
     },
     {
-     "pin": "84",
-     "net": "MUX_S0"
-    },
-    {
-     "pin": "85",
-     "net": "MUX_S1"
-    },
-    {
      "pin": "89",
      "net": "SWO"
-    },
-    {
-     "pin": "90",
-     "net": "MUX_S3"
     },
     {
      "pin": "94",
      "net": "BOOT0"
     },
     {
-     "pin": "95",
-     "net": "I2C1_SCL"
-    },
-    {
-     "pin": "96",
-     "net": "I2C1_SDA"
-    },
-    {
      "pin": "99",
      "net": "GND"
     },
     {
-     "pin": "88",
-     "net": "USER_LED"
-    },
-    {
      "pin": "28",
-     "net": "TOGGLE1",
-     "len": 10
-    },
-    {
-     "pin": "29",
-     "net": "TOGGLE2",
-     "len": 12
-    },
-    {
-     "pin": "30",
      "net": "TOGGLE3",
      "len": 10
     },
     {
-     "pin": "31",
+     "pin": "29",
      "net": "TOGGLE4",
+     "len": 12
+    },
+    {
+     "pin": "30",
+     "net": "MUX_S2",
+     "len": 10
+    },
+    {
+     "pin": "31",
+     "net": "MUX_S3",
+     "len": 12
+    },
+    {
+     "pin": "32",
+     "net": "MUX_S1",
+     "len": 10
+    },
+    {
+     "pin": "33",
+     "net": "MUX_S0",
      "len": 12
     },
     {
@@ -472,33 +430,53 @@
     },
     {
      "pin": "35",
-     "net": "TOGGLE6",
+     "net": "VA_SENSE",
      "len": 12
     },
     {
-     "pin": "46",
+     "pin": "36",
+     "net": "TOGGLE6",
+     "len": 10
+    },
+    {
+     "pin": "37",
+     "net": "TOGGLE7",
+     "len": 12
+    },
+    {
+     "pin": "38",
      "net": "TOGGLE8",
      "len": 10
     },
     {
-     "pin": "51",
-     "net": "ENC_KEY_A",
-     "len": 2
+     "pin": "39",
+     "net": "XSMT",
+     "len": 12
     },
     {
-     "pin": "52",
-     "net": "ENC_KEY_B",
-     "len": 2
+     "pin": "43",
+     "net": "ENC_MENU_SW",
+     "len": 10
     },
     {
-     "pin": "53",
-     "net": "ENC_SEMI_A",
-     "len": 2
+     "pin": "44",
+     "net": "ENC_MENU_B",
+     "len": 12
     },
     {
-     "pin": "57",
-     "net": "ENC_SEMI_B",
-     "len": 2
+     "pin": "45",
+     "net": "ENC_MENU_A",
+     "len": 10
+    },
+    {
+     "pin": "46",
+     "net": "I2C_SCL",
+     "len": 12
+    },
+    {
+     "pin": "47",
+     "net": "I2C_SDA",
+     "len": 10
     },
     {
      "pin": "63",
@@ -506,27 +484,41 @@
      "len": 2
     },
     {
-     "pin": "32",
-     "net": "VA_SENSE",
-     "len": 10
+     "pin": "90",
+     "net": "USER_LED"
+    },
+    {
+     "pin": "91",
+     "net": "MUTE_N"
+    },
+    {
+     "pin": "92",
+     "net": "TOGGLE1"
+    },
+    {
+     "pin": "93",
+     "net": "ENC_KEY_B"
+    },
+    {
+     "pin": "95",
+     "net": "ENC_KEY_A"
+    },
+    {
+     "pin": "96",
+     "net": "ENC_SEMI_B"
+    },
+    {
+     "pin": "97",
+     "net": "ENC_SEMI_A"
+    },
+    {
+     "pin": "98",
+     "net": "TOGGLE2"
     },
     {
      "pin": "1",
      "net": "ADC_SCKI_SRC",
      "len": 12
-    },
-    {
-     "pin": "58",
-     "net": "TOGGLE7"
-    },
-    {
-     "pin": "59",
-     "net": "MUTE_N",
-     "len": 10
-    },
-    {
-     "pin": "92",
-     "net": "ENC_MENU_A"
     }
    ],
    "in_bom": true,

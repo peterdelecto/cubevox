@@ -125,9 +125,9 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
    to the jack. Pole B grounds the tip while muted: COM 6 = OUT_TIP, NC 7 =
    GND, NO 5 no-connect. Coil + (1) on 5V, coil − (8) on the collector of
    Q101 (MMBT3904, C20526) with a 1N4148W flyback (D109), a 1 kΩ base
-   resistor from MUTE_N (PD12) and R153 100 kΩ from the base to GND. MUTE_N
-   high closes pole A and releases the ground; the relay stays off while PD12
-   floats at reset.
+   resistor from MUTE_N (PB5) and R153 100 kΩ from the base to GND. MUTE_N
+   high closes pole A and releases the ground; the relay stays off while PB5
+   floats at reset (PB4 and PA15 are avoided: their JTAG pull-ups are on at reset).
 10. ADC/DAC clocks: SAI1 BCLK PE5 (33 Ω), LRCLK PE4, DAC SD PE6, ADC SD PE3.
     ADC SCKI comes from an SAI master clock coherent with BCLK/LRCLK, not a
     timer (audit I01): SAI1_MCLK_A on PE2 at 12.288 MHz for 48 kHz, pins per `hardware/PINMAP.md` "ADC master clock
@@ -153,7 +153,8 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     VDDA/VREF+ through BLM18PG121SN1D ferrite, as fxbox.
 13. Analog on 5VA (5V through the ferrite): OPA2197s, PCM1808 VCC through
     10 Ω, relay coils on 5V. VA_SENSE: 5VA through 10 kΩ / 10 kΩ with 100 nF
-    to PC4 (ADC12_INP4). 3V3A: codec digital-analog, pots. USB
+    to PB1 (ADC12_INP5); R151/R152 sit at U106's 5VA pin, C163 at the MCU end.
+    Pin map: `hardware/PINMAP.md` section 2. 3V3A: codec digital-analog, pots. USB
     firmware-only, DFU via BOOT0 button (the box must be on 9 V to run DFU).
 
 ### Digital core (from fxbox)
@@ -171,7 +172,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
 F1. BOR level 3 (about 2.61 V falling).
 F2. MUTE_N goes high 500 ms after the SAI clocks run, and low when VA_SENSE
     reads below 4.75 V (provisional, tolerance and shutdown time to budget).
-F3. Assert XSMT (PE15) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
+F3. Assert XSMT (PE9) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
 F4. PLL3 M/N/P 25/196/4 (DIVN3 = 195, DIVP3 = 3, FRACN3 4981, PLL3RGE = 0,
     PLL3VCOSEL = 1); SAI1 MCKDIV = 4, OSR = 0, NOMCK = 0.
 F5. FX_ON_SENSE is active low.

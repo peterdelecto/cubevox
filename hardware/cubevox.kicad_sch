@@ -24148,7 +24148,7 @@
 		)
 		(uuid "a770aabb-ffe4-53d9-9f6b-5f909dff64de")
 	)
-	(label "I2C1_SCL"
+	(label "I2C_SCL"
 		(at 791.21 598.17 180)
 		(fields_autoplaced yes)
 		(effects
@@ -24169,7 +24169,7 @@
 		)
 		(uuid "c530ba52-88cb-55a2-8772-74d827d44162")
 	)
-	(label "I2C1_SDA"
+	(label "I2C_SDA"
 		(at 791.21 600.71 180)
 		(fields_autoplaced yes)
 		(effects
@@ -24280,7 +24280,7 @@
 		)
 		(uuid "0f59badc-c6c6-51c5-9832-69d7bd9e65f8")
 	)
-	(label "I2C1_SCL"
+	(label "I2C_SCL"
 		(at 848.36 603.25 270)
 		(fields_autoplaced yes)
 		(effects
@@ -24391,7 +24391,7 @@
 		)
 		(uuid "4a0e124a-61aa-59c5-bafb-68b5acd0a3c1")
 	)
-	(label "I2C1_SDA"
+	(label "I2C_SDA"
 		(at 863.6 603.25 270)
 		(fields_autoplaced yes)
 		(effects
@@ -25278,7 +25278,7 @@
 			)
 			(uuid "938e9eeb-1b9d-5432-bd45-90f6f2ef48f4")
 		)
-		(pin "I2C1_SCL" bidirectional
+		(pin "I2C_SCL" bidirectional
 			(at 83.82 105.41 0)
 			(effects
 				(font
@@ -25286,9 +25286,9 @@
 				)
 				(justify right)
 			)
-			(uuid "f1c4a0a3-174e-55ab-a9a0-e54eeb091805")
+			(uuid "d060f829-04be-5ecc-a4d6-a89654424d4f")
 		)
-		(pin "I2C1_SDA" bidirectional
+		(pin "I2C_SDA" bidirectional
 			(at 83.82 109.22 0)
 			(effects
 				(font
@@ -25296,7 +25296,7 @@
 				)
 				(justify right)
 			)
-			(uuid "490dac17-8c34-5160-8c91-a7c000745810")
+			(uuid "963abd56-7cdd-50f3-a10d-c262679661ff")
 		)
 		(pin "MUX_S0" output
 			(at 83.82 113.03 0)
@@ -25732,9 +25732,9 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "a9299b5e-b6ec-5fe9-bb33-6000180fd086")
+		(uuid "b1eb5203-89e5-5201-bde5-409056dc3bfa")
 	)
-	(label "I2C1_SCL"
+	(label "I2C_SCL"
 		(at 86.36 105.41 0)
 		(fields_autoplaced yes)
 		(effects
@@ -25743,7 +25743,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "fcbe6b50-e0aa-53ad-b3c3-a47ffaf31956")
+		(uuid "4649132e-1315-51e3-9e7f-48cf9968d4fd")
 	)
 	(wire
 		(pts
@@ -25753,9 +25753,9 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "997bf832-a45f-50ac-a74f-7ba32588ea5c")
+		(uuid "68fa43cf-4cd6-5725-867f-0551f086e7e6")
 	)
-	(label "I2C1_SDA"
+	(label "I2C_SDA"
 		(at 86.36 109.22 0)
 		(fields_autoplaced yes)
 		(effects
@@ -25764,7 +25764,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "30160f66-b27e-54ff-9ec0-4287acec1cef")
+		(uuid "40235e71-f332-593e-a61d-f1dcb7668d72")
 	)
 	(wire
 		(pts
