@@ -1,0 +1,7100 @@
+{
+ "id": "0111",
+ "board": {
+  "path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_pcb",
+  "sha256": "d61a02126819cdcdeb76c20ee113427a5386d03981885fe13e4235eb4855c9e2"
+ },
+ "commit": "4665dc8b1197d590196d280f385c815a2d5c8aae",
+ "dirty": true,
+ "tool_version": "0.2.28",
+ "kicad_version": "10.0.5",
+ "python_version": "3.9.13",
+ "classification_sha256": "6e05fe1454f72207b713d5b10f0b36f209aa337ef9ec391f304a7d309e61f919",
+ "timestamp_utc": "2026-10-03T09:26:34Z",
+ "pass": "placement",
+ "facts": {
+  "board_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_pcb",
+  "copper_layers": [
+   "F.Cu",
+   "In1.Cu",
+   "In2.Cu",
+   "B.Cu"
+  ],
+  "design_minima_mm": {
+   "clearance": 0.15,
+   "track_width": 0.15,
+   "via_diameter": 0.6,
+   "via_drill": 0.3,
+   "annular_width": 0.15,
+   "hole_clearance": 0.25,
+   "edge_clearance": 0.5
+  },
+  "project": {
+   "present": true,
+   "netclasses": [
+    {
+     "name": "Default",
+     "clearance": 0.2,
+     "track_width": 0.2,
+     "via_diameter": 0.6,
+     "via_drill": 0.3,
+     "diff_pair_width": 0.2,
+     "diff_pair_gap": 0.25
+    },
+    {
+     "name": "Pair_USB",
+     "clearance": 0.2,
+     "track_width": 0.2,
+     "via_diameter": 0.6,
+     "via_drill": 0.3,
+     "diff_pair_width": 0.2,
+     "diff_pair_gap": 0.2
+    },
+    {
+     "name": "Power",
+     "clearance": 0.2,
+     "track_width": 0.3,
+     "via_diameter": 0.6,
+     "via_drill": 0.3,
+     "diff_pair_width": 0.2,
+     "diff_pair_gap": 0.2
+    }
+   ],
+   "patterns": 13
+  },
+  "dru": {
+   "present": true,
+   "rules": 0
+  },
+  "tracks_per_layer": {
+   "F.Cu": 321,
+   "B.Cu": 41,
+   "In2.Cu": 281
+  },
+  "zones": {},
+  "net_count": 220,
+  "footprint_count": 223,
+  "footprints_without_courtyard": 0,
+  "pair_candidates": {
+   "DA*": [
+    "/DA_N",
+    "/DA_P"
+   ],
+   "IN*": [
+    "/IN_N",
+    "/IN_P"
+   ],
+   "LINE*": [
+    "/LINE_N",
+    "/LINE_P"
+   ],
+   "MIC*": [
+    "/MIC_N",
+    "/MIC_P"
+   ],
+   "h7core_block/USB_*": [
+    "/h7core_block/USB_DM",
+    "/h7core_block/USB_DP"
+   ]
+  },
+  "nets_by_pad_count": [
+   [
+    "/GND",
+    181
+   ],
+   [
+    "/3V3",
+    51
+   ],
+   [
+    "/3V3A",
+    26
+   ],
+   [
+    "",
+    16
+   ],
+   [
+    "/5V",
+    15
+   ],
+   [
+    "/5VA",
+    14
+   ],
+   [
+    "/h7core_block/VDDA",
+    7
+   ],
+   [
+    "/VIN_9V",
+    6
+   ]
+  ],
+  "board": {
+   "width_mm": 200.1,
+   "height_mm": 150.1,
+   "assembly_path": "standard"
+  },
+  "npth_pads": 13,
+  "pth_pads": 151,
+  "paste": {
+   "pads_on_f_paste": 588,
+   "tht_pads_on_paste": 0,
+   "paste_only_pads": 0,
+   "paste_shapes": 0
+  },
+  "erc": {
+   "schematic": "/var/folders/cr/qqzz6flx2nv31hs2zyf5f4rc0000gn/T/foreman.4qf0ruhv/cubevox.kicad_sch",
+   "erc": {
+    "board": {},
+    "quarantined": {},
+    "errors": 0,
+    "refuse_to_place": false
+   },
+   "blind_spots": {
+    "pins": 0,
+    "symbols": 0,
+    "by_symbol": {},
+    "nets": []
+   },
+   "structural": {
+    "single_pin_nets": {
+     "count": 94,
+     "unnamed": []
+    },
+    "power_name_mismatches": [],
+    "gnd_nodes": 178,
+    "untyped_pin_nets": [],
+    "parallel_passive_dead_ends": []
+   },
+   "fixer": {
+    "path": "/Users/j/Documents/KiCad/libraries/jlc-kicad-db/assign_pin_types.py",
+    "available": true
+   }
+  }
+ },
+ "audit": {
+  "per_net": {
+   "/3V3": {
+    "length_mm": 639.215,
+    "widths": [
+     0.3,
+     0.4
+    ],
+    "vias": 47,
+    "layers": [
+     "B.Cu",
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/3V3A": {
+    "length_mm": 498.762,
+    "widths": [
+     0.3
+    ],
+    "vias": 17,
+    "layers": [
+     "B.Cu",
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/5V": {
+    "length_mm": 93.958,
+    "widths": [
+     0.4
+    ],
+    "vias": 9,
+    "layers": [
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/5VA": {
+    "length_mm": 231.621,
+    "widths": [
+     0.3
+    ],
+    "vias": 14,
+    "layers": [
+     "B.Cu",
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/9V_JACK": {
+    "length_mm": 18.651,
+    "widths": [
+     0.4
+    ],
+    "vias": 2,
+    "layers": [
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/BUCK5_BST": {
+    "length_mm": 1.704,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/BUCK5_SW": {
+    "length_mm": 3.8,
+    "widths": [
+     0.5
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/GND": {
+    "length_mm": 36.378,
+    "widths": [
+     0.3
+    ],
+    "vias": 69,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/VIN_9V": {
+    "length_mm": 154.645,
+    "widths": [
+     0.4
+    ],
+    "vias": 7,
+    "layers": [
+     "B.Cu",
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/VREF": {
+    "length_mm": 110.034,
+    "widths": [
+     0.3
+    ],
+    "vias": 9,
+    "layers": [
+     "B.Cu",
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/h7core_block/ADC_SCKI_SRC": {
+    "length_mm": 2.784,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/ADC_VCC": {
+    "length_mm": 30.709,
+    "widths": [
+     0.3
+    ],
+    "vias": 3,
+    "layers": [
+     "B.Cu",
+     "F.Cu",
+     "In2.Cu"
+    ]
+   },
+   "/h7core_block/BUCK_BST": {
+    "length_mm": 1.835,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/BUCK_SW": {
+    "length_mm": 3.9,
+    "widths": [
+     0.5
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/CC1": {
+    "length_mm": 4.375,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/CC2": {
+    "length_mm": 6.335,
+    "widths": [
+     0.2
+    ],
+    "vias": 2,
+    "layers": [
+     "B.Cu",
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/HSE_IN": {
+    "length_mm": 7.066,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/HSE_OUT": {
+    "length_mm": 4.462,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/HSE_XTAL_OUT": {
+    "length_mm": 3.945,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/I2S_BCLK_SRC": {
+    "length_mm": 2.1,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/USB_DM": {
+    "length_mm": 59.262,
+    "widths": [
+     0.2
+    ],
+    "vias": 2,
+    "layers": [
+     "B.Cu",
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/USB_DP": {
+    "length_mm": 57.18,
+    "widths": [
+     0.2
+    ],
+    "vias": 2,
+    "layers": [
+     "B.Cu",
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/VBUS": {
+    "length_mm": 14.438,
+    "widths": [
+     0.3
+    ],
+    "vias": 2,
+    "layers": [
+     "B.Cu",
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/VCAP1": {
+    "length_mm": 2.096,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/VCAP2": {
+    "length_mm": 1.49,
+    "widths": [
+     0.2
+    ],
+    "vias": 0,
+    "layers": [
+     "F.Cu"
+    ]
+   },
+   "/h7core_block/VDDA": {
+    "length_mm": 30.092,
+    "widths": [
+     0.3
+    ],
+    "vias": 6,
+    "layers": [
+     "F.Cu",
+     "In2.Cu"
+    ]
+   }
+  },
+  "vias_by_net": {
+   "/3V3": {
+    "count": 47,
+    "power": true
+   },
+   "/3V3A": {
+    "count": 17,
+    "power": true
+   },
+   "/5V": {
+    "count": 9,
+    "power": true
+   },
+   "/5VA": {
+    "count": 14,
+    "power": true
+   },
+   "/9V_JACK": {
+    "count": 2,
+    "power": true
+   },
+   "/GND": {
+    "count": 69,
+    "power": true
+   },
+   "/VIN_9V": {
+    "count": 7,
+    "power": true
+   },
+   "/VREF": {
+    "count": 9,
+    "power": true
+   },
+   "/h7core_block/ADC_VCC": {
+    "count": 3,
+    "power": true
+   },
+   "/h7core_block/CC2": {
+    "count": 2,
+    "power": false
+   },
+   "/h7core_block/USB_DM": {
+    "count": 2,
+    "power": false
+   },
+   "/h7core_block/USB_DP": {
+    "count": 2,
+    "power": false
+   },
+   "/h7core_block/VBUS": {
+    "count": 2,
+    "power": true
+   },
+   "/h7core_block/VDDA": {
+    "count": 6,
+    "power": true
+   }
+  },
+  "airline": {
+   "per_net": {
+    "/3V3": 507.372,
+    "/3V3A": 447.869,
+    "/5V": 80.394,
+    "/5VA": 191.442,
+    "/9V_JACK": 15.376,
+    "/A1_FB": 14.496,
+    "/A2_FB": 9.343,
+    "/ADC_RC": 4.994,
+    "/ADC_VINL": 3.239,
+    "/ADC_VINR": 7.682,
+    "/BUCK5_BST": 1.916,
+    "/BUCK5_SW": 5.911,
+    "/BUF_IN": 88.064,
+    "/BUF_OUT": 3.984,
+    "/BUF_R": 3.09,
+    "/DAC_AC": 3.681,
+    "/DAC_ATT": 93.019,
+    "/DAC_LP": 6.136,
+    "/DAC_OUTL": 6.113,
+    "/DA_N": 4.983,
+    "/DA_P": 4.724,
+    "/ENC_KEY_A": 89.212,
+    "/ENC_KEY_B": 93.58,
+    "/ENC_MENU_A": 95.935,
+    "/ENC_MENU_B": 74.313,
+    "/ENC_MENU_SW": 85.001,
+    "/ENC_SEMI_A": 82.981,
+    "/ENC_SEMI_B": 85.182,
+    "/FX_ON_SENSE": 26.779,
+    "/G2_INV": 11.056,
+    "/G2_RG": 4.39,
+    "/GND": 1281.659,
+    "/I2C1_SCL": 60.987,
+    "/I2C1_SDA": 63.422,
+    "/INA_O1": 31.517,
+    "/INA_O2": 38.935,
+    "/IN_N": 9.658,
+    "/IN_P": 9.719,
+    "/LINE_N": 9.64,
+    "/LINE_P": 9.64,
+    "/MIC_N": 13.64,
+    "/MIC_P": 13.64,
+    "/MUTE_BASE": 4.751,
+    "/MUTE_COIL": 12.83,
+    "/MUTE_N": 16.875,
+    "/MUX_COM": 2.427,
+    "/MUX_S0": 76.491,
+    "/MUX_S1": 75.847,
+    "/MUX_S2": 69.438,
+    "/MUX_S3": 68.188,
+    "/OUT_AC": 83.521,
+    "/OUT_TIP": 26.953,
+    "/POT01": 83.286,
+    "/POT02": 92.599,
+    "/POT03": 88.969,
+    "/POT04": 65.492,
+    "/POT05": 42.607,
+    "/POT06": 57.627,
+    "/POT07": 21.77,
+    "/POT08": 43.744,
+    "/POT09": 22.023,
+    "/POT10": 44.704,
+    "/POT11": 43.276,
+    "/POT12": 58.784,
+    "/POT13": 66.455,
+    "/POT14": 77.903,
+    "/POT_MUX_OUT": 57.263,
+    "/PRE1": 11.092,
+    "/PRE_OUT": 176.737,
+    "/RG_MID": 5.75,
+    "/SW_BYPASS": 13.077,
+    "/TOGGLE1": 57.064,
+    "/TOGGLE2": 40.626,
+    "/TOGGLE3": 38.595,
+    "/TOGGLE4": 53.068,
+    "/TOGGLE5": 74.059,
+    "/TOGGLE6": 96.308,
+    "/TOGGLE7": 126.71,
+    "/TOGGLE8": 143.615,
+    "/TRS_R": 22.43,
+    "/TRS_T": 45.585,
+    "/VA_SENSE": 41.222,
+    "/VIN_9V": 140.647,
+    "/VREF": 96.615,
+    "/VREF_BUF": 5.391,
+    "/VREF_DIV": 7.199,
+    "/XLR_2": 26.477,
+    "/XLR_3": 6.43,
+    "/h7core_block/ADC_DOUT": 32.181,
+    "/h7core_block/ADC_SCKI": 39.619,
+    "/h7core_block/ADC_SCKI_SRC": 2.971,
+    "/h7core_block/ADC_VCC": 10.745,
+    "/h7core_block/ADC_VREF": 6.178,
+    "/h7core_block/BOOT0": 20.099,
+    "/h7core_block/BUCK_BST": 2.026,
+    "/h7core_block/BUCK_SW": 6.028,
+    "/h7core_block/CAPM": 6.135,
+    "/h7core_block/CAPP": 6.13,
+    "/h7core_block/CC1": 63.006,
+    "/h7core_block/CC2": 59.856,
+    "/h7core_block/HSE_IN": 7.574,
+    "/h7core_block/HSE_OUT": 3.986,
+    "/h7core_block/HSE_XTAL_OUT": 4.396,
+    "/h7core_block/I2S_BCLK": 47.968,
+    "/h7core_block/I2S_BCLK_SRC": 2.875,
+    "/h7core_block/I2S_DATA": 48.173,
+    "/h7core_block/I2S_LRCLK": 49.35,
+    "/h7core_block/LDOO": 2.632,
+    "/h7core_block/MUX1_SIG_ADC": 12.68,
+    "/h7core_block/NRST": 45.981,
+    "/h7core_block/PWR_LED_A": 1.925,
+    "/h7core_block/SWCLK": 4.114,
+    "/h7core_block/SWDIO": 6.72,
+    "/h7core_block/SWO": 3.591,
+    "/h7core_block/USB_DM": 55.212,
+    "/h7core_block/USB_DP": 54.231,
+    "/h7core_block/USER_LED": 2.918,
+    "/h7core_block/USER_LED_A": 1.925,
+    "/h7core_block/VBUS": 15.104,
+    "/h7core_block/VBUS_SENSE": 53.017,
+    "/h7core_block/VCAP1": 2.57,
+    "/h7core_block/VCAP2": 2.394,
+    "/h7core_block/VDDA": 14.881,
+    "/h7core_block/VNEG": 2.377,
+    "/h7core_block/XSMT": 51.817
+   },
+   "total_mm": 6980.619
+  },
+  "reach": {
+   "C31": {
+    "reach_mm": 6.78,
+    "pads": {
+     "/3V3": 5.15,
+     "/GND": 6.78
+    }
+   },
+   "D105": {
+    "reach_mm": 134.67,
+    "pads": {
+     "/VIN_9V": 134.67,
+     "/GND": 6.55
+    }
+   },
+   "C61": {
+    "reach_mm": 3.86,
+    "pads": {
+     "/3V3": 2.88,
+     "/GND": 3.86
+    }
+   },
+   "FB101": {
+    "reach_mm": 61.73,
+    "pads": {
+     "/5V": 12.06,
+     "/5VA": 61.73
+    }
+   },
+   "C44": {
+    "reach_mm": 6.44,
+    "pads": {
+     "/h7core_block/ADC_VCC": 6.44,
+     "/GND": 3.4
+    }
+   },
+   "C25": {
+    "reach_mm": 4.86,
+    "pads": {
+     "/3V3A": 2.21,
+     "/GND": 4.86
+    }
+   },
+   "C56": {
+    "reach_mm": 2.97,
+    "pads": {
+     "/3V3": 1.97,
+     "/GND": 2.97
+    }
+   },
+   "D106": {
+    "reach_mm": 139.49,
+    "pads": {
+     "/VIN_9V": 139.49,
+     "/9V_JACK": 9.8
+    }
+   },
+   "C115": {
+    "reach_mm": 14.25,
+    "pads": {
+     "/5V": 14.25,
+     "/GND": 9.57
+    }
+   },
+   "C114": {
+    "reach_mm": 12.22,
+    "pads": {
+     "/5V": 12.22,
+     "/GND": 7.03
+    }
+   },
+   "C18": {
+    "reach_mm": 3.02,
+    "pads": {
+     "/h7core_block/VBUS": 3.02,
+     "/GND": 3.02
+    }
+   },
+   "C57": {
+    "reach_mm": 3.69,
+    "pads": {
+     "/3V3": 2.64,
+     "/GND": 3.69
+    }
+   },
+   "C113": {
+    "reach_mm": 2.09,
+    "pads": {
+     "/VIN_9V": 2.09,
+     "/GND": 2.09
+    }
+   },
+   "C112": {
+    "reach_mm": 4.58,
+    "pads": {
+     "/VIN_9V": 4.58,
+     "/GND": 4.58
+    }
+   },
+   "C6": {
+    "reach_mm": 8.01,
+    "pads": {
+     "/3V3": 6.68,
+     "/GND": 8.01
+    }
+   },
+   "C24": {
+    "reach_mm": 2.33,
+    "pads": {
+     "/5V": 2.21,
+     "/GND": 2.33
+    }
+   },
+   "C2": {
+    "reach_mm": 4.91,
+    "pads": {
+     "/3V3": 3.34,
+     "/GND": 4.91
+    }
+   },
+   "C32": {
+    "reach_mm": 6.64,
+    "pads": {
+     "/3V3": 6.38,
+     "/GND": 6.64
+    }
+   },
+   "C130": {
+    "reach_mm": 9.15,
+    "pads": {
+     "/5VA": 2.4,
+     "/GND": 9.15
+    }
+   },
+   "C45": {
+    "reach_mm": 3.99,
+    "pads": {
+     "/h7core_block/ADC_VCC": 2.45,
+     "/GND": 3.99
+    }
+   },
+   "C22": {
+    "reach_mm": 11.28,
+    "pads": {
+     "/3V3": 11.28,
+     "/GND": 6.03
+    }
+   },
+   "C21": {
+    "reach_mm": 9.05,
+    "pads": {
+     "/3V3": 9.05,
+     "/GND": 6.37
+    }
+   },
+   "C10": {
+    "reach_mm": 9.62,
+    "pads": {
+     "/h7core_block/VDDA": 9.41,
+     "/GND": 9.62
+    }
+   },
+   "C8": {
+    "reach_mm": 6.74,
+    "pads": {
+     "/h7core_block/VDDA": 6.42,
+     "/GND": 6.74
+    }
+   },
+   "C58": {
+    "reach_mm": 2.5,
+    "pads": {
+     "/3V3": 2.5,
+     "/GND": 2.45
+    }
+   },
+   "C3": {
+    "reach_mm": 4.09,
+    "pads": {
+     "/3V3": 3.31,
+     "/GND": 4.09
+    }
+   },
+   "C7": {
+    "reach_mm": 8.68,
+    "pads": {
+     "/3V3": 8.68,
+     "/GND": 4.02
+    }
+   },
+   "FB1": {
+    "reach_mm": 36.78,
+    "pads": {
+     "/3V3A": 36.78,
+     "/h7core_block/VDDA": 5.75
+    }
+   },
+   "C29": {
+    "reach_mm": 11.23,
+    "pads": {
+     "/3V3A": 7.35,
+     "/GND": 11.23
+    }
+   },
+   "C47": {
+    "reach_mm": 3.99,
+    "pads": {
+     "/3V3": 2.62,
+     "/GND": 3.99
+    }
+   },
+   "C27": {
+    "reach_mm": 8.26,
+    "pads": {
+     "/3V3A": 2.15,
+     "/GND": 8.26
+    }
+   },
+   "C46": {
+    "reach_mm": 6.11,
+    "pads": {
+     "/3V3": 6.11,
+     "/GND": 4.92
+    }
+   },
+   "C1": {
+    "reach_mm": 5.47,
+    "pads": {
+     "/3V3": 4.12,
+     "/GND": 5.47
+    }
+   },
+   "C127": {
+    "reach_mm": 9.8,
+    "pads": {
+     "/5VA": 4.1,
+     "/GND": 9.8
+    }
+   },
+   "C4": {
+    "reach_mm": 3.22,
+    "pads": {
+     "/3V3": 2.34,
+     "/GND": 3.22
+    }
+   },
+   "C28": {
+    "reach_mm": 6.15,
+    "pads": {
+     "/3V3A": 2.67,
+     "/GND": 6.15
+    }
+   },
+   "C30": {
+    "reach_mm": 12.39,
+    "pads": {
+     "/3V3A": 12.39,
+     "/GND": 10.06
+    }
+   },
+   "C111": {
+    "reach_mm": 4.07,
+    "pads": {
+     "/3V3A": 2.43,
+     "/GND": 4.07
+    }
+   },
+   "C134": {
+    "reach_mm": 28.23,
+    "pads": {
+     "/5VA": 28.23,
+     "/GND": 5.7
+    }
+   },
+   "R20": {
+    "reach_mm": 25.93,
+    "pads": {
+     "/5VA": 25.93,
+     "/h7core_block/ADC_VCC": 10.17
+    }
+   },
+   "C9": {
+    "reach_mm": 3.96,
+    "pads": {
+     "/h7core_block/VDDA": 2.39,
+     "/GND": 3.96
+    }
+   },
+   "C160": {
+    "reach_mm": 7.41,
+    "pads": {
+     "/GND": 7.41
+    }
+   },
+   "C59": {
+    "reach_mm": 5.22,
+    "pads": {
+     "/3V3": 3.85,
+     "/GND": 5.22
+    }
+   },
+   "C20": {
+    "reach_mm": 2.58,
+    "pads": {
+     "/5V": 2.58,
+     "/GND": 2.58
+    }
+   },
+   "C11": {
+    "reach_mm": 5.3,
+    "pads": {
+     "/h7core_block/VDDA": 3.71,
+     "/GND": 5.3
+    }
+   },
+   "C117": {
+    "reach_mm": 59.2,
+    "pads": {
+     "/5VA": 59.2,
+     "/GND": 14.41
+    }
+   },
+   "C118": {
+    "reach_mm": 8.74,
+    "pads": {
+     "/5VA": 1.9,
+     "/GND": 8.74
+    }
+   },
+   "C101": {
+    "reach_mm": 3.84,
+    "pads": {
+     "/3V3A": 2.46,
+     "/GND": 3.84
+    }
+   },
+   "C5": {
+    "reach_mm": 6.74,
+    "pads": {
+     "/3V3": 4.88,
+     "/GND": 6.74
+    }
+   },
+   "C19": {
+    "reach_mm": 15.73,
+    "pads": {
+     "/5V": 15.73,
+     "/GND": 14.23
+    }
+   }
+  },
+  "courtyard_open": [],
+  "body_gaps": {
+   "min_gap_mm": 0.28,
+   "floor_mm": 0.3,
+   "tight_pairs": [
+    {
+     "a": "C16",
+     "b": "Y1",
+     "gap_mm": 0.28
+    },
+    {
+     "a": "R1",
+     "b": "Y1",
+     "gap_mm": 0.28
+    }
+   ]
+  },
+  "fastener_clearance": [
+   {
+    "ref": "H104",
+    "hole_mm": 3.2,
+    "clear_mm": 3.2,
+    "nearest": "RV102",
+    "gap_mm": 3.86,
+    "gate": "pass"
+   },
+   {
+    "ref": "H102",
+    "hole_mm": 3.2,
+    "clear_mm": 3.2,
+    "nearest": "J106",
+    "gap_mm": 6.46,
+    "gate": "pass"
+   },
+   {
+    "ref": "H101",
+    "hole_mm": 3.2,
+    "clear_mm": 3.2,
+    "nearest": "J108",
+    "gap_mm": 9.46,
+    "gate": "pass"
+   },
+   {
+    "ref": "H103",
+    "hole_mm": 3.2,
+    "clear_mm": 3.2,
+    "nearest": "ENC102",
+    "gap_mm": 3.44,
+    "gate": "pass"
+   }
+  ],
+  "pairs": [
+   {
+    "name": "USB",
+    "legs": [
+     "/h7core_block/USB_DP",
+     "/h7core_block/USB_DM"
+    ],
+    "chains": [
+     [
+      "/h7core_block/USB_DP"
+     ],
+     [
+      "/h7core_block/USB_DM"
+     ]
+    ],
+    "length_mm": [
+     57.179929,
+     59.262376
+    ],
+    "vias": [
+     2,
+     2
+    ],
+    "layers": [
+     [
+      "B.Cu",
+      "F.Cu"
+     ],
+     [
+      "B.Cu",
+      "F.Cu"
+     ]
+    ],
+    "mismatch_mm": -2.082447000000002,
+    "via_mismatch": 0,
+    "max_mismatch_mm": 5.9,
+    "gate": "pass"
+   }
+  ],
+  "critical": [
+   {
+    "net": "/h7core_block/USB_DP",
+    "length_mm": 57.18,
+    "vias": 2,
+    "airline_mm": 54.231,
+    "max_length_mm": 50,
+    "max_vias": 2,
+    "placement_gate": "fail",
+    "length_gate": "fail",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/USB_DM",
+    "length_mm": 59.262,
+    "vias": 2,
+    "airline_mm": 55.212,
+    "max_length_mm": 50,
+    "max_vias": 2,
+    "placement_gate": "fail",
+    "length_gate": "fail",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/HSE_IN",
+    "length_mm": 7.066,
+    "vias": 0,
+    "airline_mm": 7.574,
+    "max_length_mm": 8,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/HSE_XTAL_OUT",
+    "length_mm": 3.945,
+    "vias": 0,
+    "airline_mm": 4.396,
+    "max_length_mm": 8,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/HSE_OUT",
+    "length_mm": 4.462,
+    "vias": 0,
+    "airline_mm": 3.986,
+    "max_length_mm": 5,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/BUCK_SW",
+    "length_mm": 3.9,
+    "vias": 0,
+    "airline_mm": 6.028,
+    "max_length_mm": 6,
+    "max_vias": 0,
+    "placement_gate": "fail",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/VCAP1",
+    "length_mm": 2.096,
+    "vias": 0,
+    "airline_mm": 2.57,
+    "max_length_mm": 5,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/VCAP2",
+    "length_mm": 1.49,
+    "vias": 0,
+    "airline_mm": 2.394,
+    "max_length_mm": 5,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/h7core_block/I2S_BCLK",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 47.968,
+    "max_length_mm": 60,
+    "max_vias": 2,
+    "placement_gate": "pass",
+    "length_gate": "unrouted",
+    "via_gate": "unrouted"
+   },
+   {
+    "net": "/h7core_block/ADC_SCKI",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 39.619,
+    "max_length_mm": 90,
+    "max_vias": 2,
+    "placement_gate": "pass",
+    "length_gate": "unrouted",
+    "via_gate": "unrouted"
+   },
+   {
+    "net": "/h7core_block/ADC_DOUT",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 32.181,
+    "max_length_mm": 45,
+    "max_vias": 2,
+    "placement_gate": "pass",
+    "length_gate": "unrouted",
+    "via_gate": "unrouted"
+   },
+   {
+    "net": "/h7core_block/I2S_LRCLK",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 49.35,
+    "max_length_mm": 60,
+    "max_vias": 4,
+    "placement_gate": "pass",
+    "length_gate": "unrouted",
+    "via_gate": "unrouted"
+   },
+   {
+    "net": "/h7core_block/I2S_BCLK_SRC",
+    "length_mm": 2.1,
+    "vias": 0,
+    "airline_mm": 2.875,
+    "max_length_mm": 3.0,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   },
+   {
+    "net": "/MIC_P",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 13.64,
+    "max_length_mm": null,
+    "max_vias": null,
+    "placement_gate": null,
+    "length_gate": "not_gated",
+    "via_gate": "not_gated"
+   },
+   {
+    "net": "/MIC_N",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 13.64,
+    "max_length_mm": null,
+    "max_vias": null,
+    "placement_gate": null,
+    "length_gate": "not_gated",
+    "via_gate": "not_gated"
+   },
+   {
+    "net": "/PRE_OUT",
+    "length_mm": 0.0,
+    "vias": 0,
+    "airline_mm": 176.737,
+    "max_length_mm": null,
+    "max_vias": null,
+    "placement_gate": null,
+    "length_gate": "not_gated",
+    "via_gate": "not_gated"
+   },
+   {
+    "net": "/h7core_block/ADC_SCKI_SRC",
+    "length_mm": 2.784,
+    "vias": 0,
+    "airline_mm": 2.971,
+    "max_length_mm": 3.0,
+    "max_vias": 0,
+    "placement_gate": "pass",
+    "length_gate": "pass",
+    "via_gate": "pass"
+   }
+  ],
+  "width_transitions": {
+   "count": 0,
+   "points": [],
+   "unjustified": []
+  },
+  "t_junctions": {
+   "count": 9,
+   "points": [
+    {
+     "net": "/3V3",
+     "x": 87.45,
+     "y": 74.25,
+     "class": "via",
+     "note": null
+    },
+    {
+     "net": "/3V3",
+     "x": 92.4,
+     "y": 90.4,
+     "class": "via",
+     "note": null
+    },
+    {
+     "net": "/3V3",
+     "x": 92.95,
+     "y": 93.35,
+     "class": "pad",
+     "note": null
+    },
+    {
+     "net": "/3V3",
+     "x": 132.35,
+     "y": 103.6,
+     "class": "pad",
+     "note": null
+    },
+    {
+     "net": "/3V3",
+     "x": 168.9,
+     "y": 60.3,
+     "class": "via",
+     "note": null
+    },
+    {
+     "net": "/3V3A",
+     "x": 145.85,
+     "y": 100.9,
+     "class": "courtyard",
+     "note": null
+    },
+    {
+     "net": "/5V",
+     "x": 104.2,
+     "y": 62.55,
+     "class": "pad",
+     "note": null
+    },
+    {
+     "net": "/5VA",
+     "x": 161.1,
+     "y": 94.4,
+     "class": "via",
+     "note": null
+    },
+    {
+     "net": "/VIN_9V",
+     "x": 96.1,
+     "y": 53.6,
+     "class": "via",
+     "note": null
+    }
+   ],
+   "mid_run": [],
+   "signal_t": []
+  },
+  "right_angles": [],
+  "collinear_overlaps": [],
+  "micro_segments": [],
+  "zero_length": 0,
+  "detour": {
+   "signal_nets": 15,
+   "rated_nets": 15,
+   "median": 0.889,
+   "p90": 1.073,
+   "max": 1.119,
+   "worst": [
+    [
+     "/h7core_block/HSE_OUT",
+     1.12
+    ],
+    [
+     "/h7core_block/USB_DM",
+     1.07
+    ],
+    [
+     "/h7core_block/USB_DP",
+     1.05
+    ],
+    [
+     "/h7core_block/ADC_SCKI_SRC",
+     0.94
+    ]
+   ],
+   "segments_per_net_median": 2,
+   "segments_per_net_max": 21,
+   "direction_classes": {
+    "1": 3,
+    "2": 6,
+    "3": 3,
+    "4": 3
+   },
+   "multi_width_nets": 0
+  },
+  "alignment": {
+   "passives": 165,
+   "aligned": 155,
+   "percent": 93.9,
+   "rotations": {
+    "0": 44,
+    "90": 37,
+    "180": 23,
+    "270": 61
+   }
+  },
+  "fills": {},
+  "totals": {
+   "copper_mm": 2020.838,
+   "segments": 643,
+   "vias": 191
+  },
+  "drc": {
+   "board": {
+    "total": 122,
+    "by_type": {
+     "annular_width": 3,
+     "copper_edge_clearance": 2,
+     "padstack": 3,
+     "silk_edge_clearance": 11,
+     "silk_over_copper": 32,
+     "via_dangling": 71
+    },
+    "by_severity": {
+     "error": 5,
+     "warning": 117
+    },
+    "by_type_severity": {
+     "annular_width|error": 3,
+     "copper_edge_clearance|error": 2,
+     "padstack|warning": 3,
+     "silk_edge_clearance|warning": 11,
+     "silk_over_copper|warning": 32,
+     "via_dangling|warning": 71
+    },
+    "errors": 5,
+    "warnings": 117,
+    "shorting_items": 0,
+    "tracks_crossing": 0,
+    "violations": [
+     {
+      "type": "annular_width",
+      "severity": "error",
+      "description": "Annular width (board setup constraints min annular width 0.1500 mm; actual 0.0000 mm)",
+      "item": "PTH pad [<no net>] of J101",
+      "x": 183.65,
+      "y": 36.31
+     },
+     {
+      "type": "annular_width",
+      "severity": "error",
+      "description": "Annular width (board setup constraints min annular width 0.1500 mm; actual 0.0000 mm)",
+      "item": "PTH pad [<no net>] of J101",
+      "x": 189.36,
+      "y": 39.48
+     },
+     {
+      "type": "annular_width",
+      "severity": "error",
+      "description": "Annular width (board setup constraints min annular width 0.1500 mm; actual 0.0000 mm)",
+      "item": "PTH pad [<no net>] of J101",
+      "x": 195.08,
+      "y": 36.31
+     },
+     {
+      "type": "copper_edge_clearance",
+      "severity": "error",
+      "description": "Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.4500 mm)",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "copper_edge_clearance",
+      "severity": "error",
+      "description": "Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.4500 mm)",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 125.45,
+      "y": 101.65
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 143.55,
+      "y": 134.4
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 99.7,
+      "y": 46.35
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 203.95,
+      "y": 77.4
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 85.55,
+      "y": 72.35
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 119.6,
+      "y": 37.4
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 106.55,
+      "y": 98.4
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 108.55,
+      "y": 63.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 228.0,
+      "y": 45.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 148.35,
+      "y": 99.6
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 130.4,
+      "y": 100.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 102.15,
+      "y": 46.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 105.8,
+      "y": 64.099999
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 162.7,
+      "y": 89.25
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 198.4,
+      "y": 151.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 104.8,
+      "y": 78.4
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 105.05,
+      "y": 71.85
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 87.45,
+      "y": 73.3
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 232.7,
+      "y": 85.75
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 121.55,
+      "y": 41.05
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 97.05,
+      "y": 72.35
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 90.8,
+      "y": 77.75
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 109.95,
+      "y": 44.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 133.9,
+      "y": 103.05
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 105.2,
+      "y": 75.3
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 181.15,
+      "y": 144.7
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 135.45,
+      "y": 102.85
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 154.95,
+      "y": 84.6
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 143.5,
+      "y": 104.05
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 146.2,
+      "y": 100.1
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 105.05,
+      "y": 92.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 123.7,
+      "y": 38.8
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 139.3,
+      "y": 130.6
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 157.85,
+      "y": 96.0
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 197.1,
+      "y": 85.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 94.3,
+      "y": 97.3
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 227.85,
+      "y": 77.6
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 137.8,
+      "y": 99.45
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 101.55,
+      "y": 63.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 98.1,
+      "y": 94.95
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 99.05,
+      "y": 72.35
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 92.25,
+      "y": 74.0
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 93.8,
+      "y": 101.4
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 101.2,
+      "y": 73.3
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 133.1,
+      "y": 99.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 97.9,
+      "y": 51.95
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 105.2,
+      "y": 89.75
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 102.05,
+      "y": 94.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 102.05,
+      "y": 99.1
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 100.05,
+      "y": 94.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 89.7,
+      "y": 89.5
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 143.3,
+      "y": 126.45
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 92.4,
+      "y": 95.15
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 131.699999,
+      "y": 105.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 108.15,
+      "y": 49.25
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 83.3,
+      "y": 91.6
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 98.15,
+      "y": 50.75
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 104.65,
+      "y": 68.45
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 148.35,
+      "y": 104.6
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 125.5,
+      "y": 42.75
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 95.15,
+      "y": 50.9
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 205.15,
+      "y": 144.7
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 93.35,
+      "y": 61.85
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 190.4,
+      "y": 151.55
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 84.75,
+      "y": 89.75
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 140.5,
+      "y": 104.7
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 227.6,
+      "y": 39.25
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 95.05,
+      "y": 72.35
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/GND] on F.Cu - B.Cu",
+      "x": 101.65,
+      "y": 68.45
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/h7core_block/VDDA] on F.Cu - B.Cu",
+      "x": 108.45,
+      "y": 96.85
+     },
+     {
+      "type": "via_dangling",
+      "severity": "warning",
+      "description": "Via is not connected or connected on only one layer",
+      "item": "Via [/5V] on F.Cu - B.Cu",
+      "x": 106.05,
+      "y": 50.35
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "silk_edge_clearance",
+      "severity": "warning",
+      "description": "Silkscreen clipped by board edge",
+      "item": "Segment on Edge.Cuts",
+      "x": 51.5,
+      "y": 30.0
+     },
+     {
+      "type": "padstack",
+      "severity": "warning",
+      "description": "Padstack is questionable (PTH pad hole leaves no copper)",
+      "item": "PTH pad [<no net>] of J101",
+      "x": 183.65,
+      "y": 36.31
+     },
+     {
+      "type": "padstack",
+      "severity": "warning",
+      "description": "Padstack is questionable (PTH pad hole leaves no copper)",
+      "item": "PTH pad [<no net>] of J101",
+      "x": 189.36,
+      "y": 39.48
+     },
+     {
+      "type": "padstack",
+      "severity": "warning",
+      "description": "Padstack is questionable (PTH pad hole leaves no copper)",
+      "item": "PTH pad [<no net>] of J101",
+      "x": 195.08,
+      "y": 36.31
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C121 on F.Silkscreen",
+      "x": 214.79,
+      "y": 72.68
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C121 on F.Silkscreen",
+      "x": 212.21,
+      "y": 72.72
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C121 on F.Silkscreen",
+      "x": 212.89,
+      "y": 68.26
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C121 on F.Silkscreen",
+      "x": 214.11,
+      "y": 68.26
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C125 on F.Silkscreen",
+      "x": 187.11,
+      "y": 68.26
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C125 on F.Silkscreen",
+      "x": 185.21,
+      "y": 72.72
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C125 on F.Silkscreen",
+      "x": 185.89,
+      "y": 68.26
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C125 on F.Silkscreen",
+      "x": 187.79,
+      "y": 72.68
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C141 on F.Silkscreen",
+      "x": 159.71,
+      "y": 78.72
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC101 on F.Silkscreen",
+      "x": 168.042,
+      "y": 64.75
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC101 on F.Silkscreen",
+      "x": 168.042,
+      "y": 72.54
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C141 on F.Silkscreen",
+      "x": 161.61,
+      "y": 74.26
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C141 on F.Silkscreen",
+      "x": 160.39,
+      "y": 74.26
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C141 on F.Silkscreen",
+      "x": 162.29,
+      "y": 78.68
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC101 on F.Silkscreen",
+      "x": 179.742,
+      "y": 72.6
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC101 on F.Silkscreen",
+      "x": 179.742,
+      "y": 64.75
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC102 on F.Silkscreen",
+      "x": 58.6,
+      "y": 158.25
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC102 on F.Silkscreen",
+      "x": 70.3,
+      "y": 158.25
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC102 on F.Silkscreen",
+      "x": 58.6,
+      "y": 166.04
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC102 on F.Silkscreen",
+      "x": 70.3,
+      "y": 166.1
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC103 on F.Silkscreen",
+      "x": 82.6,
+      "y": 158.25
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC103 on F.Silkscreen",
+      "x": 82.6,
+      "y": 166.04
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC103 on F.Silkscreen",
+      "x": 94.3,
+      "y": 166.1
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of ENC103 on F.Silkscreen",
+      "x": 94.3,
+      "y": 158.25
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C139 on F.Silkscreen",
+      "x": 153.26,
+      "y": 105.61
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C139 on F.Silkscreen",
+      "x": 157.72,
+      "y": 106.29
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C139 on F.Silkscreen",
+      "x": 157.68,
+      "y": 103.71
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C160 on F.Silkscreen",
+      "x": 155.32,
+      "y": 98.29
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C160 on F.Silkscreen",
+      "x": 155.28,
+      "y": 95.71
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C160 on F.Silkscreen",
+      "x": 159.74,
+      "y": 97.61
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C139 on F.Silkscreen",
+      "x": 153.26,
+      "y": 104.39
+     },
+     {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silkscreen clipped by solder mask",
+      "item": "Segment of C160 on F.Silkscreen",
+      "x": 159.74,
+      "y": 96.39
+     }
+    ]
+   },
+   "quarantined": {
+    "total": 0,
+    "by_type": {},
+    "by_severity": {},
+    "by_type_severity": {},
+    "errors": 0,
+    "warnings": 0,
+    "shorting_items": 0,
+    "tracks_crossing": 0,
+    "violations": []
+   },
+   "pile": {
+    "total": 0,
+    "by_type": {},
+    "by_severity": {},
+    "by_type_severity": {},
+    "errors": 0,
+    "warnings": 0,
+    "shorting_items": 0,
+    "tracks_crossing": 0,
+    "violations": []
+   },
+   "structural": {
+    "total": 0,
+    "by_type": {},
+    "by_severity": {},
+    "by_type_severity": {},
+    "errors": 0,
+    "warnings": 0,
+    "shorting_items": 0,
+    "tracks_crossing": 0,
+    "violations": []
+   },
+   "unconnected": 378,
+   "ignored_checks": [
+    "footprint_filters_mismatch",
+    "footprint_type_mismatch",
+    "missing_courtyard",
+    "track_not_centered_on_via",
+    "tuning_profile_track_geometries"
+   ]
+  },
+  "gates": {
+   "10": {
+    "rule": 10,
+    "gate": "fail",
+    "detail": "1 of 2 inner layer(s) do not read ground",
+    "subjects": 2,
+    "rows": [
+     {
+      "subject": "In2.Cu",
+      "detail": "inner layer In2.Cu role 'power: 3v3 pour with a 3v3a island and 5v (owner-confirmed 2026-09-24)' does not name ground",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": [
+     {
+      "subject": "In2.Cu",
+      "detail": "inner layer In2.Cu role 'power: 3v3 pour with a 3v3a island and 5v (owner-confirmed 2026-09-24)' does not name ground",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "11": {
+    "rule": 11,
+    "gate": "n/a",
+    "detail": "no ground fill",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "12": {
+    "rule": 12,
+    "gate": "n/a",
+    "detail": "not a 2-layer board",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "13": {
+    "rule": 13,
+    "gate": "n/a",
+    "detail": "no ground fill",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "14": {
+    "rule": 14,
+    "gate": "not_gated",
+    "detail": "no high_speed nets named",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "15": {
+    "rule": 15,
+    "gate": "pass",
+    "detail": "copper ratio 0.542 (min/max), floor 0.50",
+    "subjects": 4,
+    "rows": [
+     {
+      "subject": "F.Cu",
+      "detail": "1441.70 mm2",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "In1.Cu",
+      "detail": "781.58 mm2",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "In2.Cu",
+      "detail": "1329.95 mm2",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "B.Cu",
+      "detail": "818.66 mm2",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": []
+   },
+   "17": {
+    "rule": 17,
+    "gate": "pass",
+    "detail": "17 critical net(s), 4 via(s), 0 beyond 2.0 mm of ground",
+    "subjects": 17,
+    "rows": [],
+    "fails": []
+   },
+   "19": {
+    "rule": 19,
+    "gate": "fail",
+    "detail": "ground /GND",
+    "subjects": 1,
+    "rows": [
+     {
+      "subject": "/GND",
+      "detail": "ground net /GND has no fill",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": [
+     {
+      "subject": "/GND",
+      "detail": "ground net /GND has no fill",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "20": {
+    "rule": 20,
+    "gate": "pass",
+    "detail": "6 signal via(s), 0 beyond 2.0 mm of a ground via",
+    "subjects": 6,
+    "rows": [],
+    "fails": []
+   },
+   "21": {
+    "rule": 21,
+    "gate": "n/a",
+    "detail": "ground fill on fewer than 2 layers",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "23": {
+    "rule": 23,
+    "gate": "n/a",
+    "detail": "no ground fill",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "25": {
+    "rule": 25,
+    "gate": "n/a",
+    "detail": "no ground fill",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "28": {
+    "rule": 28,
+    "gate": "n/a",
+    "detail": "no ground fill",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "35": {
+    "rule": 35,
+    "gate": "fail",
+    "detail": "Y1: gap 1.96 mm, ground coverage 0%, 0 crosser(s), 2 load cap(s) checked",
+    "subjects": 1,
+    "rows": [],
+    "fails": [
+     {
+      "subject": "Y1",
+      "detail": "0% ground coverage under the crystal, need 90%",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "37": {
+    "rule": 37,
+    "gate": "fail",
+    "detail": "4 connector(s) checked, 4 fail(s)",
+    "subjects": 4,
+    "rows": [
+     {
+      "ref": "J1",
+      "side": null,
+      "fill_mm2": 0.0,
+      "mouth_axis": null,
+      "mouth_evidence": {
+       "axis": "x",
+       "mouth_face_mm": -4.47,
+       "rear_face_mm": 4.47,
+       "mouth_ring_points": 553,
+       "mouth_ring_sectors": 18,
+       "rear_ring_points": 553,
+       "rear_ring_sectors": 18,
+       "mouth_axis": null
+      },
+      "note": "reading only, no threshold: a pour under a connector is not itself a defect"
+     },
+     {
+      "ref": "J101",
+      "side": null,
+      "fill_mm2": 0.0,
+      "mouth_axis": null,
+      "mouth_evidence": null,
+      "note": "reading only, no threshold: a pour under a connector is not itself a defect"
+     },
+     {
+      "ref": "J106",
+      "side": null,
+      "fill_mm2": 0.0,
+      "mouth_axis": "-x",
+      "mouth_evidence": {
+       "axis": "x",
+       "mouth_face_mm": -10.7,
+       "rear_face_mm": 3.7,
+       "mouth_ring_points": 28,
+       "mouth_ring_sectors": 12,
+       "rear_ring_points": 10,
+       "rear_ring_sectors": 4,
+       "mouth_axis": "-x"
+      },
+      "note": "reading only, no threshold: a pour under a connector is not itself a defect"
+     },
+     {
+      "ref": "J108",
+      "side": null,
+      "fill_mm2": 0.0,
+      "mouth_axis": null,
+      "mouth_evidence": {
+       "axis": "x",
+       "mouth_face_mm": 19.39,
+       "rear_face_mm": -13.71,
+       "mouth_ring_points": 170,
+       "mouth_ring_sectors": 25,
+       "rear_ring_points": 34,
+       "rear_ring_sectors": 24,
+       "mouth_axis": null
+      },
+      "note": "reading only, no threshold: a pour under a connector is not itself a defect"
+     }
+    ],
+    "fails": [
+     {
+      "subject": "J1",
+      "detail": "body box not within 1.0 mm of any outline edge",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "J101",
+      "detail": "body box not within 1.0 mm of any outline edge",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "J106",
+      "detail": "body box not within 1.0 mm of any outline edge",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "J108",
+      "detail": "body box not within 1.0 mm of any outline edge",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "45": {
+    "rule": 45,
+    "gate": "pass",
+    "detail": "0 acute corner(s)",
+    "subjects": 1,
+    "rows": [],
+    "fails": []
+   },
+   "47": {
+    "rule": 47,
+    "gate": "pass",
+    "detail": "0/11 net(s) under budget",
+    "subjects": 11,
+    "rows": [
+     {
+      "subject": "/3V3",
+      "detail": "0.30 mm measured, 0.30 mm required for 0.41A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/3V3A",
+      "detail": "0.30 mm measured, 0.20 mm required for 0.06A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/5V",
+      "detail": "0.40 mm measured, 0.30 mm required for 0.43A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/5VA",
+      "detail": "0.30 mm measured, 0.20 mm required for 0.08A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/9V_JACK",
+      "detail": "0.40 mm measured, 0.30 mm required for 0.27A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/GND",
+      "detail": "0.30 mm measured, 0.30 mm required for 0.43A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/VIN_9V",
+      "detail": "0.40 mm measured, 0.30 mm required for 0.27A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/VREF",
+      "detail": "0.30 mm measured, 0.20 mm required for 0.00A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/ADC_VCC",
+      "detail": "0.30 mm measured, 0.20 mm required for 0.02A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/VBUS",
+      "detail": "0.30 mm measured, 0.30 mm required for 0.43A",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/VDDA",
+      "detail": "0.30 mm measured, 0.20 mm required for 0.01A",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": []
+   },
+   "48": {
+    "rule": 48,
+    "gate": "pass",
+    "detail": "0/11 power net(s) at the design minimum",
+    "subjects": 11,
+    "rows": [
+     {
+      "subject": "/3V3",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/3V3A",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/5V",
+      "detail": "0.400 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/5VA",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/9V_JACK",
+      "detail": "0.400 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/GND",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/VIN_9V",
+      "detail": "0.400 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/VREF",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/ADC_VCC",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/VBUS",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/VDDA",
+      "detail": "0.300 mm min width vs 0.150 mm design min",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": []
+   },
+   "50": {
+    "rule": 50,
+    "gate": "not_gated",
+    "detail": "no buses in classification",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "51": {
+    "rule": 51,
+    "gate": "fail",
+    "detail": "1 net pair(s) over the 3W coupled budget",
+    "subjects": 5,
+    "rows": [
+     {
+      "subject": "/h7core_block/USB_DM//h7core_block/USB_DP",
+      "detail": "45.32 mm coupled",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/BUCK_BST//h7core_block/BUCK_SW",
+      "detail": "1.38 mm coupled",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/BUCK5_BST//BUCK5_SW",
+      "detail": "1.35 mm coupled",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/HSE_IN//h7core_block/HSE_OUT",
+      "detail": "1.10 mm coupled",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "/h7core_block/CC1//h7core_block/USB_DM",
+      "detail": "0.84 mm coupled",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": [
+     {
+      "subject": "/h7core_block/USB_DM//h7core_block/USB_DP",
+      "detail": "45.32 mm coupled vs 5.00 mm budget",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "52": {
+    "rule": 52,
+    "gate": "pass",
+    "detail": "0 net pair(s) over the broadside budget",
+    "subjects": 0,
+    "rows": [
+     {
+      "subject": "B.Cu",
+      "detail": "29% axis-aligned of 101.3 mm signal copper",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "F.Cu",
+      "detail": "69% axis-aligned of 61.1 mm signal copper",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": []
+   },
+   "54": {
+    "rule": 54,
+    "gate": "pass",
+    "detail": "0 via(s)-in-pad",
+    "subjects": 191,
+    "rows": [],
+    "fails": []
+   },
+   "55": {
+    "rule": 55,
+    "gate": "pass",
+    "detail": "0/46 decoupler ground pad(s) not solid",
+    "subjects": 46,
+    "rows": [
+     {
+      "subject": "C31.2",
+      "detail": "no pour on layer",
+      "x": 100.0,
+      "y": 72.725
+     },
+     {
+      "subject": "D105.2",
+      "detail": "no pour on layer",
+      "x": 229.59,
+      "y": 46.55
+     },
+     {
+      "subject": "C61.2",
+      "detail": "no pour on layer",
+      "x": 106.0,
+      "y": 75.52
+     },
+     {
+      "subject": "C44.2",
+      "detail": "no pour on layer",
+      "x": 135.975,
+      "y": 101.5
+     },
+     {
+      "subject": "C25.2",
+      "detail": "no pour on layer",
+      "x": 109.5,
+      "y": 64.275
+     },
+     {
+      "subject": "C56.2",
+      "detail": "no pour on layer",
+      "x": 85.52,
+      "y": 90.0
+     },
+     {
+      "subject": "C115.2",
+      "detail": "no pour on layer",
+      "x": 103.5,
+      "y": 47.59
+     },
+     {
+      "subject": "C114.2",
+      "detail": "no pour on layer",
+      "x": 100.5,
+      "y": 47.59
+     },
+     {
+      "subject": "C18.2",
+      "detail": "no pour on layer",
+      "x": 122.5,
+      "y": 41.275
+     },
+     {
+      "subject": "C57.2",
+      "detail": "no pour on layer",
+      "x": 88.25,
+      "y": 73.52
+     },
+     {
+      "subject": "C113.2",
+      "detail": "no pour on layer",
+      "x": 97.0,
+      "y": 52.3
+     },
+     {
+      "subject": "C112.2",
+      "detail": "no pour on layer",
+      "x": 99.5,
+      "y": 51.41
+     },
+     {
+      "subject": "C6.2",
+      "detail": "no pour on layer",
+      "x": 98.0,
+      "y": 72.725
+     },
+     {
+      "subject": "C24.2",
+      "detail": "no pour on layer",
+      "x": 102.5,
+      "y": 64.275
+     },
+     {
+      "subject": "C2.2",
+      "detail": "no pour on layer",
+      "x": 84.225,
+      "y": 92.0
+     },
+     {
+      "subject": "C32.2",
+      "detail": "no pour on layer",
+      "x": 96.0,
+      "y": 72.725
+     },
+     {
+      "subject": "C130.2",
+      "detail": "no pour on layer",
+      "x": 155.3,
+      "y": 85.5
+     },
+     {
+      "subject": "C45.2",
+      "detail": "no pour on layer",
+      "x": 130.775,
+      "y": 103.5
+     },
+     {
+      "subject": "C22.2",
+      "detail": "no pour on layer",
+      "x": 105.5,
+      "y": 69.475
+     },
+     {
+      "subject": "C21.2",
+      "detail": "no pour on layer",
+      "x": 102.5,
+      "y": 69.475
+     },
+     {
+      "subject": "C10.2",
+      "detail": "no pour on layer",
+      "x": 107.5,
+      "y": 98.775
+     },
+     {
+      "subject": "C8.2",
+      "detail": "no pour on layer",
+      "x": 103.0,
+      "y": 98.775
+     },
+     {
+      "subject": "C58.2",
+      "detail": "no pour on layer",
+      "x": 106.0,
+      "y": 89.98
+     },
+     {
+      "subject": "C3.2",
+      "detail": "no pour on layer",
+      "x": 106.0,
+      "y": 93.275
+     },
+     {
+      "subject": "C7.2",
+      "detail": "no pour on layer",
+      "x": 94.75,
+      "y": 101.775
+     },
+     {
+      "subject": "C29.2",
+      "detail": "no pour on layer",
+      "x": 190.775,
+      "y": 152.5
+     },
+     {
+      "subject": "C47.2",
+      "detail": "no pour on layer",
+      "x": 130.775,
+      "y": 101.5
+     },
+     {
+      "subject": "C27.2",
+      "detail": "no pour on layer",
+      "x": 144.5,
+      "y": 134.775
+     },
+     {
+      "subject": "C46.2",
+      "detail": "no pour on layer",
+      "x": 134.275,
+      "y": 104.0
+     },
+     {
+      "subject": "C1.2",
+      "detail": "no pour on layer",
+      "x": 86.5,
+      "y": 72.725
+     },
+     {
+      "subject": "C127.2",
+      "detail": "no pour on layer",
+      "x": 228.2,
+      "y": 78.5
+     },
+     {
+      "subject": "C4.2",
+      "detail": "no pour on layer",
+      "x": 93.35,
+      "y": 95.275
+     },
+     {
+      "subject": "C28.2",
+      "detail": "no pour on layer",
+      "x": 140.225,
+      "y": 131.0
+     },
+     {
+      "subject": "C30.2",
+      "detail": "no pour on layer",
+      "x": 198.775,
+      "y": 152.5
+     },
+     {
+      "subject": "C111.2",
+      "detail": "no pour on layer",
+      "x": 148.7,
+      "y": 105.5
+     },
+     {
+      "subject": "C134.2",
+      "detail": "no pour on layer",
+      "x": 133.5,
+      "y": 98.7
+     },
+     {
+      "subject": "C9.2",
+      "detail": "no pour on layer",
+      "x": 101.0,
+      "y": 95.275
+     },
+     {
+      "subject": "C160.2",
+      "detail": "no pour on layer",
+      "x": 159.16,
+      "y": 97.0
+     },
+     {
+      "subject": "C59.2",
+      "detail": "no pour on layer",
+      "x": 102.0,
+      "y": 73.52
+     },
+     {
+      "subject": "C20.2",
+      "detail": "no pour on layer",
+      "x": 92.0,
+      "y": 62.375
+     },
+     {
+      "subject": "C11.2",
+      "detail": "no pour on layer",
+      "x": 103.0,
+      "y": 95.275
+     },
+     {
+      "subject": "C117.2",
+      "detail": "no pour on layer",
+      "x": 109.5,
+      "y": 49.91
+     },
+     {
+      "subject": "C118.2",
+      "detail": "no pour on layer",
+      "x": 197.5,
+      "y": 84.7
+     },
+     {
+      "subject": "C101.2",
+      "detail": "no pour on layer",
+      "x": 148.7,
+      "y": 100.5
+     },
+     {
+      "subject": "C5.2",
+      "detail": "no pour on layer",
+      "x": 106.0,
+      "y": 72.225
+     },
+     {
+      "subject": "C19.2",
+      "detail": "no pour on layer",
+      "x": 111.47,
+      "y": 46.0
+     }
+    ],
+    "fails": []
+   },
+   "56": {
+    "rule": 56,
+    "gate": "fail",
+    "detail": "1/1 pair(s) not same-layer/coupled",
+    "subjects": 1,
+    "rows": [
+     {
+      "subject": "USB",
+      "detail": "layers ['B.Cu', 'F.Cu']/['B.Cu', 'F.Cu'], 79% coupled over 57.18 mm",
+      "x": null,
+      "y": null
+     }
+    ],
+    "fails": [
+     {
+      "subject": "USB",
+      "detail": "layers ['B.Cu', 'F.Cu']/['B.Cu', 'F.Cu'], 79% coupled over 57.18 mm",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "63": {
+    "rule": 63,
+    "gate": "pass",
+    "detail": "50 decoupler(s) checked, 0 leg fail(s)",
+    "subjects": 50,
+    "rows": [
+     {
+      "ref": "C31",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907774,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.2539936203984448
+      }
+     },
+     {
+      "ref": "D105",
+      "legs_mm": {
+       "/VIN_9V pad": 1.8783237207680712,
+       "/VIN_9V IC side": 1.2539936203984374,
+       "/GND pad": 1.8783237207680712,
+       "/GND IC side": 2.182887995294318
+      }
+     },
+     {
+      "ref": "C61",
+      "legs_mm": {
+       "/3V3 pad": 0.8324061508662687,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 0.8296987405076586,
+       "/GND IC side": 1.2539936203984448
+      }
+     },
+     {
+      "ref": "FB101",
+      "legs_mm": {
+       "/5V pad": 1.0168118065797638,
+       "/5V IC side": 2.3243278598338946,
+       "/5VA pad": 1.0259903751985238,
+       "/5VA IC side": 1.364734406395625
+      }
+     },
+     {
+      "ref": "C44",
+      "legs_mm": {
+       "/h7core_block/ADC_VCC pad": 1.377724573345481,
+       "/h7core_block/ADC_VCC IC side": 2.2102036105300398,
+       "/GND pad": 1.4484905936870942,
+       "/GND IC side": 1.5368148880069947
+      }
+     },
+     {
+      "ref": "C25",
+      "legs_mm": {
+       "/3V3A pad": 1.2730377056474054,
+       "/3V3A IC side": 1.0307764064044151,
+       "/GND pad": 1.02133491079078,
+       "/GND IC side": 1.2529959297623372
+      }
+     },
+     {
+      "ref": "C56",
+      "legs_mm": {
+       "/3V3 pad": 1.3595587519485837,
+       "/3V3 IC side": 0.9604686356149237,
+       "/GND pad": 0.80956778592036,
+       "/GND IC side": 1.25
+      }
+     },
+     {
+      "ref": "D106",
+      "legs_mm": {
+       "/VIN_9V pad": 1.7118995297621884,
+       "/VIN_9V IC side": 1.2539936203984374,
+       "/9V_JACK pad": 1.7118995297621884,
+       "/9V_JACK IC side": 1.9241881404893788
+      }
+     },
+     {
+      "ref": "C115",
+      "legs_mm": {
+       "/5V pad": 1.6211415730897825,
+       "/5V IC side": 0.9617692030835711,
+       "/GND pad": 1.5161134522191904,
+       "/GND IC side": 1.0198039027185575
+      }
+     },
+     {
+      "ref": "C114",
+      "legs_mm": {
+       "/5V pad": 2.1043051109570583,
+       "/5V IC side": 0.9617692030835711,
+       "/GND pad": 1.4756693396557374,
+       "/GND IC side": 1.0198039027185575
+      }
+     },
+     {
+      "ref": "C18",
+      "legs_mm": {
+       "/h7core_block/VBUS pad": 1.0371234256345767,
+       "/h7core_block/VBUS IC side": 1.1499999999999986,
+       "/GND pad": 0.9762812094883347,
+       "/GND IC side": 1.1000000000000014
+      }
+     },
+     {
+      "ref": "C57",
+      "legs_mm": {
+       "/3V3 pad": 0.8324061508662687,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 0.8296987405076586,
+       "/GND IC side": 1.33416640641263
+      }
+     },
+     {
+      "ref": "C113",
+      "legs_mm": {
+       "/VIN_9V pad": 0.9055385138137476,
+       "/VIN_9V IC side": 1.2539936203984374,
+       "/GND pad": 0.9656603957914015,
+       "/GND IC side": 1.0198039027185575
+      }
+     },
+     {
+      "ref": "C112",
+      "legs_mm": {
+       "/VIN_9V pad": 1.4108862463005236,
+       "/VIN_9V IC side": 1.2539936203984374,
+       "/GND pad": 1.5026975743641768,
+       "/GND IC side": 1.0198039027185575
+      }
+     },
+     {
+      "ref": "C6",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907774,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.2539936203984448
+      }
+     },
+     {
+      "ref": "C24",
+      "legs_mm": {
+       "/5V pad": 0.9250000000000043,
+       "/5V IC side": 2.3243278598338946,
+       "/GND pad": 1.02133491079078,
+       "/GND IC side": 1.2529959297623372
+      }
+     },
+     {
+      "ref": "C2",
+      "legs_mm": {
+       "/3V3 pad": 2.3802573390287036,
+       "/3V3 IC side": 0.9604686356149237,
+       "/GND pad": 1.0077822185373182,
+       "/GND IC side": 1.25
+      }
+     },
+     {
+      "ref": "C32",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907774,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.33416640641263
+      }
+     },
+     {
+      "ref": "C130",
+      "legs_mm": {
+       "/5VA pad": 0.9656603957914015,
+       "/5VA IC side": 1.364734406395625,
+       "/GND pad": 0.9656603957914118,
+       "/GND IC side": 1.364734406395615
+      }
+     },
+     {
+      "ref": "C45",
+      "legs_mm": {
+       "/h7core_block/ADC_VCC pad": 1.765113310810383,
+       "/h7core_block/ADC_VCC IC side": 2.2102036105300398,
+       "/GND pad": 2.249027156350265,
+       "/GND IC side": 2.5387004549572105
+      }
+     },
+     {
+      "ref": "C22",
+      "legs_mm": {
+       "/3V3 pad": 1.3315873985585784,
+       "/3V3 IC side": 0.9617692030835711,
+       "/GND pad": 1.3315873985585673,
+       "/GND IC side": 1.2529959297623372
+      }
+     },
+     {
+      "ref": "C21",
+      "legs_mm": {
+       "/3V3 pad": 1.3315873985585784,
+       "/3V3 IC side": 0.9617692030835711,
+       "/GND pad": 1.3315873985585673,
+       "/GND IC side": 1.2529959297623372
+      }
+     },
+     {
+      "ref": "C10",
+      "legs_mm": {
+       "/h7core_block/VDDA pad": 1.0213349107907774,
+       "/h7core_block/VDDA IC side": 1.3285330255586434,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.668831926827869
+      }
+     },
+     {
+      "ref": "C8",
+      "legs_mm": {
+       "/h7core_block/VDDA pad": 0.9503288904374132,
+       "/h7core_block/VDDA IC side": 1.3285330255586434,
+       "/GND pad": 1.004054281401159,
+       "/GND IC side": 1.23490890352284
+      }
+     },
+     {
+      "ref": "C58",
+      "legs_mm": {
+       "/3V3 pad": 0.8296987405076586,
+       "/3V3 IC side": 1.25,
+       "/GND pad": 0.8324061508662687,
+       "/GND IC side": 1.668831926827869
+      }
+     },
+     {
+      "ref": "C3",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907774,
+       "/3V3 IC side": 1.25,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.668831926827869
+      }
+     },
+     {
+      "ref": "C7",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907774,
+       "/3V3 IC side": 1.3536986370680966,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.162970334961298
+      }
+     },
+     {
+      "ref": "FB1",
+      "legs_mm": {
+       "/3V3A pad": 1.0259903751985184,
+       "/3V3A IC side": 1.0307764064044151,
+       "/h7core_block/VDDA pad": 1.016811806579769,
+       "/h7core_block/VDDA IC side": 1.3285330255586434
+      }
+     },
+     {
+      "ref": "C29",
+      "legs_mm": {
+       "/3V3A pad": 1.0077822185373053,
+       "/3V3A IC side": 1.1672617529928788,
+       "/GND pad": 1.0213349107907643,
+       "/GND IC side": 1.1672617529928788
+      }
+     },
+     {
+      "ref": "C47",
+      "legs_mm": {
+       "/3V3 pad": 1.0077822185373053,
+       "/3V3 IC side": 1.2999999999999972,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.3647344063956108
+      }
+     },
+     {
+      "ref": "C27",
+      "legs_mm": {
+       "/3V3A pad": 2.527968552019575,
+       "/3V3A IC side": 1.1428035701729196,
+       "/GND pad": 1.0213349107907643,
+       "/GND IC side": 1.1421471008587152
+      }
+     },
+     {
+      "ref": "C46",
+      "legs_mm": {
+       "/3V3 pad": 1.0077822185373053,
+       "/3V3 IC side": 1.2999999999999972,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.3723337786413377
+      }
+     },
+     {
+      "ref": "C1",
+      "legs_mm": {
+       "/3V3 pad": 0.9503288904374136,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.33416640641263
+      }
+     },
+     {
+      "ref": "C127",
+      "legs_mm": {
+       "/5VA pad": 0.9656603957914118,
+       "/5VA IC side": 1.364734406395625,
+       "/GND pad": 0.9656603957914015,
+       "/GND IC side": 1.364734406395615
+      }
+     },
+     {
+      "ref": "C4",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907643,
+       "/3V3 IC side": 1.25,
+       "/GND pad": 0.9581883948368287,
+       "/GND IC side": 1.162970334961298
+      }
+     },
+     {
+      "ref": "C28",
+      "legs_mm": {
+       "/3V3A pad": 1.5250000000000057,
+       "/3V3A IC side": 1.1428035701729196,
+       "/GND pad": 1.0077822185373053,
+       "/GND IC side": 1.1421471008587152
+      }
+     },
+     {
+      "ref": "C30",
+      "legs_mm": {
+       "/3V3A pad": 1.0077822185373053,
+       "/3V3A IC side": 1.1672617529928788,
+       "/GND pad": 1.0213349107907643,
+       "/GND IC side": 1.1672617529928788
+      }
+     },
+     {
+      "ref": "C111",
+      "legs_mm": {
+       "/3V3A pad": 0.9656603957914118,
+       "/3V3A IC side": 1.3723337786413385,
+       "/GND pad": 0.9656603957914015,
+       "/GND IC side": 1.3723337786413377
+      }
+     },
+     {
+      "ref": "C134",
+      "legs_mm": {
+       "/5VA pad": 1.614001239156909,
+       "/5VA IC side": 1.364734406395625,
+       "/GND pad": 0.9394147114027941,
+       "/GND IC side": 1.3354025610279303
+      }
+     },
+     {
+      "ref": "R20",
+      "legs_mm": {
+       "/5VA pad": 1.0040542814011502,
+       "/5VA IC side": 1.364734406395625,
+       "/h7core_block/ADC_VCC pad": 1.0040542814011502,
+       "/h7core_block/ADC_VCC IC side": 2.2102036105300398
+      }
+     },
+     {
+      "ref": "C9",
+      "legs_mm": {
+       "/h7core_block/VDDA pad": 0.9503288904374132,
+       "/h7core_block/VDDA IC side": 1.3285330255586434,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.23490890352284
+      }
+     },
+     {
+      "ref": "C160",
+      "legs_mm": {
+       "/VREF pad": 1.6720047846821517,
+       "/GND pad": 1.6480594649465794,
+       "/GND IC side": 1.364734406395615
+      }
+     },
+     {
+      "ref": "C59",
+      "legs_mm": {
+       "/3V3 pad": 0.8324061508662687,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 0.8296987405076586,
+       "/GND IC side": 1.2539936203984448
+      }
+     },
+     {
+      "ref": "C20",
+      "legs_mm": {
+       "/5V pad": 1.4952006554305755,
+       "/5V IC side": 1.594521871910198,
+       "/GND pad": 1.4484905936870918,
+       "/GND IC side": 1.209338662244785
+      }
+     },
+     {
+      "ref": "C11",
+      "legs_mm": {
+       "/h7core_block/VDDA pad": 1.0213349107907774,
+       "/h7core_block/VDDA IC side": 1.3285330255586434,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.668831926827869
+      }
+     },
+     {
+      "ref": "C117",
+      "legs_mm": {
+       "/5VA pad": 1.5161134522191904,
+       "/5VA IC side": 1.364734406395625,
+       "/GND pad": 1.5026975743641768,
+       "/GND IC side": 1.2529959297623372
+      }
+     },
+     {
+      "ref": "C118",
+      "legs_mm": {
+       "/5VA pad": 2.5806975801127834,
+       "/5VA IC side": 1.4142135623731011,
+       "/GND pad": 0.9394147114027941,
+       "/GND IC side": 1.3647344063956108
+      }
+     },
+     {
+      "ref": "C101",
+      "legs_mm": {
+       "/3V3A pad": 0.9656603957914118,
+       "/3V3A IC side": 1.3717871555019072,
+       "/GND pad": 0.9656603957914015,
+       "/GND IC side": 1.3354025610279316
+      }
+     },
+     {
+      "ref": "C5",
+      "legs_mm": {
+       "/3V3 pad": 1.0213349107907774,
+       "/3V3 IC side": 1.2539936203984448,
+       "/GND pad": 1.0213349107907774,
+       "/GND IC side": 1.2539936203984448
+      }
+     },
+     {
+      "ref": "C19",
+      "legs_mm": {
+       "/5V pad": 1.8843831882077506,
+       "/5V IC side": 0.9617692030835711,
+       "/GND pad": 1.8762729012592998,
+       "/GND IC side": 2.4022697600394487
+      }
+     }
+    ],
+    "fails": []
+   },
+   "68": {
+    "rule": 68,
+    "gate": "fail",
+    "detail": "46 decoupler(s) with a /GND pad, 1 fail(s)",
+    "subjects": 46,
+    "rows": [
+     {
+      "via": [
+       99.05,
+       72.35
+      ],
+      "refs": [
+       "C31"
+      ]
+     },
+     {
+      "via": [
+       228.0,
+       45.55
+      ],
+      "refs": [
+       "D105"
+      ]
+     },
+     {
+      "via": [
+       105.2,
+       75.3
+      ],
+      "refs": [
+       "C61"
+      ]
+     },
+     {
+      "via": [
+       135.45,
+       102.85
+      ],
+      "refs": [
+       "C44"
+      ]
+     },
+     {
+      "via": [
+       108.55,
+       63.9
+      ],
+      "refs": [
+       "C25"
+      ]
+     },
+     {
+      "via": [
+       84.75,
+       89.75
+      ],
+      "refs": [
+       "C56"
+      ]
+     },
+     {
+      "via": [
+       102.15,
+       46.9
+      ],
+      "refs": [
+       "C115"
+      ]
+     },
+     {
+      "via": [
+       99.7,
+       46.35
+      ],
+      "refs": [
+       "C114"
+      ]
+     },
+     {
+      "via": [
+       121.55,
+       41.05
+      ],
+      "refs": [
+       "C18"
+      ]
+     },
+     {
+      "via": [
+       87.45,
+       73.3
+      ],
+      "refs": [
+       "C57"
+      ]
+     },
+     {
+      "via": [
+       97.9,
+       51.95
+      ],
+      "refs": [
+       "C113"
+      ]
+     },
+     {
+      "via": [
+       98.15,
+       50.75
+      ],
+      "refs": [
+       "C112"
+      ]
+     },
+     {
+      "via": [
+       97.05,
+       72.35
+      ],
+      "refs": [
+       "C6"
+      ]
+     },
+     {
+      "via": [
+       101.55,
+       63.9
+      ],
+      "refs": [
+       "C24"
+      ]
+     },
+     {
+      "via": [
+       83.3,
+       91.6
+      ],
+      "refs": [
+       "C2"
+      ]
+     },
+     {
+      "via": [
+       95.05,
+       72.35
+      ],
+      "refs": [
+       "C32"
+      ]
+     },
+     {
+      "via": [
+       154.95,
+       84.6
+      ],
+      "refs": [
+       "C130"
+      ]
+     },
+     {
+      "via": [
+       104.65,
+       68.45
+      ],
+      "refs": [
+       "C22"
+      ]
+     },
+     {
+      "via": [
+       101.65,
+       68.45
+      ],
+      "refs": [
+       "C21"
+      ]
+     },
+     {
+      "via": [
+       106.55,
+       98.4
+      ],
+      "refs": [
+       "C10"
+      ]
+     },
+     {
+      "via": [
+       102.05,
+       99.1
+      ],
+      "refs": [
+       "C8"
+      ]
+     },
+     {
+      "via": [
+       105.2,
+       89.75
+      ],
+      "refs": [
+       "C58"
+      ]
+     },
+     {
+      "via": [
+       105.05,
+       92.9
+      ],
+      "refs": [
+       "C3"
+      ]
+     },
+     {
+      "via": [
+       93.8,
+       101.4
+      ],
+      "refs": [
+       "C7"
+      ]
+     },
+     {
+      "via": [
+       190.4,
+       151.55
+      ],
+      "refs": [
+       "C29"
+      ]
+     },
+     {
+      "via": [
+       130.4,
+       100.55
+      ],
+      "refs": [
+       "C47"
+      ]
+     },
+     {
+      "via": [
+       143.55,
+       134.4
+      ],
+      "refs": [
+       "C27"
+      ]
+     },
+     {
+      "via": [
+       133.9,
+       103.05
+      ],
+      "refs": [
+       "C46"
+      ]
+     },
+     {
+      "via": [
+       85.55,
+       72.35
+      ],
+      "refs": [
+       "C1"
+      ]
+     },
+     {
+      "via": [
+       227.85,
+       77.6
+      ],
+      "refs": [
+       "C127"
+      ]
+     },
+     {
+      "via": [
+       92.4,
+       95.15
+      ],
+      "refs": [
+       "C4"
+      ]
+     },
+     {
+      "via": [
+       139.3,
+       130.6
+      ],
+      "refs": [
+       "C28"
+      ]
+     },
+     {
+      "via": [
+       198.4,
+       151.55
+      ],
+      "refs": [
+       "C30"
+      ]
+     },
+     {
+      "via": [
+       148.35,
+       104.6
+      ],
+      "refs": [
+       "C111"
+      ]
+     },
+     {
+      "via": [
+       133.1,
+       99.55
+      ],
+      "refs": [
+       "C134"
+      ]
+     },
+     {
+      "via": [
+       100.05,
+       94.9
+      ],
+      "refs": [
+       "C9"
+      ]
+     },
+     {
+      "via": [
+       157.85,
+       96.0
+      ],
+      "refs": [
+       "C160"
+      ]
+     },
+     {
+      "via": [
+       101.2,
+       73.3
+      ],
+      "refs": [
+       "C59"
+      ]
+     },
+     {
+      "via": [
+       93.35,
+       61.85
+      ],
+      "refs": [
+       "C20"
+      ]
+     },
+     {
+      "via": [
+       102.05,
+       94.9
+      ],
+      "refs": [
+       "C11"
+      ]
+     },
+     {
+      "via": [
+       108.15,
+       49.25
+      ],
+      "refs": [
+       "C117"
+      ]
+     },
+     {
+      "via": [
+       197.1,
+       85.55
+      ],
+      "refs": [
+       "C118"
+      ]
+     },
+     {
+      "via": [
+       148.35,
+       99.6
+      ],
+      "refs": [
+       "C101"
+      ]
+     },
+     {
+      "via": [
+       105.05,
+       71.85
+      ],
+      "refs": [
+       "C5"
+      ]
+     },
+     {
+      "via": [
+       109.95,
+       44.9
+      ],
+      "refs": [
+       "C19"
+      ]
+     }
+    ],
+    "fails": [
+     {
+      "subject": "C45",
+      "detail": "no ground via within 2.0 mm (nearest 2.25 mm) and no ground pour under the pad",
+      "x": 130.775,
+      "y": 103.5
+     }
+    ]
+   },
+   "71": {
+    "rule": 71,
+    "gate": "n/a",
+    "detail": "no copper fill on the board",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "78": {
+    "rule": 78,
+    "gate": "not_gated",
+    "detail": "clocks or analog nets not in classification",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "83": {
+    "rule": 83,
+    "gate": "n/a",
+    "detail": "no power-net fill other than ground",
+    "subjects": 0,
+    "rows": [],
+    "fails": []
+   },
+   "89": {
+    "rule": 89,
+    "gate": "fail",
+    "detail": "11 polarized part(s), 7 unmarked",
+    "subjects": 11,
+    "rows": [
+     {
+      "ref": "D105",
+      "marked": false
+     },
+     {
+      "ref": "D104",
+      "marked": false
+     },
+     {
+      "ref": "D107",
+      "marked": false
+     },
+     {
+      "ref": "D106",
+      "marked": false
+     },
+     {
+      "ref": "D109",
+      "marked": false
+     },
+     {
+      "ref": "D108",
+      "marked": false
+     },
+     {
+      "ref": "D3",
+      "marked": true
+     },
+     {
+      "ref": "D2",
+      "marked": true
+     },
+     {
+      "ref": "J117",
+      "marked": false
+     },
+     {
+      "ref": "D1",
+      "marked": true
+     },
+     {
+      "ref": "C19",
+      "marked": true
+     }
+    ],
+    "fails": [
+     {
+      "subject": "D105",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "D104",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "D107",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "D106",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "D109",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "D108",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "J117",
+      "detail": "no silk mark visible outside the body box, or covered by another part",
+      "x": null,
+      "y": null
+     }
+    ]
+   },
+   "91": {
+    "rule": 91,
+    "gate": "pass",
+    "detail": "16 visible refdes (207 hidden), 1 orientation(s), 0 fail(s)",
+    "subjects": 16,
+    "rows": [
+     {
+      "ref": "U1",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U104",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U101",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U105",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U8",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "J117",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "J1",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U6",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U3",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U4",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "J3",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U103",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "U106",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "J106",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "J108",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     },
+     {
+      "ref": "J101",
+      "under_part": false,
+      "covered": false,
+      "angle_deg": 0.0
+     }
+    ],
+    "fails": []
+   },
+   "96": {
+    "rule": 96,
+    "gate": "pass",
+    "detail": "7 field(s) checked against jlcpcb 4-layer, 0 fail(s)",
+    "subjects": 7,
+    "rows": [
+     {
+      "field": "clearance",
+      "board_mm": 0.15,
+      "fab_min_mm": 0.15
+     },
+     {
+      "field": "track_width",
+      "board_mm": 0.15,
+      "fab_min_mm": 0.15
+     },
+     {
+      "field": "via_diameter",
+      "board_mm": 0.6,
+      "fab_min_mm": 0.6
+     },
+     {
+      "field": "via_drill",
+      "board_mm": 0.3,
+      "fab_min_mm": 0.3
+     },
+     {
+      "field": "annular_width",
+      "board_mm": 0.15,
+      "fab_min_mm": 0.15
+     },
+     {
+      "field": "edge_clearance",
+      "board_mm": 0.5,
+      "fab_min_mm": 0.5
+     },
+     {
+      "field": "hole_clearance",
+      "board_mm": 0.25,
+      "fab_min_mm": 0.25
+     }
+    ],
+    "fails": []
+   },
+   "111": {
+    "rule": 111,
+    "gate": "fail",
+    "detail": "223 footprint(s) checked, 22 fail(s)",
+    "subjects": 223,
+    "rows": [
+     {
+      "ref": "C139",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C31",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV104",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW102",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C116",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D105",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U1",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C61",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D104",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV102",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV114",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C153",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R104",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "FB101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C119",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C44",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C55",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R140",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R109",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C123",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D107",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C25",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R103",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C56",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R145",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "ENC102",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D106",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW106",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C154",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C115",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C114",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "Y1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C18",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C57",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C113",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C112",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D109",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R148",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C6",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV106",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C158",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R141",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C125",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R118",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C24",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R102",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C2",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R137",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R138",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C142",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R2",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "H104",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C32",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C130",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R110",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D108",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R128",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R134",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C144",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C45",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C22",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C15",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C21",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV107",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R135",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C13",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R123",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R139",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C10",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SWBYPASS1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C138",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R27",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R136",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C151",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C48",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C152",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C161",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D3",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C8",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R152",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R126",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV111",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV103",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C14",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C58",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV108",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C156",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R112",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C3",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C16",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R125",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R111",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R151",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R116",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "L101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C120",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R108",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R146",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R113",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "ENC101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D2",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R119",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R122",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C7",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R114",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "FB1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW108",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C149",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "H102",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C121",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U104",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C29",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C143",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C132",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R4",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R150",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C34",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C47",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U101",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV101",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV112",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R142",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R29",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R120",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "L1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "Q101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C159",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R117",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C33",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "H101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C35",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R5",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C27",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C145",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C46",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C157",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C146",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW103",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RVGAIN1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "ENC103",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C127",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R132",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R105",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C4",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C148",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C147",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C141",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R129",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C28",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U105",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "K102",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R149",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R6",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW107",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV113",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U8",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R144",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C30",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "J117",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C111",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW104",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "J1",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R124",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R153",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SWBOOT1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C134",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U6",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U3",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R143",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R10",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R20",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U4",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV109",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C128",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R130",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C23",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SWRESET1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C155",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW101",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C9",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C136",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C150",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C129",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C160",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R133",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "SW105",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "H103",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C59",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C162",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R147",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C20",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV105",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "J3",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "K101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C49",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C11",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C117",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R127",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R106",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R16",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U103",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R7",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R30",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C163",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C118",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "D1",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R131",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C137",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C135",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C12",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "RV110",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C5",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R101",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C124",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "C19",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "R3",
+      "ref_on_silk": false,
+      "value_on_silk": false
+     },
+     {
+      "ref": "U106",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "J106",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "J108",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     },
+     {
+      "ref": "J101",
+      "ref_on_silk": true,
+      "value_on_silk": false
+     }
+    ],
+    "fails": [
+     {
+      "subject": "RV104",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW102",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV102",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV114",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW106",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV106",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV107",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV111",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV103",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV108",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW108",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV101",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV112",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW103",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW107",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV113",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW104",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV109",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW101",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "SW105",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV105",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     },
+     {
+      "subject": "RV110",
+      "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+      "x": null,
+      "y": null
+     }
+    ]
+   }
+  }
+ },
+ "findings": [
+  {
+   "kind": "critical_length",
+   "net": "/h7core_block/USB_DP",
+   "x": null,
+   "y": null,
+   "detail": "57.18 mm against 50.00 mm allowed",
+   "canon": null
+  },
+  {
+   "kind": "critical_infeasible_placement",
+   "net": "/h7core_block/USB_DP",
+   "x": null,
+   "y": null,
+   "detail": "airline floor 54.23 mm exceeds the 50.00 mm budget; no route can meet the gate, move a part",
+   "canon": "canon:29"
+  },
+  {
+   "kind": "critical_length",
+   "net": "/h7core_block/USB_DM",
+   "x": null,
+   "y": null,
+   "detail": "59.26 mm against 50.00 mm allowed",
+   "canon": null
+  },
+  {
+   "kind": "critical_infeasible_placement",
+   "net": "/h7core_block/USB_DM",
+   "x": null,
+   "y": null,
+   "detail": "airline floor 55.21 mm exceeds the 50.00 mm budget; no route can meet the gate, move a part",
+   "canon": "canon:29"
+  },
+  {
+   "kind": "critical_infeasible_placement",
+   "net": "/h7core_block/BUCK_SW",
+   "x": null,
+   "y": null,
+   "detail": "airline floor 6.03 mm exceeds the 6.00 mm budget; no route can meet the gate, move a part",
+   "canon": "canon:29"
+  },
+  {
+   "kind": "body_gap",
+   "net": "C16/Y1",
+   "x": null,
+   "y": null,
+   "detail": "0.28 mm body gap, floor 0.30",
+   "canon": null
+  },
+  {
+   "kind": "body_gap",
+   "net": "R1/Y1",
+   "x": null,
+   "y": null,
+   "detail": "0.28 mm body gap, floor 0.30",
+   "canon": null
+  },
+  {
+   "kind": "drc:annular_width",
+   "net": "PTH pad [<no net>] of J101",
+   "x": 183.65,
+   "y": 36.31,
+   "detail": "Annular width (board setup constraints min annular width 0.1500 mm; actual 0.0000 mm)",
+   "canon": null
+  },
+  {
+   "kind": "drc:annular_width",
+   "net": "PTH pad [<no net>] of J101",
+   "x": 189.36,
+   "y": 39.48,
+   "detail": "Annular width (board setup constraints min annular width 0.1500 mm; actual 0.0000 mm)",
+   "canon": null
+  },
+  {
+   "kind": "drc:annular_width",
+   "net": "PTH pad [<no net>] of J101",
+   "x": 195.08,
+   "y": 36.31,
+   "detail": "Annular width (board setup constraints min annular width 0.1500 mm; actual 0.0000 mm)",
+   "canon": null
+  },
+  {
+   "kind": "drc:copper_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.4500 mm)",
+   "canon": null
+  },
+  {
+   "kind": "drc:copper_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.4500 mm)",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 125.45,
+   "y": 101.65,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 143.55,
+   "y": 134.4,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 99.7,
+   "y": 46.35,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 203.95,
+   "y": 77.4,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 85.55,
+   "y": 72.35,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 119.6,
+   "y": 37.4,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 106.55,
+   "y": 98.4,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 108.55,
+   "y": 63.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 228.0,
+   "y": 45.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 148.35,
+   "y": 99.6,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 130.4,
+   "y": 100.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 102.15,
+   "y": 46.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 105.8,
+   "y": 64.099999,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 162.7,
+   "y": 89.25,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 198.4,
+   "y": 151.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 104.8,
+   "y": 78.4,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 105.05,
+   "y": 71.85,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 87.45,
+   "y": 73.3,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 232.7,
+   "y": 85.75,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 121.55,
+   "y": 41.05,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 97.05,
+   "y": 72.35,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 90.8,
+   "y": 77.75,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 109.95,
+   "y": 44.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 133.9,
+   "y": 103.05,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 105.2,
+   "y": 75.3,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 181.15,
+   "y": 144.7,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 135.45,
+   "y": 102.85,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 154.95,
+   "y": 84.6,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 143.5,
+   "y": 104.05,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 146.2,
+   "y": 100.1,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 105.05,
+   "y": 92.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 123.7,
+   "y": 38.8,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 139.3,
+   "y": 130.6,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 157.85,
+   "y": 96.0,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 197.1,
+   "y": 85.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 94.3,
+   "y": 97.3,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 227.85,
+   "y": 77.6,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 137.8,
+   "y": 99.45,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 101.55,
+   "y": 63.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 98.1,
+   "y": 94.95,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 99.05,
+   "y": 72.35,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 92.25,
+   "y": 74.0,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 93.8,
+   "y": 101.4,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 101.2,
+   "y": 73.3,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 133.1,
+   "y": 99.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 97.9,
+   "y": 51.95,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 105.2,
+   "y": 89.75,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 102.05,
+   "y": 94.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 102.05,
+   "y": 99.1,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 100.05,
+   "y": 94.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 89.7,
+   "y": 89.5,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 143.3,
+   "y": 126.45,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 92.4,
+   "y": 95.15,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 131.699999,
+   "y": 105.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 108.15,
+   "y": 49.25,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 83.3,
+   "y": 91.6,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 98.15,
+   "y": 50.75,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 104.65,
+   "y": 68.45,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 148.35,
+   "y": 104.6,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 125.5,
+   "y": 42.75,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 95.15,
+   "y": 50.9,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 205.15,
+   "y": 144.7,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 93.35,
+   "y": 61.85,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 190.4,
+   "y": 151.55,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 84.75,
+   "y": 89.75,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 140.5,
+   "y": 104.7,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 227.6,
+   "y": 39.25,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 95.05,
+   "y": 72.35,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/GND] on F.Cu - B.Cu",
+   "x": 101.65,
+   "y": 68.45,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/h7core_block/VDDA] on F.Cu - B.Cu",
+   "x": 108.45,
+   "y": 96.85,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:via_dangling",
+   "net": "Via [/5V] on F.Cu - B.Cu",
+   "x": 106.05,
+   "y": 50.35,
+   "detail": "Via is not connected or connected on only one layer",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_edge_clearance",
+   "net": "Segment on Edge.Cuts",
+   "x": 51.5,
+   "y": 30.0,
+   "detail": "Silkscreen clipped by board edge",
+   "canon": null
+  },
+  {
+   "kind": "drc:padstack",
+   "net": "PTH pad [<no net>] of J101",
+   "x": 183.65,
+   "y": 36.31,
+   "detail": "Padstack is questionable (PTH pad hole leaves no copper)",
+   "canon": null
+  },
+  {
+   "kind": "drc:padstack",
+   "net": "PTH pad [<no net>] of J101",
+   "x": 189.36,
+   "y": 39.48,
+   "detail": "Padstack is questionable (PTH pad hole leaves no copper)",
+   "canon": null
+  },
+  {
+   "kind": "drc:padstack",
+   "net": "PTH pad [<no net>] of J101",
+   "x": 195.08,
+   "y": 36.31,
+   "detail": "Padstack is questionable (PTH pad hole leaves no copper)",
+   "canon": null
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C121 on F.Silkscreen",
+   "x": 214.79,
+   "y": 72.68,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C121 on F.Silkscreen",
+   "x": 212.21,
+   "y": 72.72,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C121 on F.Silkscreen",
+   "x": 212.89,
+   "y": 68.26,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C121 on F.Silkscreen",
+   "x": 214.11,
+   "y": 68.26,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C125 on F.Silkscreen",
+   "x": 187.11,
+   "y": 68.26,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C125 on F.Silkscreen",
+   "x": 185.21,
+   "y": 72.72,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C125 on F.Silkscreen",
+   "x": 185.89,
+   "y": 68.26,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C125 on F.Silkscreen",
+   "x": 187.79,
+   "y": 72.68,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C141 on F.Silkscreen",
+   "x": 159.71,
+   "y": 78.72,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC101 on F.Silkscreen",
+   "x": 168.042,
+   "y": 64.75,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC101 on F.Silkscreen",
+   "x": 168.042,
+   "y": 72.54,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C141 on F.Silkscreen",
+   "x": 161.61,
+   "y": 74.26,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C141 on F.Silkscreen",
+   "x": 160.39,
+   "y": 74.26,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C141 on F.Silkscreen",
+   "x": 162.29,
+   "y": 78.68,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC101 on F.Silkscreen",
+   "x": 179.742,
+   "y": 72.6,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC101 on F.Silkscreen",
+   "x": 179.742,
+   "y": 64.75,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC102 on F.Silkscreen",
+   "x": 58.6,
+   "y": 158.25,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC102 on F.Silkscreen",
+   "x": 70.3,
+   "y": 158.25,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC102 on F.Silkscreen",
+   "x": 58.6,
+   "y": 166.04,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC102 on F.Silkscreen",
+   "x": 70.3,
+   "y": 166.1,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC103 on F.Silkscreen",
+   "x": 82.6,
+   "y": 158.25,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC103 on F.Silkscreen",
+   "x": 82.6,
+   "y": 166.04,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC103 on F.Silkscreen",
+   "x": 94.3,
+   "y": 166.1,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of ENC103 on F.Silkscreen",
+   "x": 94.3,
+   "y": 158.25,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C139 on F.Silkscreen",
+   "x": 153.26,
+   "y": 105.61,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C139 on F.Silkscreen",
+   "x": 157.72,
+   "y": 106.29,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C139 on F.Silkscreen",
+   "x": 157.68,
+   "y": 103.71,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C160 on F.Silkscreen",
+   "x": 155.32,
+   "y": 98.29,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C160 on F.Silkscreen",
+   "x": 155.28,
+   "y": 95.71,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C160 on F.Silkscreen",
+   "x": 159.74,
+   "y": 97.61,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C139 on F.Silkscreen",
+   "x": 153.26,
+   "y": 104.39,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "drc:silk_over_copper",
+   "net": "Segment of C160 on F.Silkscreen",
+   "x": 159.74,
+   "y": 96.39,
+   "detail": "Silkscreen clipped by solder mask",
+   "canon": "canon:90"
+  },
+  {
+   "kind": "gate:10",
+   "net": "In2.Cu",
+   "x": null,
+   "y": null,
+   "detail": "inner layer In2.Cu role 'power: 3v3 pour with a 3v3a island and 5v (owner-confirmed 2026-09-24)' does not name ground",
+   "canon": "canon:10"
+  },
+  {
+   "kind": "gate:19",
+   "net": "/GND",
+   "x": null,
+   "y": null,
+   "detail": "ground net /GND has no fill",
+   "canon": "canon:19"
+  },
+  {
+   "kind": "gate:35",
+   "net": "Y1",
+   "x": null,
+   "y": null,
+   "detail": "0% ground coverage under the crystal, need 90%",
+   "canon": "canon:35"
+  },
+  {
+   "kind": "gate:37",
+   "net": "J1",
+   "x": null,
+   "y": null,
+   "detail": "body box not within 1.0 mm of any outline edge",
+   "canon": "canon:37"
+  },
+  {
+   "kind": "gate:37",
+   "net": "J101",
+   "x": null,
+   "y": null,
+   "detail": "body box not within 1.0 mm of any outline edge",
+   "canon": "canon:37"
+  },
+  {
+   "kind": "gate:37",
+   "net": "J106",
+   "x": null,
+   "y": null,
+   "detail": "body box not within 1.0 mm of any outline edge",
+   "canon": "canon:37"
+  },
+  {
+   "kind": "gate:37",
+   "net": "J108",
+   "x": null,
+   "y": null,
+   "detail": "body box not within 1.0 mm of any outline edge",
+   "canon": "canon:37"
+  },
+  {
+   "kind": "gate:51",
+   "net": "/h7core_block/USB_DM//h7core_block/USB_DP",
+   "x": null,
+   "y": null,
+   "detail": "45.32 mm coupled vs 5.00 mm budget",
+   "canon": "canon:51"
+  },
+  {
+   "kind": "gate:56",
+   "net": "USB",
+   "x": null,
+   "y": null,
+   "detail": "layers ['B.Cu', 'F.Cu']/['B.Cu', 'F.Cu'], 79% coupled over 57.18 mm",
+   "canon": "canon:56"
+  },
+  {
+   "kind": "gate:68",
+   "net": "C45",
+   "x": 130.775,
+   "y": 103.5,
+   "detail": "no ground via within 2.0 mm (nearest 2.25 mm) and no ground pour under the pad",
+   "canon": "canon:68"
+  },
+  {
+   "kind": "gate:89",
+   "net": "D105",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:89",
+   "net": "D104",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:89",
+   "net": "D107",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:89",
+   "net": "D106",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:89",
+   "net": "D109",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:89",
+   "net": "D108",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:89",
+   "net": "J117",
+   "x": null,
+   "y": null,
+   "detail": "no silk mark visible outside the body box, or covered by another part",
+   "canon": "canon:89"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV104",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW102",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV102",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV114",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW106",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV106",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV107",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV111",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV103",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV108",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW108",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV101",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV112",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW103",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW107",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV113",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW104",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV109",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW101",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "SW105",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV105",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  },
+  {
+   "kind": "gate:111",
+   "net": "RV110",
+   "x": null,
+   "y": null,
+   "detail": "refdes visible on silk; not a semiconductor, MCU/module or jack",
+   "canon": "canon:111"
+  }
+ ],
+ "coverage": {
+  "cited": [
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   17,
+   19,
+   20,
+   21,
+   23,
+   25,
+   28,
+   29,
+   35,
+   37,
+   44,
+   45,
+   47,
+   48,
+   49,
+   50,
+   51,
+   52,
+   53,
+   54,
+   55,
+   56,
+   57,
+   63,
+   68,
+   71,
+   78,
+   83,
+   89,
+   90,
+   91,
+   94,
+   96,
+   101,
+   102,
+   103,
+   111,
+   112,
+   113,
+   114,
+   115,
+   116,
+   117,
+   118,
+   119,
+   120,
+   121
+  ],
+  "count": 53,
+  "total": 121,
+  "enforced": 50,
+  "uncovered_kinds": [
+   "alignment",
+   "body_gap",
+   "collinear_overlap",
+   "critical_length",
+   "detour",
+   "drc:annular_width",
+   "drc:copper_edge_clearance",
+   "drc:padstack",
+   "drc:silk_edge_clearance",
+   "drc:via_dangling",
+   "island",
+   "micro_segment",
+   "via_redundant",
+   "width_transition_midrun",
+   "zero_length"
+  ]
+ }
+}
