@@ -1,0 +1,103 @@
+{
+ "declaration": "D0059",
+ "ledger": "0084",
+ "baseline": "0083",
+ "board_sha256": "b1dd494fa338ef8feb52357760e5192d9d9644315bb5aba7cb917d45e10d59df",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0084.json",
+ "intended": [
+  {
+   "measure": "airline:/h7core_block/ADC_DOUT",
+   "why": "declared",
+   "before": 22.839,
+   "after": 32.181,
+   "delta": 9.342,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/ADC_SCKI",
+   "why": "declared",
+   "before": 29.81,
+   "after": 39.619,
+   "delta": 9.809,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/I2S_BCLK",
+   "why": "declared",
+   "before": 40.253,
+   "after": 50.061,
+   "delta": 9.808,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/I2S_LRCLK",
+   "why": "declared",
+   "before": 39.761,
+   "after": 49.35,
+   "delta": 9.589,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DM",
+   "why": "declared",
+   "before": 48.84,
+   "after": 55.212,
+   "delta": 6.372,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/USB_DP",
+   "why": "declared",
+   "before": 48.049,
+   "after": 54.231,
+   "delta": 6.182,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6769.3,
+   "after": 6965.2,
+   "delta": 195.9,
+   "direction": "worse"
+  },
+  {
+   "measure": "body_gap_min_mm",
+   "why": "declared",
+   "before": 0.23,
+   "after": 0.31,
+   "delta": 0.08,
+   "direction": "n/a"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C3",
+   "why": "declared",
+   "before": 6.74,
+   "after": 4.09,
+   "delta": -2.65,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:FB1",
+   "why": "declared",
+   "before": 34.93,
+   "after": 36.97,
+   "delta": 2.04,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

@@ -1,33 +1,31 @@
 {
  "declaration": "D0056",
- "ledger": "0078",
+ "ledger": "0080",
  "baseline": "0077",
- "board_sha256": "3c755a12a7d3a6d698b0f02da046541bac3c484753a1c716fb8825195f54b904",
- "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0078.json",
- "intended": [],
- "consequential": [],
- "unintended": [
+ "board_sha256": "f34c0d266651d787bcb907d9685f65980bcaef2e6ea6c46653ad753aafa18fda",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0080.json",
+ "intended": [
   {
    "measure": "airline_total_mm",
-   "why": "expected to change, did not",
+   "why": "declared",
    "before": 6772.9,
-   "after": 6772.9,
-   "delta": 0.0,
-   "direction": "same"
+   "after": 6768.9,
+   "delta": -4.0,
+   "direction": "better"
   },
   {
    "measure": "drc_board_total",
-   "why": "expected to change, did not",
+   "why": "declared",
    "before": 46,
-   "after": 46,
-   "delta": 0,
-   "direction": "same"
+   "after": 51,
+   "delta": 5,
+   "direction": "worse"
   }
  ],
+ "consequential": [],
+ "unintended": [],
  "gates": [],
  "unmeasured_expect": [],
- "moves_not_applied": [
-  "J101 declared at (190.00, 45.20), board has (190.0, 44.2)"
- ],
- "hash": "51bcb3609128"
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
 }
