@@ -1,0 +1,71 @@
+{
+ "declaration": "D0157",
+ "ledger": "0189",
+ "baseline": "0188",
+ "board_sha256": "a73a9ed5adb1a8dac274350b67e080ad7cdf0694ce1c13c8983cd4bd0416d25e",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0189.json",
+ "intended": [
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "declared",
+   "before": 5590.8,
+   "after": 5591.8,
+   "delta": 1.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/5V:In2.Cu",
+   "why": "declared",
+   "before": 3705.7,
+   "after": 3706.6,
+   "delta": 0.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "declared",
+   "before": 28585.2,
+   "after": 28584.3,
+   "delta": -0.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1241.7,
+   "after": 1242.1,
+   "delta": 0.4,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 44,
+   "after": 43,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "no_region:/GND",
+   "why": "declared",
+   "before": 138,
+   "after": 137,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 483,
+   "after": 486,
+   "delta": 3,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
