@@ -1,0 +1,61 @@
+{
+ "declaration": "D0057",
+ "ledger": "0079",
+ "baseline": "0078",
+ "board_sha256": "3c755a12a7d3a6d698b0f02da046541bac3c484753a1c716fb8825195f54b904",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0079.json",
+ "intended": [],
+ "consequential": [],
+ "unintended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "expected to change, did not",
+   "before": 6772.9,
+   "after": 6772.9,
+   "delta": 0.0,
+   "direction": "same"
+  },
+  {
+   "measure": "body_gap_min_mm",
+   "why": "expected to change, did not",
+   "before": 0.31,
+   "after": 0.31,
+   "delta": 0.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "body_tight",
+   "why": "expected to change, did not",
+   "before": 0,
+   "after": 0,
+   "delta": 0,
+   "direction": "same"
+  },
+  {
+   "measure": "reach:C160",
+   "why": "expected to change, did not",
+   "before": 6.99,
+   "after": 6.99,
+   "delta": 0.0,
+   "direction": "same"
+  },
+  {
+   "measure": "reach:C3",
+   "why": "expected to change, did not",
+   "before": 4.09,
+   "after": 4.09,
+   "delta": 0.0,
+   "direction": "same"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [
+  "C3 declared at (116.00, 95.50), board has (116.0, 92.5)",
+  "R146 declared at (156.50, 93.00), board has (156.0, 92.5)",
+  "C160 declared at (157.50, 97.00), board has (157.5, 96.5)",
+  "C161 declared at (155.00, 101.00), board has (155.0, 100.5)",
+  "C139 declared at (155.50, 105.00), board has (155.5, 104.5)"
+ ],
+ "hash": "e25d2752c5ec"
+}

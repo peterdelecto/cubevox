@@ -1,0 +1,33 @@
+{
+ "declaration": "D0056",
+ "ledger": "0078",
+ "baseline": "0077",
+ "board_sha256": "3c755a12a7d3a6d698b0f02da046541bac3c484753a1c716fb8825195f54b904",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0078.json",
+ "intended": [],
+ "consequential": [],
+ "unintended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "expected to change, did not",
+   "before": 6772.9,
+   "after": 6772.9,
+   "delta": 0.0,
+   "direction": "same"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "expected to change, did not",
+   "before": 46,
+   "after": 46,
+   "delta": 0,
+   "direction": "same"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [
+  "J101 declared at (190.00, 45.20), board has (190.0, 44.2)"
+ ],
+ "hash": "51bcb3609128"
+}
