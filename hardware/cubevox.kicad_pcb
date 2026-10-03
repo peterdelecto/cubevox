@@ -21861,7 +21861,7 @@
 	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "7cd2bfff-5ace-498d-8a14-1ff7319bd1d5")
-		(at 234.95 78.25)
+		(at 234.5 78.5)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R116"
 			(at 0 -4 180)
@@ -26561,7 +26561,7 @@
 	(footprint "cubevox:C0603"
 		(layer "F.Cu")
 		(uuid "8ae68d86-3c75-43dd-b949-6b54273054e8")
-		(at 231.25 78.25)
+		(at 231 78.5)
 		(descr "10nF (103) ±10% 50V")
 		(property "Reference" "C132"
 			(at 0 -4 180)
@@ -29579,7 +29579,7 @@
 	(footprint "CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD"
 		(layer "F.Cu")
 		(uuid "96833272-c2e0-4834-9b2e-20ed7369d669")
-		(at 237.7 84 -90)
+		(at 239.5 82 -90)
 		(property "Reference" "C159"
 			(at 0 -4 270)
 			(layer "F.SilkS")
