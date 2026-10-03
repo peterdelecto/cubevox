@@ -118,7 +118,8 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
    INSTRUMENT menu scales digitally below that.
 9. Output buffer. A5 (OPA2197) unity, input BUF_IN, output → 100 Ω → 10 µF
    25 V electrolytic (+ on the buffer side) → 100 kΩ to GND → OUT_TIP. Jack:
-   NMJ6HCD2 (C368502) T to OUT_TIP, S to GND, switch contacts no-connect.
+   HOOYA PJ-611E (C309282; owner 2026-10-02, replaces NMJ6HCD2) tip pin 6 to
+   OUT_TIP, sleeve pin 2 to GND, pins 3/4/5/7 no-connect.
    Output mute: the node after the 10 µF and the 100 kΩ is OUT_AC. A second
    G6K-2F-Y DC5 (K102) pole A (COM 3 = OUT_AC, NO 4 = OUT_TIP) connects it
    to the jack. Pole B grounds the tip while muted: COM 6 = OUT_TIP, NC 7 =
@@ -289,7 +290,8 @@ longer used. RVT1C220M0405 C72502 is no longer used, and RVT1E100M0405 C72484 dr
   5×Ø1.2). Panel cutout Ø22 plus two Ø3.2 holes 19.8 mm apart; body 24.5 mm
   deep. NOT VERIFIED: which T is the normalling contact; which holes are
   anchors. Both resolved from the Neutrik drawing when the part card is written.
-- NMJ6HCD2: T, R, S and TN, RN, SN rows 16.23 mm apart; Ø11.4 panel hole.
+- PJ-611E: pins 2..7 on a 6.4 x 11.2 mm grid, body 15.8 wide, front face 4.3 mm
+  beyond the front pin row, thread 8.7 mm (replaces the NMJ6HCD2 note).
   N contacts are the normalling pair, left no-connect.
 - G6K-2F-Y: coil 1 (+) / 8 (−), 237 Ω, 21 mA. Pole A COM 3, NC 2, NO 4.
   Pole B COM 6, NC 7, NO 5. NC/NO read from the drawn blade position.

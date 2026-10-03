@@ -51,10 +51,6 @@
   ],
   [
    "cubevox",
-   "NMJ6HCD2"
-  ],
-  [
-   "cubevox",
    "NCJ6FA-H"
   ],
   [
@@ -124,6 +120,10 @@
   [
    "power",
    "PWR_FLAG"
+  ],
+  [
+   "cubevox",
+   "PJ-611E"
   ]
  ],
  "sheets": [
@@ -3250,35 +3250,35 @@
   },
   {
    "ref": "J108",
-   "lib_id": "cubevox:NMJ6HCD2",
+   "lib_id": "cubevox:PJ-611E",
    "value": "OUT 6.35mm",
    "at": [
     860,
     200
    ],
    "angle": 0,
-   "footprint": "cubevox:AUDIO-TH_NMJ6HCD2",
-   "lcsc": "C368502",
+   "footprint": "cubevox:AUDIO-TH_PJ-611E_1",
+   "lcsc": "C309282",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "NMJ6HCD2"
+    "MPN": "PJ-611E"
    },
    "pins": [
     {
-     "pin": "1",
+     "pin": "6",
      "net": "OUT_TIP",
      "dir": [
-      -1,
+      1,
       0
      ],
      "len": 2
     },
     {
-     "pin": "3",
+     "pin": "2",
      "net": "GND",
      "dir": [
-      -1,
+      1,
       0
      ],
      "len": 2

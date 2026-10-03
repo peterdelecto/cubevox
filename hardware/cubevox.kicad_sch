@@ -1412,116 +1412,6 @@
       )
     )
   )
-		(symbol "cubevox:NMJ6HCD2"
-    (in_bom yes)
-    (on_board yes)
-    (property
-      "Reference"
-      "CN"
-      (id 0)
-      (at 0 7.62 0)
-      (effects (font (size 1.27 1.27) ) )
-    )
-    (property
-      "Value"
-      "NMJ6HCD2"
-      (id 1)
-      (at 0 -7.62 0)
-      (effects (font (size 1.27 1.27) ) )
-    )
-    (property
-      "Footprint"
-      "cubevox:AUDIO-TH_NMJ6HCD2"
-      (id 2)
-      (at 0 -10.16 0)
-      (effects (font (size 1.27 1.27) ) hide)
-    )
-    (property
-      "Datasheet"
-      "https://www.lcsc.com/datasheet/C368502.pdf"
-      (id 3)
-      (at 0 -12.70 0)
-      (effects (font (size 1.27 1.27) ) hide)
-    )
-    (property
-      "Manufacturer"
-      "NEUTRIK(优曲克)"
-      (id 4)
-      (at 0 -15.24 0)
-      (effects (font (size 1.27 1.27) ) hide)
-    )
-    (property
-      "MPN"
-      "NMJ6HCD2"
-      (id 5)
-      (at 0 -17.78 0)
-      (effects (font (size 1.27 1.27) ) hide)
-    )
-    (property
-      "LCSC Part"
-      "C368502"
-      (id 6)
-      (at 0 -20.32 0)
-      (effects (font (size 1.27 1.27) ) hide)
-    )
-    (property
-      "ki_keywords"
-      "Audio Connectors"
-      (id 8)
-      (at 0 -22.86 0)
-      (effects (font (size 1.27 1.27) ) hide)
-    )
-    (symbol "NMJ6HCD2_0_1"
-      (rectangle
-        (start -3.81 5.08)
-        (end 3.81 -5.08)
-        (stroke (width 0) (type default))
-        (fill (type background))
-      )
-      (circle
-        (center -2.54 3.81)
-        (radius 0.38)
-        (stroke (width 0) (type default))
-        (fill (type none))
-      )
-      (pin passive line
-        (at -6.35 2.54 0)
-        (length 2.54)
-        (name "T" (effects (font (size 1.27 1.27))))
-        (number "1" (effects (font (size 1.27 1.27))))
-      )
-      (pin passive line
-        (at -6.35 -0.00 0)
-        (length 2.54)
-        (name "R" (effects (font (size 1.27 1.27))))
-        (number "2" (effects (font (size 1.27 1.27))))
-      )
-      (pin passive line
-        (at -6.35 -2.54 0)
-        (length 2.54)
-        (name "S" (effects (font (size 1.27 1.27))))
-        (number "3" (effects (font (size 1.27 1.27))))
-      )
-      (pin passive line
-        (at 6.35 -2.54 180)
-        (length 2.54)
-        (name "TN" (effects (font (size 1.27 1.27))))
-        (number "4" (effects (font (size 1.27 1.27))))
-      )
-      (pin passive line
-        (at 6.35 -0.00 180)
-        (length 2.54)
-        (name "RN" (effects (font (size 1.27 1.27))))
-        (number "5" (effects (font (size 1.27 1.27))))
-      )
-      (pin passive line
-        (at 6.35 2.54 180)
-        (length 2.54)
-        (name "SN" (effects (font (size 1.27 1.27))))
-        (number "6" (effects (font (size 1.27 1.27))))
-      )
-    )
-  )
 		(symbol "cubevox:NCJ6FA-H"
     (in_bom yes)
     (on_board yes)
@@ -5048,6 +4938,340 @@
 				)
 				(fill
 					(type none)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+		(symbol "cubevox:PJ-611E"
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "J"
+			(at 0 10.16 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PJ-611E"
+			(at 0 -12.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "cubevox:AUDIO-TH_PJ-611E_1"
+			(at 0 -15.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/Others_HOOYA-PJ-611E_C309282.html"
+			(at 0 -17.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "6.35mm 耳机插座 双声道 金属头"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HOOYA(皓宇电子)"
+			(at 0 -20.32 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "PJ-611E"
+			(at 0 -22.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C309282"
+			(at 0 -25.4 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "Audio Connectors"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "PJ-611E_0_1"
+			(rectangle
+				(start -7.11 2.29)
+				(end -5.59 -5.08)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+			(polyline
+				(pts
+					(xy -0.13 -5.08) (xy 0.13 -6.35)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0 5.08) (xy -0.25 3.56)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0 0) (xy 0.25 -1.27)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 5.08 2.54) (xy 0 2.54) (xy 0 5.08) (xy 0.25 3.56)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 5.08 0) (xy -2.79 0) (xy -3.81 1.52) (xy -4.32 0.76)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 5.08 -2.54) (xy 0 -2.54) (xy 0 0) (xy -0.25 -1.27)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 5.08 -5.08) (xy -1.14 -5.08) (xy -2.16 -3.56) (xy -2.67 -4.32)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 5.08 -7.62) (xy -0.13 -7.62) (xy -0.13 -5.08) (xy -0.38 -6.35)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 6.35 5.08) (xy -6.35 5.08) (xy -6.35 2.29)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(pin passive line
+				(at 7.62 5.08 180)
+				(length 2.54)
+				(name "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 7.62 2.54 180)
+				(length 2.54)
+				(name "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 7.62 0 180)
+				(length 2.54)
+				(name "4"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "4"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 7.62 -2.54 180)
+				(length 2.54)
+				(name "5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 7.62 -5.08 180)
+				(length 2.54)
+				(name "6"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "6"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 7.62 -7.62 180)
+				(length 2.54)
+				(name "7"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "7"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
 				)
 			)
 		)
@@ -14414,7 +14638,7 @@
 		(uuid "b29b2595-3b4c-5746-8a66-340ebfb9cc3a")
 	)
 	(symbol
-		(lib_id "cubevox:NMJ6HCD2")
+		(lib_id "cubevox:PJ-611E")
 		(at 1092.2 254 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -14423,7 +14647,7 @@
 		(dnp no)
 		(uuid "2e2bdc00-57fb-5a5c-8ab9-40b9c6fe4d08")
 		(property "Reference" "J108"
-			(at 1092.2 247.65 0)
+			(at 1092.2 246.38 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14431,14 +14655,14 @@
 			)
 		)
 		(property "Value" "OUT 6.35mm"
-			(at 1092.2 260.35 0)
+			(at 1092.2 264.16 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Footprint" "cubevox:AUDIO-TH_NMJ6HCD2"
+		(property "Footprint" "cubevox:AUDIO-TH_PJ-611E_1"
 			(at 1092.2 254 0)
 			(hide yes)
 			(effects
@@ -14456,7 +14680,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C368502"
+		(property "LCSC" "C309282"
 			(at 1092.2 254 0)
 			(hide yes)
 			(effects
@@ -14465,7 +14689,7 @@
 				)
 			)
 		)
-		(property "MPN" "NMJ6HCD2"
+		(property "MPN" "PJ-611E"
 			(at 1092.2 254 0)
 			(hide yes)
 			(effects
@@ -14473,9 +14697,6 @@
 					(size 1.27 1.27)
 				)
 			)
-		)
-		(pin "1"
-			(uuid "43c3285b-1f65-5a7b-84f5-e6cbe55db97d")
 		)
 		(pin "2"
 			(uuid "538c9a57-453e-5b01-ac2b-00bb4b1e8375")
@@ -14492,6 +14713,9 @@
 		(pin "6"
 			(uuid "765194e2-5529-5060-bd90-bb0604e62aeb")
 		)
+		(pin "7"
+			(uuid "ebad10be-2a90-5eed-9cac-e5d98187dccc")
+		)
 		(instances
 			(project "cubevox"
 				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
@@ -14503,61 +14727,61 @@
 	)
 	(wire
 		(pts
-			(xy 1085.85 251.46) (xy 1083.31 251.46)
+			(xy 1099.82 248.92) (xy 1102.36 248.92)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "3cb2cb31-b70e-5116-9f86-6fa4dc83a2b5")
-	)
-	(label "OUT_TIP"
-		(at 1083.31 251.46 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "7bc9d53a-7f48-58f7-8a2e-75e010cf9db3")
-	)
-	(no_connect
-		(at 1085.85 254)
-		(uuid "657addbc-a477-5cb7-b1f3-0bd279cf65a2")
-	)
-	(wire
-		(pts
-			(xy 1085.85 256.54) (xy 1083.31 256.54)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "75d4504f-2081-5382-909d-dd60865ddb78")
+		(uuid "69edad69-45a0-50f4-8e81-216d19da074d")
 	)
 	(label "GND"
-		(at 1083.31 256.54 180)
+		(at 1102.36 248.92 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify right bottom)
+			(justify left bottom)
 		)
-		(uuid "74cf727a-77fe-5d90-b8de-1441627172ad")
+		(uuid "bce946d4-8897-5bba-b168-8eb194649ca0")
 	)
 	(no_connect
-		(at 1098.55 256.54)
+		(at 1099.82 251.46)
+		(uuid "2d5bac3a-a073-5291-be38-4e39fb398d76")
+	)
+	(no_connect
+		(at 1099.82 254)
 		(uuid "74a268d2-e9cf-522b-87f5-b7425e431bb6")
 	)
 	(no_connect
-		(at 1098.55 254)
+		(at 1099.82 256.54)
 		(uuid "debd5a6a-5345-5e10-8616-d5760b93128a")
 	)
+	(wire
+		(pts
+			(xy 1099.82 259.08) (xy 1102.36 259.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "29aafd67-7754-5739-bb0f-56daead7ef93")
+	)
+	(label "OUT_TIP"
+		(at 1102.36 259.08 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1cb3d758-6281-5211-876b-8cc801cbd7db")
+	)
 	(no_connect
-		(at 1098.55 251.46)
-		(uuid "7ea03f81-b6f3-5677-8ee9-43caab9947b2")
+		(at 1099.82 261.62)
+		(uuid "e9274178-aa37-56a8-b31b-0ef70592d698")
 	)
 	(symbol
 		(lib_id "cubevox:G6K-2F-Y-DC5")

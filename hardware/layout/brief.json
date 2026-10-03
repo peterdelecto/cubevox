@@ -354,9 +354,9 @@
     {
       "ref": "J108",
       "x": 72.5,
-      "y": 40.0,
+      "y": 41.0,
       "rotation": 90.0,
-      "reason": "1/4 in output jack on the rear edge, B.Cu hand-soldered; owner 2026-10-02 render review: moved 3 mm rearward so the housing face sits at the edge (STEP: face was 2.6 mm proud, bushing 3.9 mm beyond) and pads 3/6 clear the 0.5 mm edge rule"
+      "reason": "1/4 in output jack HOOYA PJ-611E (C309282) on the rear edge, B.Cu hand-soldered; owner 2026-10-02: part changed from NMJ6HCD2; owner column x 72.5, y set so the housing front face (4.3 mm beyond the front pin row, fxbox drawing record) sits 0.35 mm inside the edge"
     },
     {
       "ref": "J106",
@@ -1416,10 +1416,10 @@
       "mating_axis": "+x",
       "mating_axis_confirmed": false,
       "overhang_mm": {
-        "value": 3.565,
-        "source": "courtyard top y 26.435 against the outline y 30.0 after the 3 mm move; housing face at the edge, NMJ6HCD2 bushing proud through the rear plate"
+        "value": 8.4,
+        "source": "PJ-611E thread 8.7 mm (HOOYA rev A2 via the fxbox parts record) less the 0.35 mm face inset; courtyard top y 21.55 against the outline y 30.0"
       },
-      "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
+      "mating_axis_note": "PJ-611E mouth at local +x per the fxbox renders and drawing (PARTS-fxbox-source.md); rot 90 on B.Cu turns it to board -y, the rear edge. Confirmed by the courtyard trial at four rotations 2026-10-02."
     }
   ],
   "floors": {

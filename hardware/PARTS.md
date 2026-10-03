@@ -29,7 +29,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 20 | C361173 | RK09D1130C2P | pots (superseded, do not order) | Extended | 174 (LIVE) | 0.629 | RES-TH_RK09D1130C2P (cubevox) | 0 | SUPERSEDED by C470304, do not order. Alps F25 = 25 mm shaft; owner measured 13.5 mm on their sample; both are wrong for the 19.5 mm encoder tip |
 | 20b | C470304 | RK09D1130C1B | pots, 14 panel + Input Gain | Extended | 986 (LIVE 2026-10-02) | 0.84 (10+) | RES-ADJ-TH_RK09D1130C3C (cubevox) | 15 | IMPORTED with --repair-courtyard; model: Alps STEP aligned (RK09D1130C1B_alps_aligned.step), shaft tip 20.0 measured |
 | 21 | C368458 | NCJ6FA-H | XLR + 1/4" combo input | Extended | 111 (LIVE) | 2.600 | CONN-TH_NCJ6FA-H (cubevox) | 1 | IMPORTED with --model-offset -1.24 -11.46 0 and --accept-mismatch (catalogue 3P is the XLR pin count), see WARNINGS 1 |
-| 22 | C368502 | NMJ6HCD2 | 1/4" output jack | Extended | 1358 (LIVE) | 2.917 | AUDIO-TH_NMJ6HCD2 (cubevox) | 1 | IMPORTED with --repair-courtyard |
+| 22 | C309282 | PJ-611E | 1/4" output jack (HOOYA) | Extended | 1562 (LIVE 2026-10-02) | 0.541 | AUDIO-TH_PJ-611E_1 (cubevox, copied from fxbox with its model offset 2.84/-2.85) | 1 | owner 2026-10-02 replaces NMJ6HCD2 (C368502); pin map 2 sleeve, 4 ring, 6 tip, 3/5/7 switch contacts, verified against the HOOYA drawing in the fxbox record |
 | 24 | C19726 | BAT54SLT1G | preamp input clamps | Extended | 256249 | 0.019 | SOT-23 (h7core) | 2 (est.) | inherited |
 | 25 | C318884 | TS-1187A-B-A-B | BOOT0, NRST tact | Basic | 473784 | 0.016 | SW-SMD_4P 5.1x5.1 (h7core) | 2 (est.) | inherited |
 | 28b | none (owner-supplied) | SH1106 1.3in I2C 128x64 | J117 OLED module, 4-pin I2C, hand-plugged by the owner, not on the JLC BOM | n/a | n/a | n/a | OLED-1.3-SH1106-I2C-4P (cubevox, hand-written) | 1 | Module PCB 35.4x33.5x1.2, pins GND/VCC/SCL/SDA, 4x NPTH 3.2 on a 30.4x28.5 grid. Buy 4x M3 x 8 mm standoffs (plus 4 screws). Model assumes 8.0 mm standoffs: module PCB bottom at z 8.0, glass top at z 10.7, pins down to z -3.0. The 11.8 mm panel plane needs about 9.1 mm standoffs. |
@@ -83,7 +83,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 |-----|------|--------------|
 | J101 | NCJ6FA-H combo input (B.Cu) | owner, excluded from JLC BOM/CPL |
 | J106 | PJ-002A barrel (B.Cu) | owner, excluded |
-| J108 | NMJ6HCD2 1/4 in output (B.Cu) | owner, excluded |
+| J108 | PJ-611E 1/4 in output (B.Cu) | owner, excluded |
 | J117 | SH1106 OLED module and header | owner, excluded |
 | all other refs | | JLC (top side, Economic) |
 
