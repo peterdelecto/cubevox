@@ -52157,7 +52157,7 @@
 		(at 232 37 -90)
 		(property "Reference" "J106"
 			(at 4.995 1.875 0)
-			(layer "F.SilkS")
+			(layer "B.SilkS")
 			(uuid "4705a377-65ad-43e5-ba30-1eb748125b22")
 			(effects
 				(font
@@ -52412,7 +52412,7 @@
 		(descr "6.35mm 耳机插座 双声道 金属头")
 		(property "Reference" "J108"
 			(at -14.625 -8.845 0)
-			(layer "F.SilkS")
+			(layer "B.SilkS")
 			(uuid "d18c072b-774a-4524-a136-1c1f512ff5fa")
 			(effects
 				(font
@@ -53024,7 +53024,7 @@
 		(at 190 44.2)
 		(property "Reference" "J101"
 			(at -0.68 10.595 0)
-			(layer "F.SilkS")
+			(layer "B.SilkS")
 			(uuid "c7247b67-3ee4-44fc-816f-b286242394b1")
 			(effects
 				(font
