@@ -21,7 +21,7 @@
 	(pad 2 thru_hole oval (at -3.00 -2.35 0.00) (size 1.600 3.600) (layers *.Cu *.Mask)(drill oval 0.999998 2.999994))
 	(pad 3 thru_hole oval (at 0.00 2.35 0.00) (size 3.600 1.600) (layers *.Cu *.Mask)(drill oval 2.999994 0.999998))
 	(fp_circle (center 3.70 -6.85) (end 3.73 -6.85) (layer F.SilkS) (width 0.06))
-	(model "${KIPRJMOD}/cubevox.3dshapes/DC-IN-TH_PJ-002A.wrl"
+	(model "${KIPRJMOD}/cubevox.3dshapes/DC-IN-TH_PJ-002A.step"
 		(offset (xyz -7.0000 4.3000 0.0000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 180))

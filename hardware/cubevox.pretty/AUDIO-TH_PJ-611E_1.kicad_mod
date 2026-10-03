@@ -576,9 +576,9 @@
 		(uuid "c42e4158-320d-4a26-983c-bbe3b2a2a2e5")
 	)
 	(embedded_fonts no)
-	(model "${KIPRJMOD}/cubevox.3dshapes/AUDIO-TH_PJ-611E_1.wrl"
+	(model "${KIPRJMOD}/cubevox.3dshapes/AUDIO-TH_PJ-611E_1_easyeda.step"
 		(offset
-			(xyz 2.84 -2.85 0)
+			(xyz 10.69 -1.4 6.48)
 		)
 		(scale
 			(xyz 1 1 1)

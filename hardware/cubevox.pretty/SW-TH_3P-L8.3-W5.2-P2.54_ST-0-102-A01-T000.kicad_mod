@@ -24,7 +24,7 @@
 	(fp_line (start -5.75 -5.75) (end 7.05 -5.75) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 7.05 -5.75) (end 7.05 5.75) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 7.05 5.75) (end -5.75 5.75) (layer F.CrtYd) (width 0.05))
-	(model "${KIPRJMOD}/cubevox.3dshapes/SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000.wrl"
+	(model "${KIPRJMOD}/cubevox.3dshapes/SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

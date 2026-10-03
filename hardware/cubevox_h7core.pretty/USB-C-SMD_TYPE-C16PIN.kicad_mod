@@ -36,7 +36,7 @@
 	(fp_circle (center -5.20 -2.80) (end -5.17 -2.80) (layer F.SilkS) (width 0.06))
 	(fp_circle (center -2.89 -1.29) (end -2.77 -1.29) (layer Cmts.User) (width 0.25))
 	(fp_circle (center 2.89 -1.29) (end 3.01 -1.29) (layer Cmts.User) (width 0.25))
-	(model "${KIPRJMOD}/cubevox_h7core.3dshapes/USB-C-SMD_TYPE-C16PIN.wrl"
+	(model "${KIPRJMOD}/cubevox_h7core.3dshapes/USB-C-SMD_TYPE-C16PIN.step"
 		(offset (xyz 0.000 -2.350 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 180))
