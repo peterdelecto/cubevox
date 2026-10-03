@@ -20378,11 +20378,11 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "71daaa7a-8022-4597-8584-1d8344753640")
-		(at 69 97 -90)
+		(at 60.95 86.15)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C14"
-			(at 0 -1.43 0)
+			(at 0 -1.43 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3529cd30-9798-4230-9c98-32aca07bb3c5")
@@ -20394,7 +20394,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 0 1.43 270)
+			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "42c3c207-3c84-48b1-8af3-7a8a3c67b39c")
@@ -20406,7 +20406,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 270)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b7feba21-be77-4ea5-b5dd-ebc3a6a7d6bf")
@@ -20417,7 +20417,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 270)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "57f069be-b449-4147-950a-390943535345")
@@ -20428,7 +20428,7 @@
 			)
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
-			(at 0 0 270)
+			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "b220bfec-1148-4964-ba86-760838875d15")
@@ -20440,7 +20440,7 @@
 			)
 		)
 		(property "LCSC" "C14663"
-			(at 0 0 270)
+			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "5f987d3e-27d6-4036-ac36-5520c7a40b18")
@@ -20454,16 +20454,6 @@
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
-			(start -0.14058 0.51)
-			(end 0.14058 0.51)
-			(stroke
-				(width 0.12)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "18fa04a3-d6de-4dbe-8d03-db7a044cf3ff")
-		)
-		(fp_line
 			(start -0.14058 -0.51)
 			(end 0.14058 -0.51)
 			(stroke
@@ -20472,6 +20462,16 @@
 			)
 			(layer "F.SilkS")
 			(uuid "db429b89-5b06-447b-9aaf-07bb2284bde5")
+		)
+		(fp_line
+			(start -0.14058 0.51)
+			(end 0.14058 0.51)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "18fa04a3-d6de-4dbe-8d03-db7a044cf3ff")
 		)
 		(fp_rect
 			(start -1.48 -0.73)
@@ -20496,7 +20496,7 @@
 			(uuid "260bae72-43c8-459b-8381-440f24774353")
 		)
 		(fp_text user "${REFERENCE}"
-			(at 0 0 270)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(uuid "09e469ef-f8ad-4433-bde6-ca7864a6ee24")
 			(effects
@@ -20507,7 +20507,7 @@
 			)
 		)
 		(pad "1" smd roundrect
-			(at -0.775 0 270)
+			(at -0.775 0)
 			(size 0.9 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -20516,7 +20516,7 @@
 			(uuid "b9a638d7-33ab-422d-832f-27d297072570")
 		)
 		(pad "2" smd roundrect
-			(at 0.775 0 270)
+			(at 0.775 0)
 			(size 0.9 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -55822,14 +55822,6 @@
 		(uuid "ff5e06c5-5ec2-448e-a954-a7fe727f761b")
 	)
 	(segment
-		(start 69 97.775)
-		(end 69 98.625)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/GND")
-		(uuid "0228166b-8e6a-4c1d-b846-00d7aaa56ed7")
-	)
-	(segment
 		(start 82.79 53)
 		(end 82.79 54.3)
 		(width 0.3)
@@ -56702,6 +56694,14 @@
 		(uuid "c2ef8a8d-aaf0-486f-a89d-f7fbd8df6b61")
 	)
 	(segment
+		(start 61.725 86.15)
+		(end 62.7 86.15)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/GND")
+		(uuid "c35e62bf-a1de-4e3f-8581-6d26b60d5598")
+	)
+	(segment
 		(start 110.41 105.5)
 		(end 109.267 105.5)
 		(width 0.3)
@@ -57020,14 +57020,6 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/GND")
 		(uuid "082f4ab5-d9f7-45eb-bad1-51e2698d13d1")
-	)
-	(via
-		(at 69 98.625)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "/GND")
-		(uuid "086a1956-4438-4898-bd44-b5882ea4608a")
 	)
 	(via
 		(at 209 65.053)
@@ -57732,6 +57724,14 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/GND")
 		(uuid "9563dad6-e5a0-4035-8459-5c9e7a5f906b")
+	)
+	(via
+		(at 62.7 86.15)
+		(size 0.6)
+		(drill 0.3)
+		(layers "F.Cu" "B.Cu")
+		(net "/GND")
+		(uuid "957d6377-2b42-4bf5-b621-4e5f59955431")
 	)
 	(via
 		(at 199.625 152.5)
@@ -59028,6 +59028,14 @@
 		(layer "F.Cu")
 		(net "/h7core_block/HSE_OUT")
 		(uuid "fba969fa-cbbf-46e0-8bae-0c58e0ae770a")
+	)
+	(segment
+		(start 58 86.15)
+		(end 60.175 86.15)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/h7core_block/NRST")
+		(uuid "5501f227-49dd-4381-9fb3-31e2dfe2dc1a")
 	)
 	(segment
 		(start 105 100.975)
