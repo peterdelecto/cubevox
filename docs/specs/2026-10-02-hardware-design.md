@@ -84,7 +84,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
    G = 1 + 2·4.53k/1k = 10.06 (20.05 dB), corner 7 Hz (audit A04). 47 pF across
    each Rf. Difference amp A3 with four 10 kΩ 0.1 % (audit A08), gain 1,
    reference VREF. Output PRE1, DC within a few mV of VREF.
-4. Stage 2, 0–29.9 dB on the Input Gain pot (RK09D1130C1B 10 kΩ linear, wired
+4. Stage 2, 0–29.9 dB on the Input Gain pot (RK09D1130C2P 10 kΩ linear, wired
    as a variable resistor, wiper tied to one end, no end-stop). Non-inverting
    on A4 (OPA2197): the pot is the feedback resistor; R116 = 330 Ω from the
    inverting input to GND through 100 µF 10 V (DC gain 1, corner 4.8 Hz; the
@@ -180,24 +180,25 @@ F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
 
 ### Panel
 
-19. 14 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part: Alps
-    RK09D1130C1B, LCSC C470304, 10 kΩ linear, THT, Extended, $0.84 at 10+,
-    stock 986 live 2026-10-02. Alps's own STEP (file RK09D1130-F20) measures
-    shaft tip 20.0 mm and collar top 11.85 mm above the mounting surface,
-    ø6 D-shaft with 4.5 mm flat, matching the encoder (19.5 / 11.5). Same
-    part for the analog Input Gain pot, 15 in total; a build of N units needs
-    15 N. Supersedes RK09D1130C2P (C361173, owner pick earlier the same day):
-    Alps's F25 model shows a 25 mm shaft and the owner measured 13.5 mm on a
-    sample, so that code is not trusted. Measure one C470304 sample before
-    ordering fifteen.
+19. 14 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part (owner
+    2026-10-03): Alps RK09D1130C2P, LCSC C361173, 10 kΩ linear, THT, Extended,
+    $0.63 at 10+, stock 174. Alps drawing No. 4 (vertical, with collar) is
+    shared with RK09D1130C1B; the only difference is shaft length LM1 25
+    (C1B 20), D-flat ℓ1 12 (C1B 7). Shaft tip 25.0 mm, collar top 11.8 mm above
+    the mounting surface, ø6 D-shaft with 4.5 mm flat. The owner's 13.5 mm on a
+    sample was measured from the collar top (25.0 − 11.8 = 13.2). EasyEDA's
+    models for C2P and C3C are swapped (the one titled C2P is the 20 mm shaft).
+    Same part for the analog Input Gain pot, 15 in total; a build of N units
+    needs 15 N. Over the 11.8 mm panel plane the shaft stands 13.2 mm.
 20. Three encoders on direct GPIO (owner 2026-10-02): MENU with push switch,
-    KEY and SEMITONES without. Alps EC11N, shaft code 15: EC11N1525404
-    (C470748, with switch) and EC11N1520401 (C470703, no switch), THT with
-    side anchor legs, 30 detents. Datasheet heights: encoder tip 19.5 mm,
-    bushing top 11.5 mm; pot tip 20.0 mm, bushing top 11.8 mm. Both shafts
-    ø6 D-cut with a 4.5 mm flat, so one knob fits all. The 20-code EC11N
-    parts are 5 mm too tall. Pot bushing figure read from a scanned drawing,
-    ±0.2 mm.
+    KEY and SEMITONES without. Matched to the pot (owner 2026-10-03): Alps
+    EC11E vertical, operating length 20: EC11E15244B2 (C470754, push switch,
+    1.5 mm travel) and EC11E15204A3 (C470710, no switch), 30 detents, 15
+    pulses. Tip 24.5 mm, bushing top 11.5 mm, ø6 D-shaft 4.5 mm flat, flat
+    length 12. PCB layout identical to EC11N (Alps drawings 4/5 vs 6/7: 5 × ø1
+    at 2.5 pitch, legs 12.5 apart in 1.5 × 2.6), so the footprint is the Alps
+    one; EasyEDA's EC11 footprint uses 2.54 pitch and is not used. Encoder tip
+    sits 0.5 mm below the pot tip, bushing 0.3 mm below its collar.
 21. Toggles (owner 2026-10-02): Yuen Fung ST-0-102-A01-T000-LF, LCSC
     C1788487, mini bat lever, SPDT ON-ON, vertical THT, 2.54 mm pitch, body
     8.6 mm, M5 bushing 8.6–14.2 mm above the board (spans the 11.8 mm panel
@@ -258,8 +259,8 @@ F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
 Every part that reaches the panel or a wall (pots, encoders, toggles, jacks,
 USB-C, barrel) needs a 3D model whose height matches its datasheet before the
 enclosure is designed. EasyEDA/JLC models are often the family's generic body:
-the EC11N model is the 20-code shaft (24.5 mm tip, ours is 19.5) and the RK09D
-model measured 34.8 mm. Procedure: fetch the manufacturer STEP for the exact
+the EasyEDA EC11 model is the generic 24.5 mm body with a 2.54 mm-pitch footprint,
+and EasyEDA's RK09D models for C2P and C3C are swapped. Procedure: fetch the manufacturer STEP for the exact
 MPN; if none, build a simplified model from the drawing; in both cases measure
 the STEP's z extent against the datasheet and record it in PARTS.md. The
 toggle's EasyEDA STEP measured 23.6 mm and matches.

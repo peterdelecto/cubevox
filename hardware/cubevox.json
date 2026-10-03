@@ -67,15 +67,15 @@
   ],
   [
    "cubevox",
-   "RK09D1130C1B"
+   "RK09D1130C2P"
   ],
   [
    "cubevox",
-   "EC11N1525404"
+   "EC11E15244B2"
   ],
   [
    "cubevox",
-   "EC11N1520401"
+   "EC11E15204A3"
   ],
   [
    "cubevox_h7core",
@@ -2186,19 +2186,19 @@
   },
   {
    "ref": "RVGAIN1",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k GAIN",
    "at": [
     508,
     252
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -3975,19 +3975,19 @@
   },
   {
    "ref": "RV101",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     228,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4021,19 +4021,19 @@
   },
   {
    "ref": "RV102",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     268,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4067,19 +4067,19 @@
   },
   {
    "ref": "RV103",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     308,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4113,19 +4113,19 @@
   },
   {
    "ref": "RV104",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     348,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4159,19 +4159,19 @@
   },
   {
    "ref": "RV105",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     388,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4205,19 +4205,19 @@
   },
   {
    "ref": "RV106",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     428,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4251,19 +4251,19 @@
   },
   {
    "ref": "RV107",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     468,
     330
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4297,19 +4297,19 @@
   },
   {
    "ref": "RV108",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     228,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4343,19 +4343,19 @@
   },
   {
    "ref": "RV109",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     268,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4389,19 +4389,19 @@
   },
   {
    "ref": "RV110",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     308,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4435,19 +4435,19 @@
   },
   {
    "ref": "RV111",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     348,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4481,19 +4481,19 @@
   },
   {
    "ref": "RV112",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     388,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4527,19 +4527,19 @@
   },
   {
    "ref": "RV113",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     428,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4573,19 +4573,19 @@
   },
   {
    "ref": "RV114",
-   "lib_id": "cubevox:RK09D1130C1B",
+   "lib_id": "cubevox:RK09D1130C2P",
    "value": "10k",
    "at": [
     468,
     390
    ],
    "angle": 0,
-   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-   "lcsc": "C470304",
+   "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+   "lcsc": "C361173",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "RK09D1130C1B"
+    "MPN": "RK09D1130C2P"
    },
    "pins": [
     {
@@ -4619,19 +4619,19 @@
   },
   {
    "ref": "ENC101",
-   "lib_id": "cubevox:EC11N1525404",
-   "value": "EC11N1525404",
+   "lib_id": "cubevox:EC11E15244B2",
+   "value": "EC11E15244B2",
    "at": [
     128,
     470
    ],
    "angle": 0,
-   "footprint": "cubevox:SW-TH_EC11NXXXX",
-   "lcsc": "C470748",
+   "footprint": "cubevox:SW-TH_EC11E",
+   "lcsc": "C470754",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "EC11N1525404"
+    "MPN": "EC11E15244B2"
    },
    "pins": [
     {
@@ -4692,19 +4692,19 @@
   },
   {
    "ref": "ENC102",
-   "lib_id": "cubevox:EC11N1520401",
-   "value": "EC11N1520401",
+   "lib_id": "cubevox:EC11E15204A3",
+   "value": "EC11E15204A3",
    "at": [
     268,
     470
    ],
    "angle": 0,
-   "footprint": "cubevox:SW-TH_EC11NXXXX",
-   "lcsc": "C470703",
+   "footprint": "cubevox:SW-TH_EC11E",
+   "lcsc": "C470710",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "EC11N1520401"
+    "MPN": "EC11E15204A3"
    },
    "pins": [
     {
@@ -4747,19 +4747,19 @@
   },
   {
    "ref": "ENC103",
-   "lib_id": "cubevox:EC11N1520401",
-   "value": "EC11N1520401",
+   "lib_id": "cubevox:EC11E15204A3",
+   "value": "EC11E15204A3",
    "at": [
     408,
     470
    ],
    "angle": 0,
-   "footprint": "cubevox:SW-TH_EC11NXXXX",
-   "lcsc": "C470703",
+   "footprint": "cubevox:SW-TH_EC11E",
+   "lcsc": "C470710",
    "rest": "no_connect",
    "in_bom": true,
    "fields": {
-    "MPN": "EC11N1520401"
+    "MPN": "EC11E15204A3"
    },
    "pins": [
     {

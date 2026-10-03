@@ -102,10 +102,10 @@ def toggle(ref, x, y, common, throw1, throw3=None):
 
 
 def pot(ref, x, y, end1, wiper, end3, val="10k"):
-    return {"ref": ref, "lib_id": "cubevox:RK09D1130C1B", "value": val,
-            "at": [x, y], "angle": 0, "footprint": "cubevox:RES-ADJ-TH_RK09D1130C3C",
-            "lcsc": "C470304", "rest": "no_connect", "in_bom": True,
-            "fields": {"MPN": "RK09D1130C1B"},
+    return {"ref": ref, "lib_id": "cubevox:RK09D1130C2P", "value": val,
+            "at": [x, y], "angle": 0, "footprint": "cubevox:RES-ADJ-TH_RK09D1130C2P",
+            "lcsc": "C361173", "rest": "no_connect", "in_bom": True,
+            "fields": {"MPN": "RK09D1130C2P"},
             "pins": [row("1", end1, LF), row("2", wiper, UP), row("3", end3, RT)]}
 
 
@@ -433,9 +433,9 @@ def build_top():
 
     # encoders
     enc_y = 470
-    add(dict(_enc("ENC101", "EC11N1525404", "C470748", X6 + 20, enc_y, "ENC_MENU_A", "ENC_MENU_B", "ENC_MENU_SW")))
-    add(dict(_enc("ENC102", "EC11N1520401", "C470703", X6 + 160, enc_y, "ENC_KEY_A", "ENC_KEY_B", None)))
-    add(dict(_enc("ENC103", "EC11N1520401", "C470703", X6 + 300, enc_y, "ENC_SEMI_A", "ENC_SEMI_B", None)))
+    add(dict(_enc("ENC101", "EC11E15244B2", "C470754", X6 + 20, enc_y, "ENC_MENU_A", "ENC_MENU_B", "ENC_MENU_SW")))
+    add(dict(_enc("ENC102", "EC11E15204A3", "C470710", X6 + 160, enc_y, "ENC_KEY_A", "ENC_KEY_B", None)))
+    add(dict(_enc("ENC103", "EC11E15204A3", "C470710", X6 + 300, enc_y, "ENC_SEMI_A", "ENC_SEMI_B", None)))
     xe = X6 + 30
     for sigs, base in ((["ENC_MENU_A", "ENC_MENU_B", "ENC_MENU_SW"], X6 + 20),
                        (["ENC_KEY_A", "ENC_KEY_B"], X6 + 160), (["ENC_SEMI_A", "ENC_SEMI_B"], X6 + 300)):
@@ -469,8 +469,8 @@ def build_top():
         ["cubevox", "PJ-002A"], ["cubevox", "AP63205WU-7"], ["cubevox", "ANR5040T4R7M"],
         ["cubevox", TOGGLE_SYM], ["cubevox", "PZ254V-11-04P_C2691448"], ["cubevox", "OLED-1.3-SH1106-I2C-4P"],
         ["cubevox", "NCJ6FA-H"], ["cubevox", "G6K-2F-Y-DC5"], ["cubevox", "1N4148W_C81598"],
-        ["cubevox", "CD74HC4067SM96"], ["cubevox", "RK09D1130C1B"], ["cubevox", "EC11N1525404"],
-        ["cubevox", "EC11N1520401"], ["cubevox_h7core", "BAT54SLT1G"],
+        ["cubevox", "CD74HC4067SM96"], ["cubevox", "RK09D1130C2P"], ["cubevox", "EC11E15244B2"],
+        ["cubevox", "EC11E15204A3"], ["cubevox_h7core", "BAT54SLT1G"],
         ["Device", "R"], ["Device", "C"],
         ["cubevox", "RVT1E100M0405-C72484"], ["cubevox", "VT1A101M0505"], ["cubevox", "RVT1C220M0405"],
         ["cubevox", "RVT1E470M0605"], ["cubevox", "MMBT3904-C20526"], ["Device", "FerriteBead"],
@@ -501,7 +501,7 @@ def _enc(ref, mpn, lcsc, x, y, a, b, sw):
     if sw:
         rows += [row("D", sw, UP), row("E", "GND", UP)]
     return {"ref": ref, "lib_id": "cubevox:" + mpn, "value": mpn, "at": [x, y], "angle": 0,
-            "footprint": "cubevox:SW-TH_EC11NXXXX", "lcsc": lcsc, "rest": "no_connect",
+            "footprint": "cubevox:SW-TH_EC11E", "lcsc": lcsc, "rest": "no_connect",
             "in_bom": True, "fields": {"MPN": mpn}, "pins": rows}
 
 

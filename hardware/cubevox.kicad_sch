@@ -2846,7 +2846,7 @@
 		)
 		(embedded_fonts no)
 	)
-		(symbol "cubevox:RK09D1130C1B"
+		(symbol "cubevox:RK09D1130C2P"
     (in_bom yes)
     (on_board yes)
     (property
@@ -2858,7 +2858,7 @@
     )
     (property
       "Value"
-      "RK09D1130C1B"
+      "RK09D1130C2P"
       (id 1)
       (at 0 -8.89 0)
       (effects (font (size 1.27 1.27) ) )
@@ -2886,7 +2886,7 @@
     )
     (property
       "MPN"
-      "RK09D1130C1B"
+      "RK09D1130C2P"
       (id 5)
       (at 0 -19.05 0)
       (effects (font (size 1.27 1.27) ) hide)
@@ -2905,7 +2905,7 @@
       (at 0 -24.13 0)
       (effects (font (size 1.27 1.27) ) hide)
     )
-    (symbol "RK09D1130C1B_0_1"
+    (symbol "RK09D1130C2P_0_1"
       (circle
         (center -3.30 -0.51)
         (radius 0.25)
@@ -3021,7 +3021,7 @@
       )
     )
   )
-		(symbol "cubevox:EC11N1525404"
+		(symbol "cubevox:EC11E15244B2"
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
@@ -3037,7 +3037,7 @@
 				)
 			)
 		)
-		(property "Value" "EC11N1525404"
+		(property "Value" "EC11E15244B2"
 			(at 0 -12.7 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3058,7 +3058,7 @@
 				)
 			)
 		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Coded-Rotary-Switches_ALPS-Electric-EC11N1525404_C470748.html"
+		(property "Datasheet" "https://lcsc.com/product-detail/Coded-Rotary-Switches_ALPS-Electric-EC11E15244B2_C470748.html"
 			(at 0 -17.78 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3091,7 +3091,7 @@
 				)
 			)
 		)
-		(property "MPN" "EC11N1525404"
+		(property "MPN" "EC11E15244B2"
 			(at 0 -22.86 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3102,7 +3102,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470748"
+		(property "LCSC Part" "C470754"
 			(at 0 -25.4 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3124,7 +3124,7 @@
 				)
 			)
 		)
-		(symbol "EC11N1525404_0_1"
+		(symbol "EC11E15244B2_0_1"
 			(rectangle
 				(start -6.35 5.08)
 				(end 3.81 -5.08)
@@ -3313,7 +3313,7 @@
 		)
 		(embedded_fonts no)
 	)
-		(symbol "cubevox:EC11N1520401"
+		(symbol "cubevox:EC11E15204A3"
     (in_bom yes)
     (on_board yes)
     (property
@@ -3325,7 +3325,7 @@
     )
     (property
       "Value"
-      "EC11N1520401"
+      "EC11E15204A3"
       (id 1)
       (at 0 -12.70 0)
       (effects (font (size 1.27 1.27) ) )
@@ -3339,7 +3339,7 @@
     )
     (property
       "Datasheet"
-      "https://lcsc.com/product-detail/Coded-Rotary-Switches_ALPS-Electric-EC11N1520401_C470703.html"
+      "https://lcsc.com/product-detail/Coded-Rotary-Switches_ALPS-Electric-EC11E15204A3_C470703.html"
       (id 3)
       (at 0 -17.78 0)
       (effects (font (size 1.27 1.27) ) hide)
@@ -3353,7 +3353,7 @@
     )
     (property
       "MPN"
-      "EC11N1520401"
+      "EC11E15204A3"
       (id 5)
       (at 0 -22.86 0)
       (effects (font (size 1.27 1.27) ) hide)
@@ -3372,7 +3372,7 @@
       (at 0 -27.94 0)
       (effects (font (size 1.27 1.27) ) hide)
     )
-    (symbol "EC11N1520401_0_1"
+    (symbol "EC11E15204A3_0_1"
       (rectangle
         (start -6.35 5.08)
         (end 3.81 -5.08)
@@ -11141,7 +11141,7 @@
 		(uuid "774bf3e3-d9c6-5a93-83b2-1e3ca16d6a0d")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 645.16 320.04 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -11165,7 +11165,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 645.16 320.04 0)
 			(hide yes)
 			(effects
@@ -11183,7 +11183,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 645.16 320.04 0)
 			(hide yes)
 			(effects
@@ -11192,7 +11192,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 645.16 320.04 0)
 			(hide yes)
 			(effects
@@ -16921,7 +16921,7 @@
 		(uuid "a56f162d-1a29-55f2-9201-e8eaee27ec0e")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 289.56 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -16945,7 +16945,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 289.56 419.1 0)
 			(hide yes)
 			(effects
@@ -16963,7 +16963,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 289.56 419.1 0)
 			(hide yes)
 			(effects
@@ -16972,7 +16972,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 289.56 419.1 0)
 			(hide yes)
 			(effects
@@ -17077,7 +17077,7 @@
 		(uuid "2f14f07c-319d-5d7e-884a-f1962f669ef1")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 340.36 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -17101,7 +17101,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 340.36 419.1 0)
 			(hide yes)
 			(effects
@@ -17119,7 +17119,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 340.36 419.1 0)
 			(hide yes)
 			(effects
@@ -17128,7 +17128,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 340.36 419.1 0)
 			(hide yes)
 			(effects
@@ -17233,7 +17233,7 @@
 		(uuid "e5b72770-884e-5395-b422-a5c9388f5e95")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 391.16 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -17257,7 +17257,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 391.16 419.1 0)
 			(hide yes)
 			(effects
@@ -17275,7 +17275,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 391.16 419.1 0)
 			(hide yes)
 			(effects
@@ -17284,7 +17284,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 391.16 419.1 0)
 			(hide yes)
 			(effects
@@ -17389,7 +17389,7 @@
 		(uuid "69053195-cb34-5a26-8ff1-ad6eb3d14f78")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 441.96 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -17413,7 +17413,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 441.96 419.1 0)
 			(hide yes)
 			(effects
@@ -17431,7 +17431,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 441.96 419.1 0)
 			(hide yes)
 			(effects
@@ -17440,7 +17440,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 441.96 419.1 0)
 			(hide yes)
 			(effects
@@ -17545,7 +17545,7 @@
 		(uuid "27d862a3-570b-5a26-a382-3b7a944cfe4f")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 492.76 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -17569,7 +17569,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 492.76 419.1 0)
 			(hide yes)
 			(effects
@@ -17587,7 +17587,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 492.76 419.1 0)
 			(hide yes)
 			(effects
@@ -17596,7 +17596,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 492.76 419.1 0)
 			(hide yes)
 			(effects
@@ -17701,7 +17701,7 @@
 		(uuid "00db5992-ac68-563b-9cf9-fd9a5dd787f9")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 543.56 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -17725,7 +17725,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 543.56 419.1 0)
 			(hide yes)
 			(effects
@@ -17743,7 +17743,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 543.56 419.1 0)
 			(hide yes)
 			(effects
@@ -17752,7 +17752,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 543.56 419.1 0)
 			(hide yes)
 			(effects
@@ -17857,7 +17857,7 @@
 		(uuid "8f5cdfee-6302-5df9-8784-b0d26b0b3824")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 594.36 419.1 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -17881,7 +17881,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 594.36 419.1 0)
 			(hide yes)
 			(effects
@@ -17899,7 +17899,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 594.36 419.1 0)
 			(hide yes)
 			(effects
@@ -17908,7 +17908,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 594.36 419.1 0)
 			(hide yes)
 			(effects
@@ -18013,7 +18013,7 @@
 		(uuid "91e287e9-4c6b-5c5b-a068-a0175f04fbf8")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 289.56 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18037,7 +18037,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 289.56 495.3 0)
 			(hide yes)
 			(effects
@@ -18055,7 +18055,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 289.56 495.3 0)
 			(hide yes)
 			(effects
@@ -18064,7 +18064,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 289.56 495.3 0)
 			(hide yes)
 			(effects
@@ -18169,7 +18169,7 @@
 		(uuid "ee657b15-e76a-54c9-b407-f22f39d3d0f5")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 340.36 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18193,7 +18193,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 340.36 495.3 0)
 			(hide yes)
 			(effects
@@ -18211,7 +18211,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 340.36 495.3 0)
 			(hide yes)
 			(effects
@@ -18220,7 +18220,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 340.36 495.3 0)
 			(hide yes)
 			(effects
@@ -18325,7 +18325,7 @@
 		(uuid "b03f9636-4f8a-586c-b760-46117759ee98")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 391.16 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18349,7 +18349,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 391.16 495.3 0)
 			(hide yes)
 			(effects
@@ -18367,7 +18367,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 391.16 495.3 0)
 			(hide yes)
 			(effects
@@ -18376,7 +18376,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 391.16 495.3 0)
 			(hide yes)
 			(effects
@@ -18481,7 +18481,7 @@
 		(uuid "2f6b4d7e-b368-526c-a025-d49931391084")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 441.96 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18505,7 +18505,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 441.96 495.3 0)
 			(hide yes)
 			(effects
@@ -18523,7 +18523,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 441.96 495.3 0)
 			(hide yes)
 			(effects
@@ -18532,7 +18532,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 441.96 495.3 0)
 			(hide yes)
 			(effects
@@ -18637,7 +18637,7 @@
 		(uuid "f2797ff7-47e7-52e4-94f9-c49bf0f69b3c")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 492.76 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18661,7 +18661,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 492.76 495.3 0)
 			(hide yes)
 			(effects
@@ -18679,7 +18679,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 492.76 495.3 0)
 			(hide yes)
 			(effects
@@ -18688,7 +18688,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 492.76 495.3 0)
 			(hide yes)
 			(effects
@@ -18793,7 +18793,7 @@
 		(uuid "ec5776b1-a8a2-5bf5-ab0f-61d15e03c4cc")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 543.56 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18817,7 +18817,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 543.56 495.3 0)
 			(hide yes)
 			(effects
@@ -18835,7 +18835,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 543.56 495.3 0)
 			(hide yes)
 			(effects
@@ -18844,7 +18844,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 543.56 495.3 0)
 			(hide yes)
 			(effects
@@ -18949,7 +18949,7 @@
 		(uuid "99c15620-d5c4-5e0e-9c4e-263b68532fa5")
 	)
 	(symbol
-		(lib_id "cubevox:RK09D1130C1B")
+		(lib_id "cubevox:RK09D1130C2P")
 		(at 594.36 495.3 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -18973,7 +18973,7 @@
 				)
 			)
 		)
-		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C3C"
+		(property "Footprint" "cubevox:RES-ADJ-TH_RK09D1130C2P"
 			(at 594.36 495.3 0)
 			(hide yes)
 			(effects
@@ -18991,7 +18991,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470304"
+		(property "LCSC" "C361173"
 			(at 594.36 495.3 0)
 			(hide yes)
 			(effects
@@ -19000,7 +19000,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D1130C1B"
+		(property "MPN" "RK09D1130C2P"
 			(at 594.36 495.3 0)
 			(hide yes)
 			(effects
@@ -19105,7 +19105,7 @@
 		(uuid "93e7cd08-bacc-5c12-8fd3-2d669a5f900d")
 	)
 	(symbol
-		(lib_id "cubevox:EC11N1525404")
+		(lib_id "cubevox:EC11E15244B2")
 		(at 162.56 596.9 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -19122,7 +19122,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "EC11N1525404"
+		(property "Value" "EC11E15244B2"
 			(at 154.94 598.17 0)
 			(effects
 				(font
@@ -19131,7 +19131,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "cubevox:SW-TH_EC11NXXXX"
+		(property "Footprint" "cubevox:SW-TH_EC11E"
 			(at 162.56 596.9 0)
 			(hide yes)
 			(effects
@@ -19149,7 +19149,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470748"
+		(property "LCSC" "C470754"
 			(at 162.56 596.9 0)
 			(hide yes)
 			(effects
@@ -19158,7 +19158,7 @@
 				)
 			)
 		)
-		(property "MPN" "EC11N1525404"
+		(property "MPN" "EC11E15244B2"
 			(at 162.56 596.9 0)
 			(hide yes)
 			(effects
@@ -19321,7 +19321,7 @@
 		(uuid "2825e5d1-15da-5c64-af1d-9b06a4d55187")
 	)
 	(symbol
-		(lib_id "cubevox:EC11N1520401")
+		(lib_id "cubevox:EC11E15204A3")
 		(at 340.36 596.9 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -19338,7 +19338,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "EC11N1520401"
+		(property "Value" "EC11E15204A3"
 			(at 332.74 598.17 0)
 			(effects
 				(font
@@ -19347,7 +19347,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "cubevox:SW-TH_EC11NXXXX"
+		(property "Footprint" "cubevox:SW-TH_EC11E"
 			(at 340.36 596.9 0)
 			(hide yes)
 			(effects
@@ -19365,7 +19365,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470703"
+		(property "LCSC" "C470710"
 			(at 340.36 596.9 0)
 			(hide yes)
 			(effects
@@ -19374,7 +19374,7 @@
 				)
 			)
 		)
-		(property "MPN" "EC11N1520401"
+		(property "MPN" "EC11E15204A3"
 			(at 340.36 596.9 0)
 			(hide yes)
 			(effects
@@ -19503,7 +19503,7 @@
 		(uuid "9567571b-e22a-503b-8474-5ea27dae6bbb")
 	)
 	(symbol
-		(lib_id "cubevox:EC11N1520401")
+		(lib_id "cubevox:EC11E15204A3")
 		(at 518.16 596.9 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -19520,7 +19520,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "EC11N1520401"
+		(property "Value" "EC11E15204A3"
 			(at 510.54 598.17 0)
 			(effects
 				(font
@@ -19529,7 +19529,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "cubevox:SW-TH_EC11NXXXX"
+		(property "Footprint" "cubevox:SW-TH_EC11E"
 			(at 518.16 596.9 0)
 			(hide yes)
 			(effects
@@ -19547,7 +19547,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470703"
+		(property "LCSC" "C470710"
 			(at 518.16 596.9 0)
 			(hide yes)
 			(effects
@@ -19556,7 +19556,7 @@
 				)
 			)
 		)
-		(property "MPN" "EC11N1520401"
+		(property "MPN" "EC11E15204A3"
 			(at 518.16 596.9 0)
 			(hide yes)
 			(effects
