@@ -16434,7 +16434,7 @@
 	(footprint "cubevox:SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000"
 		(layer "F.Cu")
 		(uuid "63f72cc4-e1a5-47e7-b7ce-e85500affd41")
-		(at 64.5 70 90)
+		(at 64.5 62 90)
 		(property "Reference" "SWBYPASS1"
 			(at 8.195001 0 0)
 			(layer "F.Fab")
@@ -32050,7 +32050,7 @@
 	(footprint "cubevox:RES-ADJ-TH_RK09D1130C3C"
 		(layer "F.Cu")
 		(uuid "a243daef-8869-483d-8a1f-5afaf8bb7a63")
-		(at 232.5 72)
+		(at 232.5 65)
 		(property "Reference" "RVGAIN1"
 			(at 0 -10.445 0)
 			(layer "F.Fab")
