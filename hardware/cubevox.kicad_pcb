@@ -92,7 +92,7 @@
 	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "0148b9cc-6e98-414f-ac10-faa01ad60a49")
-		(at 155.5 105 180)
+		(at 155.5 104 180)
 		(descr "10uF 25V ±20%")
 		(property "Reference" "C139"
 			(at 0 -4 0)
@@ -18021,7 +18021,7 @@
 	(footprint "C0603"
 		(layer "F.Cu")
 		(uuid "6a519646-77ed-420e-b73f-71fc003bbc72")
-		(at 155 101)
+		(at 155 100.25)
 		(descr "10nF (103) ±10% 50V")
 		(property "Reference" "C161"
 			(at 0 -4 0)
@@ -55734,20 +55734,20 @@
 		(uuid "e1033243-4448-4957-82ba-f9299639cb64")
 	)
 	(segment
-		(start 155.7 101)
-		(end 156.5 101)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/GND")
-		(uuid "e2f45ff8-b0fe-4385-95b3-ddebaeeab305")
-	)
-	(segment
 		(start 110.9875 36.165)
 		(end 110.68 35.8575)
 		(width 0.3)
 		(layer "F.Cu")
 		(net "/GND")
 		(uuid "e4a729b2-8adb-40e6-9545-306f18472b9b")
+	)
+	(segment
+		(start 155.7 100.25)
+		(end 156.5 100.25)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/GND")
+		(uuid "e7b8ff08-638e-4d6b-b648-de6dd2d7fc31")
 	)
 	(segment
 		(start 213.5 76.75)
@@ -56654,14 +56654,6 @@
 		(uuid "a9cb4f0a-f9ff-429a-8a87-814b7fdda70a")
 	)
 	(via
-		(at 156.5 101)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "/GND")
-		(uuid "ac6c9a99-1f85-4a14-9bb2-b94c276a34d1")
-	)
-	(via
 		(at 118.7 99.6)
 		(size 0.6)
 		(drill 0.3)
@@ -56756,6 +56748,14 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/GND")
 		(uuid "be0c2863-1aa6-4ef8-83ef-5735816fcf24")
+	)
+	(via
+		(at 156.5 100.25)
+		(size 0.6)
+		(drill 0.3)
+		(layers "F.Cu" "B.Cu")
+		(net "/GND")
+		(uuid "c0609bcb-5856-4532-aef3-0af961dc4aca")
 	)
 	(via
 		(at 232.9 88.4)
