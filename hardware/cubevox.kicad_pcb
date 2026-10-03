@@ -51960,7 +51960,7 @@
 		(uuid "ff7e6d21-3b3f-48c6-a114-f3d66150fa21")
 		(at 161 88)
 		(property "Reference" "U106"
-			(at -3.4 0 90)
+			(at 0 0 0)
 			(layer "F.SilkS")
 			(uuid "1210ac0f-1231-489b-9eac-acea45a915e5")
 			(effects
