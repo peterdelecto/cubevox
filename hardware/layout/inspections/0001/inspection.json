@@ -1,0 +1,1028 @@
+{
+ "out_dir": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001",
+ "board": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_pcb",
+ "board_sha256": "ccf73feaf591d88152cb9127dbbf854f03dd12c36e881b4b77c71b8f866f7649",
+ "checklist": [
+  {
+   "n": 1,
+   "text": "does J1's jack bore / mouth face the top board edge, i.e. off the board, out toward the camera? edge-J1.png is a close-up shot from outside that edge, looking in -- an outward-facing bore is an open hole there; an inward-facing one is a closed body. Check edge-J1.png (and iso.png for a second angle).",
+   "subject": "J1",
+   "ref": "J1",
+   "default_render": "edge-J1.png"
+  },
+  {
+   "n": 2,
+   "text": "does J101's jack bore / mouth face the top board edge, i.e. off the board, out toward the camera? edge-J101.png is a close-up shot from outside that edge, looking in -- an outward-facing bore is an open hole there; an inward-facing one is a closed body. Check edge-J101.png (and iso.png for a second angle).",
+   "subject": "J101",
+   "ref": "J101",
+   "default_render": "edge-J101.png"
+  },
+  {
+   "n": 3,
+   "text": "does J106's jack bore / mouth face the top board edge, i.e. off the board, out toward the camera? edge-J106.png is a close-up shot from outside that edge, looking in -- an outward-facing bore is an open hole there; an inward-facing one is a closed body. Check edge-J106.png (and iso.png for a second angle).",
+   "subject": "J106",
+   "ref": "J106",
+   "default_render": "edge-J106.png"
+  },
+  {
+   "n": 4,
+   "text": "does J108's jack bore / mouth face the top board edge, i.e. off the board, out toward the camera? edge-J108.png is a close-up shot from outside that edge, looking in -- an outward-facing bore is an open hole there; an inward-facing one is a closed body. Check edge-J108.png (and iso.png for a second angle).",
+   "subject": "J108",
+   "ref": "J108",
+   "default_render": "edge-J108.png"
+  },
+  {
+   "n": 5,
+   "text": "does every 3D model sit on its own footprint in iso.png, top.png and bottom.png (no body floating beside or below its pads)?",
+   "subject": "3d_models",
+   "default_render": "iso.png"
+  },
+  {
+   "n": 6,
+   "text": "do the parts J1, D2, C18, R4, R5, R6, R7 read as one straight row in cluster-usb_esd.png?",
+   "subject": "usb_esd",
+   "default_render": "cluster-usb_esd.png"
+  },
+  {
+   "n": 7,
+   "text": "do the parts J106, D106, D105 read as one straight row in cluster-input_9v.png?",
+   "subject": "input_9v",
+   "default_render": "cluster-input_9v.png"
+  },
+  {
+   "n": 8,
+   "text": "do the parts U103, C112, C113, C116 read as one straight column in cluster-buck5_in.png?",
+   "subject": "buck5_in",
+   "default_render": "cluster-buck5_in.png"
+  },
+  {
+   "n": 9,
+   "text": "do the parts U103, L101, C114, C115, C19 read as one straight row in cluster-buck5_out.png?",
+   "subject": "buck5_out",
+   "default_render": "cluster-buck5_out.png"
+  },
+  {
+   "n": 10,
+   "text": "do the parts U3, C20, C23 read as one straight column in cluster-buck33_in.png?",
+   "subject": "buck33_in",
+   "default_render": "cluster-buck33_in.png"
+  },
+  {
+   "n": 11,
+   "text": "do the parts U3, L1, C21, C22 read as one straight row in cluster-buck33_out.png?",
+   "subject": "buck33_out",
+   "default_render": "cluster-buck33_out.png"
+  },
+  {
+   "n": 12,
+   "text": "do the parts U4, C24, C25 read as one straight row in cluster-ldo_3v3a.png?",
+   "subject": "ldo_3v3a",
+   "default_render": "cluster-ldo_3v3a.png"
+  },
+  {
+   "n": 13,
+   "text": "do the parts FB101, C117, R151, R152, C163 read as one straight row in cluster-analog_rail.png?",
+   "subject": "analog_rail",
+   "default_render": "cluster-analog_rail.png"
+  },
+  {
+   "n": 14,
+   "text": "do the parts U3, D3, R10 read as one straight row in cluster-pwr_led.png?",
+   "subject": "pwr_led",
+   "default_render": "cluster-pwr_led.png"
+  },
+  {
+   "n": 15,
+   "text": "do the parts U1, Y1, C15, C16, R1 read as one straight row in cluster-hse_crystal.png?",
+   "subject": "hse_crystal",
+   "default_render": "cluster-hse_crystal.png"
+  },
+  {
+   "n": 16,
+   "text": "do the parts U1, C2, C3, C56, C57 read as one straight column in cluster-vdd_decap_west.png?",
+   "subject": "vdd_decap_west",
+   "default_render": "cluster-vdd_decap_west.png"
+  },
+  {
+   "n": 17,
+   "text": "do the parts U1, FB1, C8, C9, C10, C11 read as one straight column in cluster-vdda.png?",
+   "subject": "vdda",
+   "default_render": "cluster-vdda.png"
+  },
+  {
+   "n": 18,
+   "text": "do the parts U1, C4, C7, C12, C31, C58, C59 read as one straight row in cluster-vdd_decap_south.png?",
+   "subject": "vdd_decap_south",
+   "default_render": "cluster-vdd_decap_south.png"
+  },
+  {
+   "n": 19,
+   "text": "do the parts U1, C5, C13, C61, C6, C32 read as one straight column in cluster-vdd_decap_east.png?",
+   "subject": "vdd_decap_east",
+   "default_render": "cluster-vdd_decap_east.png"
+  },
+  {
+   "n": 20,
+   "text": "do the parts U1, C1 read as one straight row in cluster-vdd_decap_north.png?",
+   "subject": "vdd_decap_north",
+   "default_render": "cluster-vdd_decap_north.png"
+  },
+  {
+   "n": 21,
+   "text": "do the parts U1, R27, R29 read as one straight column in cluster-clock_source_termination.png?",
+   "subject": "clock_source_termination",
+   "default_render": "cluster-clock_source_termination.png"
+  },
+  {
+   "n": 22,
+   "text": "do the parts U1, R30, C55 read as one straight column in cluster-mux_adc_rc.png?",
+   "subject": "mux_adc_rc",
+   "default_render": "cluster-mux_adc_rc.png"
+  },
+  {
+   "n": 23,
+   "text": "do the parts U1, SWRESET1, C14, SWBOOT1, R2 read as one straight row in cluster-reset_boot.png?",
+   "subject": "reset_boot",
+   "default_render": "cluster-reset_boot.png"
+  },
+  {
+   "n": 24,
+   "text": "do the parts U1, J3 read as one straight row in cluster-swd.png?",
+   "subject": "swd",
+   "default_render": "cluster-swd.png"
+  },
+  {
+   "n": 25,
+   "text": "do the parts U1, D1, R3 read as one straight row in cluster-user_led.png?",
+   "subject": "user_led",
+   "default_render": "cluster-user_led.png"
+  },
+  {
+   "n": 26,
+   "text": "do the parts U104, R101, D107, C119, R144, C120, R103 read as one straight row in cluster-mic_input_p.png?",
+   "subject": "mic_input_p",
+   "default_render": "cluster-mic_input_p.png"
+  },
+  {
+   "n": 27,
+   "text": "do the parts U104, R104, D108, C123, R145, C124, R106 read as one straight row in cluster-mic_input_n.png?",
+   "subject": "mic_input_n",
+   "default_render": "cluster-mic_input_n.png"
+  },
+  {
+   "n": 28,
+   "text": "do the parts U104, C121, C125, R102, R105, R148, R149 read as one straight row in cluster-trs_input.png?",
+   "subject": "trs_input",
+   "default_render": "cluster-trs_input.png"
+  },
+  {
+   "n": 29,
+   "text": "do the parts U104, R108, R110, R109, C158, C128, C129, C118 read as one straight row in cluster-ina_stage1.png?",
+   "subject": "ina_stage1",
+   "default_render": "cluster-ina_stage1.png"
+  },
+  {
+   "n": 30,
+   "text": "do the parts U105, R111, R112, R113, R114, C127 read as one straight row in cluster-diff_amp.png?",
+   "subject": "diff_amp",
+   "default_render": "cluster-diff_amp.png"
+  },
+  {
+   "n": 31,
+   "text": "do the parts U105, R116, C159, C132 read as one straight row in cluster-stage2_gain.png?",
+   "subject": "stage2_gain",
+   "default_render": "cluster-stage2_gain.png"
+  },
+  {
+   "n": 32,
+   "text": "do the parts U8, R119, C136, C137, C138 read as one straight row in cluster-adc_input.png?",
+   "subject": "adc_input",
+   "default_render": "cluster-adc_input.png"
+  },
+  {
+   "n": 33,
+   "text": "do the parts U8, R20, C134, C44, C45, C48, C49, C46, C47 read as one straight column in cluster-adc_supply.png?",
+   "subject": "adc_supply",
+   "default_render": "cluster-adc_supply.png"
+  },
+  {
+   "n": 34,
+   "text": "do the parts U6, C101, C111, C33, C34, C35, R16 read as one straight column in cluster-dac_supply.png?",
+   "subject": "dac_supply",
+   "default_render": "cluster-dac_supply.png"
+  },
+  {
+   "n": 35,
+   "text": "do the parts U6, R147, C161, C139, R122, R123 read as one straight row in cluster-dac_output.png?",
+   "subject": "dac_output",
+   "default_render": "cluster-dac_output.png"
+  },
+  {
+   "n": 36,
+   "text": "do the parts U106, R117, R118, C135, R146, C160, C130 read as one straight row in cluster-vref.png?",
+   "subject": "vref",
+   "default_render": "cluster-vref.png"
+  },
+  {
+   "n": 37,
+   "text": "do the parts U106, R124, C141, R125 read as one straight row in cluster-output_buffer.png?",
+   "subject": "output_buffer",
+   "default_render": "cluster-output_buffer.png"
+  },
+  {
+   "n": 38,
+   "text": "do the parts K101, D104, R120, C162 read as one straight row in cluster-bypass_relay.png?",
+   "subject": "bypass_relay",
+   "default_render": "cluster-bypass_relay.png"
+  },
+  {
+   "n": 39,
+   "text": "do the parts K102, Q101, R150, R153, D109 read as one straight row in cluster-mute_relay.png?",
+   "subject": "mute_relay",
+   "default_render": "cluster-mute_relay.png"
+  },
+  {
+   "n": 40,
+   "text": "do the parts SW101, R134, R135, R136, R137, R138, R139, R140, R141 read as one straight row in cluster-toggle_pullups.png?",
+   "subject": "toggle_pullups",
+   "default_render": "cluster-toggle_pullups.png"
+  },
+  {
+   "n": 41,
+   "text": "do the parts SW101, C150, C151, C152, C153, C154, C155, C156, C157 read as one straight row in cluster-toggle_filters.png?",
+   "subject": "toggle_filters",
+   "default_render": "cluster-toggle_filters.png"
+  },
+  {
+   "n": 42,
+   "text": "do the parts ENC102, R130, R131, C146, C147 read as one straight row in cluster-enc_key_rc.png?",
+   "subject": "enc_key_rc",
+   "default_render": "cluster-enc_key_rc.png"
+  },
+  {
+   "n": 43,
+   "text": "do the parts ENC103, R132, R133, C148, C149 read as one straight row in cluster-enc_semi_rc.png?",
+   "subject": "enc_semi_rc",
+   "default_render": "cluster-enc_semi_rc.png"
+  },
+  {
+   "n": 44,
+   "text": "do the parts ENC101, R127, R128, R129, C143, C144, C145 read as one straight row in cluster-enc_menu_rc.png?",
+   "subject": "enc_menu_rc",
+   "default_render": "cluster-enc_menu_rc.png"
+  },
+  {
+   "n": 45,
+   "text": "do the parts U101, C27, C28, R126, C142 read as one straight column in cluster-pot_mux.png?",
+   "subject": "pot_mux",
+   "default_render": "cluster-pot_mux.png"
+  },
+  {
+   "n": 46,
+   "text": "do the parts RV111, C29, C30 read as one straight row in cluster-pot_supply.png?",
+   "subject": "pot_supply",
+   "default_render": "cluster-pot_supply.png"
+  },
+  {
+   "n": 47,
+   "text": "do the parts J117, R142, R143 read as one straight row in cluster-i2c_pullups.png?",
+   "subject": "i2c_pullups",
+   "default_render": "cluster-i2c_pullups.png"
+  },
+  {
+   "n": 48,
+   "text": "is every visible silkscreen text readable, one orientation, and not under a part, in top.png and bottom.png?",
+   "subject": "silk",
+   "default_render": "top.png"
+  },
+  {
+   "n": 49,
+   "text": "is there nothing on the bottom that the brief forbids: assembled parts or silkscreen on the bottom other than the copper pour (brief assembly.sides: \"top\")?",
+   "subject": "bottom",
+   "default_render": "bottom.png"
+  }
+ ],
+ "answers": [
+  {
+   "item": 1,
+   "answer": "yes",
+   "evidence": "The USB-C opening is an open slot facing the camera, with no closed body behind it.",
+   "render": "edge-J1.png"
+  },
+  {
+   "item": 2,
+   "answer": "yes",
+   "evidence": "The XLR/combo face with its pin ring and latch shows open toward the camera.",
+   "render": "edge-J101.png"
+  },
+  {
+   "item": 3,
+   "answer": "yes",
+   "evidence": "The barrel jack shows a bore with its center pin facing the camera, not a closed back panel.",
+   "render": "edge-J106.png"
+  },
+  {
+   "item": 4,
+   "answer": "yes",
+   "evidence": "The hex-nut 1/4 in jack shows an open threaded bore facing the camera.",
+   "render": "edge-J108.png"
+  },
+  {
+   "item": 5,
+   "answer": "no",
+   "evidence": "A column of small SMD and electrolytic bodies floats off the board edge, to the right in top.png and to the left in bottom.png, with no pads beneath them.",
+   "render": "top.png"
+  },
+  {
+   "item": 6,
+   "answer": "no",
+   "evidence": "J1 sits about 170 px above the single row of D2, C18 and the passives, so J1 is not in that row.",
+   "render": "cluster-usb_esd.png"
+  },
+  {
+   "item": 7,
+   "answer": "no",
+   "evidence": "The two diodes sit side by side, but J106 is a dark block well above them and off their row.",
+   "render": "cluster-input_9v.png"
+  },
+  {
+   "item": 8,
+   "answer": "no",
+   "evidence": "The IC has two caps beside it at the same height, which makes a row, and only one cap above it.",
+   "render": "cluster-buck5_in.png"
+  },
+  {
+   "item": 9,
+   "answer": "no",
+   "evidence": "The inductor, two caps and tantalum form a row, but the AP63205 IC sits about 160 px below that row.",
+   "render": "cluster-buck5_out.png"
+  },
+  {
+   "item": 10,
+   "answer": "no",
+   "evidence": "One cap sits beside the IC at the same height and the other sits below it, so the parts do not line up in one column.",
+   "render": "cluster-buck33_in.png"
+  },
+  {
+   "item": 11,
+   "answer": "no",
+   "evidence": "The inductor and two caps form a row, but the buck IC sits well above that row.",
+   "render": "cluster-buck33_out.png"
+  },
+  {
+   "item": 12,
+   "answer": "yes",
+   "evidence": "The SOT-23-5 LDO has one cap on each side at the same height.",
+   "render": "cluster-ldo_3v3a.png"
+  },
+  {
+   "item": 13,
+   "answer": "no",
+   "evidence": "The ferrite, the large yellow cap and the R151/R152/C163 group sit at three different heights.",
+   "render": "cluster-analog_rail.png"
+  },
+  {
+   "item": 14,
+   "answer": "no",
+   "evidence": "D3 and R10 share a row, but the buck IC U3 sits about 300 px above it.",
+   "render": "cluster-pwr_led.png"
+  },
+  {
+   "item": 15,
+   "answer": "no",
+   "evidence": "Y1 and its caps form a small cluster below and left of U1, not a straight row through U1.",
+   "render": "cluster-hse_crystal.png"
+  },
+  {
+   "item": 16,
+   "answer": "yes",
+   "evidence": "A straight vertical stack of four small caps runs along the west side of U1.",
+   "render": "cluster-vdd_decap_west.png"
+  },
+  {
+   "item": 17,
+   "answer": "cannot tell",
+   "evidence": "The crop is unannotated, I can see only four caps in the west column and no identifiable ferrite, so I cannot tell which parts are FB1 and C8-C11.",
+   "render": "cluster-vdda.png"
+  },
+  {
+   "item": 18,
+   "answer": "no",
+   "evidence": "The caps below U1 sit at two different heights, with the crystal among them, so they do not form one row.",
+   "render": "cluster-vdd_decap_south.png"
+  },
+  {
+   "item": 19,
+   "answer": "cannot tell",
+   "evidence": "The caps on U1's east side are roughly vertical but gapped, and the crop does not show which parts are C5, C13, C61, C6 and C32.",
+   "render": "cluster-vdd_decap_east.png"
+  },
+  {
+   "item": 20,
+   "answer": "cannot tell",
+   "evidence": "A row of caps runs along the top of U1 and the crop does not mark which one is C1.",
+   "render": "cluster-vdd_decap_north.png"
+  },
+  {
+   "item": 21,
+   "answer": "cannot tell",
+   "evidence": "I cannot identify R27 and R29 among the west-side passives in the unannotated crop.",
+   "render": "cluster-clock_source_termination.png"
+  },
+  {
+   "item": 22,
+   "answer": "cannot tell",
+   "evidence": "I cannot identify R30 and C55 among the small parts around U1 in the unannotated crop.",
+   "render": "cluster-mux_adc_rc.png"
+  },
+  {
+   "item": 23,
+   "answer": "no",
+   "evidence": "SWRESET1, the cap and SWBOOT1 sit in a row about 180 px below and left of U1, so U1 is not in that row.",
+   "render": "cluster-reset_boot.png"
+  },
+  {
+   "item": 24,
+   "answer": "yes",
+   "evidence": "The J3 header sits level with U1's west edge, within U1's vertical extent, as a two-part row.",
+   "render": "cluster-swd.png"
+  },
+  {
+   "item": 25,
+   "answer": "yes",
+   "evidence": "D1 and R3 sit side by side at the same height on U1's west side, level with pin 88.",
+   "render": "cluster-user_led.png"
+  },
+  {
+   "item": 26,
+   "answer": "no",
+   "evidence": "The SOT-23 diode, the 100k resistor and the large electrolytic sit at scattered heights far from U104.",
+   "render": "cluster-mic_input_p.png"
+  },
+  {
+   "item": 27,
+   "answer": "no",
+   "evidence": "The mirrored leg's parts are scattered at different heights, with electrolytics well off any common line.",
+   "render": "cluster-mic_input_n.png"
+  },
+  {
+   "item": 28,
+   "answer": "no",
+   "evidence": "The coupling electrolytics and the 22k and 100k resistors sit in several clumps, not one row.",
+   "render": "cluster-trs_input.png"
+  },
+  {
+   "item": 29,
+   "answer": "no",
+   "evidence": "The small caps and resistors around U104 sit in two or three offset rows plus two large electrolytics, not one row.",
+   "render": "cluster-ina_stage1.png"
+  },
+  {
+   "item": 30,
+   "answer": "no",
+   "evidence": "The four resistors sit in two rows above and left of U105, and the 5VA decap sits lower, so there is no single row.",
+   "render": "cluster-diff_amp.png"
+  },
+  {
+   "item": 31,
+   "answer": "no",
+   "evidence": "The cap, resistor and electrolytic sit above, below and beside U105 at different heights.",
+   "render": "cluster-stage2_gain.png"
+  },
+  {
+   "item": 32,
+   "answer": "no",
+   "evidence": "The cluster's passives are parked in the off-board staging column on the right, away from U8.",
+   "render": "cluster-adc_input.png"
+  },
+  {
+   "item": 33,
+   "answer": "no",
+   "evidence": "The passives are stacked in the off-board staging column on the right while U8 sits on the board, so the crop spans both and shows no column through U8.",
+   "render": "cluster-adc_supply.png"
+  },
+  {
+   "item": 34,
+   "answer": "no",
+   "evidence": "The crop spans the board and the off-board staging column, so the supply caps are not placed in a column with U6.",
+   "render": "cluster-dac_supply.png"
+  },
+  {
+   "item": 35,
+   "answer": "no",
+   "evidence": "The output network parts are off-board in the staging column, not in a row from U6.",
+   "render": "cluster-dac_output.png"
+  },
+  {
+   "item": 36,
+   "answer": "no",
+   "evidence": "The vref parts are in the off-board staging column, away from U106 on the board.",
+   "render": "cluster-vref.png"
+  },
+  {
+   "item": 37,
+   "answer": "no",
+   "evidence": "The buffer passives are in the off-board staging column, not beside U106.",
+   "render": "cluster-output_buffer.png"
+  },
+  {
+   "item": 38,
+   "answer": "no",
+   "evidence": "The crop spans the board and the off-board staging column, so D104, R120 and C162 are not placed in a row with K101.",
+   "render": "cluster-bypass_relay.png"
+  },
+  {
+   "item": 39,
+   "answer": "no",
+   "evidence": "The mute-relay driver parts are in the off-board staging column, away from K102.",
+   "render": "cluster-mute_relay.png"
+  },
+  {
+   "item": 40,
+   "answer": "no",
+   "evidence": "The pull-ups sit in a row at about y=620 and SW101 sits about 155 px above that row.",
+   "render": "cluster-toggle_pullups.png"
+  },
+  {
+   "item": 41,
+   "answer": "no",
+   "evidence": "The filter caps sit in a row about 155 px below the toggles, so SW101 is not on that row.",
+   "render": "cluster-toggle_filters.png"
+  },
+  {
+   "item": 42,
+   "answer": "no",
+   "evidence": "The four passives form a row above ENC102, but the encoder body sits about 160 px below that row.",
+   "render": "cluster-enc_key_rc.png"
+  },
+  {
+   "item": 43,
+   "answer": "no",
+   "evidence": "The four passives form a row above ENC103, but the encoder body sits about 170 px below that row.",
+   "render": "cluster-enc_semi_rc.png"
+  },
+  {
+   "item": 44,
+   "answer": "no",
+   "evidence": "Four passives sit above ENC101 and two sit below it, so the six do not share one row.",
+   "render": "cluster-enc_menu_rc.png"
+  },
+  {
+   "item": 45,
+   "answer": "no",
+   "evidence": "The caps and resistor are scattered at different x positions around U101, not stacked in a column.",
+   "render": "cluster-pot_mux.png"
+  },
+  {
+   "item": 46,
+   "answer": "no",
+   "evidence": "C29 and C30 sit side by side between two pot rows, and RV111 is a pot body about 220 px above them.",
+   "render": "cluster-pot_supply.png"
+  },
+  {
+   "item": 47,
+   "answer": "cannot tell",
+   "evidence": "R142 and R143 sit side by side above the OLED, but the J117 header is hidden under the OLED module so I cannot compare their positions.",
+   "render": "cluster-i2c_pullups.png"
+  },
+  {
+   "item": 48,
+   "answer": "no",
+   "evidence": "Several top labels are rotated (R152/C163, D1, SWRESET1, U8), and ENC101-103, U104 and U105 labels overlap parts, with tiny bottom text.",
+   "render": "top.png"
+  },
+  {
+   "item": 49,
+   "answer": "no",
+   "evidence": "The bottom render shows J106, J101 and J108 with refdes silkscreen and stray SMD bodies at the left, beyond the copper pour.",
+   "render": "bottom.png"
+  }
+ ],
+ "reader": {
+  "model": "sonnet",
+  "cost_usd": 0.7175456,
+  "duration_ms": 148647
+ },
+ "renders": {
+  "top": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/top.png",
+  "bottom": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/bottom.png",
+  "iso": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/iso.png",
+  "edge-J1": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/edge-J1.png",
+  "edge-J101": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/edge-J101.png",
+  "edge-J106": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/edge-J106.png",
+  "edge-J108": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/edge-J108.png",
+  "cluster-usb_esd": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-usb_esd.png",
+  "cluster-input_9v": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-input_9v.png",
+  "cluster-buck5_in": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck5_in.png",
+  "cluster-buck5_out": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck5_out.png",
+  "cluster-buck33_in": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck33_in.png",
+  "cluster-buck33_out": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck33_out.png",
+  "cluster-ldo_3v3a": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-ldo_3v3a.png",
+  "cluster-analog_rail": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-analog_rail.png",
+  "cluster-pwr_led": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-pwr_led.png",
+  "cluster-hse_crystal": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-hse_crystal.png",
+  "cluster-vdd_decap_west": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_west.png",
+  "cluster-vdda": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdda.png",
+  "cluster-vdd_decap_south": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_south.png",
+  "cluster-vdd_decap_east": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_east.png",
+  "cluster-vdd_decap_north": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_north.png",
+  "cluster-clock_source_termination": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-clock_source_termination.png",
+  "cluster-mux_adc_rc": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mux_adc_rc.png",
+  "cluster-reset_boot": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-reset_boot.png",
+  "cluster-swd": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-swd.png",
+  "cluster-user_led": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-user_led.png",
+  "cluster-mic_input_p": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mic_input_p.png",
+  "cluster-mic_input_n": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mic_input_n.png",
+  "cluster-trs_input": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-trs_input.png",
+  "cluster-ina_stage1": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-ina_stage1.png",
+  "cluster-diff_amp": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-diff_amp.png",
+  "cluster-stage2_gain": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-stage2_gain.png",
+  "cluster-adc_input": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-adc_input.png",
+  "cluster-adc_supply": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-adc_supply.png",
+  "cluster-dac_supply": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-dac_supply.png",
+  "cluster-dac_output": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-dac_output.png",
+  "cluster-vref": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vref.png",
+  "cluster-output_buffer": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-output_buffer.png",
+  "cluster-bypass_relay": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-bypass_relay.png",
+  "cluster-mute_relay": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mute_relay.png",
+  "cluster-toggle_pullups": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-toggle_pullups.png",
+  "cluster-toggle_filters": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-toggle_filters.png",
+  "cluster-enc_key_rc": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-enc_key_rc.png",
+  "cluster-enc_semi_rc": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-enc_semi_rc.png",
+  "cluster-enc_menu_rc": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-enc_menu_rc.png",
+  "cluster-pot_mux": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-pot_mux.png",
+  "cluster-pot_supply": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-pot_supply.png",
+  "cluster-i2c_pullups": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-i2c_pullups.png"
+ },
+ "warnings": [
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "3d_models",
+   "detail": "A column of small SMD and electrolytic bodies floats off the board edge, to the right in top.png and to the left in bottom.png, with no pads beneath them.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/top.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "usb_esd",
+   "detail": "J1 sits about 170 px above the single row of D2, C18 and the passives, so J1 is not in that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-usb_esd.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "input_9v",
+   "detail": "The two diodes sit side by side, but J106 is a dark block well above them and off their row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-input_9v.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "buck5_in",
+   "detail": "The IC has two caps beside it at the same height, which makes a row, and only one cap above it.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck5_in.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "buck5_out",
+   "detail": "The inductor, two caps and tantalum form a row, but the AP63205 IC sits about 160 px below that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck5_out.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "buck33_in",
+   "detail": "One cap sits beside the IC at the same height and the other sits below it, so the parts do not line up in one column.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck33_in.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "buck33_out",
+   "detail": "The inductor and two caps form a row, but the buck IC sits well above that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-buck33_out.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "analog_rail",
+   "detail": "The ferrite, the large yellow cap and the R151/R152/C163 group sit at three different heights.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-analog_rail.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "pwr_led",
+   "detail": "D3 and R10 share a row, but the buck IC U3 sits about 300 px above it.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-pwr_led.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "hse_crystal",
+   "detail": "Y1 and its caps form a small cluster below and left of U1, not a straight row through U1.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-hse_crystal.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "vdda",
+   "detail": "The crop is unannotated, I can see only four caps in the west column and no identifiable ferrite, so I cannot tell which parts are FB1 and C8-C11.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdda.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "vdd_decap_south",
+   "detail": "The caps below U1 sit at two different heights, with the crystal among them, so they do not form one row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_south.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "vdd_decap_east",
+   "detail": "The caps on U1's east side are roughly vertical but gapped, and the crop does not show which parts are C5, C13, C61, C6 and C32.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_east.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "vdd_decap_north",
+   "detail": "A row of caps runs along the top of U1 and the crop does not mark which one is C1.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vdd_decap_north.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "clock_source_termination",
+   "detail": "I cannot identify R27 and R29 among the west-side passives in the unannotated crop.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-clock_source_termination.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "mux_adc_rc",
+   "detail": "I cannot identify R30 and C55 among the small parts around U1 in the unannotated crop.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mux_adc_rc.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "reset_boot",
+   "detail": "SWRESET1, the cap and SWBOOT1 sit in a row about 180 px below and left of U1, so U1 is not in that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-reset_boot.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "mic_input_p",
+   "detail": "The SOT-23 diode, the 100k resistor and the large electrolytic sit at scattered heights far from U104.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mic_input_p.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "mic_input_n",
+   "detail": "The mirrored leg's parts are scattered at different heights, with electrolytics well off any common line.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mic_input_n.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "trs_input",
+   "detail": "The coupling electrolytics and the 22k and 100k resistors sit in several clumps, not one row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-trs_input.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "ina_stage1",
+   "detail": "The small caps and resistors around U104 sit in two or three offset rows plus two large electrolytics, not one row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-ina_stage1.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "diff_amp",
+   "detail": "The four resistors sit in two rows above and left of U105, and the 5VA decap sits lower, so there is no single row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-diff_amp.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "stage2_gain",
+   "detail": "The cap, resistor and electrolytic sit above, below and beside U105 at different heights.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-stage2_gain.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "adc_input",
+   "detail": "The cluster's passives are parked in the off-board staging column on the right, away from U8.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-adc_input.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "adc_supply",
+   "detail": "The passives are stacked in the off-board staging column on the right while U8 sits on the board, so the crop spans both and shows no column through U8.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-adc_supply.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "dac_supply",
+   "detail": "The crop spans the board and the off-board staging column, so the supply caps are not placed in a column with U6.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-dac_supply.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "dac_output",
+   "detail": "The output network parts are off-board in the staging column, not in a row from U6.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-dac_output.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "vref",
+   "detail": "The vref parts are in the off-board staging column, away from U106 on the board.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-vref.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "output_buffer",
+   "detail": "The buffer passives are in the off-board staging column, not beside U106.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-output_buffer.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "bypass_relay",
+   "detail": "The crop spans the board and the off-board staging column, so D104, R120 and C162 are not placed in a row with K101.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-bypass_relay.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "mute_relay",
+   "detail": "The mute-relay driver parts are in the off-board staging column, away from K102.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-mute_relay.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "toggle_pullups",
+   "detail": "The pull-ups sit in a row at about y=620 and SW101 sits about 155 px above that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-toggle_pullups.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "toggle_filters",
+   "detail": "The filter caps sit in a row about 155 px below the toggles, so SW101 is not on that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-toggle_filters.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "enc_key_rc",
+   "detail": "The four passives form a row above ENC102, but the encoder body sits about 160 px below that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-enc_key_rc.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "enc_semi_rc",
+   "detail": "The four passives form a row above ENC103, but the encoder body sits about 170 px below that row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-enc_semi_rc.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "enc_menu_rc",
+   "detail": "Four passives sit above ENC101 and two sit below it, so the six do not share one row.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-enc_menu_rc.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "pot_mux",
+   "detail": "The caps and resistor are scattered at different x positions around U101, not stacked in a column.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-pot_mux.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "pot_supply",
+   "detail": "C29 and C30 sit side by side between two pot rows, and RV111 is a pot body about 220 px above them.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-pot_supply.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "i2c_pullups",
+   "detail": "R142 and R143 sit side by side above the OLED, but the J117 header is hidden under the OLED module so I cannot compare their positions.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/cluster-i2c_pullups.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "silk",
+   "detail": "Several top labels are rotated (R152/C163, D1, SWRESET1, U8), and ENC101-103, U104 and U105 labels overlap parts, with tiny bottom text.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/top.png"
+  },
+  {
+   "rank": 2,
+   "kind": "inspection",
+   "cost": "a defect the owner would find in the 3D view",
+   "subject": "bottom",
+   "detail": "The bottom render shows J106, J101 and J108 with refdes silkscreen and stray SMD bodies at the left, beyond the copper pour.",
+   "alternative": "fix and re-inspect",
+   "render": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/inspections/0001/bottom.png"
+  }
+ ]
+}
