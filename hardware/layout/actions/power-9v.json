@@ -1,0 +1,426 @@
+[
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+98.7,
+50.75
+],
+[
+98.15,
+50.75
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 98.15,
+"y": 50.75,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+97.4,
+51.95
+],
+[
+97.9,
+51.95
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 97.9,
+"y": 51.95,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+228.55,
+45.55
+],
+[
+228.0,
+45.55
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 228.0,
+"y": 45.55,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+233.5,
+51.45
+],
+[
+230.65,
+51.45
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+233.5,
+50.25
+],
+[
+233.5,
+49.75
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 233.5,
+"y": 49.75,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+228.55,
+50.45
+],
+[
+228.0,
+50.45
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 228.0,
+"y": 50.45,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+94.3,
+54.1
+],
+[
+94.65,
+54.1
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+95.25,
+53.7
+],
+[
+96.6,
+53.7
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+97.4,
+54.05
+],
+[
+98.7,
+54.05
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+93.85,
+54.55
+],
+[
+93.85,
+55.05
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 93.85,
+"y": 55.05,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+96.6,
+53.6
+],
+[
+96.1,
+53.6
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 96.1,
+"y": 53.6,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "F.Cu",
+"width_mm": 0.4,
+"points": [
+[
+98.7,
+55.0
+],
+[
+98.15,
+55.0
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 98.15,
+"y": 55.0,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/GND",
+"layer": "F.Cu",
+"width_mm": 0.3,
+"points": [
+[
+227.65,
+39.25
+],
+[
+227.6,
+39.25
+]
+]
+},
+{
+"op": "via",
+"net": "/GND",
+"x": 227.6,
+"y": 39.25,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+228.0,
+50.45
+],
+[
+228.7,
+49.75
+],
+[
+233.5,
+49.75
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+228.0,
+50.45
+],
+[
+223.45,
+55.0
+],
+[
+115.25,
+55.0
+],
+[
+111.4,
+51.15
+],
+[
+105.75,
+51.15
+],
+[
+103.25,
+53.65
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "B.Cu",
+"width_mm": 0.4,
+"points": [
+[
+103.25,
+53.65
+],
+[
+101.75,
+53.65
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+101.75,
+53.65
+],
+[
+100.4,
+55.0
+],
+[
+98.15,
+55.0
+]
+]
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 103.25,
+"y": 53.65,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "via",
+"net": "/VIN_9V",
+"x": 101.75,
+"y": 53.65,
+"diameter_mm": 0.6,
+"drill_mm": 0.3
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "B.Cu",
+"width_mm": 0.4,
+"points": [
+[
+98.15,
+55.0
+],
+[
+96.75,
+53.6
+],
+[
+96.1,
+53.6
+]
+]
+},
+{
+"op": "track",
+"net": "/VIN_9V",
+"layer": "In2.Cu",
+"width_mm": 0.4,
+"points": [
+[
+96.1,
+53.6
+],
+[
+94.65,
+55.05
+],
+[
+93.85,
+55.05
+]
+]
+}
+]
