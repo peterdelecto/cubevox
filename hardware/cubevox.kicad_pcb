@@ -94,7 +94,7 @@
 	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "0148b9cc-6e98-414f-ac10-faa01ad60a49")
-		(at 155.5 104.5 180)
+		(at 155.5 105 180)
 		(descr "10uF 25V ±20%")
 		(property "Reference" "C139"
 			(at 0 -4 0)
@@ -18023,7 +18023,7 @@
 	(footprint "C0603"
 		(layer "F.Cu")
 		(uuid "6a519646-77ed-420e-b73f-71fc003bbc72")
-		(at 155 100.5)
+		(at 155 101)
 		(descr "10nF (103) ±10% 50V")
 		(property "Reference" "C161"
 			(at 0 -4 0)
@@ -20890,7 +20890,7 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "77e45945-b626-4ff7-80f1-7f9cff5857f0")
-		(at 116 92.5 -90)
+		(at 116 95.5 -90)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C3"
@@ -22814,7 +22814,7 @@
 	(footprint "R0603"
 		(layer "F.Cu")
 		(uuid "7fc1b339-8772-4c18-ad17-1b591a429d4e")
-		(at 156 92.5)
+		(at 156.5 93)
 		(descr "100KΩ (1003) ±1%")
 		(property "Reference" "R146"
 			(at 0 -4 0)
@@ -44052,7 +44052,7 @@
 	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "d33b4a27-6e4e-4bb1-b2e8-265deda77a48")
-		(at 157.5 96.5)
+		(at 157.5 97)
 		(descr "10uF 25V ±20%")
 		(property "Reference" "C160"
 			(at 0 -4 0)
