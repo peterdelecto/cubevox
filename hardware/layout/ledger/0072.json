@@ -1,0 +1,59 @@
+{
+ "id": "0072",
+ "board": {
+  "path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_pcb",
+  "sha256": "ae658779cdbedd3ccfe8609b3a635438174df4d41fcf8b16d5498729bcbbd8f1"
+ },
+ "commit": "9146b409808f0b4ece60e82f6c694486007df79d",
+ "dirty": false,
+ "tool_version": "0.2.28",
+ "kicad_version": "10.0.5",
+ "python_version": "3.9.13",
+ "classification_sha256": null,
+ "timestamp_utc": "2026-10-03T06:19:38Z",
+ "pass": "placement",
+ "kind": "routable",
+ "routable": {
+  "board": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_pcb",
+  "sha256": "ae658779cdbedd3ccfe8609b3a635438174df4d41fcf8b16d5498729bcbbd8f1",
+  "excluded": [
+   "GND"
+  ],
+  "pins_removed": 0,
+  "engine": "freerouting",
+  "engine_version": "v2.4.1",
+  "java": "/opt/homebrew/opt/openjdk/bin/java",
+  "jar": "/Users/j/Documents/KiCad/freerouting/freerouting-2.4.1.jar",
+  "passes_requested": 20,
+  "timeout_s": 300,
+  "timed_out": false,
+  "freerouting_version": "v2.4.1",
+  "seconds": 279.07,
+  "returncode": 0,
+  "connections": 523,
+  "unrouted": 2,
+  "violations": 8,
+  "routed": 521,
+  "failed": [
+   {
+    "net": "/GND",
+    "from": "C12-2",
+    "to": "U1-49"
+   },
+   {
+    "net": "/h7core_block/I2S_LRCLK",
+    "from": "via",
+    "to": "U1-3"
+   }
+  ],
+  "passes": 18,
+  "completed": true,
+  "binding": "A0029",
+  "proposed": null
+ },
+ "excluded": [
+  "GND"
+ ],
+ "engine": "freerouting",
+ "passes": 18
+}

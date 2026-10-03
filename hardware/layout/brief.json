@@ -4,15 +4,15 @@
     "critical": [
       {
         "net": "/h7core_block/USB_DP",
-        "max_length_mm": 50,
+        "max_length_mm": 60,
         "max_vias": 2,
-        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1."
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1. | 60 mm: Codex 3a PASS 2026-10-02 (owner relayed), keep pair geometry and ground reference"
       },
       {
         "net": "/h7core_block/USB_DM",
-        "max_length_mm": 50,
+        "max_length_mm": 60,
         "max_vias": 2,
-        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP."
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP. | 60 mm: Codex 3a PASS 2026-10-02 (owner relayed), keep pair geometry and ground reference"
       },
       {
         "net": "/h7core_block/HSE_IN",
@@ -34,9 +34,9 @@
       },
       {
         "net": "/h7core_block/BUCK_SW",
-        "max_length_mm": 6,
+        "max_length_mm": 8,
         "max_vias": 0,
-        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation)."
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation). | 8 mm: Codex 3a PASS 2026-10-02 (owner relayed), pad-centre MST 6.03 with courtyards touching, copper about 4 mm"
       },
       {
         "net": "/h7core_block/VCAP1",
@@ -398,7 +398,7 @@
   "clusters": [
     {
       "name": "usb_esd",
-      "function": "USBLC6 D2 at J1 on the pair before any stub, VBUS bypass C18, CC pulldowns R4/R5, VBUS sense divider R6/R7 (canon 60)",
+      "function": "USBLC6 D2 at J1 on the pair before any stub, VBUS bypass C18, CC pulldowns R4/R5, VBUS sense divider R6/R7 (canon 60) | side top: the connector's side, so the pair meets D2 before any via (placement 2026-10-02)",
       "anchor": "J1",
       "members": [
         "D2",
@@ -413,7 +413,7 @@
         "kind": "row"
       },
       "pitch_mm": null,
-      "side": "bottom"
+      "side": "top"
     },
     {
       "name": "input_9v",
@@ -431,7 +431,7 @@
     },
     {
       "name": "buck5_in",
-      "function": "AP63205 input caps C112/C113 at VIN in the tightest loop with GND (canon 36), bootstrap C116 at BST/SW",
+      "function": "AP63205 input caps C112/C113 at VIN in the tightest loop with GND (canon 36), bootstrap C116 at BST/SW | row: VIN and GND pins share one flank (placement 2026-10-02)",
       "anchor": "U103",
       "members": [
         "C112",
@@ -440,7 +440,7 @@
       ],
       "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
       "axis": {
-        "kind": "column"
+        "kind": "row"
       },
       "pitch_mm": null
     },
@@ -462,7 +462,7 @@
     },
     {
       "name": "buck33_in",
-      "function": "AP63203 input cap C20 at VIN, bootstrap C23 (canon 36)",
+      "function": "AP63203 input cap C20 at VIN, bootstrap C23 (canon 36) | row: VIN and GND pins share one flank (placement 2026-10-02)",
       "anchor": "U3",
       "members": [
         "C20",
@@ -470,7 +470,7 @@
       ],
       "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
       "axis": {
-        "kind": "column"
+        "kind": "row"
       },
       "pitch_mm": null
     },
@@ -552,13 +552,11 @@
     },
     {
       "name": "vdd_decap_west",
-      "function": "VDD pins 6/11: C2/C3 100n and C56/C57 10n pin to pin (canon 32, 62)",
+      "function": "VDD pin 100 pair C56/C2 (pin map 2026-10-02)",
       "anchor": "U1",
       "members": [
         "C2",
-        "C3",
-        "C56",
-        "C57"
+        "C56"
       ],
       "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
       "axis": {
@@ -587,15 +585,11 @@
     },
     {
       "name": "vdd_decap_south",
-      "function": "VDD pins 27/50 and VCAP1 pin 48: C4/C7 100n, C12 2.2u, C58/C59 10n, C31 100n",
+      "function": "VDD pin 6 C4; pin 11 C7 plane-fed 7 mm south, the crystal takes the pin-side slot (pin map 2026-10-02)",
       "anchor": "U1",
       "members": [
         "C4",
-        "C7",
-        "C12",
-        "C31",
-        "C58",
-        "C59"
+        "C7"
       ],
       "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
       "axis": {
@@ -606,14 +600,14 @@
     },
     {
       "name": "vdd_decap_east",
-      "function": "VDD pin 75 and VCAP2 pin 73: C5 100n, C13 2.2u, C61 10n, C6 4.7u and C32 10u bulk",
+      "function": "VDD pin 50 pair C61/C5, VCAP1 C12 at pin 48, VDD pin 27 pair C58/C3 (pin map 2026-10-02)",
       "anchor": "U1",
       "members": [
         "C5",
-        "C13",
         "C61",
-        "C6",
-        "C32"
+        "C12",
+        "C58",
+        "C3"
       ],
       "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
       "axis": {
@@ -624,10 +618,16 @@
     },
     {
       "name": "vdd_decap_north",
-      "function": "VDD pin 100: C1 100n",
+      "function": "VDD pin 75 pair C57/C1, VCAP2 C13 at pin 73, bulk C32/C6/C31 and C59 where 3V3 enters from the buck row (pin map 2026-10-02)",
       "anchor": "U1",
       "members": [
-        "C1"
+        "C1",
+        "C57",
+        "C13",
+        "C6",
+        "C32",
+        "C31",
+        "C59"
       ],
       "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
       "axis": {
@@ -1249,18 +1249,6 @@
         "pot_mux",
         "pot_supply"
       ]
-    },
-    {
-      "name": "mechanical",
-      "function": "the four M3 corner holes",
-      "anchor": "H101",
-      "members": [
-        "H101",
-        "H102",
-        "H103",
-        "H104"
-      ],
-      "clusters": []
     }
   ],
   "flow": {
@@ -1268,13 +1256,14 @@
     "order": [
       "rear_io",
       "power",
-      "mcu",
+      "output",
       "display",
       "preamp",
+      "mcu",
       "codec",
-      "output",
       "control"
-    ]
+    ],
+    "note": "placement stop 2026-10-02: the audio path is a loop (rear jack in, preamp, codec, MCU, codec, relays, rear jack out), so the +y order is the eye's order under the owner's fixed panel: rear jacks, power row, relays, preamp, OLED, MCU, codecs, control rows. 'mechanical' (H101-H104, the four corners) is no longer a flow section; the holes stay fixed_parts. Order by anchor y: J101 44, U103 53, K101 60, J117 77.5, U104 79.5, U1 84, U8 102.5, SW101 115."
   },
   "grids": {
     "board_mm": {
