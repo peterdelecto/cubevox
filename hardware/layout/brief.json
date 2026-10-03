@@ -312,9 +312,9 @@
     {
       "ref": "ENC101",
       "x": 173.942,
-      "y": 75.5,
+      "y": 70.5,
       "rotation": 180.0,
-      "reason": "menu encoder beside the OLED; owner 2026-10-02 render review: 2.5 mm north with the OLED"
+      "reason": "menu encoder beside the OLED; owner 2026-10-03: moves north with the OLED (7.5 mm in total); enclosure hole follows"
     },
     {
       "ref": "SWBYPASS1",
@@ -333,9 +333,9 @@
     {
       "ref": "J117",
       "x": 135.785,
-      "y": 77.5,
+      "y": 72.5,
       "rotation": 0.0,
-      "reason": "1.3 in OLED header, window position chosen by the owner; owner 2026-10-02 render review: 2.5 mm north for the codec gap (2.6 -> 5.1 mm)"
+      "reason": "1.3 in OLED header; owner 2026-10-03: 5 mm further north (7.5 mm in total from the first drawing) to use the empty band under the rear connectors and give the codecs 10.1 mm; enclosure window follows"
     },
     {
       "ref": "J1",

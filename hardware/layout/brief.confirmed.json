@@ -1,1642 +1,1635 @@
 {
- "purpose": "cubevox: a tabletop vocal effects board for Adam Keith. One SM58 or pedal in on a combo jack, through an analog preamp into an STM32H743 at 48 kHz, out a buffered 1/4\" jack, with a relay bypass that keeps the preamp path alive when the digital is off. 9 V Boss supply, USB-C for firmware only, 15 pots, 3 encoders, toggles and an OLED on one JLC-assembled board inside a printed box.",
- "classification": {
-  "critical": [
-   {
-    "net": "/h7core_block/USB_DP",
-    "max_length_mm": 50,
-    "max_vias": 2,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1."
-   },
-   {
-    "net": "/h7core_block/USB_DM",
-    "max_length_mm": 50,
-    "max_vias": 2,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP."
-   },
-   {
-    "net": "/h7core_block/HSE_IN",
-    "max_length_mm": 8,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 06 obligation: Y1, C15, C16, R1 within a few mm of U1 pins 12-13 (AN2867, secondhand). Run lead 2026-09-25: routed 8.31 mm against 8 is accepted; its airline 8.154 mm is the stage-1 pose accepted in E0047, and no route can be shorter than its airline."
-   },
-   {
-    "net": "/h7core_block/HSE_XTAL_OUT",
-    "max_length_mm": 8,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as HSE_IN."
-   },
-   {
-    "net": "/h7core_block/HSE_OUT",
-    "max_length_mm": 5,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. R1 sits at U1 pin 13."
-   },
-   {
-    "net": "/h7core_block/BUCK_SW",
-    "max_length_mm": 6,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation)."
-   },
-   {
-    "net": "/h7core_block/VCAP1",
-    "max_length_mm": 5,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. DS12110 p102/p106: VCAP caps on or under the pins."
-   },
-   {
-    "net": "/h7core_block/VCAP2",
-    "max_length_mm": 5,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as VCAP1."
-   },
-   {
-    "net": "/h7core_block/I2S_BCLK",
-    "max_length_mm": 60,
-    "max_vias": 2,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 03 names BCLK the critical I2S net; 2.8224 MHz, fast GPIO edges."
-   },
-   {
-    "net": "/h7core_block/ADC_SCKI",
-    "max_length_mm": 90,
-    "max_vias": 2,
-    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25, rank 1: SCKI is source-terminated by R27 (33 ohm at U1 pin 61), so an 80 mm run is under 0.4 ns of propagation against the 2-3 ns edge of the 11.2896 MHz clock; 1 via. Replaces the 20 mm run default, which only an ADC beside the MCU could meet (A6: SAI3 MCLK on PD14, away from the input RC, SLES177B 10.1.6 p21). Run lead 2026-09-26: vias 1 -> 2 so R27 can sit within 3 mm of U1.61 (clock_source_termination) and SCKI takes one F-B-F hop with a qualifying reference_transition cap; a 14.7 mm unterminated source leg defeats the resistor. Codex: a source-damped, reference-clean 80 mm clock beats a shorter one with a broken reference. Run lead 2026-09-26: 80 -> 90 after (iv) F.Cu north measured 85.8/0 and closes the QSPI escapes, and (ii) east B.Cu measured 70.9/2 but breaks crystal_keepout (0.723 mm) and SW1's lane; the north B.Cu hop measures 86.3/2. Physics: 86 mm is about 0.55-0.6 ns one-way on FR4 against the 2-3 ns edge, source-terminated by R27 33 R at 2.3 mm from U1.61, both transitions capped (C62 at via A, C61 at via B); the 80 figure was a placement-fitted lead number, not a vendor limit. PCM1808 SCKI duty and thresholds verified at bring-up per clock_source_termination."
-   },
-   {
-    "net": "/h7core_block/ADC_DOUT",
-    "max_length_mm": 45,
-    "max_vias": 2,
-    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25: 2 vias, 45 mm. The channel east of U6 is reserved for U6's charge pump, AVDD and AGND pins, so DOUT hops on B.Cu from TP9 and lands beside the channel, moving its AGND crossing from 11.6 mm to about 4.5 mm from NT1. Before that: Run lead 2026-09-25, rank 1: the 40 mm route passed 0.88 mm from C51's VINL pad, digital data beside the analog input; 45 mm lets DOUT run north of U6, clear of the input network. Before that: DOUT is 2.8 MHz data received at the MCU, and 34 mm is a small fraction of its edge; 40 mm, 1 via. Replaces the 25 mm run default (A6: ADC_DOUT short, SLES177B 10.1.5 p21)."
-   },
-   {
-    "net": "/h7core_block/I2S_LRCLK",
-    "max_length_mm": 60,
-    "max_vias": 4,
-    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25, D0085: F.Cu-only entry into the 3V3A island (Astra review rule). LRCLK is the 48 kHz frame clock; the two extra vias sit outside the analog area and its B.Cu run stays over one In2 region. Length 60 mm as before."
-   },
-   {
-    "net": "/h7core_block/I2S_BCLK_SRC",
-    "max_length_mm": 3.0,
-    "max_vias": 0,
-    "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-26 (cd33d57d), brief clock_source_termination: the source leg U1.4 to R29 carries at most 3 mm of routed copper (preferably 1 mm), F.Cu, no via."
-   },
-   {
-    "net": "/MIC_P",
-    "max_length_mm": null,
-    "max_vias": null,
-    "source": "Provisional until the schematic exists: mic preamp input, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 1-2."
-   },
-   {
-    "net": "/MIC_N",
-    "max_length_mm": null,
-    "max_vias": null,
-    "source": "Provisional until the schematic exists: mic preamp input, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 1-2."
-   },
-   {
-    "net": "/PRE_OUT",
-    "max_length_mm": null,
-    "max_vias": null,
-    "source": "Provisional until the schematic exists: preamp output to the relay pole A, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 2-3."
-   },
-   {
-    "net": "/h7core_block/ADC_SCKI_SRC",
-    "max_length_mm": 3.0,
-    "max_vias": 0,
-    "source": "brief draft 2026-10-02 by the same clock_source_termination rule as I2S_BCLK_SRC: the source leg U1.1 to R27 (33 R) carries at most 3 mm of routed copper, F.Cu, no via. Pin moved from fxbox's U1.61 to U1.1 in the cubevox pinmap (PINMAP.md). Added, not owner-confirmed."
-   }
-  ],
-  "pairs": [
-   {
-    "name": "USB",
-    "legs": [
-     "/h7core_block/USB_DP",
-     "/h7core_block/USB_DM"
+  "purpose": "cubevox: a tabletop vocal effects board for Adam Keith. One SM58 or pedal in on a combo jack, through an analog preamp into an STM32H743 at 48 kHz, out a buffered 1/4\" jack, with a relay bypass that keeps the preamp path alive when the digital is off. 9 V Boss supply, USB-C for firmware only, 15 pots, 3 encoders, toggles and an OLED on one JLC-assembled board inside a printed box.",
+  "classification": {
+    "critical": [
+      {
+        "net": "/h7core_block/USB_DP",
+        "max_length_mm": 60,
+        "max_vias": 2,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1. | 60 mm: Codex 3a PASS 2026-10-02 (owner relayed), keep pair geometry and ground reference"
+      },
+      {
+        "net": "/h7core_block/USB_DM",
+        "max_length_mm": 60,
+        "max_vias": 2,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP. | 60 mm: Codex 3a PASS 2026-10-02 (owner relayed), keep pair geometry and ground reference"
+      },
+      {
+        "net": "/h7core_block/HSE_IN",
+        "max_length_mm": 8,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 06 obligation: Y1, C15, C16, R1 within a few mm of U1 pins 12-13 (AN2867, secondhand). Run lead 2026-09-25: routed 8.31 mm against 8 is accepted; its airline 8.154 mm is the stage-1 pose accepted in E0047, and no route can be shorter than its airline."
+      },
+      {
+        "net": "/h7core_block/HSE_XTAL_OUT",
+        "max_length_mm": 8,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as HSE_IN."
+      },
+      {
+        "net": "/h7core_block/HSE_OUT",
+        "max_length_mm": 5,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. R1 sits at U1 pin 13."
+      },
+      {
+        "net": "/h7core_block/BUCK_SW",
+        "max_length_mm": 8,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation). | 8 mm: Codex 3a PASS 2026-10-02 (owner relayed), pad-centre MST 6.03 with courtyards touching, copper about 4 mm"
+      },
+      {
+        "net": "/h7core_block/VCAP1",
+        "max_length_mm": 5,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. DS12110 p102/p106: VCAP caps on or under the pins."
+      },
+      {
+        "net": "/h7core_block/VCAP2",
+        "max_length_mm": 5,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as VCAP1."
+      },
+      {
+        "net": "/h7core_block/I2S_BCLK",
+        "max_length_mm": 60,
+        "max_vias": 2,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 03 names BCLK the critical I2S net; 2.8224 MHz, fast GPIO edges."
+      },
+      {
+        "net": "/h7core_block/ADC_SCKI",
+        "max_length_mm": 90,
+        "max_vias": 2,
+        "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25, rank 1: SCKI is source-terminated by R27 (33 ohm at U1 pin 61), so an 80 mm run is under 0.4 ns of propagation against the 2-3 ns edge of the 11.2896 MHz clock; 1 via. Replaces the 20 mm run default, which only an ADC beside the MCU could meet (A6: SAI3 MCLK on PD14, away from the input RC, SLES177B 10.1.6 p21). Run lead 2026-09-26: vias 1 -> 2 so R27 can sit within 3 mm of U1.61 (clock_source_termination) and SCKI takes one F-B-F hop with a qualifying reference_transition cap; a 14.7 mm unterminated source leg defeats the resistor. Codex: a source-damped, reference-clean 80 mm clock beats a shorter one with a broken reference. Run lead 2026-09-26: 80 -> 90 after (iv) F.Cu north measured 85.8/0 and closes the QSPI escapes, and (ii) east B.Cu measured 70.9/2 but breaks crystal_keepout (0.723 mm) and SW1's lane; the north B.Cu hop measures 86.3/2. Physics: 86 mm is about 0.55-0.6 ns one-way on FR4 against the 2-3 ns edge, source-terminated by R27 33 R at 2.3 mm from U1.61, both transitions capped (C62 at via A, C61 at via B); the 80 figure was a placement-fitted lead number, not a vendor limit. PCM1808 SCKI duty and thresholds verified at bring-up per clock_source_termination."
+      },
+      {
+        "net": "/h7core_block/ADC_DOUT",
+        "max_length_mm": 45,
+        "max_vias": 2,
+        "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25: 2 vias, 45 mm. The channel east of U6 is reserved for U6's charge pump, AVDD and AGND pins, so DOUT hops on B.Cu from TP9 and lands beside the channel, moving its AGND crossing from 11.6 mm to about 4.5 mm from NT1. Before that: Run lead 2026-09-25, rank 1: the 40 mm route passed 0.88 mm from C51's VINL pad, digital data beside the analog input; 45 mm lets DOUT run north of U6, clear of the input network. Before that: DOUT is 2.8 MHz data received at the MCU, and 34 mm is a small fraction of its edge; 40 mm, 1 via. Replaces the 25 mm run default (A6: ADC_DOUT short, SLES177B 10.1.5 p21)."
+      },
+      {
+        "net": "/h7core_block/I2S_LRCLK",
+        "max_length_mm": 60,
+        "max_vias": 4,
+        "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-25, D0085: F.Cu-only entry into the 3V3A island (Astra review rule). LRCLK is the 48 kHz frame clock; the two extra vias sit outside the analog area and its B.Cu run stays over one In2 region. Length 60 mm as before."
+      },
+      {
+        "net": "/h7core_block/I2S_BCLK_SRC",
+        "max_length_mm": 3.0,
+        "max_vias": 0,
+        "source": "fxbox brief <commit 48f1e82>; Run lead 2026-09-26 (cd33d57d), brief clock_source_termination: the source leg U1.4 to R29 carries at most 3 mm of routed copper (preferably 1 mm), F.Cu, no via."
+      },
+      {
+        "net": "/MIC_P",
+        "max_length_mm": null,
+        "max_vias": null,
+        "source": "Provisional until the schematic exists: mic preamp input, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 1-2."
+      },
+      {
+        "net": "/MIC_N",
+        "max_length_mm": null,
+        "max_vias": null,
+        "source": "Provisional until the schematic exists: mic preamp input, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 1-2."
+      },
+      {
+        "net": "/PRE_OUT",
+        "max_length_mm": null,
+        "max_vias": null,
+        "source": "Provisional until the schematic exists: preamp output to the relay pole A, low-noise group. Names provisional until the schematic exists; gates are not set (owner decision pending). Spec 2026-10-02-hardware-design.md, signal chain 2-3."
+      },
+      {
+        "net": "/h7core_block/ADC_SCKI_SRC",
+        "max_length_mm": 3.0,
+        "max_vias": 0,
+        "source": "brief draft 2026-10-02 by the same clock_source_termination rule as I2S_BCLK_SRC: the source leg U1.1 to R27 (33 R) carries at most 3 mm of routed copper, F.Cu, no via. Pin moved from fxbox's U1.61 to U1.1 in the cubevox pinmap (PINMAP.md). Added, not owner-confirmed."
+      }
     ],
-    "max_mismatch_mm": 5.9,
-    "width_mm": null,
-    "gap_mm": null,
-    "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 03 rule 9 and 05 section 6: D2 at J1 before any stub, TP1/TP2 on the pair without stubs. Width and gap come from the stackup at the rules pass; no impedance target (out of scope, and not needed at this length). Run lead 2026-09-26 (db0ea1dd, Codex audit 6), E0093: accepted connector-to-MCU path skew 5.9 mm (DP 41.95, DM 36.06 mm), F.Cu, 0 vias, no serpentine; the 2.0 mm field is retired."
-   }
+    "pairs": [
+      {
+        "name": "USB",
+        "legs": [
+          "/h7core_block/USB_DP",
+          "/h7core_block/USB_DM"
+        ],
+        "max_mismatch_mm": 5.9,
+        "width_mm": null,
+        "gap_mm": null,
+        "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. 03 rule 9 and 05 section 6: D2 at J1 before any stub, TP1/TP2 on the pair without stubs. Width and gap come from the stackup at the rules pass; no impedance target (out of scope, and not needed at this length). Run lead 2026-09-26 (db0ea1dd, Codex audit 6), E0093: accepted connector-to-MCU path skew 5.9 mm (DP 41.95, DM 36.06 mm), F.Cu, 0 vias, no serpentine; the 2.0 mm field is retired."
+      }
+    ],
+    "power": [
+      "/GND",
+      "/5V",
+      "/h7core_block/VBUS",
+      "/3V3",
+      "/3V3A",
+      "/h7core_block/VDDA",
+      "/h7core_block/ADC_VCC",
+      "/VIN_9V",
+      "/5VA",
+      "/VREF",
+      "/9V_JACK"
+    ],
+    "layers": {
+      "F.Cu": "signal, every part (owner-confirmed 2026-09-24)",
+      "In1.Cu": "ground: one solid GND plane (owner 2026-09-25, option A, Astra review)",
+      "In2.Cu": "power: 3V3 pour with a 3V3A island and 5V (owner-confirmed 2026-09-24)",
+      "B.Cu": "signal, no parts (owner-confirmed 2026-09-24)"
+    },
+    "ground": "/GND",
+    "source": "fxbox brief <commit 48f1e82> for critical (those cubevox keeps), pairs, layers and the fxbox power names. Power names follow the real schematic nets (owner rulings 2026-10-02, spec 2026-10-02-hardware-design.md items 11-13, 16): one ground plane so no AGND or SGND; the 9 V net is /VIN_9V (after the SS34; /9V_JACK is before it); fxbox's ADC_5V0, ADC_PRE and ADC_BIAS supply is dropped; /5VA is 5V through a ferrite feeding the OPA1678s, PCM1808 VCC (via 10 ohm to /h7core_block/ADC_VCC) and the /VREF divider. Mic nets are provisional. 2026-10-02 draft: QSPI_CLK and QSPI_CLK_SRC removed with U5 (spec item 17); 5V_PRODUCT removed with the TPS2116 (spec item 12); /9V_JACK added (barrel to SS34). NOT owner-confirmed for cubevox."
+  },
+  "fixed_parts": [
+    {
+      "ref": "SW101",
+      "x": 64.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW102",
+      "x": 88.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW103",
+      "x": 112.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW104",
+      "x": 136.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW105",
+      "x": 160.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW106",
+      "x": 184.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW107",
+      "x": 208.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "SW108",
+      "x": 232.5,
+      "y": 115.0,
+      "rotation": 90.0,
+      "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV101",
+      "x": 232.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV102",
+      "x": 232.5,
+      "y": 168.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV103",
+      "x": 64.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV104",
+      "x": 88.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV105",
+      "x": 112.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV106",
+      "x": 112.5,
+      "y": 168.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV107",
+      "x": 136.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV108",
+      "x": 136.5,
+      "y": 168.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV109",
+      "x": 160.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV110",
+      "x": 160.5,
+      "y": 168.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV111",
+      "x": 184.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV112",
+      "x": 184.5,
+      "y": 168.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV113",
+      "x": 208.5,
+      "y": 142.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "RV114",
+      "x": 208.5,
+      "y": 168.0,
+      "rotation": 0.0,
+      "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "ENC102",
+      "x": 64.5,
+      "y": 164.0,
+      "rotation": 180.0,
+      "reason": "panel encoder, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "ENC103",
+      "x": 88.5,
+      "y": 164.0,
+      "rotation": 180.0,
+      "reason": "panel encoder, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
+    },
+    {
+      "ref": "ENC101",
+      "x": 173.942,
+      "y": 70.5,
+      "rotation": 180.0,
+      "reason": "menu encoder beside the OLED; owner 2026-10-03: moves north with the OLED (7.5 mm in total); enclosure hole follows"
+    },
+    {
+      "ref": "SWBYPASS1",
+      "x": 64.5,
+      "y": 70.0,
+      "rotation": 90.0,
+      "reason": "bypass toggle on the outer left 24 mm column (commit 458ea98), owner 2026-10-02"
+    },
+    {
+      "ref": "RVGAIN1",
+      "x": 232.5,
+      "y": 72.0,
+      "rotation": 0.0,
+      "reason": "GAIN pot on the outer right 24 mm column (commit 458ea98), owner 2026-10-02"
+    },
+    {
+      "ref": "J117",
+      "x": 135.785,
+      "y": 72.5,
+      "rotation": 0.0,
+      "reason": "1.3 in OLED header; owner 2026-10-03: 5 mm further north (7.5 mm in total from the first drawing) to use the empty band under the rear connectors and give the codecs 10.1 mm; enclosure window follows"
+    },
+    {
+      "ref": "J1",
+      "x": 125.39,
+      "y": 33.71,
+      "rotation": 180.0,
+      "reason": "USB-C on the rear edge, mouth -y, JLC-assembled F.Cu; owner position"
+    },
+    {
+      "ref": "J101",
+      "x": 190.0,
+      "y": 44.2,
+      "rotation": 0.0,
+      "reason": "XLR/TRS combo on the rear edge, B.Cu hand-soldered; owner column, shifted +x by the layout lead for the console rear plate (spec item 27, 2026-10-02)"
+    },
+    {
+      "ref": "J108",
+      "x": 72.5,
+      "y": 41.0,
+      "rotation": 90.0,
+      "reason": "1/4 in output jack HOOYA PJ-611E (C309282) on the rear edge, B.Cu hand-soldered; owner 2026-10-02: part changed from NMJ6HCD2; owner column x 72.5, y set so the housing front face (4.3 mm beyond the front pin row, fxbox drawing record) sits 0.35 mm inside the edge"
+    },
+    {
+      "ref": "J106",
+      "x": 232.0,
+      "y": 37.0,
+      "rotation": -90.0,
+      "reason": "9 V barrel on the rear edge, B.Cu hand-soldered; owner position"
+    },
+    {
+      "ref": "H101",
+      "x": 53.5,
+      "y": 35.0,
+      "rotation": 0.0,
+      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+    },
+    {
+      "ref": "H102",
+      "x": 243.5,
+      "y": 35.0,
+      "rotation": 0.0,
+      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+    },
+    {
+      "ref": "H103",
+      "x": 53.5,
+      "y": 175.0,
+      "rotation": 0.0,
+      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+    },
+    {
+      "ref": "H104",
+      "x": 243.5,
+      "y": 175.0,
+      "rotation": 0.0,
+      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+    }
   ],
-  "power": [
-   "/GND",
-   "/5V",
-   "/h7core_block/VBUS",
-   "/3V3",
-   "/3V3A",
-   "/h7core_block/VDDA",
-   "/h7core_block/ADC_VCC",
-   "/VIN_9V",
-   "/5VA",
-   "/VREF",
-   "/9V_JACK"
+  "parts": null,
+  "clusters": [
+    {
+      "name": "usb_esd",
+      "function": "USBLC6 D2 at J1 on the pair before any stub, VBUS bypass C18, CC pulldowns R4/R5, VBUS sense divider R6/R7 (canon 60) | side top: the connector's side, so the pair meets D2 before any via (placement 2026-10-02)",
+      "anchor": "J1",
+      "members": [
+        "D2",
+        "C18",
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ],
+      "rotation_rule": "D2 pins 1/6 on the DP/DM pair toward J1; passives signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null,
+      "side": "top"
+    },
+    {
+      "name": "input_9v",
+      "function": "reverse Schottky D106 and TVS D105 at the barrel, before the buck (canon 60, 81)",
+      "anchor": "J106",
+      "members": [
+        "D106",
+        "D105"
+      ],
+      "rotation_rule": "cathodes toward the buck, one orientation (canon 33)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "buck5_in",
+      "function": "AP63205 input caps C112/C113 at VIN in the tightest loop with GND (canon 36), bootstrap C116 at BST/SW | row: VIN and GND pins share one flank (placement 2026-10-02)",
+      "anchor": "U103",
+      "members": [
+        "C112",
+        "C113",
+        "C116"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "buck5_out",
+      "function": "L101 at SW, output caps C114/C115, bulk C19 on 5V; switch node short (canon 26)",
+      "anchor": "U103",
+      "members": [
+        "L101",
+        "C114",
+        "C115",
+        "C19"
+      ],
+      "rotation_rule": "L101 SW pad toward U103 pin 5; caps signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "buck33_in",
+      "function": "AP63203 input cap C20 at VIN, bootstrap C23 (canon 36) | row: VIN and GND pins share one flank (placement 2026-10-02)",
+      "anchor": "U3",
+      "members": [
+        "C20",
+        "C23"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "buck33_out",
+      "function": "L1 at SW, 3V3 output caps C21/C22",
+      "anchor": "U3",
+      "members": [
+        "L1",
+        "C21",
+        "C22"
+      ],
+      "rotation_rule": "L1 SW pad toward U3 pin 5; caps signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "ldo_3v3a",
+      "function": "TLV75533 input C24 and output C25 on the pin",
+      "anchor": "U4",
+      "members": [
+        "C24",
+        "C25"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "analog_rail",
+      "function": "5V to 5VA ferrite FB101 and its 10 uF C117, the single fan-out point for the analog rail (canon 70); VA_SENSE divider R151/R152/C163 reads 5VA here",
+      "anchor": "FB101",
+      "members": [
+        "C117",
+        "R151",
+        "R152",
+        "C163"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "pwr_led",
+      "function": "power LED D3 with R10 on 3V3",
+      "anchor": "U3",
+      "members": [
+        "D3",
+        "R10"
+      ],
+      "rotation_rule": "D3 cathode toward GND, R10 inline",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "hse_crystal",
+      "function": "25 MHz Y1 at U1 pins 12/13 with C15/C16 flanking symmetrically and R1 in series at pin 13; nothing under it on any layer (canon 35, 59)",
+      "anchor": "U1",
+      "members": [
+        "Y1",
+        "C15",
+        "C16",
+        "R1"
+      ],
+      "rotation_rule": "Y1 pins 1/3 toward U1 pins 12/13; C15/C16 ground pads outward, mirror images",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null,
+      "side": "left"
+    },
+    {
+      "name": "vdd_decap_west",
+      "function": "VDD pin 100 pair C56/C2 (pin map 2026-10-02)",
+      "anchor": "U1",
+      "members": [
+        "C2",
+        "C56"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null,
+      "side": "left"
+    },
+    {
+      "name": "vdda",
+      "function": "VDDA pins 20/21: FB1 from 3V3A, C8/C10 1u and C9/C11 100n at the pins (canon 32, 70)",
+      "anchor": "U1",
+      "members": [
+        "FB1",
+        "C8",
+        "C9",
+        "C10",
+        "C11"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null,
+      "side": "left"
+    },
+    {
+      "name": "vdd_decap_south",
+      "function": "VDD pin 6 C4; pin 11 C7 plane-fed 7 mm south, the crystal takes the pin-side slot (pin map 2026-10-02)",
+      "anchor": "U1",
+      "members": [
+        "C4",
+        "C7"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null,
+      "side": "bottom"
+    },
+    {
+      "name": "vdd_decap_east",
+      "function": "VDD pin 50 pair C61/C5, VCAP1 C12 at pin 48, VDD pin 27 pair C58/C3 (pin map 2026-10-02)",
+      "anchor": "U1",
+      "members": [
+        "C5",
+        "C61",
+        "C12",
+        "C58",
+        "C3"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null,
+      "side": "right"
+    },
+    {
+      "name": "vdd_decap_north",
+      "function": "VDD pin 75 pair C57/C1, VCAP2 C13 at pin 73, bulk C32/C6/C31 and C59 where 3V3 enters from the buck row (pin map 2026-10-02)",
+      "anchor": "U1",
+      "members": [
+        "C1",
+        "C57",
+        "C13",
+        "C6",
+        "C32",
+        "C31",
+        "C59"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null,
+      "side": "top"
+    },
+    {
+      "name": "clock_source_termination",
+      "function": "R27 at U1.1 (ADC_SCKI_SRC) and R29 at U1.4 (I2S_BCLK_SRC): source termination within 3 mm of the driver pin (canon 50)",
+      "anchor": "U1",
+      "members": [
+        "R27",
+        "R29"
+      ],
+      "rotation_rule": "pad 1 on the U1 pin, pad 2 outward toward the codec",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null,
+      "side": "left"
+    },
+    {
+      "name": "mux_adc_rc",
+      "function": "R30/C55, the pot-mux ADC input RC at U1 pin 15 (anti-alias at the ADC, canon 77)",
+      "anchor": "U1",
+      "members": [
+        "R30",
+        "C55"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null,
+      "side": "left"
+    },
+    {
+      "name": "reset_boot",
+      "function": "SWRESET1 with C14 at NRST pin 14; SWBOOT1 with R2 at BOOT0 pin 94",
+      "anchor": "U1",
+      "members": [
+        "SWRESET1",
+        "C14",
+        "SWBOOT1",
+        "R2"
+      ],
+      "rotation_rule": "switch pads toward their U1 pin; C14/R2 signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "swd",
+      "function": "Tag-Connect TC2030 J3, on the SWDIO/SWCLK side (pins 72/76), footprint clear of everything so the pogo clip seats (canon 95)",
+      "anchor": "U1",
+      "members": [
+        "J3"
+      ],
+      "rotation_rule": {
+        "fixed_deg": -90
+      },
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null,
+      "side": "right"
+    },
+    {
+      "name": "user_led",
+      "function": "USER LED D1 with R3 on pin 88",
+      "anchor": "U1",
+      "members": [
+        "D1",
+        "R3"
+      ],
+      "rotation_rule": "D1 cathode toward GND, R3 inline toward pin 88",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null,
+      "side": "top"
+    },
+    {
+      "name": "mic_input_p",
+      "function": "hot leg of the mic input: R101 47 R from XLR 2, D107 clamp, C119 100 p, R144 100 k bleed, C120 47 u coupling, R103 1.2 k bias to VREF; stamped mirror of mic_input_n (canon 41)",
+      "anchor": "U104",
+      "members": [
+        "R101",
+        "D107",
+        "C119",
+        "R144",
+        "C120",
+        "R103"
+      ],
+      "rotation_rule": "signal flow J101 toward U104 pin 3; one orientation, polarity marks one way (canon 33, 89)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "mic_input_n",
+      "function": "cold leg of the mic input: R104, D108, C123, R145, C124, R106; same row geometry as mic_input_p one pitch over (canon 41, 108)",
+      "anchor": "U104",
+      "members": [
+        "R104",
+        "D108",
+        "C123",
+        "R145",
+        "C124",
+        "R106"
+      ],
+      "rotation_rule": "identical to mic_input_p",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "trs_input",
+      "function": "TRS leg: C121/C125 10 u coupling, R102/R105 22 k pad into IN_P/IN_N, R148/R149 100 k bleed on TRS_T/TRS_R; two mirrored legs (canon 41)",
+      "anchor": "U104",
+      "members": [
+        "C121",
+        "C125",
+        "R102",
+        "R105",
+        "R148",
+        "R149"
+      ],
+      "rotation_rule": "signal flow J101 toward U104; legs mirrored",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "ina_stage1",
+      "function": "OPA2197 U104 instrumentation front end: Rf R108/R110 4.53 k, RG R109 1 k with C158 22 u bipolar, C128/C129 47 p, C118 5VA decap at pin 8; feedback nodes tiny and symmetric (canon 41, 79)",
+      "anchor": "U104",
+      "members": [
+        "R108",
+        "R110",
+        "R109",
+        "C158",
+        "C128",
+        "C129",
+        "C118"
+      ],
+      "rotation_rule": "feedback parts pad to pad on the U104 pin they serve; C118 signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "diff_amp",
+      "function": "U105-A difference amplifier: R111/R112/R113/R114 10 k 0.1 % matched quad, C127 5VA decap at pin 8 (canon 41, 79)",
+      "anchor": "U105",
+      "members": [
+        "R111",
+        "R112",
+        "R113",
+        "R114",
+        "C127"
+      ],
+      "rotation_rule": "R111/R113 on the input side, R112/R114 on the output side, all one orientation",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "stage2_gain",
+      "function": "U105-B gain stage: RVGAIN1 as feedback, R116 330 R and C159 100 u to GND at G2_RG, C132 47 p across the pot; inverting node tiny (canon 79)",
+      "anchor": "U105",
+      "members": [
+        "R116",
+        "C159",
+        "C132"
+      ],
+      "rotation_rule": "R116 pad 1 on U105 pin 6, C159 ground pad outward",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "adc_input",
+      "function": "PRE_OUT to the PCM1808: R119 100 R, C136 2.2 n, C137 10 u into VINL, C138 10 u on VINR to GND; anti-alias at the ADC (canon 77)",
+      "anchor": "U8",
+      "members": [
+        "R119",
+        "C136",
+        "C137",
+        "C138"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "adc_supply",
+      "function": "PCM1808 rails: R20 10 R from 5VA, C134 before it, C44 22 u/C45 100 n on ADC_VCC pin 3, C48/C49 on VREF pin 1, C46/C47 on 3V3 pin 4 (canon 32, 66)",
+      "anchor": "U8",
+      "members": [
+        "R20",
+        "C134",
+        "C44",
+        "C45",
+        "C48",
+        "C49",
+        "C46",
+        "C47"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "dac_supply",
+      "function": "PCM5102A rails: C101/C111 on 3V3A pins 1/8, C33 LDOO pin 18, C34 CAPP/CAPM pins 2/4, C35 VNEG pin 5, R16 XSMT pull-down (canon 32)",
+      "anchor": "U6",
+      "members": [
+        "C101",
+        "C111",
+        "C33",
+        "C34",
+        "C35",
+        "R16"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "dac_output",
+      "function": "DAC_OUTL to the relay: R147 470 R, C161 2.2 n, C139 10 u, R122/R123 10 k/15 k to VREF (DAC_ATT); flows from U6 toward K101",
+      "anchor": "U6",
+      "members": [
+        "R147",
+        "C161",
+        "C139",
+        "R122",
+        "R123"
+      ],
+      "rotation_rule": "signal flow U6 pin 6 toward K101 pin 4, polarity one way",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "vref",
+      "function": "VREF: R117/R118 divider with C135, U106-A follower, R146 22 R and C160 10 u, C130 5VA decap at pin 8; one fan-out point for VREF (canon 70)",
+      "anchor": "U106",
+      "members": [
+        "R117",
+        "R118",
+        "C135",
+        "R146",
+        "C160",
+        "C130"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "output_buffer",
+      "function": "U106-B unity buffer: R124 100 R, C141 10 u, R125 100 k on OUT_AC toward K102",
+      "anchor": "U106",
+      "members": [
+        "R124",
+        "C141",
+        "R125"
+      ],
+      "rotation_rule": "signal flow U106 pin 7 toward K102 pin 3",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "bypass_relay",
+      "function": "K101 bypass relay: D104 flyback on the coil, R120 pull-up and C162 filter on FX_ON_SENSE (pole B dry contact)",
+      "anchor": "K101",
+      "members": [
+        "D104",
+        "R120",
+        "C162"
+      ],
+      "rotation_rule": "D104 cathode toward the coil + pin; R120/C162 signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "mute_relay",
+      "function": "K102 output mute relay and its driver Q101, R150 base, R153 pull-down, D109 flyback",
+      "anchor": "K102",
+      "members": [
+        "Q101",
+        "R150",
+        "R153",
+        "D109"
+      ],
+      "rotation_rule": "Q101 collector pad toward the coil; D109 cathode toward 5V",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "toggle_pullups",
+      "function": "R134..R141 10 k pull-ups on TOGGLE1..8, one per column under its toggle, pitch 24",
+      "anchor": "SW101",
+      "members": [
+        "R134",
+        "R135",
+        "R136",
+        "R137",
+        "R138",
+        "R139",
+        "R140",
+        "R141"
+      ],
+      "rotation_rule": "3V3 pad outward, signal pad toward the toggle",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": 24.0,
+      "side": "bottom"
+    },
+    {
+      "name": "toggle_filters",
+      "function": "C150..C157 100 n on TOGGLE1..8, one per column beside its pull-up, pitch 24",
+      "anchor": "SW101",
+      "members": [
+        "C150",
+        "C151",
+        "C152",
+        "C153",
+        "C154",
+        "C155",
+        "C156",
+        "C157"
+      ],
+      "rotation_rule": "signal pad toward the toggle, ground pad outward",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": 24.0,
+      "side": "bottom"
+    },
+    {
+      "name": "enc_key_rc",
+      "function": "ENC102 (KEY) pull-ups R130/R131 and filters C146/C147",
+      "anchor": "ENC102",
+      "members": [
+        "R130",
+        "R131",
+        "C146",
+        "C147"
+      ],
+      "rotation_rule": "signal pads toward the encoder A/B pins",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "enc_semi_rc",
+      "function": "ENC103 (SEMI) pull-ups R132/R133 and filters C148/C149, stamped from enc_key_rc (canon 108)",
+      "anchor": "ENC103",
+      "members": [
+        "R132",
+        "R133",
+        "C148",
+        "C149"
+      ],
+      "rotation_rule": "identical to enc_key_rc",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "enc_menu_rc",
+      "function": "ENC101 (MENU) pull-ups R127/R128/R129 and filters C143/C144/C145 including the push switch",
+      "anchor": "ENC101",
+      "members": [
+        "R127",
+        "R128",
+        "R129",
+        "C143",
+        "C144",
+        "C145"
+      ],
+      "rotation_rule": "signal pads toward the encoder pins",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "pot_mux",
+      "function": "CD74HC4067 U101 with C27/C28 on 3V3A pin 24 and the R126/C142 output RC on MUX_COM",
+      "anchor": "U101",
+      "members": [
+        "C27",
+        "C28",
+        "R126",
+        "C142"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "column"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "pot_supply",
+      "function": "C29/C30 3V3A decoupling at the pot rows, the far end of the 3V3A pot feed",
+      "anchor": "RV111",
+      "members": [
+        "C29",
+        "C30"
+      ],
+      "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    },
+    {
+      "name": "i2c_pullups",
+      "function": "R142/R143 4.7 k I2C1 pull-ups, one pair on the bus near the OLED header",
+      "anchor": "J117",
+      "members": [
+        "R142",
+        "R143"
+      ],
+      "rotation_rule": "3V3 pad outward, signal pad toward J117",
+      "axis": {
+        "kind": "row"
+      },
+      "pitch_mm": null
+    }
   ],
-  "layers": {
-   "F.Cu": "signal, every part (owner-confirmed 2026-09-24)",
-   "In1.Cu": "ground: one solid GND plane (owner 2026-09-25, option A, Astra review)",
-   "In2.Cu": "power: 3V3 pour with a 3V3A island and 5V (owner-confirmed 2026-09-24)",
-   "B.Cu": "signal, no parts (owner-confirmed 2026-09-24)"
-  },
-  "ground": "/GND",
-  "source": "fxbox brief <commit 48f1e82> for critical (those cubevox keeps), pairs, layers and the fxbox power names. Power names follow the real schematic nets (owner rulings 2026-10-02, spec 2026-10-02-hardware-design.md items 11-13, 16): one ground plane so no AGND or SGND; the 9 V net is /VIN_9V (after the SS34; /9V_JACK is before it); fxbox's ADC_5V0, ADC_PRE and ADC_BIAS supply is dropped; /5VA is 5V through a ferrite feeding the OPA1678s, PCM1808 VCC (via 10 ohm to /h7core_block/ADC_VCC) and the /VREF divider. Mic nets are provisional. 2026-10-02 draft: QSPI_CLK and QSPI_CLK_SRC removed with U5 (spec item 17); 5V_PRODUCT removed with the TPS2116 (spec item 12); /9V_JACK added (barrel to SS34). NOT owner-confirmed for cubevox."
- },
- "fixed_parts": [
-  {
-   "ref": "SW101",
-   "x": 64.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW102",
-   "x": 88.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW103",
-   "x": 112.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW104",
-   "x": 136.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW105",
-   "x": 160.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW106",
-   "x": 184.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW107",
-   "x": 208.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "SW108",
-   "x": 232.5,
-   "y": 115.0,
-   "rotation": 90.0,
-   "reason": "bat toggle, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV101",
-   "x": 232.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV102",
-   "x": 232.5,
-   "y": 168.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV103",
-   "x": 64.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV104",
-   "x": 88.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV105",
-   "x": 112.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV106",
-   "x": 112.5,
-   "y": 168.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV107",
-   "x": 136.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV108",
-   "x": 136.5,
-   "y": 168.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV109",
-   "x": 160.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV110",
-   "x": 160.5,
-   "y": 168.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV111",
-   "x": 184.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV112",
-   "x": 184.5,
-   "y": 168.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV113",
-   "x": 208.5,
-   "y": 142.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "RV114",
-   "x": 208.5,
-   "y": 168.0,
-   "rotation": 0.0,
-   "reason": "panel pot, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "ENC102",
-   "x": 64.5,
-   "y": 164.0,
-   "rotation": 180.0,
-   "reason": "panel encoder, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "ENC103",
-   "x": 88.5,
-   "y": 164.0,
-   "rotation": 180.0,
-   "reason": "panel encoder, panel grid: 8 columns at 24 mm pitch x 64.5..232.5, rows y 115 (toggles), 142 (pots), 164 (encoders), 168 (pots); owner 2026-10-02, never moved by the layout passes"
-  },
-  {
-   "ref": "ENC101",
-   "x": 173.942,
-   "y": 78.0,
-   "rotation": 180.0,
-   "reason": "menu encoder beside the OLED, owner 2026-10-02"
-  },
-  {
-   "ref": "SWBYPASS1",
-   "x": 64.5,
-   "y": 70.0,
-   "rotation": 90.0,
-   "reason": "bypass toggle on the outer left 24 mm column (commit 458ea98), owner 2026-10-02"
-  },
-  {
-   "ref": "RVGAIN1",
-   "x": 232.5,
-   "y": 72.0,
-   "rotation": 0.0,
-   "reason": "GAIN pot on the outer right 24 mm column (commit 458ea98), owner 2026-10-02"
-  },
-  {
-   "ref": "J117",
-   "x": 135.785,
-   "y": 80.0,
-   "rotation": 0.0,
-   "reason": "1.3 in OLED header, window position chosen by the owner, owner 2026-10-02"
-  },
-  {
-   "ref": "J1",
-   "x": 125.39,
-   "y": 33.71,
-   "rotation": 180.0,
-   "reason": "USB-C on the rear edge, mouth -y, JLC-assembled F.Cu; owner position"
-  },
-  {
-   "ref": "J101",
-   "x": 190.0,
-   "y": 44.2,
-   "rotation": 0.0,
-   "reason": "XLR/TRS combo on the rear edge, B.Cu hand-soldered; owner column, shifted +x by the layout lead for the console rear plate (spec item 27, 2026-10-02)"
-  },
-  {
-   "ref": "J108",
-   "x": 72.5,
-   "y": 37.0,
-   "rotation": 90.0,
-   "reason": "1/4 in output jack on the rear edge, B.Cu hand-soldered; owner column, shifted by the layout lead for the console rear plate (spec item 27, 2026-10-02)"
-  },
-  {
-   "ref": "J106",
-   "x": 232.0,
-   "y": 37.0,
-   "rotation": -90.0,
-   "reason": "9 V barrel on the rear edge, B.Cu hand-soldered; owner position"
-  },
-  {
-   "ref": "H101",
-   "x": 53.5,
-   "y": 35.0,
-   "rotation": 0.0,
-   "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
-  },
-  {
-   "ref": "H102",
-   "x": 243.5,
-   "y": 35.0,
-   "rotation": 0.0,
-   "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
-  },
-  {
-   "ref": "H103",
-   "x": 53.5,
-   "y": 175.0,
-   "rotation": 0.0,
-   "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
-  },
-  {
-   "ref": "H104",
-   "x": 243.5,
-   "y": 175.0,
-   "rotation": 0.0,
-   "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
-  }
- ],
- "parts": null,
- "clusters": [
-  {
-   "name": "usb_esd",
-   "function": "USBLC6 D2 at J1 on the pair before any stub, VBUS bypass C18, CC pulldowns R4/R5, VBUS sense divider R6/R7 (canon 60)",
-   "anchor": "J1",
-   "members": [
-    "D2",
-    "C18",
-    "R4",
-    "R5",
-    "R6",
-    "R7"
-   ],
-   "rotation_rule": "D2 pins 1/6 on the DP/DM pair toward J1; passives signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null,
-   "side": "bottom"
-  },
-  {
-   "name": "input_9v",
-   "function": "reverse Schottky D106 and TVS D105 at the barrel, before the buck (canon 60, 81)",
-   "anchor": "J106",
-   "members": [
-    "D106",
-    "D105"
-   ],
-   "rotation_rule": "cathodes toward the buck, one orientation (canon 33)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "buck5_in",
-   "function": "AP63205 input caps C112/C113 at VIN in the tightest loop with GND (canon 36), bootstrap C116 at BST/SW",
-   "anchor": "U103",
-   "members": [
-    "C112",
-    "C113",
-    "C116"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "buck5_out",
-   "function": "L101 at SW, output caps C114/C115, bulk C19 on 5V; switch node short (canon 26)",
-   "anchor": "U103",
-   "members": [
-    "L101",
-    "C114",
-    "C115",
-    "C19"
-   ],
-   "rotation_rule": "L101 SW pad toward U103 pin 5; caps signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "buck33_in",
-   "function": "AP63203 input cap C20 at VIN, bootstrap C23 (canon 36)",
-   "anchor": "U3",
-   "members": [
-    "C20",
-    "C23"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "buck33_out",
-   "function": "L1 at SW, 3V3 output caps C21/C22",
-   "anchor": "U3",
-   "members": [
-    "L1",
-    "C21",
-    "C22"
-   ],
-   "rotation_rule": "L1 SW pad toward U3 pin 5; caps signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "ldo_3v3a",
-   "function": "TLV75533 input C24 and output C25 on the pin",
-   "anchor": "U4",
-   "members": [
-    "C24",
-    "C25"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "analog_rail",
-   "function": "5V to 5VA ferrite FB101 and its 10 uF C117, the single fan-out point for the analog rail (canon 70); VA_SENSE divider R151/R152/C163 reads 5VA here",
-   "anchor": "FB101",
-   "members": [
-    "C117",
-    "R151",
-    "R152",
-    "C163"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "pwr_led",
-   "function": "power LED D3 with R10 on 3V3",
-   "anchor": "U3",
-   "members": [
-    "D3",
-    "R10"
-   ],
-   "rotation_rule": "D3 cathode toward GND, R10 inline",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "hse_crystal",
-   "function": "25 MHz Y1 at U1 pins 12/13 with C15/C16 flanking symmetrically and R1 in series at pin 13; nothing under it on any layer (canon 35, 59)",
-   "anchor": "U1",
-   "members": [
-    "Y1",
-    "C15",
-    "C16",
-    "R1"
-   ],
-   "rotation_rule": "Y1 pins 1/3 toward U1 pins 12/13; C15/C16 ground pads outward, mirror images",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null,
-   "side": "left"
-  },
-  {
-   "name": "vdd_decap_west",
-   "function": "VDD pins 6/11: C2/C3 100n and C56/C57 10n pin to pin (canon 32, 62)",
-   "anchor": "U1",
-   "members": [
-    "C2",
-    "C3",
-    "C56",
-    "C57"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null,
-   "side": "left"
-  },
-  {
-   "name": "vdda",
-   "function": "VDDA pins 20/21: FB1 from 3V3A, C8/C10 1u and C9/C11 100n at the pins (canon 32, 70)",
-   "anchor": "U1",
-   "members": [
-    "FB1",
-    "C8",
-    "C9",
-    "C10",
-    "C11"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null,
-   "side": "left"
-  },
-  {
-   "name": "vdd_decap_south",
-   "function": "VDD pins 27/50 and VCAP1 pin 48: C4/C7 100n, C12 2.2u, C58/C59 10n, C31 100n",
-   "anchor": "U1",
-   "members": [
-    "C4",
-    "C7",
-    "C12",
-    "C31",
-    "C58",
-    "C59"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null,
-   "side": "bottom"
-  },
-  {
-   "name": "vdd_decap_east",
-   "function": "VDD pin 75 and VCAP2 pin 73: C5 100n, C13 2.2u, C61 10n, C6 4.7u and C32 10u bulk",
-   "anchor": "U1",
-   "members": [
-    "C5",
-    "C13",
-    "C61",
-    "C6",
-    "C32"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null,
-   "side": "right"
-  },
-  {
-   "name": "vdd_decap_north",
-   "function": "VDD pin 100: C1 100n",
-   "anchor": "U1",
-   "members": [
-    "C1"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null,
-   "side": "top"
-  },
-  {
-   "name": "clock_source_termination",
-   "function": "R27 at U1.1 (ADC_SCKI_SRC) and R29 at U1.4 (I2S_BCLK_SRC): source termination within 3 mm of the driver pin (canon 50)",
-   "anchor": "U1",
-   "members": [
-    "R27",
-    "R29"
-   ],
-   "rotation_rule": "pad 1 on the U1 pin, pad 2 outward toward the codec",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null,
-   "side": "left"
-  },
-  {
-   "name": "mux_adc_rc",
-   "function": "R30/C55, the pot-mux ADC input RC at U1 pin 15 (anti-alias at the ADC, canon 77)",
-   "anchor": "U1",
-   "members": [
-    "R30",
-    "C55"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null,
-   "side": "left"
-  },
-  {
-   "name": "reset_boot",
-   "function": "SWRESET1 with C14 at NRST pin 14; SWBOOT1 with R2 at BOOT0 pin 94",
-   "anchor": "U1",
-   "members": [
-    "SWRESET1",
-    "C14",
-    "SWBOOT1",
-    "R2"
-   ],
-   "rotation_rule": "switch pads toward their U1 pin; C14/R2 signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "swd",
-   "function": "Tag-Connect TC2030 J3, on the SWDIO/SWCLK side (pins 72/76), footprint clear of everything so the pogo clip seats (canon 95)",
-   "anchor": "U1",
-   "members": [
-    "J3"
-   ],
-   "rotation_rule": {
-    "fixed_deg": -90
-   },
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null,
-   "side": "right"
-  },
-  {
-   "name": "user_led",
-   "function": "USER LED D1 with R3 on pin 88",
-   "anchor": "U1",
-   "members": [
-    "D1",
-    "R3"
-   ],
-   "rotation_rule": "D1 cathode toward GND, R3 inline toward pin 88",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null,
-   "side": "top"
-  },
-  {
-   "name": "mic_input_p",
-   "function": "hot leg of the mic input: R101 47 R from XLR 2, D107 clamp, C119 100 p, R144 100 k bleed, C120 47 u coupling, R103 1.2 k bias to VREF; stamped mirror of mic_input_n (canon 41)",
-   "anchor": "U104",
-   "members": [
-    "R101",
-    "D107",
-    "C119",
-    "R144",
-    "C120",
-    "R103"
-   ],
-   "rotation_rule": "signal flow J101 toward U104 pin 3; one orientation, polarity marks one way (canon 33, 89)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "mic_input_n",
-   "function": "cold leg of the mic input: R104, D108, C123, R145, C124, R106; same row geometry as mic_input_p one pitch over (canon 41, 108)",
-   "anchor": "U104",
-   "members": [
-    "R104",
-    "D108",
-    "C123",
-    "R145",
-    "C124",
-    "R106"
-   ],
-   "rotation_rule": "identical to mic_input_p",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "trs_input",
-   "function": "TRS leg: C121/C125 10 u coupling, R102/R105 22 k pad into IN_P/IN_N, R148/R149 100 k bleed on TRS_T/TRS_R; two mirrored legs (canon 41)",
-   "anchor": "U104",
-   "members": [
-    "C121",
-    "C125",
-    "R102",
-    "R105",
-    "R148",
-    "R149"
-   ],
-   "rotation_rule": "signal flow J101 toward U104; legs mirrored",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "ina_stage1",
-   "function": "OPA2197 U104 instrumentation front end: Rf R108/R110 4.53 k, RG R109 1 k with C158 22 u bipolar, C128/C129 47 p, C118 5VA decap at pin 8; feedback nodes tiny and symmetric (canon 41, 79)",
-   "anchor": "U104",
-   "members": [
-    "R108",
-    "R110",
-    "R109",
-    "C158",
-    "C128",
-    "C129",
-    "C118"
-   ],
-   "rotation_rule": "feedback parts pad to pad on the U104 pin they serve; C118 signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "diff_amp",
-   "function": "U105-A difference amplifier: R111/R112/R113/R114 10 k 0.1 % matched quad, C127 5VA decap at pin 8 (canon 41, 79)",
-   "anchor": "U105",
-   "members": [
-    "R111",
-    "R112",
-    "R113",
-    "R114",
-    "C127"
-   ],
-   "rotation_rule": "R111/R113 on the input side, R112/R114 on the output side, all one orientation",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "stage2_gain",
-   "function": "U105-B gain stage: RVGAIN1 as feedback, R116 330 R and C159 100 u to GND at G2_RG, C132 47 p across the pot; inverting node tiny (canon 79)",
-   "anchor": "U105",
-   "members": [
-    "R116",
-    "C159",
-    "C132"
-   ],
-   "rotation_rule": "R116 pad 1 on U105 pin 6, C159 ground pad outward",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "adc_input",
-   "function": "PRE_OUT to the PCM1808: R119 100 R, C136 2.2 n, C137 10 u into VINL, C138 10 u on VINR to GND; anti-alias at the ADC (canon 77)",
-   "anchor": "U8",
-   "members": [
-    "R119",
-    "C136",
-    "C137",
-    "C138"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "adc_supply",
-   "function": "PCM1808 rails: R20 10 R from 5VA, C134 before it, C44 22 u/C45 100 n on ADC_VCC pin 3, C48/C49 on VREF pin 1, C46/C47 on 3V3 pin 4 (canon 32, 66)",
-   "anchor": "U8",
-   "members": [
-    "R20",
-    "C134",
-    "C44",
-    "C45",
-    "C48",
-    "C49",
-    "C46",
-    "C47"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "dac_supply",
-   "function": "PCM5102A rails: C101/C111 on 3V3A pins 1/8, C33 LDOO pin 18, C34 CAPP/CAPM pins 2/4, C35 VNEG pin 5, R16 XSMT pull-down (canon 32)",
-   "anchor": "U6",
-   "members": [
-    "C101",
-    "C111",
-    "C33",
-    "C34",
-    "C35",
-    "R16"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "dac_output",
-   "function": "DAC_OUTL to the relay: R147 470 R, C161 2.2 n, C139 10 u, R122/R123 10 k/15 k to VREF (DAC_ATT); flows from U6 toward K101",
-   "anchor": "U6",
-   "members": [
-    "R147",
-    "C161",
-    "C139",
-    "R122",
-    "R123"
-   ],
-   "rotation_rule": "signal flow U6 pin 6 toward K101 pin 4, polarity one way",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "vref",
-   "function": "VREF: R117/R118 divider with C135, U106-A follower, R146 22 R and C160 10 u, C130 5VA decap at pin 8; one fan-out point for VREF (canon 70)",
-   "anchor": "U106",
-   "members": [
-    "R117",
-    "R118",
-    "C135",
-    "R146",
-    "C160",
-    "C130"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "output_buffer",
-   "function": "U106-B unity buffer: R124 100 R, C141 10 u, R125 100 k on OUT_AC toward K102",
-   "anchor": "U106",
-   "members": [
-    "R124",
-    "C141",
-    "R125"
-   ],
-   "rotation_rule": "signal flow U106 pin 7 toward K102 pin 3",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "bypass_relay",
-   "function": "K101 bypass relay: D104 flyback on the coil, R120 pull-up and C162 filter on FX_ON_SENSE (pole B dry contact)",
-   "anchor": "K101",
-   "members": [
-    "D104",
-    "R120",
-    "C162"
-   ],
-   "rotation_rule": "D104 cathode toward the coil + pin; R120/C162 signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "mute_relay",
-   "function": "K102 output mute relay and its driver Q101, R150 base, R153 pull-down, D109 flyback",
-   "anchor": "K102",
-   "members": [
-    "Q101",
-    "R150",
-    "R153",
-    "D109"
-   ],
-   "rotation_rule": "Q101 collector pad toward the coil; D109 cathode toward 5V",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "toggle_pullups",
-   "function": "R134..R141 10 k pull-ups on TOGGLE1..8, one per column under its toggle, pitch 24",
-   "anchor": "SW101",
-   "members": [
-    "R134",
-    "R135",
-    "R136",
-    "R137",
-    "R138",
-    "R139",
-    "R140",
-    "R141"
-   ],
-   "rotation_rule": "3V3 pad outward, signal pad toward the toggle",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": 24.0,
-   "side": "bottom"
-  },
-  {
-   "name": "toggle_filters",
-   "function": "C150..C157 100 n on TOGGLE1..8, one per column beside its pull-up, pitch 24",
-   "anchor": "SW101",
-   "members": [
-    "C150",
-    "C151",
-    "C152",
-    "C153",
-    "C154",
-    "C155",
-    "C156",
-    "C157"
-   ],
-   "rotation_rule": "signal pad toward the toggle, ground pad outward",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": 24.0,
-   "side": "bottom"
-  },
-  {
-   "name": "enc_key_rc",
-   "function": "ENC102 (KEY) pull-ups R130/R131 and filters C146/C147",
-   "anchor": "ENC102",
-   "members": [
-    "R130",
-    "R131",
-    "C146",
-    "C147"
-   ],
-   "rotation_rule": "signal pads toward the encoder A/B pins",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "enc_semi_rc",
-   "function": "ENC103 (SEMI) pull-ups R132/R133 and filters C148/C149, stamped from enc_key_rc (canon 108)",
-   "anchor": "ENC103",
-   "members": [
-    "R132",
-    "R133",
-    "C148",
-    "C149"
-   ],
-   "rotation_rule": "identical to enc_key_rc",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "enc_menu_rc",
-   "function": "ENC101 (MENU) pull-ups R127/R128/R129 and filters C143/C144/C145 including the push switch",
-   "anchor": "ENC101",
-   "members": [
-    "R127",
-    "R128",
-    "R129",
-    "C143",
-    "C144",
-    "C145"
-   ],
-   "rotation_rule": "signal pads toward the encoder pins",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "pot_mux",
-   "function": "CD74HC4067 U101 with C27/C28 on 3V3A pin 24 and the R126/C142 output RC on MUX_COM",
-   "anchor": "U101",
-   "members": [
-    "C27",
-    "C28",
-    "R126",
-    "C142"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "column"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "pot_supply",
-   "function": "C29/C30 3V3A decoupling at the pot rows, the far end of the 3V3A pot feed",
-   "anchor": "RV111",
-   "members": [
-    "C29",
-    "C30"
-   ],
-   "rotation_rule": "signal pad toward the anchor's served pin, ground pad outward toward its own via (canon 32, 68)",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  },
-  {
-   "name": "i2c_pullups",
-   "function": "R142/R143 4.7 k I2C1 pull-ups, one pair on the bus near the OLED header",
-   "anchor": "J117",
-   "members": [
-    "R142",
-    "R143"
-   ],
-   "rotation_rule": "3V3 pad outward, signal pad toward J117",
-   "axis": {
-    "kind": "row"
-   },
-   "pitch_mm": null
-  }
- ],
- "sections": [
-  {
-   "name": "rear_io",
-   "function": "the rear wall: USB-C, combo in, 1/4 in out, 9 V barrel, with ESD and input protection at the connectors",
-   "anchor": "J101",
-   "members": [
-    "J1",
-    "J101",
-    "J106",
-    "J108"
-   ],
-   "clusters": [
-    "usb_esd",
-    "input_9v"
-   ]
-  },
-  {
-   "name": "power",
-   "function": "9 V to 5 V buck, 5 V to 3V3 buck, 3V3A LDO, 5VA ferrite fan-out, power LED",
-   "anchor": "U103",
-   "members": [
-    "U103",
-    "U3",
-    "U4",
-    "FB101"
-   ],
-   "clusters": [
-    "buck5_in",
-    "buck5_out",
-    "buck33_in",
-    "buck33_out",
-    "ldo_3v3a",
-    "analog_rail",
-    "pwr_led"
-   ]
-  },
-  {
-   "name": "mcu",
-   "function": "STM32H743 with crystal, decoupling, reset/boot, SWD, clock source terminations",
-   "anchor": "U1",
-   "members": [
-    "U1"
-   ],
-   "clusters": [
-    "hse_crystal",
-    "vdd_decap_west",
-    "vdda",
-    "vdd_decap_south",
-    "vdd_decap_east",
-    "vdd_decap_north",
-    "clock_source_termination",
-    "mux_adc_rc",
-    "reset_boot",
-    "swd",
-    "user_led"
-   ]
-  },
-  {
-   "name": "preamp",
-   "function": "mic and TRS input networks, OPA2197 INA stage 1, difference amp and pot-controlled stage 2 at RVGAIN1",
-   "anchor": "U104",
-   "members": [
-    "U104",
-    "U105",
-    "RVGAIN1"
-   ],
-   "clusters": [
-    "mic_input_p",
-    "mic_input_n",
-    "trs_input",
-    "ina_stage1",
-    "diff_amp",
-    "stage2_gain"
-   ]
-  },
-  {
-   "name": "codec",
-   "function": "PCM1808 ADC with its anti-alias filter, PCM5102A DAC with its output filter, VREF and output buffer",
-   "anchor": "U8",
-   "members": [
-    "U8",
-    "U6",
-    "U106"
-   ],
-   "clusters": [
-    "adc_input",
-    "adc_supply",
-    "dac_supply",
-    "dac_output",
-    "vref",
-    "output_buffer"
-   ]
-  },
-  {
-   "name": "output",
-   "function": "K101 bypass relay and K102 mute relay with their drivers, fed from the panel bypass toggle",
-   "anchor": "K101",
-   "members": [
-    "K101",
-    "K102",
-    "SWBYPASS1"
-   ],
-   "clusters": [
-    "bypass_relay",
-    "mute_relay"
-   ]
-  },
-  {
-   "name": "display",
-   "function": "1.3 in OLED header and the I2C pull-ups",
-   "anchor": "J117",
-   "members": [
-    "J117"
-   ],
-   "clusters": [
-    "i2c_pullups"
-   ]
-  },
-  {
-   "name": "control",
-   "function": "the player's panel: eight toggles, fourteen pots, three encoders, the pot mux and every panel RC",
-   "anchor": "SW101",
-   "members": [
-    "SW101",
-    "SW102",
-    "SW103",
-    "SW104",
-    "SW105",
-    "SW106",
-    "SW107",
-    "SW108",
-    "RV101",
-    "RV102",
-    "RV103",
-    "RV104",
-    "RV105",
-    "RV106",
-    "RV107",
-    "RV108",
-    "RV109",
-    "RV110",
-    "RV111",
-    "RV112",
-    "RV113",
-    "RV114",
-    "ENC101",
-    "ENC102",
-    "ENC103",
-    "U101"
-   ],
-   "clusters": [
-    "toggle_pullups",
-    "toggle_filters",
-    "enc_key_rc",
-    "enc_semi_rc",
-    "enc_menu_rc",
-    "pot_mux",
-    "pot_supply"
-   ]
-  },
-  {
-   "name": "mechanical",
-   "function": "the four M3 corner holes",
-   "anchor": "H101",
-   "members": [
-    "H101",
-    "H102",
-    "H103",
-    "H104"
-   ],
-   "clusters": []
-  }
- ],
- "flow": {
-  "axis": "+y",
-  "order": [
-   "rear_io",
-   "power",
-   "mcu",
-   "display",
-   "preamp",
-   "codec",
-   "output",
-   "control"
-  ]
- },
- "grids": {
-  "board_mm": {
-   "value": 1.0,
-   "source": "canon 105 run default: section anchors on whole millimetres; the owner's panel rows already sit on whole mm (y 115/142/164/168, x 64.5+24n)"
-  },
-  "block_mm": {
-   "value": 0.5,
-   "source": "canon 105 run default: part grid inside a section, half the board grid"
-  }
- },
- "currents": {
-  "/VIN_9V": 0.27,
-  "/5V": 0.43,
-  "/h7core_block/VBUS": 0.43,
-  "/GND": 0.43,
-  "/3V3": 0.41,
-  "/3V3A": 0.06,
-  "/h7core_block/VDDA": 0.01,
-  "/h7core_block/ADC_VCC": 0.02,
-  "/5VA": 0.08,
-  "/VREF": 0.001,
-  "/9V_JACK": 0.27
- },
- "fab": {
-  "vendor": "JLCPCB",
-  "table": {
-   "min_track_mm": 0.15,
-   "min_clearance_mm": 0.15,
-   "min_via_mm": 0.6,
-   "min_drill_mm": 0.3,
-   "min_annular_mm": 0.15,
-   "edge_clearance_mm": 0.5,
-   "hole_clearance_mm": 0.25,
-   "pth_annular_mm": 0.2
-  },
-  "layers": 4,
-  "source": "fxbox brief <commit 48f1e82>; foreman/fab/jlcpcb.json, 4-layer recommended set (fetched 2026-09-02 from jlcpcb.com/capabilities). 1 oz outer copper; the AP63203 \"2 oz suggested\" is not taken.",
-  "layers_source": "4 copper layers, owner-confirmed 2026-09-24. Board written by foreman board init --layers 4 (foreman 0.2.15, ClaudeRouter main 675150a, register E0012); copper layer list read back in facts ledger 0014.",
-  "stackup": {
-   "assumed": "JLC04161H-7628 (1.6 mm, 7628 prepreg ~0.2 mm outer-to-plane, ~1.065 mm core)",
-   "status": "NOT VERIFIED; confirm the ordered stackup before any impedance width is set",
-   "source": "Codex outside review 2026-09-26, /Users/j/Documents/Claude/Projects/Teensy-H7-Port/hardware/fxbox/docs/FXBOX_PCB_ROUTING_RULES_2026-09-26.md; premises checked against the netlist by the run lead 2026-09-26."
-  }
- },
- "assembly": {
-  "sides": "top",
-  "min_stock": null,
-  "source": "fxbox brief <commit 48f1e82>; fxbox 01 section 5; top only constrains parts, never copper. Owner 2026-10-02: JLC assembles the top side only (single-sided Economic). J101 combo jack, J108 1/4in out and J106 barrel jack sit on B.Cu, hand-soldered by the owner, excluded from JLC BOM/CPL; the combo jack's 25 mm flange cannot clear the 11.8 mm top panel on F.Cu. USB-C J1 stays F.Cu, JLC-assembled."
- },
- "board": {
-  "width_mm": 200,
-  "height_mm": 150,
-  "outline_source": "owner 2026-10-02 pm: 200 x 150 mm for now. Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player. Rear wall left to right as seen from the front: 1/4in out, USB-C middle, XLR combo, 9 V barrel far right; every jack mouth faces the rear edge (-y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4in nose 6 mm). Knob positions are the owner's to lay out. Still provisional until Adam confirms."
- },
- "enclosure": {
-  "notes": "Spec: one board inside a 3D printed box; pots, encoders, toggles and OLED header stand up through the top; combo jack, 1/4in out jack, barrel and USB-C are right-angle THT out the rear wall. Connector positions, holes, height limits: OWNER.",
-  "walls": {
-   "back": "through"
-  },
-  "openings": null,
-  "screws": null,
-  "print": null
- },
- "barriers": null,
- "thermal": null,
- "test_points": null,
- "fiducials": {
-  "count": null,
-  "placement": null
- },
- "silk": {
-  "refdes": null
- },
- "budgets": {
-  "gap_minutes": {
-   "value": 10,
-   "source": "step8 defaults (owner 2026-09-05)"
-  },
-  "declarations_per_accept": {
-   "value": 2,
-   "source": "step8 defaults (owner 2026-09-05)"
-  },
-  "python_lines_outside_tool": {
-   "value": 200,
-   "source": "step8 defaults (owner 2026-09-05)"
-  },
-  "runlog_bytes": {
-   "value": null,
-   "source": "step8 defaults (owner 2026-09-05)"
-  },
-  "pass_minutes": {
-   "value": null,
-   "source": "step8 defaults (owner 2026-09-05)"
-  }
- },
- "schema": 2,
- "edge_connectors": [
-  {
-   "ref": "J1",
-   "edge": "top",
-   "mating_axis": "+y",
-   "mating_axis_confirmed": false,
-   "overhang_mm": {
-    "value": 1.645,
-    "source": "courtyard top y 28.355 against the outline y 30.0 (board file 2026-10-02); the spec says the USB-C shell sits 1.5 proud, the 0.145 difference is courtyard margin"
-   },
-   "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
-  },
-  {
-   "ref": "J101",
-   "edge": "top",
-   "mating_axis": "-y",
-   "mating_axis_confirmed": false,
-   "overhang_mm": {
-    "value": 6.915,
-    "source": "courtyard top y 23.085 against the outline y 30.0; the combo flange and barrel stand proud through the rear plate (spec item 27)"
-   },
-   "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
-  },
-  {
-   "ref": "J106",
-   "edge": "top",
-   "mating_axis": "-x",
-   "mating_axis_confirmed": false,
-   "overhang_mm": {
-    "value": 4.045,
-    "source": "courtyard top y 25.955 against the outline y 30.0; PJ-002A barrel body proud through the rear plate"
-   },
-   "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
-  },
-  {
-   "ref": "J108",
-   "edge": "top",
-   "mating_axis": "+x",
-   "mating_axis_confirmed": false,
-   "overhang_mm": {
-    "value": 6.565,
-    "source": "courtyard top y 23.435 against the outline y 30.0; NMJ6HCD2 nose and nut proud through the rear plate"
-   },
-   "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
-  }
- ],
- "floors": {
-  "body_gap_mm": {
-   "value": 0.3,
-   "source": "fxbox brief <commit 48f1e82>; run default (h7core 2026-09-24), no owner number given; same value as the noisemaker brief"
-  },
-  "cluster_link_cost_mm": {
-   "value": 5.0,
-   "source": "fxbox brief <commit 48f1e82>; run default (h7core 2026-09-24), no owner number given; placement-engine weight, not a dimension"
-  },
-  "section_gap_mm": {
-   "value": 3.0,
-   "source": "draft 2026-10-02: 200 x 150 board with eight sections; 3.0 mm clear board between blocks is ten body gaps and reads as a block boundary on the render (canon 106); supersedes fxbox's 1.5, which was sized for a 30 mm deep block"
-  }
- },
- "questions": [
-  {
-   "field": "purpose",
-   "required": true,
-   "shape": "str",
-   "question": "What is the board for? One sentence, written before any part is chosen: what it does, what plugs into it, what powers it."
-  },
-  {
-   "field": "classification.critical",
-   "required": true,
-   "shape": "list",
-   "question": "Which nets are critical, and what numeric gate does each carry (max_length_mm, max_vias)?"
-  },
-  {
-   "field": "classification.pairs",
-   "required": true,
-   "shape": "list",
-   "question": "Which differential pairs exist: name, two leg nets, max_mismatch_mm, and width_mm/gap_mm if known?"
-  },
-  {
-   "field": "classification.power",
-   "required": true,
-   "shape": "list",
-   "question": "Which nets are power or ground?"
-  },
-  {
-   "field": "classification.layers",
-   "required": true,
-   "shape": "dict",
-   "question": "What role does each copper layer play: signal, ground, power, mixed?"
-  },
-  {
-   "field": "fixed_parts",
-   "required": false,
-   "shape": "list",
-   "question": "Which parts are fixed by the enclosure or the owner: ref, x, y, rotation, reason?"
-  },
-  {
-   "field": "parts",
-   "required": false,
-   "shape": "list",
-   "question": "The part rows (canon 102): ref, function, and attributes {pins, gangs, lugs, value, taper, mounting (smd|tht), pin_diameter_mm} as the brief specifies them. The parts pass compares the chosen part's catalogue attributes and vendor pad count against each row; a pad-count mismatch blocks placement."
-  },
-  {
-   "field": "clusters",
-   "required": false,
-   "shape": "list",
-   "question": "Which clusters do you already want: name, members, the rule that places them?"
-  },
-  {
-   "field": "sections",
-   "required": false,
-   "shape": "list",
-   "question": "Which functional sections does the board divide into (canon 104): name, function, anchor (the section's immovable ref), the clusters it owns, extra members, and grid_mm if the block grid differs from grids.block_mm?"
-  },
-  {
-   "field": "flow",
-   "required": false,
-   "shape": "dict",
-   "question": "Signal-flow order across sections (canon 107): axis (+x/-x/+y/-y) and order (section names, first to last)?"
-  },
-  {
-   "field": "grids",
-   "required": false,
-   "shape": "dict",
-   "question": "The grid hierarchy (canon 105), each {value, source}: board_mm (section anchors sit on it) and block_mm (the default part grid inside a section)?"
-  },
-  {
-   "field": "currents",
-   "required": true,
-   "shape": "dict",
-   "question": "What current does each power net carry, in amps?"
-  },
-  {
-   "field": "fab.vendor",
-   "required": true,
-   "shape": "str",
-   "question": "Which fab and assembler? (JLCPCB is the default)"
-  },
-  {
-   "field": "fab.table",
-   "required": true,
-   "shape": "dict",
-   "question": "Confirm the capability table: min_track_mm, min_clearance_mm, min_via_mm, min_drill_mm, min_annular_mm, edge_clearance_mm, hole_clearance_mm."
-  },
-  {
-   "field": "assembly.sides",
-   "required": true,
-   "shape": "str",
-   "question": "Parts on top only, or both sides? (top is the default)"
-  },
-  {
-   "field": "assembly.min_stock",
-   "required": false,
-   "shape": "num",
-   "question": "The assembler stock floor per part: a part whose catalogue stock is under it is flagged out_of_stock. A whole number, default 1 (only zero stock is flagged)."
-  },
-  {
-   "field": "board.width_mm",
-   "required": true,
-   "shape": "num",
-   "question": "Board width in mm?"
-  },
-  {
-   "field": "board.height_mm",
-   "required": true,
-   "shape": "num",
-   "question": "Board height in mm?"
-  },
-  {
-   "field": "board.outline_source",
-   "required": false,
-   "shape": "str",
-   "question": "Where does the outline come from: enclosure drawing, a size target, existing Edge.Cuts?"
-  },
-  {
-   "field": "enclosure.notes",
-   "required": false,
-   "shape": "str",
-   "question": "Enclosure facts: connector positions, holes, LED windows, height limits?"
-  },
-  {
-   "field": "enclosure.walls",
-   "required": false,
-   "shape": "dict",
-   "question": "Which walls carry connectors (canon 113): left, right, front, back, each through (bisected at the seam, half-cradle), window (recessed part, closed opening) or blank?"
-  },
-  {
-   "field": "enclosure.openings",
-   "required": false,
-   "shape": "list",
-   "question": "Openings beyond the connectors (canon 119): ref, kind (button_pin|led_window|slot), why. An empty list means none; nothing is opened without a row."
-  },
-  {
-   "field": "enclosure.screws",
-   "required": false,
-   "shape": "dict",
-   "question": "Screw scheme (recipe 4): size (M3), scheme (sandwich|board_only), insert (heat_set|thread_forming)?"
-  },
-  {
-   "field": "enclosure.print",
-   "required": false,
-   "shape": "dict",
-   "question": "Printer floor (recipe 6): nozzle_mm, layer_mm, filament, bed_mm [x, y]?"
-  },
-  {
-   "field": "barriers",
-   "required": false,
-   "shape": "list",
-   "question": "Isolation barriers: name, nets on side A, nets on side B, gap_mm?"
-  },
-  {
-   "field": "thermal",
-   "required": false,
-   "shape": "list",
-   "question": "Parts that dissipate: ref, watts, note?"
-  },
-  {
-   "field": "test_points",
-   "required": false,
-   "shape": "list",
-   "question": "Nets that need test access?"
-  },
-  {
-   "field": "fiducials.count",
-   "required": false,
-   "shape": "num",
-   "question": "How many fiducials, if the assembler wants them?"
-  },
-  {
-   "field": "fiducials.placement",
-   "required": false,
-   "shape": "str",
-   "question": "Where: corners, diagonal, none?"
-  },
-  {
-   "field": "silk.refdes",
-   "required": false,
-   "shape": "bool",
-   "question": "Reference designators on the silkscreen?"
-  },
-  {
-   "field": "budgets",
-   "required": false,
-   "shape": "dict",
-   "question": "Per-pass budgets in minutes and tokens, if you want limits?"
-  },
-  {
-   "field": "schema",
-   "required": false,
-   "shape": "num",
-   "question": "Brief schema version: 2 opts into the placement engine's strict validation."
-  },
-  {
-   "field": "edge_connectors",
-   "required": false,
-   "shape": "list",
-   "question": "Edge connectors: ref, edge, mating_axis (the FOOTPRINT'S LOCAL axis of the mouth, +x/-x/+y/-y, verified against the physical part), overhang_mm {value, source}, mouth_tolerance_mm (optional, default 0.5mm -- how far the model's mouth face may sit off the declared edge before gate edge_connector_mouth_at_edge fails), and along_mm {value, source} when two parts share an edge?"
-  },
-  {
-   "field": "floors",
-   "required": false,
-   "shape": "dict",
-   "question": "Placement floors, each {value, source}: body_gap_mm, cluster_link_cost_mm, fastener_clear_mm, section_gap_mm, edge_clear_mm (optional, default 0.0mm -- how far a courtyard must clear the outline for the enclosure wall; gate courtyard_inside_outline reads it). A floor cites a fab field, an assembler minimum, or an owner decision verbatim."
-  }
- ],
- "currents_source": "All estimates, not measured. 3V3 0.41 A: H7 ~350 mA at 480 MHz (STM32H743 datasheet typical) + OLED 25 mA + flash 20 mA + mux and logic 10 mA = 405 mA, estimate. 3V3A 0.06 A: codecs ~60 mA, pots negligible, estimate. 5V 0.43 A: relay coil 21 mA (5 V / 237 ohm) + op-amps ~20 mA + PCM1808 VCC ~15 mA + 3V3 buck input (0.405 A x 3.3 V / 0.85 / 5 V = 314 mA) + 3V3A LDO input 60 mA, estimate. VIN_9V 0.27 A: 5 V rail 0.43 A x 5 V / 0.90 buck efficiency / 9 V = 0.265 A, estimate. VBUS carries only the USBLC6 and the 33k/82k sense divider (9 V only, spec item 12), its 0.43 figure is a width placeholder; 9V_JACK is the same current as VIN_9V (SS34 in series); GND takes the largest rail return (5V), all estimates. 5VA 0.08 A: 3 OPA1678 at 2 mA each (6 mA) + PCM1808 VCC 15 mA + margin, estimate; the relay coil is on 5V, not 5VA. VREF 0.001 A: divider bias only, estimate. VDDA 0.01 and ADC_VCC 0.02 A copied from fxbox brief <commit 48f1e82> (its estimates)."
+  "sections": [
+    {
+      "name": "rear_io",
+      "function": "the rear wall: USB-C, combo in, 1/4 in out, 9 V barrel, with ESD and input protection at the connectors",
+      "anchor": "J101",
+      "members": [
+        "J1",
+        "J101",
+        "J106",
+        "J108"
+      ],
+      "clusters": [
+        "usb_esd",
+        "input_9v"
+      ]
+    },
+    {
+      "name": "power",
+      "function": "9 V to 5 V buck, 5 V to 3V3 buck, 3V3A LDO, 5VA ferrite fan-out, power LED",
+      "anchor": "U103",
+      "members": [
+        "U103",
+        "U3",
+        "U4",
+        "FB101"
+      ],
+      "clusters": [
+        "buck5_in",
+        "buck5_out",
+        "buck33_in",
+        "buck33_out",
+        "ldo_3v3a",
+        "analog_rail",
+        "pwr_led"
+      ]
+    },
+    {
+      "name": "mcu",
+      "function": "STM32H743 with crystal, decoupling, reset/boot, SWD, clock source terminations",
+      "anchor": "U1",
+      "members": [
+        "U1"
+      ],
+      "clusters": [
+        "hse_crystal",
+        "vdd_decap_west",
+        "vdda",
+        "vdd_decap_south",
+        "vdd_decap_east",
+        "vdd_decap_north",
+        "clock_source_termination",
+        "mux_adc_rc",
+        "reset_boot",
+        "swd",
+        "user_led"
+      ]
+    },
+    {
+      "name": "preamp",
+      "function": "mic and TRS input networks, OPA2197 INA stage 1, difference amp and pot-controlled stage 2 at RVGAIN1",
+      "anchor": "U104",
+      "members": [
+        "U104",
+        "U105",
+        "RVGAIN1"
+      ],
+      "clusters": [
+        "mic_input_p",
+        "mic_input_n",
+        "trs_input",
+        "ina_stage1",
+        "diff_amp",
+        "stage2_gain"
+      ]
+    },
+    {
+      "name": "codec",
+      "function": "PCM1808 ADC with its anti-alias filter, PCM5102A DAC with its output filter, VREF and output buffer",
+      "anchor": "U8",
+      "members": [
+        "U8",
+        "U6",
+        "U106"
+      ],
+      "clusters": [
+        "adc_input",
+        "adc_supply",
+        "dac_supply",
+        "dac_output",
+        "vref",
+        "output_buffer"
+      ]
+    },
+    {
+      "name": "output",
+      "function": "K101 bypass relay and K102 mute relay with their drivers, fed from the panel bypass toggle",
+      "anchor": "K101",
+      "members": [
+        "K101",
+        "K102",
+        "SWBYPASS1"
+      ],
+      "clusters": [
+        "bypass_relay",
+        "mute_relay"
+      ]
+    },
+    {
+      "name": "display",
+      "function": "1.3 in OLED header and the I2C pull-ups",
+      "anchor": "J117",
+      "members": [
+        "J117"
+      ],
+      "clusters": [
+        "i2c_pullups"
+      ]
+    },
+    {
+      "name": "control",
+      "function": "the player's panel: eight toggles, fourteen pots, three encoders, the pot mux and every panel RC",
+      "anchor": "SW101",
+      "members": [
+        "SW101",
+        "SW102",
+        "SW103",
+        "SW104",
+        "SW105",
+        "SW106",
+        "SW107",
+        "SW108",
+        "RV101",
+        "RV102",
+        "RV103",
+        "RV104",
+        "RV105",
+        "RV106",
+        "RV107",
+        "RV108",
+        "RV109",
+        "RV110",
+        "RV111",
+        "RV112",
+        "RV113",
+        "RV114",
+        "ENC101",
+        "ENC102",
+        "ENC103",
+        "U101"
+      ],
+      "clusters": [
+        "toggle_pullups",
+        "toggle_filters",
+        "enc_key_rc",
+        "enc_semi_rc",
+        "enc_menu_rc",
+        "pot_mux",
+        "pot_supply"
+      ]
+    }
+  ],
+  "flow": {
+    "axis": "+y",
+    "order": [
+      "rear_io",
+      "power",
+      "output",
+      "display",
+      "preamp",
+      "mcu",
+      "codec",
+      "control"
+    ],
+    "note": "placement stop 2026-10-02: the audio path is a loop (rear jack in, preamp, codec, MCU, codec, relays, rear jack out), so the +y order is the eye's order under the owner's fixed panel: rear jacks, power row, relays, preamp, OLED, MCU, codecs, control rows. 'mechanical' (H101-H104, the four corners) is no longer a flow section; the holes stay fixed_parts. Order by anchor y: J101 44, U103 53, K101 60, J117 77.5, U104 79.5, U1 84, U8 102.5, SW101 115."
+  },
+  "grids": {
+    "board_mm": {
+      "value": 1.0,
+      "source": "canon 105 run default: section anchors on whole millimetres; the owner's panel rows already sit on whole mm (y 115/142/164/168, x 64.5+24n)"
+    },
+    "block_mm": {
+      "value": 0.5,
+      "source": "canon 105 run default: part grid inside a section, half the board grid"
+    }
+  },
+  "currents": {
+    "/VIN_9V": 0.27,
+    "/5V": 0.43,
+    "/h7core_block/VBUS": 0.43,
+    "/GND": 0.43,
+    "/3V3": 0.41,
+    "/3V3A": 0.06,
+    "/h7core_block/VDDA": 0.01,
+    "/h7core_block/ADC_VCC": 0.02,
+    "/5VA": 0.08,
+    "/VREF": 0.001,
+    "/9V_JACK": 0.27
+  },
+  "fab": {
+    "vendor": "JLCPCB",
+    "table": {
+      "min_track_mm": 0.15,
+      "min_clearance_mm": 0.15,
+      "min_via_mm": 0.6,
+      "min_drill_mm": 0.3,
+      "min_annular_mm": 0.15,
+      "edge_clearance_mm": 0.5,
+      "hole_clearance_mm": 0.25,
+      "pth_annular_mm": 0.2
+    },
+    "layers": 4,
+    "source": "fxbox brief <commit 48f1e82>; foreman/fab/jlcpcb.json, 4-layer recommended set (fetched 2026-09-02 from jlcpcb.com/capabilities). 1 oz outer copper; the AP63203 \"2 oz suggested\" is not taken.",
+    "layers_source": "4 copper layers, owner-confirmed 2026-09-24. Board written by foreman board init --layers 4 (foreman 0.2.15, ClaudeRouter main 675150a, register E0012); copper layer list read back in facts ledger 0014.",
+    "stackup": {
+      "assumed": "JLC04161H-7628 (1.6 mm, 7628 prepreg ~0.2 mm outer-to-plane, ~1.065 mm core)",
+      "status": "NOT VERIFIED; confirm the ordered stackup before any impedance width is set",
+      "source": "Codex outside review 2026-09-26, /Users/j/Documents/Claude/Projects/Teensy-H7-Port/hardware/fxbox/docs/FXBOX_PCB_ROUTING_RULES_2026-09-26.md; premises checked against the netlist by the run lead 2026-09-26."
+    }
+  },
+  "assembly": {
+    "sides": "top",
+    "min_stock": null,
+    "source": "fxbox brief <commit 48f1e82>; fxbox 01 section 5; top only constrains parts, never copper. Owner 2026-10-02: JLC assembles the top side only (single-sided Economic). J101 combo jack, J108 1/4in out and J106 barrel jack sit on B.Cu, hand-soldered by the owner, excluded from JLC BOM/CPL; the combo jack's 25 mm flange cannot clear the 11.8 mm top panel on F.Cu. USB-C J1 stays F.Cu, JLC-assembled.",
+    "hand_solder_clearance_mm": {
+      "value": 3.0,
+      "source": "owner 2026-10-02: J101, J106 and J108 are hand-soldered on B.Cu; keep every other part's courtyard this far from their pads so the iron reaches them. Written as a register reservation per connector. foreman has no floor of this name (brief check lists body_gap, cluster_link_cost, fastener_clear, section_gap, edge_clear), so it lives here and is enforced by register reservations E0047-E0049."
+    }
+  },
+  "board": {
+    "width_mm": 200,
+    "height_mm": 150,
+    "outline_source": "owner 2026-10-02 pm: 200 x 150 mm for now. Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player. Rear wall left to right as seen from the front: 1/4in out, USB-C middle, XLR combo, 9 V barrel far right; every jack mouth faces the rear edge (-y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4in nose 6 mm). Knob positions are the owner's to lay out. Still provisional until Adam confirms."
+  },
+  "enclosure": {
+    "notes": "Spec: one board inside a 3D printed box; pots, encoders, toggles and OLED header stand up through the top; combo jack, 1/4in out jack, barrel and USB-C are right-angle THT out the rear wall. Connector positions, holes, height limits: OWNER.",
+    "walls": {
+      "back": "through"
+    },
+    "openings": null,
+    "screws": null,
+    "print": null
+  },
+  "barriers": null,
+  "thermal": null,
+  "test_points": null,
+  "fiducials": {
+    "count": null,
+    "placement": null
+  },
+  "silk": {
+    "refdes": null
+  },
+  "budgets": {
+    "gap_minutes": {
+      "value": 10,
+      "source": "step8 defaults (owner 2026-09-05)"
+    },
+    "declarations_per_accept": {
+      "value": 2,
+      "source": "step8 defaults (owner 2026-09-05)"
+    },
+    "python_lines_outside_tool": {
+      "value": 200,
+      "source": "step8 defaults (owner 2026-09-05)"
+    },
+    "runlog_bytes": {
+      "value": null,
+      "source": "step8 defaults (owner 2026-09-05)"
+    },
+    "pass_minutes": {
+      "value": null,
+      "source": "step8 defaults (owner 2026-09-05)"
+    }
+  },
+  "schema": 2,
+  "edge_connectors": [
+    {
+      "ref": "J1",
+      "edge": "top",
+      "mating_axis": "+y",
+      "mating_axis_confirmed": false,
+      "overhang_mm": {
+        "value": 1.645,
+        "source": "courtyard top y 28.355 against the outline y 30.0 (board file 2026-10-02); the spec says the USB-C shell sits 1.5 proud, the 0.145 difference is courtyard margin"
+      },
+      "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
+    },
+    {
+      "ref": "J101",
+      "edge": "top",
+      "mating_axis": "-y",
+      "mating_axis_confirmed": false,
+      "overhang_mm": {
+        "value": 6.915,
+        "source": "courtyard top y 23.085 against the outline y 30.0; the combo flange and barrel stand proud through the rear plate (spec item 27)"
+      },
+      "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
+    },
+    {
+      "ref": "J106",
+      "edge": "top",
+      "mating_axis": "-x",
+      "mating_axis_confirmed": false,
+      "overhang_mm": {
+        "value": 4.045,
+        "source": "courtyard top y 25.955 against the outline y 30.0; PJ-002A barrel body proud through the rear plate"
+      },
+      "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
+    },
+    {
+      "ref": "J108",
+      "edge": "top",
+      "mating_axis": "+x",
+      "mating_axis_confirmed": false,
+      "overhang_mm": {
+        "value": 8.4,
+        "source": "PJ-611E thread 8.7 mm (HOOYA rev A2 via the fxbox parts record) less the 0.35 mm face inset; courtyard top y 21.55 against the outline y 30.0"
+      },
+      "mating_axis_note": "PJ-611E mouth at local +x per the fxbox renders and drawing (PARTS-fxbox-source.md); rot 90 on B.Cu turns it to board -y, the rear edge. Confirmed by the courtyard trial at four rotations 2026-10-02."
+    }
+  ],
+  "floors": {
+    "body_gap_mm": {
+      "value": 0.3,
+      "source": "fxbox brief <commit 48f1e82>; run default (h7core 2026-09-24), no owner number given; same value as the noisemaker brief"
+    },
+    "cluster_link_cost_mm": {
+      "value": 5.0,
+      "source": "fxbox brief <commit 48f1e82>; run default (h7core 2026-09-24), no owner number given; placement-engine weight, not a dimension"
+    },
+    "section_gap_mm": {
+      "value": 3.0,
+      "source": "draft 2026-10-02: 200 x 150 board with eight sections; 3.0 mm clear board between blocks is ten body gaps and reads as a block boundary on the render (canon 106); supersedes fxbox's 1.5, which was sized for a 30 mm deep block"
+    }
+  },
+  "questions": [
+    {
+      "field": "purpose",
+      "required": true,
+      "shape": "str",
+      "question": "What is the board for? One sentence, written before any part is chosen: what it does, what plugs into it, what powers it."
+    },
+    {
+      "field": "classification.critical",
+      "required": true,
+      "shape": "list",
+      "question": "Which nets are critical, and what numeric gate does each carry (max_length_mm, max_vias)?"
+    },
+    {
+      "field": "classification.pairs",
+      "required": true,
+      "shape": "list",
+      "question": "Which differential pairs exist: name, two leg nets, max_mismatch_mm, and width_mm/gap_mm if known?"
+    },
+    {
+      "field": "classification.power",
+      "required": true,
+      "shape": "list",
+      "question": "Which nets are power or ground?"
+    },
+    {
+      "field": "classification.layers",
+      "required": true,
+      "shape": "dict",
+      "question": "What role does each copper layer play: signal, ground, power, mixed?"
+    },
+    {
+      "field": "fixed_parts",
+      "required": false,
+      "shape": "list",
+      "question": "Which parts are fixed by the enclosure or the owner: ref, x, y, rotation, reason?"
+    },
+    {
+      "field": "parts",
+      "required": false,
+      "shape": "list",
+      "question": "The part rows (canon 102): ref, function, and attributes {pins, gangs, lugs, value, taper, mounting (smd|tht), pin_diameter_mm} as the brief specifies them. The parts pass compares the chosen part's catalogue attributes and vendor pad count against each row; a pad-count mismatch blocks placement."
+    },
+    {
+      "field": "clusters",
+      "required": false,
+      "shape": "list",
+      "question": "Which clusters do you already want: name, members, the rule that places them?"
+    },
+    {
+      "field": "sections",
+      "required": false,
+      "shape": "list",
+      "question": "Which functional sections does the board divide into (canon 104): name, function, anchor (the section's immovable ref), the clusters it owns, extra members, and grid_mm if the block grid differs from grids.block_mm?"
+    },
+    {
+      "field": "flow",
+      "required": false,
+      "shape": "dict",
+      "question": "Signal-flow order across sections (canon 107): axis (+x/-x/+y/-y) and order (section names, first to last)?"
+    },
+    {
+      "field": "grids",
+      "required": false,
+      "shape": "dict",
+      "question": "The grid hierarchy (canon 105), each {value, source}: board_mm (section anchors sit on it) and block_mm (the default part grid inside a section)?"
+    },
+    {
+      "field": "currents",
+      "required": true,
+      "shape": "dict",
+      "question": "What current does each power net carry, in amps?"
+    },
+    {
+      "field": "fab.vendor",
+      "required": true,
+      "shape": "str",
+      "question": "Which fab and assembler? (JLCPCB is the default)"
+    },
+    {
+      "field": "fab.table",
+      "required": true,
+      "shape": "dict",
+      "question": "Confirm the capability table: min_track_mm, min_clearance_mm, min_via_mm, min_drill_mm, min_annular_mm, edge_clearance_mm, hole_clearance_mm."
+    },
+    {
+      "field": "assembly.sides",
+      "required": true,
+      "shape": "str",
+      "question": "Parts on top only, or both sides? (top is the default)"
+    },
+    {
+      "field": "assembly.min_stock",
+      "required": false,
+      "shape": "num",
+      "question": "The assembler stock floor per part: a part whose catalogue stock is under it is flagged out_of_stock. A whole number, default 1 (only zero stock is flagged)."
+    },
+    {
+      "field": "board.width_mm",
+      "required": true,
+      "shape": "num",
+      "question": "Board width in mm?"
+    },
+    {
+      "field": "board.height_mm",
+      "required": true,
+      "shape": "num",
+      "question": "Board height in mm?"
+    },
+    {
+      "field": "board.outline_source",
+      "required": false,
+      "shape": "str",
+      "question": "Where does the outline come from: enclosure drawing, a size target, existing Edge.Cuts?"
+    },
+    {
+      "field": "enclosure.notes",
+      "required": false,
+      "shape": "str",
+      "question": "Enclosure facts: connector positions, holes, LED windows, height limits?"
+    },
+    {
+      "field": "enclosure.walls",
+      "required": false,
+      "shape": "dict",
+      "question": "Which walls carry connectors (canon 113): left, right, front, back, each through (bisected at the seam, half-cradle), window (recessed part, closed opening) or blank?"
+    },
+    {
+      "field": "enclosure.openings",
+      "required": false,
+      "shape": "list",
+      "question": "Openings beyond the connectors (canon 119): ref, kind (button_pin|led_window|slot), why. An empty list means none; nothing is opened without a row."
+    },
+    {
+      "field": "enclosure.screws",
+      "required": false,
+      "shape": "dict",
+      "question": "Screw scheme (recipe 4): size (M3), scheme (sandwich|board_only), insert (heat_set|thread_forming)?"
+    },
+    {
+      "field": "enclosure.print",
+      "required": false,
+      "shape": "dict",
+      "question": "Printer floor (recipe 6): nozzle_mm, layer_mm, filament, bed_mm [x, y]?"
+    },
+    {
+      "field": "barriers",
+      "required": false,
+      "shape": "list",
+      "question": "Isolation barriers: name, nets on side A, nets on side B, gap_mm?"
+    },
+    {
+      "field": "thermal",
+      "required": false,
+      "shape": "list",
+      "question": "Parts that dissipate: ref, watts, note?"
+    },
+    {
+      "field": "test_points",
+      "required": false,
+      "shape": "list",
+      "question": "Nets that need test access?"
+    },
+    {
+      "field": "fiducials.count",
+      "required": false,
+      "shape": "num",
+      "question": "How many fiducials, if the assembler wants them?"
+    },
+    {
+      "field": "fiducials.placement",
+      "required": false,
+      "shape": "str",
+      "question": "Where: corners, diagonal, none?"
+    },
+    {
+      "field": "silk.refdes",
+      "required": false,
+      "shape": "bool",
+      "question": "Reference designators on the silkscreen?"
+    },
+    {
+      "field": "budgets",
+      "required": false,
+      "shape": "dict",
+      "question": "Per-pass budgets in minutes and tokens, if you want limits?"
+    },
+    {
+      "field": "schema",
+      "required": false,
+      "shape": "num",
+      "question": "Brief schema version: 2 opts into the placement engine's strict validation."
+    },
+    {
+      "field": "edge_connectors",
+      "required": false,
+      "shape": "list",
+      "question": "Edge connectors: ref, edge, mating_axis (the FOOTPRINT'S LOCAL axis of the mouth, +x/-x/+y/-y, verified against the physical part), overhang_mm {value, source}, mouth_tolerance_mm (optional, default 0.5mm -- how far the model's mouth face may sit off the declared edge before gate edge_connector_mouth_at_edge fails), and along_mm {value, source} when two parts share an edge?"
+    },
+    {
+      "field": "floors",
+      "required": false,
+      "shape": "dict",
+      "question": "Placement floors, each {value, source}: body_gap_mm, cluster_link_cost_mm, fastener_clear_mm, section_gap_mm, edge_clear_mm (optional, default 0.0mm -- how far a courtyard must clear the outline for the enclosure wall; gate courtyard_inside_outline reads it). A floor cites a fab field, an assembler minimum, or an owner decision verbatim."
+    }
+  ],
+  "currents_source": "All estimates, not measured. 3V3 0.41 A: H7 ~350 mA at 480 MHz (STM32H743 datasheet typical) + OLED 25 mA + flash 20 mA + mux and logic 10 mA = 405 mA, estimate. 3V3A 0.06 A: codecs ~60 mA, pots negligible, estimate. 5V 0.43 A: relay coil 21 mA (5 V / 237 ohm) + op-amps ~20 mA + PCM1808 VCC ~15 mA + 3V3 buck input (0.405 A x 3.3 V / 0.85 / 5 V = 314 mA) + 3V3A LDO input 60 mA, estimate. VIN_9V 0.27 A: 5 V rail 0.43 A x 5 V / 0.90 buck efficiency / 9 V = 0.265 A, estimate. VBUS carries only the USBLC6 and the 33k/82k sense divider (9 V only, spec item 12), its 0.43 figure is a width placeholder; 9V_JACK is the same current as VIN_9V (SS34 in series); GND takes the largest rail return (5V), all estimates. 5VA 0.08 A: 3 OPA1678 at 2 mA each (6 mA) + PCM1808 VCC 15 mA + margin, estimate; the relay coil is on 5V, not 5VA. VREF 0.001 A: divider bias only, estimate. VDDA 0.01 and ADC_VCC 0.02 A copied from fxbox brief <commit 48f1e82> (its estimates)."
 }

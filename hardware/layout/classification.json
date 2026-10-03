@@ -2,15 +2,15 @@
  "critical": [
   {
    "net": "/h7core_block/USB_DP",
-   "max_length_mm": 50,
+   "max_length_mm": 60,
    "max_vias": 2,
-   "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1."
+   "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. USB FS rise time is 4-20 ns, so the critical length is about 100 mm (canon 6); 50 mm keeps the run electrically short, which is why no impedance target is set. Two vias allow the A6/B6 row crossing at J1. | 60 mm: Codex 3a PASS 2026-10-02 (owner relayed), keep pair geometry and ground reference"
   },
   {
    "net": "/h7core_block/USB_DM",
-   "max_length_mm": 50,
+   "max_length_mm": 60,
    "max_vias": 2,
-   "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP."
+   "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. Same as USB_DP. | 60 mm: Codex 3a PASS 2026-10-02 (owner relayed), keep pair geometry and ground reference"
   },
   {
    "net": "/h7core_block/HSE_IN",
@@ -32,9 +32,9 @@
   },
   {
    "net": "/h7core_block/BUCK_SW",
-   "max_length_mm": 6,
+   "max_length_mm": 8,
    "max_vias": 0,
-   "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation)."
+   "source": "fxbox brief <commit 48f1e82>; owner-confirmed 2026-09-24. AP63203 layout p15: SW node small, loop tight (06 obligation). | 8 mm: Codex 3a PASS 2026-10-02 (owner relayed), pad-centre MST 6.03 with courtyards touching, copper about 4 mm"
   },
   {
    "net": "/h7core_block/VCAP1",
