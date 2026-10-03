@@ -484,8 +484,9 @@
      "len": 2
     },
     {
-     "pin": "90",
-     "net": "USER_LED"
+     "pin": "41",
+     "net": "USER_LED",
+     "len": 10
     },
     {
      "pin": "91",

@@ -1,0 +1,177 @@
+{
+ "declaration": "D0199",
+ "ledger": "0242",
+ "baseline": "0241",
+ "board_sha256": "97fcf3447739b648fee3e070b458955d98aa6ddf9faa90b6cdf7868df78e57d7",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0242.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1562.8,
+   "after": 1575.8,
+   "delta": 13.0,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "airline:/h7core_block/VCAP1",
+   "why": "subject in a closure entry",
+   "before": 2.57,
+   "after": 2.211,
+   "delta": -0.359,
+   "direction": "better"
+  },
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 5571.9,
+   "after": 5572.0,
+   "delta": 0.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 599,
+   "after": 604,
+   "delta": 5,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 150,
+   "after": 145,
+   "delta": -5,
+   "direction": "better"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "undeclared",
+   "before": 6668.4,
+   "after": 6669.2,
+   "delta": 0.8,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C111",
+   "why": "undeclared",
+   "before": 4.04,
+   "after": 6.47,
+   "delta": 2.43,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C114",
+   "why": "undeclared",
+   "before": 12.22,
+   "after": 16.5,
+   "delta": 4.28,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C115",
+   "why": "undeclared",
+   "before": 14.25,
+   "after": 17.8,
+   "delta": 3.55,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C164",
+   "why": "undeclared",
+   "before": 9.26,
+   "after": 8.79,
+   "delta": -0.47,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C18",
+   "why": "undeclared",
+   "before": 19.87,
+   "after": 3.33,
+   "delta": -16.54,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C19",
+   "why": "undeclared",
+   "before": 17.54,
+   "after": 18.27,
+   "delta": 0.73,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C24",
+   "why": "undeclared",
+   "before": 2.28,
+   "after": 2.91,
+   "delta": 0.63,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C25",
+   "why": "undeclared",
+   "before": 4.84,
+   "after": 48.52,
+   "delta": 43.68,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C27",
+   "why": "undeclared",
+   "before": 8.26,
+   "after": 12.95,
+   "delta": 4.69,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C28",
+   "why": "undeclared",
+   "before": 6.15,
+   "after": 13.36,
+   "delta": 7.21,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C4",
+   "why": "undeclared",
+   "before": 3.9,
+   "after": 3.22,
+   "delta": -0.68,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C7",
+   "why": "undeclared",
+   "before": 10.23,
+   "after": 8.68,
+   "delta": -1.55,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C8",
+   "why": "undeclared",
+   "before": 8.26,
+   "after": 6.74,
+   "delta": -1.52,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C9",
+   "why": "undeclared",
+   "before": 4.23,
+   "after": 3.96,
+   "delta": -0.27,
+   "direction": "better"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "d7c5b3eaeb2e"
+}

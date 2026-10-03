@@ -135,7 +135,8 @@ U1_PINS = {"28": ("TOGGLE3", 10), "29": ("TOGGLE4", 12), "30": ("MUX_S2", 10), "
            "43": ("ENC_MENU_SW", 10), "44": ("ENC_MENU_B", 12), "45": ("ENC_MENU_A", 10),
            "46": ("I2C_SCL", 12), "47": ("I2C_SDA", 10),  # PB10/PB11 I2C2 AF4
            "63": ("FX_ON_SENSE", 2),
-           "90": ("USER_LED", None), "91": ("MUTE_N", None),   # not PB4: NJTRST pulls up at reset
+           "41": ("USER_LED", 10),                     # LED east of U1, between the MENU and toggle fans
+           "91": ("MUTE_N", None),                     # not PB4: NJTRST pulls up at reset
            "92": ("TOGGLE1", None), "93": ("ENC_KEY_B", None), "95": ("ENC_KEY_A", None),
            "96": ("ENC_SEMI_B", None), "97": ("ENC_SEMI_A", None), "98": ("TOGGLE2", None)}
 CHILD_PORTS = [

@@ -1,0 +1,19 @@
+[
+{"op": "remove_track", "layer": "F.Cu", "x": 105.9, "y": 78.9},
+{"op": "remove_track", "layer": "F.Cu", "x": 106.0, "y": 78.51},
+{"op": "remove_track", "layer": "F.Cu", "x": 105.05, "y": 79.0},
+{"op": "remove_track", "layer": "F.Cu", "x": 106.0, "y": 80.2},
+{"op": "remove_via", "x": 106.0, "y": 80.62},
+{"op": "remove_track", "layer": "F.Cu", "x": 84.28, "y": 88.0},
+{"op": "remove_via", "x": 83.88, "y": 88.0},
+{"op": "remove_track", "layer": "F.Cu", "x": 80.85, "y": 86.0},
+{"op": "remove_via", "x": 80.45, "y": 86.0},
+{"op": "remove_track", "layer": "F.Cu", "x": 78.35, "y": 82.75},
+{"op": "remove_via", "x": 77.95, "y": 82.75},
+{"op": "move", "ref": "C12", "x": 106.5, "y": 78.6, "rot": 0},
+{"op": "move", "ref": "R3", "x": 108.4, "y": 82.5, "rot": 0},
+{"op": "move", "ref": "D1", "x": 111.8, "y": 82.5, "rot": 180},
+{"op": "move", "ref": "R2", "x": 61.0, "y": 96.15, "rot": 0},
+{"op": "move", "ref": "R153", "x": 79.75, "y": 80.75, "rot": 180},
+{"op": "move", "ref": "R150", "x": 79.75, "y": 82.75, "rot": 0}
+]
