@@ -154,5 +154,14 @@
   "J101",
   "J106",
   "J108"
+ ],
+ "fast": [
+  "/h7core_block/ADC_SCKI_SRC",
+  "/h7core_block/ADC_SCKI",
+  "/h7core_block/I2S_BCLK_SRC",
+  "/h7core_block/I2S_BCLK",
+  "/h7core_block/I2S_LRCLK",
+  "/h7core_block/I2S_DATA",
+  "/h7core_block/ADC_DOUT"
  ]
 }
