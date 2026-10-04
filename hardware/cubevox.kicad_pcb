@@ -5608,7 +5608,7 @@
 			)
 		)
 	)
-	(footprint "C_0402_1005Metric"
+	(footprint "Capacitor_SMD:C_0402_1005Metric"
 		(layer "F.Cu")
 		(uuid "202163aa-5483-4a61-b10f-ce246a83b8e0")
 		(at 137.01 105.43 180)
