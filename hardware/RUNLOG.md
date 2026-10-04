@@ -91,3 +91,12 @@ C14 at SWRESET1 | D0206 ledger 0250 | Owner: C14 beside SWRESET1 like R2 at SWBO
 C29/C30 3V3A bulk | D0208 ledger 0252 | Owner: misplaced between the pot rows. Now at (165, 100.3/102.4) on the 3V3A island's north edge, 12 mm east of the LDO feeder's island entry (153.4, 99.5), each pad on its own via.
 ENC102 RC at the encoder | D0210 ledger 0255 | Owner: C146/C147/R130/R131 sat 30 mm from ENC102 across RV103. Now on ENC102's A/B pins (y 151.5/153.6), chain R → C → encoder pin straight down each line. Pull-ups fed by two 3V3 traces from the 3V3 island (vias 55.5/75.5, 128.5), because In2 under the encoders is the 3V3A island.
 Clock top-layer attempt | D0211 retired | MCLK via U8's under-body channel shorted U8's own GND/3V3 vias there (7 vias between the pin rows) and a GND via at (88.15, 103.3). Board restored to D0210. Moving U8's ground vias out of the channel would lengthen U8's ground return; not taken.
+In2 second GND plane | D0213 | Stack SIG/GND/GND/SIG (canon 10, owner 2026-10-03). In2 copies In1's GND zone; the four rails become traces. 75 rail vias left dangling until each rail is routed.
+5VA rail | D0216 | B.Cu 0.3 mm traces from the FB101 via. Gate 134 pairs at (202.5, 82.5) and (135.65, 96.375) still to merge.
+3V3A rail | D0222 | B.Cu 0.3 mm. Old F.Cu feeder diagonal (148, 88)→(153.4, 93.4) still a gate 136 row.
+J108 3D model | D0226 | J108 uses the PJ-611E STEP with the library offset; panel-parts STEP export carries every jack.
+5V trunk | D0229 | B.Cu 0.5 mm from the buck, 8 connections. J117's footprint rule areas now in the router's obstacle map (D0227 crossed them, retired).
+J101 2 mm north | D0231 | Owner: the combo jack's through-plate screw holes did not stand proud enough for the enclosure. Traces follow; brief pin and overhang updated.
+5V U4/C24 branch | D0234 | VIN_9V on B.Cu at y 55.5 walls the LDO off, so F.Cu: trunk via (156.1, 59.375) → C24.1 → U4.3, and a U4.1-U4.3 tie under the body west side (jog excused E0114). Three plane vias removed.
+5V loops | D0236 | D0229 left a 17 mm B.Cu ring at FB101 and a buck loop through via (102.3, 45.5). Both removed; gate 133 0.
+5V C20/U3 vias | D0238, D0240 | Vias (93.35, 58.75) and (95.5, 58.9) and their B.Cu branches removed; via (90.6, 59.95) moved onto C20.1's axis. D0240 refills zones (fm edit leaves stale fill around new vias).

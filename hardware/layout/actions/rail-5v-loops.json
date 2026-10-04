@@ -1,0 +1,129 @@
+[
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 153.05,
+  "y": 59.95
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 155.5,
+  "y": 59.1
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 157.75,
+  "y": 59.75
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 159.95,
+  "y": 60.4
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 161.75,
+  "y": 60.15
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 162.0,
+  "y": 58.35
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 161.75,
+  "y": 56.55
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 159.95,
+  "y": 56.3
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 157.25,
+  "y": 57.45
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 156.1,
+  "y": 58.9875
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 102.3,
+  "y": 45.9
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 102.975,
+  "y": 46.975
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 104.6,
+  "y": 47.65
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 102.275,
+  "y": 45.475
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 102.275,
+  "y": 45.125
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 102.5,
+  "y": 45.1
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 102.25,
+  "y": 45.3
+ },
+ {
+  "op": "remove_via",
+  "x": 102.3,
+  "y": 45.5
+ },
+ {
+  "op": "track",
+  "net": "/5V",
+  "layer": "B.Cu",
+  "width_mm": 0.5,
+  "points": [
+   [
+    152.2,
+    60.8
+   ],
+   [
+    153.625,
+    59.375
+   ],
+   [
+    156.1,
+    59.375
+   ]
+  ]
+ }
+]

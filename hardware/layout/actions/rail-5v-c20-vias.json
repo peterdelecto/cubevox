@@ -1,0 +1,199 @@
+[
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 90.6,
+  "y": 57.375
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 89.875,
+  "y": 59.95
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 87.075,
+  "y": 62.025
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 85.0,
+  "y": 66.5
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 92.85,
+  "y": 58.75
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 92.125,
+  "y": 58.525
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 91.9,
+  "y": 56.75
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 92.55,
+  "y": 54.55
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 93.2,
+  "y": 53.525
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 93.35,
+  "y": 61.05
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 93.575,
+  "y": 63.575
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 95.35,
+  "y": 63.8
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 97.15,
+  "y": 63.55
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 97.4,
+  "y": 61.65
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 96.85,
+  "y": 59.45
+ },
+ {
+  "op": "remove_track",
+  "layer": "B.Cu",
+  "x": 95.9,
+  "y": 58.9
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 90.875,
+  "y": 59.95
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 93.025,
+  "y": 58.9
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 93.275,
+  "y": 58.825
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 95.5,
+  "y": 59.35
+ },
+ {
+  "op": "remove_via",
+  "x": 90.6,
+  "y": 59.95
+ },
+ {
+  "op": "remove_via",
+  "x": 93.35,
+  "y": 58.75
+ },
+ {
+  "op": "remove_via",
+  "x": 95.5,
+  "y": 58.9
+ },
+ {
+  "op": "via",
+  "net": "/5V",
+  "x": 90.6,
+  "y": 59.425
+ },
+ {
+  "op": "track",
+  "net": "/5V",
+  "layer": "B.Cu",
+  "width_mm": 0.5,
+  "points": [
+   [
+    90.6,
+    54.8
+   ],
+   [
+    90.6,
+    59.425
+   ]
+  ]
+ },
+ {
+  "op": "track",
+  "net": "/5V",
+  "layer": "B.Cu",
+  "width_mm": 0.5,
+  "points": [
+   [
+    85.0,
+    68.9
+   ],
+   [
+    85.0,
+    63.575
+   ],
+   [
+    89.15,
+    59.425
+   ],
+   [
+    90.6,
+    59.425
+   ]
+  ]
+ },
+ {
+  "op": "track",
+  "net": "/5V",
+  "layer": "F.Cu",
+  "width_mm": 0.4,
+  "points": [
+   [
+    90.6,
+    59.425
+   ],
+   [
+    92.0,
+    59.425
+   ]
+  ]
+ }
+]

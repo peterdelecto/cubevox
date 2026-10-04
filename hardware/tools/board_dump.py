@@ -61,7 +61,7 @@ def main(board_path, out_path):
                     if z.IsOnLayer(lid):
                         data["rule_areas"].append({"ref": ref, "layer": name,
                                                    "poly": poly_points(z.Outline())})
-        if fp.GetValue().upper().find("MHZ") >= 0 or ref.startswith("Y"):
+        if ref.startswith("Y"):
             bb = fp.GetCourtyard(pcbnew.F_CrtYd).BBox()
             data["keepouts"].append({"ref": ref, "box": (MM(bb.GetLeft()), MM(bb.GetTop()),
                                                          MM(bb.GetRight()), MM(bb.GetBottom()))})
