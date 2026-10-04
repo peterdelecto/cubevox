@@ -1,0 +1,65 @@
+{
+ "declaration": "D0209",
+ "ledger": "0254",
+ "baseline": "0253",
+ "board_sha256": "408888576d337781d856a5ff529e3b4e42742362e85f8df4c1287edb093407a4",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0254.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 1617.7,
+   "after": 1684.3,
+   "delta": 66.6,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/3V3:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 5570.1,
+   "after": 5572.0,
+   "delta": 1.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/3V3A:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 12464.6,
+   "after": 12462.6,
+   "delta": -2.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 623,
+   "after": 631,
+   "delta": 8,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 140,
+   "after": 136,
+   "delta": -4,
+   "direction": "better"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "undeclared",
+   "before": 6702.7,
+   "after": 6722.2,
+   "delta": 19.5,
+   "direction": "worse"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "ec4b541de073"
+}
