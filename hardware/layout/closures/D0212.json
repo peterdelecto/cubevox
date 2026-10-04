@@ -1,0 +1,64 @@
+{
+ "declaration": "D0212",
+ "ledger": "0257",
+ "baseline": "0255",
+ "board_sha256": "98d8a5c4727e07d55fd12b8e7bf8456f906859306297d15748f2882295aacc88",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0257.json",
+ "intended": [],
+ "consequential": [
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 1133.4,
+   "after": 28572.7,
+   "delta": 27439.3,
+   "direction": "n/a"
+  },
+  {
+   "measure": "essential:/GND",
+   "why": "subject in a closure entry",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 0,
+   "after": 144,
+   "delta": 144,
+   "direction": "worse"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 136,
+   "after": 216,
+   "delta": 80,
+   "direction": "worse"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "copper_mm",
+   "why": "expected to change, did not",
+   "before": 1684.3,
+   "after": 1684.3,
+   "delta": 0.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 43,
+   "after": 118,
+   "delta": 75,
+   "direction": "worse"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "4ba16687812e"
+}

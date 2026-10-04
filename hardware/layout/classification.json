@@ -132,7 +132,7 @@
  "layers": {
   "F.Cu": "signal, every part (owner-confirmed 2026-09-24)",
   "In1.Cu": "ground: one solid GND plane (owner 2026-09-25, option A, Astra review)",
-  "In2.Cu": "power: 3V3 pour with a 3V3A island and 5V (owner-confirmed 2026-09-24)",
+  "In2.Cu": "ground: second solid GND plane, SIG/GND/GND/SIG with rails as traces (owner 2026-10-03, canon 10)",
   "B.Cu": "signal, no parts (owner-confirmed 2026-09-24)"
  },
  "ground": "/GND",
