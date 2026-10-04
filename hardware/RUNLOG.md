@@ -115,3 +115,5 @@ ADC_VCC 0.3 mm | D0269 | Widened from 0.15 between the C44/C47 and C45/C46 rows;
 Signal-via ground | D0271 | GND vias beside the two CC2 vias and the SWDIO via; gate 20 passes. CC2's B.Cu bridge stays (E0119).
 3V3 escape | D0273 | U1 pin 6/11 escape 0.3 mm once clear of the pin field.
 Decisions | E0115-E0120 | VDDA bulk caps upstream of C9/C11 by design (E0116); C44/C47 each have their own GND via, gate 68 pairs them by nearest-via (E0117); J1 GND pin to shield trace (E0120).
+5VA drop | D0275 | The x 155 drop from the U106/C130 via lands on the west trunk at (155, 96.375); the 9 mm detour east to R117's via and back along y 97.2 is gone (owner).
+Pot 3V3A daisy chain | D0277 | Owner: supply runs pad to pad, no stubs. East RV109 -> RV111 -> RV113 -> RV101 along y 145.5, over each pot's pins 1-2 at y 143.5, into pin 3 from the north. West enters RV105 from RV106 below, then RV104 and RV103 from the east.
