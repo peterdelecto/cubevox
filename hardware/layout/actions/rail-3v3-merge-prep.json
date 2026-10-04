@@ -1,0 +1,46 @@
+[
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 87.85,
+  "y": 90.0
+ },
+ {
+  "op": "remove_via",
+  "x": 87.25,
+  "y": 90.0
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 90.0,
+  "y": 75.85
+ },
+ {
+  "op": "remove_via",
+  "x": 90.0,
+  "y": 75.25
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 88.5,
+  "y": 124.5515
+ },
+ {
+  "op": "remove_via",
+  "x": 88.5,
+  "y": 124.953
+ },
+ {
+  "op": "remove_track",
+  "layer": "F.Cu",
+  "x": 89.0985,
+  "y": 127.0
+ },
+ {
+  "op": "remove_via",
+  "x": 88.697,
+  "y": 127.0
+ }
+]

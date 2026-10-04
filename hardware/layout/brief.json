@@ -347,9 +347,9 @@
     {
       "ref": "J101",
       "x": 190.0,
-      "y": 43.2,
+      "y": 45.7,
       "rotation": 0.0,
-      "reason": "XLR/TRS combo on the rear edge, B.Cu hand-soldered; owner column, shifted +x by the layout lead for the console rear plate (spec item 27, 2026-10-02); 2 mm north so the through-plate screw holes stand proud enough for the enclosure (owner 2026-10-04)"
+      "reason": "XLR/TRS combo on the rear edge, B.Cu hand-soldered; owner column, shifted +x by the layout lead for the console rear plate (spec item 27, 2026-10-02); 2 mm north, then 2.5 mm south, for the enclosure's through-plate screw holes (owner 2026-10-04)"
     },
     {
       "ref": "J108",
@@ -1383,8 +1383,8 @@
       "mating_axis": "-y",
       "mating_axis_confirmed": false,
       "overhang_mm": {
-        "value": 8.915,
-        "source": "courtyard top y 21.085 against the outline y 30.0; the combo flange and barrel stand proud through the rear plate (spec item 27)"
+        "value": 6.415,
+        "source": "courtyard top y 23.585 against the outline y 30.0; the combo flange and barrel stand proud through the rear plate (spec item 27)"
       },
       "mating_axis_note": "derived 2026-10-02 from pad local vs board positions (GetFPRelativePosition): the local axis that maps onto board -y, the rear edge; every jack courtyard crosses y=30 so the mouth is on that side. NOT VERIFIED against the model's mouth face by render."
     },

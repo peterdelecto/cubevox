@@ -152,8 +152,10 @@ def leg_clear(occ, i, j, di, dj, n):
     return True
 
 
-def astar(g, occ, start, goals, max_states=300_000, base=None, goal_pad=0.6):
-    """start: (x, y, size). goals: list of (x, y, size). Returns (polyline, goal) or None."""
+def astar(g, occ, start, goals, max_states=300_000, base=None, goal_pad=0.6, leg_occ=None):
+    """start: (x, y, size). goals: list of (x, y, size). Returns (polyline, goal) or None.
+    leg_occ checks the start legs; occ blocks the start's own disk so the path never
+    returns to it (canon 133)."""
     leg = int(math.ceil(END_LEG_MM / RES))
     run_min = int(math.ceil(MIN_RUN_MM / RES))
     si, sj = g.ij(start[0], start[1])
@@ -200,8 +202,11 @@ def astar(g, occ, start, goals, max_states=300_000, base=None, goal_pad=0.6):
 
     for d in (0, 2, 4, 6):
         di, dj = DIRS[d]
-        if leg_clear(occ, si, sj, di, dj, leg):
-            push((si + di * leg, sj + dj * leg, d), leg * RES, None)
+        n0 = leg
+        while n0 < 3 * leg and occ[si + di * n0, sj + dj * n0]:
+            n0 += 1
+        if leg_clear(occ if leg_occ is None else leg_occ, si, sj, di, dj, n0):
+            push((si + di * n0, sj + dj * n0, d), n0 * RES, None)
     seen, closed = 0, set()
     while openq:
         _f, st = heapq.heappop(openq)
@@ -311,9 +316,32 @@ def nodes_for(geom, net, layer):
 
 
 def groups_for(geom, net, nodes):
-    """Union nodes already joined by this net's existing copper (tracks and pads on any
-    layer). The tree reaches each group once, so it never closes a loop (canon 133)."""
-    parent = list(range(len(nodes)))
+    """Group nodes already joined by this net's existing copper. The copper is rasterised
+    per layer, so any touch counts: a via disk on a pad, a trace end on a trace's middle.
+    Vias and through-hole pads join the layers. The tree reaches each group once, so it
+    never closes a loop (canon 133)."""
+    g = Grid(geom)
+    layers = ("F.Cu", "B.Cu")
+    copper = {L: np.zeros((g.nx, g.ny), bool) for L in layers}
+    for t in geom["tracks"]:
+        if t["net"] == net and t["layer"] in copper:
+            mark_capsule(g, copper[t["layer"]], t["a"], t["b"], t["w"] / 2)
+    for p in geom["pads"]:
+        if p["net"] == net and p["layer"] in copper:
+            mark_poly(g, copper[p["layer"]], p["poly"], 0)
+    for v in geom["vias"]:
+        if v["net"] == net:
+            for L in layers:
+                mark_capsule(g, copper[L], (v["x"], v["y"]), (v["x"], v["y"]), v["d"] / 2)
+    for n in nodes:
+        for L in layers:
+            mark_capsule(g, copper[L], (n[0], n[1]), (n[0], n[1]), RES)
+    labels, offset = {}, 0
+    for L in layers:
+        lab, count = ndimage.label(copper[L])
+        labels[L] = np.where(lab > 0, lab + offset, 0)
+        offset += count
+    parent = list(range(offset + 1))
 
     def find(a):
         while parent[a] != a:
@@ -321,36 +349,19 @@ def groups_for(geom, net, nodes):
             a = parent[a]
         return a
 
-    pts = []                         # (x, y, owner) for every copper point of the net
-    for k, n in enumerate(nodes):
-        pts.append((n[0], n[1], ("n", k)))
-    tracks = [t for t in geom["tracks"] if t["net"] == net]
-    pads = [p for p in geom["pads"] if p["net"] == net]
-    items = [("t", i) for i in range(len(tracks))] + [("p", i) for i in range(len(pads))]
-    idx = {it: len(nodes) + i for i, it in enumerate(items)}
-    parent.extend(range(len(nodes), len(nodes) + len(items)))
-
-    def touch(x, y):
-        hits = [k for k, n in enumerate(nodes) if math.hypot(n[0] - x, n[1] - y) < 0.05]
-        for i, p in enumerate(pads):
-            for ring in p["poly"]:
-                if _inside(ring, np.array([x]), np.array([y]))[0]:
-                    hits.append(idx[("p", i)])
-        for i, t in enumerate(tracks):
-            for e in (t["a"], t["b"]):
-                if math.hypot(e[0] - x, e[1] - y) < 0.02:
-                    hits.append(idx[("t", i)])
-        return hits
-
-    for i, t in enumerate(tracks):
-        for e in (t["a"], t["b"]):
-            for h in touch(e[0], e[1]):
-                parent[find(h)] = find(idx[("t", i)])
-    for i, p in enumerate(pads):
-        for k, n in enumerate(nodes):
-            if any(_inside(ring, np.array([n[0]]), np.array([n[1]]))[0] for ring in p["poly"]):
-                parent[find(k)] = find(idx[("p", i)])
-    return [find(k) for k in range(len(nodes))]
+    joins = [(v["x"], v["y"]) for v in geom["vias"] if v["net"] == net]
+    joins += [(n[0], n[1]) for n in nodes]
+    joins += [(p["x"], p["y"]) for p in geom["pads"] if p["net"] == net and _is_th(geom, p)]
+    for x, y in joins:
+        i, j = g.ij(x, y)
+        ids = [labels[L][i, j] for L in layers if labels[L][i, j]]
+        for k in ids[1:]:
+            parent[find(k)] = find(ids[0])
+    out = []
+    for n in nodes:
+        i, j = g.ij(n[0], n[1])
+        out.append(find(labels["F.Cu"][i, j] or labels["B.Cu"][i, j]))
+    return out
 
 
 def _redundant_vias(geom, net, layer, nodes, plan, group, joined):
@@ -430,8 +441,10 @@ def route_net(geom, net, layer, width, sources, only=None, skip=()):
             for o in nodes:
                 if o != n:
                     mark_capsule(g, eff, (o[0], o[1]), (o[0], o[1]), o[2] / 2 + width / 2 + 0.1 + MARGIN)
+            leg_occ = eff.copy()
+            mark_capsule(g, eff, (n[0], n[1]), (n[0], n[1]), n[2] / 2 + width / 2 + 0.1 + MARGIN)
             res = astar(g, eff, n, near, base=occ | (same & ~local),
-                        goal_pad=width / 2 + 0.1 + MARGIN)
+                        goal_pad=width / 2 + 0.1 + MARGIN, leg_occ=leg_occ)
             if res is None:
                 tried[n] = len(tree)
                 continue
