@@ -1,0 +1,6 @@
+[
+ {"op": "remove_track", "layer": "B.Cu", "x": 85.0, "y": 66.2375},
+ {"op": "remove_track", "layer": "B.Cu", "x": 82.925, "y": 70.975},
+ {"op": "remove_track", "layer": "B.Cu", "x": 80.37, "y": 73.53},
+ {"op": "remove_track", "layer": "B.Cu", "x": 77.07, "y": 74.01}
+]
