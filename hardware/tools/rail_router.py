@@ -120,6 +120,9 @@ def build_obstacles(g, geom, net, layer, width, node_pts):
         mark_poly(g, occ, p["poly"], gap + half + MARGIN)
     for h in geom["npth"]:
         mark_capsule(g, occ, (h["x"], h["y"]), (h["x"], h["y"]), h["d"] / 2 + HOLE_CLEARANCE + half + MARGIN)
+    for ra in geom.get("rule_areas", []):
+        if ra["layer"] == layer:
+            mark_poly(g, occ, ra["poly"], half + MARGIN)
     for k in geom["keepouts"]:
         x0, y0, x1, y1 = k["box"]
         sl, X, Y = _window(g, x0 - half, y0 - half, x1 + half, y1 + half)
@@ -350,6 +353,26 @@ def groups_for(geom, net, nodes):
     return [find(k) for k in range(len(nodes))]
 
 
+def _redundant_vias(geom, net, layer, nodes, plan, group, joined):
+    """A via is spare when no trace on the routing layer reaches it and another via of the
+    same other-layer island does. Islands ignore routing-layer copper, which is what the
+    vias connect to."""
+    ends = [tuple(t["a"]) for t in geom["tracks"] if t["net"] == net and t["layer"] == layer]
+    ends += [tuple(t["b"]) for t in geom["tracks"] if t["net"] == net and t["layer"] == layer]
+    for op in plan:
+        ends += [tuple(op["points"][0]), tuple(op["points"][-1])]
+
+    def used(n):
+        return any(math.hypot(n[0] - x, n[1] - y) < 0.05 for x, y in ends)
+
+    other = dict(geom, tracks=[t for t in geom["tracks"] if t["layer"] != layer],
+                 pads=[p for p in geom["pads"] if p["layer"] != layer])
+    island = dict(zip(nodes, groups_for(other, net, nodes)))
+    fed = {island[n] for n in nodes if n[3] == "via" and used(n)}
+    return [n for n in nodes if n[3] == "via" and group[n] in joined and not used(n)
+            and island[n] in fed]
+
+
 def _is_th(geom, p):
     return any(q["ref"] == p["ref"] and q["num"] == p["num"] and q["layer"] != p["layer"]
                for q in geom["pads"])
@@ -370,7 +393,11 @@ def route_net(geom, net, layer, width, sources, only=None, skip=()):
     for sx, sy in sources:
         tree.append(min(nodes, key=lambda n: math.hypot(n[0] - sx, n[1] - sy)))
     joined = {group[t] for t in tree}
-    rest = [n for n in nodes if n not in tree and group[n] not in joined]
+
+    # Existing copper already joined to a source is part of the tree, so new legs may end on it.
+
+    tree += [n for n in nodes if n not in tree and group[n] in joined]
+    rest = [n for n in nodes if group[n] not in joined]
     same = np.zeros_like(occ)          # this net's new traces
     halo = np.zeros_like(occ)          # around tree nodes, where new traces may meet them
     plan, failed, tried = [], [], {}
@@ -422,7 +449,7 @@ def route_net(geom, net, layer, width, sources, only=None, skip=()):
         if not progress:
             failed = rest
             break
-    redundant = [n for n in nodes if n not in tree and n[3] == "via" and group[n] in joined]
+    redundant = _redundant_vias(geom, net, layer, nodes, plan, group, joined)
     prep = []
     for n in redundant:
         for t in geom["tracks"]:
