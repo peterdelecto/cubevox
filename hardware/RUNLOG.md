@@ -106,3 +106,12 @@ J101 2.5 mm south | D0249 | Owner correction: J101 at (190, 45.7), 0.5 mm south 
 3V3A/5VA via merges | D0251, D0253 | Each pin feeds its cap on F.Cu with one via: C28.1 → via → U101.24 → C27.1 (C28 0.08 mm S, C27 0.06 mm W; pin 24's via and its 25 mm branch gone), C29.1 → C30.1, U104.8 → C118.1 (C118 0.1 mm W), C134.1 → R20.1 (C134 0.125 mm N). Two 13 mm B.Cu loops the router drew around U104 and over C134 removed. Gate 134 0 on all rails.
 3V3A feeder | D0254 | The 7.6 mm diagonal at (148, 88) becomes orthogonal runs with 0.5 mm chamfers along y 90, clear of J117's rule area.
 5V pad entries | D0255, D0256 | Buck output node (L101.2, C114.1, C115.1, C19.1, trunk via) is a solid F.Cu 5V pour; its pads are too large and offset for centred traces. K102, C20/U3 and U103 enter from pad centres; K102's via moved onto the pad axis and the trunk bend moved so no diagonal exceeds 6 mm. Gate 132 has no rail rows.
+Owner hand cleanup | D0258 | Owner re-drew rail and I2S traces. Audit found three 3V3A loops at pot pin 3s, a 5V loop under the buck via, an 8.4 mm diagonal, a dangling stub and a 45-degree via entry.
+Pot-row 3V3A bus | D0260 | Straight buses at y 147.4 (west) and y 143.5 (east), one stub per pin 3, columns pass through the pins. Loops and stub gone.
+Via and 5V drop | D0261, D0263 | C101's 3V3A via onto the B.Cu trunk row; the buck via drops on one stem (west branch at y 56.8, chamfer to the y 60.8 trunk).
+I2S spacing | D0264, D0266 | DATA and LRCLK lane-change past the x 102/106.85 GND vias: 0.75 then 0.7 mm centres (3W); LRCLK no longer under Y1. Gates 35 and 51 pass.
+U4 input cap | D0268 | C24 turned 180 and moved 0.35 mm: U4.1 (IN) -> C24.1 straight 2.2 mm. Gates 63/71 still read a 5V via 7 mm off (plane model); decided E0115.
+ADC_VCC 0.3 mm | D0269 | Widened from 0.15 between the C44/C47 and C45/C46 rows; forced jog excused E0118.
+Signal-via ground | D0271 | GND vias beside the two CC2 vias and the SWDIO via; gate 20 passes. CC2's B.Cu bridge stays (E0119).
+3V3 escape | D0273 | U1 pin 6/11 escape 0.3 mm once clear of the pin field.
+Decisions | E0115-E0120 | VDDA bulk caps upstream of C9/C11 by design (E0116); C44/C47 each have their own GND via, gate 68 pairs them by nearest-via (E0117); J1 GND pin to shield trace (E0120).

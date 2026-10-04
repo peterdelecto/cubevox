@@ -1,0 +1,7 @@
+[
+ {"op": "remove_track", "layer": "F.Cu", "x": 135.65, "y": 101.95625},
+ {"op": "remove_track", "layer": "F.Cu", "x": 135.5, "y": 102.5625},
+ {"op": "remove_track", "layer": "F.Cu", "x": 132.4375, "y": 102.7125},
+ {"op": "remove_track", "layer": "F.Cu", "x": 129.375, "y": 102.8625},
+ {"op": "remove_track", "layer": "F.Cu", "x": 129.225, "y": 103.25625}
+]
