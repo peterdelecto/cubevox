@@ -100,3 +100,6 @@ J101 2 mm north | D0231 | Owner: the combo jack's through-plate screw holes did 
 5V U4/C24 branch | D0234 | VIN_9V on B.Cu at y 55.5 walls the LDO off, so F.Cu: trunk via (156.1, 59.375) → C24.1 → U4.3, and a U4.1-U4.3 tie under the body west side (jog excused E0114). Three plane vias removed.
 5V loops | D0236 | D0229 left a 17 mm B.Cu ring at FB101 and a buck loop through via (102.3, 45.5). Both removed; gate 133 0.
 5V C20/U3 vias | D0238, D0240 | Vias (93.35, 58.75) and (95.5, 58.9) and their B.Cu branches removed; via (90.6, 59.95) moved onto C20.1's axis. D0240 refills zones (fm edit leaves stale fill around new vias).
+3V3 trunk attempt | D0242, undone D0244 | Router plan closed two loops (gate 133). Router fixed: raster island grouping, start disk blocked after the first leg. Remaining loops come from per-pad decoupler vias, so pairs are merged before re-routing.
+3V3 via merges | D0247 | U1.100 → C56.1 straight, via (87.25, 90.0) gone; U1.75 into C57's via (88.25, 75.16), via (90, 75.25) gone; R135/R132 share one via at (88.5, 127.0). Top-row U1 decouplers still to merge, then route 3V3.
+J101 2.5 mm south | D0249 | Owner correction: J101 at (190, 45.7), 0.5 mm south of its D0056 spot. Traces follow; brief pin and overhang updated.
