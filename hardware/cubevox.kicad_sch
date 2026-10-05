@@ -10,6 +10,173 @@
 		(rev "1")
 	)
 	(lib_symbols
+	(symbol "cubevox:OPA197IDBVR"
+			(pin_names
+				(offset 0.254)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "U"
+				(at 0 10.16 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "OPA197IDBVR"
+				(at 0 -10.16 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
+				(at 0 -12.7 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://www.ti.com/lit/ds/symlink/opa197.pdf"
+				(at 0 -15.24 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "36V single precision RRIO op-amp, SOT-23-5 (OUT 1, V- 2, +IN 3, -IN 4, V+ 5)"
+				(at 0 -17.78 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "LCSC" "C221351"
+				(at 0 -20.32 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "OPA197IDBVR_0_1"
+				(polyline
+					(pts
+						(xy -5.08 5.08) (xy 5.08 0) (xy -5.08 -5.08) (xy -5.08 5.08)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+			)
+			(symbol "OPA197IDBVR_1_1"
+				(pin input line
+					(at -7.62 2.54 0)
+					(length 2.54)
+					(name "+IN"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -7.62 -2.54 0)
+					(length 2.54)
+					(name "-IN"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin output line
+					(at 7.62 0 180)
+					(length 2.54)
+					(name "OUT"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -2.54 7.62 270)
+					(length 2.54)
+					(name "V+"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -2.54 -7.62 90)
+					(length 2.54)
+					(name "V-"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+		)
+
 		(symbol "cubevox:OPA2197IDR"
     (in_bom yes)
     (on_board yes)
@@ -10628,7 +10795,7 @@
 		)
 		(uuid "fcdabe04-6764-5846-acd2-c265d36359a9")
 	)
-	(label "5VA"
+	(label "5VA_W"
 		(at 673.1 222.25 90)
 		(fields_autoplaced yes)
 		(effects
@@ -11742,7 +11909,7 @@
 		)
 		(uuid "7a897eee-674a-5438-97c6-d0328fd096ba")
 	)
-	(label "VREF_BUF"
+	(label "U106A_OUT"
 		(at 614.68 405.13 180)
 		(fields_autoplaced yes)
 		(effects
@@ -11763,7 +11930,7 @@
 		)
 		(uuid "234ca45c-fe43-5a63-af72-b6b2d4acca12")
 	)
-	(label "VREF_BUF"
+	(label "U106A_OUT"
 		(at 614.68 407.67 180)
 		(fields_autoplaced yes)
 		(effects
@@ -11784,7 +11951,7 @@
 		)
 		(uuid "b7cd91b4-1d0f-579e-889c-c84c284d3f47")
 	)
-	(label "VREF_DIV"
+	(label "BIAS_W"
 		(at 614.68 410.21 180)
 		(fields_autoplaced yes)
 		(effects
@@ -11889,7 +12056,7 @@
 		)
 		(uuid "ca5525cd-fda4-5ee8-aa0c-8afbac704d58")
 	)
-	(label "5VA"
+	(label "5VA_W"
 		(at 650.24 405.13 0)
 		(fields_autoplaced yes)
 		(effects
@@ -14062,7 +14229,7 @@
 		)
 		(uuid "302134b4-0211-5044-9a9a-ed400b703cc3")
 	)
-	(label "VREF"
+	(label "BIAS_W"
 		(at 1102.36 90.17 270)
 		(fields_autoplaced yes)
 		(effects
@@ -26248,6 +26415,918 @@
 			(justify left bottom)
 		)
 		(uuid "9889dffc-ee03-52c2-8a28-254a11305014")
+	)
+	(symbol
+		(lib_id "cubevox:OPA197IDBVR")
+		(at 619.76 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "c05bf108-42f2-432e-bff6-104263f6e016")
+		(property "Reference" "U108"
+			(at 622.3 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "OPA197IDBVR"
+			(at 622.3 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
+			(at 619.76 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 619.76 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C221351"
+			(at 619.76 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "692f6930-f13b-42a2-8f8b-f10fddf4e13f")
+		)
+		(pin "2"
+			(uuid "5718ce6f-862d-45eb-a7cf-a6b820a889d0")
+		)
+		(pin "3"
+			(uuid "74271975-3b2a-421c-b94f-d78db3295246")
+		)
+		(pin "4"
+			(uuid "1c592ff2-c6e7-4c4b-a18c-f9d25b2d41b9")
+		)
+		(pin "5"
+			(uuid "803da80e-d9a4-47c5-b512-f25df4810808")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "U108")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 612.14 453.39) (xy 609.6 453.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "74c1cb74-7493-40db-801d-673b52840789")
+	)
+	(label "VREF_DIV"
+		(at 609.6 453.39 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "dccd81e4-b14e-4439-81de-c539b159d3b7")
+	)
+	(wire
+		(pts
+			(xy 612.14 458.47) (xy 609.6 458.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7b91ec48-16da-4ff2-af78-acb35ac56344")
+	)
+	(label "VREF_BUF"
+		(at 609.6 458.47 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "bf2ec841-8aed-41cb-abc8-47606b5d37b8")
+	)
+	(wire
+		(pts
+			(xy 627.38 455.93) (xy 629.92 455.93)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7f42a17a-5ae4-4c35-9f28-4caf6cc1559b")
+	)
+	(label "VREF_BUF"
+		(at 629.92 455.93 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "161d694f-4b56-4baf-b5d0-f0453f77af28")
+	)
+	(wire
+		(pts
+			(xy 617.22 448.31) (xy 617.22 445.77)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5ae1bdc9-6e96-4e26-8e97-6bd077685adb")
+	)
+	(label "5VA"
+		(at 617.22 445.77 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "7ba1fdbf-514b-4c87-a069-0afe4d05b981")
+	)
+	(wire
+		(pts
+			(xy 617.22 463.55) (xy 617.22 466.09)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d51a0105-706c-48e4-a672-8e43eaec3f60")
+	)
+	(label "GND"
+		(at 617.22 466.09 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "ad18fa6f-93fd-49a8-b7b7-366ce9dd647d")
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 645.16 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "1ff8f743-8eec-4332-8e72-f574e760d0b2")
+		(property "Reference" "C167"
+			(at 647.7 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "100nF"
+			(at 647.7 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
+			(at 645.16 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 645.16 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C1525"
+			(at 645.16 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d50316cd-00d9-4222-9c03-2854e4d50843")
+		)
+		(pin "2"
+			(uuid "ce58d99e-1fba-4c64-9583-96835848f1e5")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C167")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 645.16 452.12) (xy 645.16 449.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8c3f88d4-dfe8-4f0f-92a7-79787ac31b8b")
+	)
+	(label "5VA"
+		(at 645.16 449.58 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "a3bcd750-85f2-4021-b977-c4237331e07a")
+	)
+	(wire
+		(pts
+			(xy 645.16 459.74) (xy 645.16 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f42c17a9-359d-4934-b425-cc91a050e32d")
+	)
+	(label "GND"
+		(at 645.16 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "e0c5a7ba-d008-47b8-b4d0-c6c441dea11d")
+	)
+	(symbol
+		(lib_id "Device:FerriteBead")
+		(at 665.48 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "bd25759f-1184-4a8d-b58f-cba097afac20")
+		(property "Reference" "FB102"
+			(at 668.02 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "120R@100MHz"
+			(at 668.02 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Inductor_SMD:L_0603_1608Metric"
+			(at 665.48 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 665.48 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C14709"
+			(at 665.48 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "46bb89bf-527f-48be-8852-dcacf67f1c21")
+		)
+		(pin "2"
+			(uuid "b59df47f-6798-497f-b313-a3efa9271f7c")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "FB102")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 665.48 452.12) (xy 665.48 449.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4620019e-8950-4e8b-bd19-1f1d93039467")
+	)
+	(label "5V"
+		(at 665.48 449.58 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "101cb94d-62a3-4842-a544-d155eead84c4")
+	)
+	(wire
+		(pts
+			(xy 665.48 459.74) (xy 665.48 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f1afcb9c-b13b-49b2-a050-f97ed8d6ab7a")
+	)
+	(label "5VA_W"
+		(at 665.48 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "2740ecdf-305d-4473-a178-f40dc4da0653")
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 680.72 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "45185216-d886-463f-9303-07103561d68f")
+		(property "Reference" "C168"
+			(at 683.26 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10uF"
+			(at 683.26 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+			(at 680.72 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 680.72 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C15850"
+			(at 680.72 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "e56fbd01-face-4c29-8c56-60164ff931da")
+		)
+		(pin "2"
+			(uuid "df418cb3-e743-4315-93fb-531d60dee63e")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C168")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 680.72 452.12) (xy 680.72 449.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7309edf5-0c5d-435c-84a4-89f999fc7976")
+	)
+	(label "5VA_W"
+		(at 680.72 449.58 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "56bf7e9e-36e3-4454-90b7-a725af96e669")
+	)
+	(wire
+		(pts
+			(xy 680.72 459.74) (xy 680.72 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "14bc2b58-a628-4f0d-94b6-eede977531b1")
+	)
+	(label "GND"
+		(at 680.72 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "87219ee3-c1b3-447e-ba27-c7a0ab0b9d63")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 699.77 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "b0ff227f-5115-48dd-8c6b-bdd4e1abf006")
+		(property "Reference" "R154"
+			(at 702.31 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10k"
+			(at 702.31 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 699.77 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 699.77 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C25744"
+			(at 699.77 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "7cd31907-3cf2-4c4b-899c-c20bdfdf05c2")
+		)
+		(pin "2"
+			(uuid "e0a0ca31-4b92-4ca7-92dd-91a0ed3026bf")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R154")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 699.77 452.12) (xy 699.77 449.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "372e5ca7-6ad0-4c69-abc2-076035802a9b")
+	)
+	(label "5VA_W"
+		(at 699.77 449.58 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "798e408c-a526-43f7-8a5b-682304fe3cf0")
+	)
+	(wire
+		(pts
+			(xy 699.77 459.74) (xy 699.77 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "70fea37e-80ce-4ac9-850a-a3de78a8b482")
+	)
+	(label "BIAS_W"
+		(at 699.77 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "17ec9239-2b80-493a-ae7e-74a05505e47c")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 715.01 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "c180069f-2086-45e6-8597-b39be2bf37f8")
+		(property "Reference" "R155"
+			(at 717.55 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10k"
+			(at 717.55 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 715.01 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 715.01 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C25744"
+			(at 715.01 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "bec81e1f-29f5-4914-a419-4a792ac86be4")
+		)
+		(pin "2"
+			(uuid "5ae90d7a-4330-4b82-9771-99f3fc791d5a")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R155")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 715.01 452.12) (xy 715.01 449.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "be831de3-f2f2-4fe3-8869-8e691f7fe61d")
+	)
+	(label "BIAS_W"
+		(at 715.01 449.58 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "44194269-cede-4db1-8159-990142127cc7")
+	)
+	(wire
+		(pts
+			(xy 715.01 459.74) (xy 715.01 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d1661532-ef78-49a6-8903-4e7e047bf44b")
+	)
+	(label "GND"
+		(at 715.01 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "d56988d8-6965-4811-ac5d-64bfd5b0b185")
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 730.25 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "7eacb381-bb5a-4103-b077-8389eceff905")
+		(property "Reference" "C169"
+			(at 732.79 454.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10uF"
+			(at 732.79 457.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+			(at 730.25 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 730.25 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C15850"
+			(at 730.25 455.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "cb8308a7-753f-4d62-873f-8397f070bca0")
+		)
+		(pin "2"
+			(uuid "50ec8ae0-1168-4158-b444-115435a1adfa")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "C169")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 730.25 452.12) (xy 730.25 449.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "851a44e5-9bd2-47b4-9210-dd52b98d5ee8")
+	)
+	(label "BIAS_W"
+		(at 730.25 449.58 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "326c33ed-9535-41c8-b331-d02be4299aa1")
+	)
+	(wire
+		(pts
+			(xy 730.25 459.74) (xy 730.25 462.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "37763e39-a257-4995-ab3c-07122f92602b")
+	)
+	(label "GND"
+		(at 730.25 462.28 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "49511dee-6b66-493c-9d46-cbbce46a9664")
+	)
+	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 749.3 455.93 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "1f79cd13-6980-4378-8046-fbe1267d23a0")
+		(property "Reference" "#FLG30004"
+			(at 304.8 203.2 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 304.8 205.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 749.3 455.93 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 749.3 455.93 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "bb8a3142-e3bd-4042-8056-c7e787afd6ec")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "#FLG30004")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 749.3 455.93) (xy 749.3 453.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "38f01740-ecc6-47f5-8bf2-1353693e298f")
+	)
+	(label "5VA_W"
+		(at 749.3 453.39 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "b88c2ba9-5fa2-4160-a65f-9fcaa5c7b4a0")
 	)
 	(sheet_instances
 		(path "/"
