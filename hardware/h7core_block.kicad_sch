@@ -6440,7 +6440,7 @@
 		)
 		(uuid "04400073-5058-5088-9c5d-464fc9aa1474")
 	)
-	(label "I2S_LRCLK"
+	(label "I2S_LRCLK_SRC"
 		(at 38.1 82.55 180)
 		(fields_autoplaced yes)
 		(effects
@@ -6482,7 +6482,7 @@
 		)
 		(uuid "a8b4dcef-bc45-58d0-977c-b4dc454c1d3d")
 	)
-	(label "I2S_DATA"
+	(label "I2S_DATA_SRC"
 		(at 39.37 87.63 180)
 		(fields_autoplaced yes)
 		(effects
@@ -18204,6 +18204,228 @@
 			(justify right bottom)
 		)
 		(uuid "2dbe4f22-ebe6-4e55-8aac-acf627a7d181")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 132.08 127 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "a311da8f-2891-46e0-8269-841308f88a18")
+		(property "Reference" "R156"
+			(at 134.62 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "33R"
+			(at 134.62 128.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 132.08 127 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 132.08 127 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25105"
+			(at 132.08 127 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "584929f4-8d82-4531-977a-40c8a0165324")
+		)
+		(pin "2"
+			(uuid "be88e00e-717d-44fb-ad17-b7997b06caed")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
+					(reference "R156")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 132.08 123.19) (xy 132.08 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "538a2108-97f4-4ce6-a2b6-785a71094520")
+	)
+	(label "I2S_LRCLK_SRC"
+		(at 132.08 120.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "75e4188c-9fbc-4fae-9c22-529b31e169d2")
+	)
+	(wire
+		(pts
+			(xy 132.08 130.81) (xy 132.08 133.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9997ecbe-507e-4790-a0c7-d1a6c97db1f4")
+	)
+	(label "I2S_LRCLK"
+		(at 132.08 133.35 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "5ffc1e8a-8bb0-46a3-ba5f-d9f3f03bd010")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 137.16 127 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "48d41d10-ca4a-4082-9544-f085416a0bae")
+		(property "Reference" "R157"
+			(at 139.7 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "33R"
+			(at 139.7 128.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 137.16 127 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 137.16 127 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25105"
+			(at 137.16 127 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "cd4a0b58-6ecc-4a81-a83d-aeec4febadf5")
+		)
+		(pin "2"
+			(uuid "a992f278-dab3-4a0c-a3c6-489004185546")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254/cdf9c81d-d554-530c-ae51-0929232e7fb3"
+					(reference "R157")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 137.16 123.19) (xy 137.16 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "efb56fd5-ff1e-4870-b301-02c653575a9b")
+	)
+	(label "I2S_DATA_SRC"
+		(at 137.16 120.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "c809a141-fd09-4f75-94a4-37051c5cd494")
+	)
+	(wire
+		(pts
+			(xy 137.16 130.81) (xy 137.16 133.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "134abf6d-29fc-40d3-b06a-675bf44b4d00")
+	)
+	(label "I2S_DATA"
+		(at 137.16 133.35 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "20343c81-b92a-492e-bd4e-8d3b37b0d7e9")
 	)
 	(sheet_instances
 		(path "/"
