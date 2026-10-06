@@ -211,9 +211,12 @@ F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
     LEDs on toggles; the lever shows the state. Datasheet gives AC ratings
     only; 5 V DC at 21 mA is far inside them.
 22. OLED. 1.3" SH1106, I2C 400 kHz on an MCU I2C peripheral with free pins,
-    4.7 kΩ pull-ups. J117 takes the module's own 4-pin header (3V3, GND, SCL,
-    SDA); any socket is owner-supplied. Module is
-    hand-plugged; the header is assembled.
+    4.7 kΩ pull-ups. J117 is a hanxia HX PM2.54-1x4P TP-YQ 5 mm SMD socket
+    (C42379197), JLC-assembled, that takes the module's own 4-pin header (GND,
+    3V3, SCL, SDA). SMD because JLC's hand-inserted through-hole headers came
+    out crooked on a previous board (owner 2026-10-06). The module is
+    hand-plugged. With 9 mm standoffs the socket takes 6.5 mm of pin, so the
+    module's pins must not reach more than 8.5 mm below its PCB.
 23. Input Gain pot is analog, in the preamp gain leg (item 4), not read by
     the MCU. FX_ON_SENSE (item 7) is the only sense GPIO; JACK_TRS_N was
     deleted in revision 2 (item 1).

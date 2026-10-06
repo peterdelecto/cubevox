@@ -1528,7 +1528,7 @@
     )
     (property
       "LCSC Part"
-      "owner-supplied module, hand-plugged"
+      "C42379197"
       (id 6)
       (at 0 -21.59 0)
       (effects (font (size 1.27 1.27) ) hide)
@@ -24224,7 +24224,7 @@
 				)
 			)
 		)
-		(property "LCSC" "owner-supplied module, hand-plugged"
+		(property "LCSC" "C42379197"
 			(at 797.56 596.9 0)
 			(hide yes)
 			(effects

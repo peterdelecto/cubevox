@@ -3,7 +3,7 @@
 	(generator "pcbnew")
 	(generator_version "10.0")
 	(layer "F.Cu")
-	(descr "1.3in SH1106 OLED module, 4-pin I2C, 35.4x33.5 mm PCB, 4x M3 holes, 2.54 mm header")
+	(descr "1.3in SH1106 OLED module on hanxia HX PM2.54-1x4P TP-YQ 5 mm SMD socket (C42379197), 35.4x33.5 mm PCB, 4x M3 holes")
 	(tags "oled sh1106 i2c module")
 	(property "Reference" "REF**"
 		(at 0 -19.2 0)
@@ -47,7 +47,7 @@
 			)
 		)
 	)
-	(property "LCSC" "owner-supplied module, hand-plugged"
+	(property "LCSC" "C42379197"
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
@@ -80,7 +80,7 @@
 			)
 		)
 	)
-	(attr through_hole)
+	(attr smd)
 	(fp_poly
 		(pts (xy -17.7 -16.75) (xy 17.7 -16.75) (xy 17.7 16.75) (xy 7 16.75) (xy 7 12.25) (xy -7 12.25) (xy -7 16.75) (xy -17.7 16.75))
 		(stroke
@@ -221,33 +221,35 @@
 			)
 		)
 	)
-	(pad "1" thru_hole rect
-		(at -3.81 -14.75)
-		(size 1.7 1.7)
-		(drill 1.0)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
+	(fp_rect
+		(start -5.08 -16.02)
+		(end 5.08 -13.48)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.Fab")
 	)
-	(pad "2" thru_hole circle
-		(at -1.27 -14.75)
-		(size 1.7 1.7)
-		(drill 1.0)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
+	(pad "1" smd rect
+		(at -3.81 -16.55)
+		(size 1.27 2.2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
 	)
-	(pad "3" thru_hole circle
-		(at 1.27 -14.75)
-		(size 1.7 1.7)
-		(drill 1.0)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
+	(pad "2" smd rect
+		(at -1.27 -12.95)
+		(size 1.27 2.2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
 	)
-	(pad "4" thru_hole circle
-		(at 3.81 -14.75)
-		(size 1.7 1.7)
-		(drill 1.0)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
+	(pad "3" smd rect
+		(at 1.27 -16.55)
+		(size 1.27 2.2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(pad "4" smd rect
+		(at 3.81 -12.95)
+		(size 1.27 2.2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
 	)
 	(pad "" np_thru_hole circle
 		(at -15.2 -14.25)

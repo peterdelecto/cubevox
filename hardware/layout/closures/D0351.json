@@ -1,0 +1,81 @@
+{
+ "declaration": "D0351",
+ "ledger": "0440",
+ "baseline": "0436",
+ "board_sha256": "a0c2b79aa7b118d8e7452611301f1fd396bbc5a04edbc6fee2c07cca5b66aabf",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0440.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6527.5,
+   "after": 6527.8,
+   "delta": 0.3,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 5245.2,
+   "after": 5245.4,
+   "delta": 0.2,
+   "direction": "n/a"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 268,
+   "after": 269,
+   "delta": 1,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28582.2,
+   "after": 28599.5,
+   "delta": 17.3,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28582.2,
+   "after": 28599.5,
+   "delta": 17.3,
+   "direction": "n/a"
+  },
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 176,
+   "after": 177,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 1315,
+   "after": 1316,
+   "delta": 1,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "body_tight",
+   "why": "undeclared",
+   "before": 32,
+   "after": 34,
+   "delta": 2,
+   "direction": "worse"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "0b2f79955045"
+}
