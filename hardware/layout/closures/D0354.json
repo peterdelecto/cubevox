@@ -1,0 +1,89 @@
+{
+ "declaration": "D0354",
+ "ledger": "0445",
+ "baseline": "0444",
+ "board_sha256": "e5e1f186ed6e21ac8e8f160c9f526f424339dcddd125ea58967ab913ce0f0050",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0445.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6530.8,
+   "after": 6545.7,
+   "delta": 14.9,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 5248.6,
+   "after": 5273.8,
+   "delta": 25.2,
+   "direction": "n/a"
+  },
+  {
+   "measure": "right_angles",
+   "why": "declared",
+   "before": 26,
+   "after": 23,
+   "delta": -3,
+   "direction": "better"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "reach:C117",
+   "why": "subject in a closure entry",
+   "before": 21.84,
+   "after": 21.79,
+   "delta": -0.05,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C25",
+   "why": "subject in a closure entry",
+   "before": 78.71,
+   "after": 81.71,
+   "delta": 3.0,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 1313,
+   "after": 1320,
+   "delta": 7,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "body_tight",
+   "why": "expected to change, did not",
+   "before": 32,
+   "after": 32,
+   "delta": 0,
+   "direction": "same"
+  },
+  {
+   "measure": "reach:C134",
+   "why": "undeclared",
+   "before": 28.48,
+   "after": 29.67,
+   "delta": 1.19,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C160",
+   "why": "undeclared",
+   "before": 7.54,
+   "after": 7.51,
+   "delta": -0.03,
+   "direction": "better"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "361c2db639b4"
+}
