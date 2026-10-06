@@ -1,0 +1,14 @@
+{
+ "declaration": "D0297",
+ "ledger": "0353",
+ "baseline": "0352",
+ "board_sha256": "bd8624c225f3bc0bd59edfa9cc60200fd54c93c083d256143481e5b879703a30",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0353.json",
+ "intended": [],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

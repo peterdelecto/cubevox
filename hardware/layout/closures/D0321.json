@@ -1,0 +1,80 @@
+{
+ "declaration": "D0321",
+ "ledger": "0389",
+ "baseline": "0386",
+ "board_sha256": "96dbe474e4d1e4e86f39b9ac6ad0a288621572852e40fb11144820e749fdde15",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0389.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2898.7,
+   "after": 3070.6,
+   "delta": 171.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "right_angles",
+   "why": "declared",
+   "before": 15,
+   "after": 19,
+   "delta": 4,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 866,
+   "after": 898,
+   "delta": 32,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 123,
+   "after": 113,
+   "delta": -10,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 204,
+   "after": 211,
+   "delta": 7,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28621.3,
+   "after": 28614.6,
+   "delta": -6.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28621.3,
+   "after": 28614.6,
+   "delta": -6.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "width_transitions",
+   "why": "reported, not ranked",
+   "before": 3,
+   "after": 5,
+   "delta": 2,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

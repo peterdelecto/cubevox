@@ -1,0 +1,57 @@
+{
+ "declaration": "D0290",
+ "ledger": "0346",
+ "baseline": "0341",
+ "board_sha256": "6ce14bef632c483cee7efaaaa270aed138a2e3d51866d3e7a19c37021b85d3fb",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0346.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2499.2,
+   "after": 2643.4,
+   "delta": 144.2,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 42,
+   "after": 40,
+   "delta": -2,
+   "direction": "better"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 759,
+   "after": 820,
+   "delta": 61,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 165,
+   "after": 148,
+   "delta": -17,
+   "direction": "better"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "vias",
+   "why": "expected to change, did not",
+   "before": 201,
+   "after": 201,
+   "delta": 0,
+   "direction": "same"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "28827e79d87e"
+}

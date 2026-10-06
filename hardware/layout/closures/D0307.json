@@ -1,0 +1,80 @@
+{
+ "declaration": "D0307",
+ "ledger": "0366",
+ "baseline": "0362",
+ "board_sha256": "b4a436df191b4325d158efc0c842a64ebb78bf37191e09d3cafe9fc5f66fb673",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0366.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6715.2,
+   "after": 6722.2,
+   "delta": 7.0,
+   "direction": "worse"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 14,
+   "after": 16,
+   "delta": 2,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2740.7,
+   "after": 2739.2,
+   "delta": -1.5,
+   "direction": "n/a"
+  },
+  {
+   "measure": "reach:C24",
+   "why": "declared",
+   "before": 2.28,
+   "after": 2.24,
+   "delta": -0.04,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 823,
+   "after": 822,
+   "delta": -1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 136,
+   "after": 139,
+   "delta": 3,
+   "direction": "worse"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 201,
+   "after": 202,
+   "delta": 1,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 145,
+   "after": 146,
+   "delta": 1,
+   "direction": "worse"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

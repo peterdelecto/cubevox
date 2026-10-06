@@ -1,0 +1,105 @@
+{
+ "declaration": "D0326",
+ "ledger": "0398",
+ "baseline": "0396",
+ "board_sha256": "b1008c03e24073f720b11065c0daff10cd39a9a7c8208283b1d407002eb69ff4",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0398.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 3162.0,
+   "after": 3373.5,
+   "delta": 211.5,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 157,
+   "after": 156,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 918,
+   "after": 1009,
+   "delta": 91,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 106,
+   "after": 76,
+   "delta": -30,
+   "direction": "better"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "abs_mismatch:USB",
+   "why": "undeclared",
+   "before": 0.44,
+   "after": 0.38,
+   "delta": -0.06,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "undeclared",
+   "before": 6575.3,
+   "after": 6575.0,
+   "delta": -0.3,
+   "direction": "better"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 174,
+   "after": 175,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "micro",
+   "why": "undeclared",
+   "before": 0,
+   "after": 1,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "overlaps",
+   "why": "undeclared",
+   "before": 1,
+   "after": 4,
+   "delta": 3,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C6",
+   "why": "undeclared",
+   "before": 8.01,
+   "after": 7.66,
+   "delta": -0.35,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "undeclared",
+   "before": 219,
+   "after": 218,
+   "delta": -1,
+   "direction": "better"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "8ed40201640b"
+}

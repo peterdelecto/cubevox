@@ -1,0 +1,145 @@
+{
+ "declaration": "D0328",
+ "ledger": "0401",
+ "baseline": "0399",
+ "board_sha256": "71847df8c77180cdf3c3fbd346432cf1a659767eef615cecca91318298147f26",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0401.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 3499.1,
+   "after": 3506.8,
+   "delta": 7.7,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "airline:/PRE_OUT",
+   "why": "subject in a closure entry",
+   "before": 165.878,
+   "after": 165.879,
+   "delta": 0.001,
+   "direction": "worse"
+  },
+  {
+   "measure": "airline:/h7core_block/VCAP1",
+   "why": "subject in a closure entry",
+   "before": 2.825,
+   "after": 4.425,
+   "delta": 1.6,
+   "direction": "worse"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28610.7,
+   "after": 28609.7,
+   "delta": -1.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28610.7,
+   "after": 28609.7,
+   "delta": -1.0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "reach:C6",
+   "why": "subject in a closure entry",
+   "before": 7.66,
+   "after": 3.51,
+   "delta": -4.15,
+   "direction": "better"
+  },
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 156,
+   "after": 157,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 1026,
+   "after": 1004,
+   "delta": -22,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 74,
+   "after": 73,
+   "delta": -1,
+   "direction": "better"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "abs_mismatch:USB",
+   "why": "undeclared",
+   "before": 0.38,
+   "after": 0.37,
+   "delta": -0.01,
+   "direction": "better"
+  },
+  {
+   "measure": "airline_total_mm",
+   "why": "undeclared",
+   "before": 6575.0,
+   "after": 6576.6,
+   "delta": 1.6,
+   "direction": "worse"
+  },
+  {
+   "measure": "body_tight",
+   "why": "undeclared",
+   "before": 32,
+   "after": 33,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 175,
+   "after": 174,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "micro",
+   "why": "undeclared",
+   "before": 2,
+   "after": 0,
+   "delta": -2,
+   "direction": "better"
+  },
+  {
+   "measure": "overlaps",
+   "why": "undeclared",
+   "before": 4,
+   "after": 1,
+   "delta": -3,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "undeclared",
+   "before": 218,
+   "after": 220,
+   "delta": 2,
+   "direction": "worse"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "d36faa90e48c"
+}

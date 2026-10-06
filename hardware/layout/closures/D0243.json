@@ -1,0 +1,49 @@
+{
+ "declaration": "D0243",
+ "ledger": "0292",
+ "baseline": "0291",
+ "board_sha256": "d9269495422c0a3cab2804fac271aa509462cd41a6409feed9581b2a822dfa54",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0292.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2914.8,
+   "after": 2502.4,
+   "delta": -412.4,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 923,
+   "after": 777,
+   "delta": -146,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 147,
+   "after": 177,
+   "delta": 30,
+   "direction": "worse"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 49,
+   "after": 81,
+   "delta": 32,
+   "direction": "worse"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "3617a2888c3b"
+}

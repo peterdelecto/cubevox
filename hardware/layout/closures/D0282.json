@@ -1,0 +1,89 @@
+{
+ "declaration": "D0282",
+ "ledger": "0330",
+ "baseline": "0329",
+ "board_sha256": "70b6a4d0210d1b483f3c134c34d7a6d3de63b99f43c79d34fb1f7ba8fa985b13",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0330.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2514.5,
+   "after": 2514.8,
+   "delta": 0.3,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 72,
+   "after": 70,
+   "delta": -2,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 232,
+   "after": 230,
+   "delta": -2,
+   "direction": "better"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28588.8,
+   "after": 28590.7,
+   "delta": 1.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28588.8,
+   "after": 28590.7,
+   "delta": 1.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 785,
+   "after": 781,
+   "delta": -4,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "micro",
+   "why": "undeclared",
+   "before": 3,
+   "after": 0,
+   "delta": -3,
+   "direction": "better"
+  },
+  {
+   "measure": "overlaps",
+   "why": "undeclared",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "unjustified",
+   "why": "expected to change, did not",
+   "before": 1,
+   "after": 1,
+   "delta": 0,
+   "direction": "same"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "362938fb93a8"
+}

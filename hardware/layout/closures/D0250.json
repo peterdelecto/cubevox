@@ -1,0 +1,81 @@
+{
+ "declaration": "D0250",
+ "ledger": "0298",
+ "baseline": "0297",
+ "board_sha256": "525df8d85fc0475330b0af9efb3daff507687b6daab1e8858c8fa73ac68f5a69",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0298.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2497.0,
+   "after": 2468.6,
+   "delta": -28.4,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28582.3,
+   "after": 28585.0,
+   "delta": 2.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28582.3,
+   "after": 28585.0,
+   "delta": 2.7,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 779,
+   "after": 772,
+   "delta": -7,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "undeclared",
+   "before": 6720.5,
+   "after": 6720.6,
+   "delta": 0.1,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C27",
+   "why": "undeclared",
+   "before": 12.95,
+   "after": 12.98,
+   "delta": 0.03,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C28",
+   "why": "undeclared",
+   "before": 13.36,
+   "after": 13.41,
+   "delta": 0.05,
+   "direction": "worse"
+  },
+  {
+   "measure": "vias",
+   "why": "undeclared",
+   "before": 236,
+   "after": 233,
+   "delta": -3,
+   "direction": "better"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "7967e8022665"
+}

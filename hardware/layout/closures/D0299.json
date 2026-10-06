@@ -1,0 +1,81 @@
+{
+ "declaration": "D0299",
+ "ledger": "0356",
+ "baseline": "0354",
+ "board_sha256": "ac3f97be88a7c82e8a38c2812b4ee59afc628902d2a22966563a1118c94f6d16",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0356.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2663.8,
+   "after": 2741.8,
+   "delta": 78.0,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 799,
+   "after": 825,
+   "delta": 26,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 144,
+   "after": 137,
+   "delta": -7,
+   "direction": "better"
+  }
+ ],
+ "unintended": [
+  {
+   "measure": "abs_mismatch:USB",
+   "why": "undeclared",
+   "before": 0.44,
+   "after": 1.71,
+   "delta": 1.27,
+   "direction": "worse"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 40,
+   "after": 39,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "overlaps",
+   "why": "undeclared",
+   "before": 0,
+   "after": 4,
+   "delta": 4,
+   "direction": "worse"
+  },
+  {
+   "measure": "right_angles",
+   "why": "undeclared",
+   "before": 3,
+   "after": 4,
+   "delta": 1,
+   "direction": "worse"
+  },
+  {
+   "measure": "signal_t",
+   "why": "undeclared",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "better"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "c0be9ae308e1"
+}

@@ -1,0 +1,104 @@
+{
+ "declaration": "D0324",
+ "ledger": "0394",
+ "baseline": "0391",
+ "board_sha256": "e14410a86e82e4ad93c5c093f23dbec6260295aa747e3c19cd4b7e126964b05b",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0394.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6574.3,
+   "after": 6575.3,
+   "delta": 1.0,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 3069.2,
+   "after": 3140.7,
+   "delta": 71.5,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 140,
+   "after": 174,
+   "delta": 34,
+   "direction": "worse"
+  },
+  {
+   "measure": "right_angles",
+   "why": "declared",
+   "before": 19,
+   "after": 21,
+   "delta": 2,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 895,
+   "after": 910,
+   "delta": 15,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 113,
+   "after": 110,
+   "delta": -3,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 211,
+   "after": 219,
+   "delta": 8,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "airline:/h7core_block/I2S_LRCLK",
+   "why": "subject in a closure entry",
+   "before": 54.861,
+   "after": 48.234,
+   "delta": -6.627,
+   "direction": "better"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28614.6,
+   "after": 28610.7,
+   "delta": -3.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28614.6,
+   "after": 28610.7,
+   "delta": -3.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 153,
+   "after": 157,
+   "delta": 4,
+   "direction": "worse"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

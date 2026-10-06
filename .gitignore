@@ -9,3 +9,6 @@ dist/
 build-release/
 .history/
 ~*.lck
+__pycache__/
+/cubevox.kicad_prl
+hardware/_panel_tmp.kicad_prl

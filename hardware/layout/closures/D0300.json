@@ -1,0 +1,95 @@
+{
+ "declaration": "D0300",
+ "ledger": "0357",
+ "baseline": "0356",
+ "board_sha256": "1a471232e908fee1c3422a347408046a805bc67be9a604b9459b4201b0a76b5c",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0357.json",
+ "intended": [
+  {
+   "measure": "abs_mismatch:USB",
+   "why": "declared",
+   "before": 1.71,
+   "after": 0.21,
+   "delta": -1.5,
+   "direction": "better"
+  },
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "declared",
+   "before": 28616.5,
+   "after": 28614.6,
+   "delta": -1.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "declared",
+   "before": 28616.5,
+   "after": 28614.6,
+   "delta": -1.9,
+   "direction": "n/a"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 2741.8,
+   "after": 2743.3,
+   "delta": 1.5,
+   "direction": "n/a"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 39,
+   "after": 38,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "overlaps",
+   "why": "declared",
+   "before": 4,
+   "after": 3,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "pair_vias:USB",
+   "why": "declared",
+   "before": 0,
+   "after": 2,
+   "delta": 2,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 825,
+   "after": 827,
+   "delta": 2,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 137,
+   "after": 136,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 201,
+   "after": 203,
+   "delta": 2,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}

@@ -1,0 +1,48 @@
+{
+ "declaration": "D0331",
+ "ledger": "0405",
+ "baseline": "0402",
+ "board_sha256": "188c9ea89a7faeec7c86dbc02f6d3b42d4d5ee649bcd79a25aa4237319945898",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0405.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6576.6,
+   "after": 6576.9,
+   "delta": 0.3,
+   "direction": "worse"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 33,
+   "after": 32,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 3506.8,
+   "after": 3507.0,
+   "delta": 0.2,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "airline:/h7core_block/VCAP1",
+   "why": "subject in a closure entry",
+   "before": 4.425,
+   "after": 4.675,
+   "delta": 0.25,
+   "direction": "worse"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
