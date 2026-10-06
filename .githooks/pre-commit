@@ -1,7 +1,7 @@
 #!/bin/sh
 # Refuse a board commit that carries an orphan via (see hardware/tools/via_audit.py).
 # Known, owner-accepted exceptions live in hardware/layout/via_allow.txt, one "x y" per line.
-git diff --cached --name-only | grep -q '^hardware/cubevox.kicad_pcb$' || exit 0
+[ -n "$VIA_HOOK_FORCE" ] || git diff --cached --name-only | grep -q '^hardware/cubevox.kicad_pcb$' || exit 0
 PY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
 cd hardware || exit 1
 out=$($PY tools/via_audit.py cubevox.kicad_pcb 2>/dev/null)
