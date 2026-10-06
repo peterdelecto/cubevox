@@ -1,0 +1,88 @@
+{
+ "declaration": "D0339",
+ "ledger": "0420",
+ "baseline": "0418",
+ "board_sha256": "7bfd8b19bac89a2908928673b1e97349eceaae2666594948d0c588bcc37cd3be",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0420.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6576.9,
+   "after": 6532.7,
+   "delta": -44.2,
+   "direction": "better"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 3832.5,
+   "after": 4010.0,
+   "delta": 177.5,
+   "direction": "n/a"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 225,
+   "after": 233,
+   "delta": 8,
+   "direction": "worse"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "subject in a closure entry",
+   "before": 28607.9,
+   "after": 28603.1,
+   "delta": -4.8,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "subject in a closure entry",
+   "before": 28607.9,
+   "after": 28603.1,
+   "delta": -4.8,
+   "direction": "n/a"
+  },
+  {
+   "measure": "redundant:/GND",
+   "why": "subject in a closure entry",
+   "before": 160,
+   "after": 163,
+   "delta": 3,
+   "direction": "worse"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 1055,
+   "after": 1096,
+   "delta": 41,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "nets in the closure were routed",
+   "before": 63,
+   "after": 57,
+   "delta": -6,
+   "direction": "better"
+  },
+  {
+   "measure": "width_transitions",
+   "why": "reported, not ranked",
+   "before": 6,
+   "after": 7,
+   "delta": 1,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
