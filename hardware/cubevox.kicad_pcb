@@ -53228,7 +53228,7 @@
 	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "f478850b-03dc-4751-832e-f0309d88950c")
-		(at 108.75 79)
+		(at 109 79)
 		(descr "Capacitor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "capacitor")
 		(property "Reference" "C12"
@@ -57268,6 +57268,14 @@
 		(uuid "7cefbd5b-b675-439d-8a10-cabf8e4a2186")
 	)
 	(segment
+		(start 109.775 79)
+		(end 110.55 79)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/GND")
+		(uuid "7efc5847-6030-4f98-ba40-a28328b9cd3a")
+	)
+	(segment
 		(start 126.8 103.8)
 		(end 125.5 103.8)
 		(width 0.3)
@@ -57338,14 +57346,6 @@
 		(layer "F.Cu")
 		(net "/GND")
 		(uuid "8e1309dc-aa8b-4261-9168-683cea4e0d20")
-	)
-	(segment
-		(start 109.525 79)
-		(end 110.3 79)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/GND")
-		(uuid "8e9a836d-906b-464f-ba90-0efd2847b763")
 	)
 	(segment
 		(start 122.9 103.475)
@@ -58516,6 +58516,14 @@
 		(uuid "7de3ad98-e3ce-4b88-a07d-ab36858f8fc5")
 	)
 	(via
+		(at 110.55 79)
+		(size 0.6)
+		(drill 0.3)
+		(layers "F.Cu" "B.Cu")
+		(net "/GND")
+		(uuid "7f1282a4-31b1-4542-93ad-b363bc7d1402")
+	)
+	(via
 		(at 85.85 71.725)
 		(size 0.6)
 		(drill 0.3)
@@ -58666,14 +58674,6 @@
 		(layers "F.Cu" "B.Cu")
 		(net "/GND")
 		(uuid "a015c766-6f2b-47ee-bcde-686c8d7cb01d")
-	)
-	(via
-		(at 110.3 79)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "/GND")
-		(uuid "a22f2d06-d1df-4140-b509-240a62bca915")
 	)
 	(via
 		(at 84.3 101.11)
@@ -62309,11 +62309,11 @@
 	)
 	(segment
 		(start 104.6 79)
-		(end 107.975 79)
+		(end 108.225 79)
 		(width 0.4)
 		(layer "F.Cu")
 		(net "/h7core_block/VCAP1")
-		(uuid "c01aedc1-1627-4b43-b323-5500931992d2")
+		(uuid "c790f75f-31dd-499f-b73e-2cf4e7a04df7")
 	)
 	(segment
 		(start 103.55 79)
