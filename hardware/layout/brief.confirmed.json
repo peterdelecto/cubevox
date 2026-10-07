@@ -360,38 +360,38 @@
     },
     {
       "ref": "J106",
-      "x": 232.0,
+      "x": 228.5,
       "y": 37.0,
       "rotation": -90.0,
       "reason": "9 V barrel on the rear edge, B.Cu hand-soldered; owner position"
     },
     {
       "ref": "H101",
-      "x": 53.5,
+      "x": 59.6,
       "y": 35.0,
       "rotation": 0.0,
-      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (59.6/237.4, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
     },
     {
       "ref": "H102",
-      "x": 243.5,
+      "x": 237.4,
       "y": 35.0,
       "rotation": 0.0,
-      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (59.6/237.4, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
     },
     {
       "ref": "H103",
-      "x": 53.5,
-      "y": 175.0,
+      "x": 76.5,
+      "y": 170.0,
       "rotation": 0.0,
-      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (59.6/237.4, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
     },
     {
       "ref": "H104",
-      "x": 243.5,
-      "y": 175.0,
+      "x": 220.5,
+      "y": 170.0,
       "rotation": 0.0,
-      "reason": "M3 corner hole 5 mm in from the outline corners (53.5/243.5, 35/175), symmetric, owner 2026-10-02; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (59.6/237.4, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
     }
   ],
   "parts": null,
@@ -1319,9 +1319,9 @@
     }
   },
   "board": {
-    "width_mm": 200,
-    "height_mm": 150,
-    "outline_source": "owner 2026-10-02 pm: 200 x 150 mm for now. Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player. Rear wall left to right as seen from the front: 1/4in out, USB-C middle, XLR combo, 9 V barrel far right; every jack mouth faces the rear edge (-y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4in nose 6 mm). Knob positions are the owner's to lay out. Still provisional until Adam confirms."
+    "width_mm": 185,
+    "height_mm": 145,
+    "outline_source": "owner 2026-10-07: 185 x 145 mm (was 200 x 150 from 2026-10-02 pm). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player. Rear wall left to right as seen from the front: 1/4in out, USB-C middle, XLR combo, 9 V barrel far right; every jack mouth faces the rear edge (-y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4in nose 6 mm). Knob positions are the owner's to lay out. Still provisional until Adam confirms."
   },
   "enclosure": {
     "notes": "Spec: one board inside a 3D printed box; pots, encoders, toggles and OLED header stand up through the top; combo jack, 1/4in out jack, barrel and USB-C are right-angle THT out the rear wall. Connector positions, holes, height limits: OWNER.",

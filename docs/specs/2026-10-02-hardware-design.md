@@ -43,7 +43,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 | 11 | Board arrangement | One board; controls up through the top, jacks right-angle out the rear |
 | 12 | 1/4" half of the combo | Mic or pedal, never both inputs at once. No pad; shared 20–50 dB preamp on the XLR leg, 1/4" through a 25.7 dB pad |
 | 13 | Which H7 | Bare STM32H743VIT6 soldered on the product board, as fxbox. Not the WeAct module |
-| 14 | Top face | Signal-flow row like the pedal view. Board 200 × 150 mm for now (owner 2026-10-02 pm). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player, equally spaced for ergonomics; the owner lays out the knobs. Rear wall left→right as seen from the front: 1/4" out, USB-C middle, XLR combo, 9 V barrel far right. Every jack mouth faces the rear edge (−y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4" nose 6 mm). Still provisional until Adam confirms |
+| 14 | Top face | Signal-flow row like the pedal view. Board 185 × 145 mm (owner 2026-10-07, was 200 × 150). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player, equally spaced for ergonomics; the owner lays out the knobs. Rear wall left→right as seen from the front: 1/4" out, USB-C middle, XLR combo, 9 V barrel far right. Every jack mouth faces the rear edge (−y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4" nose 6 mm). Still provisional until Adam confirms |
 | 15 | Gain structure | Two stages, 20.05 dB fixed + 0–29.9 dB on the pot. 1/4" contacts carry a 25.7 dB pad; menu item 1/4" INPUT: PEDAL / MIC adds 25.7 dB in firmware for a mic on a TRS cable; the combo's normalling contact tells the MCU a 1/4" plug is in |
 | 16 | Power ground | Centre pin straight to GND, +9 V sleeve through a series Schottky and TVS. fxbox's either-polarity FET bridge is dropped because the Boss daisy chain and the audio cable share ground with the BD-2 |
 | 17 | Toggle switch | Yuen Fung ST-0-102-A01-T000-LF (C1788487), the only ON-ON bat toggle on JLC whose bushing spans the 11.8 mm panel plane; lever tip 3.6 mm above the knobs |
@@ -243,9 +243,12 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
 25. Enclosure is 3D printed around the board: about 12 mm above the board
     for the controls, 1.6 mm board, about 29 mm below for the combo jack,
     plus walls. No footswitch.
-26. Mounting (owner 2026-10-02, option A): four M3 holes H101-H104 at 5 mm
-    in from each edge (53.5/243.5 x 35/175), each with a 7 mm "m3seat"
-    copper keep-out. No centre screw and no board keep-outs for the
+26. Mounting (owner 2026-10-02, option A; moved 2026-10-07 with the 185 x 145
+    outline): four M3 holes, H101 (59.6, 35), H102 (237.4, 35), H103
+    (76.5, 170) and H104 (220.5, 170), each with a 7 mm "m3seat" copper
+    keep-out. The rear pair sits near the rear corners; the front pair sits
+    on the front edge between the first and second pots because a corner
+    seat would land in the corner pot's courtyard. No centre screw and no board keep-outs for the
     enclosure (owner 2026-10-02: the enclosure is designed around the
     board; any rest boss lands on whatever bare board is left). The panel toggles' nuts tie the panel
     to the board. Panel grid: eight stage columns at 24 mm pitch centred on
@@ -261,7 +264,8 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     collar 11.85), with a 3.1 mm trough along the toggle row so the nuts
     get 3.4 mm of thread, an OLED window with a glass pocket, and four
     corner posts; one M3 x 20 per corner through lid, board and a heat-set
-    insert in the tray boss. Board changes it asks for: J101 0.8 mm
+    insert in the tray boss. The lid's front posts move with the front holes
+    (x 76.5 and 220.5, y 170) and the rear posts with H101/H102. Board changes it asks for: J101 0.8 mm
     rearward (flange face 1 mm past the plate inner face), J108 2 mm
     rearward or keep the 1 mm nut pocket, OLED standoffs 9 mm. Pot shafts
     show 6.1 mm above the lid; a 1.5 mm lid or 25 mm pots would add more.

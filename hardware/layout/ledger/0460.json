@@ -1,0 +1,45 @@
+{
+ "id": "0460",
+ "board_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch",
+ "board": {
+  "path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch",
+  "sha256": "37438614a1d7c348a3c57d0feb553444211b2cc386c55b20fdc6973abf82d12b"
+ },
+ "commit": "5b681995e96f8cccc6efe93fb17828954e8fa046",
+ "dirty": false,
+ "tool_version": "0.2.35",
+ "kicad_version": "10.0.5",
+ "python_version": "3.9.13",
+ "classification_sha256": null,
+ "timestamp_utc": "2026-10-07T22:39:35Z",
+ "pass": "placement",
+ "erc": {
+  "schematic": "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch",
+  "erc": {
+   "board": {},
+   "quarantined": {},
+   "errors": 0,
+   "refuse_to_place": false
+  },
+  "blind_spots": {
+   "pins": 0,
+   "symbols": 0,
+   "by_symbol": {},
+   "nets": []
+  },
+  "structural": {
+   "single_pin_nets": {
+    "count": 99,
+    "unnamed": []
+   },
+   "power_name_mismatches": [],
+   "gnd_nodes": 173,
+   "untyped_pin_nets": [],
+   "parallel_passive_dead_ends": []
+  },
+  "fixer": {
+   "path": "/Users/j/Documents/KiCad/libraries/jlc-kicad-db/assign_pin_types.py",
+   "available": true
+  }
+ }
+}
