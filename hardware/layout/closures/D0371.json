@@ -1,0 +1,56 @@
+{
+ "declaration": "D0371",
+ "ledger": "0463",
+ "baseline": "0462",
+ "board_sha256": "6803a3ca1806e87cffd4f87c6f7a2a9d2f0f40ad1f720ac2078d0a78dd40857e",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0463.json",
+ "intended": [
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 4929.6,
+   "after": 4930.0,
+   "delta": 0.4,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [],
+ "unintended": [
+  {
+   "measure": "drc_board_errors",
+   "why": "undeclared",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "undeclared",
+   "before": 1,
+   "after": 0,
+   "delta": -1,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "expected to change, did not",
+   "before": 1218,
+   "after": 1218,
+   "delta": 0,
+   "direction": "n/a"
+  },
+  {
+   "measure": "unconnected",
+   "why": "expected to change, did not",
+   "before": 34,
+   "after": 34,
+   "delta": 0,
+   "direction": "same"
+  }
+ ],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "e0853e319367"
+}

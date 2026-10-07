@@ -244,9 +244,9 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     for the controls, 1.6 mm board, about 29 mm below for the combo jack,
     plus walls. No footswitch.
 26. Mounting (owner 2026-10-02, option A; moved 2026-10-07 with the 185 x 145
-    outline): four M3 holes, H101 (59.6, 35), H102 (237.4, 35), H103
+    outline): four M3 holes, H101 (61, 35), H102 (236, 35), H103
     (76.5, 170) and H104 (220.5, 170), each with a 7 mm "m3seat" copper
-    keep-out. The rear pair sits near the rear corners; the front pair sits
+    keep-out. The rear pair sits 5 mm from the rear and side edges; the front pair sits
     on the front edge between the first and second pots because a corner
     seat would land in the corner pot's courtyard. No centre screw and no board keep-outs for the
     enclosure (owner 2026-10-02: the enclosure is designed around the
@@ -265,7 +265,7 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     get 3.4 mm of thread, an OLED window with a glass pocket, and four
     corner posts; one M3 x 20 per corner through lid, board and a heat-set
     insert in the tray boss. The lid's front posts move with the front holes
-    (x 76.5 and 220.5, y 170) and the rear posts with H101/H102. Board changes it asks for: J101 0.8 mm
+    (x 76.5 and 220.5, y 170) and the rear posts with H101/H102 (x 61 and 236, y 35). Board changes it asks for: J101 0.8 mm
     rearward (flange face 1 mm past the plate inner face), J108 2 mm
     rearward or keep the 1 mm nut pocket, OLED standoffs 9 mm. Pot shafts
     show 6.1 mm above the lid; a 1.5 mm lid or 25 mm pots would add more.
