@@ -84,6 +84,10 @@ void applyInputGateDefaults(cv::GateParams& g) {
 
 struct ProtoParams {
   bool playing = false;
+  // Source: 0 plays the loaded loop, 1 runs the mic macOS has chosen (System
+  // Settings > Sound > Input) through the chain.
+  int source = 0;
+  float inputGainDb = 0.0f;  // mic only, -12..+24
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -171,6 +175,8 @@ std::atomic<int> gStatePublishIndex{0};
 int gStateWriteIndex = 1;  // audio-thread-only
 
 std::string gLoopPath;  // UI-thread-only
+std::atomic<bool> gMicAvailable{false};  // duplex device opened
+std::string gInputName;                  // UI-thread-only; current capture device
 
 // Audio-thread-only.
 cv::Gate gInputGate;
@@ -254,8 +260,9 @@ void publishState(float peak, const LoopBuffer* loop) {
   gStateWriteIndex ^= 1;
 }
 
-void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
+void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCount) {
   float* out = static_cast<float*>(output);
+  const float* mic = static_cast<const float*>(input);  // mono f32, null on playback-only
   const ProtoParams params =
       gParamsBuf[gParamsPublishIndex.load(std::memory_order_acquire)];
   LoopBuffer* loop = gCurrentLoop.load(std::memory_order_acquire);
@@ -276,14 +283,17 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   }
   // Movement 100 % = 75 % of the simulator range (owner 2026-10-02: full was too much).
   constexpr float kFeedbackCap = 0.75f;  // Movement only; Amount uses the full range (owner)
-  gStageFeedback.configure(params.stageFeedback && params.playing,
+  const bool live = params.source == 1 && mic != nullptr;
+  const bool loopRunning = params.playing && loop != nullptr && !loop->samples.empty();
+  gStageFeedback.configure(params.stageFeedback && (live || params.playing),
                            0.01f * params.feedbackAmount,
                            kFeedbackCap * 0.01f * params.feedbackMovement);
-  if (!params.playing || loop == nullptr || loop->samples.empty()) {
+  if (!live && !loopRunning) {
     std::memset(out, 0, sizeof(float) * 2 * frameCount);
     publishState(0.0f, loop);
     return;
   }
+  const float micGain = std::pow(10.0f, params.inputGainDb / 20.0f);
 
   std::array<float, cv::kBlock> in;
   std::array<float, cv::kBlock> tmp;
@@ -292,7 +302,11 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
   ma_uint32 done = 0;
   while (done < frameCount) {
     const int n = static_cast<int>(std::min<ma_uint32>(cv::kBlock, frameCount - done));
-    readLoop(*loop, in.data(), n);
+    if (live) {
+      for (int i = 0; i < n; ++i) in[i] = mic[done + i] * micGain;
+    } else {
+      readLoop(*loop, in.data(), n);
+    }
     const bool feedback = gStageFeedback.enabled();
     if (feedback) {
       for (int i = 0; i < n; ++i) in[i] += gStageFeedback.returnSample(in[i]);
@@ -318,7 +332,7 @@ void dataCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
     }
     done += n;
   }
-  publishState(peak, loop);
+  publishState(peak, live ? nullptr : loop);
 }
 
 void publishParams(const ProtoParams& p) {
@@ -519,6 +533,7 @@ struct ProbeOpen {
   bool advanced = false;   // Advanced view instead of the macro view
   int reverbEngine = -1;   // forced reverb engine, -1 keeps the live one
   bool pedal = false;      // pedal mode instead of the full face
+  bool mic = false;        // source MIC, so the header shows the gain slider
 };
 bool gAdvanced = false;  // UI-thread-only; mirrors ProtoParams::advanced
 bool gDev = false;       // UI-thread-only; mirrors ProtoParams::dev
@@ -899,7 +914,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
   static double copiedAt = -10.0;
   constexpr double kCopiedShowSec = 1.5;
   const bool justCopied = ImGui::GetTime() - copiedAt < kCopiedShowSec;
-  if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings to clipboard###copy",
+  if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings###copy",
                     ImVec2(copyW, 0.0f))) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
                 params.distortion.tuning, params.reverb.spring.tuning,
@@ -945,7 +960,7 @@ void toggleButton(const char* name, bool& on, bool withState = true, float width
 // Header items in order, each at its natural width plus an equal share of the
 // spare row width, so the row spans the window.
 struct HeaderWidths {
-  float load, name, play, meter, advanced, feedback, amount, movement, reset, copy;
+  float mic, load, name, play, meter, advanced, feedback, amount, movement, reset, copy;
 };
 
 HeaderWidths headerWidths(bool dev) {
@@ -954,13 +969,13 @@ HeaderWidths headerWidths(bool dev) {
   const auto slider = [&](const char* t) {
     return kFeedbackSliderW + st.ItemInnerSpacing.x + ImGui::CalcTextSize(t).x;
   };
-  HeaderWidths w{button("Load loop"), kLoopNameW,     button("Stop"),
+  HeaderWidths w{button("MIC"),       button("Load loop"), kLoopNameW,  button("Stop"),
                  kMeterW,             dev ? button("Advanced") : 0.0f,
                  button("STAGE FEEDBACK: OFF"), slider("Amount"), slider("Movement"),
-                 button("Reset to defaults"),   button("Copy settings to clipboard")};
-  float* const items[] = {&w.load, &w.name,   &w.play,     &w.meter, &w.advanced,
-                          &w.feedback, &w.amount, &w.movement, &w.reset, &w.copy};
-  const int count = dev ? 10 : 9;
+                 button("Reset to defaults"),   button("Copy settings")};
+  float* const items[] = {&w.mic,      &w.load,   &w.name,     &w.play,   &w.meter, &w.advanced,
+                          &w.feedback, &w.amount, &w.movement, &w.reset,  &w.copy};
+  const int count = dev ? 11 : 10;
   float used = st.ItemSpacing.x * static_cast<float>(count - 1);
   for (float* v : items) used += *v;
   const float extra = std::max(0.0f, ImGui::GetContentRegionAvail().x - used) / static_cast<float>(count);
@@ -969,16 +984,8 @@ HeaderWidths headerWidths(bool dev) {
   return w;
 }
 
-void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
-  const HeaderWidths hw = headerWidths(params.dev);
-  if (ImGui::Button("Load loop", ImVec2(hw.load, 0.0f)) && !probe) {
-    const std::string path = openFilePanel();
-    if (!path.empty()) loadLoop(path);
-  }
-  ImGui::SameLine();
-  // Fixed-width name slot so a long file name never pushes the row off screen.
-  std::string name = gLoopPath.empty() ? "(no loop)" : baseName(gLoopPath);
-  const float maxW = hw.name;
+// Fixed-width name slot so a long name never pushes the row off screen.
+void fixedName(std::string name, float maxW) {
   if (ImGui::CalcTextSize(name.c_str()).x > maxW) {
     while (!name.empty() && ImGui::CalcTextSize((name + "...").c_str()).x > maxW) name.pop_back();
     name += "...";
@@ -987,9 +994,37 @@ void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   ImGui::TextUnformatted(name.c_str());
   ImGui::SameLine(0.0f, 0.0f);
   ImGui::Dummy(ImVec2(std::max(0.0f, maxW - ImGui::GetItemRectSize().x), 0.0f));
+}
+
+void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
+  const HeaderWidths hw = headerWidths(params.dev);
+  const ImGuiStyle& st = ImGui::GetStyle();
+  // MIC lights when the source is the input macOS has chosen. The loop group
+  // then gives its three slots to the input name and gain, so the row keeps its width.
+  const bool micAvailable = gMicAvailable.load(std::memory_order_relaxed);
+  ImGui::BeginDisabled(!micAvailable);
+  bool mic = params.source == 1 && micAvailable;
+  toggleButton("MIC", mic, false, hw.mic);
+  ImGui::EndDisabled();
+  params.source = mic ? 1 : 0;
   ImGui::SameLine();
-  if (ImGui::Button(params.playing ? "Stop###play" : "Play###play", ImVec2(hw.play, 0.0f)))
-    params.playing = !params.playing;
+  if (mic) {
+    fixedName(gInputName, hw.name);
+    ImGui::SameLine();
+    const float gainW = hw.load + hw.play + st.ItemSpacing.x;
+    ImGui::SetNextItemWidth(gainW - st.ItemInnerSpacing.x - ImGui::CalcTextSize("Gain").x);
+    ImGui::SliderFloat("Gain", &params.inputGainDb, -12.0f, 24.0f, "%+.0f dB");
+  } else {
+    if (ImGui::Button("Load loop", ImVec2(hw.load, 0.0f)) && !probe) {
+      const std::string path = openFilePanel();
+      if (!path.empty()) loadLoop(path);
+    }
+    ImGui::SameLine();
+    fixedName(gLoopPath.empty() ? "(no loop)" : baseName(gLoopPath), hw.name);
+    ImGui::SameLine();
+    if (ImGui::Button(params.playing ? "Stop###play" : "Play###play", ImVec2(hw.play, 0.0f)))
+      params.playing = !params.playing;
+  }
   ImGui::SameLine();
 
   const float frac = std::clamp((meterDb - kMeterFloorDb) / -kMeterFloorDb, 0.0f, 1.0f);
@@ -1139,6 +1174,8 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   add("feedback.on", &p.stageFeedback);
   add("feedback.amount", &p.feedbackAmount);
   add("feedback.movement", &p.feedbackMovement);
+  add("source", &p.source);
+  add("input.gainDb", &p.inputGainDb);
   return f;
 }
 
@@ -2057,6 +2094,8 @@ int runLayoutProbe() {
       {true, "eq", nullptr, true},              {true, "ingate", nullptr, true},
       {true, "autotune", nullptr, true},        {true, "gate", nullptr, true},
       {true, nullptr, nullptr, false, -1, true},
+      {true, nullptr, nullptr, false, -1, false, true},
+      {true, nullptr, nullptr, false, -1, true, true},
   };
 
   ProtoParams params;
@@ -2069,6 +2108,9 @@ int runLayoutProbe() {
     gProbeOpen = s;
     params.advanced = s.advanced;
     params.pedalMode = s.pedal;
+    params.source = s.mic ? 1 : 0;
+    gMicAvailable.store(s.mic);
+    gInputName = "Scarlett 2i2 USB";  // a long real name for the header
     if (s.reverbEngine >= 0) params.reverb.engine = s.reverbEngine;
     for (int frame = 0; frame < kProbeFrames; ++frame) {
       ImGui::NewFrame();
@@ -2076,9 +2118,10 @@ int runLayoutProbe() {
       ImGui::Render();
     }
     char name[64];
-    std::snprintf(name, sizeof(name), "%s %s%s%s%s", s.advanced ? "adv  " : "macro",
+    std::snprintf(name, sizeof(name), "%s %s%s%s%s%s", s.advanced ? "adv  " : "macro",
                   s.block ? s.block : "all closed", s.node ? " / " : "", s.node ? s.node : "",
-                  s.pedal ? " (PEDAL MODE)" : s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kSpringB ? " (SPRING B)" : ""));
+                  s.pedal ? " (PEDAL MODE)" : s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kSpringB ? " (SPRING B)" : ""),
+                  s.mic ? " (MIC)" : "");
     const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
     const bool headerFits = gHeaderRight <= static_cast<float>(kWindowW);
     if (!headerFits) std::printf("header row runs to %.0f px of %d\n", gHeaderRight, kWindowW);
@@ -2233,15 +2276,30 @@ int runWindow() {
   double lastSaveCheck = glfwGetTime();
   constexpr double kSaveEverySec = 1.0;  // a crash loses at most this much
 
-  ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
+  // Duplex on the devices macOS has chosen; miniaudio follows a change of
+  // default input or output while running. No mic (or no permission) falls
+  // back to playback only, so the loop still plays.
+  ma_device_config deviceConfig = ma_device_config_init(ma_device_type_duplex);
+  deviceConfig.capture.format = ma_format_f32;
+  deviceConfig.capture.channels = 1;
   deviceConfig.playback.format = ma_format_f32;
   deviceConfig.playback.channels = 2;
   deviceConfig.sampleRate = cv::kSampleRate;
+  deviceConfig.periodSizeInFrames = 128;
   deviceConfig.dataCallback = dataCallback;
   ma_device device;
-  if (ma_device_init(nullptr, &deviceConfig, &device) != MA_SUCCESS ||
-      ma_device_start(&device) != MA_SUCCESS) {
-    std::fprintf(stderr, "audio device failed\n");
+  bool duplex = ma_device_init(nullptr, &deviceConfig, &device) == MA_SUCCESS;
+  if (!duplex) {
+    std::fprintf(stderr, "[WARN] no capture device; loop playback only\n");
+    deviceConfig.deviceType = ma_device_type_playback;
+    if (ma_device_init(nullptr, &deviceConfig, &device) != MA_SUCCESS) {
+      std::fprintf(stderr, "[ERROR] audio device failed\n");
+      return 1;
+    }
+  }
+  gMicAvailable.store(duplex);
+  if (ma_device_start(&device) != MA_SUCCESS) {
+    std::fprintf(stderr, "[ERROR] audio device failed to start\n");
     return 1;
   }
 
@@ -2258,6 +2316,9 @@ int runWindow() {
     publishParams(params);
     if (glfwGetTime() - lastSaveCheck >= kSaveEverySec) {
       lastSaveCheck = glfwGetTime();
+      ma_device_info info;
+      if (duplex && ma_device_get_info(&device, ma_device_type_capture, &info) == MA_SUCCESS)
+        gInputName = info.name;
       const std::string text = stateText(params, gMenu, gLoopPath);
       if (text != savedText) {
         saveState(stateFile, text);

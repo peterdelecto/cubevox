@@ -12,3 +12,6 @@
   panel knobs (encoders below knobs), name and on/off LED at the foot; the probe checks it fits.
 - Stage feedback simulator is prototype-only test signal. It is calibrated so a bypassed
   box does not feed back at default Amount; DRIVE causes it.
+- Source (owner 2026-10-07): the transport row runs the loaded loop or MIC. MIC is whatever
+  macOS has chosen as input (System Settings > Sound > Input), followed live; no in-app
+  device picker. Gain is mic only. No mic or no permission: playback only, MIC greyed.

@@ -16,5 +16,7 @@
 	<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Runs your mic through the prototype's effects.</string>
 </dict>
 </plist>
