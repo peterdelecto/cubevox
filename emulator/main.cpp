@@ -177,6 +177,7 @@ int gStateWriteIndex = 1;  // audio-thread-only
 std::string gLoopPath;  // UI-thread-only
 std::atomic<bool> gMicAvailable{false};  // duplex device opened
 std::string gInputName;                  // UI-thread-only; current capture device
+unsigned gInputRate = 0;                 // UI-thread-only; its sample rate
 
 // Audio-thread-only.
 cv::Gate gInputGate;
@@ -1009,7 +1010,11 @@ void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   params.source = mic ? 1 : 0;
   ImGui::SameLine();
   if (mic) {
-    fixedName(gInputName, hw.name);
+    // A Bluetooth headset mic runs at 8 or 16 kHz and carries 100 ms or more of lag;
+    // naming the rate makes that visible.
+    std::string name = gInputName;
+    if (gInputRate > 0 && gInputRate < 32000) name += " " + std::to_string(gInputRate / 1000) + " kHz";
+    fixedName(name, hw.name);
     ImGui::SameLine();
     const float gainW = hw.load + hw.play + st.ItemSpacing.x;
     ImGui::SetNextItemWidth(gainW - st.ItemInnerSpacing.x - ImGui::CalcTextSize("Gain").x);
@@ -2298,6 +2303,10 @@ int runWindow() {
     }
   }
   gMicAvailable.store(duplex);
+  std::fprintf(stderr, "[INFO] audio: capture %s %u Hz period %u, playback %s %u Hz period %u\n",
+               device.capture.name, device.capture.internalSampleRate,
+               device.capture.internalPeriodSizeInFrames, device.playback.name,
+               device.playback.internalSampleRate, device.playback.internalPeriodSizeInFrames);
   if (ma_device_start(&device) != MA_SUCCESS) {
     std::fprintf(stderr, "[ERROR] audio device failed to start\n");
     return 1;
@@ -2317,8 +2326,10 @@ int runWindow() {
     if (glfwGetTime() - lastSaveCheck >= kSaveEverySec) {
       lastSaveCheck = glfwGetTime();
       ma_device_info info;
-      if (duplex && ma_device_get_info(&device, ma_device_type_capture, &info) == MA_SUCCESS)
+      if (duplex && ma_device_get_info(&device, ma_device_type_capture, &info) == MA_SUCCESS) {
         gInputName = info.name;
+        gInputRate = device.capture.internalSampleRate;
+      }
       const std::string text = stateText(params, gMenu, gLoopPath);
       if (text != savedText) {
         saveState(stateFile, text);
