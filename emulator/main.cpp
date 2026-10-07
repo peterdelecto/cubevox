@@ -2290,7 +2290,7 @@ int runWindow() {
   deviceConfig.playback.format = ma_format_f32;
   deviceConfig.playback.channels = 2;
   deviceConfig.sampleRate = cv::kSampleRate;
-  deviceConfig.periodSizeInFrames = 128;
+  deviceConfig.periodSizeInFrames = 64;  // duplex costs about four periods end to end
   deviceConfig.dataCallback = dataCallback;
   ma_device device;
   bool duplex = ma_device_init(nullptr, &deviceConfig, &device) == MA_SUCCESS;
