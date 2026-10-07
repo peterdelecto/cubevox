@@ -1,0 +1,128 @@
+{
+ "declaration": "D0366",
+ "ledger": "0458",
+ "baseline": "0456",
+ "board_sha256": "f9e973ef4d82c40b0a7f442814d0e9c60c224441db16529a76ce8bd60c004696",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0458.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6322.8,
+   "after": 6306.4,
+   "delta": -16.4,
+   "direction": "better"
+  },
+  {
+   "measure": "body_tight",
+   "why": "declared",
+   "before": 29,
+   "after": 35,
+   "delta": 6,
+   "direction": "worse"
+  },
+  {
+   "measure": "drc_board_total",
+   "why": "declared",
+   "before": 0,
+   "after": 5,
+   "delta": 5,
+   "direction": "worse"
+  },
+  {
+   "measure": "fastener_gap:H101",
+   "why": "declared",
+   "before": 9.46,
+   "after": 3.35,
+   "delta": -6.11,
+   "direction": "n/a"
+  },
+  {
+   "measure": "fastener_gap:H102",
+   "why": "declared",
+   "before": 6.46,
+   "after": 3.85,
+   "delta": -2.61,
+   "direction": "n/a"
+  },
+  {
+   "measure": "fastener_gap:H103",
+   "why": "declared",
+   "before": 6.44,
+   "after": 4.33,
+   "delta": -2.11,
+   "direction": "n/a"
+  },
+  {
+   "measure": "fastener_gap:H104",
+   "why": "declared",
+   "before": 3.86,
+   "after": 4.33,
+   "delta": 0.47,
+   "direction": "n/a"
+  },
+  {
+   "measure": "redundant:/GND",
+   "why": "declared",
+   "before": 191,
+   "after": 145,
+   "delta": -46,
+   "direction": "better"
+  },
+  {
+   "measure": "unconnected",
+   "why": "declared",
+   "before": 34,
+   "after": 52,
+   "delta": 18,
+   "direction": "worse"
+  },
+  {
+   "measure": "vias",
+   "why": "declared",
+   "before": 275,
+   "after": 227,
+   "delta": -48,
+   "direction": "better"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/GND:In1.Cu",
+   "why": "reported, not ranked",
+   "before": 28641.4,
+   "after": 25488.3,
+   "delta": -3153.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "area:/GND:In2.Cu",
+   "why": "reported, not ranked",
+   "before": 28641.4,
+   "after": 25488.3,
+   "delta": -3153.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "reported, not ranked",
+   "before": 4918.2,
+   "after": 4712.4,
+   "delta": -205.8,
+   "direction": "n/a"
+  },
+  {
+   "measure": "segments",
+   "why": "reported, not ranked",
+   "before": 1216,
+   "after": 1189,
+   "delta": -27,
+   "direction": "n/a"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
