@@ -104,8 +104,8 @@ struct ProtoParams {
   bool advanced = false;
   // Pedal mode shows each effect as a stompbox with only its panel knobs.
   bool pedalMode = false;
-  // Bypass sends the input straight out; the chain keeps running underneath.
-  bool bypass = false;
+  // Mute silences the output; the chain keeps running underneath (the box's MUTE toggle).
+  bool mute = false;
   cv::macros::State macros;
   // Prototype-only test signal. Not a panel control, not in Print tuning.
   bool stageFeedback = false;
@@ -320,9 +320,8 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
     gPolish.process(mono.data(), tmp.data(), n, params.eq);
-    // Bypass: the dry input (feedback return included) goes out, so the wedge loop
-    // hears exactly what a bypassed box would send.
-    if (params.bypass) std::copy(in.begin(), in.begin() + n, tmp.begin());
+    // Mute: silence out, so the wedge loop hears exactly what a muted box would send.
+    if (params.mute) std::fill(tmp.begin(), tmp.begin() + n, 0.0f);
     if (feedback) {
       for (int i = 0; i < n; ++i) gStageFeedback.push(tmp[i]);
     }
@@ -1174,7 +1173,7 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
                  &p.macros.pos[static_cast<size_t>(i)]});
   add("dev", &p.dev);
   add("pedal", &p.pedalMode);
-  add("bypass", &p.bypass);
+  add("mute", &p.mute);
   add("advanced", &p.advanced);
   add("feedback.on", &p.stageFeedback);
   add("feedback.amount", &p.feedbackAmount);
@@ -1696,7 +1695,7 @@ void moduleBox(const char* id, bool first, const F& draw) {
 }
 
 constexpr float kFooterH = 52.0f;    // strip under the columns for the mode button, px
-constexpr float kBypassRowH = 46.0f;  // BYPASS above the mode button, under the last column, px
+constexpr float kMuteRowH = 46.0f;  // MUTE above the mode button, under the last column, px
 constexpr ImVec2 kModeButtonPadding = ImVec2(18.0f, 10.0f);  // mode button frame padding, px
 
 // ---- Pedal mode: each effect drawn as a stompbox -----------------------------------
@@ -1932,8 +1931,8 @@ void column(int index, float width, const F& draw) {
   gCurrentColumn = index;
   ImGui::PushID(index);
   // The footer strip below the columns holds the mode button; the last column also
-  // leaves room for BYPASS above it.
-  const float reserve = index == kColumnCount - 1 ? kFooterH + kBypassRowH : kFooterH;
+  // leaves room for MUTE above it.
+  const float reserve = index == kColumnCount - 1 ? kFooterH + kMuteRowH : kFooterH;
   ImGui::BeginChild("column", ImVec2(width, -reserve), ImGuiChildFlags_None,
                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   ImGui::PushItemWidth(-kLabelW);
@@ -1989,21 +1988,22 @@ void drawModeButton(ProtoParams& params) {
   ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kHeaderScale);
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, kModeButtonPadding);
   const char* label = params.pedalMode ? "Full view###mode" : "Pedal mode###mode";
-  const float w = ImGui::CalcTextSize("BYPASSED").x + 2.0f * kModeButtonPadding.x;
+  const float w = std::max(ImGui::CalcTextSize("Pedal mode").x, ImGui::CalcTextSize("MUTED").x) +
+                  2.0f * kModeButtonPadding.x;
   ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y -
                        ImGui::GetFrameHeight());
   ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w);
   if (ImGui::Button(label, ImVec2(w, 0.0f))) params.pedalMode = !params.pedalMode;
   const float modeTop = ImGui::GetItemRectMin().y - ImGui::GetWindowPos().y;
-  // BYPASS above it, same size, lit red while bypassed.
+  // MUTE above it, same size, lit red while muted.
   ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - w,
                              modeTop - ImGui::GetStyle().ItemSpacing.y - ImGui::GetFrameHeight()));
-  const bool lit = params.bypass;
+  const bool lit = params.mute;
   if (lit) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(170, 40, 40, 255));
-  if (ImGui::Button(params.bypass ? "BYPASSED###bypass" : "Bypass###bypass", ImVec2(w, 0.0f)))
-    params.bypass = !params.bypass;
+  if (ImGui::Button(params.mute ? "MUTED###mute" : "Mute###mute", ImVec2(w, 0.0f)))
+    params.mute = !params.mute;
   if (lit) ImGui::PopStyleColor();
-  gToggleRects["BYPASS"] = {ImGui::GetItemRectMin(), ImGui::GetItemRectMax()};
+  gToggleRects["MUTE"] = {ImGui::GetItemRectMin(), ImGui::GetItemRectMax()};
   ImGui::SetCursorPosY(modeTop);
   // Build version, bottom left at the button's size; tools/bump_version.sh per change.
   ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetItemRectMin().y -
@@ -2148,8 +2148,8 @@ int runLayoutProbe() {
   gProbeOpen = ProbeOpen{};
   ProtoParams clicked;
   clicked.dev = true;
-  bool* const targets[3] = {&clicked.stageFeedback, &clicked.advanced, &clicked.bypass};
-  const char* const names[3] = {"STAGE FEEDBACK", "Advanced", "BYPASS"};
+  bool* const targets[3] = {&clicked.stageFeedback, &clicked.advanced, &clicked.mute};
+  const char* const names[3] = {"STAGE FEEDBACK", "Advanced", "MUTE"};
   for (int t = 0; t < 3; ++t) {
     bool flips = true;
     for (int c = 0; c < 2; ++c) {
