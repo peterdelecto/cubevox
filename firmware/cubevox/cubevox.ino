@@ -4,6 +4,7 @@
 
 #include "audio.h"
 #include "controls.h"
+#include "display_sh1106.h"
 #include "menu.h"
 #include "mute.h"
 #include "pins.h"
@@ -52,7 +53,12 @@ void setup() {
   Serial.begin(115200);
 
   controlsInit();
-  menuInit(stubDisplay());
+  if (sh1106Present()) {
+    menuInit(sh1106Display());
+  } else {
+    Serial.println("[WARN] OLED not found, serial display");
+    menuInit(stubDisplay());
+  }
 
   if (audioInit()) {
     muteClocksRunning(millis());

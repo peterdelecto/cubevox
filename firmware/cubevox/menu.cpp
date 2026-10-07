@@ -11,7 +11,7 @@
 namespace {
 
 constexpr int kRows = 8;
-constexpr int kCols = 22;
+constexpr int kCols = 16;  // SH1106 at the 8x8 font
 constexpr int kCountsPerDetent = 2;  // EC11E: 15 pulses and 30 detents per turn
 constexpr uint32_t kClickDebounceMs = 20;
 constexpr uint32_t kMenuTimeoutMs = 15000;
@@ -57,9 +57,9 @@ void row(int r, const char* text) { snprintf(gFrame[r], sizeof(gFrame[r]), "%s",
 
 const char* itemLabel(Item it) {
   switch (it) {
-    case Item::ReverbEngine: return "Reverb engine";
-    case Item::Output: return "Output";
-    case Item::InputJack: return "1/4\" input";
+    case Item::ReverbEngine: return "Reverb";
+    case Item::Output: return "Out";
+    case Item::InputJack: return "Input";
     case Item::ChainOrder: return "Chain order";
     case Item::UpdateFirmware: return "Update firmware";
     case Item::Exit: return "Exit";

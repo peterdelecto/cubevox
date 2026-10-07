@@ -1,6 +1,6 @@
 // MENU encoder state machine and the OLED screens.
-// Drawing goes through the Display interface. The shipped Display is a serial-logging stub
-// until an SH1106 I2C driver is proven on the H7.
+// Drawing goes through the Display interface: the SH1106 driver when the panel answers on
+// I2C2, otherwise a serial-logging stub. Lines are 16 columns, the SH1106 at the 8x8 font.
 
 #pragma once
 
