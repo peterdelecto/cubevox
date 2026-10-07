@@ -49,7 +49,9 @@ The board decides the ports:
 | 45 | PE15 | ENC_MENU_A | EXTI15 |
 | 44 | PE14 | ENC_MENU_B | EXTI14 |
 | 43 | PE13 | ENC_MENU_SW | EXTI13 |
-| 40-42 | PE10-PE12 | spare | |
+| 42 | PE12 | spare | |
+| 41 | PE11 | USER_LED | output; no JTAG pull-up, dark until init |
+| 40 | PE10 | spare | |
 | 39 | PE9 | XSMT | output, R16 pull-down |
 | 38 | PE8 | TOGGLE8 | |
 | 37 | PE7 | TOGGLE7 | |
@@ -67,7 +69,7 @@ The board decides the ports:
 
 | Pin | Port | Net | Note |
 |---|---|---|---|
-| 90 | PB4 | USER_LED | NJTRST pull-up lights the LED faintly until init |
+| 90 | PB4 | spare | NJTRST pull-up at reset; left unconnected |
 | 91 | PB5 | MUTE_N | |
 | 92 | PB6 | TOGGLE1 | |
 | 93 | PB7 | ENC_KEY_B | EXTI7 |
@@ -107,7 +109,7 @@ Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 40-42 (P
 | XSMT | PE15 | PE9 |
 | VA_SENSE | PC4 (ADC12_INP4) | PB1 (ADC12_INP5) |
 | MUTE_N | PD12 | PB5 |
-| USER_LED | PD7 | PB4 |
+| USER_LED | PD7 | PE11 |
 | OLED I2C | I2C1 PB8/PB9 (I2C1_SCL/SDA) | I2C2 PB10/PB11 (I2C_SCL/SDA) |
 | CC1 / CC2 | PA0 / PA3 | not connected |
 
@@ -231,6 +233,14 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
 4. Enable block A (starts MCLK) before the PCM1808 leaves power-down or reset, and keep MCLK
    running whenever PCM1808 is powered.
 5. Settings are written to internal flash bank 2 while the code runs from bank 1 (dual bank, no stall).
+6. MUX_S0-S3 (PC5, PC4, PA6, PA7) stay low, or input with no pull, until LDO_EN has released
+   3V3A. U101 (CD74HC4067) is on 3V3A, which U107 holds off until 3V3 is good, and a select
+   driven high into the unpowered mux back-powers it through the input clamp. Budget the
+   supervisor's maximum release delay, not the 3V3 rise time.
+7. MUX_S0-S3 at the lowest GPIO speed setting. They run 50 mm on B.Cu as one bundle.
+8. MUX1_SIG_ADC (PC0, ADC1/2/3_INP10) has a 100 R / 1 nF RC at the pin (tau 100 ns). Use a
+   sample time of at least 2 us (64.5 cycles at a 25 MHz ADC clock) and wait about 1 us after
+   a select change before the first conversion.
 
 VERIFIED (DS12110 Table 10): SAI1 on PE2-PE6, AF6, including SAI1_MCLK_A on PE2.
 NOT VERIFIED: the unused fallbacks (SAI3_MCLK_B on PD14, PF7, SAI2 pins), PLL3 settings and the MCKDIV value.
