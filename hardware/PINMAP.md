@@ -19,7 +19,7 @@ These nets are tied to a peripheral or to parts already placed at the pin.
 | 12/13 | PH0/PH1 | HSE_IN/OUT | 25 MHz crystal |
 | 14 | NRST | NRST | reset |
 | 15 | PC0 | MUX1_SIG_ADC (POT_MUX_OUT) | ADC1/2/3_INP10 |
-| 63 | PC6 | FX_ON_SENSE | R120/C162 sit at the pin (D0169) |
+| 63 | PC6 | MUTE_SW (was FX_ON_SENSE, 2026-10-07) | R120/C162 sit at the pin (D0169) |
 | 68 | PA9 | VBUS_SENSE | R6/R7 divider, native sensing off (AN4879) |
 | 70/71 | PA11/PA12 | USB_DM/DP | OTG_FS |
 | 72, 76, 89 | PA13, PA14, PB3 | SWDIO, SWCLK, SWO | SWD/SWO |
@@ -38,7 +38,7 @@ The board decides the ports:
 3. East edge. It opens onto the OLED shadow. The codec band (y 93-107, x 88-170) blocks the
    south, so south-panel nets turn down the channel at x 108-112 between U1's decoupling and U8.
    North-east nets run to the OLED and ENC101.
-4. North edge. The decoupling row C6/C31/C59/C32 walls pins 51-62, so it carries only FX_ON_SENSE, VBUS, USB and SWDIO.
+4. North edge. The decoupling row C6/C31/C59/C32 walls pins 51-62, so it carries only MUTE_SW (the former FX_ON_SENSE), VBUS, USB and SWDIO.
 
 ### East edge, pin 47 (north) to 28 (south)
 
@@ -72,11 +72,11 @@ The board decides the ports:
 | 90 | PB4 | spare | NJTRST pull-up at reset; left unconnected |
 | 91 | PB5 | MUTE_N | |
 | 92 | PB6 | TOGGLE1 | |
-| 93 | PB7 | ENC_KEY_B | EXTI7 |
+| 93 | PB7 | spare (was ENC_KEY_B; KEY is a pot, 2026-10-07) | |
 | 94 | BOOT0 | BOOT0 | fixed |
-| 95 | PB8 | ENC_KEY_A | EXTI8 |
-| 96 | PB9 | ENC_SEMI_B | EXTI9 |
-| 97 | PE0 | ENC_SEMI_A | EXTI0 |
+| 95 | PB8 | spare (was ENC_KEY_A) | |
+| 96 | PB9 | spare (was ENC_SEMI_B) | |
+| 97 | PE0 | spare (was ENC_SEMI_A) | |
 | 98 | PE1 | TOGGLE2 | |
 
 ### Why this order
@@ -102,8 +102,9 @@ Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 40-42 (P
 | Net | Was | Now |
 |---|---|---|
 | ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 |
-| ENC_KEY_A / B | PB12 / PB13 | PB8 / PB7 |
-| ENC_SEMI_A / B | PB14 / PD10 | PE0 / PB9 |
+| ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is pot POT15 on mux I14) |
+| ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is pot POT16 on mux I15) |
+| FX_ON_SENSE | PC6 | MUTE_SW on PC6 (K101 removed) |
 | TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PB6, PE1, PA4, PA5, PB0, PB2, PE7, PE8 |
 | MUX_S0-S3 | PD3, PD4, PD6, PB4 | PC5, PC4, PA6, PA7 |
 | XSMT | PE15 | PE9 |
@@ -137,8 +138,8 @@ one child cannot connect to a second child. A second sub-sheet is not buildable.
 Recommendation: option (c), top plus one h7core child, which is what the tool supports.
 1. Draw preamp, relay, output buffer, power input, mux and pots, encoders, toggles and OLED
    header as parts on the cubevox top spec. They drive the nets the sheet pins need.
-2. h7core_block.json is cubevox's own copy. Add a port per new net (ENC_KEY_A/B,
-   ENC_SEMI_A/B, TOGGLE1..8, JACK_TRS_N, FX_ON_SENSE) and a matching U1 pin row.
+2. h7core_block.json is cubevox's own copy. Add a port per new net (TOGGLE1..8,
+   MUTE_SW; ENC_KEY/ENC_SEMI and JACK_TRS_N are gone) and a matching U1 pin row.
    Add a `sheets[0].pins` row on the top for every added port, and grow `size`
    (it is `[45, 102]`, last offset 74; each new pin is 2 grid units).
 3. No global labels and no flat single sheet. A flat sheet works but throws away the

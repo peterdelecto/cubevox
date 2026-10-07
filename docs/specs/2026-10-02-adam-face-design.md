@@ -34,7 +34,7 @@ sliders, then report numbers we bake in.
 | 4 | Octave | SEMITONES · FORMANT (engine B) · MIX | Slide |
 | 5 | Harmony | KEY · MIX | Voices (High, Higher) · Tracking speed · Follow my bends |
 | 6 | Unison | DEPTH · RATE (chorus speed, ~0.2–6 Hz; past today's rate the sweep narrows so the pitch swing caps near 2x today's) | Chorus ↔ Double |
-| 7 | Slapback | INTENSITY (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
+| 7 | Slapback | MIX (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
 | 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM / PARKER SPRING = menu) | per engine, below |
 | 9a | SPRING | | Splash · Flutter · Low end |
@@ -143,13 +143,15 @@ table above unless Advanced is on; Print tuning prints Macros, Choices, Knobs, t
 7. **Pedal mode** (owner 2026-10-02): headline-size bottom-right button flips the face to a row of eight
    stompboxes in signal order, panel knobs only: AUTOTUNE (RESPONSE, KEY encoder), OCTAVE
    (MIX, SEMITONES encoder), HARMONY (MIX, KEY encoder), UNISON (DEPTH, RATE), SLAPBACK
-   (INTENSITY, TIME), DISTORTION (DRIVE, TONE), GATE (THRESHOLD, DECAY), REVERB (DECAY,
+   (MIX, TIME), DISTORTION (DRIVE, TONE), GATE (THRESHOLD, DECAY), REVERB (DECAY,
    DWELL, MIX on the selected engine). Output EQ has no pedal; it lives in the menu. Knobs drag vertically or
    scroll; encoders step one detent per 14 px or scroll notch. The foot strip toggles the
    effect and lights its LED. The input gate is not shown (not exposed on the box).
 8. **Two harmony voices** (owner 2026-10-02): Adam has no harmony of his own to match, so
    the face offers High (default Louder) and Higher (default Loud); the engine's third slot
    stays off. Drop out on breaths is removed from the face and stays off.
-9. **BYPASS** (owner 2026-10-02): above Pedal mode, same size, red while on. The dry input
-   (stage-feedback return included) goes out and the chain keeps running underneath. The
-   last column leaves room for it. Input gate shows the same controls as Gate, in both views.
+9. **MUTE** (Adam 2026-10-07; was BYPASS, owner 2026-10-02): above Pedal mode, same size,
+   red while on. The output is silent and the chain keeps running underneath, as the box's
+   top-left MUTE toggle does. The last column leaves room for it. Input gate shows the same
+   controls as Gate, in both views. The eight pedals are the box's eight slots
+   (`2026-10-07-slots-design.md`): two knobs and a toggle each, left to right is the chain.

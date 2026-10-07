@@ -31,7 +31,8 @@ build/cubevox-render in.wav out.wav --depth 0.7
 ```
 
 ## Panel (planned)
-Input Gain · Input gate Threshold+Decay (same controls as Gate) · Autotune Key (shared encoder)+Response (NATURAL → MECHANICAL, no mix) · Harmony: off the face, forced off; engine code kept (owner 2026-10-02) ·
+Slots (Adam 2026-10-07, `docs/specs/2026-10-07-slots-design.md`): 8 effect slots, each two identical pots and a bypass toggle; 16 pots on the mux. The slot is the fixed hardware unit; the effect in it and the chain order are firmware and may change with updates. Left to right is the chain by default. Top-left toggle is a global MUTE (output only, chain keeps running); the bypass relay K101 is gone, K102 mutes. MENU is the only encoder; KEY and SEMITONES are pots stepped in firmware. Firmware updates by DFU from the menu.
+Input Gain (analog, off the grid) · Input gate Threshold+Decay (same controls as Gate) · Autotune Key+Response (NATURAL → MECHANICAL, no mix) · Harmony: off the face, forced off; engine code kept (owner 2026-10-02) ·
 Octave Semitones+Mix ·
-Unison Depth+Rate · Slapback Intensity (level + repeats)+Time (60..250 ms) · Distortion Drive+Tone · Gate Threshold+Decay ·
-Reverb Intensity (mix)+Time (decay; replaced Dwell, owner 2026-10-07) (engine CHASM / SPRING B in menu, SPRING B default; SPRING and PARKER SPRING engine code kept, off the face — owner 2026-10-03) · EQ (menu) · Output (menu)
+Unison Depth+Rate · Slapback Mix (level + repeats)+Time (60..250 ms) · Distortion Drive+Tone · Gate Threshold+Decay ·
+Reverb Mix+Time (decay; replaced Dwell, owner 2026-10-07) (engine CHASM / SPRING B in menu, SPRING B default; SPRING and PARKER SPRING engine code kept, off the face — owner 2026-10-03) · EQ (menu) · Output (menu)

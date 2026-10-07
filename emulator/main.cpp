@@ -376,8 +376,8 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Unison DEPTH "
-      "%.0f %%, RATE %.0f %%; Slapback INTENSITY %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb INTENSITY "
-      "%.0f %% (MIX %.0f %%, DECAY %.0f %%), DWELL %.0f %%\n",
+      "%.0f %%, RATE %.0f %%; Slapback MIX %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
+      "%.0f %% (wet %.0f %%, DECAY %.0f %%), DWELL %.0f %%\n",
       macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
       onOff(at.chromatic), onOff(o.on), 'A' + o.engine, onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
@@ -1394,7 +1394,7 @@ void drawSlapbackTuning(cv::SlapbackTuning& t) {
     return;
   }
   ImGui::SliderFloat("Repeats", &t.feedback, 0.0f, 0.5f, "%.2f");
-  hint("echoes after the first; INTENSITY raises them too");
+  hint("echoes after the first; MIX raises them too");
   ImGui::SliderFloat("Low pass", &t.lowpassHz, 500.0f, 12000.0f, "%.0f Hz",
                      ImGuiSliderFlags_Logarithmic);
   hint("lower makes the echoes darker");
@@ -1641,7 +1641,7 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
 void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
-  percentSlider("INTENSITY", s.intensity);
+  percentSlider("MIX", s.intensity);
   ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
@@ -1662,7 +1662,7 @@ void drawReverbBlock(cv::ReverbParams& r, cv::macros::State& macros) {
   ImGui::RadioButton("CHASM", &r.engine, cv::kReverbChasm);
   ImGui::SameLine();
   ImGui::RadioButton("SPRING B", &r.engine, cv::kReverbSpringB);
-  percentSlider("INTENSITY", r.intensity);
+  percentSlider("MIX", r.intensity);
   percentSlider("TIME", r.time);
   drawReverbTuning(r, macros);
   ImGui::PopID();
@@ -1898,7 +1898,7 @@ void drawPedals(ProtoParams& params) {
   });
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
-    pedalPercent("INTENSITY", params.slapback.intensity);
+    pedalPercent("MIX", params.slapback.intensity);
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
   });
   next();
@@ -1914,7 +1914,7 @@ void drawPedals(ProtoParams& params) {
   next();
   cv::ReverbParams& r = params.reverb;
   pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
-    pedalPercent("INTENSITY", r.intensity);
+    pedalPercent("MIX", r.intensity);
     pedalPercent("TIME", r.time);
   });
 }

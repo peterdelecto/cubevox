@@ -33,13 +33,13 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 | 1 | Digital core | Clone fxbox/h7core |
 | 2 | Input connector | Neutrik NCJ6FA-H combo (C368458, THT) because LCSC stocks it; separate XLR + 1/4" only if it drops out of stock |
 | 3 | Output | Buffered 1/4" TS, instrument/line level set in a firmware menu |
-| 4 | Bypass | Relay bypass after the preamp; digital path skipped |
+| 4 | Mute (was Bypass, Adam 2026-10-07) | Global vocal MUTE: output relay K102 grounds the jack, DAC soft-muted, chain keeps running. No dry path, no bypass relay. See `2026-10-07-slots-design.md` |
 | 5 | Preamp | Discrete instrumentation amp from a dual low-noise op-amp (NE5532 / OPA1678 class) |
 | 6 | Input gain | Analog pot in the preamp gain leg; firmware never sees it |
 | 7 | Analog supply | Single 5 V rail with mid-rail bias, shared with the ADC |
 | 8 | Display | 1.3" SH1106 OLED, I2C, 4-pin header |
-| 9 | Per-effect on/off | Toggle switches; autotune for certain, the rest pending Adam. GPIO held for 8 |
-| 10 | Bypass actuator | Panel toggle, same switch part as 9. No footswitch (tabletop, printed box) |
+| 9 | Per-slot on/off | One toggle per slot, 8 slots (Adam 2026-10-07). Each slot is two identical pots and a toggle; the effect in it is firmware |
+| 10 | Mute actuator | Top-left panel toggle, same switch part as 9, read by the MCU on MUTE_SW. No footswitch (tabletop, printed box) |
 | 11 | Board arrangement | One board; controls up through the top, jacks right-angle out the rear |
 | 12 | 1/4" half of the combo | Mic or pedal, never both inputs at once. No pad; shared 20–50 dB preamp on the XLR leg, 1/4" through a 25.7 dB pad |
 | 13 | Which H7 | Bare STM32H743VIT6 soldered on the product board, as fxbox. Not the WeAct module |
@@ -104,13 +104,15 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
    under 1 % of the signal against the ADC's 60 kΩ) → PCM1808 VINL, which is internally biased at VCC/2
    through 60 kΩ (datasheet). ADC is always fed, so firmware can meter in
    bypass. VINR: 10 µF to GND (datasheet figure 26 AC-couples both inputs).
-7. Bypass relay G6K-2F-Y DPDT 5 V (C47190). Pole A carries the audio: COM (3)
-   = BUF_IN, NC (2) = PRE_OUT, NO (4) = DAC_ATT. Pole B is a dry contact: COM
-   (6) to GND, NO (5) to FX_ON_SENSE, NC (7) no-connect, so FX_ON_SENSE reads
-   low when the effect is on. FX_ON_SENSE has a 10 kΩ pull-up to 3V3 and
-   100 nF to GND at the MCU. Coil + (1) from 5V through the bypass toggle,
-   coil − (8) to GND, 1N4148W (C81598) flyback across the coil. Coil
-   energised = effect on. No MCU in the switching path.
+7. Mute toggle (Adam 2026-10-07; replaces the bypass relay K101, its D104
+   flyback and the PRE_OUT → BUF_IN dry path, all removed). DAC_ATT feeds
+   BUF_IN directly. The top-left toggle's common goes to MUTE_SW (PC6, the
+   former FX_ON_SENSE pin, keeping R120 10 kΩ pull-up to 3V3 and C162 100 nF
+   to GND at the MCU), one throw to GND, the other no-connect. MUTE_SW low =
+   muted. Firmware soft-mutes the DAC (XSMT), then drops MUTE_N so K102 (item
+   9) grounds the tip; reverse order on release. The chain keeps running while
+   muted and the OLED shows MUTED. The relay fails to muted at reset, so no
+   MCU-free path is needed.
 8. DAC. PCM5102APWR (C107671) as fxbox, output ground-centred ±3 V. OUTL →
    470 Ω → 2.2 nF to GND (TI figure 33 reconstruction filter, ~154 kHz, audit
    A09) → 10 µF 25 V electrolytic (+ on the divider side) → 10 kΩ / 15 kΩ
@@ -133,9 +135,10 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     timer (audit I01): SAI1_MCLK_A on PE2 at 12.288 MHz for 48 kHz, pins per `hardware/PINMAP.md` "ADC master clock
     (I01)". PD14 is freed. Firmware: SAI1 master, PLL3 feeds the SAI1 kernel
     clock; mux settling ≥ 0.5 ms before reading a pot channel (audit I02);
-    mute across the bypass transition with
-    MUTE_N (audit I03; the relay switches on its own, the preamp path is alive
-    only while analog power is).
+    mute on MUTE_SW with XSMT then MUTE_N (audit I03, item 7). Firmware
+    update: an OLED menu item reboots into the ROM DFU bootloader over USB-C;
+    the BOOT0 button (item 17) is recovery only. Settings in flash bank 2
+    survive because the DFU image excludes it.
 
 ### Power
 
@@ -175,13 +178,15 @@ F2. MUTE_N goes high 500 ms after the SAI clocks run, and low when VA_SENSE
 F3. Assert XSMT (PE9) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
 F4. PLL3 M/N/P 25/196/4 (DIVN3 = 195, DIVP3 = 3, FRACN3 4981, PLL3RGE = 0,
     PLL3VCOSEL = 1); SAI1 MCKDIV = 4, OSR = 0, NOMCK = 0.
-F5. FX_ON_SENSE is active low.
-F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
-    menu says, because the menu scales only the digital path.
+F5. MUTE_SW is active low (low = muted); on change, XSMT first, then MUTE_N.
+F6. Removed 2026-10-07 with the bypass path; the output is always the digital
+    path, so the INSTRUMENT / LINE menu scaling applies to everything the jack sends.
 
 ### Panel
 
-19. 14 pots to one CD74HC4067 16:1 mux into one ADC pin. Pot part (owner
+19. 16 pots (8 slots × 2, Adam 2026-10-07) to one CD74HC4067 16:1 mux into
+    one ADC pin; the mux is full. KEY and SEMITONES are two of them, stepped
+    in firmware with hysteresis (no detented parts). Pot part (owner
     2026-10-03): Alps RK09D1130C2P, LCSC C361173, 10 kΩ linear, THT, Extended,
     $0.63 at 10+, stock 174. Alps drawing No. 4 (vertical, with collar) is
     shared with RK09D1130C1B; the only difference is shaft length LM1 25
@@ -189,12 +194,13 @@ F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
     the mounting surface, ø6 D-shaft with 4.5 mm flat. The owner's 13.5 mm on a
     sample was measured from the collar top (25.0 − 11.8 = 13.2). EasyEDA's
     models for C2P and C3C are swapped (the one titled C2P is the 20 mm shaft).
-    Same part for the analog Input Gain pot, 15 in total; a build of N units
-    needs 15 N. Over the 11.8 mm panel plane the shaft stands 13.2 mm.
-20. Three encoders on direct GPIO (owner 2026-10-02): MENU with push switch,
-    KEY and SEMITONES without. Matched to the pot (owner 2026-10-03): Alps
+    Same part for the analog Input Gain pot, 17 in total; a build of N units
+    needs 17 N. Over the 11.8 mm panel plane the shaft stands 13.2 mm.
+20. One encoder on direct GPIO (Adam 2026-10-07; KEY and SEMITONES became
+    pots, freeing PB7, PB8, PB9, PE0, left unconnected): MENU with push
+    switch. Matched to the pot (owner 2026-10-03): Alps
     EC11E vertical, operating length 20: EC11E15244B2 (C470754, push switch,
-    1.5 mm travel) and EC11E15204A3 (C470710, no switch), 30 detents, 15
+    1.5 mm travel), 30 detents, 15
     pulses. Tip 24.5 mm, bushing top 11.5 mm, ø6 D-shaft 4.5 mm flat, flat
     length 12. PCB layout identical to EC11N (Alps drawings 4/5 vs 6/7: 5 × ø1
     at 2.5 pitch, legs 12.5 apart in 1.5 × 2.6), so the footprint is the Alps
@@ -204,10 +210,10 @@ F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
     C1788487, mini bat lever, SPDT ON-ON, vertical THT, 2.54 mm pitch, body
     8.6 mm, M5 bushing 8.6–14.2 mm above the board (spans the 11.8 mm panel
     plane; the printed panel hole captures it, no nut), lever tip 23.6 mm.
-    Nine per board: eight inputs TOGGLE1..8 (TOGGLE1 = autotune) each with
+    Nine per board: eight slot toggles TOGGLE1..8 (TOGGLE1 = autotune) each with
     the common pin to GPIO, 10 kΩ pull-up to 3V3, 100 nF to GND, one throw to
-    GND and the other no-connect; plus the bypass toggle in the relay block
-    (item 7), common to the coil, one throw to 5V, the other no-connect. No
+    GND and the other no-connect; plus the MUTE toggle on MUTE_SW, wired the
+    same way (item 7). No
     LEDs on toggles; the lever shows the state. Datasheet gives AC ratings
     only; 5 V DC at 21 mA is far inside them.
 22. OLED. 1.3" SH1106, I2C 400 kHz on an MCU I2C peripheral with free pins,
@@ -218,8 +224,8 @@ F6. BYPASS outputs the preamp at pot level whatever the INSTRUMENT / LINE
     hand-plugged. With 9 mm standoffs the socket takes 6.5 mm of pin, so the
     module's pins must not reach more than 8.5 mm below its PCB.
 23. Input Gain pot is analog, in the preamp gain leg (item 4), not read by
-    the MCU. FX_ON_SENSE (item 7) is the only sense GPIO; JACK_TRS_N was
-    deleted in revision 2 (item 1).
+    the MCU. MUTE_SW (item 7, the former FX_ON_SENSE) is the only sense GPIO;
+    JACK_TRS_N was deleted in revision 2 (item 1).
 
 ### Mechanical
 
