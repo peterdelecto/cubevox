@@ -93,12 +93,13 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
    29.9 dB and the chain 20.05 to 49.95 dB on XLR, −5.6 to +24.3 dB on the 1/4".
    At minimum gain the 330 Ω network loads the op-amp with 4.2 mA rms at
    1.4 Vrms, inside the OPA2197's 65 mA. Output PRE_OUT, DC at VREF.
-5. VREF. 5VA through 10 kΩ / 10 kΩ, 10 µF at the divider, follower on one
-   OPA2197 half, then 22 Ω into the VREF node with one 10 µF (the follower
+5. VREF. 5VA through 10 kΩ / 10 kΩ, 10 µF at the divider, follower on U108
+   (OPA197IDBVR, drives VREF_BUF), then 22 Ω into the VREF node with one 10 µF (the follower
    never sees the capacitance directly, audit A03). No per-load 100 nF caps.
    VREF carries bias only: the 1.2 kΩ input bias legs, the difference amp's
-   reference resistor and the DAC attenuator's bottom resistor.
-   Three OPA2197 duals in total (A1–A4, VREF follower, output buffer).
+   reference resistor. The DAC attenuator's bottom resistor returns to BIAS_W (R154/R155
+   10 kΩ / 10 kΩ off 5VA_W, followed by U106A), not VREF.
+   Three OPA2197 duals (A1–A4, BIAS_W follower and output buffer on U106) plus U108.
 6. ADC feed. PRE_OUT → 100 Ω → 2.2 nF to GND → 10 µF X7R (C14860; both
    sides sit near 2.5 V so it carries no DC bias, and the AC across it is
    under 1 % of the signal against the ADC's 60 kΩ) → PCM1808 VINL, which is internally biased at VCC/2
@@ -116,7 +117,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
 8. DAC. PCM5102APWR (C107671) as fxbox, output ground-centred ±3 V. OUTL →
    470 Ω → 2.2 nF to GND (TI figure 33 reconstruction filter, ~154 kHz, audit
    A09) → 10 µF 25 V electrolytic (+ on the divider side) → 10 kΩ / 15 kΩ
-   divider to VREF (×0.6, 1.27 Vrms max) = DAC_ATT. Firmware LINE /
+   divider to BIAS_W (×0.6, 1.27 Vrms max) = DAC_ATT. Firmware LINE /
    INSTRUMENT menu scales digitally below that.
 9. Output buffer. A5 (OPA2197) unity, input BUF_IN, output → 100 Ω → 10 µF
    25 V electrolytic (+ on the buffer side) → 100 kΩ to GND → OUT_TIP. Jack:
@@ -154,7 +155,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     with native VBUS sensing disabled (AN4879). No VBUS-only mode. 5V → AP63203 3V3
     buck (C780769, L ANR5040T3R9M C7427132) and TLV75533 3V3A LDO (C404027).
     VDDA/VREF+ through BLM18PG121SN1D ferrite, as fxbox.
-13. Analog on 5VA (5V through the ferrite): OPA2197s, PCM1808 VCC through
+13. Analog on 5VA (5V through the ferrite): OPA2197s (U106 from 5VA_W through FB102), PCM1808 VCC through
     10 Ω, relay coils on 5V. VA_SENSE: 5VA through 10 kΩ / 10 kΩ with 100 nF
     to PB1 (ADC12_INP5); R151/R152 sit at U106's 5VA pin, C163 at the MCU end.
     Pin map: `hardware/PINMAP.md` section 2. 3V3A: codec digital-analog, pots. USB
@@ -176,7 +177,7 @@ F1. BOR level 3 (about 2.61 V falling).
 F2. MUTE_N goes high 500 ms after the SAI clocks run, and low when VA_SENSE
     reads below 4.75 V (provisional, tolerance and shutdown time to budget).
 F3. Assert XSMT (PE9) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
-F4. PLL3 M/N/P 25/196/4 (DIVN3 = 195, DIVP3 = 3, FRACN3 4981, PLL3RGE = 0,
+F4. PLL3 M/N/P 25/196/4 (HAL values PLL3M = 25, PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4; raw RCC fields DIVN3 = 195 and DIVP3 = 3 encode N-1 and P-1, PLL3RGE = 0,
     PLL3VCOSEL = 1); SAI1 MCKDIV = 4, OSR = 0, NOMCK = 0.
 F5. MUTE_SW is active low (low = muted); on change, XSMT first, then MUTE_N.
 F6. Removed 2026-10-07 with the bypass path; the output is always the digital

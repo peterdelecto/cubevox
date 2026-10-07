@@ -208,8 +208,11 @@ is superseded.
 | Pin | Port | fxbox net (AF) | cubevox net |
 |---|---|---|---|
 | 1 | PE2 | QSPI_IO2 (AF9) | ADC_SCKI_SRC, SAI1_MCLK_A (AF6) |
-| 36 | PB2 | QSPI_CLK_SRC | free (NC) |
-| 37-40 | PE7-PE10 | unassigned / SYNC / SPARE | free (NC) |
+| 36 | PB2 | QSPI_CLK_SRC | TOGGLE6 (section 2) |
+| 37 | PE7 | SPARE_PE7 | TOGGLE7 (section 2) |
+| 38 | PE8 | unassigned / SYNC / SPARE | TOGGLE8 (section 2) |
+| 39 | PE9 | unassigned / SYNC / SPARE | XSMT (section 2) |
+| 40 | PE10 | unassigned / SYNC / SPARE | free (NC) |
 | 58 | PD11 | QSPI_IO0 (AF9) | free (section 2) |
 | 59 | PD12 | QSPI_IO1 (AF9) | free (section 2) |
 | 60 | PD13 | QSPI_IO3 (AF9) | free |
@@ -225,8 +228,8 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
 
 ### Firmware
 
-1. PLL3 feeds the SAI1 kernel clock (SAI1SEL = PLL3P). With HSE 25 MHz use DIVM3 = 25,
-   DIVN3 = 196, FRACN3 = 4981, DIVP3 = 4 for 49.152 MHz (NOT VERIFIED, check PLL3 range bits).
+1. PLL3 feeds the SAI1 kernel clock (SAI1SEL = PLL3P). With HSE 25 MHz use PLL3M = 25,
+   PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4 for 49.152 MHz (HAL ratio values, as in audio.cpp; the raw RCC fields DIVN3 and DIVP3 encode N-1 and P-1, so 195 and 3) (NOT VERIFIED, check PLL3 range bits).
 2. SAI1 block A is master transmitter (DAC, SD_A on PE6), MCKEN = 1, MCKDIV chosen so MCLK =
    256 fs = 12.288 MHz, 64-bit frames, BCLK = 64 fs. MCLK, FS_A and SCK_A are all outputs of
    this block.
@@ -240,8 +243,9 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
    supervisor's maximum release delay, not the 3V3 rise time.
 7. MUX_S0-S3 at the lowest GPIO speed setting. They run 50 mm on B.Cu as one bundle.
 8. MUX1_SIG_ADC (PC0, ADC1/2/3_INP10) has a 100 R / 1 nF RC at the pin (tau 100 ns). Use a
-   sample time of at least 2 us (64.5 cycles at a 25 MHz ADC clock) and wait about 1 us after
-   a select change before the first conversion.
+   sample time of at least 2 us (64.5 cycles at a 25 MHz ADC clock). Wait at least 0.5 ms per
+   channel change before the first conversion. The mux output passes R126/C142 (1k/10n, tau 10 us,
+   more at mid-travel of a 10k pot) ahead of the R30/C55 (100R/1n) stage.
 
 VERIFIED (DS12110 Table 10): SAI1 on PE2-PE6, AF6, including SAI1_MCLK_A on PE2.
 NOT VERIFIED: the unused fallbacks (SAI3_MCLK_B on PD14, PF7, SAI2 pins), PLL3 settings and the MCKDIV value.

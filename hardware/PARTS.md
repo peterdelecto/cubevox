@@ -3,7 +3,7 @@
 Board: cubevox main board (one JLC-assembled board). Spec: docs/specs/2026-10-02-hardware-design.md.
 Snapshot 2026-10-02. Prices are the 10+ tier. Stock is from `jlc_get_part` unless marked LIVE
 (`jlc_stock_check`, 2026-10-02). Re-check everything at order time.
-Build quantity: 1 board (qty column is per board; required = per-board x N + allowance, 15 pots x N).
+Build quantity: 1 board (qty column is per board; required = per-board x N + allowance, 17 pots x N).
 
 ## Parts
 
@@ -32,7 +32,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 22 | C309282 | PJ-611E | 1/4" output jack (HOOYA) | Extended | 1562 (LIVE 2026-10-02) | 0.541 | AUDIO-TH_PJ-611E_1 (cubevox, copied from fxbox with its model offset 2.84/-2.85) | 1 | owner 2026-10-02 replaces NMJ6HCD2 (C368502); pin map 2 sleeve, 4 ring, 6 tip, 3/5/7 switch contacts, verified against the HOOYA drawing in the fxbox record |
 | 24 | C19726 | BAT54SLT1G | preamp input clamps | Extended | 256249 | 0.019 | SOT-23 (h7core) | 2 (est.) | inherited |
 | 25 | C318884 | TS-1187A-B-A-B | BOOT0, NRST tact | Basic | 473784 | 0.016 | SW-SMD_4P 5.1x5.1 (h7core) | 2 (est.) | inherited |
-| 28b | C42379197 (socket); module owner-supplied | hanxia HX PM2.54-1x4P TP-YQ socket + SH1106 1.3in I2C 128x64 module | J117: 5 mm 1x4 SMD female socket, JLC-assembled (SMD so it sits square; THT headers came out crooked, owner 2026-10-06); the OLED module hand-plugs into it | extended | 0.22 | 17414 | OLED-1.3-SH1106-I2C-4P (cubevox, hand-written; socket pads staggered ±1.80 from the row, 1.27x2.20) | 1 | Module PCB 35.4x33.5x1.2, pins GND/VCC/SCL/SDA, 4x NPTH 3.2 on a 30.4x28.5 grid. Buy 4x M3 x 8 mm standoffs (plus 4 screws). Model assumes 8.0 mm standoffs: module PCB bottom at z 8.0, glass top at z 10.7, pins down to z -3.0. The 11.8 mm panel plane needs about 9.1 mm standoffs. |
+| 28b | C42379197 (socket); module owner-supplied | hanxia HX PM2.54-1x4P TP-YQ socket + SH1106 1.3in I2C 128x64 module | J117: 5 mm 1x4 SMD female socket, JLC-assembled (SMD so it sits square; THT headers came out crooked, owner 2026-10-06); the OLED module hand-plugs into it | extended | 0.22 | 17414 | OLED-1.3-SH1106-I2C-4P (cubevox, hand-written; socket pads staggered ±1.80 from the row, 1.27x2.20) | 1 | Module PCB 35.4x33.5x1.2, pins GND/VCC/SCL/SDA, 4x NPTH 3.2 on a 30.4x28.5 grid. Buy 4x M3 x 9 mm standoffs (plus 4 screws). Model assumes 9.0 mm standoffs: module PCB bottom at z 9.0, glass top at z 11.7. With 9 mm standoffs the socket takes 6.5 mm of pin (spec item 22). The 11.8 mm panel plane needs about 9.1 mm standoffs. |
 | 29 | C192421 | OPA1678IDR | SUPERSEDED by row 50 (revision 2, audit A02: input range stops 2 V below V+). Do not order | Extended | 3309 | 0.774 | SOIC-8_L5.0-W4.0 (cubevox) | 0 | footprint kept in cubevox.pretty, unused |
 | 30 | C8678 | SS34 | 9V_JACK to VIN_9V Schottky | Basic | 3557042 | 0.030 | SMA_L4.3-W2.6 (cubevox) | 1 | IMPORTED with --repair-courtyard |
 | 32 | C81598 | 1N4148W | relay flyback D109 (mute) | Basic | 5171770 | 0.012 | SOD-123F (cubevox) | 1 | inherited; D104 removed with K101, 2026-10-07 |
@@ -54,7 +54,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 47 | C57112 | 0603B103K500NT | C 10 nF X7R 50 V | Basic | 2155057 | 0.020 | C0603 | by schematic | IMPORTED |
 | 48 | C14860 | CL31B106KAHNNNE | C 10 uF X7R 25 V 1206. Revision 2: stays only at C137 (ADC feed), C138 (VINR), plus C117 (5VA bypass) and C135 (VREF divider), none a coupling position. Superseded as audio coupling cap by row 52 (audit A07) | Extended | 917604 (LIVE) | 0.169 | C1206 (cubevox) | 4 | IMPORTED |
 | 49 | C12891 | CL31A226KAHNNNE | C 22 uF X5R 25 V 1206, 9V_IN | Basic | 574332 | 0.180 | C1206 | by schematic | IMPORTED; X5R loses capacitance under DC bias |
-| 50 | C139363 | OPA2197IDR | A1-A4 (U104, U105), VREF follower + output buffer (U106): 3 duals | Extended | 9501 (import 2026-10-02; spec quotes 19.8 k live) | 0.8265 (import; spec quotes 1.26) | SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL (cubevox) | 3 | IMPORTED with --repair-courtyard (4.99x3.99 -> 5.50x7.50 mm); model offset clean, no --accept-mismatch. Pin types by hand like OPA1678 (1,7 output; 2,3,5,6 input; 4,8 power_in); 0 unspecified |
+| 50 | C139363 | OPA2197IDR | A1-A4 (U104, U105), BIAS_W follower + output buffer (U106, supplied from 5VA_W through FB102): 3 duals | Extended | 9501 (import 2026-10-02; spec quotes 19.8 k live) | 0.8265 (import; spec quotes 1.26) | SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL (cubevox) | 3 | IMPORTED with --repair-courtyard (4.99x3.99 -> 5.50x7.50 mm); model offset clean, no --accept-mismatch. Pin types by hand like OPA1678 (1,7 output; 2,3,5,6 input; 4,8 power_in); 0 unspecified |
 | 51 | C309083 | ARG03BTC1002 | R111-R114, difference amp, 10 k 0.1 % 25 ppm | Extended | 59843 | 0.0214 | R0603 (cubevox) | 4 | IMPORTED with --repair-courtyard; same R0603 footprint as the other 0603 resistors |
 | 52 | C72484 | RVT1E100M0405 | 10 uF 25 V electrolytic 4x5.4 (ROQANG, 105 C): C121, C125 coupling, C139 DAC, C141 output, C160 VREF node | Extended | 32285 | 0.0217 | CAP-SMD_BD4.0-L4.3-W4.3-FD (cubevox) | 5 | IMPORTED with --repair-courtyard (4.39x4.39 -> 6.62x4.90 mm). Symbol polarised, pin 1 = +. Footprint pad 1 = + (see WARNINGS 12) |
 | 53 | C191859 | VT1A101M0505 | 100 uF 10 V electrolytic 5x5.4: C159 (stage 2 R116 leg) | Extended | 26521 | 0.0256 | CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD (cubevox) | 1 | IMPORTED with --repair-courtyard (5.39x5.39 -> 8.00x5.90 mm). Pin 1 = + |
@@ -69,12 +69,14 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 66 | C4216 | 0603WAF3302T5E | R 33 k: R6, VBUS sense divider top | Basic | 3237413 | 0.0022 | R0603 | 1 | Same footprint |
 | 67 | C23254 | 0603WAF8202T5E | R 82 k: R7, VBUS sense divider bottom | Basic | 1318029 | 0.0027 | R0603 | 1 | Same footprint |
 | 68 | C23138 | 0603WAF3300T5E | R 330 ohm: R116, stage 2 gain leg (replaces 200 ohm C8218) | Basic | 3273227 | 0.0026 | R0603 | 1 | Same footprint |
+| 69 | C412495 | SP809EK-L-2-9/TR | U107, LDO enable supervisor: 2.9 V threshold on 3V3, 230 ms release, drives U4 EN via LDO_EN | Extended | 16416 | 0.324 | Package_TO_SOT_SMD:SOT-23 | 1 | Open-drain, active low; holds 3V3A off until 3V3 is good (PINMAP Firmware item 6) |
+| 70 | C221351 | OPA197IDBVR | U108, VREF buffer: drives VREF_BUF, then R146 22 ohm into the VREF node | Extended | 84235 | 0.8373 (10+) | Package_TO_SOT_SMD:SOT-23-5 | 1 | Supplied from 5VA; 5VA_W (FB102) supplies U106 only |
 
 ## Counts
 
-1. Unique part numbers: 56 (26 Basic, 1 Preferred, 29 Extended). Row 29 (OPA1678) is superseded and not counted. Row numbers are not contiguous (5, 15, 23, 26, 27, 28, 31, 54, 56, 58, 59 removed).
-2. Fee estimate: 29 Extended x ~$3 = ~$87 per order. NCJ6FA-H is counted although it is not in the library yet.
-3. Per-board quantities fixed: 3x OPA2197, 15 pots, 3 encoders, 9 bat toggles, 2 relays, 1 SS34. Passive quantities come from the schematic.
+1. Unique part numbers: 58 (26 Basic, 1 Preferred, 31 Extended). Row 29 (OPA1678) is superseded and not counted. Row numbers are not contiguous (5, 15, 23, 26, 27, 28, 31, 54, 56, 58, 59 removed).
+2. Fee estimate: 31 Extended x ~$3 = ~$93 per order. NCJ6FA-H is counted although it is not in the library yet.
+3. Per-board quantities fixed: 3x OPA2197, 1x OPA197, 17 pots (16 slot pots RK09D1130C2P + RVGAIN1), 1 encoder (MENU, EC11E15244B2), 9 bat toggles, 1 relay (K102), 1 SS34. Passive quantities come from the schematic.
 4. Not yet coded (spec items): 10 ohm PCM1808 VCC resistor, 2.2 uF VCAP caps, CC 5.1 k C23186, BLM18PG121SN1D ferrite, the toggle switch itself (header placeholders only), clamp C27675.
 
 ## Assembly
@@ -96,7 +98,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 5. AO4606 (C2944311) and SMBJ70CA (C224026) are dropped by the spec but still sit in cubevox.kicad_sym; remove with the schematic spec edit if wanted. cubevox.json still references PJ-611E and must be rewritten.
 6. OPA2197IDR: pin types set by hand like OPA1678 (1,7 output; 2,3,5,6 input; 4,8 power_in); `assign_pin_types.py` leaves 0 unspecified. Pin order matches the OPA1678 symbol (1 OUTA, 2 -INA, 3 +INA, 4 V-, 5 +INB, 6 -INB, 7 OUTB, 8 V+). Datasheet not re-read in this pass.
 7. Pin maps NOT VERIFIED: PJ-002A, NMJ6HCD2, OPA1678IDR symbol pin order. Axis candidates printed by the import are unverified.
-8. Stocks: RK09D1130C1B 986 (15 per board), NCJ6FA-H 111. The local foreman catalogue shows C25804 at stock 0; live check shows 23,056,985 (catalogue stale).
+8. Stocks: RK09D1130C2P 174 (17 per board), NCJ6FA-H 111. The local foreman catalogue shows C25804 at stock 0; live check shows 23,056,985 (catalogue stale).
 9. Qty for BAT54S (2) and tact switches (2) are estimates until the schematic exists.
 10. Pot and encoder shaft heights (spec item 17) are datasheet figures, not checked against the imported models. 22 uF is X5R (Basic); an X7R 22 uF would be Extended.
 11. C1788487 ST-0-102-A01-T000-LF: import refused with model_courtyard_mismatch (left 1.30, top 2.85, right 2.60, bottom 2.85 mm). Cause: the .wrl holds the M5 hex nut, the dia 11 lock washer with its 12.3 mm tab, the lever (23.6 mm high) and the pins, so its plan extent is x -5.50..6.80, y +-5.49 mm against the 8.3 x 5.2 body courtyard. Body, pads (2.54 pitch) and model alignment match the datasheet; no offset or rotation was applied. Fix: imported with --accept-mismatch, then the four F.CrtYd lines were edited to x -5.75..7.05, y -5.75..5.75 (model plan + 0.25 mm). The silk outline (8.3 x 5.2) is unchanged. The footprint carries the washer tab on the +X side; the physical orientation of the tab is not set by the datasheet. Pin names COM/T1/T3 are mine (symbol was 1/2/3); pad 2 is the centre common. The symbol is stored as ST-0-102-A01-T000-LF+PJ.
@@ -105,4 +107,4 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 
 ## Dropped from fxbox
 
-PJ-325M (C2884942), WS2812B-2020 (C52917434), B3F-4055 (C84931), RK09K pots (C470311, C209779), TPA6132A2 (C69901), AO4606 (C2944311), SMBJ70CA (C224026), NE5532DR (C7426), PJ-611E (C309282), unused probe headers C32713270 and C124378, TLV9062 (C398356), TPS63070 (C109322), LP5912 (C2761351), IS25LP064A QSPI flash (C2841348, owner 2026-10-02: settings in internal flash bank 2), TPS2116DRLR power mux (C3235557) and its 36 k PR1 resistor (C23147, owner 2026-10-02: 9 V only, USB is data only).
+PJ-325M (C2884942), WS2812B-2020 (C52917434), B3F-4055 (C84931), RK09K pots (C470311, C209779), TPA6132A2 (C69901), AO4606 (C2944311), SMBJ70CA (C224026), NE5532DR (C7426), unused probe headers C32713270 and C124378, TLV9062 (C398356), TPS63070 (C109322), LP5912 (C2761351), IS25LP064A QSPI flash (C2841348, owner 2026-10-02: settings in internal flash bank 2), TPS2116DRLR power mux (C3235557) and its 36 k PR1 resistor (C23147, owner 2026-10-02: 9 V only, USB is data only).
