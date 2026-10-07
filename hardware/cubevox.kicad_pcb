@@ -150,7 +150,7 @@
 			(outputdirectory "")
 		)
 	)
-	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
+	(footprint "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "0148b9cc-6e98-414f-ac10-faa01ad60a49")
 		(at 65.75 102.7 -90)
@@ -201,21 +201,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72484"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d814c7cf-e294-4ded-b250-2b1827c7ecdb")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C72484"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "29f9304e-9ae9-4bfd-a5c0-2dbe3d63cda8")
 			(effects
@@ -486,21 +474,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "3adbcf23-b2cc-4c3d-b544-ae32066179d2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "58a48244-b95f-4af5-8eaf-8cf9880fc95f")
 			(effects
@@ -512,7 +488,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b54fe867-f94f-4b9c-83df-8000a920805d")
 			(effects
@@ -793,21 +769,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6bfa2b91-331c-4926-810d-2ea7912d512c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "83a5f9b5-90a7-41f7-a4b4-b7d1a2f83532")
 			(effects
@@ -1029,21 +993,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "0bb891d2-6c52-4697-ad6c-d64f3d4f0052")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "86ae70f5-e017-4b6e-98fc-e30a5aad3cd1")
 			(effects
@@ -1300,21 +1252,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C224026"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "5cd956f3-de56-46fd-9068-5b4703d2c71d")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C19077570"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a6bd9baa-ecd2-4c00-b18b-dbb941fbe073")
 			(effects
@@ -1598,21 +1538,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C114409"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "658323d8-3326-46a6-a1bf-7d0808adb78f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C114409"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "75b61cb7-6e2f-4910-8d7a-41d10d7c1172")
 			(effects
@@ -2715,7 +2643,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "66d5cdb2-1083-4f24-92fb-734215036ce1")
 			(effects
@@ -2727,7 +2655,7 @@
 		)
 		(property "LCSC" "C1525"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ff01c96f-7d47-4a7c-b755-24abcb4f66e3")
 			(effects
@@ -2874,21 +2802,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C81598"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "85f5c7ff-05e5-490c-b539-0d87ee1e08ba")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C81598"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "020fd598-04c0-4f8b-b623-4fd86409423c")
 			(effects
@@ -3118,21 +3034,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "1d953a06-a46f-41f6-8439-741917863676")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "14f45e3b-ba86-4a2a-b129-fef2e4ea6ca2")
 			(effects
@@ -3144,7 +3048,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a92cdea1-ccd5-4613-8b37-33cff7ed3111")
 			(effects
@@ -3430,7 +3334,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "955d1e31-da3f-4a46-9f50-82b17978c8c1")
 			(effects
@@ -3445,18 +3349,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "247c1971-5315-466d-bcbb-e2616b04f1eb")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C15850"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6f946742-13ef-4ef4-8c8e-cf6f8e3f7bd3")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3597,21 +3489,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "71dbba58-72b8-4806-bc9f-3a3e4a2857b9")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f6083e14-fb31-4510-91aa-572fea36e0fd")
 			(effects
@@ -3623,7 +3503,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "79be0b33-ddbf-45a5-a28c-63cf2242dec6")
 			(effects
@@ -3906,21 +3786,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ab4375c5-39fd-4733-85f8-a1160b8a37df")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0f04284a-dd10-4215-bd7a-027dabf5b2f1")
 			(effects
@@ -4178,21 +4046,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "af549f60-7924-41b4-8b3f-a70482881cfa")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23182"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "78850d6b-4f6f-40b4-8c12-31d23041e428")
 			(effects
@@ -4409,7 +4265,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "eba80503-39a5-4a2e-bb2b-3737d91c28b1")
 			(effects
@@ -4424,18 +4280,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f159b35e-8526-4816-9f31-98d9cc3bccce")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C14709"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "dfa4ebd1-bcb9-4264-8e80-6394568cdbee")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4581,7 +4425,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "663e16ab-e537-45ae-924f-18e2ca87491d")
 			(effects
@@ -4593,7 +4437,7 @@
 		)
 		(property "LCSC" "C14709"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "deb697a6-5d8f-469a-aacc-d4425620ac85")
 			(effects
@@ -4740,21 +4584,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ac2bb17b-0894-471f-8735-df81a81ad5f9")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14858"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "601b1723-c369-446d-8d42-56883cb38ed9")
 			(effects
@@ -5015,7 +4847,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "47e88a4d-96d1-409e-819d-e91fb2a203a1")
 			(effects
@@ -5027,7 +4859,7 @@
 		)
 		(property "LCSC" "C12891"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "dc4b6cf2-86ec-45d3-ba61-36c0302dcd88")
 			(effects
@@ -5177,7 +5009,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "236e2783-3ffc-4cf6-8a54-0a24c60630f9")
 			(effects
@@ -5189,7 +5021,7 @@
 		)
 		(property "LCSC" "C1588"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e8c01f74-b521-4dad-a084-28e4989586dd")
 			(effects
@@ -5339,7 +5171,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f6a75f4c-c68e-4b4c-8573-b3005798b006")
 			(effects
@@ -5354,18 +5186,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "7cb683a5-c710-4224-8a2c-3bf6408e0dc2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C1525"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "556e8dea-fd15-455a-8a53-22f53a2eb065")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5508,21 +5328,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "9649161b-34f4-4ccb-9658-90319b4df9df")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "da08129e-980b-4e4b-a75c-41f49e199752")
 			(effects
@@ -5738,7 +5546,7 @@
 		)
 		(property "KiLib_Generator" "package/gullwing"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "050e6f2e-6d4b-4b39-b966-0a3e76aa9504")
 			(effects
@@ -5750,7 +5558,7 @@
 		)
 		(property "LCSC" "C412495"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "897ed975-fd5d-4bd3-aecd-8ad2999f4221")
 			(effects
@@ -5762,7 +5570,7 @@
 		)
 		(property "MPN" "SP809EK-L-2-9/TR"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "aaab1148-b04c-486c-98e5-603baceba4c6")
 			(effects
@@ -6133,21 +5941,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "35b6bf3e-49b4-4fd6-a6a5-8679da9d6a83")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C21190"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8c25b91-900b-4030-8e14-6228578af9ef")
 			(effects
@@ -6364,7 +6160,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "282c4238-189a-4c24-bd10-7ac485cba777")
 			(effects
@@ -6379,18 +6175,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ff09f65b-e925-44f0-9fef-7771708cd7e6")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C25744"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d2421af4-462b-4bca-a139-62a4f7bd0274")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6533,21 +6317,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a7312b3b-c5dc-4d77-b206-067032149ad5")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14858"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "14d061f3-7e07-47bb-b816-656b8229863b")
 			(effects
@@ -6808,7 +6580,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "de4f0e2b-7713-427b-aaa7-729de339d577")
 			(effects
@@ -6820,7 +6592,7 @@
 		)
 		(property "LCSC" "C1525"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c74398cc-24ef-4617-8ba5-7babe5208df3")
 			(effects
@@ -6967,21 +6739,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C19726"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f7d984bd-6059-41b5-ab76-6b9834110ee4")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C19726"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f14b22f9-059a-4623-a53e-b06a60a51d70")
 			(effects
@@ -7210,7 +6970,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "6aaa8518-3251-4655-8e93-e82bd526bf44")
 			(effects
@@ -7222,7 +6982,7 @@
 		)
 		(property "LCSC" "C23630"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4c22bf26-14bb-475b-a8fb-8c3e49a0d81b")
 			(effects
@@ -7369,21 +7129,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ca5b0f61-a9cb-42c3-a2f4-ab6a1754fdc3")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C22765"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c439108a-b0c8-4a96-8cdd-812965d895bf")
 			(effects
@@ -7600,7 +7348,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fc838dda-fa76-4cb0-be9e-c7b77512a6fa")
 			(effects
@@ -7612,7 +7360,7 @@
 		)
 		(property "LCSC" "C15195"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7b2e2871-125f-4bd4-92fa-896e0c0daa64")
 			(effects
@@ -7708,7 +7456,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "290738ba-0447-4130-8e8a-250b97766256")
 		(at 195 63.5 -90)
@@ -7759,21 +7507,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4d9872d8-75fd-42e2-b29b-715a078f83f2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25803"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e40ba5b8-b64c-42f7-96f4-c93faf56cdc3")
 			(effects
@@ -7986,21 +7722,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470710"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "67e223c7-a6d1-43db-aa0e-552b1ea9b134")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C470710"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "939dc75a-0fc1-46fe-9e7e-3dec24a8ba04")
 			(effects
@@ -8012,7 +7736,7 @@
 		)
 		(property "MPN" "EC11E15204A3"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "aa9322ba-eb90-45ce-89c6-f380c996f3d0")
 			(effects
@@ -8384,21 +8108,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C8678"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "8aa07549-f1fe-4b0f-beab-49df8032b50b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C8678"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "45991b06-d0a6-4475-a15f-2ee94ef8fab2")
 			(effects
@@ -8628,21 +8340,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "e315a309-eafa-4844-ac47-ad7b4c2de4db")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "11debb23-2400-4465-a018-5136ceee4099")
 			(effects
@@ -8864,21 +8564,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a05f02c0-04cc-4431-b017-297a0aa43d4e")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "cc5b30f8-6053-4fea-b0b7-48571602d6b7")
 			(effects
@@ -9136,21 +8824,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "3f9f42d5-cb49-41de-9838-672a2ef89d41")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C12891"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "164fddfd-7e29-4d56-b864-01d1e833c584")
 			(effects
@@ -9408,21 +9084,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7e580e9f-5c3a-4ce0-bed2-6b9c1ab00724")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C12891"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2db7d83e-ec37-409c-8a89-0e663232f510")
 			(effects
@@ -9680,21 +9344,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C9006"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d31dca3a-7bfa-43a1-8946-6cb94ef06f47")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C9006"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0108f5a2-429a-43bf-a3a4-7cced0aa3ad6")
 			(effects
@@ -9888,7 +9540,7 @@
 			)
 		)
 	)
-	(footprint "C_0603_1608Metric"
+	(footprint "Capacitor_SMD:C_0603_1608Metric"
 		(layer "F.Cu")
 		(uuid "3189ae79-0570-40f3-9408-b7fc39a7d0a6")
 		(at 111.91 40.775 -90)
@@ -9942,12 +9594,24 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "90869620-acf5-4cde-bb1d-e97568341944")
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C90540"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f79ab5af-f90c-46a8-9804-07b586a130e6")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -10092,7 +9756,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1916ca45-391b-4d86-a289-bc7b0c6869ac")
 			(effects
@@ -10104,7 +9768,7 @@
 		)
 		(property "LCSC" "C1525"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7129967f-1522-423e-8231-e6d5cc5b6839")
 			(effects
@@ -10251,21 +9915,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "e42629e4-a910-469a-a1c8-bfb557e37e8b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7fa15db1-959a-40ef-9bfb-da91ac4738ec")
 			(effects
@@ -10523,21 +10175,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "74f3b94b-e03e-4f55-b1df-bf54e38a1439")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C12891"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "49a3fdd4-7d03-4d87-b6e4-87cf12ebbfbf")
 			(effects
@@ -10798,7 +10438,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d26e4303-f7e8-4804-a74e-0b1a6a14df51")
 			(effects
@@ -10810,7 +10450,7 @@
 		)
 		(property "LCSC" "C15850"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0107c9ca-43ef-476a-8d56-da177cf9b3cc")
 			(effects
@@ -10906,7 +10546,7 @@
 			)
 		)
 	)
-	(footprint "SOD-123F_L2.7-W1.6-LS3.8-RD"
+	(footprint "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD"
 		(layer "F.Cu")
 		(uuid "35279949-4a7d-4e4a-8eee-89e6c5490623")
 		(at 71.2 70.6 90)
@@ -10957,11 +10597,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C81598"
-			(at 0 0 90)
+		(property "LCSC" "C81598"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "a4888d27-25f8-4693-bca6-04412d5bf347")
+			(uuid "abdf809f-df59-4381-aefc-2161490e7613")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11140,7 +10780,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "35507af1-09df-4403-b5b6-2871f011371e")
 		(at 218.5 76 -90)
@@ -11191,11 +10831,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "bac810e6-b021-4929-acc5-99801af4e9bf")
+			(uuid "2375b97f-b723-46bd-a600-d7b59ce3c4b2")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11410,7 +11050,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2b74c265-db0f-49d9-8cb7-34bcaa679035")
 			(effects
@@ -11422,7 +11062,7 @@
 		)
 		(property "LCSC" "C19666"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7baedb5b-2443-4906-97a5-afb09dbf7cff")
 			(effects
@@ -11567,21 +11207,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d7992082-961c-4357-bb20-3a69947df5dd")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "486b07ff-7df8-4c6d-ad84-13cdbe185cd4")
 			(effects
@@ -11593,7 +11221,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0c98ca68-06b9-4baa-85a2-d1b9f966c8e0")
 			(effects
@@ -11825,7 +11453,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD6.3-L6.6-W6.6-FD"
+	(footprint "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-FD"
 		(layer "F.Cu")
 		(uuid "3758f38a-ce35-4391-99ee-0dc3928cc8a6")
 		(at 205.5 90 180)
@@ -11875,11 +11503,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C413679"
-			(at 0 0 180)
+		(property "LCSC" "C413679"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "e212ec4b-4e39-48ae-b59d-1c594c9bb004")
+			(uuid "dc5afbfa-aad1-4b82-8310-a00a1797a726")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12148,21 +11776,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "461e2520-1c5b-42e3-bf7d-63b1871b8d5f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "98e5d550-f28f-402a-b7bf-1d51e2a98a78")
 			(effects
@@ -12325,7 +11941,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
+	(footprint "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "3a5acef8-0d1d-44f2-8878-26fda80138b1")
 		(at 191.5 70.5 90)
@@ -12376,21 +11992,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72484"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4aa9793c-e9be-48c0-a466-7437b799e505")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C72484"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f98d5400-ebb0-40d5-b7ec-2a25cec521be")
 			(effects
@@ -12663,21 +12267,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "bcc655d2-0297-40e6-95c1-60dc91cef191")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0ed997f5-2b83-497d-a34f-f5be6777b45c")
 			(effects
@@ -12894,7 +12486,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "41553faa-4cd3-43e0-9c8b-3af9d2959f16")
 			(effects
@@ -12906,7 +12498,7 @@
 		)
 		(property "LCSC" "C15849"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "80bbd054-867b-4707-93d3-b11d5f3828ed")
 			(effects
@@ -13053,21 +12645,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
+		(property "LCSC" "C31850"
 			(at 0 0 180)
 			(layer "F.Fab")
-			(hide yes)
-			(uuid "207e99e4-8afd-4b91-8a23-7dc03624d175")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C25804"
-			(at 0 0 180)
-			(layer "F.SilkS")
 			(hide yes)
 			(uuid "ae3ee236-6519-4a94-8a93-0667c1dac47c")
 			(effects
@@ -13284,7 +12864,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a9cde70e-09d3-4f37-ab8f-1c4e5599a7db")
 			(effects
@@ -13296,7 +12876,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "64c6e6c2-26c0-4bc7-8ba5-edf96eb433dc")
 			(effects
@@ -13443,21 +13023,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7d0cbe57-0cd3-4e83-a787-c110e82ab060")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "422ffd67-1510-43bc-afd4-d0563d7ee29c")
 			(effects
@@ -13674,7 +13242,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "320f575f-5f7f-470e-8e02-3463d9c1c3c3")
 			(effects
@@ -13686,7 +13254,7 @@
 		)
 		(property "LCSC" "C1525"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4e5a7b66-ccb9-45de-96d8-d27bf431f498")
 			(effects
@@ -13833,21 +13401,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a281a58d-a587-4c40-b986-ef28aaab9410")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "6ff110d5-2424-4c50-809d-641e16c39f8a")
 			(effects
@@ -14061,21 +13617,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "5d6ce07b-386b-49b6-b310-805075600291")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C57112"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4deb3bcd-0784-44f4-83f7-0b07adf983cb")
 			(effects
@@ -14336,7 +13880,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d446c05e-814e-493c-8c12-bd6b9ffa3881")
 			(effects
@@ -14348,7 +13892,7 @@
 		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "6ad552b4-2242-41e9-9431-84db572cfb17")
 			(effects
@@ -14497,7 +14041,7 @@
 		)
 		(property "KiLib_Generator" "fiducial"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "9c42fd71-a394-463d-8cfb-4b2318dd6ccc")
 			(effects
@@ -14606,7 +14150,7 @@
 		)
 		(property "KiLib_Generator" "mounting_hardware/mounting_hole"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "efa32297-1340-45f2-9cbb-b2b1911957fe")
 			(effects
@@ -14714,7 +14258,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "796b4fff-d235-4646-a939-6dbe71bdaf8c")
 			(effects
@@ -14726,7 +14270,7 @@
 		)
 		(property "LCSC" "C19702"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5e4488f5-0732-46f7-bf1a-6a990bb666d9")
 			(effects
@@ -14873,21 +14417,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "752ebbf3-1f87-4df3-b6e7-99d377584027")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "bb947548-4d48-48c0-bacc-8c3a0e71f5e7")
 			(effects
@@ -15148,7 +14680,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7348ae81-17bc-4301-bae3-cef7143d5dcd")
 			(effects
@@ -15160,7 +14692,7 @@
 		)
 		(property "LCSC" "C21189"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "437d7d62-ea30-4d55-bf6f-ad493ee5e613")
 			(effects
@@ -15307,21 +14839,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C23127"
+		(property "LCSC" "C25971"
 			(at 0 0 180)
 			(layer "F.Fab")
-			(hide yes)
-			(uuid "4d60a591-3696-4b80-b8c4-c2a17466d955")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C23127"
-			(at 0 0 180)
-			(layer "F.SilkS")
 			(hide yes)
 			(uuid "b085ac6e-b99b-4b06-9d2d-08bb8e9dfae2")
 			(effects
@@ -15535,21 +15055,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C19726"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "aaf57ca1-6590-4a30-8050-4324377b7905")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C19726"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c941760e-9021-4914-b7db-77f74dc641c6")
 			(effects
@@ -15775,21 +15283,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "af66324b-5655-434c-aaa0-c02ba7929c93")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "96c09ad9-55de-4bd8-84b0-f28ec58765f7")
 			(effects
@@ -16003,21 +15499,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "8b7e71fc-052e-4849-8c7f-3a76ef4e35e9")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ef6c49c8-71c5-41eb-abf4-60134cb5fa54")
 			(effects
@@ -16231,21 +15715,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "1b616177-edf1-4fea-bde2-7dc86e394f29")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "290dc294-803d-44a7-8db8-0b0edeaddad8")
 			(effects
@@ -16506,7 +15978,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "8f5e241a-ea09-44a5-a97d-e470bd1d04af")
 			(effects
@@ -16518,7 +15990,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b3be59be-2b6e-4ca7-8ae4-7795d1fbf2a4")
 			(effects
@@ -16668,7 +16140,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "45a8bb4e-8e14-4f91-b63d-003e8b33984e")
 			(effects
@@ -16680,7 +16152,7 @@
 		)
 		(property "LCSC" "C12891"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "09ece368-5524-4bd0-be78-e11c89ba2911")
 			(effects
@@ -16830,7 +16302,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e0b92ec3-2fb2-4471-9aa5-7034074ee583")
 			(effects
@@ -16845,18 +16317,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "eb0697a8-4b98-48e1-9056-f1f463d7fa0e")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C25744"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "b97c071c-4dba-43d6-8cf6-58446c4ec642")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17002,7 +16462,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "19ea8244-ab98-4650-b72b-959aecfc5d29")
 			(effects
@@ -17014,7 +16474,7 @@
 		)
 		(property "LCSC" "C1644"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "28c5c599-7a0c-48f9-ae52-68c694d5f129")
 			(effects
@@ -17164,7 +16624,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e2bc7032-d1a4-47f5-b949-56074565ade0")
 			(effects
@@ -17176,7 +16636,7 @@
 		)
 		(property "LCSC" "C12891"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d4a04efa-b2ad-4687-aa26-0ce6cc215195")
 			(effects
@@ -17321,21 +16781,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ad47dfb4-e28f-4b52-9ae4-02136cd0bf0c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a16de22a-02f4-430d-95ed-7d90f9fba20d")
 			(effects
@@ -17347,7 +16795,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b1575e91-ccbc-4c29-8075-5b1d2cf0196b")
 			(effects
@@ -17630,21 +17078,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "94bc4f27-1f73-4937-91c9-f67b59c3bda2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5ff521a3-6810-441f-b90d-b9c6914279a0")
 			(effects
@@ -17861,7 +17297,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "11a32efa-4d17-49f0-9b59-f42349d201cb")
 			(effects
@@ -17873,7 +17309,7 @@
 		)
 		(property "LCSC" "C23630"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "23da35a1-c435-4e89-957c-c5379efc48d9")
 			(effects
@@ -18020,21 +17456,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "72e78d80-736f-46a9-8ad8-4f420f3c4391")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C22809"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e5191546-2096-490a-927e-92062f62f6b3")
 			(effects
@@ -18248,21 +17672,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "481a6cac-51ef-49e7-9eb6-a0aaa0266b72")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "80447fdc-bc92-411b-8468-fff60b1b6613")
 			(effects
@@ -18479,7 +17891,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "15906b51-394b-4efb-b833-71a5664fca51")
 			(effects
@@ -18491,7 +17903,7 @@
 		)
 		(property "LCSC" "C15849"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "3a1d65c3-d9e3-43ea-bc18-c4d63c61ca25")
 			(effects
@@ -18637,21 +18049,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "5508d788-9527-4e23-984a-2f7c64fbfaf0")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e47187d0-7b8c-4a85-9ec5-8292d494a470")
 			(effects
@@ -18884,21 +18284,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "32a1c037-4010-49b4-87f2-fa2d72c86300")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14860"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a8f466be-3d50-4937-9c47-3a96d5c7cb33")
 			(effects
@@ -19159,7 +18547,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "8c0aea84-cd2f-45c3-b133-42ff353045ad")
 			(effects
@@ -19171,7 +18559,7 @@
 		)
 		(property "LCSC" "C25105"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1b53fa38-6860-4dd8-98a7-38513d78a6e1")
 			(effects
@@ -19318,21 +18706,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f530bc78-9794-4ecc-b5a1-983a6ef9ef0d")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "9b509a10-2466-45c3-89ff-e62dbc0f48e5")
 			(effects
@@ -19546,21 +18922,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "940ffba0-60ff-489e-b6d3-fc87fd9d6721")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "684c0930-efda-47c7-9af2-09037ea0a5ea")
 			(effects
@@ -19821,7 +19185,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b55e582e-496b-4786-b6ac-06e9b29b9344")
 			(effects
@@ -19833,7 +19197,7 @@
 		)
 		(property "LCSC" "C19702"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d72c8ba0-143a-43df-a484-bf45fe9bb28f")
 			(effects
@@ -19980,21 +19344,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "420a34fa-95ff-4dc1-95b7-0ae0f9efaa1b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "25bc90d6-4465-4886-88ba-543384e4ef69")
 			(effects
@@ -20201,7 +19553,7 @@
 			)
 		)
 	)
-	(footprint "C0603"
+	(footprint "cubevox:C0603"
 		(layer "F.Cu")
 		(uuid "6a519646-77ed-420e-b73f-71fc003bbc72")
 		(at 63.25 106.95 180)
@@ -20252,21 +19604,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C2991172"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4499b43a-015d-4386-9a03-d98a8f667f5f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C2991172"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1edb8ffe-6378-4db4-acbd-61ff39ff37a7")
 			(effects
@@ -20524,21 +19864,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C2286"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a21b5db0-5df3-44b0-a889-8280af8d475d")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C2286"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "80f83020-d8b5-4a50-b928-196cb05dbf31")
 			(effects
@@ -20797,7 +20125,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0b78f5ac-eebd-4d54-b112-808d8a502c35")
 			(effects
@@ -20809,7 +20137,7 @@
 		)
 		(property "LCSC" "C15849"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0cef46e7-e7d5-40ea-ae71-744d8442cd5e")
 			(effects
@@ -20905,7 +20233,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "6cb58ba2-4bbe-4dd8-b635-82a65ed63f96")
 		(at 156.9 79.1 90)
@@ -20956,11 +20284,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "05a754bf-8633-4cd7-b809-59ad6595d57d")
+			(uuid "182b7eca-5280-4f98-8813-38853de4403f")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -21172,21 +20500,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "06639bbc-4859-47db-8f90-cdb94e31956f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C21190"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d5d82967-5ed9-49ff-bc11-47508b6239bb")
 			(effects
@@ -21398,21 +20714,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "26543c8c-421f-4c7d-8c5f-28d85434631e")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b31003e9-0f2c-4ad5-b93d-162fb5bb0532")
 			(effects
@@ -21424,7 +20728,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d6b0dc40-aa45-4aea-bb0c-cf6389b7f722")
 			(effects
@@ -21705,21 +21009,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f0642af8-8375-47da-a9cd-c13c0e4338f2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fe492a1e-edd3-4682-964d-ef7f0b8edf3a")
 			(effects
@@ -21731,7 +21023,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ec316edc-663f-4602-ba5d-cda2f79146d3")
 			(effects
@@ -22017,7 +21309,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b220bfec-1148-4964-ba86-760838875d15")
 			(effects
@@ -22029,7 +21321,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5f987d3e-27d6-4036-ac36-5520c7a40b18")
 			(effects
@@ -22179,7 +21471,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a79eb596-52d6-4834-ace2-eaa3b5907283")
 			(effects
@@ -22191,7 +21483,7 @@
 		)
 		(property "LCSC" "C15195"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "93ca8d78-3e65-44a9-af2f-aca91d1f0b98")
 			(effects
@@ -22336,21 +21628,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "896f91da-0a8b-47e7-93f9-7cb4e4219fe7")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "26fbab85-3d2a-40ec-83e5-94ca1af6ba1c")
 			(effects
@@ -22362,7 +21642,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7486dceb-c032-42f5-91b8-c62c6130c363")
 			(effects
@@ -22645,21 +21925,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "9ffc9268-5284-4abe-b065-de8b3a13441f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fb743a37-f528-4f17-a65d-8faf8a457e7e")
 			(effects
@@ -22917,21 +22185,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C309083"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "0107faa4-b5d7-44dc-9590-af6242184d29")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C309083"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "01265f32-f024-4221-b506-16cd64bd22f8")
 			(effects
@@ -23148,7 +22404,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c0181c1a-126a-4922-b00f-3f4c1e2cadd9")
 			(effects
@@ -23160,7 +22416,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1441bd67-ee3c-47a3-b636-37408a87e339")
 			(effects
@@ -23310,7 +22566,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "3ff60920-b41b-4b9c-9057-8bd9eb704072")
 			(effects
@@ -23322,7 +22578,7 @@
 		)
 		(property "LCSC" "C1644"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b716c65d-1708-4342-80cb-08c4a76fc8a3")
 			(effects
@@ -23469,21 +22725,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "16ccc47f-0fc6-44bb-a556-c5ef884baade")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25803"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "47be8a94-2446-4b42-9762-009cb0b9d8ac")
 			(effects
@@ -23697,21 +22941,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C309083"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6aa98b26-578c-472b-8b96-d8912f4fc150")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C309083"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f7040d79-a18d-4ba2-b79f-f16c8d7213c9")
 			(effects
@@ -23874,7 +23106,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "7c34efc0-53bf-4976-b8dc-cdd7d71f0d2d")
 		(at 156.9 82.35 90)
@@ -23925,11 +23157,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "6a9bfd0f-916f-4dd2-9cb9-f63c388c3826")
+			(uuid "b5144c85-b971-4a1a-bd0c-974a82078b20")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -24141,21 +23373,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C8218"
+		(property "LCSC" "C23138"
 			(at 0 0 0)
 			(layer "F.Fab")
-			(hide yes)
-			(uuid "a1caf311-b81d-4c35-a6d3-1dd160d66dde")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C8218"
-			(at 0 0 0)
-			(layer "F.SilkS")
 			(hide yes)
 			(uuid "4362d80e-5bf0-4f7f-aa1d-40f94bb6d31a")
 			(effects
@@ -24368,21 +23588,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C7427135"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d3faa064-da56-4808-8967-983478385732")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C7427135"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fbbd37ac-25da-4a86-a312-053a87e3b8da")
 			(effects
@@ -24547,7 +23755,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
+	(footprint "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
 		(layer "F.Cu")
 		(uuid "7e22070b-804f-4bdb-a014-e67823ddbcee")
 		(at 212 70.5 90)
@@ -24598,11 +23806,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72521"
-			(at 0 0 90)
+		(property "LCSC" "C72521"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "01fbbadf-6135-4d6f-ad2d-012da40cfd70")
+			(uuid "607c9e37-5f09-481d-a38e-22ba2b51198e")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -24872,21 +24080,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C23127"
+		(property "LCSC" "C25971"
 			(at 0 0 0)
 			(layer "F.Fab")
-			(hide yes)
-			(uuid "aeb14f41-11f1-4e72-aad3-8579c953804f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C23127"
-			(at 0 0 0)
-			(layer "F.SilkS")
 			(hide yes)
 			(uuid "690ecf2b-d9a7-4ff8-8468-64386768d98f")
 			(effects
@@ -25049,7 +24245,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "7fc1b339-8772-4c18-ad17-1b591a429d4e")
 		(at 156.5 93)
@@ -25100,21 +24296,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C23345"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "e6501465-0c5f-41ab-8fe4-54b1a0b217fc")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23345"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c90e315d-36e0-4730-95d6-9016593e6a3e")
 			(effects
@@ -25328,21 +24512,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C309083"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "299a45a2-d8cd-4db3-a02c-cc09c8ad99c4")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C309083"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d6b32a45-d3a3-407d-914d-958964da9534")
 			(effects
@@ -25555,21 +24727,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470754"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "3eb97607-5710-4915-808c-1f1331ad0f0e")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C470754"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8cb6114-0944-4c2e-ba80-fa24bb760b71")
 			(effects
@@ -25581,7 +24741,7 @@
 		)
 		(property "MPN" "EC11E15244B2"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e93423a6-f141-4b20-b1dd-8d6691d904a3")
 			(effects
@@ -25952,21 +25112,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C2687116"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "134ed3ca-7c0e-4c4d-ae68-c9cc88141ce5")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C2687116"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "745dda15-cae3-4fad-9dd7-270000d69d05")
 			(effects
@@ -26200,21 +25348,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6a23cea8-cb87-4498-81e7-1aec02abcd46")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C22775"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "9ffa1f92-a1f4-4ebb-89f1-2e297914a38a")
 			(effects
@@ -26428,21 +25564,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4a6e68f3-a6e0-490c-8a16-36c67c21129d")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b2072e74-5e8e-4356-90dc-2d6192456134")
 			(effects
@@ -26659,7 +25783,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c722b298-7155-45ad-b68e-8b8fedbaa257")
 			(effects
@@ -26671,7 +25795,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5516a597-adfd-4ccf-9db7-9aefb1c53a5c")
 			(effects
@@ -26818,21 +25942,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C309083"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "32303eef-c313-4086-b227-728be30bbc48")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C309083"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a64de1f4-a1ea-40cb-ac74-70098ecd361e")
 			(effects
@@ -27049,7 +26161,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b537930e-23a3-47ac-8e69-32e02ced0506")
 			(effects
@@ -27061,7 +26173,7 @@
 		)
 		(property "LCSC" "C14709"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2f1a7946-b2e0-4d5b-a216-4fa2f868fa10")
 			(effects
@@ -27206,21 +26318,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "b98c3deb-fabf-41fe-a569-7a62b4501032")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e180ad9c-cedd-46b3-b60c-2b83ae26b31f")
 			(effects
@@ -27442,21 +26542,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "97573549-6128-4667-9e1c-b8b500e3cc96")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "9354eaaf-28b0-4be8-aee2-7104031ccbd0")
 			(effects
@@ -27717,7 +26805,7 @@
 		)
 		(property "KiLib_Generator" "mounting_hardware/mounting_hole"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0b7f5a5d-4bdc-4dcd-ac6b-2c981b1e0c8d")
 			(effects
@@ -27771,7 +26859,7 @@
 		)
 		(embedded_fonts no)
 	)
-	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
+	(footprint "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "88aa1d8f-e161-4967-9324-2cf3cc8c4dbc")
 		(at 218.5 70.5 90)
@@ -27822,21 +26910,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72484"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "10dbc44e-35b2-46d4-a6ec-d7d0e1d96c00")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C72484"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "27b70145-10df-4fd8-97fd-0da19ec44d19")
 			(effects
@@ -28058,7 +27134,7 @@
 			)
 		)
 	)
-	(footprint "SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
+	(footprint "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 		(layer "F.Cu")
 		(uuid "88cfb5c3-88f1-45ac-af54-6af41e7bc2ea")
 		(at 205 79.5 90)
@@ -28107,21 +27183,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C139363"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ecdf22cb-dfb8-4f85-a647-133bbc612582")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C139363"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "724d8cca-ae7a-497d-917b-926fefb3cb55")
 			(effects
@@ -28506,7 +27570,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "6d451160-7282-4d5e-a120-3882e0a49648")
 			(effects
@@ -28518,7 +27582,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "38f4ae2d-4afd-4d65-b167-f28a536a8d60")
 			(effects
@@ -28665,21 +27729,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "5012ec68-1fd2-4c60-b22d-1a9dd798bd16")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "529f4f5e-38f6-46bd-b179-384394b39d30")
 			(effects
@@ -28937,21 +27989,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7540409a-3c26-4dc6-acca-60314d23832b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1671"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "59cba24c-04fb-4941-8d80-cac7ef8ced64")
 			(effects
@@ -29212,7 +28252,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "71353d1e-d020-4ae1-913e-8d4c086c06d8")
 			(effects
@@ -29224,7 +28264,7 @@
 		)
 		(property "LCSC" "C23186"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c770adf4-deaa-4476-9931-9facfc7f26cf")
 			(effects
@@ -29320,7 +28360,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "8cc6a4f7-e4f3-457a-b145-5f87f7a57261")
 		(at 71.75 82.75)
@@ -29371,11 +28411,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
+		(property "LCSC" "C21190"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "3c4f1ff3-4a4e-4281-98df-06c72c3401b7")
+			(uuid "eac39251-605b-45c2-b9f6-20417796bb63")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29590,7 +28630,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "41e3f452-0934-4ed4-97be-5b7f2c86b5c2")
 			(effects
@@ -29602,7 +28642,7 @@
 		)
 		(property "LCSC" "C23630"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ccb4e405-6a95-4793-b326-e39aac1452c3")
 			(effects
@@ -29752,7 +28792,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1214083e-c716-4c9e-a5fe-3827f56f9aa2")
 			(effects
@@ -29764,7 +28804,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b64245ec-b36a-45e7-bb7e-0ea222331c21")
 			(effects
@@ -29909,21 +28949,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C98457"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f160a64a-d920-44ae-b8d6-ef0977207714")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C98457"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d85f2c43-9f48-4f8e-902d-8ed7d745b7ec")
 			(effects
@@ -30337,21 +29365,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "77621c13-45ed-4d89-a1c3-685958a18837")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5553bfbd-ab37-4a2a-9cb1-b5ca80631c1c")
 			(effects
@@ -30363,7 +29379,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5216d435-d8a6-4867-bc29-10c0331a8e61")
 			(effects
@@ -30644,21 +29660,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ebb881e1-7e15-4074-9473-f2e43551d529")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "79ddcc01-bec0-4324-a519-487e065cc90b")
 			(effects
@@ -30670,7 +29674,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5cc4b500-67c4-48b2-8153-c7ca7112340d")
 			(effects
@@ -30953,21 +29957,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ca5e08c3-3487-4e08-9a0d-39717dbab327")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23162"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "dfb41549-c91c-425b-97f8-9d335d4169c6")
 			(effects
@@ -31184,7 +30176,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5a32fd6a-c1e0-4c3a-b22a-b6c2b037b456")
 			(effects
@@ -31196,7 +30188,7 @@
 		)
 		(property "LCSC" "C23140"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1b658903-1222-435c-a80f-d0a234a38ee8")
 			(effects
@@ -31343,21 +30335,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "852354ad-0520-4506-947b-5c738c831c69")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f69f0858-6ff2-40b4-ac1c-341edd7578aa")
 			(effects
@@ -31570,21 +30550,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C7427132"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7f931c9b-213b-4da0-89b5-8e89d44638cb")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C7427132"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e7f5b17f-92fc-47cc-99fa-63e7e2c1e73b")
 			(effects
@@ -31749,7 +30717,7 @@
 			)
 		)
 	)
-	(footprint "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
+	(footprint "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
 		(layer "F.Cu")
 		(uuid "959b37cd-8872-4496-8c20-a56ad0500e9d")
 		(at 71.5 77.5)
@@ -31800,11 +30768,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C20526"
+		(property "LCSC" "C20526"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "0242df35-17fe-4725-ba7e-b627a0822d8c")
+			(uuid "14177392-c3ca-493f-b24d-6292fe32d9c5")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31977,7 +30945,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD"
+	(footprint "cubevox:CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD"
 		(layer "F.Cu")
 		(uuid "96833272-c2e0-4834-9b2e-20ed7369d669")
 		(at 239.5 82 -90)
@@ -32027,21 +30995,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C191859"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "8cb1b034-3e8e-48a7-b43f-f418c0bebefa")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C191859"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2d8c3c56-f81a-411a-b59d-3f5a26654493")
 			(effects
@@ -32315,21 +31271,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7c08f328-e348-4a7b-907c-24745ebdd458")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "de9349d5-c921-459d-a886-1899c22b35c5")
 			(effects
@@ -32546,7 +31490,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fb349762-da9e-4618-91b7-0f918afd0e2b")
 			(effects
@@ -32558,7 +31502,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b4468ce8-a27b-4cc5-8c73-3ac7ace1147e")
 			(effects
@@ -32708,7 +31652,7 @@
 		)
 		(property "KiLib_Generator" "mounting_hardware/mounting_hole"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c15f5f35-751e-4217-8669-6a5330b07343")
 			(effects
@@ -32816,7 +31760,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "35e3c33d-350d-44d7-a607-ae0dc2f32574")
 			(effects
@@ -32828,7 +31772,7 @@
 		)
 		(property "LCSC" "C23630"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "bcda7303-a755-4955-bdd8-4b4501a05f48")
 			(effects
@@ -32978,7 +31922,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2a27fb2a-9971-4fa6-b321-d9a13eeb4ce1")
 			(effects
@@ -32990,7 +31934,7 @@
 		)
 		(property "LCSC" "C23186"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d1b244e1-a94e-4d08-82b7-4d89f7e04a61")
 			(effects
@@ -33140,7 +32084,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "10194fcd-134d-4bd2-b812-be7c59427414")
 			(effects
@@ -33152,7 +32096,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "bb9c1027-5e69-44c1-a885-9c8f5a82952f")
 			(effects
@@ -33299,21 +32243,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d01c8ee7-e1ec-471c-8f44-624814ba1186")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4ddd8d7c-227c-4db9-9a9b-e52bd29d124a")
 			(effects
@@ -33574,7 +32506,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "64597ea8-57f5-4227-839a-de51d2dcb5d5")
 			(effects
@@ -33586,7 +32518,7 @@
 		)
 		(property "LCSC" "C19702"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f4d313ab-c112-4120-a83e-c960c1d0f013")
 			(effects
@@ -33733,21 +32665,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7770b148-29d8-47b2-87d2-36ec0a41fe34")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "aacdc307-473e-454b-bfcf-009387df28db")
 			(effects
@@ -34005,21 +32925,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "23bd31c9-d14c-4785-89a6-8f3d9df1e7eb")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "910bc86c-9cb2-457e-966a-d131460016de")
 			(effects
@@ -34275,21 +33183,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7b6eb66e-db80-414d-a558-e907680fd81b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0f093096-ffab-4861-a120-10498cbdfb62")
 			(effects
@@ -34510,21 +33406,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "abb87ecf-7956-409f-b55f-2620c69a3d74")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "6e959450-452f-4e9d-ad42-c7ece588057a")
 			(effects
@@ -34536,7 +33420,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d5ff60ae-06bf-47a6-9371-d5969350331a")
 			(effects
@@ -34829,21 +33713,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C470710"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f82e44f8-b081-416b-b9b6-2c5ba208900b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C470710"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2adae16d-d1d3-4084-84c1-e83a4cf808ac")
 			(effects
@@ -34855,7 +33727,7 @@
 		)
 		(property "MPN" "EC11E15204A3"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "575c0716-9fc3-49ea-a78b-7e07bfefaf49")
 			(effects
@@ -35227,21 +34099,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "427ce491-f207-4d30-8ba9-f81ee50364da")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ef4f6616-4d69-4836-ac39-9c8c201da322")
 			(effects
@@ -35499,21 +34359,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "9df7d2cf-6aca-4f58-add6-52b941d66409")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7b84c127-1d63-4fd5-986b-b56623a415ff")
 			(effects
@@ -35727,21 +34575,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
+		(property "LCSC" "C31850"
 			(at 0 0 0)
 			(layer "F.Fab")
-			(hide yes)
-			(uuid "198ed99d-cb53-4e21-a8ae-8d1f3bde3f68")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C25804"
-			(at 0 0 0)
-			(layer "F.SilkS")
 			(hide yes)
 			(uuid "e42748e9-fa2d-4e62-8b8d-d8ea869ee2e9")
 			(effects
@@ -35958,7 +34794,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "cd80a9cf-3575-4d68-8bf3-2a8448151777")
 			(effects
@@ -35970,7 +34806,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f6e65356-6d3b-439b-a938-713858c449d7")
 			(effects
@@ -36117,21 +34953,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "255a2cd1-8b13-4f57-ab3c-57eb1c1f3eb8")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4c34c207-5d45-4788-ac78-9468a025cadb")
 			(effects
@@ -36389,21 +35213,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "b63e44c1-c730-43b1-b008-7548511f4057")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "95401b97-e05f-41bd-bb50-985da6cb63a5")
 			(effects
@@ -36610,7 +35422,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
+	(footprint "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "abf70d0d-d13d-49fb-af2a-599f62acde5b")
 		(at 79.6 79 90)
@@ -36661,21 +35473,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72484"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4c201c08-a9a5-48b4-bf41-c9175a626789")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C72484"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7b69777a-033a-4019-9cc6-880bfd73e4da")
 			(effects
@@ -36948,21 +35748,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "3cf2abbc-689c-4c85-b30a-283317388046")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8634dff-efe6-47eb-96ee-9cd8c2abc44a")
 			(effects
@@ -37179,7 +35967,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "253ebade-cabe-4d82-8593-721c6921530d")
 			(effects
@@ -37191,7 +35979,7 @@
 		)
 		(property "LCSC" "C19702"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "bad0638b-6762-45a9-a4d3-5a91996472ed")
 			(effects
@@ -37287,7 +36075,7 @@
 			)
 		)
 	)
-	(footprint "SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
+	(footprint "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 		(layer "F.Cu")
 		(uuid "ae42ef8f-de16-42a9-9eab-85dcfaaf520e")
 		(at 231 84.5)
@@ -37336,21 +36124,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C139363"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "dfae5304-f528-452f-87a2-6005ec2dda5b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C139363"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "5b43717f-6f07-4013-b2e8-a040a86c1167")
 			(effects
@@ -37681,7 +36457,7 @@
 			)
 		)
 	)
-	(footprint "RELAY-SMD_G6K-2F-X-XX"
+	(footprint "cubevox:RELAY-SMD_G6K-2F-X-XX"
 		(layer "F.Cu")
 		(uuid "b0b0698d-f024-4095-90ac-59577a003cc6")
 		(at 78 70.5)
@@ -37732,11 +36508,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C47190"
+		(property "LCSC" "C47190"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "50cca674-a520-49bf-8003-cf2462ce47a7")
+			(uuid "73dc338d-c004-4cdc-a6eb-5daba3a0a1e7")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -38146,7 +36922,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "b12f0571-4ffa-4428-9d03-e2a58f3c3daa")
 		(at 191.5 76 -90)
@@ -38197,11 +36973,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "f67ac35c-9a60-4779-93db-512046bd0e20")
+			(uuid "ddf0c0df-4c01-404b-aaae-4cb19b4cc5ef")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -38416,7 +37192,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d9fa00c8-8c85-488a-931c-aa59f8e55229")
 			(effects
@@ -38426,9 +37202,9 @@
 				)
 			)
 		)
-		(property "LCSC" "C22967"
+		(property "LCSC" "C4216"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "dc788c03-2999-47d8-a233-90b8b804ed83")
 			(effects
@@ -38573,21 +37349,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "c2cc3722-786d-4712-9f48-e9442c7b3c5c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "81e8b190-31cc-4311-87a4-0e0cefa21e79")
 			(effects
@@ -38807,21 +37571,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "cd9cb31b-1645-46c6-9896-b33b15d15903")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "68cbdc2a-3912-4e6f-9cd2-867ef212da74")
 			(effects
@@ -38833,7 +37585,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "70a03ccf-e2b8-45e5-b24d-8b7df0a5d513")
 			(effects
@@ -39114,21 +37866,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C55513"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4ebce008-75b5-4524-bc10-809eebc8a90c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C55513"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "19d4e43d-9ad0-446d-995e-6fa92a588681")
 			(effects
@@ -39413,7 +38153,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "b8adfe39-9f96-49e5-8d05-8fa4ec0b0469")
 		(at 209 63.5 -90)
@@ -39464,21 +38204,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "218faf01-018f-46ae-b798-93e297b25b9d")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25803"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "612fd48d-c6c7-4cc5-a66c-6d2d40005ad8")
 			(effects
@@ -39695,7 +38423,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b3493862-52e9-4194-948a-33af4ebd2b2b")
 			(effects
@@ -39707,7 +38435,7 @@
 		)
 		(property "LCSC" "C19702"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "66c53030-7233-4637-b73f-41abcfab4f60")
 			(effects
@@ -39803,7 +38531,7 @@
 			)
 		)
 	)
-	(footprint "OLED-1.3-SH1106-I2C-4P"
+	(footprint "cubevox:OLED-1.3-SH1106-I2C-4P"
 		(layer "F.Cu")
 		(uuid "ba1b0b6a-9423-4574-b50b-76985f3aef06")
 		(at 135.785 57.75)
@@ -39861,18 +38589,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b516e2e7-3448-4931-b490-6718da547175")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C42379197"
-			(at 0 14.75 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "7cdb71b4-a6e9-4239-bc06-4b05279cab3f")
 			(effects
 				(font
 					(size 1 1)
@@ -40325,21 +39041,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "5af481d4-f585-4281-b752-464bbf778112")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23630"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e568bea3-72ae-4596-bd03-f94ec47ceea7")
 			(effects
@@ -40595,21 +39299,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "db007817-09fc-4feb-b081-b7cc88c6ff71")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c20ba4bf-331d-4c3b-adff-c251fe4e9c33")
 			(effects
@@ -40829,21 +39521,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C393939"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4dc001cd-1149-4b5a-8630-33377ccccf9c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C393939"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "8df3c164-c930-4a98-8525-2e5298b432bf")
 			(effects
@@ -41208,21 +39888,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "3ef2cc87-4ec1-4c37-8f0e-ce7adafaef5f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C22775"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fe541edc-d2a5-4392-ae93-f2778544b9f6")
 			(effects
@@ -41385,7 +40053,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "c0853f9e-b242-4294-88a7-557ea612d8c8")
 		(at 71.75 80.75 180)
@@ -41436,11 +40104,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 180)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "26399d90-ad59-4127-98f3-7ac8649509e6")
+			(uuid "e7b8cc9a-1dd1-4011-a80d-5d5d75cfcb9d")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -41651,21 +40319,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C318884"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4754ae17-feb2-4632-b5c0-845f6feab110")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C318884"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "946fcda1-def3-4669-8887-14344e7f35d4")
 			(effects
@@ -42010,21 +40666,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "137f15b0-b89f-4ccc-bc21-e4a4d033d0f6")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "de1aa2fd-2f22-406b-8b3e-29e964590bc2")
 			(effects
@@ -42280,21 +40924,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C107671"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "3bd4e314-637f-42f6-a0a3-987e2f40be36")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C107671"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0a0ca1dd-b2d1-4fd8-8ebe-09239ffa292b")
 			(effects
@@ -42672,21 +41304,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C780769"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "c293b256-38a3-4b97-b217-d7bc297e8c35")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C780769"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e5a1a46e-3ad3-4401-9666-1e4f31228620")
 			(effects
@@ -42910,21 +41530,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "37a01db1-e21b-4050-8215-01acae4423e9")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23162"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "82940dd2-d8d3-4da2-8387-305874d4f633")
 			(effects
@@ -43141,7 +41749,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "8ac475c4-0eb0-4a9d-bc47-b3c017e8e16b")
 			(effects
@@ -43153,7 +41761,7 @@
 		)
 		(property "LCSC" "C23228"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ccb9b938-0493-484e-9e6e-bc8e9b8a9183")
 			(effects
@@ -43303,7 +41911,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "df08b5c2-2bb1-4254-beb7-93f82a7f8f54")
 			(effects
@@ -43315,7 +41923,7 @@
 		)
 		(property "LCSC" "C22859"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "41759ff3-3c6e-48a5-abb5-41a24052ffaf")
 			(effects
@@ -43460,21 +42068,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C404027"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "724f4d40-3d2b-4d08-99d2-de588bad756e")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C404027"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4acf96ad-6a68-4b11-953e-4e0a980e2876")
 			(effects
@@ -43757,21 +42353,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "adccf9df-01e9-40f9-b5dc-7b44f567b9a9")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "46e84cac-a2ff-4594-ae40-e4b9db4e92ef")
 			(effects
@@ -43783,7 +42367,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "eb43e460-8b03-442d-a810-c8930b07e3f4")
 			(effects
@@ -44066,21 +42650,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "2ad0c076-8a86-4150-8aed-a48918657942")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1671"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ff046576-9739-4fe8-b4c2-58f62d972357")
 			(effects
@@ -44338,21 +42910,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "b959546d-ecf2-4e5c-9d0a-d75ccee13520")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "74126898-37c0-4618-a50c-1c52c4c5c917")
 			(effects
@@ -44569,7 +43129,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ae9da1c6-03ca-4663-ad5e-f72f320fa3ff")
 			(effects
@@ -44581,7 +43141,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0f166ddd-e75a-4913-a6aa-703aab7e1958")
 			(effects
@@ -44727,21 +43287,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C318884"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6fa40d8e-34aa-4bc5-8db4-aa065a9fc9ab")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C318884"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "90ccb3dc-07bb-4281-baa4-61d89c04822b")
 			(effects
@@ -45086,21 +43634,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "2becffa8-91da-4c43-9b2f-1a8e498f6857")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "635aef4d-90a3-4fa1-9bf5-51533a7902c1")
 			(effects
@@ -45356,21 +43892,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f53a32f5-d552-4858-ac43-48724bb92717")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1a49b552-9acc-4486-9e6c-81a39bacf604")
 			(effects
@@ -45595,7 +44119,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "86370998-9952-43c5-b8c7-a2bcc21b4833")
 			(effects
@@ -45607,7 +44131,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "4e3643fc-8cba-4e31-8ec0-0e3b8f74f9a5")
 			(effects
@@ -45754,21 +44278,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a30cfd0a-63d5-46bb-967d-c56f50f64c67")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C2991172"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e44d83b4-af7d-46ef-b519-d984f583d4bf")
 			(effects
@@ -46026,21 +44538,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "c205b625-f41f-4ca3-bcb1-cd8253de3853")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a1acab13-a1db-4601-a6da-957ed58a3125")
 			(effects
@@ -46298,21 +44798,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "9d5c0dbc-fc9d-4a2d-8c31-9d9960e14918")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1671"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e40435f1-19c8-425a-a12b-f75756f51334")
 			(effects
@@ -46519,7 +45007,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD4.0-L4.3-W4.3-FD"
+	(footprint "cubevox:CAP-SMD_BD4.0-L4.3-W4.3-FD"
 		(layer "F.Cu")
 		(uuid "d33b4a27-6e4e-4bb1-b2e8-265deda77a48")
 		(at 157.5 97)
@@ -46570,21 +45058,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72484"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "25481fdf-cdc8-449c-95f2-a53f98359086")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C72484"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "bb4dc355-6986-4c0a-baa2-e19aaa82c4f2")
 			(effects
@@ -46857,21 +45333,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "c5619702-f928-4c82-bd68-53537a2fc3d1")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ade07e4b-e2f8-4c1f-a370-3f706ab7897b")
 			(effects
@@ -47088,7 +45552,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "2722919e-d7c7-4355-acdf-da65a355a752")
 			(effects
@@ -47103,18 +45567,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b173693e-179b-48cd-8a51-dea77af9e9b4")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C25105"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d32af90d-045d-4371-b8eb-7b2d9f77288e")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -47255,21 +45707,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C1788487"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "64e0c4d4-8ac7-4db5-8044-440fdd8ab535")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C1788487"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "975f157d-360d-481b-b919-8943e12adc7b")
 			(effects
@@ -47494,7 +45934,7 @@
 		)
 		(property "KiLib_Generator" "mounting_hardware/mounting_hole"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "82d692ca-539d-478b-85f4-f8633fb71d0e")
 			(effects
@@ -47548,7 +45988,7 @@
 		)
 		(embedded_fonts no)
 	)
-	(footprint "C0603"
+	(footprint "cubevox:C0603"
 		(layer "F.Cu")
 		(uuid "dd561b6a-4959-4f66-a060-ceea9415ab30")
 		(at 95.3 74.19 180)
@@ -47599,11 +46039,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 180)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "9d6b363c-9d93-460c-87fd-4356c9e5bd47")
+			(uuid "5c9cea72-b1aa-4342-99af-0ab882fb1006")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -47808,7 +46248,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "dd859f18-bbf7-4082-aa6f-39c0d4063b03")
 		(at 66.5 106.95 180)
@@ -47859,21 +46299,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C23179"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "29f77154-e0ed-4380-9bc2-2c7e04477e5c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23179"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "9a80cc9e-04f8-465f-8a99-e00d79b8a65c")
 			(effects
@@ -48090,7 +46518,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "1902a914-11bd-416a-ad2b-f50dc9fa9ea9")
 			(effects
@@ -48102,7 +46530,7 @@
 		)
 		(property "LCSC" "C12891"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "012dc759-f328-41ba-9bd2-75482a5dd363")
 			(effects
@@ -48247,21 +46675,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a7dd321a-4776-4550-9fff-73c875e91064")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "dd3ae35b-77a2-47dd-8a18-dfb295496c64")
 			(effects
@@ -48273,7 +46689,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e0fd90d6-abc4-48ab-b47e-73e6b56285f8")
 			(effects
@@ -48791,21 +47207,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C47190"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4ec2950c-5132-4455-875e-548f26c9f15c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C47190"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "dbd37240-20c3-48ba-87a3-e753605b0cef")
 			(effects
@@ -49271,7 +47675,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "febe1aa1-cafe-4946-a23c-6195aa37aba0")
 			(effects
@@ -49283,7 +47687,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d6cf78c9-bb5f-48d3-a9fc-8e99b2a45a76")
 			(effects
@@ -49433,7 +47837,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7848c114-ad08-448f-8664-d85355957551")
 			(effects
@@ -49445,7 +47849,7 @@
 		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8aae539-e110-4e0b-9d84-bee9026673b9")
 			(effects
@@ -49592,21 +47996,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "f5c2ddb7-a5ce-409f-ac95-a6a11fc9f840")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14860"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "78840b69-f367-47a4-8499-1519f9e48688")
 			(effects
@@ -49864,21 +48256,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "95687c87-bfad-444a-861d-9bd91f9280e9")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "be77c92e-8abb-477b-8e1b-1025245783c7")
 			(effects
@@ -50092,21 +48472,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "1d2aef83-28a7-4b2f-adfc-0b290c985171")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C22765"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "b6ecebf2-3a9e-4549-9dcf-25e56b47f8ad")
 			(effects
@@ -50322,7 +48690,7 @@
 		)
 		(property "KiLib_Generator" "package/gullwing"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "8249befd-2b75-4a30-be85-387fb2965810")
 			(effects
@@ -50337,18 +48705,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "376be684-d6a8-4e47-961a-0046ccd10eb4")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C221351"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "0aec771c-20c3-4449-a53c-8794d71bd4a1")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -50730,7 +49086,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "06297897-3ed0-4140-86a1-c7094ff845cb")
 			(effects
@@ -50742,7 +49098,7 @@
 		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d8b13619-f083-48e3-a1d8-2495e43a2c28")
 			(effects
@@ -50887,21 +49243,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C2071056"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "309d7124-c737-4a6c-98f3-bb3baf8479e2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C2071056"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "db8f34c3-4815-4280-ae44-266a8f5c312c")
 			(effects
@@ -51127,7 +49471,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "d7e9f3c4-df4d-4be7-b769-1ee1b166bcbe")
 			(effects
@@ -51137,9 +49481,9 @@
 				)
 			)
 		)
-		(property "LCSC" "C4216"
+		(property "LCSC" "C23254"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "410fd9c2-3e2f-45fd-84bf-e463712aa16c")
 			(effects
@@ -51289,7 +49633,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "9ea05a91-242d-4a9a-b8f9-6c94e3adb304")
 			(effects
@@ -51301,7 +49645,7 @@
 		)
 		(property "LCSC" "C22775"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "10ce8b37-6c6c-4f9f-8f51-f81e693af04a")
 			(effects
@@ -51397,7 +49741,7 @@
 			)
 		)
 	)
-	(footprint "C0603"
+	(footprint "cubevox:C0603"
 		(layer "F.Cu")
 		(uuid "e86f631a-8ff8-4961-9910-228709810472")
 		(at 114.5 87.2 -90)
@@ -51448,11 +49792,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "f54604e3-1ebf-4aa1-a2e0-1906a2f7131f")
+			(uuid "5e2fa2d1-1e6d-4bf6-9ab9-9bae1e1441b1")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -51710,7 +50054,7 @@
 		)
 		(property "KiLib_Generator" "fiducial"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "bd4db2d8-a64d-43f8-ba0b-679cc80f5858")
 			(effects
@@ -51818,7 +50162,7 @@
 		)
 		(property "KiLib_Generator" "fiducial"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a2da2691-25f9-49ba-acce-36298522f2fe")
 			(effects
@@ -51924,21 +50268,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "96741a11-9924-4844-a607-9b2da26ed74c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c5e4902f-8759-4d9f-97f6-ef45fc9db729")
 			(effects
@@ -52199,7 +50531,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "38d8188b-486d-462b-adde-76ba586986e4")
 			(effects
@@ -52214,18 +50546,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e1cf9b57-5926-4683-9d9f-9e90772a9ec2")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C25105"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6870bfe5-2d33-47c5-b8e0-2023473f43de")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -52368,21 +50688,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C2286"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "8a75c16d-7b98-49e8-8993-8d878b76d31a")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C2286"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "3eea21a5-1ee9-4bc5-a1ee-874e87a5ed52")
 			(effects
@@ -52638,21 +50946,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6e706cdf-476e-4aee-99c2-ddafc6450e71")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C25804"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "914a8a6e-0331-4edf-8b3c-86b17d6ddb22")
 			(effects
@@ -52866,21 +51162,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "94959cdf-18c0-4810-81a7-910a7fdc4e6a")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14860"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "3e8206b0-5307-4520-a683-81b505660007")
 			(effects
@@ -53138,21 +51422,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C57112"
-			(at 0 0 180)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "e5c8df4a-dc9e-4f7f-89af-e67af9c52f4f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14663"
 			(at 0 0 180)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "238eab47-5df0-4aaa-87ee-1a883d129e10")
 			(effects
@@ -53410,21 +51682,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C12891"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "2a256965-a5fc-4e3d-a15d-2b6b6cc5d9cf")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C14860"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "ff6c5fa0-8a37-4d72-af85-7ee5d7024d8d")
 			(effects
@@ -53685,7 +51945,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f9c51fe2-58ef-475d-9fe5-3f6c82a5987d")
 			(effects
@@ -53697,7 +51957,7 @@
 		)
 		(property "LCSC" "C23630"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "7ae924e5-b984-414b-8601-110db7b1f261")
 			(effects
@@ -53842,21 +52102,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C361173"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "234e5b99-d5ed-488a-a1e0-572b89dc17c6")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C361173"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "c29f83d2-5112-4f1d-9ff2-7c70a56db601")
 			(effects
@@ -53868,7 +52116,7 @@
 		)
 		(property "MPN" "RK09D1130C2P"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "f10a1951-b387-4529-a0e5-873e2df94435")
 			(effects
@@ -54151,21 +52399,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C25803"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "e1c075d1-55f3-4142-ba75-af5be0dc5d58")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C23182"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "0492b8c2-c310-46d8-bc40-8844177234bb")
 			(effects
@@ -54328,7 +52564,7 @@
 			)
 		)
 	)
-	(footprint "CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
+	(footprint "cubevox:CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD"
 		(layer "F.Cu")
 		(uuid "f98dec4b-2d2c-49e5-ada9-4bca3b7f2b9d")
 		(at 198 70.5 90)
@@ -54379,11 +52615,11 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C72521"
-			(at 0 0 90)
+		(property "LCSC" "C72521"
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "447b0251-8e99-4baf-81e0-b566df9f9281")
+			(uuid "58cfc09a-2d5b-403e-9cc4-50fa50c3488d")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -54656,7 +52892,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "01d4dceb-ba94-4582-870a-31db5ad85ca9")
 			(effects
@@ -54668,7 +52904,7 @@
 		)
 		(property "LCSC" "C8649"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a82be863-2d3c-415b-8252-bc59f07278a6")
 			(effects
@@ -54867,7 +53103,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 90)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "e6f6b450-539e-44f4-bbc5-a6e862896455")
 			(effects
@@ -54882,18 +53118,6 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "125af50f-af5a-442e-89de-223d7da6a22b")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C15850"
-			(at 0 0 90)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "a257328b-f41e-4f71-8fba-97f8d5b391e7")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -55039,7 +53263,7 @@
 		)
 		(property "KiLib_Generator" "SMD_2terminal_chip_molded"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "a2e23259-615a-41f1-aaa8-7a0ad7090778")
 			(effects
@@ -55051,7 +53275,7 @@
 		)
 		(property "LCSC" "C23228"
 			(at 0 0 0)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "25500f09-66fb-4712-9bf7-93ba19c6904e")
 			(effects
@@ -55147,7 +53371,7 @@
 			)
 		)
 	)
-	(footprint "SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
+	(footprint "cubevox:SOIC-8_L4.9-W3.9-P1.27-LS6.0-BL"
 		(layer "F.Cu")
 		(uuid "ff7e6d21-3b3f-48c6-a114-f3d66150fa21")
 		(at 75 89.7 -90)
@@ -55196,21 +53420,9 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C139363"
-			(at 0 0 270)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "65e629fe-4e9c-4e50-8627-7281402b52e0")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
 		(property "LCSC" "C139363"
 			(at 0 0 270)
-			(layer "F.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "fa47007f-2939-42cb-ad0d-f7ca5be8cf57")
 			(effects
@@ -55594,22 +53806,9 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC Part" "C3096082"
-			(at 0 0 90)
-			(layer "B.Fab")
-			(hide yes)
-			(uuid "e71b16d5-5f66-4442-a76a-362f5c003059")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-				(justify mirror)
-			)
-		)
 		(property "LCSC" "C3096082"
 			(at 0 0 90)
-			(layer "B.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "54056c39-eff4-4051-b7d9-59d7b7e11407")
 			(effects
@@ -55843,22 +54042,9 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC Part" "C309282"
-			(at 0 0 270)
-			(layer "B.Fab")
-			(hide yes)
-			(uuid "f14d6332-1e8c-400d-aca2-3e897be758df")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-				(justify mirror)
-			)
-		)
 		(property "LCSC" "C309282"
 			(at 0 0 270)
-			(layer "B.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "640051ca-a078-4c4d-bc44-96264771f43e")
 			(effects
@@ -55871,7 +54057,7 @@
 		)
 		(property "MPN" "PJ-611E"
 			(at 0 0 0)
-			(layer "B.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "8580d7b4-e038-4067-98fa-40c825b28725")
 			(effects
@@ -56455,22 +54641,9 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC Part" "C368458"
-			(at 0 0 0)
-			(layer "B.Fab")
-			(hide yes)
-			(uuid "04945d7c-efc3-433c-8d3b-ec8480631f11")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-				(justify mirror)
-			)
-		)
 		(property "LCSC" "C368458"
 			(at 0 0 0)
-			(layer "B.SilkS")
+			(layer "F.Fab")
 			(hide yes)
 			(uuid "03645c63-99e7-401b-a65e-0f2cdfa2e590")
 			(effects
