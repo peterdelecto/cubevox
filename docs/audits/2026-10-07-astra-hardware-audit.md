@@ -1,4 +1,10 @@
 # Independent KiCad 9 hardware audit — cubevox — 2026-10-07
+
+## Resolution (2026-10-07)
+F1 to F8 fixed in 93d650b (PARTS.md, PINMAP.md, hardware spec, cubevox.kicad_sym). The DRC
+limitation was closed by running kicad-cli outside the sandbox; that run found stale inner-layer
+fills around the five routing vias, refilled and recorded in RUNLOG ("Zone fills after slots
+routing"). Fresh DRC: 0 violations beyond the 9 lib mismatches, 34 accepted unconnected.
 ## progress: read design intent, pin map, parts, and recent run log
 ## progress: run ERC and DRC including schematic parity; export connectivity
 ### F1 [SHOULD-FIX] OLED symbol differs from project library
