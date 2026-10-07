@@ -210,7 +210,8 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     C1788487, mini bat lever, SPDT ON-ON, vertical THT, 2.54 mm pitch, body
     8.6 mm, M5 bushing 8.6–14.2 mm above the board (spans the 11.8 mm panel
     plane; the printed panel hole captures it, no nut), lever tip 23.6 mm.
-    Nine per board: eight slot toggles TOGGLE1..8 (TOGGLE1 = autotune) each with
+    Nine per board: eight slot toggles TOGGLE1..8 (TOGGLE n = slot n, left to
+    right; low = effect on) each with
     the common pin to GPIO, 10 kΩ pull-up to 3V3, 100 nF to GND, one throw to
     GND and the other no-connect; plus the MUTE toggle on MUTE_SW, wired the
     same way (item 7). No
