@@ -154,8 +154,8 @@ Delete from `cubevox.json` (refs in the current file):
 2. Jacks: J102, J103 (PJ-325M), J104, J105 (PJ-611E), R101-R103, R119-R122, D110, D111.
 3. Controls and LEDs: SW101-SW103 (B3F-4055), D101-D103 (WS2812B), U102, R109, R110,
    RV101-RV105 (RK09K; replace with RK09D1130C1B (C470304) x15 and set the mux inputs), C106-C110.
-4. Relay driver: Q101, R111, R112, NT101; K101 stays but is rewired (coil from 5V through
-   the bypass toggle, D104 stays across it). R113/R114 go away.
+4. Relay driver: Q101, R111, R112, NT101. K101 and D104 removed 2026-10-07 (bypass became
+   MUTE; K102 mutes). R111-R114 are the difference-amp resistors and stay.
 5. J101 7-pin SPI OLED becomes a 4-pin I2C header (GND, 3V3, SCL, SDA, matches the module order). R107/R108 stay for ENC.
 Inside `h7core_block.json` (the child holds these, not the top): U12 TLV9062 and R34/R35/R36/
 R41/R42/C70-C73 (ADC driver), U10 TPS63070, U11 LP5912 and their passives
