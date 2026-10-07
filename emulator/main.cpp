@@ -132,6 +132,7 @@ struct ProtoParams {
     pitchFx.octave.mix = 0.10f;
     reverb.engine = cv::kReverbSpringB;
     reverb.intensity = 1.0f;
+    reverb.time = 1.0f;  // the v0.01 sound, where INTENSITY 100 % also set full decay
     cv::applyIntensity(reverb);
   }
 };
@@ -416,7 +417,7 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "%s\n"
       "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
-      "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff}\n"
+      "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}\n"
       "SpringTuning{%.2ff, %.0ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff, %.1ff, %.2ff, %.2ff, %d, %d, %.1ff, "
@@ -429,7 +430,7 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       o.epochSearch, o.epochLpHz, o.trimDbA, o.trimDbB, o.grainWindowMs, o.grainCount, o.trimDbC,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
-      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
+      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneMinDb, d.toneMaxDb, d.bassPeakHz,
       d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false",
@@ -488,7 +489,7 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz, trimDbA, trimDbB, grainWindowMs, grainCount, trimDbC\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
-      "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb\n"
+      "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb, trimDb\n"
       "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, stackBassHz, "
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneMinDb, toneMaxDb, bassPeakHz, bassPeakDb, "
@@ -668,6 +669,7 @@ void drawSlapbackRaw(cv::SlapbackTuning& t) {
                      ImGuiSliderFlags_Logarithmic);
   ImGui::SliderFloat("Feedback", &t.feedback, 0.0f, 0.5f, "%.2f");
   ImGui::SliderFloat("Wet level at full", &t.wetMaxDb, -24.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Trim at full", &t.trimDb, -12.0f, 6.0f, "%.1f dB");
 }
 
 void drawDistortionRaw(cv::DistortionTuning& t) {
@@ -1111,6 +1113,7 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   add("reverb.engine", &r.engine);
   add("reverb.mix", &r.mix);
   add("reverb.intensity", &r.intensity);
+  add("reverb.time", &r.time);
   add("reverb.spring.decay", &r.spring.tension);
   add("reverb.spring.dwell", &r.spring.dwell);
   add("reverb.chasm.decay", &r.chasm.decay);
@@ -1416,6 +1419,11 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
     return;
   }
   namespace mc = cv::macros;
+  // DWELL (input drive into the soft clip) left the face on 2026-10-07; it binds
+  // to the selected engine here.
+  float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.springB.dwell;
+  float dwellPct = dwell * 100.0f;
+  if (ImGui::SliderFloat("Dwell", &dwellPct, 0.0f, 100.0f, "%.0f %%")) dwell = dwellPct / 100.0f;
   if (r.engine == cv::kReverbChasm) {
     macroSlider("Wobble", "pitch wobble in the tail", m.pos[mc::ChasmWobble],
                 [&](float p) { mc::chasmWobble(r.chasm, p); });
@@ -1592,7 +1600,7 @@ void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
   percentSlider("INTENSITY", s.intensity);
-  ImGui::SliderFloat("TIME", &s.tuning.timeMs, 30.0f, 150.0f, "%.0f ms");
+  ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
 }
@@ -1612,10 +1620,8 @@ void drawReverbBlock(cv::ReverbParams& r, cv::macros::State& macros) {
   ImGui::RadioButton("CHASM", &r.engine, cv::kReverbChasm);
   ImGui::SameLine();
   ImGui::RadioButton("SPRING B", &r.engine, cv::kReverbSpringB);
-  // DWELL binds to whichever engine is selected.
-  float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.springB.dwell;
   percentSlider("INTENSITY", r.intensity);
-  percentSlider("DWELL", dwell);
+  percentSlider("TIME", r.time);
   drawReverbTuning(r, macros);
   ImGui::PopID();
 }
@@ -1851,7 +1857,7 @@ void drawPedals(ProtoParams& params) {
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
     pedalPercent("INTENSITY", params.slapback.intensity);
-    pedalRange("TIME", params.slapback.tuning.timeMs, 30.0f, 150.0f, false, "%.0f ms");
+    pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
   });
   next();
   pedal("DISTORTION", params.distortion.on, w, [&] {
@@ -1866,9 +1872,8 @@ void drawPedals(ProtoParams& params) {
   next();
   cv::ReverbParams& r = params.reverb;
   pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
-    float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.springB.dwell;
     pedalPercent("INTENSITY", r.intensity);
-    pedalPercent("DWELL", dwell);
+    pedalPercent("TIME", r.time);
   });
 }
 
@@ -1916,6 +1921,8 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   // SPRING and PARKER are off the face; a saved state that picked either loads as SPRING B.
   if (params.reverb.engine != cv::kReverbChasm) params.reverb.engine = cv::kReverbSpringB;
   params.pitchFx.octave.formant = 0.0f;
+  // A v0.01 state file can hold a TIME below the 60 ms floor.
+  params.slapback.tuning.timeMs = std::clamp(params.slapback.tuning.timeMs, 60.0f, 250.0f);
   cv::applyIntensity(params.reverb);
   if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
 

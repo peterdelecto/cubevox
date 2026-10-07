@@ -101,12 +101,15 @@ double gainDb(const Signal& in, const Signal& out) {
   return 20.0 * std::log10(rmsRange(out, from, out.size()) / rmsRange(in, from, in.size()));
 }
 
-bool check(const char* name, const Signal& in, const BlockFn& fn) {
-  const double db = gainDb(in, run(in, fn));
+bool verdict(const char* name, double db) {
   const bool ok = db >= kLoDb - kSlackDb && db <= kHiDb + kSlackDb;
   std::printf("%s %-26s %+6.2f dB  (want %+.1f..%+.1f)\n", ok ? "PASS" : "FAIL", name, db,
               kLoDb, kHiDb);
   return ok;
+}
+
+bool check(const char* name, const Signal& in, const BlockFn& fn) {
+  return verdict(name, gainDb(in, run(in, fn)));
 }
 
 // Stages sit on the heap: the reverb and unison lines are large.
@@ -120,6 +123,20 @@ template <typename T, typename P>
 bool simple(const char* name, const Signal& in, const P& p) {
   auto s = std::make_unique<Stage<T>>();
   return check(name, in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); });
+}
+
+// The program's steady tone adds to its own echo or cancels it depending on
+// TIME, so one time is a coin flip. The mean over the knob's range is the power sum.
+bool slapbackRow(const char* name, const Signal& in, cv::SlapbackParams p) {
+  double sum = 0.0;
+  int count = 0;
+  for (float ms = 60.0f; ms <= 250.0f; ms += 10.0f) {
+    p.tuning.timeMs = ms;
+    auto s = std::make_unique<Stage<cv::Slapback>>();
+    sum += gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); }));
+    ++count;
+  }
+  return verdict(name, sum / count);
 }
 
 cv::GateParams inputGate() {
@@ -224,7 +241,7 @@ int main() {
   cv::SlapbackParams slap;
   slap.on = true;
   slap.intensity = 0.5f;
-  ok &= simple<cv::Slapback>("slapback .5", in, slap);
+  ok &= slapbackRow("slapback .5 mean TIME", in, slap);
 
   cv::DistortionParams dist;
   dist.on = true;

@@ -30,12 +30,13 @@ struct ReverbParams {
   ChasmParams chasm;
   SpringCParams parker;
   SpringBParams springB;
-  float mix = 0.15f;  // 0 dry .. 1 wet; set by INTENSITY (owner default 0.15 at 50 %)
-  float intensity = 0.5f;  // panel knob; sets mix and every engine's decay
+  float mix = 0.15f;       // 0 dry .. 1 wet; set by INTENSITY (owner default 0.15 at 50 %)
+  float intensity = 0.5f;  // panel knob 1; sets mix
+  float time = 0.5f;       // panel knob 2; sets every engine's decay
 };
 
-// INTENSITY drives the reverb's amount (mix) and decay together, piecewise
-// linear through 0 / 0.5 / 1. 0.5 lands on the default mix and decays.
+// INTENSITY sets the mix and TIME sets the decay, each piecewise linear
+// through 0 / 0.5 / 1. 0.5 lands on the default mix and decays.
 struct IntensityCurve {
   float lo, mid, hi;
   float at(float t) const {
@@ -51,10 +52,10 @@ constexpr IntensityCurve kReverbMix{0.0f, 0.15f, 0.60f};
 
 inline void applyIntensity(ReverbParams& r) {
   r.mix = kReverbMix.at(r.intensity);
-  r.spring.tension = kSpringDecay.at(r.intensity);
-  r.chasm.decay = kChasmDecay.at(r.intensity);
-  r.parker.tension = kParkerDecay.at(r.intensity);
-  r.springB.decay = kSpringBDecay.at(r.intensity);
+  r.spring.tension = kSpringDecay.at(r.time);
+  r.chasm.decay = kChasmDecay.at(r.time);
+  r.parker.tension = kParkerDecay.at(r.time);
+  r.springB.decay = kSpringBDecay.at(r.time);
 }
 
 class Reverb {

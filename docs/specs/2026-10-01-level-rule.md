@@ -48,6 +48,10 @@ the whole output as dbToLin(trimDb x depth), so depth 0 is bit-exact unity. Dept
 measures +1.38 dB without the trim and +0.26 dB with it. The unison_test level band at
 DEPTH 1 is now 0.91 +-1.5 dB. Slapback keeps wetMaxDb +4.9 dB (+0.18 dB at 0.5).
 
+Slapback correction 2026-10-07: the slapback row was a coin flip on TIME (the tone adds
+or cancels with its own echo). The row now averages over TIME 60..250 ms; wetMaxDb stays
++4.9 dB and SlapbackTuning.trimDb = -4.9 dB x INTENSITY lands the mean at +0.25 dB.
+
 ## Notes
 
 1. Wet-only at MIX 1, out/in near unity means wet RMS near dry RMS. Equal power then

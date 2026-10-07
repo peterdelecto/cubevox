@@ -161,6 +161,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"atGrainDelay", &at.grainDelay},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
+      {"slapTrimDb", &st.trimDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
       {"distS1BassDb", &dt.s1BassDb},         {"distS1LpHz", &dt.s1LpHz},
       {"distGain1Max", &dt.gain1Max},         {"distStackBassHz", &dt.stackBassHz},

@@ -65,6 +65,7 @@ std::vector<float> run(cv::Slapback& s, const std::vector<float>& in,
 cv::SlapbackParams params(float intensity) {
   cv::SlapbackParams p;
   p.intensity = intensity;
+  p.tuning.trimDb = 0.0f;  // wetOf() subtracts the dry; the level trim belongs to level_test
   return p;
 }
 
@@ -129,7 +130,7 @@ bool testPassthrough() {
 }
 
 bool testTime() {
-  const float times[4] = {30.0f, 80.0f, 120.0f, 150.0f};
+  const float times[4] = {60.0f, 100.0f, 180.0f, 250.0f};
   bool ok = true;
   int worst = 0;
   for (float ms : times) {
@@ -146,7 +147,7 @@ bool testTime() {
     if (err > worst) worst = err;
     if (err > 2) ok = false;
   }
-  return report("time", ok, "worst peak error over 30/80/120/150 ms=%.0f samples (<=2)", worst);
+  return report("time", ok, "worst peak error over 60/100/180/250 ms=%.0f samples (<=2)", worst);
 }
 
 bool testLowpass() {

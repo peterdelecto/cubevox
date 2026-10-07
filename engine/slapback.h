@@ -14,10 +14,11 @@
 namespace cv {
 
 struct SlapbackTuning {
-  float timeMs = 70.0f;       // panel TIME, 30..150
+  float timeMs = 100.0f;      // panel TIME, 60..250
   float lowpassHz = 4000.0f;  // 500..12000
   float feedback = 0.35f;     // at INTENSITY 25 %: ~2.5 audible repeats (3rd at about -20 dB)
-  float wetMaxDb = 4.9f;      // wet level at INTENSITY 1; level rule at 0.5
+  float wetMaxDb = 4.9f;      // wet level at INTENSITY 1
+  float trimDb = -4.9f;       // whole output, scaled by INTENSITY; level rule at 0.5
 };
 
 struct SlapbackParams {
@@ -62,16 +63,16 @@ class Slapback {
           fminf(kFeedbackMax, feedbackRef * sqrtf(intensity_ / kFeedbackRefIntensity));
       const float lp = filter(readCubic(timeSmp_));
       line_[writePos_] = in[i] + feedback * lp;
-      out[i] = in[i] + intensity_ * wetMax * lp;
+      out[i] = (in[i] + intensity_ * wetMax * lp) * powf(10.0f, t.trimDb * intensity_ / 20.0f);
       writePos_ = (writePos_ + 1) % kLen;
     }
   }
 
  private:
-  static constexpr int kLen = 160 * kSampleRate / 1000;
+  static constexpr int kLen = 260 * kSampleRate / 1000;
   static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
-  static constexpr float kTimeMinMs = 30.0f;
-  static constexpr float kTimeMaxMs = 150.0f;
+  static constexpr float kTimeMinMs = 60.0f;
+  static constexpr float kTimeMaxMs = 250.0f;
   static constexpr float kCutoffMinHz = 500.0f;
   static constexpr float kCutoffMaxHz = 12000.0f;
   static constexpr float kFeedbackMax = 0.5f;
