@@ -245,8 +245,8 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     plus walls. No footswitch.
 26. Mounting (owner 2026-10-02, option A; moved 2026-10-07 with the 185 x 145
     outline): four M3 holes, H101 (61, 35), H102 (236, 35), H103
-    (76.5, 170) and H104 (220.5, 170), each with a 7 mm "m3seat" copper
-    keep-out. The rear pair sits 5 mm from the rear and side edges; the front pair sits
+    (76.5, 170) and H104 (220.5, 170), each with a 9 mm "m3seat" copper
+    keep-out (boss and lid post for a 4.5-5 mm M3 heat-set insert). The rear pair sits 5 mm from the rear and side edges; the front pair sits
     on the front edge between the first and second pots because a corner
     seat would land in the corner pot's courtyard. No centre screw and no board keep-outs for the
     enclosure (owner 2026-10-02: the enclosure is designed around the

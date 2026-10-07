@@ -353,7 +353,7 @@
     },
     {
       "ref": "J108",
-      "x": 74.0,
+      "x": 76.0,
       "y": 41.0,
       "rotation": 90.0,
       "reason": "1/4 in output jack HOOYA PJ-611E (C309282) on the rear edge, B.Cu hand-soldered; owner 2026-10-02: part changed from NMJ6HCD2; owner column x 72.5, y set so the housing front face (4.3 mm beyond the front pin row, fxbox drawing record) sits 0.35 mm inside the edge"
@@ -370,28 +370,28 @@
       "x": 61.0,
       "y": 35.0,
       "rotation": 0.0,
-      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 9 mm rule area (heat-set boss and lid post) reserves the screw head"
     },
     {
       "ref": "H102",
       "x": 236.0,
       "y": 35.0,
       "rotation": 0.0,
-      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 9 mm rule area (heat-set boss and lid post) reserves the screw head"
     },
     {
       "ref": "H103",
       "x": 76.5,
       "y": 170.0,
       "rotation": 0.0,
-      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 9 mm rule area (heat-set boss and lid post) reserves the screw head"
     },
     {
       "ref": "H104",
       "x": 220.5,
       "y": 170.0,
       "rotation": 0.0,
-      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 7 mm rule area reserves the screw head"
+      "reason": "M3 hole, owner 2026-10-07 on the 185 x 145 outline: rear pair at (61/236, 35), front pair on the front edge at (76.5/220.5, 170) between pots 1-2 and 7-8; m3seat 9 mm rule area (heat-set boss and lid post) reserves the screw head"
     }
   ],
   "parts": null,
