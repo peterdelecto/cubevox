@@ -7317,7 +7317,7 @@
 		)
 		(uuid "19d7d4dd-263e-5bc2-9e56-218cbef499cb")
 	)
-	(hierarchical_label "FX_ON_SENSE"
+	(hierarchical_label "MUTE_SW"
 		(shape input)
 		(at 97.79 171.45 0)
 		(fields_autoplaced yes)
@@ -7641,28 +7641,6 @@
 	)
 	(wire
 		(pts
-			(xy 95.25 95.25) (xy 97.79 95.25)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0ef61f0a-dc5d-50c8-b636-dbd58d4a0893")
-	)
-	(hierarchical_label "ENC_KEY_B"
-		(shape input)
-		(at 97.79 95.25 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "fc8b6107-bb51-5998-a943-a78ed05b4aed")
-	)
-	(wire
-		(pts
 			(xy 95.25 92.71) (xy 97.79 92.71)
 		)
 		(stroke
@@ -7682,72 +7660,6 @@
 			(justify left bottom)
 		)
 		(uuid "60ffe69f-2ea3-5d4f-a0f8-4b3e27da2fcb")
-	)
-	(wire
-		(pts
-			(xy 95.25 90.17) (xy 97.79 90.17)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c87df84a-92bc-5c23-97fb-f1ef74c9897d")
-	)
-	(hierarchical_label "ENC_KEY_A"
-		(shape input)
-		(at 97.79 90.17 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "1fca70d7-9a8b-5d69-b1c8-a079d07d9f09")
-	)
-	(wire
-		(pts
-			(xy 95.25 87.63) (xy 97.79 87.63)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "30d56658-a9c5-5271-88bc-3c6332c61fbc")
-	)
-	(hierarchical_label "ENC_SEMI_B"
-		(shape input)
-		(at 97.79 87.63 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "2e9be4d7-f800-5627-ab7e-c50f6f68eff6")
-	)
-	(wire
-		(pts
-			(xy 95.25 85.09) (xy 97.79 85.09)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4cf9b439-61d3-5d20-a7f3-e02d69121ada")
-	)
-	(hierarchical_label "ENC_SEMI_A"
-		(shape input)
-		(at 97.79 85.09 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "76ea802c-b01b-5f2e-baa8-8b22d71df4d8")
 	)
 	(wire
 		(pts
@@ -18426,6 +18338,22 @@
 			(justify right bottom)
 		)
 		(uuid "20343c81-b92a-492e-bd4e-8d3b37b0d7e9")
+	)
+	(no_connect
+		(at 95.25 95.25)
+		(uuid "f80ba54d-327f-5b54-b8ea-7f7a613f753a")
+	)
+	(no_connect
+		(at 95.25 90.17)
+		(uuid "f4e8d82b-8ff6-50be-81b9-f618760b4011")
+	)
+	(no_connect
+		(at 95.25 87.63)
+		(uuid "65545ec0-cf24-50a4-9ffb-a61dc09fa8e4")
+	)
+	(no_connect
+		(at 95.25 85.09)
+		(uuid "d239747f-3856-5e78-a4ef-dd71664369f9")
 	)
 	(sheet_instances
 		(path "/"
