@@ -10,7 +10,7 @@ a part without a code is not a part).
 cubevox: a tabletop vocal effects board for Adam Keith. One SM58 or pedal in
 on a combo jack, through an analog preamp into an STM32H743 at 48 kHz, out a
 buffered 1/4" jack, with a relay bypass that keeps the preamp path alive when
-the digital is off. 9 V Boss supply, USB-C for firmware only, 15 pots, 3
+the digital is off. 9 V Boss supply, USB-C for firmware and the slot layout, 15 pots, 3
 encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 
 ## Plan
@@ -159,7 +159,9 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     10 Ω, relay coils on 5V. VA_SENSE: 5VA through 10 kΩ / 10 kΩ with 100 nF
     to PB1 (ADC12_INP5); R151/R152 sit at U106's 5VA pin, C163 at the MCU end.
     Pin map: `hardware/PINMAP.md` section 2. 3V3A: codec digital-analog, pots. USB
-    firmware-only, DFU via BOOT0 button (the box must be on 9 V to run DFU).
+    carries DFU and the slot layout over CDC serial (owner 2026-10-08); DFU is
+    entered from the app or the menu, BOOT0 button is recovery (the box must be
+    on 9 V to run DFU).
 
 ### Digital core (from fxbox)
 
@@ -167,7 +169,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
     X322525MOB4SI (C9006), VCAP 2×2.2 µF, BOOT0 pull-down + button for DFU.
 15. USB-C C393939 16-pin, CC 5.1 kΩ (C23186), USBLC6-2SC6 ESD (C2687116).
 16. SWD on Tag-Connect TC2030-NL pads (J3), no header part. NRST + SWO pads.
-17. No external flash (owner 2026-10-02). Settings, levels, the reverb engine selection and a few presets live in internal flash bank 2 (dual bank: write bank 2 while running from bank 1, no stall). Code and constants never live in bank 2.
+17. No external flash (owner 2026-10-02). One layout record (slot cards and menu settings, schema version + CRC, ping-pong across two sectors; owner 2026-10-08, see `2026-10-08-update-and-slots-design.md`) lives in internal flash bank 2 (dual bank: write bank 2 while running from bank 1, no stall). Saved presets live on the Mac, not the box. Code and constants never live in bank 2.
 18. SAI1 pins as fxbox: BCLK PE5 (33 Ω series), LRCLK PE4, DAC SD PE6,
     ADC SD PE3. ADC SCKI is SAI1_MCLK_A on PE2 (item 10, audit I01); PD14 is free.
 
@@ -246,7 +248,7 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
 26. Mounting (owner 2026-10-02, option A; moved 2026-10-07 with the 185 x 145
     outline): four M3 holes, H101 (61, 35), H102 (236, 35), H103
     (76.5, 170) and H104 (220.5, 170), each with a 9 mm "m3seat" copper
-    keep-out (boss and lid post for a 4.5-5 mm M3 heat-set insert). The rear pair sits 5 mm from the rear and side edges; the front pair sits
+    keep-out (boss and lid post for a 4.5-5 mm M3 heat-set insert). Closure change (owner 2026-10-08): no screws; H101 to H104 stay as plain rest bosses, see `2026-10-08-enclosure-closure-design.md`. The rear pair sits 5 mm from the rear and side edges; the front pair sits
     on the front edge between the first and second pots because a corner
     seat would land in the corner pot's courtyard. No centre screw and no board keep-outs for the
     enclosure (owner 2026-10-02: the enclosure is designed around the
@@ -268,7 +270,7 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     (x 76.5 and 220.5, y 170) and the rear posts with H101/H102 (x 61 and 236, y 35). Board changes it asks for: J101 0.8 mm
     rearward (flange face 1 mm past the plate inner face), J108 2 mm
     rearward or keep the 1 mm nut pocket, OLED standoffs 9 mm. Pot shafts
-    show 6.1 mm above the lid; a 1.5 mm lid or 25 mm pots would add more.
+    show 6.1 mm above the lid; a 1.5 mm lid or 25 mm pots would add more. Superseded 2026-10-08: the corner posts, M3 x 20 screws and heat-set inserts are replaced by the fastener-free closure in `2026-10-08-enclosure-closure-design.md`; the tilt, heights and rear-plate geometry stand.
 
 ## 3D model rule (owner 2026-10-02)
 
