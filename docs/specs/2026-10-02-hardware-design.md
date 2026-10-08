@@ -99,6 +99,9 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
    VREF carries bias only: the 1.2 kΩ input bias legs, the difference amp's
    reference resistor. The DAC attenuator's bottom resistor returns to BIAS_W (R154/R155
    10 kΩ / 10 kΩ off 5VA_W, followed by U106A), not VREF.
+   As built (pre-fab review 2026-10-08): R123 returns to the raw BIAS_W divider node
+   (C169 holds it), and U106A_OUT drives nothing. U106A is a closed follower with no
+   load. Left as built.
    Three OPA2197 duals (A1–A4, BIAS_W follower and output buffer on U106) plus U108.
 6. ADC feed. PRE_OUT → 100 Ω → 2.2 nF to GND → 10 µF X7R (C14860; both
    sides sit near 2.5 V so it carries no DC bias, and the AC across it is
@@ -178,7 +181,7 @@ revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`
 F1. BOR level 3 (about 2.61 V falling).
 F2. MUTE_N goes high 500 ms after the SAI clocks run, and low when VA_SENSE
     reads below 4.75 V (provisional, tolerance and shutdown time to budget).
-F3. Assert XSMT (PE9) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
+F3. Assert XSMT (PC5, U1 pin 33) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
 F4. PLL3 M/N/P 25/196/4 (HAL values PLL3M = 25, PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4; raw RCC fields DIVN3 = 195 and DIVP3 = 3 encode N-1 and P-1, PLL3RGE = 0,
     PLL3VCOSEL = 1); SAI1 MCKDIV = 4, OSR = 0, NOMCK = 0.
 F5. MUTE_SW is active low (low = muted); on change, XSMT first, then MUTE_N.

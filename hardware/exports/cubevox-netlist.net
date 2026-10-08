@@ -2,7 +2,7 @@
 	(version "E")
 	(design
 		(source "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch")
-		(date "2026-10-07T22:12:38")
+		(date "2026-10-08T04:25:50")
 		(tool "Eeschema 10.0.5")
 		(sheet
 			(number "1")
@@ -3006,13 +3006,13 @@
 		)
 		(comp
 			(ref "D105")
-			(value "SMBJ15CA")
+			(value "SMBJ20CA")
 			(footprint "cubevox:SMB_L4.4-W3.6-LS5.4-BI")
 			(fields
 				(field
-					(name "LCSC") "C19077570")
+					(name "LCSC") "C113992")
 				(field
-					(name "MPN") "SMBJ15CA")
+					(name "MPN") "SMBJ20CA")
 				(field
 					(name "Footprint") "cubevox:SMB_L4.4-W3.6-LS5.4-BI")
 				(field
@@ -3029,11 +3029,11 @@
 			)
 			(property
 				(name "LCSC")
-				(value "C19077570")
+				(value "C113992")
 			)
 			(property
 				(name "MPN")
-				(value "SMBJ15CA")
+				(value "SMBJ20CA")
 			)
 			(property
 				(name "Sheetname")
@@ -8252,9 +8252,11 @@
 			(footprint "cubevox:RES-ADJ-TH_RK09D1130C2P")
 			(fields
 				(field
-					(name "LCSC") "C361173")
+					(name "LCSC") "C470307")
 				(field
-					(name "MPN") "RK09D1130C2P")
+					(name "MPN") "RK09D117000C")
+				(field
+					(name "Note") "15A log taper, 30 mm shaft")
 				(field
 					(name "Footprint") "cubevox:RES-ADJ-TH_RK09D1130C2P")
 				(field
@@ -8271,11 +8273,15 @@
 			)
 			(property
 				(name "LCSC")
-				(value "C361173")
+				(value "C470307")
 			)
 			(property
 				(name "MPN")
-				(value "RK09D1130C2P")
+				(value "RK09D117000C")
+			)
+			(property
+				(name "Note")
+				(value "15A log taper, 30 mm shaft")
 			)
 			(property
 				(name "Sheetname")
@@ -8895,6 +8901,234 @@
 						(pin
 							(num "3")
 						)
+						(pin
+							(num "1")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "TP1")
+			(value "9V_JACK")
+			(footprint "TestPoint:TestPoint_Pad_D1.5mm")
+			(fields
+				(field
+					(name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Connector")
+				(part "TestPoint")
+				(description "test point")
+			)
+			(property
+				(name "Sheetname")
+				(value "cubevox")
+			)
+			(property
+				(name "Sheetfile")
+				(value "cubevox.kicad_sch")
+			)
+			(property
+				(name "exclude_from_bom")
+			)
+			(property
+				(name "exclude_from_pos_files")
+			)
+			(property
+				(name "ki_keywords")
+				(value "test point tp")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Pin* Test*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "0c342d60-fdf5-4be2-9b64-0c538d9b575d")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "TP2")
+			(value "VIN_9V")
+			(footprint "TestPoint:TestPoint_Pad_D1.5mm")
+			(fields
+				(field
+					(name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Connector")
+				(part "TestPoint")
+				(description "test point")
+			)
+			(property
+				(name "Sheetname")
+				(value "cubevox")
+			)
+			(property
+				(name "Sheetfile")
+				(value "cubevox.kicad_sch")
+			)
+			(property
+				(name "exclude_from_bom")
+			)
+			(property
+				(name "exclude_from_pos_files")
+			)
+			(property
+				(name "ki_keywords")
+				(value "test point tp")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Pin* Test*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "5df8bb8f-1f9b-48f2-a0e6-58bcc68694f9")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "TP3")
+			(value "GND")
+			(footprint "TestPoint:TestPoint_Pad_D1.5mm")
+			(fields
+				(field
+					(name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Connector")
+				(part "TestPoint")
+				(description "test point")
+			)
+			(property
+				(name "Sheetname")
+				(value "cubevox")
+			)
+			(property
+				(name "Sheetfile")
+				(value "cubevox.kicad_sch")
+			)
+			(property
+				(name "exclude_from_bom")
+			)
+			(property
+				(name "exclude_from_pos_files")
+			)
+			(property
+				(name "ki_keywords")
+				(value "test point tp")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Pin* Test*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "6c73c92d-2531-4bb7-9320-3ba99a311b65")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "TP4")
+			(value "3V3")
+			(footprint "TestPoint:TestPoint_Pad_D1.5mm")
+			(fields
+				(field
+					(name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Connector")
+				(part "TestPoint")
+				(description "test point")
+			)
+			(property
+				(name "Sheetname")
+				(value "cubevox")
+			)
+			(property
+				(name "Sheetfile")
+				(value "cubevox.kicad_sch")
+			)
+			(property
+				(name "exclude_from_bom")
+			)
+			(property
+				(name "exclude_from_pos_files")
+			)
+			(property
+				(name "ki_keywords")
+				(value "test point tp")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Pin* Test*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "6dcb5228-8ebd-4c0f-8d7a-c039c7b7d12f")
+			(units
+				(unit
+					(name "A")
+					(pins
 						(pin
 							(num "1")
 						)
@@ -12118,6 +12352,66 @@
 			)
 		)
 		(comp
+			(ref "C170")
+			(value "10uF")
+			(footprint "Capacitor_SMD:C_0805_2012Metric")
+			(fields
+				(field
+					(name "LCSC") "C15850")
+				(field
+					(name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
+			)
+			(property
+				(name "LCSC")
+				(value "C15850")
+			)
+			(property
+				(name "Sheetname")
+				(value "h7core_block")
+			)
+			(property
+				(name "Sheetfile")
+				(value "h7core_block.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "cap capacitor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "C_*")
+			)
+			(sheetpath
+				(names "/h7core_block/")
+				(tstamps "/cdf9c81d-d554-530c-ae51-0929232e7fb3/")
+			)
+			(tstamps "09445e3a-b95f-4a07-8191-bb344c1eb11d")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
 			(ref "D1")
 			(value "USER red")
 			(footprint "cubevox_h7core:LED-SMD_L1.6-W0.8-R-RD")
@@ -12972,11 +13266,11 @@
 		)
 		(comp
 			(ref "R7")
-			(value "82k")
+			(value "68k")
 			(footprint "Resistor_SMD:R_0603_1608Metric")
 			(fields
 				(field
-					(name "LCSC") "C23254")
+					(name "LCSC") "C23231")
 				(field
 					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
 				(field
@@ -12993,7 +13287,7 @@
 			)
 			(property
 				(name "LCSC")
-				(value "C23254")
+				(value "C23231")
 			)
 			(property
 				(name "Sheetname")
@@ -13529,6 +13823,66 @@
 			)
 		)
 		(comp
+			(ref "R158")
+			(value "100k")
+			(footprint "Resistor_SMD:R_0402_1005Metric")
+			(fields
+				(field
+					(name "LCSC") "C25741")
+				(field
+					(name "Footprint") "Resistor_SMD:R_0402_1005Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "LCSC")
+				(value "C25741")
+			)
+			(property
+				(name "Sheetname")
+				(value "h7core_block")
+			)
+			(property
+				(name "Sheetfile")
+				(value "h7core_block.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/h7core_block/")
+				(tstamps "/cdf9c81d-d554-530c-ae51-0929232e7fb3/")
+			)
+			(tstamps "2cfca020-84af-4c72-888f-4f374096c525")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
 			(ref "SWBOOT1")
 			(value "BOOT0")
 			(footprint "cubevox_h7core:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5")
@@ -13659,6 +14013,63 @@
 						)
 						(pin
 							(num "4")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "TP5")
+			(value "VBUS")
+			(footprint "TestPoint:TestPoint_Pad_D1.5mm")
+			(fields
+				(field
+					(name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Connector")
+				(part "TestPoint")
+				(description "test point")
+			)
+			(property
+				(name "Sheetname")
+				(value "h7core_block")
+			)
+			(property
+				(name "Sheetfile")
+				(value "h7core_block.kicad_sch")
+			)
+			(property
+				(name "exclude_from_bom")
+			)
+			(property
+				(name "exclude_from_pos_files")
+			)
+			(property
+				(name "ki_keywords")
+				(value "test point tp")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Pin* Test*")
+			)
+			(sheetpath
+				(names "/h7core_block/")
+				(tstamps "/cdf9c81d-d554-530c-ae51-0929232e7fb3/")
+			)
+			(tstamps "8e6afb2f-3990-4df1-913c-bd50d73b3566")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
 						)
 					)
 				)
@@ -14568,6 +14979,36 @@
 					(num "6")
 					(name "SWO")
 					(type "input")
+				)
+			)
+		)
+		(libpart
+			(lib "Connector")
+			(part "TestPoint")
+			(description "test point")
+			(footprints
+				(fp "Pin*")
+				(fp "Test*")
+			)
+			(fields
+				(field
+					(name "Reference") "TP")
+				(field
+					(name "Value") "TestPoint")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "test point")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "1")
+					(type "passive")
 				)
 			)
 		)
@@ -17230,6 +17671,11 @@
 				(pintype "passive")
 			)
 			(node
+				(ref "R158")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
 				(ref "SWBOOT1")
 				(pin "3")
 				(pinfunction "C_3")
@@ -17239,6 +17685,12 @@
 				(ref "SWBOOT1")
 				(pin "4")
 				(pinfunction "D_4")
+				(pintype "passive")
+			)
+			(node
+				(ref "TP4")
+				(pin "1")
+				(pinfunction "1_1")
 				(pintype "passive")
 			)
 			(node
@@ -17313,6 +17765,11 @@
 			)
 			(node
 				(ref "C111")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "C170")
 				(pin "1")
 				(pintype "passive")
 			)
@@ -17675,6 +18132,12 @@
 				(ref "J106")
 				(pin "3")
 				(pinfunction "3_3")
+				(pintype "passive")
+			)
+			(node
+				(ref "TP1")
+				(pin "1")
+				(pinfunction "1_1")
 				(pintype "passive")
 			)
 		)
@@ -18372,6 +18835,11 @@
 				(pintype "passive")
 			)
 			(node
+				(ref "C170")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
 				(ref "C18")
 				(pin "2")
 				(pintype "passive")
@@ -18905,6 +19373,12 @@
 				(ref "SWRESET1")
 				(pin "4")
 				(pinfunction "D_4")
+				(pintype "passive")
+			)
+			(node
+				(ref "TP3")
+				(pin "1")
+				(pinfunction "1_1")
 				(pintype "passive")
 			)
 			(node
@@ -20242,6 +20716,12 @@
 				(pintype "passive")
 			)
 			(node
+				(ref "TP2")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
 				(ref "U103")
 				(pin "2")
 				(pinfunction "EN_2")
@@ -20779,6 +21259,11 @@
 			(name "/h7core_block/LDO_EN")
 			(class "Default")
 			(node
+				(ref "R158")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
 				(ref "U107")
 				(pin "2")
 				(pinfunction "~{RESET}_2")
@@ -21045,6 +21530,12 @@
 			(node
 				(ref "R6")
 				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "TP5")
+				(pin "1")
+				(pinfunction "1_1")
 				(pintype "passive")
 			)
 		)

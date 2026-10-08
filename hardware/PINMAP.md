@@ -133,6 +133,9 @@ slots.cpp follows this table.
 | 17 | I14 | POT10 |
 | 16 | I15 | POT16 (SEMITONES) |
 
+RVGAIN1 (Input Gain) is off the mux and wired as a rheostat in the preamp. It is the Alps
+RK09D117000C (C470307), 10 k 15A log taper, not the linear slot pot (2026-10-08).
+
 ## 3. How fxbox joins top and h7core
 
 fxbox is hierarchical with a real `(sheet ...)` symbol (`fxbox.kicad_sch` line 18111,
