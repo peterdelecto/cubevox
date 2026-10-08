@@ -50,6 +50,7 @@ class PitchFx {
     mix_.fill(0.0f);
     active_.fill(0.0f);
     activeAt_ = 0.0f;
+    gains_ = Gains{};
     autotuneWas_ = false;
     harmonyWas_ = false;
     octaveWas_ = false;
@@ -125,6 +126,7 @@ class PitchFx {
       mix_ = mixT;
       active_ = activeT;
       activeAt_ = activeAtT;
+      gains_ = gainsNow();
       fresh_ = false;
     }
 
@@ -134,6 +136,7 @@ class PitchFx {
                       activeT[0] == 0.0f && active_[1] == 0.0f && activeT[1] == 0.0f;
     if (idle) {
       mix_ = mixT;
+      gains_ = gainsNow();
       for (int i = 0; i < n; ++i) {
         writeRings(in[i], lpOn, lpA, harmonyLpOn, harmonyLpA, autotuneLpOn, autotuneLpA);
         out[i] = in[i];
@@ -142,26 +145,35 @@ class PitchFx {
       return;
     }
 
+    // The smoothers still step once per sample, so their path and snap points
+    // are unchanged; the gains they set are evaluated at the block edges and
+    // interpolated between, which is exact once settled.
     const float a = smooth::kSmoothCoef;
+    const Gains g0 = gains_;
+    for (int k = 0; k < n; ++k) {
+      activeAt_ = smooth::step(activeAt_, activeAtT, a);
+      for (int s = 0; s < kStages; ++s) {
+        mix_[s] = smooth::step(mix_[s], mixT[s], a);
+        active_[s] = smooth::step(active_[s], activeT[s], a);
+      }
+    }
+    gains_ = gainsNow();
+    const Gains g1 = gains_;
+    const float inv = 1.0f / static_cast<float>(n);
     for (int i = 0; i < n; ++i) {
       writeRings(in[i], lpOn, lpA, harmonyLpOn, harmonyLpA, autotuneLpOn, autotuneLpA);
       const float harm = harmony_.tick(ring_, harmonyLp_, writeCount_, pr.period);
       const float oct = tickOctave(pr.period);
-      activeAt_ = smooth::step(activeAt_, activeAtT, a);
+      const float f = static_cast<float>(i + 1) * inv;
+      const float at = g0.at + (g1.at - g0.at) * f;
       const float base =
-          activeAt_ > 0.0f
-              ? activeAt_ * autotune_.tick(ring_, autotuneLp_, writeCount_, pr.period) +
-                    (1.0f - activeAt_) * in[i]
-              : in[i];
-      float dry = 1.0f;
-      std::array<float, kStages> wet{};
-      for (int s = 0; s < kStages; ++s) {
-        mix_[s] = smooth::step(mix_[s], mixT[s], a);
-        active_[s] = smooth::step(active_[s], activeT[s], a);
-        dry *= 1.0f + (cosf(mix_[s] * kHalfPi) - 1.0f) * active_[s];
-        wet[s] = sinf(mix_[s] * kHalfPi) * active_[s];
-      }
-      out[i] = dry * base + wet[0] * harm + wet[1] * oct;
+          at > 0.0f ? at * autotune_.tick(ring_, autotuneLp_, writeCount_, pr.period) +
+                          (1.0f - at) * in[i]
+                    : in[i];
+      const float dry = g0.dry + (g1.dry - g0.dry) * f;
+      const float wetH = g0.wetH + (g1.wetH - g0.wetH) * f;
+      const float wetO = g0.wetO + (g1.wetO - g0.wetO) * f;
+      out[i] = dry * base + wetH * harm + wetO * oct;
       // Voices only use writeCount modulo the ring, so wrapping here is exact.
       writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1;
     }
@@ -183,6 +195,26 @@ class PitchFx {
     if (engine_ == 1) return octaveB_.prepare(pr, o, corr);
     if (engine_ == 2) return octaveC_.prepare(pr, o, corr);
     return octaveA_.prepare(pr, o, corr);
+  }
+
+  // Equal-power dry/wet gains at the smoothers' current values. Dry is the
+  // product over stages; a stage that is off contributes exactly 1 and 0.
+  struct Gains {
+    float dry = 1.0f;
+    float wetH = 0.0f;
+    float wetO = 0.0f;
+    float at = 0.0f;
+  };
+
+  Gains gainsNow() const {
+    Gains g;
+    g.at = activeAt_;
+    const float dH = 1.0f + (cosf(mix_[0] * kHalfPi) - 1.0f) * active_[0];
+    const float dO = 1.0f + (cosf(mix_[1] * kHalfPi) - 1.0f) * active_[1];
+    g.dry = dH * dO;
+    g.wetH = sinf(mix_[0] * kHalfPi) * active_[0];
+    g.wetO = sinf(mix_[1] * kHalfPi) * active_[1];
+    return g;
   }
 
   void resetOctave() {
@@ -238,6 +270,7 @@ class PitchFx {
   std::array<float, kStages> mix_{};
   std::array<float, kStages> active_{};
   float activeAt_ = 0.0f;  // Autotune crossfade, 0 dry .. 1 corrected
+  Gains gains_;            // gains at the end of the last block
   long writeCount_ = 0;
   bool autotuneWas_ = false;  // last block's on-state per card, for enable edges
   bool harmonyWas_ = false;

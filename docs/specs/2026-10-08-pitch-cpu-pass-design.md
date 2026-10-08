@@ -59,7 +59,7 @@ worst block and late count in the message.
 | 1 | YIN loop rewrite, `coarse()` and `refine()` | pitch test within 3 cents (1.34 measured, same on the old loop); A/B -70 dB autotune, octave, chain (measured -77.6 / -75.7 / -71.4: reassociated sums flip a few borderline voiced decisions on the clip) | hop ~140k measured; stage 273k → 202k, worst block 1,104k → 818k |
 | 2 | Tracker gating by consumer, instant enable | bit-exact while on (A/B vs step 1: 10 cases exact) | tracker off in the default layout unless Autotune is on |
 | 3 | Stage idles: copy-through, per-engine LP rings, constant smoother coef | bit-exact | idle measured 5.5k (was 182.8k): warm buffers plus the three per-block prepares; all-off chain 365k → 174k |
-| 4 | Crossfade gains at block rate | A/B -60 dB chain during toggle ramps; bypass exact | -10k on, -10k off |
+| 4 | Crossfade gains at block rate; smoothers still step per sample | A/B vs step 3: 10 cases exact (renders do not toggle); bypass exact | stage 202k → 181k measured; chain avg 600k → 547k, part of that is Distortion and Spring moving 27k with no code change, read as flash placement noise |
 | 5 | Spinning window, compare wraps, polynomial exp2, per-block glide ratio | A/B -60 dB autotune, octave; hard-tune under 4 cents | Autotune voice ~12k, Octave voice ~8k |
 | 6 | Fill `core/costs.h` from the bench, `measured=true` for Autotune and Octave | — | stage all-on ~80k, worst block under budget |
 
