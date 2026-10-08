@@ -1,0 +1,80 @@
+{
+ "declaration": "D0387",
+ "ledger": "0489",
+ "baseline": "0486",
+ "board_sha256": "7a0ea27d9c6173423b4c7bcafb59e185bd25b7b28c5c28fc579bea2b1c222040",
+ "ledger_path": "/Users/j/Documents/Claude/Projects/cubevox/hardware/layout/ledger/0489.json",
+ "intended": [
+  {
+   "measure": "airline_total_mm",
+   "why": "declared",
+   "before": 6329.4,
+   "after": 6331.4,
+   "delta": 2.0,
+   "direction": "worse"
+  },
+  {
+   "measure": "copper_mm",
+   "why": "declared",
+   "before": 7027.2,
+   "after": 7028.3,
+   "delta": 1.1,
+   "direction": "n/a"
+  },
+  {
+   "measure": "right_angles",
+   "why": "declared",
+   "before": 6,
+   "after": 2,
+   "delta": -4,
+   "direction": "better"
+  },
+  {
+   "measure": "segments",
+   "why": "declared",
+   "before": 1469,
+   "after": 1468,
+   "delta": -1,
+   "direction": "n/a"
+  }
+ ],
+ "consequential": [
+  {
+   "measure": "area:/5V:F.Cu",
+   "why": "subject in a closure entry",
+   "before": 25.6,
+   "after": 25.2,
+   "delta": -0.4,
+   "direction": "n/a"
+  },
+  {
+   "measure": "reach:C111",
+   "why": "subject in a closure entry",
+   "before": 6.47,
+   "after": 7.21,
+   "delta": 0.74,
+   "direction": "worse"
+  },
+  {
+   "measure": "reach:C114",
+   "why": "subject in a closure entry",
+   "before": 16.5,
+   "after": 15.03,
+   "delta": -1.47,
+   "direction": "better"
+  },
+  {
+   "measure": "reach:C115",
+   "why": "subject in a closure entry",
+   "before": 17.8,
+   "after": 16.45,
+   "delta": -1.35,
+   "direction": "better"
+  }
+ ],
+ "unintended": [],
+ "gates": [],
+ "unmeasured_expect": [],
+ "moves_not_applied": [],
+ "hash": "6b606594b340"
+}
