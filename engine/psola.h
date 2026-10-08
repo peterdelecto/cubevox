@@ -18,7 +18,7 @@ using VoiceRing = std::array<float, kVoiceRingLen>;
 class PsolaVoice {
  public:
   static constexpr int kGrainDelay = 1040;
-  static constexpr int kMaxGrains = 8;
+  static constexpr int kMaxGrains = 6;  // at ratio <= 2 at most ceil(2r) + 1 = 5 are live
 
   void reset() {
     grains_.fill(Grain{});
@@ -46,18 +46,22 @@ class PsolaVoice {
     if (countdown_ > outPeriod) countdown_ = outPeriod;
     countdown_ -= 1.0f;
     if (countdown_ <= 0.0f) {
-      launch(p, -countdown_);
+      launch(head, p, -countdown_);
       countdown_ += outPeriod;
     }
 
     float sum = 0.0f;
-    for (Grain& g : grains_) sum += play(ring, head, g);
+    for (Grain& g : grains_) sum += play(ring, g);
     return sum / r;
   }
 
  private:
   struct Grain {
-    float delay = 0.0f;  // constant distance behind the write head
+    int idx = 0;         // ring index of the next read, advances one per sample
+    float hm = 0.0f;     // Catmull-Rom weights for the fixed fractional offset
+    float h0 = 0.0f;
+    float h1 = 0.0f;
+    float h2 = 0.0f;
     float age = 0.0f;
     float len = 0.0f;
     HannRotor window;    // Hann over len, started at age
@@ -85,7 +89,7 @@ class PsolaVoice {
   }
 
   // lead is how far past the ideal launch instant this tick already is.
-  void launch(float p, float lead) {
+  void launch(int head, float p, float lead) {
     float centre = markDelay_;
     if (centre - grainDelay_ > 0.5f * p) centre -= p;
     Grain* slot = &grains_[0];
@@ -96,14 +100,25 @@ class PsolaVoice {
       }
       if (g.age > slot->age) slot = &g;
     }
-    slot->delay = clampf(centre + p - lead, kMinDelay, kMaxDelay);
+    // The delay stays constant over the grain, so the fraction is fixed.
+    const float delay = clampf(centre + p - lead, kMinDelay, kMaxDelay);
+    const float pos = static_cast<float>(head) - delay;
+    const float fl = floorf(pos);
+    const float f = pos - fl;
+    const float f2 = f * f;
+    const float f3 = f2 * f;
+    slot->idx = wrap(static_cast<int>(fl));
+    slot->hm = -0.5f * f + f2 - 0.5f * f3;
+    slot->h0 = 1.0f - 2.5f * f2 + 1.5f * f3;
+    slot->h1 = 0.5f * f + 2.0f * f2 - 1.5f * f3;
+    slot->h2 = -0.5f * f2 + 0.5f * f3;
     slot->age = lead;
     slot->len = 2.0f * p;
     slot->window.init(kTwoPi * lead / slot->len, kTwoPi / slot->len);
     slot->active = true;
   }
 
-  float play(const VoiceRing& ring, int head, Grain& g) const {
+  float play(const VoiceRing& ring, Grain& g) const {
     if (!g.active) return 0.0f;
     if (g.age >= g.len) {
       g.active = false;
@@ -112,7 +127,10 @@ class PsolaVoice {
     const float w = g.window.window();
     g.window.advance();
     g.age += 1.0f;
-    return w * readCubic(ring, head, g.delay);
+    const float y = g.hm * ring[wrap(g.idx - 1)] + g.h0 * ring[g.idx] +
+                    g.h1 * ring[wrap(g.idx + 1)] + g.h2 * ring[wrap(g.idx + 2)];
+    g.idx = wrap(g.idx + 1);
+    return w * y;
   }
 
   // Reads sit within one ring length of the head, so one step wraps them; the
@@ -121,22 +139,6 @@ class PsolaVoice {
     if (i < 0) i += kVoiceRingLen;
     else if (i >= kVoiceRingLen) i -= kVoiceRingLen;
     return static_cast<unsigned>(i) < static_cast<unsigned>(kVoiceRingLen) ? i : 0;
-  }
-
-  // Catmull-Rom at a fractional delay behind the newest sample.
-  static float readCubic(const VoiceRing& ring, int head, float delay) {
-    const float pos = static_cast<float>(head) - delay;
-    const float fl = floorf(pos);
-    const float f = pos - fl;
-    const int i0 = wrap(static_cast<int>(fl));
-    const float xm = ring[wrap(i0 - 1)];
-    const float x0 = ring[i0];
-    const float x1 = ring[wrap(i0 + 1)];
-    const float x2 = ring[wrap(i0 + 2)];
-    const float c1 = 0.5f * (x1 - xm);
-    const float c2 = xm - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
-    const float c3 = 0.5f * (x2 - xm) + 1.5f * (x0 - x1);
-    return x0 + f * (c1 + f * (c2 + f * c3));
   }
 
   std::array<Grain, kMaxGrains> grains_{};
