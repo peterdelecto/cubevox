@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include <atomic>
+#include <new>
 
 #include "engine/common.h"
 #include "h7_block_mem.h"
@@ -45,7 +46,6 @@ namespace {
 // Engine objects, constructed in reset state.
 struct Chain {
   cv::Gate inputGate;
-  cv::PitchFx pitchFx;
   cv::Unison unison;
   cv::Slapback slapback;
   cv::Distortion distortion;
@@ -55,6 +55,12 @@ struct Chain {
 };
 
 Chain gChain;
+
+// Pitch stage state (~100 KB) lives in DTCM. The section is NOLOAD and the static
+// constructor ran before audioInit() zeroes it, so audioInit() constructs the object
+// again in place; a plain reset() would leave constructor-only members (the tracker's
+// const anti-alias biquad) zeroed.
+H7_DTCM_BSS cv::PitchFx gPitchFx;
 ChainParams gParams[2];
 std::atomic<int> gPublished{0};
 int gWriteIndex = 1;
@@ -80,7 +86,7 @@ bool runStage(Card c, const float* in, float* out, int n, const ChainParams& p, 
     case Card::Octave:
       if (pitchDone) return false;
       pitchDone = true;
-      gChain.pitchFx.process(in, out, n, p.pitchFx);
+      gPitchFx.process(in, out, n, p.pitchFx);
       return true;
     case Card::Unison: gChain.unison.process(in, out, n, p.unison); return true;
     case Card::Slapback: gChain.slapback.process(in, out, n, p.slapback); return true;
@@ -295,6 +301,8 @@ bool audioInit() {
   }
   if (gError) return false;
 
+  h7_dtcm_bss_zero();
+  new (&gPitchFx) cv::PitchFx();
   gParams[0] = ChainParams();
   enableCycleCounter();
   gStats.budgetCycles = static_cast<uint32_t>(

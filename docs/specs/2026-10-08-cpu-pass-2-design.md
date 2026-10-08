@@ -103,13 +103,18 @@ grain reads at a constant delay, so the fraction never changes over its life.
 8. Oversampler histories become ring-indexed (no shifts) only if a measurement after
    decisions 6 and 7 shows the shifts above 3k per block; otherwise left alone.
 9. Placement. The STM32duino H743 linker script puts `.data` and `.bss` in AXI SRAM
-   (0x24000000, behind the 16 KB D-cache) and declares the 128 KB DTCM region
-   without using it. The firmware gets a copy of the variant with a `.dtcm` output
-   section (`build.sh` points `build.variant.path` at `firmware/variant/`), and the
-   pitch stage object (tracker rings, pane array, voice ring, LP rings, ~90 KB)
-   moves there with a section attribute at its definition in `board/audio.cpp`.
-   Engine headers are untouched. Bit-identical; measured before any tracker change
-   so the pane step is compared against a placement-clean baseline.
+   (0x24000000, behind the 16 KB D-cache, which the core enables in `main.cpp`).
+   The firmware already links `firmware/platform/h7_h743v_sections.ld`, which adds a
+   NOLOAD `.dtcm_bss` section at 0x20000000 with an overflow assert, and
+   `h7_block_mem.h` provides the `H7_DTCM_BSS` attribute and `h7_dtcm_bss_zero()`.
+   The pitch stage object (tracker rings, pane array, voice ring, LP rings, 101,736 B
+   measured) leaves the `Chain` struct and is defined with that attribute in
+   `board/audio.cpp`. Because the section is NOLOAD and static construction runs
+   before `audioInit()` zeroes it, `audioInit()` constructs the object again in place
+   (placement new); `reset()` alone would leave the tracker's const anti-alias biquad
+   zeroed and Autotune silently unvoiced. Engine headers are untouched. Bit-identical;
+   measured before any tracker change so the pane step is compared against a
+   placement-clean baseline.
 10. Coarse YIN by panes. The coarse window is W = 256 decimated samples = 16 blocks
     and the hop is 4 blocks, so d(τ) splits into 16 block-aligned partial sums.
     Pane P_s(τ) = Σ_{j ∈ pane s} (x[j] − x[j+τ])² over the 16 j-values whose newest
