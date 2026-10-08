@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "pins.h"
+#include "registry.h"
 
 namespace {
 
@@ -47,8 +48,6 @@ PotOwner ownerOf(int pot) {
   return {-1, false};
 }
 
-Param paramOf(const Slot& slot, bool knobB) { return knobB ? slot.knobB : slot.knobA; }
-
 void selectChannel(uint8_t channel) {
   for (int bit = 0; bit < 4; ++bit) digitalWrite(kMuxSelectPins[bit], (channel >> bit) & 1);
 }
@@ -73,7 +72,7 @@ void updatePot(int pot, float norm, uint32_t nowMs) {
     p.reported = norm;
     p.seeded = true;
     const PotOwner owner = ownerOf(pot);
-    const int steps = owner.slot < 0 ? 0 : paramSteps(paramOf(kSlots[owner.slot], owner.knobB));
+    const int steps = owner.slot < 0 ? 0 : knobSteps(slotCard(owner.slot), owner.knobB ? 1 : 0);
     if (steps > 0) p.step = steppedPosition(norm, steps, 0, 0.0f);
     if (++gSeededCount == kPotCount) gChanged = true;
     return;
@@ -81,7 +80,7 @@ void updatePot(int pot, float norm, uint32_t nowMs) {
   p.smoothed += kSmoothing * (norm - p.smoothed);
 
   const PotOwner owner = ownerOf(pot);
-  const int steps = owner.slot < 0 ? 0 : paramSteps(paramOf(kSlots[owner.slot], owner.knobB));
+  const int steps = owner.slot < 0 ? 0 : knobSteps(slotCard(owner.slot), owner.knobB ? 1 : 0);
   if (steps > 0) {
     const int next = steppedPosition(p.smoothed, steps, p.step);
     if (next == p.step) return;
@@ -171,8 +170,8 @@ bool controlsTakeChanged() {
 
 float controlsKnobValue(int slot, bool knobB) {
   const int pot = knobB ? kSlots[slot].muxChannelB : kSlots[slot].muxChannelA;
-  const Param param = paramOf(kSlots[slot], knobB);
-  return paramSteps(param) > 0 ? static_cast<float>(gPots[pot].step) : gPots[pot].smoothed;
+  const bool stepped = knobSteps(slotCard(slot), knobB ? 1 : 0) > 0;
+  return stepped ? static_cast<float>(gPots[pot].step) : gPots[pot].smoothed;
 }
 
 bool controlsToggleOn(int slot) { return gToggles[slot].level(); }
@@ -181,9 +180,10 @@ LastMoved controlsLastMoved() { return gLastMoved; }
 
 void controlsApply(ChainParams& out) {
   for (int s = 0; s < kSlotCount; ++s) {
-    const Slot& slot = kSlots[s];
-    applyParam(slot.effect, slot.knobA, controlsKnobValue(s, false), out);
-    applyParam(slot.effect, slot.knobB, controlsKnobValue(s, true), out);
-    applyToggle(slot.effect, gToggles[s].level(), out);
+    const Card card = slotCard(s);
+    applyPlacement(card, out);
+    applyKnob(card, 0, controlsKnobValue(s, false), out);
+    applyKnob(card, 1, controlsKnobValue(s, true), out);
+    applyToggle(card, gToggles[s].level(), out);
   }
 }

@@ -7,6 +7,7 @@
 #include "controls.h"
 #include "pins.h"
 #include "platform.h"
+#include "registry.h"
 
 namespace {
 
@@ -82,12 +83,12 @@ void drawIdle(bool muted) {
   row(1, muted ? "MUTED" : "");
   const LastMoved m = controlsLastMoved();
   if (m.slot < 0) return;
-  const Slot& slot = kSlots[m.slot];
-  const Param param = m.knobB ? slot.knobB : slot.knobA;
+  const Card card = slotCard(m.slot);
+  const int knob = m.knobB ? 1 : 0;
   char value[kCols + 1];
-  formatParam(param, controlsKnobValue(m.slot, m.knobB), value, sizeof(value));
-  row(3, effectName(slot.effect));
-  row(4, paramName(param));
+  formatKnob(card, knob, controlsKnobValue(m.slot, m.knobB), value, sizeof(value));
+  row(3, cardDesc(card).name);
+  row(4, cardDesc(card).knob[knob].name);
   row(5, value);
   row(6, controlsToggleOn(m.slot) ? "ON" : "OFF");
 }
@@ -106,7 +107,7 @@ void drawChainView() {
   row(0, "CHAIN ORDER");
   for (int i = 0; i < kSlotCount; ++i) {
     char line[kCols + 1];
-    snprintf(line, sizeof(line), "%d %s", i + 1, effectName(kSlots[i].effect));
+    snprintf(line, sizeof(line), "%d %s", i + 1, cardDesc(slotCard(i)).name);
     row(1 + i, line);
   }
 }

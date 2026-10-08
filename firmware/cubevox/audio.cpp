@@ -7,6 +7,7 @@
 
 #include "engine/common.h"
 #include "h7_block_mem.h"
+#include "registry.h"
 
 // Clocks (hardware spec item 10 and note F4): HSE 25 MHz / 25 * 196.608 = 196.608 MHz VCO,
 // / 4 = 49.152 MHz SAI kernel clock, MCKDIV 4 gives MCLK = 256 fs = 12.288 MHz.
@@ -59,21 +60,24 @@ volatile uint8_t gReadyMask = 0;  // bit h set when RX half h is waiting
 uint8_t gNextHalf = 0;
 volatile AudioStats gStats;
 
-// Runs one effect. Returns false when it wrote nothing, so the caller keeps its buffers.
-bool runStage(Effect e, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
-  switch (e) {
-    case Effect::InputGate: gChain.inputGate.process(in, out, n, p.inputGate); return true;
-    case Effect::Autotune:
-    case Effect::Octave:
+// Runs one card. Returns false when it wrote nothing, so the caller keeps its buffers.
+// Pitch cards share one PitchFx call, run at the first pitch card's slot.
+bool runStage(Card c, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
+  switch (c) {
+    case Card::Empty: return false;
+    case Card::InputGate: gChain.inputGate.process(in, out, n, p.inputGate); return true;
+    case Card::Autotune:
+    case Card::Octave:
       if (pitchDone) return false;
       pitchDone = true;
       gChain.pitchFx.process(in, out, n, p.pitchFx);
       return true;
-    case Effect::Unison: gChain.unison.process(in, out, n, p.unison); return true;
-    case Effect::Slapback: gChain.slapback.process(in, out, n, p.slapback); return true;
-    case Effect::Distortion: gChain.distortion.process(in, out, n, p.distortion); return true;
-    case Effect::Gate: gChain.gate.process(in, out, n, p.gate); return true;
-    case Effect::Reverb: gChain.reverb.process(in, out, n, p.reverb); return true;
+    case Card::Unison: gChain.unison.process(in, out, n, p.unison); return true;
+    case Card::Slapback: gChain.slapback.process(in, out, n, p.slapback); return true;
+    case Card::Distortion: gChain.distortion.process(in, out, n, p.distortion); return true;
+    case Card::Gate: gChain.gate.process(in, out, n, p.gate); return true;
+    case Card::ReverbSpring:
+    case Card::ReverbChasm: gChain.reverb.process(in, out, n, p.reverb); return true;
   }
   return false;
 }
@@ -81,8 +85,8 @@ bool runStage(Effect e, const float* in, float* out, int n, const ChainParams& p
 // Slot order, then the fixed EQ. Result lands in `a`.
 void runChain(float* a, float* b, int n, const ChainParams& p) {
   bool pitchDone = false;
-  for (const Slot& slot : kSlots) {
-    if (runStage(slot.effect, a, b, n, p, pitchDone)) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (runStage(slotCard(s), a, b, n, p, pitchDone)) {
       float* t = a;
       a = b;
       b = t;
