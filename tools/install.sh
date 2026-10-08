@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the Vox Processor Prototype into a folder on the Desktop.
 #
-#   curl -fsSL https://raw.githubusercontent.com/peterdelecto/cubevox/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/peterdelecto/cubevox/main/tools/install.sh | bash
 #
 # Running it again updates the app and the samples in place.
 set -euo pipefail
