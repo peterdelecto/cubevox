@@ -298,6 +298,8 @@ class GrainShifter {
     semisT_ = 0.0f;
     gainT_ = 0.0f;
     aGlide_ = 1.0f;
+    ratio_ = 1.0f;
+    ratioSemis_ = 0.0f;
     windowSmp_ = ShifterTuning{}.grainWindowMs * kSmpPerMs;
     grains_ = ShifterTuning{}.grainCount;
     fresh_ = true;
@@ -314,6 +316,17 @@ class GrainShifter {
     aGlide_ = smooth::coef(glideMs * 0.001f);
     windowSmp_ = clampf(windowMs, kMinWindowMs, kMaxWindowMs) * kSmpPerMs;
     grains_ = grainCount >= 4 ? 4 : 2;
+    // Each grain's Hann rotor restarts from the exact phase every block; the
+    // step uses this block's ratio, so a glide is off by a hair until the
+    // next block re-syncs it.
+    if (semis_ != ratioSemis_) {
+      ratio_ = exp2f(semis_ / 12.0f);
+      ratioSemis_ = semis_;
+    }
+    const float inv = 1.0f / static_cast<float>(grains_);
+    const float step = kTwoPi * (1.0f - ratio_) / windowSmp_;
+    for (int k = 0; k < grains_; ++k)
+      window_[k].init(kTwoPi * frac(phase_ + static_cast<float>(k) * inv), step);
   }
 
   // One sample of the voice, gain and glide applied.
@@ -322,8 +335,12 @@ class GrainShifter {
     semis_ = smooth::step(semis_, semisT_, aGlide_);
     if (gain_ == 0.0f) return 0.0f;
 
-    const int head = static_cast<int>(writeCount % kVoiceRingLen);
-    const float ratio = exp2f(semis_ / 12.0f);
+    const int head = static_cast<int>(writeCount);
+    if (semis_ != ratioSemis_) {
+      ratio_ = exp2f(semis_ / 12.0f);
+      ratioSemis_ = semis_;
+    }
+    const float ratio = ratio_;
     const float d0 = 0.5f * windowSmp_ + kMinDelay;
     const float inv = 1.0f / static_cast<float>(grains_);
 
@@ -332,7 +349,8 @@ class GrainShifter {
     float sum = 0.0f;
     for (int k = 0; k < grains_; ++k) {
       const float p = frac(phase_ + static_cast<float>(k) * inv);
-      const float g = 0.5f * (1.0f - cosf(kTwoPi * p));
+      const float g = window_[k].window();
+      window_[k].advance();
       sum += g * readCubic(ring, head, d0 + windowSmp_ * (p - 0.5f));
     }
     phase_ = frac(phase_ + (1.0f - ratio) / windowSmp_);
@@ -354,9 +372,12 @@ class GrainShifter {
     return x < 0.0f ? x + 1.0f : x;
   }
 
+  // Reads sit within one ring length of the head, so one step wraps them; the
+  // final clamp is never taken and lets the compiler bound the index.
   static int wrap(int i) {
-    i %= kVoiceRingLen;
-    return i < 0 ? i + kVoiceRingLen : i;
+    if (i < 0) i += kVoiceRingLen;
+    else if (i >= kVoiceRingLen) i -= kVoiceRingLen;
+    return static_cast<unsigned>(i) < static_cast<unsigned>(kVoiceRingLen) ? i : 0;
   }
 
   // Catmull-Rom at a fractional delay behind the newest sample.
@@ -381,8 +402,11 @@ class GrainShifter {
   float semisT_ = 0.0f;
   float gainT_ = 0.0f;
   float aGlide_ = 1.0f;
+  float ratio_ = 1.0f;       // exp2 of ratioSemis_ / 12, recomputed only while gliding
+  float ratioSemis_ = 0.0f;
   float windowSmp_ = 1920.0f;
   int grains_ = 2;
+  std::array<HannRotor, kMaxGrains> window_{};
   bool fresh_ = true;
 };
 

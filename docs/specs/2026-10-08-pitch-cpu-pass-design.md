@@ -60,7 +60,7 @@ worst block and late count in the message.
 | 2 | Tracker gating by consumer, instant enable | bit-exact while on (A/B vs step 1: 10 cases exact) | tracker off in the default layout unless Autotune is on |
 | 3 | Stage idles: copy-through, per-engine LP rings, constant smoother coef | bit-exact | idle measured 5.5k (was 182.8k): warm buffers plus the three per-block prepares; all-off chain 365k → 174k |
 | 4 | Crossfade gains at block rate; smoothers still step per sample | A/B vs step 3: 10 cases exact (renders do not toggle); bypass exact | stage 202k → 181k measured; chain avg 600k → 547k, part of that is Distortion and Spring moving 27k with no code change, read as flash placement noise |
-| 5 | Spinning window, compare wraps, polynomial exp2, per-block glide ratio | A/B -60 dB autotune, octave; hard-tune under 4 cents | Autotune voice ~12k, Octave voice ~8k |
+| 5 | Spinning window, compare wraps, polynomial exp2; glide ratio recomputed only while the glide moves (bit-exact, better than the per-block lerp planned) | A/B vs step 4: autotune -106.5 dB, octave -108.6 dB, chain -92.0 dB (-60 allowed); hard tune 3.76 cents; exp2Fast 3.8e-7 relative, rotor 3.1e-6 over a 1372-sample grain | stage 181k → 147k measured; chain avg 547k → 518k, worst 790k → 733k. Wraps and the settled exp2 cache alone moved nothing: modulo by a constant was already a multiply |
 | 6 | Fill `core/costs.h` from the bench, `measured=true` for Autotune and Octave | — | stage all-on ~80k, worst block under budget |
 
 ## Tests

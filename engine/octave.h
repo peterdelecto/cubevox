@@ -55,6 +55,8 @@ class OctaveVoice {
     semisT_ = 0.0f;
     gainT_ = 0.0f;
     aGlide_ = 1.0f;
+    ratio_ = 1.0f;
+    ratioSemis_ = 0.0f;
     fresh_ = true;
   }
 
@@ -81,7 +83,11 @@ class OctaveVoice {
     gain_ = smooth::step(gain_, gainT_, smooth::kSmoothCoef);
     semis_ = smooth::step(semis_, semisT_, aGlide_);
     if (gain_ == 0.0f) return 0.0f;
-    return gain_ * voice_.tick(ring, writeCount, period, exp2f(semis_ / 12.0f));
+    if (semis_ != ratioSemis_) {
+      ratio_ = exp2f(semis_ / 12.0f);
+      ratioSemis_ = semis_;
+    }
+    return gain_ * voice_.tick(ring, writeCount, period, ratio_);
   }
 
  private:
@@ -91,6 +97,8 @@ class OctaveVoice {
   float semisT_ = 0.0f;
   float gainT_ = 0.0f;
   float aGlide_ = 1.0f;
+  float ratio_ = 1.0f;       // exp2 of ratioSemis_ / 12, recomputed only while gliding
+  float ratioSemis_ = 0.0f;
   bool fresh_ = true;
 };
 

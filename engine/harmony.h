@@ -146,8 +146,11 @@ class HarmonyVoices {
       gain_[v] = smooth::step(gain_[v], gainT_[v], smooth::kSmoothCoef);
       semis_[v] = smooth::step(semis_[v], semisT_[v], aGlide_);
       if (gain_[v] == 0.0f) continue;
-      const float ratio = exp2f(semis_[v] / 12.0f);
-      wet += gain_[v] * voices_[v].tick(ring, writeCount, period, ratio);
+      if (semis_[v] != ratioSemis_[v]) {
+        ratio_[v] = exp2f(semis_[v] / 12.0f);
+        ratioSemis_[v] = semis_[v];
+      }
+      wet += gain_[v] * voices_[v].tick(ring, writeCount, period, ratio_[v]);
     }
     return wet;
   }
@@ -216,6 +219,8 @@ class HarmonyVoices {
     gain_.fill(0.0f);
     semisT_.fill(0.0f);
     gainT_.fill(0.0f);
+    ratio_.fill(1.0f);
+    ratioSemis_.fill(0.0f);
     aGlide_ = 1.0f;
     fresh_ = true;
   }
@@ -227,6 +232,8 @@ class HarmonyVoices {
   std::array<float, kSlots> gain_{};
   std::array<float, kSlots> semisT_{};
   std::array<float, kSlots> gainT_{};
+  std::array<float, kSlots> ratio_{};       // exp2 of ratioSemis_ / 12, recomputed only while gliding
+  std::array<float, kSlots> ratioSemis_{};
   float aGlide_ = 1.0f;
   int engine_ = 0;
   bool fresh_ = true;

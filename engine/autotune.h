@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/fastmath.h"
 #include "engine/harmony.h"
 #include "engine/pitch.h"
 #include "engine/psola.h"
@@ -96,11 +97,11 @@ class AutotuneVoice {
   float tick(const VoiceRing& ring, const VoiceRing& lp, long writeCount, float period) {
     corr_ = smooth::step(corr_, target_, a_);
     if (period <= 0.0f) {
-      const int head = static_cast<int>(writeCount % kVoiceRingLen);
+      const int head = static_cast<int>(writeCount);
       const int i = head - static_cast<int>(engine_ == 0 ? psola_.grainDelay() : PsolaVoice::kGrainDelay);
       return gain_ * ring[i < 0 ? i + kVoiceRingLen : i];
     }
-    const float ratio = exp2f(corr_ / 12.0f);
+    const float ratio = exp2Fast(corr_ / 12.0f);
     if (engine_ == 0) return gain_ * psola_.tick(ring, writeCount, period, ratio);
     return gain_ * epoch_.tick(ring, lp, writeCount, period, ratio, 1.0f, grainPeriods_, search_);
   }

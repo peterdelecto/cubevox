@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/fastmath.h"
 
 // One pitch-shifted voice by pitch-synchronous overlap-add (Lent 1989 form).
 // Grains two periods long are cut on a grid spaced one input period apart
@@ -31,15 +32,15 @@ class PsolaVoice {
   void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinDelay + 1.0f, kGrainDelay); }
   float grainDelay() const { return grainDelay_; }
 
-  // One output sample. writeCount is the absolute index of the sample just
-  // written at ring[writeCount % kVoiceRingLen]. period is the sung period in
-  // samples (last voiced), ratio the pitch ratio (clamped 0.5..2.0).
+  // One output sample. writeCount is the ring index of the sample just
+  // written, already wrapped below kVoiceRingLen by the owner. period is the
+  // sung period in samples (last voiced), ratio the pitch ratio (clamped 0.5..2.0).
   float tick(const VoiceRing& ring, long writeCount, float period, float ratio) {
     if (period <= 0.0f) return 0.0f;
     const float p = clampf(period, kMinPeriod, kMaxPeriod);
     const float r = clampf(ratio, kMinRatio, kMaxRatio);
     const float outPeriod = p / r;
-    const int head = static_cast<int>(writeCount % kVoiceRingLen);
+    const int head = static_cast<int>(writeCount);
 
     advanceMarks(p);
     if (countdown_ > outPeriod) countdown_ = outPeriod;
@@ -59,6 +60,7 @@ class PsolaVoice {
     float delay = 0.0f;  // constant distance behind the write head
     float age = 0.0f;
     float len = 0.0f;
+    HannRotor window;    // Hann over len, started at age
     bool active = false;
   };
 
@@ -97,6 +99,7 @@ class PsolaVoice {
     slot->delay = clampf(centre + p - lead, kMinDelay, kMaxDelay);
     slot->age = lead;
     slot->len = 2.0f * p;
+    slot->window.init(kTwoPi * lead / slot->len, kTwoPi / slot->len);
     slot->active = true;
   }
 
@@ -106,14 +109,18 @@ class PsolaVoice {
       g.active = false;
       return 0.0f;
     }
-    const float w = 0.5f * (1.0f - cosf(kTwoPi * g.age / g.len));
+    const float w = g.window.window();
+    g.window.advance();
     g.age += 1.0f;
     return w * readCubic(ring, head, g.delay);
   }
 
+  // Reads sit within one ring length of the head, so one step wraps them; the
+  // final clamp is never taken and lets the compiler bound the index.
   static int wrap(int i) {
-    i %= kVoiceRingLen;
-    return i < 0 ? i + kVoiceRingLen : i;
+    if (i < 0) i += kVoiceRingLen;
+    else if (i >= kVoiceRingLen) i -= kVoiceRingLen;
+    return static_cast<unsigned>(i) < static_cast<unsigned>(kVoiceRingLen) ? i : 0;
   }
 
   // Catmull-Rom at a fractional delay behind the newest sample.
