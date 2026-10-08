@@ -98,7 +98,9 @@ class PitchFx {
 };
 ```
 
-Behaviour per block: push `in` to the tracker (threshold from `harmony.tuning`);
+Behaviour per block: push `in` to the tracker (threshold from `harmony.tuning`;
+since `2026-10-08-pitch-cpu-pass-design.md` the tracker's buffers fill every block
+but its analysis runs only while Autotune, Harmony or Octave A/B is on);
 `prepare` both helpers; per sample write the ring, tick both helpers,
 `out = dryH * dryO * in + wetH * harm + wetO * oct` where for each stage
 `dry = 1 + (cos(mix*pi/2) - 1) * active`, `wet = sin(mix*pi/2) * active`, `mix` and
