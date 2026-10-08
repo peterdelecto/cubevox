@@ -10,6 +10,9 @@
 // source impedance need >= 0.5 ms after a select change. The ADC sample time is a core
 // compile-time default, set to 810.5 cycles (>= 27 us) by build.sh.
 constexpr uint32_t kMuxSettleUs = 500;
+// U107 holds 3V3A off for up to 1030 ms after power-on; a high select before that pushes
+// ~20 mA through U101's input clamp into the dead rail. Selects stay low until this passes.
+constexpr uint32_t kMuxSelectHoldMs = 1100;
 constexpr uint32_t kToggleDebounceMs = 20;
 
 // Switch input that only changes after the raw level has held for the debounce time.

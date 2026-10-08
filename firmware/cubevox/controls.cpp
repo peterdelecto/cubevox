@@ -94,6 +94,7 @@ void updatePot(int pot, float norm, uint32_t nowMs) {
 }
 
 void scanMux(uint32_t nowMs) {
+  if (nowMs < kMuxSelectHoldMs) return;  // selects stay low until 3V3A is up
   if (!gSelected) {
     selectChannel(gScanChannel);
     gSelectedAtUs = micros();
@@ -145,8 +146,10 @@ int steppedPosition(float norm, int positions, int current, float hysteresis) {
 void controlsInit() {
   analogReadResolution(kAdcBits);
   for (uint32_t pin : kMuxSelectPins) {
-    pinMode(pin, OUTPUT);
     digitalWrite(pin, LOW);
+    pinMode(pin, OUTPUT);
+    const PinName pn = digitalPinToPinName(pin);
+    LL_GPIO_SetPinSpeed(get_GPIO_Port(STM_PORT(pn)), STM_LL_GPIO_PIN(pn), LL_GPIO_SPEED_FREQ_LOW);
   }
   pinMode(pins::kPotMuxOut, INPUT_ANALOG);
   for (int s = 0; s < kSlotCount; ++s) {

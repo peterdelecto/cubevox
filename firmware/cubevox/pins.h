@@ -32,6 +32,9 @@ constexpr uint32_t kXsmt = PC5;    // XSMT, PCM5102A soft mute, low = muted, R16
 // Indicators and sense.
 constexpr uint32_t kUserLed = PB7;   // USER_LED
 constexpr uint32_t kVaSense = PB1;   // VA_SENSE, ADC12_INP5 (not read yet)
+constexpr uint32_t kVbusSense = PA9;  // VBUS_SENSE, R6/R7 divider, native OTG sensing off
+
+// USB OTG_FS: PA11 USB_DM, PA12 USB_DP, owned by the core's CDC driver (usb_link.cpp).
 
 // OLED on I2C2 (AF4), SH1106, 4.7 k pull-ups on the board.
 constexpr uint32_t kOledScl = PB10;  // I2C_SCL

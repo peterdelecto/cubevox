@@ -3,17 +3,34 @@
 #include <Arduino.h>
 
 #include "audio.h"
+#include "sysclock.h"
 #include "controls.h"
 #include "display_sh1106.h"
 #include "menu.h"
 #include "mute.h"
 #include "pins.h"
 #include "slots.h"
+#include "usb_link.h"
 
 constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;
 
 static ChainParams gParams;
+static bool gOledFound = false;
+static bool gAudioRunning = false;
+
+// Boot facts for the first-article checklist, printed whenever a terminal opens the port.
+static void printBootReport() {
+  Serial.println("[boot] cubevox firmware");
+  clockReport(Serial);
+  Serial.println(gOledFound ? "[boot] OLED at 0x3C" : "[WARN] OLED not found, serial display");
+  if (gAudioRunning) {
+    Serial.println("[boot] audio running, SAI1 48 kHz");
+  } else {
+    Serial.print("[ERROR] audio: ");
+    Serial.println(audioError());
+  }
+}
 
 // Rebuilds the full parameter set from the panel and the menu, then hands it to the audio interrupt.
 static void publishParams() {
@@ -50,26 +67,21 @@ static void heartbeat(uint32_t nowMs) {
 void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
   pinMode(pins::kUserLed, OUTPUT);
-  Serial.begin(115200);
+  usbLinkInit();  // USB attaches from loop() once VBUS is seen
 
   controlsInit();
-  if (sh1106Present()) {
-    menuInit(sh1106Display());
-  } else {
-    Serial.println("[WARN] OLED not found, serial display");
-    menuInit(stubDisplay());
-  }
+  gOledFound = sh1106Present();
+  menuInit(gOledFound ? sh1106Display() : stubDisplay());
 
-  if (audioInit()) {
-    muteClocksRunning(millis());
-  } else {
-    Serial.print("[ERROR] audio: ");
-    Serial.println(audioError());
-  }
+  gAudioRunning = audioInit();
+  if (gAudioRunning) muteClocksRunning(millis());
 }
 
 void loop() {
   const uint32_t nowMs = millis();
+
+  usbLinkPoll(nowMs);
+  if (usbLinkTerminalOpened()) printBootReport();
 
   controlsPoll(nowMs);
   mutePoll(nowMs);

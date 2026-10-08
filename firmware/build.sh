@@ -15,7 +15,8 @@ command -v arduino-cli >/dev/null || { echo "[ERROR] arduino-cli not installed (
 # Engine headers are included as "engine/x.h" from the repo root.
 INC="-I$REPO -I$FW/platform"
 # The pot mux common on PC0 is the only analogRead; take the longest sample window (spec item 10.8).
-DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5"
+# The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
+DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1"
 # RAM_D2 (SAI rings) and DTCM sections for the H743V linker script.
 LDX="-Wl,--script=$FW/platform/h7_h743v_sections.ld"
 
