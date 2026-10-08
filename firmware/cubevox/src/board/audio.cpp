@@ -1,4 +1,4 @@
-#include "audio.h"
+#include "board/audio.h"
 
 #include <Arduino.h>
 #include <math.h>
@@ -7,7 +7,7 @@
 
 #include "engine/common.h"
 #include "h7_block_mem.h"
-#include "registry.h"
+#include "core/registry.h"
 
 // Clocks (hardware spec item 10 and note F4): HSE 25 MHz / 25 * 196.608 = 196.608 MHz VCO,
 // / 4 = 49.152 MHz SAI kernel clock, MCKDIV 4 gives MCLK = 256 fs = 12.288 MHz.

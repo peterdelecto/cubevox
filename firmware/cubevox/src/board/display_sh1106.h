@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "menu.h"
+#include "core/display.h"
 
 // True when the panel acknowledges its address on the bus. Starts the bus on first call.
 bool sh1106Present();

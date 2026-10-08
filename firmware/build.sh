@@ -3,20 +3,38 @@
 # Core, FQBN and flags follow Teensy-H7-Port/test/build_fxbox_h7.sh.
 #
 #   ./build.sh              # build into /tmp/cubevox-fw
+#   TAIL=5 ./build.sh       # show only the last 5 lines of compiler output
 
 set -uo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
 OUT=/tmp/cubevox-fw
-FQBN="STMicroelectronics:stm32:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen"
+CORE="STMicroelectronics:stm32"
+CORE_VERSION="${CORE_VERSION:-3.0.0}"  # env override exists only so the check itself can be tested
+FQBN="$CORE:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen"
 
 command -v arduino-cli >/dev/null || { echo "[ERROR] arduino-cli not installed (brew install arduino-cli)"; exit 1; }
 
-# Engine headers are included as "engine/x.h" from the repo root.
-INC="-I$REPO -I$FW/platform"
+# The core is pinned: a different version changes the HAL, the USB stack and the linker defaults.
+installed="$(arduino-cli core list 2>/dev/null | awk -v c="$CORE" '$1 == c {print $2}')"
+if [ "$installed" != "$CORE_VERSION" ]; then
+  echo "[ERROR] core $CORE is '${installed:-not installed}', build needs $CORE_VERSION"
+  echo "        arduino-cli core install $CORE@$CORE_VERSION"
+  exit 1
+fi
+gcc="$(ls -d "$HOME"/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/*/bin/arm-none-eabi-gcc 2>/dev/null | head -1)"
+[ -n "$gcc" ] && echo "[build] $("$gcc" --version | head -1)"
+
+# Version string from the git tag; "dev" when the build is not from a checkout.
+VERSION="$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo dev)"
+echo "[build] core $CORE $CORE_VERSION, firmware $VERSION"
+
+# Engine headers are included as "engine/x.h" from the repo root; sketch sources as "core/x.h",
+# "board/x.h", "ui/x.h" from cubevox/src; the copied platform files by bare name.
+INC="-I$REPO -I$FW/cubevox/src -I$FW/platform"
 # The pot mux common on PC0 is the only analogRead; take the longest sample window (spec item 10.8).
 # The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
-DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1"
+DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCUBEVOX_FW_VERSION=\"\\\"$VERSION\\\"\""
 # RAM_D2 (SAI rings) and DTCM sections for the H743V linker script.
 LDX="-Wl,--script=$FW/platform/h7_h743v_sections.ld"
 

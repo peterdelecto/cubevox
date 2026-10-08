@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#include "slots.h"
+#include "core/chain_params.h"
 
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed

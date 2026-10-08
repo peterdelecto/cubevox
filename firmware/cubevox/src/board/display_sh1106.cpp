@@ -6,8 +6,8 @@
 #include <Wire.h>
 #include <string.h>
 
-#include "display_sh1106.h"
-#include "pins.h"
+#include "board/display_sh1106.h"
+#include "board/pins.h"
 
 namespace {
 

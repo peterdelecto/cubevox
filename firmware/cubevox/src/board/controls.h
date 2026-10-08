@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#include "slots.h"
+#include "core/chain_params.h"
 
 // Mux timing (hardware spec items 10 and 19). The 100 R / 1 nF at the ADC pin and the mux
 // source impedance need >= 0.5 ms after a select change. The ADC sample time is a core

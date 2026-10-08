@@ -1,10 +1,11 @@
-#include "controls.h"
+#include "board/controls.h"
 
 #include <Arduino.h>
 #include <math.h>
 
-#include "pins.h"
-#include "registry.h"
+#include "board/pins.h"
+#include "board/slots.h"
+#include "core/registry.h"
 
 namespace {
 

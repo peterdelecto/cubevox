@@ -1,9 +1,9 @@
-#include "mute.h"
+#include "board/mute.h"
 
 #include <Arduino.h>
 
-#include "controls.h"
-#include "pins.h"
+#include "board/controls.h"
+#include "board/pins.h"
 
 namespace {
 

@@ -163,3 +163,11 @@ add_executable(stage_feedback_test test/stage_feedback_test.cpp)
 target_compile_options(stage_feedback_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(stage_feedback_test PRIVATE engine)
 add_test(NAME stage_feedback COMMAND stage_feedback_test)
+
+# firmware core tier: every src/core/*.cpp must compile on the host (no Arduino, no HAL).
+file(GLOB CUBEVOX_FW_CORE_SOURCES ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/core/*.cpp)
+add_executable(firmware_test test/firmware_test.cpp ${CUBEVOX_FW_CORE_SOURCES})
+target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src)
+target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(firmware_test PRIVATE engine)
+add_test(NAME firmware COMMAND firmware_test)

@@ -1,11 +1,11 @@
-#include "registry.h"
+#include "core/registry.h"
 
 #include <math.h>
 #include <stdio.h>
 
-#include "costs.h"
+#include "core/costs.h"
 #include "engine/harmony.h"
-#include "unison_rate.h"
+#include "core/unison_rate.h"
 
 namespace {
 

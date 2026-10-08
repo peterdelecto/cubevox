@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "slots.h"
+#include "core/chain_params.h"
 
 // Table index. Ids are wire-stable once shipped; append only.
 enum class Card : uint8_t {

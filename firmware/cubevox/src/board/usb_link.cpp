@@ -1,9 +1,9 @@
-#include "usb_link.h"
+#include "board/usb_link.h"
 
 #include <Arduino.h>
 
-#include "controls.h"
-#include "pins.h"
+#include "board/controls.h"
+#include "board/pins.h"
 
 #if !defined(USBCON) || !defined(USBD_USE_CDC)
 #error "build with usb=CDCgen: Serial must be the USB CDC port"

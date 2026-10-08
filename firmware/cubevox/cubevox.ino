@@ -2,15 +2,15 @@
 
 #include <Arduino.h>
 
-#include "audio.h"
-#include "sysclock.h"
-#include "controls.h"
-#include "display_sh1106.h"
-#include "menu.h"
-#include "mute.h"
-#include "pins.h"
-#include "slots.h"
-#include "usb_link.h"
+#include "board/audio.h"
+#include "board/sysclock.h"
+#include "board/controls.h"
+#include "board/display_sh1106.h"
+#include "ui/menu.h"
+#include "board/mute.h"
+#include "board/pins.h"
+#include "board/slots.h"
+#include "board/usb_link.h"
 
 constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;

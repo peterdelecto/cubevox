@@ -1,13 +1,13 @@
-#include "menu.h"
+#include "ui/menu.h"
 
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "controls.h"
-#include "pins.h"
-#include "platform.h"
-#include "registry.h"
+#include "board/controls.h"
+#include "board/pins.h"
+#include "board/platform.h"
+#include "core/registry.h"
 
 namespace {
 
