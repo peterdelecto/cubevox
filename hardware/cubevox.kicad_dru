@@ -1,1 +1,7 @@
 (version 1)
+
+# J1's own SMD pads sit 0.26 mm from its NPTH locating pegs (vendor land pattern).
+# JLC's hole-to-copper limit is 0.254 mm, so the board-wide 0.30 is relaxed inside J1 only.
+(rule "J1 land pattern hole clearance"
+	(constraint hole_clearance (min 0.255mm))
+	(condition "A.memberOfFootprint('J1') && B.memberOfFootprint('J1')"))
