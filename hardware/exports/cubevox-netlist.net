@@ -2,7 +2,7 @@
 	(version "E")
 	(design
 		(source "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch")
-		(date "2026-10-07T19:32:56")
+		(date "2026-10-07T22:12:38")
 		(tool "Eeschema 10.0.5")
 		(sheet
 			(number "1")
@@ -19698,8 +19698,8 @@
 			)
 			(node
 				(ref "U101")
-				(pin "23")
-				(pinfunction "I8_23")
+				(pin "18")
+				(pinfunction "I13_18")
 				(pintype "passive")
 			)
 		)
@@ -19715,8 +19715,8 @@
 			)
 			(node
 				(ref "U101")
-				(pin "22")
-				(pinfunction "I9_22")
+				(pin "17")
+				(pinfunction "I14_17")
 				(pintype "passive")
 			)
 		)
@@ -19732,8 +19732,8 @@
 			)
 			(node
 				(ref "U101")
-				(pin "21")
-				(pinfunction "I10_21")
+				(pin "22")
+				(pinfunction "I9_22")
 				(pintype "passive")
 			)
 		)
@@ -19766,8 +19766,8 @@
 			)
 			(node
 				(ref "U101")
-				(pin "19")
-				(pinfunction "I12_19")
+				(pin "23")
+				(pinfunction "I8_23")
 				(pintype "passive")
 			)
 		)
@@ -19783,8 +19783,8 @@
 			)
 			(node
 				(ref "U101")
-				(pin "18")
-				(pinfunction "I13_18")
+				(pin "21")
+				(pinfunction "I10_21")
 				(pintype "passive")
 			)
 		)
@@ -19800,8 +19800,8 @@
 			)
 			(node
 				(ref "U101")
-				(pin "17")
-				(pinfunction "I14_17")
+				(pin "19")
+				(pinfunction "I12_19")
 				(pintype "passive")
 			)
 		)

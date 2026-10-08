@@ -15981,7 +15981,7 @@
 		(uuid "57a4660b-b858-5327-9ba1-0a334ed4bd9a")
 	)
 	(label "POT15"
-		(at 213.36 435.61 0)
+		(at 213.36 430.53 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -16002,7 +16002,7 @@
 		(uuid "44410449-1fca-54b0-b04a-b63df4a7127d")
 	)
 	(label "POT14"
-		(at 213.36 433.07 0)
+		(at 213.36 425.45 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -16023,7 +16023,7 @@
 		(uuid "ee712769-e100-5e48-8410-cf5d7432de88")
 	)
 	(label "POT13"
-		(at 213.36 430.53 0)
+		(at 213.36 420.37 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -16065,7 +16065,7 @@
 		(uuid "8cc6c4fa-a7f1-5154-bc48-c6d97f241534")
 	)
 	(label "POT11"
-		(at 213.36 425.45 0)
+		(at 213.36 422.91 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -16086,7 +16086,7 @@
 		(uuid "477eb61b-45dd-5733-ab8d-93d49dcf1cf0")
 	)
 	(label "POT10"
-		(at 213.36 422.91 0)
+		(at 213.36 435.61 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -16107,7 +16107,7 @@
 		(uuid "3f749cb9-5b9e-5afd-8b3f-ad78d620e58c")
 	)
 	(label "POT09"
-		(at 213.36 420.37 0)
+		(at 213.36 433.07 0)
 		(fields_autoplaced yes)
 		(effects
 			(font

@@ -104,7 +104,7 @@ Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 41 (PE11
 | Net | Was | Now |
 |---|---|---|
 | ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 |
-| ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is pot POT15 on mux I14) |
+| ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is pot POT15, now on mux I12) |
 | ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is pot POT16 on mux I15) |
 | FX_ON_SENSE | PC6 | MUTE_SW on PC6 (K101 removed) |
 | TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PA7, PC4, PB0, PA6, PB2, PA5, PE7, PA4 |
@@ -115,6 +115,23 @@ Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 41 (PE11
 | USER_LED | PD7 | PB7 |
 | OLED I2C | I2C1 PB8/PB9 (I2C1_SCL/SDA) | I2C2 PB10/PB11 (I2C_SCL/SDA) |
 | CC1 / CC2 | PA0 / PA3 | not connected |
+
+### U101 mux channels (CD74HC4067, 2026-10-08)
+
+POT01-08 sit on I0-I7 (pins 9 to 2). The west column is re-mapped so each pin's via column
+matches its pot row's order down the band (RUNLOG.md, west POT re-map); firmware
+slots.cpp follows this table.
+
+| Pin | Input | Net |
+|---|---|---|
+| 23 | I8 | POT13 |
+| 22 | I9 | POT11 |
+| 21 | I10 | POT14 |
+| 20 | I11 | POT12 |
+| 19 | I12 | POT15 (KEY) |
+| 18 | I13 | POT09 |
+| 17 | I14 | POT10 |
+| 16 | I15 | POT16 (SEMITONES) |
 
 ## 3. How fxbox joins top and h7core
 
