@@ -59,6 +59,9 @@ const char* gError = "audioInit() has not run";
 volatile uint8_t gReadyMask = 0;  // bit h set when RX half h is waiting
 uint8_t gNextHalf = 0;
 volatile AudioStats gStats;
+volatile uint64_t gSumCycles = 0;   // since the last peaks reset
+volatile uint32_t gSumBlocks = 0;
+volatile uint64_t gSlotCycles[kSlotCount + 1] = {};
 
 // Runs one card. Returns false when it wrote nothing, so the caller keeps its buffers.
 // Pitch cards share one PitchFx call, run at the first pitch card's slot.
@@ -86,14 +89,19 @@ bool runStage(Card c, const float* in, float* out, int n, const ChainParams& p, 
 void runChain(float* a, float* b, int n, const ChainParams& p) {
   bool pitchDone = false;
   for (int s = 0; s < kSlotCount; ++s) {
-    if (runStage(slotCard(s), a, b, n, p, pitchDone)) {
+    const uint32_t t0 = DWT->CYCCNT;
+    const bool wrote = runStage(slotCard(s), a, b, n, p, pitchDone);
+    gSlotCycles[s] = gSlotCycles[s] + (DWT->CYCCNT - t0);
+    if (wrote) {
       float* t = a;
       a = b;
       b = t;
     }
   }
+  const uint32_t t0 = DWT->CYCCNT;
   gChain.polish.process(a, b, n, p.eq);
   for (int i = 0; i < n; ++i) a[i] = b[i];
+  gSlotCycles[kSlotCount] = gSlotCycles[kSlotCount] + (DWT->CYCCNT - t0);
 }
 
 void processHalf(int half) {
@@ -247,6 +255,9 @@ void SWPMI1_IRQHandler(void) {
     gNextHalf ^= 1u;
     gStats.blocks = gStats.blocks + 1;
     if (cycles > gStats.maxCycles) gStats.maxCycles = cycles;
+    if (cycles > gStats.budgetCycles) gStats.late = gStats.late + 1;
+    gSumCycles = gSumCycles + cycles;
+    gSumBlocks = gSumBlocks + 1;
   }
 }
 
@@ -299,11 +310,26 @@ void audioPublish(const ChainParams& params) {
   gWriteIndex ^= 1;
 }
 
+void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }
+
+void audioResetPeaks() {
+  gStats.late = 0;
+  gStats.overruns = 0;
+  gStats.maxCycles = 0;
+  gSumCycles = 0;
+  gSumBlocks = 0;
+  for (int s = 0; s <= kSlotCount; ++s) gSlotCycles[s] = 0;
+}
+
 AudioStats audioStats() {
   AudioStats s;
   s.blocks = gStats.blocks;
+  s.late = gStats.late;
   s.overruns = gStats.overruns;
   s.maxCycles = gStats.maxCycles;
+  const uint32_t n = gSumBlocks;
+  s.avgCycles = n ? static_cast<uint32_t>(gSumCycles / n) : 0;
+  for (int i = 0; i <= kSlotCount; ++i) s.slotAvg[i] = n ? static_cast<uint32_t>(gSlotCycles[i] / n) : 0;
   s.budgetCycles = gStats.budgetCycles;
   return s;
 }

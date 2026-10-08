@@ -23,7 +23,12 @@ DebouncedInput gVbus;
 bool gStarted = false;
 bool gTerminal = false;
 
+#ifdef CUBEVOX_VBUS_ALWAYS
+// Bench boards (WeAct) have no VBUS divider on PA9.
+bool vbusPresent() { return true; }
+#else
 bool vbusPresent() { return digitalRead(pins::kVbusSense) == HIGH; }
+#endif
 
 }  // namespace
 

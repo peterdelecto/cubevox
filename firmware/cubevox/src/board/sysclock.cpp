@@ -127,7 +127,11 @@ void clockReport(Print& out) {
   out.print(HAL_RCC_GetHCLKFreq() / 1000000);
   out.println(" MHz");
 
-  const uint32_t usbHz = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_USB);
+  // The HAL frequency helper does not cover the USB mux, so read the mux and PLL1Q directly.
+  const bool usbFromPll1 = (RCC->D2CCIP2R & RCC_D2CCIP2R_USBSEL) == RCC_USBCLKSOURCE_PLL;
+  PLL1_ClocksTypeDef pll1 = {};
+  HAL_RCCEx_GetPLL1ClockFreq(&pll1);
+  const uint32_t usbHz = usbFromPll1 ? pll1.PLL1_Q_Frequency : 0;
   out.print("[clock] usb ");
   out.print(usbHz);
   out.print(usbHz == kUsbHz ? " Hz from PLL1Q, sai1 " : " Hz WRONG, sai1 ");
