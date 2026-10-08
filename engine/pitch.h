@@ -80,6 +80,7 @@ class PitchTracker {
   static constexpr float kMinRms = 0.0031623f;  // -50 dBFS
   static constexpr float kLowpassHz = 2500.0f;
 
+  static_assert(kCoarseW % 4 == 0 && kFineW % 4 == 0, "windows must unroll by four");
   static_assert(kCoarseSpan <= kDecLen, "coarse frame exceeds decimated ring");
   static_assert(kFineSpan <= kFullLen, "fine frame exceeds full-rate ring");
 
@@ -116,10 +117,36 @@ class PitchTracker {
       decLin_[j] = dec_[(decPos_ - kCoarseSpan + j) & (kDecLen - 1)];
   }
 
+  // Sum of (a[j] - b[j])^2 over n samples, n a multiple of 4. Four accumulators
+  // keep the FPU pipeline full; one accumulator serialises on its own latency.
+  static float sumSqDiff(const float* a, const float* b, int n) {
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    for (int j = 0; j < n; j += 4) {
+      const float e0 = a[j] - b[j];
+      const float e1 = a[j + 1] - b[j + 1];
+      const float e2 = a[j + 2] - b[j + 2];
+      const float e3 = a[j + 3] - b[j + 3];
+      s0 += e0 * e0;
+      s1 += e1 * e1;
+      s2 += e2 * e2;
+      s3 += e3 * e3;
+    }
+    return (s0 + s1) + (s2 + s3);
+  }
+
+  static float sumSq(const float* a, int n) {
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    for (int j = 0; j < n; j += 4) {
+      s0 += a[j] * a[j];
+      s1 += a[j + 1] * a[j + 1];
+      s2 += a[j + 2] * a[j + 2];
+      s3 += a[j + 3] * a[j + 3];
+    }
+    return (s0 + s1) + (s2 + s3);
+  }
+
   float frameRms() const {
-    float s = 0.0f;
-    for (int j = kFineSpan - kFineW; j < kFineSpan; ++j) s += fullLin_[j] * fullLin_[j];
-    return sqrtf(s / kFineW);
+    return sqrtf(sumSq(fullLin_.data() + (kFineSpan - kFineW), kFineW) / kFineW);
   }
 
   void analyse(float threshold) {
@@ -137,12 +164,9 @@ class PitchTracker {
   // writes the interpolated candidate lag in decimated samples.
   bool coarse(float threshold, float& tau) {
     float running = 0.0f;
+    const float* x = decLin_.data();
     for (int t = 1; t <= kCoarseMax; ++t) {
-      float d = 0.0f;
-      for (int j = 0; j < kCoarseW; ++j) {
-        const float e = decLin_[j] - decLin_[j + t];
-        d += e * e;
-      }
+      const float d = sumSqDiff(x, x + t, kCoarseW);
       running += d;
       cmnd_[t] = running > 0.0f ? d * t / running : 1.0f;
     }
@@ -169,12 +193,9 @@ class PitchTracker {
     const int hi = centre + kFineReach > kFineMax ? kFineMax : centre + kFineReach;
     std::array<float, 2 * kFineReach + 1> d{};
     int m = 0;
+    const float* x = fullLin_.data();
     for (int lag = lo; lag <= hi; ++lag) {
-      float s = 0.0f;
-      for (int j = 0; j < kFineW; ++j) {
-        const float e = fullLin_[j] - fullLin_[j + lag];
-        s += e * e;
-      }
+      const float s = sumSqDiff(x, x + lag, kFineW);
       d[lag - lo] = s;
       if (s < d[m]) m = lag - lo;
     }
