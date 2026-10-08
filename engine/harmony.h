@@ -141,10 +141,9 @@ class HarmonyVoices {
       for (GrainShifter& v : grain_) wet += v.tick(ring, writeCount);
       return wet;
     }
-    const float aSmooth = smooth::coef(smooth::kSmoothSec);
     float wet = 0.0f;
     for (int v = 0; v < kSlots; ++v) {
-      gain_[v] = smooth::step(gain_[v], gainT_[v], aSmooth);
+      gain_[v] = smooth::step(gain_[v], gainT_[v], smooth::kSmoothCoef);
       semis_[v] = smooth::step(semis_[v], semisT_[v], aGlide_);
       if (gain_[v] == 0.0f) continue;
       const float ratio = exp2f(semis_[v] / 12.0f);

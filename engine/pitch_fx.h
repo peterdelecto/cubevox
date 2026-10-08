@@ -50,13 +50,16 @@ class PitchFx {
     mix_.fill(0.0f);
     active_.fill(0.0f);
     activeAt_ = 0.0f;
+    autotuneWas_ = false;
+    harmonyWas_ = false;
+    octaveWas_ = false;
+    lpWas_ = false;
+    harmonyLpWas_ = false;
+    autotuneLpWas_ = false;
     fresh_ = true;
   }
 
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
-    tracker_.push(in, n, p.harmony.tuning.voicedThreshold);
-    const PitchResult& pr = tracker_.result();
-
     // Switching engines resets the one left behind so it starts clean next time.
     const int engine = p.octave.engine == 1 || p.octave.engine == 2 ? p.octave.engine : 0;
     if (engine != engine_) {
@@ -65,19 +68,59 @@ class PitchFx {
       if (engine != 2) octaveC_.reset();
       engine_ = engine;
     }
+
+    // The tracker's buffers fill every block; it analyses only for a consumer.
+    // Octave C shifts without a pitch.
+    const bool trackerOn = p.autotune.on || p.harmony.on || (p.octave.on && engine_ != 2);
+    tracker_.push(in, n, p.harmony.tuning.voicedThreshold, trackerOn);
+    const PitchResult& pr = tracker_.result();
+
+    // A card coming on starts its voice clean rather than from stale grains.
+    if (p.autotune.on && !autotuneWas_) autotune_.reset();
+    autotuneWas_ = p.autotune.on;
     const float corr = autotune_.prepare(pr, p.autotune);
     const float activeAtT = p.autotune.on ? 1.0f : 0.0f;
 
-    const float lpA = lpCoef(p.octave.tuning.epochLpHz);
-    const float harmonyLpA = lpCoef(p.harmony.tuning.shifter.epochLpHz);
-    const float autotuneLpA = lpCoef(p.autotune.tuning.shifter.epochLpHz);
+    bool harmonyOn = harmony_.prepare(pr, p.harmony, corr);
+    if (harmonyOn && !harmonyWas_) {
+      harmony_.reset();
+      harmonyOn = harmony_.prepare(pr, p.harmony, corr);
+    }
+    harmonyWas_ = harmonyOn;
+    bool octaveOn = prepareOctave(pr, p.octave, corr);
+    if (octaveOn && !octaveWas_) {
+      resetOctave();
+      octaveOn = prepareOctave(pr, p.octave, corr);
+    }
+    octaveWas_ = octaveOn;
+
+    // Each low-passed ring is kept only while the engine that reads it is
+    // selected; it starts from silence when that engine is picked.
+    const bool lpOn = engine_ == 1;
+    const bool harmonyLpOn = p.harmony.engine == 1;
+    const bool autotuneLpOn = p.autotune.engine != 0;
+    if (lpOn && !lpWas_) {
+      lp_.fill(0.0f);
+      lpZ_ = 0.0f;
+    }
+    if (harmonyLpOn && !harmonyLpWas_) {
+      harmonyLp_.fill(0.0f);
+      harmonyLpZ_ = 0.0f;
+    }
+    if (autotuneLpOn && !autotuneLpWas_) {
+      autotuneLp_.fill(0.0f);
+      autotuneLpZ_ = 0.0f;
+    }
+    lpWas_ = lpOn;
+    harmonyLpWas_ = harmonyLpOn;
+    autotuneLpWas_ = autotuneLpOn;
+    const float lpA = lpOn ? lpCoef(p.octave.tuning.epochLpHz) : 0.0f;
+    const float harmonyLpA = harmonyLpOn ? lpCoef(p.harmony.tuning.shifter.epochLpHz) : 0.0f;
+    const float autotuneLpA = autotuneLpOn ? lpCoef(p.autotune.tuning.shifter.epochLpHz) : 0.0f;
 
     const std::array<float, kStages> mixT = {smooth::clamp01(p.harmony.mix),
                                              smooth::clamp01(p.octave.mix)};
-    const std::array<float, kStages> activeT = {harmony_.prepare(pr, p.harmony, corr) ? 1.0f : 0.0f,
-                                                (prepareOctave(pr, p.octave, corr))
-                                                    ? 1.0f
-                                                    : 0.0f};
+    const std::array<float, kStages> activeT = {harmonyOn ? 1.0f : 0.0f, octaveOn ? 1.0f : 0.0f};
     if (fresh_) {
       mix_ = mixT;
       active_ = activeT;
@@ -85,15 +128,23 @@ class PitchFx {
       fresh_ = false;
     }
 
-    const float a = smooth::coef(smooth::kSmoothSec);
+    // Every stage settled off: the dry gain is exactly 1, so only the rings
+    // need writing. MIX can snap since nothing reads it until a stage comes on.
+    const bool idle = activeAt_ == 0.0f && activeAtT == 0.0f && active_[0] == 0.0f &&
+                      activeT[0] == 0.0f && active_[1] == 0.0f && activeT[1] == 0.0f;
+    if (idle) {
+      mix_ = mixT;
+      for (int i = 0; i < n; ++i) {
+        writeRings(in[i], lpOn, lpA, harmonyLpOn, harmonyLpA, autotuneLpOn, autotuneLpA);
+        out[i] = in[i];
+        writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1;
+      }
+      return;
+    }
+
+    const float a = smooth::kSmoothCoef;
     for (int i = 0; i < n; ++i) {
-      ring_[writeCount_] = in[i];
-      lpZ_ += lpA * (in[i] - lpZ_);
-      lp_[writeCount_] = lpZ_;
-      harmonyLpZ_ += harmonyLpA * (in[i] - harmonyLpZ_);
-      harmonyLp_[writeCount_] = harmonyLpZ_;
-      autotuneLpZ_ += autotuneLpA * (in[i] - autotuneLpZ_);
-      autotuneLp_[writeCount_] = autotuneLpZ_;
+      writeRings(in[i], lpOn, lpA, harmonyLpOn, harmonyLpA, autotuneLpOn, autotuneLpA);
       const float harm = harmony_.tick(ring_, harmonyLp_, writeCount_, pr.period);
       const float oct = tickOctave(pr.period);
       activeAt_ = smooth::step(activeAt_, activeAtT, a);
@@ -134,6 +185,30 @@ class PitchFx {
     return octaveA_.prepare(pr, o, corr);
   }
 
+  void resetOctave() {
+    if (engine_ == 1) octaveB_.reset();
+    else if (engine_ == 2) octaveC_.reset();
+    else octaveA_.reset();
+  }
+
+  // The shared ring always takes the sample; each low-passed copy only while on.
+  void writeRings(float x, bool lpOn, float lpA, bool harmonyLpOn, float harmonyLpA,
+                  bool autotuneLpOn, float autotuneLpA) {
+    ring_[writeCount_] = x;
+    if (lpOn) {
+      lpZ_ += lpA * (x - lpZ_);
+      lp_[writeCount_] = lpZ_;
+    }
+    if (harmonyLpOn) {
+      harmonyLpZ_ += harmonyLpA * (x - harmonyLpZ_);
+      harmonyLp_[writeCount_] = harmonyLpZ_;
+    }
+    if (autotuneLpOn) {
+      autotuneLpZ_ += autotuneLpA * (x - autotuneLpZ_);
+      autotuneLp_[writeCount_] = autotuneLpZ_;
+    }
+  }
+
   float tickOctave(float period) {
     if (engine_ == 1) return octaveB_.tick(ring_, lp_, writeCount_, period);
     if (engine_ == 2) return octaveC_.tick(ring_, writeCount_);
@@ -164,6 +239,12 @@ class PitchFx {
   std::array<float, kStages> active_{};
   float activeAt_ = 0.0f;  // Autotune crossfade, 0 dry .. 1 corrected
   long writeCount_ = 0;
+  bool autotuneWas_ = false;  // last block's on-state per card, for enable edges
+  bool harmonyWas_ = false;
+  bool octaveWas_ = false;
+  bool lpWas_ = false;  // last block's selection per low-passed ring
+  bool harmonyLpWas_ = false;
+  bool autotuneLpWas_ = false;
   bool fresh_ = true;
 };
 

@@ -78,7 +78,7 @@ class OctaveVoice {
 
   // One sample of the voice, gain and glide applied.
   float tick(const VoiceRing& ring, long writeCount, float period) {
-    gain_ = smooth::step(gain_, gainT_, smooth::coef(smooth::kSmoothSec));
+    gain_ = smooth::step(gain_, gainT_, smooth::kSmoothCoef);
     semis_ = smooth::step(semis_, semisT_, aGlide_);
     if (gain_ == 0.0f) return 0.0f;
     return gain_ * voice_.tick(ring, writeCount, period, exp2f(semis_ / 12.0f));

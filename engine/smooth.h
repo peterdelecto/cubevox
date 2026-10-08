@@ -19,6 +19,9 @@ inline float coef(float sec) {
   return sec <= 0.0f ? 1.0f : 1.0f - expf(-1.0f / (sec * kSampleRate));
 }
 
+// The 20 ms coefficient, computed once; per-sample callers must not call coef().
+inline const float kSmoothCoef = coef(kSmoothSec);
+
 // Lands exactly on its target, so settled bypass is bit-exact.
 inline float step(float x, float target, float a) {
   x += a * (target - x);

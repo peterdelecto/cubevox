@@ -37,11 +37,19 @@ class PitchTracker {
     periods_.fill(0.0f);
     nPeriods_ = 0;
     nextPeriod_ = 0;
+    active_ = false;
     result_ = PitchResult{};
   }
 
-  // Feed n <= kBlock samples. Produces a new result every kHop samples.
-  void push(const float* in, int n, float voicedThreshold) {
+  // Feed n <= kBlock samples. The rings always fill, so the frame is warm;
+  // analysis runs every kHop samples while active, and once as active rises
+  // so an enable reports pitch at once. Inactive, the result reads unvoiced.
+  void push(const float* in, int n, float voicedThreshold, bool active = true) {
+    if (active != active_) {
+      active_ = active;
+      if (active) analyse(voicedThreshold);
+      else result_ = PitchResult{};
+    }
     for (int i = 0; i < n; ++i) {
       full_[fullPos_] = in[i];
       fullPos_ = (fullPos_ + 1) & (kFullLen - 1);
@@ -53,7 +61,7 @@ class PitchTracker {
       }
       if (++hopCount_ == kHop) {
         hopCount_ = 0;
-        analyse(voicedThreshold);
+        if (active_) analyse(voicedThreshold);
       }
     }
   }
@@ -232,6 +240,7 @@ class PitchTracker {
   int decPos_ = 0;
   int decPhase_ = 0;
   int hopCount_ = 0;
+  bool active_ = false;
   float z1_ = 0.0f;
   float z2_ = 0.0f;
   PitchResult result_;

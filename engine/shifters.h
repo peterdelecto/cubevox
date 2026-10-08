@@ -261,7 +261,7 @@ class EpochShifter {
 
   // One sample of the voice, gain, glide and formant applied.
   float tick(const VoiceRing& ring, const VoiceRing& lp, long writeCount, float period) {
-    gain_ = smooth::step(gain_, gainT_, smooth::coef(smooth::kSmoothSec));
+    gain_ = smooth::step(gain_, gainT_, smooth::kSmoothCoef);
     semis_ = smooth::step(semis_, semisT_, aGlide_);
     formant_ = smooth::step(formant_, formantT_, aGlide_);
     if (gain_ == 0.0f) return 0.0f;
@@ -318,7 +318,7 @@ class GrainShifter {
 
   // One sample of the voice, gain and glide applied.
   float tick(const VoiceRing& ring, long writeCount) {
-    gain_ = smooth::step(gain_, gainT_, smooth::coef(smooth::kSmoothSec));
+    gain_ = smooth::step(gain_, gainT_, smooth::kSmoothCoef);
     semis_ = smooth::step(semis_, semisT_, aGlide_);
     if (gain_ == 0.0f) return 0.0f;
 
