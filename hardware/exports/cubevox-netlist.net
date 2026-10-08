@@ -2,7 +2,7 @@
 	(version "E")
 	(design
 		(source "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch")
-		(date "2026-10-07T14:46:45")
+		(date "2026-10-07T19:32:56")
 		(tool "Eeschema 10.0.5")
 		(sheet
 			(number "1")
@@ -19443,8 +19443,8 @@
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "33")
-				(pinfunction "PC5_33")
+				(pin "42")
+				(pinfunction "PE12_42")
 				(pintype "bidirectional")
 			)
 			(node
@@ -19460,8 +19460,8 @@
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "32")
-				(pinfunction "PC4_32")
+				(pin "40")
+				(pinfunction "PE10_40")
 				(pintype "bidirectional")
 			)
 			(node
@@ -19477,8 +19477,8 @@
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "30")
-				(pinfunction "PA6_30")
+				(pin "38")
+				(pinfunction "PE8_38")
 				(pintype "bidirectional")
 			)
 			(node
@@ -19494,8 +19494,8 @@
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "31")
-				(pinfunction "PA7_31")
+				(pin "39")
+				(pinfunction "PE9_39")
 				(pintype "bidirectional")
 			)
 			(node
@@ -19928,8 +19928,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "92")
-				(pinfunction "PB6_92")
+				(pin "31")
+				(pinfunction "PA7_31")
 				(pintype "bidirectional")
 			)
 		)
@@ -19955,8 +19955,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "98")
-				(pinfunction "PE1_98")
+				(pin "32")
+				(pinfunction "PC4_32")
 				(pintype "bidirectional")
 			)
 		)
@@ -19982,8 +19982,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "28")
-				(pinfunction "PA4_28")
+				(pin "34")
+				(pinfunction "PB0_34")
 				(pintype "bidirectional")
 			)
 		)
@@ -20009,8 +20009,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "29")
-				(pinfunction "PA5_29")
+				(pin "30")
+				(pinfunction "PA6_30")
 				(pintype "bidirectional")
 			)
 		)
@@ -20036,8 +20036,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "34")
-				(pinfunction "PB0_34")
+				(pin "36")
+				(pinfunction "PB2_36")
 				(pintype "bidirectional")
 			)
 		)
@@ -20063,8 +20063,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "36")
-				(pinfunction "PB2_36")
+				(pin "29")
+				(pinfunction "PA5_29")
 				(pintype "bidirectional")
 			)
 		)
@@ -20117,8 +20117,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "38")
-				(pinfunction "PE8_38")
+				(pin "28")
+				(pinfunction "PA4_28")
 				(pintype "bidirectional")
 			)
 		)
@@ -20994,8 +20994,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "41")
-				(pinfunction "PE11_41")
+				(pin "93")
+				(pinfunction "PB7_93")
 				(pintype "bidirectional")
 			)
 		)
@@ -21175,8 +21175,8 @@
 			)
 			(node
 				(ref "U1")
-				(pin "39")
-				(pinfunction "PE9_39")
+				(pin "33")
+				(pinfunction "PC5_33")
 				(pintype "bidirectional")
 			)
 			(node
@@ -21837,12 +21837,12 @@
 		)
 		(net
 			(code "187")
-			(name "unconnected-(U1-PB7-Pad93)")
+			(name "unconnected-(U1-PB6-Pad92)")
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "93")
-				(pinfunction "PB7_93")
+				(pin "92")
+				(pinfunction "PB6_92")
 				(pintype "bidirectional+no_connect")
 			)
 		)
@@ -22233,23 +22233,23 @@
 		)
 		(net
 			(code "223")
-			(name "unconnected-(U1-PE10-Pad40)")
+			(name "unconnected-(U1-PE1-Pad98)")
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "40")
-				(pinfunction "PE10_40")
+				(pin "98")
+				(pinfunction "PE1_98")
 				(pintype "bidirectional+no_connect")
 			)
 		)
 		(net
 			(code "224")
-			(name "unconnected-(U1-PE12-Pad42)")
+			(name "unconnected-(U1-PE11-Pad41)")
 			(class "Default")
 			(node
 				(ref "U1")
-				(pin "42")
-				(pinfunction "PE12_42")
+				(pin "41")
+				(pinfunction "PE11_41")
 				(pintype "bidirectional+no_connect")
 			)
 		)

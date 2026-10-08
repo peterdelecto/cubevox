@@ -49,21 +49,21 @@ The board decides the ports:
 | 45 | PE15 | ENC_MENU_A | EXTI15 |
 | 44 | PE14 | ENC_MENU_B | EXTI14 |
 | 43 | PE13 | ENC_MENU_SW | EXTI13 |
-| 42 | PE12 | spare | |
-| 41 | PE11 | USER_LED | output; no JTAG pull-up, dark until init |
-| 40 | PE10 | spare | |
-| 39 | PE9 | XSMT | output, R16 pull-down |
-| 38 | PE8 | TOGGLE8 | |
+| 42 | PE12 | MUX_S0 | |
+| 41 | PE11 | spare | |
+| 40 | PE10 | MUX_S1 | |
+| 39 | PE9 | MUX_S3 | |
+| 38 | PE8 | MUX_S2 | |
 | 37 | PE7 | TOGGLE7 | |
-| 36 | PB2 | TOGGLE6 | |
+| 36 | PB2 | TOGGLE5 | |
 | 35 | PB1 | VA_SENSE | ADC12_INP5 |
-| 34 | PB0 | TOGGLE5 | |
-| 33 | PC5 | MUX_S0 | |
-| 32 | PC4 | MUX_S1 | |
-| 31 | PA7 | MUX_S3 | |
-| 30 | PA6 | MUX_S2 | |
-| 29 | PA5 | TOGGLE4 | |
-| 28 | PA4 | TOGGLE3 | |
+| 34 | PB0 | TOGGLE3 | |
+| 33 | PC5 | XSMT | output, R16 pull-down |
+| 32 | PC4 | TOGGLE2 | |
+| 31 | PA7 | TOGGLE1 | |
+| 30 | PA6 | TOGGLE4 | |
+| 29 | PA5 | TOGGLE6 | |
+| 28 | PA4 | TOGGLE8 | |
 
 ### West edge, pin 90 (north) to 98 (south)
 
@@ -71,30 +71,32 @@ The board decides the ports:
 |---|---|---|---|
 | 90 | PB4 | spare | NJTRST pull-up at reset; left unconnected |
 | 91 | PB5 | MUTE_N | |
-| 92 | PB6 | TOGGLE1 | |
-| 93 | PB7 | spare (was ENC_KEY_B; KEY is a pot, 2026-10-07) | |
+| 92 | PB6 | spare (was TOGGLE1, moved east 2026-10-08) | |
+| 93 | PB7 | USER_LED | output, R3/D1 west of the pin; dark until init |
 | 94 | BOOT0 | BOOT0 | fixed |
 | 95 | PB8 | spare (was ENC_KEY_A) | |
 | 96 | PB9 | spare (was ENC_SEMI_B) | |
 | 97 | PE0 | spare (was ENC_SEMI_A) | |
-| 98 | PE1 | TOGGLE2 | |
+| 98 | PE1 | spare (was TOGGLE2, moved east 2026-10-08) | |
 
 ### Why this order
 
 1. The I2C pair reaches the OLED from the north, SDA passing R142 on its way to R143, so SDA is the north pin. I2C2 is the only I2C on that corner.
 2. MENU_A and MENU_B approach R127/R128 from the north, A outermost. MENU_SW runs flat east to R129.
-3. In the south-turning group the southmost pin takes the westmost destination. The MUX
-   selects go S2, S3 into U101's west column and S1, S0 into its east column. XSMT is the
-   northmost because it leaves the group first, north into U6 pin 17 under the SAI entries.
-4. ADC pins exist only at 28-35 on this edge, so VA_SENSE sits at 35 and crosses TOGGLE6-8 and XSMT once on B.Cu, a two-via hop over the 3V3 island. Its divider R151/R152 moved beside U106's 5VA pin so the run is flat east. C163 sits at the MCU end (114.5, 87.2) as the ADC's local reservoir (D0188-D0190).
-5. The west group exits west, then turns south. North pins peel off west (TOGGLE1, KEY_B, KEY_A), south pins peel off east (TOGGLE2, SEMI_A), and SEMI_B runs straight down.
+3. TOGGLE bus (2026-10-08, layout/TOGGLE_BUS_BRIEF.md). Pins 28-34, 36, 37 carry XSMT and the
+   eight toggles south on F.Cu lanes x 110.1-113.3, the order set by where each lane lands:
+   TOGGLE8/6/4 to the west via comb, TOGGLE1/2 on west to SW101/SW102, XSMT to its B.Cu run
+   at y 106.88, TOGGLE3/5/7 to the east comb. The MUX selects take the free north rows
+   38-40, 42 and drop to B.Cu east of the lanes.
+4. ADC pins exist only at 28-35 on this edge, so VA_SENSE sits at 35. It leaves inward through one via and runs B.Cu north of the 3V3 island and back east. Its divider R151/R152 moved beside U106's 5VA pin so the run is flat east. C163 sits at the MCU end, near (117.5, 73.5) on the B.Cu run, as the ADC's local reservoir (D0188-D0190).
+5. The west edge carries only MUTE_N, BOOT0 and USER_LED (pin 93, straight west to R3 and D1).
 6. BOOT0 (94) sits inside the west group and NRST (14) wraps the south-west corner, so both reach SWBOOT1, SWRESET1 and J3 on B.Cu.
 7. MUTE_N avoids PB4 and PA15. Their JTAG pull-ups are on at reset and would turn Q101 on, unmuting the output before firmware runs.
 8. CC1/CC2 are off PA0/PA3. USB-C carries data only (spec item 12), and R4/R5 make it a sink without the MCU.
 
-EXTI lines in use: 0, 7, 8, 9, 13, 14, 15, one per input.
+EXTI lines in use: 13, 14, 15 (MENU encoder). The toggles are polled, so TOGGLE8/TOGGLE2 (PA4/PC4) and TOGGLE1/TOGGLE7 (PA7/PE7) sharing lines 4 and 7 costs nothing.
 
-Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 40-42 (PE10-PE12),
+Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 41 (PE11), 92 (PB6), 95-98 (PB8, PB9, PE0, PE1),
 51-62 (PB12-PB15, PD8-PD15), 64-67 (PC7-PC9, PA8), 69 (PA10), 77-88 (PA15-PD7, the SWD pocket).
 
 ### Firmware changes from the previous map
@@ -105,12 +107,12 @@ Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 40-42 (P
 | ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is pot POT15 on mux I14) |
 | ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is pot POT16 on mux I15) |
 | FX_ON_SENSE | PC6 | MUTE_SW on PC6 (K101 removed) |
-| TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PB6, PE1, PA4, PA5, PB0, PB2, PE7, PE8 |
-| MUX_S0-S3 | PD3, PD4, PD6, PB4 | PC5, PC4, PA6, PA7 |
-| XSMT | PE15 | PE9 |
+| TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PA7, PC4, PB0, PA6, PB2, PA5, PE7, PA4 |
+| MUX_S0-S3 | PD3, PD4, PD6, PB4 | PE12, PE10, PE8, PE9 |
+| XSMT | PE15 | PC5 |
 | VA_SENSE | PC4 (ADC12_INP4) | PB1 (ADC12_INP5) |
 | MUTE_N | PD12 | PB5 |
-| USER_LED | PD7 | PE11 |
+| USER_LED | PD7 | PB7 |
 | OLED I2C | I2C1 PB8/PB9 (I2C1_SCL/SDA) | I2C2 PB10/PB11 (I2C_SCL/SDA) |
 | CC1 / CC2 | PA0 / PA3 | not connected |
 
@@ -208,17 +210,17 @@ is superseded.
 | Pin | Port | fxbox net (AF) | cubevox net |
 |---|---|---|---|
 | 1 | PE2 | QSPI_IO2 (AF9) | ADC_SCKI_SRC, SAI1_MCLK_A (AF6) |
-| 36 | PB2 | QSPI_CLK_SRC | TOGGLE6 (section 2) |
+| 36 | PB2 | QSPI_CLK_SRC | TOGGLE5 (section 2) |
 | 37 | PE7 | SPARE_PE7 | TOGGLE7 (section 2) |
-| 38 | PE8 | unassigned / SYNC / SPARE | TOGGLE8 (section 2) |
-| 39 | PE9 | unassigned / SYNC / SPARE | XSMT (section 2) |
-| 40 | PE10 | unassigned / SYNC / SPARE | free (NC) |
+| 38 | PE8 | unassigned / SYNC / SPARE | MUX_S2 (section 2) |
+| 39 | PE9 | unassigned / SYNC / SPARE | MUX_S3 (section 2) |
+| 40 | PE10 | unassigned / SYNC / SPARE | MUX_S1 (section 2) |
 | 58 | PD11 | QSPI_IO0 (AF9) | free (section 2) |
 | 59 | PD12 | QSPI_IO1 (AF9) | free (section 2) |
 | 60 | PD13 | QSPI_IO3 (AF9) | free |
 | 61 | PD14 | ADC_SCKI_SRC (SAI3_MCLK_B, fxbox) | free |
 | 79 | PC11 | unassigned | free (NC) |
-| 92 | PB6 | QSPI_NCS (BK1_NCS AF10) | TOGGLE1 (section 2) |
+| 92 | PB6 | QSPI_NCS (BK1_NCS AF10) | free (NC) |
 
 
 ### PCM1808 straps
@@ -237,7 +239,7 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
 4. Enable block A (starts MCLK) before the PCM1808 leaves power-down or reset, and keep MCLK
    running whenever PCM1808 is powered.
 5. Settings are written to internal flash bank 2 while the code runs from bank 1 (dual bank, no stall).
-6. MUX_S0-S3 (PC5, PC4, PA6, PA7) stay low, or input with no pull, until LDO_EN has released
+6. MUX_S0-S3 (PE12, PE10, PE8, PE9) stay low, or input with no pull, until LDO_EN has released
    3V3A. U101 (CD74HC4067) is on 3V3A, which U107 holds off until 3V3 is good, and a select
    driven high into the unpowered mux back-powers it through the input clamp. Budget the
    supervisor's maximum release delay, not the 3V3 rise time.
