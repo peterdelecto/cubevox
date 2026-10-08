@@ -50,6 +50,9 @@ pre-existing 70 field warnings). Update hardware/PINMAP.md and the firmware pin 
 
 ## 3. Geometry rules (measured on the board)
 
+As built: every 90 degree turn named below is two 45 degree bends (canon 44), legs 0.4-1.0 mm,
+checked by hardware/tools/corner_check.py (0 hits).
+
 Trace 0.2 signal, 0.3 power. Clearance 0.2. Via 0.6/0.3. So: trace centre to trace centre
 >= 0.4; via centre to other-net trace centre >= 0.6; via centre to via centre >= 0.8.
 0/45/90 only. Pads entered straight on. No GND return vias (none of these nets is critical).
@@ -152,14 +155,17 @@ T3 (row 106.1) drops at x 115.9: B.Cu south to y 115.0, west into SW103 pad 2 (1
 The other five rows step down 45 degrees to 107.9-110.3 between x 114.6 and 122
 (bottom stepping row 105.5 starts its diagonal at x 117.0, each row above starts 0.6
 further east, all end 4.8 lower; starts T4 117.0, T5 117.6, T6 118.2, T7 118.8, T8 119.4,
-diagonal spacing 0.85). This passes west of the ADC GND vias at x 122.9-134.3.
+diagonal spacing 0.85). Each step is 2.4 diagonal, 3.2 straight, 2.4 diagonal, so no 45 degree
+run exceeds 6 mm (canon 136). This passes west of the ADC GND vias at x 122.9-134.3.
 Stepped rows: 107.9 T8, 108.5 T7, 109.1 T6, 109.7 T5, 110.3 T4. Row 110.3 clears the
 switch pad tops (111.21) by 0.81. Drops: T4 at 138.45 from 110.3, T5 at 162.45 from 109.7,
 T6 at 186.45 from 109.1, T7 at 210.45 from 108.5, T8 at 234.45 from 107.9; each B.Cu south
 to y 115.0 then west into pad 2 of its switch. Drop columns measured clear on B.Cu.
 
-### 4.10 3V3 bar hop (F.Cu bar at y 107.55 crossed by lanes 111.3 and 111.7)
-Vias at (109.3,107.55) and (114.3,107.55); the bar is B.Cu between them. Clears the west
+### 4.10 3V3 bar hop (F.Cu bar at y 107.65 crossed by lanes 111.3 and 111.7)
+The whole bar sits at y 107.65 (moved 0.1 down so C138 at y 108.1 keeps 0.2 to it); the U8
+feed (124.6) joins it by a 45 degree bend at (125.2,107.65).
+Vias at (109.3,107.65) and (114.3,107.65); the bar is B.Cu between them. Clears the west
 comb via (109.3,105.5) by 2.05, the XSMT via (113.1,106.88) by 1.37, T3's drop at 115.9
 by 1.2.
 
@@ -178,9 +184,9 @@ F.Cu south to via (144.5,111.4), B.Cu south at 144.5 to y 131.08, west to the vi
 F.Cu at 144.5 clears MUX_S0 (143.75) by 0.5. Hop vias clear rows 107.9 and 110.3 by 0.5/0.7.
 
 ### 4.13 C138 (ADC_VINR cap)
-At (121.2,108.0) rot -90, straddling the 3V3 bar. Pad 1 (121.2,106.41) takes ADC_VINR as a
-straight stub from U8.14 (121.2,104.45); pad 2 (121.2,109.59) drops to a GND via at
-(121.2,111.2). The bar passes between the pads with 0.25 clearance. A rot 0 pose under U8
+At (121.2,108.1) rot -90 (owner pose), straddling the 3V3 bar. Pad 1 (121.2,106.51) takes ADC_VINR as a
+straight stub from U8.14 (121.2,104.45); pad 2 (121.2,109.69) drops to a GND via at
+(121.2,111.3). The bar passes between the pads with 0.25 clearance. A rot 0 pose under U8
 puts pad 2 on the 3V3 feed vertical (124.6, 102.9-107.55). Body gap to U8 is 0.02, the one
 new tight pair.
 
