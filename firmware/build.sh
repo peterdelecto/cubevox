@@ -44,6 +44,19 @@ fi
 OPT="${OPT:--O2}"
 DEFS="$DEFS ${EXTRA_FLAGS:-}"
 echo "[build] $OPT ${EXTRA_FLAGS:-}"
+
+# Bench clip: a WAV baked into flash that the 'v' command loops in place of the SAI input.
+# The weact build takes Adam's dry vocal from samples/ (untracked; the repo is public).
+CLIP="${CLIP:-}"
+[ "${BOARD:-}" = "weact" ] && [ -z "$CLIP" ] && [ -f "$REPO/samples/adam_vox_sample2_4s.wav" ] &&
+  CLIP="$REPO/samples/adam_vox_sample2_4s.wav"
+INC_CLIP=""
+if [ -n "$CLIP" ]; then
+  mkdir -p "$OUT-gen"
+  python3 "$FW/make_clip.py" "$CLIP" "$OUT-gen/bench_clip.h" || exit 1
+  INC_CLIP="-I$OUT-gen"
+  DEFS="$DEFS -DCUBEVOX_BENCH_CLIP"
+fi
 # RAM_D2 (SAI rings) and DTCM sections for the H743V linker script.
 LDX="-Wl,--script=$FW/platform/h7_h743v_sections.ld"
 
@@ -52,7 +65,7 @@ arduino-cli compile --fqbn "$FQBN" \
   --build-path "$OUT" --warnings more \
   --build-property "build.flags.optimize=$OPT" \
   --build-property "build.fpu=-mfpu=fpv5-d16" \
-  --build-property "compiler.cpp.extra_flags=$INC $DEFS -ffp-contract=fast" \
+  --build-property "compiler.cpp.extra_flags=$INC $INC_CLIP $DEFS -ffp-contract=fast" \
   --build-property "compiler.c.extra_flags=$INC $DEFS -ffp-contract=fast" \
   --build-property "compiler.c.elf.extra_flags=$LDX" \
   "$FW/cubevox" 2>&1 | tee "$OUT.log" | tail -${TAIL:-40}

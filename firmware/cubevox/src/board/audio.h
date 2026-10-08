@@ -32,3 +32,7 @@ void audioResetPeaks();
 
 // Stops the RX DMA so no more blocks arrive. Bench use only, to prove the stall watch.
 void audioStopForBench();
+
+// Loops the clip compiled in by CUBEVOX_BENCH_CLIP in place of the SAI input. Returns the
+// new state; false when no clip is compiled in.
+bool audioBenchClip(bool on);

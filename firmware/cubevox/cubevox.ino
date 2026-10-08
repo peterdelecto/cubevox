@@ -122,6 +122,12 @@ static void pollBenchCommands() {
         audioResetPeaks();
         Serial.println("[bench] audio peaks reset");
         break;
+      case 'v': {
+        static bool clipOn = false;
+        clipOn = audioBenchClip(!clipOn);
+        Serial.println(clipOn ? "[bench] vocal clip on" : "[bench] vocal clip off (or not compiled in)");
+        break;
+      }
       case 'd':
         Serial.println("[bench] entering DFU");
         Serial.flush();
