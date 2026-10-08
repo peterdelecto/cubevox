@@ -22,5 +22,9 @@ void muteClocksRunning(uint32_t nowMs);
 // Call every loop pass. Reads and debounces MUTE_SW and steps the sequence.
 void mutePoll(uint32_t nowMs);
 
+// Mutes through the normal sequence and ignores MUTE_SW until reset. For faults the
+// firmware can see coming (a stalled audio interrupt).
+void muteLatch();
+
 // True while the output is muted or a mute / release sequence is in progress.
 bool muteActive();

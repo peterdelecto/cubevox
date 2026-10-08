@@ -21,18 +21,21 @@ uint32_t gStateSinceMs = 0;
 DebouncedInput gSwitch;
 bool gClocksRunning = false;
 uint32_t gClocksSinceMs = 0;
+bool gLatched = false;
 
 void enter(State next, uint32_t nowMs) {
   gState = next;
   gStateSinceMs = nowMs;
 }
 
-// True when the toggle asks for sound and the boot delay has passed.
+// True when the toggle asks for sound, the boot delay has passed and no fault has latched.
 bool unmuteWanted(uint32_t nowMs) {
   const bool switchReleased = gSwitch.level();  // high = not muted
   const bool clocksReady = gClocksRunning && nowMs - gClocksSinceMs >= kBootUnmuteDelayMs;
-  return switchReleased && clocksReady;
+  return switchReleased && clocksReady && !gLatched;
 }
+
+bool muteWanted() { return !gSwitch.level() || gLatched; }
 
 }  // namespace
 
@@ -63,8 +66,8 @@ void mutePoll(uint32_t nowMs) {
       }
       break;
     case State::Releasing:
-      if (!gSwitch.level()) {
-        enter(State::Muting, nowMs);  // pressed again mid-release: XSMT is still low
+      if (muteWanted()) {
+        enter(State::Muting, nowMs);  // muted again mid-release: XSMT is still low
         digitalWrite(pins::kXsmt, LOW);
       } else if (elapsed >= kRelaySettleMs) {
         digitalWrite(pins::kXsmt, HIGH);
@@ -72,7 +75,7 @@ void mutePoll(uint32_t nowMs) {
       }
       break;
     case State::Unmuted:
-      if (!gSwitch.level()) {
+      if (muteWanted()) {
         digitalWrite(pins::kXsmt, LOW);
         enter(State::Muting, nowMs);
       }
@@ -85,5 +88,7 @@ void mutePoll(uint32_t nowMs) {
       break;
   }
 }
+
+void muteLatch() { gLatched = true; }
 
 bool muteActive() { return gState != State::Unmuted; }

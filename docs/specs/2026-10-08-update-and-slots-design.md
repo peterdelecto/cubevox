@@ -72,7 +72,9 @@ Plain DFU. The ST ROM bootloader cannot be overwritten, so a bad image is recove
 
 ## Recommended next steps
 
-Build order, each step checkable before the next:
+Build order, each step checkable before the next. The firmware foundation (directory tiers, host
+tests, toolchain pin, fault handling) is in `2026-10-08-firmware-foundation-design.md` and sits
+between step 1 part 1 (registry) and part 2 (runtime layout); its steps 1 to 4 are built.
 
 0. Firmware clock (found 2026-10-08): the generic H743 variant runs PLL1 from HSI and USB from free-running HSI48 (±1 %, outside the USB FS ±0.25 % budget, no CRS in the core), and audio.cpp's PLL3M = 25 assumes HSE as the PLL source. Override `SystemClock_Config` in the sketch: HSE 25 MHz, PLL1 M 5 / N 192 / P 2 / Q 20 (480 MHz core, 48 MHz on PLL1Q), USB clock PLL1Q, HSI48 off. Also (Astra review, `docs/audits/2026-10-08-astra-usb-response.md`): hold USB soft-disconnect (DCTL.SDIS) until PA9 reads VBUS present and drop it when VBUS goes, since the box is self-powered; mark the configuration descriptor self-powered. Record the silicon revision (Y cannot run 480 MHz) and the ROM bootloader ID at 0x1FF1E7FE on the first board. Check: USB enumerates and SAI runs at 48 kHz on the board.
 1. Firmware: effect registry with ids, knob descriptors and a costs table; bench mode to measure costs on the box.

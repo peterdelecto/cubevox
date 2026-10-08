@@ -20,7 +20,8 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`).
   bundle the audio IRQ reads), `display.h` (text display interface), `unison_rate.h`, `version.h`.
 - `src/board/`: one hardware concern per file. `pins.h`, `slots` (toggle pin and mux channels per
   slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk), `controls` (mux
-  scan, smoothing, stepping, toggles), `mute`, `display_sh1106`, `platform` (DFU entry).
+  scan, smoothing, stepping, toggles), `mute`, `fault` (watchdog, fault handlers, reset cause, audio
+  stall watch), `display_sh1106`, `platform` (DFU entry).
 - `src/ui/`: `menu` (encoder state machine and OLED screens).
 
 `platform/` holds verbatim copies from Teensy-H7-Port (first line names the source); they are on
@@ -36,10 +37,16 @@ from `../engine` by include path. No emulator files are included.
   `-DUSBD_SELF_POWERED=1` in build.sh). The boot report prints each time a terminal opens the port.
   Astra's review of the clock numbers and the gating: `docs/audits/2026-10-08-astra-clock-response.md`.
 - `board/display_sh1106.cpp`: U8x8 text driver on I2C2 PB10/PB11, 8 rows of 16 characters.
+- `board/fault.cpp`: IWDG1 at 2 s, armed at the end of `setup()` and kicked only from `loop()`. HardFault,
+  MemManage, BusFault and UsageFault drive XSMT and MUTE_N low by register write, store PC, LR, CFSR, HFSR,
+  BFAR and MMFAR in a `.noinit` record and reset; the next boot report prints `[ERROR] last reset: fault ...`
+  or `[boot] fault: none`, plus the decoded `RCC->RSR` reset cause. If the audio block counter stops for
+  100 ms while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line
+  prints.
 
 Real: slot hardware table, default card layout, mux scan (selects held low 1.1 s after boot for U107's 3V3A
 delay), smoothing, KEY/SEMITONES stepping, toggles, mute sequence, menu logic and DFU entry, clock tree,
-VBUS-gated USB, PLL3 and SAI1 TX/RX DMA setup, engine chain in slot order.
+VBUS-gated USB, PLL3 and SAI1 TX/RX DMA setup, engine chain in slot order, watchdog and fault handling.
 Stubbed or unverified on hardware: OLED (SH1106 driver compiled, falls back to `stubDisplay()` when no panel
 answers at 0x3C), layout persistence (flash bank 2, RAM only), VA_SENSE shutdown, EQ menu, costs (estimates
 until the bench runs on a board). Audio, clocks and mux timing have never run on a board.

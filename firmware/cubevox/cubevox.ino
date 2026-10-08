@@ -6,6 +6,7 @@
 #include "board/sysclock.h"
 #include "board/controls.h"
 #include "board/display_sh1106.h"
+#include "board/fault.h"
 #include "ui/menu.h"
 #include "board/mute.h"
 #include "board/pins.h"
@@ -22,6 +23,7 @@ static bool gAudioRunning = false;
 // Boot facts for the first-article checklist, printed whenever a terminal opens the port.
 static void printBootReport() {
   Serial.println("[boot] cubevox firmware");
+  faultReport(Serial);
   clockReport(Serial);
   Serial.println(gOledFound ? "[boot] OLED at 0x3C" : "[WARN] OLED not found, serial display");
   if (gAudioRunning) {
@@ -66,6 +68,7 @@ static void heartbeat(uint32_t nowMs) {
 
 void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
+  faultInit();
   pinMode(pins::kUserLed, OUTPUT);
   usbLinkInit();  // USB attaches from loop() once VBUS is seen
 
@@ -75,10 +78,13 @@ void setup() {
 
   gAudioRunning = audioInit();
   if (gAudioRunning) muteClocksRunning(millis());
+  faultWatchdogStart();  // every init is behind us; from here loop() must keep running
 }
 
 void loop() {
   const uint32_t nowMs = millis();
+  faultWatchdogKick();
+  faultAudioWatch(nowMs, gAudioRunning);
 
   usbLinkPoll(nowMs);
   if (usbLinkTerminalOpened()) printBootReport();
