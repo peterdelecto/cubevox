@@ -25,3 +25,23 @@ decides within it and reports once. It never sends a list of options back.
    exception with its coordinates. Owner-facing questions go at the end of that report.
 4. If the brief does not settle a choice, pick the option with the fewest vias and
    the shortest critical net, state the assumption in one line, and continue.
+
+## Definition of done
+Required for any routing or placement task. A task that skips a step is not done.
+
+1. Measured brief first. Before copper, write a brief file under `hardware/layout/` that
+   states the rows, lanes and vias with the three measured numbers: trace pitch >= 0.4 mm,
+   via centre to any other trace >= 0.6 mm, via to via >= 0.8 mm. It includes a band
+   crossing check that lists every segment and via lying in each band and every vertical
+   passing through it, on both layers, not only copper lying inside it.
+2. Scratch first. Apply every group to a scratch copy of the board, run DRC on it and
+   render it before the real apply.
+3. Gates. `hardware/tools/gates.sh` prints all PASS on the saved file.
+4. Corners and jogs. No right-angle corner and no jog remains anywhere the task touched
+   (canon 44, 136). A direction change is two 45s with a chamfer >= 0.4 mm. No foreman
+   finding is declared around. Fix it, or register an exception with the reason and the
+   coordinates in `gates.sh`.
+5. Renders. Write renders to `hardware/renders/` and look at them.
+6. Independent check. A second agent verifies the saved board against the expected numbers
+   from the brief, given those numbers up front.
+7. Commit with explicit pathspecs. Do not push.
