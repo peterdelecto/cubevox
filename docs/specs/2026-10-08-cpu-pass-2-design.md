@@ -187,6 +187,7 @@ paths; parallel calls inherit a drifting cwd.
 | D2 | 1c57e38 | 17/17 | distortion -90.5, chain -92.9 dB | `tanhFast` 2.6e-7 max error |
 | P1 | e54c85a | 17/17 | autotune -112.3, octave -117.6, chain -92.6 dB | hard tune 3.76 |
 | F1 | 1d7b1e4 | 17/17 | all ten cases exact | oracle agreement 100 % on 562 + 750 hops; hard tune 3.76 |
+| T1 | none, reverted | — | — | reach 5 with the 3-point parabola: 3.76 / 1.34 / 0.040 (identical); 5-point LS quadratic: 3.78 / 1.34 / 0.141; truncated sinc: 3.76 / 1.35 / 0.247 (hard tune / vibrato / steady, cents). The interpolator is not what limits hard tune; the residual sits in the vibrato itself or downstream in the Autotune stage |
 
 Listening pairs for the owner: `build/listen/unison_{old_e06d829,new_u1}.wav`,
 `build/listen/distortion_{old_feaed12,new_d2}.wav`. D3 and F2 wait on the bench.
