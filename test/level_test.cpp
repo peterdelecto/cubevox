@@ -160,7 +160,6 @@ cv::ReverbParams reverbParams(int engine) {
   p.on = true;
   p.engine = engine;
   p.mix = 1.0f;
-  p.spring.tension = p.spring.dwell = 0.5f;
   p.springB.decay = p.springB.dwell = 0.5f;
   p.chasm.decay = 0.5f;
   p.chasm.wobble = 0.3f;
@@ -248,7 +247,6 @@ int main() {
   dist.tone = 0.5f;
   ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
 
-  ok &= simple<cv::Reverb>("reverb SPRING mix 1", in, reverbParams(cv::kReverbSpring));
   ok &= simple<cv::Reverb>("reverb CHASM mix 1", in, reverbParams(cv::kReverbChasm));
   ok &= simple<cv::Reverb>("reverb SPRING B mix 1", in, reverbParams(cv::kReverbSpringB));
 

@@ -1,5 +1,7 @@
 # cubevox — spring reverb stage
 
+Status: the engine described here is removed (owner 2026-10-08). SPRING B replaces it.
+
 Date 2026-10-01. Owner: "let's do spring. the spring reverb on drumsynthv3 sounds
 pretty good but not sploshy enough." Panel knobs TENSION and DWELL, no mix (owner
 2026-10-01). Engine contract, emulator skeleton, threading unchanged.

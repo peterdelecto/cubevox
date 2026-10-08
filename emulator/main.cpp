@@ -37,7 +37,6 @@
 #include "engine/slapback.h"
 #include "engine/polish.h"
 #include "engine/reverb.h"
-#include "engine/spring.h"
 #include "engine/unison.h"
 
 namespace {
@@ -354,15 +353,15 @@ char gTuningText[8192];  // last copied settings text
 // Returns the bytes written, newline included.
 size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const auto onOff = [](bool b) { return b ? "on" : "off"; };
-  static const char* const kReverb[3] = {"SPRING", "CHASM", "SPRING B"};
+  static const char* const kReverb[2] = {"SPRING B", "CHASM"};
   const cv::HarmonyParams& h = p.pitchFx.harmony;
   const cv::AutotuneParams& at = p.pitchFx.autotune;
   const cv::OctaveParams& o = p.pitchFx.octave;
   const cv::ReverbParams& r = p.reverb;
-  const int re = r.engine >= cv::kReverbSpring && r.engine <= cv::kReverbSpringB ? r.engine : cv::kReverbSpring;
+  const int re = r.engine == cv::kReverbChasm ? cv::kReverbChasm : cv::kReverbSpringB;
   const int atKey = p.linkAutotuneKey ? h.key : at.key;
-  const float decays[3] = {r.spring.tension, r.chasm.decay, r.springB.decay};
-  const float dwells[3] = {r.spring.dwell, r.chasm.dwell, r.springB.dwell};
+  const float decays[2] = {r.springB.decay, r.chasm.decay};
+  const float dwells[2] = {r.springB.dwell, r.chasm.dwell};
   const float decay = decays[re];
   const float dwell = dwells[re];
   char macros[640];
@@ -404,7 +403,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
 // Fills gTuningText with the copied-settings text.
 void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                   const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
-                  const cv::DistortionTuning& d, const cv::SpringTuning& sp,
+                  const cv::DistortionTuning& d,
                   const cv::ChasmTuning& c,
                   const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
                   const cv::AutotuneTuning& at, const ProtoParams& params) {
@@ -434,8 +433,6 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}\n"
-      "SpringTuning{%.2ff, %.0ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff, %.1ff, %.2ff, %.2ff, %d, %d, %.1ff, "
-      "%.2ff, %.1ff, %.1ff, %.3ff}\n"
       "ChasmTuning{%.2ff, %.2ff, %.0ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.2ff, "
       "%.1ff, %.1ff, %.1ff, %.1ff}\n"
       "PolishTuning{%.2ff, %.2ff, %.0ff, %.1ff}\n"
@@ -448,9 +445,7 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneMinDb, d.toneMaxDb, d.bassPeakHz,
       d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false",
-      sp.inputGain, sp.hpHz, sp.tensionLo, sp.tensionHi, sp.dwellDrive, sp.dwellComp, sp.hfMixDbLo,
-      sp.hfMixDbHi, sp.rippleGain, sp.splashDiffuse, sp.hfSections, sp.springs, sp.modDepth,
-      sp.modRateHz, sp.boingDb, sp.wetDb, sp.tankTrim, c.timeLo, c.timeHi, c.trebleLossHz,
+      c.timeLo, c.timeHi, c.trebleLossHz,
       c.loopTrebleCut, c.inputTrebleCut, c.bassCutHz, c.bassCutHzTop, c.wobbleDepthMax,
       c.wobbleRateLo, c.wobbleRateHi, c.inputTrim, c.wobbleLevelDb, c.dwellDrive, c.dwellComp, c.wetDb, e.tuning.dipQ,
       e.tuning.presenceQ, e.tuning.airHz, e.tuning.trimDb, e.hpHz, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb,
@@ -477,11 +472,11 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
 
 void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
-                 const cv::DistortionTuning& d, const cv::SpringTuning& sp,
+                 const cv::DistortionTuning& d,
                  const cv::ChasmTuning& c,
                  const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
                  const cv::AutotuneTuning& at, const ProtoParams& params) {
-  formatTuning(h, o, t, s, d, sp, c, e, ig, g, at, params);
+  formatTuning(h, o, t, s, d, c, e, ig, g, at, params);
   std::printf(
       "// AutotuneTuning: trimDb, maxCorrectSemis, "
       "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
@@ -497,9 +492,6 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneMinDb, toneMaxDb, bassPeakHz, bassPeakDb, "
       "bassPeakQ, trimDb, fadeDrive, oversample\n"
-      "// SpringTuning: inputGain, hpHz, tensionLo, tensionHi, dwellDrive, dwellComp, hfMixDbLo, "
-      "hfMixDbHi, rippleGain, splashDiffuse, hfSections, springs, modDepth, modRateHz, "
-      "boingDb, wetDb, tankTrim\n"
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
       "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, airHz, trimDb\n"
@@ -732,37 +724,6 @@ void drawPolishRaw(cv::PolishTuning& t) {
   ImGui::SliderFloat("Output trim", &t.trimDb, -6.0f, 6.0f, "%.1f dB");
 }
 
-// SPRING is off the face (owner 2026-10-03); its engine and tuning stay in the code.
-[[maybe_unused]] void drawSpringRaw(cv::SpringTuning& t) {
-  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
-  if (tuningNode("Tank")) {
-    ImGui::SliderFloat("Feedback at tension 0", &t.tensionLo, 0.3f, 0.95f, "%.2f");
-    ImGui::SliderFloat("Feedback at tension 1", &t.tensionHi, 0.6f, 0.995f, "%.3f");
-    ImGui::SliderFloat("Pre-echo ripple", &t.rippleGain, 0.0f, 0.5f, "%.2f");
-    ImGui::SliderInt("Springs", &t.springs, 2, 3);
-    ImGui::SliderFloat("Wander depth", &t.modDepth, 0.0f, 24.0f, "%.1f samples");
-    ImGui::SliderFloat("Wander rate", &t.modRateHz, 0.1f, 10.0f, "%.2f Hz", log);
-    ImGui::TreePop();
-  }
-  if (tuningNode("Splash")) {
-    ImGui::SliderFloat("Level at dwell 0", &t.hfMixDbLo, -40.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Level at dwell 1", &t.hfMixDbHi, -40.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Diffusion", &t.splashDiffuse, 0.0f, 0.9f, "%.2f");
-    ImGui::SliderInt("Allpass sections", &t.hfSections, 0, 200);
-    ImGui::TreePop();
-  }
-  if (tuningNode("Levels")) {
-    ImGui::SliderFloat("Input gain", &t.inputGain, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Input high-pass", &t.hpHz, 20.0f, 1000.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Drive at dwell 1", &t.dwellDrive, 1.0f, 100.0f, "%.1f x", log);
-    ImGui::SliderFloat("Drive compensation", &t.dwellComp, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Tank input trim", &t.tankTrim, 0.05f, 1.5f, "%.3f", log);
-    ImGui::SliderFloat("Boing 95 Hz", &t.boingDb, -12.0f, 12.0f, "%.1f dB");
-    ImGui::SliderFloat("Wet level", &t.wetDb, -24.0f, 18.0f, "%.1f dB");
-    ImGui::TreePop();
-  }
-}
-
 void drawReverbRaw(cv::ChasmTuning& c, cv::SpringBTuning& b) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   if (tuningNode("Chasm")) {
@@ -820,7 +781,6 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
     params.distortion.tuning = cv::DistortionTuning{};
-    params.reverb.spring.tuning = cv::SpringTuning{};
     params.reverb.chasm.tuning = cv::ChasmTuning{};
     params.reverb.springB.tuning = cv::SpringBTuning{};
     params.eq.tuning = cv::PolishTuning{};
@@ -840,7 +800,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
   if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings###copy",
                     ImVec2(copyW, 0.0f))) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
-                params.distortion.tuning, params.reverb.spring.tuning,
+                params.distortion.tuning,
                 params.reverb.chasm.tuning, params.eq, params.inputGate.tuning,
                 params.gate.tuning, params.pitchFx.autotune.tuning, params);
     copiedAt = ImGui::GetTime();
@@ -1076,8 +1036,6 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   add("reverb.mix", &r.mix);
   add("reverb.intensity", &r.intensity);
   add("reverb.time", &r.time);
-  add("reverb.spring.decay", &r.spring.tension);
-  add("reverb.spring.dwell", &r.spring.dwell);
   add("reverb.chasm.decay", &r.chasm.decay);
   add("reverb.chasm.dwell", &r.chasm.dwell);
   add("reverb.springb.decay", &r.springB.decay);
@@ -1171,10 +1129,6 @@ void applyMacros(ProtoParams& p) {
   mc::distBody(p.distortion.tuning, m[mc::DistBody]);
   mc::distBite(p.distortion.tuning, m[mc::DistBite]);
   mc::distGrit(p.distortion.tuning, m[mc::DistGrit]);
-  mc::springSplash(r.spring.tuning, m[mc::SpringSplash]);
-  mc::springFlutter(r.spring.tuning, m[mc::SpringFlutter]);
-  mc::springLowEnd(r.spring.tuning, m[mc::SpringLowEnd]);
-  mc::springDrip(r.spring.tuning, m[mc::SpringDrip]);
   mc::chasmWobble(r.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(r.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(r.chasm.tuning, m[mc::ChasmBass]);
@@ -1389,7 +1343,7 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
                 [&](float p) { mc::chasmBrightness(r.chasm.tuning, p); });
     macroSlider("Bass", "more low end in the tail", m.pos[mc::ChasmBass],
                 [&](float p) { mc::chasmBass(r.chasm.tuning, p); });
-  } else if (r.engine == cv::kReverbSpringB) {
+  } else {
     cv::SpringBTuning& t = r.springB.tuning;
     macroSlider("Drip", "the drippy boing on each note", m.pos[mc::SpringBDrip],
                 [&](float p) { mc::springBDrip(t, p); });
@@ -1397,16 +1351,6 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
                 [&](float p) { mc::springBFlutter(t, p); });
     macroSlider("Brightness", "brighter tail", m.pos[mc::SpringBBrightness],
                 [&](float p) { mc::springBBrightness(t, p); });
-  } else {
-    cv::SpringTuning& t = r.spring.tuning;
-    macroSlider("Splash", "bright crash on loud notes", m.pos[mc::SpringSplash],
-                [&](float p) { mc::springSplash(t, p); });
-    macroSlider("Flutter", "wobble and shimmer in the tail", m.pos[mc::SpringFlutter],
-                [&](float p) { mc::springFlutter(t, p); });
-    macroSlider("Low end", "more boom from the springs", m.pos[mc::SpringLowEnd],
-                [&](float p) { mc::springLowEnd(t, p); });
-    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::SpringDrip],
-                [&](float p) { mc::springDrip(t, p); });
   }
 }
 
@@ -2108,8 +2052,7 @@ int runLayoutProbe() {
   loadState(probeFile, fromFile, fromFileMenu);
   std::remove(probeFile.c_str());
   applyMacros(back);  // loadState re-applies macros; match that before comparing
-  const bool fileOk = stateText(fromFile, fromFileMenu, gLoopPath) == stateText(back, backMenu, gLoopPath) &&
-                      fromFile.reverb.spring.tuning.hpHz == back.reverb.spring.tuning.hpHz;
+  const bool fileOk = stateText(fromFile, fromFileMenu, gLoopPath) == stateText(back, backMenu, gLoopPath);
   const std::vector<StateField> want = stateFields(moved, movedMenu);
   const std::vector<StateField> got = stateFields(back, backMenu);
   int mismatches = 0;
@@ -2128,7 +2071,7 @@ int runLayoutProbe() {
   // Default macro positions must reproduce the engine tuning defaults (the firmware's).
   const auto tuningText = [](const ProtoParams& q) {
     formatTuning(q.pitchFx.harmony.tuning, q.pitchFx.octave.tuning, q.unison.tuning,
-                 q.slapback.tuning, q.distortion.tuning, q.reverb.spring.tuning,
+                 q.slapback.tuning, q.distortion.tuning,
                  q.reverb.chasm.tuning, q.eq, q.inputGate.tuning,
                  q.gate.tuning, q.pitchFx.autotune.tuning, q);
     return std::string(gTuningText);
@@ -2270,7 +2213,7 @@ int printDefaults() {
   ProtoParams params;
   applyMacros(params);
   printTuning(params.pitchFx.harmony.tuning, params.pitchFx.octave.tuning, params.unison.tuning,
-              params.slapback.tuning, params.distortion.tuning, params.reverb.spring.tuning,
+              params.slapback.tuning, params.distortion.tuning,
               params.reverb.chasm.tuning, params.eq,
               params.inputGate.tuning, params.gate.tuning, params.pitchFx.autotune.tuning, params);
   ImGui::DestroyContext();

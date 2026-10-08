@@ -7,7 +7,6 @@
 #include "engine/chasm.h"
 #include "engine/common.h"
 #include "engine/smooth.h"
-#include "engine/spring.h"
 
 // SPRING B reverb: the CHASM loop voiced as a spring, cheap enough for the H7.
 //
@@ -179,7 +178,7 @@ class SpringB {
         comp = expf(-t.dwellComp * logDrive * dwell_);
       }
       const float g = timeLo + decay_ * (timeHi - timeLo);
-      const float x = spring_detail::softClipHeadroom(in[i] * drive, spring_detail::kChasmClipHeadroom) *
+      const float x = softClipHeadroom(in[i] * drive, kChasmClipHeadroom) *
                       comp * t.inputTrim * sqrtf(1.0f - g * g);
       lfoAcc_ += lfoStep;
 

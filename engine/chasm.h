@@ -6,7 +6,6 @@
 
 #include "engine/common.h"
 #include "engine/smooth.h"
-#include "engine/spring.h"
 
 // CHASM reverb: one diffuse allpass feedback loop with a downward chirp on its
 // output. Float port of DrumSynthV3 AudioEffectCavernV3, the mono port of
@@ -248,7 +247,7 @@ class Chasm {
       lfoAcc_ += static_cast<uint32_t>((rateLo + wobble_ * rateSpan) * kPhasePerHz);
       inputGain_ += (gainFor(time) - inputGain_) * 0.25f;
 
-      const float x = shelf(spring_detail::softClipHeadroom(in[i] * drive, spring_detail::kChasmClipHeadroom) * comp * trim * inputGain_, lpIn_, lpF, inCut);
+      const float x = shelf(softClipHeadroom(in[i] * drive, kChasmClipHeadroom) * comp * trim * inputGain_, lpIn_, lpF, inCut);
       const float adv1 = lfo(0u) * depth;
       const float adv2 = lfo(64u) * depth;
 

@@ -15,7 +15,6 @@
 #include "engine/distortion.h"
 #include "engine/harmony.h"
 #include "engine/octave.h"
-#include "engine/spring.h"
 #include "engine/spring_b.h"
 #include "engine/unison.h"
 
@@ -87,20 +86,6 @@ constexpr Anchor kDisTrebleCutDb{-9.0f, -6.0f, -3.0f};
 constexpr Anchor kDisRailAsym{0.0f, 0.05f, 0.2f};
 constexpr Anchor kDisRailSoft{0.3f, 0.1f, 0.02f};
 
-// SPRING
-constexpr Anchor kSprHfMixDbLo{-40.0f, -22.0f, -10.0f};
-constexpr Anchor kSprHfMixDbHi{-30.0f, -14.0f, -4.0f};
-constexpr Anchor kSprRipple{0.03f, 0.10f, 0.30f};
-constexpr Anchor kSprDiffuse{0.0f, 0.0f, 0.7f};
-constexpr Anchor kSprHfSections{0.0f, 0.0f, 120.0f, I::Round};
-constexpr Anchor kSprModDepth{2.0f, 8.0f, 24.0f};
-constexpr Anchor kSprModRate{1.5f, 3.0f, 5.0f, I::Log};
-constexpr Anchor kSprSprings{2.0f, 2.0f, 3.0f, I::Step};
-constexpr Anchor kSprHp{600.0f, 300.0f, 120.0f, I::Log};
-constexpr Anchor kSprBoingDb{0.0f, 0.0f, 6.0f};
-constexpr Anchor kSprDripA{0.60f, 0.75f, 0.85f};
-constexpr Anchor kSprDripSections{80.0f, 130.0f, 130.0f, I::Round};
-
 // CHASM
 constexpr Anchor kChmWobble{0.0f, 0.15f, 0.83f};                    // 100 % = the old 90 % (owner 2026-10-02)
 constexpr Anchor kChmTrebleLoss{1500.0f, 3000.0f, 7000.0f, I::Log};
@@ -129,13 +114,9 @@ enum Id : int {
   DistBody,
   DistBite,
   DistGrit,
-  SpringSplash,
-  SpringFlutter,
-  SpringLowEnd,
   ChasmWobble,
   ChasmBrightness,
   ChasmBass,
-  SpringDrip,
   SpringBDrip,
   SpringBFlutter,
   SpringBBrightness,
@@ -146,21 +127,19 @@ enum Id : int {
 // nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
     "Slide",          nullptr,"Chorus-Double", nullptr,       "Body",
-    "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
-    "Wobble",         "CHASM Brightness", "Bass",           "SPRING Drip",    "SPRING B Drip",
-    "SPRING B Flutter", "SPRING B Brightness"};
+    "Bite",           "Grit",           "Wobble",           "CHASM Brightness", "Bass",
+    "SPRING B Drip",  "SPRING B Flutter", "SPRING B Brightness"};
 
 // Keys for the saved-state file; one word each, stable across builds.
 constexpr const char* kStateKey[kCount] = {
     "OctaveSlide",    "HarmonyTracking", "UnisonBlend",   "UnisonMotion",  "DistBody",
-    "DistBite",       "DistGrit",        "SpringSplash",  "SpringFlutter", "SpringLowEnd",
-    "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "SpringDrip",    "SpringBDrip",
-    "SpringBFlutter", "SpringBBrightness"};
+    "DistBite",       "DistGrit",        "ChasmWobble",   "ChasmBrightness", "ChasmBass",
+    "SpringBDrip",    "SpringBFlutter",  "SpringBBrightness"};
 
 // Adam's starting positions (owner 2026-10-02), in Id order.
 constexpr std::array<float, kCount> kDefaultPos = {
-    50.0f, 50.0f, 0.0f,  0.0f,  50.0f, 60.0f, 50.0f, 65.0f, 29.0f,
-    63.0f, 85.0f, 85.0f, 50.0f, 30.0f, 50.0f, 50.0f, 50.0f};
+    50.0f, 50.0f, 0.0f,  0.0f,  50.0f, 60.0f, 50.0f, 85.0f,
+    85.0f, 50.0f, 50.0f, 50.0f, 50.0f};
 
 struct State {
   std::array<float, kCount> pos;
@@ -225,30 +204,6 @@ inline void distBite(DistortionTuning& t, float pos) {
 inline void distGrit(DistortionTuning& t, float pos) {
   t.railAsym = at(kDisRailAsym, pos);
   t.railSoft = at(kDisRailSoft, pos);
-}
-
-inline void springSplash(SpringTuning& t, float pos) {
-  t.hfMixDbLo = at(kSprHfMixDbLo, pos);
-  t.hfMixDbHi = at(kSprHfMixDbHi, pos);
-  t.rippleGain = at(kSprRipple, pos);
-  t.splashDiffuse = at(kSprDiffuse, pos);
-  t.hfSections = atInt(kSprHfSections, pos);
-}
-
-inline void springFlutter(SpringTuning& t, float pos) {
-  t.modDepth = at(kSprModDepth, pos);
-  t.modRateHz = at(kSprModRate, pos);
-  t.springs = atInt(kSprSprings, pos);
-}
-
-inline void springDrip(SpringTuning& t, float pos) {
-  t.dripA = at(kSprDripA, pos);
-  t.dripSections = atInt(kSprDripSections, pos);
-}
-
-inline void springLowEnd(SpringTuning& t, float pos) {
-  t.hpHz = at(kSprHp, pos);
-  t.boingDb = at(kSprBoingDb, pos);
 }
 
 inline void chasmWobble(ChasmParams& p, float pos) { p.wobble = at(kChmWobble, pos); }

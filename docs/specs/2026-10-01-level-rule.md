@@ -32,7 +32,6 @@ measure within 0.1 dB of one voice on all three engines (harmony_test).
 | Octave A -12, mix 1 | OctaveTuning.trimDbA | -5.3 | -1.7 | +0.26 |
 | Octave B +12, mix 1 | OctaveTuning.trimDbB | +6.2 | +6.5 | +0.28 |
 | Octave C -12, mix 1 | OctaveTuning.trimDbC | +2.6 | +2.2 | +0.23 |
-| Reverb SPRING, mix 1 | SpringTuning.wetDb | +1.3 | +4.1 | +0.23 |
 | Reverb CHASM, mix 1 | ChasmTuning.wetDb | +17.4 | +19.0 | +0.27 |
 
 Measured with the old trims under the new method, before retrimming: Harmony A/B/C

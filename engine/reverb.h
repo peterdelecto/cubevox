@@ -6,10 +6,9 @@
 #include "engine/chasm.h"
 #include "engine/common.h"
 #include "engine/smooth.h"
-#include "engine/spring.h"
 #include "engine/spring_b.h"
 
-// Reverb block: SPRING, CHASM or SPRING B behind one on/off smoother.
+// Reverb block: SPRING B or CHASM behind one on/off smoother.
 // The selected engine runs; the engine left behind is cleared on a switch.
 // While settled off, neither engine runs and the block is a bit-exact copy.
 // Each engine keeps its own wetDb, a level trim. MIX is an equal-power crossfade
@@ -17,14 +16,12 @@
 
 namespace cv {
 
-constexpr int kReverbSpring = 0;
+constexpr int kReverbSpringB = 0;
 constexpr int kReverbChasm = 1;
-constexpr int kReverbSpringB = 2;
 
 struct ReverbParams {
   bool on = true;
-  int engine = kReverbSpring;
-  SpringParams spring;  // spring.on is ignored; ReverbParams::on rules
+  int engine = kReverbSpringB;
   ChasmParams chasm;
   SpringBParams springB;
   float mix = 0.15f;       // 0 dry .. 1 wet; set by INTENSITY (owner default 0.15 at 50 %)
@@ -41,14 +38,12 @@ struct IntensityCurve {
     return t < 0.5f ? lo + (mid - lo) * 2.0f * t : mid + (hi - mid) * (2.0f * t - 1.0f);
   }
 };
-constexpr IntensityCurve kSpringDecay{0.30f, 0.55f, 0.85f};
 constexpr IntensityCurve kChasmDecay{0.10f, 0.30f, 0.70f};
 constexpr IntensityCurve kSpringBDecay{0.25f, 0.50f, 0.85f};
 constexpr IntensityCurve kReverbMix{0.0f, 0.15f, 0.60f};
 
 inline void applyIntensity(ReverbParams& r) {
   r.mix = kReverbMix.at(r.intensity);
-  r.spring.tension = kSpringDecay.at(r.time);
   r.chasm.decay = kChasmDecay.at(r.time);
   r.springB.decay = kSpringBDecay.at(r.time);
 }
@@ -58,22 +53,19 @@ class Reverb {
   Reverb() { reset(); }
 
   void reset() {
-    spring_.reset();
     chasm_.reset();
     springB_.reset();
     active_ = 0.0f;
     mix_ = 0.0f;
     dryGain_ = 1.0f;
     wetGain_ = 0.0f;
-    engine_ = kReverbSpring;
+    engine_ = kReverbSpringB;
     idle_ = false;
     valid_ = false;
   }
 
   void process(const float* in, float* out, int n, const ReverbParams& p) {
-    const int engine = p.engine == kReverbChasm || p.engine == kReverbSpringB
-                           ? p.engine
-                           : kReverbSpring;
+    const int engine = p.engine == kReverbChasm ? kReverbChasm : kReverbSpringB;
     const float target = p.on ? 1.0f : 0.0f;
     const float mixTarget = smooth::clamp01(p.mix);
     if (!valid_) {
@@ -98,13 +90,8 @@ class Reverb {
 
     if (engine_ == kReverbChasm) {
       chasm_.process(in, wet_.data(), n, p.chasm);
-    } else if (engine_ == kReverbSpringB) {
-      springB_.process(in, wet_.data(), n, p.springB);
     } else {
-      SpringParams sp = p.spring;
-      sp.on = true;
-      spring_.process(in, wet_.data(), n, sp);
-      for (int i = 0; i < n; ++i) wet_[static_cast<size_t>(i)] -= in[i];
+      springB_.process(in, wet_.data(), n, p.springB);
     }
 
     const float a = smooth::coef(smooth::kSmoothSec);
@@ -118,7 +105,6 @@ class Reverb {
   }
 
   // Test hooks.
-  Spring& spring() { return spring_; }
   Chasm& chasm() { return chasm_; }
   SpringB& springB() { return springB_; }
 
@@ -133,13 +119,10 @@ class Reverb {
   void clear(int engine) {
     if (engine == kReverbChasm)
       chasm_.reset();
-    else if (engine == kReverbSpringB)
-      springB_.reset();
     else
-      spring_.reset();
+      springB_.reset();
   }
 
-  Spring spring_;
   Chasm chasm_;
   SpringB springB_;
   std::array<float, kBlock> wet_{};
@@ -147,7 +130,7 @@ class Reverb {
   float mix_ = 0.0f;
   float dryGain_ = 1.0f;
   float wetGain_ = 0.0f;
-  int engine_ = kReverbSpring;
+  int engine_ = kReverbSpringB;
   bool idle_ = false;
   bool valid_ = false;
 };

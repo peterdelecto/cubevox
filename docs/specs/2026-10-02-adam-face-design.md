@@ -36,8 +36,7 @@ sliders, then report numbers we bake in.
 | 6 | Unison | DEPTH · RATE (chorus speed, ~0.2–6 Hz; past today's rate the sweep narrows so the pitch swing caps near 2x today's) | Chorus ↔ Double |
 | 7 | Slapback | MIX (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
-| 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM = menu) | per engine, below |
-| 9a | SPRING | | Splash · Flutter · Low end |
+| 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING B / CHASM = menu) | per engine, below |
 | 9b | CHASM | | Wobble · Brightness · Bass |
 | 10 | Output EQ | menu | Low cut · Low-mid dip (freq, amount) · Presence (freq, amount) · Air (raw) |
 
@@ -63,16 +62,6 @@ they are what Adam is choosing between.
 | | trebleCutDb | −9 | −6 | −3 |
 | Distortion Grit | railAsym | 0 | 0.05 | 0.2 |
 | | railSoft | 0.3 | 0.1 | 0.02 |
-| SPRING Splash | hfMixDbLo | −40 | −22 | −10 |
-| | hfMixDbHi | −30 | −14 | −4 |
-| | rippleGain | 0.03 | 0.10 | 0.30 |
-| | splashDiffuse | 0 | 0 | 0.7 |
-| | hfSections | 0 | 0 | 120 |
-| SPRING Flutter | modDepth | 2 | 8 | 24 |
-| | modRateHz | 1.5 | 3 | 5 |
-| | springs | 2 | 2 | 3 (≥ 75 %) |
-| SPRING Low end | hpHz | 600 | 300 | 120 |
-| | boingDb | 0 | 0 | 6 |
 | CHASM Wobble | wobble (param) | 0 | 0.15 | 1.0 |
 | CHASM Brightness | trebleLossHz | 1500 | 3000 | 7000 |
 | | inputTrebleCut | 0.85 | 0.95 | 1.0 |
@@ -96,7 +85,7 @@ each Off / Low / Med / High (no cap on how many are on), with a Formant slider p
    soft clip is the only change at 0 (below −6 dBFS it is within 0.1 dB of linear).
    Chasm test gains: dwell 1 adds ≥ 6 dB more 3rd-harmonic on a 220 Hz sine than dwell 0.
    `level_test` CHASM row re-trimmed if it leaves 0..+0.5 dB.
-3. Reverb face knobs: knob 1 DECAY → `spring.tension` / `chasm.decay`;
+3. Reverb face knobs: knob 1 DECAY → `springB.decay` / `chasm.decay`;
    knob 2 DWELL → each engine's `dwell`; MIX unchanged. Render CLI: `--decay` and
    `--dwell` apply to whichever engine is selected (keep `--tension`/`--wobble` as aliases).
 

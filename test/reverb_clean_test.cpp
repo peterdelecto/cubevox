@@ -51,10 +51,10 @@ double thdPercent(int engine) {
 }  // namespace
 
 int main() {
-  const int engines[3] = {cv::kReverbSpring, cv::kReverbChasm, cv::kReverbSpringB};
-  const char* names[3] = {"SPRING", "CHASM", "SPRING B"};
+  const int engines[2] = {cv::kReverbChasm, cv::kReverbSpringB};
+  const char* names[2] = {"CHASM", "SPRING B"};
   bool ok = true;
-  for (int e = 0; e < 3; ++e) {
+  for (int e = 0; e < 2; ++e) {
     const double thd = thdPercent(engines[e]);
     const bool pass = thd <= kMaxThdPercent;
     std::printf("%s %-14s default DWELL, -6 dBFS sine: THD %.2f %% (<= %.1f)\n", pass ? "PASS" : "FAIL",

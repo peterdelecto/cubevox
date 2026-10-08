@@ -51,13 +51,13 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--atchromatic] [--atengine 0|1] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>] [--oengine 0|1|2] [--formant <-12..12>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|chasm|springb] [--spring] [--decay <0..1>] [--dwell <0..1>]\n"
+               "       [--reverb springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony, --octave or --autotune; formant applies on --hengine 1\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
-               "  distortion runs only with --drive; reverb runs only with --reverb or --spring\n"
+               "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, eq\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  eq runs only with --eq\n"
@@ -73,9 +73,6 @@ int usage() {
                "distTrebleCutDb\n"
                "     distToneMinDb distToneMaxDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
                "distFadeDrive distOversample (0|1)\n"
-               "     sprInputGain sprHpHz sprTensionLo sprTensionHi sprDwellDrive sprDwellComp sprHfMixDbLo\n"
-               "     sprHfMixDbHi sprRippleGain sprSplashDiffuse sprHfSections sprSprings (2|3)\n"
-               "     sprModDepth sprModRateHz sprBoingDb sprWetDb sprTankTrim\n"
                "     chmTimeLo chmTimeHi chmTrebleLossHz chmLoopTrebleCut chmInputTrebleCut "
                "chmBassCutHz\n"
                "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
@@ -109,7 +106,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
   cv::DistortionTuning& dt = rp.distortion.tuning;
-  cv::SpringTuning& sp = rp.reverb.spring.tuning;
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
   cv::SpringBTuning& sb = rp.reverb.springB.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
@@ -119,8 +115,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
   float oversample = dt.oversample ? 1.0f : 0.0f;
-  float hfSections = static_cast<float>(sp.hfSections);
-  float springs = static_cast<float>(sp.springs);
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
   float harGrains = static_cast<float>(ht.shifter.grainCount);
@@ -166,14 +160,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"distBassPeakQ", &dt.bassPeakQ},       {"distTrimDb", &dt.trimDb},
       {"distFadeDrive", &dt.fadeDrive},
       {"distOversample", &oversample},
-      {"sprInputGain", &sp.inputGain}, {"sprHpHz", &sp.hpHz},                  {"sprTensionLo", &sp.tensionLo},
-      {"sprTensionHi", &sp.tensionHi},        {"sprDwellDrive", &sp.dwellDrive},
-      {"sprDwellComp", &sp.dwellComp},        {"sprHfMixDbLo", &sp.hfMixDbLo},
-      {"sprHfMixDbHi", &sp.hfMixDbHi},        {"sprRippleGain", &sp.rippleGain},
-      {"sprSplashDiffuse", &sp.splashDiffuse}, {"sprHfSections", &hfSections},
-      {"sprSprings", &springs},               {"sprModDepth", &sp.modDepth}, {"sprDripA", &sp.dripA},
-      {"sprModRateHz", &sp.modRateHz},        {"sprBoingDb", &sp.boingDb},
-      {"sprWetDb", &sp.wetDb},                {"sprTankTrim", &sp.tankTrim},
       {"chmTimeLo", &ch.timeLo},              {"chmTimeHi", &ch.timeHi},
       {"chmTrebleLossHz", &ch.trebleLossHz},  {"chmLoopTrebleCut", &ch.loopTrebleCut},
       {"chmInputTrebleCut", &ch.inputTrebleCut}, {"chmBassCutHz", &ch.bassCutHz},
@@ -207,9 +193,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (std::strlen(f.name) != keyLen || std::strncmp(f.name, kv, keyLen) != 0) continue;
     if (!parseFloat(eq + 1, f.value)) return false;
     dt.oversample = oversample != 0.0f;
-    if (hfSections < 0.0f || hfSections > 200.0f || hfSections != std::floor(hfSections))
-      return false;
-    if (springs != 2.0f && springs != 3.0f) return false;
     if (sbSections < 0.0f || sbSections > 32.0f || sbSections != std::floor(sbSections)) return false;
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
@@ -222,8 +205,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       ht.chromaticSemis[kChromVoice[i]] = static_cast<int8_t>(harChrom[i]);
     }
     sb.chirpSections = static_cast<int>(sbSections);
-    sp.hfSections = static_cast<int>(hfSections);
-    sp.springs = static_cast<int>(springs);
     return true;
   }
   return false;
@@ -325,14 +306,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (!parsePair(argv[++i], &rp.eq.presenceHz, &rp.eq.presenceDb)) return false;
     } else if (std::strcmp(a, "--eqair") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.eq.airDb)) return false;
-    } else if (std::strcmp(a, "--spring") == 0) {
-      rp.reverb.engine = cv::kReverbSpring;
-      haveReverb = true;
     } else if (std::strcmp(a, "--reverb") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
-      if (std::strcmp(v, "spring") == 0)
-        rp.reverb.engine = cv::kReverbSpring;
-      else if (std::strcmp(v, "chasm") == 0)
+      if (std::strcmp(v, "chasm") == 0)
         rp.reverb.engine = cv::kReverbChasm;
       else if (std::strcmp(v, "springb") == 0)
         rp.reverb.engine = cv::kReverbSpringB;
@@ -419,15 +395,11 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   if (positional != 2) return false;
   // DECAY and DWELL drive whichever engine is selected.
   if (haveDecay) {
-    float& d = rp.reverb.engine == cv::kReverbChasm     ? rp.reverb.chasm.decay
-               : rp.reverb.engine == cv::kReverbSpringB ? rp.reverb.springB.decay
-                                                        : rp.reverb.spring.tension;
+    float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.decay : rp.reverb.springB.decay;
     d = decay;
   }
   if (haveDwell) {
-    float& d = rp.reverb.engine == cv::kReverbChasm     ? rp.reverb.chasm.dwell
-               : rp.reverb.engine == cv::kReverbSpringB ? rp.reverb.springB.dwell
-                                                        : rp.reverb.spring.dwell;
+    float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.dwell : rp.reverb.springB.dwell;
     d = dwell;
   }
   if (voices > 0 && !haveHarmony) return false;

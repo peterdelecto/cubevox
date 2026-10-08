@@ -131,10 +131,6 @@ add_executable(distortion_test test/distortion_test.cpp)
 target_compile_options(distortion_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(distortion_test PRIVATE engine)
 add_test(NAME distortion COMMAND distortion_test)
-add_executable(spring_test test/spring_test.cpp)
-target_compile_options(spring_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
-target_link_libraries(spring_test PRIVATE engine)
-add_test(NAME spring COMMAND spring_test)
 add_test(NAME proto_layout
   COMMAND $<TARGET_FILE:cubevox-proto> --layout)
 

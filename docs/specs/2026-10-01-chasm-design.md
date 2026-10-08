@@ -2,7 +2,7 @@
 
 Date 2026-10-01. Owner: "port in the chasm reverb from drumsynthv3 as a switchable
 option for verb." Panel stage 9 stays two knobs; with CHASM selected they read
-DECAY and WOBBLE. Engine select is a prototype radio (SPRING | CHASM) and a params
+DECAY and WOBBLE. Engine select is a prototype radio (SPRING B | CHASM) and a params
 field so the render CLI can A/B.
 
 Reference (read-only, DrumSynthV3 is frozen):
