@@ -2,7 +2,7 @@
 
 ## Plan
 
-The panel is eight effect slots. Each slot is two knobs and a bypass toggle. The slot is the fixed hardware unit; the effect inside it, its knob meanings and the chain order are firmware and may change with updates. The top-left toggle is a global vocal MUTE. INTENSITY is relabelled MIX. Input Gain stays an analog face knob outside the slot grid.
+The panel is eight effect slots. Each slot is two knobs and a bypass toggle. The slot is the fixed hardware unit; the effect inside it, its knob meanings and the chain order are firmware and may change with updates. (Superseded 2026-10-08: Adam places effects from the Mac app and the chain is the slot order, see `2026-10-08-update-and-slots-design.md`.) The top-left toggle is a global vocal MUTE. INTENSITY is relabelled MIX. Input Gain stays an analog face knob outside the slot grid.
 
 Today's chain, left to right, slot 1 to 8:
 
@@ -24,8 +24,8 @@ Today's chain, left to right, slot 1 to 8:
 3. Mute toggle wiring. Same ST-0-102 part. Common to MUTE_SW on PC6 (the former FX_ON_SENSE, R120 10 k pull-up and C162 100 nF kept), one throw to GND. Firmware soft-mutes the DAC (XSMT), then drops MUTE_N; reverse on release. No MCU-free path is needed because the relay fails to muted.
 4. Input Gain. Stays analog and on the face. A menu item cannot turn the pot, and gain ahead of the ADC keeps quiet singing clear of the noise floor.
 5. Knob type. All 16 slot knobs are RK09D1130C2P continuous pots. Firmware snaps KEY to its positions and SEMITONES to -24..+24 with hysteresis; the OLED shows the landed value. The detented-knob question is closed.
-6. Chain order. Left to right is the chain by default. Firmware may reorder; the OLED menu shows the live order.
-7. Firmware update. OLED menu "Update firmware" reboots into the STM32 ROM DFU bootloader over the rear-wall USB-C. The BOOT0 button stays inside as recovery. Settings in flash bank 2 survive because the DFU image excludes it.
+6. Chain order. Left to right is the chain by default. Firmware may reorder; the OLED menu shows the live order. (Superseded 2026-10-08: the chain is always the slot order.)
+7. Firmware update. OLED menu "Update firmware" reboots into the STM32 ROM DFU bootloader over the rear-wall USB-C. The BOOT0 button stays inside as recovery. Settings in flash bank 2 survive because the DFU image excludes it. (2026-10-08: the Mac app's Update screen does the same over the cable; the menu item stays as the fallback.)
 8. Mute scope. Output only. The chain keeps running, the OLED shows MUTED, unmute is seamless.
 9. Freed GPIOs PB7, PB8, PB9, PE0. Unconnected. No pads, no header.
 10. Lid legends. Deferred. Not needed until the enclosure.
