@@ -209,6 +209,43 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
+// The integer-phase LFO delay tracks the analytic sine at the quantised
+// frequency over 10 s, at three Rate settings.
+bool testLfoAnalytic() {
+  const float rates[3] = {0.06f, 0.2f, 0.9f};
+  const int blocks = 10 * cv::kSampleRate / cv::kBlock;
+  const std::vector<float> silence(static_cast<size_t>(cv::kBlock), 0.0f);
+  std::vector<float> out(static_cast<size_t>(cv::kBlock));
+  double worstDelay = 0.0;
+  double worstHz = 0.0;
+  for (float rate : rates) {
+    cv::UnisonParams p = params(0.8f);
+    p.tuning.lfoHz[0] = rate;
+    p.tuning.lfoHz[1] = 1.5f * rate;
+    uint32_t inc[2];
+    double fq[2];
+    for (int v = 0; v < 2; ++v) {
+      inc[v] = static_cast<uint32_t>(p.tuning.lfoHz[v] / cv::kSampleRate * 4294967296.0f + 0.5f);
+      fq[v] = static_cast<double>(inc[v]) / 4294967296.0 * cv::kSampleRate;
+      worstHz = std::fmax(worstHz, std::fabs(fq[v] - static_cast<double>(p.tuning.lfoHz[v])));
+    }
+    gUnison.reset();
+    for (int b = 1; b <= blocks; ++b) {
+      gUnison.process(silence.data(), out.data(), cv::kBlock, p);
+      const double k = static_cast<double>(b) * cv::kBlock;
+      for (int v = 0; v < 2; ++v) {
+        const double sw = static_cast<double>(gUnison.swingSamples());
+        const double got = sw * static_cast<double>(cv::sinTurns(gUnison.lfoPhase(v)));
+        const double want = sw * std::sin(2.0 * 3.14159265358979323846 * fq[v] * k / cv::kSampleRate);
+        worstDelay = std::fmax(worstDelay, std::fabs(got - want));
+      }
+    }
+  }
+  return report("lfo analytic", worstDelay < 0.05 && worstHz < 1e-5,
+                "worst delay error=%.3g samples (<0.05), worst freq error=%.3g Hz (<1e-5)",
+                worstDelay, worstHz);
+}
+
 }  // namespace
 
 int main() {
@@ -218,5 +255,6 @@ int main() {
   ok &= testLevel();
   ok &= testNoAlloc();
   ok &= testFixedDetune();
+  ok &= testLfoAnalytic();
   return ok ? 0 : 1;
 }

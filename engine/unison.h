@@ -2,8 +2,10 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 
 #include "engine/common.h"
+#include "engine/fastmath.h"
 
 // Unison: two copies of the voice, each with a slow LFO wobble on its delay
 // (chorus) and a fixed detune from a crossfaded dual-tap shifter (doubler).
@@ -35,14 +37,21 @@ class Unison {
  public:
   void reset() {
     line_.fill(0.0f);
-    phase_ = {0.0f, 0.0f};
-    shiftPhase_ = {0.0f, 0.0f};
+    lfoPhase_ = {0u, 0u};
+    shiftPhase_ = {0u, 0u};
+    lfoInc_ = {0u, 0u};
+    shiftInc_ = {0u, 0u};
     depth_ = 0.0f;
+    swingSmp_ = 0.0f;
     writePos_ = 0;
   }
 
   // Test hook: mute one voice's wet contribution.
   void setVoiceEnabled(int v, bool on) { enabled_[v] = on; }
+
+  // Test hooks: LFO phase in turns of 2^32 and the last swing in samples.
+  uint32_t lfoPhase(int v) const { return lfoPhase_[v]; }
+  float swingSamples() const { return swingSmp_; }
 
   void process(const float* in, float* out, int n, const UnisonParams& p) {
     const UnisonTuning& t = p.tuning;
@@ -50,32 +59,60 @@ class Unison {
     const float wetMax = powf(10.0f, t.wetMaxDb / 20.0f);
     const float smooth = 1.0f - expf(-1.0f / (kSmoothSec * kSampleRate));
     const float windowSmp = clampWindow(t.windowMs) * kSmpPerMs;
-    float inc[2];
-    for (int v = 0; v < 2; ++v) inc[v] = kTwoPi * t.lfoHz[v] / kSampleRate;
+
+    for (int v = 0; v < 2; ++v) {
+      const float hz = t.lfoHz[v] < 0.0f ? 0.0f : (t.lfoHz[v] > kLfoMaxHz ? kLfoMaxHz : t.lfoHz[v]);
+      lfoInc_[v] = static_cast<uint32_t>(hz / kSampleRate * kTurn + 0.5f);
+    }
+
+    // Off and settled: only the line and the LFO phases advance.
+    if (depth_ == 0.0f && target == 0.0f) {
+      for (int i = 0; i < n; ++i) {
+        line_[writePos_] = in[i];
+        out[i] = in[i];
+        writePos_ = writePos_ + 1 == kLen ? 0 : writePos_ + 1;
+      }
+      for (int v = 0; v < 2; ++v) lfoPhase_[v] += lfoInc_[v] * static_cast<uint32_t>(n);
+      return;
+    }
+
+    // Depth steps per sample; ratio and trim depend on it alone, so they are
+    // evaluated at the block edges and the trim is interpolated between.
+    float depthEnd = depth_;
+    for (int i = 0; i < n; ++i) depthEnd = stepped(depthEnd, target, smooth);
+    const float trim0 = powf(10.0f, t.trimDb * depth_ / 20.0f);
+    const float trim1 = powf(10.0f, t.trimDb * depthEnd / 20.0f);
+    const float inv = 1.0f / static_cast<float>(n);
+
+    // Pitch ratio r moves the read head at r x write speed, so the tap's
+    // delay drifts by (1 - r) per sample; the sawtooth is that drift
+    // normalised to the window.
+    for (int v = 0; v < 2; ++v) {
+      const float ratio = powf(2.0f, t.detuneCents[v] * depthEnd / 1200.0f);
+      const float turns = (1.0f - ratio) / windowSmp;
+      shiftInc_[v] =
+          static_cast<uint32_t>(static_cast<int64_t>(llroundf(turns * kTurn)));
+    }
 
     for (int i = 0; i < n; ++i) {
-      stepDepth(target, smooth);
-      const float swing = t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth_;
+      depth_ = stepped(depth_, target, smooth);
+      swingSmp_ = (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth_) * kSmpPerMs;
       const float wetGain = depth_ * wetMax;
 
       line_[writePos_] = in[i];
 
       float wet = 0.0f;
       for (int v = 0; v < 2; ++v) {
-        const float centre = t.baseDelayMs[v] * kSmpPerMs + swing * kSmpPerMs * sinf(phase_[v]);
+        const float centre = t.baseDelayMs[v] * kSmpPerMs + swingSmp_ * sinTurns(lfoPhase_[v]);
         const float s = readShifted(v, centre, windowSmp);
         if (enabled_[v]) wet += s;
-        phase_[v] += inc[v];
-        if (phase_[v] >= kTwoPi) phase_[v] -= kTwoPi;
-        // Pitch ratio r moves the read head at r x write speed, so the tap's
-        // delay drifts by (1 - r) per sample; the sawtooth is that drift
-        // normalised to the window.
-        const float ratio = powf(2.0f, t.detuneCents[v] * depth_ / 1200.0f);
-        shiftPhase_[v] = frac(shiftPhase_[v] + (1.0f - ratio) / windowSmp);
+        lfoPhase_[v] += lfoInc_[v];
+        shiftPhase_[v] += shiftInc_[v];
       }
 
-      out[i] = (in[i] + wetGain * wet) * powf(10.0f, t.trimDb * depth_ / 20.0f);
-      writePos_ = (writePos_ + 1) % kLen;
+      const float f = static_cast<float>(i + 1) * inv;
+      out[i] = (in[i] + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
+      writePos_ = writePos_ + 1 == kLen ? 0 : writePos_ + 1;
     }
   }
 
@@ -85,7 +122,8 @@ class Unison {
   static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
   static constexpr float kWindowMinMs = 5.0f;
   static constexpr float kWindowMaxMs = 30.0f;
-  static constexpr float kTwoPi = 6.28318530717958647692f;
+  static constexpr float kLfoMaxHz = 20.0f;
+  static constexpr float kTurn = 4294967296.0f;
   static constexpr float kSmoothSec = 0.020f;
   static constexpr float kSnapBelow = 1e-6f;
 
@@ -93,36 +131,38 @@ class Unison {
   static float clampWindow(float ms) {
     return ms < kWindowMinMs ? kWindowMinMs : (ms > kWindowMaxMs ? kWindowMaxMs : ms);
   }
-  static float frac(float x) {
-    x -= floorf(x);
-    return x < 0.0f ? x + 1.0f : x;
-  }
 
-  // Two taps half a window apart on a sawtooth, Hann-crossfaded so the sum
-  // of the gains is always 1. Taps sit at centre + window * (p - 0.5), so
-  // with the phase parked at 0 the live tap is exactly at centre and the
-  // output matches a plain single-tap read.
+  // Parked shifter (phase and step both 0) is a single tap at centre. Else
+  // two taps half a window apart on a sawtooth, Hann-crossfaded with gains
+  // sin^2(pi p) and 1 - sin^2(pi p), which sum to exactly 1. Taps sit at
+  // centre + window * (p - 0.5).
   float readShifted(int v, float centre, float windowSmp) const {
+    const uint32_t ph = shiftPhase_[v];
+    if (ph == 0u && shiftInc_[v] == 0u) return readCubic(centre);
+    const float p0 = static_cast<float>(ph) * (1.0f / kTurn);
+    const float p1 = static_cast<float>(ph + 0x80000000u) * (1.0f / kTurn);
+    const float s = sinTurns(ph >> 1);
+    const float g0 = s * s;
+    const float g1 = 1.0f - g0;
     float sum = 0.0f;
-    for (int k = 0; k < 2; ++k) {
-      const float p = frac(shiftPhase_[v] + 0.5f * k);
-      const float gain = 0.5f * (1.0f - cosf(kTwoPi * p));
-      if (gain <= 0.0f) continue;
-      sum += gain * readCubic(centre + windowSmp * (p - 0.5f));
-    }
+    if (g0 > 0.0f) sum += g0 * readCubic(centre + windowSmp * (p0 - 0.5f));
+    if (g1 > 0.0f) sum += g1 * readCubic(centre + windowSmp * (p1 - 0.5f));
     return sum;
   }
 
   // One-pole toward target; snaps to exact 0 so settled depth 0 adds nothing.
-  void stepDepth(float target, float a) {
-    depth_ += a * (target - depth_);
-    if (target == 0.0f && depth_ < kSnapBelow) depth_ = 0.0f;
+  static float stepped(float d, float target, float a) {
+    d += a * (target - d);
+    if (target == 0.0f && d < kSnapBelow) d = 0.0f;
+    return d;
   }
 
+  // Reads sit within one ring length of the head, so one step wraps them; the
+  // final clamp is never taken and lets the compiler bound the index.
   static int wrap(int i) {
-    if (i < 0) return i + kLen;
-    if (i >= kLen) return i - kLen;
-    return i;
+    if (i < 0) i += kLen;
+    else if (i >= kLen) i -= kLen;
+    return static_cast<unsigned>(i) < static_cast<unsigned>(kLen) ? i : 0;
   }
 
   // Catmull-Rom through four taps. Delay is clamped so the newest tap
@@ -132,7 +172,7 @@ class Unison {
     const float pos = static_cast<float>(writePos_) - d;
     const float fl = floorf(pos);
     const float f = pos - fl;
-    const int i0 = wrap(static_cast<int>(fl) % kLen);
+    const int i0 = wrap(static_cast<int>(fl));
     const float xm = line_[wrap(i0 - 1)];
     const float x0 = line_[i0];
     const float x1 = line_[wrap(i0 + 1)];
@@ -145,10 +185,13 @@ class Unison {
 
   // Both voices read the same input, so one delay line serves both.
   std::array<float, kLen> line_{};
-  std::array<float, 2> phase_{{0.0f, 0.0f}};
-  std::array<float, 2> shiftPhase_{{0.0f, 0.0f}};
+  std::array<uint32_t, 2> lfoPhase_{{0u, 0u}};
+  std::array<uint32_t, 2> shiftPhase_{{0u, 0u}};
+  std::array<uint32_t, 2> lfoInc_{{0u, 0u}};
+  std::array<uint32_t, 2> shiftInc_{{0u, 0u}};
   std::array<bool, 2> enabled_{{true, true}};
   float depth_ = 0.0f;
+  float swingSmp_ = 0.0f;
   int writePos_ = 0;
 };
 

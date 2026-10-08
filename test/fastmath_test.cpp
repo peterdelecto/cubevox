@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
 
 #include "engine/fastmath.h"
 
@@ -67,6 +68,22 @@ bool testRotorBlock() {
   return report("rotor block", worst <= 1e-5, "worst window error over 64 samples=%.3g (<= 1e-5)", worst);
 }
 
+// 4. sinTurns against the double sine over the full phase range.
+bool testSinTurns() {
+  double worst = 0.0;
+  auto check = [&](uint32_t p) {
+    const double want = std::sin(2.0 * kPi * static_cast<double>(p) / 4294967296.0);
+    worst = std::fmax(worst, std::fabs(static_cast<double>(cv::sinTurns(p)) - want));
+  };
+  uint32_t p = 0;
+  for (int i = 0; i < 100000; ++i, p += 42949u) check(p);
+  for (uint32_t e : {0u, 1u << 30, 1u << 31, 3u << 30}) check(e);
+  const bool exact = cv::sinTurns(0u) == 0.0f && cv::sinTurns(1u << 31) == 0.0f;
+  return report("sinTurns", worst < 1e-6 && exact,
+                "worst absolute error=%.3g (< 1e-6), sin(0) and sin(pi) exact=%.0f", worst,
+                exact ? 1.0 : 0.0);
+}
+
 }  // namespace
 
 int main() {
@@ -74,6 +91,7 @@ int main() {
   ok &= testExp2();
   ok &= testRotorGrain();
   ok &= testRotorBlock();
+  ok &= testSinTurns();
   std::printf("%s fastmath\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

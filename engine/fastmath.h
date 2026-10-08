@@ -28,6 +28,26 @@ inline float exp2Fast(float x) {
   return p * scale;
 }
 
+// sin(2 pi phase / 2^32) from a 32-bit turn counter. The phase folds to a
+// quarter turn, then sin(pi t) is the odd Taylor series through t^11 on
+// |t| <= 0.5. The first dropped term is below 1e-7, so absolute error stays
+// under 1e-6 with float rounding.
+inline float sinTurns(uint32_t phase) {
+  float t = static_cast<float>(static_cast<int32_t>(phase)) * (1.0f / 2147483648.0f);
+  if (t > 0.5f) t = 1.0f - t;
+  if (t < -0.5f) t = -1.0f - t;
+  constexpr float kPi = 3.14159265358979323846f;
+  constexpr float c1 = kPi;
+  constexpr float c3 = -(kPi * kPi * kPi) / 6.0f;
+  constexpr float c5 = (kPi * kPi * kPi * kPi * kPi) / 120.0f;
+  constexpr float c7 = -(kPi * kPi * kPi * kPi * kPi * kPi * kPi) / 5040.0f;
+  constexpr float c9 = (kPi * kPi * kPi * kPi * kPi * kPi * kPi * kPi * kPi) / 362880.0f;
+  constexpr float c11 =
+      -(kPi * kPi * kPi * kPi * kPi * kPi * kPi * kPi * kPi * kPi * kPi) / 39916800.0f;
+  const float t2 = t * t;
+  return t * (c1 + t2 * (c3 + t2 * (c5 + t2 * (c7 + t2 * (c9 + t2 * c11)))));
+}
+
 // Hann window by rotation: one complex multiply per sample in place of a
 // cosine. init() costs two sines and two cosines; drift over a grain is
 // about n * 1e-7, so callers re-init at each grain or each block.
