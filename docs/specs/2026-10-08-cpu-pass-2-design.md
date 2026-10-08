@@ -177,6 +177,20 @@ paths; parallel calls inherit a drifting cwd.
 | C2 | This spec's "where it stands" table filled; CLAUDE.md spec list | — | — |
 | T1 | Accuracy trial, not a cost step: fine search ±5 lags and a 5-point least-squares parabola against the 3-point one on the hard-tune clip and the 220 Hz gate. Kept only if hard tune improves; otherwise reverted and the result recorded here | hard tune ≤ 4 cents either way; `pitch` test | the 3-point parabola is the most biased standard sub-sample fit; whether it limits the 3.76 cents is unknown and cheap to find out |
 
+## Progress (2026-10-08, host gates; WeAct bench pending, board off the bus)
+
+| Step | Commit | ctest | A/B vs previous step | Other |
+|---|---|---|---|---|
+| U1 | 9514f5c | 17/17 | unison -39.7, chain -38.4 dB (old accumulator's error; new is -66.4 dB vs a double-phase reference) | LFO analytic 3.7e-5 samples; `sinTurns` 1.6e-7 |
+| D1 | feaed12 | 17/17 | distortion -91.0, chain -96.5 dB | worst block should now equal average |
+| M1 | c34dcaa | — | engine untouched | `gPitchFx` 101,736 B at 0x20000000; placement new after the zeroing |
+| D2 | 1c57e38 | 17/17 | distortion -90.5, chain -92.9 dB | `tanhFast` 2.6e-7 max error |
+| P1 | e54c85a | 17/17 | autotune -112.3, octave -117.6, chain -92.6 dB | hard tune 3.76 |
+| F1 | 1d7b1e4 | 17/17 | all ten cases exact | oracle agreement 100 % on 562 + 750 hops; hard tune 3.76 |
+
+Listening pairs for the owner: `build/listen/unison_{old_e06d829,new_u1}.wav`,
+`build/listen/distortion_{old_feaed12,new_d2}.wav`. D3 and F2 wait on the bench.
+
 ## Tests
 
 1. `unison_test`: analytic LFO delay check through a `delayAt(v)` test hook, at three
