@@ -1,9 +1,0 @@
-[
- {"op":"track","net":"/h7core_block/USB_DP","layer":"F.Cu","width_mm":0.2,"points":[[124.24,38.35],[124.24,40.65]]},
- {"op":"track","net":"/h7core_block/USB_DM","layer":"F.Cu","width_mm":0.2,"points":[[126.14,38.35],[126.14,40.65]]},
- {"op":"remove_track","layer":"F.Cu","x":129.25,"y":38.1},
- {"op":"track","net":"/h7core_block/VBUS","layer":"F.Cu","width_mm":0.3,"points":[[128.4,37.25],[129.6,38.45]]},
- {"op":"track","net":"/h7core_block/VBUS","layer":"F.Cu","width_mm":0.3,"points":[[129.6,38.45],[130.1,38.95]]},
- {"op":"via","net":"/h7core_block/VBUS","x":129.6,"y":38.45,"diameter_mm":0.6,"drill_mm":0.3},
- {"op":"track","net":"/h7core_block/VBUS","layer":"B.Cu","width_mm":0.3,"points":[[125.19,39.5],[128.55,39.5],[129.6,38.45]]}
-]

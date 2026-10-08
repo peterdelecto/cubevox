@@ -1,5 +1,0 @@
-[
- {"op":"track","net":"/h7core_block/ADC_SCKI_SRC","layer":"F.Cu","width_mm":0.2,"points":[[90.0,92.2],[88.71,93.49]]},
- {"op":"track","net":"/h7core_block/ADC_SCKI_SRC","layer":"F.Cu","width_mm":0.2,"points":[[88.71,93.49],[87.75,93.49]]},
- {"op":"track","net":"/h7core_block/I2S_BCLK_SRC","layer":"F.Cu","width_mm":0.2,"points":[[91.5,92.2],[91.5,94.3]]}
-]

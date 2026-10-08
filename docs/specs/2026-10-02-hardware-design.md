@@ -52,9 +52,9 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 
 ### Signal chain
 
-Revision 2 (2026-10-02 pm, after `hardware/SCHEMATIC-AUDIT.md`): op-amp,
+Revision 2 (2026-10-02 pm, after `docs/audits/2026-10-02-schematic-audit.md`): op-amp,
 bias, DC gain, reference, coupling, DAC filter and clock items below replace
-revision 1. Disposition per finding is in `hardware/SCHEMATIC-AUDIT-RESPONSE.md`.
+revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audit-response.md`.
 
 1. Combo jack NCJ6FA-H. XLR pin 2 → MIC_P, pin 3 → MIC_N, pin 1 and G to
    GND at the jack. TRS T → LINE_P, R → LINE_N through the 25.7 dB pad into the

@@ -1,5 +1,0 @@
-[
- {"op": "remove_track", "layer": "F.Cu", "x": 148.0, "y": 70.225},
- {"op": "remove_track", "layer": "F.Cu", "x": 150.7, "y": 90.7},
- {"op": "remove_track", "layer": "F.Cu", "x": 153.4, "y": 96.45}
-]

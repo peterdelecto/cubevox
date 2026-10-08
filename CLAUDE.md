@@ -19,7 +19,7 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
   Every change that rebuilds the app bumps it first with `tools/bump_version.sh`, in the
   same commit. Not named `VERSION`: the Mac's case-insensitive disk lets `<version>` find it.
 - Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
-- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply. `2026-10-02-hardware-design.md` is the board. `2026-10-03-spring-b-design.md` is SPRING B. `2026-10-08-update-and-slots-design.md` is the Mac app, the slot layout and firmware updates. `2026-10-08-effect-registry-design.md` is the firmware effect registry (card ids, knob descriptors, groups, costs, bench).
+- Specs live in `docs/specs/`. Current: `2026-10-01-gate-design.md`; one spec per stage under `docs/specs/`, all still apply. `2026-10-02-hardware-design.md` is the board. `2026-10-03-spring-b-design.md` is SPRING B. `2026-10-08-update-and-slots-design.md` is the Mac app, the slot layout and firmware updates. `2026-10-08-effect-registry-design.md` is the firmware effect registry (card ids, knob descriptors, groups, costs, bench). `2026-10-08-firmware-foundation-design.md` is the firmware directory tiers (core/board/ui), host tests, fault handling and toolchain pin.
 - `hardware/` holds the KiCad project. Teensy-H7-Port and DrumSynthV3 are read-only sources
   to copy from, never to edit.
 

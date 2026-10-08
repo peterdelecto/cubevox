@@ -14,7 +14,7 @@ Engine headers come from `../engine` by include path. No emulator files are incl
   the ADC. `clockReport()` prints silicon rev, ROM bootloader ID at 0x1FF1E7FE and the clock tree.
 - `cubevox/usb_link.cpp`: USB CDC starts only while PA9 reads VBUS and stops when it drops (self-powered box,
   `-DUSBD_SELF_POWERED=1` in build.sh). The boot report prints each time a terminal opens the port.
-  Astra's review of the clock numbers and the gating: `docs/reference/ASTRA_PACKET_CLOCK_RESPONSE_2026-10-08.md`.
+  Astra's review of the clock numbers and the gating: `docs/audits/2026-10-08-astra-clock-response.md`.
 
 Real: slot table, mux scan (selects held low 1.1 s after boot for U107's 3V3A delay), smoothing, KEY/SEMITONES
 stepping, toggles, mute sequence, menu logic and DFU entry, clock tree, VBUS-gated USB, PLL3 and SAI1 TX/RX DMA
