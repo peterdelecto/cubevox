@@ -12,7 +12,7 @@ UNCONNECTED_EXPECT=0
 #   (111.4,35.55) (111.4,36.165) GND E0120 | (124.6,107.65) 3V3 E0147 | (115.75,37.25) USB_DM E0148
 CORNER_ALLOW="111.40,35.55 111.40,36.17 111.40,36.16 124.60,107.65 115.75,37.25"
 ANGLE_TOL_DEG=0.05
-DIAG_MAX_MM=20
+DIAG_MAX_MM=6
 
 KICAD_PY=/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
 KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli
