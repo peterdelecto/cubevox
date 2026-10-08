@@ -2,8 +2,8 @@
 
 Date 2026-10-03. Owner: "let's make a chasm-spring reverb but call it SPRING B …
 keep the original chasm untouched." Goal: a spring sound at CHASM's cost, so it
-fits the STM32H743 next to the rest of the chain. PARKER SPRING is off the face
-(owner 2026-10-03) because it projects past the H7's budget.
+fits the STM32H743 next to the rest of the chain. Parker Spring was off the face
+(owner 2026-10-03) because it projected past the H7's budget (Parker Spring removed 2026-10-08).
 
 ## What it is
 

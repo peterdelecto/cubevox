@@ -17,7 +17,6 @@
 #include "engine/octave.h"
 #include "engine/spring.h"
 #include "engine/spring_b.h"
-#include "engine/spring_c.h"
 #include "engine/unison.h"
 
 namespace cv::macros {
@@ -99,7 +98,7 @@ constexpr Anchor kSprModRate{1.5f, 3.0f, 5.0f, I::Log};
 constexpr Anchor kSprSprings{2.0f, 2.0f, 3.0f, I::Step};
 constexpr Anchor kSprHp{600.0f, 300.0f, 120.0f, I::Log};
 constexpr Anchor kSprBoingDb{0.0f, 0.0f, 6.0f};
-constexpr Anchor kSprDripA{0.60f, 0.75f, 0.85f};                     // PARKER's Drip shape
+constexpr Anchor kSprDripA{0.60f, 0.75f, 0.85f};
 constexpr Anchor kSprDripSections{80.0f, 130.0f, 130.0f, I::Round};
 
 // CHASM
@@ -108,18 +107,6 @@ constexpr Anchor kChmTrebleLoss{1500.0f, 3000.0f, 7000.0f, I::Log};
 constexpr Anchor kChmInputTrebleCut{0.85f, 0.95f, 1.0f};
 constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
 constexpr Anchor kChmBassCutTop{200.0f, 100.0f, 40.0f, I::Log};
-
-// PARKER SPRING
-constexpr Anchor kPrkHfMixDb{-30.0f, -10.0f, -4.0f};
-constexpr Anchor kPrkEcho{0.05f, 0.2f, 0.3f};
-constexpr Anchor kPrkRipple{0.05f, 0.2f, 0.3f};
-constexpr Anchor kPrkPresenceDb{1.0f, 5.0f, 8.0f};
-constexpr Anchor kPrkALf{0.55f, 0.70f, 0.82f};
-constexpr Anchor kPrkMLow{60.0f, 100.0f, 100.0f, I::Round};
-constexpr Anchor kPrkSpread{0.3f, 1.0f, 1.6f};                        // k in tdFactor
-constexpr Anchor kPrkModDepth{2.0f, 8.0f, 16.0f};
-constexpr Anchor kPrkLp{5000.0f, 9000.0f, 14000.0f, I::Log};
-constexpr Anchor kPrkPresenceHz{2500.0f, 3000.0f, 4000.0f, I::Log};
 
 // SPRING B
 constexpr Anchor kSbChirpA{0.55f, 0.70f, 0.85f};
@@ -148,10 +135,6 @@ enum Id : int {
   ChasmWobble,
   ChasmBrightness,
   ChasmBass,
-  ParkerSplash,
-  ParkerDrip,
-  ParkerFlutter,
-  ParkerBrightness,
   SpringDrip,
   SpringBDrip,
   SpringBFlutter,
@@ -164,22 +147,20 @@ enum Id : int {
 constexpr const char* kPrintName[kCount] = {
     "Slide",          nullptr,"Chorus-Double", nullptr,       "Body",
     "Bite",           "Grit",           "SPRING Splash",    "SPRING Flutter", "SPRING Low end",
-    "Wobble",         "CHASM Brightness", "Bass",           "PARKER Splash",  "PARKER Drip",
-    "PARKER Flutter", "PARKER Brightness", "SPRING Drip",   "SPRING B Drip",  "SPRING B Flutter",
-    "SPRING B Brightness"};
+    "Wobble",         "CHASM Brightness", "Bass",           "SPRING Drip",    "SPRING B Drip",
+    "SPRING B Flutter", "SPRING B Brightness"};
 
 // Keys for the saved-state file; one word each, stable across builds.
 constexpr const char* kStateKey[kCount] = {
     "OctaveSlide",    "HarmonyTracking", "UnisonBlend",   "UnisonMotion",  "DistBody",
     "DistBite",       "DistGrit",        "SpringSplash",  "SpringFlutter", "SpringLowEnd",
-    "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "ParkerSplash",  "ParkerDrip",
-    "ParkerFlutter",  "ParkerBrightness", "SpringDrip",   "SpringBDrip",   "SpringBFlutter",
-    "SpringBBrightness"};
+    "ChasmWobble",    "ChasmBrightness", "ChasmBass",     "SpringDrip",    "SpringBDrip",
+    "SpringBFlutter", "SpringBBrightness"};
 
 // Adam's starting positions (owner 2026-10-02), in Id order.
 constexpr std::array<float, kCount> kDefaultPos = {
     50.0f, 50.0f, 0.0f,  0.0f,  50.0f, 60.0f, 50.0f, 65.0f, 29.0f,
-    63.0f, 85.0f, 85.0f, 50.0f, 41.0f, 90.0f, 89.0f, 100.0f, 30.0f, 50.0f, 50.0f, 50.0f};
+    63.0f, 85.0f, 85.0f, 50.0f, 30.0f, 50.0f, 50.0f, 50.0f};
 
 struct State {
   std::array<float, kCount> pos;
@@ -280,30 +261,6 @@ inline void chasmBrightness(ChasmTuning& t, float pos) {
 inline void chasmBass(ChasmTuning& t, float pos) {
   t.bassCutHz = at(kChmBassCut, pos);
   t.bassCutHzTop = at(kChmBassCutTop, pos);
-}
-
-inline void parkerSplash(SpringCTuning& t, float pos) {
-  t.hfMixDb = at(kPrkHfMixDb, pos);
-  t.echoGain = at(kPrkEcho, pos);
-  t.rippleGain = at(kPrkRipple, pos);
-  t.presenceDb = at(kPrkPresenceDb, pos);
-}
-
-inline void parkerDrip(SpringCTuning& t, float pos) {
-  t.aLf = at(kPrkALf, pos);
-  t.mLow = atInt(kPrkMLow, pos);
-}
-
-// Spread k widens the three springs' delay factors around 1.
-inline void parkerFlutter(SpringCTuning& t, float pos) {
-  const float k = at(kPrkSpread, pos);
-  t.tdFactor = {1.0f, 1.0f + 0.15f * k, 1.0f - 0.12f * k};
-  t.modDepth = at(kPrkModDepth, pos);
-}
-
-inline void parkerBrightness(SpringCTuning& t, float pos) {
-  t.lpHz = at(kPrkLp, pos);
-  t.presenceHz = at(kPrkPresenceHz, pos);
 }
 
 inline void springBDrip(SpringBTuning& t, float pos) {

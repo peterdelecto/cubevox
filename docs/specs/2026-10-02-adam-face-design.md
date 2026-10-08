@@ -36,10 +36,9 @@ sliders, then report numbers we bake in.
 | 6 | Unison | DEPTH · RATE (chorus speed, ~0.2–6 Hz; past today's rate the sweep narrows so the pitch swing caps near 2x today's) | Chorus ↔ Double |
 | 7 | Slapback | MIX (level + repeats) · TIME (30–150 ms) | Repeats · Low pass (raw) |
 | 8 | Distortion | DRIVE · TONE | Body · Bite · Grit |
-| 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM / PARKER SPRING = menu) | per engine, below |
+| 9 | Reverb | DECAY · DWELL · MIX (engine radio SPRING / CHASM = menu) | per engine, below |
 | 9a | SPRING | | Splash · Flutter · Low end |
 | 9b | CHASM | | Wobble · Brightness · Bass |
-| 9c | PARKER SPRING | | Splash · Drip · Flutter · Brightness |
 | 10 | Output EQ | menu | Low cut · Low-mid dip (freq, amount) · Presence (freq, amount) · Air (raw) |
 
 Engine radios (Octave A/B/C, Harmony A/B/C, Autotune A/B, reverb engine) stay visible:
@@ -79,16 +78,6 @@ they are what Adam is choosing between.
 | | inputTrebleCut | 0.85 | 0.95 | 1.0 |
 | CHASM Bass | bassCutHz | 400 | 200 | 80 |
 | | bassCutHzTop | 200 | 100 | 40 |
-| PARKER Splash | hfMixDb | −40 | −22 | −8 |
-| | echoGain | 0.05 | 0.2 | 0.3 |
-| | rippleGain | 0.05 | 0.2 | 0.3 |
-| | presenceDb | 1 | 5 | 8 |
-| PARKER Drip | aLf | 0.55 | 0.70 | 0.82 |
-| | mLow | 60 | 100 | 100 |
-| PARKER Flutter | spread k (tdFactor = 1, 1+0.15k, 1−0.12k) | 0.3 | 1 | 1.6 |
-| | modDepth | 2 | 8 | 16 |
-| PARKER Brightness | lpHz | 5000 | 9000 | 14000 |
-| | presenceHz | 2500 | 3000 | 4000 |
 
 Harmony checkboxes: **Follow my bends** = `!snapToScale` (default on). **Drop out on
 breaths** = `muteUnvoiced` (default off). **Voices**: three rows Low / High / Higher,
@@ -107,7 +96,7 @@ each Off / Low / Med / High (no cap on how many are on), with a Formant slider p
    soft clip is the only change at 0 (below −6 dBFS it is within 0.1 dB of linear).
    Chasm test gains: dwell 1 adds ≥ 6 dB more 3rd-harmonic on a 220 Hz sine than dwell 0.
    `level_test` CHASM row re-trimmed if it leaves 0..+0.5 dB.
-3. Reverb face knobs: knob 1 DECAY → `spring.tension` / `chasm.decay` / `parker.tension`;
+3. Reverb face knobs: knob 1 DECAY → `spring.tension` / `chasm.decay`;
    knob 2 DWELL → each engine's `dwell`; MIX unchanged. Render CLI: `--decay` and
    `--dwell` apply to whichever engine is selected (keep `--tension`/`--wobble` as aliases).
 

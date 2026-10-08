@@ -114,7 +114,6 @@ inline float softClipHeadroom(float x, float h) { return h * softClip(x / h); }
 // Headroom per engine, set so a 0 dBFS voice at DWELL 0.2 enters the curve at
 // about a third of its knee (< 0.3 % THD).
 constexpr float kSpringClipHeadroom = 3.0f;  // inputGain 0.5 x drive 2.0 = 1.0
-constexpr float kParkerClipHeadroom = 6.0f;  // no input gain; drive 2.0
 constexpr float kChasmClipHeadroom = 4.5f;   // drive 1.5
 
 // Transposed direct form II.

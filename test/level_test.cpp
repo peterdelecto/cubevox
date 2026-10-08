@@ -161,7 +161,6 @@ cv::ReverbParams reverbParams(int engine) {
   p.engine = engine;
   p.mix = 1.0f;
   p.spring.tension = p.spring.dwell = 0.5f;
-  p.parker.tension = p.parker.dwell = 0.5f;
   p.springB.decay = p.springB.dwell = 0.5f;
   p.chasm.decay = 0.5f;
   p.chasm.wobble = 0.3f;
@@ -251,7 +250,6 @@ int main() {
 
   ok &= simple<cv::Reverb>("reverb SPRING mix 1", in, reverbParams(cv::kReverbSpring));
   ok &= simple<cv::Reverb>("reverb CHASM mix 1", in, reverbParams(cv::kReverbChasm));
-  ok &= simple<cv::Reverb>("reverb PARKER mix 1", in, reverbParams(cv::kReverbParker));
   ok &= simple<cv::Reverb>("reverb SPRING B mix 1", in, reverbParams(cv::kReverbSpringB));
 
   cv::PolishParams eq;

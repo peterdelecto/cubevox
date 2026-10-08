@@ -354,15 +354,15 @@ char gTuningText[8192];  // last copied settings text
 // Returns the bytes written, newline included.
 size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const auto onOff = [](bool b) { return b ? "on" : "off"; };
-  static const char* const kReverb[4] = {"SPRING", "CHASM", "PARKER SPRING", "SPRING B"};
+  static const char* const kReverb[3] = {"SPRING", "CHASM", "SPRING B"};
   const cv::HarmonyParams& h = p.pitchFx.harmony;
   const cv::AutotuneParams& at = p.pitchFx.autotune;
   const cv::OctaveParams& o = p.pitchFx.octave;
   const cv::ReverbParams& r = p.reverb;
   const int re = r.engine >= cv::kReverbSpring && r.engine <= cv::kReverbSpringB ? r.engine : cv::kReverbSpring;
   const int atKey = p.linkAutotuneKey ? h.key : at.key;
-  const float decays[4] = {r.spring.tension, r.chasm.decay, r.parker.tension, r.springB.decay};
-  const float dwells[4] = {r.spring.dwell, r.chasm.dwell, r.parker.dwell, r.springB.dwell};
+  const float decays[3] = {r.spring.tension, r.chasm.decay, r.springB.decay};
+  const float dwells[3] = {r.spring.dwell, r.chasm.dwell, r.springB.dwell};
   const float decay = decays[re];
   const float dwell = dwells[re];
   char macros[640];
@@ -405,7 +405,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
 void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                   const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
                   const cv::DistortionTuning& d, const cv::SpringTuning& sp,
-                  const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
+                  const cv::ChasmTuning& c,
                   const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
                   const cv::AutotuneTuning& at, const ProtoParams& params) {
   const int prefix = static_cast<int>(snapshotLines(params, gTuningText, sizeof(gTuningText)));
@@ -456,17 +456,6 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       e.tuning.presenceQ, e.tuning.airHz, e.tuning.trimDb, e.hpHz, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb,
       e.airDb);
   size_t used = std::strlen(gTuningText);
-  std::snprintf(
-      gTuningText + used, sizeof(gTuningText) - used,
-      "\nSpringCTuning{%.1ff, %.0ff, %d, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.1ff, "
-      "%.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.1ff, %.3ff, %d, {%.3ff, %.3ff, %.3ff}, "
-      "{%.3ff, %.3ff, %.3ff}, %.0ff, %.0ff, %.1ff, %.2ff, %.0ff, %.1ff, %.2ff, %.3ff, %.1ff}",
-      pk.tdMs, pk.fcLfHz, pk.mLow, pk.aLf, pk.gLo, pk.gHi, pk.gComp, pk.hfRatio, pk.mHigh, pk.aHf,
-      pk.hfMixDb, pk.cross, pk.eqPeakHz, pk.eqBwHz, pk.lowHz, pk.echoGain, pk.rippleGain,
-      pk.modDepth, pk.modPole, pk.springs, pk.tdFactor[0], pk.tdFactor[1], pk.tdFactor[2],
-      pk.fcFactor[0], pk.fcFactor[1], pk.fcFactor[2], pk.hpHz, pk.lpHz, pk.dwellDrive,
-      pk.dwellComp, pk.presenceHz, pk.presenceDb, pk.presenceQ, pk.tankTrim, pk.wetDb);
-  used = std::strlen(gTuningText);
   const cv::SpringBTuning& sb = params.reverb.springB.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nSpringBTuning{%.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, %.1ff, "
@@ -489,10 +478,10 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
 void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
                  const cv::DistortionTuning& d, const cv::SpringTuning& sp,
-                 const cv::ChasmTuning& c, const cv::SpringCTuning& pk,
+                 const cv::ChasmTuning& c,
                  const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
                  const cv::AutotuneTuning& at, const ProtoParams& params) {
-  formatTuning(h, o, t, s, d, sp, c, pk, e, ig, g, at, params);
+  formatTuning(h, o, t, s, d, sp, c, e, ig, g, at, params);
   std::printf(
       "// AutotuneTuning: trimDb, maxCorrectSemis, "
       "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
@@ -514,10 +503,6 @@ void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
       "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, airHz, trimDb\n"
-      "// SpringCTuning: tdMs, fcLfHz, mLow, aLf, gLo, gHi, gComp, hfRatio, mHigh, aHf, hfMixDb, "
-      "cross, eqPeakHz, eqBwHz, lowHz, echoGain, rippleGain, modDepth, modPole, springs, "
-      "{tdFactor[3]}, {fcFactor[3]}, hpHz, lpHz, dwellDrive, dwellComp, presenceHz, presenceDb, "
-      "presenceQ, tankTrim, wetDb\n"
       "// SpringBTuning: halfMs1, halfMs2, timeLo, timeHi, diffuse, chirpSections, chirpA, "
       "trebleLossHz, bassCutHz, wobbleDepth, wobbleRateHz, inputTrim, dwellDrive, dwellComp, wetDb\n%s\n",
       gTuningText);
@@ -747,67 +732,6 @@ void drawPolishRaw(cv::PolishTuning& t) {
   ImGui::SliderFloat("Output trim", &t.trimDb, -6.0f, 6.0f, "%.1f dB");
 }
 
-// PARKER is off the face (owner 2026-10-03); its engine and tuning stay in the code.
-[[maybe_unused]] void drawParkerTuning(cv::SpringCTuning& p) {
-  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
-  if (!tuningGroup("Parker")) return;
-  if (tuningLeaf("Parker tank", "Tank")) {
-    ImGui::SliderFloat("Delay T_D", &p.tdMs, 20.0f, 120.0f, "%.1f ms");
-    ImGui::SliderFloat("Stretch corner", &p.fcLfHz, 2000.0f, 6000.0f, "%.0f Hz", log);
-    ImGui::SliderInt("Sections", &p.mLow, 1, 100);
-    ImGui::SliderFloat("Section pole", &p.aLf, 0.3f, 0.9f, "%.2f");
-    ImGui::SliderFloat("Gain at tension 0", &p.gLo, 0.2f, 0.97f, "%.2f");
-    ImGui::SliderFloat("Gain at tension 1", &p.gHi, 0.2f, 0.97f, "%.2f");
-    ImGui::SliderFloat("Gain compensation", &p.gComp, 0.8f, 1.3f, "%.2f");
-    ImGui::TreePop();
-  }
-  if (tuningLeaf("Parker taps", "Taps & EQ")) {
-    ImGui::SliderFloat("Echo gain", &p.echoGain, 0.0f, 0.3f, "%.2f");
-    ImGui::SliderFloat("Ripple gain", &p.rippleGain, 0.0f, 0.3f, "%.2f");
-    ImGui::SliderFloat("Wander depth", &p.modDepth, 0.0f, 16.0f, "%.1f samples");
-    ImGui::SliderFloat("Wander pole", &p.modPole, 0.8f, 0.99f, "%.3f");
-    ImGui::SliderFloat("Chirp EQ centre", &p.eqPeakHz, 50.0f, 400.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Chirp EQ width", &p.eqBwHz, 0.0f, 300.0f, "%.0f Hz");
-    ImGui::Text("Low cutoff %.0f Hz, fixed table", static_cast<double>(p.lowHz));
-    ImGui::TreePop();
-  }
-  if (tuningLeaf("Parker high band", "High band")) {
-    ImGui::SliderInt("Splash sections", &p.mHigh, 0, 200);
-    ImGui::SliderFloat("Splash pole", &p.aHf, -0.9f, 0.0f, "%.2f");
-    ImGui::SliderFloat("Splash gain ratio", &p.hfRatio, 0.8f, 1.5f, "%.2f");
-    ImGui::SliderFloat("Splash level", &p.hfMixDb, -120.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Splash cross-feed", &p.cross, 0.0f, 0.3f, "%.2f");
-    ImGui::TreePop();
-  }
-  if (tuningLeaf("Parker springs", "Springs")) {
-    ImGui::SliderInt("Springs", &p.springs, 1, 3);
-    for (int i = 0; i < 3; ++i) {
-      char label[32];
-      std::snprintf(label, sizeof(label), "Delay factor %d", i + 1);
-      ImGui::SliderFloat(label, &p.tdFactor[static_cast<size_t>(i)], 0.8f, 1.25f, "%.3f");
-    }
-    for (int i = 0; i < 3; ++i) {
-      char label[32];
-      std::snprintf(label, sizeof(label), "Corner factor %d", i + 1);
-      ImGui::SliderFloat(label, &p.fcFactor[static_cast<size_t>(i)], 0.9f, 1.1f, "%.3f");
-    }
-    ImGui::TreePop();
-  }
-  if (tuningLeaf("Parker drive", "Drive")) {
-    ImGui::SliderFloat("Input high-pass", &p.hpHz, 60.0f, 400.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Output low-pass", &p.lpHz, 3000.0f, 12000.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Drive at dwell 1", &p.dwellDrive, 1.0f, 64.0f, "%.1f x");
-    ImGui::SliderFloat("Drive compensation", &p.dwellComp, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Presence centre", &p.presenceHz, 1000.0f, 6000.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Presence gain", &p.presenceDb, 0.0f, 6.0f, "%.1f dB");
-    ImGui::SliderFloat("Presence Q", &p.presenceQ, 0.5f, 2.0f, "%.2f");
-    ImGui::SliderFloat("Tank input trim", &p.tankTrim, 0.1f, 2.0f, "%.3f");
-    ImGui::SliderFloat("Wet level", &p.wetDb, -12.0f, 18.0f, "%.1f dB");
-    ImGui::TreePop();
-  }
-  ImGui::TreePop();
-}
-
 // SPRING is off the face (owner 2026-10-03); its engine and tuning stay in the code.
 [[maybe_unused]] void drawSpringRaw(cv::SpringTuning& t) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
@@ -898,7 +822,6 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
     params.distortion.tuning = cv::DistortionTuning{};
     params.reverb.spring.tuning = cv::SpringTuning{};
     params.reverb.chasm.tuning = cv::ChasmTuning{};
-    params.reverb.parker.tuning = cv::SpringCTuning{};
     params.reverb.springB.tuning = cv::SpringBTuning{};
     params.eq.tuning = cv::PolishTuning{};
     params.inputGate.tuning = cv::GateTuning{};
@@ -918,7 +841,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
                     ImVec2(copyW, 0.0f))) {
     printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
                 params.distortion.tuning, params.reverb.spring.tuning,
-                params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq, params.inputGate.tuning,
+                params.reverb.chasm.tuning, params.eq, params.inputGate.tuning,
                 params.gate.tuning, params.pitchFx.autotune.tuning, params);
     copiedAt = ImGui::GetTime();
   }
@@ -1157,8 +1080,6 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   add("reverb.spring.dwell", &r.spring.dwell);
   add("reverb.chasm.decay", &r.chasm.decay);
   add("reverb.chasm.dwell", &r.chasm.dwell);
-  add("reverb.parker.decay", &r.parker.tension);
-  add("reverb.parker.dwell", &r.parker.dwell);
   add("reverb.springb.decay", &r.springB.decay);
   add("reverb.springb.dwell", &r.springB.dwell);
   add("eq.on", &p.eq.on);
@@ -1257,10 +1178,6 @@ void applyMacros(ProtoParams& p) {
   mc::chasmWobble(r.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(r.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(r.chasm.tuning, m[mc::ChasmBass]);
-  mc::parkerSplash(r.parker.tuning, m[mc::ParkerSplash]);
-  mc::parkerDrip(r.parker.tuning, m[mc::ParkerDrip]);
-  mc::parkerFlutter(r.parker.tuning, m[mc::ParkerFlutter]);
-  mc::parkerBrightness(r.parker.tuning, m[mc::ParkerBrightness]);
   mc::springBDrip(r.springB.tuning, m[mc::SpringBDrip]);
   mc::springBFlutter(r.springB.tuning, m[mc::SpringBFlutter]);
   mc::springBBrightness(r.springB.tuning, m[mc::SpringBBrightness]);
@@ -1480,16 +1397,6 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
                 [&](float p) { mc::springBFlutter(t, p); });
     macroSlider("Brightness", "brighter tail", m.pos[mc::SpringBBrightness],
                 [&](float p) { mc::springBBrightness(t, p); });
-  } else if (r.engine == cv::kReverbParker) {
-    cv::SpringCTuning& t = r.parker.tuning;
-    macroSlider("Splash", "bright crash on loud notes", m.pos[mc::ParkerSplash],
-                [&](float p) { mc::parkerSplash(t, p); });
-    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::ParkerDrip],
-                [&](float p) { mc::parkerDrip(t, p); });
-    macroSlider("Flutter", "springs drift apart, more shimmer", m.pos[mc::ParkerFlutter],
-                [&](float p) { mc::parkerFlutter(t, p); });
-    macroSlider("Brightness", "brighter tail", m.pos[mc::ParkerBrightness],
-                [&](float p) { mc::parkerBrightness(t, p); });
   } else {
     cv::SpringTuning& t = r.spring.tuning;
     macroSlider("Splash", "bright crash on loud notes", m.pos[mc::SpringSplash],
@@ -1959,7 +1866,7 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   params.linkAutotuneKey = true;
   // Octave engine B is off the face too; its formant shift goes with it.
   if (params.pitchFx.octave.engine == 1) params.pitchFx.octave.engine = 0;
-  // SPRING and PARKER are off the face; a saved state that picked either loads as SPRING B.
+  // SPRING is off the face; a saved state that picked it loads as SPRING B.
   if (params.reverb.engine != cv::kReverbChasm) params.reverb.engine = cv::kReverbSpringB;
   params.pitchFx.octave.formant = 0.0f;
   // A v0.01 state file can hold a TIME below the 60 ms floor.
@@ -2222,7 +2129,7 @@ int runLayoutProbe() {
   const auto tuningText = [](const ProtoParams& q) {
     formatTuning(q.pitchFx.harmony.tuning, q.pitchFx.octave.tuning, q.unison.tuning,
                  q.slapback.tuning, q.distortion.tuning, q.reverb.spring.tuning,
-                 q.reverb.chasm.tuning, q.reverb.parker.tuning, q.eq, q.inputGate.tuning,
+                 q.reverb.chasm.tuning, q.eq, q.inputGate.tuning,
                  q.gate.tuning, q.pitchFx.autotune.tuning, q);
     return std::string(gTuningText);
   };
@@ -2364,7 +2271,7 @@ int printDefaults() {
   applyMacros(params);
   printTuning(params.pitchFx.harmony.tuning, params.pitchFx.octave.tuning, params.unison.tuning,
               params.slapback.tuning, params.distortion.tuning, params.reverb.spring.tuning,
-              params.reverb.chasm.tuning, params.reverb.parker.tuning, params.eq,
+              params.reverb.chasm.tuning, params.eq,
               params.inputGate.tuning, params.gate.tuning, params.pitchFx.autotune.tuning, params);
   ImGui::DestroyContext();
   return 0;
