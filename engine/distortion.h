@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/fastmath.h"
 #include "engine/smooth.h"
 
 // Distortion: behavioural Boss BD-2 model. Stage 1 (bass cut, top roll-off, gain,
@@ -267,7 +268,7 @@ class Distortion {
       const float v = fabsf(x);
       const float edge = soft * lim;
       const float start = lim - edge;
-      const float y = v <= start ? v : start + edge * tanhf((v - start) / edge);
+      const float y = v <= start ? v : start + edge * tanhFast((v - start) / edge);
       return x >= 0.0f ? y : -y;
     }
   };

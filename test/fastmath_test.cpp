@@ -84,6 +84,28 @@ bool testSinTurns() {
                 exact ? 1.0 : 0.0);
 }
 
+// 5. tanhFast against the double tanh over -10..10, exact saturation at +-9,
+// and bit-exact odd symmetry on random inputs.
+bool testTanhFast() {
+  double worst = 0.0;
+  for (int k = 0; k <= 200000; ++k) {
+    const float x = static_cast<float>(-10.0 + 20.0 * k / 200000.0);
+    const double want = std::tanh(static_cast<double>(x));
+    worst = std::fmax(worst, std::fabs(static_cast<double>(cv::tanhFast(x)) - want));
+  }
+  const bool sat = cv::tanhFast(9.0f) == 1.0f && cv::tanhFast(-9.0f) == -1.0f;
+  bool odd = true;
+  uint32_t s = 12345u;
+  for (int i = 0; i < 1000; ++i) {
+    s = s * 1664525u + 1013904223u;
+    const float x = static_cast<float>((s >> 8) * (18.0 / 16777216.0) - 9.0);
+    odd &= cv::tanhFast(-x) == -cv::tanhFast(x);
+  }
+  return report("tanhFast", worst < 1e-5 && sat && odd,
+                "worst absolute error=%.3g (< 1e-5), +-9 exact and odd symmetry exact=%.0f", worst,
+                (sat && odd) ? 1.0 : 0.0);
+}
+
 }  // namespace
 
 int main() {
@@ -92,6 +114,7 @@ int main() {
   ok &= testRotorGrain();
   ok &= testRotorBlock();
   ok &= testSinTurns();
+  ok &= testTanhFast();
   std::printf("%s fastmath\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

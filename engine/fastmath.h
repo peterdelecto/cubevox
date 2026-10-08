@@ -48,6 +48,31 @@ inline float sinTurns(uint32_t phase) {
   return t * (c1 + t2 * (c3 + t2 * (c5 + t2 * (c7 + t2 * (c9 + t2 * c11)))));
 }
 
+// tanh to about 1e-6 absolute: Eigen's odd 13/6 rational form. Inputs at or
+// beyond +-9 return exactly +-1; the polynomial input clamps at +-7.9053111,
+// where the rational already rounds to +-1. The form is odd, so
+// tanhFast(-x) == -tanhFast(x) bit for bit.
+inline float tanhFast(float x) {
+  if (x >= 9.0f) return 1.0f;
+  if (x <= -9.0f) return -1.0f;
+  constexpr float kClamp = 7.9053111f;
+  x = x < -kClamp ? -kClamp : (x > kClamp ? kClamp : x);
+  const float x2 = x * x;
+  float p = -2.76076847742355e-16f;
+  p = p * x2 + 2.00018790482477e-13f;
+  p = p * x2 + -8.60467152213735e-11f;
+  p = p * x2 + 5.12229709037114e-08f;
+  p = p * x2 + 1.48572235717979e-05f;
+  p = p * x2 + 6.37261928875436e-04f;
+  p = p * x2 + 4.89352455891786e-03f;
+  p *= x;
+  float q = 1.19825839466702e-06f;
+  q = q * x2 + 1.18534705686654e-04f;
+  q = q * x2 + 2.26843463243900e-03f;
+  q = q * x2 + 4.89352518554385e-03f;
+  return p / q;
+}
+
 // Hann window by rotation: one complex multiply per sample in place of a
 // cosine. init() costs two sines and two cosines; drift over a grain is
 // about n * 1e-7, so callers re-init at each grain or each block.
