@@ -15,7 +15,8 @@ struct AudioStats {
   uint32_t maxCycles = 0;     // worst block time in CPU cycles
   uint32_t avgCycles = 0;     // mean block time since the last peaks reset
   uint32_t budgetCycles = 0;  // CPU cycles available per block
-  uint32_t slotAvg[kSlotCount + 1] = {};  // mean cycles per slot since the reset; last is the EQ
+  uint32_t slotAvg[kSlotCount + 1] = {};    // mean cycles per slot since the reset; last is the EQ
+  uint32_t slotWorst[kSlotCount + 1] = {};  // worst single block per slot since the reset
 };
 
 // Brings up PLL3, SAI1 and DMA, and starts the stream. Returns false on failure; see audioError().

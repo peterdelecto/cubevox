@@ -66,6 +66,7 @@ volatile AudioStats gStats;
 volatile uint64_t gSumCycles = 0;   // since the last peaks reset
 volatile uint32_t gSumBlocks = 0;
 volatile uint64_t gSlotCycles[kSlotCount + 1] = {};
+volatile uint32_t gSlotWorst[kSlotCount + 1] = {};
 volatile bool gClipOn = false;
 uint32_t gClipPos = 0;
 
@@ -97,7 +98,9 @@ void runChain(float* a, float* b, int n, const ChainParams& p) {
   for (int s = 0; s < kSlotCount; ++s) {
     const uint32_t t0 = DWT->CYCCNT;
     const bool wrote = runStage(slotCard(s), a, b, n, p, pitchDone);
-    gSlotCycles[s] = gSlotCycles[s] + (DWT->CYCCNT - t0);
+    const uint32_t dt = DWT->CYCCNT - t0;
+    gSlotCycles[s] = gSlotCycles[s] + dt;
+    if (dt > gSlotWorst[s]) gSlotWorst[s] = dt;
     if (wrote) {
       float* t = a;
       a = b;
@@ -107,7 +110,9 @@ void runChain(float* a, float* b, int n, const ChainParams& p) {
   const uint32_t t0 = DWT->CYCCNT;
   gChain.polish.process(a, b, n, p.eq);
   for (int i = 0; i < n; ++i) a[i] = b[i];
-  gSlotCycles[kSlotCount] = gSlotCycles[kSlotCount] + (DWT->CYCCNT - t0);
+  const uint32_t dt = DWT->CYCCNT - t0;
+  gSlotCycles[kSlotCount] = gSlotCycles[kSlotCount] + dt;
+  if (dt > gSlotWorst[kSlotCount]) gSlotWorst[kSlotCount] = dt;
 }
 
 void processHalf(int half) {
@@ -343,7 +348,10 @@ void audioResetPeaks() {
   gStats.maxCycles = 0;
   gSumCycles = 0;
   gSumBlocks = 0;
-  for (int s = 0; s <= kSlotCount; ++s) gSlotCycles[s] = 0;
+  for (int s = 0; s <= kSlotCount; ++s) {
+    gSlotCycles[s] = 0;
+    gSlotWorst[s] = 0;
+  }
 }
 
 AudioStats audioStats() {
@@ -354,7 +362,10 @@ AudioStats audioStats() {
   s.maxCycles = gStats.maxCycles;
   const uint32_t n = gSumBlocks;
   s.avgCycles = n ? static_cast<uint32_t>(gSumCycles / n) : 0;
-  for (int i = 0; i <= kSlotCount; ++i) s.slotAvg[i] = n ? static_cast<uint32_t>(gSlotCycles[i] / n) : 0;
+  for (int i = 0; i <= kSlotCount; ++i) {
+    s.slotAvg[i] = n ? static_cast<uint32_t>(gSlotCycles[i] / n) : 0;
+    s.slotWorst[i] = gSlotWorst[i];
+  }
   s.budgetCycles = gStats.budgetCycles;
   return s;
 }

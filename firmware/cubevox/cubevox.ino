@@ -77,6 +77,12 @@ static void printStatsNow() {
     Serial.print(s.slotAvg[i]);
   }
   Serial.println(" (last is EQ)");
+  Serial.print("[audio] slot worst");
+  for (int i = 0; i <= kSlotCount; ++i) {
+    Serial.print(' ');
+    Serial.print(s.slotWorst[i]);
+  }
+  Serial.println();
 }
 
 static void printStats(uint32_t nowMs) {
