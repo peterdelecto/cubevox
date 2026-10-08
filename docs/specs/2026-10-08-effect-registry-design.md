@@ -1,6 +1,6 @@
 # Effect registry design (2026-10-08)
 
-Step 1 of `2026-10-08-update-and-slots-design.md`. Owner interview 2026-10-08.
+Step 1 of `2026-10-08-update-and-slots-design.md`. Owner interviews 2026-10-08 (two rounds).
 
 ## Plan
 
@@ -15,13 +15,18 @@ Files: `firmware/cubevox/registry.h/.cpp` (cards, knob descriptors, groups, appl
 
 | Item | Decision |
 |---|---|
-| Card ids | `empty`, `input_gate`, `autotune`, `octave`, `harmony`, `unison`, `slapback`, `distortion`, `gate`, `reverb_spring_b`, `reverb_chasm`, `reverb_spring`. Never renamed or reused once shipped. |
+| Card ids | `empty`, `input_gate`, `autotune`, `octave`, `unison`, `slapback`, `distortion`, `gate`, `reverb_spring`, `reverb_chasm`. Never renamed or reused once shipped. |
+| Card index | `enum class Card : uint8_t` in id order; the enum value is the table index. |
 | Knob descriptor | name, kind (continuous or stepped), positions, min, max, unit. Bipolar knobs are min below 0, max above. |
-| Groups | `reverb`: one card per layout, box rejects a second, page greys the rest. `pitch`: autotune, octave, harmony all placeable, run as one stage at the first one's slot; their relative order has no effect. |
+| Knobs | Input gate and Gate: Threshold (-70..-10 dB), Decay (5..1000 ms, log). Autotune: Key (12 positions, `kKeyName`), Response (log between `kMinResponseMs` and `kMaxResponseMs`). Octave: Semitones (-12..+12, 25 positions), Mix (0..100 %). Unison: Depth, Rate (%). Slapback: Mix (%), Time (60..250 ms). Distortion: Drive, Tone (%). Reverb cards: Mix (%), Time (%). Empty: no knobs. |
+| Display names | "Input gate", "Autotune", "Octave", "Unison", "Slapback", "Distortion", "Gate", "Spring Reverb" (SPRING B engine), "Chasm Reverb". |
+| Groups | `reverb`: one card per layout, box rejects a second, page greys the rest. `pitch`: autotune and octave, run as one stage at the first one's slot; their relative order has no effect. |
+| Harmony | No card. The engine stays in `engine/` but the firmware keeps it forced off. Removed from the registry because a second Key pot conflicted with Autotune's. |
+| Old Spring | Engine `kReverbSpring` (`engine/spring.h`) removed from engine, emulator, renderer and tests in its own commit before the registry. Chasm and Spring B won the audition. Spring B takes the id `reverb_spring`. |
+| Slot hardware | Toggle pin and the two mux channels stay a fixed per-slot table. The card index is the only runtime part. |
 | Cost | Integer percent of one audio frame at peak. Pitch tracker counted once; each pitch card adds only its own work. 85 % line sums placed cards. |
 | Estimates | Each card carries `measured`. Until a board measures it the value is an estimate and the page shows "est." |
-| Bench | Built-in signal (sine sweep plus noise bursts with gaps), each card alone, 3 s, peak block time. Compile flag runs it at boot and prints the table now; serial `bench` command in step 3. Numbers go into `costs.h` by hand per release. |
-| Harmony | Placing the card turns the engine on (replaces the forced-off from 2026-10-02). |
+| Bench | Built-in signal (sine sweep plus noise bursts with gaps), each card alone, 3 s, peak block time. Compile flag runs it at boot and prints the table now; serial `bench` command in step 3. Numbers go into `costs.h` by hand per release. A Daisy Seed (same die, 480 MHz) could run the bench before boards arrive; held off (owner 2026-10-08). |
 | Empty card | Cost 0, no knobs, passes audio through. |
 
 ## Open questions resolved
@@ -29,15 +34,18 @@ Files: `firmware/cubevox/registry.h/.cpp` (cards, knob descriptors, groups, appl
 1. Two reverb cards: not allowed (one `Reverb` object serves all engines; RAM is at 71 %).
 2. Bench input: built-in signal, not live mic, so costs are repeatable.
 3. Costs before boards: flagged estimates, not zeros, so the 85 % check is exercised.
-4. Reverb id naming: all three under `reverb_*`; nothing had shipped.
+4. Reverb id naming: all under `reverb_*`; nothing had shipped.
 5. Descriptor depth: full fields, not names only, so `status` can report values later.
 6. Pitch group cost: tracker once, not summed per card.
+7. Harmony Key pot: card removed rather than linked to Autotune.
+8. Semitones on a pot: 49 positions is 6° each on a 300° pot, so the range halves to ±12.
 
 ## Recommended next steps
 
-1. Write `registry.h/.cpp`: card table with descriptors, groups and apply functions; retire `Effect`/`Param` enums in favour of card index + knob index.
-2. Runtime layout array with the default table; chain walks the layout.
-3. `costs.h` with estimates from the emulator's relative timings, `measured = false`.
-4. `bench.cpp` behind `CUBEVOX_BENCH`; prints the costs table over serial at boot.
-5. Build with `firmware/build.sh`, both with and without the bench flag.
-6. Step 3 then exposes the registry and `bench` over serial.
+1. Rip out the old Spring engine (own commit, like Parker).
+2. Write `registry.h/.cpp`: card table with descriptors, groups and apply functions; retire `Effect`/`Param` enums in favour of card index + knob index.
+3. Runtime layout array with the default table; chain walks the layout.
+4. `costs.h` with estimates from the emulator's relative timings, `measured = false`.
+5. `bench.cpp` behind `CUBEVOX_BENCH`; prints the costs table over serial at boot.
+6. Build with `firmware/build.sh`, both with and without the bench flag.
+7. Step 3 then exposes the registry and `bench` over serial.

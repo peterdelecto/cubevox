@@ -32,7 +32,7 @@ build/cubevox-render in.wav out.wav --depth 0.7
 
 ## Panel (planned)
 Slots (Adam 2026-10-07, `docs/specs/2026-10-07-slots-design.md`): 8 effect slots, each two identical pots and a bypass toggle; 16 pots on the mux. The slot is the fixed hardware unit. Adam places effect cards in slots from the Mac app's page (owner 2026-10-08, `docs/specs/2026-10-08-update-and-slots-design.md`); the box stores the layout in flash bank 2 and the OLED only shows it. The chain is the slot order, left to right. Top-left toggle is a global MUTE (output only, chain keeps running); the bypass relay K101 is gone, K102 mutes. MENU is the only encoder; KEY and SEMITONES are pots stepped in firmware. Firmware updates by DFU from the app's Update screen or from the menu.
-Default layout, slot 1 to 8: Input Gain (analog, off the grid) · Input gate Threshold+Decay (same controls as Gate) · Autotune Key+Response (NATURAL → MECHANICAL, no mix) · Harmony: a library card, not in the default layout (owner 2026-10-08) ·
-Octave Semitones+Mix ·
+Default layout, slot 1 to 8: Input Gain (analog, off the grid) · Input gate Threshold+Decay (same controls as Gate) · Autotune Key+Response (NATURAL → MECHANICAL, no mix) · Harmony has no card: the engine stays forced off (owner 2026-10-08) ·
+Octave Semitones (-12..+12, 25 positions, owner 2026-10-08)+Mix ·
 Unison Depth+Rate · Slapback Mix (level + repeats)+Time (60..250 ms) · Distortion Drive+Tone · Gate Threshold+Decay ·
-Reverb Mix+Time (decay; replaced Dwell, owner 2026-10-07): each engine is its own library card, SPRING B in the default layout, CHASM and SPRING available (owner 2026-10-08; the engine menu item is gone) · EQ (menu) · Output (menu)
+Reverb Mix+Time (decay; replaced Dwell, owner 2026-10-07): each engine is its own library card, "Spring Reverb" (SPRING B) in the default layout, "Chasm Reverb" available; the old Spring engine is removed (owner 2026-10-08; the engine menu item is gone) · EQ (menu) · Output (menu)
