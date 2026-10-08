@@ -61,7 +61,36 @@ worst block and late count in the message.
 | 3 | Stage idles: copy-through, per-engine LP rings, constant smoother coef | bit-exact | idle measured 5.5k (was 182.8k): warm buffers plus the three per-block prepares; all-off chain 365k → 174k |
 | 4 | Crossfade gains at block rate; smoothers still step per sample | A/B vs step 3: 10 cases exact (renders do not toggle); bypass exact | stage 202k → 181k measured; chain avg 600k → 547k, part of that is Distortion and Spring moving 27k with no code change, read as flash placement noise |
 | 5 | Spinning window, compare wraps, polynomial exp2; glide ratio recomputed only while the glide moves (bit-exact, better than the per-block lerp planned) | A/B vs step 4: autotune -106.5 dB, octave -108.6 dB, chain -92.0 dB (-60 allowed); hard tune 3.76 cents; exp2Fast 3.8e-7 relative, rotor 3.1e-6 over a 1372-sample grain | stage 181k → 147k measured; chain avg 547k → 518k, worst 790k → 733k. Wraps and the settled exp2 cache alone moved nothing: modulo by a constant was already a multiply |
+| 5b | Tracker rings written twice so the analysis reads them in place (no copy step); coarse lags in pairs sharing loads | bit-exact vs step 5 (the coarse pass only picks the centre lag for the fine pass) | pitch slot worst block 320k → 288k, avg 147k → 139k. Pairing the fine pass too moved nothing and cost exactness, so it was dropped |
 | 6 | Fill `core/costs.h` from the bench, `measured=true` for Autotune and Octave | — | stage all-on ~80k, worst block under budget |
+
+## Where it stands after step 5b
+
+Voice clip, all cards on, per block: chain average 515k (80 %), chain worst 727k.
+Per-slot worst now reported by the bench (`[audio] slot worst`).
+
+| Slot | Avg | Worst |
+|---|---|---|
+| Input gate | 21.8k | 25.9k |
+| Autotune + Octave | 140.0k | 288.0k |
+| Unison | 132.6k | 136.3k |
+| Slapback | 27.3k | 30.4k |
+| Distortion | 88.7k | 150.0k |
+| Gate | 22.2k | 27.8k |
+| Spring | 69.4k | 81.8k |
+| EQ | 9.4k | 9.9k |
+
+Inside the pitch slot: tracker analysis about 200k on the hop block (the
+multiply-add loop retires near 3 cycles per MAC on this core; instruction issue,
+not loads, is the bound), PSOLA voice about 36k, granular voice about 25k, the
+shared per-sample loop about 23k, idle 5.5k. The hop block of the whole chain is
+about 663k, so every hop block is late until the other stages give back about
+25k; the Unison and Distortion passes are expected to give back well over 100k.
+Further tracker cuts on the table, in order of preference: an FFT difference
+function for the coarse pass (halves its MACs, needs a small float FFT in
+engine/), or a sliding update spread across the four blocks (removes the burst
+but needs a periodic rebase against float drift). Spreading the whole analysis
+is still ruled out by the hard-tune gate.
 
 ## Tests
 
