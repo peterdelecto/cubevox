@@ -23,7 +23,7 @@ Double-click starts the server on a free local port and opens the default browse
 
 ### Page
 
-1. **Layout.** Eight slot cards in one row, left to right as on the face. A library panel lists every card with its two knob names and CPU cost. Click or drag a card into a slot. A card already placed is greyed in the library. Empty is a card. A CPU meter sums the placed cards; above 85 % it turns red and Push is disabled. Push sends the layout; the box confirms and the page shows the live layout it read back.
+1. **Layout.** Eight slot cards in one row, left to right as on the face. A library panel lists every card with its two knob names and CPU cost. Click or drag a card into a slot. A card already placed is greyed in the library. Empty is a card. A CPU meter sums the placed cards' mean costs plus the fixed term; above 75 % on the mean sum, or 95 % on the worst-block sum, it turns red and Push is disabled (CPU pass 2 decision 13, 2026-10-08). Push sends the layout; the box confirms and the page shows the live layout it read back.
 2. **Layouts.** Named layouts kept on the Mac in `~/Library/Application Support/cubevox/layouts/*.json`. Save current, push, duplicate, rename, delete, export and import. The box holds only the live one.
 3. **Update.** Firmware version on the box, app version, latest release on GitHub, release notes. One Update button updates whichever is behind. For firmware the app backs the live layout up to the Mac, tells the box to enter DFU, flashes with dfu-util, waits for the box to enumerate again and reads its version back.
 4. **Status bar.** Connected or not, box firmware version, live CPU from the box.
@@ -31,7 +31,7 @@ Double-click starts the server on a free local port and opens the default browse
 ### Firmware
 
 1. **Effect registry.** Each card has a stable string id that never changes once shipped, a display name, two knob descriptors (name, range, step rule such as KEY snapping), and a CPU cost. Ids for v1: `empty`, `input_gate`, `autotune`, `octave`, `unison`, `slapback`, `distortion`, `gate`, `reverb_spring`, `reverb_chasm`. Each reverb engine is its own card; the reverb engine menu item goes away. Harmony has no card and the old Spring engine is removed (owner 2026-10-08). Groups (one reverb per layout, pitch cards as one stage), descriptor fields, the estimate flag and bench mode are in `2026-10-08-effect-registry-design.md`.
-2. **CPU cost.** Percent of one audio frame at peak, measured on the box by a bench mode that runs each card alone, written into `firmware/cubevox/costs.h` per release. The box also measures live frame time and reports it. The box rejects a layout whose summed cost exceeds 85 %.
+2. **CPU cost.** Two percents of one audio block per card, mean and worst single block, measured on the box in the chain with the knobs pinned at top, written into `firmware/cubevox/src/core/costs.h` per release (bench protocol in the registry spec). The box also measures live frame time and reports it. The box rejects a layout whose mean sum exceeds 75 % or whose worst-block sum exceeds 95 %, both including the fixed term.
 3. **Layout record in bank 2.** Two 128 KB sectors at `0x08100000` and `0x08120000`, written ping-pong so a power loss mid-write keeps the previous record. Fields: magic, schema version, sequence number, layout name, eight slots of (effect id, reserved settings bytes), menu settings (EQ, output level, 1/4" PEDAL / MIC), CRC32. On boot the newest valid record wins. An unknown effect id becomes `empty`. No valid record gives the default layout from the slots spec table.
 4. **Apply.** Validate, write the record, fade the output over 50 ms, rebuild the chain in slot order, fade back in. Pots and the bypass toggle of a slot drive whatever card sits in it. `empty` passes audio straight through and ignores its controls.
 5. **Chain order.** Slot order, left to right, always. No separate order list.
@@ -49,7 +49,7 @@ Plain DFU. The ST ROM bootloader cannot be overwritten, so a bad image is recove
 2. Where the layout lives. On the box, written from the page. Firmware carries all effects.
 3. Bricking protection. Plain DFU with ROM bootloader and BOOT0 recovery. No A/B banks.
 4. Library rule. One card per sound or variant, each card at most once, Empty allowed.
-5. CPU budget. Hard stop at 85 %, enforced by the page and by the box.
+5. CPU budget. Hard stop at 75 % mean and 95 % worst block, enforced by the page and by the box (was a single 85 % line until CPU pass 2).
 6. Chain order. Slot order, left to right.
 7. App runtime. Go single binary, no runtime to install. The emulator stays C++ and Dear ImGui as a developer tool.
 8. Saved layouts. Kept on the Mac, as many as Adam likes.
@@ -64,7 +64,7 @@ Plain DFU. The ST ROM bootloader cannot be overwritten, so a bad image is recove
 1. App in Go, page in Web Awesome, firmware in the existing Arduino H7 tree.
 2. Effect ids are strings and are never reused or renamed once shipped.
 3. Layout record schema has a version and CRC from day one and carries a layout name so on-box switching can be added later without a format change.
-4. 85 % CPU line uses summed peak costs. The box rejects, the page prevents.
+4. Two CPU lines, 75 % on summed mean costs and 95 % on summed worst-block costs, both with the fixed term. The box rejects, the page prevents.
 5. 50 ms fade on apply.
 6. dfu-util bundled in the app, no Homebrew dependency.
 7. One GitHub release per tag carries firmware, app and install script together. The page compares both versions against the latest release.

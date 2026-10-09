@@ -9,16 +9,20 @@ rules carry over. The tracker plan takes its shape from the research note
 constant-delay PSOLA weights, placement). Budget per 64-sample block is 640,000
 cycles (100 %).
 
-## Where it stands (e06d829, voice clip, all cards on, WeAct -O2)
+## Where it stands (voice clip, all cards on, WeAct -O2, percent of 640k cycles)
 
-| Slot | Avg | Worst | Off, settled |
+Before is e06d829. After is 38685f0 with the pots floating as before, then with every
+knob pinned at its top position (bench key `k`, the cost-table setting). Avg / worst.
+
+| Slot | Before | After, pots floating | After, knobs at top |
 |---|---|---|---|
-| Pitch (Autotune + Octave) | 21.9 % | 45.0 % | 0.9 % |
-| Unison | 20.7 % | 21.3 % | 15.9 % |
-| Distortion | 13.9 % | 23.4 % | ~0 (skips at drive 0) |
-| Chain | 80.5 % | 113.6 % | 27 % |
+| Pitch (Autotune + Octave) | 21.9 / 45.0 | 17.1 / 24.9 | 17.1 / 25.0 |
+| Unison | 20.7 / 21.3 | 8.6 / 8.9 | 8.6 / 8.9 |
+| Distortion | 13.9 / 23.4 | 9.1 / 14.7 | 12.6 / 17.1 |
+| Chain | 80.5 / 113.6 | 58.7 / 69.7 | 62.8 / 75.0 |
+| Late blocks | every hop block | 0 | 0 |
 
-Every hop block (one in four) is late. The hop block carries the whole tracker
+Before the pass, every hop block (one in four) was late. The hop block carries the whole tracker
 analysis, about 200k cycles, on top of the pitch slot's per-block base of about 90k
 (PSOLA voice ~36k, shared loop ~23k, front end). 288k measured worst against that
 ~290k sum, so the hop block is accounted for by work, not by cache state; placement
@@ -177,7 +181,7 @@ paths; parallel calls inherit a drifting cwd.
 | C2 | This spec's "where it stands" table filled; CLAUDE.md spec list | — | — |
 | T1 | Accuracy trial, not a cost step: fine search ±5 lags and a 5-point least-squares parabola against the 3-point one on the hard-tune clip and the 220 Hz gate. Kept only if hard tune improves; otherwise reverted and the result recorded here | hard tune ≤ 4 cents either way; `pitch` test | the 3-point parabola is the most biased standard sub-sample fit; whether it limits the 3.76 cents is unknown and cheap to find out |
 
-## Progress (2026-10-08, host gates; WeAct bench pending, board off the bus)
+## Progress (2026-10-08; host gates, then the WeAct bench once the board was on the bus)
 
 | Step | Commit | ctest | A/B vs previous step | Other |
 |---|---|---|---|---|
@@ -188,9 +192,52 @@ paths; parallel calls inherit a drifting cwd.
 | P1 | e54c85a | 17/17 | autotune -112.3, octave -117.6, chain -92.6 dB | hard tune 3.76 |
 | F1 | 1d7b1e4 | 17/17 | all ten cases exact | oracle agreement 100 % on 562 + 750 hops; hard tune 3.76 |
 | T1 | none, reverted | — | — | reach 5 with the 3-point parabola: 3.76 / 1.34 / 0.040 (identical); 5-point LS quadratic: 3.78 / 1.34 / 0.141; truncated sinc: 3.76 / 1.35 / 0.247 (hard tune / vibrato / steady, cents). The interpolator is not what limits hard tune; the residual sits in the vibrato itself or downstream in the Autotune stage |
+| bench of U1..F1 | 279e3be | — | — | chain 381.8k avg (59.7 %) / 443.5k worst (69.3 %), late 0; pitch 110.3k / 161.5k; Unison 54.7k / 56.5k; Distortion 64.5k / 80.8k; Autotune voiced on the board after M1 |
+| D3 | d0f45b2 | 17/17 | distortion -90.0, chain -92.8 dB (float contraction; tap order unchanged, not bit-exact as the step row hoped) | a stub build with the shifts deleted measured them at 32k per block (trigger 3k); the ring itself bought 6k: Distortion 64.5k → 58.2k avg, chain 375.4k avg |
+| F2 | built, measured, reverted | 17/17 in the trial | autotune -108.0, octave -107.8, chain -92.3 dB | host: pane path 99.3 % of 557 and 98.9 % of 707 voiced hops, fine oracle within 7e-7. Board, voice clip: pane path 1003 of 1552 voiced hops (65 %); pitch 109.6k → 113.2k avg, 159.5k → 168.5k worst; chain worst 446k → 479k. Not kept; see Bench findings 4 |
+| C1 | 38685f0 (88ed5fe adds bench keys `k` and `c`) | 17/17 | — | `costs.h` two columns per card plus a fixed term, every card `measured`, lines 75 % / 95 %; default layout 68 % / 82 % by the table, 62.8 % / 75.0 % measured, late 0 |
+| C2 | this commit | — | — | tables above and below filled; CLAUDE.md spec list; registry and slots specs carry the two lines |
 
-Listening pairs for the owner: `build/listen/unison_{old_e06d829,new_u1}.wav`,
-`build/listen/distortion_{old_feaed12,new_d2}.wav`. D3 and F2 wait on the bench.
+Listening pairs for the owner, still unheard: `build/listen/unison_{old_e06d829,new_u1}.wav`,
+`build/listen/distortion_{old_feaed12,new_d2}.wav`.
+
+## Bench findings (2026-10-08, WeAct, voice clip)
+
+1. Pots. The WeAct has nothing on its mux input, so the knob values were whatever the
+   floating ADC pin gave. Bench key `k` pins every knob at its top position; the cost
+   table and the "knobs at top" column use it. Keys `k`, `v` and `c` toggle and the board
+   does not reset between terminal sessions, so a session that re-sends them flips them
+   off.
+2. Worst-block counters include interrupt time (USB, DMA) that lands inside the block:
+   the same card's worst swung 80k..144k across runs while its average held within 1k,
+   and one pitch worst read 271k against 160k on every other run. The cost table takes
+   the lowest worst over repeated runs. A clean measurement would mask or subtract the
+   interrupts; not built.
+3. Unison 8.6 % and Distortion 12.6 % against the ~4 % and ~5 % estimates, both over the
+   examine-by-a-third rule. Examined. Unison's loop compiles to ~150 instructions per
+   sample and costs 430 cycles: an experiment that gave each stage its own out-of-line
+   function cut the stack traffic from 387 accesses to 2 and the literal reloads from
+   347 to 39 in the chain function, and moved the cycle count by 1k. The cost is pipeline
+   stalls on the in-order M7 (serial Catmull-Rom and polynomial chains, `vcmp`/`vmrs`
+   draining the FP pipe, the out-of-line `readCubic` call), not instruction count; the
+   estimates assumed one cycle per operation and the core runs this code at ~2.5.
+   Distortion is fifteen serial filter stages plus four divides per sample, and its
+   histories and filter states live in the object while the loop stores through a
+   `float*`, so every sample reloads them (the stub build that deleted the shifts let the
+   compiler hold the history in registers, hence its 32k; the real ring cannot). The
+   next gain for both is a restructure for instruction-level parallelism (interleave the
+   two Unison voices, hoist stage state into locals for the block loop), which is a
+   further pass, not this one.
+4. F2 cannot deliver its goal on real voice. A third of hops fall back (onsets, raw
+   period jumps over 8 lags between hops, the four-hop refill after any unvoiced hop),
+   the chain's worst block is a fallback hop by construction, and the pane kernel costs
+   every block. Widening the set to cover the misses costs more per block than the
+   burst it removes (saving ≤ 7.5k per block average at 100 % panes against 5k per 25
+   lags). Reverted; decision 11's trigger fired (pitch worst sits 50k over its average,
+   7.9 % of the budget) and the bench answered no.
+5. Pitch slot, Octave off: 84.0k / 133.0k; Autotune off, Octave on: 51.7k. The table
+   follows the registry rule (tracker inside Autotune, Octave its own voice), so a
+   layout with Octave and no Autotune runs ~4 % over its table sum.
 
 ## Tests
 
@@ -206,17 +253,18 @@ Listening pairs for the owner: `build/listen/unison_{old_e06d829,new_u1}.wav`,
 
 ## Estimates after all steps (voice clip, all cards on)
 
-| | Now | Expected |
-|---|---|---|
-| Chain average | 80.5 % | ~48 % |
-| Chain worst block | 113.6 % | ~58 % |
-| Pitch slot average | 21.9 % | ~14 % |
-| Pitch slot worst | 45.0 % | ~19 % (F2 would make it ~15 %, flat) |
-| Unison | 20.7 % | ~4 % |
-| Distortion | 13.9 % | ~5 % |
+| | Before | Expected | Measured (pots floating / knobs at top) |
+|---|---|---|---|
+| Chain average | 80.5 % | ~48 % | 58.7 % / 62.8 % |
+| Chain worst block | 113.6 % | ~58 % | 69.7 % / 75.0 % |
+| Pitch slot average | 21.9 % | ~14 % | 17.1 % |
+| Pitch slot worst | 45.0 % | ~19 % (F2 would make it ~15 %, flat) | 24.9 % (F2 tried: 26.3 %) |
+| Unison | 20.7 % | ~4 % | 8.6 % |
+| Distortion | 13.9 % | ~5 % | 9.1 % / 12.6 % |
 
-These are code-reading estimates; the bench decides. A step that misses its expected
-number by more than a third is examined before the next step starts.
+The expected column was code-reading estimates; the bench decided. A step that misses
+its expected number by more than a third is examined before the next step starts
+(Unison and Distortion were; Bench findings 3).
 
 ## Ruled out
 
@@ -252,3 +300,6 @@ number by more than a third is examined before the next step starts.
 owner has listened to the Unison and Distortion pairs; the WeAct runs the default layout
 on the voice clip with no late blocks and both sums under their lines; `costs.h` holds
 measured numbers for every card; T1's result is recorded whichever way it went.
+
+Status 2026-10-08: everything above is met except the owner's listening, which is still
+open.
