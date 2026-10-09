@@ -94,26 +94,80 @@ class Unison {
           static_cast<uint32_t>(static_cast<int64_t>(llroundf(turns * kTurn)));
     }
 
-    for (int i = 0; i < n; ++i) {
-      depth_ = stepped(depth_, target, smooth);
-      swingSmp_ = (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth_) * kSmpPerMs;
-      const float wetGain = depth_ * wetMax;
+    // Swing and wet gain follow the depth ramp linearly across the block.
+    const float depth0 = depth_;
+    const float swing0 = (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth0) * kSmpPerMs;
+    const float swing1 = (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depthEnd) * kSmpPerMs;
+    const float wet0 = depth0 * wetMax;
+    const float wet1 = depthEnd * wetMax;
+    const float base0 = t.baseDelayMs[0];
+    const float base1 = t.baseDelayMs[1];
+    const float en0 = enabled_[0] ? 1.0f : 0.0f;
+    const float en1 = enabled_[1] ? 1.0f : 0.0f;
 
-      line_[writePos_] = in[i];
+    const float* line = line_.data();
+    float* wline = line_.data();
+    int wp = writePos_;
+    uint32_t lfo0 = lfoPhase_[0];
+    uint32_t lfo1 = lfoPhase_[1];
+    const uint32_t lfoInc0 = lfoInc_[0];
+    const uint32_t lfoInc1 = lfoInc_[1];
+    uint32_t sh0 = shiftPhase_[0];
+    uint32_t sh1 = shiftPhase_[1];
+    const uint32_t shInc0 = shiftInc_[0];
+    const uint32_t shInc1 = shiftInc_[1];
 
-      float wet = 0.0f;
-      for (int v = 0; v < 2; ++v) {
-        const float centre = t.baseDelayMs[v] * kSmpPerMs + swingSmp_ * sinTurns(lfoPhase_[v]);
-        const float s = readShifted(v, centre, windowSmp);
-        if (enabled_[v]) wet += s;
-        lfoPhase_[v] += lfoInc_[v];
-        shiftPhase_[v] += shiftInc_[v];
+    if (sh0 == 0u && shInc0 == 0u && sh1 == 0u && shInc1 == 0u) {
+      for (int i = 0; i < n; ++i) {
+        const float x = in[i];
+        const float f = static_cast<float>(i + 1) * inv;
+        const float swing = swing0 + (swing1 - swing0) * f;
+        const float wetGain = wet0 + (wet1 - wet0) * f;
+
+        wline[wp] = x;
+
+        const float c0 = base0 * kSmpPerMs + swing * sinTurns(lfo0);
+        const float c1 = base1 * kSmpPerMs + swing * sinTurns(lfo1);
+        const float s0 = readCubic(line, wp, c0);
+        const float s1 = readCubic(line, wp, c1);
+        const float wet = (0.0f + s0 * en0) + s1 * en1;
+        lfo0 += lfoInc0;
+        lfo1 += lfoInc1;
+
+        out[i] = (x + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
+        wp = wp + 1 == kLen ? 0 : wp + 1;
       }
+    } else {
+      for (int i = 0; i < n; ++i) {
+        const float x = in[i];
+        const float f = static_cast<float>(i + 1) * inv;
+        const float swing = swing0 + (swing1 - swing0) * f;
+        const float wetGain = wet0 + (wet1 - wet0) * f;
 
-      const float f = static_cast<float>(i + 1) * inv;
-      out[i] = (in[i] + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
-      writePos_ = writePos_ + 1 == kLen ? 0 : writePos_ + 1;
+        wline[wp] = x;
+
+        const float c0 = base0 * kSmpPerMs + swing * sinTurns(lfo0);
+        const float c1 = base1 * kSmpPerMs + swing * sinTurns(lfo1);
+        const float s0 = readShifted(line, wp, sh0, shInc0, c0, windowSmp);
+        const float s1 = readShifted(line, wp, sh1, shInc1, c1, windowSmp);
+        const float wet = (0.0f + s0 * en0) + s1 * en1;
+        lfo0 += lfoInc0;
+        lfo1 += lfoInc1;
+        sh0 += shInc0;
+        sh1 += shInc1;
+
+        out[i] = (x + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
+        wp = wp + 1 == kLen ? 0 : wp + 1;
+      }
     }
+
+    writePos_ = wp;
+    lfoPhase_[0] = lfo0;
+    lfoPhase_[1] = lfo1;
+    shiftPhase_[0] = sh0;
+    shiftPhase_[1] = sh1;
+    depth_ = depthEnd;
+    swingSmp_ = swing1;
   }
 
  private:
@@ -136,17 +190,17 @@ class Unison {
   // two taps half a window apart on a sawtooth, Hann-crossfaded with gains
   // sin^2(pi p) and 1 - sin^2(pi p), which sum to exactly 1. Taps sit at
   // centre + window * (p - 0.5).
-  float readShifted(int v, float centre, float windowSmp) const {
-    const uint32_t ph = shiftPhase_[v];
-    if (ph == 0u && shiftInc_[v] == 0u) return readCubic(centre);
+  static float readShifted(const float* line, int wp, uint32_t ph, uint32_t inc, float centre,
+                           float windowSmp) {
+    if (ph == 0u && inc == 0u) return readCubic(line, wp, centre);
     const float p0 = static_cast<float>(ph) * (1.0f / kTurn);
     const float p1 = static_cast<float>(ph + 0x80000000u) * (1.0f / kTurn);
     const float s = sinTurns(ph >> 1);
     const float g0 = s * s;
     const float g1 = 1.0f - g0;
     float sum = 0.0f;
-    if (g0 > 0.0f) sum += g0 * readCubic(centre + windowSmp * (p0 - 0.5f));
-    if (g1 > 0.0f) sum += g1 * readCubic(centre + windowSmp * (p1 - 0.5f));
+    if (g0 > 0.0f) sum += g0 * readCubic(line, wp, centre + windowSmp * (p0 - 0.5f));
+    if (g1 > 0.0f) sum += g1 * readCubic(line, wp, centre + windowSmp * (p1 - 0.5f));
     return sum;
   }
 
@@ -167,16 +221,16 @@ class Unison {
 
   // Catmull-Rom through four taps. Delay is clamped so the newest tap
   // never crosses the write head and the oldest never wraps onto it.
-  float readCubic(float delay) const {
+  static float readCubic(const float* line, int wp, float delay) {
     const float d = delay < 2.0f ? 2.0f : (delay > kLen - 3.0f ? kLen - 3.0f : delay);
-    const float pos = static_cast<float>(writePos_) - d;
+    const float pos = static_cast<float>(wp) - d;
     const float fl = floorf(pos);
     const float f = pos - fl;
     const int i0 = wrap(static_cast<int>(fl));
-    const float xm = line_[wrap(i0 - 1)];
-    const float x0 = line_[i0];
-    const float x1 = line_[wrap(i0 + 1)];
-    const float x2 = line_[wrap(i0 + 2)];
+    const float xm = line[wrap(i0 - 1)];
+    const float x0 = line[i0];
+    const float x1 = line[wrap(i0 + 1)];
+    const float x2 = line[wrap(i0 + 2)];
     const float c1 = 0.5f * (x1 - xm);
     const float c2 = xm - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
     const float c3 = 0.5f * (x2 - xm) + 1.5f * (x0 - x1);

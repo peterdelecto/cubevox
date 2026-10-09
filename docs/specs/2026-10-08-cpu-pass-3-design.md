@@ -76,7 +76,7 @@ three runs.
 |---|---|---|---|
 | D4 | Distortion restore (decision 2) | A/B distortion and chain within -60 dB (the tanh swap and the ramp), bypass exact, `distortion_test`, `fastmath_test` tanh case | 80.6k → ~40k avg; worst within 10 % of avg |
 | S1 | Disperser pair, block-edge g, input scale, drive and comp | A/B spring and chain exact; `spring_b_test`, `level_test` | 68.7k → ~55k |
-| U2 | Unison voices interleaved, locals, block-edge swing and wet gain, parked block path | A/B unison and chain exact; `unison_test` analytic LFO case within 0.05 samples | 55.2k → under 25k |
+| U2 | Unison voices interleaved, locals, block-edge swing and wet gain, parked block path | A/B unison exact once the depth ramp has settled (the render starts at depth 0 and ramps for 0.2 s, where the linear block interpolation differs from the per-sample exponential by design); unison and chain within -60 dB overall; `unison_test` analytic LFO case within 0.05 samples | 55.2k → under 25k |
 | D5 | Only on decision 5's trigger | bit-exact | — |
 | C3 | `core/costs.h` from the bench, this spec's tables, CLAUDE.md spec list | `firmware_test` both sums | chain ~55 % / ~65 % |
 
@@ -85,7 +85,8 @@ three runs.
 | Step | Commit | ctest | A/B vs previous step | Bench |
 |---|---|---|---|---|
 | D4 | 285600f | 17/17 | distortion -90.0, chain -92.8 dB (the tanh swap), all other cases exact | pending, board off the bus |
-| S1 | this commit | 17/17 | all ten cases exact | pending |
+| S1 | 1bad8bd | 17/17 | all ten cases exact | pending |
+| U2 | this commit | 17/17 | unison -121.7 dB, every differing sample inside 0.015..0.208 s (the ramp), exact after; chain -93.2 dB (the ramp's residue in the downstream memory); other cases exact. A first cut precomputed the base delay in samples and landed at -119 dB over the whole clip: the compiler then fused the other product in the centre expression. Keeping both products in one statement restored exactness | pending |
 
 ## Ruled out
 
