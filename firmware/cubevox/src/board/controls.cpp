@@ -169,11 +169,16 @@ bool controlsTakeChanged() {
   return changed;
 }
 
+bool gBenchPin = false;
+
 float controlsKnobValue(int slot, bool knobB) {
   const int pot = knobB ? kSlots[slot].muxChannelB : kSlots[slot].muxChannelA;
-  const bool stepped = knobSteps(slotCard(slot), knobB ? 1 : 0) > 0;
-  return stepped ? static_cast<float>(gPots[pot].step) : gPots[pot].smoothed;
+  const int steps = knobSteps(slotCard(slot), knobB ? 1 : 0);
+  if (gBenchPin) return steps > 0 ? static_cast<float>(steps - 1) : 1.0f;
+  return steps > 0 ? static_cast<float>(gPots[pot].step) : gPots[pot].smoothed;
 }
+
+void controlsBenchPin(bool on) { gBenchPin = on; }
 
 bool controlsToggleOn(int slot) { return gToggles[slot].level(); }
 

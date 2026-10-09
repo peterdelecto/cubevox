@@ -57,6 +57,10 @@ void controlsApply(ChainParams& out);
 // Current value of a slot knob as the OLED shows it (0..1, or the step index for stepped knobs).
 float controlsKnobValue(int slot, bool knobB);
 
+// Bench only: while pinned, every knob reads its top position (1.0, or the last step) so the
+// cost table is taken at a defined setting rather than whatever the pots sit at.
+void controlsBenchPin(bool on);
+
 bool controlsToggleOn(int slot);
 
 LastMoved controlsLastMoved();

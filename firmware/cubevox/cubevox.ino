@@ -22,6 +22,7 @@ static ChainParams gParams;
 static bool gOledFound = false;
 static bool gAudioRunning = false;
 static uint8_t gBenchOff = 0;  // bit s: slot s forced off by a bench command
+static bool gBenchChasm = false;  // bench: run the reverb slot as Chasm so its cost can be measured
 
 // Boot facts for the first-article checklist, printed whenever a terminal opens the port.
 static void printBootReport() {
@@ -49,7 +50,7 @@ static void publishParams() {
   for (int s = 0; s < kSlotCount; ++s) {
     if (gBenchOff & (1u << s)) applyToggle(slotCard(s), false, gParams);
   }
-  gParams.reverb.engine = menuSettings().reverbEngine;
+  gParams.reverb.engine = gBenchChasm ? cv::kReverbChasm : menuSettings().reverbEngine;
   gParams.inputGainDb = menuInputGainDb();
   gParams.outputGainDb = menuOutputGainDb();
   audioPublish(gParams);
@@ -127,6 +128,19 @@ static void pollBenchCommands() {
       case 'm':
         audioResetPeaks();
         Serial.println("[bench] audio peaks reset");
+        break;
+      case 'k': {
+        static bool pinned = false;
+        pinned = !pinned;
+        controlsBenchPin(pinned);
+        publishParams();
+        Serial.println(pinned ? "[bench] knobs pinned at top" : "[bench] knobs live");
+        break;
+      }
+      case 'c':
+        gBenchChasm = !gBenchChasm;
+        publishParams();
+        Serial.println(gBenchChasm ? "[bench] reverb slot runs Chasm" : "[bench] reverb slot runs the menu engine");
         break;
       case 'v': {
         static bool clipOn = false;
