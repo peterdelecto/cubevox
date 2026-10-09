@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include "engine/common.h"
+#include "engine/fastmath.h"
 #include "engine/smooth.h"
 
 // Distortion: behavioural Boss BD-2 model. Stage 1 (bass cut, top roll-off, gain,
@@ -60,6 +61,8 @@ class Distortion {
     clearChain();
     drive_ = 0.0f;
     tone_ = 0.5f;
+    tuningValid_ = false;
+    shelfTone_ = -1.0f;
   }
 
   void process(const float* in, float* out, int n, const DistortionParams& p) {
@@ -76,51 +79,49 @@ class Distortion {
 
     const float aDrive = smooth::coef(kDriveSec);
     const float toneTarget = smooth::clamp01(p.tone);
-    setTrebleShelf(t);
-    inHp_.set(t.inputHpHz);
-    s1Lp_.set(t.s1LpHz);
-    s2Hp_.set(t.s2HpHz);
-    s2Lp_.set(t.s2LpHz);
-    dc_.set(kDcBlockHz);
-    s1Bass_.setLowShelf(t.s1BassHz, t.s1BassDb);
-    stackBass_.setLowShelf(t.stackBassHz, t.stackBassDb);
-    stackTreble_.setHighShelf(t.stackTrebleHz, t.stackTrebleDb);
-    bassPeak_.setPeak(t.bassPeakHz, t.bassPeakDb, t.bassPeakQ);
-    const Rail rail{1.0f - clampf(t.railAsym, 0.0f, 0.5f), clampf(t.railSoft, 0.01f, 1.0f)};
-    const float stackLoss = dbToLin(t.stackLossDb);
-    const float trim = dbToLin(t.trimDb);
-    const float g1Min = t.gain1Min < kMinGain ? kMinGain : t.gain1Min;
-    const float g2Min = t.gain2Min < kMinGain ? kMinGain : t.gain2Min;
-    const float logR1 = logf((t.gain1Max < g1Min ? g1Min : t.gain1Max) / g1Min);
-    const float logR2 = logf((t.gain2Max < g2Min ? g2Min : t.gain2Max) / g2Min);
-    const float fadeSpan = t.fadeDrive < kMinFade ? kMinFade : t.fadeDrive;
+    if (!tuningValid_ || !same(t, applied_)) applyTuning(t);
+    if (tone_ != shelfTone_) {
+      setTrebleShelf(t);
+      shelfTone_ = tone_;
+    }
+
+    // Stage gains and makeup are evaluated at the block edges and interpolated.
+    float driveEnd = drive_;
+    for (int i = 0; i < n; ++i) driveEnd = smooth::step(driveEnd, target, aDrive);
+    const float g1a = g1Min_ * expf(logR1_ * drive_);
+    const float g2a = g2Min_ * expf(logR2_ * drive_);
+    const float ka = trim_ / makeup(g1a * g2a);
+    const float g1b = g1Min_ * expf(logR1_ * driveEnd);
+    const float g2b = g2Min_ * expf(logR2_ * driveEnd);
+    const float kb = trim_ / makeup(g1b * g2b);
+    const float inv = n > 0 ? 1.0f / static_cast<float>(n) : 0.0f;
 
     for (int i = 0; i < n; ++i) {
       drive_ = smooth::step(drive_, target, aDrive);
-      const float prevTone = tone_;
       tone_ = smooth::step(tone_, toneTarget, aDrive);
-      if (tone_ != prevTone) setTrebleShelf(t);
-      const float g1 = g1Min * expf(logR1 * drive_);
-      const float g2 = g2Min * expf(logR2 * drive_);
+      const float fi = static_cast<float>(i + 1) * inv;
+      const float g1 = g1a + (g1b - g1a) * fi;
+      const float g2 = g2a + (g2b - g2a) * fi;
+      const float k = ka + (kb - ka) * fi;
 
       float x = inHp_.hp(in[i]);
       x = s1Bass_.run(x);
       x = s1Lp_.lp(x);
-      x = saturate(os1_, x * g1, rail, t.oversample);
+      x = saturate(os1_, x * g1, rail_, t.oversample);
 
       x = stackBass_.run(x);
-      x = stackTreble_.run(x) * stackLoss;
+      x = stackTreble_.run(x) * stackLoss_;
 
       x = s2Hp_.hp(x);
       x = s2Lp_.lp(x);
-      x = saturate(os2_, x * g2, rail, t.oversample);
+      x = saturate(os2_, x * g2, rail_, t.oversample);
 
       x = trebleCut_.run(x);
       x = bassPeak_.run(x);
       x = dc_.hp(x);
       // The fixed EQ fades in from exact passthrough over the first fadeDrive of DRIVE.
-      const float wet = x * trim / makeup(g1 * g2);
-      const float f = drive_ / fadeSpan;
+      const float wet = x * k;
+      const float f = drive_ / fadeSpan_;
       out[i] = f >= 1.0f ? wet : in[i] + f * (wet - in[i]);
     }
   }
@@ -160,6 +161,44 @@ class Distortion {
   static float toneDb(const DistortionTuning& t, float tone) {
     return tone < 0.5f ? t.toneMinDb * (1.0f - 2.0f * tone) : t.toneMaxDb * (2.0f * tone - 1.0f);
   }
+  static bool same(const DistortionTuning& a, const DistortionTuning& b) {
+    return a.inputHpHz == b.inputHpHz && a.s1BassHz == b.s1BassHz && a.s1BassDb == b.s1BassDb &&
+           a.s1LpHz == b.s1LpHz && a.gain1Min == b.gain1Min && a.gain1Max == b.gain1Max &&
+           a.stackBassHz == b.stackBassHz && a.stackBassDb == b.stackBassDb &&
+           a.stackTrebleHz == b.stackTrebleHz && a.stackTrebleDb == b.stackTrebleDb &&
+           a.stackLossDb == b.stackLossDb && a.s2HpHz == b.s2HpHz && a.s2LpHz == b.s2LpHz &&
+           a.gain2Min == b.gain2Min && a.gain2Max == b.gain2Max && a.railAsym == b.railAsym &&
+           a.railSoft == b.railSoft && a.trebleCutHz == b.trebleCutHz &&
+           a.trebleCutDb == b.trebleCutDb && a.toneMinDb == b.toneMinDb &&
+           a.toneMaxDb == b.toneMaxDb && a.bassPeakHz == b.bassPeakHz &&
+           a.bassPeakDb == b.bassPeakDb && a.bassPeakQ == b.bassPeakQ && a.trimDb == b.trimDb &&
+           a.fadeDrive == b.fadeDrive && a.oversample == b.oversample;
+  }
+
+  // Recomputes everything that depends on tuning alone.
+  void applyTuning(const DistortionTuning& t) {
+    inHp_.set(t.inputHpHz);
+    s1Lp_.set(t.s1LpHz);
+    s2Hp_.set(t.s2HpHz);
+    s2Lp_.set(t.s2LpHz);
+    dc_.set(kDcBlockHz);
+    s1Bass_.setLowShelf(t.s1BassHz, t.s1BassDb);
+    stackBass_.setLowShelf(t.stackBassHz, t.stackBassDb);
+    stackTreble_.setHighShelf(t.stackTrebleHz, t.stackTrebleDb);
+    bassPeak_.setPeak(t.bassPeakHz, t.bassPeakDb, t.bassPeakQ);
+    rail_ = Rail{1.0f - clampf(t.railAsym, 0.0f, 0.5f), clampf(t.railSoft, 0.01f, 1.0f)};
+    stackLoss_ = dbToLin(t.stackLossDb);
+    trim_ = dbToLin(t.trimDb);
+    g1Min_ = t.gain1Min < kMinGain ? kMinGain : t.gain1Min;
+    g2Min_ = t.gain2Min < kMinGain ? kMinGain : t.gain2Min;
+    logR1_ = logf((t.gain1Max < g1Min_ ? g1Min_ : t.gain1Max) / g1Min_);
+    logR2_ = logf((t.gain2Max < g2Min_ ? g2Min_ : t.gain2Max) / g2Min_);
+    fadeSpan_ = t.fadeDrive < kMinFade ? kMinFade : t.fadeDrive;
+    applied_ = t;
+    tuningValid_ = true;
+    shelfTone_ = -1.0f;
+  }
+
   void setTrebleShelf(const DistortionTuning& t) {
     trebleCut_.setHighShelf(t.trebleCutHz, t.trebleCutDb + toneDb(t, tone_));
   }
@@ -230,7 +269,7 @@ class Distortion {
       const float v = fabsf(x);
       const float edge = soft * lim;
       const float start = lim - edge;
-      const float y = v <= start ? v : start + edge * tanhf((v - start) / edge);
+      const float y = v <= start ? v : start + edge * tanhFast((v - start) / edge);
       return x >= 0.0f ? y : -y;
     }
   };
@@ -304,6 +343,13 @@ class Distortion {
   float drive_ = 0.0f;
   float tone_ = 0.5f;
   bool dirty_ = false;
+
+  DistortionTuning applied_;
+  bool tuningValid_ = false;
+  float shelfTone_ = -1.0f;
+  Rail rail_{1.0f, 1.0f};
+  float stackLoss_ = 1.0f, trim_ = 1.0f, g1Min_ = 1.0f, g2Min_ = 1.0f;
+  float logR1_ = 0.0f, logR2_ = 0.0f, fadeSpan_ = 1.0f;
 };
 
 }  // namespace cv
