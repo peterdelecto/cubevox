@@ -14,6 +14,17 @@ and commit rules carry over. Budget per 64-sample block is 640,000 cycles (100 %
 | Distortion | 80.6k | 109.5k | 13 / 18 |
 | Chain | 402.2k | 480.0k | 62.8 / 75.0, late 0 |
 
+## Where it ended (71fe7bc, 2026-10-09, same clip, cards and knobs)
+
+| Card | Avg | Worst | Percent |
+|---|---|---|---|
+| Spring | 61.5k | 61.9k | 10 / 10 |
+| Unison | 46.9k | 47.7k | 8 / 8 |
+| Distortion | 46.4k | 62.1k | 8 / 10 |
+| Chain | 349.9k | 410.8k | 54.7 / 64.2, late 0 |
+
+Default layout sums from `costs.h`: 61 % avg / 72 % worst against 75 / 95.
+
 ## Findings behind the pass
 
 1. Regression. d0f45b2 (pass 2 step D3) replaced `engine/distortion.h` with a copy that
@@ -117,3 +128,8 @@ three runs.
 `ctest` passes; every A/B case is within its stated tolerance; the WeAct runs the default
 layout on the voice clip with no late blocks and both sums under their lines;
 `costs.h` holds the new numbers; the D5 trigger has been read either way.
+
+Met 2026-10-09 at the C3 commit: ctest 17/17, every A/B case exact or within its
+tolerance, WeAct late 0 over three runs, sums 61 / 72 against 75 / 95, D5 fired and
+landed. Open from pass 2: the owner's listen on the Unison and Distortion pairs in
+`build/listen/`.
