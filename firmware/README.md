@@ -30,6 +30,9 @@ from `../engine` by include path. No emulator files are included.
 
 ## Notes
 
+- `bringup.py`: first-article checks for a new board over USB, optional fault and DFU drills, operator
+  questions, log to `hardware/bringup/`. `./bringup.py --board 1 --faults --dfu`; on the WeAct add
+  `--weact --no-oled`.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20
   for 480 MHz on rev V silicon (360 MHz, N144 Q15, on older revisions), USB from PLL1Q, HSI48 off, PLL2 40 MHz for
   the ADC. `clockReport()` prints silicon rev, ROM bootloader ID at 0x1FF1E7FE and the clock tree.
@@ -39,7 +42,7 @@ from `../engine` by include path. No emulator files are included.
 - `board/display_sh1106.cpp`: U8x8 text driver on I2C2 PB10/PB11, 8 rows of 16 characters.
 - `board/fault.cpp`: IWDG1 at 2 s, armed at the end of `setup()` and kicked only from `loop()`. HardFault,
   MemManage, BusFault and UsageFault drive XSMT and MUTE_N low by register write, store PC, LR, CFSR, HFSR,
-  BFAR and MMFAR in a `.noinit` record and reset; the next boot report prints `[ERROR] last reset: fault ...`
+  BFAR and MMFAR in a `.cv_noinit` record (`cubevox_noinit.ld`, top of DTCM) and reset; the next boot report prints `[ERROR] last reset: fault ...`
   or `[boot] fault: none`, plus the decoded `RCC->RSR` reset cause. If the audio block counter stops for
   100 ms while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line
   prints.
