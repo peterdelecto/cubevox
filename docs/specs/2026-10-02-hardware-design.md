@@ -43,7 +43,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 | 11 | Board arrangement | One board; controls up through the top, jacks right-angle out the rear |
 | 12 | 1/4" half of the combo | Mic or pedal, never both inputs at once. No pad; shared 20–50 dB preamp on the XLR leg, 1/4" through a 25.7 dB pad |
 | 13 | Which H7 | Bare STM32H743VIT6 soldered on the product board, as fxbox. Not the WeAct module |
-| 14 | Top face | Signal-flow row like the pedal view. Board 185 × 145 mm (owner 2026-10-07, was 200 × 150). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player, equally spaced for ergonomics; the owner lays out the knobs. Rear wall left→right as seen from the front: 1/4" out, USB-C middle, XLR combo, 9 V barrel far right. Every jack mouth faces the rear edge (−y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4" nose 6 mm). Still provisional until Adam confirms |
+| 14 | Top face | Signal-flow row like the pedal view. Board 185 × 145 mm (owner 2026-10-07, was 200 × 150). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player, equally spaced for ergonomics; the owner lays out the knobs. Rear wall left→right as seen from the front: 1/4" out, USB-C middle, XLR combo, power switch, 9 V barrel far right. Every jack mouth faces the rear edge (−y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4" nose 6 mm; the switch body face 0.35 inside the edge, lever 4.65 past it). Still provisional until Adam confirms |
 | 15 | Gain structure | Two stages, 20.05 dB fixed + 0–29.9 dB on the pot. 1/4" contacts carry a 25.7 dB pad; menu item 1/4" INPUT: PEDAL / MIC adds 25.7 dB in firmware for a mic on a TRS cable; the combo's normalling contact tells the MCU a 1/4" plug is in |
 | 16 | Power ground | Centre pin straight to GND, +9 V sleeve through a series Schottky and TVS. fxbox's either-polarity FET bridge is dropped because the Boss daisy chain and the audio cable share ground with the BD-2 |
 | 17 | Toggle switch | Yuen Fung ST-0-102-A01-T000-LF (C1788487), the only ON-ON bat toggle on JLC whose bushing spans the 11.8 mm panel plane; lever tip 3.6 mm above the knobs |
@@ -147,8 +147,12 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
 ### Power
 
 11. Input. PJ-002A (C3096082). Pin 1 (centre, −) straight to GND. Pins 2 and
-    3 both to 9V_JACK (one is the sleeve, the datasheet does not say which;
-    tying both is harmless, as DrumSynthV3 did). 9V_JACK → SS34 Schottky
+    3 both to 9V_PLUG (one is the sleeve, the datasheet does not say which;
+    tying both is harmless, as DrumSynthV3 did). 9V_PLUG → SWPWR1 power
+    switch (owner 2026-10-09: G-Switch SS-12D11-G050 C17179528, SPDT slide,
+    right-angle, on B.Cu between J101 and J106, owner-soldered, out of the
+    JLC BOM and CPL; centre pin 2 = 9V_PLUG, pin 1 = 9V_JACK, pin 3 and the
+    frame legs open; slide toward the barrel = ON) → 9V_JACK → SS34 Schottky
     (C8678) → 9V_IN; SMBJ15CA (C19077570) from 9V_IN to GND; 22 µF 25 V.
     fxbox's AO4606 bridge, SMBJ70CA and PE_SW/PE_BST nodes are dropped.
 12. 9 V only (owner 2026-10-02). USB never powers the box: the TPS2116 mux

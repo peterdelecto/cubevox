@@ -4,8 +4,9 @@ KiCad scaffold cloned from Teensy-H7-Port (read-only source, fxbox commit 48f1e8
 `hardware/fxbox` + `hardware/h7core`). The schematic (`cubevox.kicad_sch` plus the
 `h7core_block` child sheet) and the PCB (`cubevox.kicad_pcb`) exist; revision 2 follows
 `docs/audits/2026-10-02-schematic-audit.md` (disposition in `...-schematic-audit-response.md`).
-Audits, consult packets and reviews all live in `docs/audits/`, dated. Layout is frozen
-at a41fe4b (boards ordered 2026-10-08); `tools/gates.sh` checks it, `RUNLOG.md` is the record.
+Audits, consult packets and reviews all live in `docs/audits/`, dated. The 2026-10-08 order
+(a41fe4b) was held for the power switch SWPWR1 and J101 at x 175 (owner 2026-10-09);
+`tools/gates.sh` checks the layout, `RUNLOG.md` is the record.
 
 ## Contents
 1. `cubevox.kicad_sym`, `cubevox.pretty`, `cubevox.3dshapes` - JLC parts from fxbox (20 symbols).

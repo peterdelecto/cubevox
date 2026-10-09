@@ -38,6 +38,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 30 | C8678 | SS34 | 9V_JACK to VIN_9V Schottky | Basic | 3557042 | 0.030 | SMA_L4.3-W2.6 (cubevox) | 1 | IMPORTED with --repair-courtyard |
 | 32 | C81598 | 1N4148W | relay flyback D109 (mute) | Basic | 5171770 | 0.012 | SOD-123F (cubevox) | 1 | inherited; D104 removed with K101, 2026-10-07 |
 | 32a | C1788487 | ST-0-102-A01-T000-LF | toggle switches, SPDT ON-ON two-position (datasheet p.2 function table: model 102 = POS.1 ON, POS.2 NONE, POS.3 ON), 3 pins 2.54 mm; 8 panel + bypass | Extended | 5513 (LIVE 2026-10-02) | 0.538 (10+) | SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000 (cubevox) | 9 | IMPORTED with --accept-mismatch; courtyard edited in .kicad_mod, see WARNINGS 11. Pins: 2 = COM, 1 = T1, 3 = T3 |
+| 32b | C17179528 | SS-12D11-G050 | power switch SWPWR1, SPDT slide, right-angle, 3 A; on B.Cu between J101 and J106, owner-soldered | Extended | 768 (2026-10-09) | 0.344 | SW-TH_5P-P4.70_SS-12D11-G050 (cubevox, easyeda2kicad; STEP offset 0/2.25/3.3 measured) | 1 | owner 2026-10-09; out of the JLC BOM and CPL. Pins: 2 = COM (9V_PLUG), 1 = 9V_JACK, 3 open, 4/5 frame legs open |
 | 33 | C23182 | 0603WAF470JT5E | R 47 ohm | Basic | 975974 | 0.002 | R0603 (cubevox) | by schematic | IMPORTED, courtyard repaired |
 | 34 | C22775 | 0603WAF1000T5E | R 100 ohm | Basic | 7325193 | 0.002 | R0603 | by schematic | IMPORTED |
 | 35 | C21190 | 0603WAF1001T5E | R 1 k | Basic | 8013731 | 0.004 | R0603 | by schematic | IMPORTED |
@@ -90,6 +91,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | J101 | NCJ6FA-H combo input (B.Cu) | owner, excluded from JLC BOM/CPL |
 | J106 | PJ-002A barrel (B.Cu) | owner, excluded |
 | J108 | PJ-611E 1/4 in output (B.Cu) | owner, excluded |
+| SWPWR1 | SS-12D11-G050 power switch (B.Cu) | owner, excluded |
 | J117 | hanxia socket C42379197 JLC-assembled; SH1106 OLED module | socket on BOM/CPL; module owner-plugged |
 | all other refs | | JLC (top side, Economic) |
 
