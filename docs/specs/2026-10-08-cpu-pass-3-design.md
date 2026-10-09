@@ -25,6 +25,10 @@ and commit rules carry over. Budget per 64-sample block is 640,000 cycles (100 %
 
 Default layout sums from `costs.h`: 61 % avg / 72 % worst against 75 / 95.
 
+The heaviest layout the app allows is the default with Chasm in the reverb slot (one
+reverb per layout, each card once). Benched 2026-10-09: 384.6k cycles avg (60.1 %),
+446.9k cycles worst (69.8 %), late 0 over three runs. `costs.h` sums: 67 % / 78 %.
+
 ## Findings behind the pass
 
 1. Regression. d0f45b2 (pass 2 step D3) replaced `engine/distortion.h` with a copy that
@@ -131,5 +135,4 @@ layout on the voice clip with no late blocks and both sums under their lines;
 
 Met 2026-10-09 at the C3 commit: ctest 17/17, every A/B case exact or within its
 tolerance, WeAct late 0 over three runs, sums 61 / 72 against 75 / 95, D5 fired and
-landed. Open from pass 2: the owner's listen on the Unison and Distortion pairs in
-`build/listen/`.
+landed. The pass 2 listening pairs were heard by the owner on 2026-10-09 and sound fine.

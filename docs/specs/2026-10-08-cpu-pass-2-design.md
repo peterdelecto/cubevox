@@ -198,8 +198,8 @@ paths; parallel calls inherit a drifting cwd.
 | C1 | 38685f0 (88ed5fe adds bench keys `k` and `c`) | 17/17 | — | `costs.h` two columns per card plus a fixed term, every card `measured`, lines 75 % / 95 %; default layout 68 % / 82 % by the table, 62.8 % / 75.0 % measured, late 0 |
 | C2 | this commit | — | — | tables above and below filled; CLAUDE.md spec list; registry and slots specs carry the two lines |
 
-Listening pairs for the owner, still unheard: `build/listen/unison_{old_e06d829,new_u1}.wav`,
-`build/listen/distortion_{old_feaed12,new_d2}.wav`.
+Listening pairs `build/listen/unison_{old_e06d829,new_u1}.wav` and
+`build/listen/distortion_{old_feaed12,new_d2}.wav`: owner listened 2026-10-09, both sound fine.
 
 ## Bench findings (2026-10-08, WeAct, voice clip)
 
@@ -301,5 +301,5 @@ owner has listened to the Unison and Distortion pairs; the WeAct runs the defaul
 on the voice clip with no late blocks and both sums under their lines; `costs.h` holds
 measured numbers for every card; T1's result is recorded whichever way it went.
 
-Status 2026-10-08: everything above is met except the owner's listening, which is still
-open.
+Status 2026-10-09: everything above is met. The owner listened to both pairs on 2026-10-09
+and both sound fine.
