@@ -26,23 +26,23 @@ constexpr KnobDesc kThreshold = {"Threshold", KnobKind::Continuous, 0, kGateThre
 constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, kGateDecayMaxMs, "ms"};
 
 const CardDesc kCards[kCardCount] = {
-    {"empty", "Empty", 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty, false},
-    {"input_gate", "Input gate", 2, {kThreshold, kDecay}, Group::None, costs::kInputGate, false},
+    {"empty", "Empty", 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty, true},
+    {"input_gate", "Input gate", 2, {kThreshold, kDecay}, Group::None, costs::kInputGate, true},
     {"autotune", "Autotune", 2,
      {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, ""},
       {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMaxResponseMs, cv::AutotuneVoice::kMinResponseMs, "ms"}},
-     Group::Pitch, costs::kAutotune, false},
+     Group::Pitch, costs::kAutotune, true},
     {"octave", "Octave", 2,
      {{"Semitones", KnobKind::Stepped, kSemitonePositions, kSemitoneMin, kSemitoneMax, "st"}, kPercent("Mix")},
-     Group::Pitch, costs::kOctave, false},
-    {"unison", "Unison", 2, {kPercent("Depth"), kPercent("Rate")}, Group::None, costs::kUnison, false},
+     Group::Pitch, costs::kOctave, true},
+    {"unison", "Unison", 2, {kPercent("Depth"), kPercent("Rate")}, Group::None, costs::kUnison, true},
     {"slapback", "Slapback", 2,
      {kPercent("Mix"), {"Time", KnobKind::Continuous, 0, kSlapbackTimeMinMs, kSlapbackTimeMaxMs, "ms"}},
-     Group::None, costs::kSlapback, false},
-    {"distortion", "Distortion", 2, {kPercent("Drive"), kPercent("Tone")}, Group::None, costs::kDistortion, false},
-    {"gate", "Gate", 2, {kThreshold, kDecay}, Group::None, costs::kGate, false},
-    {"reverb_spring", "Spring Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbSpring, false},
-    {"reverb_chasm", "Chasm Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbChasm, false},
+     Group::None, costs::kSlapback, true},
+    {"distortion", "Distortion", 2, {kPercent("Drive"), kPercent("Tone")}, Group::None, costs::kDistortion, true},
+    {"gate", "Gate", 2, {kThreshold, kDecay}, Group::None, costs::kGate, true},
+    {"reverb_spring", "Spring Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbSpring, true},
+    {"reverb_chasm", "Chasm Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbChasm, true},
 };
 
 // Default layout, slot 1 to 8 (CLAUDE.md "Default layout").

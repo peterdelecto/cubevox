@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "core/chain_params.h"
+#include "core/costs.h"
 
 // Table index. Ids are wire-stable once shipped; append only.
 enum class Card : uint8_t {
@@ -44,8 +45,8 @@ struct CardDesc {
   uint8_t knobCount;  // 0 for Empty
   KnobDesc knob[kKnobsPerCard];
   Group group;
-  uint8_t costPercent;  // of one audio frame at peak; costs.h
-  bool measured;        // false until a board ran the bench
+  costs::Cost cost;  // percent of one audio block, mean and worst; costs.h
+  bool measured;     // false until a board ran the bench
 };
 
 const CardDesc& cardDesc(Card c);

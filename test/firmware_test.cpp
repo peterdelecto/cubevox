@@ -144,18 +144,25 @@ void checkFormat() {
 void checkDefaultLayout() {
   const Card expected[kSlotCount] = {Card::InputGate, Card::Autotune, Card::Octave, Card::Unison,
                                      Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring};
-  int cost = 0;
+  int avg = costs::kFixed.avg;
+  int worst = costs::kFixed.worst;
   int reverbs = 0;
   for (int s = 0; s < kSlotCount; ++s) {
     check(slotCard(s) == expected[s], "default layout slot");
     const CardDesc& d = cardDesc(slotCard(s));
-    cost += d.costPercent;
+    avg += d.cost.avg;
+    worst += d.cost.worst;
     if (d.group == Group::Reverb) ++reverbs;
   }
-  check(cost <= costs::kBudgetPercent, "default layout within budget");
+  check(avg <= costs::kBudgetAvgPercent, "default layout within the average line");
+  check(worst <= costs::kBudgetWorstPercent, "default layout within the worst-block line");
   check(reverbs == 1, "default layout has one reverb");
-  check(cardDesc(Card::Empty).costPercent == 0, "empty card costs nothing");
-  for (int i = 0; i < kCardCount; ++i) check(!cardDesc(card(i)).measured, "costs are estimates until a board measures them");
+  check(cardDesc(Card::Empty).cost.avg == 0 && cardDesc(Card::Empty).cost.worst == 0, "empty card costs nothing");
+  for (int i = 0; i < kCardCount; ++i) {
+    const CardDesc& d = cardDesc(card(i));
+    check(d.measured, "every card's cost comes from the board");
+    check(d.cost.worst >= d.cost.avg, "worst block is never under the mean");
+  }
 }
 
 }  // namespace
