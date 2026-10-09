@@ -34,6 +34,14 @@ and commit rules carry over. Budget per 64-sample block is 640,000 cycles (100 %
 4. Unison runs a per-voice loop with an out-of-line read, steps the depth smoother per
    sample with two snap compares, and recomputes swing and wet gain per sample. The two
    voices are independent.
+5. U2 examined (bench 49.1k against 25k expected). The parked loop compiles to about
+   190 instructions per sample and runs at about 4 cycles each. The listing shows why:
+   eight `vcmpe`/`vmrs` pairs per sample (four in the `sinTurns` fold, two in each
+   `readCubic` clamp), each a drain of the FP pipe; `readCubic` stays out of line
+   (71 instructions, ten call sites), so the two independent reads per sample are
+   serialised by the call instead of overlapped; and each read is a serial chain
+   (convert, round, convert, FP-to-core move, index compares, loads, cubic). The
+   instruction count was never the cost. U3 removes the compares and the call.
 
 ## Decisions
 
@@ -77,16 +85,20 @@ three runs.
 | D4 | Distortion restore (decision 2) | A/B distortion and chain within -60 dB (the tanh swap and the ramp), bypass exact, `distortion_test`, `fastmath_test` tanh case | 80.6k → ~40k avg; worst within 10 % of avg |
 | S1 | Disperser pair, block-edge g, input scale, drive and comp | A/B spring and chain exact; `spring_b_test`, `level_test` | 68.7k → ~55k |
 | U2 | Unison voices interleaved, locals, block-edge swing and wet gain, parked block path | A/B unison exact once the depth ramp has settled (the render starts at depth 0 and ramps for 0.2 s, where the linear block interpolation differs from the per-sample exponential by design); unison and chain within -60 dB overall; `unison_test` analytic LFO case within 0.05 samples | 55.2k → under 25k |
-| D5 | Only on decision 5's trigger | bit-exact | — |
+| D5 | Fired (47.7k > 45k): `CV_RESTRICT` block pointers, filter and oversampler state in locals for the block loop, hot helpers `CV_INLINE` | A/B distortion and chain exact | 47.7k → ~35k |
+| U3 | From the U2 examination (finding 5): integer-tested fold in `sinTurns`, `readCubic` clamp decided once per block for the parked path, hot helpers `CV_INLINE` so the two reads overlap | A/B unison exact after the ramp, chain within -60 dB; `fastmath_test`, `unison_test` | 49.1k → ~30k |
+| S2 | Held: section-outer block form for the disperser (ruled out 2), since S1 saved 6.9k against its 8k line. Trigger: a layout the owner wants fails either sum | — | — |
 | C3 | `core/costs.h` from the bench, this spec's tables, CLAUDE.md spec list | `firmware_test` both sums | chain ~55 % / ~65 % |
 
 ## Progress
 
 | Step | Commit | ctest | A/B vs previous step | Bench |
 |---|---|---|---|---|
-| D4 | 285600f | 17/17 | distortion -90.0, chain -92.8 dB (the tanh swap), all other cases exact | pending, board off the bus |
-| S1 | 1bad8bd | 17/17 | all ten cases exact | pending |
-| U2 | this commit | 17/17 | unison -121.7 dB, every differing sample inside 0.015..0.208 s (the ramp), exact after; chain -93.2 dB (the ramp's residue in the downstream memory); other cases exact. A first cut precomputed the base delay in samples and landed at -119 dB over the whole clip: the compiler then fused the other product in the centre expression. Keeping both products in one statement restored exactness | pending |
+| D4 | 285600f | 17/17 | distortion -90.0, chain -92.8 dB (the tanh swap), all other cases exact | Distortion 80.6k / 109.5k → 47.7k / 64.7k (one flash of 1bc59a4 carries D4, S1 and U2; worst is the lowest of three runs) |
+| S1 | 1bad8bd | 17/17 | all ten cases exact | Spring 68.7k / 69.1k → 61.8k / 61.9k, 6.9k saved, under the 8k line of ruled-out 2 |
+| U2 | 1bc59a4 | 17/17 | unison -121.7 dB, every differing sample inside 0.015..0.208 s (the ramp), exact after; chain -93.2 dB (the ramp's residue in the downstream memory); other cases exact. A first cut precomputed the base delay in samples and landed at -119 dB over the whole clip: the compiler then fused the other product in the centre expression. Keeping both products in one statement restored exactness | Unison 55.2k / 57.1k → 49.1k / 51.0k, a miss by half against the 25k expectation; examined, finding 5. Chain 402.2k / 480.0k → 359.1k / 420.5k (56.1 % / 65.7 %), late 0 |
+| D5 | 8140b55 | 17/17 | all ten cases exact | Distortion 47.7k / 64.7k → 46.3k / 62.2k. The remaining cost is the fifteen-stage serial chain's latency, not reloads |
+| U3 | this commit | 17/17 | all ten cases exact (the ramp is untouched: U3 changes no arithmetic) | Unison 49.1k / 51.0k → 46.9k / 47.7k, 2.3k against a 19k expectation. The compares and the call were not the cost either; what is left is the serial read chain itself (finding 5, third clause), which a chorus with two cubic reads per sample cannot shorten. Not examined further: the chain sits inside both lines, and the Unison card's future is open (doubler research note, owner 2026-10-09). Chain 349.9k / 410.8k (54.7 % / 64.2 %), late 0 |
 
 ## Ruled out
 

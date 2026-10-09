@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include "engine/common.h"
+
 // Cheap replacements for libm calls that sit inside per-sample loops. Each has
 // a test in test/fastmath_test.cpp that pins its error.
 
@@ -32,10 +34,15 @@ inline float exp2Fast(float x) {
 // quarter turn, then sin(pi t) is the odd Taylor series through t^11 on
 // |t| <= 0.5. The first dropped term is below 1e-7, so absolute error stays
 // under 1e-6 with float rounding.
-inline float sinTurns(uint32_t phase) {
-  float t = static_cast<float>(static_cast<int32_t>(phase)) * (1.0f / 2147483648.0f);
-  if (t > 0.5f) t = 1.0f - t;
-  if (t < -0.5f) t = -1.0f - t;
+CV_INLINE float sinTurns(uint32_t phase) {
+  const int32_t p = static_cast<int32_t>(phase);
+  float t = static_cast<float>(p) * (1.0f / 2147483648.0f);
+
+  // Integer tests avoid a float compare stall. They differ from t > 0.5f only
+  // where t rounds to exactly +-0.5, and there the fold returns the same value.
+  if (p > 0x40000000) t = 1.0f - t;
+  else if (p < -0x40000000) t = -1.0f - t;
+
   constexpr float kPi = 3.14159265358979323846f;
   constexpr float c1 = kPi;
   constexpr float c3 = -(kPi * kPi * kPi) / 6.0f;
@@ -52,7 +59,7 @@ inline float sinTurns(uint32_t phase) {
 // beyond +-9 return exactly +-1; the polynomial input clamps at +-7.9053111,
 // where the rational already rounds to +-1. The form is odd, so
 // tanhFast(-x) == -tanhFast(x) bit for bit.
-inline float tanhFast(float x) {
+CV_INLINE float tanhFast(float x) {
   if (x >= 9.0f) return 1.0f;
   if (x <= -9.0f) return -1.0f;
   constexpr float kClamp = 7.9053111f;

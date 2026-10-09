@@ -118,24 +118,42 @@ class Unison {
     const uint32_t shInc1 = shiftInc_[1];
 
     if (sh0 == 0u && shInc0 == 0u && sh1 == 0u && shInc1 == 0u) {
-      for (int i = 0; i < n; ++i) {
-        const float x = in[i];
-        const float f = static_cast<float>(i + 1) * inv;
-        const float swing = swing0 + (swing1 - swing0) * f;
-        const float wetGain = wet0 + (wet1 - wet0) * f;
+      auto parked = [&](auto read) {
+        for (int i = 0; i < n; ++i) {
+          const float x = in[i];
+          const float f = static_cast<float>(i + 1) * inv;
+          const float swing = swing0 + (swing1 - swing0) * f;
+          const float wetGain = wet0 + (wet1 - wet0) * f;
 
-        wline[wp] = x;
+          wline[wp] = x;
 
-        const float c0 = base0 * kSmpPerMs + swing * sinTurns(lfo0);
-        const float c1 = base1 * kSmpPerMs + swing * sinTurns(lfo1);
-        const float s0 = readCubic(line, wp, c0);
-        const float s1 = readCubic(line, wp, c1);
-        const float wet = (0.0f + s0 * en0) + s1 * en1;
-        lfo0 += lfoInc0;
-        lfo1 += lfoInc1;
+          const float c0 = base0 * kSmpPerMs + swing * sinTurns(lfo0);
+          const float c1 = base1 * kSmpPerMs + swing * sinTurns(lfo1);
+          const float s0 = read(line, wp, c0);
+          const float s1 = read(line, wp, c1);
+          const float wet = (0.0f + s0 * en0) + s1 * en1;
+          lfo0 += lfoInc0;
+          lfo1 += lfoInc1;
 
-        out[i] = (x + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
-        wp = wp + 1 == kLen ? 0 : wp + 1;
+          out[i] = (x + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
+          wp = wp + 1 == kLen ? 0 : wp + 1;
+        }
+      };
+
+      // |sinTurns| <= 1 up to rounding, so the centres stay within swingMax of
+      // base. When that band (plus a rounding margin) sits inside the clamp
+      // range, the clamp is an identity and the block skips it.
+      constexpr float kLo = 2.0f + kClampMargin;
+      constexpr float kHi = kLen - 3.0f - kClampMargin;
+      const float swingMax = swing0 > swing1 ? swing0 : swing1;
+      const float lo0 = base0 * kSmpPerMs - swingMax;
+      const float hi0 = base0 * kSmpPerMs + swingMax;
+      const float lo1 = base1 * kSmpPerMs - swingMax;
+      const float hi1 = base1 * kSmpPerMs + swingMax;
+      if (lo0 >= kLo && hi0 <= kHi && lo1 >= kLo && hi1 <= kHi) {
+        parked([](const float* l, int w, float d) { return readCubicUnclamped(l, w, d); });
+      } else {
+        parked([](const float* l, int w, float d) { return readCubic(l, w, d); });
       }
     } else {
       for (int i = 0; i < n; ++i) {
@@ -180,6 +198,7 @@ class Unison {
   static constexpr float kTurn = 4294967296.0f;
   static constexpr float kSmoothSec = 0.020f;
   static constexpr float kSnapBelow = 1e-6f;
+  static constexpr float kClampMargin = 0.01f;
 
   static float clamp01(float x) { return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); }
   static float clampWindow(float ms) {
@@ -190,7 +209,7 @@ class Unison {
   // two taps half a window apart on a sawtooth, Hann-crossfaded with gains
   // sin^2(pi p) and 1 - sin^2(pi p), which sum to exactly 1. Taps sit at
   // centre + window * (p - 0.5).
-  static float readShifted(const float* line, int wp, uint32_t ph, uint32_t inc, float centre,
+  static CV_INLINE float readShifted(const float* line, int wp, uint32_t ph, uint32_t inc, float centre,
                            float windowSmp) {
     if (ph == 0u && inc == 0u) return readCubic(line, wp, centre);
     const float p0 = static_cast<float>(ph) * (1.0f / kTurn);
@@ -213,7 +232,7 @@ class Unison {
 
   // Reads sit within one ring length of the head, so one step wraps them; the
   // final clamp is never taken and lets the compiler bound the index.
-  static int wrap(int i) {
+  static CV_INLINE int wrap(int i) {
     if (i < 0) i += kLen;
     else if (i >= kLen) i -= kLen;
     return static_cast<unsigned>(i) < static_cast<unsigned>(kLen) ? i : 0;
@@ -221,8 +240,13 @@ class Unison {
 
   // Catmull-Rom through four taps. Delay is clamped so the newest tap
   // never crosses the write head and the oldest never wraps onto it.
-  static float readCubic(const float* line, int wp, float delay) {
+  static CV_INLINE float readCubic(const float* line, int wp, float delay) {
     const float d = delay < 2.0f ? 2.0f : (delay > kLen - 3.0f ? kLen - 3.0f : delay);
+    return readCubicUnclamped(line, wp, d);
+  }
+
+  // readCubic for a delay already inside [2, kLen - 3].
+  static CV_INLINE float readCubicUnclamped(const float* line, int wp, float d) {
     const float pos = static_cast<float>(wp) - d;
     const float fl = floorf(pos);
     const float f = pos - fl;
