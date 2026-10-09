@@ -57,8 +57,8 @@ if [ -n "$CLIP" ]; then
   INC_CLIP="-I$OUT-gen"
   DEFS="$DEFS -DCUBEVOX_BENCH_CLIP"
 fi
-# RAM_D2 (SAI rings) and DTCM sections for the H743V linker script.
-LDX="-Wl,--script=$FW/platform/h7_h743v_sections.ld"
+# RAM_D2 (SAI rings) and DTCM sections for the H743V linker script, then the fault record.
+LDX="-Wl,--script=$FW/platform/h7_h743v_sections.ld -Wl,--script=$FW/cubevox_noinit.ld"
 
 mkdir -p "$OUT"
 arduino-cli compile --fqbn "$FQBN" \

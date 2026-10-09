@@ -12,7 +12,8 @@ constexpr uint32_t kMagic = 0x46415531;  // "FAU1"
 enum Kind : uint32_t { kHard = 0, kMemManage = 1, kBus = 2, kUsage = 3 };
 const char* const kKindName[] = {"hard", "memmanage", "bus", "usage"};
 
-// Written by the fault handler, read on the next boot. .noinit survives a system reset.
+// Written by the fault handler, read on the next boot. .cv_noinit (firmware/cubevox_noinit.ld)
+// sits at the top of DTCM, clear of .dtcm_bss, and survives a system reset.
 struct FaultRecord {
   uint32_t magic;
   uint32_t kind;
@@ -23,7 +24,7 @@ struct FaultRecord {
   uint32_t bfar;
   uint32_t mmfar;
 };
-__attribute__((section(".noinit"))) FaultRecord gStored;
+__attribute__((section(".cv_noinit"))) FaultRecord gStored;
 
 FaultRecord gLast = {};  // copy taken at boot, printed by every report this run
 uint32_t gResetFlags = 0;
