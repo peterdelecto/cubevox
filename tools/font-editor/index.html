@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cubevox font editor</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>cubevox font editor</h1>
+  <div class="actions">
+    <button id="loadBtn" type="button">Load library</button>
+    <button id="saveBtn" type="button">Save library</button>
+    <button id="exportBtn" type="button" class="primary">Export C header</button>
+    <input id="fileInput" type="file" accept=".json,application/json" hidden>
+  </div>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+</header>
+
+<main class="layout">
+
+  <section class="panel fonts" aria-labelledby="fontsHeading">
+    <h2 id="fontsHeading">Fonts</h2>
+    <ul id="fontList" class="font-list"></ul>
+
+    <h3>Selected font</h3>
+    <div class="form">
+      <label for="fontName">Name</label>
+      <input id="fontName" type="text" autocomplete="off">
+      <p id="nameError" class="field-error" role="alert"></p>
+
+      <label for="fontWidth">Width</label>
+      <span class="pair">
+        <input id="fontWidth" type="number" min="1" max="32" class="narrow"> px
+      </span>
+      <label for="fontHeight">Height</label>
+      <span class="pair">
+        <input id="fontHeight" type="number" min="1" max="32" class="narrow"> px
+      </span>
+      <span></span>
+      <button id="applySize" type="button">Apply size</button>
+      <p id="sizeHint" class="field-hint"></p>
+
+      <label for="fontSpacing">Spacing</label>
+      <span class="pair">
+        <input id="fontSpacing" type="number" min="0" max="8" class="narrow"> px
+      </span>
+    </div>
+    <div class="row">
+      <button id="duplicateBtn" type="button">Duplicate</button>
+      <button id="deleteBtn" type="button" class="danger">Delete font</button>
+    </div>
+
+    <h3>New font</h3>
+    <div class="form">
+      <label for="newName">Name</label>
+      <input id="newName" type="text" autocomplete="off" placeholder="Menu 6x8">
+      <p id="newError" class="field-error" role="alert"></p>
+      <label for="newWidth">Width</label>
+      <span class="pair"><input id="newWidth" type="number" min="1" max="32" value="6" class="narrow"> px</span>
+      <label for="newHeight">Height</label>
+      <span class="pair"><input id="newHeight" type="number" min="1" max="32" value="8" class="narrow"> px</span>
+    </div>
+    <button id="createBtn" type="button" class="primary">Create font</button>
+  </section>
+
+  <section class="panel editor" aria-labelledby="editorHeading">
+    <h2 id="editorHeading">Glyph</h2>
+    <div class="toolbar" role="toolbar" aria-label="Glyph tools">
+      <button type="button" data-action="clear">Clear</button>
+      <button type="button" data-action="invert">Invert</button>
+      <button type="button" data-action="left">Shift left</button>
+      <button type="button" data-action="right">Shift right</button>
+      <button type="button" data-action="up">Shift up</button>
+      <button type="button" data-action="down">Shift down</button>
+      <button type="button" data-action="copy">Copy</button>
+      <button type="button" data-action="paste">Paste</button>
+      <button type="button" data-action="undo">Undo</button>
+    </div>
+    <div class="zoom">
+      <label for="zoom">Editor size</label>
+      <input id="zoom" type="range" min="8" max="80" step="1">
+      <output id="zoomValue" for="zoom"></output>
+    </div>
+    <div class="canvas-scroll">
+      <canvas id="editorCanvas" class="pixel-canvas" aria-label="Glyph pixels. Click or drag to draw, right-click to erase."></canvas>
+    </div>
+    <p class="support">Click or drag to draw. Right-click or Option-drag to erase.
+      Cmd+Z undoes, Cmd+C and Cmd+V copy a glyph, the left and right arrows step through glyphs.</p>
+
+    <div id="symbolBox" class="form symbol-box" hidden>
+      <label for="symbolName">Symbol name</label>
+      <input id="symbolName" type="text" autocomplete="off">
+      <span></span>
+      <button id="deleteSymbol" type="button" class="danger">Delete symbol</button>
+    </div>
+
+    <h3>Preview on the 128 x 64 display</h3>
+    <label for="previewText" class="visually-hidden">Preview text</label>
+    <input id="previewText" type="text" autocomplete="off">
+    <canvas id="previewCanvas" class="pixel-canvas" aria-label="Preview of the text on the OLED"></canvas>
+  </section>
+
+  <section class="panel map" aria-labelledby="mapHeading">
+    <h2 id="mapHeading">Characters</h2>
+    <div id="glyphMap" class="glyph-map"></div>
+    <button id="addSymbol" type="button">Add symbol</button>
+    <p class="support">Symbols take codes 128 to 255 for icons and arrows.</p>
+  </section>
+
+</main>
+
+<script src="font-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+/* Font editor theme. The only file with px and color literals.
+   Dark mode only, desktop windows 1280 x 800 and up. */
+
+:root {
+  --hue: 250;
+
+  /* app chrome */
+  --bg:          oklch(0.16 0.012 var(--hue));
+  --panel-bg:    oklch(0.20 0.012 var(--hue));
+  --ctrl-bg:     oklch(0.26 0.012 var(--hue));
+  --border:      oklch(0.32 0.012 var(--hue));
+  --text:        oklch(0.90 0.010 var(--hue));
+  --text-dim:    oklch(0.79 0.010 var(--hue));
+  --text-on-accent: oklch(0.12 0.012 var(--hue));
+  --accent:      oklch(0.80 0.120 var(--hue));
+  --accent-soft: oklch(0.30 0.060 var(--hue));
+  --ok:     oklch(0.81 0.140 150);
+  --warn:   oklch(0.82 0.130  75);
+  --danger: oklch(0.80 0.130  25);
+
+  /* user content: the OLED surface, kept apart from the chrome */
+  --oled-off:   oklch(0.10 0 0);
+  --oled-on:    oklch(0.93 0.030 230);
+  --grid-line:  oklch(0.24 0 0);
+  --sel-core:   oklch(0.98 0 0);
+  --sel-halo:   oklch(0.10 0 0);
+
+  /* type */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+             Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-xs: 13px;
+  --text-sm: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --weight-normal: 400;
+  --weight-bold:   600;
+  --leading: 1.5;
+  --leading-tight: 1.2;
+
+  /* spacing */
+  --unit: 4px;
+  --gap-1: calc(var(--unit) * 1);
+  --gap-2: calc(var(--unit) * 2);
+  --gap-3: calc(var(--unit) * 3);
+  --gap-4: calc(var(--unit) * 4);
+  --gap-6: calc(var(--unit) * 6);
+  --target-min: 32px;
+
+  /* layout */
+  --sidebar-w: 280px;
+  --map-w: 400px;
+  --input-narrow: 7ch;
+  --tile-min: 58px;
+  --slider-w: 220px;
+
+  /* canvas sizing, read by app.js as plain numbers */
+  --editor-px: 440;
+  --tile-px: 28;
+  --preview-scale: 3;
+  --oled-w: 128;
+  --oled-h: 64;
+
+  /* shape and motion */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --border-w: 1px;
+  --dur-fast: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+
+  accent-color: var(--accent);
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; }
+}

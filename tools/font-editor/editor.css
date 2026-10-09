@@ -1,0 +1,196 @@
+/* Font editor layout and controls. Every value comes from tokens.css. */
+
+* { box-sizing: border-box; }
+
+/* Canvases keep their drawn size; a border inside the box would rescale the pixels. */
+canvas { box-sizing: content-box; }
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading);
+}
+
+h1, h2, h3, p, ul { margin: 0; }
+h1 { font-size: var(--text-lg); font-weight: var(--weight-bold); }
+h2 { font-size: var(--text-md); font-weight: var(--weight-bold); }
+h3 {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  margin-top: var(--gap-4);
+}
+
+.support, .field-hint {
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+.field-hint.warn { color: var(--warn); }
+.field-error {
+  grid-column: 2;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+.field-error:empty, .field-hint:empty { display: none; }
+
+.visually-hidden {
+  position: absolute;
+  width: var(--border-w);
+  height: var(--border-w);
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* ── controls ─────────────────────────────────────────── */
+
+button, input {
+  font: inherit;
+  color: var(--text);
+  background: var(--ctrl-bg);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: var(--target-min);
+}
+
+button {
+  padding: 0 var(--gap-3);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+button:hover { background: var(--accent-soft); border-color: var(--accent); }
+button:active { background: var(--accent); color: var(--text-on-accent); }
+button:disabled { color: var(--text-dim); background: var(--panel-bg); cursor: not-allowed; border-color: var(--border); }
+
+button.primary { border-color: var(--accent); font-weight: var(--weight-bold); }
+button.danger { border-color: var(--danger); color: var(--danger); }
+button.danger:hover { background: var(--ctrl-bg); }
+button.danger.armed { background: var(--danger); color: var(--text-on-accent); font-weight: var(--weight-bold); }
+
+input { padding: 0 var(--gap-2); width: 100%; }
+input.narrow { width: var(--input-narrow); }
+input[aria-invalid="true"] { border-color: var(--danger); }
+
+:where(button, input, canvas, [tabindex]):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* ── frame ────────────────────────────────────────────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-4);
+  padding: var(--gap-3) var(--gap-4);
+  background: var(--panel-bg);
+  border-bottom: var(--border-w) solid var(--border);
+}
+.actions { display: flex; gap: var(--gap-2); }
+.status { color: var(--ok); }
+.status.error { color: var(--danger); }
+
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--map-w);
+  gap: var(--gap-4);
+  padding: var(--gap-4);
+  align-items: start;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
+  padding: var(--gap-4);
+  background: var(--panel-bg);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--gap-2) var(--gap-3);
+  align-items: center;
+}
+.form .field-hint { grid-column: 1 / -1; }
+.pair { display: flex; align-items: center; gap: var(--gap-2); color: var(--text-dim); }
+.row { display: flex; gap: var(--gap-2); flex-wrap: wrap; }
+
+/* ── font list ────────────────────────────────────────── */
+
+.font-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--gap-1); }
+.font-list button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-2);
+}
+.font-list .size { color: var(--text-dim); font-size: var(--text-xs); align-self: center; }
+.font-list button[aria-current="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: var(--weight-bold);
+}
+.font-list button[aria-current="true"] .size { color: var(--text-on-accent); }
+
+/* ── editor ───────────────────────────────────────────── */
+
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--gap-2); }
+.pixel-canvas {
+  display: block;
+  align-self: flex-start;
+  background: var(--oled-off);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
+  image-rendering: pixelated;
+}
+#editorCanvas { cursor: crosshair; touch-action: none; }
+
+.zoom { display: flex; align-items: center; gap: var(--gap-3); }
+.zoom output { color: var(--text-dim); font-size: var(--text-xs); }
+input[type="range"] {
+  width: var(--slider-w);
+  padding: 0;
+  background: none;
+  border: none;
+}
+.canvas-scroll { max-width: 100%; overflow: auto; }
+.symbol-box { margin-top: var(--gap-2); }
+
+/* ── glyph map ────────────────────────────────────────── */
+
+.glyph-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
+  gap: var(--gap-1);
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-1);
+  padding: var(--gap-1);
+  min-height: var(--tile-min);
+}
+.tile canvas { background: var(--oled-off); image-rendering: pixelated; }
+.tile .label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: var(--leading-tight);
+}
+.tile[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: var(--weight-bold);
+}
