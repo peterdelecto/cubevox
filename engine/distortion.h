@@ -65,7 +65,8 @@ class Distortion {
     shelfTone_ = -1.0f;
   }
 
-  void process(const float* in, float* out, int n, const DistortionParams& p) {
+  void process(const float* CV_RESTRICT in, float* CV_RESTRICT out, int n,
+               const DistortionParams& p) {
     const DistortionTuning& t = p.tuning;
     const float target = p.on ? smooth::clamp01(p.drive) : 0.0f;
 
@@ -96,34 +97,50 @@ class Distortion {
     const float kb = trim_ / makeup(g1b * g2b);
     const float inv = n > 0 ? 1.0f / static_cast<float>(n) : 0.0f;
 
+    // The loop runs on local copies so stores to out cannot alias filter state.
+    Pole inHp = inHp_, s1Lp = s1Lp_, s2Hp = s2Hp_, s2Lp = s2Lp_, dc = dc_;
+    Biquad s1Bass = s1Bass_, stackBass = stackBass_, stackTreble = stackTreble_;
+    Biquad trebleCut = trebleCut_, bassPeak = bassPeak_;
+    Oversampler os1 = os1_, os2 = os2_;
+    const Rail rail = rail_;
+    const float stackLoss = stackLoss_, fadeSpan = fadeSpan_;
+    const bool oversample = t.oversample;
+    float drive = drive_, tone = tone_;
+
     for (int i = 0; i < n; ++i) {
-      drive_ = smooth::step(drive_, target, aDrive);
-      tone_ = smooth::step(tone_, toneTarget, aDrive);
+      drive = smooth::step(drive, target, aDrive);
+      tone = smooth::step(tone, toneTarget, aDrive);
       const float fi = static_cast<float>(i + 1) * inv;
       const float g1 = g1a + (g1b - g1a) * fi;
       const float g2 = g2a + (g2b - g2a) * fi;
       const float k = ka + (kb - ka) * fi;
 
-      float x = inHp_.hp(in[i]);
-      x = s1Bass_.run(x);
-      x = s1Lp_.lp(x);
-      x = saturate(os1_, x * g1, rail_, t.oversample);
+      float x = inHp.hp(in[i]);
+      x = s1Bass.run(x);
+      x = s1Lp.lp(x);
+      x = saturate(os1, x * g1, rail, oversample);
 
-      x = stackBass_.run(x);
-      x = stackTreble_.run(x) * stackLoss_;
+      x = stackBass.run(x);
+      x = stackTreble.run(x) * stackLoss;
 
-      x = s2Hp_.hp(x);
-      x = s2Lp_.lp(x);
-      x = saturate(os2_, x * g2, rail_, t.oversample);
+      x = s2Hp.hp(x);
+      x = s2Lp.lp(x);
+      x = saturate(os2, x * g2, rail, oversample);
 
-      x = trebleCut_.run(x);
-      x = bassPeak_.run(x);
-      x = dc_.hp(x);
+      x = trebleCut.run(x);
+      x = bassPeak.run(x);
+      x = dc.hp(x);
       // The fixed EQ fades in from exact passthrough over the first fadeDrive of DRIVE.
       const float wet = x * k;
-      const float f = drive_ / fadeSpan_;
+      const float f = drive / fadeSpan;
       out[i] = f >= 1.0f ? wet : in[i] + f * (wet - in[i]);
     }
+
+    inHp_ = inHp, s1Lp_ = s1Lp, s2Hp_ = s2Hp, s2Lp_ = s2Lp, dc_ = dc;
+    s1Bass_ = s1Bass, stackBass_ = stackBass, stackTreble_ = stackTreble;
+    trebleCut_ = trebleCut, bassPeak_ = bassPeak;
+    os1_ = os1, os2_ = os2;
+    drive_ = drive, tone_ = tone;
   }
 
  private:
@@ -207,11 +224,11 @@ class Distortion {
   struct Pole {
     float a = 0.0f, y = 0.0f;
     void set(float hz) { a = 1.0f - expf(-kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate); }
-    float lp(float x) {
+    CV_INLINE float lp(float x) {
       y += a * (x - y);
       return y;
     }
-    float hp(float x) { return x - lp(x); }
+    CV_INLINE float hp(float x) { return x - lp(x); }
   };
 
   // RBJ biquad, transposed direct form II. Zero dB gain is an exact identity.
@@ -251,7 +268,7 @@ class Distortion {
       a2 = (ap - sign * am * cw - beta) / a0;
     }
 
-    float run(float x) {
+    CV_INLINE float run(float x) {
       const float y = b0 * x + z1;
       z1 = b1 * x - a1 * y + z2;
       z2 = b2 * x - a2 * y;
@@ -264,7 +281,7 @@ class Distortion {
   // Positive rail 1, negative rail -neg, tanh edge over the last soft fraction.
   struct Rail {
     float neg, soft;
-    float operator()(float x) const {
+    CV_INLINE float operator()(float x) const {
       const float lim = x >= 0.0f ? 1.0f : neg;
       const float v = fabsf(x);
       const float edge = soft * lim;
@@ -283,18 +300,18 @@ class Distortion {
     std::array<float, N> buf{};
     std::size_t newest = 0;
 
-    void push(float v) {
+    CV_INLINE void push(float v) {
       newest = (newest - 1) & kMask;
       buf[newest] = v;
     }
-    float at(std::size_t k) const { return buf[(newest + k) & kMask]; }
+    CV_INLINE float at(std::size_t k) const { return buf[(newest + k) & kMask]; }
     void clear() {
       buf.fill(0.0f);
       newest = 0;
     }
   };
 
-  static float halfBand(const Ring<kHist>& h) {
+  static CV_INLINE float halfBand(const Ring<kHist>& h) {
     static_assert(kHist == 8, "halfBand taps assume 8 samples");
     return kH7 * (h.at(0) + h.at(7)) + kH5 * (h.at(1) + h.at(6)) +
            kH3 * (h.at(2) + h.at(5)) + kH1 * (h.at(3) + h.at(4));
@@ -307,7 +324,7 @@ class Distortion {
     Ring<4> downOdd;
 
     template <class F>
-    float run(float x, const F& f) {
+    CV_INLINE float run(float x, const F& f) {
       up.push(x);
       const float zEven = f(2.0f * halfBand(up));
       const float zOdd = f(up.at(3));
@@ -324,7 +341,7 @@ class Distortion {
     }
   };
 
-  static float saturate(Oversampler& os, float x, const Rail& rail, bool oversample) {
+  static CV_INLINE float saturate(Oversampler& os, float x, const Rail& rail, bool oversample) {
     return oversample ? os.run(x, rail) : rail(x);
   }
 
