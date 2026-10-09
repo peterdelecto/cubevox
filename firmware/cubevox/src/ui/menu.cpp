@@ -19,7 +19,7 @@ constexpr uint32_t kMenuTimeoutMs = 15000;
 constexpr float kInstrumentTrimDb = -12.0f;  // INSTRUMENT is about -10 dBV against the 1.27 Vrms LINE reference
 constexpr float kMicTrimDb = 25.7f;          // gives back the 1/4" jack pad, -25.7 dB (hardware spec item 2)
 
-enum class Item : uint8_t { ReverbEngine, Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
+enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
 enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
 
 constexpr int kItemCount = static_cast<int>(Item::Count);
@@ -58,7 +58,6 @@ void row(int r, const char* text) { snprintf(gFrame[r], sizeof(gFrame[r]), "%s",
 
 const char* itemLabel(Item it) {
   switch (it) {
-    case Item::ReverbEngine: return "Reverb";
     case Item::Output: return "Out";
     case Item::InputJack: return "Input";
     case Item::ChainOrder: return "Chain order";
@@ -71,7 +70,6 @@ const char* itemLabel(Item it) {
 
 const char* itemValue(Item it) {
   switch (it) {
-    case Item::ReverbEngine: return gSettings.reverbEngine == cv::kReverbChasm ? "CHASM" : "SPRING B";
     case Item::Output: return gSettings.outputInstrument ? "INSTRUMENT" : "LINE";
     case Item::InputJack: return gSettings.inputMic ? "MIC" : "PEDAL";
     default: return "";
@@ -141,10 +139,6 @@ void changeSetting() { gSettingsChanged = true; }
 
 void activateItem(Item it) {
   switch (it) {
-    case Item::ReverbEngine:
-      gSettings.reverbEngine = gSettings.reverbEngine == cv::kReverbSpringB ? cv::kReverbChasm : cv::kReverbSpringB;
-      changeSetting();
-      break;
     case Item::Output: gSettings.outputInstrument = !gSettings.outputInstrument; changeSetting(); break;
     case Item::InputJack: gSettings.inputMic = !gSettings.inputMic; changeSetting(); break;
     case Item::ChainOrder: gMode = Mode::ChainView; break;

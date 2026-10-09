@@ -50,7 +50,7 @@ static void publishParams() {
   for (int s = 0; s < kSlotCount; ++s) {
     if (gBenchOff & (1u << s)) applyToggle(slotCard(s), false, gParams);
   }
-  gParams.reverb.engine = gBenchChasm ? cv::kReverbChasm : menuSettings().reverbEngine;
+  if (gBenchChasm) gParams.reverb.engine = cv::kReverbChasm;
   gParams.inputGainDb = menuInputGainDb();
   gParams.outputGainDb = menuOutputGainDb();
   audioPublish(gParams);
@@ -140,7 +140,7 @@ static void pollBenchCommands() {
       case 'c':
         gBenchChasm = !gBenchChasm;
         publishParams();
-        Serial.println(gBenchChasm ? "[bench] reverb slot runs Chasm" : "[bench] reverb slot runs the menu engine");
+        Serial.println(gBenchChasm ? "[bench] reverb slot runs Chasm" : "[bench] reverb slot runs its card's engine");
         break;
       case 'v': {
         static bool clipOn = false;

@@ -7,11 +7,10 @@
 #include <stdint.h>
 
 #include "core/display.h"
-#include "engine/reverb.h"
 
 // Settings the menu owns. The main loop copies them into ChainParams.
+// The reverb engine is not one of them: the reverb card placed in the slot picks it.
 struct MenuSettings {
-  int reverbEngine = cv::kReverbSpringB;  // cv::kReverbChasm or cv::kReverbSpringB
   bool outputInstrument = false;           // false = LINE, true = INSTRUMENT
   bool inputMic = false;                   // false = PEDAL, true = MIC (adds kMicTrimDb)
 };
