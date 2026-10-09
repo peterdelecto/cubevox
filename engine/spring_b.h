@@ -97,6 +97,22 @@ struct Disperser {
     return in;
   }
 
+  // Runs two dispersers in one section loop so the independent chains overlap.
+  static void runPair(Disperser& d1, Disperser& d2, float& in1, float& in2, int sections, float a) {
+    for (int u = 0; u < sections; ++u) {
+      float& z1 = d1.buf[static_cast<size_t>(u * kStretch + d1.pos)];
+      float& z2 = d2.buf[static_cast<size_t>(u * kStretch + d2.pos)];
+      const float out1 = z1 + a * in1;
+      const float out2 = z2 + a * in2;
+      z1 = in1 - a * out1;
+      z2 = in2 - a * out2;
+      in1 = out1;
+      in2 = out2;
+    }
+    if (++d1.pos >= kStretch) d1.pos = 0;
+    if (++d2.pos >= kStretch) d2.pos = 0;
+  }
+
   // Sections from..end held stale state while unused.
   void clearFrom(int from) {
     for (size_t i = static_cast<size_t>(from * kStretch); i < buf.size(); ++i) buf[i] = 0.0f;
@@ -166,32 +182,45 @@ class SpringB {
     const float adv1 = advance(t.halfMs1, kDiff1A + kDiff1B, depth);
     const float adv2 = advance(t.halfMs2, kDiff2A + kDiff2B, depth);
     const float logDrive = logf(t.dwellDrive < 1.0f ? 1.0f : t.dwellDrive);
-    float lastDwell = -1.0f, drive = 1.0f, comp = 1.0f;
     const float wetGain = powf(10.0f, t.wetDb / 20.0f);
 
+    // Smoothed values are evaluated at the block edges and interpolated.
+    float decayEnd = decay_, dwellEnd = dwell_;
     for (int i = 0; i < n; ++i) {
-      decay_ = smooth::step(decay_, decayTarget, a);
-      dwell_ = smooth::step(dwell_, dwellTarget, a);
-      if (dwell_ != lastDwell) {
-        lastDwell = dwell_;
-        drive = expf(logDrive * dwell_);
-        comp = expf(-t.dwellComp * logDrive * dwell_);
-      }
-      const float g = timeLo + decay_ * (timeHi - timeLo);
+      decayEnd = smooth::step(decayEnd, decayTarget, a);
+      dwellEnd = smooth::step(dwellEnd, dwellTarget, a);
+    }
+    const float g0 = timeLo + decay_ * (timeHi - timeLo);
+    const float g1 = timeLo + decayEnd * (timeHi - timeLo);
+    const float scale0 = sqrtf(1.0f - g0 * g0), scale1 = sqrtf(1.0f - g1 * g1);
+    const float drive0 = expf(logDrive * dwell_), drive1 = expf(logDrive * dwellEnd);
+    const float comp0 = expf(-t.dwellComp * logDrive * dwell_);
+    const float comp1 = expf(-t.dwellComp * logDrive * dwellEnd);
+    const float inv = 1.0f / static_cast<float>(n);
+
+    for (int i = 0; i < n; ++i) {
+      const float f = static_cast<float>(i + 1) * inv;
+      const float g = g0 + (g1 - g0) * f;
+      const float scale = scale0 + (scale1 - scale0) * f;
+      const float drive = drive0 + (drive1 - drive0) * f;
+      const float comp = comp0 + (comp1 - comp0) * f;
       const float x = softClipHeadroom(in[i] * drive, kChasmClipHeadroom) *
-                      comp * t.inputTrim * sqrtf(1.0f - g * g);
+                      comp * t.inputTrim * scale;
       lfoAcc_ += lfoStep;
 
+      // Both lines are read before either is written.
       const float out1 = filter(dly1_.read(adv1 + lfo(0u) * depth) * g, lp1_, hp1_, lpF, hpF);
-      const float tap1 = disp1_.run(d1b_.run(d1a_.run(out1, k), k), sections, chirpA);
-
       const float out2 = filter(dly2_.read(adv2 + lfo(64u) * depth) * g, lp2_, hp2_, lpF, hpF);
+      float tap1 = d1b_.run(d1a_.run(out1, k), k);
+      float tap2 = d2b_.run(d2a_.run(out2, k), k);
+      Disperser::runPair(disp1_, disp2_, tap1, tap2, sections, chirpA);
       dly2_.write(tap1 + x);
-      const float tap2 = disp2_.run(d2b_.run(d2a_.run(out2, k), k), sections, chirpA);
       dly1_.write(tap2 + x);
 
       wet[i] = (tap1 + tap2) * wetGain;
     }
+    decay_ = decayEnd;
+    dwell_ = dwellEnd;
   }
 
  private:

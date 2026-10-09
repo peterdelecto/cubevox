@@ -84,7 +84,8 @@ three runs.
 
 | Step | Commit | ctest | A/B vs previous step | Bench |
 |---|---|---|---|---|
-| D4 | this commit | 17/17 | distortion -90.0, chain -92.8 dB (the tanh swap), all other cases exact | pending, board off the bus |
+| D4 | 285600f | 17/17 | distortion -90.0, chain -92.8 dB (the tanh swap), all other cases exact | pending, board off the bus |
+| S1 | this commit | 17/17 | all ten cases exact | pending |
 
 ## Ruled out
 
