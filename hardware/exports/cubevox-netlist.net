@@ -2,7 +2,7 @@
 	(version "E")
 	(design
 		(source "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.kicad_sch")
-		(date "2026-10-10T07:28:47")
+		(date "2026-10-10T07:43:43")
 		(tool "Eeschema 10.0.5")
 		(sheet
 			(number "1")
@@ -10390,12 +10390,12 @@
 		(comp
 			(ref "U108")
 			(value "OPA197IDBVR")
-			(footprint "Package_TO_SOT_SMD:SOT-23-5")
+			(footprint "cubevox_h7core:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR")
 			(fields
 				(field
 					(name "LCSC") "C221351")
 				(field
-					(name "Footprint") "Package_TO_SOT_SMD:SOT-23-5")
+					(name "Footprint") "cubevox_h7core:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR")
 				(field
 					(name "Datasheet")
 				)
@@ -11351,12 +11351,12 @@
 		(comp
 			(ref "C19")
 			(value "100uF 10V")
-			(footprint "Capacitor_Tantalum_SMD:CP_EIA-6032-28_Kemet-C")
+			(footprint "cubevox_h7core:CAP-SMD_L6.0-W3.2-R-RD")
 			(fields
 				(field
 					(name "LCSC") "C8649")
 				(field
-					(name "Footprint") "Capacitor_Tantalum_SMD:CP_EIA-6032-28_Kemet-C")
+					(name "Footprint") "cubevox_h7core:CAP-SMD_L6.0-W3.2-R-RD")
 				(field
 					(name "Datasheet")
 				)
@@ -15665,14 +15665,14 @@
 		(comp
 			(ref "U107")
 			(value "SP809EK-L-2-9/TR")
-			(footprint "Package_TO_SOT_SMD:SOT-23")
+			(footprint "cubevox_h7core:SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR")
 			(fields
 				(field
 					(name "LCSC") "C412495")
 				(field
 					(name "MPN") "SP809EK-L-2-9/TR")
 				(field
-					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+					(name "Footprint") "cubevox_h7core:SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR")
 				(field
 					(name "Datasheet")
 				)

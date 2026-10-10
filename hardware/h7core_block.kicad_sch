@@ -12491,7 +12491,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_Tantalum_SMD:CP_EIA-6032-28_Kemet-C"
+		(property "Footprint" "cubevox_h7core:CAP-SMD_L6.0-W3.2-R-RD"
 			(at 158.75 190.5 0)
 			(hide yes)
 			(effects
@@ -18032,7 +18032,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+		(property "Footprint" "cubevox_h7core:SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR"
 			(at 298.45 116.84 0)
 			(hide yes)
 			(effects

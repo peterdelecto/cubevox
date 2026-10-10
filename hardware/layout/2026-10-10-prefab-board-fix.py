@@ -126,7 +126,7 @@ def main(path, apply):
     x.commit(apply)
 
 
-if __name__ == '__main__' and '--pass2' not in sys.argv and '--pass3' not in sys.argv:
+if __name__ == '__main__' and not any(a in sys.argv for a in ('--pass2', '--pass3', '--pass4', '--pass5')):
     main(sys.argv[1], '--apply' in sys.argv)
 
 
@@ -175,3 +175,106 @@ def pass3(path, apply):
 
 if __name__ == '__main__' and '--pass3' in sys.argv:
     pass3(sys.argv[1], '--apply' in sys.argv)
+
+
+LIB_H7 = 'hardware/cubevox_h7core.pretty'
+
+
+def swap(x, ref, fp_name, pad1_at):
+    """Replace ref's footprint with the JLC (EasyEDA) one from cubevox_h7core.pretty, same centre, rotated
+    so pad 1 lands at pad1_at; fields, path, pad nets and the reference/value text placement carry over."""
+    b = x.b
+    old = b.FindFootprintByReference(ref)
+    new = pcbnew.FootprintLoad(LIB_H7, fp_name)
+    new.SetFPID(pcbnew.LIB_ID('cubevox_h7core', fp_name))
+    new.SetReference(ref); new.SetValue(old.GetValue()); new.SetPath(old.GetPath())
+    for f in old.GetFields():
+        if f.GetName() not in ('Reference', 'Value', 'Datasheet', 'Description', 'Footprint'):
+            new.SetField(f.GetName(), f.GetText())
+    for f in new.GetFields():
+        if f.GetName() not in ('Reference', 'Value'):
+            f.SetVisible(False)
+    new.SetPosition(old.GetPosition())
+    for rot in (0, 90, 180, 270):
+        new.SetOrientationDegrees(rot)
+        p1 = next(p for p in new.Pads() if p.GetNumber() == '1').GetPosition()
+        if x.near(p1, V(*pad1_at)):
+            break
+    else:
+        raise SystemExit('swap %s: no rotation puts pad 1 at %s' % (ref, pad1_at))
+    for to, tn in ((old.Reference(), new.Reference()), (old.Value(), new.Value())):
+        tn.SetAttributes(to.GetAttributes()); tn.SetLayer(to.GetLayer()); tn.SetVisible(to.IsVisible())
+        tn.SetPosition(to.GetPosition()); tn.SetTextAngle(to.GetTextAngle())
+    nets = {p.GetNumber(): p.GetNetname() for p in old.Pads()}
+    for p in new.Pads():
+        p.SetNet(x.net(nets[p.GetNumber()]))
+    b.Remove(old); b.Add(new)
+    x.say('  swap %s -> cubevox_h7core:%s rot %d, pads %s' % (ref, fp_name, rot,
+          ' '.join('%s(%.3f,%.3f)' % (p.GetNumber(), M(p.GetPosition().x), M(p.GetPosition().y)) for p in new.Pads())))
+
+
+def pass4(path, apply):
+    """U107, U108, C19 from KiCad stock footprints to the JLC ones (CPL rotation convention), with the
+    track ends, TP10 and two vias following the 0.13 to 0.30 mm pad shifts."""
+    b = pcbnew.LoadBoard(path)
+    x = Fix2(b)
+    x.say('9. U107 SP809 SOT-23')
+    swap(x, 'U107', 'SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR', (158.7, 47.25))
+    x.end('/GND', F, (158.7, 47.55), (158.7, 46.7), (158.7, 47.55), (158.7, 47.25))
+    x.end('/GND', F, (158.7, 47.25), (158.7, 46.7), (158.7, 46.7), (158.7, 46.2))
+    x.via('/GND', (158.7, 46.7), (158.7, 46.2))
+    LDO = '/h7core_block/LDO_EN'
+    x.rm(LDO, F, (156.3, 47.55), (156.8, 47.55))
+    x.rm(LDO, F, (155.37, 46.62), (156.3, 47.55))
+    x.add(LDO, F, 0.2, [(155.37, 46.62), (156.0, 47.25), (156.8, 47.25)])
+    x.rm('/3V3', F, (157.75, 49.43), (159.97, 49.43))
+    x.add('/3V3', F, 0.3, [(159.97, 49.43), (158.5, 49.43), (158.2, 49.73), (157.75, 49.73)])
+
+    x.say('10. U108 OPA197 SOT-23-5')
+    swap(x, 'U108', 'SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', (159.45, 88.55))
+    VB, VD = '/VREF_BUF', '/VREF_DIV'
+    x.end(VB, F, (156.05, 88.55), (159.613, 88.55), (159.613, 88.55), (159.45, 88.55))
+    x.rm(VB, F, (159.613, 85.7), (159.613, 88.55))
+    x.move('TP10', 159.45 - 159.6125, 0)
+    x.add(VB, F, 0.2, [(159.45, 85.7), (159.45, 88.55)])
+    x.end(VB, F, (159.613, 88.55), (160.5, 88.55), (159.613, 88.55), (159.45, 88.55))
+    x.end('/GND', F, (158.15, 89.5), (159.61, 89.5), (159.61, 89.5), (159.45, 89.5))
+    x.rm(VD, F, (159.61, 90.45), (159.61, 92.25))
+    x.rm(VD, F, (159.61, 92.25), (160.61, 93.25))
+    x.add(VD, F, 0.2, [(159.45, 90.45), (159.45, 92.09), (160.61, 93.25)])
+    x.end(VB, F, (161.1, 90.45), (161.887, 90.45), (161.887, 90.45), (162.05, 90.45))
+    x.end('/5VA', F, (161.89, 88.55), (163.37, 88.55), (161.89, 88.55), (162.05, 88.55))
+    x.rm('/5VA', F, (161.89, 84.1), (161.89, 88.55))
+    x.rm('/5VA', F, (160.89, 83.1), (161.89, 84.1))
+    x.end('/5VA', F, (158.0, 83.1), (160.89, 83.1), (160.89, 83.1), (161.05, 83.1))
+    x.add('/5VA', F, 0.3, [(161.05, 83.1), (162.05, 84.1), (162.05, 88.55)])
+
+    x.say('11. C19 tantalum 6032')
+    swap(x, 'C19', 'CAP-SMD_L6.0-W3.2-R-RD', (106.4, 46.0))
+    x.end('/5V', F, (103.5, 46.0), (106.53, 46.0), (106.53, 46.0), (106.4, 46.0))
+    x.rm('/5V', F, (106.53, 46.0), (106.53, 56.8))
+    x.add('/5V', F, 0.5, [(106.4, 46.0), (106.4, 56.8)])
+    x.via('/5V', (106.53, 56.8), (106.4, 56.8))
+    x.end('/5V', B, (98.1, 56.8), (106.53, 56.8), (106.53, 56.8), (106.4, 56.8))
+    x.rm('/5V', B, (106.53, 56.8), (106.53, 59.8))
+    x.rm('/5V', B, (106.53, 59.8), (107.53, 60.8))
+    x.add('/5V', B, 0.5, [(106.4, 56.8), (106.4, 59.67), (107.53, 60.8)])
+    x.end('/GND', F, (111.47, 46.0), (112.905, 46.0), (111.47, 46.0), (111.6, 46.0))
+    x.commit(apply)
+
+
+if __name__ == '__main__' and '--pass4' in sys.argv:
+    pass4(sys.argv[1], '--apply' in sys.argv)
+
+
+def pass5(path, apply):
+    """U107.1 GND via 0.1 mm south: 0.25 mm to the 3V3 lane at y 45.6 (netclass clearance 0.2)."""
+    b = pcbnew.LoadBoard(path)
+    x = Fix2(b)
+    x.end('/GND', F, (158.7, 47.25), (158.7, 46.2), (158.7, 46.2), (158.7, 46.3))
+    x.via('/GND', (158.7, 46.2), (158.7, 46.3))
+    x.commit(apply)
+
+
+if __name__ == '__main__' and '--pass5' in sys.argv:
+    pass5(sys.argv[1], '--apply' in sys.argv)

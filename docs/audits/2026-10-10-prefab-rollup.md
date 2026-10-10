@@ -29,13 +29,14 @@ Routing style was already clean (`2026-10-09-prefab-mega-audit.md`, c2635eb).
 
 ## 3. Owner checks at upload and on the first boards
 
-1. JLC placement preview: U107 and U108 (KiCad SOT-23 footprints, 180 deg from the EasyEDA ones), C19 tantalum, J117 socket, U1, SOT-23s, diodes, polar caps, toggles.
+1. JLC placement preview: U1, SOT-23s, diodes, polar caps, toggles, J117. (U107, U108 and C19 were on KiCad stock footprints whose zero sits 180 deg from JLC's; swapped to the JLC footprints 2026-10-10 before v4, so the v3 CPL is wrong for those three and must not be uploaded. J117's hand-made footprint matches the JLC socket footprint pad for pad.)
 2. JLC DFM viewer: the pot lug ovals (1.25:1 slots), the J1 USB-C 0.6 mm slots, hole-to-hole at exactly 0.50 mm near the buck (GND / 5V vias at y 56.8).
 3. First board: K103 continuity, coil off: K103.2 to K103.3 and K103.6 to K103.7 closed, 4/5 open. K102 muted at reset. DFU by menu and by BOOT0 with USB connected.
 4. Bench items carried forward: OPA2197 swing, noise dBu, RVGAIN1 rotation sense, input current at 9.6 V.
 
-## 4. Production v3
+## 4. Production v4
 
-Export from the commit that carries these fixes, 4-layer JLC04161H-7628, standard PCBA top side with THT.
-Re-export the netlist and position file first (`hardware/exports/` was stale). The v2 files in
-`hardware/production/` must not be uploaded.
+Upload `cubevox-gerbers-v4.zip`, `cubevox-bom-v4.csv`, `cubevox-cpl-v4.csv`: 4-layer JLC04161H-7628,
+standard PCBA top side with THT. v2 and v3 are superseded (v3 carries U107, U108 and C19 rotations
+180 deg off JLC's convention). Rule from here: every assembled part uses the JLC/EasyEDA footprint
+for its LCSC number; KiCad stock footprints only remain on symmetric two-pad passives (rev-B tidy).

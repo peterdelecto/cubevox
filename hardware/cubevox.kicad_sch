@@ -26073,7 +26073,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
+		(property "Footprint" "cubevox_h7core:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR"
 			(at 619.76 455.93 0)
 			(effects
 				(font
