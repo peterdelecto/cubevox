@@ -27505,6 +27505,391 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
+		(at 254.0 55.88 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "e28d89b8-c776-496b-b722-3595346fd37e")
+		(property "Reference" "TP6"
+			(at 257.81 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "3V3A"
+			(at 257.81 57.150000000000006 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 254.0 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 254.0 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fd334308-b6da-4ec5-a1f6-043499011798")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "TP6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 254.0 55.88) (xy 254.0 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "56f17645-ab96-4324-ab37-e78c8188dd10")
+	)
+	(label "3V3A"
+		(at 254.0 58.42 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "afd04d43-a5a2-4a79-8dd1-ee4e05fecfa8")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 266.7 55.88 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "f1f5b7be-5a60-464b-9838-ac27e8235fd3")
+		(property "Reference" "TP7"
+			(at 270.51 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "5V"
+			(at 270.51 57.150000000000006 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 266.7 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 266.7 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a8e0d5dd-80ce-4c1a-b438-ea15db80b3bf")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "TP7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 266.7 55.88) (xy 266.7 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e432f559-a4a0-462f-9234-2175212eb59a")
+	)
+	(label "5V"
+		(at 266.7 58.42 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "8513de77-87f8-43c0-98c6-399e9b99f303")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 279.4 55.88 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "3ce0ef17-0838-4f00-8327-a16db28e2a4d")
+		(property "Reference" "TP8"
+			(at 283.21 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "5VA"
+			(at 283.21 57.150000000000006 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 279.4 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 279.4 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4b98b0ac-63cf-4a7c-ba91-034ada3ae6f9")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "TP8")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 279.4 55.88) (xy 279.4 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7aa56ae0-fc00-44f5-a963-fd7d7c153bb0")
+	)
+	(label "5VA"
+		(at 279.4 58.42 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "d9b3fa5c-4e0f-4d93-94bf-a7a131192932")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 292.1 55.88 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "4ccf191b-8e2a-41c4-bcb9-0a18ede0507a")
+		(property "Reference" "TP9"
+			(at 295.91 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "5VA_W"
+			(at 295.91 57.150000000000006 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 292.1 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 292.1 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "3c4da5b7-d495-4faa-821e-2737067d53e7")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "TP9")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 292.1 55.88) (xy 292.1 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e221ce2c-1113-4ed6-9e94-650c65186707")
+	)
+	(label "5VA_W"
+		(at 292.1 58.42 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "d7c48662-a1fb-47e2-9a10-dd5828991aeb")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 304.8 55.88 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "3b4e92a7-9087-4236-8750-3378e699f812")
+		(property "Reference" "TP10"
+			(at 308.61 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "VREF_BUF"
+			(at 308.61 57.150000000000006 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 304.8 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 304.8 55.88 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4a30b02b-d85f-4143-aabc-38a2b0acab71")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "TP10")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 304.8 55.88) (xy 304.8 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f979ff99-d331-42da-9105-4974c80f5c90")
+	)
+	(label "VREF_BUF"
+		(at 304.8 58.42 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "6b7c3223-449f-4761-9214-1c709b7b2411")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
 		(at 241.3 55.88 0)
 		(unit 1)
 		(exclude_from_sim no)
