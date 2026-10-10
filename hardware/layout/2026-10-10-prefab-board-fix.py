@@ -126,7 +126,7 @@ def main(path, apply):
     x.commit(apply)
 
 
-if __name__ == '__main__' and '--pass2' not in sys.argv:
+if __name__ == '__main__' and '--pass2' not in sys.argv and '--pass3' not in sys.argv:
     main(sys.argv[1], '--apply' in sys.argv)
 
 
@@ -146,3 +146,32 @@ def pass2(path, apply):
 
 if __name__ == '__main__' and '--pass2' in sys.argv:
     pass2(sys.argv[1], '--apply' in sys.argv)
+
+
+def pass3(path, apply):
+    """Owner moved R162 east of U101.10. Make pad 1 the corner (S0 vertical in from the north, straight
+    west into pin 10), drop the off-pad T, merge the collinear MUX_S0 split left at the old spot."""
+    b = pcbnew.LoadBoard(path)
+    x = Fix2(b)
+    x.say('7. R162 pad 1 as the MUX_S0 corner')
+    x.rm('/MUX_S0', F, (153.15, 119.85), (153.65, 120.35))
+    x.rm('/MUX_S0', F, (153.65, 120.35), (153.65, 124.72))
+    x.rm('/MUX_S0', F, (153.65, 124.72), (153.15, 125.22))
+    x.rm('/MUX_S0', F, (153.15, 125.22), (151.56, 125.22))
+    x.rm('/MUX_S0', F, (154.03, 125.1), (153.65, 124.72))
+    x.rm('/MUX_S0', F, (154.49, 125.1), (154.03, 125.1))
+    x.rm('/GND', F, (155.51, 125.1), (156.54, 125.1))
+    x.move('R162', 0, 0.12)
+    x.via('/GND', (156.54, 125.1), (156.54, 125.22))
+    x.add('/GND', F, 0.3, [(155.51, 125.22), (156.54, 125.22)])
+    x.end('/MUX_S0', F, (144.25, 119.85), (153.15, 119.85), (153.15, 119.85), (153.99, 119.85))
+    x.add('/MUX_S0', F, 0.2, [(153.99, 119.85), (154.49, 120.35), (154.49, 125.22)])
+    x.add('/MUX_S0', F, 0.2, [(154.49, 125.22), (151.56, 125.22)])
+    x.say('8. merge the MUX_S0 split at the old R162 spot')
+    x.rm('/MUX_S0', F, (143.75, 114.0), (143.75, 119.35))
+    x.end('/MUX_S0', F, (143.75, 95.6), (143.75, 114.0), (143.75, 114.0), (143.75, 119.35))
+    x.commit(apply)
+
+
+if __name__ == '__main__' and '--pass3' in sys.argv:
+    pass3(sys.argv[1], '--apply' in sys.argv)
