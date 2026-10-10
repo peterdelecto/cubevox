@@ -11858,7 +11858,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C470307"
+		(property "LCSC" "C361173"
 			(at 645.16 320.04 0)
 			(hide yes)
 			(effects
@@ -11867,7 +11867,7 @@
 				)
 			)
 		)
-		(property "MPN" "RK09D117000C"
+		(property "MPN" "RK09D1130C2P"
 			(at 645.16 320.04 0)
 			(hide yes)
 			(effects
@@ -11876,7 +11876,7 @@
 				)
 			)
 		)
-		(property "Note" "15A log taper, 30 mm shaft"
+		(property "Note" "1B linear, 25 mm shaft, same part as the slot pots; divider wiring with R116 470R and R159 1k gives a near-log gain law"
 			(at 645.16 320.04 0)
 			(hide yes)
 			(effects
@@ -11961,7 +11961,7 @@
 		)
 		(uuid "6985781d-a6f4-5c0d-b857-5b80f9a3107c")
 	)
-	(label "G2_INV"
+	(label "G2_BOT"
 		(at 652.78 321.31 0)
 		(fields_autoplaced yes)
 		(effects
@@ -11982,6 +11982,117 @@
 	)
 	(symbol
 		(lib_id "Device:R")
+		(at 713.74 320.04 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "16352ec4-173e-4864-96f0-20570d028047")
+		(property "Reference" "R159"
+			(at 716.28 318.77 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 716.28 321.31 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 713.74 320.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 713.74 320.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C21190"
+			(at 713.74 320.04 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "38c766c9-57ea-42ee-a8a4-7f8506417942")
+		)
+		(pin "2"
+			(uuid "38937f73-6e7e-4233-8919-2066794dba46")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R159")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 713.74 316.23) (xy 713.74 313.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "60c9be3f-732a-44e9-bfe1-faf67c911616")
+	)
+	(label "G2_INV"
+		(at 713.74 313.69 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "7d1f4b0a-3c2e-4b8f-9a61-2f5e8c0d4a17")
+	)
+	(wire
+		(pts
+			(xy 713.74 323.85) (xy 713.74 326.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a2c9e7d3-5b14-4f6a-8e02-93d7c1b6f085")
+	)
+	(label "G2_RG"
+		(at 713.74 326.39 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "c4e81f26-9d7b-4a35-b1c8-6e0f2a5d7943")
+	)
+	(symbol
+		(lib_id "Device:R")
 		(at 706.12 320.04 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -11998,7 +12109,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "330R"
+		(property "Value" "470R"
 			(at 708.66 321.31 0)
 			(effects
 				(font
@@ -12025,7 +12136,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C23138"
+		(property "LCSC" "C23179"
 			(at 706.12 320.04 0)
 			(hide yes)
 			(effects
@@ -12059,7 +12170,7 @@
 		)
 		(uuid "4c104922-47bd-58c5-a90c-676ac432ffbc")
 	)
-	(label "G2_INV"
+	(label "G2_BOT"
 		(at 706.12 313.69 90)
 		(fields_autoplaced yes)
 		(effects
@@ -24182,6 +24293,720 @@
 		)
 		(uuid "6a2c9f53-b6f5-5683-b8ab-b4a52d53f874")
 	)
+	(symbol
+		(lib_id "cubevox:G6K-2F-Y-DC5")
+		(at 975.36 571.5 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "8f26214a-e733-4de5-b216-76228ce9b695")
+		(property "Reference" "K103"
+			(at 989.33 571.5 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "G6K-2F-Y DC5"
+			(at 989.33 574.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:RELAY-SMD_G6K-2F-X-XX"
+			(at 975.36 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 975.36 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C47190"
+			(at 975.36 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "G6K-2F-Y-TR DC5"
+			(at 975.36 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "3e3ad83e-526d-48e1-8910-a7a0fa75d211")
+		)
+		(pin "2"
+			(uuid "13449689-11a5-411d-ba75-759547bc4865")
+		)
+		(pin "3"
+			(uuid "40ec7caa-ae16-48f4-9962-f45761fba69d")
+		)
+		(pin "4"
+			(uuid "395a1749-587c-454d-af8d-4b3229123d60")
+		)
+		(pin "5"
+			(uuid "5dcbe1ab-ceba-4e13-a629-deed0de12d49")
+		)
+		(pin "6"
+			(uuid "60225c3d-0742-4f6c-889d-3b19a9ced312")
+		)
+		(pin "7"
+			(uuid "d335f769-1970-4ffd-afab-61ae902ec3a3")
+		)
+		(pin "8"
+			(uuid "adf76e87-08a2-4189-a978-a257690d129e")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "K103")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 967.74 581.66) (xy 967.74 586.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "44e72e4d-bd0f-4db0-915c-9f7209391d66")
+	)
+	(label "5V"
+		(at 967.74 586.74 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "b1845a61-e4d8-43fc-9741-a45a39ea37f8")
+	)
+	(no_connect
+		(at 970.28 581.66)
+		(uuid "5ab0a62b-c4c9-473b-939b-1891ba6910f7")
+	)
+	(wire
+		(pts
+			(xy 977.9 581.66) (xy 977.9 591.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e23fe1df-71ce-4137-b7a5-752fc9b70b52")
+	)
+	(label "LINE_P"
+		(at 977.9 591.82 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "6a1a79b3-66e2-4c48-aa36-59ad241831b9")
+	)
+	(wire
+		(pts
+			(xy 985.52 581.66) (xy 985.52 594.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c0a2507d-6fa8-4feb-ab60-11f41562cc32")
+	)
+	(label "IN_P"
+		(at 985.52 594.36 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "fbd682ac-86ba-4c0b-a3f8-ded26e12780d")
+	)
+	(wire
+		(pts
+			(xy 985.52 562.61) (xy 985.52 549.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e592d0e8-f503-429b-a92f-ec084c846289")
+	)
+	(label "LINE_N"
+		(at 985.52 549.91 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "312fc317-b8ae-4c2a-8b13-4e6d22fb4333")
+	)
+	(wire
+		(pts
+			(xy 977.9 562.61) (xy 977.9 552.45)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d6e6ddc2-75b8-4696-8bc8-396ae1dfb735")
+	)
+	(label "IN_N"
+		(at 977.9 552.45 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "20e4b3cf-812a-41fe-b2cb-030e49ca6a9a")
+	)
+	(no_connect
+		(at 970.28 562.61)
+		(uuid "5c0f2421-206b-475d-b826-864589402fff")
+	)
+	(wire
+		(pts
+			(xy 967.74 562.61) (xy 967.74 557.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bf98f299-4798-4b07-962a-566c05eea0e0")
+	)
+	(label "PAD_COIL"
+		(at 967.74 557.53 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "a277c309-47ee-4fed-8656-3b0480d1b29e")
+	)
+	(symbol
+		(lib_id "cubevox:1N4148W_C81598")
+		(at 1054.1 571.5 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2c2d1719-1db5-4836-8a4d-0a7ed013c9b6")
+		(property "Reference" "D110"
+			(at 1054.1 567.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "1N4148W"
+			(at 1054.1 575.31 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD"
+			(at 1054.1 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 1054.1 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C81598"
+			(at 1054.1 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "1N4148W"
+			(at 1054.1 571.5 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0b2f6fc7-3965-452f-ae7f-1aee75e195f1")
+		)
+		(pin "2"
+			(uuid "5aa98a19-c210-4f40-9d1b-8d3a8857b505")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "D110")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 1049.02 571.5) (xy 1046.48 571.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "84650a07-aa2a-4df7-a214-fef6a734edc9")
+	)
+	(label "5V"
+		(at 1046.48 571.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "09123a24-654b-48d4-b526-fadee2ff9241")
+	)
+	(wire
+		(pts
+			(xy 1059.18 571.5) (xy 1061.72 571.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "84c42641-38a9-4c50-b5d0-7029e5a16d8a")
+	)
+	(label "PAD_COIL"
+		(at 1061.72 571.5 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "04db2793-f997-4b3b-a000-5f7b8863b770")
+	)
+	(symbol
+		(lib_id "cubevox:MMBT3904-C20526")
+		(at 1016 632.46 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "7845e10a-eafa-4189-9526-ace3819a909e")
+		(property "Reference" "Q102"
+			(at 1019.81 631.19 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MMBT3904"
+			(at 1019.81 633.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
+			(at 1016 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 1016 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C20526"
+			(at 1016 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MMBT3904"
+			(at 1016 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "cc7deaf9-dc8f-4830-8858-0fbfef469226")
+		)
+		(pin "2"
+			(uuid "86366f30-e907-4c2c-84d1-ec692b5947ef")
+		)
+		(pin "3"
+			(uuid "0b93216c-0480-4969-862d-e311e5a40e1f")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "Q102")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 1013.46 632.46) (xy 1010.92 632.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a0459a18-90ad-49dc-9566-2739df6678e9")
+	)
+	(label "PAD_BASE"
+		(at 1010.92 632.46 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "713ed69a-2f57-4c01-906c-0ee247b2e6f0")
+	)
+	(wire
+		(pts
+			(xy 1018.54 637.54) (xy 1018.54 640.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "351abb38-205d-477d-b7a0-3fd3c66a5f66")
+	)
+	(label "GND"
+		(at 1018.54 640.08 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "419d2c85-94f1-4931-bd37-0c7f51860461")
+	)
+	(wire
+		(pts
+			(xy 1018.54 627.38) (xy 1018.54 624.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "81f46d18-9f40-4810-9d66-b90c44c3d849")
+	)
+	(label "PAD_COIL"
+		(at 1018.54 624.84 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "2f3a68f8-ab21-44ea-bae0-9b42a71cafbd")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 990.6 632.46 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "7ee86725-16b3-412a-b29d-cba650d7ab62")
+		(property "Reference" "R160"
+			(at 993.14 631.19 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 993.14 633.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 990.6 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 990.6 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C21190"
+			(at 990.6 632.46 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8ed24330-68c0-4a31-ad5c-abe0fe17bc0d")
+		)
+		(pin "2"
+			(uuid "0a86548b-dccb-4642-a7be-f3b75d2a3f0b")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R160")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 990.6 628.65) (xy 990.6 626.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a9c9649d-e769-4662-9da2-9e19ee076703")
+	)
+	(label "PAD_EN"
+		(at 990.6 626.11 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "a228ad56-1a0f-427e-9b1e-fa6f0ade67ca")
+	)
+	(wire
+		(pts
+			(xy 990.6 636.27) (xy 990.6 638.81)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b63b83de-7b11-437d-beb7-45c881a50e38")
+	)
+	(label "PAD_BASE"
+		(at 990.6 638.81 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "76cd12c1-d046-40f9-8608-3df1f5971e88")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 990.6 657.86 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "3a625e55-7808-47bf-bdab-62021627bc1c")
+		(property "Reference" "R161"
+			(at 993.14 656.59 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 993.14 659.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "cubevox:R0603"
+			(at 990.6 657.86 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 990.6 657.86 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25803"
+			(at 990.6 657.86 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "31dedfe8-fbb0-4941-be30-fea708d3fec6")
+		)
+		(pin "2"
+			(uuid "876dc060-9f72-4f4e-80d6-ea94082532c8")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R161")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 990.6 654.05) (xy 990.6 651.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3715c6f0-7f3e-4a45-8cff-114829dcabb5")
+	)
+	(label "PAD_BASE"
+		(at 990.6 651.51 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "2c04622b-a300-4d3b-96c8-cdad57711c97")
+	)
+	(wire
+		(pts
+			(xy 990.6 661.67) (xy 990.6 664.21)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1315fda0-18b0-413b-8293-4af07ae4b26d")
+	)
+	(label "GND"
+		(at 990.6 664.21 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "aa957498-896c-4c32-9eca-e3298eb0cb57")
+	)
 	(sheet
 		(at 25.4 50.8)
 		(size 58.42 152.4)
@@ -24544,6 +25369,16 @@
 				(justify right)
 			)
 			(uuid "bef151c7-ca10-51ac-b7db-ca77dc8a2db2")
+		)
+		(pin "PAD_EN" output
+			(at 83.82 143.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "4eba35cd-bc59-4478-ac62-ce3e1e2ed830")
 		)
 		(pin "VA_SENSE" input
 			(at 83.82 196.85 0)
@@ -25170,6 +26005,27 @@
 			(justify left bottom)
 		)
 		(uuid "836e127e-04ad-5a5e-95e6-9dcafd4daf26")
+	)
+	(wire
+		(pts
+			(xy 83.82 143.51) (xy 86.36 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b11bc918-4fc6-4d9d-932a-bc37b11aa7b1")
+	)
+	(label "PAD_EN"
+		(at 86.36 143.51 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "08e48ba9-40f4-443e-ac58-5cf74d9d775d")
 	)
 	(wire
 		(pts

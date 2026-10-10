@@ -1,0 +1,1 @@
+Use the relay: it reuses your proven hardware, avoids adding semiconductor switching to the 2 mV mic path, and consumes no coil power in the default MIC state, while its 28 mA PEDAL draw is the main tradeoff and menu-only switching makes speed irrelevant.

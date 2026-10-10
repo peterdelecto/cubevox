@@ -7740,6 +7740,28 @@
 		)
 		(uuid "258acf31-0457-5019-a168-d1cd7ddc2cef")
 	)
+	(hierarchical_label "PAD_EN"
+		(shape output)
+		(at 97.79 90.17 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "c3978398-db88-4a98-b01f-f8f18850e189")
+	)
+	(wire
+		(pts
+			(xy 95.25 90.17) (xy 97.79 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f4ea4706-4e86-4e32-8111-3394462f8f5a")
+	)
 	(wire
 		(pts
 			(xy 54.61 181.61) (xy 39.37 181.61)
@@ -18465,10 +18487,6 @@
 	(no_connect
 		(at 54.61 179.07)
 		(uuid "f80ba54d-327f-5b54-b8ea-7f7a613f753a")
-	)
-	(no_connect
-		(at 95.25 90.17)
-		(uuid "f4e8d82b-8ff6-50be-81b9-f618760b4011")
 	)
 	(no_connect
 		(at 95.25 87.63)
