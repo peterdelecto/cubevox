@@ -2,8 +2,9 @@
 
 Board: `hardware/cubevox.kicad_pcb` at commit c2635eb. **4-layer**, JLC04161H-7628 stackup,
 1.6 mm, HASL lead-free. F.Cu signal (1 oz), In1.Cu full GND zone (0.5 oz, 0.21 mm prepreg
-below F.Cu), In2.Cu full GND zone (0.5 oz, 0.21 mm above B.Cu), B.Cu signal (1 oz); F.Cu and
-B.Cu also carry GND fill zones. JLC fab + standard PCBA, top side, THT included.
+below F.Cu), In2.Cu full GND zone (0.5 oz, 0.21 mm above B.Cu), B.Cu signal (1 oz); the outer
+layers carry no GND fill, only a small /5V pour on F.Cu at the buck output. JLC fab + standard
+PCBA, top side, THT included.
 Schematics: `hardware/cubevox.kicad_sch` (root), `hardware/h7core_block.kicad_sch`.
 Project: `hardware/cubevox.kicad_pro`. Parts list: `hardware/PARTS.md`. Pins: `hardware/PINMAP.md`.
 Previous audits to read first so you do not repeat closed items:

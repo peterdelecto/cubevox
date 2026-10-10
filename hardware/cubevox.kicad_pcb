@@ -11407,7 +11407,7 @@
 			)
 		)
 	)
-	(footprint "RELAY-SMD_G6K-2F-X-XX"
+	(footprint "cubevox:RELAY-SMD_G6K-2F-X-XX"
 		(layer "F.Cu")
 		(uuid "36ee592c-2ce6-4520-9002-4159246bebd2")
 		(at 191.3 83)
@@ -12144,7 +12144,7 @@
 			)
 		)
 	)
-	(footprint "SOD-123F_L2.7-W1.6-LS3.8-RD"
+	(footprint "cubevox:SOD-123F_L2.7-W1.6-LS3.8-RD"
 		(layer "F.Cu")
 		(uuid "3848b568-f5e2-4a7d-a434-0d8443a9a789")
 		(at 184.6 82.5 90)
@@ -12869,7 +12869,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "3b1840d9-94ab-49d4-a462-2f436200a85f")
 		(at 233.4 74.75 -90)
@@ -33199,7 +33199,7 @@
 			)
 		)
 	)
-	(footprint "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
+	(footprint "cubevox:SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
 		(layer "F.Cu")
 		(uuid "9b78fd8c-8e76-4a0d-97be-025b84c4d56c")
 		(at 185.6 75.5 180)
@@ -50112,7 +50112,7 @@
 		)
 		(embedded_fonts no)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "ec60e26d-6aef-4cd3-b540-abd24f780ded")
 		(at 185.35 72.5 180)
@@ -53256,7 +53256,7 @@
 			)
 		)
 	)
-	(footprint "R0603"
+	(footprint "cubevox:R0603"
 		(layer "F.Cu")
 		(uuid "fa6e63b1-bd35-4db8-aa25-b4bf35df5193")
 		(at 185.35 70.5)
