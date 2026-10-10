@@ -29,6 +29,9 @@ constexpr uint32_t kMuteSw = PC6;  // MUTE_SW, low = muted, R120 pull-up on the 
 constexpr uint32_t kMuteN = PB5;   // MUTE_N, high closes relay K102, low at reset
 constexpr uint32_t kXsmt = PC5;    // XSMT, PCM5102A soft mute, low = muted, R16 pull-down
 
+// Input pad relay K103.
+constexpr uint32_t kPadEn = PE11;  // PAD_EN, output, high = PEDAL (pad in circuit), default low = MIC
+
 // Indicators and sense.
 constexpr uint32_t kUserLed = PB7;   // USER_LED
 constexpr uint32_t kVaSense = PB1;   // VA_SENSE, ADC12_INP5 (not read yet)
@@ -51,6 +54,6 @@ constexpr uint32_t kEncMenuSw = PE13;  // ENC_MENU_SW
 
 // BOOT0 (pin 94) is the DFU recovery button, not a GPIO the firmware uses.
 // PB8, PB9 and PE0 are spare (freed 2026-10-07 when KEY and SEMITONES became pots).
-// PB6, PE1, PE11 and PB4 are also unconnected.
+// PB6, PE1 and PB4 are also unconnected.
 
 }  // namespace pins

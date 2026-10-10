@@ -44,7 +44,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 | 12 | 1/4" half of the combo | Mic or pedal, never both inputs at once. No pad; shared 20–50 dB preamp on the XLR leg, 1/4" through a 25.7 dB pad |
 | 13 | Which H7 | Bare STM32H743VIT6 soldered on the product board, as fxbox. Not the WeAct module |
 | 14 | Top face | Signal-flow row like the pedal view. Board 185 × 145 mm (owner 2026-10-07, was 200 × 150). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player, equally spaced for ergonomics; the owner lays out the knobs. Rear wall left→right as seen from the front: 1/4" out, USB-C middle, XLR combo, power switch, 9 V barrel far right. Every jack mouth faces the rear edge (−y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4" nose 6 mm; the switch body face 0.35 inside the edge, lever 4.65 past it). Still provisional until Adam confirms |
-| 15 | Gain structure | Two stages, 20.05 dB fixed + 0–29.9 dB on the pot. 1/4" contacts carry a 25.7 dB pad; menu item 1/4" INPUT: PEDAL / MIC adds 25.7 dB in firmware for a mic on a TRS cable; the combo's normalling contact tells the MCU a 1/4" plug is in |
+| 15 | Gain structure | Two stages, 20.05 dB fixed + 0–30.2 dB on the pot (owner 2026-10-10, divider wiring, item 4). 1/4" contacts carry a 25.7 dB pad that relay K103 switches (owner 2026-10-10): menu item 1/4" INPUT: PEDAL / MIC drives PAD_EN (PE11), PEDAL = pad in, MIC (default, coil off) = pad shorted by the relay's NC contacts |
 | 16 | Power ground | Centre pin straight to GND, +9 V sleeve through a series Schottky and TVS. fxbox's either-polarity FET bridge is dropped because the Boss daisy chain and the audio cable share ground with the BD-2 |
 | 17 | Toggle switch | Yuen Fung ST-0-102-A01-T000-LF (C1788487), the only ON-ON bat toggle on JLC whose bushing spans the 11.8 mm panel plane; lever tip 3.6 mm above the knobs |
 
@@ -61,6 +61,12 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
    same preamp nodes, S to GND. BOTH T holes are the tip (Neutrik electrical
    diagram: one tip circuit, no switch; audit A01); both go to TRS_T. There is
    no plug detection; the 1/4" PEDAL / MIC menu item is a manual setting.
+   It drives PAD_EN (PE11; was PB8 in earlier drafts) and relay K103 (owner 2026-10-10): the
+   same G6K-2F-Y DC5 (C47190) on its NC contacts, IN_P on pin 2 and LINE_P on pin 3 (COM), IN_N
+   on pin 6 (COM) and LINE_N on pin 7, pins 4/5 (NO) open. Coil off = pad resistors R102/R105
+   shorted = MIC. PAD_EN high = PEDAL (coil on, 28 mA). Driver Q102 MMBT3904, R160 1 kΩ base,
+   R161 100 kΩ base-emitter, D110 1N4148W across the coil. The firmware MIC trim (+25.7 dB)
+   no longer applies; the relay removes the pad instead.
    JACK_TRS_N and R107 are deleted, PB11 is free. A TS plug shorts ring to
    sleeve, which grounds the cold input.
 2. Input network, per leg (P and N identical). XLR leg: 47 Ω series, BAT54S
@@ -84,15 +90,17 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
    G = 1 + 2·4.53k/1k = 10.06 (20.05 dB), corner 7 Hz (audit A04). 47 pF across
    each Rf. Difference amp A3 with four 10 kΩ 0.1 % (audit A08), gain 1,
    reference VREF. Output PRE1, DC within a few mV of VREF.
-4. Stage 2, 0–29.9 dB on the Input Gain pot (RK09D1130C2P 10 kΩ linear, wired
-   as a variable resistor, wiper tied to one end, no end-stop). Non-inverting
-   on A4 (OPA2197): the pot is the feedback resistor; R116 = 330 Ω from the
-   inverting input to GND through 100 µF 10 V (DC gain 1, corner 4.8 Hz; the
+4. Stage 2, 0–30.2 dB on the Input Gain pot (RK09D1130C2P 10 kΩ linear, wired
+   as a divider, owner 2026-10-10; replaces the log RK09D117000C). Non-inverting
+   on A4 (OPA2197): pot end 1 is PRE_OUT, the wiper is the inverting input, and
+   end 3 reaches the RG node through R116 = 470 Ω, with R159 = 1 kΩ from the
+   wiper to the RG node in parallel; the RG node goes to GND through 100 µF 10 V (DC gain 1, corner 4.8 Hz; the
    feedback current returns to ground, never into VREF, audit A03/A05).
-   47 pF across the pot. G = 1 + Rpot/330 = 1 .. 31.3, so the stage runs 0 to
-   29.9 dB and the chain 20.05 to 49.95 dB on XLR, −5.6 to +24.3 dB on the 1/4".
-   At minimum gain the 330 Ω network loads the op-amp with 4.2 mA rms at
-   1.4 Vrms, inside the OPA2197's 65 mA. Output PRE_OUT, DC at VREF.
+   47 pF across the pot. With x the wiper position from PRE_OUT (0) to end 3 (1),
+   G = 1 + (1−x)·10 kΩ / (1 kΩ ‖ (x·10 kΩ + 470 Ω)) = 1 .. 32.3 (computed), so the stage runs 0 to
+   30.2 dB and the chain 20.05 to 50.2 dB on XLR, −5.6 to +24.5 dB on the 1/4" (pad in).
+   The 330 Ω load figure (4.2 mA rms at 1.4 Vrms) predates the divider and is not recomputed;
+   the OPA2197 limit is 65 mA. Output PRE_OUT, DC at VREF.
 5. VREF. 5VA through 10 kΩ / 10 kΩ, 10 µF at the divider, follower on U108
    (OPA197IDBVR, drives VREF_BUF), then 22 Ω into the VREF node with one 10 µF (the follower
    never sees the capacitance directly, audit A03). No per-load 100 nF caps.
@@ -165,7 +173,9 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
 13. Analog on 5VA (5V through the ferrite): OPA2197s (U106 from 5VA_W through FB102), PCM1808 VCC through
     10 Ω, relay coils on 5V. VA_SENSE: 5VA through 10 kΩ / 10 kΩ with 100 nF
     to PB1 (ADC12_INP5); R151/R152 sit at U106's 5VA pin, C163 at the MCU end.
-    Pin map: `hardware/PINMAP.md` section 2. 3V3A: codec digital-analog, pots. USB
+    Pin map: `hardware/PINMAP.md` section 2. Test pads TP1 to TP11 (owner 2026-10-10): 9V_JACK, VIN_9V, GND, 3V3, VBUS, 3V3A, 5V, 5VA, 5VA_W, VREF_BUF, VDDA (D1.5 mm, not in the BOM).
+    R162 100 kΩ 0402 (C25741) pulls MUX_S0 (PE12) to GND (owner 2026-10-10): in ROM DFU the bootloader listens on SPI4 (NSS PE11, SCK PE12), and a floating SCK could feed a false sync byte and lock it to SPI. The other three mux selects are not on bootloader pins.
+    3V3A: codec digital-analog, pots. USB
     carries DFU and the slot layout over CDC serial (owner 2026-10-08); DFU is
     entered from the app or the menu, BOOT0 button is recovery (the box must be
     on 9 V to run DFU).
@@ -204,7 +214,7 @@ F6. Removed 2026-10-07 with the bypass path; the output is always the digital
     the mounting surface, ø6 D-shaft with 4.5 mm flat. The owner's 13.5 mm on a
     sample was measured from the collar top (25.0 − 11.8 = 13.2). EasyEDA's
     models for C2P and C3C are swapped (the one titled C2P is the 20 mm shaft).
-    Same part for the analog Input Gain pot, 17 in total; a build of N units
+    Same part for the analog Input Gain pot (owner 2026-10-10), 17 in total; a build of N units
     needs 17 N. Over the 11.8 mm panel plane the shaft stands 13.2 mm.
 20. One encoder on direct GPIO (Adam 2026-10-07; KEY and SEMITONES became
     pots, freeing PB7, PB8, PB9, PE0, left unconnected): MENU with push

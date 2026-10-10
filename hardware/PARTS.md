@@ -1,7 +1,7 @@
 # cubevox PARTS
 
 Board: cubevox main board (one JLC-assembled board). Spec: docs/specs/2026-10-02-hardware-design.md.
-Snapshot 2026-10-02. Prices are the 10+ tier. Stock is from `jlc_get_part` unless marked LIVE
+Snapshot 2026-10-02; rows reconciled with the board 2026-10-10 (pre-fab audit). Prices are the 10+ tier. Stock is from `jlc_get_part` unless marked LIVE
 (`jlc_stock_check`, 2026-10-02). Re-check everything at order time.
 Build quantity: 1 board (qty column is per board; required = per-board x N + allowance, 17 pots x N).
 
@@ -20,14 +20,14 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 10 | C404027 | TLV75533PDBVR | 3V3A LDO | Extended | 136560 | 0.113 | SOT-23-5 (h7core) | 1 | inherited |
 | 11 | C55513 | PCM1808PWR | ADC | Extended | 27700 | 0.563 | TSSOP-14 (h7core) | 1 | inherited |
 | 12 | C107671 | PCM5102APWR | DAC | Extended | 6661 | 1.276 | TSSOP-20 (h7core) | 1 | inherited |
-| 13 | C47190 | G6K-2F-Y-TR DC5 | output mute relay K102 (pole B grounds the tip while muted), DPDT 5 V | Extended | 68587 | 0.915 | RELAY-SMD_G6K-2F (cubevox) | 1 | inherited; K101 bypass relay removed 2026-10-07 (bypass became MUTE) |
+| 13 | C47190 | G6K-2F-Y-TR DC5 | K102 output mute relay (pole B grounds the tip while muted) and K103 input pad relay (NC contacts: coil off = pad resistors R102/R105 shorted = MIC; PAD_EN high = PEDAL), DPDT 5 V | Extended | 68587 | 0.915 | RELAY-SMD_G6K-2F (cubevox) | 2 | inherited; K101 bypass relay removed 2026-10-07 (bypass became MUTE); K103 added 2026-10-10 (owner) |
 | 14 | C3096082 | PJ-002A | 9 V barrel jack | Extended | 1893 | 0.753 | DC-IN-TH_PJ-002A (cubevox) | 1 | inherited |
 | 16 | C113992 | SMBJ20CA (MDD) | 9 V TVS D105 | Extended | 40190 (2026-10-08) | 0.045 (100+) | SMB (cubevox) | 1 | pre-fab 2026-10-08: replaces SMBJ15CA C19077570, which conducts from 16.7 V and cooks on an 18 V pedal supply. Same footprint |
 | 17 | C98457 | CD74HC4067SM96 | 16:1 pot mux | Extended | 9499 | 0.460 | SSOP-24 (cubevox) | 1 | inherited |
 | 18 | C470754 | EC11E15244B2 | MENU encoder, with switch (1.5 mm travel) | Extended | 5660 (2026-10-03) | 2.04 (10+) | SW-TH_EC11E (cubevox, Alps layout) | 1 | owner 2026-10-03, matches C2P pot; model EC11E15244B2_from_alps_ec11n.step = Alps EC11N1525404 STEP with shaft +5 mm, measured tip 24.5 |
 | 19 | C470710 | EC11E15204A3 | KEY, SEMITONES encoders (removed 2026-10-07, do not order: both are pots now) | Extended | 847 (2026-10-03) | 2.24 (10+) | SW-TH_EC11E (cubevox, Alps layout) | 0 | owner 2026-10-03; model EC11E15204A3_from_alps_ec11n.step = Alps EC11N1520401 STEP with shaft +5 mm, measured tip 24.5 |
 | 20 | C361173 | RK09D1130C2P | pots, 16 slot knobs on the mux (RVGAIN1 moved to row 20c, 2026-10-08) | Extended | 174 (2026-10-03) | 0.629 (10+) | RES-ADJ-TH_RK09D1130C2P (cubevox) | 16 | owner 2026-10-03; Adam 2026-10-07 8 slots × 2; Alps drawing No. 4 shared with C1B, LM1 25. Model RK09D1130C2P_from_alps_c1b.step = Alps C1B STEP with shaft +5 mm in the D-flat, measured tip 25.0, collar 11.8. EasyEDA's C2P/C3C models are swapped |
-| 20c | C470307 | RK09D117000C | RVGAIN1 Input Gain, 10 k 15A log taper, 30 mm shaft | Extended | 78 (2026-10-08) | 0.616 (10+) | RES-ADJ-TH_RK09D1130C2P (cubevox, same Alps drawing 4) | 1 | pre-fab 2026-10-08: log taper gives ~6 dB per quarter turn as a rheostat; the linear part put 12 of 30 dB in the first tenth. Shaft is 5 mm longer than the C2P slot pots |
+| 20c | C361173 | RK09D1130C2P | RVGAIN1 Input Gain, 10 k linear, 25 mm shaft, wired as a divider with R116 470 ohm and R159 1 k (near-log gain law); same part as row 20 | Extended | 174 (2026-10-03) | 0.629 (10+) | RES-ADJ-TH_RK09D1130C2P (cubevox) | 1 | pre-fab 2026-10-10 (owner): replaces the C470307 RK09D117000C log pot. Pots on this LCSC number: 17 per board (16 slot pots + RVGAIN1) |
 | 20b | C470304 | RK09D1130C1B | pots (superseded 2026-10-03, do not order) | Extended | 986 | 0.84 (10+) | RES-ADJ-TH_RK09D1130C3C (cubevox) | 0 | replaced by C361173 (owner wants the 25 mm shaft); its Alps STEP (tip 20.0) is the base of the C2P model |
 | 21 | C368458 | NCJ6FA-H | XLR + 1/4" combo input | Extended | 111 (LIVE) | 2.600 | CONN-TH_NCJ6FA-H (cubevox) | 1 | IMPORTED with --model-offset -1.24 -11.46 0 and --accept-mismatch (catalogue 3P is the XLR pin count), see WARNINGS 1 |
 | 22 | C309282 | PJ-611E | 1/4" output jack (HOOYA) | Extended | 1562 (LIVE 2026-10-02) | 0.541 | AUDIO-TH_PJ-611E_1 (cubevox, copied from fxbox with its model offset 2.84/-2.85) | 1 | owner 2026-10-02 replaces NMJ6HCD2 (C368502); pin map 2 sleeve, 4 ring, 6 tip, 3/5/7 switch contacts, verified against the HOOYA drawing in the fxbox record |
@@ -36,7 +36,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 28b | C42379197 (socket); module owner-supplied | hanxia HX PM2.54-1x4P TP-YQ socket + SH1106 1.3in I2C 128x64 module | J117: 5 mm 1x4 SMD female socket, JLC-assembled (SMD so it sits square; THT headers came out crooked, owner 2026-10-06); the OLED module hand-plugs into it | extended | 0.22 | 17414 | OLED-1.3-SH1106-I2C-4P (cubevox, hand-written; socket pads staggered ±1.80 from the row, 1.27x2.20) | 1 | Module PCB 35.4x33.5x1.2, pins GND/VCC/SCL/SDA, 4x NPTH 3.2 on a 30.4x28.5 grid. Buy 4x M3 x 9 mm standoffs (plus 4 screws). Model assumes 9.0 mm standoffs: module PCB bottom at z 9.0, glass top at z 11.7. With 9 mm standoffs the socket takes 6.5 mm of pin (spec item 22). The 11.8 mm panel plane needs about 9.1 mm standoffs. |
 | 29 | C192421 | OPA1678IDR | SUPERSEDED by row 50 (revision 2, audit A02: input range stops 2 V below V+). Do not order | Extended | 3309 | 0.774 | SOIC-8_L5.0-W4.0 (cubevox) | 0 | footprint kept in cubevox.pretty, unused |
 | 30 | C8678 | SS34 | 9V_JACK to VIN_9V Schottky | Basic | 3557042 | 0.030 | SMA_L4.3-W2.6 (cubevox) | 1 | IMPORTED with --repair-courtyard |
-| 32 | C81598 | 1N4148W | relay flyback D109 (mute) | Basic | 5171770 | 0.012 | SOD-123F (cubevox) | 1 | inherited; D104 removed with K101, 2026-10-07 |
+| 32 | C81598 | 1N4148W | relay flyback D109 (K102 mute), D110 (K103 pad) | Basic | 5171770 | 0.012 | SOD-123F (cubevox) | 2 | inherited; D104 removed with K101, 2026-10-07; D110 added 2026-10-10 |
 | 32a | C1788487 | ST-0-102-A01-T000-LF | toggle switches, SPDT ON-ON two-position (datasheet p.2 function table: model 102 = POS.1 ON, POS.2 NONE, POS.3 ON), 3 pins 2.54 mm; 8 panel + bypass | Extended | 5513 (LIVE 2026-10-02) | 0.538 (10+) | SW-TH_3P-L8.3-W5.2-P2.54_ST-0-102-A01-T000 (cubevox) | 9 | IMPORTED with --accept-mismatch; courtyard edited in .kicad_mod, see WARNINGS 11. Pins: 2 = COM, 1 = T1, 3 = T3 |
 | 32b | C17179528 | SS-12D11-G050 | power switch SWPWR1, SPDT slide, right-angle, 3 A; on B.Cu between J101 and J106, owner-soldered | Extended | 768 (2026-10-09) | 0.344 | SW-TH_5P-P4.70_SS-12D11-G050 (cubevox, easyeda2kicad; STEP offset 0/2.25/3.3 measured) | 1 | owner 2026-10-09; out of the JLC BOM and CPL. Pins: 2 = COM (9V_PLUG), 1 = 9V_JACK, 3 open, 4/5 frame legs open |
 | 33 | C23182 | 0603WAF470JT5E | R 47 ohm | Basic | 975974 | 0.002 | R0603 (cubevox) | by schematic | IMPORTED, courtyard repaired |
@@ -46,7 +46,6 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 37 | C23162 | 0603WAF4701T5E | R 4.7 k | Basic | 7433362 | 0.002 | R0603 | by schematic | IMPORTED |
 | 38 | C25804 | 0603WAF1002T5E | R 10 k | Basic | 23056985 (LIVE; local catalog says 0, stale) | 0.002 | R0603 | by schematic | IMPORTED |
 | 39 | C22809 | 0603WAF1502T5E | R 15 k | Basic | 1150042 | 0.002 | R0603 | by schematic | IMPORTED |
-| 40 | C25810 | 0603WAF1802T5E | R 18 k | Basic | 410427 | 0.002 | R0603 | by schematic | IMPORTED |
 | 41 | C23140 | 0603WAF330JT5E | R 33 ohm | Basic | 1772784 | 0.001 | R0603 | by schematic | IMPORTED |
 | 42 | C25803 | 0603WAF1003T5E | R 100 k | Basic | 7990119 | 0.002 | R0603 | by schematic | IMPORTED |
 | 43 | C1671 | CL10C470JB8NNNC | C 47 pF C0G 50 V | Basic | 360883 | 0.006 | C0603 (cubevox) | by schematic | IMPORTED |
@@ -60,29 +59,47 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 51 | C309083 | ARG03BTC1002 | R111-R114, difference amp, 10 k 0.1 % 25 ppm | Extended | 59843 | 0.0214 | R0603 (cubevox) | 4 | IMPORTED with --repair-courtyard; same R0603 footprint as the other 0603 resistors |
 | 52 | C72484 | RVT1E100M0405 | 10 uF 25 V electrolytic 4x5.4 (ROQANG, 105 C): C121, C125 coupling, C139 DAC, C141 output, C160 VREF node | Extended | 32285 | 0.0217 | CAP-SMD_BD4.0-L4.3-W4.3-FD (cubevox) | 5 | IMPORTED with --repair-courtyard (4.39x4.39 -> 6.62x4.90 mm). Symbol polarised, pin 1 = +. Footprint pad 1 = + (see WARNINGS 12) |
 | 53 | C191859 | VT1A101M0505 | 100 uF 10 V electrolytic 5x5.4: C159 (stage 2 R116 leg) | Extended | 26521 | 0.0256 | CAP-SMD_BD5.0-L5.3-W5.3-LS6.3-FD (cubevox) | 1 | IMPORTED with --repair-courtyard (5.39x5.39 -> 8.00x5.90 mm). Pin 1 = + |
-| 55 | C23179 | 0603WAF4700T5E | R 470 ohm: R147, DAC reconstruction filter | Basic | 1899614 | 0.0016 | R0603 | 1 | IMPORTED, courtyard repaired (same footprint) |
+| 55 | C23179 | 0603WAF4700T5E | R 470 ohm: R147, DAC reconstruction filter; R116, Input Gain divider (2026-10-10) | Basic | 1899614 | 0.0016 | R0603 | 2 | IMPORTED, courtyard repaired (same footprint) |
 | 57 | C23345 | 0603WAF220JT5E | R 22 ohm: R146, VREF follower isolation | Basic | 2657294 | 0.0017 | R0603 | 1 | IMPORTED, courtyard repaired |
 | 60 | C90540 | 0603B105K500NT | C 1 uF X7R 50 V: C18, USB-C VBUS bypass beside J1/D2 | Extended | 918076 | 0.0368 | Capacitor_SMD:C_0603_1608Metric | 1 | stock from search 2026-10-02; replaces the inherited X5R C15849 |
 | 61 | C72521 | RVT1E470M0605 | 47 uF 25 V electrolytic 6.3x5.4 (ROQANG, 105 C): C120, C124 mic coupling | Extended | 139544 (import 2026-10-02; search DB 67202) | 0.0319 | CAP-SMD_BD6.3-L6.6-W6.6-LS7.6-FD (cubevox) | 2 | IMPORTED with --repair-courtyard (6.69x6.69 -> 9.34x7.20 mm). Pin 1 = + by the family convention; pad 1 sits on -X like the 4x5.4 parts. Silk polarity mark and 3D orientation not checked |
 | 62 | C413679 | EEEHP1E220P | 22 uF 25 V bipolar (non-polarised) electrolytic 6.3x5.8 (Panasonic): C158 stage 1 RG leg | Extended | 835 (import 2026-10-02; search DB 660) | 0.3059 | CAP-SMD_BD6.3-L6.6-W6.6-FD (cubevox) | 1 | IMPORTED with --repair-courtyard (6.69x6.69 -> 9.34x7.20 mm). Schematic uses Device:C; the imported symbol draws a polarity mark and is unused |
-| 63 | C20526 | MMBT3904 | Q101 NPN, K102 coil driver (R150 1 k base, R153 100 k base pull-down) | Basic | 2033567 (import) | 0.0108 | SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (cubevox) | 1 | IMPORTED with --repair-courtyard (1.39x2.99 -> 3.50x3.50 mm). Shares the footprint file of the unused 2N7002 (C8545). Pins B 1, E 2, C 3 |
+| 63 | C20526 | MMBT3904 | Q101 NPN, K102 coil driver (R150 1 k base, R153 100 k base pull-down); Q102 NPN, K103 coil driver (R160 1 k base, R161 100 k base-emitter; PAD_EN on PE11, 28 mA coil) | Basic | 2033567 (import) | 0.0108 | SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (cubevox) | 2 | IMPORTED with --repair-courtyard (1.39x2.99 -> 3.50x3.50 mm). Shares the footprint file of the unused 2N7002 (C8545). Pins B 1, E 2, C 3 |
 | 64 | C25971 | 0603WAF4531T5E | R 4.53 k: R108, R110, stage 1 feedback (replaces 9.53 k C23127) | Extended | 15479 | 0.0027 | R0603 | 2 | Same footprint as the other 0603 resistors. No Basic 4.53 k exists |
 | 65 | C31850 | 0603WAF2202T5E | R 22 k: R102, R105, TRS pad series | Basic | 3702668 | 0.0041 | R0603 | 2 | Same footprint |
 | 66 | C4216 | 0603WAF3302T5E | R 33 k: R6, VBUS sense divider top | Basic | 3237413 | 0.0022 | R0603 | 1 | Same footprint |
 | 67 | C23231 | 0603WAF6802T5E | R 68 k: R7, VBUS sense divider bottom | Basic | 785704 (2026-10-08) | 0.0013 | R0603 | 1 | pre-fab 2026-10-08: was 82 k C23254. PA9 sees 3.53 V instead of 3.74 V from a 5.25 V host with the box unpowered |
-| 68 | C23138 | 0603WAF3300T5E | R 330 ohm: R116, stage 2 gain leg (replaces 200 ohm C8218) | Basic | 3273227 | 0.0026 | R0603 | 1 | Same footprint |
 | 69 | C412495 | SP809EK-L-2-9/TR | U107, LDO enable supervisor: 2.9 V threshold on 3V3, 230 ms release, drives U4 EN via LDO_EN | Extended | 16416 | 0.324 | Package_TO_SOT_SMD:SOT-23 | 1 | Push-pull, active low per the MaxLinear datasheet (SP809N is the open-drain variant; LCSC lists it as open-drain). R158 100 k pulls LDO_EN to 3V3 so EN never floats. Holds 3V3A off until 3V3 is good (PINMAP Firmware item 6) |
-| 71 | C25741 | 0402WGF1003TCE | R 100 k 0402: R158, LDO_EN pull-up to 3V3 | Basic | 8459437 (2026-10-08) | 0.0019 | Resistor_SMD:R_0402_1005Metric | 1 | pre-fab 2026-10-08. 0402 because pad 1 sits inline on the 3V3 trunk and pad 2 inline on LDO_EN between U4 and U107; an 0603 pitch puts a 0.3 mm jog in one of them |
+| 71 | C25741 | 0402WGF1003TCE | R 100 k 0402: R158, LDO_EN pull-up to 3V3; R162, MUX_S0 (PE12) pull-down to GND | Basic | 8459437 (2026-10-08) | 0.0019 | Resistor_SMD:R_0402_1005Metric | 2 | pre-fab 2026-10-08. R162 added 2026-10-10 (owner): in ROM DFU the bootloader listens on SPI4 (NSS PE11 held low by the K103 driver, SCK PE12), and a floating SCK could feed a false sync byte and lock it to SPI, so USB DFU would not connect. 0402 because pad 1 sits inline on the 3V3 trunk and pad 2 inline on LDO_EN between U4 and U107; an 0603 pitch puts a 0.3 mm jog in one of them |
 | 72 | C15850 | CL21A106KAYNNNE | C 10 uF X5R 25 V 0805: C164, C168, C169, C170 (U6 AVDD bulk, pre-fab 2026-10-08) | Basic | 4645301 (2026-10-08) | 0.051 | Capacitor_SMD:C_0805_2012Metric | 4 | C170 sits 4 mm from U6 pin 1 per the PCM5102A typical application |
-| 73 | none | TestPoint_Pad_D1.5mm | TP1 9V_JACK, TP2 VIN_9V, TP3 GND, TP4 3V3, TP5 VBUS | none | n/a | 0 | TestPoint:TestPoint_Pad_D1.5mm | 5 | bare 1.5 mm pads, excluded from BOM and CPL |
+| 73 | none | TestPoint_Pad_D1.5mm | TP1 9V_JACK, TP2 VIN_9V, TP3 GND, TP4 3V3, TP5 VBUS, TP6 3V3A, TP7 5V, TP8 5VA, TP9 5VA_W, TP10 VREF_BUF, TP11 VDDA | none | n/a | 0 | TestPoint:TestPoint_Pad_D1.5mm | 11 | bare 1.5 mm pads, excluded from BOM and CPL |
 | 70 | C221351 | OPA197IDBVR | U108, VREF buffer: drives VREF_BUF, then R146 22 ohm into the VREF node | Extended | 84235 | 0.8373 (10+) | Package_TO_SOT_SMD:SOT-23-5 | 1 | Supplied from 5VA; 5VA_W (FB102) supplies U106 only |
+| 74 | C19666 | - | C6, 4.7 uF 16 V X5R | Basic | 2210949 (2026-10-10) | n/a | Capacitor_SMD:C_0603_1608Metric | 1 | board vs PARTS reconcile 2026-10-10 |
+| 75 | C15849 | - | C8, C10, C24, 1 uF 50 V X5R | Basic | 8651827 (2026-10-10) | n/a | Capacitor_SMD:C_0603_1608Metric | 3 | as row 74 |
+| 76 | C23630 | - | C12, C13, C25, C34, C35, C111, 2.2 uF 16 V X5R | Basic | 2269120 (2026-10-10) | n/a | Capacitor_SMD:C_0603_1608Metric | 6 | as row 74 |
+| 77 | C1644 | - | C15, C16, 15 pF C0G (crystal load) | Basic | 963616 (2026-10-10) | n/a | Capacitor_SMD:C_0603_1608Metric | 2 | as row 74 |
+| 78 | C8649 | - | C19, 100 uF 10 V tantalum | Extended | 322411 (2026-10-10) | n/a | Capacitor_Tantalum_SMD:CP_EIA-6032-28_Kemet-C | 1 | as row 74. KiCad stock footprint, zero orientation unchecked against JLC (audit D1) |
+| 79 | C19702 | - | C28, C30, C32, C46, C48, 10 uF 10 V X5R | Basic | 10419984 (2026-10-10) | n/a | Capacitor_SMD:C_0603_1608Metric | 5 | as row 74 |
+| 80 | C1588 | - | C55, 1 nF X7R | Basic | 7127051 (2026-10-10) | n/a | Capacitor_SMD:C_0603_1608Metric | 1 | as row 74 |
+| 81 | C15195 | - | C56, C58, 10 nF X7R | Basic | 3598539 (2026-10-10) | n/a | Capacitor_SMD:C_0402_1005Metric | 2 | as row 74 |
+| 82 | C1525 | - | C57, C61, C165, C166, C167, 100 nF 16 V X7R | Basic | 24133848 (2026-10-10) | n/a | Capacitor_SMD:C_0402_1005Metric | 5 | as row 74 |
+| 83 | C2286 | KT-0603R | D1 USER, D3 PWR, red LED | Basic | 7292564 (2026-10-10) | n/a | LED-SMD_L1.6-W0.8-R-RD (h7core) | 2 | as row 74 |
+| 84 | C14709 | BLM18PG121SN1D (FB101) | FB1, FB101, FB102, ferrite 120 ohm at 100 MHz | Basic | 1487486 (2026-10-10) | n/a | Inductor_SMD:L_0603_1608Metric | 3 | as row 74 |
+| 85 | C21189 | - | R1, 0 ohm | Basic | 25228968 (2026-10-10) | n/a | Resistor_SMD:R_0603_1608Metric | 1 | as row 74 |
+| 86 | C23228 | - | R3, R10, 680 ohm | Basic | 2322057 (2026-10-10) | n/a | Resistor_SMD:R_0603_1608Metric | 2 | as row 74 |
+| 87 | C23186 | - | R4, R5, 5.1 k USB-C CC | Basic | 24611641 (2026-10-10) | n/a | Resistor_SMD:R_0603_1608Metric | 2 | as row 74 |
+| 88 | C22859 | - | R20, 10 ohm | Basic | 6814936 (2026-10-10) | n/a | Resistor_SMD:R_0603_1608Metric | 1 | as row 74 |
+| 89 | C25105 | - | R27, R156, R157, 33 ohm | Basic | 1685687 (2026-10-10) | n/a | Resistor_SMD:R_0402_1005Metric | 3 | as row 74 |
+| 90 | C25744 | - | R154, R155, 10 k | Basic | 19810438 (2026-10-10) | n/a | Resistor_SMD:R_0402_1005Metric | 2 | as row 74 |
+| 91 | C21190 | - | R159, Input Gain divider (RVGAIN1 wiper leg, 1 k to the G2_RG node); R160, Q102 base (K103 driver). Same LCSC as row 35 | Basic | 19272175 (2026-10-10) | n/a | cubevox:R0603 | 2 | K103 / gain pass 2026-10-10 |
+| 92 | C25803 | - | R161, Q102 base-emitter 100 k. Same LCSC as row 42 | Basic | 21003892 (2026-10-10) | n/a | cubevox:R0603 | 1 | K103 pass 2026-10-10 |
 
 ## Counts
 
-1. Unique part numbers: 61 (28 Basic, 0 Preferred, 33 Extended) after the 2026-10-08 pre-fab pass (SMBJ20CA replaces the Preferred SMBJ15CA; RK09D117000C, 100 k 0402 and the 10 uF 0805 added). The JLC BOM in production/ is the authoritative count. Row 29 (OPA1678) is superseded and not counted. Row numbers are not contiguous (5, 15, 23, 26, 27, 28, 31, 54, 56, 58, 59 removed).
+1. Unique part numbers: 73 distinct LCSC numbers in the BOM generated 2026-10-10 from the board netlist (the 2026-10-08 figure was 61: 28 Basic, 0 Preferred, 33 Extended). Rows 74 to 92 were added in that reconcile; the Basic/Extended split is not recounted (SMBJ20CA replaces the Preferred SMBJ15CA; RK09D117000C, 100 k 0402 and the 10 uF 0805 added). The JLC BOM in production/ is the authoritative count. Row 29 (OPA1678) is superseded and not counted. Row numbers are not contiguous (5, 15, 23, 26, 27, 28, 31, 54, 56, 58, 59 removed).
 2. Fee estimate: 33 Extended x ~$3 = ~$99 per order. NCJ6FA-H is counted although it is not in the library yet.
-3. Per-board quantities fixed: 3x OPA2197, 1x OPA197, 17 pots (16 slot pots RK09D1130C2P + RVGAIN1), 1 encoder (MENU, EC11E15244B2), 9 bat toggles, 1 relay (K102), 1 SS34. Passive quantities come from the schematic.
-4. Not yet coded (spec items): 10 ohm PCM1808 VCC resistor, 2.2 uF VCAP caps, CC 5.1 k C23186, BLM18PG121SN1D ferrite, the toggle switch itself (header placeholders only), clamp C27675.
+3. Per-board quantities fixed: 3x OPA2197, 1x OPA197, 17 pots (16 slot pots RK09D1130C2P + RVGAIN1), 1 encoder (MENU, EC11E15244B2), 9 bat toggles, 2 relays (K102, K103), 1 SS34. Passive quantities come from the schematic.
+4. Not yet coded (spec items): 2.2 uF VCAP caps, the toggle switch itself (header placeholders only), clamp C27675. The 10 ohm PCM1808 VCC resistor (R20), CC 5.1 k (R4, R5) and BLM18PG121SN1D (FB101) are on the board (rows 87, 88, 84).
 
 ## Assembly
 

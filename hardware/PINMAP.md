@@ -49,8 +49,8 @@ The board decides the ports:
 | 45 | PE15 | ENC_MENU_A | EXTI15 |
 | 44 | PE14 | ENC_MENU_B | EXTI14 |
 | 43 | PE13 | ENC_MENU_SW | EXTI13 |
-| 42 | PE12 | MUX_S0 | |
-| 41 | PE11 | spare | |
+| 42 | PE12 | MUX_S0 | R162 100k pulls it to GND (2026-10-10). In ROM DFU the bootloader listens on SPI4, whose NSS is PE11 and SCK is PE12; a floating SCK could feed a false sync byte and lock it to SPI. The other three selects are not on bootloader pins |
+| 41 | PE11 | PAD_EN | output, high = PEDAL (K103 coil on via Q102, R160/R161), default low = MIC; driver holds NSS low in ROM DFU (see MUX_S0) |
 | 40 | PE10 | MUX_S1 | |
 | 39 | PE9 | MUX_S3 | |
 | 38 | PE8 | MUX_S2 | |
@@ -96,14 +96,14 @@ The board decides the ports:
 
 EXTI lines in use: 13, 14, 15 (MENU encoder). The toggles are polled, so TOGGLE8/TOGGLE2 (PA4/PC4) and TOGGLE1/TOGGLE7 (PA7/PE7) sharing lines 4 and 7 costs nothing.
 
-Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 41 (PE11), 92 (PB6), 95-98 (PB8, PB9, PE0, PE1),
+Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 92 (PB6), 95-98 (PB8, PB9, PE0, PE1),
 51-62 (PB12-PB15, PD8-PD15), 64-67 (PC7-PC9, PA8), 69 (PA10), 77-88 (PA15-PD7, the SWD pocket).
 
 ### Firmware changes from the previous map
 
 | Net | Was | Now |
 |---|---|---|
-| ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 |
+| ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 (PE11 is PAD_EN since 2026-10-10) |
 | ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is pot POT15, now on mux I12) |
 | ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is pot POT16 on mux I15) |
 | FX_ON_SENSE | PC6 | MUTE_SW on PC6 (K101 removed) |
@@ -133,8 +133,9 @@ slots.cpp follows this table.
 | 17 | I14 | POT10 |
 | 16 | I15 | POT16 (SEMITONES) |
 
-RVGAIN1 (Input Gain) is off the mux and wired as a rheostat in the preamp. It is the Alps
-RK09D117000C (C470307), 10 k 15A log taper, not the linear slot pot (2026-10-08).
+RVGAIN1 (Input Gain) is off the mux and sits in the stage 2 gain leg of the preamp. Since
+2026-10-10 it is the same Alps RK09D1130C2P linear part as the slot pots (C361173), wired as a
+divider with R116 470R and R159 1k. The old RK09D117000C log pot (C470307) is gone.
 
 ## 3. How fxbox joins top and h7core
 

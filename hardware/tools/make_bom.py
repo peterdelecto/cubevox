@@ -108,7 +108,7 @@ def write_cpl(raw_path, out_path, bom_refs):
         w = csv.writer(f)
         w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
         for r in sorted(out, key=lambda r: ref_key(r["Ref"])):
-            w.writerow([r["Ref"], r["PosX"], r["PosY"], "Top" if r["Side"] == "top" else "Bottom", r["Rot"]])
+            w.writerow([r["Ref"], r["PosX"], r["PosY"], "Top" if r["Side"] == "top" else "Bottom", "%g" % (float(r["Rot"]) % 360)])
     cpl_refs = {r["Ref"] for r in out}
     dropped = sorted({r["Ref"] for r in raw} - bom_refs, key=ref_key)
     print("CPL: %d rows -> %s (dropped from the raw export: %s)" % (len(out), out_path, ",".join(dropped) or "none"))

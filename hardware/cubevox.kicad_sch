@@ -24411,7 +24411,7 @@
 		(uuid "b1845a61-e4d8-43fc-9741-a45a39ea37f8")
 	)
 	(no_connect
-		(at 970.28 581.66)
+		(at 985.52 581.66)
 		(uuid "5ab0a62b-c4c9-473b-939b-1891ba6910f7")
 	)
 	(wire
@@ -24437,7 +24437,7 @@
 	)
 	(wire
 		(pts
-			(xy 985.52 581.66) (xy 985.52 594.36)
+			(xy 970.28 581.66) (xy 970.28 594.36)
 		)
 		(stroke
 			(width 0)
@@ -24446,7 +24446,7 @@
 		(uuid "c0a2507d-6fa8-4feb-ab60-11f41562cc32")
 	)
 	(label "IN_P"
-		(at 985.52 594.36 270)
+		(at 970.28 594.36 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24458,7 +24458,7 @@
 	)
 	(wire
 		(pts
-			(xy 985.52 562.61) (xy 985.52 549.91)
+			(xy 970.28 562.61) (xy 970.28 549.91)
 		)
 		(stroke
 			(width 0)
@@ -24467,7 +24467,7 @@
 		(uuid "e592d0e8-f503-429b-a92f-ec084c846289")
 	)
 	(label "LINE_N"
-		(at 985.52 549.91 90)
+		(at 970.28 549.91 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24499,7 +24499,7 @@
 		(uuid "20e4b3cf-812a-41fe-b2cb-030e49ca6a9a")
 	)
 	(no_connect
-		(at 970.28 562.61)
+		(at 985.52 562.61)
 		(uuid "5c0f2421-206b-475d-b826-864589402fff")
 	)
 	(wire
@@ -27964,6 +27964,117 @@
 			(justify right bottom)
 		)
 		(uuid "1bfa1654-aa4b-4f14-8e8d-54aaf900a8ad")
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 111.76 115.57 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d9854ea8-e917-48a2-bf55-d48c614fec1d")
+		(property "Reference" "R162"
+			(at 114.3 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 114.3 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 111.76 115.57 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 111.76 115.57 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C25741"
+			(at 111.76 115.57 0)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2f73194b-1117-4134-be4b-a060ebfebcf2")
+		)
+		(pin "2"
+			(uuid "aa556b5f-314c-4ed3-b2ef-6cda88bf8528")
+		)
+		(instances
+			(project "cubevox"
+				(path "/99ad1494-2bf8-5051-8886-2c8b83c86254"
+					(reference "R162")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 111.76 109.22) (xy 111.76 111.76)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "33fe1739-0001-434a-981e-e45447939a19")
+	)
+	(wire
+		(pts
+			(xy 111.76 119.38) (xy 111.76 121.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a1cc2991-ef04-4e2a-b4b7-eeff2bd0f40a")
+	)
+	(label "MUX_S0"
+		(at 111.76 109.22 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "e82fec88-40ac-448d-9acd-35766bf534a8")
+	)
+	(label "GND"
+		(at 111.76 121.92 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "57f2bc97-0515-4588-94d8-efaf08a48b7e")
 	)
 	(sheet_instances
 		(path "/"
