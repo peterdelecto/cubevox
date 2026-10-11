@@ -6,6 +6,13 @@ const F = window.FontCore;
 const STORE_KEY = 'cubevox-font-editor-v1';
 const MAX_UNDO = 200;
 const DELETE_ARM_MS = 3000;
+const SAVE_DEBOUNCE_MS = 400;
+const POLL_MS = 2000;
+const LIBRARY_URL = '/api/library';
+const LIBRARY_PATH = 'fonts/cubevox-fonts.json';
+
+// Served by serve.js the library lives in the repo file; opened as a file it lives in localStorage.
+const SERVED = location.protocol.startsWith('http');
 
 const $ = (id) => document.getElementById(id);
 
@@ -57,7 +64,11 @@ function drawGlyph(ctx, rows, x0, y0, scale) {
 
 // ── persistence and status ──────────────────────────────────────
 
+// version is the file's last known version; null means the library never loaded.
+const sync = { version: null, dirty: false, edits: 0, saving: false, timer: null, pollFailed: false };
+
 function persist() {
+  if (SERVED) return scheduleSave();
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(F.toLibrary(state.fonts)));
   } catch (err) {
@@ -84,6 +95,170 @@ function setStatus(message, isError = false) {
   const el = $('status');
   el.textContent = message;
   el.classList.toggle('error', isError);
+}
+
+// ── served library ──────────────────────────────────────────────
+
+async function requestJson(url, options) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok && res.status !== 409) throw new Error(data.error || `${url} returned ${res.status}`);
+  return { status: res.status, data };
+}
+
+async function fetchLibrary() {
+  const { data } = await requestJson(LIBRARY_URL);
+  const result = F.parseLibrary(data.library);
+  if (result.error || !result.fonts.length) throw new Error(result.error || 'The library has no fonts.');
+  return { version: data.version, fonts: result.fonts };
+}
+
+function scheduleSave() {
+  if (sync.version === null) {
+    setStatus('The library did not load, so edits are not saved. Start serve.js and reload.', true);
+    return;
+  }
+  sync.dirty = true;
+  sync.edits += 1;
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(save, SAVE_DEBOUNCE_MS);
+}
+
+async function save() {
+  sync.timer = null;
+  if (sync.saving) {
+    sync.timer = setTimeout(save, SAVE_DEBOUNCE_MS);
+    return;
+  }
+  sync.saving = true;
+  const sent = sync.edits;
+  const body = JSON.stringify(F.toLibrary(state.fonts), null, 1);
+  try {
+    const { status, data } = await requestJson(LIBRARY_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'If-Match': sync.version },
+      body,
+    });
+    if (status === 409) {
+      await resolveConflict(body);
+      return;
+    }
+    sync.version = data.version;
+    if (sync.edits === sent) sync.dirty = false;
+    setStatus(`Saved to ${LIBRARY_PATH}`);
+  } catch (err) {
+    console.error('[font-editor] save failed', err);
+    setStatus(`Save failed: ${err.message}`, true);
+  } finally {
+    sync.saving = false;
+  }
+}
+
+// Replaces the fonts with the disk copy and keeps the selected font (by name) and glyph.
+async function reloadFromDisk() {
+  const { version, fonts } = await fetchLibrary();
+  const name = font().name;
+  const code = state.code;
+  state.fonts = fonts;
+  state.current = Math.max(0, fonts.findIndex((f) => f.name === name));
+  state.code = font().glyphs[code] ? code : 65;
+  state.undo = [];
+  sync.version = version;
+  sync.dirty = false;
+  clearTimeout(sync.timer);
+  sync.timer = null;
+  renderAll();
+}
+
+// Parks the editor's copy in conflict.json, then shows the disk copy.
+async function resolveConflict(ownCopy) {
+  try {
+    await requestJson('/api/conflict', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: ownCopy,
+    });
+    await reloadFromDisk();
+    setStatus('Conflict: the file changed on disk. Your copy is in fonts/conflict.json.', true);
+  } catch (err) {
+    console.error('[font-editor] conflict handling failed', err);
+    setStatus(`Conflict: the file changed on disk and your copy could not be parked: ${err.message}`, true);
+  }
+}
+
+async function pollOnce() {
+  try {
+    const { data } = await requestJson(`${LIBRARY_URL}?versionOnly=1`);
+    sync.pollFailed = false;
+    if (sync.saving || data.version === sync.version) return;
+    if (sync.dirty) {
+      await resolveConflict(JSON.stringify(F.toLibrary(state.fonts), null, 1));
+    } else {
+      await reloadFromDisk();
+      setStatus('Reloaded: file changed on disk');
+    }
+  } catch (err) {
+    console.error('[font-editor] poll failed', err);
+    if (!sync.pollFailed) setStatus(`Lost the editor server: ${err.message}`, true);
+    sync.pollFailed = true;
+  }
+}
+
+async function pollLoop() {
+  await pollOnce();
+  setTimeout(pollLoop, POLL_MS);
+}
+
+async function loadServed() {
+  try {
+    const { version, fonts } = await fetchLibrary();
+    state.fonts = fonts;
+    sync.version = version;
+  } catch (err) {
+    console.error('[font-editor] library load failed', err);
+    state.fonts = [F.exampleFont()];
+    setStatus(`Could not load ${LIBRARY_PATH}: ${err.message}. Showing the example font; edits are not saved.`, true);
+  }
+}
+
+async function exportHeaderServed() {
+  try {
+    await requestJson('/api/header', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/plain' },
+      body: F.toCHeader(state.fonts),
+    });
+    setStatus('Wrote fonts/cubevox_fonts.h');
+  } catch (err) {
+    console.error('[font-editor] header export failed', err);
+    setStatus(`Header export failed: ${err.message}`, true);
+  }
+}
+
+// ── opened as a file ────────────────────────────────────────────
+
+const EDITOR_URL = 'http://127.0.0.1:8765/';
+
+// Hands this browser's copy to the running editor server (fonts/from-browser.json), then opens it.
+async function moveToRepoEditor() {
+  try {
+    const res = await fetch(`${EDITOR_URL}api/import`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(F.toLibrary(state.fonts), null, 1),
+    });
+    if (!res.ok) throw new Error(`import returned ${res.status}`);
+    location.href = EDITOR_URL;
+  } catch (err) {
+    console.error('[font-editor] move to repo editor failed', err);
+    $('fileBannerText').textContent = 'The repo editor is not running. Double-click '
+      + 'tools/font-editor/Font Editor.command, then press Move again.';
+  }
+}
+
+function showFileBanner() {
+  $('fileBanner').hidden = false;
+  $('moveBtn').addEventListener('click', moveToRepoEditor);
 }
 
 function download(filename, text, type) {
@@ -540,6 +715,7 @@ function wireFiles() {
   });
 
   $('exportBtn').addEventListener('click', () => {
+    if (SERVED) return exportHeaderServed();
     download('cubevox_fonts.h', F.toCHeader(state.fonts), 'text/plain');
     setStatus(`Exported ${state.fonts.length} fonts to cubevox_fonts.h.`);
   });
@@ -584,11 +760,30 @@ function wireKeys() {
 
 // ── start ───────────────────────────────────────────────────────
 
-if (!restore()) state.fonts = [F.exampleFont()];
-document.querySelectorAll('[data-action]').forEach((btn) =>
-  btn.addEventListener('click', () => actions[btn.dataset.action]()));
-wireEditor();
-wireSettings();
-wireFiles();
-wireKeys();
-renderAll();
+async function start() {
+  if (SERVED) {
+    $('saveBtn').textContent = 'Export copy';
+    $('loadBtn').textContent = 'Import';
+    await loadServed();
+  } else {
+    if (!restore()) state.fonts = [F.exampleFont()];
+    showFileBanner();
+  }
+  wireAll();
+  renderAll();
+  if (SERVED) setTimeout(pollLoop, POLL_MS);
+}
+
+function wireAll() {
+  document.querySelectorAll('[data-action]').forEach((btn) =>
+    btn.addEventListener('click', () => actions[btn.dataset.action]()));
+  wireEditor();
+  wireSettings();
+  wireFiles();
+  wireKeys();
+}
+
+start().catch((err) => {
+  console.error('[font-editor] start failed', err);
+  setStatus(`Start failed: ${err.message}`, true);
+});

@@ -93,6 +93,17 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .status { color: var(--ok); }
 .status.error { color: var(--danger); }
 
+.file-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-4);
+  padding: var(--gap-3) var(--gap-4);
+  background: var(--accent-soft);
+  color: var(--text);
+  border-bottom: var(--border-w) solid var(--warn);
+}
+.file-banner[hidden] { display: none; }
+
 .layout {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--map-w);

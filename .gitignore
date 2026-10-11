@@ -12,3 +12,6 @@ build-release/
 __pycache__/
 *.kicad_prl
 samples/
+
+# font proof renders (proof.js default --out)
+tools/font-editor/proofs/
