@@ -6,6 +6,8 @@ Build only, nothing here flashes. Needs arduino-cli and the STMicroelectronics:s
     ./build.sh        # FQBN STMicroelectronics:stm32:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen
     TAIL=5 ./build.sh # last 5 lines only
 
+After the build, `warn_gate.py` recompiles our sources (sketch, `src/**`, engine headers) with `-Wall -Wextra -Werror`, third-party and `platform/` includes as `-isystem`, so any warning of ours fails the script.
+
 Design: `docs/specs/2026-10-08-firmware-foundation-design.md` (tiers, tests, fault handling),
 `2026-10-08-effect-registry-design.md` (cards), `2026-10-08-update-and-slots-design.md` (roadmap).
 

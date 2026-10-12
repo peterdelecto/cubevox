@@ -182,4 +182,8 @@ target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cu
 target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}")
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(firmware_test PRIVATE engine)
+# ASan + UBSan on this target only; any report aborts the process, so ctest fails.
+set(CUBEVOX_SANITIZE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+target_compile_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
+target_link_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 add_test(NAME firmware COMMAND firmware_test)

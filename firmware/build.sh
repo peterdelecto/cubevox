@@ -70,4 +70,7 @@ arduino-cli compile --fqbn "$FQBN" \
   --build-property "compiler.c.extra_flags=$INC $DEFS -ffp-contract=fast" \
   --build-property "compiler.c.elf.extra_flags=$LDX" \
   "$FW/cubevox" 2>&1 | tee "$OUT.log" | tail -${TAIL:-40}
-exit "${PIPESTATUS[0]}"
+[ "${PIPESTATUS[0]}" -eq 0 ] || exit 1
+
+# Warnings gate: our sources again with -Wall -Wextra -Werror, third-party headers as system headers.
+python3 "$FW/warn_gate.py" "$OUT" "${TAIL:-40}"

@@ -78,7 +78,9 @@ volatile uint32_t gSumBlocks = 0;
 volatile uint64_t gSlotCycles[kSlotCount + 1] = {};
 volatile uint32_t gSlotWorst[kSlotCount + 1] = {};
 volatile bool gClipOn = false;
+#ifdef CUBEVOX_BENCH_CLIP
 uint32_t gClipPos = 0;
+#endif
 
 // Runs one card. Returns false when it wrote nothing, so the caller keeps its buffers.
 // Pitch cards share one PitchFx call, run at the first pitch card's slot.

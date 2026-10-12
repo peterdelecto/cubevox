@@ -16,10 +16,15 @@ constexpr int kItemCount = static_cast<int>(Item::Count);
 
 using FrameRows = char[kDisplayRows][kDisplayCols + 1];
 
-// Rows past the screen are dropped (the chain view has a title plus eight slots).
+// Rows past the screen are dropped; text clips to the row width.
 void row(FrameRows& frame, int r, const char* text) {
   if (r >= kDisplayRows) return;
-  snprintf(frame[r], sizeof(frame[r]), "%s", text);
+  int n = 0;
+  while (n < kDisplayCols && text[n] != '\0') {
+    frame[r][n] = text[n];
+    ++n;
+  }
+  frame[r][n] = '\0';
 }
 
 const char* itemLabel(Item it) {
