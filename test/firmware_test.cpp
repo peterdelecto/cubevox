@@ -8,12 +8,15 @@
 #include "core/chain_params.h"
 #include "core/compose.h"
 #include "core/costs.h"
+#include "core/display.h"
+#include "core/jack_switch.h"
 #include "core/knob_filter.h"
 #include "core/layout.h"
 #include "core/panel.h"
 #include "core/registry.h"
 #include "core/settings.h"
 #include "core/version.h"
+#include "ui/menu.h"
 
 namespace {
 
@@ -305,6 +308,132 @@ void checkKnobFilter() {
   check(s.update(0.95f, 0) == KnobEvent::Reseeded && s.value() < 1.0f, "filter: back to continuous re-seeds");
 }
 
+// Records the rows the menu draws.
+class RecordingDisplay : public Display {
+ public:
+  void clear() override { std::memset(rows_, 0, sizeof(rows_)); inverted_ = -1; }
+  void text(int r, const char* line) override { std::snprintf(rows_[r], sizeof(rows_[r]), "%s", line); }
+  void invertRow(int r) override { inverted_ = r; }
+  void flush() override { ++flushes_; }
+  const char* rowText(int r) const { return rows_[r]; }
+  int inverted() const { return inverted_; }
+  int flushes() const { return flushes_; }
+
+ private:
+  char rows_[kDisplayRows][kDisplayCols + 1] = {};
+  int inverted_ = -1;
+  int flushes_ = 0;
+};
+
+struct MenuRig {
+  Menu menu;
+  Layout layout = defaultLayout();
+  PanelReading panel;
+  Settings settings;
+  RecordingDisplay display;
+  uint32_t nowMs = 100;
+
+  UiAction step(int detents, bool click, uint32_t advanceMs = 10) {
+    nowMs += advanceMs;
+    UiInput in;
+    in.detents = detents;
+    in.click = click;
+    return menu.update(in, nowMs);
+  }
+  void draw() { menu.draw(UiContext{layout, panel, settings, false}, display); }
+};
+
+void checkMenu() {
+  MenuRig m;
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "cubevox") == 0, "menu: idle title");
+
+  m.step(0, true);
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: click opens the list");
+  check(m.display.inverted() == 1 && std::strcmp(m.display.rowText(1), ">Out LINE") == 0, "menu: cursor 0 row inverted");
+  check(std::strcmp(m.display.rowText(2), " Input MIC") == 0, "menu: input row text");
+
+  m.step(-1, false);
+  m.draw();
+  check(m.display.inverted() == 5, "menu: turning back from 0 wraps to the last item");
+  m.step(1, false);
+  m.draw();
+  check(m.display.inverted() == 1, "menu: turning forward wraps to 0");
+
+  check(m.step(0, true) == UiAction::ToggleOutput, "menu: Out click toggles output");
+  m.step(1, false);
+  check(m.step(0, true) == UiAction::ToggleInputJack, "menu: Input click toggles the jack");
+  m.settings.inputJack = InputJack::Pedal;
+  m.draw();
+  check(std::strcmp(m.display.rowText(2), ">Input PEDAL") == 0, "menu: row reads the settings");
+
+  m.step(1, false);
+  check(m.step(0, true) == UiAction::None, "menu: Chain order click has no action");
+  m.draw();
+  check(std::strncmp(m.display.rowText(0), "1 ", 2) == 0, "menu: chain view starts at slot 1");
+  check(std::strncmp(m.display.rowText(kDisplayRows - 1), "8 ", 2) == 0, "menu: chain view shows slot 8");
+  m.step(0, true);
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: click leaves the chain view");
+
+  m.step(1, false);
+  m.step(0, true);
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "UPDATE FIRMWARE") == 0, "menu: confirm screen");
+  m.step(1, false);
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: turn cancels the confirm");
+  m.step(0, true);
+  m.step(0, true);
+  check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
+}
+
+void checkMenuTimeout() {
+  MenuRig m;
+  m.step(0, true);
+  m.step(0, false, 14000);
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: still open before the timeout");
+  m.step(0, false, 1500);
+  m.draw();
+  check(std::strcmp(m.display.rowText(0), "cubevox") == 0, "menu: 15 s without input returns to idle");
+}
+
+void checkMenuRedraw() {
+  MenuRig m;
+  m.draw();
+  m.draw();
+  check(m.display.flushes() <= 1, "menu: an unchanged frame is not redrawn");
+}
+
+void checkJackSwitch() {
+  JackSwitch j;
+  j.update(0, InputJack::Mic, false);
+  check(!j.holdMute() && j.relay() == InputJack::Mic, "jack: no change, no hold");
+
+  j.update(10, InputJack::Pedal, false);
+  check(j.holdMute() && j.relay() == InputJack::Mic, "jack: request holds the mute, relay waits");
+  j.update(20, InputJack::Pedal, false);
+  check(j.relay() == InputJack::Mic, "jack: relay waits until fully muted");
+  j.update(30, InputJack::Pedal, true);
+  check(j.relay() == InputJack::Pedal && j.holdMute(), "jack: relay switches when fully muted");
+  j.update(30 + kRelaySettleMs - 1, InputJack::Pedal, true);
+  check(j.holdMute(), "jack: hold stays until the relay settles");
+  j.update(30 + kRelaySettleMs, InputJack::Pedal, true);
+  check(!j.holdMute() && j.relay() == InputJack::Pedal, "jack: hold released after the settle time");
+
+  j.update(100, InputJack::Mic, true);
+  j.update(110, InputJack::Pedal, true);
+  check(j.relay() == InputJack::Mic, "jack: relay moved on the first request");
+  j.update(111, InputJack::Pedal, true);
+  j.update(111 + kRelaySettleMs, InputJack::Pedal, true);
+  j.update(112 + kRelaySettleMs, InputJack::Pedal, true);
+  check(j.holdMute() && j.relay() == InputJack::Pedal, "jack: a second change mid-sequence ends on the latest request");
+  j.update(112 + 2 * kRelaySettleMs, InputJack::Pedal, true);
+  check(!j.holdMute() && j.relay() == InputJack::Pedal, "jack: latest request settles and releases");
+}
+
 int main() {
   checkIds();
   checkGroups();
@@ -322,6 +451,10 @@ int main() {
   checkDebounce();
   checkSteppedPosition();
   checkKnobFilter();
+  checkMenu();
+  checkMenuTimeout();
+  checkMenuRedraw();
+  checkJackSwitch();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;
 }

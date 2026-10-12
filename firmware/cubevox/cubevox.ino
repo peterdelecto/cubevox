@@ -7,21 +7,29 @@
 #include "board/controls.h"
 #include "board/display_sh1106.h"
 #include "board/fault.h"
+#include "board/display_stub.h"
+#include "board/input.h"
 #include "board/input_jack.h"
-#include "ui/menu.h"
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/platform.h"
 #include "board/slots.h"
 #include "board/usb_link.h"
 #include "core/compose.h"
+#include "core/jack_switch.h"
 #include "core/layout.h"
 #include "core/registry.h"
+#include "core/settings.h"
+#include "ui/menu.h"
 
 constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;
 
 static Layout gLayout = defaultLayout();
+static Settings gSettings;
+static Menu gMenu;
+static JackSwitch gJack;
+static Display* gDisplay = nullptr;
 static BenchOverrides gBench;
 static bool gOledFound = false;
 static bool gAudioRunning = false;
@@ -46,9 +54,9 @@ static void printBootReport() {
   }
 }
 
-// Rebuilds the snapshot from the layout, panel and menu, then hands it to the audio interrupt.
+// Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
 static void publishSnapshot() {
-  audioPublish(composeSnapshot(gLayout, controlsReading(), menuSettings(), gBench));
+  audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, gBench));
 }
 
 static void printStatsNow() {
@@ -152,6 +160,31 @@ static void pollBenchCommands() {
   }
 }
 
+// Applies what the menu asked for. Returns true when a setting changed.
+static bool applyAction(UiAction action) {
+  switch (action) {
+    case UiAction::ToggleOutput:
+      gSettings.output = gSettings.output == OutputLevel::Line ? OutputLevel::Instrument : OutputLevel::Line;
+      return true;
+    case UiAction::ToggleInputJack:
+      gSettings.inputJack = gSettings.inputJack == InputJack::Mic ? InputJack::Pedal : InputJack::Mic;
+      return true;
+    case UiAction::EnterDfu:
+      muteForReset();
+      platformEnterDfu();  // does not return
+      break;
+    case UiAction::None: break;
+  }
+  return false;
+}
+
+// The relay switches only while the output is fully muted; the mute is held until it settles.
+static void runJackSwitch(uint32_t nowMs) {
+  gJack.update(nowMs, gSettings.inputJack, muteFullyMuted());
+  muteHold(gJack.holdMute());
+  inputJackApply(gJack.relay());
+}
+
 static void heartbeat(uint32_t nowMs) {
   static uint32_t lastMs = 0;
   if (nowMs - lastMs < kHeartbeatMs) return;
@@ -168,7 +201,8 @@ void setup() {
 
   controlsInit();
   gOledFound = sh1106Present();
-  menuInit(gOledFound ? sh1106Display() : stubDisplay());
+  inputInit();
+  gDisplay = gOledFound ? &sh1106Display() : &stubDisplay();
 
   gAudioRunning = audioInit();
   if (gAudioRunning) muteClocksRunning(millis());
@@ -187,12 +221,12 @@ void loop() {
   controlsPoll(nowMs, gLayout);
   mutePoll(nowMs);
 
-  const bool panelChanged = controlsTakeChanged();
-  const bool menuChanged = menuTakeSettingsChanged();
-  if (menuChanged) inputJackApply(menuSettings().inputJack);
-  if (panelChanged || menuChanged) publishSnapshot();
+  const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
+  runJackSwitch(nowMs);
+  if (controlsTakeChanged() || settingsChanged) publishSnapshot();
 
-  menuPoll(nowMs, gLayout, controlsReading(), muteActive());
+  const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
+  gMenu.draw(ctx, *gDisplay);
   heartbeat(nowMs);
   printStats(nowMs);
 }

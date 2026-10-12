@@ -1,6 +1,5 @@
-// MENU encoder state machine and the OLED screens.
-// Drawing goes through the Display interface: the SH1106 driver when the panel answers on
-// I2C2, otherwise a serial-logging stub. Lines are 16 columns, the SH1106 at the 8x8 font.
+// MENU state machine and the OLED screens. Pure: input events in, actions out, text rows drawn
+// through the Display interface (the SH1106 driver or the serial stub).
 
 #pragma once
 
@@ -11,17 +10,42 @@
 #include "core/panel.h"
 #include "core/settings.h"
 
-// Returned when no SH1106 driver is linked: prints each changed screen to Serial.
-Display& stubDisplay();
+// What the encoder did since the last pass.
+struct UiInput {
+  int detents = 0;  // signed turn steps
+  bool click = false;
+};
 
-void menuInit(Display& display);
+// What the sketch must do after an update. The menu never edits settings itself.
+enum class UiAction : uint8_t { None, ToggleOutput, ToggleInputJack, EnterDfu };
 
-// Call every loop pass. Reads the encoder state, runs the menu, redraws on change.
-// The idle screen shows the last-moved knob from `panel`; the chain view lists `layout`.
-void menuPoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool muted);
+// Read-only state the screens draw. The idle screen shows the last-moved knob from `panel`;
+// the chain view lists `layout`.
+struct UiContext {
+  const Layout& layout;
+  const PanelReading& panel;
+  const Settings& settings;
+  bool muted;
+};
 
-// Settings the menu edits. The reverb engine is not one of them: the placed reverb card picks it.
-const Settings& menuSettings();
+class Menu {
+ public:
+  UiAction update(const UiInput& in, uint32_t nowMs);
 
-// True once after a setting changed.
-bool menuTakeSettingsChanged();
+  // Redraws when the frame differs from the one on the display.
+  void draw(const UiContext& ctx, Display& display);
+
+ private:
+  enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
+  struct Frame {
+    char row[kDisplayRows][kDisplayCols + 1];
+  };
+
+  UiAction onClick();
+  void onTurn(int detents);
+
+  Mode mode_ = Mode::Idle;
+  int cursor_ = 0;
+  uint32_t lastActivityMs_ = 0;
+  Frame shown_ = {};
+};

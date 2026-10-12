@@ -1,60 +1,25 @@
 #include "ui/menu.h"
 
-#include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "board/mute.h"
-#include "board/pins.h"
-#include "board/platform.h"
-#include "core/knob_filter.h"
 #include "core/registry.h"
-#include "core/settings.h"
 
 namespace {
 
-constexpr int kRows = 8;
-constexpr int kCols = 16;  // SH1106 at the 8x8 font
-constexpr int kCountsPerDetent = 2;  // EC11E: 15 pulses and 30 detents per turn
-constexpr uint32_t kClickDebounceMs = 20;
 constexpr uint32_t kMenuTimeoutMs = 15000;
 
 enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
-enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
 
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
-// Encoder decode. The ISR only updates these.
-volatile int gCounts = 0;
-volatile uint8_t gQuadState = 0;
+using FrameRows = char[kDisplayRows][kDisplayCols + 1];
 
-Display* gDisplay = nullptr;
-Settings gSettings;
-bool gSettingsChanged = false;
-DebouncedInput gClick;
-Mode gMode = Mode::Idle;
-int gCursor = 0;
-uint32_t gLastActivityMs = 0;
-char gFrame[kRows][kCols + 1];
-char gShown[kRows][kCols + 1];
-
-void encoderIsr() {
-  static const int8_t kStep[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
-  const uint8_t ab = static_cast<uint8_t>((digitalRead(pins::kEncMenuA) << 1) | digitalRead(pins::kEncMenuB));
-  gQuadState = static_cast<uint8_t>(((gQuadState << 2) | ab) & 0x0F);
-  gCounts = gCounts + kStep[gQuadState];
+// Rows past the screen are dropped (the chain view has a title plus eight slots).
+void row(FrameRows& frame, int r, const char* text) {
+  if (r >= kDisplayRows) return;
+  snprintf(frame[r], sizeof(frame[r]), "%s", text);
 }
-
-int takeDetents() {
-  noInterrupts();
-  const int counts = gCounts;
-  const int detents = counts / kCountsPerDetent;
-  gCounts = counts - detents * kCountsPerDetent;
-  interrupts();
-  return detents;
-}
-
-void row(int r, const char* text) { snprintf(gFrame[r], sizeof(gFrame[r]), "%s", text); }
 
 const char* itemLabel(Item it) {
   switch (it) {
@@ -68,159 +33,109 @@ const char* itemLabel(Item it) {
   return "";
 }
 
-const char* itemValue(Item it) {
+const char* itemValue(Item it, const Settings& s) {
   switch (it) {
-    case Item::Output: return gSettings.output == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
-    case Item::InputJack: return gSettings.inputJack == InputJack::Mic ? "MIC" : "PEDAL";
+    case Item::Output: return s.output == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
+    case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "PEDAL";
     default: return "";
   }
 }
 
-void drawIdle(bool muted, const Layout& layout, const PanelReading& panel) {
-  row(0, "cubevox");
-  row(1, muted ? "MUTED" : "");
-  const LastMoved m = panel.lastMoved;
+void drawIdle(FrameRows& f, const UiContext& ctx) {
+  row(f, 0, "cubevox");
+  row(f, 1, ctx.muted ? "MUTED" : "");
+  const LastMoved m = ctx.panel.lastMoved;
   if (m.slot < 0) return;
-  const Card card = layout.card[m.slot];
+  const Card card = ctx.layout.card[m.slot];
   const int knob = m.knobB ? 1 : 0;
-  char value[kCols + 1];
-  formatKnob(card, knob, panel.knob[m.slot][knob], value, sizeof(value));
-  row(3, cardDesc(card).name);
-  row(4, cardDesc(card).knob[knob].name);
-  row(5, value);
-  row(6, panel.toggle[m.slot] ? "ON" : "OFF");
+  char value[kDisplayCols + 1];
+  formatKnob(card, knob, ctx.panel.knob[m.slot][knob], value, sizeof(value));
+  row(f, 3, cardDesc(card).name);
+  row(f, 4, cardDesc(card).knob[knob].name);
+  row(f, 5, value);
+  row(f, 6, ctx.panel.toggle[m.slot] ? "ON" : "OFF");
 }
 
-void drawList() {
-  row(0, "MENU");
+void drawList(FrameRows& f, const UiContext& ctx, int cursor) {
+  row(f, 0, "MENU");
   for (int i = 0; i < kItemCount; ++i) {
     const Item it = static_cast<Item>(i);
-    char line[kCols + 1];
-    snprintf(line, sizeof(line), "%s%s %s", i == gCursor ? ">" : " ", itemLabel(it), itemValue(it));
-    row(1 + i, line);
+    char line[kDisplayCols + 1];
+    snprintf(line, sizeof(line), "%s%s %s", i == cursor ? ">" : " ", itemLabel(it), itemValue(it, ctx.settings));
+    row(f, 1 + i, line);
   }
 }
 
-void drawChainView(const Layout& layout) {
-  row(0, "CHAIN ORDER");
+// Eight slots fill all eight rows, so the numbered rows stand in for a title.
+void drawChainView(FrameRows& f, const Layout& layout) {
   for (int i = 0; i < kSlotCount; ++i) {
-    char line[kCols + 1];
+    char line[kDisplayCols + 1];
     snprintf(line, sizeof(line), "%d %s", i + 1, cardDesc(layout.card[i]).name);
-    row(1 + i, line);
+    row(f, i, line);
   }
 }
 
-void drawConfirmDfu() {
-  row(0, "UPDATE FIRMWARE");
-  row(2, "Click to reboot");
-  row(3, "into DFU mode.");
-  row(5, "Turn to cancel.");
-}
-
-void redraw(bool muted, const Layout& layout, const PanelReading& panel) {
-  memset(gFrame, 0, sizeof(gFrame));
-  switch (gMode) {
-    case Mode::Idle: drawIdle(muted, layout, panel); break;
-    case Mode::List: drawList(); break;
-    case Mode::ChainView: drawChainView(layout); break;
-    case Mode::ConfirmDfu: drawConfirmDfu(); break;
-  }
-  if (memcmp(gFrame, gShown, sizeof(gFrame)) == 0) return;
-  memcpy(gShown, gFrame, sizeof(gFrame));
-  gDisplay->clear();
-  for (int r = 0; r < kRows; ++r) {
-    if (gFrame[r][0]) gDisplay->text(r, gFrame[r]);
-  }
-  if (gMode == Mode::List) gDisplay->invertRow(1 + gCursor);
-  gDisplay->flush();
-}
-
-void changeSetting() { gSettingsChanged = true; }
-
-void activateItem(Item it) {
-  switch (it) {
-    case Item::Output: gSettings.output =
-        gSettings.output == OutputLevel::Line ? OutputLevel::Instrument : OutputLevel::Line; changeSetting(); break;
-    case Item::InputJack: gSettings.inputJack =
-        gSettings.inputJack == InputJack::Mic ? InputJack::Pedal : InputJack::Mic; changeSetting(); break;
-    case Item::ChainOrder: gMode = Mode::ChainView; break;
-    case Item::UpdateFirmware: gMode = Mode::ConfirmDfu; break;
-    case Item::Exit: gMode = Mode::Idle; break;
-    case Item::Count: break;
-  }
-}
-
-void onClick() {
-  switch (gMode) {
-    case Mode::Idle: gMode = Mode::List; gCursor = 0; break;
-    case Mode::List: activateItem(static_cast<Item>(gCursor)); break;
-    case Mode::ChainView: gMode = Mode::List; break;
-    case Mode::ConfirmDfu:
-      muteForReset();
-      platformEnterDfu();  // does not return
-      break;
-  }
-}
-
-void onTurn(int detents) {
-  if (gMode == Mode::List) {
-    gCursor = (gCursor + detents % kItemCount + kItemCount) % kItemCount;
-  } else if (gMode == Mode::ConfirmDfu) {
-    gMode = Mode::List;
-  }
+void drawConfirmDfu(FrameRows& f) {
+  row(f, 0, "UPDATE FIRMWARE");
+  row(f, 2, "Click to reboot");
+  row(f, 3, "into DFU mode.");
+  row(f, 5, "Turn to cancel.");
 }
 
 }  // namespace
 
-class StubDisplay : public Display {
- public:
-  void clear() override { memset(rows_, 0, sizeof(rows_)); inverted_ = -1; }
-  void text(int r, const char* line) override { snprintf(rows_[r], sizeof(rows_[r]), "%.*s", kCols, line); }
-  void invertRow(int r) override { inverted_ = r; }
-  void flush() override {
-    Serial.println("[oled] ----------------------");
-    for (int r = 0; r < kRows; ++r) {
-      Serial.print(r == inverted_ ? "[oled] *" : "[oled]  ");
-      Serial.println(rows_[r]);
-    }
+UiAction Menu::onClick() {
+  switch (mode_) {
+    case Mode::Idle:
+      mode_ = Mode::List;
+      cursor_ = 0;
+      break;
+    case Mode::List:
+      switch (static_cast<Item>(cursor_)) {
+        case Item::Output: return UiAction::ToggleOutput;
+        case Item::InputJack: return UiAction::ToggleInputJack;
+        case Item::ChainOrder: mode_ = Mode::ChainView; break;
+        case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
+        case Item::Exit: mode_ = Mode::Idle; break;
+        case Item::Count: break;
+      }
+      break;
+    case Mode::ChainView: mode_ = Mode::List; break;
+    case Mode::ConfirmDfu: return UiAction::EnterDfu;
   }
-
- private:
-  char rows_[kRows][kCols + 1] = {};
-  int inverted_ = -1;
-};
-
-Display& stubDisplay() {
-  static StubDisplay display;
-  return display;
+  return UiAction::None;
 }
 
-void menuInit(Display& display) {
-  gDisplay = &display;
-  pinMode(pins::kEncMenuA, INPUT_PULLUP);
-  pinMode(pins::kEncMenuB, INPUT_PULLUP);
-  pinMode(pins::kEncMenuSw, INPUT_PULLUP);
-  gClick.reset(digitalRead(pins::kEncMenuSw) == HIGH);
-  gQuadState = static_cast<uint8_t>((digitalRead(pins::kEncMenuA) << 1) | digitalRead(pins::kEncMenuB));
-  attachInterrupt(digitalPinToInterrupt(pins::kEncMenuA), encoderIsr, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(pins::kEncMenuB), encoderIsr, CHANGE);
+void Menu::onTurn(int detents) {
+  if (mode_ == Mode::List) {
+    cursor_ = (cursor_ + detents % kItemCount + kItemCount) % kItemCount;
+  } else if (mode_ == Mode::ConfirmDfu) {
+    mode_ = Mode::List;
+  }
 }
 
-void menuPoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool muted) {
-  const int detents = takeDetents();
-  const bool pressed = gClick.update(digitalRead(pins::kEncMenuSw) == HIGH, nowMs, kClickDebounceMs) &&
-                       !gClick.level();
-  if (detents != 0 || pressed) gLastActivityMs = nowMs;
-  if (detents != 0) onTurn(detents);
-  if (pressed) onClick();
-  if (gMode != Mode::Idle && nowMs - gLastActivityMs > kMenuTimeoutMs) gMode = Mode::Idle;
-  redraw(muted, layout, panel);
+UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
+  if (in.detents != 0 || in.click) lastActivityMs_ = nowMs;
+  if (in.detents != 0) onTurn(in.detents);
+  const UiAction action = in.click ? onClick() : UiAction::None;
+  if (mode_ != Mode::Idle && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
+  return action;
 }
 
-const Settings& menuSettings() { return gSettings; }
-
-bool menuTakeSettingsChanged() {
-  const bool changed = gSettingsChanged;
-  gSettingsChanged = false;
-  return changed;
+void Menu::draw(const UiContext& ctx, Display& display) {
+  Frame frame = {};
+  switch (mode_) {
+    case Mode::Idle: drawIdle(frame.row, ctx); break;
+    case Mode::List: drawList(frame.row, ctx, cursor_); break;
+    case Mode::ChainView: drawChainView(frame.row, ctx.layout); break;
+    case Mode::ConfirmDfu: drawConfirmDfu(frame.row); break;
+  }
+  if (memcmp(&frame, &shown_, sizeof(frame)) == 0) return;
+  shown_ = frame;
+  display.clear();
+  for (int r = 0; r < kDisplayRows; ++r) {
+    if (frame.row[r][0]) display.text(r, frame.row[r]);
+  }
+  if (mode_ == Mode::List) display.invertRow(1 + cursor_);
+  display.flush();
 }

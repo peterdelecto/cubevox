@@ -22,6 +22,7 @@ DebouncedInput gSwitch;
 bool gClocksRunning = false;
 uint32_t gClocksSinceMs = 0;
 bool gLatched = false;
+bool gHeld = false;
 
 void enter(State next, uint32_t nowMs) {
   gState = next;
@@ -32,10 +33,10 @@ void enter(State next, uint32_t nowMs) {
 bool unmuteWanted(uint32_t nowMs) {
   const bool switchReleased = gSwitch.level();  // high = not muted
   const bool clocksReady = gClocksRunning && nowMs - gClocksSinceMs >= kBootUnmuteDelayMs;
-  return switchReleased && clocksReady && !gLatched;
+  return switchReleased && clocksReady && !gLatched && !gHeld;
 }
 
-bool muteWanted() { return !gSwitch.level() || gLatched; }
+bool muteWanted() { return !gSwitch.level() || gLatched || gHeld; }
 
 }  // namespace
 
@@ -92,6 +93,10 @@ void mutePoll(uint32_t nowMs) {
 void muteLatch() { gLatched = true; }
 
 bool muteActive() { return gState != State::Unmuted; }
+
+bool muteFullyMuted() { return gState == State::Muted; }
+
+void muteHold(bool on) { gHeld = on; }
 
 void muteForReset() {
   digitalWrite(pins::kXsmt, LOW);

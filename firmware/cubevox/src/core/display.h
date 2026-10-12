@@ -3,6 +3,9 @@
 
 #pragma once
 
+constexpr int kDisplayRows = 8;
+constexpr int kDisplayCols = 16;  // 8 px font across 128 px
+
 class Display {
  public:
   virtual ~Display() {}
