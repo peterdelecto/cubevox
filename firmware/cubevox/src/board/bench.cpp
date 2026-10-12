@@ -5,6 +5,7 @@
 #include "board/audio.h"
 #include "board/mute.h"
 #include "board/platform.h"
+#include "board/record_service.h"
 
 namespace {
 
@@ -86,6 +87,9 @@ bool run(int c, void (*bootReport)()) {
     case 'm': resetPeaks(); break;
     case 'v': toggleClip(); break;
     case 'd': enterDfu(); break;
+    case 's': recordSaveNow(); break;
+    case 'q': recordPrintStatus(Serial); break;
+    case 'e': recordEraseAll(); break;
     default: break;
   }
   return false;

@@ -14,6 +14,10 @@ constexpr uint32_t kAudioStallMs = 100;
 // BusFault, UsageFault and MemManage to their own handlers. Call right after muteInit().
 void faultInit();
 
+// True when the previous run died on a double ECC error in flash bank 2 (FLASH->SR2 DBECCERR);
+// `address` is the failing flash word. Valid after faultInit().
+bool faultLastWasBank2Ecc(uint32_t& address);
+
 // Starts the watchdog. Call after audioInit(); from then on loop() must call faultWatchdogKick()
 // at least every kWatchdogMs.
 void faultWatchdogStart();

@@ -72,5 +72,12 @@ arduino-cli compile --fqbn "$FQBN" \
   "$FW/cubevox" 2>&1 | tee "$OUT.log" | tail -${TAIL:-40}
 [ "${PIPESTATUS[0]}" -eq 0 ] || exit 1
 
+# Bank 1 is 1 MB. A larger image would reach bank 2, where the layout record lives and DFU would overwrite it.
+size="$(wc -c < "$OUT/cubevox.ino.bin" 2>/dev/null || echo 0)"
+if [ "$size" -eq 0 ] || [ "$size" -gt 1048576 ]; then
+  echo "[ERROR] cubevox.ino.bin is $size bytes; it must be 1..1048576 (flash bank 1 only)"
+  exit 1
+fi
+
 # Warnings gate: our sources again with -Wall -Wextra -Werror, third-party headers as system headers.
 python3 "$FW/warn_gate.py" "$OUT" "${TAIL:-40}"

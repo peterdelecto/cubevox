@@ -14,6 +14,7 @@
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/platform.h"
+#include "board/record_service.h"
 #include "board/slots.h"
 #include "board/usb_link.h"
 #include "core/compose.h"
@@ -40,6 +41,7 @@ static bool gSnapshotStale = false;  // a change is waiting for the panel to be 
 static void printBootReport() {
   Serial.println("[boot] cubevox firmware");
   faultReport(Serial);
+  recordPrintBoot(Serial);
   clockReport(Serial);
   pins::report(Serial);
   Serial.print("[boot] icache ");
@@ -111,6 +113,9 @@ void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
   inputJackInit();  // PAD_EN low = MIC
   faultInit();
+  recordBoot(gLayout, gSettings);  // blocking ECC erase is safe: the watchdog starts at the end of setup()
+  gJack = JackSwitch(gSettings.inputJack);  // output is still muted, so no dip
+  inputJackApply(gSettings.inputJack);
   pinMode(pins::kUserLed, OUTPUT);
   usbLinkInit();  // USB attaches from loop() once VBUS is seen
 
@@ -137,6 +142,8 @@ void loop() {
   mutePoll(nowMs);
 
   const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
+  if (settingsChanged) recordRequestSave(gLayout, gSettings, nowMs);
+  recordPoll(nowMs);
   runJackSwitch(nowMs);
   // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
   if (controlsTakeChanged() || settingsChanged || gSnapshotStale) publishSnapshot();

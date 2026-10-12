@@ -3,12 +3,13 @@
 #include "stm32yyxx_ll_iwdg.h"  // the core leaves the IWDG HAL module out; LL is what it uses
 
 #include "board/audio.h"
+#include "board/flash_bank2.h"
 #include "board/mute.h"
 #include "board/pins.h"
 
 namespace {
 
-constexpr uint32_t kMagic = 0x46415531;  // "FAU1"
+constexpr uint32_t kMagic = 0x46415532;  // "FAU2"
 
 enum Kind : uint32_t { kHard = 0, kMemManage = 1, kBus = 2, kUsage = 3 };
 const char* const kKindName[] = {"hard", "memmanage", "bus", "usage"};
@@ -24,6 +25,8 @@ struct FaultRecord {
   uint32_t hfsr;
   uint32_t bfar;
   uint32_t mmfar;
+  uint32_t sr2;     // FLASH->SR2 at the fault, for DBECCERR
+  uint32_t eccFa2;  // FLASH->ECC_FA2 at the fault, bank 2 ECC fail address
 };
 __attribute__((section(".cv_noinit"))) FaultRecord gStored;
 
@@ -44,6 +47,13 @@ constexpr ResetFlag kResetFlags[] = {
     {RCC_RSR_BORRSTF, "brown-out"},  {RCC_RSR_PINRSTF, "pin"},
     {RCC_RSR_LPWRRSTF, "low-power"},
 };
+
+// ECC_FA2 counts 32-byte flash words from the start of bank 2 (15 bits cover the 1 MB bank).
+uint32_t bank2EccAddress(const FaultRecord& r) {
+  return kBank2Base + (r.eccFa2 & FLASH_ECC_FA_FAIL_ECC_ADDR) * 32u;
+}
+
+bool bank2EccSet(const FaultRecord& r) { return (r.sr2 & FLASH_SR_DBECCERR) != 0; }
 
 void printHex(Print& out, const char* label, uint32_t v) {
   out.print(label);
@@ -67,6 +77,8 @@ extern "C" __attribute__((used, noreturn)) void faultCapture(const uint32_t* fra
   gStored.hfsr = SCB->HFSR;
   gStored.bfar = SCB->BFAR;
   gStored.mmfar = SCB->MMFAR;
+  gStored.sr2 = FLASH->SR2;
+  gStored.eccFa2 = FLASH->ECC_FA2;
   gStored.magic = kMagic;
   NVIC_SystemReset();
   for (;;) {}
@@ -99,6 +111,12 @@ void faultInit() {
 
   // Without these the three lesser faults escalate to HardFault and lose their kind.
   SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk;
+}
+
+bool faultLastWasBank2Ecc(uint32_t& address) {
+  if (gLast.magic != kMagic || !bank2EccSet(gLast)) return false;
+  address = bank2EccAddress(gLast);
+  return true;
 }
 
 void faultWatchdogStart() {
@@ -149,6 +167,9 @@ void faultReport(Print& out) {
     printHex(out, " hfsr", gLast.hfsr);
     printHex(out, " bfar", gLast.bfar);
     printHex(out, " mmfar", gLast.mmfar);
+    if (bank2EccSet(gLast)) {
+      printHex(out, " bank2-ecc", bank2EccAddress(gLast));
+    }
     out.println();
   } else {
     out.println("[boot] fault: none");

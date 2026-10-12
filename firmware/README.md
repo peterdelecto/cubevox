@@ -25,12 +25,12 @@ Module map and ownership rules: `docs/specs/2026-10-12-firmware-structure-design
   (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_params`, `knob_filter`
   (debounce, stepping, smoothing), `jack_switch` (mute dip around K103), `canvas` (128 x 64 page-layout
   frame buffer with dirty pages), `fonts` (the font editor's export as `FontDesc`), `display.h`
-  (backend interface, `flushStep`), `unison_rate.h`, `version.h`.
+  (backend interface, `flushStep`), `record` (layout record codec, CRC32, newest-valid scan), `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `unison_rate.h`, `version.h`.
 - `src/board/`: one hardware concern per file. `pins.h`, `slots` (toggle pin and mux channels per
   slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk over the published
   snapshot), `controls` (mux scan, ADC, toggles), `input` (encoder and click to `UiInput`), `mute`,
   `input_jack` (PAD_EN for relay K103), `fault` (watchdog, fault handlers, reset cause, audio stall
-  watch), `display_sh1106`, `display_stub` (ASCII render over Serial), `platform` (DFU entry).
+  watch), `flash_bank2` (bank 2 erase and flash-word program by register, non-blocking erase), `record_service` (store wiring: boot load, ECC recovery, save request, bench hooks), `display_sh1106`, `display_stub` (ASCII render over Serial), `platform` (DFU entry).
 - `src/ui/`: pure, also host-compiled. `menu` (state machine, `UiInput` in, `UiAction` out, draws
   on the canvas).
 
@@ -57,10 +57,17 @@ from `../engine` by include path. No emulator files are included.
   or `[boot] fault: none`, plus the decoded `RCC->RSR` reset cause. If the audio block counter stops for
   100 ms while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line
   prints.
+- `board/flash_bank2.cpp` and `board/record_service.cpp`: the layout record lives in bank 2 at 0x08100000 and 0x08120000
+  (spec `2026-10-12-layout-record-design.md`). A save runs 2 s after the last settings change, one erase or flash-word
+  program per `loop()` pass. `build.sh` fails when the .bin exceeds 1 MB so DFU never reaches bank 2. The fault record
+  keeps FLASH->SR2 and ECC_FA2; a double ECC fault in a record sector is erased at boot before the scan.
+- Bench commands (serial, one letter): `1`-`8` toggle slot off, `0` all on, `k` pin knobs, `c` Chasm reverb, `r` boot
+  report, `p` stats, `f` bus fault, `w` watchdog spin, `a` stop audio, `m` reset peaks, `v` vocal clip, `d` DFU,
+  `s` save the layout record now, `q` print record status (sector, slot, sequence, name, settings), `e` erase both bank 2 sectors.
 
 Real: slot hardware table, default card layout, mux scan (selects held low 1.1 s after boot for U107's 3V3A
 delay), smoothing, KEY/SEMITONES stepping, toggles, mute sequence, menu logic and DFU entry, clock tree,
 VBUS-gated USB, PLL3 and SAI1 TX/RX DMA setup, engine chain in slot order, watchdog and fault handling.
 Stubbed or unverified on hardware: OLED (SH1106 driver compiled, falls back to `stubDisplay()` when no panel
-answers at 0x3C), layout persistence (flash bank 2, RAM only), VA_SENSE shutdown, EQ menu, costs (estimates
+answers at 0x3C), layout persistence (flash bank 2 record written; chip behavior unverified until the WeAct bench run), VA_SENSE shutdown, EQ menu, costs (estimates
 until the bench runs on a board). Audio, clocks and mux timing have never run on a board.

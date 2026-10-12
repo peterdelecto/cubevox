@@ -1,10 +1,12 @@
 // Firmware core tier on the host: registry apply, descriptors, default layout, costs.
 // Compiles firmware/cubevox/src/core/*.cpp; a core file that pulls in Arduino breaks this build.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "core/canvas.h"
 #include "core/chain_params.h"
@@ -17,6 +19,8 @@
 #include "core/layout.h"
 #include "core/mute_sequence.h"
 #include "core/panel.h"
+#include "core/record.h"
+#include "core/record_store.h"
 #include "core/registry.h"
 #include "core/settings.h"
 #include "core/version.h"
@@ -722,6 +726,231 @@ void checkMuteLatchAndHold() {
   check(!out.muteNHigh && mid.fullyMuted(), "mute: a mid-release mute ends fully muted");
 }
 
+
+// In-memory bank 2: two 128 KB sectors, 0xFF erased. Programming ANDs bits in like real flash.
+class FakeFlash : public FlashIo {
+ public:
+  FakeFlash() { mem[0].assign(kRecordSectorBytes, 0xFF); mem[1].assign(kRecordSectorBytes, 0xFF); }
+  const uint8_t* read(int s) const override { return mem[s].data(); }
+  void eraseStart(int s) override { erasing = s; busyPolls = 3; ++erases[s]; ++ops; }
+  bool eraseBusy() override {
+    if (erasing < 0) return false;
+    if (busyPolls-- > 0) return true;
+    mem[erasing].assign(kRecordSectorBytes, 0xFF);
+    erasing = -1;
+    return false;
+  }
+  void programWord(int s, uint32_t off, const uint8_t* w) override {
+    for (size_t i = 0; i < kFlashWordBytes; ++i) mem[s][off + i] &= w[i];
+    ++programs;
+    ++ops;
+  }
+  bool takeError() override { return false; }
+
+  void put(int sector, int slot, const RecordData& rec) {
+    const RecordBytes b = encodeRecord(rec);
+    std::memcpy(&mem[sector][slot * kRecordBytes], b.data(), kRecordBytes);
+  }
+
+  std::vector<uint8_t> mem[2];
+  int erasing = -1;
+  int busyPolls = 0;
+  int erases[2] = {0, 0};
+  int programs = 0;
+  int ops = 0;
+};
+
+RecordData makeRec(uint32_t seq, OutputLevel out = OutputLevel::Line, const char* name = "") {
+  RecordData r;
+  r.sequence = seq;
+  r.settings.output = out;
+  std::strncpy(r.name, name, kRecordNameBytes);
+  return r;
+}
+
+void checkRecordCodec() {
+  const uint8_t vec[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+  check(crc32(vec, sizeof vec) == 0xCBF43926u, "record: crc32 of 123456789");
+
+  RecordData in = makeRec(77, OutputLevel::Instrument, "stage rig");
+  in.settings.inputJack = InputJack::Pedal;
+  in.layout.card[2] = Card::ReverbChasm;
+  in.layout.card[7] = Card::Empty;
+  RecordBytes b = encodeRecord(in);
+  RecordData out;
+  check(decodeRecord(b.data(), out), "record: round trip decodes");
+  check(out.sequence == 77 && out.settings.output == OutputLevel::Instrument &&
+            out.settings.inputJack == InputJack::Pedal && std::strcmp(out.name, "stage rig") == 0 &&
+            out.layout.card == in.layout.card,
+        "record: round trip keeps every field");
+
+  RecordBytes bad = b;
+  bad[kOffName] ^= 0x01;
+  check(!decodeRecord(bad.data(), out), "record: corrupt byte fails the CRC");
+  bad = b;
+  bad[kOffSchema] = 2;
+  check(!decodeRecord(bad.data(), out), "record: wrong schema rejected");
+
+  bad = b;
+  std::memset(&bad[kOffSlots], 0, kCardIdBytes);
+  std::memcpy(&bad[kOffSlots], "no_such_card", 12);
+  const uint32_t crc = crc32(bad.data(), kOffCrc);
+  for (int i = 0; i < 4; ++i) bad[kOffCrc + i] = static_cast<uint8_t>(crc >> (8 * i));
+  check(decodeRecord(bad.data(), out) && out.layout.card[0] == Card::Empty, "record: unknown card id becomes empty");
+
+  const uint8_t blank[kRecordBytes] = {};
+  std::vector<uint8_t> ff(kRecordBytes, 0xFF);
+  check(classifyRecordSlot(ff.data()) == SlotState::Blank, "record: all 0xFF is blank");
+  check(classifyRecordSlot(blank) == SlotState::Torn, "record: zeros are torn");
+  check(classifyRecordSlot(b.data()) == SlotState::Valid, "record: encoded slot is valid");
+}
+
+void checkRecordNewest() {
+  FakeFlash f;
+  f.put(0, 0, makeRec(3));
+  f.put(1, 0, makeRec(5, OutputLevel::Instrument));
+  f.put(0, 1, makeRec(4));
+  const uint8_t* views[2] = {f.read(0), f.read(1)};
+  RecordFound found;
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 5 && found.sector == 1,
+        "record: newest wins across sectors");
+
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 5, "store: boot loads the newest");
+  check(store.status().sector == 1 && store.status().nextSlot == 1, "store: append goes after the newest");
+}
+
+// Polls until the store is idle; returns the largest number of flash ops one poll started.
+int runToIdle(RecordStore& store, FakeFlash& f, uint32_t& t) {
+  int worst = 0;
+  for (int i = 0; i < 100 && store.status().busy; ++i) {
+    const int before = f.ops;
+    store.poll(t++);
+    worst = std::max(worst, f.ops - before);
+  }
+  return worst;
+}
+
+void checkStoreAppend() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  check(!store.begin(out), "store: blank flash has no record");
+
+  Settings s;
+  s.output = OutputLevel::Instrument;
+  store.request(defaultLayout(), s, 100);
+  store.poll(2099);
+  check(f.ops == 0, "store: no write before 2 s of quiet");
+  store.request(defaultLayout(), s, 1500);
+  store.poll(3499);
+  check(f.ops == 0, "store: a new request restarts the debounce");
+  uint32_t t = 3500;
+  const int worst = runToIdle(store, f, t);
+  check(f.programs == kWordsPerRecord && f.erases[0] + f.erases[1] == 0, "store: one record is eight word programs, no erase");
+  check(worst == 1, "store: at most one flash op per poll");
+
+  FakeFlash again;
+  std::memcpy(again.mem[0].data(), f.mem[0].data(), kRecordBytes);
+  RecordStore reboot(again);
+  check(reboot.begin(out) && out.sequence == 1 && out.settings.output == OutputLevel::Instrument,
+        "store: the saved record reloads");
+
+  store.saveNow();
+  store.poll(3501 + 1000);
+  check(f.programs == kWordsPerRecord, "store: save-now starts without waiting (first poll sets up)");
+  runToIdle(store, f, t);
+  check(f.programs == 2 * kWordsPerRecord && store.status().sequence == 2 && store.status().nextSlot == 2,
+        "store: second record appends after the first");
+}
+
+void checkStoreTornTail() {
+  FakeFlash f;
+  f.put(0, 0, makeRec(1));
+  f.put(0, 1, makeRec(2, OutputLevel::Instrument));
+  f.put(0, 2, makeRec(3));
+  std::memset(&f.mem[0][2 * kRecordBytes + 3 * kFlashWordBytes], 0xFF, 5 * kFlashWordBytes);  // cut after 3 words
+  f.mem[0][2 * kRecordBytes + 100] = 0x00;                                                        // and damaged
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 2, "store: torn tail is skipped, previous record loads");
+  check(store.status().nextSlot == 3, "store: append goes after the torn slot");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  const uint8_t* views[2] = {f.read(0), f.read(1)};
+  RecordFound found;
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 3 && found.slot == 3,
+        "store: record lands in slot 3 with sequence 3");
+}
+
+void fillSector(FakeFlash& f, int sector, uint32_t firstSeq) {
+  for (int slot = 0; slot < kSlotsPerSector; ++slot) f.put(sector, slot, makeRec(firstSeq + slot));
+}
+
+void checkStoreSectorSwitch() {
+  FakeFlash f;
+  fillSector(f, 0, 1);
+  f.put(1, 0, makeRec(0));
+  std::memset(&f.mem[1][kRecordBytes], 0x5A, 64);  // stale junk in the other sector
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == kSlotsPerSector, "store: full sector loads its last record");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  const int worst = runToIdle(store, f, t);
+  check(f.erases[1] == 1 && f.erases[0] == 0, "store: full sector erases the other one");
+  check(worst == 1, "store: erase start and programs are separate polls");
+  check(store.status().sector == 1 && store.status().nextSlot == 1 && store.status().sequence == kSlotsPerSector + 1,
+        "store: new record is slot 0 of the other sector");
+  const uint8_t* views[2] = {f.read(0), f.read(1)};
+  RecordFound found;
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.sector == 1 && found.slot == 0,
+        "store: newest is in the fresh sector");
+}
+
+void checkStoreInterruptedErase() {
+  // The older sector was mid-erase: a blank slot followed by old data.
+  FakeFlash f;
+  fillSector(f, 1, 1);
+  std::memset(&f.mem[1][0], 0xFF, 3 * kRecordBytes);
+  fillSector(f, 0, 600);
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 600 + kSlotsPerSector - 1, "store: dirty sector does not hide the newest");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.erases[1] == 1, "store: interrupted erase is re-erased before use");
+
+  // No valid record anywhere and sector 0 dirty: use the blank sector, leave the dirty one.
+  FakeFlash g;
+  std::memset(&g.mem[0][kRecordBytes], 0x33, 64);
+  RecordStore fresh(g);
+  check(!fresh.begin(out), "store: junk is not a record");
+  fresh.request(defaultLayout(), Settings{}, 0);
+  t = kSaveDebounceMs;
+  runToIdle(fresh, g, t);
+  check(g.erases[0] + g.erases[1] == 0 && fresh.status().sector == 1 && fresh.status().sequence == 1,
+        "store: a blank sector is used without an erase");
+
+  // Bench erase wipes both.
+  check(fresh.eraseAll(), "store: erase-all accepted when idle");
+  for (int i = 0; i < 50; ++i) fresh.poll(t++);
+  check(g.erases[0] == 1 && g.erases[1] == 1 && !fresh.status().hasRecord && !fresh.status().busy,
+        "store: erase-all clears both sectors");
+}
+
+void checkRecords() {
+  checkRecordCodec();
+  checkRecordNewest();
+  checkStoreAppend();
+  checkStoreTornTail();
+  checkStoreSectorSwitch();
+  checkStoreInterruptedErase();
+}
+
 int main() {
   checkIds();
   checkGroups();
@@ -749,6 +978,7 @@ int main() {
   checkVersionTag();
   checkMuteSequence();
   checkMuteLatchAndHold();
+  checkRecords();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;
 }
