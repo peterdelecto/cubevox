@@ -6,7 +6,10 @@
 #include <cstring>
 
 #include "core/chain_params.h"
+#include "core/compose.h"
 #include "core/costs.h"
+#include "core/layout.h"
+#include "core/panel.h"
 #include "core/registry.h"
 #include "core/settings.h"
 #include "core/version.h"
@@ -148,9 +151,10 @@ void checkDefaultLayout() {
   int avg = costs::kFixed.avg;
   int worst = costs::kFixed.worst;
   int reverbs = 0;
+  const Layout layout = defaultLayout();
   for (int s = 0; s < kSlotCount; ++s) {
-    check(slotCard(s) == expected[s], "default layout slot");
-    const CardDesc& d = cardDesc(slotCard(s));
+    check(layout.card[s] == expected[s], "default layout slot");
+    const CardDesc& d = cardDesc(layout.card[s]);
     avg += d.cost.avg;
     worst += d.cost.worst;
     if (d.group == Group::Reverb) ++reverbs;
@@ -164,6 +168,72 @@ void checkDefaultLayout() {
     check(d.measured, "every card's cost comes from the board");
     check(d.cost.worst >= d.cost.avg, "worst block is never under the mean");
   }
+}
+
+void checkLayoutValid() {
+  check(layoutValid(defaultLayout()), "default layout is valid");
+  Layout bad = defaultLayout();
+  bad.card[3] = static_cast<Card>(kCardCount);
+  check(!layoutValid(bad), "out-of-range card id is rejected");
+  Layout twoReverbs = defaultLayout();
+  twoReverbs.card[0] = Card::ReverbChasm;
+  check(!layoutValid(twoReverbs), "second reverb card is rejected");
+}
+
+PanelReading panelWithToggles(bool on) {
+  PanelReading r;
+  r.toggle.fill(on);
+  return r;
+}
+
+void checkComposeToggles() {
+  const Layout layout = defaultLayout();
+  const ChainSnapshot off = composeSnapshot(layout, panelWithToggles(false), Settings(), BenchOverrides());
+  check(!off.params.distortion.on && !off.params.unison.on && !off.params.reverb.on && !off.params.gate.on &&
+            !off.params.pitchFx.autotune.on && !off.params.pitchFx.octave.on,
+        "toggles off leave every stage off");
+  const ChainSnapshot on = composeSnapshot(layout, panelWithToggles(true), Settings(), BenchOverrides());
+  check(on.params.distortion.on && on.params.unison.on && on.params.reverb.on && on.params.gate.on &&
+            on.params.pitchFx.autotune.on && on.params.pitchFx.octave.on,
+        "toggles on turn every stage on");
+  check(on.layout.card == layout.card, "snapshot carries the layout");
+}
+
+void checkComposeBench() {
+  const Layout layout = defaultLayout();  // slot 6 (index 5) is Distortion
+  BenchOverrides bench;
+  bench.slotsOff = 1u << 5;
+  ChainSnapshot snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  check(!snap.params.distortion.on && snap.params.unison.on, "slotsOff bit forces only that slot off");
+
+  bench = BenchOverrides();
+  bench.reverbChasm = true;
+  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  check(snap.params.reverb.engine == cv::kReverbChasm, "reverbChasm selects the chasm engine");
+
+  // Octave semitones (stepped, slot index 2) and Unison depth (continuous, index 3) read the top position.
+  PanelReading low;
+  bench = BenchOverrides();
+  bench.knobsPinned = true;
+  const ChainSnapshot pinned = composeSnapshot(layout, low, Settings(), bench);
+  ChainParams expect;
+  applyKnob(Card::Octave, 0, 24.0f, expect);
+  applyKnob(Card::Unison, 0, 1.0f, expect);
+  check(pinned.params.pitchFx.octave.semitones == expect.pitchFx.octave.semitones &&
+            pinned.params.pitchFx.octave.semitones == 12,
+        "pinned stepped knob sits on its last step");
+  check(std::fabs(pinned.params.unison.depth - expect.unison.depth) < 1e-6f, "pinned continuous knob sits at 1.0");
+  const ChainSnapshot live = composeSnapshot(layout, low, Settings(), BenchOverrides());
+  check(live.params.pitchFx.octave.semitones == -12, "unpinned stepped knob follows the panel");
+}
+
+void checkOutputGain() {
+  Settings s;
+  const BenchOverrides none;
+  check(composeSnapshot(defaultLayout(), PanelReading(), s, none).outputGain == 1.0f, "LINE gain is unity");
+  s.output = OutputLevel::Instrument;
+  const float g = composeSnapshot(defaultLayout(), PanelReading(), s, none).outputGain;
+  check(std::fabs(g - 0.2512f) < 1e-3f, "INSTRUMENT gain is -12 dB linear");
 }
 
 void checkSettings() {
@@ -188,6 +258,10 @@ int main() {
   checkFormat();
   checkDefaultLayout();
   checkSettings();
+  checkLayoutValid();
+  checkComposeToggles();
+  checkComposeBench();
+  checkOutputGain();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;
 }

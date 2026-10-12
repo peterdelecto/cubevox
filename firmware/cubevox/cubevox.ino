@@ -1,4 +1,4 @@
-// cubevox firmware, STM32H743VIT6. Panel -> ChainParams -> audio interrupt.
+// cubevox firmware, STM32H743VIT6. Panel + layout + settings -> ChainSnapshot -> audio interrupt.
 
 #include <Arduino.h>
 
@@ -14,16 +14,17 @@
 #include "board/platform.h"
 #include "board/slots.h"
 #include "board/usb_link.h"
+#include "core/compose.h"
+#include "core/layout.h"
 #include "core/registry.h"
 
 constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;
 
-static ChainParams gParams;
+static Layout gLayout = defaultLayout();
+static BenchOverrides gBench;
 static bool gOledFound = false;
 static bool gAudioRunning = false;
-static uint8_t gBenchOff = 0;  // bit s: slot s forced off by a bench command
-static bool gBenchChasm = false;  // bench: run the reverb slot as Chasm so its cost can be measured
 
 // Boot facts for the first-article checklist, printed whenever a terminal opens the port.
 static void printBootReport() {
@@ -45,15 +46,9 @@ static void printBootReport() {
   }
 }
 
-// Rebuilds the full parameter set from the panel and the menu, then hands it to the audio interrupt.
-static void publishParams() {
-  controlsApply(gParams);
-  for (int s = 0; s < kSlotCount; ++s) {
-    if (gBenchOff & (1u << s)) applyToggle(slotCard(s), false, gParams);
-  }
-  if (gBenchChasm) gParams.reverb.engine = cv::kReverbChasm;
-  gParams.outputGainDb = menuOutputGainDb();
-  audioPublish(gParams);
+// Rebuilds the snapshot from the layout, panel and menu, then hands it to the audio interrupt.
+static void publishSnapshot() {
+  audioPublish(composeSnapshot(gLayout, controlsReading(), menuSettings(), gBench));
 }
 
 static void printStatsNow() {
@@ -71,7 +66,7 @@ static void printStatsNow() {
   Serial.print(" of ");
   Serial.print(s.budgetCycles);
   Serial.print(" cycles, slots off 0x");
-  Serial.println(gBenchOff, HEX);
+  Serial.println(gBench.slotsOff, HEX);
   Serial.print("[audio] per slot");
   for (int i = 0; i <= kSlotCount; ++i) {
     Serial.print(' ');
@@ -99,8 +94,8 @@ static void pollBenchCommands() {
   while (Serial.available() > 0) {
     const int c = Serial.read();
     if (c >= '1' && c <= '8') {
-      gBenchOff ^= static_cast<uint8_t>(1u << (c - '1'));
-      publishParams();
+      gBench.slotsOff ^= static_cast<uint8_t>(1u << (c - '1'));
+      publishSnapshot();
       printStatsNow();
       continue;
     }
@@ -108,8 +103,8 @@ static void pollBenchCommands() {
       case 'r': printBootReport(); break;
       case 'p': printStatsNow(); break;
       case '0':
-        gBenchOff = 0;
-        publishParams();
+        gBench.slotsOff = 0;
+        publishSnapshot();
         printStatsNow();
         break;
       case 'f':
@@ -130,17 +125,15 @@ static void pollBenchCommands() {
         Serial.println("[bench] audio peaks reset");
         break;
       case 'k': {
-        static bool pinned = false;
-        pinned = !pinned;
-        controlsBenchPin(pinned);
-        publishParams();
-        Serial.println(pinned ? "[bench] knobs pinned at top" : "[bench] knobs live");
+        gBench.knobsPinned = !gBench.knobsPinned;
+        publishSnapshot();
+        Serial.println(gBench.knobsPinned ? "[bench] knobs pinned at top" : "[bench] knobs live");
         break;
       }
       case 'c':
-        gBenchChasm = !gBenchChasm;
-        publishParams();
-        Serial.println(gBenchChasm ? "[bench] reverb slot runs Chasm" : "[bench] reverb slot runs its card's engine");
+        gBench.reverbChasm = !gBench.reverbChasm;
+        publishSnapshot();
+        Serial.println(gBench.reverbChasm ? "[bench] reverb slot runs Chasm" : "[bench] reverb slot runs its card's engine");
         break;
       case 'v': {
         static bool clipOn = false;
@@ -191,15 +184,15 @@ void loop() {
   if (usbLinkTerminalOpened()) printBootReport();
   pollBenchCommands();
 
-  controlsPoll(nowMs);
+  controlsPoll(nowMs, gLayout);
   mutePoll(nowMs);
 
   const bool panelChanged = controlsTakeChanged();
   const bool menuChanged = menuTakeSettingsChanged();
   if (menuChanged) inputJackApply(menuSettings().inputJack);
-  if (panelChanged || menuChanged) publishParams();
+  if (panelChanged || menuChanged) publishSnapshot();
 
-  menuPoll(nowMs, muteActive());
+  menuPoll(nowMs, gLayout, controlsReading(), muteActive());
   heartbeat(nowMs);
   printStats(nowMs);
 }

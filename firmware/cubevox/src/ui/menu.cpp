@@ -76,19 +76,19 @@ const char* itemValue(Item it) {
   }
 }
 
-void drawIdle(bool muted) {
+void drawIdle(bool muted, const Layout& layout, const PanelReading& panel) {
   row(0, "cubevox");
   row(1, muted ? "MUTED" : "");
-  const LastMoved m = controlsLastMoved();
+  const LastMoved m = panel.lastMoved;
   if (m.slot < 0) return;
-  const Card card = slotCard(m.slot);
+  const Card card = layout.card[m.slot];
   const int knob = m.knobB ? 1 : 0;
   char value[kCols + 1];
-  formatKnob(card, knob, controlsKnobValue(m.slot, m.knobB), value, sizeof(value));
+  formatKnob(card, knob, panel.knob[m.slot][knob], value, sizeof(value));
   row(3, cardDesc(card).name);
   row(4, cardDesc(card).knob[knob].name);
   row(5, value);
-  row(6, controlsToggleOn(m.slot) ? "ON" : "OFF");
+  row(6, panel.toggle[m.slot] ? "ON" : "OFF");
 }
 
 void drawList() {
@@ -101,11 +101,11 @@ void drawList() {
   }
 }
 
-void drawChainView() {
+void drawChainView(const Layout& layout) {
   row(0, "CHAIN ORDER");
   for (int i = 0; i < kSlotCount; ++i) {
     char line[kCols + 1];
-    snprintf(line, sizeof(line), "%d %s", i + 1, cardDesc(slotCard(i)).name);
+    snprintf(line, sizeof(line), "%d %s", i + 1, cardDesc(layout.card[i]).name);
     row(1 + i, line);
   }
 }
@@ -117,12 +117,12 @@ void drawConfirmDfu() {
   row(5, "Turn to cancel.");
 }
 
-void redraw(bool muted) {
+void redraw(bool muted, const Layout& layout, const PanelReading& panel) {
   memset(gFrame, 0, sizeof(gFrame));
   switch (gMode) {
-    case Mode::Idle: drawIdle(muted); break;
+    case Mode::Idle: drawIdle(muted, layout, panel); break;
     case Mode::List: drawList(); break;
-    case Mode::ChainView: drawChainView(); break;
+    case Mode::ChainView: drawChainView(layout); break;
     case Mode::ConfirmDfu: drawConfirmDfu(); break;
   }
   if (memcmp(gFrame, gShown, sizeof(gFrame)) == 0) return;
@@ -206,7 +206,7 @@ void menuInit(Display& display) {
   attachInterrupt(digitalPinToInterrupt(pins::kEncMenuB), encoderIsr, CHANGE);
 }
 
-void menuPoll(uint32_t nowMs, bool muted) {
+void menuPoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool muted) {
   const int detents = takeDetents();
   const bool pressed = gClick.update(digitalRead(pins::kEncMenuSw) == HIGH, nowMs, kClickDebounceMs) &&
                        !gClick.level();
@@ -214,7 +214,7 @@ void menuPoll(uint32_t nowMs, bool muted) {
   if (detents != 0) onTurn(detents);
   if (pressed) onClick();
   if (gMode != Mode::Idle && nowMs - gLastActivityMs > kMenuTimeoutMs) gMode = Mode::Idle;
-  redraw(muted);
+  redraw(muted, layout, panel);
 }
 
 const Settings& menuSettings() { return gSettings; }
@@ -224,5 +224,3 @@ bool menuTakeSettingsChanged() {
   gSettingsChanged = false;
   return changed;
 }
-
-float menuOutputGainDb() { return outputTrimDb(gSettings); }

@@ -70,8 +70,10 @@ getters behind the sketch's back.
 4. `board/input` and the pure `Menu`; host build compiles `ui/`; DFU is a `UiAction`.
    A 1/4" INPUT change dips the output mute around the K103 switch, so the 25.7 dB level step
    and the contact click never reach the output.
-5. Display. `core/canvas`, `core/fonts`, `ui/screens` for the three layouts in
-   `2026-10-11-font-sizes-design.md`; SH1106 page flush; host test writes `build/oled-*.pgm`.
+5. Display plumbing. `core/canvas`, `core/fonts`, SH1106 page flush; host test writes
+   `build/oled-*.pgm`. The existing screens move onto the canvas unchanged in content.
+   The OLED GUI itself (screens, navigation, what shows when) is planned with the owner in
+   its own spec later (owner 2026-10-12); `ui/screens` is built from that spec.
 6. Registry: curve field on `KnobDesc` (Decay is log, Response min > max), one gate decay
    mapping, key positions derived from `cv::kKeyName`.
 7. Cleanups: stats reads with IRQ masked, PC5 / PB5 / PE2-PE6 into `pins.h`, dead

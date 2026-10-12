@@ -7,6 +7,8 @@
 #include <stdint.h>
 
 #include "core/display.h"
+#include "core/layout.h"
+#include "core/panel.h"
 #include "core/settings.h"
 
 // Returned when no SH1106 driver is linked: prints each changed screen to Serial.
@@ -15,14 +17,11 @@ Display& stubDisplay();
 void menuInit(Display& display);
 
 // Call every loop pass. Reads the encoder state, runs the menu, redraws on change.
-// `muted` and the last-moved knob feed the idle screen.
-void menuPoll(uint32_t nowMs, bool muted);
+// The idle screen shows the last-moved knob from `panel`; the chain view lists `layout`.
+void menuPoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool muted);
 
 // Settings the menu edits. The reverb engine is not one of them: the placed reverb card picks it.
 const Settings& menuSettings();
 
 // True once after a setting changed.
 bool menuTakeSettingsChanged();
-
-// Output trim for the LINE / INSTRUMENT choice, applied after the chain.
-float menuOutputGainDb();

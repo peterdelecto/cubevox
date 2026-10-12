@@ -45,12 +45,6 @@ const CardDesc kCards[kCardCount] = {
     {"reverb_chasm", "Chasm Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbChasm, true},
 };
 
-// Default layout, slot 1 to 8 (CLAUDE.md "Default layout").
-const Card kDefaultLayout[kSlotCount] = {
-    Card::InputGate, Card::Autotune, Card::Octave, Card::Unison,
-    Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring,
-};
-
 // GateParams carries two knobs per stage, so the input gate and the second gate share one setter.
 void applyGateKnob(int knob, float v, cv::GateParams& g) {
   if (knob == 0) {
@@ -166,5 +160,3 @@ void formatKnob(Card c, int knob, float v, char* buf, size_t size) {
   }
   snprintf(buf, size, "%d %s", static_cast<int>(lroundf(k.min + (k.max - k.min) * v)), k.unit);
 }
-
-Card slotCard(int slot) { return kDefaultLayout[slot]; }

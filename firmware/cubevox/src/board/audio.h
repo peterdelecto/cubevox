@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "core/chain_params.h"
+#include "core/compose.h"
 
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed
@@ -23,8 +24,8 @@ struct AudioStats {
 bool audioInit();
 const char* audioError();
 
-// Hands a complete parameter set to the audio interrupt. Lock-free, call from the main loop.
-void audioPublish(const ChainParams& params);
+// Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop.
+void audioPublish(const ChainSnapshot& snapshot);
 
 AudioStats audioStats();
 

@@ -22,12 +22,14 @@ struct PotState {
   float smoothed = 0.0f;
   float reported = 0.0f;  // value at the last "moved" report
   int step = 0;           // stepped knobs only
+  int stepsSeeded = 0;    // step count `step` was seeded for; 0 for a continuous knob
   bool seeded = false;
 };
 
 PotState gPots[kPotCount];
 DebouncedInput gToggles[kSlotCount];
 LastMoved gLastMoved;
+Layout gLayout = defaultLayout();
 
 uint8_t gScanChannel = 0;
 bool gSelected = false;
@@ -66,22 +68,34 @@ void noteMoved(int pot, uint32_t nowMs) {
   gChanged = true;
 }
 
+int stepsFor(int pot) {
+  const PotOwner owner = ownerOf(pot);
+  return owner.slot < 0 ? 0 : knobSteps(gLayout.card[owner.slot], owner.knobB ? 1 : 0);
+}
+
+// Places the step under the knob's current position when the knob's step count changes.
+void reseedStep(PotState& p, int steps) {
+  p.stepsSeeded = steps;
+  p.step = steps > 0 ? steppedPosition(p.smoothed, steps, 0, 0.0f) : 0;
+}
+
 void updatePot(int pot, float norm, uint32_t nowMs) {
   PotState& p = gPots[pot];
+  const int steps = stepsFor(pot);
   if (!p.seeded) {
     p.smoothed = norm;
     p.reported = norm;
     p.seeded = true;
-    const PotOwner owner = ownerOf(pot);
-    const int steps = owner.slot < 0 ? 0 : knobSteps(slotCard(owner.slot), owner.knobB ? 1 : 0);
-    if (steps > 0) p.step = steppedPosition(norm, steps, 0, 0.0f);
+    reseedStep(p, steps);
     if (++gSeededCount == kPotCount) gChanged = true;
     return;
   }
   p.smoothed += kSmoothing * (norm - p.smoothed);
-
-  const PotOwner owner = ownerOf(pot);
-  const int steps = owner.slot < 0 ? 0 : knobSteps(slotCard(owner.slot), owner.knobB ? 1 : 0);
+  if (steps != p.stepsSeeded) {
+    reseedStep(p, steps);
+    gChanged = true;
+    return;
+  }
   if (steps > 0) {
     const int next = steppedPosition(p.smoothed, steps, p.step);
     if (next == p.step) return;
@@ -158,7 +172,8 @@ void controlsInit() {
   }
 }
 
-void controlsPoll(uint32_t nowMs) {
+void controlsPoll(uint32_t nowMs, const Layout& layout) {
+  gLayout = layout;
   scanMux(nowMs);
   scanToggles(nowMs);
 }
@@ -169,27 +184,16 @@ bool controlsTakeChanged() {
   return changed;
 }
 
-bool gBenchPin = false;
-
-float controlsKnobValue(int slot, bool knobB) {
-  const int pot = knobB ? kSlots[slot].muxChannelB : kSlots[slot].muxChannelA;
-  const int steps = knobSteps(slotCard(slot), knobB ? 1 : 0);
-  if (gBenchPin) return steps > 0 ? static_cast<float>(steps - 1) : 1.0f;
-  return steps > 0 ? static_cast<float>(gPots[pot].step) : gPots[pot].smoothed;
-}
-
-void controlsBenchPin(bool on) { gBenchPin = on; }
-
-bool controlsToggleOn(int slot) { return gToggles[slot].level(); }
-
-LastMoved controlsLastMoved() { return gLastMoved; }
-
-void controlsApply(ChainParams& out) {
+PanelReading controlsReading() {
+  PanelReading r;
   for (int s = 0; s < kSlotCount; ++s) {
-    const Card card = slotCard(s);
-    applyPlacement(card, out);
-    applyKnob(card, 0, controlsKnobValue(s, false), out);
-    applyKnob(card, 1, controlsKnobValue(s, true), out);
-    applyToggle(card, gToggles[s].level(), out);
+    const int pots[kKnobsPerCard] = {kSlots[s].muxChannelA, kSlots[s].muxChannelB};
+    for (int k = 0; k < kKnobsPerCard; ++k) {
+      const PotState& p = gPots[pots[k]];
+      r.knob[s][k] = p.stepsSeeded > 0 ? static_cast<float>(p.step) : p.smoothed;
+    }
+    r.toggle[s] = gToggles[s].level();
   }
+  r.lastMoved = gLastMoved;
+  return r;
 }

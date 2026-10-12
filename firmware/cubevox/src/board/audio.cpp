@@ -8,6 +8,7 @@
 
 #include "engine/common.h"
 #include "h7_block_mem.h"
+#include "core/compose.h"
 #include "core/registry.h"
 
 #ifdef CUBEVOX_BENCH_CLIP
@@ -30,7 +31,7 @@ constexpr int kWordsPerRing = kWordsPerHalf * 2;
 constexpr float kInt32Scale = 2147483648.0f;
 constexpr float kInt32Max = 2147483520.0f;  // largest float below 2^31
 constexpr uint32_t kDmaIrqPriority = 2;
-constexpr uint32_t kBlockIrqPriority = 15;  // lowest, so the main loop and DMA both preempt it
+constexpr uint32_t kBlockIrqPriority = 15;  // lowest, so the DMA interrupts preempt it
 
 // Rings live in RAM_D2 and are marked non-cacheable by h7_block_mem_mpu_init().
 H7_DMA_MEM static uint32_t gTxRing[kWordsPerRing];
@@ -61,7 +62,9 @@ Chain gChain;
 // again in place; a plain reset() would leave constructor-only members (the tracker's
 // const anti-alias biquad) zeroed.
 H7_DTCM_BSS cv::PitchFx gPitchFx;
-ChainParams gParams[2];
+// The main loop only writes the slot the interrupt is not reading. The block interrupt runs to
+// completion before the main loop resumes, so a block sees one snapshot from start to end.
+ChainSnapshot gSnapshots[2];
 std::atomic<int> gPublished{0};
 int gWriteIndex = 1;
 
@@ -99,11 +102,12 @@ bool runStage(Card c, const float* in, float* out, int n, const ChainParams& p, 
 }
 
 // Slot order, then the fixed EQ. Result lands in `a`.
-void runChain(float* a, float* b, int n, const ChainParams& p) {
+void runChain(float* a, float* b, int n, const ChainSnapshot& snap) {
+  const ChainParams& p = snap.params;
   bool pitchDone = false;
   for (int s = 0; s < kSlotCount; ++s) {
     const uint32_t t0 = DWT->CYCCNT;
-    const bool wrote = runStage(slotCard(s), a, b, n, p, pitchDone);
+    const bool wrote = runStage(snap.layout.card[s], a, b, n, p, pitchDone);
     const uint32_t dt = DWT->CYCCNT - t0;
     gSlotCycles[s] = gSlotCycles[s] + dt;
     if (dt > gSlotWorst[s]) gSlotWorst[s] = dt;
@@ -124,7 +128,7 @@ void runChain(float* a, float* b, int n, const ChainParams& p) {
 void processHalf(int half) {
   const uint32_t* rx = gRxRing + half * kWordsPerHalf;
   uint32_t* tx = gTxRing + half * kWordsPerHalf;
-  const ChainParams& p = gParams[gPublished.load(std::memory_order_acquire)];
+  const ChainSnapshot& snap = gSnapshots[gPublished.load(std::memory_order_acquire)];
 
   const float inGain = 1.0f / kInt32Scale;
   float a[cv::kBlock];
@@ -141,9 +145,9 @@ void processHalf(int half) {
   for (int i = 0; i < kFramesPerHalf; ++i) {
     a[i] = static_cast<float>(static_cast<int32_t>(rx[2 * i])) * inGain;  // left only
   }
-  runChain(a, b, kFramesPerHalf, p);
+  runChain(a, b, kFramesPerHalf, snap);
 
-  const float gain = powf(10.0f, p.outputGainDb / 20.0f);
+  const float gain = snap.outputGain;
   for (int i = 0; i < kFramesPerHalf; ++i) {
     float v = a[i] * gain;
     v = v > 1.0f ? 1.0f : (v < -1.0f ? -1.0f : v);
@@ -303,7 +307,7 @@ bool audioInit() {
 
   h7_dtcm_bss_zero();
   new (&gPitchFx) cv::PitchFx();
-  gParams[0] = ChainParams();
+  gSnapshots[0] = ChainSnapshot();
   enableCycleCounter();
   gStats.budgetCycles = static_cast<uint32_t>(
       static_cast<uint64_t>(SystemCoreClock) * kFramesPerHalf / cv::kSampleRate);
@@ -332,8 +336,8 @@ bool audioInit() {
 
 const char* audioError() { return gError; }
 
-void audioPublish(const ChainParams& params) {
-  gParams[gWriteIndex] = params;
+void audioPublish(const ChainSnapshot& snapshot) {
+  gSnapshots[gWriteIndex] = snapshot;
   gPublished.store(gWriteIndex, std::memory_order_release);
   gWriteIndex ^= 1;
 }

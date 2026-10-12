@@ -4,7 +4,8 @@
 
 #include <stdint.h>
 
-#include "core/chain_params.h"
+#include "core/layout.h"
+#include "core/panel.h"
 
 // Mux timing (hardware spec items 10 and 19). The 100 R / 1 nF at the ADC pin and the mux
 // source impedance need >= 0.5 ms after a select change. The ADC sample time is a core
@@ -37,30 +38,14 @@ class DebouncedInput {
 // an edge does not flicker. `current` is the previous position.
 int steppedPosition(float norm, int positions, int current, float hysteresis = 0.2f);
 
-struct LastMoved {
-  int8_t slot = -1;  // -1 until a knob has moved
-  bool knobB = false;
-  uint32_t atMs = 0;
-};
-
 void controlsInit();
 
 // Call every loop pass. Advances the mux scan without blocking and debounces the toggles.
-void controlsPoll(uint32_t nowMs);
+// Step counts come from `layout`; a knob whose count changes re-seeds its step position.
+void controlsPoll(uint32_t nowMs, const Layout& layout);
 
 // True once since the last call if any knob, step or toggle changed (and once after the first full scan).
 bool controlsTakeChanged();
 
-// Applies every knob and toggle to `out`. Fields that belong to the menu are left alone.
-void controlsApply(ChainParams& out);
-
-// Current value of a slot knob as the OLED shows it (0..1, or the step index for stepped knobs).
-float controlsKnobValue(int slot, bool knobB);
-
-// Bench only: while pinned, every knob reads its top position (1.0, or the last step) so the
-// cost table is taken at a defined setting rather than whatever the pots sit at.
-void controlsBenchPin(bool on);
-
-bool controlsToggleOn(int slot);
-
-LastMoved controlsLastMoved();
+// Knob values (0..1, or the step index for stepped knobs), toggles and the last moved knob.
+PanelReading controlsReading();

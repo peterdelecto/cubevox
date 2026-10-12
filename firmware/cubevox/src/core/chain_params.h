@@ -23,7 +23,6 @@ struct ChainParams {
   cv::ReverbParams reverb;
   cv::PolishParams eq;
   float unisonRatePercent = 50.0f;
-  float outputGainDb = 0.0f;
 
   ChainParams();
 };

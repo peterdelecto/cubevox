@@ -65,6 +65,3 @@ void applyPlacement(Card c, ChainParams& out);
 
 // Readout text for the OLED, for example "-24 dB" or "F / Dm".
 void formatKnob(Card c, int knob, float value, char* buf, size_t size);
-
-// Card in a slot. Defaults from the slots spec; runtime layout and flash come in step 2.
-Card slotCard(int slot);
