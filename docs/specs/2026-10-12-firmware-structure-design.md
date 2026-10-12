@@ -84,3 +84,9 @@ getters behind the sketch's back.
 2. Step 5: the PGM renders read against the font editor's `screens.png`.
 3. On hardware (relay click in PEDAL, OLED, audio on the snapshot): `firmware/bringup.py` checks
    on the WeAct bench or the first JLC board.
+
+## Deferred
+1. Duplicate cards (owner 2026-10-12, on hold). Engines are one object per card type, so
+   `layoutValid` rejects a repeated card. Allowing repeats means per-slot engine instances and
+   a RAM budget beside the CPU budget; pitch and reverb cards stay single (shared ~100 KB
+   tracker in DTCM, large reverb buffers).
