@@ -4,6 +4,7 @@
 
 #include "board/audio.h"
 #include "board/mute.h"
+#include "board/pins.h"
 
 namespace {
 
@@ -55,9 +56,9 @@ void printHex(Print& out, const char* label, uint32_t v) {
 // The trampoline picks the stack the fault came from and hands the exception frame to
 // faultCapture. Frame layout: r0 r1 r2 r3 r12 lr pc xpsr.
 extern "C" __attribute__((used, noreturn)) void faultCapture(const uint32_t* frame, uint32_t kind) {
-  // Mute by register write: pins::kXsmt is PC5, pins::kMuteN is PB5. No HAL calls here.
-  GPIOC->BSRR = static_cast<uint32_t>(GPIO_PIN_5) << 16;
-  GPIOB->BSRR = static_cast<uint32_t>(GPIO_PIN_5) << 16;
+  // Mute by register write (BSRR upper half clears the pin). No HAL calls here.
+  pins::portOf(pins::kXsmt)->BSRR = pins::maskOf(pins::kXsmt) << 16;
+  pins::portOf(pins::kMuteN)->BSRR = pins::maskOf(pins::kMuteN) << 16;
 
   gStored.kind = kind;
   gStored.pc = frame[6];

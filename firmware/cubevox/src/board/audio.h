@@ -1,5 +1,5 @@
 // Audio path: SAI1 master TX to the PCM5102A and slave RX from the PCM1808 (both I2S, 32-bit
-// slots, 48 kHz, MCLK 12.288 MHz on PE2). Each 64-frame block runs the engine chain in slot
+// slots, 48 kHz, MCLK 12.288 MHz on pins::kSaiMclkA). Each 64-frame block runs the engine chain in slot
 // order from a low-priority interrupt that the RX DMA half-transfer pends.
 
 #pragma once

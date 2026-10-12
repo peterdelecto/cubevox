@@ -94,6 +94,59 @@ void checkKnobsMove() {
   }
 }
 
+// The engine field a continuous knob drives, in the field's own unit (percent knobs hold 0..1).
+float engineValue(Card c, int knob, const ChainParams& p) {
+  switch (c) {
+    case Card::InputGate: return knob == 0 ? p.inputGate.thresholdDb : p.inputGate.tuning.releaseMs;
+    case Card::Gate: return knob == 0 ? p.gate.thresholdDb : p.gate.tuning.releaseMs;
+    case Card::Autotune: return p.pitchFx.autotune.responseMs;
+    case Card::Octave: return p.pitchFx.octave.mix;
+    case Card::Unison: return knob == 0 ? p.unison.depth : p.unisonRatePercent;
+    case Card::Slapback: return knob == 0 ? p.slapback.intensity : p.slapback.tuning.timeMs;
+    case Card::Distortion: return knob == 0 ? p.distortion.drive : p.distortion.tone;
+    case Card::ReverbSpring:
+    case Card::ReverbChasm: return knob == 0 ? p.reverb.intensity : p.reverb.time;
+    case Card::Empty: break;
+  }
+  return 0.0f;
+}
+
+// Descriptor, formatKnob and applyKnob must tell the same story for every continuous knob.
+void checkDescriptors() {
+  for (int i = 1; i < kCardCount; ++i) {
+    const Card c = card(i);
+    for (int k = 0; k < cardDesc(c).knobCount; ++k) {
+      const KnobDesc& d = cardDesc(c).knob[k];
+      if (d.kind != KnobKind::Continuous) continue;
+      char what[96];
+      check(d.min < d.max, "descriptor min below max");
+      const bool reversed = d.curve == Curve::LogReversed;
+      char lo[24];
+      char hi[24];
+      formatKnob(c, k, 0.0f, lo, sizeof(lo));
+      formatKnob(c, k, 1.0f, hi, sizeof(hi));
+      std::snprintf(what, sizeof(what), "%s knob %d format at 0 and 1", cardDesc(c).id, k);
+      check(std::atoi(lo) == std::lround(reversed ? d.max : d.min) && std::atoi(hi) == std::lround(reversed ? d.min : d.max), what);
+
+      const bool percent = std::strcmp(d.unit, "%") == 0;
+      float prev = 0.0f;
+      for (int s = 0; s <= 4; ++s) {
+        ChainParams p;
+        applyKnob(c, k, s / 4.0f, p);
+        const float v = engineValue(c, k, p);
+        std::snprintf(what, sizeof(what), "%s knob %d engine value %d", cardDesc(c).id, k, s);
+        if (s > 0) check(reversed ? v < prev : v > prev, what);
+        if (!percent) check(std::fabs(v - knobValue(d, s / 4.0f)) < 1e-3f, what);
+        prev = v;
+      }
+    }
+  }
+  check(std::fabs(knobValue(cardDesc(Card::Autotune).knob[1], 0.3f) - cv::AutotuneVoice::responseMsAt(0.3f)) < 1e-3f,
+        "response curve matches the engine");
+  check(knobSteps(Card::Autotune, 0) == static_cast<int>(sizeof(cv::kKeyName) / sizeof(cv::kKeyName[0])),
+        "key positions equal cv::kKeyName");
+}
+
 void checkKnobTargets() {
   ChainParams p;
   applyKnob(Card::InputGate, 0, 1.0f, p);
@@ -579,6 +632,7 @@ int main() {
   checkGroups();
   checkKnobsMove();
   checkKnobTargets();
+  checkDescriptors();
   checkToggles();
   checkPlacement();
   checkFormat();

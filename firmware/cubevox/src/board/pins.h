@@ -7,6 +7,13 @@
 
 namespace pins {
 
+// GPIO register access for code that cannot call HAL (fault handler, bulk init). The port and bit
+// come from the pin constant itself, so no pin number is written twice.
+inline GPIO_TypeDef* portOf(uint32_t pin) {
+  return reinterpret_cast<GPIO_TypeDef*>(GPIOA_BASE + (GPIOB_BASE - GPIOA_BASE) * STM_PORT(pin));
+}
+constexpr uint32_t maskOf(uint32_t pin) { return 1u << STM_PIN(pin); }
+
 // Pot mux (CD74HC4067 on 3V3A). Keep the selects low until 3V3A is up, and at the lowest GPIO speed.
 constexpr uint32_t kMuxS0 = PE12;  // MUX_S0
 constexpr uint32_t kMuxS1 = PE10;  // MUX_S1
@@ -48,9 +55,12 @@ constexpr uint32_t kEncMenuA = PE15;   // ENC_MENU_A
 constexpr uint32_t kEncMenuB = PE14;   // ENC_MENU_B
 constexpr uint32_t kEncMenuSw = PE13;  // ENC_MENU_SW
 
-// SAI1, AF6. Owned by the audio driver (HAL), listed here for reference.
-//   PE2 MCLK_A (ADC_SCKI_SRC), PE3 SD_B (ADC_DOUT), PE4 FS_A (I2S_LRCLK),
-//   PE5 SCK_A (I2S_BCLK_SRC), PE6 SD_A (I2S_DATA)
+// SAI1, AF6, all on port E. Owned by the audio driver (HAL).
+constexpr uint32_t kSaiMclkA = PE2;  // MCLK_A (ADC_SCKI_SRC)
+constexpr uint32_t kSaiSdB = PE3;    // SD_B (ADC_DOUT)
+constexpr uint32_t kSaiFsA = PE4;    // FS_A (I2S_LRCLK)
+constexpr uint32_t kSaiSckA = PE5;   // SCK_A (I2S_BCLK_SRC)
+constexpr uint32_t kSaiSdA = PE6;    // SD_A (I2S_DATA)
 
 // BOOT0 (pin 94) is the DFU recovery button, not a GPIO the firmware uses.
 // PB8, PB9 and PE0 are spare (freed 2026-10-07 when KEY and SEMITONES became pots).

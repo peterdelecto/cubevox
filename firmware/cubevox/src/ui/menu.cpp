@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "core/registry.h"
+#include "core/version.h"
 
 namespace {
 
@@ -44,6 +45,7 @@ const char* itemValue(Item it, const Settings& s) {
 void drawIdle(FrameRows& f, const UiContext& ctx) {
   row(f, 0, "cubevox");
   row(f, 1, ctx.muted ? "MUTED" : "");
+  row(f, 7, kFirmwareVersion);
   const LastMoved m = ctx.panel.lastMoved;
   if (m.slot < 0) return;
   const Card card = ctx.layout.card[m.slot];

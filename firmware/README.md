@@ -14,16 +14,23 @@ Design: `docs/specs/2026-10-08-firmware-foundation-design.md` (tiers, tests, fau
 `cubevox/cubevox.ino` is `setup()` and `loop()`. Sources sit under `cubevox/src/` in three tiers;
 includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`).
 
+Module map and ownership rules: `docs/specs/2026-10-12-firmware-structure-design.md`.
+
 - `src/core/`: pure C++17, no Arduino or HAL include. Compiled on the Mac by `test/firmware_test.cpp`
   (`ctest` target `firmware`), so an Arduino include here breaks the host build.
-  `registry` (cards, knob descriptors, apply, format), `costs.h`, `chain_params` (the parameter
-  bundle the audio IRQ reads), `canvas` (128 x 64 page-layout frame buffer with dirty pages), `fonts` (the
-  font editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`), `unison_rate.h`, `version.h`.
+  `registry` (cards, knob descriptors with curves, apply, format), `costs.h`, `layout` (card per slot,
+  validation), `settings.h` (output level, input jack), `panel.h` (`PanelReading`), `compose`
+  (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_params`, `knob_filter`
+  (debounce, stepping, smoothing), `jack_switch` (mute dip around K103), `canvas` (128 x 64 page-layout
+  frame buffer with dirty pages), `fonts` (the font editor's export as `FontDesc`), `display.h`
+  (backend interface, `flushStep`), `unison_rate.h`, `version.h`.
 - `src/board/`: one hardware concern per file. `pins.h`, `slots` (toggle pin and mux channels per
-  slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk), `controls` (mux
-  scan, smoothing, stepping, toggles), `mute`, `input_jack` (PAD_EN for relay K103), `fault` (watchdog, fault handlers, reset cause, audio
-  stall watch), `display_sh1106`, `platform` (DFU entry).
-- `src/ui/`: `menu` (encoder state machine and OLED screens).
+  slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk over the published
+  snapshot), `controls` (mux scan, ADC, toggles), `input` (encoder and click to `UiInput`), `mute`,
+  `input_jack` (PAD_EN for relay K103), `fault` (watchdog, fault handlers, reset cause, audio stall
+  watch), `display_sh1106`, `display_stub` (ASCII render over Serial), `platform` (DFU entry).
+- `src/ui/`: pure, also host-compiled. `menu` (state machine, `UiInput` in, `UiAction` out, draws
+  on the canvas).
 
 `platform/` holds verbatim copies from Teensy-H7-Port (first line names the source); they are on
 the include path and come into the build through `board/platform_shim.cpp`. Engine headers come

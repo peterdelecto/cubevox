@@ -30,13 +30,17 @@ constexpr int kKnobsPerCard = 2;
 enum class KnobKind : uint8_t { Continuous, Stepped };
 enum class Group : uint8_t { None, Pitch, Reverb };
 
+// Maps the knob's 0..1 position onto min..max. LogReversed runs geometrically from max at 0 to min at 1.
+enum class Curve : uint8_t { Linear, Log, LogReversed };
+
 struct KnobDesc {
   const char* name;
   KnobKind kind;
   uint8_t positions;  // stepped only; 0 for continuous
-  float min;          // in `unit`; bipolar knobs have min < 0 < max
+  float min;          // in `unit`; min < max always; bipolar knobs have min < 0 < max
   float max;
   const char* unit;   // "", "dB", "ms", "st", "%"
+  Curve curve = Curve::Linear;
 };
 
 struct CardDesc {
@@ -50,6 +54,9 @@ struct CardDesc {
 };
 
 const CardDesc& cardDesc(Card c);
+
+// The value a continuous knob holds at position 0..1, in the descriptor's unit. applyKnob and formatKnob both use it.
+float knobValue(const KnobDesc& k, float position);
 
 // 0 for a continuous knob, otherwise the number of positions it snaps to.
 int knobSteps(Card c, int knob);
