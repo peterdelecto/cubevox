@@ -32,7 +32,9 @@ constexpr int kWordsPerRing = kWordsPerHalf * 2;
 constexpr float kInt32Scale = 2147483648.0f;
 constexpr float kInt32Max = 2147483520.0f;  // largest float below 2^31
 constexpr uint32_t kDmaIrqPriority = 2;
-constexpr uint32_t kBlockIrqPriority = 15;  // lowest, so the DMA interrupts preempt it
+// Lowest, so the DMA interrupts preempt it. USB OTG and the encoder EXTI also preempt it, so USB
+// traffic counts toward block time.
+constexpr uint32_t kBlockIrqPriority = 15;
 
 // Rings live in RAM_D2 and are marked non-cacheable by h7_block_mem_mpu_init().
 H7_DMA_MEM static uint32_t gTxRing[kWordsPerRing];
@@ -371,6 +373,8 @@ void audioResetPeaks() {
   }
   NVIC_EnableIRQ(SWPMI1_IRQn);
 }
+
+uint32_t audioBlockCount() { return gStats.blocks; }
 
 AudioStats audioStats() {
   uint64_t sumCycles;

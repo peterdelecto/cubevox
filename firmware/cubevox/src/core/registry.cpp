@@ -29,23 +29,23 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 
 const CardDesc kCards[kCardCount] = {
-    {"empty", "Empty", 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty, true},
-    {"input_gate", "Input gate", 2, {kThreshold, kDecay}, Group::None, costs::kInputGate, true},
+    {"empty", "Empty", 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
+    {"input_gate", "Input gate", 2, {kThreshold, kDecay}, Group::None, costs::kInputGate},
     {"autotune", "Autotune", 2,
      {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, ""},
       kResponse},
-     Group::Pitch, costs::kAutotune, true},
+     Group::Pitch, costs::kAutotune},
     {"octave", "Octave", 2,
      {{"Semitones", KnobKind::Stepped, kSemitonePositions, kSemitoneMin, kSemitoneMax, "st"}, kPercent("Mix")},
-     Group::Pitch, costs::kOctave, true},
-    {"unison", "Unison", 2, {kPercent("Depth"), kPercent("Rate")}, Group::None, costs::kUnison, true},
+     Group::Pitch, costs::kOctave},
+    {"unison", "Unison", 2, {kPercent("Depth"), kPercent("Rate")}, Group::None, costs::kUnison},
     {"slapback", "Slapback", 2,
      {kPercent("Mix"), kSlapbackTime},
-     Group::None, costs::kSlapback, true},
-    {"distortion", "Distortion", 2, {kPercent("Drive"), kPercent("Tone")}, Group::None, costs::kDistortion, true},
-    {"gate", "Gate", 2, {kThreshold, kDecay}, Group::None, costs::kGate, true},
-    {"reverb_spring", "Spring Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbSpring, true},
-    {"reverb_chasm", "Chasm Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbChasm, true},
+     Group::None, costs::kSlapback},
+    {"distortion", "Distortion", 2, {kPercent("Drive"), kPercent("Tone")}, Group::None, costs::kDistortion},
+    {"gate", "Gate", 2, {kThreshold, kDecay}, Group::None, costs::kGate},
+    {"reverb_spring", "Spring Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbSpring},
+    {"reverb_chasm", "Chasm Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbChasm},
 };
 
 // GateParams carries two knobs per stage, so the input gate and the second gate share one setter.
@@ -54,6 +54,47 @@ void applyGateKnob(int knob, float v, cv::GateParams& g) {
     g.thresholdDb = knobValue(kThreshold, v);
   } else {
     g.tuning.releaseMs = knobValue(kDecay, v);
+  }
+}
+
+void applyAutotuneKnob(int knob, float v, cv::AutotuneParams& a) {
+  if (knob == 0) {
+    a.key = static_cast<int>(v);
+  } else {
+    a.responseMs = knobValue(kResponse, v);
+  }
+}
+
+void applyOctaveKnob(int knob, float v, cv::OctaveParams& o) {
+  if (knob == 0) {
+    o.semitones = kSemitoneMin + static_cast<int>(v);
+  } else {
+    o.mix = v;
+  }
+}
+
+void applyUnisonKnob(int knob, float v, ChainParams& out) {
+  if (knob == 0) {
+    out.unison.depth = v;
+  } else {
+    out.unisonRatePercent = 100.0f * v;
+    unisonrate::apply(out.unison.tuning, out.unisonRatePercent);
+  }
+}
+
+void applySlapbackKnob(int knob, float v, cv::SlapbackParams& s) {
+  if (knob == 0) {
+    s.intensity = v;
+  } else {
+    s.tuning.timeMs = knobValue(kSlapbackTime, v);
+  }
+}
+
+void applyDistortionKnob(int knob, float v, cv::DistortionParams& d) {
+  if (knob == 0) {
+    d.drive = v;
+  } else {
+    d.tone = v;
   }
 }
 
@@ -89,42 +130,11 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::Empty: break;
     case Card::InputGate: applyGateKnob(knob, v, out.inputGate); break;
     case Card::Gate: applyGateKnob(knob, v, out.gate); break;
-    case Card::Autotune:
-      if (knob == 0) {
-        out.pitchFx.autotune.key = static_cast<int>(v);
-      } else {
-        out.pitchFx.autotune.responseMs = knobValue(kResponse, v);
-      }
-      break;
-    case Card::Octave:
-      if (knob == 0) {
-        out.pitchFx.octave.semitones = kSemitoneMin + static_cast<int>(v);
-      } else {
-        out.pitchFx.octave.mix = v;
-      }
-      break;
-    case Card::Unison:
-      if (knob == 0) {
-        out.unison.depth = v;
-      } else {
-        out.unisonRatePercent = 100.0f * v;
-        unisonrate::apply(out.unison.tuning, out.unisonRatePercent);
-      }
-      break;
-    case Card::Slapback:
-      if (knob == 0) {
-        out.slapback.intensity = v;
-      } else {
-        out.slapback.tuning.timeMs = knobValue(kSlapbackTime, v);
-      }
-      break;
-    case Card::Distortion:
-      if (knob == 0) {
-        out.distortion.drive = v;
-      } else {
-        out.distortion.tone = v;
-      }
-      break;
+    case Card::Autotune: applyAutotuneKnob(knob, v, out.pitchFx.autotune); break;
+    case Card::Octave: applyOctaveKnob(knob, v, out.pitchFx.octave); break;
+    case Card::Unison: applyUnisonKnob(knob, v, out); break;
+    case Card::Slapback: applySlapbackKnob(knob, v, out.slapback); break;
+    case Card::Distortion: applyDistortionKnob(knob, v, out.distortion); break;
     case Card::ReverbSpring:
     case Card::ReverbChasm:
       applyReverbKnob(knob, v, out.reverb);

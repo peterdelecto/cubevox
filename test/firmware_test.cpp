@@ -15,6 +15,7 @@
 #include "core/jack_switch.h"
 #include "core/knob_filter.h"
 #include "core/layout.h"
+#include "core/mute_sequence.h"
 #include "core/panel.h"
 #include "core/registry.h"
 #include "core/settings.h"
@@ -227,7 +228,7 @@ void checkDefaultLayout() {
   check(cardDesc(Card::Empty).cost.avg == 0 && cardDesc(Card::Empty).cost.worst == 0, "empty card costs nothing");
   for (int i = 0; i < kCardCount; ++i) {
     const CardDesc& d = cardDesc(card(i));
-    check(d.measured, "every card's cost comes from the board");
+    check(d.cost.measured, "every card's cost comes from the board");
     check(d.cost.worst >= d.cost.avg, "worst block is never under the mean");
   }
 }
@@ -240,6 +241,13 @@ void checkLayoutValid() {
   Layout twoReverbs = defaultLayout();
   twoReverbs.card[0] = Card::ReverbChasm;
   check(!layoutValid(twoReverbs), "second reverb card is rejected");
+  Layout twice = defaultLayout();
+  twice.card[7] = twice.card[4];
+  check(!layoutValid(twice), "a card placed twice is rejected");
+  Layout gaps = defaultLayout();
+  gaps.card[0] = Card::Empty;
+  gaps.card[1] = Card::Empty;
+  check(layoutValid(gaps), "several Empty slots are accepted");
 }
 
 PanelReading panelWithToggles(bool on) {
@@ -411,6 +419,9 @@ void checkMenu() {
   MenuRig m;
   m.draw();
   check(rowIs(m.canvas, 0, "cubevox"), "menu: idle title");
+  char tag[kDisplayCols + 1];
+  versionTag(kFirmwareVersion, tag, sizeof(tag));
+  check(rowIs(m.canvas, 7, tag) && std::strchr(tag, '-') == nullptr, "menu: idle shows the version tag only");
 
   m.step(0, true);
   m.draw();
@@ -627,6 +638,90 @@ void checkJackSwitch() {
   check(!j.holdMute() && j.relay() == InputJack::Pedal, "jack: latest request settles and releases");
 }
 
+void checkVersionTag() {
+  char buf[16];
+  versionTag("v2.00.04-3-gabc123-dirty", buf, sizeof(buf));
+  check(std::strcmp(buf, "v2.00.04") == 0, "version: tag is cut at the first dash");
+  versionTag("v2.00.04", buf, sizeof(buf));
+  check(std::strcmp(buf, "v2.00.04") == 0, "version: a bare tag passes through");
+  versionTag("dev", buf, sizeof(buf));
+  check(std::strcmp(buf, "dev") == 0, "version: dev passes through");
+  char small[5];
+  versionTag("v2.00.04-1-gabc", small, sizeof(small));
+  check(std::strcmp(small, "v2.0") == 0, "version: clipped to the buffer");
+}
+
+// Steps the sequence once per ms from `from` to `to` inclusive and returns the last outputs.
+MuteOutputs runMute(MuteSequence& m, uint32_t from, uint32_t to, bool released) {
+  MuteOutputs out;
+  for (uint32_t t = from; t <= to; ++t) out = m.update(t, released);
+  return out;
+}
+
+void checkMuteSequence() {
+  MuteSequence m;
+  m.reset(true, 0);
+  MuteOutputs out = runMute(m, 0, kBootUnmuteDelayMs - 1, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: stays muted before the clocks run");
+  m.clocksRunning(100);
+  out = runMute(m, 100, 100 + kBootUnmuteDelayMs - 1, true);
+  check(!out.xsmtHigh && !out.muteNHigh, "mute: boot delay holds the output muted");
+
+  uint32_t t = 100 + kBootUnmuteDelayMs;
+  out = m.update(t, true);
+  check(out.muteNHigh && !out.xsmtHigh && !m.fullyMuted(), "mute: release raises MUTE_N first");
+  out = runMute(m, t + 1, t + kRelaySettleMs - 1, true);
+  check(out.muteNHigh && !out.xsmtHigh, "mute: XSMT waits for the relay to settle");
+  out = m.update(t + kRelaySettleMs, true);
+  check(out.muteNHigh && out.xsmtHigh && !m.active(), "mute: XSMT rises after the settle");
+
+  t += kRelaySettleMs + 100;
+  runMute(m, t, t + kMuteSwitchDebounceMs - 1, false);
+  out = m.update(t + kMuteSwitchDebounceMs, false);
+  check(!out.xsmtHigh && out.muteNHigh, "mute: XSMT falls first, MUTE_N still high");
+  out = runMute(m, t + kMuteSwitchDebounceMs + 1, t + kMuteSwitchDebounceMs + kXsmtLeadMs - 1, false);
+  check(!out.xsmtHigh && out.muteNHigh && !m.fullyMuted(), "mute: MUTE_N waits out the XSMT lead");
+  out = m.update(t + kMuteSwitchDebounceMs + kXsmtLeadMs, false);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: MUTE_N falls after the lead");
+}
+
+void checkMuteLatchAndHold() {
+  MuteSequence m;
+  m.reset(true, 0);
+  m.clocksRunning(0);
+  runMute(m, 0, kBootUnmuteDelayMs + kRelaySettleMs + 1, true);
+  check(!m.active(), "mute: unmuted after the boot delay and settle");
+
+  uint32_t t = 1000;
+  m.hold(true);
+  MuteOutputs out = runMute(m, t, t + kXsmtLeadMs, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: a hold mutes through the sequence");
+  t += 100;
+  out = runMute(m, t, t + kRelaySettleMs + 1, true);
+  check(!out.xsmtHigh && !out.muteNHigh, "mute: the output stays muted while held");
+  m.hold(false);
+  t += 100;
+  out = runMute(m, t, t + kRelaySettleMs + 1, true);
+  check(out.xsmtHigh && out.muteNHigh, "mute: releasing the hold runs the release sequence");
+
+  t += 100;
+  m.latch();
+  out = runMute(m, t, t + kXsmtLeadMs, true);
+  check(m.fullyMuted() && !out.xsmtHigh, "mute: a latch mutes");
+  out = runMute(m, t + 100, t + 300, true);
+  check(!out.xsmtHigh && !out.muteNHigh, "mute: a latch ignores a released switch");
+
+  MuteSequence mid;
+  mid.reset(true, 0);
+  mid.clocksRunning(0);
+  runMute(mid, 0, kBootUnmuteDelayMs, true);
+  mid.hold(true);
+  out = mid.update(kBootUnmuteDelayMs + 1, true);
+  check(!out.xsmtHigh && out.muteNHigh, "mute: muted again mid-release keeps XSMT low");
+  out = runMute(mid, kBootUnmuteDelayMs + 2, kBootUnmuteDelayMs + kXsmtLeadMs + 2, true);
+  check(!out.muteNHigh && mid.fullyMuted(), "mute: a mid-release mute ends fully muted");
+}
+
 int main() {
   checkIds();
   checkGroups();
@@ -651,6 +746,9 @@ int main() {
   checkCanvas();
   checkScreenshots();
   checkJackSwitch();
+  checkVersionTag();
+  checkMuteSequence();
+  checkMuteLatchAndHold();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;
 }

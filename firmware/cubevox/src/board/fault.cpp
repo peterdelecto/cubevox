@@ -116,7 +116,7 @@ void faultWatchdogKick() { LL_IWDG_ReloadCounter(IWDG1); }
 
 void faultAudioWatch(uint32_t nowMs, bool audioRunning) {
   if (!audioRunning || gStalled) return;
-  const uint32_t blocks = audioStats().blocks;
+  const uint32_t blocks = audioBlockCount();
   if (blocks != gLastBlocks) {
     gLastBlocks = blocks;
     gLastAdvanceMs = nowMs;

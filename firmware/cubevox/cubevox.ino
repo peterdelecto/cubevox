@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "board/audio.h"
+#include "board/bench.h"
 #include "board/sysclock.h"
 #include "board/controls.h"
 #include "board/display_sh1106.h"
@@ -31,15 +32,16 @@ static Menu gMenu;
 static JackSwitch gJack;
 static Display* gDisplay = nullptr;
 static Canvas gCanvas;
-static BenchOverrides gBench;
 static bool gOledFound = false;
 static bool gAudioRunning = false;
+static bool gSnapshotStale = false;  // a change is waiting for the panel to be read
 
 // Boot facts for the first-article checklist, printed whenever a terminal opens the port.
 static void printBootReport() {
   Serial.println("[boot] cubevox firmware");
   faultReport(Serial);
   clockReport(Serial);
+  pins::report(Serial);
   Serial.print("[boot] icache ");
   Serial.print((SCB->CCR & SCB_CCR_IC_Msk) ? "on" : "OFF");
   Serial.print(", dcache ");
@@ -56,109 +58,21 @@ static void printBootReport() {
 }
 
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
+// Before the panel is read the knobs would be zero, so the request waits in gSnapshotStale.
 static void publishSnapshot() {
-  audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, gBench));
-}
-
-static void printStatsNow() {
-  const AudioStats s = audioStats();
-  Serial.print("[audio] blocks ");
-  Serial.print(s.blocks);
-  Serial.print(" late ");
-  Serial.print(s.late);
-  Serial.print(" overruns ");
-  Serial.print(s.overruns);
-  Serial.print(" avg ");
-  Serial.print(s.avgCycles);
-  Serial.print(" worst ");
-  Serial.print(s.maxCycles);
-  Serial.print(" of ");
-  Serial.print(s.budgetCycles);
-  Serial.print(" cycles, slots off 0x");
-  Serial.println(gBench.slotsOff, HEX);
-  Serial.print("[audio] per slot");
-  for (int i = 0; i <= kSlotCount; ++i) {
-    Serial.print(' ');
-    Serial.print(s.slotAvg[i]);
+  if (!controlsSeeded()) {
+    gSnapshotStale = true;
+    return;
   }
-  Serial.println(" (last is EQ)");
-  Serial.print("[audio] slot worst");
-  for (int i = 0; i <= kSlotCount; ++i) {
-    Serial.print(' ');
-    Serial.print(s.slotWorst[i]);
-  }
-  Serial.println();
+  gSnapshotStale = false;
+  audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides()));
 }
 
 static void printStats(uint32_t nowMs) {
   static uint32_t lastMs = 0;
   if (nowMs - lastMs < kStatsMs) return;
   lastMs = nowMs;
-  printStatsNow();
-}
-
-// Single-letter bench commands from a terminal. Roadmap step 3 replaces these with the JSON
-// protocol; until then they are how the first-article fault checks are driven.
-static void pollBenchCommands() {
-  while (Serial.available() > 0) {
-    const int c = Serial.read();
-    if (c >= '1' && c <= '8') {
-      gBench.slotsOff ^= static_cast<uint8_t>(1u << (c - '1'));
-      publishSnapshot();
-      printStatsNow();
-      continue;
-    }
-    switch (c) {
-      case 'r': printBootReport(); break;
-      case 'p': printStatsNow(); break;
-      case '0':
-        gBench.slotsOff = 0;
-        publishSnapshot();
-        printStatsNow();
-        break;
-      case 'f':
-        Serial.println("[bench] forcing a bus fault");
-        Serial.flush();
-        (void)*reinterpret_cast<volatile uint32_t*>(0xDEADBEE0);
-        break;
-      case 'w':
-        Serial.println("[bench] spinning; the watchdog resets in 2 s");
-        Serial.flush();
-        for (;;) {}
-      case 'a':
-        Serial.println("[bench] stopping audio DMA");
-        audioStopForBench();
-        break;
-      case 'm':
-        audioResetPeaks();
-        Serial.println("[bench] audio peaks reset");
-        break;
-      case 'k': {
-        gBench.knobsPinned = !gBench.knobsPinned;
-        publishSnapshot();
-        Serial.println(gBench.knobsPinned ? "[bench] knobs pinned at top" : "[bench] knobs live");
-        break;
-      }
-      case 'c':
-        gBench.reverbChasm = !gBench.reverbChasm;
-        publishSnapshot();
-        Serial.println(gBench.reverbChasm ? "[bench] reverb slot runs Chasm" : "[bench] reverb slot runs its card's engine");
-        break;
-      case 'v': {
-        static bool clipOn = false;
-        clipOn = audioBenchClip(!clipOn);
-        Serial.println(clipOn ? "[bench] vocal clip on" : "[bench] vocal clip off (or not compiled in)");
-        break;
-      }
-      case 'd':
-        Serial.println("[bench] entering DFU");
-        Serial.flush();
-        muteForReset();
-        platformEnterDfu();
-        break;
-      default: break;
-    }
-  }
+  benchPrintStats();
 }
 
 // Applies what the menu asked for. Returns true when a setting changed.
@@ -182,7 +96,7 @@ static bool applyAction(UiAction action) {
 // The relay switches only while the output is fully muted; the mute is held until it settles.
 static void runJackSwitch(uint32_t nowMs) {
   gJack.update(nowMs, gSettings.inputJack, muteFullyMuted());
-  muteHold(gJack.holdMute());
+  muteHold(gJack.holdMute() || !controlsSeeded());  // unseeded knobs read 0, so stay muted
   inputJackApply(gJack.relay());
 }
 
@@ -217,14 +131,15 @@ void loop() {
 
   usbLinkPoll(nowMs);
   if (usbLinkTerminalOpened()) printBootReport();
-  pollBenchCommands();
+  if (benchPoll(printBootReport)) publishSnapshot();
 
   controlsPoll(nowMs, gLayout);
   mutePoll(nowMs);
 
   const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
   runJackSwitch(nowMs);
-  if (controlsTakeChanged() || settingsChanged) publishSnapshot();
+  // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
+  if (controlsTakeChanged() || settingsChanged || gSnapshotStale) publishSnapshot();
 
   const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
   gMenu.draw(ctx, gCanvas);

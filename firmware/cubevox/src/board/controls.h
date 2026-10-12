@@ -23,6 +23,9 @@ void controlsInit();
 // Step counts come from `layout`; a knob whose count changes re-seeds its step position.
 void controlsPoll(uint32_t nowMs, const Layout& layout);
 
+// True once every pot has been read at least once. Until then the panel values are not real.
+bool controlsSeeded();
+
 // True once since the last call if any knob, step or toggle changed (and once after the first full scan).
 bool controlsTakeChanged();
 

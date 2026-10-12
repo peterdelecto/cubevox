@@ -126,6 +126,8 @@ void controlsPoll(uint32_t nowMs, const Layout& layout) {
   scanToggles(nowMs);
 }
 
+bool controlsSeeded() { return gSeededCount == kPotCount; }
+
 bool controlsTakeChanged() {
   const bool changed = gChanged;
   gChanged = false;

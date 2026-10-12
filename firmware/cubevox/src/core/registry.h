@@ -49,13 +49,14 @@ struct CardDesc {
   uint8_t knobCount;  // 0 for Empty
   KnobDesc knob[kKnobsPerCard];
   Group group;
-  costs::Cost cost;  // percent of one audio block, mean and worst; costs.h
-  bool measured;     // false until a board ran the bench
+  costs::Cost cost;  // percent of one audio block, mean and worst, and whether a board measured it; costs.h
 };
 
 const CardDesc& cardDesc(Card c);
 
-// The value a continuous knob holds at position 0..1, in the descriptor's unit. applyKnob and formatKnob both use it.
+// The value a continuous knob holds at position 0..1, in the descriptor's unit. formatKnob uses it for
+// every continuous knob; applyKnob uses it only where the engine field is in that unit (dB, ms), and
+// hands percent knobs the 0..1 position directly.
 float knobValue(const KnobDesc& k, float position);
 
 // 0 for a continuous knob, otherwise the number of positions it snaps to.

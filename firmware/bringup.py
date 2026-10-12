@@ -136,6 +136,11 @@ def check_boot(log, lines, want_oled):
         ppm = (int(m.group(3)) - SAI_HZ) / SAI_HZ * 1e6
         log.check("SAI kernel clock", abs(ppm) <= SAI_TOL_PPM, f"{m.group(3)} Hz ({ppm:+.1f} ppm)")
 
+    want = "[boot] pins XSMT C5 MUTE_N B5 SAI E2 E3 E4 E5 E6"
+    got = find(lines, r"^\[boot\] pins .*$")
+    log.check("pin decode", bool(got) and got.group(0).strip() == want,
+              got.group(0) if got else "pins line missing")
+
     m = find(lines, r"icache (\S+), dcache (\S+), fpu (\S+)")
     log.check("caches and FPU", bool(m) and m.groups() == ("on", "on", "on"),
               ", ".join(m.groups()) if m else "missing")

@@ -14,6 +14,6 @@ struct Layout {
 // Slot 1 to 8 as shipped (CLAUDE.md "Default layout").
 Layout defaultLayout();
 
-// Placement rules of the registry spec: ids in range, at most one reverb card, and the
+// Placement rules of the registry spec: ids in range, no card twice (Empty excepted), at most one reverb card, and the
 // placed costs plus the fixed term under the average and worst-block lines.
 bool layoutValid(const Layout& layout);

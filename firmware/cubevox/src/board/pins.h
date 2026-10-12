@@ -7,12 +7,14 @@
 
 namespace pins {
 
-// GPIO register access for code that cannot call HAL (fault handler, bulk init). The port and bit
-// come from the pin constant itself, so no pin number is written twice.
+// GPIO register access for code that cannot call HAL (fault handler, bulk init). The pin
+// constants below are Arduino pin indexes, so each decode goes through digitalPin[], a const table
+// in flash with no HAL state, which makes it safe inside a fault handler.
 inline GPIO_TypeDef* portOf(uint32_t pin) {
-  return reinterpret_cast<GPIO_TypeDef*>(GPIOA_BASE + (GPIOB_BASE - GPIOA_BASE) * STM_PORT(pin));
+  return reinterpret_cast<GPIO_TypeDef*>(GPIOA_BASE +
+                                         (GPIOB_BASE - GPIOA_BASE) * STM_PORT(digitalPinToPinName(pin)));
 }
-constexpr uint32_t maskOf(uint32_t pin) { return 1u << STM_PIN(pin); }
+inline uint32_t maskOf(uint32_t pin) { return 1u << STM_PIN(digitalPinToPinName(pin)); }
 
 // Pot mux (CD74HC4067 on 3V3A). Keep the selects low until 3V3A is up, and at the lowest GPIO speed.
 constexpr uint32_t kMuxS0 = PE12;  // MUX_S0
@@ -66,4 +68,27 @@ constexpr uint32_t kSaiSdA = PE6;    // SD_A (I2S_DATA)
 // PB8, PB9 and PE0 are spare (freed 2026-10-07 when KEY and SEMITONES became pots).
 // PB6, PE1 and PB4 are also unconnected.
 
-}  // namespace pins
+// Boot report line: the port letter and bit that portOf / maskOf decode for the pins driven by
+// register, so a misdecode shows on the first board.
+inline void report(Print& out) {
+  struct Named {
+    const char* name;
+    uint32_t pin;
+  };
+  const Named list[] = {{"XSMT", kXsmt},  {"MUTE_N", kMuteN}, {"SAI", kSaiMclkA}, {"", kSaiSdB},
+                        {"", kSaiFsA},    {"", kSaiSckA},     {"", kSaiSdA}};
+  out.print("[boot] pins");
+  for (const Named& n : list) {
+    if (n.name[0] != '\0') {
+      out.print(' ');
+      out.print(n.name);
+    }
+    out.print(' ');
+    out.print(static_cast<char>('A' + (reinterpret_cast<uintptr_t>(portOf(n.pin)) - GPIOA_BASE) /
+                                          (GPIOB_BASE - GPIOA_BASE)));
+    out.print(static_cast<int>(__builtin_ctz(maskOf(n.pin))));
+  }
+  out.println();
+}
+
+}  // namespace

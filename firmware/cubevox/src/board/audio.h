@@ -27,6 +27,9 @@ const char* audioError();
 // Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop.
 void audioPublish(const ChainSnapshot& snapshot);
 
+// Blocks processed so far. One word read, cheap enough for every loop pass.
+uint32_t audioBlockCount();
+
 AudioStats audioStats();
 
 // Clears late, overruns and maxCycles so a measurement can exclude the first blocks.
