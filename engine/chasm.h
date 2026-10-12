@@ -45,7 +45,7 @@ struct ChasmTuning {
   float timeLo = 0.35f, timeHi = 0.86f;  // feedback at DECAY 0 / 1
   float trebleLossHz = 5429.0f;
   float loopTrebleCut = 1.0f;            // 1 = off
-  float inputTrebleCut = 0.99f;
+  float inputTrebleCut = 0.985f;         // Brightness 85 %, Adam's setting (emulator/macros.h)
   float bassCutHz = 200.0f, bassCutHzTop = 100.0f;
   float wobbleDepthMax = 64.0f;          // samples
   float wobbleRateLo = 0.5f, wobbleRateHi = 7.0f;

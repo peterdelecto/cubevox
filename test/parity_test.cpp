@@ -6,6 +6,7 @@
 // (emulator/macros.h) are header-only and are called directly. Any drift on either side fails the
 // test unless the case sits in kKnown, which keeps every open mismatch visible in the output.
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <map>
@@ -39,31 +40,9 @@ struct Known {
   const char* emCite;
 };
 
-#define UNISON_BLEND(group, field, fwCite, emCite)                                                   \
-  {                                                                                                  \
-    group "." #field, "firmware fixes Chorus-Double at 50 % (unison_rate.h:11); emulator opens at 0 %", \
-        fwCite, emCite                                                                               \
-  }
-
-// Every entry must still mismatch; a stale entry fails the test.
-const Known kKnown[] = {
-    UNISON_BLEND("sweep.unison.rate", detuneCents[0], "core/unison_rate.h:28", "emulator/macros.h:141,182"),
-    UNISON_BLEND("sweep.unison.rate", detuneCents[1], "core/unison_rate.h:29", "emulator/macros.h:141,183"),
-    UNISON_BLEND("sweep.unison.rate", swingMinMs, "core/unison_rate.h:27,30", "emulator/macros.h:71,141,184"),
-    UNISON_BLEND("sweep.unison.rate", swingMaxMs, "core/unison_rate.h:27,31", "emulator/macros.h:71,141,185"),
-    // The depth sweep and the defaults carry the same blend difference through the RATE background.
-    UNISON_BLEND("sweep.unison.depth", detuneCents[0], "core/unison_rate.h:28", "emulator/macros.h:141,182"),
-    UNISON_BLEND("sweep.unison.depth", detuneCents[1], "core/unison_rate.h:29", "emulator/macros.h:141,183"),
-    UNISON_BLEND("sweep.unison.depth", swingMinMs, "core/unison_rate.h:27,30", "emulator/macros.h:71,141,184"),
-    UNISON_BLEND("sweep.unison.depth", swingMaxMs, "core/unison_rate.h:27,31", "emulator/macros.h:71,141,185"),
-    UNISON_BLEND("default.unison", detuneCents[0], "core/unison_rate.h:28", "emulator/macros.h:141,182"),
-    UNISON_BLEND("default.unison", detuneCents[1], "core/unison_rate.h:29", "emulator/macros.h:141,183"),
-    UNISON_BLEND("default.unison", swingMinMs, "core/unison_rate.h:27,30", "emulator/macros.h:71,141,184"),
-    UNISON_BLEND("default.unison", swingMaxMs, "core/unison_rate.h:27,31", "emulator/macros.h:71,141,185"),
-    {"default.reverb.chasm.inputTrebleCut",
-     "firmware keeps the engine 0.99; emulator applies Brightness 85 % (0.985)",
-     "engine/chasm.h:48 (no macro applied in core/registry.cpp)", "emulator/macros.h:92,213"},
-};
+// Open mismatches the owner has accepted, each with a reason and file:line on both sides.
+// Every entry must still mismatch; a stale entry fails the test. Empty: the firmware matches.
+constexpr std::array<Known, 0> kKnown{};
 
 // 1e-4 relative: the emulator's macro defaults reproduce the engine tuning only to about 3e-5 (macros.h:140).
 bool near(float a, float b) { return std::fabs(a - b) <= 1e-4f * std::fmax(std::fabs(a), std::fabs(b)) + 1e-6f; }

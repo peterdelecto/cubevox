@@ -1,4 +1,4 @@
-// Source: /Users/j/Documents/Claude/Projects/cubevox/emulator/macros.h (kUni* anchors, at(), unison() at blend 50 %), trimmed to the Unison RATE mapping.
+// Source: /Users/j/Documents/Claude/Projects/cubevox/emulator/macros.h (kUni* anchors, at(), unison() at blend 0 %), trimmed to the Unison RATE mapping.
 
 #pragma once
 
@@ -8,7 +8,10 @@
 
 namespace unisonrate {
 
-constexpr float kBlendPercent = 50.0f;  // Chorus-Double centre; the box has no blend knob
+// The box has no blend knob, so the Chorus-Double blend sits at Adam's 0 % (macros.h kDefaultPos):
+// no fixed detune, swing at twice the base (kUniDetune and kUniSwingScale at 0 %).
+constexpr float kDetuneCents = 0.0f;
+constexpr float kSwingScale = 2.0f;
 constexpr float kMaxSwingGrowth = 2.0f;
 
 // Log-interpolated lfo scale through 0.33 / 1.0 / 7.0 at RATE 0 / 50 / 100 %.
@@ -21,12 +24,12 @@ inline float lfoScale(float ratePercent) {
   return from * powf(to / from, t);
 }
 
-// Writes the LFO speeds and swing for a RATE position (0..100 %), blend fixed at 50 %.
+// Writes the LFO speeds and swing for a RATE position (0..100 %) at the fixed blend.
 inline void apply(cv::UnisonTuning& t, float ratePercent) {
   const float m = lfoScale(ratePercent);
-  const float swing = 1.0f * (m > kMaxSwingGrowth ? kMaxSwingGrowth / m : 1.0f);
-  t.detuneCents[0] = 2.0f;
-  t.detuneCents[1] = -2.0f;
+  const float swing = kSwingScale * (m > kMaxSwingGrowth ? kMaxSwingGrowth / m : 1.0f);
+  t.detuneCents[0] = kDetuneCents;
+  t.detuneCents[1] = 0.0f - kDetuneCents;  // +0, not -0, at no detune
   t.swingMinMs = 0.5f * swing;
   t.swingMaxMs = 3.0f * swing;
   t.lfoHz[0] = 0.60f * m;
