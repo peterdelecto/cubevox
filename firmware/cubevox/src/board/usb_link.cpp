@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 
-#include "board/controls.h"
 #include "board/pins.h"
+#include "core/knob_filter.h"
 
 #if !defined(USBCON) || !defined(USBD_USE_CDC)
 #error "build with usb=CDCgen: Serial must be the USB CDC port"

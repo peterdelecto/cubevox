@@ -1,7 +1,6 @@
 #include "board/controls.h"
 
 #include <Arduino.h>
-#include <math.h>
 
 #include "board/pins.h"
 #include "board/slots.h"
@@ -11,22 +10,12 @@ namespace {
 
 constexpr int kAdcBits = 12;
 constexpr float kAdcFull = 4095.0f;
-constexpr float kSmoothing = 0.3f;      // one-pole step per scan visit
-constexpr float kMoveThreshold = 0.015f;  // knob travel that counts as touched
 constexpr float kEndMargin = 0.01f;     // dead band at each end of pot travel
 constexpr bool kToggleOnWhenLow = true;  // throw-to-GND position engages the effect
 
 constexpr uint32_t kMuxSelectPins[4] = {pins::kMuxS0, pins::kMuxS1, pins::kMuxS2, pins::kMuxS3};
 
-struct PotState {
-  float smoothed = 0.0f;
-  float reported = 0.0f;  // value at the last "moved" report
-  int step = 0;           // stepped knobs only
-  int stepsSeeded = 0;    // step count `step` was seeded for; 0 for a continuous knob
-  bool seeded = false;
-};
-
-PotState gPots[kPotCount];
+KnobFilter gKnobs[kPotCount];
 DebouncedInput gToggles[kSlotCount];
 LastMoved gLastMoved;
 Layout gLayout = defaultLayout();
@@ -73,37 +62,19 @@ int stepsFor(int pot) {
   return owner.slot < 0 ? 0 : knobSteps(gLayout.card[owner.slot], owner.knobB ? 1 : 0);
 }
 
-// Places the step under the knob's current position when the knob's step count changes.
-void reseedStep(PotState& p, int steps) {
-  p.stepsSeeded = steps;
-  p.step = steps > 0 ? steppedPosition(p.smoothed, steps, 0, 0.0f) : 0;
-}
-
 void updatePot(int pot, float norm, uint32_t nowMs) {
-  PotState& p = gPots[pot];
-  const int steps = stepsFor(pot);
-  if (!p.seeded) {
-    p.smoothed = norm;
-    p.reported = norm;
-    p.seeded = true;
-    reseedStep(p, steps);
-    if (++gSeededCount == kPotCount) gChanged = true;
-    return;
-  }
-  p.smoothed += kSmoothing * (norm - p.smoothed);
-  if (steps != p.stepsSeeded) {
-    reseedStep(p, steps);
-    gChanged = true;
-    return;
-  }
-  if (steps > 0) {
-    const int next = steppedPosition(p.smoothed, steps, p.step);
-    if (next == p.step) return;
-    p.step = next;
-    noteMoved(pot, nowMs);
-  } else if (fabsf(p.smoothed - p.reported) > kMoveThreshold) {
-    p.reported = p.smoothed;
-    noteMoved(pot, nowMs);
+  switch (gKnobs[pot].update(norm, stepsFor(pot))) {
+    case KnobEvent::Seeded:
+      if (++gSeededCount == kPotCount) gChanged = true;
+      break;
+    case KnobEvent::Reseeded:
+      gChanged = true;
+      break;
+    case KnobEvent::Moved:
+      noteMoved(pot, nowMs);
+      break;
+    case KnobEvent::None:
+      break;
   }
 }
 
@@ -133,29 +104,6 @@ void scanToggles(uint32_t nowMs) {
 }
 
 }  // namespace
-
-bool DebouncedInput::update(bool raw, uint32_t nowMs, uint32_t holdMs) {
-  if (raw != candidate_) {
-    candidate_ = raw;
-    candidateSinceMs_ = nowMs;
-    return false;
-  }
-  if (candidate_ == stable_ || nowMs - candidateSinceMs_ < holdMs) return false;
-  stable_ = candidate_;
-  return true;
-}
-
-int steppedPosition(float norm, int positions, int current, float hysteresis) {
-  const float band = 1.0f / static_cast<float>(positions);
-  int pos = static_cast<int>(norm * static_cast<float>(positions));
-  if (pos >= positions) pos = positions - 1;
-  if (pos < 0) pos = 0;
-  if (pos == current) return current;
-
-  const float lo = static_cast<float>(current) * band - hysteresis * band;
-  const float hi = static_cast<float>(current + 1) * band + hysteresis * band;
-  return (norm >= lo && norm <= hi) ? current : pos;
-}
 
 void controlsInit() {
   analogReadResolution(kAdcBits);
@@ -189,8 +137,7 @@ PanelReading controlsReading() {
   for (int s = 0; s < kSlotCount; ++s) {
     const int pots[kKnobsPerCard] = {kSlots[s].muxChannelA, kSlots[s].muxChannelB};
     for (int k = 0; k < kKnobsPerCard; ++k) {
-      const PotState& p = gPots[pots[k]];
-      r.knob[s][k] = p.stepsSeeded > 0 ? static_cast<float>(p.step) : p.smoothed;
+      r.knob[s][k] = gKnobs[pots[k]].value();
     }
     r.toggle[s] = gToggles[s].level();
   }

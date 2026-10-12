@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 
-#include "board/controls.h"
 #include "board/pins.h"
+#include "core/knob_filter.h"
 
 namespace {
 

@@ -4,10 +4,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "board/controls.h"
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/platform.h"
+#include "core/knob_filter.h"
 #include "core/registry.h"
 #include "core/settings.h"
 

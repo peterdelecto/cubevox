@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "core/knob_filter.h"
 #include "core/layout.h"
 #include "core/panel.h"
 
@@ -15,28 +16,6 @@ constexpr uint32_t kMuxSettleUs = 500;
 // ~20 mA through U101's input clamp into the dead rail. Selects stay low until this passes.
 constexpr uint32_t kMuxSelectHoldMs = 1100;
 constexpr uint32_t kToggleDebounceMs = 20;
-
-// Switch input that only changes after the raw level has held for the debounce time.
-class DebouncedInput {
- public:
-  void reset(bool level) {
-    stable_ = level;
-    candidate_ = level;
-  }
-  // Returns true when the stable level changed on this call.
-  bool update(bool raw, uint32_t nowMs, uint32_t holdMs);
-  bool level() const { return stable_; }
-
- private:
-  bool stable_ = false;
-  bool candidate_ = false;
-  uint32_t candidateSinceMs_ = 0;
-};
-
-// Maps a 0..1 knob position onto `positions` equal bands. The knob must travel
-// `hysteresis` of a band past an edge before the position changes, so a value resting on
-// an edge does not flicker. `current` is the previous position.
-int steppedPosition(float norm, int positions, int current, float hysteresis = 0.2f);
 
 void controlsInit();
 

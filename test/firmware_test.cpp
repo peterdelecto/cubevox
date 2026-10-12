@@ -8,6 +8,7 @@
 #include "core/chain_params.h"
 #include "core/compose.h"
 #include "core/costs.h"
+#include "core/knob_filter.h"
 #include "core/layout.h"
 #include "core/panel.h"
 #include "core/registry.h"
@@ -248,6 +249,62 @@ void checkSettings() {
 
 }  // namespace
 
+void checkDebounce() {
+  DebouncedInput in;
+  in.reset(false);
+  check(!in.update(true, 100, 20), "debounce: edge not reported at once");
+  check(!in.update(true, 110, 20) && !in.level(), "debounce: no change before hold time");
+  check(in.update(true, 120, 20) && in.level(), "debounce: changes after hold time");
+  check(!in.update(true, 200, 20), "debounce: reported once");
+  in.update(false, 300, 20);
+  in.update(true, 310, 20);
+  check(!in.update(true, 325, 20) && in.level(), "debounce: glitch shorter than hold ignored");
+}
+
+void checkSteppedPosition() {
+  for (int p = 0; p < 4; ++p) {
+    const float centre = (static_cast<float>(p) + 0.5f) / 4.0f;
+    check(steppedPosition(centre, 4, 0) == p, "stepped: band centre");
+  }
+  check(steppedPosition(0.26f, 4, 0) == 0, "stepped: hysteresis holds just past the edge");
+  check(steppedPosition(0.40f, 4, 0) == 1, "stepped: moves once clear of the hysteresis");
+  check(steppedPosition(0.24f, 4, 1) == 1, "stepped: hysteresis holds just below the edge");
+  check(steppedPosition(-0.5f, 4, 2) == 0, "stepped: clamps at 0");
+  check(steppedPosition(1.0f, 4, 0) == 3 && steppedPosition(2.0f, 4, 0) == 3, "stepped: clamps at 1");
+}
+
+void settle(KnobFilter& f, float norm, int steps) {
+  for (int i = 0; i < 60; ++i) f.update(norm, steps);
+}
+
+void checkKnobFilter() {
+  KnobFilter f;
+  check(!f.seeded(), "filter: unseeded at start");
+  check(f.update(0.5f, 0) == KnobEvent::Seeded, "filter: first sample seeds");
+  check(f.seeded() && std::fabs(f.value() - 0.5f) < 1e-6f, "filter: seed takes the sample");
+  check(f.update(0.505f, 0) == KnobEvent::None, "filter: jitter under threshold is not a move");
+  KnobEvent last = KnobEvent::None;
+  bool moved = false;
+  for (int i = 0; i < 20; ++i) {
+    last = f.update(0.8f, 0);
+    moved = moved || last == KnobEvent::Moved;
+  }
+  check(moved, "filter: real move reported");
+  check(f.value() > 0.7f, "filter: value follows the knob");
+
+  KnobFilter s;
+  s.update(0.1f, 5);
+  check(s.value() == 0.0f, "filter: stepped seeds at the step under the knob");
+  bool stepMoved = false;
+  for (int i = 0; i < 30; ++i) stepMoved = stepMoved || s.update(0.3f, 5) == KnobEvent::Moved;
+  check(stepMoved && s.value() == 1.0f, "filter: stepped knob moves one step");
+  check(s.update(0.3f, 5) == KnobEvent::None, "filter: stepped knob rests");
+  settle(s, 0.95f, 5);
+  check(s.update(0.95f, 10) == KnobEvent::Reseeded, "filter: step count change re-seeds");
+  check(s.value() == 9.0f, "filter: re-seed lands on the position under the knob");
+  check(s.update(0.95f, 0) == KnobEvent::Reseeded && s.value() < 1.0f, "filter: back to continuous re-seeds");
+}
+
 int main() {
   checkIds();
   checkGroups();
@@ -262,6 +319,9 @@ int main() {
   checkComposeToggles();
   checkComposeBench();
   checkOutputGain();
+  checkDebounce();
+  checkSteppedPosition();
+  checkKnobFilter();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;
 }
