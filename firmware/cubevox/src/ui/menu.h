@@ -1,10 +1,11 @@
 // MENU state machine and the OLED screens. Pure: input events in, actions out, text rows drawn
-// through the Display interface (the SH1106 driver or the serial stub).
+// onto a Canvas that a Display backend pushes to the panel.
 
 #pragma once
 
 #include <stdint.h>
 
+#include "core/canvas.h"
 #include "core/display.h"
 #include "core/layout.h"
 #include "core/panel.h"
@@ -32,8 +33,8 @@ class Menu {
  public:
   UiAction update(const UiInput& in, uint32_t nowMs);
 
-  // Redraws when the frame differs from the one on the display.
-  void draw(const UiContext& ctx, Display& display);
+  // Redraws the canvas when the frame differs from the last one drawn.
+  void draw(const UiContext& ctx, Canvas& canvas);
 
  private:
   enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };

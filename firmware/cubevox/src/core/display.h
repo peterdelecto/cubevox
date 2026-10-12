@@ -1,16 +1,19 @@
-// Text display the menu draws on: 8 rows of 16 characters. The OLED driver and the
-// serial stub both implement it.
+// What the menu and a display backend share. The menu draws into a Canvas and lays text out on a
+// grid of 8 rows (one canvas page each) by 16 columns. A backend pushes the canvas to a panel
+// or a log.
 
 #pragma once
 
+#include "core/canvas.h"
+
 constexpr int kDisplayRows = 8;
-constexpr int kDisplayCols = 16;  // 8 px font across 128 px
+constexpr int kDisplayCols = 16;
+constexpr int kDisplayRowPx = 8;
 
 class Display {
  public:
   virtual ~Display() {}
-  virtual void clear() = 0;
-  virtual void text(int row, const char* line) = 0;  // row 0..7
-  virtual void invertRow(int row) = 0;
-  virtual void flush() = 0;
+
+  // Sends at most one dirty page of `canvas` and clears its dirty bit. Called once per loop pass.
+  virtual void flushStep(Canvas& canvas) = 0;
 };

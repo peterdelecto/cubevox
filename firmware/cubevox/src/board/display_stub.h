@@ -1,4 +1,4 @@
-// Serial-logging Display for boards where no SH1106 answers: prints each changed screen.
+// Serial-logging Display for boards where no SH1106 answers: prints each changed page as ASCII art.
 
 #pragma once
 

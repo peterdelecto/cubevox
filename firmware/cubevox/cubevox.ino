@@ -30,6 +30,7 @@ static Settings gSettings;
 static Menu gMenu;
 static JackSwitch gJack;
 static Display* gDisplay = nullptr;
+static Canvas gCanvas;
 static BenchOverrides gBench;
 static bool gOledFound = false;
 static bool gAudioRunning = false;
@@ -226,7 +227,8 @@ void loop() {
   if (controlsTakeChanged() || settingsChanged) publishSnapshot();
 
   const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
-  gMenu.draw(ctx, *gDisplay);
+  gMenu.draw(ctx, gCanvas);
+  gDisplay->flushStep(gCanvas);
   heartbeat(nowMs);
   printStats(nowMs);
 }

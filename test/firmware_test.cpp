@@ -4,11 +4,14 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
+#include "core/canvas.h"
 #include "core/chain_params.h"
 #include "core/compose.h"
 #include "core/costs.h"
 #include "core/display.h"
+#include "core/fonts.h"
 #include "core/jack_switch.h"
 #include "core/knob_filter.h"
 #include "core/layout.h"
@@ -17,6 +20,8 @@
 #include "core/settings.h"
 #include "core/version.h"
 #include "ui/menu.h"
+
+#include "cubevox_fonts.h"
 
 namespace {
 
@@ -308,29 +313,35 @@ void checkKnobFilter() {
   check(s.update(0.95f, 0) == KnobEvent::Reseeded && s.value() < 1.0f, "filter: back to continuous re-seeds");
 }
 
-// Records the rows the menu draws.
-class RecordingDisplay : public Display {
- public:
-  void clear() override { std::memset(rows_, 0, sizeof(rows_)); inverted_ = -1; }
-  void text(int r, const char* line) override { std::snprintf(rows_[r], sizeof(rows_[r]), "%s", line); }
-  void invertRow(int r) override { inverted_ = r; }
-  void flush() override { ++flushes_; }
-  const char* rowText(int r) const { return rows_[r]; }
-  int inverted() const { return inverted_; }
-  int flushes() const { return flushes_; }
+// Canvas page r holds text row r, so a row matches when its page equals the rendered text.
+bool rowIs(const Canvas& canvas, int r, const char* text, bool inverted = false) {
+  Canvas ref;
+  ref.drawText(0, 0, font5x7(), text);
+  for (int x = 0; x < kCanvasWidth; ++x) {
+    const uint8_t want = inverted ? static_cast<uint8_t>(~ref.page(0)[x]) : ref.page(0)[x];
+    if (canvas.page(r)[x] != want) return false;
+  }
+  return true;
+}
 
- private:
-  char rows_[kDisplayRows][kDisplayCols + 1] = {};
-  int inverted_ = -1;
-  int flushes_ = 0;
-};
+std::string chainRow(const Layout& layout, int slot) {
+  char line[kDisplayCols + 1];
+  std::snprintf(line, sizeof(line), "%d %s", slot + 1, cardDesc(layout.card[slot]).name);
+  return line;
+}
+
+bool pagesClean(const Canvas& canvas) { return canvas.dirtyPages() == 0; }
+
+void clearAllDirty(Canvas& canvas) {
+  for (int p = 0; p < kCanvasPages; ++p) canvas.clearDirty(p);
+}
 
 struct MenuRig {
   Menu menu;
   Layout layout = defaultLayout();
   PanelReading panel;
   Settings settings;
-  RecordingDisplay display;
+  Canvas canvas;
   uint32_t nowMs = 100;
 
   UiAction step(int detents, bool click, uint32_t advanceMs = 10) {
@@ -340,50 +351,50 @@ struct MenuRig {
     in.click = click;
     return menu.update(in, nowMs);
   }
-  void draw() { menu.draw(UiContext{layout, panel, settings, false}, display); }
+  void draw() { menu.draw(UiContext{layout, panel, settings, false}, canvas); }
 };
 
 void checkMenu() {
   MenuRig m;
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "cubevox") == 0, "menu: idle title");
+  check(rowIs(m.canvas, 0, "cubevox"), "menu: idle title");
 
   m.step(0, true);
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: click opens the list");
-  check(m.display.inverted() == 1 && std::strcmp(m.display.rowText(1), ">Out LINE") == 0, "menu: cursor 0 row inverted");
-  check(std::strcmp(m.display.rowText(2), " Input MIC") == 0, "menu: input row text");
+  check(rowIs(m.canvas, 0, "MENU"), "menu: click opens the list");
+  check(rowIs(m.canvas, 1, ">Out LINE", true) && rowIs(m.canvas, 2, " Input MIC"), "menu: cursor 0 row inverted");
+  check(rowIs(m.canvas, 2, " Input MIC"), "menu: input row text");
 
   m.step(-1, false);
   m.draw();
-  check(m.display.inverted() == 5, "menu: turning back from 0 wraps to the last item");
+  check(rowIs(m.canvas, 5, ">Exit ", true), "menu: turning back from 0 wraps to the last item");
   m.step(1, false);
   m.draw();
-  check(m.display.inverted() == 1, "menu: turning forward wraps to 0");
+  check(rowIs(m.canvas, 1, ">Out LINE", true), "menu: turning forward wraps to 0");
 
   check(m.step(0, true) == UiAction::ToggleOutput, "menu: Out click toggles output");
   m.step(1, false);
   check(m.step(0, true) == UiAction::ToggleInputJack, "menu: Input click toggles the jack");
   m.settings.inputJack = InputJack::Pedal;
   m.draw();
-  check(std::strcmp(m.display.rowText(2), ">Input PEDAL") == 0, "menu: row reads the settings");
+  check(rowIs(m.canvas, 2, ">Input PEDAL", true), "menu: row reads the settings");
 
   m.step(1, false);
   check(m.step(0, true) == UiAction::None, "menu: Chain order click has no action");
   m.draw();
-  check(std::strncmp(m.display.rowText(0), "1 ", 2) == 0, "menu: chain view starts at slot 1");
-  check(std::strncmp(m.display.rowText(kDisplayRows - 1), "8 ", 2) == 0, "menu: chain view shows slot 8");
+  check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()), "menu: chain view starts at slot 1");
+  check(rowIs(m.canvas, kDisplayRows - 1, chainRow(m.layout, 7).c_str()), "menu: chain view shows slot 8");
   m.step(0, true);
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: click leaves the chain view");
+  check(rowIs(m.canvas, 0, "MENU"), "menu: click leaves the chain view");
 
   m.step(1, false);
   m.step(0, true);
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "UPDATE FIRMWARE") == 0, "menu: confirm screen");
+  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE"), "menu: confirm screen");
   m.step(1, false);
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: turn cancels the confirm");
+  check(rowIs(m.canvas, 0, "MENU"), "menu: turn cancels the confirm");
   m.step(0, true);
   m.step(0, true);
   check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
@@ -394,17 +405,146 @@ void checkMenuTimeout() {
   m.step(0, true);
   m.step(0, false, 14000);
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "MENU") == 0, "menu: still open before the timeout");
+  check(rowIs(m.canvas, 0, "MENU"), "menu: still open before the timeout");
   m.step(0, false, 1500);
   m.draw();
-  check(std::strcmp(m.display.rowText(0), "cubevox") == 0, "menu: 15 s without input returns to idle");
+  check(rowIs(m.canvas, 0, "cubevox"), "menu: 15 s without input returns to idle");
 }
 
 void checkMenuRedraw() {
   MenuRig m;
   m.draw();
+  clearAllDirty(m.canvas);
   m.draw();
-  check(m.display.flushes() <= 1, "menu: an unchanged frame is not redrawn");
+  check(pagesClean(m.canvas), "menu: an unchanged frame is not redrawn");
+}
+
+void checkCanvas() {
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  const FontDesc& font = font5x7();
+  const uint8_t* glyphA = &f::kGlyphs['A' - 0x20][0];
+
+  Canvas c;
+  check(c.dirtyPages() == 0xFF, "canvas: starts fully dirty");
+  clearAllDirty(c);
+  const int pen = c.drawText(0, 0, font, "A");
+  check(std::memcmp(c.page(0), glyphA, f::kWidth) == 0, "canvas: 5x7 A matches the header bytes");
+  check(c.page(0)[f::kWidth] == 0 && c.page(1)[0] == 0, "canvas: nothing past the glyph");
+  check(c.dirtyPages() == 0x01, "canvas: drawing sets only the touched page dirty");
+  check(pen == f::kWidth + f::kSpacing, "canvas: drawText returns the pen after the spacing");
+  c.clearDirty(0);
+  check(c.dirtyPages() == 0, "canvas: clearDirty clears the bit");
+
+  Canvas shifted;
+  shifted.drawText(0, 3, font, "A");
+  bool shiftOk = true;
+  for (int col = 0; col < f::kWidth; ++col) {
+    shiftOk = shiftOk && shifted.page(0)[col] == static_cast<uint8_t>(glyphA[col] << 3);
+    shiftOk = shiftOk && shifted.page(1)[col] == static_cast<uint8_t>(glyphA[col] >> 5);
+  }
+  check(shiftOk, "canvas: glyph at y = 3 splits across pages 0 and 1");
+
+  Canvas above;
+  above.drawText(0, -4, font, "A");
+  bool aboveOk = true;
+  for (int col = 0; col < f::kWidth; ++col) aboveOk = aboveOk && above.page(0)[col] == static_cast<uint8_t>(glyphA[col] >> 4);
+  check(aboveOk, "canvas: glyph above the top edge clips to its lower rows");
+
+  check(Canvas::textWidth(font, "AB") == 2 * (f::kWidth + f::kSpacing) - f::kSpacing, "canvas: textWidth drops the trailing gap");
+  check(Canvas::textWidth(font, "") == 0, "canvas: textWidth of an empty string is 0");
+
+  Canvas edge;
+  edge.drawText(125, 60, font, "AB");
+  edge.drawText(-3, -3, font, "A");
+  edge.drawText(120, 62, font, "AAA");
+  edge.fillRect(-5, -5, 300, 300, true);
+  edge.invertRect(100, 50, 100, 100);
+  edge.setPixel(-1, 0, true);
+  edge.setPixel(128, 64, true);
+  check(edge.page(7)[127] == 0x00 && edge.page(6)[127] == 0x03 && edge.page(0)[0] == 0xFF, "canvas: fill and invert clip at the edges");
+
+  // A capitals-only font, so lowercase has no glyph of its own.
+  const uint8_t caps[2][5] = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}};
+  const FontDesc capsOnly{5, 7, 1, 5, "AB", 2, &caps[0][0], false};
+  Canvas low;
+  Canvas up;
+  low.drawText(0, 0, capsOnly, "ab");
+  up.drawText(0, 0, capsOnly, "AB");
+  check(low.page(0)[0] == 1 && std::memcmp(low.page(0), up.page(0), kCanvasWidth) == 0, "canvas: lowercase falls back to uppercase");
+  Canvas gap;
+  gap.drawText(0, 0, capsOnly, "?B");
+  Canvas direct;
+  direct.drawText(capsOnly.width + capsOnly.spacing, 0, capsOnly, "B");
+  check(std::memcmp(gap.page(0), direct.page(0), kCanvasWidth) == 0, "canvas: a missing glyph is blank and keeps its advance");
+
+  Canvas lower5;
+  Canvas upper5;
+  lower5.drawText(0, 0, font, "u");
+  upper5.drawText(0, 0, font, "U");
+  check(lower5.page(0)[1] != 0 && std::memcmp(lower5.page(0), upper5.page(0), kCanvasWidth) == 0,
+        "canvas: 5x7 u draws the bytes of U");
+
+  namespace f9 = cubevox::fonts::StylizedHyperlegible9X12;
+  Canvas big9;
+  big9.drawText(0, 0, font9x12(), "u");
+  bool ok9 = true;
+  for (int col = 0; col < f9::kWidth; ++col) {
+    ok9 = ok9 && big9.page(0)[col] == f9::kGlyphs['U' - 0x20][col];
+    ok9 = ok9 && big9.page(1)[col] == (f9::kGlyphs['U' - 0x20][f9::kWidth + col] & 0x0F);
+  }
+  check(ok9 && big9.page(0)[1] != 0, "canvas: 9x12 u draws the glyph bytes of U");
+
+  namespace f16 = cubevox::fonts::StylizedHyperlegible16X24;
+  Canvas big16;
+  big16.drawText(0, 0, font16x24(), "H");
+  bool ok16 = true;
+  for (int col = 0; col < f16::kWidth; ++col)
+    for (int band = 0; band < 3; ++band)
+      ok16 = ok16 && big16.page(band)[col] == f16::kGlyphs['H' - 0x20][band * f16::kWidth + col];
+  check(ok16 && big16.page(0)[0] != 0, "canvas: 16x24 H draws the glyph bytes");
+
+  Canvas rect;
+  clearAllDirty(rect);
+  rect.fillRect(10, 10, 4, 3, true);
+  check(rect.dirtyPages() == 0x02 && rect.page(1)[10] == 0x1C, "canvas: fillRect sets the rows inside page 1");
+  rect.invertRect(10, 10, 4, 3);
+  check(rect.page(1)[10] == 0 && rect.page(1)[13] == 0, "canvas: invertRect undoes a fill");
+}
+
+// Writes a screen as a binary PGM at 4x, lit pixels white.
+void writePgm(const Canvas& canvas, const char* name) {
+  constexpr int kScale = 4;
+  const std::string path = std::string(CUBEVOX_OUT_DIR) + "/" + name;
+  std::FILE* file = std::fopen(path.c_str(), "wb");
+  check(file != nullptr, "pgm: output file opens");
+  if (!file) return;
+  std::fprintf(file, "P5\n%d %d\n255\n", kCanvasWidth * kScale, kCanvasHeight * kScale);
+  for (int y = 0; y < kCanvasHeight * kScale; ++y) {
+    const int py = y / kScale;
+    for (int x = 0; x < kCanvasWidth * kScale; ++x) {
+      const bool on = (canvas.page(py / 8)[x / kScale] >> (py % 8)) & 1;
+      std::fputc(on ? 0xFF : 0x00, file);
+    }
+  }
+  std::fclose(file);
+}
+
+void checkScreenshots() {
+  MenuRig m;
+  m.panel.lastMoved.slot = 5;
+  m.panel.knob[5][0] = 0.6f;
+  m.panel.toggle[5] = true;
+  m.draw();
+  writePgm(m.canvas, "oled-idle.pgm");
+
+  m.step(0, true);
+  m.draw();
+  writePgm(m.canvas, "oled-menu.pgm");
+
+  m.step(2, false);
+  m.step(0, true);
+  m.draw();
+  writePgm(m.canvas, "oled-chain.pgm");
 }
 
 void checkJackSwitch() {
@@ -454,6 +594,8 @@ int main() {
   checkMenu();
   checkMenuTimeout();
   checkMenuRedraw();
+  checkCanvas();
+  checkScreenshots();
   checkJackSwitch();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;

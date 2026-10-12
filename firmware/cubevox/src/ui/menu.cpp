@@ -122,7 +122,7 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   return action;
 }
 
-void Menu::draw(const UiContext& ctx, Display& display) {
+void Menu::draw(const UiContext& ctx, Canvas& canvas) {
   Frame frame = {};
   switch (mode_) {
     case Mode::Idle: drawIdle(frame.row, ctx); break;
@@ -132,10 +132,9 @@ void Menu::draw(const UiContext& ctx, Display& display) {
   }
   if (memcmp(&frame, &shown_, sizeof(frame)) == 0) return;
   shown_ = frame;
-  display.clear();
+  canvas.clear();
   for (int r = 0; r < kDisplayRows; ++r) {
-    if (frame.row[r][0]) display.text(r, frame.row[r]);
+    if (frame.row[r][0]) canvas.drawText(0, r * kDisplayRowPx, font5x7(), frame.row[r]);
   }
-  if (mode_ == Mode::List) display.invertRow(1 + cursor_);
-  display.flush();
+  if (mode_ == Mode::List) canvas.invertRect(0, (1 + cursor_) * kDisplayRowPx, kCanvasWidth, kDisplayRowPx);
 }

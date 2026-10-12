@@ -17,7 +17,8 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`).
 - `src/core/`: pure C++17, no Arduino or HAL include. Compiled on the Mac by `test/firmware_test.cpp`
   (`ctest` target `firmware`), so an Arduino include here breaks the host build.
   `registry` (cards, knob descriptors, apply, format), `costs.h`, `chain_params` (the parameter
-  bundle the audio IRQ reads), `display.h` (text display interface), `unison_rate.h`, `version.h`.
+  bundle the audio IRQ reads), `canvas` (128 x 64 page-layout frame buffer with dirty pages), `fonts` (the
+  font editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`), `unison_rate.h`, `version.h`.
 - `src/board/`: one hardware concern per file. `pins.h`, `slots` (toggle pin and mux channels per
   slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk), `controls` (mux
   scan, smoothing, stepping, toggles), `mute`, `input_jack` (PAD_EN for relay K103), `fault` (watchdog, fault handlers, reset cause, audio
@@ -39,7 +40,8 @@ from `../engine` by include path. No emulator files are included.
 - `board/usb_link.cpp`: USB CDC starts only while PA9 reads VBUS and stops when it drops (self-powered box,
   `-DUSBD_SELF_POWERED=1` in build.sh). The boot report prints each time a terminal opens the port.
   Astra's review of the clock numbers and the gating: `docs/audits/2026-10-08-astra-clock-response.md`.
-- `board/display_sh1106.cpp`: U8x8 text driver on I2C2 PB10/PB11, 8 rows of 16 characters.
+- `board/display_sh1106.cpp`: U8x8 init on I2C2 PB10/PB11; `flushStep` sends the lowest dirty canvas page with `drawTile`, once per loop pass.
+  The fonts come from `tools/font-editor/fonts/cubevox_fonts.h` through an include path, no copy.
 - `board/fault.cpp`: IWDG1 at 2 s, armed at the end of `setup()` and kicked only from `loop()`. HardFault,
   MemManage, BusFault and UsageFault drive XSMT and MUTE_N low by register write, store PC, LR, CFSR, HFSR,
   BFAR and MMFAR in a `.cv_noinit` record (`cubevox_noinit.ld`, top of DTCM) and reset; the next boot report prints `[ERROR] last reset: fault ...`

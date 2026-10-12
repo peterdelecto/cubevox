@@ -32,8 +32,9 @@ VERSION="$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo d
 echo "[build] core $CORE $CORE_VERSION, firmware $VERSION"
 
 # Engine headers are included as "engine/x.h" from the repo root; sketch sources as "core/x.h",
-# "board/x.h", "ui/x.h" from cubevox/src; the copied platform files by bare name.
-INC="-I$REPO -I$FW/cubevox/src -I$FW/platform"
+# "board/x.h", "ui/x.h" from cubevox/src; the copied platform files by bare name; the font
+# editor's export as "cubevox_fonts.h".
+INC="-I$REPO -I$FW/cubevox/src -I$FW/platform -I$REPO/tools/font-editor/fonts"
 # The pot mux common on PC0 is the only analogRead; take the longest sample window (spec item 10.8).
 # The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
 DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCUBEVOX_FW_VERSION=\"\\\"$VERSION\\\"\""

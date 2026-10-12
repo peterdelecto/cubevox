@@ -177,7 +177,9 @@ add_test(NAME stage_feedback COMMAND stage_feedback_test)
 file(GLOB CUBEVOX_FW_CORE_SOURCES ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/core/*.cpp
                                   ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/ui/*.cpp)
 add_executable(firmware_test test/firmware_test.cpp ${CUBEVOX_FW_CORE_SOURCES})
-target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src)
+target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
+                                                 ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
+target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}")
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 target_link_libraries(firmware_test PRIVATE engine)
 add_test(NAME firmware COMMAND firmware_test)
