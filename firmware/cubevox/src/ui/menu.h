@@ -36,6 +36,10 @@ class Menu {
   // Redraws the canvas when the frame differs from the last one drawn.
   void draw(const UiContext& ctx, Canvas& canvas);
 
+  // Forgets the last frame, so the next draw repaints even if the content is unchanged. Call it
+  // after something else drew on the canvas.
+  void invalidate();
+
  private:
   enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
   struct Frame {

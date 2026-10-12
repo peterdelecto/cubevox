@@ -131,6 +131,8 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   return action;
 }
 
+void Menu::invalidate() { shown_.row[0][0] = '\x01'; }  // no frame holds this byte
+
 void Menu::draw(const UiContext& ctx, Canvas& canvas) {
   Frame frame = {};
   switch (mode_) {

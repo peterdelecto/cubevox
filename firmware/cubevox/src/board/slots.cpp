@@ -33,3 +33,21 @@ const Slot kSlots[kSlotCount] = {
     {pins::kToggle7, kPot11, kPot12},
     {pins::kToggle8, kPot13, kPot14},
 };
+
+int potNumber(int muxChannel) {
+  static const uint8_t kChannelOfPot[kPotCount] = {kPot01, kPot02, kPot03, kPot04, kPot05, kPot06,
+                                                   kPot07, kPot08, kPot09, kPot10, kPot11, kPot12,
+                                                   kPot13, kPot14, kPot15Key, kPot16Semitones};
+  for (int i = 0; i < kPotCount; ++i) {
+    if (kChannelOfPot[i] == muxChannel) return i + 1;
+  }
+  return 0;
+}
+
+PotOwner potOwner(int muxChannel) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (kSlots[s].muxChannelA == muxChannel) return {static_cast<int8_t>(s), false};
+    if (kSlots[s].muxChannelB == muxChannel) return {static_cast<int8_t>(s), true};
+  }
+  return {-1, false};
+}

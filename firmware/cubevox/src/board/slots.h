@@ -16,3 +16,13 @@ struct Slot {
 };
 
 extern const Slot kSlots[kSlotCount];
+
+// Silkscreen number (1..16) of the pot wired to a 0-based mux channel.
+int potNumber(int muxChannel);
+
+// The slot knob wired to a mux channel; slot is -1 for a channel no slot uses.
+struct PotOwner {
+  int8_t slot;
+  bool knobB;
+};
+PotOwner potOwner(int muxChannel);

@@ -16,6 +16,7 @@ constexpr bool kToggleOnWhenLow = true;  // throw-to-GND position engages the ef
 constexpr uint32_t kMuxSelectPins[4] = {pins::kMuxS0, pins::kMuxS1, pins::kMuxS2, pins::kMuxS3};
 
 KnobFilter gKnobs[kPotCount];
+float gRaw[kPotCount];  // last unfiltered read per mux channel
 DebouncedInput gToggles[kSlotCount];
 LastMoved gLastMoved;
 Layout gLayout = defaultLayout();
@@ -25,20 +26,6 @@ bool gSelected = false;
 uint32_t gSelectedAtUs = 0;
 int gSeededCount = 0;
 bool gChanged = false;
-
-// Reverse lookup from pot index to the slot knob that owns it.
-struct PotOwner {
-  int8_t slot;
-  bool knobB;
-};
-
-PotOwner ownerOf(int pot) {
-  for (int s = 0; s < kSlotCount; ++s) {
-    if (kSlots[s].muxChannelA == pot) return {static_cast<int8_t>(s), false};
-    if (kSlots[s].muxChannelB == pot) return {static_cast<int8_t>(s), true};
-  }
-  return {-1, false};
-}
 
 void selectChannel(uint8_t channel) {
   for (int bit = 0; bit < 4; ++bit) digitalWrite(kMuxSelectPins[bit], (channel >> bit) & 1);
@@ -51,14 +38,14 @@ float readNorm() {
 }
 
 void noteMoved(int pot, uint32_t nowMs) {
-  const PotOwner owner = ownerOf(pot);
+  const PotOwner owner = potOwner(pot);
   if (owner.slot < 0) return;
   gLastMoved = {owner.slot, owner.knobB, nowMs};
   gChanged = true;
 }
 
 int stepsFor(int pot) {
-  const PotOwner owner = ownerOf(pot);
+  const PotOwner owner = potOwner(pot);
   return owner.slot < 0 ? 0 : knobSteps(gLayout.card[owner.slot], owner.knobB ? 1 : 0);
 }
 
@@ -87,7 +74,9 @@ void scanMux(uint32_t nowMs) {
     return;
   }
   if (micros() - gSelectedAtUs < kMuxSettleUs) return;
-  updatePot(gScanChannel, readNorm(), nowMs);
+  const float norm = readNorm();
+  gRaw[gScanChannel] = norm;
+  updatePot(gScanChannel, norm, nowMs);
   gScanChannel = (gScanChannel + 1) % kPotCount;
   gSelected = false;
 }
@@ -133,6 +122,10 @@ bool controlsTakeChanged() {
   gChanged = false;
   return changed;
 }
+
+float controlsRawPot(int muxChannel) { return gRaw[muxChannel]; }
+
+bool controlsToggleOn(int slot) { return gToggles[slot].level(); }
 
 PanelReading controlsReading() {
   PanelReading r;

@@ -7,6 +7,7 @@ person can take, and writes a log to hardware/bringup/.
 
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and DFU entry (reflashes)
+  ./bringup.py --board 1 --panel         # also the panel walk: pots, toggles, K103, mute, OLED
   ./bringup.py --weact --no-oled --no-prompt --faults --dfu   # dry run on the WeAct bench board
 """
 
@@ -182,6 +183,152 @@ def check_audio(log, port, seconds=20.0):
               f"{b[2]} late, {b[3]} overruns in {b[1]} blocks")
 
 
+PANEL_POT = re.compile(r"^\[panel\] (raw )?pot (\d+) slot (\d) ([AB]) (\d\.\d\d)")
+PANEL_TOGGLE = re.compile(r"^\[panel\] (raw )?toggle slot (\d) (on|off)")
+PANEL_LOW = 0.05
+PANEL_HIGH = 0.95
+PANEL_WAIT_S = 20.0
+
+
+def panel_event(line):
+    """('pot', raw, (slot, knob), pot number, value) or ('toggle', raw, slot, state) or None."""
+    m = PANEL_POT.match(line)
+    if m:
+        return ("pot", bool(m.group(1)), (int(m.group(3)), m.group(4)), int(m.group(2)), float(m.group(5)))
+    m = PANEL_TOGGLE.match(line)
+    if m:
+        return ("toggle", bool(m.group(1)), int(m.group(2)), m.group(3))
+    return None
+
+
+def watch(port, seconds, handler):
+    """Feeds stream lines to `handler` until it returns something other than None."""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        for line in port.read(0.3):
+            result = handler(line)
+            if result is not None:
+                return result
+    return None
+
+
+def panel_dump(port):
+    """Pot values from the 'g' command, keyed by (slot, knob) as (pot number, value)."""
+    port.read(0.2)
+    port.send("g")
+    pots = {}
+    for line in port.read(3.0, until=r"raw toggle slot 8"):
+        ev = panel_event(line)
+        if ev and ev[0] == "pot":
+            pots[ev[2]] = (ev[3], ev[4])
+    return pots
+
+
+def wait_pot(port, key, goal, others):
+    """Waits for `key` to reach `goal` ('low' or 'high'). Returns ok, reversed or None (timeout)."""
+    def handler(line):
+        ev = panel_event(line)
+        if not ev or ev[1] or ev[0] != "pot":
+            return None
+        if ev[2] != key:
+            others.add(f"slot {ev[2][0]} {ev[2][1]} (pot {ev[3]:02d})")
+            return None
+        value = ev[4]
+        if goal == "low":
+            return "ok" if value < PANEL_LOW else ("reversed" if value > PANEL_HIGH else None)
+        return "ok" if value > PANEL_HIGH else None
+    return watch(port, PANEL_WAIT_S, handler)
+
+
+def panel_pot(log, port, slot, knob):
+    key = (slot, knob)
+    others = set()
+    verdict = "ok"
+    for goal, word in (("low", "LEFT (counter-clockwise)"), ("high", "RIGHT (clockwise)")):
+        print(f"  Turn slot {slot} knob {knob} fully {word}.", flush=True)
+        start = panel_dump(port).get(key)
+        reached = start is not None and ((start[1] < PANEL_LOW) if goal == "low" else (start[1] > PANEL_HIGH))
+        verdict = "ok" if reached else wait_pot(port, key, goal, others)
+        if verdict != "ok":
+            break
+    nn = panel_dump(port).get(key, (0, 0.0))[0]
+    name = f"panel slot {slot} knob {knob} (pot {nn:02d})"
+    other = f"; movement also seen on {', '.join(sorted(others))}" if others else ""
+    if verdict == "ok" and not others:
+        log.check(name, True, "full travel, left then right")
+    elif verdict == "reversed":
+        log.check(name, False, f"read high when turned left (reversed){other}")
+    elif verdict is None:
+        log.check(name, False, f"no travel to the {goal} end seen in {PANEL_WAIT_S:.0f} s{other}")
+    else:
+        log.check(name, False, f"full travel but not alone{other}")
+
+
+def panel_toggle(log, port, slot):
+    print(f"  Flick toggle {slot} both ways.", flush=True)
+    port.read(0.2)
+    seen, others = set(), set()
+
+    def handler(line):
+        ev = panel_event(line)
+        if not ev or ev[1] or ev[0] != "toggle":
+            return None
+        if ev[2] == slot:
+            seen.add(ev[3])
+        else:
+            others.add(f"slot {ev[2]}")
+        return True if seen == {"on", "off"} else None
+    watch(port, PANEL_WAIT_S, handler)
+    name = f"panel toggle {slot}"
+    other = f"; edges also seen on {', '.join(sorted(others))}" if others else ""
+    if seen == {"on", "off"} and not others:
+        log.check(name, True, "both states seen")
+    else:
+        log.check(name, False, f"saw {', '.join(sorted(seen)) or 'no edge'}{other}")
+
+
+def panel_yes(log, port, name, command, expect, question):
+    """Sends a bench command, waits for its reply line, asks the operator, then sends it again."""
+    port.read(0.2)
+    port.send(command)
+    sent = port.read(2.0, until=expect)
+    if not find(sent, expect):
+        log.check(name, False, "no reply from the box")
+        return
+    answer = input(question + " (y/n): ").strip().lower()
+    log.check(name, answer.startswith("y"), "operator " + ("confirmed" if answer.startswith("y") else "says no"))
+    if command != "o":  # the pattern stays up until the test ends
+        port.send(command)  # restores the setting
+        port.read(1.0)
+
+
+def panel_test(log, port, prompt, want_oled):
+    if not prompt:
+        log.note("panel test", "SKIPPED (--no-prompt)")
+        return
+    port.send("t")
+    if not find(port.read(2.0, until=r"test on"), r"test on"):
+        log.check("panel test mode", False, "no reply to t")
+        return
+    print("\nPanel walk: do each step within 20 s.", flush=True)
+    for slot in range(1, 9):
+        for knob in "AB":
+            panel_pot(log, port, slot, knob)
+        panel_toggle(log, port, slot)
+    port.send("l")
+    summary = find(port.read(2.0, until=r"toggles \d+/8"), r"^\[panel\] pots.*")
+    log.note("panel summary", summary.group(0) if summary else "no summary line")
+    panel_yes(log, port, "K103 relay click", "i", r"K103 to",
+              "K103 switched to PEDAL: one click, no thump from the output?")
+    panel_yes(log, port, "mute relay click", "x", r"mute held",
+              "Output muted with a K102 click?")
+    if want_oled:
+        panel_yes(log, port, "OLED test pattern", "o", r"OLED pattern up",
+                  "Border, checkerboard and three text lines (5X7 OK, 9X12, 16X24) readable?")
+    port.send("t")
+    port.read(1.0)
+
+
 def reset_and_report(port, command, expect, timeout_s=10.0):
     """Sends a command that resets the board and returns the next boot report."""
     port.send(command)
@@ -264,6 +411,7 @@ def main():
     ap.add_argument("--no-oled", action="store_true", help="skip the OLED check")
     ap.add_argument("--faults", action="store_true", help="drill audio stall, watchdog and bus fault")
     ap.add_argument("--dfu", action="store_true", help="drill DFU entry; reflashes the board")
+    ap.add_argument("--panel", action="store_true", help="walk every pot and toggle, then K103, mute and OLED")
     ap.add_argument("--no-prompt", action="store_true", help="skip every question to the operator")
     a = ap.parse_args()
 
@@ -277,6 +425,8 @@ def main():
 
     check_boot(log, boot_report(port), not a.no_oled)
     check_audio(log, port)
+    if a.panel:
+        panel_test(log, port, not a.no_prompt, not a.no_oled)
     if a.faults:
         port = fault_drill(log, port)
     if a.dfu:

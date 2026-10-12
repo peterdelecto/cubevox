@@ -31,3 +31,9 @@ bool controlsTakeChanged();
 
 // Knob values (0..1, or the step index for stepped knobs), toggles and the last moved knob.
 PanelReading controlsReading();
+
+// Unfiltered pot read, 0..1, for the panel self-test. `muxChannel` is 0-based; valid once controlsSeeded().
+float controlsRawPot(int muxChannel);
+
+// Debounced toggle state; true = on (throw to GND).
+bool controlsToggleOn(int slot);

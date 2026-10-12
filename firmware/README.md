@@ -64,6 +64,14 @@ from `../engine` by include path. No emulator files are included.
 - Bench commands (serial, one letter): `1`-`8` toggle slot off, `0` all on, `k` pin knobs, `c` Chasm reverb, `r` boot
   report, `p` stats, `f` bus fault, `w` watchdog spin, `a` stop audio, `m` reset peaks, `v` vocal clip, `d` DFU,
   `s` save the layout record now, `q` print record status (sector, slot, sequence, name, settings), `e` erase both bank 2 sectors.
+- Panel self-test (bench, `core/panel_test`): `t` on/off, `l` summary (pots and toggles still to exercise), `g` raw dump of
+  all 16 pots and 8 toggles. While on, the box prints `[panel] pot NN slot S A|B v.vv` when a pot moves and
+  `[panel] toggle slot S on|off` on each edge. `i` steps K103 MIC/PEDAL through the jack-switch mute dip, `x` holds and
+  releases the output mute through the mute sequence, `o` holds an OLED pattern (border, checkerboard, 5x7, 9x12 and
+  16x24 text) with the menu draw paused. `i`, `x`, `o` and `l` need the test on; leaving it restores jack, mute and menu.
+  `./bringup.py --board 1 --panel` walks slots 1 to 8 (knob A and B left then right, toggle both ways), fails a pot
+  that does not travel, reads backwards, or moves with another channel, then asks about the K103 click, the mute click
+  and the OLED pattern. `--no-prompt` skips it.
 
 Real: slot hardware table, default card layout, mux scan (selects held low 1.1 s after boot for U107's 3V3A
 delay), smoothing, KEY/SEMITONES stepping, toggles, mute sequence, menu logic and DFU entry, clock tree,

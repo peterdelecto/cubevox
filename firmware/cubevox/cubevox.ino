@@ -97,9 +97,24 @@ static bool applyAction(UiAction action) {
 
 // The relay switches only while the output is fully muted; the mute is held until it settles.
 static void runJackSwitch(uint32_t nowMs) {
-  gJack.update(nowMs, gSettings.inputJack, muteFullyMuted());
-  muteHold(gJack.holdMute() || !controlsSeeded());  // unseeded knobs read 0, so stay muted
+  gJack.update(nowMs, benchJack(gSettings.inputJack), muteFullyMuted());
+  // Unseeded knobs read 0, so stay muted; the panel test can hold the mute too.
+  muteHold(gJack.holdMute() || !controlsSeeded() || benchMuteHeld());
   inputJackApply(gJack.relay());
+}
+
+// The menu owns the canvas except while the bench OLED pattern is up; it repaints once that ends.
+static void drawFace(const UiContext& ctx) {
+  static bool patternShown = false;
+  if (benchDrawPanelPattern(gCanvas)) {
+    patternShown = true;
+    return;
+  }
+  if (patternShown) {
+    patternShown = false;
+    gMenu.invalidate();
+  }
+  gMenu.draw(ctx, gCanvas);
 }
 
 static void heartbeat(uint32_t nowMs) {
@@ -139,6 +154,7 @@ void loop() {
   if (benchPoll(printBootReport)) publishSnapshot();
 
   controlsPoll(nowMs, gLayout);
+  benchPanelPoll(nowMs);
   mutePoll(nowMs);
 
   const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
@@ -149,7 +165,7 @@ void loop() {
   if (controlsTakeChanged() || settingsChanged || gSnapshotStale) publishSnapshot();
 
   const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
-  gMenu.draw(ctx, gCanvas);
+  drawFace(ctx);
   gDisplay->flushStep(gCanvas);
   heartbeat(nowMs);
   printStats(nowMs);
