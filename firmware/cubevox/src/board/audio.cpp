@@ -126,7 +126,7 @@ void processHalf(int half) {
   uint32_t* tx = gTxRing + half * kWordsPerHalf;
   const ChainParams& p = gParams[gPublished.load(std::memory_order_acquire)];
 
-  const float inGain = powf(10.0f, p.inputGainDb / 20.0f) / kInt32Scale;
+  const float inGain = 1.0f / kInt32Scale;
   float a[cv::kBlock];
   float b[cv::kBlock];
 #ifdef CUBEVOX_BENCH_CLIP

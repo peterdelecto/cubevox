@@ -28,3 +28,6 @@ void muteLatch();
 
 // True while the output is muted or a mute / release sequence is in progress.
 bool muteActive();
+
+// Blocking mute for DFU entry or a reset: XSMT low, wait, MUTE_N low, wait for the relay.
+void muteForReset();

@@ -23,7 +23,6 @@ struct ChainParams {
   cv::ReverbParams reverb;
   cv::PolishParams eq;
   float unisonRatePercent = 50.0f;
-  float inputGainDb = 0.0f;   // digital trim ahead of the chain (MIC adds back the 1/4" pad)
   float outputGainDb = 0.0f;
 
   ChainParams();

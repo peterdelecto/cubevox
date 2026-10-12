@@ -5,9 +5,11 @@
 #include <string.h>
 
 #include "board/controls.h"
+#include "board/mute.h"
 #include "board/pins.h"
 #include "board/platform.h"
 #include "core/registry.h"
+#include "core/settings.h"
 
 namespace {
 
@@ -16,8 +18,6 @@ constexpr int kCols = 16;  // SH1106 at the 8x8 font
 constexpr int kCountsPerDetent = 2;  // EC11E: 15 pulses and 30 detents per turn
 constexpr uint32_t kClickDebounceMs = 20;
 constexpr uint32_t kMenuTimeoutMs = 15000;
-constexpr float kInstrumentTrimDb = -12.0f;  // INSTRUMENT is about -10 dBV against the 1.27 Vrms LINE reference
-constexpr float kMicTrimDb = 25.7f;          // gives back the 1/4" jack pad, -25.7 dB (hardware spec item 2)
 
 enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
 enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
@@ -29,7 +29,7 @@ volatile int gCounts = 0;
 volatile uint8_t gQuadState = 0;
 
 Display* gDisplay = nullptr;
-MenuSettings gSettings;
+Settings gSettings;
 bool gSettingsChanged = false;
 DebouncedInput gClick;
 Mode gMode = Mode::Idle;
@@ -70,8 +70,8 @@ const char* itemLabel(Item it) {
 
 const char* itemValue(Item it) {
   switch (it) {
-    case Item::Output: return gSettings.outputInstrument ? "INSTRUMENT" : "LINE";
-    case Item::InputJack: return gSettings.inputMic ? "MIC" : "PEDAL";
+    case Item::Output: return gSettings.output == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
+    case Item::InputJack: return gSettings.inputJack == InputJack::Mic ? "MIC" : "PEDAL";
     default: return "";
   }
 }
@@ -139,8 +139,10 @@ void changeSetting() { gSettingsChanged = true; }
 
 void activateItem(Item it) {
   switch (it) {
-    case Item::Output: gSettings.outputInstrument = !gSettings.outputInstrument; changeSetting(); break;
-    case Item::InputJack: gSettings.inputMic = !gSettings.inputMic; changeSetting(); break;
+    case Item::Output: gSettings.output =
+        gSettings.output == OutputLevel::Line ? OutputLevel::Instrument : OutputLevel::Line; changeSetting(); break;
+    case Item::InputJack: gSettings.inputJack =
+        gSettings.inputJack == InputJack::Mic ? InputJack::Pedal : InputJack::Mic; changeSetting(); break;
     case Item::ChainOrder: gMode = Mode::ChainView; break;
     case Item::UpdateFirmware: gMode = Mode::ConfirmDfu; break;
     case Item::Exit: gMode = Mode::Idle; break;
@@ -153,7 +155,10 @@ void onClick() {
     case Mode::Idle: gMode = Mode::List; gCursor = 0; break;
     case Mode::List: activateItem(static_cast<Item>(gCursor)); break;
     case Mode::ChainView: gMode = Mode::List; break;
-    case Mode::ConfirmDfu: platformEnterDfu(); break;  // does not return
+    case Mode::ConfirmDfu:
+      muteForReset();
+      platformEnterDfu();  // does not return
+      break;
   }
 }
 
@@ -212,7 +217,7 @@ void menuPoll(uint32_t nowMs, bool muted) {
   redraw(muted);
 }
 
-const MenuSettings& menuSettings() { return gSettings; }
+const Settings& menuSettings() { return gSettings; }
 
 bool menuTakeSettingsChanged() {
   const bool changed = gSettingsChanged;
@@ -220,6 +225,4 @@ bool menuTakeSettingsChanged() {
   return changed;
 }
 
-float menuOutputGainDb() { return gSettings.outputInstrument ? kInstrumentTrimDb : 0.0f; }
-
-float menuInputGainDb() { return gSettings.inputMic ? kMicTrimDb : 0.0f; }
+float menuOutputGainDb() { return outputTrimDb(gSettings); }

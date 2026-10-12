@@ -7,6 +7,7 @@
 #include "board/controls.h"
 #include "board/display_sh1106.h"
 #include "board/fault.h"
+#include "board/input_jack.h"
 #include "ui/menu.h"
 #include "board/mute.h"
 #include "board/pins.h"
@@ -51,7 +52,6 @@ static void publishParams() {
     if (gBenchOff & (1u << s)) applyToggle(slotCard(s), false, gParams);
   }
   if (gBenchChasm) gParams.reverb.engine = cv::kReverbChasm;
-  gParams.inputGainDb = menuInputGainDb();
   gParams.outputGainDb = menuOutputGainDb();
   audioPublish(gParams);
 }
@@ -151,6 +151,7 @@ static void pollBenchCommands() {
       case 'd':
         Serial.println("[bench] entering DFU");
         Serial.flush();
+        muteForReset();
         platformEnterDfu();
         break;
       default: break;
@@ -167,6 +168,7 @@ static void heartbeat(uint32_t nowMs) {
 
 void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
+  inputJackInit();  // PAD_EN low = MIC
   faultInit();
   pinMode(pins::kUserLed, OUTPUT);
   usbLinkInit();  // USB attaches from loop() once VBUS is seen
@@ -194,6 +196,7 @@ void loop() {
 
   const bool panelChanged = controlsTakeChanged();
   const bool menuChanged = menuTakeSettingsChanged();
+  if (menuChanged) inputJackApply(menuSettings().inputJack);
   if (panelChanged || menuChanged) publishParams();
 
   menuPoll(nowMs, muteActive());

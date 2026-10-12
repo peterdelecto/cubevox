@@ -8,6 +8,7 @@
 #include "core/chain_params.h"
 #include "core/costs.h"
 #include "core/registry.h"
+#include "core/settings.h"
 #include "core/version.h"
 
 namespace {
@@ -165,6 +166,16 @@ void checkDefaultLayout() {
   }
 }
 
+void checkSettings() {
+  const Settings s;
+  check(s.inputJack == InputJack::Mic, "input jack defaults to MIC");
+  check(s.output == OutputLevel::Line, "output defaults to LINE");
+  check(outputTrimDb(s) == 0.0f, "LINE output trim is 0 dB");
+  Settings inst;
+  inst.output = OutputLevel::Instrument;
+  check(std::fabs(outputTrimDb(inst) - (-12.0f)) < 1e-6f, "INSTRUMENT output trim is -12 dB");
+}
+
 }  // namespace
 
 int main() {
@@ -176,6 +187,7 @@ int main() {
   checkPlacement();
   checkFormat();
   checkDefaultLayout();
+  checkSettings();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;
 }

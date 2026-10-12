@@ -92,3 +92,10 @@ void mutePoll(uint32_t nowMs) {
 void muteLatch() { gLatched = true; }
 
 bool muteActive() { return gState != State::Unmuted; }
+
+void muteForReset() {
+  digitalWrite(pins::kXsmt, LOW);
+  delay(kXsmtLeadMs);
+  digitalWrite(pins::kMuteN, LOW);
+  delay(kRelaySettleMs);
+}

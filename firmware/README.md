@@ -20,7 +20,7 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`).
   bundle the audio IRQ reads), `display.h` (text display interface), `unison_rate.h`, `version.h`.
 - `src/board/`: one hardware concern per file. `pins.h`, `slots` (toggle pin and mux channels per
   slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk), `controls` (mux
-  scan, smoothing, stepping, toggles), `mute`, `fault` (watchdog, fault handlers, reset cause, audio
+  scan, smoothing, stepping, toggles), `mute`, `input_jack` (PAD_EN for relay K103), `fault` (watchdog, fault handlers, reset cause, audio
   stall watch), `display_sh1106`, `platform` (DFU entry).
 - `src/ui/`: `menu` (encoder state machine and OLED screens).
 

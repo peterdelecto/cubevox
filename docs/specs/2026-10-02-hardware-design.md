@@ -78,7 +78,7 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
    and TRS_R each carry 100 kΩ to GND (R148, R149) so the coupling caps sit at
    a defined bias with no plug. Node
    IN_x: 1.2 kΩ to VREF. The 1.2 kΩ is both the mic bias path and the pad
-   shunt: pad = 1.2/(22+1.2) = −25.7 dB (firmware MIC trim is +25.7 dB), mic
+   shunt: pad = 1.2/(22+1.2) = −25.7 dB (relay K103 shorts the pad in MIC, no firmware trim), mic
    input impedance 2.4 kΩ differential, pedal input impedance about 23 kΩ per leg.
    Electrolytics, not X7R, in every audio coupling position (audit A07).
 3. Stage 1, fixed 20.05 dB. Instrumentation amp on OPA2197IDR (C139363,
