@@ -24,8 +24,28 @@ struct AudioStats {
 bool audioInit();
 const char* audioError();
 
-// Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop.
+// Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop. A snapshot with
+// the layout the interrupt runs is adopted at once; a different layout fades the output out and in
+// around the swap (core/layout_fade).
 void audioPublish(const ChainSnapshot& snapshot);
+
+// CPU load over the blocks since the previous call (or since boot), as percent of the block budget,
+// and the cumulative late-block count. Resets the window; call from the main loop.
+struct AudioLoad {
+  float meanPercent = 0.0f;
+  float worstPercent = 0.0f;
+  uint32_t late = 0;
+};
+AudioLoad audioTakeLoad();
+
+// Cost of the last layout swap in CPU cycles: the swap block (where the engine clears land) and the
+// worst block from the swap to the end of the fade-in. Zero until a swap has happened.
+struct AudioSwapStats {
+  uint32_t count = 0;
+  uint32_t swapBlockCycles = 0;
+  uint32_t worstCycles = 0;
+};
+AudioSwapStats audioSwapStats();
 
 // Blocks processed so far. One word read, cheap enough for every loop pass.
 uint32_t audioBlockCount();

@@ -1,5 +1,5 @@
-// Single-letter bench commands from a serial terminal. Roadmap step 3 replaces these with the JSON
-// protocol; until then they drive the first-article fault checks and the cost measurements.
+// Single-letter bench commands from a serial terminal. They share the port with the JSON protocol
+// and drive the first-article fault checks and the cost measurements.
 
 #pragma once
 
@@ -13,9 +13,9 @@
 //   s save the layout record now, q record status, e erase both bank 2 sectors.
 // Panel self-test (spec 2026-10-12 panel test): t on/off, l summary, g raw dump of all pots and
 //   toggles; while on, i steps K103 MIC/PEDAL, x holds/releases the output mute, o OLED pattern.
-// Reads pending serial input and runs each command. `bootReport` prints the boot report ('r').
+// Runs one command byte, which board/serial_link hands over. `bootReport` prints the boot report ('r').
 // Returns true when the overrides changed, so the caller republishes the snapshot.
-bool benchPoll(void (*bootReport)());
+bool benchCommand(char c, void (*bootReport)());
 
 const BenchOverrides& benchOverrides();
 

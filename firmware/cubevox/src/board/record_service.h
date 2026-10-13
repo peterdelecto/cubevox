@@ -16,6 +16,16 @@ void recordBoot(Layout& layout, Settings& settings);
 // A settings or layout change. The store writes 2 s after the last call.
 void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t nowMs);
 
+// The layout name the next save writes, and the one in force (loaded or set). Empty when never named.
+void recordSetName(const char* name);
+const char* recordName();
+
+// Sequence of the newest record written to flash; it rises when a save finishes.
+uint32_t recordSequence();
+
+// Flash erase or program failures since boot.
+uint32_t recordErrors();
+
 // Call every loop pass. Starts at most one flash operation.
 void recordPoll(uint32_t nowMs);
 

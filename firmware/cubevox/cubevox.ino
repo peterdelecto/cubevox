@@ -15,17 +15,21 @@
 #include "board/pins.h"
 #include "board/platform.h"
 #include "board/record_service.h"
+#include "board/serial_link.h"
 #include "board/slots.h"
 #include "board/usb_link.h"
 #include "core/compose.h"
 #include "core/jack_switch.h"
 #include "core/layout.h"
+#include "core/protocol.h"
 #include "core/registry.h"
 #include "core/settings.h"
+#include "core/version.h"
 #include "ui/menu.h"
 
 constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;
+constexpr uint32_t kDfuFlushMs = 100;  // the ok reply gets this long to leave before the box resets
 
 static Layout gLayout = defaultLayout();
 static Settings gSettings;
@@ -39,23 +43,24 @@ static bool gSnapshotStale = false;  // a change is waiting for the panel to be 
 
 // Boot facts for the first-article checklist, printed whenever a terminal opens the port.
 static void printBootReport() {
-  Serial.println("[boot] cubevox firmware");
-  faultReport(Serial);
-  recordPrintBoot(Serial);
-  clockReport(Serial);
-  pins::report(Serial);
-  Serial.print("[boot] icache ");
-  Serial.print((SCB->CCR & SCB_CCR_IC_Msk) ? "on" : "OFF");
-  Serial.print(", dcache ");
-  Serial.print((SCB->CCR & SCB_CCR_DC_Msk) ? "on" : "OFF");
-  Serial.print(", fpu ");
-  Serial.println((SCB->CPACR & (0xFu << 20)) == (0xFu << 20) ? "on" : "OFF");
-  Serial.println(gOledFound ? "[boot] OLED at 0x3C" : "[WARN] OLED not found, serial display");
+  Print& out = serialOut();
+  out.println("[boot] cubevox firmware");
+  faultReport(out);
+  recordPrintBoot(out);
+  clockReport(out);
+  pins::report(out);
+  out.print("[boot] icache ");
+  out.print((SCB->CCR & SCB_CCR_IC_Msk) ? "on" : "OFF");
+  out.print(", dcache ");
+  out.print((SCB->CCR & SCB_CCR_DC_Msk) ? "on" : "OFF");
+  out.print(", fpu ");
+  out.println((SCB->CPACR & (0xFu << 20)) == (0xFu << 20) ? "on" : "OFF");
+  out.println(gOledFound ? "[boot] OLED at 0x3C" : "[WARN] OLED not found, serial display");
   if (gAudioRunning) {
-    Serial.println("[boot] audio running, SAI1 48 kHz");
+    out.println("[boot] audio running, SAI1 48 kHz");
   } else {
-    Serial.print("[ERROR] audio: ");
-    Serial.println(audioError());
+    out.print("[ERROR] audio: ");
+    out.println(audioError());
   }
 }
 
@@ -94,6 +99,61 @@ static bool applyAction(UiAction action) {
   }
   return false;
 }
+
+static const char* layoutName() {
+  const char* name = recordName();
+  return name[0] != '\0' ? name : "Default";
+}
+
+static void sendStatus(uint32_t id) {
+  const AudioLoad load = audioTakeLoad();
+  protocol::replyStatus(serialWriter(), id,
+                        {load.meanPercent, load.worstPercent, load.late, muteActive(), recordSequence(),
+                         recordErrors(), serialDropped()});
+}
+
+// Validates and adopts a layout from the app. The save runs after the usual debounce.
+static void replySetLayout(const protocol::Request& req) {
+  Layout next = defaultLayout();
+  char err[protocol::kErrorBytes];
+  if (!protocol::resolveLayout(req, next, err, sizeof err)) {
+    protocol::replyError(serialWriter(), req.id, err);
+    return;
+  }
+  gLayout = next;
+  recordSetName(req.name);
+  recordRequestSave(gLayout, gSettings, millis());
+  gSnapshotStale = true;  // published after controlsPoll() re-seeds the knobs for the new cards
+  protocol::replyOk(serialWriter(), req.id);
+}
+
+static void onRequest(const char* line) {
+  protocol::Writer& out = serialWriter();
+  protocol::Request req;
+  char err[protocol::kErrorBytes];
+  if (!protocol::parseRequest(line, req, err, sizeof err)) {
+    protocol::replyError(out, req.id, err);
+    return;
+  }
+  switch (req.cmd) {
+    case protocol::Command::Hello: protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout); break;
+    case protocol::Command::GetLayout: protocol::replyLayout(out, req.id, layoutName(), gLayout); break;
+    case protocol::Command::SetLayout: replySetLayout(req); break;
+    case protocol::Command::Status: sendStatus(req.id); break;
+    case protocol::Command::EnterDfu:
+      protocol::replyOk(out, req.id);
+      serialFlush(kDfuFlushMs);
+      muteForReset();
+      platformEnterDfu();  // does not return
+      break;
+  }
+}
+
+static void onBench(char letter) {
+  if (benchCommand(letter, printBootReport)) publishSnapshot();
+}
+
+static const SerialHandlers kSerialHandlers = {onBench, onRequest};
 
 // The relay switches only while the output is fully muted; the mute is held until it settles.
 static void runJackSwitch(uint32_t nowMs) {
@@ -150,8 +210,11 @@ void loop() {
   faultAudioWatch(nowMs, gAudioRunning);
 
   usbLinkPoll(nowMs);
-  if (usbLinkTerminalOpened()) printBootReport();
-  if (benchPoll(printBootReport)) publishSnapshot();
+  if (usbLinkTerminalOpened()) {
+    serialLinkSessionStart();
+    printBootReport();
+  }
+  serialLinkPoll(kSerialHandlers);
 
   controlsPoll(nowMs, gLayout);
   benchPanelPoll(nowMs);

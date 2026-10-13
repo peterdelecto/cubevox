@@ -21,14 +21,16 @@ Module map and ownership rules: `docs/specs/2026-10-12-firmware-structure-design
 - `src/core/`: pure C++17, no Arduino or HAL include. Compiled on the Mac by `test/firmware_test.cpp`
   (`ctest` target `firmware`), so an Arduino include here breaks the host build.
   `registry` (cards, knob descriptors with curves, apply, format), `costs.h`, `layout` (card per slot,
-  validation), `settings.h` (output level, input jack), `panel.h` (`PanelReading`), `compose`
+  validation with a reason), `layout_fade` (50 ms out/in sequencer for a live layout change, engines to reset),
+  `protocol` (JSON line framing, request parse, reply formatting into a `Writer`), `tx_queue` (bounded line queue for serial output), `settings.h` (output level, input jack), `panel.h` (`PanelReading`), `compose`
   (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_params`, `knob_filter`
   (debounce, stepping, smoothing), `jack_switch` (mute dip around K103), `canvas` (128 x 64 page-layout
   frame buffer with dirty pages), `fonts` (the font editor's export as `FontDesc`), `display.h`
   (backend interface, `flushStep`), `record` (layout record codec, CRC32, newest-valid scan), `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `unison_rate.h`, `version.h`.
 - `src/board/`: one hardware concern per file. `pins.h`, `slots` (toggle pin and mux channels per
   slot), `sysclock`, `usb_link`, `audio` (SAI, DMA, the audio IRQ, chain walk over the published
-  snapshot), `controls` (mux scan, ADC, toggles), `input` (encoder and click to `UiInput`), `mute`,
+  snapshot, fade and engine reset on a layout change), `serial_link` (CDC bytes to JSON lines and bench letters, reply writer),
+  `controls` (mux scan, ADC, toggles), `input` (encoder and click to `UiInput`), `mute`,
   `input_jack` (PAD_EN for relay K103), `fault` (watchdog, fault handlers, reset cause, audio stall
   watch), `flash_bank2` (bank 2 erase and flash-word program by register, non-blocking erase), `record_service` (store wiring: boot load, ECC recovery, save request, bench hooks), `display_sh1106`, `display_stub` (ASCII render over Serial), `platform` (DFU entry).
 - `src/ui/`: pure, also host-compiled. `menu` (state machine, `UiInput` in, `UiAction` out, draws
@@ -61,6 +63,21 @@ from `../engine` by include path. No emulator files are included.
   (spec `2026-10-12-layout-record-design.md`). A save runs 2 s after the last settings change, one erase or flash-word
   program per `loop()` pass. `build.sh` fails when the .bin exceeds 1 MB so DFU never reaches bank 2. The fault record
   keeps FLASH->SR2 and ECC_FA2; a double ECC fault in a record sector is erased at boot before the scan.
+- Serial protocol (spec `2026-10-12-serial-protocol-design.md`): one JSON object per line on the same CDC port, requests
+  `{"id":N,"cmd":"..."}` with `hello`, `get_layout`, `set_layout`, `status` and `enter_dfu`; a `{` outside a line starts a
+  JSON line, any other byte is a bench letter, lines over 768 bytes get an error reply with id 0. `set_layout` validates
+  (`layoutValid` gives the reason), publishes, and requests a record save; the audio block fades the output out over 50 ms,
+  swaps the snapshot at zero, resets the engines whose slot changed card, and fades back in. The layout name is 1 to 31 printable
+  ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own window; the bench peaks are
+  untouched), cumulative `late`, `muted`, the record `seq` and `rec_errors`, and `serial_dropped`. All output (replies, boot
+  report, bench prints) goes through `serialOut()`, a bounded queue (`core/tx_queue`) that `serialLinkPoll` drains each pass
+  with non-blocking writes sized by `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and
+  with no host connected the queue is discarded. `enter_dfu` and the bench fault, spin and DFU commands give the queue 100 ms
+  (`serialFlush`) before they act. Engine clears happen on the silent swap block; `kResetsPerSilentBlock` and
+  `kFadeHoldBlocks` spread them over several blocks if the bench shows that block late, and the bench `p` line `layout swaps`
+  prints the swap block and the worst block through the last fade-in. `./tools/protocol_check.py` (repo root
+  `tools/`, no pyserial needed) runs the checks against a box and prints PASS or FAIL per check; `--no-reset` skips the
+  reset-and-reload check, which uses the bench `w` command.
 - Bench commands (serial, one letter): `1`-`8` toggle slot off, `0` all on, `k` pin knobs, `c` Chasm reverb, `r` boot
   report, `p` stats, `f` bus fault, `w` watchdog spin, `a` stop audio, `m` reset peaks, `v` vocal clip, `d` DFU,
   `s` save the layout record now, `q` print record status (sector, slot, sequence, name, settings), `e` erase both bank 2 sectors.

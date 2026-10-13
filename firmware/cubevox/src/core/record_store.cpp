@@ -57,6 +57,11 @@ void RecordStore::request(const Layout& layout, const Settings& settings, uint32
   lastRequestMs_ = nowMs;
 }
 
+void RecordStore::setName(const char* name) {
+  strncpy(cur_.name, name, kRecordNameBytes);  // zero-pads the rest
+  cur_.name[kRecordNameBytes] = '\0';
+}
+
 void RecordStore::saveNow() {
   pending_ = true;
   force_ = true;

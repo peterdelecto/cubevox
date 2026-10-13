@@ -37,7 +37,10 @@ echo "[build] core $CORE $CORE_VERSION, firmware $VERSION"
 INC="-I$REPO -I$FW/cubevox/src -I$FW/platform -I$REPO/tools/font-editor/fonts"
 # The pot mux common on PC0 is the only analogRead; take the longest sample window (spec item 10.8).
 # The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
-DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCUBEVOX_FW_VERSION=\"\\\"$VERSION\\\"\""
+# The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
+# fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
+# replays up to a queue's worth of bytes. 32 packets (2 KB) hold two 768-byte requests.
+DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"\\\"$VERSION\\\"\""
 if [ "${BOARD:-}" = "weact" ]; then
   DEFS="$DEFS -DCUBEVOX_VBUS_ALWAYS"
   echo "[build] bench board weact: USB attach not gated on VBUS"

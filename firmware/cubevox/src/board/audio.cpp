@@ -9,6 +9,7 @@
 #include "engine/common.h"
 #include "h7_block_mem.h"
 #include "core/compose.h"
+#include "core/layout_fade.h"
 #include "core/registry.h"
 #include "board/pins.h"
 
@@ -65,11 +66,18 @@ Chain gChain;
 // again in place; a plain reset() would leave constructor-only members (the tracker's
 // const anti-alias biquad) zeroed.
 H7_DTCM_BSS cv::PitchFx gPitchFx;
-// The main loop only writes the slot the interrupt is not reading. The block interrupt runs to
-// completion before the main loop resumes, so a block sees one snapshot from start to end.
+// Published snapshots alternate between two slots by sequence number, so the main loop only writes
+// the slot the interrupt does not read. The interrupt preempts the main loop and runs to completion,
+// so a block sees one snapshot from start to end. Sequence 0 means nothing was published yet.
 ChainSnapshot gSnapshots[2];
-std::atomic<int> gPublished{0};
-int gWriteIndex = 1;
+std::atomic<uint32_t> gPublished{0};
+
+// The snapshot the blocks run. It takes a copy of the published one only when that changes, and a
+// published snapshot with a different layout waits for the zero point of the fade.
+ChainSnapshot gHeld;
+uint32_t gSeenSeq = 0;
+bool gLayoutPending = false;
+LayoutFade gFade;
 
 const char* gError = "audioInit() has not run";
 volatile uint8_t gReadyMask = 0;  // bit h set when RX half h is waiting
@@ -79,6 +87,18 @@ volatile uint64_t gSumCycles = 0;   // since the last peaks reset
 volatile uint32_t gSumBlocks = 0;
 volatile uint64_t gSlotCycles[kSlotCount + 1] = {};
 volatile uint32_t gSlotWorst[kSlotCount + 1] = {};
+// Cost of the last layout swap: the swap block, and the worst block until the fade-in is over.
+constexpr int kSwapWatchBlocks = kFadeBlocks + kFadeHoldBlocks + 2;
+bool gSwapStarted = false;  // set by the swap, consumed by the block handler
+int gSwapWatchLeft = 0;
+volatile uint32_t gSwapBlockCycles = 0;
+volatile uint32_t gSwapWorstCycles = 0;
+volatile uint32_t gSwapCount = 0;
+
+// Own window for audioTakeLoad(); the shared peaks are never reset from here.
+volatile uint64_t gWindowSum = 0;  // since the last audioTakeLoad()
+volatile uint32_t gWindowBlocks = 0;
+volatile uint32_t gWindowMax = 0;
 volatile bool gClipOn = false;
 #ifdef CUBEVOX_BENCH_CLIP
 uint32_t gClipPos = 0;
@@ -130,10 +150,64 @@ void runChain(float* a, float* b, int n, const ChainSnapshot& snap) {
   if (dt > gSlotWorst[kSlotCount]) gSlotWorst[kSlotCount] = dt;
 }
 
+// Engine clears per silent block. One per block keeps the largest clear inside the block budget.
+constexpr int kResetsPerSilentBlock = 1;
+static_assert(kResetsPerSilentBlock * (1 + kFadeHoldBlocks) >= kEngineCount,
+              "the silent blocks must be enough to clear every engine");
+
+uint32_t gResetMask = 0;  // engines waiting for their clear
+
+void resetEngine(Engine e) {
+  switch (e) {
+    case Engine::InputGate: gChain.inputGate.reset(); break;
+    case Engine::Pitch: gPitchFx.reset(); break;
+    case Engine::Unison: gChain.unison.reset(); break;
+    case Engine::Slapback: gChain.slapback.reset(); break;
+    case Engine::Distortion: gChain.distortion.reset(); break;
+    case Engine::Gate: gChain.gate.reset(); break;
+    case Engine::Reverb: gChain.reverb.reset(); break;
+  }
+}
+
+// Clears up to `count` of the waiting engines, lowest first.
+void resetWaiting(int count) {
+  for (int e = 0; e < kEngineCount && count > 0; ++e) {
+    if (!(gResetMask & (1u << e))) continue;
+    resetEngine(static_cast<Engine>(e));
+    gResetMask &= ~(1u << e);
+    --count;
+  }
+}
+
+// Picks up a newly published snapshot. The same layout is adopted at once; a different one waits.
+// The first publish after boot has nothing to fade from and is adopted whole.
+void syncSnapshot() {
+  const uint32_t seq = gPublished.load(std::memory_order_acquire);
+  if (seq == gSeenSeq) return;
+  const ChainSnapshot& pub = gSnapshots[seq & 1];
+  gLayoutPending = gSeenSeq != 0 && pub.layout != gHeld.layout;
+  gSeenSeq = seq;
+  if (!gLayoutPending) gHeld = pub;
+}
+
+// At the zero point of the fade: adopts the newest snapshot and resets the engines whose slot changed card.
+void swapSnapshot() {
+  gSeenSeq = gPublished.load(std::memory_order_acquire);
+  const ChainSnapshot& pub = gSnapshots[gSeenSeq & 1];
+  gResetMask |= enginesToReset(gHeld.layout, pub.layout);
+  gHeld = pub;
+  gLayoutPending = false;
+  gSwapStarted = true;
+}
+
 void processHalf(int half) {
   const uint32_t* rx = gRxRing + half * kWordsPerHalf;
   uint32_t* tx = gTxRing + half * kWordsPerHalf;
-  const ChainSnapshot& snap = gSnapshots[gPublished.load(std::memory_order_acquire)];
+
+  syncSnapshot();
+  const LayoutFade::Block fade = gFade.next(gLayoutPending);
+  if (fade.swap) swapSnapshot();
+  const ChainSnapshot& snap = gHeld;
 
   const float inGain = 1.0f / kInt32Scale;
   float a[cv::kBlock];
@@ -150,11 +224,20 @@ void processHalf(int half) {
   for (int i = 0; i < kFramesPerHalf; ++i) {
     a[i] = static_cast<float>(static_cast<int32_t>(rx[2 * i])) * inGain;  // left only
   }
-  runChain(a, b, kFramesPerHalf, snap);
+  if (fade.swap || (fade.from == 0.0f && fade.to == 0.0f)) {
+    // The output is at zero here. The block skips the chain so the engine clears never land on top
+    // of a full chain pass.
+    resetWaiting(kResetsPerSilentBlock);
+    for (int i = 0; i < kFramesPerHalf; ++i) a[i] = 0.0f;
+  } else {
+    runChain(a, b, kFramesPerHalf, snap);
+  }
 
-  const float gain = snap.outputGain;
+  float gain = snap.outputGain * fade.from;
+  const float gainStep = snap.outputGain * (fade.to - fade.from) / kFramesPerHalf;
   for (int i = 0; i < kFramesPerHalf; ++i) {
     float v = a[i] * gain;
+    gain += gainStep;
     v = v > 1.0f ? 1.0f : (v < -1.0f ? -1.0f : v);
     const uint32_t word = static_cast<uint32_t>(static_cast<int32_t>(v * kInt32Max));
     tx[2 * i] = word;
@@ -294,6 +377,20 @@ void SWPMI1_IRQHandler(void) {
     if (cycles > gStats.budgetCycles) gStats.late = gStats.late + 1;
     gSumCycles = gSumCycles + cycles;
     gSumBlocks = gSumBlocks + 1;
+    gWindowSum = gWindowSum + cycles;
+    gWindowBlocks = gWindowBlocks + 1;
+    if (cycles > gWindowMax) gWindowMax = cycles;
+    if (gSwapStarted) {
+      gSwapStarted = false;
+      gSwapBlockCycles = cycles;
+      gSwapWorstCycles = 0;
+      gSwapWatchLeft = kSwapWatchBlocks;
+      gSwapCount = gSwapCount + 1;
+    }
+    if (gSwapWatchLeft > 0) {
+      --gSwapWatchLeft;
+      if (cycles > gSwapWorstCycles) gSwapWorstCycles = cycles;
+    }
   }
 }
 
@@ -314,6 +411,7 @@ bool audioInit() {
   h7_dtcm_bss_zero();
   new (&gPitchFx) cv::PitchFx();
   gSnapshots[0] = ChainSnapshot();
+  gHeld = ChainSnapshot();
   enableCycleCounter();
   gStats.budgetCycles = static_cast<uint32_t>(
       static_cast<uint64_t>(SystemCoreClock) * kFramesPerHalf / cv::kSampleRate);
@@ -343,9 +441,39 @@ bool audioInit() {
 const char* audioError() { return gError; }
 
 void audioPublish(const ChainSnapshot& snapshot) {
-  gSnapshots[gWriteIndex] = snapshot;
-  gPublished.store(gWriteIndex, std::memory_order_release);
-  gWriteIndex ^= 1;
+  const uint32_t next = gPublished.load(std::memory_order_relaxed) + 1;
+  gSnapshots[next & 1] = snapshot;
+  gPublished.store(next, std::memory_order_release);
+}
+
+AudioSwapStats audioSwapStats() {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  AudioSwapStats s;
+  s.count = gSwapCount;
+  s.swapBlockCycles = gSwapBlockCycles;
+  s.worstCycles = gSwapWorstCycles;
+  NVIC_EnableIRQ(SWPMI1_IRQn);
+  return s;
+}
+
+AudioLoad audioTakeLoad() {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  const uint64_t sum = gWindowSum;
+  const uint32_t blocks = gWindowBlocks;
+  const uint32_t worst = gWindowMax;
+  const uint32_t late = gStats.late;
+  const uint32_t budget = gStats.budgetCycles;
+  gWindowSum = 0;
+  gWindowBlocks = 0;
+  gWindowMax = 0;
+  NVIC_EnableIRQ(SWPMI1_IRQn);
+
+  AudioLoad load;
+  load.late = late;
+  if (blocks == 0 || budget == 0) return load;
+  load.meanPercent = 100.0f * static_cast<float>(sum / blocks) / static_cast<float>(budget);
+  load.worstPercent = 100.0f * static_cast<float>(worst) / static_cast<float>(budget);
+  return load;
 }
 
 void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }

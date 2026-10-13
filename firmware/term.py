@@ -42,7 +42,7 @@ def main():
         a.seconds = max(a.seconds, a.wait * len(sends) + 2.0)
 
     fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    tty.setraw(fd)
+    tty.setraw(fd, termios.TCSANOW)  # the default TCSAFLUSH eats the head of the boot report
     attrs = termios.tcgetattr(fd)
     attrs[2] |= termios.CLOCAL | termios.CREAD
     termios.tcsetattr(fd, termios.TCSANOW, attrs)

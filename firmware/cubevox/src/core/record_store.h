@@ -50,6 +50,8 @@ class RecordStore {
 
   // Records the state to save and (re)starts the debounce.
   void request(const Layout& layout, const Settings& settings, uint32_t nowMs);
+  // The layout name the next save writes; clipped to kRecordNameBytes.
+  void setName(const char* name);
   // Writes the current state now, bypassing the debounce.
   void saveNow();
   // Erases both sectors, forgetting all records. Drops the pending save. False while busy.

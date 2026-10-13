@@ -2,6 +2,7 @@
 
 #include "board/fault.h"
 #include "board/flash_bank2.h"
+#include "board/serial_link.h"
 #include "core/record_store.h"
 
 namespace {
@@ -15,6 +16,7 @@ int gBootSector = 0;
 int gEccSector = -1;      // sector erased by ECC recovery, -1 when none
 uint32_t gEccAddress = 0;
 bool gLayoutRejected = false;
+char gRejectReason[48] = {};
 
 // A double ECC error on a half-programmed word repeats on every read, so the sector goes.
 void recoverEcc() {
@@ -40,7 +42,9 @@ void recordBoot(Layout& layout, Settings& settings) {
   gBootSequence = rec.sequence;
   gBootSector = gStore.status().sector;
   gLoaded = true;
-  gLayoutRejected = !layoutValid(rec.layout);
+  const LayoutCheck check = layoutValid(rec.layout);
+  gLayoutRejected = !check.ok();
+  if (gLayoutRejected) layoutReason(check, gRejectReason, sizeof gRejectReason);
   if (!gLayoutRejected) layout = rec.layout;
   settings = rec.settings;
   if (gLayoutRejected) gStore.request(layout, settings, millis());  // rewrite with the default layout
@@ -50,15 +54,23 @@ void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t 
   gStore.request(layout, settings, nowMs);
 }
 
+void recordSetName(const char* name) { gStore.setName(name); }
+
+const char* recordName() { return gStore.current().name; }
+
+uint32_t recordSequence() { return gStore.status().sequence; }
+
+uint32_t recordErrors() { return gStore.status().errors; }
+
 void recordPoll(uint32_t nowMs) { gStore.poll(nowMs); }
 
 void recordSaveNow() {
   gStore.saveNow();
-  Serial.println("[bench] record save requested");
+  serialOut().println("[bench] record save requested");
 }
 
 void recordEraseAll() {
-  Serial.println(gStore.eraseAll() ? "[bench] erasing both bank 2 sectors" : "[bench] record store busy");
+  serialOut().println(gStore.eraseAll() ? "[bench] erasing both bank 2 sectors" : "[bench] record store busy");
 }
 
 void recordPrintStatus(Print& out) {
@@ -90,7 +102,11 @@ void recordPrintBoot(Print& out) {
     out.print(gEccSector);
     out.println(" erased");
   }
-  if (gLayoutRejected) out.println("[WARN] record layout invalid, using the default layout");
+  if (gLayoutRejected) {
+    out.print("[WARN] record layout invalid (");
+    out.print(gRejectReason);
+    out.println("), using the default layout");
+  }
   if (gLoaded) {
     out.print("[boot] record: seq ");
     out.print(gBootSequence);

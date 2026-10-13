@@ -6,6 +6,7 @@
 #include "board/flash_bank2.h"
 #include "board/mute.h"
 #include "board/pins.h"
+#include "board/serial_link.h"
 
 namespace {
 
@@ -143,9 +144,9 @@ void faultAudioWatch(uint32_t nowMs, bool audioRunning) {
   if (nowMs - gLastAdvanceMs < kAudioStallMs) return;
   gStalled = true;
   muteLatch();
-  Serial.print("[ERROR] audio stalled after ");
-  Serial.print(blocks);
-  Serial.println(" blocks, output muted");
+  serialOut().print("[ERROR] audio stalled after ");
+  serialOut().print(blocks);
+  serialOut().println(" blocks, output muted");
 }
 
 void faultReport(Print& out) {

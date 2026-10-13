@@ -17,9 +17,12 @@
 #include "core/jack_switch.h"
 #include "core/knob_filter.h"
 #include "core/layout.h"
+#include "core/layout_fade.h"
 #include "core/mute_sequence.h"
 #include "core/panel.h"
 #include "core/panel_test.h"
+#include "core/protocol.h"
+#include "core/tx_queue.h"
 #include "core/record.h"
 #include "core/record_store.h"
 #include "core/registry.h"
@@ -239,20 +242,37 @@ void checkDefaultLayout() {
 }
 
 void checkLayoutValid() {
-  check(layoutValid(defaultLayout()), "default layout is valid");
+  check(layoutValid(defaultLayout()).ok(), "default layout is valid");
+  char why[96];
   Layout bad = defaultLayout();
   bad.card[3] = static_cast<Card>(kCardCount);
-  check(!layoutValid(bad), "out-of-range card id is rejected");
+  LayoutCheck c = layoutValid(bad);
+  layoutReason(c, why, sizeof why);
+  check(!c.ok() && std::strcmp(why, "card id out of range in slot 4") == 0, "out-of-range card id is rejected");
   Layout twoReverbs = defaultLayout();
   twoReverbs.card[0] = Card::ReverbChasm;
-  check(!layoutValid(twoReverbs), "second reverb card is rejected");
+  c = layoutValid(twoReverbs);
+  layoutReason(c, why, sizeof why);
+  check(!c.ok() && std::strcmp(why, "two reverb cards") == 0, "second reverb card is rejected");
   Layout twice = defaultLayout();
   twice.card[7] = twice.card[4];
-  check(!layoutValid(twice), "a card placed twice is rejected");
+  c = layoutValid(twice);
+  layoutReason(c, why, sizeof why);
+  check(!c.ok() && std::strcmp(why, "same card twice: slapback") == 0, "a card placed twice is rejected");
   Layout gaps = defaultLayout();
   gaps.card[0] = Card::Empty;
   gaps.card[1] = Card::Empty;
-  check(layoutValid(gaps), "several Empty slots are accepted");
+  check(layoutValid(gaps).ok(), "several Empty slots are accepted");
+
+  LayoutCheck over;
+  over.error = LayoutError::OverWorst;
+  over.percent = 97;
+  layoutReason(over, why, sizeof why);
+  check(std::strcmp(why, "over CPU budget (worst 97 %)") == 0, "budget reason names the worst line");
+  over.error = LayoutError::OverAvg;
+  over.percent = 80;
+  layoutReason(over, why, sizeof why);
+  check(std::strcmp(why, "over CPU budget (mean 80 %)") == 0, "budget reason names the mean line");
 }
 
 PanelReading panelWithToggles(bool on) {
@@ -1017,13 +1037,523 @@ void checkPanelTest() {
   checkPanelTestPattern();
 }
 
+void checkStoreName() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  store.setName("stage rig");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = 2000;
+  runToIdle(store, f, t);
+  RecordData back;
+  check(decodeRecord(f.mem[0].data(), back) && std::strcmp(back.name, "stage rig") == 0, "store: the layout name is saved");
+  store.setName("a name that is longer than thirty-two bytes");
+  check(std::strlen(store.current().name) == kRecordNameBytes, "store: a long name is clipped to 32 bytes");
+}
+
 void checkRecords() {
   checkRecordCodec();
   checkRecordNewest();
   checkStoreAppend();
+  checkStoreName();
   checkStoreTornTail();
   checkStoreSectorSwitch();
   checkStoreInterruptedErase();
+}
+
+// ---- serial protocol ------------------------------------------------------------------------
+
+class StringWriter : public protocol::Writer {
+ public:
+  void write(const char* text, size_t len) override {
+    out.append(text, len);
+    ++calls;
+  }
+  std::string out;
+  int calls = 0;
+};
+
+// Strict JSON reader: true when `s` is one whole valid value. Enough to prove the replies parse.
+class JsonReader {
+ public:
+  explicit JsonReader(const std::string& s) : s_(s) {}
+  bool valid() {
+    ws();
+    return value(0) && (ws(), i_ == s_.size() || (s_[i_] == '\n' && i_ + 1 == s_.size()));
+  }
+
+ private:
+  void ws() { while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\r')) ++i_; }
+  bool lit(const char* w) {
+    const size_t n = std::strlen(w);
+    if (s_.compare(i_, n, w) != 0) return false;
+    i_ += n;
+    return true;
+  }
+  bool str() {
+    if (i_ >= s_.size() || s_[i_] != '"') return false;
+    for (++i_; i_ < s_.size(); ++i_) {
+      const unsigned char c = static_cast<unsigned char>(s_[i_]);
+      if (c == '"') { ++i_; return true; }
+      if (c < 0x20) return false;
+      if (c == '\\') {
+        ++i_;
+        if (i_ >= s_.size() || !std::strchr("\"\\/bfnrtu", s_[i_])) return false;
+        if (s_[i_] == 'u') {
+          for (int k = 0; k < 4; ++k) {
+            if (++i_ >= s_.size() || !std::isxdigit(static_cast<unsigned char>(s_[i_]))) return false;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  bool num() {
+    const size_t start = i_;
+    while (i_ < s_.size() && std::strchr("+-0123456789.eE", s_[i_])) ++i_;
+    return i_ > start;
+  }
+  bool seq(char close, bool pairs, int depth) {
+    ++i_;
+    ws();
+    if (i_ < s_.size() && s_[i_] == close) { ++i_; return true; }
+    for (;;) {
+      ws();
+      if (pairs && (!str() || (ws(), i_ >= s_.size() || s_[i_++] != ':'))) return false;
+      if (!value(depth + 1)) return false;
+      ws();
+      if (i_ < s_.size() && s_[i_] == ',') { ++i_; continue; }
+      if (i_ < s_.size() && s_[i_] == close) { ++i_; return true; }
+      return false;
+    }
+  }
+  bool value(int depth) {
+    ws();
+    if (depth > 8 || i_ >= s_.size()) return false;
+    switch (s_[i_]) {
+      case '{': return seq('}', true, depth);
+      case '[': return seq(']', false, depth);
+      case '"': return str();
+      case 't': return lit("true");
+      case 'f': return lit("false");
+      case 'n': return lit("null");
+      default: return num();
+    }
+  }
+  const std::string& s_;
+  size_t i_ = 0;
+};
+
+bool has(const std::string& hay, const std::string& needle) { return hay.find(needle) != std::string::npos; }
+
+bool parses(const char* line, protocol::Request& req, std::string& err) {
+  char buf[protocol::kErrorBytes];
+  const bool ok = protocol::parseRequest(line, req, buf, sizeof buf);
+  err = ok ? "" : buf;
+  return ok;
+}
+
+void checkProtocolCommands() {
+  protocol::Request r;
+  std::string err;
+  check(parses("{\"id\":7,\"cmd\":\"hello\"}", r, err) && r.id == 7 && r.cmd == protocol::Command::Hello, "proto: hello parses");
+  check(parses("{\"cmd\":\"get_layout\",\"id\":8}", r, err) && r.id == 8 && r.cmd == protocol::Command::GetLayout,
+        "proto: key order is free");
+  check(parses(" { \"id\" : 9 , \"cmd\" : \"status\" } ", r, err) && r.cmd == protocol::Command::Status, "proto: whitespace is free");
+  check(parses("{\"id\":10,\"cmd\":\"enter_dfu\"}", r, err) && r.cmd == protocol::Command::EnterDfu, "proto: enter_dfu parses");
+  check(parses("{\"id\":4294967295,\"cmd\":\"hello\"}", r, err) && r.id == 4294967295u, "proto: largest id parses");
+  check(parses("{\"id\":1,\"cmd\":\"hello\",\"x\":[1,{\"a\":[true,null,\"s\\\"\"]},-2.5e3],\"y\":{}}", r, err),
+        "proto: unknown keys with nested values are skipped");
+
+  const char* set =
+      "{\"id\":3,\"cmd\":\"set_layout\",\"name\":\"Stage \\u0041\\\"x\",\"slots\":[\"input_gate\",\"autotune\","
+      "\"octave\",\"unison\",\"slapback\",\"distortion\",\"gate\",\"reverb_chasm\"]}";
+  check(parses(set, r, err) && r.cmd == protocol::Command::SetLayout && r.slotCount == 8, "proto: set_layout parses");
+  check(std::strcmp(r.name, "Stage A\"x") == 0, "proto: escapes in the name decode");
+  Layout l;
+  check(protocol::resolveLayout(r, l, nullptr, 0) && l.card[7] == Card::ReverbChasm && l.card[0] == Card::InputGate,
+        "proto: set_layout resolves to cards");
+}
+
+void checkProtocolErrors() {
+  protocol::Request r;
+  std::string err;
+  check(!parses("{\"id\":1,\"cmd\":\"hello\"", r, err) && err == "malformed json", "proto: unterminated object");
+  check(!parses("not json", r, err) && err == "malformed json", "proto: not json");
+  check(!parses("{\"id\":1,\"cmd\":\"hello\"} x", r, err) && err == "malformed json", "proto: trailing text");
+  check(!parses("{\"id\":1,}", r, err) && err == "malformed json", "proto: trailing comma");
+  check(!parses("{\"id\":5,\"cmd\":\"hel", r, err) && r.id == 5, "proto: a cut-off line still echoes the id it read");
+  check(!parses("{\"cmd\":\"hello\"}", r, err) && err == "missing id" && r.id == 0, "proto: missing id");
+  check(!parses("{\"id\":\"1\",\"cmd\":\"hello\"}", r, err) && err == "id must be a non-negative integer", "proto: string id");
+  check(!parses("{\"id\":-1,\"cmd\":\"hello\"}", r, err) && err == "id must be a non-negative integer", "proto: negative id");
+  check(!parses("{\"id\":1.5,\"cmd\":\"hello\"}", r, err) && err == "id must be a non-negative integer", "proto: fractional id");
+  check(!parses("{\"id\":4294967296,\"cmd\":\"hello\"}", r, err) && err == "id must be a non-negative integer", "proto: id over 32 bits");
+  check(!parses("{\"id\":2}", r, err) && err == "missing cmd" && r.id == 2, "proto: missing cmd echoes the id");
+  check(!parses("{\"id\":2,\"cmd\":4}", r, err) && err == "cmd must be a string", "proto: numeric cmd");
+  check(!parses("{\"id\":2,\"cmd\":\"fly\"}", r, err) && err == "unknown cmd \"fly\"" && r.id == 2, "proto: unknown cmd");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"slots\":[]}", r, err) && err == "missing name", "proto: set_layout needs a name");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\"}", r, err) && err == "missing slots", "proto: set_layout needs slots");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":3,\"slots\":[]}", r, err) && err == "name must be a string",
+        "proto: numeric name");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":\"x\"}", r, err) &&
+            err == "slots must be an array of card ids", "proto: slots not an array");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[1,2,3,4,5,6,7,8]}", r, err) &&
+            err == "slots must be an array of card ids", "proto: slot ids must be strings");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[\"gate\"]}", r, err) &&
+            err == "slots needs 8 card ids", "proto: too few slots");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\"]}",
+                r, err) && err == "slots needs 8 card ids", "proto: too many slots");
+  const std::string nameRule = "name must be 1 to 31 printable ASCII characters";
+  const std::string head = "{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"";
+  const std::string tailSlots = "\",\"slots\":[]}";
+  check(!parses((head + "0123456789012345678901234567890" + "1" + tailSlots).c_str(), r, err) && err == nameRule,
+        "proto: name of 32 characters is rejected");
+  check(!parses((head + "0123456789012345678901234567890" + tailSlots).c_str(), r, err) && err == "slots needs 8 card ids",
+        "proto: name of 31 characters passes the name rule");
+  check(!parses((head + tailSlots).c_str(), r, err) && err == nameRule, "proto: empty name is rejected");
+  check(!parses((head + "a\\nb" + tailSlots).c_str(), r, err) && err == nameRule, "proto: control character in the name");
+  check(!parses((head + "caf\\u00e9" + tailSlots).c_str(), r, err) && err == nameRule, "proto: non-ASCII name is rejected");
+  check(!parses((head + "caf\xC3\xA9" + tailSlots).c_str(), r, err) && err == nameRule, "proto: raw UTF-8 name is rejected");
+
+  Layout l;
+  char why[protocol::kErrorBytes];
+  auto resolve = [&](const char* ids) {
+    std::string line = std::string("{\"id\":1,\"cmd\":\"set_layout\",\"name\":\"n\",\"slots\":[") + ids + "]}";
+    protocol::Request q;
+    char e[protocol::kErrorBytes];
+    check(protocol::parseRequest(line.c_str(), q, e, sizeof e), "proto: layout line parses");
+    why[0] = '\0';
+    return protocol::resolveLayout(q, l, why, sizeof why);
+  };
+  const char* tail = "\"gate\",\"slapback\",\"unison\",\"octave\",\"autotune\",\"distortion\"";
+  check(!resolve((std::string("\"input_gate\",\"foo\",") + tail).c_str()) &&
+            std::strcmp(why, "unknown card \"foo\" in slot 2") == 0, "proto: unknown card names the id and slot");
+  check(!resolve((std::string("\"reverb_spring\",\"reverb_chasm\",") + tail).c_str()) &&
+            std::strcmp(why, "two reverb cards") == 0, "proto: two reverbs");
+  check(!resolve((std::string("\"slapback\",\"input_gate\",") + tail).c_str()) &&
+            std::strcmp(why, "same card twice: slapback") == 0, "proto: duplicate card");
+  check(resolve("\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\"") && l.card[3] == Card::Empty,
+        "proto: all-empty layout is accepted");
+}
+
+void checkProtocolReplies() {
+  StringWriter w;
+  protocol::replyError(w, 12, "unknown card \"foo\" in slot 3\\");
+  check(JsonReader(w.out).valid() && has(w.out, "\"id\":12,\"ok\":false,\"error\":\"unknown card \\\"foo\\\" in slot 3\\\\\""),
+        "proto: error reply escapes and parses");
+  w = StringWriter();
+  protocol::replyOk(w, 13);
+  check(w.out == "{\"id\":13,\"ok\":true}\n", "proto: ok reply");
+
+  w = StringWriter();
+  protocol::replyLayout(w, 14, "Rig \"A\"", defaultLayout());
+  check(JsonReader(w.out).valid() && has(w.out, "\"layout\":{\"name\":\"Rig \\\"A\\\"\",\"slots\":[\"input_gate\",\"autotune\"") &&
+            has(w.out, "\"reverb_spring\"]}"), "proto: layout reply");
+
+  w = StringWriter();
+  protocol::Status s{54.66f, 71.0f, 0, true, 9, 2, 5};
+  protocol::replyStatus(w, 15, s);
+  check(JsonReader(w.out).valid() &&
+            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5}\n",
+        "proto: status reply");
+
+  w = StringWriter();
+  protocol::replyHello(w, 16, "v2.00.04", "Default", defaultLayout());
+  check(JsonReader(w.out).valid(), "proto: hello parses as JSON");
+  check(w.calls > 20, "proto: hello streams in pieces");
+  check(has(w.out, "\"proto\":1,\"fw\":\"v2.00.04\""), "proto: hello carries proto and fw");
+  for (int i = 0; i < kCardCount; ++i) {
+    const CardDesc& d = cardDesc(card(i));
+    check(has(w.out, std::string("{\"id\":\"") + d.id + "\",\"name\":\"" + d.name + "\""), d.id);
+    for (int k = 0; k < d.knobCount; ++k) check(has(w.out, std::string("{\"name\":\"") + d.knob[k].name + "\""), d.knob[k].name);
+  }
+  check(has(w.out, "\"cost\":{\"avg\":14,\"worst\":21,\"measured\":true}"), "proto: hello carries costs");
+  check(has(w.out, "\"kind\":\"stepped\",\"positions\":25,\"min\":-12,\"max\":12,\"unit\":\"st\",\"curve\":\"linear\""),
+        "proto: hello carries the octave knob");
+  check(has(w.out, "\"curve\":\"log\"") && has(w.out, "\"curve\":\"log_reversed\""), "proto: hello carries curves");
+  check(has(w.out, "\"group\":\"pitch\"") && has(w.out, "\"group\":\"reverb\""), "proto: hello carries groups");
+  check(has(w.out, "\"layout\":{\"name\":\"Default\""), "proto: hello carries the layout");
+}
+
+void checkFramer() {
+  protocol::Framer f;
+  using K = protocol::Framer::Kind;
+  check(f.feed('p') == K::Bench && f.bench() == 'p', "framer: a bare byte is a bench letter");
+  check(f.feed('\n') == K::Bench, "framer: a newline outside a line is not a line");
+  const char* line = "{\"id\":1}";
+  K k = K::None;
+  for (const char* c = line; *c; ++c) {
+    k = f.feed(static_cast<uint8_t>(*c));
+    check(k == K::None, "framer: line bytes are held");
+  }
+  check(f.feed('\n') == K::Line && std::strcmp(f.line(), line) == 0, "framer: newline ends the line");
+  check(f.feed('q') == K::Bench, "framer: bench letters work after a line");
+
+  // letters inside a line belong to the line
+  f.feed('{');
+  check(f.feed('p') == K::None && f.feed('\n') == K::Line && std::strcmp(f.line(), "{p") == 0, "framer: letters inside a line stay in it");
+
+  // 768 bytes pass, 769 do not
+  f.feed('{');
+  for (size_t i = 1; i < protocol::kMaxLine; ++i) f.feed('a');
+  check(f.feed('\n') == K::Line && std::strlen(f.line()) == protocol::kMaxLine, "framer: a 768-byte line passes");
+  f.feed('{');
+  for (size_t i = 1; i < protocol::kMaxLine; ++i) f.feed('a');
+  check(f.feed('a') == K::TooLong, "framer: byte 769 is too long");
+  check(f.feed('b') == K::None && f.feed('{') == K::None && f.feed('\n') == K::None, "framer: the rest of a long line is dropped");
+  check(f.feed('m') == K::Bench && f.bench() == 'm', "framer: bench letters resume after a dropped line");
+
+  // a host that left mid-line does not leak into the next session
+  for (const char* c = "{\"id\":1,\"cm"; *c; ++c) f.feed(static_cast<uint8_t>(*c));
+  f.reset();
+  check(f.feed('d') == K::Bench, "framer: a new session starts outside a line");
+  for (const char* c = line; *c; ++c) f.feed(static_cast<uint8_t>(*c));
+  check(f.feed('\n') == K::Line && std::strcmp(f.line(), line) == 0, "framer: the first line after a reset is whole");
+  f.feed('{');
+  for (size_t i = 1; i <= protocol::kMaxLine; ++i) f.feed('a');
+  f.reset();
+  check(f.feed('q') == K::Bench, "framer: a reset ends a dropped line");
+}
+
+void checkLayoutFade() {
+  LayoutFade fade;
+  LayoutFade::Block b = fade.next(false);
+  check(b.from == 1.0f && b.to == 1.0f && !b.swap, "fade: idle passes at unity");
+
+  // Run a whole fade; the new layout is pending until the swap.
+  float last = 1.0f;
+  int outBlocks = 0;
+  int inBlocks = 0;
+  int swaps = 0;
+  bool swapped = false;
+  bool monotone = true;
+  bool continuous = true;
+  for (int i = 0; i < 4 * kFadeBlocks; ++i) {
+    b = fade.next(!swapped);
+    if (b.from != last) continuous = false;
+    if (b.swap) {
+      ++swaps;
+      swapped = true;
+      check(b.from == 0.0f && last == 0.0f, "fade: the swap block starts at zero");
+    }
+    if (!swapped) {
+      ++outBlocks;
+      if (b.to > b.from) monotone = false;
+    } else {
+      if (b.to > b.from) ++inBlocks;  // the silent hold blocks are not part of the ramp
+      if (b.to < b.from) monotone = false;
+    }
+    last = b.to;
+    if (swapped && b.to == 1.0f) break;
+  }
+  check(swaps == 1, "fade: one swap per layout change");
+  check(monotone && continuous, "fade: gain falls then rises with no jump");
+  check(outBlocks == kFadeBlocks && inBlocks == kFadeBlocks, "fade: each ramp takes kFadeBlocks blocks");
+  check(last == 1.0f, "fade: gain returns to unity");
+  check(kFadeBlocks * cv::kBlock * 1000 / cv::kSampleRate >= kFadeMs && kFadeBlocks * cv::kBlock * 1000 / cv::kSampleRate <= kFadeMs + 2,
+        "fade: each ramp lasts about 50 ms");
+  b = fade.next(false);
+  check(b.from == 1.0f && b.to == 1.0f && !b.swap, "fade: idle again after the ramp");
+
+  // A second layout during the fade-out is taken at the same zero point: one swap, one fade.
+  fade = LayoutFade();
+  swaps = 0;
+  for (int i = 0; i < 4 * kFadeBlocks; ++i) {
+    b = fade.next(true);
+    if (b.swap) {
+      ++swaps;
+      break;
+    }
+  }
+  check(swaps == 1, "fade: a second layout mid-fade waits for the same zero point");
+
+  // A layout arriving during the fade-in turns the ramp down again from where it is.
+  fade = LayoutFade();
+  bool pending = true;
+  float at = 0.0f;
+  for (int i = 0; i < 2 * kFadeBlocks; ++i) {
+    b = fade.next(pending);
+    if (b.swap) pending = false;
+    if (b.swap) {
+      for (int j = 0; j < 10; ++j) at = fade.next(false).to;
+      break;
+    }
+  }
+  b = fade.next(true);
+  check(b.from == at && b.to < b.from && !b.swap, "fade: a new layout during fade-in ramps down from the current gain");
+
+  // The layout changing back during the fade-out turns the ramp up with no swap.
+  fade = LayoutFade();
+  for (int i = 0; i < 10; ++i) b = fade.next(true);
+  const float turn = b.to;
+  b = fade.next(false);
+  check(b.from == turn && b.to > b.from && !b.swap, "fade: changing back mid-fade-out ramps up without a swap");
+}
+
+void checkEnginesToReset() {
+  const Layout base = defaultLayout();
+  auto bit = [](Engine e) { return 1u << static_cast<int>(e); };
+  check(enginesToReset(base, base) == 0, "reset: same layout resets nothing");
+
+  Layout swapped = base;
+  swapped.card[1] = Card::Octave;
+  swapped.card[2] = Card::Autotune;
+  check(enginesToReset(base, swapped) == bit(Engine::Pitch), "reset: swapping the two pitch cards resets the pitch engine once");
+
+  Layout chasm = base;
+  chasm.card[7] = Card::ReverbChasm;
+  check(enginesToReset(base, chasm) == bit(Engine::Reverb), "reset: Spring to Chasm resets the reverb engine");
+
+  Layout moved = base;
+  moved.card[4] = Card::Empty;
+  moved.card[0] = Card::Slapback;
+  moved.card[1] = Card::Autotune;
+  check(enginesToReset(base, moved) == (bit(Engine::InputGate) | bit(Engine::Slapback)),
+        "reset: only engines in changed slots reset, Autotune stayed put");
+
+  Layout empty = base;
+  empty.card[2] = Card::Empty;
+  check(enginesToReset(base, empty) == bit(Engine::Pitch), "reset: a card leaving a slot resets its engine");
+  check(enginesToReset(empty, empty) == 0 && enginesToReset(Layout{{}}, Layout{{}}) == 0, "reset: empty slots reset nothing");
+}
+
+void checkReplyEscapes() {
+  StringWriter w;
+  protocol::replyLayout(w, 1, "caf\xC3\xA9\x01\x7F", defaultLayout());
+  check(JsonReader(w.out).valid() && has(w.out, "\"name\":\"caf\\u00c3\\u00a9\\u0001\\u007f\""),
+        "proto: non-ASCII and control bytes in a reply string are escaped");
+}
+
+void checkFadeHold() {
+  LayoutFade fade(3);
+  LayoutFade::Block b;
+  int swaps = 0;
+  int zeroBlocks = 0;
+  bool inFade = false;
+  float last = 1.0f;
+  for (int i = 0; i < 6 * kFadeBlocks; ++i) {
+    b = fade.next(swaps == 0);
+    if (b.swap) ++swaps;
+    if (swaps > 0 && b.from == 0.0f && b.to == 0.0f) ++zeroBlocks;
+    if (swaps > 0 && b.to > b.from) inFade = true;
+    check(b.from == last, "fade hold: no jump in gain");
+    last = b.to;
+    if (inFade && b.to == 1.0f) break;
+  }
+  check(swaps == 1 && zeroBlocks == 4 && last == 1.0f, "fade hold: the swap block plus 3 held blocks stay at zero, then the ramp returns");
+}
+
+void checkTxQueue() {
+  TxQueue q;
+  const char* run;
+  q.put("abc", 3);
+  check(q.pending() == 0 && q.peek(run) == 0, "tx: an unfinished line is held back");
+  q.put("d\nef\n", 5);
+  check(q.pending() == 8 && q.peek(run) == 8 && std::memcmp(run, "abcd\nef\n", 8) == 0, "tx: finished lines are ready");
+  q.consume(5);
+  check(q.pending() == 3, "tx: consume advances");
+  q.consume(3);
+
+  // A line that does not fit is dropped whole, counted once, and the queue keeps working.
+  const std::string big(TxQueue::kCapacity - 4, 'x');
+  q.put("keep\n", 5);
+  q.put(big.data(), big.size());
+  q.put("\nnext\n", 6);
+  check(q.dropped() == 1, "tx: an overflowing line is counted");
+  size_t got = 0;
+  std::string seen;
+  while ((got = q.peek(run)) > 0) {
+    seen.append(run, got);
+    q.consume(got);
+  }
+  check(seen == "keep\nnext\n", "tx: only whole lines survive an overflow");
+
+  // Wrap-around: the ring hands out contiguous runs.
+  for (int round = 0; round < 3; ++round) {
+    const std::string line(TxQueue::kCapacity / 2 + 100, 'a' + round);
+    q.put(line.data(), line.size());
+    q.put("\n", 1);
+    seen.clear();
+    while ((got = q.peek(run)) > 0) {
+      seen.append(run, got);
+      q.consume(got);
+    }
+    check(seen == line + "\n", "tx: lines survive the ring wrapping");
+  }
+
+  q.put("lost\n", 5);
+  q.discard();
+  check(q.pending() == 0 && q.dropped() == 1, "tx: discard empties the queue without counting");
+}
+
+// Deterministic generator so a failure reproduces.
+struct Lcg {
+  uint32_t s;
+  uint32_t next() {
+    s = s * 1664525u + 1013904223u;
+    return s >> 8;
+  }
+};
+
+void parseAndResolve(const char* line) {
+  protocol::Request req;
+  char err[protocol::kErrorBytes];
+  if (protocol::parseRequest(line, req, err, sizeof err) && req.cmd == protocol::Command::SetLayout) {
+    Layout l = defaultLayout();
+    protocol::resolveLayout(req, l, err, sizeof err);
+  }
+}
+
+void checkFuzz() {
+  const std::string valid =
+      "{\"id\":3,\"cmd\":\"set_layout\",\"name\":\"Stage\",\"slots\":[\"input_gate\",\"autotune\",\"octave\","
+      "\"unison\",\"slapback\",\"distortion\",\"gate\",\"reverb_chasm\"],\"extra\":{\"a\":[1,2,{\"b\":null}]}}";
+  Lcg rng{12345};
+
+  // every prefix of a valid line, and the line with each single byte replaced
+  for (size_t n = 0; n <= valid.size(); ++n) parseAndResolve(valid.substr(0, n).c_str());
+  for (size_t i = 0; i < valid.size(); ++i) {
+    std::string s = valid;
+    for (int k = 0; k < 8; ++k) {
+      s[i] = static_cast<char>(rng.next());
+      if (s[i] == '\0') s[i] = '?';
+      parseAndResolve(s.c_str());
+    }
+  }
+
+  // random JSON-flavored soup and raw bytes
+  const char soup[] = "{}[]\",:\\ \t0123456789-+.eEtrufalsn\"idcmdnameslots";
+  for (int i = 0; i < 20000; ++i) {
+    std::string s;
+    const size_t len = rng.next() % 200;
+    for (size_t k = 0; k < len; ++k) {
+      const bool raw = i % 4 == 0;
+      char c = raw ? static_cast<char>(rng.next()) : soup[rng.next() % (sizeof soup - 1)];
+      if (c == '\0') c = ' ';
+      s.push_back(c);
+    }
+    parseAndResolve(s.c_str());
+  }
+
+  // deep nesting and long strings must not blow the stack or the buffers
+  parseAndResolve(("{\"x\":" + std::string(5000, '[') + std::string(5000, ']') + "}").c_str());
+  parseAndResolve(("{\"x\":" + std::string(5000, '{') + "}").c_str());
+  parseAndResolve(("{\"id\":1,\"cmd\":\"" + std::string(5000, 'x') + "\"}").c_str());
+
+  // the framer sees every byte value in any order
+  protocol::Framer f;
+  size_t lines = 0;
+  for (int i = 0; i < 200000; ++i) {
+    const uint8_t byte = (i % 7 == 0) ? '\n' : (i % 11 == 0 ? '{' : static_cast<uint8_t>(rng.next()));
+    const protocol::Framer::Kind k = f.feed(byte);
+    if (k == protocol::Framer::Kind::Line) {
+      ++lines;
+      check(std::strlen(f.line()) <= protocol::kMaxLine, "fuzz: framed line fits the limit");
+      parseAndResolve(f.line());
+    }
+  }
+  check(lines > 100, "fuzz: the framer produced lines");
 }
 
 int main() {
@@ -1038,6 +1568,16 @@ int main() {
   checkDefaultLayout();
   checkSettings();
   checkLayoutValid();
+  checkProtocolCommands();
+  checkProtocolErrors();
+  checkProtocolReplies();
+  checkFramer();
+  checkLayoutFade();
+  checkFadeHold();
+  checkReplyEscapes();
+  checkTxQueue();
+  checkFuzz();
+  checkEnginesToReset();
   checkComposeToggles();
   checkComposeBench();
   checkOutputGain();

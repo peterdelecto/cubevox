@@ -7,10 +7,13 @@
 #include "board/mute.h"
 #include "board/platform.h"
 #include "board/record_service.h"
+#include "board/serial_link.h"
 #include "board/slots.h"
 #include "core/panel_test.h"
 
 namespace {
+
+constexpr uint32_t kFlushMs = 100;  // queued text gets this long to leave before a fault, spin or DFU
 
 BenchOverrides gBench;
 bool gClipOn = false;
@@ -25,107 +28,107 @@ InputJack gJackForce = InputJack::Mic;
 InputJack gJackEffective = InputJack::Mic;
 
 void printSlotRow(const char* label, const uint32_t* values) {
-  Serial.print(label);
+  serialOut().print(label);
   for (int i = 0; i <= kSlotCount; ++i) {
-    Serial.print(' ');
-    Serial.print(values[i]);
+    serialOut().print(' ');
+    serialOut().print(values[i]);
   }
 }
 
 void forceBusFault() {
-  Serial.println("[bench] forcing a bus fault");
-  Serial.flush();
+  serialOut().println("[bench] forcing a bus fault");
+  serialFlush(kFlushMs);
   (void)*reinterpret_cast<volatile uint32_t*>(0xDEADBEE0);
 }
 
 [[noreturn]] void spinForWatchdog() {
-  Serial.println("[bench] spinning; the watchdog resets in 2 s");
-  Serial.flush();
+  serialOut().println("[bench] spinning; the watchdog resets in 2 s");
+  serialFlush(kFlushMs);
   for (;;) {}
 }
 
 void enterDfu() {
-  Serial.println("[bench] entering DFU");
-  Serial.flush();
+  serialOut().println("[bench] entering DFU");
+  serialFlush(kFlushMs);
   muteForReset();
   platformEnterDfu();
 }
 
 void toggleKnobsPinned() {
   gBench.knobsPinned = !gBench.knobsPinned;
-  Serial.println(gBench.knobsPinned ? "[bench] knobs pinned at top" : "[bench] knobs live");
+  serialOut().println(gBench.knobsPinned ? "[bench] knobs pinned at top" : "[bench] knobs live");
 }
 
 void toggleReverbChasm() {
   gBench.reverbChasm = !gBench.reverbChasm;
-  Serial.println(gBench.reverbChasm ? "[bench] reverb slot runs Chasm"
+  serialOut().println(gBench.reverbChasm ? "[bench] reverb slot runs Chasm"
                                     : "[bench] reverb slot runs its card's engine");
 }
 
 void toggleClip() {
   gClipOn = audioBenchClip(!gClipOn);
-  Serial.println(gClipOn ? "[bench] vocal clip on" : "[bench] vocal clip off (or not compiled in)");
+  serialOut().println(gClipOn ? "[bench] vocal clip on" : "[bench] vocal clip off (or not compiled in)");
 }
 
 void resetPeaks() {
   audioResetPeaks();
-  Serial.println("[bench] audio peaks reset");
+  serialOut().println("[bench] audio peaks reset");
 }
 
 void stopAudio() {
-  Serial.println("[bench] stopping audio DMA");
+  serialOut().println("[bench] stopping audio DMA");
   audioStopForBench();
 }
 
 void printTwoDigits(int n) {
-  if (n < 10) Serial.print('0');
-  Serial.print(n);
+  if (n < 10) serialOut().print('0');
+  serialOut().print(n);
 }
 
 // "pot NN slot S A|B", slots numbered 1..8 as on the panel.
 void printPotId(int channel) {
   const PotOwner owner = potOwner(channel);
-  Serial.print("pot ");
+  serialOut().print("pot ");
   printTwoDigits(potNumber(channel));
-  Serial.print(" slot ");
-  Serial.print(owner.slot + 1);
-  Serial.print(owner.knobB ? " B " : " A ");
+  serialOut().print(" slot ");
+  serialOut().print(owner.slot + 1);
+  serialOut().print(owner.knobB ? " B " : " A ");
 }
 
 void printToggle(int slot, bool on) {
-  Serial.print("toggle slot ");
-  Serial.print(slot + 1);
-  Serial.println(on ? " on" : " off");
+  serialOut().print("toggle slot ");
+  serialOut().print(slot + 1);
+  serialOut().println(on ? " on" : " off");
 }
 
 void panelSummary() {
-  Serial.print("[panel] pots ");
-  Serial.print(gPanel.potsDone());
-  Serial.print("/16 todo");
+  serialOut().print("[panel] pots ");
+  serialOut().print(gPanel.potsDone());
+  serialOut().print("/16 todo");
   for (int i = 0; i < kPanelTestPots; ++i) {
     if (gPanel.potDone(i)) continue;
-    Serial.print(' ');
+    serialOut().print(' ');
     printTwoDigits(potNumber(i));
   }
-  Serial.print("; toggles ");
-  Serial.print(gPanel.togglesDone());
-  Serial.print("/8 todo");
+  serialOut().print("; toggles ");
+  serialOut().print(gPanel.togglesDone());
+  serialOut().print("/8 todo");
   for (int i = 0; i < kPanelTestToggles; ++i) {
     if (gPanel.toggleDone(i)) continue;
-    Serial.print(' ');
-    Serial.print(i + 1);
+    serialOut().print(' ');
+    serialOut().print(i + 1);
   }
-  Serial.println();
+  serialOut().println();
 }
 
 void panelDump() {
   for (int ch = 0; ch < kPotCount; ++ch) {
-    Serial.print("[panel] raw ");
+    serialOut().print("[panel] raw ");
     printPotId(ch);
-    Serial.println(controlsRawPot(ch), 2);
+    serialOut().println(controlsRawPot(ch), 2);
   }
   for (int s = 0; s < kSlotCount; ++s) {
-    Serial.print("[panel] raw ");
+    serialOut().print("[panel] raw ");
     printToggle(s, controlsToggleOn(s));
   }
 }
@@ -140,17 +143,17 @@ void togglePanelTest() {
   gPanelOn = !gPanelOn;
   if (gPanelOn) {
     gPanel.reset();
-    Serial.println("[panel] test on (g dump, l summary, i K103, x mute, o OLED, t off)");
+    serialOut().println("[panel] test on (g dump, l summary, i K103, x mute, o OLED, t off)");
     return;
   }
   panelEnd();
   panelSummary();
-  Serial.println("[panel] test off");
+  serialOut().println("[panel] test off");
 }
 
 // The commands below only act while the test is on, so leaving it restores the box.
 bool requirePanelTest() {
-  if (!gPanelOn) Serial.println("[panel] start the test first with t");
+  if (!gPanelOn) serialOut().println("[panel] start the test first with t");
   return gPanelOn;
 }
 
@@ -158,14 +161,14 @@ void stepRelay() {
   if (!requirePanelTest()) return;
   gJackForced = true;
   gJackForce = gJackEffective == InputJack::Mic ? InputJack::Pedal : InputJack::Mic;
-  Serial.println(gJackForce == InputJack::Pedal ? "[panel] K103 to PEDAL (PAD_EN high)"
+  serialOut().println(gJackForce == InputJack::Pedal ? "[panel] K103 to PEDAL (PAD_EN high)"
                                                 : "[panel] K103 to MIC (PAD_EN low)");
 }
 
 void toggleMute() {
   if (!requirePanelTest()) return;
   gMuteHeld = !gMuteHeld;
-  Serial.println(gMuteHeld ? "[panel] mute held (XSMT low, then K102 opens)"
+  serialOut().println(gMuteHeld ? "[panel] mute held (XSMT low, then K102 opens)"
                            : "[panel] mute released (K102 closes, then XSMT high)");
 }
 
@@ -173,7 +176,7 @@ void showOledPattern() {
   if (!requirePanelTest()) return;
   gOledPattern = true;
   gOledDrawn = false;
-  Serial.println("[panel] OLED pattern up until t");
+  serialOut().println("[panel] OLED pattern up until t");
 }
 
 // Runs one command. Returns true when it changed the overrides.
@@ -199,7 +202,7 @@ bool run(int c, void (*bootReport)()) {
     case 'v': toggleClip(); break;
     case 'd': enterDfu(); break;
     case 's': recordSaveNow(); break;
-    case 'q': recordPrintStatus(Serial); break;
+    case 'q': recordPrintStatus(serialOut()); break;
     case 'e': recordEraseAll(); break;
     case 't': togglePanelTest(); break;
     case 'l': if (requirePanelTest()) panelSummary(); break;
@@ -218,47 +221,51 @@ const BenchOverrides& benchOverrides() { return gBench; }
 
 void benchPrintStats() {
   const AudioStats s = audioStats();
-  Serial.print("[audio] blocks ");
-  Serial.print(s.blocks);
-  Serial.print(" late ");
-  Serial.print(s.late);
-  Serial.print(" overruns ");
-  Serial.print(s.overruns);
-  Serial.print(" avg ");
-  Serial.print(s.avgCycles);
-  Serial.print(" worst ");
-  Serial.print(s.maxCycles);
-  Serial.print(" of ");
-  Serial.print(s.budgetCycles);
-  Serial.print(" cycles, slots off 0x");
-  Serial.println(gBench.slotsOff, HEX);
+  serialOut().print("[audio] blocks ");
+  serialOut().print(s.blocks);
+  serialOut().print(" late ");
+  serialOut().print(s.late);
+  serialOut().print(" overruns ");
+  serialOut().print(s.overruns);
+  serialOut().print(" avg ");
+  serialOut().print(s.avgCycles);
+  serialOut().print(" worst ");
+  serialOut().print(s.maxCycles);
+  serialOut().print(" of ");
+  serialOut().print(s.budgetCycles);
+  serialOut().print(" cycles, slots off 0x");
+  serialOut().println(gBench.slotsOff, HEX);
   printSlotRow("[audio] per slot", s.slotAvg);
-  Serial.println(" (last is EQ)");
+  serialOut().println(" (last is EQ)");
   printSlotRow("[audio] slot worst", s.slotWorst);
-  Serial.println();
+  serialOut().println();
+  const AudioSwapStats sw = audioSwapStats();
+  serialOut().print("[audio] layout swaps ");
+  serialOut().print(sw.count);
+  serialOut().print(", last: swap block ");
+  serialOut().print(sw.swapBlockCycles);
+  serialOut().print(", worst block through the fade-in ");
+  serialOut().print(sw.worstCycles);
+  serialOut().print(" of ");
+  serialOut().print(s.budgetCycles);
+  serialOut().println(" cycles");
 }
 
-bool benchPoll(void (*bootReport)()) {
-  bool changed = false;
-  while (Serial.available() > 0) {
-    if (run(Serial.read(), bootReport)) changed = true;
-  }
-  return changed;
-}
+bool benchCommand(char c, void (*bootReport)()) { return run(c, bootReport); }
 
 void benchPanelPoll(uint32_t nowMs) {
   if (!gPanelOn || !controlsSeeded()) return;
   for (int ch = 0; ch < kPotCount; ++ch) {
     const float v = controlsRawPot(ch);
     if (!gPanel.updatePot(ch, v, nowMs)) continue;
-    Serial.print("[panel] ");
+    serialOut().print("[panel] ");
     printPotId(ch);
-    Serial.println(v, 2);
+    serialOut().println(v, 2);
   }
   for (int s = 0; s < kSlotCount; ++s) {
     const bool on = controlsToggleOn(s);
     if (gPanel.updateToggle(s, on)) {
-      Serial.print("[panel] ");
+      serialOut().print("[panel] ");
       printToggle(s, on);
     }
   }

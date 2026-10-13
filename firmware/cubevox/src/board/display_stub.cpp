@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include "board/serial_link.h"
+
 namespace {
 
 // Prints one dirty page per step as four text lines. Each character covers two canvas rows of
@@ -15,8 +17,8 @@ class StubDisplay : public Display {
     int page = 0;
     while (!(dirty & (1u << page))) ++page;
 
-    Serial.print("[oled] page ");
-    Serial.println(page);
+    serialOut().print("[oled] page ");
+    serialOut().println(page);
     const uint8_t* bytes = canvas.page(page);
     for (int pair = 0; pair < 4; ++pair) {
       char line[kCanvasWidth + 1];
@@ -26,8 +28,8 @@ class StubDisplay : public Display {
         line[x] = top && bottom ? '#' : top ? '\'' : bottom ? ',' : ' ';
       }
       line[kCanvasWidth] = '\0';
-      Serial.print("[oled] ");
-      Serial.println(line);
+      serialOut().print("[oled] ");
+      serialOut().println(line);
     }
     canvas.clearDirty(page);
   }
