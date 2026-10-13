@@ -7,9 +7,9 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 ## Transport
 1. USB CDC, one JSON object per line, `\n` terminated. Requests carry `"id"` (integer) and `"cmd"`;
    the reply echoes `id`.
-2. The port also carries the boot report and the single-letter bench commands. A byte `{` starts
-   a JSON line, which runs to `\n`; any other byte outside a line is a bench letter. The app reads
-   only lines that start with `{`.
+2. The port also carries the boot report and diagnostic log lines. A byte `{` starts a JSON line,
+   which runs to `\n`. Every other byte outside a line is ignored and counted (`stray_bytes` in
+   `status`), so no single byte can act. The app reads only lines that start with `{`.
 3. Lines longer than 768 bytes are dropped with an error reply (`id` 0).
 4. Output never blocks `loop()`. Replies, the boot report and bench prints go through a bounded
    transmit queue drained with non-blocking writes each pass, so a host that stops reading can't
@@ -20,11 +20,34 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 ## Commands
 | cmd | Request fields | Reply |
 |---|---|---|
-| `hello` | — | `proto` 1, `fw` version, `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout` |
+| `hello` | — | `proto` 1, `fw` version, `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout` |
 | `get_layout` | — | `layout`: `name`, `slots` (8 card ids) |
 | `set_layout` | `name`, `slots` (8 card ids) | `ok`, or an error |
-| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late`, `muted`, record `seq` and write errors, serial lines dropped |
+| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late`, `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes` |
 | `enter_dfu` | — | `ok`, sent and flushed before the box mutes and reboots |
+| `bench` | `op`, plus `slot` (1 to 8) for `slot_off` | `ok` after the op runs, or an error; diagnostic text goes to the log lines |
+
+## Bench operations
+Owner 2026-10-12: a performance box must never act on an unframed byte, and Adam's release image
+carries no drill it doesn't need. This realises item 5 of `2026-10-08-effect-registry-design.md`
+(bench behind `CUBEVOX_BENCH`).
+
+| Class | Ops | Builds |
+|---|---|---|
+| Query | `report`, `stats`, `record_status` | all |
+| Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled` | `CUBEVOX_BENCH` only |
+
+1. One table in `core/bench_ops` holds each op's wire name and class. `hello` lists the ops the
+   build accepts, from that table.
+2. A bench op sent to a release image replies `op not in this build: <op>`. Its board code sits
+   under `#if CUBEVOX_BENCH`, so the release image does not contain it.
+3. DFU stays `enter_dfu` in every build, because the app needs it.
+4. `./build.sh` makes the release image and `BENCH=1 ./build.sh` the bench image; `BOARD=weact`
+   implies bench. The boot report prints `[boot] build release|bench`.
+5. Host tools map the familiar letters to ops in one place (`firmware/bench_ops.py`), so
+   `term.py -s p` still works and sends JSON.
+6. First-article bring-up flashes the bench image, runs every check, then flashes the release image
+   and confirms `hello` reports `release`.
 
 Errors reply `{"id":N,"ok":false,"error":"<reason>"}`. Reasons are short and readable on the page,
 for example `unknown card "foo" in slot 3`, `two reverb cards`, `same card twice: slapback`,
