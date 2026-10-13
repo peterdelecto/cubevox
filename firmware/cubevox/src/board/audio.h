@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 
+#include "board/build_kind.h"
 #include "core/chain_params.h"
 #include "core/compose.h"
 
@@ -52,12 +53,14 @@ uint32_t audioBlockCount();
 
 AudioStats audioStats();
 
+#if CUBEVOX_BENCH
 // Clears late, overruns and maxCycles so a measurement can exclude the first blocks.
 void audioResetPeaks();
 
-// Stops the RX DMA so no more blocks arrive. Bench use only, to prove the stall watch.
+// Stops the RX DMA so no more blocks arrive, to prove the stall watch.
 void audioStopForBench();
 
 // Loops the clip compiled in by CUBEVOX_BENCH_CLIP in place of the SAI input. Returns the
 // new state; false when no clip is compiled in.
 bool audioBenchClip(bool on);
+#endif

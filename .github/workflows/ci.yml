@@ -60,12 +60,21 @@ jobs:
           arduino-cli lib install U8g2@${U8G2_VERSION}
           arduino-cli core list
           arduino-cli lib list
-      - name: Build (warn gate runs inside build.sh)
+      - name: Build release image (warn gate runs inside build.sh)
         run: firmware/build.sh
+      - name: Build bench image (warn gate runs inside build.sh)
+        run: BENCH=1 firmware/build.sh
       - name: Check build.sh outcome
-        run: test -s /tmp/cubevox-fw/cubevox.ino.bin
+        run: |
+          test -s /tmp/cubevox-fw-release/cubevox.ino.bin
+          test -s /tmp/cubevox-fw-bench/cubevox.ino.bin
       - uses: actions/upload-artifact@v4
         with:
-          name: cubevox-firmware
-          path: /tmp/cubevox-fw/cubevox.ino.bin
+          name: cubevox-firmware-release
+          path: /tmp/cubevox-fw-release/cubevox.ino.bin
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cubevox-firmware-bench
+          path: /tmp/cubevox-fw-bench/cubevox.ino.bin
           if-no-files-found: error

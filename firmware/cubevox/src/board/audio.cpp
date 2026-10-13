@@ -476,6 +476,7 @@ AudioLoad audioTakeLoad() {
   return load;
 }
 
+#if CUBEVOX_BENCH
 void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }
 
 bool audioBenchClip(bool on) {
@@ -501,6 +502,7 @@ void audioResetPeaks() {
   }
   NVIC_EnableIRQ(SWPMI1_IRQn);
 }
+#endif
 
 uint32_t audioBlockCount() { return gStats.blocks; }
 

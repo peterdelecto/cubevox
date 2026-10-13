@@ -1147,9 +1147,9 @@ class JsonReader {
 
 bool has(const std::string& hay, const std::string& needle) { return hay.find(needle) != std::string::npos; }
 
-bool parses(const char* line, protocol::Request& req, std::string& err) {
+bool parses(const char* line, protocol::Request& req, std::string& err, bool benchBuild = true) {
   char buf[protocol::kErrorBytes];
-  const bool ok = protocol::parseRequest(line, req, buf, sizeof buf);
+  const bool ok = protocol::parseRequest(line, req, buf, sizeof buf, benchBuild);
   err = ok ? "" : buf;
   return ok;
 }
@@ -1222,7 +1222,7 @@ void checkProtocolErrors() {
     std::string line = std::string("{\"id\":1,\"cmd\":\"set_layout\",\"name\":\"n\",\"slots\":[") + ids + "]}";
     protocol::Request q;
     char e[protocol::kErrorBytes];
-    check(protocol::parseRequest(line.c_str(), q, e, sizeof e), "proto: layout line parses");
+    check(protocol::parseRequest(line.c_str(), q, e, sizeof e, true), "proto: layout line parses");
     why[0] = '\0';
     return protocol::resolveLayout(q, l, why, sizeof why);
   };
@@ -1252,14 +1252,14 @@ void checkProtocolReplies() {
             has(w.out, "\"reverb_spring\"]}"), "proto: layout reply");
 
   w = StringWriter();
-  protocol::Status s{54.66f, 71.0f, 0, true, 9, 2, 5};
+  protocol::Status s{54.66f, 71.0f, 0, true, 9, 2, 5, 8};
   protocol::replyStatus(w, 15, s);
   check(JsonReader(w.out).valid() &&
-            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5}\n",
+            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8}\n",
         "proto: status reply");
 
   w = StringWriter();
-  protocol::replyHello(w, 16, "v2.00.04", "Default", defaultLayout());
+  protocol::replyHello(w, 16, "v2.00.04", "Default", defaultLayout(), false);
   check(JsonReader(w.out).valid(), "proto: hello parses as JSON");
   check(w.calls > 20, "proto: hello streams in pieces");
   check(has(w.out, "\"proto\":1,\"fw\":\"v2.00.04\""), "proto: hello carries proto and fw");
@@ -1279,16 +1279,17 @@ void checkProtocolReplies() {
 void checkFramer() {
   protocol::Framer f;
   using K = protocol::Framer::Kind;
-  check(f.feed('p') == K::Bench && f.bench() == 'p', "framer: a bare byte is a bench letter");
-  check(f.feed('\n') == K::Bench, "framer: a newline outside a line is not a line");
+  check(f.feed('p') == K::None && f.strayBytes() == 1, "framer: a bare byte is ignored and counted");
+  check(f.feed('\n') == K::None && f.strayBytes() == 2, "framer: a newline outside a line is not a line");
   const char* line = "{\"id\":1}";
   K k = K::None;
   for (const char* c = line; *c; ++c) {
     k = f.feed(static_cast<uint8_t>(*c));
     check(k == K::None, "framer: line bytes are held");
   }
+  check(f.strayBytes() == 2, "framer: line bytes are not stray");
   check(f.feed('\n') == K::Line && std::strcmp(f.line(), line) == 0, "framer: newline ends the line");
-  check(f.feed('q') == K::Bench, "framer: bench letters work after a line");
+  check(f.feed('q') == K::None && f.strayBytes() == 3, "framer: stray bytes after a line are counted");
 
   // letters inside a line belong to the line
   f.feed('{');
@@ -1302,18 +1303,104 @@ void checkFramer() {
   for (size_t i = 1; i < protocol::kMaxLine; ++i) f.feed('a');
   check(f.feed('a') == K::TooLong, "framer: byte 769 is too long");
   check(f.feed('b') == K::None && f.feed('{') == K::None && f.feed('\n') == K::None, "framer: the rest of a long line is dropped");
-  check(f.feed('m') == K::Bench && f.bench() == 'm', "framer: bench letters resume after a dropped line");
+  const uint32_t before = f.strayBytes();
+  check(f.feed('m') == K::None && f.strayBytes() == before + 1, "framer: stray bytes count again after a dropped line");
+  check(f.strayBytes() == before + 1, "framer: a dropped line's bytes are not stray");
 
   // a host that left mid-line does not leak into the next session
   for (const char* c = "{\"id\":1,\"cm"; *c; ++c) f.feed(static_cast<uint8_t>(*c));
   f.reset();
-  check(f.feed('d') == K::Bench, "framer: a new session starts outside a line");
+  const uint32_t reset = f.strayBytes();
+  check(f.feed('d') == K::None && f.strayBytes() == reset + 1, "framer: a new session starts outside a line");
   for (const char* c = line; *c; ++c) f.feed(static_cast<uint8_t>(*c));
   check(f.feed('\n') == K::Line && std::strcmp(f.line(), line) == 0, "framer: the first line after a reset is whole");
   f.feed('{');
   for (size_t i = 1; i <= protocol::kMaxLine; ++i) f.feed('a');
   f.reset();
-  check(f.feed('q') == K::Bench, "framer: a reset ends a dropped line");
+  check(f.feed('q') == K::None && f.strayBytes() == reset + 2, "framer: a reset ends a dropped line");
+}
+
+// Bytes that would have been bench letters do nothing, and the next line still frames.
+void checkFramerStray() {
+  protocol::Framer f;
+  using K = protocol::Framer::Kind;
+  for (const char* c = "faewdx1k"; *c; ++c) check(f.feed(static_cast<uint8_t>(*c)) == K::None, "framer: letters give no event");
+  check(f.strayBytes() == 8, "framer: eight stray letters counted");
+  const char* line = "{\"id\":2,\"cmd\":\"status\"}";
+  for (const char* c = line; *c; ++c) f.feed(static_cast<uint8_t>(*c));
+  check(f.feed('\n') == K::Line && std::strcmp(f.line(), line) == 0, "framer: a line after stray letters is whole");
+  check(f.strayBytes() == 8, "framer: the line added no stray bytes");
+}
+
+std::string allOps(bool benchBuild) {
+  std::string out = "[";
+  for (int i = 0; i < kBenchOpCount; ++i) {
+    if (!opAllowed(benchOp(i), benchBuild)) continue;
+    if (out.size() > 1) out += ",";
+    out += std::string("\"") + opName(benchOp(i)) + "\"";
+  }
+  return out + "]";
+}
+
+void checkBenchOps() {
+  protocol::Request r;
+  std::string err;
+  int queries = 0;
+  for (int i = 0; i < kBenchOpCount; ++i) {
+    const BenchOp op = benchOp(i);
+    BenchOp back;
+    check(static_cast<int>(op) == i, "ops: table index matches the enum");
+    check(opFromName(opName(op), back) && back == op, opName(op));
+    const std::string line = std::string("{\"id\":4,\"cmd\":\"bench\",\"op\":\"") + opName(op) + "\"" +
+                             (op == BenchOp::SlotOff ? ",\"slot\":3" : "") + "}";
+    check(parses(line.c_str(), r, err, true) && r.cmd == protocol::Command::Bench && r.op == op, "ops: every op round-trips in a bench build");
+    const bool query = opClass(op) == OpClass::Query;
+    queries += query ? 1 : 0;
+    check(opAllowed(op, true), "ops: bench build allows every op");
+    check(opAllowed(op, false) == query, "ops: release build allows queries only");
+    check(parses(line.c_str(), r, err, false) == query &&
+              (query || err == std::string("op not in this build: ") + opName(op)),
+          "ops: release build parse follows the class");
+  }
+  check(queries == 3, "ops: three query ops");
+  BenchOp none;
+  check(!opFromName("nope", none) && !opFromName("", none) && !opFromName("Report", none), "ops: lookup is exact");
+
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":8}", r, err) && r.benchSlot == 8, "ops: slot 8 parses");
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":1}", r, err) && r.benchSlot == 1, "ops: slot 1 parses");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\"}", r, err) && err == "missing op" && r.id == 4, "ops: missing op");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":7}", r, err) && err == "op must be a string", "ops: numeric op");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"zap\"}", r, err) && err == "unknown op: zap", "ops: unknown op");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"zap\"}", r, err, false) && err == "unknown op: zap", "ops: unknown op in release");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"fault\"}", r, err, false) && err == "op not in this build: fault",
+        "ops: bench op in release");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\"}", r, err) && err == "missing slot", "ops: slot_off needs a slot");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":0}", r, err) && err == "slot must be 1 to 8", "ops: slot 0");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":9}", r, err) && err == "slot must be 1 to 8", "ops: slot 9");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":99999999999}", r, err) && err == "slot must be an integer",
+        "ops: slot over 32 bits");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":4000000000}", r, err) && err == "slot must be 1 to 8",
+        "ops: a huge slot is out of range");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":\"3\"}", r, err) && err == "slot must be an integer",
+        "ops: string slot");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":-1}", r, err) && err == "slot must be an integer",
+        "ops: negative slot");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":2.5}", r, err) && err == "slot must be an integer",
+        "ops: fractional slot");
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"stats\",\"slot\":0}", r, err) && r.op == BenchOp::Stats,
+        "ops: other ops ignore the slot");
+
+  for (const bool bench : {false, true}) {
+    StringWriter w;
+    protocol::replyHello(w, 1, "v", "Default", defaultLayout(), bench);
+    check(JsonReader(w.out).valid(), "ops: hello parses as JSON");
+    check(has(w.out, std::string("\"build\":\"") + (bench ? "bench" : "release") + "\""), "ops: hello names the build");
+    check(has(w.out, "\"bench_ops\":" + allOps(bench) + ","), "ops: hello lists exactly the allowed ops");
+  }
+  StringWriter rel;
+  protocol::replyHello(rel, 1, "v", "Default", defaultLayout(), false);
+  check(has(rel.out, "\"bench_ops\":[\"report\",\"stats\",\"record_status\"],") && !has(rel.out, "\"fault\""),
+        "ops: release hello lists the three queries only");
 }
 
 void checkLayoutFade() {
@@ -1499,7 +1586,8 @@ struct Lcg {
 void parseAndResolve(const char* line) {
   protocol::Request req;
   char err[protocol::kErrorBytes];
-  if (protocol::parseRequest(line, req, err, sizeof err) && req.cmd == protocol::Command::SetLayout) {
+  protocol::parseRequest(line, req, err, sizeof err, false);
+  if (protocol::parseRequest(line, req, err, sizeof err, true) && req.cmd == protocol::Command::SetLayout) {
     Layout l = defaultLayout();
     protocol::resolveLayout(req, l, err, sizeof err);
   }
@@ -1554,6 +1642,7 @@ void checkFuzz() {
     }
   }
   check(lines > 100, "fuzz: the framer produced lines");
+  check(f.strayBytes() > 1000, "fuzz: bytes outside lines are counted, never acted on");
 }
 
 int main() {
@@ -1570,6 +1659,8 @@ int main() {
   checkLayoutValid();
   checkProtocolCommands();
   checkProtocolErrors();
+  checkBenchOps();
+  checkFramerStray();
   checkProtocolReplies();
   checkFramer();
   checkLayoutFade();

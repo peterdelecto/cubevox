@@ -11,7 +11,9 @@ namespace {
 
 constexpr size_t kKeyBytes = 16;
 constexpr size_t kCmdBytes = 16;
+constexpr size_t kOpBytes = 24;  // longest op name is 13 characters
 constexpr int kMaxSkipDepth = 4;
+constexpr uint32_t kSlotClamp = 255;  // keeps a huge slot number out of int range; it still fails the check
 
 struct CommandName {
   const char* text;
@@ -20,7 +22,7 @@ struct CommandName {
 
 constexpr CommandName kCommands[] = {
     {"hello", Command::Hello},       {"get_layout", Command::GetLayout}, {"set_layout", Command::SetLayout},
-    {"status", Command::Status},     {"enter_dfu", Command::EnterDfu},
+    {"status", Command::Status},     {"enter_dfu", Command::EnterDfu},   {"bench", Command::Bench},
 };
 
 // ---- reading -------------------------------------------------------------------------------
@@ -194,8 +196,11 @@ bool skipValue(const char*& p, int depth) {
 struct Fields {
   Request& req;
   char cmd[kCmdBytes] = {};
+  char op[kOpBytes] = {};
   bool hasId = false;
   bool hasCmd = false;
+  bool hasOp = false;
+  bool hasSlot = false;
   bool hasName = false;
   bool hasSlots = false;
   bool nameClipped = false;
@@ -217,6 +222,19 @@ bool parseId(const char*& p, Fields& f) {
   }
   p = start;
   f.typeFail("id must be a non-negative integer");
+  return skipValue(p, 0);
+}
+
+bool parseBenchSlot(const char*& p, Fields& f) {
+  const char* start = p;
+  uint32_t v;
+  if (readUint(p, v)) {
+    f.req.benchSlot = static_cast<int>(v < kSlotClamp ? v : kSlotClamp);
+    f.hasSlot = true;
+    return true;
+  }
+  p = start;
+  f.typeFail("slot must be an integer");
   return skipValue(p, 0);
 }
 
@@ -262,6 +280,11 @@ bool parseField(const char*& p, const char* key, Fields& f) {
     StrOut out{f.cmd, sizeof f.cmd};
     return parseText(p, f, out, "cmd must be a string", f.hasCmd);
   }
+  if (strcmp(key, "op") == 0) {
+    StrOut out{f.op, sizeof f.op};
+    return parseText(p, f, out, "op must be a string", f.hasOp);
+  }
+  if (strcmp(key, "slot") == 0) return parseBenchSlot(p, f);
   if (strcmp(key, "name") == 0) {
     StrOut out{f.req.name, kNameBytes};  // one byte under the buffer: 31 characters fit
     const bool ok = parseText(p, f, out, "name must be a string", f.hasName);
@@ -313,6 +336,33 @@ const char* setLayoutProblem(const Fields& f) {
   if (!f.hasSlots) return "missing slots";
   if (f.req.slotCount != kSlotCount) return "slots needs 8 card ids";
   return nullptr;
+}
+
+// Resolves the bench op and checks the build carries it and slot_off has its target. On failure
+// writes the reason to `err`.
+bool resolveBenchOp(Fields& f, bool benchBuild, char* err, size_t errSize) {
+  if (!f.hasOp) {
+    snprintf(err, errSize, "missing op");
+    return false;
+  }
+  if (!opFromName(f.op, f.req.op)) {
+    snprintf(err, errSize, "unknown op: %s", f.op);
+    return false;
+  }
+  if (!opAllowed(f.req.op, benchBuild)) {
+    snprintf(err, errSize, "op not in this build: %s", f.op);
+    return false;
+  }
+  if (f.req.op != BenchOp::SlotOff) return true;
+  if (!f.hasSlot) {
+    snprintf(err, errSize, "missing slot");
+    return false;
+  }
+  if (f.req.benchSlot < kMinBenchSlot || f.req.benchSlot > kMaxBenchSlot) {
+    snprintf(err, errSize, "slot must be %d to %d", kMinBenchSlot, kMaxBenchSlot);
+    return false;
+  }
+  return true;
 }
 
 bool findCommand(const char* text, Command& out) {
@@ -441,8 +491,8 @@ Framer::Kind Framer::feed(uint8_t byte) {
   }
   if (!inLine_) {
     if (byte != '{') {
-      bench_ = static_cast<char>(byte);
-      return Kind::Bench;
+      ++stray_;
+      return Kind::None;
     }
     inLine_ = true;
     len_ = 0;
@@ -461,7 +511,7 @@ Framer::Kind Framer::feed(uint8_t byte) {
   return Kind::None;
 }
 
-bool parseRequest(const char* line, Request& req, char* err, size_t errSize) {
+bool parseRequest(const char* line, Request& req, char* err, size_t errSize, bool benchBuild) {
   req = Request();
   Fields f(req);
   const char* p = line;
@@ -475,6 +525,7 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize) {
     return false;
   }
   if (!problem && req.cmd == Command::SetLayout) problem = setLayoutProblem(f);
+  if (!problem && req.cmd == Command::Bench) return resolveBenchOp(f, benchBuild, err, errSize);
   if (problem) {
     snprintf(err, errSize, "%s", problem);
     return false;
@@ -508,9 +559,28 @@ void replyError(Writer& w, uint32_t id, const char* reason) {
 
 void replyOk(Writer& w, uint32_t id) { emit(w, "{\"id\":%lu,\"ok\":true}\n", static_cast<unsigned long>(id)); }
 
-void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout) {
+namespace {
+
+void writeBenchOps(Writer& w, bool benchBuild) {
+  w.write("[", 1);
+  bool first = true;
+  for (int i = 0; i < kBenchOpCount; ++i) {
+    const BenchOp op = benchOp(i);
+    if (!opAllowed(op, benchBuild)) continue;
+    if (!first) w.write(",", 1);
+    first = false;
+    writeString(w, opName(op));
+  }
+  w.write("]", 1);
+}
+
+}  // namespace
+
+void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild) {
   emit(w, "{\"id\":%lu,\"ok\":true,\"proto\":%d,\"fw\":", static_cast<unsigned long>(id), kVersion);
   writeString(w, fw);
+  emit(w, ",\"build\":\"%s\",\"bench_ops\":", benchBuild ? "bench" : "release");
+  writeBenchOps(w, benchBuild);
   w.write(",\"cards\":[", 10);
   for (int c = 0; c < kCardCount; ++c) {
     if (c > 0) w.write(",", 1);
@@ -535,8 +605,8 @@ void replyStatus(Writer& w, uint32_t id, const Status& s) {
   emit(w, "{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"muted\":%s,\"seq\":%lu,",
        static_cast<unsigned long>(id), mean, worst, static_cast<unsigned long>(s.late),
        s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
-  emit(w, "\"rec_errors\":%lu,\"serial_dropped\":%lu}\n", static_cast<unsigned long>(s.recordErrors),
-       static_cast<unsigned long>(s.serialDropped));
+  emit(w, "\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu}\n", static_cast<unsigned long>(s.recordErrors),
+       static_cast<unsigned long>(s.serialDropped), static_cast<unsigned long>(s.strayBytes));
 }
 
 }  // namespace protocol

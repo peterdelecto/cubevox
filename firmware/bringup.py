@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """First-article bring-up for a cubevox board (checklist in hardware/RUNLOG.md, boards ordered).
 
-Run after first power-up, with the board flashed and on USB. Checks the boot report, times the
-audio block rate, optionally drills the fault paths and DFU entry, asks for the readings only a
-person can take, and writes a log to hardware/bringup/.
+Run after first power-up, with the board on USB. A real board gets the bench image first (the
+drills need it); the script checks the boot report, times the audio block rate, optionally drills
+the fault paths and DFU entry, asks for the readings only a person can take, then flashes the
+release image and confirms hello reports build "release". --weact stays on the bench image.
+Every command goes out as a framed JSON request through bench_ops.py. The log goes to
+hardware/bringup/.
 
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and DFU entry (reflashes)
@@ -14,6 +17,7 @@ person can take, and writes a log to hardware/bringup/.
 import argparse
 import datetime
 import glob
+import json
 import os
 import re
 import select
@@ -25,6 +29,8 @@ import tty
 
 FW = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(FW)
+sys.path.insert(0, FW)  # python3 -I leaves the script dir out
+import bench_ops  # noqa: E402
 
 BLOCK_RATE_HZ = 48000 / 64
 SAI_HZ = 49152000
@@ -53,7 +59,11 @@ class Port:
         self.buf = b""
 
     def send(self, s):
-        os.write(self.fd, s.encode())
+        """Sends a bench letter or a raw JSON request as one framed line."""
+        self.os_write(bench_ops.to_line(s))
+
+    def os_write(self, line):
+        os.write(self.fd, line.encode())
 
     def read(self, seconds, until=None):
         """Lines for up to `seconds`; stops early once a line matches `until`."""
@@ -113,6 +123,8 @@ def find(lines, pattern):
 
 
 def check_boot(log, lines, want_oled):
+    m = find(lines, r"^\[boot\] build (\S+)")
+    log.note("image", m.group(1) if m else "build line missing")
     m = find(lines, r"^\[boot\] reset: (.*)$")
     log.note("reset cause", m.group(1) if m else "not reported")
     log.check("fault record", find(lines, r"^\[boot\] fault: none") is not None,
@@ -367,15 +379,47 @@ def wait_dfu(seconds):
     return False
 
 
-def flash_back(weact):
-    env = dict(os.environ, TAIL="2")
+def flash_variant(variant, weact):
+    """Builds and flashes the release or bench image. The WeAct board only ever runs bench."""
+    env = dict(os.environ, TAIL="2", VARIANT=variant)
+    env.pop("BENCH", None)
+    env.pop("BOARD", None)
     if weact:
-        env["BOARD"] = "weact"
-    else:
-        env.pop("BOARD", None)
+        env["BOARD"] = "weact"  # implies the bench image
+    elif variant == "bench":
+        env["BENCH"] = "1"
     if subprocess.run([os.path.join(FW, "build.sh")], env=env, capture_output=True).returncode != 0:
         return False
-    return subprocess.run([os.path.join(FW, "flash.sh")], capture_output=True).returncode == 0
+    return subprocess.run([os.path.join(FW, "flash.sh")], env=env, capture_output=True).returncode == 0
+
+
+def flash_back(weact):
+    """Reflashes the bench image the drills run on."""
+    return flash_variant("bench", weact)
+
+
+def check_release_image(log):
+    """Flashes the release image and confirms hello reports build "release"."""
+    flashed = flash_variant("release", False)
+    log.check("flash release image", flashed, "build.sh + flash.sh VARIANT=release")
+    if not flashed:
+        return
+    try:
+        port = Port(wait_s=30.0)
+    except RuntimeError as e:
+        log.check("release image build", False, str(e))
+        return
+    req_id = bench_ops.next_id()
+    port.os_write(bench_ops.cmd_line("hello", req_id))
+    build = None
+    for line in port.read(5.0, until=r'^\{.*"proto"'):
+        if line.startswith("{") and '"proto"' in line:
+            try:
+                build = json.loads(line).get("build")
+            except ValueError:
+                pass
+    port.close()
+    log.check("release image build", build == "release", f'hello build "{build}"')
 
 
 def dfu_drill(log, port, weact, prompt):
@@ -416,6 +460,12 @@ def main():
     a = ap.parse_args()
 
     log = Log()
+    if not a.weact:
+        # A real board gets the bench image for the drills and the release image at the end.
+        flashed = flash_variant("bench", False)
+        log.check("flash bench image", flashed, "build.sh BENCH=1 + flash.sh VARIANT=bench")
+        if not flashed:
+            return finish(log, a)
     try:
         port = Port()
     except RuntimeError as e:
@@ -433,6 +483,8 @@ def main():
         port = dfu_drill(log, port, a.weact, not a.no_prompt)
         check_boot(log, boot_report(port), not a.no_oled)
     port.close()
+    if not a.weact:
+        check_release_image(log)
 
     if not a.no_prompt:
         for name, question in MANUAL:

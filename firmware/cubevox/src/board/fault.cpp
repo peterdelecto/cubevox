@@ -182,3 +182,17 @@ void faultReport(Print& out) {
     out.println(" blocks, output muted");
   }
 }
+
+#if CUBEVOX_BENCH
+void faultForceBusFault() {
+  serialOut().println("[bench] forcing a bus fault");
+  serialFlush(kDrillFlushMs);
+  (void)*reinterpret_cast<volatile uint32_t*>(0xDEADBEE0);
+}
+
+[[noreturn]] void faultSpinForWatchdog() {
+  serialOut().println("[bench] spinning; the watchdog resets in 2 s");
+  serialFlush(kDrillFlushMs);
+  for (;;) {}
+}
+#endif

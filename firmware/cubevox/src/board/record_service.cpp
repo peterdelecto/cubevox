@@ -64,14 +64,18 @@ uint32_t recordErrors() { return gStore.status().errors; }
 
 void recordPoll(uint32_t nowMs) { gStore.poll(nowMs); }
 
+#if CUBEVOX_BENCH
 void recordSaveNow() {
   gStore.saveNow();
   serialOut().println("[bench] record save requested");
 }
 
-void recordEraseAll() {
-  serialOut().println(gStore.eraseAll() ? "[bench] erasing both bank 2 sectors" : "[bench] record store busy");
+bool recordEraseAll() {
+  const bool started = gStore.eraseAll();
+  serialOut().println(started ? "[bench] erasing both bank 2 sectors" : "[bench] record store busy");
+  return started;
 }
+#endif
 
 void recordPrintStatus(Print& out) {
   const RecordStatus st = gStore.status();

@@ -187,6 +187,7 @@ set(CUBEVOX_SANITIZE -fsanitize=address,undefined -fno-sanitize-recover=all -fno
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 target_link_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 add_test(NAME firmware COMMAND firmware_test)
+add_test(NAME bench_ops_map COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/bench_ops_check.py)
 
 # Emulator-to-firmware parity: knob position -> engine params, both sides (test/parity_test.cpp).
 add_executable(parity test/parity_test.cpp ${CUBEVOX_FW_CORE_SOURCES})

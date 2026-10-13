@@ -2,10 +2,16 @@
 """Checks the cubevox serial protocol against a box on USB (spec 2026-10-12-serial-protocol-design.md).
 
 Runs hello, get_layout, a valid set_layout, three invalid ones, status, a malformed and an overlong
-line, a bench letter, and then resets the box to see that the layout survived. The layout it
-found is put back at the end. Prints PASS or FAIL per check and exits non-zero on any FAIL.
+line, the bench op checks, a stray-bytes check, and then resets the box to see that the layout
+survived. The layout it found is put back at the end. Prints PASS or FAIL per check and exits
+non-zero on any FAIL.
 
-No pyserial: the OS driver and termios are enough for a CDC port, as in firmware/term.py.
+The checks follow the build hello reports. A bench build runs a query op and the reset check
+(bench spin). A release build must refuse bench fault, record_erase and stop_audio with "op not in
+this build", and has no reset check. Both builds must ignore raw bytes outside a line.
+
+No pyserial: the OS driver and termios are enough for a CDC port, as in firmware/term.py. Bench
+requests come from firmware/bench_ops.py.
 
   python3 -I tools/protocol_check.py
   python3 -I tools/protocol_check.py --port /dev/cu.usbmodemXXXX --no-reset
@@ -21,7 +27,11 @@ import termios
 import time
 import tty
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware"))  # -I drops the script dir
+import bench_ops  # noqa: E402
+
 SLOTS = 8
+STRAY = b"faewdx1k"  # old bench letters, sent outside a line
 SAVE_WAIT_S = 8.0     # record saves 2 s after the last change; allow for the flash ops
 REPLY_WAIT_S = 3.0
 REBOOT_WAIT_S = 30.0  # watchdog reset (2 s) plus USB enumeration
@@ -95,6 +105,13 @@ class Link:
         self.send((json.dumps(req) + "\n").encode())
         return self.read_json(rid)
 
+    def bench(self, op, slot=None, wait=REPLY_WAIT_S):
+        """Sends a bench op through bench_ops.py and returns its reply."""
+        rid = self.next_id
+        self.next_id += 1
+        self.send(bench_ops.op_line(op, slot, rid).encode())
+        return self.read_json(rid, wait)
+
     def drain(self, quiet=0.3):
         """Reads until the port is quiet; returns the non-JSON text lines."""
         lines = []
@@ -131,6 +148,13 @@ def check_hello(link, rep):
     rep.check("hello: ok, proto 1, fw string", good, str(hello)[:120])
     if not good:
         return None
+    ops = hello.get("bench_ops")
+    rep.check("hello: build is release or bench, with an op list",
+              hello.get("build") in ("release", "bench") and isinstance(ops, list)
+              and {"report", "stats", "record_status"} <= set(ops), str((hello.get("build"), ops)))
+    want = bench_ops.ALL_OPS if hello.get("build") == "bench" else bench_ops.QUERY_OPS
+    rep.check(f"hello: {hello.get('build')} lists exactly its ops",
+              isinstance(ops, list) and len(ops) == len(set(ops)) and set(ops) == want, str(ops))
     cards = hello.get("cards", [])
     ids = [c.get("id") for c in cards]
     rep.check("hello: cards listed with unique ids", len(ids) > 1 and len(set(ids)) == len(ids), str(ids))
@@ -155,7 +179,7 @@ def check_get(link, rep, hello):
 
 
 def status_ok(st):
-    keys = ("cpu_mean", "cpu_worst", "late", "muted", "seq", "rec_errors", "serial_dropped")
+    keys = ("cpu_mean", "cpu_worst", "late", "muted", "seq", "rec_errors", "serial_dropped", "stray_bytes")
     return ok_reply(st) and all(k in st for k in keys)
 
 
@@ -229,13 +253,52 @@ def check_bad_lines(link, rep):
     rep.check("after bad lines: protocol still answers", ok_reply(hello))
 
 
-def check_bench_letter(link, rep):
+def check_bench_ops(link, rep, build):
     link.drain(0.2)
-    link.send(b"p")
-    lines = link.drain(0.6)
-    rep.check("bench letter p: stats line on the same port", any(l.startswith("[audio]") for l in lines), str(lines[:3]))
+    link.text.clear()
+
+    # The box prints the stats, then replies, so the lines arrive while read_json waits.
+    r = link.bench("stats")
+    lines = link.text + link.drain(0.6)
+    rep.check("bench stats: ok reply and a stats line on the same port",
+              ok_reply(r) and any(l.startswith("[audio]") for l in lines), f"{r} {lines[:3]}")
+    r = link.ask("bench", op="zap")
+    rep.check("bench unknown op: error", err_reply(r, "unknown op: zap"), str(r))
+    r = link.ask("bench")
+    rep.check("bench missing op: error", err_reply(r, "missing op"), str(r))
+    if build == "bench":
+        r = link.bench("slot_off")
+        rep.check("bench slot_off without a slot: error", err_reply(r, "missing slot"), str(r))
+        r = link.bench("slot_off", 9)
+        rep.check("bench slot_off slot 9: error", err_reply(r, "slot must be 1 to 8"), str(r))
+    else:
+        for op in ("fault", "record_erase", "stop_audio"):
+            r = link.bench(op)
+            rep.check(f"release bench {op}: refused", err_reply(r, f"op not in this build: {op}"), str(r))
     r = link.ask("status")
-    rep.check("bench letter: protocol answers afterwards", status_ok(r))
+    rep.check("bench ops: protocol answers afterwards", status_ok(r))
+
+
+def check_stray_bytes(link, rep):
+    """Raw bytes outside a line must not act: no record write, no late block, audio still running."""
+    link.ask("status")  # opens the load window
+    time.sleep(0.3)
+    before = link.ask("status")
+    if not status_ok(before):
+        rep.check("stray bytes: status before", False, str(before))
+        return
+    link.send(STRAY)
+    time.sleep(0.5)
+    after = link.ask("status")
+    if not rep.check("stray bytes: port still answers", status_ok(after), str(after)):
+        return
+    rep.check("stray bytes: record seq unchanged", after["seq"] == before["seq"], f"{before['seq']} -> {after['seq']}")
+    rep.check("stray bytes: late blocks unchanged", after["late"] == before["late"], f"{before['late']} -> {after['late']}")
+    rep.check(f"stray bytes: counted {len(STRAY)}", after["stray_bytes"] == before["stray_bytes"] + len(STRAY),
+              f"{before['stray_bytes']} -> {after['stray_bytes']}")
+    rep.check("stray bytes: audio still running", after["cpu_mean"] > 0, f"cpu_mean {after['cpu_mean']}")
+    rep.check("stray bytes: output not muted by them", after["muted"] == before["muted"],
+              f"{before['muted']} -> {after['muted']}")
 
 
 def wait_saved(link, rep, before_seq, label):
@@ -250,9 +313,9 @@ def wait_saved(link, rep, before_seq, label):
 
 
 def reopen_after_reset(link, rep):
-    """Triggers a watchdog reset with the bench 'w' command and reconnects."""
+    """Triggers a watchdog reset with the bench spin op and reconnects."""
     old = link.port
-    link.send(b"w")
+    link.send(bench_ops.op_line("spin", req_id=link.next_id).encode())
     time.sleep(0.5)
     link.close()
     deadline = time.time() + REBOOT_WAIT_S
@@ -307,10 +370,14 @@ def run(link, rep, no_reset):
     check_set_invalid(link, rep, hello, new)
     check_status(link, rep, "after applies")
     check_bad_lines(link, rep)
-    check_bench_letter(link, rep)
+    build = hello.get("build")
+    check_bench_ops(link, rep, build)
 
     wait_saved(link, rep, before, "set_layout")
-    if not no_reset:
+    check_stray_bytes(link, rep)  # after the save, so a changed seq can only come from the bytes
+    if build != "bench":
+        print("SKIP reset check: a release build has no bench spin op", flush=True)
+    elif not no_reset:
         link = check_survives_reset(link, rep, new)
         if link is None:
             return

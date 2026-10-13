@@ -5,9 +5,12 @@ Opening the port raises DTR, which makes the firmware print its boot report. No 
 the OS driver and termios are enough for a CDC port.
 
   ./term.py                 # read for 5 s
-  ./term.py -t 20 -s f      # send 'f' after the report, read for 20 s
+  ./term.py -t 20 -s f      # send the bench letter 'f' (op fault; bench image only)
   ./term.py -s m -s p -w 5  # send 'm', wait 5 s, send 'p'
+  ./term.py -s '{"id":1,"cmd":"status"}'   # a raw JSON request passes through
   ./term.py /dev/cu.usbmodemXXXX
+
+A letter expands to a framed JSON request through bench_ops.py (see its letter map).
 """
 
 import argparse
@@ -18,6 +21,9 @@ import sys
 import termios
 import time
 import tty
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # python3 -I leaves the script dir out
+import bench_ops  # noqa: E402
 
 
 def find_port():
@@ -32,12 +38,15 @@ def main():
     ap.add_argument("port", nargs="?", default=None)
     ap.add_argument("-t", "--seconds", type=float, default=5.0, help="how long to read")
     ap.add_argument("-s", "--send", action="append", default=[],
-                    help="characters to send; repeat for a sequence")
+                    help="a bench letter or a raw JSON request; repeat for a sequence")
     ap.add_argument("-w", "--wait", type=float, default=1.0,
                     help="seconds before the first send and between sends")
     a = ap.parse_args()
     port = a.port or find_port()
-    sends = list(a.send)
+    try:
+        sends = [bench_ops.to_line(s) for s in a.send]
+    except ValueError as e:
+        sys.exit(f"[ERROR] {e}")
     if sends:
         a.seconds = max(a.seconds, a.wait * len(sends) + 2.0)
 
@@ -55,7 +64,7 @@ def main():
         if send_at and time.monotonic() >= send_at:
             s = sends.pop(0)
             os.write(fd, s.encode())
-            print(f"[term] sent {s!r}", flush=True)
+            print(f"[term] sent {s.strip()}", flush=True)
             send_at = time.monotonic() + a.wait if sends else None
         r, _, _ = select.select([fd], [], [], 0.1)
         if not r:

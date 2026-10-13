@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "core/bench_ops.h"
 #include "core/layout.h"
 #include "core/record.h"
 
@@ -24,16 +25,18 @@ class Writer {
   virtual void write(const char* text, size_t len) = 0;
 };
 
-// Splits the byte stream into JSON lines and bench letters. A `{` outside a line starts one, and it
-// runs to the next '\n'. Any other byte outside a line is a bench letter.
+// Splits the byte stream into JSON lines. A `{` outside a line starts one, and it runs to the next
+// '\n'. Any other byte outside a line is ignored and counted.
 class Framer {
  public:
-  enum class Kind : uint8_t { None, Bench, Line, TooLong };
+  enum class Kind : uint8_t { None, Line, TooLong };
 
   // `Line` leaves the NUL-terminated text in line(). `TooLong` fires once; the rest of the line is dropped.
   Kind feed(uint8_t byte);
   const char* line() const { return line_; }
-  char bench() const { return bench_; }
+
+  // Bytes seen outside a line since boot.
+  uint32_t strayBytes() const { return stray_; }
 
   // Forgets a half-received line, for when a new host session starts.
   void reset() {
@@ -47,22 +50,25 @@ class Framer {
   size_t len_ = 0;
   bool inLine_ = false;
   bool dropping_ = false;
-  char bench_ = 0;
+  uint32_t stray_ = 0;
 };
 
-enum class Command : uint8_t { Hello, GetLayout, SetLayout, Status, EnterDfu };
+enum class Command : uint8_t { Hello, GetLayout, SetLayout, Status, EnterDfu, Bench };
 
 struct Request {
   uint32_t id = 0;
   Command cmd = Command::Hello;
+  BenchOp op = BenchOp::Report;  // Bench only
+  int benchSlot = 0;             // Bench only; the slot_off target, 1 to 8
   char name[kNameBytes + 1] = {};
   int slotCount = 0;  // ids present in "slots"
   char slot[kSlotCount][kIdBytes] = {};
 };
 
 // Parses and checks one request. On failure returns false with a readable reason in `err`; `req.id`
-// holds the request's id when the parser got far enough to read it, otherwise 0.
-bool parseRequest(const char* line, Request& req, char* err, size_t errSize);
+// holds the request's id when the parser got far enough to read it, otherwise 0. A bench op the
+// build does not carry (`benchBuild` false) is an error.
+bool parseRequest(const char* line, Request& req, char* err, size_t errSize, bool benchBuild);
 
 // Maps the request's card ids onto a layout and checks it with layoutValid.
 bool resolveLayout(const Request& req, Layout& out, char* err, size_t errSize);
@@ -75,11 +81,14 @@ struct Status {
   uint32_t seq;
   uint32_t recordErrors;
   uint32_t serialDropped;
+  uint32_t strayBytes;
 };
 
 void replyError(Writer& w, uint32_t id, const char* reason);
 void replyOk(Writer& w, uint32_t id);
-void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout);
+
+// Lists the build ("release" or "bench") and the ops it accepts.
+void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild);
 void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout);
 void replyStatus(Writer& w, uint32_t id, const Status& s);
 

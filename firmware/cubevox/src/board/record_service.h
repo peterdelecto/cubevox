@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 
+#include "board/build_kind.h"
 #include "core/layout.h"
 #include "core/settings.h"
 
@@ -29,10 +30,14 @@ uint32_t recordErrors();
 // Call every loop pass. Starts at most one flash operation.
 void recordPoll(uint32_t nowMs);
 
-// Bench: write the current state now, erase both sectors, print status.
-void recordSaveNow();
-void recordEraseAll();
+// Prints the newest record's sequence, sector, errors, name and settings.
 void recordPrintStatus(Print& out);
+
+#if CUBEVOX_BENCH
+// Bench drills: write the current state now, erase both sectors.
+void recordSaveNow();
+bool recordEraseAll();  // false while the store is busy
+#endif
 
 // The "[boot] record: ..." line and any recovery warning.
 void recordPrintBoot(Print& out);

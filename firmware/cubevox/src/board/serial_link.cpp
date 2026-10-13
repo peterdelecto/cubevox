@@ -56,6 +56,8 @@ protocol::Writer& serialWriter() { return gWriter; }
 
 uint32_t serialDropped() { return gQueue.dropped(); }
 
+uint32_t serialStrayBytes() { return gFramer.strayBytes(); }
+
 bool serialFlush(uint32_t timeoutMs) {
   const uint32_t start = millis();
   for (;;) {
@@ -67,11 +69,10 @@ bool serialFlush(uint32_t timeoutMs) {
 
 void serialLinkSessionStart() { gFramer.reset(); }
 
-void serialLinkPoll(const SerialHandlers& handlers) {
+void serialLinkPoll(void (*onRequest)(const char* line)) {
   while (Serial.available() > 0) {
     switch (gFramer.feed(static_cast<uint8_t>(Serial.read()))) {
-      case protocol::Framer::Kind::Bench: handlers.bench(gFramer.bench()); break;
-      case protocol::Framer::Kind::Line: handlers.request(gFramer.line()); break;
+      case protocol::Framer::Kind::Line: onRequest(gFramer.line()); break;
       case protocol::Framer::Kind::TooLong: protocol::replyError(gWriter, 0, "line too long (max 768 bytes)"); break;
       case protocol::Framer::Kind::None: break;
     }

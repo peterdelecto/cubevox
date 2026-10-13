@@ -2,15 +2,46 @@
 # Compile the cubevox firmware for the H743 with arduino-cli. Never flashes.
 # Core, FQBN and flags follow Teensy-H7-Port/test/build_fxbox_h7.sh.
 #
-#   ./build.sh              # build into /tmp/cubevox-fw
+#   ./build.sh              # release image into /tmp/cubevox-fw-release
+#   BENCH=1 ./build.sh      # bench image (-DCUBEVOX_BENCH: drills and panel test) into /tmp/cubevox-fw-bench
 #   TAIL=5 ./build.sh       # show only the last 5 lines of compiler output
-#   BOARD=weact ./build.sh  # bench build for the WeAct H743 (no VBUS divider: USB always on)
-#   OPT=-O3 EXTRA_FLAGS=-ffast-math ./build.sh   # bench experiments; the release build is -O2
+#   BOARD=weact ./build.sh  # bench image for the WeAct H743 (no VBUS divider: USB always on)
+#   OPT=-O3 EXTRA_FLAGS=-ffast-math ./build.sh   # experiments; the release build is -O2
+#
+# Each variant has its own output dir and a lock, so two builds of one variant queue up.
 
 set -uo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
-OUT=/tmp/cubevox-fw
+
+VARIANT=release
+{ [ "${BENCH:-}" = 1 ] || [ "${BOARD:-}" = "weact" ]; } && VARIANT=bench
+OUT="/tmp/cubevox-fw-$VARIANT"
+
+# A second build of the same variant waits for the first; the lock is released on every exit path.
+# The lock dir holds the owner's PID, so a lock left by a dead build is removed.
+LOCK="$OUT.lock"
+LOCK_WAIT_S="${LOCK_WAIT_S:-600}"  # env override exists so the wait can be tested
+waited=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+  owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
+  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+    echo "[build] removing stale lock $LOCK (pid $owner is gone)"
+    rm -f "$LOCK/pid"
+    rmdir "$LOCK" 2>/dev/null
+    continue
+  fi
+  if [ "$waited" -ge "$LOCK_WAIT_S" ]; then
+    echo "[ERROR] a $VARIANT build (pid ${owner:-unknown}) held $LOCK for $LOCK_WAIT_S s"
+    exit 1
+  fi
+  [ "$waited" -eq 0 ] && echo "[build] waiting for the running $VARIANT build (pid ${owner:-unknown}, lock $LOCK)"
+  sleep 2
+  waited=$((waited + 2))
+done
+echo $$ > "$LOCK/pid"
+trap 'rm -f "$LOCK/pid"; rmdir "$LOCK"' EXIT
+trap 'exit 130' INT TERM
 CORE="STMicroelectronics:stm32"
 CORE_VERSION="${CORE_VERSION:-3.0.0}"  # env override exists only so the check itself can be tested
 FQBN="$CORE:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen"
@@ -45,13 +76,16 @@ if [ "${BOARD:-}" = "weact" ]; then
   DEFS="$DEFS -DCUBEVOX_VBUS_ALWAYS"
   echo "[build] bench board weact: USB attach not gated on VBUS"
 fi
+[ "$VARIANT" = bench ] && DEFS="$DEFS -DCUBEVOX_BENCH"
 OPT="${OPT:--O2}"
 DEFS="$DEFS ${EXTRA_FLAGS:-}"
-echo "[build] $OPT ${EXTRA_FLAGS:-}"
+echo "[build] $VARIANT image, $OPT ${EXTRA_FLAGS:-}"
 
-# Bench clip: a WAV baked into flash that the 'v' command loops in place of the SAI input.
+# Bench clip: a WAV baked into flash that the clip op loops in place of the SAI input.
+# Only the bench image carries it, so a release image never holds the sample.
 # The weact build takes Adam's dry vocal from samples/ (untracked; the repo is public).
 CLIP="${CLIP:-}"
+[ "$VARIANT" = bench ] || CLIP=""
 [ "${BOARD:-}" = "weact" ] && [ -z "$CLIP" ] && [ -f "$REPO/samples/adam_vox_sample2_4s.wav" ] &&
   CLIP="$REPO/samples/adam_vox_sample2_4s.wav"
 INC_CLIP=""

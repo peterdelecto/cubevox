@@ -4,6 +4,7 @@
 
 #include "board/audio.h"
 #include "board/bench.h"
+#include "board/build_kind.h"
 #include "board/sysclock.h"
 #include "board/controls.h"
 #include "board/display_sh1106.h"
@@ -45,6 +46,7 @@ static bool gSnapshotStale = false;  // a change is waiting for the panel to be 
 static void printBootReport() {
   Print& out = serialOut();
   out.println("[boot] cubevox firmware");
+  out.println(kBenchBuild ? "[boot] build bench" : "[boot] build release");
   faultReport(out);
   recordPrintBoot(out);
   clockReport(out);
@@ -109,7 +111,7 @@ static void sendStatus(uint32_t id) {
   const AudioLoad load = audioTakeLoad();
   protocol::replyStatus(serialWriter(), id,
                         {load.meanPercent, load.worstPercent, load.late, muteActive(), recordSequence(),
-                         recordErrors(), serialDropped()});
+                         recordErrors(), serialDropped(), serialStrayBytes()});
 }
 
 // Validates and adopts a layout from the app. The save runs after the usual debounce.
@@ -127,16 +129,32 @@ static void replySetLayout(const protocol::Request& req) {
   protocol::replyOk(serialWriter(), req.id);
 }
 
+// Replies after the op runs, so a failure reaches the host. Fault and spin never return, so
+// they reply first and flush inside the drill before they act.
+static void runBench(const protocol::Request& req) {
+  protocol::Writer& out = serialWriter();
+  if (req.op == BenchOp::Fault || req.op == BenchOp::Spin) protocol::replyOk(out, req.id);  // the drill flushes it
+  const BenchResult result = benchRun(req.op, req.benchSlot, printBootReport);
+  if (result.republish) publishSnapshot();
+  if (result.error) {
+    protocol::replyError(out, req.id, result.error);
+  } else {
+    protocol::replyOk(out, req.id);
+  }
+}
+
 static void onRequest(const char* line) {
   protocol::Writer& out = serialWriter();
   protocol::Request req;
   char err[protocol::kErrorBytes];
-  if (!protocol::parseRequest(line, req, err, sizeof err)) {
+  if (!protocol::parseRequest(line, req, err, sizeof err, kBenchBuild)) {
     protocol::replyError(out, req.id, err);
     return;
   }
   switch (req.cmd) {
-    case protocol::Command::Hello: protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout); break;
+    case protocol::Command::Hello:
+      protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout, kBenchBuild);
+      break;
     case protocol::Command::GetLayout: protocol::replyLayout(out, req.id, layoutName(), gLayout); break;
     case protocol::Command::SetLayout: replySetLayout(req); break;
     case protocol::Command::Status: sendStatus(req.id); break;
@@ -146,14 +164,15 @@ static void onRequest(const char* line) {
       muteForReset();
       platformEnterDfu();  // does not return
       break;
+    case protocol::Command::Bench:
+      if (!opAllowed(req.op, kBenchBuild)) {
+        protocol::replyError(out, req.id, "op not in this build");
+        break;
+      }
+      runBench(req);
+      break;
   }
 }
-
-static void onBench(char letter) {
-  if (benchCommand(letter, printBootReport)) publishSnapshot();
-}
-
-static const SerialHandlers kSerialHandlers = {onBench, onRequest};
 
 // The relay switches only while the output is fully muted; the mute is held until it settles.
 static void runJackSwitch(uint32_t nowMs) {
@@ -214,7 +233,7 @@ void loop() {
     serialLinkSessionStart();
     printBootReport();
   }
-  serialLinkPoll(kSerialHandlers);
+  serialLinkPoll(onRequest);
 
   controlsPoll(nowMs, gLayout);
   benchPanelPoll(nowMs);
