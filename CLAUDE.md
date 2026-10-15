@@ -29,6 +29,7 @@ cmake -S . -B build && cmake --build build -j && ctest --test-dir build
 open build/cubevox-proto.app
 build/cubevox-render in.wav out.wav --depth 0.7
 node tools/font-editor/serve.js   # font editor; edits save straight to tools/font-editor/fonts/cubevox-fonts.json
+cd app && go run . --fake        # Mac app on a fake box; go test ./... ; app/bundle.sh builds dist/cubevox.app
 ```
 
 ## Panel (planned)
