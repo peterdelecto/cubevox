@@ -1,0 +1,129 @@
+name: release
+
+# A tag vX.YY.ZZ builds the firmware image, a static dfu-util and the Mac app bundle, then
+# attaches cubevox.bin, cubevox.app.tar.gz and install.sh to the release for that tag.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    # Same steps as the firmware job in ci.yml. macOS because warn_gate.py treats
+    # ~/Library/Arduino15 as the third-party tree. Keep the core pin in sync with ci.yml.
+    runs-on: macos-14
+    env:
+      ARDUINO_CLI_VERSION: 1.5.1
+      STM32_CORE_VERSION: 3.0.0
+      U8G2_VERSION: 2.34.22
+      STM32_INDEX_URL: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # build.sh stamps `git describe --tags`, so the tag must be reachable.
+          fetch-depth: 0
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_macOS_ARM64.tar.gz -o "$RUNNER_TEMP/acli.tgz"
+          mkdir "$RUNNER_TEMP/acli"
+          tar -xzf "$RUNNER_TEMP/acli.tgz" -C "$RUNNER_TEMP/acli"
+          echo "$RUNNER_TEMP/acli" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Arduino15
+            ~/Documents/Arduino/libraries
+          key: arduino-${{ runner.os }}-core${{ env.STM32_CORE_VERSION }}-u8g2${{ env.U8G2_VERSION }}
+      - name: Install core and libraries
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls "$STM32_INDEX_URL"
+          arduino-cli core update-index
+          arduino-cli core install STMicroelectronics:stm32@${STM32_CORE_VERSION}
+          arduino-cli lib install U8g2@${U8G2_VERSION}
+          arduino-cli core list
+          arduino-cli lib list
+      - name: Build release image (warn gate runs inside build.sh)
+        run: firmware/build.sh
+      - name: Name the image
+        run: |
+          test -s /tmp/cubevox-fw-release/cubevox.ino.bin
+          mkdir -p out
+          cp /tmp/cubevox-fw-release/cubevox.ino.bin out/cubevox.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cubevox-bin
+          path: out/cubevox.bin
+          if-no-files-found: error
+
+  dfu-util:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build static universal dfu-util
+        run: app/dfu-util-static.sh "$RUNNER_TEMP/dfu-util"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dfu-util
+          path: ${{ runner.temp }}/dfu-util
+          if-no-files-found: error
+
+  app:
+    needs: dfu-util
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # bundle.sh stamps `git describe --tags`.
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          name: dfu-util
+          path: ${{ runner.temp }}/dfu
+      - name: Test
+        run: cd app && go vet ./... && go test ./...
+      - name: Bundle
+        run: |
+          chmod +x "$RUNNER_TEMP/dfu/dfu-util"
+          DFU_UTIL="$RUNNER_TEMP/dfu/dfu-util" app/bundle.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cubevox-app
+          path: app/dist/cubevox.app.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [firmware, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: app/install.sh
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cubevox-bin
+          path: assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: cubevox-app
+          path: assets
+      - name: Attach to the release
+        run: |
+          cp app/install.sh assets/install.sh
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" assets/cubevox.bin assets/cubevox.app.tar.gz assets/install.sh --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" assets/cubevox.bin assets/cubevox.app.tar.gz assets/install.sh \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
