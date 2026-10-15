@@ -74,7 +74,8 @@ The page polls `GET /api/state` once a second.
    card shows its name and its two knob names in pot order. An empty slot says "empty".
 2. **Bank.** Every card except `empty`, name and knob names, no cost. Drag into a slot to place,
    drag a slot's card back to the bank to empty the slot, drop on a filled slot to swap. A placed
-   card greys in the bank. Once a reverb is placed, the other reverb greys (one reverb per layout).
+   card greys in the bank. Dropping a reverb while another reverb is placed empties that other
+   slot, so the layout keeps one reverb without a clearing step (owner 2026-10-15).
 3. **Meter.** "Processing room", one bar. The budget is shown as 100 %: the bar reads
    `max(meanSum / 75, worstSum / 95)` with the fixed term in both sums, as "76 % used, 24 % left".
    Over 100 % the bar turns red and Push is disabled. The box checks the same two lines and

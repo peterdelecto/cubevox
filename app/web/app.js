@@ -251,8 +251,7 @@ function renderBank() {
   for (const c of M.bankCards(S.state.cards)) {
     const block = M.bankBlock(S.slots, map, c.id);
     const cls = ['card'];
-    if (block === 'used') cls.push('is-used');
-    if (block === 'reverb') cls.push('is-blocked');
+    if (block) cls.push('is-used');
     const picked = S.pick && S.pick.from === 'bank' && S.pick.id === c.id;
     if (picked) cls.push('is-picked');
 
@@ -260,7 +259,6 @@ function renderBank() {
     if (block) {
       attrs['aria-disabled'] = 'true';
       attrs.tabindex = '-1';
-      if (block === 'reverb') attrs.title = 'one reverb per layout';
     } else {
       attrs.tabindex = '0';
       if (picked) attrs['aria-pressed'] = 'true';

@@ -32,17 +32,15 @@ export function placedReverb(slots, byId) {
   return null;
 }
 
-// Why a bank card cannot be placed: 'used', 'reverb', or null when it can.
+// Why a bank card cannot be placed: 'used', or null when it can.
 export function bankBlock(slots, byId, id) {
-  if (slots.includes(id)) return 'used';
-  const c = byId.get(id);
-  const other = placedReverb(slots, byId);
-  if (c && c.group === REVERB_GROUP && other && other !== id) return 'reverb';
-  return null;
+  return slots.includes(id) ? 'used' : null;
 }
 
 // Result of dropping `src` on slot `i`, or null when the drop is invalid.
 // src is { from: 'bank', id } or { from: 'slot', index }.
+// A reverb dropped from the bank replaces the reverb already placed, so the
+// layout keeps one reverb without a clearing step.
 export function applyDrop(slots, byId, src, i) {
   const next = slots.slice();
   if (src.from === 'slot') {
@@ -50,7 +48,12 @@ export function applyDrop(slots, byId, src, i) {
     [next[i], next[src.index]] = [next[src.index], next[i]];
     return next;
   }
-  if (!byId.has(src.id) || bankBlock(slots, byId, src.id)) return null;
+  const c = byId.get(src.id);
+  if (!c || bankBlock(slots, byId, src.id)) return null;
+  if (c.group === REVERB_GROUP) {
+    const other = placedReverb(slots, byId);
+    if (other) next[slots.indexOf(other)] = EMPTY;
+  }
   next[i] = src.id;
   return next;
 }

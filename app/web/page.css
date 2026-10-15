@@ -117,13 +117,11 @@ wa-button { --wa-focus-ring: var(--focus-ring); min-width: var(--btn-min); }
   padding: calc(var(--gap-3) - var(--border-w));
 }
 
-.card.is-used,
-.card.is-blocked {
+.card.is-used {
   opacity: var(--dim);
   cursor: not-allowed;
 }
-.card.is-used:hover,
-.card.is-blocked:hover { background: var(--panel-bg); }
+.card.is-used:hover { background: var(--panel-bg); }
 
 .card.is-dragging { opacity: var(--dim); }
 
