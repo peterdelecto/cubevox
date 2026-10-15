@@ -15,6 +15,9 @@ The firmware carries every effect. A firmware update only matters when a new car
 | Firmware | `firmware/cubevox/` | Effect registry with stable ids and CPU costs, layout record in bank 2, serial command set, live apply with a 50 ms fade. |
 | Release | GitHub Releases on `peterdelecto/cubevox` | One release per tag `vX.Y.Z` holding `cubevox.bin`, `cubevox.app.tar.gz`, `install.sh`. Built by a GitHub Action. |
 
+> Superseded 2026-10-15 for the app and page: `2026-10-15-mac-app-design.md`. One screen, no
+> saved layouts, one Update button. The Firmware and Recovery sections below still apply.
+
 ### Install and launch
 
 `curl -fsSL https://github.com/peterdelecto/cubevox/releases/latest/download/install.sh | sh` downloads the latest `cubevox.app` into `/Applications` and replaces an older copy. The same line updates the app; the Update screen can also do it by itself. curl does not set the quarantine flag, so Gatekeeper does not block the app. dfu-util ships inside the bundle as a static binary, so Homebrew is not needed.
