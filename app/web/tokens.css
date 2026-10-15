@@ -1,0 +1,117 @@
+/* cubevox page tokens. The one place for numeric and color literals.
+   Color roles alias Web Awesome's Default dark theme where it has them.
+   Geometry and type map the other way, so Web Awesome parts follow this scale. */
+
+:root {
+  color-scheme: dark;
+
+  /* ── color roles ───────────────────────────────────── */
+  --bg:         var(--wa-color-surface-default);
+  --panel-bg:   var(--wa-color-surface-raised);
+  --ctrl-bg:    color-mix(in oklab, var(--panel-bg), var(--text) var(--ctrl-mix));
+  --border:     var(--wa-color-surface-border);
+  --text:       var(--wa-color-text-normal);
+  --text-dim:   oklch(0.79 0.015 270);   /* Web Awesome's quiet text is Lc 43, under the 60 floor */
+  --accent:     var(--wa-color-brand-fill-loud);
+  --on-accent:  var(--wa-color-brand-on-loud);
+  --accent-soft: var(--wa-color-brand-fill-quiet);
+  --ok:         var(--wa-color-success-fill-loud);
+  --ok-ink:     oklch(0.84 0.15 150);
+  --warn:       var(--wa-color-warning-fill-loud);
+  --danger:     var(--wa-color-danger-fill-loud);
+  --danger-ink: oklch(0.83 0.11 20);
+  --danger-soft: var(--wa-color-danger-fill-normal);
+  --focus:      var(--wa-color-focus);
+
+  /* badge pair for "Box connected" */
+  --badge-bg:   var(--wa-color-success-fill-normal);
+  --badge-ink:  oklch(0.88 0.11 150);
+
+  /* drop-target ring: light core inside a dark halo, reads on any card */
+  --ring-core: oklch(0.96 0 0);
+  --ring-halo: oklch(0.12 0 0);
+  --ring-core-w: 2px;
+  --ring-halo-w: 4px;
+
+  --ctrl-mix: 8%;
+
+  /* ── type ──────────────────────────────────────────── */
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+             "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 13px;   /* support text only */
+  --text-sm: 15px;   /* body */
+  --text-md: 17px;   /* section headers */
+  --text-xl: 25px;   /* page title */
+  --weight-normal: 400;
+  --weight-bold: 600;
+  --leading: 1.4;
+  --leading-tight: 1.2;
+  --tracking: 0.02em;
+
+  /* ── spacing, one 4 px unit ────────────────────────── */
+  --unit: 4px;
+  --gap-1: calc(var(--unit) * 1);
+  --gap-2: calc(var(--unit) * 2);
+  --gap-3: calc(var(--unit) * 3);
+  --gap-4: calc(var(--unit) * 4);
+  --gap-6: calc(var(--unit) * 6);
+  --gap-8: calc(var(--unit) * 8);
+
+  /* ── shape ─────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --border-w: 1px;
+  --border-w-strong: 2px;
+  --dim: 0.4;
+
+  /* ── layout ────────────────────────────────────────── */
+  --page-min: 900px;
+  --slot-count: 8;
+  --slot-col-min: 100px;
+  --slot-h: 132px;
+  --bank-col-min: 160px;
+  --meter-h: 12px;
+  --meter-min: 320px;
+  --btn-min: 140px;
+
+  /* ── motion ────────────────────────────────────────── */
+  --dur-fast: 120ms;
+  --dur-med: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ── focus ─────────────────────────────────────────── */
+  --focus-ring: 3px solid var(--focus);
+  --focus-offset: 2px;
+
+  accent-color: var(--accent);
+
+  /* ── Web Awesome follows this scale ────────────────── */
+  --wa-font-family-body: var(--font-ui);
+  --wa-font-size-xs: var(--text-xs);
+  --wa-font-size-s: var(--text-sm);
+  --wa-font-size-m: var(--text-sm);
+  --wa-font-size-l: var(--text-md);
+  --wa-font-weight-normal: var(--weight-normal);
+  --wa-font-weight-semibold: var(--weight-bold);
+  --wa-space-2xs: var(--gap-1);
+  --wa-space-xs: var(--gap-2);
+  --wa-space-s: var(--gap-3);
+  --wa-space-m: var(--gap-4);
+  --wa-space-l: var(--gap-6);
+  --wa-space-xl: var(--gap-8);
+  --wa-border-radius-s: var(--radius-sm);
+  --wa-border-radius-m: var(--radius-md);
+  --wa-focus-ring-width: 3px;
+  --wa-focus-ring-offset: var(--focus-offset);
+  --wa-transition-fast: var(--dur-fast);
+  --wa-transition-normal: var(--dur-med);
+  --wa-transition-slow: var(--dur-med);
+  --wa-transition-easing: var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-med: 0ms;
+  }
+}

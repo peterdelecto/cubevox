@@ -1,0 +1,262 @@
+/* Page rules. Every value reads from tokens.css. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: var(--page-min);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading);
+}
+
+wa-button:not(:defined),
+wa-badge:not(:defined),
+wa-progress-bar:not(:defined),
+wa-spinner:not(:defined) { visibility: hidden; }
+
+/* one focus ring for everything focusable */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible,
+wa-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+wa-button { --wa-focus-ring: var(--focus-ring); min-width: var(--btn-min); }
+
+/* ── layout ──────────────────────────────────────────── */
+
+.page {
+  flex: 1;
+  width: 100%;
+  padding: var(--gap-6) var(--gap-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-6);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.section-h {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  color: var(--text);
+}
+
+.support {
+  margin: var(--gap-1) 0 var(--gap-3);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+/* ── cards (bank) and slot faces ─────────────────────── */
+
+.card-face, .card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-1);
+  text-align: center;
+}
+
+.card-name {
+  font-weight: var(--weight-bold);
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.card-knobs {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  letter-spacing: var(--tracking);
+  text-transform: uppercase;
+  line-height: var(--leading);
+}
+
+.bank {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--bank-col-min), 1fr));
+  gap: var(--gap-2);
+  padding: var(--gap-2);
+  border: var(--border-w-strong) solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.card {
+  padding: var(--gap-3);
+  background: var(--panel-bg);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: grab;
+  user-select: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.card:hover { background: var(--ctrl-bg); }
+.card:active { cursor: grabbing; }
+
+.card.is-picked {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  border-width: var(--border-w-strong);
+  padding: calc(var(--gap-3) - var(--border-w));
+}
+
+.card.is-used,
+.card.is-blocked {
+  opacity: var(--dim);
+  cursor: not-allowed;
+}
+.card.is-used:hover,
+.card.is-blocked:hover { background: var(--panel-bg); }
+
+.card.is-dragging { opacity: var(--dim); }
+
+.bank.is-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 var(--ring-core-w) var(--ring-halo), 0 0 0 var(--ring-halo-w) var(--ring-core);
+}
+
+/* ── slots ───────────────────────────────────────────── */
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(var(--slot-count), minmax(var(--slot-col-min), 1fr));
+  gap: var(--gap-2);
+}
+
+.slot {
+  min-height: var(--slot-h);
+  padding: var(--gap-2) var(--gap-1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-1);
+  border: var(--border-w-strong) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  user-select: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.slot.is-empty {
+  border-style: dashed;
+  background: var(--bg);
+}
+
+.slot.is-filled { cursor: grab; }
+.slot.is-filled:active { cursor: grabbing; }
+
+.slot:hover { background: var(--ctrl-bg); }
+
+.slot-num {
+  align-self: stretch;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.slot-empty {
+  margin: auto 0;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.slot.is-armed { border-color: var(--accent); }
+
+.slot.is-picked {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.slot.is-differs { border-color: var(--warn); }
+
+.slot.is-dragging { opacity: var(--dim); }
+
+.slot.is-over {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 var(--ring-core-w) var(--ring-halo), 0 0 0 var(--ring-halo-w) var(--ring-core);
+}
+
+.slot.is-invalid {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+/* ── meter and push ──────────────────────────────────── */
+
+.push-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap-6);
+}
+
+.meter { flex: 1; min-width: var(--meter-min); }
+
+.meter-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--gap-4);
+  margin-bottom: var(--gap-2);
+}
+
+.meter-text { font-size: var(--text-sm); color: var(--text); }
+.meter-text.is-over { color: var(--danger-ink); font-weight: var(--weight-bold); }
+
+wa-progress-bar {
+  --track-height: var(--meter-h);
+  --track-color: var(--ctrl-bg);
+  --indicator-color: var(--accent);
+}
+wa-progress-bar.is-over { --indicator-color: var(--danger); }
+
+.push-note {
+  margin: var(--gap-2) 0 0;
+  min-height: calc(var(--text-xs) * var(--leading));
+  overflow-wrap: anywhere;
+}
+.push-note.is-error { color: var(--danger-ink); }
+.push-note.is-ok { color: var(--ok-ink); }
+
+/* ── bottom bar ──────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-4);
+  padding: var(--gap-3) var(--gap-4);
+  background: var(--panel-bg);
+  border-top: var(--border-w) solid var(--border);
+}
+
+.bar-group { display: flex; align-items: center; gap: var(--gap-4); }
+.bar-update { flex: 1; justify-content: flex-end; min-width: 0; }
+.bar-text { overflow-wrap: anywhere; }
+
+.ink-dim { color: var(--text-dim); }
+.ink-danger { color: var(--danger-ink); }
+
+wa-badge {
+  --wa-color-success-fill-loud: var(--badge-bg);
+  --wa-color-success-on-loud: var(--badge-ink);
+  font-size: var(--text-xs);
+}

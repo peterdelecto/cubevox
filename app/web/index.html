@@ -1,0 +1,46 @@
+<!doctype html>
+<html class="wa-theme-default wa-palette-default wa-brand-blue wa-dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cubevox</title>
+  <link rel="stylesheet" href="vendor/webawesome/styles/webawesome.css">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="page.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main class="page">
+    <h1 class="title">cubevox</h1>
+
+    <section aria-labelledby="slots-h">
+      <h2 id="slots-h" class="section-h">Slots</h2>
+      <p class="support">Left to right, as on the box.</p>
+      <div class="slots" id="slots"></div>
+    </section>
+
+    <section aria-labelledby="bank-h">
+      <h2 id="bank-h" class="section-h">Effects</h2>
+      <p class="support">Drag an effect into a slot, or press Enter on one, then Enter on a slot. Backspace empties a slot.</p>
+      <div class="bank" id="bank"></div>
+    </section>
+
+    <section aria-labelledby="meter-h" class="push-area">
+      <div class="push-row">
+        <div class="meter">
+          <div class="meter-label">
+            <h2 id="meter-h" class="section-h">Processing room</h2>
+            <span id="meter-text" class="meter-text"></span>
+          </div>
+          <wa-progress-bar id="meter" label="Processing room" value="0"></wa-progress-bar>
+        </div>
+        <wa-button id="push" variant="brand" appearance="accent">Push to box</wa-button>
+      </div>
+      <p id="push-note" class="support push-note" role="status"></p>
+    </section>
+  </main>
+
+  <footer class="bar" id="bar" aria-label="Box status"></footer>
+  <div class="wa-visually-hidden" id="live" role="status" aria-live="polite"></div>
+</body>
+</html>
