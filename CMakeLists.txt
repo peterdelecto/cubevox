@@ -189,6 +189,22 @@ target_link_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 add_test(NAME firmware COMMAND firmware_test)
 add_test(NAME bench_ops_map COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/bench_ops_check.py)
 
+# hello_dump prints the firmware's real `hello` reply. app/fixtures/hello.json must equal it.
+add_executable(hello_dump tools/hello_dump.cpp ${CUBEVOX_FW_CORE_SOURCES})
+target_include_directories(hello_dump PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
+                                              ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
+target_compile_options(hello_dump PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+target_link_libraries(hello_dump PRIVATE engine)
+add_test(NAME hello_fixture
+         COMMAND ${CMAKE_COMMAND} -DDUMP=$<TARGET_FILE:hello_dump>
+                 -DFIXTURE=${CMAKE_SOURCE_DIR}/app/fixtures/hello.json
+                 -P ${CMAKE_SOURCE_DIR}/tools/hello_fixture_check.cmake)
+add_custom_target(hello_fixture_refresh
+                  COMMAND ${CMAKE_COMMAND} -DREFRESH=1 -DDUMP=$<TARGET_FILE:hello_dump>
+                          -DFIXTURE=${CMAKE_SOURCE_DIR}/app/fixtures/hello.json
+                          -P ${CMAKE_SOURCE_DIR}/tools/hello_fixture_check.cmake
+                  DEPENDS hello_dump VERBATIM)
+
 # Emulator-to-firmware parity: knob position -> engine params, both sides (test/parity_test.cpp).
 add_executable(parity test/parity_test.cpp ${CUBEVOX_FW_CORE_SOURCES})
 target_include_directories(parity PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
