@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include <array>
+
 #include "board/pins.h"
 #include "core/debounce.h"
 #include "core/timing.h"
@@ -18,7 +20,7 @@ volatile uint8_t gQuadState = 0;
 DebouncedInput gClick;
 
 void encoderIsr() {
-  static const int8_t kStep[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
+  static constexpr std::array<int8_t, 16> kStep = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
   const uint8_t ab = static_cast<uint8_t>((digitalRead(pins::kEncMenuA) << 1) | digitalRead(pins::kEncMenuB));
   gQuadState = static_cast<uint8_t>(((gQuadState << 2) | ab) & 0x0F);
   gCounts = gCounts + kStep[gQuadState];

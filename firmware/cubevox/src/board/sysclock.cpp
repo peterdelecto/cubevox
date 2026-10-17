@@ -5,9 +5,9 @@
 #include "board/clocks.h"
 #include "board/fault.h"
 
-// The generic H743 variant runs PLL1 from HSI and USB from the free-running HSI48, which is outside
-// the USB FS tolerance without CRS. This file runs all three PLLs from the 25 MHz HSE instead, so
-// the PLL3 numbers in audio.cpp (M 25 from 25 MHz) hold.
+// All three PLLs run from the HSE (kHseHz). USB comes from PLL1Q because the free-running HSI48 is
+// outside the USB FS tolerance without CRS, and a crystal-derived 48 MHz needs no correction.
+// audio.cpp derives its PLL3 divider from the same kHseHz.
 //
 // Rev V (REV_ID 0x2003): VOS0, 480 MHz. Older silicon tops out at 400 MHz on VOS1, so it gets
 // 360 MHz, the highest integer PLL1 setting that still puts exactly 48 MHz on PLL1Q.

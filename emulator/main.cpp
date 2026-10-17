@@ -131,7 +131,7 @@ struct ProtoParams {
     eq.on = true;
     pitchFx.harmony.key = kStartKey;  // Autotune follows through the shared KEY
     pitchFx.autotune.key = kStartKey;
-    pitchFx.octave.engine = 2;
+    pitchFx.octave.engine = cv::kOctaveGranular;
     pitchFx.octave.mix = 0.10f;
     reverb.engine = cv::kReverbSpringB;
     reverb.intensity = 1.0f;

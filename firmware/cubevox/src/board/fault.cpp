@@ -222,7 +222,9 @@ void faultWatchdogStart() {
     // Without the update the watchdog keeps its power-on period of about half a second, which
     // loop() still meets. The wait gives up and says so, because a hang here would stop the box
     // before the watchdog could help.
-    serialOut().println("[ERROR] watchdog did not accept its 2 s period, running on its default");
+    serialOut().print("[ERROR] watchdog did not accept its ");
+    serialOut().print(kWatchdogMs / 1000);
+    serialOut().println(" s period, running on its default");
     return;
   }
   LL_IWDG_ReloadCounter(IWDG1);

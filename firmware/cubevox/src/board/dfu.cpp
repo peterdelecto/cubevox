@@ -1,5 +1,6 @@
 #include "board/dfu.h"
 
+#include "board/flash_bank2.h"
 #include "board/mute.h"
 #include "board/platform.h"
 #include "board/record_service.h"
@@ -7,8 +8,8 @@
 
 namespace {
 
-// Matches the flash driver's erase timeout, so a stuck erase ends this wait too.
-constexpr uint32_t kSaveWaitMs = 5000;
+// A stuck erase ends this wait when the flash driver's erase timeout does.
+constexpr uint32_t kSaveWaitMs = kEraseTimeoutMs;
 
 }  // namespace
 

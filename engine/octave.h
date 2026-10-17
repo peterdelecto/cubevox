@@ -33,6 +33,8 @@ struct OctaveTuning {
   float trimDbC = 2.2f;
 };
 
+constexpr int kOctaveGranular = 2;  // OctaveParams::engine value for option C
+
 struct OctaveParams {
   bool on = true;                // panel toggle; off fades the stage out
   int engine = 0;                // 0 = A (grid PSOLA), 1 = B (epoch PSOLA + formant), 2 = C (granular)

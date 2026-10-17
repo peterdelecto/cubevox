@@ -5,6 +5,8 @@
 
 #include <stdint.h>
 
+#include <array>
+
 #include "board/build_kind.h"
 #include "core/slots.h"
 
@@ -14,7 +16,7 @@ struct Slot {
   uint8_t muxChannelB;
 };
 
-extern const Slot kSlots[kSlotCount];
+extern const std::array<Slot, kSlotCount> kSlots;
 
 #if CUBEVOX_BENCH
 // Silkscreen number (1..16) of the pot wired to a 0-based mux channel.

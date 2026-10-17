@@ -25,7 +25,7 @@ constexpr uint8_t kPot14 = 10;
 constexpr uint8_t kPot15Key = 12;
 constexpr uint8_t kPot16Semitones = 15;
 
-const Slot kSlots[kSlotCount] = {
+const std::array<Slot, kSlotCount> kSlots = {{
     {pins::kToggle1, kPot01, kPot02},
     {pins::kToggle2, kPot15Key, kPot03},
     {pins::kToggle3, kPot16Semitones, kPot04},
@@ -34,7 +34,7 @@ const Slot kSlots[kSlotCount] = {
     {pins::kToggle6, kPot09, kPot10},
     {pins::kToggle7, kPot11, kPot12},
     {pins::kToggle8, kPot13, kPot14},
-};
+}};
 
 #if CUBEVOX_BENCH
 int potNumber(int muxChannel) {

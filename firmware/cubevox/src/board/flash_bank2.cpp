@@ -15,7 +15,6 @@ constexpr uint32_t kErrors = FLASH_SR_WRPERR | FLASH_SR_PGSERR | FLASH_SR_STRBER
                              FLASH_SR_DBECCERR | FLASH_SR_CRCRDERR;
 constexpr uint32_t kClearAll = kErrors | FLASH_SR_EOP;  // CCR2 bits sit at the same positions as SR2
 constexpr uint32_t kProgramTimeoutUs = 5000;            // one flash word takes tens of microseconds
-constexpr uint32_t kEraseTimeoutMs = 5000;              // a bound for a stuck controller, not an erase time
 
 bool validSector(int sector) { return sector >= 0 && sector < kRecordSectors; }
 
@@ -29,6 +28,14 @@ bool unlock() {
 }
 
 void lock() { FLASH->CR2 |= FLASH_CR_LOCK; }
+
+// Ends an operation, finished or abandoned: clears the status flags and the mode bit (SER or PG),
+// then locks. A mode bit left set would be ORed with the next operation's and raise PGSERR.
+void release(uint32_t modeBit) {
+  FLASH->CCR2 = kClearAll;
+  FLASH->CR2 &= ~modeBit;
+  lock();
+}
 
 // Drops cached lines so a read sees what the flash holds now. Lines are 32 bytes.
 void invalidate(uint32_t address, uint32_t bytes) {
@@ -65,17 +72,15 @@ bool Bank2Flash::eraseBusy() {
   if (!erasing_) return false;
   if (FLASH->SR2 & kBusy) {
     if (millis() - eraseStartMs_ < kEraseTimeoutMs) return true;
-    // A controller that is still busy stays unlocked, since locking it mid-erase is not defined.
     error_ = true;
     erasing_ = false;
+    release(FLASH_CR_SER);
     return false;
   }
 
   erasing_ = false;
   if (FLASH->SR2 & kErrors) error_ = true;
-  FLASH->CCR2 = kClearAll;
-  FLASH->CR2 &= ~FLASH_CR_SER;
-  lock();
+  release(FLASH_CR_SER);
   invalidate(sectorAddress(erasingSector_), kRecordSectorBytes);
   return false;
 }
@@ -101,16 +106,10 @@ void Bank2Flash::programWord(int sector, uint32_t offset, const uint8_t* flashWo
 
   const uint32_t startUs = micros();
   while ((FLASH->SR2 & kBusy) && micros() - startUs < kProgramTimeoutUs) {}
-  if (FLASH->SR2 & kBusy) {
-    // Still programming: PG and the unlock stay as they are until the next operation clears them.
-    error_ = true;
-    return;
-  }
-  if (FLASH->SR2 & kErrors) error_ = true;
-  FLASH->CCR2 = kClearAll;
-  FLASH->CR2 &= ~FLASH_CR_PG;
-  lock();
-  invalidate(address, kFlashWordBytes);
+  const uint32_t status = FLASH->SR2;
+  if ((status & kBusy) || (status & kErrors)) error_ = true;
+  release(FLASH_CR_PG);
+  if (!(status & kBusy)) invalidate(address, kFlashWordBytes);
 }
 
 bool Bank2Flash::takeError() {

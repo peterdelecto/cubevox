@@ -10,6 +10,9 @@
 
 constexpr uint32_t kBank2Base = FLASH_BANK2_BASE;  // bank 2 sector 0
 
+// A bound for a stuck controller, not an erase time.
+constexpr uint32_t kEraseTimeoutMs = 5000;
+
 // Any failure (a refused unlock, a sector outside the record sectors, a busy wait that timed out,
 // a flash status error) sets a flag that takeError() returns once.
 class Bank2Flash : public FlashIo {

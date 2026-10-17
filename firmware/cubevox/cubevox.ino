@@ -47,7 +47,7 @@ PublishGate gPublish;
 Every gHeartbeat{kHeartbeatMs};
 Every gStats{kStatsMs};
 
-void printBootReport() { bootReportPrint(gOledFound); }
+void reportBoot() { bootReport(gOledFound); }
 
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
 void publishSnapshot() { audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides())); }
@@ -98,7 +98,7 @@ void replySetLayout(const protocol::Request& req, uint32_t nowMs) {
 void replyBench(const protocol::Request& req) {
   protocol::Writer& out = serialWriter();
   if (req.op == BenchOp::Fault || req.op == BenchOp::Spin) protocol::replyOk(out, req.id);  // the drill flushes it
-  const BenchResult result = benchRun(req.op, req.benchSlot, printBootReport);
+  const BenchResult result = benchRun(req.op, req.benchSlot, reportBoot);
   if (result.republish) gPublish.markStale();
   if (result.error) {
     protocol::replyError(out, req.id, result.error);
@@ -177,7 +177,7 @@ void loop() {
   usbLinkPoll(nowMs);
   if (usbLinkTerminalOpened()) {
     serialLinkSessionStart();
-    printBootReport();
+    reportBoot();
   }
   serialLinkPoll(nowMs, onRequest);
 

@@ -38,7 +38,7 @@ void reportOled(Print& out, bool found) {
 
 }  // namespace
 
-void bootReportPrint(bool oledFound) {
+void bootReport(bool oledFound) {
   Print& out = serialOut();
   out.print("[boot] cubevox firmware ");
   out.println(kFirmwareVersion);
