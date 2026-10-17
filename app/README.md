@@ -3,7 +3,7 @@
 Go helper that serves the layout page on 127.0.0.1 and relays it to the box over USB. Spec: `docs/specs/2026-10-15-mac-app-design.md`.
 
 Run with no hardware: `go run . --fake --no-open` (flags: `--fake`, `--port N` with 0 for a free port, `--no-open`).
-Test: `go vet ./... && go test ./...`. Build: `go build -ldflags "-X main.version=v0.01.00" -o cubevox-app .`
+Test: `go vet ./... && go test ./...`. Page: `node tools/page_check.mjs` drives the page in headless Chrome through every spec behaviour (drag, swap, reverb replace, push error, keyboard, over the limit, bar states) and writes screenshots to `build/page-check/`. Build: `go build -ldflags "-X main.version=v0.01.00" -o cubevox-app .`
 The app writes `~/Library/Application Support/cubevox/port`, exits 60 s after the last heartbeat, and a second launch only opens the browser.
 
 API: `GET /api/state` (connected, fw, app, cards, layout, limits, update), `POST /api/layout` with `{"slots":[8 ids]}`
