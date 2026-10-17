@@ -1,56 +1,77 @@
 #!/usr/bin/env bash
-# Flash /tmp/cubevox-fw-<variant>/cubevox.ino.bin over DFU and print the boot report.
+# Flash <out dir>/cubevox.ino.bin over DFU and print the boot report.
 #
-# VARIANT=release|bench picks the image. It defaults to bench when BOARD=weact and to release
-# otherwise. If a cubevox CDC port is present the box is asked to enter DFU itself (the
+# The variant and out dir come from build.sh (VARIANT=release|bench; BENCH=1 and BOARD=weact
+# imply bench). If a cubevox CDC port is present the box is asked to enter DFU itself (the
 # enter_dfu command). Otherwise hold BOOT0, tap NRST, release BOOT0; the script waits up to WAIT
-# seconds (default 300).
+# seconds (default 300). With several cu.usbmodem* ports, name one in CUBEVOX_PORT.
 #
 #   ./flash.sh                    # release image; build first with ./build.sh
 #   VARIANT=bench ./flash.sh      # bench image; build first with BENCH=1 ./build.sh
 #   BOARD=weact ./flash.sh        # bench image for the WeAct board
 
-set -uo pipefail
+set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
-if [ -z "${VARIANT:-}" ]; then
-  [ "${BOARD:-}" = "weact" ] && VARIANT=bench || VARIANT=release
-fi
-case "$VARIANT" in
-  release|bench) ;;
-  *) echo "[ERROR] VARIANT is '$VARIANT'; use release or bench"; exit 1 ;;
-esac
-BIN="/tmp/cubevox-fw-$VARIANT/cubevox.ino.bin"
+VARIANT="$("$FW/build.sh" --variant)"
+BIN="$("$FW/build.sh" --outdir)/cubevox.ino.bin"
 WAIT="${WAIT:-300}"
+PORT_TOOL=(python3 -I "$FW/cubevox_port.py")
 
-command -v dfu-util >/dev/null || { echo "[ERROR] dfu-util not installed (brew install dfu-util)"; exit 1; }
+if ! command -v dfu-util >/dev/null; then
+  echo "[ERROR] dfu-util not installed (brew install dfu-util)"
+  exit 1
+fi
 if [ ! -f "$BIN" ]; then
-  [ "$VARIANT" = bench ] && hint="BENCH=1 ./build.sh" || hint="./build.sh"
+  hint="./build.sh"
+  if [ "$VARIANT" = bench ]; then hint="BENCH=1 ./build.sh"; fi
   echo "[ERROR] $BIN missing; run $hint first"
   exit 1
 fi
 echo "[flash] $VARIANT image"
 
-have_port() { ls /dev/ | grep -q '^cu\.usbmodem'; }
-in_dfu() { dfu-util -l 2>/dev/null | grep -q "0483:df11"; }
+in_dfu() {
+  local listing
+  listing="$(dfu-util -l)" || { echo "[ERROR] dfu-util -l failed"; exit 1; }
+  [[ "$listing" == *0483:df11* ]]
+}
 
-if ! in_dfu && have_port; then
-  echo "[flash] asking the box to enter DFU"
-  "$FW/term.py" -t 2 -s '{"id":1,"cmd":"enter_dfu"}' >/dev/null 2>&1
+# Fails with the candidates listed when several ports match and none was named.
+box_port="$("${PORT_TOOL[@]}" --allow-none)"
+
+if ! in_dfu && [ -n "$box_port" ]; then
+  echo "[flash] asking the box on $box_port to enter DFU"
+  if ! "${PORT_TOOL[@]}" --port "$box_port" --request enter_dfu >/dev/null; then
+    echo "[flash] the box did not accept enter_dfu; enter DFU by hand with BOOT0"
+  fi
 fi
 
 for ((i = 0; i < WAIT; i++)); do
-  in_dfu && break
-  [ "$i" -eq 0 ] && echo "[flash] waiting for the ST bootloader (hold BOOT0, tap NRST, release BOOT0)"
+  if in_dfu; then break; fi
+  if [ "$i" -eq 0 ]; then echo "[flash] waiting for the ST bootloader (hold BOOT0, tap NRST, release BOOT0)"; fi
   sleep 1
 done
-in_dfu || { echo "[ERROR] no DFU device after ${WAIT}s"; exit 1; }
+if ! in_dfu; then
+  echo "[ERROR] no DFU device after ${WAIT}s"
+  exit 1
+fi
 
-# The leave request resets the chip before it answers, so dfu-util reports a get_status error.
-dfu-util -a 0 -s 0x08000000:leave -D "$BIN" 2>&1 | grep -E "Erase|downloaded|Error" | grep -v get_status
-for ((i = 0; i < 30; i++)); do
-  have_port && break
-  sleep 1
-done
-have_port || { echo "[ERROR] box did not enumerate after the flash"; exit 1; }
+# The leave request resets the chip before it answers, so dfu-util reports a get_status error
+# and may exit non-zero. The flash counts as good when the download finished and no other error shows.
+dfu_log="$(mktemp)"
+trap 'rm -f "$dfu_log"' EXIT
+dfu_rc=0
+dfu-util -a 0 -s 0x08000000:leave -D "$BIN" >"$dfu_log" 2>&1 || dfu_rc=$?
+grep -E "Erase|downloaded|Error" "$dfu_log" | grep -v get_status || true  # no match is a normal outcome
+unexpected="$(awk 'tolower($0) ~ /error/ && $0 !~ /get_status/' "$dfu_log")"
+if ! grep -q "File downloaded successfully" "$dfu_log" || [ -n "$unexpected" ]; then
+  echo "[ERROR] dfu-util did not finish the download (exit $dfu_rc); output follows"
+  cat "$dfu_log"
+  exit 1
+fi
+
+rm -f "$dfu_log"  # exec below skips the EXIT trap
+
+# The port name can change across the reset, so ask again.
+box_port="$("${PORT_TOOL[@]}" --wait 30)"
 sleep 2
-exec "$FW/term.py" -t 3 -s '{"id":2,"cmd":"bench","op":"report"}'
+exec "$FW/term.py" -t 3 -s '{"id":2,"cmd":"bench","op":"report"}' "$box_port"

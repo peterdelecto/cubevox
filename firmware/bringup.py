@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""First-article bring-up for a cubevox board (checklist in hardware/RUNLOG.md, boards ordered).
+"""First-article bring-up for a cubevox board (checklist in hardware/RUNLOG.md).
 
 Run after first power-up, with the board on USB. A real board gets the bench image first (the
 drills need it); the script checks the boot report, times the audio block rate, optionally drills
 the fault paths and DFU entry, asks for the readings only a person can take, then flashes the
 release image and confirms hello reports build "release". --weact stays on the bench image.
 Every command goes out as a framed JSON request through bench_ops.py. The log goes to
-hardware/bringup/.
+hardware/bringup/. With several cu.usbmodem* ports, name one with --port.
 
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and DFU entry (reflashes)
@@ -16,78 +16,56 @@ hardware/bringup/.
 
 import argparse
 import datetime
-import glob
-import json
 import os
 import re
-import select
 import subprocess
 import sys
-import termios
 import time
-import tty
 
 FW = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(FW)
 sys.path.insert(0, FW)  # python3 -I leaves the script dir out
 import bench_ops  # noqa: E402
+import cubevox_port  # noqa: E402
 
-BLOCK_RATE_HZ = 48000 / 64
+SAMPLE_RATE_HZ = 48000
+BLOCK_FRAMES = 64
+BLOCK_RATE_HZ = SAMPLE_RATE_HZ / BLOCK_FRAMES
 SAI_HZ = 49152000
 SAI_TOL_PPM = 100
+ENUMERATE_SETTLE_S = 1.0
+SCRIPT_FAIL_TAIL_LINES = 20
+PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 
-class Port:
-    """CDC port opened raw. Opening raises DTR, which makes the firmware print its boot report."""
+class Port(cubevox_port.Link):
+    """CDC port that waits for the box to enumerate. Opening raises DTR, so the firmware prints its boot report."""
 
     def __init__(self, wait_s=20.0):
-        end = time.monotonic() + wait_s
-        while True:
-            ports = glob.glob("/dev/cu.usbmodem*")
-            if ports:
-                break
-            if time.monotonic() > end:
-                raise RuntimeError("no /dev/cu.usbmodem* port")
-            time.sleep(0.5)
-        self.name = ports[0]
-        time.sleep(1.0)
-        self.fd = os.open(self.name, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-        tty.setraw(self.fd)
-        attrs = termios.tcgetattr(self.fd)
-        attrs[2] |= termios.CLOCAL | termios.CREAD
-        termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
-        self.buf = b""
+        path = cubevox_port.find_port(wait_s=wait_s)
+        time.sleep(ENUMERATE_SETTLE_S)
+        super().__init__(path)
 
     def send(self, s):
         """Sends a bench letter or a raw JSON request as one framed line."""
-        self.os_write(bench_ops.to_line(s))
-
-    def os_write(self, line):
-        os.write(self.fd, line.encode())
+        self.send_line(bench_ops.to_line(s))
 
     def read(self, seconds, until=None):
         """Lines for up to `seconds`; stops early once a line matches `until`."""
         lines = []
         end = time.monotonic() + seconds
         while time.monotonic() < end:
-            r, _, _ = select.select([self.fd], [], [], 0.1)
-            if not r:
-                continue
             try:
-                chunk = os.read(self.fd, 4096)
-            except OSError:
-                break  # the board reset and the port went away
-            self.buf += chunk
-            while b"\n" in self.buf:
-                raw, self.buf = self.buf.split(b"\n", 1)
-                line = raw.decode("utf-8", "replace").rstrip("\r")
-                lines.append(line)
-                if until and re.search(until, line):
-                    return lines
+                line = self.read_line(end - time.monotonic())
+            except cubevox_port.PortGone as e:
+                print(f"[bringup] port went away: {e}", flush=True)  # expected when a drill resets the board
+                break
+            if line is None:
+                break
+            lines.append(line)
+            if until and re.search(until, line):
+                break
         return lines
-
-    def close(self):
-        os.close(self.fd)
 
 
 class Log:
@@ -256,6 +234,7 @@ def panel_pot(log, port, slot, knob):
     key = (slot, knob)
     others = set()
     verdict = "ok"
+    goal = "low"  # the end being tried when the loop stops, used in the timeout message
     for goal, word in (("low", "LEFT (counter-clockwise)"), ("high", "RIGHT (clockwise)")):
         print(f"  Turn slot {slot} knob {knob} fully {word}.", flush=True)
         start = panel_dump(port).get(key)
@@ -357,17 +336,20 @@ def fault_drill(log, port):
     log.check("audio stall mutes", find(lines, r"\[ERROR\] audio stalled") is not None,
               "stall reported, output muted" if find(lines, r"audio stalled") else "no stall line within 3 s")
 
-    port, lines, m = reset_and_report(port, "w", r"^\[boot\] reset:.*watchdog")
+    port, _, m = reset_and_report(port, "w", r"^\[boot\] reset:.*watchdog")
     log.check("watchdog reset", m is not None, m.group(0) if m else "reset cause did not show watchdog")
 
-    port, lines, m = reset_and_report(port, "f", r"^\[ERROR\] last reset: fault .*")
+    port, _, m = reset_and_report(port, "f", r"^\[ERROR\] last reset: fault .*")
     log.check("fault recorded across reset", m is not None, m.group(0) if m else "no fault record after a forced fault")
     return port
 
 
 def in_dfu():
-    out = subprocess.run(["dfu-util", "-l"], capture_output=True, text=True).stdout
-    return "0483:df11" in out
+    r = subprocess.run(["dfu-util", "-l"], capture_output=True, text=True)
+    if r.returncode:
+        print(f"[bringup] dfu-util -l failed (exit {r.returncode}): {r.stderr.strip()}", flush=True)
+        return False
+    return "0483:df11" in r.stdout
 
 
 def wait_dfu(seconds):
@@ -380,22 +362,23 @@ def wait_dfu(seconds):
 
 
 def flash_variant(variant, weact):
-    """Builds and flashes the release or bench image. The WeAct board only ever runs bench."""
-    env = dict(os.environ, TAIL="2", VARIANT=variant)
+    """Builds and flashes the release or bench image. The WeAct board only ever runs bench.
+
+    build.sh derives the out dir from VARIANT and BOARD; a failing script's output tail is shown.
+    """
+    env = dict(os.environ, TAIL=str(SCRIPT_FAIL_TAIL_LINES), VARIANT=variant)
     env.pop("BENCH", None)
     env.pop("BOARD", None)
     if weact:
-        env["BOARD"] = "weact"  # implies the bench image
-    elif variant == "bench":
-        env["BENCH"] = "1"
-    if subprocess.run([os.path.join(FW, "build.sh")], env=env, capture_output=True).returncode != 0:
-        return False
-    return subprocess.run([os.path.join(FW, "flash.sh")], env=env, capture_output=True).returncode == 0
-
-
-def flash_back(weact):
-    """Reflashes the bench image the drills run on."""
-    return flash_variant("bench", weact)
+        env["BOARD"] = "weact"
+    for script in ("build.sh", "flash.sh"):
+        r = subprocess.run([os.path.join(FW, script)], env=env, text=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if r.returncode:
+            tail = "\n".join(r.stdout.splitlines()[-SCRIPT_FAIL_TAIL_LINES:])
+            print(f"[bringup] {script} ({variant}) exited {r.returncode}:\n{tail}", flush=True)
+            return False
+    return True
 
 
 def check_release_image(log):
@@ -406,20 +389,18 @@ def check_release_image(log):
         return
     try:
         port = Port(wait_s=30.0)
-    except RuntimeError as e:
+        reply = port.ask("hello", 5.0)
+        port.close()
+    except PORT_ERRORS as e:
         log.check("release image build", False, str(e))
         return
-    req_id = bench_ops.next_id()
-    port.os_write(bench_ops.cmd_line("hello", req_id))
-    build = None
-    for line in port.read(5.0, until=r'^\{.*"proto"'):
-        if line.startswith("{") and '"proto"' in line:
-            try:
-                build = json.loads(line).get("build")
-            except ValueError:
-                pass
-    port.close()
-    log.check("release image build", build == "release", f'hello build "{build}"')
+    if reply is None:
+        log.check("release image build", False, "no hello reply in 5 s")
+    elif "_unparsed" in reply:
+        log.check("release image build", False, f"hello reply is not JSON: {reply['_unparsed'][:120]}")
+    else:
+        build = reply.get("build")
+        log.check("release image build", build == "release", f'hello build "{build}"')
 
 
 def dfu_drill(log, port, weact, prompt):
@@ -429,14 +410,14 @@ def dfu_drill(log, port, weact, prompt):
     ok = wait_dfu(15)
     log.check("DFU entry by command (menu path)", ok, "0483:df11 listed" if ok else "no DFU device in 15 s")
     if ok:
-        log.check("flash back over DFU", flash_back(weact), "build.sh + flash.sh for this board")
+        log.check("flash back over DFU", flash_variant("bench", weact), "build.sh + flash.sh for this board")
 
     if prompt:
         input("\nHold BOOT0, tap reset, release BOOT0, then press Enter. ")
         ok = wait_dfu(30)
         log.check("DFU entry by BOOT0", ok, "0483:df11 listed" if ok else "no DFU device in 30 s")
         if ok:
-            log.check("flash back over DFU", flash_back(weact), "build.sh + flash.sh for this board")
+            log.check("flash back over DFU", flash_variant("bench", weact), "build.sh + flash.sh for this board")
     return Port(wait_s=30.0)
 
 
@@ -457,21 +438,32 @@ def main():
     ap.add_argument("--dfu", action="store_true", help="drill DFU entry; reflashes the board")
     ap.add_argument("--panel", action="store_true", help="walk every pot and toggle, then K103, mute and OLED")
     ap.add_argument("--no-prompt", action="store_true", help="skip every question to the operator")
+    ap.add_argument("--port", default=None, help="serial port, needed only when several cu.usbmodem* exist")
     a = ap.parse_args()
+    if a.port:
+        os.environ[cubevox_port.PORT_ENV] = a.port  # flash.sh inherits it
 
     log = Log()
+    try:
+        run_checks(log, a)
+    except PORT_ERRORS as e:
+        log.check("serial port", False, str(e))
+    return finish(log, a)
+
+
+def run_checks(log, a):
     if not a.weact:
         # A real board gets the bench image for the drills and the release image at the end.
         flashed = flash_variant("bench", False)
-        log.check("flash bench image", flashed, "build.sh BENCH=1 + flash.sh VARIANT=bench")
+        log.check("flash bench image", flashed, "build.sh VARIANT=bench + flash.sh")
         if not flashed:
-            return finish(log, a)
+            return
     try:
         port = Port()
-    except RuntimeError as e:
+    except PORT_ERRORS as e:
         log.check("USB enumeration", False, str(e))
-        return finish(log, a)
-    log.check("USB enumeration", True, port.name)
+        return
+    log.check("USB enumeration", True, port.path)
 
     check_boot(log, boot_report(port), not a.no_oled)
     check_audio(log, port)
@@ -489,7 +481,6 @@ def main():
     if not a.no_prompt:
         for name, question in MANUAL:
             log.note(name, input(question).strip() or "no answer")
-    return finish(log, a)
 
 
 def finish(log, a):

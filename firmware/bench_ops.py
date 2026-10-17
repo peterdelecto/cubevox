@@ -30,7 +30,7 @@ LETTER_OPS = {
     "x": "panel_mute",
     "o": "panel_oled",
 }
-SLOT_LETTERS = "12345678"  # slot_off N
+SLOT_LETTERS = frozenset("12345678")  # slot_off N
 DFU_LETTER = "d"           # the enter_dfu command
 
 QUERY_OPS = {"report", "stats", "record_status"}      # every build
@@ -60,7 +60,7 @@ def letter_line(letter, req_id=None):
     """The request line for a familiar letter, or None when the letter is unknown."""
     if letter == DFU_LETTER:
         return cmd_line("enter_dfu", req_id)
-    if letter in SLOT_LETTERS and len(letter) == 1:
+    if letter in SLOT_LETTERS:
         return op_line("slot_off", int(letter), req_id)
     op = LETTER_OPS.get(letter)
     return op_line(op, req_id=req_id) if op else None

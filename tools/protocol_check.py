@@ -10,25 +10,21 @@ The checks follow the build hello reports. A bench build runs a query op and the
 (bench spin). A release build must refuse bench fault, record_erase and stop_audio with "op not in
 this build", and has no reset check. Both builds must ignore raw bytes outside a line.
 
-No pyserial: the OS driver and termios are enough for a CDC port, as in firmware/term.py. Bench
-requests come from firmware/bench_ops.py.
+The port handling comes from firmware/cubevox_port.py and the bench requests from
+firmware/bench_ops.py. With several cu.usbmodem* ports, name one with --port.
 
   python3 -I tools/protocol_check.py
   python3 -I tools/protocol_check.py --port /dev/cu.usbmodemXXXX --no-reset
 """
 
 import argparse
-import glob
-import json
 import os
-import select
 import sys
-import termios
 import time
-import tty
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware"))  # -I drops the script dir
 import bench_ops  # noqa: E402
+import cubevox_port  # noqa: E402
 
 SLOTS = 8
 STRAY = b"faewdx1k"  # old bench letters, sent outside a line
@@ -37,86 +33,32 @@ REPLY_WAIT_S = 3.0
 REBOOT_WAIT_S = 30.0  # watchdog reset (2 s) plus USB enumeration
 
 
-def find_port():
-    ports = sorted(glob.glob("/dev/cu.usbmodem*"))
-    if not ports:
-        sys.exit("[ERROR] no /dev/cu.usbmodem* port; is the box enumerated?")
-    return ports[0]
+class Link(cubevox_port.Link):
+    """The shared port link plus the non-JSON lines seen while waiting for replies."""
 
-
-class Link:
-    """One open serial port that reads JSON lines and ignores every other line."""
-
-    def __init__(self, port):
-        self.port = port
-        self.fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-        tty.setraw(self.fd, termios.TCSANOW)  # the default TCSAFLUSH cuts the boot report mid-line
-        attrs = termios.tcgetattr(self.fd)
-        attrs[2] |= termios.CLOCAL | termios.CREAD
-        termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
-        self.buf = b""
-        self.next_id = 1
+    def __init__(self, path, explicit=None):
+        super().__init__(path)
+        self.explicit = explicit  # the --port value, reused when the box re-enumerates
         self.text = []  # non-JSON lines seen, newest last
-
-    def close(self):
-        os.close(self.fd)
-
-    def send(self, data):
-        os.write(self.fd, data)
-
-    def _fill(self, wait):
-        ready, _, _ = select.select([self.fd], [], [], wait)
-        if ready:
-            self.buf += os.read(self.fd, 4096)
-
-    def read_line(self, deadline):
-        """Next line from the port, or None at the deadline."""
-        while True:
-            if b"\n" in self.buf:
-                line, self.buf = self.buf.split(b"\n", 1)
-                return line.decode("utf-8", "replace").strip("\r")
-            left = deadline - time.time()
-            if left <= 0:
-                return None
-            self._fill(min(left, 0.2))
 
     def read_json(self, want_id, wait=REPLY_WAIT_S):
         """The reply with `want_id`; other lines are kept in self.text or dropped."""
-        deadline = time.time() + wait
-        while True:
-            line = self.read_line(deadline)
-            if line is None:
-                return None
-            if not line.startswith("{"):
-                self.text.append(line)
-                continue
-            try:
-                reply = json.loads(line)
-            except ValueError:
-                return {"_unparsed": line}
-            if reply.get("id") == want_id:
-                return reply
+        return self.read_reply(want_id, wait, self.text.append)
 
     def ask(self, cmd, **fields):
-        rid = self.next_id
-        self.next_id += 1
-        req = {"id": rid, "cmd": cmd}
-        req.update(fields)
-        self.send((json.dumps(req) + "\n").encode())
-        return self.read_json(rid)
+        return super().ask(cmd, REPLY_WAIT_S, self.text.append, **fields)
 
     def bench(self, op, slot=None, wait=REPLY_WAIT_S):
         """Sends a bench op through bench_ops.py and returns its reply."""
-        rid = self.next_id
-        self.next_id += 1
-        self.send(bench_ops.op_line(op, slot, rid).encode())
+        rid = self.take_id()
+        self.send_line(bench_ops.op_line(op, slot, rid))
         return self.read_json(rid, wait)
 
     def drain(self, quiet=0.3):
         """Reads until the port is quiet; returns the non-JSON text lines."""
         lines = []
         while True:
-            line = self.read_line(time.time() + quiet)
+            line = self.read_line(quiet)
             if line is None:
                 return lines
             if not line.startswith("{"):
@@ -238,11 +180,11 @@ def check_set_invalid(link, rep, hello, current):
 
 
 def check_bad_lines(link, rep):
-    link.send(b"{not json at all\n")
+    link.write(b"{not json at all\n")
     r = link.read_json(0)
     rep.check("malformed line: error with id 0", err_reply(r, "malformed"), str(r))
 
-    link.send(b'{"id":' + b"1" * 800 + b"}\n")
+    link.write(b'{"id":' + b"1" * 800 + b"}\n")
     r = link.read_json(0)
     rep.check("overlong line: error with id 0", err_reply(r, "too long"), str(r))
 
@@ -287,7 +229,7 @@ def check_stray_bytes(link, rep):
     if not status_ok(before):
         rep.check("stray bytes: status before", False, str(before))
         return
-    link.send(STRAY)
+    link.write(STRAY)
     time.sleep(0.5)
     after = link.ask("status")
     if not rep.check("stray bytes: port still answers", status_ok(after), str(after)):
@@ -314,28 +256,27 @@ def wait_saved(link, rep, before_seq, label):
 
 def reopen_after_reset(link, rep):
     """Triggers a watchdog reset with the bench spin op and reconnects."""
-    old = link.port
-    link.send(bench_ops.op_line("spin", req_id=link.next_id).encode())
+    old = link.path
+    link.send_line(bench_ops.op_line("spin", req_id=link.take_id()))
     time.sleep(0.5)
     link.close()
-    deadline = time.time() + REBOOT_WAIT_S
+    deadline = time.monotonic() + REBOOT_WAIT_S
     # The box spins for the watchdog period with its port still up; wait for the port to go first.
-    while glob.glob("/dev/cu.usbmodem*") and time.time() < deadline:
+    while cubevox_port.list_ports() and time.monotonic() < deadline:
         time.sleep(0.1)
-    while time.time() < deadline:
+    last_error = "no port appeared"
+    while time.monotonic() < deadline:
         time.sleep(0.5)
-        ports = sorted(glob.glob("/dev/cu.usbmodem*"))
-        if not ports:
-            continue
         try:
-            new = Link(ports[0])
-        except OSError:
+            new = Link(cubevox_port.find_port(link.explicit), link.explicit)
+        except cubevox_port.PortError as e:
+            last_error = str(e)  # not enumerated yet, or several ports; retried until the deadline
             continue
         time.sleep(1.0)
         new.drain(0.5)
         rep.check("reset: box came back on USB", True)
         return new
-    rep.check("reset: box came back on USB", False, f"no port within {REBOOT_WAIT_S:g} s (was {old})")
+    rep.check("reset: box came back on USB", False, f"{last_error} within {REBOOT_WAIT_S:g} s (was {old})")
     return None
 
 
@@ -348,7 +289,7 @@ def check_survives_reset(link, rep, expected):
     return link
 
 
-def restore(link, rep, orig, hello):
+def restore(link, rep, orig):
     st = link.ask("status")
     before = st["seq"] if status_ok(st) else 0
     r = link.ask("set_layout", name=orig["name"], slots=orig["slots"])
@@ -381,19 +322,23 @@ def run(link, rep, no_reset):
         link = check_survives_reset(link, rep, new)
         if link is None:
             return
-    restore(link, rep, orig, hello)
+    restore(link, rep, orig)
     check_status(link, rep, "end")
     link.close()
 
 
 def main():
     ap = argparse.ArgumentParser(description="Check the cubevox serial protocol against a box on USB.")
-    ap.add_argument("--port", default=None, help="serial port (default: first /dev/cu.usbmodem*)")
+    ap.add_argument("--port", default=None,
+                    help="serial port (default: CUBEVOX_PORT, else the only /dev/cu.usbmodem*)")
     ap.add_argument("--no-reset", action="store_true", help="skip the reset-and-reload check")
     a = ap.parse_args()
 
-    link = Link(a.port or find_port())
-    print(f"[check] {link.port}", flush=True)
+    try:
+        link = Link(cubevox_port.find_port(a.port), a.port)
+    except cubevox_port.PortError as e:
+        sys.exit(f"[ERROR] {e}")
+    print(f"[check] {link.path}", flush=True)
     time.sleep(1.0)  # the boot report prints when the port opens
     link.drain(0.5)
     rep = Report()
