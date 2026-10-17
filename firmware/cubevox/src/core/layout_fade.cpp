@@ -7,19 +7,8 @@ float gainAt(int level) { return level >= kFadeBlocks ? 1.0f : static_cast<float
 
 // Bit of the engine behind a card, 0 for Empty.
 uint32_t engineBit(Card c) {
-  switch (c) {
-    case Card::Empty: return 0;
-    case Card::InputGate: return 1u << static_cast<int>(Engine::InputGate);
-    case Card::Autotune:
-    case Card::Octave: return 1u << static_cast<int>(Engine::Pitch);
-    case Card::Unison: return 1u << static_cast<int>(Engine::Unison);
-    case Card::Slapback: return 1u << static_cast<int>(Engine::Slapback);
-    case Card::Distortion: return 1u << static_cast<int>(Engine::Distortion);
-    case Card::Gate: return 1u << static_cast<int>(Engine::Gate);
-    case Card::ReverbSpring:
-    case Card::ReverbChasm: return 1u << static_cast<int>(Engine::Reverb);
-  }
-  return 0;
+  const Engine e = engineOf(c);
+  return e == kNoEngine ? 0u : 1u << static_cast<int>(e);
 }
 
 }  // namespace

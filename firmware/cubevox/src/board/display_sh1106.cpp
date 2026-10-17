@@ -36,10 +36,8 @@ void initOnce() {
 class Sh1106Display : public Display {
  public:
   void flushStep(Canvas& canvas) override {
-    const uint8_t dirty = canvas.dirtyPages();
-    if (dirty == 0) return;
-    int page = 0;
-    while (!(dirty & (1u << page))) ++page;
+    const int page = canvas.firstDirtyPage();
+    if (page < 0) return;
     // A page is 16 tiles of 8 bytes, which is the canvas page layout as is.
     gU8x8.drawTile(0, page, kCanvasWidth / 8, const_cast<uint8_t*>(canvas.page(page)));
     canvas.clearDirty(page);

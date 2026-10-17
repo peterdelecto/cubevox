@@ -1,8 +1,8 @@
 #include "ui/menu.h"
 
 #include <stdio.h>
-#include <string.h>
 
+#include "core/fonts.h"
 #include "core/registry.h"
 #include "core/version.h"
 
@@ -10,16 +10,35 @@ namespace {
 
 constexpr uint32_t kMenuTimeoutMs = 15000;
 
+// Idle screen.
+constexpr int kRowTitle = 0;
+constexpr int kRowMuted = 1;
+constexpr int kRowCardName = 3;
+constexpr int kRowKnobName = 4;
+constexpr int kRowKnobValue = 5;
+constexpr int kRowToggle = 6;
+constexpr int kRowVersion = kDisplayRows - 1;
+
+// Menu list: a title row, then one row per item.
+constexpr int kRowListTitle = 0;
+constexpr int kRowListFirstItem = 1;
+
+// Firmware update confirmation.
+constexpr int kRowConfirmTitle = 0;
+constexpr int kRowConfirmBody1 = 2;
+constexpr int kRowConfirmBody2 = 3;
+constexpr int kRowConfirmCancel = 5;
+
 enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
 
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
-using FrameRows = char[kDisplayRows][kDisplayCols + 1];
+static_assert(kRowListFirstItem + kItemCount <= kDisplayRows, "the menu items must fit on the screen");
 
 // Rows past the screen are dropped; text clips to the row width.
-void row(FrameRows& frame, int r, const char* text) {
-  if (r >= kDisplayRows) return;
-  int n = 0;
+void putRow(MenuFrame& frame, int r, const char* text) {
+  if (r < 0 || r >= kDisplayRows) return;
+  size_t n = 0;
   while (n < kDisplayCols && text[n] != '\0') {
     frame[r][n] = text[n];
     ++n;
@@ -41,54 +60,57 @@ const char* itemLabel(Item it) {
 
 const char* itemValue(Item it, const Settings& s) {
   switch (it) {
-    case Item::Output: return s.output == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
+    case Item::Output: return s.outputLevel == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
     case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "PEDAL";
     default: return "";
   }
 }
 
-void drawIdle(FrameRows& f, const UiContext& ctx) {
-  row(f, 0, "cubevox");
-  row(f, 1, ctx.muted ? "MUTED" : "");
+void drawIdle(MenuFrame& f, const UiContext& ctx) {
+  putRow(f, kRowTitle, "cubevox");
+  putRow(f, kRowMuted, ctx.muted ? "MUTED" : "");
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
-  row(f, 7, tag);
+  putRow(f, kRowVersion, tag);
   const LastMoved m = ctx.panel.lastMoved;
-  if (m.slot < 0) return;
+  if (m.slot < 0 || m.slot >= kSlotCount) return;
   const Card card = ctx.layout.card[m.slot];
   const int knob = m.knobB ? 1 : 0;
   char value[kDisplayCols + 1];
   formatKnob(card, knob, ctx.panel.knob[m.slot][knob], value, sizeof(value));
-  row(f, 3, cardDesc(card).name);
-  row(f, 4, cardDesc(card).knob[knob].name);
-  row(f, 5, value);
-  row(f, 6, ctx.panel.toggle[m.slot] ? "ON" : "OFF");
+  putRow(f, kRowCardName, cardDesc(card).name);
+  putRow(f, kRowKnobName, cardDesc(card).knob[knob].name);
+  putRow(f, kRowKnobValue, value);
+  putRow(f, kRowToggle, ctx.panel.toggle[m.slot] ? "ON" : "OFF");
 }
 
-void drawList(FrameRows& f, const UiContext& ctx, int cursor) {
-  row(f, 0, "MENU");
+void drawList(MenuFrame& f, const UiContext& ctx, int cursor) {
+  putRow(f, kRowListTitle, "MENU");
   for (int i = 0; i < kItemCount; ++i) {
     const Item it = static_cast<Item>(i);
+    const char* value = itemValue(it, ctx.settings);
     char line[kDisplayCols + 1];
-    snprintf(line, sizeof(line), "%s%s %s", i == cursor ? ">" : " ", itemLabel(it), itemValue(it, ctx.settings));
-    row(f, 1 + i, line);
+    snprintf(line, sizeof(line), "%s%s%s%s", i == cursor ? ">" : " ", itemLabel(it), value[0] != '\0' ? " " : "",
+             value);
+    putRow(f, kRowListFirstItem + i, line);
   }
 }
 
-// Eight slots fill all eight rows, so the numbered rows stand in for a title.
-void drawChainView(FrameRows& f, const Layout& layout) {
+// The slots fill every row, so the numbered rows stand in for a title.
+void drawChainView(MenuFrame& f, const Layout& layout) {
+  static_assert(kSlotCount <= kDisplayRows, "the chain view shows one slot per row");
   for (int i = 0; i < kSlotCount; ++i) {
     char line[kDisplayCols + 1];
     snprintf(line, sizeof(line), "%d %s", i + 1, cardDesc(layout.card[i]).name);
-    row(f, i, line);
+    putRow(f, i, line);
   }
 }
 
-void drawConfirmDfu(FrameRows& f) {
-  row(f, 0, "UPDATE FIRMWARE");
-  row(f, 2, "Click to reboot");
-  row(f, 3, "into DFU mode.");
-  row(f, 5, "Turn to cancel.");
+void drawConfirmDfu(MenuFrame& f) {
+  putRow(f, kRowConfirmTitle, "UPDATE FIRMWARE");
+  putRow(f, kRowConfirmBody1, "Click to reboot");
+  putRow(f, kRowConfirmBody2, "into DFU mode.");
+  putRow(f, kRowConfirmCancel, "Turn to cancel.");
 }
 
 }  // namespace
@@ -115,9 +137,9 @@ UiAction Menu::onClick() {
   return UiAction::None;
 }
 
-void Menu::onTurn(int detents) {
+void Menu::onTurn(int32_t detents) {
   if (mode_ == Mode::List) {
-    cursor_ = (cursor_ + detents % kItemCount + kItemCount) % kItemCount;
+    cursor_ = static_cast<uint8_t>((cursor_ + detents % kItemCount + kItemCount) % kItemCount);
   } else if (mode_ == Mode::ConfirmDfu) {
     mode_ = Mode::List;
   }
@@ -131,21 +153,22 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   return action;
 }
 
-void Menu::invalidate() { shown_.row[0][0] = '\x01'; }  // no frame holds this byte
-
 void Menu::draw(const UiContext& ctx, Canvas& canvas) {
-  Frame frame = {};
+  MenuFrame frame = {};
   switch (mode_) {
-    case Mode::Idle: drawIdle(frame.row, ctx); break;
-    case Mode::List: drawList(frame.row, ctx, cursor_); break;
-    case Mode::ChainView: drawChainView(frame.row, ctx.layout); break;
-    case Mode::ConfirmDfu: drawConfirmDfu(frame.row); break;
+    case Mode::Idle: drawIdle(frame, ctx); break;
+    case Mode::List: drawList(frame, ctx, cursor_); break;
+    case Mode::ChainView: drawChainView(frame, ctx.layout); break;
+    case Mode::ConfirmDfu: drawConfirmDfu(frame); break;
   }
-  if (memcmp(&frame, &shown_, sizeof(frame)) == 0) return;
+  if (shownValid_ && frame == shown_) return;
   shown_ = frame;
+  shownValid_ = true;
   canvas.clear();
   for (int r = 0; r < kDisplayRows; ++r) {
-    if (frame.row[r][0]) canvas.drawText(0, r * kDisplayRowPx, font5x7(), frame.row[r]);
+    if (frame[r][0]) canvas.drawText(0, r * kDisplayRowPx, font5x7(), frame[r].data());
   }
-  if (mode_ == Mode::List) canvas.invertRect(0, (1 + cursor_) * kDisplayRowPx, kCanvasWidth, kDisplayRowPx);
+  if (mode_ == Mode::List) {
+    canvas.invertRect(0, (kRowListFirstItem + cursor_) * kDisplayRowPx, kCanvasWidth, kDisplayRowPx);
+  }
 }

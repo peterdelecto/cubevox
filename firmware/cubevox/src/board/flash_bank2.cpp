@@ -1,6 +1,7 @@
 #include "board/flash_bank2.h"
 
 #include <Arduino.h>
+#include <string.h>
 
 namespace {
 
@@ -71,9 +72,9 @@ void Bank2Flash::programWord(int sector, uint32_t offset, const uint8_t* word) {
   __DSB();
 
   volatile uint32_t* dest = reinterpret_cast<volatile uint32_t*>(address);
-  for (int i = 0; i < 8; ++i) {  // eight 32-bit writes fill the 256-bit flash word
+  for (size_t i = 0; i < kFlashWordBytes / sizeof(uint32_t); ++i) {  // 32-bit writes fill the flash word
     uint32_t v;
-    memcpy(&v, word + 4 * i, 4);
+    memcpy(&v, word + sizeof v * i, sizeof v);
     dest[i] = v;
   }
   __DSB();
@@ -84,7 +85,7 @@ void Bank2Flash::programWord(int sector, uint32_t offset, const uint8_t* word) {
   FLASH->CCR2 = kClearAll;
   FLASH->CR2 &= ~FLASH_CR_PG;
   lock();
-  invalidate(address, 32);
+  invalidate(address, kFlashWordBytes);
 }
 
 bool Bank2Flash::takeError() {

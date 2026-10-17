@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "core/registry.h"
+
 namespace {
 
 constexpr float kDbPerDecade = 20.0f;

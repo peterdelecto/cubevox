@@ -6,14 +6,12 @@
 #include <stdint.h>
 
 #include "core/settings.h"
-
-// Covers the G6K-2F-Y operate time.
-constexpr uint32_t kRelaySettleMs = 20;
+#include "core/timing.h"
 
 class JackSwitch {
  public:
   // The relay starts on `initial`; at boot the output is already muted, so no dip is needed.
-  explicit JackSwitch(InputJack initial = InputJack::Mic) : relay_(initial) {}
+  explicit JackSwitch(InputJack initial) : relay_(initial) {}
 
   // Call every loop pass with the latest request and whether the output is fully muted.
   void update(uint32_t nowMs, InputJack requested, bool outputFullyMuted);

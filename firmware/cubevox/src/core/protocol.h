@@ -6,34 +6,52 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <array>
+
 #include "core/bench_ops.h"
 #include "core/layout.h"
-#include "core/record.h"
+#include "core/registry.h"
+#include "core/slots.h"
 
 namespace protocol {
 
 constexpr int kVersion = 1;
 constexpr size_t kMaxLine = 768;
-constexpr size_t kIdBytes = 24;  // a longer card id is clipped; no real id comes near it
-constexpr size_t kNameBytes = kRecordNameBytes;  // storage; a name holds 1 to kNameBytes - 1 printable ASCII characters
+constexpr size_t kIdBytes = kCardIdBytes;  // a longer card id is clipped to this
+constexpr size_t kNameBytes = kLayoutNameBytes;
 constexpr size_t kErrorBytes = 96;
 
 // Sink for reply text. `hello` streams through it in pieces.
 class Writer {
  public:
+  // Longest text one format() call can hold.
+  static constexpr size_t kFormatBytes = 160;
+
   virtual ~Writer() = default;
   virtual void write(const char* text, size_t len) = 0;
+
+  // Writes printf-formatted text. Text that does not fit kFormatBytes is not written at all; the
+  // call returns false and counts an overflow, so a lost piece of a reply shows in overflows().
+  bool format(const char* fmt, ...) __attribute__((format(printf, 2, 3)));
+
+  // Pieces of replies lost to format() overflow since boot.
+  uint32_t overflows() const { return overflows_; }
+
+ private:
+  uint32_t overflows_ = 0;
 };
 
 // Splits the byte stream into JSON lines. A `{` outside a line starts one, and it runs to the next
 // '\n'. Any other byte outside a line is ignored and counted.
 class Framer {
  public:
-  enum class Kind : uint8_t { None, Line, TooLong };
+  enum class Kind : uint8_t { None, Line, TooLong, BadByte };
 
-  // `Line` leaves the NUL-terminated text in line(). `TooLong` fires once; the rest of the line is dropped.
+  // `Line` leaves the NUL-terminated text in line(). `TooLong` fires once; the rest of the line is
+  // dropped. `BadByte` fires once on a NUL inside a line, which would cut the text short; the rest
+  // of that line is dropped too.
   Kind feed(uint8_t byte);
-  const char* line() const { return line_; }
+  const char* line() const { return line_.data(); }
 
   // Bytes seen outside a line since boot.
   uint32_t strayBytes() const { return stray_; }
@@ -46,7 +64,7 @@ class Framer {
   }
 
  private:
-  char line_[kMaxLine + 1] = {};
+  std::array<char, kMaxLine + 1> line_ = {};
   size_t len_ = 0;
   bool inLine_ = false;
   bool dropping_ = false;
@@ -59,10 +77,10 @@ struct Request {
   uint32_t id = 0;
   Command cmd = Command::Hello;
   BenchOp op = BenchOp::Report;  // Bench only
-  int benchSlot = 0;             // Bench only; the slot_off target, 1 to 8
+  int benchSlot = 0;             // Bench only; the slot_off target, 1 to kMaxBenchSlot
   char name[kNameBytes + 1] = {};
   int slotCount = 0;  // ids present in "slots"
-  char slot[kSlotCount][kIdBytes] = {};
+  std::array<std::array<char, kIdBytes>, kSlotCount> slot = {};
 };
 
 // Parses and checks one request. On failure returns false with a readable reason in `err`; `req.id`
@@ -73,15 +91,19 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize, boo
 // Maps the request's card ids onto a layout and checks it with layoutValid.
 bool resolveLayout(const Request& req, Layout& out, char* err, size_t errSize);
 
+// Fill the fields by name. The constructor is explicit and non-aggregate on purpose, so a positional
+// initializer cannot swap the four adjacent counters.
 struct Status {
-  float cpuMeanPercent;
-  float cpuWorstPercent;
-  uint32_t late;
-  bool muted;
-  uint32_t seq;
-  uint32_t recordErrors;
-  uint32_t serialDropped;
-  uint32_t strayBytes;
+  float cpuMeanPercent = 0.0f;
+  float cpuWorstPercent = 0.0f;
+  uint32_t late = 0;
+  bool muted = false;
+  uint32_t seq = 0;
+  uint32_t recordErrors = 0;
+  uint32_t serialDropped = 0;
+  uint32_t strayBytes = 0;
+
+  explicit Status() = default;
 };
 
 void replyError(Writer& w, uint32_t id, const char* reason);

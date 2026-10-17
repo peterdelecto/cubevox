@@ -51,7 +51,7 @@ constexpr ResetFlag kResetFlags[] = {
 
 // ECC_FA2 counts 32-byte flash words from the start of bank 2 (15 bits cover the 1 MB bank).
 uint32_t bank2EccAddress(const FaultRecord& r) {
-  return kBank2Base + (r.eccFa2 & FLASH_ECC_FA_FAIL_ECC_ADDR) * 32u;
+  return kBank2Base + (r.eccFa2 & FLASH_ECC_FA_FAIL_ECC_ADDR) * static_cast<uint32_t>(kFlashWordBytes);
 }
 
 bool bank2EccSet(const FaultRecord& r) { return (r.sr2 & FLASH_SR_DBECCERR) != 0; }

@@ -12,10 +12,8 @@ namespace {
 class StubDisplay : public Display {
  public:
   void flushStep(Canvas& canvas) override {
-    const uint8_t dirty = canvas.dirtyPages();
-    if (dirty == 0) return;
-    int page = 0;
-    while (!(dirty & (1u << page))) ++page;
+    const int page = canvas.firstDirtyPage();
+    if (page < 0) return;
 
     serialOut().print("[oled] page ");
     serialOut().println(page);

@@ -174,13 +174,17 @@ add_test(NAME stage_feedback COMMAND stage_feedback_test)
 
 # firmware core and ui tiers: every src/core/*.cpp and src/ui/*.cpp must compile on the host
 # (no Arduino, no HAL, no board/ include).
-file(GLOB CUBEVOX_FW_CORE_SOURCES ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/core/*.cpp
+file(GLOB CUBEVOX_FW_CORE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/core/*.cpp
                                   ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/ui/*.cpp)
 add_executable(firmware_test test/firmware_test.cpp ${CUBEVOX_FW_CORE_SOURCES})
 target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
                                                  ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
 target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}")
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
+# Optimised like the firmware, so optimisation-only warnings reach the sanitizers, with the same
+# float contraction as the target. The extra warnings matter on a single-precision FPU.
+target_compile_options(firmware_test PRIVATE -O2 -g -ffp-contract=fast
+                       -Wshadow -Wdouble-promotion -Wundef -Wformat=2)
 target_link_libraries(firmware_test PRIVATE engine)
 # ASan + UBSan on this target only; any report aborts the process, so ctest fails.
 set(CUBEVOX_SANITIZE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)

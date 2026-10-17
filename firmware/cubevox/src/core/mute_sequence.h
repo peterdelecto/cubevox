@@ -1,31 +1,24 @@
 // Output mute sequencing, pure. MUTE_SW (low = muted) drives the DAC soft mute (XSMT) and the
 // output relay (MUTE_N). Mute order is XSMT low, wait, MUTE_N low. Release order is MUTE_N high,
-// wait, XSMT high. The chain keeps running while muted.
+// wait, XSMT high. The chain keeps running while muted. Timing constants live in core/timing.h.
 
 #pragma once
 
 #include <stdint.h>
 
-#include "core/jack_switch.h"  // kRelaySettleMs
-#include "core/knob_filter.h"
-
-// Timing in ms. The XSMT lead is spec note F3 (>= 3.4 ms at 48 kHz) with margin.
-// The relay settle (kRelaySettleMs) covers the G6K-2F-Y operate time. The boot delay is spec note F2.
-constexpr uint32_t kXsmtLeadMs = 5;
-constexpr uint32_t kBootUnmuteDelayMs = 500;
-constexpr uint32_t kMuteSwitchDebounceMs = 20;
+#include "core/debounce.h"
+#include "core/timing.h"
 
 // Pin levels the board drives; true = high.
 struct MuteOutputs {
   bool xsmtHigh = false;
   bool muteNHigh = false;
-  bool operator==(const MuteOutputs& o) const { return xsmtHigh == o.xsmtHigh && muteNHigh == o.muteNHigh; }
-  bool operator!=(const MuteOutputs& o) const { return !(*this == o); }
 };
 
 class MuteSequence {
  public:
-  // Starts fully muted. `switchReleased` is the raw MUTE_SW level (high = not muted).
+  // Starts fully muted with no latch, hold or running clocks. `switchReleased` is the raw MUTE_SW
+  // level (high = not muted).
   void reset(bool switchReleased, uint32_t nowMs);
 
   // The box stays muted until kBootUnmuteDelayMs after the SAI clocks started.

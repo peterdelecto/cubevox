@@ -2,10 +2,12 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "core/costs.h"
-#include "engine/harmony.h"
+#include <array>
+
 #include "core/unison_rate.h"
+#include "engine/harmony.h"
 
 namespace {
 
@@ -28,25 +30,54 @@ constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, 
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 
-const CardDesc kCards[kCardCount] = {
-    {"empty", "Empty", 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
-    {"input_gate", "Input gate", 2, {kThreshold, kDecay}, Group::None, costs::kInputGate},
-    {"autotune", "Autotune", 2,
-     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, ""},
-      kResponse},
+constexpr std::array<CardDesc, kCardCount> kCards = {{
+    {Card::Empty, "empty", "Empty", kNoEngine, 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
+    {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kThreshold, kDecay}, Group::None,
+     costs::kInputGate},
+    {Card::Autotune, "autotune", "Autotune", Engine::Pitch, 2,
+     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, ""}, kResponse},
      Group::Pitch, costs::kAutotune},
-    {"octave", "Octave", 2,
+    {Card::Octave, "octave", "Octave", Engine::Pitch, 2,
      {{"Semitones", KnobKind::Stepped, kSemitonePositions, kSemitoneMin, kSemitoneMax, "st"}, kPercent("Mix")},
      Group::Pitch, costs::kOctave},
-    {"unison", "Unison", 2, {kPercent("Depth"), kPercent("Rate")}, Group::None, costs::kUnison},
-    {"slapback", "Slapback", 2,
-     {kPercent("Mix"), kSlapbackTime},
-     Group::None, costs::kSlapback},
-    {"distortion", "Distortion", 2, {kPercent("Drive"), kPercent("Tone")}, Group::None, costs::kDistortion},
-    {"gate", "Gate", 2, {kThreshold, kDecay}, Group::None, costs::kGate},
-    {"reverb_spring", "Spring Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbSpring},
-    {"reverb_chasm", "Chasm Reverb", 2, {kPercent("Mix"), kPercent("Time")}, Group::Reverb, costs::kReverbChasm},
-};
+    {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Depth"), kPercent("Rate")}, Group::None,
+     costs::kUnison},
+    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kPercent("Mix"), kSlapbackTime}, Group::None,
+     costs::kSlapback},
+    {Card::Distortion, "distortion", "Distortion", Engine::Distortion, 2, {kPercent("Drive"), kPercent("Tone")},
+     Group::None, costs::kDistortion},
+    {Card::Gate, "gate", "Gate", Engine::Gate, 2, {kThreshold, kDecay}, Group::None, costs::kGate},
+    {Card::ReverbSpring, "reverb_spring", "Spring Reverb", Engine::Reverb, 2, {kPercent("Mix"), kPercent("Time")},
+     Group::Reverb, costs::kReverbSpring},
+    {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Mix"), kPercent("Time")},
+     Group::Reverb, costs::kReverbChasm},
+}};
+
+// Every entry sits at its own enum index with an id that fits the clip width with room to spare,
+// so a clipped over-long id can never equal a real one. Empty is the only card without an engine.
+constexpr bool tableIsSound() {
+  for (int i = 0; i < kCardCount; ++i) {
+    const CardDesc& d = kCards[static_cast<size_t>(i)];
+    if (static_cast<int>(d.card) != i || d.id == nullptr || d.name == nullptr) return false;
+    if (__builtin_strlen(d.id) + 2 > kCardIdBytes) return false;
+    if ((d.engine == kNoEngine) != (d.card == Card::Empty)) return false;
+  }
+  return true;
+}
+static_assert(tableIsSound(), "kCards must follow the Card enum and keep ids short");
+
+const KnobDesc* knobOf(Card c, int knob) {
+  const CardDesc& d = cardDesc(c);
+  return knob >= 0 && knob < d.knobCount ? &d.knob[knob] : nullptr;
+}
+
+// The position index a stepped value selects, clamped to the knob's positions.
+int stepIndex(const KnobDesc& k, float v) {
+  const int last = k.positions - 1;
+  if (!(v > 0.0f)) return 0;  // also catches NaN
+  if (v >= static_cast<float>(last)) return last;
+  return static_cast<int>(v);
+}
 
 // GateParams carries two knobs per stage, so the input gate and the second gate share one setter.
 void applyGateKnob(int knob, float v, cv::GateParams& g) {
@@ -73,12 +104,11 @@ void applyOctaveKnob(int knob, float v, cv::OctaveParams& o) {
   }
 }
 
-void applyUnisonKnob(int knob, float v, ChainParams& out) {
+void applyUnisonKnob(int knob, float v, cv::UnisonParams& u) {
   if (knob == 0) {
-    out.unison.depth = v;
+    u.depth = v;
   } else {
-    out.unisonRatePercent = 100.0f * v;
-    unisonrate::apply(out.unison.tuning, out.unisonRatePercent);
+    unisonrate::apply(u.tuning, 100.0f * v);
   }
 }
 
@@ -109,7 +139,23 @@ void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
 
 }  // namespace
 
-const CardDesc& cardDesc(Card c) { return kCards[static_cast<uint8_t>(c)]; }
+const CardDesc& cardDesc(Card c) {
+  const size_t i = static_cast<size_t>(c);
+  return kCards[i < kCards.size() ? i : 0];
+}
+
+Engine engineOf(Card c) { return cardDesc(c).engine; }
+
+bool cardFromId(const char* id, Card& out) {
+  if (id == nullptr) return false;
+  for (const CardDesc& d : kCards) {
+    if (strcmp(id, d.id) == 0) {
+      out = d.card;
+      return true;
+    }
+  }
+  return false;
+}
 
 float knobValue(const KnobDesc& k, float p) {
   switch (k.curve) {
@@ -121,30 +167,33 @@ float knobValue(const KnobDesc& k, float p) {
 }
 
 int knobSteps(Card c, int knob) {
-  const KnobDesc& k = cardDesc(c).knob[knob];
-  return k.kind == KnobKind::Stepped ? k.positions : 0;
+  const KnobDesc* k = knobOf(c, knob);
+  return k && k->kind == KnobKind::Stepped ? k->positions : 0;
 }
 
 void applyKnob(Card c, int knob, float v, ChainParams& out) {
+  const KnobDesc* k = knobOf(c, knob);
+  if (!k) return;
+  if (k->kind == KnobKind::Stepped) v = static_cast<float>(stepIndex(*k, v));
   switch (c) {
-    case Card::Empty: break;
     case Card::InputGate: applyGateKnob(knob, v, out.inputGate); break;
     case Card::Gate: applyGateKnob(knob, v, out.gate); break;
     case Card::Autotune: applyAutotuneKnob(knob, v, out.pitchFx.autotune); break;
     case Card::Octave: applyOctaveKnob(knob, v, out.pitchFx.octave); break;
-    case Card::Unison: applyUnisonKnob(knob, v, out); break;
+    case Card::Unison: applyUnisonKnob(knob, v, out.unison); break;
     case Card::Slapback: applySlapbackKnob(knob, v, out.slapback); break;
     case Card::Distortion: applyDistortionKnob(knob, v, out.distortion); break;
     case Card::ReverbSpring:
     case Card::ReverbChasm:
       applyReverbKnob(knob, v, out.reverb);
       break;
+    case Card::Empty:
+    case Card::Count: break;
   }
 }
 
 void applyToggle(Card c, bool on, ChainParams& out) {
   switch (c) {
-    case Card::Empty: break;
     case Card::InputGate: out.inputGate.on = on; break;
     case Card::Autotune: out.pitchFx.autotune.on = on; break;
     case Card::Octave: out.pitchFx.octave.on = on; break;
@@ -154,6 +203,8 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::Gate: out.gate.on = on; break;
     case Card::ReverbSpring:
     case Card::ReverbChasm: out.reverb.on = on; break;
+    case Card::Empty:
+    case Card::Count: break;
   }
 }
 
@@ -163,14 +214,18 @@ void applyPlacement(Card c, ChainParams& out) {
 }
 
 void formatKnob(Card c, int knob, float v, char* buf, size_t size) {
-  const KnobDesc& k = cardDesc(c).knob[knob];
+  if (size == 0) return;
+  buf[0] = '\0';
+  const KnobDesc* k = knobOf(c, knob);
+  if (!k) return;
+  if (k->kind != KnobKind::Stepped) {
+    snprintf(buf, size, "%d %s", static_cast<int>(lroundf(knobValue(*k, v))), k->unit);
+    return;
+  }
+  const int step = stepIndex(*k, v);
   if (c == Card::Autotune && knob == 0) {
-    snprintf(buf, size, "%s", cv::kKeyName[static_cast<int>(v)]);
-    return;
+    snprintf(buf, size, "%s", cv::kKeyName[step]);
+  } else {
+    snprintf(buf, size, "%+d %s", static_cast<int>(k->min) + step, k->unit);
   }
-  if (k.kind == KnobKind::Stepped) {
-    snprintf(buf, size, "%+d %s", static_cast<int>(k.min) + static_cast<int>(v), k.unit);
-    return;
-  }
-  snprintf(buf, size, "%d %s", static_cast<int>(lroundf(knobValue(k, v))), k.unit);
 }

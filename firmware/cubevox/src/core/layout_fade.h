@@ -6,14 +6,16 @@
 #include <stdint.h>
 
 #include "core/layout.h"
+#include "core/registry.h"
 #include "engine/common.h"
 
 constexpr int kFadeMs = 50;
 constexpr int kFadeBlocks = (kFadeMs * cv::kSampleRate / 1000 + cv::kBlock - 1) / cv::kBlock;
 
-// Extra silent blocks after the swap block, so each of the 7 engines clears in its own block
-// (kEngineCount - 1). All seven clears in one block measured 758k cycles against a 640k budget.
-constexpr int kFadeHoldBlocks = 6;
+// Extra silent blocks after the swap block, one fewer than the engine count, so each engine clears
+// in its own block. Clearing every engine's state in a single block would overrun that block's
+// cycle budget.
+constexpr int kFadeHoldBlocks = kEngineCount - 1;
 
 class LayoutFade {
  public:
@@ -45,12 +47,6 @@ class LayoutFade {
   Phase phase_ = Phase::Idle;
   int level_ = kFadeBlocks;  // 0..kFadeBlocks, the gain at the end of the last block in steps
 };
-
-// Engines the audio block owns. Cards map onto them; Autotune and Octave share Pitch, and both
-// reverb cards share Reverb.
-enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb };
-
-constexpr int kEngineCount = 7;
 
 // Bit per Engine for every engine that serves a card in a slot whose card differs between the layouts.
 uint32_t enginesToReset(const Layout& from, const Layout& to);

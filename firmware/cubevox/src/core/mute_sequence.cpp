@@ -2,6 +2,10 @@
 
 void MuteSequence::reset(bool switchReleased, uint32_t nowMs) {
   switch_.reset(switchReleased);
+  clocksRunning_ = false;
+  clocksSinceMs_ = 0;
+  latched_ = false;
+  held_ = false;
   enter(State::Muted, nowMs);
 }
 
@@ -26,7 +30,7 @@ MuteOutputs MuteSequence::outputs() const {
 }
 
 MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
-  switch_.update(switchReleased, nowMs, kMuteSwitchDebounceMs);
+  switch_.update(switchReleased, nowMs, kSwitchDebounceMs);
   const uint32_t elapsed = nowMs - sinceMs_;
 
   switch (state_) {

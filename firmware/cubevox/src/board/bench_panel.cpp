@@ -44,7 +44,9 @@ void printToggle(int slot, bool on) {
 void panelSummary() {
   serialOut().print("[panel] pots ");
   serialOut().print(gPanel.potsDone());
-  serialOut().print("/16 todo");
+  serialOut().print('/');
+  serialOut().print(kPanelTestPots);
+  serialOut().print(" todo");
   for (int i = 0; i < kPanelTestPots; ++i) {
     if (gPanel.potDone(i)) continue;
     serialOut().print(' ');
@@ -52,7 +54,9 @@ void panelSummary() {
   }
   serialOut().print("; toggles ");
   serialOut().print(gPanel.togglesDone());
-  serialOut().print("/8 todo");
+  serialOut().print('/');
+  serialOut().print(kPanelTestToggles);
+  serialOut().print(" todo");
   for (int i = 0; i < kPanelTestToggles; ++i) {
     if (gPanel.toggleDone(i)) continue;
     serialOut().print(' ');

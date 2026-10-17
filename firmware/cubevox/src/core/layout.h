@@ -1,13 +1,17 @@
-// Which card sits in each of the eight slots. The chain order is the slot order.
+// Which card sits in each of the kSlotCount slots. The chain order is the slot order.
 
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include <array>
 
-#include "core/chain_params.h"
 #include "core/registry.h"
+#include "core/slots.h"
+
+// Bytes of a layout name including the NUL; a name holds 1 to kLayoutNameBytes - 1 printable ASCII characters.
+constexpr size_t kLayoutNameBytes = 32;
 
 struct Layout {
   std::array<Card, kSlotCount> card;
@@ -16,8 +20,11 @@ struct Layout {
 inline bool operator==(const Layout& a, const Layout& b) { return a.card == b.card; }
 inline bool operator!=(const Layout& a, const Layout& b) { return !(a == b); }
 
-// Slot 1 to 8 as shipped (CLAUDE.md "Default layout").
+// Slot 1 to kSlotCount as shipped.
 Layout defaultLayout();
+
+// The name to show for a stored layout name: the name itself, or "Default" when it is empty.
+const char* layoutDisplayName(const char* stored);
 
 enum class LayoutError : uint8_t { None, BadCard, SameCardTwice, TwoReverbs, OverAvg, OverWorst };
 

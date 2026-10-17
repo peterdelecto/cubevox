@@ -10,17 +10,19 @@ struct FontDesc {
   uint8_t height;
   uint8_t spacing;  // blank columns between glyphs
   uint8_t bytesPerGlyph;
-  const char* codes;  // ascending ASCII codes, one per glyph
+  const uint8_t* codes;  // ascending character codes, one per glyph
   int glyphCount;
   const uint8_t* glyphs;  // glyphCount * bytesPerGlyph bytes
-  bool singleCase;  // a..z draw as A..Z even though the export carries blank lowercase cells
 };
+
+// Pen advance of the 5x7 font: glyph width plus spacing. fonts.cpp checks it against the export.
+constexpr int kFont5x7Advance = 6;
 
 const FontDesc& font5x7();
 const FontDesc& font9x12();
 const FontDesc& font16x24();
 
-// Glyph bytes for `c`. In a singleCase font, and for any font lacking a lowercase glyph,
-// a lowercase letter maps to its capital.
-// Returns nullptr when neither exists, and the caller advances over a blank cell.
+// Glyph bytes for `c`. The project fonts carry blank lowercase cells, so a lowercase letter draws
+// as its capital. Returns nullptr when the font has no glyph for the code, and the caller advances
+// over a blank cell.
 const uint8_t* findGlyph(const FontDesc& font, char c);

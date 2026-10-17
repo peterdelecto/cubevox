@@ -40,7 +40,19 @@ void Canvas::apply(int x, int y, int w, int h, Op op) {
   }
 }
 
-void Canvas::setPixel(int x, int y, bool on) { apply(x, y, 1, 1, on ? Op::Set : Op::Clear); }
+void Canvas::clearDirty(int page) {
+  if (page < 0 || page >= kCanvasPages) return;
+  dirty_ &= static_cast<uint8_t>(~(1u << page));
+}
+
+int Canvas::firstDirtyPage() const {
+  for (int p = 0; p < kCanvasPages; ++p) {
+    if (dirty_ & (1u << p)) return p;
+  }
+  return -1;
+}
+
+const uint8_t* Canvas::page(int p) const { return p >= 0 && p < kCanvasPages ? pages_[p].data() : nullptr; }
 
 void Canvas::fillRect(int x, int y, int w, int h, bool on) { apply(x, y, w, h, on ? Op::Set : Op::Clear); }
 

@@ -1,11 +1,15 @@
-// Per-card CPU cost as integer percent of one audio block (640,000 cycles at 480 MHz),
-// rounded up, two columns: the mean block and the worst single block. Measured on the WeAct
-// H743 bench (2026-10-09, CPU pass 3 end, main at 71fe7bc): default layout on the voice clip, every knob
-// pinned at its top position, per-slot cycle counters, worst taken as the lowest worst over
-// repeated runs so interrupt time landing in a block does not count. The pitch tracker is
-// costed once, inside Autotune; Octave is the pitch slot with Octave on minus with it off.
-// Chasm was measured in the reverb slot in place of Spring. A layout is accepted when both
-// column sums over its cards, plus the fixed term, stay under their lines.
+// Per-card CPU cost as integer percent of one audio block's cycle budget (kBlock samples at the
+// sample rate, counted in cycles at 480 MHz), in two columns: the mean block and the worst
+// single block. Each is rounded up, except Autotune's mean, which carries one extra point over
+// its measured 13.0 %.
+//
+// Method: default layout on the voice clip with every knob pinned at its top position and
+// per-slot cycle counters. The worst figure is the lowest worst over repeated runs, so interrupt
+// time landing in a block does not count. The pitch tracker is costed once, inside Autotune;
+// Octave is the pitch slot with Octave on minus with it off. Chasm is costed in the reverb slot.
+//
+// A layout is accepted when both column sums over its cards, plus the fixed term, stay under
+// their lines. The trailing comments give the measured cycles, mean then worst.
 
 #pragma once
 

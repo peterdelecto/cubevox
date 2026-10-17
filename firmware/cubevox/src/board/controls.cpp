@@ -4,7 +4,10 @@
 
 #include "board/pins.h"
 #include "board/slots.h"
+#include "core/debounce.h"
+#include "core/knob_filter.h"
 #include "core/registry.h"
+#include "core/timing.h"
 
 namespace {
 
@@ -13,7 +16,9 @@ constexpr float kAdcFull = 4095.0f;
 constexpr float kEndMargin = 0.01f;     // dead band at each end of pot travel
 constexpr bool kToggleOnWhenLow = true;  // throw-to-GND position engages the effect
 
-constexpr uint32_t kMuxSelectPins[4] = {pins::kMuxS0, pins::kMuxS1, pins::kMuxS2, pins::kMuxS3};
+constexpr int kMuxSelectBits = 4;
+constexpr uint32_t kMuxSelectPins[kMuxSelectBits] = {pins::kMuxS0, pins::kMuxS1, pins::kMuxS2, pins::kMuxS3};
+static_assert(kPotCount <= (1 << kMuxSelectBits), "the mux select pins must address every pot");
 
 KnobFilter gKnobs[kPotCount];
 float gRaw[kPotCount];  // last unfiltered read per mux channel
@@ -28,7 +33,7 @@ int gSeededCount = 0;
 bool gChanged = false;
 
 void selectChannel(uint8_t channel) {
-  for (int bit = 0; bit < 4; ++bit) digitalWrite(kMuxSelectPins[bit], (channel >> bit) & 1);
+  for (int bit = 0; bit < kMuxSelectBits; ++bit) digitalWrite(kMuxSelectPins[bit], (channel >> bit) & 1);
 }
 
 float readNorm() {
@@ -37,10 +42,10 @@ float readNorm() {
   return n < 0.0f ? 0.0f : (n > 1.0f ? 1.0f : n);
 }
 
-void noteMoved(int pot, uint32_t nowMs) {
+void noteMoved(int pot) {
   const PotOwner owner = potOwner(pot);
   if (owner.slot < 0) return;
-  gLastMoved = {owner.slot, owner.knobB, nowMs};
+  gLastMoved = {owner.slot, owner.knobB};
   gChanged = true;
 }
 
@@ -49,7 +54,7 @@ int stepsFor(int pot) {
   return owner.slot < 0 ? 0 : knobSteps(gLayout.card[owner.slot], owner.knobB ? 1 : 0);
 }
 
-void updatePot(int pot, float norm, uint32_t nowMs) {
+void updatePot(int pot, float norm) {
   switch (gKnobs[pot].update(norm, stepsFor(pot))) {
     case KnobEvent::Seeded:
       if (++gSeededCount == kPotCount) gChanged = true;
@@ -58,7 +63,7 @@ void updatePot(int pot, float norm, uint32_t nowMs) {
       gChanged = true;
       break;
     case KnobEvent::Moved:
-      noteMoved(pot, nowMs);
+      noteMoved(pot);
       break;
     case KnobEvent::None:
       break;
@@ -76,7 +81,7 @@ void scanMux(uint32_t nowMs) {
   if (micros() - gSelectedAtUs < kMuxSettleUs) return;
   const float norm = readNorm();
   gRaw[gScanChannel] = norm;
-  updatePot(gScanChannel, norm, nowMs);
+  updatePot(gScanChannel, norm);
   gScanChannel = (gScanChannel + 1) % kPotCount;
   gSelected = false;
 }
@@ -88,7 +93,7 @@ bool readToggleOn(int slot) {
 
 void scanToggles(uint32_t nowMs) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (gToggles[s].update(readToggleOn(s), nowMs, kToggleDebounceMs)) gChanged = true;
+    if (gToggles[s].update(readToggleOn(s), nowMs, kSwitchDebounceMs)) gChanged = true;
   }
 }
 

@@ -7,13 +7,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <array>
+
+// What a line is. The tail of the queue is kept free of log lines, so a reply still fits when
+// diagnostics have filled the rest and log lines drop first.
+enum class TxClass : uint8_t { Log, Reply };
+
 class TxQueue {
  public:
   static constexpr size_t kCapacity = 8192;
+  static constexpr size_t kReplyReserve = 1024;
 
-  // Appends text. A line ends at '\n'; bytes after the last '\n' are held back from draining
-  // until their line ends.
-  void put(const char* text, size_t len);
+  // Appends text of one class. A line ends at '\n'; bytes after the last '\n' are held back from
+  // draining until their line ends. A line is written by one producer, so it keeps one class.
+  void put(const char* text, size_t len, TxClass cls);
 
   // The next contiguous run of finished lines. Returns its length, 0 when nothing is ready.
   size_t peek(const char*& run) const;
@@ -22,13 +29,14 @@ class TxQueue {
   size_t pending() const { return commit_ - head_; }
   uint32_t dropped() const { return dropped_; }
 
-  // Forgets everything unsent, for when no host is there to read it. Not counted as dropped.
+  // Forgets every finished line, for when no host is there to read it. Not counted as dropped.
+  // A line still open keeps its bytes, so its remainder does not reach the host as a fragment.
   void discard();
 
  private:
-  void putByte(char c);
+  void putByte(char c, size_t limit);
 
-  char buf_[kCapacity];
+  std::array<char, kCapacity> buf_;
   size_t head_ = 0;    // next byte to send (absolute count)
   size_t commit_ = 0;  // end of the finished lines
   size_t tail_ = 0;    // end of everything written

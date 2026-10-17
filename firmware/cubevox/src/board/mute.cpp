@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "board/pins.h"
+#include "core/timing.h"
 
 namespace {
 

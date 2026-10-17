@@ -11,8 +11,6 @@
 #include "engine/slapback.h"
 #include "engine/unison.h"
 
-constexpr int kSlotCount = 8;
-
 struct ChainParams {
   cv::GateParams inputGate;
   cv::PitchFxParams pitchFx;
@@ -22,7 +20,6 @@ struct ChainParams {
   cv::GateParams gate;
   cv::ReverbParams reverb;
   cv::PolishParams eq;
-  float unisonRatePercent = 50.0f;
 
   ChainParams();
 };

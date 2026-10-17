@@ -5,9 +5,7 @@
 
 #include <stdint.h>
 
-#include "core/chain_params.h"
-
-constexpr int kPotCount = 2 * kSlotCount;  // POT01..POT16 on mux I0..I15
+#include "core/slots.h"
 
 struct Slot {
   uint32_t togglePin;   // pins:: constant

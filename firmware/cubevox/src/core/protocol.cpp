@@ -5,13 +5,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "core/registry.h"
+
 namespace protocol {
 
 namespace {
 
 constexpr size_t kKeyBytes = 16;
 constexpr size_t kCmdBytes = 16;
-constexpr size_t kOpBytes = 24;  // longest op name is 13 characters
+constexpr size_t kOpBytes = kOpNameBytes;
 constexpr int kMaxSkipDepth = 4;
 constexpr uint32_t kSlotClamp = 255;  // keeps a huge slot number out of int range; it still fails the check
 
@@ -20,10 +22,19 @@ struct CommandName {
   Command cmd;
 };
 
-constexpr CommandName kCommands[] = {
+constexpr std::array<CommandName, 6> kCommands = {{
     {"hello", Command::Hello},       {"get_layout", Command::GetLayout}, {"set_layout", Command::SetLayout},
     {"status", Command::Status},     {"enter_dfu", Command::EnterDfu},   {"bench", Command::Bench},
-};
+}};
+
+// A command name clipped to the buffer must not be able to equal a real one.
+constexpr bool commandNamesFit() {
+  for (const CommandName& c : kCommands) {
+    if (__builtin_strlen(c.text) + 2 > kCmdBytes) return false;
+  }
+  return true;
+}
+static_assert(commandNamesFit(), "command names must be shorter than kCmdBytes");
 
 // ---- reading -------------------------------------------------------------------------------
 
@@ -127,27 +138,50 @@ bool readString(const char*& p, StrOut& out) {
   }
 }
 
-bool isNumberChar(char c) { return (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E'; }
+bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
-bool skipNumber(const char*& p) {
-  if (!isNumberChar(*p)) return false;
-  while (isNumberChar(*p)) ++p;
+// Consumes digits; false when there is none.
+bool skipDigits(const char*& q) {
+  if (!isDigit(*q)) return false;
+  while (isDigit(*q)) ++q;
   return true;
 }
 
-// A plain non-negative integer that fits in 32 bits, with nothing numeric after it.
+// The JSON number grammar: -? (0 | [1-9][0-9]*) (. [0-9]+)? ([eE] [+-]? [0-9]+)?
+// On failure `p` is left where it was.
+bool skipNumber(const char*& p) {
+  const char* q = p;
+  if (*q == '-') ++q;
+  if (*q == '0') {
+    ++q;  // no leading zeros: "01" stops after the 0
+  } else if (!skipDigits(q)) {
+    return false;
+  }
+  if (*q == '.') {
+    ++q;
+    if (!skipDigits(q)) return false;
+  }
+  if (*q == 'e' || *q == 'E') {
+    ++q;
+    if (*q == '+' || *q == '-') ++q;
+    if (!skipDigits(q)) return false;
+  }
+  p = q;
+  return true;
+}
+
+// A plain non-negative integer that fits in 32 bits: a JSON number with no sign, fraction or exponent.
 bool readUint(const char*& p, uint32_t& v) {
   skipWs(p);
+  const char* end = p;
+  if (!skipNumber(end)) return false;
   uint64_t acc = 0;
-  int digits = 0;
-  const char* q = p;
-  while (*q >= '0' && *q <= '9') {
-    acc = acc * 10 + static_cast<uint64_t>(*q - '0');
-    if (++digits > 10 || acc > 0xFFFFFFFFull) return false;
-    ++q;
+  for (const char* d = p; d < end; ++d) {
+    if (!isDigit(*d)) return false;
+    acc = acc * 10 + static_cast<uint64_t>(*d - '0');
+    if (acc > 0xFFFFFFFFull) return false;
   }
-  if (digits == 0 || isNumberChar(*q)) return false;
-  p = q;
+  p = end;
   v = static_cast<uint32_t>(acc);
   return true;
 }
@@ -205,6 +239,7 @@ struct Fields {
   bool hasSlots = false;
   bool nameClipped = false;
   const char* typeError = nullptr;  // first wrong-typed field
+  char problemText[kErrorBytes] = {};  // backs a problem message built from constants
 
   explicit Fields(Request& r) : req(r) {}
   void typeFail(const char* msg) {
@@ -266,7 +301,7 @@ bool parseSlots(const char*& p, Fields& f) {
       f.typeFail("slots must be an array of card ids");
       if (!skipValue(p, 1)) return false;
     } else {
-      StrOut out{i < kSlotCount ? f.req.slot[i] : nullptr, kIdBytes};
+      StrOut out{i < kSlotCount ? f.req.slot[i].data() : nullptr, kIdBytes};
       if (!readString(p, out)) return false;
     }
     if (eat(p, ',')) continue;
@@ -330,11 +365,18 @@ const char* commonProblem(const Fields& f) {
 }
 
 // The reason a set_layout request lacks its own fields, or null.
-const char* setLayoutProblem(const Fields& f) {
+const char* setLayoutProblem(Fields& f) {
   if (!f.hasName) return "missing name";
-  if (f.nameClipped || !printableName(f.req.name)) return "name must be 1 to 31 printable ASCII characters";
+  if (f.nameClipped || !printableName(f.req.name)) {
+    snprintf(f.problemText, sizeof f.problemText, "name must be 1 to %d printable ASCII characters",
+             static_cast<int>(kNameBytes) - 1);
+    return f.problemText;
+  }
   if (!f.hasSlots) return "missing slots";
-  if (f.req.slotCount != kSlotCount) return "slots needs 8 card ids";
+  if (f.req.slotCount != kSlotCount) {
+    snprintf(f.problemText, sizeof f.problemText, "slots needs %d card ids", kSlotCount);
+    return f.problemText;
+  }
   return nullptr;
 }
 
@@ -377,18 +419,6 @@ bool findCommand(const char* text, Command& out) {
 
 // ---- writing -------------------------------------------------------------------------------
 
-void emit(Writer& w, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
-
-void emit(Writer& w, const char* fmt, ...) {
-  char buf[160];
-  va_list ap;
-  va_start(ap, fmt);
-  const int n = vsnprintf(buf, sizeof buf, fmt, ap);
-  va_end(ap);
-  if (n <= 0) return;
-  w.write(buf, static_cast<size_t>(n) < sizeof buf ? static_cast<size_t>(n) : sizeof buf - 1);
-}
-
 // Quoted JSON string. Quote, backslash, control and non-ASCII bytes are escaped, so any bytes
 // (a corrupt record name, say) still give valid JSON.
 void writeString(Writer& w, const char* s) {
@@ -403,7 +433,7 @@ void writeString(Writer& w, const char* s) {
     } else if (c == '\\') {
       w.write("\\\\", 2);
     } else {
-      emit(w, "\\u%04x", static_cast<unsigned>(c));
+      w.format("\\u%04x", static_cast<unsigned>(c));
     }
     run = s + 1;
   }
@@ -462,10 +492,10 @@ void writeKnob(Writer& w, const KnobDesc& k) {
   formatNumber(k.max, hi, sizeof hi);
   w.write("{\"name\":", 8);
   writeString(w, k.name);
-  emit(w, ",\"kind\":\"%s\",\"positions\":%d,\"min\":%s,\"max\":%s,\"unit\":",
-       k.kind == KnobKind::Stepped ? "stepped" : "continuous", k.positions, lo, hi);
+  w.format(",\"kind\":\"%s\",\"positions\":%d,\"min\":%s,\"max\":%s,\"unit\":",
+           k.kind == KnobKind::Stepped ? "stepped" : "continuous", k.positions, lo, hi);
   writeString(w, k.unit);
-  emit(w, ",\"curve\":\"%s\"}", curveName(k.curve));
+  w.format(",\"curve\":\"%s\"}", curveName(k.curve));
 }
 
 void writeCard(Writer& w, const CardDesc& d) {
@@ -473,8 +503,8 @@ void writeCard(Writer& w, const CardDesc& d) {
   writeString(w, d.id);
   w.write(",\"name\":", 8);
   writeString(w, d.name);
-  emit(w, ",\"group\":\"%s\",\"cost\":{\"avg\":%d,\"worst\":%d,\"measured\":%s},\"knobs\":[", groupName(d.group),
-       d.cost.avg, d.cost.worst, d.cost.measured ? "true" : "false");
+  w.format(",\"group\":\"%s\",\"cost\":{\"avg\":%d,\"worst\":%d,\"measured\":%s},\"knobs\":[", groupName(d.group),
+           d.cost.avg, d.cost.worst, d.cost.measured ? "true" : "false");
   for (int k = 0; k < d.knobCount; ++k) {
     if (k > 0) w.write(",", 1);
     writeKnob(w, d.knob[k]);
@@ -483,6 +513,20 @@ void writeCard(Writer& w, const CardDesc& d) {
 }
 
 }  // namespace
+
+bool Writer::format(const char* fmt, ...) {
+  std::array<char, kFormatBytes> buf;
+  va_list ap;
+  va_start(ap, fmt);
+  const int n = vsnprintf(buf.data(), buf.size(), fmt, ap);
+  va_end(ap);
+  if (n < 0 || static_cast<size_t>(n) >= buf.size()) {
+    ++overflows_;
+    return false;
+  }
+  if (n > 0) write(buf.data(), static_cast<size_t>(n));
+  return true;
+}
 
 Framer::Kind Framer::feed(uint8_t byte) {
   if (dropping_) {
@@ -496,6 +540,11 @@ Framer::Kind Framer::feed(uint8_t byte) {
     }
     inLine_ = true;
     len_ = 0;
+  }
+  if (byte == '\0') {
+    inLine_ = false;
+    dropping_ = true;
+    return Kind::BadByte;
   }
   if (byte == '\n') {
     line_[len_] = '\0';
@@ -535,15 +584,10 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize, boo
 
 bool resolveLayout(const Request& req, Layout& out, char* err, size_t errSize) {
   for (int s = 0; s < kSlotCount; ++s) {
-    int found = -1;
-    for (int c = 0; c < kCardCount && found < 0; ++c) {
-      if (strcmp(req.slot[s], cardDesc(static_cast<Card>(c)).id) == 0) found = c;
-    }
-    if (found < 0) {
-      snprintf(err, errSize, "unknown card \"%s\" in slot %d", req.slot[s], s + 1);
+    if (!cardFromId(req.slot[s].data(), out.card[s])) {
+      snprintf(err, errSize, "unknown card \"%s\" in slot %d", req.slot[s].data(), s + 1);
       return false;
     }
-    out.card[s] = static_cast<Card>(found);
   }
   const LayoutCheck check = layoutValid(out);
   if (check.ok()) return true;
@@ -552,12 +596,12 @@ bool resolveLayout(const Request& req, Layout& out, char* err, size_t errSize) {
 }
 
 void replyError(Writer& w, uint32_t id, const char* reason) {
-  emit(w, "{\"id\":%lu,\"ok\":false,\"error\":", static_cast<unsigned long>(id));
+  w.format("{\"id\":%lu,\"ok\":false,\"error\":", static_cast<unsigned long>(id));
   writeString(w, reason);
   w.write("}\n", 2);
 }
 
-void replyOk(Writer& w, uint32_t id) { emit(w, "{\"id\":%lu,\"ok\":true}\n", static_cast<unsigned long>(id)); }
+void replyOk(Writer& w, uint32_t id) { w.format("{\"id\":%lu,\"ok\":true}\n", static_cast<unsigned long>(id)); }
 
 namespace {
 
@@ -577,9 +621,9 @@ void writeBenchOps(Writer& w, bool benchBuild) {
 }  // namespace
 
 void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild) {
-  emit(w, "{\"id\":%lu,\"ok\":true,\"proto\":%d,\"fw\":", static_cast<unsigned long>(id), kVersion);
+  w.format("{\"id\":%lu,\"ok\":true,\"proto\":%d,\"fw\":", static_cast<unsigned long>(id), kVersion);
   writeString(w, fw);
-  emit(w, ",\"build\":\"%s\",\"bench_ops\":", benchBuild ? "bench" : "release");
+  w.format(",\"build\":\"%s\",\"bench_ops\":", benchBuild ? "bench" : "release");
   writeBenchOps(w, benchBuild);
   w.write(",\"cards\":[", 10);
   for (int c = 0; c < kCardCount; ++c) {
@@ -592,7 +636,7 @@ void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, 
 }
 
 void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout) {
-  emit(w, "{\"id\":%lu,\"ok\":true,\"layout\":", static_cast<unsigned long>(id));
+  w.format("{\"id\":%lu,\"ok\":true,\"layout\":", static_cast<unsigned long>(id));
   writeLayout(w, layoutName, layout);
   w.write("}\n", 2);
 }
@@ -602,11 +646,12 @@ void replyStatus(Writer& w, uint32_t id, const Status& s) {
   char worst[16];
   formatNumber(s.cpuMeanPercent, mean, sizeof mean);
   formatNumber(s.cpuWorstPercent, worst, sizeof worst);
-  emit(w, "{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"muted\":%s,\"seq\":%lu,",
-       static_cast<unsigned long>(id), mean, worst, static_cast<unsigned long>(s.late),
-       s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
-  emit(w, "\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu}\n", static_cast<unsigned long>(s.recordErrors),
-       static_cast<unsigned long>(s.serialDropped), static_cast<unsigned long>(s.strayBytes));
+  w.format("{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"muted\":%s,\"seq\":%lu,",
+           static_cast<unsigned long>(id), mean, worst, static_cast<unsigned long>(s.late),
+           s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
+  w.format("\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu}\n",
+           static_cast<unsigned long>(s.recordErrors), static_cast<unsigned long>(s.serialDropped),
+           static_cast<unsigned long>(s.strayBytes));
 }
 
 }  // namespace protocol

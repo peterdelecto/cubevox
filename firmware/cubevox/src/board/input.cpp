@@ -3,12 +3,12 @@
 #include <Arduino.h>
 
 #include "board/pins.h"
-#include "core/knob_filter.h"
+#include "core/debounce.h"
+#include "core/timing.h"
 
 namespace {
 
 constexpr int kCountsPerDetent = 2;  // EC11E: 15 pulses and 30 detents per turn
-constexpr uint32_t kClickDebounceMs = 20;
 
 // Encoder decode. The ISR only updates these.
 volatile int gCounts = 0;
@@ -47,6 +47,6 @@ void inputInit() {
 UiInput inputPoll(uint32_t nowMs) {
   UiInput in;
   in.detents = takeDetents();
-  in.click = gClick.update(digitalRead(pins::kEncMenuSw) == HIGH, nowMs, kClickDebounceMs) && !gClick.level();
+  in.click = gClick.update(digitalRead(pins::kEncMenuSw) == HIGH, nowMs, kSwitchDebounceMs) && !gClick.level();
   return in;
 }

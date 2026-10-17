@@ -1,17 +1,22 @@
-// Firmware core tier on the host: registry apply, descriptors, default layout, costs.
-// Compiles firmware/cubevox/src/core/*.cpp; a core file that pulls in Arduino breaks this build.
+// Firmware core and ui tiers on the host: registry, layout, compose, protocol, record store, input
+// logic, canvas and menu. Compiles firmware/cubevox/src/core/*.cpp and src/ui/*.cpp; a file that
+// pulls in Arduino breaks this build.
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include "core/bench_ops.h"
 #include "core/canvas.h"
 #include "core/chain_params.h"
 #include "core/compose.h"
 #include "core/costs.h"
+#include "core/debounce.h"
 #include "core/display.h"
 #include "core/fonts.h"
 #include "core/jack_switch.h"
@@ -22,12 +27,16 @@
 #include "core/panel.h"
 #include "core/panel_test.h"
 #include "core/protocol.h"
-#include "core/tx_queue.h"
 #include "core/record.h"
 #include "core/record_store.h"
 #include "core/registry.h"
 #include "core/settings.h"
+#include "core/slots.h"
+#include "core/timing.h"
+#include "core/tx_queue.h"
+#include "core/unison_rate.h"
 #include "core/version.h"
+#include "ui/actions.h"
 #include "ui/menu.h"
 
 #include "cubevox_fonts.h"
@@ -54,6 +63,8 @@ bool snakeCase(const char* s) {
   return true;
 }
 
+// ---- registry ------------------------------------------------------------------------------
+
 void checkIds() {
   for (int i = 0; i < kCardCount; ++i) {
     const CardDesc& d = cardDesc(card(i));
@@ -72,6 +83,28 @@ void checkIds() {
   }
   check(std::strcmp(cardDesc(Card::ReverbSpring).name, "Spring Reverb") == 0, "spring reverb name");
   check(std::strcmp(cardDesc(Card::ReverbChasm).name, "Chasm Reverb") == 0, "chasm reverb name");
+}
+
+void checkCardTable() {
+  check(kCardCount == static_cast<int>(Card::Count), "table: the count follows the enum");
+  for (int i = 0; i < kCardCount; ++i) {
+    const CardDesc& d = cardDesc(card(i));
+    check(d.card == card(i), "table: an entry sits at its enum index");
+    check(std::strlen(d.id) + 2 <= kCardIdBytes, "table: an id leaves room under the clip width");
+    check((engineOf(card(i)) == kNoEngine) == (card(i) == Card::Empty), "table: only Empty has no engine");
+    Card back = Card::Empty;
+    check(cardFromId(d.id, back) && back == card(i), d.id);
+  }
+  Card out = Card::Gate;
+  check(!cardFromId("nope", out) && !cardFromId("", out) && !cardFromId(nullptr, out) && out == Card::Gate,
+        "table: an unknown id finds nothing and leaves the output alone");
+  check(&cardDesc(Card::Count) == &cardDesc(Card::Empty) && &cardDesc(card(200)) == &cardDesc(Card::Empty),
+        "table: an out-of-range card reads as Empty");
+  check(engineOf(Card::Autotune) == Engine::Pitch && engineOf(Card::Octave) == Engine::Pitch,
+        "table: both pitch cards share the pitch engine");
+  check(engineOf(Card::ReverbSpring) == Engine::Reverb && engineOf(Card::ReverbChasm) == Engine::Reverb,
+        "table: both reverb cards share the reverb engine");
+  check(kFadeHoldBlocks == kEngineCount - 1, "table: one silent block per engine after the swap block");
 }
 
 void checkGroups() {
@@ -110,12 +143,13 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Gate: return knob == 0 ? p.gate.thresholdDb : p.gate.tuning.releaseMs;
     case Card::Autotune: return p.pitchFx.autotune.responseMs;
     case Card::Octave: return p.pitchFx.octave.mix;
-    case Card::Unison: return knob == 0 ? p.unison.depth : p.unisonRatePercent;
+    case Card::Unison: return knob == 0 ? p.unison.depth : p.unison.tuning.lfoHz[0];
     case Card::Slapback: return knob == 0 ? p.slapback.intensity : p.slapback.tuning.timeMs;
     case Card::Distortion: return knob == 0 ? p.distortion.drive : p.distortion.tone;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.intensity : p.reverb.time;
-    case Card::Empty: break;
+    case Card::Empty:
+    case Card::Count: break;
   }
   return 0.0f;
 }
@@ -141,11 +175,11 @@ void checkDescriptors() {
       float prev = 0.0f;
       for (int s = 0; s <= 4; ++s) {
         ChainParams p;
-        applyKnob(c, k, s / 4.0f, p);
+        applyKnob(c, k, static_cast<float>(s) / 4.0f, p);
         const float v = engineValue(c, k, p);
         std::snprintf(what, sizeof(what), "%s knob %d engine value %d", cardDesc(c).id, k, s);
         if (s > 0) check(reversed ? v < prev : v > prev, what);
-        if (!percent) check(std::fabs(v - knobValue(d, s / 4.0f)) < 1e-3f, what);
+        if (!percent) check(std::fabs(v - knobValue(d, static_cast<float>(s) / 4.0f)) < 1e-3f, what);
         prev = v;
       }
     }
@@ -176,8 +210,86 @@ void checkKnobTargets() {
   check(std::fabs(p.slapback.tuning.timeMs - 60.0f) < 1e-4f, "slapback time min 60 ms");
   applyKnob(Card::Slapback, 1, 1.0f, p);
   check(std::fabs(p.slapback.tuning.timeMs - 250.0f) < 1e-4f, "slapback time max 250 ms");
+}
+
+// A stepped value outside its positions, NaN included, lands on the nearest valid step.
+void checkKnobClamps() {
+  ChainParams p;
+  applyKnob(Card::Autotune, 0, 99.0f, p);
+  check(p.pitchFx.autotune.key == 11, "clamp: key above the last position");
+  applyKnob(Card::Autotune, 0, -3.0f, p);
+  check(p.pitchFx.autotune.key == 0, "clamp: key below the first position");
+  applyKnob(Card::Autotune, 0, NAN, p);
+  check(p.pitchFx.autotune.key == 0, "clamp: NaN key");
+  applyKnob(Card::Octave, 0, 99.0f, p);
+  check(p.pitchFx.octave.semitones == 12, "clamp: semitones above the last position");
+  applyKnob(Card::Octave, 0, -1.0f, p);
+  check(p.pitchFx.octave.semitones == -12, "clamp: semitones below the first position");
+
+  char buf[32];
+  formatKnob(Card::Autotune, 0, 99.0f, buf, sizeof(buf));
+  check(std::strcmp(buf, cv::kKeyName[11]) == 0, "clamp: key readout above the last position");
+  formatKnob(Card::Autotune, 0, -4.0f, buf, sizeof(buf));
+  check(std::strcmp(buf, cv::kKeyName[0]) == 0, "clamp: key readout below the first position");
+  formatKnob(Card::Octave, 0, 99.0f, buf, sizeof(buf));
+  check(std::strcmp(buf, "+12 st") == 0, "clamp: semitone readout above the last position");
+}
+
+void checkRegistryBounds() {
+  char buf[32] = "unchanged";
+  formatKnob(Card::Count, 0, 0.5f, buf, sizeof(buf));
+  check(buf[0] == '\0', "bounds: an out-of-range card formats as empty");
+  std::strcpy(buf, "unchanged");
+  formatKnob(Card::Gate, kKnobsPerCard, 0.5f, buf, sizeof(buf));
+  check(buf[0] == '\0', "bounds: a knob past the card formats as empty");
+  formatKnob(Card::Gate, -1, 0.5f, buf, 0);
+  check(knobSteps(Card::Count, 0) == 0 && knobSteps(Card::Autotune, kKnobsPerCard) == 0 && knobSteps(Card::Autotune, -1) == 0,
+        "bounds: an invalid card or knob has no steps");
+
+  const ChainParams before;
+  ChainParams after;
+  applyKnob(Card::Count, 0, 1.0f, after);
+  applyKnob(Card::Gate, kKnobsPerCard, 1.0f, after);
+  applyKnob(Card::Gate, -1, 1.0f, after);
+  check(std::memcmp(&before, &after, sizeof(ChainParams)) == 0, "bounds: an invalid card or knob changes nothing");
+}
+
+void checkChainDefaults() {
+  const ChainParams p;
+  check(p.inputGate.on && std::fabs(p.inputGate.thresholdDb - (-12.0f)) < 1e-6f &&
+            std::fabs(p.inputGate.tuning.rangeDb - (-12.0f)) < 1e-6f &&
+            std::fabs(p.inputGate.tuning.holdMs - 100.0f) < 1e-6f &&
+            std::fabs(p.inputGate.tuning.releaseMs - 10.0f) < 1e-6f,
+        "defaults: input gate on with the live-vocal settings");
+  check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.harmony.on && !p.pitchFx.octave.on && !p.unison.on &&
+            !p.slapback.on && !p.distortion.on && !p.reverb.on,
+        "defaults: every other stage off");
+  check(p.pitchFx.octave.engine == 2 && std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
+        "defaults: octave engine C at 10 % mix");
+  check(p.reverb.engine == cv::kReverbSpringB && p.eq.on, "defaults: spring B reverb engine and the EQ on");
+}
+
+void checkUnisonRate() {
+  using unisonrate::lfoScale;
+  check(std::fabs(lfoScale(0.0f) - 0.33f) < 1e-5f, "unison rate: 0 % scales the LFO by 0.33");
+  check(std::fabs(lfoScale(50.0f) - 1.0f) < 1e-5f, "unison rate: 50 % scales by 1");
+  check(std::fabs(lfoScale(100.0f) - 7.0f) < 1e-4f, "unison rate: 100 % scales by 7");
+  check(lfoScale(-20.0f) == lfoScale(0.0f) && lfoScale(250.0f) == lfoScale(100.0f) && lfoScale(NAN) == lfoScale(0.0f),
+        "unison rate: positions outside 0..100 clamp");
+  check(lfoScale(25.0f) > lfoScale(0.0f) && lfoScale(25.0f) < lfoScale(50.0f) && lfoScale(75.0f) < lfoScale(100.0f),
+        "unison rate: the scale rises between the anchors");
+
+  cv::UnisonTuning t;
+  unisonrate::apply(t, 50.0f);
+  check(std::fabs(t.lfoHz[0] - 0.60f) < 1e-5f && std::fabs(t.lfoHz[1] - 0.90f) < 1e-5f, "unison rate: LFO speeds at 50 %");
+  check(std::fabs(t.swingMinMs - 1.0f) < 1e-5f && std::fabs(t.swingMaxMs - 6.0f) < 1e-5f, "unison rate: swing at 50 %");
+  check(t.detuneCents[0] == 0.0f && t.detuneCents[1] == 0.0f && !std::signbit(t.detuneCents[1]), "unison rate: no detune");
+  unisonrate::apply(t, 100.0f);
+  check(std::fabs(t.lfoHz[0] - 4.2f) < 1e-4f && std::fabs(t.swingMaxMs - 6.0f * 2.0f / 7.0f) < 1e-4f,
+        "unison rate: fast rates keep the swing from growing");
+  ChainParams p;
   applyKnob(Card::Unison, 1, 0.5f, p);
-  check(std::fabs(p.unisonRatePercent - 50.0f) < 1e-4f, "unison rate 50 %");
+  check(std::fabs(p.unison.tuning.lfoHz[0] - 0.60f) < 1e-5f, "unison rate: the RATE knob drives the mapping");
 }
 
 void checkToggles() {
@@ -215,6 +327,8 @@ void checkFormat() {
   formatKnob(Card::Distortion, 0, 0.5f, buf, sizeof(buf));
   check(std::strcmp(buf, "50 %") == 0, "drive formats in percent");
 }
+
+// ---- layout and compose --------------------------------------------------------------------
 
 void checkDefaultLayout() {
   const Card expected[kSlotCount] = {Card::InputGate, Card::Autotune, Card::Octave, Card::Unison,
@@ -263,7 +377,12 @@ void checkLayoutValid() {
   gaps.card[0] = Card::Empty;
   gaps.card[1] = Card::Empty;
   check(layoutValid(gaps).ok(), "several Empty slots are accepted");
+}
 
+void checkLayoutReasons() {
+  char why[96] = "stale";
+  layoutReason(LayoutCheck(), why, sizeof why);
+  check(why[0] == '\0', "reason: an ok check gives an empty string");
   LayoutCheck over;
   over.error = LayoutError::OverWorst;
   over.percent = 97;
@@ -273,6 +392,14 @@ void checkLayoutValid() {
   over.percent = 80;
   layoutReason(over, why, sizeof why);
   check(std::strcmp(why, "over CPU budget (mean 80 %)") == 0, "budget reason names the mean line");
+  layoutReason(over, why, 0);  // no room: must not write
+  check(std::strcmp(why, "over CPU budget (mean 80 %)") == 0, "reason: a zero-size buffer is left alone");
+}
+
+void checkLayoutName() {
+  check(std::strcmp(layoutDisplayName(""), "Default") == 0, "name: an empty stored name shows Default");
+  check(std::strcmp(layoutDisplayName(nullptr), "Default") == 0, "name: a missing stored name shows Default");
+  check(std::strcmp(layoutDisplayName("Stage rig"), "Stage rig") == 0, "name: a stored name shows as is");
 }
 
 PanelReading panelWithToggles(bool on) {
@@ -326,7 +453,7 @@ void checkOutputGain() {
   Settings s;
   const BenchOverrides none;
   check(composeSnapshot(defaultLayout(), PanelReading(), s, none).outputGain == 1.0f, "LINE gain is unity");
-  s.output = OutputLevel::Instrument;
+  s.outputLevel = OutputLevel::Instrument;
   const float g = composeSnapshot(defaultLayout(), PanelReading(), s, none).outputGain;
   check(std::fabs(g - 0.2512f) < 1e-3f, "INSTRUMENT gain is -12 dB linear");
 }
@@ -334,14 +461,61 @@ void checkOutputGain() {
 void checkSettings() {
   const Settings s;
   check(s.inputJack == InputJack::Mic, "input jack defaults to MIC");
-  check(s.output == OutputLevel::Line, "output defaults to LINE");
+  check(s.outputLevel == OutputLevel::Line, "output defaults to LINE");
   check(outputTrimDb(s) == 0.0f, "LINE output trim is 0 dB");
   Settings inst;
-  inst.output = OutputLevel::Instrument;
+  inst.outputLevel = OutputLevel::Instrument;
   check(std::fabs(outputTrimDb(inst) - (-12.0f)) < 1e-6f, "INSTRUMENT output trim is -12 dB");
 }
 
-}  // namespace
+void checkApplyAction() {
+  Settings s;
+  check(ui::applyAction(UiAction::ToggleOutput, s) == ui::ApplyResult::SettingsChanged &&
+            s.outputLevel == OutputLevel::Instrument,
+        "action: ToggleOutput flips LINE to INSTRUMENT");
+  check(ui::applyAction(UiAction::ToggleOutput, s) == ui::ApplyResult::SettingsChanged && s.outputLevel == OutputLevel::Line,
+        "action: ToggleOutput flips back");
+  check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Pedal,
+        "action: ToggleInputJack flips MIC to PEDAL");
+  check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Mic,
+        "action: ToggleInputJack flips back");
+  const Settings before = s;
+  check(ui::applyAction(UiAction::EnterDfu, s) == ui::ApplyResult::EnterDfu && s.outputLevel == before.outputLevel &&
+            s.inputJack == before.inputJack,
+        "action: EnterDfu asks for the reset and changes nothing");
+  check(ui::applyAction(UiAction::None, s) == ui::ApplyResult::None && s.inputJack == before.inputJack,
+        "action: None does nothing");
+}
+
+void checkRegistry() {
+  checkIds();
+  checkCardTable();
+  checkGroups();
+  checkKnobsMove();
+  checkKnobTargets();
+  checkKnobClamps();
+  checkRegistryBounds();
+  checkDescriptors();
+  checkChainDefaults();
+  checkUnisonRate();
+  checkToggles();
+  checkPlacement();
+  checkFormat();
+}
+
+void checkLayoutAndCompose() {
+  checkDefaultLayout();
+  checkSettings();
+  checkLayoutValid();
+  checkLayoutReasons();
+  checkLayoutName();
+  checkApplyAction();
+  checkComposeToggles();
+  checkComposeBench();
+  checkOutputGain();
+}
+
+// ---- input logic ---------------------------------------------------------------------------
 
 void checkDebounce() {
   DebouncedInput in;
@@ -365,27 +539,29 @@ void checkSteppedPosition() {
   check(steppedPosition(0.24f, 4, 1) == 1, "stepped: hysteresis holds just below the edge");
   check(steppedPosition(-0.5f, 4, 2) == 0, "stepped: clamps at 0");
   check(steppedPosition(1.0f, 4, 0) == 3 && steppedPosition(2.0f, 4, 0) == 3, "stepped: clamps at 1");
+  check(steppedPosition(NAN, 4, 2) == 0, "stepped: NaN reads as 0");
+  check(steppedPosition(0.5f, 0, 0) == 0 && steppedPosition(0.5f, -3, 1) == 0, "stepped: no positions gives 0");
 }
 
 void settle(KnobFilter& f, float norm, int steps) {
   for (int i = 0; i < 60; ++i) f.update(norm, steps);
 }
 
-void checkKnobFilter() {
+void checkKnobFilterContinuous() {
   KnobFilter f;
-  check(!f.seeded(), "filter: unseeded at start");
   check(f.update(0.5f, 0) == KnobEvent::Seeded, "filter: first sample seeds");
-  check(f.seeded() && std::fabs(f.value() - 0.5f) < 1e-6f, "filter: seed takes the sample");
+  check(std::fabs(f.value() - 0.5f) < 1e-6f, "filter: seed takes the sample");
   check(f.update(0.505f, 0) == KnobEvent::None, "filter: jitter under threshold is not a move");
-  KnobEvent last = KnobEvent::None;
   bool moved = false;
   for (int i = 0; i < 20; ++i) {
-    last = f.update(0.8f, 0);
-    moved = moved || last == KnobEvent::Moved;
+    const KnobEvent e = f.update(0.8f, 0);
+    moved = moved || e == KnobEvent::Moved;
   }
   check(moved, "filter: real move reported");
   check(f.value() > 0.7f, "filter: value follows the knob");
+}
 
+void checkKnobFilterStepped() {
   KnobFilter s;
   s.update(0.1f, 5);
   check(s.value() == 0.0f, "filter: stepped seeds at the step under the knob");
@@ -399,254 +575,27 @@ void checkKnobFilter() {
   check(s.update(0.95f, 0) == KnobEvent::Reseeded && s.value() < 1.0f, "filter: back to continuous re-seeds");
 }
 
-// Canvas page r holds text row r, so a row matches when its page equals the rendered text.
-bool rowIs(const Canvas& canvas, int r, const char* text, bool inverted = false) {
-  Canvas ref;
-  ref.drawText(0, 0, font5x7(), text);
-  for (int x = 0; x < kCanvasWidth; ++x) {
-    const uint8_t want = inverted ? static_cast<uint8_t>(~ref.page(0)[x]) : ref.page(0)[x];
-    if (canvas.page(r)[x] != want) return false;
-  }
-  return true;
+// A re-seed restarts the move reference, so a knob parked where it re-seeded does not report a move.
+void checkKnobFilterReseedReference() {
+  KnobFilter f;
+  f.update(0.2f, 0);
+  settle(f, 0.2f, 0);
+  f.update(0.9f, 5);  // the card changed to a stepped knob
+  settle(f, 0.9f, 5);
+  check(f.update(0.9f, 0) == KnobEvent::Reseeded, "filter: back to continuous re-seeds again");
+  bool spurious = false;
+  for (int i = 0; i < 20; ++i) spurious = spurious || f.update(0.9f, 0) == KnobEvent::Moved;
+  check(!spurious, "filter: a parked knob reports no move after a re-seed");
 }
 
-std::string chainRow(const Layout& layout, int slot) {
-  char line[kDisplayCols + 1];
-  std::snprintf(line, sizeof(line), "%d %s", slot + 1, cardDesc(layout.card[slot]).name);
-  return line;
-}
-
-bool pagesClean(const Canvas& canvas) { return canvas.dirtyPages() == 0; }
-
-void clearAllDirty(Canvas& canvas) {
-  for (int p = 0; p < kCanvasPages; ++p) canvas.clearDirty(p);
-}
-
-struct MenuRig {
-  Menu menu;
-  Layout layout = defaultLayout();
-  PanelReading panel;
-  Settings settings;
-  Canvas canvas;
-  uint32_t nowMs = 100;
-
-  UiAction step(int detents, bool click, uint32_t advanceMs = 10) {
-    nowMs += advanceMs;
-    UiInput in;
-    in.detents = detents;
-    in.click = click;
-    return menu.update(in, nowMs);
-  }
-  void draw() { menu.draw(UiContext{layout, panel, settings, false}, canvas); }
-};
-
-void checkMenu() {
-  MenuRig m;
-  m.draw();
-  check(rowIs(m.canvas, 0, "cubevox"), "menu: idle title");
-  char tag[kDisplayCols + 1];
-  versionTag(kFirmwareVersion, tag, sizeof(tag));
-  check(rowIs(m.canvas, 7, tag) && std::strchr(tag, '-') == nullptr, "menu: idle shows the version tag only");
-
-  m.step(0, true);
-  m.draw();
-  check(rowIs(m.canvas, 0, "MENU"), "menu: click opens the list");
-  check(rowIs(m.canvas, 1, ">Out LINE", true) && rowIs(m.canvas, 2, " Input MIC"), "menu: cursor 0 row inverted");
-  check(rowIs(m.canvas, 2, " Input MIC"), "menu: input row text");
-
-  m.step(-1, false);
-  m.draw();
-  check(rowIs(m.canvas, 5, ">Exit ", true), "menu: turning back from 0 wraps to the last item");
-  m.step(1, false);
-  m.draw();
-  check(rowIs(m.canvas, 1, ">Out LINE", true), "menu: turning forward wraps to 0");
-
-  check(m.step(0, true) == UiAction::ToggleOutput, "menu: Out click toggles output");
-  m.step(1, false);
-  check(m.step(0, true) == UiAction::ToggleInputJack, "menu: Input click toggles the jack");
-  m.settings.inputJack = InputJack::Pedal;
-  m.draw();
-  check(rowIs(m.canvas, 2, ">Input PEDAL", true), "menu: row reads the settings");
-
-  m.step(1, false);
-  check(m.step(0, true) == UiAction::None, "menu: Chain order click has no action");
-  m.draw();
-  check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()), "menu: chain view starts at slot 1");
-  check(rowIs(m.canvas, kDisplayRows - 1, chainRow(m.layout, 7).c_str()), "menu: chain view shows slot 8");
-  m.step(0, true);
-  m.draw();
-  check(rowIs(m.canvas, 0, "MENU"), "menu: click leaves the chain view");
-
-  m.step(1, false);
-  m.step(0, true);
-  m.draw();
-  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE"), "menu: confirm screen");
-  m.step(1, false);
-  m.draw();
-  check(rowIs(m.canvas, 0, "MENU"), "menu: turn cancels the confirm");
-  m.step(0, true);
-  m.step(0, true);
-  check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
-}
-
-void checkMenuTimeout() {
-  MenuRig m;
-  m.step(0, true);
-  m.step(0, false, 14000);
-  m.draw();
-  check(rowIs(m.canvas, 0, "MENU"), "menu: still open before the timeout");
-  m.step(0, false, 1500);
-  m.draw();
-  check(rowIs(m.canvas, 0, "cubevox"), "menu: 15 s without input returns to idle");
-}
-
-void checkMenuRedraw() {
-  MenuRig m;
-  m.draw();
-  clearAllDirty(m.canvas);
-  m.draw();
-  check(pagesClean(m.canvas), "menu: an unchanged frame is not redrawn");
-}
-
-void checkMenuInvalidate() {
-  MenuRig m;
-  m.draw();
-  clearAllDirty(m.canvas);
-  m.menu.invalidate();
-  m.draw();
-  check(!pagesClean(m.canvas), "menu: invalidate makes the next draw repaint");
-}
-
-void checkCanvas() {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
-  const FontDesc& font = font5x7();
-  const uint8_t* glyphA = &f::kGlyphs['A' - 0x20][0];
-
-  Canvas c;
-  check(c.dirtyPages() == 0xFF, "canvas: starts fully dirty");
-  clearAllDirty(c);
-  const int pen = c.drawText(0, 0, font, "A");
-  check(std::memcmp(c.page(0), glyphA, f::kWidth) == 0, "canvas: 5x7 A matches the header bytes");
-  check(c.page(0)[f::kWidth] == 0 && c.page(1)[0] == 0, "canvas: nothing past the glyph");
-  check(c.dirtyPages() == 0x01, "canvas: drawing sets only the touched page dirty");
-  check(pen == f::kWidth + f::kSpacing, "canvas: drawText returns the pen after the spacing");
-  c.clearDirty(0);
-  check(c.dirtyPages() == 0, "canvas: clearDirty clears the bit");
-
-  Canvas shifted;
-  shifted.drawText(0, 3, font, "A");
-  bool shiftOk = true;
-  for (int col = 0; col < f::kWidth; ++col) {
-    shiftOk = shiftOk && shifted.page(0)[col] == static_cast<uint8_t>(glyphA[col] << 3);
-    shiftOk = shiftOk && shifted.page(1)[col] == static_cast<uint8_t>(glyphA[col] >> 5);
-  }
-  check(shiftOk, "canvas: glyph at y = 3 splits across pages 0 and 1");
-
-  Canvas above;
-  above.drawText(0, -4, font, "A");
-  bool aboveOk = true;
-  for (int col = 0; col < f::kWidth; ++col) aboveOk = aboveOk && above.page(0)[col] == static_cast<uint8_t>(glyphA[col] >> 4);
-  check(aboveOk, "canvas: glyph above the top edge clips to its lower rows");
-
-  check(Canvas::textWidth(font, "AB") == 2 * (f::kWidth + f::kSpacing) - f::kSpacing, "canvas: textWidth drops the trailing gap");
-  check(Canvas::textWidth(font, "") == 0, "canvas: textWidth of an empty string is 0");
-
-  Canvas edge;
-  edge.drawText(125, 60, font, "AB");
-  edge.drawText(-3, -3, font, "A");
-  edge.drawText(120, 62, font, "AAA");
-  edge.fillRect(-5, -5, 300, 300, true);
-  edge.invertRect(100, 50, 100, 100);
-  edge.setPixel(-1, 0, true);
-  edge.setPixel(128, 64, true);
-  check(edge.page(7)[127] == 0x00 && edge.page(6)[127] == 0x03 && edge.page(0)[0] == 0xFF, "canvas: fill and invert clip at the edges");
-
-  // A capitals-only font, so lowercase has no glyph of its own.
-  const uint8_t caps[2][5] = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}};
-  const FontDesc capsOnly{5, 7, 1, 5, "AB", 2, &caps[0][0], false};
-  Canvas low;
-  Canvas up;
-  low.drawText(0, 0, capsOnly, "ab");
-  up.drawText(0, 0, capsOnly, "AB");
-  check(low.page(0)[0] == 1 && std::memcmp(low.page(0), up.page(0), kCanvasWidth) == 0, "canvas: lowercase falls back to uppercase");
-  Canvas gap;
-  gap.drawText(0, 0, capsOnly, "?B");
-  Canvas direct;
-  direct.drawText(capsOnly.width + capsOnly.spacing, 0, capsOnly, "B");
-  check(std::memcmp(gap.page(0), direct.page(0), kCanvasWidth) == 0, "canvas: a missing glyph is blank and keeps its advance");
-
-  Canvas lower5;
-  Canvas upper5;
-  lower5.drawText(0, 0, font, "u");
-  upper5.drawText(0, 0, font, "U");
-  check(lower5.page(0)[1] != 0 && std::memcmp(lower5.page(0), upper5.page(0), kCanvasWidth) == 0,
-        "canvas: 5x7 u draws the bytes of U");
-
-  namespace f9 = cubevox::fonts::StylizedHyperlegible9X12;
-  Canvas big9;
-  big9.drawText(0, 0, font9x12(), "u");
-  bool ok9 = true;
-  for (int col = 0; col < f9::kWidth; ++col) {
-    ok9 = ok9 && big9.page(0)[col] == f9::kGlyphs['U' - 0x20][col];
-    ok9 = ok9 && big9.page(1)[col] == (f9::kGlyphs['U' - 0x20][f9::kWidth + col] & 0x0F);
-  }
-  check(ok9 && big9.page(0)[1] != 0, "canvas: 9x12 u draws the glyph bytes of U");
-
-  namespace f16 = cubevox::fonts::StylizedHyperlegible16X24;
-  Canvas big16;
-  big16.drawText(0, 0, font16x24(), "H");
-  bool ok16 = true;
-  for (int col = 0; col < f16::kWidth; ++col)
-    for (int band = 0; band < 3; ++band)
-      ok16 = ok16 && big16.page(band)[col] == f16::kGlyphs['H' - 0x20][band * f16::kWidth + col];
-  check(ok16 && big16.page(0)[0] != 0, "canvas: 16x24 H draws the glyph bytes");
-
-  Canvas rect;
-  clearAllDirty(rect);
-  rect.fillRect(10, 10, 4, 3, true);
-  check(rect.dirtyPages() == 0x02 && rect.page(1)[10] == 0x1C, "canvas: fillRect sets the rows inside page 1");
-  rect.invertRect(10, 10, 4, 3);
-  check(rect.page(1)[10] == 0 && rect.page(1)[13] == 0, "canvas: invertRect undoes a fill");
-}
-
-// Writes a screen as a binary PGM at 4x, lit pixels white.
-void writePgm(const Canvas& canvas, const char* name) {
-  constexpr int kScale = 4;
-  const std::string path = std::string(CUBEVOX_OUT_DIR) + "/" + name;
-  std::FILE* file = std::fopen(path.c_str(), "wb");
-  check(file != nullptr, "pgm: output file opens");
-  if (!file) return;
-  std::fprintf(file, "P5\n%d %d\n255\n", kCanvasWidth * kScale, kCanvasHeight * kScale);
-  for (int y = 0; y < kCanvasHeight * kScale; ++y) {
-    const int py = y / kScale;
-    for (int x = 0; x < kCanvasWidth * kScale; ++x) {
-      const bool on = (canvas.page(py / 8)[x / kScale] >> (py % 8)) & 1;
-      std::fputc(on ? 0xFF : 0x00, file);
-    }
-  }
-  std::fclose(file);
-}
-
-void checkScreenshots() {
-  MenuRig m;
-  m.panel.lastMoved.slot = 5;
-  m.panel.knob[5][0] = 0.6f;
-  m.panel.toggle[5] = true;
-  m.draw();
-  writePgm(m.canvas, "oled-idle.pgm");
-
-  m.step(0, true);
-  m.draw();
-  writePgm(m.canvas, "oled-menu.pgm");
-
-  m.step(2, false);
-  m.step(0, true);
-  m.draw();
-  writePgm(m.canvas, "oled-chain.pgm");
+void checkKnobFilter() {
+  checkKnobFilterContinuous();
+  checkKnobFilterStepped();
+  checkKnobFilterReseedReference();
 }
 
 void checkJackSwitch() {
-  JackSwitch j;
+  JackSwitch j(InputJack::Mic);
   j.update(0, InputJack::Mic, false);
   check(!j.holdMute() && j.relay() == InputJack::Mic, "jack: no change, no hold");
 
@@ -670,6 +619,14 @@ void checkJackSwitch() {
   check(j.holdMute() && j.relay() == InputJack::Pedal, "jack: a second change mid-sequence ends on the latest request");
   j.update(112 + 2 * kRelaySettleMs, InputJack::Pedal, true);
   check(!j.holdMute() && j.relay() == InputJack::Pedal, "jack: latest request settles and releases");
+}
+
+void checkJackRequestWithdrawn() {
+  JackSwitch j(InputJack::Mic);
+  j.update(0, InputJack::Pedal, false);
+  check(j.holdMute(), "jack: a request holds the mute");
+  j.update(5, InputJack::Mic, false);
+  check(!j.holdMute() && j.relay() == InputJack::Mic, "jack: a request withdrawn before the mute needs no dip");
 }
 
 void checkVersionTag() {
@@ -710,12 +667,12 @@ void checkMuteSequence() {
   check(out.muteNHigh && out.xsmtHigh && !m.active(), "mute: XSMT rises after the settle");
 
   t += kRelaySettleMs + 100;
-  runMute(m, t, t + kMuteSwitchDebounceMs - 1, false);
-  out = m.update(t + kMuteSwitchDebounceMs, false);
+  runMute(m, t, t + kSwitchDebounceMs - 1, false);
+  out = m.update(t + kSwitchDebounceMs, false);
   check(!out.xsmtHigh && out.muteNHigh, "mute: XSMT falls first, MUTE_N still high");
-  out = runMute(m, t + kMuteSwitchDebounceMs + 1, t + kMuteSwitchDebounceMs + kXsmtLeadMs - 1, false);
+  out = runMute(m, t + kSwitchDebounceMs + 1, t + kSwitchDebounceMs + kXsmtLeadMs - 1, false);
   check(!out.xsmtHigh && out.muteNHigh && !m.fullyMuted(), "mute: MUTE_N waits out the XSMT lead");
-  out = m.update(t + kMuteSwitchDebounceMs + kXsmtLeadMs, false);
+  out = m.update(t + kSwitchDebounceMs + kXsmtLeadMs, false);
   check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: MUTE_N falls after the lead");
 }
 
@@ -744,238 +701,465 @@ void checkMuteLatchAndHold() {
   check(m.fullyMuted() && !out.xsmtHigh, "mute: a latch mutes");
   out = runMute(m, t + 100, t + 300, true);
   check(!out.xsmtHigh && !out.muteNHigh, "mute: a latch ignores a released switch");
+}
 
+void checkMuteMidRelease() {
   MuteSequence mid;
   mid.reset(true, 0);
   mid.clocksRunning(0);
   runMute(mid, 0, kBootUnmuteDelayMs, true);
   mid.hold(true);
-  out = mid.update(kBootUnmuteDelayMs + 1, true);
+  MuteOutputs out = mid.update(kBootUnmuteDelayMs + 1, true);
   check(!out.xsmtHigh && out.muteNHigh, "mute: muted again mid-release keeps XSMT low");
   out = runMute(mid, kBootUnmuteDelayMs + 2, kBootUnmuteDelayMs + kXsmtLeadMs + 2, true);
   check(!out.muteNHigh && mid.fullyMuted(), "mute: a mid-release mute ends fully muted");
 }
 
+// reset() returns to the fully muted start: no latch, hold or running clocks survive it.
+void checkMuteReset() {
+  MuteSequence m;
+  m.reset(true, 0);
+  m.clocksRunning(0);
+  m.latch();
+  m.hold(true);
+  m.reset(true, 5000);
+  const MuteOutputs out = runMute(m, 5000, 5000 + 2 * kBootUnmuteDelayMs, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: reset waits for the clocks again");
+  m.clocksRunning(20000);
+  runMute(m, 20000, 20000 + kBootUnmuteDelayMs + kRelaySettleMs + 1, true);
+  check(!m.active(), "mute: after reset a released switch and running clocks unmute");
+}
 
-// In-memory bank 2: two 128 KB sectors, 0xFF erased. Programming ANDs bits in like real flash.
-class FakeFlash : public FlashIo {
- public:
-  FakeFlash() { mem[0].assign(kRecordSectorBytes, 0xFF); mem[1].assign(kRecordSectorBytes, 0xFF); }
-  const uint8_t* read(int s) const override { return mem[s].data(); }
-  void eraseStart(int s) override { erasing = s; busyPolls = 3; ++erases[s]; ++ops; }
-  bool eraseBusy() override {
-    if (erasing < 0) return false;
-    if (busyPolls-- > 0) return true;
-    mem[erasing].assign(kRecordSectorBytes, 0xFF);
-    erasing = -1;
-    return false;
+void checkInputLogic() {
+  checkDebounce();
+  checkSteppedPosition();
+  checkKnobFilter();
+  checkJackSwitch();
+  checkJackRequestWithdrawn();
+  checkVersionTag();
+  checkMuteSequence();
+  checkMuteLatchAndHold();
+  checkMuteMidRelease();
+  checkMuteReset();
+}
+
+// ---- canvas and fonts ----------------------------------------------------------------------
+
+// Canvas page r holds text row r, so a row matches when its page equals the rendered text.
+bool rowIs(const Canvas& canvas, int r, const char* text, bool inverted = false) {
+  Canvas ref;
+  ref.drawText(0, 0, font5x7(), text);
+  for (int x = 0; x < kCanvasWidth; ++x) {
+    const uint8_t want = inverted ? static_cast<uint8_t>(~ref.page(0)[x]) : ref.page(0)[x];
+    if (canvas.page(r)[x] != want) return false;
   }
-  void programWord(int s, uint32_t off, const uint8_t* w) override {
-    for (size_t i = 0; i < kFlashWordBytes; ++i) mem[s][off + i] &= w[i];
-    ++programs;
-    ++ops;
-  }
-  bool takeError() override { return false; }
-
-  void put(int sector, int slot, const RecordData& rec) {
-    const RecordBytes b = encodeRecord(rec);
-    std::memcpy(&mem[sector][slot * kRecordBytes], b.data(), kRecordBytes);
-  }
-
-  std::vector<uint8_t> mem[2];
-  int erasing = -1;
-  int busyPolls = 0;
-  int erases[2] = {0, 0};
-  int programs = 0;
-  int ops = 0;
-};
-
-RecordData makeRec(uint32_t seq, OutputLevel out = OutputLevel::Line, const char* name = "") {
-  RecordData r;
-  r.sequence = seq;
-  r.settings.output = out;
-  std::strncpy(r.name, name, kRecordNameBytes);
-  return r;
+  return true;
 }
 
-void checkRecordCodec() {
-  const uint8_t vec[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
-  check(crc32(vec, sizeof vec) == 0xCBF43926u, "record: crc32 of 123456789");
-
-  RecordData in = makeRec(77, OutputLevel::Instrument, "stage rig");
-  in.settings.inputJack = InputJack::Pedal;
-  in.layout.card[2] = Card::ReverbChasm;
-  in.layout.card[7] = Card::Empty;
-  RecordBytes b = encodeRecord(in);
-  RecordData out;
-  check(decodeRecord(b.data(), out), "record: round trip decodes");
-  check(out.sequence == 77 && out.settings.output == OutputLevel::Instrument &&
-            out.settings.inputJack == InputJack::Pedal && std::strcmp(out.name, "stage rig") == 0 &&
-            out.layout.card == in.layout.card,
-        "record: round trip keeps every field");
-
-  RecordBytes bad = b;
-  bad[kOffName] ^= 0x01;
-  check(!decodeRecord(bad.data(), out), "record: corrupt byte fails the CRC");
-  bad = b;
-  bad[kOffSchema] = 2;
-  check(!decodeRecord(bad.data(), out), "record: wrong schema rejected");
-
-  bad = b;
-  std::memset(&bad[kOffSlots], 0, kCardIdBytes);
-  std::memcpy(&bad[kOffSlots], "no_such_card", 12);
-  const uint32_t crc = crc32(bad.data(), kOffCrc);
-  for (int i = 0; i < 4; ++i) bad[kOffCrc + i] = static_cast<uint8_t>(crc >> (8 * i));
-  check(decodeRecord(bad.data(), out) && out.layout.card[0] == Card::Empty, "record: unknown card id becomes empty");
-
-  const uint8_t blank[kRecordBytes] = {};
-  std::vector<uint8_t> ff(kRecordBytes, 0xFF);
-  check(classifyRecordSlot(ff.data()) == SlotState::Blank, "record: all 0xFF is blank");
-  check(classifyRecordSlot(blank) == SlotState::Torn, "record: zeros are torn");
-  check(classifyRecordSlot(b.data()) == SlotState::Valid, "record: encoded slot is valid");
+std::string chainRow(const Layout& layout, int slot) {
+  char line[kDisplayCols + 1];
+  std::snprintf(line, sizeof(line), "%d %s", slot + 1, cardDesc(layout.card[slot]).name);
+  return line;
 }
 
-void checkRecordNewest() {
-  FakeFlash f;
-  f.put(0, 0, makeRec(3));
-  f.put(1, 0, makeRec(5, OutputLevel::Instrument));
-  f.put(0, 1, makeRec(4));
-  const uint8_t* views[2] = {f.read(0), f.read(1)};
-  RecordFound found;
-  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 5 && found.sector == 1,
-        "record: newest wins across sectors");
+bool pagesClean(const Canvas& canvas) { return canvas.dirtyPages() == 0; }
 
-  RecordStore store(f);
-  RecordData out;
-  check(store.begin(out) && out.sequence == 5, "store: boot loads the newest");
-  check(store.status().sector == 1 && store.status().nextSlot == 1, "store: append goes after the newest");
-}
-
-// Polls until the store is idle; returns the largest number of flash ops one poll started.
-int runToIdle(RecordStore& store, FakeFlash& f, uint32_t& t) {
-  int worst = 0;
-  for (int i = 0; i < 100 && store.status().busy; ++i) {
-    const int before = f.ops;
-    store.poll(t++);
-    worst = std::max(worst, f.ops - before);
-  }
-  return worst;
-}
-
-void checkStoreAppend() {
-  FakeFlash f;
-  RecordStore store(f);
-  RecordData out;
-  check(!store.begin(out), "store: blank flash has no record");
-
-  Settings s;
-  s.output = OutputLevel::Instrument;
-  store.request(defaultLayout(), s, 100);
-  store.poll(2099);
-  check(f.ops == 0, "store: no write before 2 s of quiet");
-  store.request(defaultLayout(), s, 1500);
-  store.poll(3499);
-  check(f.ops == 0, "store: a new request restarts the debounce");
-  uint32_t t = 3500;
-  const int worst = runToIdle(store, f, t);
-  check(f.programs == kWordsPerRecord && f.erases[0] + f.erases[1] == 0, "store: one record is eight word programs, no erase");
-  check(worst == 1, "store: at most one flash op per poll");
-
-  FakeFlash again;
-  std::memcpy(again.mem[0].data(), f.mem[0].data(), kRecordBytes);
-  RecordStore reboot(again);
-  check(reboot.begin(out) && out.sequence == 1 && out.settings.output == OutputLevel::Instrument,
-        "store: the saved record reloads");
-
-  store.saveNow();
-  store.poll(3501 + 1000);
-  check(f.programs == kWordsPerRecord, "store: save-now starts without waiting (first poll sets up)");
-  runToIdle(store, f, t);
-  check(f.programs == 2 * kWordsPerRecord && store.status().sequence == 2 && store.status().nextSlot == 2,
-        "store: second record appends after the first");
-}
-
-void checkStoreTornTail() {
-  FakeFlash f;
-  f.put(0, 0, makeRec(1));
-  f.put(0, 1, makeRec(2, OutputLevel::Instrument));
-  f.put(0, 2, makeRec(3));
-  std::memset(&f.mem[0][2 * kRecordBytes + 3 * kFlashWordBytes], 0xFF, 5 * kFlashWordBytes);  // cut after 3 words
-  f.mem[0][2 * kRecordBytes + 100] = 0x00;                                                        // and damaged
-  RecordStore store(f);
-  RecordData out;
-  check(store.begin(out) && out.sequence == 2, "store: torn tail is skipped, previous record loads");
-  check(store.status().nextSlot == 3, "store: append goes after the torn slot");
-  store.request(defaultLayout(), Settings{}, 0);
-  uint32_t t = kSaveDebounceMs;
-  runToIdle(store, f, t);
-  const uint8_t* views[2] = {f.read(0), f.read(1)};
-  RecordFound found;
-  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 3 && found.slot == 3,
-        "store: record lands in slot 3 with sequence 3");
-}
-
-void fillSector(FakeFlash& f, int sector, uint32_t firstSeq) {
-  for (int slot = 0; slot < kSlotsPerSector; ++slot) f.put(sector, slot, makeRec(firstSeq + slot));
-}
-
-void checkStoreSectorSwitch() {
-  FakeFlash f;
-  fillSector(f, 0, 1);
-  f.put(1, 0, makeRec(0));
-  std::memset(&f.mem[1][kRecordBytes], 0x5A, 64);  // stale junk in the other sector
-  RecordStore store(f);
-  RecordData out;
-  check(store.begin(out) && out.sequence == kSlotsPerSector, "store: full sector loads its last record");
-  store.request(defaultLayout(), Settings{}, 0);
-  uint32_t t = kSaveDebounceMs;
-  const int worst = runToIdle(store, f, t);
-  check(f.erases[1] == 1 && f.erases[0] == 0, "store: full sector erases the other one");
-  check(worst == 1, "store: erase start and programs are separate polls");
-  check(store.status().sector == 1 && store.status().nextSlot == 1 && store.status().sequence == kSlotsPerSector + 1,
-        "store: new record is slot 0 of the other sector");
-  const uint8_t* views[2] = {f.read(0), f.read(1)};
-  RecordFound found;
-  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.sector == 1 && found.slot == 0,
-        "store: newest is in the fresh sector");
-}
-
-void checkStoreInterruptedErase() {
-  // The older sector was mid-erase: a blank slot followed by old data.
-  FakeFlash f;
-  fillSector(f, 1, 1);
-  std::memset(&f.mem[1][0], 0xFF, 3 * kRecordBytes);
-  fillSector(f, 0, 600);
-  RecordStore store(f);
-  RecordData out;
-  check(store.begin(out) && out.sequence == 600 + kSlotsPerSector - 1, "store: dirty sector does not hide the newest");
-  store.request(defaultLayout(), Settings{}, 0);
-  uint32_t t = kSaveDebounceMs;
-  runToIdle(store, f, t);
-  check(f.erases[1] == 1, "store: interrupted erase is re-erased before use");
-
-  // No valid record anywhere and sector 0 dirty: use the blank sector, leave the dirty one.
-  FakeFlash g;
-  std::memset(&g.mem[0][kRecordBytes], 0x33, 64);
-  RecordStore fresh(g);
-  check(!fresh.begin(out), "store: junk is not a record");
-  fresh.request(defaultLayout(), Settings{}, 0);
-  t = kSaveDebounceMs;
-  runToIdle(fresh, g, t);
-  check(g.erases[0] + g.erases[1] == 0 && fresh.status().sector == 1 && fresh.status().sequence == 1,
-        "store: a blank sector is used without an erase");
-
-  // Bench erase wipes both.
-  check(fresh.eraseAll(), "store: erase-all accepted when idle");
-  for (int i = 0; i < 50; ++i) fresh.poll(t++);
-  check(g.erases[0] == 1 && g.erases[1] == 1 && !fresh.status().hasRecord && !fresh.status().busy,
-        "store: erase-all clears both sectors");
+void clearAllDirty(Canvas& canvas) {
+  for (int p = 0; p < kCanvasPages; ++p) canvas.clearDirty(p);
 }
 
 bool pixelOn(const Canvas& c, int x, int y) { return (c.page(y / 8)[x] >> (y % 8)) & 1; }
 
+void checkCanvasText() {
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  const FontDesc& font = font5x7();
+  const uint8_t* glyphA = &f::kGlyphs['A' - 0x20][0];
+
+  Canvas c;
+  check(c.dirtyPages() == 0xFF, "canvas: starts fully dirty");
+  clearAllDirty(c);
+  const int pen = c.drawText(0, 0, font, "A");
+  check(std::memcmp(c.page(0), glyphA, f::kWidth) == 0, "canvas: 5x7 A matches the header bytes");
+  check(c.page(0)[f::kWidth] == 0 && c.page(1)[0] == 0, "canvas: nothing past the glyph");
+  check(c.dirtyPages() == 0x01, "canvas: drawing sets only the touched page dirty");
+  check(pen == f::kWidth + f::kSpacing && pen == kFont5x7Advance, "canvas: drawText returns the pen after the spacing");
+  c.clearDirty(0);
+  check(c.dirtyPages() == 0, "canvas: clearDirty clears the bit");
+
+  Canvas shifted;
+  shifted.drawText(0, 3, font, "A");
+  bool shiftOk = true;
+  for (int col = 0; col < f::kWidth; ++col) {
+    shiftOk = shiftOk && shifted.page(0)[col] == static_cast<uint8_t>(glyphA[col] << 3);
+    shiftOk = shiftOk && shifted.page(1)[col] == static_cast<uint8_t>(glyphA[col] >> 5);
+  }
+  check(shiftOk, "canvas: glyph at y = 3 splits across pages 0 and 1");
+
+  Canvas above;
+  above.drawText(0, -4, font, "A");
+  bool aboveOk = true;
+  for (int col = 0; col < f::kWidth; ++col) aboveOk = aboveOk && above.page(0)[col] == static_cast<uint8_t>(glyphA[col] >> 4);
+  check(aboveOk, "canvas: glyph above the top edge clips to its lower rows");
+}
+
+void checkCanvasWidth() {
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  const FontDesc& font = font5x7();
+  check(Canvas::textWidth(font, "AB") == 2 * (f::kWidth + f::kSpacing) - f::kSpacing, "canvas: textWidth drops the trailing gap");
+  check(Canvas::textWidth(font, "") == 0, "canvas: textWidth of an empty string is 0");
+}
+
+void checkCanvasEdges() {
+  const FontDesc& font = font5x7();
+  Canvas edge;
+  edge.drawText(125, 60, font, "AB");
+  edge.drawText(-3, -3, font, "A");
+  edge.drawText(120, 62, font, "AAA");
+  edge.fillRect(-5, -5, 300, 300, true);
+  edge.invertRect(100, 50, 100, 100);
+  check(edge.page(7)[127] == 0x00 && edge.page(6)[127] == 0x03 && edge.page(0)[0] == 0xFF, "canvas: fill and invert clip at the edges");
+
+  Canvas c;
+  c.fillRect(0, 0, kCanvasWidth, kCanvasHeight, true);
+  clearAllDirty(c);
+  c.clear();
+  bool blank = true;
+  for (int p = 0; p < kCanvasPages; ++p) {
+    for (int x = 0; x < kCanvasWidth; ++x) blank = blank && c.page(p)[x] == 0;
+  }
+  check(blank && c.dirtyPages() == 0xFF, "canvas: clear blanks every page and marks them dirty");
+}
+
+void checkCanvasDirtyApi() {
+  Canvas c;
+  check(c.firstDirtyPage() == 0, "canvas: a fresh canvas has page 0 dirty first");
+  clearAllDirty(c);
+  check(c.firstDirtyPage() == -1, "canvas: no dirty page reports -1");
+  c.fillRect(0, 30, 4, 2, true);
+  c.fillRect(0, 50, 4, 2, true);
+  check(c.firstDirtyPage() == 3, "canvas: the lowest dirty page comes first");
+  c.clearDirty(3);
+  check(c.firstDirtyPage() == 6, "canvas: clearing a page moves on to the next");
+  const uint8_t before = c.dirtyPages();
+  c.clearDirty(-1);
+  c.clearDirty(kCanvasPages);
+  c.clearDirty(40);
+  check(c.dirtyPages() == before, "canvas: clearDirty ignores a page out of range");
+  check(c.page(-1) == nullptr && c.page(kCanvasPages) == nullptr && c.page(0) != nullptr, "canvas: page() rejects an index out of range");
+}
+
+void checkCanvasFallback() {
+  // A capitals-only font, so lowercase has no glyph of its own.
+  const uint8_t caps[2][5] = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}};
+  const uint8_t codes[2] = {'A', 'B'};
+  const FontDesc capsOnly{5, 7, 1, 5, codes, 2, &caps[0][0]};
+  Canvas low;
+  Canvas up;
+  low.drawText(0, 0, capsOnly, "ab");
+  up.drawText(0, 0, capsOnly, "AB");
+  check(low.page(0)[0] == 1 && std::memcmp(low.page(0), up.page(0), kCanvasWidth) == 0, "canvas: lowercase falls back to uppercase");
+  Canvas gap;
+  gap.drawText(0, 0, capsOnly, "?B");
+  Canvas direct;
+  direct.drawText(capsOnly.width + capsOnly.spacing, 0, capsOnly, "B");
+  check(std::memcmp(gap.page(0), direct.page(0), kCanvasWidth) == 0, "canvas: a missing glyph is blank and keeps its advance");
+
+  check(findGlyph(capsOnly, 'A') == &caps[0][0] && findGlyph(capsOnly, 'a') == &caps[0][0], "glyph: a capital and its lowercase find the same bytes");
+  check(findGlyph(capsOnly, 'C') == nullptr && findGlyph(capsOnly, 'c') == nullptr && findGlyph(capsOnly, '\x01') == nullptr,
+        "glyph: a letter the font lacks finds nothing");
+  check(findGlyph(font5x7(), 'u') != nullptr && findGlyph(font5x7(), 'u') == findGlyph(font5x7(), 'U'), "glyph: 5x7 u is the glyph of U");
+}
+
+void checkCanvasFonts() {
+  Canvas lower5;
+  Canvas upper5;
+  lower5.drawText(0, 0, font5x7(), "u");
+  upper5.drawText(0, 0, font5x7(), "U");
+  check(lower5.page(0)[1] != 0 && std::memcmp(lower5.page(0), upper5.page(0), kCanvasWidth) == 0,
+        "canvas: 5x7 u draws the bytes of U");
+
+  namespace f9 = cubevox::fonts::StylizedHyperlegible9X12;
+  Canvas big9;
+  big9.drawText(0, 0, font9x12(), "u");
+  bool ok9 = true;
+  for (int col = 0; col < f9::kWidth; ++col) {
+    ok9 = ok9 && big9.page(0)[col] == f9::kGlyphs['U' - 0x20][col];
+    ok9 = ok9 && big9.page(1)[col] == (f9::kGlyphs['U' - 0x20][f9::kWidth + col] & 0x0F);
+  }
+  check(ok9 && big9.page(0)[1] != 0, "canvas: 9x12 u draws the glyph bytes of U");
+
+  namespace f16 = cubevox::fonts::StylizedHyperlegible16X24;
+  Canvas big16;
+  big16.drawText(0, 0, font16x24(), "H");
+  bool ok16 = true;
+  for (int col = 0; col < f16::kWidth; ++col)
+    for (int band = 0; band < 3; ++band)
+      ok16 = ok16 && big16.page(band)[col] == f16::kGlyphs['H' - 0x20][band * f16::kWidth + col];
+  check(ok16 && big16.page(0)[0] != 0, "canvas: 16x24 H draws the glyph bytes");
+}
+
+void checkCanvasRects() {
+  Canvas rect;
+  clearAllDirty(rect);
+  rect.fillRect(10, 10, 4, 3, true);
+  check(rect.dirtyPages() == 0x02 && rect.page(1)[10] == 0x1C, "canvas: fillRect sets the rows inside page 1");
+  rect.invertRect(10, 10, 4, 3);
+  check(rect.page(1)[10] == 0 && rect.page(1)[13] == 0, "canvas: invertRect undoes a fill");
+}
+
+void checkCanvas() {
+  checkCanvasText();
+  checkCanvasWidth();
+  checkCanvasEdges();
+  checkCanvasDirtyApi();
+  checkCanvasFallback();
+  checkCanvasFonts();
+  checkCanvasRects();
+}
+
+void checkDisplayGrid() {
+  check(kDisplayRows * kDisplayRowPx == kCanvasHeight, "display: the rows fill the canvas height");
+  check(kDisplayCols * kFont5x7Advance <= kCanvasWidth && (kDisplayCols + 1) * kFont5x7Advance > kCanvasWidth,
+        "display: the columns fill the canvas width at the 5x7 advance");
+}
+
+// ---- menu ----------------------------------------------------------------------------------
+
+struct MenuRig {
+  Menu menu;
+  Layout layout = defaultLayout();
+  PanelReading panel;
+  Settings settings;
+  Canvas canvas;
+  bool muted = false;
+  uint32_t nowMs = 100;
+
+  UiAction step(int detents, bool click, uint32_t advanceMs = 10) {
+    nowMs += advanceMs;
+    UiInput in;
+    in.detents = detents;
+    in.click = click;
+    return menu.update(in, nowMs);
+  }
+  void draw() { menu.draw(UiContext{layout, panel, settings, muted}, canvas); }
+
+  // Opens the list and turns to `item` (0 = Out, 1 = Input, 2 = Chain order, 3 = Update, 4 = Exit).
+  void openListAt(int item) {
+    step(0, true);
+    step(item, false);
+  }
+};
+
+void checkMenuIdle() {
+  MenuRig m;
+  m.draw();
+  check(rowIs(m.canvas, 0, "cubevox"), "menu: idle title");
+  char tag[kDisplayCols + 1];
+  versionTag(kFirmwareVersion, tag, sizeof(tag));
+  check(rowIs(m.canvas, 7, tag) && std::strchr(tag, '-') == nullptr, "menu: idle shows the version tag only");
+  check(rowIs(m.canvas, 1, ""), "menu: no MUTED row while the output plays");
+  m.muted = true;
+  m.draw();
+  check(rowIs(m.canvas, 1, "MUTED"), "menu: the MUTED row shows while muted");
+  m.muted = false;
+  m.draw();
+  check(rowIs(m.canvas, 1, ""), "menu: the MUTED row clears when the mute lifts");
+}
+
+void checkMenuIdleReadout() {
+  MenuRig m;
+  m.panel.lastMoved.slot = 5;  // Distortion
+  m.panel.knob[5][0] = 0.6f;
+  m.panel.toggle[5] = true;
+  m.draw();
+  check(rowIs(m.canvas, 3, "Distortion") && rowIs(m.canvas, 4, "Drive"), "menu: readout names the card and knob");
+  check(rowIs(m.canvas, 5, "60 %") && rowIs(m.canvas, 6, "ON"), "menu: readout shows the value and the toggle");
+  m.panel.toggle[5] = false;
+  m.draw();
+  check(rowIs(m.canvas, 6, "OFF"), "menu: readout shows the toggle off");
+
+  m.layout.card[0] = Card::Empty;
+  m.panel.lastMoved.slot = 0;
+  m.draw();
+  check(rowIs(m.canvas, 3, "Empty") && rowIs(m.canvas, 4, "") && rowIs(m.canvas, 5, ""), "menu: an Empty slot reads as a bare card name");
+
+  m.panel.lastMoved.slot = kSlotCount;
+  m.draw();
+  check(rowIs(m.canvas, 3, "") && rowIs(m.canvas, 6, "") && rowIs(m.canvas, 0, "cubevox"),
+        "menu: a last-moved slot out of range draws no readout");
+}
+
+void checkMenuList() {
+  MenuRig m;
+  m.step(0, true);
+  m.draw();
+  check(rowIs(m.canvas, 0, "MENU"), "menu: click opens the list");
+  check(rowIs(m.canvas, 1, ">Out LINE", true) && rowIs(m.canvas, 2, " Input MIC"), "menu: cursor 0 row inverted, input row text");
+
+  m.step(-1, false);
+  m.draw();
+  check(rowIs(m.canvas, 5, ">Exit", true), "menu: turning back from 0 wraps to the last item");
+  m.step(1, false);
+  m.draw();
+  check(rowIs(m.canvas, 1, ">Out LINE", true), "menu: turning forward wraps to 0");
+
+  check(m.step(0, true) == UiAction::ToggleOutput, "menu: Out click toggles output");
+  m.step(1, false);
+  check(m.step(0, true) == UiAction::ToggleInputJack, "menu: Input click toggles the jack");
+  m.settings.inputJack = InputJack::Pedal;
+  m.draw();
+  check(rowIs(m.canvas, 2, ">Input PEDAL", true), "menu: row reads the settings");
+}
+
+void checkMenuWrapAndCombo() {
+  MenuRig m;
+  m.openListAt(7);  // 7 detents past the cursor wraps to item 2
+  m.draw();
+  check(rowIs(m.canvas, 3, ">Chain order", true), "menu: +7 detents wraps around the list");
+  m.step(-7, false);  // back by 7 lands on item 0
+  m.draw();
+  check(rowIs(m.canvas, 1, ">Out LINE", true), "menu: -7 detents wraps the other way");
+
+  MenuRig n;
+  n.openListAt(0);
+  check(n.step(1, true) == UiAction::ToggleInputJack, "menu: a turn and a click in one pass act on the new cursor");
+}
+
+void checkMenuScreens() {
+  MenuRig m;
+  m.openListAt(2);
+  check(m.step(0, true) == UiAction::None, "menu: Chain order click has no action");
+  m.draw();
+  check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()), "menu: chain view starts at slot 1");
+  check(rowIs(m.canvas, kDisplayRows - 1, chainRow(m.layout, 7).c_str()), "menu: chain view shows slot 8");
+  m.step(0, true);
+  m.draw();
+  check(rowIs(m.canvas, 0, "MENU"), "menu: click leaves the chain view");
+
+  m.step(1, false);
+  m.step(0, true);
+  m.draw();
+  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE"), "menu: confirm screen");
+  m.step(1, false);
+  m.draw();
+  check(rowIs(m.canvas, 0, "MENU"), "menu: turn cancels the confirm");
+  m.step(0, true);
+  m.step(0, true);
+  check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
+}
+
+void checkMenuExit() {
+  MenuRig m;
+  m.openListAt(4);
+  m.draw();
+  check(rowIs(m.canvas, 5, ">Exit", true), "menu: the cursor sits on Exit");
+  check(m.step(0, true) == UiAction::None, "menu: Exit click has no action");
+  m.draw();
+  check(rowIs(m.canvas, 0, "cubevox"), "menu: Exit returns to the idle screen");
+}
+
+void checkMenuTimeout() {
+  MenuRig m;
+  m.step(0, true);
+  m.step(0, false, 14000);
+  m.draw();
+  check(rowIs(m.canvas, 0, "MENU"), "menu: still open before the timeout");
+  m.step(0, false, 1500);
+  m.draw();
+  check(rowIs(m.canvas, 0, "cubevox"), "menu: 15 s without input returns to idle");
+
+  MenuRig chain;
+  chain.openListAt(2);
+  chain.step(0, true);
+  chain.step(0, false, 15001);
+  chain.draw();
+  check(rowIs(chain.canvas, 0, "cubevox"), "menu: the chain view times out to idle");
+
+  MenuRig dfu;
+  dfu.openListAt(3);
+  dfu.step(0, true);
+  dfu.step(0, false, 15001);
+  dfu.draw();
+  check(rowIs(dfu.canvas, 0, "cubevox"), "menu: the DFU confirm times out to idle without acting");
+}
+
+void checkMenuRedraw() {
+  MenuRig m;
+  m.draw();
+  clearAllDirty(m.canvas);
+  m.draw();
+  check(pagesClean(m.canvas), "menu: an unchanged frame is not redrawn");
+}
+
+void checkMenuInvalidate() {
+  MenuRig m;
+  m.draw();
+  clearAllDirty(m.canvas);
+  m.menu.invalidate();
+  m.draw();
+  check(!pagesClean(m.canvas), "menu: invalidate makes the next draw repaint");
+}
+
+// Writes a screen as a binary PGM at 4x, lit pixels white.
+void writePgm(const Canvas& canvas, const char* name) {
+  constexpr int kScale = 4;
+  const std::string path = std::string(CUBEVOX_OUT_DIR) + "/" + name;
+  std::FILE* file = std::fopen(path.c_str(), "wb");
+  check(file != nullptr, "pgm: output file opens");
+  if (!file) return;
+  std::fprintf(file, "P5\n%d %d\n255\n", kCanvasWidth * kScale, kCanvasHeight * kScale);
+  for (int y = 0; y < kCanvasHeight * kScale; ++y) {
+    const int py = y / kScale;
+    for (int x = 0; x < kCanvasWidth * kScale; ++x) {
+      const bool on = (canvas.page(py / 8)[x / kScale] >> (py % 8)) & 1;
+      std::fputc(on ? 0xFF : 0x00, file);
+    }
+  }
+  std::fclose(file);
+}
+
+void checkScreenshots() {
+  MenuRig m;
+  m.panel.lastMoved.slot = 5;
+  m.panel.knob[5][0] = 0.6f;
+  m.panel.toggle[5] = true;
+  m.draw();
+  check(rowIs(m.canvas, 3, "Distortion") && rowIs(m.canvas, 4, "Drive") && rowIs(m.canvas, 5, "60 %") && rowIs(m.canvas, 6, "ON"),
+        "screens: idle readout rows");
+  writePgm(m.canvas, "oled-idle.pgm");
+
+  m.step(0, true);
+  m.draw();
+  check(rowIs(m.canvas, 0, "MENU") && rowIs(m.canvas, 1, ">Out LINE", true), "screens: menu rows");
+  writePgm(m.canvas, "oled-menu.pgm");
+
+  m.step(2, false);
+  m.step(0, true);
+  m.draw();
+  check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()) && rowIs(m.canvas, 7, chainRow(m.layout, 7).c_str()),
+        "screens: chain rows");
+  writePgm(m.canvas, "oled-chain.pgm");
+}
+
+void checkMenu() {
+  checkMenuIdle();
+  checkMenuIdleReadout();
+  checkMenuList();
+  checkMenuWrapAndCombo();
+  checkMenuScreens();
+  checkMenuExit();
+  checkMenuTimeout();
+  checkMenuRedraw();
+  checkMenuInvalidate();
+  checkScreenshots();
+  checkDisplayGrid();
+}
+
+// ---- panel test ----------------------------------------------------------------------------
+
 void checkPanelTestPots() {
   PanelTest t;
+  check(t.potsDone() == 0 && t.togglesDone() == 0 && !t.updatePot(0, 0.5f, 0), "panel test: a new test starts empty");
   t.reset();
   check(!t.updatePot(3, 0.5f, 0), "panel test: the first sample is not movement");
   check(t.updatePot(3, 0.6f, 100), "panel test: a step past the print threshold reports");
@@ -985,30 +1169,37 @@ void checkPanelTestPots() {
   check(t.updatePot(3, 0.02f, 300), "panel test: reaching the low end reports");
   check(!t.potDone(3), "panel test: one end is not a full travel");
   check(t.updatePot(3, 0.99f, 400), "panel test: reaching the high end reports");
-  check(t.potDone(3) && t.potMin(3) < 0.05f && t.potMax(3) > 0.95f, "panel test: both ends make a full travel");
-  check(t.nextPot() == 0, "panel test: next untested pot is the first one not done");
+  check(t.potDone(3), "panel test: both ends make a full travel");
   for (int i = 0; i < kPanelTestPots; ++i) {
     t.updatePot(i, 0.0f, 0);
     t.updatePot(i, 1.0f, 1000);
   }
-  check(t.potsDone() == kPanelTestPots && t.nextPot() == -1, "panel test: all pots done");
+  check(t.potsDone() == kPanelTestPots, "panel test: all pots done");
   t.reset();
   check(t.potsDone() == 0, "panel test: reset forgets the travel");
 }
 
 void checkPanelTestToggles() {
   PanelTest t;
-  t.reset();
   check(!t.updateToggle(2, true), "panel test: the first toggle sample is not an edge");
   check(!t.toggleDone(2), "panel test: one state is not both");
   check(!t.updateToggle(2, true), "panel test: a steady toggle has no edge");
   check(t.updateToggle(2, false), "panel test: a toggle change is an edge");
-  check(t.toggleDone(2) && t.nextToggle() == 0, "panel test: both states seen, next toggle is slot 1");
+  check(t.toggleDone(2), "panel test: both states seen");
   for (int s = 0; s < kPanelTestToggles; ++s) {
     t.updateToggle(s, true);
     t.updateToggle(s, false);
   }
-  check(t.togglesDone() == kPanelTestToggles && t.nextToggle() == -1, "panel test: all toggles done");
+  check(t.togglesDone() == kPanelTestToggles, "panel test: all toggles done");
+}
+
+void checkPanelTestBounds() {
+  PanelTest t;
+  check(!t.updatePot(-1, 0.5f, 0) && !t.updatePot(kPanelTestPots, 0.5f, 0), "panel test: an out-of-range pot is ignored");
+  check(!t.updateToggle(-1, true) && !t.updateToggle(kPanelTestToggles, true), "panel test: an out-of-range toggle is ignored");
+  check(!t.potDone(-1) && !t.potDone(kPanelTestPots) && !t.toggleDone(-1) && !t.toggleDone(kPanelTestToggles),
+        "panel test: an out-of-range control is never done");
+  check(kPanelTestPots == kPotCount && kPanelTestToggles == kSlotCount, "panel test: sizes follow the slot geometry");
 }
 
 void checkPanelTestPattern() {
@@ -1034,7 +1225,364 @@ void checkPanelTestPattern() {
 void checkPanelTest() {
   checkPanelTestPots();
   checkPanelTestToggles();
+  checkPanelTestBounds();
   checkPanelTestPattern();
+}
+
+// ---- record codec and store ----------------------------------------------------------------
+
+// In-memory bank 2: two 128 KB sectors, 0xFF erased. Programming ANDs bits in like real flash.
+// failNextErase and failNextProgram make the next such operation report an error.
+class FakeFlash : public FlashIo {
+ public:
+  FakeFlash() {
+    mem[0].assign(kRecordSectorBytes, 0xFF);
+    mem[1].assign(kRecordSectorBytes, 0xFF);
+  }
+  const uint8_t* read(int s) const override { return mem[s].data(); }
+  void eraseStart(int s) override {
+    erasing = s;
+    busyPolls = 3;
+    ++erases[s];
+    ++ops;
+  }
+  bool eraseBusy() override {
+    if (erasing < 0) return false;
+    if (busyPolls-- > 0) return true;
+    if (failNextErase) {
+      error = true;
+      failNextErase = false;
+    } else {
+      mem[erasing].assign(kRecordSectorBytes, 0xFF);
+    }
+    erasing = -1;
+    return false;
+  }
+  void programWord(int s, uint32_t off, const uint8_t* w) override {
+    ++programs;
+    ++ops;
+    if (failNextProgram) {
+      error = true;
+      failNextProgram = false;
+      return;
+    }
+    for (size_t i = 0; i < kFlashWordBytes; ++i) mem[s][off + i] &= w[i];
+  }
+  bool takeError() override {
+    const bool e = error;
+    error = false;
+    return e;
+  }
+
+  void put(int sector, int entry, const RecordData& rec) {
+    const RecordBytes b = encodeRecord(rec);
+    std::memcpy(&mem[sector][static_cast<size_t>(entry) * kRecordBytes], b.data(), kRecordBytes);
+  }
+
+  std::vector<uint8_t> mem[2];
+  int erasing = -1;
+  int busyPolls = 0;
+  int erases[2] = {0, 0};
+  int programs = 0;
+  int ops = 0;
+  bool error = false;
+  bool failNextErase = false;
+  bool failNextProgram = false;
+};
+
+RecordData makeRec(uint32_t seq, OutputLevel out = OutputLevel::Line, const char* name = "") {
+  RecordData r;
+  r.sequence = seq;
+  r.settings.outputLevel = out;
+  std::strncpy(r.name, name, kLayoutNameBytes);
+  return r;
+}
+
+// Polls until the store is idle; returns the largest number of flash ops one poll started.
+int runToIdle(RecordStore& store, FakeFlash& f, uint32_t& t) {
+  int worst = 0;
+  for (int i = 0; i < 100 && store.status().busy; ++i) {
+    const int before = f.ops;
+    store.poll(t++);
+    worst = std::max(worst, f.ops - before);
+  }
+  return worst;
+}
+
+void checkRecordCodec() {
+  const uint8_t vec[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+  check(crc32(vec, sizeof vec) == 0xCBF43926u, "record: crc32 of 123456789");
+
+  RecordData in = makeRec(77, OutputLevel::Instrument, "stage rig");
+  in.settings.inputJack = InputJack::Pedal;
+  in.layout.card[2] = Card::ReverbChasm;
+  in.layout.card[7] = Card::Empty;
+  RecordBytes b = encodeRecord(in);
+  RecordData out;
+  check(decodeRecord(b.data(), out), "record: round trip decodes");
+  check(out.sequence == 77 && out.settings.outputLevel == OutputLevel::Instrument &&
+            out.settings.inputJack == InputJack::Pedal && std::strcmp(out.name, "stage rig") == 0 &&
+            out.layout.card == in.layout.card && !out.unknownCard,
+        "record: round trip keeps every field");
+
+  RecordBytes bad = b;
+  bad[kOffName] ^= 0x01;
+  check(!decodeRecord(bad.data(), out), "record: corrupt byte fails the CRC");
+  bad = b;
+  bad[kOffSchema] = 2;
+  check(!decodeRecord(bad.data(), out), "record: wrong schema rejected");
+}
+
+void checkRecordUnknownCard() {
+  const RecordBytes good = encodeRecord(makeRec(1));
+  RecordBytes bad = good;
+  std::memset(&bad[kOffSlots], 0, kCardIdBytes);
+  std::memcpy(&bad[kOffSlots], "no_such_card", 12);
+  const uint32_t crc = crc32(bad.data(), kOffCrc);
+  for (int i = 0; i < 4; ++i) bad[kOffCrc + i] = static_cast<uint8_t>(crc >> (8 * i));
+  RecordData out;
+  check(decodeRecord(bad.data(), out) && out.layout.card[0] == Card::Empty, "record: unknown card id becomes empty");
+  check(out.unknownCard, "record: an unknown card id is flagged");
+  check(decodeRecord(good.data(), out) && !out.unknownCard, "record: known ids raise no flag");
+}
+
+void checkRecordEntryStates() {
+  const RecordBytes b = encodeRecord(makeRec(1));
+  const uint8_t blank[kRecordBytes] = {};
+  std::vector<uint8_t> ff(kRecordBytes, 0xFF);
+  check(classifyRecordEntry(ff.data()) == EntryState::Blank, "record: all 0xFF is blank");
+  check(classifyRecordEntry(blank) == EntryState::Torn, "record: zeros are torn");
+  check(classifyRecordEntry(b.data()) == EntryState::Valid, "record: an encoded entry is valid");
+  check(kRecordCardFieldBytes == kCardIdBytes + kCardFieldReservedBytes && kRecordBytes % kFlashWordBytes == 0,
+        "record: field widths derive from the id width and the flash word");
+}
+
+void checkRecordNewest() {
+  FakeFlash f;
+  f.put(0, 0, makeRec(3));
+  f.put(1, 0, makeRec(5, OutputLevel::Instrument));
+  f.put(0, 1, makeRec(4));
+  const uint8_t* views[2] = {f.read(0), f.read(1)};
+  RecordFound found;
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 5 && found.sector == 1,
+        "record: newest wins across sectors");
+
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 5, "store: boot loads the newest");
+  check(store.status().sector == 1 && store.status().nextEntry == 1, "store: append goes after the newest");
+}
+
+void checkStoreAppend() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  check(!store.begin(out), "store: blank flash has no record");
+
+  Settings s;
+  s.outputLevel = OutputLevel::Instrument;
+  store.request(defaultLayout(), s, 100);
+  store.poll(2099);
+  check(f.ops == 0, "store: no write before 2 s of quiet");
+  store.request(defaultLayout(), s, 1500);
+  store.poll(3499);
+  check(f.ops == 0, "store: a new request restarts the debounce");
+  uint32_t t = 3500;
+  const int worst = runToIdle(store, f, t);
+  check(f.programs == kWordsPerRecord && f.erases[0] + f.erases[1] == 0, "store: one record is eight word programs, no erase");
+  check(worst == 1, "store: at most one flash op per poll");
+
+  FakeFlash again;
+  std::memcpy(again.mem[0].data(), f.mem[0].data(), kRecordBytes);
+  RecordStore reboot(again);
+  check(reboot.begin(out) && out.sequence == 1 && out.settings.outputLevel == OutputLevel::Instrument,
+        "store: the saved record reloads");
+
+  store.saveNow();
+  store.poll(3501 + 1000);
+  check(f.programs == kWordsPerRecord, "store: save-now starts without waiting (first poll sets up)");
+  runToIdle(store, f, t);
+  check(f.programs == 2 * kWordsPerRecord && store.status().sequence == 2 && store.status().nextEntry == 2,
+        "store: second record appends after the first");
+}
+
+// A request stamped later than the poll's clock (two clock reads in one pass) is not yet due.
+void checkStoreClockSkew() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  store.request(defaultLayout(), Settings{}, 5000);
+  store.poll(4000);
+  store.poll(4001);
+  check(f.ops == 0, "store: a poll earlier than the request does not save");
+  store.poll(6999);
+  check(f.ops == 0, "store: still waiting just under the debounce");
+  uint32_t t = 7000;
+  runToIdle(store, f, t);
+  check(f.programs == kWordsPerRecord, "store: the save runs once the debounce has passed");
+}
+
+void checkStoreTornTail() {
+  FakeFlash f;
+  f.put(0, 0, makeRec(1));
+  f.put(0, 1, makeRec(2, OutputLevel::Instrument));
+  f.put(0, 2, makeRec(3));
+  std::memset(&f.mem[0][2 * kRecordBytes + 3 * kFlashWordBytes], 0xFF, 5 * kFlashWordBytes);  // cut after 3 words
+  f.mem[0][2 * kRecordBytes + 100] = 0x00;                                                        // and damaged
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 2, "store: torn tail is skipped, previous record loads");
+  check(store.status().nextEntry == 3, "store: append goes after the torn entry");
+  check(store.bootNotes().tornEntries == 1 && store.bootNotes().dirtySectors == 0 && !store.bootNotes().unknownCard,
+        "store: boot notes count the torn entry");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  const uint8_t* views[2] = {f.read(0), f.read(1)};
+  RecordFound found;
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 3 && found.entry == 3,
+        "store: record lands in entry 3 with sequence 3");
+}
+
+void fillSector(FakeFlash& f, int sector, uint32_t firstSeq) {
+  for (int entry = 0; entry < kEntriesPerSector; ++entry) f.put(sector, entry, makeRec(firstSeq + static_cast<uint32_t>(entry)));
+}
+
+void checkStoreSectorSwitch() {
+  FakeFlash f;
+  fillSector(f, 0, 1);
+  f.put(1, 0, makeRec(0));
+  std::memset(&f.mem[1][kRecordBytes], 0x5A, 64);  // stale junk in the other sector
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == kEntriesPerSector, "store: full sector loads its last record");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  const int worst = runToIdle(store, f, t);
+  check(f.erases[1] == 1 && f.erases[0] == 0, "store: full sector erases the other one");
+  check(worst == 1, "store: erase start and programs are separate polls");
+  check(store.status().sector == 1 && store.status().nextEntry == 1 && store.status().sequence == kEntriesPerSector + 1,
+        "store: new record is entry 0 of the other sector");
+  const uint8_t* views[2] = {f.read(0), f.read(1)};
+  RecordFound found;
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.sector == 1 && found.entry == 0,
+        "store: newest is in the fresh sector");
+}
+
+void checkStoreInterruptedErase() {
+  // The older sector was mid-erase: a blank entry followed by old data.
+  FakeFlash f;
+  fillSector(f, 1, 1);
+  std::memset(&f.mem[1][0], 0xFF, 3 * kRecordBytes);
+  fillSector(f, 0, 600);
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 600 + kEntriesPerSector - 1, "store: dirty sector does not hide the newest");
+  check(store.bootNotes().dirtySectors == 1, "store: boot notes count the dirty sector");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.erases[1] == 1, "store: interrupted erase is re-erased before use");
+
+  // No valid record anywhere and sector 0 dirty: use the blank sector, leave the dirty one.
+  FakeFlash g;
+  std::memset(&g.mem[0][kRecordBytes], 0x33, 64);
+  RecordStore fresh(g);
+  check(!fresh.begin(out), "store: junk is not a record");
+  fresh.request(defaultLayout(), Settings{}, 0);
+  t = kSaveDebounceMs;
+  runToIdle(fresh, g, t);
+  check(g.erases[0] + g.erases[1] == 0 && fresh.status().sector == 1 && fresh.status().sequence == 1,
+        "store: a blank sector is used without an erase");
+}
+
+void checkStoreEraseAll() {
+  FakeFlash g;
+  RecordStore fresh(g);
+  RecordData out;
+  fresh.begin(out);
+  fresh.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(fresh, g, t);
+  check(fresh.eraseAll(), "store: erase-all accepted when idle");
+  check(!fresh.eraseAll(), "store: erase-all is refused while one runs");
+  for (int i = 0; i < 50; ++i) fresh.poll(t++);
+  check(g.erases[0] == 1 && g.erases[1] == 1 && !fresh.status().hasRecord && !fresh.status().busy,
+        "store: erase-all clears both sectors");
+}
+
+void checkStoreProgramFailure() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  f.failNextProgram = true;
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(store.status().errors == 1 && store.status().sequence == 0 && !store.status().busy,
+        "store: a failed program counts an error and keeps the old sequence");
+  check(store.takeSaveFailed() && !store.takeSaveFailed(), "store: a failed save is reported once");
+  check(store.status().nextEntry == 1, "store: the part-written entry is skipped");
+
+  store.request(defaultLayout(), Settings{}, t);
+  t += kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(store.status().errors == 1 && store.status().sequence == 1 && store.status().nextEntry == 2 && !store.takeSaveFailed(),
+        "store: the next save lands after the skipped entry");
+}
+
+void checkStoreEraseFailure() {
+  FakeFlash f;
+  fillSector(f, 1, 1);     // old records in the sector the log has to move to
+  fillSector(f, 0, 1000);  // the full, newest sector
+  const uint32_t newest = 1000 + kEntriesPerSector - 1;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  f.failNextErase = true;
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(store.status().errors == 1 && store.takeSaveFailed(), "store: a failed erase counts an error and is reported");
+  check(store.status().sequence == newest, "store: a failed erase keeps the old sequence");
+
+  store.request(defaultLayout(), Settings{}, t);
+  t += kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.erases[1] == 2 && store.status().sector == 1 && store.status().sequence == newest + 1,
+        "store: the sector is erased again and the save lands");
+
+  FakeFlash g;
+  RecordStore wipe(g);
+  wipe.begin(out);
+  g.failNextErase = true;
+  wipe.eraseAll();
+  t = 0;
+  for (int i = 0; i < 50; ++i) wipe.poll(t++);
+  check(wipe.status().errors == 1 && wipe.takeSaveFailed(), "store: a failed erase-all counts an error and is reported");
+}
+
+void checkStoreWhileBusy() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  Settings first;
+  first.outputLevel = OutputLevel::Instrument;
+  store.request(defaultLayout(), first, 0);
+  uint32_t t = kSaveDebounceMs;
+  store.poll(t++);  // the write starts and its record is fixed
+  check(!store.eraseAll(), "store: erase-all is refused while a save runs");
+  store.request(defaultLayout(), Settings{}, t);  // a newer state arrives mid-write
+  store.saveNow();
+  runToIdle(store, f, t);
+  RecordData back;
+  check(decodeRecord(f.mem[0].data(), back) && back.settings.outputLevel == OutputLevel::Instrument,
+        "store: a request during programming does not change the record being written");
+  check(decodeRecord(f.mem[0].data() + kRecordBytes, back) && back.settings.outputLevel == OutputLevel::Line && back.sequence == 2,
+        "store: the save-now behind it writes the newer state next");
 }
 
 void checkStoreName() {
@@ -1049,20 +1597,41 @@ void checkStoreName() {
   RecordData back;
   check(decodeRecord(f.mem[0].data(), back) && std::strcmp(back.name, "stage rig") == 0, "store: the layout name is saved");
   store.setName("a name that is longer than thirty-two bytes");
-  check(std::strlen(store.current().name) == kRecordNameBytes, "store: a long name is clipped to 32 bytes");
+  check(std::strlen(store.current().name) == kLayoutNameBytes, "store: a long name is clipped to 32 bytes");
+}
+
+void checkStoreUnknownCard() {
+  FakeFlash f;
+  RecordData rec = makeRec(1);
+  f.put(0, 0, rec);
+  std::memset(&f.mem[0][kOffSlots], 0, kCardIdBytes);
+  std::memcpy(&f.mem[0][kOffSlots], "no_such_card", 12);
+  const uint32_t crc = crc32(f.mem[0].data(), kOffCrc);
+  for (int i = 0; i < 4; ++i) f.mem[0][kOffCrc + static_cast<size_t>(i)] = static_cast<uint8_t>(crc >> (8 * i));
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && store.bootNotes().unknownCard, "store: boot notes flag an unknown card in the newest record");
 }
 
 void checkRecords() {
   checkRecordCodec();
+  checkRecordUnknownCard();
+  checkRecordEntryStates();
   checkRecordNewest();
   checkStoreAppend();
+  checkStoreClockSkew();
   checkStoreName();
   checkStoreTornTail();
   checkStoreSectorSwitch();
   checkStoreInterruptedErase();
+  checkStoreEraseAll();
+  checkStoreProgramFailure();
+  checkStoreEraseFailure();
+  checkStoreWhileBusy();
+  checkStoreUnknownCard();
 }
 
-// ---- serial protocol ------------------------------------------------------------------------
+// ---- serial protocol -----------------------------------------------------------------------
 
 class StringWriter : public protocol::Writer {
  public:
@@ -1169,14 +1738,14 @@ void checkProtocolCommands() {
   const char* set =
       "{\"id\":3,\"cmd\":\"set_layout\",\"name\":\"Stage \\u0041\\\"x\",\"slots\":[\"input_gate\",\"autotune\","
       "\"octave\",\"unison\",\"slapback\",\"distortion\",\"gate\",\"reverb_chasm\"]}";
-  check(parses(set, r, err) && r.cmd == protocol::Command::SetLayout && r.slotCount == 8, "proto: set_layout parses");
+  check(parses(set, r, err) && r.cmd == protocol::Command::SetLayout && r.slotCount == kSlotCount, "proto: set_layout parses");
   check(std::strcmp(r.name, "Stage A\"x") == 0, "proto: escapes in the name decode");
   Layout l;
   check(protocol::resolveLayout(r, l, nullptr, 0) && l.card[7] == Card::ReverbChasm && l.card[0] == Card::InputGate,
         "proto: set_layout resolves to cards");
 }
 
-void checkProtocolErrors() {
+void checkRequestErrors() {
   protocol::Request r;
   std::string err;
   check(!parses("{\"id\":1,\"cmd\":\"hello\"", r, err) && err == "malformed json", "proto: unterminated object");
@@ -1192,52 +1761,109 @@ void checkProtocolErrors() {
   check(!parses("{\"id\":2}", r, err) && err == "missing cmd" && r.id == 2, "proto: missing cmd echoes the id");
   check(!parses("{\"id\":2,\"cmd\":4}", r, err) && err == "cmd must be a string", "proto: numeric cmd");
   check(!parses("{\"id\":2,\"cmd\":\"fly\"}", r, err) && err == "unknown cmd \"fly\"" && r.id == 2, "proto: unknown cmd");
+}
+
+void checkJsonNumbers() {
+  protocol::Request r;
+  std::string err;
+  for (const char* good : {"0", "-0", "7", "-12", "0.5", "10.25", "1e5", "1E5", "2e+3", "-4.5e-2", "0e0"}) {
+    const std::string line = std::string("{\"id\":1,\"cmd\":\"hello\",\"x\":") + good + "}";
+    check(parses(line.c_str(), r, err), good);
+  }
+  for (const char* bad : {"01", "-01", "00", "1.", ".5", "+1", "-", "1e", "1e+", "--1", "1.2.3", "0x10", "1e5.5"}) {
+    const std::string line = std::string("{\"id\":1,\"cmd\":\"hello\",\"x\":") + bad + "}";
+    check(!parses(line.c_str(), r, err) && err == "malformed json", bad);
+  }
+  check(parses("{\"id\":0,\"cmd\":\"hello\"}", r, err) && r.id == 0, "proto: id 0 parses");
+  check(!parses("{\"id\":01,\"cmd\":\"hello\"}", r, err) && err == "malformed json", "proto: an id with a leading zero is malformed");
+  check(!parses("{\"id\":1e2,\"cmd\":\"hello\"}", r, err) && err == "id must be a non-negative integer", "proto: an exponent id is not an integer");
+}
+
+void checkSetLayoutNameRules() {
+  protocol::Request r;
+  std::string err;
   check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"slots\":[]}", r, err) && err == "missing name", "proto: set_layout needs a name");
   check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\"}", r, err) && err == "missing slots", "proto: set_layout needs slots");
   check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":3,\"slots\":[]}", r, err) && err == "name must be a string",
         "proto: numeric name");
-  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":\"x\"}", r, err) &&
-            err == "slots must be an array of card ids", "proto: slots not an array");
-  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[1,2,3,4,5,6,7,8]}", r, err) &&
-            err == "slots must be an array of card ids", "proto: slot ids must be strings");
-  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[\"gate\"]}", r, err) &&
-            err == "slots needs 8 card ids", "proto: too few slots");
-  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\"]}",
-                r, err) && err == "slots needs 8 card ids", "proto: too many slots");
-  const std::string nameRule = "name must be 1 to 31 printable ASCII characters";
+  const std::string nameRule = "name must be 1 to " + std::to_string(kLayoutNameBytes - 1) + " printable ASCII characters";
   const std::string head = "{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"";
   const std::string tailSlots = "\",\"slots\":[]}";
+  const std::string slotsRule = "slots needs " + std::to_string(kSlotCount) + " card ids";
   check(!parses((head + "0123456789012345678901234567890" + "1" + tailSlots).c_str(), r, err) && err == nameRule,
         "proto: name of 32 characters is rejected");
-  check(!parses((head + "0123456789012345678901234567890" + tailSlots).c_str(), r, err) && err == "slots needs 8 card ids",
+  check(!parses((head + "0123456789012345678901234567890" + tailSlots).c_str(), r, err) && err == slotsRule,
         "proto: name of 31 characters passes the name rule");
   check(!parses((head + tailSlots).c_str(), r, err) && err == nameRule, "proto: empty name is rejected");
   check(!parses((head + "a\\nb" + tailSlots).c_str(), r, err) && err == nameRule, "proto: control character in the name");
   check(!parses((head + "caf\\u00e9" + tailSlots).c_str(), r, err) && err == nameRule, "proto: non-ASCII name is rejected");
   check(!parses((head + "caf\xC3\xA9" + tailSlots).c_str(), r, err) && err == nameRule, "proto: raw UTF-8 name is rejected");
-
-  Layout l;
-  char why[protocol::kErrorBytes];
-  auto resolve = [&](const char* ids) {
-    std::string line = std::string("{\"id\":1,\"cmd\":\"set_layout\",\"name\":\"n\",\"slots\":[") + ids + "]}";
-    protocol::Request q;
-    char e[protocol::kErrorBytes];
-    check(protocol::parseRequest(line.c_str(), q, e, sizeof e, true), "proto: layout line parses");
-    why[0] = '\0';
-    return protocol::resolveLayout(q, l, why, sizeof why);
-  };
-  const char* tail = "\"gate\",\"slapback\",\"unison\",\"octave\",\"autotune\",\"distortion\"";
-  check(!resolve((std::string("\"input_gate\",\"foo\",") + tail).c_str()) &&
-            std::strcmp(why, "unknown card \"foo\" in slot 2") == 0, "proto: unknown card names the id and slot");
-  check(!resolve((std::string("\"reverb_spring\",\"reverb_chasm\",") + tail).c_str()) &&
-            std::strcmp(why, "two reverb cards") == 0, "proto: two reverbs");
-  check(!resolve((std::string("\"slapback\",\"input_gate\",") + tail).c_str()) &&
-            std::strcmp(why, "same card twice: slapback") == 0, "proto: duplicate card");
-  check(resolve("\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\"") && l.card[3] == Card::Empty,
-        "proto: all-empty layout is accepted");
+  check(nameRule == "name must be 1 to 31 printable ASCII characters" && slotsRule == "slots needs 8 card ids",
+        "proto: the messages follow the constants");
 }
 
-void checkProtocolReplies() {
+void checkSetLayoutSlotRules() {
+  protocol::Request r;
+  std::string err;
+  const std::string slotsRule = "slots needs " + std::to_string(kSlotCount) + " card ids";
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":\"x\"}", r, err) &&
+            err == "slots must be an array of card ids", "proto: slots not an array");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[1,2,3,4,5,6,7,8]}", r, err) &&
+            err == "slots must be an array of card ids", "proto: slot ids must be strings");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[\"gate\"]}", r, err) && err == slotsRule,
+        "proto: too few slots");
+  check(!parses("{\"id\":2,\"cmd\":\"set_layout\",\"name\":\"a\",\"slots\":[\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\",\"a\"]}",
+                r, err) && err == slotsRule, "proto: too many slots");
+}
+
+// Resolves a set_layout line made from `ids`; returns the resolveLayout result and its message.
+bool resolveIds(const char* ids, Layout& l, char* why, size_t whySize) {
+  std::string line = std::string("{\"id\":1,\"cmd\":\"set_layout\",\"name\":\"n\",\"slots\":[") + ids + "]}";
+  protocol::Request q;
+  char e[protocol::kErrorBytes];
+  check(protocol::parseRequest(line.c_str(), q, e, sizeof e, true), "proto: layout line parses");
+  why[0] = '\0';
+  return protocol::resolveLayout(q, l, why, whySize);
+}
+
+void checkResolveErrors() {
+  Layout l;
+  char why[protocol::kErrorBytes];
+  const char* tail = "\"gate\",\"slapback\",\"unison\",\"octave\",\"autotune\",\"distortion\"";
+  check(!resolveIds((std::string("\"input_gate\",\"foo\",") + tail).c_str(), l, why, sizeof why) &&
+            std::strcmp(why, "unknown card \"foo\" in slot 2") == 0, "proto: unknown card names the id and slot");
+  check(!resolveIds((std::string("\"reverb_spring\",\"reverb_chasm\",") + tail).c_str(), l, why, sizeof why) &&
+            std::strcmp(why, "two reverb cards") == 0, "proto: two reverbs");
+  check(!resolveIds((std::string("\"slapback\",\"input_gate\",") + tail).c_str(), l, why, sizeof why) &&
+            std::strcmp(why, "same card twice: slapback") == 0, "proto: duplicate card");
+  check(resolveIds("\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\"", l, why, sizeof why) &&
+            l.card[3] == Card::Empty, "proto: all-empty layout is accepted");
+}
+
+// An id longer than the clip width is cut short, and the cut text never matches a real card.
+void checkIdClipping() {
+  Layout l;
+  char why[protocol::kErrorBytes];
+  const std::string tail = "\"gate\",\"slapback\",\"unison\",\"octave\",\"autotune\",\"distortion\",\"input_gate\"";
+  const std::string longId(40, 'x');
+  check(!resolveIds(("\"" + longId + "\"," + tail).c_str(), l, why, sizeof why) &&
+            std::string(why) == "unknown card \"" + longId.substr(0, protocol::kIdBytes - 1) + "\" in slot 1",
+        "proto: an over-long id is clipped in the unknown-card reply");
+  check(!resolveIds(("\"reverb_spring_and_then_some_more\"," + tail).c_str(), l, why, sizeof why) &&
+            std::strncmp(why, "unknown card \"", 14) == 0, "proto: a real id with a long tail is not a match");
+  check(protocol::kIdBytes == kCardIdBytes, "proto: the id buffer is the card id width");
+}
+
+void checkProtocolErrors() {
+  checkRequestErrors();
+  checkJsonNumbers();
+  checkSetLayoutNameRules();
+  checkSetLayoutSlotRules();
+  checkResolveErrors();
+  checkIdClipping();
+}
+
+void checkSimpleReplies() {
   StringWriter w;
   protocol::replyError(w, 12, "unknown card \"foo\" in slot 3\\");
   check(JsonReader(w.out).valid() && has(w.out, "\"id\":12,\"ok\":false,\"error\":\"unknown card \\\"foo\\\" in slot 3\\\\\""),
@@ -1252,16 +1878,25 @@ void checkProtocolReplies() {
             has(w.out, "\"reverb_spring\"]}"), "proto: layout reply");
 
   w = StringWriter();
-  protocol::Status s{54.66f, 71.0f, 0, true, 9, 2, 5, 8};
+  protocol::Status s;
+  s.cpuMeanPercent = 54.66f;
+  s.cpuWorstPercent = 71.0f;
+  s.muted = true;
+  s.seq = 9;
+  s.recordErrors = 2;
+  s.serialDropped = 5;
+  s.strayBytes = 8;
   protocol::replyStatus(w, 15, s);
   check(JsonReader(w.out).valid() &&
             w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8}\n",
         "proto: status reply");
+}
 
-  w = StringWriter();
+void checkHelloReply() {
+  StringWriter w;
   protocol::replyHello(w, 16, "v2.00.04", "Default", defaultLayout(), false);
   check(JsonReader(w.out).valid(), "proto: hello parses as JSON");
-  check(w.calls > 20, "proto: hello streams in pieces");
+  check(w.calls > 20 && w.overflows() == 0, "proto: hello streams in pieces without overflow");
   check(has(w.out, "\"proto\":1,\"fw\":\"v2.00.04\""), "proto: hello carries proto and fw");
   for (int i = 0; i < kCardCount; ++i) {
     const CardDesc& d = cardDesc(card(i));
@@ -1276,7 +1911,32 @@ void checkProtocolReplies() {
   check(has(w.out, "\"layout\":{\"name\":\"Default\""), "proto: hello carries the layout");
 }
 
-void checkFramer() {
+void checkReplyEscapes() {
+  StringWriter w;
+  protocol::replyLayout(w, 1, "caf\xC3\xA9\x01\x7F", defaultLayout());
+  check(JsonReader(w.out).valid() && has(w.out, "\"name\":\"caf\\u00c3\\u00a9\\u0001\\u007f\""),
+        "proto: non-ASCII and control bytes in a reply string are escaped");
+}
+
+void checkWriterFormat() {
+  StringWriter w;
+  check(w.format("%d-%s", 42, "ab") && w.out == "42-ab" && w.overflows() == 0, "writer: a short format is written");
+  const int fits = static_cast<int>(protocol::Writer::kFormatBytes) - 1;
+  check(w.format("%0*d", fits, 1) && w.out.size() == 5 + static_cast<size_t>(fits), "writer: the longest format that fits is written whole");
+  const std::string kept = w.out;
+  check(!w.format("%0*d", fits + 1, 1) && w.out == kept && w.overflows() == 1,
+        "writer: a format that overflows writes nothing, returns false and is counted");
+  check(!w.format("%0*d", fits + 50, 1) && w.overflows() == 2, "writer: every overflow is counted");
+}
+
+void checkProtocolReplies() {
+  checkSimpleReplies();
+  checkHelloReply();
+  checkReplyEscapes();
+  checkWriterFormat();
+}
+
+void checkFramerBasics() {
   protocol::Framer f;
   using K = protocol::Framer::Kind;
   check(f.feed('p') == K::None && f.strayBytes() == 1, "framer: a bare byte is ignored and counted");
@@ -1294,7 +1954,11 @@ void checkFramer() {
   // letters inside a line belong to the line
   f.feed('{');
   check(f.feed('p') == K::None && f.feed('\n') == K::Line && std::strcmp(f.line(), "{p") == 0, "framer: letters inside a line stay in it");
+}
 
+void checkFramerLimits() {
+  protocol::Framer f;
+  using K = protocol::Framer::Kind;
   // 768 bytes pass, 769 do not
   f.feed('{');
   for (size_t i = 1; i < protocol::kMaxLine; ++i) f.feed('a');
@@ -1305,8 +1969,12 @@ void checkFramer() {
   check(f.feed('b') == K::None && f.feed('{') == K::None && f.feed('\n') == K::None, "framer: the rest of a long line is dropped");
   const uint32_t before = f.strayBytes();
   check(f.feed('m') == K::None && f.strayBytes() == before + 1, "framer: stray bytes count again after a dropped line");
-  check(f.strayBytes() == before + 1, "framer: a dropped line's bytes are not stray");
+}
 
+void checkFramerReset() {
+  protocol::Framer f;
+  using K = protocol::Framer::Kind;
+  const char* line = "{\"id\":1}";
   // a host that left mid-line does not leak into the next session
   for (const char* c = "{\"id\":1,\"cm"; *c; ++c) f.feed(static_cast<uint8_t>(*c));
   f.reset();
@@ -1318,6 +1986,21 @@ void checkFramer() {
   for (size_t i = 1; i <= protocol::kMaxLine; ++i) f.feed('a');
   f.reset();
   check(f.feed('q') == K::None && f.strayBytes() == reset + 2, "framer: a reset ends a dropped line");
+}
+
+// A NUL inside a line would end the C string early, so the line is rejected whole.
+void checkFramerNul() {
+  protocol::Framer f;
+  using K = protocol::Framer::Kind;
+  check(f.feed('\0') == K::None && f.strayBytes() == 1, "framer: a NUL outside a line is stray");
+  f.feed('{');
+  f.feed('"');
+  check(f.feed('\0') == K::BadByte, "framer: a NUL inside a line is reported once");
+  check(f.feed('i') == K::None && f.feed('}') == K::None && f.feed('\n') == K::None, "framer: the rest of that line is dropped");
+  check(f.strayBytes() == 1, "framer: the dropped line adds no stray bytes");
+  const char* line = "{\"id\":2,\"cmd\":\"status\"}";
+  for (const char* c = line; *c; ++c) f.feed(static_cast<uint8_t>(*c));
+  check(f.feed('\n') == K::Line && std::strcmp(f.line(), line) == 0, "framer: the next line frames normally");
 }
 
 // Bytes that would have been bench letters do nothing, and the next line still frames.
@@ -1332,6 +2015,16 @@ void checkFramerStray() {
   check(f.strayBytes() == 8, "framer: the line added no stray bytes");
 }
 
+void checkFramer() {
+  checkFramerBasics();
+  checkFramerLimits();
+  checkFramerReset();
+  checkFramerNul();
+  checkFramerStray();
+}
+
+// ---- bench ops -----------------------------------------------------------------------------
+
 std::string allOps(bool benchBuild) {
   std::string out = "[";
   for (int i = 0; i < kBenchOpCount; ++i) {
@@ -1342,7 +2035,7 @@ std::string allOps(bool benchBuild) {
   return out + "]";
 }
 
-void checkBenchOps() {
+void checkOpTable() {
   protocol::Request r;
   std::string err;
   int queries = 0;
@@ -1363,9 +2056,21 @@ void checkBenchOps() {
           "ops: release build parse follows the class");
   }
   check(queries == 3, "ops: three query ops");
+  check(kBenchOpCount == static_cast<int>(BenchOp::Count) && kMaxBenchSlot == kSlotCount, "ops: counts derive from their sources");
   BenchOp none;
   check(!opFromName("nope", none) && !opFromName("", none) && !opFromName("Report", none), "ops: lookup is exact");
+}
 
+void checkOpBounds() {
+  check(benchOp(-1) == BenchOp::Count && benchOp(kBenchOpCount) == BenchOp::Count && benchOp(1000) == BenchOp::Count,
+        "ops: an index out of range gives the Count sentinel");
+  check(std::strcmp(opName(BenchOp::Count), "") == 0, "ops: the sentinel has no name");
+  check(opClass(BenchOp::Count) == OpClass::Bench && !opAllowed(BenchOp::Count, false), "ops: the sentinel is never a query");
+}
+
+void checkOpSlotParsing() {
+  protocol::Request r;
+  std::string err;
   check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":8}", r, err) && r.benchSlot == 8, "ops: slot 8 parses");
   check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_off\",\"slot\":1}", r, err) && r.benchSlot == 1, "ops: slot 1 parses");
   check(!parses("{\"id\":4,\"cmd\":\"bench\"}", r, err) && err == "missing op" && r.id == 4, "ops: missing op");
@@ -1389,11 +2094,12 @@ void checkBenchOps() {
         "ops: fractional slot");
   check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"stats\",\"slot\":0}", r, err) && r.op == BenchOp::Stats,
         "ops: other ops ignore the slot");
+}
 
+void checkHelloOps() {
   for (const bool bench : {false, true}) {
     StringWriter w;
     protocol::replyHello(w, 1, "v", "Default", defaultLayout(), bench);
-    check(JsonReader(w.out).valid(), "ops: hello parses as JSON");
     check(has(w.out, std::string("\"build\":\"") + (bench ? "bench" : "release") + "\""), "ops: hello names the build");
     check(has(w.out, "\"bench_ops\":" + allOps(bench) + ","), "ops: hello lists exactly the allowed ops");
   }
@@ -1403,7 +2109,16 @@ void checkBenchOps() {
         "ops: release hello lists the three queries only");
 }
 
-void checkLayoutFade() {
+void checkBenchOps() {
+  checkOpTable();
+  checkOpBounds();
+  checkOpSlotParsing();
+  checkHelloOps();
+}
+
+// ---- layout fade ---------------------------------------------------------------------------
+
+void checkFadeRamp() {
   LayoutFade fade;
   LayoutFade::Block b = fade.next(false);
   check(b.from == 1.0f && b.to == 1.0f && !b.swap, "fade: idle passes at unity");
@@ -1438,14 +2153,17 @@ void checkLayoutFade() {
   check(monotone && continuous, "fade: gain falls then rises with no jump");
   check(outBlocks == kFadeBlocks && inBlocks == kFadeBlocks, "fade: each ramp takes kFadeBlocks blocks");
   check(last == 1.0f, "fade: gain returns to unity");
-  check(kFadeBlocks * cv::kBlock * 1000 / cv::kSampleRate >= kFadeMs && kFadeBlocks * cv::kBlock * 1000 / cv::kSampleRate <= kFadeMs + 2,
-        "fade: each ramp lasts about 50 ms");
+  const int rampMs = kFadeBlocks * cv::kBlock * 1000 / cv::kSampleRate;
+  check(rampMs >= kFadeMs && rampMs <= kFadeMs + 2, "fade: each ramp lasts about 50 ms");
   b = fade.next(false);
   check(b.from == 1.0f && b.to == 1.0f && !b.swap, "fade: idle again after the ramp");
+}
 
+void checkFadeInterrupted() {
+  LayoutFade::Block b{};
   // A second layout during the fade-out is taken at the same zero point: one swap, one fade.
-  fade = LayoutFade();
-  swaps = 0;
+  LayoutFade fade;
+  int swaps = 0;
   for (int i = 0; i < 4 * kFadeBlocks; ++i) {
     b = fade.next(true);
     if (b.swap) {
@@ -1478,6 +2196,25 @@ void checkLayoutFade() {
   check(b.from == turn && b.to > b.from && !b.swap, "fade: changing back mid-fade-out ramps up without a swap");
 }
 
+void checkFadeHold() {
+  LayoutFade fade(3);
+  LayoutFade::Block b;
+  int swaps = 0;
+  int zeroBlocks = 0;
+  bool inFade = false;
+  float last = 1.0f;
+  for (int i = 0; i < 6 * kFadeBlocks; ++i) {
+    b = fade.next(swaps == 0);
+    if (b.swap) ++swaps;
+    if (swaps > 0 && b.from == 0.0f && b.to == 0.0f) ++zeroBlocks;
+    if (swaps > 0 && b.to > b.from) inFade = true;
+    check(b.from == last, "fade hold: no jump in gain");
+    last = b.to;
+    if (inFade && b.to == 1.0f) break;
+  }
+  check(swaps == 1 && zeroBlocks == 4 && last == 1.0f, "fade hold: the swap block plus 3 held blocks stay at zero, then the ramp returns");
+}
+
 void checkEnginesToReset() {
   const Layout base = defaultLayout();
   auto bit = [](Engine e) { return 1u << static_cast<int>(e); };
@@ -1505,38 +2242,33 @@ void checkEnginesToReset() {
   check(enginesToReset(empty, empty) == 0 && enginesToReset(Layout{{}}, Layout{{}}) == 0, "reset: empty slots reset nothing");
 }
 
-void checkReplyEscapes() {
-  StringWriter w;
-  protocol::replyLayout(w, 1, "caf\xC3\xA9\x01\x7F", defaultLayout());
-  check(JsonReader(w.out).valid() && has(w.out, "\"name\":\"caf\\u00c3\\u00a9\\u0001\\u007f\""),
-        "proto: non-ASCII and control bytes in a reply string are escaped");
+void checkFade() {
+  checkFadeRamp();
+  checkFadeInterrupted();
+  checkFadeHold();
+  checkEnginesToReset();
 }
 
-void checkFadeHold() {
-  LayoutFade fade(3);
-  LayoutFade::Block b;
-  int swaps = 0;
-  int zeroBlocks = 0;
-  bool inFade = false;
-  float last = 1.0f;
-  for (int i = 0; i < 6 * kFadeBlocks; ++i) {
-    b = fade.next(swaps == 0);
-    if (b.swap) ++swaps;
-    if (swaps > 0 && b.from == 0.0f && b.to == 0.0f) ++zeroBlocks;
-    if (swaps > 0 && b.to > b.from) inFade = true;
-    check(b.from == last, "fade hold: no jump in gain");
-    last = b.to;
-    if (inFade && b.to == 1.0f) break;
+// ---- tx queue ------------------------------------------------------------------------------
+
+// Takes every finished line out of the queue.
+std::string drainQueue(TxQueue& q) {
+  const char* run;
+  size_t got = 0;
+  std::string seen;
+  while ((got = q.peek(run)) > 0) {
+    seen.append(run, got);
+    q.consume(got);
   }
-  check(swaps == 1 && zeroBlocks == 4 && last == 1.0f, "fade hold: the swap block plus 3 held blocks stay at zero, then the ramp returns");
+  return seen;
 }
 
 void checkTxQueue() {
   TxQueue q;
   const char* run;
-  q.put("abc", 3);
+  q.put("abc", 3, TxClass::Reply);
   check(q.pending() == 0 && q.peek(run) == 0, "tx: an unfinished line is held back");
-  q.put("d\nef\n", 5);
+  q.put("d\nef\n", 5, TxClass::Reply);
   check(q.pending() == 8 && q.peek(run) == 8 && std::memcmp(run, "abcd\nef\n", 8) == 0, "tx: finished lines are ready");
   q.consume(5);
   check(q.pending() == 3, "tx: consume advances");
@@ -1544,35 +2276,71 @@ void checkTxQueue() {
 
   // A line that does not fit is dropped whole, counted once, and the queue keeps working.
   const std::string big(TxQueue::kCapacity - 4, 'x');
-  q.put("keep\n", 5);
-  q.put(big.data(), big.size());
-  q.put("\nnext\n", 6);
+  q.put("keep\n", 5, TxClass::Reply);
+  q.put(big.data(), big.size(), TxClass::Reply);
+  q.put("\nnext\n", 6, TxClass::Reply);
   check(q.dropped() == 1, "tx: an overflowing line is counted");
-  size_t got = 0;
-  std::string seen;
-  while ((got = q.peek(run)) > 0) {
-    seen.append(run, got);
-    q.consume(got);
-  }
-  check(seen == "keep\nnext\n", "tx: only whole lines survive an overflow");
+  check(drainQueue(q) == "keep\nnext\n", "tx: only whole lines survive an overflow");
 
   // Wrap-around: the ring hands out contiguous runs.
   for (int round = 0; round < 3; ++round) {
-    const std::string line(TxQueue::kCapacity / 2 + 100, 'a' + round);
-    q.put(line.data(), line.size());
-    q.put("\n", 1);
-    seen.clear();
-    while ((got = q.peek(run)) > 0) {
-      seen.append(run, got);
-      q.consume(got);
-    }
-    check(seen == line + "\n", "tx: lines survive the ring wrapping");
+    const std::string line(TxQueue::kCapacity / 2 + 100, static_cast<char>('a' + round));
+    q.put(line.data(), line.size(), TxClass::Reply);
+    q.put("\n", 1, TxClass::Reply);
+    check(drainQueue(q) == line + "\n", "tx: lines survive the ring wrapping");
   }
-
-  q.put("lost\n", 5);
-  q.discard();
-  check(q.pending() == 0 && q.dropped() == 1, "tx: discard empties the queue without counting");
 }
+
+// Log lines stop at the free-tail line, so a reply still fits when diagnostics fill the queue.
+void checkTxReplyReserve() {
+  TxQueue q;
+  const std::string logLine(99, 'l');
+  int logged = 0;
+  while (q.dropped() == 0 && logged < 1000) {
+    q.put(logLine.data(), logLine.size(), TxClass::Log);
+    q.put("\n", 1, TxClass::Log);
+    ++logged;
+  }
+  check(q.dropped() == 1 && q.pending() <= TxQueue::kCapacity - TxQueue::kReplyReserve,
+        "tx: log lines drop once the queue is full up to the reply reserve");
+  q.put("reply\n", 6, TxClass::Reply);
+  check(q.dropped() == 1, "tx: a reply still fits in the reserve");
+  const std::string seen = drainQueue(q);
+  check(seen.size() >= 6 && seen.compare(seen.size() - 6, 6, "reply\n") == 0, "tx: the reply is queued behind the log lines");
+
+  const std::string reply(500, 'r');
+  while (q.dropped() == 1) {
+    q.put(reply.data(), reply.size(), TxClass::Reply);
+    q.put("\n", 1, TxClass::Reply);
+  }
+  check(q.pending() <= TxQueue::kCapacity, "tx: replies drop only when the whole queue is full");
+}
+
+// discard() empties the finished lines; the line being written keeps its bytes and ends whole.
+void checkTxDiscard() {
+  TxQueue q;
+  q.put("lost\n", 5, TxClass::Reply);
+  q.discard();
+  check(q.pending() == 0 && q.dropped() == 0, "tx: discard empties the queue without counting");
+
+  q.put("op", 2, TxClass::Log);
+  q.discard();
+  q.put("en\n", 3, TxClass::Log);
+  check(drainQueue(q) == "open\n", "tx: a line open at discard time is not cut into a fragment");
+}
+
+void checkProtocolAndQueue() {
+  checkProtocolCommands();
+  checkProtocolErrors();
+  checkBenchOps();
+  checkProtocolReplies();
+  checkFramer();
+  checkTxQueue();
+  checkTxReplyReserve();
+  checkTxDiscard();
+}
+
+// ---- fuzz ----------------------------------------------------------------------------------
 
 // Deterministic generator so a failure reproduces.
 struct Lcg {
@@ -1583,6 +2351,8 @@ struct Lcg {
   }
 };
 
+// Runs a line through the release-build parse, whose result is not needed (it only has to stay
+// safe), then through the bench-build parse and the layout resolve.
 void parseAndResolve(const char* line) {
   protocol::Request req;
   char err[protocol::kErrorBytes];
@@ -1593,7 +2363,7 @@ void parseAndResolve(const char* line) {
   }
 }
 
-void checkFuzz() {
+void checkFuzzParser() {
   const std::string valid =
       "{\"id\":3,\"cmd\":\"set_layout\",\"name\":\"Stage\",\"slots\":[\"input_gate\",\"autotune\",\"octave\","
       "\"unison\",\"slapback\",\"distortion\",\"gate\",\"reverb_chasm\"],\"extra\":{\"a\":[1,2,{\"b\":null}]}}";
@@ -1628,8 +2398,11 @@ void checkFuzz() {
   parseAndResolve(("{\"x\":" + std::string(5000, '[') + std::string(5000, ']') + "}").c_str());
   parseAndResolve(("{\"x\":" + std::string(5000, '{') + "}").c_str());
   parseAndResolve(("{\"id\":1,\"cmd\":\"" + std::string(5000, 'x') + "\"}").c_str());
+}
 
-  // the framer sees every byte value in any order
+// The framer sees every byte value in any order.
+void checkFuzzFramer() {
+  Lcg rng{777};
   protocol::Framer f;
   size_t lines = 0;
   for (int i = 0; i < 200000; ++i) {
@@ -1645,46 +2418,22 @@ void checkFuzz() {
   check(f.strayBytes() > 1000, "fuzz: bytes outside lines are counted, never acted on");
 }
 
+void checkFuzz() {
+  checkFuzzParser();
+  checkFuzzFramer();
+}
+
+}  // namespace
+
 int main() {
-  checkIds();
-  checkGroups();
-  checkKnobsMove();
-  checkKnobTargets();
-  checkDescriptors();
-  checkToggles();
-  checkPlacement();
-  checkFormat();
-  checkDefaultLayout();
-  checkSettings();
-  checkLayoutValid();
-  checkProtocolCommands();
-  checkProtocolErrors();
-  checkBenchOps();
-  checkFramerStray();
-  checkProtocolReplies();
-  checkFramer();
-  checkLayoutFade();
-  checkFadeHold();
-  checkReplyEscapes();
-  checkTxQueue();
+  checkRegistry();
+  checkLayoutAndCompose();
+  checkProtocolAndQueue();
+  checkFade();
   checkFuzz();
-  checkEnginesToReset();
-  checkComposeToggles();
-  checkComposeBench();
-  checkOutputGain();
-  checkDebounce();
-  checkSteppedPosition();
-  checkKnobFilter();
+  checkInputLogic();
   checkMenu();
-  checkMenuTimeout();
-  checkMenuRedraw();
-  checkMenuInvalidate();
   checkCanvas();
-  checkScreenshots();
-  checkJackSwitch();
-  checkVersionTag();
-  checkMuteSequence();
-  checkMuteLatchAndHold();
   checkPanelTest();
   checkRecords();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);

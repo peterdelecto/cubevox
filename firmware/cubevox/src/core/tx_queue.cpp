@@ -1,7 +1,7 @@
 #include "core/tx_queue.h"
 
-void TxQueue::putByte(char c) {
-  if (!failed_ && tail_ - head_ >= kCapacity) {
+void TxQueue::putByte(char c, size_t limit) {
+  if (!failed_ && tail_ - head_ >= limit) {
     tail_ = commit_;  // roll the open line back
     failed_ = true;
   }
@@ -17,22 +17,19 @@ void TxQueue::putByte(char c) {
   if (c == '\n') commit_ = tail_;
 }
 
-void TxQueue::put(const char* text, size_t len) {
-  for (size_t i = 0; i < len; ++i) putByte(text[i]);
+void TxQueue::put(const char* text, size_t len, TxClass cls) {
+  const size_t limit = cls == TxClass::Reply ? kCapacity : kCapacity - kReplyReserve;
+  for (size_t i = 0; i < len; ++i) putByte(text[i], limit);
 }
 
 size_t TxQueue::peek(const char*& run) const {
   const size_t start = head_ % kCapacity;
   size_t n = commit_ - head_;
   if (n > kCapacity - start) n = kCapacity - start;
-  run = buf_ + start;
+  run = buf_.data() + start;
   return n;
 }
 
 void TxQueue::consume(size_t len) { head_ += len; }
 
-void TxQueue::discard() {
-  head_ = tail_;
-  commit_ = tail_;
-  failed_ = false;
-}
+void TxQueue::discard() { head_ = commit_; }

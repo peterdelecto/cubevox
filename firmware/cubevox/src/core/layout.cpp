@@ -2,10 +2,15 @@
 
 #include <stdio.h>
 
+#include "core/costs.h"
+#include "core/registry.h"
+
 Layout defaultLayout() {
   return {{Card::InputGate, Card::Autotune, Card::Octave, Card::Unison,
            Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring}};
 }
+
+const char* layoutDisplayName(const char* stored) { return stored != nullptr && stored[0] != '\0' ? stored : "Default"; }
 
 namespace {
 
@@ -45,8 +50,9 @@ LayoutCheck layoutValid(const Layout& layout) {
 }
 
 void layoutReason(const LayoutCheck& check, char* buf, size_t size) {
+  if (size == 0) return;
   switch (check.error) {
-    case LayoutError::None: snprintf(buf, size, "%s", ""); break;
+    case LayoutError::None: buf[0] = '\0'; break;
     case LayoutError::BadCard: snprintf(buf, size, "card id out of range in slot %d", check.slot + 1); break;
     case LayoutError::SameCardTwice: snprintf(buf, size, "same card twice: %s", cardDesc(check.card).id); break;
     case LayoutError::TwoReverbs: snprintf(buf, size, "two reverb cards"); break;

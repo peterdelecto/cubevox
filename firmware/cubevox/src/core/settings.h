@@ -8,7 +8,7 @@ enum class OutputLevel : uint8_t { Line, Instrument };
 enum class InputJack : uint8_t { Mic, Pedal };  // Mic = relay K103 coil off, pad shorted
 
 struct Settings {
-  OutputLevel output = OutputLevel::Line;
+  OutputLevel outputLevel = OutputLevel::Line;
   InputJack inputJack = InputJack::Mic;
 };
 
@@ -17,5 +17,5 @@ constexpr float kInstrumentTrimDb = -12.0f;
 
 // Output trim applied after the chain.
 inline float outputTrimDb(const Settings& s) {
-  return s.output == OutputLevel::Instrument ? kInstrumentTrimDb : 0.0f;
+  return s.outputLevel == OutputLevel::Instrument ? kInstrumentTrimDb : 0.0f;
 }

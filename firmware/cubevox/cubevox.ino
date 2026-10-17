@@ -26,6 +26,7 @@
 #include "core/registry.h"
 #include "core/settings.h"
 #include "core/version.h"
+#include "ui/actions.h"
 #include "ui/menu.h"
 
 constexpr uint32_t kHeartbeatMs = 500;
@@ -35,7 +36,7 @@ constexpr uint32_t kDfuFlushMs = 100;  // the ok reply gets this long to leave b
 static Layout gLayout = defaultLayout();
 static Settings gSettings;
 static Menu gMenu;
-static JackSwitch gJack;
+static JackSwitch gJack{Settings().inputJack};
 static Display* gDisplay = nullptr;
 static Canvas gCanvas;
 static bool gOledFound = false;
@@ -86,32 +87,31 @@ static void printStats(uint32_t nowMs) {
 
 // Applies what the menu asked for. Returns true when a setting changed.
 static bool applyAction(UiAction action) {
-  switch (action) {
-    case UiAction::ToggleOutput:
-      gSettings.output = gSettings.output == OutputLevel::Line ? OutputLevel::Instrument : OutputLevel::Line;
-      return true;
-    case UiAction::ToggleInputJack:
-      gSettings.inputJack = gSettings.inputJack == InputJack::Mic ? InputJack::Pedal : InputJack::Mic;
-      return true;
-    case UiAction::EnterDfu:
+  switch (ui::applyAction(action, gSettings)) {
+    case ui::ApplyResult::SettingsChanged: return true;
+    case ui::ApplyResult::EnterDfu:
       muteForReset();
       platformEnterDfu();  // does not return
       break;
-    case UiAction::None: break;
+    case ui::ApplyResult::None: break;
   }
   return false;
 }
 
-static const char* layoutName() {
-  const char* name = recordName();
-  return name[0] != '\0' ? name : "Default";
-}
+static const char* layoutName() { return layoutDisplayName(recordName()); }
 
 static void sendStatus(uint32_t id) {
   const AudioLoad load = audioTakeLoad();
-  protocol::replyStatus(serialWriter(), id,
-                        {load.meanPercent, load.worstPercent, load.late, muteActive(), recordSequence(),
-                         recordErrors(), serialDropped(), serialStrayBytes()});
+  protocol::Status status;
+  status.cpuMeanPercent = load.meanPercent;
+  status.cpuWorstPercent = load.worstPercent;
+  status.late = load.late;
+  status.muted = muteActive();
+  status.seq = recordSequence();
+  status.recordErrors = recordErrors();
+  status.serialDropped = serialDropped();
+  status.strayBytes = serialStrayBytes();
+  protocol::replyStatus(serialWriter(), id, status);
 }
 
 // Validates and adopts a layout from the app. The save runs after the usual debounce.

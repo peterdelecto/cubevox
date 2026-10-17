@@ -5,23 +5,28 @@
 #include "core/canvas.h"
 #include "core/fonts.h"
 
+namespace {
+
+bool potInRange(int pot) { return pot >= 0 && pot < kPanelTestPots; }
+
+bool toggleInRange(int slot) { return slot >= 0 && slot < kPanelTestToggles; }
+
+}  // namespace
+
 void PanelTest::reset() {
-  for (int i = 0; i < kPanelTestPots; ++i) {
-    min_[i] = 1.0f;
-    max_[i] = 0.0f;
-    printed_[i] = 0.0f;
-    printedAtMs_[i] = 0;
-    potSeen_[i] = false;
-  }
-  for (int i = 0; i < kPanelTestToggles; ++i) {
-    seenOn_[i] = false;
-    seenOff_[i] = false;
-    toggleLevel_[i] = false;
-    toggleSeen_[i] = false;
-  }
+  min_.fill(1.0f);
+  max_.fill(0.0f);
+  printed_.fill(0.0f);
+  printedAtMs_.fill(0);
+  potSeen_.fill(false);
+  seenOn_.fill(false);
+  seenOff_.fill(false);
+  toggleLevel_.fill(false);
+  toggleSeen_.fill(false);
 }
 
 bool PanelTest::updatePot(int pot, float value, uint32_t nowMs) {
+  if (!potInRange(pot)) return false;
   const bool first = !potSeen_[pot];
   const bool hadLow = min_[pot] < kPanelTestLow;
   const bool hadHigh = max_[pot] > kPanelTestHigh;
@@ -44,6 +49,7 @@ bool PanelTest::updatePot(int pot, float value, uint32_t nowMs) {
 }
 
 bool PanelTest::updateToggle(int slot, bool on) {
+  if (!toggleInRange(slot)) return false;
   const bool first = !toggleSeen_[slot];
   const bool edge = !first && on != toggleLevel_[slot];
   toggleSeen_[slot] = true;
@@ -52,7 +58,11 @@ bool PanelTest::updateToggle(int slot, bool on) {
   return edge;
 }
 
-bool PanelTest::potDone(int pot) const { return min_[pot] < kPanelTestLow && max_[pot] > kPanelTestHigh; }
+bool PanelTest::potDone(int pot) const {
+  return potInRange(pot) && min_[pot] < kPanelTestLow && max_[pot] > kPanelTestHigh;
+}
+
+bool PanelTest::toggleDone(int slot) const { return toggleInRange(slot) && seenOn_[slot] && seenOff_[slot]; }
 
 int PanelTest::potsDone() const {
   int n = 0;
@@ -64,20 +74,6 @@ int PanelTest::togglesDone() const {
   int n = 0;
   for (int i = 0; i < kPanelTestToggles; ++i) n += toggleDone(i) ? 1 : 0;
   return n;
-}
-
-int PanelTest::nextPot() const {
-  for (int i = 0; i < kPanelTestPots; ++i) {
-    if (!potDone(i)) return i;
-  }
-  return -1;
-}
-
-int PanelTest::nextToggle() const {
-  for (int i = 0; i < kPanelTestToggles; ++i) {
-    if (!toggleDone(i)) return i;
-  }
-  return -1;
 }
 
 namespace {

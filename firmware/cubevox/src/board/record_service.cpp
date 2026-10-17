@@ -3,6 +3,7 @@
 #include "board/fault.h"
 #include "board/flash_bank2.h"
 #include "board/serial_link.h"
+#include "core/protocol.h"
 #include "core/record_store.h"
 
 namespace {
@@ -16,7 +17,7 @@ int gBootSector = 0;
 int gEccSector = -1;      // sector erased by ECC recovery, -1 when none
 uint32_t gEccAddress = 0;
 bool gLayoutRejected = false;
-char gRejectReason[48] = {};
+char gRejectReason[protocol::kErrorBytes] = {};
 
 // A double ECC error on a half-programmed word repeats on every read, so the sector goes.
 void recoverEcc() {
@@ -27,7 +28,7 @@ void recoverEcc() {
 
 void printSettings(Print& out, const Settings& s) {
   out.print(" output ");
-  out.print(s.output == OutputLevel::Instrument ? "instrument" : "line");
+  out.print(s.outputLevel == OutputLevel::Instrument ? "instrument" : "line");
   out.print(" jack ");
   out.print(s.inputJack == InputJack::Pedal ? "pedal" : "mic");
 }
@@ -84,8 +85,8 @@ void recordPrintStatus(Print& out) {
   out.print(st.sequence);
   out.print(" next sector ");
   out.print(st.sector);
-  out.print(" slot ");
-  out.print(st.nextSlot);
+  out.print(" entry ");
+  out.print(st.nextEntry);
   out.print(" busy ");
   out.print(st.busy ? "yes" : "no");
   out.print(" errors ");

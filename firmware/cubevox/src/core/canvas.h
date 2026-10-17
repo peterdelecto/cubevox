@@ -20,7 +20,6 @@ class Canvas {
   Canvas() { clear(); }
 
   void clear();
-  void setPixel(int x, int y, bool on);
   void fillRect(int x, int y, int w, int h, bool on);
   void invertRect(int x, int y, int w, int h);
 
@@ -33,10 +32,15 @@ class Canvas {
 
   // Bit p set means page p changed since clearDirty(p).
   uint8_t dirtyPages() const { return dirty_; }
-  void clearDirty(int page) { dirty_ &= static_cast<uint8_t>(~(1u << page)); }
 
-  // 128 bytes, left to right.
-  const uint8_t* page(int p) const { return pages_[p].data(); }
+  // Does nothing for a page outside 0..kCanvasPages - 1.
+  void clearDirty(int page);
+
+  // The lowest dirty page, or -1 when none is.
+  int firstDirtyPage() const;
+
+  // 128 bytes, left to right; nullptr for a page outside 0..kCanvasPages - 1.
+  const uint8_t* page(int p) const;
 
  private:
   enum class Op : uint8_t { Set, Clear, Toggle };

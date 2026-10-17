@@ -4,34 +4,43 @@
 
 namespace {
 
-const uint8_t* slotAt(const uint8_t* sector, int slot) { return sector + static_cast<size_t>(slot) * kRecordBytes; }
+const uint8_t* entryAt(const uint8_t* sector, int entry) { return sector + static_cast<size_t>(entry) * kRecordBytes; }
 
 }  // namespace
 
-// Clean log: records, then blank slots to the end. A blank slot followed by data means an erase
+// Clean log: records, then blank entries to the end. A blank entry followed by data means an erase
 // was cut off, so the sector is Dirty. `firstBlank` is where an append goes (after a torn tail).
-RecordStore::Sector RecordStore::classify(int sector, int& firstBlank) const {
+// `torn` counts the entries cut off mid-write.
+RecordStore::Sector RecordStore::classify(int sector, int& firstBlank, int& torn) const {
   const uint8_t* base = io_.read(sector);
-  firstBlank = kSlotsPerSector;
+  firstBlank = kEntriesPerSector;
+  torn = 0;
+  bool dirty = false;
   bool anyData = false;
-  for (int slot = 0; slot < kSlotsPerSector; ++slot) {
-    const SlotState s = classifyRecordSlot(slotAt(base, slot));
-    if (s == SlotState::Blank) {
-      if (firstBlank == kSlotsPerSector) firstBlank = slot;
+  for (int entry = 0; entry < kEntriesPerSector; ++entry) {
+    const EntryState s = classifyRecordEntry(entryAt(base, entry));
+    if (s == EntryState::Blank) {
+      if (firstBlank == kEntriesPerSector) firstBlank = entry;
       continue;
     }
-    if (firstBlank != kSlotsPerSector) return Sector::Dirty;
+    if (s == EntryState::Torn) ++torn;
+    if (firstBlank != kEntriesPerSector) dirty = true;
     anyData = true;
   }
+  if (dirty) return Sector::Dirty;
   return anyData ? Sector::Log : Sector::Blank;
 }
 
 bool RecordStore::begin(RecordData& out) {
-  int firstBlank[kRecordSectors];
+  std::array<int, kRecordSectors> firstBlank{};
   const uint8_t* views[kRecordSectors];
+  notes_ = BootNotes();
   for (int s = 0; s < kRecordSectors; ++s) {
-    state_[s] = classify(s, firstBlank[s]);
+    int torn = 0;
+    state_[s] = classify(s, firstBlank[s], torn);
     views[s] = io_.read(s);
+    notes_.tornEntries += torn;
+    if (state_[s] == Sector::Dirty) ++notes_.dirtySectors;
   }
 
   RecordFound found;
@@ -41,12 +50,13 @@ bool RecordStore::begin(RecordData& out) {
     sequence_ = found.rec.sequence;
     cur_ = found.rec;
     out = found.rec;
+    notes_.unknownCard = found.rec.unknownCard;
     // A dirty sector takes no appends; the next save moves to the other sector.
-    nextSlot_ = state_[active_] == Sector::Dirty ? kSlotsPerSector : firstBlank[active_];
+    nextEntry_ = state_[active_] == Sector::Dirty ? kEntriesPerSector : firstBlank[active_];
     return true;
   }
   active_ = state_[0] != Sector::Dirty ? 0 : 1;
-  nextSlot_ = state_[active_] == Sector::Dirty ? kSlotsPerSector : firstBlank[active_];
+  nextEntry_ = state_[active_] == Sector::Dirty ? kEntriesPerSector : firstBlank[active_];
   return false;
 }
 
@@ -58,8 +68,8 @@ void RecordStore::request(const Layout& layout, const Settings& settings, uint32
 }
 
 void RecordStore::setName(const char* name) {
-  strncpy(cur_.name, name, kRecordNameBytes);  // zero-pads the rest
-  cur_.name[kRecordNameBytes] = '\0';
+  strncpy(cur_.name, name, kLayoutNameBytes);  // zero-pads the rest
+  cur_.name[kLayoutNameBytes] = '\0';
 }
 
 void RecordStore::saveNow() {
@@ -85,9 +95,17 @@ void RecordStore::poll(uint32_t nowMs) {
   }
 }
 
+bool RecordStore::takeSaveFailed() {
+  const bool failed = saveFailed_;
+  saveFailed_ = false;
+  return failed;
+}
+
+// The difference is signed so a request stamped later than `nowMs` (two clock reads in one loop
+// pass) counts as not yet due instead of wrapping to a huge elapsed time.
 void RecordStore::pollIdle(uint32_t nowMs) {
   if (!pending_) return;
-  if (!force_ && nowMs - lastRequestMs_ < kSaveDebounceMs) return;
+  if (!force_ && static_cast<int32_t>(nowMs - lastRequestMs_) < static_cast<int32_t>(kSaveDebounceMs)) return;
   startWrite();
 }
 
@@ -99,7 +117,7 @@ void RecordStore::startWrite() {
   writing_ = encodeRecord(cur_);
   word_ = 0;
 
-  if (state_[active_] != Sector::Dirty && nextSlot_ < kSlotsPerSector) {
+  if (state_[active_] != Sector::Dirty && nextEntry_ < kEntriesPerSector) {
     target_ = active_;
     phase_ = Phase::Programming;
     return;
@@ -108,7 +126,7 @@ void RecordStore::startWrite() {
   target_ = hasRecord_ ? 1 - active_ : active_;
   if (state_[target_] == Sector::Blank) {
     active_ = target_;
-    nextSlot_ = 0;
+    nextEntry_ = 0;
     phase_ = Phase::Programming;
     return;
   }
@@ -118,6 +136,7 @@ void RecordStore::startWrite() {
 
 void RecordStore::abandon() {
   ++errors_;
+  saveFailed_ = true;
   phase_ = Phase::Idle;
   cur_.sequence = sequence_;
 }
@@ -131,23 +150,23 @@ void RecordStore::pollErase() {
   }
   state_[target_] = Sector::Blank;
   active_ = target_;
-  nextSlot_ = 0;
+  nextEntry_ = 0;
   phase_ = Phase::Programming;
 }
 
 void RecordStore::pollProgram() {
-  io_.programWord(target_, static_cast<uint32_t>(nextSlot_) * kRecordBytes + word_ * kFlashWordBytes,
+  io_.programWord(target_, static_cast<uint32_t>(nextEntry_) * kRecordBytes + word_ * kFlashWordBytes,
                   writing_.data() + word_ * kFlashWordBytes);
   if (io_.takeError()) {
-    // The slot is part-written; skip it and drop this save.
+    // The entry is part-written; skip it and drop this save.
     state_[target_] = Sector::Log;
-    ++nextSlot_;
+    ++nextEntry_;
     abandon();
     return;
   }
   if (++word_ < kWordsPerRecord) return;
   state_[target_] = Sector::Log;
-  ++nextSlot_;
+  ++nextEntry_;
   sequence_ = cur_.sequence;
   hasRecord_ = true;
   phase_ = Phase::Idle;
@@ -158,6 +177,7 @@ void RecordStore::pollEraseAll() {
     if (io_.eraseBusy()) return;
     if (io_.takeError()) {
       ++errors_;
+      saveFailed_ = true;
       state_[eraseIdx_] = Sector::Dirty;
     } else {
       state_[eraseIdx_] = Sector::Blank;
@@ -169,11 +189,11 @@ void RecordStore::pollEraseAll() {
   }
   hasRecord_ = false;
   active_ = 0;
-  nextSlot_ = state_[0] == Sector::Dirty ? kSlotsPerSector : 0;
+  nextEntry_ = state_[0] == Sector::Dirty ? kEntriesPerSector : 0;
   sequence_ = 0;
   phase_ = Phase::Idle;
 }
 
 RecordStatus RecordStore::status() const {
-  return {hasRecord_, active_, nextSlot_, sequence_, phase_ != Phase::Idle || pending_, errors_};
+  return {hasRecord_, active_, nextEntry_, sequence_, phase_ != Phase::Idle || pending_, errors_};
 }

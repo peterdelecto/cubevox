@@ -10,18 +10,18 @@ class QueuePrint : public Print {
  public:
   size_t write(uint8_t byte) override {
     const char c = static_cast<char>(byte);
-    gQueue.put(&c, 1);
+    gQueue.put(&c, 1, TxClass::Log);
     return 1;
   }
   size_t write(const uint8_t* data, size_t len) override {
-    gQueue.put(reinterpret_cast<const char*>(data), len);
+    gQueue.put(reinterpret_cast<const char*>(data), len, TxClass::Log);
     return len;
   }
 };
 
 class QueueWriter : public protocol::Writer {
  public:
-  void write(const char* text, size_t len) override { gQueue.put(text, len); }
+  void write(const char* text, size_t len) override { gQueue.put(text, len, TxClass::Reply); }
 };
 
 QueuePrint gPrint;
@@ -74,6 +74,7 @@ void serialLinkPoll(void (*onRequest)(const char* line)) {
     switch (gFramer.feed(static_cast<uint8_t>(Serial.read()))) {
       case protocol::Framer::Kind::Line: onRequest(gFramer.line()); break;
       case protocol::Framer::Kind::TooLong: protocol::replyError(gWriter, 0, "line too long (max 768 bytes)"); break;
+      case protocol::Framer::Kind::BadByte: protocol::replyError(gWriter, 0, "line contains a NUL byte"); break;
       case protocol::Framer::Kind::None: break;
     }
   }

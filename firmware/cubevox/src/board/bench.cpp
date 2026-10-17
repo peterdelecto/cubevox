@@ -73,6 +73,7 @@ BenchResult benchRun(BenchOp op, int slot, void (*bootReport)()) {
     case BenchOp::PanelJack:
     case BenchOp::PanelMute:
     case BenchOp::PanelOled: return benchDrillRun(op, slot);
+    case BenchOp::Count: break;
   }
   return {false, "op not handled"};
 }

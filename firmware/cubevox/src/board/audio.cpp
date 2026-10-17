@@ -107,21 +107,19 @@ uint32_t gClipPos = 0;
 // Runs one card. Returns false when it wrote nothing, so the caller keeps its buffers.
 // Pitch cards share one PitchFx call, run at the first pitch card's slot.
 bool runStage(Card c, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
-  switch (c) {
-    case Card::Empty: return false;
-    case Card::InputGate: gChain.inputGate.process(in, out, n, p.inputGate); return true;
-    case Card::Autotune:
-    case Card::Octave:
+  switch (engineOf(c)) {
+    case Engine::InputGate: gChain.inputGate.process(in, out, n, p.inputGate); return true;
+    case Engine::Pitch:
       if (pitchDone) return false;
       pitchDone = true;
       gPitchFx.process(in, out, n, p.pitchFx);
       return true;
-    case Card::Unison: gChain.unison.process(in, out, n, p.unison); return true;
-    case Card::Slapback: gChain.slapback.process(in, out, n, p.slapback); return true;
-    case Card::Distortion: gChain.distortion.process(in, out, n, p.distortion); return true;
-    case Card::Gate: gChain.gate.process(in, out, n, p.gate); return true;
-    case Card::ReverbSpring:
-    case Card::ReverbChasm: gChain.reverb.process(in, out, n, p.reverb); return true;
+    case Engine::Unison: gChain.unison.process(in, out, n, p.unison); return true;
+    case Engine::Slapback: gChain.slapback.process(in, out, n, p.slapback); return true;
+    case Engine::Distortion: gChain.distortion.process(in, out, n, p.distortion); return true;
+    case Engine::Gate: gChain.gate.process(in, out, n, p.gate); return true;
+    case Engine::Reverb: gChain.reverb.process(in, out, n, p.reverb); return true;
+    case Engine::Count: break;  // Empty runs no engine
   }
   return false;
 }
@@ -166,6 +164,7 @@ void resetEngine(Engine e) {
     case Engine::Distortion: gChain.distortion.reset(); break;
     case Engine::Gate: gChain.gate.reset(); break;
     case Engine::Reverb: gChain.reverb.reset(); break;
+    case Engine::Count: break;
   }
 }
 

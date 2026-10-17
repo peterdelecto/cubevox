@@ -6,12 +6,11 @@
 
 #include <array>
 
-#include "core/registry.h"
+#include "core/slots.h"
 
 struct LastMoved {
   int8_t slot = -1;  // -1 until a knob has moved
   bool knobB = false;
-  uint32_t atMs = 0;
 };
 
 struct PanelReading {
