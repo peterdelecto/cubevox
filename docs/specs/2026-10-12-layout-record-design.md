@@ -32,7 +32,9 @@ the record is written and recovered on the H743.
 2. When the active sector is full, the save goes to the other sector after a non-blocking erase.
    A sector holds 512 records, so erases are rare (flash endurance is 10 k cycles per sector).
 3. A save starts 2 s after the last settings change, so turning through the menu writes once.
-4. Erase and program run as a state machine polled from `loop()`; no call waits on the flash.
+4. Erase and program run as a state machine polled from `loop()`. An erase is started and polled across passes. A program
+   call writes one flash word, which takes tens of microseconds, and waits for that word at most 5 ms before it reports an
+   error. No other call waits on the flash.
 
 ## Reading at boot
 1. Scan both sectors; the valid record (magic, schema, CRC) with the highest sequence wins.

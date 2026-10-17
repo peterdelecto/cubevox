@@ -24,14 +24,21 @@ InputJack benchJack(InputJack requested);
 // True while panel_mute holds the output muted.
 bool benchMuteHeld();
 
-// While the OLED pattern is up, draws it and returns true; the caller skips its own draw.
-bool benchDrawPanelPattern(Canvas& canvas);
-
 #else
 
 inline void benchPanelPoll(uint32_t) {}
 inline InputJack benchJack(InputJack requested) { return requested; }
 inline bool benchMuteHeld() { return false; }
-inline bool benchDrawPanelPattern(Canvas&) { return false; }
 
+#endif
+
+// Who owns the canvas this pass. Up: the OLED pattern is showing and the caller skips its own draw.
+// Ended: the pattern let go on this pass, so the caller must repaint everything. Off: the caller draws.
+enum class BenchPattern : uint8_t { Off, Up, Ended };
+
+#if CUBEVOX_BENCH
+// Draws the pattern once when it is up.
+BenchPattern benchPanelPattern(Canvas& canvas);
+#else
+inline BenchPattern benchPanelPattern(Canvas&) { return BenchPattern::Off; }
 #endif

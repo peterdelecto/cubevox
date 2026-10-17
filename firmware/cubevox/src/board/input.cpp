@@ -5,6 +5,7 @@
 #include "board/pins.h"
 #include "core/debounce.h"
 #include "core/timing.h"
+#include "ui/menu.h"
 
 namespace {
 

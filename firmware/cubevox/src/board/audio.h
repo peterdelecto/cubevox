@@ -4,7 +4,10 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <stdint.h>
+
+#include <array>
 
 #include "board/build_kind.h"
 #include "core/chain_params.h"
@@ -17,13 +20,23 @@ struct AudioStats {
   uint32_t maxCycles = 0;     // worst block time in CPU cycles
   uint32_t avgCycles = 0;     // mean block time since the last peaks reset
   uint32_t budgetCycles = 0;  // CPU cycles available per block
-  uint32_t slotAvg[kSlotCount + 1] = {};    // mean cycles per slot since the reset; last is the EQ
-  uint32_t slotWorst[kSlotCount + 1] = {};  // worst single block per slot since the reset
+  std::array<uint32_t, kSlotCount + 1> slotAvg = {};    // mean cycles per slot since the reset; last is the EQ
+  std::array<uint32_t, kSlotCount + 1> slotWorst = {};  // worst single block per slot since the reset
 };
 
-// Brings up PLL3, SAI1 and DMA, and starts the stream. Returns false on failure; see audioError().
+// Brings up PLL3, SAI1 and DMA, and starts the stream. Returns false on failure; audioReport() says why.
 bool audioInit();
-const char* audioError();
+
+// The "[boot] audio ..." line, or the "[ERROR] audio: ..." line when audioInit failed. Also reports
+// SAI and DMA errors counted since boot.
+void audioReport(Print& out);
+
+// SAI and DMA transfer errors since boot, and the HAL error bits seen.
+struct AudioErrors {
+  uint32_t count = 0;
+  uint32_t codes = 0;
+};
+AudioErrors audioErrors();
 
 // Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop. A snapshot with
 // the layout the interrupt runs is adopted at once; a different layout fades the output out and in
@@ -63,4 +76,7 @@ void audioStopForBench();
 // Loops the clip compiled in by CUBEVOX_BENCH_CLIP in place of the SAI input. Returns the
 // new state; false when no clip is compiled in.
 bool audioBenchClip(bool on);
+
+// True while the clip replaces the SAI input.
+bool audioBenchClipOn();
 #endif

@@ -4,103 +4,67 @@
 
 #include "board/audio.h"
 #include "board/bench.h"
+#include "board/bench_panel.h"
+#include "board/boot_report.h"
 #include "board/build_kind.h"
-#include "board/sysclock.h"
 #include "board/controls.h"
+#include "board/dfu.h"
 #include "board/display_sh1106.h"
-#include "board/fault.h"
 #include "board/display_stub.h"
+#include "board/fault.h"
 #include "board/input.h"
 #include "board/input_jack.h"
 #include "board/mute.h"
 #include "board/pins.h"
-#include "board/platform.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
-#include "board/slots.h"
 #include "board/usb_link.h"
 #include "core/compose.h"
 #include "core/jack_switch.h"
 #include "core/layout.h"
+#include "core/loop_policy.h"
 #include "core/protocol.h"
-#include "core/registry.h"
 #include "core/settings.h"
+#include "core/timing.h"
 #include "core/version.h"
 #include "ui/actions.h"
 #include "ui/menu.h"
 
+namespace {
+
 constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;
-constexpr uint32_t kDfuFlushMs = 100;  // the ok reply gets this long to leave before the box resets
 
-static Layout gLayout = defaultLayout();
-static Settings gSettings;
-static Menu gMenu;
-static JackSwitch gJack{Settings().inputJack};
-static Display* gDisplay = nullptr;
-static Canvas gCanvas;
-static bool gOledFound = false;
-static bool gAudioRunning = false;
-static bool gSnapshotStale = false;  // a change is waiting for the panel to be read
+Layout gLayout = defaultLayout();
+Settings gSettings;
+Menu gMenu;
+JackSwitch gJack{Settings().inputJack};
+Display* gDisplay = nullptr;
+Canvas gCanvas;
+bool gOledFound = false;
+bool gAudioRunning = false;
+PublishGate gPublish;
+Every gHeartbeat{kHeartbeatMs};
+Every gStats{kStatsMs};
 
-// Boot facts for the first-article checklist, printed whenever a terminal opens the port.
-static void printBootReport() {
-  Print& out = serialOut();
-  out.println("[boot] cubevox firmware");
-  out.println(kBenchBuild ? "[boot] build bench" : "[boot] build release");
-  faultReport(out);
-  recordPrintBoot(out);
-  clockReport(out);
-  pins::report(out);
-  out.print("[boot] icache ");
-  out.print((SCB->CCR & SCB_CCR_IC_Msk) ? "on" : "OFF");
-  out.print(", dcache ");
-  out.print((SCB->CCR & SCB_CCR_DC_Msk) ? "on" : "OFF");
-  out.print(", fpu ");
-  out.println((SCB->CPACR & (0xFu << 20)) == (0xFu << 20) ? "on" : "OFF");
-  out.println(gOledFound ? "[boot] OLED at 0x3C" : "[WARN] OLED not found, serial display");
-  if (gAudioRunning) {
-    out.println("[boot] audio running, SAI1 48 kHz");
-  } else {
-    out.print("[ERROR] audio: ");
-    out.println(audioError());
-  }
-}
+void printBootReport() { bootReportPrint(gOledFound); }
 
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
-// Before the panel is read the knobs would be zero, so the request waits in gSnapshotStale.
-static void publishSnapshot() {
-  if (!controlsSeeded()) {
-    gSnapshotStale = true;
-    return;
-  }
-  gSnapshotStale = false;
-  audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides()));
-}
-
-static void printStats(uint32_t nowMs) {
-  static uint32_t lastMs = 0;
-  if (nowMs - lastMs < kStatsMs) return;
-  lastMs = nowMs;
-  benchPrintStats();
-}
+void publishSnapshot() { audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides())); }
 
 // Applies what the menu asked for. Returns true when a setting changed.
-static bool applyAction(UiAction action) {
+bool applyAction(UiAction action) {
   switch (ui::applyAction(action, gSettings)) {
     case ui::ApplyResult::SettingsChanged: return true;
-    case ui::ApplyResult::EnterDfu:
-      muteForReset();
-      platformEnterDfu();  // does not return
-      break;
+    case ui::ApplyResult::EnterDfu: enterDfu();
     case ui::ApplyResult::None: break;
   }
   return false;
 }
 
-static const char* layoutName() { return layoutDisplayName(recordName()); }
+const char* layoutName() { return layoutDisplayName(recordName()); }
 
-static void sendStatus(uint32_t id) {
+void replyStatus(uint32_t id) {
   const AudioLoad load = audioTakeLoad();
   protocol::Status status;
   status.cpuMeanPercent = load.meanPercent;
@@ -115,7 +79,7 @@ static void sendStatus(uint32_t id) {
 }
 
 // Validates and adopts a layout from the app. The save runs after the usual debounce.
-static void replySetLayout(const protocol::Request& req) {
+void replySetLayout(const protocol::Request& req, uint32_t nowMs) {
   Layout next = defaultLayout();
   char err[protocol::kErrorBytes];
   if (!protocol::resolveLayout(req, next, err, sizeof err)) {
@@ -124,18 +88,18 @@ static void replySetLayout(const protocol::Request& req) {
   }
   gLayout = next;
   recordSetName(req.name);
-  recordRequestSave(gLayout, gSettings, millis());
-  gSnapshotStale = true;  // published after controlsPoll() re-seeds the knobs for the new cards
+  recordRequestSave(gLayout, gSettings, nowMs);
+  gPublish.markStale();  // goes out after controlsPoll() re-seeds the knobs for the new cards
   protocol::replyOk(serialWriter(), req.id);
 }
 
 // Replies after the op runs, so a failure reaches the host. Fault and spin never return, so
 // they reply first and flush inside the drill before they act.
-static void runBench(const protocol::Request& req) {
+void replyBench(const protocol::Request& req) {
   protocol::Writer& out = serialWriter();
   if (req.op == BenchOp::Fault || req.op == BenchOp::Spin) protocol::replyOk(out, req.id);  // the drill flushes it
   const BenchResult result = benchRun(req.op, req.benchSlot, printBootReport);
-  if (result.republish) publishSnapshot();
+  if (result.republish) gPublish.markStale();
   if (result.error) {
     protocol::replyError(out, req.id, result.error);
   } else {
@@ -143,7 +107,7 @@ static void runBench(const protocol::Request& req) {
   }
 }
 
-static void onRequest(const char* line) {
+void onRequest(const char* line, uint32_t nowMs) {
   protocol::Writer& out = serialWriter();
   protocol::Request req;
   char err[protocol::kErrorBytes];
@@ -156,26 +120,17 @@ static void onRequest(const char* line) {
       protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout, kBenchBuild);
       break;
     case protocol::Command::GetLayout: protocol::replyLayout(out, req.id, layoutName(), gLayout); break;
-    case protocol::Command::SetLayout: replySetLayout(req); break;
-    case protocol::Command::Status: sendStatus(req.id); break;
+    case protocol::Command::SetLayout: replySetLayout(req, nowMs); break;
+    case protocol::Command::Status: replyStatus(req.id); break;
     case protocol::Command::EnterDfu:
       protocol::replyOk(out, req.id);
-      serialFlush(kDfuFlushMs);
-      muteForReset();
-      platformEnterDfu();  // does not return
-      break;
-    case protocol::Command::Bench:
-      if (!opAllowed(req.op, kBenchBuild)) {
-        protocol::replyError(out, req.id, "op not in this build");
-        break;
-      }
-      runBench(req);
-      break;
+      enterDfu();
+    case protocol::Command::Bench: replyBench(req); break;
   }
 }
 
 // The relay switches only while the output is fully muted; the mute is held until it settles.
-static void runJackSwitch(uint32_t nowMs) {
+void runJackSwitch(uint32_t nowMs) {
   gJack.update(nowMs, benchJack(gSettings.inputJack), muteFullyMuted());
   // Unseeded knobs read 0, so stay muted; the panel test can hold the mute too.
   muteHold(gJack.holdMute() || !controlsSeeded() || benchMuteHeld());
@@ -183,31 +138,22 @@ static void runJackSwitch(uint32_t nowMs) {
 }
 
 // The menu owns the canvas except while the bench OLED pattern is up; it repaints once that ends.
-static void drawFace(const UiContext& ctx) {
-  static bool patternShown = false;
-  if (benchDrawPanelPattern(gCanvas)) {
-    patternShown = true;
-    return;
-  }
-  if (patternShown) {
-    patternShown = false;
-    gMenu.invalidate();
+void drawFace(const UiContext& ctx) {
+  switch (benchPanelPattern(gCanvas)) {
+    case BenchPattern::Up: return;
+    case BenchPattern::Ended: gMenu.invalidate(); break;
+    case BenchPattern::Off: break;
   }
   gMenu.draw(ctx, gCanvas);
 }
 
-static void heartbeat(uint32_t nowMs) {
-  static uint32_t lastMs = 0;
-  if (nowMs - lastMs < kHeartbeatMs) return;
-  lastMs = nowMs;
-  digitalToggle(pins::kUserLed);
-}
+}  // namespace
 
 void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
   inputJackInit();  // PAD_EN low = MIC
-  faultInit();
-  recordBoot(gLayout, gSettings);  // blocking ECC erase is safe: the watchdog starts at the end of setup()
+  faultInit();  // before recordBoot: the ECC recovery reads the fault record this loads
+  recordBoot(gLayout, gSettings, millis());  // blocking ECC erase is safe: the watchdog starts at the end of setup()
   gJack = JackSwitch(gSettings.inputJack);  // output is still muted, so no dip
   inputJackApply(gSettings.inputJack);
   pinMode(pins::kUserLed, OUTPUT);
@@ -233,7 +179,7 @@ void loop() {
     serialLinkSessionStart();
     printBootReport();
   }
-  serialLinkPoll(onRequest);
+  serialLinkPoll(nowMs, onRequest);
 
   controlsPoll(nowMs, gLayout);
   benchPanelPoll(nowMs);
@@ -244,11 +190,11 @@ void loop() {
   recordPoll(nowMs);
   runJackSwitch(nowMs);
   // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
-  if (controlsTakeChanged() || settingsChanged || gSnapshotStale) publishSnapshot();
+  if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
   const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
   drawFace(ctx);
   gDisplay->flushStep(gCanvas);
-  heartbeat(nowMs);
-  printStats(nowMs);
+  if (gHeartbeat.due(nowMs)) digitalToggle(pins::kUserLed);
+  if (gStats.due(nowMs)) benchReportStats();
 }

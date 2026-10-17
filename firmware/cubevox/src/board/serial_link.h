@@ -7,10 +7,16 @@
 
 #include "core/protocol.h"
 
-// Reads the pending bytes and calls `onRequest` for each complete JSON line (NUL-terminated, valid
+// How long the queue gets to leave before the box resets, so the last reply and log lines reach the host.
+constexpr uint32_t kFlushBeforeResetMs = 100;
+
+// Called for each complete request line. `nowMs` is the loop pass's clock read.
+using LineHandler = void (*)(const char* line, uint32_t nowMs);
+
+// Reads the pending bytes and calls `onLine` for each complete JSON line (NUL-terminated, valid
 // during the call), then sends as much queued output as the port takes. Bytes outside a line are
 // ignored and counted. A line over the length limit gets its error reply here.
-void serialLinkPoll(void (*onRequest)(const char* line));
+void serialLinkPoll(uint32_t nowMs, LineHandler onLine);
 
 // Drops a line the last host left unfinished, so it can't swallow the new session's first bytes.
 void serialLinkSessionStart();

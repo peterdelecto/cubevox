@@ -44,3 +44,12 @@ LayoutCheck layoutValid(const Layout& layout);
 
 // Short readable reason for a failed check, for example "two reverb cards". Empty string when ok.
 void layoutReason(const LayoutCheck& check, char* buf, size_t size);
+
+// What recoverLayout did to a layout that came from storage.
+struct Recovery {
+  bool replaced = false;  // the layout failed layoutValid and now holds the default layout
+  LayoutCheck why;        // the failed check, ok when nothing was replaced
+};
+
+// Keeps `layout` when layoutValid accepts it, otherwise replaces the whole layout with the default.
+Recovery recoverLayout(Layout& layout);

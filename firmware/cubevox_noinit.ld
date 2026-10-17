@@ -1,9 +1,6 @@
 /* cubevox_noinit.ld: the fault record's section, at the top of DTCM.
  *
- * The stock .noinit lands at 0x20000000, where platform/h7_h743v_sections.ld also
- * starts .dtcm_bss, so the record shared bytes with the pitch stage state and its
- * constructor wiped the record before faultInit() read it. This section sits above
- * .dtcm_bss; nothing zeroes it, and a system reset keeps DTCM. */
+ * The section sits above .dtcm_bss and nothing zeroes it, so the record survives a system reset. */
 
 SECTIONS
 {

@@ -14,7 +14,6 @@
 namespace {
 
 BenchOverrides gBench;
-bool gClipOn = false;
 
 void toggleKnobsPinned() {
   gBench.knobsPinned = !gBench.knobsPinned;
@@ -29,10 +28,10 @@ void toggleReverbChasm() {
 
 // Null on success; turning the clip on fails when none is compiled in.
 const char* toggleClip() {
-  const bool wantOn = !gClipOn;
-  gClipOn = audioBenchClip(wantOn);
-  serialOut().println(gClipOn ? "[bench] vocal clip on" : "[bench] vocal clip off");
-  return wantOn && !gClipOn ? "no clip compiled in" : nullptr;
+  const bool wantOn = !audioBenchClipOn();
+  const bool on = audioBenchClip(wantOn);
+  serialOut().println(on ? "[bench] vocal clip on" : "[bench] vocal clip off");
+  return wantOn && !on ? "no clip compiled in" : nullptr;
 }
 
 void resetPeaks() {
@@ -54,12 +53,12 @@ BenchResult benchDrillRun(BenchOp op, int slot) {
   switch (op) {
     case BenchOp::SlotOff:
       gBench.slotsOff ^= static_cast<uint8_t>(1u << (slot - kMinBenchSlot));
-      benchPrintStats();
+      benchReportStats();
       r.republish = true;
       break;
     case BenchOp::SlotsOn:
       gBench.slotsOff = 0;
-      benchPrintStats();
+      benchReportStats();
       r.republish = true;
       break;
     case BenchOp::PinKnobs: toggleKnobsPinned(); r.republish = true; break;

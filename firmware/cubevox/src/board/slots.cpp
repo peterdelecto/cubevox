@@ -1,11 +1,13 @@
 #include "board/slots.h"
 
+#include <array>
+
 #include "board/pins.h"
 
-// POT15 is KEY and POT16 is SEMITONES (hardware/PINMAP.md). The other fourteen pots fill
-// POT01..POT14 left to right, so KEY and SEMITONES sit out of left-to-right order.
-// Channel numbers are 0-based mux inputs. POT01-08 and POT16 are channel nn - 1; POT09-15 are
-// re-mapped to match the board's west-row order (hardware/PINMAP.md, 2026-10-08).
+// POT01..POT16 are the silkscreen numbers (hardware/PINMAP.md). Each constant is the 0-based mux
+// input the pot is wired to: POT01-08 and POT16 sit on channel nn - 1, POT09-15 follow the board's
+// west-row order. POT15 is KEY and POT16 is SEMITONES, so they sit out of left-to-right order in
+// the slot table below.
 constexpr uint8_t kPot01 = 0;
 constexpr uint8_t kPot02 = 1;
 constexpr uint8_t kPot03 = 2;
@@ -34,15 +36,17 @@ const Slot kSlots[kSlotCount] = {
     {pins::kToggle8, kPot13, kPot14},
 };
 
+#if CUBEVOX_BENCH
 int potNumber(int muxChannel) {
-  static const uint8_t kChannelOfPot[kPotCount] = {kPot01, kPot02, kPot03, kPot04, kPot05, kPot06,
-                                                   kPot07, kPot08, kPot09, kPot10, kPot11, kPot12,
-                                                   kPot13, kPot14, kPot15Key, kPot16Semitones};
-  for (int i = 0; i < kPotCount; ++i) {
-    if (kChannelOfPot[i] == muxChannel) return i + 1;
+  static constexpr std::array<uint8_t, kPotCount> kChannelOfPot = {
+      kPot01, kPot02, kPot03, kPot04, kPot05, kPot06, kPot07, kPot08,
+      kPot09, kPot10, kPot11, kPot12, kPot13, kPot14, kPot15Key, kPot16Semitones};
+  for (size_t i = 0; i < kChannelOfPot.size(); ++i) {
+    if (kChannelOfPot[i] == muxChannel) return static_cast<int>(i) + 1;
   }
   return 0;
 }
+#endif
 
 PotOwner potOwner(int muxChannel) {
   for (int s = 0; s < kSlotCount; ++s) {

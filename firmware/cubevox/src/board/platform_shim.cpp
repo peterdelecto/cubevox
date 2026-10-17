@@ -6,4 +6,9 @@
 #include "h7_dfu_reboot.h"
 #include "board/platform.h"
 
-void platformEnterDfu() { dfu_reboot_request(); }
+// dfu_reboot_request() resets the chip. If it ever returned, nothing kicks the watchdog any more,
+// so the box would still reset within the watchdog period.
+void platformEnterDfu() {
+  dfu_reboot_request();
+  for (;;) {}
+}

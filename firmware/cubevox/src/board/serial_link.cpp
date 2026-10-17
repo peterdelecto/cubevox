@@ -1,8 +1,17 @@
 #include "board/serial_link.h"
 
+#include <stdio.h>
+
+#include "cdc_queue.h"
 #include "core/tx_queue.h"
 
 namespace {
+
+// The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
+// fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
+// replays up to a queue's worth of bytes. Two full requests fit; build.sh sets the packet count.
+static_assert(CDC_RECEIVE_QUEUE_BUFFER_SIZE >= 2 * protocol::kMaxLine,
+              "raise CDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER in build.sh to hold two maximum-length requests");
 
 TxQueue gQueue;
 
@@ -48,6 +57,12 @@ void drain() {
   }
 }
 
+void replyTooLong() {
+  char reason[protocol::kErrorBytes];
+  snprintf(reason, sizeof reason, "line too long (max %u bytes)", static_cast<unsigned>(protocol::kMaxLine));
+  protocol::replyError(gWriter, 0, reason);
+}
+
 }  // namespace
 
 Print& serialOut() { return gPrint; }
@@ -69,11 +84,11 @@ bool serialFlush(uint32_t timeoutMs) {
 
 void serialLinkSessionStart() { gFramer.reset(); }
 
-void serialLinkPoll(void (*onRequest)(const char* line)) {
+void serialLinkPoll(uint32_t nowMs, LineHandler onLine) {
   while (Serial.available() > 0) {
     switch (gFramer.feed(static_cast<uint8_t>(Serial.read()))) {
-      case protocol::Framer::Kind::Line: onRequest(gFramer.line()); break;
-      case protocol::Framer::Kind::TooLong: protocol::replyError(gWriter, 0, "line too long (max 768 bytes)"); break;
+      case protocol::Framer::Kind::Line: onLine(gFramer.line(), nowMs); break;
+      case protocol::Framer::Kind::TooLong: replyTooLong(); break;
       case protocol::Framer::Kind::BadByte: protocol::replyError(gWriter, 0, "line contains a NUL byte"); break;
       case protocol::Framer::Kind::None: break;
     }

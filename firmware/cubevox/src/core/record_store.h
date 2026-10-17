@@ -62,6 +62,8 @@ class RecordStore {
   void setName(const char* name);
   // Writes the current state now, bypassing the debounce.
   void saveNow();
+  // Skips the debounce for a save that is already pending. Does nothing when none is.
+  void flushPending() { force_ = pending_ || force_; }
   // Erases both sectors, forgetting all records. Drops the pending save. False while busy.
   bool eraseAll();
 

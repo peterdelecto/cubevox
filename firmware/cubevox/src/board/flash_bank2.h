@@ -3,26 +3,32 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <stdint.h>
 
 #include "core/record_store.h"
 
-constexpr uint32_t kBank2Base = 0x08100000u;  // FLASH_BANK2_BASE, bank 2 sector 0
+constexpr uint32_t kBank2Base = FLASH_BANK2_BASE;  // bank 2 sector 0
 
+// Any failure (a refused unlock, a sector outside the record sectors, a busy wait that timed out,
+// a flash status error) sets a flag that takeError() returns once.
 class Bank2Flash : public FlashIo {
  public:
   const uint8_t* read(int sector) const override;
   void eraseStart(int sector) override;
   bool eraseBusy() override;
-  void programWord(int sector, uint32_t offset, const uint8_t* word) override;
+  void programWord(int sector, uint32_t offset, const uint8_t* flashWord) override;
   bool takeError() override;
 
-  // Blocking erase for the boot-time ECC recovery only. Never call after the watchdog starts.
+  // Blocking erase for the boot-time ECC recovery only, bounded by the erase timeout. Never call
+  // after the watchdog starts.
   void eraseBlocking(int sector);
 
  private:
   bool erasing_ = false;
   bool error_ = false;
+  int erasingSector_ = 0;
+  uint32_t eraseStartMs_ = 0;
 };
 
 // Sector index (0 or 1) holding a bank 2 address, or -1 outside the record sectors.

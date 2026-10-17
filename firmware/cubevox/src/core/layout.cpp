@@ -49,6 +49,15 @@ LayoutCheck layoutValid(const Layout& layout) {
   return LayoutCheck();
 }
 
+Recovery recoverLayout(Layout& layout) {
+  Recovery r;
+  r.why = layoutValid(layout);
+  if (r.why.ok()) return r;
+  layout = defaultLayout();
+  r.replaced = true;
+  return r;
+}
+
 void layoutReason(const LayoutCheck& check, char* buf, size_t size) {
   if (size == 0) return;
   switch (check.error) {

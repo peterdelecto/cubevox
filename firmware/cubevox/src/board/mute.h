@@ -5,8 +5,6 @@
 
 #include <stdint.h>
 
-#include "core/mute_sequence.h"
-
 // Drives MUTE_N and XSMT low. Call first in setup(), before anything that takes time.
 void muteInit();
 

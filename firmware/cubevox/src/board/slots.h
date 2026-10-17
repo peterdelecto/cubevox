@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#include "board/build_kind.h"
 #include "core/slots.h"
 
 struct Slot {
@@ -15,8 +16,10 @@ struct Slot {
 
 extern const Slot kSlots[kSlotCount];
 
+#if CUBEVOX_BENCH
 // Silkscreen number (1..16) of the pot wired to a 0-based mux channel.
 int potNumber(int muxChannel);
+#endif
 
 // The slot knob wired to a mux channel; slot is -1 for a channel no slot uses.
 struct PotOwner {

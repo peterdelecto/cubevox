@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recompile our sketch sources with -Wall -Wextra -Werror, third-party includes as -isystem.
+"""Recompile our sketch sources with the warning flags below as errors, third-party includes as -isystem.
 
 Reads the compile commands arduino-cli wrote for the build, so flags and defines match the
 firmware build exactly. Only .cpp files under the sketch copy are checked; the STM32 core, HAL,
@@ -19,6 +19,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 SKIPPED = "requiredLibraries.cpp"  # arduino-cli's library probe, not our code
 
+# -Wdouble-promotion matters on the single-precision FPU, -Wshadow and -Wundef catch silent
+# name and macro mistakes, -Wformat=2 checks the printf-style calls.
+WARNING_FLAGS = ["-Wall", "-Wextra", "-Wshadow", "-Wdouble-promotion", "-Wundef", "-Wformat=2", "-Werror"]
+
 
 def under(path, dirs):
     """True when path is one of dirs or inside one; a sibling sharing a name prefix does not match."""
@@ -35,7 +39,7 @@ def command(entry, system_dirs):
             out.append(a)
     i = out.index("-o")
     out = [a for a in out[:i] if a != "-MMD"]
-    return out + ["-Wall", "-Wextra", "-Werror", "-o", os.devnull]
+    return out + WARNING_FLAGS + ["-o", os.devnull]
 
 
 def sketch_sources(sketch):
@@ -70,7 +74,7 @@ def main():
     bad = [r for r in results if r.returncode]
     log = "".join(r.stderr for r in bad)
     print("\n".join(log.splitlines()[-a.tail:]))
-    print(f"[warn-gate] {len(entries)} files, -Wall -Wextra -Werror: {'FAIL ' + str(len(bad)) if bad else 'ok'}")
+    print(f"[warn-gate] {len(entries)} files, {' '.join(WARNING_FLAGS)}: {'FAIL ' + str(len(bad)) if bad else 'ok'}")
     return 1 if bad else 0
 
 

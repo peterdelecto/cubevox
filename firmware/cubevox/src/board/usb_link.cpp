@@ -12,12 +12,15 @@
 // The core's PCD MSP configures every pin in this table. Only D+ and D- belong to the OTG
 // core here; PA9 stays a plain input (native VBUS sensing is off), PA8 and PA10 are unused.
 const PinMap PinMap_USB_OTG_FS[] = {
-    {PA_11, USB_OTG_FS, STM_PIN_DATA(STM_MODE_AF_PP, LL_GPIO_PULL_UP, GPIO_AF10_OTG1_FS)},
-    {PA_12, USB_OTG_FS, STM_PIN_DATA(STM_MODE_AF_PP, LL_GPIO_PULL_UP, GPIO_AF10_OTG1_FS)},
+    {pins::kUsbDm, USB_OTG_FS, STM_PIN_DATA(STM_MODE_AF_PP, LL_GPIO_PULL_UP, GPIO_AF10_OTG1_FS)},
+    {pins::kUsbDp, USB_OTG_FS, STM_PIN_DATA(STM_MODE_AF_PP, LL_GPIO_PULL_UP, GPIO_AF10_OTG1_FS)},
     {NC, NP, 0},
 };
 
 namespace {
+
+// VBUS must hold a level this long before USB attaches or detaches.
+constexpr uint32_t kVbusDebounceMs = 50;
 
 DebouncedInput gVbus;
 bool gStarted = false;
@@ -33,7 +36,7 @@ bool vbusPresent() { return digitalRead(pins::kVbusSense) == HIGH; }
 }  // namespace
 
 void usbLinkInit() {
-  pinMode(pins::kVbusSense, INPUT);  // no pull: the divider sets the level (Astra item 8)
+  pinMode(pins::kVbusSense, INPUT);  // no pull: a pull-up or pull-down would skew the R6/R7 divider
   gVbus.reset(vbusPresent());
 }
 

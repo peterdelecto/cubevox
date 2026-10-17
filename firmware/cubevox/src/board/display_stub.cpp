@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include <array>
+
 #include "board/serial_link.h"
 
 namespace {
@@ -19,7 +21,7 @@ class StubDisplay : public Display {
     serialOut().println(page);
     const uint8_t* bytes = canvas.page(page);
     for (int pair = 0; pair < 4; ++pair) {
-      char line[kCanvasWidth + 1];
+      std::array<char, kCanvasWidth + 1> line;
       for (int x = 0; x < kCanvasWidth; ++x) {
         const int top = (bytes[x] >> (pair * 2)) & 1;
         const int bottom = (bytes[x] >> (pair * 2 + 1)) & 1;
@@ -27,7 +29,7 @@ class StubDisplay : public Display {
       }
       line[kCanvasWidth] = '\0';
       serialOut().print("[oled] ");
-      serialOut().println(line);
+      serialOut().println(line.data());
     }
     canvas.clearDirty(page);
   }

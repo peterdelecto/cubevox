@@ -9,6 +9,12 @@ constexpr float kMoveThreshold = 0.015f;  // knob travel that counts as touched
 
 }  // namespace
 
+float knobPosition(float adcFraction) {
+  const float n = (adcFraction - kKnobEndMargin) / (1.0f - 2.0f * kKnobEndMargin);
+  if (!(n > 0.0f)) return 0.0f;  // also catches NaN
+  return n > 1.0f ? 1.0f : n;
+}
+
 int steppedPosition(float norm, int positions, int current, float hysteresis) {
   if (positions <= 0) return 0;
   if (!(norm > 0.0f)) norm = 0.0f;  // also catches NaN
@@ -28,6 +34,12 @@ void KnobFilter::reseed(int steps) {
   stepsSeeded_ = steps;
   step_ = steps > 0 ? steppedPosition(smoothed_, steps, 0, 0.0f) : 0;
   reported_ = smoothed_;
+}
+
+KnobEvent KnobFilter::restep(int steps) {
+  if (!seeded_ || steps == stepsSeeded_) return KnobEvent::None;
+  reseed(steps);
+  return KnobEvent::Reseeded;
 }
 
 KnobEvent KnobFilter::update(float norm, int steps) {
@@ -53,4 +65,38 @@ KnobEvent KnobFilter::update(float norm, int steps) {
     return KnobEvent::Moved;
   }
   return KnobEvent::None;
+}
+
+void KnobBank::setSteps(const std::array<int, kPotCount>& steps) {
+  for (size_t i = 0; i < steps.size(); ++i) {
+    if (steps[i] == steps_[i]) continue;
+    steps_[i] = steps[i];
+    if (knob_[i].restep(steps[i]) == KnobEvent::Reseeded) changed_ = true;
+  }
+}
+
+void KnobBank::update(int pot, float position, LastMoved owner) {
+  if (pot < 0 || pot >= kPotCount) return;
+  const size_t i = static_cast<size_t>(pot);
+  switch (knob_[i].update(position, steps_[i])) {
+    case KnobEvent::Seeded:
+      if (++seededCount_ == kPotCount) changed_ = true;
+      break;
+    case KnobEvent::Reseeded:
+      changed_ = true;
+      break;
+    case KnobEvent::Moved:
+      if (owner.slot < 0) break;
+      lastMoved_ = owner;
+      changed_ = true;
+      break;
+    case KnobEvent::None:
+      break;
+  }
+}
+
+bool KnobBank::takeChanged() {
+  const bool changed = changed_;
+  changed_ = false;
+  return changed;
 }

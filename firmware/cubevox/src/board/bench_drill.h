@@ -1,6 +1,6 @@
 // Bench-class ops that act on the box: slot and knob overrides, audio stop, forced faults, record
-// save and erase, the panel test. Bench builds only; the release image gets inline stubs and none
-// of the code.
+// save and erase, the panel test. Bench builds only; the release image gets the empty overrides
+// and none of the code.
 
 #pragma once
 
@@ -28,7 +28,5 @@ inline const BenchOverrides& benchOverrides() {
   static const BenchOverrides none;
   return none;
 }
-
-inline BenchResult benchDrillRun(BenchOp, int) { return {false, "op not in this build"}; }
 
 #endif

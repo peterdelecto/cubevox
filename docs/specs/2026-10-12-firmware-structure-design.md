@@ -17,10 +17,10 @@ map and the ownership rules before the OLED font renderer and runtime layouts la
 
 ## Data flow
 ```
-board/input ──UiEvent──▶ ui/Menu ──UiAction──▶ sketch ──▶ Settings
+board/input ──UiInput──▶ ui/Menu ──UiAction──▶ sketch ──▶ Settings
 board/controls(Layout) ──PanelReading──┐
 Layout, Settings, BenchOverrides ──────┴──▶ core/compose ──ChainSnapshot──▶ board/audio (IRQ)
-Menu + UiContext ──▶ ui/screens ──▶ core/Canvas ──▶ board/display_sh1106 (one page per pass)
+Menu + UiContext ──▶ Menu::draw ──▶ core/Canvas ──▶ board/display_sh1106 (one page per pass)
 ```
 The sketch is the only place that wires modules together. No module calls another tier's
 getters behind the sketch's back.
@@ -36,16 +36,16 @@ getters behind the sketch's back.
 | core | `canvas` | 128 x 64 1 bpp, page-major 1024 B, `drawText`, `textWidth`, `fillRect`, `invertRect`, dirty-page mask |
 | core | `fonts` | `FontDesc` table over `cubevox_fonts.h` (Hyperlegible 5x7, 9X12, 16X24) |
 | core | `registry` | cards, knob descriptors, apply, format; no layout state |
-| ui | `menu` | `Menu` state machine, `UiEvent` in, `UiAction` out, host-tested |
-| ui | `screens` | `render(const Menu&, const UiContext&, Canvas&)`, one function per screen |
-| board | `input` | encoder ISR (counts only), click debounce, `UiEvent` queue |
+| ui | `menu` | `Menu` state machine, `UiInput` in, `UiAction` out, the screens as `Menu::draw`, host-tested |
+| ui | `screens` | not split out yet; the OLED GUI spec decides when `render(const Menu&, const UiContext&, Canvas&)` leaves `menu.cpp` |
+| board | `input` | encoder ISR (counts only), click debounce, one `UiInput` per pass |
 | board | `input_jack` | drives PAD_EN from `Settings` |
 | board | `controls` | mux scan, ADC, toggles; owns `KnobFilter[16]`; reads step counts from the `Layout` it is given |
 | board | `audio` | SAI, DMA, chain walk over `ChainSnapshot.layout` only |
 | board | `mute` | sequenced mute, `muteForReset()` (blocking, before DFU or reset) |
-| board | `display_sh1106` | panel init, `flushStep(const Canvas&)` sends one dirty page per call |
-| board | `bench` | single-letter serial commands, `BenchOverrides` |
-| sketch | `cubevox.ino` | `setup()`, `loop()` wiring only |
+| board | `display_sh1106` | panel init, `flushStep(Canvas&)` sends one dirty page per call and clears its dirty bit, so it takes a mutable canvas |
+| board | `bench` | framed JSON bench ops (`{"cmd":"bench","op":...}`), `BenchOverrides` |
+| sketch | `cubevox.ino` | `setup()`, `loop()`, request dispatch and reply wiring; every decision it calls is pure code in `core/` or `ui/` |
 
 ## Rules
 1. Tiers. `core` includes only core, engine and the font header. `ui` includes core and ui.
@@ -76,8 +76,9 @@ getters behind the sketch's back.
    its own spec later (owner 2026-10-12); `ui/screens` is built from that spec.
 6. Registry: curve field on `KnobDesc` (Decay is log, Response min > max), one gate decay
    mapping, key positions derived from `cv::kKeyName`.
-7. Cleanups: stats reads with IRQ masked, PC5 / PB5 / PE2-PE6 into `pins.h`, dead
-   `Cost::measured`, wrong preemption comment in `audio.cpp`, firmware version on the OLED.
+7. Cleanups: stats reads with IRQ masked, PC5 / PB5 / PE2-PE6 into `pins.h`, wrong preemption
+   comment in `audio.cpp`, firmware version on the OLED. `Cost::measured` stays because it is a
+   protocol field the app reads.
 
 ## Verification
 1. Each step: `ctest --test-dir build` and `firmware/build.sh`, output quoted in the report.

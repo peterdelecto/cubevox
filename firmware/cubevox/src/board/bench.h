@@ -5,13 +5,12 @@
 #pragma once
 
 #include "board/bench_drill.h"
-#include "board/bench_panel.h"
 #include "core/bench_ops.h"
 
-// Runs one op the caller has already checked with opAllowed(). `slot` is the slot_off target.
+// Runs one op the parser already accepted for this build. `slot` is the slot_off target.
 // `bootReport` prints the boot report (op report). The result says whether it failed and whether
 // the caller must republish the snapshot.
 BenchResult benchRun(BenchOp op, int slot, void (*bootReport)());
 
 // Prints the audio counters, total and per slot.
-void benchPrintStats();
+void benchReportStats();

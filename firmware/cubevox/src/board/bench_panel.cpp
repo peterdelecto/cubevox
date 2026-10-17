@@ -7,6 +7,7 @@
 #include "board/controls.h"
 #include "board/serial_link.h"
 #include "board/slots.h"
+#include "core/loop_policy.h"
 #include "core/panel_test.h"
 
 namespace {
@@ -15,6 +16,7 @@ PanelTest gPanel;
 bool gPanelOn = false;
 bool gOledPattern = false;
 bool gOledDrawn = false;
+CanvasHandoff gHandoff;
 bool gMuteHeld = false;
 bool gJackForced = false;
 InputJack gJackForce = InputJack::Mic;
@@ -137,7 +139,7 @@ const char* benchPanelRun(BenchOp op) {
     case BenchOp::PanelJack: stepRelay(); break;
     case BenchOp::PanelMute: toggleMute(); break;
     case BenchOp::PanelOled: showOledPattern(); break;
-    default: break;
+    default: return "op not handled";
   }
   return nullptr;
 }
@@ -167,13 +169,14 @@ InputJack benchJack(InputJack requested) {
 
 bool benchMuteHeld() { return gMuteHeld; }
 
-bool benchDrawPanelPattern(Canvas& canvas) {
-  if (!gOledPattern) return false;
+BenchPattern benchPanelPattern(Canvas& canvas) {
+  if (gHandoff.update(gOledPattern)) return BenchPattern::Ended;
+  if (!gOledPattern) return BenchPattern::Off;
   if (!gOledDrawn) {
     drawPanelTestPattern(canvas);
     gOledDrawn = true;
   }
-  return true;
+  return BenchPattern::Up;
 }
 
 #endif

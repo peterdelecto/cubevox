@@ -83,7 +83,7 @@ Rules:
 | Version | `-DCUBEVOX_FW_VERSION="$(git describe --tags --always --dirty)"` from `build.sh`; `core/version.h` exposes it; the release action passes the tag. Shown on the OLED and in `hello`. |
 | JSON | Hand-written. Requests are flat objects with few keys; a small tokenizer extracts `cmd`, `id` and a fixed field set. Replies are built with `snprintf`. No ArduinoJson. Lives in `core/protocol.cpp`, host-tested. CDC transport in `board/usb_link.cpp` stays thin. |
 | Record schema v1 | magic, schema, sequence, name[32], 8 × (id[16], 8 reserved bytes), menu settings, CRC32 over everything before it. Codec pure in `core/record.cpp`; `board/flash_bank2.cpp` erases and programs only. |
-| Record fallbacks | Unknown card id becomes `empty`. A second reverb card becomes `empty` with a `[WARN]`. No valid record gives the default layout. |
+| Record fallbacks | Unknown card id becomes `empty`. A layout that fails validation (a second reverb card, a repeated card, a bad card id, over the CPU budget) is replaced whole by the default layout, the boot report prints a `[WARN]` with the reason, and the default is saved. No valid record gives the default layout. |
 | Harmony engine | Still compiles into `PitchFx` with no card (RAM 48 %). Remove from the firmware build only if RAM becomes a problem. |
 | Daisy bench | Deferred (owner 2026-10-08). |
 

@@ -5,14 +5,16 @@
 
 #include <Arduino.h>
 
+#include <array>
+
 namespace pins {
 
 // GPIO register access for code that cannot call HAL (fault handler, bulk init). The pin
 // constants below are Arduino pin indexes, so each decode goes through digitalPin[], a const table
 // in flash with no HAL state, which makes it safe inside a fault handler.
+inline uint32_t portIndexOf(uint32_t pin) { return STM_PORT(digitalPinToPinName(pin)); }
 inline GPIO_TypeDef* portOf(uint32_t pin) {
-  return reinterpret_cast<GPIO_TypeDef*>(GPIOA_BASE +
-                                         (GPIOB_BASE - GPIOA_BASE) * STM_PORT(digitalPinToPinName(pin)));
+  return reinterpret_cast<GPIO_TypeDef*>(GPIOA_BASE + (GPIOB_BASE - GPIOA_BASE) * portIndexOf(pin));
 }
 inline uint32_t maskOf(uint32_t pin) { return 1u << STM_PIN(digitalPinToPinName(pin)); }
 
@@ -43,10 +45,11 @@ constexpr uint32_t kPadEn = PE11;  // PAD_EN, output, high = PEDAL (pad in circu
 
 // Indicators and sense.
 constexpr uint32_t kUserLed = PB7;   // USER_LED
-constexpr uint32_t kVaSense = PB1;   // VA_SENSE, ADC12_INP5 (not read yet)
 constexpr uint32_t kVbusSense = PA9;  // VBUS_SENSE, R6/R7 divider, native OTG sensing off
 
-// USB OTG_FS: PA11 USB_DM, PA12 USB_DP, owned by the core's CDC driver (usb_link.cpp).
+// USB OTG_FS data pins as PinName, because the core's PinMap_USB_OTG_FS table takes those.
+constexpr PinName kUsbDm = PA_11;  // USB_DM
+constexpr PinName kUsbDp = PA_12;  // USB_DP
 
 // OLED on I2C2 (AF4), SH1106, 4.7 k pull-ups on the board.
 constexpr uint32_t kOledScl = PB10;  // I2C_SCL
@@ -63,32 +66,14 @@ constexpr uint32_t kSaiSdB = PE3;    // SD_B (ADC_DOUT)
 constexpr uint32_t kSaiFsA = PE4;    // FS_A (I2S_LRCLK)
 constexpr uint32_t kSaiSckA = PE5;   // SCK_A (I2S_BCLK_SRC)
 constexpr uint32_t kSaiSdA = PE6;    // SD_A (I2S_DATA)
+constexpr std::array<uint32_t, 5> kSaiPins = {kSaiMclkA, kSaiSdB, kSaiFsA, kSaiSckA, kSaiSdA};
 
 // BOOT0 (pin 94) is the DFU recovery button, not a GPIO the firmware uses.
-// PB8, PB9 and PE0 are spare (freed 2026-10-07 when KEY and SEMITONES became pots).
-// PB6, PE1 and PB4 are also unconnected.
+// PB8, PB9 and PE0 are spare. PB6, PE1 and PB4 are unconnected.
+// PB1 carries VA_SENSE (ADC12_INP5), which no code reads.
 
 // Boot report line: the port letter and bit that portOf / maskOf decode for the pins driven by
 // register, so a misdecode shows on the first board.
-inline void report(Print& out) {
-  struct Named {
-    const char* name;
-    uint32_t pin;
-  };
-  const Named list[] = {{"XSMT", kXsmt},  {"MUTE_N", kMuteN}, {"SAI", kSaiMclkA}, {"", kSaiSdB},
-                        {"", kSaiFsA},    {"", kSaiSckA},     {"", kSaiSdA}};
-  out.print("[boot] pins");
-  for (const Named& n : list) {
-    if (n.name[0] != '\0') {
-      out.print(' ');
-      out.print(n.name);
-    }
-    out.print(' ');
-    out.print(static_cast<char>('A' + (reinterpret_cast<uintptr_t>(portOf(n.pin)) - GPIOA_BASE) /
-                                          (GPIOB_BASE - GPIOA_BASE)));
-    out.print(static_cast<int>(__builtin_ctz(maskOf(n.pin))));
-  }
-  out.println();
-}
+void report(Print& out);
 
-}  // namespace
+}  // namespace pins

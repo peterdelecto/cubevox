@@ -23,6 +23,7 @@
 #include "core/knob_filter.h"
 #include "core/layout.h"
 #include "core/layout_fade.h"
+#include "core/loop_policy.h"
 #include "core/mute_sequence.h"
 #include "core/panel.h"
 #include "core/panel_test.h"
@@ -503,8 +504,30 @@ void checkRegistry() {
   checkFormat();
 }
 
+void checkRecoverLayout() {
+  Layout good = defaultLayout();
+  good.card[0] = Card::Empty;
+  Layout kept = good;
+  const Recovery ok = recoverLayout(kept);
+  check(!ok.replaced && ok.why.ok() && kept == good, "recover: a valid layout is kept as it is");
+
+  Layout bad = defaultLayout();
+  bad.card[0] = Card::ReverbChasm;
+  const Recovery twoReverbs = recoverLayout(bad);
+  check(twoReverbs.replaced && twoReverbs.why.error == LayoutError::TwoReverbs && bad == defaultLayout(),
+        "recover: an invalid layout becomes the whole default and keeps the reason");
+
+  Layout outOfRange = defaultLayout();
+  outOfRange.card[5] = static_cast<Card>(kCardCount);
+  const Recovery badCard = recoverLayout(outOfRange);
+  check(badCard.replaced && badCard.why.error == LayoutError::BadCard && badCard.why.slot == 5 &&
+            outOfRange == defaultLayout(),
+        "recover: a bad card id is replaced and names its slot");
+}
+
 void checkLayoutAndCompose() {
   checkDefaultLayout();
+  checkRecoverLayout();
   checkSettings();
   checkLayoutValid();
   checkLayoutReasons();
@@ -588,10 +611,102 @@ void checkKnobFilterReseedReference() {
   check(!spurious, "filter: a parked knob reports no move after a re-seed");
 }
 
+void checkKnobPosition() {
+  check(knobPosition(0.0f) == 0.0f && knobPosition(kKnobEndMargin) == 0.0f, "knob position: low dead band reads 0");
+  check(knobPosition(1.0f) == 1.0f && knobPosition(1.0f - kKnobEndMargin) > 0.999f, "knob position: high dead band reads 1");
+  check(std::fabs(knobPosition(0.5f) - 0.5f) < 1e-6f, "knob position: mid travel is unchanged");
+  check(knobPosition(-0.2f) == 0.0f && knobPosition(1.7f) == 1.0f, "knob position: out of range clamps");
+  check(knobPosition(NAN) == 0.0f, "knob position: NaN reads 0");
+}
+
+void checkKnobRestep() {
+  KnobFilter f;
+  check(f.restep(5) == KnobEvent::None, "restep: an unseeded filter does nothing");
+  settle(f, 0.95f, 5);
+  check(f.restep(5) == KnobEvent::None, "restep: an unchanged count does nothing");
+  check(f.restep(10) == KnobEvent::Reseeded && f.value() == 9.0f, "restep: a new count re-derives the position");
+}
+
+// Feeds every pot once, a slot-owned pot first.
+void seedBank(KnobBank& bank, float position) {
+  for (int pot = 0; pot < kPotCount; ++pot) bank.update(pot, position, LastMoved{static_cast<int8_t>(pot / 2), false});
+}
+
+void checkKnobBankSeeding() {
+  KnobBank bank;
+  check(!bank.seeded() && !bank.takeChanged(), "bank: starts unseeded and unchanged");
+  for (int pot = 0; pot < kPotCount - 1; ++pot) bank.update(pot, 0.5f, LastMoved{});
+  check(!bank.seeded() && !bank.takeChanged(), "bank: not seeded until the last pot is read");
+  bank.update(kPotCount - 1, 0.5f, LastMoved{});
+  check(bank.seeded() && bank.takeChanged() && !bank.takeChanged(), "bank: the last pot seeds and reports once");
+  bank.update(-1, 0.5f, LastMoved{});
+  bank.update(kPotCount, 0.5f, LastMoved{});
+  check(!bank.takeChanged(), "bank: a pot outside the panel is ignored");
+}
+
+void checkKnobBankMoves() {
+  KnobBank bank;
+  seedBank(bank, 0.2f);
+  bank.takeChanged();
+  for (int i = 0; i < 30; ++i) bank.update(5, 0.9f, LastMoved{-1, false});
+  check(!bank.takeChanged() && bank.lastMoved().slot == -1, "bank: a pot no slot owns moves without a report");
+  for (int i = 0; i < 30; ++i) bank.update(6, 0.9f, LastMoved{3, true});
+  check(bank.takeChanged(), "bank: a slot pot move is reported");
+  check(bank.lastMoved().slot == 3 && bank.lastMoved().knobB, "bank: the last moved knob is the owner");
+  check(bank.value(6) > 0.8f, "bank: the value follows the pot");
+}
+
+void checkKnobBankSteps() {
+  KnobBank bank;
+  std::array<int, kPotCount> steps{};
+  steps[2] = 5;
+  bank.setSteps(steps);
+  seedBank(bank, 0.9f);
+  bank.takeChanged();
+  check(bank.value(2) == 4.0f, "bank: a stepped pot seeds at its step");
+  steps[2] = 10;
+  bank.setSteps(steps);
+  check(bank.takeChanged() && bank.value(2) == 9.0f, "bank: a new step count re-seeds every seeded pot at once");
+  bank.setSteps(steps);
+  check(!bank.takeChanged(), "bank: an unchanged count reports nothing");
+}
+
 void checkKnobFilter() {
   checkKnobFilterContinuous();
   checkKnobFilterStepped();
   checkKnobFilterReseedReference();
+  checkKnobPosition();
+  checkKnobRestep();
+  checkKnobBankSeeding();
+  checkKnobBankMoves();
+  checkKnobBankSteps();
+}
+
+void checkEvery() {
+  Every e(100);
+  check(!e.due(50), "every: not due inside the first period");
+  check(e.due(100) && !e.due(150), "every: due once per period");
+  check(e.due(200), "every: due again after a period");
+  Every wrap(100);
+  wrap.due(0xFFFFFF00u);
+  check(!wrap.due(0xFFFFFF50u) && wrap.due(0x00000020u), "every: survives the millisecond counter wrapping");
+}
+
+void checkPublishGate() {
+  PublishGate gate;
+  check(!gate.take(true, false), "publish gate: nothing changed, nothing to publish");
+  check(gate.take(true, true), "publish gate: a change publishes");
+  check(!gate.take(false, true) && gate.take(true, false), "publish gate: a change before the panel is read waits for it");
+  gate.markStale();
+  check(!gate.take(false, false) && gate.take(true, false) && !gate.take(true, false),
+        "publish gate: a stale request waits for the panel and fires once");
+}
+
+void checkCanvasHandoff() {
+  CanvasHandoff h;
+  check(!h.update(false), "handoff: the menu owning the canvas is not a release");
+  check(!h.update(true) && !h.update(true), "handoff: holding the canvas is not a release");
+  check(h.update(false) && !h.update(false), "handoff: the first pass after the release reports it once");
 }
 
 void checkJackSwitch() {
@@ -734,6 +849,9 @@ void checkInputLogic() {
   checkDebounce();
   checkSteppedPosition();
   checkKnobFilter();
+  checkEvery();
+  checkPublishGate();
+  checkCanvasHandoff();
   checkJackSwitch();
   checkJackRequestWithdrawn();
   checkVersionTag();
@@ -1613,8 +1731,28 @@ void checkStoreUnknownCard() {
   check(store.begin(out) && store.bootNotes().unknownCard, "store: boot notes flag an unknown card in the newest record");
 }
 
+void checkStoreFlushPending() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  store.flushPending();
+  uint32_t t = 0;
+  store.poll(t++);
+  check(f.programs == 0 && !store.status().busy, "store: flushing with nothing pending starts nothing");
+
+  store.request(defaultLayout(), Settings{}, 0);
+  store.poll(t++);
+  check(f.programs == 0 && store.status().busy, "store: a request waits out the debounce");
+  store.flushPending();
+  runToIdle(store, f, t);
+  check(f.programs > 0 && store.status().sequence == 1 && !store.status().busy,
+        "store: flushing a pending save writes it before the debounce ends");
+}
+
 void checkRecords() {
   checkRecordCodec();
+  checkStoreFlushPending();
   checkRecordUnknownCard();
   checkRecordEntryStates();
   checkRecordNewest();

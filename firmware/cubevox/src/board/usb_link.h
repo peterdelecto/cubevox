@@ -1,11 +1,10 @@
-// USB attach gated on VBUS (spec 2026-10-08 step 0, Astra USB review item 7). The box is
-// self-powered, so the CDC device starts only while PA9 reads VBUS and stops when it drops.
+// USB attach gated on VBUS (spec 2026-10-08 step 0). The box is self-powered, so the CDC device
+// starts only while PA9 reads VBUS and stops when it drops. A self-powered device that pulled D+ up
+// without bus power would back-feed the host port.
 
 #pragma once
 
 #include <Arduino.h>
-
-constexpr uint32_t kVbusDebounceMs = 50;
 
 void usbLinkInit();
 

@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include <array>
+
 #include "board/audio.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
@@ -9,17 +11,17 @@
 
 namespace {
 
-void printSlotRow(const char* label, const uint32_t* values) {
+void printSlotRow(const char* label, const std::array<uint32_t, kSlotCount + 1>& values) {
   serialOut().print(label);
-  for (int i = 0; i <= kSlotCount; ++i) {
+  for (uint32_t value : values) {
     serialOut().print(' ');
-    serialOut().print(values[i]);
+    serialOut().print(value);
   }
 }
 
 }  // namespace
 
-void benchPrintStats() {
+void benchReportStats() {
   const AudioStats s = audioStats();
   serialOut().print("[audio] blocks ");
   serialOut().print(s.blocks);
@@ -54,26 +56,14 @@ void benchPrintStats() {
 BenchResult benchRun(BenchOp op, int slot, void (*bootReport)()) {
   switch (op) {
     case BenchOp::Report: bootReport(); return {};
-    case BenchOp::Stats: benchPrintStats(); return {};
-    case BenchOp::RecordStatus: recordPrintStatus(serialOut()); return {};
-    case BenchOp::SlotOff:
-    case BenchOp::SlotsOn:
-    case BenchOp::PinKnobs:
-    case BenchOp::Chasm:
-    case BenchOp::Clip:
-    case BenchOp::ResetPeaks:
-    case BenchOp::StopAudio:
-    case BenchOp::Fault:
-    case BenchOp::Spin:
-    case BenchOp::RecordSave:
-    case BenchOp::RecordErase:
-    case BenchOp::PanelTest:
-    case BenchOp::PanelSummary:
-    case BenchOp::PanelDump:
-    case BenchOp::PanelJack:
-    case BenchOp::PanelMute:
-    case BenchOp::PanelOled: return benchDrillRun(op, slot);
-    case BenchOp::Count: break;
+    case BenchOp::Stats: benchReportStats(); return {};
+    case BenchOp::RecordStatus: recordReportStatus(serialOut()); return {};
+    default: break;  // bench-class ops
   }
-  return {false, "op not handled"};
+#if CUBEVOX_BENCH
+  return benchDrillRun(op, slot);
+#else
+  (void)slot;
+  return {false, "op not handled"};  // the parser refuses these ops in a release build
+#endif
 }

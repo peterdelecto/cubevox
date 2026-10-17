@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "board/pins.h"
+#include "core/mute_sequence.h"
 #include "core/timing.h"
 
 namespace {
@@ -42,9 +43,13 @@ bool muteFullyMuted() { return gSequence.fullyMuted(); }
 
 void muteHold(bool on) { gSequence.hold(on); }
 
+// The polled sequence cannot finish before a reset, so this blocks through the same order and
+// delays: XSMT low, then MUTE_N low once the DAC is silent. gDriven follows the pins, so a later
+// mutePoll would write the right difference.
 void muteForReset() {
   digitalWrite(pins::kXsmt, LOW);
   delay(kXsmtLeadMs);
   digitalWrite(pins::kMuteN, LOW);
   delay(kRelaySettleMs);
+  gDriven = MuteOutputs();
 }

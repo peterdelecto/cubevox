@@ -2,7 +2,11 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #include "core/display.h"
+
+constexpr uint8_t kOledAddress = 0x3C;  // 7-bit
 
 // True when the panel acknowledges its address on the bus. Starts the bus on first call.
 bool sh1106Present();

@@ -3,4 +3,4 @@
 #pragma once
 
 // Reboots into the STM32 ROM DFU bootloader over the rear USB-C. Does not return.
-void platformEnterDfu();
+[[noreturn]] void platformEnterDfu();

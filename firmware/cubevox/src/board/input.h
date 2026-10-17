@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#include "ui/menu.h"
+struct UiInput;  // ui/menu.h
 
 // Sets the pins and attaches the encoder interrupts.
 void inputInit();

@@ -16,3 +16,20 @@ constexpr uint32_t kXsmtLeadMs = 5;
 
 // The output stays muted this long after the SAI clocks start, so the DAC settles first.
 constexpr uint32_t kBootUnmuteDelayMs = 500;
+
+// A periodic job in a polled loop. due() is true once per period; the difference is unsigned, so it
+// survives the millisecond counter wrapping.
+class Every {
+ public:
+  explicit constexpr Every(uint32_t periodMs) : periodMs_(periodMs) {}
+
+  bool due(uint32_t nowMs) {
+    if (nowMs - lastMs_ < periodMs_) return false;
+    lastMs_ = nowMs;
+    return true;
+  }
+
+ private:
+  uint32_t periodMs_;
+  uint32_t lastMs_ = 0;
+};
