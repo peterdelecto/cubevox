@@ -5,12 +5,14 @@
 #include <cstddef>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/smooth.h"
 
 // Distortion: behavioural Boss BD-2 model. Stage 1 (bass cut, top roll-off, gain,
 // rail), tone stack, stage 2 (band limit, gain, rail), fixed post shaping, DC block.
-// DRIVE sweeps both stage gains exponentially from gainNMin to gainNMax. The two rail saturators run 2x oversampled.
+// DRIVE sweeps both stage gains exponentially from gainNMin to gainNMax. The two
+// rail saturators run 2x oversampled.
 
 namespace cv {
 
@@ -45,11 +47,10 @@ struct DistortionTuning {
   float bassPeakQ = 1.0f;
   float trimDb = 3.3f;            // on top of the makeup law; level rule
   float fadeDrive = 0.05f;        // dry-to-chain crossfade span from DRIVE 0
-  bool oversample = true;
 };
 
 struct DistortionParams {
-  bool on = true;       // menu bypass
+  bool on = true;       // panel toggle
   float drive = 0.0f;   // panel knob 0..1
   float tone = 0.5f;    // panel knob 0..1; noon is flat
   DistortionTuning tuning;
@@ -78,80 +79,58 @@ class Distortion {
     }
     dirty_ = true;
 
-    const float aDrive = smooth::coef(kDriveSec);
-    const float toneTarget = smooth::clamp01(p.tone);
     if (!tuningValid_ || !same(t, applied_)) applyTuning(t);
     if (tone_ != shelfTone_) {
       setTrebleShelf(t);
       shelfTone_ = tone_;
     }
-
-    // Stage gains and makeup are evaluated at the block edges and interpolated.
-    float driveEnd = drive_;
-    for (int i = 0; i < n; ++i) driveEnd = smooth::step(driveEnd, target, aDrive);
-    const float g1a = g1Min_ * expf(logR1_ * drive_);
-    const float g2a = g2Min_ * expf(logR2_ * drive_);
-    const float ka = trim_ / makeup(g1a * g2a);
-    const float g1b = g1Min_ * expf(logR1_ * driveEnd);
-    const float g2b = g2Min_ * expf(logR2_ * driveEnd);
-    const float kb = trim_ / makeup(g1b * g2b);
-    const float inv = n > 0 ? 1.0f / static_cast<float>(n) : 0.0f;
-
-    // The loop runs on local copies so stores to out cannot alias filter state.
-    Pole inHp = inHp_, s1Lp = s1Lp_, s2Hp = s2Hp_, s2Lp = s2Lp_, dc = dc_;
-    Biquad s1Bass = s1Bass_, stackBass = stackBass_, stackTreble = stackTreble_;
-    Biquad trebleCut = trebleCut_, bassPeak = bassPeak_;
-    Oversampler os1 = os1_, os2 = os2_;
-    const Rail rail = rail_;
-    const float stackLoss = stackLoss_, fadeSpan = fadeSpan_;
-    const bool oversample = t.oversample;
-    float drive = drive_, tone = tone_;
-
-    for (int i = 0; i < n; ++i) {
-      drive = smooth::step(drive, target, aDrive);
-      tone = smooth::step(tone, toneTarget, aDrive);
-      const float fi = static_cast<float>(i + 1) * inv;
-      const float g1 = g1a + (g1b - g1a) * fi;
-      const float g2 = g2a + (g2b - g2a) * fi;
-      const float k = ka + (kb - ka) * fi;
-
-      float x = inHp.hp(in[i]);
-      x = s1Bass.run(x);
-      x = s1Lp.lp(x);
-      x = saturate(os1, x * g1, rail, oversample);
-
-      x = stackBass.run(x);
-      x = stackTreble.run(x) * stackLoss;
-
-      x = s2Hp.hp(x);
-      x = s2Lp.lp(x);
-      x = saturate(os2, x * g2, rail, oversample);
-
-      x = trebleCut.run(x);
-      x = bassPeak.run(x);
-      x = dc.hp(x);
-      // The fixed EQ fades in from exact passthrough over the first fadeDrive of DRIVE.
-      const float wet = x * k;
-      const float f = drive / fadeSpan;
-      out[i] = f >= 1.0f ? wet : in[i] + f * (wet - in[i]);
-    }
-
-    inHp_ = inHp, s1Lp_ = s1Lp, s2Hp_ = s2Hp, s2Lp_ = s2Lp, dc_ = dc;
-    s1Bass_ = s1Bass, stackBass_ = stackBass, stackTreble_ = stackTreble;
-    trebleCut_ = trebleCut, bassPeak_ = bassPeak;
-    os1_ = os1, os2_ = os2;
-    drive_ = drive, tone_ = tone;
+    runBlock(in, out, n, target, smooth::clamp01(p.tone));
   }
 
  private:
-  static constexpr float kTwoPi = 6.28318530717958647692f;
-  static constexpr float kDriveSec = 0.020f;
   static constexpr float kDcBlockHz = 10.0f;
   static constexpr float kMinFade = 1e-4f;
   static constexpr float kMinGain = 0.1f;
-  static constexpr float kMinHz = 20.0f;
-  static constexpr float kMaxHz = 0.45f * kSampleRate;
-  static constexpr float kHalfPi = 1.57079632679489661923f;
+
+  // Stage gains and the output scale at one DRIVE value.
+  struct Gains {
+    float g1, g2, k;
+  };
+
+  Gains gainsAt(float drive) const {
+    const float g1 = g1Min_ * expf(logR1_ * drive);
+    const float g2 = g2Min_ * expf(logR2_ * drive);
+    return {g1, g2, trim_ / makeup(g1 * g2)};
+  }
+
+  // Stage gains and makeup are evaluated at the block edges and interpolated. The loop runs on a
+  // local copy of the chain so stores to out cannot alias filter state.
+  void runBlock(const float* CV_RESTRICT in, float* CV_RESTRICT out, int n, float target,
+                float toneTarget) {
+    float driveEnd = drive_;
+    for (int i = 0; i < n; ++i) driveEnd = smooth::step(driveEnd, target, smooth::kSmoothCoef);
+    const Gains a = gainsAt(drive_);
+    const Gains b = gainsAt(driveEnd);
+    const float inv = n > 0 ? 1.0f / static_cast<float>(n) : 0.0f;
+    Chain c = chain_;
+    const Rail rail = rail_;
+    const float stackLoss = stackLoss_, fadeSpan = fadeSpan_;
+    float drive = drive_, tone = tone_;
+    for (int i = 0; i < n; ++i) {
+      drive = smooth::step(drive, target, smooth::kSmoothCoef);
+      tone = smooth::step(tone, toneTarget, smooth::kSmoothCoef);
+      const float fi = static_cast<float>(i + 1) * inv;
+      const float g1 = a.g1 + (b.g1 - a.g1) * fi;
+      const float g2 = a.g2 + (b.g2 - a.g2) * fi;
+      const float wet = c.run(in[i], g1, g2, rail, stackLoss) * (a.k + (b.k - a.k) * fi);
+      // The fixed EQ fades in from exact passthrough over the first fadeDrive of DRIVE.
+      const float f = drive / fadeSpan;
+      out[i] = f >= 1.0f ? wet : in[i] + f * (wet - in[i]);
+    }
+    chain_ = c;
+    drive_ = drive;
+    tone_ = tone;
+  }
 
   // makeup(g) = a*g / sqrt(1 + (a*g / s)^2): follows the linear stage gain (a = 0.06)
   // and flattens at the saturated level (s = 10.3) so a -18 dBFS RMS vocal holds level.
@@ -171,7 +150,6 @@ class Distortion {
   static constexpr float kH7 = -0.003638f;
   static constexpr int kHist = 8;
 
-  static float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
   static float dbToLin(float db) { return powf(10.0f, db / 20.0f); }
   // TONE maps min..0 dB over the lower half and 0..max dB over the upper half, so
   // noon adds nothing.
@@ -189,20 +167,20 @@ class Distortion {
            a.trebleCutDb == b.trebleCutDb && a.toneMinDb == b.toneMinDb &&
            a.toneMaxDb == b.toneMaxDb && a.bassPeakHz == b.bassPeakHz &&
            a.bassPeakDb == b.bassPeakDb && a.bassPeakQ == b.bassPeakQ && a.trimDb == b.trimDb &&
-           a.fadeDrive == b.fadeDrive && a.oversample == b.oversample;
+           a.fadeDrive == b.fadeDrive;
   }
 
   // Recomputes everything that depends on tuning alone.
   void applyTuning(const DistortionTuning& t) {
-    inHp_.set(t.inputHpHz);
-    s1Lp_.set(t.s1LpHz);
-    s2Hp_.set(t.s2HpHz);
-    s2Lp_.set(t.s2LpHz);
-    dc_.set(kDcBlockHz);
-    s1Bass_.setLowShelf(t.s1BassHz, t.s1BassDb);
-    stackBass_.setLowShelf(t.stackBassHz, t.stackBassDb);
-    stackTreble_.setHighShelf(t.stackTrebleHz, t.stackTrebleDb);
-    bassPeak_.setPeak(t.bassPeakHz, t.bassPeakDb, t.bassPeakQ);
+    chain_.inHp.set(t.inputHpHz);
+    chain_.s1Lp.set(t.s1LpHz);
+    chain_.s2Hp.set(t.s2HpHz);
+    chain_.s2Lp.set(t.s2LpHz);
+    chain_.dc.set(kDcBlockHz);
+    chain_.s1Bass.setLowShelf(t.s1BassHz, t.s1BassDb);
+    chain_.stackBass.setLowShelf(t.stackBassHz, t.stackBassDb);
+    chain_.stackTreble.setHighShelf(t.stackTrebleHz, t.stackTrebleDb);
+    chain_.bassPeak.setPeak(t.bassPeakHz, t.bassPeakDb, t.bassPeakQ);
     rail_ = Rail{1.0f - clampf(t.railAsym, 0.0f, 0.5f), clampf(t.railSoft, 0.01f, 1.0f)};
     stackLoss_ = dbToLin(t.stackLossDb);
     trim_ = dbToLin(t.trimDb);
@@ -217,66 +195,8 @@ class Distortion {
   }
 
   void setTrebleShelf(const DistortionTuning& t) {
-    trebleCut_.setHighShelf(t.trebleCutHz, t.trebleCutDb + toneDb(t, tone_));
+    chain_.trebleCut.setHighShelf(t.trebleCutHz, t.trebleCutDb + toneDb(t, tone_));
   }
-
-  // 1-pole; hp is the input minus its low-pass.
-  struct Pole {
-    float a = 0.0f, y = 0.0f;
-    void set(float hz) { a = 1.0f - expf(-kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate); }
-    CV_INLINE float lp(float x) {
-      y += a * (x - y);
-      return y;
-    }
-    CV_INLINE float hp(float x) { return x - lp(x); }
-  };
-
-  // RBJ biquad, transposed direct form II. Zero dB gain is an exact identity.
-  struct Biquad {
-    float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
-    float z1 = 0.0f, z2 = 0.0f;
-
-    void setPeak(float hz, float db, float q) {
-      const float w0 = kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate;
-      const float amp = powf(10.0f, db / 40.0f);
-      const float cw = cosf(w0);
-      const float alpha = sinf(w0) / (2.0f * (q < 0.1f ? 0.1f : q));
-      const float a0 = 1.0f + alpha / amp;
-      b0 = (1.0f + alpha * amp) / a0;
-      b1 = -2.0f * cw / a0;
-      b2 = (1.0f - alpha * amp) / a0;
-      a1 = b1;
-      a2 = (1.0f - alpha / amp) / a0;
-    }
-
-    // Shelf slope S = 1.
-    void setLowShelf(float hz, float db) { setShelf(hz, db, -1.0f); }
-    void setHighShelf(float hz, float db) { setShelf(hz, db, 1.0f); }
-
-    // sign -1 low shelf, +1 high shelf.
-    void setShelf(float hz, float db, float sign) {
-      const float w0 = kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate;
-      const float amp = powf(10.0f, db / 40.0f);
-      const float cw = cosf(w0);
-      const float beta = 2.0f * sqrtf(amp) * (sinf(w0) * 0.70710678f);
-      const float ap = amp + 1.0f, am = amp - 1.0f;
-      const float a0 = ap - sign * am * cw + beta;
-      b0 = amp * (ap + sign * am * cw + beta) / a0;
-      b1 = -sign * 2.0f * amp * (am + sign * ap * cw) / a0;
-      b2 = amp * (ap + sign * am * cw - beta) / a0;
-      a1 = sign * 2.0f * (am - sign * ap * cw) / a0;
-      a2 = (ap - sign * am * cw - beta) / a0;
-    }
-
-    CV_INLINE float run(float x) {
-      const float y = b0 * x + z1;
-      z1 = b1 * x - a1 * y + z2;
-      z2 = b2 * x - a2 * y;
-      return y;
-    }
-
-    void clear() { z1 = z2 = 0.0f; }
-  };
 
   // Positive rail 1, negative rail -neg, tanh edge over the last soft fraction.
   struct Rail {
@@ -341,22 +261,35 @@ class Distortion {
     }
   };
 
-  static CV_INLINE float saturate(Oversampler& os, float x, const Rail& rail, bool oversample) {
-    return oversample ? os.run(x, rail) : rail(x);
-  }
+  // The signal path, in order. Stage gains g1 and g2 come from DRIVE.
+  struct Chain {
+    OnePole inHp, s1Lp, s2Hp, s2Lp, dc;
+    Biquad s1Bass, stackBass, stackTreble, trebleCut, bassPeak;
+    Oversampler os1, os2;
+
+    CV_INLINE float run(float x, float g1, float g2, const Rail& rail, float stackLoss) {
+      x = s1Lp.lp(s1Bass.run(inHp.hp(x)));
+      x = os1.run(x * g1, rail);
+      x = stackTreble.run(stackBass.run(x)) * stackLoss;
+      x = s2Lp.lp(s2Hp.hp(x));
+      x = os2.run(x * g2, rail);
+      return dc.hp(bassPeak.run(trebleCut.run(x)));
+    }
+
+    void clear() {
+      for (OnePole* p : {&inHp, &s1Lp, &s2Hp, &s2Lp, &dc}) p->clear();
+      for (Biquad* b : {&s1Bass, &stackBass, &stackTreble, &trebleCut, &bassPeak}) b->clear();
+      os1.clear();
+      os2.clear();
+    }
+  };
 
   void clearChain() {
-    for (Pole* p : {&inHp_, &s1Lp_, &s2Hp_, &s2Lp_, &dc_}) p->y = 0.0f;
-    for (Biquad* b : {&s1Bass_, &stackBass_, &stackTreble_, &trebleCut_, &bassPeak_})
-      b->clear();
-    os1_.clear();
-    os2_.clear();
+    chain_.clear();
     dirty_ = false;
   }
 
-  Pole inHp_, s1Lp_, s2Hp_, s2Lp_, dc_;
-  Biquad s1Bass_, stackBass_, stackTreble_, trebleCut_, bassPeak_;
-  Oversampler os1_, os2_;
+  Chain chain_;
   float drive_ = 0.0f;
   float tone_ = 0.5f;
   bool dirty_ = false;

@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
 
 // Monophonic pitch tracker. Two-stage YIN: a coarse search on a 12 kHz copy
 // finds the period cheaply, then a narrow search at 48 kHz refines it.
@@ -22,8 +23,16 @@ class PitchTracker {
   static constexpr int kHop = 256;
   static constexpr float kMinHz = 70.0f;
   static constexpr float kMaxHz = 1000.0f;
+  static constexpr float kVoicedThreshold = 0.15f;  // YIN threshold on the coarse search
 
-  PitchTracker() : lp_(makeLowpass()) { reset(); }
+  // A frame rebuilt on enable takes this many panes per block on top of the block's own pane, so
+  // no single block carries the whole rebuild.
+  static constexpr int kRebuildPanesPerBlock = 2;
+
+  PitchTracker() {
+    lp_.setLowPass(kLowpassHz, kButterworthQ);
+    reset();
+  }
 
   void reset() {
     full_.fill(0.0f);
@@ -34,9 +43,10 @@ class PitchTracker {
     panes_.fill(0.0f);
     paneRow_ = 0;
     paneFill_ = 0;
+    staleFrom_ = kPanes;
+    panesThisPush_ = 0;
     hopCount_ = 0;
-    z1_ = 0.0f;
-    z2_ = 0.0f;
+    lp_.clear();
     periods_.fill(0.0f);
     nPeriods_ = 0;
     nextPeriod_ = 0;
@@ -44,37 +54,38 @@ class PitchTracker {
     result_ = PitchResult{};
   }
 
-  // Feed n <= kBlock samples. The rings always fill, so the frame is warm;
-  // analysis runs every kHop samples while active, and once as active rises
-  // so an enable reports pitch at once. Inactive, the result reads unvoiced.
-  void push(const float* in, int n, float voicedThreshold, bool active = true) {
+  // Feed n <= kBlock samples. The rings always fill, so the frame is warm. Analysis runs every
+  // kHop samples while active and the panes are current. An enable rebuilds the panes over the
+  // next few blocks and analyses at the end of the block that makes them whole, unless a hop
+  // already did in that block. Inactive, the result reads unvoiced.
+  void push(const float* in, int n, bool active = true) {
+    panesThisPush_ = 0;
     if (active != active_) {
       active_ = active;
-      if (active) {
-        rebuildPanes();
-        analyse(voicedThreshold);
-      } else result_ = PitchResult{};
+      result_ = PitchResult{};
+      staleFrom_ = active ? 0 : kPanes;
     }
+    const bool stale = active_ && staleFrom_ < kPanes;
+    if (stale) rebuildSome();
+    bool analysed = false;
     for (int i = 0; i < n; ++i) {
       full_[fullPos_] = in[i];
       full_[fullPos_ + kFullLen] = in[i];
       fullPos_ = (fullPos_ + 1) & (kFullLen - 1);
-      const float y = lowpass(in[i]);
+      const float y = lp_.run(in[i]);
       if (++decPhase_ == kDecim) {
         decPhase_ = 0;
-        dec_[decPos_] = y;
-        dec_[decPos_ + kDecLen] = y;
-        decPos_ = (decPos_ + 1) & (kDecLen - 1);
-        if (++paneFill_ == kPaneLen) {
-          paneFill_ = 0;
-          if (active_) computePane();
-        }
+        pushDecimated(y);
       }
       if (++hopCount_ == kHop) {
         hopCount_ = 0;
-        if (active_) analyse(voicedThreshold);
+        if (active_ && staleFrom_ == kPanes) {
+          analyse();
+          analysed = true;
+        }
       }
     }
+    if (stale && staleFrom_ == kPanes && !analysed) analyse();
   }
 
   const PitchResult& result() const { return result_; }
@@ -86,12 +97,10 @@ class PitchTracker {
   const float* coarseFrameForTest() const { return coarseFrame(); }
   float lastCoarseTau() const { return lastTau_; }
   bool lastCoarsePeriodic() const { return lastPeriodic_; }
+  int panesLastPushForTest() const { return panesThisPush_; }
+  bool panesCurrentForTest() const { return staleFrom_ == kPanes; }
 
  private:
-  struct Biquad {
-    float b0, b1, b2, a1, a2;
-  };
-
   static constexpr int kFullLen = 2048;
   static constexpr int kDecLen = 512;
   static constexpr int kDecim = 4;
@@ -121,23 +130,7 @@ class PitchTracker {
                     kCoarseMaxForTest == kCoarseMax,
                 "test hooks mirror the coarse constants");
   static_assert(kFineSpan <= kFullLen, "fine frame exceeds full-rate ring");
-
-  // 2-pole Butterworth (RBJ form, Q = 1/sqrt 2) ahead of the decimator.
-  static Biquad makeLowpass() {
-    const float w0 = 6.28318530717958647692f * kLowpassHz / kSampleRate;
-    const float c = cosf(w0);
-    const float alpha = sinf(w0) * 0.70710678f;
-    const float a0 = 1.0f + alpha;
-    return {0.5f * (1.0f - c) / a0, (1.0f - c) / a0, 0.5f * (1.0f - c) / a0,
-            -2.0f * c / a0, (1.0f - alpha) / a0};
-  }
-
-  float lowpass(float x) {
-    const float y = lp_.b0 * x + z1_;
-    z1_ = lp_.b1 * x - lp_.a1 * y + z2_;
-    z2_ = lp_.b2 * x - lp_.a2 * y;
-    return y;
-  }
+  static_assert(kRebuildPanesPerBlock >= 1, "an enable must make progress on its rebuild");
 
   // Vertex offset of the parabola through three points, 0 if not a minimum.
   static float parabolic(float a, float b, float c) {
@@ -206,9 +199,9 @@ class PitchTracker {
     return sqrtf(sumSq(fineFrame() + (kFineSpan - kFineW), kFineW) / kFineW);
   }
 
-  void analyse(float threshold) {
+  void analyse() {
     float tau = 0.0f;
-    const bool periodic = coarse(threshold, tau);
+    const bool periodic = coarse(tau);
     if (periodic && frameRms() > kMinRms) {
       publishVoiced(refine(tau));
     } else {
@@ -216,9 +209,10 @@ class PitchTracker {
     }
   }
 
-  // YIN on the 12 kHz frame. Returns whether min d' is below threshold and
-  // writes the interpolated candidate lag in decimated samples.
-  bool coarse(float threshold, float& tau) {
+  // YIN on the 12 kHz frame. Returns whether min d' is below kVoicedThreshold
+  // and writes the interpolated candidate lag in decimated samples.
+  bool coarse(float& tau) {
+    constexpr float threshold = kVoicedThreshold;
     std::array<float, kCoarseMax + 1> d{};
     for (int r = 0; r < kPanes; ++r) {
       const float* row = panes_.data() + r * (kCoarseMax + 1);
@@ -255,22 +249,41 @@ class PitchTracker {
     row[kCoarseMax] = sumSqDiff(x, x + kCoarseMax, kPaneLen);
   }
 
+  // Writes one decimated sample. While active, each completed pane gets its row at once.
+  void pushDecimated(float y) {
+    dec_[decPos_] = y;
+    dec_[decPos_ + kDecLen] = y;
+    decPos_ = (decPos_ + 1) & (kDecLen - 1);
+    if (++paneFill_ < kPaneLen) return;
+    paneFill_ = 0;
+    if (!active_) return;
+    computePane();
+    // The new pane replaces the oldest, so one stale pane fewer is left in the frame.
+    if (staleFrom_ < kPanes) ++staleFrom_;
+  }
+
   // The pane that just completed: its first sample is kPaneLen + kCoarseMax back.
   void computePane() {
     const float* x = dec_.data() + decPos_ + kDecLen - (kPaneLen + kCoarseMax);
     paneKernel(x, panes_.data() + paneRow_ * (kCoarseMax + 1));
     paneRow_ = paneRow_ + 1 == kPanes ? 0 : paneRow_ + 1;
+    ++panesThisPush_;
   }
 
-  // Fills every row from the frame ending at the last pane boundary, oldest
-  // row first, so the next computePane() replaces the oldest.
-  void rebuildPanes() {
-    const float* x = dec_.data() + decPos_ + kDecLen - kCoarseSpan - paneFill_;
-    for (int i = 0; i < kPanes; ++i) {
-      const int k = kPanes - 1 - i;
-      const int row = (paneRow_ + i) % kPanes;
-      paneKernel(x + kCoarseW - kPaneLen - kPaneLen * k, panes_.data() + row * (kCoarseMax + 1));
-    }
+  // Panes of age staleFrom_ and older hold rows from before the enable. Rebuilds the newest of
+  // them, at most kRebuildPanesPerBlock.
+  void rebuildSome() {
+    for (int k = 0; k < kRebuildPanesPerBlock && staleFrom_ < kPanes; ++k) rebuildPane(staleFrom_++);
+  }
+
+  // Age 0 is the newest complete pane. It starts kPaneLen + kCoarseMax back from the last pane
+  // boundary, and each older pane kPaneLen further; the oldest row is the one paneRow_ points at.
+  void rebuildPane(int age) {
+    const float* x =
+        dec_.data() + decPos_ + kDecLen - paneFill_ - (kPaneLen + kCoarseMax) - kPaneLen * age;
+    const int row = (paneRow_ + kPanes - 1 - age) % kPanes;
+    paneKernel(x, panes_.data() + row * (kCoarseMax + 1));
+    ++panesThisPush_;
   }
 
   // Plain difference function at 48 kHz over a few lags around 4 * tau.
@@ -306,13 +319,15 @@ class PitchTracker {
     result_.voiced = true;
   }
 
-  const Biquad lp_;
+  Biquad lp_;  // anti-alias low-pass ahead of the decimator
   std::array<float, 2 * kFullLen> full_{};  // doubled, see fineFrame()
   std::array<float, 2 * kDecLen> dec_{};
   std::array<float, kCoarseMax + 1> cmnd_{};
   std::array<float, kPanes * (kCoarseMax + 1)> panes_{};  // rows of per-lag sums, index 0 unused
   int paneRow_ = 0;
   int paneFill_ = 0;
+  int staleFrom_ = kPanes;  // panes of this age and older still wait for their rebuild
+  int panesThisPush_ = 0;
   float lastTau_ = 0.0f;
   bool lastPeriodic_ = false;
   std::array<float, 3> periods_{};
@@ -323,8 +338,6 @@ class PitchTracker {
   int decPhase_ = 0;
   int hopCount_ = 0;
   bool active_ = false;
-  float z1_ = 0.0f;
-  float z2_ = 0.0f;
   PitchResult result_;
 };
 

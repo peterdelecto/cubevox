@@ -84,3 +84,8 @@ OCTAVE `Engine` radio A | B | C. FORMANT disabled for A and C. Tuning node gains
 ## Done when
 
 `ctest` passes; OCTAVE offers A | B | C; owner A/Bs the three on octave down.
+
+Box code: option C is the only Octave engine, `OctaveVoice` in `engine/octave.h`, with its level
+trim in `OctaveTuning::trimDb` (+2.2 dB; -12 at MIX 1 reads +0.23 dB). Its voice resets on the
+enable edge only once the stage crossfade sits at 0, so SEMITONES through 0 never cuts it
+(`octave_test` through 0).

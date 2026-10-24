@@ -1,5 +1,6 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
-// (out/in RMS) on vocal-like program material. No window, no audio device.
+// (out/in RMS) on vocal-like program material. The reverb rows take every
+// setting from the registry, as the box runs them. No window, no audio device.
 
 #include <cmath>
 #include <cstdint>
@@ -8,6 +9,8 @@
 #include <memory>
 #include <vector>
 
+#include "core/chain_params.h"
+#include "core/registry.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
@@ -31,6 +34,11 @@ constexpr double kCompProgramDbfs = -23.0;
 constexpr double kLoDb = 0.0;
 constexpr double kHiDb = 0.5;
 constexpr double kSlackDb = 0.1;
+
+// A MIX knob at 50 % is reported against a looser band: the equal-power crossfade keeps it near
+// unity without its own trim.
+constexpr double kMidLoDb = -1.5;
+constexpr double kMidHiDb = 1.0;
 
 using Signal = std::vector<float>;
 
@@ -114,10 +122,9 @@ double gainDb(const Signal& in, const Signal& out) {
   return 20.0 * std::log10(rmsRange(out, from, out.size()) / rmsRange(in, from, in.size()));
 }
 
-bool verdict(const char* name, double db) {
-  const bool ok = db >= kLoDb - kSlackDb && db <= kHiDb + kSlackDb;
-  std::printf("%s %-26s %+6.2f dB  (want %+.1f..%+.1f)\n", ok ? "PASS" : "FAIL", name, db,
-              kLoDb, kHiDb);
+bool verdict(const char* name, double db, double lo = kLoDb - kSlackDb, double hi = kHiDb + kSlackDb) {
+  const bool ok = db >= lo && db <= hi;
+  std::printf("%s %-30s %+6.2f dB  (want %+.1f..%+.1f)\n", ok ? "PASS" : "FAIL", name, db, lo, hi);
   return ok;
 }
 
@@ -163,86 +170,56 @@ cv::GateParams inputGate() {
 
 cv::PitchFxParams pitchOff() {
   cv::PitchFxParams p;
-  p.harmony.on = false;
   p.octave.on = false;
   return p;
 }
 
-cv::ReverbParams reverbParams(int engine) {
-  cv::ReverbParams p;
-  p.on = true;
-  p.engine = engine;
-  p.mix = 1.0f;
-  p.springB.decay = p.springB.dwell = 0.5f;
-  p.chasm.decay = 0.5f;
-  p.chasm.wobble = 0.3f;
-  p.chasm.dwell = 0.5f;
+cv::PitchFxParams octave(float mix) {
+  cv::PitchFxParams p = pitchOff();
+  p.octave.on = true;
+  p.octave.mix = mix;
+  p.octave.semitones = -12;
   return p;
 }
 
-}  // namespace
+// The box's reverb card placed and switched on, with its MIX knob at `mix` and every other
+// setting (TIME, dwell, wobble) where the registry leaves it.
+cv::ReverbParams boxReverb(Card card, float mix) {
+  ChainParams chain;
+  applyPlacement(card, chain);
+  applyToggle(card, true, chain);
+  applyKnob(card, 0, mix, chain);
+  return chain.reverb;
+}
 
-int main() {
-  const Signal in = program();
+// The wet path alone (crossfade 1), which the MIX knob never reaches; the level rule trims it.
+cv::ReverbParams boxReverbWetOnly(Card card) {
+  cv::ReverbParams p = boxReverb(card, 1.0f);
+  p.wet = 1.0f;
+  return p;
+}
+
+template <typename T, typename P>
+bool midRow(const char* name, const Signal& in, const P& p) {
+  auto s = std::make_unique<Stage<T>>();
+  const double db = gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); }));
+  return verdict(name, db, kMidLoDb, kMidHiDb);
+}
+
+// The slot stages at their default engaged settings.
+bool slotRows(const Signal& in) {
   bool ok = true;
-
   ok &= simple<cv::Gate>("input gate -40", in, inputGate());
   cv::GateParams panelGate;
   panelGate.thresholdDb = -40.0f;
   ok &= simple<cv::Gate>("panel gate -40", in, panelGate);
 
-  cv::PitchFxParams harmony = pitchOff();
-  harmony.harmony.on = true;
-  harmony.harmony.mix = 1.0f;
-  harmony.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
-  ok &= simple<cv::PitchFx>("harmony A High L3 mix 1", in, harmony);
-
-  cv::PitchFxParams harmonyB = harmony;
-  harmonyB.harmony.engine = 1;
-  ok &= simple<cv::PitchFx>("harmony B High L3 mix 1", in, harmonyB);
-
-  cv::PitchFxParams harmonyC = harmony;
-  harmonyC.harmony.engine = 2;
-  ok &= simple<cv::PitchFx>("harmony C High L3 mix 1", in, harmonyC);
-
-  // Equal-power middle: reported against a looser band, no trim chasing.
-  cv::PitchFxParams harmonyMid = harmony;
-  harmonyMid.harmony.mix = 0.5f;
-  {
-    auto s = std::make_unique<Stage<cv::PitchFx>>();
-    const double db = gainDb(in, run(in, [&](const float* i, float* o, int n) {
-                               s->fx.process(i, o, n, harmonyMid);
-                             }));
-    const bool midOk = db >= -1.5 && db <= 1.0;
-    std::printf("%s %-26s %+6.2f dB  (want -1.5..+1.0)\n", midOk ? "PASS" : "FAIL",
-                "harmony A mix .5", db);
-    ok &= midOk;
-  }
-
   cv::PitchFxParams autotune = pitchOff();
   autotune.autotune.on = true;
   ok &= simple<cv::PitchFx>("autotune key C", in, autotune);
 
-  cv::PitchFxParams octA = pitchOff();
-  octA.octave.on = true;
-  octA.octave.mix = 1.0f;
-  octA.octave.engine = 0;
-  octA.octave.semitones = -12;
-  ok &= simple<cv::PitchFx>("octave A -12 mix 1", in, octA);
-
-  cv::PitchFxParams octB = pitchOff();
-  octB.octave.on = true;
-  octB.octave.mix = 1.0f;
-  octB.octave.engine = 1;
-  octB.octave.semitones = 12;
-  ok &= simple<cv::PitchFx>("octave B +12 mix 1", in, octB);
-
-  cv::PitchFxParams octC = pitchOff();
-  octC.octave.on = true;
-  octC.octave.mix = 1.0f;
-  octC.octave.engine = 2;
-  octC.octave.semitones = -12;
-  ok &= simple<cv::PitchFx>("octave C -12 mix 1", in, octC);
+  ok &= simple<cv::PitchFx>("octave -12 mix 1", in, octave(1.0f));
+  ok &= midRow<cv::PitchFx>("octave -12 mix .5", in, octave(0.5f));
 
   cv::UnisonParams unison;
   unison.on = true;
@@ -251,7 +228,7 @@ int main() {
 
   cv::SlapbackParams slap;
   slap.on = true;
-  slap.intensity = 0.5f;
+  slap.mix = 0.5f;
   ok &= slapbackRow("slapback .5 mean TIME", in, slap);
 
   cv::DistortionParams dist;
@@ -260,10 +237,16 @@ int main() {
   dist.tone = 0.5f;
   ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
 
-  ok &= simple<cv::Reverb>("reverb CHASM mix 1", in, reverbParams(cv::kReverbChasm));
-  ok &= simple<cv::Reverb>("reverb SPRING B mix 1", in, reverbParams(cv::kReverbSpringB));
+  ok &= simple<cv::Reverb>("reverb chasm wet only", in, boxReverbWetOnly(Card::ReverbChasm));
+  ok &= simple<cv::Reverb>("reverb spring wet only", in, boxReverbWetOnly(Card::ReverbSpring));
+  ok &= midRow<cv::Reverb>("reverb chasm MIX 50 %", in, boxReverb(Card::ReverbChasm, 0.5f));
+  ok &= midRow<cv::Reverb>("reverb spring MIX 50 %", in, boxReverb(Card::ReverbSpring, 0.5f));
+  return ok;
+}
 
-  // One row per named tuning, each with its own makeup. The default params carry FIRM.
+// One comp row per named tuning, each with its own makeup; the default params carry FIRM.
+bool tailRows(const Signal& in) {
+  bool ok = true;
   const Signal compProgram = programAt(kCompProgramDbfs);
   cv::PolishCompParams comp;
   comp.on = true;
@@ -276,7 +259,15 @@ int main() {
   cv::PolishParams eq;
   eq.on = true;
   ok &= simple<cv::Polish>("polish EQ defaults", in, eq);
+  return ok;
+}
 
+}  // namespace
+
+int main() {
+  const Signal in = program();
+  bool ok = slotRows(in);
+  ok &= tailRows(in);
   std::printf("%s level\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

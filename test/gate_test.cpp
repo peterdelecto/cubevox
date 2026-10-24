@@ -1,6 +1,7 @@
-// Gate checks: passthrough, closing, attack/release timing, hysteresis, no-alloc.
-// No window, no audio device.
+// Gate checks: passthrough, closing, attack/release timing, hysteresis, the applied gain against
+// libm, no-alloc. No window, no audio device.
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -185,6 +186,26 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
+// The gain runs through dbToGainFast. Through an open, a hold and a close to the -80 dB range,
+// every output sample sits within 1e-6 relative of the input times libm's 10^(gainDb / 20).
+bool testGainMatchesLibm() {
+  cv::GateParams p = fixedParams();
+  Rig r;
+  r.gate.reset();
+  std::vector<float> in, out;
+  std::vector<float> g = r.feed(500 * kMs, 1000.0, dbfs(-20.0), p, &in, &out);
+  const std::vector<float> shut = r.feed(2 * cv::kSampleRate, 1000.0, dbfs(-60.0), p, &in, &out);
+  g.insert(g.end(), shut.begin(), shut.end());
+  double worst = 0.0;
+  for (size_t i = 0; i < in.size(); ++i) {
+    const double want = static_cast<double>(in[i]) * std::pow(10.0, static_cast<double>(g[i]) / 20.0);
+    if (want != 0.0) worst = std::fmax(worst, std::fabs(static_cast<double>(out[i]) - want) / std::fabs(want));
+  }
+  const float lowest = *std::min_element(g.begin(), g.end());
+  return report("gain vs libm", worst <= 1e-6 && lowest <= -79.0f,
+                "worst relative error %.3g (<= 1e-6) with the gain down to %.1f dB (<= -79)", worst, lowest);
+}
+
 }  // namespace
 
 int main() {
@@ -193,6 +214,7 @@ int main() {
   ok &= testCloses();
   ok &= testTiming();
   ok &= testHysteresis();
+  ok &= testGainMatchesLibm();
   ok &= testNoAlloc();
   return ok ? 0 : 1;
 }

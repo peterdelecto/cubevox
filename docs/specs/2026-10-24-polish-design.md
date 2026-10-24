@@ -8,8 +8,8 @@ MUTE/BYPASS assignment. The menu stays minimal: one row per item, no sub-pages.
 ```
 slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → soft ceiling → DAC
 ```
-1. Both stages run always; OFF is a settled bit-exact passthrough reached through the same
-   50 ms crossfade the EQ already uses, so a click on the menu never clicks in the audio.
+1. Both stages run always; OFF is a settled bit-exact passthrough reached through the shared
+   20 ms one-pole crossfade (`smooth::kSmoothCoef`), so a click on the menu never clicks in the audio.
 2. Level rule: each stage at its default (ON) outputs 0 to +0.5 dB RMS over its input on program
    material. The trim that gets it there lives in the stage tuning (`trimDb`); `level_test` enforces
    it with one row per stage.

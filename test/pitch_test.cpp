@@ -1,5 +1,5 @@
-// PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, no-alloc.
-// No window, no audio device.
+// PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, the pane
+// oracle, the enable rebuild spread over blocks, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -10,7 +10,6 @@
 #include <new>
 #include <vector>
 
-#include "engine/harmony.h"
 #include "engine/pitch.h"
 
 namespace {
@@ -81,7 +80,7 @@ std::vector<float> tone(double hz, int n) {
 
 double cents(double hz, double ref) { return 1200.0 * std::log2(hz / ref); }
 
-const float kThreshold = cv::HarmonyTuning{}.voicedThreshold;
+constexpr float kThreshold = cv::PitchTracker::kVoicedThreshold;
 
 // One result per hop, recorded where the hop ends.
 struct Hop {
@@ -99,7 +98,7 @@ std::vector<Hop> run(cv::PitchTracker& t, const std::vector<float>& x) {
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
     gInProcess = true;
-    t.push(&x[static_cast<size_t>(i)], n, kThreshold);
+    t.push(&x[static_cast<size_t>(i)], n);
     gInProcess = false;
     const int end = i + n;
     if (end % cv::PitchTracker::kHop == 0) hops.push_back({end, t.result().voiced, t.result().rawHz});
@@ -257,7 +256,7 @@ bool oracleCase(const char* name, const std::vector<float>& x) {
   const int total = static_cast<int>(x.size());
   for (int i = 0; i + cv::kBlock <= total; i += cv::kBlock) {
     gInProcess = true;
-    t.push(&x[static_cast<size_t>(i)], cv::kBlock, kThreshold, true);
+    t.push(&x[static_cast<size_t>(i)], cv::kBlock, true);
     gInProcess = false;
     if ((i + cv::kBlock) % cv::PitchTracker::kHop != 0) continue;
     const Coarse o = oracleCoarse(t.coarseFrameForTest(), kThreshold);
@@ -283,6 +282,56 @@ bool testOracle() {
   return ok;
 }
 
+// 5. An enable after a long idle rebuilds the panes over a few blocks: no block computes more
+// than the rebuild share plus its own pane, the frame is whole within kMaxRebuildBlocks, the
+// first analysis reports the tone, and every hop after it matches the direct coarse search.
+bool testEnableSpread() {
+  constexpr int kIdleBlocks = 200;
+  constexpr int kMaxRebuildBlocks = 8;
+  const std::vector<float> x = voiceLike(4 * cv::kSampleRate);
+  cv::PitchTracker t;
+  int worstPanes = 0, wholeAfter = -1, hops = 0, tauOk = 0;
+  const int blocks = static_cast<int>(x.size()) / cv::kBlock;
+  for (int b = 0; b < blocks; ++b) {
+    const bool active = b >= kIdleBlocks;
+    gInProcess = true;
+    t.push(&x[static_cast<size_t>(b * cv::kBlock)], cv::kBlock, active);
+    gInProcess = false;
+    if (!active) continue;
+    worstPanes = std::max(worstPanes, t.panesLastPushForTest());
+    if (wholeAfter < 0 && t.panesCurrentForTest()) wholeAfter = b - kIdleBlocks + 1;
+    if (!t.panesCurrentForTest() || ((b + 1) * cv::kBlock) % cv::PitchTracker::kHop != 0) continue;
+    ++hops;
+    if (std::fabs(t.lastCoarseTau() - oracleCoarse(t.coarseFrameForTest(), kThreshold).tau) <= 1.0f) ++tauOk;
+  }
+  const int maxPanes = cv::PitchTracker::kRebuildPanesPerBlock + 1;
+  const double tauPct = hops > 0 ? 100.0 * tauOk / hops : 0.0;
+  return report("enable spread", worstPanes <= maxPanes && wholeAfter > 0 && wholeAfter <= kMaxRebuildBlocks &&
+                                     tauPct >= 99.5,
+                "worst block %.0f panes (<= %.0f), frame whole after %.0f blocks (<= 8), tau within 1 on %.2f %% "
+                "of hops (>= 99.5)",
+                worstPanes, maxPanes, wholeAfter, tauPct);
+}
+
+// 6. The first analysis after an enable reports a steady tone at its pitch.
+bool testEnableReports() {
+  const std::vector<float> x = tone(kA3, 2 * cv::kSampleRate);
+  cv::PitchTracker t;
+  int firstVoiced = -1;
+  float hz = 0.0f;
+  const int idle = cv::kSampleRate / cv::kBlock;
+  for (int b = 0; b < 2 * idle && firstVoiced < 0; ++b) {
+    t.push(&x[static_cast<size_t>(b * cv::kBlock)], cv::kBlock, b >= idle);
+    if (b >= idle && t.result().voiced) {
+      firstVoiced = b - idle + 1;
+      hz = t.result().hz;
+    }
+  }
+  const double err = hz > 0.0f ? std::fabs(cents(hz, kA3)) : 9999.0;
+  return report("enable reports", firstVoiced > 0 && firstVoiced <= 8 && err <= 0.5,
+                "voiced %.0f blocks after the enable (<= 8) at %.3f cents off A3 (<= 0.5)", firstVoiced, err);
+}
+
 }  // namespace
 
 int main() {
@@ -291,6 +340,8 @@ int main() {
   ok &= testSteady();
   ok &= testSilence();
   ok &= testOracle();
+  ok &= testEnableSpread();
+  ok &= testEnableReports();
   // Every push() call above ran under the allocation guard.
   ok &= report("no allocation", true, "push() ran under the new/delete guard", 0.0);
   std::printf("%s pitch\n", ok ? "PASS" : "FAIL");

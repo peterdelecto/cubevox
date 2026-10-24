@@ -101,3 +101,5 @@ stays the effect and a whole-output `trimDb` = -4.9 dB x INTENSITY brings the me
    owner 2026-10-07). The delay line holds 260 ms.
 3. `slapback_test` checks the repeat ratio at 6 / 25 / 100 % against the law and peak
    timing at 60 / 100 / 180 / 250 ms.
+4. The panel and the code call INTENSITY MIX (`SlapbackParams::mix`). Wet gain, feedback and
+   trim follow it at the block edges and are interpolated between, so no libm runs per sample.

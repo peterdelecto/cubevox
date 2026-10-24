@@ -5,23 +5,23 @@ part. Filenames are `YYYY-MM-DD-name-design.md`. Add a row here with every new s
 
 | Spec | Covers | Status |
 |---|---|---|
-| `2026-10-01-autotune-design.md` | Autotune: KEY and RESPONSE, correction inside `PitchFx` that replaces the dry path | current |
-| `2026-10-01-chasm-design.md` | CHASM reverb, a second engine ported from DrumSynthV3 | current; the engine radio is superseded, because each reverb engine is its own card ("Chasm Reverb") |
-| `2026-10-01-distortion-design.md` | Distortion stage, a Boss BD-2 model with DRIVE and TONE | current |
+| `2026-10-01-autotune-design.md` | Autotune: KEY and RESPONSE, correction inside `PitchFx` that replaces the dry path | current; engine B, chromatic mode and the Harmony key link are out of the code |
+| `2026-10-01-chasm-design.md` | CHASM reverb, a second engine ported from DrumSynthV3, the Chasm Reverb card | current; its knobs are superseded by the v2 spec (MIX and TIME) and the engine radio by the registry's reverb cards |
+| `2026-10-01-distortion-design.md` | Distortion stage, a Boss BD-2 model with DRIVE and TONE | current; the menu bypass is the slot toggle; always 2x oversampled |
 | `2026-10-01-gate-design.md` | Gate stage; the stage specs follow its shape | current |
-| `2026-10-01-harmony-design.md` | Harmony stage, a Zoom V3 model with KEY and MIX | the box has no Harmony card (owner 2026-10-08); reference only |
-| `2026-10-01-harmony-engines-design.md` | Harmony shifter engines A, B and C, per-voice formant, chromatic mode | the box has no Harmony card; reference only |
+| `2026-10-01-harmony-design.md` | Harmony stage, a Zoom V3 model with KEY and MIX | the box has no Harmony card (owner 2026-10-08); out of the code: no card, engine, test or emulator controls; the key tables live in `engine/scale.h` |
+| `2026-10-01-harmony-engines-design.md` | Harmony shifter engines A, B and C, per-voice formant, chromatic mode | out of the code with Harmony; reference only |
 | `2026-10-01-level-rule.md` | The level rule (every stage at its default outputs 0 to +0.5 dB RMS over its input) and how `level_test` trims it | current; CLAUDE.md states the rule |
-| `2026-10-01-octave-b-design.md` | Octave engine B, epoch-aligned PSOLA with formant control | reference only; the box runs Octave C |
-| `2026-10-01-octave-c-design.md` | Octave engine C, an asynchronous granular shifter | current; the engine the box runs |
-| `2026-10-01-octave-pitchfx-design.md` | The Octave stage and the shared pitch front end `PitchFx` | current for the Octave stage and the front end; the Harmony pairing is reference only |
-| `2026-10-01-polish-eq-design.md` | The final output EQ ("polish"), a menu stage last in the chain | current; POLISH EQ is a menu row (polish spec) |
-| `2026-10-01-slapback-design.md` | Slapback stage: delay, low-pass, wet level | current; the panel is MIX and TIME (v2 spec) |
-| `2026-10-01-unison-emulator-design.md` | UNISON, and the emulator skeleton, engine contract, threading and build layout the stage specs share | current for the contract; its panel table is superseded by the slots spec |
+| `2026-10-01-octave-b-design.md` | Octave engine B, epoch-aligned PSOLA with formant control | out of the code; reference only |
+| `2026-10-01-octave-c-design.md` | Octave engine C, an asynchronous granular shifter | current; the only Octave engine |
+| `2026-10-01-octave-pitchfx-design.md` | The Octave stage and the shared pitch front end `PitchFx` (ring, tracker, crossfades) | front end current; Harmony and Octave option A are out of the code |
+| `2026-10-01-polish-eq-design.md` | The final output EQ ("polish"), a menu stage last in the chain | current for the EQ; its place in the tail and the menu row are superseded by the polish spec |
+| `2026-10-01-slapback-design.md` | Slapback stage: delay, low-pass, wet level | current; the panel is MIX and TIME (v2 spec), the 30..120 ms range is superseded by the v2 spec's 60..250 ms, and INTENSITY is the MIX knob |
+| `2026-10-01-unison-emulator-design.md` | UNISON, and the emulator skeleton, engine contract, threading and build layout the stage specs share | current for the contract; its panel table is superseded by the slots spec; the fixed-detune shifter is out of the code |
 | `2026-10-02-adam-face-design.md` | Adam's face: hardware knobs and musician tuning sliders in the emulator | emulator only, and the Mac emulator is parked (owner 2026-10-24); the reverb engine radio is superseded |
-| `2026-10-02-hardware-design.md` | The board | the firmware-update sentences of items 10 and 13 (menu reboot into the ROM DFU) are superseded by the field-update spec |
-| `2026-10-03-spring-b-design.md` | SPRING B reverb | current; the panel is MIX and TIME (v2 spec) and the card is named "Spring Reverb" |
-| `2026-10-07-slots-design.md` | Eight slots of two pots and a toggle, 16 pots on the mux, the MUTE toggle, the default slot table | current; the menu reboot into the ROM DFU is superseded by the field-update spec |
+| `2026-10-02-hardware-design.md` | The board | the firmware-update sentences of items 10 and 13 (menu reboot into the ROM DFU) are superseded by the field-update spec; item 27 by the enclosure-closure spec |
+| `2026-10-03-spring-b-design.md` | SPRING B reverb, the Spring Reverb card (`engine/spring.h`) | current; the panel is MIX and TIME (v2 spec) |
+| `2026-10-07-slots-design.md` | Eight slots of two pots and a toggle, 16 pots on the mux, the MUTE toggle, the default slot table | current; card placement and chain order are superseded by the update-and-slots spec, and the menu reboot into the ROM DFU by the field-update spec |
 | `2026-10-07-v2-mic-reverb-time-slapback.md` | v2: a live mic in the emulator, reverb TIME in place of DWELL, slapback 60 to 250 ms | built; the box has reverb TIME and the slapback range |
 | `2026-10-08-update-and-slots-design.md` | Mac app, slot layout, firmware updates | page parts superseded by the Mac-app spec; the Release row (`cubevox.bin`, app tar, `install.sh`), the Recovery section (ROM DFU, BOOT0, no A/B) and the menu item that enters DFU are superseded by the field-update spec |
 | `2026-10-08-effect-registry-design.md` | Firmware effect registry: card ids, knob descriptors, groups, costs, bench | current |

@@ -1,5 +1,7 @@
-// Unison checks: passthrough, detune, level, no-alloc. No window, no audio device.
+// Unison checks: passthrough, detune, level, no-alloc, the LFO against its analytic sine, and a
+// RATE step that glides instead of jumping. No window, no audio device.
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -7,6 +9,7 @@
 #include <new>
 #include <vector>
 
+#include "core/unison_rate.h"
 #include "engine/unison.h"
 
 namespace {
@@ -141,53 +144,44 @@ bool testDetune() {
   std::vector<float> wet(in.size());
   for (size_t i = 0; i < in.size(); ++i) wet[i] = out[i] - in[i];
   const float cents = peakCents(wet, cv::kSampleRate / 2);
-  // Expected peak follows the shipped tuning: LFO swing detune plus the
-  // fixed offset, so retuning by ear moves the band instead of breaking it.
+  // Expected peak follows the shipped tuning, so retuning by ear moves the band instead of
+  // breaking it.
   const cv::UnisonTuning t;
   const float swingSec = t.swingMaxMs * 0.001f;
-  const float lfoCents = 1200.0f * std::log2(1.0f + 2.0f * kPi * t.lfoHz[1] * swingSec);
-  const float expect = lfoCents + std::fabs(t.detuneCents[1]);
+  const float expect = 1200.0f * std::log2(1.0f + 2.0f * kPi * t.lfoHz[1] * swingSec);
   const float tol = 0.15f * expect;
   return report("detune", std::fabs(cents - expect) <= tol,
                 "peak=%.2f cents (expect %.1f +-%.1f)", cents, expect, tol);
 }
 
-// Mean signed cents from upward zero-crossing periods, linearly interpolated.
-float meanCents(const std::vector<float>& x, int skip) {
-  double sum = 0.0;
-  int count = 0;
-  float prevCross = -1.0f;
-  for (size_t i = static_cast<size_t>(skip); i + 1 < x.size(); ++i) {
-    if (!(x[i] < 0.0f && x[i + 1] >= 0.0f)) continue;
-    const float cross = static_cast<float>(i) + (-x[i]) / (x[i + 1] - x[i]);
-    if (prevCross >= 0.0f) {
-      const float hz = cv::kSampleRate / (cross - prevCross);
-      sum += 1200.0f * log2f(hz / kFreq);
-      ++count;
-    }
-    prevCross = cross;
+// Largest |second difference| of x over [from, to): a jump of the taps shows as a spike here.
+double peakCurvature(const std::vector<float>& x, int from, int to) {
+  double worst = 0.0;
+  for (int i = std::max(from, 2); i < to; ++i) {
+    const size_t k = static_cast<size_t>(i);
+    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
   }
-  return count ? static_cast<float>(sum / count) : 0.0f;
+  return worst;
 }
 
-bool testFixedDetune() {
+// One knob-filter step of RATE above 68 %, where the swing follows the rate, at DEPTH 1. The
+// taps glide to the new swing, so the output bends no harder than in steady state at either rate.
+bool testRateStep() {
   const int n = 4 * cv::kSampleRate;
+  const int stepAt = 2 * cv::kSampleRate;
   const std::vector<float> in = sine(n);
-  cv::UnisonParams p = untrimmed(1.0f);
-  p.tuning.swingMinMs = 0.0f;
-  p.tuning.swingMaxMs = 0.0f;
-  p.tuning.detuneCents[1] = 10.0f;
-  p.tuning.windowMs = 20.0f;
+  cv::UnisonParams before = params(1.0f);
+  cv::UnisonParams after = before;
+  unisonrate::apply(before.tuning, 70.0f);
+  unisonrate::apply(after.tuning, 71.5f);
+  std::vector<float> out(in.size());
   gUnison.reset();
-  gUnison.setVoiceEnabled(0, false);
-  const std::vector<float> out = run(gUnison, in, p);
-  gUnison.setVoiceEnabled(0, true);
-
-  std::vector<float> wet(in.size());
-  for (size_t i = 0; i < in.size(); ++i) wet[i] = out[i] - in[i];
-  const float cents = meanCents(wet, cv::kSampleRate);
-  return report("fixed detune", cents >= 8.0f && cents <= 12.0f,
-                "mean=%.2f cents (10 +-2)", cents);
+  for (int i = 0; i < n; i += cv::kBlock)
+    gUnison.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, i < stepAt ? before : after);
+  const double steady = std::max(peakCurvature(out, cv::kSampleRate, stepAt), peakCurvature(out, n - cv::kSampleRate, n));
+  const double step = peakCurvature(out, stepAt, stepAt + cv::kSampleRate / 10);
+  return report("rate step", step <= steady,
+                "RATE 70 to 71.5 %%: peak curvature %.4g after the step, %.4g steady (<=)", step, steady);
 }
 
 bool testLevel() {
@@ -197,7 +191,7 @@ bool testLevel() {
   const std::vector<float> out = run(gUnison, in, params(1.0f));
   const float db = 20.0f * log10f(rms(out) / rms(in));
   // Default wetMaxDb is -4.0 dB (owner ear tuning) and trimDb -1.4 dB scales with depth
-  // (level rule, set at DEPTH 0.8). At DEPTH 1 on this sine the output measures 0.91 dB;
+  // (level rule at DEPTH 0.5). At DEPTH 1 on this sine the output measures 0.91 dB;
   // band is that +-1.5.
   return report("level", std::fabs(db - 0.91f) <= 1.5f, "out/in=%.2f dB (0.91 +-1.5)", db);
 }
@@ -254,7 +248,7 @@ int main() {
   ok &= testDetune();
   ok &= testLevel();
   ok &= testNoAlloc();
-  ok &= testFixedDetune();
   ok &= testLfoAnalytic();
+  ok &= testRateStep();
   return ok ? 0 : 1;
 }

@@ -1,6 +1,6 @@
 // Octave checks: shift up/down, fifth, bypass, shared-tracker wiring, no-alloc,
-// then option B pitch, formant-vs-pitch, formant envelope and level, bypass.
-// No window, no audio device.
+// formants that move with the pitch, noise level, and SEMITONES through 0
+// without a cut. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -59,8 +59,6 @@ std::vector<float> tone(double hz, int n) {
   return out;
 }
 
-const float kThreshold = cv::HarmonyTuning{}.voicedThreshold;
-
 // PitchFx::pitch() read after one block, stamped with the block's end sample.
 struct Hop {
   int end;
@@ -110,7 +108,7 @@ double outputHz(double inHz, const cv::PitchFxParams& p) {
   const int total = static_cast<int>(out.size());
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
-    t.push(&out[static_cast<size_t>(i)], n, kThreshold);
+    t.push(&out[static_cast<size_t>(i)], n);
     if (i + n > cv::kSampleRate && t.result().voiced) hz.push_back(t.result().hz);
   }
   if (hz.empty()) return 0.0;
@@ -118,10 +116,11 @@ double outputHz(double inHz, const cv::PitchFxParams& p) {
   return hz[hz.size() / 2];
 }
 
+// The granular shifter spreads each partial into window-rate sidebands, so pitch holds +-15 cents.
 bool checkShift(const char* name, int semis, double expect) {
   const double got = outputHz(220.0, octaveOnly(semis));
   const double err = got > 0.0 ? cents(got, expect) : 9999.0;
-  return report(name, std::fabs(err) <= 10.0, "out=%.2f Hz, expect %.2f, err=%.2f cents (+-10)",
+  return report(name, std::fabs(err) <= 15.0, "out=%.2f Hz, expect %.2f, err=%.2f cents (+-15)",
                 got, expect, err);
 }
 
@@ -150,14 +149,14 @@ bool testBypass() {
   gFx.reset();
   const std::vector<float> offOut = run(gFx, in, off);
   for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(offOut[i] - in[i]));
-  return report("bypass", worst < 1e-6f, "mix 0/0.5/1 and on=false max|out-in|=%.3g (<1e-6)", worst);
+  return report("bypass", worst == 0.0f, "semitones 0 at mix 0/0.5/1 and on=false max|out-in|=%.3g (0)", worst);
 }
 
-// Octave and Harmony on together; the tracker must still hear only the dry tone.
+// Octave and Autotune on together; the tracker must still hear only the dry tone.
 bool testWiring() {
   cv::PitchFxParams p = octaveOnly(12);
-  p.harmony.mix = 1.0f;
-  p.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
+  p.autotune.on = true;
+  p.autotune.responseMs = 20.0f;
   gFx.reset();
   std::vector<Hop> hops;
   run(gFx, tone(220.0, 2 * cv::kSampleRate), p, &hops);
@@ -182,40 +181,12 @@ bool testWiring() {
 bool testNoAlloc() {
   cv::PitchFxParams p = octaveOnly(-12);
   p.octave.mix = 0.5f;
-  p.harmony.mix = 0.5f;
-  p.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
-  p.harmony.slots[1] = {cv::HarmonyVoice::Lower, 2};
+  p.autotune.on = true;
   const std::vector<float> in = tone(220.0, cv::kBlock * 64);
   gFx.reset();
   run(gFx, in, p);  // aborts on any new/delete inside process()
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
-
-// Option B checks.
-
-cv::PitchFxParams octaveB(int semis, float formant) {
-  cv::PitchFxParams p = octaveOnly(semis);
-  p.octave.engine = 1;
-  p.octave.formant = formant;
-  p.octave.tuning.trimDbB = 0.0f;  // level checks here are against unity, not the level-rule trim
-  return p;
-}
-
-bool checkShiftB(const char* name, int semis, float formant, double expect) {
-  const double got = outputHz(220.0, octaveB(semis, formant));
-  const double err = got > 0.0 ? cents(got, expect) : 9999.0;
-  return report(name, std::fabs(err) <= 10.0, "out=%.2f Hz, expect %.2f, err=%.2f cents (+-10)",
-                got, expect, err);
-}
-
-bool testOctaveB() {
-  bool ok = true;
-  ok &= checkShiftB("B octave up", 12, 0.0f, 440.0);
-  ok &= checkShiftB("B octave down", -12, 0.0f, 110.0);
-  return ok;
-}
-
-bool testFormantKeepsPitchB() { return checkShiftB("B formant pitch", 7, 12.0f, 329.63); }
 
 // Goertzel magnitude of x at hz.
 double goertzel(const float* x, int n, double hz) {
@@ -229,84 +200,6 @@ double goertzel(const float* x, int n, double hz) {
     s1 = s0;
   }
   return std::sqrt(s1 * s1 + s2 * s2 - c * s1 * s2);
-}
-
-// Amplitude-weighted mean harmonic number over harmonics 1..10 of 220 Hz,
-// measured on second 1..2 (exactly 220 cycles, so no leakage).
-double centroidB(float formant) {
-  gFx.reset();
-  const std::vector<float> out = run(gFx, tone(220.0, 2 * cv::kSampleRate), octaveB(0, formant));
-  double num = 0.0;
-  double den = 0.0;
-  for (int k = 1; k <= 10; ++k) {
-    const double a = goertzel(&out[cv::kSampleRate], cv::kSampleRate, 220.0 * k);
-    num += k * a;
-    den += a;
-  }
-  return den > 0.0 ? num / den : 0.0;
-}
-
-bool testFormantEnvelopeB() {
-  const double flat = centroidB(0.0f);
-  const double up = centroidB(12.0f);
-  const double down = centroidB(-12.0f);
-  const double rUp = up / flat;
-  const double rDown = down / flat;
-  return report("B formant envelope", rUp >= 1.2 && rDown <= 0.8,
-                "centroid 0 st=%.3f, +12 x%.3f (>=1.2), -12 x%.3f (<=0.8)", flat, rUp, rDown);
-}
-
-// Goertzel magnitude of harmonic k of 220 Hz over second 1..2.
-double harmonic(const std::vector<float>& x, int k) {
-  return goertzel(&x[cv::kSampleRate], cv::kSampleRate, 220.0 * k);
-}
-
-// Formant shift moves the envelope, so the level is checked where it is
-// defined: an output harmonic against the input harmonic it maps from.
-bool testFormantLevelB() {
-  const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
-  gFx.reset();
-  const std::vector<float> up = run(gFx, in, octaveB(0, 12.0f));
-  gFx.reset();
-  const std::vector<float> down = run(gFx, in, octaveB(0, -12.0f));
-  const double upDb = 20.0 * std::log10(harmonic(up, 2) / harmonic(in, 1));
-  const double downDb = 20.0 * std::log10(harmonic(down, 1) / harmonic(in, 2));
-  return report("B formant level", std::fabs(upDb) <= 0.2 && std::fabs(downDb) <= 0.2,
-                "+12 out h2 vs in h1 %+.3f dB, -12 out h1 vs in h2 %+.3f dB (+-0.2)", upDb,
-                downDb);
-}
-
-bool testBypassB() {
-  const std::vector<float> in = tone(220.0, cv::kSampleRate);
-  float worst = 0.0f;
-  for (float mix : {0.0f, 0.5f, 1.0f}) {
-    cv::PitchFxParams p = octaveB(0, 0.0f);
-    p.octave.mix = mix;
-    gFx.reset();
-    const std::vector<float> out = run(gFx, in, p);
-    for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
-  }
-  return report("B bypass", worst == 0.0f, "semitones 0 mix 0/0.5/1 max|out-in|=%.3g (0)", worst);
-}
-
-// Option C checks.
-
-cv::PitchFxParams octaveC(int semis) {
-  cv::PitchFxParams p = octaveOnly(semis);
-  p.octave.engine = 2;
-  return p;
-}
-
-bool testPitchC() {
-  bool ok = true;
-  for (int semis : {12, -12}) {
-    const double expect = semis > 0 ? 440.0 : 110.0;
-    const double got = outputHz(220.0, octaveC(semis));
-    const double err = got > 0.0 ? cents(got, expect) : 9999.0;
-    ok &= report(semis > 0 ? "C octave up" : "C octave down", std::fabs(err) <= 15.0,
-                 "out=%.2f Hz, expect %.2f, err=%.2f cents (+-15)", got, expect, err);
-  }
-  return ok;
 }
 
 // Root-sum-square Goertzel magnitude within +-halfHz of hz over second 1..2.
@@ -341,7 +234,7 @@ double medianHz(const std::vector<float>& x) {
   const int total = static_cast<int>(x.size());
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
-    t.push(&x[static_cast<size_t>(i)], n, kThreshold);
+    t.push(&x[static_cast<size_t>(i)], n);
     if (i + n > cv::kSampleRate && t.result().voiced) hz.push_back(t.result().hz);
   }
   if (hz.empty()) return 0.0;
@@ -349,43 +242,20 @@ double medianHz(const std::vector<float>& x) {
   return hz[hz.size() / 2];
 }
 
-// C moves the envelope with the pitch: the centroid in harmonics of its own
-// f0 matches the input's. A keeps the envelope in place: its output harmonics
-// 2, 4, .. 10 sit on the input's 220..1100 Hz grid, so those centroids match.
-bool testFormantMovesC() {
+// The granular shifter moves the envelope with the pitch: the centroid in harmonics of its own
+// f0 matches the input's.
+bool testFormantMoves() {
   const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
   const double inRel = centroidHz(in, 220.0, 1, 10, 1) / 220.0;
-  const double inAbs = centroidHz(in, 220.0, 1, 5, 1);
-
   gFx.reset();
-  const std::vector<float> c = run(gFx, in, octaveC(-12));
+  const std::vector<float> c = run(gFx, in, octaveOnly(-12));
   const double fC = medianHz(c);
   const double rC = centroidHz(c, fC, 1, 10, 1) / fC / inRel;
-
-  gFx.reset();
-  const std::vector<float> a = run(gFx, in, octaveOnly(-12));
-  const double fA = medianHz(a);
-  const double rA = centroidHz(a, fA, 2, 10, 2) / inAbs;
-  return report("C formants move", std::fabs(rC - 1.0) <= 0.10 && std::fabs(rA - 1.0) <= 0.10,
-                "C centroid/f0 x%.3f of input (+-10%%), A absolute centroid x%.3f (+-10%%), "
-                "C f0=%.1f",
-                rC, rA, fC);
+  return report("formants move", std::fabs(rC - 1.0) <= 0.10,
+                "centroid/f0 x%.3f of input (+-10%%), f0=%.1f", rC, fC);
 }
 
-bool testBypassC() {
-  const std::vector<float> in = tone(220.0, cv::kSampleRate);
-  float worst = 0.0f;
-  for (float mix : {0.0f, 0.5f, 1.0f}) {
-    cv::PitchFxParams p = octaveC(0);
-    p.octave.mix = mix;
-    gFx.reset();
-    const std::vector<float> out = run(gFx, in, p);
-    for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
-  }
-  return report("C bypass", worst == 0.0f, "semitones 0 mix 0/0.5/1 max|out-in|=%.3g (0)", worst);
-}
-
-bool testNoiseC() {
+bool testNoise() {
   const int n = 2 * cv::kSampleRate;
   std::vector<float> in(static_cast<size_t>(n));
   uint64_t s = 0x9E3779B97F4A7C15ULL;
@@ -393,7 +263,7 @@ bool testNoiseC() {
     s = s * 6364136223846793005ULL + 1442695040888963407ULL;
     v = 0.25f * (static_cast<float>(s >> 40) / 8388608.0f - 1.0f);
   }
-  const cv::PitchFxParams p = octaveC(-12);
+  const cv::PitchFxParams p = octaveOnly(-12);
   gFx.reset();
   const std::vector<float> out = run(gFx, in, p);
   double ri = 0.0;
@@ -403,9 +273,55 @@ bool testNoiseC() {
     ro += static_cast<double>(out[static_cast<size_t>(i)]) * out[static_cast<size_t>(i)];
   }
   const double gainDb = 10.0 * std::log10(ro / ri);
-  const double wantDb = p.octave.tuning.levelDb + p.octave.tuning.trimDbC;
-  return report("C noise level", std::fabs(gainDb - wantDb) <= 3.0,
+  const double wantDb = p.octave.tuning.levelDb + p.octave.tuning.trimDb;
+  return report("noise level", std::fabs(gainDb - wantDb) <= 3.0,
                 "out/in %+.2f dB, expect %+.2f dB (+-3)", gainDb, wantDb);
+}
+
+// Largest |second difference| of x over [from, to): a cut in the waveform shows as a spike here.
+double peakCurvature(const std::vector<float>& x, int from, int to) {
+  double worst = 0.0;
+  for (int i = std::max(from, 2); i < to; ++i) {
+    const size_t k = static_cast<size_t>(i);
+    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
+  }
+  return worst;
+}
+
+// SEMITONES +1 to 0 to -1 with 0 held for gapBlocks: the stage switches off at 0, and its voice
+// must keep running while the crossfade is up, so no sample bends harder than in steady state.
+double throughZeroRatio(float mix, int gapBlocks) {
+  const int half = cv::kSampleRate;
+  const int stepAt = half / cv::kBlock * cv::kBlock;
+  const std::vector<float> in = tone(220.0, 2 * half);
+  std::vector<float> out(in.size());
+  cv::PitchFxParams p = octaveOnly(1);
+  p.octave.mix = mix;
+  gFx.reset();
+  const int total = static_cast<int>(in.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    const int block = (i - stepAt) / cv::kBlock;
+    p.octave.semitones = i < stepAt ? 1 : (block < gapBlocks ? 0 : -1);
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], std::min(cv::kBlock, total - i), p);
+  }
+  const int window = cv::kSampleRate / 2;
+  const double steady =
+      std::max(peakCurvature(out, stepAt - window, stepAt), peakCurvature(out, total - window, total));
+  return peakCurvature(out, stepAt, stepAt + gapBlocks * cv::kBlock + cv::kSampleRate / 10) / steady;
+}
+
+bool testThroughZero() {
+  constexpr double kMaxRatio = 1.0;
+  bool ok = true;
+  for (float mix : {1.0f, 0.10f}) {
+    double worst = 0.0;
+    for (int gap : {1, 4, 8, 15}) worst = std::max(worst, throughZeroRatio(mix, gap));
+    char name[48];
+    std::snprintf(name, sizeof name, "through 0 at mix %.0f %%", static_cast<double>(mix * 100.0f));
+    ok &= report(name, worst <= kMaxRatio,
+                 "0 held 1.3 to 20 ms: peak curvature x%.3f of steady state (<= %.1f)", worst, kMaxRatio);
+  }
+  return ok;
 }
 
 }  // namespace
@@ -417,14 +333,8 @@ int main() {
   ok &= testBypass();
   ok &= testWiring();
   ok &= testNoAlloc();
-  ok &= testOctaveB();
-  ok &= testFormantKeepsPitchB();
-  ok &= testFormantEnvelopeB();
-  ok &= testFormantLevelB();
-  ok &= testBypassB();
-  ok &= testPitchC();
-  ok &= testFormantMovesC();
-  ok &= testBypassC();
-  ok &= testNoiseC();
+  ok &= testFormantMoves();
+  ok &= testNoise();
+  ok &= testThroughZero();
   return ok ? 0 : 1;
 }

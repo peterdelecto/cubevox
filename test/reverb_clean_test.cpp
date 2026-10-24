@@ -1,6 +1,6 @@
-// Reverb front-end distortion: each engine at its default DWELL, fed a -6 dBFS
+// Reverb front-end distortion: each engine at its default dwell, fed a -6 dBFS
 // 220 Hz sine, must stay clean. A linear tank returns a sine as a sine, so the
-// harmonics measure the DWELL clipper alone. No window, no audio device.
+// harmonics measure the dwell clipper alone. No window, no audio device.
 
 #include <cmath>
 #include <cstdio>
@@ -33,7 +33,7 @@ double thdPercent(int engine) {
   cv::ReverbParams p;
   p.on = true;
   p.engine = engine;
-  p.mix = 1.0f;
+  p.wet = 1.0f;
   const int total = 4 * cv::kSampleRate;
   std::vector<float> in(static_cast<size_t>(total)), out(in.size());
   for (int i = 0; i < total; ++i)
@@ -51,13 +51,13 @@ double thdPercent(int engine) {
 }  // namespace
 
 int main() {
-  const int engines[2] = {cv::kReverbChasm, cv::kReverbSpringB};
-  const char* names[2] = {"CHASM", "SPRING B"};
+  const int engines[2] = {cv::kReverbChasm, cv::kReverbSpring};
+  const char* names[2] = {"CHASM", "SPRING"};
   bool ok = true;
   for (int e = 0; e < 2; ++e) {
     const double thd = thdPercent(engines[e]);
     const bool pass = thd <= kMaxThdPercent;
-    std::printf("%s %-14s default DWELL, -6 dBFS sine: THD %.2f %% (<= %.1f)\n", pass ? "PASS" : "FAIL",
+    std::printf("%s %-14s default dwell, -6 dBFS sine: THD %.2f %% (<= %.1f)\n", pass ? "PASS" : "FAIL",
                 names[e], thd, kMaxThdPercent);
     ok = ok && pass;
   }

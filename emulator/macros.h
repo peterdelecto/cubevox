@@ -13,9 +13,8 @@
 
 #include "engine/chasm.h"
 #include "engine/distortion.h"
-#include "engine/harmony.h"
 #include "engine/octave.h"
-#include "engine/spring_b.h"
+#include "engine/spring.h"
 #include "engine/unison.h"
 
 namespace cv::macros {
@@ -61,17 +60,11 @@ using I = Interp;
 // Octave
 constexpr Anchor kOctSlide{2.0f, 15.0f, 120.0f, I::Log};              // glideMs
 
-// Harmony
-constexpr Anchor kHarGlide{120.0f, 30.0f, 5.0f, I::Log};              // glideMs
-
-// Unison
-// Ends are wide so each slider is clearly audible (owner 2026-10-02); 50 % is the
-// owner's tuning. Chorus end: 6 ms swing, no fixed detune. Double end: 15 cents, near-still.
-constexpr Anchor kUniDetune{0.0f, 2.0f, 15.0f};                       // |detuneCents|
-constexpr Anchor kUniSwingScale{2.0f, 1.0f, 0.1f};                    // x swingMin/MaxMs
+// Unison RATE. The swing runs at twice its base, the chorus voicing the owner tuned.
 constexpr Anchor kUniLfoScale{0.33f, 1.0f, 7.0f, I::Log};             // x lfoHz both: ~0.2..6 Hz
-// Above today's rate the sweep narrows so the pitch swing stays within about twice
-// today's (RATE 100 %: ~60 cents peak instead of ~200).
+constexpr float kUniSwingScale = 2.0f;                                // x swingMin/MaxMs
+// Above the middle rate the sweep narrows so the pitch swing stays within about twice
+// the middle's (RATE 100 %: ~60 cents peak instead of ~200).
 constexpr float kUniMaxSwingGrowth = 2.0f;
 
 // Distortion
@@ -93,7 +86,7 @@ constexpr Anchor kChmInputTrebleCut{0.85f, 0.95f, 1.0f};
 constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
 constexpr Anchor kChmBassCutTop{200.0f, 100.0f, 40.0f, I::Log};
 
-// SPRING B
+// Spring
 constexpr Anchor kSbChirpA{0.55f, 0.70f, 0.85f};
 constexpr Anchor kSbChirpSections{12.0f, 24.0f, 32.0f, I::Round};
 constexpr Anchor kSbWobbleDepth{2.0f, 8.0f, 24.0f};
@@ -108,8 +101,6 @@ constexpr Anchor kSbTrebleLoss{3000.0f, 6000.0f, 10000.0f, I::Log};
 
 enum Id : int {
   OctaveSlide,
-  HarmonyTracking,
-  UnisonBlend,
   UnisonMotion,
   DistBody,
   DistBite,
@@ -117,29 +108,29 @@ enum Id : int {
   ChasmWobble,
   ChasmBrightness,
   ChasmBass,
-  SpringBDrip,
-  SpringBFlutter,
-  SpringBBrightness,
+  SpringDrip,
+  SpringFlutter,
+  SpringBrightness,
   kCount
 };
 
 // Names for the Print tuning line; reverb names carry the engine where two share one.
 // nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
-    "Slide",          nullptr,"Chorus-Double", nullptr,       "Body",
-    "Bite",           "Grit",           "Wobble",           "CHASM Brightness", "Bass",
-    "SPRING B Drip",  "SPRING B Flutter", "SPRING B Brightness"};
+    "Slide",       nullptr,          "Body",              "Bite",       "Grit",
+    "Wobble",      "CHASM Brightness", "Bass",            "SPRING Drip", "SPRING Flutter",
+    "SPRING Brightness"};
 
-// Keys for the saved-state file; one word each, stable across builds.
+// Keys for the saved-state file; one word each, stable across builds, so a key keeps the name it
+// was first saved under.
 constexpr const char* kStateKey[kCount] = {
-    "OctaveSlide",    "HarmonyTracking", "UnisonBlend",   "UnisonMotion",  "DistBody",
-    "DistBite",       "DistGrit",        "ChasmWobble",   "ChasmBrightness", "ChasmBass",
-    "SpringBDrip",    "SpringBFlutter",  "SpringBBrightness"};
+    "OctaveSlide",     "UnisonMotion", "DistBody",    "DistBite",       "DistGrit",
+    "ChasmWobble",     "ChasmBrightness", "ChasmBass", "SpringBDrip",   "SpringBFlutter",
+    "SpringBBrightness"};
 
 // Adam's starting positions (owner 2026-10-02), in Id order.
 constexpr std::array<float, kCount> kDefaultPos = {
-    50.0f, 50.0f, 0.0f,  0.0f,  50.0f, 60.0f, 50.0f, 85.0f,
-    85.0f, 50.0f, 50.0f, 50.0f, 50.0f};
+    50.0f, 0.0f, 50.0f, 60.0f, 50.0f, 85.0f, 85.0f, 50.0f, 50.0f, 50.0f, 50.0f};
 
 struct State {
   std::array<float, kCount> pos;
@@ -163,24 +154,17 @@ inline void formatAll(const State& s, char* buf, size_t size) {
 
 inline void octaveSlide(OctaveTuning& t, float pos) { t.glideMs = at(kOctSlide, pos); }
 
-inline void harmonyTracking(HarmonyTuning& t, float pos) { t.glideMs = at(kHarGlide, pos); }
-
-// Chorus <-> Double (blend) and RATE (rate) both shape the sweep, so one function
-// writes every field they touch. Blend: detune grows and the swing shrinks.
-// Rate: the LFOs speed up; past today's rate the swing narrows to cap the pitch swing.
-// Unison at Chorus-Double 50 % and RATE 50 %; the macro scales from here.
+// RATE: the LFOs speed up; past the middle rate the swing narrows to cap the pitch swing.
+// Unison at RATE 50 %; the macro scales from here.
 struct UnisonBase {
   float lfoHz[2] = {0.60f, 0.90f};
   float swingMinMs = 0.5f, swingMaxMs = 3.0f;
 };
 
-inline void unison(UnisonTuning& t, float blendPos, float ratePos) {
+inline void unison(UnisonTuning& t, float ratePos) {
   const UnisonBase base;
-  const float d = at(kUniDetune, blendPos);
   const float m = at(kUniLfoScale, ratePos);
-  const float swing = at(kUniSwingScale, blendPos) * (m > kUniMaxSwingGrowth ? kUniMaxSwingGrowth / m : 1.0f);
-  t.detuneCents[0] = d;
-  t.detuneCents[1] = 0.0f - d;  // +0, not -0, at no detune
+  const float swing = kUniSwingScale * (m > kUniMaxSwingGrowth ? kUniMaxSwingGrowth / m : 1.0f);
   t.swingMinMs = base.swingMinMs * swing;
   t.swingMaxMs = base.swingMaxMs * swing;
   t.lfoHz[0] = base.lfoHz[0] * m;
@@ -218,17 +202,17 @@ inline void chasmBass(ChasmTuning& t, float pos) {
   t.bassCutHzTop = at(kChmBassCutTop, pos);
 }
 
-inline void springBDrip(SpringBTuning& t, float pos) {
+inline void springDrip(SpringTuning& t, float pos) {
   t.chirpA = at(kSbChirpA, pos);
   t.chirpSections = atInt(kSbChirpSections, pos);
 }
 
-inline void springBFlutter(SpringBTuning& t, float pos) {
+inline void springFlutter(SpringTuning& t, float pos) {
   t.wobbleDepth = at(kSbWobbleDepth, pos);
   t.wobbleRateHz = at(kSbWobbleRate, pos);
   t.diffuse = at(kSbDiffuse, pos);
 }
 
-inline void springBBrightness(SpringBTuning& t, float pos) { t.trebleLossHz = at(kSbTrebleLoss, pos); }
+inline void springBrightness(SpringTuning& t, float pos) { t.trebleLossHz = at(kSbTrebleLoss, pos); }
 
 }  // namespace cv::macros

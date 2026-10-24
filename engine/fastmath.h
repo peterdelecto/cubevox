@@ -5,10 +5,11 @@
 #include <cstring>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
 
 // Cheap replacements for libm calls that sit inside per-sample loops. Each has
-// a test that pins its error: test/fastmath_test.cpp, and test/polish_comp_test.cpp
-// for log2Fast.
+// a test that pins its error against libm: test/fastmath_test.cpp, and
+// test/polish_comp_test.cpp for log2Fast.
 
 namespace cv {
 
@@ -51,6 +52,15 @@ inline float log2Fast(float x) {
   return exponent + p * t;
 }
 
+constexpr float kDbPerLog2 = 6.02059991328f;  // 20 log10(2): amplitude dB per octave of level
+constexpr float kLog2PerDb = 0.16609640474f;  // log2(10) / 20
+
+// 20 log10(x) to under 2e-4 dB for positive normal x, through log2Fast.
+inline float dbFast(float x) { return kDbPerLog2 * log2Fast(x); }
+
+// 10^(db / 20) to about 1e-7 relative, through exp2Fast.
+inline float dbToGainFast(float db) { return exp2Fast(db * kLog2PerDb); }
+
 // sin(2 pi phase / 2^32) from a 32-bit turn counter. The phase folds to a
 // quarter turn, then sin(pi t) is the odd Taylor series through t^11 on
 // |t| <= 0.5. The first dropped term is below 1e-7, so absolute error stays
@@ -64,7 +74,6 @@ CV_INLINE float sinTurns(uint32_t phase) {
   if (p > 0x40000000) t = 1.0f - t;
   else if (p < -0x40000000) t = -1.0f - t;
 
-  constexpr float kPi = 3.14159265358979323846f;
   constexpr float c1 = kPi;
   constexpr float c3 = -(kPi * kPi * kPi) / 6.0f;
   constexpr float c5 = (kPi * kPi * kPi * kPi * kPi) / 120.0f;

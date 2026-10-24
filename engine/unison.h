@@ -5,25 +5,25 @@
 #include <cstdint>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
 #include "engine/fastmath.h"
+#include "engine/smooth.h"
 
 // Unison: two copies of the voice, each with a slow LFO wobble on its delay
-// (chorus) and a fixed detune from a crossfaded dual-tap shifter (doubler).
-// One DEPTH knob scales swing, fixed detune, and wet level together, so the
-// two flavours blend through the tuning constants, not separate controls.
+// (chorus). DEPTH scales the swing and the wet level together. A RATE move
+// changes the tuning's swing; the swing glides to it with the depth smoother,
+// so the taps never jump.
 
 namespace cv {
 
 struct UnisonTuning {
   // Owner-tuned by ear 2026-10-01 against dry vocal loops.
-  float baseDelayMs[2] = {20.0f, 15.0f};
-  float lfoHz[2] = {0.20f, 0.30f};
-  float swingMinMs = 1.0f;   // modulation swing (peak) at DEPTH 0
-  float swingMaxMs = 6.0f;   // modulation swing (peak) at DEPTH 1
+  std::array<float, 2> baseDelayMs = {20.0f, 15.0f};
+  std::array<float, 2> lfoHz = {0.20f, 0.30f};
+  float swingMinMs = 1.0f;  // modulation swing (peak) at DEPTH 0
+  float swingMaxMs = 6.0f;  // modulation swing (peak) at DEPTH 1
   float wetMaxDb = -4.0f;   // per-voice level at DEPTH 1
-  float detuneCents[2] = {0.0f, 0.0f};  // fixed per-voice detune at DEPTH 1
-  float windowMs = 20.0f;    // crossfade window of the dual-tap shifter
-  // Whole-output gain (dry + wet) at DEPTH 1, scaled by depth in dB; level rule at DEPTH 0.8.
+  // Whole-output gain (dry + wet) at DEPTH 1, scaled by depth in dB; level rule at DEPTH 0.5.
   float trimDb = -1.4f;
 };
 
@@ -38,235 +38,154 @@ class Unison {
   void reset() {
     line_.fill(0.0f);
     lfoPhase_ = {0u, 0u};
-    shiftPhase_ = {0u, 0u};
     lfoInc_ = {0u, 0u};
-    shiftInc_ = {0u, 0u};
     depth_ = 0.0f;
     swingSmp_ = 0.0f;
     writePos_ = 0;
   }
 
   // Test hook: mute one voice's wet contribution.
-  void setVoiceEnabled(int v, bool on) { enabled_[v] = on; }
+  void setVoiceEnabled(int v, bool on) { enabled_[static_cast<size_t>(v)] = on; }
 
-  // Test hooks: LFO phase in turns of 2^32 and the last swing in samples.
-  uint32_t lfoPhase(int v) const { return lfoPhase_[v]; }
+  // Test hooks: LFO phase in turns of 2^32 and the swing at the end of the last block, in samples.
+  uint32_t lfoPhase(int v) const { return lfoPhase_[static_cast<size_t>(v)]; }
   float swingSamples() const { return swingSmp_; }
 
   void process(const float* in, float* out, int n, const UnisonParams& p) {
     const UnisonTuning& t = p.tuning;
-    const float target = p.on ? clamp01(p.depth) : 0.0f;
-    const float wetMax = powf(10.0f, t.wetMaxDb / 20.0f);
-    const float smooth = 1.0f - expf(-1.0f / (kSmoothSec * kSampleRate));
-    const float windowSmp = clampWindow(t.windowMs) * kSmpPerMs;
+    const float target = p.on ? smooth::clamp01(p.depth) : 0.0f;
+    setLfoRates(t);
 
-    for (int v = 0; v < 2; ++v) {
-      const float hz = t.lfoHz[v] < 0.0f ? 0.0f : (t.lfoHz[v] > kLfoMaxHz ? kLfoMaxHz : t.lfoHz[v]);
-      lfoInc_[v] = static_cast<uint32_t>(hz / kSampleRate * kTurn + 0.5f);
-    }
-
-    // Off and settled: only the line and the LFO phases advance.
+    // Off and settled: only the line and the LFO phases advance, and the swing waits on its
+    // depth-0 value so the next engage starts there.
     if (depth_ == 0.0f && target == 0.0f) {
-      for (int i = 0; i < n; ++i) {
-        line_[writePos_] = in[i];
-        out[i] = in[i];
-        writePos_ = writePos_ + 1 == kLen ? 0 : writePos_ + 1;
-      }
-      for (int v = 0; v < 2; ++v) lfoPhase_[v] += lfoInc_[v] * static_cast<uint32_t>(n);
+      passThrough(in, out, n);
+      swingSmp_ = swingAt(t, 0.0f);
       return;
     }
 
-    // Depth steps per sample; ratio and trim depend on it alone, so they are
-    // evaluated at the block edges and the trim is interpolated between.
+    // Depth and swing step per sample; trim and wet gain depend on depth alone, so everything is
+    // evaluated at the block edges and interpolated between.
+    Ramp r;
+    r.depth0 = depth_;
+    r.swing0 = swingSmp_;
     float depthEnd = depth_;
-    for (int i = 0; i < n; ++i) depthEnd = stepped(depthEnd, target, smooth);
-    const float trim0 = powf(10.0f, t.trimDb * depth_ / 20.0f);
-    const float trim1 = powf(10.0f, t.trimDb * depthEnd / 20.0f);
-    const float inv = 1.0f / static_cast<float>(n);
-
-    // Pitch ratio r moves the read head at r x write speed, so the tap's
-    // delay drifts by (1 - r) per sample; the sawtooth is that drift
-    // normalised to the window.
-    for (int v = 0; v < 2; ++v) {
-      const float ratio = powf(2.0f, t.detuneCents[v] * depthEnd / 1200.0f);
-      const float turns = (1.0f - ratio) / windowSmp;
-      shiftInc_[v] =
-          static_cast<uint32_t>(static_cast<int64_t>(llroundf(turns * kTurn)));
+    float swingEnd = swingSmp_;
+    const float swingTarget = swingAt(t, target);
+    for (int i = 0; i < n; ++i) {
+      depthEnd = smooth::step(depthEnd, target, smooth::kSmoothCoef);
+      swingEnd = smooth::step(swingEnd, swingTarget, smooth::kSmoothCoef);
     }
-
-    // Swing and wet gain follow the depth ramp linearly across the block.
-    const float depth0 = depth_;
-    const float swing0 = (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth0) * kSmpPerMs;
-    const float swing1 = (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depthEnd) * kSmpPerMs;
-    const float wet0 = depth0 * wetMax;
-    const float wet1 = depthEnd * wetMax;
-    const float base0 = t.baseDelayMs[0];
-    const float base1 = t.baseDelayMs[1];
-    const float en0 = enabled_[0] ? 1.0f : 0.0f;
-    const float en1 = enabled_[1] ? 1.0f : 0.0f;
-
-    const float* line = line_.data();
-    float* wline = line_.data();
-    int wp = writePos_;
-    uint32_t lfo0 = lfoPhase_[0];
-    uint32_t lfo1 = lfoPhase_[1];
-    const uint32_t lfoInc0 = lfoInc_[0];
-    const uint32_t lfoInc1 = lfoInc_[1];
-    uint32_t sh0 = shiftPhase_[0];
-    uint32_t sh1 = shiftPhase_[1];
-    const uint32_t shInc0 = shiftInc_[0];
-    const uint32_t shInc1 = shiftInc_[1];
-
-    if (sh0 == 0u && shInc0 == 0u && sh1 == 0u && shInc1 == 0u) {
-      auto parked = [&](auto read) {
-        for (int i = 0; i < n; ++i) {
-          const float x = in[i];
-          const float f = static_cast<float>(i + 1) * inv;
-          const float swing = swing0 + (swing1 - swing0) * f;
-          const float wetGain = wet0 + (wet1 - wet0) * f;
-
-          wline[wp] = x;
-
-          const float c0 = base0 * kSmpPerMs + swing * sinTurns(lfo0);
-          const float c1 = base1 * kSmpPerMs + swing * sinTurns(lfo1);
-          const float s0 = read(line, wp, c0);
-          const float s1 = read(line, wp, c1);
-          const float wet = (0.0f + s0 * en0) + s1 * en1;
-          lfo0 += lfoInc0;
-          lfo1 += lfoInc1;
-
-          out[i] = (x + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
-          wp = wp + 1 == kLen ? 0 : wp + 1;
-        }
-      };
-
-      // |sinTurns| <= 1 up to rounding, so the centres stay within swingMax of
-      // base. When that band (plus a rounding margin) sits inside the clamp
-      // range, the clamp is an identity and the block skips it.
-      constexpr float kLo = 2.0f + kClampMargin;
-      constexpr float kHi = kLen - 3.0f - kClampMargin;
-      const float swingMax = swing0 > swing1 ? swing0 : swing1;
-      const float lo0 = base0 * kSmpPerMs - swingMax;
-      const float hi0 = base0 * kSmpPerMs + swingMax;
-      const float lo1 = base1 * kSmpPerMs - swingMax;
-      const float hi1 = base1 * kSmpPerMs + swingMax;
-      if (lo0 >= kLo && hi0 <= kHi && lo1 >= kLo && hi1 <= kHi) {
-        parked([](const float* l, int w, float d) { return readCubicUnclamped(l, w, d); });
-      } else {
-        parked([](const float* l, int w, float d) { return readCubic(l, w, d); });
-      }
-    } else {
-      for (int i = 0; i < n; ++i) {
-        const float x = in[i];
-        const float f = static_cast<float>(i + 1) * inv;
-        const float swing = swing0 + (swing1 - swing0) * f;
-        const float wetGain = wet0 + (wet1 - wet0) * f;
-
-        wline[wp] = x;
-
-        const float c0 = base0 * kSmpPerMs + swing * sinTurns(lfo0);
-        const float c1 = base1 * kSmpPerMs + swing * sinTurns(lfo1);
-        const float s0 = readShifted(line, wp, sh0, shInc0, c0, windowSmp);
-        const float s1 = readShifted(line, wp, sh1, shInc1, c1, windowSmp);
-        const float wet = (0.0f + s0 * en0) + s1 * en1;
-        lfo0 += lfoInc0;
-        lfo1 += lfoInc1;
-        sh0 += shInc0;
-        sh1 += shInc1;
-
-        out[i] = (x + wetGain * wet) * (trim0 + (trim1 - trim0) * f);
-        wp = wp + 1 == kLen ? 0 : wp + 1;
-      }
-    }
-
-    writePos_ = wp;
-    lfoPhase_[0] = lfo0;
-    lfoPhase_[1] = lfo1;
-    shiftPhase_[0] = sh0;
-    shiftPhase_[1] = sh1;
+    r.depth1 = depthEnd;
+    r.swing1 = swingEnd;
+    r.trim0 = powf(10.0f, t.trimDb * r.depth0 / 20.0f);
+    r.trim1 = powf(10.0f, t.trimDb * r.depth1 / 20.0f);
+    render(in, out, n, t, r);
     depth_ = depthEnd;
-    swingSmp_ = swing1;
+    swingSmp_ = swingEnd;
   }
 
  private:
   static constexpr int kDelayMs = 80;
   static constexpr int kLen = kDelayMs * kSampleRate / 1000;
   static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
-  static constexpr float kWindowMinMs = 5.0f;
-  static constexpr float kWindowMaxMs = 30.0f;
   static constexpr float kLfoMaxHz = 20.0f;
   static constexpr float kTurn = 4294967296.0f;
-  static constexpr float kSmoothSec = 0.020f;
-  static constexpr float kSnapBelow = 1e-6f;
   static constexpr float kClampMargin = 0.01f;
 
-  static float clamp01(float x) { return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); }
-  static float clampWindow(float ms) {
-    return ms < kWindowMinMs ? kWindowMinMs : (ms > kWindowMaxMs ? kWindowMaxMs : ms);
+  // Block-edge values of everything that follows the smoothers.
+  struct Ramp {
+    float depth0 = 0.0f, depth1 = 0.0f;
+    float swing0 = 0.0f, swing1 = 0.0f;
+    float trim0 = 1.0f, trim1 = 1.0f;
+  };
+
+  // LFO swing (peak) in samples at a given depth.
+  static float swingAt(const UnisonTuning& t, float depth) {
+    return (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth) * kSmpPerMs;
   }
 
-  // Parked shifter (phase and step both 0) is a single tap at centre. Else
-  // two taps half a window apart on a sawtooth, Hann-crossfaded with gains
-  // sin^2(pi p) and 1 - sin^2(pi p), which sum to exactly 1. Taps sit at
-  // centre + window * (p - 0.5).
-  static CV_INLINE float readShifted(const float* line, int wp, uint32_t ph, uint32_t inc, float centre,
-                           float windowSmp) {
-    if (ph == 0u && inc == 0u) return readCubic(line, wp, centre);
-    const float p0 = static_cast<float>(ph) * (1.0f / kTurn);
-    const float p1 = static_cast<float>(ph + 0x80000000u) * (1.0f / kTurn);
-    const float s = sinTurns(ph >> 1);
-    const float g0 = s * s;
-    const float g1 = 1.0f - g0;
-    float sum = 0.0f;
-    if (g0 > 0.0f) sum += g0 * readCubic(line, wp, centre + windowSmp * (p0 - 0.5f));
-    if (g1 > 0.0f) sum += g1 * readCubic(line, wp, centre + windowSmp * (p1 - 0.5f));
-    return sum;
+  void setLfoRates(const UnisonTuning& t) {
+    for (size_t v = 0; v < 2; ++v) {
+      const float hz = clampf(t.lfoHz[v], 0.0f, kLfoMaxHz);
+      lfoInc_[v] = static_cast<uint32_t>(hz / kSampleRate * kTurn + 0.5f);
+    }
   }
 
-  // One-pole toward target; snaps to exact 0 so settled depth 0 adds nothing.
-  static float stepped(float d, float target, float a) {
-    d += a * (target - d);
-    if (target == 0.0f && d < kSnapBelow) d = 0.0f;
-    return d;
+  void passThrough(const float* in, float* out, int n) {
+    for (int i = 0; i < n; ++i) {
+      line_[static_cast<size_t>(writePos_)] = in[i];
+      out[i] = in[i];
+      writePos_ = writePos_ + 1 == kLen ? 0 : writePos_ + 1;
+    }
+    for (size_t v = 0; v < 2; ++v) lfoPhase_[v] += lfoInc_[v] * static_cast<uint32_t>(n);
   }
 
-  // Reads sit within one ring length of the head, so one step wraps them; the
-  // final clamp is never taken and lets the compiler bound the index.
-  static CV_INLINE int wrap(int i) {
-    if (i < 0) i += kLen;
-    else if (i >= kLen) i -= kLen;
-    return static_cast<unsigned>(i) < static_cast<unsigned>(kLen) ? i : 0;
+  // |sinTurns| <= 1 up to rounding, so the tap centres stay within the swing of their base. When
+  // that band, with a rounding margin, sits inside the clamp range, the clamp is an identity and
+  // the block skips it.
+  void render(const float* in, float* out, int n, const UnisonTuning& t, const Ramp& r) {
+    constexpr float kLo = 2.0f + kClampMargin;
+    constexpr float kHi = kLen - 3.0f - kClampMargin;
+    const float swingMax = r.swing0 > r.swing1 ? r.swing0 : r.swing1;
+    bool inside = true;
+    for (size_t v = 0; v < 2; ++v) {
+      const float base = t.baseDelayMs[v] * kSmpPerMs;
+      inside = inside && base - swingMax >= kLo && base + swingMax <= kHi;
+    }
+    const float wetMax = powf(10.0f, t.wetMaxDb / 20.0f);
+    const auto unclamped = [](const float* l, int w, float d) { return readCubicUnclamped(l, w, d); };
+    const auto clamped = [](const float* l, int w, float d) { return readCubic(l, w, d); };
+    if (inside) {
+      renderWith(in, out, n, t, r, wetMax, unclamped);
+    } else {
+      renderWith(in, out, n, t, r, wetMax, clamped);
+    }
+  }
+
+  // The per-sample loop, with the swing, wet gain and trim ramped linearly across the block.
+  template <class Read>
+  void renderWith(const float* in, float* out, int n, const UnisonTuning& t, const Ramp& r,
+                  float wetMax, const Read& read) {
+    const float inv = 1.0f / static_cast<float>(n);
+    const float base0 = t.baseDelayMs[0] * kSmpPerMs;
+    const float base1 = t.baseDelayMs[1] * kSmpPerMs;
+    const float en0 = enabled_[0] ? 1.0f : 0.0f;
+    const float en1 = enabled_[1] ? 1.0f : 0.0f;
+    float* line = line_.data();
+    int wp = writePos_;
+    uint32_t lfo0 = lfoPhase_[0];
+    uint32_t lfo1 = lfoPhase_[1];
+    for (int i = 0; i < n; ++i) {
+      const float f = static_cast<float>(i + 1) * inv;
+      const float swing = r.swing0 + (r.swing1 - r.swing0) * f;
+      const float wetGain = (r.depth0 + (r.depth1 - r.depth0) * f) * wetMax;
+      line[wp] = in[i];
+      const float s0 = read(line, wp, base0 + swing * sinTurns(lfo0));
+      const float s1 = read(line, wp, base1 + swing * sinTurns(lfo1));
+      lfo0 += lfoInc_[0];
+      lfo1 += lfoInc_[1];
+      out[i] = (in[i] + wetGain * (s0 * en0 + s1 * en1)) * (r.trim0 + (r.trim1 - r.trim0) * f);
+      wp = wp + 1 == kLen ? 0 : wp + 1;
+    }
+    writePos_ = wp;
+    lfoPhase_[0] = lfo0;
+    lfoPhase_[1] = lfo1;
   }
 
   // Catmull-Rom through four taps. Delay is clamped so the newest tap
   // never crosses the write head and the oldest never wraps onto it.
   static CV_INLINE float readCubic(const float* line, int wp, float delay) {
-    const float d = delay < 2.0f ? 2.0f : (delay > kLen - 3.0f ? kLen - 3.0f : delay);
-    return readCubicUnclamped(line, wp, d);
+    return readRing<kLen>(line, wp, clampf(delay, 2.0f, kLen - 3.0f));
   }
 
   // readCubic for a delay already inside [2, kLen - 3].
-  static CV_INLINE float readCubicUnclamped(const float* line, int wp, float d) {
-    const float pos = static_cast<float>(wp) - d;
-    const float fl = floorf(pos);
-    const float f = pos - fl;
-    const int i0 = wrap(static_cast<int>(fl));
-    const float xm = line[wrap(i0 - 1)];
-    const float x0 = line[i0];
-    const float x1 = line[wrap(i0 + 1)];
-    const float x2 = line[wrap(i0 + 2)];
-    const float c1 = 0.5f * (x1 - xm);
-    const float c2 = xm - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
-    const float c3 = 0.5f * (x2 - xm) + 1.5f * (x0 - x1);
-    return x0 + f * (c1 + f * (c2 + f * c3));
-  }
+  static CV_INLINE float readCubicUnclamped(const float* line, int wp, float d) { return readRing<kLen>(line, wp, d); }
 
   // Both voices read the same input, so one delay line serves both.
   std::array<float, kLen> line_{};
   std::array<uint32_t, 2> lfoPhase_{{0u, 0u}};
-  std::array<uint32_t, 2> shiftPhase_{{0u, 0u}};
   std::array<uint32_t, 2> lfoInc_{{0u, 0u}};
-  std::array<uint32_t, 2> shiftInc_{{0u, 0u}};
   std::array<bool, 2> enabled_{{true, true}};
   float depth_ = 0.0f;
   float swingSmp_ = 0.0f;

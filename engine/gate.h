@@ -3,11 +3,15 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
+#include "engine/fastmath.h"
 #include "engine/smooth.h"
 
 // Gate: one-pole highpassed peak detector drives a soft-knee gain computer with
 // hysteresis, hold, and attack/release smoothing of the gain in dB.
 // The input soft gate and the panel GATE are two instances of this class.
+// The per-sample dB conversions run through fastmath. fastmath_test pins both to
+// libm, and gate_test checks the applied gain against it.
 
 namespace cv {
 
@@ -30,7 +34,7 @@ struct GateParams {
 class Gate {
  public:
   void reset() {
-    hpState_ = 0.0f;
+    hp_.clear();
     env_ = 0.0f;
     gainDb_ = 0.0f;
     onMix_ = 0.0f;
@@ -39,50 +43,17 @@ class Gate {
   }
 
   void process(const float* in, float* out, int n, const GateParams& p) {
-    const GateTuning& t = p.tuning;
-    const float range = t.rangeDb < 0.0f ? t.rangeDb : 0.0f;
-    const float knee = t.kneeDb > kKneeMinDb ? t.kneeDb : kKneeMinDb;
-    const float hyst = t.hysteresisDb > 0.0f ? t.hysteresisDb : 0.0f;
-    const float hpHz = t.detectorHpHz > kHpMinHz ? t.detectorHpHz : kHpMinHz;
-    const float aHp = 1.0f - expf(-kTwoPi * hpHz / kSampleRate);
-    const float aDet = smooth::coef(kDetectorReleaseSec);
-    const float aAtt = smooth::coef(t.attackMs * 1e-3f);
-    const float aRel = smooth::coef(t.releaseMs * 1e-3f);
-    const float aOn = smooth::coef(smooth::kSmoothSec);
-    const int holdSmp = static_cast<int>((t.holdMs > 0.0f ? t.holdMs : 0.0f) * kSampleRate / 1000.0f);
-    const float openAt = p.thresholdDb;
-    const float closeAt = p.thresholdDb - hyst;
-    const float onTarget = p.on ? 1.0f : 0.0f;
-
+    const Law law = lawFor(p);
+    hp_.set(p.tuning.detectorHpHz);
     for (int i = 0; i < n; ++i) {
-      // Detector.
-      hpState_ += aHp * (in[i] - hpState_);
-      const float mag = fabsf(in[i] - hpState_);
-      env_ = mag > env_ ? mag : env_ + aDet * (mag - env_);
-      const float levelDb = 20.0f * log10f(env_ + kFloor);
-
-      // Gain computer.
-      if (levelDb >= openAt) open_ = true;
-      else if (levelDb < closeAt) open_ = false;
-      float target = 0.0f;
-      if (!open_) {
-        const float below = openAt - levelDb;
-        target = below >= knee ? range : range * below / knee;
-      }
-
-      // Attack, hold, release.
-      if (target >= gainDb_) {
-        holdLeft_ = holdSmp;
-        gainDb_ = smooth::step(gainDb_, target, aAtt);
-      } else if (holdLeft_ > 0) {
-        --holdLeft_;
-      } else {
-        gainDb_ = smooth::step(gainDb_, target, aRel);
-      }
+      // Detector: the 20 ms release is the shared smoothing coefficient.
+      const float mag = fabsf(hp_.hp(in[i]));
+      env_ = mag > env_ ? mag : env_ + smooth::kSmoothCoef * (mag - env_);
+      stepGain(dbFast(env_ + kFloor), law);
 
       // Bypass fade: settled off multiplies by exactly 1.0.
-      onMix_ = smooth::step(onMix_, onTarget, aOn);
-      out[i] = in[i] * expf(gainDb_ * onMix_ * kDbToNeper);
+      onMix_ = smooth::step(onMix_, law.onTarget, smooth::kSmoothCoef);
+      out[i] = in[i] * dbToGainFast(gainDb_ * onMix_);
     }
   }
 
@@ -90,14 +61,49 @@ class Gate {
   float gainDb() const { return gainDb_ * onMix_; }
 
  private:
-  static constexpr float kTwoPi = 6.28318530717958647692f;
-  static constexpr float kDbToNeper = 0.11512925465f;
   static constexpr float kFloor = 1e-9f;
   static constexpr float kKneeMinDb = 0.1f;
-  static constexpr float kHpMinHz = 1.0f;
-  static constexpr float kDetectorReleaseSec = 0.020f;
 
-  float hpState_ = 0.0f;
+  // The gain computer's settings for one block.
+  struct Law {
+    float range, knee, openAt, closeAt, aAtt, aRel, onTarget;
+    int holdSmp;
+  };
+
+  static Law lawFor(const GateParams& p) {
+    const GateTuning& t = p.tuning;
+    Law law;
+    law.range = t.rangeDb < 0.0f ? t.rangeDb : 0.0f;
+    law.knee = t.kneeDb > kKneeMinDb ? t.kneeDb : kKneeMinDb;
+    law.openAt = p.thresholdDb;
+    law.closeAt = p.thresholdDb - (t.hysteresisDb > 0.0f ? t.hysteresisDb : 0.0f);
+    law.aAtt = smooth::coef(t.attackMs * 1e-3f);
+    law.aRel = smooth::coef(t.releaseMs * 1e-3f);
+    law.onTarget = p.on ? 1.0f : 0.0f;
+    law.holdSmp = static_cast<int>((t.holdMs > 0.0f ? t.holdMs : 0.0f) * kSampleRate / 1000.0f);
+    return law;
+  }
+
+  // Gain computer with hysteresis and a soft knee, then attack, hold and release on the gain in dB.
+  void stepGain(float levelDb, const Law& law) {
+    if (levelDb >= law.openAt) open_ = true;
+    else if (levelDb < law.closeAt) open_ = false;
+    float target = 0.0f;
+    if (!open_) {
+      const float below = law.openAt - levelDb;
+      target = below >= law.knee ? law.range : law.range * below / law.knee;
+    }
+    if (target >= gainDb_) {
+      holdLeft_ = law.holdSmp;
+      gainDb_ = smooth::step(gainDb_, target, law.aAtt);
+    } else if (holdLeft_ > 0) {
+      --holdLeft_;
+    } else {
+      gainDb_ = smooth::step(gainDb_, target, law.aRel);
+    }
+  }
+
+  OnePole hp_;  // detector side-chain high-pass
   float env_ = 0.0f;
   float gainDb_ = 0.0f;
   float onMix_ = 0.0f;
