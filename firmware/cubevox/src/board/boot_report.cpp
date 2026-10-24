@@ -76,7 +76,7 @@ void reportCpu(Print& out) {
 
 void reportOled(Print& out, bool found) {
   if (!found) {
-    out.println("[WARN] OLED not found, serial display");
+    out.println("[WARN] OLED not answering, retrying once a second");
     return;
   }
   out.print("[boot] OLED at 0x");

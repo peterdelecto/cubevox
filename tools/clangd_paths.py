@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Points the two .clangd files at this machine.
 
-clangd has no variable expansion, so both files hold absolute paths under three prefixes. They are
-the Arduino data dir (the STM32 core and the xpack compiler), the Arduino user dir (libraries) and
-the checkout. This script rewrites each prefix to the one arduino-cli and the script's own location
-report, and leaves every other line alone. Run it after a clone on another machine, and after
-moving the checkout or the Arduino dirs.
+clangd has no variable expansion, so both files hold absolute paths under two prefixes. They are
+the Arduino data dir (the STM32 core and the xpack compiler) and the checkout. This script rewrites
+each prefix to the one arduino-cli and the script's own location report, and leaves every other
+line alone. It also moves a third prefix, the Arduino user dir (libraries), which no include line
+holds now because no library header is on the include path. Run it after a clone on another
+machine, and after moving the checkout or the Arduino dirs.
 
   python3 -I tools/clangd_paths.py
 """

@@ -116,6 +116,12 @@ void drawConfirmDfu(MenuFrame& f) {
   putRow(f, kRowConfirmCancel, "Turn to cancel.");
 }
 
+// Shows from the confirm click until the reset, while a pending save and the diag entry reach flash.
+void drawStarting(MenuFrame& f) {
+  putRow(f, kRowConfirmTitle, "Starting the update.");
+  putRow(f, kRowConfirmVersion, "Wait a moment.");
+}
+
 }  // namespace
 
 UiAction Menu::onClick() {
@@ -137,7 +143,10 @@ UiAction Menu::onClick() {
       }
       break;
     case Mode::ChainView: mode_ = Mode::List; break;
-    case Mode::ConfirmDfu: return UiAction::EnterDfu;
+    case Mode::ConfirmDfu:
+      mode_ = Mode::Starting;
+      return UiAction::EnterDfu;
+    case Mode::Starting: break;
   }
   return UiAction::None;
 }
@@ -155,7 +164,7 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   if (in.detents != 0 || in.click) lastActivityMs_ = nowMs;
   if (in.detents != 0) onTurn(in.detents);
   const UiAction action = in.click ? onClick() : UiAction::None;
-  if (mode_ != Mode::Idle && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
+  if (mode_ != Mode::Idle && mode_ != Mode::Starting && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
   return action;
 }
 
@@ -167,6 +176,7 @@ void Menu::draw(const UiContext& ctx, Canvas& canvas) {
     case Mode::List: drawList(frame, ctx, cursor_); break;
     case Mode::ChainView: drawChainView(frame, ctx.layout); break;
     case Mode::ConfirmDfu: drawConfirmDfu(frame); break;
+    case Mode::Starting: drawStarting(frame); break;
   }
   if (shownValid_ && frame == shown_) return;
   shown_ = frame;

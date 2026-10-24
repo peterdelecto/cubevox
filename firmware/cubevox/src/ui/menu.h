@@ -54,7 +54,8 @@ class Menu {
   // when nobody could see the menu it opened, does nothing.
   void listen() { listening_ = true; }
 
-  // True while a menu screen is up, which is until Exit, the timeout or a DFU entry closes it.
+  // True while a menu screen is up, which is until Exit or the timeout closes it, and from the
+  // update's confirm click until the reset.
   bool open() const { return mode_ != Mode::Idle; }
 
   // Redraws the canvas when the frame differs from the last one drawn. Does nothing while the menu
@@ -69,7 +70,7 @@ class Menu {
   void showChainView() { mode_ = Mode::ChainView; }
 
  private:
-  enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
+  enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu, Starting };
 
   UiAction onClick();
   void onTurn(int32_t detents);

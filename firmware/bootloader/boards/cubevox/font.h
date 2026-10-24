@@ -1,6 +1,6 @@
 // The project fonts for C code. fonts.cpp fills these from tools/font-editor/fonts/cubevox_fonts.h,
 // the only font source. A glyph is ceil(height / 8) pages, top page first, one byte per column
-// left to right, bit 0 on top. The fonts are single case: a..z are blank cells.
+// left to right, bit 0 on top. The 5x7 font, the only one here, is single case, so a..z are blank cells.
 
 #pragma once
 

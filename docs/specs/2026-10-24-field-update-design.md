@@ -267,10 +267,11 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    after the reset are expected and harmless.
 
 ## OLED in update mode
-The bootloader drives the SH1106 over I2C2 (PB10/PB11) with its own driver, about 150 lines: the
-init sequence and a full-frame write. U8g2 is not linked. Screens are drawn at run time by
-`screens.c` with the 5x7 font from `cubevox_fonts.h`; the same file compiles on the host and renders
-the numbered proof PNGs (`build.sh --proofs`), so the proofs show the shipped pixels.
+The bootloader drives the SH1106 over I2C2 (PB10/PB11) through `firmware/cubevox/src/board/sh1106.c`,
+the driver the application runs too: bus recovery, the init sequence and a full-frame write. Screens
+are drawn at run time by `screens.c` with the 5x7 font from `cubevox_fonts.h`; the same file compiles
+on the host and renders the numbered proof PNGs (`build.sh --proofs`), so the proofs show the shipped
+pixels.
 
 Owner rules for these screens (2026-10-24): every line is a full sentence with a period, no bare
 titles; prose in the 5x7 font sits on alternate rows (0, 2, 4, 6), so a screen holds at most four
@@ -472,7 +473,7 @@ firmware/bootloader/
 ## Drills (`bringup.py --update`)
 | # | Drill | Expected |
 |---|---|---|
-| 1 | Send `enter_dfu` over serial | CDC port gone, `/Volumes/CUBEVOX` mounted within 5 s, OLED `Drop the firmware on the CUBEVOX drive.` |
+| 1 | Send `enter_dfu` over serial | CDC port gone, `/Volumes/CUBEVOX` mounted within 5 s, OLED `Drop the firmware on the CUBEVOX drive.`; `DIAG.TXT` option bytes shows `BOR level 3` and `sector 0 protected` |
 | 2 | Copy the bench `.uf2` to the volume | Volume unmounts, CDC port back within 10 s, `hello` says `bench` |
 | 3 | Operator pulls USB at about 30 % of a copy | OLED `The cable came out.`, box stays in update mode; a full copy then succeeds |
 | 4 | Operator cuts 9 V at about 30 % of a copy | Next power-on shows `The update stopped.`; `DIAG.TXT` says `ImageInvalid` or `ImageUnreadable` with an address; a full copy then succeeds |
