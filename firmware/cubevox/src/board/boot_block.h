@@ -182,6 +182,66 @@ CV_STATIC_ASSERT(image_version_at_16,
 CV_STATIC_ASSERT(image_version_fills_header,
                  CV_IMAGE_OFFSET_VERSION + CV_IMAGE_VERSION_BYTES == CV_IMAGE_HEADER_SIZE);
 
+// ---- Diagnostic log ------------------------------------------------------------------------
+
+// Bank 2 sector 2. The application appends fixed-size entries and erases the sector when it is
+// full; the bootloader lists the newest entries in DIAG.TXT and never writes here. An entry is
+// blank when every byte is 0xFF, valid when its magic matches and the trailing crc32 covers the
+// preceding bytes, torn otherwise.
+#define CV_DIAG_LOG_ADDR     0x08140000u
+#define CV_DIAG_LOG_SIZE     0x20000u
+#define CV_DIAG_ENTRY_SIZE   256u
+// The bytes C V D G.
+#define CV_DIAG_MAGIC        0x47445643u
+// A numeric field nobody knew when the entry was written.
+#define CV_DIAG_UNKNOWN_U32  0xFFFFFFFFu
+
+// What the application was doing when it wrote the entry.
+enum CvDiagKind {
+  CvDiagKindBoot = 1,
+  CvDiagKindUpdateRequest = 2
+};
+
+// One log entry. Text fields are NUL padded. Reserved bytes stay 0xFF so a later field can be
+// added without a new magic.
+struct CvDiagEntry {
+  // CV_DIAG_MAGIC.
+  uint32_t magic;
+  // Counts up across erases, never CV_DIAG_UNKNOWN_U32.
+  uint32_t sequence;
+  // An enum CvDiagKind.
+  uint32_t kind;
+  // Seconds since the application started, or CV_DIAG_UNKNOWN_U32 for a boot entry.
+  uint32_t uptimeS;
+  // RCC reset flags as read at this boot.
+  uint32_t resetCause;
+  // The bootloader's boot-fail count as the application saw it at this boot.
+  uint32_t bootFails;
+  // CvBootBlock::lastReason and faultAddress as the bootloader left them.
+  uint32_t lastReason;
+  uint32_t faultAddress;
+  // Audio error counters of the run that wrote the entry.
+  uint32_t saiErrors;
+  uint32_t overruns;
+  // Release name, the CUBEVOX_FW_VERSION string.
+  char firmware[32];
+  // Fault record summary as faultSummaryText prints it, or empty.
+  char fault[64];
+  // The previous run's CvBootBlock::appSummary, or empty.
+  char summary[64];
+  uint8_t reserved[52];
+  // CRC-32 (zlib polynomial) over the preceding 252 bytes.
+  uint32_t crc32;
+};
+
+CV_STATIC_ASSERT(diag_entry_256_bytes, sizeof(struct CvDiagEntry) == CV_DIAG_ENTRY_SIZE);
+CV_STATIC_ASSERT(diag_crc_is_last, offsetof(struct CvDiagEntry, crc32) == CV_DIAG_ENTRY_SIZE - 4u);
+CV_STATIC_ASSERT(diag_log_in_bank_2,
+                 CV_DIAG_LOG_ADDR >= 0x08100000u && CV_DIAG_LOG_ADDR + CV_DIAG_LOG_SIZE <= 0x08200000u);
+CV_STATIC_ASSERT(diag_log_one_sector,
+                 CV_DIAG_LOG_SIZE == CV_FLASH_SECTOR_SIZE && CV_DIAG_LOG_ADDR % CV_FLASH_SECTOR_SIZE == 0u);
+CV_STATIC_ASSERT(diag_entries_fill_sector, CV_DIAG_LOG_SIZE % CV_DIAG_ENTRY_SIZE == 0u);
+
 // ---- Flash map checks ----------------------------------------------------------------------
 
 CV_STATIC_ASSERT(app_region_on_sector_bounds,
