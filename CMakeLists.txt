@@ -178,8 +178,24 @@ file(GLOB CUBEVOX_FW_CORE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/firmware
                                   ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/ui/*.cpp)
 # boot_decide.c is the bootloader's pure policy; the host build compiles it as C99.
 set(CUBEVOX_BOOT_DECIDE_DIR ${CMAKE_SOURCE_DIR}/firmware/bootloader/boards/cubevox)
-add_executable(firmware_test test/firmware_test.cpp ${CUBEVOX_FW_CORE_SOURCES}
-                             ${CUBEVOX_BOOT_DECIDE_DIR}/boot_decide.c)
+# Test sources are one file per subject in test/firmware/. main.cpp runs them in a fixed order.
+add_executable(firmware_test
+               test/firmware/main.cpp
+               test/firmware/support.cpp
+               test/firmware/boot_decide.cpp
+               test/firmware/core_canvas.cpp
+               test/firmware/core_input.cpp
+               test/firmware/core_layout.cpp
+               test/firmware/core_layout_fade.cpp
+               test/firmware/core_panel_test.cpp
+               test/firmware/core_protocol.cpp
+               test/firmware/core_protocol_fuzz.cpp
+               test/firmware/core_record.cpp
+               test/firmware/core_registry.cpp
+               test/firmware/core_tx_queue.cpp
+               test/firmware/ui_menu.cpp
+               ${CUBEVOX_FW_CORE_SOURCES}
+               ${CUBEVOX_BOOT_DECIDE_DIR}/boot_decide.c)
 target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
                                                  ${CUBEVOX_BOOT_DECIDE_DIR}
                                                  ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
