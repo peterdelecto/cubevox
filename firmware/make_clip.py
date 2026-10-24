@@ -2,9 +2,10 @@
 """Turns a WAV into a C header holding a mono 16-bit 48 kHz clip for the bench build.
 
 Stereo is folded to mono by taking the left channel. The clip loops in place of the SAI
-input while the bench op clip is on. build.sh writes the header to <out dir>-gen/bench_clip.h.
+input while the bench op clip is on. build.sh runs this when CLIP names a WAV (CLIP=loop.wav
+BENCH=1 ./build.sh) and writes the header to <out dir>-gen/bench_clip.h.
 
-  ./make_clip.py ../samples/adam_vox_sample2_4s.wav /tmp/cubevox-fw-bench-gen/bench_clip.h
+  ./make_clip.py loop.wav /tmp/cubevox-fw-bench-gen/bench_clip.h
 """
 
 import argparse

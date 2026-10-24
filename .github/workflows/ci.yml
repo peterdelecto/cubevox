@@ -25,10 +25,12 @@ jobs:
       - name: Build
         run: cmake --build build -j
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        # --no-tests=error makes a broken test registration fail instead of passing an empty run.
+        run: ctest --test-dir build --output-on-failure --no-tests=error
 
   firmware:
-    # macOS because warn_gate.py treats ~/Library/Arduino15 as the third-party tree.
+    # macOS because the arduino-cli download and the cache paths below are the macOS ones. The
+    # pins below must equal the ones in firmware/build.sh, which stops on any other version.
     runs-on: macos-14
     env:
       ARDUINO_CLI_VERSION: 1.5.1
@@ -60,9 +62,11 @@ jobs:
           arduino-cli lib install U8g2@${U8G2_VERSION}
           arduino-cli core list
           arduino-cli lib list
-      - name: Build release image (warn gate runs inside build.sh)
+      - name: Build release image (warn gate and bench-symbol check run inside build.sh)
+        # The release build proves the image holds no bench code.
         run: firmware/build.sh
-      - name: Build bench image (warn gate runs inside build.sh)
+      - name: Build bench image (warn gate and bench-symbol check run inside build.sh)
+        # The bench build is the control for that proof: it fails unless it holds every bench function.
         run: BENCH=1 firmware/build.sh
       - name: Check build.sh outcome
         id: images
@@ -72,19 +76,37 @@ jobs:
           release="$(firmware/build.sh --outdir)"
           bench="$(BENCH=1 firmware/build.sh --outdir)"
           for dir in "$release" "$bench"; do
-            for file in cubevox.ino.bin cubevox.uf2; do
+            for file in cubevox.ino.bin cubevox.uf2 cubevox.ino.elf; do
               test -s "$dir/$file" || { echo "[ERROR] $dir/$file is missing or empty"; exit 1; }
             done
             python3 -I tools/stamp_image.py check "$dir/cubevox.uf2"
           done
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "bench=$bench" >> "$GITHUB_OUTPUT"
+      - name: Check the bench symbols on both images
+        # build.sh already checks each image against its own variant. This step runs the rule on both
+        # elfs and adds the control: the release rule has to flag the bench image, or a renamed
+        # function has blinded the list of names.
+        env:
+          RELEASE_DIR: ${{ steps.images.outputs.release }}
+          BENCH_DIR: ${{ steps.images.outputs.bench }}
+        run: |
+          toolchain="$(firmware/build.sh --toolchain)"
+          export NM="$toolchain/arm-none-eabi-nm"
+          tools/check_bench_symbols.sh release "$RELEASE_DIR/cubevox.ino.elf"
+          tools/check_bench_symbols.sh bench "$BENCH_DIR/cubevox.ino.elf"
+          if tools/check_bench_symbols.sh release "$BENCH_DIR/cubevox.ino.elf" >/dev/null; then
+            echo "[ERROR] the release rule passed the bench image, so it cannot see bench code"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
+        # The elf is for the shop: it resolves the addresses in a DIAG.TXT.
         with:
           name: cubevox-firmware-release
           path: |
             ${{ steps.images.outputs.release }}/cubevox.uf2
             ${{ steps.images.outputs.release }}/cubevox.ino.bin
+            ${{ steps.images.outputs.release }}/cubevox.ino.elf
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
@@ -92,6 +114,7 @@ jobs:
           path: |
             ${{ steps.images.outputs.bench }}/cubevox.uf2
             ${{ steps.images.outputs.bench }}/cubevox.ino.bin
+            ${{ steps.images.outputs.bench }}/cubevox.ino.elf
           if-no-files-found: error
 
   bootloader:

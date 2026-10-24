@@ -85,15 +85,15 @@ load maps unknown ids to `empty`.
    silent blocks before the fade-in.
 3. The ramp is a pure core sequencer (`core/layout_fade`): per block it gives the gain and whether
    to swap. Host-tested.
-4. Controls re-seed knob steps for the new cards (already in place); the menu's chain view reads
-   the new layout.
+4. Controls re-seed knob steps for the new cards (already in place). No menu row opens the chain
+   view (`2026-10-24-polish-design.md`).
 
 ## Modules
 | Tier | Module | Owns |
 |---|---|---|
 | core | `protocol` | line framing state, request parse, reply formatting into a writer interface |
 | core | `layout_fade` | fade-out, swap, fade-in per block |
-| board | `serial_link` | reads CDC bytes, splits JSON lines from bench letters, writes replies |
+| board | `serial_link` | reads CDC bytes, cuts JSON lines and ignores every other byte (counted as stray), writes replies |
 | sketch | | dispatches commands to layout, record, audio stats, mute and DFU |
 
 ## Verification
