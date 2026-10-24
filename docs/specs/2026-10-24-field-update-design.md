@@ -5,6 +5,9 @@ and he updates its firmware himself over USB-C with nothing to install. cubevox 
 and open source. A handful of hand-built units will exist. The OLED tells Adam what the box is
 doing in update mode. A diagnostics file on the update drive is how he sends us what went wrong.
 Firmware is not signed. Adam will later keep his own data on the box, so flash is reserved for it.
+When the Mac app returns, one click in it also updates the firmware by copying the same file to the
+drive. Going back to an older firmware is dragging the older release file; the box keeps one image.
+The repository licence is MIT.
 
 This spec supersedes the ROM-DFU items of `2026-10-02-hardware-design.md` (lines 151 and 180) and
 the box side of the Update section of `2026-10-15-mac-app-design.md`. When the app returns it
@@ -212,7 +215,7 @@ and serial lines are drawn at run time with the 5x7 font.
 | Wrong file dragged | every block refused, image intact | `WRONG FILE` | `refused N blocks, family X` |
 | Corrupt download | CRC fails, update mode | `UPDATE NEEDED` | `reason ImageInvalid` |
 | New firmware crashes at start | 3 resets, update mode | `UPDATE NEEDED … 3 times` | `reason BootFailed`, fault record |
-| New firmware works but sounds wrong | — | — | Adam drags the previous release file (section Open items, 4) |
+| New firmware works but sounds wrong | — | — | Adam drags the previous release file; every release stays downloadable |
 | Menu dead, app otherwise fine | hold MENU at power-on | `UPDATE MODE` | `reason MenuHeld` |
 | Confirm with no computer | 60 s, back to the app | `UPDATE MODE`, then normal | `reason AppRequest, timeout` |
 | Bootloader hangs | power cycle | screen frozen, then normal | nothing |
@@ -350,9 +353,11 @@ firmware/bootloader/
 5. `docs/update-guide.md` is Adam's one page. Steps 1–5 of "What Adam does", a photo of each OLED
    screen, the Finder notice, and the support sentence about `DIAG.TXT`.
 6. `VERSION.txt` is bumped as today; the header string and the release file name derive from it.
-7. `LICENSE` is added at the repository root (owner picks the licence; MIT for firmware and tools
-   is the usual match for the MIT dependencies). The bootloader README carries the TinyUF2 and
-   TinyUSB notices.
+7. `LICENSE` at the repository root is MIT (owner 2026-10-24), covering firmware, tools, docs and
+   the hardware files alike. The bootloader README carries the TinyUF2 and TinyUSB notices.
+8. The parked app, when it returns, replaces its dfu-util step with a copy of the release `.uf2` to
+   `/Volumes/CUBEVOX` and a wait for the CDC port. `app/dfu-util-static.sh` and the `dfu-util`
+   release job go at that time, not before.
 
 ## Compatibility rules
 1. The boot block offsets, the header layout, the family id, the application start address and the
@@ -376,8 +381,9 @@ firmware/bootloader/
 | Update time | about 3 s for a 200 KB image, erase included |
 
 ## Roadmap
-1. Repository public with `LICENSE`; pid.codes pull request for two ids. Owner action, start first
-   because the grant takes days to weeks.
+1. `LICENSE` (MIT) committed; repository made public by the owner; pid.codes pull request for two
+   ids, drafted here and opened under the owner's account. Start first because the grant takes
+   days to weeks.
 2. `boot_block.h`, `stamp_image.py` (stamp, check, UF2 write), `boot_decide.c`, host tests for all
    of them. Gate: `ctest`.
 3. Bootloader board, patches, build script, OLED driver and screens, `DIAG.TXT`. Proof set for the
@@ -392,10 +398,6 @@ firmware/bootloader/
 7. Shop steps on every shipping unit, one log per unit in `hardware/bringup/`.
 
 ## Open items for the owner
-1. Mac app and updates, later. When the app returns, should one click in it also update the
-   firmware by copying the file for him? Assumed yes; it costs the firmware nothing either way.
-2. Going back. If a new firmware works but Adam prefers the old one, he downloads the older release
-   file and drags it like any update. Assumed; the alternative keeps a second image on the box and
-   adds a menu item.
-3. Licence choice for `LICENSE`.
-4. OLED screen proofs arrive with roadmap step 3 and the confirm screen with step 4.
+1. OLED screen proofs arrive with roadmap step 3 and the confirm screen with step 4, numbered,
+   approved per number.
+2. Repository public and the pid.codes pull request opened, both under the owner's account.
