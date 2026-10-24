@@ -1,10 +1,16 @@
 // Checks the OLED canvas on the host. Covers text drawing, clipping, the dirty-page API, glyph
-// fallback, the three fonts and rectangle fills.
+// fallback, the three fonts, rectangle fills, text spaced by ink, tabular digits and the 5x7
+// fixed pitch.
 
 #include "support.h"
 
+#include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <iterator>
+#include <string>
+#include <vector>
 
 #include "core/canvas.h"
 #include "core/fonts.h"
@@ -150,6 +156,343 @@ void checkCanvasRects() {
   check(rect.page(1)[10] == 0 && rect.page(1)[13] == 0, "canvas: invertRect undoes a fill");
 }
 
+// The 9X12 and 16X24 fonts keep this many blank columns between neighbouring inks.
+constexpr int kInkGap = 3;
+
+// Holds the first and last column with a lit pixel. first is -1 when nothing is lit.
+struct Ink {
+  int first = -1;
+  int last = -1;
+  int width() const { return first < 0 ? 0 : last - first + 1; }
+};
+
+bool columnLit(const Canvas& c, int x) {
+  for (int p = 0; p < kCanvasPages; ++p) {
+    if (c.page(p)[x]) return true;
+  }
+  return false;
+}
+
+bool sameColumn(const Canvas& a, int ax, const Canvas& b, int bx) {
+  for (int p = 0; p < kCanvasPages; ++p) {
+    if (a.page(p)[ax] != b.page(p)[bx]) return false;
+  }
+  return true;
+}
+
+bool samePages(const Canvas& a, const Canvas& b) {
+  for (int p = 0; p < kCanvasPages; ++p) {
+    if (std::memcmp(a.page(p), b.page(p), kCanvasWidth) != 0) return false;
+  }
+  return true;
+}
+
+Ink inkOf(const Canvas& c) {
+  Ink ink;
+  for (int x = 0; x < kCanvasWidth; ++x) {
+    if (!columnLit(c, x)) continue;
+    if (ink.first < 0) ink.first = x;
+    ink.last = x;
+  }
+  return ink;
+}
+
+// Reads the ink of glyph `index` from its bitmap, so tests check the exported tables against pixels.
+Ink bitmapInk(const FontDesc& font, int index) {
+  Ink ink;
+  const int bands = (font.height + 7) / 8;
+  for (int col = 0; col < font.width; ++col) {
+    bool lit = false;
+    for (int band = 0; band < bands; ++band) lit = lit || glyphAt(font, index)[band * font.width + col] != 0;
+    if (!lit) continue;
+    if (ink.first < 0) ink.first = col;
+    ink.last = col;
+  }
+  return ink;
+}
+
+struct NamedFont {
+  const char* name;
+  const FontDesc* font;
+};
+
+std::array<NamedFont, 2> inkFonts() { return {{{"9X12", &font9x12()}, {"16X24", &font16x24()}}}; }
+
+// The GUI draws values in 16X24 and labels in 9X12. The gap rule holds for both fonts, so every
+// line is checked in both, and a label is wider than the panel in 16X24.
+constexpr const char* kValues[] = {"MUTED", "210 MS", "-24 DB"};
+constexpr const char* kLabels[] = {"SEMITONES", "THRESHOLD"};
+
+std::string said(const NamedFont& nf, const char* text, const char* what) {
+  return std::string("canvas: ") + nf.name + " \"" + text + "\" " + what;
+}
+
+std::vector<const char*> allLines() {
+  std::vector<const char*> lines(std::begin(kValues), std::end(kValues));
+  lines.insert(lines.end(), std::begin(kLabels), std::end(kLabels));
+  return lines;
+}
+
+// Returns the lines that fit the panel in this font, which is all of them in 9X12.
+std::vector<const char*> fittingLines(const NamedFont& nf) {
+  std::vector<const char*> lines;
+  for (const char* text : allLines()) {
+    if (Canvas::textWidth(*nf.font, text) <= kCanvasWidth - 2) lines.push_back(text);
+  }
+  return lines;
+}
+
+// True when `a`, `blanks` spaces and `b` are drawn with each ink whole, starting on its own pen, and
+// the blank columns between the two inks equal `gap` plus one space advance per blank.
+bool pairIsSpaced(const FontDesc& font, char a, int blanks, char b, int gap) {
+  char pair[8] = {a};
+  for (int i = 0; i < blanks; ++i) pair[1 + i] = ' ';
+  pair[1 + blanks] = b;
+  const char loneA[2] = {a, 0};
+  const char loneB[2] = {b, 0};
+  Canvas line;
+  Canvas first;
+  Canvas second;
+  line.drawText(0, 0, font, pair);
+  first.drawText(0, 0, font, loneA);
+  second.drawText(0, 0, font, loneB);
+  const Ink inkA = inkOf(first);
+  const Ink inkB = inkOf(second);
+  if (inkA.first != 0 || inkB.first != 0) return false;
+
+  int start = inkA.width();
+  while (start < kCanvasWidth && !columnLit(line, start)) ++start;
+  for (int k = 0; k < inkA.width(); ++k) {
+    if (!sameColumn(line, k, first, k)) return false;
+  }
+  for (int k = 0; k < inkB.width(); ++k) {
+    if (start + k >= kCanvasWidth || !sameColumn(line, start + k, second, k)) return false;
+  }
+  return start - inkA.width() == gap + blanks * font.spaceAdvance;
+}
+
+// True when every neighbouring pair of inked glyphs in `text` passes pairIsSpaced.
+bool pairsAreSpaced(const FontDesc& font, const char* text, int gap) {
+  bool any = false;
+  for (const char* p = text; *p; ++p) {
+    if (*p == ' ') continue;
+    const char* q = p + 1;
+    while (*q == ' ') ++q;
+    if (!*q) break;
+    any = true;
+    if (!pairIsSpaced(font, *p, static_cast<int>(q - p) - 1, *q, gap)) return false;
+  }
+  return any;
+}
+
+// Checks the same rule on one drawing of a line that fits the panel, where each glyph sits whole
+// after the one before it.
+bool lineIsSpaced(const FontDesc& font, const char* text, int gap) {
+  Canvas line;
+  line.drawText(0, 0, font, text);
+  int prevEnd = -1;
+  int blanks = 0;
+  for (const char* p = text; *p; ++p) {
+    if (*p == ' ') {
+      ++blanks;
+      continue;
+    }
+    const char one[2] = {*p, 0};
+    Canvas alone;
+    alone.drawText(0, 0, font, one);
+    const Ink glyph = inkOf(alone);
+    int start = prevEnd + 1;
+    while (start < kCanvasWidth && !columnLit(line, start)) ++start;
+    for (int k = 0; k < glyph.width(); ++k) {
+      if (start + k >= kCanvasWidth || !sameColumn(line, start + k, alone, k)) return false;
+    }
+    const int expected = prevEnd < 0 ? 0 : gap + blanks * font.spaceAdvance;
+    if (start - prevEnd - 1 != expected) return false;
+    prevEnd = start + glyph.width() - 1;
+    blanks = 0;
+  }
+  return prevEnd >= 0;
+}
+
+void checkInkTables() {
+  const NamedFont all[] = {{"5x7", &font5x7()}, {"9X12", &font9x12()}, {"16X24", &font16x24()}};
+  for (const NamedFont& nf : all) {
+    const FontDesc& font = *nf.font;
+    bool ok = font.inkLeft != nullptr && font.inkWidth != nullptr;
+    for (int i = 0; ok && i < font.glyphCount; ++i) {
+      const Ink ink = bitmapInk(font, i);
+      ok = font.inkLeft[i] == (ink.first < 0 ? 0 : ink.first) && font.inkWidth[i] == ink.width();
+    }
+    check(ok, (std::string("canvas: ") + nf.name + " ink tables match the bitmaps, 0 for a blank glyph").c_str());
+    check(font.spaceAdvance == font.width / 2, (std::string("canvas: ") + nf.name + " space advance is half the cell").c_str());
+  }
+  check(font5x7().inkGap == 0 && font9x12().inkGap == kInkGap && font16x24().inkGap == kInkGap,
+        "canvas: only 5x7 stays on the fixed pitch, the others use a 3 px gap");
+}
+
+void checkInkSpacing() {
+  for (const NamedFont& nf : inkFonts()) {
+    for (const char* text : allLines()) {
+      check(pairsAreSpaced(*nf.font, text, kInkGap), said(nf, text, "adjacent inks sit exactly the gap apart").c_str());
+    }
+    for (const char* text : fittingLines(nf)) {
+      check(lineIsSpaced(*nf.font, text, kInkGap), said(nf, text, "drawn whole keeps the same gaps").c_str());
+    }
+  }
+  check(fittingLines({"9X12", &font9x12()}).size() == 5 && fittingLines({"16X24", &font16x24()}).size() == 3,
+        "canvas: every line fits the panel in 9X12, the three values fit in 16X24");
+}
+
+void checkInkWidthAndCentring() {
+  for (const NamedFont& nf : inkFonts()) {
+    const FontDesc& font = *nf.font;
+    for (const char* text : fittingLines(nf)) {
+      const int width = Canvas::textWidth(font, text);
+
+      Canvas flush;
+      flush.drawText(0, 0, font, text);
+      check(inkOf(flush).first == 0 && inkOf(flush).width() == width, said(nf, text, "textWidth is the ink width from x").c_str());
+
+      const int x = (kCanvasWidth - width) / 2;
+      Canvas mid;
+      const int pen = mid.drawText(x, 0, font, text);
+      const Ink ink = inkOf(mid);
+      check(std::abs(ink.first - (kCanvasWidth - 1 - ink.last)) <= 1 && pen == x + width + kInkGap,
+            said(nf, text, "centred margins differ by at most 1 px").c_str());
+
+      Canvas padded;
+      padded.drawText(1, 0, font, text);
+      check(!columnLit(padded, 0) && inkOf(padded).first == 1 && width <= kCanvasWidth - 2,
+            said(nf, text, "at x = 1 keeps 1 px clear and fits with 1 px each side").c_str());
+    }
+  }
+}
+
+void checkInkPen() {
+  const char unknown[] = "A\x01" "B";  // A code no font has advances like a blank.
+  for (const NamedFont& nf : inkFonts()) {
+    const FontDesc& font = *nf.font;
+    Canvas whole;
+    whole.drawText(2, 0, font, "MUTED");
+    Canvas split;
+    const int pen = split.drawText(2, 0, font, "MU");
+    split.drawText(pen, 0, font, "TED");
+    check(samePages(whole, split), said(nf, "MU + TED", "a second call continues the line").c_str());
+
+    const int blank = Canvas::textWidth(font, "A") + kInkGap + font.spaceAdvance + Canvas::textWidth(font, "B");
+    check(Canvas::textWidth(font, "A B") == blank && Canvas::textWidth(font, unknown) == blank,
+          said(nf, "A B", "a blank glyph advances by the space advance").c_str());
+    check(Canvas::textWidth(font, "") == 0, said(nf, "", "has no width").c_str());
+  }
+}
+
+void checkInkClipping() {
+  for (const NamedFont& nf : inkFonts()) {
+    Canvas ref;
+    ref.drawText(30, 0, *nf.font, "MUTED");
+    Canvas left;
+    left.drawText(-20, 0, *nf.font, "MUTED");
+    Canvas right;
+    right.drawText(100, 0, *nf.font, "MUTED");
+    bool ok = true;
+    for (int c = 0; c < kCanvasWidth - 50; ++c) ok = ok && sameColumn(left, c, ref, c + 50);
+    for (int k = 0; k < kCanvasWidth - 100; ++k) ok = ok && sameColumn(right, 100 + k, ref, 30 + k);
+    check(ok && inkOf(left).width() > 0 && inkOf(right).width() > 0,
+          said(nf, "MUTED", "clips at both edges without moving the rest").c_str());
+  }
+}
+
+void checkTabularDigits() {
+  for (const NamedFont& nf : inkFonts()) {
+    const FontDesc& font = *nf.font;
+    const int pitch = font.width + font.spacing;
+
+    bool centred = true;
+    for (const char* d = "0123456789-"; *d; ++d) {
+      const char one[2] = {*d, 0};
+      Canvas c;
+      c.drawDigits(0, 0, font, one);
+      const Ink ink = inkOf(c);
+      centred = centred && ink.first >= 0 && std::abs(ink.first - (font.width - 1 - ink.last)) <= 1;
+    }
+    check(centred, said(nf, "0123456789-", "tabular ink sits mid-cell, slack within 1 px").c_str());
+
+    Canvas one;
+    one.drawDigits(0, 0, font, "1");
+    const Ink ink1 = inkOf(one);
+    check(std::abs(ink1.first - (font.width - 1 - ink1.last)) <= 1 && ink1.first > 0,
+          said(nf, "1", "left and right slack differ by at most 1 px").c_str());
+
+    check(Canvas::digitsWidth(font, "111") == 3 * pitch - font.spacing && Canvas::digitsWidth(font, "111") == Canvas::digitsWidth(font, "888") &&
+              Canvas::digitsWidth(font, "") == 0,
+          said(nf, "111", "digitsWidth depends on the length only").c_str());
+
+    Canvas ten;
+    Canvas eighty;
+    const int pen = ten.drawDigits(0, 0, font, "10");
+    eighty.drawDigits(0, 0, font, "80");
+    bool tailStill = true;
+    for (int col = pitch; col < pitch + font.width; ++col) tailStill = tailStill && sameColumn(ten, col, eighty, col);
+    check(tailStill && !sameColumn(ten, 0, eighty, 0) && !samePages(ten, eighty) && pen == 2 * pitch,
+          said(nf, "10 and 80", "a changed digit leaves its neighbour in place").c_str());
+
+    Canvas gap;
+    gap.drawDigits(0, 0, font, "1 1");
+    bool blankCell = true;
+    for (int col = pitch; col < 2 * pitch; ++col) blankCell = blankCell && !columnLit(gap, col);
+    check(blankCell && columnLit(gap, 2 * pitch + font.width / 2), said(nf, "1 1", "a space holds a whole cell").c_str());
+  }
+}
+
+// Lays glyph cells on a width + spacing grid, which is the 5x7 pitch the menu screens rely on.
+void fixedPitchRow(const char* text, uint8_t (&row)[kCanvasWidth]) {
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  std::memset(row, 0, sizeof row);
+  int x = 0;
+  for (; *text; ++text) {
+    int code = static_cast<unsigned char>(*text);
+    if (code >= 'a' && code <= 'z') code -= 'a' - 'A';
+    if (code >= 0x20 && code <= 0x7E) {
+      for (int col = 0; col < f::kWidth; ++col) {
+        if (x + col < kCanvasWidth) row[x + col] |= f::kGlyphs[code - 0x20][col];
+      }
+    }
+    x += f::kWidth + f::kSpacing;
+  }
+}
+
+bool fixedPitchMatches(const char* text) {
+  uint8_t want[kCanvasWidth];
+  fixedPitchRow(text, want);
+  Canvas c;
+  const int n = static_cast<int>(std::strlen(text));
+  const int pen = c.drawText(0, 0, font5x7(), text);
+  bool ok = std::memcmp(c.page(0), want, kCanvasWidth) == 0 && pen == n * kFont5x7Advance;
+  ok = ok && Canvas::textWidth(font5x7(), text) == (n == 0 ? 0 : n * kFont5x7Advance - 1);
+  for (int p = 1; p < kCanvasPages; ++p) {
+    for (int x = 0; x < kCanvasWidth; ++x) ok = ok && c.page(p)[x] == 0;
+  }
+  return ok;
+}
+
+void checkFixedPitch5x7() {
+  bool ok = true;
+  char chunk[22];
+  for (int start = 0x20; start <= 0x7E; start += 21) {
+    int n = 0;
+    for (int code = start; code <= 0x7E && n < 21; ++code) chunk[n++] = static_cast<char>(code);
+    chunk[n] = '\0';
+    ok = ok && fixedPitchMatches(chunk);
+  }
+  check(ok, "canvas: 5x7 prints every character on the 6 px grid, byte for byte");
+
+  const char* ui[] = {"Update the firmware?", "You have v2.00.19.", "Click to start.", "Turn to cancel.",
+                      ">Out LINE", "Chain order", "1 INPUT GATE", "I", "i", "", " "};
+  bool menuOk = true;
+  for (const char* s : ui) menuOk = menuOk && fixedPitchMatches(s);
+  check(menuOk, "canvas: 5x7 menu and update strings are byte for byte the fixed pitch");
+}
+
 }  // namespace
 
 void checkCanvas() {
@@ -160,4 +503,11 @@ void checkCanvas() {
   checkCanvasFallback();
   checkCanvasFonts();
   checkCanvasRects();
+  checkInkTables();
+  checkInkSpacing();
+  checkInkWidthAndCentring();
+  checkInkPen();
+  checkInkClipping();
+  checkTabularDigits();
+  checkFixedPitch5x7();
 }

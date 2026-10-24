@@ -3,6 +3,10 @@
 // Each glyph is ceil(kHeight / 8) pages, top page first. A page holds one byte per
 // column, left to right, with bit 0 as the top pixel (SH1106 page layout).
 // kCodes ascends, so ASCII 32..126 sit at index code - 32 and symbols follow.
+//
+// kInkLeft and kInkWidth hold, per glyph, the first inked column and the columns from there
+// to the last inked one, measured from the bitmap. A blank glyph has both at 0.
+// kSpaceAdvance is half the cell width.
 
 #pragma once
 #include <cstdint>
@@ -14,6 +18,7 @@ namespace Stylized9X12 {
 constexpr uint8_t kWidth = 9;
 constexpr uint8_t kHeight = 12;
 constexpr uint8_t kSpacing = 1;
+constexpr uint8_t kSpaceAdvance = 4;
 constexpr uint16_t kGlyphCount = 95;
 constexpr uint16_t kBytesPerGlyph = 18;
 constexpr uint8_t kCodes[kGlyphCount] = {
@@ -23,6 +28,22 @@ constexpr uint8_t kCodes[kGlyphCount] = {
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
   0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
   0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E,
+};
+constexpr uint8_t kInkLeft[kGlyphCount] = {
+   0,  3,  2,  0,  0,  0,  0,  4,  2,  2,  0,  0,  4,  0,  3,  1,
+   0,  2,  1,  1,  0,  1,  1,  1,  0,  0,  4,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+};
+constexpr uint8_t kInkWidth[kGlyphCount] = {
+   0,  3,  5,  9,  0,  0,  9,  2,  5,  5,  0,  0,  2,  0,  3,  7,
+   9,  5,  7,  7,  9,  8,  8,  7,  9,  8,  2,  0,  0,  0,  0,  0,
+   0,  9,  9,  9,  9,  8,  9,  9,  9,  4,  9,  9,  8,  9,  9,  9,
+   9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {
   {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},  // 0x20 space
@@ -128,6 +149,7 @@ namespace StylizedRefined9X12 {
 constexpr uint8_t kWidth = 9;
 constexpr uint8_t kHeight = 12;
 constexpr uint8_t kSpacing = 1;
+constexpr uint8_t kSpaceAdvance = 4;
 constexpr uint16_t kGlyphCount = 95;
 constexpr uint16_t kBytesPerGlyph = 18;
 constexpr uint8_t kCodes[kGlyphCount] = {
@@ -137,6 +159,22 @@ constexpr uint8_t kCodes[kGlyphCount] = {
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
   0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
   0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E,
+};
+constexpr uint8_t kInkLeft[kGlyphCount] = {
+   0,  3,  2,  0,  0,  0,  0,  4,  2,  2,  0,  0,  2,  0,  3,  1,
+   0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  3,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+};
+constexpr uint8_t kInkWidth[kGlyphCount] = {
+   0,  2,  5,  8,  0,  0,  9,  2,  5,  5,  0,  0,  3,  0,  2,  7,
+   7,  4,  8,  8,  8,  8,  8,  8,  8,  8,  2,  0,  0,  0,  0,  0,
+   0,  8,  8,  8,  8,  8,  8,  8,  8,  6,  8,  8,  7,  9,  8,  8,
+   8,  8,  8,  8,  8,  8,  8,  9,  8,  8,  8,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {
   {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},  // 0x20 space
@@ -242,6 +280,7 @@ namespace StylizedHyperlegible5x7 {
 constexpr uint8_t kWidth = 5;
 constexpr uint8_t kHeight = 7;
 constexpr uint8_t kSpacing = 1;
+constexpr uint8_t kSpaceAdvance = 2;
 constexpr uint16_t kGlyphCount = 95;
 constexpr uint16_t kBytesPerGlyph = 5;
 constexpr uint8_t kCodes[kGlyphCount] = {
@@ -251,6 +290,22 @@ constexpr uint8_t kCodes[kGlyphCount] = {
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
   0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
   0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E,
+};
+constexpr uint8_t kInkLeft[kGlyphCount] = {
+   0,  1,  1,  0,  0,  0,  0,  1,  1,  1,  0,  0,  1,  0,  1,  0,
+   0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,  1,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  1,  0,  0,
+   1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  1,  0,
+};
+constexpr uint8_t kInkWidth[kGlyphCount] = {
+   0,  3,  3,  5,  5,  5,  5,  2,  3,  3,  5,  5,  2,  5,  2,  5,
+   4,  3,  4,  5,  5,  5,  5,  5,  5,  5,  2,  2,  4,  5,  4,  5,
+   5,  5,  5,  5,  5,  5,  5,  5,  5,  3,  5,  5,  5,  5,  5,  5,
+   5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  3,  5,  3,  5,  5,
+   3,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  3,  1,  3,  5,
 };
 constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {
   {0x00, 0x00, 0x00, 0x00, 0x00},  // 0x20 space
@@ -356,6 +411,7 @@ namespace StylizedHyperlegible9X12 {
 constexpr uint8_t kWidth = 9;
 constexpr uint8_t kHeight = 12;
 constexpr uint8_t kSpacing = 2;
+constexpr uint8_t kSpaceAdvance = 4;
 constexpr uint16_t kGlyphCount = 95;
 constexpr uint16_t kBytesPerGlyph = 18;
 constexpr uint8_t kCodes[kGlyphCount] = {
@@ -365,6 +421,22 @@ constexpr uint8_t kCodes[kGlyphCount] = {
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
   0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
   0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E,
+};
+constexpr uint8_t kInkLeft[kGlyphCount] = {
+   0,  2,  2,  0,  0,  0,  0,  4,  2,  2,  0,  0,  2,  1,  3,  1,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  3,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+};
+constexpr uint8_t kInkWidth[kGlyphCount] = {
+   0,  4,  5,  8,  0,  0,  9,  2,  5,  5,  0,  0,  3,  6,  2,  7,
+   7,  5,  8,  8,  8,  8,  8,  8,  8,  8,  2,  0,  0,  0,  0,  0,
+   0,  8,  8,  8,  8,  8,  8,  8,  8,  6,  8,  9,  7,  9,  8,  8,
+   8,  8,  8,  8,  8,  8,  8,  9,  8,  8,  8,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {
   {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},  // 0x20 space
@@ -470,6 +542,7 @@ namespace StylizedHyperlegible16X24 {
 constexpr uint8_t kWidth = 16;
 constexpr uint8_t kHeight = 24;
 constexpr uint8_t kSpacing = 2;
+constexpr uint8_t kSpaceAdvance = 8;
 constexpr uint16_t kGlyphCount = 95;
 constexpr uint16_t kBytesPerGlyph = 48;
 constexpr uint8_t kCodes[kGlyphCount] = {
@@ -479,6 +552,22 @@ constexpr uint8_t kCodes[kGlyphCount] = {
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
   0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
   0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E,
+};
+constexpr uint8_t kInkLeft[kGlyphCount] = {
+   0,  3,  2,  0,  0,  0,  0,  6,  4,  0,  0,  1,  3,  2,  5,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  5,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+};
+constexpr uint8_t kInkWidth[kGlyphCount] = {
+   0,  8, 11, 15,  0, 15, 15,  6, 10, 10,  0, 13,  6, 11,  4, 15,
+  13,  9, 15, 15, 15, 15, 15, 15, 15, 15,  4,  0,  0,  0,  0,  0,
+   0, 15, 15, 15, 15, 15, 15, 15, 15, 11, 15, 15, 13, 15, 15, 15,
+  15, 15, 15, 15, 15, 15, 15, 15, 15, 14, 15,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {
   {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},  // 0x20 space

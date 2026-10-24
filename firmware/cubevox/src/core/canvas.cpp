@@ -8,6 +8,36 @@ namespace {
 // below zero.
 int pageOf(int y) { return y >= 0 ? y / 8 : -((-y + 7) / 8); }
 
+int cellPitch(const FontDesc& font) { return font.width + font.spacing; }
+
+bool spacedByInk(const FontDesc& font) { return font.inkGap > 0 && font.inkLeft && font.inkWidth; }
+
+// Where one character sits on the pen. The glyph cell starts `shift` columns left of the pen, so
+// the ink starts at the pen. The pen then moves `advance` columns, and the last `trail` of them are
+// blank, which textWidth leaves out. A null glyph draws nothing but still moves the pen.
+struct Step {
+  const uint8_t* glyph;
+  int shift;
+  int advance;
+  int trail;
+};
+
+Step stepFor(const FontDesc& font, char c) {
+  const int i = glyphIndex(font, c);
+  const uint8_t* glyph = i < 0 ? nullptr : glyphAt(font, i);
+  if (!spacedByInk(font)) return {glyph, 0, cellPitch(font), font.spacing};
+  const int ink = i < 0 ? 0 : font.inkWidth[i];
+  if (ink == 0) return {nullptr, 0, font.spaceAdvance, 0};
+  return {glyph, font.inkLeft[i], ink + font.inkGap, font.inkGap};
+}
+
+// Offset from a cell's left edge at which to draw glyph i so its ink sits mid-cell. An odd slack
+// puts the extra pixel on the right.
+int centreShift(const FontDesc& font, int i) {
+  if (!font.inkLeft || !font.inkWidth || font.inkWidth[i] == 0) return 0;
+  return (font.width - font.inkWidth[i]) / 2 - font.inkLeft[i];
+}
+
 }  // namespace
 
 void Canvas::clear() {
@@ -87,14 +117,34 @@ void Canvas::drawGlyph(int x, int y, const FontDesc& font, const uint8_t* glyph)
 
 int Canvas::drawText(int x, int y, const FontDesc& font, const char* text) {
   for (; *text; ++text) {
-    const uint8_t* glyph = findGlyph(font, *text);
-    if (glyph) drawGlyph(x, y, font, glyph);
-    x += font.width + font.spacing;
+    const Step step = stepFor(font, *text);
+    if (step.glyph) drawGlyph(x - step.shift, y, font, step.glyph);
+    x += step.advance;
   }
   return x;
 }
 
 int Canvas::textWidth(const FontDesc& font, const char* text) {
+  int width = 0;
+  int trail = 0;
+  for (; *text; ++text) {
+    const Step step = stepFor(font, *text);
+    width += step.advance;
+    trail = step.trail;
+  }
+  return width - trail;
+}
+
+int Canvas::drawDigits(int x, int y, const FontDesc& font, const char* text) {
+  for (; *text; ++text) {
+    const int i = glyphIndex(font, *text);
+    if (i >= 0) drawGlyph(x + centreShift(font, i), y, font, glyphAt(font, i));
+    x += cellPitch(font);
+  }
+  return x;
+}
+
+int Canvas::digitsWidth(const FontDesc& font, const char* text) {
   const int n = static_cast<int>(strlen(text));
-  return n == 0 ? 0 : n * (font.width + font.spacing) - font.spacing;
+  return n == 0 ? 0 : n * cellPitch(font) - font.spacing;
 }

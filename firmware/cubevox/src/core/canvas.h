@@ -23,12 +23,26 @@ class Canvas {
   void fillRect(int x, int y, int w, int h, bool on);
   void invertRect(int x, int y, int w, int h);
 
-  // Draws set pixels only (blank glyph pixels leave the canvas alone). Returns the pen x after
-  // the last glyph, trailing spacing included, so a second call continues the line.
+  // Draws set pixels only (blank glyph pixels leave the canvas alone). The 5x7 font keeps its fixed
+  // cell, so x is the left edge of the first cell. The 9X12 and 16X24 fonts are spaced by ink, so x
+  // is the left edge of the first glyph's ink and neighbouring inks sit the font's gap apart. A
+  // blank glyph advances the pen by the font's space advance. Returns the pen x after the last
+  // glyph, trailing gap included, so a second call continues the line.
   int drawText(int x, int y, const FontDesc& font, const char* text);
 
-  // Ink width: advance per glyph times the count, minus the trailing spacing. 0 for "".
+  // Width of the line drawText draws, without the trailing gap. For a font spaced by ink that is
+  // the ink width, so centring on it centres the ink. 0 for "".
   static int textWidth(const FontDesc& font, const char* text);
+
+  // Tabular text for numbers that change. Every character takes one fixed cell of width plus
+  // spacing, and a glyph's ink is centred in the cell's width, so a digit swaps for another
+  // without moving its neighbours. x is the left edge of the first cell. Returns the pen x after
+  // the last cell, spacing included.
+  int drawDigits(int x, int y, const FontDesc& font, const char* text);
+
+  // Width of the line drawDigits draws: the cell pitch times the count, minus the trailing
+  // spacing. It depends on the length only, never on which digits. 0 for "".
+  static int digitsWidth(const FontDesc& font, const char* text);
 
   // Bit p set means page p changed since clearDirty(p).
   uint8_t dirtyPages() const { return dirty_; }

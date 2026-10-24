@@ -174,8 +174,37 @@
     return code >= SYMBOL_FIRST || code === 32 ? label : `'${label}'`;
   }
 
+  // Columns holding ink: the first lit column, and the count from there to the last lit one.
+  // A blank glyph has no ink, so both are 0.
+  function inkExtent(rows) {
+    let first = Infinity;
+    let last = -1;
+    for (const row of rows) {
+      const lo = row.indexOf('#');
+      if (lo < 0) continue;
+      first = Math.min(first, lo);
+      last = Math.max(last, row.lastIndexOf('#'));
+    }
+    return last < 0 ? { left: 0, width: 0 } : { left: first, width: last - first + 1 };
+  }
+
+  // Pen advance over a blank glyph in ink layout: half the cell width, rounded down.
+  const spaceAdvance = (font) => Math.floor(font.width / 2);
+
+  const dec2 = (n) => String(n).padStart(2);
+
+  // A constexpr uint8_t table with one entry per glyph, 16 to a line.
+  function byteTable(lines, name, values, format) {
+    lines.push(`constexpr uint8_t ${name}[kGlyphCount] = {`);
+    for (let i = 0; i < values.length; i += 16) {
+      lines.push('  ' + values.slice(i, i + 16).map(format).join(', ') + ',');
+    }
+    lines.push('};');
+  }
+
   function fontBlock(font, ident) {
     const codes = codesOf(font);
+    const ink = codes.map((c) => inkExtent(font.glyphs[c]));
     const perGlyph = font.width * Math.ceil(font.height / 8);
     const lines = [
       `// ${font.name.replace(/[\r\n]+/g, ' ')}: ${font.width} x ${font.height} px, ` +
@@ -184,14 +213,14 @@
       `constexpr uint8_t kWidth = ${font.width};`,
       `constexpr uint8_t kHeight = ${font.height};`,
       `constexpr uint8_t kSpacing = ${font.spacing};`,
+      `constexpr uint8_t kSpaceAdvance = ${spaceAdvance(font)};`,
       `constexpr uint16_t kGlyphCount = ${codes.length};`,
       `constexpr uint16_t kBytesPerGlyph = ${perGlyph};`,
-      `constexpr uint8_t kCodes[kGlyphCount] = {`,
     ];
-    for (let i = 0; i < codes.length; i += 16) {
-      lines.push('  ' + codes.slice(i, i + 16).map((c) => `0x${hex2(c)}`).join(', ') + ',');
-    }
-    lines.push('};', 'constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {');
+    byteTable(lines, 'kCodes', codes, (c) => `0x${hex2(c)}`);
+    byteTable(lines, 'kInkLeft', ink.map((e) => e.left), dec2);
+    byteTable(lines, 'kInkWidth', ink.map((e) => e.width), dec2);
+    lines.push('constexpr uint8_t kGlyphs[kGlyphCount][kBytesPerGlyph] = {');
     for (const code of codes) {
       const bytes = glyphBytes(font.glyphs[code], font.width, font.height);
       lines.push(`  {${bytes.map((b) => `0x${hex2(b)}`).join(', ')}},  // 0x${hex2(code)} ${commentLabel(font, code)}`);
@@ -214,6 +243,10 @@
       '// Each glyph is ceil(kHeight / 8) pages, top page first. A page holds one byte per',
       '// column, left to right, with bit 0 as the top pixel (SH1106 page layout).',
       '// kCodes ascends, so ASCII 32..126 sit at index code - 32 and symbols follow.',
+      '//',
+      '// kInkLeft and kInkWidth hold, per glyph, the first inked column and the columns from there',
+      '// to the last inked one, measured from the bitmap. A blank glyph has both at 0.',
+      '// kSpaceAdvance is half the cell width.',
       '',
       '#pragma once',
       '#include <cstdint>',
@@ -280,7 +313,7 @@
     ASCII_FIRST, ASCII_LAST, SYMBOL_FIRST, SYMBOL_LAST, MAX_SIZE, MAX_SPACING,
     makeFont, exampleFont, isOn, setPixel, resize, shift, invert, clear,
     codesOf, addSymbol, removeSymbol, resizeFont, charLabel,
-    toLibrary, parseLibrary, glyphBytes, toCHeader,
+    toLibrary, parseLibrary, glyphBytes, inkExtent, spaceAdvance, toCHeader,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
