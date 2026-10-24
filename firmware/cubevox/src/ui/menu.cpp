@@ -28,6 +28,10 @@ constexpr int kRowConfirmTitle = 0;
 constexpr int kRowConfirmVersion = 2;
 constexpr int kRowConfirmBody = 4;
 constexpr int kRowConfirmCancel = 6;
+constexpr char kHavePrefix[] = "You have ";
+// Columns left for the version between the prefix and the period; bounds the snprintf so the
+// warn gate can prove the row never truncates.
+constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix) - 1) - 1;
 
 enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
 
@@ -112,7 +116,7 @@ void drawConfirmDfu(MenuFrame& f) {
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
   char have[kDisplayCols + 1];
-  snprintf(have, sizeof(have), "You have %s.", tag);
+  snprintf(have, sizeof(have), "%s%.*s.", kHavePrefix, kHaveTagCols, tag);
   putRow(f, kRowConfirmTitle, "Update the firmware?");
   putRow(f, kRowConfirmVersion, have);
   putRow(f, kRowConfirmBody, "Click to start.");
