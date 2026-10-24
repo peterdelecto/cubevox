@@ -95,6 +95,7 @@ void replySetLayout(const protocol::Request& req, uint32_t nowMs) {
     return;
   }
   gLayout = next;
+  protocol::applySettings(req, gSettings);  // only the fields the request carried
   recordSetName(req.name);
   recordRequestSave(gLayout, gSettings, nowMs);
   gPublish.markStale();  // goes out after controlsPoll() re-seeds the knobs for the new cards
@@ -125,9 +126,9 @@ void onRequest(const char* line, uint32_t nowMs) {
   }
   switch (req.cmd) {
     case protocol::Command::Hello:
-      protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout, kBenchBuild, deviceSerial());
+      protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout, kBenchBuild, deviceSerial(), &gSettings);
       break;
-    case protocol::Command::GetLayout: protocol::replyLayout(out, req.id, layoutName(), gLayout); break;
+    case protocol::Command::GetLayout: protocol::replyLayout(out, req.id, layoutName(), gLayout, gSettings); break;
     case protocol::Command::SetLayout: replySetLayout(req, nowMs); break;
     case protocol::Command::Status: replyStatus(req.id); break;
     case protocol::Command::EnterDfu:
@@ -202,7 +203,7 @@ void loop() {
 
   controlsPoll(nowMs, gLayout);
   benchPanelPoll(nowMs);
-  mutePoll(nowMs);
+  mutePoll(nowMs, gSettings.topSwitch);
 
   const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
   if (settingsChanged) recordRequestSave(gLayout, gSettings, nowMs);

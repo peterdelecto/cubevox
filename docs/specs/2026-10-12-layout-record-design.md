@@ -26,6 +26,26 @@ the record is written and recovered on the H743.
 
 256 bytes, eight flash words. A card id the firmware does not know becomes `empty`.
 
+## Format (schema v2)
+Owner 2026-10-24, `2026-10-24-polish-design.md`. Only the settings block changes. Every offset and
+the 256-byte size stay, and the three new bytes come out of the reserved ones.
+
+| Settings byte | Field | Values | Default |
+|---|---|---|---|
+| 0 | output level | 0 LINE, 1 INSTRUMENT | LINE |
+| 1 | input jack | 0 MIC, 1 PEDAL | MIC |
+| 2 | polish comp | 0 off, 1 on | on |
+| 3 | polish EQ | 0 off, 1 on | on |
+| 4 | top switch | 0 MUTE, 1 BYPASS | MUTE |
+| 5 to 15 | reserved, zero | | |
+
+1. A v1 record still decodes. Its bytes 2 to 4 were reserved, so they are ignored and the three
+   new settings take their defaults, not the zeros.
+2. Every save writes v2, so a v1 record is replaced by the next save.
+3. A v1 firmware refuses a v2 record on the schema field and falls back to the default layout, as
+   for any unknown schema.
+4. A settings byte out of range makes the whole record invalid, as in v1.
+
 ## Writing
 1. Each sector is a log of 256-byte records. A save appends the next record (sequence + 1) to the
    first blank slot of the active sector, so the previous record is never touched.
@@ -37,7 +57,7 @@ the record is written and recovered on the H743.
    error. No other call waits on the flash.
 
 ## Reading at boot
-1. Scan both sectors; the valid record (magic, schema, CRC) with the highest sequence wins.
+1. Scan both sectors; the valid record (magic, schema 1 or 2, CRC) with the highest sequence wins.
 2. No valid record gives the default layout and default settings.
 3. ECC recovery: the fault handler also stores bank 2's double-ECC flag and failing address
    (`FLASH->SR2`, `FLASH->ECC_FA2`), because BFAR is not always valid for a flash ECC error. If

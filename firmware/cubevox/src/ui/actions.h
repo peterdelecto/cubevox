@@ -15,7 +15,7 @@ enum class ApplyResult : uint8_t {
   EnterDfu,         // nothing changed; the caller mutes and resets into the bootloader
 };
 
-// Applies `action` to `settings`. The output and input toggles flip their setting.
+// Applies `action` to `settings`. Each toggle flips its setting, and the top switch cycles.
 ApplyResult applyAction(const UiAction& action, Settings& settings);
 
 }  // namespace ui

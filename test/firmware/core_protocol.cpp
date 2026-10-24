@@ -248,6 +248,99 @@ void checkProtocolErrors() {
   checkIdClipping();
 }
 
+// A set_layout request with `extra` (a comma and more fields, or nothing) before the closing brace.
+std::string setLayoutWith(const std::string& extra) {
+  return std::string("{\"id\":5,\"cmd\":\"set_layout\",\"name\":\"n\",\"slots\":[\"input_gate\",\"autotune\",\"octave\","
+                     "\"unison\",\"slapback\",\"distortion\",\"gate\",\"reverb_spring\"]") + extra + "}";
+}
+
+bool settingsAre(const Settings& s, bool comp, bool eq, TopSwitch top) {
+  return s.polishComp == comp && s.polishEq == eq && s.topSwitch == top;
+}
+
+// The settings after a set_layout request carrying `extra` is applied to `start`. `given` gets the
+// request's settingsGiven bits.
+Settings appliedTo(const Settings& start, const std::string& extra, uint8_t& given) {
+  protocol::Request r;
+  std::string err;
+  check(parses(setLayoutWith(extra).c_str(), r, err), extra.c_str());
+  Settings s = start;
+  protocol::applySettings(r, s);
+  given = r.settingsGiven;
+  return s;
+}
+
+// The "settings" object: each field optional, and a field the request leaves out stays as the box has it.
+void checkSettingsRequest() {
+  protocol::Request r;
+  std::string err;
+  Settings usual;  // comp on, EQ on, MUTE
+  Settings flipped;
+  flipped.polishComp = false;
+  flipped.polishEq = false;
+  flipped.topSwitch = TopSwitch::Bypass;
+  Settings mixed;
+  mixed.polishEq = false;
+  uint8_t given = 0xFF;
+
+  check(settingsAre(appliedTo(flipped, "", given), false, false, TopSwitch::Bypass) && given == 0,
+        "settings: absent leaves every current value");
+  check(settingsAre(appliedTo(usual, "", given), true, true, TopSwitch::Mute) && given == 0,
+        "settings: absent leaves the defaults too");
+  check(settingsAre(appliedTo(flipped, ",\"settings\":{}", given), false, false, TopSwitch::Bypass) && given == 0,
+        "settings: an empty object leaves every current value");
+  check(settingsAre(appliedTo(usual, ",\"settings\":{\"polish_comp\":false,\"polish_eq\":false,\"top_switch\":\"bypass\"}", given),
+                    false, false, TopSwitch::Bypass) &&
+            given == (protocol::kGivenPolishComp | protocol::kGivenPolishEq | protocol::kGivenTopSwitch),
+        "settings: all three fields in");
+  check(settingsAre(appliedTo(mixed, ",\"settings\":{\"top_switch\":\"bypass\"}", given), true, false, TopSwitch::Bypass) &&
+            given == protocol::kGivenTopSwitch,
+        "settings: top_switch alone changes only the switch");
+  check(settingsAre(appliedTo(usual, ",\"settings\":{\"polish_eq\":false}", given), true, false, TopSwitch::Mute) &&
+            given == protocol::kGivenPolishEq,
+        "settings: polish_eq alone changes only the EQ");
+  check(settingsAre(appliedTo(flipped, ",\"settings\":{\"top_switch\":\"mute\",\"polish_comp\":true}", given), true, false,
+                    TopSwitch::Mute) &&
+            given == (protocol::kGivenPolishComp | protocol::kGivenTopSwitch),
+        "settings: a value equal to the default still applies, and the field left out stays");
+  check(settingsAre(appliedTo(usual, " , \"settings\" : { \"polish_comp\" : false , \"x\" : [1,{\"a\":null}] , \"polish_eq\":false } ", given),
+                    false, false, TopSwitch::Mute) &&
+            given == (protocol::kGivenPolishComp | protocol::kGivenPolishEq),
+        "settings: whitespace is free and unknown keys with nested values are skipped");
+  check(parses("{\"id\":6,\"cmd\":\"hello\",\"settings\":{\"polish_comp\":false}}", r, err) && r.cmd == protocol::Command::Hello,
+        "settings: any command may carry the object");
+
+  struct Bad {
+    const char* extra;
+    const char* why;
+  };
+  const Bad bad[] = {
+      {",\"settings\":{\"polish_comp\":1}", "polish_comp must be true or false"},
+      {",\"settings\":{\"polish_comp\":\"true\"}", "polish_comp must be true or false"},
+      {",\"settings\":{\"polish_eq\":null}", "polish_eq must be true or false"},
+      {",\"settings\":{\"top_switch\":\"loud\"}", "top_switch must be \"mute\" or \"bypass\""},
+      {",\"settings\":{\"top_switch\":\"bypassX\"}", "top_switch must be \"mute\" or \"bypass\""},
+      {",\"settings\":{\"top_switch\":\"\"}", "top_switch must be \"mute\" or \"bypass\""},
+      {",\"settings\":{\"top_switch\":true}", "top_switch must be \"mute\" or \"bypass\""},
+      {",\"settings\":true", "settings must be an object"},
+      {",\"settings\":null", "settings must be an object"},
+      {",\"settings\":[{\"polish_eq\":false}]", "settings must be an object"},
+  };
+  for (const Bad& b : bad) {
+    check(!parses(setLayoutWith(b.extra).c_str(), r, err) && err == b.why, b.extra);
+  }
+  for (const char* torn : {",\"settings\":{\"polish_comp\":tru}", ",\"settings\":{\"polish_comp\":false", ",\"settings\":{\"top_switch\"}",
+                           ",\"settings\":{\"polish_eq\":false,}"}) {
+    check(!parses(setLayoutWith(torn).c_str(), r, err) && err == "malformed json", torn);
+  }
+
+  // A line cut anywhere is refused and read no further than its end (the sanitizers watch the reads).
+  const std::string whole = setLayoutWith(",\"settings\":{\"polish_comp\":false,\"polish_eq\":true,\"top_switch\":\"bypass\"}");
+  bool everyCutRefused = true;
+  for (size_t cut = 0; cut < whole.size(); ++cut) everyCutRefused = everyCutRefused && !parses(whole.substr(0, cut).c_str(), r, err);
+  check(everyCutRefused && parses(whole.c_str(), r, err), "settings: every cut of a settings request is refused, the whole line parses");
+}
+
 void checkSimpleReplies() {
   StringWriter w;
   protocol::replyError(w, 12, "unknown card \"foo\" in slot 3\\");
@@ -258,7 +351,7 @@ void checkSimpleReplies() {
   check(w.out == "{\"id\":13,\"ok\":true}\n", "proto: ok reply");
 
   w = StringWriter();
-  protocol::replyLayout(w, 14, "Rig \"A\"", defaultLayout());
+  protocol::replyLayout(w, 14, "Rig \"A\"", defaultLayout(), Settings());
   check(JsonReader(w.out).valid() && has(w.out, "\"layout\":{\"name\":\"Rig \\\"A\\\"\",\"slots\":[\"input_gate\",\"autotune\"") &&
             has(w.out, "\"reverb_spring\"]}"), "proto: layout reply");
 
@@ -330,9 +423,49 @@ void checkHelloSerial() {
 
 void checkReplyEscapes() {
   StringWriter w;
-  protocol::replyLayout(w, 1, "caf\xC3\xA9\x01\x7F", defaultLayout());
+  protocol::replyLayout(w, 1, "caf\xC3\xA9\x01\x7F", defaultLayout(), Settings());
   check(JsonReader(w.out).valid() && has(w.out, "\"name\":\"caf\\u00c3\\u00a9\\u0001\\u007f\""),
         "proto: non-ASCII and control bytes in a reply string are escaped");
+}
+
+const char* kDefaultSettingsText = "\"settings\":{\"polish_comp\":true,\"polish_eq\":true,\"top_switch\":\"mute\"}";
+
+// The settings object leaves the box in every reply that carries the layout, and its text is
+// what a set_layout request takes back.
+void checkSettingsReplies() {
+  StringWriter w;
+  protocol::replyLayout(w, 2, "Default", defaultLayout(), Settings());
+  check(JsonReader(w.out).valid() && w.overflows() == 0 && has(w.out, std::string("\"reverb_spring\"]},") + kDefaultSettingsText + "}\n"),
+        "settings: the layout reply ends with the default settings");
+
+  Settings changed;
+  changed.polishComp = false;
+  changed.polishEq = false;
+  changed.topSwitch = TopSwitch::Bypass;
+  StringWriter c;
+  protocol::replyLayout(c, 3, "Default", defaultLayout(), changed);
+  const std::string text = "\"settings\":{\"polish_comp\":false,\"polish_eq\":false,\"top_switch\":\"bypass\"}";
+  check(JsonReader(c.out).valid() && has(c.out, text + "}\n"), "settings: the layout reply carries the changed settings");
+
+  const size_t at = c.out.find("\"settings\":");
+  const std::string back = c.out.substr(at, c.out.size() - 2 - at);  // the field, without the reply's closing brace and newline
+  uint8_t given = 0;
+  check(settingsAre(appliedTo(Settings(), "," + back, given), false, false, TopSwitch::Bypass) && given == 7,
+        "settings: a set_layout request takes the reply's settings text back");
+
+  StringWriter hello;
+  protocol::replyHello(hello, 4, "v", "Default", defaultLayout(), false, nullptr, &changed);
+  check(JsonReader(hello.out).valid() && hello.overflows() == 0 && has(hello.out, text + "}\n") &&
+            has(hello.out, "\"reverb_spring\"]},\"settings\""),
+        "settings: hello carries the settings after the layout");
+  StringWriter withSerial;
+  protocol::replyHello(withSerial, 4, "v", "Default", defaultLayout(), false, "0123456789ABCDEF01234567", &changed);
+  check(JsonReader(withSerial.out).valid() && has(withSerial.out, "\"serial\":\"0123456789ABCDEF01234567\"") &&
+            has(withSerial.out, text + "}\n"),
+        "settings: hello carries both the serial and the settings");
+  StringWriter none;
+  protocol::replyHello(none, 4, "v", "Default", defaultLayout(), false);
+  check(!has(none.out, "settings"), "settings: hello leaves the settings out when the caller has none");
 }
 
 void checkWriterFormat() {
@@ -352,6 +485,7 @@ void checkProtocolReplies() {
   checkHelloReply();
   checkHelloSerial();
   checkReplyEscapes();
+  checkSettingsReplies();
   checkWriterFormat();
 }
 
@@ -540,6 +674,7 @@ void checkBenchOps() {
 void checkProtocol() {
   checkProtocolCommands();
   checkProtocolErrors();
+  checkSettingsRequest();
   checkBenchOps();
   checkProtocolReplies();
   checkFramer();

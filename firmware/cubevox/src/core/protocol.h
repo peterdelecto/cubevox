@@ -11,6 +11,7 @@
 #include "core/bench_ops.h"
 #include "core/layout.h"
 #include "core/registry.h"
+#include "core/settings.h"
 #include "core/slots.h"
 
 namespace protocol {
@@ -81,7 +82,20 @@ struct Request {
   char name[kNameBytes + 1] = {};
   int slotCount = 0;  // ids present in "slots"
   std::array<std::array<char, kIdBytes>, kSlotCount> slot = {};
+
+  // The "settings" object: polish_comp, polish_eq and top_switch. `settingsGiven` has a kGiven bit
+  // for each field the request carried, and `settings` holds those values. A field the request
+  // leaves out stays as the box has it. The output and input settings are not on the wire.
+  Settings settings;
+  uint8_t settingsGiven = 0;
 };
+
+constexpr uint8_t kGivenPolishComp = 1u << 0;
+constexpr uint8_t kGivenPolishEq = 1u << 1;
+constexpr uint8_t kGivenTopSwitch = 1u << 2;
+
+// Copies the settings fields the request carried onto `current`; the others stay as they are.
+void applySettings(const Request& req, Settings& current);
 
 // Parses and checks one request. On failure returns false with a readable reason in `err`; `req.id`
 // holds the request's id when the parser got far enough to read it, otherwise 0. A bench op the
@@ -112,11 +126,11 @@ void replyError(Writer& w, uint32_t id, const char* reason);
 void replyOk(Writer& w, uint32_t id);
 
 // Lists the build ("release" or "bench") and the ops it accepts. `serial` is the box's 24-character
-// hex id; the reply leaves the field out when it is null, which is how the host tools that have no
-// board call it.
+// hex id and `settings` its current settings; the reply leaves either field out when it is null,
+// which is how the host tools that have no board call it.
 void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild,
-                const char* serial = nullptr);
-void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout);
+                const char* serial = nullptr, const Settings* settings = nullptr);
+void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout, const Settings& settings);
 void replyStatus(Writer& w, uint32_t id, const Status& s);
 
 }  // namespace protocol

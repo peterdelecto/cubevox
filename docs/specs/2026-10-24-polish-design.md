@@ -38,13 +38,13 @@ Feed-forward, mono, no lookahead, log-domain gain computer, in `engine/polish_co
 | Tuning | Value | Why |
 |---|---|---|
 | Detector | RMS, 10 ms window, sidechain 2-pole high-pass at 150 Hz | plosives and handling noise never pump the gain |
-| Threshold | -18 dBFS RMS | sits just under a normal singing level at the chain's unity |
+| Threshold | -24 dBFS RMS | Adam's loops sit near -23 dBFS RMS; here the loud syllables get 3 to 5 dB and the average about 1 dB. At -18 the comp idled and only its makeup showed |
 | Ratio | 2.2 : 1 | levelling, not squashing |
 | Knee | 6 dB soft | no audible onset |
 | Attack | 10 ms | consonants pass |
 | Release | 150 ms, program-independent | steady on held notes, no breathing |
 | Max gain reduction | 12 dB | a shout stays a shout |
-| Makeup | `trimDb` in the tuning, set by `level_test` | unity at default |
+| Makeup | `trimDb` in the tuning, set by `level_test` on the program scaled to -23 dBFS RMS | unity at the level the voice actually has; the other stages are linear and keep the test's -18 dBFS program |
 
 Gain per sample from the envelope through the engine's fast log2/exp2. OFF settles to a
 bit-exact copy. CPU cost is measured on the bench and added to the chain table; the budget rule
@@ -61,21 +61,22 @@ else in the voicing is reachable from the box.
 existing settings bytes. A v1 record decodes with the defaults for the new fields and is written
 back as v2 on the next save; v2 records are refused by a v1 firmware as today (schema mismatch
 falls back to the default layout). The serial protocol carries the three fields in the settings
-object, optional on input with the same defaults, always present in replies.
+object, optional on input where an absent field leaves the box's value unchanged, always present
+in replies.
 
 ## Emulator and render
 `cubevox-proto` and `cubevox-render` run the same tail (comp, eq, trim) so loops audition exactly
 what the box plays; `--polish-comp off` and `--polish-eq off` switch them for A/B listening.
 
 ## Tests
-1. `test/polish_comp_test.cpp`: static curve (gain reduction at -30, -18, -12, -6, 0 dBFS inputs
-   within 0.3 dB of the knee formula), attack and release times within 20 %, sidechain high-pass
+1. `test/polish_comp_test.cpp`: static curve (gain reduction at fixed offsets around the
+   threshold within 0.3 dB of the knee formula), attack and release times within 20 %, sidechain high-pass
    (a 50 Hz tone at -6 dBFS causes under 0.5 dB of reduction), OFF is bit-exact after the
    crossfade, no NaN or denormal on silence.
 2. `level_test` rows: `polish COMP defaults`, `polish EQ defaults` (exists).
 3. `test/firmware/core_record.cpp`: v2 round trip, v1 record decodes with defaults, a bad
    settings byte is rejected.
-4. `test/firmware/core_protocol.cpp`: the three fields in and out, absent on input means default.
+4. `test/firmware/core_protocol.cpp`: the three fields in and out, absent on input means unchanged.
 5. `test/firmware/ui_menu.cpp`: the eight rows in order, each click, the saved settings, proofs
    `oled-menu.pgm` for the owner.
 6. Bench (hardware, later): bypass crossfade audible-click free on glass, comp cost in load %,

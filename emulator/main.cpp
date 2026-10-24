@@ -36,6 +36,7 @@
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
 #include "engine/polish.h"
+#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/unison.h"
 
@@ -96,6 +97,7 @@ struct ProtoParams {
   cv::SlapbackParams slapback{true, kStartIntensity, {}};
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
+  cv::PolishCompParams comp;  // the chain tail, always on here like the box default: comp, then eq
   cv::PolishParams eq;
   // Cmd+Shift+D shows our test control: Advanced.
   bool dev = false;
@@ -186,6 +188,7 @@ cv::Unison gUnison;
 cv::Slapback gSlapback;
 cv::Distortion gDistortion;
 cv::Reverb gReverb;
+cv::PolishComp gPolishComp;
 cv::Polish gPolish;
 cv::stagefb::StageFeedback gStageFeedback;
 LoopBuffer* gLastLoop = nullptr;
@@ -278,6 +281,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gSlapback.reset();
     gDistortion.reset();
     gReverb.reset();
+    gPolishComp.reset();
     gPolish.reset();
     gStageFeedback.reset(1u);
   }
@@ -318,16 +322,17 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
     gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
-    gPolish.process(mono.data(), tmp.data(), n, params.eq);
+    gPolishComp.process(mono.data(), tmp.data(), n, params.comp);
+    gPolish.process(tmp.data(), mono.data(), n, params.eq);
     // Mute: silence out, so the wedge loop hears exactly what a muted box would send.
-    if (params.mute) std::fill(tmp.begin(), tmp.begin() + n, 0.0f);
+    if (params.mute) std::fill(mono.begin(), mono.begin() + n, 0.0f);
     if (feedback) {
-      for (int i = 0; i < n; ++i) gStageFeedback.push(tmp[i]);
+      for (int i = 0; i < n; ++i) gStageFeedback.push(mono[i]);
     }
     for (int i = 0; i < n; ++i) {
-      out[2 * (done + i)] = tmp[i];
-      out[2 * (done + i) + 1] = tmp[i];
-      peak = std::max(peak, std::fabs(tmp[i]));
+      out[2 * (done + i)] = mono[i];
+      out[2 * (done + i) + 1] = mono[i];
+      peak = std::max(peak, std::fabs(mono[i]));
     }
     done += n;
   }

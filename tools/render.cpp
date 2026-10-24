@@ -1,5 +1,5 @@
-// cubevox-render: loop in, gates + harmony + octave + unison + slapback + distortion + reverb + eq processed
-// mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, gates + harmony + octave + unison + slapback + distortion + reverb, then the
+// polish tail (comp, eq) like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -11,6 +11,7 @@
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
+#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -30,7 +31,9 @@ struct RenderParams {
   bool slapOn = false;
   bool distOn = false;
   bool reverbOn = false;
-  bool eqOn = false;
+  bool compOn = true;  // the polish tail runs as on the box unless switched off
+  bool eqOn = true;
+  bool compStats = false;  // print the comp's gain reduction after the render
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -38,6 +41,7 @@ struct RenderParams {
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
   cv::ReverbParams reverb;
+  cv::PolishCompParams comp;
   cv::PolishParams eq;
 };
 
@@ -54,13 +58,16 @@ int usage() {
                "       [--reverb springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
+               "       [--polish-comp on|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony, --octave or --autotune; formant applies on --hengine 1\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
-               "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, eq\n"
+               "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, comp, eq\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
-               "  eq runs only with --eq\n"
+               "  comp and eq are the box's polish tail and run by default; --polish-comp off and --polish-eq off\n"
+               "  switch them for A/B listening; --eq is accepted and changes nothing\n"
+               "  --comp-stats prints the comp's average and peak gain reduction, read once per block\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
                "     harChromLower harChromLow harChromHigh harChromHigher (-12..12) harTrimDbA harTrimDbB harTrimDbC\n"
@@ -92,6 +99,13 @@ bool parseFloat(const char* s, float* out) {
   char* end = nullptr;
   *out = std::strtof(s, &end);
   return end != s && *end == '\0';
+}
+
+bool parseOnOff(const char* s, bool* out) {
+  const bool on = std::strcmp(s, "on") == 0;
+  if (!on && std::strcmp(s, "off") != 0) return false;
+  *out = on;
+  return true;
 }
 
 // "hz,db"
@@ -250,7 +264,6 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveSlap = false;
   bool haveDrive = false;
   bool haveReverb = false;
-  bool haveEq = false;
   bool haveInGate = false;
   bool haveGate = false;
   bool haveDecay = false;
@@ -297,7 +310,13 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         return false;
       haveGate = true;
     } else if (std::strcmp(a, "--eq") == 0) {
-      haveEq = true;
+      // The EQ runs by default; the flag stays so old command lines still parse.
+    } else if (std::strcmp(a, "--comp-stats") == 0) {
+      rp.compStats = true;
+    } else if (std::strcmp(a, "--polish-comp") == 0 && i + 1 < argc) {
+      if (!parseOnOff(argv[++i], &rp.compOn)) return false;
+    } else if (std::strcmp(a, "--polish-eq") == 0 && i + 1 < argc) {
+      if (!parseOnOff(argv[++i], &rp.eqOn)) return false;
     } else if (std::strcmp(a, "--eqhp") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.eq.hpHz)) return false;
     } else if (std::strcmp(a, "--eqdip") == 0 && i + 1 < argc) {
@@ -416,13 +435,14 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.distOn = haveDrive;
   rp.reverbOn = haveReverb;
   rp.reverb.on = haveReverb;
-  rp.eqOn = haveEq;
-  rp.eq.on = haveEq;
+  rp.comp.on = rp.compOn;
+  rp.eq.on = rp.eqOn;
   rp.inGateOn = haveInGate;
   rp.inGate.on = haveInGate;
   rp.gateOn = haveGate;
   rp.gate.on = haveGate;
-  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.reverbOn || rp.eqOn;
+  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.reverbOn || rp.compOn ||
+         rp.eqOn;
 }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
@@ -449,6 +469,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Slapback slapback;
   static cv::Distortion distortion;
   static cv::Reverb reverb;
+  static cv::PolishComp polishComp;
   static cv::Polish polish;
   inGate.reset();
   gate.reset();
@@ -457,12 +478,16 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   slapback.reset();
   distortion.reset();
   reverb.reset();
+  polishComp.reset();
   polish.reset();
 
   float inBuf[cv::kBlock];
   float bufA[cv::kBlock];
   float bufB[cv::kBlock];
   float* const scratch[2] = {bufA, bufB};
+  double reductionSum = 0.0;  // comp gain reduction in dB, read at the end of each block, weighted by its length
+  double reductionPeak = 0.0;
+  double reductionSamples = 0.0;
   int rc = 0;
   for (;;) {
     ma_uint64 got = 0;
@@ -507,6 +532,15 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         src = scratch[next];
         next ^= 1;
       }
+      if (rp.compOn) {
+        polishComp.process(src, scratch[next], n, rp.comp);
+        const double reduction = polishComp.gainReductionDb();
+        reductionSum += reduction * n;
+        reductionSamples += n;
+        if (reduction > reductionPeak) reductionPeak = reduction;
+        src = scratch[next];
+        next ^= 1;
+      }
       if (rp.eqOn) {
         polish.process(src, scratch[next], n, rp.eq);
         src = scratch[next];
@@ -529,6 +563,13 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
 
   ma_encoder_uninit(&enc);
   ma_decoder_uninit(&dec);
+  if (rc == 0 && rp.compStats) {
+    if (rp.compOn && reductionSamples > 0.0) {
+      std::printf("comp: average gain reduction %.2f dB, peak %.2f dB\n", reductionSum / reductionSamples, reductionPeak);
+    } else {
+      std::printf("comp: off\n");
+    }
+  }
   return rc;
 }
 

@@ -14,6 +14,8 @@ namespace {
 constexpr size_t kKeyBytes = 16;
 constexpr size_t kCmdBytes = 16;
 constexpr size_t kOpBytes = kOpNameBytes;
+// Longer than "bypass" plus its NUL, so a clipped word can never equal a real one.
+constexpr size_t kSwitchWordBytes = 8;
 constexpr int kMaxSkipDepth = 4;
 constexpr uint32_t kSlotClamp = 255;  // keeps a huge slot number out of int range; it still fails the check
 
@@ -309,6 +311,77 @@ bool parseSlots(const char*& p, Fields& f) {
   }
 }
 
+// A JSON true or false. On failure `p` is left where it was.
+bool readBool(const char*& p, bool& v) {
+  skipWs(p);
+  if (skipLiteral(p, "true")) {
+    v = true;
+    return true;
+  }
+  if (skipLiteral(p, "false")) {
+    v = false;
+    return true;
+  }
+  return false;
+}
+
+// Reads a settings flag and marks its field given, or notes the type error and skips the value.
+bool parseFlag(const char*& p, Fields& f, bool& flag, uint8_t given, const char* typeMsg) {
+  if (readBool(p, flag)) {
+    f.req.settingsGiven |= given;
+    return true;
+  }
+  f.typeFail(typeMsg);
+  return skipValue(p, 1);
+}
+
+bool parseTopSwitch(const char*& p, Fields& f) {
+  constexpr const char* kTypeMsg = "top_switch must be \"mute\" or \"bypass\"";
+  char word[kSwitchWordBytes] = {};
+  StrOut out{word, sizeof word};
+  bool present = false;
+  if (!parseText(p, f, out, kTypeMsg, present)) return false;
+  if (!present) return true;  // parseText noted the type error and skipped the value
+  const bool mute = strcmp(word, "mute") == 0;
+  if (!mute && strcmp(word, "bypass") != 0) {
+    f.typeFail(kTypeMsg);
+    return true;
+  }
+  f.req.settings.topSwitch = mute ? TopSwitch::Mute : TopSwitch::Bypass;
+  f.req.settingsGiven |= kGivenTopSwitch;
+  return true;
+}
+
+bool parseSettingsField(const char*& p, const char* key, Fields& f) {
+  Settings& s = f.req.settings;
+  if (strcmp(key, "polish_comp") == 0) {
+    return parseFlag(p, f, s.polishComp, kGivenPolishComp, "polish_comp must be true or false");
+  }
+  if (strcmp(key, "polish_eq") == 0) {
+    return parseFlag(p, f, s.polishEq, kGivenPolishEq, "polish_eq must be true or false");
+  }
+  if (strcmp(key, "top_switch") == 0) return parseTopSwitch(p, f);
+  return skipValue(p, 1);
+}
+
+// The "settings" object. Unknown keys are skipped, and a field it leaves out is not marked given.
+bool parseSettings(const char*& p, Fields& f) {
+  skipWs(p);
+  if (*p != '{') {
+    f.typeFail("settings must be an object");
+    return skipValue(p, 0);
+  }
+  ++p;
+  if (eat(p, '}')) return true;
+  for (;;) {
+    char key[kKeyBytes];
+    StrOut k{key, sizeof key};
+    if (!readString(p, k) || !eat(p, ':') || !parseSettingsField(p, key, f)) return false;
+    if (eat(p, ',')) continue;
+    return eat(p, '}');
+  }
+}
+
 bool parseField(const char*& p, const char* key, Fields& f) {
   if (strcmp(key, "id") == 0) return parseId(p, f);
   if (strcmp(key, "cmd") == 0) {
@@ -327,6 +400,7 @@ bool parseField(const char*& p, const char* key, Fields& f) {
     return ok;
   }
   if (strcmp(key, "slots") == 0) return parseSlots(p, f);
+  if (strcmp(key, "settings") == 0) return parseSettings(p, f);
   return skipValue(p, 0);
 }
 
@@ -467,6 +541,11 @@ void writeLayout(Writer& w, const char* name, const Layout& layout) {
   w.write("]}", 2);
 }
 
+void writeSettings(Writer& w, const Settings& s) {
+  w.format("{\"polish_comp\":%s,\"polish_eq\":%s,\"top_switch\":\"%s\"}", s.polishComp ? "true" : "false",
+           s.polishEq ? "true" : "false", s.topSwitch == TopSwitch::Bypass ? "bypass" : "mute");
+}
+
 const char* groupName(Group g) {
   switch (g) {
     case Group::None: return "none";
@@ -582,6 +661,12 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize, boo
   return true;
 }
 
+void applySettings(const Request& req, Settings& current) {
+  if (req.settingsGiven & kGivenPolishComp) current.polishComp = req.settings.polishComp;
+  if (req.settingsGiven & kGivenPolishEq) current.polishEq = req.settings.polishEq;
+  if (req.settingsGiven & kGivenTopSwitch) current.topSwitch = req.settings.topSwitch;
+}
+
 bool resolveLayout(const Request& req, Layout& out, char* err, size_t errSize) {
   for (int s = 0; s < kSlotCount; ++s) {
     if (!cardFromId(req.slot[s].data(), out.card[s])) {
@@ -621,7 +706,7 @@ void writeBenchOps(Writer& w, bool benchBuild) {
 }  // namespace
 
 void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild,
-                const char* serial) {
+                const char* serial, const Settings* settings) {
   w.format("{\"id\":%lu,\"ok\":true,\"proto\":%d,\"fw\":", static_cast<unsigned long>(id), kVersion);
   writeString(w, fw);
   if (serial) {
@@ -637,12 +722,18 @@ void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, 
   }
   w.write("],\"layout\":", 11);
   writeLayout(w, layoutName, layout);
+  if (settings) {
+    w.write(",\"settings\":", 12);
+    writeSettings(w, *settings);
+  }
   w.write("}\n", 2);
 }
 
-void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout) {
+void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout, const Settings& settings) {
   w.format("{\"id\":%lu,\"ok\":true,\"layout\":", static_cast<unsigned long>(id));
   writeLayout(w, layoutName, layout);
+  w.write(",\"settings\":", 12);
+  writeSettings(w, settings);
   w.write("}\n", 2);
 }
 

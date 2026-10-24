@@ -11,12 +11,17 @@
 
 namespace {
 
-void printSlotRow(const char* label, const std::array<uint32_t, kSlotCount + 1>& values) {
+// The eight slots in order, then the two polish stages under their names.
+void printSlotRow(const char* label, const std::array<uint32_t, kStatBuckets>& values) {
   serialOut().print(label);
-  for (uint32_t value : values) {
+  for (int s = 0; s < kSlotCount; ++s) {
     serialOut().print(' ');
-    serialOut().print(value);
+    serialOut().print(values[s]);
   }
+  serialOut().print(" COMP ");
+  serialOut().print(values[kStatComp]);
+  serialOut().print(" EQ ");
+  serialOut().print(values[kStatEq]);
 }
 
 }  // namespace
@@ -38,7 +43,7 @@ void benchReportStats() {
   serialOut().print(" cycles, slots off 0x");
   serialOut().println(benchOverrides().slotsOff, HEX);
   printSlotRow("[audio] per slot", s.slotAvg);
-  serialOut().println(" (last is EQ)");
+  serialOut().println();
   printSlotRow("[audio] slot worst", s.slotWorst);
   serialOut().println();
   const AudioSwapStats sw = audioSwapStats();

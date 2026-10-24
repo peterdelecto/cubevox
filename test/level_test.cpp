@@ -12,6 +12,7 @@
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
+#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -23,6 +24,10 @@ constexpr int kSeconds = 3;
 constexpr int kMeasureFrom = 1 * cv::kSampleRate;
 constexpr double kProgramDbfs = -18.0;
 constexpr double kNoiseDbfs = -40.0;
+
+// The comp threshold sits at -24 dBFS, close to the voice loops (-22.7 to -24.5 dBFS RMS), so the
+// comp row runs the program at that level and every other row keeps kProgramDbfs.
+constexpr double kCompProgramDbfs = -23.0;
 constexpr double kLoDb = 0.0;
 constexpr double kHiDb = 0.5;
 constexpr double kSlackDb = 0.1;
@@ -79,6 +84,14 @@ Signal program() {
   Signal x(n);
   for (size_t i = 0; i < n; ++i) x[i] = static_cast<float>(tone[i] * tg + noise[i] * ng);
   const double g = dbToLin(kProgramDbfs) / rmsRange(x, 0, n);
+  for (float& v : x) v = static_cast<float>(v * g);
+  return x;
+}
+
+// program() scaled so its RMS over the whole signal is targetDb dBFS.
+Signal programAt(double targetDb) {
+  Signal x = program();
+  const double g = dbToLin(targetDb) / rmsRange(x, 0, x.size());
   for (float& v : x) v = static_cast<float>(v * g);
   return x;
 }
@@ -249,6 +262,10 @@ int main() {
 
   ok &= simple<cv::Reverb>("reverb CHASM mix 1", in, reverbParams(cv::kReverbChasm));
   ok &= simple<cv::Reverb>("reverb SPRING B mix 1", in, reverbParams(cv::kReverbSpringB));
+
+  cv::PolishCompParams comp;
+  comp.on = true;
+  ok &= simple<cv::PolishComp>("polish COMP defaults", programAt(kCompProgramDbfs), comp);
 
   cv::PolishParams eq;
   eq.on = true;

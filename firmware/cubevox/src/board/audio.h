@@ -13,6 +13,11 @@
 #include "core/chain_params.h"
 #include "core/compose.h"
 
+// Cycle buckets: one per slot, then one each for the two polish stages.
+constexpr int kStatComp = kSlotCount;
+constexpr int kStatEq = kSlotCount + 1;
+constexpr int kStatBuckets = kSlotCount + 2;
+
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed
   uint32_t late = 0;          // blocks that took longer than the budget (the DMA played stale data)
@@ -20,8 +25,8 @@ struct AudioStats {
   uint32_t maxCycles = 0;     // worst block time in CPU cycles
   uint32_t avgCycles = 0;     // mean block time since the last peaks reset
   uint32_t budgetCycles = 0;  // CPU cycles available per block
-  std::array<uint32_t, kSlotCount + 1> slotAvg = {};    // mean cycles per slot since the reset; last is the EQ
-  std::array<uint32_t, kSlotCount + 1> slotWorst = {};  // worst single block per slot since the reset
+  std::array<uint32_t, kStatBuckets> slotAvg = {};    // mean cycles per bucket since the reset
+  std::array<uint32_t, kStatBuckets> slotWorst = {};  // worst single block per bucket since the reset
 };
 
 // Brings up PLL3, SAI1 and DMA, and starts the stream. Returns false on failure; audioReport() says why.

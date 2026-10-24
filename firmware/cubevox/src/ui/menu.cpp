@@ -19,9 +19,8 @@ constexpr int kRowKnobValue = 5;
 constexpr int kRowToggle = 6;
 constexpr int kRowVersion = kDisplayRows - 1;
 
-// Menu list: a title row, then one row per item.
-constexpr int kRowListTitle = 0;
-constexpr int kRowListFirstItem = 1;
+// Menu list: one row per item, no title row.
+constexpr int kRowListFirstItem = 0;
 
 // Firmware update confirmation. Prose in the 5x7 font sits on alternate rows (owner rule).
 constexpr int kRowConfirmTitle = 0;
@@ -33,7 +32,17 @@ constexpr char kHavePrefix[] = "You have ";
 // warn gate can prove the row never truncates.
 constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix) - 1) - 1;
 
-enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
+enum class Item : uint8_t {
+  PolishComp,
+  PolishEq,
+  Output,
+  InputJack,
+  TopSwitch,
+  ChainOrder,
+  UpdateFirmware,
+  Exit,
+  Count,
+};
 
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
@@ -52,20 +61,28 @@ void putRow(MenuFrame& frame, int r, const char* text) {
 
 const char* itemLabel(Item it) {
   switch (it) {
-    case Item::Output: return "Out";
-    case Item::InputJack: return "Input";
-    case Item::ChainOrder: return "Chain order";
-    case Item::UpdateFirmware: return "Update firmware";
-    case Item::Exit: return "Exit";
+    case Item::PolishComp: return "POLISH COMP";
+    case Item::PolishEq: return "POLISH EQ";
+    case Item::Output: return "OUT";
+    case Item::InputJack: return "INPUT";
+    case Item::TopSwitch: return "TOP SWITCH";
+    case Item::ChainOrder: return "CHAIN ORDER";
+    case Item::UpdateFirmware: return "UPDATE FIRMWARE";
+    case Item::Exit: return "EXIT";
     case Item::Count: break;
   }
   return "";
 }
 
+const char* onOff(bool on) { return on ? "ON" : "OFF"; }
+
 const char* itemValue(Item it, const Settings& s) {
   switch (it) {
+    case Item::PolishComp: return onOff(s.polishComp);
+    case Item::PolishEq: return onOff(s.polishEq);
     case Item::Output: return s.outputLevel == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
     case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "PEDAL";
+    case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     default: return "";
   }
 }
@@ -89,7 +106,6 @@ void drawIdle(MenuFrame& f, const UiContext& ctx) {
 }
 
 void drawList(MenuFrame& f, const UiContext& ctx, int cursor) {
-  putRow(f, kRowListTitle, "MENU");
   for (int i = 0; i < kItemCount; ++i) {
     const Item it = static_cast<Item>(i);
     const char* value = itemValue(it, ctx.settings);
@@ -133,8 +149,11 @@ UiAction Menu::onClick() {
       break;
     case Mode::List:
       switch (static_cast<Item>(cursor_)) {
+        case Item::PolishComp: return UiAction::TogglePolishComp;
+        case Item::PolishEq: return UiAction::TogglePolishEq;
         case Item::Output: return UiAction::ToggleOutput;
         case Item::InputJack: return UiAction::ToggleInputJack;
+        case Item::TopSwitch: return UiAction::CycleTopSwitch;
         case Item::ChainOrder: mode_ = Mode::ChainView; break;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;

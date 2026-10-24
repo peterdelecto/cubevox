@@ -18,6 +18,28 @@ Card cardFromField(const uint8_t* field, bool& known) {
   return known ? card : Card::Empty;
 }
 
+// Reads the settings bytes. A v1 record carries only the first two, so the polish settings keep
+// the defaults already in `s`. False when a byte is out of range.
+bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
+  const uint8_t output = b[kOffOutputLevel];
+  const uint8_t jack = b[kOffInputJack];
+  if (output > static_cast<uint8_t>(OutputLevel::Instrument)) return false;
+  if (jack > static_cast<uint8_t>(InputJack::Pedal)) return false;
+  s.outputLevel = static_cast<OutputLevel>(output);
+  s.inputJack = static_cast<InputJack>(jack);
+  if (schema == kRecordSchemaV1) return true;
+
+  const uint8_t comp = b[kOffPolishComp];
+  const uint8_t eq = b[kOffPolishEq];
+  const uint8_t top = b[kOffTopSwitch];
+  if (comp > 1 || eq > 1) return false;
+  if (top > static_cast<uint8_t>(TopSwitch::Bypass)) return false;
+  s.polishComp = comp != 0;
+  s.polishEq = eq != 0;
+  s.topSwitch = static_cast<TopSwitch>(top);
+  return true;
+}
+
 }  // namespace
 
 RecordBytes encodeRecord(const RecordData& rec) {
@@ -30,25 +52,24 @@ RecordBytes encodeRecord(const RecordData& rec) {
     const char* id = cardDesc(rec.layout.card[s]).id;
     strncpy(reinterpret_cast<char*>(b.data() + kOffSlots + s * kRecordCardFieldBytes), id, kCardIdBytes);
   }
-  b[kOffSettings] = static_cast<uint8_t>(rec.settings.outputLevel);
-  b[kOffSettings + 1] = static_cast<uint8_t>(rec.settings.inputJack);
+  b[kOffOutputLevel] = static_cast<uint8_t>(rec.settings.outputLevel);
+  b[kOffInputJack] = static_cast<uint8_t>(rec.settings.inputJack);
+  b[kOffPolishComp] = rec.settings.polishComp ? 1 : 0;
+  b[kOffPolishEq] = rec.settings.polishEq ? 1 : 0;
+  b[kOffTopSwitch] = static_cast<uint8_t>(rec.settings.topSwitch);
   put32(b.data() + kOffCrc, crc32(b.data(), kOffCrc));
   return b;
 }
 
 bool decodeRecord(const uint8_t* b, RecordData& out) {
   if (memcmp(b + kOffMagic, kMagic.data(), kMagic.size()) != 0) return false;
-  if (get16(b + kOffSchema) != kRecordSchema) return false;
+  const uint16_t schema = get16(b + kOffSchema);
+  if (schema != kRecordSchema && schema != kRecordSchemaV1) return false;
   if (get32(b + kOffCrc) != crc32(b, kOffCrc)) return false;
-  const uint8_t output = b[kOffSettings];
-  const uint8_t jack = b[kOffSettings + 1];
-  if (output > static_cast<uint8_t>(OutputLevel::Instrument)) return false;
-  if (jack > static_cast<uint8_t>(InputJack::Pedal)) return false;
 
   RecordData rec;
+  if (!decodeSettings(b, schema, rec.settings)) return false;
   rec.sequence = get32(b + kOffSequence);
-  rec.settings.outputLevel = static_cast<OutputLevel>(output);
-  rec.settings.inputJack = static_cast<InputJack>(jack);
   memcpy(rec.name, b + kOffName, kLayoutNameBytes);
   for (int s = 0; s < kSlotCount; ++s) {
     bool known = false;

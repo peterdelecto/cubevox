@@ -7,6 +7,7 @@
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
+#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -19,6 +20,7 @@ struct ChainParams {
   cv::DistortionParams distortion;
   cv::GateParams gate;
   cv::ReverbParams reverb;
+  cv::PolishCompParams comp;  // the chain tail: comp, then eq
   cv::PolishParams eq;
 
   ChainParams();

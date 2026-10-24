@@ -1,4 +1,4 @@
-// Layout record, schema v1 (spec 2026-10-12-layout-record-design.md). Pure codec: no flash access.
+// Layout record, schema v2 (spec 2026-10-12-layout-record-design.md). Pure codec: no flash access.
 
 #pragma once
 
@@ -24,10 +24,18 @@ constexpr size_t kOffSequence = 8;
 constexpr size_t kOffName = 12;
 constexpr size_t kOffSlots = kOffName + kLayoutNameBytes;
 constexpr size_t kOffSettings = kOffSlots + kSlotCount * kRecordCardFieldBytes;
-constexpr size_t kSettingsBytes = 16;  // output level, input jack, 14 reserved
+constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, polish eq, top switch, 11 reserved
 constexpr size_t kOffCrc = kOffSettings + kSettingsBytes;
 
-constexpr uint16_t kRecordSchema = 1;
+// Byte offsets of the settings, in file order. A v1 record has the first two.
+constexpr size_t kOffOutputLevel = kOffSettings;
+constexpr size_t kOffInputJack = kOffSettings + 1;
+constexpr size_t kOffPolishComp = kOffSettings + 2;
+constexpr size_t kOffPolishEq = kOffSettings + 3;
+constexpr size_t kOffTopSwitch = kOffSettings + 4;
+
+constexpr uint16_t kRecordSchema = 2;
+constexpr uint16_t kRecordSchemaV1 = 1;  // still read; the v2 settings take their defaults
 
 static_assert(kOffCrc + 4 == kRecordBytes, "record fields must add up to 256 bytes");
 static_assert(kRecordBytes % kFlashWordBytes == 0, "record must be a whole number of flash words");
@@ -44,8 +52,9 @@ using RecordBytes = std::array<uint8_t, kRecordBytes>;
 
 RecordBytes encodeRecord(const RecordData& rec);
 
-// False when magic, schema, CRC or a settings byte is wrong. Unknown card ids decode to Card::Empty
-// and set `out.unknownCard`.
+// False when magic, schema, CRC or a settings byte is wrong. A v1 record decodes with the default
+// polish settings; encodeRecord always writes v2. Unknown card ids decode to Card::Empty and set
+// `out.unknownCard`.
 bool decodeRecord(const uint8_t* bytes, RecordData& out);
 
 // One record-sized entry of a sector's append log.

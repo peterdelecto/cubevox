@@ -57,8 +57,70 @@ void checkRecordCodec() {
   bad[kOffName] ^= 0x01;
   check(!decodeRecord(bad.data(), out), "record: corrupt byte fails the CRC");
   bad = b;
-  bad[kOffSchema] = 2;
+  bad[kOffSchema] = 3;
   check(!decodeRecord(bad.data(), out), "record: wrong schema rejected");
+}
+
+// Rewrites the CRC after a test edits the bytes it covers.
+void reseal(RecordBytes& b) {
+  const uint32_t crc = crc32(b.data(), kOffCrc);
+  for (size_t i = 0; i < 4; ++i) b[kOffCrc + i] = static_cast<uint8_t>(crc >> (8 * i));
+}
+
+// What a v1 firmware wrote: schema 1, and zeros where the v2 settings bytes now sit.
+RecordBytes asV1(RecordBytes b) {
+  b[kOffSchema] = static_cast<uint8_t>(kRecordSchemaV1);
+  b[kOffSchema + 1] = 0;
+  for (size_t off : {kOffPolishComp, kOffPolishEq, kOffTopSwitch}) b[off] = 0;
+  reseal(b);
+  return b;
+}
+
+void checkRecordSchemaV2() {
+  Settings changed;
+  changed.polishComp = false;
+  changed.polishEq = false;
+  changed.topSwitch = TopSwitch::Bypass;
+  RecordData in = makeRec(9, OutputLevel::Instrument);
+  in.settings = changed;
+  in.settings.outputLevel = OutputLevel::Instrument;
+  const RecordBytes b = encodeRecord(in);
+  RecordData out;
+  check(b[kOffSchema] == kRecordSchema && b[kOffPolishComp] == 0 && b[kOffPolishEq] == 0 &&
+            b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
+        "record v2: the polish bytes follow the two v1 settings bytes");
+  check(decodeRecord(b.data(), out) && !out.settings.polishComp && !out.settings.polishEq &&
+            out.settings.topSwitch == TopSwitch::Bypass && out.settings.outputLevel == OutputLevel::Instrument,
+        "record v2: round trip keeps the polish settings");
+
+  const RecordBytes defaults = encodeRecord(makeRec(1));
+  check(decodeRecord(defaults.data(), out) && out.settings.polishComp && out.settings.polishEq &&
+            out.settings.topSwitch == TopSwitch::Mute,
+        "record v2: default settings are comp on, EQ on, MUTE");
+
+  RecordData wasV1 = makeRec(4, OutputLevel::Instrument);
+  wasV1.settings.inputJack = InputJack::Pedal;
+  const RecordBytes v1 = asV1(encodeRecord(wasV1));
+  check(decodeRecord(v1.data(), out) && out.sequence == 4 && out.settings.outputLevel == OutputLevel::Instrument &&
+            out.settings.inputJack == InputJack::Pedal && out.settings.polishComp && out.settings.polishEq &&
+            out.settings.topSwitch == TopSwitch::Mute,
+        "record v1: decodes with the polish defaults, not the zero bytes");
+  check(classifyRecordEntry(v1.data()) == EntryState::Valid, "record v1: still a valid entry");
+  check(encodeRecord(out)[kOffSchema] == kRecordSchema, "record v1: the next save writes v2");
+
+  RecordBytes junk = v1;  // a v1 reserved byte is not a setting, whatever it holds
+  junk[kOffPolishComp] = 0x7F;
+  junk[kOffTopSwitch] = 0xFF;
+  reseal(junk);
+  check(decodeRecord(junk.data(), out) && out.settings.polishComp && out.settings.topSwitch == TopSwitch::Mute,
+        "record v1: bytes past the two settings are ignored");
+
+  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffPolishComp, kOffPolishEq, kOffTopSwitch}) {
+    RecordBytes bad = b;
+    bad[off] = 2;
+    reseal(bad);
+    check(!decodeRecord(bad.data(), out), "record v2: a settings byte out of range is rejected");
+  }
 }
 
 void checkRecordUnknownCard() {
@@ -364,6 +426,7 @@ void checkStoreFlushPending() {
 
 void checkRecords() {
   checkRecordCodec();
+  checkRecordSchemaV2();
   checkStoreFlushPending();
   checkRecordUnknownCard();
   checkRecordEntryStates();

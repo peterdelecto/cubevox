@@ -20,7 +20,15 @@ struct UiInput {
 };
 
 // What the sketch must do after an update. The menu never edits settings itself.
-enum class UiAction : uint8_t { None, ToggleOutput, ToggleInputJack, EnterDfu };
+enum class UiAction : uint8_t {
+  None,
+  TogglePolishComp,
+  TogglePolishEq,
+  ToggleOutput,
+  ToggleInputJack,
+  CycleTopSwitch,
+  EnterDfu,
+};
 
 // Read-only state the screens draw. The idle screen shows the last-moved knob from `panel`;
 // the chain view lists `layout`.

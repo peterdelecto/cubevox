@@ -5,6 +5,8 @@
 
 #include <stdint.h>
 
+#include "core/settings.h"
+
 // Drives MUTE_N and XSMT low. Call first in setup(), before anything that takes time.
 void muteInit();
 
@@ -12,8 +14,14 @@ void muteInit();
 // kBootUnmuteDelayMs after this, even if MUTE_SW is released.
 void muteClocksRunning(uint32_t nowMs);
 
-// Call every loop pass. Reads MUTE_SW, steps the sequence and drives the pins.
-void mutePoll(uint32_t nowMs);
+// Call every loop pass. Reads MUTE_SW, steps the sequence and drives the pins. With TOP SWITCH
+// MUTE the switch runs the mute sequence. With BYPASS the sequence ignores the switch and
+// muteBypassOn() follows it.
+void mutePoll(uint32_t nowMs, TopSwitch role);
+
+// True while TOP SWITCH is BYPASS and MUTE_SW is in its muted position, debounced. The audio
+// interrupt reads it once per block.
+bool muteBypassOn();
 
 // Mutes through the normal sequence and ignores MUTE_SW until reset. For faults the
 // firmware can see coming (a stalled audio interrupt).

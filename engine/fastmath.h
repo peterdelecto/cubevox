@@ -7,7 +7,8 @@
 #include "engine/common.h"
 
 // Cheap replacements for libm calls that sit inside per-sample loops. Each has
-// a test in test/fastmath_test.cpp that pins its error.
+// a test that pins its error: test/fastmath_test.cpp, and test/polish_comp_test.cpp
+// for log2Fast.
 
 namespace cv {
 
@@ -28,6 +29,26 @@ inline float exp2Fast(float x) {
   float scale;
   std::memcpy(&scale, &bits, sizeof scale);
   return p * scale;
+}
+
+// log2(x) to under 3e-5 absolute for positive normal x: the exponent field plus a
+// degree-5 polynomial on the mantissa in [1, 2). The fit passes through 0 at 1 and
+// 1 at 2, so the result is continuous across octaves. Zero, negative and subnormal
+// inputs return garbage, so callers keep x above a floor.
+inline float log2Fast(float x) {
+  uint32_t bits;
+  std::memcpy(&bits, &x, sizeof bits);
+  const float exponent = static_cast<float>(static_cast<int32_t>(bits >> 23) - 127);
+  bits = (bits & 0x007FFFFFu) | 0x3F800000u;  // mantissa with exponent 0: [1, 2)
+  float m;
+  std::memcpy(&m, &bits, sizeof m);
+  const float t = m - 1.0f;
+  float p = 4.5149041594e-2f;
+  p = p * t - 1.9357568174e-1f;
+  p = p * t + 4.1560604039e-1f;
+  p = p * t - 7.0909643857e-1f;
+  p = p * t + 1.4419170383f;
+  return exponent + p * t;
 }
 
 // sin(2 pi phase / 2^32) from a 32-bit turn counter. The phase folds to a

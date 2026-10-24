@@ -32,6 +32,8 @@ ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, c
   snap.layout = layout;
   for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, s, snap.params);
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
+  snap.params.comp.on = settings.polishComp;
+  snap.params.eq.on = settings.polishEq;
   snap.outputGain = powf(10.0f, outputTrimDb(settings) / kDbPerDecade);
   return snap;
 }

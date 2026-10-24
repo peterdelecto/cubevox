@@ -20,12 +20,30 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 ## Commands
 | cmd | Request fields | Reply |
 |---|---|---|
-| `hello` | — | `proto` 1, `fw` version, `serial` (24 uppercase hex characters of the MCU's 96-bit unique id, the text the update drive serves as its USB serial), `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout` |
-| `get_layout` | — | `layout`: `name`, `slots` (8 card ids) |
-| `set_layout` | `name`, `slots` (8 card ids) | `ok`, or an error |
+| `hello` | — | `proto` 1, `fw` version, `serial` (24 uppercase hex characters of the MCU's 96-bit unique id, the text the update drive serves as its USB serial), `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout`, `settings` (the box always sends it; the host tool that has no board leaves it out) |
+| `get_layout` | — | `layout`: `name`, `slots` (8 card ids); `settings` |
+| `set_layout` | `name`, `slots` (8 card ids), optional `settings` | `ok`, or an error |
 | `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late`, `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes`, `boot_fails` (earlier starts that never reported healthy, read at boot), `update_reason` (why the bootloader last stayed in update mode: `none`, `MenuHeld`, `AppRequest`, `ImageInvalid`, `ImageUnreadable` or `BootFailed`) |
 | `enter_dfu` | — | `ok`, sent and flushed before the box mutes and reboots into the UF2 update drive (the `CUBEVOX` volume, spec `2026-10-24-field-update-design.md`) |
 | `bench` | `op`, plus `slot` (1 to 8) for `slot_off` | `ok` after the op runs, or an error; diagnostic text goes to the log lines |
+
+## Settings object
+Owner 2026-10-24, `2026-10-24-polish-design.md`. The settings that live in the layout record's
+settings block and belong to the polish stages travel with the layout, as one object next to it.
+
+| Field | Values | Default on a fresh box |
+|---|---|---|
+| `polish_comp` | `true`, `false` | `true` |
+| `polish_eq` | `true`, `false` | `true` |
+| `top_switch` | `"mute"`, `"bypass"` | `"mute"` |
+
+1. Replies always carry all three. A `set_layout` request may leave out the object or any field in
+   it, and a missing field leaves the box's current value. Only the fields a request carries change,
+   so a request without `settings` changes none of them.
+2. A wrong type or an unknown word is an error that names the field, for example
+   `top_switch must be "mute" or "bypass"`. Unknown keys inside the object are skipped.
+3. The output level and input jack settings stay off the wire; the menu owns them.
+4. The box applies the settings with the layout and saves the record through the usual debounce.
 
 ## Bench operations
 Owner 2026-10-12: a performance box must never act on an unframed byte, and Adam's release image
