@@ -27,15 +27,20 @@ $(foreach v,CV_APP_END CV_BOOT_BLOCK_ADDR CV_FAULT_RECORD_ADDR CV_FAMILY,\
 # The board's own UF2 family instead of the port's STM32H7 id, which port.mk assigns after this file.
 override UF2_FAMILY_ID = $(CV_FAMILY)
 
-# Pinned upstream commit and patch count for INFO_UF2.TXT.
-CV_TINYUF2_VERSION := $(shell git -C '$(TOP)' describe --always --tags) with $(words $(wildcard $(CV_BOOTLOADER)/patches/*.patch)) cubevox patches
+# Upstream's version and the patch count for INFO_UF2.TXT. build.sh passes GIT_VERSION pinned next
+# to the commit, so the text does not depend on the tags a checkout fetched.
+CV_TINYUF2_VERSION := $(GIT_VERSION) with $(words $(wildcard $(CV_BOOTLOADER)/patches/*.patch)) cubevox patches
 
-# HSE_VALUE is the 25 MHz crystal, kHseHz in firmware/cubevox/src/board/clocks.h.
+# HSE_VALUE is the 25 MHz crystal, kHseHz in firmware/cubevox/src/board/clocks.h. The fixed date
+# and time are the TinyUF2 pin's, for the drive's file times and upstream's strings, so two builds
+# of one commit are the same bytes.
 CFLAGS += \
   -DSTM32H743xx \
   -DHSE_VALUE=25000000U \
   -DTINYUF2_LED=1 \
   -DBOARD_PFLASH_APP_EN=1 \
+  -DCOMPILE_DATE='"Oct 23 2026"' \
+  -DCOMPILE_TIME='"00:00:00"' \
   -DCV_TINYUF2_VERSION='"$(CV_TINYUF2_VERSION)"'
 
 INC += \

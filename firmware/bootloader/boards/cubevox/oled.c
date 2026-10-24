@@ -6,6 +6,8 @@
 
 #include "oled.h"
 
+#include "boot_block.h"
+#include "clock.h"
 #include "stm32h7xx_hal.h"
 
 // 7-bit address, kOledAddress in firmware/cubevox/src/board/display_sh1106.h.
@@ -13,8 +15,12 @@
 // The SH1106 drives 132 columns; the 128-column panel starts at column 2.
 #define CV_OLED_COLUMN 2u
 // 400 kHz Fast-mode from the 90 MHz rcc_pclk1 clock.c gives I2C2 (I2C123SEL keeps its reset value):
-// PRESC 2 (33.3 ns), SCLDEL 12 (433 ns setup), SDADEL 7 (233 ns hold), SCLH 30, SCLL 44.
+// PRESC 2 (33.3 ns), SCLDEL 12 (433 ns setup), SDADEL 7 (233 ns hold), SCLH 30, SCLL 44. The HSI
+// fallback's slower PCLK1 only lengthens every one of these times, which Fast-mode allows.
 #define CV_OLED_TIMINGR 0x20C71E2Cu
+#define CV_OLED_TIMINGR_PCLK1_HZ 90000000u
+CV_STATIC_ASSERT(oled_timing_matches_pclk1, CV_PCLK1_HZ == CV_OLED_TIMINGR_PCLK1_HZ);
+CV_STATIC_ASSERT(oled_fallback_is_slower, CV_HSI_HZ <= CV_OLED_TIMINGR_PCLK1_HZ);
 // Status polls before a transfer counts as failed, a few milliseconds.
 #define CV_OLED_POLLS 200000u
 #define CV_OLED_COMMANDS 0x00u
@@ -60,7 +66,7 @@ static void busRecover(void) {
   HAL_GPIO_WritePin(GPIOB, CV_OLED_SCL | CV_OLED_SDA, GPIO_PIN_SET);
   HAL_GPIO_Init(GPIOB, &pins);
   pause();
-  for (int i = 0; i < 9 && HAL_GPIO_ReadPin(GPIOB, CV_OLED_SDA) == GPIO_PIN_RESET; ++i) {
+  for (uint8_t i = 0; i < 9u && HAL_GPIO_ReadPin(GPIOB, CV_OLED_SDA) == GPIO_PIN_RESET; ++i) {
     HAL_GPIO_WritePin(GPIOB, CV_OLED_SCL, GPIO_PIN_RESET);
     pause();
     HAL_GPIO_WritePin(GPIOB, CV_OLED_SCL, GPIO_PIN_SET);

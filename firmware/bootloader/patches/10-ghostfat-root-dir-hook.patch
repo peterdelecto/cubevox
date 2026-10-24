@@ -1,0 +1,43 @@
+Why: a file that is not UF2 never reaches the block filter, so the board cannot report a wrong file the host copies; the root directory the host writes names every file it copies.
+
+diff --git a/src/board_api.h b/src/board_api.h
+index 2c67be1..96bf686 100644
+--- a/src/board_api.h
++++ b/src/board_api.h
+@@ -125,6 +125,8 @@
+
+ // Define TINYUF2_BOARD_BLOCK_FILTER to pass every UF2 block through board_uf2_block_accept() first
+
++// Define TINYUF2_BOARD_DIR_HOOK to pass every root directory sector the host writes to board_uf2_dir_written()
++
+ //--------------------------------------------------------------------+
+ // Constant
+ //--------------------------------------------------------------------+
+@@ -227,6 +229,10 @@ uint8_t board_usb_get_serial(uint8_t serial_id[16]);
+ // Returns the text and sets its length
+ char const* board_uf2_info(uint32_t* len);
+
++// A root directory sector the host wrote, of a board that defines TINYUF2_BOARD_DIR_HOOK. The
++// directory names every file the host copies, a file that is not UF2 among them
++void board_uf2_dir_written(uint8_t const* sector);
++
+ // Check if NRST pin is used to reset the board
+ // bool board_reseted_by_nrst(void);
+
+diff --git a/src/ghostfat.c b/src/ghostfat.c
+index 7179046..835654b 100644
+--- a/src/ghostfat.c
++++ b/src/ghostfat.c
+@@ -528,6 +528,12 @@ int uf2_write_block (uint32_t block_no, uint8_t *data, WriteState *state) {
+   (void) block_no;
+   UF2_Block *bl = (void*) data;
+
++#ifdef TINYUF2_BOARD_DIR_HOOK
++  if ( (block_no >= FS_START_ROOTDIR_SECTOR) && (block_no < FS_START_CLUSTERS_SECTOR) ) {
++    board_uf2_dir_written(data);
++  }
++#endif
++
+   if ( !is_uf2_block(bl) ) return -1;
+
+ #ifdef TINYUF2_BOARD_BLOCK_FILTER

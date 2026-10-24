@@ -32,7 +32,7 @@ Verdict gVerdict = Verdict::Unknown;
 // Reads the stamped header through its address. The compiled constant holds zero length and CRC.
 bool checkImageInFlash() {
   const volatile CvImageHeader* stamped = reinterpret_cast<const volatile CvImageHeader*>(kHeaderAddress);
-  if (stamped->magic != CV_IMAGE_MAGIC || stamped->headerVersion != CV_IMAGE_HEADER_VERSION) return false;
+  if (stamped->magic != CV_IMAGE_MAGIC || !cvImageHeaderVersionOk(stamped->headerVersion)) return false;
   const uint32_t length = stamped->length;
   if (length < kMinLength || length > CV_APP_END - CV_APP_START) return false;
   const uint8_t* image = reinterpret_cast<const uint8_t*>(CV_APP_START);
