@@ -6,7 +6,7 @@ MUTE/BYPASS assignment. The menu stays minimal: one row per item, no sub-pages.
 
 ## Signal path tail
 ```
-slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → DAC
+slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → soft ceiling → DAC
 ```
 1. Both stages run always; OFF is a settled bit-exact passthrough reached through the same
    50 ms crossfade the EQ already uses, so a click on the menu never clicks in the audio.
@@ -46,18 +46,31 @@ Feed-forward, mono, no lookahead, log-domain gain computer, in `engine/polish_co
 
 | Tuning | Value | Why |
 |---|---|---|
-| Detector | RMS, 10 ms window, sidechain 2-pole high-pass at 150 Hz | plosives and handling noise never pump the gain |
-| Threshold | -24 dBFS RMS | Adam's loops sit near -23 dBFS RMS; here the loud syllables get 3 to 5 dB and the average about 1 dB. At -18 the comp idled and only its makeup showed |
-| Ratio | 2.2 : 1 | levelling, not squashing |
-| Knee | 6 dB soft | no audible onset |
-| Attack | 10 ms | consonants pass |
-| Release | 150 ms, program-independent | steady on held notes, no breathing |
-| Max gain reduction | 12 dB | a shout stays a shout |
-| Makeup | `trimDb` in the tuning, set by `level_test` on the program scaled to -23 dBFS RMS | unity at the level the voice actually has; the other stages are linear and keep the test's -18 dBFS program |
+| Detector | RMS, 10 ms window, sidechain 4-pole high-pass at 150 Hz (38 dB down at 50 Hz) | plosives and handling noise never pump the gain; a 50 Hz tone at -6 dBFS causes no reduction at any tuning |
+| Release | program-independent | steady on held notes, no breathing |
+| Makeup | `trimDb` per tuning, set by `level_test` on the program scaled to -23 dBFS RMS | unity at the level the voice actually has; the other stages are linear and keep the test's -18 dBFS program |
+
+Three named tunings live in the engine; FIRM is the default (owner 2026-10-24, by ear on the loops).
+Adam's loops sit near -23 dBFS RMS, which is why the thresholds sit where they do.
+
+| Tuning | Threshold | Ratio | Knee | Attack | Release | Max GR | Makeup | On the loops |
+|---|---|---|---|---|---|---|---|---|
+| GENTLE | -24 dBFS | 2.2 : 1 | 6 dB | 10 ms | 150 ms | 12 dB | +1.5 dB | about 1 dB average, 3 to 5 dB peaks |
+| MEDIUM | -28 dBFS | 3 : 1 | 6 dB | 5 ms | 120 ms | 15 dB | +4.1 dB | about 2.5 dB average, 7 to 9 dB peaks |
+| FIRM (default) | -30 dBFS | 4 : 1 | 4 dB | 3 ms | 100 ms | 18 dB | +5.9 dB | about 3.5 dB average, 9 to 12 dB peaks |
+
+`cubevox-render --polish-comp gentle|medium|firm|off` renders any of them for listening.
 
 Gain per sample from the envelope through the engine's fast log2/exp2. OFF settles to a
 bit-exact copy. CPU cost is measured on the bench and added to the chain table; the budget rule
 (75 % / 95 %) of the CPU pass 2 spec applies.
+
+## Soft ceiling
+Makeup plus a transient that passes the 3 ms attack can exceed full scale, so `engine/soft_ceiling.h`
+closes the tail after the output trim: bit-exact below -2 dBFS, a tanh shoulder above it with
+matched value, slope and curvature, never past 1.0, NaN mapped to 0. A +6 dBFS peak leaves at
+0.9999965. None of the nine listening renders touches it. Estimated cost about 0.05 % of the
+480 MHz budget below the knee and 0.6 % while a sample is in the shoulder; measured on the bench.
 
 ## POLISH EQ
 The existing `engine/polish.h` stage with its fixed voicing (110 Hz high-pass, -2.5 dB at 300 Hz,
@@ -83,7 +96,9 @@ what the box plays; `--polish-comp off` and `--polish-eq off` switch them for A/
    threshold within 0.3 dB of the knee formula), attack and release times within 20 %, sidechain high-pass
    (a 50 Hz tone at -6 dBFS causes under 0.5 dB of reduction), OFF is bit-exact after the
    crossfade, no NaN or denormal on silence.
-2. `level_test` rows: `polish COMP defaults`, `polish EQ defaults` (exists).
+2. `level_test` rows: `polish COMP defaults` (FIRM) plus one row per other tuning, `polish EQ
+   defaults` (exists). `test/soft_ceiling_test.cpp`: a +6 dB transient stays under full scale,
+   a -3 dBFS sine is bit-exact, no NaN out for any input.
 3. `test/firmware/core_record.cpp`: v2 round trip, v1 record decodes with defaults, a bad
    settings byte is rejected.
 4. `test/firmware/core_protocol.cpp`: the three fields in and out, absent on input means unchanged.

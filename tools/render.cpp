@@ -1,5 +1,5 @@
 // cubevox-render: loop in, gates + harmony + octave + unison + slapback + distortion + reverb, then the
-// polish tail (comp, eq) like the box, processed mono 48 kHz f32 WAV out.
+// polish tail (comp, eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -14,6 +14,7 @@
 #include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
+#include "engine/soft_ceiling.h"
 #include "engine/unison.h"
 
 namespace {
@@ -34,6 +35,7 @@ struct RenderParams {
   bool compOn = true;  // the polish tail runs as on the box unless switched off
   bool eqOn = true;
   bool compStats = false;  // print the comp's gain reduction after the render
+  const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -58,16 +60,18 @@ int usage() {
                "       [--reverb springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
-               "       [--polish-comp on|off] [--polish-eq on|off] [--comp-stats]\n"
+               "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --harmony, --octave or --autotune; formant applies on --hengine 1\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, comp, eq\n"
+               "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
-               "  comp and eq are the box's polish tail and run by default; --polish-comp off and --polish-eq off\n"
-               "  switch them for A/B listening; --eq is accepted and changes nothing\n"
-               "  --comp-stats prints the comp's average and peak gain reduction, read once per block\n"
+               "  comp and eq are the box's polish tail and run by default, the comp at its firm tuning\n"
+               "  --polish-comp gentle|medium|firm picks the comp tuning, and --polish-comp off and --polish-eq off\n"
+               "  switch them out for A/B listening; --eq is accepted and changes nothing\n"
+               "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs "
                "wetMaxDb detuneCents0 detuneCents1 windowMs\n"
                "     harChromLower harChromLow harChromHigh harChromHigher (-12..12) harTrimDbA harTrimDbB harTrimDbC\n"
@@ -106,6 +110,32 @@ bool parseOnOff(const char* s, bool* out) {
   if (!on && std::strcmp(s, "off") != 0) return false;
   *out = on;
   return true;
+}
+
+struct CompTuningName {
+  const char* name;
+  cv::PolishCompTuning (*make)();
+};
+
+constexpr CompTuningName kCompTunings[] = {{"gentle", cv::PolishCompTuning::gentle},
+                                           {"medium", cv::PolishCompTuning::medium},
+                                           {"firm", cv::PolishCompTuning::firm}};
+
+// gentle, medium or firm picks a tuning, on keeps the default one, off switches the comp out.
+bool parseCompChoice(const char* s, RenderParams* rp) {
+  if (std::strcmp(s, "off") == 0) {
+    rp->compOn = false;
+    return true;
+  }
+  rp->compOn = true;
+  if (std::strcmp(s, "on") == 0) return true;
+  for (const CompTuningName& c : kCompTunings) {
+    if (std::strcmp(s, c.name) != 0) continue;
+    rp->comp.tuning = c.make();
+    rp->compName = c.name;
+    return true;
+  }
+  return false;
 }
 
 // "hz,db"
@@ -314,7 +344,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--comp-stats") == 0) {
       rp.compStats = true;
     } else if (std::strcmp(a, "--polish-comp") == 0 && i + 1 < argc) {
-      if (!parseOnOff(argv[++i], &rp.compOn)) return false;
+      if (!parseCompChoice(argv[++i], &rp)) return false;
     } else if (std::strcmp(a, "--polish-eq") == 0 && i + 1 < argc) {
       if (!parseOnOff(argv[++i], &rp.eqOn)) return false;
     } else if (std::strcmp(a, "--eqhp") == 0 && i + 1 < argc) {
@@ -488,6 +518,10 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   double reductionSum = 0.0;  // comp gain reduction in dB, read at the end of each block, weighted by its length
   double reductionPeak = 0.0;
   double reductionSamples = 0.0;
+  double ceilingPeakIn = 0.0;  // largest sample into the output ceiling and out of it
+  double ceilingPeakOut = 0.0;
+  double ceilingTouched = 0.0;  // samples past the ceiling's knee
+  double ceilingSamples = 0.0;
   int rc = 0;
   for (;;) {
     ma_uint64 got = 0;
@@ -544,7 +578,18 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       if (rp.eqOn) {
         polish.process(src, scratch[next], n, rp.eq);
         src = scratch[next];
+        next ^= 1;
       }
+      for (int i = 0; i < n; ++i) {
+        const float x = src[i];
+        const float y = cv::softCeiling(x);
+        ceilingPeakIn = std::fmax(ceilingPeakIn, std::fabs(x));
+        ceilingPeakOut = std::fmax(ceilingPeakOut, std::fabs(y));
+        if (std::fabs(x) > cv::kSoftCeilingKnee) ceilingTouched += 1.0;
+        scratch[next][i] = y;
+      }
+      ceilingSamples += n;
+      src = scratch[next];
       ma_uint64 wrote = 0;
       if (ma_encoder_write_pcm_frames(&enc, src, got, &wrote) != MA_SUCCESS ||
           wrote != got) {
@@ -565,10 +610,14 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   ma_decoder_uninit(&dec);
   if (rc == 0 && rp.compStats) {
     if (rp.compOn && reductionSamples > 0.0) {
-      std::printf("comp: average gain reduction %.2f dB, peak %.2f dB\n", reductionSum / reductionSamples, reductionPeak);
+      std::printf("comp %s: average gain reduction %.2f dB, peak %.2f dB\n", rp.compName, reductionSum / reductionSamples,
+                  reductionPeak);
     } else {
       std::printf("comp: off\n");
     }
+    std::printf("ceiling: peak in %.3f (%+.2f dBFS), out %.3f (%+.2f dBFS), %.0f of %.0f samples past the %.0f dBFS knee\n",
+                ceilingPeakIn, 20.0 * std::log10(ceilingPeakIn), ceilingPeakOut, 20.0 * std::log10(ceilingPeakOut),
+                ceilingTouched, ceilingSamples, 20.0 * std::log10(cv::kSoftCeilingKnee));
   }
   return rc;
 }

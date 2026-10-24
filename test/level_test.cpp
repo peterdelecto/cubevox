@@ -25,8 +25,8 @@ constexpr int kMeasureFrom = 1 * cv::kSampleRate;
 constexpr double kProgramDbfs = -18.0;
 constexpr double kNoiseDbfs = -40.0;
 
-// The comp threshold sits at -24 dBFS, close to the voice loops (-22.7 to -24.5 dBFS RMS), so the
-// comp row runs the program at that level and every other row keeps kProgramDbfs.
+// The comp thresholds sit at -24 to -30 dBFS, around the voice loops (-22.7 to -24.5 dBFS RMS), so
+// the comp rows run the program at that level and every other row keeps kProgramDbfs.
 constexpr double kCompProgramDbfs = -23.0;
 constexpr double kLoDb = 0.0;
 constexpr double kHiDb = 0.5;
@@ -263,9 +263,15 @@ int main() {
   ok &= simple<cv::Reverb>("reverb CHASM mix 1", in, reverbParams(cv::kReverbChasm));
   ok &= simple<cv::Reverb>("reverb SPRING B mix 1", in, reverbParams(cv::kReverbSpringB));
 
+  // One row per named tuning, each with its own makeup. The default params carry FIRM.
+  const Signal compProgram = programAt(kCompProgramDbfs);
   cv::PolishCompParams comp;
   comp.on = true;
-  ok &= simple<cv::PolishComp>("polish COMP defaults", programAt(kCompProgramDbfs), comp);
+  ok &= simple<cv::PolishComp>("polish COMP defaults", compProgram, comp);
+  comp.tuning = cv::PolishCompTuning::gentle();
+  ok &= simple<cv::PolishComp>("polish COMP gentle", compProgram, comp);
+  comp.tuning = cv::PolishCompTuning::medium();
+  ok &= simple<cv::PolishComp>("polish COMP medium", compProgram, comp);
 
   cv::PolishParams eq;
   eq.on = true;

@@ -1,5 +1,6 @@
-// Polish compressor checks: static curve, ballistics, sidechain high-pass, cap, bit-exact off,
-// silence, log2Fast error, no-alloc. No window, no audio device.
+// Polish compressor checks: the named tunings, then for each one the static curve, ballistics,
+// sidechain high-pass and cap; bit-exact off, silence, log2Fast error and no-alloc on the default.
+// No window, no audio device.
 
 #include <atomic>
 #include <cfenv>
@@ -7,6 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <new>
+#include <string>
 #include <vector>
 
 #include "engine/fastmath.h"
@@ -88,11 +90,23 @@ Signal run(cv::PolishComp& c, const Signal& in, const cv::PolishCompParams& p) {
 }
 
 // Unity makeup, so the gain is the gain reduction alone.
-cv::PolishCompParams pureParams() {
+cv::PolishCompParams pureParams(const cv::PolishCompTuning& t = cv::PolishCompTuning()) {
   cv::PolishCompParams p;
+  p.tuning = t;
   p.tuning.trimDb = 0.0f;
   return p;
 }
+
+struct Named {
+  const char* name;
+  cv::PolishCompTuning tuning;
+};
+
+const Named kTunings[] = {{"gentle", cv::PolishCompTuning::gentle()},
+                          {"medium", cv::PolishCompTuning::medium()},
+                          {"firm", cv::PolishCompTuning::firm()}};
+
+std::string labelled(const char* what, const Named& n) { return std::string(what) + " " + n.name; }
 
 bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0, double c = 0.0,
             double d = 0.0, double e = 0.0) {
@@ -103,12 +117,40 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
 }
 
 // Gain reduction of a steady sine, measured over seconds 1 to 2 of a 2 s run.
-double steadyReductionDb(double hz, double rmsDb) {
+double steadyReductionDb(double hz, double rmsDb, const cv::PolishCompTuning& t) {
   static cv::PolishComp comp;
   comp.reset();
   const Signal in = sine(hz, rmsDb, 2 * kSecond);
-  const Signal out = run(comp, in, pureParams());
-  return -20.0 * std::log10(rmsOf(out, kSecond, 2 * kSecond) / rmsOf(in, kSecond, 2 * kSecond));
+  const Signal out = run(comp, in, pureParams(t));
+  // The leading 0.0 keeps an exact unity gain from printing as -0.00.
+  return 0.0 - 20.0 * std::log10(rmsOf(out, kSecond, 2 * kSecond) / rmsOf(in, kSecond, 2 * kSecond));
+}
+
+bool sameTuning(const cv::PolishCompTuning& a, const cv::PolishCompTuning& b) {
+  return a.rmsMs == b.rmsMs && a.sidechainHz == b.sidechainHz && a.thresholdDb == b.thresholdDb && a.ratio == b.ratio &&
+         a.kneeDb == b.kneeDb && a.attackMs == b.attackMs && a.releaseMs == b.releaseMs &&
+         a.maxReductionDb == b.maxReductionDb && a.trimDb == b.trimDb;
+}
+
+// The spec's table, pinned. FIRM is the default, and all three share the detector and the sidechain.
+bool testNamedTunings() {
+  struct Row {
+    float threshold, ratio, knee, attack, release, max;
+  };
+  const Row want[] = {{-24.0f, 2.2f, 6.0f, 10.0f, 150.0f, 12.0f},
+                      {-28.0f, 3.0f, 6.0f, 5.0f, 120.0f, 15.0f},
+                      {-30.0f, 4.0f, 4.0f, 3.0f, 100.0f, 18.0f}};
+  bool table = true;
+  for (int i = 0; i < 3; ++i) {
+    const cv::PolishCompTuning& t = kTunings[i].tuning;
+    table = table && t.thresholdDb == want[i].threshold && t.ratio == want[i].ratio && t.kneeDb == want[i].knee &&
+            t.attackMs == want[i].attack && t.releaseMs == want[i].release && t.maxReductionDb == want[i].max &&
+            t.rmsMs == 10.0f && t.sidechainHz == 150.0f;
+  }
+  const bool defaultIsFirm = sameTuning(cv::PolishCompTuning(), cv::PolishCompTuning::firm()) &&
+                             sameTuning(cv::PolishCompParams().tuning, cv::PolishCompTuning::firm());
+  return report("named tunings", table && defaultIsFirm, "table matches the spec=%.0f (1), default is firm=%.0f (1)",
+                table ? 1.0 : 0.0, defaultIsFirm ? 1.0 : 0.0);
 }
 
 // The textbook soft-knee curve: none below the knee, quadratic through it, then 1 - 1/ratio per dB.
@@ -129,24 +171,29 @@ double kneeReductionDb(double levelDb, const cv::PolishCompTuning& t) {
 
 // The five levels sit at fixed offsets from the threshold: under the knee, at its centre, just over
 // it, and two steps up the ratio slope. They were -30/-18/-12/-6/0 dBFS for a -18 dBFS threshold.
-bool testStaticCurve() {
-  const cv::PolishCompTuning t;
+bool testStaticCurve(const Named& n) {
+  const cv::PolishCompTuning& t = n.tuning;
   const double offsets[] = {-12.0, 0.0, 6.0, 12.0, 18.0};
   double got[5], worst = 0.0;
   for (int i = 0; i < 5; ++i) {
     const double level = t.thresholdDb + offsets[i];
-    got[i] = steadyReductionDb(1000.0, level);
+    got[i] = steadyReductionDb(1000.0, level, t);
     worst = std::fmax(worst, std::fabs(got[i] - kneeReductionDb(level, t)));
   }
-  std::printf("     reduction at threshold -12/0/+6/+12/+18 dB = %.2f / %.2f / %.2f / %.2f / %.2f dB\n", got[0], got[1],
-              got[2], got[3], got[4]);
-  return report("static curve", worst <= 0.3, "worst distance from the knee formula=%.3f dB (<= 0.3)", worst);
+  std::printf("     %s reduction at threshold -12/0/+6/+12/+18 dB = %.2f / %.2f / %.2f / %.2f / %.2f dB\n", n.name, got[0],
+              got[1], got[2], got[3], got[4]);
+  return report(labelled("static curve", n).c_str(), worst <= 0.3, "worst distance from the knee formula=%.3f dB (<= 0.3)",
+                worst);
 }
 
-bool testReductionCap() {
-  const cv::PolishCompTuning t;
-  const double got = steadyReductionDb(1000.0, t.thresholdDb + 24.0);  // the slope alone asks for 13.1 dB
-  return report("reduction cap", std::fabs(got - 12.0) <= 0.2, "24 dB over the threshold reduces %.2f dB (12 +-0.2)", got);
+// A level 3 dB past what the cap allows: the slope asks for more than the cap, and the cap wins.
+bool testReductionCap(const Named& n) {
+  const cv::PolishCompTuning& t = n.tuning;
+  const double slope = 1.0 - 1.0 / t.ratio;
+  const double asked = t.maxReductionDb + 3.0;
+  const double got = steadyReductionDb(1000.0, t.thresholdDb + asked / slope, t);
+  return report(labelled("reduction cap", n).c_str(), std::fabs(got - t.maxReductionDb) <= 0.2,
+                "the slope asks %.0f dB and %.2f dB is applied (cap %.0f +-0.2)", asked, got, t.maxReductionDb);
 }
 
 // Gain reduction in dB per sample from out/in, NaN where the input sits too close to a zero
@@ -182,52 +229,58 @@ double timeConstantMs(const std::vector<double>& gr, int from, int settled) {
 
 // Attack and release as the gain smoother's time constants. The detector sits still at -12 dBFS
 // RMS while the threshold moves, so the target gain reduction steps and nothing else does.
-bool testBallistics() {
+bool testBallistics(const Named& n) {
   static cv::PolishComp comp;
   comp.reset();
   const Signal in = sine(1000.0, -12.0, 3 * kSecond);
-  const Signal out = runWith(comp, in, [](int i) {
-    cv::PolishCompParams p = pureParams();
+  const Signal out = runWith(comp, in, [&n](int i) {
+    cv::PolishCompParams p = pureParams(n.tuning);
     p.tuning.thresholdDb = (i >= kSecond && i < 2 * kSecond) ? -30.0f : -18.0f;
     return p;
   });
-  const std::vector<double> gr = reductionTrace(in, out, 0.5 * std::sqrt(2.0) * std::pow(10.0, -12.0 / 20.0));
+  const std::vector<double> gr = reductionTrace(in, out, 0.25 * std::sqrt(2.0) * std::pow(10.0, -12.0 / 20.0));
   const double attack = timeConstantMs(gr, kSecond, 2 * kSecond - 1);
   const double release = timeConstantMs(gr, 2 * kSecond, 3 * kSecond - 1);
-  const cv::PolishCompTuning t;
+  const cv::PolishCompTuning& t = n.tuning;
   const bool ok = std::fabs(attack - t.attackMs) <= 0.2 * t.attackMs &&
                   std::fabs(release - t.releaseMs) <= 0.2 * t.releaseMs;
-  return report("ballistics", ok, "attack %.1f ms (10 +-20%%), release %.1f ms (150 +-20%%)", attack, release);
+  return report(labelled("ballistics", n).c_str(), ok, "attack %.1f ms (%.0f +-20%%), release %.1f ms (%.0f +-20%%)", attack,
+                t.attackMs, release, t.releaseMs);
 }
 
-// The same times end to end, through the 10 ms RMS window. Printed for the owner; the bounds only
-// catch a detector that has stopped following the level.
-bool testStepResponse() {
+// The same times end to end, through the 10 ms RMS window, for a level step 18 dB over the
+// threshold. Printed for the owner. The bounds only catch a detector that has stopped following
+// the level: the attack lands within the detector window of the smoother's, the release within half again.
+bool testStepResponse(const Named& n) {
   static cv::PolishComp comp;
+  const cv::PolishCompTuning& t = n.tuning;
+  const double loudDb = t.thresholdDb + 18.0;
   comp.reset();
   const int quiet = kSecond / 2;
-  const Signal up = join(sine(1000.0, -50.0, quiet), sine(1000.0, -6.0, kSecond));
-  const std::vector<double> rise = reductionTrace(up, run(comp, up, pureParams()), kQuietMinAbs);
+  const Signal up = join(sine(1000.0, -50.0, quiet), sine(1000.0, loudDb, kSecond));
+  const std::vector<double> rise = reductionTrace(up, run(comp, up, pureParams(t)), kQuietMinAbs);
   const double attack = timeConstantMs(rise, quiet, quiet + kSecond - 1);
 
   comp.reset();
   const int loud = kSecond;
-  const Signal down = join(sine(1000.0, -6.0, loud), sine(1000.0, -50.0, 3 * kSecond / 2));
-  const std::vector<double> fall = reductionTrace(down, run(comp, down, pureParams()), kQuietMinAbs);
+  const Signal down = join(sine(1000.0, loudDb, loud), sine(1000.0, -50.0, 3 * kSecond / 2));
+  const std::vector<double> fall = reductionTrace(down, run(comp, down, pureParams(t)), kQuietMinAbs);
   const double release = timeConstantMs(fall, loud, loud + 3 * kSecond / 2 - 1);
 
-  const bool ok = attack >= 8.0 && attack <= 24.0 && release >= 120.0 && release <= 200.0;
-  return report("step response", ok, "level step up %.1f ms (8..24), level step down %.1f ms (120..200)", attack,
-                release);
+  const bool ok = attack >= t.attackMs && attack <= t.attackMs + 15.0 && release >= t.releaseMs &&
+                  release <= 1.5 * t.releaseMs;
+  return report(labelled("step response", n).c_str(), ok, "level step up %.1f ms over a %.0f ms smoother, down %.1f ms over %.0f ms",
+                attack, t.attackMs, release, t.releaseMs);
 }
 
-// A 50 Hz tone at -6 dBFS RMS sits 19 dB down after the sidechain filter, at the foot of the knee.
-// Without the filter it would reduce 9.8 dB, as the 1 kHz tone does.
-bool testSidechain() {
-  const double low = steadyReductionDb(50.0, -6.0);
-  const double mid = steadyReductionDb(1000.0, -6.0);
-  return report("sidechain high-pass", low < 0.5 && mid > 5.0, "-6 dBFS RMS reduces %.2f dB at 50 Hz (<0.5), %.2f dB at 1 kHz (>5)",
-                low, mid);
+// A 50 Hz tone at -6 dBFS RMS sits 38 dB down after the 4-pole sidechain filter, well under every
+// tuning's knee. Without the filter it would reduce as much as the 1 kHz tone does.
+bool testSidechain(const Named& n) {
+  const double levelDb = -6.0;
+  const double low = steadyReductionDb(50.0, levelDb, n.tuning);
+  const double mid = steadyReductionDb(1000.0, levelDb, n.tuning);
+  return report(labelled("sidechain high-pass", n).c_str(), std::fabs(low) < 0.5 && mid > 3.0,
+                "%.0f dBFS RMS reduces %.2f dB at 50 Hz (<0.5), %.2f dB at 1 kHz (>3)", levelDb, low, mid);
 }
 
 bool testOffBitExact() {
@@ -317,12 +370,14 @@ bool testNoAlloc() {
 }  // namespace
 
 int main() {
-  bool ok = true;
-  ok &= testStaticCurve();
-  ok &= testReductionCap();
-  ok &= testBallistics();
-  ok &= testStepResponse();
-  ok &= testSidechain();
+  bool ok = testNamedTunings();
+  for (const Named& n : kTunings) {
+    ok &= testStaticCurve(n);
+    ok &= testReductionCap(n);
+    ok &= testBallistics(n);
+    ok &= testStepResponse(n);
+    ok &= testSidechain(n);
+  }
   ok &= testOffBitExact();
   ok &= testSilence();
   ok &= testLog2Fast();

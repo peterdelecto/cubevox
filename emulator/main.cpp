@@ -38,6 +38,7 @@
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
 #include "engine/reverb.h"
+#include "engine/soft_ceiling.h"
 #include "engine/unison.h"
 
 namespace {
@@ -324,6 +325,8 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
     gPolishComp.process(mono.data(), tmp.data(), n, params.comp);
     gPolish.process(tmp.data(), mono.data(), n, params.eq);
+    // The box's output ceiling, last in the chain.
+    for (int i = 0; i < n; ++i) mono[i] = cv::softCeiling(mono[i]);
     // Mute: silence out, so the wedge loop hears exactly what a muted box would send.
     if (params.mute) std::fill(mono.begin(), mono.begin() + n, 0.0f);
     if (feedback) {
