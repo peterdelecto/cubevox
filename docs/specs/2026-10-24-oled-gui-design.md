@@ -8,7 +8,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Status
 1. Host part built and tested 2026-10-24. The readout and MUTED frames equal the proof renderer byte for byte.
 2. The owner approved proofs 3 to 10 on 2026-10-24 with one change, "we don't want re-centering". The value row now sits in a fixed field per parameter, as set out under Value field. The proof renderer and the goldens follow it.
-3. Bench part open. The list is in Bench, below.
+3. A sweep test measures every parameter of every card for sideways movement and is a hard gate, as set out under Tests and proofs.
+4. Bench part open. The list is in Bench, below.
 
 ## Screens
 | Screen | Shows | Rows |
@@ -150,9 +151,13 @@ Settings, mute state, Menu::open ───────────────�
 The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the nine `roll-time` frames, `roll-semi-40` and the three `muted` frames. Their numbers already filled the field.
 
 4. The field tests build the value rows from the wording of Value field, taking only the knob's readings from the code. They compare every number of every knob in the default layout (about 3,600) cell by cell, then check that nothing lies left of the field and the unit never moves while numbers roll. They also check 99 to 100, -9 to -10, the sign cell, and the key's left-aligned field.
-5. The voice has no byte reference, because the proof's voice comes from Adam's recordings. Its tests check the level map, the heights, the scroll, the rim, the walk and three input levels through the whole path.
-6. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm` and `oled-face-menu.pgm` at 4x.
-7. To refresh the goldens after the owner changes the proof:
+5. The lateral sweep is the hard gate for the owner's rule, "I don't want anything bouncing around laterally as values change". `checkReadoutSweep` renders the settled readout at every step of every knob of every card in the registry, Chasm Reverb included.
+6. A continuous knob runs through every whole number between the lowest and the highest its 4096 pot readings reach. A stepped knob runs through every position. Today that is 18 parameters and 3,852 steps, and the test prints both counts on every run.
+7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns and a key name's first lit column are read straight off the frame. Each must equal the column the first frame that showed it gave, so a shift of one pixel fails.
+8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before. A knob that declares decimals fails it until the sweep models them.
+9. The voice has no byte reference, because the proof's voice comes from Adam's recordings. Its tests check the level map, the heights, the scroll, the rim, the walk and three input levels through the whole path.
+10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm` and `oled-face-menu.pgm` at 4x.
+11. To refresh the goldens after the owner changes the proof:
 ```
 clang++ -std=c++17 -O2 -I firmware/cubevox/src -I tools/font-editor/fonts tools/oled-proof/oled_motion.cpp \
   firmware/cubevox/src/core/canvas.cpp firmware/cubevox/src/core/fonts.cpp -o build/oled_motion

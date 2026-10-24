@@ -5,8 +5,10 @@
 #include "support.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
@@ -296,6 +298,270 @@ void checkReadoutNeverMoves() {
   }
   check(unitStill, "readout: the unit never moves while any number changes or rolls");
   check(inField, "readout: nothing in the value rows lies left of the field");
+}
+
+// ---------------------------------------------------------------------------------------------
+// The lateral sweep. Every knob of every card in the registry runs through its whole range one step
+// at a time, and each settled frame is measured on its pixels. The test takes no position from the
+// renderer and none from a model of the layout. It finds a glyph by matching its picture, and any
+// column that differs from the first frame fails, however small the change.
+
+// The value rows as one word per column. Bit r of a word is row kValueTop + r.
+using Columns = std::array<uint32_t, kCanvasWidth>;
+
+Columns bandColumns(const Canvas& c) {
+  Columns cols{};
+  for (int x = 0; x < kCanvasWidth; ++x) {
+    for (int r = 0; r < kValueBottom - kValueTop; ++r) {
+      if (lit(c, x, kValueTop + r)) cols[static_cast<size_t>(x)] |= 1u << r;
+    }
+  }
+  return cols;
+}
+
+// The picture of one character in a tabular cell whose left edge is column 0.
+std::vector<uint32_t> cellPicture(char ch) {
+  const char text[2] = {ch, '\0'};
+  Canvas c;
+  c.drawDigits(0, kValueTop, font16x24(), text);
+  const Columns cols = bandColumns(c);
+  return std::vector<uint32_t>(cols.begin(), cols.begin() + font16x24().width);
+}
+
+// Every column from which the band shows exactly that picture, left to right.
+std::vector<int> picturesIn(const Columns& cols, const std::vector<uint32_t>& picture) {
+  std::vector<int> found;
+  const int width = static_cast<int>(picture.size());
+  for (int x = 0; x + width <= kCanvasWidth; ++x) {
+    bool same = true;
+    for (int i = 0; same && i < width; ++i) same = cols[static_cast<size_t>(x + i)] == picture[static_cast<size_t>(i)];
+    if (same) found.push_back(x);
+  }
+  return found;
+}
+
+// The first and last lit columns of the band from column `from` on. Both are -1 when none is lit.
+struct Extent {
+  int left = -1;
+  int right = -1;
+};
+
+Extent inkFrom(const Columns& cols, int from) {
+  Extent e;
+  for (int x = from; x < kCanvasWidth; ++x) {
+    if (cols[static_cast<size_t>(x)] == 0) continue;
+    if (e.left < 0) e.left = x;
+    e.right = x;
+  }
+  return e;
+}
+
+// The settled readout of a knob on any card, showing the number `shown`.
+Canvas settledReadout(Card cardId, int slot, int knob, int shown) {
+  ReadoutView v;
+  v.slot = slot;
+  v.card = cardDesc(cardId).name;
+  v.knob = knobDesc(cardId, knob);
+  v.shown = static_cast<float>(shown);
+  v.target = shown;
+  Canvas c;
+  renderReadout(c, v);
+  return c;
+}
+
+// Every number the knob can show, in order. A stepped knob has one for each position. A continuous
+// knob has every whole step from the lowest number its travel reaches to the highest, found over the
+// 4096 readings of the pot's 12-bit converter.
+std::vector<int> sweepValues(const KnobDesc& k) {
+  std::vector<int> values;
+  if (k.kind == KnobKind::Stepped) {
+    for (int i = 0; i < k.positions; ++i) values.push_back(knobShown(k, static_cast<float>(i)));
+    return values;
+  }
+  constexpr int kReadings = 4096;
+  int lo = knobShown(k, 0.0f);
+  int hi = lo;
+  for (int i = 0; i < kReadings; ++i) {
+    const int shown = knobShown(k, static_cast<float>(i) / static_cast<float>(kReadings - 1));
+    lo = std::min(lo, shown);
+    hi = std::max(hi, shown);
+  }
+  for (int shown = lo; shown <= hi; ++shown) values.push_back(shown);
+  return values;
+}
+
+// The number with its unit, or the name of a labelled knob, for a failure message.
+std::string valueText(const KnobDesc& k, int shown) {
+  char text[32];
+  formatShown(k, shown, text, sizeof(text));
+  return k.unit[0] != '\0' ? std::string(text) + " " + k.unit : std::string(text);
+}
+
+// Finds each non-blank character of `cells` in the band by its picture, left to right. A cell takes
+// the leftmost match that clears the cell before it, and a blank cell has no ink to find and stays at
+// -1. False when a character has no picture or no match.
+bool placeCells(const Columns& cols, const std::string& cells, std::vector<std::vector<uint32_t>>& pictures,
+                std::vector<int>& at) {
+  at.assign(cells.size(), -1);
+  int next = 0;
+  for (size_t j = 0; j < cells.size(); ++j) {
+    if (cells[j] == ' ') continue;
+    std::vector<uint32_t>& picture = pictures[static_cast<size_t>(cells[j])];
+    if (picture.empty()) picture = cellPicture(cells[j]);
+    if (std::all_of(picture.begin(), picture.end(), [](uint32_t word) { return word == 0; })) return false;
+    int pick = -1;
+    for (int x : picturesIn(cols, picture)) {
+      if (x >= next) {
+        pick = x;
+        break;
+      }
+    }
+    if (pick < 0) return false;
+    at[j] = pick;
+    next = pick + font16x24().width;
+  }
+  return true;
+}
+
+// Sweeps a numeric knob and returns what moved first, or "" when nothing did. `steps` counts the
+// frames measured. Every frame must put each digit, the sign and the unit where the first frame that
+// showed them put them. The rest of the screen must not change either, and each step must look new.
+std::string sweepNumber(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
+                        std::vector<std::vector<uint32_t>>& pictures, int& steps) {
+  const FontDesc& big = font16x24();
+  Field f;
+  for (int v : values) {
+    f.signedRange = f.signedRange || v < 0;
+    f.digits = std::max(f.digits, static_cast<int>(std::to_string(std::abs(v)).size()));
+  }
+  std::vector<int> cellX(static_cast<size_t>(f.cells()), -1);
+  Extent unit;
+  bool haveUnit = false;
+  Canvas first;
+  Canvas previous;
+  for (size_t n = 0; n < values.size(); ++n) {
+    const int v = values[n];
+    const std::string where = "at " + valueText(k, v) + ", ";
+    const Canvas frame = settledReadout(cardId, slot, knob, v);
+    ++steps;
+
+    const Columns cols = bandColumns(frame);
+    const std::string cells = cellsFor(f, v);
+    std::vector<int> at;
+    if (!placeCells(cols, cells, pictures, at)) return where + "the characters \"" + cells + "\" are not in their cells";
+    for (size_t j = 0; j < at.size(); ++j) {
+      if (at[j] < 0) continue;
+      if (cellX[j] < 0) cellX[j] = at[j];
+      if (at[j] != cellX[j]) {
+        return where + "cell " + std::to_string(j + 1) + " of " + std::to_string(at.size()) + " moved from x " +
+               std::to_string(cellX[j]) + " to x " + std::to_string(at[j]);
+      }
+    }
+
+    // The last cell always holds a digit, so the unit lies to the right of it.
+    const Extent seen = inkFrom(cols, at.back() + big.width);
+    if (!haveUnit) {
+      unit = seen;
+      haveUnit = true;
+    }
+    if (seen.left != unit.left || seen.right != unit.right) {
+      return where + "the unit moved from columns " + std::to_string(unit.left) + " to " + std::to_string(unit.right) +
+             " to columns " + std::to_string(seen.left) + " to " + std::to_string(seen.right);
+    }
+
+    // Cells at the places found, and the unit after the last one, must account for every lit pixel.
+    Canvas rebuilt;
+    for (size_t j = 0; j < at.size(); ++j) {
+      if (at[j] < 0) continue;
+      const char one[2] = {cells[j], '\0'};
+      rebuilt.drawDigits(at[j], kValueTop, big, one);
+    }
+    if (k.unit[0] != '\0') {
+      const std::string text = std::string(" ") + k.unit;
+      rebuilt.drawText(at.back() + cellPitch(), kValueTop, big, text.c_str());
+    }
+    if (!sameRows(frame, rebuilt, kValueTop, kValueBottom)) return where + "the value rows hold ink that is no cell and not the unit";
+
+    if (n == 0) first = frame;
+    if (!sameRows(first, frame, 0, kValueTop) || !sameRows(first, frame, kValueBottom, kCanvasHeight)) {
+      return where + "something outside the value rows changed";
+    }
+    if (n > 0 && sameRows(previous, frame, kValueTop, kValueBottom)) return where + "the step looks like the one before";
+    previous = frame;
+  }
+  return "";
+}
+
+// Sweeps a labelled knob the same way. Each name must start at the column the first one started at.
+std::string sweepLabelled(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
+                          int& steps) {
+  int left = -1;
+  Canvas first;
+  Canvas previous;
+  for (size_t n = 0; n < values.size(); ++n) {
+    const int v = values[n];
+    const std::string where = "at " + valueText(k, v) + ", ";
+    const Canvas frame = settledReadout(cardId, slot, knob, v);
+    ++steps;
+
+    const Extent ink = inkFrom(bandColumns(frame), 0);
+    if (ink.left < 0) return where + "the name draws nothing";
+    if (n == 0) left = ink.left;
+    if (ink.left != left) {
+      return where + "the name moved from x " + std::to_string(left) + " to x " + std::to_string(ink.left);
+    }
+    Canvas rebuilt;
+    rebuilt.drawText(ink.left, kValueTop, font16x24(), knobLabel(k, v));
+    if (!sameRows(frame, rebuilt, kValueTop, kValueBottom)) return where + "the value rows hold ink that is not the name";
+
+    if (n == 0) first = frame;
+    if (!sameRows(first, frame, 0, kValueTop) || !sameRows(first, frame, kValueBottom, kCanvasHeight)) {
+      return where + "something outside the value rows changed";
+    }
+    if (n > 0 && sameRows(previous, frame, kValueTop, kValueBottom)) return where + "the step looks like the one before";
+    previous = frame;
+  }
+  return "";
+}
+
+// Hard gate (owner 2026-10-24, "I don't want anything bouncing around laterally as values change").
+// Prints how many parameters and steps it covered.
+void checkReadoutSweep() {
+  std::vector<std::vector<uint32_t>> pictures(128);
+  int expected = 0;
+  int parameters = 0;
+  int steps = 0;
+  for (int index = 1; index < kCardCount; ++index) {
+    const Card cardId = card(index);
+    const CardDesc& desc = cardDesc(cardId);
+    for (int knob = 0; knob < desc.knobCount; ++knob) {
+      ++expected;
+      const KnobDesc* k = knobDesc(cardId, knob);
+      if (!k) {
+        check(false, (std::string("readout sweep: ") + desc.name + " has no knob " + std::to_string(knob + 1)).c_str());
+        continue;
+      }
+      const std::string who = std::string("readout sweep: ") + desc.name + " " + k->name;
+      if (k->decimals != 0) {
+        check(false, (who + " declares decimals, which the sweep does not model yet").c_str());
+        continue;
+      }
+      const std::vector<int> values = sweepValues(*k);
+      const int slot = (index - 1) % kSlotCount;
+      int done = 0;
+      const std::string moved = k->labels ? sweepLabelled(cardId, slot, knob, *k, values, done)
+                                          : sweepNumber(cardId, slot, knob, *k, values, pictures, done);
+      check(moved.empty(), (who + " " + moved).c_str());
+
+      // A sweep that found nothing must also have reached every step between the ends of the travel.
+      const int reach = k->kind == KnobKind::Stepped ? k->positions : std::abs(knobShown(*k, 1.0f) - knobShown(*k, 0.0f)) + 1;
+      if (moved.empty()) check(done == reach && reach >= 2, (who + " was not swept through its whole range").c_str());
+      ++parameters;
+      steps += done;
+    }
+  }
+  check(parameters == expected && parameters > 0, "readout sweep: every knob of every card was swept");
+  std::printf("readout sweep: %d parameters, %d settled steps\n", parameters, steps);
 }
 
 // A number that gains a digit lights its leading cell in place while the other digits roll.
@@ -637,6 +903,7 @@ void checkScreens() {
   checkReadoutRows();
   checkReadoutField();
   checkReadoutNeverMoves();
+  checkReadoutSweep();
   checkReadoutGainsDigit();
   checkReadoutRollClip();
   checkReadoutEdges();
