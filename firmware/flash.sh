@@ -15,13 +15,11 @@
 # above the bootloader's sector. Hold BOOT0, tap NRST, release BOOT0; the script waits up to WAIT
 # seconds. Written at 0x08000000, that file would destroy the bootloader.
 #
-# The variant and out dir come from build.sh (VARIANT=release|bench; BENCH=1 and BOARD=weact imply
-# bench). BOARD=weact flashes through the WEACTBOOT drive. With several cu.usbmodem* ports, name one
-# in CUBEVOX_PORT.
+# The variant and out dir come from build.sh (VARIANT=release|bench; BENCH=1 implies bench). With
+# several cu.usbmodem* ports, name one in CUBEVOX_PORT.
 #
 #   ./flash.sh                    # release image; build first with ./build.sh
 #   VARIANT=bench ./flash.sh      # bench image; build first with BENCH=1 ./build.sh
-#   BOARD=weact ./flash.sh        # bench image for the WeAct board
 #   ./flash.sh --rom              # the same image through the ROM DFU
 #   ./flash.sh --help             # the short usage
 
@@ -36,20 +34,19 @@ LEAVE_WAIT=15  # the drive leaves within a few seconds of the last block
 PORT_TOOL=(python3 -I "$FW/cubevox_port.py")
 STAMP_TOOL=(python3 -I "$REPO/tools/stamp_image.py")
 
-# The drive label each bootloader board serves (bootloader/boards/*/board.h).
+# The drive label the bootloader serves (bootloader/boards/cubevox/board.h).
 VOLUME=CUBEVOX
-if [ "${BOARD:-}" = weact ]; then VOLUME=WEACTBOOT; fi
 
 usage() {
   cat <<'USAGE'
 usage: ./flash.sh [--rom | --help]
   (no flag)  update-drive path: send enter_dfu over the serial port if one is present, wait for
-             /Volumes/CUBEVOX (WEACTBOOT with BOARD=weact), copy <out dir>/cubevox.uf2 onto it,
+             /Volumes/CUBEVOX, copy <out dir>/cubevox.uf2 onto it,
              wait for the drive to go and the box's port to return, print the boot report
   --rom      ST ROM DFU path: hold BOOT0, tap NRST, release; dfu-util writes <out dir>/cubevox.ino.bin
              at the application start from boot_block.h (0x08020000), above the bootloader's sector
-  VARIANT=release|bench, BENCH=1, BOARD=weact pick the image as build.sh does; WAIT=<s> bounds the
-  waits (default 300); CUBEVOX_PORT names the port when several cu.usbmodem* exist
+  VARIANT=release|bench and BENCH=1 pick the image as build.sh does; WAIT=<s> bounds the waits
+  (default 300); CUBEVOX_PORT names the port when several cu.usbmodem* exist
 USAGE
 }
 
@@ -66,7 +63,6 @@ if [ "$ROM" -eq 1 ]; then IMAGE="$OUT/cubevox.ino.bin"; fi
 if [ ! -f "$IMAGE" ]; then
   hint="./build.sh"
   if [ "$VARIANT" = bench ]; then hint="BENCH=1 ./build.sh"; fi
-  if [ "${BOARD:-}" = weact ]; then hint="BOARD=weact ./build.sh"; fi
   echo "[ERROR] $IMAGE missing; run $hint first"
   exit 1
 fi

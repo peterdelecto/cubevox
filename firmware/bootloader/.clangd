@@ -6,8 +6,7 @@
 #   REPO  the checkout
 # The list follows the compile command make prints for boards/cubevox/board_hooks.c:
 #   make -C build/tinyuf2/ports/stm32h7 BOARD=cubevox CROSS_COMPILE=$TC/bin/arm-none-eabi- V=1 -n -B all
-# board.mk passes CV_BOARD_WEACT=0 for the cubevox board and 1 for BOARD=weact. Change it below to
-# browse the WeAct board. The version strings are placeholders for the ones build.sh computes.
+# The version strings are placeholders for the ones build.sh computes.
 CompileFlags:
   Add:
     - --target=arm-none-eabi
@@ -32,7 +31,6 @@ CompileFlags:
     - -DTINYUF2_LED=1
     - -DBOARD_PFLASH_APP_EN=1
     - -DBOARD_UF2_FAMILY_ID=0x43564258
-    - -DCV_BOARD_WEACT=0
     - -DCV_TINYUF2_VERSION="editor"
     - -DCFG_TUSB_MCU=OPT_MCU_STM32H7
     - -DCFG_TUSB_DEBUG=0

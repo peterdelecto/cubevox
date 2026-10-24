@@ -1,6 +1,5 @@
 // TinyUF2 board for cubevox: STM32H743VIT6, 25 MHz crystal, TinyUF2 in bank 1 sector 0 and the
-// application from CV_APP_START. Addresses, magics and ids come from boot_block.h. The WeAct H743
-// test board builds this board with CV_BOARD_WEACT 1 (boards/weact).
+// application from CV_APP_START. Addresses, magics and ids come from boot_block.h.
 
 #ifndef BOARD_H_
 #define BOARD_H_
@@ -19,16 +18,6 @@ extern "C" {
 // Board identity
 //--------------------------------------------------------------------+
 
-#if CV_BOARD_WEACT
-// WeAct MiniSTM32H743: LED on PE3, a reset button for the double tap, no OLED.
-#define LED_PORT             GPIOE
-#define LED_PIN              GPIO_PIN_3
-#define CV_OLED              0
-#define TINYUF2_DBL_TAP_DFU  1
-#define CV_BOARD_FAMILY      CV_UF2_FAMILY_WEACT
-#define UF2_BOARD_ID         "cubevox-weact-h743"
-#define UF2_VOLUME_LABEL     "WEACTBOOT"
-#else
 // USER_LED (pins.h kUserLed). The sealed box has no reset button Adam can reach, so no double
 // tap: the 500 ms wait would cost every boot for nothing.
 #define LED_PORT             GPIOB
@@ -38,7 +27,6 @@ extern "C" {
 #define CV_BOARD_FAMILY      CV_UF2_FAMILY_CUBEVOX
 #define UF2_BOARD_ID         "cubevox-h743-v4"
 #define UF2_VOLUME_LABEL     "CUBEVOX"
-#endif
 #define LED_STATE_ON         1
 
 //--------------------------------------------------------------------+

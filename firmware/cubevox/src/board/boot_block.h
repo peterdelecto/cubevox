@@ -67,11 +67,9 @@
 
 // ---- UF2 families --------------------------------------------------------------------------
 
-// cubevox-private ids ("CVBX" and "CVWA" in ASCII), not registered in microsoft/uf2
-// uf2families.json. Each bootloader accepts only its own family, so a bench image for the WeAct
-// board or another project's file never reaches the cubevox flash.
+// cubevox-private id ("CVBX" in ASCII), not registered in microsoft/uf2 uf2families.json. The
+// bootloader accepts only this family, so another project's file never reaches the cubevox flash.
 #define CV_UF2_FAMILY_CUBEVOX  0x43564258u
-#define CV_UF2_FAMILY_WEACT    0x43565741u
 
 // ---- USB identity --------------------------------------------------------------------------
 

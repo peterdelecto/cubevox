@@ -114,8 +114,8 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    vendoring `uf2conv.py` would add a second definition of the same constants.
 2. The UF2 family id is cubevox's own, `kUf2FamilyCubevox` in `boot_block.h`, not the generic
    STM32H7 id. TinyUF2 refuses every block whose family differs, before writing anything. One
-   constant therefore rejects a wrong file, a bench image for the WeAct (its own family id), and
-   any other project's UF2, while the installed image stays intact.
+   constant therefore rejects a wrong file and any other project's UF2, while the installed image
+   stays intact.
 3. The bootloader's `board_app_valid2` hook (an upstream weak symbol) checks magic, header version,
    length inside the region and the CRC. TinyUF2's own test is a stack-pointer and reset-vector
    sanity check that a half-written image passes; the header is what makes an incomplete image
@@ -180,7 +180,7 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    and counted. After the last block, `bootFails` is zeroed, `lastReason` cleared, the D-cache
    cleaned, and the box resets with no wait.
 4. Finder's `.fseventsd`, `.Spotlight-V100`, `._*` files and the "disk not ejected properly" notice
-   after the reset are expected and harmless. The update guide says so.
+   after the reset are expected and harmless.
 
 ## OLED in update mode
 The bootloader drives the SH1106 over I2C2 (PB10/PB11) with its own driver, about 150 lines: the
@@ -248,7 +248,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
    the application erases the bank 2 sector that its own fault record or `faultAddress` in the
    boot block names. After a successful erase it clears `faultAddress`, so the bootloader reads
    the log again. The boot entry still records the address the bootloader left.
-4. Adam's support step is one sentence in the guide. Open the `CUBEVOX` drive, send `DIAG.TXT`.
+4. Adam's support step is one sentence, told to him: open the `CUBEVOX` drive, send `DIAG.TXT`.
 
 ## Application changes
 | File | Change |
@@ -296,7 +296,6 @@ firmware/bootloader/
   flash.sh                  ROM DFU of the bootloader at 0x08000000 (BOOT0), shop only
   patches/                  board-overridable flash bound and NOINIT origin; optional CURRENT.UF2 and INDEX.HTM; sent upstream
   boards/cubevox/           board.h, board.mk, board.cmake, clock_init (25 MHz HSE), oled.c, boot_decide.c, app_valid2, diag.c
-  boards/weact/             same with OLED off, LED on, its own family id, double-tap on (it has a reset button)
 ```
 1. Pin. adafruit/tinyuf2 `29d9ce231bada513a7200c087f10a91c832aec42` (master, 2026-10-23) and TinyUSB
    at its submodule commit. `build.sh` checks the pin the way the firmware `build.sh` checks the
@@ -342,7 +341,7 @@ firmware/bootloader/
 | 3 | Operator pulls USB at about 30 % of a copy | Box stays in update mode; a full copy then succeeds |
 | 4 | Operator cuts 9 V at about 30 % of a copy | Next power-on shows `The update stopped.`; `DIAG.TXT` says `ImageInvalid` or `ImageUnreadable` with an address; a full copy then succeeds |
 | 5 | Copy a `.uf2` built with `-b 0x08100000` | Every block refused, OLED `That is not a cubevox firmware file.`, layout record intact (`get_layout` after reboot) |
-| 6 | Copy the WeAct bench `.uf2` | Every block refused (family), installed image intact |
+| 6 | Copy a `.uf2` made with `stamp_image.py uf2 --family-id 0x00000000` from the bench image | Every block refused (family), installed image intact |
 | 7 | Copy a `.uf2` with one payload byte flipped | Box resets into update mode, `INFO_UF2.TXT` `Installed: invalid` |
 | 8 | Bench op `f` (bus fault) three times inside 5 s of boot | Third reset lands in update mode, `DIAG.TXT` carries the fault record |
 | 9 | `set_layout`, update, `get_layout` | Same layout |
@@ -361,16 +360,15 @@ firmware/bootloader/
 3. `.github/workflows/ci.yml` adds a `bootloader` job using the same xpack toolchain the firmware
    job installs, runs `firmware/bootloader/build.sh`, and checks both `.uf2` files with
    `stamp_image.py --check`. The host job runs the `boot_decide` tests with the rest of `ctest`.
-4. `release.yml` attaches `cubevox-vX.YY.ZZ.uf2`, `cubevox-rom-0x08020000.bin` (shop, ROM path; the
-   address in the name is the one dfu-util must write it at, so the old `cubevox.bin` name that the
-   parked app wrote at 0x08000000 can never hit the bootloader) and
-   `cubevox-bootloader-vB.BB.bin`. The app jobs stay; the app is parked, not removed.
-5. `docs/update-guide.md` is Adam's one page. Steps 1–5 of "What Adam does", a photo of each OLED
-   screen, the Finder notice, and the support sentence about `DIAG.TXT`.
-6. `VERSION.txt` is bumped as today; the header string and the release file name derive from it.
-7. `LICENSE` at the repository root is MIT. The bootloader README carries the TinyUF2 and TinyUSB
+4. `release.yml` attaches `cubevox-vX.YY.ZZ.uf2` and `cubevox-rom-0x08020000.bin` (shop, ROM path;
+   the address in the name is the one dfu-util must write it at, so the old `cubevox.bin` name that
+   the parked app wrote at 0x08000000 can never hit the bootloader). The bootloader binary is
+   shop-only and is not attached; its job stays as a build check. The app jobs stay; the app is
+   parked, not removed.
+5. `VERSION.txt` is bumped as today; the header string and the release file name derive from it.
+6. `LICENSE` at the repository root is MIT. The bootloader README carries the TinyUF2 and TinyUSB
    notices. Nothing else is needed on licensing.
-8. The parked app, when it returns, replaces its dfu-util step with a copy of the release `.uf2` to
+7. The parked app, when it returns, replaces its dfu-util step with a copy of the release `.uf2` to
    `/Volumes/CUBEVOX` and a wait for the CDC port. `app/dfu-util-static.sh` and the `dfu-util`
    release job go at that time, not before.
 
@@ -381,7 +379,6 @@ firmware/bootloader/
 2. The application must keep working with the oldest shipped bootloader. The host test for
    `boot_decide` runs against the bootloader source at the pinned commit, so a drift shows in CI.
 3. `enter_dfu` keeps its name and reply forever; the parked app and `flash.sh` depend on it.
-4. The WeAct carries the same bootloader with its own family id. It is a test target only.
 
 ## Budgets
 | Item | Value |
@@ -405,8 +402,8 @@ firmware/bootloader/
    Teensy-H7-Port cut-over. Gates: `ctest`, both `build.sh` variants with the warn gate, a hand
    copy of the `.uf2` boots and shows the version.
 4. Diagnostic log in bank 2 sector 2, `status` and `hello` fields, serial spec line.
-5. `flash.sh`, `cubevox_port.py`, `bringup.py --update`, workflows, update guide. Gate: drills
-   1–13 logged for board 1.
+5. `flash.sh`, `cubevox_port.py`, `bringup.py --update`, workflows. Gate: drills 1–13 logged for
+   board 1.
 6. Shop steps on every shipping unit, one log per unit in `hardware/bringup/`.
 
 ## Open items for the owner

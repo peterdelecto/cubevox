@@ -74,7 +74,7 @@ CPU pass and its grill decisions are `docs/specs/2026-10-08-pitch-cpu-pass-desig
 3. Idle path when every pitch stage is settled off copies in → out and only writes rings (0.9 % of a block).
 4. Tracker runs only when Autotune, Harmony, or Octave A/B is on. Octave C (default) needs no pitch.
 
-## Cost (share of a 640k-cycle block, WeAct H743, voice clip)
+## Cost (share of a 640k-cycle block, H743 test board, voice clip)
 
 | Part | Cost |
 |---|---|

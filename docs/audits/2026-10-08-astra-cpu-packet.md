@@ -13,7 +13,7 @@ Engine state is a single `Chain` struct in `.bss` (AXI SRAM at 0x24000000, cache
 Block buffers are two `float[64]` on the IRQ stack. Input on the bench board is a floating
 SAI pin (noise), no codec.
 
-Measured on a WeAct H743 (same die), average cycles per block over about 3000 blocks:
+Measured on an H743 test board (same die), average cycles per block over about 3000 blocks:
 
 | stage | off | on |
 |---|---|---|

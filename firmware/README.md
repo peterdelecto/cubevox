@@ -14,7 +14,7 @@ flashes. The image runs from 0x08020000, behind the bootloader in flash sector 0
     ./flash.sh --rom    # ST ROM DFU (hold BOOT0): dfu-util writes the .bin at 0x08020000
 
 1. **Variant.** `build.sh` is the only place that decides it. `VARIANT=release|bench` names it outright,
-   `BENCH=1` and `BOARD=weact` imply bench, and a conflicting `VARIANT` is an error. `./build.sh --variant`
+   `BENCH=1` implies bench, and a conflicting `VARIANT` is an error. `./build.sh --variant`
    prints the variant and `./build.sh --outdir` prints the output dir (`/tmp/cubevox-fw-release` or
    `/tmp/cubevox-fw-bench`) for the current environment, then exit. `flash.sh`, `bringup.py` and CI ask it
    instead of repeating the rule.
@@ -35,8 +35,8 @@ flashes. The image runs from 0x08020000, behind the bootloader in flash sector 0
 6. **Image size.** The build fails when the .bin exceeds 917504 bytes, the room between the bootloader's sector
    and flash bank 2, which holds the layout record.
 7. **Stamp and update file.** `tools/stamp_image.py` writes the length and CRC-32 into the image header, in place.
-   It then writes `cubevox.uf2` next to the .bin, in the cubevox family (the `weact` family when
-   `BOARD=weact`), and reads that file back the way the bootloader will. `build.sh` prints the stamped version.
+   It then writes `cubevox.uf2` next to the .bin, in the cubevox family, and reads that file back the way the
+   bootloader will. `build.sh` prints the stamped version.
 8. **Version.** The release name is `v` plus `VERSION.txt`. `build.sh` passes it as `CUBEVOX_FW_VERSION`, and
    the image header, `hello`, the boot report, the boot splash and the confirm screen all show that one string.
    The bench image adds `-bench` to the header only.
@@ -124,9 +124,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `bootloader/flash.sh` puts in sector 0. `./flash.sh --help` lists the knobs.
 - `bringup.py`: first-article checks for a new board over USB, optional fault, ROM-DFU and update drills
   (`--faults`, `--dfu`, `--update`, the last one being spec drills 1 to 13), operator questions, log to
-  `hardware/bringup/`. `./bringup.py --board 1 --faults --update`; on the WeAct add
-  `--weact --no-oled`. It checks its panel thresholds, block rate and SAI clock against the firmware through
-  `tools/bench_ops_check.py`.
+  `hardware/bringup/`. `./bringup.py --board 1 --faults --update`. It checks its panel thresholds, block rate
+  and SAI clock against the firmware through `tools/bench_ops_check.py`.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20
   for 480 MHz on rev V silicon (360 MHz, N144 Q15, on older revisions), USB from PLL1Q, HSI48 off, PLL2 40 MHz as
   the ADC kernel clock. A failing step records its name in the fault record and resets; the next boot report
@@ -219,12 +218,12 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `panel test is off` unless the test is on; leaving it restores jack, mute and menu. `./bringup.py --board 1
   --panel` walks slots 1 to 8 (knob A and B left then right, toggle both ways), fails a pot that does not travel,
   reads backwards, or moves with another channel, then asks about the K103 click, the mute click and the OLED
-  pattern. `--no-prompt` skips it. On a real board `bringup.py` flashes the bench image first, runs its checks,
-  then flashes the release image and checks that `hello` reports `release`; `--weact` stays on the bench image.
+  pattern. `--no-prompt` skips it. `bringup.py` flashes the bench image first, runs its checks, then flashes the
+  release image and checks that `hello` reports `release`.
 
 ## Status
 
-Costs in `core/costs.h` are marked measured, from runs of the engine chain on the WeAct H743 stand-in; the method
-is in that file. The audio path, clock tree, USB gating and mux timing have run on the WeAct and not yet on a
+Costs in `core/costs.h` are marked measured, from runs of the engine chain on an H743 test board; the method
+is in that file. The audio path, clock tree, USB gating and mux timing have run on the test board and not yet on a
 cubevox board. The bring-up logs are in `hardware/bringup/`. The OLED driver is compiled and falls back to
 `stubDisplay()` when nothing answers at 0x3C. VA_SENSE shutdown is not implemented, and no code reads PB1.

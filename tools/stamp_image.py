@@ -3,12 +3,13 @@
 
   python3 -I tools/stamp_image.py stamp IN.bin [--out OUT.bin]
   python3 -I tools/stamp_image.py check IN.bin|IN.uf2
-  python3 -I tools/stamp_image.py uf2 IN.bin OUT.uf2 --family cubevox|weact [--base 0x08020000]
+  python3 -I tools/stamp_image.py uf2 IN.bin OUT.uf2 [--family-id 0xHEX] [--base 0x08020000]
   python3 -I tools/stamp_image.py selftest
 
-The application region, the image header layout and magic, and the UF2 family ids come from
+The application region, the image header layout and magic, and the UF2 family id come from
 firmware/cubevox/src/board/boot_block.h (--header names another file), so this tool holds no
-second copy of them. It is the only UF2 writer in the project.
+second copy of them. --family-id writes any 32-bit family id instead, for a file the bootloader
+must refuse. It is the only UF2 writer in the project.
 """
 
 import argparse
@@ -41,7 +42,7 @@ NEEDED = (
     "CV_APP_START", "CV_APP_END", "CV_IMAGE_HEADER_OFFSET", "CV_IMAGE_HEADER_SIZE",
     "CV_IMAGE_OFFSET_MAGIC", "CV_IMAGE_OFFSET_HEADER_VERSION", "CV_IMAGE_OFFSET_LENGTH",
     "CV_IMAGE_OFFSET_CRC", "CV_IMAGE_OFFSET_VERSION", "CV_IMAGE_VERSION_BYTES",
-    "CV_IMAGE_MAGIC", "CV_IMAGE_HEADER_VERSION", "CV_UF2_FAMILY_CUBEVOX", "CV_UF2_FAMILY_WEACT",
+    "CV_IMAGE_MAGIC", "CV_IMAGE_HEADER_VERSION", "CV_UF2_FAMILY_CUBEVOX",
 )
 DEFINE = re.compile(
     r"^[ \t]*#[ \t]*define[ \t]+(CV_[A-Z0-9_]+)[ \t]+(0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*[ \t]*$",
@@ -114,7 +115,7 @@ class Contract:
         self.version_bytes = v["CV_IMAGE_VERSION_BYTES"]
         self.magic = v["CV_IMAGE_MAGIC"]
         self.header_version = v["CV_IMAGE_HEADER_VERSION"]
-        self.families = {"cubevox": v["CV_UF2_FAMILY_CUBEVOX"], "weact": v["CV_UF2_FAMILY_WEACT"]}
+        self.families = {"cubevox": v["CV_UF2_FAMILY_CUBEVOX"]}
         self.max_bytes = self.app_end - self.app_start
 
 
@@ -249,14 +250,22 @@ def is_uf2(path, data):
 
 # ---- commands ------------------------------------------------------------------------------------
 
-def parse_address(text):
+def parse_u32(text, noun):
     try:
         value = int(text, 0)
     except ValueError:
         raise argparse.ArgumentTypeError(f"{text!r} is not a number")
     if not 0 <= value < 1 << 32:
-        raise argparse.ArgumentTypeError(f"{text!r} is not a 32-bit address")
+        raise argparse.ArgumentTypeError(f"{text!r} is not a 32-bit {noun}")
     return value
+
+
+def parse_address(text):
+    return parse_u32(text, "address")
+
+
+def parse_family_id(text):
+    return parse_u32(text, "family id")
 
 
 def cmd_stamp(c, args):
@@ -279,9 +288,13 @@ def cmd_uf2(c, args):
     base = c.app_start if args.base is None else args.base
     if base % UF2_PAYLOAD_BYTES or base + len(data) > 1 << 32:
         raise ToolError(f"base 0x{base:08X} is not a {UF2_PAYLOAD_BYTES}-byte aligned address that fits {len(data)} bytes")
-    blob = make_uf2(data, c.families[args.family], base)
+    if args.family_id is None:
+        family, label = c.families[args.family], args.family
+    else:
+        family, label = args.family_id, f"0x{args.family_id:08X}"
+    blob = make_uf2(data, family, base)
     write_file(args.output, blob)
-    print(f"wrote {len(blob) // UF2_BLOCK_BYTES} blocks, family {args.family}, base 0x{base:08X}")
+    print(f"wrote {len(blob) // UF2_BLOCK_BYTES} blocks, family {label}, base 0x{base:08X}")
     return 0
 
 
@@ -363,7 +376,7 @@ def selftest_uf2(c, failures, image, info):
     refused("a foreign family", make_uf2(image, 0x6DB66082, c.app_start))
     refused("a base outside the application", make_uf2(image, cubevox, c.app_end))
     mixed = bytearray(blob)
-    struct.pack_into("<I", mixed, UF2_BLOCK_BYTES + 28, c.families["weact"])
+    struct.pack_into("<I", mixed, UF2_BLOCK_BYTES + 28, 0x6DB66082)
     refused("two families in one file", bytes(mixed))
     refused("a missing block", blob[:5 * UF2_BLOCK_BYTES] + blob[6 * UF2_BLOCK_BYTES:])
     refused("a truncated file", blob[:-UF2_BLOCK_BYTES])
@@ -390,14 +403,24 @@ def selftest_cli(c, args, failures):
         write_file(raw, fake_image(c, 3072))
         expect(cli("stamp", raw, "--out", stamped)[0] == 0, "cli stamp --out succeeds")
         expect(cli("check", stamped)[0] == 0, "cli check accepts the stamped file")
-        expect(cli("uf2", stamped, uf2, "--family", "weact")[0] == 0, "cli uf2 succeeds")
+        expect(cli("uf2", stamped, uf2, "--family", "cubevox")[0] == 0, "cli uf2 succeeds")
         expect(cli("check", uf2)[0] == 0, "cli check accepts the uf2")
+        expect(cli("uf2", stamped, uf2)[0] == 0 and cli("check", uf2)[0] == 0, "cli uf2 defaults to cubevox")
+        foreign = os.path.join(tmp, "foreign.uf2")
+        expect(cli("uf2", stamped, foreign, "--family-id", "0x6DB66082")[0] == 0, "cli uf2 --family-id succeeds")
+        expect(u32(read_file(foreign), 28) == 0x6DB66082, "--family-id is the family word of the first block")
+        expect(cli("check", foreign)[0] == 1, "cli check refuses a uf2 of a foreign family")
+        zero = os.path.join(tmp, "zero.uf2")
+        expect(cli("uf2", stamped, zero, "--family-id", "0x00000000")[0] == 0 and u32(read_file(zero), 28) == 0,
+               "--family-id 0x00000000 writes family 0")
         expect(cli("stamp", raw)[0] == 0 and cli("check", raw)[0] == 0, "cli stamps in place")
         write_file(raw, fake_image(c, 3072))
         for what, argv in (
                 ("an unstamped bin", ("check", raw)),
                 ("an unstamped bin to uf2", ("uf2", raw, os.path.join(tmp, "x.uf2"), "--family", "cubevox")),
                 ("an unknown family", ("uf2", stamped, os.path.join(tmp, "y.uf2"), "--family", "stm32h7")),
+                ("a family id over 32 bits", ("uf2", stamped, os.path.join(tmp, "w.uf2"), "--family-id", "0x100000000")),
+                ("a family id that is not a number", ("uf2", stamped, os.path.join(tmp, "v.uf2"), "--family-id", "cubevox")),
                 ("a missing file", ("check", os.path.join(tmp, "missing.bin"))),
                 ("an unknown command", ("flash",))):
             code, err = cli(*argv)
@@ -440,7 +463,9 @@ def build_parser():
     p = sub.add_parser("uf2", parents=[common], help="convert a stamped .bin to .uf2")
     p.add_argument("input")
     p.add_argument("output")
-    p.add_argument("--family", required=True, choices=("cubevox", "weact"))
+    p.add_argument("--family", choices=("cubevox",), default="cubevox")
+    p.add_argument("--family-id", type=parse_family_id, metavar="0xHEX",
+                   help="any 32-bit family id instead of --family, for a file the bootloader must refuse")
     p.add_argument("--base", type=parse_address, help="address of byte 0 (default: the application start)")
     p.set_defaults(run=cmd_uf2)
 

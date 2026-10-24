@@ -2,7 +2,7 @@
 
 Source of used pins: `h7core_block.json` U1 rows, names cross-checked against
 `cubevox_h7core.kicad_sym`. AF numbers come from STM32duino
-`PeripheralPins_WeActMiniH7xx.c` (H743 V-I package set, local Arduino15 install).
+`PeripheralPins.c` (H743 V-I package set, local Arduino15 install).
 Verified against DS12110 Table 10 and RM0433 (Codex, 2026-10-03): PE2-PE6 are SAI1
 MCLK_A, SD_B, FS_A, SCK_A, SD_A on AF6; PB10/PB11 are I2C2 SCL/SDA on AF4; at reset PB4
 has a pull-up and PB5 no pull. On this board (U1 at 96, 84, rotation 0) pins 1-25 face
@@ -199,7 +199,7 @@ one GND plane, matching the spec and canon 27.
 ## 5. ADC master clock (I01)
 
 Sources. Net and pin rows come from `h7core_block.json` and the local STM32duino
-`PeripheralPins_WeActMiniH7xx.c`, which lists no SAI. The datasheet PDF could
+`PeripheralPins.c`, which lists no SAI. The datasheet PDF could
 not be fetched (timeout) at first. The SAI1 pins used (PE2-PE6, AF6) are now verified
 against DS12110 Table 10; the fallbacks below are still from memory.
 

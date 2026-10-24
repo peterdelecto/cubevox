@@ -129,8 +129,6 @@ jobs:
           arduino-cli lib list
       - name: Build cubevox bootloader
         run: firmware/bootloader/build.sh
-      - name: Build WeAct bootloader
-        run: BOARD=weact firmware/bootloader/build.sh
       - name: Host selftest
         # A host-only check that the C image check and the DIAG.TXT fields agree with
         # tools/stamp_image.py.
@@ -139,19 +137,10 @@ jobs:
         id: bootloaders
         run: |
           cubevox="$(firmware/bootloader/build.sh --outdir)"
-          weact="$(BOARD=weact firmware/bootloader/build.sh --outdir)"
-          for dir in "$cubevox" "$weact"; do
-            test -s "$dir/cubevox-bootloader.bin" || { echo "[ERROR] $dir/cubevox-bootloader.bin is missing or empty"; exit 1; }
-          done
+          test -s "$cubevox/cubevox-bootloader.bin" || { echo "[ERROR] $cubevox/cubevox-bootloader.bin is missing or empty"; exit 1; }
           echo "cubevox=$cubevox" >> "$GITHUB_OUTPUT"
-          echo "weact=$weact" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: cubevox-bootloader-cubevox
           path: ${{ steps.bootloaders.outputs.cubevox }}/cubevox-bootloader.bin
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cubevox-bootloader-weact
-          path: ${{ steps.bootloaders.outputs.weact }}/cubevox-bootloader.bin
           if-no-files-found: error

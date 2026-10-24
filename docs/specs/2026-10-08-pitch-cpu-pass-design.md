@@ -8,7 +8,7 @@ rewriting effects is wanted. This spec covers the pitch stage (`engine/pitch.h`,
 
 ## Where the cycles go today
 
-Bench on the WeAct, Adam's voice clip, -O2, all cards on. Estimates from the code
+Bench on the test board, Adam's voice clip, -O2, all cards on. Estimates from the code
 against the measured slot totals (Autotune slot 273k on, 183k off, worst block 1,104k).
 
 | Part | What runs | Cycles per block | When |
@@ -51,7 +51,7 @@ stage spends 40k per block doing nothing.
 ## Steps
 
 Each step: edit, `ctest` 15/15, `tools/engine_ab.sh e68171c` with the step's
-tolerance, WeAct measure (`./term.py -s 0vm -s p -w 5`), commit with the average,
+tolerance, test board measure (`./term.py -s 0vm -s p -w 5`), commit with the average,
 worst block and late count in the message.
 
 | Step | Change | Tolerance | Expected |
@@ -117,6 +117,6 @@ is still ruled out by the hard-tune gate.
 ## Done when
 
 `ctest` passes with the new `pitch` test; the A/B guard reports every case within
-its tolerance; the WeAct shows the Autotune slot under 90k all-on, under 2k all-off,
+its tolerance; the test board shows the Autotune slot under 90k all-on, under 2k all-off,
 and no late blocks with the default layout running on the voice clip, or the
 remaining overrun is attributed to the other stages by the per-slot stats.

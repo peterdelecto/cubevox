@@ -6,13 +6,12 @@
 #   ./build.sh              # release image into /tmp/cubevox-fw-release
 #   BENCH=1 ./build.sh      # bench image (-DCUBEVOX_BENCH: drills and panel test) into /tmp/cubevox-fw-bench
 #   TAIL=5 ./build.sh       # show only the last 5 lines of compiler output
-#   BOARD=weact ./build.sh  # bench image for the WeAct H743 (no VBUS divider: USB always on)
 #   OPT=-O3 EXTRA_FLAGS=-ffast-math ./build.sh   # experiments; the release build is -O2
 #   ./build.sh --variant    # print release or bench for the current environment and exit
 #   ./build.sh --outdir     # print the output dir for the current environment and exit
 #
-# VARIANT=release|bench names the variant outright; BENCH=1 and BOARD=weact imply bench. This
-# script is the one place that rule lives; flash.sh and bringup.py ask it.
+# VARIANT=release|bench names the variant outright; BENCH=1 implies bench. This script is the
+# one place that rule lives; flash.sh and bringup.py ask it.
 # Each variant has its own output dir and a lock, so two builds of one variant queue up.
 
 set -euo pipefail
@@ -20,14 +19,14 @@ FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
 
 implied=release
-if [ "${BENCH:-}" = 1 ] || [ "${BOARD:-}" = "weact" ]; then implied=bench; fi
+if [ "${BENCH:-}" = 1 ]; then implied=bench; fi
 VARIANT="${VARIANT:-$implied}"
 case "$VARIANT" in
   release|bench) ;;
   *) echo "[ERROR] VARIANT is '$VARIANT'; use release or bench"; exit 1 ;;
 esac
 if [ "$implied" = bench ] && [ "$VARIANT" != bench ]; then
-  echo "[ERROR] VARIANT=$VARIANT conflicts with BENCH=1 / BOARD=weact, which need the bench image"
+  echo "[ERROR] VARIANT=$VARIANT conflicts with BENCH=1, which needs the bench image"
   exit 1
 fi
 OUT="/tmp/cubevox-fw-$VARIANT"
@@ -168,10 +167,6 @@ INC="-I$REPO -I$FW/cubevox/src -I$REPO/tools/font-editor/fonts"
 # arduino-cli hands the quotes of CUBEVOX_FW_VERSION to the compiler as they stand, so one level
 # of escaping makes the macro a string literal. A second level put quote characters in the string.
 DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"$VERSION\""
-if [ "${BOARD:-}" = "weact" ]; then
-  DEFS="$DEFS -DCUBEVOX_VBUS_ALWAYS"
-  echo "[build] bench board weact: USB attach not gated on VBUS"
-fi
 if [ "$VARIANT" = bench ]; then DEFS="$DEFS -DCUBEVOX_BENCH"; fi
 OPT="${OPT:--O2}"
 DEFS="$DEFS ${EXTRA_FLAGS:-}"
@@ -179,11 +174,8 @@ echo "[build] $VARIANT image, $OPT ${EXTRA_FLAGS:-}"
 
 # Bench clip: a WAV baked into flash that the clip op loops in place of the SAI input.
 # Only the bench image carries it, so a release image never holds the sample.
-# The weact build takes Adam's dry vocal from samples/ (untracked; the repo is public).
 CLIP="${CLIP:-}"
 if [ "$VARIANT" != bench ]; then CLIP=""; fi
-WEACT_CLIP="$REPO/samples/adam_vox_sample2_4s.wav"
-if [ "${BOARD:-}" = "weact" ] && [ -z "$CLIP" ] && [ -f "$WEACT_CLIP" ]; then CLIP="$WEACT_CLIP"; fi
 INC_CLIP=""
 if [ -n "$CLIP" ]; then
   mkdir -p "$OUT-gen"
@@ -241,11 +233,9 @@ check_symbol_address kImageHeader "$((APP_START + $(cv_define CV_IMAGE_HEADER_OF
 
 # Fill the header's length and CRC in place, write the update file next to the .bin, and read the
 # update file back the way the bootloader will.
-FAMILY=cubevox
-if [ "${BOARD:-}" = "weact" ]; then FAMILY=weact; fi
 STAMP=(python3 -I "$REPO/tools/stamp_image.py")
 "${STAMP[@]}" stamp "$BIN"
-"${STAMP[@]}" uf2 "$BIN" "$OUT/cubevox.uf2" --family "$FAMILY"
+"${STAMP[@]}" uf2 "$BIN" "$OUT/cubevox.uf2" --family cubevox
 uf2_check="$("${STAMP[@]}" check "$OUT/cubevox.uf2")"
 echo "[build] cubevox.uf2 $uf2_check"
 

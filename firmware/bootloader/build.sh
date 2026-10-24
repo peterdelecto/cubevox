@@ -3,14 +3,13 @@
 # boards in boards/. Never flashes; flash.sh writes it through the ROM DFU (shop only).
 #
 #   ./build.sh               # cubevox board into /tmp/cubevox-boot-cubevox
-#   BOARD=weact ./build.sh   # WeAct H743 test board into /tmp/cubevox-boot-weact
-#   ./build.sh --outdir      # print the output dir for the current BOARD and exit
+#   ./build.sh --outdir      # print the output dir and exit
 #   ./build.sh --proofs      # host build of screens.c; numbered PNGs and diag-sample.txt in build/proofs/boot/
 #   ./build.sh --selftest    # host run of the image check against tools/stamp_image.py, the screen rules and the drive texts
 #
 # The checkout is build/tinyuf2 (gitignored). Every build resets it to the pin, links
-# boards/cubevox and boards/weact into ports/stm32h7/boards/ as symlinks and applies patches/ in
-# order, so local edits there do not survive a build.
+# boards/cubevox into ports/stm32h7/boards/ as a symlink and applies patches/ in order, so local
+# edits there do not survive a build.
 
 set -euo pipefail
 BL="$(cd "$(dirname "$0")" && pwd)"
@@ -23,11 +22,7 @@ XPACK_VERSION="14.2.1-1.1"
 # Bank 1 sector 0, the bootloader's whole space.
 BIN_LIMIT=131072
 
-BOARD="${BOARD:-cubevox}"
-case "$BOARD" in
-  cubevox|weact) ;;
-  *) echo "[ERROR] BOARD is '$BOARD'; use cubevox or weact"; exit 1 ;;
-esac
+BOARD=cubevox
 OUT="/tmp/cubevox-boot-$BOARD"
 TU="$BL/build/tinyuf2"
 HOST="$BL/build/host"
@@ -41,7 +36,7 @@ case "${1:-}" in
   *) echo "[ERROR] unknown argument '$1'; use --outdir, --proofs or --selftest"; exit 1 ;;
 esac
 
-# One build at a time: every board shares the checkout and the host build. The lock dir holds the
+# One build at a time: every mode shares the checkout and the host build. The lock dir holds the
 # owner's PID; a lock whose owner is gone is reaped under a second mkdir, so two waiters cannot
 # both remove it.
 mkdir -p "$BL/build"
@@ -195,7 +190,7 @@ drive_texts() {
   expect_line "$diag" "fault address: 0x8045000"
   expect_line "$diag" "app summary: v2.00.10 up 1234 s software none"
   expect_line "$diag" "fault: bus pc=0x8021A4C lr=0x8020F31 cfsr=0x8200 hfsr=0x40000000 bfar=0xDEADBEE0 mmfar=0xDEADBEE0 bank2-ecc=0x8102460"
-  expect_line "$diag" "refused blocks: 12, last family 0x43565741"
+  expect_line "$diag" "refused blocks: 12, last family 0x6DB66082"
   expect_line "$diag" "#9 boot v2.00.10 up=? rst=0x1000000 fails=0 AppRequest fa=0x0 software none sai=0 ovr=0"
   expect_line "$diag" "#8 update v2.00.10 up=1234s rst=0x1000000 fails=0 none fa=0x0 software none sai=2 ovr=0"
   expect_line "$diag" "#7 boot v2.00.09 up=? rst=0x4000000 fails=1 none fa=0x0 watchdog bus sai=0 ovr=3"
@@ -258,8 +253,8 @@ dependencies() {
 }
 
 patch_tree() {
-  local board patch
-  for board in cubevox weact; do ln -sfn "$BL/boards/$board" "$TU/ports/stm32h7/boards/$board"; done
+  local patch
+  ln -sfn "$BL/boards/$BOARD" "$TU/ports/stm32h7/boards/$BOARD"
   for patch in "$BL"/patches/*.patch; do
     if ! git -C "$TU" apply --check "$patch"; then
       echo "[ERROR] $(basename "$patch") does not apply to tinyuf2 $TINYUF2_COMMIT"

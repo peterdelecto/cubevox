@@ -1,9 +1,8 @@
-# TinyUF2 board for cubevox (STM32H743VIT6). boards/weact/board.mk sets CV_BOARD = weact and
-# includes this file. The port includes board.mk twice, so the body runs once.
+# TinyUF2 board for cubevox (STM32H743VIT6).
+# The port includes board.mk twice, so the body runs once.
 ifndef CV_BOARD_MK
 CV_BOARD_MK := 1
 
-CV_BOARD ?= cubevox
 MCU = h743xx
 JLINK_DEVICE = stm32h743vi
 
@@ -21,13 +20,7 @@ cv_define = $(shell awk '$$1 == "$(CV_HASH)define" && $$2 == "$(1)" { sub(/[uU]$
 CV_APP_END := $(call cv_define,CV_APP_END)
 CV_BOOT_BLOCK_ADDR := $(call cv_define,CV_BOOT_BLOCK_ADDR)
 CV_FAULT_RECORD_ADDR := $(call cv_define,CV_FAULT_RECORD_ADDR)
-ifeq ($(CV_BOARD),weact)
-CV_FAMILY := $(call cv_define,CV_UF2_FAMILY_WEACT)
-CV_BOARD_WEACT := 1
-else
 CV_FAMILY := $(call cv_define,CV_UF2_FAMILY_CUBEVOX)
-CV_BOARD_WEACT := 0
-endif
 $(foreach v,CV_APP_END CV_BOOT_BLOCK_ADDR CV_FAULT_RECORD_ADDR CV_FAMILY,\
   $(if $($(v)),,$(error $(v) not found in $(CV_BOOT_BLOCK_H))))
 
@@ -43,7 +36,6 @@ CFLAGS += \
   -DHSE_VALUE=25000000U \
   -DTINYUF2_LED=1 \
   -DBOARD_PFLASH_APP_EN=1 \
-  -DCV_BOARD_WEACT=$(CV_BOARD_WEACT) \
   -DCV_TINYUF2_VERSION='"$(CV_TINYUF2_VERSION)"'
 
 INC += \
@@ -68,7 +60,6 @@ SRC_C += \
 SRC_S += \
   $(ST_CMSIS)/Source/Templates/gcc/startup_stm32h743xx.s
 
-ifeq ($(CV_BOARD),cubevox)
 SRC_C += \
   $(CV_SRC)/oled.c \
   $(CV_SRC)/screens.c
@@ -81,6 +72,5 @@ $(CV_FONTS_OBJ): $(TOP)/$(CV_SRC)/fonts.cpp
 	@echo CXX $(notdir $@)
 	@$(CROSS_COMPILE)g++ $(filter-out -Wstrict-prototypes -Werror-implicit-function-declaration,$(CFLAGS)) \
 	  -std=c++17 -fno-exceptions -fno-rtti -fno-threadsafe-statics -c -o $@ $<
-endif
 
 endif

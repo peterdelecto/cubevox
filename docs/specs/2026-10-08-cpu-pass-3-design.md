@@ -90,8 +90,8 @@ reverb per layout, each card once). Benched 2026-10-09: 384.6k cycles avg (60.1 
 ## Steps
 
 Each step: edit, `cmake --build build -j && ctest --test-dir build`,
-`tools/engine_ab.sh <previous step commit> --tol <dB>`, WeAct bench
-(`BOARD=weact ./build.sh`, `./flash.sh`, then `./term.py -s 0kvm -s p -w 12` once after
+`tools/engine_ab.sh <previous step commit> --tol <dB>`, test board bench
+(`BENCH=1 ./build.sh`, `./flash.sh`, then `./term.py -s 0kvm -s p -w 12` once after
 the flash; `-s 0m -s p -w 12` after), commit with the numbers. Worst is the lowest over
 three runs.
 
@@ -129,10 +129,10 @@ three runs.
 
 ## Done when
 
-`ctest` passes; every A/B case is within its stated tolerance; the WeAct runs the default
+`ctest` passes; every A/B case is within its stated tolerance; the test board runs the default
 layout on the voice clip with no late blocks and both sums under their lines;
 `costs.h` holds the new numbers; the D5 trigger has been read either way.
 
 Met 2026-10-09 at the C3 commit: ctest 17/17, every A/B case exact or within its
-tolerance, WeAct late 0 over three runs, sums 61 / 72 against 75 / 95, D5 fired and
+tolerance, test board late 0 over three runs, sums 61 / 72 against 75 / 95, D5 fired and
 landed. The pass 2 listening pairs were heard by the owner on 2026-10-09 and sound fine.

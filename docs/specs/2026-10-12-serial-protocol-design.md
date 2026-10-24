@@ -42,8 +42,8 @@ carries no drill it doesn't need. This realises item 5 of `2026-10-08-effect-reg
 2. A bench op sent to a release image replies `op not in this build: <op>`. Its board code sits
    under `#if CUBEVOX_BENCH`, so the release image does not contain it.
 3. DFU stays `enter_dfu` in every build, because the app needs it.
-4. `./build.sh` makes the release image and `BENCH=1 ./build.sh` the bench image; `BOARD=weact`
-   implies bench. The boot report prints `[boot] build release|bench`.
+4. `./build.sh` makes the release image and `BENCH=1 ./build.sh` the bench image. The boot report
+   prints `[boot] build release|bench`.
 5. Host tools map the familiar letters to ops in one place (`firmware/bench_ops.py`), so
    `term.py -s p` still works and sends JSON.
 6. First-article bring-up flashes the bench image, runs every check, then flashes the release image
@@ -86,4 +86,4 @@ load maps unknown ids to `empty`.
    sanitizers.
 2. `tools/protocol_check.py`: talks to the box over the port; runs hello, get, set valid, set
    invalid (unknown id, two reverbs, duplicate), status, and checks the layout survives a reset.
-   Run on the WeAct bench (chip checks only); audio stays at 0 late through every apply.
+   Run on the test board (chip checks only); audio stays at 0 late through every apply.

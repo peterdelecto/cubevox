@@ -3,7 +3,6 @@
 # enclosure open, hold BOOT0, tap NRST, release BOOT0. build.sh never flashes.
 #
 #   ./flash.sh               # the cubevox board's build; run ./build.sh first
-#   BOARD=weact ./flash.sh   # the WeAct test board's build; run BOARD=weact ./build.sh first
 #   ./flash.sh FILE.bin      # a given bootloader image
 #
 # Waits up to WAIT seconds (default 300) for the ROM DFU device.

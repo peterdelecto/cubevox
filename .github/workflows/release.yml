@@ -1,16 +1,15 @@
 name: release
 
 # A tag vX.YY.ZZ has to equal v plus the text of VERSION.txt, or the run stops with [ERROR]. The
-# workflow then builds the release firmware and the cubevox bootloader and attaches three files to
-# the release for that tag.
+# workflow then builds the release firmware and attaches two files to the release for that tag.
 #   cubevox-vX.YY.ZZ.uf2           the file Adam drags onto the CUBEVOX drive
 #   cubevox-rom-0x08020000.bin     the same image for the shop's ROM DFU, written at that address
-#   cubevox-bootloader-vB.BB.bin   the bootloader for bank 1 sector 0, written over BOOT0 (shop only)
 # The rom file starts at the application, which sits above the bootloader's sector. Written at
 # 0x08000000 it would destroy the bootloader, so its name carries the address that
 # firmware/flash.sh --rom uses.
-# The dfu-util and app jobs only prove that the parked Mac app still builds. Nothing from them is
-# attached, and publish does not wait for them.
+# The bootloader job builds and checks the shop's bootloader and publish waits for it, but nothing
+# of it is attached. The dfu-util and app jobs only prove that the parked Mac app still builds.
+# Nothing from them is attached, and publish does not wait for them.
 on:
   push:
     tags: ["v*"]
@@ -118,9 +117,9 @@ jobs:
           arduino-cli lib list
       - name: Build bootloader
         run: firmware/bootloader/build.sh
-      - name: Name the file
-        # The name carries CV_BOOT_VERSION from board.h. The check reads it back from the built
-        # file, because INFO_UF2.TXT on the update drive prints the same string.
+      - name: Check the build
+        # The built file must carry CV_BOOT_VERSION from board.h, because INFO_UF2.TXT on the
+        # update drive prints the same string.
         run: |
           out="$(firmware/bootloader/build.sh --outdir)"
           version="$(awk '$1 == "#define" && $2 == "CV_BOOT_VERSION" { gsub(/"/, "", $3); print $3; exit }' firmware/bootloader/boards/cubevox/board.h)"
@@ -130,13 +129,6 @@ jobs:
           fi
           test -s "$out/cubevox-bootloader.bin" || { echo "[ERROR] $out/cubevox-bootloader.bin is missing or empty"; exit 1; }
           grep -aq "cubevox bootloader v$version" "$out/cubevox-bootloader.bin" || { echo "[ERROR] the built bootloader does not carry 'cubevox bootloader v$version'"; exit 1; }
-          mkdir -p assets
-          cp "$out/cubevox-bootloader.bin" "assets/cubevox-bootloader-v$version.bin"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cubevox-bootloader
-          path: assets/*
-          if-no-files-found: error
 
   dfu-util:
     runs-on: macos-14
@@ -193,13 +185,9 @@ jobs:
         with:
           name: cubevox-firmware
           path: assets
-      - uses: actions/download-artifact@v4
-        with:
-          name: cubevox-bootloader
-          path: assets
       - name: Attach to the release
         run: |
-          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.bin assets/cubevox-bootloader-v*.bin)
+          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.bin)
           for file in "${files[@]}"; do
             test -s "$file" || { echo "[ERROR] $file is missing or empty"; exit 1; }
           done

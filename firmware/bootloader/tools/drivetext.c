@@ -1,6 +1,6 @@
 // Writes OUT_DIR/INFO_UF2.TXT and the DIAG*.TXT files with diag.c for build.sh --selftest and
 // --proofs. DIAG.TXT is the sample box. It stayed in update mode after a read fault in bank 1, holds
-// a bus fault record with a bank 2 ECC error, an application summary, refused blocks of the WeAct
+// a bus fault record with a bank 2 ECC error, an application summary, refused blocks of a foreign
 // family and a flash log of three valid entries, one torn entry and blank slots. The other files
 // cover an empty log, a log that must not be read, 40 typical entries and 40 of the longest
 // plausible lines.
@@ -148,8 +148,9 @@ int main(int argc, char** argv) {
   const struct CvFaultRecord fault = {CV_FAULT_MAGIC, 2u,          0x08021A4Cu,          0x08020F31u,
                                       0x00008200u,    0x40000000u, 0xDEADBEE0u,          0xDEADBEE0u,
                                       CV_FLASH_SR_DBECCERR, 0x0123u, 0u};
-  CvDriveState state = {&block, &image, &fault,           "0123456789ABCDEF01234567",
-                        "0.21.0", 12u,  CV_UF2_FAMILY_WEACT, gSector};
+  // 0x6DB66082 is the generic STM32H7 UF2 family, which the bootloader refuses.
+  CvDriveState state = {&block, &image, &fault,      "0123456789ABCDEF01234567",
+                        "0.21.0", 12u,  0x6DB66082u, gSector};
 
   uint32_t infoLength = 0u;
   const char* info = cvInfoText(&state, &infoLength);

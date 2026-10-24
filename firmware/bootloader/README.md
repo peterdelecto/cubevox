@@ -20,8 +20,7 @@ The commit and the compiler version are `TINYUF2_COMMIT` and `XPACK_VERSION` in 
 ## Build
 ```
 ./build.sh                # cubevox board: /tmp/cubevox-boot-cubevox/cubevox-bootloader.{bin,elf}
-BOARD=weact ./build.sh    # WeAct H743 test board: /tmp/cubevox-boot-weact/
-./build.sh --outdir       # the output dir for the current BOARD
+./build.sh --outdir       # the output dir
 ./build.sh --proofs       # host build of screens.c: build/proofs/boot/NN-<state>.png and diag-sample.txt at the repo root
 ./build.sh --selftest     # host run of the image check against tools/stamp_image.py, and the drive texts
 ```
@@ -30,9 +29,9 @@ BOARD=weact ./build.sh    # WeAct H743 test board: /tmp/cubevox-boot-weact/
 2. Every build resets the checkout to the pin with `git reset --hard`, so edits made there are lost.
    Only `lib/tinyusb` is fetched as a submodule; `tools/get_deps.py stm32h7` fetches the HAL and the
    CMSIS device files. `lib/CMSIS_5` ships in the tree.
-3. `boards/cubevox` and `boards/weact` are symlinked into `ports/stm32h7/boards/`, not copied.
+3. `boards/cubevox` is symlinked into `ports/stm32h7/boards/`, not copied.
 4. `patches/*.patch` apply in name order, each with `git apply --check` first.
-5. `make BOARD=<board> clean all` runs in `ports/stm32h7` with `CROSS_COMPILE` set to the compiler
+5. `make BOARD=cubevox clean all` runs in `ports/stm32h7` with `CROSS_COMPILE` set to the compiler
    above. A `.bin` over 131072 bytes fails the build. The script ends with `arm-none-eabi-size` and
    the output dir.
 6. The bootloader version is `CV_BOOT_VERSION` in `boards/cubevox/board.h`. Bump it with every
@@ -55,18 +54,18 @@ Each is small, has one purpose and a one-line reason at its top, and is written 
 With every define at its default the drive is byte-identical to upstream: the upstream
 `ports/test_ghostfat` selftest passes on the patched tree (boards 4k, 4k_favicon, 32k, 512b_favicon).
 
-## Boards
-| | cubevox | weact |
-|---|---|---|
-| Hardware | cubevox v4, STM32H743VIT6 | WeAct MiniSTM32H743, test only |
-| LED | PB7 `USER_LED` | PE3 |
-| OLED | SH1106 on I2C2 (PB10/PB11) | none |
-| Double tap | off: the sealed box has no reachable reset button | on |
-| UF2 family | `CV_UF2_FAMILY_CUBEVOX` | `CV_UF2_FAMILY_WEACT` |
-| Volume label | `CUBEVOX` | `WEACTBOOT` |
-| Board-ID | `cubevox-h743-v4` | `cubevox-weact-h743` |
+## Board
+| Item | Value |
+|---|---|
+| Hardware | cubevox v4, STM32H743VIT6 |
+| LED | PB7 `USER_LED` |
+| OLED | SH1106 on I2C2 (PB10/PB11) |
+| Double tap | off: the sealed box has no reachable reset button |
+| UF2 family | `CV_UF2_FAMILY_CUBEVOX` |
+| Volume label | `CUBEVOX` |
+| Board-ID | `cubevox-h743-v4` |
 
-Both: 25 MHz crystal, USB OTG_FS on PA11/PA12 with the B-session override, VID:PID
+25 MHz crystal, USB OTG_FS on PA11/PA12 with the B-session override, VID:PID
 `CV_USB_VID_BOOT`:`CV_USB_PID_BOOT` (1209:0001), manufacturer `cubevox`, product `cubevox update`,
 serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (the firmware's
 `deviceSerial()` prints the same text). MENU on PE13 with a pull-up, sampled 20 ms after start.
@@ -150,7 +149,7 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
 2. A UF2 write, the lazy sector erase, the reset into the new image.
 3. The read-fault path: a power cut mid-copy, the ECC fault, the sector erase, `ImageUnreadable`.
 4. The OLED driver: I2C timing at 400 kHz, the init sequence, orientation against the firmware.
-5. The MENU switch at power-on, the 60 s timeout, the LED, the WeAct double tap.
+5. The MENU switch at power-on, the 60 s timeout, the LED.
 6. Real log entries listed after a fault reboot, and the `unreadable` line after a double ECC error in
    sector 2 (one reset, then the sector is skipped).
 7. A different file copied after a cable pulled mid-copy, with no power cycle between.

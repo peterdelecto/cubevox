@@ -65,7 +65,7 @@ The r-dependence of the PSOLA cost is the live-grain count: with L = 2P and laun
 **Recommended sequence**, each step gated by ctest hard-tune ≤ 4 cents RMS, pitch (vibrato ≤ 3 cents at every voiced hop, steady 220 Hz 0.04 cents, silence unvoiced, no allocation) and `engine_ab.sh` at the floor stated:
 
 0. **Instrument** (no code change to the DSP): per-block DWT CYCCNT delta, classified into non-hop, hop and (later) fallback blocks, with min/max/histogram over ≥ 10⁴ blocks, logged alongside r and the live-grain count (Section 3).
-1. **DTCM/ITCM placement** — expect −200 dB. If the WeAct default linker leaves `.bss` in AXI SRAM, this alone can take the hop block down by a large fraction and should narrow 45 % toward 31 %.
+1. **DTCM/ITCM placement** — expect −200 dB. If the default linker leaves `.bss` in AXI SRAM, this alone can take the hop block down by a large fraction and should narrow 45 % toward 31 %.
 2. **PSOLA precomputed weights** and pool 8 → 6 — expect −200 dB (or −60 dB if the compiler reassociates). Per-voice ≈ 5.6 % → ≈ 3.5 %.
 3. **Coarse panes in the difference form** (keep the VSUB so the terms are identical to today's and only the order changes) — expect −60 dB; ctest should be within noise of 3.76 cents. This is the step that removes the burst: hop block ≈ 31 % → ≈ 4.3 % fine + ≈ 2 % pane/combine.
 4. **Predicted-lag fine panes with fallback** — expect −60 dB when prediction holds, identical on fallback; count fallback rate on the ctest and vibrato clips (should be near zero except at onsets). Steady state ≈ 2 %, worst ≈ 7.7 %.

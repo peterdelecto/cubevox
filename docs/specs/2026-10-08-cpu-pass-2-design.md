@@ -9,7 +9,7 @@ rules carry over. The tracker plan takes its shape from the research note
 constant-delay PSOLA weights, placement). Budget per 64-sample block is 640,000
 cycles (100 %).
 
-## Where it stands (voice clip, all cards on, WeAct -O2, percent of 640k cycles)
+## Where it stands (voice clip, all cards on, test board -O2, percent of 640k cycles)
 
 Before is e06d829. After is 38685f0 with the pots floating as before, then with every
 knob pinned at its top position (bench key `k`, the cost-table setting). Avg / worst.
@@ -156,20 +156,20 @@ grain reads at a constant delay, so the fraction never changes over its life.
     the Unison line and the granular shifters move their read points per sample.
 13. Budget rule becomes two sums over the placed cards: average ≤ 75 % and worst
     block ≤ 95 %. `core/costs.h` carries both numbers per card from the bench,
-    `measured = true` for every card the WeAct has measured. The app shows the
+    `measured = true` for every card the test board has measured. The app shows the
     average sum; placement refuses a layout that breaks either sum.
 
 ## Steps
 
 Each step: edit, `cmake --build build -j && ctest --test-dir build`, `tools/engine_ab.sh
-<previous step commit> --tol <dB>`, WeAct bench (`./term.py -s 0vm -s p -s p -w 12`,
+<previous step commit> --tol <dB>`, test board bench (`./term.py -s 0vm -s p -s p -w 12`,
 read avg, worst, per slot, slot worst), commit with the numbers. Reference for the
 first step is e06d829 (b2327c2 and 5d76b06 are docs only). Always `cd` with absolute
 paths; parallel calls inherit a drifting cwd.
 
 | Step | Change | Gate | Expected |
 |---|---|---|---|
-| U1 | Unison: block-edge ratio and trim, integer phase LFO with `sinTurns`, integer sawtooth with exact-sum Hann gains, parked-shifter single tap, compare wraps, idle path | new `unison_test` case: per-voice delay from a test hook within 0.05 samples of the analytic sine over 10 s at Rate 0, 50, 100 %; `sinTurns` error test; `level_test` rows exact; A/B unison and chain within -40 dB (the old float phase random-walks ~1e-4 rad over the clip, so the two LFOs differ slightly in phase; the analytic test is the real guard); owner listens to the Unison A/B pair. Measured: unison -39.7 dB, chain -38.4 dB, all other cases exact. The miss is the old code's: against a copy of e06d829 with a double-precision phase, the old float Unison sits at -31.8 dB and the new one at -66.4 dB on a 4 s synthetic clip, so the A/B reference is the less accurate side. Analytic LFO test 3.7e-5 samples, `sinTurns` 1.6e-7. Listening pair in `build/listen/unison_{old_e06d829,new_u1}.wav` (depth 0.5) | 132.6k → under 30k on, 102k → under 3k off. Bench pending: the WeAct was off the bus |
+| U1 | Unison: block-edge ratio and trim, integer phase LFO with `sinTurns`, integer sawtooth with exact-sum Hann gains, parked-shifter single tap, compare wraps, idle path | new `unison_test` case: per-voice delay from a test hook within 0.05 samples of the analytic sine over 10 s at Rate 0, 50, 100 %; `sinTurns` error test; `level_test` rows exact; A/B unison and chain within -40 dB (the old float phase random-walks ~1e-4 rad over the clip, so the two LFOs differ slightly in phase; the analytic test is the real guard); owner listens to the Unison A/B pair. Measured: unison -39.7 dB, chain -38.4 dB, all other cases exact. The miss is the old code's: against a copy of e06d829 with a double-precision phase, the old float Unison sits at -31.8 dB and the new one at -66.4 dB on a 4 s synthetic clip, so the A/B reference is the less accurate side. Analytic LFO test 3.7e-5 samples, `sinTurns` 1.6e-7. Listening pair in `build/listen/unison_{old_e06d829,new_u1}.wav` (depth 0.5) | 132.6k → under 30k on, 102k → under 3k off. Bench pending: the test board was off the bus |
 | D1 | Distortion: block-edge `g1`, `g2`, `trim/makeup`; coefficient sets only on change; shelf once per block | A/B distortion within -60 dB (differs only during the 20 ms drive ramp at the render head), bypass exact, `distortion_test` | 88.7k → ~55k avg; worst 150k → within 10 % of avg |
 | D2 | `tanhFast` in the rail | `fastmath_test` tanh error under 1e-5 over ±9 and exactly ±1 beyond; A/B distortion within -60 dB; owner listens | ~55k → under 35k |
 | D3 | Oversampler ring histories, only if D2 measurement says shifts exceed 3k | bit-exact | — |
@@ -177,11 +177,11 @@ paths; parallel calls inherit a drifting cwd.
 | P1 | PSOLA launch-time weights, pool 6, integer index step | A/B autotune, octave, chain within -60 dB (expected under -90); hard tune ≤ 4 cents; octave bypass exact | PSOLA voice ~36k → ~22k; pitch slot avg −14k |
 | F1 | Coarse panes in `PitchTracker` (pane array, counter-triggered pane kernel, hop combine); direct coarse code removed from the engine | `pitch` test (vibrato 3 cents, steady, silence, no alloc); new `pitch_test` case with the direct CMND as an oracle inside the test: pick within ±1 lag on ≥ 99.5 % of hops and the same voicing decision on ≥ 99 % over the vibrato tone and the voice clip; hard tune ≤ 4 cents; A/B autotune, octave, chain within -60 dB | hop block ~200k → ~45k; non-hop blocks +8k; pitch slot worst 288k → ~125k, avg 140k → ~100k |
 | F2 | Predicted-lag fine panes with fallback, only on decision 11's trigger | as F1 plus fallback rate on the clips (near zero away from onsets); identical values on fallback | pitch slot worst → ~100k, flat |
-| C1 | `core/costs.h` two columns from the bench, `measured = true`, rule 75 % / 95 %, `registry.cpp`, `test/firmware_test.cpp`, Mac app placement check, `2026-10-08-effect-registry-design.md` | `ctest` (firmware test checks the default layout against both sums); WeAct bench of the default layout: no late blocks on the voice clip | chain ~48 % avg, ~58 % worst (estimate) |
+| C1 | `core/costs.h` two columns from the bench, `measured = true`, rule 75 % / 95 %, `registry.cpp`, `test/firmware_test.cpp`, Mac app placement check, `2026-10-08-effect-registry-design.md` | `ctest` (firmware test checks the default layout against both sums); test board bench of the default layout: no late blocks on the voice clip | chain ~48 % avg, ~58 % worst (estimate) |
 | C2 | This spec's "where it stands" table filled; CLAUDE.md spec list | — | — |
 | T1 | Accuracy trial, not a cost step: fine search ±5 lags and a 5-point least-squares parabola against the 3-point one on the hard-tune clip and the 220 Hz gate. Kept only if hard tune improves; otherwise reverted and the result recorded here | hard tune ≤ 4 cents either way; `pitch` test | the 3-point parabola is the most biased standard sub-sample fit; whether it limits the 3.76 cents is unknown and cheap to find out |
 
-## Progress (2026-10-08; host gates, then the WeAct bench once the board was on the bus)
+## Progress (2026-10-08; host gates, then the bench once the board was on the bus)
 
 | Step | Commit | ctest | A/B vs previous step | Other |
 |---|---|---|---|---|
@@ -201,9 +201,9 @@ paths; parallel calls inherit a drifting cwd.
 Listening pairs `build/listen/unison_{old_e06d829,new_u1}.wav` and
 `build/listen/distortion_{old_feaed12,new_d2}.wav`: owner listened 2026-10-09, both sound fine.
 
-## Bench findings (2026-10-08, WeAct, voice clip)
+## Bench findings (2026-10-08, test board, voice clip)
 
-1. Pots. The WeAct has nothing on its mux input, so the knob values were whatever the
+1. Pots. The test board has nothing on its mux input, so the knob values were whatever the
    floating ADC pin gave. Bench key `k` pins every knob at its top position; the cost
    table and the "knobs at top" column use it. Keys `k`, `v` and `c` toggle and the board
    does not reset between terminal sessions, so a session that re-sends them flips them
@@ -297,7 +297,7 @@ its expected number by more than a third is examined before the next step starts
 ## Done when
 
 `ctest` passes with the new cases; every A/B case is within its stated tolerance; the
-owner has listened to the Unison and Distortion pairs; the WeAct runs the default layout
+owner has listened to the Unison and Distortion pairs; the test board runs the default layout
 on the voice clip with no late blocks and both sums under their lines; `costs.h` holds
 measured numbers for every card; T1's result is recorded whichever way it went.
 

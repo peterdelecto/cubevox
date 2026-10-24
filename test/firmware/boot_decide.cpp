@@ -40,9 +40,7 @@ static_assert(offsetof(CvImageHeader, magic) == 0 && offsetof(CvImageHeader, hea
 static_assert(CV_REQUEST_UPDATE == 0xF01669EFu, "boot: the request word is TinyUF2's double-tap magic");
 static_assert(CV_IMAGE_MAGIC == (uint32_t{'C'} | uint32_t{'V'} << 8 | uint32_t{'F'} << 16 | uint32_t{'W'} << 24),
               "boot: the image magic spells CVFW in file order");
-static_assert(CV_UF2_FAMILY_CUBEVOX != CV_UF2_FAMILY_WEACT && CV_UF2_FAMILY_CUBEVOX != 0x6db66082u &&
-                  CV_UF2_FAMILY_WEACT != 0x6db66082u,
-              "boot: the family ids differ from each other and from the generic STM32H7 id");
+static_assert(CV_UF2_FAMILY_CUBEVOX != 0x6db66082u, "boot: the family id differs from the generic STM32H7 id");
 static_assert(CV_APP_START == 0x08020000u && CV_APP_END == 0x08100000u && CV_IMAGE_HEADER_OFFSET == 0x400u,
               "boot: flash map");
 static_assert(CV_USB_VID_BOOT == 0x1209u && CV_USB_PID_BOOT == 0x0001u && CV_USB_VID_APP == 0x0483u &&

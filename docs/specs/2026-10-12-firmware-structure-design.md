@@ -84,7 +84,7 @@ getters behind the sketch's back.
 1. Each step: `ctest --test-dir build` and `firmware/build.sh`, output quoted in the report.
 2. Step 5: the PGM renders read against the font editor's `screens.png`.
 3. On hardware (relay click in PEDAL, OLED, audio on the snapshot): `firmware/bringup.py` checks
-   on the WeAct bench or the first JLC board.
+   on the test board or the first JLC board.
 
 ## Deferred
 1. Duplicate cards (owner 2026-10-12, on hold). Engines are one object per card type, so

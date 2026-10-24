@@ -58,5 +58,5 @@ first path that changes the layout at runtime.
 ## Verification
 1. Host tests: round trip, CRC failure, unknown id to `empty`, newest wins across both sectors,
    torn last record ignored, sector full switches and erases, interrupted erase recovers.
-2. WeAct bench (chip checks only): bench commands save, report, and erase bank 2; a saved setting
+2. Test board (chip checks only): bench commands save, report, and erase bank 2; a saved setting
    survives a reset and a DFU reflash; a save during audio leaves block timing at 0 late.
