@@ -62,9 +62,9 @@ std::vector<float> run(cv::Slapback& s, const std::vector<float>& in,
   return out;
 }
 
-cv::SlapbackParams params(float intensity) {
+cv::SlapbackParams params(float mix) {
   cv::SlapbackParams p;
-  p.intensity = intensity;
+  p.mix = mix;
   p.tuning.trimDb = 0.0f;  // wetOf() subtracts the dry; the level trim belongs to level_test
   return p;
 }
@@ -125,7 +125,7 @@ bool testPassthrough() {
     const float d = std::fabs(offOut[static_cast<size_t>(i)] - in[static_cast<size_t>(i)]);
     if (d > maxDiff) maxDiff = d;
   }
-  return report("passthrough", maxDiff < 1e-6f, "intensity 0 and on=false max|out-in|=%.3g (<1e-6)",
+  return report("passthrough", maxDiff < 1e-6f, "MIX 0 and on=false max|out-in|=%.3g (<1e-6)",
                 maxDiff);
 }
 
@@ -170,15 +170,15 @@ bool testLowpass() {
                 "8 kHz wet vs 500 Hz wet=%.2f dB (-15..-9)", db);
 }
 
-// INTENSITY drives the repeats: tuned 0.35 at 25 %, sqrt growth, capped at 0.5.
+// MIX drives the repeats: tuned 0.35 at 25 %, sqrt growth, capped at 0.5.
 // The lowpass softens the second peak by a fixed factor, so the law is checked as
-// ratios to the full-INTENSITY repeat; that one keeps the 0.5 +-0.1 window.
+// ratios to the full-MIX repeat; that one keeps the 0.5 +-0.1 window.
 bool testFeedback() {
-  const float intensity[3] = {0.0625f, 0.25f, 1.0f};
+  const float mix[3] = {0.0625f, 0.25f, 1.0f};
   std::array<float, 3> ratio{};
   for (int k = 0; k < 3; ++k) {
     const std::vector<float> in = impulse(cv::kSampleRate);
-    cv::SlapbackParams p = params(intensity[k]);
+    cv::SlapbackParams p = params(mix[k]);
     p.tuning.lowpassHz = 12000.0f;
     p.tuning.timeMs = 80.0f;
     p.tuning.feedback = 0.35f;
@@ -195,7 +195,7 @@ bool testFeedback() {
   const bool ok = ratio[2] >= 0.4f && ratio[2] <= 0.6f && std::fabs(low - 0.35f) <= 0.03f &&
                   std::fabs(mid - 0.70f) <= 0.03f;
   return report("feedback", ok,
-                "full-INTENSITY repeat ratio=%.3f (0.4..0.6); 6 %% and 25 %% vs full=%.3f, %.3f (0.35, 0.70 +-0.03)",
+                "full-MIX repeat ratio=%.3f (0.4..0.6); 6 %% and 25 %% vs full=%.3f, %.3f (0.35, 0.70 +-0.03)",
                 ratio[2], low, mid);
 }
 

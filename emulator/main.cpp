@@ -45,13 +45,9 @@ namespace {
 
 constexpr int kWindowW = 1440;
 constexpr int kWindowH = 840;  // owner's laptop shows ~847 px of window
-constexpr float kHarmonyColumnW = 400.0f;  // Harmony column width
+constexpr float kWideColumnW = 400.0f;     // second column (Octave, Unison) width
 constexpr float kLabelW = 175.0f;          // room right of each slider for its label
-constexpr float kHarmonyEngineX = 140.0f;  // Engine radios beside the HARMONY checkbox
-constexpr float kHarmonyKeyW = 200.0f;     // KEY combo, leaves room for Chromatic
-constexpr float kFormantW = 60.0f;         // FORMANT slider at the end of each Menu row
-constexpr float kMenuRadioX = 52.0f;       // Menu row: radios start after the voice name
-constexpr float kAutotuneKeyW = 80.0f;     // KEY combo beside Link key to Harmony
+constexpr float kAutotuneKeyW = 80.0f;     // KEY combo width
 constexpr float kMeterW = 100.0f;
 constexpr float kLoopNameW = 110.0f;                 // loop file name slot in the header, px
 constexpr float kHeaderScale = 1.4f;                  // transport row type size vs the face
@@ -65,7 +61,7 @@ constexpr float kMeterDecayDbPerFrame = 0.6f;
 // pot decides (owner 2026-10-01: DEPTH 80 %).
 constexpr float kStartDepth = 0.5f;
 constexpr int kStartKey = 11;  // F / Dm (kKeyName runs round the circle of fifths)
-constexpr float kStartIntensity = 0.25f;
+constexpr float kStartSlapMix = 0.25f;
 constexpr float kStartDrive = 0.65f;
 constexpr float kStartTone = 1.0f;
 // Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
@@ -92,10 +88,8 @@ struct ProtoParams {
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
-  // The box has one KEY encoder; linked, Autotune copies Harmony's key.
-  bool linkAutotuneKey = true;
   cv::UnisonParams unison{false, kStartDepth, {}};
-  cv::SlapbackParams slapback{true, kStartIntensity, {}};
+  cv::SlapbackParams slapback{true, kStartSlapMix, {}};
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
   cv::PolishCompParams comp;  // the chain tail, always on here like the box default: comp, then eq
@@ -120,11 +114,6 @@ struct ProtoParams {
     inputGate.on = true;
     applyInputGateDefaults(inputGate);
     gate.on = false;
-    pitchFx.harmony.on = false;
-    // Owner default voices: High louder, Higher loud; third slot unused (matches HarmonyMenu).
-    pitchFx.harmony.slots[0] = {cv::HarmonyVoice::High, 3, 0.0f};
-    pitchFx.harmony.slots[1] = {cv::HarmonyVoice::Higher, 2, 0.0f};
-    pitchFx.harmony.slots[2] = {cv::HarmonyVoice::Low, 0, 0.0f};
     pitchFx.octave.on = false;
     unison.on = false;
     distortion.on = false;
@@ -132,14 +121,12 @@ struct ProtoParams {
     // Adam's starting point (owner 2026-10-02).
     slapback.on = true;
     eq.on = true;
-    pitchFx.harmony.key = kStartKey;  // Autotune follows through the shared KEY
     pitchFx.autotune.key = kStartKey;
-    pitchFx.octave.engine = cv::kOctaveGranular;
     pitchFx.octave.mix = 0.10f;
-    reverb.engine = cv::kReverbSpringB;
-    reverb.intensity = 1.0f;
-    reverb.time = 1.0f;  // the v0.01 sound, where INTENSITY 100 % also set full decay
-    cv::applyIntensity(reverb);
+    reverb.engine = cv::kReverbSpring;
+    reverb.mix = 1.0f;
+    reverb.time = 1.0f;  // full MIX with full decay, Adam's starting sound
+    cv::applyKnobs(reverb);
   }
 };
 
@@ -361,15 +348,13 @@ char gTuningText[8192];  // last copied settings text
 // Returns the bytes written, newline included.
 size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const auto onOff = [](bool b) { return b ? "on" : "off"; };
-  static const char* const kReverb[2] = {"SPRING B", "CHASM"};
-  const cv::HarmonyParams& h = p.pitchFx.harmony;
+  static const char* const kReverb[2] = {"SPRING", "CHASM"};
   const cv::AutotuneParams& at = p.pitchFx.autotune;
   const cv::OctaveParams& o = p.pitchFx.octave;
   const cv::ReverbParams& r = p.reverb;
-  const int re = r.engine == cv::kReverbChasm ? cv::kReverbChasm : cv::kReverbSpringB;
-  const int atKey = p.linkAutotuneKey ? h.key : at.key;
-  const float decays[2] = {r.springB.decay, r.chasm.decay};
-  const float dwells[2] = {r.springB.dwell, r.chasm.dwell};
+  const int re = r.engine == cv::kReverbChasm ? cv::kReverbChasm : cv::kReverbSpring;
+  const float decays[2] = {r.spring.decay, r.chasm.decay};
+  const float dwells[2] = {r.spring.dwell, r.chasm.dwell};
   const float decay = decays[re];
   const float dwell = dwells[re];
   char macros[640];
@@ -377,31 +362,29 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const int n = std::snprintf(
       buf, size,
       "%s\n"
-      "Choices: Input gate on; Gate %s; Autotune %s, engine %c, chromatic %s; "
-      "Octave %s, engine %c; Unison %s; Slapback %s; "
+      "Choices: Input gate on; Gate %s; Autotune %s; Octave %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback MIX %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
-      "%.0f %% (wet %.0f %%, DECAY %.0f %%), DWELL %.0f %%\n",
-      macros, onOff(p.gate.on), onOff(at.on), 'A' + at.engine,
-      onOff(at.chromatic), onOff(o.on), 'A' + o.engine, onOff(p.unison.on),
+      "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
+      macros, onOff(p.gate.on), onOff(at.on), onOff(o.on), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
       static_cast<double>(p.inputGate.thresholdDb),
       static_cast<double>(p.inputGate.tuning.releaseMs), static_cast<double>(p.gate.thresholdDb),
       static_cast<double>(p.gate.tuning.releaseMs),
-      cv::kKeyName[atKey],
+      cv::kKeyName[at.key],
       static_cast<double>(cv::AutotuneVoice::mechanicalOf(at.responseMs) * 100.0f),
       static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
       static_cast<double>(o.mix * 100.0f),
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
-      static_cast<double>(p.slapback.intensity * 100.0f),
+      static_cast<double>(p.slapback.mix * 100.0f),
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
-      static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.intensity * 100.0f),
-      static_cast<double>(r.mix * 100.0f), static_cast<double>(decay * 100.0f),
+      static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.mix * 100.0f),
+      static_cast<double>(r.time * 100.0f), static_cast<double>(r.wet * 100.0f), static_cast<double>(decay * 100.0f),
       static_cast<double>(dwell * 100.0f));
   return n < 0 ? 0 : std::min(static_cast<size_t>(n), size - 1);
 }
@@ -409,59 +392,38 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
 // Finder launches have no stdout, so the text also goes to the clipboard
 // and into a read-only field beside the button.
 // Fills gTuningText with the copied-settings text.
-void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
-                  const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
-                  const cv::DistortionTuning& d,
-                  const cv::ChasmTuning& c,
-                  const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
-                  const cv::AutotuneTuning& at, const ProtoParams& params) {
+void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
+                  const cv::DistortionTuning& d, const cv::ChasmTuning& c, const cv::PolishParams& e,
+                  const cv::GateTuning& ig, const cv::GateTuning& g, const cv::AutotuneTuning& at,
+                  const ProtoParams& params) {
   const int prefix = static_cast<int>(snapshotLines(params, gTuningText, sizeof(gTuningText)));
-  char line[512];
-  int len = std::snprintf(
-      line, sizeof(line),
-      "HarmonyTuning{{%.1ff, %.1ff, %.1ff}, %.1ff, %.2ff, %s, %s",
-      h.levelDb[0], h.levelDb[1], h.levelDb[2], h.glideMs, h.voicedThreshold,
-      h.muteUnvoiced ? "true" : "false", h.snapToScale ? "true" : "false");
-  const int8_t* tables[] = {h.lower, h.low, h.high, h.higher};
-  for (const int8_t* row : tables) {
-    len += std::snprintf(line + len, sizeof(line) - len, ", {%d, %d, %d, %d, %d, %d, %d}",
-                         row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
-  }
-  const int8_t* cs = h.chromaticSemis;
-  const cv::ShifterTuning& sh = h.shifter;
-  std::snprintf(line + len, sizeof(line) - len,
-                ", {%d, %d, %d, %d, %d}, {%.1ff, %.1ff, %.1ff}, {%.2ff, %.2ff, %.0ff, %.0ff, %d}}",
-                cs[0], cs[1], cs[2], cs[3], cs[4], h.trimDb[0], h.trimDb[1], h.trimDb[2],
-                sh.grainPeriods, sh.epochSearch, sh.epochLpHz, sh.grainWindowMs, sh.grainCount);
   std::snprintf(
       gTuningText + prefix, sizeof(gTuningText) - static_cast<size_t>(prefix),
-      "%s\n"
-      "OctaveTuning{%.1ff, %.1ff, %s, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
-      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, {%.1ff, %.1ff}, %.0ff}\n"
+      "OctaveTuning{%.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
+      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.1ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
-      "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff, %s}\n"
+      "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff}\n"
       "ChasmTuning{%.2ff, %.2ff, %.0ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.2ff, "
       "%.1ff, %.1ff, %.1ff, %.1ff}\n"
       "PolishTuning{%.2ff, %.2ff, %.0ff, %.1ff}\n"
       "// PolishParams: hpHz %.0f, dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB, air %.1f dB",
-      line, o.levelDb, o.glideMs, o.muteUnvoiced ? "true" : "false", o.grainPeriods,
-      o.epochSearch, o.epochLpHz, o.trimDbA, o.trimDbB, o.grainWindowMs, o.grainCount, o.trimDbC,
+      o.levelDb, o.glideMs, o.grainWindowMs, o.grainCount, o.trimDb,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
-      t.swingMaxMs, t.wetMaxDb, t.detuneCents[0], t.detuneCents[1], t.windowMs,
+      t.swingMaxMs, t.wetMaxDb, t.trimDb,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneMinDb, d.toneMaxDb, d.bassPeakHz,
-      d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive, d.oversample ? "true" : "false",
+      d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive,
       c.timeLo, c.timeHi, c.trebleLossHz,
       c.loopTrebleCut, c.inputTrebleCut, c.bassCutHz, c.bassCutHzTop, c.wobbleDepthMax,
       c.wobbleRateLo, c.wobbleRateHi, c.inputTrim, c.wobbleLevelDb, c.dwellDrive, c.dwellComp, c.wetDb, e.tuning.dipQ,
       e.tuning.presenceQ, e.tuning.airHz, e.tuning.trimDb, e.hpHz, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb,
       e.airDb);
   size_t used = std::strlen(gTuningText);
-  const cv::SpringBTuning& sb = params.reverb.springB.tuning;
+  const cv::SpringTuning& sb = params.reverb.spring.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
-                "\nSpringBTuning{%.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, %.1ff, "
+                "\nSpringTuning{%.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, %.1ff, "
                 "%.2ff, %.2ff, %.1ff, %.2ff, %.1ff}",
                 sb.halfMs1, sb.halfMs2, sb.timeLo, sb.timeHi, sb.diffuse, sb.chirpSections, sb.chirpA,
                 sb.trebleLossHz, sb.bassCutHz, sb.wobbleDepth, sb.wobbleRateHz, sb.inputTrim,
@@ -471,39 +433,32 @@ void formatTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
       gTuningText + used, sizeof(gTuningText) - used,
       "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
       "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
-      "\nAutotuneTuning{%.1ff, %.1ff, {%.2ff, %.2ff, %.0ff, %.0ff, %d}}",
+      "\nAutotuneTuning{%.1ff, %.1ff, %.0ff}",
       ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
       g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
-      at.trimDb, at.maxCorrectSemis, at.shifter.grainPeriods, at.shifter.epochSearch,
-      at.shifter.epochLpHz, at.shifter.grainWindowMs, at.shifter.grainCount);
+      at.trimDb, at.maxCorrectSemis, at.grainDelay);
 }
 
-void printTuning(const cv::HarmonyTuning& h, const cv::OctaveTuning& o,
-                 const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
-                 const cv::DistortionTuning& d,
-                 const cv::ChasmTuning& c,
-                 const cv::PolishParams& e, const cv::GateTuning& ig, const cv::GateTuning& g,
-                 const cv::AutotuneTuning& at, const ProtoParams& params) {
-  formatTuning(h, o, t, s, d, c, e, ig, g, at, params);
+void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
+                 const cv::DistortionTuning& d, const cv::ChasmTuning& c, const cv::PolishParams& e,
+                 const cv::GateTuning& ig, const cv::GateTuning& g, const cv::AutotuneTuning& at,
+                 const ProtoParams& params) {
+  formatTuning(o, t, s, d, c, e, ig, g, at, params);
   std::printf(
-      "// AutotuneTuning: trimDb, maxCorrectSemis, "
-      "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
+      "// AutotuneTuning: trimDb, maxCorrectSemis, grainDelay\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
-      "// HarmonyTuning: {levelDb[3]}, glideMs, voicedThreshold, muteUnvoiced, snapToScale, "
-      "lower, low, high, higher, chromaticSemis, trimDb[A, B, C], "
-      "shifter{grainPeriods, epochSearch, epochLpHz, grainWindowMs, grainCount}\n"
-      "// OctaveTuning: levelDb, glideMs, muteUnvoiced, grainPeriods, epochSearch, epochLpHz, trimDbA, trimDbB, grainWindowMs, grainCount, trimDbC\n"
+      "// OctaveTuning: levelDb, glideMs, grainWindowMs, grainCount, trimDb\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
-      "swingMaxMs, wetMaxDb, {detuneCents[0], detuneCents[1]}, windowMs\n"
+      "swingMaxMs, wetMaxDb, trimDb\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb, trimDb\n"
       "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, stackBassHz, "
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneMinDb, toneMaxDb, bassPeakHz, bassPeakDb, "
-      "bassPeakQ, trimDb, fadeDrive, oversample\n"
+      "bassPeakQ, trimDb, fadeDrive\n"
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
       "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, airHz, trimDb\n"
-      "// SpringBTuning: halfMs1, halfMs2, timeLo, timeHi, diffuse, chirpSections, chirpA, "
+      "// SpringTuning: halfMs1, halfMs2, timeLo, timeHi, diffuse, chirpSections, chirpA, "
       "trebleLossHz, bassCutHz, wobbleDepth, wobbleRateHz, inputTrim, dwellDrive, dwellComp, wetDb\n%s\n",
       gTuningText);
   std::fflush(stdout);
@@ -572,77 +527,25 @@ bool tuningLeaf(const char* probeName, const char* label) {
 }
 
 // Long tuning sections split into sub-nodes so no column ever needs a scroll bar.
-void drawHarmonyRaw(cv::HarmonyTuning& h) {
-  if (tuningNode("Levels")) {
-    ImGui::SliderFloat("Level low", &h.levelDb[0], -24.0f, 6.0f, "%.1f dB");
-    ImGui::SliderFloat("Level medium", &h.levelDb[1], -24.0f, 6.0f, "%.1f dB");
-    ImGui::SliderFloat("Level high", &h.levelDb[2], -24.0f, 6.0f, "%.1f dB");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Trims")) {
-    ImGui::SliderFloat("Trim A", &h.trimDb[0], -12.0f, 18.0f, "%.1f dB");
-    ImGui::SliderFloat("Trim B", &h.trimDb[1], -12.0f, 18.0f, "%.1f dB");
-    ImGui::SliderFloat("Trim C", &h.trimDb[2], -12.0f, 18.0f, "%.1f dB");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Tracking")) {
-    ImGui::SliderFloat("Tracking speed (ms)", &h.glideMs, 0.0f, 100.0f, "%.0f ms");
-    ImGui::SliderFloat("Voiced threshold", &h.voicedThreshold, 0.05f, 0.4f, "%.2f");
-    ImGui::Checkbox("Mute unvoiced (A, B)", &h.muteUnvoiced);
-    ImGui::Checkbox("Snap to scale", &h.snapToScale);
-    ImGui::TreePop();
-  }
-  if (tuningNode("Chromatic intervals")) {
-    // Rows follow HarmonyVoice; Fixed (index 2) is unused in chromatic mode.
-    static const char* const kName[5] = {"Lower", "Low", nullptr, "High", "Higher"};
-    for (int v = 0; v < 5; ++v) {
-      if (kName[v] == nullptr) continue;
-      int semis = h.chromaticSemis[v];
-      if (ImGui::SliderInt(kName[v], &semis, -12, 12, "%+d st"))
-        h.chromaticSemis[v] = static_cast<int8_t>(semis);
-    }
-    ImGui::TreePop();
-  }
-  if (tuningNode("Shifter B/C")) {
-    cv::ShifterTuning& s = h.shifter;
-    ImGui::SliderFloat("Grain length (B)", &s.grainPeriods, 1.5f, 3.0f, "%.2f periods");
-    ImGui::SliderFloat("Epoch search (B)", &s.epochSearch, 0.0f, 0.3f, "%.2f period");
-    ImGui::SliderFloat("Epoch low-pass (B)", &s.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
-                       ImGuiSliderFlags_Logarithmic);
-    ImGui::SliderFloat("Grain window (C)", &s.grainWindowMs, 20.0f, 80.0f, "%.0f ms");
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Grains (C)");
-    ImGui::SameLine();
-    ImGui::RadioButton("2", &s.grainCount, 2);
-    ImGui::SameLine();
-    ImGui::RadioButton("4", &s.grainCount, 4);
-    ImGui::TreePop();
-  }
-}
-
 void drawOctaveRaw(cv::OctaveTuning& o) {
   ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("Trim A", &o.trimDbA, -12.0f, 12.0f, "%.1f dB");
-  ImGui::SliderFloat("Trim B", &o.trimDbB, -12.0f, 12.0f, "%.1f dB");
-  ImGui::SliderFloat("Trim C", &o.trimDbC, -12.0f, 12.0f, "%.1f dB");
+  ImGui::SliderFloat("Trim", &o.trimDb, -12.0f, 12.0f, "%.1f dB");
   ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
-  ImGui::Checkbox("Mute unvoiced", &o.muteUnvoiced);
-  ImGui::SliderFloat("Grain length (B)", &o.grainPeriods, 1.5f, 3.0f, "%.2f periods");
-  ImGui::SliderFloat("Epoch search (B)", &o.epochSearch, 0.0f, 0.3f, "%.2f period");
-  ImGui::SliderFloat("Epoch low-pass (B)", &o.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
-                     ImGuiSliderFlags_Logarithmic);
+  ImGui::SliderFloat("Grain window", &o.grainWindowMs, 20.0f, 80.0f, "%.0f ms");
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextUnformatted("Grains");
+  ImGui::SameLine();
+  ImGui::RadioButton("2", &o.grainCount, 2);
+  ImGui::SameLine();
+  ImGui::RadioButton("4", &o.grainCount, 4);
 }
 
 void drawAutotuneRaw(cv::AutotuneTuning& t) {
   ImGui::SliderFloat("Trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
-  ImGui::SliderFloat("Grain length (B)", &t.shifter.grainPeriods, 1.5f, 3.0f, "%.2f periods");
-  ImGui::SliderFloat("Epoch search (B)", &t.shifter.epochSearch, 0.0f, 0.3f, "%.2f period");
-  ImGui::SliderFloat("Epoch low-pass (B)", &t.shifter.epochLpHz, 100.0f, 4000.0f, "%.0f Hz",
-                     ImGuiSliderFlags_Logarithmic);
 }
 
 void drawUnisonRaw(cv::UnisonTuning& t) {
-  ImGui::TextDisabled("DEPTH scales both methods; the blend lives in these constants.");
+  ImGui::TextDisabled("DEPTH scales the swing and the wet level together.");
   if (tuningNode("Chorus (LFO-wobbled delay)")) {
     ImGui::SliderFloat("Base delay 1", &t.baseDelayMs[0], 5.0f, 40.0f, "%.1f ms");
     ImGui::SliderFloat("Base delay 2", &t.baseDelayMs[1], 5.0f, 40.0f, "%.1f ms");
@@ -650,12 +553,6 @@ void drawUnisonRaw(cv::UnisonTuning& t) {
     ImGui::SliderFloat("LFO rate 2", &t.lfoHz[1], 0.1f, 3.0f, "%.2f Hz");
     ImGui::SliderFloat("Swing at depth 0", &t.swingMinMs, 0.0f, 1.0f, "%.2f ms");
     ImGui::SliderFloat("Swing at depth 1", &t.swingMaxMs, 0.5f, 6.0f, "%.2f ms");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Doubler (fixed detune, TC-Helicon style)")) {
-    ImGui::SliderFloat("DETUNE 0", &t.detuneCents[0], -30.0f, 30.0f, "%.1f cents");
-    ImGui::SliderFloat("DETUNE 1", &t.detuneCents[1], -30.0f, 30.0f, "%.1f cents");
-    ImGui::SliderFloat("WINDOW", &t.windowMs, 5.0f, 30.0f, "%.0f ms");
     ImGui::TreePop();
   }
   if (tuningNode("Shared")) {
@@ -696,7 +593,6 @@ void drawDistortionRaw(cv::DistortionTuning& t) {
     ImGui::SliderFloat("Gain at full", &t.gain2Max, 1.0f, 300.0f, "%.1f x", log);
     ImGui::SliderFloat("Rail asymmetry", &t.railAsym, 0.0f, 0.5f, "%.2f");
     ImGui::SliderFloat("Rail soft edge", &t.railSoft, 0.01f, 0.5f, "%.2f");
-    ImGui::Checkbox("2x oversampling", &t.oversample);
     ImGui::TreePop();
   }
   if (tuningNode("Post")) {
@@ -732,7 +628,7 @@ void drawPolishRaw(cv::PolishTuning& t) {
   ImGui::SliderFloat("Output trim", &t.trimDb, -6.0f, 6.0f, "%.1f dB");
 }
 
-void drawReverbRaw(cv::ChasmTuning& c, cv::SpringBTuning& b) {
+void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   if (tuningNode("Chasm")) {
     ImGui::SliderFloat("Feedback at decay 0", &c.timeLo, 0.1f, 0.95f, "%.2f");
@@ -755,7 +651,7 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringBTuning& b) {
     ImGui::SliderFloat("Wet level", &c.wetDb, -24.0f, 24.0f, "%.1f dB");
     ImGui::TreePop();
   }
-  if (tuningNode("Spring B")) {
+  if (tuningNode("Spring")) {
     ImGui::SliderFloat("Echo spacing 1", &b.halfMs1, 10.0f, 80.0f, "%.1f ms");
     ImGui::SliderFloat("Echo spacing 2", &b.halfMs2, 10.0f, 80.0f, "%.1f ms");
     ImGui::SliderFloat("Feedback at decay 0", &b.timeLo, 0.1f, 0.95f, "%.2f");
@@ -769,7 +665,7 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringBTuning& b) {
     ImGui::SliderFloat("Wobble rate", &b.wobbleRateHz, 0.1f, 10.0f, "%.2f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::TreePop();
   }
-  if (tuningNode("Spring B levels")) {
+  if (tuningNode("Spring levels")) {
     ImGui::SliderFloat("Drive at dwell 1", &b.dwellDrive, 1.0f, 64.0f, "%.1f x", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Drive compensation", &b.dwellComp, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Input trim", &b.inputTrim, 0.05f, 1.5f, "%.2f", ImGuiSliderFlags_Logarithmic);
@@ -780,17 +676,15 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringBTuning& b) {
 
 // Reset and Print cover every effect's tuning.
 void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
-  cv::HarmonyTuning& ht = params.pitchFx.harmony.tuning;
   cv::OctaveTuning& ot = params.pitchFx.octave.tuning;
   if (ImGui::Button("Reset to defaults", ImVec2(resetW, 0.0f))) {
-    ht = cv::HarmonyTuning{};
     ot = cv::OctaveTuning{};
     params.pitchFx.autotune.tuning = cv::AutotuneTuning{};
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
     params.distortion.tuning = cv::DistortionTuning{};
     params.reverb.chasm.tuning = cv::ChasmTuning{};
-    params.reverb.springB.tuning = cv::SpringBTuning{};
+    params.reverb.spring.tuning = cv::SpringTuning{};
     params.eq.tuning = cv::PolishTuning{};
     params.inputGate.tuning = cv::GateTuning{};
     params.inputGate.tuning.rangeDb = kInputGateRangeDb;
@@ -807,8 +701,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
   const bool justCopied = ImGui::GetTime() - copiedAt < kCopiedShowSec;
   if (ImGui::Button(justCopied ? "Copied###copy" : "Copy settings###copy",
                     ImVec2(copyW, 0.0f))) {
-    printTuning(ht, ot, params.unison.tuning, params.slapback.tuning,
-                params.distortion.tuning,
+    printTuning(ot, params.unison.tuning, params.slapback.tuning, params.distortion.tuning,
                 params.reverb.chasm.tuning, params.eq, params.inputGate.tuning,
                 params.gate.tuning, params.pitchFx.autotune.tuning, params);
     copiedAt = ImGui::GetTime();
@@ -947,36 +840,12 @@ void drawTransportItems(ProtoParams& params, float& meterDb, bool probe) {
   drawTuningButtons(params, hw.reset, hw.copy);
 }
 
-// ---- Harmony voices: High / Higher, each Off / Quiet / Loud / Louder ----------------
-//
-// Adam has no harmony of his own to match, so the face offers the two voices above
-// him (owner 2026-10-02). The engine's third slot stays off.
-
-constexpr int kVoiceRows = 2;
-constexpr cv::HarmonyVoice kVoiceOf[kVoiceRows] = {cv::HarmonyVoice::High, cv::HarmonyVoice::Higher};
-constexpr const char* kVoiceKey[kVoiceRows] = {"high", "higher"};  // saved-state names
-
-struct HarmonyMenu {
-  // 0 off, 1 quiet, 2 loud, 3 louder. Owner default: High louder, Higher loud.
-  std::array<int, kVoiceRows> level{{3, 2}};
-  std::array<int, kVoiceRows> formant{};  // engine B formant, semitones
-};
-HarmonyMenu gMenu;  // UI-thread-only
-
-void syncSlots(const HarmonyMenu& m, cv::HarmonyParams& h) {
-  for (int i = 0; i < kVoiceRows; ++i) {
-    h.slots[i].voice = kVoiceOf[i];
-    h.slots[i].level = m.level[i];
-    h.slots[i].formant = static_cast<float>(m.formant[i]);
-  }
-  for (size_t i = kVoiceRows; i < h.slots.size(); ++i) h.slots[i].level = 0;
-}
-
 // ---- Saved state: the face as Adam left it ----------------------------------------
 //
 // Plain "key value" lines. Unknown keys are skipped and missing keys keep their
-// defaults, so a new build reads an old file. Raw Advanced edits are not saved;
-// the macros rewrite those fields on load.
+// defaults, so a new build reads an old file. A key keeps the name it was first
+// saved under. Raw Advanced edits are not saved; the macros rewrite those fields
+// on load.
 
 struct StateField {
   std::string key;
@@ -984,7 +853,7 @@ struct StateField {
   void* ptr;
 };
 
-std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
+std::vector<StateField> stateFields(ProtoParams& p) {
   std::vector<StateField> f;
   const auto add = [&](const char* key, auto* ptr) {
     using T = std::remove_pointer_t<decltype(ptr)>;
@@ -1004,34 +873,17 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   gate("gate", p.gate);
   cv::AutotuneParams& at = p.pitchFx.autotune;
   add("autotune.on", &at.on);
-  add("autotune.engine", &at.engine);
   add("autotune.key", &at.key);
-  add("autotune.chromatic", &at.chromatic);
   add("autotune.response", &at.responseMs);
   add("autotune.pull", &at.tuning.maxCorrectSemis);
-  add("autotune.link", &p.linkAutotuneKey);
   cv::OctaveParams& o = p.pitchFx.octave;
   add("octave.on", &o.on);
-  add("octave.engine", &o.engine);
   add("octave.semitones", &o.semitones);
-  add("octave.formant", &o.formant);
   add("octave.mix", &o.mix);
-  cv::HarmonyParams& h = p.pitchFx.harmony;
-  add("harmony.on", &h.on);
-  add("harmony.engine", &h.engine);
-  add("harmony.key", &h.key);
-  add("harmony.chromatic", &h.chromatic);
-  add("harmony.mix", &h.mix);
-  add("harmony.snap", &h.tuning.snapToScale);
-  for (int i = 0; i < kVoiceRows; ++i) {
-    const std::string n = std::string("harmony.") + kVoiceKey[i];
-    f.push_back({n + ".level", 'i', &m.level[static_cast<size_t>(i)]});
-    f.push_back({n + ".formant", 'i', &m.formant[static_cast<size_t>(i)]});
-  }
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
   add("slapback.on", &p.slapback.on);
-  add("slapback.intensity", &p.slapback.intensity);
+  add("slapback.intensity", &p.slapback.mix);
   add("slapback.time", &p.slapback.tuning.timeMs);
   add("slapback.repeats", &p.slapback.tuning.feedback);
   add("slapback.lowpass", &p.slapback.tuning.lowpassHz);
@@ -1041,13 +893,12 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   cv::ReverbParams& r = p.reverb;
   add("reverb.on", &r.on);
   add("reverb.engine", &r.engine);
-  add("reverb.mix", &r.mix);
-  add("reverb.intensity", &r.intensity);
+  add("reverb.intensity", &r.mix);
   add("reverb.time", &r.time);
   add("reverb.chasm.decay", &r.chasm.decay);
   add("reverb.chasm.dwell", &r.chasm.dwell);
-  add("reverb.springb.decay", &r.springB.decay);
-  add("reverb.springb.dwell", &r.springB.dwell);
+  add("reverb.springb.decay", &r.spring.decay);
+  add("reverb.springb.dwell", &r.spring.dwell);
   add("eq.on", &p.eq.on);
   add("eq.lowcut", &p.eq.hpHz);
   add("eq.dipHz", &p.eq.dipHz);
@@ -1070,10 +921,10 @@ std::vector<StateField> stateFields(ProtoParams& p, HarmonyMenu& m) {
   return f;
 }
 
-std::string stateText(ProtoParams& p, HarmonyMenu& m, const std::string& loop) {
+std::string stateText(ProtoParams& p, const std::string& loop) {
   std::string out = "loop " + loop + "\n";
   char line[160];
-  for (const StateField& f : stateFields(p, m)) {
+  for (const StateField& f : stateFields(p)) {
     if (f.kind == 'f')
       std::snprintf(line, sizeof(line), "%s %.9g\n", f.key.c_str(),
                     static_cast<double>(*static_cast<float*>(f.ptr)));
@@ -1086,9 +937,9 @@ std::string stateText(ProtoParams& p, HarmonyMenu& m, const std::string& loop) {
   return out;
 }
 
-// Parses stateText output into p, m and loop. Returns the number of fields set.
-int parseStateText(const std::string& text, ProtoParams& p, HarmonyMenu& m, std::string& loop) {
-  const std::vector<StateField> fields = stateFields(p, m);
+// Parses stateText output into p and loop. Returns the number of fields set.
+int parseStateText(const std::string& text, ProtoParams& p, std::string& loop) {
+  const std::vector<StateField> fields = stateFields(p);
   int set = 0;
   size_t pos = 0;
   while (pos < text.size()) {
@@ -1132,17 +983,16 @@ void applyMacros(ProtoParams& p) {
   const auto& m = p.macros.pos;
   cv::ReverbParams& r = p.reverb;
   mc::octaveSlide(p.pitchFx.octave.tuning, m[mc::OctaveSlide]);
-  mc::harmonyTracking(p.pitchFx.harmony.tuning, m[mc::HarmonyTracking]);
-  mc::unison(p.unison.tuning, m[mc::UnisonBlend], m[mc::UnisonMotion]);
+  mc::unison(p.unison.tuning, m[mc::UnisonMotion]);
   mc::distBody(p.distortion.tuning, m[mc::DistBody]);
   mc::distBite(p.distortion.tuning, m[mc::DistBite]);
   mc::distGrit(p.distortion.tuning, m[mc::DistGrit]);
   mc::chasmWobble(r.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(r.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(r.chasm.tuning, m[mc::ChasmBass]);
-  mc::springBDrip(r.springB.tuning, m[mc::SpringBDrip]);
-  mc::springBFlutter(r.springB.tuning, m[mc::SpringBFlutter]);
-  mc::springBBrightness(r.springB.tuning, m[mc::SpringBBrightness]);
+  mc::springDrip(r.spring.tuning, m[mc::SpringDrip]);
+  mc::springFlutter(r.spring.tuning, m[mc::SpringFlutter]);
+  mc::springBrightness(r.spring.tuning, m[mc::SpringBrightness]);
 }
 
 // ~/Library/Application Support/cubevox-proto/state.txt; empty if HOME is unset.
@@ -1154,7 +1004,7 @@ std::string statePath() {
   return dir + "/state.txt";
 }
 
-void loadState(const std::string& path, ProtoParams& p, HarmonyMenu& m) {
+void loadState(const std::string& path, ProtoParams& p) {
   std::FILE* f = path.empty() ? nullptr : std::fopen(path.c_str(), "rb");
   if (f == nullptr) return;  // first launch
   std::string text;
@@ -1163,7 +1013,7 @@ void loadState(const std::string& path, ProtoParams& p, HarmonyMenu& m) {
   while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n);
   std::fclose(f);
   std::string loop;
-  if (parseStateText(text, p, m, loop) == 0)
+  if (parseStateText(text, p, loop) == 0)
     std::fprintf(stderr, "[WARN] %s has no readable settings\n", path.c_str());
   applyMacros(p);
   p.playing = false;
@@ -1185,28 +1035,6 @@ void saveState(const std::string& path, const std::string& text) {
     std::fprintf(stderr, "[ERROR] could not replace %s\n", path.c_str());
 }
 
-// Each row: name, level radios, then FORMANT (engine B, voice on).
-void drawHarmonyVoices(const cv::HarmonyParams& h) {
-  static const char* const kRowName[kVoiceRows] = {"High", "Higher"};
-  static const char* const kLevelName[4] = {"Off", "Quiet", "Loud", "Louder"};
-  ImGui::TextUnformatted("Voices");
-  for (int row = 0; row < kVoiceRows; ++row) {
-    ImGui::PushID(row);
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(kRowName[row]);
-    for (int level = 0; level < 4; ++level) {
-      ImGui::SameLine(level == 0 ? kMenuRadioX : 0.0f);
-      ImGui::RadioButton(kLevelName[level], &gMenu.level[row], level);
-    }
-    ImGui::SameLine();
-    ImGui::BeginDisabled(h.engine != 1 || gMenu.level[row] == 0);
-    ImGui::SetNextItemWidth(kFormantW);
-    ImGui::SliderInt("Formant", &gMenu.formant[row], -12, 12, "%+d st");
-    ImGui::EndDisabled();
-    ImGui::PopID();
-  }
-}
-
 // ---- Tuning headers: macro view by default, raw nodes under Advanced --------------
 
 // One plain line under a tuning control: what it does, the technical term last.
@@ -1216,21 +1044,6 @@ template <class F>
 void macroSlider(const char* label, const char* help, float& pos, const F& apply) {
   if (ImGui::SliderFloat(label, &pos, 0.0f, 100.0f, "%.0f %%")) apply(pos);
   hint(help);
-}
-
-void drawHarmonyTuning(cv::HarmonyParams& h, cv::macros::State& m) {
-  if (!tuningHeader("harmony")) return;
-  drawHarmonyVoices(h);
-  if (gAdvanced) {
-    drawHarmonyRaw(h.tuning);
-    return;
-  }
-  macroSlider("Tracking speed", "how fast the voices catch a new note",
-              m.pos[cv::macros::HarmonyTracking],
-              [&](float p) { cv::macros::harmonyTracking(h.tuning, p); });
-  bool follow = !h.tuning.snapToScale;
-  if (ImGui::Checkbox("Follow my bends", &follow)) h.tuning.snapToScale = !follow;
-  hint("voices bend with you; off snaps them to the key");
 }
 
 void drawOctaveTuning(cv::OctaveParams& o, cv::macros::State& m) {
@@ -1249,20 +1062,16 @@ void drawAutotuneTuning(cv::AutotuneParams& a) {
   if (!tuningHeader("autotune")) return;
   ImGui::SliderFloat("Pull range", &a.tuning.maxCorrectSemis, 0.5f, 6.0f, "%.1f st");
   hint("how far off a note it will still fix");
-  ImGui::Checkbox("Correct to every note", &a.chromatic);
-  hint("snaps to the nearest note; picking a KEY turns this off");
   if (gAdvanced) drawAutotuneRaw(a.tuning);
 }
 
-void drawUnisonTuning(cv::UnisonTuning& t, cv::macros::State& m) {
+void drawUnisonTuning(cv::UnisonTuning& t) {
   if (!tuningHeader("unison")) return;
   if (gAdvanced) {
     drawUnisonRaw(t);
     return;
   }
-  macroSlider("Chorus ↔ Double", "left more swirl, right a tighter double",
-              m.pos[cv::macros::UnisonBlend],
-              [&](float p) { cv::macros::unison(t, p, m.pos[cv::macros::UnisonMotion]); });
+  hint("DEPTH and RATE on the face set the chorus; Advanced shows its raw values");
 }
 
 void drawSlapbackTuning(cv::SlapbackTuning& t) {
@@ -1335,13 +1144,12 @@ void drawEqTuning(cv::PolishParams& e) {
 void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
   if (!tuningHeader("reverb")) return;
   if (gAdvanced) {
-    drawReverbRaw(r.chasm.tuning, r.springB.tuning);
+    drawReverbRaw(r.chasm.tuning, r.spring.tuning);
     return;
   }
   namespace mc = cv::macros;
-  // DWELL (input drive into the soft clip) left the face on 2026-10-07; it binds
-  // to the selected engine here.
-  float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.springB.dwell;
+  // Dwell (input drive into the soft clip) has no panel knob; it binds to the selected engine here.
+  float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.spring.dwell;
   float dwellPct = dwell * 100.0f;
   if (ImGui::SliderFloat("Dwell", &dwellPct, 0.0f, 100.0f, "%.0f %%")) dwell = dwellPct / 100.0f;
   if (r.engine == cv::kReverbChasm) {
@@ -1352,13 +1160,13 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
     macroSlider("Bass", "more low end in the tail", m.pos[mc::ChasmBass],
                 [&](float p) { mc::chasmBass(r.chasm.tuning, p); });
   } else {
-    cv::SpringBTuning& t = r.springB.tuning;
-    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::SpringBDrip],
-                [&](float p) { mc::springBDrip(t, p); });
-    macroSlider("Flutter", "wobble and crisper repeats", m.pos[mc::SpringBFlutter],
-                [&](float p) { mc::springBFlutter(t, p); });
-    macroSlider("Brightness", "brighter tail", m.pos[mc::SpringBBrightness],
-                [&](float p) { mc::springBBrightness(t, p); });
+    cv::SpringTuning& t = r.spring.tuning;
+    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::SpringDrip],
+                [&](float p) { mc::springDrip(t, p); });
+    macroSlider("Flutter", "wobble and crisper repeats", m.pos[mc::SpringFlutter],
+                [&](float p) { mc::springFlutter(t, p); });
+    macroSlider("Brightness", "brighter tail", m.pos[mc::SpringBrightness],
+                [&](float p) { mc::springBrightness(t, p); });
   }
 }
 
@@ -1375,53 +1183,11 @@ const char* responseFormat(float mechanical) {
   return "%.0f %%";
 }
 
-void drawHarmonyBlock(cv::HarmonyParams& h, cv::macros::State& macros) {
-  ImGui::PushID("harmony");
-  ImGui::Checkbox("HARMONY", &h.on);
-  ImGui::SameLine(kHarmonyEngineX);
-  ImGui::TextUnformatted("Engine");
-  ImGui::SameLine();
-  ImGui::RadioButton("A", &h.engine, 0);
-  ImGui::SameLine();
-  ImGui::RadioButton("B", &h.engine, 1);
-  ImGui::SameLine();
-  ImGui::RadioButton("C", &h.engine, 2);
-  ImGui::BeginDisabled(h.chromatic);
-  ImGui::SetNextItemWidth(kHarmonyKeyW);
-  ImGui::Combo("KEY", &h.key, cv::kKeyName, 12);
-  ImGui::EndDisabled();
-  if (gAdvanced) {
-    ImGui::SameLine();
-    ImGui::Checkbox("Chromatic", &h.chromatic);
-  }
-  percentSlider("MIX", h.mix);
-  drawHarmonyTuning(h, macros);
-  syncSlots(gMenu, h);
-  ImGui::PopID();
-}
-
-// KEY is the box's one shared encoder: when linked, picking a key here sets
-// Harmony's too (sharedKey), so the combo is never locked.
-void drawAutotuneBlock(cv::AutotuneParams& a, bool& linkKey, int& sharedKey,
-                       const ProtoState& state) {
+void drawAutotuneBlock(cv::AutotuneParams& a, const ProtoState& state) {
   ImGui::PushID("autotune");
   ImGui::Checkbox("AUTOTUNE", &a.on);
-  ImGui::SameLine(kHarmonyEngineX);
-  ImGui::RadioButton("A", &a.engine, 0);
-  ImGui::SameLine();
-  ImGui::RadioButton("B", &a.engine, 1);
-  // KEY stays live; picking a key leaves "Correct to every note" mode.
   ImGui::SetNextItemWidth(kAutotuneKeyW);
-  if (ImGui::BeginCombo("KEY", a.chromatic ? "Every note" : cv::kKeyName[a.key])) {
-    for (int k = 0; k < 12; ++k) {
-      if (ImGui::Selectable(cv::kKeyName[k], !a.chromatic && k == a.key)) {
-        a.key = k;
-        a.chromatic = false;
-        if (linkKey) sharedKey = k;
-      }
-    }
-    ImGui::EndCombo();
-  }
+  ImGui::Combo("KEY", &a.key, cv::kKeyName, cv::kKeyCount);
   if (gAdvanced) {
     ImGui::SameLine();
     ImGui::Text("Correction: %+.2f st", a.on ? state.correctionSemis : 0.0f);
@@ -1437,12 +1203,6 @@ void drawAutotuneBlock(cv::AutotuneParams& a, bool& linkKey, int& sharedKey,
 void drawOctaveBlock(cv::OctaveParams& o, cv::macros::State& macros) {
   ImGui::PushID("octave");
   ImGui::Checkbox("OCTAVE", &o.on);
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("Engine");
-  ImGui::SameLine();
-  ImGui::RadioButton("A", &o.engine, 0);
-  ImGui::SameLine();
-  ImGui::RadioButton("C", &o.engine, 2);
   ImGui::SliderInt("SEMITONES", &o.semitones, -12, 12, "%+d st");
   percentSlider("MIX", o.mix);
   drawOctaveTuning(o, macros);
@@ -1490,16 +1250,15 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
   percentSlider("DEPTH", u.depth);
   // RATE: chorus speed. Faster also deepens the swirl, up to a capped pitch swing.
   float& rate = macros.pos[cv::macros::UnisonMotion];
-  if (ImGui::SliderFloat("RATE", &rate, 0.0f, 100.0f, "%.0f %%"))
-    cv::macros::unison(u.tuning, macros.pos[cv::macros::UnisonBlend], rate);
-  drawUnisonTuning(u.tuning, macros);
+  if (ImGui::SliderFloat("RATE", &rate, 0.0f, 100.0f, "%.0f %%")) cv::macros::unison(u.tuning, rate);
+  drawUnisonTuning(u.tuning);
   ImGui::PopID();
 }
 
 void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
-  percentSlider("MIX", s.intensity);
+  percentSlider("MIX", s.mix);
   ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
@@ -1519,8 +1278,8 @@ void drawReverbBlock(cv::ReverbParams& r, cv::macros::State& macros) {
   ImGui::Checkbox("REVERB", &r.on);
   ImGui::RadioButton("CHASM", &r.engine, cv::kReverbChasm);
   ImGui::SameLine();
-  ImGui::RadioButton("SPRING B", &r.engine, cv::kReverbSpringB);
-  percentSlider("MIX", r.intensity);
+  ImGui::RadioButton("SPRING", &r.engine, cv::kReverbSpring);
+  percentSlider("MIX", r.mix);
   percentSlider("TIME", r.time);
   drawReverbTuning(r, macros);
   ImGui::PopID();
@@ -1716,7 +1475,6 @@ void drawPedals(ProtoParams& params) {
   gPedalBottom = 0.0f;
   const auto next = [] { ImGui::SameLine(0.0f, kPedalGap); };
   cv::AutotuneParams& at = params.pitchFx.autotune;
-  cv::HarmonyParams& h = params.pitchFx.harmony;
   cv::OctaveParams& o = params.pitchFx.octave;
   char semis[16];
   std::snprintf(semis, sizeof(semis), "%+d st", o.semitones);
@@ -1733,10 +1491,7 @@ void drawPedals(ProtoParams& params) {
                   static_cast<double>(mechanical * 100.0f));
     if (pedalKnobRaw("RESPONSE", mechanical, text, 0))
       at.responseMs = cv::AutotuneVoice::responseMsAt(mechanical);
-    if (pedalEncoder("KEY", at.key, 0, 11, at.chromatic ? "Every note" : cv::kKeyName[at.key])) {
-      at.chromatic = false;  // picking a key leaves every-note mode, as on the full face
-      if (params.linkAutotuneKey) h.key = at.key;
-    }
+    pedalEncoder("KEY", at.key, 0, cv::kKeyCount - 1, cv::kKeyName[at.key]);
     pedalSwitch("autotuneSwitch", at.on);
   });
   next();
@@ -1750,13 +1505,12 @@ void drawPedals(ProtoParams& params) {
     float rate = 0.01f * params.macros.pos[cv::macros::UnisonMotion];
     if (pedalPercent("RATE", rate)) {
       params.macros.pos[cv::macros::UnisonMotion] = 100.0f * rate;
-      cv::macros::unison(params.unison.tuning, params.macros.pos[cv::macros::UnisonBlend],
-                         params.macros.pos[cv::macros::UnisonMotion]);
+      cv::macros::unison(params.unison.tuning, params.macros.pos[cv::macros::UnisonMotion]);
     }
   });
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
-    pedalPercent("MIX", params.slapback.intensity);
+    pedalPercent("MIX", params.slapback.mix);
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
   });
   next();
@@ -1772,7 +1526,7 @@ void drawPedals(ProtoParams& params) {
   next();
   cv::ReverbParams& r = params.reverb;
   pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
-    pedalPercent("MIX", r.intensity);
+    pedalPercent("MIX", r.mix);
     pedalPercent("TIME", r.time);
   });
 }
@@ -1812,19 +1566,12 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   if (!params.dev) params.advanced = false;
   gDev = params.dev;
   gAdvanced = params.advanced;
-  // Harmony is off the face (owner 2026-10-02). It stays off and only carries the shared KEY.
-  params.pitchFx.harmony.on = false;
-  params.pitchFx.harmony.chromatic = false;
-  params.linkAutotuneKey = true;
-  // Octave engine B is off the face too; its formant shift goes with it.
-  if (params.pitchFx.octave.engine == 1) params.pitchFx.octave.engine = 0;
-  // SPRING is off the face; a saved state that picked it loads as SPRING B.
-  if (params.reverb.engine != cv::kReverbChasm) params.reverb.engine = cv::kReverbSpringB;
-  params.pitchFx.octave.formant = 0.0f;
-  // A v0.01 state file can hold a TIME below the 60 ms floor.
+  // A saved state can name an engine the face no longer offers; it loads as Spring.
+  if (params.reverb.engine != cv::kReverbChasm) params.reverb.engine = cv::kReverbSpring;
+  // A saved state can hold a TIME below the 60 ms floor.
   params.slapback.tuning.timeMs = std::clamp(params.slapback.tuning.timeMs, 60.0f, 250.0f);
-  cv::applyIntensity(params.reverb);
-  if (params.linkAutotuneKey) params.pitchFx.autotune.key = params.pitchFx.harmony.key;
+  params.pitchFx.autotune.key = std::clamp(params.pitchFx.autotune.key, 0, cv::kKeyCount - 1);
+  cv::applyKnobs(params.reverb);
 
   ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -1876,17 +1623,14 @@ void drawModeButton(ProtoParams& params) {
 void drawColumns(ProtoParams& params, const ProtoState& state) {
   // Signal order runs down each column, then left to right.
   const float colW =
-      (ImGui::GetContentRegionAvail().x - kHarmonyColumnW - 3.0f * kColumnGap) / 3.0f;
+      (ImGui::GetContentRegionAvail().x - kWideColumnW - 3.0f * kColumnGap) / 3.0f;
   column(0, colW, [&] {
     moduleBox("ingateBox", true,
               [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
-    moduleBox("autotuneBox", false, [&] {
-      drawAutotuneBlock(params.pitchFx.autotune, params.linkAutotuneKey,
-                        params.pitchFx.harmony.key, state);
-    });
+    moduleBox("autotuneBox", false, [&] { drawAutotuneBlock(params.pitchFx.autotune, state); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
-  column(1, kHarmonyColumnW, [&] {
+  column(1, kWideColumnW, [&] {
     moduleBox("octaveBox", true,
               [&] { drawOctaveBlock(params.pitchFx.octave, params.macros); });
     moduleBox("unisonBox", false, [&] { drawUnisonBlock(params.unison, params.macros); });
@@ -1934,27 +1678,26 @@ int runLayoutProbe() {
 
   // Macro view: all headers closed, then each Tuning header open (reverb once per engine).
   // Advanced view: the same, plus each raw sub-node open alone.
-  constexpr int kChasm = cv::kReverbChasm, kSpringB = cv::kReverbSpringB;
+  constexpr int kChasm = cv::kReverbChasm, kSpring = cv::kReverbSpring;
   static const ProbeOpen kScenarios[] = {
       {true, nullptr, nullptr},
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr},
-      {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpringB},
+      {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpring},
       {true, "eq", nullptr},         {true, "ingate", nullptr},
       {true, "gate", nullptr},
       {true, nullptr, nullptr, true},
       {true, "octave", nullptr, true},          {true, "unison", nullptr, true},
       {true, "unison", "Chorus (LFO-wobbled delay)", true},
-      {true, "unison", "Doubler (fixed detune, TC-Helicon style)", true},
       {true, "unison", "Shared", true},
       {true, "slapback", nullptr, true},        {true, "distortion", nullptr, true},
       {true, "distortion", "Stage 1", true},    {true, "distortion", "Tone stack", true},
       {true, "distortion", "Stage 2", true},    {true, "distortion", "Post", true},
       {true, "reverb", nullptr, true},
       {true, "reverb", "Chasm", true},          {true, "reverb", "Chasm levels", true},
-      {true, "reverb", "Spring B", true},       {true, "reverb", "Spring B levels", true},
+      {true, "reverb", "Spring", true},         {true, "reverb", "Spring levels", true},
       {true, "eq", nullptr, true},              {true, "ingate", nullptr, true},
       {true, "autotune", nullptr, true},        {true, "gate", nullptr, true},
       {true, nullptr, nullptr, false, -1, true},
@@ -1984,7 +1727,7 @@ int runLayoutProbe() {
     char name[64];
     std::snprintf(name, sizeof(name), "%s %s%s%s%s%s", s.advanced ? "adv  " : "macro",
                   s.block ? s.block : "all closed", s.node ? " / " : "", s.node ? s.node : "",
-                  s.pedal ? " (PEDAL MODE)" : s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kSpringB ? " (SPRING B)" : ""),
+                  s.pedal ? " (PEDAL MODE)" : s.reverbEngine == kChasm ? " (CHASM)" : (s.reverbEngine == kSpring ? " (SPRING)" : ""),
                   s.mic ? " (MIC)" : "");
     const float worst = *std::max_element(gColumnUsed.begin(), gColumnUsed.end());
     const bool headerFits = gHeaderRight <= static_cast<float>(kWindowW);
@@ -2041,28 +1784,25 @@ int runLayoutProbe() {
 
   // Saved state: move every field off its default, write, read into a fresh face, compare.
   ProtoParams moved;
-  HarmonyMenu movedMenu;
-  for (const StateField& f : stateFields(moved, movedMenu)) {
+  for (const StateField& f : stateFields(moved)) {
     if (f.kind == 'f') *static_cast<float*>(f.ptr) += 0.37f;
     else if (f.kind == 'i') *static_cast<int*>(f.ptr) += 1;
     else *static_cast<bool*>(f.ptr) = !*static_cast<bool*>(f.ptr);
   }
-  const std::string text = stateText(moved, movedMenu, "/tmp/a loop.wav");
+  const std::string text = stateText(moved, "/tmp/a loop.wav");
   ProtoParams back;
-  HarmonyMenu backMenu;
   std::string backLoop;
-  const int set = parseStateText(text, back, backMenu, backLoop);
+  const int set = parseStateText(text, back, backLoop);
   // The file path: write, read back, and the face must match the parsed one.
   const std::string probeFile = "/tmp/cubevox-proto-probe-state.txt";
   saveState(probeFile, text);
   ProtoParams fromFile;
-  HarmonyMenu fromFileMenu;
-  loadState(probeFile, fromFile, fromFileMenu);
+  loadState(probeFile, fromFile);
   std::remove(probeFile.c_str());
   applyMacros(back);  // loadState re-applies macros; match that before comparing
-  const bool fileOk = stateText(fromFile, fromFileMenu, gLoopPath) == stateText(back, backMenu, gLoopPath);
-  const std::vector<StateField> want = stateFields(moved, movedMenu);
-  const std::vector<StateField> got = stateFields(back, backMenu);
+  const bool fileOk = stateText(fromFile, gLoopPath) == stateText(back, gLoopPath);
+  const std::vector<StateField> want = stateFields(moved);
+  const std::vector<StateField> got = stateFields(back);
   int mismatches = 0;
   for (size_t i = 0; i < want.size(); ++i) {
     const size_t bytes = want[i].kind == 'f' ? sizeof(float) : (want[i].kind == 'i' ? sizeof(int) : sizeof(bool));
@@ -2078,10 +1818,9 @@ int runLayoutProbe() {
 
   // Default macro positions must reproduce the engine tuning defaults (the firmware's).
   const auto tuningText = [](const ProtoParams& q) {
-    formatTuning(q.pitchFx.harmony.tuning, q.pitchFx.octave.tuning, q.unison.tuning,
-                 q.slapback.tuning, q.distortion.tuning,
-                 q.reverb.chasm.tuning, q.eq, q.inputGate.tuning,
-                 q.gate.tuning, q.pitchFx.autotune.tuning, q);
+    formatTuning(q.pitchFx.octave.tuning, q.unison.tuning, q.slapback.tuning, q.distortion.tuning,
+                 q.reverb.chasm.tuning, q.eq, q.inputGate.tuning, q.gate.tuning,
+                 q.pitchFx.autotune.tuning, q);
     return std::string(gTuningText);
   };
   ProtoParams engineDefaults;
@@ -2131,11 +1870,11 @@ int runWindow() {
 
   ProtoParams params;
   const std::string stateFile = statePath();
-  loadState(stateFile, params, gMenu);
+  loadState(stateFile, params);
   gParamsBuf[0] = params;
   gParamsBuf[1] = params;
   float meterDb = kSilenceDb;
-  std::string savedText = stateText(params, gMenu, gLoopPath);
+  std::string savedText = stateText(params, gLoopPath);
   double lastSaveCheck = glfwGetTime();
   constexpr double kSaveEverySec = 1.0;  // a crash loses at most this much
 
@@ -2188,7 +1927,7 @@ int runWindow() {
         gInputName = info.name;
         gInputRate = device.capture.internalSampleRate;
       }
-      const std::string text = stateText(params, gMenu, gLoopPath);
+      const std::string text = stateText(params, gLoopPath);
       if (text != savedText) {
         saveState(stateFile, text);
         savedText = text;
@@ -2205,7 +1944,7 @@ int runWindow() {
     glfwSwapBuffers(window);
   }
 
-  saveState(stateFile, stateText(params, gMenu, gLoopPath));
+  saveState(stateFile, stateText(params, gLoopPath));
   ma_device_uninit(&device);
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
@@ -2220,9 +1959,8 @@ int printDefaults() {
   ImGui::CreateContext();
   ProtoParams params;
   applyMacros(params);
-  printTuning(params.pitchFx.harmony.tuning, params.pitchFx.octave.tuning, params.unison.tuning,
-              params.slapback.tuning, params.distortion.tuning,
-              params.reverb.chasm.tuning, params.eq,
+  printTuning(params.pitchFx.octave.tuning, params.unison.tuning, params.slapback.tuning,
+              params.distortion.tuning, params.reverb.chasm.tuning, params.eq,
               params.inputGate.tuning, params.gate.tuning, params.pitchFx.autotune.tuning, params);
   ImGui::DestroyContext();
   return 0;

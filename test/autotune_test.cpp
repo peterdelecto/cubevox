@@ -1,5 +1,6 @@
-// Autotune checks: passthrough, correction, scale vs chromatic, response time,
-// Harmony builds on the corrected note, no-alloc. No window, no audio device.
+// Autotune checks: passthrough, scale degrees, correction, out-of-scale notes,
+// response time, Octave builds on the corrected note, hard tune, the toggle,
+// no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -73,8 +74,6 @@ std::vector<float> tone(double hz, int n) {
 
 double cents(double hz, double ref) { return 1200.0 * std::log2(hz / ref); }
 
-const float kThreshold = cv::HarmonyTuning{}.voicedThreshold;
-
 // Median f0 after 300 ms, measured by a fresh tracker.
 double medianHz(const std::vector<float>& x) {
   cv::PitchTracker t;
@@ -82,7 +81,7 @@ double medianHz(const std::vector<float>& x) {
   const int total = static_cast<int>(x.size());
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
-    t.push(&x[static_cast<size_t>(i)], n, kThreshold);
+    t.push(&x[static_cast<size_t>(i)], n);
     if (i + n > kSettle && t.result().voiced) hz.push_back(t.result().hz);
   }
   if (hz.empty()) return 0.0;
@@ -122,15 +121,12 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
 
 static cv::PitchFx gFx;
 
-// Autotune alone in key C; Harmony and Octave off.
-cv::PitchFxParams autotuneOnly(float responseMs, int engine = 1) {
+// Autotune alone in key C; Octave off.
+cv::PitchFxParams autotuneOnly(float responseMs) {
   cv::PitchFxParams p;
   p.autotune.on = true;
-  p.autotune.engine = engine;
   p.autotune.key = 0;
   p.autotune.responseMs = responseMs;
-  p.harmony.on = false;
-  p.harmony.key = 0;
   p.octave.on = false;
   return p;
 }
@@ -187,36 +183,42 @@ bool testPassthrough() {
   return ok;
 }
 
-// 2. A3 + 50 cents pulls to A3 on both engines.
-bool testCorrection() {
-  bool ok = true;
-  const char* names[2] = {"correction A", "correction B"};
-  for (int e = 0; e < 2; ++e) {
-    const double got = outputHz(kSharp, autotuneOnly(20.0f, e));
-    const double err = got > 0.0 ? cents(got, kA3) : 9999.0;
-    ok &= report(names[e], std::fabs(err) <= 5.0, "in=%.2f Hz, out=%.2f Hz, err vs A3=%.2f cents (+-5)",
-                 kSharp, got, err);
+// 2. Scale degrees: every semitone of C major from C4 to B4 in key C. A scale note is its own
+// degree; a note between two scale notes sits a tie away from both and snaps to the lower one.
+bool testDegrees() {
+  constexpr int kDegreeOf[12] = {0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6};
+  constexpr float kDevOf[12] = {0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0};
+  int bad = 0;
+  for (int s = 0; s < 12; ++s) {
+    const float hz = 261.6256f * std::exp2(static_cast<float>(s) / 12.0f);
+    const cv::Degree d = cv::degreeOf(hz, 0);
+    if (d.index != kDegreeOf[s] || std::fabs(d.dev - kDevOf[s]) > 1e-3f) ++bad;
   }
-  return ok;
+  // G major (KEY position 1) holds F#, so F#4 is its own degree there.
+  const cv::Degree fs = cv::degreeOf(369.994f, 1);
+  const bool fsOk = fs.index == 6 && std::fabs(fs.dev) < 1e-3f;
+  return report("scale degrees", bad == 0 && fsOk, "wrong degrees in C=%.0f (0), F#4 in G degree %.0f (6)", bad,
+                fs.index);
 }
 
-// 3. Bb3 is not in C major: scale mode pulls to A3 or B3, chromatic leaves it.
+// 3. A3 + 50 cents pulls to A3.
+bool testCorrection() {
+  const double got = outputHz(kSharp, autotuneOnly(20.0f));
+  const double err = got > 0.0 ? cents(got, kA3) : 9999.0;
+  return report("correction", std::fabs(err) <= 5.0, "in=%.2f Hz, out=%.2f Hz, err vs A3=%.2f cents (+-5)",
+                kSharp, got, err);
+}
+
+// 4. Bb3 is not in C major: Autotune pulls it to A3 or B3.
 bool testScale() {
   const double got = outputHz(kBb3, autotuneOnly(20.0f));
   const double errA = got > 0.0 ? cents(got, kA3) : 9999.0;
   const double errB = got > 0.0 ? cents(got, kB3) : 9999.0;
-  bool ok = report("scale Bb3 in C", std::fabs(errA) <= 5.0 || std::fabs(errB) <= 5.0,
-                   "out=%.2f Hz, err vs A3=%.2f, vs B3=%.2f cents (one within +-5)", got, errA, errB);
-  cv::PitchFxParams chrom = autotuneOnly(20.0f);
-  chrom.autotune.chromatic = true;
-  const double gotC = outputHz(kBb3, chrom);
-  const double errC = gotC > 0.0 ? cents(gotC, kBb3) : 9999.0;
-  ok &= report("chromatic Bb3", std::fabs(errC) <= 5.0, "out=%.2f Hz, err vs Bb3=%.2f cents (+-5)",
-               gotC, errC);
-  return ok;
+  return report("scale Bb3 in C", std::fabs(errA) <= 5.0 || std::fabs(errB) <= 5.0,
+                "out=%.2f Hz, err vs A3=%.2f, vs B3=%.2f cents (one within +-5)", got, errA, errB);
 }
 
-// 4. Step A3 to A3 + 50 cents at 1 s, response 200 ms. Time runs from the
+// 5. Step A3 to A3 + 50 cents at 1 s, response 200 ms. Time runs from the
 // first hop where the tracker reports > 225 Hz to the hop where the
 // correction has moved 63 % of the way to its final value.
 bool testResponse() {
@@ -248,25 +250,26 @@ bool testResponse() {
                 (final - start) * 100.0, hitMs);
 }
 
-// 5. Harmony High on the corrected note: A3 + 50 cents gives C4, not C4 + 50.
-bool testHarmonyFollows() {
+// 6. Octave +3 on the corrected note: A3 + 50 cents gives C4, not C4 + 50. The
+// granular shifter holds +-15 cents.
+bool testOctaveFollows() {
   cv::PitchFxParams p = autotuneOnly(20.0f);
-  p.harmony.on = true;
-  p.harmony.mix = 1.0f;
-  p.harmony.slots[0] = {cv::HarmonyVoice::High, 3};
+  p.octave.on = true;
+  p.octave.mix = 1.0f;
+  p.octave.semitones = 3;
   const double got = outputHz(kSharp, p);
   const double err = got > 0.0 ? cents(got, kC4) : 9999.0;
-  return report("feeds harmony", std::fabs(err) <= 10.0,
-                "out=%.2f Hz, err vs C4=%.2f cents (+-10)", got, err);
+  return report("feeds octave", std::fabs(err) <= 15.0,
+                "out=%.2f Hz, err vs C4=%.2f cents (+-15)", got, err);
 }
 
-// 6. Hard tune at the shipped defaults: A3 with a 5 Hz, +-30 cent vibrato comes
+// 7. Hard tune at the shipped defaults: A3 with a 5 Hz, +-30 cent vibrato comes
 // out held on A3. Adam's own box measures about 2 cents median off the note.
 bool testHardTune() {
   const std::vector<float> in = tone(3 * cv::kSampleRate, [](int i) {
     return kA3 * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * 5.0 * i / cv::kSampleRate));
   });
-  cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs, cv::AutotuneParams{}.engine);
+  cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
   gFx.reset();
   const std::vector<float> out = run(gFx, in, p);
   cv::PitchTracker t;
@@ -274,7 +277,7 @@ bool testHardTune() {
   int n = 0;
   const int total = static_cast<int>(out.size());
   for (int i = 0; i < total; i += cv::kBlock) {
-    t.push(&out[static_cast<size_t>(i)], std::min(cv::kBlock, total - i), kThreshold);
+    t.push(&out[static_cast<size_t>(i)], std::min(cv::kBlock, total - i));
     if (i > kSettle && t.result().voiced) {
       const double c = cents(t.result().rawHz, kA3);
       sum += c * c;
@@ -286,16 +289,71 @@ bool testHardTune() {
                 "+-30 cent vibrato in, %.2f cents RMS off A3 out (<= 4)", rmsCents);
 }
 
+// Largest |second difference| of x over [from, to): a cut in the waveform shows as a spike here.
+double peakCurvature(const std::vector<float>& x, int from, int to) {
+  double worst = 0.0;
+  for (int i = std::max(from, 2); i < to; ++i) {
+    const size_t k = static_cast<size_t>(i);
+    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
+  }
+  return worst;
+}
+
+// Autotune off for gapBlocks and on again over a held A3 + 50 cents. The output crossfades between
+// the corrected voice and the dry input, so it may bend no harder than either does alone. Returns
+// the peak from the off edge to 100 ms past the on edge over the larger steady peak.
+double toggleRatio(int gapBlocks) {
+  const int offAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
+  const int total = offAt + 2 * cv::kSampleRate;
+  const std::vector<float> in = tone(kSharp, total);
+  std::vector<float> out(in.size());
+  const cv::PitchFxParams on = autotuneOnly(20.0f);
+  cv::PitchFxParams off = on;
+  off.autotune.on = false;
+  gFx.reset();
+  for (int i = 0; i < total; i += cv::kBlock) {
+    const bool gap = i >= offAt && i < offAt + gapBlocks * cv::kBlock;
+    gInProcess = true;
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, gap ? off : on);
+    gInProcess = false;
+  }
+  const int window = cv::kSampleRate / 2;
+  const double steady = std::max({peakCurvature(out, offAt - window, offAt), peakCurvature(out, total - window, total),
+                                  peakCurvature(in, 0, total)});
+  return peakCurvature(out, offAt, offAt + gapBlocks * cv::kBlock + cv::kSampleRate / 10) / steady;
+}
+
+// 8. A flick inside the crossfade keeps the running voice; a long gap lets the crossfade settle,
+// and the voice then starts clean once the tracker has rebuilt. The fade's own slope adds under
+// 1 %; a voice that loses its period mid-fade reads about 18 times steady state.
+bool testToggle() {
+  constexpr double kMaxRatio = 1.05;
+  double worst = 0.0;
+  int worstGap = 0;
+  for (int gap : {1, 4, 15, 60, 300}) {
+    const double r = toggleRatio(gap);
+    if (r >= worst) {
+      worst = r;
+      worstGap = gap;
+    }
+  }
+  return report("toggle", worst <= kMaxRatio,
+                "off for 1.3 to 400 ms: peak curvature x%.3f of steady state at %.0f blocks off (<= %.2f)", worst,
+                worstGap, kMaxRatio);
+}
+
 }  // namespace
 
 int main() {
   bool ok = true;
   ok &= testPassthrough();
+  ok &= testDegrees();
   ok &= testCorrection();
   ok &= testScale();
   ok &= testResponse();
-  ok &= testHarmonyFollows();
+  ok &= testOctaveFollows();
   ok &= testHardTune();
+  ok &= testToggle();
   // Every process() call above ran under the allocation guard.
   ok &= report("no allocation", true, "process() ran under the new/delete guard", 0.0);
   std::printf("%s autotune\n", ok ? "PASS" : "FAIL");

@@ -7,7 +7,7 @@
 #include <array>
 
 #include "core/unison_rate.h"
-#include "engine/harmony.h"
+#include "engine/scale.h"
 
 namespace {
 
@@ -110,7 +110,7 @@ void applyUnisonKnob(int knob, float v, cv::UnisonParams& u) {
 
 void applySlapbackKnob(int knob, float v, cv::SlapbackParams& s) {
   if (knob == 0) {
-    s.intensity = v;
+    s.mix = v;
   } else {
     s.tuning.timeMs = knobValue(kSlapbackTime, v);
   }
@@ -126,11 +126,11 @@ void applyDistortionKnob(int knob, float v, cv::DistortionParams& d) {
 
 void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
   if (knob == 0) {
-    r.intensity = v;
+    r.mix = v;
   } else {
     r.time = v;
   }
-  cv::applyIntensity(r);
+  cv::applyKnobs(r);
 }
 
 }  // namespace
@@ -210,7 +210,7 @@ void applyToggle(Card c, bool on, ChainParams& out) {
 }
 
 void applyPlacement(Card c, ChainParams& out) {
-  if (c == Card::ReverbSpring) out.reverb.engine = cv::kReverbSpringB;
+  if (c == Card::ReverbSpring) out.reverb.engine = cv::kReverbSpring;
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
 }
 

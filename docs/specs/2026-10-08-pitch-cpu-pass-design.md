@@ -106,9 +106,13 @@ is still ruled out by the hard-tune gate.
 
 1. Spread the analysis or make it fast: fast first; spread only if the burst still
    does not fit, and then re-pass the hard-tune gate.
-2. Off-state: skip the analysis, keep the input buffers warm; enable is instant.
+2. Off-state: skip the analysis, keep the input buffers warm.
    A full skip with 36 ms warm-up was the first proposal; the warm buffers cost
    under 1k per block and remove the warm-up.
+   An enable rebuilds the coarse panes two per block, newest first, so the frame is whole
+   within 8 blocks (11 ms) and no block carries a 16-pane burst (`pitch_test` enable spread).
+   Autotune fades in once the tracker reports a period, and the tracker keeps analysing until
+   a fade-out settles.
 3. Library math versus replacements: replacements, each with an error test.
    Keeping libm would spend 10 % of the chip for bit-exactness nothing downstream needs.
 4. Window method: rotation recurrence over a lookup table (cheaper, no flash table).

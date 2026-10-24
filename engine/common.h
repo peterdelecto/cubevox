@@ -27,11 +27,11 @@ inline float softClip(float x) {
 }
 
 // The same curve with headroom h: unity gain below the knee, which sits h times
-// higher. DWELL then saturates only near the top of its travel.
+// higher, so a reverb's input drive saturates only near the top of its range.
 inline float softClipHeadroom(float x, float h) { return h * softClip(x / h); }
 
-// Headroom for the CHASM and SPRING B input drive (drive 1.5), set so a 0 dBFS
-// voice at DWELL 0.2 enters the curve at about a third of its knee.
+// Headroom for the Chasm and Spring input drive, set so a 0 dBFS voice at the
+// default dwell of 0.2 (drive 1.5) enters the curve at about a third of its knee.
 constexpr float kChasmClipHeadroom = 4.5f;
 
 }  // namespace cv

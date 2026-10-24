@@ -132,7 +132,11 @@ He sings near-monotone and lets the box hold him on the note, artifacts included
    The knob reads like the V3 (owner 2026-10-02): NATURAL (500 ms) on the left to MECHANICAL
    (1 ms) on the right, log taper, `AutotuneVoice::responseMsAt` / `mechanicalOf`. No MIX knob;
    the footswitch turns it on or off.
-3. Default engine A. Engine B drops the share of frames a tracker reads as voiced from 33 %
-   to 20 % on Adam's dry loop, i.e. it roughens the voice; A keeps it at 33 %.
+3. Engine A, the grid PSOLA voice, is the only engine, and Autotune corrects to the key's
+   major scale only; there is no engine B and no chromatic mode.
 4. `autotune_test` hard-tune check: 5 Hz, +-30 cent vibrato on A3 at the defaults must come
    out within 4 cents RMS (3.8 now; 7.3 with the median pitch).
+5. KEY belongs to Autotune alone; Harmony is out of the firmware, the emulator and the render tool.
+6. The dry-to-corrected crossfade waits for the tracker's first period. The tracker keeps
+   analysing until a fade-out settles, and the voice resets on its enable edge only once the
+   crossfade sits at 0, so a quick off and on never cuts the voice (`autotune_test` toggle).

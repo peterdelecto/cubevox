@@ -2,7 +2,7 @@
 // against the ones the Mac emulator sets for the same position. Adam tuned in the emulator.
 //
 // The emulator's panel mappings live inline in emulator/main.cpp (ImGui code, not linkable), so each
-// one is transcribed below as a function with a file:line citation. The macro mappings
+// one is transcribed below with a citation of the function it comes from. The macro mappings
 // (emulator/macros.h) are header-only and are called directly. Any drift on either side fails the
 // test unless the case sits in kKnown, which keeps every open mismatch visible in the output.
 
@@ -44,7 +44,8 @@ struct Known {
 // Every entry must still mismatch; a stale entry fails the test. Empty: the firmware matches.
 constexpr std::array<Known, 0> kKnown{};
 
-// 1e-4 relative: the emulator's macro defaults reproduce the engine tuning only to about 3e-5 (macros.h:140).
+// 1e-4 relative: the emulator's macro defaults reproduce the engine tuning only to about 3e-5
+// (macros.h kDefaultPos).
 bool near(float a, float b) { return std::fabs(a - b) <= 1e-4f * std::fmax(std::fabs(a), std::fabs(b)) + 1e-6f; }
 
 void expectNear(const std::string& key, float pos, float fw, float em) {
@@ -57,22 +58,20 @@ void expectNear(const std::string& key, float pos, float fw, float em) {
 
 // ---- Emulator mapping, transcribed -------------------------------------------------
 
-// emulator/main.cpp:1650-1657 pedalRange; faces at :1471 (THRESHOLD, linear), :1472 (DECAY, log).
+// emulator/main.cpp pedalRange; the faces in drawGateBlock (THRESHOLD linear, DECAY log).
 float emuLinear(float lo, float hi, float p) { return lo + p * (hi - lo); }
 float emuLog(float lo, float hi, float p) { return lo * std::pow(hi / lo, p); }
 
-// emulator/main.cpp:1471 and :1717 / :1761 (-70..-10 dB), :1472 and :1718 / :1762 (5..1000 ms log).
+// emulator/main.cpp drawGateBlock and drawPedals: -70..-10 dB, 5..1000 ms log.
 constexpr float kEmuThresholdLoDb = -70.0f, kEmuThresholdHiDb = -10.0f;
 constexpr float kEmuDecayLoMs = 5.0f, kEmuDecayHiMs = 1000.0f;
-// emulator/main.cpp:1495 and :1752 (60..250 ms linear).
+// emulator/main.cpp drawSlapbackBlock and drawPedals: 60..250 ms linear.
 constexpr float kEmuSlapLoMs = 60.0f, kEmuSlapHiMs = 250.0f;
-// emulator/main.cpp:1728 (KEY 0..11), :1737 (SEMITONES -12..12).
+// emulator/main.cpp drawPedals: KEY 0..11, SEMITONES -12..12.
 constexpr int kEmuKeys = 12, kEmuSemiLo = -12, kEmuSemiHi = 12;
 
-// emulator/main.cpp:1741-1747 (RATE knob) -> macros::unison(tuning, blend, rate).
-void emuUnisonRate(float p, cv::UnisonTuning& t) {
-  mc::unison(t, mc::kDefaultPos[mc::UnisonBlend], 100.0f * p);
-}
+// emulator/main.cpp drawPedals (RATE knob) -> macros::unison(tuning, rate).
+void emuUnisonRate(float p, cv::UnisonTuning& t) { mc::unison(t, 100.0f * p); }
 
 // ---- Field comparison helpers ------------------------------------------------------
 
@@ -86,13 +85,10 @@ void cmpUnison(const std::string& p, float pos, const cv::UnisonParams& f, const
   CMP(p, pos, f.tuning, e.tuning, lfoHz[1]);
   CMP(p, pos, f.tuning, e.tuning, swingMinMs);
   CMP(p, pos, f.tuning, e.tuning, swingMaxMs);
-  CMP(p, pos, f.tuning, e.tuning, detuneCents[0]);
-  CMP(p, pos, f.tuning, e.tuning, detuneCents[1]);
   if (!rest) return;
   CMP(p, pos, f.tuning, e.tuning, baseDelayMs[0]);
   CMP(p, pos, f.tuning, e.tuning, baseDelayMs[1]);
   CMP(p, pos, f.tuning, e.tuning, wetMaxDb);
-  CMP(p, pos, f.tuning, e.tuning, windowMs);
   CMP(p, pos, f.tuning, e.tuning, trimDb);
 }
 
@@ -110,11 +106,9 @@ void cmpGate(const std::string& p, float pos, const cv::GateParams& f, const cv:
 
 void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, const cv::AutotuneParams& e,
                  bool rest) {
-  CMP(p, pos, f, e, chromatic);
   CMP(p, pos, f, e, key);
   CMP(p, pos, f, e, responseMs);
   if (!rest) return;
-  CMP(p, pos, f, e, engine);
   CMP(p, pos, f.tuning, e.tuning, trimDb);
   CMP(p, pos, f.tuning, e.tuning, maxCorrectSemis);
   CMP(p, pos, f.tuning, e.tuning, grainDelay);
@@ -124,19 +118,16 @@ void cmpOctave(const std::string& p, float pos, const cv::OctaveParams& f, const
   CMP(p, pos, f, e, semitones);
   CMP(p, pos, f, e, mix);
   if (!rest) return;
-  CMP(p, pos, f, e, engine);
-  CMP(p, pos, f, e, formant);
   CMP(p, pos, f.tuning, e.tuning, levelDb);
   CMP(p, pos, f.tuning, e.tuning, glideMs);
-  CMP(p, pos, f.tuning, e.tuning, muteUnvoiced);
-  CMP(p, pos, f.tuning, e.tuning, trimDbA);
-  CMP(p, pos, f.tuning, e.tuning, trimDbB);
-  CMP(p, pos, f.tuning, e.tuning, trimDbC);
+  CMP(p, pos, f.tuning, e.tuning, grainWindowMs);
+  CMP(p, pos, f.tuning, e.tuning, grainCount);
+  CMP(p, pos, f.tuning, e.tuning, trimDb);
 }
 
 void cmpSlapback(const std::string& p, float pos, const cv::SlapbackParams& f, const cv::SlapbackParams& e,
                  bool rest) {
-  CMP(p, pos, f, e, intensity);
+  CMP(p, pos, f, e, mix);
   CMP(p, pos, f.tuning, e.tuning, timeMs);
   if (!rest) return;
   CMP(p, pos, f.tuning, e.tuning, lowpassHz);
@@ -178,21 +169,9 @@ void cmpDistortion(const std::string& p, float pos, const cv::DistortionParams& 
   CMP(p, pos, a, b, bassPeakQ);
   CMP(p, pos, a, b, trimDb);
   CMP(p, pos, a, b, fadeDrive);
-  CMP(p, pos, a, b, oversample);
 }
 
-void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
-  CMP(p, pos, f, e, engine);
-  CMP(p, pos, f, e, mix);
-  CMP(p, pos, f, e, intensity);
-  CMP(p, pos, f, e, time);
-  CMP(p, pos, f.chasm, e.chasm, decay);
-  CMP(p, pos, f.springB, e.springB, decay);
-  if (!rest) return;
-  CMP(p, pos, f.chasm, e.chasm, wobble);
-  CMP(p, pos, f.chasm, e.chasm, dwell);
-  const cv::ChasmTuning& ca = f.chasm.tuning;
-  const cv::ChasmTuning& cb = e.chasm.tuning;
+void cmpChasmTuning(const std::string& p, float pos, const cv::ChasmTuning& ca, const cv::ChasmTuning& cb) {
   CMP(p + ".chasm", pos, ca, cb, timeLo);
   CMP(p + ".chasm", pos, ca, cb, timeHi);
   CMP(p + ".chasm", pos, ca, cb, trebleLossHz);
@@ -208,30 +187,45 @@ void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const
   CMP(p + ".chasm", pos, ca, cb, dwellDrive);
   CMP(p + ".chasm", pos, ca, cb, dwellComp);
   CMP(p + ".chasm", pos, ca, cb, wetDb);
-  CMP(p, pos, f.springB, e.springB, dwell);
-  const cv::SpringBTuning& sa = f.springB.tuning;
-  const cv::SpringBTuning& sb = e.springB.tuning;
-  CMP(p + ".springB", pos, sa, sb, halfMs1);
-  CMP(p + ".springB", pos, sa, sb, halfMs2);
-  CMP(p + ".springB", pos, sa, sb, timeLo);
-  CMP(p + ".springB", pos, sa, sb, timeHi);
-  CMP(p + ".springB", pos, sa, sb, diffuse);
-  CMP(p + ".springB", pos, sa, sb, chirpSections);
-  CMP(p + ".springB", pos, sa, sb, chirpA);
-  CMP(p + ".springB", pos, sa, sb, trebleLossHz);
-  CMP(p + ".springB", pos, sa, sb, bassCutHz);
-  CMP(p + ".springB", pos, sa, sb, wobbleDepth);
-  CMP(p + ".springB", pos, sa, sb, wobbleRateHz);
-  CMP(p + ".springB", pos, sa, sb, inputTrim);
-  CMP(p + ".springB", pos, sa, sb, dwellDrive);
-  CMP(p + ".springB", pos, sa, sb, dwellComp);
-  CMP(p + ".springB", pos, sa, sb, wetDb);
+}
+
+void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& sa, const cv::SpringTuning& sb) {
+  CMP(p + ".spring", pos, sa, sb, halfMs1);
+  CMP(p + ".spring", pos, sa, sb, halfMs2);
+  CMP(p + ".spring", pos, sa, sb, timeLo);
+  CMP(p + ".spring", pos, sa, sb, timeHi);
+  CMP(p + ".spring", pos, sa, sb, diffuse);
+  CMP(p + ".spring", pos, sa, sb, chirpSections);
+  CMP(p + ".spring", pos, sa, sb, chirpA);
+  CMP(p + ".spring", pos, sa, sb, trebleLossHz);
+  CMP(p + ".spring", pos, sa, sb, bassCutHz);
+  CMP(p + ".spring", pos, sa, sb, wobbleDepth);
+  CMP(p + ".spring", pos, sa, sb, wobbleRateHz);
+  CMP(p + ".spring", pos, sa, sb, inputTrim);
+  CMP(p + ".spring", pos, sa, sb, dwellDrive);
+  CMP(p + ".spring", pos, sa, sb, dwellComp);
+  CMP(p + ".spring", pos, sa, sb, wetDb);
+}
+
+void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
+  CMP(p, pos, f, e, engine);
+  CMP(p, pos, f, e, wet);
+  CMP(p, pos, f, e, mix);
+  CMP(p, pos, f, e, time);
+  CMP(p, pos, f.chasm, e.chasm, decay);
+  CMP(p, pos, f.spring, e.spring, decay);
+  if (!rest) return;
+  CMP(p, pos, f.chasm, e.chasm, wobble);
+  CMP(p, pos, f.chasm, e.chasm, dwell);
+  CMP(p, pos, f.spring, e.spring, dwell);
+  cmpChasmTuning(p, pos, f.chasm.tuning, e.chasm.tuning);
+  cmpSpringTuning(p, pos, f.spring.tuning, e.spring.tuning);
 }
 
 // ---- Emulator state as the app starts ------------------------------------------------
 
-// emulator/main.cpp:63-140 (ProtoParams constructor, start constants), :1122-1138 applyMacros,
-// :1797-1818 drawFrame overrides. Engine structs keep their engine defaults where main.cpp does.
+// emulator/main.cpp: the start constants and the ProtoParams constructor, applyMacros, and the
+// drawFrame overrides. Engine structs keep their engine defaults where main.cpp does.
 struct EmuState {
   cv::GateParams inputGate;
   cv::GateParams gate;
@@ -243,43 +237,43 @@ struct EmuState {
 };
 
 EmuState emuStart() {
-  constexpr float kStartDepth = 0.5f;       // main.cpp:63
-  constexpr int kStartKey = 11;             // main.cpp:65
-  constexpr float kStartIntensity = 0.25f;  // main.cpp:66
-  constexpr float kStartDrive = 0.65f;      // main.cpp:67
-  constexpr float kStartTone = 1.0f;        // main.cpp:68
+  constexpr float kStartDepth = 0.5f;     // kStartDepth
+  constexpr int kStartKey = 11;           // kStartKey
+  constexpr float kStartSlapMix = 0.25f;  // kStartSlapMix
+  constexpr float kStartDrive = 0.65f;    // kStartDrive
+  constexpr float kStartTone = 1.0f;      // kStartTone
   EmuState s;
-  s.unison = cv::UnisonParams{false, kStartDepth, {}};                  // main.cpp:108
-  s.slapback = cv::SlapbackParams{true, kStartIntensity, {}};           // main.cpp:109
-  s.distortion = cv::DistortionParams{true, kStartDrive, kStartTone, {}};  // main.cpp:110
-  // main.cpp:75-81 applyInputGateDefaults, :124 construction
+  s.unison = cv::UnisonParams{false, kStartDepth, {}};                     // ProtoParams members
+  s.slapback = cv::SlapbackParams{true, kStartSlapMix, {}};
+  s.distortion = cv::DistortionParams{true, kStartDrive, kStartTone, {}};
+  // applyInputGateDefaults, called by the ProtoParams constructor
   s.inputGate.on = true;
   s.inputGate.thresholdDb = -12.0f;
   s.inputGate.tuning = cv::GateTuning{};
   s.inputGate.tuning.rangeDb = -12.0f;
   s.inputGate.tuning.holdMs = 100.0f;
   s.inputGate.tuning.releaseMs = 10.0f;
-  s.gate.on = false;                // main.cpp:126
-  s.pitchFx.octave.engine = 2;      // main.cpp:137
-  s.pitchFx.octave.mix = 0.10f;     // main.cpp:138
-  s.pitchFx.autotune.key = kStartKey;  // main.cpp:135
-  s.reverb.engine = cv::kReverbSpringB;  // main.cpp:139
-  s.reverb.intensity = 1.0f;        // main.cpp:140
-  s.reverb.time = 1.0f;             // main.cpp:141
-  // applyMacros at the default positions, main.cpp:1122-1138
+  // The rest of the ProtoParams constructor
+  s.gate.on = false;
+  s.pitchFx.octave.mix = 0.10f;
+  s.pitchFx.autotune.key = kStartKey;
+  s.reverb.engine = cv::kReverbSpring;
+  s.reverb.mix = 1.0f;
+  s.reverb.time = 1.0f;
+  // applyMacros at the default positions
   const auto& m = mc::kDefaultPos;
   mc::octaveSlide(s.pitchFx.octave.tuning, m[mc::OctaveSlide]);
-  mc::unison(s.unison.tuning, m[mc::UnisonBlend], m[mc::UnisonMotion]);
+  mc::unison(s.unison.tuning, m[mc::UnisonMotion]);
   mc::distBody(s.distortion.tuning, m[mc::DistBody]);
   mc::distBite(s.distortion.tuning, m[mc::DistBite]);
   mc::distGrit(s.distortion.tuning, m[mc::DistGrit]);
   mc::chasmWobble(s.reverb.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(s.reverb.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(s.reverb.chasm.tuning, m[mc::ChasmBass]);
-  mc::springBDrip(s.reverb.springB.tuning, m[mc::SpringBDrip]);
-  mc::springBFlutter(s.reverb.springB.tuning, m[mc::SpringBFlutter]);
-  mc::springBBrightness(s.reverb.springB.tuning, m[mc::SpringBBrightness]);
-  cv::applyIntensity(s.reverb);  // main.cpp:1818
+  mc::springDrip(s.reverb.spring.tuning, m[mc::SpringDrip]);
+  mc::springFlutter(s.reverb.spring.tuning, m[mc::SpringFlutter]);
+  mc::springBrightness(s.reverb.spring.tuning, m[mc::SpringBrightness]);
+  cv::applyKnobs(s.reverb);  // drawFrame
   return s;
 }
 
@@ -303,12 +297,12 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Octave, 1, em.pitchFx.octave.mix, fw);
   applyKnob(Card::Unison, 0, em.unison.depth, fw);
   applyKnob(Card::Unison, 1, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
-  applyKnob(Card::Slapback, 0, em.slapback.intensity, fw);
+  applyKnob(Card::Slapback, 0, em.slapback.mix, fw);
   applyKnob(Card::Slapback, 1, posLinear(kEmuSlapLoMs, kEmuSlapHiMs, em.slapback.tuning.timeMs), fw);
   applyKnob(Card::Distortion, 0, em.distortion.drive, fw);
   applyKnob(Card::Distortion, 1, em.distortion.tone, fw);
   applyPlacement(Card::ReverbSpring, fw);
-  applyKnob(Card::ReverbSpring, 0, em.reverb.intensity, fw);
+  applyKnob(Card::ReverbSpring, 0, em.reverb.mix, fw);
   applyKnob(Card::ReverbSpring, 1, em.reverb.time, fw);
   return fw;
 }
@@ -341,8 +335,7 @@ void sweepAutotune() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Autotune, 0, static_cast<float>(k), fw);
-    em.pitchFx.autotune.key = k;
-    em.pitchFx.autotune.chromatic = false;  // main.cpp:1729
+    em.pitchFx.autotune.key = k;  // drawPedals KEY encoder
     cmpAutotune("sweep.autotune.key", static_cast<float>(k), fw.pitchFx.autotune, em.pitchFx.autotune, false);
   }
   for (int i = 0; i <= kSweepSteps; ++i) {
@@ -350,7 +343,7 @@ void sweepAutotune() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Autotune, 1, p, fw);
-    em.pitchFx.autotune.responseMs = cv::AutotuneVoice::responseMsAt(p);  // main.cpp:1727
+    em.pitchFx.autotune.responseMs = cv::AutotuneVoice::responseMsAt(p);  // drawPedals RESPONSE
     cmpAutotune("sweep.autotune.response", p, fw.pitchFx.autotune, em.pitchFx.autotune, false);
   }
 }
@@ -360,7 +353,7 @@ void sweepOctave() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Octave, 0, static_cast<float>(pos), fw);
-    em.pitchFx.octave.semitones = kEmuSemiLo + pos;  // main.cpp:1737
+    em.pitchFx.octave.semitones = kEmuSemiLo + pos;  // drawPedals SEMITONES
     cmpOctave("sweep.octave.semitones", static_cast<float>(pos), fw.pitchFx.octave, em.pitchFx.octave, false);
   }
   for (int i = 0; i <= kSweepSteps; ++i) {
@@ -368,7 +361,7 @@ void sweepOctave() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Octave, 1, p, fw);
-    em.pitchFx.octave.mix = p;  // main.cpp:1736 pedalPercent
+    em.pitchFx.octave.mix = p;  // drawPedals MIX, pedalPercent
     cmpOctave("sweep.octave.mix", p, fw.pitchFx.octave, em.pitchFx.octave, false);
   }
 }
@@ -379,7 +372,7 @@ void sweepUnison() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Unison, 0, p, fw);
-    em.unison.depth = p;  // main.cpp:1741
+    em.unison.depth = p;  // drawPedals DEPTH
     cmpUnison("sweep.unison.depth", p, fw.unison, em.unison, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
@@ -395,12 +388,12 @@ void sweepSlapback() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Slapback, 0, p, fw);
-    em.slapback.intensity = p;  // main.cpp:1751
+    em.slapback.mix = p;  // drawPedals MIX
     cmpSlapback("sweep.slapback.mix", p, fw.slapback, em.slapback, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
     applyKnob(Card::Slapback, 1, p, fw2);
-    em2.slapback.tuning.timeMs = emuLinear(kEmuSlapLoMs, kEmuSlapHiMs, p);  // main.cpp:1752
+    em2.slapback.tuning.timeMs = emuLinear(kEmuSlapLoMs, kEmuSlapHiMs, p);  // drawPedals TIME
     cmpSlapback("sweep.slapback.time", p, fw2.slapback, em2.slapback, false);
   }
 }
@@ -411,12 +404,12 @@ void sweepDistortion() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Distortion, 0, p, fw);
-    em.distortion.drive = p;  // main.cpp:1756
+    em.distortion.drive = p;  // drawPedals DRIVE
     cmpDistortion("sweep.distortion.drive", p, fw.distortion, em.distortion, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
     applyKnob(Card::Distortion, 1, p, fw2);
-    em2.distortion.tone = p;  // main.cpp:1757
+    em2.distortion.tone = p;  // drawPedals TONE
     cmpDistortion("sweep.distortion.tone", p, fw2.distortion, em2.distortion, false);
   }
 }
@@ -430,8 +423,8 @@ void sweepReverb(Card card, const char* name, int engine) {
       applyPlacement(card, fw);
       applyKnob(card, knob, p, fw);
       em.reverb.engine = engine;
-      (knob == 0 ? em.reverb.intensity : em.reverb.time) = p;  // main.cpp:1767-1768
-      cv::applyIntensity(em.reverb);                           // main.cpp:1818
+      (knob == 0 ? em.reverb.mix : em.reverb.time) = p;  // drawPedals MIX and TIME
+      cv::applyKnobs(em.reverb);                         // drawFrame
       cmpReverb(std::string("sweep.") + name + (knob == 0 ? ".mix" : ".time"), p, fw.reverb, em.reverb, false);
     }
   }
@@ -491,7 +484,7 @@ int main() {
   sweepUnison();
   sweepSlapback();
   sweepDistortion();
-  sweepReverb(Card::ReverbSpring, "reverbSpring", cv::kReverbSpringB);
+  sweepReverb(Card::ReverbSpring, "reverbSpring", cv::kReverbSpring);
   sweepReverb(Card::ReverbChasm, "reverbChasm", cv::kReverbChasm);
   defaults();
   report();

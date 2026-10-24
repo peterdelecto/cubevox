@@ -107,10 +107,10 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Autotune: return p.pitchFx.autotune.responseMs;
     case Card::Octave: return p.pitchFx.octave.mix;
     case Card::Unison: return knob == 0 ? p.unison.depth : p.unison.tuning.lfoHz[0];
-    case Card::Slapback: return knob == 0 ? p.slapback.intensity : p.slapback.tuning.timeMs;
+    case Card::Slapback: return knob == 0 ? p.slapback.mix : p.slapback.tuning.timeMs;
     case Card::Distortion: return knob == 0 ? p.distortion.drive : p.distortion.tone;
     case Card::ReverbSpring:
-    case Card::ReverbChasm: return knob == 0 ? p.reverb.intensity : p.reverb.time;
+    case Card::ReverbChasm: return knob == 0 ? p.reverb.mix : p.reverb.time;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -226,12 +226,12 @@ void checkChainDefaults() {
             std::fabs(p.inputGate.tuning.holdMs - 100.0f) < 1e-6f &&
             std::fabs(p.inputGate.tuning.releaseMs - 10.0f) < 1e-6f,
         "defaults: input gate on with the live-vocal settings");
-  check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.harmony.on && !p.pitchFx.octave.on && !p.unison.on &&
+  check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
             !p.slapback.on && !p.distortion.on && !p.reverb.on,
         "defaults: every other stage off");
-  check(p.pitchFx.octave.engine == 2 && std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
-        "defaults: octave engine C at 10 % mix");
-  check(p.reverb.engine == cv::kReverbSpringB && p.eq.on, "defaults: spring B reverb engine and the EQ on");
+  check(std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
+        "defaults: octave at 10 % mix");
+  check(p.reverb.engine == cv::kReverbSpring && p.eq.on, "defaults: spring reverb engine and the EQ on");
 }
 
 void checkUnisonRate() {
@@ -248,7 +248,6 @@ void checkUnisonRate() {
   unisonrate::apply(t, 50.0f);
   check(std::fabs(t.lfoHz[0] - 0.60f) < 1e-5f && std::fabs(t.lfoHz[1] - 0.90f) < 1e-5f, "unison rate: LFO speeds at 50 %");
   check(std::fabs(t.swingMinMs - 1.0f) < 1e-5f && std::fabs(t.swingMaxMs - 6.0f) < 1e-5f, "unison rate: swing at 50 %");
-  check(t.detuneCents[0] == 0.0f && t.detuneCents[1] == 0.0f && !std::signbit(t.detuneCents[1]), "unison rate: no detune");
   unisonrate::apply(t, 100.0f);
   check(std::fabs(t.lfoHz[0] - 4.2f) < 1e-4f && std::fabs(t.swingMaxMs - 6.0f * 2.0f / 7.0f) < 1e-4f,
         "unison rate: fast rates keep the swing from growing");
@@ -266,7 +265,6 @@ void checkToggles() {
   applyToggle(Card::Autotune, true, p);
   applyToggle(Card::Octave, false, p);
   check(p.pitchFx.autotune.on && !p.pitchFx.octave.on, "pitch toggles are independent");
-  check(!p.pitchFx.harmony.on, "harmony stays off");
 }
 
 void checkPlacement() {
@@ -274,9 +272,9 @@ void checkPlacement() {
   applyPlacement(Card::ReverbChasm, p);
   check(p.reverb.engine == cv::kReverbChasm, "chasm card selects chasm engine");
   applyPlacement(Card::ReverbSpring, p);
-  check(p.reverb.engine == cv::kReverbSpringB, "spring card selects spring B engine");
+  check(p.reverb.engine == cv::kReverbSpring, "spring card selects spring engine");
   applyPlacement(Card::Unison, p);
-  check(p.reverb.engine == cv::kReverbSpringB, "non-reverb card leaves the engine alone");
+  check(p.reverb.engine == cv::kReverbSpring, "non-reverb card leaves the engine alone");
 }
 
 void checkFormat() {

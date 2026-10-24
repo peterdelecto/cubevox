@@ -50,6 +50,13 @@ Slapback correction 2026-10-07: the slapback row was a coin flip on TIME (the to
 or cancels with its own echo). The row now averages over TIME 60..250 ms; wetMaxDb stays
 +4.9 dB and SlapbackTuning.trimDb = -4.9 dB x INTENSITY lands the mean at +0.25 dB.
 
+The reverb rows take every setting from the registry: the card placed and switched on, TIME
+and dwell where the box leaves them (TIME 50 %, dwell 0.20), and the crossfade forced to the
+wet alone. There ChasmTuning.wetDb = +19.2 dB reads +0.28 dB and SpringTuning.wetDb = +8.9 dB
+reads +0.22 dB. MIX 50 % rows for Octave -12 and both reverb cards report against the
+-1.5..+1.0 dB band (+0.17, +0.35 and -0.12 dB). Harmony and Octave A and B are out of the
+code, so their rows are gone.
+
 ## Notes
 
 1. Wet-only at MIX 1, out/in near unity means wet RMS near dry RMS. Equal power then

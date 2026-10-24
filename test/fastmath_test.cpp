@@ -1,5 +1,6 @@
-// Error bounds for engine/fastmath.h: exp2Fast against the double exp2, and the
-// Hann rotor against the cosine over the longest grain either voice runs.
+// Error bounds for engine/fastmath.h against the double libm: exp2Fast, the dB
+// conversions, sinTurns, tanhFast, and the Hann rotor over the longest grain
+// either voice runs.
 
 #include <cmath>
 #include <cstdio>
@@ -106,6 +107,38 @@ bool testTanhFast() {
                 (sat && odd) ? 1.0 : 0.0);
 }
 
+// 6. dbFast against 20 log10 from the gate's detector floor (1e-9) to +12 dBFS, log-spaced.
+bool testDbFast() {
+  double worst = 0.0;
+  double at = 0.0;
+  for (double e = -9.0; e <= 0.6; e += 1e-5) {
+    const float x = static_cast<float>(std::pow(10.0, e));
+    const double want = 20.0 * std::log10(static_cast<double>(x));
+    const double err = std::fabs(static_cast<double>(cv::dbFast(x)) - want);
+    if (err > worst) {
+      worst = err;
+      at = want;
+    }
+  }
+  return report("dbFast", worst < 2e-4, "worst error=%.3g dB at %.2f dB (< 2e-4)", worst, at);
+}
+
+// 7. dbToGainFast against 10^(dB / 20) over -140..+24 dB, relative.
+bool testDbToGainFast() {
+  double worst = 0.0;
+  double at = 0.0;
+  for (double db = -140.0; db <= 24.0; db += 1e-3) {
+    const float d = static_cast<float>(db);
+    const double want = std::pow(10.0, static_cast<double>(d) / 20.0);
+    const double rel = std::fabs(static_cast<double>(cv::dbToGainFast(d)) - want) / want;
+    if (rel > worst) {
+      worst = rel;
+      at = db;
+    }
+  }
+  return report("dbToGainFast", worst <= 1e-6, "worst relative error=%.3g at %.2f dB (<= 1e-6)", worst, at);
+}
+
 }  // namespace
 
 int main() {
@@ -115,6 +148,8 @@ int main() {
   ok &= testRotorBlock();
   ok &= testSinTurns();
   ok &= testTanhFast();
+  ok &= testDbFast();
+  ok &= testDbToGainFast();
   std::printf("%s fastmath\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

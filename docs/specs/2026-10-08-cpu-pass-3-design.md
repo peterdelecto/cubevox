@@ -29,6 +29,10 @@ The heaviest layout the app allows is the default with Chasm in the reverb slot 
 reverb per layout, each card once). Benched 2026-10-09: 384.6k cycles avg (60.1 %),
 446.9k cycles worst (69.8 %), late 0 over three runs. `costs.h` sums: 67 % / 78 %.
 
+`kFixed` now carries the whole chain tail, 6 % / 6 %: POLISH EQ and the conversion measured,
+POLISH COMP, the soft ceiling and the BYPASS mix estimated. With it the default layout sums
+64 % / 75 % and the Chasm layout 70 % / 81 %, against 75 / 95.
+
 ## Findings behind the pass
 
 1. Regression. d0f45b2 (pass 2 step D3) replaced `engine/distortion.h` with a copy that

@@ -1,4 +1,4 @@
-// SPRING B checks: echo spacing, upward sweep, sweep growth per lap, level
+// Spring reverb checks: echo spacing, upward sweep, sweep growth per lap, level
 // across DECAY, stability, Reverb passthrough and no-alloc. No window, no audio device.
 
 #include <atomic>
@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "engine/reverb.h"
-#include "engine/spring_b.h"
+#include "engine/spring.h"
 
 namespace {
 
@@ -58,8 +58,8 @@ bool report(const char* name, bool pass, const char* fmt, ...) {
 }
 
 // Plain loop: no diffusion, no wobble, filters wide open, no drive.
-cv::SpringBParams plain() {
-  cv::SpringBParams p;
+cv::SpringParams plain() {
+  cv::SpringParams p;
   p.dwell = 0.0f;
   p.tuning.diffuse = 0.0f;
   p.tuning.wobbleDepth = 0.0f;
@@ -68,8 +68,8 @@ cv::SpringBParams plain() {
   return p;
 }
 
-Signal run(const Signal& in, const cv::SpringBParams& p) {
-  auto sb = std::make_unique<cv::SpringB>();
+Signal run(const Signal& in, const cv::SpringParams& p) {
+  auto sb = std::make_unique<cv::Spring>();
   Signal out(in.size());
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock)
     sb->process(&in[i], &out[i], cv::kBlock, p);
@@ -114,7 +114,7 @@ double groupDelay(const Signal& x, size_t from, size_t to, double hz) {
 
 // 1. With no diffusion or sweep, the first two echoes land at halfMs1 and halfMs2.
 bool echoSpacing() {
-  cv::SpringBParams p = plain();
+  cv::SpringParams p = plain();
   p.tuning.chirpSections = 0;
   const Signal y = run(impulse(4800), p);
   const auto peakIn = [&](double fromMs, double toMs) {
@@ -132,7 +132,7 @@ bool echoSpacing() {
 // 2. Echo 1 sweeps up: 3.8 kHz arrives after 300 Hz. Echo 2 has passed the
 // disperser twice, so its lag is about twice echo 1's.
 bool sweepGrows() {
-  cv::SpringBParams p = plain();
+  cv::SpringParams p = plain();
   p.tuning.halfMs1 = p.tuning.halfMs2 = 80.0f;
   p.decay = 1.0f;
   const Signal y = run(impulse(static_cast<int>(240 * kMs)), p);
@@ -149,7 +149,7 @@ bool sweepGrows() {
 // 3. The input scales by sqrt(1 - g^2), so the tail's level holds as DECAY moves.
 bool levelAcrossDecay() {
   const Signal x = noise(4 * cv::kSampleRate, 0.25f);
-  cv::SpringBParams lo, hi;
+  cv::SpringParams lo, hi;
   lo.decay = 0.0f;
   hi.decay = 1.0f;
   const size_t from = static_cast<size_t>(2 * cv::kSampleRate);
@@ -158,12 +158,12 @@ bool levelAcrossDecay() {
   return report("level vs DECAY", std::fabs(db) < 3.0, "DECAY 1 vs 0: %+.2f dB (want within 3)", db);
 }
 
-// 4. Full DECAY and DWELL on loud noise stays finite and dies after the input stops.
+// 4. Full DECAY and dwell on loud noise stays finite and dies after the input stops.
 bool stable() {
   const int on = 10 * cv::kSampleRate;
   Signal x = noise(on + 20 * cv::kSampleRate, 1.0f);
   for (size_t i = static_cast<size_t>(on); i < x.size(); ++i) x[i] = 0.0f;
-  cv::SpringBParams p;
+  cv::SpringParams p;
   p.decay = 1.0f;
   p.dwell = 1.0f;
   const Signal y = run(x, p);
@@ -178,12 +178,12 @@ bool stable() {
   return report("stability", ok, "peak %.2f, tail RMS %.2g 20 s after input stops", static_cast<double>(peak), tail);
 }
 
-// 5. Reverb engine SPRING B: on=false is a bit-exact copy; process() never allocates.
+// 5. Reverb engine Spring: on=false is a bit-exact copy; process() never allocates.
 bool reverbBlock() {
   auto rv = std::make_unique<cv::Reverb>();
   cv::ReverbParams p;
-  p.engine = cv::kReverbSpringB;
-  p.mix = 1.0f;
+  p.engine = cv::kReverbSpring;
+  p.wet = 1.0f;
   const Signal x = noise(cv::kSampleRate, 0.5f);
   Signal y(x.size());
   gInProcess = true;
@@ -208,7 +208,7 @@ int main() {
   ok &= levelAcrossDecay();
   ok &= stable();
   ok &= reverbBlock();
-  std::printf("sizeof(cv::SpringB) = %zu bytes\n", sizeof(cv::SpringB));
-  std::printf("%s spring_b\n", ok ? "PASS" : "FAIL");
+  std::printf("sizeof(cv::Spring) = %zu bytes\n", sizeof(cv::Spring));
+  std::printf("%s spring\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }
