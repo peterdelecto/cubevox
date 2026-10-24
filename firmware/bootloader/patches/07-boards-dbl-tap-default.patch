@@ -1,0 +1,18 @@
+Why: the port forces double-tap on, and the sealed cubevox box has no reset button, so a board must be able to turn it off without a redefinition error.
+
+diff --git a/ports/stm32h7/boards.h b/ports/stm32h7/boards.h
+index 2f3eb14..240aaaf 100644
+--- a/ports/stm32h7/boards.h
++++ b/ports/stm32h7/boards.h
+@@ -84,8 +84,10 @@
+ 
+ #define SET_BOOT_ADDR(x) board_save_app_start_address(x)
+ 
+-// Double Reset tap to enter DFU
++// Double Reset tap to enter DFU, unless the board turns it off
++#ifndef TINYUF2_DBL_TAP_DFU
+ #define TINYUF2_DBL_TAP_DFU  1
++#endif
+ 
+ void board_flash_early_init(void);
+ uint32_t board_get_app_start_address(void);

@@ -1,0 +1,42 @@
+Why: upstream counts a block the flash refused toward completion and resets, so a wrong file reboots the box; a board filter refuses it visibly and keeps the box in update mode.
+
+diff --git a/src/board_api.h b/src/board_api.h
+index 166540c..e55d8db 100644
+--- a/src/board_api.h
++++ b/src/board_api.h
+@@ -123,6 +123,8 @@
+ 
+ // Define TINYUF2_BOARD_INFO_UF2 to serve the board's own INFO_UF2.TXT from board_uf2_info()
+ 
++// Define TINYUF2_BOARD_BLOCK_FILTER to pass every UF2 block through board_uf2_block_accept() first
++
+ //--------------------------------------------------------------------+
+ // Constant
+ //--------------------------------------------------------------------+
+@@ -241,6 +243,10 @@ void board_flash_read (uint32_t addr, void* buffer, uint32_t len);
+ // Write to flash, len is uf2's payload size (often 256 bytes)
+ bool board_flash_write(uint32_t addr, void const* data, uint32_t len);
+ 
++// Of a board that defines TINYUF2_BOARD_BLOCK_FILTER: false refuses a UF2 block before the family
++// check. A refused block is not written and does not count toward the end of the transfer
++bool board_uf2_block_accept(uint32_t family_id, uint32_t addr, uint32_t len);
++
+ // Flush/Sync flash contents
+ void board_flash_flush(void);
+ 
+diff --git a/src/ghostfat.c b/src/ghostfat.c
+index 03a5777..445e4da 100644
+--- a/src/ghostfat.c
++++ b/src/ghostfat.c
+@@ -530,6 +530,11 @@ int uf2_write_block (uint32_t block_no, uint8_t *data, WriteState *state) {
+ 
+   if ( !is_uf2_block(bl) ) return -1;
+ 
++#ifdef TINYUF2_BOARD_BLOCK_FILTER
++  // a refused block is neither written nor counted toward the end of the transfer
++  if ( !board_uf2_block_accept(bl->familyID, bl->targetAddr, bl->payloadSize) ) return -1;
++#endif
++
+   if (bl->familyID == BOARD_UF2_FAMILY_ID) {
+     // generic family ID
+     board_flash_write(bl->targetAddr, bl->data, bl->payloadSize);

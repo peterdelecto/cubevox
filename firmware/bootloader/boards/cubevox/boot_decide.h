@@ -1,6 +1,6 @@
 // The bootloader's policy as pure C: run the application or stay in update mode. No HAL, no I/O.
 // Board code reads the MENU switch, checks the image, calls these functions and acts on the
-// result. The host tests (test/firmware_test.cpp) compile boot_decide.c unchanged.
+// result. The host tests (test/firmware/boot_decide.cpp) compile boot_decide.c unchanged.
 //
 // Row numbers refer to the Boot sequence table of docs/specs/2026-10-24-field-update-design.md.
 

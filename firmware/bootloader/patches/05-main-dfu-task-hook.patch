@@ -1,0 +1,30 @@
+Why: the DFU loop has no board hook, and cubevox must poll its update-mode timeout and redraw its OLED from it.
+
+diff --git a/src/board_api.h b/src/board_api.h
+index e55d8db..a71728a 100644
+--- a/src/board_api.h
++++ b/src/board_api.h
+@@ -172,6 +172,9 @@ void board_teardown(void) __attribute__ ((weak));
+ // board_teardown2() is called immediately after board_init()
+ void board_teardown2(void) __attribute__ ((weak));
+ 
++// Called on every pass of the DFU loop, for board work such as a display or a timeout
++void board_dfu_task(void) __attribute__ ((weak));
++
+ // Reset board, no return
+ void board_reset(void);
+ 
+diff --git a/src/main.c b/src/main.c
+index 212d403..b9df614 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -104,6 +104,9 @@ int main(void) {
+ #if CFG_TUSB_OS == OPT_OS_NONE || CFG_TUSB_OS == OPT_OS_PICO
+   while (1) {
+     tud_task();
++    if (board_dfu_task) {
++      board_dfu_task();
++    }
+   }
+ #endif
+ }

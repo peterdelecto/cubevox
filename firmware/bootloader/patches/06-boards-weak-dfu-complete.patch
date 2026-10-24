@@ -1,0 +1,16 @@
+Why: cubevox must zero its boot-fail counter and clear the update reason after the last block, before the port resets.
+
+diff --git a/ports/stm32h7/boards.c b/ports/stm32h7/boards.c
+index bc2cf9b..edd6299 100644
+--- a/ports/stm32h7/boards.c
++++ b/ports/stm32h7/boards.c
+@@ -141,7 +141,8 @@ void board_reset(void)
+   NVIC_SystemReset();
+ }
+ 
+-void board_dfu_complete(void)
++// weak: a board can record the finished update before the reset
++__weak void board_dfu_complete(void)
+ {
+   // Clean Cache
+   SCB_CleanDCache();

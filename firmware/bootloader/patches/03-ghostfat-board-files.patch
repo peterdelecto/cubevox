@@ -1,0 +1,57 @@
+Why: cubevox serves its own INFO_UF2.TXT (serial, installed version, notices) and a DIAG.TXT the owner asks for when an update fails.
+
+diff --git a/src/board_api.h b/src/board_api.h
+index 0899467..166540c 100644
+--- a/src/board_api.h
++++ b/src/board_api.h
+@@ -118,6 +118,11 @@
+ #define TINYUF2_CURRENT_UF2  1
+ #endif
+ 
++// More files on the drive: define TINYUF2_BOARD_FILES as ghostfat FileContent_t initializers of
++// fixed size, e.g. {.name = "DIAG    TXT", .content = diag_text, .size = 1024},
++
++// Define TINYUF2_BOARD_INFO_UF2 to serve the board's own INFO_UF2.TXT from board_uf2_info()
++
+ //--------------------------------------------------------------------+
+ // Constant
+ //--------------------------------------------------------------------+
+@@ -213,6 +218,10 @@ void board_reboot_to_bootloader(void);
+ // Fill Serial Number and return its length (limit to 16 bytes)
+ uint8_t board_usb_get_serial(uint8_t serial_id[16]);
+ 
++// INFO_UF2.TXT of a board that defines TINYUF2_BOARD_INFO_UF2, made before USB starts.
++// Returns the text and sets its length
++char const* board_uf2_info(uint32_t* len);
++
+ // Check if NRST pin is used to reset the board
+ // bool board_reseted_by_nrst(void);
+ 
+diff --git a/src/ghostfat.c b/src/ghostfat.c
+index 270316b..03a5777 100644
+--- a/src/ghostfat.c
++++ b/src/ghostfat.c
+@@ -177,6 +177,9 @@ static FileContent_t info[] = {
+     {.name = "AUTORUN INF", .content = autorunFile , .size = sizeof(autorunFile) - 1},
+     {.name = "FAVICON ICO", .content = favicon_data, .size = favicon_len            },
+ #endif
++#ifdef TINYUF2_BOARD_FILES
++    TINYUF2_BOARD_FILES
++#endif
+ #if TINYUF2_CURRENT_UF2
+     // current.uf2 must be the last element and its content must be NULL
+     {.name = "CURRENT UF2", .content = NULL       , .size = 0                       },
+@@ -326,6 +329,13 @@ void uf2_init(void) {
+   }
+   info[FID_INFO].size = txt_len;
+ 
++#ifdef TINYUF2_BOARD_INFO_UF2
++  // the board serves its own INFO_UF2.TXT
++  uint32_t board_len = 0;
++  info[FID_INFO].content = board_uf2_info(&board_len);
++  info[FID_INFO].size = board_len;
++#endif
++
+   init_starting_clusters();
+ }
+ 
