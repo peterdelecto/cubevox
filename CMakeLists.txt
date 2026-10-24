@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(cubevox CXX OBJCXX)
+project(cubevox C CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -176,9 +176,14 @@ add_test(NAME stage_feedback COMMAND stage_feedback_test)
 # (no Arduino, no HAL, no board/ include).
 file(GLOB CUBEVOX_FW_CORE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/core/*.cpp
                                   ${CMAKE_SOURCE_DIR}/firmware/cubevox/src/ui/*.cpp)
-add_executable(firmware_test test/firmware_test.cpp ${CUBEVOX_FW_CORE_SOURCES})
+# boot_decide.c is the bootloader's pure policy; the host build compiles it as C99.
+set(CUBEVOX_BOOT_DECIDE_DIR ${CMAKE_SOURCE_DIR}/firmware/bootloader/boards/cubevox)
+add_executable(firmware_test test/firmware_test.cpp ${CUBEVOX_FW_CORE_SOURCES}
+                             ${CUBEVOX_BOOT_DECIDE_DIR}/boot_decide.c)
 target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
+                                                 ${CUBEVOX_BOOT_DECIDE_DIR}
                                                  ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
+set_target_properties(firmware_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
 target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}")
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 # Optimised like the firmware, so optimisation-only warnings reach the sanitizers, with the same
@@ -192,6 +197,7 @@ target_compile_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 target_link_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 add_test(NAME firmware COMMAND firmware_test)
 add_test(NAME bench_ops_map COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/bench_ops_check.py)
+add_test(NAME stamp_image_selftest COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/stamp_image.py selftest)
 
 # hello_dump prints the firmware's real `hello` reply. app/fixtures/hello.json must equal it.
 add_executable(hello_dump tools/hello_dump.cpp ${CUBEVOX_FW_CORE_SOURCES})
