@@ -122,8 +122,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `--rom` is the shop fallback for a box whose application is unreachable: dfu-util writes
   `<out dir>/cubevox.ino.bin` at 0x08020000 (`-s 0x08020000:leave`), above the bootloader that
   `bootloader/flash.sh` puts in sector 0. `./flash.sh --help` lists the knobs.
-- `bringup.py`: first-article checks for a new board over USB, optional fault and DFU drills, operator
-  questions, log to `hardware/bringup/`. `./bringup.py --board 1 --faults --dfu`; on the WeAct add
+- `bringup.py`: first-article checks for a new board over USB, optional fault, ROM-DFU and update drills
+  (`--faults`, `--dfu`, `--update`, the last one being spec drills 1 to 13), operator questions, log to
+  `hardware/bringup/`. `./bringup.py --board 1 --faults --update`; on the WeAct add
   `--weact --no-oled`. It checks its panel thresholds, block rate and SAI clock against the firmware through
   `tools/bench_ops_check.py`.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20

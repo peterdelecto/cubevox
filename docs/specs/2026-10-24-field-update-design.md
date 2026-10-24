@@ -17,11 +17,12 @@ copies the same `.uf2` file to the same drive. The firmware structure rules of
 ## What Adam does
 1. Downloads `cubevox-vX.YY.ZZ.uf2` from the release page. One file.
 2. With the box powered on as usual, plugs USB-C into the Mac. Turns MENU to `Update firmware`,
-   clicks, reads the installed version on the confirm screen, clicks again.
-3. The OLED says `UPDATE MODE / Drag cubevox.uf2 / onto the CUBEVOX drive`. A drive named
-   `CUBEVOX` appears on the desktop. He drags the file onto it.
-4. The OLED says `Writing…`, then `Done. Restarting.` The drive goes away by itself, the box
-   restarts, the boot screen shows the new version, and the layout and settings are as before.
+   clicks, reads the version he has on the confirm screen (`You have vX.YY.ZZ.`), clicks again.
+3. The OLED says `Drop the firmware on / the CUBEVOX drive.` A drive named `CUBEVOX` appears on
+   the desktop. He drags the file onto it.
+4. The OLED says `Writing the firmware. / Do not unplug.`, then `The update is done. / Restarting
+   now.` The drive goes away by itself, the box restarts, the boot screen shows the new version,
+   and the layout and settings are as before.
 5. If the copy is interrupted, the box comes back in update mode on its own, says why, and he drags
    again. If the box ever fails to start three times in a row it also comes back in update mode.
    Holding MENU while switching the power on forces update mode. No action from outside the box
@@ -211,15 +212,15 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 ## Failure handling
 | Event | Box | Adam sees | `DIAG.TXT` records |
 |---|---|---|---|
-| Power loss mid-copy, no half-programmed word | CRC fails at next boot, update mode | `UPDATE NEEDED`, drive | `reason ImageInvalid` |
+| Power loss mid-copy, no half-programmed word | CRC fails at next boot, update mode | `The update stopped.`, drive | `reason ImageInvalid` |
 | Power loss mid-copy, half-programmed word | read fault, sector erased, update mode | same | `reason ImageUnreadable, address` |
-| USB pulled mid-copy | drive gone, box waits | `UPDATE MODE`, drive returns when replugged | nothing yet |
-| Wrong file dragged | every block refused, image intact | `WRONG FILE` | `refused N blocks, family X` |
-| Corrupt download | CRC fails, update mode | `UPDATE NEEDED` | `reason ImageInvalid` |
-| New firmware crashes at start | 3 resets, update mode | `UPDATE NEEDED … 3 times` | `reason BootFailed`, fault record |
+| USB pulled mid-copy | drive gone, box waits | `The update stopped.`, drive returns when replugged | nothing yet |
+| Wrong file dragged | every block refused, image intact | `That is not a cubevox firmware file.` | `refused N blocks, family X` |
+| Corrupt download | CRC fails, update mode | `The update stopped.` | `reason ImageInvalid` |
+| New firmware crashes at start | 3 resets, update mode | `Startup failed.` | `reason BootFailed`, fault record |
 | New firmware works but sounds wrong | — | — | Adam drags the previous release file; every release stays downloadable |
-| Menu dead, app otherwise fine | hold MENU at power-on | `UPDATE MODE` | `reason MenuHeld` |
-| Confirm with no computer | 60 s, back to the app | `UPDATE MODE`, then normal | `reason AppRequest, timeout` |
+| Menu dead, app otherwise fine | hold MENU at power-on | `Drop the firmware on the CUBEVOX drive.` | `reason MenuHeld` |
+| Confirm with no computer | 60 s, back to the app | `Drop the firmware on the CUBEVOX drive.`, then normal | `reason AppRequest, timeout` |
 | Bootloader hangs | power cycle | screen frozen, then normal | nothing |
 | Bootloader itself damaged | shop only | box dark | BOOT0 inside the enclosure, dfu-util |
 
@@ -252,7 +253,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 ## Application changes
 | File | Change |
 |---|---|
-| `firmware/build.sh` | `--build-property build.flash_offset=0x20000` sets the FLASH origin and `VECT_TAB_OFFSET` in one place (`platform.txt:68,78`). `build.vid`/`build.pid` from `boot_block.h`. Size gate 917504. Runs `stamp_image.py`, emits `cubevox.uf2` next to the `.bin`. |
+| `firmware/build.sh` | `--build-property build.flash_offset=0x20000` sets the FLASH origin and `VECT_TAB_OFFSET` in one place (`platform.txt:68,78`). USB ids stay the core's defaults, which equal `boot_block.h`. Size gate 917504. Runs `stamp_image.py`, emits `cubevox.uf2` next to the `.bin`. |
 | `firmware/cubevox.ld` | New, the one owned linker script. It replaces `cubevox_noinit.ld` and the platform copy. `.sram1_bss` and `.dtcm_bss` (bound `0x2001FF00`), `.cv_boot_block`, `.cv_noinit`, and `.cv_image_hdr` at app+0x400. Asserts image end `<= 0x08100000`. |
 | `board/boot_block.h` | New. The shared contract. C-compatible, no C++ in it. |
 | `board/boot_block.cpp` | New. The `.cv_boot_block` variable and its accessor `bootBlock()` (declared in `boot_block_access.h`). |
@@ -324,9 +325,9 @@ firmware/bootloader/
 ## Shop steps, every unit
 1. Board on the bench, enclosure open, 9 V on. Hold BOOT0, tap NRST, release. `firmware/bootloader/flash.sh`
    writes the bootloader with dfu-util at 0x08000000 and resets. Expected within 3 s: OLED
-   `UPDATE NEEDED`, `CUBEVOX` drive mounted, `INFO_UF2.TXT` reads `Installed: none`.
+   `The update stopped.`, `CUBEVOX` drive mounted, `INFO_UF2.TXT` reads `Installed: none`.
 2. Drag the release `.uf2` from Finder. This is Adam's path and doubles as its acceptance test.
-   Expected: `Writing…`, `Done. Restarting.`, boot splash with the version, boot report
+   Expected: `Writing the firmware.`, `The update is done.`, boot splash with the version, boot report
    `crc ok, boot fails 0`.
 3. `./bringup.py --board N --faults --update` runs the drills below and writes
    `hardware/bringup/board-N.md` with the UID, bootloader version, firmware version and every
@@ -336,11 +337,11 @@ firmware/bootloader/
 ## Drills (`bringup.py --update`)
 | # | Drill | Expected |
 |---|---|---|
-| 1 | Send `enter_dfu` over serial | CDC port gone, `/Volumes/CUBEVOX` mounted within 5 s, OLED `UPDATE MODE` |
+| 1 | Send `enter_dfu` over serial | CDC port gone, `/Volumes/CUBEVOX` mounted within 5 s, OLED `Drop the firmware on the CUBEVOX drive.` |
 | 2 | Copy the bench `.uf2` to the volume | Volume unmounts, CDC port back within 10 s, `hello` says `bench` |
 | 3 | Operator pulls USB at about 30 % of a copy | Box stays in update mode; a full copy then succeeds |
-| 4 | Operator cuts 9 V at about 30 % of a copy | Next power-on shows `UPDATE NEEDED`; `DIAG.TXT` says `ImageInvalid` or `ImageUnreadable` with an address; a full copy then succeeds |
-| 5 | Copy a `.uf2` built with `-b 0x08100000` | Every block refused, OLED `WRONG FILE`, layout record intact (`get_layout` after reboot) |
+| 4 | Operator cuts 9 V at about 30 % of a copy | Next power-on shows `The update stopped.`; `DIAG.TXT` says `ImageInvalid` or `ImageUnreadable` with an address; a full copy then succeeds |
+| 5 | Copy a `.uf2` built with `-b 0x08100000` | Every block refused, OLED `That is not a cubevox firmware file.`, layout record intact (`get_layout` after reboot) |
 | 6 | Copy the WeAct bench `.uf2` | Every block refused (family), installed image intact |
 | 7 | Copy a `.uf2` with one payload byte flipped | Box resets into update mode, `INFO_UF2.TXT` `Installed: invalid` |
 | 8 | Bench op `f` (bus fault) three times inside 5 s of boot | Third reset lands in update mode, `DIAG.TXT` carries the fault record |

@@ -19,7 +19,7 @@ part. Filenames are `YYYY-MM-DD-name-design.md`. Add a row here with every new s
 | `2026-10-12-firmware-structure-design.md` | Firmware module map and ownership rules (snapshot, pure menu, canvas); new firmware follows it | current |
 | `2026-10-12-serial-protocol-design.md` | USB JSON protocol, live layout apply with a 50 ms fade | current |
 | `2026-10-15-mac-app-design.md` | Mac app: one page, slots and a card bank, headroom meter, one Update button | app parked (owner 2026-10-24); box side of Update superseded by the field-update spec |
-| `2026-10-24-field-update-design.md` | Field update: TinyUF2 bootloader in sector 0, app at 0x08020000 with a CRC header, shared boot block, Adam drags a `.uf2` onto the `CUBEVOX` drive; `firmware/platform/` absorbed into `board/` | current, building |
+| `2026-10-24-field-update-design.md` | Field update: TinyUF2 bootloader in sector 0, app at 0x08020000 with a CRC header, shared boot block, Adam drags a `.uf2` onto the `CUBEVOX` drive; `firmware/platform/` absorbed into `board/` | current; host side built and on `main` 2026-10-24, screens approved; shop steps and drills wait for a board |
 
 Research notes live in `docs/audits/`. `2026-10-08-pitch-tracker-research.md` is the note behind
 the tracker plan.
