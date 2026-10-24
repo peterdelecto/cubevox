@@ -12,11 +12,11 @@
 #include "board/pins.h"
 #include "board/serial_link.h"
 #include "core/audio_recovery.h"
+#include "core/chain_run.h"
 #include "core/layout_fade.h"
 #include "core/output_stage.h"
 #include "core/registry.h"
 #include "engine/common.h"
-#include "engine/fastmath.h"
 #include "engine/soft_ceiling.h"
 
 #ifdef CUBEVOX_BENCH_CLIP
@@ -76,25 +76,13 @@ DMA_HandleTypeDef gDmaRx;
 DMA_Stream_TypeDef* txStream() { return DMA1_Stream0; }
 DMA_Stream_TypeDef* rxStream() { return DMA1_Stream1; }
 
-// Engine objects, constructed in reset state.
-struct Chain {
-  cv::Gate inputGate;
-  cv::Unison unison;
-  cv::Slapback slapback;
-  cv::Distortion distortion;
-  cv::Gate gate;
-  cv::Reverb reverb;
-  cv::PolishComp comp;
-  cv::Polish polish;
-};
-
-Chain gChain;
-
-// Pitch stage state (~100 KB) lives in DTCM. The section is NOLOAD and the static
-// constructor ran before audioInit() zeroes it, so audioInit() constructs the object
-// again in place; a plain reset() would leave constructor-only members (the tracker's
-// const anti-alias biquad) zeroed.
+// Pitch stage state (about 51 KB) lives in DTCM. The section is NOLOAD and the static constructor ran
+// before audioInit() zeroes it, so audioInit() constructs the object again in place; a plain reset()
+// would leave the tracker's anti-alias coefficients, which only the constructor sets, zeroed.
 H7_DTCM_BSS cv::PitchFx gPitchFx;
+
+// Engine objects, constructed in reset state.
+ChainEngines gChain{gPitchFx};
 
 // Published snapshots alternate between two slots by sequence number, so the main loop only writes
 // the slot the interrupt does not read. The interrupt preempts the main loop and runs to completion,
@@ -109,6 +97,7 @@ uint32_t gSeenSeq = 0;
 bool gLayoutPending = false;
 LayoutFade gFade;
 OutputGain gOutputGain;
+uint32_t gBypassPhase = 0;  // the BYPASS crossfade position, 0 plays the chain (see mixBypass)
 
 const char* gError = "audioInit() has not run";
 volatile uint8_t gReadyMask = 0;  // bit h set when RX half h is waiting
@@ -165,29 +154,21 @@ volatile bool gClipOn = false;
 uint32_t gClipPos = 0;
 #endif
 
-// Runs one card. Returns false when it wrote nothing, so the caller keeps its buffers.
-// Pitch cards share one PitchFx call, run at the first pitch card's slot.
-bool runStage(Card c, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
-  switch (engineOf(c)) {
-    case Engine::InputGate: gChain.inputGate.process(in, out, n, p.inputGate); return true;
-    case Engine::Pitch:
-      if (pitchDone) return false;
-      pitchDone = true;
-      gPitchFx.process(in, out, n, p.pitchFx);
-      return true;
-    case Engine::Unison: gChain.unison.process(in, out, n, p.unison); return true;
-    case Engine::Slapback: gChain.slapback.process(in, out, n, p.slapback); return true;
-    case Engine::Distortion: gChain.distortion.process(in, out, n, p.distortion); return true;
-    case Engine::Gate: gChain.gate.process(in, out, n, p.gate); return true;
-    case Engine::Reverb: gChain.reverb.process(in, out, n, p.reverb); return true;
-    case Engine::Count: break;  // Empty runs no engine
-  }
-  return false;
-}
+// The CPU's free-running cycle counter, which times each stage of the chain.
+struct CycleCounter {
+  uint32_t operator()() const { return DWT->CYCCNT; }
+};
 
 void addSlotTime(int index, uint32_t cycles) {
   gSlotCycles[index] = gSlotCycles[index] + cycles;
   if (cycles > gSlotWorst[index]) gSlotWorst[index] = cycles;
+}
+
+// Folds the stage times of one pass into the per-bucket totals and worsts.
+void addChainCycles(const ChainCycles& cycles) {
+  for (int s = 0; s < kSlotCount; ++s) addSlotTime(s, cycles.slot[s]);
+  addSlotTime(kStatComp, cycles.comp);
+  addSlotTime(kStatEq, cycles.eq);
 }
 
 // Engine clears per silent block. One per block keeps the largest clear inside the block budget.
@@ -201,7 +182,7 @@ uint32_t gResetMask = 0;  // engines waiting for their clear
 void resetEngine(Engine e) {
   switch (e) {
     case Engine::InputGate: gChain.inputGate.reset(); break;
-    case Engine::Pitch: gPitchFx.reset(); break;
+    case Engine::Pitch: gChain.pitch.reset(); break;
     case Engine::Unison: gChain.unison.reset(); break;
     case Engine::Slapback: gChain.slapback.reset(); break;
     case Engine::Distortion: gChain.distortion.reset(); break;
@@ -221,42 +202,13 @@ void resetWaiting(int count) {
   }
 }
 
-// One NaN or infinity out of the slots would leave the EQ's filter state non-finite for good, so the
-// polish stages never see it. The block goes silent, the output cuts to zero, and every engine
+// A NaN or an infinity out of the slots would leave the EQ's filter state non-finite for good, so
+// runChain silences the block before the polish stages. The output cuts to zero, and every engine
 // clears in the silent blocks that follow, because the one that produced it is not known.
-void guardSlotsOutput(float* a, int n) {
-  if (guardBlock(a, n)) return;
+void discardBlock() {
   gResetMask = kAllEngines;
   gFade.cut();
   gCounts.nanBlocks = gCounts.nanBlocks + 1;
-}
-
-// Slot order, then the polish tail: comp, then EQ. Both run always, and each is a bit-exact copy
-// once settled off. The finished block lands in the caller's `a`. Each stage has its own cycle bucket.
-void runChain(float* a, float* b, int n, const ChainSnapshot& snap) {
-  const ChainParams& p = snap.params;
-  float* const result = a;
-  bool pitchDone = false;
-  for (int s = 0; s < kSlotCount; ++s) {
-    const uint32_t start = DWT->CYCCNT;
-    const bool wrote = runStage(snap.layout.card[s], a, b, n, p, pitchDone);
-    addSlotTime(s, DWT->CYCCNT - start);
-    if (wrote) {
-      float* swap = a;
-      a = b;
-      b = swap;
-    }
-  }
-  guardSlotsOutput(a, n);
-  const uint32_t compStart = DWT->CYCCNT;
-  gChain.comp.process(a, b, n, p.comp);
-  const uint32_t eqStart = DWT->CYCCNT;
-  addSlotTime(kStatComp, eqStart - compStart);
-  gChain.polish.process(b, a, n, p.eq);
-  addSlotTime(kStatEq, DWT->CYCCNT - eqStart);
-  if (a != result) {
-    for (int i = 0; i < n; ++i) result[i] = a[i];
-  }
 }
 
 // Picks up a newly published snapshot. The same layout is adopted at once; a different one waits.
@@ -325,37 +277,6 @@ void writeOutput(uint32_t* tx, const float* a, GainRamp ramp) {
   }
 }
 
-// TOP SWITCH = BYPASS: an equal-power crossfade from the chain output to the dry input and back.
-// The chain keeps running underneath. gBypassPhase runs a quarter turn from the chain (0) to the
-// dry input (kBypassFull) over kFadeMs, like the layout fade, and the two gains are the cosine and
-// sine of it. Settled at either end the block is the chain output untouched or exactly the dry input.
-constexpr uint32_t kBypassFull = 1u << 30;
-constexpr uint32_t kBypassStep = kBypassFull / (kFadeMs * cv::kSampleRate / 1000);
-uint32_t gBypassPhase = 0;
-
-// One step toward `goal`, never past it.
-uint32_t stepPhase(uint32_t phase, uint32_t goal) {
-  if (phase < goal) return goal - phase < kBypassStep ? goal : phase + kBypassStep;
-  return phase - goal < kBypassStep ? goal : phase - kBypassStep;
-}
-
-// Mixes `dry` into the chain output in `a` for a block.
-void mixBypass(float* a, const float* dry, bool bypassOn) {
-  const uint32_t goal = bypassOn ? kBypassFull : 0;
-  if (gBypassPhase == goal) {
-    if (bypassOn) {
-      for (int i = 0; i < kFramesPerHalf; ++i) a[i] = dry[i];
-    }
-    return;
-  }
-  for (int i = 0; i < kFramesPerHalf; ++i) {
-    gBypassPhase = stepPhase(gBypassPhase, goal);
-    const float toDry = cv::sinTurns(gBypassPhase);
-    const float toChain = cv::sinTurns(kBypassFull - gBypassPhase);
-    a[i] = a[i] * toChain + dry[i] * toDry;
-  }
-}
-
 void processHalf(int half) {
   const uint32_t* rx = gRxRing.data() + half * kWordsPerHalf;
   uint32_t* tx = gTxRing.data() + half * kWordsPerHalf;
@@ -376,9 +297,12 @@ void processHalf(int half) {
     resetWaiting(kResetsPerSilentBlock);
     a.fill(0.0f);
   } else {
-    runChain(a.data(), b.data(), kFramesPerHalf, gHeld);
+    ChainCycles cycles;
+    const bool finite = runChain(gChain, a.data(), b.data(), kFramesPerHalf, gHeld, CycleCounter(), cycles);
+    if (!finite) discardBlock();
+    addChainCycles(cycles);
   }
-  mixBypass(a.data(), dry.data(), muteBypassOn());
+  mixBypass(a.data(), dry.data(), kFramesPerHalf, muteBypassOn(), gBypassPhase);
   writeOutput(tx, a.data(), gOutputGain.next(gHeld.outputGain, fade.from, fade.to, kFramesPerHalf));
 }
 

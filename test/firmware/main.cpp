@@ -17,6 +17,7 @@ int main() {
   checkProtocol();
   checkTx();
   checkFade();
+  checkChainRun();
   checkFuzz();
   checkInputLogic();
   checkMenu();

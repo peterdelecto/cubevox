@@ -1,7 +1,8 @@
 # Bench checklist
 
 These checks need a person at the bench with a board, a scope or a PA. They come from the "Bench
-checks" sections of the 2026-10-24 firmware audits, grouped by the slice each audit covered.
+checks" sections of the 2026-10-24 firmware audits and from the bench checks the fix reports of the
+same pass added, grouped by the slice each audit covered.
 `firmware/bringup.py` names this file in its final summary and automates none of it.
 
 Each row has an id for citing it, the check, what a pass looks like, and the audit item it answers.
@@ -22,9 +23,16 @@ carry a measured number from the audit keep that number.
 | AU7 | Sweep RATE above 68 % at full DEPTH and listen for ticks. Flip OUTPUT on a sine and scope the step. | No tick on the sweep. The OUTPUT flip ramps over a block or more and shows no single-sample 30 dB step. | audio B2, Unison swing, and audio B1, OUTPUT step |
 | AU8 | Read every pot at full clockwise with panel_dump. | All 16 print 1.00. The pots run on 3V3A and VREF+ comes from a separate supply, so the end margin of 1 % has to cover the difference (hardware spec items 12 and 13). | audio answer 5, end dead band |
 | AU9 | Time 3V3A's rise after power-on against kMuxSelectHoldMs (1,100 ms). Compare the first published knob values with the values one second later. | 3V3A is up before the hold ends, with the margin logged. No knob moves by more than the 1.5 % move threshold between the first publish and one second later. | audio answer 5, mux timing |
-| AU10 | Measure the longest loop() pass and the 16-pot scan period, with analogRead's init and calibration included. | Both numbers are logged. The scan keeps the one mux step per pass at least 500 microseconds apart, and the longest pass stays far under the 2 s watchdog. | audio C4, analogRead cost |
+| AU10 | Measure the longest loop() pass and the 16-pot scan period with the ADC3 scan running. | Both numbers are logged. The scan keeps the one mux step per pass at least 500 microseconds apart, and the longest pass stays far under the 2 s watchdog. | audio C4, analogRead cost |
 | AU11 | Run the stats op on the default layout with both polish stages on. | The COMP and soft ceiling load in percent is read and entered in core/costs.h. The default layout stays under the 75 % mean and 95 % worst lines with those terms added. | audio C1, kFixed misses the polish tail; engine B7 |
 | AU12 | Plug and unplug USB in the middle of a song. | The late count in status does not move and the audio does not glitch. | audio answer 8, USB attach |
+| AU13 | Run the default chain and lower 5VA below 4.75 V, then raise it again. | MUTE_N and XSMT fall within 1 ms of 5VA crossing 4.75 V. At 4.80 V on the way up the output stays muted. Above 4.85 V it releases 500 ms later. One `[WARN] power:` line prints at the trip, one `[power] 5VA back` line at the release, and `power_trips` in status counts the trip. | audio A1, power-fail trip and release (hardware spec F2 and F3); AU14 sets the final level |
+| AU14 | With every slot on and a loud signal playing, note the lowest 5VA the box shows before the pull. Then pull the barrel and scope 5VA's fall against XSMT, MUTE_N and 3V3A. | kPowerTripMv in core/power_fail.h is set from these two measurements. It sits below the lowest 5VA under load with a margin, and it is high enough for XSMT to fall in the order and times of AU1. kPowerClearMv keeps its 100 mV band above it. The values and the captures are logged in hardware/bringup/, and AU13 passes at the final value. | audio A1, trip level provisional at 4,750 mV (hardware spec F2) |
+| AU15 | Boot the box, play the default chain for a minute and send status. | `sai_errors`, `overruns`, `restarts`, `nan_blocks` and `power_trips` all read 0. | audio A1, A3, B3, B5 and B6, the new counters on a clean run |
+| AU16 | Run the stop_audio op with a sine playing and scope the output. | The output is silent within 3 ms of the op, because each TX half is zeroed once the stream has read it. The stall watch latches the mute at 100 ms and prints one error line, and `stalled` in status reads true. | audio B6, TX halves zeroed once read, and A3, stall watch; same op as AU4 |
+| AU17 | Pin every knob at its top with the pin_knobs op, play the voice clip, run reset_peaks and read stats after one minute. | `late` reads 0 after 60 s. The count also catches a block finished after the TX stream had read its half (see AU3). | audio B4, late count |
+| AU18 | Read the boot report, then run panel_dump with every pot fully counter-clockwise and again fully clockwise. | The boot report reads `[boot] pots: ADC3, 0 samples dropped`. panel_dump prints 0.00 at the counter-clockwise stop and 1.00 at the clockwise stop on all 16 pots. | audio C4, the ADC3 scan, and A2, exact ends of travel; the clockwise half is AU8 |
+| AU19 | Turn DRIVE from the top to 0 fast on Distortion with its toggle on, and listen. | The readout reads 0 % within 0.3 s of the knob stopping, and no fuzz is left at the output. | audio A2, knob rest value; same knob as AU6 |
 
 ## Bootloader and update path
 
@@ -68,9 +76,12 @@ carry a measured number from the audit keep that number.
 | EN3 | Read the worst block while toggling Autotune on with the voice clip, and while sweeping reverb MIX and SEMITONES. | No block reaches 100 % of its budget and the worst stays under the 95 % line. | engine B7 and B4, engage block and glides |
 | EN4 | Count each gate's and Slapback's cycles before and after the fastmath swap. | The saving per stage is logged. About 10 % of the block in total is the estimate to confirm. | engine B4, libm per sample |
 | EN5 | Measure the cycles of the AXI SRAM engines, which have a 143,596 B working set against the 16 KB D-cache. | The cycles match the figures in core/costs.h, or costs.h is updated with the new ones. | engine budget, state in AXI SRAM |
-| EN6 | Check the `.dtcm_bss` end in the link map against 0x2001FF00. | The end is at or below 0x2001FF00. build.sh prints the margin as the `[budget] DTCM` line (PitchFx takes 112,920 B at v2.00.27). | engine C1, PitchFx DTCM budget |
+| EN6 | Check the `.dtcm_bss` end in the link map against 0x2001FF00. | The end is at or below 0x2001FF00. build.sh prints the margin as the `[budget] DTCM` line (PitchFx takes 51,944 B). | engine C1, PitchFx DTCM budget |
 | EN7 | Measure round-trip latency with Autotune off and with it on, and ask Adam whether he accepts the Autotune latency in his monitors. | Off reads about 2.7 ms plus the codec delay. On reads 25 to 39 ms. Adam's answer is logged. | engine answer 9, latency |
 | EN8 | Listen for clicks at RATE above 68 %, with SEMITONES through 0 at high MIX, with OUTPUT LINE/MIC on a held note, and with BYPASS both ways. | No click in any of the four. | engine B2, B3 and B6, and answer 3 for BYPASS |
+| EN9 | Re-bench core/costs.h with both passes of the method in that file. The first pins every knob at its top. The second switches Autotune on with the clip playing and sweeps reverb MIX and SEMITONES end to end. | Every row marked measured=false (POLISH COMP, soft ceiling, BYPASS mix) holds a measured value and reads measured=true, and the other rows are checked against their trailing comments. The default layout stays under the 75 % mean and 95 % worst lines, and ctest passes with the new numbers. | engine B7, cost table after the engine fixes; same table as EN2 |
+| EN10 | Read the per-slot cycles for the default layout with every knob at its top, after the fastmath changes. | The saving per slot against the cycles in the costs.h trailing comments is logged. The total comes to about 10 % of the block, which is the audit's estimate to confirm. | engine B4, libm per sample; same measurement as EN4 |
+| EN11 | Listen through a PA for clicks while sweeping Unison RATE above 68 %, moving Octave SEMITONES through 0 with MIX at 100 %, and flicking Autotune off and on. | No click in any of the three. | engine B2 and B3, and the Autotune toggle; same listening as EN8, which also covers OUTPUT and BYPASS |
 
 ## OLED and UI
 

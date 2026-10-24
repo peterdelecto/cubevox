@@ -31,6 +31,7 @@ void checkLayoutAndCompose();  // core_layout.cpp
 void checkProtocol();          // core_protocol.cpp
 void checkTx();                // core_tx_queue.cpp
 void checkFade();              // core_layout_fade.cpp
+void checkChainRun();          // core_chain_run.cpp
 void checkFuzz();              // core_protocol_fuzz.cpp
 void checkInputLogic();        // core_input.cpp
 void checkMenu();              // ui_menu.cpp
