@@ -10,8 +10,14 @@ As a command it prints the port path, for shell scripts, and can send one reques
   python3 -I cubevox_port.py --wait 30            # wait for the box to enumerate
   python3 -I cubevox_port.py --allow-none         # print nothing and exit 0 when no box is present
   python3 -I cubevox_port.py --request enter_dfu  # send {"id":N,"cmd":"enter_dfu"}, exit 0 on ok:true
+  python3 -I cubevox_port.py --wait-volume CUBEVOX             # wait up to 10 s for /Volumes/CUBEVOX
+  python3 -I cubevox_port.py --wait-volume CUBEVOX --wait 30   # same, 30 s
 
 CUBEVOX_PORT names the port when more than one cu.usbmodem* device is attached.
+
+The update drive is a volume, not a port. wait_volume and wait_volume_gone give the shop scripts
+the two edges of an update: the drive appears when the box enters update mode and goes away when
+the copy completes and the box restarts.
 """
 
 import argparse
@@ -29,6 +35,9 @@ PORT_ENV = "CUBEVOX_PORT"
 READ_BYTES = 4096
 WRITE_TIMEOUT_S = 5.0
 POLL_S = 0.5
+VOLUMES_DIR = "/Volumes"
+VOLUME_WAIT_S = 10.0
+VOLUME_POLL_S = 0.2
 
 
 class PortError(Exception):
@@ -66,6 +75,37 @@ def find_port(explicit=None, wait_s=0.0, allow_none=False):
         raise PortError(f"{len(ports)} ports match {PORT_GLOB}: {' '.join(ports)}; "
                         f"name one with --port or {PORT_ENV}")
     return ports[0]
+
+
+def volume_path(name):
+    return os.path.join(VOLUMES_DIR, name)
+
+
+def volume_mounted(name):
+    """True when /Volumes/NAME is a mounted volume. A leftover empty folder of that name is not."""
+    path = volume_path(name)
+    return os.path.isdir(path) and os.path.ismount(path)
+
+
+def wait_volume(name, wait_s=VOLUME_WAIT_S):
+    """The path of /Volumes/NAME once it is mounted, or None when wait_s passes first."""
+    end = time.monotonic() + wait_s
+    while True:
+        if volume_mounted(name):
+            return volume_path(name)
+        if time.monotonic() >= end:
+            return None
+        time.sleep(VOLUME_POLL_S)
+
+
+def wait_volume_gone(name, wait_s=VOLUME_WAIT_S):
+    """True once /Volumes/NAME is no longer mounted, False when wait_s passes first."""
+    end = time.monotonic() + wait_s
+    while volume_mounted(name):
+        if time.monotonic() >= end:
+            return False
+        time.sleep(VOLUME_POLL_S)
+    return True
 
 
 class Link:
@@ -169,16 +209,38 @@ class Link:
         return self.read_reply(rid, wait_s, on_text)
 
 
+def volume_command(a):
+    """--wait-volume: prints the mount path, or [ERROR] and exit 1 when the volume stays away."""
+    clash = [flag for flag, given in (("--request", a.request), ("--port", a.port),
+                                      ("--allow-none", a.allow_none)) if given]
+    if clash:
+        print(f"[ERROR] --wait-volume cannot be combined with {' '.join(clash)}", file=sys.stderr)
+        return 1
+    wait_s = VOLUME_WAIT_S if a.wait is None else a.wait
+    path = wait_volume(a.wait_volume, wait_s)
+    if path is None:
+        print(f"[ERROR] {volume_path(a.wait_volume)} is not mounted after {wait_s:g} s", file=sys.stderr)
+        return 1
+    print(path)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="Print the cubevox serial port, or send one request to it.")
     ap.add_argument("--port", default=None, help=f"port path (default: {PORT_ENV}, else the only {PORT_GLOB})")
-    ap.add_argument("--wait", type=float, default=0.0, help="seconds to wait for the port to appear")
+    ap.add_argument("--wait", type=float, default=None,
+                    help="seconds to wait for the port to appear (default 0), or for the volume with "
+                         f"--wait-volume (default {VOLUME_WAIT_S:g})")
+    ap.add_argument("--wait-volume", metavar="NAME",
+                    help="wait for /Volumes/NAME to mount, print its path and exit; the update drive is CUBEVOX")
     ap.add_argument("--allow-none", action="store_true", help="print nothing and exit 0 when no port is present")
     ap.add_argument("--request", metavar="CMD", help="send this command and require ok:true in the reply")
     ap.add_argument("--reply-wait", type=float, default=3.0, help="seconds to wait for the reply")
     a = ap.parse_args()
+    if a.wait_volume is not None:
+        return volume_command(a)
     try:
-        path = find_port(a.port, a.wait, a.allow_none)
+        path = find_port(a.port, a.wait or 0.0, a.allow_none)
         if path is None:
             return 0
         if not a.request:

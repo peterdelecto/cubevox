@@ -8,25 +8,42 @@ release image and confirms hello reports build "release". --weact stays on the b
 Every command goes out as a framed JSON request through bench_ops.py. The log goes to
 hardware/bringup/. With several cu.usbmodem* ports, name one with --port.
 
+--dfu drills the ROM DFU, which only BOOT0 reaches once the bootloader is in sector 0. --update
+runs the 13 drills of docs/specs/2026-10-24-field-update-design.md against the bootloader's update
+drive (/Volumes/CUBEVOX, or WEACTBOOT with --weact). It needs the bootloader installed and the
+bench image running. The operator drills (3, 4, 10, 11, 12) wait for Enter, and --no-prompt skips
+them. Drill 13 is the release image check, so --update does not flash the release image again. The
+log of an --update run is hardware/bringup/board-N.md: UID, bootloader and firmware versions, the
+checks and the drill table.
+
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and DFU entry (reflashes)
   ./bringup.py --board 1 --panel         # also the panel walk: pots, toggles, K103, mute, OLED
+  ./bringup.py --board 1 --faults --update   # also the update drills; log board-1.md
   ./bringup.py --weact --no-oled --no-prompt --faults --dfu   # dry run on the WeAct bench board
 """
 
 import argparse
+import collections
 import datetime
+import fcntl
+import functools
 import os
 import re
+import struct
 import subprocess
 import sys
+import tempfile
 import time
+import traceback
 
 FW = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(FW)
 sys.path.insert(0, FW)  # python3 -I leaves the script dir out
+sys.path.insert(0, os.path.join(REPO, "tools"))
 import bench_ops  # noqa: E402
 import cubevox_port  # noqa: E402
+import stamp_image  # noqa: E402
 
 SAMPLE_RATE_HZ = 48000
 BLOCK_FRAMES = 64
@@ -36,14 +53,15 @@ SAI_TOL_PPM = 100
 ENUMERATE_SETTLE_S = 1.0
 SCRIPT_FAIL_TAIL_LINES = 20
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
+STAMP_TOOL = os.path.join(REPO, "tools", "stamp_image.py")
 
 
 class Port(cubevox_port.Link):
     """CDC port that waits for the box to enumerate. Opening raises DTR, so the firmware prints its boot report."""
 
-    def __init__(self, wait_s=20.0):
+    def __init__(self, wait_s=20.0, settle_s=ENUMERATE_SETTLE_S):
         path = cubevox_port.find_port(wait_s=wait_s)
-        time.sleep(ENUMERATE_SETTLE_S)
+        time.sleep(settle_s)
         super().__init__(path)
 
     def send(self, s):
@@ -72,6 +90,8 @@ class Log:
     def __init__(self):
         self.rows = []
         self.failed = 0
+        self.facts = {}    # UID, bootloader and firmware version, filled by the update drills
+        self.drills = []   # (number, name, status, detail, measured time)
 
     def check(self, name, ok, detail):
         state = "PASS" if ok else "FAIL"
@@ -82,6 +102,11 @@ class Log:
     def note(self, name, detail):
         self.rows.append(f"NOTE  {name}: {detail}")
         print(self.rows[-1], flush=True)
+
+    def drill(self, number, name, status, detail, measured=""):
+        self.failed += 1 if status == "FAIL" else 0
+        self.drills.append((number, name, status, detail, measured))
+        print(f"DRILL {number:02d} {status:7} {name}: {detail}", flush=True)
 
 
 def boot_report(port):
@@ -361,16 +386,22 @@ def wait_dfu(seconds):
     return False
 
 
-def flash_variant(variant, weact):
-    """Builds and flashes the release or bench image. The WeAct board only ever runs bench.
-
-    build.sh derives the out dir from VARIANT and BOARD; a failing script's output tail is shown.
-    """
+def fw_env(variant, weact):
+    """The environment build.sh derives its variant and out dir from."""
     env = dict(os.environ, TAIL=str(SCRIPT_FAIL_TAIL_LINES), VARIANT=variant)
     env.pop("BENCH", None)
     env.pop("BOARD", None)
     if weact:
         env["BOARD"] = "weact"
+    return env
+
+
+def flash_variant(variant, weact):
+    """Builds and flashes the release or bench image. The WeAct board only ever runs bench.
+
+    build.sh derives the out dir from VARIANT and BOARD; a failing script's output tail is shown.
+    """
+    env = fw_env(variant, weact)
     for script in ("build.sh", "flash.sh"):
         r = subprocess.run([os.path.join(FW, script)], env=env, text=True,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -421,12 +452,786 @@ def dfu_drill(log, port, weact, prompt):
     return Port(wait_s=30.0)
 
 
+# ---- update drills -------------------------------------------------------------------------------
+# The 13 drills of docs/specs/2026-10-24-field-update-design.md. Each moves the box between the
+# running application and the bootloader's update drive and judges a step by what the host can see:
+# the serial port, the drive, INFO_UF2.TXT, DIAG.TXT and the replies of hello, status and get_layout.
+# What the OLED showed is a question to the operator at the end of the run.
+
+PASS, FAIL, SKIPPED = "PASS", "FAIL", "SKIPPED"
+Target = collections.namedtuple("Target", "volume family foreign")
+TARGETS = {False: Target("CUBEVOX", "cubevox", "weact"), True: Target("WEACTBOOT", "weact", "cubevox")}
+Install = collections.namedtuple("Install", "copy_error gone_s back_s")
+
+VOLUME_APPEAR_S = 5.0     # drill 1: the drive mounts this soon after enter_dfu
+PORT_RETURN_S = 10.0      # drill 2: the serial port returns this soon after the drive leaves
+UPDATE_WAIT_S = 15.0      # steps the drill table gives no limit
+REPLUG_WAIT_S = 30.0      # the operator replugs USB or cycles the power
+RESET_WAIT_S = 12.0       # the watchdog op takes its period to reset the box
+FAULT_WAIT_S = 5.0
+HEALTHY_MARGIN_S = 2.0    # on top of the healthy window, so the failed-start count reads 0
+FAST_SETTLE_S = 0.3       # a drill that acts inside the healthy window skips the long settle
+PORT_POLL_S = 0.25
+COPY_NAME = "cubevox.uf2"
+PARTIAL_FRACTION = 0.3
+PARTIAL_SETTLE_S = 2.0    # lets the OS push a partial copy to the box before the link breaks
+
+
+class DrillError(Exception):
+    """A drill step failed. The message becomes the drill's detail."""
+
+
+@functools.lru_cache(maxsize=None)
+def contract():
+    """Every integer #define of boot_block.h, the one definition of the addresses and limits."""
+    try:
+        return stamp_image.read_defines(stamp_image.DEFAULT_HEADER)
+    except stamp_image.ToolError as e:
+        raise DrillError(str(e)) from e
+
+
+def contract_value(name):
+    value = contract().get(name)
+    if value is None:
+        raise DrillError(f"{name} is not defined in boot_block.h")
+    return value
+
+
+class Ctx:
+    """What the drills share: the target, the temp files, the open application port and the facts."""
+
+    def __init__(self, log, target, prompt, tmp):
+        self.log = log
+        self.target = target
+        self.prompt = prompt
+        self.tmp = tmp
+        self.files = {}
+        self.port = None
+        self.uid = None          # the drive's serial, drill 1
+        self.app_serial = None   # the application's serial, from hello
+        self.fw = None
+
+    def app(self):
+        """The open port of the running application. Restores the box first when it is elsewhere."""
+        if self.port is None:
+            restore_app(self)
+        return self.port
+
+    def drop_port(self):
+        if self.port is not None:
+            try:
+                self.port.close()
+            except OSError as e:
+                print(f"[WARN] closing {self.port.path}: {e}", flush=True)
+            self.port = None
+
+    def volume(self):
+        return cubevox_port.volume_path(self.target.volume)
+
+
+# -- what the host can see of the box
+
+def port_present():
+    """True when a serial port node exists: the one named with --port, else any cu.usbmodem*."""
+    named = os.environ.get(cubevox_port.PORT_ENV)
+    return os.path.exists(named) if named else bool(cubevox_port.list_ports())
+
+
+def wait_port(wait_s):
+    """Seconds until a serial port node exists, or None after wait_s."""
+    start = time.monotonic()
+    while not port_present():
+        if time.monotonic() - start >= wait_s:
+            return None
+        time.sleep(PORT_POLL_S)
+    return time.monotonic() - start
+
+
+def wait_port_gone(path, wait_s):
+    end = time.monotonic() + wait_s
+    while os.path.exists(path):
+        if time.monotonic() >= end:
+            return False
+        time.sleep(PORT_POLL_S)
+    return True
+
+
+def wait_state(ctx, wait_s):
+    """'app' once a serial port exists, 'drive' once the update drive is mounted, None after wait_s."""
+    end = time.monotonic() + wait_s
+    while True:
+        if port_present():
+            return "app"
+        if cubevox_port.volume_mounted(ctx.target.volume):
+            return "drive"
+        if time.monotonic() >= end:
+            return None
+        time.sleep(PORT_POLL_S)
+
+
+def read_bytes(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError as e:
+        raise DrillError(f"cannot read {path}: {e.strerror}") from e
+
+
+def write_bytes(path, data):
+    try:
+        with open(path, "wb") as f:
+            f.write(data)
+    except OSError as e:
+        raise DrillError(f"cannot write {path}: {e.strerror}") from e
+
+
+def flush_to_device(fd):
+    """Pushes written data to the box. F_FULLFSYNC also asks the drive to flush; fsync is the fallback."""
+    try:
+        fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+    except OSError:
+        os.fsync(fd)
+
+
+def copy_to_drive(volume, src, name, fraction=1.0):
+    """Writes src, or its first `fraction` in whole UF2 blocks, to the drive. Returns None or the error text.
+
+    The box resets after the last block, so the OS may report an error for a copy that worked.
+    Callers judge by the drive and the serial port.
+    """
+    data = read_bytes(src)
+    block = stamp_image.UF2_BLOCK_BYTES
+    size = len(data) if fraction >= 1.0 else max(1, int(len(data) // block * fraction)) * block
+    error, fd = None, None
+    try:
+        fd = os.open(os.path.join(volume, name), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+        view = memoryview(data[:size])
+        while view:
+            view = view[os.write(fd, view):]
+        flush_to_device(fd)
+    except OSError as e:
+        error = str(e)
+    if fd is not None:
+        try:
+            os.close(fd)
+        except OSError as e:
+            error = error or str(e)
+    return error
+
+
+def read_uncached(path):
+    """A file's text, read around the page cache so a DIAG.TXT the bootloader rewrote shows."""
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        fcntl.fcntl(fd, fcntl.F_NOCACHE, 1)
+        chunks = []
+        while True:
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                return b"".join(chunks).decode("ascii", "replace")
+            chunks.append(chunk)
+    finally:
+        os.close(fd)
+
+
+def read_drive_text(volume, name, wait_s=5.0):
+    """Text of a file on the update drive. Retries while the drive settles after mounting."""
+    path = os.path.join(volume, name)
+    end = time.monotonic() + wait_s
+    while True:
+        try:
+            return read_uncached(path)
+        except OSError as e:
+            if time.monotonic() >= end:
+                raise DrillError(f"cannot read {path}: {e}") from e
+        time.sleep(0.3)
+
+
+FIELD = re.compile(r"^([A-Za-z][A-Za-z0-9 -]*): (.*)$")
+
+
+def parse_fields(text):
+    """The `key: value` lines of INFO_UF2.TXT or DIAG.TXT with lower-case keys, plus line 1 as 'title'."""
+    lines = [line.strip() for line in text.replace("\r", "").split("\n")]
+    fields = {"title": lines[0]}
+    for line in lines[1:]:
+        m = FIELD.match(line)
+        if m:
+            fields.setdefault(m.group(1).lower(), m.group(2))
+    return fields
+
+
+def parse_refused(fields):
+    """(refused block count, last refused family id or None) from DIAG.TXT's 'refused blocks' line."""
+    m = re.match(r"(\d+)(?:, last family (0x[0-9A-Fa-f]+))?", fields.get("refused blocks", ""))
+    if not m:
+        return 0, None
+    return int(m.group(1)), (int(m.group(2), 16) if m.group(2) else None)
+
+
+def hex_value(text):
+    """The integer in a '0x...' field, or None."""
+    try:
+        return int(text, 16)
+    except (TypeError, ValueError):
+        return None
+
+
+# -- the operator and the serial protocol
+
+def ask_operator(text):
+    """Prints one instruction and waits for Enter. An answer starting with n says it did not go that way."""
+    try:
+        answer = input(f"\n  {text}\n  Enter when done, n if it did not go that way: ")
+    except EOFError as e:
+        raise DrillError("stdin is closed; run with --no-prompt to skip the operator drills") from e
+    return not answer.strip().lower().startswith("n")
+
+
+def ask_ok(port, cmd, wait_s=5.0, **fields):
+    """The reply to a command when it says ok:true, else a DrillError that shows what came back."""
+    reply = port.ask(cmd, wait_s, **fields)
+    if reply is None:
+        raise DrillError(f"{cmd}: no reply in {wait_s:g} s")
+    if reply.get("ok") is not True:
+        raise DrillError(f"{cmd}: {str(reply)[:160]}")
+    return reply
+
+
+def get_layout(port):
+    layout = ask_ok(port, "get_layout").get("layout")
+    if not (isinstance(layout, dict) and "name" in layout and "slots" in layout):
+        raise DrillError(f"get_layout: no layout in the reply: {str(layout)[:120]}")
+    return layout
+
+
+def layout_key(layout):
+    return layout["name"], tuple(layout["slots"])
+
+
+def note_hello(ctx, hello):
+    ctx.fw = hello.get("fw")
+    ctx.log.facts["Firmware"] = f"{hello.get('fw')} ({hello.get('build')})"
+
+
+# -- moving the box between the application and the drive
+
+def restore_app(ctx):
+    """Brings the box back to the running application and opens its port.
+
+    A mounted drive gets the bench image, so a failed drill does not strand the ones after it.
+    """
+    state = wait_state(ctx, REPLUG_WAIT_S)
+    if state == "app":
+        ctx.port = Port(wait_s=1.0)
+    elif state == "drive":
+        install(ctx, ctx.files["bench"], COPY_NAME)
+    else:
+        raise DrillError(f"the box is neither a serial port nor the {ctx.target.volume} drive "
+                         f"after {REPLUG_WAIT_S:g} s")
+
+
+def install(ctx, src, name, port_wait_s=UPDATE_WAIT_S):
+    """Drags `src` onto the mounted drive and waits for the box to restart into the application.
+
+    Opens ctx.port. The box resets after the last block, so the OS may report an error for a copy
+    that worked. Only the drive and the serial port decide.
+    """
+    ctx.drop_port()
+    copy_error = copy_to_drive(ctx.volume(), src, name)
+    done = time.monotonic()
+    if not cubevox_port.wait_volume_gone(ctx.target.volume, UPDATE_WAIT_S):
+        raise DrillError(f"{ctx.target.volume} is still mounted {UPDATE_WAIT_S:g} s after the copy"
+                         f"{os_note(copy_error)}")
+    gone_s = time.monotonic() - done
+    back_s = wait_port(port_wait_s)
+    if back_s is None:
+        raise DrillError(f"no serial port {port_wait_s:g} s after the drive left")
+    ctx.port = Port(wait_s=1.0)
+    return Install(copy_error, gone_s, back_s)
+
+
+def os_note(error):
+    return f"; the OS reported: {error}" if error else ""
+
+
+def copy_note(r):
+    return os_note(r.copy_error)
+
+
+def enter_update_mode(ctx, wait_s):
+    """enter_dfu from the running application. Returns the seconds until the drive mounted."""
+    port = ctx.app()
+    ask_ok(port, "enter_dfu", 3.0)
+    path = port.path
+    ctx.drop_port()
+    start = time.monotonic()
+    if cubevox_port.wait_volume(ctx.target.volume, wait_s) is None:
+        raise DrillError(f"{ctx.target.volume} is not mounted {wait_s:g} s after enter_dfu")
+    mount_s = time.monotonic() - start
+    if os.path.exists(path):
+        raise DrillError(f"serial port {path} is still there with the drive mounted")
+    return mount_s
+
+
+def ensure_drive(ctx):
+    """The mounted update drive's path. Asks the application for the drive when it is not up."""
+    if not cubevox_port.volume_mounted(ctx.target.volume):
+        enter_update_mode(ctx, UPDATE_WAIT_S)
+    return ctx.volume()
+
+
+# -- the files the drills copy
+
+def fw_outdir(variant, weact):
+    """The out dir build.sh uses for a variant. The script is the one place that rule lives."""
+    r = subprocess.run([os.path.join(FW, "build.sh"), "--outdir"], env=fw_env(variant, weact),
+                       capture_output=True, text=True)
+    out = r.stdout.strip()
+    if r.returncode or not out:
+        raise DrillError(f"build.sh --outdir exited {r.returncode}: {(r.stdout + r.stderr).strip()[:160]}")
+    return out
+
+
+def build_release():
+    """Builds the release image so its .uf2 is current. Returns the out dir."""
+    r = subprocess.run([os.path.join(FW, "build.sh")], env=fw_env("release", False), text=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if r.returncode:
+        tail = "\n".join(r.stdout.splitlines()[-SCRIPT_FAIL_TAIL_LINES:])
+        raise DrillError(f"build.sh (release) exited {r.returncode}:\n{tail}")
+    return fw_outdir("release", False)
+
+
+def rewrap(tmp, image, name, family, base=None):
+    """A .uf2 of the stamped image in another family or at another base, written by stamp_image.py."""
+    out = os.path.join(tmp, name)
+    cmd = [sys.executable, "-I", STAMP_TOOL, "uf2", image, out, "--family", family]
+    if base is not None:
+        cmd += ["--base", f"0x{base:08X}"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        raise DrillError((r.stderr or r.stdout).strip() or f"stamp_image.py exited {r.returncode}")
+    return out
+
+
+def flip_payload_byte(path):
+    """Flips one bit in the payload of the middle block. Headers and end magics stay valid, so only the CRC knows."""
+    blob = bytearray(read_bytes(path))
+    block = (len(blob) // stamp_image.UF2_BLOCK_BYTES) // 2
+    blob[block * stamp_image.UF2_BLOCK_BYTES + stamp_image.UF2_HEADER_BYTES + 17] ^= 0x01
+    write_bytes(path, bytes(blob))
+
+
+def uf2_family(path):
+    """The family id in a .uf2's first block, the eighth word of the header stamp_image.make_uf2 writes."""
+    head = read_bytes(path)[:stamp_image.UF2_HEADER_BYTES]
+    if len(head) < stamp_image.UF2_HEADER_BYTES:
+        raise DrillError(f"{path} is shorter than one UF2 block header")
+    return struct.unpack_from("<8I", head, 0)[7]
+
+
+def stamp_version(uf2):
+    """The version `stamp_image.py check` reads from a .uf2, so a stale build shows before the copy."""
+    r = subprocess.run([sys.executable, "-I", STAMP_TOOL, "check", uf2], capture_output=True, text=True)
+    m = re.match(r"ok (\S+)", r.stdout)
+    if r.returncode or not m:
+        raise DrillError((r.stderr or r.stdout).strip() or f"stamp_image.py check exited {r.returncode}")
+    return m.group(1)
+
+
+def release_version():
+    """VERSION.txt, the text the release file name and the image header both come from."""
+    lines = read_bytes(os.path.join(REPO, "VERSION.txt")).decode("ascii", "replace").splitlines()
+    version = lines[0].strip() if lines else ""
+    if not re.fullmatch(r"[0-9]+\.[0-9][0-9]\.[0-9][0-9]", version):
+        raise DrillError(f"VERSION.txt is '{version}'; it must look like 2.00.10")
+    return version
+
+
+def prepare_files(ctx, foreign_uf2):
+    """Fills ctx.files from the installed bench image: the good .uf2 and the three bad ones."""
+    outdir = fw_outdir("bench", ctx.target.family == "weact")
+    image = os.path.join(outdir, "cubevox.ino.bin")
+    bench = os.path.join(outdir, "cubevox.uf2")
+    for path in (image, bench):
+        if not os.path.isfile(path):
+            raise DrillError(f"{path} is missing; build the bench image first")
+    own = ctx.target.family
+    if foreign_uf2:
+        if not os.path.isfile(foreign_uf2):
+            raise DrillError(f"--weact-uf2 {foreign_uf2} is not a file")
+        if uf2_family(foreign_uf2) == contract_value(f"CV_UF2_FAMILY_{own.upper()}"):
+            raise DrillError(f"--weact-uf2 {foreign_uf2} is in this board's own family")
+    flipped = rewrap(ctx.tmp, image, "flipped.uf2", own)
+    flip_payload_byte(flipped)
+    ctx.files = {
+        "bench": bench,
+        "wrongbase": rewrap(ctx.tmp, image, "wrongbase.uf2", own, contract_value("CV_APP_END")),
+        "foreign": foreign_uf2 or rewrap(ctx.tmp, image, "foreign.uf2", ctx.target.foreign),
+        "flipped": flipped,
+    }
+
+
+# -- drills 1 and 2: into the drive and out again
+
+def drill_enter_dfu(ctx):
+    mount_s = enter_update_mode(ctx, VOLUME_APPEAR_S)
+    measured = f"{mount_s:.1f} s"
+    info = parse_fields(read_drive_text(ctx.volume(), "INFO_UF2.TXT"))
+    uid = info.get("serial", "")
+    if not re.fullmatch(r"[0-9A-F]{24}", uid):
+        return FAIL, f"INFO_UF2.TXT serial is '{uid}', want 24 hex characters", measured
+    if ctx.app_serial and ctx.app_serial != uid:
+        return FAIL, f"hello serial {ctx.app_serial} differs from the drive serial {uid}", measured
+    ctx.uid = uid
+    ctx.log.facts.update({"UID": uid, "Bootloader": info["title"]})
+    return (PASS, f"serial port gone, drive mounted in {mount_s:.1f} s (limit {VOLUME_APPEAR_S:g} s); "
+            f"{info['title']}; installed {info.get('installed', '?')}", measured)
+
+
+def drill_install_bench(ctx):
+    ensure_drive(ctx)
+    r = install(ctx, ctx.files["bench"], COPY_NAME, PORT_RETURN_S)
+    hello = ask_ok(ctx.port, "hello")
+    note_hello(ctx, hello)
+    detail = (f"drive left {r.gone_s:.1f} s after the copy, serial port back {r.back_s:.1f} s later "
+              f"(limit {PORT_RETURN_S:g} s); hello build {hello.get('build')}, fw {hello.get('fw')}")
+    return (PASS if hello.get("build") == "bench" else FAIL), detail + copy_note(r), f"{r.back_s:.1f} s"
+
+
+# -- drills 3 and 4: a copy cut short
+
+def partial_copy(ctx, instruction):
+    """Copies the first 30 % of the bench file, then asks the operator to break the link.
+
+    False when the operator says it did not go that way.
+    """
+    error = copy_to_drive(ensure_drive(ctx), ctx.files["bench"], COPY_NAME, PARTIAL_FRACTION)
+    if error:
+        raise DrillError(f"the partial copy failed: {error}")
+    time.sleep(PARTIAL_SETTLE_S)
+    return ask_operator(f"{int(PARTIAL_FRACTION * 100)} % of the file is on the drive, so {instruction}")
+
+
+def drill_usb_pull(ctx):
+    if not partial_copy(ctx, "pull the USB-C cable, wait 3 s and plug it back in."):
+        return FAIL, "operator says the cable was not pulled", ""
+    if cubevox_port.wait_volume(ctx.target.volume, REPLUG_WAIT_S) is None:
+        return FAIL, f"{ctx.target.volume} did not return {REPLUG_WAIT_S:g} s after the replug", ""
+    if port_present():
+        return FAIL, "a serial port appeared; the application started instead of waiting", ""
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    return PASS, f"drive returned and the box kept waiting; a full copy then restarted it ({r.back_s:.1f} s)", ""
+
+
+def drill_power_cut(ctx):
+    if not partial_copy(ctx, "switch the 9 V off, wait 3 s and switch it on."):
+        return FAIL, "operator says the power was not cut", ""
+    if cubevox_port.wait_volume(ctx.target.volume, REPLUG_WAIT_S) is None:
+        return FAIL, f"{ctx.target.volume} did not appear {REPLUG_WAIT_S:g} s after power-on", ""
+    diag = parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT"))
+    reason, address = diag.get("reason", "?"), diag.get("fault address", "?")
+    good = reason == "ImageInvalid" or (reason == "ImageUnreadable" and bool(hex_value(address)))
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    return ((PASS if good else FAIL), f"DIAG.TXT reason {reason}, fault address {address}; "
+            f"a full copy then restarted the box ({r.back_s:.1f} s)", "")
+
+
+# -- drills 5 to 7: files the bootloader must refuse or catch
+
+Refusal = collections.namedtuple("Refusal", "refused family blocks copy_error")
+
+
+def refused_copy(ctx, path):
+    """Copies a file the bootloader must refuse, then reads DIAG.TXT until every block is counted.
+
+    A refused file leaves the box in update mode, so a drive that vanishes is a failure.
+    """
+    blocks = os.path.getsize(path) // stamp_image.UF2_BLOCK_BYTES
+    error = copy_to_drive(ctx.volume(), path, COPY_NAME)
+    end = time.monotonic() + UPDATE_WAIT_S
+    while True:
+        if not cubevox_port.volume_mounted(ctx.target.volume):
+            raise DrillError(f"the drive went away after the copy; the box restarted instead of refusing"
+                             f"{os_note(error)}")
+        refused, family = parse_refused(parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT")))
+        if refused >= blocks or time.monotonic() >= end:
+            return Refusal(refused, family, blocks, error)
+        time.sleep(0.5)
+
+
+def drill_wrong_base(ctx):
+    before = layout_key(get_layout(ctx.app()))
+    ensure_drive(ctx)
+    refusal = refused_copy(ctx, ctx.files["wrongbase"])
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    same = layout_key(get_layout(ctx.port)) == before
+    detail = (f"{refusal.refused} of {refusal.blocks} blocks refused and the drive stayed up; layout "
+              f"{'unchanged' if same else 'CHANGED'} after the restart ({r.back_s:.1f} s)")
+    good = refusal.refused >= refusal.blocks and same
+    return (PASS if good else FAIL), detail + copy_note(refusal), ""
+
+
+def drill_other_family(ctx):
+    expected = uf2_family(ctx.files["foreign"])
+    ensure_drive(ctx)
+    refusal = refused_copy(ctx, ctx.files["foreign"])
+    installed = parse_fields(read_drive_text(ctx.volume(), "INFO_UF2.TXT")).get("installed", "?")
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    last = "none" if refusal.family is None else hex(refusal.family)
+    detail = (f"{refusal.refused} of {refusal.blocks} blocks refused, last family {last} (file {hex(expected)}); "
+              f"drive still reports installed {installed}; a full copy then restarted the box ({r.back_s:.1f} s)")
+    good = refusal.refused >= refusal.blocks and refusal.family == expected
+    return (PASS if good else FAIL), detail + copy_note(refusal), ""
+
+
+def wait_installed(ctx, want, wait_s):
+    """Polls INFO_UF2.TXT until its Installed line says `want`. Returns (last value seen, last read error)."""
+    path = os.path.join(ctx.volume(), "INFO_UF2.TXT")
+    end = time.monotonic() + wait_s
+    seen, error = None, None
+    while True:
+        try:
+            seen = parse_fields(read_uncached(path)).get("installed")
+        except OSError as e:
+            error = str(e)  # the drive is between two sessions while the box restarts
+        if seen == want or time.monotonic() >= end:
+            return seen, error
+        time.sleep(0.5)
+
+
+def drill_flipped_byte(ctx):
+    ensure_drive(ctx)
+    copy_error = copy_to_drive(ctx.volume(), ctx.files["flipped"], COPY_NAME)  # the box restarts after the last block
+    seen, read_error = wait_installed(ctx, "invalid", UPDATE_WAIT_S)
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    got = f"installed '{seen}'" + (f" (last read error: {read_error})" if seen != "invalid" and read_error else "")
+    detail = (f"after the flipped copy the restarted drive reports {got}; a full copy then restarted the box "
+              f"({r.back_s:.1f} s)")
+    return (PASS if seen == "invalid" else FAIL), detail + os_note(copy_error if seen != "invalid" else None), ""
+
+
+# -- drill 8: failed starts
+
+def read_boot_fails(port):
+    """boot_fails from status, or None when the box does not answer inside the healthy window."""
+    reply = port.ask("status", 1.5)
+    return reply.get("boot_fails") if isinstance(reply, dict) else None
+
+
+def trigger_reset(ctx, op, wait_s):
+    """Sends a bench op that resets the box and waits for the serial port to drop."""
+    port = ctx.port
+    path = port.path
+    port.send(op)
+    port.read(wait_s)  # returns early when the reset drops the port
+    ctx.drop_port()
+    if not wait_port_gone(path, 1.0):
+        raise DrillError(f"serial port still there {wait_s:g} s after bench op {op}")
+
+
+def drill_failed_starts(ctx):
+    limit = contract_value("CV_BOOT_FAIL_LIMIT")
+    healthy_s = contract_value("CV_HEALTHY_MS") / 1000.0
+    ctx.app()
+    time.sleep(healthy_s + HEALTHY_MARGIN_S)  # the running start has reported healthy, so the count is 0
+    trigger_reset(ctx, "w", RESET_WAIT_S)     # a fresh start; the faults land inside its healthy window
+    seen = []
+    for n in range(1, limit + 1):
+        if wait_state(ctx, UPDATE_WAIT_S) != "app":
+            return FAIL, f"the application did not start before fault {n} of {limit}", ""
+        ctx.port = Port(wait_s=2.0, settle_s=FAST_SETTLE_S)
+        seen.append(read_boot_fails(ctx.port))
+        trigger_reset(ctx, "f", FAULT_WAIT_S)
+    state = wait_state(ctx, UPDATE_WAIT_S)
+    if state != "drive":
+        return FAIL, f"after {limit} faults the box shows {state or 'neither port nor drive'}, want the drive", ""
+    diag = parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT"))
+    reason, fault = diag.get("reason", "?"), diag.get("fault", "?")
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    good = reason == "BootFailed" and not fault.startswith("none")
+    return ((PASS if good else FAIL), f"started {limit} times, then update mode; DIAG.TXT reason {reason}, "
+            f"fault {fault}; status boot_fails at each start {seen}; a full copy then restarted the box "
+            f"({r.back_s:.1f} s)", "")
+
+
+# -- drill 9: the layout
+
+def drill_layout(ctx):
+    before = get_layout(ctx.app())
+    name = "drill9b" if before["name"] == "drill9" else "drill9"
+    new = {"name": name, "slots": [before["slots"][1], before["slots"][0], *before["slots"][2:]]}
+    ask_ok(ctx.port, "set_layout", **new)
+    if layout_key(get_layout(ctx.port)) != layout_key(new):
+        return FAIL, "get_layout differs from the layout set, before any update", ""
+    enter_update_mode(ctx, UPDATE_WAIT_S)
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    kept = layout_key(get_layout(ctx.port)) == layout_key(new)
+    ask_ok(ctx.port, "set_layout", name=before["name"], slots=before["slots"])  # leaves the box as found
+    return ((PASS if kept else FAIL), f"layout '{name}' with slots 1 and 2 swapped "
+            f"{'survived' if kept else 'did NOT survive'} the update ({r.back_s:.1f} s); original layout set again", "")
+
+
+# -- drills 10 to 12: the operator at the box
+
+def countdown(seconds):
+    """Sleeps with a progress line every 10 s, because the box is silent for the whole wait."""
+    left = int(seconds)
+    while left > 0:
+        print(f"  waiting, {left} s left", flush=True)
+        step = min(10, left)
+        time.sleep(step)
+        left -= step
+
+
+def drill_menu_held(ctx):
+    ctx.app()
+    ctx.drop_port()
+    if not ask_operator("Hold MENU, switch the 9 V off and on while holding it, "
+                        "and release when the OLED says 'Drop the firmware on'."):
+        return FAIL, "operator says MENU was not held through the power cycle", ""
+    if cubevox_port.wait_volume(ctx.target.volume, REPLUG_WAIT_S) is None:
+        return FAIL, f"{ctx.target.volume} did not appear {REPLUG_WAIT_S:g} s after power-on", ""
+    reason = parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT")).get("reason", "?")
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    return ((PASS if reason == "MenuHeld" else FAIL),
+            f"DIAG.TXT reason {reason}; a full copy then restarted the box ({r.back_s:.1f} s)", "")
+
+
+def drill_no_computer(ctx):
+    wait_s = contract_value("CV_UPDATE_TIMEOUT_MS") / 1000.0 + 10.0
+    ctx.app()
+    ctx.drop_port()
+    # A host that enumerates switches the 60 s timeout off for good, and serial needs a host. The
+    # menu with USB-C unplugged calls the same enterDfu() as the enter_dfu command.
+    if not ask_operator("Unplug the USB-C cable, turn MENU to Update firmware, click twice, "
+                        "and keep USB-C out until this script says to plug it in."):
+        return FAIL, "operator says update mode was not entered", ""
+    countdown(wait_s)
+    print("  Plug the USB-C cable back in now.", flush=True)
+    state = wait_state(ctx, REPLUG_WAIT_S)
+    measured = f"{wait_s:g} s"
+    if state == "app":
+        return PASS, f"after {wait_s:g} s with no computer the serial port came back, no drive", measured
+    if state == "drive":
+        return FAIL, f"the box was still in update mode {wait_s:g} s after the click", measured
+    return FAIL, f"neither a serial port nor the drive appeared {REPLUG_WAIT_S:g} s after the replug", measured
+
+
+def drill_menu_entry(ctx):
+    ctx.app()
+    shown = f"'You have {ctx.fw}.'" if ctx.fw else "the installed version"
+    ctx.drop_port()
+    if not ask_operator(f"Turn MENU to Update firmware, click, check that the confirm screen shows "
+                        f"{shown}, and click again."):
+        return FAIL, "operator says the confirm screen or the click did not behave", ""
+    if cubevox_port.wait_volume(ctx.target.volume, UPDATE_WAIT_S) is None:
+        return FAIL, f"{ctx.target.volume} did not mount after the second click", ""
+    r = install(ctx, ctx.files["bench"], COPY_NAME)
+    return PASS, f"the second click opened the drive; a full copy then restarted the box ({r.back_s:.1f} s)", ""
+
+
+# -- drill 13: what Adam does
+
+def drill_release(ctx):
+    if ctx.target.family != "cubevox":
+        return SKIPPED, "the WeAct board runs the bench image only", ""
+    version = release_version()
+    uf2 = os.path.join(build_release(), "cubevox.uf2")
+    stamped = stamp_version(uf2)
+    if stamped != f"v{version}":
+        return FAIL, f"the release image says {stamped} but VERSION.txt says v{version}; the build is stale", ""
+    ensure_drive(ctx)
+    r = install(ctx, uf2, f"cubevox-v{version}.uf2", PORT_RETURN_S)
+    hello = ask_ok(ctx.port, "hello")
+    note_hello(ctx, hello)
+    want = (("build", "release"), ("fw", f"v{version}"), ("serial", ctx.uid or ctx.app_serial))
+    wrong = [f"hello {key} is {hello.get(key)!r}, want {value!r}" for key, value in want if hello.get(key) != value]
+    measured = f"{r.back_s:.1f} s"
+    if wrong:
+        return FAIL, "; ".join(wrong), measured
+    return PASS, f"hello build release, fw v{version}, serial {hello.get('serial')}{copy_note(r)}", measured
+
+
+# (number, name, function, needs the operator)
+DRILLS = (
+    (1, "enter_dfu opens the update drive", drill_enter_dfu, False),
+    (2, "bench .uf2 copy restarts the application", drill_install_bench, False),
+    (3, "USB pulled at 30 % of a copy", drill_usb_pull, True),
+    (4, "9 V cut at 30 % of a copy", drill_power_cut, True),
+    (5, "wrong base address refused", drill_wrong_base, False),
+    (6, "other family refused", drill_other_family, False),
+    (7, "flipped byte lands in update mode", drill_flipped_byte, False),
+    (8, "failed starts land in update mode", drill_failed_starts, False),
+    (9, "layout survives an update", drill_layout, False),
+    (10, "MENU held at power-on", drill_menu_held, True),
+    (11, "no computer, back to the application", drill_no_computer, True),
+    (12, "menu entry and confirm screen", drill_menu_entry, True),
+    (13, "release .uf2 copy", drill_release, False),
+)
+
+
+def run_drill(ctx, number, name, fn, operator):
+    """Runs one drill and logs its verdict. A failure drops the port, so the next drill restores the box."""
+    if operator and not ctx.prompt:
+        ctx.log.drill(number, name, SKIPPED, "needs the operator; --no-prompt")
+        return
+    measured = ""
+    try:
+        status, detail, measured = fn(ctx)
+    except (DrillError, *PORT_ERRORS) as e:
+        status, detail = FAIL, str(e)
+        print(f"[ERROR] drill {number}: {detail}", flush=True)
+        ctx.drop_port()
+    except Exception as e:  # a bug in one drill must not lose the others' results
+        traceback.print_exc()
+        status, detail = FAIL, f"unexpected {type(e).__name__}: {e}"
+        ctx.drop_port()
+    ctx.log.drill(number, name, status, detail, measured)
+
+
+def update_drills(log, port, a):
+    """Runs the 13 drills. Takes over `port`, the open port of the running bench application."""
+    with tempfile.TemporaryDirectory(prefix="cubevox-update-") as tmp:
+        ctx = Ctx(log, TARGETS[a.weact], not a.no_prompt, tmp)
+        ctx.port = port
+        try:
+            prepare_files(ctx, a.weact_uf2)
+            hello = ask_ok(ctx.port, "hello")
+        except (DrillError, *PORT_ERRORS) as e:
+            print(f"[ERROR] update drills: {e}", flush=True)
+            log.check("update drills", False, str(e))
+            for number, name, _, _ in DRILLS:
+                log.drill(number, name, SKIPPED, "setup failed")
+            ctx.drop_port()
+            return
+        note_hello(ctx, hello)
+        ctx.app_serial = hello.get("serial")
+        log.facts["UID"] = ctx.app_serial or "unknown"
+        for number, name, fn, operator in DRILLS:
+            run_drill(ctx, number, name, fn, operator)
+        ctx.drop_port()
+
+
 MANUAL = [
     ("input current at 9.6 V", "Bench supply current at 9.6 V, before USB (mA): "),
     ("placement orientation", "U1, SOT-23s, diodes, polarised caps match the silkscreen? (y/n, note): "),
     ("menu DFU entry", "MENU > Update firmware > click reaches DFU (dfu-util -l)? (y/n/skip): "),
     ("OLED readable", "OLED shows the idle screen and the knob readout? (y/n/skip): "),
 ]
+UPDATE_SCREENS = ("update-mode OLED screens",
+                  "During the drills did the OLED show 'Drop the firmware on', 'The update stopped.', "
+                  "'Startup failed.', 'Writing the firmware.', 'That is not a cubevox' and "
+                  "'The update is done.'? (y/n/skip): ")
+
+
+def manual_questions(a):
+    """The closing questions. The update drills answer the menu DFU one and add the update screens."""
+    questions = [q for q in MANUAL if not (a.update and q[0] == "menu DFU entry")]
+    if a.update and not a.no_oled:
+        questions.append(UPDATE_SCREENS)
+    return questions
 
 
 def main():
@@ -437,6 +1242,10 @@ def main():
     ap.add_argument("--faults", action="store_true", help="drill audio stall, watchdog and bus fault")
     ap.add_argument("--dfu", action="store_true", help="drill DFU entry; reflashes the board")
     ap.add_argument("--panel", action="store_true", help="walk every pot and toggle, then K103, mute and OLED")
+    ap.add_argument("--update", action="store_true",
+                    help="run the 13 update drills against the bootloader's drive; the log is board-N.md")
+    ap.add_argument("--weact-uf2", default=None, metavar="PATH",
+                    help="drill 6 file, a .uf2 of the other family (default: the bench image rewrapped)")
     ap.add_argument("--no-prompt", action="store_true", help="skip every question to the operator")
     ap.add_argument("--port", default=None, help="serial port, needed only when several cu.usbmodem* exist")
     a = ap.parse_args()
@@ -474,23 +1283,48 @@ def run_checks(log, a):
     if a.dfu:
         port = dfu_drill(log, port, a.weact, not a.no_prompt)
         check_boot(log, boot_report(port), not a.no_oled)
-    port.close()
-    if not a.weact:
-        check_release_image(log)
+    if a.update:
+        update_drills(log, port, a)
+    else:
+        port.close()
+    if not a.weact and not a.update:
+        check_release_image(log)  # under --update, drill 13 is the release image check
 
     if not a.no_prompt:
-        for name, question in MANUAL:
+        for name, question in manual_questions(a):
             log.note(name, input(question).strip() or "no answer")
+
+
+def cell(text):
+    """A Markdown table cell has no pipes and no line breaks."""
+    return str(text).replace("|", "/").replace("\n", " ")
+
+
+def markdown_log(log, a, stamp):
+    """board-N.md: the unit's UID and versions, the checks as text and the drill table."""
+    facts = {"Date": stamp, "UID": "unknown", "Bootloader": "unknown", "Firmware": "unknown", **log.facts}
+    facts["Failed"] = log.failed
+    lines = [f"# cubevox bring-up, board {a.board}", "", "| Item | Value |", "|---|---|"]
+    lines += [f"| {key} | {cell(value)} |" for key, value in facts.items()]
+    lines += ["", "## Checks", "", "```text", *log.rows, "```", "", "## Update drills", "",
+              "| # | Drill | Result | Time | Detail |", "|---|---|---|---|---|"]
+    lines += [f"| {n} | {cell(name)} | {status} | {cell(measured)} | {cell(detail)} |"
+              for n, name, status, detail, measured in log.drills]
+    return "\n".join(lines) + "\n"
 
 
 def finish(log, a):
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
     out_dir = os.path.join(REPO, "hardware", "bringup")
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"{stamp}-board-{a.board}.txt")
+    if a.update:
+        path = os.path.join(out_dir, f"board-{a.board}.md")
+        text = markdown_log(log, a, stamp)
+    else:
+        path = os.path.join(out_dir, f"{stamp}-board-{a.board}.txt")
+        text = f"cubevox bring-up, board {a.board}, {stamp}\n" + "\n".join(log.rows) + "\n"
     with open(path, "w") as f:
-        f.write(f"cubevox bring-up, board {a.board}, {stamp}\n")
-        f.write("\n".join(log.rows) + "\n")
+        f.write(text)
     print(f"\n[bringup] {log.failed} failed; log {path}")
     return 1 if log.failed else 0
 
