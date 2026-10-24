@@ -97,6 +97,8 @@ echo $$ > "$LOCK/pid"
 
 CORE="STMicroelectronics:stm32"
 CORE_VERSION="${CORE_VERSION:-3.0.0}"  # env override exists only so the check itself can be tested
+# The compiler the core installs. bootloader/build.sh pins the same version, so one toolchain serves both.
+XPACK_VERSION="14.2.1-1.1"
 FQBN="$CORE:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen"
 
 if ! command -v arduino-cli >/dev/null; then
@@ -117,11 +119,13 @@ fi
 # The CLI knows where its packages and libraries live, so nothing here hard-codes a platform path.
 ARDUINO_DATA="$(arduino-cli config get directories.data)"
 ARDUINO_USER="$(arduino-cli config get directories.user)"
-gcc=""
-for candidate in "$ARDUINO_DATA"/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/*/bin/arm-none-eabi-gcc; do
-  if [ -x "$candidate" ]; then gcc="$candidate"; break; fi
-done
-if [ -n "$gcc" ]; then echo "[build] $("$gcc" --version | head -1)"; fi
+gcc="$ARDUINO_DATA/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/$XPACK_VERSION/bin/arm-none-eabi-gcc"
+if [ ! -x "$gcc" ]; then
+  echo "[ERROR] xpack-arm-none-eabi-gcc $XPACK_VERSION missing at $(dirname "$gcc")"
+  echo "        arduino-cli core install $CORE@$CORE_VERSION installs it"
+  exit 1
+fi
+echo "[build] $("$gcc" --version | head -1)"
 
 # The release name is v<VERSION.txt>. The image header, hello, the OLED and the boot report show
 # this one string, and the update drive reads it back from the header. The git state only goes in
@@ -221,10 +225,6 @@ fi
 
 # cubevox.ld cannot include the header, so it carries copies of the contract addresses. Compare
 # the linked symbols with the header.
-if [ -z "$gcc" ]; then
-  echo "[ERROR] no arm-none-eabi toolchain under $ARDUINO_DATA/packages/STMicroelectronics/tools; the symbol check needs its nm"
-  exit 1
-fi
 NM="$(dirname "$gcc")/arm-none-eabi-nm"
 SYMBOLS="$("$NM" "$OUT/cubevox.ino.elf")"
 check_symbol_address() {  # symbol, expected address

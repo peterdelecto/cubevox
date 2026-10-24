@@ -1,36 +1,77 @@
 #!/usr/bin/env bash
-# Flash <out dir>/cubevox.ino.bin over DFU and print the boot report.
+# Installs the application on a box whose sector 0 holds the bootloader (bootloader/flash.sh puts
+# it there), then prints the boot report.
 #
-# The image sits at 0x08020000, so the bootloader must already be in sector 0
-# (firmware/bootloader/flash.sh).
+# By default the script uses the update drive, the path Adam takes by hand. With a cubevox serial
+# port present it sends enter_dfu, waits for /Volumes/CUBEVOX, copies <out dir>/cubevox.uf2 onto
+# it, waits for the box to restart and prints the boot report. With no serial port it waits up to
+# WAIT seconds (default 300) for the drive. A failed start or a MENU held at power-on brings the
+# drive up, and so does a bootloader that has no application yet.
 #
-# The variant and out dir come from build.sh (VARIANT=release|bench; BENCH=1 and BOARD=weact
-# imply bench). If a cubevox CDC port is present the box is asked to enter DFU itself (the
-# enter_dfu command). Otherwise hold BOOT0, tap NRST, release BOOT0; the script waits up to WAIT
-# seconds (default 300). With several cu.usbmodem* ports, name one in CUBEVOX_PORT.
+# --rom goes through the ST ROM DFU with dfu-util, for a box whose application is unreachable. It
+# writes <out dir>/cubevox.ino.bin at the application start (0x08020000, read from boot_block.h),
+# above the bootloader's sector. Hold BOOT0, tap NRST, release BOOT0; the script waits up to WAIT
+# seconds. Written at 0x08000000, that file would destroy the bootloader.
+#
+# The variant and out dir come from build.sh (VARIANT=release|bench; BENCH=1 and BOARD=weact imply
+# bench). BOARD=weact flashes through the WEACTBOOT drive. With several cu.usbmodem* ports, name one
+# in CUBEVOX_PORT.
 #
 #   ./flash.sh                    # release image; build first with ./build.sh
 #   VARIANT=bench ./flash.sh      # bench image; build first with BENCH=1 ./build.sh
 #   BOARD=weact ./flash.sh        # bench image for the WeAct board
+#   ./flash.sh --rom              # the same image through the ROM DFU
 
 set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$FW/.." && pwd)"
 VARIANT="$("$FW/build.sh" --variant)"
-BIN="$("$FW/build.sh" --outdir)/cubevox.ino.bin"
+OUT="$("$FW/build.sh" --outdir)"
 WAIT="${WAIT:-300}"
+MOUNT_WAIT=15  # the drive mounts within 5 s of enter_dfu
 PORT_TOOL=(python3 -I "$FW/cubevox_port.py")
+STAMP_TOOL=(python3 -I "$REPO/tools/stamp_image.py")
 
-if ! command -v dfu-util >/dev/null; then
-  echo "[ERROR] dfu-util not installed (brew install dfu-util)"
-  exit 1
-fi
-if [ ! -f "$BIN" ]; then
+# The drive label each bootloader board serves (bootloader/boards/*/board.h).
+VOLUME=CUBEVOX
+if [ "${BOARD:-}" = weact ]; then VOLUME=WEACTBOOT; fi
+
+usage() {
+  cat <<'USAGE'
+usage: ./flash.sh [--rom]
+  (no flag)  update-drive path: send enter_dfu over the serial port if one is present, wait for
+             /Volumes/CUBEVOX (WEACTBOOT with BOARD=weact), copy <out dir>/cubevox.uf2 onto it,
+             wait for the box to restart, print the boot report
+  --rom      ST ROM DFU path: hold BOOT0, tap NRST, release; dfu-util writes <out dir>/cubevox.ino.bin
+             at the application start from boot_block.h (0x08020000), above the bootloader's sector
+  VARIANT=release|bench, BENCH=1, BOARD=weact pick the image as build.sh does; WAIT=<s> bounds the
+  waits (default 300); CUBEVOX_PORT names the port when several cu.usbmodem* exist
+USAGE
+}
+
+ROM=0
+case "${1:-}" in
+  "") ;;
+  --rom) ROM=1 ;;
+  -h|--help) usage; exit 0 ;;
+  *) echo "[ERROR] unknown argument '$1'; use --rom or --help"; exit 1 ;;
+esac
+
+IMAGE="$OUT/cubevox.uf2"
+if [ "$ROM" -eq 1 ]; then IMAGE="$OUT/cubevox.ino.bin"; fi
+if [ ! -f "$IMAGE" ]; then
   hint="./build.sh"
   if [ "$VARIANT" = bench ]; then hint="BENCH=1 ./build.sh"; fi
-  echo "[ERROR] $BIN missing; run $hint first"
+  if [ "${BOARD:-}" = weact ]; then hint="BOARD=weact ./build.sh"; fi
+  echo "[ERROR] $IMAGE missing; run $hint first"
   exit 1
 fi
-echo "[flash] $VARIANT image"
+# The tool refuses an unstamped image, a bad CRC and a .uf2 outside the application region.
+checked="$("${STAMP_TOOL[@]}" check "$IMAGE")"
+echo "[flash] $VARIANT image, $checked"
+
+copy_log=""
+trap 'if [ -n "$copy_log" ]; then rm -f "$copy_log"; fi' EXIT
 
 in_dfu() {
   local listing
@@ -38,43 +79,84 @@ in_dfu() {
   [[ "$listing" == *0483:df11* ]]
 }
 
-# Fails with the candidates listed when several ports match and none was named.
-box_port="$("${PORT_TOOL[@]}" --allow-none)"
-
-if ! in_dfu && [ -n "$box_port" ]; then
-  echo "[flash] asking the box on $box_port to enter DFU"
-  if ! "${PORT_TOOL[@]}" --port "$box_port" --request enter_dfu >/dev/null; then
-    echo "[flash] the box did not accept enter_dfu; enter DFU by hand with BOOT0"
+rom_flash() {
+  if ! command -v dfu-util >/dev/null; then
+    echo "[ERROR] dfu-util not installed (brew install dfu-util)"
+    exit 1
   fi
-fi
+  local start i dfu_log dfu_rc=0 unexpected
+  start="$(awk '$1 == "#define" && $2 == "CV_APP_START" { sub(/[uUlL]+$/, "", $3); print $3; exit }' \
+    "$FW/cubevox/src/board/boot_block.h")"
+  if [ -z "$start" ]; then
+    echo "[ERROR] CV_APP_START is missing from boot_block.h"
+    exit 1
+  fi
+  for ((i = 0; i < WAIT; i++)); do
+    if in_dfu; then break; fi
+    if [ "$i" -eq 0 ]; then echo "[flash] waiting for the ST ROM DFU (hold BOOT0, tap NRST, release BOOT0)"; fi
+    sleep 1
+  done
+  if ! in_dfu; then
+    echo "[ERROR] no DFU device after ${WAIT}s"
+    exit 1
+  fi
 
-for ((i = 0; i < WAIT; i++)); do
-  if in_dfu; then break; fi
-  if [ "$i" -eq 0 ]; then echo "[flash] waiting for the ST bootloader (hold BOOT0, tap NRST, release BOOT0)"; fi
-  sleep 1
-done
-if ! in_dfu; then
-  echo "[ERROR] no DFU device after ${WAIT}s"
-  exit 1
-fi
+  # The leave request resets the chip before it answers, so dfu-util reports a get_status error
+  # and may exit non-zero. The flash counts as good when the download finished and no other error shows.
+  dfu_log="$(mktemp)"
+  dfu-util -a 0 -s "$start:leave" -D "$IMAGE" >"$dfu_log" 2>&1 || dfu_rc=$?
+  grep -E "Erase|downloaded|Error" "$dfu_log" | grep -v get_status || true  # no match is a normal outcome
+  unexpected="$(awk 'tolower($0) ~ /error/ && $0 !~ /get_status/' "$dfu_log")"
+  if ! grep -q "File downloaded successfully" "$dfu_log" || [ -n "$unexpected" ]; then
+    echo "[ERROR] dfu-util did not finish the download (exit $dfu_rc); output follows"
+    cat "$dfu_log"
+    rm -f "$dfu_log"
+    exit 1
+  fi
+  rm -f "$dfu_log"
+}
 
-# The leave request resets the chip before it answers, so dfu-util reports a get_status error
-# and may exit non-zero. The flash counts as good when the download finished and no other error shows.
-dfu_log="$(mktemp)"
-trap 'rm -f "$dfu_log"' EXIT
-dfu_rc=0
-dfu-util -a 0 -s 0x08020000:leave -D "$BIN" >"$dfu_log" 2>&1 || dfu_rc=$?
-grep -E "Erase|downloaded|Error" "$dfu_log" | grep -v get_status || true  # no match is a normal outcome
-unexpected="$(awk 'tolower($0) ~ /error/ && $0 !~ /get_status/' "$dfu_log")"
-if ! grep -q "File downloaded successfully" "$dfu_log" || [ -n "$unexpected" ]; then
-  echo "[ERROR] dfu-util did not finish the download (exit $dfu_rc); output follows"
-  cat "$dfu_log"
-  exit 1
-fi
+drive_flash() {
+  local box_port drive_wait="$WAIT" volume copy_rc=0
+  # Fails with the candidates listed when several ports match and none was named.
+  box_port="$("${PORT_TOOL[@]}" --allow-none)"
+  if [ -n "$box_port" ]; then
+    echo "[flash] asking the box on $box_port to enter update mode"
+    if "${PORT_TOOL[@]}" --port "$box_port" --request enter_dfu >/dev/null; then
+      drive_wait="$MOUNT_WAIT"
+    else
+      echo "[flash] the box did not accept enter_dfu; switch it on again while holding MENU"
+    fi
+  fi
 
-rm -f "$dfu_log"  # exec below skips the EXIT trap
+  echo "[flash] waiting for /Volumes/$VOLUME"
+  if ! volume="$("${PORT_TOOL[@]}" --wait-volume "$VOLUME" --wait "$drive_wait")"; then
+    echo "        hold MENU while switching the box on, or put the bootloader in with bootloader/flash.sh;"
+    echo "        a box without the bootloader enters the ST ROM DFU instead, so use --rom"
+    exit 1
+  fi
+
+  # The box resets after the last block, so the OS may report an error for a copy that worked. The
+  # port that returns below decides.
+  copy_log="$(mktemp)"
+  echo "[flash] copying $(basename "$IMAGE") to $volume"
+  cp -X "$IMAGE" "$volume/" >"$copy_log" 2>&1 || copy_rc=$?
+  if [ "$copy_rc" -ne 0 ]; then
+    echo "[flash] cp reported '$(tr '\n' ' ' < "$copy_log")'"
+  fi
+}
+
+if [ "$ROM" -eq 1 ]; then
+  rom_flash
+else
+  drive_flash
+fi
 
 # The port name can change across the reset, so ask again.
-box_port="$("${PORT_TOOL[@]}" --wait 30)"
+if ! box_port="$("${PORT_TOOL[@]}" --wait 30)"; then
+  if [ -n "$copy_log" ]; then echo "[ERROR] the box did not come back after the copy; cp said '$(tr '\n' ' ' < "$copy_log")'"; fi
+  exit 1
+fi
+if [ -n "$copy_log" ]; then rm -f "$copy_log"; fi  # exec below skips the EXIT trap
 sleep 2
 exec "$FW/term.py" -t 3 -s '{"id":2,"cmd":"bench","op":"report"}' "$box_port"

@@ -10,7 +10,8 @@ flashes. The image runs from 0x08020000, behind the bootloader in flash sector 0
     ./build.sh          # release image, FQBN STMicroelectronics:stm32:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen
     BENCH=1 ./build.sh  # bench image (drills, panel test)
     TAIL=5 ./build.sh   # last 5 lines of compiler output only
-    ./flash.sh          # write the .bin at 0x08020000 with dfu-util
+    ./flash.sh          # enter_dfu, copy cubevox.uf2 onto the CUBEVOX drive, print the boot report
+    ./flash.sh --rom    # ST ROM DFU (hold BOOT0): dfu-util writes the .bin at 0x08020000
 
 1. **Variant.** `build.sh` is the only place that decides it. `VARIANT=release|bench` names it outright,
    `BENCH=1` and `BOARD=weact` imply bench, and a conflicting `VARIANT` is an error. `./build.sh --variant`
@@ -115,10 +116,11 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
 
 ## Notes
 
-- `flash.sh` writes `<out dir>/cubevox.ino.bin` at 0x08020000 with dfu-util (`-s 0x08020000:leave`), so the
-  bootloader must already be in sector 0 (`bootloader/flash.sh` puts it there). The ST ROM DFU (BOOT0) is its only
-  way in for now. The `enter_dfu` command and the menu now land in the update drive, which `flash.sh` does not
-  wait for until the update-drive rewrite of the script.
+- `flash.sh` takes the path Adam takes: with a serial port present it sends `enter_dfu`, waits for the
+  `CUBEVOX` drive, copies `<out dir>/cubevox.uf2` onto it and prints the boot report once the port returns.
+  `--rom` is the shop fallback for a box whose application is unreachable: dfu-util writes
+  `<out dir>/cubevox.ino.bin` at 0x08020000 (`-s 0x08020000:leave`), above the bootloader that
+  `bootloader/flash.sh` puts in sector 0. `./flash.sh --help` lists the knobs.
 - `bringup.py`: first-article checks for a new board over USB, optional fault and DFU drills, operator
   questions, log to `hardware/bringup/`. `./bringup.py --board 1 --faults --dfu`; on the WeAct add
   `--weact --no-oled`. It checks its panel thresholds, block rate and SAI clock against the firmware through

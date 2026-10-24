@@ -8,19 +8,20 @@ release image and confirms hello reports build "release". --weact stays on the b
 Every command goes out as a framed JSON request through bench_ops.py. The log goes to
 hardware/bringup/. With several cu.usbmodem* ports, name one with --port.
 
---dfu drills the ROM DFU, which only BOOT0 reaches once the bootloader is in sector 0. --update
-runs the 13 drills of docs/specs/2026-10-24-field-update-design.md against the bootloader's update
-drive (/Volumes/CUBEVOX, or WEACTBOOT with --weact). It needs the bootloader installed and the
-bench image running. The operator drills (3, 4, 10, 11, 12) wait for Enter, and --no-prompt skips
-them. Drill 13 is the release image check, so --update does not flash the release image again. The
-log of an --update run is hardware/bringup/board-N.md: UID, bootloader and firmware versions, the
-checks and the drill table.
+--dfu drills the ROM DFU, which only BOOT0 reaches once the bootloader is in sector 0, and flashes
+back with flash.sh --rom. --update runs the 13 drills of
+docs/specs/2026-10-24-field-update-design.md against the bootloader's update drive
+(/Volumes/CUBEVOX, or WEACTBOOT with --weact). It needs the bootloader installed and the bench
+image running. The operator drills (3, 4, 10, 11, 12) wait for Enter, and --no-prompt skips them.
+Drill 13 is the release image check, so --update does not flash the release image again. Its log
+is hardware/bringup/board-N.md with the UID, the bootloader and firmware versions, the checks and
+the drill table.
 
   ./bringup.py --board 1                 # USB checks, then the manual questions
-  ./bringup.py --board 1 --faults --dfu  # also the fault drill and DFU entry (reflashes)
+  ./bringup.py --board 1 --faults --dfu  # also the fault drill and the BOOT0 ROM DFU entry (reflashes)
   ./bringup.py --board 1 --panel         # also the panel walk: pots, toggles, K103, mute, OLED
   ./bringup.py --board 1 --faults --update   # also the update drills; log board-1.md
-  ./bringup.py --weact --no-oled --no-prompt --faults --dfu   # dry run on the WeAct bench board
+  ./bringup.py --weact --no-oled --no-prompt --faults --update   # dry run on the WeAct bench board
 """
 
 import argparse
@@ -28,6 +29,7 @@ import collections
 import datetime
 import fcntl
 import functools
+import importlib.util
 import os
 import re
 import struct
@@ -40,10 +42,23 @@ import traceback
 FW = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(FW)
 sys.path.insert(0, FW)  # python3 -I leaves the script dir out
-sys.path.insert(0, os.path.join(REPO, "tools"))
 import bench_ops  # noqa: E402
 import cubevox_port  # noqa: E402
-import stamp_image  # noqa: E402
+
+STAMP_TOOL = os.path.join(REPO, "tools", "stamp_image.py")
+
+
+def load_tool(name, path):
+    """A module loaded from its file. tools/ is outside the import path of this script and of the editor."""
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"[ERROR] cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+stamp_image = load_tool("stamp_image", STAMP_TOOL)
 
 SAMPLE_RATE_HZ = 48000
 BLOCK_FRAMES = 64
@@ -53,7 +68,6 @@ SAI_TOL_PPM = 100
 ENUMERATE_SETTLE_S = 1.0
 SCRIPT_FAIL_TAIL_LINES = 20
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
-STAMP_TOOL = os.path.join(REPO, "tools", "stamp_image.py")
 
 
 class Port(cubevox_port.Link):
@@ -396,14 +410,15 @@ def fw_env(variant, weact):
     return env
 
 
-def flash_variant(variant, weact):
+def flash_variant(variant, weact, rom=False):
     """Builds and flashes the release or bench image. The WeAct board only ever runs bench.
 
-    build.sh derives the out dir from VARIANT and BOARD; a failing script's output tail is shown.
+    flash.sh uses the update drive, or the ST ROM DFU with rom=True. build.sh derives the out dir
+    from VARIANT and BOARD; a failing script's output tail is shown.
     """
     env = fw_env(variant, weact)
-    for script in ("build.sh", "flash.sh"):
-        r = subprocess.run([os.path.join(FW, script)], env=env, text=True,
+    for script, args in (("build.sh", []), ("flash.sh", ["--rom"] if rom else [])):
+        r = subprocess.run([os.path.join(FW, script), *args], env=env, text=True,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if r.returncode:
             tail = "\n".join(r.stdout.splitlines()[-SCRIPT_FAIL_TAIL_LINES:])
@@ -435,20 +450,20 @@ def check_release_image(log):
 
 
 def dfu_drill(log, port, weact, prompt):
-    port.send("d")
-    port.read(2.0)
-    port.close()
-    ok = wait_dfu(15)
-    log.check("DFU entry by command (menu path)", ok, "0483:df11 listed" if ok else "no DFU device in 15 s")
-    if ok:
-        log.check("flash back over DFU", flash_variant("bench", weact), "build.sh + flash.sh for this board")
+    """The ST ROM DFU, which only BOOT0 reaches once the bootloader is in.
 
-    if prompt:
-        input("\nHold BOOT0, tap reset, release BOOT0, then press Enter. ")
-        ok = wait_dfu(30)
-        log.check("DFU entry by BOOT0", ok, "0483:df11 listed" if ok else "no DFU device in 30 s")
-        if ok:
-            log.check("flash back over DFU", flash_variant("bench", weact), "build.sh + flash.sh for this board")
+    enter_dfu and the menu open the update drive, which the update drills cover.
+    """
+    port.close()
+    if not prompt:
+        log.note("DFU entry by BOOT0", "SKIPPED (--no-prompt)")
+        return Port(wait_s=30.0)
+    input("\nHold BOOT0, tap reset, release BOOT0, then press Enter. ")
+    ok = wait_dfu(30)
+    log.check("DFU entry by BOOT0", ok, "0483:df11 listed" if ok else "no DFU device in 30 s")
+    if ok:
+        flashed = flash_variant("bench", weact, rom=True)
+        log.check("flash back over DFU", flashed, "build.sh + flash.sh --rom for this board")
     return Port(wait_s=30.0)
 
 
@@ -1217,7 +1232,7 @@ def update_drills(log, port, a):
 MANUAL = [
     ("input current at 9.6 V", "Bench supply current at 9.6 V, before USB (mA): "),
     ("placement orientation", "U1, SOT-23s, diodes, polarised caps match the silkscreen? (y/n, note): "),
-    ("menu DFU entry", "MENU > Update firmware > click reaches DFU (dfu-util -l)? (y/n/skip): "),
+    ("menu update entry", "MENU > Update firmware > two clicks open the CUBEVOX drive? (y/n/skip): "),
     ("OLED readable", "OLED shows the idle screen and the knob readout? (y/n/skip): "),
 ]
 UPDATE_SCREENS = ("update-mode OLED screens",
@@ -1227,8 +1242,8 @@ UPDATE_SCREENS = ("update-mode OLED screens",
 
 
 def manual_questions(a):
-    """The closing questions. The update drills answer the menu DFU one and add the update screens."""
-    questions = [q for q in MANUAL if not (a.update and q[0] == "menu DFU entry")]
+    """The closing questions. The update drills answer the menu entry one and add the update screens."""
+    questions = [q for q in MANUAL if not (a.update and q[0] == "menu update entry")]
     if a.update and not a.no_oled:
         questions.append(UPDATE_SCREENS)
     return questions
@@ -1240,7 +1255,7 @@ def main():
     ap.add_argument("--weact", action="store_true", help="WeAct bench board: flash back the weact build")
     ap.add_argument("--no-oled", action="store_true", help="skip the OLED check")
     ap.add_argument("--faults", action="store_true", help="drill audio stall, watchdog and bus fault")
-    ap.add_argument("--dfu", action="store_true", help="drill DFU entry; reflashes the board")
+    ap.add_argument("--dfu", action="store_true", help="drill ROM DFU entry by BOOT0 and flash back over it")
     ap.add_argument("--panel", action="store_true", help="walk every pot and toggle, then K103, mute and OLED")
     ap.add_argument("--update", action="store_true",
                     help="run the 13 update drills against the bootloader's drive; the log is board-N.md")

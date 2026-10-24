@@ -106,6 +106,10 @@ jobs:
       STM32_INDEX_URL: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
     steps:
       - uses: actions/checkout@v4
+      - name: Host selftest
+        # Runs the bootloader's image check and drive texts on the host against tools/stamp_image.py.
+        # It needs no toolchain, so it runs before the core download.
+        run: firmware/bootloader/build.sh --selftest
       - name: Install arduino-cli
         run: |
           curl -fsSL https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_macOS_ARM64.tar.gz -o "$RUNNER_TEMP/acli.tgz"

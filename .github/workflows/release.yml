@@ -4,8 +4,11 @@ name: release
 # workflow then builds the release firmware and the cubevox bootloader and attaches three files to
 # the release for that tag.
 #   cubevox-vX.YY.ZZ.uf2           the file Adam drags onto the CUBEVOX drive
-#   cubevox.bin                    the same image for the shop's ROM DFU path, at 0x08020000
+#   cubevox-rom-0x08020000.bin     the same image for the shop's ROM DFU, written at that address
 #   cubevox-bootloader-vB.BB.bin   the bootloader for bank 1 sector 0, written over BOOT0 (shop only)
+# The rom file starts at the application, which sits above the bootloader's sector. Written at
+# 0x08000000 it would destroy the bootloader, so its name carries the address that
+# firmware/flash.sh --rom uses.
 # The dfu-util and app jobs only prove that the parked Mac app still builds. Nothing from them is
 # attached, and publish does not wait for them.
 on:
@@ -29,8 +32,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          # build.sh logs `git describe --tags`, so the tag must be reachable.
-          fetch-depth: 0
       - name: Tag matches VERSION.txt
         run: |
           version="v$(cat VERSION.txt)"
@@ -62,15 +63,21 @@ jobs:
       - name: Build release image (warn gate runs inside build.sh)
         run: firmware/build.sh
       - name: Name the files
+        # The rom file is named for the address flash.sh --rom writes it at, which boot_block.h defines.
         run: |
           out="$(firmware/build.sh --outdir)"
           for file in cubevox.ino.bin cubevox.uf2; do
             test -s "$out/$file" || { echo "[ERROR] $out/$file is missing or empty"; exit 1; }
             python3 -I tools/stamp_image.py check "$out/$file"
           done
+          start="$(awk '$1 == "#define" && $2 == "CV_APP_START" { sub(/[uUlL]+$/, "", $3); print $3; exit }' firmware/cubevox/src/board/boot_block.h)"
+          if ! [[ "$start" =~ ^0x[0-9A-Fa-f]+$ ]]; then
+            echo "[ERROR] CV_APP_START is '$start' in boot_block.h; it must look like 0x08020000"
+            exit 1
+          fi
           mkdir -p assets
           cp "$out/cubevox.uf2" "assets/cubevox-v$(cat VERSION.txt).uf2"
-          cp "$out/cubevox.ino.bin" assets/cubevox.bin
+          cp "$out/cubevox.ino.bin" "assets/cubevox-rom-$start.bin"
       - uses: actions/upload-artifact@v4
         with:
           name: cubevox-firmware
@@ -192,7 +199,7 @@ jobs:
           path: assets
       - name: Attach to the release
         run: |
-          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox.bin assets/cubevox-bootloader-v*.bin)
+          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.bin assets/cubevox-bootloader-v*.bin)
           for file in "${files[@]}"; do
             test -s "$file" || { echo "[ERROR] $file is missing or empty"; exit 1; }
           done

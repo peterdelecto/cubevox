@@ -360,7 +360,9 @@ firmware/bootloader/
 3. `.github/workflows/ci.yml` adds a `bootloader` job using the same xpack toolchain the firmware
    job installs, runs `firmware/bootloader/build.sh`, and checks both `.uf2` files with
    `stamp_image.py --check`. The host job runs the `boot_decide` tests with the rest of `ctest`.
-4. `release.yml` attaches `cubevox-vX.YY.ZZ.uf2`, `cubevox.bin` (shop, ROM path) and
+4. `release.yml` attaches `cubevox-vX.YY.ZZ.uf2`, `cubevox-rom-0x08020000.bin` (shop, ROM path; the
+   address in the name is the one dfu-util must write it at, so the old `cubevox.bin` name that the
+   parked app wrote at 0x08000000 can never hit the bootloader) and
    `cubevox-bootloader-vB.BB.bin`. The app jobs stay; the app is parked, not removed.
 5. `docs/update-guide.md` is Adam's one page. Steps 1–5 of "What Adam does", a photo of each OLED
    screen, the Finder notice, and the support sentence about `DIAG.TXT`.
