@@ -91,13 +91,17 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
 
 ## Update mode
 1. A UF2 block is written only with this board's family, inside [0x08020000, 0x08100000), in whole
-   32-byte flash words. Anything else is refused and counted; the OLED shows WRONG FILE and DIAG.TXT
-   the count and the last family. A wrong file never completes, so the box stays in update mode.
+   32-byte flash words. Anything else is refused and counted; the OLED shows the wrong-file screen and
+   DIAG.TXT the count and the last family. A wrong file never completes, so the box stays in update
+   mode.
 2. After the last block the screen shows DONE, `cvBootMarkUpdated` clears the counter and the reason,
    the D-cache is cleaned and the box resets.
 3. With reason MenuHeld or AppRequest, a valid image, no host enumerated and no block written, update
    mode resets after 60 s; the request is consumed, so the decision then runs the application.
-4. Screens follow the spec's table (`boards/cubevox/screens.c`); `./build.sh --proofs` renders them.
+4. Screens follow the spec's table (`boards/cubevox/screens.c`). Every line is a full sentence in the
+   5x7 font, a screen holds four lines of 21 characters on rows 0, 2, 4 and 6, and the file
+   extension never appears. `./build.sh --proofs` renders them and `./build.sh --selftest` checks
+   the wording and the rows.
 5. Every enumeration clears the UF2 block count and the flash driver's record of erased sectors
    (patch 08). A copy cut short by a pulled cable therefore does not stop the next file, even a
    different one, and needs no power cycle. A copy cancelled on the host with the cable in place
@@ -138,7 +142,8 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
 1. Enclosure open, 9 V on. Hold BOOT0, tap NRST, release BOOT0.
 2. `./flash.sh` waits for 0483:df11 and runs `dfu-util -a 0 -s 0x08000000:leave -D cubevox-bootloader.bin`.
    It refuses a file over 131072 bytes.
-3. Expected within 3 s: OLED `UPDATE NEEDED`, drive `CUBEVOX`, `INFO_UF2.TXT` says `Installed: none`.
+3. Expected within 3 s: OLED `The update stopped.` / `Drop the firmware on` / `the CUBEVOX drive.`,
+   drive `CUBEVOX`, `INFO_UF2.TXT` says `Installed: none`.
 
 ## Only hardware can verify
 1. USB enumeration as 1209:0001 and the `CUBEVOX` drive mounting on macOS.

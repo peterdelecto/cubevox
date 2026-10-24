@@ -314,7 +314,7 @@ char const* board_uf2_info(uint32_t* len) {
 }
 
 // Only this board's family, inside the application region, whole flash words. A refused block is
-// counted for DIAG.TXT and the WRONG FILE screen and never written.
+// counted for DIAG.TXT and the wrong-file screen and never written.
 bool board_uf2_block_accept(uint32_t family_id, uint32_t addr, uint32_t len) {
   const bool inRegion = addr >= CV_APP_START && addr < CV_APP_END && len <= CV_APP_END - addr;
   const bool wholeWords = len != 0u && addr % CV_FLASH_WORD_BYTES == 0u && len % CV_FLASH_WORD_BYTES == 0u;

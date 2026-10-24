@@ -6,7 +6,7 @@
 #   BOARD=weact ./build.sh   # WeAct H743 test board into /tmp/cubevox-boot-weact
 #   ./build.sh --outdir      # print the output dir for the current BOARD and exit
 #   ./build.sh --proofs      # host build of screens.c; numbered PNGs and diag-sample.txt in build/proofs/boot/
-#   ./build.sh --selftest    # host run of the image check against tools/stamp_image.py, and the drive texts
+#   ./build.sh --selftest    # host run of the image check against tools/stamp_image.py, the screen rules and the drive texts
 #
 # The checkout is build/tinyuf2 (gitignored). Every build resets it to the pin, links
 # boards/cubevox and boards/weact into ports/stm32h7/boards/ as symlinks and applies patches/ in
@@ -126,7 +126,8 @@ expect_check() {
 }
 
 # The bootloader's CRC and header check against the stamp tool: a stamped image passes both, a
-# flipped byte fails both, an unstamped image and an erased region are refused.
+# flipped byte fails both, an unstamped image and an erased region are refused. Then the screens
+# against the approved wording and the owner's row rules, and the drive texts.
 selftest() {
   host_tools
   local dir="$BL/build/selftest"
@@ -146,6 +147,7 @@ selftest() {
   expect_check "$dir/unstamped.bin" "bad v2.00.10"
   expect_check "$dir/erased.bin" "none"
   echo "[selftest] PASS: image_check.c agrees with tools/stamp_image.py"
+  "$HOST/proof" --check
   drive_texts "$dir"
 }
 

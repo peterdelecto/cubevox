@@ -1,0 +1,64 @@
+# Editor include paths for the bootloader tree: boards/cubevox, tools/ and the TinyUF2 checkout that
+# build.sh keeps in build/tinyuf2. Run ./build.sh once so the checkout, TinyUSB and the ST HAL exist.
+# clangd has no variable expansion, so every path is absolute. To regenerate on another machine,
+# replace the prefixes below with the output of these commands:
+#   TC    $(arduino-cli config get directories.data)/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1
+#   REPO  the checkout
+# The list follows the compile command make prints for boards/cubevox/board_hooks.c:
+#   make -C build/tinyuf2/ports/stm32h7 BOARD=cubevox CROSS_COMPILE=$TC/bin/arm-none-eabi- V=1 -n -B all
+# board.mk passes CV_BOARD_WEACT=0 for the cubevox board and 1 for BOARD=weact. Change it below to
+# browse the WeAct board. The version strings are placeholders for the ones build.sh computes.
+CompileFlags:
+  Add:
+    - --target=arm-none-eabi
+    - -mcpu=cortex-m7
+    - -mfpu=fpv5-d16
+    - -mfloat-abi=hard
+    - -mthumb
+    - -isystem/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1/arm-none-eabi/include
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/boards/cubevox
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/cubevox/src/board
+    - -I/Users/j/Documents/Claude/Projects/cubevox/tools/font-editor/fonts
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/src
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/src/favicon
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/ports/stm32h7
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/lib/tinyusb/src
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/lib/CMSIS_5/CMSIS/Core/Include
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/lib/mcu/st/cmsis_device_h7/Include
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/bootloader/build/tinyuf2/lib/mcu/st/stm32h7xx_hal_driver/Inc
+    - -DSTM32H743xx
+    - -DHSE_VALUE=25000000U
+    - -DTINYUF2_LED=1
+    - -DBOARD_PFLASH_APP_EN=1
+    - -DBOARD_UF2_FAMILY_ID=0x43564258
+    - -DCV_BOARD_WEACT=0
+    - -DCV_TINYUF2_VERSION="editor"
+    - -DCFG_TUSB_MCU=OPT_MCU_STM32H7
+    - -DCFG_TUSB_DEBUG=0
+    - -DTUF2_LOG=0
+    - -DUF2_VERSION_BASE="editor"
+    - -DUF2_VERSION="editor"
+  Remove:
+    - -fsanitize*
+    - -Werror
+---
+# The C sources build as C with the compiler's default dialect. Without this clangd may borrow a C++
+# or strict C99 command from another project in the tree.
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Add:
+    - -xc
+    - -std=gnu17
+---
+# fonts.cpp is the one C++ file; cubevox_fonts.h includes <cstdint>.
+If:
+  PathMatch: .*\.cpp
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -fno-exceptions
+    - -fno-rtti
+    - -isystem/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1/arm-none-eabi/include/c++/14.2.1
+    - -isystem/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1/arm-none-eabi/include/c++/14.2.1/arm-none-eabi/thumb/v7e-m+dp/hard
