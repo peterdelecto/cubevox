@@ -200,13 +200,17 @@ add_executable(firmware_test
                test/firmware/core_input.cpp
                test/firmware/core_layout.cpp
                test/firmware/core_layout_fade.cpp
+               test/firmware/core_level.cpp
                test/firmware/core_panel_test.cpp
                test/firmware/core_protocol.cpp
                test/firmware/core_protocol_fuzz.cpp
                test/firmware/core_record.cpp
                test/firmware/core_registry.cpp
                test/firmware/core_tx_queue.cpp
+               test/firmware/ui_face.cpp
+               test/firmware/ui_gui.cpp
                test/firmware/ui_menu.cpp
+               test/firmware/ui_screens.cpp
                test/firmware/ui_splash.cpp
                ${CUBEVOX_FW_CORE_SOURCES}
                ${CUBEVOX_BOOT_DECIDE_DIR}/boot_decide.c)
@@ -215,6 +219,7 @@ target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cu
                                                  ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
 set_target_properties(firmware_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
 target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}"
+  CUBEVOX_GOLDEN_DIR="${CMAKE_SOURCE_DIR}/test/firmware/golden"
   CUBEVOX_FW_VERSION="v${CUBEVOX_VERSION}")
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 # Optimised like the firmware, so optimisation-only warnings reach the sanitizers, with the same

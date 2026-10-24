@@ -88,6 +88,7 @@ void KnobBank::update(int pot, float position, LastMoved owner) {
     case KnobEvent::Moved:
       if (owner.slot < 0) break;
       lastMoved_ = owner;
+      touched_ = true;
       changed_ = true;
       break;
     case KnobEvent::None:
@@ -99,4 +100,11 @@ bool KnobBank::takeChanged() {
   const bool changed = changed_;
   changed_ = false;
   return changed;
+}
+
+bool KnobBank::takeTouch(LastMoved& out) {
+  if (!touched_) return false;
+  touched_ = false;
+  out = lastMoved_;
+  return true;
 }

@@ -124,6 +124,10 @@ volatile uint32_t gWindowMax = 0;
 volatile uint32_t gSaiErrors = 0;
 volatile uint32_t gSaiErrorCodes = 0;
 
+// The input's energy since the last audioTakeInputEnergy(), summed by the block interrupt.
+volatile float gInputSumSquares = 0.0f;
+volatile uint32_t gInputSamples = 0;
+
 #ifdef CUBEVOX_BENCH_CLIP
 volatile bool gClipOn = false;
 uint32_t gClipPos = 0;
@@ -320,6 +324,8 @@ void processHalf(int half) {
   std::array<float, cv::kBlock> a;
   std::array<float, cv::kBlock> b;
   loadInput(a.data(), rx);
+  gInputSumSquares = gInputSumSquares + level::sumSquares(a.data(), kFramesPerHalf);
+  gInputSamples = gInputSamples + kFramesPerHalf;
   const std::array<float, cv::kBlock> dry = a;  // the chain works over `a`; BYPASS needs the input
   if (fade.swap || (fade.from == 0.0f && fade.to == 0.0f)) {
     // The output is at zero here. The block skips the chain so the engine clears never land on top
@@ -679,6 +685,17 @@ void audioResetPeaks() {
 #endif
 
 uint32_t audioBlockCount() { return gCounts.blocks; }
+
+level::InputEnergy audioTakeInputEnergy() {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  level::InputEnergy energy;
+  energy.sumSquares = gInputSumSquares;
+  energy.samples = gInputSamples;
+  gInputSumSquares = 0.0f;
+  gInputSamples = 0;
+  NVIC_EnableIRQ(SWPMI1_IRQn);
+  return energy;
+}
 
 AudioStats audioStats() {
   uint64_t sumCycles;

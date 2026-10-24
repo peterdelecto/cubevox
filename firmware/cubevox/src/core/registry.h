@@ -55,6 +55,8 @@ struct KnobDesc {
   float max;
   const char* unit;   // "", "dB", "ms", "st", "%"
   Curve curve = Curve::Linear;
+  uint8_t decimals = 0;                 // digits after the point on the OLED, 0 for whole numbers
+  const char* const* labels = nullptr;  // names of a stepped knob's positions, shown in place of a number
 };
 
 struct CardDesc {
@@ -94,6 +96,21 @@ void applyToggle(Card c, bool on, ChainParams& out);
 
 // One-time engine selection when a card lands in a slot (reverb engine). Safe to call every apply.
 void applyPlacement(Card c, ChainParams& out);
+
+// The descriptor of knob `knob` on card `c`, or nullptr when the card has no such knob.
+const KnobDesc* knobDesc(Card c, int knob);
+
+// The number the OLED shows for a reading `value` (0..1, or the step index for a stepped knob), in
+// whole steps of 10^-decimals of the unit. A stepped value is clamped to the knob's positions. A
+// knob with labels shows a name, so this is the index of that name.
+int knobShown(const KnobDesc& k, float value);
+
+// Prints a shown number the way the OLED does: "+5", "0", "-12", "1.5". Only a knob whose range
+// reaches below zero marks a positive number with "+". A labelled knob prints its name.
+void formatShown(const KnobDesc& k, int shown, char* buf, size_t size);
+
+// The name at index `shown` of a labelled knob, clamped to its positions. "" for any other knob.
+const char* knobLabel(const KnobDesc& k, int shown);
 
 // Readout text for the OLED, for example "-24 dB" or "F / Dm". A stepped value is clamped to the
 // knob's positions; an out-of-range card or knob writes an empty string.

@@ -35,7 +35,8 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kThreshold, kDecay}, Group::None,
      costs::kInputGate},
     {Card::Autotune, "autotune", "Autotune", Engine::Pitch, 2,
-     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, ""}, kResponse},
+     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, 0, cv::kKeyName},
+      kResponse},
      Group::Pitch, costs::kAutotune},
     {Card::Octave, "octave", "Octave", Engine::Pitch, 2,
      {{"Semitones", KnobKind::Stepped, kSemitonePositions, kSemitoneMin, kSemitoneMax, "st"}, kPercent("Mix")},
@@ -65,11 +66,6 @@ constexpr bool tableIsSound() {
   return true;
 }
 static_assert(tableIsSound(), "kCards must follow the Card enum and keep ids short");
-
-const KnobDesc* knobOf(Card c, int knob) {
-  const CardDesc& d = cardDesc(c);
-  return knob >= 0 && knob < d.knobCount ? &d.knob[knob] : nullptr;
-}
 
 // The position index a stepped value selects, clamped to the knob's positions.
 int stepIndex(const KnobDesc& k, float v) {
@@ -144,6 +140,11 @@ const CardDesc& cardDesc(Card c) {
   return kCards[i < kCards.size() ? i : 0];
 }
 
+const KnobDesc* knobDesc(Card c, int knob) {
+  const CardDesc& d = cardDesc(c);
+  return knob >= 0 && knob < d.knobCount ? &d.knob[knob] : nullptr;
+}
+
 Engine engineOf(Card c) { return cardDesc(c).engine; }
 
 bool cardFromId(const char* id, Card& out) {
@@ -167,12 +168,12 @@ float knobValue(const KnobDesc& k, float p) {
 }
 
 int knobSteps(Card c, int knob) {
-  const KnobDesc* k = knobOf(c, knob);
+  const KnobDesc* k = knobDesc(c, knob);
   return k && k->kind == KnobKind::Stepped ? k->positions : 0;
 }
 
 void applyKnob(Card c, int knob, float v, ChainParams& out) {
-  const KnobDesc* k = knobOf(c, knob);
+  const KnobDesc* k = knobDesc(c, knob);
   if (!k) return;
   if (k->kind == KnobKind::Stepped) v = static_cast<float>(stepIndex(*k, v));
   switch (c) {
@@ -213,19 +214,46 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
 }
 
+int knobShown(const KnobDesc& k, float v) {
+  const bool stepped = k.kind == KnobKind::Stepped;
+  if (stepped && k.labels) return stepIndex(k, v);
+  const float position = v > 0.0f ? (v < 1.0f ? v : 1.0f) : 0.0f;  // also catches NaN
+  const float value = stepped ? k.min + static_cast<float>(stepIndex(k, v)) : knobValue(k, position);
+  return static_cast<int>(lroundf(value * powf(10.0f, static_cast<float>(k.decimals))));
+}
+
+const char* knobLabel(const KnobDesc& k, int shown) {
+  if (!k.labels) return "";
+  const int last = k.positions - 1;
+  return k.labels[shown < 0 ? 0 : (shown > last ? last : shown)];
+}
+
+void formatShown(const KnobDesc& k, int shown, char* buf, size_t size) {
+  if (size == 0) return;
+  if (k.labels) {
+    snprintf(buf, size, "%s", knobLabel(k, shown));
+    return;
+  }
+  const char* sign = shown < 0 ? "-" : (shown > 0 && k.min < 0.0f ? "+" : "");
+  if (k.decimals == 0) {
+    snprintf(buf, size, "%s%d", sign, shown < 0 ? -shown : shown);
+    return;
+  }
+  const int scale = static_cast<int>(lroundf(powf(10.0f, static_cast<float>(k.decimals))));
+  const int magnitude = shown < 0 ? -shown : shown;
+  snprintf(buf, size, "%s%d.%0*d", sign, magnitude / scale, static_cast<int>(k.decimals), magnitude % scale);
+}
+
 void formatKnob(Card c, int knob, float v, char* buf, size_t size) {
   if (size == 0) return;
   buf[0] = '\0';
-  const KnobDesc* k = knobOf(c, knob);
+  const KnobDesc* k = knobDesc(c, knob);
   if (!k) return;
-  if (k->kind != KnobKind::Stepped) {
-    snprintf(buf, size, "%d %s", static_cast<int>(lroundf(knobValue(*k, v))), k->unit);
-    return;
-  }
-  const int step = stepIndex(*k, v);
-  if (c == Card::Autotune && knob == 0) {
-    snprintf(buf, size, "%s", cv::kKeyName[step]);
+  char shown[16];
+  formatShown(*k, knobShown(*k, v), shown, sizeof(shown));
+  if (k->labels || k->unit[0] == '\0') {
+    snprintf(buf, size, "%s", shown);
   } else {
-    snprintf(buf, size, "%+d %s", static_cast<int>(k->min) + step, k->unit);
+    snprintf(buf, size, "%s %s", shown, k->unit);
   }
 }

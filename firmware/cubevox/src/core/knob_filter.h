@@ -74,10 +74,15 @@ class KnobBank {
 
   LastMoved lastMoved() const { return lastMoved_; }
 
+  // True once per touch with the knob that moved since the last call. Several moves in between
+  // report the last one. Seeding and re-seeding never count, and neither does a pot no slot uses.
+  bool takeTouch(LastMoved& out);
+
  private:
   std::array<KnobFilter, kPotCount> knob_;
   std::array<int, kPotCount> steps_{};
   int seededCount_ = 0;
   bool changed_ = false;
+  bool touched_ = false;
   LastMoved lastMoved_;
 };

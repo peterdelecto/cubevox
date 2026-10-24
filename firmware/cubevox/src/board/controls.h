@@ -24,6 +24,10 @@ bool controlsTakeChanged();
 // Knob values (0..1, or the step index for stepped knobs), toggles and the last moved knob.
 PanelReading controlsReading();
 
+// True once per touch, with the knob that moved past the dead band since the last call. Several
+// moves in between report the last. The OLED readout follows it.
+bool controlsTakeTouch(LastMoved& out);
+
 #if CUBEVOX_BENCH
 // Unfiltered pot read, 0..1, for the panel self-test. `muxChannel` is 0-based; valid once controlsSeeded().
 float controlsRawPot(int muxChannel);

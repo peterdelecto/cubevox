@@ -1,0 +1,47 @@
+// The runtime face of the box. Each UI tick it asks the gui which screen to show, draws that screen
+// and dissolves from the frame already on the panel. The menu draws itself through it, so its text
+// and cursor stay as the menu spec has them. The code is pure.
+// Spec: docs/specs/2026-10-24-oled-gui-design.md.
+
+#pragma once
+
+#include <stdint.h>
+
+#include "core/canvas.h"
+#include "core/layout.h"
+#include "core/level.h"
+#include "core/panel.h"
+#include "core/timing.h"
+#include "ui/gui.h"
+#include "ui/menu.h"
+#include "ui/screens.h"
+
+class Face {
+ public:
+  // A knob moved. Takes its card from `layout` and its reading from `panel`. A slot with no card,
+  // and so no knob, raises no readout.
+  void knobMoved(const Layout& layout, const PanelReading& panel, LastMoved moved, uint32_t nowMs);
+
+  // Something else drew on the panel. The next frame dissolves from whatever it left.
+  void invalidate() { gui_.forceChange(); }
+
+  // True when a tick is due, which takes kUiTickMs since the last one and every page of the
+  // previous frame already sent. A tick that outran the panel would tear the picture. Call tick()
+  // whenever this returns true.
+  bool due(uint32_t nowMs, const Canvas& live);
+
+  // One UI tick. `energy` is what the audio interrupt heard since the last one.
+  void tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& energy, Menu& menu, Canvas& live);
+
+ private:
+  void render(const GuiFrame& frame, const UiContext& ctx, Menu& menu);
+
+  Gui gui_;
+  level::Meter meter_;
+  Ribbon ribbon_;
+  Canvas target_;                  // the screen the gui picked, before it reaches the panel
+  bool targetHoldsMenu_ = false;   // whether the menu's last frame is still in target_
+  Every tick_{kUiTickMs};
+  bool ticked_ = false;
+  uint32_t lastTickMs_ = 0;        // the level meter falls by real time, so a late tick falls further
+};

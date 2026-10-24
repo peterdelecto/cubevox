@@ -7,8 +7,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
+#include "core/canvas.h"
 #include "core/chain_params.h"
+#include "core/fonts.h"
 #include "core/layout_fade.h"
 #include "core/registry.h"
 #include "core/unison_rate.h"
@@ -280,13 +283,91 @@ void checkFormat() {
   formatKnob(Card::Autotune, 0, 11.0f, buf, sizeof(buf));
   check(std::strcmp(buf, "F / Dm") == 0, "key 11 formats as F / Dm");
   formatKnob(Card::Octave, 0, 12.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, "+0 st") == 0, "semitones centre formats as +0 st");
+  check(std::strcmp(buf, "0 st") == 0, "semitones centre formats as 0 st, with no sign");
   formatKnob(Card::Gate, 0, 1.0f, buf, sizeof(buf));
   check(std::strcmp(buf, "-10 dB") == 0, "gate threshold formats in dB");
   formatKnob(Card::Slapback, 1, 0.0f, buf, sizeof(buf));
   check(std::strcmp(buf, "60 ms") == 0, "slapback time formats in ms");
   formatKnob(Card::Distortion, 0, 0.5f, buf, sizeof(buf));
   check(std::strcmp(buf, "50 %") == 0, "drive formats in percent");
+}
+
+// What the OLED reads for a reading, as numbers and names from the descriptor.
+std::string shownText(const KnobDesc& k, float reading) {
+  char buf[16];
+  formatShown(k, knobShown(k, reading), buf, sizeof(buf));
+  return buf;
+}
+
+void checkShownNumbers() {
+  const KnobDesc& semitones = *knobDesc(Card::Octave, 0);
+  check(shownText(semitones, 17.0f) == "+5" && shownText(semitones, 12.0f) == "0" && shownText(semitones, 0.0f) == "-12",
+        "shown: semitones read +5, 0 and -12");
+  check(knobShown(semitones, 24.0f) == 12 && knobShown(semitones, 99.0f) == 12 && knobShown(semitones, -3.0f) == -12 &&
+            knobShown(semitones, NAN) == -12,
+        "shown: a stepped reading clamps to the positions");
+
+  const KnobDesc& threshold = *knobDesc(Card::Gate, 0);
+  check(shownText(threshold, 0.0f) == "-70" && shownText(threshold, 1.0f) == "-10" && knobShown(threshold, 0.5f) == -40,
+        "shown: a threshold reads whole dB with no plus");
+  const KnobDesc& mix = *knobDesc(Card::Octave, 1);
+  check(shownText(mix, 0.0f) == "0" && shownText(mix, 0.65f) == "65" && shownText(mix, 1.0f) == "100",
+        "shown: a percent reads whole numbers and no plus");
+  check(knobShown(mix, 5.0f) == 100 && knobShown(mix, -1.0f) == 0 && knobShown(mix, NAN) == 0,
+        "shown: a continuous reading clamps to 0..1");
+  const KnobDesc& time = *knobDesc(Card::Slapback, 1);
+  check(knobShown(time, 0.0f) == 60 && knobShown(time, 1.0f) == 250, "shown: slapback time spans 60 to 250 ms");
+}
+
+void checkShownLabels() {
+  const KnobDesc& key = *knobDesc(Card::Autotune, 0);
+  check(key.labels != nullptr && std::strcmp(key.labels[11], cv::kKeyName[11]) == 0 && knobShown(key, 11.0f) == 11,
+        "shown: the key reads its step index");
+  check(shownText(key, 11.0f) == "F / Dm" && shownText(key, 0.0f) == "C / Am", "shown: the key reads its name");
+  check(shownText(key, 99.0f) == cv::kKeyName[11] && shownText(key, -2.0f) == cv::kKeyName[0],
+        "shown: a key reading clamps to the first and last name");
+  check(std::strcmp(knobLabel(key, 99), cv::kKeyName[11]) == 0 && std::strcmp(knobLabel(key, -5), cv::kKeyName[0]) == 0,
+        "label: an index clamps to the positions");
+  check(std::strcmp(knobLabel(*knobDesc(Card::Octave, 0), 3), "") == 0, "label: a knob without labels has none");
+}
+
+// No card declares decimals yet, so a made-up knob stands in.
+void checkShownDecimals() {
+  const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
+  check(knobShown(rate, 0.0f) == 1 && knobShown(rate, 1.0f) == 50 && shownText(rate, 0.0f) == "0.1" &&
+            shownText(rate, 1.0f) == "5.0",
+        "shown: one decimal counts in tenths and prints a point");
+  const KnobDesc bipolar = {"Trim", KnobKind::Continuous, 0, -2.0f, 2.0f, "db", Curve::Linear, 2};
+  check(shownText(bipolar, 0.0f) == "-2.00" && shownText(bipolar, 0.5f) == "0.00" && shownText(bipolar, 0.6f) == "+0.40" &&
+            shownText(bipolar, 0.1f) == "-1.60",
+        "shown: two decimals keep their zeros, a minus and a plus");
+  char buf[8];
+  formatShown(rate, 5, buf, 0);
+  formatShown(rate, 15, buf, sizeof(buf));
+  check(std::strcmp(buf, "1.5") == 0, "shown: formatShown takes any size and honours a size of zero");
+}
+
+// Every knob's widest readout, a number and its unit in 16X24, must fit the panel with 1 px each side.
+void checkReadoutsFit() {
+  const FontDesc& big = font16x24();
+  bool fits = true;
+  for (int c = 1; c < kCardCount; ++c) {
+    for (int k = 0; k < cardDesc(card(c)).knobCount; ++k) {
+      const KnobDesc& kd = *knobDesc(card(c), k);
+      const int count = kd.kind == KnobKind::Stepped ? kd.positions : 101;
+      for (int i = 0; i < count; ++i) {
+        const float reading = kd.kind == KnobKind::Stepped ? static_cast<float>(i) : static_cast<float>(i) / 100.0f;
+        char number[16];
+        formatShown(kd, knobShown(kd, reading), number, sizeof(number));
+        char unit[16];
+        std::snprintf(unit, sizeof(unit), " %s", kd.unit);
+        const int width = kd.labels ? Canvas::textWidth(big, number)
+                                    : Canvas::digitsWidth(big, number) + big.spacing + Canvas::textWidth(big, unit);
+        fits = fits && width <= kCanvasWidth - 2;
+      }
+    }
+  }
+  check(fits, "readout: every knob's widest value fits the panel in 16X24");
 }
 
 }  // namespace
@@ -305,4 +386,8 @@ void checkRegistry() {
   checkToggles();
   checkPlacement();
   checkFormat();
+  checkShownNumbers();
+  checkShownLabels();
+  checkShownDecimals();
+  checkReadoutsFit();
 }

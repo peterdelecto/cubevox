@@ -493,6 +493,217 @@ void checkFixedPitch5x7() {
   check(menuOk, "canvas: 5x7 menu and update strings are byte for byte the fixed pitch");
 }
 
+bool pixelLit(const Canvas& c, int x, int y) { return ((c.page(y / 8)[x] >> (y % 8)) & 1) != 0; }
+
+int litPixels(const Canvas& c) {
+  int n = 0;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) n += pixelLit(c, x, y) ? 1 : 0;
+  }
+  return n;
+}
+
+void checkSetPixel() {
+  Canvas c;
+  clearAllDirty(c);
+  c.setPixel(5, 10, true);
+  check(pixelLit(c, 5, 10) && litPixels(c) == 1 && c.dirtyPages() == 0x02, "canvas: setPixel lights one pixel and dirties its page");
+  clearAllDirty(c);
+  c.setPixel(5, 10, true);
+  check(c.dirtyPages() == 0, "canvas: lighting a lit pixel changes nothing");
+  c.setPixel(5, 10, false);
+  check(litPixels(c) == 0 && c.dirtyPages() == 0x02, "canvas: setPixel false clears it");
+  clearAllDirty(c);
+  c.setPixel(-1, 0, true);
+  c.setPixel(0, -1, true);
+  c.setPixel(kCanvasWidth, 0, true);
+  c.setPixel(0, kCanvasHeight, true);
+  check(litPixels(c) == 0 && c.dirtyPages() == 0, "canvas: setPixel outside the canvas does nothing");
+  c.setPixel(kCanvasWidth - 1, kCanvasHeight - 1, true);
+  check(pixelLit(c, kCanvasWidth - 1, kCanvasHeight - 1) && c.dirtyPages() == 0x80, "canvas: setPixel reaches the last pixel");
+}
+
+// Draws "8" in 16X24 at y = 10 clipped to the rows [clipTop, clipBottom) and returns the canvas.
+Canvas clippedEight(int clipTop, int clipBottom) {
+  Canvas c;
+  c.drawDigitsClipped(4, 10, font16x24(), "8", clipTop, clipBottom);
+  return c;
+}
+
+void checkClippedDigits() {
+  Canvas whole;
+  whole.drawDigits(4, 10, font16x24(), "8");
+  check(samePages(whole, clippedEight(0, kCanvasHeight)) && samePages(whole, clippedEight(-100, 1000)),
+        "canvas: a clip covering the canvas draws what drawDigits draws");
+
+  bool band = true;
+  for (int top = 8; top <= 30; top += 3) {
+    const Canvas c = clippedEight(top, top + 7);
+    for (int y = 0; y < kCanvasHeight; ++y) {
+      for (int x = 0; x < kCanvasWidth; ++x) {
+        const bool want = y >= top && y < top + 7 && pixelLit(whole, x, y);
+        band = band && pixelLit(c, x, y) == want;
+      }
+    }
+  }
+  check(band, "canvas: a clipped digit keeps exactly the rows inside the clip, at any alignment to a page");
+
+  check(litPixels(clippedEight(20, 20)) == 0 && litPixels(clippedEight(30, 20)) == 0, "canvas: an empty or reversed clip draws nothing");
+  check(litPixels(clippedEight(0, 10)) == 0 && litPixels(clippedEight(34, 64)) == 0, "canvas: a clip clear of the glyph draws nothing");
+  Canvas two;
+  const int pen = two.drawDigitsClipped(0, 10, font16x24(), "12", 10, 34);
+  check(pen == 2 * (font16x24().width + font16x24().spacing), "canvas: a clipped line returns the pen after its cells");
+}
+
+void checkBayer() {
+  int unique = 0;
+  bool seen[64] = {};
+  for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < 8; ++x) {
+      int below = 0;
+      for (int level = 0; level <= 64; ++level) below += bayerLit(x, y, level) ? 1 : 0;
+      // The threshold is the lowest level that lights the pixel, 64 minus the levels that do.
+      const int threshold = 64 - below;
+      if (threshold >= 0 && threshold < 64 && !seen[threshold]) {
+        seen[threshold] = true;
+        ++unique;
+      }
+    }
+  }
+  check(unique == 64, "bayer: the 64 pixels of a tile hold the 64 thresholds once each");
+
+  int half = 0;
+  int none = 0;
+  int all = 0;
+  for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < 8; ++x) {
+      half += bayerLit(x, y, 32) ? 1 : 0;
+      none += bayerLit(x, y, 0) ? 1 : 0;
+      all += bayerLit(x, y, 64) ? 1 : 0;
+    }
+  }
+  check(half == 32 && none == 0 && all == 64, "bayer: level 0 lights none, 32 half and 64 all");
+  check(bayerLit(0, 0, 1) && !bayerLit(1, 0, 32) && bayerLit(1, 0, 33) && bayerLit(8, 8, 1) == bayerLit(0, 0, 1),
+        "bayer: thresholds follow the standard 8 x 8 matrix and repeat every 8 pixels");
+
+  bool nested = true;
+  for (int level = 0; level < 64; ++level) {
+    for (int y = 0; y < 8; ++y) {
+      for (int x = 0; x < 8; ++x) nested = nested && (!bayerLit(x, y, level) || bayerLit(x, y, level + 1));
+    }
+  }
+  check(nested, "bayer: a pixel lit at one level stays lit at every higher level");
+}
+
+void checkCopyFrom() {
+  Canvas src;
+  src.drawText(3, 20, font9x12(), "COPY");
+  Canvas dst;
+  clearAllDirty(dst);
+  dst.copyFrom(src);
+  check(samePages(dst, src), "canvas: copyFrom copies every page");
+  const Canvas blank;
+  unsigned changed = 0;
+  for (int p = 0; p < kCanvasPages; ++p) {
+    if (std::memcmp(blank.page(p), src.page(p), kCanvasWidth) != 0) changed |= 1u << p;
+  }
+  check(changed != 0 && changed != 0xFF && dst.dirtyPages() == changed, "canvas: copyFrom dirties exactly the pages that differ");
+  clearAllDirty(dst);
+  dst.copyFrom(src);
+  check(dst.dirtyPages() == 0, "canvas: copying an identical canvas dirties nothing");
+}
+
+// Per-pixel dissolve, the definition the per-byte masks must equal.
+Canvas dissolvedPerPixel(const Canvas& from, const Canvas& to, int level) {
+  Canvas r;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) r.setPixel(x, y, bayerLit(x, y, level) ? pixelLit(to, x, y) : pixelLit(from, x, y));
+  }
+  return r;
+}
+
+Canvas dissolveFixture(int seed) {
+  Canvas c;
+  for (int i = 0; i < 700; ++i) {
+    const int v = (i * 2654435761u + static_cast<unsigned>(seed) * 40503u) >> 7;
+    c.setPixel(v % kCanvasWidth, (v / 131) % kCanvasHeight, true);
+  }
+  return c;
+}
+
+void checkDissolve() {
+  check(kDissolveSteps == 2, "dissolve: a dissolve has 2 mixed steps");
+  const Canvas from = dissolveFixture(1);
+  const Canvas to = dissolveFixture(2);
+  check(litPixels(from) > 300 && litPixels(to) > 300 && !samePages(from, to), "dissolve: the fixtures are busy and differ");
+
+  Canvas r;
+  r.dissolve(from, to, 0);
+  check(samePages(r, from), "dissolve: step 0 is the old screen");
+  r.dissolve(from, to, kDissolveSteps + 1);
+  check(samePages(r, to), "dissolve: the step after the last is the new screen");
+  r.dissolve(from, to, -4);
+  check(samePages(r, from), "dissolve: a step below 0 reads as 0");
+  r.dissolve(from, to, 99);
+  check(samePages(r, to), "dissolve: a step past the end reads as the new screen");
+
+  r.dissolve(from, to, 1);
+  check(samePages(r, dissolvedPerPixel(from, to, 21)), "dissolve: step 1 equals the per-pixel Bayer dissolve at 21 of 64");
+  r.dissolve(from, to, 2);
+  check(samePages(r, dissolvedPerPixel(from, to, 43)), "dissolve: step 2 equals the per-pixel Bayer dissolve at 43 of 64");
+
+  Canvas black;
+  Canvas white;
+  white.fillRect(0, 0, kCanvasWidth, kCanvasHeight, true);
+  Canvas third;
+  third.dissolve(black, white, 1);
+  Canvas twoThirds;
+  twoThirds.dissolve(black, white, 2);
+  check(litPixels(third) == kCanvasWidth * kCanvasHeight * 21 / 64 && litPixels(twoThirds) == kCanvasWidth * kCanvasHeight * 43 / 64,
+        "dissolve: the steps light 21 and 43 of every 64 pixels, about a third and two thirds");
+  bool nested = true;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) nested = nested && (!pixelLit(third, x, y) || pixelLit(twoThirds, x, y));
+  }
+  check(nested, "dissolve: every pixel the first step lights, the second keeps lit");
+
+  // In place, the second step works from the first step's result because it nests inside it.
+  Canvas live = from;
+  live.dissolve(live, to, 1);
+  live.dissolve(live, to, 2);
+  Canvas direct;
+  direct.dissolve(from, to, 2);
+  check(samePages(live, direct), "dissolve: step 2 over step 1, in place, equals step 2 over the old screen");
+  live.dissolve(live, to, kDissolveSteps + 1);
+  check(samePages(live, to), "dissolve: and the last step lands on the new screen");
+
+  Canvas dirty = from;
+  clearAllDirty(dirty);
+  dirty.dissolve(dirty, from, 1);
+  check(dirty.dirtyPages() == 0 && samePages(dirty, from), "dissolve: mixing a screen with itself changes nothing and dirties nothing");
+  Canvas topOnly;
+  topOnly.drawText(0, 0, font5x7(), "TOP");
+  Canvas blank;
+  clearAllDirty(blank);
+  blank.dissolve(blank, topOnly, kDissolveSteps + 1);
+  check(blank.dirtyPages() == 0x01, "dissolve: only the pages that changed are dirty");
+}
+
+// The proof renderer's dissolve from the silent voice line to MUTED, byte for byte.
+void checkDissolveAgainstProof() {
+  Canvas line;
+  line.fillRect(0, 32, kCanvasWidth, 1, true);
+  Canvas muted;
+  muted.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), "MUTED")) / 2, (kCanvasHeight - 24) / 2, font16x24(), "MUTED");
+  Canvas r;
+  r.dissolve(line, muted, 1);
+  check(matchesGolden(r, "muted-1"), "dissolve: step 1 from the line to MUTED matches the proof frame");
+  r.dissolve(line, muted, 2);
+  check(matchesGolden(r, "muted-2"), "dissolve: step 2 matches the proof frame");
+  r.dissolve(line, muted, 3);
+  check(matchesGolden(r, "muted-3"), "dissolve: the last step matches the proof frame");
+}
+
 }  // namespace
 
 void checkCanvas() {
@@ -510,4 +721,10 @@ void checkCanvas() {
   checkInkClipping();
   checkTabularDigits();
   checkFixedPitch5x7();
+  checkSetPixel();
+  checkClippedDigits();
+  checkBayer();
+  checkCopyFrom();
+  checkDissolve();
+  checkDissolveAgainstProof();
 }

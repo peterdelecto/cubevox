@@ -121,6 +121,8 @@ bool controlsTakeChanged() {
   return changed;
 }
 
+bool controlsTakeTouch(LastMoved& out) { return gKnobs.takeTouch(out); }
+
 #if CUBEVOX_BENCH
 float controlsRawPot(int muxChannel) { return gRaw[muxChannel]; }
 

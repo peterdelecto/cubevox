@@ -152,6 +152,33 @@ void checkKnobBankSteps() {
   check(!bank.takeChanged(), "bank: an unchanged count reports nothing");
 }
 
+// A touch is a move past the dead band on a slot's pot, taken once. It feeds the OLED readout.
+void checkKnobBankTouch() {
+  KnobBank bank;
+  LastMoved touch;
+  seedBank(bank, 0.2f);
+  check(!bank.takeTouch(touch), "touch: seeding is no touch");
+  for (int i = 0; i < 30; ++i) bank.update(5, 0.9f, LastMoved{-1, false});
+  check(!bank.takeTouch(touch), "touch: a pot no slot owns is no touch");
+  for (int i = 0; i < 30; ++i) bank.update(6, 0.9f, LastMoved{3, true});
+  check(bank.takeTouch(touch) && touch.slot == 3 && touch.knobB, "touch: a slot pot move reports its owner");
+  check(!bank.takeTouch(touch), "touch: one move reports once");
+  for (int i = 0; i < 30; ++i) bank.update(6, 0.2f, LastMoved{3, true});
+  for (int i = 0; i < 30; ++i) bank.update(2, 0.9f, LastMoved{1, false});
+  check(bank.takeTouch(touch) && touch.slot == 1 && !touch.knobB, "touch: two moves between calls report the last");
+
+  KnobBank stepped;
+  std::array<int, kPotCount> steps{};
+  steps[2] = 5;
+  stepped.setSteps(steps);
+  seedBank(stepped, 0.9f);
+  steps[2] = 10;
+  stepped.setSteps(steps);
+  check(!stepped.takeTouch(touch), "touch: a re-seed after a card change is no touch");
+  for (int i = 0; i < 30; ++i) stepped.update(2, 0.1f, LastMoved{1, false});
+  check(stepped.takeTouch(touch) && touch.slot == 1, "touch: a stepped knob crossing to another step is a touch");
+}
+
 void checkKnobFilter() {
   checkKnobFilterContinuous();
   checkKnobFilterStepped();
@@ -161,6 +188,7 @@ void checkKnobFilter() {
   checkKnobBankSeeding();
   checkKnobBankMoves();
   checkKnobBankSteps();
+  checkKnobBankTouch();
 }
 
 void checkEvery() {

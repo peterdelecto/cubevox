@@ -31,6 +31,8 @@
 #include "core/timing.h"
 #include "core/version.h"
 #include "ui/actions.h"
+#include "ui/face.h"
+#include "ui/gui.h"
 #include "ui/menu.h"
 #include "ui/splash.h"
 
@@ -42,6 +44,7 @@ constexpr uint32_t kStatsMs = 5000;
 Layout gLayout = defaultLayout();
 Settings gSettings;
 Menu gMenu;
+Face gFace;
 Splash gSplash;
 char gVersionTag[kDisplayCols + 1];
 JackSwitch gJack{Settings().inputJack};
@@ -146,20 +149,22 @@ void runJackSwitch(uint32_t nowMs) {
   inputJackApply(gJack.relay());
 }
 
-// The menu owns the canvas except while the boot splash or the bench OLED pattern is up; it
-// repaints once either ends.
+// The face owns the canvas except while the boot splash or the bench OLED pattern is up; it
+// dissolves in from what they left once either ends. It ticks at 25 frames a second and only
+// after the panel has taken the last frame. Without a panel there is nothing to draw, and the
+// stub display would log every page of the moving voice screen.
 void drawFace(const UiContext& ctx, uint32_t nowMs) {
   switch (gSplash.draw(nowMs, gVersionTag, gCanvas)) {
     case SplashStep::Up: return;
-    case SplashStep::Ended: gMenu.invalidate(); break;
+    case SplashStep::Ended: gFace.invalidate(); break;
     case SplashStep::Off: break;
   }
   switch (benchPanelPattern(gCanvas)) {
     case BenchPattern::Up: return;
-    case BenchPattern::Ended: gMenu.invalidate(); break;
+    case BenchPattern::Ended: gFace.invalidate(); break;
     case BenchPattern::Off: break;
   }
-  gMenu.draw(ctx, gCanvas);
+  if (gOledFound && gFace.due(nowMs, gCanvas)) gFace.tick(nowMs, ctx, audioTakeInputEnergy(), gMenu, gCanvas);
 }
 
 }  // namespace
@@ -213,7 +218,10 @@ void loop() {
   // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
-  const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
+  const bool switchOn = topSwitchEngaged(gSettings.topSwitch, muteActive(), muteBypassOn());
+  const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn};
+  LastMoved touch;
+  if (controlsTakeTouch(touch)) gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
   drawFace(ctx, nowMs);
   gDisplay->flushStep(gCanvas);
   if (gHeartbeat.due(nowMs)) digitalToggle(pins::kUserLed);

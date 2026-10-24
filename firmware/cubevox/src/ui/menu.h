@@ -1,5 +1,7 @@
-// MENU state machine and the OLED screens. Pure: input events in, actions out, text rows drawn
-// onto a Canvas that a Display backend pushes to the panel.
+// MENU state machine and its OLED screens. Input events go in, actions come out, and text rows are
+// drawn onto a Canvas that a Display backend pushes to the panel. The code is pure. The screens
+// shown while the menu is closed (voice, readout, muted) live in ui/screens, and ui/face picks
+// between them.
 
 #pragma once
 
@@ -30,13 +32,14 @@ enum class UiAction : uint8_t {
   EnterDfu,
 };
 
-// Read-only state the screens draw. The idle screen shows the last-moved knob from `panel`;
-// the chain view lists `layout`.
+// Read-only state the screens draw. `layout` names the cards, `panel` holds the knob readings and
+// `settings` the menu values. `topSwitchOn` says the top switch sits in its engaged position,
+// whether it mutes or bypasses.
 struct UiContext {
   const Layout& layout;
   const PanelReading& panel;
   const Settings& settings;
-  bool muted;
+  bool topSwitchOn;
 };
 
 // The text of one screen: kDisplayRows rows of up to kDisplayCols characters, each NUL-terminated.
@@ -46,7 +49,11 @@ class Menu {
  public:
   UiAction update(const UiInput& in, uint32_t nowMs);
 
-  // Redraws the canvas when the frame differs from the last one drawn.
+  // True while a menu screen is up, which is until Exit, the timeout or a DFU entry closes it.
+  bool open() const { return mode_ != Mode::Idle; }
+
+  // Redraws the canvas when the frame differs from the last one drawn. Does nothing while the menu
+  // is closed.
   void draw(const UiContext& ctx, Canvas& canvas);
 
   // Forgets the last frame, so the next draw repaints even if the content is unchanged. Call it

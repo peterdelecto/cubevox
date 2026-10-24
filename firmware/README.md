@@ -74,8 +74,9 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    `mute_sequence`, `panel_test`, `bench_ops` (the op table), `timing.h` (switch, relay and mute times, `Every`),
    `loop_policy.h` (`PublishGate`, `CanvasHandoff`).
 3. Sound path: `compose` (`ChainSnapshot` from layout, panel, settings and bench overrides).
-4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages), `fonts` (the font editor's export as
-   `FontDesc`), `display.h` (backend interface, `flushStep`).
+4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
+   editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`), `level` (input energy to the voice
+   ribbon's 0..1 level).
 5. Protocol and storage: `protocol` (JSON line framing, request parse, reply formatting into a `Writer`),
    `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
    `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `crc32` (the one
@@ -83,9 +84,11 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
 6. Update support: `boot_health_rule.h` (when a start counts as healthy, the failed-start count). The names
    of the update reasons, fault kinds and clock steps live in the contract header `board/boot_block.h`.
 
-**`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the
-screens on the canvas), `actions` (what a `UiAction` does to the settings) and `splash` (the version, centred,
-for 2 s after `setup()`).
+**`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the open
+menu on the canvas), `actions` (what a `UiAction` does to the settings), `splash` (the version, centred, for 2 s
+after `setup()`), and the runtime screens of `docs/specs/2026-10-24-oled-gui-design.md`: `gui` (which screen and
+dissolve step), `screens` (voice ribbon, knob readout, MUTED or BYPASS) and `face` (the 25 fps tick that draws them
+and dissolves between them).
 
 **`src/board/`** has one hardware concern per file.
 
@@ -96,7 +99,8 @@ for 2 s after `setup()`).
    layout change, SAI and DMA error count).
 3. Panel: `controls` (mux scan, ADC, toggles), `input` (encoder and click to `UiInput`), `mute`, `input_jack`
    (PAD_EN for relay K103).
-4. Display: `display_sh1106` (U8x8 driver), `display_stub` (ASCII render over Serial when no panel answers).
+4. Display: `display_sh1106` (U8x8 driver), `display_stub` (ASCII render over Serial when no panel answers; the
+   runtime face stays off then, since the moving voice screen would log every page).
 5. USB and protocol: `usb_link` (CDC gated on VBUS), `serial_link` (CDC bytes to JSON lines, reply writer, output
    queue), `boot_report` (the report a terminal gets on open).
 6. Safety and storage: `fault` (watchdog, fault handlers, reset cause, clock failure record, audio stall and
@@ -137,8 +141,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   receive queue holds two maximum-length requests, and `serial_link.cpp` asserts it at compile time.
   The clock numbers and the gating were reviewed in `docs/audits/2026-10-08-astra-clock-response.md`.
 - `board/display_sh1106.cpp`: U8x8 init on I2C2 PB10/PB11; `flushStep` sends the lowest dirty canvas page with
-  `drawTile`, once per loop pass, and keeps the page dirty when the write fails. The fonts come from
-  `tools/font-editor/fonts/cubevox_fonts.h` through an include path, no copy.
+  `drawTile`, once per loop pass, and keeps the page dirty when the write fails. The face draws a new frame
+  only once every page of the last one has gone out, so a slow or failing write never gets outrun. The fonts come
+  from `tools/font-editor/fonts/cubevox_fonts.h` through an include path, no copy.
 - `board/fault.cpp`: IWDG1 at 2 s, armed at the end of `setup()` and kicked only from `loop()` (and from
   `recordFlush`). HardFault, MemManage, BusFault and UsageFault drive XSMT and MUTE_N low by register write, store
   PC, LR, CFSR, HFSR, BFAR and MMFAR in a `.cv_noinit` record (`cubevox.ld`, top of DTCM) and reset; the

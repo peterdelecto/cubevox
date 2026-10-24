@@ -10,15 +10,6 @@ namespace {
 
 constexpr uint32_t kMenuTimeoutMs = 15000;
 
-// Idle screen.
-constexpr int kRowTitle = 0;
-constexpr int kRowMuted = 1;
-constexpr int kRowCardName = 3;
-constexpr int kRowKnobName = 4;
-constexpr int kRowKnobValue = 5;
-constexpr int kRowToggle = 6;
-constexpr int kRowVersion = kDisplayRows - 1;
-
 // Menu list: one row per item, no title row.
 constexpr int kRowListFirstItem = 0;
 
@@ -92,24 +83,6 @@ const char* itemValue(Item it, const Settings& s) {
     case Item::PolishEq: return onOff(s.polishEq);
     default: return "";
   }
-}
-
-void drawIdle(MenuFrame& f, const UiContext& ctx) {
-  putRow(f, kRowTitle, "cubevox");
-  putRow(f, kRowMuted, ctx.muted ? "MUTED" : "");
-  char tag[kDisplayCols + 1];
-  versionTag(kFirmwareVersion, tag, sizeof(tag));
-  putRow(f, kRowVersion, tag);
-  const LastMoved m = ctx.panel.lastMoved;
-  if (m.slot < 0 || m.slot >= kSlotCount) return;
-  const Card card = ctx.layout.card[m.slot];
-  const int knob = m.knobB ? 1 : 0;
-  char value[kDisplayCols + 1];
-  formatKnob(card, knob, ctx.panel.knob[m.slot][knob], value, sizeof(value));
-  putRow(f, kRowCardName, cardDesc(card).name);
-  putRow(f, kRowKnobName, cardDesc(card).knob[knob].name);
-  putRow(f, kRowKnobValue, value);
-  putRow(f, kRowToggle, ctx.panel.toggle[m.slot] ? "ON" : "OFF");
 }
 
 void drawList(MenuFrame& f, const UiContext& ctx, int cursor) {
@@ -189,9 +162,10 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
 }
 
 void Menu::draw(const UiContext& ctx, Canvas& canvas) {
+  if (mode_ == Mode::Idle) return;
   MenuFrame frame = {};
   switch (mode_) {
-    case Mode::Idle: drawIdle(frame, ctx); break;
+    case Mode::Idle: break;
     case Mode::List: drawList(frame, ctx, cursor_); break;
     case Mode::ChainView: drawChainView(frame, ctx.layout); break;
     case Mode::ConfirmDfu: drawConfirmDfu(frame); break;

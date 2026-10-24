@@ -18,6 +18,14 @@ Card card(int i);
 // Clears the dirty flag of every canvas page.
 void clearAllDirty(Canvas& canvas);
 
+// Writes the canvas as a binary PGM at 4x, lit pixels white, to build/<name>.
+void writePgm(const Canvas& canvas, const char* name);
+
+// True when the canvas holds the golden frame test/firmware/golden/<name>.bin byte for byte. Those
+// are the page-layout bytes the OLED proof renderer (tools/oled-proof/oled_motion.cpp) drew, cut out
+// by tools/oled_golden.py. A mismatch writes the canvas to build/oled-mismatch-<name>.pgm.
+bool matchesGolden(const Canvas& canvas, const char* name);
+
 void checkRegistry();          // core_registry.cpp
 void checkLayoutAndCompose();  // core_layout.cpp
 void checkProtocol();          // core_protocol.cpp
@@ -26,6 +34,10 @@ void checkFade();              // core_layout_fade.cpp
 void checkFuzz();              // core_protocol_fuzz.cpp
 void checkInputLogic();        // core_input.cpp
 void checkMenu();              // ui_menu.cpp
+void checkGui();               // ui_gui.cpp
+void checkScreens();           // ui_screens.cpp
+void checkFace();              // ui_face.cpp
+void checkLevel();             // core_level.cpp
 void checkCanvas();            // core_canvas.cpp
 void checkPanelTest();         // core_panel_test.cpp
 void checkRecords();           // core_record.cpp

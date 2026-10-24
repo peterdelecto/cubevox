@@ -12,6 +12,7 @@
 #include "board/build_kind.h"
 #include "core/chain_params.h"
 #include "core/compose.h"
+#include "core/level.h"
 
 // Cycle buckets: one per slot, then one each for the two polish stages.
 constexpr int kStatComp = kSlotCount;
@@ -68,6 +69,10 @@ AudioSwapStats audioSwapStats();
 
 // Blocks processed so far. One word read, cheap enough for every loop pass.
 uint32_t audioBlockCount();
+
+// The energy of the input since the previous call (or since boot), for the OLED's voice screen. It
+// is measured on the samples that enter the chain. Resets the window; call from the main loop.
+level::InputEnergy audioTakeInputEnergy();
 
 AudioStats audioStats();
 

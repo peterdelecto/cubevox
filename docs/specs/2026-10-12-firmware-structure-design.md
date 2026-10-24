@@ -20,7 +20,7 @@ map and the ownership rules before the OLED font renderer and runtime layouts la
 board/input ──UiInput──▶ ui/Menu ──UiAction──▶ sketch ──▶ Settings
 board/controls(Layout) ──PanelReading──┐
 Layout, Settings, BenchOverrides ──────┴──▶ core/compose ──ChainSnapshot──▶ board/audio (IRQ)
-Menu + UiContext ──▶ Menu::draw ──▶ core/Canvas ──▶ board/display_sh1106 (one page per pass)
+Face (Gui, screens, Menu::draw) ──▶ core/Canvas ──▶ board/display_sh1106 (one page per pass)
 ```
 The sketch is the only place that wires modules together. No module calls another tier's
 getters behind the sketch's back.
@@ -33,11 +33,14 @@ getters behind the sketch's back.
 | core | `knob_filter` | `DebouncedInput`, `steppedPosition`, `KnobFilter` (smoothing, stepping, move detect, re-seed on step-count change) |
 | core | `panel` | `PanelReading` (knob values, toggles, last moved), the value the board hands up |
 | core | `compose` | `ChainSnapshot composeSnapshot(Layout, PanelReading, Settings, BenchOverrides)` |
-| core | `canvas` | 128 x 64 1 bpp, page-major 1024 B, `drawText`, `textWidth`, `fillRect`, `invertRect`, dirty-page mask |
+| core | `canvas` | 128 x 64 1 bpp, page-major 1024 B, `drawText`, `textWidth`, `fillRect`, `invertRect`, `setPixel`, clipped digits, `copyFrom`, `dissolve`, dirty-page mask |
+| core | `level` | input energy per block, RMS, the dB map to the 0..1 display level, the meter (OLED GUI spec) |
 | core | `fonts` | `FontDesc` table over `cubevox_fonts.h` (Hyperlegible 5x7, 9X12, 16X24) |
 | core | `registry` | cards, knob descriptors, apply, format; no layout state |
-| ui | `menu` | `Menu` state machine, `UiInput` in, `UiAction` out, the screens as `Menu::draw`, host-tested |
-| ui | `screens` | not split out yet; the OLED GUI spec decides when `render(const Menu&, const UiContext&, Canvas&)` leaves `menu.cpp` |
+| ui | `menu` | `Menu` state machine, `UiInput` in, `UiAction` out, the menu screens as `Menu::draw` (open menu only), host-tested |
+| ui | `gui` | which runtime screen and dissolve step, from knob touches and the switch states (OLED GUI spec) |
+| ui | `screens` | `renderVoice`, `renderReadout`, `renderMuted` onto a canvas (OLED GUI spec) |
+| ui | `face` | the top-level draw: tick gate, screen pick, dissolve onto the panel (OLED GUI spec) |
 | board | `input` | encoder ISR (counts only), click debounce, one `UiInput` per pass |
 | board | `input_jack` | drives PAD_EN from `Settings` |
 | board | `controls` | mux scan, ADC, toggles; owns `KnobFilter[16]`; reads step counts from the `Layout` it is given |

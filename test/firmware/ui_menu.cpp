@@ -1,6 +1,7 @@
-// Checks the OLED menu on the host. Covers the idle screen, the list and its click actions, the
+// Checks the OLED menu on the host. Covers the closed menu, the list and its click actions, the
 // settings those clicks save and play, the chain and update screens, the timeout, redraw, the
-// screenshot files, the text grid and the list's row pitch.
+// screenshot files, the text grid and the list's row pitch. The screens shown while the menu is
+// closed are checked in ui_screens.cpp and ui_face.cpp.
 
 #include "support.h"
 
@@ -77,7 +78,7 @@ struct MenuRig {
   PanelReading panel;
   Settings settings;
   Canvas canvas;
-  bool muted = false;
+  bool topSwitchOn = false;
   uint32_t nowMs = 100;
 
   UiAction step(int detents, bool click, uint32_t advanceMs = 10) {
@@ -87,7 +88,7 @@ struct MenuRig {
     in.click = click;
     return menu.update(in, nowMs);
   }
-  void draw() { menu.draw(UiContext{layout, panel, settings, muted}, canvas); }
+  void draw() { menu.draw(UiContext{layout, panel, settings, topSwitchOn}, canvas); }
 
   // Opens the list and turns to `item` (see the Row constants).
   void openListAt(int item) {
@@ -107,43 +108,21 @@ std::string defaultRow(int r, bool cursor) {
   return std::string(cursor ? ">" : " ") + text[r];
 }
 
-void checkMenuIdle() {
+// A closed menu draws nothing, so the runtime screens own the canvas.
+void checkMenuClosed() {
   MenuRig m;
+  check(!m.menu.open(), "menu: starts closed");
+  clearAllDirty(m.canvas);
   m.draw();
-  check(rowIs(m.canvas, 0, "cubevox"), "menu: idle title");
-  char tag[kDisplayCols + 1];
-  versionTag(kFirmwareVersion, tag, sizeof(tag));
-  check(rowIs(m.canvas, 7, tag) && std::strchr(tag, '-') == nullptr, "menu: idle shows the version tag only");
-  check(rowIs(m.canvas, 1, ""), "menu: no MUTED row while the output plays");
-  m.muted = true;
+  check(pagesClean(m.canvas), "menu: a closed menu leaves the canvas alone");
+  m.step(0, true);
+  check(m.menu.open(), "menu: a click opens it");
   m.draw();
-  check(rowIs(m.canvas, 1, "MUTED"), "menu: the MUTED row shows while muted");
-  m.muted = false;
+  check(!pagesClean(m.canvas), "menu: an open menu draws");
+  m.topSwitchOn = true;
+  m.panel.lastMoved.slot = 5;
   m.draw();
-  check(rowIs(m.canvas, 1, ""), "menu: the MUTED row clears when the mute lifts");
-}
-
-void checkMenuIdleReadout() {
-  MenuRig m;
-  m.panel.lastMoved.slot = 5;  // Distortion
-  m.panel.knob[5][0] = 0.6f;
-  m.panel.toggle[5] = true;
-  m.draw();
-  check(rowIs(m.canvas, 3, "Distortion") && rowIs(m.canvas, 4, "Drive"), "menu: readout names the card and knob");
-  check(rowIs(m.canvas, 5, "60 %") && rowIs(m.canvas, 6, "ON"), "menu: readout shows the value and the toggle");
-  m.panel.toggle[5] = false;
-  m.draw();
-  check(rowIs(m.canvas, 6, "OFF"), "menu: readout shows the toggle off");
-
-  m.layout.card[0] = Card::Empty;
-  m.panel.lastMoved.slot = 0;
-  m.draw();
-  check(rowIs(m.canvas, 3, "Empty") && rowIs(m.canvas, 4, "") && rowIs(m.canvas, 5, ""), "menu: an Empty slot reads as a bare card name");
-
-  m.panel.lastMoved.slot = kSlotCount;
-  m.draw();
-  check(rowIs(m.canvas, 3, "") && rowIs(m.canvas, 6, "") && rowIs(m.canvas, 0, "cubevox"),
-        "menu: a last-moved slot out of range draws no readout");
+  check(listRowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: the top switch and the last knob do not show in the menu");
 }
 
 void checkMenuList() {
@@ -194,20 +173,6 @@ void checkMenuListPitch() {
 void checkOtherScreensKeepGrid() {
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
-
-  MenuRig idle;
-  idle.panel.lastMoved.slot = 5;  // Distortion
-  idle.panel.knob[5][0] = 0.6f;
-  idle.panel.toggle[5] = true;
-  idle.draw();
-  Canvas wantIdle;
-  wantIdle.drawText(0, 0, font5x7(), "cubevox");
-  wantIdle.drawText(0, 24, font5x7(), "Distortion");
-  wantIdle.drawText(0, 32, font5x7(), "Drive");
-  wantIdle.drawText(0, 40, font5x7(), "60 %");
-  wantIdle.drawText(0, 48, font5x7(), "ON");
-  wantIdle.drawText(0, 56, font5x7(), tag);
-  check(sameCanvas(idle.canvas, wantIdle), "menu: the idle screen keeps the 8 px grid");
 
   MenuRig chain;
   chain.step(0, true);
@@ -335,8 +300,10 @@ void checkMenuExit() {
   m.draw();
   check(listRowIs(m.canvas, kExit, ">EXIT", true), "menu: the cursor sits on Exit");
   check(m.step(0, true) == UiAction::None, "menu: Exit click has no action");
+  check(!m.menu.open(), "menu: Exit closes the menu");
+  clearAllDirty(m.canvas);
   m.draw();
-  check(rowIs(m.canvas, 0, "cubevox"), "menu: Exit returns to the idle screen");
+  check(pagesClean(m.canvas), "menu: a closed menu draws nothing after Exit");
 }
 
 void checkMenuTimeout() {
@@ -344,28 +311,26 @@ void checkMenuTimeout() {
   m.step(0, true);
   m.step(0, false, 14000);
   m.draw();
-  check(listRowIs(m.canvas, 0, ">INPUT: MIC", true), "menu: still open before the timeout");
+  check(listRowIs(m.canvas, 0, ">INPUT: MIC", true) && m.menu.open(), "menu: still open before the timeout");
   m.step(0, false, 1500);
-  m.draw();
-  check(rowIs(m.canvas, 0, "cubevox"), "menu: 15 s without input returns to idle");
+  check(!m.menu.open(), "menu: 15 s without input closes it");
 
   MenuRig chain;
   chain.step(0, true);
   chain.menu.showChainView();
   chain.step(0, false, 15001);
-  chain.draw();
-  check(rowIs(chain.canvas, 0, "cubevox"), "menu: the chain view times out to idle");
+  check(!chain.menu.open(), "menu: the chain view times out");
 
   MenuRig dfu;
   dfu.openListAt(kUpdate);
   dfu.step(0, true);
   dfu.step(0, false, 15001);
-  dfu.draw();
-  check(rowIs(dfu.canvas, 0, "cubevox"), "menu: the DFU confirm times out to idle without acting");
+  check(!dfu.menu.open(), "menu: the DFU confirm times out without acting");
 }
 
 void checkMenuRedraw() {
   MenuRig m;
+  m.step(0, true);
   m.draw();
   clearAllDirty(m.canvas);
   m.draw();
@@ -374,6 +339,7 @@ void checkMenuRedraw() {
 
 void checkMenuInvalidate() {
   MenuRig m;
+  m.step(0, true);
   m.draw();
   clearAllDirty(m.canvas);
   m.menu.invalidate();
@@ -381,34 +347,8 @@ void checkMenuInvalidate() {
   check(!pagesClean(m.canvas), "menu: invalidate makes the next draw repaint");
 }
 
-// Writes a screen as a binary PGM at 4x, lit pixels white.
-void writePgm(const Canvas& canvas, const char* name) {
-  constexpr int kScale = 4;
-  const std::string path = std::string(CUBEVOX_OUT_DIR) + "/" + name;
-  std::FILE* file = std::fopen(path.c_str(), "wb");
-  check(file != nullptr, "pgm: output file opens");
-  if (!file) return;
-  std::fprintf(file, "P5\n%d %d\n255\n", kCanvasWidth * kScale, kCanvasHeight * kScale);
-  for (int y = 0; y < kCanvasHeight * kScale; ++y) {
-    const int py = y / kScale;
-    for (int x = 0; x < kCanvasWidth * kScale; ++x) {
-      const bool on = (canvas.page(py / 8)[x / kScale] >> (py % 8)) & 1;
-      std::fputc(on ? 0xFF : 0x00, file);
-    }
-  }
-  std::fclose(file);
-}
-
 void checkScreenshots() {
   MenuRig m;
-  m.panel.lastMoved.slot = 5;
-  m.panel.knob[5][0] = 0.6f;
-  m.panel.toggle[5] = true;
-  m.draw();
-  check(rowIs(m.canvas, 3, "Distortion") && rowIs(m.canvas, 4, "Drive") && rowIs(m.canvas, 5, "60 %") && rowIs(m.canvas, 6, "ON"),
-        "screens: idle readout rows");
-  writePgm(m.canvas, "oled-idle.pgm");
-
   m.step(0, true);
   m.draw();
   bool listRows = true;
@@ -439,8 +379,7 @@ void checkDisplayGrid() {
 }  // namespace
 
 void checkMenu() {
-  checkMenuIdle();
-  checkMenuIdleReadout();
+  checkMenuClosed();
   checkMenuList();
   checkMenuListPitch();
   checkMenuClicks();
