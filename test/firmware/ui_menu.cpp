@@ -266,7 +266,7 @@ void checkScreenshots() {
   m.step(1, false);
   m.step(0, true);
   m.draw();
-  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE") && rowIs(m.canvas, 7, "Turn to cancel."), "screens: confirm rows");
+  check(rowIs(m.canvas, 0, "Update the firmware?") && rowIs(m.canvas, 6, "Turn to cancel."), "screens: confirm rows");
   writePgm(m.canvas, "oled-confirm.pgm");
 }
 
