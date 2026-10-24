@@ -10,7 +10,6 @@ namespace {
 
 uint32_t gFailsAtBoot = 0;
 uint32_t gReasonAtBoot = CvReasonNone;
-uint32_t gFaultAddressAtBoot = 0;
 uint32_t gSetupDoneMs = 0;
 uint32_t gBlocksAtSetup = 0;
 bool gOpen = false;
@@ -22,9 +21,7 @@ void bootHealthInit() {
   const CvBootBlock& block = bootBlock();
   gFailsAtBoot = failedStartsBefore(cvBootFailsGet(&block));
   // Another block version means the bootloader did not write this one since power-on.
-  const bool written = bootBlockWritten();
-  gReasonAtBoot = written ? block.lastReason : static_cast<uint32_t>(CvReasonNone);
-  gFaultAddressAtBoot = written ? block.faultAddress : 0u;
+  gReasonAtBoot = bootBlockWritten() ? block.lastReason : static_cast<uint32_t>(CvReasonNone);
   gSetupDoneMs = millis();
   gBlocksAtSetup = audioBlockCount();
   gOpen = true;
@@ -42,5 +39,3 @@ uint32_t bootHealthFails() { return gFailsAtBoot; }
 const char* bootHealthLastReason() { return updateReasonName(gReasonAtBoot); }
 
 uint32_t bootHealthLastReasonCode() { return gReasonAtBoot; }
-
-uint32_t bootHealthFaultAddress() { return gFaultAddressAtBoot; }

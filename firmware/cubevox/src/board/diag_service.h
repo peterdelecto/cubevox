@@ -8,9 +8,9 @@
 #include <Arduino.h>
 
 // Opens the log and queues the boot entry when this start calls for one. Call after recordBoot()
-// (its ECC recovery makes an unreadable sector readable before the scan) and after
-// bootHealthInit() (the failed-start count and the bootloader's reason). Then lifts the
-// bootloader's mark on the log sector, because the scan has read the sector.
+// (its ECC recovery makes an unreadable sector readable before the scan, and it holds the
+// bootloader's fault address) and after bootHealthInit() (the failed-start count and the
+// bootloader's reason).
 void diagInit();
 
 // Call every loop pass. Starts at most one flash operation and reports a failed write once.

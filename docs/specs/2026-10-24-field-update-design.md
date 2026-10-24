@@ -243,9 +243,10 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
       not count against that wait, because a reset would leave the sector half erased. A timeout
       prints a warning and the update goes ahead.
 3. The bootloader reads the log and never writes it. A read fault inside sector 2 marks the log
-   `unreadable` in `DIAG.TXT` and leaves recovery to the application. At boot, before the scan,
-   the application erases sector 2 when its own fault record or `faultAddress` in the boot block
-   names it. After a clean scan it clears `faultAddress`, so the bootloader reads the log again.
+   `unreadable` in `DIAG.TXT` and leaves recovery to the application. At boot, before any scan,
+   the application erases the bank 2 sector that its own fault record or `faultAddress` in the
+   boot block names. After a successful erase it clears `faultAddress`, so the bootloader reads
+   the log again. The boot entry still records the address the bootloader left.
 4. Adam's support step is one sentence in the guide. Open the `CUBEVOX` drive, send `DIAG.TXT`.
 
 ## Application changes
@@ -264,7 +265,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | `core/flash_io.{h,cpp}` | New. `FlashIo` moves here from `record_store.h`, with `kFlashWordBytes`, `kFlashSectorBytes` and the three steps both stores take: blank test, program one word, poll an erase. `core/le_bytes.h` holds the little-endian helpers that `record.cpp` and the log share. |
 | `core/entry_log.{h,cpp}` | New. Append log of fixed-size entries in one sector over `FlashIo`. It stamps the sequence and the CRC-32 and knows no other field of `CvDiagEntry`. |
 | `board/diag_service.{h,cpp}` | New. Builds `CvDiagEntry` bytes on bank 2 sector 2: `diagInit` (boot entry), `diagPoll`, `diagNoteUpdateRequest`, `diagFlush`, `diagReportBoot` (the `[boot] diag log:` line). |
-| `board/flash_bank2.{h,cpp}`, `board/record_service.cpp` | Sector index 2 maps to `CV_DIAG_LOG_ADDR`, and `bank2Flash()` is the one controller both stores use. Each store skips its poll while the other erases. `recoverEcc` also erases sector 2. |
+| `board/flash_bank2.{h,cpp}`, `board/record_service.cpp` | Sector index 2 maps to `CV_DIAG_LOG_ADDR`, and `bank2Flash()` is the one controller both stores use. Each store skips its poll while the other erases. `recoverEcc` also covers sector 2 and the sector a bootloader read fault names, and clears that fault address. |
 | `board/block_mem.{h,cpp}` | Moved from `platform/`, trimmed, flash table fixed (section Teensy-H7-Port cut-over). |
 | `board/fault.cpp` | Boot report line `[boot] image v2.00.10 crc ok, boot fails 0, last update reason none`. `faultResetFlags`, `faultResetWasPowerOn` and `faultRecordPresent` feed the diagnostic log. |
 | `ui/menu.cpp` | Confirm screen per section OLED. |

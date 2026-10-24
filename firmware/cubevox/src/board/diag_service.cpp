@@ -8,6 +8,7 @@
 #include "board/boot_health.h"
 #include "board/fault.h"
 #include "board/flash_bank2.h"
+#include "board/record_service.h"
 #include "board/serial_link.h"
 #include "core/entry_log.h"
 #include "core/version.h"
@@ -43,7 +44,7 @@ CvDiagEntry makeEntry(CvDiagKind kind) {
   e.resetCause = faultResetFlags();
   e.bootFails = bootHealthFails();
   e.lastReason = bootHealthLastReasonCode();
-  e.faultAddress = bootHealthFaultAddress();
+  e.faultAddress = recordBootFaultAddress();
   e.saiErrors = audioErrors().count;
   e.overruns = audioStats().overruns;
   copyText(e.firmware, sizeof e.firmware, kFirmwareVersion, SIZE_MAX);
@@ -74,12 +75,7 @@ void queueBootEntry() {
 
 void diagInit() {
   gFailed = !gLog.begin();
-  if (gFailed) return;
-  // The scan read every slot, so the sector is readable, whatever the bootloader found earlier.
-  if (bootBlockWritten() && bank2RecordSector(bootBlock().faultAddress) == kDiagLogSector) {
-    bootBlock().faultAddress = 0;
-  }
-  queueBootEntry();
+  if (!gFailed) queueBootEntry();
 }
 
 void diagPoll() {

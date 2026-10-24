@@ -21,27 +21,29 @@ bool gEccEraseFailed = false;
 bool gFaultInitMissing = false;
 bool gLayoutRejected = false;
 char gRejectReason[protocol::kErrorBytes] = {};
+uint32_t gBootFaultAddress = 0;  // the bootloader's last read fault, kept after recoverEcc clears it
 
 // The bank 2 address of a double ECC error. Either the last run hit it, or the bootloader hit it
-// reading the diagnostic log for DIAG.TXT and left the address in the boot block. The bootloader
-// reads no other bank 2 sector, so no other address from it is acted on.
+// (reading the diagnostic log for DIAG.TXT, say) and left the address in the boot block.
 bool eccFaultAddress(uint32_t& address) {
   if (faultLastWasBank2Ecc(address)) return true;
-  if (!bootBlockWritten()) return false;
-  const uint32_t reported = bootBlock().faultAddress;
-  if (bank2RecordSector(reported) != kDiagLogSector) return false;
-  address = reported;
+  if (bank2RecordSector(gBootFaultAddress) < 0) return false;
+  address = gBootFaultAddress;
   return true;
 }
 
 // A double ECC error on a half-programmed word repeats on every read, so the sector goes. That
-// includes sector 2, the diagnostic log, whose scan at boot would otherwise fault again.
+// includes sector 2, the diagnostic log, whose scan at boot would otherwise fault again. Once the
+// sector the bootloader named is erased, its address is cleared so the bootloader reads the log
+// again. A failed erase leaves the address, and the bootloader keeps skipping the sector.
 void recoverEcc() {
+  gBootFaultAddress = bootBlockWritten() ? bootBlock().faultAddress : 0u;
   if (!eccFaultAddress(gEccAddress)) return;
   gEccSector = bank2RecordSector(gEccAddress);
   if (gEccSector < 0) return;
   gFlash.eraseBlocking(gEccSector);
   gEccEraseFailed = gFlash.takeError();
+  if (!gEccEraseFailed && bank2RecordSector(gBootFaultAddress) == gEccSector) bootBlock().faultAddress = 0;
 }
 
 void printSettings(Print& out, const Settings& s) {
@@ -114,6 +116,8 @@ const char* recordName() { return gStore.current().name; }
 uint32_t recordSequence() { return gStore.status().sequence; }
 
 uint32_t recordErrors() { return gStore.status().errors; }
+
+uint32_t recordBootFaultAddress() { return gBootFaultAddress; }
 
 void recordPoll(uint32_t nowMs) {
   // The bank takes one operation at a time, so a save waits while the diagnostic log erases.
