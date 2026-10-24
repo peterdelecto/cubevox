@@ -41,5 +41,11 @@ void faultForceBusFault();
 [[noreturn]] void faultSpinForWatchdog();
 #endif
 
-// Boot report lines: reset cause, last fault (or "[boot] fault: none"), audio stall if any.
+// Boot report lines: reset cause, last fault (or "[boot] fault: none"), the image line (version,
+// CRC verdict, earlier failed starts, last update reason), audio stall if any.
 void faultReport(Print& out);
+
+// Short text for the boot block's appSummary. It holds the first reset cause that was set at boot
+// and the kind of the last fault, as in "power-on none" or "watchdog bus", NUL-terminated within
+// `size`.
+void faultSummaryText(char* out, size_t size);

@@ -96,8 +96,8 @@ reset and is random after power-on, so every field is validated before use.
 
 ## Image header and UF2 family
 A 32-byte header sits at application offset 0x400, after the 0x298-byte vector table.
-`firmware/cubevox_image.ld` places section `.cv_image_hdr` at that address with `INSERT AFTER
-.isr_vector`, the mechanism `cubevox_noinit.ld` already uses.
+`firmware/cubevox.ld`, the one owned linker script, places section `.cv_image_hdr` at that address
+(`ALIGN(0x400)` after `.isr_vector`, with a linker assert on 0x08020400).
 
 | Offset | Size | Field |
 |---|---|---|
@@ -240,17 +240,20 @@ and serial lines are drawn at run time with the 5x7 font.
 | File | Change |
 |---|---|
 | `firmware/build.sh` | `--build-property build.flash_offset=0x20000` sets the FLASH origin and `VECT_TAB_OFFSET` in one place (`platform.txt:68,78`). `build.vid`/`build.pid` from `boot_block.h`. Size gate 917504. Runs `stamp_image.py`, emits `cubevox.uf2` next to the `.bin`. |
-| `firmware/cubevox_image.ld` | New. `.cv_image_hdr` at app+0x400. Asserts image end `<= 0x08100000`. |
-| `firmware/cubevox_sections.ld` | Owned replacement for the platform copy; `.dtcm_bss` bound `0x2001FF00`; boot block symbols. |
+| `firmware/cubevox.ld` | New, the one owned linker script. It replaces `cubevox_noinit.ld` and the platform copy. `.sram1_bss` and `.dtcm_bss` (bound `0x2001FF00`), `.cv_boot_block`, `.cv_noinit`, and `.cv_image_hdr` at app+0x400. Asserts image end `<= 0x08100000`. |
 | `board/boot_block.h` | New. The shared contract. C-compatible, no C++ in it. |
-| `board/image_header.cpp` | New. The `.cv_image_hdr` object; version string from `CUBEVOX_VERSION`. |
+| `board/boot_block.cpp` | New. The `.cv_boot_block` variable and its accessor `bootBlock()` (declared in `boot_block_access.h`). |
+| `board/image_header.{h,cpp}` | New. The `.cv_image_hdr` object; version string from `CUBEVOX_FW_VERSION` (`-bench` added in the bench build); the CRC check of the running image. |
 | `board/dfu.{h,cpp}` | `enterDfu()` keeps its name and both callers. Body: write `appSummary`, `recordFlush`, `serialFlush`, `muteForReset`, write `request`, `NVIC_SystemReset()`. The ROM jump is gone. |
-| `board/boot_health.{h,cpp}` | New. `bootHealthPoll(nowMs)` from `loop()`; clears `bootFails` when the 5 s rule holds; exposes the count for the boot report and the diagnostic log. |
+| `core/boot_health_rule.h` | New. The pure rules: healthy window, failed-start count, update reason names. |
+| `board/boot_health.{h,cpp}` | New. `bootHealthPoll(nowMs)` from `loop()`; clears `bootFails` when the 5 s rule holds; exposes the count and the last reason for the boot report, `status` and the diagnostic log. |
+| `core/crc32.{h,cpp}` | New. The one CRC-32, moved out of `core/record.cpp`; also checks the image. |
+| `board/device_serial.{h,cpp}` | New. The MCU id as 24 hex characters, for `hello`. |
 | `board/diag_log.{h,cpp}` | New. Second `record_store` on bank 2 sector 2; append at boot and before update mode. |
 | `board/block_mem.{h,cpp}` | Moved from `platform/`, trimmed, flash table fixed (section Teensy-H7-Port cut-over). |
 | `board/fault.cpp` | Boot report line `[boot] image v2.00.10 crc ok, boot fails 0, last update reason none`. |
 | `ui/menu.cpp` | Confirm screen per section OLED. |
-| `ui/splash` | Boot splash with version, 2 s. |
+| `ui/splash.{h,cpp}` | Boot splash with version, 2 s. |
 | `core/protocol.cpp` | `enter_dfu` unchanged in name and reply. `status` gains `boot_fails` and `update_reason`. `hello` gains `serial`. |
 | `platform_shim.cpp`, `platform.h`, `firmware/platform/` | Deleted. |
 

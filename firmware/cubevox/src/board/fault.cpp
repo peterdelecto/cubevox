@@ -5,11 +5,13 @@
 #include "stm32yyxx_ll_iwdg.h"  // the core leaves the IWDG HAL module out; LL is what it uses
 
 #include "board/audio.h"
+#include "board/block_mem.h"
+#include "board/boot_health.h"
 #include "board/flash_bank2.h"
+#include "board/image_header.h"
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/serial_link.h"
-#include "h7_block_mem.h"
 
 namespace {
 
@@ -33,8 +35,8 @@ static_assert(kKindClock == kKindName.size() - 1, "kKindClock must index the las
 constexpr std::array<const char*, 6> kClockStepName = {"?", "supply", "voltage scaling", "oscillator and PLL1",
                                                        "bus clocks", "peripheral clocks"};
 
-// Written by the fault handler, read on the next boot. .cv_noinit (firmware/cubevox_noinit.ld)
-// sits at the top of DTCM, clear of .dtcm_bss, and survives a system reset.
+// Written by the fault handler, read on the next boot. .cv_noinit (firmware/cubevox.ld) sits at
+// the top of DTCM, above the boot block and .dtcm_bss, and survives a system reset.
 struct FaultRecord {
   uint32_t magic;
   uint32_t kind;
@@ -136,6 +138,18 @@ void reportFault(Print& out) {
   printHex(out, " mmfar", gLast.mmfar);
   if (bank2EccSet(gLast)) printHex(out, " bank2-ecc", bank2EccAddress(gLast));
   out.println();
+}
+
+// The release name and CRC verdict of the running image, the failed starts the bootloader counted
+// before this one, and why the bootloader last stayed in update mode.
+void reportImage(Print& out) {
+  out.print("[boot] image ");
+  out.print(imageVersion());
+  out.print(imageCrcOk() ? " crc ok" : " crc BAD");
+  out.print(", boot fails ");
+  out.print(bootHealthFails());
+  out.print(", last update reason ");
+  out.println(bootHealthLastReason());
 }
 
 }  // namespace
@@ -266,11 +280,26 @@ void faultReport(Print& out) {
     out.println("[boot] fault: none");
   }
 
+  reportImage(out);
+
   if (gStalled) {
     out.print("[ERROR] audio stalled after ");
     out.print(gLastBlocks);
     out.println(" blocks, output muted");
   }
+}
+
+void faultSummaryText(char* out, size_t size) {
+  const char* reset = "none";
+  for (const ResetFlag& f : kResetFlags) {
+    if (gResetFlags & f.mask) {
+      reset = f.name;
+      break;
+    }
+  }
+  const char* fault = "none";
+  if (gLast.magic == kMagic) fault = gLast.kind < kKindName.size() ? kKindName[gLast.kind] : "unknown";
+  snprintf(out, size, "%s %s", reset, fault);
 }
 
 #if CUBEVOX_BENCH

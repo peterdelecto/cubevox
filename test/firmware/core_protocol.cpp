@@ -273,8 +273,28 @@ void checkSimpleReplies() {
   s.strayBytes = 8;
   protocol::replyStatus(w, 15, s);
   check(JsonReader(w.out).valid() &&
-            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8}\n",
+            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,\"update_reason\":\"none\"}\n",
         "proto: status reply");
+
+  w = StringWriter();
+  s.bootFails = 2;
+  s.updateReason = "BootFailed";
+  protocol::replyStatus(w, 17, s);
+  check(JsonReader(w.out).valid() && has(w.out, "\"stray_bytes\":8,\"boot_fails\":2,\"update_reason\":\"BootFailed\"}\n"),
+        "proto: status carries the boot fails and the update reason");
+}
+
+// Every counter at its widest, so a reply piece that outgrows the writer's buffer shows up.
+void checkStatusWidest() {
+  StringWriter w;
+  protocol::Status s;
+  s.cpuMeanPercent = 100.0f;
+  s.cpuWorstPercent = 100.0f;
+  s.late = s.seq = s.recordErrors = s.serialDropped = s.strayBytes = s.bootFails = 0xFFFFFFFFu;
+  s.updateReason = "ImageUnreadable";
+  protocol::replyStatus(w, 0xFFFFFFFFu, s);
+  check(JsonReader(w.out).valid() && w.overflows() == 0 && has(w.out, "\"update_reason\":\"ImageUnreadable\"}\n"),
+        "proto: the widest status reply fits every piece");
 }
 
 void checkHelloReply() {
@@ -294,6 +314,18 @@ void checkHelloReply() {
   check(has(w.out, "\"curve\":\"log\"") && has(w.out, "\"curve\":\"log_reversed\""), "proto: hello carries curves");
   check(has(w.out, "\"group\":\"pitch\"") && has(w.out, "\"group\":\"reverb\""), "proto: hello carries groups");
   check(has(w.out, "\"layout\":{\"name\":\"Default\""), "proto: hello carries the layout");
+}
+
+void checkHelloSerial() {
+  StringWriter w;
+  protocol::replyHello(w, 3, "v2.00.10", "Default", defaultLayout(), false, "0123456789ABCDEF01234567");
+  check(JsonReader(w.out).valid() && w.overflows() == 0, "proto: hello with a serial parses as JSON");
+  check(has(w.out, "\"fw\":\"v2.00.10\",\"serial\":\"0123456789ABCDEF01234567\",\"build\":\"release\""),
+        "proto: hello carries the serial between fw and build");
+
+  StringWriter none;
+  protocol::replyHello(none, 3, "v2.00.10", "Default", defaultLayout(), false);
+  check(!has(none.out, "serial"), "proto: hello leaves the serial out when the caller has none");
 }
 
 void checkReplyEscapes() {
@@ -316,7 +348,9 @@ void checkWriterFormat() {
 
 void checkProtocolReplies() {
   checkSimpleReplies();
+  checkStatusWidest();
   checkHelloReply();
+  checkHelloSerial();
   checkReplyEscapes();
   checkWriterFormat();
 }

@@ -102,6 +102,8 @@ struct Status {
   uint32_t recordErrors = 0;
   uint32_t serialDropped = 0;
   uint32_t strayBytes = 0;
+  uint32_t bootFails = 0;  // earlier starts that never reported healthy
+  const char* updateReason = "none";  // why the bootloader last stayed in update mode
 
   explicit Status() = default;
 };
@@ -109,8 +111,11 @@ struct Status {
 void replyError(Writer& w, uint32_t id, const char* reason);
 void replyOk(Writer& w, uint32_t id);
 
-// Lists the build ("release" or "bench") and the ops it accepts.
-void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild);
+// Lists the build ("release" or "bench") and the ops it accepts. `serial` is the box's 24-character
+// hex id; the reply leaves the field out when it is null, which is how the host tools that have no
+// board call it.
+void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild,
+                const char* serial = nullptr);
 void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout);
 void replyStatus(Writer& w, uint32_t id, const Status& s);
 

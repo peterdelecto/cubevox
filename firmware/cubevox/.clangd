@@ -1,0 +1,59 @@
+# Editor include paths for the board tier: Arduino.h, the HAL, the variant and the U8g2 headers.
+# clangd has no variable expansion, so every path is absolute. To regenerate after a core upgrade or on
+# another machine, replace the prefixes below with the output of these commands:
+#   CORE  $(arduino-cli config get directories.data)/packages/STMicroelectronics/hardware/stm32/3.0.0
+#   TOOLS $(arduino-cli config get directories.data)/packages/STMicroelectronics/tools
+#   LIBS  $(arduino-cli config get directories.user)/libraries
+#   REPO  the checkout
+# The list follows the compile command arduino-cli writes to <build dir>/compile_commands.json. The
+# target and the toolchain's library headers make clangd parse the files as the Cortex-M7 build does,
+# and GCC_VERSION satisfies the compiler check in Arduino.h, which clang's own version fails.
+CompileFlags:
+  Add:
+    - --target=arm-none-eabi
+    - -mcpu=cortex-m7
+    - -mfpu=fpv5-d16
+    - -mfloat-abi=hard
+    - -mthumb
+    - -isystem/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1/arm-none-eabi/include/c++/14.2.1
+    - -isystem/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1/arm-none-eabi/include/c++/14.2.1/arm-none-eabi/thumb/v7e-m+dp/hard
+    - -isystem/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1/arm-none-eabi/include
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/cores/arduino
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/cores/arduino/avr
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/cores/arduino/stm32
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/cores/arduino/api/deprecated
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/variants/STM32H7xx/H742V(G-I)(H-T)_H743V(G-I)(H-T)_H750VBT_H753VI(H-T)
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/SrcWrapper/inc
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/SrcWrapper/inc/LL
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/SrcWrapper/src
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/USBDevice/inc
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/USBDevice/src
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/Wire/src
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/SPI/src
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/STM32H7xx
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/Drivers/STM32H7xx_HAL_Driver/Inc
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/Drivers/CMSIS/Device/ST/STM32H7xx/Include
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/CMSIS/6.3.0/CMSIS/Core/Include
+    - -I/Users/j/Documents/Arduino/libraries/U8g2/src
+    - -I/Users/j/Documents/Claude/Projects/cubevox
+    - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/cubevox/src
+    - -I/Users/j/Documents/Claude/Projects/cubevox/tools/font-editor/fonts
+    - -DGCC_VERSION=140201
+    - -DSTM32H7xx
+    - -DSTM32H743xx
+    - -DCORE_CM7
+    - -DARDUINO=10607
+    - -DARDUINO_ARCH_STM32
+    - -DUSBCON
+    - -DUSBD_USE_CDC
+    - -DUSE_HAL_DRIVER
+    - -DUSE_FULL_LL_DRIVER
+    - -DEXTENDED_PIN_MODE
+    - -DHAL_PCD_MODULE_ENABLED
+    - -DHAL_UART_MODULE_ENABLED
+    - -DVARIANT_H="variant_generic.h"
+    - -DBOARD_NAME="GENERIC_H743VITX"
+  Remove:
+    - -fsanitize*
+    - -Werror

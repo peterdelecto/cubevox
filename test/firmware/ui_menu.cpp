@@ -153,7 +153,13 @@ void checkMenuScreens() {
   m.step(1, false);
   m.step(0, true);
   m.draw();
-  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE"), "menu: confirm screen");
+  char tag[kDisplayCols + 1];
+  versionTag(kFirmwareVersion, tag, sizeof(tag));
+  const std::string installed = std::string("Installed ") + tag;
+  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE") && rowIs(m.canvas, 2, installed.c_str()), "menu: confirm screen names the installed version");
+  check(rowIs(m.canvas, 4, "Click to enter") && rowIs(m.canvas, 5, "update mode.") && rowIs(m.canvas, 7, "Turn to cancel."),
+        "menu: confirm screen says a click enters update mode and a turn cancels");
+  check(rowIs(m.canvas, 1, "") && rowIs(m.canvas, 3, "") && rowIs(m.canvas, 6, ""), "menu: confirm screen keeps its spacer rows blank");
   m.step(1, false);
   m.draw();
   check(rowIs(m.canvas, 0, "MENU"), "menu: turn cancels the confirm");
@@ -253,6 +259,13 @@ void checkScreenshots() {
   check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()) && rowIs(m.canvas, 7, chainRow(m.layout, 7).c_str()),
         "screens: chain rows");
   writePgm(m.canvas, "oled-chain.pgm");
+
+  m.step(0, true);
+  m.step(1, false);
+  m.step(0, true);
+  m.draw();
+  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE") && rowIs(m.canvas, 7, "Turn to cancel."), "screens: confirm rows");
+  writePgm(m.canvas, "oled-confirm.pgm");
 }
 
 void checkDisplayGrid() {

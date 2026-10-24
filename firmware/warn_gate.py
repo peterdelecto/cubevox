@@ -2,9 +2,9 @@
 """Recompile our sketch sources with the warning flags below as errors, third-party includes as -isystem.
 
 Reads the compile commands arduino-cli wrote for the build, so flags and defines match the
-firmware build exactly. Only .cpp files under the sketch copy are checked; the STM32 core, HAL,
-libraries and the verbatim platform/ copies are never compiled here and their headers are
-system headers, so their warnings are silent. Fails when fewer files are checked than the
+firmware build exactly. Only .cpp files under the sketch copy are checked; the STM32 core, HAL
+and libraries are never compiled here and their headers are system headers, so their warnings
+are silent. Fails when fewer files are checked than the
 sketch copy holds, so a path mismatch cannot pass an empty gate.
 
   warn_gate.py BUILD_DIR [--tail N] [--system-dir DIR ...]

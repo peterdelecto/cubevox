@@ -183,7 +183,9 @@ add_executable(firmware_test
                test/firmware/main.cpp
                test/firmware/support.cpp
                test/firmware/boot_decide.cpp
+               test/firmware/core_boot_health.cpp
                test/firmware/core_canvas.cpp
+               test/firmware/core_crc32.cpp
                test/firmware/core_input.cpp
                test/firmware/core_layout.cpp
                test/firmware/core_layout_fade.cpp
@@ -194,6 +196,7 @@ add_executable(firmware_test
                test/firmware/core_registry.cpp
                test/firmware/core_tx_queue.cpp
                test/firmware/ui_menu.cpp
+               test/firmware/ui_splash.cpp
                ${CUBEVOX_FW_CORE_SOURCES}
                ${CUBEVOX_BOOT_DECIDE_DIR}/boot_decide.c)
 target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src

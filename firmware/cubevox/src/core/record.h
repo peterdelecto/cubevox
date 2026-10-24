@@ -7,6 +7,7 @@
 
 #include <array>
 
+#include "core/crc32.h"
 #include "core/layout.h"
 #include "core/settings.h"
 #include "core/slots.h"
@@ -42,9 +43,6 @@ struct RecordData {
 };
 
 using RecordBytes = std::array<uint8_t, kRecordBytes>;
-
-// Standard CRC-32 (reflected 0xEDB88320, init and final xor 0xFFFFFFFF).
-uint32_t crc32(const uint8_t* data, size_t len);
 
 RecordBytes encodeRecord(const RecordData& rec);
 

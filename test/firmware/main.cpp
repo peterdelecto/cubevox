@@ -23,6 +23,9 @@ int main() {
   checkCanvas();
   checkPanelTest();
   checkRecords();
+  checkCrc32();
+  checkBootHealth();
+  checkSplash();
   checkBootDecide();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);
   return gFailures == 0 ? 0 : 1;

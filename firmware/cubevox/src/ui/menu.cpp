@@ -25,9 +25,13 @@ constexpr int kRowListFirstItem = 1;
 
 // Firmware update confirmation.
 constexpr int kRowConfirmTitle = 0;
-constexpr int kRowConfirmBody1 = 2;
-constexpr int kRowConfirmBody2 = 3;
-constexpr int kRowConfirmCancel = 5;
+constexpr int kRowConfirmInstalled = 2;
+constexpr int kRowConfirmBody1 = 4;
+constexpr int kRowConfirmBody2 = 5;
+constexpr int kRowConfirmCancel = 7;
+constexpr char kInstalledPrefix[] = "Installed ";
+// Columns left for the version after the prefix.
+constexpr int kInstalledTagCols = kDisplayCols - static_cast<int>(sizeof(kInstalledPrefix) - 1);
 
 enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
 
@@ -106,10 +110,16 @@ void drawChainView(MenuFrame& f, const Layout& layout) {
   }
 }
 
+// Names the installed version so Adam can compare it with the file he downloaded.
 void drawConfirmDfu(MenuFrame& f) {
+  char tag[kDisplayCols + 1];
+  versionTag(kFirmwareVersion, tag, sizeof(tag));
+  char installed[kDisplayCols + 1];
+  snprintf(installed, sizeof(installed), "%s%.*s", kInstalledPrefix, kInstalledTagCols, tag);
   putRow(f, kRowConfirmTitle, "UPDATE FIRMWARE");
-  putRow(f, kRowConfirmBody1, "Click to reboot");
-  putRow(f, kRowConfirmBody2, "into DFU mode.");
+  putRow(f, kRowConfirmInstalled, installed);
+  putRow(f, kRowConfirmBody1, "Click to enter");
+  putRow(f, kRowConfirmBody2, "update mode.");
   putRow(f, kRowConfirmCancel, "Turn to cancel.");
 }
 

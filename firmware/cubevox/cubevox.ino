@@ -5,9 +5,11 @@
 #include "board/audio.h"
 #include "board/bench.h"
 #include "board/bench_panel.h"
+#include "board/boot_health.h"
 #include "board/boot_report.h"
 #include "board/build_kind.h"
 #include "board/controls.h"
+#include "board/device_serial.h"
 #include "board/dfu.h"
 #include "board/display_sh1106.h"
 #include "board/display_stub.h"
@@ -29,6 +31,7 @@
 #include "core/version.h"
 #include "ui/actions.h"
 #include "ui/menu.h"
+#include "ui/splash.h"
 
 namespace {
 
@@ -38,6 +41,8 @@ constexpr uint32_t kStatsMs = 5000;
 Layout gLayout = defaultLayout();
 Settings gSettings;
 Menu gMenu;
+Splash gSplash;
+char gVersionTag[kDisplayCols + 1];
 JackSwitch gJack{Settings().inputJack};
 Display* gDisplay = nullptr;
 Canvas gCanvas;
@@ -75,6 +80,8 @@ void replyStatus(uint32_t id) {
   status.recordErrors = recordErrors();
   status.serialDropped = serialDropped();
   status.strayBytes = serialStrayBytes();
+  status.bootFails = bootHealthFails();
+  status.updateReason = bootHealthLastReason();
   protocol::replyStatus(serialWriter(), id, status);
 }
 
@@ -117,7 +124,7 @@ void onRequest(const char* line, uint32_t nowMs) {
   }
   switch (req.cmd) {
     case protocol::Command::Hello:
-      protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout, kBenchBuild);
+      protocol::replyHello(out, req.id, kFirmwareVersion, layoutName(), gLayout, kBenchBuild, deviceSerial());
       break;
     case protocol::Command::GetLayout: protocol::replyLayout(out, req.id, layoutName(), gLayout); break;
     case protocol::Command::SetLayout: replySetLayout(req, nowMs); break;
@@ -137,8 +144,14 @@ void runJackSwitch(uint32_t nowMs) {
   inputJackApply(gJack.relay());
 }
 
-// The menu owns the canvas except while the bench OLED pattern is up; it repaints once that ends.
-void drawFace(const UiContext& ctx) {
+// The menu owns the canvas except while the boot splash or the bench OLED pattern is up; it
+// repaints once either ends.
+void drawFace(const UiContext& ctx, uint32_t nowMs) {
+  switch (gSplash.draw(nowMs, gVersionTag, gCanvas)) {
+    case SplashStep::Up: return;
+    case SplashStep::Ended: gMenu.invalidate(); break;
+    case SplashStep::Off: break;
+  }
   switch (benchPanelPattern(gCanvas)) {
     case BenchPattern::Up: return;
     case BenchPattern::Ended: gMenu.invalidate(); break;
@@ -167,12 +180,16 @@ void setup() {
   gAudioRunning = audioInit();
   if (gAudioRunning) muteClocksRunning(millis());
   faultWatchdogStart();  // every init is behind us; from here loop() must keep running
+  bootHealthInit();  // after the watchdog: a start only counts as healthy with both running
+  versionTag(kFirmwareVersion, gVersionTag, sizeof(gVersionTag));
+  gSplash.start(millis());
 }
 
 void loop() {
   const uint32_t nowMs = millis();
   faultWatchdogKick();
   faultAudioWatch(nowMs, gAudioRunning);
+  bootHealthPoll(nowMs);
 
   usbLinkPoll(nowMs);
   if (usbLinkTerminalOpened()) {
@@ -193,7 +210,7 @@ void loop() {
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
   const UiContext ctx{gLayout, controlsReading(), gSettings, muteActive()};
-  drawFace(ctx);
+  drawFace(ctx, nowMs);
   gDisplay->flushStep(gCanvas);
   if (gHeartbeat.due(nowMs)) digitalToggle(pins::kUserLed);
   if (gStats.due(nowMs)) benchReportStats();

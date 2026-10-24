@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Compile the cubevox firmware for the H743 with arduino-cli. Never flashes.
-# Core, FQBN and flags follow Teensy-H7-Port/test/build_fxbox_h7.sh.
+# The image links at the application start (0x08020000), behind the bootloader's sector. A stamp
+# step then fills the length and CRC of its header and writes cubevox.uf2 next to the .bin.
 #
 #   ./build.sh              # release image into /tmp/cubevox-fw-release
 #   BENCH=1 ./build.sh      # bench image (-DCUBEVOX_BENCH: drills and panel test) into /tmp/cubevox-fw-bench
@@ -122,23 +123,47 @@ for candidate in "$ARDUINO_DATA"/packages/STMicroelectronics/tools/xpack-arm-non
 done
 if [ -n "$gcc" ]; then echo "[build] $("$gcc" --version | head -1)"; fi
 
-# Version string from the git tag; "dev" when the build is not from a checkout.
-VERSION="$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo dev)"
-echo "[build] core $CORE $CORE_VERSION, firmware $VERSION"
+# The release name is v<VERSION.txt>. The image header, hello, the OLED and the boot report show
+# this one string, and the update drive reads it back from the header. The git state only goes in
+# the log.
+VERSION_TXT="$(head -n 1 "$REPO/VERSION.txt")"
+if ! [[ "$VERSION_TXT" =~ ^[0-9]+\.[0-9][0-9]\.[0-9][0-9]$ ]]; then
+  echo "[ERROR] VERSION.txt is '$VERSION_TXT'; it must look like 2.00.10"
+  exit 1
+fi
+VERSION="v$VERSION_TXT"
+GIT_STATE="$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo no-git)"
+echo "[build] core $CORE $CORE_VERSION, firmware $VERSION (git $GIT_STATE)"
+
+# The addresses the image and the bootloader agree on come from the header both read.
+BOOT_BLOCK_H="$FW/cubevox/src/board/boot_block.h"
+cv_define() {  # integer value of a #define in the contract header, without its u suffix
+  awk -v name="$1" '$1 == "#define" && $2 == name { sub(/[uUlL]+$/, "", $3); print $3; exit }' "$BOOT_BLOCK_H"
+}
+APP_START="$(cv_define CV_APP_START)"
+APP_END="$(cv_define CV_APP_END)"
+if [ -z "$APP_START" ] || [ -z "$APP_END" ]; then
+  echo "[ERROR] CV_APP_START or CV_APP_END is missing from $BOOT_BLOCK_H"
+  exit 1
+fi
+FLASH_BASE=0x08000000
+FLASH_OFFSET="$(printf '0x%X' $((APP_START - FLASH_BASE)))"
+MAX_BIN=$((APP_END - APP_START))
 
 # The Python tools carry copies of firmware constants; a drift fails the build here.
 python3 -I "$REPO/tools/bench_ops_check.py"
 
 # Engine headers are included as "engine/x.h" from the repo root; sketch sources as "core/x.h",
-# "board/x.h", "ui/x.h" from cubevox/src; the copied platform files by bare name; the font
-# editor's export as "cubevox_fonts.h".
-INC="-I$REPO -I$FW/cubevox/src -I$FW/platform -I$REPO/tools/font-editor/fonts"
+# "board/x.h", "ui/x.h" from cubevox/src; the font editor's export as "cubevox_fonts.h".
+INC="-I$REPO -I$FW/cubevox/src -I$REPO/tools/font-editor/fonts"
 # The pot mux common on PC0 is the only analogRead; take the longest sample window (spec item 10.8).
 # The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
 # The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
 # fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
 # replays up to a queue's worth of bytes. 32 packets (2 KB) hold two 768-byte requests.
-DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"\\\"$VERSION\\\"\""
+# arduino-cli hands the quotes of CUBEVOX_FW_VERSION to the compiler as they stand, so one level
+# of escaping makes the macro a string literal. A second level put quote characters in the string.
+DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"$VERSION\""
 if [ "${BOARD:-}" = "weact" ]; then
   DEFS="$DEFS -DCUBEVOX_VBUS_ALWAYS"
   echo "[build] bench board weact: USB attach not gated on VBUS"
@@ -162,12 +187,15 @@ if [ -n "$CLIP" ]; then
   INC_CLIP="-I$OUT-gen"
   DEFS="$DEFS -DCUBEVOX_BENCH_CLIP"
 fi
-# RAM_D2 (SAI rings) and DTCM sections for the H743V linker script, then the fault record.
-LDX="-Wl,--script=$FW/platform/h7_h743v_sections.ld -Wl,--script=$FW/cubevox_noinit.ld"
+# RAM_D2 (SAI rings), DTCM, the boot block, the fault record and the image header for the H743V.
+LDX="-Wl,--script=$FW/cubevox.ld"
 
+# build.flash_offset sets the FLASH origin and -DVECT_TAB_OFFSET together, so the link address and
+# the VTOR the core writes in SystemInit agree. Nothing else sets VTOR.
 mkdir -p "$OUT"
 if ! arduino-cli compile --fqbn "$FQBN" \
   --build-path "$OUT" --warnings more \
+  --build-property "build.flash_offset=$FLASH_OFFSET" \
   --build-property "build.flags.optimize=$OPT" \
   --build-property "build.fpu=-mfpu=fpv5-d16" \
   --build-property "compiler.cpp.extra_flags=$INC $INC_CLIP $DEFS -ffp-contract=fast" \
@@ -178,18 +206,49 @@ if ! arduino-cli compile --fqbn "$FQBN" \
   exit 1
 fi
 
-# Bank 1 is 1 MB. A larger image would reach bank 2, where the layout record lives and DFU would overwrite it.
+# The bootloader owns the first sector of bank 1 and the layout record lives in bank 2, so the
+# image gets what lies between. The linker script asserts the image end; this guards the shipped file.
 BIN="$OUT/cubevox.ino.bin"
 if [ ! -f "$BIN" ]; then
   echo "[ERROR] $BIN missing after a successful compile"
   exit 1
 fi
 size="$(wc -c < "$BIN")"
-if [ "$size" -eq 0 ] || [ "$size" -gt 1048576 ]; then
-  echo "[ERROR] cubevox.ino.bin is $size bytes; it must be 1..1048576 (flash bank 1 only)"
+if [ "$size" -eq 0 ] || [ "$size" -gt "$MAX_BIN" ]; then
+  echo "[ERROR] cubevox.ino.bin is $size bytes; it must be 1..$MAX_BIN (flash bank 1 after the bootloader's sector, short of bank 2)"
   exit 1
 fi
 
+# cubevox.ld cannot include the header, so it carries copies of the contract addresses. Compare
+# the linked symbols with the header.
+if [ -z "$gcc" ]; then
+  echo "[ERROR] no arm-none-eabi toolchain under $ARDUINO_DATA/packages/STMicroelectronics/tools; the symbol check needs its nm"
+  exit 1
+fi
+NM="$(dirname "$gcc")/arm-none-eabi-nm"
+SYMBOLS="$("$NM" "$OUT/cubevox.ino.elf")"
+check_symbol_address() {  # symbol, expected address
+  local got
+  got="$(awk -v s="$1" '$3 == s { print "0x" $1; exit }' <<<"$SYMBOLS")"
+  if [ -z "$got" ] || [ $((got)) -ne $(($2)) ]; then
+    echo "[ERROR] $1 is at ${got:-nowhere} in the elf; boot_block.h puts it at $(printf '0x%08X' $(($2))), so fix firmware/cubevox.ld"
+    exit 1
+  fi
+}
+check_symbol_address gBootBlock "$(cv_define CV_BOOT_BLOCK_ADDR)"
+check_symbol_address __cv_noinit_start "$(cv_define CV_FAULT_RECORD_ADDR)"
+check_symbol_address kImageHeader "$((APP_START + $(cv_define CV_IMAGE_HEADER_OFFSET)))"
+
+# Fill the header's length and CRC in place, write the update file next to the .bin, and read the
+# update file back the way the bootloader will.
+FAMILY=cubevox
+if [ "${BOARD:-}" = "weact" ]; then FAMILY=weact; fi
+STAMP=(python3 -I "$REPO/tools/stamp_image.py")
+"${STAMP[@]}" stamp "$BIN"
+"${STAMP[@]}" uf2 "$BIN" "$OUT/cubevox.uf2" --family "$FAMILY"
+uf2_check="$("${STAMP[@]}" check "$OUT/cubevox.uf2")"
+echo "[build] cubevox.uf2 $uf2_check"
+
 # Warnings gate: our sources again with -Wall -Wextra -Werror, third-party headers as system headers.
 python3 -I "$FW/warn_gate.py" "$OUT" --tail "${TAIL:-40}" \
-  --system-dir "$ARDUINO_DATA" --system-dir "$ARDUINO_USER/libraries" --system-dir "$FW/platform"
+  --system-dir "$ARDUINO_DATA" --system-dir "$ARDUINO_USER/libraries"

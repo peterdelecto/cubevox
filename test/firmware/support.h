@@ -29,4 +29,7 @@ void checkMenu();              // ui_menu.cpp
 void checkCanvas();            // core_canvas.cpp
 void checkPanelTest();         // core_panel_test.cpp
 void checkRecords();           // core_record.cpp
+void checkCrc32();             // core_crc32.cpp
+void checkBootHealth();        // core_boot_health.cpp
+void checkSplash();            // ui_splash.cpp
 void checkBootDecide();        // boot_decide.cpp

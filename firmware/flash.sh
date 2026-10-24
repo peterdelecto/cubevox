@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Flash <out dir>/cubevox.ino.bin over DFU and print the boot report.
 #
+# The image sits at 0x08020000, so the bootloader must already be in sector 0
+# (firmware/bootloader/flash.sh).
+#
 # The variant and out dir come from build.sh (VARIANT=release|bench; BENCH=1 and BOARD=weact
 # imply bench). If a cubevox CDC port is present the box is asked to enter DFU itself (the
 # enter_dfu command). Otherwise hold BOOT0, tap NRST, release BOOT0; the script waits up to WAIT
@@ -60,7 +63,7 @@ fi
 dfu_log="$(mktemp)"
 trap 'rm -f "$dfu_log"' EXIT
 dfu_rc=0
-dfu-util -a 0 -s 0x08000000:leave -D "$BIN" >"$dfu_log" 2>&1 || dfu_rc=$?
+dfu-util -a 0 -s 0x08020000:leave -D "$BIN" >"$dfu_log" 2>&1 || dfu_rc=$?
 grep -E "Erase|downloaded|Error" "$dfu_log" | grep -v get_status || true  # no match is a normal outcome
 unexpected="$(awk 'tolower($0) ~ /error/ && $0 !~ /get_status/' "$dfu_log")"
 if ! grep -q "File downloaded successfully" "$dfu_log" || [ -n "$unexpected" ]; then

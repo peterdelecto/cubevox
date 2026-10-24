@@ -2,14 +2,15 @@
 
 Needs arduino-cli and the STMicroelectronics:stm32 3.0.0 core. `build.sh` refuses any other core version
 and prints the gcc and firmware version it builds with. `build.sh` compiles and never flashes; `flash.sh`
-flashes.
+flashes. The image runs from 0x08020000, behind the bootloader in flash sector 0
+(`docs/specs/2026-10-24-field-update-design.md`).
 
 ## Build and flash
 
     ./build.sh          # release image, FQBN STMicroelectronics:stm32:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen
     BENCH=1 ./build.sh  # bench image (drills, panel test)
     TAIL=5 ./build.sh   # last 5 lines of compiler output only
-    ./flash.sh          # flash the image build.sh made for the same variant
+    ./flash.sh          # write the .bin at 0x08020000 with dfu-util
 
 1. **Variant.** `build.sh` is the only place that decides it. `VARIANT=release|bench` names it outright,
    `BENCH=1` and `BOARD=weact` imply bench, and a conflicting `VARIANT` is an error. `./build.sh --variant`
@@ -21,17 +22,35 @@ flashes.
 3. **Host-tool check.** Before compiling, `build.sh` runs `tools/bench_ops_check.py`. It compares the op
    table, the panel thresholds, the block rate and the SAI kernel clock that the Python tools carry against
    the firmware sources, so a drift fails the build.
-4. **Image size.** The build fails when the .bin exceeds 1 MB, so DFU never reaches flash bank 2.
-5. **Warning gate.** `warn_gate.py` recompiles every source under the sketch (sketch, `src/**`) with
-   `-Wall -Wextra -Wshadow -Wdouble-promotion -Wundef -Wformat=2 -Werror`. Third-party and `platform/`
-   includes are `-isystem`. It fails when fewer files are checked than the sketch holds. Both variants must
-   pass; CI builds, gates and uploads both. Check the split with
+4. **Link address.** `build.sh` reads `CV_APP_START` and `CV_APP_END` from `cubevox/src/board/boot_block.h` and
+   passes `build.flash_offset=0x20000` to arduino-cli. That one property sets the FLASH origin and
+   `-DVECT_TAB_OFFSET`, so the link address and the VTOR the core writes in `SystemInit` agree. Nothing else
+   sets VTOR.
+5. **Linker script.** `cubevox.ld` is the one script cubevox owns. It adds the RAM_D2 and DTCM data sections,
+   `.cv_boot_block` at 0x2001FF00, `.cv_noinit` at 0x2001FFC0 and `.cv_image_hdr` at 0x08020400, and it asserts
+   that the image ends below flash bank 2. `ld` cannot include `boot_block.h`, so the addresses are copies with
+   the macro named beside each. After the link `build.sh` compares `gBootBlock`, `kImageHeader` and
+   `__cv_noinit_start` in the elf with the header and fails on a drift.
+6. **Image size.** The build fails when the .bin exceeds 917504 bytes, the room between the bootloader's sector
+   and flash bank 2, which holds the layout record.
+7. **Stamp and update file.** `tools/stamp_image.py` writes the length and CRC-32 into the image header, in place.
+   It then writes `cubevox.uf2` next to the .bin, in the cubevox family (the `weact` family when
+   `BOARD=weact`), and reads that file back the way the bootloader will. `build.sh` prints the stamped version.
+8. **Version.** The release name is `v` plus `VERSION.txt`. `build.sh` passes it as `CUBEVOX_FW_VERSION`, and
+   the image header, `hello`, the boot report, the boot splash and the confirm screen all show that one string.
+   The bench image adds `-bench` to the header only.
+9. **Warning gate.** `warn_gate.py` recompiles every source under the sketch (sketch, `src/**`) with
+   `-Wall -Wextra -Wshadow -Wdouble-promotion -Wundef -Wformat=2 -Werror`. Third-party includes are `-isystem`.
+   It fails when fewer files are checked than the sketch holds. Both variants must pass; CI builds, gates and
+   uploads both. Check the split with
    `nm /tmp/cubevox-fw-release/cubevox.ino.elf | grep -E 'audioStopForBench|recordEraseAll|faultForceBusFault'`,
    which finds nothing.
-6. **Serial port.** `cubevox_port.py` is the one place that finds and opens the CDC port. `term.py`,
-   `bringup.py`, `flash.sh` and `tools/protocol_check.py` use it. With more than one `cu.usbmodem*` device,
-   name the port with `CUBEVOX_PORT=/dev/cu.usbmodemXXXX` or the tool's `--port` option (`term.py` takes it as
-   the argument).
+10. **Serial port.** `cubevox_port.py` is the one place that finds and opens the CDC port. `term.py`,
+    `bringup.py`, `flash.sh` and `tools/protocol_check.py` use it. With more than one `cu.usbmodem*` device,
+    name the port with `CUBEVOX_PORT=/dev/cu.usbmodemXXXX` or the tool's `--port` option (`term.py` takes it as
+    the argument).
+11. **Editor.** `cubevox/.clangd` gives clangd the include paths and defines of the board tier, so `Arduino.h`,
+    the HAL and the variant headers resolve. The paths are absolute and the file says how to regenerate them.
 
 Design: `docs/specs/2026-10-08-firmware-foundation-design.md` (tiers, tests, fault handling),
 `2026-10-08-effect-registry-design.md` (cards), `2026-10-08-update-and-slots-design.md` (roadmap).
@@ -43,7 +62,7 @@ calls is a pure function or class in `core/` or `ui/`. Sources sit under `cubevo
 includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Module map and ownership rules:
 `docs/specs/2026-10-12-firmware-structure-design.md`.
 
-**`src/core/`** is pure C++17 with no Arduino or HAL include. `test/firmware_test.cpp` compiles it on the Mac
+**`src/core/`** is pure C++17 with no Arduino or HAL include. `test/firmware/*.cpp` compiles it on the Mac
 (`ctest` target `firmware`), so an Arduino include here breaks the host build.
 
 1. Cards and layout: `registry` (cards, knob descriptors with curves, apply, format), `costs.h`, `chain_params`,
@@ -57,11 +76,15 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages), `fonts` (the font editor's export as
    `FontDesc`), `display.h` (backend interface, `flushStep`).
 5. Protocol and storage: `protocol` (JSON line framing, request parse, reply formatting into a `Writer`),
-   `tx_queue` (bounded line queue for serial output), `record` (layout record codec, CRC32, newest-valid scan),
-   `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `version.h`.
+   `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
+   `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `crc32` (the one
+   CRC-32, shared by the record and the image header), `version.h`.
+6. Update support: `boot_health_rule.h` (when a start counts as healthy, the failed-start count, the names of
+   the update reasons).
 
 **`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the
-screens on the canvas) and `actions` (what a `UiAction` does to the settings).
+screens on the canvas), `actions` (what a `UiAction` does to the settings) and `splash` (the version, centred,
+for 2 s after `setup()`).
 
 **`src/board/`** has one hardware concern per file.
 
@@ -77,17 +100,25 @@ screens on the canvas) and `actions` (what a `UiAction` does to the settings).
    queue), `boot_report` (the report a terminal gets on open).
 6. Safety and storage: `fault` (watchdog, fault handlers, reset cause, clock failure record, audio stall and
    transfer error watch), `flash_bank2` (bank 2 erase and flash-word program by register, non-blocking erase),
-   `record_service` (store wiring: boot load, ECC recovery, save request, flush before reset), `dfu` (the one
-   path into the ROM bootloader), `platform.h` and `platform_shim.cpp` (DFU entry from the copied platform code).
-7. Bench: `bench` (query ops and stats), `bench_drill` (slot and knob overrides, faults, record drills),
+   `record_service` (store wiring: boot load, ECC recovery, save request, flush before reset), `block_mem`
+   (where audio memory lives: the RAM_D2 MPU region, the DTCM section, adapted from Teensy-H7-Port).
+7. Bootloader contract: `boot_block.h` (the addresses, magics and two structs both programs read; C-compatible,
+   the bootloader and `tools/stamp_image.py` read it too), `boot_block` (the shared DTCM block as a variable),
+   `image_header` (the 32-byte header at +0x400 and the CRC check of the running image), `boot_health` (zeroes
+   the bootloader's start counter once the audio interrupt has run for 5 s), `dfu` (the one way into update
+   mode), `device_serial` (the MCU id as 24 hex characters).
+8. Bench: `bench` (query ops and stats), `bench_drill` (slot and knob overrides, faults, record drills),
    `bench_panel` (panel self-test). The drill and panel code is compiled in the bench image only.
 
-`platform/` holds verbatim copies from Teensy-H7-Port (first line names the source); they are on the include
-path and come into the build through `board/platform_shim.cpp`. Engine headers come from `../engine` by include
-path. No emulator files are included.
+Engine headers come from `../engine` by include path. No emulator files are included. Teensy-H7-Port and
+DrumSynthV3 are references to read, and nothing in `firmware/` is copied from them verbatim.
 
 ## Notes
 
+- `flash.sh` writes `<out dir>/cubevox.ino.bin` at 0x08020000 with dfu-util (`-s 0x08020000:leave`), so the
+  bootloader must already be in sector 0 (`bootloader/flash.sh` puts it there). The ST ROM DFU (BOOT0) is its only
+  way in for now. The `enter_dfu` command and the menu now land in the update drive, which `flash.sh` does not
+  wait for until the update-drive rewrite of the script.
 - `bringup.py`: first-article checks for a new board over USB, optional fault and DFU drills, operator
   questions, log to `hardware/bringup/`. `./bringup.py --board 1 --faults --dfu`; on the WeAct add
   `--weact --no-oled`. It checks its panel thresholds, block rate and SAI clock against the firmware through
@@ -107,20 +138,31 @@ path. No emulator files are included.
   `tools/font-editor/fonts/cubevox_fonts.h` through an include path, no copy.
 - `board/fault.cpp`: IWDG1 at 2 s, armed at the end of `setup()` and kicked only from `loop()` (and from
   `recordFlush`). HardFault, MemManage, BusFault and UsageFault drive XSMT and MUTE_N low by register write, store
-  PC, LR, CFSR, HFSR, BFAR and MMFAR in a `.cv_noinit` record (`cubevox_noinit.ld`, top of DTCM) and reset; the
+  PC, LR, CFSR, HFSR, BFAR and MMFAR in a `.cv_noinit` record (`cubevox.ld`, top of DTCM) and reset; the
   next boot report prints `[ERROR] last reset: fault ...` or `[boot] fault: none`, plus the decoded `RCC->RSR`
   reset cause. A stack pointer outside RAM stores zero for PC and LR. If the audio block counter stops for 100 ms
   while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line prints.
   SAI and DMA transfer errors are counted in `audio.cpp` and reported at most once a second.
-- `board/dfu.cpp`: `enterDfu()` is the only way into the ROM bootloader. It writes a pending record save, waits up
-  to 5 s for the store to go idle, lets the serial queue drain for 100 ms, mutes through `muteForReset()` and
-  reboots. The menu action and the `enter_dfu` command both call it.
+- `board/dfu.cpp`: `enterDfu()` is the only way into update mode, where the bootloader serves the `CUBEVOX` drive.
+  It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), writes a
+  pending record save, waits up to 5 s for the store to go idle, lets the serial queue drain for 100 ms, mutes
+  through `muteForReset()`, writes the request word and resets. The menu action and the `enter_dfu` command both
+  call it. The confirm screen shows the installed version, and the box shows the same version for 2 s after
+  every start.
+- `board/boot_health.cpp`: the bootloader counts every start that reaches the application. `bootHealthInit()` at
+  the end of `setup()` reads that count, and `bootHealthPoll()` zeroes it 5 s later if the audio interrupt has
+  advanced blocks since `setup()` ended. A fault, a watchdog reset or a hang inside those 5 s leaves the count
+  standing, and after three such starts in a row the next reset stays in update mode. The boot report line
+  `[boot] image <version> crc ok|BAD, boot fails <n>, last update reason <text>` and the `status` fields
+  `boot_fails` and `update_reason` give the earlier failed starts and why the bootloader last stayed in update
+  mode. The CRC covers the running image and is computed once, on the first report.
 - `board/flash_bank2.cpp` and `board/record_service.cpp`: the layout record lives in bank 2 at 0x08100000 and
   0x08120000 (spec `2026-10-12-layout-record-design.md`). A save runs 2 s after the last settings change, one erase
   or flash-word program per `loop()` pass. The flash driver checks the unlock, rejects a sector outside the two
   record sectors, and bounds every wait (5 s for an erase, 5 ms for one program word); a failure sets an error flag
-  and `recordPoll` prints `[ERROR] record save failed`. `build.sh` fails when the .bin exceeds 1 MB so DFU never
-  reaches bank 2. The fault record keeps FLASH->SR2 and ECC_FA2; a double ECC fault in a record sector is erased at
+  and `recordPoll` prints `[ERROR] record save failed`. `build.sh` and the linker script keep the image below
+  bank 2, and the bootloader writes only inside the image region. The fault record keeps FLASH->SR2 and ECC_FA2;
+  a double ECC fault in a record sector is erased at
   boot before the scan, and a failed erase is reported in the boot report. A record whose layout fails validation
   gives the default layout with a `[WARN]` and a rewrite. The boot report also warns about an unknown card id, a
   sector with data after a blank entry, and torn entries.
@@ -131,8 +173,8 @@ path. No emulator files are included.
   same pass re-seeds every knob whose step count changed, then publishes. The audio block fades the output out over
   50 ms, swaps the snapshot at zero, resets the engines whose slot changed card, and fades back in. The layout name
   is 1 to 31 printable ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own
-  window; the bench peaks are untouched), cumulative `late`, `muted`, the record `seq` and `rec_errors`, and
-  `serial_dropped`. All output (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue
+  window; the bench peaks are untouched), cumulative `late`, `muted`, the record `seq` and `rec_errors`,
+  `serial_dropped`, `stray_bytes`, `boot_fails` and `update_reason`. All output (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue
   (`core/tx_queue`) that `serialLinkPoll` drains each pass with non-blocking writes sized by
   `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected
   the queue is discarded. `enter_dfu` and the bench fault and spin ops give the queue 100 ms (`serialFlush`) before
@@ -155,8 +197,8 @@ path. No emulator files are included.
      `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`,
      `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`.
   3. DFU is `{"id":N,"cmd":"enter_dfu"}` in every build.
-  `hello` reports `build` (`release` or `bench`) and `bench_ops` (what this build accepts); the boot report prints
-  `[boot] build release|bench`.
+  `hello` reports the box's `serial` (the MCU id the update drive also serves), `build` (`release` or `bench`)
+  and `bench_ops` (what this build accepts); the boot report prints `[boot] build release|bench`.
 - Letter map for the host tools (`firmware/bench_ops.py`, used by `term.py -s`, `flash.sh`, `bringup.py` and
   `tools/protocol_check.py`): `1`-`8` `slot_off` N, `0` `slots_on`, `k` `pin_knobs`, `c` `chasm`, `r` `report`, `p`
   `stats`, `f` `fault`, `w` `spin`, `a` `stop_audio`, `m` `reset_peaks`, `v` `clip`, `s` `record_save`, `q`

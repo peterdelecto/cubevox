@@ -20,11 +20,11 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 ## Commands
 | cmd | Request fields | Reply |
 |---|---|---|
-| `hello` | — | `proto` 1, `fw` version, `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout` |
+| `hello` | — | `proto` 1, `fw` version, `serial` (24 uppercase hex characters of the MCU's 96-bit unique id, the text the update drive serves as its USB serial), `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout` |
 | `get_layout` | — | `layout`: `name`, `slots` (8 card ids) |
 | `set_layout` | `name`, `slots` (8 card ids) | `ok`, or an error |
-| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late`, `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes` |
-| `enter_dfu` | — | `ok`, sent and flushed before the box mutes and reboots |
+| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late`, `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes`, `boot_fails` (earlier starts that never reported healthy, read at boot), `update_reason` (why the bootloader last stayed in update mode: `none`, `MenuHeld`, `AppRequest`, `ImageInvalid`, `ImageUnreadable` or `BootFailed`) |
+| `enter_dfu` | — | `ok`, sent and flushed before the box mutes and reboots into the UF2 update drive (the `CUBEVOX` volume, spec `2026-10-24-field-update-design.md`) |
 | `bench` | `op`, plus `slot` (1 to 8) for `slot_off` | `ok` after the op runs, or an error; diagnostic text goes to the log lines |
 
 ## Bench operations
