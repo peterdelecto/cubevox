@@ -33,6 +33,11 @@ class LayoutFade {
   // the fade around.
   Block next(bool differs);
 
+  // Drops the gain to zero at once, then runs the silent hold and the fade-in, for a block the
+  // caller had to discard. The hold runs one block longer than a swap's, because no swap block comes
+  // first, so the caller gets as many silent blocks for its engine clears.
+  void cut();
+
   // `holdBlocks` silent blocks follow the swap block before the fade-in starts. They give the
   // caller room to spread engine clears over several blocks.
   explicit LayoutFade(int holdBlocks = kFadeHoldBlocks) : hold_(holdBlocks) {}

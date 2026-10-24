@@ -118,6 +118,13 @@ struct Status {
   uint32_t strayBytes = 0;
   uint32_t bootFails = 0;  // earlier starts that never reported healthy
   const char* updateReason = "none";  // why the bootloader last stayed in update mode
+  uint32_t overruns = 0;    // blocks the audio interrupt never started before their half came round again
+  uint32_t saiErrors = 0;   // SAI and DMA errors the HAL reported
+  uint32_t restarts = 0;    // audio stream restarts after a fault
+  uint32_t nanBlocks = 0;   // blocks discarded before the polish stages for a NaN or an infinity
+  uint32_t powerTrips = 0;  // power-fail mutes, 5VA under its trip level
+  bool stalled = false;       // the stall watch latched the mute
+  bool audioLatched = false;  // a fault past the restart budget latched the mute
 
   explicit Status() = default;
 };
@@ -131,6 +138,8 @@ void replyOk(Writer& w, uint32_t id);
 void replyHello(Writer& w, uint32_t id, const char* fw, const char* layoutName, const Layout& layout, bool benchBuild,
                 const char* serial = nullptr, const Settings* settings = nullptr);
 void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& layout, const Settings& settings);
+
+// Also reports `reply_overflows`, the reply pieces `w` has lost to its format buffer since boot.
 void replyStatus(Writer& w, uint32_t id, const Status& s);
 
 }  // namespace protocol

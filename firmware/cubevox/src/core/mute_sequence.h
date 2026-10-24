@@ -30,6 +30,10 @@ class MuteSequence {
   // Another reason to stay muted. Releasing it runs the normal release sequence.
   void hold(bool on) { held_ = on; }
 
+  // An interrupt already drove both pins low by register (power fail, audio trip). The sequence is
+  // muted from the next update on and stays there while the trip lasts; then it releases as usual.
+  void trip(bool on) { tripped_ = on; }
+
   // Call every loop pass with the raw MUTE_SW level. Returns the pin levels to drive.
   MuteOutputs update(uint32_t nowMs, bool switchReleased);
 
@@ -63,4 +67,5 @@ class MuteSequence {
   uint32_t clocksSinceMs_ = 0;
   bool latched_ = false;
   bool held_ = false;
+  bool tripped_ = false;
 };
