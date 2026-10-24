@@ -17,7 +17,7 @@
 
 set -euo pipefail
 BL="$(cd "$(dirname "$0")" && pwd)"
-BOOT_BLOCK_H="$BL/../cubevox/src/board/boot_block.h"
+source "$BL/../cv_define.sh"
 
 usage() {  # the header comment above, without its marks
   awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
@@ -40,7 +40,7 @@ if [ ! -f "$BIN" ]; then
   exit 1
 fi
 # Bank 1 sector 0. A larger file would reach the application's first sector.
-limit=$(($(awk '$1 == "#define" && $2 == "CV_FLASH_SECTOR_SIZE" { sub(/[uU]$/, "", $3); print $3; exit }' "$BOOT_BLOCK_H")))
+limit=$(($(cv_define CV_FLASH_SECTOR_SIZE)))
 size=$(($(wc -c < "$BIN")))
 if [ "$size" -eq 0 ] || [ "$size" -gt "$limit" ]; then
   echo "[ERROR] $BIN is $size bytes; a bootloader is 1..$limit bytes (bank 1 sector 0)"

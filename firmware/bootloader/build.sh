@@ -17,7 +17,7 @@
 set -euo pipefail
 BL="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$BL/../.." && pwd)"
-BOOT_BLOCK_H="$REPO/firmware/cubevox/src/board/boot_block.h"
+source "$BL/../cv_define.sh"
 
 TINYUF2_URL="https://github.com/adafruit/tinyuf2.git"
 TINYUF2_COMMIT="29d9ce231bada513a7200c087f10a91c832aec42"
@@ -33,11 +33,6 @@ OUT="${OUT:-/tmp/cubevox-boot-$BOARD}"
 TU="$BL/build/tinyuf2"
 HOST="$BL/build/host"
 
-# One value from boot_block.h, which keeps every shared value an integer literal alone on its line.
-boot_define() {
-  awk -v name="$1" '$1 == "#define" && $2 == name { sub(/[uU]$/, "", $3); print $3; exit }' "$BOOT_BLOCK_H"
-}
-
 usage() {  # the header comment above, without its marks
   awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
 }
@@ -52,12 +47,10 @@ case "${1:-}" in
   *) echo "[ERROR] unknown argument '$1'; use --outdir, --proofs, --selftest or --help"; exit 1 ;;
 esac
 
-# The compiler is the one firmware/build.sh pins for the application.
-XPACK_VERSION="$(sed -n 's/^XPACK_VERSION="\([^"]*\)"$/\1/p' "$REPO/firmware/build.sh")"
 # Bank 1 sector 0, the bootloader's whole space.
-BIN_LIMIT=$(($(boot_define CV_FLASH_SECTOR_SIZE)))
-if [ -z "$XPACK_VERSION" ] || [ "$BIN_LIMIT" -le 0 ]; then
-  echo "[ERROR] XPACK_VERSION in firmware/build.sh or CV_FLASH_SECTOR_SIZE in boot_block.h is missing"
+BIN_LIMIT=$(($(cv_define CV_FLASH_SECTOR_SIZE)))
+if [ "$BIN_LIMIT" -le 0 ]; then
+  echo "[ERROR] CV_FLASH_SECTOR_SIZE in boot_block.h is missing"
   exit 1
 fi
 
@@ -353,14 +346,9 @@ patch_tree() {
 }
 
 toolchain() {
-  if ! command -v arduino-cli >/dev/null; then
-    echo "[ERROR] arduino-cli not installed; it holds xpack-arm-none-eabi-gcc $XPACK_VERSION"
-    exit 1
-  fi
-  TC="$(arduino-cli config get directories.data)/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/$XPACK_VERSION/bin"
-  if [ ! -x "$TC/arm-none-eabi-gcc" ]; then
-    echo "[ERROR] xpack-arm-none-eabi-gcc $XPACK_VERSION missing at $TC"
-    echo "        arduino-cli core install STMicroelectronics:stm32@3.0.0 installs it"
+  # firmware/build.sh holds the pins and prints its own [ERROR] lines, which the capture would hide.
+  if ! TC="$("$BL/../build.sh" --toolchain)"; then
+    echo "$TC"
     exit 1
   fi
   echo "[build] $("$TC/arm-none-eabi-gcc" --version | head -1)"

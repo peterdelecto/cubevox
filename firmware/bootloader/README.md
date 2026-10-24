@@ -16,7 +16,8 @@ Run-or-update policy: `boards/cubevox/boot_decide.c` (pure C, covered by `ctest`
 | Compiler | `xpack-arm-none-eabi-gcc` 14.2.1-1.1, the one the Arduino core installs |
 
 The commit and its version strings are `TINYUF2_COMMIT`, `TINYUF2_DESCRIBE` and `TINYUSB_DESCRIBE`
-in `build.sh`. The compiler version is `XPACK_VERSION` in `firmware/build.sh`, which this build reads.
+in `build.sh`. The compiler version is `XPACK_VERSION` in `firmware/build.sh`, which this build reads through
+`firmware/build.sh --toolchain`.
 
 ## Build
 ```

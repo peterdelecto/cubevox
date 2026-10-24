@@ -410,7 +410,7 @@ firmware/bootloader/
 2. Toolchain. The compiler is the one the Arduino core installs,
    `~/Library/Arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1`, passed
    as `CROSS_COMPILE`. One toolchain pin for both programs, `XPACK_VERSION` in `firmware/build.sh`,
-   which the bootloader build reads.
+   which the bootloader build reads through `firmware/build.sh --toolchain`.
 3. `boot_decide.c` has no HAL includes. It takes the block, the reset flags, the image status, the
    switch state and the clock step and returns the action and reason; the fault rule, the option
    byte step, the block filter, the transfer restart, the directory scan, the screen choice and the
