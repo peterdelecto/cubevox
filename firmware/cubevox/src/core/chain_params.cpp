@@ -4,15 +4,15 @@
 
 namespace {
 
-// Live-vocal gate: opens at -12 dB, drops 12 dB when closed, holds 100 ms so gaps between
-// syllables do not chatter, and releases in 10 ms so word endings are not chopped.
+// Input gate tuning the panel never sets: it drops 12 dB when closed and holds 100 ms, so gaps
+// between syllables do not chatter. THRESHOLD and DECAY hold these values only until
+// composeSnapshot applies the card's knobs.
 constexpr float kInputGateThresholdDb = -12.0f;
 constexpr float kInputGateRangeDb = -12.0f;
 constexpr float kInputGateHoldMs = 100.0f;
 constexpr float kInputGateReleaseMs = 10.0f;
 
-// The granular octave engine is the one the box ships. It starts with a light mix so the second
-// voice sits under the dry vocal.
+// Octave MIX until composeSnapshot reads its pot.
 constexpr float kOctaveStartMix = 0.10f;
 
 }  // namespace

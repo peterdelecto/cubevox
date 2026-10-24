@@ -67,7 +67,7 @@ Signal runFx(const Signal& in, const ChainParams& a, const ChainParams& b, P Cha
   return out;
 }
 
-// The engine a card runs, mapped as runStage in board/audio.cpp maps it.
+// The engine a card runs, mapped as runStage in core/chain_run.cpp maps it.
 Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams& b) {
   switch (engineOf(c)) {
     case Engine::InputGate: return runFx<cv::Gate>(in, a, b, &ChainParams::inputGate);

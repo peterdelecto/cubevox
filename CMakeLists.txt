@@ -154,6 +154,7 @@ add_executable(firmware_test
                test/firmware/boot_decide.cpp
                test/firmware/core_boot_health.cpp
                test/firmware/core_canvas.cpp
+               test/firmware/core_chain_run.cpp
                test/firmware/core_crc32.cpp
                test/firmware/core_entry_log.cpp
                test/firmware/core_input.cpp

@@ -1,7 +1,8 @@
 # Bench checklist
 
 These checks need a person at the bench with a board, a scope or a PA. They come from the "Bench
-checks" sections of the 2026-10-24 firmware audits, grouped by the slice each audit covered.
+checks" sections of the 2026-10-24 firmware audits and from the bench checks the fix reports of the
+same pass added, grouped by the slice each audit covered.
 `firmware/bringup.py` names this file in its final summary and automates none of it.
 
 Each row has an id for citing it, the check, what a pass looks like, and the audit item it answers.
@@ -22,9 +23,16 @@ carry a measured number from the audit keep that number.
 | AU7 | Sweep RATE above 68 % at full DEPTH and listen for ticks. Flip OUTPUT on a sine and scope the step. | No tick on the sweep. The OUTPUT flip ramps over a block or more and shows no single-sample 30 dB step. | audio B2, Unison swing, and audio B1, OUTPUT step |
 | AU8 | Read every pot at full clockwise with panel_dump. | All 16 print 1.00. The pots run on 3V3A and VREF+ comes from a separate supply, so the end margin of 1 % has to cover the difference (hardware spec items 12 and 13). | audio answer 5, end dead band |
 | AU9 | Time 3V3A's rise after power-on against kMuxSelectHoldMs (1,100 ms). Compare the first published knob values with the values one second later. | 3V3A is up before the hold ends, with the margin logged. No knob moves by more than the 1.5 % move threshold between the first publish and one second later. | audio answer 5, mux timing |
-| AU10 | Measure the longest loop() pass and the 16-pot scan period, with analogRead's init and calibration included. | Both numbers are logged. The scan keeps the one mux step per pass at least 500 microseconds apart, and the longest pass stays far under the 2 s watchdog. | audio C4, analogRead cost |
+| AU10 | Measure the longest loop() pass and the 16-pot scan period with the ADC3 scan running. | Both numbers are logged. The scan keeps the one mux step per pass at least 500 microseconds apart, and the longest pass stays far under the 2 s watchdog. | audio C4, analogRead cost |
 | AU11 | Run the stats op on the default layout with both polish stages on. | The COMP and soft ceiling load in percent is read and entered in core/costs.h. The default layout stays under the 75 % mean and 95 % worst lines with those terms added. | audio C1, kFixed misses the polish tail; engine B7 |
 | AU12 | Plug and unplug USB in the middle of a song. | The late count in status does not move and the audio does not glitch. | audio answer 8, USB attach |
+| AU13 | Run the default chain and lower 5VA below 4.75 V, then raise it again. | MUTE_N and XSMT fall within 1 ms of 5VA crossing 4.75 V. At 4.80 V on the way up the output stays muted. Above 4.85 V it releases 500 ms later. One `[WARN] power:` line prints at the trip, one `[power] 5VA back` line at the release, and `power_trips` in status counts the trip. | audio A1, power-fail trip and release (hardware spec F2 and F3); AU14 sets the final level |
+| AU14 | With every slot on and a loud signal playing, note the lowest 5VA the box shows before the pull. Then pull the barrel and scope 5VA's fall against XSMT, MUTE_N and 3V3A. | kPowerTripMv in core/power_fail.h is set from these two measurements. It sits below the lowest 5VA under load with a margin, and it is high enough for XSMT to fall in the order and times of AU1. kPowerClearMv keeps its 100 mV band above it. The values and the captures are logged in hardware/bringup/, and AU13 passes at the final value. | audio A1, trip level provisional at 4,750 mV (hardware spec F2) |
+| AU15 | Boot the box, play the default chain for a minute and send status. | `sai_errors`, `overruns`, `restarts`, `nan_blocks` and `power_trips` all read 0. | audio A1, A3, B3, B5 and B6, the new counters on a clean run |
+| AU16 | Run the stop_audio op with a sine playing and scope the output. | The output is silent within 3 ms of the op, because each TX half is zeroed once the stream has read it. The stall watch latches the mute at 100 ms and prints one error line, and `stalled` in status reads true. | audio B6, TX halves zeroed once read, and A3, stall watch; same op as AU4 |
+| AU17 | Pin every knob at its top with the pin_knobs op, play the voice clip, run reset_peaks and read stats after one minute. | `late` reads 0 after 60 s. The count also catches a block finished after the TX stream had read its half (see AU3). | audio B4, late count |
+| AU18 | Read the boot report, then run panel_dump with every pot fully counter-clockwise and again fully clockwise. | The boot report reads `[boot] pots: ADC3, 0 samples dropped`. panel_dump prints 0.00 at the counter-clockwise stop and 1.00 at the clockwise stop on all 16 pots. | audio C4, the ADC3 scan, and A2, exact ends of travel; the clockwise half is AU8 |
+| AU19 | Turn DRIVE from the top to 0 fast on Distortion with its toggle on, and listen. | The readout reads 0 % within 0.3 s of the knob stopping, and no fuzz is left at the output. | audio A2, knob rest value; same knob as AU6 |
 
 ## Bootloader and update path
 
@@ -33,15 +41,25 @@ carry a measured number from the audit keep that number.
 | BO1 | Power on cold 20 times with no debugger attached. | The box reaches the app 20 times out of 20. | boot answer 5, DWT CYCCNT spin, and answer 3, byte stores into random DTCM |
 | BO2 | Measure MENU released at power-on. | MENU reads high 20 ms after a cold power-on on the internal pull-up alone. An RC on ENC_MENU_SW would read as held at every power-on, so a box that does is a fail. | boot answer 3, MENU read |
 | BO3 | Power on cold with MENU held, 20 times. | The OLED answers its first init every time. The driver never retries, so one miss shows as a dark screen. | boot answer 5, OLED waits |
-| BO4 | Pull the cable in the middle of a copy and record the screen. | The screen says the update stopped (field-update spec failure table) and the 60 s timeout runs again. Before the fix the screen keeps "Do not unplug." | boot B1, pulled cable |
+| BO4 | Pull the cable in the middle of a copy, wait 3 s, plug it back in, and record the screens. | The OLED shows "The cable came out." (field-update spec failure table). The CUBEVOX drive is back on the replug, and a full copy then completes. | boot B1, pulled cable |
 | BO5 | Force a double ECC error in log sector 2. | DIAG.TXT shows `flash log: unreadable at 0x814xxxx`, which confirms the FAIL_ECC_ADDR decode, and the box stays in update mode. | boot B8 (unsure item) and answer 4 |
 | BO6 | Cut 9 V during sector 1's erase, then drag the release once. | The first copy completes with no reset in the middle. | boot B9, torn word survives |
 | BO7 | Enter update mode by the menu, by the app request and by MENU at power-on, many times over. | The CUBEVOX drive appears within 3 s on every entry. | boot answer 5, TinyUSB core reset loops |
-| BO8 | Cold-start every board and watch for the update screen or the app. | HSE starts inside its 100 ms timeout on every board. A miss is a dark box. | boot answer 6 and B13, missing crystal |
+| BO8 | Cold-start every board and watch for the update screen or the app. | HSE starts inside its 100 ms timeout on every board. A miss shows "The clock failed." with the drive up on HSI48, not a dark box (BO15). | boot answer 6 and B13, missing crystal |
 | BO9 | Scope I2C2 SCL while the bootloader draws a screen. | SCL runs near 400 kHz. | boot C7, CV_OLED_TIMINGR |
 | BO10 | Hold the box in update mode and watch K102 and XSMT. | K102 stays open and XSMT stays low through update mode. The bootloader never drives PB5 or PC5. | boot pins; same measurement as AU2 |
 | BO11 | Time a full update of the current release image, and time the update-mode timeout against a stopwatch. | The copy takes about 3 s for a 200 KB image with the erase included (field-update spec). The timeout fires at 60 s. | field-update spec timing table |
 | BO12 | Drag the release onto the drive on Adam's macOS version. | The only dialog is the "not ejected properly" notice after the reset (field-update spec, Writes item 4). Any other error dialog before the reset is logged as a finding. | field-update spec, Writes item 4 |
+| BO13 | Scope PA9 (VBUS_SENSE) in update mode, then pull the cable and plug it back in. | PA9 reads high with the cable in and low within 50 ms of the pull. | boot B1, cable detect on PA9 |
+| BO14 | Enter update mode from the menu with the cable in, copy nothing, then pull the cable and time the wait. | The application starts 60 s after the pull. | boot B1, the 60 s timeout restarts from the pull |
+| BO15 | Power on a board with the crystal lifted. | The OLED shows "The clock failed." and the CUBEVOX drive mounts. DIAG.TXT shows `clock: failed in oscillator and PLL1`, and a full copy completes. | boot B13, missing crystal; BO8 is the cold-start count |
+| BO16 | Flash a fresh part with firmware/bootloader/flash.sh, power on and read DIAG.TXT, then power-cycle and read it again. | The first DIAG.TXT says `option bytes: programmed, BOR level 3, sector 0 protected`. After the next power-on the result word is `set`. | health A4, option byte step; same register as HE3 |
+| BO17 | Run firmware/bootloader/flash.sh with BOOT0 held, on a unit whose bootloader already protects sector 0, and keep BOOT0 held to the end. | `dfu-util -l` lists `@Option Bytes`. flash.sh prints "clearing it", the chip restarts into the ROM DFU, and the run ends with "written and read back". | boot B11, clearing the sector 0 protection |
+| BO18 | Run an image whose setup() never returns, and power on. | The watchdog resets the box after about 16 s, with the bootloader's start count at 1. Three hung starts in a row end in "Startup failed.". | boot B5, bootloader watchdog from the jump |
+| BO19 | Drag cubevox-rom-0x08020000.bin onto the drive. | The wrong-file screen shows, DIAG.TXT has `wrong file: CUBEVO~1.BIN`, and the installed image is intact. | boot B4, a .bin on the drive |
+| BO20 | Start a Finder copy of a release .uf2, cancel it at about 30 %, and drop the same file again. Then drop a different release's .uf2. | Both copies complete, and the box restarts into the new image each time. | boot B2 and B3, restart of a cut transfer |
+| BO21 | Cut the 9 V three times, each within 5 s of a start. | Each start is normal and the boot report reads `boot fails 0`, because a power-on clears the count. "Startup failed." never appears. | health A2, start counter and power dips; same cut as HE2 |
+| BO22 | Time the boot CRC on today's image and on an 896 KB image. | Both times are logged. Today's image stays under the 20 ms boot delay budget of the field-update spec, and the 896 KB time is recorded as the limit for the largest image. | field-update spec, boot delay budget (the CRC time at 360 MHz is not measured yet) |
 
 ## App boot, bank 2, faults and watchdog
 
@@ -55,7 +73,7 @@ carry a measured number from the audit keep that number.
 | HE6 | Leave the drive from enter_dfu mounted past 2 s and up to the 60 s timeout. | No watchdog reset happens in update mode, which shows the IWDG stops at a system reset. | health answer 1, watchdog |
 | HE7 | Read "[clock] silicon rev" on every unit. | Rev V runs 480 MHz. A unit on other silicon runs 360 MHz, where the default chain nears 96 % worst. The revision of each unit is logged. | health answer 6, clocks; same as AU5 and EN1 |
 | HE8 | Hold the OLED's SDA low and watch the heartbeat LED. | The LED toggles every 0.5 s. A toggle of 0.7 to 1.4 s measures the loop pass, and it stays under the 2 s watchdog with no reset. | health answer 1, loop pass against the watchdog |
-| HE9 | Cold-start the crystal against the HAL's 100 ms HSE timeout. | HSE starts inside 100 ms on every cold start tried. A miss leaves the bootloader dark until a power cycle. | health answer 6 and boot B13 |
+| HE9 | Cold-start the crystal against the HAL's 100 ms HSE timeout. | HSE starts inside 100 ms on every cold start tried. A miss shows "The clock failed." with the drive up on HSI48, not a dark box (BO15). | health answer 6 and boot B13 |
 | HE10 | Scope MUTE_N, XSMT and the K102 contacts through a watchdog reset. | The board pulls hold the mute while the MCU pins float. MUTE_N and XSMT stay low and K102 stays open. | health answer 7, power order |
 | HE11 | Time a boot-time recovery erase of a bank 2 sector. | The erase takes 1 to 2 s against the 5 s bound and ends before the watchdog starts. | health answer 1, flash waits |
 
@@ -68,9 +86,12 @@ carry a measured number from the audit keep that number.
 | EN3 | Read the worst block while toggling Autotune on with the voice clip, and while sweeping reverb MIX and SEMITONES. | No block reaches 100 % of its budget and the worst stays under the 95 % line. | engine B7 and B4, engage block and glides |
 | EN4 | Count each gate's and Slapback's cycles before and after the fastmath swap. | The saving per stage is logged. About 10 % of the block in total is the estimate to confirm. | engine B4, libm per sample |
 | EN5 | Measure the cycles of the AXI SRAM engines, which have a 143,596 B working set against the 16 KB D-cache. | The cycles match the figures in core/costs.h, or costs.h is updated with the new ones. | engine budget, state in AXI SRAM |
-| EN6 | Check the `.dtcm_bss` end in the link map against 0x2001FF00. | The end is at or below 0x2001FF00. build.sh prints the margin as the `[budget] DTCM` line (PitchFx takes 112,920 B at v2.00.27). | engine C1, PitchFx DTCM budget |
+| EN6 | Check the `.dtcm_bss` end in the link map against 0x2001FF00. | The end is at or below 0x2001FF00. build.sh prints the margin as the `[budget] DTCM` line (PitchFx takes 51,944 B). | engine C1, PitchFx DTCM budget |
 | EN7 | Measure round-trip latency with Autotune off and with it on, and ask Adam whether he accepts the Autotune latency in his monitors. | Off reads about 2.7 ms plus the codec delay. On reads 25 to 39 ms. Adam's answer is logged. | engine answer 9, latency |
 | EN8 | Listen for clicks at RATE above 68 %, with SEMITONES through 0 at high MIX, with OUTPUT LINE/MIC on a held note, and with BYPASS both ways. | No click in any of the four. | engine B2, B3 and B6, and answer 3 for BYPASS |
+| EN9 | Re-bench core/costs.h with both passes of the method in that file. The first pins every knob at its top. The second switches Autotune on with the clip playing and sweeps reverb MIX and SEMITONES end to end. | Every row marked measured=false (POLISH COMP, soft ceiling, BYPASS mix) holds a measured value and reads measured=true, and the other rows are checked against their trailing comments. The default layout stays under the 75 % mean and 95 % worst lines, and ctest passes with the new numbers. | engine B7, cost table after the engine fixes; same table as EN2 |
+| EN10 | Read the per-slot cycles for the default layout with every knob at its top, after the fastmath changes. | The saving per slot against the cycles in the costs.h trailing comments is logged. The total comes to about 10 % of the block, which is the audit's estimate to confirm. | engine B4, libm per sample; same measurement as EN4 |
+| EN11 | Listen through a PA for clicks while sweeping Unison RATE above 68 %, moving Octave SEMITONES through 0 with MIX at 100 %, and flicking Autotune off and on. | No click in any of the three. | engine B2 and B3, and the Autotune toggle; same listening as EN8, which also covers OUTPUT and BYPASS |
 
 ## OLED and UI
 

@@ -55,8 +55,8 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    changes the CRC, so `CLEAN=1` builds the image to compare with the check line in a release's notes.
 8. **Budget.** After the stamp `build.sh` prints one `[budget]` block of true headroom, from the link map and
    the elf. App flash counts against the 917504 B region, DTCM against the boot block address, D1 against the
-   stack top and D2 against its end. At v2.00.27 the release image uses 192712 B of flash (21.0 %) and
-   112928 B of DTCM (86.3 %, 17888 B free), 167336 B of D1 and 2048 B of D2. arduino-cli prints its own
+   stack top and D2 against its end. At v2.00.30 the release image uses 172956 B of flash (18.9 %) and
+   51968 B of DTCM (39.7 %, 78848 B free), 167208 B of D1 and 2048 B of D2. arduino-cli prints its own
    summary above it, which divides by the whole 2 MB flash and by D1 alone.
 9. **Version.** The release name is `v` plus `VERSION.txt`. `build.sh` passes it as `CUBEVOX_FW_VERSION`, and
    the image header, `hello`, the boot report, the boot splash and the confirm screen all show that one string.
@@ -102,9 +102,13 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    `layout_fade` (50 ms out/in sequencer for a live layout change, engines to reset), `unison_rate`, `settings.h`.
 2. Panel and input: `panel.h` (`PanelReading`), `knob_filter` (stepping, per-knob smoothing, `KnobBank` for the
    sixteen pots, the end-of-travel dead band), `debounce`, `jack_switch` (mute dip around K103),
-   `mute_sequence`, `panel_test`, `bench_ops` (the op table), `timing.h` (switch, relay and mute times, `Every`),
+   `mute_sequence`, `power_fail` (the 5VA trip and clear levels and the hold before a power-fail mute releases),
+   `panel_test`, `bench_ops` (the op table), `timing.h` (switch, relay and mute times, `Every`),
    `loop_policy.h` (`PublishGate`, `CanvasHandoff`).
-3. Sound path: `compose` (`ChainSnapshot` from layout, panel, settings and bench overrides).
+3. Sound path: `compose` (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_run` (the
+   slot walk, the NaN guard, the polish tail and the BYPASS mix, over the engines and buffers the board hands in),
+   `output_stage` (the NaN guard and the output gain ramp), `audio_recovery` (when a faulted stream restarts: at
+   most 3 times in 60 s, then the mute latches).
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
    editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`), `level` (input energy to the voice
    ribbon's 0..1 level).
@@ -128,16 +132,18 @@ and dissolves between them).
 1. Pins and clocks: `pins.h` and `pins.cpp` (every pin, port decode, the boot pin report), `clocks.h` (HSE),
    `sysclock` (the `SystemClock_Config` override and the clock report), `slots` (toggle pin and mux channels per
    slot), `build_kind.h` (`CUBEVOX_BENCH`).
-2. Audio: `audio` (SAI, DMA, the audio IRQ, chain walk over the published snapshot, fade and engine reset on a
-   layout change, SAI and DMA error count).
-3. Panel: `controls` (mux scan, ADC, toggles), `input` (encoder and click to `UiInput`), `mute`, `input_jack`
-   (PAD_EN for relay K103).
+2. Audio: `audio` (SAI, DMA, the audio IRQ, the engines and the published snapshot, fade and engine reset on a
+   layout change, per-stage cycle counts, SAI and DMA error handling with the stream restart).
+3. Panel: `controls` (mux scan on ADC3, toggles), `adc_setup` (one ADC brought up once, for `controls` and
+   `power_sense`), `input` (encoder and click to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
 4. Display: `display_sh1106` (U8x8 driver), `display_stub` (ASCII render over Serial when no panel answers; the
    runtime face stays off then, since the moving voice screen would log every page).
 5. USB and protocol: `usb_link` (CDC gated on VBUS), `serial_link` (CDC bytes to JSON lines, reply writer, output
    queue), `boot_report` (the report a terminal gets on open).
 6. Safety and storage: `fault` (watchdog, fault handlers, reset cause, clock failure record, audio stall and
-   transfer error watch), `flash_bank2` (bank 2 erase and flash-word program by register, non-blocking erase),
+   transfer error watch), `power_sense` (VA_SENSE on ADC1: its analog watchdog interrupt mutes at once when 5VA
+   falls under the trip level, and the poll releases the mute once the rail holds), `flash_bank2` (bank 2 erase
+   and flash-word program by register, non-blocking erase),
    `record_service` (store wiring: boot load, ECC recovery, save request, flush before reset), `diag_service`
    (the diagnostic log in bank 2 sector 2: an entry for a start that follows a fault or a reset that was not a
    plain power-on, and one before each update-mode request; the bootloader lists them in `DIAG.TXT`),
@@ -175,8 +181,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   for 480 MHz on rev V silicon (360 MHz, N144 Q15, on older revisions), USB from PLL1Q, HSI48 off, PLL2 40 MHz as
   the ADC kernel clock. A failing step records its name in the fault record and resets; the next boot report
   says which step failed. `clockReport()` prints silicon rev, ROM bootloader ID at 0x1FF1E7FE and the clock tree.
-- ADC: `build.sh` sets the 810.5-cycle sample window. The core configures the ADC from the AHB clock divided by 4,
-  so the PLL2 kernel clock is not the one in use. Each `analogRead` blocks `loop()` for one conversion.
+- ADC: pots on ADC3 and VA_SENSE on ADC1, set up once by `board/adc_setup` (PLL2 40 MHz / 2). The scan never
+  waits; a failed sample drops with a `[WARN]`. Nothing calls `analogRead`, which resets ADC1 and ADC2.
 - `board/usb_link.cpp`: USB CDC starts only while PA9 reads VBUS and stops when it drops (self-powered box,
   `-DUSBD_SELF_POWERED=1` in build.sh). The boot report prints each time a terminal opens the port. The CDC
   receive queue holds two maximum-length requests, and `serial_link.cpp` asserts it at compile time.
@@ -191,7 +197,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   next boot report prints `[ERROR] last reset: fault ...` or `[boot] fault: none`, plus the decoded `RCC->RSR`
   reset cause. A stack pointer outside RAM stores zero for PC and LR. If the audio block counter stops for 100 ms
   while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line prints.
-  SAI and DMA transfer errors are counted in `audio.cpp` and reported at most once a second.
+  SAI and DMA transfer errors are counted in `audio.cpp` and reported at most once a second. `SAI1_IRQn`
+  delivers `OVRUDR`, `AFSDET`, `LFSDET` and `WCKCFG`. A stream-stopping error or 8 overruns in a row mutes;
+  `audioPoll` restarts at most 3 times a minute, then latches. TX halves are zeroed once read.
 - `board/dfu.cpp`: `enterDfu()` is the only way into update mode, where the bootloader serves the `CUBEVOX` drive.
   It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), queues a
   diagnostic log entry and waits up to 3 s for it, writes a pending record save, waits up to 5 s for the store to go idle, lets the serial queue drain for 100 ms, mutes
@@ -225,7 +233,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   50 ms, swaps the snapshot at zero, resets the engines whose slot changed card, and fades back in. The layout name
   is 1 to 31 printable ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own
   window; the bench peaks are untouched), cumulative `late`, `muted`, the record `seq` and `rec_errors`,
-  `serial_dropped`, `stray_bytes`, `boot_fails` and `update_reason`. All output (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue
+  `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the audio counters `overruns`, `sai_errors`,
+  `restarts` and `nan_blocks`, and `power_trips`, `stalled`, `audio_latched` and `reply_overflows`. All output (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue
   (`core/tx_queue`) that `serialLinkPoll` drains each pass with non-blocking writes sized by
   `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected
   the queue is discarded. `enter_dfu` and the bench fault and spin ops give the queue 100 ms (`serialFlush`) before
@@ -269,7 +278,10 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
 
 ## Status
 
-Costs in `core/costs.h` are marked measured, from runs of the engine chain on an H743 test board; the method
-is in that file. The audio path, clock tree, USB gating and mux timing have run on the test board and not yet on a
-cubevox board. The bring-up logs are in `hardware/bringup/`. The OLED driver is compiled and falls back to
-`stubDisplay()` when nothing answers at 0x3C. VA_SENSE shutdown is not implemented, and no code reads PB1.
+Costs in `core/costs.h` are marked measured or estimated. The measured rows come from runs of the engine chain on
+an H743 test board, and the POLISH COMP, soft ceiling and BYPASS rows stay estimates until a cubevox board runs
+them; the method is in that file. The audio path, clock tree, USB gating and mux timing have run on the test board
+and not yet on a cubevox board. The bring-up logs are in `hardware/bringup/`. The OLED driver is compiled and
+falls back to `stubDisplay()` when nothing answers at 0x3C. `board/power_sense` mutes the output when 5VA, read
+on VA_SENSE (PB1), falls under `kPowerTripMv` (4750 mV) and releases it after 500 ms above 4850 mV. The trip
+level is provisional until the bench sets it from the measured fall of 5VA.
