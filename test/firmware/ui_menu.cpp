@@ -1,6 +1,6 @@
 // Checks the OLED menu on the host. Covers the idle screen, the list and its click actions, the
 // settings those clicks save and play, the chain and update screens, the timeout, redraw, the
-// screenshot files and the text grid.
+// screenshot files, the text grid and the list's row pitch.
 
 #include "support.h"
 
@@ -31,6 +31,34 @@ bool rowIs(const Canvas& canvas, int r, const char* text, bool inverted = false)
   for (int x = 0; x < kCanvasWidth; ++x) {
     const uint8_t want = inverted ? static_cast<uint8_t>(~ref.page(0)[x]) : ref.page(0)[x];
     if (canvas.page(r)[x] != want) return false;
+  }
+  return true;
+}
+
+// The list rows sit on a 9 px pitch from y = 0 (owner 2026-10-24), so they do not line up with canvas
+// pages. The 7 px text sits 1 px below its row top, 1 px clear above and below inside the cursor bar
+// (owner 2026-10-12). A list row matches when its 9 pixel lines equal the rendered text, with the
+// bar inverted for the cursor row.
+constexpr int kListPitch = 9;
+constexpr int kListTextTop = 1;
+
+bool pixelOn(const Canvas& canvas, int x, int y) { return ((canvas.page(y / 8)[x] >> (y % 8)) & 1) != 0; }
+
+bool listRowIs(const Canvas& canvas, int r, const char* text, bool inverted = false) {
+  Canvas ref;
+  ref.drawText(0, kListTextTop, font5x7(), text);
+  if (inverted) ref.invertRect(0, 0, kCanvasWidth, kListPitch);
+  for (int line = 0; line < kListPitch; ++line) {
+    for (int x = 0; x < kCanvasWidth; ++x) {
+      if (pixelOn(canvas, x, r * kListPitch + line) != pixelOn(ref, x, line)) return false;
+    }
+  }
+  return true;
+}
+
+bool sameCanvas(const Canvas& a, const Canvas& b) {
+  for (int p = 0; p < kCanvasPages; ++p) {
+    if (std::memcmp(a.page(p), b.page(p), kCanvasWidth) != 0) return false;
   }
   return true;
 }
@@ -124,18 +152,82 @@ void checkMenuList() {
   m.draw();
   for (int r = 0; r < kRowCount; ++r) {
     const std::string want = defaultRow(r, r == kInput);
-    check(rowIs(m.canvas, r, want.c_str(), r == kInput), want.c_str());
+    check(listRowIs(m.canvas, r, want.c_str(), r == kInput), want.c_str());
   }
-  check(kRowCount == kDisplayRows - 1 && rowIs(m.canvas, kDisplayRows - 1, ""),
-        "menu: seven rows with no title row, row 7 blank");
+  check(kRowCount * kListPitch <= kCanvasHeight, "menu: seven rows with no title row fit the canvas on their pitch");
 
   m.step(-1, false);
   m.draw();
-  check(rowIs(m.canvas, kExit, ">EXIT", true) && rowIs(m.canvas, kInput, " INPUT: MIC"),
+  check(listRowIs(m.canvas, kExit, ">EXIT", true) && listRowIs(m.canvas, kInput, " INPUT: MIC"),
         "menu: turning back from 0 wraps to the last row");
   m.step(1, false);
   m.draw();
-  check(rowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: turning forward wraps to 0");
+  check(listRowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: turning forward wraps to 0");
+}
+
+// The list draws its seven rows on a 9 px pitch (owner 2026-10-24). Each 7 px text starts 1 px below
+// its row top, so the cursor bar, the 9 px row, keeps 1 px clear above and below the text (owner
+// 2026-10-12). The last pixel line stays blank. The expected canvas is composed from literal y values.
+void checkMenuListPitch() {
+  static const int kTextY[kRowCount] = {1, 10, 19, 28, 37, 46, 55};
+  const auto listWithCursorOn = [](int cursor) {
+    Canvas want;
+    for (int r = 0; r < kRowCount; ++r) want.drawText(0, kTextY[r], font5x7(), defaultRow(r, r == cursor).c_str());
+    want.invertRect(0, kTextY[cursor] - 1, kCanvasWidth, kListPitch);
+    return want;
+  };
+
+  MenuRig m;
+  m.step(0, true);
+  m.draw();
+  check(sameCanvas(m.canvas, listWithCursorOn(kInput)), "menu: the list text starts at y 1, 10, 19, 28, 37, 46 and 55");
+  m.step(kExit, false);
+  m.draw();
+  check(sameCanvas(m.canvas, listWithCursorOn(kExit)), "menu: the cursor bar follows to the last row, lines 54 to 62");
+  bool lastLineBlank = true;
+  for (int x = 0; x < kCanvasWidth; ++x) lastLineBlank = lastLineBlank && !pixelOn(m.canvas, x, kCanvasHeight - 1);
+  check(lastLineBlank, "menu: the last pixel line stays blank");
+}
+
+// Every screen but the list keeps its text rows 8 px apart, one per canvas page. The expected
+// canvases are composed from literal y values.
+void checkOtherScreensKeepGrid() {
+  char tag[kDisplayCols + 1];
+  versionTag(kFirmwareVersion, tag, sizeof(tag));
+
+  MenuRig idle;
+  idle.panel.lastMoved.slot = 5;  // Distortion
+  idle.panel.knob[5][0] = 0.6f;
+  idle.panel.toggle[5] = true;
+  idle.draw();
+  Canvas wantIdle;
+  wantIdle.drawText(0, 0, font5x7(), "cubevox");
+  wantIdle.drawText(0, 24, font5x7(), "Distortion");
+  wantIdle.drawText(0, 32, font5x7(), "Drive");
+  wantIdle.drawText(0, 40, font5x7(), "60 %");
+  wantIdle.drawText(0, 48, font5x7(), "ON");
+  wantIdle.drawText(0, 56, font5x7(), tag);
+  check(sameCanvas(idle.canvas, wantIdle), "menu: the idle screen keeps the 8 px grid");
+
+  MenuRig chain;
+  chain.step(0, true);
+  chain.menu.showChainView();
+  chain.draw();
+  Canvas wantChain;
+  for (int s = 0; s < kSlotCount; ++s) wantChain.drawText(0, 8 * s, font5x7(), chainRow(chain.layout, s).c_str());
+  check(sameCanvas(chain.canvas, wantChain), "menu: the chain view keeps the 8 px grid");
+
+  MenuRig confirm;
+  confirm.openListAt(kUpdate);
+  confirm.step(0, true);
+  confirm.draw();
+  const std::string have = std::string("You have ") + tag + ".";
+  Canvas wantConfirm;
+  wantConfirm.drawText(0, 0, font5x7(), "Update the firmware?");
+  wantConfirm.drawText(0, 16, font5x7(), have.c_str());
+  wantConfirm.drawText(0, 32, font5x7(), "Click to start.");
+  wantConfirm.drawText(0, 48, font5x7(), "Turn to cancel.");
+  check(sameCanvas(confirm.canvas, wantConfirm), "menu: the confirm screen keeps the 8 px grid");
 }
 
 // Each of the first five rows asks for its action, and applying it flips the row's setting.
@@ -159,7 +251,7 @@ void checkMenuClicks() {
     const UiAction a = m.step(0, true);
     check(a == clicks[r].action && ui::applyAction(a, m.settings) == ui::ApplyResult::SettingsChanged, clicks[r].after);
     m.draw();
-    check(rowIs(m.canvas, r, clicks[r].after, true), clicks[r].after);
+    check(listRowIs(m.canvas, r, clicks[r].after, true), clicks[r].after);
   }
   const Settings flipped = m.settings;
   check(!flipped.polishComp && !flipped.polishEq && flipped.outputLevel == OutputLevel::Mic &&
@@ -185,7 +277,7 @@ void checkMenuClicks() {
     const UiAction a = m.step(0, true);
     ui::applyAction(a, m.settings);
     m.draw();
-    check(rowIs(m.canvas, r, clicks[r].back, true), clicks[r].back);
+    check(listRowIs(m.canvas, r, clicks[r].back, true), clicks[r].back);
   }
   check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute,
@@ -196,10 +288,10 @@ void checkMenuWrapAndCombo() {
   MenuRig m;
   m.openListAt(9);  // 9 detents past the cursor wraps to row 2
   m.draw();
-  check(rowIs(m.canvas, kTopSwitch, ">TOP SWITCH: MUTE", true), "menu: +9 detents wraps around the list");
+  check(listRowIs(m.canvas, kTopSwitch, ">TOP SWITCH: MUTE", true), "menu: +9 detents wraps around the list");
   m.step(-9, false);  // back by 9 lands on row 0
   m.draw();
-  check(rowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: -9 detents wraps the other way");
+  check(listRowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: -9 detents wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
@@ -215,7 +307,7 @@ void checkMenuScreens() {
   check(rowIs(m.canvas, kDisplayRows - 1, chainRow(m.layout, 7).c_str()), "menu: chain view shows slot 8");
   check(m.step(0, true) == UiAction::None, "menu: a click in the chain view has no action");
   m.draw();
-  check(rowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: click leaves the chain view for the list");
+  check(listRowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: click leaves the chain view for the list");
 
   m.step(kUpdate, false);
   m.step(0, true);
@@ -231,7 +323,7 @@ void checkMenuScreens() {
         "menu: confirm screen keeps a blank row between sentences");
   m.step(1, false);
   m.draw();
-  check(rowIs(m.canvas, kUpdate, ">UPDATE FIRMWARE >", true), "menu: turn cancels the confirm and returns to the list");
+  check(listRowIs(m.canvas, kUpdate, ">UPDATE FIRMWARE >", true), "menu: turn cancels the confirm and returns to the list");
   m.step(0, true);
   m.step(0, true);
   check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
@@ -241,7 +333,7 @@ void checkMenuExit() {
   MenuRig m;
   m.openListAt(kExit);
   m.draw();
-  check(rowIs(m.canvas, kExit, ">EXIT", true), "menu: the cursor sits on Exit");
+  check(listRowIs(m.canvas, kExit, ">EXIT", true), "menu: the cursor sits on Exit");
   check(m.step(0, true) == UiAction::None, "menu: Exit click has no action");
   m.draw();
   check(rowIs(m.canvas, 0, "cubevox"), "menu: Exit returns to the idle screen");
@@ -252,7 +344,7 @@ void checkMenuTimeout() {
   m.step(0, true);
   m.step(0, false, 14000);
   m.draw();
-  check(rowIs(m.canvas, 0, ">INPUT: MIC", true), "menu: still open before the timeout");
+  check(listRowIs(m.canvas, 0, ">INPUT: MIC", true), "menu: still open before the timeout");
   m.step(0, false, 1500);
   m.draw();
   check(rowIs(m.canvas, 0, "cubevox"), "menu: 15 s without input returns to idle");
@@ -320,7 +412,7 @@ void checkScreenshots() {
   m.step(0, true);
   m.draw();
   bool listRows = true;
-  for (int r = 0; r < kRowCount; ++r) listRows = listRows && rowIs(m.canvas, r, defaultRow(r, r == kInput).c_str(), r == kInput);
+  for (int r = 0; r < kRowCount; ++r) listRows = listRows && listRowIs(m.canvas, r, defaultRow(r, r == kInput).c_str(), r == kInput);
   check(listRows, "screens: menu rows");
   writePgm(m.canvas, "oled-menu.pgm");
 
@@ -350,9 +442,11 @@ void checkMenu() {
   checkMenuIdle();
   checkMenuIdleReadout();
   checkMenuList();
+  checkMenuListPitch();
   checkMenuClicks();
   checkMenuWrapAndCombo();
   checkMenuScreens();
+  checkOtherScreensKeepGrid();
   checkMenuExit();
   checkMenuTimeout();
   checkMenuRedraw();

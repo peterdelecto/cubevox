@@ -17,7 +17,7 @@ slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → D
    chain) through a 50 ms equal-power crossfade; the chain and both polish stages keep running so
    the switch back is seamless. TOP SWITCH = MUTE: as today, the DAC soft-mute sequence.
 
-## Menu, final order (7 rows, 5x7, no title row, cursor `>` in column 0, eighth screen row blank)
+## Menu, final order (7 rows, 5x7, no title row, cursor `>` in column 0, 9 px row pitch)
 | Row | Text | Click |
 |---|---|---|
 | 1 | `INPUT: MIC` | cycles MIC / LINE. LINE puts the 25.7 dB pad of relay K103 in circuit (hardware spec row 15) |
@@ -34,6 +34,12 @@ CHAIN ORDER row (owner 2026-10-24, no-op for now). `drawChainView` and its proof
 firmware, and no row opens the view. Turn moves the cursor; the list does not scroll. Every
 change saves through the layout record's existing debounce. Screens are approved per numbered
 proof, as always.
+
+The list rows sit on a 9 px pitch, so row r spans pixel lines 9r to 9r + 8, because seven rows
+leave breathing room (owner 2026-10-24). The 7 px text starts at y = 9r + 1, which is y = 1, 10,
+19, 28, 37, 46 and 55, so it keeps 1 px clear above and below inside the cursor bar (owner rule
+of 2026-10-12, an inverted row is text height + 2 px). The cursor bar spans the 9 px row. The
+last pixel line stays blank. The confirm, chain, idle and update screens keep the 8 px grid.
 
 ## POLISH COMP, a gentle live vocal compressor
 Feed-forward, mono, no lookahead, log-domain gain computer, in `engine/polish_comp.h`.
@@ -81,8 +87,8 @@ what the box plays; `--polish-comp off` and `--polish-eq off` switch them for A/
 3. `test/firmware/core_record.cpp`: v2 round trip, v1 record decodes with defaults, a bad
    settings byte is rejected.
 4. `test/firmware/core_protocol.cpp`: the three fields in and out, absent on input means unchanged.
-5. `test/firmware/ui_menu.cpp`: the seven rows in order, the blank eighth row, each click, the
-   saved settings, proofs `oled-menu.pgm` for the owner.
+5. `test/firmware/ui_menu.cpp`: the seven rows in order at their 9 px y positions, the other
+   screens on the 8 px grid, each click, the saved settings, proofs `oled-menu.pgm` for the owner.
 6. Bench (hardware, later): bypass crossfade audible-click free on glass, comp cost in load %,
    TOP SWITCH both ways with the real switch.
 

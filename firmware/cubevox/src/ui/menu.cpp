@@ -22,6 +22,13 @@ constexpr int kRowVersion = kDisplayRows - 1;
 // Menu list: one row per item, no title row.
 constexpr int kRowListFirstItem = 0;
 
+// Seven rows leave breathing room, so the list rows sit 9 px apart (owner 2026-10-24).
+constexpr int kListRowPitchPx = 9;
+
+// The text sits 1 px below its row top, so the cursor bar keeps 1 px clear above and below it
+// (owner 2026-10-12).
+constexpr int kListTextTopPx = 1;
+
 // Firmware update confirmation. Prose in the 5x7 font sits on alternate rows (owner rule).
 constexpr int kRowConfirmTitle = 0;
 constexpr int kRowConfirmVersion = 2;
@@ -46,6 +53,8 @@ enum class Item : uint8_t {
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
 static_assert(kRowListFirstItem + kItemCount <= kDisplayRows, "the menu items must fit on the screen");
+static_assert((kRowListFirstItem + kItemCount) * kListRowPitchPx < kCanvasHeight,
+              "the menu items must fit at their pitch and leave the last pixel line blank");
 
 // Rows past the screen are dropped; text clips to the row width.
 void putRow(MenuFrame& frame, int r, const char* text) {
@@ -191,10 +200,13 @@ void Menu::draw(const UiContext& ctx, Canvas& canvas) {
   shown_ = frame;
   shownValid_ = true;
   canvas.clear();
+  const bool list = mode_ == Mode::List;
+  const int pitch = list ? kListRowPitchPx : kDisplayRowPx;
+  const int textTop = list ? kListTextTopPx : 0;
   for (int r = 0; r < kDisplayRows; ++r) {
-    if (frame[r][0]) canvas.drawText(0, r * kDisplayRowPx, font5x7(), frame[r].data());
+    if (frame[r][0]) canvas.drawText(0, r * pitch + textTop, font5x7(), frame[r].data());
   }
-  if (mode_ == Mode::List) {
-    canvas.invertRect(0, (kRowListFirstItem + cursor_) * kDisplayRowPx, kCanvasWidth, kDisplayRowPx);
+  if (list) {
+    canvas.invertRect(0, (kRowListFirstItem + cursor_) * pitch, kCanvasWidth, kListRowPitchPx);
   }
 }
