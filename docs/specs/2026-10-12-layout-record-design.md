@@ -32,8 +32,8 @@ the 256-byte size stay, and the three new bytes come out of the reserved ones.
 
 | Settings byte | Field | Values | Default |
 |---|---|---|---|
-| 0 | output level | 0 LINE, 1 INSTRUMENT | LINE |
-| 1 | input jack | 0 MIC, 1 PEDAL | MIC |
+| 0 | output level | 0 LINE, 1 MIC | LINE |
+| 1 | input jack | 0 MIC, 1 LINE | MIC |
 | 2 | polish comp | 0 off, 1 on | on |
 | 3 | polish EQ | 0 off, 1 on | on |
 | 4 | top switch | 0 MUTE, 1 BYPASS | MUTE |

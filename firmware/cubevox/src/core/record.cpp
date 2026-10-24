@@ -23,8 +23,8 @@ Card cardFromField(const uint8_t* field, bool& known) {
 bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   const uint8_t output = b[kOffOutputLevel];
   const uint8_t jack = b[kOffInputJack];
-  if (output > static_cast<uint8_t>(OutputLevel::Instrument)) return false;
-  if (jack > static_cast<uint8_t>(InputJack::Pedal)) return false;
+  if (output > static_cast<uint8_t>(OutputLevel::Mic)) return false;
+  if (jack > static_cast<uint8_t>(InputJack::Line)) return false;
   s.outputLevel = static_cast<OutputLevel>(output);
   s.inputJack = static_cast<InputJack>(jack);
   if (schema == kRecordSchemaV1) return true;

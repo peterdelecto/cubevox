@@ -48,9 +48,9 @@ void recoverEcc() {
 
 void printSettings(Print& out, const Settings& s) {
   out.print(" output ");
-  out.print(s.outputLevel == OutputLevel::Instrument ? "instrument" : "line");
+  out.print(s.outputLevel == OutputLevel::Mic ? "mic" : "line");
   out.print(" jack ");
-  out.print(s.inputJack == InputJack::Pedal ? "pedal" : "mic");
+  out.print(s.inputJack == InputJack::Line ? "line" : "mic");
 }
 
 void reportRecovery(Print& out) {

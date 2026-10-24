@@ -33,12 +33,11 @@ constexpr char kHavePrefix[] = "You have ";
 constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix) - 1) - 1;
 
 enum class Item : uint8_t {
+  InputJack,
+  Output,
+  TopSwitch,
   PolishComp,
   PolishEq,
-  Output,
-  InputJack,
-  TopSwitch,
-  ChainOrder,
   UpdateFirmware,
   Exit,
   Count,
@@ -61,13 +60,12 @@ void putRow(MenuFrame& frame, int r, const char* text) {
 
 const char* itemLabel(Item it) {
   switch (it) {
-    case Item::PolishComp: return "POLISH COMP";
-    case Item::PolishEq: return "POLISH EQ";
-    case Item::Output: return "OUT";
-    case Item::InputJack: return "INPUT";
-    case Item::TopSwitch: return "TOP SWITCH";
-    case Item::ChainOrder: return "CHAIN ORDER";
-    case Item::UpdateFirmware: return "UPDATE FIRMWARE";
+    case Item::InputJack: return "INPUT:";
+    case Item::Output: return "OUTPUT:";
+    case Item::TopSwitch: return "TOP SWITCH:";
+    case Item::PolishComp: return "POLISH COMP:";
+    case Item::PolishEq: return "POLISH EQ:";
+    case Item::UpdateFirmware: return "UPDATE FIRMWARE >";
     case Item::Exit: return "EXIT";
     case Item::Count: break;
   }
@@ -78,11 +76,11 @@ const char* onOff(bool on) { return on ? "ON" : "OFF"; }
 
 const char* itemValue(Item it, const Settings& s) {
   switch (it) {
+    case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "LINE";
+    case Item::Output: return s.outputLevel == OutputLevel::Mic ? "MIC" : "LINE";
+    case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::PolishEq: return onOff(s.polishEq);
-    case Item::Output: return s.outputLevel == OutputLevel::Instrument ? "INSTRUMENT" : "LINE";
-    case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "PEDAL";
-    case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     default: return "";
   }
 }
@@ -149,12 +147,11 @@ UiAction Menu::onClick() {
       break;
     case Mode::List:
       switch (static_cast<Item>(cursor_)) {
+        case Item::InputJack: return UiAction::ToggleInputJack;
+        case Item::Output: return UiAction::ToggleOutput;
+        case Item::TopSwitch: return UiAction::CycleTopSwitch;
         case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::PolishEq: return UiAction::TogglePolishEq;
-        case Item::Output: return UiAction::ToggleOutput;
-        case Item::InputJack: return UiAction::ToggleInputJack;
-        case Item::TopSwitch: return UiAction::CycleTopSwitch;
-        case Item::ChainOrder: mode_ = Mode::ChainView; break;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;
         case Item::Count: break;

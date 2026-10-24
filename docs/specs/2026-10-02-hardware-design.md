@@ -32,7 +32,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 |---|----------|--------|
 | 1 | Digital core | Clone fxbox/h7core |
 | 2 | Input connector | Neutrik NCJ6FA-H combo (C368458, THT) because LCSC stocks it; separate XLR + 1/4" only if it drops out of stock |
-| 3 | Output | Buffered 1/4" TS, instrument/line level set in a firmware menu |
+| 3 | Output | Buffered 1/4" TS, mic/line level set in a firmware menu |
 | 4 | Mute (was Bypass, Adam 2026-10-07) | Global vocal MUTE: output relay K102 grounds the jack, DAC soft-muted, chain keeps running. No dry path, no bypass relay. See `2026-10-07-slots-design.md` |
 | 5 | Preamp | Discrete instrumentation amp from a dual low-noise op-amp (NE5532 / OPA1678 class) |
 | 6 | Input gain | Analog pot in the preamp gain leg; firmware never sees it |
@@ -44,7 +44,7 @@ encoders, toggles and an OLED on one JLC-assembled board inside a printed box.
 | 12 | 1/4" half of the combo | Mic or pedal, never both inputs at once. No pad; shared 20–50 dB preamp on the XLR leg, 1/4" through a 25.7 dB pad |
 | 13 | Which H7 | Bare STM32H743VIT6 soldered on the product board, as fxbox. Not a dev-board module |
 | 14 | Top face | Signal-flow row like the pedal view. Board 185 × 145 mm (owner 2026-10-07, was 200 × 150). Orientation as the box sits: REAR edge at y = 0 (top of the KiCad view), knobs along the bottom toward the player, equally spaced for ergonomics; the owner lays out the knobs. Rear wall left→right as seen from the front: 1/4" out, USB-C middle, XLR combo, power switch, 9 V barrel far right. Every jack mouth faces the rear edge (−y) and sits proud of it (USB-C 1.5, barrel 1, combo flange 1, 1/4" nose 6 mm; the switch body face 0.35 inside the edge, lever 4.65 past it). Still provisional until Adam confirms |
-| 15 | Gain structure | Two stages, 20.05 dB fixed + 0–30.2 dB on the pot (owner 2026-10-10, divider wiring, item 4). 1/4" contacts carry a 25.7 dB pad that relay K103 switches (owner 2026-10-10): menu item 1/4" INPUT: PEDAL / MIC drives PAD_EN (PE11), PEDAL = pad in, MIC (default, coil off) = pad shorted by the relay's NC contacts |
+| 15 | Gain structure | Two stages, 20.05 dB fixed + 0–30.2 dB on the pot (owner 2026-10-10, divider wiring, item 4). 1/4" contacts carry a 25.7 dB pad that relay K103 switches (owner 2026-10-10): menu item 1/4" INPUT: MIC / LINE drives PAD_EN (PE11), LINE = pad in, MIC (default, coil off) = pad shorted by the relay's NC contacts |
 | 16 | Power ground | Centre pin straight to GND, +9 V sleeve through a series Schottky and TVS. fxbox's either-polarity FET bridge is dropped because the Boss daisy chain and the audio cable share ground with the BD-2 |
 | 17 | Toggle switch | Yuen Fung ST-0-102-A01-T000-LF (C1788487), the only ON-ON bat toggle on JLC whose bushing spans the 11.8 mm panel plane; lever tip 3.6 mm above the knobs |
 

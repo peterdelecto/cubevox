@@ -1,4 +1,4 @@
-// Drives PAD_EN, which switches relay K103 between the MIC and PEDAL input networks.
+// Drives PAD_EN, which switches relay K103 between the MIC and LINE input networks.
 
 #pragma once
 
@@ -7,5 +7,5 @@
 // Drives PAD_EN low (MIC, coil off). Call in setup() right after muteInit().
 void inputJackInit();
 
-// Pedal drives PAD_EN high (pad in circuit); Mic drives it low.
+// Line drives PAD_EN high (pad in circuit); Mic drives it low.
 void inputJackApply(InputJack jack);

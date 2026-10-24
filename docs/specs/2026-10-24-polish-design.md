@@ -6,7 +6,7 @@ MUTE/BYPASS assignment. The menu stays minimal: one row per item, no sub-pages.
 
 ## Signal path tail
 ```
-slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/INSTRUMENT) → DAC
+slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → DAC
 ```
 1. Both stages run always; OFF is a settled bit-exact passthrough reached through the same
    50 ms crossfade the EQ already uses, so a click on the menu never clicks in the audio.
@@ -17,20 +17,23 @@ slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/INSTRUMENT
    chain) through a 50 ms equal-power crossfade; the chain and both polish stages keep running so
    the switch back is seamless. TOP SWITCH = MUTE: as today, the DAC soft-mute sequence.
 
-## Menu, final order (8 rows, 5x7, no title row, cursor `>` in column 0)
+## Menu, final order (7 rows, 5x7, no title row, cursor `>` in column 0, eighth screen row blank)
 | Row | Text | Click |
 |---|---|---|
-| 1 | `POLISH COMP ON` | toggles ON / OFF |
-| 2 | `POLISH EQ ON` | toggles ON / OFF |
-| 3 | `OUT LINE` | cycles LINE / INSTRUMENT. A digital -12 dB trim before the DAC, the category's norm with no analog switch on the output; kept because the box may feed a PA or a pedal (owner 2026-10-24) |
-| 4 | `INPUT MIC` | cycles MIC / PEDAL |
-| 5 | `TOP SWITCH MUTE` | cycles MUTE / BYPASS |
-| 6 | `CHAIN ORDER` | opens the read-only chain view |
-| 7 | `UPDATE FIRMWARE` | opens the confirm screen |
-| 8 | `EXIT` | closes the menu |
+| 1 | `INPUT: MIC` | cycles MIC / LINE. LINE puts the 25.7 dB pad of relay K103 in circuit (hardware spec row 15) |
+| 2 | `OUTPUT: LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
+| 3 | `TOP SWITCH: MUTE` | cycles MUTE / BYPASS |
+| 4 | `POLISH COMP: ON` | cycles ON / OFF |
+| 5 | `POLISH EQ: ON` | cycles ON / OFF |
+| 6 | `UPDATE FIRMWARE >` | opens the confirm screen |
+| 7 | `EXIT` | closes the menu |
 
-Turn moves the cursor; the list does not scroll. Every change saves through the layout record's
-existing debounce. Screens are approved per numbered proof, as always.
+The owner's `[A \ B]` notation names the value set. A row shows the current value and a click
+cycles it, because the longest row with both values does not fit 21 columns. The list has no
+CHAIN ORDER row (owner 2026-10-24, no-op for now). `drawChainView` and its proof stay in the
+firmware, and no row opens the view. Turn moves the cursor; the list does not scroll. Every
+change saves through the layout record's existing debounce. Screens are approved per numbered
+proof, as always.
 
 ## POLISH COMP, a gentle live vocal compressor
 Feed-forward, mono, no lookahead, log-domain gain computer, in `engine/polish_comp.h`.
@@ -62,7 +65,8 @@ existing settings bytes. A v1 record decodes with the defaults for the new field
 back as v2 on the next save; v2 records are refused by a v1 firmware as today (schema mismatch
 falls back to the default layout). The serial protocol carries the three fields in the settings
 object, optional on input where an absent field leaves the box's value unchanged, always present
-in replies.
+in replies. The output level and input jack bytes keep their values (output 0 LINE, 1 MIC; jack
+0 MIC, 1 LINE).
 
 ## Emulator and render
 `cubevox-proto` and `cubevox-render` run the same tail (comp, eq, trim) so loops audition exactly
@@ -77,8 +81,8 @@ what the box plays; `--polish-comp off` and `--polish-eq off` switch them for A/
 3. `test/firmware/core_record.cpp`: v2 round trip, v1 record decodes with defaults, a bad
    settings byte is rejected.
 4. `test/firmware/core_protocol.cpp`: the three fields in and out, absent on input means unchanged.
-5. `test/firmware/ui_menu.cpp`: the eight rows in order, each click, the saved settings, proofs
-   `oled-menu.pgm` for the owner.
+5. `test/firmware/ui_menu.cpp`: the seven rows in order, the blank eighth row, each click, the
+   saved settings, proofs `oled-menu.pgm` for the owner.
 6. Bench (hardware, later): bypass crossfade audible-click free on glass, comp cost in load %,
    TOP SWITCH both ways with the real switch.
 

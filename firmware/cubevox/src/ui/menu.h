@@ -53,6 +53,9 @@ class Menu {
   // after something else drew on the canvas.
   void invalidate() { shownValid_ = false; }
 
+  // Opens the read-only chain view. No list row opens it, so only the proof writer calls this.
+  void showChainView() { mode_ = Mode::ChainView; }
+
  private:
   enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu };
 

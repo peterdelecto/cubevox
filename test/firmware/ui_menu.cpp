@@ -69,12 +69,13 @@ struct MenuRig {
 };
 
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md).
-enum Row { kPolishComp, kPolishEq, kOut, kInput, kTopSwitch, kChainOrder, kUpdate, kExit, kRowCount };
+enum Row { kInput, kOutput, kTopSwitch, kPolishComp, kPolishEq, kUpdate, kExit, kRowCount };
 
 // List row `r` as drawn for the default settings: the cursor mark or a blank in column 0, then the text.
 std::string defaultRow(int r, bool cursor) {
-  static const char* const text[kRowCount] = {"POLISH COMP ON", "POLISH EQ ON", "OUT LINE",        "INPUT MIC",
-                                              "TOP SWITCH MUTE", "CHAIN ORDER",  "UPDATE FIRMWARE", "EXIT"};
+  static const char* const text[kRowCount] = {"INPUT: MIC",      "OUTPUT: LINE", "TOP SWITCH: MUTE",
+                                              "POLISH COMP: ON", "POLISH EQ: ON", "UPDATE FIRMWARE >",
+                                              "EXIT"};
   return std::string(cursor ? ">" : " ") + text[r];
 }
 
@@ -122,18 +123,19 @@ void checkMenuList() {
   m.step(0, true);
   m.draw();
   for (int r = 0; r < kRowCount; ++r) {
-    const std::string want = defaultRow(r, r == kPolishComp);
-    check(rowIs(m.canvas, r, want.c_str(), r == kPolishComp), want.c_str());
+    const std::string want = defaultRow(r, r == kInput);
+    check(rowIs(m.canvas, r, want.c_str(), r == kInput), want.c_str());
   }
-  check(kRowCount == kDisplayRows, "menu: the eight rows fill the screen with no title row");
+  check(kRowCount == kDisplayRows - 1 && rowIs(m.canvas, kDisplayRows - 1, ""),
+        "menu: seven rows with no title row, row 7 blank");
 
   m.step(-1, false);
   m.draw();
-  check(rowIs(m.canvas, kExit, ">EXIT", true) && rowIs(m.canvas, kPolishComp, " POLISH COMP ON"),
+  check(rowIs(m.canvas, kExit, ">EXIT", true) && rowIs(m.canvas, kInput, " INPUT: MIC"),
         "menu: turning back from 0 wraps to the last row");
   m.step(1, false);
   m.draw();
-  check(rowIs(m.canvas, kPolishComp, ">POLISH COMP ON", true), "menu: turning forward wraps to 0");
+  check(rowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: turning forward wraps to 0");
 }
 
 // Each of the first five rows asks for its action, and applying it flips the row's setting.
@@ -144,24 +146,24 @@ void checkMenuClicks() {
     const char* back;   // and once a second click undoes it
   };
   const Click clicks[] = {
-      {UiAction::TogglePolishComp, ">POLISH COMP OFF", ">POLISH COMP ON"},
-      {UiAction::TogglePolishEq, ">POLISH EQ OFF", ">POLISH EQ ON"},
-      {UiAction::ToggleOutput, ">OUT INSTRUMENT", ">OUT LINE"},
-      {UiAction::ToggleInputJack, ">INPUT PEDAL", ">INPUT MIC"},
-      {UiAction::CycleTopSwitch, ">TOP SWITCH BYPASS", ">TOP SWITCH MUTE"},
+      {UiAction::ToggleInputJack, ">INPUT: LINE", ">INPUT: MIC"},
+      {UiAction::ToggleOutput, ">OUTPUT: MIC", ">OUTPUT: LINE"},
+      {UiAction::CycleTopSwitch, ">TOP SWITCH: BYPASS", ">TOP SWITCH: MUTE"},
+      {UiAction::TogglePolishComp, ">POLISH COMP: OFF", ">POLISH COMP: ON"},
+      {UiAction::TogglePolishEq, ">POLISH EQ: OFF", ">POLISH EQ: ON"},
   };
   MenuRig m;
   m.step(0, true);
-  for (int r = kPolishComp; r <= kTopSwitch; ++r) {
-    if (r > kPolishComp) m.step(1, false);
+  for (int r = kInput; r <= kPolishEq; ++r) {
+    if (r > kInput) m.step(1, false);
     const UiAction a = m.step(0, true);
     check(a == clicks[r].action && ui::applyAction(a, m.settings) == ui::ApplyResult::SettingsChanged, clicks[r].after);
     m.draw();
     check(rowIs(m.canvas, r, clicks[r].after, true), clicks[r].after);
   }
   const Settings flipped = m.settings;
-  check(!flipped.polishComp && !flipped.polishEq && flipped.outputLevel == OutputLevel::Instrument &&
-            flipped.inputJack == InputJack::Pedal && flipped.topSwitch == TopSwitch::Bypass,
+  check(!flipped.polishComp && !flipped.polishEq && flipped.outputLevel == OutputLevel::Mic &&
+            flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass,
         "menu: five clicks flipped the five settings");
 
   // What the box saves and plays is what the menu showed.
@@ -178,8 +180,8 @@ void checkMenuClicks() {
   const ChainSnapshot fresh = composeSnapshot(m.layout, m.panel, Settings(), BenchOverrides());
   check(fresh.params.comp.on && fresh.params.eq.on && fresh.outputGain == 1.0f, "menu: the default snapshot has both polish stages on");
 
-  for (int r = kTopSwitch; r >= kPolishComp; --r) {
-    if (r < kTopSwitch) m.step(-1, false);
+  for (int r = kPolishEq; r >= kInput; --r) {
+    if (r < kPolishEq) m.step(-1, false);
     const UiAction a = m.step(0, true);
     ui::applyAction(a, m.settings);
     m.draw();
@@ -192,30 +194,30 @@ void checkMenuClicks() {
 
 void checkMenuWrapAndCombo() {
   MenuRig m;
-  m.openListAt(9);  // 9 detents past the cursor wraps to row 1
+  m.openListAt(9);  // 9 detents past the cursor wraps to row 2
   m.draw();
-  check(rowIs(m.canvas, kPolishEq, ">POLISH EQ ON", true), "menu: +9 detents wraps around the list");
+  check(rowIs(m.canvas, kTopSwitch, ">TOP SWITCH: MUTE", true), "menu: +9 detents wraps around the list");
   m.step(-9, false);  // back by 9 lands on row 0
   m.draw();
-  check(rowIs(m.canvas, kPolishComp, ">POLISH COMP ON", true), "menu: -9 detents wraps the other way");
+  check(rowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: -9 detents wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
-  check(n.step(1, true) == UiAction::TogglePolishEq, "menu: a turn and a click in one pass act on the new cursor");
+  check(n.step(1, true) == UiAction::ToggleOutput, "menu: a turn and a click in one pass act on the new cursor");
 }
 
 void checkMenuScreens() {
   MenuRig m;
-  m.openListAt(kChainOrder);
-  check(m.step(0, true) == UiAction::None, "menu: Chain order click has no action");
+  m.step(0, true);
+  m.menu.showChainView();
   m.draw();
   check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()), "menu: chain view starts at slot 1");
   check(rowIs(m.canvas, kDisplayRows - 1, chainRow(m.layout, 7).c_str()), "menu: chain view shows slot 8");
-  m.step(0, true);
+  check(m.step(0, true) == UiAction::None, "menu: a click in the chain view has no action");
   m.draw();
-  check(rowIs(m.canvas, kChainOrder, ">CHAIN ORDER", true), "menu: click leaves the chain view for the list");
+  check(rowIs(m.canvas, kInput, ">INPUT: MIC", true), "menu: click leaves the chain view for the list");
 
-  m.step(1, false);
+  m.step(kUpdate, false);
   m.step(0, true);
   m.draw();
   char tag[kDisplayCols + 1];
@@ -229,7 +231,7 @@ void checkMenuScreens() {
         "menu: confirm screen keeps a blank row between sentences");
   m.step(1, false);
   m.draw();
-  check(rowIs(m.canvas, kUpdate, ">UPDATE FIRMWARE", true), "menu: turn cancels the confirm and returns to the list");
+  check(rowIs(m.canvas, kUpdate, ">UPDATE FIRMWARE >", true), "menu: turn cancels the confirm and returns to the list");
   m.step(0, true);
   m.step(0, true);
   check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
@@ -250,14 +252,14 @@ void checkMenuTimeout() {
   m.step(0, true);
   m.step(0, false, 14000);
   m.draw();
-  check(rowIs(m.canvas, 0, ">POLISH COMP ON", true), "menu: still open before the timeout");
+  check(rowIs(m.canvas, 0, ">INPUT: MIC", true), "menu: still open before the timeout");
   m.step(0, false, 1500);
   m.draw();
   check(rowIs(m.canvas, 0, "cubevox"), "menu: 15 s without input returns to idle");
 
   MenuRig chain;
-  chain.openListAt(kChainOrder);
   chain.step(0, true);
+  chain.menu.showChainView();
   chain.step(0, false, 15001);
   chain.draw();
   check(rowIs(chain.canvas, 0, "cubevox"), "menu: the chain view times out to idle");
@@ -318,19 +320,18 @@ void checkScreenshots() {
   m.step(0, true);
   m.draw();
   bool listRows = true;
-  for (int r = 0; r < kRowCount; ++r) listRows = listRows && rowIs(m.canvas, r, defaultRow(r, r == kPolishComp).c_str(), r == kPolishComp);
+  for (int r = 0; r < kRowCount; ++r) listRows = listRows && rowIs(m.canvas, r, defaultRow(r, r == kInput).c_str(), r == kInput);
   check(listRows, "screens: menu rows");
   writePgm(m.canvas, "oled-menu.pgm");
 
-  m.step(kChainOrder, false);
-  m.step(0, true);
+  m.menu.showChainView();
   m.draw();
   check(rowIs(m.canvas, 0, chainRow(m.layout, 0).c_str()) && rowIs(m.canvas, 7, chainRow(m.layout, 7).c_str()),
         "screens: chain rows");
   writePgm(m.canvas, "oled-chain.pgm");
 
   m.step(0, true);
-  m.step(1, false);
+  m.step(kUpdate, false);
   m.step(0, true);
   m.draw();
   check(rowIs(m.canvas, 0, "Update the firmware?") && rowIs(m.canvas, 6, "Turn to cancel."), "screens: confirm rows");

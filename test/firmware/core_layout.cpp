@@ -140,9 +140,9 @@ void checkOutputGain() {
   Settings s;
   const BenchOverrides none;
   check(composeSnapshot(defaultLayout(), PanelReading(), s, none).outputGain == 1.0f, "LINE gain is unity");
-  s.outputLevel = OutputLevel::Instrument;
+  s.outputLevel = OutputLevel::Mic;
   const float g = composeSnapshot(defaultLayout(), PanelReading(), s, none).outputGain;
-  check(std::fabs(g - 0.2512f) < 1e-3f, "INSTRUMENT gain is -12 dB linear");
+  check(std::fabs(g - 0.0316f) < 1e-3f, "MIC gain is -30 dB linear");
 }
 
 void checkSettings() {
@@ -150,20 +150,20 @@ void checkSettings() {
   check(s.inputJack == InputJack::Mic, "input jack defaults to MIC");
   check(s.outputLevel == OutputLevel::Line, "output defaults to LINE");
   check(outputTrimDb(s) == 0.0f, "LINE output trim is 0 dB");
-  Settings inst;
-  inst.outputLevel = OutputLevel::Instrument;
-  check(std::fabs(outputTrimDb(inst) - (-12.0f)) < 1e-6f, "INSTRUMENT output trim is -12 dB");
+  Settings mic;
+  mic.outputLevel = OutputLevel::Mic;
+  check(std::fabs(outputTrimDb(mic) - (-30.0f)) < 1e-6f, "MIC output trim is -30 dB");
 }
 
 void checkApplyAction() {
   Settings s;
   check(ui::applyAction(UiAction::ToggleOutput, s) == ui::ApplyResult::SettingsChanged &&
-            s.outputLevel == OutputLevel::Instrument,
-        "action: ToggleOutput flips LINE to INSTRUMENT");
+            s.outputLevel == OutputLevel::Mic,
+        "action: ToggleOutput flips LINE to MIC");
   check(ui::applyAction(UiAction::ToggleOutput, s) == ui::ApplyResult::SettingsChanged && s.outputLevel == OutputLevel::Line,
         "action: ToggleOutput flips back");
-  check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Pedal,
-        "action: ToggleInputJack flips MIC to PEDAL");
+  check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Line,
+        "action: ToggleInputJack flips MIC to LINE");
   check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Mic,
         "action: ToggleInputJack flips back");
   const Settings before = s;

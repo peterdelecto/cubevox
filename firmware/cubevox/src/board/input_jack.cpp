@@ -10,5 +10,5 @@ void inputJackInit() {
 }
 
 void inputJackApply(InputJack jack) {
-  digitalWrite(pins::kPadEn, jack == InputJack::Pedal ? HIGH : LOW);
+  digitalWrite(pins::kPadEn, jack == InputJack::Line ? HIGH : LOW);
 }

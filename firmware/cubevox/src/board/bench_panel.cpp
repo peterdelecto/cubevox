@@ -105,8 +105,8 @@ bool requirePanelTest() {
 
 void stepRelay() {
   gJackForced = true;
-  gJackForce = gJackEffective == InputJack::Mic ? InputJack::Pedal : InputJack::Mic;
-  serialOut().println(gJackForce == InputJack::Pedal ? "[panel] K103 to PEDAL (PAD_EN high)"
+  gJackForce = gJackEffective == InputJack::Mic ? InputJack::Line : InputJack::Mic;
+  serialOut().println(gJackForce == InputJack::Line ? "[panel] K103 to LINE (PAD_EN high)"
                                                 : "[panel] K103 to MIC (PAD_EN low)");
 }
 

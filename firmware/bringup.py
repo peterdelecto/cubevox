@@ -348,7 +348,7 @@ def panel_test(log, port, prompt, want_oled):
     summary = find(port.read(2.0, until=r"toggles \d+/8"), r"^\[panel\] pots.*")
     log.note("panel summary", summary.group(0) if summary else "no summary line")
     panel_yes(log, port, "K103 relay click", "i", r"K103 to",
-              "K103 switched to PEDAL: one click, no thump from the output?")
+              "K103 switched to LINE: one click, no thump from the output?")
     panel_yes(log, port, "mute relay click", "x", r"mute held",
               "Output muted with a K102 click?")
     if want_oled:

@@ -212,7 +212,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
 - Panel self-test (bench image, `core/panel_test`): `t` `panel_test` on/off, `l` `panel_summary` (pots and toggles
   still to exercise), `g` `panel_dump` raw dump of all 16 pots and 8 toggles. While on, the box prints
   `[panel] pot NN slot S A|B v.vv` when a pot moves and `[panel] toggle slot S on|off` on each edge. `i`
-  `panel_jack` steps K103 MIC/PEDAL through the jack-switch mute dip, `x` `panel_mute` holds and releases the output
+  `panel_jack` steps K103 MIC/LINE through the jack-switch mute dip, `x` `panel_mute` holds and releases the output
   mute through the mute sequence, `o` `panel_oled` holds an OLED pattern (border, checkerboard, 5x7, 9x12 and 16x24
   text) with the menu draw paused. The `panel_summary`, `panel_jack`, `panel_mute` and `panel_oled` ops error with
   `panel test is off` unless the test is on; leaving it restores jack, mute and menu. `./bringup.py --board 1

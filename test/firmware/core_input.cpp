@@ -195,31 +195,31 @@ void checkJackSwitch() {
   j.update(0, InputJack::Mic, false);
   check(!j.holdMute() && j.relay() == InputJack::Mic, "jack: no change, no hold");
 
-  j.update(10, InputJack::Pedal, false);
+  j.update(10, InputJack::Line, false);
   check(j.holdMute() && j.relay() == InputJack::Mic, "jack: request holds the mute, relay waits");
-  j.update(20, InputJack::Pedal, false);
+  j.update(20, InputJack::Line, false);
   check(j.relay() == InputJack::Mic, "jack: relay waits until fully muted");
-  j.update(30, InputJack::Pedal, true);
-  check(j.relay() == InputJack::Pedal && j.holdMute(), "jack: relay switches when fully muted");
-  j.update(30 + kRelaySettleMs - 1, InputJack::Pedal, true);
+  j.update(30, InputJack::Line, true);
+  check(j.relay() == InputJack::Line && j.holdMute(), "jack: relay switches when fully muted");
+  j.update(30 + kRelaySettleMs - 1, InputJack::Line, true);
   check(j.holdMute(), "jack: hold stays until the relay settles");
-  j.update(30 + kRelaySettleMs, InputJack::Pedal, true);
-  check(!j.holdMute() && j.relay() == InputJack::Pedal, "jack: hold released after the settle time");
+  j.update(30 + kRelaySettleMs, InputJack::Line, true);
+  check(!j.holdMute() && j.relay() == InputJack::Line, "jack: hold released after the settle time");
 
   j.update(100, InputJack::Mic, true);
-  j.update(110, InputJack::Pedal, true);
+  j.update(110, InputJack::Line, true);
   check(j.relay() == InputJack::Mic, "jack: relay moved on the first request");
-  j.update(111, InputJack::Pedal, true);
-  j.update(111 + kRelaySettleMs, InputJack::Pedal, true);
-  j.update(112 + kRelaySettleMs, InputJack::Pedal, true);
-  check(j.holdMute() && j.relay() == InputJack::Pedal, "jack: a second change mid-sequence ends on the latest request");
-  j.update(112 + 2 * kRelaySettleMs, InputJack::Pedal, true);
-  check(!j.holdMute() && j.relay() == InputJack::Pedal, "jack: latest request settles and releases");
+  j.update(111, InputJack::Line, true);
+  j.update(111 + kRelaySettleMs, InputJack::Line, true);
+  j.update(112 + kRelaySettleMs, InputJack::Line, true);
+  check(j.holdMute() && j.relay() == InputJack::Line, "jack: a second change mid-sequence ends on the latest request");
+  j.update(112 + 2 * kRelaySettleMs, InputJack::Line, true);
+  check(!j.holdMute() && j.relay() == InputJack::Line, "jack: latest request settles and releases");
 }
 
 void checkJackRequestWithdrawn() {
   JackSwitch j(InputJack::Mic);
-  j.update(0, InputJack::Pedal, false);
+  j.update(0, InputJack::Line, false);
   check(j.holdMute(), "jack: a request holds the mute");
   j.update(5, InputJack::Mic, false);
   check(!j.holdMute() && j.relay() == InputJack::Mic, "jack: a request withdrawn before the mute needs no dip");

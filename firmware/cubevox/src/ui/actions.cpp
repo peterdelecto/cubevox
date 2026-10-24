@@ -14,10 +14,10 @@ ApplyResult applyAction(const UiAction& action, Settings& settings) {
       settings.topSwitch = settings.topSwitch == TopSwitch::Mute ? TopSwitch::Bypass : TopSwitch::Mute;
       return ApplyResult::SettingsChanged;
     case UiAction::ToggleOutput:
-      settings.outputLevel = settings.outputLevel == OutputLevel::Line ? OutputLevel::Instrument : OutputLevel::Line;
+      settings.outputLevel = settings.outputLevel == OutputLevel::Line ? OutputLevel::Mic : OutputLevel::Line;
       return ApplyResult::SettingsChanged;
     case UiAction::ToggleInputJack:
-      settings.inputJack = settings.inputJack == InputJack::Mic ? InputJack::Pedal : InputJack::Mic;
+      settings.inputJack = settings.inputJack == InputJack::Mic ? InputJack::Line : InputJack::Mic;
       return ApplyResult::SettingsChanged;
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;

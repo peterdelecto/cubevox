@@ -41,15 +41,15 @@ void checkRecordCodec() {
   const uint8_t vec[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
   check(crc32(vec, sizeof vec) == 0xCBF43926u, "record: crc32 of 123456789");
 
-  RecordData in = makeRec(77, OutputLevel::Instrument, "stage rig");
-  in.settings.inputJack = InputJack::Pedal;
+  RecordData in = makeRec(77, OutputLevel::Mic, "stage rig");
+  in.settings.inputJack = InputJack::Line;
   in.layout.card[2] = Card::ReverbChasm;
   in.layout.card[7] = Card::Empty;
   RecordBytes b = encodeRecord(in);
   RecordData out;
   check(decodeRecord(b.data(), out), "record: round trip decodes");
-  check(out.sequence == 77 && out.settings.outputLevel == OutputLevel::Instrument &&
-            out.settings.inputJack == InputJack::Pedal && std::strcmp(out.name, "stage rig") == 0 &&
+  check(out.sequence == 77 && out.settings.outputLevel == OutputLevel::Mic &&
+            out.settings.inputJack == InputJack::Line && std::strcmp(out.name, "stage rig") == 0 &&
             out.layout.card == in.layout.card && !out.unknownCard,
         "record: round trip keeps every field");
 
@@ -81,16 +81,16 @@ void checkRecordSchemaV2() {
   changed.polishComp = false;
   changed.polishEq = false;
   changed.topSwitch = TopSwitch::Bypass;
-  RecordData in = makeRec(9, OutputLevel::Instrument);
+  RecordData in = makeRec(9, OutputLevel::Mic);
   in.settings = changed;
-  in.settings.outputLevel = OutputLevel::Instrument;
+  in.settings.outputLevel = OutputLevel::Mic;
   const RecordBytes b = encodeRecord(in);
   RecordData out;
   check(b[kOffSchema] == kRecordSchema && b[kOffPolishComp] == 0 && b[kOffPolishEq] == 0 &&
             b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
         "record v2: the polish bytes follow the two v1 settings bytes");
   check(decodeRecord(b.data(), out) && !out.settings.polishComp && !out.settings.polishEq &&
-            out.settings.topSwitch == TopSwitch::Bypass && out.settings.outputLevel == OutputLevel::Instrument,
+            out.settings.topSwitch == TopSwitch::Bypass && out.settings.outputLevel == OutputLevel::Mic,
         "record v2: round trip keeps the polish settings");
 
   const RecordBytes defaults = encodeRecord(makeRec(1));
@@ -98,11 +98,11 @@ void checkRecordSchemaV2() {
             out.settings.topSwitch == TopSwitch::Mute,
         "record v2: default settings are comp on, EQ on, MUTE");
 
-  RecordData wasV1 = makeRec(4, OutputLevel::Instrument);
-  wasV1.settings.inputJack = InputJack::Pedal;
+  RecordData wasV1 = makeRec(4, OutputLevel::Mic);
+  wasV1.settings.inputJack = InputJack::Line;
   const RecordBytes v1 = asV1(encodeRecord(wasV1));
-  check(decodeRecord(v1.data(), out) && out.sequence == 4 && out.settings.outputLevel == OutputLevel::Instrument &&
-            out.settings.inputJack == InputJack::Pedal && out.settings.polishComp && out.settings.polishEq &&
+  check(decodeRecord(v1.data(), out) && out.sequence == 4 && out.settings.outputLevel == OutputLevel::Mic &&
+            out.settings.inputJack == InputJack::Line && out.settings.polishComp && out.settings.polishEq &&
             out.settings.topSwitch == TopSwitch::Mute,
         "record v1: decodes with the polish defaults, not the zero bytes");
   check(classifyRecordEntry(v1.data()) == EntryState::Valid, "record v1: still a valid entry");
@@ -150,7 +150,7 @@ void checkRecordEntryStates() {
 void checkRecordNewest() {
   FakeFlash f;
   f.put(0, 0, makeRec(3));
-  f.put(1, 0, makeRec(5, OutputLevel::Instrument));
+  f.put(1, 0, makeRec(5, OutputLevel::Mic));
   f.put(0, 1, makeRec(4));
   const uint8_t* views[2] = {f.read(0), f.read(1)};
   RecordFound found;
@@ -170,7 +170,7 @@ void checkStoreAppend() {
   check(!store.begin(out), "store: blank flash has no record");
 
   Settings s;
-  s.outputLevel = OutputLevel::Instrument;
+  s.outputLevel = OutputLevel::Mic;
   store.request(defaultLayout(), s, 100);
   store.poll(2099);
   check(f.ops == 0, "store: no write before 2 s of quiet");
@@ -185,7 +185,7 @@ void checkStoreAppend() {
   FakeFlash again;
   std::memcpy(again.mem[0].data(), f.mem[0].data(), kRecordBytes);
   RecordStore reboot(again);
-  check(reboot.begin(out) && out.sequence == 1 && out.settings.outputLevel == OutputLevel::Instrument,
+  check(reboot.begin(out) && out.sequence == 1 && out.settings.outputLevel == OutputLevel::Mic,
         "store: the saved record reloads");
 
   store.saveNow();
@@ -216,7 +216,7 @@ void checkStoreClockSkew() {
 void checkStoreTornTail() {
   FakeFlash f;
   f.put(0, 0, makeRec(1));
-  f.put(0, 1, makeRec(2, OutputLevel::Instrument));
+  f.put(0, 1, makeRec(2, OutputLevel::Mic));
   f.put(0, 2, makeRec(3));
   std::memset(&f.mem[0][2 * kRecordBytes + 3 * kFlashWordBytes], 0xFF, 5 * kFlashWordBytes);  // cut after 3 words
   f.mem[0][2 * kRecordBytes + 100] = 0x00;                                                        // and damaged
@@ -360,7 +360,7 @@ void checkStoreWhileBusy() {
   RecordData out;
   store.begin(out);
   Settings first;
-  first.outputLevel = OutputLevel::Instrument;
+  first.outputLevel = OutputLevel::Mic;
   store.request(defaultLayout(), first, 0);
   uint32_t t = kSaveDebounceMs;
   store.poll(t++);  // the write starts and its record is fixed
@@ -369,7 +369,7 @@ void checkStoreWhileBusy() {
   store.saveNow();
   runToIdle(store, f, t);
   RecordData back;
-  check(decodeRecord(f.mem[0].data(), back) && back.settings.outputLevel == OutputLevel::Instrument,
+  check(decodeRecord(f.mem[0].data(), back) && back.settings.outputLevel == OutputLevel::Mic,
         "store: a request during programming does not change the record being written");
   check(decodeRecord(f.mem[0].data() + kRecordBytes, back) && back.settings.outputLevel == OutputLevel::Line && back.sequence == 2,
         "store: the save-now behind it writes the newer state next");
