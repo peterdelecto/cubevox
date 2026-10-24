@@ -109,6 +109,22 @@ int knobShown(const KnobDesc& k, float value);
 // reaches below zero marks a positive number with "+". A labelled knob prints its name.
 void formatShown(const KnobDesc& k, int shown, char* buf, size_t size);
 
+// The most character cells a knob's number takes.
+constexpr int kMaxKnobCells = 12;
+
+// The character cells the number of knob `k` takes on the OLED, in the widest case. A knob whose
+// range reaches below zero has a sign cell first. The digit cells follow, enough for the widest
+// number of the range, and a knob with decimals adds a cell for the point and one for each decimal.
+// 0 for a knob with labels. Never more than kMaxKnobCells.
+int knobCells(const KnobDesc& k);
+
+// Prints `shown` into exactly knobCells(k) characters, so every value of a knob fills the same
+// cells. The sign goes in the sign cell, which stays blank for zero. A knob without a sign cell
+// prints a negative number without its minus. The digits are right-aligned and the cells left of
+// them stay blank. A number wider than its cells keeps its rightmost characters. Writes an empty
+// string for a knob with labels or when `size` is too small.
+void formatCells(const KnobDesc& k, int shown, char* buf, size_t size);
+
 // The name at index `shown` of a labelled knob, clamped to its positions. "" for any other knob.
 const char* knobLabel(const KnobDesc& k, int shown);
 

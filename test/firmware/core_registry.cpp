@@ -3,6 +3,7 @@
 
 #include "support.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -347,27 +348,111 @@ void checkShownDecimals() {
   check(std::strcmp(buf, "1.5") == 0, "shown: formatShown takes any size and honours a size of zero");
 }
 
-// Every knob's widest readout, a number and its unit in 16X24, must fit the panel with 1 px each side.
+// The cells of a knob's number are fixed by its range. Each value fills all of them.
+void checkCells() {
+  struct Case {
+    Card card;
+    int knob;
+    int cells;
+  };
+  const Case cases[] = {
+      {Card::Octave, 0, 3},      // -12..+12 is a sign cell and 2 digits
+      {Card::Octave, 1, 3},      // 0..100 %
+      {Card::Gate, 0, 3},        // -70..-10 dB is a sign cell and 2 digits
+      {Card::Gate, 1, 4},        // 5..1000 ms
+      {Card::Slapback, 1, 3},    // 60..250 ms
+      {Card::Autotune, 1, 3},    // 5..500 ms response
+      {Card::Distortion, 0, 3},  // 0..100 %
+      {Card::Autotune, 0, 0},    // the key has names, not a number
+  };
+  for (const Case& c : cases) {
+    const std::string what = std::string("cells: ") + cardDesc(c.card).name + " " + cardDesc(c.card).knob[c.knob].name;
+    check(knobCells(*knobDesc(c.card, c.knob)) == c.cells, (what + " takes " + std::to_string(c.cells) + " cells").c_str());
+  }
+}
+
+std::string cellsOf(const KnobDesc& k, int shown) {
+  char buf[kMaxKnobCells + 1];
+  formatCells(k, shown, buf, sizeof(buf));
+  return buf;
+}
+
+void checkFormatCells() {
+  const KnobDesc& semitones = *knobDesc(Card::Octave, 0);
+  check(cellsOf(semitones, 5) == "+ 5" && cellsOf(semitones, 0) == "  0" && cellsOf(semitones, -5) == "- 5" &&
+            cellsOf(semitones, 12) == "+12" && cellsOf(semitones, -12) == "-12",
+        "cells: semitones keep the sign in its own cell and a blank tens cell for one digit");
+  const KnobDesc& threshold = *knobDesc(Card::Gate, 0);
+  check(cellsOf(threshold, -24) == "-24" && cellsOf(threshold, -70) == "-70" && cellsOf(threshold, -10) == "-10",
+        "cells: a threshold is the minus and its two digits");
+  const KnobDesc& mix = *knobDesc(Card::Octave, 1);
+  check(cellsOf(mix, 0) == "  0" && cellsOf(mix, 65) == " 65" && cellsOf(mix, 99) == " 99" && cellsOf(mix, 100) == "100",
+        "cells: a percent is right-aligned with blank cells on the left, and no sign cell");
+  const KnobDesc& decay = *knobDesc(Card::Gate, 1);
+  check(cellsOf(decay, 5) == "   5" && cellsOf(decay, 150) == " 150" && cellsOf(decay, 1000) == "1000", "cells: decay has 4 digit cells");
+
+  // A number wider than its cells keeps the rightmost characters, and a negative number in a range with no sign loses its minus.
+  check(cellsOf(mix, 1234) == "234" && cellsOf(mix, -7) == "  7", "cells: a number past the field keeps its low digits");
+  check(cellsOf(*knobDesc(Card::Autotune, 0), 3).empty(), "cells: a knob with names has no cells");
+  char tiny[3] = "xx";
+  formatCells(semitones, 5, tiny, sizeof(tiny));
+  check(tiny[0] == '\0', "cells: a buffer too small for the cells gets an empty string");
+  formatCells(semitones, 5, tiny, 0);
+
+  // The cell strings and the printed number say the same thing.
+  bool agree = true;
+  for (int v = -12; v <= 12; ++v) {
+    char text[16];
+    formatShown(semitones, v, text, sizeof(text));
+    std::string cells = cellsOf(semitones, v);
+    cells.erase(std::remove(cells.begin(), cells.end(), ' '), cells.end());
+    agree = agree && cells == text;
+  }
+  check(agree, "cells: dropping the blanks of a number's cells leaves formatShown's text");
+}
+
+// The cells follow whichever end of the range is wider. No card's lower end is wider than its upper one.
+void checkCellsWiderLowEnd() {
+  const KnobDesc deep = {"Deep", KnobKind::Continuous, 0, -100.0f, 5.0f, "db"};
+  check(knobCells(deep) == 4 && cellsOf(deep, -100) == "-100" && cellsOf(deep, 5) == "+  5" && cellsOf(deep, -7) == "-  7",
+        "cells: a range whose lower end has more digits sizes the field for it");
+  const KnobDesc high = {"High", KnobKind::Continuous, 0, -5.0f, 100.0f, "db"};
+  check(knobCells(high) == 4 && cellsOf(high, 100) == "+100" && cellsOf(high, -5) == "-  5",
+        "cells: and so does a range whose upper end has more digits");
+}
+
+// A knob with decimals counts a point cell and one cell for each decimal. No card has one yet.
+void checkCellsDecimals() {
+  const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
+  check(knobCells(rate) == 3 && cellsOf(rate, 15) == "1.5" && cellsOf(rate, 1) == "0.1" && cellsOf(rate, 50) == "5.0",
+        "cells: one decimal makes 3 cells, the point included");
+  const KnobDesc trim = {"Trim", KnobKind::Continuous, 0, -2.0f, 2.0f, "db", Curve::Linear, 2};
+  check(knobCells(trim) == 5 && cellsOf(trim, -160) == "-1.60" && cellsOf(trim, 40) == "+0.40" && cellsOf(trim, 0) == " 0.00",
+        "cells: a signed range with two decimals is a sign cell and 4 more");
+  const KnobDesc wide = {"Wide", KnobKind::Continuous, 0, 0.0f, 1000.0f, "hz", Curve::Linear, 2};
+  check(knobCells(wide) == 7 && cellsOf(wide, 1) == "   0.01", "cells: a leading zero stays before the point");
+}
+
+// The field of every knob must fit the panel with 1 px each side: its cells and unit in 16X24, or for a
+// knob with names, the widest name.
 void checkReadoutsFit() {
   const FontDesc& big = font16x24();
   bool fits = true;
   for (int c = 1; c < kCardCount; ++c) {
     for (int k = 0; k < cardDesc(card(c)).knobCount; ++k) {
       const KnobDesc& kd = *knobDesc(card(c), k);
-      const int count = kd.kind == KnobKind::Stepped ? kd.positions : 101;
-      for (int i = 0; i < count; ++i) {
-        const float reading = kd.kind == KnobKind::Stepped ? static_cast<float>(i) : static_cast<float>(i) / 100.0f;
-        char number[16];
-        formatShown(kd, knobShown(kd, reading), number, sizeof(number));
-        char unit[16];
-        std::snprintf(unit, sizeof(unit), " %s", kd.unit);
-        const int width = kd.labels ? Canvas::textWidth(big, number)
-                                    : Canvas::digitsWidth(big, number) + big.spacing + Canvas::textWidth(big, unit);
-        fits = fits && width <= kCanvasWidth - 2;
+      int width = 0;
+      if (kd.labels) {
+        for (int i = 0; i < kd.positions; ++i) width = std::max(width, Canvas::textWidth(big, kd.labels[i]));
+      } else {
+        const std::string cells(static_cast<size_t>(knobCells(kd)), '8');
+        const std::string unit = std::string(" ") + kd.unit;
+        width = Canvas::digitsWidth(big, cells.c_str()) + big.spacing + Canvas::textWidth(big, unit.c_str());
       }
+      fits = fits && width <= kCanvasWidth - 2;
     }
   }
-  check(fits, "readout: every knob's widest value fits the panel in 16X24");
+  check(fits, "readout: every knob's field fits the panel in 16X24");
 }
 
 }  // namespace
@@ -389,5 +474,9 @@ void checkRegistry() {
   checkShownNumbers();
   checkShownLabels();
   checkShownDecimals();
+  checkCells();
+  checkFormatCells();
+  checkCellsWiderLowEnd();
+  checkCellsDecimals();
   checkReadoutsFit();
 }

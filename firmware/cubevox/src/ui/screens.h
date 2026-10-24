@@ -16,7 +16,7 @@
 constexpr int kScreenPad = 1;
 
 // Readout rows. The card line is 5x7 at the pad, the parameter name is 9X12 centred with its top at
-// kReadoutNameY, and the value is 16X24 centred with its top at kReadoutValueY.
+// kReadoutNameY, and the value is 16X24 in a field centred once with its top at kReadoutValueY.
 constexpr int kReadoutNameY = 15;
 constexpr int kReadoutValueY = 34;
 
@@ -56,8 +56,9 @@ struct ReadoutView {
   int target = 0;                  // where it settles; picks the name of a labelled knob
 };
 
-// Slot and card, the parameter name, and the value with its unit. Each digit that changes rolls
-// vertically from the old glyph to the new one.
+// Slot and card, the parameter name, and the value with its unit. The value sits in a field fixed
+// by the parameter, so the row never moves sideways. Each digit that changes rolls vertically from
+// the old glyph to the new one.
 void renderReadout(Canvas& canvas, const ReadoutView& view);
 
 // The word the top switch shows while it is engaged.

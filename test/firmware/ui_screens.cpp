@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "core/canvas.h"
 #include "core/fonts.h"
@@ -128,6 +129,7 @@ void checkReadoutRolling() {
     const Canvas canvas = readoutOf(2, 0, proofShown(0.0f, -12.0f, true, frame));
     const std::string name = "roll-semi-" + std::to_string(frame);
     check(matchesGolden(canvas, name.c_str()), ("readout: " + name + " matches the proof frame").c_str());
+    if (frame == 32) writePgm(canvas, "oled-readout-roll-m10-m9.pgm");  // -9.9, the number gains a digit
   }
 }
 
@@ -143,24 +145,193 @@ void checkReadoutRows() {
   check(!rowsBlank(c, 34, 58) && edgesDark(c), "readout: the value fills the band from row 34 to 57 and the edges stay dark");
 }
 
-// Digits sit in fixed cells, so the unit never shifts while the digits change.
-void checkReadoutTabular() {
+// ---------------------------------------------------------------------------------------------
+// The value field. These tests build the row from the spec's wording and take nothing from the
+// renderer: a sign cell when the range is signed, one cell for each digit of the widest number, a
+// space and the unit, the whole field centred once. A number is right-aligned in the digit cells and
+// its sign sits in the sign cell.
+
+constexpr int kValueTop = 34;
+constexpr int kValueBottom = kValueTop + 24;
+
+struct Field {
+  bool signedRange = false;
+  int digits = 1;
+  int cells() const { return digits + (signedRange ? 1 : 0); }
+};
+
+// The lowest and highest number a numeric knob can show. A continuous knob reaches both ends at the
+// readings 0 and 1, and a stepped one at its first and last positions.
+void shownRange(const KnobDesc& k, int& lo, int& hi) {
+  lo = knobShown(k, 0.0f);
+  hi = lo;
+  const int count = k.kind == KnobKind::Stepped ? k.positions : 2;
+  for (int i = 0; i < count; ++i) {
+    const int shown = knobShown(k, static_cast<float>(i));
+    lo = std::min(lo, shown);
+    hi = std::max(hi, shown);
+  }
+}
+
+// Runs through every reading the knob can make to find its widest number and whether any is negative.
+Field fieldOf(const KnobDesc& k) {
+  Field f;
+  const int count = k.kind == KnobKind::Stepped ? k.positions : 101;
+  for (int i = 0; i < count; ++i) {
+    const float reading = k.kind == KnobKind::Stepped ? static_cast<float>(i) : static_cast<float>(i) / 100.0f;
+    const int shown = knobShown(k, reading);
+    f.signedRange = f.signedRange || shown < 0;
+    f.digits = std::max(f.digits, static_cast<int>(std::to_string(std::abs(shown)).size()));
+  }
+  return f;
+}
+
+// One character per cell for the whole number v.
+std::string cellsFor(const Field& f, int v) {
+  std::string cells(static_cast<size_t>(f.digits), ' ');
+  const std::string magnitude = std::to_string(std::abs(v));
+  for (size_t i = 0; i < magnitude.size() && i < cells.size(); ++i) {
+    cells[cells.size() - 1 - i] = magnitude[magnitude.size() - 1 - i];
+  }
+  if (f.signedRange) cells.insert(cells.begin(), v < 0 ? '-' : (v > 0 ? '+' : ' '));
+  return cells;
+}
+
+int cellPitch() { return font16x24().width + font16x24().spacing; }
+
+// Left edge of the first cell. The field is as wide as all its cells and the unit with its space.
+int fieldLeft(const KnobDesc& k, const Field& f) {
   const FontDesc& big = font16x24();
-  const int cell = big.width + big.spacing;
-  const int unitX = (kCanvasWidth - (3 * cell + Canvas::textWidth(big, " MS"))) / 2 + 3 * cell;
-  const Canvas base = readoutOf(4, 1, 100.0f);
-  bool still = true;
-  for (int v = 100; v <= 250; ++v) {
-    const Canvas next = readoutOf(4, 1, static_cast<float>(v));
-    for (int y = 34; y < 58 && still; ++y) {
-      for (int x = unitX; x < kCanvasWidth; ++x) still = still && lit(base, x, y) == lit(next, x, y);
+  const std::string unit = k.unit[0] != '\0' ? std::string(" ") + k.unit : std::string();
+  const int unitWidth = unit.empty() ? 0 : big.spacing + Canvas::textWidth(big, unit.c_str());
+  return (kCanvasWidth - (f.cells() * cellPitch() - big.spacing + unitWidth)) / 2;
+}
+
+void drawUnit(Canvas& c, const KnobDesc& k, int pen) {
+  if (k.unit[0] == '\0') return;
+  const std::string unit = std::string(" ") + k.unit;
+  c.drawText(pen, kValueTop, font16x24(), unit.c_str());
+}
+
+// The value rows of a number at rest, cell by cell, with `rolled` px of roll into the next number.
+// Cells that differ between the two numbers roll up out of the band while the next ones roll in.
+Canvas valueBand(const KnobDesc& k, int v, int rolled = 0) {
+  const FontDesc& big = font16x24();
+  const Field f = fieldOf(k);
+  const int x0 = fieldLeft(k, f);
+  const std::string from = cellsFor(f, v);
+  const std::string to = cellsFor(f, v + 1);
+  Canvas c;
+  for (size_t j = 0; j < from.size(); ++j) {
+    const int x = x0 + static_cast<int>(j) * cellPitch();
+    const char a[2] = {from[j], '\0'};
+    const char b[2] = {to[j], '\0'};
+    if (from[j] == to[j] || rolled == 0) {
+      c.drawDigits(x, kValueTop, big, a);
+    } else {
+      c.drawDigitsClipped(x, kValueTop - rolled, big, a, kValueTop, kValueBottom);
+      c.drawDigitsClipped(x, kValueBottom - rolled, big, b, kValueTop, kValueBottom);
     }
   }
-  check(still, "readout: the unit stays in place while the digits run from 100 to 250");
+  drawUnit(c, k, x0 + f.cells() * cellPitch());
+  return c;
+}
 
-  const Canvas one = readoutOf(4, 1, 111.0f);
-  const Canvas eight = readoutOf(4, 1, 188.0f);
-  check(!sameRows(one, eight, 34, 58) && sameRows(one, eight, 0, 34), "readout: only the value rows change between two numbers");
+// Every number a knob can show lands in the same cells, whatever its digit count or sign.
+void checkReadoutField() {
+  const Layout layout = defaultLayout();
+  bool inPlace = true;
+  int numbers = 0;
+  for (int slot = 0; slot < kSlotCount; ++slot) {
+    for (int knob = 0; knob < kKnobsPerCard; ++knob) {
+      const KnobDesc* k = knobDesc(layout.card[static_cast<size_t>(slot)], knob);
+      if (!k || k->labels) continue;
+      int lo = 0;
+      int hi = 0;
+      shownRange(*k, lo, hi);
+      for (int v = lo; v <= hi; ++v) {
+        inPlace = inPlace && sameRows(readoutOf(slot, knob, static_cast<float>(v)), valueBand(*k, v), kValueTop, kValueBottom);
+        ++numbers;
+      }
+    }
+  }
+  check(inPlace && numbers > 2000, "readout: every number of every knob sits in its fixed field, cell by cell");
+}
+
+// While the value changes or rolls, nothing in the value rows moves sideways. The unit stays where it
+// is and every pixel stays inside the field.
+void checkReadoutNeverMoves() {
+  const Layout layout = defaultLayout();
+  const float fractions[] = {0.0f, 0.25f, 0.5f, 0.75f, 0.96f};
+  bool unitStill = true;
+  bool inField = true;
+  for (int slot = 0; slot < kSlotCount; ++slot) {
+    for (int knob = 0; knob < kKnobsPerCard; ++knob) {
+      const KnobDesc* k = knobDesc(layout.card[static_cast<size_t>(slot)], knob);
+      if (!k || k->labels) continue;
+      const Field f = fieldOf(*k);
+      const int x0 = fieldLeft(*k, f);
+      const int pen = x0 + f.cells() * cellPitch();
+      int lo = 0;
+      int hi = 0;
+      shownRange(*k, lo, hi);
+      const Canvas unitOnly = valueBand(*k, lo);
+      std::vector<int> bases;
+      for (int b = lo; b < hi; b += std::max(1, (hi - lo) / 40)) bases.push_back(b);
+      for (int b : {-100, -10, -9, -1, 0, 9, 10, 99, 100, 999}) {
+        if (b >= lo && b < hi) bases.push_back(b);
+      }
+      for (int b : bases) {
+        for (float t : fractions) {
+          const Canvas c = readoutOf(slot, knob, static_cast<float>(b) + t);
+          for (int y = kValueTop; y < kValueBottom; ++y) {
+            for (int x = 0; x < kCanvasWidth; ++x) {
+              if (x >= pen) unitStill = unitStill && lit(c, x, y) == lit(unitOnly, x, y);
+              if (x < x0) inField = inField && !lit(c, x, y);
+            }
+          }
+        }
+      }
+    }
+  }
+  check(unitStill, "readout: the unit never moves while any number changes or rolls");
+  check(inField, "readout: nothing in the value rows lies left of the field");
+}
+
+// A number that gains a digit lights its leading cell in place while the other digits roll.
+void checkReadoutGainsDigit() {
+  // 99 to 100 on a percent knob. The field has 3 cells, so 99 is a blank cell and two 9s.
+  const KnobDesc& percent = *knobDesc(defaultLayout().card[7], 0);
+  check(cellsFor(fieldOf(percent), 99) == " 99" && cellsFor(fieldOf(percent), 100) == "100", "readout: 99 is a blank cell and two 9s, 100 fills the cells");
+  const Canvas settled99 = readoutOf(7, 0, 99.0f);
+  const Canvas settled100 = readoutOf(7, 0, 100.0f);
+  const Field f = fieldOf(percent);
+  const int x0 = fieldLeft(percent, f);
+  bool leadingBlank = true;
+  for (int y = kValueTop; y < kValueBottom; ++y) {
+    for (int x = x0; x < x0 + cellPitch(); ++x) leadingBlank = leadingBlank && !lit(settled99, x, y);
+  }
+  check(leadingBlank && sameRows(settled99, valueBand(percent, 99), kValueTop, kValueBottom), "readout: 99 leaves the leading cell blank");
+  check(sameRows(settled100, valueBand(percent, 100), kValueTop, kValueBottom), "readout: 100 fills all three cells");
+
+  // The leading cell lights while the 9s roll to 0 in the cells they already sit in.
+  const Canvas half = readoutOf(7, 0, 99.5f);
+  check(sameRows(half, valueBand(percent, 99, 12), kValueTop, kValueBottom), "readout: 99.5 rolls the 1 in and the 9s to 0, in place");
+  bool leadingTopBlank = true;
+  for (int y = kValueTop; y < kValueTop + 12; ++y) {
+    for (int x = x0; x < x0 + cellPitch(); ++x) leadingTopBlank = leadingTopBlank && !lit(half, x, y);
+  }
+  check(leadingTopBlank && !rowsBlank(half, kValueTop + 12, kValueBottom), "readout: the 1 rises into the leading cell from below");
+  writePgm(half, "oled-readout-roll-99-100.pgm");
+
+  // -9 to -10 on a signed knob. The sign cell keeps its minus and does not roll.
+  const KnobDesc& semitones = *knobDesc(defaultLayout().card[2], 0);
+  const Field s = fieldOf(semitones);
+  check(s.signedRange && s.digits == 2 && cellsFor(s, -9) == "- 9" && cellsFor(s, 5) == "+ 5" && cellsFor(s, 0) == "  0" &&
+            cellsFor(s, -10) == "-10",
+        "readout: a signed knob has a sign cell, a blank tens cell for one digit, and no sign for zero");
+  check(sameRows(readoutOf(2, 0, -9.5f), valueBand(semitones, -10, 12), kValueTop, kValueBottom),
+        "readout: -9.5 rolls the 1 in and the 0 to 9, with the minus in its own cell");
 }
 
 // A rolling digit stays inside the 24 px band of the value.
@@ -195,14 +366,38 @@ void checkReadoutEdges() {
   check(dark, "readout: every value of every default-layout knob keeps its edges dark");
 }
 
+// The autotune key is a name. It draws in 16X24 and does not roll. Its field is as wide as the widest
+// name and sits centred once, and each name starts at the field's left edge.
 void checkReadoutText() {
-  // The autotune key is a name. It draws centred in 16X24 and does not roll.
+  const KnobDesc& keyKnob = *knobDesc(defaultLayout().card[1], 0);
+  int widest = 0;
+  for (int i = 0; i < keyKnob.positions; ++i) widest = std::max(widest, Canvas::textWidth(font16x24(), keyKnob.labels[i]));
+  const int left = (kCanvasWidth - widest) / 2;
+  check(widest == 121 && left == 3, "readout: the widest key name is 121 px, so its field starts at x 3");
+
+  bool inPlace = true;
+  bool startsAtLeft = true;
+  for (int i = 0; i < keyKnob.positions; ++i) {
+    const Canvas c = readoutOf(1, 0, static_cast<float>(i));
+    Canvas want;
+    want.drawText(left, 34, font16x24(), keyKnob.labels[i]);
+    inPlace = inPlace && sameRows(c, want, 34, 58);
+    int first = kCanvasWidth;
+    for (int y = 34; y < 58; ++y) {
+      for (int x = 0; x < kCanvasWidth; ++x) {
+        if (lit(c, x, y)) first = std::min(first, x);
+      }
+    }
+    startsAtLeft = startsAtLeft && first == left;
+  }
+  check(inPlace, "readout: each key name is drawn in 16X24 from the left edge of the one fixed field");
+  check(startsAtLeft, "readout: every key name starts at the same column, the shorter ones leave the right of the field blank");
+
   const Canvas key = readoutOf(1, 0, 11.0f);
-  Canvas want;
-  want.drawText(1, 1, font5x7(), "2 AUTOTUNE");
-  want.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "KEY")) / 2, 15, font9x12(), "KEY");
-  want.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), "F / DM")) / 2, 34, font16x24(), "F / DM");
-  check(sameRows(key, want, 0, kCanvasHeight), "readout: the key shows its name in 16X24 as on the approved sheet");
+  Canvas head;
+  head.drawText(1, 1, font5x7(), "2 AUTOTUNE");
+  head.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "KEY")) / 2, 15, font9x12(), "KEY");
+  check(sameRows(key, head, 0, 34), "readout: the key's card line and parameter name are as for any knob");
   writePgm(key, "oled-readout-key.pgm");
 
   check(edgesDark(readoutOf(1, 0, 6.0f)), "readout: the widest key name, F# / D#m, keeps the edges dark");
@@ -211,7 +406,7 @@ void checkReadoutText() {
   Canvas clamped;
   renderReadout(clamped, stray);
   Canvas last;
-  last.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), "F / DM")) / 2, 34, font16x24(), "F / DM");
+  last.drawText(left, 34, font16x24(), "F / DM");
   check(sameRows(clamped, last, 34, 58), "readout: a target past the last key clamps to the last name");
 }
 
@@ -440,7 +635,9 @@ void checkScreens() {
   checkReadoutSettled();
   checkReadoutRolling();
   checkReadoutRows();
-  checkReadoutTabular();
+  checkReadoutField();
+  checkReadoutNeverMoves();
+  checkReadoutGainsDigit();
   checkReadoutRollClip();
   checkReadoutEdges();
   checkReadoutText();

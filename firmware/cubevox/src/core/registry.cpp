@@ -214,12 +214,40 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
 }
 
+namespace {
+
+// 10 to the power n, for the few decimals a knob declares.
+unsigned tenPow(unsigned n) {
+  unsigned p = 1;
+  for (; n > 0; --n) p *= 10;
+  return p;
+}
+
+unsigned magnitudeOf(int shown) {
+  return shown < 0 ? 0u - static_cast<unsigned>(shown) : static_cast<unsigned>(shown);
+}
+
+// Writes a magnitude as text, its digits with the point and decimal digits when the knob declares
+// decimals, and returns the length written.
+int magnitudeText(const KnobDesc& k, unsigned magnitude, char* out, size_t size) {
+  const unsigned scale = tenPow(k.decimals);
+  int length;
+  if (k.decimals == 0) {
+    length = snprintf(out, size, "%u", magnitude);
+  } else {
+    length = snprintf(out, size, "%u.%0*u", magnitude / scale, static_cast<int>(k.decimals), magnitude % scale);
+  }
+  return length < static_cast<int>(size) ? length : static_cast<int>(size) - 1;
+}
+
+}  // namespace
+
 int knobShown(const KnobDesc& k, float v) {
   const bool stepped = k.kind == KnobKind::Stepped;
   if (stepped && k.labels) return stepIndex(k, v);
   const float position = v > 0.0f ? (v < 1.0f ? v : 1.0f) : 0.0f;  // also catches NaN
   const float value = stepped ? k.min + static_cast<float>(stepIndex(k, v)) : knobValue(k, position);
-  return static_cast<int>(lroundf(value * powf(10.0f, static_cast<float>(k.decimals))));
+  return static_cast<int>(lroundf(value * static_cast<float>(tenPow(k.decimals))));
 }
 
 const char* knobLabel(const KnobDesc& k, int shown) {
@@ -234,14 +262,37 @@ void formatShown(const KnobDesc& k, int shown, char* buf, size_t size) {
     snprintf(buf, size, "%s", knobLabel(k, shown));
     return;
   }
+  char magnitude[16];
+  magnitudeText(k, magnitudeOf(shown), magnitude, sizeof(magnitude));
   const char* sign = shown < 0 ? "-" : (shown > 0 && k.min < 0.0f ? "+" : "");
-  if (k.decimals == 0) {
-    snprintf(buf, size, "%s%d", sign, shown < 0 ? -shown : shown);
-    return;
-  }
-  const int scale = static_cast<int>(lroundf(powf(10.0f, static_cast<float>(k.decimals))));
-  const int magnitude = shown < 0 ? -shown : shown;
-  snprintf(buf, size, "%s%d.%0*d", sign, magnitude / scale, static_cast<int>(k.decimals), magnitude % scale);
+  snprintf(buf, size, "%s%s", sign, magnitude);
+}
+
+int knobCells(const KnobDesc& k) {
+  if (k.labels) return 0;
+  const float scale = static_cast<float>(tenPow(k.decimals));
+  char text[16];
+  const int low = magnitudeText(k, magnitudeOf(static_cast<int>(lroundf(k.min * scale))), text, sizeof(text));
+  const int high = magnitudeText(k, magnitudeOf(static_cast<int>(lroundf(k.max * scale))), text, sizeof(text));
+  const int cells = (k.min < 0.0f ? 1 : 0) + (low > high ? low : high);
+  return cells < kMaxKnobCells ? cells : kMaxKnobCells;
+}
+
+void formatCells(const KnobDesc& k, int shown, char* buf, size_t size) {
+  if (size == 0) return;
+  const int cells = knobCells(k);
+  buf[0] = '\0';
+  if (cells == 0 || size <= static_cast<size_t>(cells)) return;
+
+  const bool signedRange = k.min < 0.0f;
+  char text[16];
+  const int length = magnitudeText(k, magnitudeOf(shown), text, sizeof(text));
+  const int digitCells = cells - (signedRange ? 1 : 0);
+  const int kept = length < digitCells ? length : digitCells;
+  memset(buf, ' ', static_cast<size_t>(cells));
+  if (signedRange) buf[0] = shown < 0 ? '-' : (shown > 0 ? '+' : ' ');
+  memcpy(buf + cells - kept, text + length - kept, static_cast<size_t>(kept));
+  buf[cells] = '\0';
 }
 
 void formatKnob(Card c, int knob, float v, char* buf, size_t size) {

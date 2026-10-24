@@ -2,7 +2,6 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "core/fonts.h"
 
@@ -17,41 +16,36 @@ constexpr int kRibbonRimLevel = 32;
 // Values past this never occur. The limit keeps the cast to int defined.
 constexpr float kShownLimit = 1.0e6f;
 
-// Longest printed number, sign and digits, with its NUL.
-constexpr int kNumberChars = 12;
-
 int centredX(const FontDesc& font, const char* text) { return (kCanvasWidth - Canvas::textWidth(font, text)) / 2; }
 
 void drawCentred(Canvas& canvas, int y, const FontDesc& font, const char* text) {
   canvas.drawText(centredX(font, text), y, font, text);
 }
 
-// Right-aligns `text` in `cells` characters. `out` holds at least cells + 1.
-void padLeft(char* out, const char* text, int cells) {
-  const int length = static_cast<int>(strlen(text));
-  for (int i = 0; i < cells - length; ++i) out[i] = ' ';
-  memcpy(out + (cells - length), text, static_cast<size_t>(length) + 1);
-}
-
-// The number just below the value and the one just above it, as strings of equal width.
+// The number just below the value and the one just above it, each in all the cells of the knob's
+// field, so the two strings and every other value of the knob have the same length.
 struct RollPair {
-  char from[kNumberChars + 1];
-  char to[kNumberChars + 1];
+  char from[kMaxKnobCells + 1];
+  char to[kMaxKnobCells + 1];
   int cells;
 };
 
 RollPair rollPair(const KnobDesc& knob, int base) {
-  char low[kNumberChars];
-  char high[kNumberChars];
-  formatShown(knob, base, low, sizeof(low));
-  formatShown(knob, base + 1, high, sizeof(high));
-  const int lowLength = static_cast<int>(strlen(low));
-  const int highLength = static_cast<int>(strlen(high));
   RollPair pair;
-  pair.cells = lowLength > highLength ? lowLength : highLength;
-  padLeft(pair.from, low, pair.cells);
-  padLeft(pair.to, high, pair.cells);
+  pair.cells = knobCells(knob);
+  formatCells(knob, base, pair.from, sizeof(pair.from));
+  formatCells(knob, base + 1, pair.to, sizeof(pair.to));
   return pair;
+}
+
+// The widest name of a labelled knob. Its field is that wide for every name.
+int widestLabel(const FontDesc& font, const KnobDesc& knob) {
+  int widest = 0;
+  for (int i = 0; i < knob.positions; ++i) {
+    const int width = Canvas::textWidth(font, knobLabel(knob, i));
+    widest = width > widest ? width : widest;
+  }
+  return widest;
 }
 
 // Draws the digits of the value, each in a fixed cell. A digit that differs between the two numbers
@@ -73,6 +67,8 @@ int drawRolled(Canvas& canvas, int x, const RollPair& pair, int rolled) {
   return x;
 }
 
+// The field holds the knob's cells, a space and the unit, and its width never changes. It is
+// centred once, so the unit stays put and each cell keeps its place while the value changes.
 void drawNumber(Canvas& canvas, const ReadoutView& view) {
   const FontDesc& big = font16x24();
   const KnobDesc& knob = *view.knob;
@@ -133,7 +129,10 @@ void renderReadout(Canvas& canvas, const ReadoutView& view) {
   if (!view.knob) return;
   drawCentred(canvas, kReadoutNameY, font9x12(), view.knob->name);
   if (view.knob->labels) {
-    drawCentred(canvas, kReadoutValueY, font16x24(), knobLabel(*view.knob, view.target));
+    // The field is as wide as the widest name. The name starts at its left edge.
+    const FontDesc& big = font16x24();
+    const int x = (kCanvasWidth - widestLabel(big, *view.knob)) / 2;
+    canvas.drawText(x, kReadoutValueY, big, knobLabel(*view.knob, view.target));
   } else {
     drawNumber(canvas, view);
   }

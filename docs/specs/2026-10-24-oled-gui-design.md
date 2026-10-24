@@ -7,7 +7,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 
 ## Status
 1. Host part built and tested 2026-10-24. The readout and MUTED frames equal the proof renderer byte for byte.
-2. Bench part open. The list is in Bench, below.
+2. The owner approved proofs 3 to 10 on 2026-10-24 with one change, "we don't want re-centering". The value row now sits in a fixed field per parameter, as set out under Value field. The proof renderer and the goldens follow it.
+3. Bench part open. The list is in Bench, below.
 
 ## Screens
 | Screen | Shows | Rows |
@@ -29,14 +30,33 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Readout
 1. Row one is the slot number, a space and the card name, 5x7 at (1, 1).
 2. Row two is the parameter name, 9X12, centred, top at row 15.
-3. Row three is the value, a space and the unit, 16X24, centred, top at row 34, in a 24 px band that spans rows 34 to 57.
-4. A text value (the autotune key) has no unit and is centred in 16X24 without rolling.
+3. Row three is the value, a space and the unit, 16X24, with its top at row 34, in a 24 px band that spans rows 34 to 57. It sits in a fixed field, set out under Value field.
+4. A text value (the autotune key) has no unit and does not roll. It is left-aligned in a field as wide as the widest name.
 5. The value eases to the knob with a 20 ms time constant, which closes 86.5 % of the gap per tick.
-6. Each tick the value sits between two whole numbers. A digit that differs between them rolls up out of its cell while the next digit rolls in from below. Both are clipped to the band.
-7. The roll offset is `round(fraction * 24)` px. A digit that is equal in both numbers draws plain.
-8. Digits sit in fixed cells of width plus spacing, so the unit never moves while the digits change.
-9. The number of cells is the longer of the two numbers, right-aligned, and the row is centred on that count.
-10. A new readout starts at the knob's reading. A different knob, or a readout that had gone, never eases from the old value.
+6. Each tick the value sits between two whole numbers. A cell that differs between them rolls up out of its place while the next glyph rolls in from below. Both are clipped to the band.
+7. The roll offset is `round(fraction * 24)` px. A cell that is equal in both numbers draws plain.
+8. A new readout starts at the knob's reading. A different knob, or a readout that had gone, never eases from the old value.
+
+## Value field
+The value row never moves sideways. Each parameter has one field, computed once from its widest possible rendering and centred once. The current value only fills the cells of that field.
+
+1. A numeric field is a sign cell, the digit cells, a space and the unit.
+2. The sign cell exists when the range reaches below zero. It holds `-`, `+` or a blank for zero, and it stays in the leftmost cell.
+3. The digit cells are as many as the digits of the widest number of the range. A parameter with decimals adds a cell for the point and one for each decimal.
+4. A cell is 18 px wide, a 16 px glyph cell and 2 px of spacing, and a glyph's ink is centred in its cell.
+5. The field is `cells * 18` px plus the width of the space and the unit. Its left edge is `(128 - width) / 2`, taken once. The space and the unit start at the left edge plus `cells * 18`.
+6. A number is right-aligned in the digit cells, and a shorter number leaves its leading cells blank. `+5 ST` is the sign cell `+`, a blank tens cell and `5` in the ones cell. `0 ST` is two blank cells and `0`.
+7. A number that gains a digit lights its leading cell and nothing else shifts. On a percent knob 99 to 100 rolls a `1` into the blank leading cell while each 9 rolls to 0 in its own cell.
+8. A name field (the key) is as wide as the widest name, which is `F# / D#M` at 121 px. A name starts at the field's left edge, and a shorter name leaves the right of the field blank.
+
+| Knob | Range | Cells | Field width | Left edge |
+|---|---|---|---|---|
+| Mix, Depth, Rate, Drive, Tone, Time on reverbs | 0..100 % | 3 | 77 px | 25 |
+| Threshold | -70..-10 dB | sign and 2 | 95 px | 16 |
+| Semitones | -12..+12 ST | sign and 2 | 95 px | 16 |
+| Slapback Time, Response | 60..250 and 1..500 ms | 3 | 95 px | 16 |
+| Decay | 5..1000 ms | 4 | 113 px | 7 |
+| Key | 12 names | none | 121 px | 3 |
 
 ## Value formatting
 All of it comes from the card's parameter table in `core/registry`, never from the screens.
@@ -51,7 +71,8 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 1. A positive number carries `+` only when the parameter's range reaches below zero.
 2. Zero carries no sign.
 3. The font draws lowercase as capitals, so the table keeps its natural case.
-4. `core_registry.cpp` checks that every knob's widest value fits the panel in 16X24 with 1 px each side. The widest is `1000 MS` at 113 px and `F# / D#M` at 121 px.
+4. `knobCells` gives the cells of a parameter and `formatCells` fills them. `formatShown` prints the same number as one string.
+5. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 121 px.
 
 ## Voice
 1. The audio interrupt sums the squares of the input samples of every block. The main loop takes the sum and the sample count at each UI tick.
@@ -118,9 +139,20 @@ Settings, mute state, Menu::open ───────────────�
 ## Tests and proofs
 1. `test/firmware/golden/*.bin` hold 27 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
 2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, and one readout replaced by another.
-3. The voice has no byte reference, because the proof's voice comes from Adam's recordings. Its tests check the level map, the heights, the scroll, the rim, the walk and three input levels through the whole path.
-4. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key}.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm` and `oled-face-menu.pgm` at 4x.
-5. To refresh the goldens after the owner changes the proof:
+3. The fixed field changed 11 of the 27 frames, and the other 16 stayed byte-identical. The proof renderer's `rollValue` follows the same rule, and the goldens were re-cut from it.
+
+| Frames | Why they changed |
+|---|---|
+| `settled-65pct` | the field has 3 digit cells, so 65 has a blank leading cell and sits half a cell to the right |
+| `roll-semi-6`, `-12`, `-16`, `-20`, `-24`, `-28`, `-32` | the sign sits in its own cell and a one-digit number leaves its tens cell blank. `-32` is the frame mid-roll between -10 and -9, where the number loses a digit |
+| `switch-1`, `-2`, `-3` | the second readout is SEMITONES at 0, laid out in its field |
+
+The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the nine `roll-time` frames, `roll-semi-40` and the three `muted` frames. Their numbers already filled the field.
+
+4. The field tests build the value rows from the wording of Value field, taking only the knob's readings from the code. They compare every number of every knob in the default layout (about 3,600) cell by cell, then check that nothing lies left of the field and the unit never moves while numbers roll. They also check 99 to 100, -9 to -10, the sign cell, and the key's left-aligned field.
+5. The voice has no byte reference, because the proof's voice comes from Adam's recordings. Its tests check the level map, the heights, the scroll, the rim, the walk and three input levels through the whole path.
+6. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm` and `oled-face-menu.pgm` at 4x.
+7. To refresh the goldens after the owner changes the proof:
 ```
 clang++ -std=c++17 -O2 -I firmware/cubevox/src -I tools/font-editor/fonts tools/oled-proof/oled_motion.cpp \
   firmware/cubevox/src/core/canvas.cpp firmware/cubevox/src/core/fonts.cpp -o build/oled_motion
@@ -133,11 +165,9 @@ Each item says what is built now. The owner approves text and screens per number
 1. Level map. The brief gives -6 dBFS for full height and -50 dBFS for zero. It is linear in dB between them, so a quiet voice shows. A map linear in amplitude would show far less.
 2. Height curve. The proof renderer raises the level to 0.8 again when it sets the height. The build keeps that, as `kRibbonCurve`. Setting it to 1 drops it.
 3. Walk. It covers the voice screen only, as the brief says. MUTED and the readout stay put, and MUTED can sit unchanged for hours. Giving MUTED the same shift is a small change to `renderMuted`.
-4. Digit count. The row centres on the digit count of the two numbers, as the proof does. Crossing 99 to 100 moves the row by half a cell, which the brief's "never shifts sideways" rules out. Centring on the widest value of the parameter would stop it and would differ from the proof frames.
-5. Menu motion. Opening and closing the menu dissolves. The cursor, the values and the sub-screens do not, because the menu stays as it is. They show at the next tick, up to 40 ms after the click.
-6. Text values. The key swaps its name in place. Only digits roll.
-7. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. `KnobDesc::decimals` is ready for a parameter that declares one.
-8. No panel. The face stays off, as under Timing.
+4. Menu motion. Opening and closing the menu dissolves. The cursor, the values and the sub-screens do not, because the menu stays as it is. They show at the next tick, up to 40 ms after the click.
+5. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. `KnobDesc::decimals` is ready for a parameter that declares one.
+6. No panel. The face stays off, as under Timing.
 
 ## Bench
 1. UI cost as load % at 480 MHz with the default chain running, measured with the face on and off. The audio side adds one multiply-add per input sample.

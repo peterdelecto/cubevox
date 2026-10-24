@@ -21,7 +21,7 @@ part. Filenames are `YYYY-MM-DD-name-design.md`. Add a row here with every new s
 | `2026-10-15-mac-app-design.md` | Mac app: one page, slots and a card bank, headroom meter, one Update button | app parked (owner 2026-10-24); box side of Update superseded by the field-update spec |
 | `2026-10-24-field-update-design.md` | Field update: TinyUF2 bootloader in sector 0, app at 0x08020000 with a CRC header, shared boot block, Adam drags a `.uf2` onto the `CUBEVOX` drive; `firmware/platform/` absorbed into `board/` | current; host side built and on `main` 2026-10-24, screens approved; shop steps and drills wait for a board |
 | `2026-10-24-polish-design.md` | Polish tail: POLISH COMP and POLISH EQ close the chain, TOP SWITCH is MUTE or BYPASS, the final seven-row menu, layout record schema v2 and the protocol `settings` object | built, bench pending |
-| `2026-10-24-oled-gui-design.md` | OLED runtime screens: the voice ribbon, the knob readout with rolling digits, MUTED or BYPASS, the 2-frame dissolve, the burn-in walk, and the `level`, `gui`, `screens` and `face` modules; settles the `ui/screens` split the structure spec deferred | host part built 2026-10-24, bench pending, owner approves per proof |
+| `2026-10-24-oled-gui-design.md` | OLED runtime screens: the voice ribbon, the knob readout with rolling digits in a fixed field per parameter (no re-centring), MUTED or BYPASS, the 2-frame dissolve, the burn-in walk, and the `level`, `gui`, `screens` and `face` modules; settles the `ui/screens` split the structure spec deferred | host part built 2026-10-24, proofs 3 to 10 approved with the fixed field, bench pending |
 
 Research notes live in `docs/audits/`. `2026-10-08-pitch-tracker-research.md` is the note behind
 the tracker plan.
