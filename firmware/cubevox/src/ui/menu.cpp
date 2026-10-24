@@ -26,7 +26,6 @@ constexpr int kRowListFirstItem = 1;
 // Firmware update confirmation.
 constexpr int kRowConfirmTitle = 0;
 constexpr int kRowConfirmRunning = 2;
-constexpr int kRowConfirmTag = 3;
 constexpr int kRowConfirmBody1 = 4;
 constexpr int kRowConfirmBody2 = 5;
 constexpr int kRowConfirmCancel = 7;
@@ -108,14 +107,15 @@ void drawChainView(MenuFrame& f, const Layout& layout) {
   }
 }
 
-// The running version gets its own row so Adam can compare it with the file he downloaded and a
-// long bench tag never clips.
+// Names the running version so Adam can compare it with the file he downloaded. versionTag clips
+// a bench suffix, so the line always fits the row.
 void drawConfirmDfu(MenuFrame& f) {
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
+  char running[kDisplayCols + 1];
+  snprintf(running, sizeof(running), "Now running %s", tag);
   putRow(f, kRowConfirmTitle, "UPDATE FIRMWARE");
-  putRow(f, kRowConfirmRunning, "Now running");
-  putRow(f, kRowConfirmTag, tag);
+  putRow(f, kRowConfirmRunning, running);
   putRow(f, kRowConfirmBody1, "Click to enter");
   putRow(f, kRowConfirmBody2, "update mode.");
   putRow(f, kRowConfirmCancel, "Turn to cancel.");

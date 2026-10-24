@@ -155,11 +155,11 @@ void checkMenuScreens() {
   m.draw();
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
-  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE") && rowIs(m.canvas, 2, "Now running") && rowIs(m.canvas, 3, tag),
-        "menu: confirm screen names the running version on its own row");
+  const std::string running = std::string("Now running ") + tag;
+  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE") && rowIs(m.canvas, 2, running.c_str()), "menu: confirm screen names the running version");
   check(rowIs(m.canvas, 4, "Click to enter") && rowIs(m.canvas, 5, "update mode.") && rowIs(m.canvas, 7, "Turn to cancel."),
         "menu: confirm screen says a click enters update mode and a turn cancels");
-  check(rowIs(m.canvas, 1, "") && rowIs(m.canvas, 6, ""), "menu: confirm screen keeps its spacer rows blank");
+  check(rowIs(m.canvas, 1, "") && rowIs(m.canvas, 3, "") && rowIs(m.canvas, 6, ""), "menu: confirm screen keeps its spacer rows blank");
   m.step(1, false);
   m.draw();
   check(rowIs(m.canvas, 0, "MENU"), "menu: turn cancels the confirm");
