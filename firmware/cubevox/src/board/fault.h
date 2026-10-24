@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 
+#include "board/boot_block.h"
 #include "board/build_kind.h"
 
 // Reads and clears the reset cause and any fault record left by the previous run, and enables the
@@ -38,8 +39,15 @@ void faultWatchdogKick();
 // transfer errors are reported at most once a second.
 void faultAudioWatch(uint32_t nowMs, bool audioRunning);
 
-// The clock setup step that failed.
-enum class ClockStep : uint32_t { Supply = 1, VoltageScale, Oscillator, ClockTree, PeripheralClocks };
+// The clock setup step that failed. The values are the contract's, so the bootloader names the
+// same step from the record.
+enum class ClockStep : uint32_t {
+  Supply = CvClockStepSupply,
+  VoltageScale = CvClockStepVoltageScale,
+  Oscillator = CvClockStepOscillator,
+  ClockTree = CvClockStepClockTree,
+  PeripheralClocks = CvClockStepPeripheralClocks
+};
 
 // Records the failed clock step in the fault record and resets. Runs before main(), so it touches
 // no peripheral beyond the reset request. The next boot report names the step.

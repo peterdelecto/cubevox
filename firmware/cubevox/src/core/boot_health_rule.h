@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <stddef.h>
 #include <stdint.h>
 
 // True once `windowMs` have passed since setup() ended and the audio interrupt advanced blocks in
@@ -19,12 +18,4 @@ constexpr bool bootHealthy(uint32_t setupDoneMs, uint32_t nowMs, uint32_t blocks
 // means the bootloader did not write it, and that also reads as no earlier failure.
 constexpr uint32_t failedStartsBefore(uint32_t counterAtStart) {
   return counterAtStart > 0 ? counterAtStart - 1 : 0;
-}
-
-// Why the bootloader last stayed in update mode, spelled as DIAG.TXT spells it. The index is the
-// bootloader's CvBootReason, and a value past the table reads "unknown".
-inline const char* updateReasonName(uint32_t reason) {
-  static constexpr const char* kNames[] = {"none", "MenuHeld", "AppRequest", "ImageInvalid", "ImageUnreadable",
-                                           "BootFailed"};
-  return reason < sizeof(kNames) / sizeof(kNames[0]) ? kNames[reason] : "unknown";
 }

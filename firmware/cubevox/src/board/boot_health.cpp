@@ -36,6 +36,6 @@ void bootHealthPoll(uint32_t nowMs) {
 
 uint32_t bootHealthFails() { return gFailsAtBoot; }
 
-const char* bootHealthLastReason() { return updateReasonName(gReasonAtBoot); }
+const char* bootHealthLastReason() { return cvBootReasonName(gReasonAtBoot); }
 
 uint32_t bootHealthLastReasonCode() { return gReasonAtBoot; }

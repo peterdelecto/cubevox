@@ -1,11 +1,10 @@
-// Checks the boot health rules on the host: when a start counts as healthy, how many earlier
-// starts failed, and the names the update reasons carry. board/boot_health.cpp only feeds these
-// rules the clock, the audio block counter and the boot block.
+// Checks the boot health rules on the host: when a start counts as healthy and how many earlier
+// starts failed. board/boot_health.cpp only feeds these rules the clock, the audio block counter
+// and the boot block.
 
 #include "support.h"
 
 #include <cstdint>
-#include <cstring>
 
 #include "board/boot_block.h"
 #include "core/boot_health_rule.h"
@@ -51,18 +50,6 @@ void checkFailedStarts() {
   check(failedStartsBefore(0xFFFFFFFFu) == 0xFFFFFFFEu, "fails: the largest counter does not wrap");
 }
 
-void checkReasonNames() {
-  check(std::strcmp(updateReasonName(CvReasonNone), "none") == 0, "reason: none");
-  check(std::strcmp(updateReasonName(CvReasonMenuHeld), "MenuHeld") == 0, "reason: MenuHeld");
-  check(std::strcmp(updateReasonName(CvReasonAppRequest), "AppRequest") == 0, "reason: AppRequest");
-  check(std::strcmp(updateReasonName(CvReasonImageInvalid), "ImageInvalid") == 0, "reason: ImageInvalid");
-  check(std::strcmp(updateReasonName(CvReasonImageUnreadable), "ImageUnreadable") == 0, "reason: ImageUnreadable");
-  check(std::strcmp(updateReasonName(CvReasonBootFailed), "BootFailed") == 0, "reason: BootFailed");
-  check(std::strcmp(updateReasonName(CvReasonBootFailed + 1), "unknown") == 0,
-        "reason: the first value past the contract enum reads unknown");
-  check(std::strcmp(updateReasonName(0xFFFFFFFFu), "unknown") == 0, "reason: garbage reads unknown");
-}
-
 }  // namespace
 
 void checkBootHealth() {
@@ -71,5 +58,4 @@ void checkBootHealth() {
   checkClockWrap();
   checkWindowIsTheCallers();
   checkFailedStarts();
-  checkReasonNames();
 }

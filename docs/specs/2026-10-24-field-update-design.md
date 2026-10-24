@@ -258,7 +258,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | `board/boot_block.cpp` | New. The `.cv_boot_block` variable and its accessor `bootBlock()` (declared in `boot_block_access.h`). |
 | `board/image_header.{h,cpp}` | New. The `.cv_image_hdr` object; version string from `CUBEVOX_FW_VERSION` (`-bench` added in the bench build); the CRC check of the running image. |
 | `board/dfu.{h,cpp}` | `enterDfu()` keeps its name and both callers. Body: write `appSummary`, queue the diagnostic entry and `diagFlush`, `recordFlush`, `serialFlush`, `muteForReset`, write `request`, `NVIC_SystemReset()`. The ROM jump is gone. |
-| `core/boot_health_rule.h` | New. The pure rules: healthy window, failed-start count, update reason names. |
+| `core/boot_health_rule.h` | New. The pure rules: healthy window, failed-start count. The reason, fault-kind and clock-step names live in `board/boot_block.h` as inline functions both programs call (one definition). |
 | `board/boot_health.{h,cpp}` | New. `bootHealthPoll(nowMs)` from `loop()`; clears `bootFails` when the 5 s rule holds; exposes the count and the last reason for the boot report, `status` and the diagnostic log. |
 | `core/crc32.{h,cpp}` | New. The one CRC-32, moved out of `core/record.cpp`; also checks the image. |
 | `board/device_serial.{h,cpp}` | New. The MCU id as 24 hex characters, for `hello`. |

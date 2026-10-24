@@ -9,23 +9,12 @@
 
 #define CV_ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define CV_INFO_TEXT_BYTES 640u
-#define CV_FAULT_KIND_CLOCK 4u
 
 // Entries DIAG.TXT lists, newest first.
 #define CV_LOG_LINES 16u
 #define CV_LOG_SLOTS (CV_DIAG_LOG_SIZE / CV_DIAG_ENTRY_SIZE)
 // Kept free after the entries for the longest counts lines.
 #define CV_LOG_COUNTS_BYTES 64u
-
-// fault.cpp's kKindName and kClockStepName.
-static const char* const kKindName[] = {"hard", "memmanage", "bus", "usage", "clock"};
-static const char* const kClockStepName[] = {"?", "supply", "voltage scaling", "oscillator and PLL1",
-                                             "bus clocks", "peripheral clocks"};
-
-// Indexed by enum CvBootReason; the firmware's updateReasonName() uses the same names.
-static const char* const kReasonName[] = {"none", "MenuHeld", "AppRequest", "ImageInvalid", "ImageUnreadable",
-                                          "BootFailed"};
-CV_STATIC_ASSERT(reason_names_cover_reasons, CV_ARRAY_SIZE(kReasonName) == (size_t)CvReasonBootFailed + 1u);
 
 // Indexed by enum CvDiagKind; 0 and anything past the table print as "?".
 static const char* const kDiagKindName[] = {"?", "boot", "update"};
@@ -126,10 +115,6 @@ static void putSummary(Text* text, const struct CvBootBlock* block) {
   putLine(text, "app summary: ", n == 0u ? "none" : summary);
 }
 
-static const char* reasonText(uint32_t reason) {
-  return reason < CV_ARRAY_SIZE(kReasonName) ? kReasonName[reason] : "unknown";
-}
-
 // The fault record as faultReport prints it over serial.
 static void putFault(Text* text, const struct CvFaultRecord* r) {
   put(text, "fault: ");
@@ -137,13 +122,13 @@ static void putFault(Text* text, const struct CvFaultRecord* r) {
     put(text, "none\r\n");
     return;
   }
-  if (r->kind == CV_FAULT_KIND_CLOCK) {
+  if (r->kind == CvFaultKindClock) {
     put(text, "clock setup failed in ");
-    put(text, kClockStepName[r->detail < CV_ARRAY_SIZE(kClockStepName) ? r->detail : 0u]);
+    put(text, cvClockStepName(r->detail));
     put(text, "\r\n");
     return;
   }
-  put(text, r->kind < CV_ARRAY_SIZE(kKindName) ? kKindName[r->kind] : "unknown");
+  put(text, cvFaultKindName(r->kind));
   putField(text, " pc", r->pc);
   putField(text, " lr", r->lr);
   putField(text, " cfsr", r->cfsr);
@@ -226,7 +211,7 @@ static void putEntry(Text* text, const uint8_t* slot) {
   putMeasure(text, " rst=", e.resetCause, true, "");
   putMeasure(text, " fails=", e.bootFails, false, "");
   put(text, " ");
-  put(text, reasonText(e.lastReason));
+  put(text, cvBootReasonName(e.lastReason));
   putMeasure(text, " fa=", e.faultAddress, true, "");
   put(text, " ");
   put(text, printable(fault, e.fault, sizeof e.fault) != 0u ? fault : "-");
@@ -303,7 +288,7 @@ void cvDiagWrite(const CvDriveState* state) {
   put(&text, "cubevox bootloader v" CV_BOOT_VERSION "\r\n");
   putLine(&text, "board: ", UF2_BOARD_ID);
   putLine(&text, "serial: ", state->serial);
-  putLine(&text, "reason: ", reasonText(state->block->lastReason));
+  putLine(&text, "reason: ", cvBootReasonName(state->block->lastReason));
   put(&text, "fault address: ");
   putHex(&text, state->block->faultAddress);
   put(&text, "\r\n");

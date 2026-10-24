@@ -80,8 +80,8 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
    `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `crc32` (the one
    CRC-32, shared by the record and the image header), `version.h`.
-6. Update support: `boot_health_rule.h` (when a start counts as healthy, the failed-start count, the names of
-   the update reasons).
+6. Update support: `boot_health_rule.h` (when a start counts as healthy, the failed-start count). The names
+   of the update reasons, fault kinds and clock steps live in the contract header `board/boot_block.h`.
 
 **`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the
 screens on the canvas), `actions` (what a `UiAction` does to the settings) and `splash` (the version, centred,
@@ -103,8 +103,9 @@ for 2 s after `setup()`).
    transfer error watch), `flash_bank2` (bank 2 erase and flash-word program by register, non-blocking erase),
    `record_service` (store wiring: boot load, ECC recovery, save request, flush before reset), `block_mem`
    (where audio memory lives: the RAM_D2 MPU region, the DTCM section, adapted from Teensy-H7-Port).
-7. Bootloader contract: `boot_block.h` (the addresses, magics and two structs both programs read; C-compatible,
-   the bootloader and `tools/stamp_image.py` read it too), `boot_block` (the shared DTCM block as a variable),
+7. Bootloader contract: `boot_block.h` (the addresses, magics, name tables and the four structs both programs
+   read: boot block, image header, diagnostic entry, fault record; C-compatible, the bootloader and
+   `tools/stamp_image.py` read it too), `boot_block` (the shared DTCM block as a variable),
    `image_header` (the 32-byte header at +0x400 and the CRC check of the running image), `boot_health` (zeroes
    the bootloader's start counter once the audio interrupt has run for 5 s), `dfu` (the one way into update
    mode), `device_serial` (the MCU id as 24 hex characters).

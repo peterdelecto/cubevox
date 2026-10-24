@@ -1,5 +1,7 @@
-// Checks the bootloader on the host. Covers the boot block contract and the decision policy,
-// which the host build compiles from boot_decide.c as C99.
+// Checks the bootloader on the host. Covers the boot block contract, the fault record and the name
+// functions both programs print from, and the decision policy. The host build compiles
+// boot_decide.c as C99, which includes boot_block.h as C, so the header's own asserts hold there
+// too.
 
 #include "support.h"
 
@@ -48,6 +50,21 @@ static_assert(CV_USB_VID_BOOT == 0x1209u && CV_USB_PID_BOOT == 0x0001u && CV_USB
               "boot: USB ids");
 static_assert(CV_BOOT_FAIL_LIMIT == 3u && CV_UPDATE_TIMEOUT_MS == 60000u && CV_HEALTHY_MS == 5000u,
               "boot: limits");
+static_assert(CV_FAULT_MAGIC == 0x46415533u, "boot: the fault magic reads FAU3");
+static_assert(sizeof(CvFaultRecord) == 44 && offsetof(CvFaultRecord, magic) == 0 &&
+                  offsetof(CvFaultRecord, kind) == 4 && offsetof(CvFaultRecord, pc) == 8 &&
+                  offsetof(CvFaultRecord, lr) == 12 && offsetof(CvFaultRecord, cfsr) == 16 &&
+                  offsetof(CvFaultRecord, hfsr) == 20 && offsetof(CvFaultRecord, bfar) == 24 &&
+                  offsetof(CvFaultRecord, mmfar) == 28 && offsetof(CvFaultRecord, sr2) == 32 &&
+                  offsetof(CvFaultRecord, eccFa2) == 36 && offsetof(CvFaultRecord, detail) == 40,
+              "boot: fault record offsets");
+static_assert(CvFaultKindHard == 0 && CvFaultKindMemManage == 1 && CvFaultKindBus == 2 &&
+                  CvFaultKindUsage == 3 && CvFaultKindClock == 4,
+              "boot: the fault kinds are numbered as the application's trampolines pass them");
+static_assert(CvClockStepSupply == 1 && CvClockStepVoltageScale == 2 &&
+                  CvClockStepOscillator == 3 && CvClockStepClockTree == 4 &&
+                  CvClockStepPeripheralClocks == 5,
+              "boot: the clock steps are numbered from 1");
 
 namespace {
 
@@ -323,9 +340,58 @@ void checkBootMarkUpdated() {
         "boot: after an update the next start runs the application");
 }
 
+struct NameRow {
+  uint32_t value;
+  const char* text;
+};
+
+// Checks each row of one name function. The value after the last row and two garbage words must
+// all read `other`, because DTCM holds whatever the last run or power-on left.
+template <std::size_t N>
+void checkNameTable(const char* table, const char* (*nameOf)(uint32_t), const NameRow (&rows)[N],
+                    const char* other) {
+  char message[96];
+  for (const NameRow& row : rows) {
+    std::snprintf(message, sizeof message, "names: %s %u reads %s", table,
+                  static_cast<unsigned>(row.value), row.text);
+    check(std::strcmp(nameOf(row.value), row.text) == 0, message);
+  }
+  const uint32_t unknown[] = {rows[N - 1].value + 1u, 0xDEADBEEFu, 0xFFFFFFFFu};
+  for (const uint32_t value : unknown) {
+    std::snprintf(message, sizeof message, "names: %s 0x%X reads %s", table,
+                  static_cast<unsigned>(value), other);
+    check(std::strcmp(nameOf(value), other) == 0, message);
+  }
+}
+
+// The strings faultReport, faultSummaryText and DIAG.TXT print, which one definition now serves.
+void checkBootNames() {
+  const NameRow reasons[] = {{CvReasonNone, "none"},
+                             {CvReasonMenuHeld, "MenuHeld"},
+                             {CvReasonAppRequest, "AppRequest"},
+                             {CvReasonImageInvalid, "ImageInvalid"},
+                             {CvReasonImageUnreadable, "ImageUnreadable"},
+                             {CvReasonBootFailed, "BootFailed"}};
+  const NameRow kinds[] = {{CvFaultKindHard, "hard"},
+                           {CvFaultKindMemManage, "memmanage"},
+                           {CvFaultKindBus, "bus"},
+                           {CvFaultKindUsage, "usage"},
+                           {CvFaultKindClock, "clock"}};
+  const NameRow steps[] = {{0, "?"},
+                           {CvClockStepSupply, "supply"},
+                           {CvClockStepVoltageScale, "voltage scaling"},
+                           {CvClockStepOscillator, "oscillator and PLL1"},
+                           {CvClockStepClockTree, "bus clocks"},
+                           {CvClockStepPeripheralClocks, "peripheral clocks"}};
+  checkNameTable("reason", cvBootReasonName, reasons, "unknown");
+  checkNameTable("fault kind", cvFaultKindName, kinds, "unknown");
+  checkNameTable("clock step", cvClockStepName, steps, "?");
+}
+
 }  // namespace
 
 void checkBootDecide() {
+  checkBootNames();
   checkBootRows();
   checkBootPriority();
   checkBootCounter();

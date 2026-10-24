@@ -1,6 +1,7 @@
-// Bootloader and application contract: the addresses, magics and ids both programs rely on, and
-// the two structs they share. One definition for the C99 bootloader, the C++17 firmware and host
-// tests, tools/stamp_image.py and the linker scripts.
+// Bootloader and application contract: the addresses, magics and ids both programs rely on, the
+// structs they share, and the names both programs print for the values in them. One definition for
+// the C99 bootloader, the C++17 firmware and host tests, tools/stamp_image.py and the linker
+// scripts.
 //
 // tools/stamp_image.py, firmware/build.sh and the linker scripts read the #define lines by
 // pattern. A value they read stays an integer literal alone on its own #define line.
@@ -59,6 +60,8 @@
 #define CV_REQUEST_UPDATE        0xF01669EFu
 // The bytes C V F W at the start of the image header.
 #define CV_IMAGE_MAGIC           0x57465643u
+// The first word of a valid fault record. As text it reads FAU3, most significant byte first.
+#define CV_FAULT_MAGIC           0x46415533u
 #define CV_IMAGE_HEADER_VERSION  1u
 #define CV_BOOT_BLOCK_VERSION    1u
 
@@ -99,6 +102,19 @@ enum CvBootReason {
   CvReasonImageUnreadable,
   CvReasonBootFailed
 };
+
+// How DIAG.TXT and the boot report spell a reason. A value past the enum reads "unknown".
+static inline const char* cvBootReasonName(uint32_t reason) {
+  switch (reason) {
+    case CvReasonNone: return "none";
+    case CvReasonMenuHeld: return "MenuHeld";
+    case CvReasonAppRequest: return "AppRequest";
+    case CvReasonImageInvalid: return "ImageInvalid";
+    case CvReasonImageUnreadable: return "ImageUnreadable";
+    case CvReasonBootFailed: return "BootFailed";
+    default: return "unknown";
+  }
+}
 
 // The 192 bytes at CV_BOOT_BLOCK_ADDR. Readers validate every field before use. The reason is a
 // uint32_t so the layout does not depend on the compiler's enum width.
@@ -150,6 +166,77 @@ static inline uint32_t cvBootFailsGet(const struct CvBootBlock* block) {
 static inline void cvBootFailsSet(struct CvBootBlock* block, uint32_t count) {
   block->bootFails = count;
   block->bootFailsCheck = (uint32_t)~count;
+}
+
+// ---- Fault record --------------------------------------------------------------------------
+
+// What stopped the application. The first four are the Cortex-M exceptions, numbered as the fault
+// trampolines in board/fault.cpp pass them. Clock is a failed clock setup.
+enum CvFaultKind {
+  CvFaultKindHard = 0,
+  CvFaultKindMemManage = 1,
+  CvFaultKindBus = 2,
+  CvFaultKindUsage = 3,
+  CvFaultKindClock = 4
+};
+
+// The clock setup step that failed, stored in CvFaultRecord::detail for CvFaultKindClock.
+enum CvClockStep {
+  CvClockStepSupply = 1,
+  CvClockStepVoltageScale = 2,
+  CvClockStepOscillator = 3,
+  CvClockStepClockTree = 4,
+  CvClockStepPeripheralClocks = 5
+};
+
+// The record at CV_FAULT_RECORD_ADDR. The application's fault handler fills the fields, writes the
+// magic last and resets. The application reads the record at the next boot and clears the magic.
+// The bootloader reads it for DIAG.TXT and never clears it. Readers check the magic first.
+struct CvFaultRecord {
+  // CV_FAULT_MAGIC when the record is valid.
+  uint32_t magic;
+  // An enum CvFaultKind.
+  uint32_t kind;
+  // The stacked pc and lr, 0 when the exception frame was unreadable.
+  uint32_t pc;
+  uint32_t lr;
+  // SCB->CFSR, HFSR, BFAR and MMFAR at the fault.
+  uint32_t cfsr;
+  uint32_t hfsr;
+  uint32_t bfar;
+  uint32_t mmfar;
+  // FLASH->SR2 and FLASH->ECC_FA2 at the fault, for a double ECC error in bank 2.
+  uint32_t sr2;
+  uint32_t eccFa2;
+  // An enum CvClockStep for CvFaultKindClock, else 0.
+  uint32_t detail;
+};
+
+CV_STATIC_ASSERT(fault_record_fits_its_slot, sizeof(struct CvFaultRecord) <= CV_FAULT_RECORD_SIZE);
+CV_STATIC_ASSERT(fault_magic_at_00, offsetof(struct CvFaultRecord, magic) == 0x00u);
+
+// How faultReport and DIAG.TXT spell a kind. A value past the enum reads "unknown".
+static inline const char* cvFaultKindName(uint32_t kind) {
+  switch (kind) {
+    case CvFaultKindHard: return "hard";
+    case CvFaultKindMemManage: return "memmanage";
+    case CvFaultKindBus: return "bus";
+    case CvFaultKindUsage: return "usage";
+    case CvFaultKindClock: return "clock";
+    default: return "unknown";
+  }
+}
+
+// How a clock failure names its step. Zero and any value past the enum read "?".
+static inline const char* cvClockStepName(uint32_t step) {
+  switch (step) {
+    case CvClockStepSupply: return "supply";
+    case CvClockStepVoltageScale: return "voltage scaling";
+    case CvClockStepOscillator: return "oscillator and PLL1";
+    case CvClockStepClockTree: return "bus clocks";
+    case CvClockStepPeripheralClocks: return "peripheral clocks";
+    default: return "?";
+  }
 }
 
 // ---- Image header --------------------------------------------------------------------------

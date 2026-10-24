@@ -12,28 +12,6 @@
 extern "C" {
 #endif
 
-// The DTCM fault record at CV_FAULT_RECORD_ADDR, FaultRecord in firmware/cubevox/src/board/fault.cpp,
-// field for field. The bootloader reads it and never clears it.
-struct CvFaultRecord {
-  uint32_t magic;
-  uint32_t kind;
-  uint32_t pc;
-  uint32_t lr;
-  uint32_t cfsr;
-  uint32_t hfsr;
-  uint32_t bfar;
-  uint32_t mmfar;
-  // FLASH->SR2 and FLASH->ECC_FA2 at the fault.
-  uint32_t sr2;
-  uint32_t eccFa2;
-  // The ClockStep of a clock failure.
-  uint32_t detail;
-};
-CV_STATIC_ASSERT(fault_record_fits_its_slot, sizeof(struct CvFaultRecord) <= CV_FAULT_RECORD_SIZE);
-
-// fault.cpp's kMagic ("FAU3").
-#define CV_FAULT_MAGIC 0x46415533u
-
 // RM0433 register fields the fault line decodes as fault.cpp does: FLASH_SR DBECCERR, FLASH_ECC_FA
 // FAIL_ECC_ADDR in 32-byte flash words, the bank 2 base. board_hooks.c checks them against CMSIS.
 #define CV_FLASH_SR_DBECCERR  (1u << 26)
