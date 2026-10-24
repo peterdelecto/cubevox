@@ -197,29 +197,34 @@ def make_uf2(image, family, base):
     return bytes(out)
 
 
+def read_uf2_block(c, blob, index, count, where):
+    """Checks one block's magics, flags, size, numbering and family. Returns (address, family, payload)."""
+    block = blob[index * UF2_BLOCK_BYTES:(index + 1) * UF2_BLOCK_BYTES]
+    magic0, magic1, flags, addr, size, number, total, fam = struct.unpack_from("<8I", block, 0)
+    if (magic0, magic1, u32(block, UF2_END_OFFSET)) != (UF2_MAGIC0, UF2_MAGIC1, UF2_MAGIC_END):
+        raise ToolError(f"block {index} has a bad magic in {where}")
+    if flags != UF2_FLAG_FAMILY_ID or size != UF2_PAYLOAD_BYTES:
+        raise ToolError(f"block {index} has flags 0x{flags:X} and payload {size}, "
+                        f"want 0x{UF2_FLAG_FAMILY_ID:X} and {UF2_PAYLOAD_BYTES} in {where}")
+    if number != index or total != count:
+        raise ToolError(f"block {index} says it is {number} of {total}, the file has {count} in {where}")
+    if fam not in c.families.values():
+        raise ToolError(f"block {index} has family 0x{fam:08X}, not a cubevox family in {where}")
+    return addr, fam, block[UF2_HEADER_BYTES:UF2_HEADER_BYTES + UF2_PAYLOAD_BYTES]
+
+
 def parse_uf2(c, blob, where):
     """Checks every block and reassembles the payload. Returns (base, family id, payload)."""
     if not blob or len(blob) % UF2_BLOCK_BYTES:
         raise ToolError(f"{len(blob)} bytes is not a whole number of {UF2_BLOCK_BYTES}-byte blocks in {where}")
     count = len(blob) // UF2_BLOCK_BYTES
-    base = family = None
-    payload = bytearray()
-    for i in range(count):
-        block = blob[i * UF2_BLOCK_BYTES:(i + 1) * UF2_BLOCK_BYTES]
-        magic0, magic1, flags, addr, size, number, total, fam = struct.unpack_from("<8I", block, 0)
-        if (magic0, magic1, u32(block, UF2_END_OFFSET)) != (UF2_MAGIC0, UF2_MAGIC1, UF2_MAGIC_END):
-            raise ToolError(f"block {i} has a bad magic in {where}")
-        if flags != UF2_FLAG_FAMILY_ID or size != UF2_PAYLOAD_BYTES:
-            raise ToolError(f"block {i} has flags 0x{flags:X} and payload {size}, want 0x{UF2_FLAG_FAMILY_ID:X} and {UF2_PAYLOAD_BYTES} in {where}")
-        if number != i or total != count:
-            raise ToolError(f"block {i} says it is {number} of {total}, the file has {count} in {where}")
-        if fam not in c.families.values():
-            raise ToolError(f"block {i} has family 0x{fam:08X}, not a cubevox family in {where}")
-        if i == 0:
-            base, family = addr, fam
-        elif fam != family or addr != base + i * UF2_PAYLOAD_BYTES:
+    base, family, first = read_uf2_block(c, blob, 0, count, where)
+    payload = bytearray(first)
+    for i in range(1, count):
+        addr, fam, chunk = read_uf2_block(c, blob, i, count, where)
+        if fam != family or addr != base + i * UF2_PAYLOAD_BYTES:
             raise ToolError(f"block {i} breaks the family or the address run in {where}")
-        payload += block[UF2_HEADER_BYTES:UF2_HEADER_BYTES + UF2_PAYLOAD_BYTES]
+        payload += chunk
     return base, family, bytes(payload)
 
 
