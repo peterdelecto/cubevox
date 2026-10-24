@@ -1,5 +1,5 @@
-// Firmware version string. build.sh passes CUBEVOX_FW_VERSION from `git describe`;
-// a plain compile without it reads "dev".
+// Firmware version string. build.sh and the host test build pass CUBEVOX_FW_VERSION as "v" plus
+// VERSION.txt; a plain compile without it reads "dev".
 
 #pragma once
 

@@ -203,7 +203,8 @@ target_include_directories(firmware_test PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cu
                                                  ${CUBEVOX_BOOT_DECIDE_DIR}
                                                  ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
 set_target_properties(firmware_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
-target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}")
+target_compile_definitions(firmware_test PRIVATE CUBEVOX_OUT_DIR="${CMAKE_BINARY_DIR}"
+  CUBEVOX_FW_VERSION="v${CUBEVOX_VERSION}")
 target_compile_options(firmware_test PRIVATE ${CUBEVOX_ENGINE_FLAGS})
 # Optimised like the firmware, so optimisation-only warnings reach the sanitizers, with the same
 # float contraction as the target. The extra warnings matter on a single-precision FPU.
