@@ -21,10 +21,13 @@ ReadoutView readoutView(const GuiFrame& frame, const UiContext& ctx) {
 void Face::knobMoved(const Layout& layout, const PanelReading& panel, LastMoved moved, uint32_t nowMs) {
   if (moved.slot < 0 || moved.slot >= kSlotCount) return;
   const int knob = moved.knobB ? 1 : 0;
-  const KnobDesc* desc = knobDesc(layout.card[static_cast<size_t>(moved.slot)], knob);
+  const Card card = layout.card[static_cast<size_t>(moved.slot)];
+  const KnobDesc* desc = knobDesc(card, knob);
   if (!desc) return;
   const int shown = knobShown(*desc, panel.knob[static_cast<size_t>(moved.slot)][static_cast<size_t>(knob)]);
   gui_.knobMoved(moved.slot, knob, static_cast<float>(shown), nowMs);
+  readoutSlot_ = moved.slot;
+  readoutCard_ = card;
 }
 
 bool Face::due(uint32_t nowMs, const Canvas& live) { return live.dirtyPages() == 0 && tick_.due(nowMs); }
@@ -46,6 +49,12 @@ void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& 
   const uint32_t sinceMs = ticked_ ? nowMs - lastTickMs_ : kUiTickMs;
   ticked_ = true;
   lastTickMs_ = nowMs;
+  menu.listen();
+  // The number came from the card the knob belonged to, so it means nothing under another card.
+  if (readoutSlot_ >= 0 && ctx.layout.card[static_cast<size_t>(readoutSlot_)] != readoutCard_) {
+    gui_.dropReadout();
+    readoutSlot_ = -1;
+  }
   ribbon_.push(meter_.update(energy, static_cast<float>(sinceMs)));
   const GuiFrame frame = gui_.tick(nowMs, ctx.topSwitchOn, menu.open());
   render(frame, ctx, menu);

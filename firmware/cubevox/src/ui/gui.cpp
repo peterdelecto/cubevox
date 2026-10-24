@@ -2,19 +2,21 @@
 
 #include <math.h>
 
+#include <array>
+
 namespace {
 
 // The value closes the gap to the knob with this time constant.
 constexpr float kEaseTauS = 0.02f;
 constexpr float kTickS = 1.0f / kUiFps;
 
-constexpr Walk kWalkRing[8] = {{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}};
+constexpr std::array<Walk, 8> kWalkRing = {{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}}};
 
 }  // namespace
 
 Walk walkAt(uint32_t step) {
   if (step == 0) return {0, 0};
-  return kWalkRing[(step - 1) % 8];
+  return kWalkRing[(step - 1) % kWalkRing.size()];
 }
 
 Gui::Gui() : ease_(1.0f - expf(-kTickS / kEaseTauS)) {}

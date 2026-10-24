@@ -106,13 +106,10 @@ void drawChainView(MenuFrame& f, const Layout& layout) {
   }
 }
 
-// Names the version on the box so Adam can compare it with the file he downloaded. versionTag
-// clips a bench suffix, so the line always fits the row.
+// Names the version on the box so Adam can compare it with the file he downloaded.
 void drawConfirmDfu(MenuFrame& f) {
-  char tag[kDisplayCols + 1];
-  versionTag(kFirmwareVersion, tag, sizeof(tag));
   char have[kDisplayCols + 1];
-  snprintf(have, sizeof(have), "%s%.*s.", kHavePrefix, kHaveTagCols, tag);
+  snprintf(have, sizeof(have), "%s%.*s.", kHavePrefix, kHaveTagCols, kFirmwareVersion);
   putRow(f, kRowConfirmTitle, "Update the firmware?");
   putRow(f, kRowConfirmVersion, have);
   putRow(f, kRowConfirmBody, "Click to start.");
@@ -154,6 +151,7 @@ void Menu::onTurn(int32_t detents) {
 }
 
 UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
+  if (!listening_) return UiAction::None;
   if (in.detents != 0 || in.click) lastActivityMs_ = nowMs;
   if (in.detents != 0) onTurn(in.detents);
   const UiAction action = in.click ? onClick() : UiAction::None;

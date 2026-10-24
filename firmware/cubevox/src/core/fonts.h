@@ -36,12 +36,10 @@ const FontDesc& font5x7();    // fixed pitch
 const FontDesc& font9x12();   // spaced by ink
 const FontDesc& font16x24();  // spaced by ink
 
-// Table index of the glyph for `c`, or -1 when the font has none. The project fonts carry blank
-// lowercase cells, so a lowercase letter maps to its capital.
+// Table index of the glyph for `c`, or -1 when the font has none. The project fonts are single case,
+// so a lowercase letter whose cell is blank maps to its capital. A lowercase cell the font inks keeps
+// its own glyph: the 9X12 and 16X24 fonts draw the flat sign in the "b" cell, for key names such as
+// "Bb / Gm". A descriptor without ink metrics maps every lowercase letter.
 int glyphIndex(const FontDesc& font, char c);
 
 inline const uint8_t* glyphAt(const FontDesc& font, int index) { return font.glyphs + index * font.bytesPerGlyph; }
-
-// Glyph bytes for `c`, or nullptr when the font has no glyph for the code. The caller advances
-// over a blank cell.
-const uint8_t* findGlyph(const FontDesc& font, char c);

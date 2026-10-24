@@ -45,12 +45,9 @@ const FontDesc& font9x12() { return k9x12; }
 const FontDesc& font16x24() { return k16x24; }
 
 int glyphIndex(const FontDesc& font, char c) {
-  uint8_t code = static_cast<uint8_t>(c);
-  if (code >= 'a' && code <= 'z') code = static_cast<uint8_t>(code - 'a' + 'A');
-  return indexOf(font, code);
-}
-
-const uint8_t* findGlyph(const FontDesc& font, char c) {
-  const int i = glyphIndex(font, c);
-  return i < 0 ? nullptr : glyphAt(font, i);
+  const uint8_t code = static_cast<uint8_t>(c);
+  const int own = indexOf(font, code);
+  const bool lower = code >= 'a' && code <= 'z';
+  if (!lower || (own >= 0 && font.inkWidth && font.inkWidth[own] > 0)) return own;
+  return indexOf(font, static_cast<uint8_t>(code - 'a' + 'A'));
 }

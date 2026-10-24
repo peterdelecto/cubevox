@@ -30,7 +30,7 @@ class Splash {
     painted_ = false;
   }
 
-  // Call every pass before the menu draws. Paints `version` once, when the splash comes up.
+  // Call every pass before the face draws. Paints `version` once, when the splash comes up.
   SplashStep draw(uint32_t nowMs, const char* version, Canvas& canvas);
 
  private:

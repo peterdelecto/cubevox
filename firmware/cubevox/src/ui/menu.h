@@ -47,7 +47,12 @@ using MenuFrame = std::array<std::array<char, kDisplayCols + 1>, kDisplayRows>;
 
 class Menu {
  public:
+  // Takes the encoder's input. Until listen() it drops every click and turn.
   UiAction update(const UiInput& in, uint32_t nowMs);
+
+  // Lets input through. The face calls it on every tick, so a click or a turn during the boot splash,
+  // when nobody could see the menu it opened, does nothing.
+  void listen() { listening_ = true; }
 
   // True while a menu screen is up, which is until Exit, the timeout or a DFU entry closes it.
   bool open() const { return mode_ != Mode::Idle; }
@@ -70,6 +75,7 @@ class Menu {
   void onTurn(int32_t detents);
 
   Mode mode_ = Mode::Idle;
+  bool listening_ = false;
   uint8_t cursor_ = 0;
   uint32_t lastActivityMs_ = 0;
   MenuFrame shown_ = {};

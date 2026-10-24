@@ -48,7 +48,7 @@ uint8_t bandMask(int top, int clipTop, int clipBottom) {
 }
 
 // Bayer 8 x 8 thresholds, indexed [y & 7][x & 7].
-constexpr uint8_t kBayer[8][8] = {
+constexpr std::array<std::array<uint8_t, 8>, 8> kBayer = {{
     {0, 32, 8, 40, 2, 34, 10, 42},
     {48, 16, 56, 24, 50, 18, 58, 26},
     {12, 44, 4, 36, 14, 46, 6, 38},
@@ -57,7 +57,7 @@ constexpr uint8_t kBayer[8][8] = {
     {51, 19, 59, 27, 49, 17, 57, 25},
     {15, 47, 7, 39, 13, 45, 5, 37},
     {63, 31, 55, 23, 61, 29, 53, 21},
-};
+}};
 
 constexpr int kBayerLevels = 64;
 
@@ -89,7 +89,7 @@ bool bayerLit(int x, int y, int level) { return kBayer[y & 7][x & 7] < level; }
 
 void Canvas::clear() {
   for (auto& p : pages_) p.fill(0);
-  dirty_ = 0xFF;
+  dirty_ = kAllPages;
 }
 
 void Canvas::apply(int x, int y, int w, int h, Op op) {

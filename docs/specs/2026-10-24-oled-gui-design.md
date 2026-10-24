@@ -10,6 +10,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 2. The owner approved proofs 3 to 10 on 2026-10-24 with one change, "we don't want re-centering". The value row now sits in a fixed field per parameter, as set out under Value field. The proof renderer and the goldens follow it.
 3. A sweep test measures every parameter of every card for sideways movement and is a hard gate, as set out under Tests and proofs.
 4. Bench part open. The list is in Bench, below.
+5. The application drives the panel through `board/sh1106.c`, the driver the bootloader compiles too, with no U8g2 or Wire. Panel, below, sets out how it starts, retries and recovers.
 
 ## Screens
 | Screen | Shows | Rows |
@@ -27,6 +28,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 5. The word comes from `Settings::topSwitch`. `Mute` reads MUTED and `Bypass` reads BYPASS.
 6. The switch is on when `muteActive()` is true under `Mute`, and when `muteBypassOn()` is true under `Bypass`. `topSwitchEngaged` holds that rule.
 7. A knob moved under the open menu updates the readout state but does not show it. Closing the menu inside the hold shows the readout again.
+8. A readout belongs to the card its knob was on. When a new layout puts another card in that slot, the readout leaves at the next tick.
+9. The menu takes no input until the face's first tick. A click or a turn during the boot splash, when nobody could see the menu, does nothing. Without a panel the face never ticks, so the menu never listens. MENU held at power-on still reaches update mode, because the bootloader reads it.
 
 ## Readout
 1. Row one is the slot number, a space and the card name, 5x7 at (1, 1).
@@ -66,14 +69,15 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 |---|---|---|
 | Continuous | rounded whole number of the unit | `210 MS`, `65 %`, `-24 DB` |
 | Stepped number | the step's whole number | `+5 ST`, `0 ST`, `-12 ST` |
-| Text | the name at the step | `F / DM` |
+| Text | the name at the step | `F / DM`, `D♭ / B♭M` |
 | Decimals | `KnobDesc::decimals` digits after the point, shown as tenths and so on | none declared yet |
 
 1. A positive number carries `+` only when the parameter's range reaches below zero.
 2. Zero carries no sign.
-3. The font draws lowercase as capitals, so the table keeps its natural case.
-4. `knobCells` gives the cells of a parameter and `formatCells` fills them. `formatShown` prints the same number as one string.
-5. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 121 px.
+3. The fonts are single case. A lowercase letter whose cell is blank draws as its capital, so the table keeps its natural case.
+4. The key names write a flat as a lowercase b (`Db / Bbm`). The 9X12 and 16X24 fonts ink a flat sign in the b cell, and a lowercase cell a font inks keeps its own glyph, so the readout shows `D♭ / B♭M`. The flat is a draft the owner refines in the font editor. The 5x7 font has none, so a b there draws as B.
+5. `knobCells` gives the cells of a parameter and `formatCells` fills them.
+6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 121 px. The flat is 12 px wide, 3 px narrower than the sharp, so the flat names stay inside that field.
 
 ## Voice
 1. The audio interrupt sums the squares of the input samples of every block. The main loop takes the sum and the sample count at each UI tick.
@@ -113,19 +117,31 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 | Panel flush | one dirty page per loop pass, about 25 ms for a full frame at 400 kHz |
 
 1. The gate keeps a tick from outrunning the flush, which would tear the picture. A write that fails leaves its page dirty, so ticks wait until it goes through.
-2. Without a panel (no SH1106 answers) the face does not run. The stub display would log every page of the moving ribbon to the serial port.
+2. Without a panel the pages stay dirty, so the face does not tick and costs nothing.
+
+## Panel
+1. `board/sh1106.c` is the one SH1106 driver. The bootloader compiles it through its `board.mk` and the application through the sketch. Each program passes its own bus: the pins, the alternate function, the I2C and the TIMINGR for its clock. The init sequence is the one U8x8 sends this panel, and the 128 columns start at column 2.
+2. Every wait polls a bounded number of times, a few milliseconds. A NACK or a timeout ends the transfer, turns the I2C off and returns false.
+3. At boot the application gives the panel 5 starts, 20 ms apart. A start runs up to nine SCL clocks and a STOP, which frees a bus that a reset left mid-transfer, then the init sequence.
+4. One dirty page goes out per loop pass, and a failed page stays dirty. The first failure restarts the panel on the next pass. A failure after that, before the panel has taken a whole frame again, waits for a 1 s retry window. A missing panel costs one short start a second, and a panel that appears later shows within a second.
+5. After a start the whole canvas goes out again, and the display turns on in the pass that sends the frame's last page.
+6. A run of failures prints `[WARN] OLED not answering, retrying once a second` once. Once the panel has taken a whole frame again it prints `[oled] OLED answering again after N failed tries`. `PanelLink` in `core/display.h` holds the rule as pure code with host tests.
+7. The application's TIMINGR gives 400 kHz from a 120 MHz I2C2 kernel clock, the PCLK1 of the 480 MHz profile. The 360 MHz profile's 90 MHz only slows the bus. A faster clock, or I2C2 on another source, prints an `[ERROR]` line and the panel stays off.
 
 ## Modules
 | Module | Owns |
 |---|---|
 | `core/level` | sum of squares, RMS, dB to level, the meter |
-| `core/canvas` | `setPixel`, clipped digits, `copyFrom`, `dissolve`, the Bayer table and the dissolve masks |
-| `core/registry` | `KnobDesc::decimals` and `labels`, `knobDesc`, `knobShown`, `formatShown`, `knobLabel` |
+| `core/canvas` | `setPixel`, clipped digits, `copyFrom`, `dissolve`, `markAllDirty`, the Bayer table and the dissolve masks |
+| `core/display` | the `Display` interface and `PanelLink`, which says when the backend sends, restarts the panel or waits |
+| `core/registry` | `KnobDesc::decimals` and `labels`, `knobDesc`, `knobShown`, `knobCells`, `formatCells`, `knobLabel` |
 | `core/knob_filter` | `KnobBank::takeTouch`, one touch per move |
 | `ui/gui` | the state machine: which screen, which dissolve step, the eased value, the walk |
 | `ui/screens` | `renderVoice`, `renderReadout`, `renderMuted`, the ribbon history |
-| `ui/face` | the top-level draw: the tick gate, the level meter, the screen pick, the dissolve onto the panel |
-| `ui/menu` | `Menu::draw` draws the open menu only, `Menu::open` |
+| `ui/face` | the top-level draw: the tick gate, the level meter, the screen pick, the dissolve onto the panel, the readout's card, the menu's `listen` |
+| `ui/menu` | `Menu::draw` draws the open menu only, `Menu::open`, `Menu::listen` |
+| `board/sh1106.c` | the SH1106 driver the application and the bootloader share |
+| `board/display_sh1106` | the application's bus from `pins.h`, the boot starts, the page loop under `PanelLink` |
 | `board/controls` | `controlsTakeTouch` |
 | `board/audio` | `audioTakeInputEnergy` |
 
@@ -156,8 +172,10 @@ The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the 
 7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns and a key name's first lit column are read straight off the frame. Each must equal the column the first frame that showed it gave, so a shift of one pixel fails.
 8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before. A knob that declares decimals fails it until the sweep models them.
 9. The voice has no byte reference, because the proof's voice comes from Adam's recordings. Its tests check the level map, the heights, the scroll, the rim, the walk and three input levels through the whole path.
-10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm` and `oled-face-menu.pgm` at 4x.
-11. To refresh the goldens after the owner changes the proof:
+10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key,key-flat}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm`, `oled-face-menu.pgm` and `oled-splash.pgm` at 4x.
+11. `core_canvas.cpp` drives `PanelLink` with a fake clock: the first failure restarts at once, later ones wait for the 1 s window, Lost and Back come once per run, and the window survives a millis() wrap. `ui_splash.cpp` runs the sketch's order through the splash and checks that a click or a turn during it opens nothing.
+12. The CI host job runs `node tools/font-editor/check-header.js`, which fails unless `cubevox_fonts.h` is what the font editor exports from `cubevox-fonts.json`.
+13. To refresh the goldens after the owner changes the proof:
 ```
 clang++ -std=c++17 -O2 -I firmware/cubevox/src -I tools/font-editor/fonts tools/oled-proof/oled_motion.cpp \
   firmware/cubevox/src/core/canvas.cpp firmware/cubevox/src/core/fonts.cpp -o build/oled_motion
@@ -172,7 +190,8 @@ Each item says what is built now. The owner approves text and screens per number
 3. Walk. It covers the voice screen only, as the brief says. MUTED and the readout stay put, and MUTED can sit unchanged for hours. Giving MUTED the same shift is a small change to `renderMuted`.
 4. Menu motion. Opening and closing the menu dissolves. The cursor, the values and the sub-screens do not, because the menu stays as it is. They show at the next tick, up to 40 ms after the click.
 5. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. `KnobDesc::decimals` is ready for a parameter that declares one.
-6. No panel. The face stays off, as under Timing.
+6. No panel. The face waits on the dirty pages and the driver tries a start once a second, so a panel plugged in later shows the face within a second.
+7. Panel reset under a still screen. A panel that loses power and comes back while nothing changes on glass, such as MUTED for minutes, powers up with its display off and still answers its address. Its later writes go through, so the driver never restarts it, and it stays dark until the box restarts. Built now: nothing catches it. Re-sending the init settings and the display-on command once a second would, for about 0.6 ms of bus time a second. Bench 8 shows first whether it happens.
 
 ## Bench
 1. UI cost as load % at 480 MHz with the default chain running, measured with the face on and off. The audio side adds one multiply-add per input sample.
@@ -181,3 +200,5 @@ Each item says what is built now. The owner approves text and screens per number
 4. The level map against the real mic and line input: where speech and singing sit between -50 and -6 dBFS.
 5. TOP SWITCH set to BYPASS with the real switch shows BYPASS.
 6. The 60 s walk, seen once on glass.
+7. The panel's connector pulled and pushed back while the voice runs. The face returns within 1 s, and the log shows one `[WARN]` line and one `[oled]` line.
+8. The panel's VCC lifted for 50 ms while MUTED shows and nothing else changes. Whether the panel comes back dark, as Open decisions 7 expects.
