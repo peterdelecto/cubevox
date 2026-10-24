@@ -6,8 +6,9 @@
 // tools/stamp_image.py, firmware/build.sh and the linker scripts read the #define lines by
 // pattern. A value they read stays an integer literal alone on its own #define line.
 //
-// Offsets, magics, ids and the application start are frozen once a box ships. New fields take
-// reserved space and bump the version word they belong to.
+// Offsets, magics, ids and the application start are frozen once a box ships, because the
+// bootloader in Adam's box is the oldest reader there will ever be. The image header and the boot
+// block each state how they grow.
 
 #pragma once
 
@@ -43,6 +44,8 @@
 #define CV_APP_START            0x08020000u
 #define CV_APP_END              0x08100000u
 #define CV_IMAGE_HEADER_OFFSET  0x400u
+#define CV_BANK2_BASE           0x08100000u
+#define CV_BANK2_END            0x08200000u
 
 // ---- Image header layout -------------------------------------------------------------------
 
@@ -58,11 +61,18 @@
 
 // TinyUF2's double-tap word. The application writes it to CvBootBlock::request, then resets.
 #define CV_REQUEST_UPDATE        0xF01669EFu
+// The bytes C V R S. The bootloader's fault handler writes it to CvBootBlock::request so the next
+// start returns to update mode for the reason in lastReason. The application never writes it.
+#define CV_REQUEST_RESUME        0x53525643u
 // The bytes C V F W at the start of the image header.
 #define CV_IMAGE_MAGIC           0x57465643u
 // The first word of a valid fault record. As text it reads FAU3, most significant byte first.
 #define CV_FAULT_MAGIC           0x46415533u
+// The header version this tree writes. Readers accept every version from 1 up (section Image
+// header).
 #define CV_IMAGE_HEADER_VERSION  1u
+// The boot block version this bootloader writes. Readers accept every version from 1 up (section
+// Boot block).
 #define CV_BOOT_BLOCK_VERSION    1u
 
 // ---- UF2 families --------------------------------------------------------------------------
@@ -89,6 +99,16 @@
 // Audio blocks must advance this long after setup() before the application reports healthy.
 #define CV_HEALTHY_MS         5000u
 
+// ---- Watchdog ------------------------------------------------------------------------------
+
+// The bootloader starts IWDG1 with this period right before it jumps to the application, and
+// never in update mode. The application's faultWatchdogStart rewrites the prescaler and the reload
+// while the watchdog runs: with 0x5555 in KR both registers take a new value at any time, and SR's
+// PVU and RVU show the update landing (RM0433, IWDG). setup() therefore has this long before the
+// application's own period applies, and a hang in it resets with IWDG1RSTF set, which the next
+// start counts as a failed one.
+#define CV_WATCHDOG_BOOT_MS   16000u
+
 // ---- Boot block ----------------------------------------------------------------------------
 
 // Why the bootloader last stayed in update mode.
@@ -98,8 +118,18 @@ enum CvBootReason {
   CvReasonAppRequest,
   CvReasonImageInvalid,
   CvReasonImageUnreadable,
-  CvReasonBootFailed
+  CvReasonBootFailed,
+  // The bootloader itself faulted outside an image read; bootFault* hold its registers.
+  CvReasonBootFault,
+  // The crystal or PLL1 did not start, so the application cannot run.
+  CvReasonClockFailed
 };
+
+// True for a value of enum CvBootReason. DTCM holds whatever the last run left, so every reader
+// checks before it trusts the word.
+static inline bool cvBootReasonKnown(uint32_t reason) {
+  return reason <= (uint32_t)CvReasonClockFailed;
+}
 
 // How DIAG.TXT and the boot report spell a reason. A value past the enum reads "unknown".
 static inline const char* cvBootReasonName(uint32_t reason) {
@@ -110,14 +140,64 @@ static inline const char* cvBootReasonName(uint32_t reason) {
     case CvReasonImageInvalid: return "ImageInvalid";
     case CvReasonImageUnreadable: return "ImageUnreadable";
     case CvReasonBootFailed: return "BootFailed";
+    case CvReasonBootFault: return "BootFault";
+    case CvReasonClockFailed: return "ClockFailed";
     default: return "unknown";
   }
 }
 
-// The 192 bytes at CV_BOOT_BLOCK_ADDR. Readers validate every field before use. The reason is a
-// uint32_t so the layout does not depend on the compiler's enum width.
+// What the bootloader's option byte step found or did since power-on, in CvBootBlock::optionBytes.
+// The step wants BOR level 3 and bank 1 sector 0 write protected.
+enum CvOptionResult {
+  CvOptionUnchecked = 0,
+  // Both were already set when the step read them.
+  CvOptionAlreadySet,
+  // Programmed at this power-on and read back.
+  CvOptionProgrammed,
+  // The option registers stayed locked after the key sequence.
+  CvOptionLocked,
+  // A flash operation or OPT_BUSY did not finish in time.
+  CvOptionTimeout,
+  // OPTCHANGEERR is set after the change.
+  CvOptionChangeError,
+  // The change finished, but OPTSR_CUR or WPSN_CUR1 did not show the new values.
+  CvOptionNotApplied,
+  // The step began and never finished: a fault or a reset cut it.
+  CvOptionInterrupted
+};
+
+// How DIAG.TXT and the boot report spell an option result. A value past the enum reads "unknown".
+static inline const char* cvOptionResultName(uint32_t result) {
+  switch (result) {
+    case CvOptionUnchecked: return "unchecked";
+    case CvOptionAlreadySet: return "set";
+    case CvOptionProgrammed: return "programmed";
+    case CvOptionLocked: return "failed, locked";
+    case CvOptionTimeout: return "failed, timeout";
+    case CvOptionChangeError: return "failed, change error";
+    case CvOptionNotApplied: return "failed, not applied";
+    case CvOptionInterrupted: return "failed, interrupted";
+    default: return "unknown";
+  }
+}
+
+// True for a result that names a failure. The step tries again only at the next power-on.
+static inline bool cvOptionResultFailed(uint32_t result) {
+  return result >= (uint32_t)CvOptionLocked && result <= (uint32_t)CvOptionInterrupted;
+}
+
+// The 192 bytes at CV_BOOT_BLOCK_ADDR. Readers validate every field before use. Enums are stored
+// as uint32_t so the layout does not depend on the compiler's enum width.
+//
+// The block grows without moving a field. blockVersion is the bootloader's alone: it names the
+// bootloader fields that exist, a reader accepts every version from 1 up, and the application
+// never writes it. Fields the bootloader adds take bootReserved and bump CV_BOOT_BLOCK_VERSION.
+// Fields the application adds take appReserved and bump appFieldsVersion, which the bootloader
+// never reads. The bootloader clears the whole block at a power-on reset and when blockVersion is
+// 0; otherwise it leaves the application's area alone.
 struct CvBootBlock {
-  // CV_REQUEST_UPDATE asks the bootloader to stay in update mode.
+  // CV_REQUEST_UPDATE asks the bootloader to stay in update mode; CV_REQUEST_RESUME is the
+  // bootloader's own. Every boot decision clears it.
   uint32_t request;
   // Starts since the last healthy report.
   uint32_t bootFails;
@@ -131,8 +211,22 @@ struct CvBootBlock {
   uint32_t faultAddress;
   // Text the application writes before it requests update mode, NUL padded.
   char appSummary[40];
+
+  // Written by the bootloader. The stacked pc and SCB->CFSR, HFSR and BFAR of its last fault, all 0
+  // when none has been recorded since power-on or the last update.
+  uint32_t bootFaultPc;
+  uint32_t bootFaultCfsr;
+  uint32_t bootFaultHfsr;
+  uint32_t bootFaultBfar;
+  // An enum CvOptionResult.
+  uint32_t optionBytes;
   // Zero when written.
-  uint8_t reserved[128];
+  uint8_t bootReserved[44];
+
+  // Written by the application. 0 until an application adds a field to appReserved.
+  uint32_t appFieldsVersion;
+  // Zero when written.
+  uint8_t appReserved[60];
 };
 
 CV_STATIC_ASSERT(boot_block_192_bytes, sizeof(struct CvBootBlock) == 0xC0u);
@@ -143,12 +237,24 @@ CV_STATIC_ASSERT(boot_block_version_at_0c, offsetof(struct CvBootBlock, blockVer
 CV_STATIC_ASSERT(boot_block_reason_at_10, offsetof(struct CvBootBlock, lastReason) == 0x10u);
 CV_STATIC_ASSERT(boot_block_fault_at_14, offsetof(struct CvBootBlock, faultAddress) == 0x14u);
 CV_STATIC_ASSERT(boot_block_summary_at_18, offsetof(struct CvBootBlock, appSummary) == 0x18u);
-CV_STATIC_ASSERT(boot_block_reserved_at_40, offsetof(struct CvBootBlock, reserved) == 0x40u);
+CV_STATIC_ASSERT(boot_block_boot_fault_at_40, offsetof(struct CvBootBlock, bootFaultPc) == 0x40u);
+CV_STATIC_ASSERT(boot_block_cfsr_at_44, offsetof(struct CvBootBlock, bootFaultCfsr) == 0x44u);
+CV_STATIC_ASSERT(boot_block_hfsr_at_48, offsetof(struct CvBootBlock, bootFaultHfsr) == 0x48u);
+CV_STATIC_ASSERT(boot_block_bfar_at_4c, offsetof(struct CvBootBlock, bootFaultBfar) == 0x4Cu);
+CV_STATIC_ASSERT(boot_block_options_at_50, offsetof(struct CvBootBlock, optionBytes) == 0x50u);
+CV_STATIC_ASSERT(boot_block_boot_reserved_at_54, offsetof(struct CvBootBlock, bootReserved) == 0x54u);
+CV_STATIC_ASSERT(boot_block_app_version_at_80, offsetof(struct CvBootBlock, appFieldsVersion) == 0x80u);
+CV_STATIC_ASSERT(boot_block_app_reserved_at_84, offsetof(struct CvBootBlock, appReserved) == 0x84u);
 CV_STATIC_ASSERT(boot_block_ends_at_fault_record,
                  CV_BOOT_BLOCK_ADDR + sizeof(struct CvBootBlock) == CV_FAULT_RECORD_ADDR);
 CV_STATIC_ASSERT(boot_region_ends_at_dtcm_end, CV_BOOT_BLOCK_ADDR + CV_BOOT_BLOCK_SIZE == CV_DTCM_END);
 CV_STATIC_ASSERT(fault_record_ends_at_dtcm_end,
                  CV_FAULT_RECORD_ADDR + CV_FAULT_RECORD_SIZE == CV_DTCM_END);
+
+// True when a bootloader has initialised the block since power-on.
+static inline bool cvBootBlockInitialised(const struct CvBootBlock* block) {
+  return block->blockVersion >= 1u;
+}
 
 // True when the check word agrees with the counter.
 static inline bool cvBootFailsValid(const struct CvBootBlock* block) {
@@ -195,7 +301,7 @@ struct CvFaultRecord {
   uint32_t magic;
   // An enum CvFaultKind.
   uint32_t kind;
-  // The stacked pc and lr, 0 when the exception frame was unreadable.
+  // The stacked pc and lr, 0 when the exception frame is unreadable.
   uint32_t pc;
   uint32_t lr;
   // SCB->CFSR, HFSR, BFAR and MMFAR at the fault.
@@ -212,6 +318,16 @@ struct CvFaultRecord {
 
 CV_STATIC_ASSERT(fault_record_fits_its_slot, sizeof(struct CvFaultRecord) <= CV_FAULT_RECORD_SIZE);
 CV_STATIC_ASSERT(fault_magic_at_00, offsetof(struct CvFaultRecord, magic) == 0x00u);
+CV_STATIC_ASSERT(fault_kind_at_04, offsetof(struct CvFaultRecord, kind) == 0x04u);
+CV_STATIC_ASSERT(fault_pc_at_08, offsetof(struct CvFaultRecord, pc) == 0x08u);
+CV_STATIC_ASSERT(fault_lr_at_0c, offsetof(struct CvFaultRecord, lr) == 0x0Cu);
+CV_STATIC_ASSERT(fault_cfsr_at_10, offsetof(struct CvFaultRecord, cfsr) == 0x10u);
+CV_STATIC_ASSERT(fault_hfsr_at_14, offsetof(struct CvFaultRecord, hfsr) == 0x14u);
+CV_STATIC_ASSERT(fault_bfar_at_18, offsetof(struct CvFaultRecord, bfar) == 0x18u);
+CV_STATIC_ASSERT(fault_mmfar_at_1c, offsetof(struct CvFaultRecord, mmfar) == 0x1Cu);
+CV_STATIC_ASSERT(fault_sr2_at_20, offsetof(struct CvFaultRecord, sr2) == 0x20u);
+CV_STATIC_ASSERT(fault_ecc_fa2_at_24, offsetof(struct CvFaultRecord, eccFa2) == 0x24u);
+CV_STATIC_ASSERT(fault_detail_at_28, offsetof(struct CvFaultRecord, detail) == 0x28u);
 
 // How faultReport and DIAG.TXT spell a kind. A value past the enum reads "unknown".
 static inline const char* cvFaultKindName(uint32_t kind) {
@@ -241,10 +357,14 @@ static inline const char* cvClockStepName(uint32_t step) {
 
 // The 32-byte header at CV_APP_START + CV_IMAGE_HEADER_OFFSET. The compiler emits length and
 // crc32 as zero and tools/stamp_image.py fills them after the link.
+//
+// These 32 bytes never change their meaning. A later header puts its new fields after them and
+// bumps CV_IMAGE_HEADER_VERSION; the CRC already covers every byte of the image, so a reader that
+// knows only version 1 still checks the whole image.
 struct CvImageHeader {
   // CV_IMAGE_MAGIC.
   uint32_t magic;
-  // CV_IMAGE_HEADER_VERSION.
+  // CV_IMAGE_HEADER_VERSION of the tree that built the image.
   uint32_t headerVersion;
   // Bytes in the whole image file.
   uint32_t length;
@@ -267,6 +387,11 @@ CV_STATIC_ASSERT(image_version_at_16,
 CV_STATIC_ASSERT(image_version_fills_header,
                  CV_IMAGE_OFFSET_VERSION + CV_IMAGE_VERSION_BYTES == CV_IMAGE_HEADER_SIZE);
 
+// True for a header version every reader accepts: 1 and every later one, read as version 1.
+static inline bool cvImageHeaderVersionOk(uint32_t headerVersion) {
+  return headerVersion >= 1u;
+}
+
 // ---- Diagnostic log ------------------------------------------------------------------------
 
 // Bank 2 sector 2. The application appends fixed-size entries and erases the sector when it is
@@ -278,10 +403,10 @@ CV_STATIC_ASSERT(image_version_fills_header,
 #define CV_DIAG_ENTRY_SIZE   256u
 // The bytes C V D G.
 #define CV_DIAG_MAGIC        0x47445643u
-// A numeric field nobody knew when the entry was written.
+// A numeric field the application does not know when it writes the entry.
 #define CV_DIAG_UNKNOWN_U32  0xFFFFFFFFu
 
-// What the application was doing when it wrote the entry.
+// What the application is doing when it writes the entry.
 enum CvDiagKind {
   CvDiagKindBoot = 1,
   CvDiagKindUpdateRequest = 2
@@ -314,15 +439,19 @@ struct CvDiagEntry {
   char fault[64];
   // The previous run's CvBootBlock::appSummary, or empty.
   char summary[64];
-  uint8_t reserved[52];
+  // CvBootBlock::optionBytes at this boot. DIAG.TXT prints it only when it names a failure, so an
+  // entry that leaves it 0 or 0xFF prints nothing.
+  uint32_t optionBytes;
+  uint8_t reserved[48];
   // CRC-32 (zlib polynomial) over the preceding 252 bytes.
   uint32_t crc32;
 };
 
 CV_STATIC_ASSERT(diag_entry_256_bytes, sizeof(struct CvDiagEntry) == CV_DIAG_ENTRY_SIZE);
+CV_STATIC_ASSERT(diag_option_bytes_at_200, offsetof(struct CvDiagEntry, optionBytes) == 200u);
 CV_STATIC_ASSERT(diag_crc_is_last, offsetof(struct CvDiagEntry, crc32) == CV_DIAG_ENTRY_SIZE - 4u);
 CV_STATIC_ASSERT(diag_log_in_bank_2,
-                 CV_DIAG_LOG_ADDR >= 0x08100000u && CV_DIAG_LOG_ADDR + CV_DIAG_LOG_SIZE <= 0x08200000u);
+                 CV_DIAG_LOG_ADDR >= CV_BANK2_BASE && CV_DIAG_LOG_ADDR + CV_DIAG_LOG_SIZE <= CV_BANK2_END);
 CV_STATIC_ASSERT(diag_log_one_sector,
                  CV_DIAG_LOG_SIZE == CV_FLASH_SECTOR_SIZE && CV_DIAG_LOG_ADDR % CV_FLASH_SECTOR_SIZE == 0u);
 CV_STATIC_ASSERT(diag_entries_fill_sector, CV_DIAG_LOG_SIZE % CV_DIAG_ENTRY_SIZE == 0u);
@@ -332,6 +461,9 @@ CV_STATIC_ASSERT(diag_entries_fill_sector, CV_DIAG_LOG_SIZE % CV_DIAG_ENTRY_SIZE
 CV_STATIC_ASSERT(app_region_on_sector_bounds,
                  CV_APP_START < CV_APP_END && CV_APP_START % CV_FLASH_SECTOR_SIZE == 0u &&
                      CV_APP_END % CV_FLASH_SECTOR_SIZE == 0u);
+// The application region ends where bank 2 begins; bank 2 is 1 MB, eight sectors.
+CV_STATIC_ASSERT(app_ends_at_bank2, CV_APP_END == CV_BANK2_BASE);
+CV_STATIC_ASSERT(bank2_eight_sectors, CV_BANK2_END - CV_BANK2_BASE == 8u * CV_FLASH_SECTOR_SIZE);
 // 0x298 bytes is the vector table of the H743 (166 vectors).
 CV_STATIC_ASSERT(header_after_vector_table,
                  CV_IMAGE_HEADER_OFFSET >= 0x298u && CV_IMAGE_HEADER_OFFSET % 4u == 0u);

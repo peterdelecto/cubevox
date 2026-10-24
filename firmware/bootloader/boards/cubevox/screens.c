@@ -10,6 +10,7 @@
 
 #include "boot_block.h"
 #include "font.h"
+#include "text.h"
 
 #define CV_PAD    1  // clear pixels around every text
 #define CV_ROW_PX 8  // one of the panel's eight rows
@@ -42,6 +43,12 @@ static const ScreenText kScreens[] = {
                             "the CUBEVOX drive."},
                            false},
     [CvScreenDone] = {{"The update is done.", "Restarting now.", NULL, NULL}, false},
+    [CvScreenCableOut] = {{"The cable came out.", "Plug it back in and", "drop the firmware on",
+                           "the CUBEVOX drive."},
+                          false},
+    [CvScreenClockFailed] = {{"The clock failed.", "Send the DIAG.TXT", "file on the CUBEVOX",
+                              "drive for a repair."},
+                             false},
 };
 
 // Appends at most `limit` characters of `text`.
@@ -58,13 +65,7 @@ static void lineAdd(Line* line, const char* text) {
 
 static void lineAddNumber(Line* line, uint32_t value) {
   char digits[11];
-  uint32_t n = sizeof digits - 1u;
-  digits[n] = '\0';
-  do {
-    digits[--n] = (char)('0' + value % 10u);
-    value /= 10u;
-  } while (value != 0u && n > 0u);
-  lineAdd(line, &digits[n]);
+  lineAdd(line, cvTextDecimal(digits, value));
 }
 
 // Writes a table line: fixed wording as it stands, the two run-time lines composed. The release
@@ -95,13 +96,13 @@ void cvScreenCompose(CvScreen screen, const char* installed, bool connected, CvS
 }
 
 // ORs 8 vertical pixels, the top one at row y, into the one or two pages they cover.
-static void orColumn(uint8_t* frame, int x, int y, uint8_t bits) {
+static void orColumn(uint8_t* frame, int16_t x, int16_t y, uint8_t bits) {
   if (x < 0 || x >= CV_FRAME_WIDTH || y < 0 || bits == 0u) return;
-  const int page = y / 8;
-  const int shift = y % 8;
+  const int16_t page = (int16_t)(y / 8);
+  const uint8_t shift = (uint8_t)(y % 8);
   if (page < CV_FRAME_HEIGHT / 8) frame[page * CV_FRAME_WIDTH + x] |= (uint8_t)(bits << shift);
-  if (shift != 0 && page + 1 < CV_FRAME_HEIGHT / 8) {
-    frame[(page + 1) * CV_FRAME_WIDTH + x] |= (uint8_t)(bits >> (8 - shift));
+  if (shift != 0u && page + 1 < CV_FRAME_HEIGHT / 8) {
+    frame[(page + 1) * CV_FRAME_WIDTH + x] |= (uint8_t)(bits >> (8u - shift));
   }
 }
 
@@ -109,10 +110,10 @@ static void orColumn(uint8_t* frame, int x, int y, uint8_t bits) {
 static const uint8_t* glyphOf(const struct CvFont* font, char c) {
   uint8_t code = (uint8_t)c;
   if (code >= 'a' && code <= 'z') code = (uint8_t)(code - 'a' + 'A');
-  int lo = 0;
-  int hi = (int)font->glyphCount - 1;
+  int32_t lo = 0;
+  int32_t hi = (int32_t)font->glyphCount - 1;
   while (lo <= hi) {
-    const int mid = (lo + hi) / 2;
+    const int32_t mid = (lo + hi) / 2;
     if (font->codes[mid] == code) return font->glyphs + mid * font->bytesPerGlyph;
     if (font->codes[mid] < code) {
       lo = mid + 1;
@@ -123,22 +124,23 @@ static const uint8_t* glyphOf(const struct CvFont* font, char c) {
   return NULL;
 }
 
-static void drawGlyph(uint8_t* frame, int x, int y, const struct CvFont* font, const uint8_t* glyph) {
-  const int bands = (font->height + 7) / 8;
-  for (int band = 0; band < bands; ++band) {
-    const int rows = font->height - band * 8;
-    const uint8_t keep = rows >= 8 ? 0xFFu : (uint8_t)((1u << rows) - 1u);
-    for (int col = 0; col < font->width; ++col) {
-      orColumn(frame, x + col, y + band * 8, (uint8_t)(glyph[band * font->width + col] & keep));
+static void drawGlyph(uint8_t* frame, int16_t x, int16_t y, const struct CvFont* font, const uint8_t* glyph) {
+  const uint8_t bands = (uint8_t)((font->height + 7u) / 8u);
+  for (uint8_t band = 0; band < bands; ++band) {
+    const uint8_t rows = (uint8_t)(font->height - band * 8u);
+    const uint8_t keep = rows >= 8u ? 0xFFu : (uint8_t)((1u << rows) - 1u);
+    for (uint8_t col = 0; col < font->width; ++col) {
+      orColumn(frame, (int16_t)(x + col), (int16_t)(y + band * 8), (uint8_t)(glyph[band * font->width + col] & keep));
     }
   }
 }
 
-static void drawText(uint8_t* frame, int x, int y, const struct CvFont* font, const char* text, uint32_t length) {
+static void drawText(uint8_t* frame, int16_t x, int16_t y, const struct CvFont* font, const char* text,
+                     uint32_t length) {
   for (uint32_t i = 0; i < length; ++i) {
     const uint8_t* glyph = glyphOf(font, text[i]);
     if (glyph != NULL) drawGlyph(frame, x, y, font, glyph);
-    x += font->width + font->spacing;
+    x = (int16_t)(x + font->width + font->spacing);
   }
 }
 
@@ -150,6 +152,6 @@ void cvScreenDraw(uint8_t frame[CV_FRAME_BYTES], CvScreen screen, const char* in
     // The wording fits, and proof --check says so. The cut keeps a fault in it on the panel.
     uint32_t length = (uint32_t)strlen(text.line[i]);
     if (length > CV_SCREEN_LINE_CHARS) length = CV_SCREEN_LINE_CHARS;
-    drawText(frame, CV_PAD, (int)(2u * i) * CV_ROW_PX + CV_PAD, &cvFont5x7, text.line[i], length);
+    drawText(frame, CV_PAD, (int16_t)(2u * i * CV_ROW_PX + CV_PAD), &cvFont5x7, text.line[i], length);
   }
 }

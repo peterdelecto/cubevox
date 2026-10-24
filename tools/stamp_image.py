@@ -136,7 +136,11 @@ def parse_version(c, data, where):
 
 
 def read_header(c, data, where):
-    """Checks the header's place, magic and version. Returns (length, crc, version string)."""
+    """Checks the header's place, magic and version. Returns (length, crc, version string).
+
+    Every header version from 1 up reads as version 1, as the bootloader reads it (boot_block.h,
+    cvImageHeaderVersionOk): a later version keeps the first 32 bytes and adds its fields after them.
+    """
     base = c.header_offset
     if len(data) < base + c.header_size:
         raise ToolError(f"{len(data)} bytes is too short for the image header at 0x{base:X} in {where}")
@@ -144,8 +148,8 @@ def read_header(c, data, where):
     if magic != c.magic:
         raise ToolError(f"image magic 0x{magic:08X} at 0x{base:X}, want 0x{c.magic:08X} in {where}")
     version = u32(data, base + c.off_header_version)
-    if version != c.header_version:
-        raise ToolError(f"image header version {version}, want {c.header_version} in {where}")
+    if version < 1:
+        raise ToolError(f"image header version {version}, want 1 or later in {where}")
     return u32(data, base + c.off_length), u32(data, base + c.off_crc), parse_version(c, data, where)
 
 
@@ -300,13 +304,14 @@ def cmd_uf2(c, args):
 
 # ---- selftest ------------------------------------------------------------------------------------
 
-def fake_image(c, size, version=b"v2.00.10"):
+def fake_image(c, size, version=b"v2.00.10", header_version=None):
     """An unstamped image: an odd-period body, the header at its offset, length and CRC zero."""
     buf = bytearray((bytes(range(251)) * (size // 251 + 1))[:size])
     h = c.header_offset
     buf[h:h + c.header_size] = bytes(c.header_size)
     struct.pack_into("<I", buf, h + c.off_magic, c.magic)
-    struct.pack_into("<I", buf, h + c.off_header_version, c.header_version)
+    struct.pack_into("<I", buf, h + c.off_header_version,
+                     c.header_version if header_version is None else header_version)
     buf[h + c.off_version:h + c.off_version + len(version)] = version
     return bytes(buf)
 
@@ -354,6 +359,10 @@ def selftest_image(c, failures):
     refused("an image without a header", stamp_bytes, c, bytes(3072), "zeros")
     refused("an oversize image", stamp_bytes, c, fake_image(c, c.max_bytes + 4), "big")
     refused("a version string with a control byte", stamp_bytes, c, fake_image(c, 3072, b"v2\x01"), "ctl")
+    refused("header version 0", stamp_bytes, c, fake_image(c, 3072, header_version=0), "v0")
+    later, later_info = stamp_bytes(c, fake_image(c, 3072, header_version=c.header_version + 1), "later")
+    expect(check_image(c, later, "later") == later_info and later_info.version == "v2.00.10",
+           "a later header version checks as version 1")
     return image, info
 
 

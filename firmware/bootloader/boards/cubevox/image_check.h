@@ -26,8 +26,9 @@ struct CvImageReport {
   char version[CV_IMAGE_VERSION_BYTES + 1];
 };
 
-// Checks the image at `image` in a region of `regionBytes`: the magic, the header version, the
-// length inside the region, then the CRC-32 over the image with the CRC field as zero.
+// Checks the image at `image` in a region of `regionBytes`: the magic, a header version from 1 up
+// (read as version 1), the length inside the region, then the CRC-32 over the image with the CRC
+// field as zero.
 void cvImageInspect(const uint8_t* image, uint32_t regionBytes, struct CvImageReport* report);
 
 // CRC-32 with the zlib polynomial, chained like zlib's crc32(): start with crc 0.

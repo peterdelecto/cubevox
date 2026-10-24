@@ -32,7 +32,11 @@ typedef enum {
   CvScreenWaitBootFailed,
   CvScreenWriting,
   CvScreenWrongFile,
-  CvScreenDone
+  CvScreenDone,
+  // The cable came out after a computer had connected, and update mode cannot time out.
+  CvScreenCableOut,
+  // The crystal or PLL1 did not start; USB runs from the internal oscillator.
+  CvScreenClockFailed
 } CvScreen;
 
 // The text of a screen as it is drawn, one string per line, "" for a blank line.
