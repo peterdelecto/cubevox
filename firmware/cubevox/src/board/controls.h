@@ -1,19 +1,30 @@
-// Panel input: the 16-pot mux scan, per-pot smoothing, stepped knobs and the slot toggles.
+// Panel input: the 16-pot mux scan, per-pot smoothing, stepped knobs and the slot toggles. ADC3
+// reads the mux, set up once; the core's analogRead is never called, because each call resets the
+// ADC it uses and ADC1 carries the power-fail watch.
 
 #pragma once
 
+#include <Arduino.h>
 #include <stdint.h>
 
 #include "board/build_kind.h"
 #include "core/layout.h"
 #include "core/panel.h"
 
+// Sets up the mux selects, ADC3 and the toggles. A failed ADC leaves the panel unread, so the box
+// stays muted; controlsReport() says why.
 void controlsInit();
 
-// Call every loop pass. Advances the mux scan without blocking and debounces the toggles. Step counts
-// come from `layout`; when a card change alters a knob's step count the knob re-seeds before this
-// call returns, so the reading that follows matches the layout.
+// Call every loop pass. Each pass takes one step of the mux scan (select, start a conversion or
+// read it) and never waits on the ADC; it also debounces the toggles. A conversion that fails or
+// times out drops that pot's sample for the round. Step counts come from `layout`; when a card
+// change alters a knob's step count the knob re-seeds before this call returns, so the reading
+// that follows matches the layout.
 void controlsPoll(uint32_t nowMs, const Layout& layout);
+
+// The "[boot] pots ..." line with the samples dropped since boot, or "[ERROR] pots: ..." when ADC3
+// would not come up.
+void controlsReport(Print& out);
 
 // True once every pot has been read at least once. Until then the panel values are not real.
 bool controlsSeeded();

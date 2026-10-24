@@ -32,7 +32,6 @@ by dependency tier. Files move; nothing is rewritten in the move.
 firmware/
   build.sh                  pins the core, sets the version, builds
   README.md
-  platform/                 verbatim Teensy-H7-Port copies (unchanged)
   cubevox/
     cubevox.ino             setup() and loop() only
     src/
@@ -56,7 +55,6 @@ firmware/
         display_sh1106.h/.cpp
         fault.h/.cpp        watchdog, fault handlers, reset cause
         flash_bank2.h/.cpp  erase and program only (step 2)
-        platform.h, platform_shim.cpp
       ui/
         menu.h/.cpp         OLED screens; deliberately unplanned beyond today
 ```
@@ -79,8 +77,10 @@ Rules:
 | Fault handlers | HardFault, BusFault, UsageFault, MemManage: drive MUTE_N low, store PC, LR, CFSR, HFSR and a magic word in a `.noinit` struct, reset. Next boot report and `status` print `[ERROR] last reset: fault pc=... cfsr=...` then clear it. |
 | Reset cause | Boot report prints `RCC->RSR` decoded (power-on, pin, IWDG, software) and clears it. `[boot] fault: none` when clean, for the first-article checklist. |
 | Audio stall | `loop()` watches `audioStats().blocks`. No advance in 100 ms while audio is running: mute, set the audio error string, report once. |
+| Audio fault | An error that stops a SAI block or a DMA stream silences the TX ring; 8 overruns in a row mute by register from the DMA interrupt. `audioPoll()` restarts SAI1 and both streams once the output is fully muted, at most 3 times in any minute; another fault latches the mute. Each TX half is zeroed once the DMA has read it, so a block that never runs plays silence. The stall watch stays as the backstop. |
+| Power fail | ADC1's analog watchdog on VA_SENSE drops XSMT and MUTE_N by register below 4.75 V; the mute releases once 5VA holds 4.85 V for 500 ms (hardware spec F2). The pots read on ADC3, so nothing resets ADC1. |
 | Toolchain | `build.sh` reads `arduino-cli core list`, refuses any core version but the pinned one, prints the first line of `arm-none-eabi-gcc --version`. Release action (step 6) pins the board index URL and the same core version. |
-| Version | `-DCUBEVOX_FW_VERSION="$(git describe --tags --always --dirty)"` from `build.sh`; `core/version.h` exposes it; the release action passes the tag. Shown on the OLED and in `hello`. |
+| Version | `build.sh` passes `-DCUBEVOX_FW_VERSION="v<VERSION.txt>"` and logs the git state beside it; `core/version.h` exposes it; the release action refuses a tag that differs from it. Shown on the OLED and in `hello`. |
 | JSON | Hand-written. Requests are flat objects with few keys; a small tokenizer extracts `cmd`, `id` and a fixed field set. Replies are built with `snprintf`. No ArduinoJson. Lives in `core/protocol.cpp`, host-tested. CDC transport in `board/usb_link.cpp` stays thin. |
 | Record schema v1 | magic, schema, sequence, name[32], 8 × (id[16], 8 reserved bytes), menu settings, CRC32 over everything before it. Codec pure in `core/record.cpp`; `board/flash_bank2.cpp` erases and programs only. |
 | Record fallbacks | Unknown card id becomes `empty`. A layout that fails validation (a second reverb card, a repeated card, a bad card id, over the CPU budget) is replaced whole by the default layout, the boot report prints a `[WARN]` with the reason, and the default is saved. No valid record gives the default layout. |

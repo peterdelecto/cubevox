@@ -3,10 +3,12 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/peterdelecto/cubevox/main/tools/install.sh | bash
 #
-# Running it again updates the app and the samples in place.
+# tools/package.sh builds the zip and a person attaches it to a release. The workflows attach
+# firmware files only, so the latest release does not carry the zip, and the URL below names the
+# newest release that does. Running the script again replaces the app and the samples in place.
 set -euo pipefail
 
-url="https://github.com/peterdelecto/cubevox/releases/latest/download/vox-processor-prototype.zip"
+url="https://github.com/peterdelecto/cubevox/releases/download/v2.00.04/vox-processor-prototype.zip"
 name="Vox Processor Prototype"
 dest="$HOME/Desktop/$name"
 tmp="$(mktemp -d)"

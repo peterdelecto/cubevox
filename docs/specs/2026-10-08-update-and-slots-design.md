@@ -13,10 +13,12 @@ The firmware carries every effect. A firmware update only matters when a new car
 | Page | `app/web/`, embedded in the app | Layout editor, saved layouts, update screen. Web Awesome components. |
 | App | `app/`, Go, one binary in `cubevox.app` | Serves the page on 127.0.0.1, relays JSON to the box over USB CDC, runs dfu-util, keeps saved layouts, checks GitHub Releases. |
 | Firmware | `firmware/cubevox/` | Effect registry with stable ids and CPU costs, layout record in bank 2, serial command set, live apply with a 50 ms fade. |
-| Release | GitHub Releases on `peterdelecto/cubevox` | One release per tag `vX.Y.Z` holding `cubevox.bin`, `cubevox.app.tar.gz`, `install.sh`. Built by a GitHub Action. |
+| Release | GitHub Releases on `peterdelecto/cubevox` | One release per tag `vX.Y.Z` holding `cubevox.bin`, `cubevox.app.tar.gz`, `install.sh`. Built by a GitHub Action. Superseded by `2026-10-24-field-update-design.md`: a release holds the `.uf2` and the ROM `.bin`. |
 
 > Superseded 2026-10-15 for the app and page: `2026-10-15-mac-app-design.md`. One screen, no
-> saved layouts, one Update button. The Firmware and Recovery sections below still apply.
+> saved layouts, one Update button. The Firmware section below still applies, except its OLED menu
+> item that enters DFU. The Release row above and the Recovery section below are superseded by
+> `2026-10-24-field-update-design.md`.
 
 ### Install and launch
 
@@ -35,22 +37,22 @@ Double-click starts the server on a free local port and opens the default browse
 
 1. **Effect registry.** Each card has a stable string id that never changes once shipped, a display name, two knob descriptors (name, range, step rule such as KEY snapping), and a CPU cost. Ids for v1: `empty`, `input_gate`, `autotune`, `octave`, `unison`, `slapback`, `distortion`, `gate`, `reverb_spring`, `reverb_chasm`. Each reverb engine is its own card; the reverb engine menu item goes away. Harmony has no card and the old Spring engine is removed (owner 2026-10-08). Groups (one reverb per layout, pitch cards as one stage), descriptor fields, the estimate flag and bench mode are in `2026-10-08-effect-registry-design.md`.
 2. **CPU cost.** Two percents of one audio block per card, mean and worst single block, measured on the box in the chain with the knobs pinned at top, written into `firmware/cubevox/src/core/costs.h` per release (bench protocol in the registry spec). The box also measures live frame time and reports it. The box rejects a layout whose mean sum exceeds 75 % or whose worst-block sum exceeds 95 %, both including the fixed term.
-3. **Layout record in bank 2.** Two 128 KB sectors at `0x08100000` and `0x08120000`, written ping-pong so a power loss mid-write keeps the previous record. Fields: magic, schema version, sequence number, layout name, eight slots of (effect id, reserved settings bytes), menu settings (EQ, output level, 1/4" PEDAL / MIC), CRC32. On boot the newest valid record wins. An unknown effect id becomes `empty`. No valid record gives the default layout from the slots spec table.
+3. **Layout record in bank 2.** Two 128 KB sectors at `0x08100000` and `0x08120000`, written ping-pong so a power loss mid-write keeps the previous record. Fields: magic, schema version, sequence number, layout name, eight slots of (effect id, reserved settings bytes), menu settings (EQ, output level, INPUT MIC / LINE), CRC32. On boot the newest valid record wins. An unknown effect id becomes `empty`. No valid record gives the default layout from the slots spec table.
 4. **Apply.** Validate, write the record, fade the output over 50 ms, rebuild the chain in slot order, fade back in. Pots and the bypass toggle of a slot drive whatever card sits in it. `empty` passes audio straight through and ignores its controls.
 5. **Chain order.** Slot order, left to right, always. No separate order list.
 6. **Serial.** USB CDC, newline-delimited JSON, request and reply matched by `id`. Commands: `hello` (firmware version, registry with costs, live layout), `get_layout`, `set_layout`, `status` (live CPU, mute state), `enter_dfu`. Errors reply with a reason string the page shows.
 7. **Version.** A compiled-in firmware version string, bumped by the release tag. Shown on the OLED and in `hello`.
-8. **OLED menu.** Chain view (read only), knob readout on touch, EQ, output level, 1/4" PEDAL / MIC, MUTED, Update firmware (enters DFU, kept for when the app cannot talk). No slot editing.
+8. **OLED menu.** Chain view (read only), knob readout on touch, EQ, output level, INPUT MIC / LINE, MUTED, Update firmware (superseded by `2026-10-24-field-update-design.md`: it resets into the bootloader's `CUBEVOX` drive, not the ROM DFU). No slot editing.
 
 ### Recovery
 
-Plain DFU. The ST ROM bootloader cannot be overwritten, so a bad image is recovered from the Update screen or the OLED menu, and from the BOOT0 button inside the box if the firmware does not boot. The image stays inside bank 1 so bank 2 and the layout survive every flash.
+Superseded by `2026-10-24-field-update-design.md`: a bootloader in sector 0 serves the `CUBEVOX` drive, refuses an image whose CRC fails and stays in update mode after three failed starts, and the ROM DFU through BOOT0 is the shop's fallback. The image stays inside bank 1 so bank 2 and the layout survive every flash.
 
 ## Open questions resolved
 
 1. Host tool. A Mac app installed and updated by one curl line, serving a local page (owner chose this over a hosted WebUSB page, which would have tied Adam to Chrome, and over in-person updates).
 2. Where the layout lives. On the box, written from the page. Firmware carries all effects.
-3. Bricking protection. Plain DFU with ROM bootloader and BOOT0 recovery. No A/B banks.
+3. Bricking protection. Plain DFU with ROM bootloader and BOOT0 recovery. No A/B banks. (Superseded by the sector-0 bootloader of `2026-10-24-field-update-design.md`; the box still keeps one image.)
 4. Library rule. One card per sound or variant, each card at most once, Empty allowed.
 5. CPU budget. Hard stop at 75 % mean and 95 % worst block, enforced by the page and by the box (was a single 85 % line until CPU pass 2).
 6. Chain order. Slot order, left to right.

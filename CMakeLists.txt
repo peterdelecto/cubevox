@@ -193,6 +193,7 @@ target_link_options(firmware_test PRIVATE ${CUBEVOX_SANITIZE})
 add_test(NAME firmware COMMAND firmware_test)
 add_test(NAME bench_ops_map COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/bench_ops_check.py)
 add_test(NAME stamp_image_selftest COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/stamp_image.py selftest)
+add_test(NAME tooling_scripts COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/scripts_check.py)
 
 # hello_dump prints the firmware's real `hello` reply. app/fixtures/hello.json must equal it.
 add_executable(hello_dump tools/hello_dump.cpp ${CUBEVOX_FW_CORE_SOURCES})

@@ -354,8 +354,10 @@ void checkSimpleReplies() {
   protocol::replyLayout(w, 14, "Rig \"A\"", defaultLayout(), Settings());
   check(JsonReader(w.out).valid() && has(w.out, "\"layout\":{\"name\":\"Rig \\\"A\\\"\",\"slots\":[\"input_gate\",\"autotune\"") &&
             has(w.out, "\"reverb_spring\"]}"), "proto: layout reply");
+}
 
-  w = StringWriter();
+void checkStatusReply() {
+  StringWriter w;
   protocol::Status s;
   s.cpuMeanPercent = 54.66f;
   s.cpuWorstPercent = 71.0f;
@@ -366,15 +368,43 @@ void checkSimpleReplies() {
   s.strayBytes = 8;
   protocol::replyStatus(w, 15, s);
   check(JsonReader(w.out).valid() &&
-            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,\"update_reason\":\"none\"}\n",
+            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,"
+                     "\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,"
+                     "\"overruns\":0,\"sai_errors\":0,\"restarts\":0,\"nan_blocks\":0,"
+                     "\"power_trips\":0,\"stalled\":false,\"audio_latched\":false,\"reply_overflows\":0,"
+                     "\"update_reason\":\"none\"}\n",
         "proto: status reply");
 
   w = StringWriter();
   s.bootFails = 2;
   s.updateReason = "BootFailed";
   protocol::replyStatus(w, 17, s);
-  check(JsonReader(w.out).valid() && has(w.out, "\"stray_bytes\":8,\"boot_fails\":2,\"update_reason\":\"BootFailed\"}\n"),
+  check(JsonReader(w.out).valid() && has(w.out, "\"stray_bytes\":8,\"boot_fails\":2,") &&
+            has(w.out, "\"update_reason\":\"BootFailed\"}\n"),
         "proto: status carries the boot fails and the update reason");
+}
+
+// The audio fault counters, the power trips, the latches and the reply pieces lost to overflow.
+void checkStatusFaults() {
+  StringWriter w;
+  protocol::Status s;
+  s.overruns = 3;
+  s.saiErrors = 1;
+  s.restarts = 2;
+  s.nanBlocks = 4;
+  s.powerTrips = 5;
+  s.stalled = true;
+  s.audioLatched = true;
+  protocol::replyStatus(w, 18, s);
+  check(JsonReader(w.out).valid() &&
+            has(w.out, "\"overruns\":3,\"sai_errors\":1,\"restarts\":2,\"nan_blocks\":4,\"power_trips\":5,"
+                       "\"stalled\":true,\"audio_latched\":true,"),
+        "proto: status carries the audio faults and the power trips");
+
+  w = StringWriter();
+  w.format("%0*d", static_cast<int>(protocol::Writer::kFormatBytes), 1);
+  protocol::replyStatus(w, 19, s);
+  check(has(w.out, "\"reply_overflows\":1,"), "proto: status reports the reply pieces lost to overflow");
 }
 
 // Every counter at its widest, so a reply piece that outgrows the writer's buffer shows up.
@@ -384,6 +414,8 @@ void checkStatusWidest() {
   s.cpuMeanPercent = 100.0f;
   s.cpuWorstPercent = 100.0f;
   s.late = s.seq = s.recordErrors = s.serialDropped = s.strayBytes = s.bootFails = 0xFFFFFFFFu;
+  s.overruns = s.saiErrors = s.restarts = s.nanBlocks = s.powerTrips = 0xFFFFFFFFu;
+  s.stalled = s.audioLatched = true;
   s.updateReason = "ImageUnreadable";
   protocol::replyStatus(w, 0xFFFFFFFFu, s);
   check(JsonReader(w.out).valid() && w.overflows() == 0 && has(w.out, "\"update_reason\":\"ImageUnreadable\"}\n"),
@@ -481,6 +513,8 @@ void checkWriterFormat() {
 
 void checkProtocolReplies() {
   checkSimpleReplies();
+  checkStatusReply();
+  checkStatusFaults();
   checkStatusWidest();
   checkHelloReply();
   checkHelloSerial();

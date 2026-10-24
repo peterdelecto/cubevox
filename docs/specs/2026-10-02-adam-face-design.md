@@ -40,6 +40,10 @@ sliders, then report numbers we bake in.
 | 9b | CHASM | | Wobble · Brightness · Bass |
 | 10 | Output EQ | menu | Low cut · Low-mid dip (freq, amount) · Presence (freq, amount) · Air (raw) |
 
+Superseded: the reverb knobs are MIX and TIME, each reverb engine is its own library card, and the
+menu has no engine item (`2026-10-08-update-and-slots-design.md`,
+`2026-10-07-v2-mic-reverb-time-slapback.md`).
+
 Engine radios (Octave A/B/C, Harmony A/B/C, Autotune A/B, reverb engine) stay visible:
 they are what Adam is choosing between.
 

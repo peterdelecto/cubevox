@@ -25,6 +25,9 @@ Full panel (for context; only UNISON is built here):
 | 9 | Spring reverb | Tension | Dwell |
 | 10 | Output | menu | |
 
+Superseded: the panel is eight slots (`2026-10-07-slots-design.md`), and the reverb knobs are MIX and
+TIME (`2026-10-07-v2-mic-reverb-time-slapback.md`).
+
 ## Decisions
 
 1. Shared portable engine. Effect code lives in `engine/*.h`, plain C++17, and the H7

@@ -2,7 +2,8 @@
 # Usage: flash.sh [--rom | --help]
 #
 # Installs the application on a box whose sector 0 holds the bootloader (bootloader/flash.sh puts
-# it there), then prints the boot report.
+# it there), then prints the boot report. The script refuses an image whose header version differs
+# from VERSION.txt, and it exits 1 unless the boot report names the version it flashed.
 #
 # By default the script uses the update drive, the path Adam takes by hand. With a cubevox serial
 # port present it sends enter_dfu, waits for /Volumes/CUBEVOX, copies <out dir>/cubevox.uf2 onto
@@ -26,6 +27,7 @@
 set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
+source "$FW/cv_define.sh"
 VARIANT="$("$FW/build.sh" --variant)"
 OUT="$("$FW/build.sh" --outdir)"
 WAIT="${WAIT:-300}"
@@ -45,8 +47,9 @@ usage: ./flash.sh [--rom | --help]
              wait for the drive to go and the box's port to return, print the boot report
   --rom      ST ROM DFU path: hold BOOT0, tap NRST, release; dfu-util writes <out dir>/cubevox.ino.bin
              at the application start from boot_block.h (0x08020000), above the bootloader's sector
-  VARIANT=release|bench and BENCH=1 pick the image as build.sh does; WAIT=<s> bounds the waits
-  (default 300); CUBEVOX_PORT names the port when several cu.usbmodem* exist
+  VARIANT=release|bench and BENCH=1 pick the image as build.sh does, and OUT=<dir> names its output dir;
+  WAIT=<s> bounds the waits (default 300); CUBEVOX_PORT names the port when several cu.usbmodem* exist
+  Exit 1 unless the image matches VERSION.txt and the box's boot report names the version flashed.
 USAGE
 }
 
@@ -69,6 +72,14 @@ fi
 # The tool refuses an unstamped image, a bad CRC and a .uf2 outside the application region.
 checked="$("${STAMP_TOOL[@]}" check "$IMAGE")"
 echo "[flash] $VARIANT image, $checked"
+# The header must carry the release name VERSION.txt gives now. Another name means the file comes
+# from an earlier build. The bench image adds -bench, which the variant already chose.
+flashed="$(awk '{ print $2 }' <<<"$checked")"
+expected="v$(head -n 1 "$REPO/VERSION.txt")"
+if [ "${flashed%-bench}" != "$expected" ]; then
+  echo "[ERROR] $IMAGE carries $flashed but VERSION.txt says $expected; build again first"
+  exit 1
+fi
 
 copy_log=""
 trap 'if [ -n "$copy_log" ]; then rm -f "$copy_log"; fi' EXIT
@@ -85,8 +96,7 @@ rom_flash() {
     exit 1
   fi
   local start i dfu_log dfu_rc=0 unexpected
-  start="$(awk '$1 == "#define" && $2 == "CV_APP_START" { sub(/[uUlL]+$/, "", $3); print $3; exit }' \
-    "$FW/cubevox/src/board/boot_block.h")"
+  start="$(cv_define CV_APP_START)"
   if [ -z "$start" ]; then
     echo "[ERROR] CV_APP_START is missing from boot_block.h"
     exit 1
@@ -164,4 +174,6 @@ if ! box_port="$("${PORT_TOOL[@]}" --wait 30)"; then
 fi
 if [ -n "$copy_log" ]; then rm -f "$copy_log"; fi  # exec below skips the EXIT trap
 sleep 2
-exec "$FW/term.py" -t 3 -s '{"id":2,"cmd":"bench","op":"report"}' "$box_port"
+# term.py exits 1 unless the box's boot report names the version just flashed, so a box that came
+# back on its old image or printed no report does not read as success.
+exec "$FW/term.py" -t 3 -s '{"id":2,"cmd":"bench","op":"report"}' --expect-image "$flashed" "$box_port"

@@ -111,6 +111,11 @@ level trims behind MIX.
 
 ## Emulator
 
+Superseded: each reverb engine is its own library card ("Spring Reverb", "Chasm Reverb") with the
+knobs MIX and TIME, so the engine radio and the DECAY, WOBBLE and TENSION knob labels are gone
+(`2026-10-08-update-and-slots-design.md`, `2026-10-07-v2-mic-reverb-time-slapback.md`). The old
+Spring engine is removed, and `tools/render.cpp` lists the engine names the render CLI takes.
+
 The SPRING block becomes **REVERB**: checkbox `REVERB`, radio `SPRING | CHASM`,
 knob 1 labelled `TENSION` or `DECAY`, knob 2 `DWELL` or `WOBBLE` by engine, both
 `%.0f %%`, then `MIX` `%.0f %%` opening at 50 %, shared by both engines. Tuning header under it has `Spring` and `Chasm` sub-tree-nodes (Spring's

@@ -5,18 +5,33 @@
 #
 #   ./build.sh              # release image into /tmp/cubevox-fw-release
 #   BENCH=1 ./build.sh      # bench image (-DCUBEVOX_BENCH: drills and panel test) into /tmp/cubevox-fw-bench
+#   OUT=/tmp/mine ./build.sh   # any output dir; its lock, log and clip header sit beside it
 #   TAIL=5 ./build.sh       # show only the last 5 lines of compiler output
+#   CLEAN=1 ./build.sh      # rebuild everything, so the image matches what CI builds from the same commit
+#   CLIP=loop.wav BENCH=1 ./build.sh   # bake a 48 kHz 16-bit WAV into the bench image for the clip op
 #   OPT=-O3 EXTRA_FLAGS=-ffast-math ./build.sh   # experiments; the release build is -O2
 #   ./build.sh --variant    # print release or bench for the current environment and exit
 #   ./build.sh --outdir     # print the output dir for the current environment and exit
+#   ./build.sh --toolchain  # print the bin/ dir of the pinned compiler and exit
+#   ./build.sh --help       # print this text and exit
 #
 # VARIANT=release|bench names the variant outright; BENCH=1 implies bench. This script is the
-# one place that rule lives; flash.sh and bringup.py ask it.
-# Each variant has its own output dir and a lock, so two builds of one variant queue up.
+# one place that rule lives; flash.sh and bringup.py ask it, and so does the CI.
+# Each output dir has its own lock, so two builds into one dir queue up and builds into
+# different dirs run side by side.
+# arduino-cli, the core and the compiler are pinned below, and any other version stops the build.
+# A build that does not finish leaves no .bin or .uf2 in its output dir, so a flash script
+# cannot install an image that failed a check or came from an earlier build.
 
 set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
+source "$FW/cv_define.sh"
+
+usage() {  # the header comment above, without its marks
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+}
+if [ "${1:-}" = -h ] || [ "${1:-}" = --help ]; then usage; exit 0; fi
 
 implied=release
 if [ "${BENCH:-}" = 1 ]; then implied=bench; fi
@@ -29,24 +44,76 @@ if [ "$implied" = bench ] && [ "$VARIANT" != bench ]; then
   echo "[ERROR] VARIANT=$VARIANT conflicts with BENCH=1, which needs the bench image"
   exit 1
 fi
-OUT="/tmp/cubevox-fw-$VARIANT"
+OUT="${OUT:-/tmp/cubevox-fw-$VARIANT}"
+case "$OUT" in
+  /*) ;;
+  *) OUT="$PWD/$OUT" ;;
+esac
+OUT="${OUT%/}"  # the lock and log names append to it, so a trailing slash would move them inside the dir
+
+# Pinned: another CLI or core changes how libraries resolve, the HAL, the USB stack and the linker
+# defaults. The compiler is the one the core installs; bootloader/build.sh asks for it with
+# --toolchain, so one pin serves both programs.
+CORE="STMicroelectronics:stm32"
+CLI_VERSION="1.5.1"
+CORE_VERSION="3.0.0"
+XPACK_VERSION="14.2.1-1.1"
+FQBN="$CORE:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen"
+
+# Checks the pins and sets ARDUINO_DATA, ARDUINO_USER and gcc, or stops with the command that fixes
+# the first one that fails. A failing arduino-cli stops the script with its own message.
+locate_toolchain() {
+  if ! command -v arduino-cli >/dev/null; then
+    echo "[ERROR] arduino-cli not installed; the build needs $CLI_VERSION"
+    echo "        https://github.com/arduino/arduino-cli/releases/tag/v$CLI_VERSION"
+    exit 1
+  fi
+  local cli core_list installed
+  cli="$(arduino-cli version | awk '{ for (i = 1; i < NF; i++) if ($i == "Version:") { print $(i + 1); exit } }')"
+  if [ "$cli" != "$CLI_VERSION" ]; then
+    echo "[ERROR] arduino-cli is '${cli:-unknown}', build needs $CLI_VERSION"
+    echo "        https://github.com/arduino/arduino-cli/releases/tag/v$CLI_VERSION"
+    exit 1
+  fi
+  core_list="$(arduino-cli core list)"
+  installed="$(awk -v c="$CORE" '$1 == c {print $2}' <<<"$core_list")"
+  if [ "$installed" != "$CORE_VERSION" ]; then
+    echo "[ERROR] core $CORE is '${installed:-not installed}', build needs $CORE_VERSION"
+    echo "        arduino-cli core install $CORE@$CORE_VERSION"
+    exit 1
+  fi
+  # The CLI knows where its packages and libraries live, so nothing here hard-codes a platform path.
+  ARDUINO_DATA="$(arduino-cli config get directories.data)"
+  ARDUINO_USER="$(arduino-cli config get directories.user)"
+  gcc="$ARDUINO_DATA/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/$XPACK_VERSION/bin/arm-none-eabi-gcc"
+  if [ ! -x "$gcc" ]; then
+    echo "[ERROR] xpack-arm-none-eabi-gcc $XPACK_VERSION missing at $(dirname "$gcc")"
+    echo "        arduino-cli core install $CORE@$CORE_VERSION installs it"
+    exit 1
+  fi
+}
 
 case "${1:-}" in
   "") ;;
   --variant) echo "$VARIANT"; exit 0 ;;
   --outdir) echo "$OUT"; exit 0 ;;
-  *) echo "[ERROR] unknown argument '$1'; use --variant or --outdir"; exit 1 ;;
+  --toolchain) locate_toolchain; dirname "$gcc"; exit 0 ;;
+  *) echo "[ERROR] unknown argument '$1'; use --variant, --outdir, --toolchain or --help"; exit 1 ;;
 esac
 
-# A second build of the same variant waits for the first; the lock is released on every exit path.
+# A second build into the same dir waits for the first. The lock is released on every exit path.
 # The lock dir holds the owner's PID. A lock whose owner is dead is reaped under a second mkdir
 # mutex, so two waiters cannot both remove it and the second then remove a lock the first re-created.
+# A build that starts compiling and does not finish deletes the .bin and .uf2 it found, because
+# neither one matches the sources any more.
 LOCK="$OUT.lock"
-LOCK_WAIT_S="${LOCK_WAIT_S:-600}"  # env override exists so the wait can be tested
+LOCK_WAIT_S=600
 held=0
 reaping=0
+compiling=0
 
 release_locks() {
+  if [ "$compiling" -eq 1 ]; then rm -f "$OUT/cubevox.ino.bin" "$OUT/cubevox.uf2"; fi
   if [ "$reaping" -eq 1 ]; then rmdir "$LOCK.reap"; reaping=0; fi
   if [ "$held" -eq 1 ]; then rm -f "$LOCK/pid"; rmdir "$LOCK"; held=0; fi
 }
@@ -94,37 +161,8 @@ done
 held=1
 echo $$ > "$LOCK/pid"
 
-CORE="STMicroelectronics:stm32"
-CORE_VERSION="${CORE_VERSION:-3.0.0}"  # env override exists only so the check itself can be tested
-# The compiler the core installs. bootloader/build.sh pins the same version, so one toolchain serves both.
-XPACK_VERSION="14.2.1-1.1"
-FQBN="$CORE:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen"
-
-if ! command -v arduino-cli >/dev/null; then
-  echo "[ERROR] arduino-cli not installed (brew install arduino-cli)"
-  exit 1
-fi
-
-# The core is pinned: a different version changes the HAL, the USB stack and the linker defaults.
-# A failing arduino-cli stops the script with its own message instead of reading as "not installed".
-core_list="$(arduino-cli core list)"
-installed="$(awk -v c="$CORE" '$1 == c {print $2}' <<<"$core_list")"
-if [ "$installed" != "$CORE_VERSION" ]; then
-  echo "[ERROR] core $CORE is '${installed:-not installed}', build needs $CORE_VERSION"
-  echo "        arduino-cli core install $CORE@$CORE_VERSION"
-  exit 1
-fi
-
-# The CLI knows where its packages and libraries live, so nothing here hard-codes a platform path.
-ARDUINO_DATA="$(arduino-cli config get directories.data)"
-ARDUINO_USER="$(arduino-cli config get directories.user)"
-gcc="$ARDUINO_DATA/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/$XPACK_VERSION/bin/arm-none-eabi-gcc"
-if [ ! -x "$gcc" ]; then
-  echo "[ERROR] xpack-arm-none-eabi-gcc $XPACK_VERSION missing at $(dirname "$gcc")"
-  echo "        arduino-cli core install $CORE@$CORE_VERSION installs it"
-  exit 1
-fi
-echo "[build] $("$gcc" --version | head -1)"
+locate_toolchain
+echo "[build] arduino-cli $CLI_VERSION, $("$gcc" --version | head -1)"
 
 # The release name is v<VERSION.txt>. The image header, hello, the OLED and the boot report show
 # this one string, and the update drive reads it back from the header. The git state only goes in
@@ -139,14 +177,10 @@ GIT_STATE="$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo
 echo "[build] core $CORE $CORE_VERSION, firmware $VERSION (git $GIT_STATE)"
 
 # The addresses the image and the bootloader agree on come from the header both read.
-BOOT_BLOCK_H="$FW/cubevox/src/board/boot_block.h"
-cv_define() {  # integer value of a #define in the contract header, without its u suffix
-  awk -v name="$1" '$1 == "#define" && $2 == name { sub(/[uUlL]+$/, "", $3); print $3; exit }' "$BOOT_BLOCK_H"
-}
 APP_START="$(cv_define CV_APP_START)"
 APP_END="$(cv_define CV_APP_END)"
 if [ -z "$APP_START" ] || [ -z "$APP_END" ]; then
-  echo "[ERROR] CV_APP_START or CV_APP_END is missing from $BOOT_BLOCK_H"
+  echo "[ERROR] CV_APP_START or CV_APP_END is missing from $CV_BOOT_BLOCK_H"
   exit 1
 fi
 FLASH_BASE=0x08000000
@@ -188,8 +222,13 @@ LDX="-Wl,--script=$FW/cubevox.ld"
 
 # build.flash_offset sets the FLASH origin and -DVECT_TAB_OFFSET together, so the link address and
 # the VTOR the core writes in SystemInit agree. Nothing else sets VTOR.
+# An incremental build can order the link differently from a clean one, which moves functions
+# and changes the CRC. CLEAN=1 rebuilds everything, the way CI builds.
+CLEAN_ARG=""
+if [ "${CLEAN:-}" = 1 ]; then CLEAN_ARG="--clean"; fi
 mkdir -p "$OUT"
-if ! arduino-cli compile --fqbn "$FQBN" \
+compiling=1
+if ! arduino-cli compile --fqbn "$FQBN" $CLEAN_ARG \
   --build-path "$OUT" --warnings more \
   --build-property "build.flash_offset=$FLASH_OFFSET" \
   --build-property "build.flags.optimize=$OPT" \
@@ -219,9 +258,12 @@ fi
 # the linked symbols with the header.
 NM="$(dirname "$gcc")/arm-none-eabi-nm"
 SYMBOLS="$("$NM" "$OUT/cubevox.ino.elf")"
+symbol_address() {  # symbol -> its 0x address, or nothing when the elf lacks it
+  awk -v s="$1" '$3 == s { print "0x" $1; exit }' <<<"$SYMBOLS"
+}
 check_symbol_address() {  # symbol, expected address
   local got
-  got="$(awk -v s="$1" '$3 == s { print "0x" $1; exit }' <<<"$SYMBOLS")"
+  got="$(symbol_address "$1")"
   if [ -z "$got" ] || [ $((got)) -ne $(($2)) ]; then
     echo "[ERROR] $1 is at ${got:-nowhere} in the elf; boot_block.h puts it at $(printf '0x%08X' $(($2))), so fix firmware/cubevox.ld"
     exit 1
@@ -231,6 +273,10 @@ check_symbol_address gBootBlock "$(cv_define CV_BOOT_BLOCK_ADDR)"
 check_symbol_address __cv_noinit_start "$(cv_define CV_FAULT_RECORD_ADDR)"
 check_symbol_address kImageHeader "$((APP_START + $(cv_define CV_IMAGE_HEADER_OFFSET)))"
 
+# Only the bench image holds bench code. The check runs on the release image for the absence and on
+# the bench image for the presence, which keeps its list of names tied to real functions.
+NM="$NM" "$REPO/tools/check_bench_symbols.sh" "$VARIANT" "$OUT/cubevox.ino.elf"
+
 # Fill the header's length and CRC in place, write the update file next to the .bin, and read the
 # update file back the way the bootloader will.
 STAMP=(python3 -I "$REPO/tools/stamp_image.py")
@@ -239,6 +285,43 @@ STAMP=(python3 -I "$REPO/tools/stamp_image.py")
 uf2_check="$("${STAMP[@]}" check "$OUT/cubevox.uf2")"
 echo "[build] cubevox.uf2 $uf2_check"
 
+# Real headroom per region. arduino-cli's own summary divides by the whole 2 MB flash and by D1 alone.
+region() {  # linker region name -> "origin length", read from the memory configuration in the map
+  local line
+  line="$(awk -v n="$1" '$1 == n && $2 ~ /^0x/ { print $2, $3; exit }' "$OUT/cubevox.ino.map")"
+  if [ -z "$line" ]; then
+    echo "[ERROR] region $1 is missing from $OUT/cubevox.ino.map, so the budget cannot be read"
+    exit 1
+  fi
+  echo "$line"
+}
+budget_line() {  # label, used bytes, limit bytes
+  awk -v l="$1" -v u="$2" -v m="$3" \
+    'BEGIN { printf "[budget] %-9s %7d of %7d B  %5.1f %%  %7d B free\n", l, u, m, 100 * u / m, m - u }'
+}
+print_budget() {
+  local name line origin length
+  for name in __dtcm_bss_end _end _estack __sram1_bss_end; do
+    if [ -z "$(symbol_address "$name")" ]; then
+      echo "[ERROR] $name is missing from the elf, so the budget cannot be read"
+      exit 1
+    fi
+  done
+  budget_line "app flash" "$size" "$MAX_BIN"
+  line="$(region RAM)"
+  read -r origin length <<<"$line"
+  budget_line "DTCM" $(($(symbol_address __dtcm_bss_end) - origin)) $(($(cv_define CV_BOOT_BLOCK_ADDR) - origin))
+  line="$(region RAM_D1)"
+  read -r origin length <<<"$line"
+  budget_line "D1 SRAM" $(($(symbol_address _end) - origin)) $(($(symbol_address _estack) - origin))
+  line="$(region RAM_D2)"
+  read -r origin length <<<"$line"
+  budget_line "D2 SRAM" $(($(symbol_address __sram1_bss_end) - origin)) $((length))
+}
+print_budget
+
 # Warnings gate: our sources again with -Wall -Wextra -Werror, third-party headers as system headers.
+# It runs last, so a failure here removes the image the stamp step just wrote.
 python3 -I "$FW/warn_gate.py" "$OUT" --tail "${TAIL:-40}" \
   --system-dir "$ARDUINO_DATA" --system-dir "$ARDUINO_USER/libraries"
+compiling=0

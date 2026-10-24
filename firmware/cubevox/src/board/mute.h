@@ -33,8 +33,25 @@ bool muteActive();
 // True once MUTE_N has gone low; see MuteSequence::fullyMuted.
 bool muteFullyMuted();
 
-// Another reason to stay muted, like the switch. Releasing it runs the normal release sequence.
+// Reasons besides the switch to stay muted. Each owner sets and clears its own.
+enum class MuteReason : uint8_t {
+  Panel = 1u << 0,      // the sketch: the jack relay, unseeded knobs, the bench
+  PowerFail = 1u << 1,  // 5VA under its trip level (board/power_sense)
+  Audio = 1u << 2,      // an audio stream fault until its restart (board/audio)
+};
+
+// The Panel reason. Releasing the last reason runs the normal release sequence.
 void muteHold(bool on);
+
+// Holds or releases `reason` through the normal sequence. Call from loop().
+void muteHoldFor(MuteReason reason, bool on);
+
+// Drives XSMT and MUTE_N low by register at once and holds the mute for `reason` until
+// muteTripClear(). For faults that cannot wait for loop(): safe in any interrupt.
+void muteTrip(MuteReason reason);
+
+// Ends a trip from loop(). The output releases through the normal sequence once no reason is left.
+void muteTripClear(MuteReason reason);
 
 // Blocking mute for DFU entry or a reset: XSMT low, wait, MUTE_N low, wait for the relay.
 void muteForReset();

@@ -60,11 +60,11 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
    GND at the jack. TRS T → LINE_P, R → LINE_N through the 25.7 dB pad into the
    same preamp nodes, S to GND. BOTH T holes are the tip (Neutrik electrical
    diagram: one tip circuit, no switch; audit A01); both go to TRS_T. There is
-   no plug detection; the 1/4" PEDAL / MIC menu item is a manual setting.
+   no plug detection; the INPUT MIC / LINE menu item is a manual setting.
    It drives PAD_EN (PE11; was PB8 in earlier drafts) and relay K103 (owner 2026-10-10): the
    same G6K-2F-Y DC5 (C47190) on its NC contacts, IN_P on pin 2 and LINE_P on pin 3 (COM), IN_N
    on pin 6 (COM) and LINE_N on pin 7, pins 4/5 (NO) open. Coil off = pad resistors R102/R105
-   shorted = MIC. PAD_EN high = PEDAL (coil on, 28 mA). Driver Q102 MMBT3904, R160 1 kΩ base,
+   shorted = MIC. PAD_EN high = LINE (coil on, 28 mA). Driver Q102 MMBT3904, R160 1 kΩ base,
    R161 100 kΩ base-emitter, D110 1N4148W across the coil. The firmware MIC trim (+25.7 dB)
    no longer applies; the relay removes the pad instead.
    JACK_TRS_N and R107 are deleted, PB11 is free. A TS plug shorts ring to
@@ -128,8 +128,8 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
 8. DAC. PCM5102APWR (C107671) as fxbox, output ground-centred ±3 V. OUTL →
    470 Ω → 2.2 nF to GND (TI figure 33 reconstruction filter, ~154 kHz, audit
    A09) → 10 µF 25 V electrolytic (+ on the divider side) → 10 kΩ / 15 kΩ
-   divider to BIAS_W (×0.6, 1.27 Vrms max) = DAC_ATT. Firmware LINE /
-   INSTRUMENT menu scales digitally below that.
+   divider to BIAS_W (×0.6, 1.27 Vrms max) = DAC_ATT. The firmware OUTPUT
+   menu (LINE or MIC) scales digitally below that.
 9. Output buffer. A5 (OPA2197) unity, input BUF_IN, output → 100 Ω → 10 µF
    25 V electrolytic (+ on the buffer side) → 100 kΩ to GND → OUT_TIP. Jack:
    HOOYA PJ-611E (C309282; owner 2026-10-02, replaces NMJ6HCD2) tip pin 6 to
@@ -148,9 +148,10 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
     (I01)". PD14 is freed. Firmware: SAI1 master, PLL3 feeds the SAI1 kernel
     clock; mux settling ≥ 0.5 ms before reading a pot channel (audit I02);
     mute on MUTE_SW with XSMT then MUTE_N (audit I03, item 7). Firmware
-    update: an OLED menu item reboots into the ROM DFU bootloader over USB-C;
-    the BOOT0 button (item 17) is recovery only. Settings in flash bank 2
-    survive because the DFU image excludes it.
+    update (superseded by the field-update spec): the menu item resets into
+    the bootloader's CUBEVOX drive over USB-C; the ROM DFU through the BOOT0
+    button (item 17) is the shop's fallback. Settings in flash bank 2 survive
+    because the image excludes them.
 
 ### Power
 
@@ -176,9 +177,10 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
     Pin map: `hardware/PINMAP.md` section 2. Test pads TP1 to TP11 (owner 2026-10-10): 9V_JACK, VIN_9V, GND, 3V3, VBUS, 3V3A, 5V, 5VA, 5VA_W, VREF_BUF, VDDA (D1.5 mm, not in the BOM).
     R162 100 kΩ 0402 (C25741) pulls MUX_S0 (PE12) to GND (owner 2026-10-10): in ROM DFU the bootloader listens on SPI4 (NSS PE11, SCK PE12), and a floating SCK could feed a false sync byte and lock it to SPI. The other three mux selects are not on bootloader pins.
     3V3A: codec digital-analog, pots. USB
-    carries DFU and the slot layout over CDC serial (owner 2026-10-08); DFU is
-    entered from the app or the menu, BOOT0 button is recovery (the box must be
-    on 9 V to run DFU).
+    carries the slot layout over CDC serial (owner 2026-10-08). Updates use the
+    bootloader's CUBEVOX drive, which the menu or the app request enters (field-update
+    spec supersedes the DFU wording); the BOOT0 button is the shop's fallback (the box
+    must be on 9 V to update).
 
 ### Digital core (from fxbox)
 
@@ -195,12 +197,15 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
 F1. BOR level 3 (about 2.61 V falling).
 F2. MUTE_N goes high 500 ms after the SAI clocks run, and low when VA_SENSE
     reads below 4.75 V (provisional, tolerance and shutdown time to budget).
+    ADC1 converts VA_SENSE without pause; its analog watchdog interrupt drops
+    XSMT and MUTE_N by register at once. The mute releases through the normal
+    sequence once 5VA has held at or above 4.85 V for 500 ms (`core/power_fail`).
 F3. Assert XSMT (PC5, U1 pin 33) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
 F4. PLL3 M/N/P 25/196/4 (HAL values PLL3M = 25, PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4; raw RCC fields DIVN3 = 195 and DIVP3 = 3 encode N-1 and P-1, PLL3RGE = 0,
     PLL3VCOSEL = 1); SAI1 MCKDIV = 4, OSR = 0, NOMCK = 0.
 F5. MUTE_SW is active low (low = muted); on change, XSMT first, then MUTE_N.
 F6. Removed 2026-10-07 with the bypass path; the output is always the digital
-    path, so the INSTRUMENT / LINE menu scaling applies to everything the jack sends.
+    path, so the OUTPUT LINE / MIC menu scaling applies to everything the jack sends.
 
 ### Panel
 

@@ -6,7 +6,8 @@ drills need it); the script checks the boot report, times the audio block rate, 
 the fault paths and DFU entry, asks for the readings only a person can take, then flashes the
 release image and confirms hello reports build "release".
 Every command goes out as a framed JSON request through bench_ops.py. The log goes to
-hardware/bringup/. With several cu.usbmodem* ports, name one with --port.
+hardware/bringup/, and the final summary names hardware/bringup/bench-checklist.md, the
+measurements this script cannot take. With several cu.usbmodem* ports, name one with --port.
 
 --dfu drills the ROM DFU, which only BOOT0 reaches once the bootloader is in sector 0, and flashes
 back with flash.sh --rom. --update runs the 13 drills of
@@ -31,6 +32,7 @@ import functools
 import importlib.util
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -45,6 +47,8 @@ import bench_ops  # noqa: E402
 import cubevox_port  # noqa: E402
 
 STAMP_TOOL = os.path.join(REPO, "tools", "stamp_image.py")
+BRINGUP_DIR = os.path.join(REPO, "hardware", "bringup")  # the logs and the checklist for a person at the bench
+CHECKLIST = os.path.join(BRINGUP_DIR, "bench-checklist.md")
 
 
 def load_tool(name, path):
@@ -1252,6 +1256,8 @@ def main():
     ap.add_argument("--no-prompt", action="store_true", help="skip every question to the operator")
     ap.add_argument("--port", default=None, help="serial port, needed only when several cu.usbmodem* exist")
     a = ap.parse_args()
+    if a.dfu and not shutil.which("dfu-util"):
+        sys.exit("[ERROR] dfu-util not installed (brew install dfu-util)")  # before the operator holds BOOT0
     if a.port:
         os.environ[cubevox_port.PORT_ENV] = a.port  # flash.sh inherits it
 
@@ -1317,17 +1323,17 @@ def markdown_log(log, a, stamp):
 
 def finish(log, a):
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
-    out_dir = os.path.join(REPO, "hardware", "bringup")
-    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(BRINGUP_DIR, exist_ok=True)
     if a.update:
-        path = os.path.join(out_dir, f"board-{a.board}.md")
+        path = os.path.join(BRINGUP_DIR, f"board-{a.board}.md")
         text = markdown_log(log, a, stamp)
     else:
-        path = os.path.join(out_dir, f"{stamp}-board-{a.board}.txt")
+        path = os.path.join(BRINGUP_DIR, f"{stamp}-board-{a.board}.txt")
         text = f"cubevox bring-up, board {a.board}, {stamp}\n" + "\n".join(log.rows) + "\n"
     with open(path, "w") as f:
         f.write(text)
     print(f"\n[bringup] {log.failed} failed; log {path}")
+    print(f"[bringup] checks that need a person at the bench: {CHECKLIST}")
     return 1 if log.failed else 0
 
 

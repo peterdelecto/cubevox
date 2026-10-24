@@ -36,7 +36,9 @@ input. Output = the two disperser outputs summed × wetGain.
 
 ## Panel and prototype
 
-1. Panel: MIX + TIME, as every reverb card. Card name "Spring Reverb".
+1. Panel: MIX + TIME (`2026-10-07-v2-mic-reverb-time-slapback.md`), as every reverb card. DWELL stays
+   a tuning field off the face. The engine is Spring (`engine/spring.h`, the SPRING B design) and its
+   card is named "Spring Reverb".
 2. Tuning macros: Drip (chirpA 0.55/0.70/0.85, sections 12/24/32), Flutter
    (wobble 2/8/24 samples at 1.5/3/5 Hz, diffusion 0.45/0.30/0.15), Brightness
    (treble loss 3/6/10 kHz). All default 50 %.
