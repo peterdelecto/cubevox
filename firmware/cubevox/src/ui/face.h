@@ -19,7 +19,7 @@
 class Face {
  public:
   // A knob moved. Takes its card from `layout` and its reading from `panel`. A slot with no card,
-  // and so no knob, raises no readout.
+  // and so no knob, raises no readout. A readout ends at the next tick once its card leaves the slot.
   void knobMoved(const Layout& layout, const PanelReading& panel, LastMoved moved, uint32_t nowMs);
 
   // Something else drew on the panel. The next frame dissolves from whatever it left.
@@ -30,13 +30,19 @@ class Face {
   // whenever this returns true.
   bool due(uint32_t nowMs, const Canvas& live);
 
-  // One UI tick. `energy` is what the audio interrupt heard since the last one.
+  // One UI tick. `energy` is what the audio interrupt heard since the last one. From the first tick
+  // on, the face is on the panel, so the menu listens to the encoder.
   void tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& energy, Menu& menu, Canvas& live);
 
  private:
   void render(const GuiFrame& frame, const UiContext& ctx, Menu& menu);
 
   Gui gui_;
+
+  // The slot of the last knob moved, -1 for none, and the card that slot held then.
+  int readoutSlot_ = -1;
+  Card readoutCard_ = Card::Empty;
+
   level::Meter meter_;
   Ribbon ribbon_;
   Canvas target_;                  // the screen the gui picked, before it reaches the panel

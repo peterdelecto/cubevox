@@ -43,8 +43,6 @@ class Meter {
   // Takes the energy of the tick that just ended, `dtMs` long. Returns the level to show.
   float update(const InputEnergy& energy, float dtMs);
 
-  float value() const { return level_; }
-
  private:
   float level_ = 0.0f;
 };

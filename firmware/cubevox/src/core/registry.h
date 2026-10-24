@@ -79,7 +79,7 @@ Engine engineOf(Card c);
 // Looks a card up by its wire id. False when no card has that id.
 bool cardFromId(const char* id, Card& out);
 
-// The value a continuous knob holds at position 0..1, in the descriptor's unit. formatKnob uses it for
+// The value a continuous knob holds at position 0..1, in the descriptor's unit. knobShown uses it for
 // every continuous knob; applyKnob uses it only where the engine field is in that unit (dB, ms), and
 // hands percent knobs the 0..1 position directly.
 float knobValue(const KnobDesc& k, float position);
@@ -105,10 +105,6 @@ const KnobDesc* knobDesc(Card c, int knob);
 // knob with labels shows a name, so this is the index of that name.
 int knobShown(const KnobDesc& k, float value);
 
-// Prints a shown number the way the OLED does: "+5", "0", "-12", "1.5". Only a knob whose range
-// reaches below zero marks a positive number with "+". A labelled knob prints its name.
-void formatShown(const KnobDesc& k, int shown, char* buf, size_t size);
-
 // The most character cells a knob's number takes.
 constexpr int kMaxKnobCells = 12;
 
@@ -127,7 +123,3 @@ void formatCells(const KnobDesc& k, int shown, char* buf, size_t size);
 
 // The name at index `shown` of a labelled knob, clamped to its positions. "" for any other knob.
 const char* knobLabel(const KnobDesc& k, int shown);
-
-// Readout text for the OLED, for example "-24 dB" or "F / Dm". A stepped value is clamped to the
-// knob's positions; an out-of-range card or knob writes an empty string.
-void formatKnob(Card c, int knob, float value, char* buf, size_t size);

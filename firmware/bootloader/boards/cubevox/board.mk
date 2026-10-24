@@ -69,6 +69,15 @@ SRC_C += \
   $(CV_SRC)/oled.c \
   $(CV_SRC)/screens.c
 
+# The SH1106 driver is the application's, beside boot_block.h. It lies outside the port tree, where
+# the port's pattern rule looks, so it gets its own rule with the port's C flags.
+CV_SH1106_C := $(CV_REPO)/firmware/cubevox/src/board/sh1106.c
+CV_SH1106_OBJ := $(BUILD)/obj/$(CV_SRC)/sh1106.o
+OBJ += $(CV_SH1106_OBJ)
+$(CV_SH1106_OBJ): $(CV_SH1106_C)
+	@echo CC $(notdir $@)
+	@$(CC) $(CFLAGS) -c -o $@ $<
+
 # fonts.cpp hands the project's C++ font header to the C code. The port's rules compile only C,
 # and C-only warnings are dropped for C++.
 CV_FONTS_OBJ := $(BUILD)/obj/$(CV_SRC)/fonts.o

@@ -1,10 +1,11 @@
-// Checks the OLED menu on the host. Covers the closed menu, the list and its click actions, the
-// settings those clicks save and play, the chain and update screens, the timeout, redraw, the
-// screenshot files, the text grid and the list's row pitch. The screens shown while the menu is
-// closed are checked in ui_screens.cpp and ui_face.cpp.
+// Checks the OLED menu on the host. Covers the input it drops before the face shows, the closed menu,
+// the list and its click actions, the settings those clicks save and play, the chain and update
+// screens, the timeout, redraw, the screenshot files, the text grid and the list's row pitch. The
+// screens shown while the menu is closed are checked in ui_screens.cpp and ui_face.cpp.
 
 #include "support.h"
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -72,6 +73,7 @@ std::string chainRow(const Layout& layout, int slot) {
 
 bool pagesClean(const Canvas& canvas) { return canvas.dirtyPages() == 0; }
 
+// A menu as the face leaves it once it is on the panel, listening to the encoder.
 struct MenuRig {
   Menu menu;
   Layout layout = defaultLayout();
@@ -80,6 +82,8 @@ struct MenuRig {
   Canvas canvas;
   bool topSwitchOn = false;
   uint32_t nowMs = 100;
+
+  MenuRig() { menu.listen(); }
 
   UiAction step(int detents, bool click, uint32_t advanceMs = 10) {
     nowMs += advanceMs;
@@ -171,9 +175,6 @@ void checkMenuListPitch() {
 // Every screen but the list keeps its text rows 8 px apart, one per canvas page. The expected
 // canvases are composed from literal y values.
 void checkOtherScreensKeepGrid() {
-  char tag[kDisplayCols + 1];
-  versionTag(kFirmwareVersion, tag, sizeof(tag));
-
   MenuRig chain;
   chain.step(0, true);
   chain.menu.showChainView();
@@ -186,7 +187,7 @@ void checkOtherScreensKeepGrid() {
   confirm.openListAt(kUpdate);
   confirm.step(0, true);
   confirm.draw();
-  const std::string have = std::string("You have ") + tag + ".";
+  const std::string have = std::string("You have ") + kFirmwareVersion + ".";
   Canvas wantConfirm;
   wantConfirm.drawText(0, 0, font5x7(), "Update the firmware?");
   wantConfirm.drawText(0, 16, font5x7(), have.c_str());
@@ -195,35 +196,59 @@ void checkOtherScreensKeepGrid() {
   check(sameCanvas(confirm.canvas, wantConfirm), "menu: the confirm screen keeps the 8 px grid");
 }
 
-// Each of the first five rows asks for its action, and applying it flips the row's setting.
-void checkMenuClicks() {
-  struct Click {
-    UiAction action;
-    const char* after;  // the row as drawn once the click is applied
-    const char* back;   // and once a second click undoes it
-  };
-  const Click clicks[] = {
-      {UiAction::ToggleInputJack, ">INPUT: LINE", ">INPUT: MIC"},
-      {UiAction::ToggleOutput, ">OUTPUT: MIC", ">OUTPUT: LINE"},
-      {UiAction::CycleTopSwitch, ">TOP SWITCH: BYPASS", ">TOP SWITCH: MUTE"},
-      {UiAction::TogglePolishComp, ">POLISH COMP: OFF", ">POLISH COMP: ON"},
-      {UiAction::TogglePolishEq, ">POLISH EQ: OFF", ">POLISH EQ: ON"},
-  };
-  MenuRig m;
+// What a click on each of the first five rows asks for, and the row as drawn once the click is
+// applied and once a second click undoes it.
+struct Click {
+  UiAction action;
+  const char* after;
+  const char* back;
+};
+constexpr std::array<Click, 5> kClicks = {{
+    {UiAction::ToggleInputJack, ">INPUT: LINE", ">INPUT: MIC"},
+    {UiAction::ToggleOutput, ">OUTPUT: MIC", ">OUTPUT: LINE"},
+    {UiAction::CycleTopSwitch, ">TOP SWITCH: BYPASS", ">TOP SWITCH: MUTE"},
+    {UiAction::TogglePolishComp, ">POLISH COMP: OFF", ">POLISH COMP: ON"},
+    {UiAction::TogglePolishEq, ">POLISH EQ: OFF", ">POLISH EQ: ON"},
+}};
+
+// Opens the list and clicks each of the first five rows once, top to bottom, applying each action.
+// Returns the settings the clicks left.
+Settings clickEveryRow(MenuRig& m) {
   m.step(0, true);
   for (int r = kInput; r <= kPolishEq; ++r) {
     if (r > kInput) m.step(1, false);
     const UiAction a = m.step(0, true);
-    check(a == clicks[r].action && ui::applyAction(a, m.settings) == ui::ApplyResult::SettingsChanged, clicks[r].after);
+    check(a == kClicks[r].action && ui::applyAction(a, m.settings) == ui::ApplyResult::SettingsChanged, kClicks[r].after);
     m.draw();
-    check(listRowIs(m.canvas, r, clicks[r].after, true), clicks[r].after);
+    check(listRowIs(m.canvas, r, kClicks[r].after, true), kClicks[r].after);
   }
-  const Settings flipped = m.settings;
+  return m.settings;
+}
+
+// Each of the first five rows asks for its action, applying it flips the row's setting, and a second
+// click flips it back.
+void checkMenuClicks() {
+  MenuRig m;
+  const Settings flipped = clickEveryRow(m);
   check(!flipped.polishComp && !flipped.polishEq && flipped.outputLevel == OutputLevel::Mic &&
             flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass,
         "menu: five clicks flipped the five settings");
+  for (int r = kPolishEq; r >= kInput; --r) {
+    if (r < kPolishEq) m.step(-1, false);
+    const UiAction a = m.step(0, true);
+    ui::applyAction(a, m.settings);
+    m.draw();
+    check(listRowIs(m.canvas, r, kClicks[r].back, true), kClicks[r].back);
+  }
+  check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
+            m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute,
+        "menu: a second click on each row restores the defaults");
+}
 
-  // What the box saves and plays is what the menu showed.
+// What the box saves and plays is what the menu showed.
+void checkMenuClicksSavedAndPlayed() {
+  MenuRig m;
+  const Settings flipped = clickEveryRow(m);
   RecordData saved;
   saved.settings = flipped;
   RecordData loaded;
@@ -236,17 +261,21 @@ void checkMenuClicks() {
         "menu: the flipped settings reach the audio snapshot");
   const ChainSnapshot fresh = composeSnapshot(m.layout, m.panel, Settings(), BenchOverrides());
   check(fresh.params.comp.on && fresh.params.eq.on && fresh.outputGain == 1.0f, "menu: the default snapshot has both polish stages on");
+}
 
-  for (int r = kPolishEq; r >= kInput; --r) {
-    if (r < kPolishEq) m.step(-1, false);
-    const UiAction a = m.step(0, true);
-    ui::applyAction(a, m.settings);
-    m.draw();
-    check(listRowIs(m.canvas, r, clicks[r].back, true), clicks[r].back);
-  }
-  check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
-            m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute,
-        "menu: a second click on each row restores the defaults");
+// Until the face is on the panel, nobody can see the menu, so a click or a turn must do nothing.
+void checkMenuDeafUntilListening() {
+  Menu menu;
+  UiInput click;
+  click.click = true;
+  UiInput turn;
+  turn.detents = 3;
+  check(menu.update(click, 100) == UiAction::None && menu.update(turn, 110) == UiAction::None && !menu.open(),
+        "menu: before listen() a click and a turn open nothing");
+  check(menu.update(click, 120) == UiAction::None && !menu.open(), "menu: a second click before listen() flips no setting");
+  menu.listen();
+  check(menu.update(click, 130) == UiAction::None && menu.open(), "menu: once listening, a click opens the list");
+  check(menu.update(click, 140) == UiAction::ToggleInputJack, "menu: and the list starts on its first row, untouched by the dropped turn");
 }
 
 void checkMenuWrapAndCombo() {
@@ -277,9 +306,7 @@ void checkMenuScreens() {
   m.step(kUpdate, false);
   m.step(0, true);
   m.draw();
-  char tag[kDisplayCols + 1];
-  versionTag(kFirmwareVersion, tag, sizeof(tag));
-  const std::string have = std::string("You have ") + tag + ".";
+  const std::string have = std::string("You have ") + kFirmwareVersion + ".";
   check(rowIs(m.canvas, 0, "Update the firmware?") && rowIs(m.canvas, 2, have.c_str()),
         "menu: confirm screen asks and names the version on the box");
   check(rowIs(m.canvas, 4, "Click to start.") && rowIs(m.canvas, 6, "Turn to cancel."),
@@ -379,10 +406,12 @@ void checkDisplayGrid() {
 }  // namespace
 
 void checkMenu() {
+  checkMenuDeafUntilListening();
   checkMenuClosed();
   checkMenuList();
   checkMenuListPitch();
   checkMenuClicks();
+  checkMenuClicksSavedAndPlayed();
   checkMenuWrapAndCombo();
   checkMenuScreens();
   checkOtherScreensKeepGrid();

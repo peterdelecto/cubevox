@@ -117,7 +117,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
   return 0.0f;
 }
 
-// Descriptor, formatKnob and applyKnob must tell the same story for every continuous knob.
+// Descriptor, the OLED number and applyKnob must tell the same story for every continuous knob.
 void checkDescriptors() {
   for (int i = 1; i < kCardCount; ++i) {
     const Card c = card(i);
@@ -127,12 +127,9 @@ void checkDescriptors() {
       char what[96];
       check(d.min < d.max, "descriptor min below max");
       const bool reversed = d.curve == Curve::LogReversed;
-      char lo[24];
-      char hi[24];
-      formatKnob(c, k, 0.0f, lo, sizeof(lo));
-      formatKnob(c, k, 1.0f, hi, sizeof(hi));
-      std::snprintf(what, sizeof(what), "%s knob %d format at 0 and 1", cardDesc(c).id, k);
-      check(std::atoi(lo) == std::lround(reversed ? d.max : d.min) && std::atoi(hi) == std::lround(reversed ? d.min : d.max), what);
+      std::snprintf(what, sizeof(what), "%s knob %d shows its ends at 0 and 1", cardDesc(c).id, k);
+      check(knobShown(d, 0.0f) == std::lround(reversed ? d.max : d.min) && knobShown(d, 1.0f) == std::lround(reversed ? d.min : d.max),
+            what);
 
       const bool percent = std::strcmp(d.unit, "%") == 0;
       float prev = 0.0f;
@@ -189,23 +186,15 @@ void checkKnobClamps() {
   applyKnob(Card::Octave, 0, -1.0f, p);
   check(p.pitchFx.octave.semitones == -12, "clamp: semitones below the first position");
 
-  char buf[32];
-  formatKnob(Card::Autotune, 0, 99.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, cv::kKeyName[11]) == 0, "clamp: key readout above the last position");
-  formatKnob(Card::Autotune, 0, -4.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, cv::kKeyName[0]) == 0, "clamp: key readout below the first position");
-  formatKnob(Card::Octave, 0, 99.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, "+12 st") == 0, "clamp: semitone readout above the last position");
+  const KnobDesc& key = *knobDesc(Card::Autotune, 0);
+  check(std::strcmp(knobLabel(key, knobShown(key, 99.0f)), cv::kKeyName[11]) == 0, "clamp: key readout above the last position");
+  check(std::strcmp(knobLabel(key, knobShown(key, -4.0f)), cv::kKeyName[0]) == 0, "clamp: key readout below the first position");
+  check(knobShown(*knobDesc(Card::Octave, 0), 99.0f) == 12, "clamp: semitone readout above the last position");
 }
 
 void checkRegistryBounds() {
-  char buf[32] = "unchanged";
-  formatKnob(Card::Count, 0, 0.5f, buf, sizeof(buf));
-  check(buf[0] == '\0', "bounds: an out-of-range card formats as empty");
-  std::strcpy(buf, "unchanged");
-  formatKnob(Card::Gate, kKnobsPerCard, 0.5f, buf, sizeof(buf));
-  check(buf[0] == '\0', "bounds: a knob past the card formats as empty");
-  formatKnob(Card::Gate, -1, 0.5f, buf, 0);
+  check(knobDesc(Card::Count, 0) == nullptr && knobDesc(Card::Gate, kKnobsPerCard) == nullptr && knobDesc(Card::Gate, -1) == nullptr,
+        "bounds: an out-of-range card or knob has no descriptor");
   check(knobSteps(Card::Count, 0) == 0 && knobSteps(Card::Autotune, kKnobsPerCard) == 0 && knobSteps(Card::Autotune, -1) == 0,
         "bounds: an invalid card or knob has no steps");
 
@@ -277,25 +266,20 @@ void checkPlacement() {
   check(p.reverb.engine == cv::kReverbSpring, "non-reverb card leaves the engine alone");
 }
 
-void checkFormat() {
-  char buf[32];
-  formatKnob(Card::Autotune, 0, 11.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, "F / Dm") == 0, "key 11 formats as F / Dm");
-  formatKnob(Card::Octave, 0, 12.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, "0 st") == 0, "semitones centre formats as 0 st, with no sign");
-  formatKnob(Card::Gate, 0, 1.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, "-10 dB") == 0, "gate threshold formats in dB");
-  formatKnob(Card::Slapback, 1, 0.0f, buf, sizeof(buf));
-  check(std::strcmp(buf, "60 ms") == 0, "slapback time formats in ms");
-  formatKnob(Card::Distortion, 0, 0.5f, buf, sizeof(buf));
-  check(std::strcmp(buf, "50 %") == 0, "drive formats in percent");
+std::string cellsOf(const KnobDesc& k, int shown) {
+  char buf[kMaxKnobCells + 1];
+  formatCells(k, shown, buf, sizeof(buf));
+  return buf;
 }
 
-// What the OLED reads for a reading, as numbers and names from the descriptor.
+// What the OLED reads for a reading: the name of a labelled knob, else the number's cells with the
+// blank ones dropped.
 std::string shownText(const KnobDesc& k, float reading) {
-  char buf[16];
-  formatShown(k, knobShown(k, reading), buf, sizeof(buf));
-  return buf;
+  const int shown = knobShown(k, reading);
+  if (k.labels) return knobLabel(k, shown);
+  std::string text = cellsOf(k, shown);
+  text.erase(std::remove(text.begin(), text.end(), ' '), text.end());
+  return text;
 }
 
 void checkShownNumbers() {
@@ -340,10 +324,6 @@ void checkShownDecimals() {
   check(shownText(bipolar, 0.0f) == "-2.00" && shownText(bipolar, 0.5f) == "0.00" && shownText(bipolar, 0.6f) == "+0.40" &&
             shownText(bipolar, 0.1f) == "-1.60",
         "shown: two decimals keep their zeros, a minus and a plus");
-  char buf[8];
-  formatShown(rate, 5, buf, 0);
-  formatShown(rate, 15, buf, sizeof(buf));
-  check(std::strcmp(buf, "1.5") == 0, "shown: formatShown takes any size and honours a size of zero");
 }
 
 // The cells of a knob's number are fixed by its range. Each value fills all of them.
@@ -369,12 +349,6 @@ void checkCells() {
   }
 }
 
-std::string cellsOf(const KnobDesc& k, int shown) {
-  char buf[kMaxKnobCells + 1];
-  formatCells(k, shown, buf, sizeof(buf));
-  return buf;
-}
-
 void checkFormatCells() {
   const KnobDesc& semitones = *knobDesc(Card::Octave, 0);
   check(cellsOf(semitones, 5) == "+ 5" && cellsOf(semitones, 0) == "  0" && cellsOf(semitones, -5) == "- 5" &&
@@ -397,16 +371,16 @@ void checkFormatCells() {
   check(tiny[0] == '\0', "cells: a buffer too small for the cells gets an empty string");
   formatCells(semitones, 5, tiny, 0);
 
-  // The cell strings and the printed number say the same thing.
+  // The cells say the number as the spec writes it: a minus below zero, a plus above it on a signed
+  // range, and no sign for zero.
   bool agree = true;
   for (int v = -12; v <= 12; ++v) {
-    char text[16];
-    formatShown(semitones, v, text, sizeof(text));
+    const std::string written = (v < 0 ? "-" : (v > 0 ? "+" : "")) + std::to_string(std::abs(v));
     std::string cells = cellsOf(semitones, v);
     cells.erase(std::remove(cells.begin(), cells.end(), ' '), cells.end());
-    agree = agree && cells == text;
+    agree = agree && cells == written;
   }
-  check(agree, "cells: dropping the blanks of a number's cells leaves formatShown's text");
+  check(agree, "cells: dropping the blanks of a number's cells leaves the number as written");
 }
 
 // The cells follow whichever end of the range is wider. No card's lower end is wider than its upper one.
@@ -468,7 +442,6 @@ void checkRegistry() {
   checkUnisonRate();
   checkToggles();
   checkPlacement();
-  checkFormat();
   checkShownNumbers();
   checkShownLabels();
   checkShownDecimals();

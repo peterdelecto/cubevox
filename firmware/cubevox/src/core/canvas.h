@@ -73,6 +73,10 @@ class Canvas {
   // Does nothing for a page outside 0..kCanvasPages - 1.
   void clearDirty(int page);
 
+  // Marks every page dirty and leaves the pixels alone, so the whole frame goes out again, as it
+  // must to a panel that has just restarted.
+  void markAllDirty() { dirty_ = kAllPages; }
+
   // The lowest dirty page, or -1 when none is.
   int firstDirtyPage() const;
 
@@ -81,6 +85,8 @@ class Canvas {
 
  private:
   enum class Op : uint8_t { Set, Clear, Toggle };
+
+  static constexpr uint8_t kAllPages = static_cast<uint8_t>((1u << kCanvasPages) - 1);
 
   void apply(int x, int y, int w, int h, Op op);
   void orColumn(int x, int y, uint8_t bits);

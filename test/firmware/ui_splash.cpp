@@ -1,5 +1,5 @@
-// Checks the boot splash on the host: the timer rule, the hand-over to the menu and the centred
-// version text.
+// Checks the boot splash on the host: the timer rule, the hand-over to the face, the input dropped
+// while it shows, and the centred version text. Its proof goes to build/oled-splash.pgm.
 
 #include "support.h"
 
@@ -7,6 +7,13 @@
 
 #include "core/canvas.h"
 #include "core/fonts.h"
+#include "core/layout.h"
+#include "core/level.h"
+#include "core/panel.h"
+#include "core/settings.h"
+#include "core/version.h"
+#include "ui/face.h"
+#include "ui/menu.h"
 #include "ui/splash.h"
 
 namespace {
@@ -98,6 +105,50 @@ void checkTooWide() {
   check(sameFrame(canvas, expected), "splash: text wider than the panel starts at the left edge");
 }
 
+// The sketch's order each pass: the menu takes the encoder's input, then the splash draws, and the
+// face ticks once the splash has gone and the panel has taken its frame. A click or a turn while the
+// splash shows opens nothing; the first click once the face shows opens the menu.
+void checkInputDuringSplash() {
+  Splash splash;
+  Face face;
+  Menu menu;
+  Canvas live;
+  const Layout layout = defaultLayout();
+  const PanelReading panel{};
+  const Settings settings{};
+  const UiContext ctx{layout, panel, settings, false};
+  UiInput click;
+  click.click = true;
+  UiInput turn;
+  turn.detents = 2;
+
+  splash.start(1000);
+  bool quiet = true;
+  for (uint32_t now = 1000; now < 1000 + kSplashMs; now += 50) {
+    quiet = quiet && menu.update(click, now) == UiAction::None && menu.update(turn, now) == UiAction::None;
+    quiet = quiet && splash.draw(now, kVersion, live) == SplashStep::Up;
+    clearAllDirty(live);  // the panel takes the frame
+  }
+  check(quiet && !menu.open(), "splash: clicks and turns while it shows open no menu and flip no setting");
+
+  const uint32_t end = 1000 + kSplashMs;
+  check(splash.draw(end, kVersion, live) == SplashStep::Ended, "splash: hands over on time");
+  face.invalidate();
+  check(face.due(end + kUiTickMs, live), "splash: the face ticks once the splash has gone");
+  face.tick(end + kUiTickMs, ctx, level::InputEnergy(), menu, live);
+  menu.update(click, end + kUiTickMs + 1);
+  check(menu.open(), "splash: the first click once the face shows opens the menu");
+}
+
+// The splash as the box shows it, with this build's version, for the owner's proof.
+void writeProof() {
+  Splash splash;
+  Canvas canvas;
+  splash.start(0);
+  splash.draw(0, kFirmwareVersion, canvas);
+  writePgm(canvas, "oled-splash.pgm");
+}
+
 }  // namespace
 
 void checkSplash() {
@@ -107,4 +158,6 @@ void checkSplash() {
   checkCentred();
   checkReplacesWhatWasThere();
   checkTooWide();
+  checkInputDuringSplash();
+  writeProof();
 }
