@@ -1,5 +1,6 @@
 // Fault story (foundation spec 2026-10-08): independent watchdog, Cortex-M fault handlers that
-// mute and record before resetting, reset-cause decode, and a watch on the audio interrupt.
+// mute and record before resetting, reset-cause decode, a watch on the audio interrupt, and a
+// measure of the main stack.
 
 #pragma once
 
@@ -8,8 +9,9 @@
 #include "board/boot_block.h"
 #include "board/build_kind.h"
 
-// Reads and clears the reset cause and any fault record left by the previous run, and enables the
-// MemManage, BusFault and UsageFault exceptions. Call right after muteInit().
+// Reads and clears the reset cause and any fault record left by the previous run, enables the
+// MemManage, BusFault and UsageFault exceptions, and paints the unused main stack. Call early in
+// setup(), right after the mute pins are set up.
 void faultInit();
 
 // True once faultInit() has run. The ECC recovery reads the fault record faultInit() loads.
@@ -30,14 +32,21 @@ bool faultRecordPresent();
 // `address` is the failing flash word. Valid after faultInit().
 bool faultLastWasBank2Ecc(uint32_t& address);
 
-// Starts the watchdog. Call after audioInit(); from then on loop() must call faultWatchdogKick()
-// at least every watchdog period (2 s).
+// Sets the watchdog's own 2 s period over the 16 s the bootloader started it with. Call at the end
+// of setup(); from then on loop() must call faultWatchdogKick() at least every 2 s.
 void faultWatchdogStart();
 void faultWatchdogKick();
 
-// Call every loop pass. A stalled audio interrupt latches the mute and reports once; new SAI or DMA
-// transfer errors are reported at most once a second.
+// Call every loop pass. New SAI or DMA transfer errors are reported at most once a second. An audio
+// stream that stops advancing for kAudioStallMs while it runs latches the mute, queues an audio
+// fault entry in the diagnostic log, and starts a planned reset that brings the sound back.
 void faultAudioWatch(uint32_t nowMs, bool audioRunning);
+
+// True once the stall watch has latched the mute.
+bool faultAudioStalled();
+
+// Bytes of the main stack no code has touched since faultInit() painted it.
+uint32_t faultStackUntouchedBytes();
 
 // The clock setup step that failed. The values are the contract's, so the bootloader names the
 // same step from the record.
@@ -61,10 +70,16 @@ void faultForceBusFault();
 #endif
 
 // Boot report lines: reset cause, last fault (or "[boot] fault: none"), the image line (version,
-// CRC verdict, earlier failed starts, last update reason), audio stall if any.
+// CRC verdict, earlier failed starts, last update reason), the watchdog period, the untouched stack,
+// audio stall if any.
 void faultReport(Print& out);
+
+// The previous run's fault record for a diagnostic log entry: the kind, pc, lr, cfsr and bfar, as
+// in "bus pc=0x8021A4C lr=0x8020F31 cfsr=0x8200 bfar=0xDEADBEE0", or the clock step that failed.
+// Empty without a record. NUL-terminated within `size`.
+void faultSummaryText(char* out, size_t size);
 
 // Short text for the boot block's appSummary. It holds the first reset cause that was set at boot
 // and the kind of the last fault, as in "power-on none" or "watchdog bus", NUL-terminated within
 // `size`.
-void faultSummaryText(char* out, size_t size);
+void faultResetText(char* out, size_t size);

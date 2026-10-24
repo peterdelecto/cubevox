@@ -9,16 +9,27 @@
 #include "core/layout.h"
 #include "core/settings.h"
 
-// Boot-time load. Recovers from a bank 2 double ECC fault first, whether the last run hit it or the
-// bootloader reported its address, in a record sector or in the diagnostic log's sector (blocking
-// erase, so call it after faultInit() and before faultWatchdogStart()), then loads the newest
-// valid record into
-// `layout` and `settings`. A record whose layout fails validation gives the default layout and a
-// save that rewrites it. Leaves both untouched when there is no usable record.
+// Boot-time load. First recovers from a bank 2 double ECC fault, whether the last run hit it or the
+// bootloader reported its address, in a record sector or in the diagnostic log's sector. The
+// recovery waits on flash erases, so call it after faultInit() and before faultWatchdogStart().
+// Then loads the newest valid record into `layout` and `settings`. A record whose layout fails
+// validation gives the default layout and a save that rewrites it. Leaves both untouched when
+// there is no usable record.
 void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs);
 
-// A settings or layout change. The store writes 2 s after the last call.
+// A settings or layout change. The store writes kSaveDebounceMs after the last call, and writes
+// nothing when flash already holds the same state.
 void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t nowMs);
+
+// A pending save starts on the next poll instead of at the end of the debounce.
+void recordSkipDebounce();
+
+// True while a save is pending or being written.
+bool recordBusy();
+
+// False when the boot's ECC recovery could not erase the diagnostic log's sector. Reading that
+// sector would fault again, so the log stays closed.
+bool recordLogSectorReadable();
 
 // The layout name the next save writes, and the one in force (loaded or set). Empty when never named.
 void recordSetName(const char* name);
@@ -38,15 +49,11 @@ uint32_t recordBootFaultAddress();
 // Call every loop pass. Starts at most one flash operation and reports a failed save once.
 void recordPoll(uint32_t nowMs);
 
-// Writes a pending save now and polls until the store is idle, kicking the watchdog. Returns false
-// when it is still busy after `timeoutMs`. For the moments before a reset.
-bool recordFlush(uint32_t timeoutMs);
-
 // Prints the newest record's sequence, sector, errors, name and settings.
 void recordReportStatus(Print& out);
 
 #if CUBEVOX_BENCH
-// Bench drills: write the current state now, erase both sectors.
+// Bench drills: write the current state now, even when unchanged; erase both sectors.
 void recordSaveNow();
 bool recordEraseAll();  // false while the store is busy
 #endif

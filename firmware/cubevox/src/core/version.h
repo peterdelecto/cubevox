@@ -11,8 +11,9 @@
 
 constexpr const char* kFirmwareVersion = CUBEVOX_FW_VERSION;
 
-// Copies the tag part of a `git describe` string (up to the first '-') into out, clipped to size - 1.
-// "v2.00.04-3-gabc123-dirty" gives "v2.00.04".
+// Copies `version` up to its first '-' into `out`, clipped to size - 1. kFirmwareVersion never holds
+// a '-', because build.sh admits N.NN.NN only and the -bench suffix lives in the image header alone,
+// so it can be used as it is.
 inline void versionTag(const char* version, char* out, size_t size) {
   size_t n = 0;
   while (n + 1 < size && version[n] != '\0' && version[n] != '-') {

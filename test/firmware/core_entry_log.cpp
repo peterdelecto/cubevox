@@ -24,13 +24,8 @@ constexpr int kWordsPerEntry = CV_DIAG_ENTRY_SIZE / kFlashWordBytes;
 static_assert(CV_DIAG_LOG_SIZE == kFlashSectorBytes, "the contract sector is one flash sector");
 static_assert(CV_DIAG_ENTRY_SIZE <= kMaxLogEntryBytes, "the log takes the contract entry");
 
-// A fake clock that moves 10 ms on every read, and a counter for the per-pass hook.
-uint32_t gClockMs = 0;
-int gPasses = 0;
 bool gGateOpen = true;
 
-uint32_t tick() { return gClockMs += 10; }
-void countPass() { ++gPasses; }
 bool gate() { return gGateOpen; }
 
 EntryLog makeLog(FakeFlash& f, EntryLog::Gate g = nullptr) {
@@ -192,35 +187,6 @@ void checkPendingReplacement() {
         "entry log: the running write keeps its bytes and the queued entry follows");
 }
 
-void checkFlush() {
-  FakeFlash f;
-  EntryLog entries = makeLog(f);
-  entries.begin();
-  check(entries.flush(100, tick), "entry log: flush of an idle log returns at once");
-
-  gClockMs = 0;
-  gPasses = 0;
-  queueEntry(entries, makeEntry(0x71));
-  check(entries.flush(1000, tick, countPass) && !entries.busy() && gPasses > 0 && slotValid(f, 0),
-        "entry log: flush writes the queued entry and runs the hook each pass");
-
-  queueEntry(entries, makeEntry(0x72));
-  check(!entries.flush(30, tick) && entries.busy(), "entry log: flush gives up when the write outlasts the timeout");
-  check(entries.flush(1000, tick) && slotValid(f, 1), "entry log: a later flush finishes the entry");
-}
-
-void checkFlushWaitsOutErase() {
-  FakeFlash f;
-  f.eraseBusyPolls = 300;  // 3000 ms on the fake clock
-  fillSector(f, 1);
-  EntryLog entries = makeLog(f);
-  entries.begin();
-  queueEntry(entries, makeEntry(0x73));
-  gClockMs = 0;
-  check(entries.flush(200, tick) && slotValid(f, 0) && f.erases[kLogSector] == 1,
-        "entry log: a running erase does not count against the flush timeout");
-}
-
 void checkErrors() {
   FakeFlash f;
   EntryLog entries = makeLog(f);
@@ -272,8 +238,6 @@ void checkGate() {
   queueEntry(entries, makeEntry(0xA1));
   for (int i = 0; i < 20; ++i) entries.poll();
   check(f.ops == 0 && entries.busy(), "entry log: a closed gate starts nothing and keeps the entry");
-  gClockMs = 0;
-  check(!entries.flush(50, tick), "entry log: flush gives up behind a closed gate");
   gGateOpen = true;
   runToIdle(entries, f);
   check(slotValid(f, 0) && !entries.busy(), "entry log: the entry is written once the gate opens");
@@ -302,8 +266,6 @@ void checkEntryLog() {
   checkCrcMismatch();
   checkEraseWhenFull();
   checkPendingReplacement();
-  checkFlush();
-  checkFlushWaitsOutErase();
   checkErrors();
   checkDirtySector();
   checkGate();

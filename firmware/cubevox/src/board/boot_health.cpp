@@ -20,7 +20,7 @@ bool gReported = false;
 void bootHealthInit() {
   const CvBootBlock& block = bootBlock();
   gFailsAtBoot = failedStartsBefore(cvBootFailsGet(&block));
-  // Another block version means the bootloader did not write this one since power-on.
+  // Without a block the bootloader wrote since power-on, the reason word is random.
   gReasonAtBoot = bootBlockWritten() ? block.lastReason : static_cast<uint32_t>(CvReasonNone);
   gSetupDoneMs = millis();
   gBlocksAtSetup = audioBlockCount();

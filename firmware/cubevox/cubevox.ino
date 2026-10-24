@@ -19,6 +19,8 @@
 #include "board/input_jack.h"
 #include "board/mute.h"
 #include "board/pins.h"
+#include "board/planned_reset.h"
+#include "board/power_sense.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
 #include "board/usb_link.h"
@@ -46,13 +48,13 @@ Settings gSettings;
 Menu gMenu;
 Face gFace;
 Splash gSplash;
-char gVersionTag[kDisplayCols + 1];
 JackSwitch gJack{Settings().inputJack};
 Display* gDisplay = nullptr;
 Canvas gCanvas;
 bool gOledFound = false;
 bool gAudioRunning = false;
 PublishGate gPublish;
+FallingEdge gMenuClosed;
 Every gHeartbeat{kHeartbeatMs};
 Every gStats{kStatsMs};
 
@@ -61,14 +63,28 @@ void reportBoot() { bootReport(gOledFound); }
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
 void publishSnapshot() { audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides())); }
 
+// The encoder's turns and clicks for the menu. While a planned reset waits on the flash the menu
+// takes none, so a turn cannot leave the confirm screen behind an update that is already starting.
+UiInput menuInput(uint32_t nowMs) {
+  const UiInput input = inputPoll(nowMs);
+  return plannedResetPending() ? UiInput{} : input;
+}
+
 // Applies what the menu asked for. Returns true when a setting changed.
-bool applyAction(UiAction action) {
+bool applyAction(UiAction action, uint32_t nowMs) {
   switch (ui::applyAction(action, gSettings)) {
     case ui::ApplyResult::SettingsChanged: return true;
-    case ui::ApplyResult::EnterDfu: enterDfu();
+    case ui::ApplyResult::EnterDfu: enterDfu(nowMs); break;
     case ui::ApplyResult::None: break;
   }
   return false;
+}
+
+// A settings change saves kSaveDebounceMs after the last click, or at once when the menu closes,
+// so the last click is in flash by the time Adam plays.
+void saveSettings(bool changed, uint32_t nowMs) {
+  if (changed) recordRequestSave(gLayout, gSettings, nowMs);
+  if (gMenuClosed.update(gMenu.open())) recordSkipDebounce();
 }
 
 const char* layoutName() { return layoutDisplayName(recordName()); }
@@ -86,6 +102,14 @@ void replyStatus(uint32_t id) {
   status.strayBytes = serialStrayBytes();
   status.bootFails = bootHealthFails();
   status.updateReason = bootHealthLastReason();
+  const AudioHealth health = audioHealth();
+  status.overruns = health.overruns;
+  status.saiErrors = health.errors.count;
+  status.restarts = health.restarts;
+  status.nanBlocks = health.nanBlocks;
+  status.audioLatched = health.latched;
+  status.stalled = faultAudioStalled();
+  status.powerTrips = powerSenseTrips();
   protocol::replyStatus(serialWriter(), id, status);
 }
 
@@ -136,7 +160,8 @@ void onRequest(const char* line, uint32_t nowMs) {
     case protocol::Command::Status: replyStatus(req.id); break;
     case protocol::Command::EnterDfu:
       protocol::replyOk(out, req.id);
-      enterDfu();
+      enterDfu(nowMs);
+      break;
     case protocol::Command::Bench: replyBench(req); break;
   }
 }
@@ -154,7 +179,7 @@ void runJackSwitch(uint32_t nowMs) {
 // after the panel has taken the last frame. Without a panel there is nothing to draw, and the
 // stub display would log every page of the moving voice screen.
 void drawFace(const UiContext& ctx, uint32_t nowMs) {
-  switch (gSplash.draw(nowMs, gVersionTag, gCanvas)) {
+  switch (gSplash.draw(nowMs, kFirmwareVersion, gCanvas)) {
     case SplashStep::Up: return;
     case SplashStep::Ended: gFace.invalidate(); break;
     case SplashStep::Off: break;
@@ -169,11 +194,23 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
 
 }  // namespace
 
+// The bootloader starts the watchdog at 16 s (CV_WATCHDOG_BOOT_MS) right before the jump, and
+// faultWatchdogStart() sets the box's own 2 s at the end. The refresh after recordBoot splits the
+// time between into two stretches, each well inside 16 s:
+//   1. Up to the end of the ECC recovery, at most 10.3 s: the clock setup's waits (0.2 s), the
+//      power sense ADC (tens of ms), two erases at the driver's 5 s bound and eight program words
+//      at 5 ms each.
+//   2. From there to faultWatchdogStart(), at most about 7.2 s: the panel's start (about 7.1 s when
+//      its bus sticks after the probe: U8x8's 0.3 s of reset delays and some 68 transfers that each
+//      wait out the core's 100 ms I2C timeout) and the HAL's bounded ADC, PLL3, SAI and DMA waits
+//      (tens of ms).
 void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
+  powerSenseInit();  // needs the mute pins; a failure prints in the boot report
   inputJackInit();  // PAD_EN low = MIC
   faultInit();  // before recordBoot: the ECC recovery reads the fault record this loads
-  recordBoot(gLayout, gSettings, millis());  // blocking ECC erase is safe: the watchdog starts at the end of setup()
+  recordBoot(gLayout, gSettings, millis());  // waits on the ECC recovery's erases, if any
+  faultWatchdogKick();  // ends stretch 1 above
   gJack = JackSwitch(gSettings.inputJack);  // output is still muted, so no dip
   inputJackApply(gSettings.inputJack);
   pinMode(pins::kUserLed, OUTPUT);
@@ -189,7 +226,6 @@ void setup() {
   faultWatchdogStart();  // every init is behind us; from here loop() must keep running
   bootHealthInit();  // after the watchdog: a start only counts as healthy with both running
   diagInit();  // after recordBoot (ECC recovery) and bootHealthInit (failed starts, bootloader reason)
-  versionTag(kFirmwareVersion, gVersionTag, sizeof(gVersionTag));
   gSplash.start(millis());
 }
 
@@ -197,6 +233,7 @@ void loop() {
   const uint32_t nowMs = millis();
   faultWatchdogKick();
   faultAudioWatch(nowMs, gAudioRunning);
+  if (audioPoll(nowMs) != AudioEvent::None) diagNoteAudioFault();
   bootHealthPoll(nowMs);
 
   usbLinkPoll(nowMs);
@@ -208,12 +245,14 @@ void loop() {
 
   controlsPoll(nowMs, gLayout);
   benchPanelPoll(nowMs);
+  powerSensePoll(nowMs);  // before mutePoll, so a trip it clears starts the release this pass
   mutePoll(nowMs, gSettings.topSwitch);
 
-  const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
-  if (settingsChanged) recordRequestSave(gLayout, gSettings, nowMs);
+  const bool settingsChanged = applyAction(gMenu.update(menuInput(nowMs), nowMs), nowMs);
+  saveSettings(settingsChanged, nowMs);
   recordPoll(nowMs);
   diagPoll();
+  plannedResetPoll(nowMs);  // after both stores took their step this pass
   runJackSwitch(nowMs);
   // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();

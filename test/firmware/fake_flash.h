@@ -1,6 +1,7 @@
 // In-memory bank 2 for the flash store tests: three 128 KB sectors, 0xFF erased. Programming ANDs
 // bits in like real flash. failNextErase and failNextProgram make the next such operation report
-// an error. An erase stays busy for eraseBusyPolls polls.
+// an error. An erase stays busy for eraseBusyPolls polls. reads counts the views handed out per
+// sector, so a test can prove a sector was never looked at.
 
 #pragma once
 
@@ -19,7 +20,10 @@ class FakeFlash : public FlashIo {
   FakeFlash() {
     for (std::vector<uint8_t>& sector : mem) sector.assign(kFlashSectorBytes, 0xFF);
   }
-  const uint8_t* read(int s) const override { return mem[s].data(); }
+  const uint8_t* read(int s) const override {
+    ++reads[s];
+    return mem[s].data();
+  }
   void eraseStart(int s) override {
     erasing = s;
     busyPolls = eraseBusyPolls;
@@ -59,7 +63,16 @@ class FakeFlash : public FlashIo {
     std::memcpy(&mem[sector][static_cast<size_t>(entry) * kRecordBytes], b.data(), kRecordBytes);
   }
 
+  // A power cut while `word` of `entry` was programming: that flash word holds part of its bits, and
+  // on the board reading it raises a double ECC error. Returns the word's offset in the sector.
+  uint32_t tear(int sector, int entry, int word) {
+    const size_t at = static_cast<size_t>(entry) * kRecordBytes + static_cast<size_t>(word) * kFlashWordBytes;
+    std::memset(&mem[sector][at], 0x5A, kFlashWordBytes);
+    return static_cast<uint32_t>(at);
+  }
+
   std::vector<uint8_t> mem[kSectors];
+  mutable int reads[kSectors] = {0, 0, 0};
   int erasing = -1;
   int eraseBusyPolls = 3;
   int busyPolls = 0;

@@ -1,12 +1,13 @@
-// Checks the boot health rules on the host: when a start counts as healthy and how many earlier
-// starts failed. board/boot_health.cpp only feeds these rules the clock, the audio block counter
-// and the boot block.
+// Checks the health rules on the host: when a start counts as healthy, how many earlier starts
+// failed, and when the audio stream counts as stalled. board/boot_health.cpp and board/fault.cpp
+// only feed these rules the clock, the audio state and the boot block.
 
 #include "support.h"
 
 #include <cstdint>
 
 #include "board/boot_block.h"
+#include "core/audio_stall.h"
 #include "core/boot_health_rule.h"
 
 namespace {
@@ -50,6 +51,53 @@ void checkFailedStarts() {
   check(failedStartsBefore(0xFFFFFFFFu) == 0xFFFFFFFEu, "fails: the largest counter does not wrap");
 }
 
+// setup() spends 300 ms in the panel's reset delays before the stream starts, and the first look
+// comes before the first block.
+void checkStallArmsAtStreamStart() {
+  AudioStallWatch w;
+  check(!w.update(300, true, 0, 0), "stall: the first look arms the watch and is no stall");
+  check(!w.update(301, true, 0, 0) && !w.update(300 + kAudioStallMs - 1, true, 0, 0),
+        "stall: the time setup() spent before the stream started never counts");
+  check(w.update(300 + kAudioStallMs, true, 0, 0) && w.stalled(), "stall: a stream that never advances stalls after the window");
+  check(!w.update(300 + 2 * kAudioStallMs, true, 0, 0) && w.stalled(), "stall: it reports once and stays stalled");
+}
+
+void checkStallFollowsBlocks() {
+  AudioStallWatch w;
+  w.update(0, true, 0, 0);
+  const uint32_t last = 10 * kAudioStallMs;  // one block per ms until then
+  bool any = false;
+  for (uint32_t t = 1; t <= last; ++t) any = w.update(t, true, 0, t) || any;
+  check(!any && !w.stalled(), "stall: blocks that keep advancing never stall");
+  check(!w.update(last + kAudioStallMs - 1, true, 0, last) && w.update(last + kAudioStallMs, true, 0, last),
+        "stall: the window runs from the last block");
+  check(w.blocks() == last, "stall: it keeps the count it stalled at");
+}
+
+void checkStallSkipsStoppedStream() {
+  AudioStallWatch idle;
+  check(!idle.update(5000, false, 0, 0) && !idle.update(9000, false, 0, 0), "stall: no stream, no stall");
+
+  AudioStallWatch latched;
+  latched.update(0, true, 0, 0);
+  check(!latched.update(50, false, 0, 0) && !latched.update(50 + 10 * kAudioStallMs, false, 0, 0),
+        "stall: a stream the audio module latched is not a stall");
+
+  AudioStallWatch restarted;
+  restarted.update(0, true, 0, 0);
+  check(!restarted.update(80, true, 1, 0) && !restarted.update(80 + kAudioStallMs - 1, true, 1, 0),
+        "stall: a restart arms the watch afresh, so its gap is not a stall");
+  check(restarted.update(80 + kAudioStallMs, true, 1, 0), "stall: a restarted stream that stays still still stalls");
+}
+
+void checkStallClockWrap() {
+  AudioStallWatch w;
+  const uint32_t start = 0xFFFFFFF0u;
+  w.update(start, true, 0, 7);
+  check(!w.update(start + kAudioStallMs - 1, true, 0, 7) && w.update(start + kAudioStallMs, true, 0, 7),
+        "stall: the window holds across a millisecond wrap");
+}
+
 }  // namespace
 
 void checkBootHealth() {
@@ -58,4 +106,8 @@ void checkBootHealth() {
   checkClockWrap();
   checkWindowIsTheCallers();
   checkFailedStarts();
+  checkStallArmsAtStreamStart();
+  checkStallFollowsBlocks();
+  checkStallSkipsStoppedStream();
+  checkStallClockWrap();
 }

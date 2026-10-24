@@ -1,5 +1,6 @@
-// Checks the layout record codec and the flash record store on the host. Covers encoding,
-// recovery after torn writes and interrupted erases, sector switches and flash errors.
+// Checks the layout record codec and the flash record store on the host. Covers encoding, the
+// save debounce and the skipped save of an unchanged state, recovery after torn writes and
+// interrupted erases, the boot-time ECC recovery, sector switches and flash errors.
 
 #include "support.h"
 
@@ -171,13 +172,15 @@ void checkStoreAppend() {
 
   Settings s;
   s.outputLevel = OutputLevel::Mic;
+  check(kSaveDebounceMs == 500, "store: a save waits 500 ms after the last change");
   store.request(defaultLayout(), s, 100);
-  store.poll(2099);
-  check(f.ops == 0, "store: no write before 2 s of quiet");
-  store.request(defaultLayout(), s, 1500);
-  store.poll(3499);
+  store.poll(100 + kSaveDebounceMs - 1);
+  check(f.ops == 0, "store: no write before the debounce has passed");
+  const uint32_t later = 100 + kSaveDebounceMs / 2;
+  store.request(defaultLayout(), s, later);
+  store.poll(later + kSaveDebounceMs - 1);
   check(f.ops == 0, "store: a new request restarts the debounce");
-  uint32_t t = 3500;
+  uint32_t t = later + kSaveDebounceMs;
   const int worst = runToIdle(store, f, t);
   check(f.programs == kWordsPerRecord && f.erases[0] + f.erases[1] == 0, "store: one record is eight word programs, no erase");
   check(worst == 1, "store: at most one flash op per poll");
@@ -189,11 +192,11 @@ void checkStoreAppend() {
         "store: the saved record reloads");
 
   store.saveNow();
-  store.poll(3501 + 1000);
+  store.poll(t + 1);
   check(f.programs == kWordsPerRecord, "store: save-now starts without waiting (first poll sets up)");
   runToIdle(store, f, t);
   check(f.programs == 2 * kWordsPerRecord && store.status().sequence == 2 && store.status().nextEntry == 2,
-        "store: second record appends after the first");
+        "store: save-now writes even an unchanged state, after the first record");
 }
 
 // A request stamped later than the poll's clock (two clock reads in one pass) is not yet due.
@@ -206,9 +209,9 @@ void checkStoreClockSkew() {
   store.poll(4000);
   store.poll(4001);
   check(f.ops == 0, "store: a poll earlier than the request does not save");
-  store.poll(6999);
+  store.poll(5000 + kSaveDebounceMs - 1);
   check(f.ops == 0, "store: still waiting just under the debounce");
-  uint32_t t = 7000;
+  uint32_t t = 5000 + kSaveDebounceMs;
   runToIdle(store, f, t);
   check(f.programs == kWordsPerRecord, "store: the save runs once the debounce has passed");
 }
@@ -239,6 +242,13 @@ void fillSector(FakeFlash& f, int sector, uint32_t firstSeq) {
   for (int entry = 0; entry < kEntriesPerSector; ++entry) f.put(sector, entry, makeRec(firstSeq + static_cast<uint32_t>(entry)));
 }
 
+// Settings that differ from the ones makeRec stores, so a save has something to write.
+Settings micOutput() {
+  Settings s;
+  s.outputLevel = OutputLevel::Mic;
+  return s;
+}
+
 void checkStoreSectorSwitch() {
   FakeFlash f;
   fillSector(f, 0, 1);
@@ -247,7 +257,7 @@ void checkStoreSectorSwitch() {
   RecordStore store(f);
   RecordData out;
   check(store.begin(out) && out.sequence == kEntriesPerSector, "store: full sector loads its last record");
-  store.request(defaultLayout(), Settings{}, 0);
+  store.request(defaultLayout(), micOutput(), 0);
   uint32_t t = kSaveDebounceMs;
   const int worst = runToIdle(store, f, t);
   check(f.erases[1] == 1 && f.erases[0] == 0, "store: full sector erases the other one");
@@ -270,7 +280,7 @@ void checkStoreInterruptedErase() {
   RecordData out;
   check(store.begin(out) && out.sequence == 600 + kEntriesPerSector - 1, "store: dirty sector does not hide the newest");
   check(store.bootNotes().dirtySectors == 1, "store: boot notes count the dirty sector");
-  store.request(defaultLayout(), Settings{}, 0);
+  store.request(defaultLayout(), micOutput(), 0);
   uint32_t t = kSaveDebounceMs;
   runToIdle(store, f, t);
   check(f.erases[1] == 1, "store: interrupted erase is re-erased before use");
@@ -332,13 +342,13 @@ void checkStoreEraseFailure() {
   RecordData out;
   store.begin(out);
   f.failNextErase = true;
-  store.request(defaultLayout(), Settings{}, 0);
+  store.request(defaultLayout(), micOutput(), 0);
   uint32_t t = kSaveDebounceMs;
   runToIdle(store, f, t);
   check(store.status().errors == 1 && store.takeSaveFailed(), "store: a failed erase counts an error and is reported");
   check(store.status().sequence == newest, "store: a failed erase keeps the old sequence");
 
-  store.request(defaultLayout(), Settings{}, t);
+  store.request(defaultLayout(), micOutput(), t);
   t += kSaveDebounceMs;
   runToIdle(store, f, t);
   check(f.erases[1] == 2 && store.status().sector == 1 && store.status().sequence == newest + 1,
@@ -422,6 +432,149 @@ void checkStoreFlushPending() {
         "store: flushing a pending save writes it before the debounce ends");
 }
 
+void checkSameContent() {
+  RecordData a = makeRec(7, OutputLevel::Mic, "rig");
+  RecordData b = a;
+  b.sequence = 8;
+  const RecordBytes ea = encodeRecord(a);
+  const RecordBytes eb = encodeRecord(b);
+  check(ea != eb && sameRecordContent(ea.data(), eb.data()), "record: sequence and CRC aside, the same state is the same content");
+  b.settings.outputLevel = OutputLevel::Line;
+  const RecordBytes ec = encodeRecord(b);
+  check(!sameRecordContent(ea.data(), ec.data()), "record: a changed setting is new content");
+}
+
+void checkStoreSkipsSameState() {
+  FakeFlash f;
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  store.request(defaultLayout(), micOutput(), 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  const int written = f.programs;
+  store.request(defaultLayout(), micOutput(), t);
+  t += kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.programs == written && store.status().sequence == 1 && !store.status().busy,
+        "store: a save of the state flash already holds writes nothing");
+
+  Settings line = micOutput();
+  line.outputLevel = OutputLevel::Line;
+  store.request(defaultLayout(), line, t);  // MIC to LINE and back inside one debounce
+  store.request(defaultLayout(), micOutput(), t + 1);
+  t += 1 + kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.programs == written, "store: a setting flipped and flipped back inside the debounce writes nothing");
+
+  store.setName("stage rig");
+  store.request(defaultLayout(), micOutput(), t);
+  t += kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.programs == written + kWordsPerRecord && store.status().sequence == 2, "store: a new name is a change and saves");
+}
+
+void checkStoreRewritesV1() {
+  FakeFlash f;
+  const RecordBytes v1 = asV1(encodeRecord(makeRec(4)));
+  std::memcpy(f.mem[0].data(), v1.data(), kRecordBytes);
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 4, "store: a v1 record loads");
+  store.request(out.layout, out.settings, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  RecordData back;
+  check(store.status().sequence == 5 && decodeRecord(f.mem[0].data() + kRecordBytes, back) &&
+            f.mem[0][kRecordBytes + kOffSchema] == kRecordSchema,
+        "store: the same state over a v1 record is written again as v2");
+}
+
+// Records firstSeq onward in entries 0 to records - 1 of `sector`, the next record torn at its
+// fourth word, and a valid record past the tear that only a read beyond the faulted word could
+// find. Returns the offset of the faulted word.
+uint32_t tornTail(FakeFlash& f, int sector, uint32_t firstSeq, int records) {
+  for (int i = 0; i < records; ++i) f.put(sector, i, makeRec(firstSeq + static_cast<uint32_t>(i), OutputLevel::Mic));
+  const uint32_t next = firstSeq + static_cast<uint32_t>(records);
+  f.put(sector, records, makeRec(next));
+  const uint32_t fault = f.tear(sector, records, 3);
+  f.put(sector, records + 1, makeRec(next + 50));
+  return fault;
+}
+
+void checkRecoverTornTail() {
+  FakeFlash f;
+  fillSector(f, 1, 1);  // the older sector, full
+  const uint32_t fault = tornTail(f, 0, 1000, 37);
+  const uint32_t newest = 1000 + 36;
+  RecordStore store(f);
+  const RecordRecovery r = store.recover(0, fault);
+  check(r.carried && !r.carryFailed && !r.eraseFailed && r.sequence == newest,
+        "recover: the newest record below the faulted word is carried, never one past it");
+  check(f.erases[1] == 1 && f.erases[0] == 1, "recover: the other sector is erased for the copy, then the faulted one");
+  RecordData out;
+  check(store.begin(out) && out.sequence == newest && out.settings.outputLevel == OutputLevel::Mic,
+        "recover: a torn tail after 37 records boots on record 37, never the defaults");
+  check(store.status().sector == 1 && store.status().nextEntry == 1, "recover: the next save appends after the copy");
+}
+
+void checkRecoverNothingBelow() {
+  FakeFlash f;
+  fillSector(f, 0, 1);  // the full sector the log moved away from
+  const uint32_t fault = f.tear(1, 0, 2);  // the first record of the fresh sector, cut off
+  RecordStore store(f);
+  const RecordRecovery r = store.recover(1, fault);
+  check(!r.carried && !r.carryFailed && !r.eraseFailed && f.erases[1] == 1 && f.erases[0] == 0,
+        "recover: with nothing readable below the fault the sector is only erased");
+  check(f.reads[0] == 0, "recover: the other sector is not read when nothing needs carrying");
+  RecordData out;
+  check(store.begin(out) && out.sequence == kEntriesPerSector, "recover: the box boots on the other sector's newest");
+}
+
+void checkRecoverOtherNewer() {
+  FakeFlash f;
+  fillSector(f, 0, 2000);                                     // the newest records
+  for (int i = 0; i < 5; ++i) f.put(1, i, makeRec(10 + static_cast<uint32_t>(i)));  // left by a cut erase
+  const uint32_t fault = f.tear(1, 5, 0);
+  RecordStore store(f);
+  const RecordRecovery r = store.recover(1, fault);
+  check(!r.carried && !r.eraseFailed && f.erases[0] == 0 && f.erases[1] == 1,
+        "recover: an older record below the fault is not carried over newer ones");
+  RecordData out;
+  check(store.begin(out) && out.sequence == 2000 + kEntriesPerSector - 1, "recover: the newest record survives");
+}
+
+void checkRecoverEraseFails() {
+  FakeFlash f;
+  const uint32_t fault = tornTail(f, 0, 1, 5);  // sector 1 is blank, so the copy needs no erase
+  RecordStore store(f);
+  f.failNextErase = true;  // the erase of the faulted sector
+  const RecordRecovery r = store.recover(0, fault);
+  check(r.carried && r.eraseFailed && f.erases[1] == 0, "recover: the copy lands and the failed erase is reported");
+  const int readsBefore = f.reads[0];
+  RecordData out;
+  check(store.begin(out) && out.sequence == 5 && f.reads[0] == readsBefore,
+        "recover: begin leaves the sector that would not erase unread and boots on the copy");
+  check(store.bootNotes().dirtySectors == 0, "recover: an unread sector is not reported as a cut erase");
+}
+
+void checkRecoverCopyFails() {
+  FakeFlash f;
+  fillSector(f, 1, 1);
+  const uint32_t fault = tornTail(f, 0, 1000, 20);
+  RecordStore store(f);
+  f.failNextErase = true;  // the erase that makes room for the copy
+  const RecordRecovery r = store.recover(0, fault);
+  check(r.carryFailed && !r.carried && r.sequence == 1019 && f.erases[0] == 0, "recover: a failed copy keeps the faulted sector");
+  RecordData out;
+  check(store.begin(out) && out.sequence == 1019, "recover: begin reads the kept sector up to the fault and boots on its newest");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(f.erases[1] == 2 && f.erases[0] == 0 && store.status().sector == 1 && store.status().sequence == 1020,
+        "recover: the next save erases the other sector and lands there");
+}
+
 }  // namespace
 
 void checkRecords() {
@@ -442,4 +595,12 @@ void checkRecords() {
   checkStoreEraseFailure();
   checkStoreWhileBusy();
   checkStoreUnknownCard();
+  checkSameContent();
+  checkStoreSkipsSameState();
+  checkStoreRewritesV1();
+  checkRecoverTornTail();
+  checkRecoverNothingBelow();
+  checkRecoverOtherNewer();
+  checkRecoverEraseFails();
+  checkRecoverCopyFails();
 }

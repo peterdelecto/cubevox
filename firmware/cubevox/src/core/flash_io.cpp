@@ -17,3 +17,10 @@ EraseStatus checkErase(FlashIo& io) {
   if (io.eraseBusy()) return EraseStatus::Running;
   return io.takeError() ? EraseStatus::Failed : EraseStatus::Done;
 }
+
+bool eraseAndWait(FlashIo& io, int sector) {
+  io.eraseStart(sector);
+  EraseStatus status = checkErase(io);
+  while (status == EraseStatus::Running) status = checkErase(io);
+  return status == EraseStatus::Done;
+}

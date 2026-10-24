@@ -18,8 +18,8 @@
 #define CV_LOG_COUNTS_BYTES 64u
 
 // Indexed by enum CvDiagKind; 0 and anything past the table print as "?".
-static const char* const kDiagKindName[] = {"?", "boot", "update"};
-CV_STATIC_ASSERT(kind_names_cover_kinds, CV_ARRAY_SIZE(kDiagKindName) == (size_t)CvDiagKindUpdateRequest + 1u);
+static const char* const kDiagKindName[] = {"?", "boot", "update", "audio"};
+CV_STATIC_ASSERT(kind_names_cover_kinds, CV_ARRAY_SIZE(kDiagKindName) == (size_t)CvDiagKindAudioFault + 1u);
 
 char cvDiagText[CV_DIAG_TEXT_BYTES];
 

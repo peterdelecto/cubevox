@@ -1,5 +1,7 @@
 #include "board/record_service.h"
 
+#include <array>
+
 #include "board/boot_block_access.h"
 #include "board/fault.h"
 #include "board/flash_bank2.h"
@@ -15,35 +17,66 @@ RecordStore gStore(gFlash);
 bool gLoaded = false;
 uint32_t gBootSequence = 0;
 int gBootSector = 0;
-int gEccSector = -1;      // sector erased by ECC recovery, -1 when none
+int gEccSector = -1;  // sector the ECC recovery handled, -1 when none
 uint32_t gEccAddress = 0;
-bool gEccEraseFailed = false;
+RecordRecovery gEccRecord;     // what the recovery did in a record sector
+bool gLogEraseFailed = false;  // the log's sector would not erase
 bool gFaultInitMissing = false;
 bool gLayoutRejected = false;
-char gRejectReason[protocol::kErrorBytes] = {};
+std::array<char, protocol::kErrorBytes> gRejectReason = {};
 uint32_t gBootFaultAddress = 0;  // the bootloader's last read fault, kept after recoverEcc clears it
 
 // The bank 2 address of a double ECC error. Either the last run hit it, or the bootloader hit it
 // (reading the diagnostic log for DIAG.TXT, say) and left the address in the boot block.
 bool eccFaultAddress(uint32_t& address) {
   if (faultLastWasBank2Ecc(address)) return true;
-  if (bank2RecordSector(gBootFaultAddress) < 0) return false;
+  if (bank2SectorOf(gBootFaultAddress) < 0) return false;
   address = gBootFaultAddress;
   return true;
 }
 
-// A double ECC error on a half-programmed word repeats on every read, so the sector goes. That
-// includes sector 2, the diagnostic log, whose scan at boot would otherwise fault again. Once the
-// sector the bootloader named is erased, its address is cleared so the bootloader reads the log
-// again. A failed erase leaves the address, and the bootloader keeps skipping the sector.
+// A double ECC error on a half-programmed word repeats on every read, so the faulted sector goes.
+// In a record sector the store first carries the newest readable record to the other sector. The
+// log's sector holds diagnostics alone and is simply erased; its scan at boot would otherwise fault
+// again. Once the sector the bootloader named is erased, its address is cleared so the bootloader
+// reads the log again. A sector that stays leaves the address, and the bootloader keeps skipping it.
 void recoverEcc() {
   gBootFaultAddress = bootBlockWritten() ? bootBlock().faultAddress : 0u;
   if (!eccFaultAddress(gEccAddress)) return;
-  gEccSector = bank2RecordSector(gEccAddress);
+  gEccSector = bank2SectorOf(gEccAddress);
   if (gEccSector < 0) return;
-  gFlash.eraseBlocking(gEccSector);
-  gEccEraseFailed = gFlash.takeError();
-  if (!gEccEraseFailed && bank2RecordSector(gBootFaultAddress) == gEccSector) bootBlock().faultAddress = 0;
+  bool erased = false;
+  if (gEccSector == kDiagLogSector) {
+    gLogEraseFailed = !eraseAndWait(gFlash, gEccSector);
+    erased = !gLogEraseFailed;
+  } else {
+    gEccRecord = gStore.recover(gEccSector, (gEccAddress - kBank2Base) % kFlashSectorBytes);
+    erased = !gEccRecord.carryFailed && !gEccRecord.eraseFailed;
+  }
+  if (erased && bank2SectorOf(gBootFaultAddress) == gEccSector) bootBlock().faultAddress = 0;
+}
+
+// One line on what the recovery did, an [ERROR] when a sector had to stay.
+void reportEcc(Print& out) {
+  const RecordRecovery& r = gEccRecord;
+  out.print(gLogEraseFailed || r.carryFailed || r.eraseFailed ? "[ERROR]" : "[WARN]");
+  out.print(" bank 2 ECC fault at 0x");
+  out.print(gEccAddress, HEX);
+  out.print(" in sector ");
+  out.print(gEccSector);
+  if (r.carried || r.carryFailed) {
+    out.print("; record seq ");
+    out.print(r.sequence);
+    out.print(r.carried ? " moved to sector " : " could not move to sector ");
+    out.print(1 - gEccSector);
+  }
+  if (r.carryFailed) {
+    out.println(", so the sector stays and is read up to the fault");
+  } else if (gLogEraseFailed) {
+    out.println("; it would not erase, so the diag log stays closed");
+  } else {
+    out.println(r.eraseFailed ? "; it would not erase and stays unread" : "; it is erased");
+  }
 }
 
 void printSettings(Print& out, const Settings& s) {
@@ -55,16 +88,10 @@ void printSettings(Print& out, const Settings& s) {
 
 void reportRecovery(Print& out) {
   if (gFaultInitMissing) out.println("[ERROR] record: recordBoot ran before faultInit, ECC recovery skipped");
-  if (gEccSector >= 0) {
-    out.print(gEccEraseFailed ? "[ERROR] bank 2 ECC fault at 0x" : "[WARN] bank 2 ECC fault at 0x");
-    out.print(gEccAddress, HEX);
-    out.print(", sector ");
-    out.print(gEccSector);
-    out.println(gEccEraseFailed ? " erase failed" : " erased");
-  }
+  if (gEccSector >= 0) reportEcc(out);
   if (gLayoutRejected) {
     out.print("[WARN] record layout invalid (");
-    out.print(gRejectReason);
+    out.print(gRejectReason.data());
     out.println("), using the default layout");
   }
 }
@@ -101,13 +128,19 @@ void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
   const Recovery recovery = recoverLayout(layout);
   gLayoutRejected = recovery.replaced;
   if (!recovery.replaced) return;
-  layoutReason(recovery.why, gRejectReason, sizeof gRejectReason);
+  layoutReason(recovery.why, gRejectReason.data(), gRejectReason.size());
   gStore.request(layout, settings, nowMs);  // rewrite the record with the default layout
 }
 
 void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t nowMs) {
   gStore.request(layout, settings, nowMs);
 }
+
+void recordSkipDebounce() { gStore.flushPending(); }
+
+bool recordBusy() { return gStore.status().busy; }
+
+bool recordLogSectorReadable() { return !gLogEraseFailed; }
 
 void recordSetName(const char* name) { gStore.setName(name); }
 
@@ -123,20 +156,6 @@ void recordPoll(uint32_t nowMs) {
   // The bank takes one operation at a time, so a save waits while the diagnostic log erases.
   if (gFlash.erasingSector() != kDiagLogSector) gStore.poll(nowMs);
   if (gStore.takeSaveFailed()) serialOut().println("[ERROR] record save failed, the box keeps the previous record");
-}
-
-bool recordFlush(uint32_t timeoutMs) {
-  gStore.flushPending();
-  const uint32_t startMs = millis();
-  while (gStore.status().busy) {
-    if (millis() - startMs >= timeoutMs) {
-      serialOut().println("[WARN] record save still running at reset");
-      return false;
-    }
-    faultWatchdogKick();
-    recordPoll(millis());
-  }
-  return true;
 }
 
 #if CUBEVOX_BENCH

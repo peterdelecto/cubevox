@@ -80,6 +80,11 @@ bool decodeRecord(const uint8_t* b, RecordData& out) {
   return true;
 }
 
+bool sameRecordContent(const uint8_t* a, const uint8_t* b) {
+  constexpr size_t kAfterSequence = kOffSequence + sizeof(uint32_t);
+  return memcmp(a, b, kOffSequence) == 0 && memcmp(a + kAfterSequence, b + kAfterSequence, kOffCrc - kAfterSequence) == 0;
+}
+
 EntryState classifyRecordEntry(const uint8_t* bytes) {
   RecordData scratch;
   if (decodeRecord(bytes, scratch)) return EntryState::Valid;

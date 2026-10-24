@@ -51,7 +51,7 @@ Bank2Flash gBank2;
 
 Bank2Flash& bank2Flash() { return gBank2; }
 
-int bank2RecordSector(uint32_t address) {
+int bank2SectorOf(uint32_t address) {
   if (address < kBank2Base) return -1;
   const int index = static_cast<int>((address - kBank2Base) / kFlashSectorBytes);
   return validSector(index) ? index : -1;
@@ -121,9 +121,4 @@ bool Bank2Flash::takeError() {
   const bool e = error_;
   error_ = false;
   return e;
-}
-
-void Bank2Flash::eraseBlocking(int sector) {
-  eraseStart(sector);
-  while (eraseBusy()) {}
 }

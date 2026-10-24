@@ -10,11 +10,13 @@ const uint8_t* entryAt(const uint8_t* sector, int entry) { return sector + stati
 
 // Clean log: records, then blank entries to the end. A blank entry followed by data means an erase
 // was cut off, so the sector is Dirty. `firstBlank` is where an append goes (after a torn tail).
-// `torn` counts the entries cut off mid-write.
+// `torn` counts the entries cut off mid-write. A sector begin() may read only in part is Dirty too,
+// so it takes no appends.
 RecordStore::Sector RecordStore::classify(int sector, int& firstBlank, int& torn) const {
-  const uint8_t* base = io_.read(sector);
   firstBlank = kEntriesPerSector;
   torn = 0;
+  if (readable_[sector] < kRecordSectorBytes) return Sector::Dirty;
+  const uint8_t* base = io_.read(sector);
   bool dirty = false;
   bool anyData = false;
   for (int entry = 0; entry < kEntriesPerSector; ++entry) {
@@ -31,25 +33,82 @@ RecordStore::Sector RecordStore::classify(int sector, int& firstBlank, int& torn
   return anyData ? Sector::Log : Sector::Blank;
 }
 
+// The newest valid record among the first `bytes` of `sector`.
+bool RecordStore::newestIn(int sector, size_t bytes, RecordFound& found) const {
+  if (bytes == 0) return false;
+  const uint8_t* view = io_.read(sector);
+  if (!newestRecord(&view, 1, bytes, found)) return false;
+  found.sector = sector;
+  return true;
+}
+
+// True when `sector` holds no record as new as `sequence`.
+bool RecordStore::olderElsewhere(int sector, uint32_t sequence) const {
+  RecordFound theirs;
+  return !newestIn(sector, kRecordSectorBytes, theirs) || theirs.rec.sequence < sequence;
+}
+
+// Writes `raw` as the first entry of `sector`, erasing the sector first unless it is blank. With
+// nothing below the copy, a power cut that tears it leaves that sector no record to carry, so its
+// own recovery erases it without reading the sector the record came from, whose faulting word is
+// still there. Two recoveries therefore never fault on each other's sector in turn.
+bool RecordStore::copyTo(int sector, const RecordBytes& raw) {
+  int firstBlank = 0;
+  int torn = 0;
+  if (classify(sector, firstBlank, torn) != Sector::Blank && !eraseAndWait(io_, sector)) return false;
+  for (int word = 0; word < kWordsPerRecord; ++word) {
+    if (!programEntryWord(io_, sector, 0, raw.data(), word)) return false;
+  }
+  return true;
+}
+
+RecordRecovery RecordStore::recover(int sector, uint32_t faultOffset) {
+  RecordRecovery r;
+  if (sector < 0 || sector >= kRecordSectors) return r;
+  const int other = 1 - sector;
+  const size_t fault = faultOffset < kRecordSectorBytes ? faultOffset : kRecordSectorBytes;
+  const size_t readable = fault / kRecordBytes * kRecordBytes;  // the entries that end before the word
+  RecordFound mine;
+  if (newestIn(sector, readable, mine) && olderElsewhere(other, mine.rec.sequence)) {
+    RecordBytes raw;  // RAM, because the bank stalls reads while it erases and programs
+    memcpy(raw.data(), entryAt(io_.read(sector), mine.entry), kRecordBytes);
+    r.sequence = mine.rec.sequence;
+    r.carried = copyTo(other, raw);
+    r.carryFailed = !r.carried;
+  }
+  if (r.carryFailed) {
+    readable_[sector] = readable;  // the record stays put, and begin() reads up to the fault
+    readable_[other] = 0;          // the failed copy left it unknown
+    return r;
+  }
+  r.eraseFailed = !eraseAndWait(io_, sector);
+  if (r.eraseFailed) readable_[sector] = 0;
+  return r;
+}
+
 bool RecordStore::begin(RecordData& out) {
   std::array<int, kRecordSectors> firstBlank{};
-  const uint8_t* views[kRecordSectors];
   notes_ = BootNotes();
+  RecordFound found;
+  hasRecord_ = false;
   for (int s = 0; s < kRecordSectors; ++s) {
     int torn = 0;
     state_[s] = classify(s, firstBlank[s], torn);
-    views[s] = io_.read(s);
     notes_.tornEntries += torn;
-    if (state_[s] == Sector::Dirty) ++notes_.dirtySectors;
+    // A sector left unread is Dirty without having been read; recover() reported why.
+    if (state_[s] == Sector::Dirty && readable_[s] == kRecordSectorBytes) ++notes_.dirtySectors;
+    RecordFound here;
+    if (!newestIn(s, readable_[s], here) || (hasRecord_ && here.rec.sequence <= found.rec.sequence)) continue;
+    found = here;
+    hasRecord_ = true;
   }
 
-  RecordFound found;
-  hasRecord_ = newestRecord(views, kRecordSectors, kRecordSectorBytes, found);
   if (hasRecord_) {
     active_ = found.sector;
     sequence_ = found.rec.sequence;
     cur_ = found.rec;
     out = found.rec;
+    memcpy(stored_.data(), entryAt(io_.read(found.sector), found.entry), kRecordBytes);
     notes_.unknownCard = found.rec.unknownCard;
     // A dirty sector takes no appends; the next save moves to the other sector.
     nextEntry_ = state_[active_] == Sector::Dirty ? kEntriesPerSector : firstBlank[active_];
@@ -75,12 +134,14 @@ void RecordStore::setName(const char* name) {
 void RecordStore::saveNow() {
   pending_ = true;
   force_ = true;
+  writeSame_ = true;
 }
 
 bool RecordStore::eraseAll() {
   if (phase_ != Phase::Idle) return false;
   pending_ = false;
   force_ = false;
+  writeSame_ = false;
   phase_ = Phase::ErasingAll;
   eraseIdx_ = -1;  // pollEraseAll starts sector 0 on its first call
   return true;
@@ -109,12 +170,19 @@ void RecordStore::pollIdle(uint32_t nowMs) {
   startWrite();
 }
 
-// Picks the sector, snapshots the record, and starts an erase when the log has to move.
+// Snapshots the record, skips it when flash already holds the same state, picks the sector, and
+// starts an erase when the log has to move.
 void RecordStore::startWrite() {
+  const bool writeSame = writeSame_;
   pending_ = false;
   force_ = false;
+  writeSame_ = false;
   cur_.sequence = sequence_ + 1;
   writing_ = encodeRecord(cur_);
+  if (hasRecord_ && !writeSame && sameRecordContent(writing_.data(), stored_.data())) {
+    cur_.sequence = sequence_;
+    return;
+  }
   word_ = 0;
 
   if (state_[active_] != Sector::Dirty && nextEntry_ < kEntriesPerSector) {
@@ -168,6 +236,7 @@ void RecordStore::pollProgram() {
   state_[target_] = Sector::Log;
   ++nextEntry_;
   sequence_ = cur_.sequence;
+  stored_ = writing_;
   hasRecord_ = true;
   phase_ = Phase::Idle;
 }
