@@ -1,0 +1,67 @@
+Why: the indicator reprograms SysTick to 5 and 25 ms ticks, so HAL_GetTick stops counting milliseconds in DFU mode and the flash driver's 50 s bound stretches to 21 min; SysTick stays at 1 ms and the board timer divides it.
+
+diff --git a/ports/stm32h7/board_irq.c b/ports/stm32h7/board_irq.c
+index 36404f5..5437408 100644
+--- a/ports/stm32h7/board_irq.c
++++ b/ports/stm32h7/board_irq.c
+@@ -39,7 +39,7 @@ void OTG_HS_IRQHandler(void)
+ void SysTick_Handler(void)
+ {
+   HAL_IncTick();
+-  board_timer_handler();
++  board_timer_tick();
+ }
+
+ #if defined(TRAP_EXC)
+diff --git a/ports/stm32h7/boards.c b/ports/stm32h7/boards.c
+index edd6299..be1c24b 100644
+--- a/ports/stm32h7/boards.c
++++ b/ports/stm32h7/boards.c
+@@ -282,15 +282,30 @@ uint8_t board_usb_get_serial(uint8_t serial_id[16])
+ // Timer
+ //--------------------------------------------------------------------+
+
++// SysTick keeps the 1 ms the HAL's tick needs, which bounds every flash wait; the board timer calls
++// board_timer_handler() every _timer_period_ms ticks, never while it is 0
++static volatile uint32_t _timer_period_ms = 1;
++static volatile uint32_t _timer_elapsed_ms = 0;
++
+ void board_timer_start(uint32_t ms)
+ {
+-  // TODO: check if ST HAL requires Systick timing to always be 1ms
+-  SysTick_Config((SystemCoreClock/1000) * ms);
++  _timer_elapsed_ms = 0;
++  _timer_period_ms = ms;
+ }
+
+ void board_timer_stop(void)
+ {
+-  SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
++  _timer_period_ms = 0;
++}
++
++void board_timer_tick(void)
++{
++  uint32_t const period = _timer_period_ms;
++  if ( period && (++_timer_elapsed_ms >= period) )
++  {
++    _timer_elapsed_ms = 0;
++    board_timer_handler();
++  }
+ }
+
+ int board_uart_write(void const * buf, int len)
+diff --git a/ports/stm32h7/boards.h b/ports/stm32h7/boards.h
+index 240aaaf..3efc261 100644
+--- a/ports/stm32h7/boards.h
++++ b/ports/stm32h7/boards.h
+@@ -95,6 +95,9 @@ void board_save_app_start_address(uint32_t addr);
+ void board_clear_temp_boot_addr(void);
+ void board_flash_deinit(void);
+
++// SysTick_Handler's share of the board timer, on every 1 ms tick
++void board_timer_tick(void);
++
+ #ifdef __cplusplus
+  }
+ #endif

@@ -6,9 +6,10 @@
 #include <string.h>
 
 #include "board.h"
+#include "boot_decide.h"
+#include "text.h"
 
 #define CV_ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define CV_INFO_TEXT_BYTES 640u
 
 // Entries DIAG.TXT lists, newest first.
 #define CV_LOG_LINES 16u
@@ -43,25 +44,18 @@ static void put(Text* text, const char* s) {
 }
 
 static void putHex(Text* text, uint32_t value) {
-  static const char kHex[] = "0123456789ABCDEF";
   char digits[11] = "0x";
-  int shift = 28;
-  while (shift > 0 && ((value >> shift) & 0xFu) == 0u) shift -= 4;
+  int8_t shift = 28;
+  while (shift > 0 && ((value >> shift) & 0xFu) == 0u) shift = (int8_t)(shift - 4);
   uint32_t n = 2u;
-  for (; shift >= 0; shift -= 4) digits[n++] = kHex[(value >> shift) & 0xFu];
+  for (; shift >= 0; shift = (int8_t)(shift - 4)) digits[n++] = cvTextHexDigit(value >> shift);
   digits[n] = '\0';
   put(text, digits);
 }
 
 static void putDecimal(Text* text, uint32_t value) {
   char digits[11];
-  uint32_t n = sizeof digits - 1u;
-  digits[n] = '\0';
-  do {
-    digits[--n] = (char)('0' + value % 10u);
-    value /= 10u;
-  } while (value != 0u && n > 0u);
-  put(text, &digits[n]);
+  put(text, cvTextDecimal(digits, value));
 }
 
 static void putLine(Text* text, const char* label, const char* value) {
@@ -76,15 +70,22 @@ static void putField(Text* text, const char* label, uint32_t value) {
   putHex(text, value);
 }
 
+// Spaces to the last two bytes, then CR LF, so a file of fixed size ends like every line.
+static void padToSize(char* buffer, uint32_t length, uint32_t size) {
+  for (uint32_t i = length; i < size - 2u; ++i) buffer[i] = ' ';
+  buffer[size - 2u] = '\r';
+  buffer[size - 1u] = '\n';
+}
+
 const char* cvInstalledText(const struct CvImageReport* image) {
   if (image->state == CvImageNone) return "none";
   if (image->state == CvImageBad) return "invalid";
   return image->version;
 }
 
-const char* cvInfoText(const CvDriveState* state, uint32_t* length) {
+const char* cvInfoText(const CvDriveState* state) {
   static char info[CV_INFO_TEXT_BYTES];
-  Text text = {info, sizeof info, 0u, false};
+  Text text = {info, sizeof info - 2u, 0u, false};
   put(&text, "cubevox bootloader v" CV_BOOT_VERSION "\r\n");
   put(&text, "Model: " UF2_PRODUCT_NAME "\r\n");
   put(&text, "Board-ID: " UF2_BOARD_ID "\r\n");
@@ -95,24 +96,48 @@ const char* cvInfoText(const CvDriveState* state, uint32_t* length) {
   put(&text, state->tinyusbVersion);
   put(&text, ", MIT License, Copyright (c) 2012-2026, Ha Thach (tinyusb.org)\r\n");
   put(&text, "Licence texts: firmware/bootloader/README.md at github.com/peterdelecto/cubevox\r\n");
-  *length = text.length;
+  padToSize(info, text.length, sizeof info);
   return info;
-}
-
-// Copies a NUL padded text field of `size` bytes to out[size + 1], a non-printable byte as '?'.
-// Returns the length.
-static uint32_t printable(char* out, const char* field, uint32_t size) {
-  uint32_t n = 0;
-  for (; n < size && field[n] != '\0'; ++n) out[n] = (field[n] >= 0x20 && field[n] < 0x7F) ? field[n] : '?';
-  out[n] = '\0';
-  return n;
 }
 
 // The application's summary as written.
 static void putSummary(Text* text, const struct CvBootBlock* block) {
   char summary[sizeof block->appSummary + 1u];
-  const uint32_t n = printable(summary, block->appSummary, sizeof block->appSummary);
+  const uint32_t n = cvTextPrintable(summary, block->appSummary, sizeof block->appSummary);
   putLine(text, "app summary: ", n == 0u ? "none" : summary);
+}
+
+// The registers of the bootloader's own last fault.
+static void putBootFault(Text* text, const struct CvBootBlock* block) {
+  put(text, "boot fault:");
+  if ((block->bootFaultPc | block->bootFaultCfsr | block->bootFaultHfsr | block->bootFaultBfar) == 0u) {
+    put(text, " none\r\n");
+    return;
+  }
+  putField(text, " pc", block->bootFaultPc);
+  putField(text, " cfsr", block->bootFaultCfsr);
+  putField(text, " hfsr", block->bootFaultHfsr);
+  putField(text, " bfar", block->bootFaultBfar);
+  put(text, "\r\n");
+}
+
+static void putClock(Text* text, uint32_t clockStep) {
+  if (clockStep == 0u) {
+    put(text, "clock: crystal\r\n");
+    return;
+  }
+  put(text, "clock: failed in ");
+  put(text, cvClockStepName(clockStep));
+  put(text, ", USB on the internal oscillator\r\n");
+}
+
+// The option byte step's result and the values in force now.
+static void putOptions(Text* text, const CvDriveState* state) {
+  put(text, "option bytes: ");
+  put(text, cvOptionResultName(state->block->optionBytes));
+  put(text, ", BOR level ");
+  putDecimal(text, (state->optsrCur & CV_OPTSR_BOR_LEV_MASK) >> CV_OPTSR_BOR_LEV_POS);
+  put(text, (state->wpsnCur1 & CV_WPSN_SECTOR0) == 0u ? ", sector 0 protected\r\n" : ", sector 0 writable\r\n");
 }
 
 // The fault record as faultReport prints it over serial.
@@ -136,17 +161,26 @@ static void putFault(Text* text, const struct CvFaultRecord* r) {
   putField(text, " bfar", r->bfar);
   putField(text, " mmfar", r->mmfar);
   if (r->sr2 & CV_FLASH_SR_DBECCERR) {
-    putField(text, " bank2-ecc", CV_FLASH_BANK2_BASE + (r->eccFa2 & CV_FLASH_ECC_ADDR) * CV_FLASH_WORD_BYTES);
+    putField(text, " bank2-ecc", CV_BANK2_BASE + (r->eccFa2 & CV_FLASH_ECC_ADDR) * CV_FLASH_WORD_BYTES);
   }
   put(text, "\r\n");
 }
 
-static void putRefused(Text* text, const CvDriveState* state) {
-  put(text, "refused blocks: ");
-  putDecimal(text, state->refusedBlocks);
-  if (state->refusedBlocks != 0u) {
+static void putBlocks(Text* text, const CvBlockCounts* blocks) {
+  put(text, "blocks: ");
+  putDecimal(text, blocks->written);
+  put(text, " written, ");
+  putDecimal(text, blocks->refused);
+  put(text, " refused, ");
+  putDecimal(text, blocks->failed);
+  put(text, " failed");
+  if (blocks->refused != 0u) {
     put(text, ", last family ");
-    putHex(text, state->lastRefusedFamily);
+    putHex(text, blocks->lastRefusedFamily);
+  }
+  if (blocks->failed != 0u) {
+    put(text, ", first failure at ");
+    putHex(text, blocks->firstFailedAddress);
   }
   put(text, "\r\n");
 }
@@ -195,7 +229,8 @@ static void putMeasure(Text* text, const char* label, uint32_t value, bool hex, 
   put(text, unit);
 }
 
-// Writes one entry as `#sequence kind firmware up= rst= fails= reason fa= fault sai= ovr=`.
+// Writes one entry as `#sequence kind firmware up= rst= fails= reason fa= fault sai= ovr=`, and
+// `ob=` when the option byte step failed at that boot.
 static void putEntry(Text* text, const uint8_t* slot) {
   struct CvDiagEntry e;
   char firmware[sizeof e.firmware + 1u];
@@ -206,7 +241,7 @@ static void putEntry(Text* text, const uint8_t* slot) {
   put(text, " ");
   put(text, e.kind < CV_ARRAY_SIZE(kDiagKindName) ? kDiagKindName[e.kind] : "?");
   put(text, " ");
-  put(text, printable(firmware, e.firmware, sizeof e.firmware) != 0u ? firmware : "?");
+  put(text, cvTextPrintable(firmware, e.firmware, sizeof e.firmware) != 0u ? firmware : "?");
   putMeasure(text, " up=", e.uptimeS, false, "s");
   putMeasure(text, " rst=", e.resetCause, true, "");
   putMeasure(text, " fails=", e.bootFails, false, "");
@@ -214,9 +249,13 @@ static void putEntry(Text* text, const uint8_t* slot) {
   put(text, cvBootReasonName(e.lastReason));
   putMeasure(text, " fa=", e.faultAddress, true, "");
   put(text, " ");
-  put(text, printable(fault, e.fault, sizeof e.fault) != 0u ? fault : "-");
+  put(text, cvTextPrintable(fault, e.fault, sizeof e.fault) != 0u ? fault : "-");
   putMeasure(text, " sai=", e.saiErrors, false, "");
   putMeasure(text, " ovr=", e.overruns, false, "");
+  if (cvOptionResultFailed(e.optionBytes)) {
+    put(text, " ob=");
+    put(text, cvOptionResultName(e.optionBytes));
+  }
   put(text, "\r\n");
 }
 
@@ -266,7 +305,7 @@ static void putCounts(Text* text, const LogScan* scan) {
 uint32_t cvDiagLogLines(const struct CvBootBlock* block, const uint8_t* sector, char* out, uint32_t capacity) {
   Text text = {out, capacity, 0u, false};
   const uint32_t at = block->faultAddress;
-  if (at >= CV_DIAG_LOG_ADDR && at - CV_DIAG_LOG_ADDR < CV_DIAG_LOG_SIZE) {
+  if (at >= CV_BANK2_BASE && at < CV_BANK2_END) {
     put(&text, "flash log: unreadable at ");
     putHex(&text, at);
     put(&text, "\r\n");
@@ -288,15 +327,18 @@ void cvDiagWrite(const CvDriveState* state) {
   put(&text, "cubevox bootloader v" CV_BOOT_VERSION "\r\n");
   putLine(&text, "board: ", UF2_BOARD_ID);
   putLine(&text, "serial: ", state->serial);
+  putLine(&text, "installed: ", cvInstalledText(state->image));
   putLine(&text, "reason: ", cvBootReasonName(state->block->lastReason));
   put(&text, "fault address: ");
   putHex(&text, state->block->faultAddress);
   put(&text, "\r\n");
+  putBootFault(&text, state->block);
+  putClock(&text, state->clockStep);
+  putOptions(&text, state);
   putSummary(&text, state->block);
   putFault(&text, state->fault);
-  putRefused(&text, state);
+  putBlocks(&text, &state->blocks);
+  putLine(&text, "wrong file: ", state->wrongFile[0] != '\0' ? state->wrongFile : "none");
   text.length += cvDiagLogLines(state->block, state->log, &text.buffer[text.length], text.capacity - text.length);
-  for (uint32_t i = text.length; i < CV_DIAG_TEXT_BYTES - 2u; ++i) cvDiagText[i] = ' ';
-  cvDiagText[CV_DIAG_TEXT_BYTES - 2u] = '\r';
-  cvDiagText[CV_DIAG_TEXT_BYTES - 1u] = '\n';
+  padToSize(cvDiagText, text.length, CV_DIAG_TEXT_BYTES);
 }

@@ -2,10 +2,11 @@
 // can hold it against tools/stamp_image.py. A file is read as flash: its bytes, then erased 0xFF
 // to the end of the application region.
 //
-//   imagecheck check FILE           prints "good <version>", "bad <version>" or "none"
-//   imagecheck fake FILE BYTES      writes an unstamped image: body bytes, the header with length
-//                                   and CRC zero, release name v2.00.10
-//   imagecheck flip IN OUT INDEX    writes IN with bit 0 of byte INDEX inverted
+//   imagecheck check FILE                  prints "good <version>", "bad <version>" or "none"
+//   imagecheck fake FILE BYTES [VERSION]   writes an unstamped image: body bytes, the header with
+//                                          length and CRC zero, header version VERSION (default
+//                                          CV_IMAGE_HEADER_VERSION), release name v2.00.10
+//   imagecheck flip IN OUT INDEX           writes IN with bit 0 of byte INDEX inverted
 
 #include <stdint.h>
 #include <stdio.h>
@@ -55,7 +56,7 @@ static int check(const char* path) {
 }
 
 // The layout of tools/stamp_image.py's fake_image: an odd-period body and the header at its offset.
-static int fake(const char* path, const char* bytesText) {
+static int fake(const char* path, const char* bytesText, uint32_t headerVersion) {
   const unsigned long length = strtoul(bytesText, NULL, 0);
   if (length < CV_IMAGE_HEADER_OFFSET + CV_IMAGE_HEADER_SIZE || length > CV_REGION_BYTES) {
     return fail("image size out of range:", bytesText);
@@ -64,7 +65,7 @@ static int fake(const char* path, const char* bytesText) {
   struct CvImageHeader header;
   memset(&header, 0, sizeof header);
   header.magic = CV_IMAGE_MAGIC;
-  header.headerVersion = CV_IMAGE_HEADER_VERSION;
+  header.headerVersion = headerVersion;
   memcpy(header.version, "v2.00.10", 8);
   memcpy(gImage + CV_IMAGE_HEADER_OFFSET, &header, sizeof header);
   return writeImage(path, (uint32_t)length);
@@ -81,7 +82,10 @@ static int flip(const char* in, const char* out, const char* indexText) {
 
 int main(int argc, char** argv) {
   if (argc == 3 && strcmp(argv[1], "check") == 0) return check(argv[2]);
-  if (argc == 4 && strcmp(argv[1], "fake") == 0) return fake(argv[2], argv[3]);
+  if (argc == 4 && strcmp(argv[1], "fake") == 0) return fake(argv[2], argv[3], CV_IMAGE_HEADER_VERSION);
+  if (argc == 5 && strcmp(argv[1], "fake") == 0) {
+    return fake(argv[2], argv[3], (uint32_t)strtoul(argv[4], NULL, 0));
+  }
   if (argc == 5 && strcmp(argv[1], "flip") == 0) return flip(argv[2], argv[3], argv[4]);
-  return fail("usage: imagecheck check FILE | fake FILE BYTES | flip IN OUT INDEX", "");
+  return fail("usage: imagecheck check FILE | fake FILE BYTES [VERSION] | flip IN OUT INDEX", "");
 }

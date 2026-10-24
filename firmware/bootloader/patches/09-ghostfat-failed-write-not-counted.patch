@@ -1,0 +1,34 @@
+Why: upstream drops board_flash_write's result and counts the block, so a failed erase or program still completes the transfer and resets into a broken image; with this patch a failed block does not count, and a board with a filter hears of it.
+
+diff --git a/src/ghostfat.c b/src/ghostfat.c
+index 4111c5d..7179046 100644
+--- a/src/ghostfat.c
++++ b/src/ghostfat.c
+@@ -537,7 +537,12 @@ int uf2_write_block (uint32_t block_no, uint8_t *data, WriteState *state) {
+
+   if (bl->familyID == BOARD_UF2_FAMILY_ID) {
+     // generic family ID
+-    board_flash_write(bl->targetAddr, bl->data, bl->payloadSize);
++    bool const written = board_flash_write(bl->targetAddr, bl->data, bl->payloadSize);
++#ifdef TINYUF2_BOARD_BLOCK_FILTER
++    board_uf2_block_written(bl, written);
++#endif
++    // a block the flash refused does not count toward the end of the transfer
++    if ( !written ) return -1;
+   }else {
+     // TODO family matches VID/PID
+     return -1;
+diff --git a/src/uf2.h b/src/uf2.h
+index f452d8d..b31a770 100644
+--- a/src/uf2.h
++++ b/src/uf2.h
+@@ -106,6 +106,9 @@ typedef struct {
+ // transfer the block would join
+ bool board_uf2_block_accept(UF2_Block const* block, WriteState const* state);
+
++// Of a board that defines TINYUF2_BOARD_BLOCK_FILTER: whether the flash took a block it accepted
++void board_uf2_block_written(UF2_Block const* block, bool written);
++
+
+ void uf2_init(void);
+ void uf2_read_block(uint32_t block_no, uint8_t *data);

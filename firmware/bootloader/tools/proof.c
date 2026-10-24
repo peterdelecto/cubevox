@@ -42,7 +42,8 @@ static const Proof kProofs[] = {
     {"wait-menu", CvScreenWaitMenu, false},      {"wait-no-image", CvScreenWaitNoImage, false},
     {"wait-boot-failed", CvScreenWaitBootFailed, false}, {"host-connected", CvScreenWaitMenu, true},
     {"writing", CvScreenWriting, false},         {"wrong-file", CvScreenWrongFile, false},
-    {"done", CvScreenDone, false},
+    {"done", CvScreenDone, false},               {"cable-out", CvScreenCableOut, false},
+    {"clock-failed", CvScreenClockFailed, false},
 };
 
 // The release the menu proofs show as installed.
@@ -136,7 +137,8 @@ static bool pngWrite(const char* path, const uint8_t* frame) {
 
 // The approved wording, rows 0 / 2 / 4 / 6 of each screen as the spec table gives it, "" for a blank
 // line. The composed text must equal it, so a change to screens.c the owner has not approved fails
-// the selftest. The last three entries are the waiting screens with a host connected.
+// the selftest. Entries named for a connected host show that a waiting screen swaps its last line
+// for "Computer connected." and every other screen keeps its own.
 typedef struct {
   const char* name;
   CvScreen screen;
@@ -155,6 +157,12 @@ static const Wording kWording[] = {
     {"wrong-file", CvScreenWrongFile, false,
      {"That is not a cubevox", "firmware file.", "Drop the firmware on", "the CUBEVOX drive."}},
     {"done", CvScreenDone, false, {"The update is done.", "Restarting now.", "", ""}},
+    {"cable-out", CvScreenCableOut, false,
+     {"The cable came out.", "Plug it back in and", "drop the firmware on", "the CUBEVOX drive."}},
+    {"clock-failed", CvScreenClockFailed, false,
+     {"The clock failed.", "Send the DIAG.TXT", "file on the CUBEVOX", "drive for a repair."}},
+    {"cable-out-connected", CvScreenCableOut, true,
+     {"The cable came out.", "Plug it back in and", "drop the firmware on", "the CUBEVOX drive."}},
     {"host-connected", CvScreenWaitMenu, true,
      {"Drop the firmware on", "the CUBEVOX drive.", "You have v2.00.10.", "Computer connected."}},
     {"no-image-connected", CvScreenWaitNoImage, true,

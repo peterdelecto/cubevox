@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "text.h"
+
 // Reflected zlib polynomial.
 #define CV_CRC_POLY 0xEDB88320u
 
@@ -15,7 +17,7 @@ static bool gCrcTableReady;
 static void crcTableBuild(void) {
   for (uint32_t i = 0; i < 256u; ++i) {
     uint32_t c = i;
-    for (int bit = 0; bit < 8; ++bit) c = (c & 1u) ? (c >> 1) ^ CV_CRC_POLY : c >> 1;
+    for (uint8_t bit = 0; bit < 8u; ++bit) c = (c & 1u) ? (c >> 1) ^ CV_CRC_POLY : c >> 1;
     gCrcTable[i] = c;
   }
   gCrcTableReady = true;
@@ -37,15 +39,6 @@ static uint32_t imageCrc(const uint8_t* image, uint32_t length) {
   return cvCrc32(crc, image + field + sizeof kZero, length - field - (uint32_t)sizeof kZero);
 }
 
-static void versionCopy(const struct CvImageHeader* header, char out[CV_IMAGE_VERSION_BYTES + 1]) {
-  uint32_t n = 0;
-  for (; n < CV_IMAGE_VERSION_BYTES && header->version[n] != '\0'; ++n) {
-    const char c = header->version[n];
-    out[n] = (c >= 0x20 && c < 0x7F) ? c : '?';
-  }
-  out[n] = '\0';
-}
-
 void cvImageInspect(const uint8_t* image, uint32_t regionBytes, struct CvImageReport* report) {
   struct CvImageHeader header;
   report->state = CvImageNone;
@@ -56,9 +49,9 @@ void cvImageInspect(const uint8_t* image, uint32_t regionBytes, struct CvImageRe
   if (header.magic != CV_IMAGE_MAGIC) return;
 
   report->state = CvImageBad;
-  versionCopy(&header, report->version);
+  cvTextPrintable(report->version, header.version, CV_IMAGE_VERSION_BYTES);
   const bool lengthOk = header.length >= CV_IMAGE_HEADER_OFFSET + CV_IMAGE_HEADER_SIZE &&
                         header.length <= regionBytes;
-  if (header.headerVersion != CV_IMAGE_HEADER_VERSION || !lengthOk) return;
+  if (!cvImageHeaderVersionOk(header.headerVersion) || !lengthOk) return;
   if (imageCrc(image, header.length) == header.crc32) report->state = CvImageGood;
 }
