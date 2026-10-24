@@ -56,7 +56,7 @@ getters behind the sketch's back.
    and reaches the IRQ only inside a snapshot. Settings live only in the sketch's `Settings`.
 4. The IRQ reads exactly one published `ChainSnapshot` per block. Gains are linear in the
    snapshot (no `powf` in the IRQ).
-5. Every core and ui module has host tests in `test/firmware_test.cpp`.
+5. Every core and ui module has host tests in `test/firmware/<tier>_<module>.cpp`.
 6. `loop()` never blocks on I2C for a full frame. The display sends at most one page per pass.
 7. Conventions follow `~/.claude/rules/cpp.md`; functions stay under 40 lines.
 

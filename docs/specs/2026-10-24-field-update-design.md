@@ -286,7 +286,7 @@ firmware/bootloader/
    as `CROSS_COMPILE`. One toolchain pin for both programs, in `firmware/build.sh` and read by the
    bootloader build.
 3. `boot_decide.c` has no HAL includes. It takes the block, a header reader and the switch state
-   and returns the action and reason. `test/firmware_test.cpp` compiles it and covers every row of
+   and returns the action and reason. `test/firmware/boot_decide.cpp` compiles it and covers every row of
    the decision table, the check-word garbage case, the counter wrap and the timeout rule.
 4. The bootloader has its own `VERSION` line in `board.h`, shown in `INFO_UF2.TXT`, bumped on every
    bootloader change. It is independent of `VERSION.txt` because the two ship on different paths.

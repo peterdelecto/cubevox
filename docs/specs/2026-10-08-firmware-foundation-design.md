@@ -72,7 +72,7 @@ Rules:
 
 | Item | Decision |
 |---|---|
-| Host tests | CMake target `firmware_test` (`test/firmware_test.cpp`) compiles `firmware/cubevox/src/core/*.cpp` with `CUBEVOX_ENGINE_FLAGS` against `engine/`. In `ctest` alongside the engine tests. |
+| Host tests | CMake target `firmware_test` (`test/firmware/*.cpp`, one file per module) compiles `firmware/cubevox/src/core/*.cpp` with `CUBEVOX_ENGINE_FLAGS` against `engine/`. In `ctest` alongside the engine tests. |
 | Test content, step 1 | Each card's two knobs move the expected `ChainParams` field at 0 and 1. Stepped knobs report their positions. `formatKnob` per unit. `applyPlacement` selects the reverb engine. Default layout matches CLAUDE.md. Ids unique and snake_case. Default layout cost sum is under `costs::kBudgetPercent`. |
 | Test content, later | `layout`: reverb rejection, unknown id to `empty`. `record`: encode/decode round trip, CRC, newest valid wins, corrupt record falls back. `protocol`: each command parses, each reply formats, bad input gives an error reply. Each module joins the target the day it is written. |
 | Watchdog | IWDG, 2 s, kicked from `loop()` only, never from the audio IRQ. Armed after `audioInit()`. |
