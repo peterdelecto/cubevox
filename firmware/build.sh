@@ -193,14 +193,13 @@ python3 -I "$REPO/tools/bench_ops_check.py"
 # Engine headers are included as "engine/x.h" from the repo root; sketch sources as "core/x.h",
 # "board/x.h", "ui/x.h" from cubevox/src; the font editor's export as "cubevox_fonts.h".
 INC="-I$REPO -I$FW/cubevox/src -I$REPO/tools/font-editor/fonts"
-# The pot mux common on PC0 is the only analogRead; take the longest sample window (spec item 10.8).
 # The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
 # The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
 # fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
 # replays up to a queue's worth of bytes. 32 packets (2 KB) hold two 768-byte requests.
 # arduino-cli hands the quotes of CUBEVOX_FW_VERSION to the compiler as they stand, so one level
 # of escaping makes the macro a string literal. A second level put quote characters in the string.
-DEFS="-DADC_SAMPLINGTIME=ADC_SAMPLETIME_810CYCLES_5 -DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"$VERSION\""
+DEFS="-DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"$VERSION\""
 if [ "$VARIANT" = bench ]; then DEFS="$DEFS -DCUBEVOX_BENCH"; fi
 OPT="${OPT:--O2}"
 DEFS="$DEFS ${EXTRA_FLAGS:-}"
