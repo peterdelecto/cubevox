@@ -314,9 +314,41 @@ void checkPublishGate() {
 
 void checkCanvasHandoff() {
   CanvasHandoff h;
-  check(!h.update(false), "handoff: the menu owning the canvas is not a release");
+  check(!h.update(false), "handoff: the face owning the canvas is not a release");
   check(!h.update(true) && !h.update(true), "handoff: holding the canvas is not a release");
   check(h.update(false) && !h.update(false), "handoff: the first pass after the release reports it once");
+}
+
+// The sketch saves a pending settings change the moment the menu closes.
+void checkMenuCloseSave() {
+  FallingEdge closed;
+  check(!closed.update(false), "menu close: a menu that was never open does not close");
+  check(!closed.update(true) && !closed.update(true), "menu close: clicks in an open menu save on the debounce");
+  check(closed.update(false), "menu close: the pass the menu closes saves at once");
+  check(!closed.update(false), "menu close: it fires once per close");
+}
+
+void checkResetWait() {
+  ResetWait w;
+  w.start(1000);
+  check(w.update(1000, false, false) == ResetWait::Verdict::Go, "reset wait: idle stores reset at once");
+  check(w.update(1000 + kResetWaitMs - 1, true, false) == ResetWait::Verdict::Wait,
+        "reset wait: busy stores are waited for");
+  check(w.update(1000 + kResetWaitMs, true, false) == ResetWait::Verdict::GiveUp,
+        "reset wait: the wait gives up after kResetWaitMs");
+
+  ResetWait e;
+  e.start(0);
+  check(e.update(4000, true, true) == ResetWait::Verdict::Wait, "reset wait: a running erase is waited out, however long");
+  check(e.update(4000 + kResetWaitMs - 1, true, false) == ResetWait::Verdict::Wait,
+        "reset wait: the program words after an erase get the whole wait");
+  check(e.update(4000 + kResetWaitMs, true, false) == ResetWait::Verdict::GiveUp, "reset wait: then it gives up");
+
+  ResetWait wrap;
+  wrap.start(0xFFFFFF00u);
+  check(wrap.update(0xFFFFFF00u + kResetWaitMs - 1, true, false) == ResetWait::Verdict::Wait &&
+            wrap.update(0xFFFFFF00u + kResetWaitMs, true, false) == ResetWait::Verdict::GiveUp,
+        "reset wait: the count holds across a millisecond wrap");
 }
 
 void checkJackSwitch() {
@@ -530,6 +562,8 @@ void checkInputLogic() {
   checkEvery();
   checkPublishGate();
   checkCanvasHandoff();
+  checkMenuCloseSave();
+  checkResetWait();
   checkJackSwitch();
   checkJackRequestWithdrawn();
   checkVersionTag();

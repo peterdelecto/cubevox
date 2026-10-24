@@ -135,21 +135,6 @@ void EntryLog::pollProgram() {
   phase_ = Phase::Idle;
 }
 
-bool EntryLog::flush(uint32_t timeoutMs, uint32_t (*nowMs)(), void (*onPass)()) {
-  uint32_t sinceMs = nowMs();
-  while (busy()) {
-    const uint32_t now = nowMs();
-    if (phase_ == Phase::Erasing) {
-      sinceMs = now;
-    } else if (now - sinceMs >= timeoutMs) {
-      return false;
-    }
-    if (onPass != nullptr) onPass();
-    poll();
-  }
-  return true;
-}
-
 bool EntryLog::takeError() {
   const bool failed = error_;
   error_ = false;

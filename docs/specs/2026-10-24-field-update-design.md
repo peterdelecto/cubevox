@@ -316,6 +316,8 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | Menu dead, app otherwise fine | hold MENU at power-on | `Drop the firmware on the CUBEVOX drive.` | `reason MenuHeld` |
 | Confirm with no computer | 60 s, back to the app | `Drop the firmware on the CUBEVOX drive.`, then normal | `reason AppRequest, timeout` |
 | 9 V dips or flickers | BOR resets at 2.7 V; a power-on clears the start count | normal start | nothing |
+| Power cut tears a layout save | the next start's scan faults and resets; the start after it copies the newest intact record to the other sector, then erases the faulted one | normal start on the last saved settings | a boot entry with the fault, `bus pc=... bfar=...` |
+| Audio stream stalls while running | mute at once, reset once the flash is idle | silence, then normal sound about 1 s later | an `audio` entry, then a boot entry after the software reset |
 | Bootloader faults | reset, update mode again for the same reason; a second fault there runs a valid image | the waiting screen | `reason BootFault`, `boot fault: pc cfsr hfsr bfar` |
 | Crystal or PLL1 fails | HSI, USB on HSI48 with CRS, update mode | `The clock failed.` | `reason ClockFailed`, `clock: failed in <step>` |
 | Bootloader hangs | power cycle | screen frozen, then normal | nothing |
@@ -336,21 +338,30 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
    the flash steps it shares with `record_store` (`core/flash_io`). It follows the layout record's
    non-blocking rules, one flash operation per `loop()` pass, and the sequence keeps counting
    across erases. The two share one flash controller, so each waits while the other erases.
-   1. The application queues one entry at boot whenever the reset cause is not power-on alone or a
-      fault record is present, and one entry when it requests update mode.
+   1. The application queues one entry at boot whenever the reset cause is not power-on alone, a
+      fault record is present, or the option byte step failed. It queues one entry (`update`) when
+      it requests update mode, and one (`audio`) for every audio fault: a stream restart, a mute
+      the audio module latched, or a stall.
    2. An entry carries the firmware version, the uptime (unknown at boot), the reset flags, the
-      fault summary, the boot-fail count, the bootloader's last reason and fault address, the
-      option byte step's result, and the SAI and overrun counters of the run. `DIAG.TXT` shows the
-      option byte result only when the step failed.
-   3. `enterDfu()` queues its entry first and waits up to 3 s for it. An erase the entry needs does
-      not count against that wait, because a reset would leave the sector half erased. A timeout
-      prints a warning and the update goes ahead.
+      fault record as kind, pc, lr, cfsr and bfar (or the clock step that failed), the boot-fail
+      count, the bootloader's last reason and fault address, the option byte step's result, and
+      the SAI and overrun counters of the run. `DIAG.TXT` shows the option byte result only when
+      the step failed.
+   3. A planned reset, into update mode or after an audio stall, lets `loop()` keep running until
+      the entry and any pending layout save are in flash, then mutes and resets
+      (`board/planned_reset`). It gives up after 3 s of waiting with no erase running. An erase
+      does not count against that wait, because a reset would leave the sector half erased. A
+      timeout prints a warning and the reset goes ahead.
 3. The bootloader reads the log and never writes it. A read fault anywhere in bank 2, where the
    bootloader reads nothing but the log, marks the log `unreadable` in `DIAG.TXT` and leaves
-   recovery to the application. At boot, before any scan,
-   the application erases the bank 2 sector that its own fault record or `faultAddress` in the
-   boot block names. After a successful erase it clears `faultAddress`, so the bootloader reads
-   the log again. The boot entry still records the address the bootloader left.
+   recovery to the application. At boot, before any scan, the application recovers the bank 2
+   sector that its own fault record or `faultAddress` in the boot block names. In a record sector
+   the records that end below the faulted word read safely; when the newest of them is newer than
+   everything in the other sector, it is copied there first (that sector erased unless blank), and
+   then the faulted sector is erased. The log's sector is erased. After a successful erase the
+   application clears `faultAddress`, so the bootloader reads the log again. A sector that will not
+   erase stays unread for that start, and the log stays closed when it is the log's. The boot
+   entry still records the address the bootloader left.
 4. Adam's support step is one sentence, told to him: open the `CUBEVOX` drive, send `DIAG.TXT`.
 
 ## Application changes
@@ -361,17 +372,19 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | `board/boot_block.h` | New. The shared contract. C-compatible, no C++ in it. |
 | `board/boot_block.cpp` | New. The `.cv_boot_block` variable and its accessor `bootBlock()` (declared in `boot_block_access.h`). |
 | `board/image_header.{h,cpp}` | New. The `.cv_image_hdr` object; version string from `CUBEVOX_FW_VERSION` (`-bench` added in the bench build); the CRC check of the running image. |
-| `board/dfu.{h,cpp}` | `enterDfu()` keeps its name and both callers. Body: write `appSummary`, queue the diagnostic entry and `diagFlush`, `recordFlush`, `serialFlush`, `muteForReset`, write `request`, `NVIC_SystemReset()`. The ROM jump is gone. |
+| `board/dfu.{h,cpp}` | `enterDfu()` keeps its name and both callers. Body: write `appSummary`, queue the diagnostic entry, start the planned reset into update mode. The ROM jump is gone. |
+| `board/planned_reset.{h,cpp}` | New. Waits from `loop()` until the layout record and the log are idle (3 s at most outside erases), then `serialFlush`, `muteForReset`, writes `request` for update mode, `NVIC_SystemReset()`. The menu takes no input meanwhile. |
 | `core/boot_health_rule.h` | New. The pure rules: healthy window, failed-start count. The reason, fault-kind and clock-step names live in `board/boot_block.h` as inline functions both programs call (one definition). |
 | `board/boot_health.{h,cpp}` | New. `bootHealthPoll(nowMs)` from `loop()`; clears `bootFails` when the 5 s rule holds; exposes the count and the last reason for the boot report, `status` and the diagnostic log. |
 | `core/crc32.{h,cpp}` | New. The one CRC-32, moved out of `core/record.cpp`; also checks the image. |
-| `board/device_serial.{h,cpp}` | New. The MCU id as 24 hex characters, for `hello`. |
+| `board/device_serial.{h,cpp}` | New. The MCU id as 24 hex characters, for `hello` and the boot report. |
 | `core/flash_io.{h,cpp}` | New. `FlashIo` moves here from `record_store.h`, with `kFlashWordBytes`, `kFlashSectorBytes` and the three steps both stores take: blank test, program one word, poll an erase. `core/le_bytes.h` holds the little-endian helpers that `record.cpp` and the log share. |
 | `core/entry_log.{h,cpp}` | New. Append log of fixed-size entries in one sector over `FlashIo`. It stamps the sequence and the CRC-32 and knows no other field of `CvDiagEntry`. |
-| `board/diag_service.{h,cpp}` | New. Builds `CvDiagEntry` bytes on bank 2 sector 2: `diagInit` (boot entry), `diagPoll`, `diagNoteUpdateRequest`, `diagFlush`, `diagReportBoot` (the `[boot] diag log:` line). |
-| `board/flash_bank2.{h,cpp}`, `board/record_service.cpp` | Sector index 2 maps to `CV_DIAG_LOG_ADDR`, and `bank2Flash()` is the one controller both stores use. Each store skips its poll while the other erases. `recoverEcc` also covers sector 2 and the sector a bootloader read fault names, and clears that fault address. |
+| `board/diag_service.{h,cpp}` | New. Builds `CvDiagEntry` bytes on bank 2 sector 2: `diagInit` (boot entry), `diagPoll`, `diagNoteUpdateRequest`, `diagNoteAudioFault`, `diagBusy`, `diagReportBoot` (the `[boot] diag log:` line). |
+| `board/flash_bank2.{h,cpp}`, `board/record_service.cpp` | Sector index 2 maps to `CV_DIAG_LOG_ADDR`, and `bank2Flash()` is the one controller both stores use. Each store skips its poll while the other erases. `recoverEcc` also covers sector 2 and the sector a bootloader read fault names, carries the newest intact record out of a faulted record sector (`RecordStore::recover`), and clears that fault address. |
 | `board/block_mem.{h,cpp}` | Moved from `platform/`, trimmed, flash table fixed (section Teensy-H7-Port cut-over). |
-| `board/fault.cpp` | Boot report line `[boot] image v2.00.10 crc ok, boot fails 0, last update reason none`. `faultResetFlags`, `faultResetWasPowerOn` and `faultRecordPresent` feed the diagnostic log. |
+| `board/fault.cpp` | Boot report lines `[boot] image v2.00.10 crc ok, boot fails 0, last update reason none` and `[boot] watchdog 2 s` (the period read back over the bootloader's 16 s). `faultResetFlags`, `faultResetWasPowerOn`, `faultRecordPresent` and `faultSummaryText` feed the diagnostic log. |
+| `board/boot_report.cpp` | `[boot] option bytes: <result>, BOR level <n>, sector 0 protected` or `writable`, from the boot block, `OPTSR_CUR` and `WPSN_CUR1`, in `DIAG.TXT`'s words; `[WARN]` when the step failed or a value is not the one it sets. A bootloader fault prints `boot fault: pc cfsr hfsr bfar`. |
 | `ui/menu.cpp` | Confirm screen per section OLED. |
 | `ui/splash.{h,cpp}` | Boot splash with version, 2 s. |
 | `core/protocol.cpp` | `enter_dfu` unchanged in name and reply. `status` gains `boot_fails` and `update_reason`. `hello` gains `serial`. |
@@ -436,8 +449,10 @@ firmware/bootloader/
    `0483:5740` as today. The bootloader uses the pid.codes test id `1209:0001`, meant for exactly
    this kind of private device. The two differ because macOS and Windows remember the device class
    per id.
-2. The serial string in both programs is the MCU UID, so two boxes on one Mac are distinct. The
-   bringup log maps box number to UID.
+2. The bootloader's USB serial string is the MCU UID as 24 hex characters. The application's CDC
+   device keeps the core's 12-character serial, which mixes the same UID, so two boxes on one Mac
+   are distinct in both programs. The application gives the full 24 characters in `hello` and in
+   the boot report, and the bringup log maps box number to that UID.
 
 ## Shop steps, every unit
 1. Board on the bench, enclosure open, 9 V on. Hold BOOT0 down through the whole run and tap NRST.
@@ -517,7 +532,7 @@ firmware/bootloader/
 | Application region | 896 KB, asserted by the linker, gated by `build.sh` |
 | Bootloader | about 35 KB of the 128 KB sector, OLED driver and screens included |
 | Shared boot block | 256 B DTCM at 0x2001FF00 |
-| Watchdog from the jump to the end of `setup()` | 16 s, then the application's 2 s |
+| Watchdog from the jump to the end of `setup()` | 16 s, refreshed once after the ECC recovery; at most 10.3 s up to that refresh and about 7.2 s after it; then the application's 2 s |
 | Healthy-boot window | 5 s of audio blocks after `setup()` |
 | Boot-fail limit | 3 |
 | Update-mode timeout, no host | 60 s, menu, app request or bootloader fault only; starts again from a cable pull with nothing written |

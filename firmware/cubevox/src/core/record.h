@@ -57,6 +57,10 @@ RecordBytes encodeRecord(const RecordData& rec);
 // `out.unknownCard`.
 bool decodeRecord(const uint8_t* bytes, RecordData& out);
 
+// True when two encoded records hold the same bytes everywhere but the sequence and the CRC, so
+// writing the second would store nothing new.
+bool sameRecordContent(const uint8_t* a, const uint8_t* b);
+
 // One record-sized entry of a sector's append log.
 enum class EntryState : uint8_t { Blank, Valid, Torn };
 

@@ -38,3 +38,8 @@ enum class EraseStatus : uint8_t { Running, Done, Failed };
 
 // One look at the erase begun with eraseStart(). Failed takes the flash's error flag.
 EraseStatus checkErase(FlashIo& io);
+
+// Erases `sector` and waits for the result, as long as eraseBusy() takes to give up on a hung flash.
+// For the boot-time ECC recovery only, which runs before the application's watchdog. Returns false
+// when the erase failed.
+bool eraseAndWait(FlashIo& io, int sector);

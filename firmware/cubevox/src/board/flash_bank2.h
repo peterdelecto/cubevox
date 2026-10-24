@@ -29,10 +29,6 @@ class Bank2Flash : public FlashIo {
   void programWord(int sector, uint32_t offset, const uint8_t* flashWord) override;
   bool takeError() override;
 
-  // Blocking erase for the boot-time ECC recovery only, bounded by the erase timeout. Never call
-  // after the watchdog starts.
-  void eraseBlocking(int sector);
-
   // The sector whose erase is running, or -1. The bank takes one operation at a time, so the
   // layout record and the log each wait while the other one erases.
   int erasingSector() const { return erasing_ ? erasingSector_ : -1; }
@@ -48,6 +44,5 @@ class Bank2Flash : public FlashIo {
 Bank2Flash& bank2Flash();
 
 // Sector index holding a bank 2 address, or -1 outside the sectors the box uses. Sectors 0 and 1
-// hold the layout record and sector 2 holds the diagnostic log. The name dates from when the
-// record had bank 2 alone.
-int bank2RecordSector(uint32_t address);
+// hold the layout record and sector 2 holds the diagnostic log.
+int bank2SectorOf(uint32_t address);

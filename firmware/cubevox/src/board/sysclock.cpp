@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include <array>
+
 #include "board/clocks.h"
 #include "board/fault.h"
 
@@ -24,7 +26,7 @@ struct RevName {
   uint32_t id;
   const char* name;
 };
-constexpr RevName kRevNames[] = {{0x1001, "Z"}, {0x1003, "Y"}, {0x2001, "X"}, {kRevIdV, "V"}};
+constexpr std::array<RevName, 4> kRevNames = {{{0x1001, "Z"}, {0x1003, "Y"}, {0x2001, "X"}, {kRevIdV, "V"}}};
 
 // Flash wait states and programming delay follow RM0433 table 16 for the HCLK each profile gives.
 struct CoreProfile {

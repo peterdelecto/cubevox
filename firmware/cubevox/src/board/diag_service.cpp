@@ -24,15 +24,13 @@ bool bankFree() {
 EntryLog gLog(bank2Flash(), kDiagLogSector, CV_DIAG_ENTRY_SIZE, offsetof(CvDiagEntry, sequence), bankFree);
 bool gFailed = false;  // the log would not open, or a write failed since boot
 
-uint32_t nowMs() { return millis(); }
-
 // Copies at most srcMax bytes of `src`, up to its first NUL, and leaves the last byte of `dest`
 // NUL. `dest` starts zeroed.
 void copyText(char* dest, size_t destSize, const char* src, size_t srcMax) {
   for (size_t i = 0; i + 1 < destSize && i < srcMax && src[i] != '\0'; ++i) dest[i] = src[i];
 }
 
-// The fields both kinds of entry share. The log stamps the sequence and the CRC. Text fields are
+// The fields every kind of entry shares. The log stamps the sequence and the CRC. Text fields are
 // NUL padded and reserved bytes stay 0xFF, as boot_block.h says.
 CvDiagEntry makeEntry(CvDiagKind kind) {
   CvDiagEntry e;
@@ -47,6 +45,7 @@ CvDiagEntry makeEntry(CvDiagKind kind) {
   e.faultAddress = recordBootFaultAddress();
   e.saiErrors = audioErrors().count;
   e.overruns = audioStats().overruns;
+  e.optionBytes = bootBlockWritten() ? bootBlock().optionBytes : CV_DIAG_UNKNOWN_U32;
   copyText(e.firmware, sizeof e.firmware, kFirmwareVersion, SIZE_MAX);
   if (faultRecordPresent()) faultSummaryText(e.fault, sizeof e.fault);
   return e;
@@ -54,15 +53,24 @@ CvDiagEntry makeEntry(CvDiagKind kind) {
 
 void queue(const CvDiagEntry& entry) { gLog.append(reinterpret_cast<const uint8_t*>(&entry)); }
 
+// An entry written while the box runs carries the uptime.
+void queueLive(CvDiagKind kind) {
+  CvDiagEntry e = makeEntry(kind);
+  e.uptimeS = millis() / 1000;
+  queue(e);
+}
+
 void reportFailure() {
   if (!gLog.takeError()) return;
   gFailed = true;
   serialOut().println("[ERROR] diag log write failed, that entry is lost");
 }
 
-// A start that followed a plain power-on with no fault record has nothing to explain.
+// A start that followed a plain power-on with no fault record and a working option byte step has
+// nothing to explain.
 void queueBootEntry() {
-  if (faultResetWasPowerOn() && !faultRecordPresent()) return;
+  const bool optionsFailed = bootBlockWritten() && cvOptionResultFailed(bootBlock().optionBytes);
+  if (faultResetWasPowerOn() && !faultRecordPresent() && !optionsFailed) return;
   CvDiagEntry e = makeEntry(CvDiagKindBoot);
   if (bootBlockWritten()) {
     const CvBootBlock& block = bootBlock();
@@ -74,7 +82,8 @@ void queueBootEntry() {
 }  // namespace
 
 void diagInit() {
-  gFailed = !gLog.begin();
+  // A sector the ECC recovery could not erase would fault again on the scan.
+  gFailed = !recordLogSectorReadable() || !gLog.begin();
   if (!gFailed) queueBootEntry();
 }
 
@@ -83,18 +92,11 @@ void diagPoll() {
   reportFailure();
 }
 
-void diagNoteUpdateRequest() {
-  CvDiagEntry e = makeEntry(CvDiagKindUpdateRequest);
-  e.uptimeS = millis() / 1000;
-  queue(e);
-}
+void diagNoteUpdateRequest() { queueLive(CvDiagKindUpdateRequest); }
 
-bool diagFlush(uint32_t timeoutMs) {
-  const bool done = gLog.flush(timeoutMs, nowMs, faultWatchdogKick);
-  reportFailure();
-  if (!done) serialOut().println("[WARN] diag entry still unwritten at reset");
-  return done;
-}
+void diagNoteAudioFault() { queueLive(CvDiagKindAudioFault); }
+
+bool diagBusy() { return gLog.busy(); }
 
 void diagReportBoot(Print& out) {
   if (gFailed) {

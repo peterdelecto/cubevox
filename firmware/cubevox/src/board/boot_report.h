@@ -2,6 +2,8 @@
 
 #pragma once
 
-// Prints the firmware version, build kind, reset cause, record, clocks, pins, CPU features, OLED
-// and audio lines through serialOut(). `oledFound` is what setup() learned from the panel probe.
+// Prints through serialOut() the firmware version, build kind and serial; the reset cause, last
+// fault, image, watchdog and stack lines; the option bytes and any bootloader fault; then the
+// record, diag log, clocks, pins, CPU features, OLED, audio, power sense and pot lines. `oledFound`
+// is what setup() learned from the panel probe.
 void bootReport(bool oledFound);

@@ -409,7 +409,9 @@ static inline bool cvImageHeaderVersionOk(uint32_t headerVersion) {
 // What the application is doing when it writes the entry.
 enum CvDiagKind {
   CvDiagKindBoot = 1,
-  CvDiagKindUpdateRequest = 2
+  CvDiagKindUpdateRequest = 2,
+  // The audio stream restarted after a fault, latched its mute, or stalled.
+  CvDiagKindAudioFault = 3
 };
 
 // One log entry. Text fields are NUL padded. Reserved bytes stay 0xFF so a later field can be

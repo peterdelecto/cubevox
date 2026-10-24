@@ -8,6 +8,7 @@
 
 CvBootBlock& bootBlock();
 
-// True when the bootloader wrote the block since power-on. Any other version word is power-on
-// garbage, and the reason, the fault address and the summary hold nothing to read.
-inline bool bootBlockWritten() { return bootBlock().blockVersion == CV_BOOT_BLOCK_VERSION; }
+// True when a bootloader wrote the block since power-on. Every block version from 1 up counts,
+// because a later bootloader only adds fields. Without it the reason, the fault address and the
+// summary hold nothing to read.
+inline bool bootBlockWritten() { return cvBootBlockInitialised(&bootBlock()); }

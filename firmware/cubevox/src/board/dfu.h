@@ -3,6 +3,10 @@
 
 #pragma once
 
-// Writes a pending layout or settings save, waits (bounded) for the store to finish, lets the serial
-// queue drain, mutes the output, asks the bootloader for update mode and resets. Never returns.
-[[noreturn]] void enterDfu();
+#include <stdint.h>
+
+// Writes the summary the bootloader prints in DIAG.TXT, queues the diagnostic entry for the request,
+// and starts the planned reset into update mode (board/planned_reset). loop() keeps running while a
+// pending save and the entry reach flash; then the serial queue drains, the output mutes and the
+// box resets. A second call does nothing.
+void enterDfu(uint32_t nowMs);

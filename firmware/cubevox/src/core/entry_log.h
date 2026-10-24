@@ -42,11 +42,6 @@ class EntryLog {
   // erased first and the log starts again at slot 0.
   void poll();
 
-  // Polls until nothing is queued or in flight. Returns false when work is left after `timeoutMs`
-  // on the clock `nowMs`. A running erase does not count against the timeout, because the flash
-  // driver bounds it and a reset would cut it short. `onPass` runs before every poll.
-  bool flush(uint32_t timeoutMs, uint32_t (*nowMs)(), void (*onPass)() = nullptr);
-
   // True while an entry is queued or being written.
   bool busy() const { return hasPending_ || phase_ != Phase::Idle; }
 

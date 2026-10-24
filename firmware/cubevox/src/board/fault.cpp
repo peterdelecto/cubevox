@@ -1,27 +1,50 @@
 #include "board/fault.h"
 
+#include <unistd.h>
+
+#include <array>
+
 #include "stm32yyxx_ll_iwdg.h"  // the core leaves the IWDG HAL module out; LL is what it uses
 
 #include "board/audio.h"
 #include "board/block_mem.h"
 #include "board/boot_block.h"
 #include "board/boot_health.h"
+#include "board/diag_service.h"
 #include "board/flash_bank2.h"
 #include "board/image_header.h"
 #include "board/mute.h"
 #include "board/pins.h"
+#include "board/planned_reset.h"
 #include "board/serial_link.h"
+#include "core/audio_stall.h"
+#include "core/timing.h"
+
+// faultCapture's own stack, so a fault from an overflowed main stack still records. The trampolines
+// name it in assembly, which takes the size as text.
+#define FAULT_STACK_BYTES 512
+extern "C" {
+__attribute__((used, aligned(8))) std::array<uint32_t, FAULT_STACK_BYTES / sizeof(uint32_t)> gFaultStack;
+}
+static_assert(sizeof(gFaultStack) == FAULT_STACK_BYTES, "the trampolines put the stack top at this offset");
 
 namespace {
 
 // Watchdog period. loop() kicks it; the audio interrupt never does.
 constexpr uint32_t kWatchdogMs = 2000;
+// LSI is about 32 kHz; / 64 gives 500 Hz, so the reload counts in 2 ms.
+constexpr uint32_t kWatchdogReload = kWatchdogMs / 2 - 1;
 // Longest the watchdog may take to accept its period.
 constexpr uint32_t kWatchdogReadyMs = 100;
-// Longest the audio block counter may sit still while audio is running.
-constexpr uint32_t kAudioStallMs = 100;
 // Gap between two reports of new SAI or DMA transfer errors.
 constexpr uint32_t kTransferErrorGapMs = 1000;
+
+// faultInit fills the free part of the main stack with this word. The stack grows down from
+// _estack toward the heap and every interrupt shares it, so a word that still holds the paint was
+// never used.
+constexpr uint32_t kStackPaint = 0xC5A5C5A5u;
+// Left unpainted below the stack pointer, for the frames of the calls that paint.
+constexpr uintptr_t kPaintMarginBytes = 256;
 
 // Written by the fault handler, read on the next boot. .cv_noinit (firmware/cubevox.ld) sits at
 // the top of DTCM, above the boot block and .dtcm_bss, and survives a system reset.
@@ -30,10 +53,10 @@ __attribute__((section(".cv_noinit"))) CvFaultRecord gStored;
 CvFaultRecord gLast = {};  // copy taken at boot, printed by every report this run
 uint32_t gResetFlags = 0;
 bool gInitDone = false;
+bool gWatchdogPeriodSet = false;  // the 2 s period read back as written
+uintptr_t gPaintTop = 0;          // one past the highest painted word
 
-uint32_t gLastBlocks = 0;
-uint32_t gLastAdvanceMs = 0;
-bool gStalled = false;
+AudioStallWatch gStallWatch;
 uint32_t gReportedTransferErrors = 0;
 uint32_t gTransferErrorReportMs = 0;
 
@@ -41,12 +64,15 @@ struct ResetFlag {
   uint32_t mask;
   const char* name;
 };
-constexpr ResetFlag kResetFlags[] = {
-    {RCC_RSR_IWDG1RSTF, "watchdog"}, {RCC_RSR_WWDG1RSTF, "window-watchdog"},
-    {RCC_RSR_SFTRSTF, "software"},   {RCC_RSR_PORRSTF, "power-on"},
-    {RCC_RSR_BORRSTF, "brown-out"},  {RCC_RSR_PINRSTF, "pin"},
+constexpr std::array<ResetFlag, 7> kResetFlags = {{
+    {RCC_RSR_IWDG1RSTF, "watchdog"},
+    {RCC_RSR_WWDG1RSTF, "window-watchdog"},
+    {RCC_RSR_SFTRSTF, "software"},
+    {RCC_RSR_PORRSTF, "power-on"},
+    {RCC_RSR_BORRSTF, "brown-out"},
+    {RCC_RSR_PINRSTF, "pin"},
     {RCC_RSR_LPWRRSTF, "low-power"},
-};
+}};
 
 // The first flag set, in table order, names the reset.
 const ResetFlag* firstResetFlag() {
@@ -135,14 +161,44 @@ void reportImage(Print& out) {
   out.println(bootHealthLastReason());
 }
 
+void reportWatchdog(Print& out) {
+  if (gWatchdogPeriodSet) {
+    out.print("[boot] watchdog ");
+    out.print(kWatchdogMs / 1000);
+    out.println(" s");
+    return;
+  }
+  out.print("[ERROR] watchdog did not take its ");
+  out.print(kWatchdogMs / 1000);
+  out.println(" s period and runs on the one it had");
+}
+
+// Waits about `ms` with no timer, which may be what faulted. One pass of the loop takes at least a
+// cycle of SystemCoreClock, the core clock the HAL last set, so the wait is never short; a few
+// cycles per pass make it a few times longer.
+void spinMs(uint32_t ms) {
+  const uint32_t passes = ms * (SystemCoreClock / 1000u);
+  for (volatile uint32_t i = 0; i < passes; i = i + 1) {}
+}
+
+// The heap's end, where the free stack begins.
+uintptr_t heapTop() { return (reinterpret_cast<uintptr_t>(sbrk(0)) + 3u) & ~uintptr_t{3}; }
+
+void paintStack() {
+  const uintptr_t top = (__get_MSP() - kPaintMarginBytes) & ~uintptr_t{3};
+  for (uintptr_t at = heapTop(); at < top; at += sizeof(uint32_t)) *reinterpret_cast<uint32_t*>(at) = kStackPaint;
+  gPaintTop = top;
+}
+
 }  // namespace
 
 // The trampoline picks the stack the fault came from and hands the exception frame to
 // faultCapture. Frame layout: r0 r1 r2 r3 r12 lr pc xpsr.
 extern "C" __attribute__((used, noreturn)) void faultCapture(const uint32_t* frame, uint32_t kind) {
-  // Mute by register write (BSRR upper half clears the pin). No HAL calls here.
+  // XSMT first, so the DAC ramps to silence before K102 opens, the order muteForReset keeps. By
+  // register write (BSRR upper half clears the pin), because the HAL may be mid-call. The DMA keeps
+  // the SAI clocked through the waits, since its interrupts rank below this handler.
   pins::portOf(pins::kXsmt)->BSRR = pins::maskOf(pins::kXsmt) << 16;
-  pins::portOf(pins::kMuteN)->BSRR = pins::maskOf(pins::kMuteN) << 16;
 
   const bool readable = frameReadable(frame);
   gStored.kind = kind;
@@ -156,6 +212,10 @@ extern "C" __attribute__((used, noreturn)) void faultCapture(const uint32_t* fra
   gStored.eccFa2 = FLASH->ECC_FA2;
   gStored.detail = 0;
   gStored.magic = CV_FAULT_MAGIC;
+
+  spinMs(kXsmtLeadMs);
+  pins::portOf(pins::kMuteN)->BSRR = pins::maskOf(pins::kMuteN) << 16;
+  spinMs(kRelaySettleMs);
   NVIC_SystemReset();
   for (;;) {}
 }
@@ -166,15 +226,22 @@ static_assert(CvFaultKindHard == 0 && CvFaultKindMemManage == 1 && CvFaultKindBu
                   CvFaultKindUsage == 3,
               "the FAULT_TRAMPOLINE literals must equal enum CvFaultKind");
 
-#define FAULT_TRAMPOLINE(handler, kind)                   \
-  extern "C" __attribute__((naked)) void handler() {      \
-    __asm volatile(                                       \
-        "tst lr, #4        \n"                            \
-        "ite eq            \n"                            \
-        "mrseq r0, msp     \n"                            \
-        "mrsne r0, psp     \n"                            \
-        "mov r1, #" #kind "\n"                            \
-        "b faultCapture    \n");                          \
+#define FAULT_STRINGIFY(x) #x
+#define FAULT_TEXT(x) FAULT_STRINGIFY(x)
+
+// r0 takes the frame from the stack in use at the fault, then MSP moves to the top of gFaultStack.
+#define FAULT_TRAMPOLINE(handler, kind)                                         \
+  extern "C" __attribute__((naked)) void handler() {                            \
+    __asm volatile(                                                             \
+        "tst lr, #4                                                \n"          \
+        "ite eq                                                    \n"          \
+        "mrseq r0, msp                                             \n"          \
+        "mrsne r0, psp                                             \n"          \
+        "movw r2, #:lower16:gFaultStack+" FAULT_TEXT(FAULT_STACK_BYTES) "\n"    \
+        "movt r2, #:upper16:gFaultStack+" FAULT_TEXT(FAULT_STACK_BYTES) "\n"    \
+        "msr msp, r2                                               \n"          \
+        "mov r1, #" #kind "                                        \n"          \
+        "b faultCapture                                            \n");        \
   }
 
 FAULT_TRAMPOLINE(HardFault_Handler, 0)
@@ -202,6 +269,7 @@ void faultInit() {
 
   // Without these the three lesser faults escalate to HardFault and lose their kind.
   SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk;
+  paintStack();
   gInitDone = true;
 }
 
@@ -222,44 +290,49 @@ bool faultLastWasBank2Ecc(uint32_t& address) {
   return true;
 }
 
+// The bootloader started the watchdog at 16 s right before the jump. With 0x5555 in KR the
+// prescaler and the reload take new values while it runs, SR's PVU and RVU clear once they have
+// crossed into the LSI domain, and the refresh then loads the new reload (RM0433, IWDG). Reading
+// both registers back after that proves the period took. Under a bootloader that never started it,
+// Enable starts it here and forces LSI on; once running it stops only at a reset.
 void faultWatchdogStart() {
-  // LSI is about 32 kHz; / 64 gives 500 Hz, so the reload counts in 2 ms. Starting the
-  // watchdog forces LSI on. Once enabled it cannot be stopped short of a reset.
   LL_IWDG_Enable(IWDG1);
   LL_IWDG_EnableWriteAccess(IWDG1);
   LL_IWDG_SetPrescaler(IWDG1, LL_IWDG_PRESCALER_64);
-  LL_IWDG_SetReloadCounter(IWDG1, kWatchdogMs / 2 - 1);
-
-  if (!watchdogAcceptedPeriod()) {
-    // Without the update the watchdog keeps its power-on period of about half a second, which
-    // loop() still meets. The wait gives up and says so, because a hang here would stop the box
-    // before the watchdog could help.
-    serialOut().print("[ERROR] watchdog did not accept its ");
-    serialOut().print(kWatchdogMs / 1000);
-    serialOut().println(" s period, running on its default");
-    return;
-  }
+  LL_IWDG_SetReloadCounter(IWDG1, kWatchdogReload);
+  // The wait gives up rather than hang, because a hang here would stop the box before the watchdog
+  // could help. A watchdog that missed the update keeps the period it had.
+  gWatchdogPeriodSet = watchdogAcceptedPeriod() && LL_IWDG_GetPrescaler(IWDG1) == LL_IWDG_PRESCALER_64 &&
+                       LL_IWDG_GetReloadCounter(IWDG1) == kWatchdogReload;
   LL_IWDG_ReloadCounter(IWDG1);
+  if (!gWatchdogPeriodSet) reportWatchdog(serialOut());
 }
 
 void faultWatchdogKick() { LL_IWDG_ReloadCounter(IWDG1); }
 
+// A stream the audio module latched has stopped on purpose and is not a stall; a restart arms the
+// watch afresh. A stall mutes at once and resets once the flash is idle, so DIAG.TXT gets the entry
+// and the sound comes back about a second later.
 void faultAudioWatch(uint32_t nowMs, bool audioRunning) {
   if (!audioRunning) return;
   reportTransferErrors(nowMs);
-  if (gStalled) return;
-  const uint32_t blocks = audioBlockCount();
-  if (blocks != gLastBlocks) {
-    gLastBlocks = blocks;
-    gLastAdvanceMs = nowMs;
-    return;
-  }
-  if (nowMs - gLastAdvanceMs < kAudioStallMs) return;
-  gStalled = true;
+  const AudioHealth health = audioHealth();
+  if (!gStallWatch.update(nowMs, !health.latched, health.restarts, audioBlockCount())) return;
   muteLatch();
   serialOut().print("[ERROR] audio stalled after ");
-  serialOut().print(blocks);
-  serialOut().println(" blocks, output muted");
+  serialOut().print(gStallWatch.blocks());
+  serialOut().println(" blocks, output muted; resetting");
+  diagNoteAudioFault();
+  plannedResetStart(PlannedReset::AudioStall, nowMs);
+}
+
+bool faultAudioStalled() { return gStallWatch.stalled(); }
+
+uint32_t faultStackUntouchedBytes() {
+  const uintptr_t bottom = heapTop();
+  uintptr_t at = bottom;
+  while (at < gPaintTop && *reinterpret_cast<const volatile uint32_t*>(at) == kStackPaint) at += sizeof(uint32_t);
+  return static_cast<uint32_t>(at - bottom);
 }
 
 void faultReport(Print& out) {
@@ -279,15 +352,32 @@ void faultReport(Print& out) {
   }
 
   reportImage(out);
+  reportWatchdog(out);
+  out.print("[boot] stack: ");
+  out.print(faultStackUntouchedBytes());
+  out.println(" bytes never used");
 
-  if (gStalled) {
+  if (gStallWatch.stalled()) {
     out.print("[ERROR] audio stalled after ");
-    out.print(gLastBlocks);
+    out.print(gStallWatch.blocks());
     out.println(" blocks, output muted");
   }
 }
 
 void faultSummaryText(char* out, size_t size) {
+  if (size == 0) return;
+  out[0] = '\0';
+  if (gLast.magic != CV_FAULT_MAGIC) return;
+  if (gLast.kind == CvFaultKindClock) {
+    snprintf(out, size, "clock setup failed in %s", cvClockStepName(gLast.detail));
+    return;
+  }
+  snprintf(out, size, "%s pc=0x%lX lr=0x%lX cfsr=0x%lX bfar=0x%lX", cvFaultKindName(gLast.kind),
+           static_cast<unsigned long>(gLast.pc), static_cast<unsigned long>(gLast.lr),
+           static_cast<unsigned long>(gLast.cfsr), static_cast<unsigned long>(gLast.bfar));
+}
+
+void faultResetText(char* out, size_t size) {
   const ResetFlag* first = firstResetFlag();
   const char* reset = first != nullptr ? first->name : "none";
   const char* fault = "none";
