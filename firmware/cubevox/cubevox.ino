@@ -13,7 +13,6 @@
 #include "board/dfu.h"
 #include "board/diag_service.h"
 #include "board/display_sh1106.h"
-#include "board/display_stub.h"
 #include "board/fault.h"
 #include "board/input.h"
 #include "board/input_jack.h"
@@ -51,14 +50,13 @@ Splash gSplash;
 JackSwitch gJack{Settings().inputJack};
 Display* gDisplay = nullptr;
 Canvas gCanvas;
-bool gOledFound = false;
 bool gAudioRunning = false;
 PublishGate gPublish;
 FallingEdge gMenuClosed;
 Every gHeartbeat{kHeartbeatMs};
 Every gStats{kStatsMs};
 
-void reportBoot() { bootReport(gOledFound); }
+void reportBoot() { bootReport(sh1106Present()); }
 
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
 void publishSnapshot() { audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides())); }
@@ -176,8 +174,7 @@ void runJackSwitch(uint32_t nowMs) {
 
 // The face owns the canvas except while the boot splash or the bench OLED pattern is up; it
 // dissolves in from what they left once either ends. It ticks at 25 frames a second and only
-// after the panel has taken the last frame. Without a panel there is nothing to draw, and the
-// stub display would log every page of the moving voice screen.
+// after the panel has taken the last frame. Without a panel the pages stay dirty, so the face waits.
 void drawFace(const UiContext& ctx, uint32_t nowMs) {
   switch (gSplash.draw(nowMs, kFirmwareVersion, gCanvas)) {
     case SplashStep::Up: return;
@@ -189,7 +186,7 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
     case BenchPattern::Ended: gFace.invalidate(); break;
     case BenchPattern::Off: break;
   }
-  if (gOledFound && gFace.due(nowMs, gCanvas)) gFace.tick(nowMs, ctx, audioTakeInputEnergy(), gMenu, gCanvas);
+  if (gFace.due(nowMs, gCanvas)) gFace.tick(nowMs, ctx, audioTakeInputEnergy(), gMenu, gCanvas);
 }
 
 }  // namespace
@@ -200,10 +197,9 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
 //   1. Up to the end of the ECC recovery, at most 10.3 s: the clock setup's waits (0.2 s), the
 //      power sense ADC (tens of ms), two erases at the driver's 5 s bound and eight program words
 //      at 5 ms each.
-//   2. From there to faultWatchdogStart(), at most about 7.2 s: the panel's start (about 7.1 s when
-//      its bus sticks after the probe: U8x8's 0.3 s of reset delays and some 68 transfers that each
-//      wait out the core's 100 ms I2C timeout) and the HAL's bounded ADC, PLL3, SAI and DMA waits
-//      (tens of ms).
+//   2. From there to faultWatchdogStart(), well under 1 s: the panel's start (five tries 20 ms
+//      apart, each a bus recovery of about 0.3 ms and one polled wait that gives up within about
+//      15 ms, so 0.2 s at the most) and the HAL's bounded ADC, PLL3, SAI and DMA waits (tens of ms).
 void setup() {
   muteInit();  // MUTE_N and XSMT low before anything slow
   powerSenseInit();  // needs the mute pins; a failure prints in the boot report
@@ -217,9 +213,8 @@ void setup() {
   usbLinkInit();  // USB attaches from loop() once VBUS is seen
 
   controlsInit();
-  gOledFound = sh1106Present();
+  gDisplay = &sh1106Display();  // starts the panel; one that does not answer is retried once a second
   inputInit();
-  gDisplay = gOledFound ? &sh1106Display() : &stubDisplay();
 
   gAudioRunning = audioInit();
   if (gAudioRunning) muteClocksRunning(millis());

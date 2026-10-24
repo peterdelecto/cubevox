@@ -29,7 +29,7 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    the compiler (`XPACK_VERSION`), and stops on any other. The workflows install the same versions in their
    `env` blocks, and `tools/scripts_check.py` (ctest `tooling_scripts`) fails when they differ.
    `./build.sh --toolchain` prints the compiler's `bin/` dir, which is the way for the bootloader build to
-   use the same compiler. U8g2 is pinned in the workflows only.
+   use the same compiler.
 3. **Host-tool check.** Before compiling, `build.sh` runs `tools/bench_ops_check.py`. It compares the op
    table, the panel thresholds, the block rate and the SAI kernel clock that the Python tools carry against
    the firmware sources, so a drift fails the build.
@@ -42,7 +42,9 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    that each data section ends inside its region, that the core's `.noinit` (which lands after `.cv_noinit`)
    ends inside DTCM, and that the image ends below flash bank 2. `ld` cannot include `boot_block.h`, so the
    addresses are copies with the macro named beside each. After the link `build.sh` compares `gBootBlock`,
-   `kImageHeader` and `__cv_noinit_start` in the elf with the header and fails on a drift.
+   `kImageHeader` and `__cv_noinit_start` in the elf with the header and fails on a drift. It also fails
+   when the core's `.noinit` (`_snoinit` to `_enoinit`) holds any data, because that section lands inside
+   the fault record's slot.
 6. **Image size.** The build fails when the .bin exceeds 917504 bytes, the room between the bootloader's sector
    and flash bank 2, which holds the layout record.
 7. **Stamp and update file.** `tools/stamp_image.py` writes the length and CRC-32 into the image header, in place.
@@ -55,19 +57,19 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    changes the CRC, so `CLEAN=1` builds the image to compare with the check line in a release's notes.
 8. **Budget.** After the stamp `build.sh` prints one `[budget]` block of true headroom, from the link map and
    the elf. App flash counts against the 917504 B region, DTCM against the boot block address, D1 against the
-   stack top and D2 against its end. At v2.00.30 the release image uses 172956 B of flash (18.9 %) and
-   51968 B of DTCM (39.7 %, 78848 B free), 167208 B of D1 and 2048 B of D2. arduino-cli prints its own
+   stack top and D2 against its end. At v2.00.35 the release image uses 164960 B of flash (18.0 %) and
+   51968 B of DTCM (39.7 %, 78848 B free), 167624 B of D1 and 2048 B of D2. arduino-cli prints its own
    summary above it, which divides by the whole 2 MB flash and by D1 alone.
 9. **Version.** The release name is `v` plus `VERSION.txt`. `build.sh` passes it as `CUBEVOX_FW_VERSION`, and
    the image header, `hello`, the boot report, the boot splash and the confirm screen all show that one string.
    The bench image adds `-bench` to the header only. `tools/bump_version.sh` raises the last field and carries
    into the minor field; every field is read as decimal.
-10. **Warning gate and symbol check.** `warn_gate.py` recompiles every source under the sketch (sketch, `src/**`)
-    with `-Wall -Wextra -Wshadow -Wdouble-promotion -Wundef -Wformat=2 -Werror`. Third-party includes are
-    `-isystem`. It fails when fewer files are checked than the sketch holds. It runs last, and a failure
-    removes the image the stamp step wrote. `tools/check_bench_symbols.sh` runs after the link. The release
-    image must hold none of five bench-only functions and the bench image must hold all five, which keeps the
-    list tied to real code. Both variants must pass; CI builds, gates and uploads both.
+10. **Warning gate and symbol check.** `warn_gate.py` recompiles every `.c` and `.cpp` source under the sketch
+    (sketch, `src/**`) with `-Wall -Wextra -Wshadow -Wdouble-promotion -Wundef -Wformat=2 -Wstack-usage=1152
+    -Werror`. Third-party includes are `-isystem`. It fails when fewer files are checked than the sketch holds. It
+    runs last, and a failure removes the image the stamp step wrote. `tools/check_bench_symbols.sh` runs after the
+    link. The release image must hold none of five bench-only functions and the bench image must hold all five,
+    which keeps the list tied to real code. Both variants must pass; CI builds, gates and uploads both.
 11. **Serial port.** `cubevox_port.py` is the one place that finds and opens the CDC port. `term.py`,
     `bringup.py`, `flash.sh` and `tools/protocol_check.py` use it. With more than one `cu.usbmodem*` device,
     name the port with `CUBEVOX_PORT=/dev/cu.usbmodemXXXX` or the tool's `--port` option (`term.py` takes it as
@@ -104,26 +106,28 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    sixteen pots, the end-of-travel dead band), `debounce`, `jack_switch` (mute dip around K103),
    `mute_sequence`, `power_fail` (the 5VA trip and clear levels and the hold before a power-fail mute releases),
    `panel_test`, `bench_ops` (the op table), `timing.h` (switch, relay and mute times, `Every`),
-   `loop_policy.h` (`PublishGate`, `CanvasHandoff`).
+   `loop_policy.h` (`PublishGate`, `FallingEdge` with its `CanvasHandoff` name, `ResetWait`).
 3. Sound path: `compose` (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_run` (the
    slot walk, the NaN guard, the polish tail and the BYPASS mix, over the engines and buffers the board hands in),
    `output_stage` (the NaN guard and the output gain ramp), `audio_recovery` (when a faulted stream restarts: at
    most 3 times in 60 s, then the mute latches).
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
-   editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`), `level` (input energy to the voice
-   ribbon's 0..1 level).
+   editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`, and `PanelLink`, the restart rule
+   for a panel that is missing or stops answering), `level` (input energy to the voice ribbon's 0..1 level).
 5. Protocol and storage: `protocol` (JSON line framing, request parse, reply formatting into a `Writer`),
    `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
    `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `entry_log` (the
    same append-log machine for the diagnostic log's fixed-size entries), `flash_io` (the flash interface both
    stores use, with the word and sector sizes), `le_bytes.h` (little-endian field access for records and
    entries), `crc32` (the one CRC-32, shared by the record, the log and the image header), `version.h`.
-6. Update support: `boot_health_rule.h` (when a start counts as healthy, the failed-start count). The names
-   of the update reasons, fault kinds and clock steps live in the contract header `board/boot_block.h`.
+6. Update support and health: `boot_health_rule.h` (when a start counts as healthy, the failed-start count),
+   `audio_stall.h` (when the running stream counts as stalled). The names of the update reasons, fault kinds
+   and clock steps live in the contract header `board/boot_block.h`.
 
 **`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the open
-menu on the canvas), `actions` (what a `UiAction` does to the settings), `splash` (the version, centred, for 2 s
-after `setup()`), and the runtime screens of `docs/specs/2026-10-24-oled-gui-design.md`: `gui` (which screen and
+menu and the update's starting screen on the canvas, and drops every click and turn until the face has ticked),
+`actions` (what a `UiAction` does to the settings), `splash` (the version, centred, for 2 s after `setup()`), and
+the runtime screens of `docs/specs/2026-10-24-oled-gui-design.md`: `gui` (which screen and
 dissolve step), `screens` (voice ribbon, knob readout, MUTED or BYPASS) and `face` (the 25 fps tick that draws them
 and dissolves between them).
 
@@ -136,19 +140,21 @@ and dissolves between them).
    layout change, per-stage cycle counts, SAI and DMA error handling with the stream restart).
 3. Panel: `controls` (mux scan on ADC3, toggles), `adc_setup` (one ADC brought up once, for `controls` and
    `power_sense`), `input` (encoder and click to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
-4. Display: `display_sh1106` (U8x8 driver), `display_stub` (ASCII render over Serial when no panel answers; the
-   runtime face stays off then, since the moving voice screen would log every page).
+4. Display: `sh1106.c` (the SH1106 driver the bootloader compiles too) and `display_sh1106` (the bus from
+   `pins.h`, boot starts with bus recovery, one page per loop pass under `PanelLink`).
 5. USB and protocol: `usb_link` (CDC gated on VBUS), `serial_link` (CDC bytes to JSON lines, reply writer, output
    queue), `boot_report` (the report a terminal gets on open).
 6. Safety and storage: `fault` (watchdog, fault handlers, reset cause, clock failure record, audio stall and
    transfer error watch), `power_sense` (VA_SENSE on ADC1: its analog watchdog interrupt mutes at once when 5VA
    falls under the trip level, and the poll releases the mute once the rail holds), `flash_bank2` (bank 2 erase
    and flash-word program by register, non-blocking erase),
-   `record_service` (store wiring: boot load, ECC recovery, save request, flush before reset), `diag_service`
-   (the diagnostic log in bank 2 sector 2: an entry for a start that follows a fault or a reset that was not a
-   plain power-on, and one before each update-mode request; the bootloader lists them in `DIAG.TXT`),
-   `block_mem` (where audio memory lives: the RAM_D2 MPU region, the DTCM section, adapted from
-   Teensy-H7-Port).
+   `record_service` (store wiring: boot load, the ECC recovery that carries the newest intact record out of a
+   faulted sector, save requests and the debounce skip), `diag_service` (the diagnostic log in bank 2 sector 2:
+   an entry for a start that follows a fault, a reset that was not a plain power-on or a failed option byte
+   step, one before each update-mode request, and one per audio fault; the bootloader lists them in
+   `DIAG.TXT`), `planned_reset` (the reset into update mode and the reset after an audio stall wait in
+   `loop()` until both stores are idle, then mute and reset), `block_mem` (where audio memory lives: the RAM_D2
+   MPU region, the DTCM section, adapted from Teensy-H7-Port).
 7. Bootloader contract: `boot_block.h` (the addresses, magics, name tables and the four structs both programs
    read: boot block, image header, diagnostic entry, fault record; C-compatible, the bootloader and
    `tools/stamp_image.py` read it too), `boot_block` (the shared DTCM block as a variable) with
@@ -156,8 +162,9 @@ and dissolves between them).
    `image_header` (the 32-byte header at +0x400 and the CRC check of the running image), `boot_health` (zeroes
    the bootloader's start counter once the audio interrupt has run for 5 s), `dfu` (the one way into update
    mode), `device_serial` (the MCU id as 24 hex characters).
-8. Bench: `bench` (query ops and stats), `bench_drill` (slot and knob overrides, faults, record drills),
-   `bench_panel` (panel self-test). The drill and panel code is compiled in the bench image only.
+8. Bench: `bench` (query ops and stats, which also print the stack never used), `bench_drill` (slot and knob
+   overrides, faults, record drills), `bench_panel` (panel self-test). The drill and panel code is compiled in the
+   bench image only.
 
 Engine headers come from `../engine` by include path. No emulator files are included. Teensy-H7-Port and
 DrumSynthV3 are references to read, and nothing in `firmware/` is copied from them verbatim.
@@ -175,8 +182,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   (`--faults`, `--dfu`, `--update`, the last one being spec drills 1 to 13), operator questions, log to
   `hardware/bringup/`. `./bringup.py --board 1 --faults --update`. It checks its panel thresholds, block rate
   and SAI clock against the firmware through `tools/bench_ops_check.py`. `--dfu` stops at once when dfu-util is
-  missing. The final summary names `hardware/bringup/bench-checklist.md`, the checks that need a person at the
-  bench with a scope or a PA.
+  missing. Drill 1 fails a unit whose option bytes are not BOR level 3 with sector 0 protected. The final summary
+  names `hardware/bringup/bench-checklist.md`, the checks that need a person at the bench with a scope or a PA.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20
   for 480 MHz on rev V silicon (360 MHz, N144 Q15, on older revisions), USB from PLL1Q, HSI48 off, PLL2 40 MHz as
   the ADC kernel clock. A failing step records its name in the fault record and resets; the next boot report
@@ -187,25 +194,34 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `-DUSBD_SELF_POWERED=1` in build.sh). The boot report prints each time a terminal opens the port. The CDC
   receive queue holds two maximum-length requests, and `serial_link.cpp` asserts it at compile time.
   The clock numbers and the gating were reviewed in `docs/audits/2026-10-08-astra-clock-response.md`.
-- `board/display_sh1106.cpp`: U8x8 init on I2C2 PB10/PB11; `flushStep` sends the lowest dirty canvas page with
-  `drawTile`, once per loop pass, and keeps the page dirty when the write fails. The face draws a new frame
-  only once every page of the last one has gone out, so a slow or failing write never gets outrun. The fonts come
-  from `tools/font-editor/fonts/cubevox_fonts.h` through an include path, no copy.
-- `board/fault.cpp`: IWDG1 at 2 s, armed at the end of `setup()` and kicked only from `loop()` (and from
-  `recordFlush`). HardFault, MemManage, BusFault and UsageFault drive XSMT and MUTE_N low by register write, store
-  PC, LR, CFSR, HFSR, BFAR and MMFAR in a `.cv_noinit` record (`cubevox.ld`, top of DTCM) and reset; the
-  next boot report prints `[ERROR] last reset: fault ...` or `[boot] fault: none`, plus the decoded `RCC->RSR`
-  reset cause. A stack pointer outside RAM stores zero for PC and LR. If the audio block counter stops for 100 ms
-  while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line prints.
-  SAI and DMA transfer errors are counted in `audio.cpp` and reported at most once a second. `SAI1_IRQn`
-  delivers `OVRUDR`, `AFSDET`, `LFSDET` and `WCKCFG`. A stream-stopping error or 8 overruns in a row mutes;
-  `audioPoll` restarts at most 3 times a minute, then latches. TX halves are zeroed once read.
+- `board/display_sh1106.cpp`: drives the panel through `board/sh1106.c`, the driver the bootloader shares, on I2C2
+  PB10/PB11 at 400 kHz. At boot the panel gets 5 starts 20 ms apart, each after nine SCL clocks and a STOP.
+  `flushStep` sends the lowest dirty canvas page once per loop pass and keeps a failed page dirty. `PanelLink`
+  (`core/display.h`) restarts the panel at once after the first failure, then once a second, and prints one
+  `[WARN]` per run and one `[oled]` line when the panel is back. The face draws a new frame only once every page
+  of the last one has gone out. The fonts come from `tools/font-editor/fonts/cubevox_fonts.h` through an include
+  path, no copy.
+- `board/fault.cpp`: the bootloader starts IWDG1 at 16 s before the jump; `faultWatchdogStart()` sets 2 s at the
+  end of `setup()` and reads it back, and the boot report prints `[boot] watchdog 2 s`. `loop()` kicks it, and
+  `setup()` refreshes the bootloader's period once after the ECC recovery. HardFault, MemManage, BusFault and
+  UsageFault move to a 512-byte stack of their own, drive XSMT low by register write, store PC, LR, CFSR, HFSR,
+  BFAR, MMFAR, SR2 and ECC_FA2 in a `.cv_noinit` record (`cubevox.ld`, top of DTCM), drive MUTE_N low 5 ms later
+  and reset 20 ms after that. The next boot report prints `[ERROR] last reset: fault ...` or `[boot] fault: none`,
+  plus the decoded `RCC->RSR` reset cause. A stack pointer outside RAM stores zero for PC and LR. `faultInit()`
+  paints the free stack, and the boot report prints how much was never used. The stall watch arms at each stream
+  start. If the block counter then stops for 100 ms while the stream runs and the audio module has not latched,
+  the mute latches, an `audio` entry goes to the diagnostic log, and a planned reset brings the sound back. SAI and
+  DMA transfer errors are counted in `audio.cpp` and reported at most once a second. `SAI1_IRQn` delivers `OVRUDR`,
+  `AFSDET`, `LFSDET` and `WCKCFG`. A stream-stopping error or 8 overruns in a row mutes; `audioPoll` restarts at
+  most 3 times a minute, then latches. TX halves are zeroed once read.
 - `board/dfu.cpp`: `enterDfu()` is the only way into update mode, where the bootloader serves the `CUBEVOX` drive.
   It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), queues a
-  diagnostic log entry and waits up to 3 s for it, writes a pending record save, waits up to 5 s for the store to go idle, lets the serial queue drain for 100 ms, mutes
-  through `muteForReset()`, writes the request word and resets. The menu action and the `enter_dfu` command both
-  call it. The confirm screen shows the installed version, and the box shows the same version for 2 s after
-  every start.
+  diagnostic log entry and starts the planned reset (`board/planned_reset.cpp`). `loop()` keeps running until a
+  pending record save and the entry are in flash (3 s at most, a running erase not counted), and the menu takes
+  no input meanwhile. Then the serial queue drains for 100 ms, `muteForReset()` mutes, the request word is written
+  and the box resets. The menu action and the `enter_dfu` command both call it. The confirm screen shows the
+  installed version, the box shows "Starting the update." until the reset, and it shows the same version for 2 s
+  after every start.
 - `board/boot_health.cpp`: the bootloader counts every start that reaches the application. `bootHealthInit()` at
   the end of `setup()` reads that count, and `bootHealthPoll()` zeroes it 5 s later if the audio interrupt has
   advanced blocks since `setup()` ended. A fault, a watchdog reset or a hang inside those 5 s leaves the count
@@ -214,15 +230,18 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `boot_fails` and `update_reason` give the earlier failed starts and why the bootloader last stayed in update
   mode. The CRC covers the running image and is computed once, on the first report.
 - `board/flash_bank2.cpp` and `board/record_service.cpp`: the layout record lives in bank 2 at 0x08100000 and
-  0x08120000 (spec `2026-10-12-layout-record-design.md`). A save runs 2 s after the last settings change, one erase
-  or flash-word program per `loop()` pass. Bank 2 sector 2 at 0x08140000 holds the diagnostic log, which
+  0x08120000 (spec `2026-10-12-layout-record-design.md`). A save runs 500 ms after the last change, or at once when
+  the menu closes, and writes nothing when flash already holds the same state; one erase or flash-word program per
+  `loop()` pass. Bank 2 sector 2 at 0x08140000 holds the diagnostic log, which
   `core/entry_log` appends to over `core/flash_io`, `board/diag_service` fills and polls, and the bootloader only
   reads for `DIAG.TXT`. The flash driver checks the unlock, rejects a sector outside the record's two and the log's
   one, and bounds every wait (5 s for an erase, 5 ms for one program word); a failure sets an error flag
   and `recordPoll` prints `[ERROR] record save failed`. `build.sh` and the linker script keep the image below
   bank 2, and the bootloader writes only inside the image region. The fault record keeps FLASH->SR2 and ECC_FA2;
-  a double ECC fault in a record or log sector is erased at
-  boot before the scan, and a failed erase is reported in the boot report. A record whose layout fails validation
+  a double ECC fault is recovered at boot before the scan. In a record sector the newest record that ends below the
+  faulted word moves to the other sector first when nothing there is newer, then the faulted sector is erased; the
+  log's sector is simply erased. A sector that will not erase stays unread for that start, the log stays closed,
+  and the boot report names what happened. A record whose layout fails validation
   gives the default layout with a `[WARN]` and a rewrite. The boot report also warns about an unknown card id, a
   sector with data after a blank entry, and torn entries.
 - Serial protocol (spec `2026-10-12-serial-protocol-design.md`): one JSON object per line on the same CDC port,
@@ -234,9 +253,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   is 1 to 31 printable ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own
   window; the bench peaks are untouched), cumulative `late`, `muted`, the record `seq` and `rec_errors`,
   `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the audio counters `overruns`, `sai_errors`,
-  `restarts` and `nan_blocks`, and `power_trips`, `stalled`, `audio_latched` and `reply_overflows`. All output (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue
-  (`core/tx_queue`) that `serialLinkPoll` drains each pass with non-blocking writes sized by
-  `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected
+  `restarts` and `nan_blocks`, and `power_trips`, `stalled`, `audio_latched` and `reply_overflows`. All output
+  (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue (`core/tx_queue`) that
+  `serialLinkPoll` drains each pass with non-blocking writes sized by `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected
   the queue is discarded. `enter_dfu` and the bench fault and spin ops give the queue 100 ms (`serialFlush`) before
   they act. Engine clears happen on the silent swap block; `kResetsPerSilentBlock` and `kFadeHoldBlocks` spread them
   over several blocks if the bench shows that block late, and the `stats` op's line `layout swaps` prints the swap
@@ -281,7 +300,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
 Costs in `core/costs.h` are marked measured or estimated. The measured rows come from runs of the engine chain on
 an H743 test board, and the POLISH COMP, soft ceiling and BYPASS rows stay estimates until a cubevox board runs
 them; the method is in that file. The audio path, clock tree, USB gating and mux timing have run on the test board
-and not yet on a cubevox board. The bring-up logs are in `hardware/bringup/`. The OLED driver is compiled and
-falls back to `stubDisplay()` when nothing answers at 0x3C. `board/power_sense` mutes the output when 5VA, read
-on VA_SENSE (PB1), falls under `kPowerTripMv` (4750 mV) and releases it after 500 ms above 4850 mV. The trip
-level is provisional until the bench sets it from the measured fall of 5VA.
+and not yet on a cubevox board. The bring-up logs are in `hardware/bringup/`. The OLED driver starts the panel at
+boot and retries one that does not answer once a second, with a `[WARN]` in the boot report, so the box plays on
+without a panel. `board/power_sense` mutes the output when 5VA, read on VA_SENSE (PB1), falls under
+`kPowerTripMv` (4750 mV) and releases it after 500 ms above 4850 mV, and `status` reports its trips as
+`power_trips`. The trip level is provisional until the bench sets it from the measured fall of 5VA.

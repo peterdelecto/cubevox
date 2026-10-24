@@ -5,5 +5,5 @@
 // Prints through serialOut() the firmware version, build kind and serial; the reset cause, last
 // fault, image, watchdog and stack lines; the option bytes and any bootloader fault; then the
 // record, diag log, clocks, pins, CPU features, OLED, audio, power sense and pot lines. `oledFound`
-// is what setup() learned from the panel probe.
+// is whether the panel link is up when the report prints.
 void bootReport(bool oledFound);

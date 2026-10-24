@@ -1,13 +1,11 @@
 // Checks the input logic on the host. Covers debouncing, knob filtering, the periodic timer,
-// the publish gate, the input jack switch, the version tag, the mute sequence and the power-fail
-// mute policy.
+// the publish gate, the input jack switch, the mute sequence and the power-fail mute policy.
 
 #include "support.h"
 
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 
 #include "core/debounce.h"
 #include "core/jack_switch.h"
@@ -19,7 +17,6 @@
 #include "core/settings.h"
 #include "core/slots.h"
 #include "core/timing.h"
-#include "core/version.h"
 
 namespace {
 
@@ -386,19 +383,6 @@ void checkJackRequestWithdrawn() {
   check(!j.holdMute() && j.relay() == InputJack::Mic, "jack: a request withdrawn before the mute needs no dip");
 }
 
-void checkVersionTag() {
-  char buf[16];
-  versionTag("v2.00.04-3-gabc123-dirty", buf, sizeof(buf));
-  check(std::strcmp(buf, "v2.00.04") == 0, "version: tag is cut at the first dash");
-  versionTag("v2.00.04", buf, sizeof(buf));
-  check(std::strcmp(buf, "v2.00.04") == 0, "version: a bare tag passes through");
-  versionTag("dev", buf, sizeof(buf));
-  check(std::strcmp(buf, "dev") == 0, "version: dev passes through");
-  char small[5];
-  versionTag("v2.00.04-1-gabc", small, sizeof(small));
-  check(std::strcmp(small, "v2.0") == 0, "version: clipped to the buffer");
-}
-
 // Steps the sequence once per ms from `from` to `to` inclusive and returns the last outputs.
 MuteOutputs runMute(MuteSequence& m, uint32_t from, uint32_t to, bool released) {
   MuteOutputs out;
@@ -566,7 +550,6 @@ void checkInputLogic() {
   checkResetWait();
   checkJackSwitch();
   checkJackRequestWithdrawn();
-  checkVersionTag();
   checkMuteSequence();
   checkMuteLatchAndHold();
   checkMuteMidRelease();

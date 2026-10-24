@@ -128,10 +128,10 @@ class Log:
 
 
 def boot_report(port):
-    lines = port.read(4.0, until=r"^\[(boot\] audio|ERROR\] audio:)")
+    lines = port.read(4.0, until=r"^\[(boot\] pots|ERROR\] pots:)")
     if not any(l.startswith("[boot] cubevox") for l in lines):
         port.send("r")
-        lines += port.read(4.0, until=r"^\[(boot\] audio|ERROR\] audio:)")
+        lines += port.read(4.0, until=r"^\[(boot\] pots|ERROR\] pots:)")
     return lines
 
 
@@ -170,7 +170,7 @@ def check_boot(log, lines, want_oled):
         ppm = (int(m.group(3)) - SAI_HZ) / SAI_HZ * 1e6
         log.check("SAI kernel clock", abs(ppm) <= SAI_TOL_PPM, f"{m.group(3)} Hz ({ppm:+.1f} ppm)")
 
-    want = "[boot] pins XSMT C5 MUTE_N B5 SAI E2 E3 E4 E5 E6"
+    want = "[boot] pins XSMT C5 MUTE_N B5 SAI E2 E3 E4 E5 E6 OLED B10 B11"
     got = find(lines, r"^\[boot\] pins .*$")
     log.check("pin decode", bool(got) and got.group(0).strip() == want,
               got.group(0) if got else "pins line missing")
@@ -375,9 +375,13 @@ def reset_and_report(port, command, expect, timeout_s=10.0):
 
 def fault_drill(log, port):
     port.send("a")
-    lines = port.read(3.0, until=r"audio stalled")
+    lines = port.read(10.0)  # the stall line, then the port drops when the box resets
     log.check("audio stall mutes", find(lines, r"\[ERROR\] audio stalled") is not None,
-              "stall reported, output muted" if find(lines, r"audio stalled") else "no stall line within 3 s")
+              "stall reported, output muted" if find(lines, r"audio stalled") else "no stall line before the reset")
+    port.close()
+    port = Port(wait_s=20.0)
+    m = find(boot_report(port), r"^\[boot\] reset:.*software")
+    log.check("audio stall resets", m is not None, m.group(0) if m else "no software reset after the stall")
 
     port, _, m = reset_and_report(port, "w", r"^\[boot\] reset:.*watchdog")
     log.check("watchdog reset", m is not None, m.group(0) if m else "reset cause did not show watchdog")

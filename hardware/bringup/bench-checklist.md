@@ -17,7 +17,7 @@ carry a measured number from the audit keep that number.
 | AU1 | Pull the barrel and switch SWPWR1 off, once while singing and once in silence. Scope the output and time 5VA's fall against K102's release. | The order on the scope is XSMT low at least 3.4 ms before the rails go, then MUTE_N low, then K102 open. No thump is audible through the PA and no step shows above the noise floor, in both cases. | audio A1, the power-fail mute (hardware spec F2 and F3) |
 | AU2 | Hold the box in reset, in the UF2 bootloader and in the ROM DFU. | K102 stays open and XSMT stays low in all three states, with both pins undriven. | audio answer 4, mute at start; same measurement as BO10 |
 | AU3 | Read DMA1_Stream0->NDTR in the RX half callback. | The lead of the TX DMA over the RX half is measured and written down. A lead above zero confirms the finding, and the late count then has to count inside that lead. | audio B4, late count (unsure item) |
-| AU4 | Run the stop_audio op with signal playing and listen to the 100 ms before the latch. | The 375 Hz buzz of the looped ring is absent. The mute latches or the stream restarts, and status and the next boot report show the stall. | audio A3, DMA error ends the audio |
+| AU4 | Run the stop_audio op with signal playing and listen to the 100 ms before the latch. | The 375 Hz buzz of the looped ring is absent. The output mutes, the box resets once the diag entry is written, sound returns about 1 s later, and DIAG.TXT lists an audio entry before a boot entry with reset software. | audio A3, DMA error ends the audio; health B5, the stall resets |
 | AU5 | Read the silicon revision in the boot report. | Rev V (0x2003) runs 480 MHz. Any other revision runs 360 MHz, where the default layout's worst sum rises from 72 % to about 96 % of the block. The revision of each unit is logged. | audio answer 9, budget; same as EN1 and HE7 |
 | AU6 | Turn DRIVE to 0 with the Distortion toggle on and listen for fuzz. Repeat with Mix at 0 on Octave and on Reverb. | No fuzz at DRIVE 0 and no effect at Mix 0, and the readout agrees with the sound. | audio A2, knob rest value |
 | AU7 | Sweep RATE above 68 % at full DEPTH and listen for ticks. Flip OUTPUT on a sine and scope the step. | No tick on the sweep. The OUTPUT flip ramps over a block or more and shows no single-sample 30 dB step. | audio B2, Unison swing, and audio B1, OUTPUT step |
@@ -75,7 +75,11 @@ carry a measured number from the audit keep that number.
 | HE8 | Hold the OLED's SDA low and watch the heartbeat LED. | The LED toggles every 0.5 s. A toggle of 0.7 to 1.4 s measures the loop pass, and it stays under the 2 s watchdog with no reset. | health answer 1, loop pass against the watchdog |
 | HE9 | Cold-start the crystal against the HAL's 100 ms HSE timeout. | HSE starts inside 100 ms on every cold start tried. A miss shows "The clock failed." with the drive up on HSI48, not a dark box (BO15). | health answer 6 and boot B13 |
 | HE10 | Scope MUTE_N, XSMT and the K102 contacts through a watchdog reset. | The board pulls hold the mute while the MCU pins float. MUTE_N and XSMT stay low and K102 stays open. | health answer 7, power order |
-| HE11 | Time a boot-time recovery erase of a bank 2 sector. | The erase takes 1 to 2 s against the 5 s bound and ends before the watchdog starts. | health answer 1, flash waits |
+| HE11 | Tear a save (HE4) and time the next start's recovery. | Each of its two erases takes 1 to 2 s against the 5 s bound, and the box starts normally inside the bootloader's 16 s watchdog. | health answer 1, flash waits |
+| HE12 | Read the boot report of a box with the bootloader installed. | `[boot] watchdog 2 s`; `[boot] option bytes`: set (programmed at the first power-on), BOR level 3, sector 0 protected; `[boot] serial` equals INFO_UF2.TXT's Serial line; `[boot] stack` above 300000 bytes never used. | health decision 6, A4, C8, C5 |
+| HE13 | Run the stats op after an hour of playing with every card in the chain. | The stack line still reads above 300000 bytes. | health C5 |
+| HE14 | Change OUTPUT in the menu, leave the menu, and cut the 9 V within half a second. | The box comes back with the new OUTPUT. | UI B3 |
+| HE15 | Change a setting and confirm Update firmware within half a second. | The confirm screen gives way at once, the drive mounts, and after an update the box starts with the changed setting. | UI B6, health B3 |
 
 ## Engines and CPU
 
@@ -108,6 +112,11 @@ carry a measured number from the audit keep that number.
 | UI9 | Leave the pots untouched for 10 minutes. | No readout appears. | ui answer 2 with audio A2, readout trigger |
 | UI10 | Sing so that the ribbon fills (about -6 dBFS RMS) and watch whether the ADC already clips on peaks. | No clipping on peaks while the ribbon is full. If the ADC clips, the owner decides whether the meter needs a clip mark. | ui answer 7, level meter |
 | UI11 | Cycle TOP SWITCH in the menu with the switch engaged. | The output changes at once and the new word shows after the menu closes. | ui answer 2, TOP SWITCH |
+| UI12 | Pull the panel connector while the voice runs, push it back after 5 s. | The face returns within 1 s, one `[WARN]` and one `[oled]` line appear, and passes stay under 6 ms while the panel is out. | ui A1, B1 |
+| UI13 | Lift the panel VCC for 50 ms while MUTED shows and nothing else changes, then unmute. | Record whether the panel stays dark (OLED GUI spec Open decisions 7); the owner then decides on a settings refresh. | ui B1 |
+| UI14 | Scope SCL on rev V silicon, and on 360 MHz silicon if one is at hand. | About 390 kHz on rev V and about 300 kHz on the older part, never above 400 kHz. | ui A1, app TIMINGR |
+| UI15 | Power up with no panel, then fit one. | The face shows within 1 s of the panel answering and MENU does nothing until then. | ui B1, B2 |
+| UI16 | Click and turn MENU during the 2 s splash. | Nothing opens, and the first click after the face shows opens the list with INPUT unchanged. | ui B2 |
 
 ## Tooling
 

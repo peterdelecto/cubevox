@@ -51,7 +51,9 @@ the 256-byte size stay, and the three new bytes come out of the reserved ones.
    first blank slot of the active sector, so the previous record is never touched.
 2. When the active sector is full, the save goes to the other sector after a non-blocking erase.
    A sector holds 512 records, so erases are rare (flash endurance is 10 k cycles per sector).
-3. A save starts 2 s after the last settings change, so turning through the menu writes once.
+3. A save starts 500 ms after the last change, so a run of menu clicks writes once, and at once when the menu closes.
+   A save whose encoded record matches the newest one in every byte but the sequence and the CRC is not written;
+   the bench `record_save` op writes anyway.
 4. Erase and program run as a state machine polled from `loop()`. An erase is started and polled across passes. A program
    call writes one flash word, which takes tens of microseconds, and waits for that word at most 5 ms before it reports an
    error. No other call waits on the flash.
@@ -61,8 +63,14 @@ the 256-byte size stay, and the three new bytes come out of the reserved ones.
 2. No valid record gives the default layout and default settings.
 3. ECC recovery: the fault handler also stores bank 2's double-ECC flag and failing address
    (`FLASH->SR2`, `FLASH->ECC_FA2`), because BFAR is not always valid for a flash ECC error. If
-   the last reset was a fault at a bank 2 address, the boot erases that sector before scanning.
-   One bad word costs that sector's history, never a boot loop.
+   the last reset was a fault at a bank 2 address, the boot recovers that sector before scanning.
+   The records that end before the faulted word read safely, since the scan that faulted read them
+   first. When the newest of them is newer than everything in the other sector, it is copied to
+   entry 0 there (that sector erased first unless blank), and then the faulted sector is erased.
+   The other sector is read only when there is a record to carry, and the copy sits alone in its
+   sector, so a power cut during the copy cannot leave two recoveries faulting on each other's
+   sector. A sector that will not erase stays unread for that start. One bad word costs only older
+   records, never the newest, and never a boot loop.
 
 ## Modules
 | Tier | Module | Owns |
@@ -77,6 +85,7 @@ first path that changes the layout at runtime.
 
 ## Verification
 1. Host tests: round trip, CRC failure, unknown id to `empty`, newest wins across both sectors,
-   torn last record ignored, sector full switches and erases, interrupted erase recovers.
+   torn last record ignored, sector full switches and erases, interrupted erase recovers, a torn tail
+   after N records boots on record N, an unchanged state writes nothing.
 2. Test board (chip checks only): bench commands save, report, and erase bank 2; a saved setting
    survives a reset and a DFU reflash; a save during audio leaves block timing at 0 late.

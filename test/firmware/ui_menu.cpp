@@ -1,7 +1,8 @@
 // Checks the OLED menu on the host. Covers the input it drops before the face shows, the closed menu,
 // the list and its click actions, the settings those clicks save and play, the chain and update
-// screens, the timeout, redraw, the screenshot files, the text grid and the list's row pitch. The
-// screens shown while the menu is closed are checked in ui_screens.cpp and ui_face.cpp.
+// screens, the starting screen, the timeout, redraw, the screenshot files, the text grid and the
+// list's row pitch. The screens shown while the menu is closed are checked in ui_screens.cpp and
+// ui_face.cpp.
 
 #include "support.h"
 
@@ -317,8 +318,25 @@ void checkMenuScreens() {
   m.draw();
   check(listRowIs(m.canvas, kUpdate, ">UPDATE FIRMWARE >", true), "menu: turn cancels the confirm and returns to the list");
   m.step(0, true);
-  m.step(0, true);
   check(m.step(0, true) == UiAction::EnterDfu, "menu: click on confirm enters DFU");
+}
+
+// From the confirm click to the reset the glass says the update is starting, takes no input and
+// never times out, because the reset waits on the flash.
+void checkMenuUpdateStarting() {
+  MenuRig m;
+  m.openListAt(kUpdate);
+  m.step(0, true);
+  check(m.step(0, true) == UiAction::EnterDfu, "menu: the confirm click starts the update");
+  m.draw();
+  check(rowIs(m.canvas, 0, "Starting the update.") && rowIs(m.canvas, 2, "Wait a moment.") && rowIs(m.canvas, 4, "") &&
+            rowIs(m.canvas, 6, ""),
+        "menu: the starting screen replaces the confirm screen");
+  check(m.step(1, false) == UiAction::None && m.step(0, true) == UiAction::None && m.menu.open(),
+        "menu: turns and clicks leave the starting screen up");
+  m.step(0, false, 60000);
+  check(m.menu.open(), "menu: the starting screen stays up until the reset");
+  writePgm(m.canvas, "oled-update-starting.pgm");
 }
 
 void checkMenuExit() {
@@ -414,6 +432,7 @@ void checkMenu() {
   checkMenuClicksSavedAndPlayed();
   checkMenuWrapAndCombo();
   checkMenuScreens();
+  checkMenuUpdateStarting();
   checkOtherScreensKeepGrid();
   checkMenuExit();
   checkMenuTimeout();

@@ -2,10 +2,10 @@
 """Recompile our sketch sources with the warning flags below as errors, third-party includes as -isystem.
 
 Reads the compile commands arduino-cli wrote for the build, so flags and defines match the
-firmware build exactly. Only .cpp files under the sketch copy are checked; the STM32 core, HAL
-and libraries are never compiled here and their headers are system headers, so their warnings
-are silent. Fails when fewer files are checked than the
-sketch copy holds, so a path mismatch cannot pass an empty gate.
+firmware build exactly. Only .c and .cpp files under the sketch copy are checked; the STM32 core,
+HAL and libraries are never compiled here and their headers are system headers, so their warnings
+are silent. Fails when fewer files are checked than the sketch copy holds, so a path mismatch
+cannot pass an empty gate.
 
   warn_gate.py BUILD_DIR [--tail N] [--system-dir DIR ...]
 """
@@ -20,8 +20,11 @@ from concurrent.futures import ThreadPoolExecutor
 SKIPPED = "requiredLibraries.cpp"  # arduino-cli's library probe, not our code
 
 # -Wdouble-promotion matters on the single-precision FPU, -Wshadow and -Wundef catch silent
-# name and macro mistakes, -Wformat=2 checks the printf-style calls.
-WARNING_FLAGS = ["-Wall", "-Wextra", "-Wshadow", "-Wdouble-promotion", "-Wundef", "-Wformat=2", "-Werror"]
+# name and macro mistakes, -Wformat=2 checks the printf-style calls. -Wstack-usage bounds every
+# frame on the one stack all interrupts share. processHalf's frame in audio.cpp is the largest at
+# 1016 B, with 768 B of block buffers, so 1152 leaves 136 B for locals and refuses a fourth buffer.
+WARNING_FLAGS = ["-Wall", "-Wextra", "-Wshadow", "-Wdouble-promotion", "-Wundef", "-Wformat=2",
+                 "-Wstack-usage=1152", "-Werror"]
 
 
 def under(path, dirs):
@@ -45,7 +48,7 @@ def command(entry, system_dirs):
 def sketch_sources(sketch):
     found = []
     for root, _, names in os.walk(sketch):
-        found += [os.path.join(root, n) for n in names if n.endswith(".cpp") and n != SKIPPED]
+        found += [os.path.join(root, n) for n in names if n.endswith((".cpp", ".c")) and n != SKIPPED]
     return found
 
 
@@ -60,11 +63,11 @@ def main():
     sketch = os.path.realpath(os.path.join(a.build, "sketch"))
     with open(os.path.join(a.build, "compile_commands.json")) as f:
         db = json.load(f)
-    entries = [e for e in db if under(e["file"], [sketch]) and e["file"].endswith(".cpp")
+    entries = [e for e in db if under(e["file"], [sketch]) and e["file"].endswith((".cpp", ".c"))
                and not e["file"].endswith(SKIPPED)]
     expected = len(sketch_sources(sketch))
     if not entries or len(entries) < expected:
-        print(f"[warn-gate] FAIL: {len(entries)} compile commands match the {expected} .cpp files under {sketch}")
+        print(f"[warn-gate] FAIL: {len(entries)} compile commands match the {expected} source files under {sketch}")
         return 1
 
     with ThreadPoolExecutor() as pool:

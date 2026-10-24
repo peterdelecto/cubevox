@@ -272,6 +272,15 @@ check_symbol_address gBootBlock "$(cv_define CV_BOOT_BLOCK_ADDR)"
 check_symbol_address __cv_noinit_start "$(cv_define CV_FAULT_RECORD_ADDR)"
 check_symbol_address kImageHeader "$((APP_START + $(cv_define CV_IMAGE_HEADER_OFFSET)))"
 
+# The core's .noinit lands right after .cv_noinit, inside the fault record's slot the bootloader
+# reads, so it must stay empty. A missing symbol fails too, because the check could not look.
+noinit_start="$(symbol_address _snoinit)"
+noinit_end="$(symbol_address _enoinit)"
+if [ -z "$noinit_start" ] || [ "$noinit_start" != "$noinit_end" ]; then
+  echo "[ERROR] the core's .noinit is not empty (_snoinit ${noinit_start:-missing}, _enoinit ${noinit_end:-missing}); it would sit inside the fault record's slot, so move its data to .cv_noinit or elsewhere"
+  exit 1
+fi
+
 # Only the bench image holds bench code. The check runs on the release image for the absence and on
 # the bench image for the presence, which keeps its list of names tied to real functions.
 NM="$NM" "$REPO/tools/check_bench_symbols.sh" "$VARIANT" "$OUT/cubevox.ino.elf"

@@ -5,6 +5,7 @@
 #include <array>
 
 #include "board/audio.h"
+#include "board/fault.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
 #include "core/layout.h"
@@ -56,6 +57,9 @@ void benchReportStats() {
   serialOut().print(" of ");
   serialOut().print(s.budgetCycles);
   serialOut().println(" cycles");
+  serialOut().print("[stack] ");
+  serialOut().print(faultStackUntouchedBytes());
+  serialOut().println(" bytes never used since boot");
 }
 
 BenchResult benchRun(BenchOp op, int slot, void (*bootReport)()) {

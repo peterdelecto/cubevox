@@ -1,7 +1,7 @@
-# Editor include paths for the board tier: Arduino.h, the HAL, the variant and the U8g2 headers.
+# Editor include paths for the board tier: Arduino.h, the HAL and the variant.
 # clangd has no variable expansion, so every path is absolute. On another machine, or after moving the
-# checkout, run `python3 -I tools/clangd_paths.py`. It rewrites the Arduino data dir, the Arduino user
-# dir and the checkout prefixes from arduino-cli and from its own location.
+# checkout, run `python3 -I tools/clangd_paths.py`. It rewrites the Arduino data dir and the checkout
+# prefixes from arduino-cli and from its own location.
 # The list follows the compile command arduino-cli writes to <build dir>/compile_commands.json. The
 # target and the toolchain's library headers make clangd parse the files as the Cortex-M7 build does,
 # and GCC_VERSION satisfies the compiler check in Arduino.h, which clang's own version fails.
@@ -25,14 +25,11 @@ CompileFlags:
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/SrcWrapper/src
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/USBDevice/inc
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/USBDevice/src
-    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/Wire/src
-    - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/libraries/SPI/src
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/STM32H7xx
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/Drivers/STM32H7xx_HAL_Driver/Inc
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/Drivers/CMSIS/Device/ST/STM32H7xx/Include
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/hardware/stm32/3.0.0/system/Middlewares/ST/STM32_USB_Device_Library/Core/Inc
     - -I/Users/j/Library/Arduino15/packages/STMicroelectronics/tools/CMSIS/6.3.0/CMSIS/Core/Include
-    - -I/Users/j/Documents/Arduino/libraries/U8g2/src
     - -I/Users/j/Documents/Claude/Projects/cubevox
     - -I/Users/j/Documents/Claude/Projects/cubevox/firmware/cubevox/src
     - -I/Users/j/Documents/Claude/Projects/cubevox/tools/font-editor/fonts
