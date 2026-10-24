@@ -102,7 +102,7 @@ The page polls `GET /api/state` once a second.
 ## Open questions resolved
 
 1. App runtime: Go single binary (owner 2026-10-15, round 1).
-2. Page scope: layout only; EQ, output level and pedal/mic stay on the OLED.
+2. Page scope: layout only; EQ, output level and the mic/line input stay on the OLED.
 3. Versions: one tag stream for emulator, firmware and app.
 4. App presence: hidden helper, the browser tab is the app, idle exit after 60 s.
 5. Port ownership: only while a page is open, status once a second.

@@ -8,7 +8,7 @@
  * ld cannot include board/boot_block.h. Each address that mirrors it carries the macro's name in a
  * comment, and build.sh compares the linked symbols with the header, so a drift fails the build.
  *
- * DTCM, bottom to top: .dtcm_bss, .cv_boot_block (192 bytes), .cv_noinit (64 bytes).
+ * DTCM, bottom to top: .dtcm_bss, .cv_boot_block (192 bytes), .cv_noinit (64 bytes), the core's .noinit.
  * Flash, bottom to top: .isr_vector, gap, .cv_image_hdr at +0x400, code, constants, .data's load image. */
 
 SECTIONS
@@ -61,6 +61,10 @@ SECTIONS
   }
   /* CV_DTCM_END */
   ASSERT(__cv_noinit_end <= 0x20020000, "cubevox.ld: .cv_noinit overflows DTCM")
+
+  /* The core's own .noinit follows .cv_noinit, so it holds whatever DTCM has left above it. */
+  /* CV_DTCM_END */
+  ASSERT(_enoinit <= 0x20020000, "cubevox.ld: the core's .noinit overflows DTCM")
 }
 INSERT AFTER .bss;
 
