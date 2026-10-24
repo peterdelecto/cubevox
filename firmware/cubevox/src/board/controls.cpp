@@ -1,10 +1,10 @@
 #include "board/controls.h"
 
-#include <Arduino.h>
-
 #include <array>
 
+#include "board/adc_setup.h"
 #include "board/pins.h"
+#include "board/serial_link.h"
 #include "board/slots.h"
 #include "core/debounce.h"
 #include "core/knob_filter.h"
@@ -13,8 +13,7 @@
 
 namespace {
 
-constexpr int kAdcBits = 12;
-constexpr float kAdcFull = 4095.0f;
+constexpr float kAdcFull = static_cast<float>(kAdcSetupFullScale);
 constexpr bool kToggleOnWhenLow = true;  // throw-to-GND position engages the effect
 
 // The 100 R / 1 nF at the ADC pin and the mux source impedance need at least 0.5 ms after a
@@ -24,10 +23,21 @@ constexpr uint32_t kMuxSettleUs = 500;
 // ~20 mA through U101's input clamp into the dead rail. Selects stay low until this passes.
 constexpr uint32_t kMuxSelectHoldMs = 1100;
 
+// The longest sample window (hardware spec item 10): 810.5 cycles and 12.5 to convert, about
+// 82 us at the 10 MHz ADC clock. A conversion still running after kConversionTimeoutUs is dropped.
+constexpr uint32_t kSampleTime = ADC_SAMPLETIME_810CYCLES_5;
+constexpr uint32_t kConversionTimeoutUs = 1000;
+constexpr uint32_t kDropReportMs = 1000;  // at most one dropped-sample line this often
+
 constexpr int kMuxSelectBits = 4;
 constexpr std::array<uint32_t, kMuxSelectBits> kMuxSelectPins = {pins::kMuxS0, pins::kMuxS1, pins::kMuxS2,
                                                                  pins::kMuxS3};
 static_assert(kPotCount <= (1 << kMuxSelectBits), "the mux select pins must address every pot");
+
+ADC_HandleTypeDef gAdc;  // ADC3; ADC1 and ADC2 belong to board/power_sense
+const char* gAdcError = "not set up";  // the ADC3 step that failed; null once it runs
+uint32_t gDropped = 0;
+Every gDropReport{kDropReportMs};
 
 KnobBank gKnobs;
 std::array<DebouncedInput, kSlotCount> gToggles;
@@ -36,38 +46,73 @@ bool gToggleChanged = false;
 std::array<float, kPotCount> gRaw;  // last unfiltered read per mux channel
 #endif
 
+// One pot's turn: select its mux channel, start the conversion once the mux has settled, read it.
+enum class Scan : uint8_t { Select, Convert, Read };
+Scan gScan = Scan::Select;
 uint8_t gScanChannel = 0;
-bool gSelected = false;
-uint32_t gSelectedAtUs = 0;
+uint32_t gStepAtUs = 0;
 
 void selectChannel(uint8_t channel) {
   for (int bit = 0; bit < kMuxSelectBits; ++bit) digitalWrite(kMuxSelectPins[bit], (channel >> bit) & 1);
 }
 
-// Blocks for one conversion: the sample window set by ADC_SAMPLINGTIME in build.sh (810.5 ADC
-// cycles) plus the 12-bit conversion, at the ADC clock the core configures (the AHB clock / 4).
-// The mux settle wait is separate and does not block.
-float readPosition() {
-  return knobPosition(static_cast<float>(analogRead(pins::kPotMuxOut)) / kAdcFull);
+void nextChannel() {
+  gScanChannel = (gScanChannel + 1) % kPotCount;
+  gScan = Scan::Select;
 }
 
-void scanMux(uint32_t nowMs) {
-  if (nowMs < kMuxSelectHoldMs) return;  // selects stay low until 3V3A is up
-  if (!gSelected) {
-    selectChannel(gScanChannel);
-    gSelectedAtUs = micros();
-    gSelected = true;
+// A failed conversion skips its pot for this round rather than reading as a knob at its stop. The
+// stop leaves ADC3 ready for the next start.
+void dropSample(uint32_t nowMs, const char* why) {
+  HAL_ADC_Stop(&gAdc);
+  ++gDropped;
+  if (gDropReport.due(nowMs)) {
+    serialOut().print("[WARN] pots: ADC3 conversion ");
+    serialOut().print(why);
+    serialOut().print(" on mux channel ");
+    serialOut().print(gScanChannel);
+    serialOut().print(", sample dropped, ");
+    serialOut().print(gDropped);
+    serialOut().println(" since boot");
+  }
+  nextChannel();
+}
+
+void startConversion(uint32_t nowMs) {
+  if (micros() - gStepAtUs < kMuxSettleUs) return;
+  if (HAL_ADC_Start(&gAdc) != HAL_OK) {
+    dropSample(nowMs, "would not start");
     return;
   }
-  if (micros() - gSelectedAtUs < kMuxSettleUs) return;
-  const float position = readPosition();
+  gStepAtUs = micros();
+  gScan = Scan::Read;
+}
+
+void readConversion(uint32_t nowMs) {
+  if (!__HAL_ADC_GET_FLAG(&gAdc, ADC_FLAG_EOC)) {
+    if (micros() - gStepAtUs >= kConversionTimeoutUs) dropSample(nowMs, "timed out");
+    return;
+  }
+  const float position = knobPosition(static_cast<float>(HAL_ADC_GetValue(&gAdc)) / kAdcFull);
 #if CUBEVOX_BENCH
   gRaw[gScanChannel] = position;
 #endif
   const PotOwner owner = potOwner(gScanChannel);
-  gKnobs.update(gScanChannel, position, LastMoved{owner.slot, owner.knobB});
-  gScanChannel = (gScanChannel + 1) % kPotCount;
-  gSelected = false;
+  gKnobs.update(gScanChannel, position, LastMoved{owner.slot, owner.knobB}, nowMs);
+  nextChannel();
+}
+
+void scanMux(uint32_t nowMs) {
+  if (nowMs < kMuxSelectHoldMs || gAdcError != nullptr) return;  // selects stay low until 3V3A is up
+  switch (gScan) {
+    case Scan::Select:
+      selectChannel(gScanChannel);
+      gStepAtUs = micros();
+      gScan = Scan::Convert;
+      break;
+    case Scan::Convert: startConversion(nowMs); break;
+    case Scan::Read: readConversion(nowMs); break;
+  }
 }
 
 bool readToggleOn(int slot) {
@@ -94,17 +139,29 @@ std::array<int, kPotCount> stepCounts(const Layout& layout) {
 }  // namespace
 
 void controlsInit() {
-  analogReadResolution(kAdcBits);
   for (uint32_t pin : kMuxSelectPins) {
     digitalWrite(pin, LOW);
     pinMode(pin, OUTPUT);
     LL_GPIO_SetPinSpeed(pins::portOf(pin), pins::maskOf(pin), LL_GPIO_SPEED_FREQ_LOW);
   }
   pinMode(pins::kPotMuxOut, INPUT_ANALOG);
+  gAdcError = adcSetup(gAdc, ADC3, pins::kPotMuxAdcChannel, kSampleTime, false);
   for (int s = 0; s < kSlotCount; ++s) {
     pinMode(kSlots[s].togglePin, INPUT);  // pull-up is on the board
     gToggles[s].reset(readToggleOn(s));
   }
+}
+
+void controlsReport(Print& out) {
+  if (gAdcError != nullptr) {
+    out.print("[ERROR] pots: ADC3 ");
+    out.print(gAdcError);
+    out.println(", the panel stays unread and the output muted");
+    return;
+  }
+  out.print("[boot] pots: ADC3, ");
+  out.print(gDropped);
+  out.println(" samples dropped");
 }
 
 void controlsPoll(uint32_t nowMs, const Layout& layout) {

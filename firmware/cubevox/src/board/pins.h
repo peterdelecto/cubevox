@@ -24,6 +24,7 @@ constexpr uint32_t kMuxS1 = PE10;  // MUX_S1
 constexpr uint32_t kMuxS2 = PE8;   // MUX_S2
 constexpr uint32_t kMuxS3 = PE9;   // MUX_S3
 constexpr uint32_t kPotMuxOut = PC0;  // POT_MUX_OUT (MUX1_SIG_ADC), ADC1/2/3_INP10, 100 R / 1 nF at the pin
+constexpr uint32_t kPotMuxAdcChannel = ADC_CHANNEL_10;  // INP10 of whichever ADC reads kPotMuxOut
 
 // Slot bypass toggles, 10 k pull-up and 100 nF on the board, one throw to GND.
 constexpr uint32_t kToggle1 = PA7;  // TOGGLE1
@@ -46,6 +47,8 @@ constexpr uint32_t kPadEn = PE11;  // PAD_EN, output, high = LINE (pad in circui
 // Indicators and sense.
 constexpr uint32_t kUserLed = PB7;   // USER_LED
 constexpr uint32_t kVbusSense = PA9;  // VBUS_SENSE, R6/R7 divider, native OTG sensing off
+constexpr uint32_t kVaSense = PB1;    // VA_SENSE, 5VA through 10 k / 10 k, 100 nF at the pin, ADC12_INP5
+constexpr uint32_t kVaSenseAdcChannel = ADC_CHANNEL_5;
 
 // USB OTG_FS data pins as PinName, because the core's PinMap_USB_OTG_FS table takes those.
 constexpr PinName kUsbDm = PA_11;  // USB_DM
@@ -70,7 +73,6 @@ constexpr std::array<uint32_t, 5> kSaiPins = {kSaiMclkA, kSaiSdB, kSaiFsA, kSaiS
 
 // BOOT0 (pin 94) is the DFU recovery button, not a GPIO the firmware uses.
 // PB8, PB9 and PE0 are spare. PB6, PE1 and PB4 are unconnected.
-// PB1 carries VA_SENSE (ADC12_INP5), which no code reads.
 
 // Boot report line: the port letter and bit that portOf / maskOf decode for the pins driven by
 // register, so a misdecode shows on the first board.

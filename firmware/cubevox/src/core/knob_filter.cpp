@@ -4,8 +4,14 @@
 
 namespace {
 
-constexpr float kSmoothing = 0.3f;        // one-pole step per update
-constexpr float kMoveThreshold = 0.015f;  // knob travel that counts as touched
+constexpr float kSmoothing = 0.3f;  // one-pole step per update
+
+// A resting value this close to an end is the end.
+float snapToEnds(float v) {
+  if (v < kKnobRestBand) return 0.0f;
+  if (v > 1.0f - kKnobRestBand) return 1.0f;
+  return v;
+}
 
 }  // namespace
 
@@ -30,10 +36,13 @@ int steppedPosition(float norm, int positions, int current, float hysteresis) {
   return (norm >= lo && norm <= hi) ? current : pos;
 }
 
+// The knob is taken as resting where it is, so its value starts at the end it sits near.
 void KnobFilter::reseed(int steps) {
   stepsSeeded_ = steps;
+  smoothed_ = snapToEnds(smoothed_);
   step_ = steps > 0 ? steppedPosition(smoothed_, steps, 0, 0.0f) : 0;
   reported_ = smoothed_;
+  tracking_ = false;
 }
 
 KnobEvent KnobFilter::restep(int steps) {
@@ -42,7 +51,40 @@ KnobEvent KnobFilter::restep(int steps) {
   return KnobEvent::Reseeded;
 }
 
-KnobEvent KnobFilter::update(float norm, int steps) {
+void KnobFilter::restartRest(float norm, uint32_t nowMs) {
+  restAnchor_ = norm;
+  restSum_ = norm;
+  restReads_ = 1;
+  restSinceMs_ = nowMs;
+}
+
+// Ends the touch with the mean of the resting reads, which the one-pole would only approach.
+KnobEvent KnobFilter::settle() {
+  tracking_ = false;
+  smoothed_ = snapToEnds(restSum_ / static_cast<float>(restReads_));
+  if (smoothed_ == reported_) return KnobEvent::None;
+  reported_ = smoothed_;
+  return KnobEvent::Moved;
+}
+
+KnobEvent KnobFilter::updateContinuous(float norm, uint32_t nowMs) {
+  if (!tracking_) {
+    if (fabsf(smoothed_ - reported_) <= kKnobMoveThreshold) return KnobEvent::None;
+    tracking_ = true;
+    restartRest(norm, nowMs);
+  } else if (fabsf(norm - restAnchor_) > kKnobRestBand) {
+    restartRest(norm, nowMs);
+  } else {
+    restSum_ += norm;
+    ++restReads_;
+    if (nowMs - restSinceMs_ >= kKnobRestMs) return settle();
+  }
+  if (smoothed_ == reported_) return KnobEvent::None;
+  reported_ = smoothed_;
+  return KnobEvent::Moved;
+}
+
+KnobEvent KnobFilter::update(float norm, int steps, uint32_t nowMs) {
   if (!seeded_) {
     smoothed_ = norm;
     seeded_ = true;
@@ -54,17 +96,11 @@ KnobEvent KnobFilter::update(float norm, int steps) {
     reseed(steps);
     return KnobEvent::Reseeded;
   }
-  if (steps > 0) {
-    const int next = steppedPosition(smoothed_, steps, step_);
-    if (next == step_) return KnobEvent::None;
-    step_ = next;
-    return KnobEvent::Moved;
-  }
-  if (fabsf(smoothed_ - reported_) > kMoveThreshold) {
-    reported_ = smoothed_;
-    return KnobEvent::Moved;
-  }
-  return KnobEvent::None;
+  if (steps == 0) return updateContinuous(norm, nowMs);
+  const int next = steppedPosition(smoothed_, steps, step_);
+  if (next == step_) return KnobEvent::None;
+  step_ = next;
+  return KnobEvent::Moved;
 }
 
 void KnobBank::setSteps(const std::array<int, kPotCount>& steps) {
@@ -75,10 +111,10 @@ void KnobBank::setSteps(const std::array<int, kPotCount>& steps) {
   }
 }
 
-void KnobBank::update(int pot, float position, LastMoved owner) {
+void KnobBank::update(int pot, float position, LastMoved owner, uint32_t nowMs) {
   if (pot < 0 || pot >= kPotCount) return;
   const size_t i = static_cast<size_t>(pot);
-  switch (knob_[i].update(position, steps_[i])) {
+  switch (knob_[i].update(position, steps_[i], nowMs)) {
     case KnobEvent::Seeded:
       if (++seededCount_ == kPotCount) changed_ = true;
       break;

@@ -13,6 +13,14 @@
 // Dead band at each end of pot travel, as a fraction of the ADC range.
 constexpr float kKnobEndMargin = 0.01f;
 
+// Travel from the last reported value that counts as a touch.
+constexpr float kKnobMoveThreshold = 0.015f;
+
+// A touched knob is at rest once its raw reads stay inside this band for kKnobRestMs. The band sits
+// well above the ADC noise, or a resting knob would never settle.
+constexpr float kKnobRestBand = 0.01f;
+constexpr uint32_t kKnobRestMs = 200;
+
 // Maps an ADC fraction (0..1) to a knob position (0..1). The dead band at each end reads as 0 and
 // 1, so a pot that stops short of the rails still reaches both ends. NaN reads as 0.
 float knobPosition(float adcFraction);
@@ -31,26 +39,38 @@ enum class KnobEvent : uint8_t {
 };
 
 // Smooths one pot and reports when it moved. `steps` is the knob's step count, 0 for a
-// continuous knob.
+// continuous knob. A continuous knob waits for a touch, then reports every change of its smoothed
+// value until it rests, and then reports once more with the mean of its resting reads. A resting
+// value within kKnobRestBand of an end is that end, so a knob at its stop reads exactly 0 or 1.
 class KnobFilter {
  public:
-  KnobEvent update(float norm, int steps);
+  // `nowMs` times the rest that ends a touch.
+  KnobEvent update(float norm, int steps, uint32_t nowMs);
 
   // Re-derives the step position for a new step count without a new sample. None until seeded or
   // when the count is unchanged.
   KnobEvent restep(int steps);
 
-  // Step index for a stepped knob, smoothed 0..1 otherwise.
-  float value() const { return stepsSeeded_ > 0 ? static_cast<float>(step_) : smoothed_; }
+  // Step index for a stepped knob. For a continuous knob, the value last reported, which is what
+  // the audio and the glass both hold.
+  float value() const { return stepsSeeded_ > 0 ? static_cast<float>(step_) : reported_; }
 
  private:
   void reseed(int steps);
+  KnobEvent updateContinuous(float norm, uint32_t nowMs);
+  void restartRest(float norm, uint32_t nowMs);
+  KnobEvent settle();
 
   float smoothed_ = 0.0f;
-  float reported_ = 0.0f;  // value at the last Moved event
+  float reported_ = 0.0f;    // value at the last Moved event
+  float restAnchor_ = 0.0f;  // raw read that opened the current rest window
+  float restSum_ = 0.0f;     // raw reads inside the rest window
+  int restReads_ = 0;
+  uint32_t restSinceMs_ = 0;
   int step_ = 0;
   int stepsSeeded_ = 0;    // step count step_ was seeded for; 0 for a continuous knob
   bool seeded_ = false;
+  bool tracking_ = false;  // touched and not yet at rest
 };
 
 // The panel's pots together: one filter each, plus the changed flag, the seeded count and the
@@ -61,8 +81,8 @@ class KnobBank {
   // position at once, so the next snapshot never mixes a new card with an old step index.
   void setSteps(const std::array<int, kPotCount>& steps);
 
-  // Feeds one reading of `pot`. `owner.slot` is -1 for a pot no slot uses.
-  void update(int pot, float position, LastMoved owner);
+  // Feeds one reading of `pot` taken at `nowMs`. `owner.slot` is -1 for a pot no slot uses.
+  void update(int pot, float position, LastMoved owner, uint32_t nowMs);
 
   float value(int pot) const { return knob_[static_cast<size_t>(pot)].value(); }
 

@@ -745,9 +745,15 @@ void replyStatus(Writer& w, uint32_t id, const Status& s) {
   w.format("{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"muted\":%s,\"seq\":%lu,",
            static_cast<unsigned long>(id), mean, worst, static_cast<unsigned long>(s.late),
            s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
-  w.format("\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu,\"boot_fails\":%lu,\"update_reason\":",
+  w.format("\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu,\"boot_fails\":%lu,",
            static_cast<unsigned long>(s.recordErrors), static_cast<unsigned long>(s.serialDropped),
            static_cast<unsigned long>(s.strayBytes), static_cast<unsigned long>(s.bootFails));
+  w.format("\"overruns\":%lu,\"sai_errors\":%lu,\"restarts\":%lu,\"nan_blocks\":%lu,",
+           static_cast<unsigned long>(s.overruns), static_cast<unsigned long>(s.saiErrors),
+           static_cast<unsigned long>(s.restarts), static_cast<unsigned long>(s.nanBlocks));
+  w.format("\"power_trips\":%lu,\"stalled\":%s,\"audio_latched\":%s,\"reply_overflows\":%lu,\"update_reason\":",
+           static_cast<unsigned long>(s.powerTrips), s.stalled ? "true" : "false", s.audioLatched ? "true" : "false",
+           static_cast<unsigned long>(w.overflows()));
   writeString(w, s.updateReason);
   w.write("}\n", 2);
 }
