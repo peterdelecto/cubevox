@@ -183,25 +183,28 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
 
 ## OLED in update mode
 The bootloader drives the SH1106 over I2C2 (PB10/PB11) with its own driver, about 150 lines: the
-init sequence and a full-frame write. U8g2 is not linked. Screens use the project fonts from
-`cubevox_fonts.h`; static screens are rendered at build time by `tools/render_boot_screens.py`
-from the same font tables, so the proof PNGs and the shipped bitmaps are the same bytes. The version
-and serial lines are drawn at run time with the 5x7 font.
+init sequence and a full-frame write. U8g2 is not linked. Screens are drawn at run time by
+`screens.c` with the 5x7 font from `cubevox_fonts.h`; the same file compiles on the host and renders
+the numbered proof PNGs (`build.sh --proofs`), so the proofs show the shipped pixels.
 
-| State | Screen (title / lines) |
+Owner rules for these screens (2026-10-24): every line is a full sentence with a period, no bare
+titles; prose in the 5x7 font sits on alternate rows (0, 2, 4, 6), so a screen holds at most four
+lines of 21 characters; the extension `uf2` never appears on screen because the font blurs it.
+
+| State | Rows 0 / 2 / 4 / 6 |
 |---|---|
-| Waiting, from the menu | `UPDATE MODE` / `Drag cubevox.uf2` / `onto the CUBEVOX drive.` / `Installed vX.YY.ZZ` / `Wait 60 s to cancel.` |
-| Waiting, no valid image | `UPDATE NEEDED` / `Last update did not` / `finish.` / `Drag cubevox.uf2` / `onto the CUBEVOX drive.` |
-| Waiting, three failed boots | `UPDATE NEEDED` / `Firmware failed to` / `start 3 times.` / `Drag cubevox.uf2` / `onto the CUBEVOX drive.` |
-| Host connected | adds `Connected.` to the last line |
-| Writing | `UPDATING` / `Writing…` / `Do not unplug.` |
-| Wrong file | `WRONG FILE` / `That is not a cubevox` / `firmware file.` / `Drag cubevox.uf2.` |
-| Done | `DONE` / `Restarting.` |
+| Waiting, from the menu or the app | `Drop the firmware on` / `the CUBEVOX drive.` / `You have vX.YY.ZZ.` / `Wait 60 s to cancel.` |
+| Waiting, no valid image | `The update stopped.` / `Drop the firmware on` / `the CUBEVOX drive.` / (blank) |
+| Waiting, three failed boots | `Startup failed.` / `Drop the firmware on` / `the CUBEVOX drive.` / (blank) |
+| Host connected | row 6 becomes `Computer connected.` on every waiting screen |
+| Writing | `Writing the firmware.` / `Do not unplug.` |
+| Wrong file | `That is not a cubevox` / `firmware file.` / `Drop the firmware on` / `the CUBEVOX drive.` |
+| Done | `The update is done.` / `Restarting now.` |
 
-1. Every string above is a proposal. The screens get a numbered proof set with roadmap step 2 and
-   the owner approves per number, as for every OLED screen.
-2. The application's confirm screen changes to `UPDATE FIRMWARE` / `Installed vX.YY.ZZ` /
-   `Click to enter` / `update mode.` / `Turn to cancel.` Same proof rule.
+1. The screens get a numbered proof set and the owner approves per number, as for every OLED
+   screen. The wording above is the approved source; the code matches it.
+2. The application's confirm screen is `Update the firmware?` / `You have vX.YY.ZZ.` /
+   `Click to start.` / `Turn to cancel.` on rows 0, 2, 4, 6. Same proof rule.
 3. The application's boot splash shows the version for 2 s so Adam can confirm an update without a
    computer.
 

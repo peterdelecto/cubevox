@@ -23,12 +23,11 @@ constexpr int kRowVersion = kDisplayRows - 1;
 constexpr int kRowListTitle = 0;
 constexpr int kRowListFirstItem = 1;
 
-// Firmware update confirmation.
+// Firmware update confirmation. Prose in the 5x7 font sits on alternate rows (owner rule).
 constexpr int kRowConfirmTitle = 0;
-constexpr int kRowConfirmRunning = 2;
-constexpr int kRowConfirmBody1 = 4;
-constexpr int kRowConfirmBody2 = 5;
-constexpr int kRowConfirmCancel = 7;
+constexpr int kRowConfirmVersion = 2;
+constexpr int kRowConfirmBody = 4;
+constexpr int kRowConfirmCancel = 6;
 
 enum class Item : uint8_t { Output, InputJack, ChainOrder, UpdateFirmware, Exit, Count };
 
@@ -107,17 +106,16 @@ void drawChainView(MenuFrame& f, const Layout& layout) {
   }
 }
 
-// Names the running version so Adam can compare it with the file he downloaded. versionTag clips
-// a bench suffix, so the line always fits the row.
+// Names the version on the box so Adam can compare it with the file he downloaded. versionTag
+// clips a bench suffix, so the line always fits the row.
 void drawConfirmDfu(MenuFrame& f) {
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
-  char running[kDisplayCols + 1];
-  snprintf(running, sizeof(running), "Now running %s", tag);
-  putRow(f, kRowConfirmTitle, "UPDATE FIRMWARE");
-  putRow(f, kRowConfirmRunning, running);
-  putRow(f, kRowConfirmBody1, "Click to enter");
-  putRow(f, kRowConfirmBody2, "update mode.");
+  char have[kDisplayCols + 1];
+  snprintf(have, sizeof(have), "You have %s.", tag);
+  putRow(f, kRowConfirmTitle, "Update the firmware?");
+  putRow(f, kRowConfirmVersion, have);
+  putRow(f, kRowConfirmBody, "Click to start.");
   putRow(f, kRowConfirmCancel, "Turn to cancel.");
 }
 

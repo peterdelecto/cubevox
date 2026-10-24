@@ -155,11 +155,13 @@ void checkMenuScreens() {
   m.draw();
   char tag[kDisplayCols + 1];
   versionTag(kFirmwareVersion, tag, sizeof(tag));
-  const std::string running = std::string("Now running ") + tag;
-  check(rowIs(m.canvas, 0, "UPDATE FIRMWARE") && rowIs(m.canvas, 2, running.c_str()), "menu: confirm screen names the running version");
-  check(rowIs(m.canvas, 4, "Click to enter") && rowIs(m.canvas, 5, "update mode.") && rowIs(m.canvas, 7, "Turn to cancel."),
-        "menu: confirm screen says a click enters update mode and a turn cancels");
-  check(rowIs(m.canvas, 1, "") && rowIs(m.canvas, 3, "") && rowIs(m.canvas, 6, ""), "menu: confirm screen keeps its spacer rows blank");
+  const std::string have = std::string("You have ") + tag + ".";
+  check(rowIs(m.canvas, 0, "Update the firmware?") && rowIs(m.canvas, 2, have.c_str()),
+        "menu: confirm screen asks and names the version on the box");
+  check(rowIs(m.canvas, 4, "Click to start.") && rowIs(m.canvas, 6, "Turn to cancel."),
+        "menu: confirm screen says a click starts and a turn cancels");
+  check(rowIs(m.canvas, 1, "") && rowIs(m.canvas, 3, "") && rowIs(m.canvas, 5, "") && rowIs(m.canvas, 7, ""),
+        "menu: confirm screen keeps a blank row between sentences");
   m.step(1, false);
   m.draw();
   check(rowIs(m.canvas, 0, "MENU"), "menu: turn cancels the confirm");
