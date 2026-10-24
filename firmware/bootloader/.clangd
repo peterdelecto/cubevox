@@ -1,9 +1,8 @@
 # Editor include paths for the bootloader tree: boards/cubevox, tools/ and the TinyUF2 checkout that
 # build.sh keeps in build/tinyuf2. Run ./build.sh once so the checkout, TinyUSB and the ST HAL exist.
-# clangd has no variable expansion, so every path is absolute. To regenerate on another machine,
-# replace the prefixes below with the output of these commands:
-#   TC    $(arduino-cli config get directories.data)/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1
-#   REPO  the checkout
+# clangd has no variable expansion, so every path is absolute. On another machine, or after moving the
+# checkout, run `python3 -I tools/clangd_paths.py`. It rewrites the Arduino data dir and the checkout
+# prefixes from arduino-cli and from its own location.
 # The list follows the compile command make prints for boards/cubevox/board_hooks.c:
 #   make -C build/tinyuf2/ports/stm32h7 BOARD=cubevox CROSS_COMPILE=$TC/bin/arm-none-eabi- V=1 -n -B all
 # The version strings are placeholders for the ones build.sh computes.

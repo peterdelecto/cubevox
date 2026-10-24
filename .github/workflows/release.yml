@@ -1,15 +1,20 @@
 name: release
 
 # A tag vX.YY.ZZ has to equal v plus the text of VERSION.txt, or the run stops with [ERROR]. The
-# workflow then builds the release firmware and attaches two files to the release for that tag.
+# workflow then builds the release firmware and, once every test has passed, creates a draft
+# release for that tag with three files. The owner publishes the draft after the bench look.
 #   cubevox-vX.YY.ZZ.uf2           the file Adam drags onto the CUBEVOX drive
 #   cubevox-rom-0x08020000.bin     the same image for the shop's ROM DFU, written at that address
-# The rom file starts at the application, which sits above the bootloader's sector. Written at
-# 0x08000000 it would destroy the bootloader, so its name carries the address that
-# firmware/flash.sh --rom uses.
-# The bootloader job builds and checks the shop's bootloader and publish waits for it, but nothing
-# of it is attached. The dfu-util and app jobs only prove that the parked Mac app still builds.
-# Nothing from them is attached, and publish does not wait for them.
+#   cubevox-rom-0x08020000.elf     the shop's symbols for that image; they resolve the pc and lr
+#                                  addresses in a DIAG.TXT
+# The rom files start at the application, which sits above the bootloader's sector. Written at
+# 0x08000000 the .bin would destroy the bootloader, so its name carries the address that
+# firmware/flash.sh --rom uses. The release notes carry the stamp check line of the .uf2 (version,
+# bytes, CRC), which the owner compares with the build on the bench.
+# The tests job runs the host suite, the bootloader selftest and the bench build, and publish waits
+# for it. The bootloader job builds and checks the shop's bootloader and publish waits for it too,
+# but nothing of it is attached. The dfu-util and app jobs only prove that the parked Mac app still
+# builds. Nothing from them is attached, and publish does not wait for them.
 on:
   push:
     tags: ["v*"]
@@ -19,8 +24,9 @@ permissions:
 
 jobs:
   firmware:
-    # Same steps as the firmware job in ci.yml. macOS because warn_gate.py treats
-    # ~/Library/Arduino15 as the third-party tree. Keep the core pin in sync with ci.yml.
+    # Same steps as the firmware job in ci.yml. macOS because the arduino-cli download and the
+    # cache paths below are the macOS ones. The pins below must equal the ones in firmware/build.sh,
+    # which stops on any other version.
     runs-on: macos-14
     env:
       ARDUINO_CLI_VERSION: 1.5.1
@@ -59,17 +65,21 @@ jobs:
           arduino-cli lib install U8g2@${U8G2_VERSION}
           arduino-cli core list
           arduino-cli lib list
-      - name: Build release image (warn gate runs inside build.sh)
+      - name: Build release image (warn gate and bench-symbol check run inside build.sh)
         run: firmware/build.sh
       - name: Name the files
-        # The rom file is named for the address flash.sh --rom writes it at, which boot_block.h defines.
+        # The rom files are named for the address flash.sh --rom writes the .bin at, which boot_block.h
+        # defines. The notes file carries the check line for the release page.
         run: |
           out="$(firmware/build.sh --outdir)"
-          for file in cubevox.ino.bin cubevox.uf2; do
+          for file in cubevox.ino.bin cubevox.uf2 cubevox.ino.elf; do
             test -s "$out/$file" || { echo "[ERROR] $out/$file is missing or empty"; exit 1; }
+          done
+          for file in cubevox.ino.bin cubevox.uf2; do
             python3 -I tools/stamp_image.py check "$out/$file"
           done
-          start="$(awk '$1 == "#define" && $2 == "CV_APP_START" { sub(/[uUlL]+$/, "", $3); print $3; exit }' firmware/cubevox/src/board/boot_block.h)"
+          source firmware/cv_define.sh
+          start="$(cv_define CV_APP_START)"
           if ! [[ "$start" =~ ^0x[0-9A-Fa-f]+$ ]]; then
             echo "[ERROR] CV_APP_START is '$start' in boot_block.h; it must look like 0x08020000"
             exit 1
@@ -77,15 +87,70 @@ jobs:
           mkdir -p assets
           cp "$out/cubevox.uf2" "assets/cubevox-v$(cat VERSION.txt).uf2"
           cp "$out/cubevox.ino.bin" "assets/cubevox-rom-$start.bin"
+          cp "$out/cubevox.ino.elf" "assets/cubevox-rom-$start.elf"
+          {
+            echo "Adam installs the .uf2 by dragging it onto the CUBEVOX drive. The .bin and the .elf are for the shop. The .bin goes through the ROM DFU, and the .elf resolves the addresses in a DIAG.TXT."
+            echo
+            echo "Image check: \`$(python3 -I tools/stamp_image.py check "$out/cubevox.uf2")\`"
+          } > assets/release-notes.md
       - uses: actions/upload-artifact@v4
         with:
           name: cubevox-firmware
           path: assets/*
           if-no-files-found: error
 
+  tests:
+    # What ci.yml runs on the same commit that the release jobs do not: the host suite, the
+    # bootloader selftest and the bench build. publish waits for it, so a tag on a red commit ships
+    # nothing. The pins below must equal the ones in firmware/build.sh.
+    runs-on: macos-14
+    env:
+      ARDUINO_CLI_VERSION: 1.5.1
+      STM32_CORE_VERSION: 3.0.0
+      U8G2_VERSION: 2.34.22
+      STM32_INDEX_URL: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install GLFW
+        run: brew install glfw
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build -j
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_macOS_ARM64.tar.gz -o "$RUNNER_TEMP/acli.tgz"
+          mkdir "$RUNNER_TEMP/acli"
+          tar -xzf "$RUNNER_TEMP/acli.tgz" -C "$RUNNER_TEMP/acli"
+          echo "$RUNNER_TEMP/acli" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Arduino15
+            ~/Documents/Arduino/libraries
+          key: arduino-${{ runner.os }}-core${{ env.STM32_CORE_VERSION }}-u8g2${{ env.U8G2_VERSION }}
+      - name: Install core and libraries
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls "$STM32_INDEX_URL"
+          arduino-cli core update-index
+          arduino-cli core install STMicroelectronics:stm32@${STM32_CORE_VERSION}
+          arduino-cli lib install U8g2@${U8G2_VERSION}
+          arduino-cli core list
+          arduino-cli lib list
+      - name: Bootloader host selftest
+        run: firmware/bootloader/build.sh --selftest
+      - name: Build bench image (warn gate and bench-symbol check run inside build.sh)
+        # The bench build is the control for the release build's proof that it holds no bench code.
+        run: BENCH=1 firmware/build.sh
+
   bootloader:
     # Same toolchain steps as the firmware job: the xpack compiler the STM32 core installs.
-    # Keep the core pin in sync with ci.yml.
+    # The pins below must equal the ones in firmware/build.sh.
     runs-on: macos-14
     env:
       ARDUINO_CLI_VERSION: 1.5.1
@@ -170,7 +235,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [firmware, bootloader]
+    needs: [firmware, bootloader, tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -185,14 +250,24 @@ jobs:
         with:
           name: cubevox-firmware
           path: assets
-      - name: Attach to the release
+      - name: Create the draft release
+        # The release stays a draft until the owner publishes it after the bench look. A release that
+        # exists already takes the files it lacks. One that holds a file stops the run, because a
+        # moved tag would otherwise swap the asset under an unchanged version.
         run: |
-          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.bin)
+          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.bin assets/cubevox-rom-0x*.elf)
           for file in "${files[@]}"; do
             test -s "$file" || { echo "[ERROR] $file is missing or empty"; exit 1; }
           done
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          if held="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"; then
+            for file in "${files[@]}"; do
+              if grep -qxF "$(basename "$file")" <<<"$held"; then
+                echo "[ERROR] release $GITHUB_REF_NAME already holds $(basename "$file"); delete the asset or the release first"
+                exit 1
+              fi
+            done
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}"
           else
-            gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --draft --title "$GITHUB_REF_NAME" \
+              --notes-file assets/release-notes.md --generate-notes
           fi

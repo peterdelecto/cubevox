@@ -7,7 +7,7 @@ map and the ownership rules before the OLED font renderer and runtime layouts la
 ## Problems found (audit 2026-10-12)
 1. PAD_EN (PE11) is never driven, so relay K103 never switches. MIC mode adds a +25.7 dB digital
    trim that the hardware spec retired (`2026-10-02-hardware-design.md` item 2).
-2. The 1/4" INPUT setting defaults to PEDAL. The hardware default is MIC (coil off).
+2. The 1/4" INPUT setting defaults to LINE. The hardware default is MIC (coil off).
 3. The audio IRQ reads the layout live through `slotCard()`; knob step counts are seeded from it
    once. A runtime layout change would run new cards on old params.
 4. `ui/menu.cpp` owns the encoder ISR, `pinMode`, `digitalRead` and DFU entry. Menu screens read
@@ -86,7 +86,7 @@ getters behind the sketch's back.
 ## Verification
 1. Each step: `ctest --test-dir build` and `firmware/build.sh`, output quoted in the report.
 2. Step 5: the PGM renders read against the font editor's `screens.png`.
-3. On hardware (relay click in PEDAL, OLED, audio on the snapshot): `firmware/bringup.py` checks
+3. On hardware (relay click in LINE, OLED, audio on the snapshot): `firmware/bringup.py` checks
    on the test board or the first JLC board.
 
 ## Deferred

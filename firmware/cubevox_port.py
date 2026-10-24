@@ -35,6 +35,7 @@ PORT_GLOB = "/dev/cu.usbmodem*"
 PORT_ENV = "CUBEVOX_PORT"
 READ_BYTES = 4096
 WRITE_TIMEOUT_S = 5.0
+REPLY_WAIT_S = 3.0  # how long --request waits for the reply
 POLL_S = 0.5
 VOLUMES_DIR = "/Volumes"
 VOLUME_WAIT_S = 10.0
@@ -249,7 +250,6 @@ def main():
                     help="with --wait-volume, wait for the volume to be unmounted instead")
     ap.add_argument("--allow-none", action="store_true", help="print nothing and exit 0 when no port is present")
     ap.add_argument("--request", metavar="CMD", help="send this command and require ok:true in the reply")
-    ap.add_argument("--reply-wait", type=float, default=3.0, help="seconds to wait for the reply")
     a = ap.parse_args()
     if a.wait_volume is not None or a.gone:
         return volume_command(a)
@@ -262,7 +262,7 @@ def main():
             return 0
         link = Link(path)
         try:
-            reply = link.ask(a.request, a.reply_wait)
+            reply = link.ask(a.request, REPLY_WAIT_S)
         finally:
             link.close()
     except (PortError, PortGone) as e:
@@ -271,7 +271,7 @@ def main():
     if reply is not None:
         print(json.dumps(reply))
     if not (isinstance(reply, dict) and reply.get("ok") is True):
-        print(f"[ERROR] {a.request}: {reply if reply is not None else f'no reply in {a.reply_wait:g} s'}",
+        print(f"[ERROR] {a.request}: {reply if reply is not None else f'no reply in {REPLY_WAIT_S:g} s'}",
               file=sys.stderr)
         return 1
     return 0

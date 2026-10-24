@@ -50,7 +50,7 @@ The board decides the ports:
 | 44 | PE14 | ENC_MENU_B | EXTI14 |
 | 43 | PE13 | ENC_MENU_SW | EXTI13 |
 | 42 | PE12 | MUX_S0 | R162 100k pulls it to GND (2026-10-10). In ROM DFU the bootloader listens on SPI4, whose NSS is PE11 and SCK is PE12; a floating SCK could feed a false sync byte and lock it to SPI. The other three selects are not on bootloader pins |
-| 41 | PE11 | PAD_EN | output, high = PEDAL (K103 coil on via Q102, R160/R161), default low = MIC; driver holds NSS low in ROM DFU (see MUX_S0) |
+| 41 | PE11 | PAD_EN | output, high = LINE (K103 coil on via Q102, R160/R161), default low = MIC; driver holds NSS low in ROM DFU (see MUX_S0) |
 | 40 | PE10 | MUX_S1 | |
 | 39 | PE9 | MUX_S3 | |
 | 38 | PE8 | MUX_S2 | |
@@ -139,6 +139,9 @@ divider with R116 470R and R159 1k. The old RK09D117000C log pot (C470307) is go
 
 ## 3. How fxbox joins top and h7core
 
+Done. The cubevox top and its h7core child are built as option (c) below. The section stays as the
+record of that choice.
+
 fxbox is hierarchical with a real `(sheet ...)` symbol (`fxbox.kicad_sch` line 18111,
 Sheetname h7core_block, Sheetfile h7core_block.kicad_sch). The file has 0 `global_label`
 rows in either sheet. Each child stub that names a port becomes a `hierarchical_label`;
@@ -155,7 +158,7 @@ schematic.py docstring, lines 39-52:
     a pin whose net nothing else on the top already drives, is refused, naming the port.
     A pin row with `"no_connect": true` gets its sheet pin and a `no_connect` at the pin ...
 
-B96 (`QUEUE.md` line 70, still open): `driven_nets` is computed once from the top body, so
+B96 (ClaudeRouter `docs/QUEUE.md` line 70, still open there): `driven_nets` is computed once from the top body, so
 one child cannot connect to a second child. A second sub-sheet is not buildable.
 
 Recommendation: option (c), top plus one h7core child, which is what the tool supports.
@@ -170,7 +173,11 @@ Recommendation: option (c), top plus one h7core child, which is what the tool su
 
 ## 4. Deletions and joins on the cubevox top
 
-Delete from `cubevox.json` (refs in the current file):
+Done. None of the parts below is on the cubevox top any more. The references are fxbox's, and the
+cubevox schematic reuses some of the numbers for other parts (Q102 is now the driver of K103). The
+section stays as the record of the conversion.
+
+Delete from `cubevox.json` (refs in the file at the time):
 1. Bridge and surge: Q102, Q103 (AO4606), R115-R118, D106-D109 (BZT52C15), D112-D115 (SMBJ70CA),
    C116 (PE_BST/PE_SW), C112/C113 rewired to 9V_IN. Keep J106 PJ-002A and D105 SMBJ15CA
    (rewire BAR_A/BAR_B to the item-11 chain: SS34 then 9V_IN).
@@ -252,7 +259,8 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
 ### Firmware
 
 1. PLL3 feeds the SAI1 kernel clock (SAI1SEL = PLL3P). With HSE 25 MHz use PLL3M = 25,
-   PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4 for 49.152 MHz (HAL ratio values, as in audio.cpp; the raw RCC fields DIVN3 and DIVP3 encode N-1 and P-1, so 195 and 3) (NOT VERIFIED, check PLL3 range bits).
+   PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4 for 49.152 MHz (HAL ratio values, as in audio.cpp; the raw RCC fields DIVN3 and DIVP3 encode N-1 and P-1, so 195 and 3). `board/audio.cpp` sets RGE 0 for the 1 MHz reference and VCOSEL medium for the
+   196.608 MHz VCO, and checks the kernel clock to within 5 kHz at start.
 2. SAI1 block A is master transmitter (DAC, SD_A on PE6), MCKEN = 1, MCKDIV chosen so MCLK =
    256 fs = 12.288 MHz, 64-bit frames, BCLK = 64 fs. MCLK, FS_A and SCK_A are all outputs of
    this block.
@@ -271,4 +279,5 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
    more at mid-travel of a 10k pot) ahead of the R30/C55 (100R/1n) stage.
 
 VERIFIED (DS12110 Table 10): SAI1 on PE2-PE6, AF6, including SAI1_MCLK_A on PE2.
-NOT VERIFIED: the unused fallbacks (SAI3_MCLK_B on PD14, PF7, SAI2 pins), PLL3 settings and the MCKDIV value.
+NOT VERIFIED: the unused fallbacks (SAI3_MCLK_B on PD14, PF7, SAI2 pins).
+RAN ON THE TEST BOARD, NOT YET ON A CUBEVOX BOARD: the PLL3 settings and the MCKDIV value (`firmware/README.md`, Status).

@@ -8,8 +8,9 @@ Firmware holds the registry and is the only source of truth. The Mac app reads i
 `hello` (step 3) and never hardcodes it. The slot table becomes a runtime layout, slot
 to card index, with defaults from the slots spec table. Flash persistence is step 2.
 
-Files: `firmware/cubevox/registry.h/.cpp` (cards, knob descriptors, groups, apply),
-`firmware/cubevox/costs.h` (per-release numbers), `firmware/cubevox/bench.cpp` (bench mode).
+Files: `firmware/cubevox/src/core/registry.h/.cpp` (cards, knob descriptors, groups, apply),
+`firmware/cubevox/src/core/costs.h` (per-release numbers), `firmware/cubevox/src/board/bench.cpp`
+(bench mode).
 
 ## Decisions
 
