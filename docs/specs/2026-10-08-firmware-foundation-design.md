@@ -39,6 +39,7 @@ firmware/
         registry.h/.cpp     cards, knob descriptors, apply, format
         costs.h             per-release cost percents
         chain_params.h/.cpp ChainParams and its defaults
+        chain_run.h/.cpp    the chain walk (runChain) and the BYPASS mix (mixBypass)
         layout.h/.cpp       runtime slot-to-card array, validation (step 2)
         record.h/.cpp       bank 2 record codec, CRC32 (step 2)
         protocol.h/.cpp     JSON request parse, reply format (step 3)
@@ -49,7 +50,7 @@ firmware/
         slots.h/.cpp        toggle pin and mux channels per slot
         sysclock.h/.cpp
         usb_link.h/.cpp
-        audio.h/.cpp        SAI, DMA, the audio IRQ, runChain
+        audio.h/.cpp        SAI, DMA, the audio IRQ, the engines
         controls.h/.cpp     mux scan, smoothing, stepping, toggles
         mute.h/.cpp
         display_sh1106.h/.cpp

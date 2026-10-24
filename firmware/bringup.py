@@ -13,7 +13,8 @@ measurements this script cannot take. With several cu.usbmodem* ports, name one 
 back with flash.sh --rom. --update runs the 13 drills of
 docs/specs/2026-10-24-field-update-design.md against the bootloader's update drive
 (/Volumes/CUBEVOX). It needs the bootloader installed and the bench image running. The operator
-drills (3, 4, 10, 11, 12) wait for Enter, and --no-prompt skips them.
+drills (3, 4, 10, 11, 12) wait for Enter, and --no-prompt skips them. Drill 1 also fails a unit
+whose DIAG.TXT option bytes line lacks BOR level 3 or a write protected sector 0.
 Drill 13 is the release image check, so --update does not flash the release image again. Its log
 is hardware/bringup/board-N.md with the UID, the bootloader and firmware versions, the checks and
 the drill table.
@@ -682,6 +683,19 @@ def parse_refused(fields):
     return int(m.group(1)), (int(m.group(2), 16) if m.group(2) else None)
 
 
+OPTION_BYTES_WANT = ("BOR level 3", "sector 0 protected")
+
+
+def option_bytes_problem(value):
+    """Why a unit fails on DIAG.TXT's `option bytes` value, or None when it shows BOR level 3 and sector 0 protected."""
+    if value is None:
+        return "DIAG.TXT has no 'option bytes' line"
+    missing = [f"'{want}'" for want in OPTION_BYTES_WANT if want not in value]
+    if missing:
+        return f"DIAG.TXT option bytes '{value}' lacks {' and '.join(missing)}"
+    return None
+
+
 def hex_value(text):
     """The integer in a '0x...' field, or None."""
     try:
@@ -898,8 +912,12 @@ def drill_enter_dfu(ctx):
         return FAIL, f"hello serial {ctx.app_serial} differs from the drive serial {uid}", measured
     ctx.uid = uid
     ctx.log.facts.update({"UID": uid, "Bootloader": info["title"]})
+    options = parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT")).get("option bytes")
+    problem = option_bytes_problem(options)
+    if problem:
+        return FAIL, problem, measured
     return (PASS, f"serial port gone, drive mounted in {mount_s:.1f} s (limit {VOLUME_APPEAR_S:g} s); "
-            f"{info['title']}; installed {info.get('installed', '?')}", measured)
+            f"{info['title']}; installed {info.get('installed', '?')}; option bytes {options}", measured)
 
 
 def drill_install_bench(ctx):
@@ -1231,9 +1249,9 @@ MANUAL = [
     ("OLED readable", "OLED shows the idle screen and the knob readout? (y/n/skip): "),
 ]
 UPDATE_SCREENS = ("update-mode OLED screens",
-                  "During the drills did the OLED show 'Drop the firmware on', 'The update stopped.', "
-                  "'Startup failed.', 'Writing the firmware.', 'That is not a cubevox' and "
-                  "'The update is done.'? (y/n/skip): ")
+                  "During the drills did the OLED show 'Drop the firmware on', 'The cable came out.', "
+                  "'The update stopped.', 'Startup failed.', 'Writing the firmware.', "
+                  "'That is not a cubevox' and 'The update is done.'? (y/n/skip): ")
 
 
 def manual_questions(a):

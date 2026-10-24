@@ -41,15 +41,25 @@ carry a measured number from the audit keep that number.
 | BO1 | Power on cold 20 times with no debugger attached. | The box reaches the app 20 times out of 20. | boot answer 5, DWT CYCCNT spin, and answer 3, byte stores into random DTCM |
 | BO2 | Measure MENU released at power-on. | MENU reads high 20 ms after a cold power-on on the internal pull-up alone. An RC on ENC_MENU_SW would read as held at every power-on, so a box that does is a fail. | boot answer 3, MENU read |
 | BO3 | Power on cold with MENU held, 20 times. | The OLED answers its first init every time. The driver never retries, so one miss shows as a dark screen. | boot answer 5, OLED waits |
-| BO4 | Pull the cable in the middle of a copy and record the screen. | The screen says the update stopped (field-update spec failure table) and the 60 s timeout runs again. Before the fix the screen keeps "Do not unplug." | boot B1, pulled cable |
+| BO4 | Pull the cable in the middle of a copy, wait 3 s, plug it back in, and record the screens. | The OLED shows "The cable came out." (field-update spec failure table). The CUBEVOX drive is back on the replug, and a full copy then completes. | boot B1, pulled cable |
 | BO5 | Force a double ECC error in log sector 2. | DIAG.TXT shows `flash log: unreadable at 0x814xxxx`, which confirms the FAIL_ECC_ADDR decode, and the box stays in update mode. | boot B8 (unsure item) and answer 4 |
 | BO6 | Cut 9 V during sector 1's erase, then drag the release once. | The first copy completes with no reset in the middle. | boot B9, torn word survives |
 | BO7 | Enter update mode by the menu, by the app request and by MENU at power-on, many times over. | The CUBEVOX drive appears within 3 s on every entry. | boot answer 5, TinyUSB core reset loops |
-| BO8 | Cold-start every board and watch for the update screen or the app. | HSE starts inside its 100 ms timeout on every board. A miss is a dark box. | boot answer 6 and B13, missing crystal |
+| BO8 | Cold-start every board and watch for the update screen or the app. | HSE starts inside its 100 ms timeout on every board. A miss shows "The clock failed." with the drive up on HSI48, not a dark box (BO15). | boot answer 6 and B13, missing crystal |
 | BO9 | Scope I2C2 SCL while the bootloader draws a screen. | SCL runs near 400 kHz. | boot C7, CV_OLED_TIMINGR |
 | BO10 | Hold the box in update mode and watch K102 and XSMT. | K102 stays open and XSMT stays low through update mode. The bootloader never drives PB5 or PC5. | boot pins; same measurement as AU2 |
 | BO11 | Time a full update of the current release image, and time the update-mode timeout against a stopwatch. | The copy takes about 3 s for a 200 KB image with the erase included (field-update spec). The timeout fires at 60 s. | field-update spec timing table |
 | BO12 | Drag the release onto the drive on Adam's macOS version. | The only dialog is the "not ejected properly" notice after the reset (field-update spec, Writes item 4). Any other error dialog before the reset is logged as a finding. | field-update spec, Writes item 4 |
+| BO13 | Scope PA9 (VBUS_SENSE) in update mode, then pull the cable and plug it back in. | PA9 reads high with the cable in and low within 50 ms of the pull. | boot B1, cable detect on PA9 |
+| BO14 | Enter update mode from the menu with the cable in, copy nothing, then pull the cable and time the wait. | The application starts 60 s after the pull. | boot B1, the 60 s timeout restarts from the pull |
+| BO15 | Power on a board with the crystal lifted. | The OLED shows "The clock failed." and the CUBEVOX drive mounts. DIAG.TXT shows `clock: failed in oscillator and PLL1`, and a full copy completes. | boot B13, missing crystal; BO8 is the cold-start count |
+| BO16 | Flash a fresh part with firmware/bootloader/flash.sh, power on and read DIAG.TXT, then power-cycle and read it again. | The first DIAG.TXT says `option bytes: programmed, BOR level 3, sector 0 protected`. After the next power-on the result word is `set`. | health A4, option byte step; same register as HE3 |
+| BO17 | Run firmware/bootloader/flash.sh with BOOT0 held, on a unit whose bootloader already protects sector 0, and keep BOOT0 held to the end. | `dfu-util -l` lists `@Option Bytes`. flash.sh prints "clearing it", the chip restarts into the ROM DFU, and the run ends with "written and read back". | boot B11, clearing the sector 0 protection |
+| BO18 | Run an image whose setup() never returns, and power on. | The watchdog resets the box after about 16 s, with the bootloader's start count at 1. Three hung starts in a row end in "Startup failed.". | boot B5, bootloader watchdog from the jump |
+| BO19 | Drag cubevox-rom-0x08020000.bin onto the drive. | The wrong-file screen shows, DIAG.TXT has `wrong file: CUBEVO~1.BIN`, and the installed image is intact. | boot B4, a .bin on the drive |
+| BO20 | Start a Finder copy of a release .uf2, cancel it at about 30 %, and drop the same file again. Then drop a different release's .uf2. | Both copies complete, and the box restarts into the new image each time. | boot B2 and B3, restart of a cut transfer |
+| BO21 | Cut the 9 V three times, each within 5 s of a start. | Each start is normal and the boot report reads `boot fails 0`, because a power-on clears the count. "Startup failed." never appears. | health A2, start counter and power dips; same cut as HE2 |
+| BO22 | Time the boot CRC on today's image and on an 896 KB image. | Both times are logged. Today's image stays under the 20 ms boot delay budget of the field-update spec, and the 896 KB time is recorded as the limit for the largest image. | field-update spec, boot delay budget (the CRC time at 360 MHz is not measured yet) |
 
 ## App boot, bank 2, faults and watchdog
 
@@ -63,7 +73,7 @@ carry a measured number from the audit keep that number.
 | HE6 | Leave the drive from enter_dfu mounted past 2 s and up to the 60 s timeout. | No watchdog reset happens in update mode, which shows the IWDG stops at a system reset. | health answer 1, watchdog |
 | HE7 | Read "[clock] silicon rev" on every unit. | Rev V runs 480 MHz. A unit on other silicon runs 360 MHz, where the default chain nears 96 % worst. The revision of each unit is logged. | health answer 6, clocks; same as AU5 and EN1 |
 | HE8 | Hold the OLED's SDA low and watch the heartbeat LED. | The LED toggles every 0.5 s. A toggle of 0.7 to 1.4 s measures the loop pass, and it stays under the 2 s watchdog with no reset. | health answer 1, loop pass against the watchdog |
-| HE9 | Cold-start the crystal against the HAL's 100 ms HSE timeout. | HSE starts inside 100 ms on every cold start tried. A miss leaves the bootloader dark until a power cycle. | health answer 6 and boot B13 |
+| HE9 | Cold-start the crystal against the HAL's 100 ms HSE timeout. | HSE starts inside 100 ms on every cold start tried. A miss shows "The clock failed." with the drive up on HSI48, not a dark box (BO15). | health answer 6 and boot B13 |
 | HE10 | Scope MUTE_N, XSMT and the K102 contacts through a watchdog reset. | The board pulls hold the mute while the MCU pins float. MUTE_N and XSMT stay low and K102 stays open. | health answer 7, power order |
 | HE11 | Time a boot-time recovery erase of a bank 2 sector. | The erase takes 1 to 2 s against the 5 s bound and ends before the watchdog starts. | health answer 1, flash waits |
 
