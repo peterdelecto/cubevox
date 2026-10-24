@@ -22,7 +22,7 @@ slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/INSTRUMENT
 |---|---|---|
 | 1 | `POLISH COMP ON` | toggles ON / OFF |
 | 2 | `POLISH EQ ON` | toggles ON / OFF |
-| 3 | `OUT LINE` | cycles LINE / INSTRUMENT |
+| 3 | `OUT LINE` | cycles LINE / INSTRUMENT. A digital -12 dB trim before the DAC, the category's norm with no analog switch on the output; kept because the box may feed a PA or a pedal (owner 2026-10-24) |
 | 4 | `INPUT MIC` | cycles MIC / PEDAL |
 | 5 | `TOP SWITCH MUTE` | cycles MUTE / BYPASS |
 | 6 | `CHAIN ORDER` | opens the read-only chain view |
