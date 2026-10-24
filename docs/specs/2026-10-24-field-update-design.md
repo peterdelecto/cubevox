@@ -114,8 +114,7 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
 2. The UF2 family id is cubevox's own, `kUf2FamilyCubevox` in `boot_block.h`, not the generic
    STM32H7 id. TinyUF2 refuses every block whose family differs, before writing anything. One
    constant therefore rejects a wrong file, a bench image for the WeAct (its own family id), and
-   any other project's UF2, while the installed image stays intact. The id is registered in
-   `uf2families.json` by pull request for completeness.
+   any other project's UF2, while the installed image stays intact.
 3. The bootloader's `board_app_valid2` hook (an upstream weak symbol) checks magic, header version,
    length inside the region and the CRC. TinyUF2's own test is a stack-pointer and reset-vector
    sanity check that a half-written image passes; the header is what makes an incomplete image
@@ -296,18 +295,12 @@ firmware/bootloader/
    power loss leaves the box for the shop. The bootloader is kept small so that it never needs it.
 
 ## USB identity
-1. cubevox is open source, so pid.codes grants vendor id `0x1209` product ids for free. Two are
-   requested in one pull request to `pidcodes/pidcodes.github.com`: one for the application (CDC)
-   and one for the bootloader (MSC), because macOS and Windows cache the device class per VID:PID.
-   The request needs the public repository with a licence file and a product page; the README is
-   the page.
-2. Until granted, the bootloader and application build with the pid.codes test id `1209:0001` and a
-   build warning. A device that leaves the bench with the test id is a known deviation, recorded in
-   the bringup log, not a silent one.
-3. The application today enumerates as `0483:5740`, ST's vendor id with the STM32duino default. It
-   moves to the granted id by `--build-property build.vid/build.pid`; the port glob
-   `cu.usbmodem*` and the parked app's port discovery are unaffected.
-4. The serial string in both programs is the MCU UID. The bringup log maps box number to UID.
+1. The box only ever meets two computers, so no registered ids are sought. The application keeps
+   `0483:5740` as today. The bootloader uses the pid.codes test id `1209:0001`, meant for exactly
+   this kind of private device. The two differ because macOS and Windows remember the device class
+   per id.
+2. The serial string in both programs is the MCU UID, so two boxes on one Mac are distinct. The
+   bringup log maps box number to UID.
 
 ## Shop steps, every unit
 1. Board on the bench, enclosure open, 9 V on. Hold BOOT0, tap NRST, release. `firmware/bootloader/flash.sh`
@@ -353,8 +346,8 @@ firmware/bootloader/
 5. `docs/update-guide.md` is Adam's one page. Steps 1–5 of "What Adam does", a photo of each OLED
    screen, the Finder notice, and the support sentence about `DIAG.TXT`.
 6. `VERSION.txt` is bumped as today; the header string and the release file name derive from it.
-7. `LICENSE` at the repository root is MIT (owner 2026-10-24), covering firmware, tools, docs and
-   the hardware files alike. The bootloader README carries the TinyUF2 and TinyUSB notices.
+7. `LICENSE` at the repository root is MIT. The bootloader README carries the TinyUF2 and TinyUSB
+   notices. Nothing else is needed on licensing.
 8. The parked app, when it returns, replaces its dfu-util step with a copy of the release `.uf2` to
    `/Volumes/CUBEVOX` and a wait for the CDC port. `app/dfu-util-static.sh` and the `dfu-util`
    release job go at that time, not before.
@@ -381,23 +374,19 @@ firmware/bootloader/
 | Update time | about 3 s for a 200 KB image, erase included |
 
 ## Roadmap
-1. `LICENSE` (MIT) committed; repository made public by the owner; pid.codes pull request for two
-   ids, drafted here and opened under the owner's account. Start first because the grant takes
-   days to weeks.
-2. `boot_block.h`, `stamp_image.py` (stamp, check, UF2 write), `boot_decide.c`, host tests for all
+1. `boot_block.h`, `stamp_image.py` (stamp, check, UF2 write), `boot_decide.c`, host tests for all
    of them. Gate: `ctest`.
-3. Bootloader board, patches, build script, OLED driver and screens, `DIAG.TXT`. Proof set for the
+2. Bootloader board, patches, build script, OLED driver and screens, `DIAG.TXT`. Proof set for the
    OLED screens. Flash board 1 over BOOT0. Gate: `CUBEVOX` drive on the Mac, `INFO_UF2.TXT` and
    `DIAG.TXT` readable, screens approved.
-4. Application relocation, header, `enterDfu` rewrite, boot health, confirm screen, splash,
+3. Application relocation, header, `enterDfu` rewrite, boot health, confirm screen, splash,
    Teensy-H7-Port cut-over. Gates: `ctest`, both `build.sh` variants with the warn gate, a hand
    copy of the `.uf2` boots and shows the version.
-5. Diagnostic log in bank 2 sector 2, `status` and `hello` fields, serial spec line.
-6. `flash.sh`, `cubevox_port.py`, `bringup.py --update`, workflows, update guide. Gate: drills
+4. Diagnostic log in bank 2 sector 2, `status` and `hello` fields, serial spec line.
+5. `flash.sh`, `cubevox_port.py`, `bringup.py --update`, workflows, update guide. Gate: drills
    1–13 logged for board 1.
-7. Shop steps on every shipping unit, one log per unit in `hardware/bringup/`.
+6. Shop steps on every shipping unit, one log per unit in `hardware/bringup/`.
 
 ## Open items for the owner
-1. OLED screen proofs arrive with roadmap step 3 and the confirm screen with step 4, numbered,
+1. OLED screen proofs arrive with roadmap step 2 and the confirm screen with step 3, numbered,
    approved per number.
-2. Repository public and the pid.codes pull request opened, both under the owner's account.
