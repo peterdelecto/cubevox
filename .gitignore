@@ -1,4 +1,5 @@
 build/
+build-*/
 imgui.ini
 .DS_Store
 *.png
