@@ -29,6 +29,7 @@ CompileFlags:
     - -DHSE_VALUE=25000000U
     - -DTINYUF2_LED=1
     - -DBOARD_PFLASH_APP_EN=1
+    # CV_UF2_FAMILY_CUBEVOX in firmware/cubevox/src/board/boot_block.h; board.mk passes it to make and board_hooks.c asserts the two agree.
     - -DBOARD_UF2_FAMILY_ID=0x43564258
     - -DCV_TINYUF2_VERSION="editor"
     - -DCFG_TUSB_MCU=OPT_MCU_STM32H7

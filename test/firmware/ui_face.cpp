@@ -1,6 +1,7 @@
 // Checks the runtime face end to end on the host. Covers the dissolve frames against the proof
-// renderer, the readout flowing in and out, the menu on top, the tick gate, the burn-in walk and
-// the voice at three input levels. The proof PGMs go to build/oled-*.pgm.
+// renderer, the readout flowing in and out and leaving with its card, the menu on top and the input
+// it takes once the face draws, the tick gate, the burn-in walk and the voice at three input levels.
+// The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
 
@@ -204,21 +205,32 @@ void checkBypassWord() {
   writePgm(r.live, "oled-bypass-face.pgm");
 }
 
-void checkMenuOnTop() {
-  FaceRig r;
-  Menu ref;  // takes the same input, and draws the frame the face must show
+UiInput clickInput() {
+  UiInput click;
+  click.click = true;
+  return click;
+}
+
+// Opens the menu over a settled readout and returns the frame the face must then show, which `ref`
+// draws from the same input. `readout` gets the frame the panel held before.
+Canvas openMenuOverReadout(FaceRig& r, Menu& ref, Canvas& readout) {
+  ref.listen();
   r.ticks(3);
   r.turn(4, 1, kTime160);
   r.ticks(4);
-  const Canvas readout = r.live;
-
-  UiInput click;
-  click.click = true;
-  r.menu.update(click, r.now);
-  ref.update(click, r.now);
+  readout = r.live;
+  r.menu.update(clickInput(), r.now);
+  ref.update(clickInput(), r.now);
   Canvas menuScreen;
   ref.draw(r.ctx(), menuScreen);
+  return menuScreen;
+}
 
+void checkMenuOnTop() {
+  FaceRig r;
+  Menu ref;
+  Canvas readout;
+  const Canvas menuScreen = openMenuOverReadout(r, ref, readout);
   r.tick();
   check(sameCanvas(r.live, blend(readout, menuScreen, kStep1Level)), "face: an open menu dissolves in over the readout, step 1");
   r.tick();
@@ -231,8 +243,16 @@ void checkMenuOnTop() {
   r.turn(4, 1, kTime160 + 0.1f);
   r.ticks(80);
   check(sameCanvas(r.live, menuScreen), "face: the menu stays while a knob moves and the hold runs out");
+}
 
-  // The cursor moves at the next tick, as the menu draws it.
+// The menu's own redraws show at the next tick, and closing it dissolves back to the voice.
+void checkMenuMovesAndCloses() {
+  FaceRig r;
+  Menu ref;
+  Canvas readout;
+  const Canvas menuScreen = openMenuOverReadout(r, ref, readout);
+  r.ticks(80);  // the readout's hold runs out under the menu
+
   UiInput down;
   down.detents = 1;
   r.menu.update(down, r.now);
@@ -242,11 +262,10 @@ void checkMenuOnTop() {
   r.tick();
   check(sameCanvas(r.live, moved) && !sameCanvas(moved, menuScreen), "face: a cursor move shows at the next tick, with no dissolve");
 
-  // Exit closes the menu, and the voice dissolves back from the last menu frame.
   UiInput toExit;
   toExit.detents = 5;
   r.menu.update(toExit, r.now);
-  r.menu.update(click, r.now);
+  r.menu.update(clickInput(), r.now);
   check(!r.menu.open(), "face: Exit closed the menu");
   const Canvas lastMenu = r.live;
   r.tick();
@@ -255,10 +274,39 @@ void checkMenuOnTop() {
   check(sameCanvas(r.live, lineScreen()), "face: and the voice settles");
 }
 
+// The menu listens once the face has drawn. Before that the boot splash is up and nobody could see
+// what a click opened.
+void checkMenuListensOnceFaceDraws() {
+  FaceRig r;
+  check(r.menu.update(clickInput(), r.now) == UiAction::None && !r.menu.open(), "face: before its first tick a click opens no menu");
+  r.tick();
+  r.menu.update(clickInput(), r.now);
+  check(r.menu.open(), "face: after its first tick a click opens the menu");
+}
+
+// A readout belongs to the card its knob was on. When a new layout puts another card in that slot, the
+// readout leaves at the next tick instead of showing the old number under the new card's name.
+void checkReadoutLeavesWithItsCard() {
+  FaceRig r;
+  r.ticks(3);
+  r.turn(4, 1, kTime160);
+  r.ticks(4);
+  const Canvas readout = r.live;
+  r.layout.card[2] = Card::Unison;
+  r.ticks(2);
+  check(sameCanvas(r.live, readout), "face: a new card in another slot leaves the readout up");
+  r.layout.card[4] = Card::Distortion;
+  r.tick();
+  check(sameCanvas(r.live, blend(readout, lineScreen(), kStep1Level)), "face: a new card in the readout's slot dissolves it away at once");
+  r.ticks(2);
+  check(sameCanvas(r.live, lineScreen()), "face: and the voice settles with no readout of the new card");
+}
+
 // The menu caches its last frame. Reopening it after another screen drew in between must still show it.
 void checkMenuReopens() {
   FaceRig r;
   Menu ref;
+  ref.listen();
   r.ticks(3);
   UiInput click;
   click.click = true;
@@ -420,6 +468,9 @@ void checkFace() {
   checkMutedReadout();
   checkBypassWord();
   checkMenuOnTop();
+  checkMenuMovesAndCloses();
+  checkMenuListensOnceFaceDraws();
+  checkReadoutLeavesWithItsCard();
   checkMenuReopens();
   checkTickGate();
   checkQuietFrames();

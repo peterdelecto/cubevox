@@ -1,6 +1,6 @@
 // Checks the OLED canvas on the host. Covers text drawing, clipping, the dirty-page API, glyph
-// fallback, the three fonts, rectangle fills, text spaced by ink, tabular digits and the 5x7
-// fixed pitch.
+// fallback and the flat sign, the three fonts, rectangle fills, text spaced by ink, tabular digits,
+// the 5x7 fixed pitch, and the panel link that decides when the display backend writes.
 
 #include "support.h"
 
@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "core/canvas.h"
+#include "core/display.h"
 #include "core/fonts.h"
 
 #include "cubevox_fonts.h"
@@ -95,6 +96,15 @@ void checkCanvasDirtyApi() {
   c.clearDirty(40);
   check(c.dirtyPages() == before, "canvas: clearDirty ignores a page out of range");
   check(c.page(-1) == nullptr && c.page(kCanvasPages) == nullptr && c.page(0) != nullptr, "canvas: page() rejects an index out of range");
+
+  // A restarted panel needs the whole frame again, pixels unchanged.
+  clearAllDirty(c);
+  std::array<std::array<uint8_t, kCanvasWidth>, kCanvasPages> pixels{};
+  for (int p = 0; p < kCanvasPages; ++p) std::memcpy(pixels[p].data(), c.page(p), kCanvasWidth);
+  c.markAllDirty();
+  bool same = true;
+  for (int p = 0; p < kCanvasPages; ++p) same = same && std::memcmp(pixels[p].data(), c.page(p), kCanvasWidth) == 0;
+  check(c.dirtyPages() == 0xFF && c.firstDirtyPage() == 0 && same, "canvas: markAllDirty marks every page and keeps the pixels");
 }
 
 void checkCanvasFallback() {
@@ -113,10 +123,36 @@ void checkCanvasFallback() {
   direct.drawText(capsOnly.width + capsOnly.spacing, 0, capsOnly, "B");
   check(std::memcmp(gap.page(0), direct.page(0), kCanvasWidth) == 0, "canvas: a missing glyph is blank and keeps its advance");
 
-  check(findGlyph(capsOnly, 'A') == &caps[0][0] && findGlyph(capsOnly, 'a') == &caps[0][0], "glyph: a capital and its lowercase find the same bytes");
-  check(findGlyph(capsOnly, 'C') == nullptr && findGlyph(capsOnly, 'c') == nullptr && findGlyph(capsOnly, '\x01') == nullptr,
+  check(glyphIndex(capsOnly, 'A') == 0 && glyphIndex(capsOnly, 'a') == 0, "glyph: a capital and its lowercase find the same glyph");
+  check(glyphIndex(capsOnly, 'C') < 0 && glyphIndex(capsOnly, 'c') < 0 && glyphIndex(capsOnly, '\x01') < 0,
         "glyph: a letter the font lacks finds nothing");
-  check(findGlyph(font5x7(), 'u') != nullptr && findGlyph(font5x7(), 'u') == findGlyph(font5x7(), 'U'), "glyph: 5x7 u is the glyph of U");
+  check(glyphIndex(font5x7(), 'u') >= 0 && glyphIndex(font5x7(), 'u') == glyphIndex(font5x7(), 'U'), "glyph: 5x7 u is the glyph of U");
+}
+
+// The key names write a flat as a lowercase b. The 9X12 and 16X24 fonts ink a flat sign in that cell,
+// so it keeps its own glyph there, while every blank lowercase cell still draws as its capital.
+void checkFlatGlyph() {
+  const auto own = [](const FontDesc& font, char c) { return glyphIndex(font, c) == static_cast<int>(c) - 0x20; };
+  check(own(font9x12(), 'b') && own(font16x24(), 'b'), "flat: 9X12 and 16X24 draw b from its own inked cell");
+  check(glyphIndex(font5x7(), 'b') == glyphIndex(font5x7(), 'B'), "flat: 5x7 has no flat, so b draws as B");
+  bool othersMap = true;
+  for (char c = 'a'; c <= 'z'; ++c) {
+    if (c == 'b') continue;
+    othersMap = othersMap && glyphIndex(font9x12(), c) == glyphIndex(font9x12(), static_cast<char>(c - 'a' + 'A')) &&
+                glyphIndex(font16x24(), c) == glyphIndex(font16x24(), static_cast<char>(c - 'a' + 'A'));
+  }
+  check(othersMap, "flat: every other lowercase letter still draws as its capital");
+
+  const FontDesc& big = font16x24();
+  const int flat = glyphIndex(big, 'b');
+  const int sharp = glyphIndex(big, '#');
+  check(big.inkWidth[flat] > 0 && big.inkWidth[flat] <= big.inkWidth[sharp] && big.inkWidth[flat] < big.inkWidth[glyphIndex(big, 'B')],
+        "flat: the 16X24 flat is inked, no wider than the sharp and narrower than B");
+  Canvas flatKey;
+  flatKey.drawText(0, 0, big, "Bb");
+  Canvas capitals;
+  capitals.drawText(0, 0, big, "BB");
+  check(std::memcmp(flatKey.page(1), capitals.page(1), kCanvasWidth) != 0, "flat: Bb draws a flat after the B, not a second B");
 }
 
 void checkCanvasFonts() {
@@ -631,7 +667,7 @@ Canvas dissolveFixture(int seed) {
   return c;
 }
 
-void checkDissolve() {
+void checkDissolveSteps() {
   check(kDissolveSteps == 2, "dissolve: a dissolve has 2 mixed steps");
   const Canvas from = dissolveFixture(1);
   const Canvas to = dissolveFixture(2);
@@ -651,7 +687,9 @@ void checkDissolve() {
   check(samePages(r, dissolvedPerPixel(from, to, 21)), "dissolve: step 1 equals the per-pixel Bayer dissolve at 21 of 64");
   r.dissolve(from, to, 2);
   check(samePages(r, dissolvedPerPixel(from, to, 43)), "dissolve: step 2 equals the per-pixel Bayer dissolve at 43 of 64");
+}
 
+void checkDissolveCoverage() {
   Canvas black;
   Canvas white;
   white.fillRect(0, 0, kCanvasWidth, kCanvasHeight, true);
@@ -666,6 +704,11 @@ void checkDissolve() {
     for (int x = 0; x < kCanvasWidth; ++x) nested = nested && (!pixelLit(third, x, y) || pixelLit(twoThirds, x, y));
   }
   check(nested, "dissolve: every pixel the first step lights, the second keeps lit");
+}
+
+void checkDissolveInPlace() {
+  const Canvas from = dissolveFixture(1);
+  const Canvas to = dissolveFixture(2);
 
   // In place, the second step works from the first step's result because it nests inside it.
   Canvas live = from;
@@ -704,6 +747,56 @@ void checkDissolveAgainstProof() {
   check(matchesGolden(r, "muted-3"), "dissolve: the last step matches the proof frame");
 }
 
+// ---------------------------------------------------------------------------------------------
+// The panel link (core/display.h): when the display backend sends a page, restarts the panel or waits.
+
+void checkPanelLinkHealthy() {
+  PanelLink link;
+  check(link.step(0) == PanelStep::Restart && !link.up(), "panel link: a fresh link starts the panel first");
+  check(link.started(true, 10) == PanelEvent::None && link.up() && link.step(11) == PanelStep::Send,
+        "panel link: a start that answers lets the pages go out");
+  check(link.wrote(true, 12) == PanelEvent::None && link.shown(true, 13) == PanelEvent::None && link.failures() == 0,
+        "panel link: pages and a display-on that answer report nothing");
+}
+
+// One failed page restarts the panel on the next pass, reports Lost once, and Back once a whole frame
+// is in again.
+void checkPanelLinkGlitch() {
+  PanelLink link;
+  link.started(true, 0);
+  link.shown(true, 5);
+  check(link.wrote(false, 100) == PanelEvent::Lost && !link.up(), "panel link: the first failed page reports Lost");
+  check(link.step(100) == PanelStep::Restart, "panel link: the panel restarts on the next pass, without waiting");
+  check(link.started(true, 101) == PanelEvent::None && link.step(102) == PanelStep::Send,
+        "panel link: a restart that answers sends again");
+  check(link.wrote(true, 103) == PanelEvent::None && link.shown(true, 130) == PanelEvent::Back && link.failures() == 1,
+        "panel link: Back once the whole frame is in, after one failure");
+  check(link.wrote(false, 5000) == PanelEvent::Lost, "panel link: a later failure starts a new run");
+}
+
+// A panel that stays away costs one start per retry window and reports once.
+void checkPanelLinkDown() {
+  PanelLink link;
+  check(link.started(false, 1000) == PanelEvent::Lost && link.step(1000) == PanelStep::Wait,
+        "panel link: a boot start that fails reports Lost and waits");
+  check(link.step(1999) == PanelStep::Wait && link.step(2000) == PanelStep::Restart, "panel link: the next start comes 1 s later");
+  check(link.started(false, 2000) == PanelEvent::None && link.step(2999) == PanelStep::Wait,
+        "panel link: a second failure stays quiet and keeps the 1 s window");
+  link.started(true, 3000);
+  check(link.wrote(false, 3001) == PanelEvent::None && link.step(3002) == PanelStep::Wait && link.step(4001) == PanelStep::Restart,
+        "panel link: a failure before the frame is back waits for the window too");
+  check(link.started(true, 4001) == PanelEvent::None && link.shown(false, 4010) == PanelEvent::None &&
+            link.step(4011) == PanelStep::Wait,
+        "panel link: a display-on that fails counts as a failed write");
+  link.started(true, 5010);
+  check(link.shown(true, 5050) == PanelEvent::Back && link.failures() == 4, "panel link: Back counts the run's 4 failures");
+
+  PanelLink wrap;
+  wrap.started(false, 0xFFFFFF00u);
+  check(wrap.step(0xFFFFFF00u + kPanelRetryMs - 1) == PanelStep::Wait && wrap.step(0xFFFFFF00u + kPanelRetryMs) == PanelStep::Restart,
+        "panel link: the retry window survives a millis() wrap");
+}
+
 }  // namespace
 
 void checkCanvas() {
@@ -712,6 +805,7 @@ void checkCanvas() {
   checkCanvasEdges();
   checkCanvasDirtyApi();
   checkCanvasFallback();
+  checkFlatGlyph();
   checkCanvasFonts();
   checkCanvasRects();
   checkInkTables();
@@ -725,6 +819,11 @@ void checkCanvas() {
   checkClippedDigits();
   checkBayer();
   checkCopyFrom();
-  checkDissolve();
+  checkDissolveSteps();
+  checkDissolveCoverage();
+  checkDissolveInPlace();
   checkDissolveAgainstProof();
+  checkPanelLinkHealthy();
+  checkPanelLinkGlitch();
+  checkPanelLinkDown();
 }

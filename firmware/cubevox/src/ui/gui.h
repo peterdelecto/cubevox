@@ -70,6 +70,9 @@ class Gui {
   // knob, or one whose readout had gone, starts at the reading. The same knob eases to it.
   void knobMoved(int slot, int knob, float target, uint32_t nowMs);
 
+  // Ends the readout now, as when the card it describes has left its slot.
+  void dropReadout() { readoutLive_ = false; }
+
   // Starts a dissolve on the coming tick even when the wanted screen is the one shown. Call it when
   // something else drew on the panel.
   void forceChange() { force_ = true; }

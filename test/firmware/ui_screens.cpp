@@ -1,6 +1,6 @@
 // Checks the runtime screens on the host. Covers the readout against the proof renderer byte for
-// byte (settled, rolling and muted), its rows and edges, the voice ribbon and the muted word. The
-// proof PGMs go to build/oled-*.pgm.
+// byte (settled, rolling and muted), its rows and edges, the key names with their flats, the voice
+// ribbon and the muted word. The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
 
@@ -392,9 +392,12 @@ std::vector<int> sweepValues(const KnobDesc& k) {
 
 // The number with its unit, or the name of a labelled knob, for a failure message.
 std::string valueText(const KnobDesc& k, int shown) {
-  char text[32];
-  formatShown(k, shown, text, sizeof(text));
-  return k.unit[0] != '\0' ? std::string(text) + " " + k.unit : std::string(text);
+  if (k.labels) return knobLabel(k, shown);
+  char cells[kMaxKnobCells + 1];
+  formatCells(k, shown, cells, sizeof(cells));
+  std::string text(cells);
+  text.erase(std::remove(text.begin(), text.end(), ' '), text.end());
+  return k.unit[0] != '\0' ? text + " " + k.unit : text;
 }
 
 // Finds each non-blank character of `cells` in the band by its picture, left to right. A cell takes
@@ -423,71 +426,100 @@ bool placeCells(const Columns& cols, const std::string& cells, std::vector<std::
   return true;
 }
 
-// Sweeps a numeric knob and returns what moved first, or "" when nothing did. `steps` counts the
-// frames measured. Every frame must put each digit, the sign and the unit where the first frame that
-// showed them put them. The rest of the screen must not change either, and each step must look new.
-std::string sweepNumber(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
-                        std::vector<std::vector<uint32_t>>& pictures, int& steps) {
-  const FontDesc& big = font16x24();
+// What a sweep remembers from the frames before: the column each cell and the unit first took, and
+// the first and the previous frame.
+struct SweepMemory {
+  std::vector<int> cellX;
+  Extent unit;
+  bool haveUnit = false;
+  Canvas first;
+  Canvas previous;
+};
+
+// The field the spec gives a knob whose numbers are `values`.
+Field fieldOfValues(const std::vector<int>& values) {
   Field f;
   for (int v : values) {
     f.signedRange = f.signedRange || v < 0;
     f.digits = std::max(f.digits, static_cast<int>(std::to_string(std::abs(v)).size()));
   }
-  std::vector<int> cellX(static_cast<size_t>(f.cells()), -1);
-  Extent unit;
-  bool haveUnit = false;
-  Canvas first;
-  Canvas previous;
+  return f;
+}
+
+// Each character must sit where the first frame that showed it put it. Fills `at` with the columns found.
+std::string cellsInPlace(const Columns& cols, const std::string& cells, std::vector<std::vector<uint32_t>>& pictures,
+                         SweepMemory& memory, std::vector<int>& at) {
+  if (!placeCells(cols, cells, pictures, at)) return "the characters \"" + cells + "\" are not in their cells";
+  for (size_t j = 0; j < at.size(); ++j) {
+    if (at[j] < 0) continue;
+    if (memory.cellX[j] < 0) memory.cellX[j] = at[j];
+    if (at[j] != memory.cellX[j]) {
+      return "cell " + std::to_string(j + 1) + " of " + std::to_string(at.size()) + " moved from x " +
+             std::to_string(memory.cellX[j]) + " to x " + std::to_string(at[j]);
+    }
+  }
+  return "";
+}
+
+// The last cell always holds a digit, so the unit lies to the right of it, on the columns it first took.
+std::string unitInPlace(const Columns& cols, int lastCell, SweepMemory& memory) {
+  const Extent seen = inkFrom(cols, lastCell + font16x24().width);
+  if (!memory.haveUnit) {
+    memory.unit = seen;
+    memory.haveUnit = true;
+  }
+  if (seen.left == memory.unit.left && seen.right == memory.unit.right) return "";
+  return "the unit moved from columns " + std::to_string(memory.unit.left) + " to " + std::to_string(memory.unit.right) +
+         " to columns " + std::to_string(seen.left) + " to " + std::to_string(seen.right);
+}
+
+// The cells at the places found, and the unit after the last one, account for every lit pixel.
+bool inkAccounted(const Canvas& frame, const KnobDesc& k, const std::string& cells, const std::vector<int>& at) {
+  const FontDesc& big = font16x24();
+  Canvas rebuilt;
+  for (size_t j = 0; j < at.size(); ++j) {
+    if (at[j] < 0) continue;
+    const char one[2] = {cells[j], '\0'};
+    rebuilt.drawDigits(at[j], kValueTop, big, one);
+  }
+  if (k.unit[0] != '\0') {
+    const std::string text = std::string(" ") + k.unit;
+    rebuilt.drawText(at.back() + cellPitch(), kValueTop, big, text.c_str());
+  }
+  return sameRows(frame, rebuilt, kValueTop, kValueBottom);
+}
+
+// Nothing outside the value rows changes, and each step looks new. Remembers the frame for the next.
+std::string restStill(const Canvas& frame, size_t n, SweepMemory& memory) {
+  if (n == 0) memory.first = frame;
+  if (!sameRows(memory.first, frame, 0, kValueTop) || !sameRows(memory.first, frame, kValueBottom, kCanvasHeight)) {
+    return "something outside the value rows changed";
+  }
+  if (n > 0 && sameRows(memory.previous, frame, kValueTop, kValueBottom)) return "the step looks like the one before";
+  memory.previous = frame;
+  return "";
+}
+
+// Sweeps a numeric knob and returns what moved first, or "" when nothing did. `steps` counts the
+// frames measured. Every frame must put each digit, the sign and the unit where the first frame that
+// showed them put them. The rest of the screen must not change either, and each step must look new.
+std::string sweepNumber(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
+                        std::vector<std::vector<uint32_t>>& pictures, int& steps) {
+  const Field f = fieldOfValues(values);
+  SweepMemory memory;
+  memory.cellX.assign(static_cast<size_t>(f.cells()), -1);
   for (size_t n = 0; n < values.size(); ++n) {
     const int v = values[n];
-    const std::string where = "at " + valueText(k, v) + ", ";
     const Canvas frame = settledReadout(cardId, slot, knob, v);
     ++steps;
-
     const Columns cols = bandColumns(frame);
     const std::string cells = cellsFor(f, v);
     std::vector<int> at;
-    if (!placeCells(cols, cells, pictures, at)) return where + "the characters \"" + cells + "\" are not in their cells";
-    for (size_t j = 0; j < at.size(); ++j) {
-      if (at[j] < 0) continue;
-      if (cellX[j] < 0) cellX[j] = at[j];
-      if (at[j] != cellX[j]) {
-        return where + "cell " + std::to_string(j + 1) + " of " + std::to_string(at.size()) + " moved from x " +
-               std::to_string(cellX[j]) + " to x " + std::to_string(at[j]);
-      }
-    }
-
-    // The last cell always holds a digit, so the unit lies to the right of it.
-    const Extent seen = inkFrom(cols, at.back() + big.width);
-    if (!haveUnit) {
-      unit = seen;
-      haveUnit = true;
-    }
-    if (seen.left != unit.left || seen.right != unit.right) {
-      return where + "the unit moved from columns " + std::to_string(unit.left) + " to " + std::to_string(unit.right) +
-             " to columns " + std::to_string(seen.left) + " to " + std::to_string(seen.right);
-    }
-
-    // Cells at the places found, and the unit after the last one, must account for every lit pixel.
-    Canvas rebuilt;
-    for (size_t j = 0; j < at.size(); ++j) {
-      if (at[j] < 0) continue;
-      const char one[2] = {cells[j], '\0'};
-      rebuilt.drawDigits(at[j], kValueTop, big, one);
-    }
-    if (k.unit[0] != '\0') {
-      const std::string text = std::string(" ") + k.unit;
-      rebuilt.drawText(at.back() + cellPitch(), kValueTop, big, text.c_str());
-    }
-    if (!sameRows(frame, rebuilt, kValueTop, kValueBottom)) return where + "the value rows hold ink that is no cell and not the unit";
-
-    if (n == 0) first = frame;
-    if (!sameRows(first, frame, 0, kValueTop) || !sameRows(first, frame, kValueBottom, kCanvasHeight)) {
-      return where + "something outside the value rows changed";
-    }
-    if (n > 0 && sameRows(previous, frame, kValueTop, kValueBottom)) return where + "the step looks like the one before";
-    previous = frame;
+    std::string moved = cellsInPlace(cols, cells, pictures, memory, at);
+    if (moved.empty()) moved = unitInPlace(cols, at.back(), memory);
+    if (moved.empty() && !inkAccounted(frame, k, cells, at)) moved = "the value rows hold ink that is no cell and not the unit";
+    if (moved.empty()) moved = restStill(frame, n, memory);
+    if (!moved.empty()) return "at " + valueText(k, v) + ", " + moved;
   }
   return "";
 }
@@ -496,8 +528,7 @@ std::string sweepNumber(Card cardId, int slot, int knob, const KnobDesc& k, cons
 std::string sweepLabelled(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
                           int& steps) {
   int left = -1;
-  Canvas first;
-  Canvas previous;
+  SweepMemory memory;
   for (size_t n = 0; n < values.size(); ++n) {
     const int v = values[n];
     const std::string where = "at " + valueText(k, v) + ", ";
@@ -513,13 +544,8 @@ std::string sweepLabelled(Card cardId, int slot, int knob, const KnobDesc& k, co
     Canvas rebuilt;
     rebuilt.drawText(ink.left, kValueTop, font16x24(), knobLabel(k, v));
     if (!sameRows(frame, rebuilt, kValueTop, kValueBottom)) return where + "the value rows hold ink that is not the name";
-
-    if (n == 0) first = frame;
-    if (!sameRows(first, frame, 0, kValueTop) || !sameRows(first, frame, kValueBottom, kCanvasHeight)) {
-      return where + "something outside the value rows changed";
-    }
-    if (n > 0 && sameRows(previous, frame, kValueTop, kValueBottom)) return where + "the step looks like the one before";
-    previous = frame;
+    const std::string still = restStill(frame, n, memory);
+    if (!still.empty()) return where + still;
   }
   return "";
 }
@@ -634,36 +660,36 @@ void checkReadoutEdges() {
 
 // The autotune key is a name. It draws in 16X24 and does not roll. Its field is as wide as the widest
 // name and sits centred once, and each name starts at the field's left edge.
-void checkReadoutText() {
-  const KnobDesc& keyKnob = *knobDesc(defaultLayout().card[1], 0);
+const KnobDesc& keyKnob() { return *knobDesc(defaultLayout().card[1], 0); }
+
+constexpr int kKeyFieldLeft = 3;
+
+void checkKeyField() {
+  const KnobDesc& key = keyKnob();
   int widest = 0;
-  for (int i = 0; i < keyKnob.positions; ++i) widest = std::max(widest, Canvas::textWidth(font16x24(), keyKnob.labels[i]));
-  const int left = (kCanvasWidth - widest) / 2;
-  check(widest == 121 && left == 3, "readout: the widest key name is 121 px, so its field starts at x 3");
+  for (int i = 0; i < key.positions; ++i) widest = std::max(widest, Canvas::textWidth(font16x24(), key.labels[i]));
+  check(widest == 121 && (kCanvasWidth - widest) / 2 == kKeyFieldLeft,
+        "readout: the widest key name is 121 px, so its field starts at x 3");
 
   bool inPlace = true;
   bool startsAtLeft = true;
-  for (int i = 0; i < keyKnob.positions; ++i) {
+  for (int i = 0; i < key.positions; ++i) {
     const Canvas c = readoutOf(1, 0, static_cast<float>(i));
     Canvas want;
-    want.drawText(left, 34, font16x24(), keyKnob.labels[i]);
-    inPlace = inPlace && sameRows(c, want, 34, 58);
-    int first = kCanvasWidth;
-    for (int y = 34; y < 58; ++y) {
-      for (int x = 0; x < kCanvasWidth; ++x) {
-        if (lit(c, x, y)) first = std::min(first, x);
-      }
-    }
-    startsAtLeft = startsAtLeft && first == left;
+    want.drawText(kKeyFieldLeft, kValueTop, font16x24(), key.labels[i]);
+    inPlace = inPlace && sameRows(c, want, kValueTop, kValueBottom);
+    startsAtLeft = startsAtLeft && inkFrom(bandColumns(c), 0).left == kKeyFieldLeft;
   }
   check(inPlace, "readout: each key name is drawn in 16X24 from the left edge of the one fixed field");
   check(startsAtLeft, "readout: every key name starts at the same column, the shorter ones leave the right of the field blank");
+}
 
+void checkKeyRows() {
   const Canvas key = readoutOf(1, 0, 11.0f);
   Canvas head;
   head.drawText(1, 1, font5x7(), "2 AUTOTUNE");
   head.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "KEY")) / 2, 15, font9x12(), "KEY");
-  check(sameRows(key, head, 0, 34), "readout: the key's card line and parameter name are as for any knob");
+  check(sameRows(key, head, 0, kValueTop), "readout: the key's card line and parameter name are as for any knob");
   writePgm(key, "oled-readout-key.pgm");
 
   check(edgesDark(readoutOf(1, 0, 6.0f)), "readout: the widest key name, F# / D#m, keeps the edges dark");
@@ -672,8 +698,33 @@ void checkReadoutText() {
   Canvas clamped;
   renderReadout(clamped, stray);
   Canvas last;
-  last.drawText(left, 34, font16x24(), "F / DM");
-  check(sameRows(clamped, last, 34, 58), "readout: a target past the last key clamps to the last name");
+  last.drawText(kKeyFieldLeft, kValueTop, font16x24(), "F / DM");
+  check(sameRows(clamped, last, kValueTop, kValueBottom), "readout: a target past the last key clamps to the last name");
+}
+
+// How often the ink of character `c` in 16X24 appears in the value rows, column for column.
+int inkTimes(const Columns& cols, char c) {
+  const char text[2] = {c, '\0'};
+  Canvas alone;
+  alone.drawText(0, kValueTop, font16x24(), text);
+  const Columns ink = bandColumns(alone);
+  const int width = Canvas::textWidth(font16x24(), text);
+  const std::vector<uint32_t> picture(ink.begin(), ink.begin() + width);
+  return static_cast<int>(picturesIn(cols, picture).size());
+}
+
+// A key name writes a flat as a lowercase b, and the 16X24 font draws the flat sign for it.
+void checkKeyFlats() {
+  const KnobDesc& key = keyKnob();
+  int flats = 0;
+  for (int i = 0; i < key.positions; ++i) flats += inkTimes(bandColumns(readoutOf(1, 0, static_cast<float>(i))), 'b');
+  check(flats == 5, "readout: the five flats of Db / Bbm, Ab / Fm, Eb / Cm and Bb / Gm draw as the flat sign");
+
+  const Canvas flat = readoutOf(1, 0, 7.0f);
+  check(std::strcmp(knobLabel(key, 7), "Db / Bbm") == 0 && inkTimes(bandColumns(flat), 'b') == 2 &&
+            inkTimes(bandColumns(flat), 'B') == 1,
+        "readout: Db / Bbm shows two flats and one B");
+  writePgm(flat, "oled-readout-key-flat.pgm");
 }
 
 void checkReadoutEdgeCases() {
@@ -907,7 +958,9 @@ void checkScreens() {
   checkReadoutGainsDigit();
   checkReadoutRollClip();
   checkReadoutEdges();
-  checkReadoutText();
+  checkKeyField();
+  checkKeyRows();
+  checkKeyFlats();
   checkReadoutEdgeCases();
   checkRibbonHeight();
   checkRibbonHistory();

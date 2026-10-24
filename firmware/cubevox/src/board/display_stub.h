@@ -1,4 +1,5 @@
-// Serial-logging Display for boards where no SH1106 answers: prints each changed page as ASCII art.
+// A Display with no panel behind it. It sends nothing and leaves every page dirty, so the face, which
+// waits for the panel to take each frame, never draws.
 
 #pragma once
 

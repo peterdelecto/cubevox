@@ -20,7 +20,7 @@ Build quantity: 1 board (qty column is per board; required = per-board x N + all
 | 10 | C404027 | TLV75533PDBVR | 3V3A LDO | Extended | 136560 | 0.113 | SOT-23-5 (h7core) | 1 | inherited |
 | 11 | C55513 | PCM1808PWR | ADC | Extended | 27700 | 0.563 | TSSOP-14 (h7core) | 1 | inherited |
 | 12 | C107671 | PCM5102APWR | DAC | Extended | 6661 | 1.276 | TSSOP-20 (h7core) | 1 | inherited |
-| 13 | C47190 | G6K-2F-Y-TR DC5 | K102 output mute relay (pole B grounds the tip while muted) and K103 input pad relay (NC contacts: coil off = pad resistors R102/R105 shorted = MIC; PAD_EN high = PEDAL), DPDT 5 V | Extended | 68587 | 0.915 | RELAY-SMD_G6K-2F (cubevox) | 2 | inherited; K101 bypass relay removed 2026-10-07 (bypass became MUTE); K103 added 2026-10-10 (owner) |
+| 13 | C47190 | G6K-2F-Y-TR DC5 | K102 output mute relay (pole B grounds the tip while muted) and K103 input pad relay (NC contacts: coil off = pad resistors R102/R105 shorted = MIC; PAD_EN high = LINE), DPDT 5 V | Extended | 68587 | 0.915 | RELAY-SMD_G6K-2F (cubevox) | 2 | inherited; K101 bypass relay removed 2026-10-07 (bypass became MUTE); K103 added 2026-10-10 (owner) |
 | 14 | C3096082 | PJ-002A | 9 V barrel jack | Extended | 1893 | 0.753 | DC-IN-TH_PJ-002A (cubevox) | 1 | inherited |
 | 16 | C113992 | SMBJ20CA (MDD) | 9 V TVS D105 | Extended | 40190 (2026-10-08) | 0.045 (100+) | SMB (cubevox) | 1 | pre-fab 2026-10-08: replaces SMBJ15CA C19077570, which conducts from 16.7 V and cooks on an 18 V pedal supply. Same footprint |
 | 17 | C98457 | CD74HC4067SM96 | 16:1 pot mux | Extended | 9499 | 0.460 | SSOP-24 (cubevox) | 1 | inherited |

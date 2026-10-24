@@ -256,18 +256,6 @@ const char* knobLabel(const KnobDesc& k, int shown) {
   return k.labels[shown < 0 ? 0 : (shown > last ? last : shown)];
 }
 
-void formatShown(const KnobDesc& k, int shown, char* buf, size_t size) {
-  if (size == 0) return;
-  if (k.labels) {
-    snprintf(buf, size, "%s", knobLabel(k, shown));
-    return;
-  }
-  char magnitude[16];
-  magnitudeText(k, magnitudeOf(shown), magnitude, sizeof(magnitude));
-  const char* sign = shown < 0 ? "-" : (shown > 0 && k.min < 0.0f ? "+" : "");
-  snprintf(buf, size, "%s%s", sign, magnitude);
-}
-
 int knobCells(const KnobDesc& k) {
   if (k.labels) return 0;
   const float scale = static_cast<float>(tenPow(k.decimals));
@@ -293,18 +281,4 @@ void formatCells(const KnobDesc& k, int shown, char* buf, size_t size) {
   if (signedRange) buf[0] = shown < 0 ? '-' : (shown > 0 ? '+' : ' ');
   memcpy(buf + cells - kept, text + length - kept, static_cast<size_t>(kept));
   buf[cells] = '\0';
-}
-
-void formatKnob(Card c, int knob, float v, char* buf, size_t size) {
-  if (size == 0) return;
-  buf[0] = '\0';
-  const KnobDesc* k = knobDesc(c, knob);
-  if (!k) return;
-  char shown[16];
-  formatShown(*k, knobShown(*k, v), shown, sizeof(shown));
-  if (k->labels || k->unit[0] == '\0') {
-    snprintf(buf, size, "%s", shown);
-  } else {
-    snprintf(buf, size, "%s %s", shown, k->unit);
-  }
 }

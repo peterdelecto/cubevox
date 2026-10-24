@@ -75,8 +75,9 @@ void checkMapping() {
 }
 
 void checkMeterAttackAndRelease() {
+  level::Meter silent;
+  check(silent.update(level::InputEnergy(), kTickMs) == 0.0f, "meter: starts silent");
   level::Meter meter;
-  check(meter.value() == 0.0f, "meter: starts silent");
   const float loud = meter.update(energyOfRms(dbToLinear(-6.0f)), kTickMs);
   check(std::fabs(loud - 1.0f) < 1e-4f, "meter: a loud tick shows at once");
 
@@ -88,11 +89,12 @@ void checkMeterAttackAndRelease() {
   check(std::fabs(after3 - std::exp(-1.0f)) < 1e-3f, "meter: 120 ms after the peak the level is 1 / e");
 
   int ticks = 3;
-  while (meter.value() > 0.0f && ticks < 100) {
-    meter.update(level::InputEnergy(), kTickMs);
+  float shown = after3;
+  while (shown > 0.0f && ticks < 100) {
+    shown = meter.update(level::InputEnergy(), kTickMs);
     ++ticks;
   }
-  check(meter.value() == 0.0f && ticks == 14, "meter: a decayed level snaps to zero once under the silence mark");
+  check(shown == 0.0f && ticks == 14, "meter: a decayed level snaps to zero once under the silence mark");
 
   // A quieter tick after a loud one releases toward the new level, a louder tick takes it at once.
   meter.update(energyOfRms(dbToLinear(-6.0f)), kTickMs);
