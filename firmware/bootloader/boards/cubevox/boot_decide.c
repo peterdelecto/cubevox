@@ -2,6 +2,17 @@
 
 #include "boot_decide.h"
 
+// Bank 2 starts where the application region ends and holds the layout record and the diagnostic
+// log. Its end is the 2 MB part's.
+#define CV_BANK2_BASE  CV_APP_END
+#define CV_BANK2_END   0x08200000u
+CV_STATIC_ASSERT(diag_log_inside_bank2,
+                 CV_DIAG_LOG_ADDR >= CV_BANK2_BASE && CV_DIAG_LOG_ADDR + CV_DIAG_LOG_SIZE <= CV_BANK2_END);
+
+static bool inBank2(uint32_t address) {
+  return address >= CV_BANK2_BASE && address < CV_BANK2_END;
+}
+
 // The 128 KB sector holding an application address, or 0 outside the application region. Sector 0
 // is the bootloader and bank 2 holds the layout record, so neither is ever returned.
 static uint32_t appSectorOf(uint32_t address) {
@@ -38,7 +49,7 @@ CvBootDecision cvBootDecide(struct CvBootBlock* block, bool menuHeld, CvImageSta
   block->request = 0u;
   if (readFault) {
     decision.eraseAddress = appSectorOf(block->faultAddress);
-  } else {
+  } else if (!inBank2(block->faultAddress)) {
     block->faultAddress = 0u;
   }
 
@@ -66,9 +77,10 @@ CvBootDecision cvBootDecide(struct CvBootBlock* block, bool menuHeld, CvImageSta
 
 void cvBootRecordReadFault(struct CvBootBlock* block, uint32_t flashAddress) {
   adoptBlock(block);
+  block->faultAddress = flashAddress;
+  if (inBank2(flashAddress)) return;
   block->request = CV_REQUEST_UPDATE;
   block->lastReason = (uint32_t)CvReasonImageUnreadable;
-  block->faultAddress = flashAddress;
 }
 
 bool cvBootTimeoutAllowed(const struct CvBootBlock* block, CvImageStatus image, bool hostEnumerated,

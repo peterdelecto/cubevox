@@ -5,8 +5,8 @@
 #   ./build.sh               # cubevox board into /tmp/cubevox-boot-cubevox
 #   BOARD=weact ./build.sh   # WeAct H743 test board into /tmp/cubevox-boot-weact
 #   ./build.sh --outdir      # print the output dir for the current BOARD and exit
-#   ./build.sh --proofs      # host build of screens.c; numbered PNGs in build/proofs/boot/
-#   ./build.sh --selftest    # host run of the image check against tools/stamp_image.py
+#   ./build.sh --proofs      # host build of screens.c; numbered PNGs and diag-sample.txt in build/proofs/boot/
+#   ./build.sh --selftest    # host run of the image check against tools/stamp_image.py, and the drive texts
 #
 # The checkout is build/tinyuf2 (gitignored). Every build resets it to the pin, links
 # boards/cubevox and boards/weact into ports/stm32h7/boards/ as symlinks and applies patches/ in
@@ -107,6 +107,12 @@ proofs() {
   rm -f "$dir"/*.png
   "$HOST/proof" "$dir"
   echo "[proofs] $(find "$dir" -name '*.png' | wc -l | tr -d ' ') screens in $dir"
+
+  # DIAG.TXT of the sample box, its flash log read by diag.c from a synthetic sector
+  mkdir -p "$HOST/drive"
+  "$HOST/drivetext" "$HOST/drive" > /dev/null
+  cp "$HOST/drive/DIAG.TXT" "$dir/diag-sample.txt"
+  echo "[proofs] diag-sample.txt in $dir"
 }
 
 expect_check() {
@@ -150,27 +156,69 @@ expect_line() {
   fi
 }
 
-# diag.c's two files for a sample box: DIAG.TXT keeps its fixed size and every field is present.
+expect_diag_size() {
+  local size
+  size=$(($(wc -c < "$1")))
+  if [ "$size" -ne 2048 ] || [ "$(tail -c 2 "$1" | od -An -c | tr -d ' ')" != '\r\n' ]; then
+    echo "[ERROR] $(basename "$1") is $size bytes or lacks its closing CR LF; it must be 2048"
+    exit 1
+  fi
+}
+
+# The sequence numbers of a DIAG file's log lines, newest first, as "#9 #8 #7". Empty without lines.
+log_order() {
+  grep -o '^#[0-9]*' "$1" | paste -sd' ' - || true
+}
+
+expect_log_order() {
+  local got
+  got="$(log_order "$1")"
+  if [ "$got" != "$2" ]; then
+    echo "[ERROR] $(basename "$1") lists '$got', expected '$2'"
+    exit 1
+  fi
+}
+
+# diag.c's files for a sample box. Every DIAG file keeps its fixed size. DIAG.TXT carries every field
+# and a flash log of three valid entries, one torn and blank slots. The others cover an empty log, a
+# log in a faulted sector that must not be read, a full one (newest 16 of 40) and a crowded one
+# (the longest lines, so fewer than 16 fit).
 drive_texts() {
-  local dir="$1" diag info size
+  local dir="$1" diag info name newest crowded first
   "$HOST/drivetext" "$dir" > /dev/null
   diag="$dir/DIAG.TXT"
   info="$dir/INFO_UF2.TXT"
-  size=$(($(wc -c < "$diag")))
-  if [ "$size" -ne 1024 ] || [ "$(tail -c 2 "$diag" | od -An -c | tr -d ' ')" != '\r\n' ]; then
-    echo "[ERROR] DIAG.TXT is $size bytes or lacks its closing CR LF; it must be 1024"
-    exit 1
-  fi
+  for name in DIAG DIAG-empty DIAG-full DIAG-crowded DIAG-unreadable; do expect_diag_size "$dir/$name.TXT"; done
   expect_line "$diag" "reason: ImageUnreadable"
   expect_line "$diag" "fault address: 0x8045000"
   expect_line "$diag" "app summary: v2.00.10 up 1234 s software none"
   expect_line "$diag" "fault: bus pc=0x8021A4C lr=0x8020F31 cfsr=0x8200 hfsr=0x40000000 bfar=0xDEADBEE0 mmfar=0xDEADBEE0 bank2-ecc=0x8102460"
   expect_line "$diag" "refused blocks: 12, last family 0x43565741"
-  expect_line "$diag" "flash log: not in this build"
+  expect_line "$diag" "#9 boot v2.00.10 up=? rst=0x1000000 fails=0 AppRequest fa=0x0 software none sai=0 ovr=0"
+  expect_line "$diag" "#8 update v2.00.10 up=1234s rst=0x1000000 fails=0 none fa=0x0 software none sai=2 ovr=0"
+  expect_line "$diag" "#7 boot v2.00.09 up=? rst=0x4000000 fails=1 none fa=0x0 watchdog bus sai=0 ovr=3"
+  expect_line "$diag" "flash log: 3 valid, 1 torn, 508 blank"
+  expect_log_order "$diag" "#9 #8 #7"
   expect_line "$info" "Board-ID: cubevox-h743-v4"
   expect_line "$info" "Serial: 0123456789ABCDEF01234567"
   expect_line "$info" "Installed: v2.00.10"
-  echo "[selftest] PASS: DIAG.TXT 1024 bytes and INFO_UF2.TXT $(($(wc -c < "$info"))) bytes carry every field"
+
+  expect_line "$dir/DIAG-empty.TXT" "flash log: empty"
+  expect_log_order "$dir/DIAG-empty.TXT" ""
+  expect_line "$dir/DIAG-unreadable.TXT" "reason: MenuHeld"
+  expect_line "$dir/DIAG-unreadable.TXT" "flash log: unreadable at 0x8141230"
+  expect_log_order "$dir/DIAG-unreadable.TXT" ""
+  newest="$(printf '#%s ' $(seq 139 -1 124))"
+  expect_line "$dir/DIAG-full.TXT" "flash log: 40 valid, 0 torn, 472 blank"
+  expect_log_order "$dir/DIAG-full.TXT" "${newest% }"
+  expect_line "$dir/DIAG-crowded.TXT" "flash log: 40 valid, 0 torn, 472 blank"
+  crowded=$(grep -c '^#' "$dir/DIAG-crowded.TXT" || true)
+  first="$(log_order "$dir/DIAG-crowded.TXT" | cut -d' ' -f1)"
+  if [ "$crowded" -lt 8 ] || [ "$crowded" -gt 16 ] || [ "$first" != '#1039' ]; then
+    echo "[ERROR] DIAG-crowded.TXT lists $crowded lines from '$first'; expected 8 to 16 from #1039"
+    exit 1
+  fi
+  echo "[selftest] PASS: DIAG files 2048 bytes; full log lists 16 of 40, crowded log $crowded of 16; INFO_UF2.TXT $(($(wc -c < "$info"))) bytes"
 }
 
 checkout() {

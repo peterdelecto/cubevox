@@ -210,8 +210,7 @@ void checkBootReadFault() {
       {0x08020000u, 0x08020000u, CvReasonImageUnreadable, "the first application word"},
       {0x080FFFFCu, 0x080E0000u, CvReasonImageUnreadable, "the last application word"},
       {0x0801FFFCu, 0u, CvReasonImageInvalid, "the bootloader sector, which is never erased"},
-      {0x08100000u, 0u, CvReasonImageInvalid, "the first word of bank 2"},
-      {0x08145678u, 0u, CvReasonImageInvalid, "an address in bank 2"},
+      {0x08200000u, 0u, CvReasonImageInvalid, "the first address past flash"},
       {0u, 0u, CvReasonImageInvalid, "address zero"},
       {0xFFFFFFFFu, 0u, CvReasonImageInvalid, "a garbage address"},
   };
@@ -237,6 +236,50 @@ void checkBootReadFault() {
   cvBootRecordReadFault(&garbage, 0x08065432u);
   check(decided(decide(garbage, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u),
         "boot: a read fault recorded on a power-on garbage block survives to the decision");
+}
+
+// A fault in bank 2 is a read of the diagnostic log. It records the address and nothing else, so the
+// image check alone decides the next start, no sector is erased, and the address stays for the
+// DIAG.TXT reader and the application.
+void checkBootBank2Fault() {
+  const uint32_t addresses[] = {0x08100000u, 0x08145678u, 0x081FFFE0u};
+  for (const uint32_t address : addresses) {
+    CvBootBlock b = bootBlock();
+    decide(b, true, CvImageValid);
+    cvBootRecordReadFault(&b, address);
+    check(b.request == 0 && b.lastReason == CvReasonMenuHeld && b.faultAddress == address,
+          "boot: a bank 2 fault records the address and leaves the request and the reason");
+
+    CvBootBlock running = b;
+    check(decided(decide(running, false, CvImageValid), CvActionRunApp, CvReasonNone) &&
+              running.faultAddress == address,
+          "boot: after a bank 2 fault a valid image runs and the address stays");
+    check(decided(decide(running, false, CvImageValid), CvActionRunApp, CvReasonNone) &&
+              running.faultAddress == address && cvBootFailsGet(&running) == 2,
+          "boot: the address outlasts further starts until the application clears it");
+
+    check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid) &&
+              b.faultAddress == address,
+          "boot: after a bank 2 fault an invalid image is the image check's verdict, with no erase");
+  }
+
+  CvBootBlock b = bootBlock();
+  cvBootRecordReadFault(&b, 0x080FFFFCu);
+  check(b.request == CV_REQUEST_UPDATE && b.lastReason == CvReasonImageUnreadable,
+        "boot: the last application word is still a read fault of the image");
+
+  b = bootBlock();
+  cvBootRecordReadFault(&b, 0x08145678u);
+  cvBootRecordReadFault(&b, 0x08065432u);
+  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u),
+        "boot: an application fault after a bank 2 fault still yields its sector");
+
+  b = bootBlock();
+  b.faultAddress = 0x08145678u;
+  b.request = CV_REQUEST_UPDATE;
+  b.lastReason = CvReasonImageUnreadable;
+  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonImageInvalid),
+        "boot: a stale unreadable request with a bank 2 address erases nothing");
 }
 
 void checkBootTimeout() {
@@ -288,6 +331,7 @@ void checkBootDecide() {
   checkBootCounter();
   checkBootGarbage();
   checkBootReadFault();
+  checkBootBank2Fault();
   checkBootTimeout();
   checkBootMarkUpdated();
 }

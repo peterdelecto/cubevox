@@ -1,0 +1,41 @@
+Why: a host that detaches mid-copy leaves the block count and the flash driver's erased-sector map describing a file that never finished, so the next file never completes and writes into stale sectors until a power cycle. A board without VBUS sensing sees no unplug, and a bus reset does not reach tud_umount_cb, but every enumeration ends in tud_mount_cb.
+
+diff --git a/src/msc.c b/src/msc.c
+--- a/src/msc.c
++++ b/src/msc.c
+@@ -37,6 +37,13 @@
+
+ static WriteState _wr_state = {0};
+
++// Forgets a copy the last host session cut short: the block count, and the flash driver's record of
++// which sectors it erased. The next file then counts and erases afresh.
++void uf2_write_state_reset(void) {
++  memset(&_wr_state, 0, sizeof(_wr_state));
++  board_flash_init();
++}
++
+ //--------------------------------------------------------------------+
+ // tinyusb callbacks
+ //--------------------------------------------------------------------+
+diff --git a/src/uf2.h b/src/uf2.h
+--- a/src/uf2.h
++++ b/src/uf2.h
+@@ -105,5 +105,6 @@
+ void uf2_init(void);
+ void uf2_read_block(uint32_t block_no, uint8_t *data);
+ int  uf2_write_block(uint32_t block_no, uint8_t *data, WriteState *state);
++void uf2_write_state_reset(void);
+
+ #endif
+diff --git a/src/main.c b/src/main.c
+--- a/src/main.c
++++ b/src/main.c
+@@ -189,6 +189,8 @@
+
+ // Invoked when device is plugged and configured
+ void tud_mount_cb(void) {
++  // a copy the last host session left unfinished must not count toward this one
++  uf2_write_state_reset();
+   indicator_set(STATE_USB_PLUGGED);
+ }
+

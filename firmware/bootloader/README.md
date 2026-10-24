@@ -22,7 +22,7 @@ The commit and the compiler version are `TINYUF2_COMMIT` and `XPACK_VERSION` in 
 ./build.sh                # cubevox board: /tmp/cubevox-boot-cubevox/cubevox-bootloader.{bin,elf}
 BOARD=weact ./build.sh    # WeAct H743 test board: /tmp/cubevox-boot-weact/
 ./build.sh --outdir       # the output dir for the current BOARD
-./build.sh --proofs       # host build of screens.c: build/proofs/boot/NN-<state>.png at the repo root
+./build.sh --proofs       # host build of screens.c: build/proofs/boot/NN-<state>.png and diag-sample.txt at the repo root
 ./build.sh --selftest     # host run of the image check against tools/stamp_image.py, and the drive texts
 ```
 1. The checkout is `build/tinyuf2`, gitignored. A missing checkout is cloned; one off the pin is
@@ -50,6 +50,7 @@ Each is small, has one purpose and a one-line reason at its top, and is written 
 | `05-main-dfu-task-hook` | weak `board_dfu_task()` on every pass of the DFU loop |
 | `06-boards-weak-dfu-complete` | `board_dfu_complete()` is weak, so a board records the update before the reset |
 | `07-boards-dbl-tap-default` | the port's `TINYUF2_DBL_TAP_DFU 1` becomes a default a board can turn off |
+| `08-msc-write-state-reset-on-mount` | `tud_mount_cb` calls `uf2_write_state_reset()`, which clears the UF2 block count and calls `board_flash_init()` to forget the erased sectors, so each enumeration starts a clean copy |
 
 With every define at its default the drive is byte-identical to upstream: the upstream
 `ports/test_ghostfat` selftest passes on the patched tree (boards 4k, 4k_favicon, 32k, 512b_favicon).
@@ -80,8 +81,11 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
 3. The image check is the header (magic, version, length in the region), the CRC-32 over the image
    with its CRC field zero, then upstream's stack and reset-vector check, so upstream never disagrees.
 4. NMI, HardFault, MemManage, BusFault and UsageFault reset the stack to the top of RAM, decode a
-   double ECC error (bank 1: the word's address; bank 2: the log's address, nothing erased), call
-   `cvBootRecordReadFault` and reset.
+   double ECC error (bank 1: the word's address; bank 2: the log's address), call
+   `cvBootRecordReadFault` and reset. A bank 1 address makes the next start update mode and erases
+   its sector. A bank 2 address can only come from reading the log, so it is recorded and nothing
+   else changes: the reason and the image check stand, no sector is erased, and DIAG.TXT skips the
+   log until the application clears the address.
 5. NOINIT is the boot block, 0xC0 bytes at 0x2001FF00, so `_board_dfu_dbl_tap` is its `request` word.
    The fault record above it at 0x2001FFC0 is only read.
 
@@ -94,14 +98,41 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
 3. With reason MenuHeld or AppRequest, a valid image, no host enumerated and no block written, update
    mode resets after 60 s; the request is consumed, so the decision then runs the application.
 4. Screens follow the spec's table (`boards/cubevox/screens.c`); `./build.sh --proofs` renders them.
+5. Every enumeration clears the UF2 block count and the flash driver's record of erased sectors
+   (patch 08). A copy cut short by a pulled cable therefore does not stop the next file, even a
+   different one, and needs no power cycle. A copy cancelled on the host with the cable in place
+   is not covered.
 
 ## The drive
 | File | Content |
 |---|---|
 | `INFO_UF2.TXT` | bootloader version, Model, Board-ID, Serial, Installed (`v2.00.10`, `none` or `invalid`), TinyUF2 and TinyUSB versions with their MIT notices |
-| `DIAG.TXT` | 1024 bytes, space padded: bootloader version, board, serial, reason, fault address, app summary, the fault record as `faultReport` prints it, refused blocks and the last refused family, `flash log: not in this build` |
+| `DIAG.TXT` | 2048 bytes, space padded: bootloader version, board, serial, reason, fault address, app summary, the fault record as `faultReport` prints it, refused blocks and the last refused family, then the `flash log:` lines |
 
-DIAG.TXT is rewritten at every mount and whenever a block is refused.
+DIAG.TXT is rewritten at every mount and whenever a block is refused. Each rewrite reads the log
+again, which takes a few milliseconds.
+
+## Flash log in DIAG.TXT
+The application appends 256-byte entries to bank 2 sector 2 and the bootloader only reads them
+(contract: `boot_block.h`, section Diagnostic log). `cvDiagLogLines` in `diag.c` classifies all 512
+slots. A slot is blank when every byte is 0xFF, valid when its magic and its trailing CRC-32 hold
+(`cvCrc32`, the image check's), and torn otherwise.
+
+| Text | Meaning |
+|---|---|
+| `#12 boot v2.00.10 up=? rst=0x4 fails=3 BootFailed fa=0x0 watchdog bus sai=0 ovr=0` | One valid entry. Fields in order: sequence, kind (`boot` or `update`), firmware, uptime in seconds, reset flags in hex, boot fails, last reason, fault address in hex, fault text, SAI errors, overruns. `?` marks a field the application did not know. |
+| `flash log: 3 valid, 1 torn, 508 blank` | The counts over all slots, after the entries. |
+| `flash log: empty` | No valid entry. The counts line follows only when a slot is torn. |
+| `flash log: unreadable at 0x8141230` | A read fault hit sector 2, so the sector is not read at all. |
+
+1. The newest 16 valid entries come first. The application only appends and erases the whole
+   sector, so the highest slot is the newest.
+2. A line that does not fit whole in the 2048 bytes is left out with every older line. Typical lines
+   are 85 to 91 bytes with the line break, so 16 fit. The longest plausible lines are 139 bytes and
+   11 fit.
+3. Text fields print printable bytes only, anything else as `?`.
+4. `./build.sh --proofs` writes `build/proofs/boot/diag-sample.txt`, the sample box with three valid
+   entries, one torn entry and blank slots. `./build.sh --selftest` checks it and four variants.
 
 ## Flash (shop only)
 1. Enclosure open, 9 V on. Hold BOOT0, tap NRST, release BOOT0.
@@ -115,6 +146,9 @@ DIAG.TXT is rewritten at every mount and whenever a block is refused.
 3. The read-fault path: a power cut mid-copy, the ECC fault, the sector erase, `ImageUnreadable`.
 4. The OLED driver: I2C timing at 400 kHz, the init sequence, orientation against the firmware.
 5. The MENU switch at power-on, the 60 s timeout, the LED, the WeAct double tap.
+6. Real log entries listed after a fault reboot, and the `unreadable` line after a double ECC error in
+   sector 2 (one reset, then the sector is skipped).
+7. A different file copied after a cable pulled mid-copy, with no power cycle between.
 
 ## Licences
 cubevox is MIT. The bootloader binary contains TinyUF2 and TinyUSB under these notices:

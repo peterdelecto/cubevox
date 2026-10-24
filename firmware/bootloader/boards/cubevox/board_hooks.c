@@ -19,6 +19,11 @@ CV_STATIC_ASSERT(dbeccerr_is_cmsis, CV_FLASH_SR_DBECCERR == FLASH_SR_DBECCERR);
 CV_STATIC_ASSERT(ecc_address_is_cmsis, CV_FLASH_ECC_ADDR == FLASH_ECC_FA_FAIL_ECC_ADDR);
 CV_STATIC_ASSERT(bank2_base_is_cmsis, CV_FLASH_BANK2_BASE == FLASH_BANK2_BASE);
 CV_STATIC_ASSERT(flash_word_is_hal, CV_FLASH_WORD_BYTES == 4u * FLASH_NB_32BITWORD_IN_FLASHWORD);
+// A double ECC error while DIAG.TXT reads the log decodes to an address inside the log sector, so no
+// separate marker is needed around the read.
+CV_STATIC_ASSERT(ecc_decode_covers_log,
+                 CV_FLASH_BANK2_BASE + (CV_FLASH_ECC_ADDR + 1u) * CV_FLASH_WORD_BYTES >=
+                         CV_DIAG_LOG_ADDR + CV_DIAG_LOG_SIZE);
 
 #define CV_BLOCK ((struct CvBootBlock*)CV_BOOT_BLOCK_ADDR)
 #define CV_FAULT_RECORD ((const struct CvFaultRecord*)CV_FAULT_RECORD_ADDR)
@@ -187,8 +192,10 @@ CV_FAULT_ENTRY(BusFault_Handler)
 CV_FAULT_ENTRY(UsageFault_Handler)
 
 // A double ECC error in bank 1 is a word whose programming a power loss cut; the decision erases its
-// sector on the next boot. One in bank 2 is the diagnostic log, outside the application region, so
-// the decision records the address and erases nothing. Any other fault records address 0.
+// sector on the next boot. One in bank 2 can only come from reading the diagnostic log for DIAG.TXT.
+// It records the address and nothing else, so the image check still decides and no bank 2 sector is
+// erased here. DIAG.TXT then skips the log, and the application erases the sector. Any other fault
+// records address 0.
 void cvBootFault(void) {
   uint32_t address = 0u;
   if (FLASH->SR1 & FLASH_SR_DBECCERR) {
@@ -224,7 +231,8 @@ static const char* serialText(void) {
 
 static CvDriveState driveState(void) {
   const CvDriveState state = {CV_BLOCK,     &gState.image,      CV_FAULT_RECORD,         serialText(),
-                              TUSB_VERSION_STRING, gState.refusedBlocks, gState.lastRefusedFamily};
+                              TUSB_VERSION_STRING, gState.refusedBlocks, gState.lastRefusedFamily,
+                              (const uint8_t*)CV_DIAG_LOG_ADDR};
   return state;
 }
 

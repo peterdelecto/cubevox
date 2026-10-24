@@ -37,12 +37,20 @@ typedef struct {
 // before anything reads it again. Outside the region there is nothing to erase and the reason
 // becomes CvReasonImageInvalid.
 //
+// A faultAddress in bank 2 is a fault in the diagnostic log. The block keeps it across starts, for
+// the DIAG.TXT reader and for the application, which erases that sector and clears it. Any other
+// faultAddress is cleared by the next decision.
+//
 // A pending request outranks the image, so board code can pass CvImageInvalid without reading
 // flash when block->request is set. Reading would fault on the very word the request names.
 CvBootDecision cvBootDecide(struct CvBootBlock* block, bool menuHeld, CvImageStatus image);
 
 // Fault handler path. Records the unreadable flash address and asks for update mode. The caller
 // resets afterwards.
+//
+// A fault in bank 2 can only come from reading the diagnostic log, which says nothing about the
+// application image. It records the address and leaves the request and the reason alone, so the
+// image check alone decides the next start, and it never yields a sector to erase.
 void cvBootRecordReadFault(struct CvBootBlock* block, uint32_t flashAddress);
 
 // True when update mode may fall back to the application after CV_UPDATE_TIMEOUT_MS. That holds

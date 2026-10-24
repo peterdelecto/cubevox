@@ -13,7 +13,7 @@ extern "C" {
 
 // Shown in INFO_UF2.TXT and DIAG.TXT. Bumped with every bootloader change; independent of
 // VERSION.txt because the two programs ship on different paths.
-#define CV_BOOT_VERSION "0.01"
+#define CV_BOOT_VERSION "0.02"
 
 //--------------------------------------------------------------------+
 // Board identity
@@ -76,12 +76,12 @@ extern "C" {
 
 // The drive serves INFO_UF2.TXT and DIAG.TXT only (diag.c), and every UF2 block passes
 // board_uf2_block_accept() (board_hooks.c). DIAG.TXT has a fixed size, so the directory never
-// changes while its text does.
+// changes while its text does. 2 KB holds the header lines and the 16 newest log lines.
 #define TINYUF2_INDEX_HTM           0
 #define TINYUF2_CURRENT_UF2         0
 #define TINYUF2_BOARD_INFO_UF2      1
 #define TINYUF2_BOARD_BLOCK_FILTER  1
-#define CV_DIAG_TEXT_BYTES          1024u
+#define CV_DIAG_TEXT_BYTES          2048u
 extern char cvDiagText[CV_DIAG_TEXT_BYTES];
 #define TINYUF2_BOARD_FILES {.name = "DIAG    TXT", .content = cvDiagText, .size = CV_DIAG_TEXT_BYTES},
 
