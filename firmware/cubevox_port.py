@@ -12,6 +12,7 @@ As a command it prints the port path, for shell scripts, and can send one reques
   python3 -I cubevox_port.py --request enter_dfu  # send {"id":N,"cmd":"enter_dfu"}, exit 0 on ok:true
   python3 -I cubevox_port.py --wait-volume CUBEVOX             # wait up to 10 s for /Volumes/CUBEVOX
   python3 -I cubevox_port.py --wait-volume CUBEVOX --wait 30   # same, 30 s
+  python3 -I cubevox_port.py --wait-volume CUBEVOX --gone      # wait up to 10 s for it to be unmounted
 
 CUBEVOX_PORT names the port when more than one cu.usbmodem* device is attached.
 
@@ -210,13 +211,24 @@ class Link:
 
 
 def volume_command(a):
-    """--wait-volume: prints the mount path, or [ERROR] and exit 1 when the volume stays away."""
+    """--wait-volume: prints the mount path, or [ERROR] and exit 1 when the volume stays away.
+
+    With --gone it waits for the volume to be unmounted instead and prints nothing.
+    """
+    if a.wait_volume is None:
+        print("[ERROR] --gone goes with --wait-volume", file=sys.stderr)
+        return 1
     clash = [flag for flag, given in (("--request", a.request), ("--port", a.port),
                                       ("--allow-none", a.allow_none)) if given]
     if clash:
         print(f"[ERROR] --wait-volume cannot be combined with {' '.join(clash)}", file=sys.stderr)
         return 1
     wait_s = VOLUME_WAIT_S if a.wait is None else a.wait
+    if a.gone:
+        if not wait_volume_gone(a.wait_volume, wait_s):
+            print(f"[ERROR] {volume_path(a.wait_volume)} is still mounted after {wait_s:g} s", file=sys.stderr)
+            return 1
+        return 0
     path = wait_volume(a.wait_volume, wait_s)
     if path is None:
         print(f"[ERROR] {volume_path(a.wait_volume)} is not mounted after {wait_s:g} s", file=sys.stderr)
@@ -233,11 +245,13 @@ def main():
                          f"--wait-volume (default {VOLUME_WAIT_S:g})")
     ap.add_argument("--wait-volume", metavar="NAME",
                     help="wait for /Volumes/NAME to mount, print its path and exit; the update drive is CUBEVOX")
+    ap.add_argument("--gone", action="store_true",
+                    help="with --wait-volume, wait for the volume to be unmounted instead")
     ap.add_argument("--allow-none", action="store_true", help="print nothing and exit 0 when no port is present")
     ap.add_argument("--request", metavar="CMD", help="send this command and require ok:true in the reply")
     ap.add_argument("--reply-wait", type=float, default=3.0, help="seconds to wait for the reply")
     a = ap.parse_args()
-    if a.wait_volume is not None:
+    if a.wait_volume is not None or a.gone:
         return volume_command(a)
     try:
         path = find_port(a.port, a.wait or 0.0, a.allow_none)

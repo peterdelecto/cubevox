@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
+# Usage: flash.sh [--rom | --help]
+#
 # Installs the application on a box whose sector 0 holds the bootloader (bootloader/flash.sh puts
 # it there), then prints the boot report.
 #
 # By default the script uses the update drive, the path Adam takes by hand. With a cubevox serial
 # port present it sends enter_dfu, waits for /Volumes/CUBEVOX, copies <out dir>/cubevox.uf2 onto
-# it, waits for the box to restart and prints the boot report. With no serial port it waits up to
-# WAIT seconds (default 300) for the drive. A failed start or a MENU held at power-on brings the
-# drive up, and so does a bootloader that has no application yet.
+# it, waits for the drive to go and the box's port to return, and prints the boot report. With no
+# serial port it waits up to WAIT seconds (default 300) for the drive. A failed start or a MENU
+# held at power-on brings the drive up, and so does a bootloader that has no application yet.
 #
 # --rom goes through the ST ROM DFU with dfu-util, for a box whose application is unreachable. It
 # writes <out dir>/cubevox.ino.bin at the application start (0x08020000, read from boot_block.h),
@@ -21,6 +23,7 @@
 #   VARIANT=bench ./flash.sh      # bench image; build first with BENCH=1 ./build.sh
 #   BOARD=weact ./flash.sh        # bench image for the WeAct board
 #   ./flash.sh --rom              # the same image through the ROM DFU
+#   ./flash.sh --help             # the short usage
 
 set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
@@ -29,6 +32,7 @@ VARIANT="$("$FW/build.sh" --variant)"
 OUT="$("$FW/build.sh" --outdir)"
 WAIT="${WAIT:-300}"
 MOUNT_WAIT=15  # the drive mounts within 5 s of enter_dfu
+LEAVE_WAIT=15  # the drive leaves within a few seconds of the last block
 PORT_TOOL=(python3 -I "$FW/cubevox_port.py")
 STAMP_TOOL=(python3 -I "$REPO/tools/stamp_image.py")
 
@@ -38,10 +42,10 @@ if [ "${BOARD:-}" = weact ]; then VOLUME=WEACTBOOT; fi
 
 usage() {
   cat <<'USAGE'
-usage: ./flash.sh [--rom]
+usage: ./flash.sh [--rom | --help]
   (no flag)  update-drive path: send enter_dfu over the serial port if one is present, wait for
              /Volumes/CUBEVOX (WEACTBOOT with BOARD=weact), copy <out dir>/cubevox.uf2 onto it,
-             wait for the box to restart, print the boot report
+             wait for the drive to go and the box's port to return, print the boot report
   --rom      ST ROM DFU path: hold BOOT0, tap NRST, release; dfu-util writes <out dir>/cubevox.ino.bin
              at the application start from boot_block.h (0x08020000), above the bootloader's sector
   VARIANT=release|bench, BENCH=1, BOARD=weact pick the image as build.sh does; WAIT=<s> bounds the
@@ -137,13 +141,18 @@ drive_flash() {
   fi
 
   # The box resets after the last block, so the OS may report an error for a copy that worked. The
-  # port that returns below decides.
+  # drive leaving and the port returning decide.
   copy_log="$(mktemp)"
   echo "[flash] copying $(basename "$IMAGE") to $volume"
   cp -X "$IMAGE" "$volume/" >"$copy_log" 2>&1 || copy_rc=$?
   if [ "$copy_rc" -ne 0 ]; then
     echo "[flash] cp reported '$(tr '\n' ' ' < "$copy_log")'"
   fi
+  if ! "${PORT_TOOL[@]}" --wait-volume "$VOLUME" --gone --wait "$LEAVE_WAIT" >/dev/null; then
+    echo "[ERROR] the drive is still mounted ${LEAVE_WAIT}s after the copy; cp said '$(tr '\n' ' ' < "$copy_log")'"
+    exit 1
+  fi
+  echo "[flash] the drive left; waiting for the box to restart"
 }
 
 if [ "$ROM" -eq 1 ]; then

@@ -106,10 +106,6 @@ jobs:
       STM32_INDEX_URL: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
     steps:
       - uses: actions/checkout@v4
-      - name: Host selftest
-        # Runs the bootloader's image check and drive texts on the host against tools/stamp_image.py.
-        # It needs no toolchain, so it runs before the core download.
-        run: firmware/bootloader/build.sh --selftest
       - name: Install arduino-cli
         run: |
           curl -fsSL https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_macOS_ARM64.tar.gz -o "$RUNNER_TEMP/acli.tgz"
@@ -135,6 +131,10 @@ jobs:
         run: firmware/bootloader/build.sh
       - name: Build WeAct bootloader
         run: BOARD=weact firmware/bootloader/build.sh
+      - name: Host selftest
+        # A host-only check that the C image check and the DIAG.TXT fields agree with
+        # tools/stamp_image.py.
+        run: firmware/bootloader/build.sh --selftest
       - name: Check bootloader outcome
         id: bootloaders
         run: |
