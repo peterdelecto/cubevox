@@ -43,6 +43,12 @@ LayoutFade::Block LayoutFade::next(bool differs) {
   return ramp(false);
 }
 
+void LayoutFade::cut() {
+  level_ = 0;
+  phase_ = Phase::Hold;
+  holdLeft_ = hold_ + 1;
+}
+
 uint32_t enginesToReset(const Layout& from, const Layout& to) {
   uint32_t mask = 0;
   for (int s = 0; s < kSlotCount; ++s) {

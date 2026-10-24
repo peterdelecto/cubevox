@@ -189,3 +189,6 @@ over seconds 1–2.
 
 `ctest` passes all stages; face shows DISTORTION under SLAPBACK; owner listens with
 a vocal loop and tunes toward the Blues Driver by ear.
+
+Box code: both clipping stages always run 2x oversampled; there is no non-oversampled path. The
+panel toggle switches the stage, which settles off to a plain copy.

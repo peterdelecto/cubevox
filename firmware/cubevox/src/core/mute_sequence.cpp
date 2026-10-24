@@ -6,6 +6,7 @@ void MuteSequence::reset(bool switchReleased, uint32_t nowMs) {
   clocksSinceMs_ = 0;
   latched_ = false;
   held_ = false;
+  tripped_ = false;
   enter(State::Muted, nowMs);
 }
 
@@ -31,6 +32,10 @@ MuteOutputs MuteSequence::outputs() const {
 
 MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
   switch_.update(switchReleased, nowMs, kSwitchDebounceMs);
+  if (tripped_) {
+    if (state_ != State::Muted) enter(State::Muted, nowMs);  // the pins are low already
+    return outputs();
+  }
   const uint32_t elapsed = nowMs - sinceMs_;
 
   switch (state_) {

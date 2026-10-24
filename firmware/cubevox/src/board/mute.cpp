@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include <atomic>
+
 #include "board/pins.h"
 #include "core/debounce.h"
 #include "core/mute_sequence.h"
@@ -10,13 +12,33 @@
 namespace {
 
 MuteSequence gSequence;
-MuteOutputs gDriven;  // pin levels last written
+uint8_t gHolds = 0;              // MuteReason bits held from loop()
+std::atomic<uint8_t> gTrips{0};  // MuteReason bits tripped from interrupts, cleared from loop()
 
 // The switch as the BYPASS role sees it. The sequence debounces its own copy of the same pin.
 DebouncedInput gBypassSwitch;
 volatile bool gBypassOn = false;  // written by mutePoll, read by the audio interrupt
 
 bool switchReleased() { return digitalRead(pins::kMuteSw) == HIGH; }
+
+uint8_t bitOf(MuteReason reason) { return static_cast<uint8_t>(reason); }
+
+// By register: no HAL state, so an interrupt can use it while loop() is mid-call.
+void setPin(uint32_t pin, bool high) {
+  pins::portOf(pin)->BSRR = high ? pins::maskOf(pin) : pins::maskOf(pin) << 16;
+}
+
+// A trip can land between the sequence step and this write, so the write runs with interrupts off
+// and a trip set by then keeps both pins low. Each sequence step changes one pin, so writing both
+// cannot reorder the mute.
+void drive(MuteOutputs next) {
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
+  if (gTrips.load() != 0) next = MuteOutputs();
+  setPin(pins::kXsmt, next.xsmtHigh);
+  setPin(pins::kMuteN, next.muteNHigh);
+  __set_PRIMASK(primask);
+}
 
 }  // namespace
 
@@ -28,7 +50,8 @@ void muteInit() {
   pinMode(pins::kMuteSw, INPUT);  // R120 pull-up on the board
   gSequence.reset(switchReleased(), millis());
   gBypassSwitch.reset(switchReleased());
-  gDriven = MuteOutputs();
+  gHolds = 0;
+  gTrips.store(0);
 }
 
 void muteClocksRunning(uint32_t nowMs) { gSequence.clocksRunning(nowMs); }
@@ -38,12 +61,10 @@ void mutePoll(uint32_t nowMs, TopSwitch role) {
   gBypassSwitch.update(released, nowMs, kSwitchDebounceMs);
   gBypassOn = role == TopSwitch::Bypass && !gBypassSwitch.level();
 
+  gSequence.hold(gHolds != 0);
+  gSequence.trip(gTrips.load() != 0);
   // BYPASS leaves the sequence a switch that never mutes; MUTE hands it the pin as it always was.
-  const MuteOutputs next = gSequence.update(nowMs, role == TopSwitch::Mute ? released : true);
-  // Each sequence step changes one pin, so the write order here cannot reorder the mute.
-  if (next.muteNHigh != gDriven.muteNHigh) digitalWrite(pins::kMuteN, next.muteNHigh ? HIGH : LOW);
-  if (next.xsmtHigh != gDriven.xsmtHigh) digitalWrite(pins::kXsmt, next.xsmtHigh ? HIGH : LOW);
-  gDriven = next;
+  drive(gSequence.update(nowMs, role == TopSwitch::Mute ? released : true));
 }
 
 void muteLatch() { gSequence.latch(); }
@@ -54,15 +75,25 @@ bool muteActive() { return gSequence.active(); }
 
 bool muteFullyMuted() { return gSequence.fullyMuted(); }
 
-void muteHold(bool on) { gSequence.hold(on); }
+void muteHold(bool on) { muteHoldFor(MuteReason::Panel, on); }
+
+void muteHoldFor(MuteReason reason, bool on) {
+  gHolds = static_cast<uint8_t>(on ? gHolds | bitOf(reason) : gHolds & ~bitOf(reason));
+}
+
+void muteTrip(MuteReason reason) {
+  setPin(pins::kXsmt, false);
+  setPin(pins::kMuteN, false);
+  gTrips.fetch_or(bitOf(reason));
+}
+
+void muteTripClear(MuteReason reason) { gTrips.fetch_and(static_cast<uint8_t>(~bitOf(reason))); }
 
 // The polled sequence cannot finish before a reset, so this blocks through the same order and
-// delays: XSMT low, then MUTE_N low once the DAC is silent. gDriven follows the pins, so a later
-// mutePoll would write the right difference.
+// delays: XSMT low, then MUTE_N low once the DAC is silent.
 void muteForReset() {
-  digitalWrite(pins::kXsmt, LOW);
+  setPin(pins::kXsmt, false);
   delay(kXsmtLeadMs);
-  digitalWrite(pins::kMuteN, LOW);
+  setPin(pins::kMuteN, false);
   delay(kRelaySettleMs);
-  gDriven = MuteOutputs();
 }

@@ -23,7 +23,7 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 | `hello` | — | `proto` 1, `fw` version, `serial` (24 uppercase hex characters of the MCU's 96-bit unique id, the text the update drive serves as its USB serial), `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout`, `settings` (the box always sends it; the host tool that has no board leaves it out) |
 | `get_layout` | — | `layout`: `name`, `slots` (8 card ids); `settings` |
 | `set_layout` | `name`, `slots` (8 card ids), optional `settings` | `ok`, or an error |
-| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late`, `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes`, `boot_fails` (earlier starts that never reported healthy, read at boot), `update_reason` (why the bootloader last stayed in update mode: `none`, `MenuHeld`, `AppRequest`, `ImageInvalid`, `ImageUnreadable` or `BootFailed`) |
+| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late` (blocks past their budget or written after the DMA began reading their half), `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes`, `boot_fails` (earlier starts that never reported healthy, read at boot), the audio faults since boot (`overruns`, `sai_errors`, `restarts`, `nan_blocks`, `stalled` for the stall watch's latch, `audio_latched` for a fault past the restart budget), `power_trips` (power-fail mutes), `reply_overflows` (reply pieces lost to the format buffer), `update_reason` (why the bootloader last stayed in update mode: `none`, `MenuHeld`, `AppRequest`, `ImageInvalid`, `ImageUnreadable` or `BootFailed`) |
 | `enter_dfu` | — | `ok`, sent and flushed before the box mutes and reboots into the UF2 update drive (the `CUBEVOX` volume, spec `2026-10-24-field-update-design.md`) |
 | `bench` | `op`, plus `slot` (1 to 8) for `slot_off` | `ok` after the op runs, or an error; diagnostic text goes to the log lines |
 
@@ -85,15 +85,15 @@ load maps unknown ids to `empty`.
    silent blocks before the fade-in.
 3. The ramp is a pure core sequencer (`core/layout_fade`): per block it gives the gain and whether
    to swap. Host-tested.
-4. Controls re-seed knob steps for the new cards (already in place); the menu's chain view reads
-   the new layout.
+4. Controls re-seed knob steps for the new cards (already in place). No menu row opens the chain
+   view (`2026-10-24-polish-design.md`).
 
 ## Modules
 | Tier | Module | Owns |
 |---|---|---|
 | core | `protocol` | line framing state, request parse, reply formatting into a writer interface |
 | core | `layout_fade` | fade-out, swap, fade-in per block |
-| board | `serial_link` | reads CDC bytes, splits JSON lines from bench letters, writes replies |
+| board | `serial_link` | reads CDC bytes, cuts JSON lines and ignores every other byte (counted as stray), writes replies |
 | sketch | | dispatches commands to layout, record, audio stats, mute and DFU |
 
 ## Verification

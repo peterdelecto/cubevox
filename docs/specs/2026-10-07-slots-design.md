@@ -23,9 +23,9 @@ Today's chain, left to right, slot 1 to 8:
 2. Relays. K101 (bypass, dry path PRE_OUT to BUF_IN) leaves with the bypass, with D104 and the dry path. K102 (output mute, MUTE_N on PB5, tip grounded while off and at reset) stays and is the mute.
 3. Mute toggle wiring. Same ST-0-102 part. Common to MUTE_SW on PC6 (the former FX_ON_SENSE, R120 10 k pull-up and C162 100 nF kept), one throw to GND. Firmware soft-mutes the DAC (XSMT), then drops MUTE_N; reverse on release. No MCU-free path is needed because the relay fails to muted.
 4. Input Gain. Stays analog and on the face. A menu item cannot turn the pot, and gain ahead of the ADC keeps quiet singing clear of the noise floor.
-5. Knob type. All 16 slot knobs are RK09D1130C2P continuous pots. Firmware snaps KEY to its positions and SEMITONES to -24..+24 with hysteresis; the OLED shows the landed value. The detented-knob question is closed.
+5. Knob type. All 16 slot knobs are RK09D1130C2P continuous pots. Firmware snaps KEY to its positions and SEMITONES to -12..+12 with hysteresis; the OLED shows the landed value. The detented-knob question is closed.
 6. Chain order. Left to right is the chain by default. Firmware may reorder; the OLED menu shows the live order. (Superseded 2026-10-08: the chain is always the slot order.)
-7. Firmware update. OLED menu "Update firmware" reboots into the STM32 ROM DFU bootloader over the rear-wall USB-C. The BOOT0 button stays inside as recovery. Settings in flash bank 2 survive because the DFU image excludes it. (2026-10-08: the Mac app's Update screen does the same over the cable; the menu item stays as the fallback.)
+7. Firmware update. OLED menu "Update firmware" reboots into the STM32 ROM DFU bootloader over the rear-wall USB-C. The BOOT0 button stays inside as recovery. Settings in flash bank 2 survive because the DFU image excludes it. (2026-10-08: the Mac app's Update screen does the same over the cable; the menu item stays as the fallback.) Superseded 2026-10-24 by `2026-10-24-field-update-design.md`: the menu item resets into the bootloader's `CUBEVOX` drive, and the ROM DFU through BOOT0 is the shop's fallback.
 8. Mute scope. Output only. The chain keeps running, the OLED shows MUTED, unmute is seamless.
 9. Freed GPIOs PB7, PB8, PB9, PE0. Unconnected. No pads, no header.
 10. Lid legends. Deferred. Not needed until the enclosure.

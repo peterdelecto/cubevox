@@ -25,9 +25,7 @@ ChainParams::ChainParams() {
   inputGate.tuning.releaseMs = kInputGateReleaseMs;
   gate.on = false;
   pitchFx.autotune.on = false;
-  pitchFx.harmony.on = false;  // Harmony has no card, so its engine stays off
   pitchFx.octave.on = false;
-  pitchFx.octave.engine = cv::kOctaveGranular;
   pitchFx.octave.mix = kOctaveStartMix;
   unison.on = false;
   slapback.on = false;

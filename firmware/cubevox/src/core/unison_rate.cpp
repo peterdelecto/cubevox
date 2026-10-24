@@ -18,13 +18,11 @@ constexpr float kScaleAtMax = 7.0f;
 constexpr float kLfoBaseHzFirst = 0.60f;
 constexpr float kLfoBaseHzSecond = 0.90f;
 
-// Swing range at the fixed blend, and the cap that stops fast rates from swinging wider.
+// Swing range at a multiplier of 1, its scale, and the cap that stops fast rates from swinging wider.
 constexpr float kSwingBaseMinMs = 0.5f;
 constexpr float kSwingBaseMaxMs = 3.0f;
 constexpr float kSwingScale = 2.0f;
 constexpr float kMaxSwingGrowth = 2.0f;
-
-constexpr float kDetuneCents = 0.0f;
 
 }  // namespace
 
@@ -42,8 +40,6 @@ float lfoScale(float ratePercent) {
 void apply(cv::UnisonTuning& tuning, float ratePercent) {
   const float m = lfoScale(ratePercent);
   const float swing = kSwingScale * (m > kMaxSwingGrowth ? kMaxSwingGrowth / m : 1.0f);
-  tuning.detuneCents[0] = kDetuneCents;
-  tuning.detuneCents[1] = 0.0f - kDetuneCents;  // +0, not -0, at no detune
   tuning.swingMinMs = kSwingBaseMinMs * swing;
   tuning.swingMaxMs = kSwingBaseMaxMs * swing;
   tuning.lfoHz[0] = kLfoBaseHzFirst * m;

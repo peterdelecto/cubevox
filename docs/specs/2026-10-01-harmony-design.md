@@ -1,5 +1,8 @@
 # cubevox — harmony stage (Zoom V3 model)
 
+Status: out of the code. Harmony has no card, and `engine/harmony.h`, its test and its emulator
+and render controls are gone; the key tables live in `engine/scale.h`.
+
 Date 2026-10-01. Approved in chat ("lets do psola", "just /go"). Implementation reference.
 Builds on `2026-10-01-unison-emulator-design.md` for the engine contract, emulator
 skeleton, threading, and build layout. Nothing there changes.
@@ -31,6 +34,9 @@ Updated panel table:
 | 8 | Gate | Threshold | |
 | 9 | Spring reverb | Tension | Dwell |
 | 10 | Output | menu | |
+
+Superseded: the box has no Harmony card (owner 2026-10-08), and the reverb knobs are MIX and TIME
+(`2026-10-07-v2-mic-reverb-time-slapback.md`). The slot table is in `2026-10-07-slots-design.md`.
 
 ## Decisions
 

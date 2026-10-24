@@ -142,4 +142,6 @@ checks unchanged. New `test/octave_test.cpp` (ctest `octave`):
 1. `ctest` passes `unison`, `harmony`, `octave`, `proto_layout`; output pasted.
 2. Emulator face shows Harmony, Octave, Unison in that order; owner listens.
 
-Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `OctaveTuning::trimDbA` (new, default -5.3 dB) adds to `levelDb` for engine A; A -12 at MIX 0.5 reads +0.26 dB out/in.
+Box code: the front end serves Autotune and the granular Octave (option C) only; Harmony and
+Octave A and B are out of the code, and `PitchFx` holds 51,944 B of DTCM. Octave's level trim is
+`OctaveTuning::trimDb`, see `2026-10-01-octave-c-design.md`.

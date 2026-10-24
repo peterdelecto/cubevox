@@ -111,6 +111,11 @@ level trims behind MIX.
 
 ## Emulator
 
+Superseded: each reverb engine is its own library card ("Spring Reverb", "Chasm Reverb") with the
+knobs MIX and TIME, so the engine radio and the DECAY, WOBBLE and TENSION knob labels are gone
+(`2026-10-08-update-and-slots-design.md`, `2026-10-07-v2-mic-reverb-time-slapback.md`). The old
+Spring engine is removed, and `tools/render.cpp` lists the engine names the render CLI takes.
+
 The SPRING block becomes **REVERB**: checkbox `REVERB`, radio `SPRING | CHASM`,
 knob 1 labelled `TENSION` or `DECAY`, knob 2 `DWELL` or `WOBBLE` by engine, both
 `%.0f %%`, then `MIX` `%.0f %%` opening at 50 %, shared by both engines. Tuning header under it has `Spring` and `Chasm` sub-tree-nodes (Spring's
@@ -150,4 +155,7 @@ Spring's test file is unchanged; it keeps driving `Spring` directly.
 `ctest` passes; REVERB block switches engines with relabelled knobs; owner A/Bs
 Spring and Chasm on a vocal loop.
 
-Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetDb` default is now 17.4 dB (was 0), set so CHASM at MIX 0.5 reads +0.26 dB out/in.
+Level rule (see `2026-10-01-level-rule.md`): `wetDb` +19.2 dB puts the wet alone at +0.28 dB
+out/in at the box's settings, TIME 50 % and dwell 0.20.
+
+Box code: the card's knobs are MIX and TIME; dwell is a tuning value with no knob (0.20).

@@ -1,5 +1,8 @@
 # cubevox — Octave option B (epoch-aligned PSOLA with formant control)
 
+Status: out of the code. The box runs option C only (`2026-10-01-octave-c-design.md`), and
+`engine/octave_b.h`, option A and the low-passed rings they read are gone.
+
 Date 2026-10-01. Owner: "explore an alternative octave engine (Octave option A and
 this one Octave Option B). It needs to be more natural-sounding and possibly have a
 formant control." Option A is `engine/octave.h` (grid PSOLA, formants preserved,

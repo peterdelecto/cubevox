@@ -1,5 +1,7 @@
 # cubevox — Harmony shifter engines A | B | C, per-voice formant, chromatic mode
 
+Status: out of the code with Harmony itself, see `2026-10-01-harmony-design.md`.
+
 Date 2026-10-01. Owner: "both. /go". Harmony keeps its interval logic (key, scale
 degree, voice tables) and gains a selectable shifter per voice, reusing the three
 Octave engines, plus a chromatic (fixed-interval, no key) mode like pedal harmonizers.

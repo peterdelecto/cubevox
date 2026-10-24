@@ -1,10 +1,7 @@
 # Editor include paths for the board tier: Arduino.h, the HAL, the variant and the U8g2 headers.
-# clangd has no variable expansion, so every path is absolute. To regenerate after a core upgrade or on
-# another machine, replace the prefixes below with the output of these commands:
-#   CORE  $(arduino-cli config get directories.data)/packages/STMicroelectronics/hardware/stm32/3.0.0
-#   TOOLS $(arduino-cli config get directories.data)/packages/STMicroelectronics/tools
-#   LIBS  $(arduino-cli config get directories.user)/libraries
-#   REPO  the checkout
+# clangd has no variable expansion, so every path is absolute. On another machine, or after moving the
+# checkout, run `python3 -I tools/clangd_paths.py`. It rewrites the Arduino data dir, the Arduino user
+# dir and the checkout prefixes from arduino-cli and from its own location.
 # The list follows the compile command arduino-cli writes to <build dir>/compile_commands.json. The
 # target and the toolchain's library headers make clangd parse the files as the Cortex-M7 build does,
 # and GCC_VERSION satisfies the compiler check in Arduino.h, which clang's own version fails.

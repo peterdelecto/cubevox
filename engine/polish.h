@@ -4,10 +4,12 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
 #include "engine/smooth.h"
 
 // Final EQ: 2-pole Butterworth high-pass, low-mid dip, presence peak, air shelf.
-// RBJ biquads, TDF-II, coefficients rebuilt per block. Settled off is a bit-exact copy.
+// RBJ biquads, TDF-II, coefficients rebuilt only when a setting changes. Settled
+// off is a bit-exact copy.
 
 namespace cv {
 
@@ -48,87 +50,34 @@ class Polish {
       return;
     }
     dirty_ = true;
+    if (!shapeValid_ || !sameShape(p, applied_)) applyShape(p);
 
-    const PolishTuning& t = p.tuning;
-    hp_.setHighPass(p.hpHz);
-    dip_.setPeak(p.dipHz, p.dipDb, t.dipQ);
-    presence_.setPeak(p.presenceHz, p.presenceDb, t.presenceQ);
-    air_.setHighShelf(t.airHz, p.airDb);
-
-    const float a = smooth::coef(smooth::kSmoothSec);
-    const float trim = powf(10.0f, t.trimDb / 20.0f);
     for (int i = 0; i < n; ++i) {
-      active_ = smooth::step(active_, target, a);
-      float x = hp_.run(in[i]);
-      x = dip_.run(x);
-      x = presence_.run(x);
-      x = air_.run(x) * trim;
+      active_ = smooth::step(active_, target, smooth::kSmoothCoef);
+      const float x = air_.run(presence_.run(dip_.run(hp_.run(in[i])))) * trim_;
       out[i] = in[i] + active_ * (x - in[i]);
     }
   }
 
  private:
-  static constexpr float kTwoPi = 6.28318530717958647692f;
-  static constexpr float kMinHz = 20.0f;
-  static constexpr float kMaxHz = 0.45f * kSampleRate;
-  static constexpr float kButterworthQ = 0.70710678f;
+  static bool sameShape(const PolishParams& a, const PolishParams& b) {
+    return a.hpHz == b.hpHz && a.dipHz == b.dipHz && a.dipDb == b.dipDb &&
+           a.presenceHz == b.presenceHz && a.presenceDb == b.presenceDb && a.airDb == b.airDb &&
+           a.tuning.dipQ == b.tuning.dipQ && a.tuning.presenceQ == b.tuning.presenceQ &&
+           a.tuning.airHz == b.tuning.airHz && a.tuning.trimDb == b.tuning.trimDb;
+  }
 
-  static float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
-
-  // RBJ biquad, transposed direct form II.
-  struct Biquad {
-    float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
-    float z1 = 0.0f, z2 = 0.0f;
-
-    void setHighPass(float hz) {
-      const float w0 = kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate;
-      const float cw = cosf(w0);
-      const float alpha = sinf(w0) / (2.0f * kButterworthQ);
-      const float a0 = 1.0f + alpha;
-      b0 = (1.0f + cw) * 0.5f / a0;
-      b1 = -(1.0f + cw) / a0;
-      b2 = b0;
-      a1 = -2.0f * cw / a0;
-      a2 = (1.0f - alpha) / a0;
-    }
-
-    void setPeak(float hz, float db, float q) {
-      const float w0 = kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate;
-      const float amp = powf(10.0f, db / 40.0f);
-      const float cw = cosf(w0);
-      const float alpha = sinf(w0) / (2.0f * (q < 0.1f ? 0.1f : q));
-      const float a0 = 1.0f + alpha / amp;
-      b0 = (1.0f + alpha * amp) / a0;
-      b1 = -2.0f * cw / a0;
-      b2 = (1.0f - alpha * amp) / a0;
-      a1 = b1;
-      a2 = (1.0f - alpha / amp) / a0;
-    }
-
-    // Shelf slope S = 1.
-    void setHighShelf(float hz, float db) {
-      const float w0 = kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate;
-      const float amp = powf(10.0f, db / 40.0f);
-      const float cw = cosf(w0);
-      const float beta = 2.0f * sqrtf(amp) * (sinf(w0) * kButterworthQ);
-      const float ap = amp + 1.0f, am = amp - 1.0f;
-      const float a0 = ap - am * cw + beta;
-      b0 = amp * (ap + am * cw + beta) / a0;
-      b1 = -2.0f * amp * (am + ap * cw) / a0;
-      b2 = amp * (ap + am * cw - beta) / a0;
-      a1 = 2.0f * (am - ap * cw) / a0;
-      a2 = (ap - am * cw - beta) / a0;
-    }
-
-    float run(float x) {
-      const float y = b0 * x + z1;
-      z1 = b1 * x - a1 * y + z2;
-      z2 = b2 * x - a2 * y;
-      return y;
-    }
-
-    void clear() { z1 = z2 = 0.0f; }
-  };
+  // Rebuilds the coefficients and keeps each section's state.
+  void applyShape(const PolishParams& p) {
+    const PolishTuning& t = p.tuning;
+    hp_.setHighPass(p.hpHz, kButterworthQ);
+    dip_.setPeak(p.dipHz, p.dipDb, t.dipQ);
+    presence_.setPeak(p.presenceHz, p.presenceDb, t.presenceQ);
+    air_.setHighShelf(t.airHz, p.airDb);
+    trim_ = powf(10.0f, t.trimDb / 20.0f);
+    applied_ = p;
+    shapeValid_ = true;
+  }
 
   void clearChain() {
     for (Biquad* b : {&hp_, &dip_, &presence_, &air_}) b->clear();
@@ -136,8 +85,11 @@ class Polish {
   }
 
   Biquad hp_, dip_, presence_, air_;
+  float trim_ = 1.0f;
   float active_ = 0.0f;
   bool dirty_ = false;
+  PolishParams applied_;  // the settings the coefficients were built from
+  bool shapeValid_ = false;
 };
 
 }  // namespace cv

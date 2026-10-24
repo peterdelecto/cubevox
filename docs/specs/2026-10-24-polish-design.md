@@ -8,14 +8,19 @@ MUTE/BYPASS assignment. The menu stays minimal: one row per item, no sub-pages.
 ```
 slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → soft ceiling → DAC
 ```
-1. Both stages run always; OFF is a settled bit-exact passthrough reached through the same
-   50 ms crossfade the EQ already uses, so a click on the menu never clicks in the audio.
+1. Both stages run always; OFF is a settled bit-exact passthrough reached through the shared
+   20 ms one-pole crossfade (`smooth::kSmoothCoef`), so a click on the menu never clicks in the audio.
 2. Level rule: each stage at its default (ON) outputs 0 to +0.5 dB RMS over its input on program
    material. The trim that gets it there lives in the stage tuning (`trimDb`); `level_test` enforces
    it with one row per stage.
 3. TOP SWITCH = BYPASS: with the switch on, the output is the dry input (post input gain, pre
    chain) through a 50 ms equal-power crossfade; the chain and both polish stages keep running so
    the switch back is seamless. TOP SWITCH = MUTE: as today, the DAC soft-mute sequence.
+4. A change of the output trim ramps across one 64-sample block (1.3 ms), so OUTPUT LINE / MIC
+   never steps 30 dB between two samples.
+5. A block with a NaN or an infinity out of the slots is zeroed before POLISH COMP, so the comp and
+   EQ state stay finite. The output cuts to zero, every engine clears in the silent blocks that
+   follow, and the output fades back in; `status` counts it as `nan_blocks`.
 
 ## Menu, final order (7 rows, 5x7, no title row, cursor `>` in column 0, 9 px row pitch)
 | Row | Text | Click |

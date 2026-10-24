@@ -25,6 +25,9 @@ Full panel (for context; only UNISON is built here):
 | 9 | Spring reverb | Tension | Dwell |
 | 10 | Output | menu | |
 
+Superseded: the panel is eight slots (`2026-10-07-slots-design.md`), and the reverb knobs are MIX and
+TIME (`2026-10-07-v2-mic-reverb-time-slapback.md`).
+
 ## Decisions
 
 1. Shared portable engine. Effect code lives in `engine/*.h`, plain C++17, and the H7
@@ -204,4 +207,9 @@ that fits the structure above without redesign.
 3. The owner has listened and either accepted the default knob mapping or produced a
    new `UnisonTuning` via `Print tuning` that is then baked into `unison.h`.
 
-Level rule (2026-10-01, see `2026-10-01-level-rule.md`): `wetMaxDb` default is now -12.4 dB (was 0), set so DEPTH 0.8 reads +0.25 dB out/in.
+Level rule (see `2026-10-01-level-rule.md`): `wetMaxDb` -4.0 dB, and `trimDb` -1.4 dB scaled by
+DEPTH puts DEPTH 0.5 at +0.28 dB out/in.
+
+Box code: the fixed-detune shifter is out of the code, so RATE moves only the two chorus LFOs and
+their swing. A RATE step glides the swing over the shared 20 ms smoother instead of jumping the
+taps (`unison_test` rate step, `knob_step_test`).

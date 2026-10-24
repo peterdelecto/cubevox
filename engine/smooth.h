@@ -4,7 +4,7 @@
 
 #include "engine/common.h"
 
-// One-pole smoothing shared by the pitch stages.
+// One-pole smoothing shared by the engines.
 
 namespace cv {
 namespace smooth {
@@ -22,10 +22,11 @@ inline float coef(float sec) {
 // The 20 ms coefficient, computed once; per-sample callers must not call coef().
 inline const float kSmoothCoef = coef(kSmoothSec);
 
-// Lands exactly on its target, so settled bypass is bit-exact.
+// One step toward target. It lands exactly on the target once within kSnap or once a step no
+// longer moves the float, so a settled smoother holds its target bit for bit.
 inline float step(float x, float target, float a) {
-  x += a * (target - x);
-  return fabsf(target - x) < kSnap ? target : x;
+  const float next = x + a * (target - x);
+  return next == x || fabsf(target - next) < kSnap ? target : next;
 }
 
 }  // namespace smooth

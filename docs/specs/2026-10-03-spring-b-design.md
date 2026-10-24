@@ -7,8 +7,8 @@ fits the STM32H743 next to the rest of the chain. Parker Spring was off the face
 
 ## What it is
 
-CHASM's two-half feedback loop, voiced as a spring. Code: `engine/spring_b.h`,
-class `SpringB`. It reuses `chasm_detail::Delay` and `onePole`; `chasm.h` is unchanged.
+CHASM's two-half feedback loop, voiced as a spring. Code: `engine/spring.h`,
+class `Spring`. It reuses `chasm_detail::Delay` and the one-pole from `engine/dsp.h`.
 
 Per half: delay read (wobbled) × feedback g → one-pole treble loss → one-pole
 bass cut → two diffusers → disperser → write into the other half's delay, plus
@@ -28,18 +28,22 @@ input. Output = the two disperser outputs summed × wetGain.
 4. **Level across DECAY.** Input × sqrt(1 − g²), so the tail's RMS holds as
    feedback moves (measured −0.75 dB from DECAY 0 to 1).
 5. **Feedback** `timeLo / timeHi` = 0.70 / 0.93 per half, ceiling 0.97.
-   Intensity curve `kSpringBDecay` {0.25, 0.50, 0.85}.
-6. **DWELL** reuses CHASM's soft clip (`kChasmClipHeadroom`), drive 8×, comp 0.8.
-7. **wetDb** = +7.9 dB, trimmed by `level_test` (wet only at MIX 1: +0.24 dB).
+   TIME curve `kSpringDecay` {0.25, 0.50, 0.85}.
+6. **Dwell** is a tuning value with no knob (0.20). It drives CHASM's soft clip
+   (`kChasmClipHeadroom`), drive 8×, comp 0.8.
+7. **wetDb** = +8.9 dB, trimmed by `level_test` on the wet alone at the box's
+   TIME 50 % and dwell 0.20 (+0.22 dB).
 
 ## Panel and prototype
 
-1. Panel: INTENSITY + DWELL, as every reverb engine. Menu name "SPRING B".
+1. Panel: MIX + TIME (`2026-10-07-v2-mic-reverb-time-slapback.md`), as every reverb card. DWELL stays
+   a tuning field off the face. The engine is Spring (`engine/spring.h`, the SPRING B design) and its
+   card is named "Spring Reverb".
 2. Tuning macros: Drip (chirpA 0.55/0.70/0.85, sections 12/24/32), Flutter
    (wobble 2/8/24 samples at 1.5/3/5 Hz, diffusion 0.45/0.30/0.15), Brightness
    (treble loss 3/6/10 kHz). All default 50 %.
-3. Advanced: raw sliders under "Spring B" and "Spring B levels".
-4. Render: `--reverb springb`, tuning keys `sb*`.
+3. Advanced: raw sliders under "Spring" and "Spring levels".
+4. Render: `--reverb spring` (`springb` also accepted), tuning keys `sb*`.
 
 ## Cost
 
@@ -52,6 +56,6 @@ input. Output = the two disperser outputs summed × wetGain.
 
 ## Tests
 
-`spring_b_test`: echo spacing, upward sweep that doubles from echo 1 to 2,
-level across DECAY, stability at full DECAY + DWELL, Reverb on=false bit-exact
-and no allocation. `level_test` and `reverb_clean_test` carry SPRING B.
+`spring_test`: echo spacing, upward sweep that doubles from echo 1 to 2,
+level across DECAY, stability at full DECAY and dwell 1, Reverb on=false bit-exact
+and no allocation. `level_test`, `knob_step_test` and `reverb_clean_test` carry it.

@@ -216,11 +216,11 @@ bool testPassthrough() {
   float maxSilent = 0.0f;
   for (float v : out) maxSilent = std::fabs(v) > maxSilent ? std::fabs(v) : maxSilent;
 
-  // Mix 0 with the block on and chasm running is a bit-exact copy once settled.
+  // Wet 0 with the block on and chasm running is a bit-exact copy once settled.
   cv::ReverbParams m;
   m.engine = cv::kReverbChasm;
   m.chasm = params(1.0f, 1.0f);
-  m.mix = 0.0f;
+  m.wet = 0.0f;
   gReverb.reset();
   const Signal mixOut = run(gReverb, in, m);
   float maxMix = 0.0f;

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "engine/common.h"
+#include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/smooth.h"
 
@@ -86,22 +87,17 @@ class PolishComp {
       return;
     }
     dirty_ = true;
+    if (!coefsValid_ || !sameTuning(p.tuning, applied_)) applyTuning(p.tuning);
 
-    const Coefs c = coefs(p.tuning);
     for (int i = 0; i < n; ++i) {
       active_ = smooth::step(active_, target, smooth::kSmoothCoef);
-      const float gain = nextGain(in[i], c);
+      const float gain = nextGain(in[i], c_);
       out[i] = in[i] * (1.0f + active_ * (gain - 1.0f));
     }
   }
 
  private:
-  static constexpr float kTwoPi = 6.28318530717958647692f;
-  static constexpr float kMinHz = 20.0f;
-  static constexpr float kMaxHz = 0.45f * kSampleRate;
-  static constexpr float kButterworthQ = 0.70710678f;
-  static constexpr float kDbPerLog2 = 3.01029995664f;  // 10 log10(2): mean-square to dB
-  static constexpr float kLog2PerDb = 0.16609640474f;  // log2(10) / 20: dB to amplitude
+  static constexpr float kPowerDbPerLog2 = 3.01029995664f;  // 10 log10(2): mean-square to dB
 
   // Added to the input of each high-pass section and to the squared sidechain. They hold the
   // filter states and the detector above the denormal range when the input is digital silence, and
@@ -109,54 +105,29 @@ class PolishComp {
   static constexpr float kSidechainGuard = 1e-10f;
   static constexpr float kPowerFloor = 1e-20f;
 
-  static float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
-
-  // 2-pole Butterworth high-pass, RBJ form, transposed direct form II. The sidechain runs two in
-  // series, which puts 50 Hz 38 dB down for a 150 Hz corner and the corner itself 6 dB down.
-  struct HighPass {
-    float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
-    float z1 = 0.0f, z2 = 0.0f;
-
-    void set(float hz) {
-      const float w0 = kTwoPi * clampf(hz, kMinHz, kMaxHz) / kSampleRate;
-      const float cw = cosf(w0);
-      const float alpha = sinf(w0) / (2.0f * kButterworthQ);
-      const float a0 = 1.0f + alpha;
-      b0 = (1.0f + cw) * 0.5f / a0;
-      b1 = -(1.0f + cw) / a0;
-      b2 = b0;
-      a1 = -2.0f * cw / a0;
-      a2 = (1.0f - alpha) / a0;
-    }
-
-    // Takes the coefficients of `o` and leaves this section's state alone.
-    void setFrom(const HighPass& o) {
-      b0 = o.b0;
-      b1 = o.b1;
-      b2 = o.b2;
-      a1 = o.a1;
-      a2 = o.a2;
-    }
-
-    float run(float x) {
-      const float y = b0 * x + z1;
-      z1 = b1 * x - a1 * y + z2;
-      z2 = b2 * x - a2 * y;
-      return y;
-    }
-
-    void clear() { z1 = z2 = 0.0f; }
-  };
-
-  // Everything process() derives from the tuning once per block.
+  // Everything process() derives from the tuning, rebuilt only when the tuning changes.
   struct Coefs {
     float aDet, aAtk, aRel;
     float thresholdDb, halfKneeDb, slope, kneeScale, maxDb, trimDb;
   };
 
+  static bool sameTuning(const PolishCompTuning& a, const PolishCompTuning& b) {
+    return a.rmsMs == b.rmsMs && a.sidechainHz == b.sidechainHz && a.thresholdDb == b.thresholdDb &&
+           a.ratio == b.ratio && a.kneeDb == b.kneeDb && a.attackMs == b.attackMs &&
+           a.releaseMs == b.releaseMs && a.maxReductionDb == b.maxReductionDb && a.trimDb == b.trimDb;
+  }
+
+  void applyTuning(const PolishCompTuning& t) {
+    c_ = coefs(t);
+    applied_ = t;
+    coefsValid_ = true;
+  }
+
+  // The sidechain runs two 2-pole Butterworth high-passes in series, which puts 50 Hz 38 dB down for
+  // a 150 Hz corner and the corner itself 6 dB down.
   Coefs coefs(const PolishCompTuning& t) {
-    hp1_.set(t.sidechainHz);
-    hp2_.setFrom(hp1_);
+    hp1_.setHighPass(t.sidechainHz, kButterworthQ);
+    hp2_.setCoefsFrom(hp1_);
     const float knee = t.kneeDb > 0.0f ? t.kneeDb : 0.0f;
     const float ratio = t.ratio > 1.0f ? t.ratio : 1.0f;
     Coefs c;
@@ -186,9 +157,9 @@ class PolishComp {
   float nextGain(float x, const Coefs& c) {
     const float side = hp2_.run(hp1_.run(x + kSidechainGuard) + kSidechainGuard);
     ms_ += c.aDet * (side * side + kPowerFloor - ms_);
-    const float want = reductionDb(kDbPerLog2 * log2Fast(ms_), c);
+    const float want = reductionDb(kPowerDbPerLog2 * log2Fast(ms_), c);
     grDb_ = smooth::step(grDb_, want, want > grDb_ ? c.aAtk : c.aRel);
-    return exp2Fast((c.trimDb - grDb_) * kLog2PerDb);
+    return dbToGainFast(c.trimDb - grDb_);
   }
 
   void clearState() {
@@ -199,12 +170,15 @@ class PolishComp {
     dirty_ = false;
   }
 
-  HighPass hp1_;
-  HighPass hp2_;
+  Biquad hp1_;
+  Biquad hp2_;
   float ms_ = kPowerFloor;
   float grDb_ = 0.0f;
   float active_ = 0.0f;
   bool dirty_ = false;
+  Coefs c_{};
+  PolishCompTuning applied_;  // the tuning c_ was built from
+  bool coefsValid_ = false;
 };
 
 }  // namespace cv

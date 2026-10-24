@@ -10,7 +10,10 @@
 #include "board/clocks.h"
 #include "board/mute.h"
 #include "board/pins.h"
+#include "board/serial_link.h"
+#include "core/audio_recovery.h"
 #include "core/layout_fade.h"
+#include "core/output_stage.h"
 #include "core/registry.h"
 #include "engine/common.h"
 #include "engine/fastmath.h"
@@ -31,9 +34,13 @@ constexpr uint32_t kPll3FracN = 4981;
 constexpr uint32_t kPll3P = 4;
 constexpr uint32_t kSaiKernelHz = 49152000;
 constexpr uint32_t kSaiKernelToleranceHz = 5000;
+constexpr uint32_t kSaiMckDiv = 4;
+constexpr uint32_t kMclkPerFrame = 256;
 static_assert(kHseHz % kPll3RefHz == 0, "PLL3 needs a whole divider from HSE to a 1 MHz reference");
 static_assert(static_cast<int>(SAI_AUDIO_FREQUENCY_48K) == cv::kSampleRate,
               "the SAI frequency macro must match the engine sample rate");
+static_assert(kSaiKernelHz == kSaiMckDiv * kMclkPerFrame * static_cast<uint32_t>(cv::kSampleRate),
+              "the SAI kernel clock must give MCLK = 256 fs through MCKDIV 4");
 
 constexpr int kFramesPerHalf = cv::kBlock;
 constexpr int kWordsPerHalf = kFramesPerHalf * 2;  // L and R per frame
@@ -43,9 +50,19 @@ constexpr float kInt32Scale = 2147483648.0f;
 constexpr float kInt32Inverse = 1.0f / kInt32Scale;  // a multiply per sample, not a divide
 constexpr float kInt32Max = 2147483520.0f;  // largest float below 2^31
 constexpr uint32_t kDmaIrqPriority = 2;
+// SAI errors arrive beside the DMA ones and abort the same streams, so they share the level.
+constexpr uint32_t kSaiIrqPriority = kDmaIrqPriority;
 // Lowest, so the DMA interrupts preempt it. USB OTG and the encoder EXTI also preempt it, so USB
 // traffic counts toward block time.
 constexpr uint32_t kBlockIrqPriority = 15;
+
+// RX halves that find their last block not yet run, in a row, before the DMA interrupt mutes by
+// register: about 11 ms. By then the block interrupt is a whole ring behind and starving loop(),
+// where the mute sequence and the stall watch run.
+constexpr uint32_t kOverrunTripRun = 8;
+
+// In direct mode the TX stream holds one word read from memory ahead of the count in NDTR.
+constexpr uint32_t kTxDmaReadAhead = 1;
 
 // Rings live in RAM_D2 and are marked non-cacheable by h7_block_mem_mpu_init().
 H7_DMA_MEM std::array<uint32_t, kWordsPerRing> gTxRing;
@@ -55,6 +72,9 @@ SAI_HandleTypeDef gSaiTx;
 SAI_HandleTypeDef gSaiRx;
 DMA_HandleTypeDef gDmaTx;
 DMA_HandleTypeDef gDmaRx;
+
+DMA_Stream_TypeDef* txStream() { return DMA1_Stream0; }
+DMA_Stream_TypeDef* rxStream() { return DMA1_Stream1; }
 
 // Engine objects, constructed in reset state.
 struct Chain {
@@ -88,18 +108,21 @@ ChainSnapshot gHeld;
 uint32_t gSeenSeq = 0;
 bool gLayoutPending = false;
 LayoutFade gFade;
+OutputGain gOutputGain;
 
 const char* gError = "audioInit() has not run";
 volatile uint8_t gReadyMask = 0;  // bit h set when RX half h is waiting
 uint8_t gNextHalf = 0;
 
-// Block counters, written by the block interrupt and read under its mask.
+// Block counters, written by the block interrupt (overruns by the RX DMA interrupt) and read under
+// the block interrupt's mask.
 struct Counters {
   uint32_t blocks;
   uint32_t late;
   uint32_t overruns;
   uint32_t maxCycles;
   uint32_t budgetCycles;
+  uint32_t nanBlocks;
 };
 volatile Counters gCounts = {};
 volatile uint64_t gSumCycles = 0;  // since the last peaks reset
@@ -120,9 +143,18 @@ volatile uint64_t gWindowSum = 0;  // since the last audioTakeLoad()
 volatile uint32_t gWindowBlocks = 0;
 volatile uint32_t gWindowMax = 0;
 
-// SAI and DMA transfer errors, counted from the HAL error callback.
+// SAI and DMA errors, counted from the HAL error callback.
 volatile uint32_t gSaiErrors = 0;
 volatile uint32_t gSaiErrorCodes = 0;
+
+// Faults the stream did not ride through. The error callback sets gStreamFault when an error
+// stopped a block or a stream; the RX DMA interrupt sets gOverrunTripped. audioPoll restarts the
+// stream and clears both.
+volatile bool gStreamFault = false;
+volatile bool gOverrunTripped = false;
+uint32_t gOverrunRun = 0;  // RX halves in a row that found their last block not yet run
+StreamRecovery gRecovery;
+bool gStreamUp = false;  // the stream started and no restart has failed since
 
 // The input's energy since the last audioTakeInputEnergy(), summed by the block interrupt.
 volatile float gInputSumSquares = 0.0f;
@@ -158,38 +190,12 @@ void addSlotTime(int index, uint32_t cycles) {
   if (cycles > gSlotWorst[index]) gSlotWorst[index] = cycles;
 }
 
-// Slot order, then the polish tail: comp, then EQ. Both run always, and each is a bit-exact copy
-// once settled off. The finished block lands in the caller's `a`. Each stage has its own cycle bucket.
-void runChain(float* a, float* b, int n, const ChainSnapshot& snap) {
-  const ChainParams& p = snap.params;
-  float* const result = a;
-  bool pitchDone = false;
-  for (int s = 0; s < kSlotCount; ++s) {
-    const uint32_t start = DWT->CYCCNT;
-    const bool wrote = runStage(snap.layout.card[s], a, b, n, p, pitchDone);
-    addSlotTime(s, DWT->CYCCNT - start);
-    if (wrote) {
-      float* swap = a;
-      a = b;
-      b = swap;
-    }
-  }
-  const uint32_t compStart = DWT->CYCCNT;
-  gChain.comp.process(a, b, n, p.comp);
-  const uint32_t eqStart = DWT->CYCCNT;
-  addSlotTime(kStatComp, eqStart - compStart);
-  gChain.polish.process(b, a, n, p.eq);
-  addSlotTime(kStatEq, DWT->CYCCNT - eqStart);
-  if (a != result) {
-    for (int i = 0; i < n; ++i) result[i] = a[i];
-  }
-}
-
 // Engine clears per silent block. One per block keeps the largest clear inside the block budget.
 constexpr int kResetsPerSilentBlock = 1;
 static_assert(kResetsPerSilentBlock * (1 + kFadeHoldBlocks) >= kEngineCount,
               "the silent blocks must be enough to clear every engine");
 
+constexpr uint32_t kAllEngines = (1u << kEngineCount) - 1u;
 uint32_t gResetMask = 0;  // engines waiting for their clear
 
 void resetEngine(Engine e) {
@@ -212,6 +218,44 @@ void resetWaiting(int count) {
     resetEngine(static_cast<Engine>(e));
     gResetMask &= ~(1u << e);
     --count;
+  }
+}
+
+// One NaN or infinity out of the slots would leave the EQ's filter state non-finite for good, so the
+// polish stages never see it. The block goes silent, the output cuts to zero, and every engine
+// clears in the silent blocks that follow, because the one that produced it is not known.
+void guardSlotsOutput(float* a, int n) {
+  if (guardBlock(a, n)) return;
+  gResetMask = kAllEngines;
+  gFade.cut();
+  gCounts.nanBlocks = gCounts.nanBlocks + 1;
+}
+
+// Slot order, then the polish tail: comp, then EQ. Both run always, and each is a bit-exact copy
+// once settled off. The finished block lands in the caller's `a`. Each stage has its own cycle bucket.
+void runChain(float* a, float* b, int n, const ChainSnapshot& snap) {
+  const ChainParams& p = snap.params;
+  float* const result = a;
+  bool pitchDone = false;
+  for (int s = 0; s < kSlotCount; ++s) {
+    const uint32_t start = DWT->CYCCNT;
+    const bool wrote = runStage(snap.layout.card[s], a, b, n, p, pitchDone);
+    addSlotTime(s, DWT->CYCCNT - start);
+    if (wrote) {
+      float* swap = a;
+      a = b;
+      b = swap;
+    }
+  }
+  guardSlotsOutput(a, n);
+  const uint32_t compStart = DWT->CYCCNT;
+  gChain.comp.process(a, b, n, p.comp);
+  const uint32_t eqStart = DWT->CYCCNT;
+  addSlotTime(kStatComp, eqStart - compStart);
+  gChain.polish.process(b, a, n, p.eq);
+  addSlotTime(kStatEq, DWT->CYCCNT - eqStart);
+  if (a != result) {
+    for (int i = 0; i < n; ++i) result[i] = a[i];
   }
 }
 
@@ -269,13 +313,12 @@ float clampSample(float v) {
   return __builtin_isnan(v) ? 0.0f : v;
 }
 
-// Applies the output gain along the fade ramp, then the output ceiling, and writes both stereo slots.
-void writeOutput(uint32_t* tx, const float* a, float outputGain, const LayoutFade::Block& fade) {
-  float gain = outputGain * fade.from;
-  const float gainStep = outputGain * (fade.to - fade.from) / kFramesPerHalf;
+// Applies the output gain along its ramp, then the output ceiling, and writes both stereo slots.
+void writeOutput(uint32_t* tx, const float* a, GainRamp ramp) {
+  float gain = ramp.start;
   for (int i = 0; i < kFramesPerHalf; ++i) {
     const float v = clampSample(cv::softCeiling(a[i] * gain));
-    gain += gainStep;
+    gain += ramp.step;
     const uint32_t word = static_cast<uint32_t>(static_cast<int32_t>(v * kInt32Max));
     tx[2 * i] = word;
     tx[2 * i + 1] = word;
@@ -336,7 +379,23 @@ void processHalf(int half) {
     runChain(a.data(), b.data(), kFramesPerHalf, gHeld);
   }
   mixBypass(a.data(), dry.data(), muteBypassOn());
-  writeOutput(tx, a.data(), gHeld.outputGain, fade);
+  writeOutput(tx, a.data(), gOutputGain.next(gHeld.outputGain, fade.from, fade.to, kFramesPerHalf));
+}
+
+// True when the TX stream has already read part of half `half` from memory, so the block just
+// written came too late for some of its samples.
+bool txReadInside(int half) {
+  const uint32_t remaining = txStream()->NDTR;
+  const uint32_t next = (kWordsPerRing - remaining + kTxDmaReadAhead) % kWordsPerRing;
+  return next / kWordsPerHalf == static_cast<uint32_t>(half) && next % kWordsPerHalf != 0;
+}
+
+// Each TX half is zeroed as soon as the stream has read it, and the block for that half refills it
+// before the stream comes round again. A block that never runs, because the input stopped or the
+// block interrupt hangs, leaves silence instead of a replayed ring.
+void silenceTxHalf(int half) {
+  uint32_t* tx = gTxRing.data() + half * kWordsPerHalf;
+  for (int i = 0; i < kWordsPerHalf; ++i) tx[i] = 0;
 }
 
 void enableCycleCounter() {
@@ -402,32 +461,31 @@ bool initDma(DMA_HandleTypeDef& dma, DMA_Stream_TypeDef* stream, uint32_t reques
   return true;
 }
 
-// Both codecs use I2S standard framing (PCM5102A FMT low, PCM1808 strapped I2S 24-bit).
+// Both codecs use I2S standard framing (PCM5102A FMT low, PCM1808 strapped I2S 24-bit). Each
+// block starts from a fresh handle, so a restart never inherits the other block's DMA links.
+bool initSaiBlock(SAI_HandleTypeDef& sai, SAI_Block_TypeDef* block, uint32_t mode, uint32_t synchro, uint32_t mck) {
+  sai = SAI_HandleTypeDef{};
+  sai.Instance = block;
+  sai.Init.AudioMode = mode;
+  sai.Init.Synchro = synchro;
+  sai.Init.SynchroExt = SAI_SYNCEXT_DISABLE;
+  sai.Init.MckOutput = mck;
+  sai.Init.OutputDrive = SAI_OUTPUTDRIVE_ENABLE;
+  sai.Init.NoDivider = SAI_MASTERDIVIDER_ENABLE;
+  sai.Init.FIFOThreshold = SAI_FIFOTHRESHOLD_HF;
+  sai.Init.AudioFrequency = SAI_AUDIO_FREQUENCY_48K;
+  sai.Init.MckOverSampling = SAI_MCK_OVERSAMPLING_DISABLE;
+  sai.Init.MonoStereoMode = SAI_STEREOMODE;
+  sai.Init.CompandingMode = SAI_NOCOMPANDING;
+  sai.Init.TriState = SAI_OUTPUT_NOTRELEASED;
+  return HAL_SAI_InitProtocol(&sai, SAI_I2S_STANDARD, SAI_PROTOCOL_DATASIZE_32BIT, 2) == HAL_OK;
+}
+
+// Block B takes BCLK and LRCLK from block A inside the peripheral.
 bool initSai() {
   __HAL_RCC_SAI1_CLK_ENABLE();
-
-  gSaiTx.Instance = SAI1_Block_A;
-  gSaiTx.Init.AudioMode = SAI_MODEMASTER_TX;
-  gSaiTx.Init.Synchro = SAI_ASYNCHRONOUS;
-  gSaiTx.Init.SynchroExt = SAI_SYNCEXT_DISABLE;
-  gSaiTx.Init.MckOutput = SAI_MCK_OUTPUT_ENABLE;
-  gSaiTx.Init.OutputDrive = SAI_OUTPUTDRIVE_ENABLE;
-  gSaiTx.Init.NoDivider = SAI_MASTERDIVIDER_ENABLE;
-  gSaiTx.Init.FIFOThreshold = SAI_FIFOTHRESHOLD_HF;
-  gSaiTx.Init.AudioFrequency = SAI_AUDIO_FREQUENCY_48K;
-  gSaiTx.Init.MckOverSampling = SAI_MCK_OVERSAMPLING_DISABLE;
-  gSaiTx.Init.MonoStereoMode = SAI_STEREOMODE;
-  gSaiTx.Init.CompandingMode = SAI_NOCOMPANDING;
-  gSaiTx.Init.TriState = SAI_OUTPUT_NOTRELEASED;
-  if (HAL_SAI_InitProtocol(&gSaiTx, SAI_I2S_STANDARD, SAI_PROTOCOL_DATASIZE_32BIT, 2) != HAL_OK) return false;
-
-  // Block B takes BCLK and LRCLK from block A inside the peripheral.
-  gSaiRx = gSaiTx;
-  gSaiRx.Instance = SAI1_Block_B;
-  gSaiRx.Init.AudioMode = SAI_MODESLAVE_RX;
-  gSaiRx.Init.Synchro = SAI_SYNCHRONOUS;
-  gSaiRx.Init.MckOutput = SAI_MCK_OUTPUT_DISABLE;
-  return HAL_SAI_InitProtocol(&gSaiRx, SAI_I2S_STANDARD, SAI_PROTOCOL_DATASIZE_32BIT, 2) == HAL_OK;
+  return initSaiBlock(gSaiTx, SAI1_Block_A, SAI_MODEMASTER_TX, SAI_ASYNCHRONOUS, SAI_MCK_OUTPUT_ENABLE) &&
+         initSaiBlock(gSaiRx, SAI1_Block_B, SAI_MODESLAVE_RX, SAI_SYNCHRONOUS, SAI_MCK_OUTPUT_DISABLE);
 }
 
 // A spare peripheral vector serves as the software interrupt that runs the audio block.
@@ -437,18 +495,44 @@ void initBlockInterrupt() {
   NVIC_EnableIRQ(SWPMI1_IRQn);
 }
 
+// The HAL arms OVRUDR, AFSDET, LFSDET and WCKCFG with each DMA start; this lets them reach the
+// error callback.
+void initSaiInterrupt() {
+  NVIC_SetPriority(SAI1_IRQn, kSaiIrqPriority);
+  NVIC_ClearPendingIRQ(SAI1_IRQn);
+  NVIC_EnableIRQ(SAI1_IRQn);
+}
+
+// Both SAI blocks and both streams still enabled. The HAL disables a block on a DMA error and on a
+// frame-sync or clock error; an underrun or overrun leaves everything running.
+bool streamRunning() {
+  return (gSaiTx.Instance->CR1 & SAI_xCR1_SAIEN) && (gSaiRx.Instance->CR1 & SAI_xCR1_SAIEN) &&
+         (txStream()->CR & DMA_SxCR_EN) && (rxStream()->CR & DMA_SxCR_EN);
+}
+
+// The block interrupt has stayed a whole ring behind for kOverrunTripRun halves, which also keeps
+// loop() from running, so the mute cannot wait for the sequence.
 void onRxHalf(int half) {
   const uint8_t bit = static_cast<uint8_t>(1u << half);
-  if (gReadyMask & bit) gCounts.overruns = gCounts.overruns + 1;
+  if (gReadyMask & bit) {
+    gCounts.overruns = gCounts.overruns + 1;
+    if (++gOverrunRun == kOverrunTripRun) {
+      muteTrip(MuteReason::Audio);
+      gOverrunTripped = true;
+    }
+  } else {
+    gOverrunRun = 0;
+  }
   gReadyMask = gReadyMask | bit;
   NVIC_SetPendingIRQ(SWPMI1_IRQn);
 }
 
-// Folds one finished block's cycle count into the totals, the load window and the swap watch.
-void recordBlock(uint32_t cycles) {
+// Folds one finished block's cycle count into the totals, the load window and the swap watch. A
+// block is late when it ran past its budget or the TX stream had already read into its half.
+void recordBlock(uint32_t cycles, bool readTooSoon) {
   gCounts.blocks = gCounts.blocks + 1;
   if (cycles > gCounts.maxCycles) gCounts.maxCycles = cycles;
-  if (cycles > gCounts.budgetCycles) gCounts.late = gCounts.late + 1;
+  if (cycles > gCounts.budgetCycles || readTooSoon) gCounts.late = gCounts.late + 1;
   gSumCycles = gSumCycles + cycles;
   gSumBlocks = gSumBlocks + 1;
   gWindowSum = gWindowSum + cycles;
@@ -479,31 +563,47 @@ void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef* hsai) {
   if (hsai == &gSaiRx) onRxHalf(1);
 }
 
-// TX needs no work: block processing is paced by RX, which is synchronous with TX, and each
-// pass rewrites the TX half the DMA just finished.
-void HAL_SAI_TxHalfCpltCallback(SAI_HandleTypeDef*) {}
-void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef*) {}
+// Block processing is paced by RX, which is synchronous with TX. The TX stream reads each half a
+// few frames before RX delivers the same half, so the zeroing lands before that half's block.
+void HAL_SAI_TxHalfCpltCallback(SAI_HandleTypeDef* hsai) {
+  if (hsai == &gSaiTx) silenceTxHalf(0);
+}
 
-// The HAL calls this from a DMA transfer error. It only counts, because the main loop reports.
+void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef* hsai) {
+  if (hsai == &gSaiTx) silenceTxHalf(1);
+}
+
+// The HAL calls this for DMA errors and, through SAI1_IRQHandler, for SAI errors. It counts them,
+// and when the error stopped a block or a stream it silences the TX ring and leaves the restart to
+// audioPoll.
 void HAL_SAI_ErrorCallback(SAI_HandleTypeDef* hsai) {
   gSaiErrors = gSaiErrors + 1;
   gSaiErrorCodes = gSaiErrorCodes | hsai->ErrorCode;
+  if (streamRunning()) return;
+  gTxRing.fill(0);
+  gStreamFault = true;
 }
 
 void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&gDmaTx); }
 void DMA1_Stream1_IRQHandler(void) { HAL_DMA_IRQHandler(&gDmaRx); }
+
+void SAI1_IRQHandler(void) {
+  HAL_SAI_IRQHandler(&gSaiTx);
+  HAL_SAI_IRQHandler(&gSaiRx);
+}
 
 void SWPMI1_IRQHandler(void) {
   while (gReadyMask & (1u << gNextHalf)) {
     const uint32_t start = DWT->CYCCNT;
     processHalf(gNextHalf);
     const uint32_t cycles = DWT->CYCCNT - start;
+    const bool readTooSoon = txReadInside(gNextHalf);
 
     __disable_irq();
     gReadyMask = gReadyMask & static_cast<uint8_t>(~(1u << gNextHalf));
     __enable_irq();
     gNextHalf ^= 1u;
-    recordBlock(cycles);
+    recordBlock(cycles, readTooSoon);
   }
 }
 
@@ -552,13 +652,14 @@ bool initPeripherals() {
     gError = "SAI1 init failed";
     return false;
   }
-  if (!initDma(gDmaTx, DMA1_Stream0, DMA_REQUEST_SAI1_A, DMA_MEMORY_TO_PERIPH, DMA1_Stream0_IRQn) ||
-      !initDma(gDmaRx, DMA1_Stream1, DMA_REQUEST_SAI1_B, DMA_PERIPH_TO_MEMORY, DMA1_Stream1_IRQn)) {
+  if (!initDma(gDmaTx, txStream(), DMA_REQUEST_SAI1_A, DMA_MEMORY_TO_PERIPH, DMA1_Stream0_IRQn) ||
+      !initDma(gDmaRx, rxStream(), DMA_REQUEST_SAI1_B, DMA_PERIPH_TO_MEMORY, DMA1_Stream1_IRQn)) {
     gError = "DMA1 init failed";
     return false;
   }
   __HAL_LINKDMA(&gSaiTx, hdmatx, gDmaTx);
   __HAL_LINKDMA(&gSaiRx, hdmarx, gDmaRx);
+  initSaiInterrupt();
   return true;
 }
 
@@ -577,6 +678,64 @@ bool startStream() {
   return true;
 }
 
+// Takes SAI1 and both streams down from whatever state a fault left them in, then brings them up
+// as audioInit does. The RCC reset clears a block that never finished disabling, which a slave
+// block without clocks can do. Each HAL wait is bounded. Runs from loop() with the output muted.
+bool restartStream() {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  NVIC_DisableIRQ(SAI1_IRQn);
+  HAL_DMA_Abort(&gDmaRx);  // NO_XFER when the error already stopped it
+  HAL_DMA_Abort(&gDmaTx);
+  __HAL_RCC_SAI1_FORCE_RESET();
+  __HAL_RCC_SAI1_RELEASE_RESET();
+  HAL_DMA_DeInit(&gDmaRx);
+  HAL_DMA_DeInit(&gDmaTx);
+  // Nothing can raise a fault while both streams are down, so a fault from the new stream is never
+  // cleared with the old one.
+  gStreamFault = false;
+  gOverrunTripped = false;
+  gOverrunRun = 0;
+  gReadyMask = 0;
+  gNextHalf = 0;
+  NVIC_ClearPendingIRQ(SWPMI1_IRQn);
+  NVIC_EnableIRQ(SWPMI1_IRQn);
+  return initPeripherals() && startStream();
+}
+
+// The fault behind a restart, for the report line.
+void printFaultCause(Print& out) {
+  if (gOverrunTripped) {
+    out.print(kOverrunTripRun);
+    out.print(" overruns in a row");
+    return;
+  }
+  out.print("a SAI/DMA error, HAL error bits 0x");
+  out.print(gSaiErrorCodes, HEX);
+}
+
+void latchAfterFault(const char* why) {
+  muteLatch();
+  serialOut().print("[ERROR] audio: ");
+  serialOut().print(why);
+  serialOut().println("; output muted until reset");
+}
+
+AudioEvent restartAfterFault(uint32_t nowMs) {
+  Print& out = serialOut();
+  out.print("[WARN] audio: restarting the stream after ");
+  printFaultCause(out);
+  out.println();
+  if (!restartStream()) {
+    gStreamUp = false;
+    gRecovery.fail();
+    latchAfterFault(gError);
+    return AudioEvent::Latched;
+  }
+  muteTripClear(MuteReason::Audio);
+  muteClocksRunning(nowMs);  // the DAC gets the same settle as at boot before the mute releases
+  return AudioEvent::Restarted;
+}
+
 }  // namespace
 
 bool audioInit() {
@@ -584,7 +743,23 @@ bool audioInit() {
   resetAudioState();
   if (!initPeripherals()) return false;
   initBlockInterrupt();
-  return startStream();
+  gStreamUp = startStream();
+  return gStreamUp;
+}
+
+AudioEvent audioPoll(uint32_t nowMs) {
+  if (!gStreamUp) return AudioEvent::None;
+  const StreamRecovery::Action action =
+      gRecovery.update(nowMs, gStreamFault || gOverrunTripped, muteFullyMuted());
+  muteHoldFor(MuteReason::Audio, gRecovery.holdMute());
+  switch (action) {
+    case StreamRecovery::Action::None: break;
+    case StreamRecovery::Action::Restart: return restartAfterFault(nowMs);
+    case StreamRecovery::Action::Latch:
+      latchAfterFault("another fault inside a minute of three restarts");
+      return AudioEvent::Latched;
+  }
+  return AudioEvent::None;
 }
 
 void audioReport(Print& out) {
@@ -596,13 +771,23 @@ void audioReport(Print& out) {
   out.print("[boot] audio running, SAI1 ");
   out.print(cv::kSampleRate / 1000);
   out.println(" kHz");
-  const AudioErrors errors = audioErrors();
-  if (errors.count > 0) {
+  const AudioHealth h = audioHealth();
+  if (h.errors.count > 0) {
     out.print("[ERROR] audio: ");
-    out.print(errors.count);
-    out.print(" SAI/DMA transfer errors since boot, HAL error bits 0x");
-    out.println(errors.codes, HEX);
+    out.print(h.errors.count);
+    out.print(" SAI/DMA errors since boot, HAL error bits 0x");
+    out.println(h.errors.codes, HEX);
   }
+  if (h.overruns > 0 || h.restarts > 0 || h.nanBlocks > 0) {
+    out.print("[WARN] audio: ");
+    out.print(h.overruns);
+    out.print(" overruns, ");
+    out.print(h.restarts);
+    out.print(" stream restarts, ");
+    out.print(h.nanBlocks);
+    out.println(" NaN blocks since boot");
+  }
+  if (h.latched) out.println("[ERROR] audio: a fault past the restart budget latched the mute");
 }
 
 AudioErrors audioErrors() {
@@ -610,6 +795,18 @@ AudioErrors audioErrors() {
   e.count = gSaiErrors;
   e.codes = gSaiErrorCodes;
   return e;
+}
+
+AudioHealth audioHealth() {
+  AudioHealth h;
+  h.errors = audioErrors();
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  h.overruns = gCounts.overruns;
+  h.nanBlocks = gCounts.nanBlocks;
+  NVIC_EnableIRQ(SWPMI1_IRQn);
+  h.restarts = gRecovery.restarts();
+  h.latched = gRecovery.latched();
+  return h;
 }
 
 void audioPublish(const ChainSnapshot& snapshot) {

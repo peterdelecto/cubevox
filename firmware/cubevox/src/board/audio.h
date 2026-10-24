@@ -21,7 +21,7 @@ constexpr int kStatBuckets = kSlotCount + 2;
 
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed
-  uint32_t late = 0;          // blocks that took longer than the budget (the DMA played stale data)
+  uint32_t late = 0;          // blocks past the budget, or written after the DMA began reading their half
   uint32_t overruns = 0;      // blocks that were not even started before the next one arrived
   uint32_t maxCycles = 0;     // worst block time in CPU cycles
   uint32_t avgCycles = 0;     // mean block time since the last peaks reset
@@ -33,16 +33,38 @@ struct AudioStats {
 // Brings up PLL3, SAI1 and DMA, and starts the stream. Returns false on failure; audioReport() says why.
 bool audioInit();
 
+// What audioPoll did this pass.
+enum class AudioEvent : uint8_t {
+  None,
+  Restarted,  // a fault stopped the stream and it runs again; the mute releases after the settle
+  Latched,    // a fault past the restart budget, or a restart that failed: muted until reset
+};
+
+// Call every loop pass. A fault that stopped the stream (a DMA error, a SAI frame-sync or clock
+// error) or kept the block interrupt a ring behind holds the mute; once the output is fully muted
+// the stream restarts, at most three times in any minute. Prints one line per restart or latch.
+AudioEvent audioPoll(uint32_t nowMs);
+
 // The "[boot] audio ..." line, or the "[ERROR] audio: ..." line when audioInit failed. Also reports
-// SAI and DMA errors counted since boot.
+// the SAI and DMA errors, overruns, restarts and NaN blocks counted since boot, and a latched fault.
 void audioReport(Print& out);
 
-// SAI and DMA transfer errors since boot, and the HAL error bits seen.
+// SAI and DMA errors since boot, and the HAL error bits seen.
 struct AudioErrors {
   uint32_t count = 0;
   uint32_t codes = 0;
 };
 AudioErrors audioErrors();
+
+// The audio fault counters for status and the boot report.
+struct AudioHealth {
+  AudioErrors errors;
+  uint32_t overruns = 0;   // blocks never started before their half came round again
+  uint32_t restarts = 0;   // stream restarts after a fault
+  uint32_t nanBlocks = 0;  // blocks discarded before the polish stages for a NaN or an infinity
+  bool latched = false;    // a fault past the restart budget, or a failed restart, latched the mute
+};
+AudioHealth audioHealth();
 
 // Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop. A snapshot with
 // the layout the interrupt runs is adopted at once; a different layout fades the output out and in
@@ -80,7 +102,8 @@ AudioStats audioStats();
 // Clears late, overruns and maxCycles so a measurement can exclude the first blocks.
 void audioResetPeaks();
 
-// Stops the RX DMA so no more blocks arrive, to prove the stall watch.
+// Stops the RX DMA so no more blocks arrive, to prove the stall watch. The TX ring goes silent
+// within a ring, because no block refills it.
 void audioStopForBench();
 
 // Loops the clip compiled in by CUBEVOX_BENCH_CLIP in place of the SAI input. Returns the
