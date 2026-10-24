@@ -52,6 +52,9 @@ firmware and the app in one click.
    tarball, unpack beside the bundle, swap directories, relaunch, and the page reloads. The page
    shows each step and the dfu-util output on failure with a Retry button; the box stays in DFU
    until a flash succeeds.
+   Superseded on the box side by `2026-10-24-field-update-design.md` (owner 2026-10-24): the box
+   reboots into a UF2 drive, so the app copies the release `.uf2` to `/Volumes/CUBEVOX` instead
+   of running dfu-util. The app is parked until the owner reopens it.
 7. **Versions.** One tag per release. `VERSION.txt` holds the tag; `git describe` gives the
    firmware its string; the Go binary gets the same tag by `-ldflags -X`.
 8. **Security.** Listens on 127.0.0.1 only. No request leaves the Mac except the GitHub release
