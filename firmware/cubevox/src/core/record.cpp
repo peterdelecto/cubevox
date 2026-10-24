@@ -2,25 +2,12 @@
 
 #include <string.h>
 
+#include "core/le_bytes.h"
 #include "core/registry.h"
 
 namespace {
 
 constexpr std::array<uint8_t, 4> kMagic = {'C', 'V', 'L', 'R'};
-
-void put16(uint8_t* p, uint16_t v) {
-  p[0] = static_cast<uint8_t>(v);
-  p[1] = static_cast<uint8_t>(v >> 8);
-}
-
-void put32(uint8_t* p, uint32_t v) {
-  put16(p, static_cast<uint16_t>(v));
-  put16(p + 2, static_cast<uint16_t>(v >> 16));
-}
-
-uint16_t get16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
-
-uint32_t get32(const uint8_t* p) { return get16(p) | (static_cast<uint32_t>(get16(p + 2)) << 16); }
 
 // An id that matches no card reads as Empty, and `known` says so.
 Card cardFromField(const uint8_t* field, bool& known) {
@@ -75,10 +62,7 @@ bool decodeRecord(const uint8_t* b, RecordData& out) {
 EntryState classifyRecordEntry(const uint8_t* bytes) {
   RecordData scratch;
   if (decodeRecord(bytes, scratch)) return EntryState::Valid;
-  for (size_t i = 0; i < kRecordBytes; ++i) {
-    if (bytes[i] != 0xFF) return EntryState::Torn;
-  }
-  return EntryState::Blank;
+  return isErased(bytes, kRecordBytes) ? EntryState::Blank : EntryState::Torn;
 }
 
 bool newestRecord(const uint8_t* const* sectors, int sectorCount, size_t sectorBytes, RecordFound& out) {

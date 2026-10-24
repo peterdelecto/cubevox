@@ -4,6 +4,7 @@
 
 #include "board/audio.h"
 #include "board/build_kind.h"
+#include "board/diag_service.h"
 #include "board/display_sh1106.h"
 #include "board/fault.h"
 #include "board/pins.h"
@@ -45,6 +46,7 @@ void bootReport(bool oledFound) {
   out.println(kBenchBuild ? "[boot] build bench" : "[boot] build release");
   faultReport(out);
   recordReportBoot(out);
+  diagReportBoot(out);
   clockReport(out);
   pins::report(out);
   reportCpu(out);

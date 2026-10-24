@@ -14,67 +14,9 @@
 #include "core/record_store.h"
 #include "core/registry.h"
 #include "core/settings.h"
+#include "fake_flash.h"
 
 namespace {
-
-// In-memory bank 2: two 128 KB sectors, 0xFF erased. Programming ANDs bits in like real flash.
-// failNextErase and failNextProgram make the next such operation report an error.
-class FakeFlash : public FlashIo {
- public:
-  FakeFlash() {
-    mem[0].assign(kRecordSectorBytes, 0xFF);
-    mem[1].assign(kRecordSectorBytes, 0xFF);
-  }
-  const uint8_t* read(int s) const override { return mem[s].data(); }
-  void eraseStart(int s) override {
-    erasing = s;
-    busyPolls = 3;
-    ++erases[s];
-    ++ops;
-  }
-  bool eraseBusy() override {
-    if (erasing < 0) return false;
-    if (busyPolls-- > 0) return true;
-    if (failNextErase) {
-      error = true;
-      failNextErase = false;
-    } else {
-      mem[erasing].assign(kRecordSectorBytes, 0xFF);
-    }
-    erasing = -1;
-    return false;
-  }
-  void programWord(int s, uint32_t off, const uint8_t* w) override {
-    ++programs;
-    ++ops;
-    if (failNextProgram) {
-      error = true;
-      failNextProgram = false;
-      return;
-    }
-    for (size_t i = 0; i < kFlashWordBytes; ++i) mem[s][off + i] &= w[i];
-  }
-  bool takeError() override {
-    const bool e = error;
-    error = false;
-    return e;
-  }
-
-  void put(int sector, int entry, const RecordData& rec) {
-    const RecordBytes b = encodeRecord(rec);
-    std::memcpy(&mem[sector][static_cast<size_t>(entry) * kRecordBytes], b.data(), kRecordBytes);
-  }
-
-  std::vector<uint8_t> mem[2];
-  int erasing = -1;
-  int busyPolls = 0;
-  int erases[2] = {0, 0};
-  int programs = 0;
-  int ops = 0;
-  bool error = false;
-  bool failNextErase = false;
-  bool failNextProgram = false;
-};
 
 RecordData makeRec(uint32_t seq, OutputLevel out = OutputLevel::Line, const char* name = "") {
   RecordData r;

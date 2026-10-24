@@ -1,5 +1,6 @@
 #include "board/record_service.h"
 
+#include "board/boot_block_access.h"
 #include "board/fault.h"
 #include "board/flash_bank2.h"
 #include "board/serial_link.h"
@@ -8,7 +9,7 @@
 
 namespace {
 
-Bank2Flash gFlash;
+Bank2Flash& gFlash = bank2Flash();
 RecordStore gStore(gFlash);
 
 bool gLoaded = false;
@@ -21,9 +22,22 @@ bool gFaultInitMissing = false;
 bool gLayoutRejected = false;
 char gRejectReason[protocol::kErrorBytes] = {};
 
-// A double ECC error on a half-programmed word repeats on every read, so the sector goes.
+// The bank 2 address of a double ECC error. Either the last run hit it, or the bootloader hit it
+// reading the diagnostic log for DIAG.TXT and left the address in the boot block. The bootloader
+// reads no other bank 2 sector, so no other address from it is acted on.
+bool eccFaultAddress(uint32_t& address) {
+  if (faultLastWasBank2Ecc(address)) return true;
+  if (!bootBlockWritten()) return false;
+  const uint32_t reported = bootBlock().faultAddress;
+  if (bank2RecordSector(reported) != kDiagLogSector) return false;
+  address = reported;
+  return true;
+}
+
+// A double ECC error on a half-programmed word repeats on every read, so the sector goes. That
+// includes sector 2, the diagnostic log, whose scan at boot would otherwise fault again.
 void recoverEcc() {
-  if (!faultLastWasBank2Ecc(gEccAddress)) return;
+  if (!eccFaultAddress(gEccAddress)) return;
   gEccSector = bank2RecordSector(gEccAddress);
   if (gEccSector < 0) return;
   gFlash.eraseBlocking(gEccSector);
@@ -102,7 +116,8 @@ uint32_t recordSequence() { return gStore.status().sequence; }
 uint32_t recordErrors() { return gStore.status().errors; }
 
 void recordPoll(uint32_t nowMs) {
-  gStore.poll(nowMs);
+  // The bank takes one operation at a time, so a save waits while the diagnostic log erases.
+  if (gFlash.erasingSector() != kDiagLogSector) gStore.poll(nowMs);
   if (gStore.takeSaveFailed()) serialOut().println("[ERROR] record save failed, the box keeps the previous record");
 }
 

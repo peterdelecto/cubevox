@@ -6,7 +6,7 @@
 namespace {
 
 // Bank 2 control registers are FLASH->CR2, SR2, CCR2 and KEYR2 (stm32h743xx.h). Sector numbers
-// run 0..7 inside the bank, so sector n of the record is bank 2 sector n.
+// run 0..7 inside the bank, so sector n here is bank 2 sector n.
 constexpr uint32_t kKey1 = 0x45670123u;  // FLASH_KEY1 in stm32h7xx_hal_flash.h
 constexpr uint32_t kKey2 = 0xCDEF89ABu;
 constexpr uint32_t kBusy = FLASH_SR_BSY | FLASH_SR_QW;
@@ -16,7 +16,8 @@ constexpr uint32_t kErrors = FLASH_SR_WRPERR | FLASH_SR_PGSERR | FLASH_SR_STRBER
 constexpr uint32_t kClearAll = kErrors | FLASH_SR_EOP;  // CCR2 bits sit at the same positions as SR2
 constexpr uint32_t kProgramTimeoutUs = 5000;            // one flash word takes tens of microseconds
 
-bool validSector(int sector) { return sector >= 0 && sector < kRecordSectors; }
+// The record's two sectors and the log's one. Sectors 3 to 7 are reserved for Adam's data.
+bool validSector(int sector) { return (sector >= 0 && sector < kRecordSectors) || sector == kDiagLogSector; }
 
 // True when the control register is unlocked afterwards. A refused key sequence leaves it locked
 // until the next reset, so erase and program would silently do nothing.
@@ -42,14 +43,18 @@ void invalidate(uint32_t address, uint32_t bytes) {
   SCB_InvalidateDCache_by_Addr(reinterpret_cast<uint32_t*>(address), static_cast<int32_t>(bytes));
 }
 
-uint32_t sectorAddress(int sector) { return kBank2Base + static_cast<uint32_t>(sector) * kRecordSectorBytes; }
+uint32_t sectorAddress(int sector) { return kBank2Base + static_cast<uint32_t>(sector) * kFlashSectorBytes; }
+
+Bank2Flash gBank2;
 
 }  // namespace
 
+Bank2Flash& bank2Flash() { return gBank2; }
+
 int bank2RecordSector(uint32_t address) {
   if (address < kBank2Base) return -1;
-  const uint32_t index = (address - kBank2Base) / kRecordSectorBytes;
-  return index < kRecordSectors ? static_cast<int>(index) : -1;
+  const int index = static_cast<int>((address - kBank2Base) / kFlashSectorBytes);
+  return validSector(index) ? index : -1;
 }
 
 const uint8_t* Bank2Flash::read(int sector) const { return reinterpret_cast<const uint8_t*>(sectorAddress(sector)); }
@@ -81,12 +86,12 @@ bool Bank2Flash::eraseBusy() {
   erasing_ = false;
   if (FLASH->SR2 & kErrors) error_ = true;
   release(FLASH_CR_SER);
-  invalidate(sectorAddress(erasingSector_), kRecordSectorBytes);
+  invalidate(sectorAddress(erasingSector_), kFlashSectorBytes);
   return false;
 }
 
 void Bank2Flash::programWord(int sector, uint32_t offset, const uint8_t* flashWord) {
-  if (!validSector(sector) || offset + kFlashWordBytes > kRecordSectorBytes || !unlock()) {
+  if (!validSector(sector) || offset + kFlashWordBytes > kFlashSectorBytes || !unlock()) {
     error_ = true;
     return;
   }

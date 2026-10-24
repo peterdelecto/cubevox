@@ -8,6 +8,7 @@
 #include <array>
 
 #include "core/crc32.h"
+#include "core/flash_io.h"
 #include "core/layout.h"
 #include "core/settings.h"
 #include "core/slots.h"
@@ -15,9 +16,6 @@
 constexpr size_t kRecordBytes = 256;
 constexpr size_t kCardFieldReservedBytes = 8;
 constexpr size_t kRecordCardFieldBytes = kCardIdBytes + kCardFieldReservedBytes;  // wire id, then reserved
-
-// The flash programs whole words of this size, and a record is a whole number of them.
-constexpr size_t kFlashWordBytes = 32;
 
 // Byte offsets of the fields, in file order.
 constexpr size_t kOffMagic = 0;

@@ -7,3 +7,7 @@
 #include "board/boot_block.h"
 
 CvBootBlock& bootBlock();
+
+// True when the bootloader wrote the block since power-on. Any other version word is power-on
+// garbage, and the reason, the fault address and the summary hold nothing to read.
+inline bool bootBlockWritten() { return bootBlock().blockVersion == CV_BOOT_BLOCK_VERSION; }

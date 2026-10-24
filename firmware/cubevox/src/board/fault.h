@@ -14,6 +14,17 @@ void faultInit();
 // True once faultInit() has run. The ECC recovery reads the fault record faultInit() loads.
 bool faultInitDone();
 
+// The reset flags (RCC->RSR) as this boot read them, before faultInit() cleared them. Valid after
+// faultInit().
+uint32_t faultResetFlags();
+
+// True when the first reset flag set, in the order of the boot report, is power-on. A power-up
+// also raises the brown-out and pin flags, which sort behind it. Valid after faultInit().
+bool faultResetWasPowerOn();
+
+// True when the previous run left a fault record. Valid after faultInit().
+bool faultRecordPresent();
+
 // True when the previous run died on a double ECC error in flash bank 2 (FLASH->SR2 DBECCERR);
 // `address` is the failing flash word. Valid after faultInit().
 bool faultLastWasBank2Ecc(uint32_t& address);

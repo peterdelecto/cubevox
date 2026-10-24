@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "board/boot_block_access.h"
+#include "board/diag_service.h"
 #include "board/fault.h"
 #include "board/flash_bank2.h"
 #include "board/mute.h"
@@ -14,6 +15,9 @@ namespace {
 
 // A stuck erase ends this wait when the flash driver's erase timeout does.
 constexpr uint32_t kSaveWaitMs = kEraseTimeoutMs;
+
+// Eight flash words take well under a second. An erase the entry needs is waited out beyond this.
+constexpr uint32_t kDiagWaitMs = 3000;
 
 // The bootloader prints this field in DIAG.TXT: the version, the uptime in seconds, this boot's
 // reset cause and the last fault kind, as in "v2.00.10 3600s power-on none". The field holds 40
@@ -34,6 +38,8 @@ void writeSummary(CvBootBlock& block) {
 void enterDfu() {
   CvBootBlock& block = bootBlock();
   writeSummary(block);
+  diagNoteUpdateRequest();
+  diagFlush(kDiagWaitMs);  // a timeout prints its own warning, and the update goes ahead
   recordFlush(kSaveWaitMs);
   serialFlush(kFlushBeforeResetMs);
   muteForReset();

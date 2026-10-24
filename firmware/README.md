@@ -144,8 +144,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   while audio runs, the mute latches (`muteLatch()`, MUTE_SW ignored until reset) and one error line prints.
   SAI and DMA transfer errors are counted in `audio.cpp` and reported at most once a second.
 - `board/dfu.cpp`: `enterDfu()` is the only way into update mode, where the bootloader serves the `CUBEVOX` drive.
-  It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), writes a
-  pending record save, waits up to 5 s for the store to go idle, lets the serial queue drain for 100 ms, mutes
+  It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), queues a
+  diagnostic log entry and waits up to 3 s for it, writes a pending record save, waits up to 5 s for the store to go idle, lets the serial queue drain for 100 ms, mutes
   through `muteForReset()`, writes the request word and resets. The menu action and the `enter_dfu` command both
   call it. The confirm screen shows the installed version, and the box shows the same version for 2 s after
   every start.
@@ -158,11 +158,13 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   mode. The CRC covers the running image and is computed once, on the first report.
 - `board/flash_bank2.cpp` and `board/record_service.cpp`: the layout record lives in bank 2 at 0x08100000 and
   0x08120000 (spec `2026-10-12-layout-record-design.md`). A save runs 2 s after the last settings change, one erase
-  or flash-word program per `loop()` pass. The flash driver checks the unlock, rejects a sector outside the two
-  record sectors, and bounds every wait (5 s for an erase, 5 ms for one program word); a failure sets an error flag
+  or flash-word program per `loop()` pass. Bank 2 sector 2 at 0x08140000 holds the diagnostic log, which
+  `core/entry_log` appends to over `core/flash_io`, `board/diag_service` fills and polls, and the bootloader only
+  reads for `DIAG.TXT`. The flash driver checks the unlock, rejects a sector outside the record's two and the log's
+  one, and bounds every wait (5 s for an erase, 5 ms for one program word); a failure sets an error flag
   and `recordPoll` prints `[ERROR] record save failed`. `build.sh` and the linker script keep the image below
   bank 2, and the bootloader writes only inside the image region. The fault record keeps FLASH->SR2 and ECC_FA2;
-  a double ECC fault in a record sector is erased at
+  a double ECC fault in a record or log sector is erased at
   boot before the scan, and a failed erase is reported in the boot report. A record whose layout fails validation
   gives the default layout with a `[WARN]` and a rewrite. The boot report also warns about an unknown card id, a
   sector with data after a blank entry, and torn entries.

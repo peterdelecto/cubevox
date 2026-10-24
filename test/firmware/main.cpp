@@ -23,6 +23,7 @@ int main() {
   checkCanvas();
   checkPanelTest();
   checkRecords();
+  checkEntryLog();
   checkCrc32();
   checkBootHealth();
   checkSplash();

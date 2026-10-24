@@ -17,3 +17,9 @@ uint32_t bootHealthFails();
 
 // Why the bootloader last stayed in update mode, as DIAG.TXT spells it.
 const char* bootHealthLastReason();
+
+// The same reason as the CvBootReason number, and the flash address of the bootloader's last read
+// fault (0 for none). Both are zero when the bootloader did not write the block, and both are
+// the values at boot, so later changes to the block do not show here.
+uint32_t bootHealthLastReasonCode();
+uint32_t bootHealthFaultAddress();

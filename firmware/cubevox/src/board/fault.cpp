@@ -73,6 +73,14 @@ constexpr ResetFlag kResetFlags[] = {
     {RCC_RSR_LPWRRSTF, "low-power"},
 };
 
+// The first flag set, in table order, names the reset.
+const ResetFlag* firstResetFlag() {
+  for (const ResetFlag& f : kResetFlags) {
+    if (gResetFlags & f.mask) return &f;
+  }
+  return nullptr;
+}
+
 // ECC_FA2 counts 32-byte flash words from the start of bank 2 (15 bits cover the 1 MB bank).
 uint32_t bank2EccAddress(const FaultRecord& r) {
   return kBank2Base + (r.eccFa2 & FLASH_ECC_FA_FAIL_ECC_ADDR) * static_cast<uint32_t>(kFlashWordBytes);
@@ -218,6 +226,15 @@ void faultInit() {
 
 bool faultInitDone() { return gInitDone; }
 
+uint32_t faultResetFlags() { return gResetFlags; }
+
+bool faultResetWasPowerOn() {
+  const ResetFlag* first = firstResetFlag();
+  return first != nullptr && first->mask == RCC_RSR_PORRSTF;
+}
+
+bool faultRecordPresent() { return gLast.magic == kMagic; }
+
 bool faultLastWasBank2Ecc(uint32_t& address) {
   if (gLast.magic != kMagic || !bank2EccSet(gLast)) return false;
   address = bank2EccAddress(gLast);
@@ -290,13 +307,8 @@ void faultReport(Print& out) {
 }
 
 void faultSummaryText(char* out, size_t size) {
-  const char* reset = "none";
-  for (const ResetFlag& f : kResetFlags) {
-    if (gResetFlags & f.mask) {
-      reset = f.name;
-      break;
-    }
-  }
+  const ResetFlag* first = firstResetFlag();
+  const char* reset = first != nullptr ? first->name : "none";
   const char* fault = "none";
   if (gLast.magic == kMagic) fault = gLast.kind < kKindName.size() ? kKindName[gLast.kind] : "unknown";
   snprintf(out, size, "%s %s", reset, fault);

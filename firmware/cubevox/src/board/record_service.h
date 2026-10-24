@@ -1,5 +1,5 @@
-// Owns the bank 2 flash and the record store, and turns them into calls the sketch and the bench
-// make: load at boot, request a save, poll, report.
+// Owns the record store on the bank 2 flash (shared with the diagnostic log, board/diag_service),
+// and turns it into calls the sketch and the bench make: load at boot, request a save, poll, report.
 
 #pragma once
 
@@ -9,8 +9,9 @@
 #include "core/layout.h"
 #include "core/settings.h"
 
-// Boot-time load. Recovers from a bank 2 double ECC fault first (blocking erase, so call it
-// after faultInit() and before faultWatchdogStart()), then loads the newest valid record into
+// Boot-time load. Recovers from a bank 2 double ECC fault first, in a record sector or in the
+// diagnostic log's sector (blocking erase, so call it after faultInit() and before
+// faultWatchdogStart()), then loads the newest valid record into
 // `layout` and `settings`. A record whose layout fails validation gives the default layout and a
 // save that rewrites it. Leaves both untouched when there is no usable record.
 void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs);

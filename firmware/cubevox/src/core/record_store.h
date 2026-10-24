@@ -8,30 +8,16 @@
 
 #include <array>
 
+#include "core/flash_io.h"
 #include "core/record.h"
 
 constexpr int kRecordSectors = 2;
-constexpr size_t kRecordSectorBytes = 128 * 1024;
+constexpr size_t kRecordSectorBytes = kFlashSectorBytes;
 constexpr int kEntriesPerSector = kRecordSectorBytes / kRecordBytes;
 constexpr int kWordsPerRecord = kRecordBytes / kFlashWordBytes;
 
 // A save starts this long after the last request, so turning through the menu writes once.
 constexpr uint32_t kSaveDebounceMs = 2000;
-
-// What the store needs from the flash. The board implements it for bank 2, the host test with RAM.
-class FlashIo {
- public:
-  virtual ~FlashIo() = default;
-  // Read-only view of one sector. The store reads it only in begin(), because the same bank
-  // stalls reads while it programs or erases.
-  virtual const uint8_t* read(int sector) const = 0;
-  virtual void eraseStart(int sector) = 0;
-  virtual bool eraseBusy() = 0;
-  // Programs one flash word (kFlashWordBytes) at `offset` bytes into the sector.
-  virtual void programWord(int sector, uint32_t offset, const uint8_t* word) = 0;
-  // True once if an erase or program since the last call failed.
-  virtual bool takeError() = 0;
-};
 
 struct RecordStatus {
   bool hasRecord;

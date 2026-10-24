@@ -142,8 +142,9 @@ void RecordStore::abandon() {
 }
 
 void RecordStore::pollErase() {
-  if (io_.eraseBusy()) return;
-  if (io_.takeError()) {
+  const EraseStatus erase = checkErase(io_);
+  if (erase == EraseStatus::Running) return;
+  if (erase == EraseStatus::Failed) {
     state_[target_] = Sector::Dirty;  // not known to be blank
     abandon();
     return;
@@ -155,9 +156,8 @@ void RecordStore::pollErase() {
 }
 
 void RecordStore::pollProgram() {
-  io_.programWord(target_, static_cast<uint32_t>(nextEntry_) * kRecordBytes + word_ * kFlashWordBytes,
-                  writing_.data() + word_ * kFlashWordBytes);
-  if (io_.takeError()) {
+  const uint32_t entryOffset = static_cast<uint32_t>(nextEntry_) * static_cast<uint32_t>(kRecordBytes);
+  if (!programEntryWord(io_, target_, entryOffset, writing_.data(), word_)) {
     // The entry is part-written; skip it and drop this save.
     state_[target_] = Sector::Log;
     ++nextEntry_;
@@ -174,8 +174,9 @@ void RecordStore::pollProgram() {
 
 void RecordStore::pollEraseAll() {
   if (eraseIdx_ >= 0) {
-    if (io_.eraseBusy()) return;
-    if (io_.takeError()) {
+    const EraseStatus erase = checkErase(io_);
+    if (erase == EraseStatus::Running) return;
+    if (erase == EraseStatus::Failed) {
       ++errors_;
       saveFailed_ = true;
       state_[eraseIdx_] = Sector::Dirty;

@@ -11,6 +11,7 @@
 #include "board/controls.h"
 #include "board/device_serial.h"
 #include "board/dfu.h"
+#include "board/diag_service.h"
 #include "board/display_sh1106.h"
 #include "board/display_stub.h"
 #include "board/fault.h"
@@ -181,6 +182,7 @@ void setup() {
   if (gAudioRunning) muteClocksRunning(millis());
   faultWatchdogStart();  // every init is behind us; from here loop() must keep running
   bootHealthInit();  // after the watchdog: a start only counts as healthy with both running
+  diagInit();  // after recordBoot (ECC recovery) and bootHealthInit (failed starts, bootloader reason)
   versionTag(kFirmwareVersion, gVersionTag, sizeof(gVersionTag));
   gSplash.start(millis());
 }
@@ -205,6 +207,7 @@ void loop() {
   const bool settingsChanged = applyAction(gMenu.update(inputPoll(nowMs), nowMs));
   if (settingsChanged) recordRequestSave(gLayout, gSettings, nowMs);
   recordPoll(nowMs);
+  diagPoll();
   runJackSwitch(nowMs);
   // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
