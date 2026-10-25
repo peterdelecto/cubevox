@@ -66,6 +66,8 @@ const TEST_STRINGS = [
 
 const REQUIRED_PAIRS = ('0O 0D 0Q 0C OQ OD DQ CG OC 8B 83 86 80 89 BR BE PR PF EF 5S 56 2Z 17 1I 1L 1! I! IL 7T ' +
   'MN HN MW NW HM UV VY KX XY 3B 69 G6 GC').split(' ');
+// The 16X24's 0 is its O (owner 2026-10-25); the letter O never appears in 16X24 text on the box.
+const DROPPED_PAIRS = { 'Stylized Hyperlegible 16X24 Final': ['0O'] };
 const SYMMETRIC = 'AHMOTUVWXY08';
 const CAPS_DIGITS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
@@ -892,7 +894,8 @@ function lintConfusables(font, cmp, allDrawn, out, args) {
     : `blur ${minBlur.toFixed(1)}, bloom ${minBloom.toFixed(1)}`;
   out.push(`-- required pairs${args.pairs ? ` (bars: ${bars})` : ''} --`);
   const failing = [];
-  for (const pair of REQUIRED_PAIRS) {
+  const dropped = DROPPED_PAIRS[font.name] || [];
+  for (const pair of REQUIRED_PAIRS.filter((p) => !dropped.includes(p))) {
     const d = dist(codeOf(pair[0]), codeOf(pair[1]));
     if (!d) continue;
     out.push(line(codeOf(pair[0]), codeOf(pair[1])));

@@ -202,16 +202,23 @@ std::string cellsFor(const Field& f, int v) {
 int cellPitch() { return font16x24().width + font16x24().spacing; }
 
 // Left edge of the first cell. The field is as wide as all its cells and the unit with its space.
+// The unit as the readout draws it: a leading space, in capitals, "" when the knob has none.
+std::string unitOf(const KnobDesc& k) {
+  char unit[16];
+  unitText(k, unit, sizeof(unit));
+  return unit;
+}
+
 int fieldLeft(const KnobDesc& k, const Field& f) {
   const FontDesc& big = font16x24();
-  const std::string unit = k.unit[0] != '\0' ? std::string(" ") + k.unit : std::string();
+  const std::string unit = unitOf(k);
   const int unitWidth = unit.empty() ? 0 : big.spacing + Canvas::textWidth(big, unit.c_str());
   return (kCanvasWidth - (f.cells() * cellPitch() - big.spacing + unitWidth)) / 2;
 }
 
 void drawUnit(Canvas& c, const KnobDesc& k, int pen) {
-  if (k.unit[0] == '\0') return;
-  const std::string unit = std::string(" ") + k.unit;
+  const std::string unit = unitOf(k);
+  if (unit.empty()) return;
   c.drawText(pen, kValueTop, font16x24(), unit.c_str());
 }
 
@@ -397,7 +404,7 @@ std::string valueText(const KnobDesc& k, int shown) {
   formatCells(k, shown, cells, sizeof(cells));
   std::string text(cells);
   text.erase(std::remove(text.begin(), text.end(), ' '), text.end());
-  return k.unit[0] != '\0' ? text + " " + k.unit : text;
+  return text + unitOf(k);
 }
 
 // Finds each non-blank character of `cells` in the band by its picture, left to right. A cell takes
@@ -482,10 +489,8 @@ bool inkAccounted(const Canvas& frame, const KnobDesc& k, const std::string& cel
     const char one[2] = {cells[j], '\0'};
     rebuilt.drawDigits(at[j], kValueTop, big, one);
   }
-  if (k.unit[0] != '\0') {
-    const std::string text = std::string(" ") + k.unit;
-    rebuilt.drawText(at.back() + cellPitch(), kValueTop, big, text.c_str());
-  }
+  const std::string unit = unitOf(k);
+  if (!unit.empty()) rebuilt.drawText(at.back() + cellPitch(), kValueTop, big, unit.c_str());
   return sameRows(frame, rebuilt, kValueTop, kValueBottom);
 }
 
@@ -662,14 +667,14 @@ void checkReadoutEdges() {
 // name and sits centred once, and each name starts at the field's left edge.
 const KnobDesc& keyKnob() { return *knobDesc(defaultLayout().card[1], 0); }
 
-constexpr int kKeyFieldLeft = 3;
+constexpr int kKeyFieldLeft = 6;
 
 void checkKeyField() {
   const KnobDesc& key = keyKnob();
   int widest = 0;
   for (int i = 0; i < key.positions; ++i) widest = std::max(widest, Canvas::textWidth(font16x24(), key.labels[i]));
-  check(widest == 121 && (kCanvasWidth - widest) / 2 == kKeyFieldLeft,
-        "readout: the widest key name is 121 px, so its field starts at x 3");
+  check(widest == 116 && (kCanvasWidth - widest) / 2 == kKeyFieldLeft,
+        "readout: the widest key name is 116 px, so its field starts at x 6");
 
   bool inPlace = true;
   bool startsAtLeft = true;
@@ -698,7 +703,7 @@ void checkKeyRows() {
   Canvas clamped;
   renderReadout(clamped, stray);
   Canvas last;
-  last.drawText(kKeyFieldLeft, kValueTop, font16x24(), "F / DM");
+  last.drawText(kKeyFieldLeft, kValueTop, font16x24(), "F / Dm");
   check(sameRows(clamped, last, kValueTop, kValueBottom), "readout: a target past the last key clamps to the last name");
 }
 

@@ -61,6 +61,15 @@ struct ReadoutView {
 // the old glyph to the new one.
 void renderReadout(Canvas& canvas, const ReadoutView& view);
 
+// The value row's unit with its leading space, in capitals, or "" for a knob without one. The value
+// font's lowercase cells hold the flat sign and the minor-key glyph for key names, so unit text
+// never passes through them. Returns the length written.
+int unitText(const KnobDesc& knob, char* out, int size);
+
+// Copies text in capitals. The 9X12 and 16X24 draw a lowercase b and m as the flat and the
+// minor-key glyph, so prose that may hold them goes up before it is drawn.
+int upperText(const char* in, char* out, int size);
+
 // The word the top switch shows while it is engaged.
 const char* topSwitchWord(TopSwitch role);
 

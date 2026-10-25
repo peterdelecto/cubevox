@@ -51,16 +51,16 @@ The value row never moves sideways. Each parameter has one field, computed once 
 5. The field is `cells * 18` px plus the width of the space and the unit. Its left edge is `(128 - width) / 2`, taken once. The space and the unit start at the left edge plus `cells * 18`.
 6. A number is right-aligned in the digit cells, and a shorter number leaves its leading cells blank. `+5 ST` is the sign cell `+`, a blank tens cell and `5` in the ones cell. `0 ST` is two blank cells and `0`.
 7. A number that gains a digit lights its leading cell and nothing else shifts. On a percent knob 99 to 100 rolls a `1` into the blank leading cell while each 9 rolls to 0 in its own cell.
-8. A name field (the key) is as wide as the widest name, which is `F# / D#M` at 121 px. A name starts at the field's left edge, and a shorter name leaves the right of the field blank.
+8. A name field (the key) is as wide as the widest name, which is `F# / D#M` at 116 px. A name starts at the field's left edge, and a shorter name leaves the right of the field blank.
 
 | Knob | Range | Cells | Field width | Left edge |
 |---|---|---|---|---|
 | Mix, Depth, Rate, Drive, Tone, Time on reverbs | 0..100 % | 3 | 77 px | 25 |
-| Threshold | -70..-10 dB | sign and 2 | 95 px | 16 |
+| Threshold | -70..-10 dB | sign and 2 | 94 px | 17 |
 | Semitones | -12..+12 ST | sign and 2 | 95 px | 16 |
 | Slapback Time, Response | 60..250 and 1..500 ms | 3 | 95 px | 16 |
 | Decay | 5..1000 ms | 4 | 113 px | 7 |
-| Key | 12 names | none | 121 px | 3 |
+| Key | 12 names | none | 116 px | 6 |
 
 ## Value formatting
 All of it comes from the card's parameter table in `core/registry`, never from the screens.
@@ -77,7 +77,7 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 3. The fonts are single case. A lowercase letter whose cell is blank draws as its capital, so the table keeps its natural case.
 4. The key names write a flat as a lowercase b (`Db / Bbm`). The 9X12 and 16X24 fonts ink a flat sign in the b cell, and a lowercase cell a font inks keeps its own glyph, so the readout shows `D♭ / B♭M`. The flat is a draft the owner refines in the font editor. The 5x7 font has none, so a b there draws as B.
 5. `knobCells` gives the cells of a parameter and `formatCells` fills them.
-6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 121 px. The flat is 12 px wide, 3 px narrower than the sharp, so the flat names stay inside that field.
+6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 116 px. The flat is 12 px wide, 1 px narrower than the 13 px sharp, so the flat names stay inside that field (`Db / Bbm` is 114 px).
 
 ## Voice
 1. The audio interrupt sums the squares of the input samples of every block. The main loop takes the sum and the sample count at each UI tick.
