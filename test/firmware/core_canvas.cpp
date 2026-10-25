@@ -21,7 +21,7 @@
 namespace {
 
 void checkCanvasText() {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7Final;
   const FontDesc& font = font5x7();
   const uint8_t* glyphA = &f::kGlyphs['A' - 0x20][0];
 
@@ -53,7 +53,7 @@ void checkCanvasText() {
 }
 
 void checkCanvasWidth() {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7Final;
   const FontDesc& font = font5x7();
   check(Canvas::textWidth(font, "AB") == 2 * (f::kWidth + f::kSpacing) - f::kSpacing, "canvas: textWidth drops the trailing gap");
   check(Canvas::textWidth(font, "") == 0, "canvas: textWidth of an empty string is 0");
@@ -129,17 +129,19 @@ void checkCanvasFallback() {
   check(glyphIndex(font5x7(), 'u') >= 0 && glyphIndex(font5x7(), 'u') == glyphIndex(font5x7(), 'U'), "glyph: 5x7 u is the glyph of U");
 }
 
-// The key names write a flat as a lowercase b. The 9X12 and 16X24 fonts ink a flat sign in that cell,
-// so it keeps its own glyph there, while every blank lowercase cell still draws as its capital.
+// The key names write a flat as a lowercase b and minor as a lowercase m. The 9X12 and 16X24 fonts
+// ink a flat sign in the b cell, and 16X24 inks a minor-key m in the m cell, so those keep their own
+// glyphs, while every blank lowercase cell still draws as its capital.
 void checkFlatGlyph() {
   const auto own = [](const FontDesc& font, char c) { return glyphIndex(font, c) == static_cast<int>(c) - 0x20; };
   check(own(font9x12(), 'b') && own(font16x24(), 'b'), "flat: 9X12 and 16X24 draw b from its own inked cell");
+  check(own(font9x12(), 'm') && own(font16x24(), 'm'), "minor: 9X12 and 16X24 draw m from its own inked cell");
   check(glyphIndex(font5x7(), 'b') == glyphIndex(font5x7(), 'B'), "flat: 5x7 has no flat, so b draws as B");
   bool othersMap = true;
   for (char c = 'a'; c <= 'z'; ++c) {
-    if (c == 'b') continue;
-    othersMap = othersMap && glyphIndex(font9x12(), c) == glyphIndex(font9x12(), static_cast<char>(c - 'a' + 'A')) &&
-                glyphIndex(font16x24(), c) == glyphIndex(font16x24(), static_cast<char>(c - 'a' + 'A'));
+    if (c == 'b' || c == 'm') continue;
+    othersMap = othersMap && glyphIndex(font9x12(), c) == glyphIndex(font9x12(), static_cast<char>(c - 'a' + 'A'));
+    othersMap = othersMap && glyphIndex(font16x24(), c) == glyphIndex(font16x24(), static_cast<char>(c - 'a' + 'A'));
   }
   check(othersMap, "flat: every other lowercase letter still draws as its capital");
 
@@ -163,7 +165,7 @@ void checkCanvasFonts() {
   check(lower5.page(0)[1] != 0 && std::memcmp(lower5.page(0), upper5.page(0), kCanvasWidth) == 0,
         "canvas: 5x7 u draws the bytes of U");
 
-  namespace f9 = cubevox::fonts::StylizedHyperlegible9X12;
+  namespace f9 = cubevox::fonts::StylizedHyperlegible9X12Final;
   Canvas big9;
   big9.drawText(0, 0, font9x12(), "u");
   bool ok9 = true;
@@ -173,7 +175,7 @@ void checkCanvasFonts() {
   }
   check(ok9 && big9.page(0)[1] != 0, "canvas: 9x12 u draws the glyph bytes of U");
 
-  namespace f16 = cubevox::fonts::StylizedHyperlegible16X24;
+  namespace f16 = cubevox::fonts::StylizedHyperlegible16X24Final;
   Canvas big16;
   big16.drawText(0, 0, font16x24(), "H");
   bool ok16 = true;
@@ -482,7 +484,7 @@ void checkTabularDigits() {
 
 // Lays glyph cells on a width + spacing grid, which is the 5x7 pitch the menu screens rely on.
 void fixedPitchRow(const char* text, uint8_t (&row)[kCanvasWidth]) {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7;
+  namespace f = cubevox::fonts::StylizedHyperlegible5x7Final;
   std::memset(row, 0, sizeof row);
   int x = 0;
   for (; *text; ++text) {

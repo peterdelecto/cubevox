@@ -1,5 +1,6 @@
 #include "ui/screens.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -78,8 +79,8 @@ void drawNumber(Canvas& canvas, const ReadoutView& view) {
   const float base = floorf(shown);
   const RollPair pair = rollPair(knob, static_cast<int>(base));
 
-  char unit[16] = "";
-  if (knob.unit[0] != '\0') snprintf(unit, sizeof(unit), " %s", knob.unit);
+  char unit[16];
+  unitText(knob, unit, sizeof(unit));
   const int unitWidth = unit[0] != '\0' ? big.spacing + Canvas::textWidth(big, unit) : 0;
   const int x = (kCanvasWidth - (Canvas::digitsWidth(big, pair.from) + unitWidth)) / 2;
   const int rolled = static_cast<int>(lroundf((shown - base) * static_cast<float>(big.height)));
@@ -88,6 +89,22 @@ void drawNumber(Canvas& canvas, const ReadoutView& view) {
 }
 
 }  // namespace
+
+int upperText(const char* in, char* out, int size) {
+  if (size <= 0) return 0;
+  int n = 0;
+  for (; in[n] != '\0' && n < size - 1; ++n) out[n] = static_cast<char>(toupper(static_cast<unsigned char>(in[n])));
+  out[n] = '\0';
+  return n;
+}
+
+int unitText(const KnobDesc& knob, char* out, int size) {
+  if (size <= 0) return 0;
+  out[0] = '\0';
+  if (knob.unit[0] == '\0') return 0;
+  snprintf(out, static_cast<size_t>(size), " %s", knob.unit);
+  return upperText(out, out, size);
+}
 
 int ribbonHalfHeight(float level) {
   if (!(level > 0.0f)) return 0;
@@ -127,7 +144,9 @@ void renderReadout(Canvas& canvas, const ReadoutView& view) {
   snprintf(head, sizeof(head), "%d %s", view.slot + 1, view.card);
   canvas.drawText(kScreenPad, kScreenPad, font5x7(), head);
   if (!view.knob) return;
-  drawCentred(canvas, kReadoutNameY, font9x12(), view.knob->name);
+  char name[32];
+  upperText(view.knob->name, name, sizeof(name));
+  drawCentred(canvas, kReadoutNameY, font9x12(), name);
   if (view.knob->labels) {
     // The field is as wide as the widest name. The name starts at its left edge.
     const FontDesc& big = font16x24();
