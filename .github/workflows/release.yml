@@ -2,15 +2,16 @@ name: release
 
 # A tag vX.YY.ZZ has to equal v plus the text of VERSION.txt, or the run stops with [ERROR]. The
 # workflow then builds the release firmware and, once every test has passed, creates a draft
-# release for that tag with three files. The owner publishes the draft after the bench look.
+# release for that tag with two files. The owner publishes the draft after the bench look.
 #   cubevox-vX.YY.ZZ.uf2           the file Adam drags onto the CUBEVOX drive
-#   cubevox-rom-0x08020000.bin     the same image for the shop's ROM DFU, written at that address
 #   cubevox-rom-0x08020000.elf     the shop's symbols for that image; they resolve the pc and lr
 #                                  addresses in a DIAG.TXT
-# The rom files start at the application, which sits above the bootloader's sector. Written at
-# 0x08000000 the .bin would destroy the bootloader, so its name carries the address that
-# firmware/flash.sh --rom uses. The release notes carry the stamp check line of the .uf2 (version,
-# bytes, CRC), which the owner compares with the build on the bench.
+# A third file, cubevox-rom-0x08020000.bin, the same image for the shop's ROM DFU, stays in the
+# cubevox-firmware CI artifact and never reaches the release page, so Adam sees no .bin beside the
+# .uf2 (owner 2026-10-24). The rom files start at the application, which sits above the
+# bootloader's sector. Written at 0x08000000 the .bin would destroy the bootloader, so its name
+# carries the address that firmware/flash.sh --rom uses. The release notes carry the stamp check
+# line of the .uf2 (version, bytes, CRC), which the owner compares with the build on the bench.
 # The tests job runs the host suite, the bootloader selftest and the bench build, and publish waits
 # for it. The bootloader job builds and checks the shop's bootloader and publish waits for it too,
 # but nothing of it is attached. The dfu-util and app jobs only prove that the parked Mac app still
@@ -87,7 +88,7 @@ jobs:
           cp "$out/cubevox.ino.bin" "assets/cubevox-rom-$start.bin"
           cp "$out/cubevox.ino.elf" "assets/cubevox-rom-$start.elf"
           {
-            echo "Adam installs the .uf2 by dragging it onto the CUBEVOX drive. The .bin and the .elf are for the shop. The .bin goes through the ROM DFU, and the .elf resolves the addresses in a DIAG.TXT."
+            echo "Adam installs the .uf2 by dragging it onto the CUBEVOX drive. The .elf is for the shop; it resolves the addresses in a DIAG.TXT. The ROM DFU image is in the cubevox-firmware artifact of the workflow run, not here."
             echo
             echo "Image check: \`$(python3 -I tools/stamp_image.py check "$out/cubevox.uf2")\`"
           } > assets/release-notes.md
@@ -249,7 +250,7 @@ jobs:
         # exists already takes the files it lacks. One that holds a file stops the run, because a
         # moved tag would otherwise swap the asset under an unchanged version.
         run: |
-          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.bin assets/cubevox-rom-0x*.elf)
+          files=("assets/cubevox-v$(cat VERSION.txt).uf2" assets/cubevox-rom-0x*.elf)
           for file in "${files[@]}"; do
             test -s "$file" || { echo "[ERROR] $file is missing or empty"; exit 1; }
           done

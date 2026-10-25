@@ -16,3 +16,6 @@ samples/
 
 # font proof renders (proof.js default --out)
 tools/font-editor/proofs/
+
+# motion proofs (tools/oled-proof/motion_gif.py output)
+*.gif
