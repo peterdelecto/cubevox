@@ -39,7 +39,8 @@ part. Filenames are `YYYY-MM-DD-name-design.md`. Add a row here with every new s
 | `2026-10-24-polish-design.md` | Polish tail: POLISH COMP and POLISH EQ close the chain, TOP SWITCH is MUTE or BYPASS, the final seven-row menu, layout record schema v2 and the protocol `settings` object | built, bench pending |
 | `2026-10-25-font-16x24-neo-grotesque-design.md` | The 16X24 value font redrawn as a condensed neo-grotesque from pixel recipes: the construction rules, widths, per-glyph forms, the gate with 0/O dropped, and the build procedure | built 2026-10-25 |
 | `2026-10-24-oled-gui-design.md` | OLED runtime screens: the voice ribbon, the knob readout with rolling digits in a fixed field per parameter (no re-centring), MUTED or BYPASS, the 2-frame dissolve, the burn-in walk, and the `level`, `gui`, `screens` and `face` modules; settles the `ui/screens` split the structure spec deferred; the SH1106 driver shared with the bootloader and its retry rule, which supersede item 6 (U8x8 tile mode) of the font-sizes spec | host part built 2026-10-24, proofs 3 to 10 approved with the fixed field, bench pending |
-| `2026-10-24-solder-jig-design.md` | Printed jig for hand-soldering the four underside jacks; `solder-jig` component in the Fusion enclosure document | current |
+| `2026-10-24-solder-jig-design.md` | Printed jig for hand-soldering the four underside jacks; `solder-jig` component in the Fusion enclosure document | current; rev 4 shadow pockets built 2026-10-27 |
+| `2026-10-27-oled-adapter-design.md` | Printed adapter between the board's OLED holes and the module's, which sit about 1 mm north; posts with crush ribs slid by the parameter `oledOffset` | current; pegs chosen and built in Fusion 2026-10-27, awaiting the first print |
 
 Research notes live in `docs/audits/`. `2026-10-08-pitch-tracker-research.md` is the note behind
 the tracker plan.
