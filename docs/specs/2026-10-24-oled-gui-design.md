@@ -9,6 +9,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 1. Host part built and tested 2026-10-24. The readout and MUTED frames equal the proof renderer byte for byte.
 2. The owner approved proofs 3 to 10 on 2026-10-24 with one change, "we don't want re-centering". The value row now sits in a fixed field per parameter, as set out under Value field. The proof renderer and the goldens follow it.
 3. A sweep test measures every parameter of every card for sideways movement and is a hard gate, as set out under Tests and proofs.
+4. The Readout section is superseded by `2026-10-29-readout-card-design.md` (owner approved proof D on 2026-10-29, not yet built). The value field, priority, hold, dissolve, voice, MUTED and panel rules here still stand.
 4. Bench part open. The list is in Bench, below.
 5. The application drives the panel through `board/sh1106.c`, the driver the bootloader compiles too, with no U8g2 or Wire. Panel, below, sets out how it starts, retries and recovers.
 
