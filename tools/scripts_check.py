@@ -2,7 +2,8 @@
 """Checks the build, flash, bring-up and release scripts without a board, a toolchain or a network.
 
 It covers the version bump, the output-dir and variant rules of firmware/build.sh, the bench symbol
-check, the boot-line match of term.py, the dfu-util check of bringup.py, the version guard of
+check, the boot-line match of term.py, the dfu-util check of bringup.py, the DIAG.TXT blocks line
+that bringup.py parses against the one the bootloader's diag.c writes, the version guard of
 flash.sh, the .clangd rewrite, and the pins and release steps that must agree across build.sh and
 the workflows. Nothing here opens a serial port, a window or a drive.
 
@@ -204,6 +205,40 @@ def bringup_failures():
     return failed
 
 
+def diag_text_failures():
+    """bringup.py reads the DIAG.TXT that the bootloader's diag.c writes.
+
+    The bootloader's host tool drivetext renders sample files with the real diag.c. It is built here
+    in a private build dir, so the check needs only cmake and a compiler and never reuses a stale
+    binary. The wanted values are the block counts in drivetext.c: DIAG.TXT is the sample box (12
+    refused blocks, last family 0x6DB66082) and DIAG-clock.TXT has all counts zero.
+    """
+    wanted = {"DIAG.TXT": (12, 0x6DB66082), "DIAG-clock.TXT": (0, None)}
+
+    def describe(result):
+        refused, family = result
+        return f"{refused} refused, family {'none' if family is None else hex(family)}"
+
+    tools = os.path.join(FW, "bootloader", "tools")
+    failed = []
+    with tempfile.TemporaryDirectory() as d:
+        build, drive = os.path.join(d, "build"), os.path.join(d, "drive")
+        os.mkdir(drive)
+        steps = [["cmake", "-S", tools, "-B", build],
+                 ["cmake", "--build", build, "--target", "drivetext", "-j"],
+                 [os.path.join(build, "drivetext"), drive]]
+        for step in steps:
+            code, out = run(step)
+            if code:
+                return [f"{os.path.basename(step[0])} {step[1]} for drivetext: exit {code}, '{out.strip()[-160:]}'"]
+        for name, want in wanted.items():
+            got = bringup.parse_refused(bringup.parse_fields(read(os.path.join(drive, name))))
+            if got != want:
+                failed.append(f"bringup.parse_refused on drivetext's {name} gives {describe(got)}, "
+                              f"drivetext.c writes {describe(want)}")
+    return failed
+
+
 def flash_failures():
     """flash.sh refuses an image from another version before it looks for a board."""
     stamp = load("stamp_image", os.path.join(TOOLS, "stamp_image.py"))
@@ -277,7 +312,7 @@ def workflow_failures():
 
 def syntax_failures():
     failed = []
-    scripts = [os.path.join(FW, n) for n in ("build.sh", "flash.sh", "cv_define.sh")]
+    scripts = [os.path.join(FW, n) for n in ("build.sh", "flash.sh", "cv_define.sh", "dfu_util.sh")]
     scripts += [os.path.join(TOOLS, n) for n in os.listdir(TOOLS) if n.endswith(".sh")]
     for path in scripts:
         code, out = run(["bash", "-n", path])
@@ -293,7 +328,7 @@ def syntax_failures():
 
 
 CHECKS = [bump_failures, build_query_failures, pin_failures, symbol_failures, term_failures,
-          bringup_failures, flash_failures, clangd_failures, workflow_failures, syntax_failures]
+          bringup_failures, diag_text_failures, flash_failures, clangd_failures, workflow_failures, syntax_failures]
 
 
 def main():

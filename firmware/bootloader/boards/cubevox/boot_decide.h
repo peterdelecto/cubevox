@@ -96,14 +96,15 @@ typedef struct {
 // ---- Boot decision ------------------------------------------------------------------------
 
 // True for a pure power-on: PORRSTF or BORRSTF set, and none of the software, independent
-// watchdog and window watchdog flags. The bootloader never clears RCC_RSR, so its own resets keep
-// the power-on flags until the application clears them; SFTRSTF tells those apart, and a
-// watchdog reset after a hang counts as a start like any other.
+// watchdog and window watchdog flags. The flags are those of this start alone, because the
+// bootloader clears RCC_RSR once it has read it. A watchdog reset after a hang counts as a start
+// like any other.
 bool cvBootPowerOn(uint32_t resetFlags);
 
 // The first call of every start, before anything reads the block. A pure power-on or a block
 // whose blockVersion is 0 is cleared whole: DTCM holds nothing a reader may trust then. Otherwise
-// the block is kept, the reason is range checked and blockVersion is written.
+// the block is kept, the reason is range checked and blockVersion is written. The flags go into
+// resetFlags for the application, which finds RCC_RSR cleared by the jump.
 void cvBootAdopt(struct CvBootBlock* block, uint32_t resetFlags);
 
 // True when a request stands that the decision will honour. Board code then passes CvImageInvalid

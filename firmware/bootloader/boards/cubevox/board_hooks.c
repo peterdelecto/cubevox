@@ -75,6 +75,8 @@ typedef struct {
   uint32_t elapsedMs;
   uint32_t cycleMark;
   uint32_t cycleCarry;
+  // RCC_RSR as this start found it, saved by cvResetFlagsTake before anything could clear it.
+  uint32_t resetFlags;
   // What the fault handler needs to know about the moment it interrupts.
   bool adopted;
   bool imageReading;
@@ -109,6 +111,18 @@ typedef struct {
 } BoardState;
 
 static BoardState gState = {.shown = -1};
+
+//--------------------------------------------------------------------+
+// Reset flags
+//--------------------------------------------------------------------+
+
+// Saves RCC_RSR and clears it, so every start sees the flags of its own reset only. clock_init calls
+// this first. Its HSI fallback and the jump to the application both run HAL_RCC_DeInit(), which
+// clears the flags, so a later read finds nothing.
+void cvResetFlagsTake(void) {
+  gState.resetFlags = RCC->RSR;
+  RCC->RSR |= RCC_RSR_RMVF;
+}
 
 //--------------------------------------------------------------------+
 // Time
@@ -258,7 +272,7 @@ static void updateModeStart(void);
 void board_init2(void) {
   cycleCounterStart();
   struct CvBootBlock* block = CV_BLOCK;
-  cvBootAdopt(block, RCC->RSR);
+  cvBootAdopt(block, gState.resetFlags);
   gState.adopted = true;
   SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk;
   optionBytesCheck(block);
@@ -343,7 +357,7 @@ static uint32_t eccAddress(void) {
 // cvBootRecordFault decides what the next start does; this records and resets.
 void cvBootFault(const uint32_t* frame) {
   CvFaultInfo fault;
-  fault.resetFlags = RCC->RSR;
+  fault.resetFlags = gState.resetFlags;
   fault.blockAdopted = gState.adopted;
   fault.eccAddress = eccAddress();
   fault.imageReading = gState.imageReading;

@@ -28,6 +28,7 @@ set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
 source "$FW/cv_define.sh"
+source "$FW/dfu_util.sh"
 VARIANT="$("$FW/build.sh" --variant)"
 OUT="$("$FW/build.sh" --outdir)"
 WAIT="${WAIT:-300}"
@@ -116,7 +117,7 @@ rom_flash() {
   dfu_log="$(mktemp)"
   dfu-util -a 0 -s "$start:leave" -D "$IMAGE" >"$dfu_log" 2>&1 || dfu_rc=$?
   grep -E "Erase|downloaded|Error" "$dfu_log" | grep -v get_status || true  # no match is a normal outcome
-  unexpected="$(awk 'tolower($0) ~ /error/ && $0 !~ /get_status/' "$dfu_log")"
+  unexpected="$(dfu_unexpected_errors "$dfu_log")"
   if ! grep -q "File downloaded successfully" "$dfu_log" || [ -n "$unexpected" ]; then
     echo "[ERROR] dfu-util did not finish the download (exit $dfu_rc); output follows"
     cat "$dfu_log"

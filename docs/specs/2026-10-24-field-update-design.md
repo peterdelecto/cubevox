@@ -88,13 +88,14 @@ reset and is random after power-on, so every field is validated before use.
 | 0x2001FF00 | `request` | TinyUF2's double-tap register. `0xF01669EF` (`CV_REQUEST_UPDATE`): the application asks for update mode, then resets. `0x53525643` (`CV_REQUEST_RESUME`): the bootloader's fault handler returns to update mode for `lastReason`. Every decision clears it |
 | 0x2001FF04 | `bootFails` | Jumps to the application with no healthy report since the last good run |
 | 0x2001FF08 | `bootFailsCheck` | `~bootFails`. Disagreement means power-on garbage, read as 0 |
-| 0x2001FF0C | `blockVersion` | 1. The bootloader's alone: names the bootloader fields that exist |
+| 0x2001FF0C | `blockVersion` | 2 since bootloader v0.04 (1 before). The bootloader's alone: names the bootloader fields that exist |
 | 0x2001FF10 | `lastReason` | Why the bootloader last stayed in update mode (enum, section Boot sequence) |
 | 0x2001FF14 | `faultAddress` | Flash address the bootloader faulted on while reading, else 0 |
 | 0x2001FF18 | `appSummary[40]` | Written by the application before it requests update mode: version, uptime s, reset cause, last fault kind |
 | 0x2001FF40 | `bootFaultPc`, `bootFaultCfsr`, `bootFaultHfsr`, `bootFaultBfar` | The bootloader's own last fault: stacked pc, CFSR, HFSR, BFAR. 0 when none since power-on or the last update |
 | 0x2001FF50 | `optionBytes` | What the option byte step found or did since power-on (enum `CvOptionResult`) |
-| 0x2001FF54 | `bootReserved` (44 B) | Zero. New bootloader fields |
+| 0x2001FF54 | `resetFlags` | `RCC->RSR` as the bootloader read it at this start (block version 2, bootloader v0.04). The application's boot report reads the reset cause from here, because the jump into the application clears the register (power-on rule) |
+| 0x2001FF58 | `bootReserved` (40 B) | Zero. New bootloader fields |
 | 0x2001FF80 | `appFieldsVersion` | 0 until the application adds a field. The bootloader never reads it |
 | 0x2001FF84 | `appReserved` (60 B) | Zero. New application fields |
 | 0x2001FFC0 | fault record (64 B) | `.cv_noinit`, `FAU3`, unchanged. The bootloader reads it for `DIAG.TXT` and never clears it |
@@ -105,11 +106,16 @@ reset and is random after power-on, so every field is validated before use.
    bumps `blockVersion`; an application field takes `appReserved` and bumps `appFieldsVersion`.
    Readers accept every version from 1 up, because a newer writer never changes an older field.
    The bootloader in Adam's box is the oldest reader there will ever be.
-3. Power-on rule. The bootloader reads `RCC->RSR` and never clears it; the application clears it
-   for its boot report. A pure power-on (PORRSTF or BORRSTF, with none of SFTRSTF, IWDG1RSTF and
-   WWDG1RSTF) clears the whole block, so power cycles and brown-outs never count as failed starts.
-   The flags pile up until the application clears them, so a reset the bootloader makes after a
-   power-on still shows PORRSTF, and SFTRSTF tells it apart. A block with `blockVersion` 0 is
+3. Power-on rule. The bootloader reads `RCC->RSR` once, first thing in its clock step, clears the
+   register, keeps the value for its own decisions and writes it to `resetFlags` in the block
+   (bootloader v0.04, found on board 1 2026-10-29). It has to read first because the HAL's
+   `HAL_RCC_DeInit()`, which the HSI fallback and the jump into the application both call, clears
+   every flag; before v0.04 the application read the register after the jump and its boot report
+   showed no reset cause. The application reads the cause from the block (OR'd with the live
+   register) and still clears the register. A pure power-on (PORRSTF or BORRSTF, with none of
+   SFTRSTF, IWDG1RSTF and WWDG1RSTF) clears the whole block, so power cycles and brown-outs never
+   count as failed starts. Each start sees only its own reset's flags, so a reset the bootloader
+   makes shows SFTRSTF alone and never reads as a power-on. A block with `blockVersion` 0 is
    cleared too. Otherwise the bootloader leaves the application's area alone.
 
 ## Image header and UF2 family
@@ -151,8 +157,8 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    180 MHz, USB 48 MHz from PLL1Q. When the crystal or PLL1 fails, the core goes back to HSI at
    64 MHz and USB runs from HSI48, which CRS trims to the host's start-of-frame packets, so the
    drive and `DIAG.TXT` stay reachable.
-2. `board_init2` reads `RCC->RSR` and adopts the block (power-on rule, section Shared boot block),
-   then runs the option byte step (section Option bytes).
+2. `board_init2` adopts the block with the reset flags the clock step saved (power-on rule,
+   section Shared boot block), then runs the option byte step (section Option bytes).
 3. `cvBootDecide()` (pure C, `firmware/bootloader/boards/cubevox/boot_decide.c`, shared with the
    host tests) returns one of two actions from the block, the image check, the MENU switch and the
    clock. `board_app_valid2` hands the action to TinyUF2. The first matching row wins.
@@ -469,6 +475,10 @@ firmware/bootloader/
    `hardware/bringup/board-N.md` with the UID, bootloader version, firmware version and every
    drill result.
 4. Close the enclosure. BOOT0 is now unreachable, which is the intended state.
+5. Reading `DIAG.TXT` by hand: the Mac serves the copy it read when the drive mounted, so a count
+   the bootloader changed during that mount (refused blocks, a wrong file) shows only after the
+   drive is unmounted and mounted again (`diskutil unmount /Volumes/CUBEVOX`, `diskutil mount
+   CUBEVOX`). `bringup.py` remounts before each such read (board 1, 2026-10-29).
 
 ## Drills (`bringup.py --update`)
 | # | Drill | Expected |

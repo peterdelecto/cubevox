@@ -9,16 +9,17 @@
 #include "board/boot_block.h"
 #include "board/build_kind.h"
 
-// Reads and clears the reset cause and any fault record left by the previous run, enables the
-// MemManage, BusFault and UsageFault exceptions, and paints the unused main stack. Call early in
-// setup(), right after the mute pins are set up.
+// Takes the reset cause from the boot block and loads any fault record left by the previous run,
+// enables the MemManage, BusFault and UsageFault exceptions, and paints the unused main stack. Call
+// early in setup(), right after the mute pins are set up.
 void faultInit();
 
 // True once faultInit() has run. The ECC recovery reads the fault record faultInit() loads.
 bool faultInitDone();
 
-// The reset flags (RCC->RSR) as this boot read them, before faultInit() cleared them. Valid after
-// faultInit().
+// The reset flags (RCC->RSR bits) of this boot, as the bootloader stored them in the boot block
+// (CvBootBlock::resetFlags, block version 2 and up). The bootloader reads and clears the register
+// and owns it, so the application never touches it. Valid after faultInit().
 uint32_t faultResetFlags();
 
 // True when the first reset flag set, in the order of the boot report, is power-on. A power-up

@@ -175,7 +175,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `CUBEVOX` drive, copies `<out dir>/cubevox.uf2` onto it and prints the boot report once the port returns.
   `--rom` is the shop fallback for a box whose application is unreachable: dfu-util writes
   `<out dir>/cubevox.ino.bin` at 0x08020000 (`-s 0x08020000:leave`), above the bootloader that
-  `bootloader/flash.sh` puts in sector 0. `./flash.sh --help` lists the knobs. The script refuses an image
+  `bootloader/flash.sh` puts in sector 0. Both scripts judge a dfu-util log with `dfu_unexpected_errors`
+  from `dfu_util.sh`. `./flash.sh --help` lists the knobs. The script refuses an image
   whose header version differs from `VERSION.txt` and exits 1 unless the boot report that follows names the
   version it flashed.
 - `bringup.py`: first-article checks for a new board over USB, optional fault, ROM-DFU and update drills

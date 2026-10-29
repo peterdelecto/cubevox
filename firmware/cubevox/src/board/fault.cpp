@@ -9,6 +9,7 @@
 #include "board/audio.h"
 #include "board/block_mem.h"
 #include "board/boot_block.h"
+#include "board/boot_block_access.h"
 #include "board/boot_health.h"
 #include "board/diag_service.h"
 #include "board/flash_bank2.h"
@@ -259,8 +260,9 @@ void faultClockFailure(ClockStep step) {
 }
 
 void faultInit() {
-  gResetFlags = RCC->RSR;
-  RCC->RSR |= RCC_RSR_RMVF;
+  // The bootloader reads RCC->RSR at its start and clears it, so the register is 0 here. The flags
+  // of this reset come from its boot block, and the bootloader owns the register.
+  gResetFlags = cvBootBlockResetFlags(&bootBlock());
 
   if (gStored.magic == CV_FAULT_MAGIC) {
     gLast = gStored;

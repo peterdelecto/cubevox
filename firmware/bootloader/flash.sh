@@ -18,6 +18,7 @@
 set -euo pipefail
 BL="$(cd "$(dirname "$0")" && pwd)"
 source "$BL/../cv_define.sh"
+source "$BL/../dfu_util.sh"
 
 usage() {  # the header comment above, without its marks
   awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
@@ -64,12 +65,8 @@ wait_dfu() {
   exit 1
 }
 
-# dfu-util ends a transfer that resets or leaves with a get_status error and may exit non-zero, so
-# its exit code alone says little. Any other error line fails the run.
-dfu_errors() {
-  awk 'tolower($0) ~ /error/ && $0 !~ /get_status/' "$1"
-}
-
+# dfu-util may exit non-zero on a transfer that resets or leaves, so its exit code alone says
+# little. Any error line dfu_unexpected_errors reports fails the run.
 dfu_failed() {
   echo "[ERROR] dfu-util ${*:3} did not finish (exit $2); output follows"
   cat "$1"
@@ -81,7 +78,7 @@ dfu_download() {
   local log="$1" rc=0
   shift
   dfu-util "$@" > "$log" 2>&1 || rc=$?
-  if ! grep -q "File downloaded successfully" "$log" || [ -n "$(dfu_errors "$log")" ]; then
+  if ! grep -q "File downloaded successfully" "$log" || [ -n "$(dfu_unexpected_errors "$log")" ]; then
     dfu_failed "$log" "$rc" "$@"
   fi
 }
@@ -91,7 +88,7 @@ dfu_upload() {
   local log="$1" file="$2" bytes="$3" rc=0
   shift 3
   dfu-util "$@" -U "$file" > "$log" 2>&1 || rc=$?
-  if [ ! -f "$file" ] || [ "$(($(wc -c < "$file")))" -ne "$bytes" ] || [ -n "$(dfu_errors "$log")" ]; then
+  if [ ! -f "$file" ] || [ "$(($(wc -c < "$file")))" -ne "$bytes" ] || [ -n "$(dfu_unexpected_errors "$log")" ]; then
     dfu_failed "$log" "$rc" "$@" -U "$file"
   fi
 }

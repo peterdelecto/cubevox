@@ -25,6 +25,9 @@ extern "C" {
 // Called by the port's board_init before anything else runs.
 void clock_init(void);
 
+// Saves RCC_RSR for this start and clears it (board_hooks.c). clock_init calls it first.
+void cvResetFlagsTake(void);
+
 // The CvClockStep that failed at this start, 0 when the crystal and PLL1 run. After a failure the
 // core runs from HSI and USB from HSI48 trimmed by CRS, so update mode still serves DIAG.TXT.
 uint32_t cvClockFailedStep(void);

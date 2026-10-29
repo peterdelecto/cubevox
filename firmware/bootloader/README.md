@@ -95,10 +95,12 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
    to HSI at 64 MHz and USB runs from HSI48, which CRS trims to the host's start-of-frame packets.
    The decision then stays in update mode with `ClockFailed`, so the screen says so and DIAG.TXT
    names the step.
-2. `board_init2` reads RCC_RSR without clearing it and adopts the boot block (`cvBootAdopt`). A pure
-   power-on (PORRSTF or BORRSTF, and none of SFTRSTF, IWDG1RSTF, WWDG1RSTF) clears the block whole,
-   so power cycles never count as failed starts. The bootloader's own resets keep the power-on flags
-   until the application clears them, and SFTRSTF tells those apart.
+2. `clock_init` saves RCC_RSR and clears it (`cvResetFlagsTake`), before the HSI fallback's
+   `HAL_RCC_DeInit()` can. `board_init2` adopts the boot block with the saved flags (`cvBootAdopt`),
+   which also stores them in `resetFlags` for the application, because the jump's
+   `HAL_RCC_DeInit()` clears the register. A pure power-on (PORRSTF or BORRSTF, and none of SFTRSTF,
+   IWDG1RSTF, WWDG1RSTF) clears the block whole, so power cycles never count as failed starts. Each
+   start sees the flags of its own reset only.
 3. Next the option bytes: BOR level 3 and write protection of bank 1 sector 0. When either is
    missing they are programmed in one change (unlock, OPTSR_PRG and WPSN_PRG1, OPTSTART, a bounded
    wait on OPT_BUSY, lock), once per power-on. The result is `optionBytes` in the block and a line

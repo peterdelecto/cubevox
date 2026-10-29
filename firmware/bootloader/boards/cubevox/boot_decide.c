@@ -42,6 +42,7 @@ void cvBootAdopt(struct CvBootBlock* block, uint32_t resetFlags) {
   }
   if (!cvBootReasonKnown(block->lastReason)) block->lastReason = (uint32_t)CvReasonNone;
   block->blockVersion = CV_BOOT_BLOCK_VERSION;
+  block->resetFlags = resetFlags;
 }
 
 bool cvBootRequestPending(const struct CvBootBlock* block) {

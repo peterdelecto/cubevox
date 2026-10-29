@@ -112,6 +112,8 @@ static void fallbackStart(void) {
 }
 
 void clock_init(void) {
+  // First, because fallbackStart's HAL_RCC_DeInit() clears the reset flags.
+  cvResetFlagsTake();
   // The port never calls HAL_Init. The HAL's timeouts below need the tick, and
   // HAL_RCC_ClockConfig's closing HAL_InitTick needs a valid uwTickPrio.
   HAL_InitTick(TICK_INT_PRIORITY);

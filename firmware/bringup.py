@@ -637,19 +637,10 @@ def copy_to_drive(volume, src, name, fraction=1.0):
     return error
 
 
-def read_uncached(path):
-    """A file's text, read around the page cache so a DIAG.TXT the bootloader rewrote shows."""
-    fd = os.open(path, os.O_RDONLY)
-    try:
-        fcntl.fcntl(fd, fcntl.F_NOCACHE, 1)
-        chunks = []
-        while True:
-            chunk = os.read(fd, 4096)
-            if not chunk:
-                return b"".join(chunks).decode("ascii", "replace")
-            chunks.append(chunk)
-    finally:
-        os.close(fd)
+def read_text(path):
+    """A file's text, decoded as ASCII with undecodable bytes replaced."""
+    with open(path, "rb") as f:
+        return f.read().decode("ascii", "replace")
 
 
 def read_drive_text(volume, name, wait_s=5.0):
@@ -658,10 +649,39 @@ def read_drive_text(volume, name, wait_s=5.0):
     end = time.monotonic() + wait_s
     while True:
         try:
-            return read_uncached(path)
+            return read_text(path)
         except OSError as e:
             if time.monotonic() >= end:
                 raise DrillError(f"cannot read {path}: {e}") from e
+        time.sleep(0.3)
+
+
+def run_diskutil(*args):
+    r = subprocess.run(["diskutil", *args], capture_output=True, text=True)
+    if r.returncode:
+        raise DrillError((r.stderr or r.stdout).strip() or f"diskutil {args[0]} exited {r.returncode}")
+
+
+def remount_drive(wait_s=UPDATE_WAIT_S):
+    """Unmounts and mounts the update drive, then waits until DIAG.TXT reads again.
+
+    The bootloader regenerates INFO_UF2.TXT and DIAG.TXT on every mount. macOS serves the copy it
+    read at mount time, so DIAG.TXT only refreshes on a remount. The unmount also flushes the host's
+    pending writes, so a file just copied is fully counted on the next read.
+    """
+    run_diskutil("unmount", cubevox_port.volume_path(VOLUME))
+    run_diskutil("mount", VOLUME)
+    end = time.monotonic() + wait_s
+    path = os.path.join(cubevox_port.volume_path(VOLUME), "DIAG.TXT")
+    while True:
+        if cubevox_port.volume_mounted(VOLUME):
+            try:
+                read_text(path)
+                return
+            except OSError:
+                pass
+        if time.monotonic() >= end:
+            raise DrillError(f"{VOLUME} did not return with a readable DIAG.TXT {wait_s:g} s after the remount")
         time.sleep(0.3)
 
 
@@ -679,9 +699,16 @@ def parse_fields(text):
     return fields
 
 
+BLOCKS = re.compile(r"\d+ written, (\d+) refused, \d+ failed(?:, last family (0x[0-9A-Fa-f]+))?")
+
+
 def parse_refused(fields):
-    """(refused block count, last refused family id or None) from DIAG.TXT's 'refused blocks' line."""
-    m = re.match(r"(\d+)(?:, last family (0x[0-9A-Fa-f]+))?", fields.get("refused blocks", ""))
+    """(refused block count, last refused family id or None) from DIAG.TXT's 'blocks' line.
+
+    The line reads `N written, N refused, N failed`. The bootloader adds `, last family 0x...` once a
+    block was refused and `, first failure at 0x...` once a write failed. Without the line: (0, None).
+    """
+    m = BLOCKS.match(fields.get("blocks", ""))
     if not m:
         return 0, None
     return int(m.group(1)), (int(m.group(2), 16) if m.group(2) else None)
@@ -980,7 +1007,9 @@ Refusal = collections.namedtuple("Refusal", "refused family blocks copy_error")
 def refused_copy(ctx, path):
     """Copies a file the bootloader must refuse, then reads DIAG.TXT until every block is counted.
 
-    A refused file leaves the box in update mode, so a drive that vanishes is a failure.
+    A refused file leaves the box in update mode, so a drive that vanishes is a failure. DIAG.TXT
+    only changes on a mount, so each read follows a remount. The drive is absent for a moment
+    inside the remount, so the vanished-drive check runs just before it.
     """
     blocks = os.path.getsize(path) // stamp_image.UF2_BLOCK_BYTES
     error = copy_to_drive(ctx.volume(), path, COPY_NAME)
@@ -989,6 +1018,7 @@ def refused_copy(ctx, path):
         if not cubevox_port.volume_mounted(VOLUME):
             raise DrillError(f"the drive went away after the copy; the box restarted instead of refusing"
                              f"{os_note(error)}")
+        remount_drive()
         refused, family = parse_refused(parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT")))
         if refused >= blocks or time.monotonic() >= end:
             return Refusal(refused, family, blocks, error)
@@ -1027,7 +1057,7 @@ def wait_installed(ctx, want, wait_s):
     seen, error = None, None
     while True:
         try:
-            seen = parse_fields(read_uncached(path)).get("installed")
+            seen = parse_fields(read_text(path)).get("installed")
         except OSError as e:
             error = str(e)  # the drive is between two sessions while the box restarts
         if seen == want or time.monotonic() >= end:

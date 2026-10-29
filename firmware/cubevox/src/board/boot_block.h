@@ -73,7 +73,7 @@
 #define CV_IMAGE_HEADER_VERSION  1u
 // The boot block version this bootloader writes. Readers accept every version from 1 up (section
 // Boot block).
-#define CV_BOOT_BLOCK_VERSION    1u
+#define CV_BOOT_BLOCK_VERSION    2u
 
 // ---- UF2 families --------------------------------------------------------------------------
 
@@ -220,8 +220,11 @@ struct CvBootBlock {
   uint32_t bootFaultBfar;
   // An enum CvOptionResult.
   uint32_t optionBytes;
+  // Block version 2. RCC_RSR as the bootloader read it at this start. The bootloader then clears
+  // the register, so the application's reset cause comes from here.
+  uint32_t resetFlags;
   // Zero when written.
-  uint8_t bootReserved[44];
+  uint8_t bootReserved[40];
 
   // Written by the application. 0 until an application adds a field to appReserved.
   uint32_t appFieldsVersion;
@@ -242,7 +245,8 @@ CV_STATIC_ASSERT(boot_block_cfsr_at_44, offsetof(struct CvBootBlock, bootFaultCf
 CV_STATIC_ASSERT(boot_block_hfsr_at_48, offsetof(struct CvBootBlock, bootFaultHfsr) == 0x48u);
 CV_STATIC_ASSERT(boot_block_bfar_at_4c, offsetof(struct CvBootBlock, bootFaultBfar) == 0x4Cu);
 CV_STATIC_ASSERT(boot_block_options_at_50, offsetof(struct CvBootBlock, optionBytes) == 0x50u);
-CV_STATIC_ASSERT(boot_block_boot_reserved_at_54, offsetof(struct CvBootBlock, bootReserved) == 0x54u);
+CV_STATIC_ASSERT(boot_block_reset_flags_at_54, offsetof(struct CvBootBlock, resetFlags) == 0x54u);
+CV_STATIC_ASSERT(boot_block_boot_reserved_at_58, offsetof(struct CvBootBlock, bootReserved) == 0x58u);
 CV_STATIC_ASSERT(boot_block_app_version_at_80, offsetof(struct CvBootBlock, appFieldsVersion) == 0x80u);
 CV_STATIC_ASSERT(boot_block_app_reserved_at_84, offsetof(struct CvBootBlock, appReserved) == 0x84u);
 CV_STATIC_ASSERT(boot_block_ends_at_fault_record,
@@ -254,6 +258,12 @@ CV_STATIC_ASSERT(fault_record_ends_at_dtcm_end,
 // True when a bootloader has initialised the block since power-on.
 static inline bool cvBootBlockInitialised(const struct CvBootBlock* block) {
   return block->blockVersion >= 1u;
+}
+
+// The reset flags the bootloader recorded at this start, or 0 from a bootloader older than block
+// version 2, which never wrote the field.
+static inline uint32_t cvBootBlockResetFlags(const struct CvBootBlock* block) {
+  return block->blockVersion >= 2u ? block->resetFlags : 0u;
 }
 
 // True when the check word agrees with the counter.

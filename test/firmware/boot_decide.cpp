@@ -36,9 +36,13 @@ static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, bootFaultPc) == 0x2001F
                   CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, bootFaultBfar) == 0x2001FF4Cu,
               "boot: the bootloader's fault registers");
 static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, optionBytes) == 0x2001FF50u, "boot: optionBytes");
-static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, bootReserved) == 0x2001FF54u &&
-                  sizeof(CvBootBlock::bootReserved) == 44,
+static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, resetFlags) == 0x2001FF54u &&
+                  sizeof(CvBootBlock::resetFlags) == 4,
+              "boot: resetFlags");
+static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, bootReserved) == 0x2001FF58u &&
+                  sizeof(CvBootBlock::bootReserved) == 40,
               "boot: the bootloader's reserved bytes end at +0x80");
+static_assert(CV_BOOT_BLOCK_VERSION == 2u, "boot: block version 2 added resetFlags");
 static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, appFieldsVersion) == 0x2001FF80u &&
                   CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, appReserved) == 0x2001FF84u &&
                   sizeof(CvBootBlock::appReserved) == 60,
@@ -229,8 +233,7 @@ void checkBootCounter() {
         "boot: a huge valid count stays in update mode without wrapping");
 }
 
-// The flags are RCC_RSR as the bootloader reads it, which the application clears in faultInit and
-// the bootloader never does.
+// The flags are RCC_RSR as the bootloader read it at this start, before it cleared the register.
 void checkBootPowerOnFlags() {
   struct Case {
     uint32_t flags;
@@ -324,6 +327,38 @@ void checkBootGarbage() {
         "boot: a block no bootloader initialised is cleared on any reset");
 }
 
+// The bootloader hands its reset flags to the application in the block, because the jump clears
+// RCC_RSR. Every start overwrites them, and an application reading a block from a bootloader older
+// than version 2 gets none.
+void checkBootResetFlags() {
+  CvBootBlock b = bootBlock();
+  decide(b, inputs(false, CvImageValid), kPowerOn);
+  check(b.resetFlags == kPowerOn, "boot: a start stores the flags it read in the block");
+  decide(b, inputs(false, CvImageValid), kSoftware);
+  check(b.resetFlags == kSoftware, "boot: the next start replaces them with its own");
+  check(cvBootBlockResetFlags(&b) == kSoftware,
+        "boot: the application takes the flags from the block when the live register reads 0");
+
+  CvBootBlock garbage;
+  std::memset(&garbage, 0xA5, sizeof garbage);
+  decide(garbage, inputs(false, CvImageValid), kPowerOn);
+  check(garbage.resetFlags == kPowerOn, "boot: a power-on clears the block and then stores the flags");
+
+  CvFaultInfo early = faultAt(0u, false, false);
+  early.blockAdopted = false;
+  early.resetFlags = kPowerOn;
+  std::memset(&garbage, 0xA5, sizeof garbage);
+  cvBootRecordFault(&garbage, &early);
+  check(garbage.resetFlags == kPowerOn, "boot: a fault before the block was adopted stores the flags too");
+
+  b = bootBlock();
+  b.blockVersion = 1;
+  b.resetFlags = 0xDEADBEEFu;
+  check(cvBootBlockResetFlags(&b) == 0, "boot: a version 1 block carries no flags, whatever its bytes hold");
+  b.blockVersion = 0;
+  check(cvBootBlockResetFlags(&b) == 0, "boot: an uninitialised block carries no flags");
+}
+
 // Fields the last run left out of range after a reset that keeps DTCM.
 void checkBootStaleFields() {
   CvBootBlock b = bootBlock();
@@ -348,7 +383,7 @@ void checkBootStaleFields() {
 // application's own area survives decisions, faults and updates.
 void checkBootVersions() {
   CvBootBlock b = bootBlock();
-  b.blockVersion = 2;
+  b.blockVersion = CV_BOOT_BLOCK_VERSION + 1u;
   std::strcpy(b.appSummary, "v3.00.00 up 9 s");
   b.appFieldsVersion = 2;
   b.appReserved[0] = 0x5A;
@@ -854,6 +889,7 @@ void checkBootDecide() {
   checkBootPowerOn();
   checkBootRestartsCount();
   checkBootGarbage();
+  checkBootResetFlags();
   checkBootStaleFields();
   checkBootVersions();
   checkBootReadFault();
