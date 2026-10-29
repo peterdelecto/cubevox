@@ -23,7 +23,7 @@ struct CvFont {
   const uint8_t* glyphs;
 };
 
-// Stylized Hyperlegible 5x7, the project's prose font and the only one the update screens draw.
+// Myrtle 5x7, the project's prose font and the only one the update screens draw.
 extern const struct CvFont cvFont5x7;
 
 #ifdef __cplusplus
