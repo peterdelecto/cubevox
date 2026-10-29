@@ -30,7 +30,7 @@ part. Filenames are `YYYY-MM-DD-name-design.md`. Add a row here with every new s
 | `2026-10-08-pitch-cpu-pass-design.md` | Pitch stage CPU pass: tracker gating, warm buffers, spinning window, block-rate gains | current |
 | `2026-10-08-cpu-pass-2-design.md` | CPU pass 2: Unison, Distortion, DTCM placement, pane tracker, PSOLA weights, 75 % / 95 % budget rule | done 2026-10-08 with the bench numbers and the measured cost table; owner listening done 2026-10-09 (both pairs fine) |
 | `2026-10-08-cpu-pass-3-design.md` | CPU pass 3: Distortion restore after the D3 regression, Spring B disperser pair, Unison voice interleave, restrict/locals, agent worktree merge rule | done 2026-10-09; chain 54.7 % / 64.2 %, default layout sums 61 / 72 |
-| `2026-10-11-font-sizes-design.md` | OLED fonts: Stylized Hyperlegible 5x7, 9X12 and 16X24 (owner 2026-10-11), exported to `tools/font-editor/fonts/cubevox_fonts.h` | current |
+| `2026-10-11-font-sizes-design.md` | OLED fonts: Stylized Hyperlegible 5x7, 9X12 and 16X24 (owner 2026-10-11), exported to `tools/font-editor/fonts/cubevox_fonts.h` | current; renamed Myrtle 5x7 / 9X12 / 16X24 (owner 2026-10-29) |
 | `2026-10-12-layout-record-design.md` | Layout record in flash bank 2: schema v1 and v2, append log, ECC recovery | current |
 | `2026-10-12-firmware-structure-design.md` | Firmware module map and ownership rules (snapshot, pure menu, canvas); new firmware follows it | current |
 | `2026-10-12-serial-protocol-design.md` | USB JSON protocol, live layout apply with a 50 ms fade | current |

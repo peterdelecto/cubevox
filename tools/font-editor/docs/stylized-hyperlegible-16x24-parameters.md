@@ -1,4 +1,4 @@
-# Stylized Hyperlegible 16X24 Final, parameter sheet
+# Myrtle 16X24, parameter sheet
 
 The readout's value font. Drawn from pixel recipes in `build/fontaudit/font16.py` (gitignored)
 and written into the editor library; the glyph bitmaps in `fonts/cubevox-fonts.json` are the

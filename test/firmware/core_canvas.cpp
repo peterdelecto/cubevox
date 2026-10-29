@@ -21,7 +21,7 @@
 namespace {
 
 void checkCanvasText() {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7Final;
+  namespace f = cubevox::fonts::Myrtle5x7;
   const FontDesc& font = font5x7();
   const uint8_t* glyphA = &f::kGlyphs['A' - 0x20][0];
 
@@ -53,7 +53,7 @@ void checkCanvasText() {
 }
 
 void checkCanvasWidth() {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7Final;
+  namespace f = cubevox::fonts::Myrtle5x7;
   const FontDesc& font = font5x7();
   check(Canvas::textWidth(font, "AB") == 2 * (f::kWidth + f::kSpacing) - f::kSpacing, "canvas: textWidth drops the trailing gap");
   check(Canvas::textWidth(font, "") == 0, "canvas: textWidth of an empty string is 0");
@@ -165,7 +165,7 @@ void checkCanvasFonts() {
   check(lower5.page(0)[1] != 0 && std::memcmp(lower5.page(0), upper5.page(0), kCanvasWidth) == 0,
         "canvas: 5x7 u draws the bytes of U");
 
-  namespace f9 = cubevox::fonts::StylizedHyperlegible9X12Final;
+  namespace f9 = cubevox::fonts::Myrtle9X12;
   Canvas big9;
   big9.drawText(0, 0, font9x12(), "u");
   bool ok9 = true;
@@ -175,7 +175,7 @@ void checkCanvasFonts() {
   }
   check(ok9 && big9.page(0)[1] != 0, "canvas: 9x12 u draws the glyph bytes of U");
 
-  namespace f16 = cubevox::fonts::StylizedHyperlegible16X24Final;
+  namespace f16 = cubevox::fonts::Myrtle16X24;
   Canvas big16;
   big16.drawText(0, 0, font16x24(), "H");
   bool ok16 = true;
@@ -484,7 +484,7 @@ void checkTabularDigits() {
 
 // Lays glyph cells on a width + spacing grid, which is the 5x7 pitch the menu screens rely on.
 void fixedPitchRow(const char* text, uint8_t (&row)[kCanvasWidth]) {
-  namespace f = cubevox::fonts::StylizedHyperlegible5x7Final;
+  namespace f = cubevox::fonts::Myrtle5x7;
   std::memset(row, 0, sizeof row);
   int x = 0;
   for (; *text; ++text) {

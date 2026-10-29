@@ -1,6 +1,6 @@
 # 16X24 neo-grotesque redraw
 
-The readout's value font, `Stylized Hyperlegible 16X24 Final`, drawn as a condensed
+The readout's value font, `Myrtle 16X24`, drawn as a condensed
 neo-grotesque from pixel recipes. The recipes live in `build/fontaudit/font16.py`
 (gitignored); the glyph bitmaps in `tools/font-editor/fonts/cubevox-fonts.json` are what the
 firmware builds from. Supersedes the generator notes in

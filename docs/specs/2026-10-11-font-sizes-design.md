@@ -1,5 +1,8 @@
 # Font sizes for the 128 x 64 OLED — design
 
+## Status
+Renamed (owner 2026-10-29): the three shipped fonts are Myrtle 5x7, Myrtle 9X12 and Myrtle 16X24 in the library and `Myrtle5x7`, `Myrtle9X12`, `Myrtle16X24` in the header. The older Stylized Hyperlegible drafts keep their names.
+
 ## Goal
 Three font sizes, each matched to one job on the SH1106 (128 x 64 px, 0.23 mm pitch,
 white on black, read from about 70 cm). All three belong to the "Stylized" family, are

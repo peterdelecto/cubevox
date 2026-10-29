@@ -18,9 +18,9 @@ namespace f = cubevox::fonts;
 constexpr uint8_t kInkGap = 3;
 
 // The 5x7 font stays on its fixed 6 px pitch, which the menu and update screens are laid out on.
-constexpr FontDesc k5x7 = CUBEVOX_DESCRIBE(StylizedHyperlegible5x7Final, 0);
-constexpr FontDesc k9x12 = CUBEVOX_DESCRIBE(StylizedHyperlegible9X12Final, kInkGap);
-constexpr FontDesc k16x24 = CUBEVOX_DESCRIBE(StylizedHyperlegible16X24Final, kInkGap);
+constexpr FontDesc k5x7 = CUBEVOX_DESCRIBE(Myrtle5x7, 0);
+constexpr FontDesc k9x12 = CUBEVOX_DESCRIBE(Myrtle9X12, kInkGap);
+constexpr FontDesc k16x24 = CUBEVOX_DESCRIBE(Myrtle16X24, kInkGap);
 
 static_assert(kFont5x7Advance == k5x7.width + k5x7.spacing, "kFont5x7Advance must match the export");
 
