@@ -195,11 +195,14 @@ revision 1. Disposition per finding is in `docs/audits/2026-10-02-schematic-audi
 ### Firmware notes
 
 F1. BOR level 3 (about 2.61 V falling).
-F2. MUTE_N goes high 500 ms after the SAI clocks run, and low when VA_SENSE
-    reads below 4.75 V (provisional, tolerance and shutdown time to budget).
-    ADC1 converts VA_SENSE without pause; its analog watchdog interrupt drops
-    XSMT and MUTE_N by register at once. The mute releases through the normal
-    sequence once 5VA has held at or above 4.85 V for 500 ms (`core/power_fail`).
+F2. MUTE_N goes high no earlier than 6 s after the app starts, with XSMT already
+    high and the chain's output held at zero until the relay has settled, so the
+    10 µF / 100 kΩ output coupling (item 9) has discharged and nothing is on the
+    tip when the contacts meet (`2026-10-30-output-safety-design.md` item 6). MUTE_N
+    goes low when VA_SENSE reads below 4.75 V, and the H7's PVD at level 6 (2.85 V on
+    VDD) drops it by register in its own interrupt before the main loop sees the
+    rail go (same spec, item 5). The mute releases through the normal sequence once
+    5VA has held at or above 4.85 V for 500 ms (`core/power_fail`).
 F3. Assert XSMT (PC5, U1 pin 33) at least 3.4 ms before shutdown (PCM5102A, 48 kHz).
 F4. PLL3 M/N/P 25/196/4 (HAL values PLL3M = 25, PLL3N = 196, PLL3FRACN = 4981, PLL3P = 4; raw RCC fields DIVN3 = 195 and DIVP3 = 3 encode N-1 and P-1, PLL3RGE = 0,
     PLL3VCOSEL = 1); SAI1 MCKDIV = 4, OSR = 0, NOMCK = 0.

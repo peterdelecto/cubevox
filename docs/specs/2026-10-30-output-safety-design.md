@@ -46,8 +46,9 @@ through the output stage, the counter reads 1, and the block after runs the chai
 
 ## 5. Brownout drops the mute relay at once
 Today the mute on power loss waits for the main loop to read 5VA on VA_SENSE and trip under
-4.75 V. The H7's programmable voltage detector (PVD) on VDD, level 7 (2.9 V, the highest step),
-raises EXTI line 16; its interrupt pulls MUTE_N low in the first instruction, writes the mute
+4.75 V. The H7's programmable voltage detector (PVD) on VDD, level 6 (2.85 V, the highest internal
+step on the H743; level 7 selects the external PVD_IN pin, as built 2026-10-30), raises
+EXTI line 16; its interrupt pulls MUTE_N low in the first instruction, writes the mute
 holder flag the main loop already honours (`power_trips`), and returns. The main loop then
 runs the ordinary power-fail path (XSMT low, hold, release after 5VA recovers) as today. The
 PVD interrupt sits at a priority above the audio block (priority 1) so it runs inside a block.
