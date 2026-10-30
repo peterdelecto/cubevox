@@ -79,45 +79,6 @@ void slotMap(Canvas& c, int top, int barH, int focus) {
   }
 }
 
-// Strip of eight boxes naming where the touched knob sits on the panel.
-void slotStrip(Canvas& c, int y, int slot, int knob) {
-  for (int s = 0; s < kSlots; ++s) {
-    const int x = s * kCell + 2;
-    frameRect(c, x, y, 12, 6);
-    if (s != slot) continue;
-    if (knob < 0) {
-      c.fillRect(x + 1, y + 1, 10, 4, true);
-    } else {
-      c.fillRect(x + 1 + knob * 5, y + 1, 5, 4, true);
-    }
-  }
-}
-
-void bar(Canvas& c, int y, float v, bool bipolar) {
-  frameRect(c, 0, y, kCanvasWidth, 7);
-  const int inner = kCanvasWidth - 4;
-  if (!bipolar) {
-    c.fillRect(2, y + 2, static_cast<int>(v * inner), 3, true);
-    return;
-  }
-  const int mid = 2 + inner / 2;
-  const int to = 2 + static_cast<int>(v * inner);
-  c.fillRect(mid - 1, y, 2, 7, true);
-  c.fillRect(to < mid ? to : mid, y + 2, to < mid ? mid - to : to - mid, 3, true);
-}
-
-void stepTicks(Canvas& c, int y, int positions, int current) {
-  const int pitch = kCanvasWidth / positions;
-  for (int i = 0; i < positions; ++i) {
-    const int x = i * pitch + (pitch - 6) / 2;
-    if (i == current) {
-      c.fillRect(x, y, 6, 7, true);
-    } else {
-      frameRect(c, x, y + 2, 6, 3);
-    }
-  }
-}
-
 void home(Canvas& c) {
   c.drawText(kPad, kPad, font5x7(), "CUBEVOX");
   rightAligned(c, kPad, font5x7(), "MIC  LINE");
@@ -139,23 +100,26 @@ void muted(Canvas& c) {
   }
 }
 
-void knobScreen(Canvas& c, int slot, int knob, const char* label, const char* value, float v,
-                bool bipolar) {
+// The readout's title bar: a lit bar across the whole width, rows 0 to 13, with the slot number and
+// card name in black 7X12, centred, top at row 1. The text is drawn lit and the bar inverted over it.
+void titleBar(Canvas& c, const char* head) {
+  c.drawText((kCanvasWidth - Canvas::textWidth(font7x12(), head)) / 2, kPad, font7x12(), head);
+  c.invertRect(0, 0, kCanvasWidth, 12 + 2 * kPad);
+}
+
+// The knob readout: the title bar, the parameter name with its top at row 16, the value at row 34.
+void knobScreen(Canvas& c, int slot, const char* label, const char* value) {
   char head[24];
   std::snprintf(head, sizeof(head), "%d %s", slot + 1, kChain[slot].name);
-  c.drawText(kPad, kPad, font5x7(), head);
-  slotStrip(c, 9, slot, knob);
-  centered(c, 17, font9x12(), label);
-  centered(c, 31, font16x24(), value);
-  bar(c, 57, v, bipolar);
+  titleBar(c, head);
+  centered(c, 16, font9x12(), label);
+  centered(c, 34, font16x24(), value);
 }
 
 void keyScreen(Canvas& c) {
-  c.drawText(kPad, kPad, font5x7(), "2 AUTOTUNE");
-  slotStrip(c, 9, 1, 0);
-  centered(c, 17, font9x12(), "KEY");
-  centered(c, 31, font16x24(), "F / DM");
-  stepTicks(c, 57, 12, 8);
+  titleBar(c, "2 AUTOTUNE");
+  centered(c, 16, font9x12(), "KEY");
+  centered(c, 34, font16x24(), "F / DM");
 }
 
 // The runtime toggle readout, drawn by the firmware's renderer: slot 6 flipped on.
@@ -253,9 +217,9 @@ void writeSheet(const char* path, const std::vector<Draw>& screens) {
   std::fclose(f);
 }
 
-void knobMix(Canvas& c) { knobScreen(c, 7, 0, "MIX", "50 %", 0.5f, false); }
-void knobSemis(Canvas& c) { knobScreen(c, 2, 0, "SEMITONES", "-12 ST", 0.0f, true); }
-void knobTime(Canvas& c) { knobScreen(c, 4, 1, "TIME", "120 MS", 0.32f, false); }
+void knobMix(Canvas& c) { knobScreen(c, 7, "MIX", "50 %"); }
+void knobSemis(Canvas& c) { knobScreen(c, 2, "SEMITONES", "-12 ST"); }
+void knobTime(Canvas& c) { knobScreen(c, 4, "TIME", "120 MS"); }
 
 }  // namespace
 

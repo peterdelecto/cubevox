@@ -30,6 +30,9 @@ constexpr int kH = kCanvasHeight;
 constexpr int kFps = 25;
 constexpr float kDt = 1.0f / kFps;
 constexpr int kPad = 1;
+constexpr int kTitleBarH = 12 + 2 * kPad;  // 12 px glyphs with 1 px of bar above and below
+constexpr int kNameY = 16;   // top of the readout's 9X12 parameter name
+constexpr int kValueY = 34;  // top of the readout's 16X24 value
 constexpr int kCapH = 16;
 constexpr int kCapPages = kCapH / 8;
 
@@ -379,29 +382,35 @@ void rollValue(Frame& f, int y, const Param& p, float shown) {
   text(f, pen, y, big, unit);
 }
 
+// The title bar: a lit bar across the whole width, rows 0 to 13, with the slot number, a space and
+// the card name in black 7X12, centred, top at row 1. The text is drawn lit and the bar is
+// inverted over it.
 void title(Frame& f, int slot) {
   char head[32];
   std::snprintf(head, sizeof head, "%d %s", slot + 1, kCards[slot].name);
-  text(f, kPad, kPad, font5x7(), head);
+  const FontDesc& font = font7x12();
+  Canvas c;
+  c.drawText((kW - textW(font, head)) / 2, kPad, font, head);
+  c.invertRect(0, 0, kW, kTitleBarH);
+  f.orCanvas(c);
 }
 
-// The knob screen: slot and card on top, the parameter, the rolling value. The three rows share
-// the free height evenly (7 px, 7 px, 6 px gaps).
+// The knob screen: the title bar, the parameter, the rolling value.
 Frame knobScreen(int slot, int knob, float shown) {
   const Param& p = knob ? kCards[slot].b : kCards[slot].a;
   Frame f;
   title(f, slot);
-  textCentered(f, 15, font9x12(), p.label);
-  rollValue(f, 34, p, shown);
+  textCentered(f, kNameY, font9x12(), p.label);
+  rollValue(f, kValueY, p, shown);
   return f;
 }
 
-// The toggle screen: slot and card on top, the parameter row empty, ON or OFF in 16X24 centred on
-// the value row.
+// The toggle screen: the title bar, the parameter row empty, ON or OFF in 16X24 centred on the
+// value row.
 Frame toggleScreen(int slot, bool on) {
   Frame f;
   title(f, slot);
-  textCentered(f, 34, font16x24(), on ? "ON" : "OFF");
+  textCentered(f, kValueY, font16x24(), on ? "ON" : "OFF");
   return f;
 }
 

@@ -17,7 +17,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 | Screen | Shows | Rows |
 |---|---|---|
 | Voice | the output as a ribbon scrolling right to left, scaled to its own recent peak, with the input level as a bar at the left and the DEBUG load figure bottom right | ribbon columns 4 to 127, horizon at row 32, up to 22 px each side, 1 px rim; bar columns 1 to 2, rows 9 to 55 |
-| Readout | the knob that moved last | card line 5x7 at (1, 1), name 9X12 top at 15, value 16X24 top at 34 |
+| Readout | the knob that moved last | title bar rows 0 to 13 with the slot and card name black in 7X12 centred, name 9X12 top at 16, value 16X24 top at 34 |
 | Muted | the word of the top switch, nothing else | 16X24 centred both ways, top at 20 |
 | Menu | the list, chain view or update confirm | as the menu spec, unchanged |
 
@@ -33,8 +33,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 9. The menu takes no input until the face's first tick. A click or a turn during the boot splash, when nobody could see the menu, does nothing. Without a panel the face never ticks, so the menu never listens. MENU held at power-on still reaches update mode, because the bootloader reads it.
 
 ## Readout
-1. Row one is the slot number, a space and the card name, 5x7 at (1, 1).
-2. Row two is the parameter name, 9X12, centred, top at row 15.
+1. Row one is a title bar (owner 2026-10-30, proof C2 of `tools/oled-proof/readout-title-proof.png`): the full width lit over rows 0 to 13, with the slot number, a space and the card name in capitals, Myrtle 7X12 spaced by ink with a 2 px gap, black, centred on the width, glyph top at row 1, so 1 px of bar shows above and below the letters. The bar is 12 + 2 × kScreenPad tall. The longest default title, `8 SPRING REVERB`, is 108 px wide; every card name in the registry fits with bar on both sides.
+2. Row two is the parameter name, 9X12, centred, top at row 16.
 3. Row three is the value, a space and the unit, 16X24, with its top at row 34, in a 24 px band that spans rows 34 to 57. It sits in a fixed field, set out under Value field.
 4. A text value (the autotune key) has no unit and does not roll. It is left-aligned in a field as wide as the widest name.
 5. The value eases to the knob with a 20 ms time constant, which closes 86.5 % of the gap per tick.
@@ -48,7 +48,7 @@ MUTED word is for the top switch.
 1. A flip of a slot's toggle raises the readout for that slot as a knob move does, with the same
    hold, priority, dissolve and card rule (Priority 2, 4, 7, 8). A flip under the open menu is
    not shown; a flip on a slot with no card raises nothing.
-2. The toggle readout keeps row one, leaves row two empty, and draws ON or OFF on the value row,
+2. The toggle readout keeps the title bar, leaves row two empty, and draws ON or OFF on the value row,
    16X24, centred, top at row 34. The words are ON and OFF, never BYPASS, so the slot's state
    never reads like the top switch's BYPASS screen.
 3. A flip or a knob on the slot already shown refreshes the readout in place, without a

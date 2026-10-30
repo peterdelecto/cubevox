@@ -353,7 +353,7 @@ bool lineIsSpaced(const FontDesc& font, const char* text, int gap) {
 }
 
 void checkInkTables() {
-  const NamedFont all[] = {{"5x7", &font5x7()}, {"9X12", &font9x12()}, {"16X24", &font16x24()}};
+  const NamedFont all[] = {{"5x7", &font5x7()}, {"7X12", &font7x12()}, {"9X12", &font9x12()}, {"16X24", &font16x24()}};
   for (const NamedFont& nf : all) {
     const FontDesc& font = *nf.font;
     bool ok = font.inkLeft != nullptr && font.inkWidth != nullptr;
@@ -365,7 +365,8 @@ void checkInkTables() {
     check(font.spaceAdvance == font.width / 2, (std::string("canvas: ") + nf.name + " space advance is half the cell").c_str());
   }
   check(font5x7().inkGap == 0 && font9x12().inkGap == kInkGap && font16x24().inkGap == kInkGap,
-        "canvas: only 5x7 stays on the fixed pitch, the others use a 3 px gap");
+        "canvas: only 5x7 stays on the fixed pitch, 9X12 and 16X24 use a 3 px gap");
+  check(font7x12().inkGap == 2, "canvas: the 7X12 title font is spaced by ink with a 2 px gap");
 }
 
 void checkInkSpacing() {

@@ -33,6 +33,7 @@ struct FontDesc {
 constexpr int kFont5x7Advance = 6;
 
 const FontDesc& font5x7();    // fixed pitch
+const FontDesc& font7x12();   // spaced by ink, a 2 px gap
 const FontDesc& font9x12();   // spaced by ink
 const FontDesc& font16x24();  // spaced by ink
 

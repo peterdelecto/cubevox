@@ -1,5 +1,5 @@
 // Checks the runtime screens on the host. Covers the readout against the proof renderer byte for
-// byte (settled, rolling and muted), its rows and edges, the key names with their flats, the voice
+// byte (settled, rolling and muted), its title bar, rows and edges, the key names with their flats, the voice
 // ribbon, the input level bar, the muted word and the DEBUG load figure. The proof PGMs go to
 // build/oled-*.pgm.
 
@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -47,15 +48,68 @@ bool rowsBlank(const Canvas& c, int y0, int y1) {
   return true;
 }
 
-// The outermost ring of pixels must stay dark, which keeps text 1 px clear of every edge.
-bool edgesDark(const Canvas& c) {
+// The readout's title bar (owner 2026-10-30): rows 0 to 13 lit across the full width, the slot
+// number and card name on it in black 7X12 with their top at row 1, so 1 px of bar lies above and
+// below the 12 px glyphs. The parameter name's top is at row 16.
+constexpr int kBarRows = 14;
+constexpr int kTitleTop = 1;
+constexpr int kNameTop = 16;
+
+// The outermost ring of pixels must stay dark, which keeps text 1 px clear of every edge. The title
+// bar lights rows 0 to 13 edge to edge, so a readout asks from row `top` down, with row 0 skipped.
+bool edgesDark(const Canvas& c, int top = 0) {
   for (int x = 0; x < kCanvasWidth; ++x) {
-    if (lit(c, x, 0) || lit(c, x, kCanvasHeight - 1)) return false;
+    if ((top == 0 && lit(c, x, 0)) || lit(c, x, kCanvasHeight - 1)) return false;
   }
-  for (int y = 0; y < kCanvasHeight; ++y) {
+  for (int y = top; y < kCanvasHeight; ++y) {
     if (lit(c, 0, y) || lit(c, kCanvasWidth - 1, y)) return false;
   }
   return true;
+}
+
+// The title bar built from the pick: `text` in 7X12 centred with its top at row 1, then rows 0 to 13
+// inverted over it, so the glyphs come out black on the bar.
+Canvas titleBarOf(const char* text) {
+  Canvas c;
+  c.drawText((kCanvasWidth - Canvas::textWidth(font7x12(), text)) / 2, kTitleTop, font7x12(), text);
+  c.invertRect(0, 0, kCanvasWidth, kBarRows);
+  return c;
+}
+
+// True when the bar's first and last rows and both side columns are lit end to end and the two rows
+// under it are blank, so nothing but the title's glyphs is dark inside the bar.
+bool barSpansWidth(const Canvas& c) {
+  for (int x = 0; x < kCanvasWidth; ++x) {
+    if (!lit(c, x, 0) || !lit(c, x, kBarRows - 1)) return false;
+  }
+  for (int y = 0; y < kBarRows; ++y) {
+    if (!lit(c, 0, y) || !lit(c, kCanvasWidth - 1, y)) return false;
+  }
+  for (int y = kBarRows; y < kNameTop; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) {
+      if (lit(c, x, y)) return false;
+    }
+  }
+  return true;
+}
+
+// First and last column holding a dark pixel inside the bar, -1 when the bar is solid.
+struct DarkSpan {
+  int left = -1;
+  int right = -1;
+};
+
+DarkSpan darkInBar(const Canvas& c) {
+  DarkSpan span;
+  for (int x = 0; x < kCanvasWidth; ++x) {
+    for (int y = 0; y < kBarRows; ++y) {
+      if (lit(c, x, y)) continue;
+      if (span.left < 0) span.left = x;
+      span.right = x;
+      break;
+    }
+  }
+  return span;
 }
 
 // The readout of knob `knob` on the card in `slot` of the default layout.
@@ -138,14 +192,13 @@ void checkReadoutRolling() {
 
 void checkReadoutRows() {
   const Canvas c = readoutOf(4, 1, 210.0f);
-  Canvas head;
-  head.drawText(1, 1, font5x7(), "5 SLAPBACK");
-  check(sameRows(c, head, 0, 9), "readout: row one is the slot, a space and the card in 5x7 at (1, 1)");
+  check(sameRows(c, titleBarOf("5 SLAPBACK"), 0, kNameTop),
+        "readout: the first rows are the slot, a space and the card in black 7X12 on a bar, top at row 1");
   Canvas name;
-  name.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "TIME")) / 2, 15, font9x12(), "TIME");
-  check(sameRows(c, name, 9, 30), "readout: row two is the parameter name in 9X12 centred, top at 15");
-  check(rowsBlank(c, 27, 34) && rowsBlank(c, 58, kCanvasHeight), "readout: nothing between the rows or under the value");
-  check(!rowsBlank(c, 34, 58) && edgesDark(c), "readout: the value fills the band from row 34 to 57 and the edges stay dark");
+  name.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "TIME")) / 2, kNameTop, font9x12(), "TIME");
+  check(sameRows(c, name, kNameTop, 30), "readout: the parameter name is 9X12 centred, top at 16");
+  check(rowsBlank(c, 28, 34) && rowsBlank(c, 58, kCanvasHeight), "readout: nothing between the rows or under the value");
+  check(!rowsBlank(c, 34, 58) && edgesDark(c, kBarRows), "readout: the value fills the band from row 34 to 57 and the edges below the bar stay dark");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -638,8 +691,8 @@ void checkReadoutRollClip() {
   bool dark = true;
   for (int k = 0; k <= 48; ++k) {
     const Canvas c = readoutOf(4, 1, 120.0f + static_cast<float>(k) / 24.0f);
-    clipped = clipped && rowsBlank(c, 27, 34) && rowsBlank(c, 58, kCanvasHeight);
-    dark = dark && edgesDark(c);
+    clipped = clipped && rowsBlank(c, 28, 34) && rowsBlank(c, 58, kCanvasHeight);
+    dark = dark && edgesDark(c, kBarRows);
   }
   check(clipped, "readout: a rolling digit never leaves its band");
   check(dark, "readout: a rolling readout keeps the edges dark");
@@ -657,7 +710,7 @@ void checkReadoutEdges() {
       for (int i = 0; i < count; ++i) {
         const float reading = k->kind == KnobKind::Stepped ? static_cast<float>(i) : static_cast<float>(i) / 100.0f;
         const float shown = static_cast<float>(knobShown(*k, reading));
-        dark = dark && edgesDark(readoutOf(slot, knob, shown)) && edgesDark(readoutOf(slot, knob, shown + 0.5f));
+        dark = dark && edgesDark(readoutOf(slot, knob, shown), kBarRows) && edgesDark(readoutOf(slot, knob, shown + 0.5f), kBarRows);
       }
     }
   }
@@ -692,13 +745,12 @@ void checkKeyField() {
 
 void checkKeyRows() {
   const Canvas key = readoutOf(1, 0, 11.0f);
-  Canvas head;
-  head.drawText(1, 1, font5x7(), "2 AUTOTUNE");
-  head.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "KEY")) / 2, 15, font9x12(), "KEY");
-  check(sameRows(key, head, 0, kValueTop), "readout: the key's card line and parameter name are as for any knob");
+  Canvas head = titleBarOf("2 AUTOTUNE");
+  head.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "KEY")) / 2, kNameTop, font9x12(), "KEY");
+  check(sameRows(key, head, 0, kValueTop), "readout: the key's title bar and parameter name are as for any knob");
   writePgm(key, "oled-readout-key.pgm");
 
-  check(edgesDark(readoutOf(1, 0, 6.0f)), "readout: the widest key name, F# / D#m, keeps the edges dark");
+  check(edgesDark(readoutOf(1, 0, 6.0f), kBarRows), "readout: the widest key name, F# / D#m, keeps the edges below the bar dark");
   ReadoutView stray = viewOf(1, 0, 3.5f);
   stray.target = 99;
   Canvas clamped;
@@ -739,18 +791,15 @@ void checkReadoutEdgeCases() {
   none.card = "Empty";
   Canvas c;
   renderReadout(c, none);
-  Canvas head;
-  head.drawText(1, 1, font5x7(), "4 EMPTY");
-  check(sameRows(c, head, 0, kCanvasHeight), "readout: a slot with no knob draws the card line only");
+  check(sameRows(c, titleBarOf("4 EMPTY"), 0, kCanvasHeight), "readout: a slot with no knob draws the title bar only");
 
-  // Values no knob produces still draw the card line and never fault.
-  Canvas title;
-  title.drawText(1, 1, font5x7(), "3 OCTAVE");
+  // Values no knob produces still draw the title bar and never fault.
+  const Canvas title = titleBarOf("3 OCTAVE");
   bool stable = true;
   const float inf = std::numeric_limits<float>::infinity();
   const float nan = std::numeric_limits<float>::quiet_NaN();
-  for (float shown : {nan, inf, -inf, 1.0e9f, -1.0e9f}) stable = stable && sameRows(readoutOf(2, 0, shown), title, 0, 9);
-  check(stable, "readout: a wild value still draws the card line");
+  for (float shown : {nan, inf, -inf, 1.0e9f, -1.0e9f}) stable = stable && sameRows(readoutOf(2, 0, shown), title, 0, kNameTop);
+  check(stable, "readout: a wild value still draws the title bar");
 
   // A knob with decimals rolls through the point. No card has one yet.
   const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
@@ -761,11 +810,11 @@ void checkReadoutEdgeCases() {
   fine.shown = 14.5f;
   Canvas d;
   renderReadout(d, fine);
-  check(edgesDark(d) && !rowsBlank(d, 34, 58), "readout: a decimal value draws with its point");
+  check(edgesDark(d, kBarRows) && !rowsBlank(d, 34, 58), "readout: a decimal value draws with its point");
 
   // Rolling from -1 to 0, the sign cell rolls through a blank.
   const Canvas across = readoutOf(2, 0, -0.5f);
-  check(edgesDark(across) && !rowsBlank(across, 34, 58), "readout: a value rolling from -1 to 0 draws");
+  check(edgesDark(across, kBarRows) && !rowsBlank(across, 34, 58), "readout: a value rolling from -1 to 0 draws");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1068,9 +1117,9 @@ void checkMuted() {
 // ---------------------------------------------------------------------------------------------
 // Toggle
 
-// Slot 6 (Distortion) with its toggle at `on`.
-Canvas toggleOf(bool on) {
-  ReadoutView v = viewOf(5, 0, 0.0f);
+// The toggle readout of the card in `slot` of the default layout, with its toggle at `on`.
+Canvas toggleReadout(int slot, bool on) {
+  ReadoutView v = viewOf(slot, 0, 0.0f);
   v.knob = nullptr;
   v.toggle = true;
   v.on = on;
@@ -1078,6 +1127,9 @@ Canvas toggleOf(bool on) {
   renderReadout(c, v);
   return c;
 }
+
+// Slot 6 (Distortion) with its toggle at `on`.
+Canvas toggleOf(bool on) { return toggleReadout(5, on); }
 
 void checkToggle() {
   struct Case {
@@ -1093,15 +1145,13 @@ void checkToggle() {
     check(matchesGolden(c, t.golden), (what + "matches the proof frame").c_str());
     writePgm(c, t.pgm);
 
-    Canvas head;
-    head.drawText(1, 1, font5x7(), "6 DISTORTION");
-    check(sameRows(c, head, 0, 9), (what + "row one is the slot and card in 5x7 at (1, 1), as on a knob readout").c_str());
-    check(rowsBlank(c, 9, 34), (what + "row two is empty").c_str());
+    check(sameRows(c, titleBarOf("6 DISTORTION"), 0, kNameTop), (what + "the title bar holds the slot and card, as on a knob readout").c_str());
+    check(rowsBlank(c, kBarRows, 34), (what + "the parameter row is empty").c_str());
 
     Canvas word;
     word.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), t.word)) / 2, 34, font16x24(), t.word);
     check(sameRows(c, word, 34, 58) && !rowsBlank(c, 34, 58), (what + "the word is 16X24 centred with its top at row 34").c_str());
-    check(rowsBlank(c, 58, kCanvasHeight) && edgesDark(c), (what + "nothing under the word and the edges stay dark").c_str());
+    check(rowsBlank(c, 58, kCanvasHeight) && edgesDark(c, kBarRows), (what + "nothing under the word and the edges below the bar stay dark").c_str());
 
     int first = kCanvasWidth;
     int last = -1;
@@ -1116,15 +1166,82 @@ void checkToggle() {
   }
   check(!sameRows(toggleOf(true), toggleOf(false), 34, 58), "toggle: ON and OFF differ on the value row");
 
-  // The word does not depend on a knob descriptor, so the slot's card line alone changes with the slot.
+  // The word does not depend on a knob descriptor, so the slot's title bar alone changes with the slot.
   Canvas other;
   ReadoutView v = viewOf(7, 1, 0.0f);
   v.knob = nullptr;
   v.toggle = true;
   v.on = true;
   renderReadout(other, v);
-  check(sameRows(other, toggleOf(true), 34, kCanvasHeight) && !sameRows(other, toggleOf(true), 0, 9),
-        "toggle: only the card line differs between two slots' readouts");
+  check(sameRows(other, toggleOf(true), kBarRows, kCanvasHeight) && !sameRows(other, toggleOf(true), 0, kBarRows),
+        "toggle: only the title bar differs between two slots' readouts");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Title bar
+
+// A card name in capitals, the form the title shows.
+std::string capitals(const char* name) {
+  std::string s = name;
+  for (char& ch : s) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+  return s;
+}
+
+// Every readout of the default layout, knob and toggle alike, carries the same bar and title for its
+// slot: the bar lit across columns 0 to 127 of rows 0 to 13, the title centred in black with 1 px of
+// bar above and below, and rows 14 and 15 blank.
+void checkReadoutTitleBar() {
+  const Layout layout = defaultLayout();
+  bool spans = true;
+  bool exact = true;
+  bool centred = true;
+  bool margins = true;
+  bool toggleSame = true;
+  int widest = 0;
+  std::string widestTitle;
+  for (int slot = 0; slot < kSlotCount; ++slot) {
+    const Card cardId = layout.card[static_cast<size_t>(slot)];
+    const std::string title = std::to_string(slot + 1) + " " + capitals(cardDesc(cardId).name);
+    std::vector<Canvas> screens;
+    for (int knob = 0; knob < kKnobsPerCard; ++knob) {
+      if (knobDesc(cardId, knob)) screens.push_back(readoutOf(slot, knob, 0.0f));
+    }
+    screens.push_back(toggleReadout(slot, true));
+    screens.push_back(toggleReadout(slot, false));
+    const Canvas want = titleBarOf(title.c_str());
+    for (const Canvas& c : screens) {
+      spans = spans && barSpansWidth(c);
+      exact = exact && sameRows(c, want, 0, kNameTop);
+      const DarkSpan dark = darkInBar(c);
+      const int left = dark.left;
+      const int right = kCanvasWidth - 1 - dark.right;
+      centred = centred && dark.left >= 0 && std::abs(left - right) <= 1;
+      margins = margins && left >= kScreenPad && right >= kScreenPad;
+    }
+    toggleSame = toggleSame && sameRows(screens[screens.size() - 2], screens[0], 0, kNameTop) &&
+                 sameRows(screens[screens.size() - 2], screens.back(), 0, kNameTop);
+    const int width = Canvas::textWidth(font7x12(), title.c_str());
+    if (width > widest) {
+      widest = width;
+      widestTitle = title;
+    }
+  }
+  check(spans, "title bar: every readout lights columns 0 to 127 of rows 0 and 13 and the side columns of rows 0 to 13, with rows 14 and 15 blank");
+  check(exact, "title bar: every readout holds its slot, a space and the card in capitals in black 7X12, top at row 1");
+  check(centred, "title bar: the title is centred, its left and right margins within 1 px");
+  check(widestTitle == "8 SPRING REVERB" && widest == 108, "title bar: the longest title of the default layout is 8 SPRING REVERB, 108 px wide");
+  check(margins, "title bar: every title of the default layout keeps at least 1 px of bar on both sides");
+  check(toggleSame, "title bar: a toggle readout, ON or OFF, carries the same bar and title as the knob readout of its slot");
+
+  // Any card in any slot fits between the pad on both sides.
+  bool allFit = true;
+  for (int index = 1; index < kCardCount; ++index) {
+    for (int slot = 0; slot < kSlotCount; ++slot) {
+      const std::string title = std::to_string(slot + 1) + " " + capitals(cardDesc(card(index)).name);
+      allFit = allFit && Canvas::textWidth(font7x12(), title.c_str()) <= kCanvasWidth - 2 * kScreenPad;
+    }
+  }
+  check(allFit, "title bar: the title of every card in every slot fits with 1 px of bar on both sides");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1211,5 +1328,6 @@ void checkScreens() {
   checkVoiceWalk();
   checkMuted();
   checkToggle();
+  checkReadoutTitleBar();
   checkLoad();
 }

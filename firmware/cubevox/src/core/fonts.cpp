@@ -17,8 +17,12 @@ namespace f = cubevox::fonts;
 // Blank columns between neighbouring inks in the fonts spaced by ink.
 constexpr uint8_t kInkGap = 3;
 
+// The 7X12 title font sits closer, so a long card name fits between the readout bar's edges.
+constexpr uint8_t kTitleInkGap = 2;
+
 // The 5x7 font stays on its fixed 6 px pitch, which the menu and update screens are laid out on.
 constexpr FontDesc k5x7 = CUBEVOX_DESCRIBE(Myrtle5x7, 0);
+constexpr FontDesc k7x12 = CUBEVOX_DESCRIBE(Myrtle7X12, kTitleInkGap);
 constexpr FontDesc k9x12 = CUBEVOX_DESCRIBE(Myrtle9X12, kInkGap);
 constexpr FontDesc k16x24 = CUBEVOX_DESCRIBE(Myrtle16X24, kInkGap);
 
@@ -39,6 +43,8 @@ int indexOf(const FontDesc& font, uint8_t code) {
 }  // namespace
 
 const FontDesc& font5x7() { return k5x7; }
+
+const FontDesc& font7x12() { return k7x12; }
 
 const FontDesc& font9x12() { return k9x12; }
 

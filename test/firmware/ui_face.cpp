@@ -716,7 +716,8 @@ void checkBarAndRibbonAgainstProof() {
 }
 
 // Screens off the voice carry no bar. Each settles to the same frame with a loud input as with a
-// silent one, and the bar's place stays dark on the ones that leave it free.
+// silent one, and the bar's place stays dark on the ones that leave it free. The readout and toggle
+// screens light rows 0 to 13 with their title bar, so they leave the place free from row 14 down.
 Canvas settledOff(void (*setUp)(FaceRig&), float inRms) {
   FaceRig r;
   r.ticks(4, 0.0f, inRms);
@@ -725,8 +726,8 @@ Canvas settledOff(void (*setUp)(FaceRig&), float inRms) {
   return r.live;
 }
 
-bool barPlaceDark(const Canvas& c) {
-  for (int y = 9; y <= 55; ++y) {
+bool barPlaceDark(const Canvas& c, int fromRow = 9) {
+  for (int y = fromRow; y <= 55; ++y) {
     if (lit(c, 1, y) || lit(c, 2, y)) return false;
   }
   return true;
@@ -736,21 +737,24 @@ void checkNoBarOffTheVoice() {
   struct Scene {
     const char* name;
     void (*setUp)(FaceRig&);
-    bool placeFree;  // the screen draws nothing of its own at the bar's columns
+    int freeFrom;  // first row from which the screen draws nothing of its own at the bar's columns, -1 for none
   };
   const Scene scenes[] = {
-      {"readout", [](FaceRig& r) { r.turn(4, 1, kTime160); }, true},
-      {"toggle", [](FaceRig& r) { r.flip(5, true); }, true},
-      {"MUTED", [](FaceRig& r) { r.switchOn = true; }, true},
-      {"BYPASS", [](FaceRig& r) { r.settings.topSwitch = TopSwitch::Bypass; r.switchOn = true; }, true},
-      {"menu", [](FaceRig& r) { r.menu.update(clickInput(), r.now); }, false},
+      {"readout", [](FaceRig& r) { r.turn(4, 1, kTime160); }, 14},
+      {"toggle", [](FaceRig& r) { r.flip(5, true); }, 14},
+      {"MUTED", [](FaceRig& r) { r.switchOn = true; }, 9},
+      {"BYPASS", [](FaceRig& r) { r.settings.topSwitch = TopSwitch::Bypass; r.switchOn = true; }, 9},
+      {"menu", [](FaceRig& r) { r.menu.update(clickInput(), r.now); }, -1},
   };
   const float loud = dbToLinear(-6.0f);
   for (const Scene& s : scenes) {
     const Canvas withInput = settledOff(s.setUp, loud);
     const Canvas silent = settledOff(s.setUp, 0.0f);
     check(sameCanvas(withInput, silent), (std::string("face: the ") + s.name + " screen is the same with a loud input and a silent one").c_str());
-    if (s.placeFree) check(barPlaceDark(withInput), (std::string("face: the ") + s.name + " screen has nothing at the bar's columns").c_str());
+    if (s.freeFrom >= 0) {
+      check(barPlaceDark(withInput, s.freeFrom),
+            (std::string("face: the ") + s.name + " screen has nothing at the bar's columns from row " + std::to_string(s.freeFrom)).c_str());
+    }
   }
 
   FaceRig voice;

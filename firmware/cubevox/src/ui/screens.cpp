@@ -89,6 +89,17 @@ void drawNumber(Canvas& canvas, const ReadoutView& view) {
   canvas.drawText(pen, kReadoutValueY, big, unit);
 }
 
+// The slot number, a space and the card name in capitals, black on a lit bar across the full
+// width. The text is drawn lit and the bar inverted over it, as the menu does for its cursor row.
+void drawTitleBar(Canvas& canvas, const ReadoutView& view) {
+  char card[32];
+  upperText(view.card, card, sizeof(card));
+  char title[48];
+  snprintf(title, sizeof(title), "%d %s", view.slot + 1, card);
+  drawCentred(canvas, kReadoutTitleY, font7x12(), title);
+  canvas.invertRect(0, 0, kCanvasWidth, kReadoutBarHeight);
+}
+
 }  // namespace
 
 int upperText(const char* in, char* out, int size) {
@@ -150,9 +161,7 @@ void renderVoice(Canvas& canvas, const Ribbon& ribbon, int rows, Walk walk) {
 
 void renderReadout(Canvas& canvas, const ReadoutView& view) {
   canvas.clear();
-  char head[32];
-  snprintf(head, sizeof(head), "%d %s", view.slot + 1, view.card);
-  canvas.drawText(kScreenPad, kScreenPad, font5x7(), head);
+  drawTitleBar(canvas, view);
   if (view.toggle) {
     drawCentred(canvas, kReadoutValueY, font16x24(), view.on ? "ON" : "OFF");
     return;

@@ -15,9 +15,13 @@
 // Text keeps this many pixels clear of the panel edge.
 constexpr int kScreenPad = 1;
 
-// Readout rows. The card line is 5x7 at the pad, the parameter name is 9X12 centred with its top at
+// Readout rows. A lit title bar spans the full width over rows 0 to kReadoutBarHeight - 1. The slot
+// number and card name sit on it in black 7X12, centred, with their top at kReadoutTitleY and 1 px
+// of bar above and below the 12 px glyphs. The parameter name is 9X12 centred with its top at
 // kReadoutNameY, and the value is 16X24 in a field centred once with its top at kReadoutValueY.
-constexpr int kReadoutNameY = 15;
+constexpr int kReadoutTitleY = kScreenPad;
+constexpr int kReadoutBarHeight = 12 + 2 * kScreenPad;
+constexpr int kReadoutNameY = 16;
 constexpr int kReadoutValueY = 34;
 
 // The voice ribbon is mirrored about the horizon, and each level it holds spans two columns, so it
@@ -64,17 +68,17 @@ void renderVoice(Canvas& canvas, const Ribbon& ribbon, int rows, Walk walk);
 struct ReadoutView {
   int slot = 0;                    // 0-based; the screen shows slot + 1
   const char* card = "";           // card name
-  const KnobDesc* knob = nullptr;  // null draws the card line only
+  const KnobDesc* knob = nullptr;  // null draws the title bar only
   float shown = 0.0f;              // the eased value, in the whole steps knobShown counts
   int target = 0;                  // where it settles; picks the name of a labelled knob
   bool toggle = false;             // the slot's toggle: no parameter row, ON or OFF as the value
   bool on = false;                 // the toggle's state
 };
 
-// Slot and card, the parameter name, and the value with its unit. The value sits in a field fixed
-// by the parameter, so the row never moves sideways. Each digit that changes rolls vertically from
-// the old glyph to the new one. A toggle leaves the parameter row empty and centres ON or OFF on
-// the value row.
+// The title bar with slot and card, the parameter name, and the value with its unit. The value sits
+// in a field fixed by the parameter, so the row never moves sideways. Each digit that changes rolls
+// vertically from the old glyph to the new one. A toggle keeps the bar, leaves the parameter row
+// empty and centres ON or OFF on the value row.
 void renderReadout(Canvas& canvas, const ReadoutView& view);
 
 // The value row's unit with its leading space, in capitals, or "" for a knob without one. The value
