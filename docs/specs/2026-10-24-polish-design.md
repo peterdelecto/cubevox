@@ -25,17 +25,19 @@ slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → s
 ## Menu, final order (11 rows, 4 visible, Myrtle 7X12, no title row, 16 px row pitch)
 Owner 2026-10-30, proof A3 of `tools/oled-proof/menu-font-proof-2.png` ("the menu item text is too small", then "these are quite crammed" of the 12 and 13 px pitches): the list draws in the 7X12 font. Each row is a label at the left edge and a value right-aligned to the right edge, no colon. The row's label and value are:
 
+The order (owner 2026-10-30, "looks good") runs from the input to the output and ends with the rows touched once: page 1 is the sound, page 2 the output and the toggle's job, page 3 DEBUG, the update and EXIT.
+
 | Row | Label | Value | Click |
 |---|---|---|---|
 | 1 | `INPUT` | `MIC` | cycles MIC / LINE. LINE puts the 25.7 dB pad of relay K103 in circuit (hardware spec row 15) |
-| 2 | `OUTPUT` | `LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
-| 3 | `TOP SWITCH` | `MUTE` | cycles MUTE / BYPASS |
-| 4 | `REVERB` | `SPRING` | cycles SPRING / CHASM (owner 2026-10-30). The value is the reverb card in the layout; a click swaps that slot's card and saves the layout record through the path a layout from the app takes, so the audio fades, resets and comes back. With no reverb card in the layout the row reads NONE and a click does nothing |
+| 2 | `HPF` | `120 Hz` | cycles OFF, 80 Hz, 100 Hz, 120 Hz, 150 Hz (`2026-10-30-input-conditioning-design.md`); units on the value (owner 2026-10-30) |
+| 3 | `LPF` | `12 kHz` | cycles OFF, 4 kHz, 5 kHz, 6 kHz, 8 kHz, 10 kHz, 12 kHz |
+| 4 | `REVERB` | `SPRING` | cycles SPRING / CHASM (owner 2026-10-30). The value is the reverb card in the layout; a click swaps that slot's card and saves the layout record through the path a layout from the app takes, so the audio fades, resets and comes back. The row never reads NONE (owner 2026-10-30): every valid layout holds exactly one reverb card, so a record without one is replaced by the default layout at boot like any other invalid record |
 | 5 | `POLISH COMP` | `ON` | cycles ON / OFF |
 | 6 | `POLISH EQ` | `ON` | cycles ON / OFF |
-| 7 | `DEBUG` | `OFF` | cycles OFF / ON (owner 2026-10-30). ON draws the audio load figure on the voice screen, OLED GUI spec, Voice item 9 |
-| 8 | `HPF` | `120 Hz` | cycles OFF, 80 Hz, 100 Hz, 120 Hz, 150 Hz (`2026-10-30-input-conditioning-design.md`); units on the value (owner 2026-10-30) |
-| 9 | `LPF` | `12 kHz` | cycles OFF, 4 kHz, 5 kHz, 6 kHz, 8 kHz, 10 kHz, 12 kHz |
+| 7 | `OUTPUT` | `LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
+| 8 | `TOP SWITCH` | `MUTE` | cycles MUTE / BYPASS |
+| 9 | `DEBUG` | `OFF` | cycles OFF / ON (owner 2026-10-30). ON draws the audio load figure on the voice screen, OLED GUI spec, Voice item 9 |
 | 10 | `UPDATE FIRMWARE` | `>` | opens the confirm screen |
 | 11 | `EXIT` | | closes the menu |
 
