@@ -401,7 +401,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       "OctaveTuning{%.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.1ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
-      "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
+      "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, %.2ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff}\n"
       "ChasmTuning{%.2ff, %.2ff, %.0ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.2ff, "
       "%.1ff, %.1ff, %.1ff, %.1ff}\n"
@@ -410,7 +410,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       o.levelDb, o.glideMs, o.grainWindowMs, o.grainCount, o.trimDb,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.trimDb,
-      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.stackBassHz, d.stackBassDb,
+      s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.topBoostDb, d.topBoostFrom, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneMinDb, d.toneMaxDb, d.bassPeakHz,
       d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive,
@@ -453,7 +453,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, trimDb\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb, trimDb\n"
-      "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, stackBassHz, "
+      "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, topBoostDb, topBoostFrom, stackBassHz, "
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneMinDb, toneMaxDb, bassPeakHz, bassPeakDb, "
       "bassPeakQ, trimDb, fadeDrive\n"
@@ -580,6 +580,8 @@ void drawDistortionRaw(cv::DistortionTuning& t) {
     ImGui::SliderFloat("Bass cut depth", &t.s1BassDb, -24.0f, 0.0f, "%.1f dB");
     ImGui::SliderFloat("Top roll-off", &t.s1LpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
     ImGui::SliderFloat("Gain at full", &t.gain1Max, 1.0f, 300.0f, "%.1f x", log);
+    ImGui::SliderFloat("Top boost at full", &t.topBoostDb, 0.0f, 12.0f, "%.1f dB");
+    ImGui::SliderFloat("Top boost starts", &t.topBoostFrom, 0.0f, 0.95f, "%.2f");
     ImGui::TreePop();
   }
   if (tuningNode("Tone stack")) {

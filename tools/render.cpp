@@ -79,7 +79,8 @@ int usage() {
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
                "     octGrainWindowMs octGrainCount (2|4) octTrimDb eqTrimDb\n"
                "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
-               "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distStackBassHz\n"
+               "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distTopBoostDb\n"
+               "     distTopBoostFrom distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
                "     distS2LpHz distGain2Max distRailAsym distRailSoft distTrebleCutHz "
                "distTrebleCutDb\n"
@@ -187,7 +188,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"slapTrimDb", &st.trimDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
       {"distS1BassDb", &dt.s1BassDb},         {"distS1LpHz", &dt.s1LpHz},
-      {"distGain1Max", &dt.gain1Max},         {"distStackBassHz", &dt.stackBassHz},
+      {"distGain1Max", &dt.gain1Max},         {"distTopBoostDb", &dt.topBoostDb},
+      {"distTopBoostFrom", &dt.topBoostFrom}, {"distStackBassHz", &dt.stackBassHz},
       {"distStackBassDb", &dt.stackBassDb},   {"distStackTrebleHz", &dt.stackTrebleHz},
       {"distStackTrebleDb", &dt.stackTrebleDb}, {"distStackLossDb", &dt.stackLossDb},
       {"distS2HpHz", &dt.s2HpHz},             {"distS2LpHz", &dt.s2LpHz},

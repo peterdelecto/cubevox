@@ -11,7 +11,8 @@
 
 // Distortion: behavioural Boss BD-2 model. Stage 1 (bass cut, top roll-off, gain,
 // rail), tone stack, stage 2 (band limit, gain, rail), fixed post shaping, DC block.
-// DRIVE sweeps both stage gains exponentially from gainNMin to gainNMax. The two
+// DRIVE sweeps both stage gains exponentially from gainNMin to gainNMax. Stage 1 gains
+// topBoostDb more over the top of the knob, from topBoostFrom to DRIVE 1. The two
 // rail saturators run 2x oversampled.
 
 namespace cv {
@@ -24,6 +25,8 @@ struct DistortionTuning {
   float s1LpHz = 6892.0f;         // top roll-off
   float gain1Min = 16.0f;         // stage gain at DRIVE 0
   float gain1Max = 45.0f;         // stage gain at DRIVE 1
+  float topBoostDb = 6.0f;        // extra stage 1 gain at DRIVE 1, ramped in dB from topBoostFrom
+  float topBoostFrom = 0.6f;      // DRIVE where the top boost starts
   // tone stack between the stages (bass 10 / mid 6 / treble 0)
   float stackBassHz = 400.0f;     // low shelf boost corner
   float stackBassDb = 10.0f;
@@ -87,18 +90,25 @@ class Distortion {
     runBlock(in, out, n, target, smooth::clamp01(p.tone));
   }
 
+  // Stage 1 gain at DRIVE d for the tuning the last process() call applied.
+  float stage1GainAt(float d) const { return gainsAt(d).g1; }
+
  private:
   static constexpr float kDcBlockHz = 10.0f;
   static constexpr float kMinFade = 1e-4f;
   static constexpr float kMinGain = 0.1f;
+  static constexpr float kLn10 = 2.302585093f;
 
   // Stage gains and the output scale at one DRIVE value.
   struct Gains {
     float g1, g2, k;
   };
 
+  // The top boost ramps in dB, so it adds to the stage 1 exponent. Below topBoostFrom the
+  // added term is exactly 0.0f and the gain equals the plain exponential sweep bit for bit.
   Gains gainsAt(float drive) const {
-    const float g1 = g1Min_ * expf(logR1_ * drive);
+    const float over = drive > boostFrom_ ? drive - boostFrom_ : 0.0f;
+    const float g1 = g1Min_ * expf(logR1_ * drive + boostK_ * over);
     const float g2 = g2Min_ * expf(logR2_ * drive);
     return {g1, g2, trim_ / makeup(g1 * g2)};
   }
@@ -159,6 +169,7 @@ class Distortion {
   static bool same(const DistortionTuning& a, const DistortionTuning& b) {
     return a.inputHpHz == b.inputHpHz && a.s1BassHz == b.s1BassHz && a.s1BassDb == b.s1BassDb &&
            a.s1LpHz == b.s1LpHz && a.gain1Min == b.gain1Min && a.gain1Max == b.gain1Max &&
+           a.topBoostDb == b.topBoostDb && a.topBoostFrom == b.topBoostFrom &&
            a.stackBassHz == b.stackBassHz && a.stackBassDb == b.stackBassDb &&
            a.stackTrebleHz == b.stackTrebleHz && a.stackTrebleDb == b.stackTrebleDb &&
            a.stackLossDb == b.stackLossDb && a.s2HpHz == b.s2HpHz && a.s2LpHz == b.s2LpHz &&
@@ -188,6 +199,10 @@ class Distortion {
     g2Min_ = t.gain2Min < kMinGain ? kMinGain : t.gain2Min;
     logR1_ = logf((t.gain1Max < g1Min_ ? g1Min_ : t.gain1Max) / g1Min_);
     logR2_ = logf((t.gain2Max < g2Min_ ? g2Min_ : t.gain2Max) / g2Min_);
+    boostFrom_ = clampf(t.topBoostFrom, 0.0f, 1.0f);
+    const float boostRoom = 1.0f - boostFrom_;
+    const float boostSpan = boostRoom < kMinFade ? kMinFade : boostRoom;
+    boostK_ = t.topBoostDb * (kLn10 / 20.0f) / boostSpan;
     fadeSpan_ = t.fadeDrive < kMinFade ? kMinFade : t.fadeDrive;
     applied_ = t;
     tuningValid_ = true;
@@ -300,6 +315,7 @@ class Distortion {
   Rail rail_{1.0f, 1.0f};
   float stackLoss_ = 1.0f, trim_ = 1.0f, g1Min_ = 1.0f, g2Min_ = 1.0f;
   float logR1_ = 0.0f, logR2_ = 0.0f, fadeSpan_ = 1.0f;
+  float boostFrom_ = 1.0f, boostK_ = 0.0f;  // top boost: start DRIVE, exponent per unit DRIVE past it
 };
 
 }  // namespace cv

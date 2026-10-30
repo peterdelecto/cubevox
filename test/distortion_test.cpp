@@ -1,4 +1,4 @@
-// Distortion checks: passthrough, harmonics, clean, level, asymmetry, DC, no-alloc. No window, no audio device.
+// Distortion checks: passthrough, top boost, harmonics, clean, level, asymmetry, DC, no-alloc. No window, no audio device.
 
 #include <atomic>
 #include <cmath>
@@ -128,12 +128,107 @@ bool testPassthrough() {
                 maxDiff);
 }
 
-// DRIVE taper (owner 2026-10-02: dead until 50-60 %, too saturated at 100 %). Each
-// drive has a 3rd-harmonic target and a +-3 dB band; drive 1 matches the old drive 0.7.
+// Stage 1 gain before the top boost: the plain exponential sweep, in the same float operations
+// as the engine used before topBoostDb existed.
+float todaysGain1(const cv::DistortionTuning& t, float drive) {
+  return t.gain1Min * expf(logf(t.gain1Max / t.gain1Min) * drive);
+}
+
+// Applies p's tuning to d, so stage1GainAt() reads it.
+void prime(cv::Distortion& d, const cv::DistortionParams& p) {
+  const std::vector<float> in(static_cast<size_t>(cv::kBlock), 0.0f);
+  std::vector<float> out(in.size());
+  d.reset();
+  d.process(in.data(), out.data(), cv::kBlock, p);
+}
+
+// DRIVE 0 to topBoostFrom: the boost term is exactly 0.0f, so the gain law and the whole output
+// match the sweep without the boost, sample for sample.
+bool testBelowBoost() {
+  cv::DistortionParams p = params(0.5f);
+  prime(gDist, p);
+  const cv::DistortionTuning& t = p.tuning;
+  bool law = true;
+  for (int k = 0; k <= 60; ++k) {
+    const float drive = static_cast<float>(k) / 100.0f;
+    if (gDist.stage1GainAt(drive) != todaysGain1(t, drive)) law = false;
+  }
+  if (gDist.stage1GainAt(t.topBoostFrom) != todaysGain1(t, t.topBoostFrom)) law = false;
+
+  const float drives[4] = {0.1f, 0.3f, 0.5f, 0.6f};
+  bool audio = true;
+  for (float drive : drives) {
+    const std::vector<float> boosted = render(params(drive));
+    cv::DistortionParams plain = params(drive);
+    plain.tuning.topBoostDb = 0.0f;
+    const std::vector<float> flat = render(plain);
+    for (size_t i = 0; i < boosted.size(); ++i)
+      if (boosted[i] != flat[i]) audio = false;
+  }
+  char detail[160];
+  std::snprintf(detail, sizeof detail,
+                "gain at DRIVE 0..0.6 equals today's law (==): %s; output at 0.1/0.3/0.5/0.6 equals boost 0 dB (==): %s",
+                law ? "yes" : "NO", audio ? "yes" : "NO");
+  std::printf("%s below-boost  %s\n", law && audio ? "PASS" : "FAIL", detail);
+  return law && audio;
+}
+
+// topBoostDb extra stage 1 gain at DRIVE 1, half of it halfway up the ramp, and none of it
+// when topBoostDb is 0.
+bool testTopBoost() {
+  cv::DistortionParams p = params(0.5f);
+  prime(gDist, p);
+  const cv::DistortionTuning& t = p.tuning;
+  const double want = std::pow(10.0, t.topBoostDb / 20.0);
+  const double top = gDist.stage1GainAt(1.0f) / todaysGain1(t, 1.0f);
+  const double mid = gDist.stage1GainAt(0.8f) / todaysGain1(t, 0.8f);
+  const bool topOk = std::fabs(top / want - 1.0) < 1e-4 && std::fabs(top - 2.0) < 0.01;
+  const bool midOk = std::fabs(mid / std::sqrt(want) - 1.0) < 1e-4;
+
+  p.tuning.topBoostDb = 0.0f;
+  prime(gDist, p);
+  bool offOk = true;
+  for (int k = 0; k <= 100; ++k) {
+    const float drive = static_cast<float>(k) / 100.0f;
+    if (gDist.stage1GainAt(drive) != todaysGain1(p.tuning, drive)) offOk = false;
+  }
+  const bool ok = topOk && midOk && offOk;
+  char detail[160];
+  std::snprintf(detail, sizeof detail,
+                "stage 1 gain vs today's: DRIVE 1 x%.5f = %.3f dB (x%.5f), DRIVE 0.8 x%.5f; boost 0 dB equals today's: %s",
+                top, 20.0 * std::log10(top), want, mid, offOk ? "yes" : "NO");
+  std::printf("%s top-boost  %s\n", ok ? "PASS" : "FAIL", detail);
+  return ok;
+}
+
+// The stage 1 gain rises with DRIVE for the default tuning and for the widest boost.
+bool testGainMonotonic() {
+  bool ok = true;
+  for (int wide = 0; wide < 2; ++wide) {
+    cv::DistortionParams p = params(0.5f);
+    if (wide) {
+      p.tuning.topBoostDb = 12.0f;
+      p.tuning.topBoostFrom = 0.0f;
+    }
+    prime(gDist, p);
+    float prev = 0.0f;
+    for (int k = 0; k <= 1000; ++k) {
+      const float g = gDist.stage1GainAt(static_cast<float>(k) / 1000.0f);
+      if (!(g > prev)) ok = false;
+      prev = g;
+    }
+  }
+  return report("gain-monotonic", ok,
+                "stage 1 gain strictly rising over DRIVE 0..1 in %.0f steps, default and 12 dB from 0",
+                1000.0);
+}
+
+// DRIVE taper (owner 2026-10-02: dead until 50-60 %, too saturated at 100 %). Each drive has a
+// 3rd-harmonic target and a +-3 dB band. Drives 0.7 and 1 carry the top boost (owner 2026-10-30).
 bool testHarmonics() {
   constexpr int kPoints = 5;
   const float drives[kPoints] = {0.1f, 0.3f, 0.5f, 0.7f, 1.0f};
-  const double target[kPoints] = {-40.0, -28.0, -20.0, -15.0, -11.4};
+  const double target[kPoints] = {-40.0, -28.0, -20.0, -14.0, -11.6};
   double h[kPoints];
   bool ok = true;
   for (int k = 0; k < kPoints; ++k) {
@@ -143,7 +238,7 @@ bool testHarmonics() {
   }
   char detail[160];
   std::snprintf(detail, sizeof detail,
-                "3rd at drive 0.1/0.3/0.5/0.7/1 = %.1f / %.1f / %.1f / %.1f / %.1f dB (targets -40/-28/-20/-15/-11.4 +-3, rising)",
+                "3rd at drive 0.1/0.3/0.5/0.7/1 = %.1f / %.1f / %.1f / %.1f / %.1f dB (targets -40/-28/-20/-14/-11.6 +-3, rising)",
                 h[0], h[1], h[2], h[3], h[4]);
   std::printf("%s harmonics  %s\n", ok ? "PASS" : "FAIL", detail);
   return ok;
@@ -218,6 +313,9 @@ bool testTone() {
 int main() {
   bool ok = true;
   ok &= testPassthrough();
+  ok &= testBelowBoost();
+  ok &= testTopBoost();
+  ok &= testGainMonotonic();
   ok &= testHarmonics();
   ok &= testClean();
   ok &= testLevel();

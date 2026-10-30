@@ -155,6 +155,8 @@ void cmpDistortion(const std::string& p, float pos, const cv::DistortionParams& 
   CMP(p, pos, a, b, s1LpHz);
   CMP(p, pos, a, b, gain1Min);
   CMP(p, pos, a, b, gain1Max);
+  CMP(p, pos, a, b, topBoostDb);
+  CMP(p, pos, a, b, topBoostFrom);
   CMP(p, pos, a, b, stackBassHz);
   CMP(p, pos, a, b, stackBassDb);
   CMP(p, pos, a, b, stackTrebleHz);
