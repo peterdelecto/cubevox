@@ -154,6 +154,10 @@ bool gStreamUp = false;  // the stream started and no restart has failed since
 volatile float gInputSumSquares = 0.0f;
 volatile uint32_t gInputSamples = 0;
 
+// The same for the output, since the last audioTakeOutputEnergy().
+volatile float gOutputSumSquares = 0.0f;
+volatile uint32_t gOutputSamples = 0;
+
 #ifdef CUBEVOX_BENCH_CLIP
 volatile bool gClipOn = false;
 uint32_t gClipPos = 0;
@@ -271,15 +275,19 @@ float clampSample(float v) {
 }
 
 // Applies the output gain along its ramp, then the output ceiling, and writes both stereo slots.
-void writeOutput(uint32_t* tx, const float* a, GainRamp ramp) {
+// Returns the sum of the squares of the samples written, for the output level.
+float writeOutput(uint32_t* tx, const float* a, GainRamp ramp) {
   float gain = ramp.start;
+  float energy = 0.0f;
   for (int i = 0; i < kFramesPerHalf; ++i) {
     const float v = clampSample(cv::softCeiling(a[i] * gain));
     gain += ramp.step;
+    energy += v * v;
     const uint32_t word = static_cast<uint32_t>(static_cast<int32_t>(v * kInt32Max));
     tx[2 * i] = word;
     tx[2 * i + 1] = word;
   }
+  return energy;
 }
 
 void processHalf(int half) {
@@ -308,7 +316,9 @@ void processHalf(int half) {
     addChainCycles(cycles);
   }
   mixBypass(a.data(), dry.data(), kFramesPerHalf, muteBypassOn(), gBypassPhase);
-  writeOutput(tx, a.data(), gOutputGain.next(gHeld.outputGain, fade.from, fade.to, kFramesPerHalf));
+  gOutputSumSquares =
+      gOutputSumSquares + writeOutput(tx, a.data(), gOutputGain.next(gHeld.outputGain, fade.from, fade.to, kFramesPerHalf));
+  gOutputSamples = gOutputSamples + kFramesPerHalf;
 }
 
 // True when the TX stream has already read part of half `half` from memory, so the block just
@@ -822,6 +832,17 @@ level::InputEnergy audioTakeInputEnergy() {
   energy.samples = gInputSamples;
   gInputSumSquares = 0.0f;
   gInputSamples = 0;
+  NVIC_EnableIRQ(SWPMI1_IRQn);
+  return energy;
+}
+
+level::OutputEnergy audioTakeOutputEnergy() {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  level::OutputEnergy energy;
+  energy.sumSquares = gOutputSumSquares;
+  energy.samples = gOutputSamples;
+  gOutputSumSquares = 0.0f;
+  gOutputSamples = 0;
   NVIC_EnableIRQ(SWPMI1_IRQn);
   return energy;
 }

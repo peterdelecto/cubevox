@@ -193,7 +193,9 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
     case BenchPattern::Ended: gFace.invalidate(); break;
     case BenchPattern::Off: break;
   }
-  if (gFace.due(nowMs, gCanvas)) gFace.tick(nowMs, ctx, audioTakeInputEnergy(), gMenu, gCanvas);
+  if (gFace.due(nowMs, gCanvas)) {
+    gFace.tick(nowMs, ctx, audioTakeInputEnergy(), audioTakeOutputEnergy(), gMenu, gCanvas);
+  }
 }
 
 }  // namespace

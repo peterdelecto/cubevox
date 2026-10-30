@@ -1,5 +1,6 @@
-// Animated OLED GUI proof. Nine scenes (Adam's voice, four knob turns, idle, mute, the motion
-// rules, a toggle flip) each run on their own clock from a clean screen, through the firmware's own Canvas and
+// Animated OLED GUI proof. Ten scenes (Adam's voice, four knob turns, idle, mute, the motion
+// rules, a toggle flip, the level bar beside the ribbon on a scripted drive) each run on their own
+// clock from a clean screen, through the firmware's own Canvas and
 // fonts at 25 frames a second, and come out as raw 1-bit frames with a two-line caption strip
 // per frame plus a scene table. motion_gif.py cuts one GIF per scene from them.
 //
@@ -39,6 +40,18 @@ constexpr float kValueTauS = 0.02f;     // the readout eases toward the knob
 constexpr int kScrollPxPerFrame = 2;    // voice history scrolls 50 px/s
 constexpr float kSilence = 0.03f;       // env below this counts as silence
 
+// The voice screen. The ribbon (the output) runs from column 4 to 127 about the horizon. The input
+// bar stands in columns 1 and 2 over the ribbon's rows, 9 to 55, and fills up from row 55.
+constexpr int kRibbonLeft = 4;
+constexpr int kHalfMax = 22;
+constexpr int kBarX = 1;
+constexpr int kBarW = 2;
+constexpr int kBarBottom = kH / 2 + kHalfMax + 1;   // 55
+constexpr int kBarRows = 2 * (kHalfMax + 1) + 1;    // 47
+constexpr float kBarFloorDb = -50.0f;               // empty here, full at 0 dBFS
+constexpr float kBarReleaseS = 0.12f;
+constexpr float kBarSilence = 0.01f;
+
 // Scene clocks.
 constexpr float kTurnS = 2.0f;          // an effect scene turns its knob this long
 constexpr float kEffectSceneS = kTurnS + kRestAfterS;
@@ -54,6 +67,7 @@ constexpr float kToggleSceneS = 3.0f;
 constexpr float kToggleOnS = 0.4f;      // in the toggle scene slot 6 flips on at this time
 constexpr float kToggleOffS = 1.4f;     // and off, on the readout already up, at this time
 constexpr int kToggleSlot = 5;          // Distortion
+constexpr float kScriptSceneS = 4.0f;   // the scripted drive of scene 12
 
 float clamp01(float v) { return std::min(1.0f, std::max(0.0f, v)); }
 float lerp(float a, float b, float t) { return a + (b - a) * t; }
@@ -183,7 +197,8 @@ int digitsClipped(Frame& f, int x, int y, const FontDesc& font, const char* s, i
 // frame 0, after `delay` frames of silence, or keeps it silent.
 
 struct Voice {
-  std::vector<float> perf;  // the performance, per frame, 0..1, perceptual
+  std::vector<float> perf;  // the ribbon's level per frame, 0..1, scaled to the performance's own peak
+  std::vector<float> bar;   // the bar's level per frame, 0..1, absolute and linear in dB from -50 to 0 dBFS
   int delay = 0;
   bool silent = false;
 
@@ -191,6 +206,11 @@ struct Voice {
     const int i = frame - delay;
     if (silent || i < 0 || perf.empty()) return 0.0f;
     return perf[i % perf.size()];
+  }
+  float barAt(int frame) const {
+    const int i = frame - delay;
+    if (silent || i < 0 || bar.empty()) return 0.0f;
+    return bar[i % bar.size()];
   }
   float atTime(float t) const { return at(static_cast<int>(std::floor(t * kFps))); }
 };
@@ -259,11 +279,19 @@ bool buildVoice(Voice& voice) {
   const float ref = std::max(1e-6f, sorted[sorted.size() * 98 / 100]);
 
   float smooth = 0;
+  float barSmooth = 0;
   const float release = std::exp(-kDt / 0.12f);
+  const float barRelease = std::exp(-kDt / kBarReleaseS);
   for (float r : raw) {
     const float level = std::pow(clamp01(r / ref), 0.6f);
     smooth = level > smooth ? level : level + (smooth - level) * release;
     voice.perf.push_back(smooth < 0.01f ? 0.0f : smooth);
+
+    const float db = r > 0.0f ? 20.0f * std::log10(r) : -200.0f;
+    const float pos = clamp01((db - kBarFloorDb) / -kBarFloorDb);
+    barSmooth = pos >= barSmooth ? pos : pos + (barSmooth - pos) * barRelease;
+    if (barSmooth < kBarSilence) barSmooth = 0.0f;
+    voice.bar.push_back(barSmooth);
   }
   return true;
 }
@@ -377,14 +405,17 @@ Frame toggleScreen(int slot, bool on) {
   return f;
 }
 
-// The rest screen: Adam's voice scrolling by as a ribbon around a horizon line. In silence the
-// ribbon is the line and nothing else.
-Frame restScreen(const Live& L) {
+// The voice screen. The output scrolls by as a ribbon around a horizon line, from column 4, and
+// the input stands as a 2 px bar at the left edge. `ribbonAt(age)` is the ribbon's level `age`
+// frames back and `barRows` the bar's height. In silence the ribbon is the line and the bar is empty.
+template <typename LevelAt>
+Frame voiceScreen(LevelAt ribbonAt, int barRows) {
   Frame f;
   const int cy = kH / 2;
-  for (int x = 0; x < kW; ++x) {
-    const float e = L.voice->at(L.frame - (kW - 1 - x) / kScrollPxPerFrame);
-    const int h = roundInt(std::pow(e, 0.8f) * 22);
+  f.fill(kBarX, kBarBottom - barRows + 1, kBarW, barRows);
+  for (int x = kRibbonLeft; x < kW; ++x) {
+    const float e = ribbonAt((kW - 1 - x) / kScrollPxPerFrame);
+    const int h = roundInt(std::pow(e, 0.8f) * kHalfMax);
     if (h <= 0) {
       f.set(x, cy);
       continue;
@@ -394,6 +425,43 @@ Frame restScreen(const Live& L) {
     if (bayer(x, cy + h + 1, 0.5f)) f.set(x, cy + h + 1);
   }
   return f;
+}
+
+// The rest screen shows Adam's voice. The ribbon is the performance scaled to its own peak, the way
+// the self-scaling output window shows it, and the bar is the same take at its absolute level.
+Frame restScreen(const Live& L) {
+  return voiceScreen([&L](int age) { return L.voice->at(L.frame - age); },
+                     roundInt(L.voice->barAt(L.frame) * kBarRows));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The scripted drive of scene 12, which test/firmware/ui_face.cpp repeats tick for tick. The input
+// holds kScriptInDb and the output cycles through twelve levels, one per frame. The ribbon level
+// follows the box's rule. The window top jumps to a louder tick and falls 10 dB a second, never
+// below -30 dBFS. The level is the tick's place in the 44 dB under the top, raised to 0.6, with an
+// instant attack and a 120 ms release.
+constexpr float kScriptInDb = -23.0f;
+constexpr float kScriptOutDb[12] = {-30, -24, -19, -12, -8, -14, -20, -26, -32, -40, -52, -60};
+
+std::vector<float> scriptedRibbon(int frames) {
+  std::vector<float> levels;
+  float top = -30.0f;
+  float level = 0.0f;
+  const float release = std::exp(-kDt / 0.12f);
+  for (int k = 0; k < frames; ++k) {
+    const float d = kScriptOutDb[k % 12];
+    if (d > top) {
+      top = d;
+    } else {
+      top = std::max(-30.0f, top - 10.0f * kDt);
+    }
+    const float position = clamp01((d - (top - 44.0f)) / 44.0f);
+    const float now = std::pow(position, 0.6f);
+    level = now >= level ? now : now + (level - now) * release;
+    if (level < 0.01f) level = 0.0f;
+    levels.push_back(level);
+  }
+  return levels;
 }
 
 // The word may become BYPASS, depending on what the switch ends up doing.
@@ -465,7 +533,8 @@ const Effect kEffects[] = {
     {"5", "gate-threshold", "GATE  THRESHOLD", {6, 0, -40, -24}},
 };
 
-// Scene 1: the rest screen while Adam sings, from an empty line.
+// Scene 1: the rest screen while Adam sings, from an empty line. The bar reads his level in
+// absolute dB and the ribbon the same take scaled to its own peak, so the two differ.
 Scene voiceScene(Voice& voice) {
   return {"1", "voice-line", kVoiceSceneS, [&voice](int i, float, Caption& cap) {
             voice.delay = kFps / 2;
@@ -568,6 +637,17 @@ Scene toggleScene(Voice& voice) {
           }};
 }
 
+// Scene 12: the voice screen on the scripted drive above. The bar holds still at 25 rows while the
+// ribbon cycles, so the two read apart. The host test repeats the drive and matches frame 79.
+Scene scriptScene() {
+  return {"12", "bar-ribbon", kScriptSceneS, [](int i, float, Caption& cap) {
+            static const std::vector<float> ribbon = scriptedRibbon(static_cast<int>(kScriptSceneS * kFps));
+            setCaption(cap, "12  BAR AND RIBBON", "IN STEADY, OUT CYCLES");
+            const int rows = roundInt(clamp01((kScriptInDb - kBarFloorDb) / -kBarFloorDb) * kBarRows);
+            return voiceScreen([i](int age) { return i - age >= 0 ? ribbon[i - age] : 0.0f; }, rows);
+          }};
+}
+
 void writeCaption(Frame& cap, const Caption& c) {
   Canvas canvas;
   canvas.drawText(kPad, kPad, font5x7(), c.line1);
@@ -607,6 +687,7 @@ int main(int argc, char** argv) {
   scenes.push_back(mutedScene(voice));
   scenes.push_back(rulesScene(voice, shown));
   scenes.push_back(toggleScene(voice));
+  scenes.push_back(scriptScene());
 
   int total = 0;
   for (const Scene& s : scenes) total += static_cast<int>(s.seconds * kFps);

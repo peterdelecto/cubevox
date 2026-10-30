@@ -1,8 +1,8 @@
 // Checks the runtime face end to end on the host. Covers the dissolve frames against the proof
 // renderer, the readout flowing in and out and leaving with its card, the menu on top and the input
-// it takes once the face draws, the tick gate, the burn-in walk, the DEBUG load figure and the voice at
-// three input levels.
-// The proof PGMs go to build/oled-*.pgm.
+// it takes once the face draws, the tick gate, the burn-in walk, the DEBUG load figure, the voice at
+// three levels and the input bar beside the output ribbon against the proof renderer. The proof
+// PGMs go to build/oled-*.pgm.
 
 #include "support.h"
 
@@ -48,9 +48,10 @@ Canvas blend(const Canvas& from, const Canvas& to, int level) {
 constexpr int kStep1Level = 21;
 constexpr int kStep2Level = 43;
 
+// The voice screen in silence, which is the horizon line from the ribbon's first column and no bar.
 Canvas lineScreen() {
   Canvas c;
-  c.fillRect(0, 32, kCanvasWidth, 1, true);
+  c.fillRect(kRibbonLeftX, 32, kCanvasWidth - kRibbonLeftX, 1, true);
   return c;
 }
 
@@ -86,14 +87,14 @@ struct FaceRig {
 
   UiContext ctx() const { return UiContext{layout, panel, settings, switchOn, loadPercent}; }
 
-  // One UI tick, 40 ms on, with the input at `rms`.
-  void tick(float rms = 0.0f) {
+  // One UI tick, 40 ms on, with the output at `outRms` (the ribbon) and the input at `inRms` (the bar).
+  void tick(float outRms = 0.0f, float inRms = 0.0f) {
     now += kUiTickMs;
-    face.tick(now, ctx(), energyOfRms(rms), menu, live);
+    face.tick(now, ctx(), energyOfRms(inRms), energyOfRms(outRms), menu, live);
   }
 
-  void ticks(int n, float rms = 0.0f) {
-    for (int i = 0; i < n; ++i) tick(rms);
+  void ticks(int n, float outRms = 0.0f, float inRms = 0.0f) {
+    for (int i = 0; i < n; ++i) tick(outRms, inRms);
   }
 
   // Ticks until the next one would land `ms` after `since`.
@@ -509,11 +510,11 @@ void checkWalkOnPanel() {
   check(sameCanvas(r.live, lineScreen()), "face: the voice starts unshifted");
   r.ticks(static_cast<int>(kWalkStepMs / kUiTickMs) + 10);
   Canvas shifted;
-  shifted.fillRect(1, 32, kCanvasWidth - 1, 1, true);
+  shifted.fillRect(kRibbonLeftX + 1, 32, kCanvasWidth - kRibbonLeftX - 1, 1, true);
   check(sameCanvas(r.live, shifted), "face: after 60 s the voice moves 1 px, with no dissolve");
   r.ticks(static_cast<int>(kWalkStepMs / kUiTickMs));
   Canvas again;
-  again.fillRect(1, 33, kCanvasWidth - 1, 1, true);
+  again.fillRect(kRibbonLeftX + 1, 33, kCanvasWidth - kRibbonLeftX - 1, 1, true);
   check(sameCanvas(r.live, again), "face: after 120 s it moves 1 px more");
 }
 
@@ -571,7 +572,7 @@ void checkLoadFigure() {
   r.loadPercent = 42;
   r.ticks(static_cast<int>(kWalkStepMs / kUiTickMs) + 10);
   Canvas shifted;
-  shifted.fillRect(1, 32, kCanvasWidth - 1, 1, true);
+  shifted.fillRect(kRibbonLeftX + 1, 32, kCanvasWidth - kRibbonLeftX - 1, 1, true);
   shifted.drawText(110, 56, font5x7(), "42%");
   check(sameCanvas(r.live, shifted), "face: the ribbon walks 1 px after 60 s and the figure stays where it was");
 }
@@ -631,36 +632,130 @@ void checkLoadFigureAbsent() {
   check(sameCanvas(menu.live, menuScreen), "face: the menu has no figure with DEBUG on");
 }
 
-// The voice at three input levels, as an RMS through the whole path: energy, meter, ribbon.
+// The bar's two columns hold `rows` lit rows ending at row 55, and the row above them is dark.
+bool barRows(const Canvas& c, int rows) {
+  bool ok = true;
+  for (int y = 9; y <= 55; ++y) {
+    const bool want = y > 55 - rows;
+    ok = ok && lit(c, 1, y) == want && lit(c, 2, y) == want && !lit(c, 3, y);
+  }
+  return ok;
+}
+
+// The voice at three levels, through the whole path. The output feeds the ribbon, which scales to
+// its own peak. The window top sits at -30 dBFS or at the level, whichever is louder, so a steady
+// level under -30 dBFS shows by its place in the 44 dB under that mark and a steady level over it
+// shows full. The input feeds the bar, which reads absolute dB from -50 to 0.
 void checkVoiceLevels() {
   struct Case {
-    float db;
+    float outDb;
     int half;
+    float inDb;
+    int rows;
     const char* pgm;
   };
   const Case cases[] = {
-      {-40.0f, 11, "oled-voice-quiet.pgm"},
-      {-24.0f, 17, "oled-voice-mid.pgm"},
-      {-8.0f, 22, "oled-voice-loud.pgm"},
+      {-60.0f, 13, -40.0f, 9, "oled-voice-quiet.pgm"},
+      {-45.0f, 18, -30.0f, 19, "oled-voice-mid.pgm"},
+      {-8.0f, 22, -6.0f, 41, "oled-voice-loud.pgm"},
   };
   for (const Case& c : cases) {
-    const std::string db = std::to_string(static_cast<int>(c.db)) + " dBFS";
-    check(ribbonHalfHeight(level::displayLevel(dbToLinear(c.db))) == c.half, ("voice: " + db + " reads " + std::to_string(c.half) + " px").c_str());
+    const std::string out = std::to_string(static_cast<int>(c.outDb)) + " dBFS out";
+    const std::string in = std::to_string(static_cast<int>(c.inDb)) + " dBFS in";
+    level::OutputMeter probe;
+    check(ribbonHalfHeight(probe.update(energyOfRms(dbToLinear(c.outDb)), 40.0f)) == c.half,
+          ("voice: " + out + " reads " + std::to_string(c.half) + " px").c_str());
+    check(meterRows(level::displayLevel(dbToLinear(c.inDb))) == c.rows, ("voice: " + in + " reads " + std::to_string(c.rows) + " rows").c_str());
 
-    // 20 ticks of silence, 30 at the level, 14 of silence again fill the 64 levels of history.
+    // 20 ticks of silence, 30 at the levels, 14 of silence again fill the 62 levels of history.
     FaceRig r;
     r.ticks(20);
-    r.ticks(30, dbToLinear(c.db));
+    r.ticks(30, dbToLinear(c.outDb), dbToLinear(c.inDb));
     bool solid = true;
     for (int y = 32 - c.half; y <= 32 + c.half; ++y) solid = solid && lit(r.live, 126, y) && lit(r.live, 127, y);
     check(solid && !lit(r.live, 127, 32 - c.half - 2) && !lit(r.live, 127, 32 + c.half + 2),
-          ("voice: the plateau at " + db + " is solid to its height and no taller").c_str());
+          ("voice: the plateau at " + out + " is solid to its height and no taller").c_str());
+    check(barRows(r.live, c.rows), ("voice: the bar at " + in + " stands " + std::to_string(c.rows) + " rows tall from row 55").c_str());
 
     r.ticks(14);
     check(lit(r.live, 127, 32) && !lit(r.live, 127, 31) && !lit(r.live, 127, 33) && !lit(r.live, 126, 31),
-          ("voice: 14 ticks after " + db + " the 120 ms release is back on the line").c_str());
+          ("voice: 14 ticks after " + out + " the 120 ms release is back on the line").c_str());
+    check(barRows(r.live, 0), ("voice: 14 ticks after " + in + " the bar has released to nothing").c_str());
     writePgm(r.live, c.pgm);
   }
+}
+
+// The input reaches the bar and the output reaches the ribbon, each alone.
+void checkEachOwnsItsSource() {
+  FaceRig inputOnly;
+  inputOnly.ticks(10, 0.0f, dbToLinear(-6.0f));
+  Canvas bar = lineScreen();
+  bar.fillRect(1, 55 - 41 + 1, 2, 41, true);
+  check(sameCanvas(inputOnly.live, bar), "face: an input with a silent output stands the bar and leaves the ribbon on the line");
+
+  // Ten levels of 22 px fill columns 108 to 127.
+  FaceRig outputOnly;
+  outputOnly.ticks(10, dbToLinear(-6.0f), 0.0f);
+  check(barRows(outputOnly.live, 0) && lit(outputOnly.live, 108, 32 - 22) && lit(outputOnly.live, 127, 32 + 22) && !lit(outputOnly.live, 107, 32 - 22),
+        "face: an output with a silent input fills the ribbon and leaves the bar empty");
+}
+
+// The scripted drive of proof scene 12 in tools/oled-proof/oled_motion.cpp. The input holds
+// -23 dBFS (25 rows) and the output cycles through twelve levels, one per tick. The golden is the
+// frame after tick 80, when the 62 levels of the ribbon all come from the cycle.
+constexpr float kScriptInDb = -23.0f;
+constexpr float kScriptOutDb[12] = {-30.0f, -24.0f, -19.0f, -12.0f, -8.0f, -14.0f, -20.0f, -26.0f, -32.0f, -40.0f, -52.0f, -60.0f};
+constexpr int kScriptTicks = 80;
+
+void checkBarAndRibbonAgainstProof() {
+  FaceRig r;
+  for (int k = 0; k < kScriptTicks; ++k) r.tick(dbToLinear(kScriptOutDb[k % 12]), dbToLinear(kScriptInDb));
+  check(matchesGolden(r.live, "voice-meter-ribbon"), "face: the bar beside the ribbon matches the proof frame");
+  check(barRows(r.live, 25), "face: that frame's bar is 25 rows at columns 1 and 2");
+  writePgm(r.live, "oled-voice-meter.pgm");
+}
+
+// Screens off the voice carry no bar. Each settles to the same frame with a loud input as with a
+// silent one, and the bar's place stays dark on the ones that leave it free.
+Canvas settledOff(void (*setUp)(FaceRig&), float inRms) {
+  FaceRig r;
+  r.ticks(4, 0.0f, inRms);
+  setUp(r);
+  r.ticks(6, 0.0f, inRms);
+  return r.live;
+}
+
+bool barPlaceDark(const Canvas& c) {
+  for (int y = 9; y <= 55; ++y) {
+    if (lit(c, 1, y) || lit(c, 2, y)) return false;
+  }
+  return true;
+}
+
+void checkNoBarOffTheVoice() {
+  struct Scene {
+    const char* name;
+    void (*setUp)(FaceRig&);
+    bool placeFree;  // the screen draws nothing of its own at the bar's columns
+  };
+  const Scene scenes[] = {
+      {"readout", [](FaceRig& r) { r.turn(4, 1, kTime160); }, true},
+      {"toggle", [](FaceRig& r) { r.flip(5, true); }, true},
+      {"MUTED", [](FaceRig& r) { r.switchOn = true; }, true},
+      {"BYPASS", [](FaceRig& r) { r.settings.topSwitch = TopSwitch::Bypass; r.switchOn = true; }, true},
+      {"menu", [](FaceRig& r) { r.menu.update(clickInput(), r.now); }, false},
+  };
+  const float loud = dbToLinear(-6.0f);
+  for (const Scene& s : scenes) {
+    const Canvas withInput = settledOff(s.setUp, loud);
+    const Canvas silent = settledOff(s.setUp, 0.0f);
+    check(sameCanvas(withInput, silent), (std::string("face: the ") + s.name + " screen is the same with a loud input and a silent one").c_str());
+    if (s.placeFree) check(barPlaceDark(withInput), (std::string("face: the ") + s.name + " screen has nothing at the bar's columns").c_str());
+  }
+
+  FaceRig voice;
+  voice.ticks(4, 0.0f, loud);
+  check(!barPlaceDark(voice.live), "face: the same input does stand the bar on the voice screen");
 }
 
 }  // namespace
@@ -688,4 +783,7 @@ void checkFace() {
   checkLoadFigure();
   checkLoadFigureAbsent();
   checkVoiceLevels();
+  checkEachOwnsItsSource();
+  checkBarAndRibbonAgainstProof();
+  checkNoBarOffTheVoice();
 }

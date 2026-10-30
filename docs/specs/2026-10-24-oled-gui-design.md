@@ -16,7 +16,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Screens
 | Screen | Shows | Rows |
 |---|---|---|
-| Voice | the input level as a ribbon scrolling right to left | horizon at row 32, up to 22 px each side, 1 px rim |
+| Voice | the output as a ribbon scrolling right to left, scaled to its own recent peak, with the input level as a bar at the left and the DEBUG load figure bottom right | ribbon columns 4 to 127, horizon at row 32, up to 22 px each side, 1 px rim; bar columns 1 to 2, rows 9 to 55 |
 | Readout | the knob that moved last | card line 5x7 at (1, 1), name 9X12 top at 15, value 16X24 top at 34 |
 | Muted | the word of the top switch, nothing else | 16X24 centred both ways, top at 20 |
 | Menu | the list, chain view or update confirm | as the menu spec, unchanged |
@@ -98,14 +98,15 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 116 px. The flat is 12 px wide, 1 px narrower than the 13 px sharp, so the flat names stay inside that field (`Db / Bbm` is 114 px).
 
 ## Voice
-1. The audio interrupt sums the squares of the input samples of every block. The main loop takes the sum and the sample count at each UI tick.
-2. The RMS of that window maps to 0..1. It is linear in dB from -50 dBFS (0) to -6 dBFS (1), raised to the power 0.6.
+1. The audio interrupt sums the squares of the input samples of every block where they enter the chain (so the bench clip moves the bar too), and of the left output sample as written to the DAC, after output trim and the soft ceiling. The main loop takes both sums with their sample counts at each UI tick, each in its own masked take.
+2. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The ribbon level is `(d - (t - 44)) / 44` held to 0..1, then raised to the power 0.6. A steady output above -30 dBFS fills the ribbon; a quieter one sits by its place in the 44 dB under the top.
 3. The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further. A level under 0.01 snaps to 0.
-4. A tick turns the level into a half-height of `round(level^0.8 * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s.
+4. A tick turns the level into a half-height of `round(level^0.8 * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 4 to column 127, 62 levels.
 5. A column is solid from `32 - h` to `32 + h`. A 1 px rim above and below it is lit where the Bayer threshold of the pixel is under 32, which is half of them.
-6. At height 0 the column is the one pixel on row 32. In silence the screen is the line and nothing else.
+6. At height 0 the column is the one pixel on row 32. In silence the screen is the line, the empty bar and nothing else.
 7. The ribbon keeps filling while another screen shows, so the voice returns with its history.
-8. The input level is measured where the samples enter the chain, so the bench clip moves it too.
+8. The input bar (owner 2026-10-30, "a minimal, thin input level VU meter on the left"): columns 1 and 2, rows 9 to 55, filled from row 55 upward with `round(level * 47)` rows, where the level is linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (1) with the same rise, 120 ms fall and snap as the ribbon. Column 3 stays blank. The bar walks with the ribbon and shows on the voice screen only.
+9. The DEBUG load figure (owner 2026-10-30, polish spec menu row 7): with DEBUG on, the voice screen draws the worst audio block of the last whole second as a percent of the block budget (640000 cycles at 480 MHz) in 5x7, last column 126 and top row 56, so `42%` keeps 1 px from the right and bottom edges. It reads 0 for the first second after boot, is held to 0..999, refreshes each UI tick, does not walk, and never appears on the readout, the toggle readout, MUTED, BYPASS or the menu.
 
 ## Dissolve
 1. A screen change shows two mixed frames and then the new screen. At 25 fps each frame lasts 40 ms, so the mix takes 80 ms.
@@ -172,8 +173,8 @@ Settings, mute state, Menu::open ───────────────�
 ```
 
 ## Tests and proofs
-1. `test/firmware/golden/*.bin` hold 27 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
-2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, and one readout replaced by another.
+1. `test/firmware/golden/*.bin` hold 30 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
+2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, one readout replaced by another, the two toggle frames and one voice frame (`voice-meter-ribbon`, scene 12).
 3. The fixed field changed 11 of the 27 frames, and the other 16 stayed byte-identical. The proof renderer's `rollValue` follows the same rule, and the goldens were re-cut from it.
 
 | Frames | Why they changed |
@@ -189,7 +190,7 @@ The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the 
 6. A continuous knob runs through every whole number between the lowest and the highest its 4096 pot readings reach. A stepped knob runs through every position. Today that is 18 parameters and 3,852 steps, and the test prints both counts on every run.
 7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns and a key name's first lit column are read straight off the frame. Each must equal the column the first frame that showed it gave, so a shift of one pixel fails.
 8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before. A knob that declares decimals fails it until the sweep models them.
-9. The voice has no byte reference, because the proof's voice comes from Adam's recordings. Its tests check the level map, the heights, the scroll, the rim, the walk and three input levels through the whole path.
+9. The voice golden `voice-meter-ribbon` is frame 79 of scene 12, a scripted drive the test repeats tick for tick, because the proof's scene 1 comes from Adam's recordings, which the host cannot replay. The voice tests also check the level map, the window, the heights, the scroll, the rim, the walk, the bar and three levels through the whole path.
 10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key,key-flat}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm`, `oled-face-menu.pgm` and `oled-splash.pgm` at 4x.
 11. `core_canvas.cpp` drives `PanelLink` with a fake clock: the first failure restarts at once, later ones wait for the 1 s window, Lost and Back come once per run, and the window survives a millis() wrap. `ui_splash.cpp` runs the sketch's order through the splash and checks that a click or a turn during it opens nothing.
 12. The CI host job runs `node tools/font-editor/check-header.js`, which fails unless `cubevox_fonts.h` is what the font editor exports from `cubevox-fonts.json`.

@@ -21,16 +21,27 @@ constexpr int kReadoutNameY = 15;
 constexpr int kReadoutValueY = 34;
 
 // The voice ribbon is mirrored about the horizon, and each level it holds spans two columns, so it
-// scrolls 50 px/s at 25 frames a second.
+// scrolls 50 px/s at 25 frames a second. It starts at kRibbonLeftX and runs to the right edge.
 constexpr int kRibbonHorizonY = kCanvasHeight / 2;
 constexpr int kRibbonHalfMax = 22;
 constexpr int kRibbonColumnsPerLevel = 2;
-constexpr int kRibbonLevels = kCanvasWidth / kRibbonColumnsPerLevel;
+constexpr int kRibbonLeftX = 4;
+constexpr int kRibbonLevels = (kCanvasWidth - kRibbonLeftX) / kRibbonColumnsPerLevel;
+
+// The input level bar fills up from the last row of the ribbon's span (the tallest column and its
+// rim). The columns between the bar and the ribbon stay blank.
+constexpr int kMeterX = 1;
+constexpr int kMeterWidth = 2;
+constexpr int kMeterTopY = kRibbonHorizonY - kRibbonHalfMax - 1;
+constexpr int kMeterRows = 2 * (kRibbonHalfMax + 1) + 1;
 
 // Half-height of the ribbon, in pixels, for a level of 0..1.
 int ribbonHalfHeight(float level);
 
-// The recent input levels, newest first.
+// Height of the level bar, in rows, for a level of 0..1.
+int meterRows(float level);
+
+// The recent output levels, newest first.
 class Ribbon {
  public:
   // Adds the newest level, which enters at the right edge and scrolls left.
@@ -44,8 +55,10 @@ class Ribbon {
   int head_ = 0;
 };
 
-// The ribbon mirrored about the horizon, shifted by `walk`. In silence it is the horizon line alone.
-void renderVoice(Canvas& canvas, const Ribbon& ribbon, Walk walk);
+// The voice screen. The ribbon is mirrored about the horizon and shifted by `walk`; in silence it
+// is the horizon line alone. The level bar stands at the left edge with `rows` rows lit and walks
+// with the ribbon.
+void renderVoice(Canvas& canvas, const Ribbon& ribbon, int rows, Walk walk);
 
 // What the readout needs, taken from the card table and the gui.
 struct ReadoutView {
