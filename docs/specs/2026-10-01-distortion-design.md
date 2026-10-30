@@ -54,6 +54,14 @@ Notes from the same author's Boneyard / BD-2w mod write-up (part 4):
    so the 3rd harmonic of a -12 dBFS 220 Hz sine runs about -41, -29, -21, -15, -12 dB at
    DRIVE 0.1, 0.3, 0.5, 0.7, 1 (old: nothing below 0.45, -11.4 at 0.7, -11.2 at 1).
    DRIVE 0 is sample-exact passthrough so the always-on stage is transparent at zero.
+   Owner 2026-10-30, board 1 with Adam's samples: "distortion is a little subtle at max",
+   and the BD-2's voice is what Adam picked, so the top of the knob gets reach without a
+   change of character, as a boost in front of the pedal does. From DRIVE 0.6 to 1 stage 1
+   gains up to `topBoostDb` = 6 dB more, linear in dB over that span (`topBoostFrom` = 0.6),
+   on top of the exponential sweep; stage 2, both rails, the tone stack and the post chain
+   are unchanged, and DRIVE 0 to 0.6 is bit-exact against before. The owner asked for 6 dB
+   ("split the difference" against a 12 dB proposal). Renders of the three samples at DRIVE
+   1, before and after, in `build/drive-ab/`.
 3. The only nonlinearity is rail saturation, applied after stage 1 and after stage 2,
    as a clamp with a short soft edge. A small tunable rail asymmetry stands in for
    imperfect biasing (default 0.05).
