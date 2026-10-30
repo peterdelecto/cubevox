@@ -45,7 +45,7 @@ bool Face::due(uint32_t nowMs, const Canvas& live) { return live.dirtyPages() ==
 
 void Face::render(const GuiFrame& frame, const UiContext& ctx, Menu& menu) {
   switch (frame.screen) {
-    case Screen::Voice: renderVoice(target_, ribbon_, meterRows_, frame.walk); break;
+    case Screen::Voice: renderVoice(target_, ribbon_, meterSegments_, frame.walk); break;
     case Screen::Readout: renderReadout(target_, readoutView(frame, ctx)); break;
     case Screen::Muted: renderMuted(target_, topSwitchWord(ctx.settings.topSwitch)); break;
     case Screen::Menu:
@@ -69,7 +69,7 @@ void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& 
     readoutSlot_ = -1;
   }
   const float dtMs = static_cast<float>(sinceMs);
-  meterRows_ = meterRows(inputMeter_.update(input, dtMs));
+  meterSegments_ = meterSegments(inputMeter_.update(input, dtMs));
   ribbon_.push(outputMeter_.update(output, dtMs));
   const GuiFrame frame = gui_.tick(nowMs, ctx.topSwitchOn, menu.open());
   render(frame, ctx, menu);

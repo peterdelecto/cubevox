@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "core/fonts.h"
 #include "core/load_window.h"
@@ -24,30 +25,48 @@ void drawCentred(Canvas& canvas, int y, const FontDesc& font, const char* text) 
   canvas.drawText(centredX(font, text), y, font, text);
 }
 
-// The number just below the value and the one just above it, each in all the cells of the knob's
-// field, so the two strings and every other value of the knob have the same length.
+// Two numbers a roll sits between, each in the same `cells` characters. The digits are right-aligned
+// and a sign cell comes first when either number has a sign, so a digit or sign that only one number
+// has is a blank in the other string. A settled value is the pair of one number with itself.
 struct RollPair {
   char from[kMaxKnobCells + 1];
   char to[kMaxKnobCells + 1];
   int cells;
 };
 
-RollPair rollPair(const KnobDesc& knob, int base) {
-  RollPair pair;
-  pair.cells = knobCells(knob);
-  formatCells(knob, base, pair.from, sizeof(pair.from));
-  formatCells(knob, base + 1, pair.to, sizeof(pair.to));
-  return pair;
+int leadingBlanks(const char* text) {
+  int n = 0;
+  while (text[n] == ' ') ++n;
+  return n;
 }
 
-// The widest name of a labelled knob. Its field is that wide for every name.
-int widestLabel(const FontDesc& font, const KnobDesc& knob) {
-  int widest = 0;
-  for (int i = 0; i < knob.positions; ++i) {
-    const int width = Canvas::textWidth(font, knobLabel(knob, i));
-    widest = width > widest ? width : widest;
+// formatCells lays a number out in the knob's widest field. This drops the cells neither number
+// uses, which are the sign cell when both are unsigned and the leading blank digit cells both leave.
+RollPair rollPair(const KnobDesc& knob, int from, int to) {
+  RollPair pair = {"", "", 0};
+  const int total = knobCells(knob);
+  if (total <= 0) return pair;
+
+  char full[2][kMaxKnobCells + 1];
+  formatCells(knob, from, full[0], sizeof(full[0]));
+  formatCells(knob, to, full[1], sizeof(full[1]));
+
+  const int signCells = knob.min < 0.0f ? 1 : 0;
+  const bool keepSign = signCells > 0 && (full[0][0] != ' ' || full[1][0] != ' ');
+  const int blankFrom = leadingBlanks(full[0] + signCells);
+  const int blankTo = leadingBlanks(full[1] + signCells);
+  const int blank = blankFrom < blankTo ? blankFrom : blankTo;
+  const int digitCells = total - signCells - blank;
+  pair.cells = (keepSign ? 1 : 0) + digitCells;
+
+  char* const out[2] = {pair.from, pair.to};
+  for (int n = 0; n < 2; ++n) {
+    int at = 0;
+    if (keepSign) out[n][at++] = full[n][0];
+    memcpy(out[n] + at, full[n] + signCells + blank, static_cast<size_t>(digitCells));
+    out[n][pair.cells] = '\0';
   }
-  return widest;
+  return pair;
 }
 
 // Draws the digits of the value, each in a fixed cell. A digit that differs between the two numbers
@@ -69,8 +88,10 @@ int drawRolled(Canvas& canvas, int x, const RollPair& pair, int rolled) {
   return x;
 }
 
-// The field holds the knob's cells, a space and the unit, and its width never changes. It is
-// centred once, so the unit stays put and each cell keeps its place while the value changes.
+// The field holds the cells of the number, a space and the unit, and it is centred on the panel.
+// A roll holds the wider of its two numbers, so the unit and every cell stay put while numbers of
+// one digit count roll, and the row re-centres once when a digit or the sign appears or vanishes.
+// A roll of 0 px or of the full height draws one number alone, so the field is that number's own.
 void drawNumber(Canvas& canvas, const ReadoutView& view) {
   const FontDesc& big = font16x24();
   const KnobDesc& knob = *view.knob;
@@ -78,14 +99,20 @@ void drawNumber(Canvas& canvas, const ReadoutView& view) {
   if (!(shown > -kShownLimit)) shown = -kShownLimit;  // also catches NaN
   if (shown > kShownLimit) shown = kShownLimit;
   const float base = floorf(shown);
-  const RollPair pair = rollPair(knob, static_cast<int>(base));
+  const int below = static_cast<int>(base);
+  const int rolled = static_cast<int>(lroundf((shown - base) * static_cast<float>(big.height)));
+
+  const bool settledBelow = rolled <= 0;
+  const bool settledAbove = rolled >= big.height;
+  const int from = settledAbove ? below + 1 : below;
+  const int to = settledBelow || settledAbove ? from : below + 1;
+  const RollPair pair = rollPair(knob, from, to);
 
   char unit[16];
   unitText(knob, unit, sizeof(unit));
   const int unitWidth = unit[0] != '\0' ? big.spacing + Canvas::textWidth(big, unit) : 0;
   const int x = (kCanvasWidth - (Canvas::digitsWidth(big, pair.from) + unitWidth)) / 2;
-  const int rolled = static_cast<int>(lroundf((shown - base) * static_cast<float>(big.height)));
-  const int pen = drawRolled(canvas, x, pair, rolled);
+  const int pen = drawRolled(canvas, x, pair, settledBelow || settledAbove ? 0 : rolled);
   canvas.drawText(pen, kReadoutValueY, big, unit);
 }
 
@@ -114,8 +141,8 @@ int unitText(const KnobDesc& knob, char* out, int size) {
   if (size <= 0) return 0;
   out[0] = '\0';
   if (knob.unit[0] == '\0') return 0;
-  snprintf(out, static_cast<size_t>(size), " %s", knob.unit);
-  return upperText(out, out, size);
+  const int length = snprintf(out, static_cast<size_t>(size), " %s", knob.unit);
+  return length < size ? length : size - 1;
 }
 
 int ribbonHalfHeight(float level) {
@@ -124,9 +151,9 @@ int ribbonHalfHeight(float level) {
   return static_cast<int>(lroundf(shaped * static_cast<float>(kRibbonHalfMax)));
 }
 
-int meterRows(float level) {
-  if (!(level > 0.0f)) return 0;
-  return static_cast<int>(lroundf((level > 1.0f ? 1.0f : level) * static_cast<float>(kMeterRows)));
+int meterSegments(float level) {
+  const float held = level > 0.0f ? (level < 1.0f ? level : 1.0f) : 0.0f;  // also catches NaN
+  return static_cast<int>(lroundf(held * static_cast<float>(kMeterSegments)));
 }
 
 void Ribbon::push(float level) {
@@ -139,15 +166,38 @@ int Ribbon::half(int age) const {
   return half_[static_cast<size_t>((head_ - 1 - age + 2 * kRibbonLevels) % kRibbonLevels)];
 }
 
-void renderVoice(Canvas& canvas, const Ribbon& ribbon, int rows, Walk walk) {
-  canvas.clear();
-  if (rows > 0) {
-    const int shown = rows < kMeterRows ? rows : kMeterRows;
-    canvas.fillRect(kMeterX + walk.x, kMeterTopY + kMeterRows - shown + walk.y, kMeterWidth, shown, true);
+namespace {
+
+// The outline of the meter, 1 px wide, shifted by the walk.
+void drawMeterBox(Canvas& canvas, Walk walk) {
+  const int left = kMeterBoxLeftX + walk.x;
+  const int top = kMeterBoxTopY + walk.y;
+  const int width = kMeterBoxRightX - kMeterBoxLeftX + 1;
+  const int height = kMeterBoxBottomY - kMeterBoxTopY + 1;
+  canvas.fillRect(left, top, width, 1, true);
+  canvas.fillRect(left, top + height - 1, width, 1, true);
+  canvas.fillRect(left, top, 1, height, true);
+  canvas.fillRect(left + width - 1, top, 1, height, true);
+}
+
+// The lowest `lit` segments, each kMeterSegmentRows tall with kMeterSegmentGap rows between them.
+void drawMeterSegments(Canvas& canvas, int lit, Walk walk) {
+  const int bottom = kMeterTopY + kMeterRows;
+  for (int i = 0; i < lit; ++i) {
+    const int top = bottom - (i + 1) * kMeterSegmentRows - i * kMeterSegmentGap;
+    canvas.fillRect(kMeterX + walk.x, top + walk.y, kMeterWidth, kMeterSegmentRows, true);
   }
+}
+
+}  // namespace
+
+void renderVoice(Canvas& canvas, const Ribbon& ribbon, int segments, Walk walk) {
+  canvas.clear();
+  drawMeterBox(canvas, walk);
+  drawMeterSegments(canvas, segments < kMeterSegments ? segments : kMeterSegments, walk);
   const int centre = kRibbonHorizonY + walk.y;
-  for (int x = kRibbonLeftX; x < kCanvasWidth; ++x) {
-    const int half = ribbon.half((kCanvasWidth - 1 - x) / kRibbonColumnsPerLevel);
+  for (int x = kRibbonLeftX; x <= kRibbonRightX; ++x) {
+    const int half = ribbon.half((kRibbonRightX - x) / kRibbonColumnsPerLevel);
     const int column = x + walk.x;
     if (half <= 0) {
       canvas.setPixel(column, centre, true);
@@ -171,10 +221,7 @@ void renderReadout(Canvas& canvas, const ReadoutView& view) {
   upperText(view.knob->name, name, sizeof(name));
   drawCentred(canvas, kReadoutNameY, font9x12(), name);
   if (view.knob->labels) {
-    // The field is as wide as the widest name. The name starts at its left edge.
-    const FontDesc& big = font16x24();
-    const int x = (kCanvasWidth - widestLabel(big, *view.knob)) / 2;
-    canvas.drawText(x, kReadoutValueY, big, knobLabel(*view.knob, view.target));
+    drawCentred(canvas, kReadoutValueY, font16x24(), knobLabel(*view.knob, view.target));
   } else {
     drawNumber(canvas, view);
   }

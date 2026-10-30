@@ -1,5 +1,5 @@
 // Animated OLED GUI proof. Ten scenes (Adam's voice, four knob turns, idle, mute, the motion
-// rules, a toggle flip, the level bar beside the ribbon on a scripted drive) each run on their own
+// rules, a toggle flip, the boxed level meter beside the ribbon on a scripted drive) each run on their own
 // clock from a clean screen, through the firmware's own Canvas and
 // fonts at 25 frames a second, and come out as raw 1-bit frames with a two-line caption strip
 // per frame plus a scene table. motion_gif.py cuts one GIF per scene from them.
@@ -43,15 +43,22 @@ constexpr float kValueTauS = 0.02f;     // the readout eases toward the knob
 constexpr int kScrollPxPerFrame = 2;    // voice history scrolls 50 px/s
 constexpr float kSilence = 0.03f;       // env below this counts as silence
 
-// The voice screen. The ribbon (the output) runs from column 4 to 127 about the horizon. The input
-// bar stands in columns 1 and 2 over the ribbon's rows, 9 to 55, and fills up from row 55.
-constexpr int kRibbonLeft = 4;
+// The voice screen. The ribbon (the output) runs from column 13 to 126 about the horizon, 57 levels
+// of 2 columns, and column 127 stays blank. The input meter is a 1 px outline box in columns 1 to 9
+// and rows 8 to 56, with 16 segments inside it, each 2 rows tall at columns 2 to 8 with 1 row of gap
+// above it. The lowest segment sits on rows 54 and 55 and the highest on rows 9 and 10. Columns 10
+// to 12 stay blank.
+constexpr int kRibbonLeft = 13;
+constexpr int kRibbonRight = 126;
 constexpr int kHalfMax = 22;
-constexpr int kBarX = 1;
-constexpr int kBarW = 2;
-constexpr int kBarBottom = kH / 2 + kHalfMax + 1;   // 55
-constexpr int kBarRows = 2 * (kHalfMax + 1) + 1;    // 47
-constexpr float kBarFloorDb = -50.0f;               // empty here, full at 0 dBFS
+constexpr int kBoxLeft = 1;
+constexpr int kBoxRight = 9;
+constexpr int kBoxTop = 8;
+constexpr int kBoxBottom = 56;
+constexpr int kSegments = 16;
+constexpr int kSegmentRows = 2;
+constexpr int kSegmentPitch = 3;                    // the segment's rows and the gap above it
+constexpr float kBarFloorDb = -50.0f;               // no segment here, all 16 at 0 dBFS
 constexpr float kBarReleaseS = 0.12f;
 constexpr float kBarSilence = 0.01f;
 
@@ -323,60 +330,64 @@ struct Card {
 
 // Slots 1..8 of the default layout.
 const Card kCards[8] = {
-    {"INPUT GATE", {"THRESHOLD", "DB", -60, -10, false, -35}, {"DECAY", "MS", 20, 500, false, 150}},
+    {"INPUT GATE", {"THRESHOLD", "dB", -60, -10, false, -35}, {"DECAY", "ms", 20, 500, false, 150}},
     {"AUTOTUNE", {"KEY", "", 0, 11, true, 5}, {"RESPONSE", "%", 0, 100, false, 50}},
-    {"OCTAVE", {"SEMITONES", "ST", -12, 12, true, 0}, {"MIX", "%", 0, 100, false, 60}},
-    {"UNISON", {"DEPTH", "%", 0, 100, false, 20}, {"RATE", "HZ", 0.1f, 5, false, 1.5f}},
-    {"SLAPBACK", {"MIX", "%", 0, 100, false, 40}, {"TIME", "MS", 60, 250, false, 120}},
+    {"OCTAVE", {"SEMITONES", "st", -12, 12, true, 0}, {"MIX", "%", 0, 100, false, 60}},
+    {"UNISON", {"DEPTH", "%", 0, 100, false, 20}, {"RATE", "hz", 0.1f, 5, false, 1.5f}},
+    {"SLAPBACK", {"MIX", "%", 0, 100, false, 40}, {"TIME", "ms", 60, 250, false, 120}},
     {"DISTORTION", {"DRIVE", "%", 0, 100, false, 20}, {"TONE", "%", 0, 100, false, 50}},
-    {"GATE", {"THRESHOLD", "DB", -60, -10, false, -40}, {"DECAY", "MS", 20, 500, false, 150}},
+    {"GATE", {"THRESHOLD", "dB", -60, -10, false, -40}, {"DECAY", "ms", 20, 500, false, 150}},
     {"SPRING REVERB", {"MIX", "%", 0, 100, false, 30}, {"TIME", "%", 0, 100, false, 50}},
 };
 
-// The value's field is fixed per parameter, so the row never moves sideways. It holds a sign cell
-// when the range is signed, one cell per digit of the widest number, a space and the unit, and it is
-// centred once. A number is right-aligned in the digit cells with its sign in the sign cell, and a
-// shorter number leaves its leading cells blank.
-int fieldDigits(const Param& p) {
-  const long widest = std::max(std::lround(std::fabs(p.lo)), std::lround(std::fabs(p.hi)));
-  return static_cast<int>(std::to_string(widest).size());
-}
+// The value row is centred on its field. The field holds the cells of the wider of the two numbers a
+// roll sits between, a space and the unit, and a number at rest is its own field. Digits are
+// right-aligned, a sign cell comes first when either number has a sign (zero has none), and a digit
+// or sign that only one number has is a blank in the other.
+struct Cells {
+  std::string a, b;
+};
 
-// One character per cell of the field for the whole number v.
-std::string fieldCells(const Param& p, int v) {
-  std::string cells(static_cast<size_t>(fieldDigits(p)), ' ');
-  const std::string magnitude = std::to_string(std::abs(v));
-  for (size_t i = 0; i < magnitude.size() && i < cells.size(); ++i)
-    cells[cells.size() - 1 - i] = magnitude[magnitude.size() - 1 - i];
-  if (p.lo < 0) cells.insert(cells.begin(), v < 0 ? '-' : (v > 0 ? '+' : ' '));
-  return cells;
+Cells fieldCells(const Param& p, int from, int to) {
+  const std::string da = std::to_string(std::abs(from));
+  const std::string db = std::to_string(std::abs(to));
+  const size_t width = std::max(da.size(), db.size());
+  const bool signCell = p.lo < 0 && (from != 0 || to != 0);
+  const auto lay = [&](const std::string& d, int v) {
+    std::string cells = std::string(width - d.size(), ' ') + d;
+    if (signCell) cells.insert(cells.begin(), v < 0 ? '-' : (v > 0 ? '+' : ' '));
+    return cells;
+  };
+  return {lay(da, from), lay(db, to)};
 }
 
 // ---------------------------------------------------------------------------------------------
 // Screens.
 
 // 16X24 readout. Each digit that changes rolls vertically from the old glyph to the new one. The
-// digits sit in the fixed cells of the parameter's field, so the unit after them never moves while
-// they roll, and a number that gains a digit lights its leading cell in place.
+// cells and the unit stay put while numbers of one digit count roll. A roll of 0 px or of the full
+// height shows one number alone, so the row re-centres when a digit or the sign appears or vanishes.
 void rollValue(Frame& f, int y, const Param& p, float shown) {
   const FontDesc& big = font16x24();
   const float fl = std::floor(shown);
-  const float frac = shown - fl;
-  const std::string A = fieldCells(p, static_cast<int>(fl));
-  const std::string B = fieldCells(p, static_cast<int>(fl) + 1);
-  const int n = static_cast<int>(A.size());
+  const int lower = static_cast<int>(fl);
+  const int dy = roundInt((shown - fl) * big.height);
+  const int from = dy >= big.height ? lower + 1 : lower;
+  const int to = (dy <= 0 || dy >= big.height) ? from : lower + 1;
+  const int lift = (dy <= 0 || dy >= big.height) ? 0 : dy;
+  const Cells c = fieldCells(p, from, to);
+  const int n = static_cast<int>(c.a.size());
   char unit[8];
   std::snprintf(unit, sizeof unit, " %s", p.unit);
-  const int x0 = (kW - (Canvas::digitsWidth(big, A.c_str()) + big.spacing + textW(big, unit))) / 2;
-  const int dy = roundInt(frac * big.height);
+  const int x0 = (kW - (Canvas::digitsWidth(big, c.a.c_str()) + big.spacing + textW(big, unit))) / 2;
   int pen = x0;
   for (int i = 0; i < n; ++i) {
-    const char ca[2] = {A[i], 0}, cb[2] = {B[i], 0};
-    if (A[i] == B[i]) {
+    const char ca[2] = {c.a[i], 0}, cb[2] = {c.b[i], 0};
+    if (c.a[i] == c.b[i]) {
       pen = digits(f, pen, y, big, ca);
     } else {
-      digitsClipped(f, pen, y - dy, big, ca, y, y + big.height);
-      pen = digitsClipped(f, pen, y + big.height - dy, big, cb, y, y + big.height);
+      digitsClipped(f, pen, y - lift, big, ca, y, y + big.height);
+      pen = digitsClipped(f, pen, y + big.height - lift, big, cb, y, y + big.height);
     }
   }
   text(f, pen, y, big, unit);
@@ -414,16 +425,24 @@ Frame toggleScreen(int slot, bool on) {
   return f;
 }
 
-// The voice screen. The output scrolls by as a ribbon around a horizon line, from column 4, and
-// the input stands as a 2 px bar at the left edge. `ribbonAt(age)` is the ribbon's level `age`
-// frames back and `barRows` the bar's height. In silence the ribbon is the line and the bar is empty.
+// The voice screen. The output scrolls by as a ribbon around a horizon line, from column 13, and
+// the input stands as a boxed meter at the left edge. `ribbonAt(age)` is the ribbon's level `age`
+// frames back and `segments` the number of lit meter segments, counted from the bottom. In silence
+// the ribbon is the line and the meter is its empty box.
 template <typename LevelAt>
-Frame voiceScreen(LevelAt ribbonAt, int barRows) {
+Frame voiceScreen(LevelAt ribbonAt, int segments) {
   Frame f;
   const int cy = kH / 2;
-  f.fill(kBarX, kBarBottom - barRows + 1, kBarW, barRows);
-  for (int x = kRibbonLeft; x < kW; ++x) {
-    const float e = ribbonAt((kW - 1 - x) / kScrollPxPerFrame);
+  f.fill(kBoxLeft, kBoxTop, kBoxRight - kBoxLeft + 1, 1);
+  f.fill(kBoxLeft, kBoxBottom, kBoxRight - kBoxLeft + 1, 1);
+  f.fill(kBoxLeft, kBoxTop, 1, kBoxBottom - kBoxTop + 1);
+  f.fill(kBoxRight, kBoxTop, 1, kBoxBottom - kBoxTop + 1);
+  for (int i = 0; i < std::min(segments, kSegments); ++i) {
+    const int bottomRow = kBoxBottom - 1 - i * kSegmentPitch;
+    f.fill(kBoxLeft + 1, bottomRow - kSegmentRows + 1, kBoxRight - kBoxLeft - 1, kSegmentRows);
+  }
+  for (int x = kRibbonLeft; x <= kRibbonRight; ++x) {
+    const float e = ribbonAt((kRibbonRight - x) / kScrollPxPerFrame);
     const int h = roundInt(std::pow(e, 0.8f) * kHalfMax);
     if (h <= 0) {
       f.set(x, cy);
@@ -437,18 +456,19 @@ Frame voiceScreen(LevelAt ribbonAt, int barRows) {
 }
 
 // The rest screen shows Adam's voice. The ribbon is the performance scaled to its own peak, the way
-// the self-scaling output window shows it, and the bar is the same take at its absolute level.
+// the self-scaling output window shows it, and the meter is the same take at its absolute level.
 Frame restScreen(const Live& L) {
   return voiceScreen([&L](int age) { return L.voice->at(L.frame - age); },
-                     roundInt(L.voice->barAt(L.frame) * kBarRows));
+                     roundInt(L.voice->barAt(L.frame) * kSegments));
 }
 
 // ---------------------------------------------------------------------------------------------
 // The scripted drive of scene 12, which test/firmware/ui_face.cpp repeats tick for tick. The input
 // holds kScriptInDb and the output cycles through twelve levels, one per frame. The ribbon level
 // follows the box's rule. The window top jumps to a louder tick and falls 10 dB a second, never
-// below -30 dBFS. The level is the tick's place in the 44 dB under the top, raised to 0.6, with an
-// instant attack and a 120 ms release.
+// below -30 dBFS. The level is the tick's place between the window's bottom and its top, raised to
+// 0.6, with an instant attack and a 120 ms release. The bottom is 44 dB under the top but never
+// under -60 dBFS, so a tick under -60 dBFS is silence.
 constexpr float kScriptInDb = -23.0f;
 constexpr float kScriptOutDb[12] = {-30, -24, -19, -12, -8, -14, -20, -26, -32, -40, -52, -60};
 
@@ -464,7 +484,8 @@ std::vector<float> scriptedRibbon(int frames) {
     } else {
       top = std::max(-30.0f, top - 10.0f * kDt);
     }
-    const float position = clamp01((d - (top - 44.0f)) / 44.0f);
+    const float bottom = std::max(top - 44.0f, -60.0f);
+    const float position = clamp01((d - bottom) / (top - bottom));
     const float now = std::pow(position, 0.6f);
     level = now >= level ? now : now + (level - now) * release;
     if (level < 0.01f) level = 0.0f;
@@ -646,14 +667,14 @@ Scene toggleScene(Voice& voice) {
           }};
 }
 
-// Scene 12: the voice screen on the scripted drive above. The bar holds still at 25 rows while the
-// ribbon cycles, so the two read apart. The host test repeats the drive and matches frame 79.
+// Scene 12: the voice screen on the scripted drive above. The meter holds still at 9 segments while
+// the ribbon cycles, so the two read apart. The host test repeats the drive and matches frame 79.
 Scene scriptScene() {
   return {"12", "bar-ribbon", kScriptSceneS, [](int i, float, Caption& cap) {
             static const std::vector<float> ribbon = scriptedRibbon(static_cast<int>(kScriptSceneS * kFps));
             setCaption(cap, "12  BAR AND RIBBON", "IN STEADY, OUT CYCLES");
-            const int rows = roundInt(clamp01((kScriptInDb - kBarFloorDb) / -kBarFloorDb) * kBarRows);
-            return voiceScreen([i](int age) { return i - age >= 0 ? ribbon[i - age] : 0.0f; }, rows);
+            const int segments = roundInt(clamp01((kScriptInDb - kBarFloorDb) / -kBarFloorDb) * kSegments);
+            return voiceScreen([i](int age) { return i - age >= 0 ? ribbon[i - age] : 0.0f; }, segments);
           }};
 }
 

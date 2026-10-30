@@ -42,7 +42,7 @@ constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
 constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
 constexpr Cost kDistortion{8, 10, true};   // 46.4k / 62.1k
 constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
-constexpr Cost kReverbSpring{10, 10, true};  // 61.5k / 61.9k
+constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the board's boot worst 107.4k against the two-half engine's 72.0k (1.49x of 61.9k); two-pass bench pending
 constexpr Cost kReverbChasm{16, 16, true};   // 97.6k / 98.4k
 
 // What every block spends whatever the layout: the tail after the slots, and the input conditioning

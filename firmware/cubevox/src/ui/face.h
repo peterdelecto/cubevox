@@ -51,7 +51,7 @@ class Face {
 
   level::Meter inputMeter_;
   level::OutputMeter outputMeter_;
-  int meterRows_ = 0;
+  int meterSegments_ = 0;
   Ribbon ribbon_;
   Canvas target_;                  // the screen the gui picked, before it reaches the panel
   bool targetHoldsMenu_ = false;   // whether the menu's last frame is still in target_

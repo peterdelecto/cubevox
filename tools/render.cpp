@@ -89,9 +89,9 @@ int usage() {
                "chmBassCutHz\n"
                "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
                "     chmWobbleLevelDb chmDwellDrive chmDwellComp chmWetDb\n"
-               "     sbHalfMs1 sbHalfMs2 sbTimeLo sbTimeHi sbDiffuse sbChirpSections (0..32) sbChirpA\n"
-               "     sbTrebleLossHz sbBassCutHz sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive\n"
-               "     sbDwellComp sbWetDb\n"
+               "     sbSpringMs1 sbSpringMs2 sbSpringMs3 sbTimeLo sbTimeHi sbDiffuse sbChirpSections (0..32)\n"
+               "     sbChirpA sbChirpSign (1 sweeps up, -1 sweeps down) sbTrebleLossHz sbBassCutHz sbReturnLpHz\n"
+               "     sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive sbDwellComp sbWetDb\n"
                "     eqDipQ eqPresenceQ eqAirHz\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
@@ -205,11 +205,13 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"chmInputTrim", &ch.inputTrim},        {"chmWobbleLevelDb", &ch.wobbleLevelDb},
       {"chmDwellDrive", &ch.dwellDrive}, {"chmDwellComp", &ch.dwellComp},
       {"chmWetDb", &ch.wetDb},
-      {"sbHalfMs1", &sb.halfMs1},             {"sbHalfMs2", &sb.halfMs2},
+      {"sbSpringMs1", &sb.springMs1},         {"sbSpringMs2", &sb.springMs2},
+      {"sbSpringMs3", &sb.springMs3},
       {"sbTimeLo", &sb.timeLo},               {"sbTimeHi", &sb.timeHi},
       {"sbDiffuse", &sb.diffuse},             {"sbChirpSections", &sbSections},
-      {"sbChirpA", &sb.chirpA},               {"sbTrebleLossHz", &sb.trebleLossHz},
-      {"sbBassCutHz", &sb.bassCutHz},         {"sbWobbleDepth", &sb.wobbleDepth},
+      {"sbChirpA", &sb.chirpA},               {"sbChirpSign", &sb.chirpSign},
+      {"sbTrebleLossHz", &sb.trebleLossHz},   {"sbBassCutHz", &sb.bassCutHz},
+      {"sbReturnLpHz", &sb.returnLpHz},       {"sbWobbleDepth", &sb.wobbleDepth},
       {"sbWobbleRateHz", &sb.wobbleRateHz},   {"sbInputTrim", &sb.inputTrim},
       {"sbDwellDrive", &sb.dwellDrive},       {"sbDwellComp", &sb.dwellComp},
       {"sbWetDb", &sb.wetDb},
@@ -230,7 +232,10 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   for (const TuningField& f : fields) {
     if (std::strlen(f.name) != keyLen || std::strncmp(f.name, kv, keyLen) != 0) continue;
     if (!parseFloat(eq + 1, f.value)) return false;
-    if (sbSections < 0.0f || sbSections > 32.0f || sbSections != std::floor(sbSections)) return false;
+    if (sbSections < 0.0f || sbSections > static_cast<float>(cv::spring_detail::kMaxSections) ||
+        sbSections != std::floor(sbSections))
+      return false;
+    if (sb.chirpSign != 1.0f && sb.chirpSign != -1.0f) return false;
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;

@@ -132,8 +132,8 @@ void toggleScreen(Canvas& c) {
   renderReadout(c, view);
 }
 
-// The runtime voice screen, drawn by the firmware's renderer. The input bar stands 25 rows tall in
-// columns 1 and 2, and the output ribbon runs from column 4 on a swell that fades.
+// The runtime voice screen, drawn by the firmware's renderer. The input meter is a box at the left
+// with 9 of its 16 segments lit, and the output ribbon runs from column 13 on a swell that fades.
 void voiceScreen(Canvas& c) {
   Ribbon ribbon;
   for (int i = 0; i < kRibbonLevels; ++i) {
@@ -141,7 +141,7 @@ void voiceScreen(Canvas& c) {
     const float swell = 0.5f + 0.5f * std::sin(static_cast<float>(i) * 0.45f);
     ribbon.push((1.0f - 0.6f * age) * swell);
   }
-  renderVoice(c, ribbon, 25, Walk{0, 0});
+  renderVoice(c, ribbon, 9, Walk{0, 0});
 }
 
 void menu(Canvas& c) {
@@ -218,8 +218,8 @@ void writeSheet(const char* path, const std::vector<Draw>& screens) {
 }
 
 void knobMix(Canvas& c) { knobScreen(c, 7, "MIX", "50 %"); }
-void knobSemis(Canvas& c) { knobScreen(c, 2, "SEMITONES", "-12 ST"); }
-void knobTime(Canvas& c) { knobScreen(c, 4, "TIME", "120 MS"); }
+void knobSemis(Canvas& c) { knobScreen(c, 2, "SEMITONES", "-12 st"); }
+void knobTime(Canvas& c) { knobScreen(c, 4, "TIME", "120 ms"); }
 
 }  // namespace
 
