@@ -56,12 +56,32 @@ board.
 
 ## 6. Power-on mute order
 Today the mute release is MUTE_N high, 20 ms for the relay, then XSMT high, so the DAC's
-unmute step reaches the output after the relay has closed. Now the release is XSMT high first,
-then at least 100 ms of audio blocks (75 blocks) with the DAC running into an open relay, then
-MUTE_N high. The mute order stays XSMT low, 5 ms, MUTE_N low, so a wanted mute has no relay
-click. The 500 ms hold after the SAI clocks start stays; the 100 ms sits inside it when both
-apply. Host test in `core_mute_sequence` (or wherever `mute_sequence.h` is tested): the release
-steps come in the new order with the 75-block wait, and the mute steps are unchanged.
+unmute step reaches the output after the relay has closed, and the relay closes 500 ms after
+the SAI clocks start, 2 to 3 s after power-on.
+
+The pop at power-on (owner 2026-10-30, "is it possible to close the relay so that no pop?") has
+two parts. The output buffer sits at its bias and feeds the jack through C 10 µF with R 100 kΩ
+to ground on the jack side (hardware spec item 9), a 1 s time constant: at power-on the jack
+side of the cap jumps to the bias and decays toward zero, and reaches 10 mV only after about
+5.5 s. Closing the relay earlier puts the remainder on the tip. The second part is whatever
+signal the chain is passing at the instant the contacts meet.
+
+Now the release from power-on is: XSMT high as soon as the SAI runs, into the grounded tip;
+the chain's output held at digital zero (the layout fade's zero point, `core/layout_fade`);
+MUTE_N high no earlier than 6.0 s after the app started (`kRelayCloseAfterPowerOnMs = 6000`,
+counted from `setup()`; the bootloader's time is not counted, so the cap has had longer); then
+20 ms for the relay; then the output fades up over the fade's 50 ms. A release after a wanted
+mute (the MUTE toggle, a jack change) keeps the same order without the 6 s wait: XSMT high,
+output at zero, MUTE_N high, 20 ms, fade up. The mute order stays XSMT low, 5 ms, MUTE_N low,
+so a wanted mute has no relay click. The 500 ms hold after the SAI clocks start is subsumed.
+
+Host test in the mute sequence's test: the power-on release steps in this order with the
+6.0 s wait and the fade after the relay, the later releases without the wait, the mute steps
+unchanged. The emulator is unaffected.
+
+Board, next revision (not this change): R on the jack side of the output cap 100 kΩ → 10 kΩ,
+time constant 0.1 s, settled in 0.6 s; the OPA2197 drives 10 kΩ in parallel with the PA's input
+without strain. The firmware wait then drops to 1 s.
 
 ## Costs and budget
 Items 1 and 2 add work: six blocks of double running per flipped slot (bounded, not steady), and
