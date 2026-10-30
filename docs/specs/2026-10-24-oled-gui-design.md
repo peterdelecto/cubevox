@@ -16,7 +16,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Screens
 | Screen | Shows | Rows |
 |---|---|---|
-| Voice | the output as a ribbon scrolling right to left, scaled to its own recent peak, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 1 to 9, rows 8 to 56, 16 segments inside |
+| Voice | the output as a ribbon scrolling right to left, each tick's amplitude over the recent peak, steady noise under a tracked floor drawn as the line, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 1 to 9, rows 8 to 56, 16 segments inside |
 | Readout | the knob that moved last | title bar rows 0 to 13 with the slot and card name black in 7X12 centred, name 9X12 top at 16, value 16X24 top at 34 |
 | Muted | the word of the top switch, nothing else | 16X24 centred both ways, top at 20 |
 | Menu | the list, chain view or update confirm | as the menu spec, unchanged |
@@ -99,13 +99,13 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 
 ## Voice
 1. The audio interrupt sums the squares of the input samples of every block where they enter the chain (so the bench clip moves the bar too), and of the left output sample as written to the DAC, after output trim and the soft ceiling. The main loop takes both sums with their sample counts at each UI tick, each in its own masked take.
-2. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The window bottom is `max(t - 44, -60)` dBFS, and an output under -60 dBFS is silence (level 0) whatever the top, so idle hiss draws the line and not a voice (owner 2026-10-30, after the first build let the bottom reach -74 dBFS). The ribbon level is `(d - bottom) / (t - bottom)` held to 0..1, then raised to the power 0.6. A steady output above -30 dBFS fills the ribbon; a quieter one sits by its place in the window.
-3. The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further. A level under 0.01 snaps to 0.
-4. A tick turns the level into a half-height of `round(level^0.8 * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 13 to column 126, 57 levels; column 127 and columns 10 to 12 stay blank (owner 2026-10-30, more black around the meter).
+2. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The ribbon level is the tick's amplitude over the peak's, `10^((d - t) / 20)`, held to 0..1, so the loudest recent tick reaches the top, a tick 6 dB under it reaches half, and one 20 dB under reaches a tenth. The map is linear in amplitude, the way a waveform overview draws (owner 2026-10-30, after the dB map with its 0.6 and 0.8 curves put everything within 20 dB of the peak in the top 6 px and drew a block in place of the peaks and valleys).
+3. A floor `f` in dBFS tracks the quietest recent tick, so steady noise draws the line and not a voice (owner 2026-10-30, a Korg Volca idling on the input drew a block of its hiss). When `d` is quieter than `f`, `f` becomes `d` at once, but never under -60 dBFS; otherwise `f` rises 3 dB per second of real time, but never over `t - 12` dB, so the loudest recent tick always draws. A tick under `f + 6` dB is silence, level 0. The ribbon has no release: each 40 ms tick stands on its own, so the gaps between words show as valleys.
+4. A tick turns the level into a half-height of `round(level * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 13 to column 126, 57 levels; column 127 and columns 10 to 12 stay blank (owner 2026-10-30, more black around the meter).
 5. A column is solid from `32 - h` to `32 + h`. A 1 px rim above and below it is lit where the Bayer threshold of the pixel is under 32, which is half of them.
 6. At height 0 the column is the one pixel on row 32. In silence the screen is the line, the empty meter box and nothing else.
 7. The ribbon keeps filling while another screen shows, so the voice returns with its history.
-8. The input meter (owner 2026-10-30, "a minimal, thin input level VU meter on the left", then "a bounding box, like a thermometer without the bulb, in segments", then "5 px wider with more black around it"): a 1 px outline box with its sides at columns 1 and 9 and its top and bottom at rows 8 and 56, always drawn on the voice screen so the meter is present in silence. Inside, 16 segments across columns 2 to 8, each 2 rows tall with 1 row of gap, segment 1 at rows 54 and 55 up to segment 16 at rows 9 and 10. Lit segments = `round(level * 16)`, the level linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (16), with the same rise, 120 ms fall and snap as the ribbon, so each segment is about 3 dB and the top one is the clip light. The box, the segments and the ribbon walk together, and the meter shows on the voice screen only.
+8. The input meter (owner 2026-10-30, "a minimal, thin input level VU meter on the left", then "a bounding box, like a thermometer without the bulb, in segments", then "5 px wider with more black around it"): a 1 px outline box with its sides at columns 1 and 9 and its top and bottom at rows 8 and 56, always drawn on the voice screen so the meter is present in silence. Inside, 16 segments across columns 2 to 8, each 2 rows tall with 1 row of gap, segment 1 at rows 54 and 55 up to segment 16 at rows 9 and 10. Lit segments = `round(level * 16)`, the level linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (16). The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further, and a level under 0.01 snaps to 0. Each segment is about 3 dB and the top one is the clip light. The box, the segments and the ribbon walk together, and the meter shows on the voice screen only.
 9. The DEBUG load figure (owner 2026-10-30, polish spec menu row 7): with DEBUG on, the voice screen draws the worst audio block of the last whole second as a percent of the block budget (640000 cycles at 480 MHz) in 5x7, last column 126 and top row 56, so `42%` keeps 1 px from the right and bottom edges. It reads 0 for the first second after boot, is held to 0..999, refreshes each UI tick, does not walk, and never appears on the readout, the toggle readout, MUTED, BYPASS or the menu.
 
 ## Dissolve
@@ -131,7 +131,7 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 | Dissolve | 2 mixed frames |
 | Readout hold | 2000 ms after the last move |
 | Value easing | 20 ms time constant |
-| Level release | 120 ms time constant |
+| Input meter release | 120 ms time constant; the ribbon has none |
 | Walk step | 60 s |
 | Panel flush | one dirty page per loop pass, about 25 ms for a full frame at 400 kHz |
 
@@ -204,8 +204,8 @@ build/oled_motion build/oled-motion.raw && python3 -I tools/oled_golden.py build
 ## Open decisions
 Each item says what is built now. The owner approves text and screens per numbered proof.
 
-1. Level map. The brief gives -6 dBFS for full height and -50 dBFS for zero. It is linear in dB between them, so a quiet voice shows. A map linear in amplitude would show far less.
-2. Height curve. The proof renderer raises the level to 0.8 again when it sets the height. The build keeps that, as `kRibbonCurve`. Setting it to 1 drops it.
+1. Level map. The brief gave -6 dBFS for full height and -50 dBFS for zero, linear in dB. Superseded twice on 2026-10-30: first by the window under the recent peak, then by the map linear in amplitude of Voice 2, which the owner chose over a 24 dB window linear in dB because a waveform overview draws that way.
+2. Height curve. The proof renderer raised the level to 0.8 again when it set the height. Dropped 2026-10-30 with the 0.6 curve of the old level map; the half-height is the level times 22.
 3. Walk. It covers the voice screen only, as the brief says. MUTED and the readout stay put, and MUTED can sit unchanged for hours. Giving MUTED the same shift is a small change to `renderMuted`.
 4. Menu motion. Opening and closing the menu dissolves. The cursor, the values and the sub-screens do not, because the menu stays as it is. They show at the next tick, up to 40 ms after the click.
 5. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. `KnobDesc::decimals` is ready for a parameter that declares one.

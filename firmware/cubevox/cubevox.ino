@@ -24,6 +24,7 @@
 #include "board/serial_link.h"
 #include "board/usb_link.h"
 #include "core/compose.h"
+#include "core/gate_floor.h"
 #include "core/jack_switch.h"
 #include "core/layout.h"
 #include "core/loop_policy.h"
@@ -58,6 +59,17 @@ Every gStats{kStatsMs};
 Every gLoadRefresh{kUiTickMs};  // the DEBUG figure moves once per UI tick
 int gLoadPercent = 0;
 
+// FPSCR and FPDSCR bit 24: flush subnormal results and operands to zero. The input filters decay
+// toward silence, and a subnormal state would cost the FPU extra cycles on every sample.
+constexpr uint32_t kFlushToZero = 1u << 24;
+
+// FPSCR covers the main loop. The FPU loads FPDSCR into FPSCR on exception entry, so FPDSCR covers
+// the audio interrupt that runs the filters.
+void flushDenormalsToZero() {
+  __set_FPSCR(__get_FPSCR() | kFlushToZero);
+  FPU->FPDSCR |= kFlushToZero;
+}
+
 void reportBoot() { bootReport(sh1106Present()); }
 
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
@@ -80,6 +92,8 @@ bool applyAction(UiAction action, uint32_t nowMs) {
       gPublish.markStale();
       return true;
     case ui::ApplyResult::EnterDfu: enterDfu(nowMs); break;
+    case ui::ApplyResult::LearnStart: audioTakeGatePeak(GateWindow::Learn); break;  // drops the stale peak
+    case ui::ApplyResult::LearnRead: gMenu.setLearnFloor(peakDbfs(audioTakeGatePeak(GateWindow::Learn))); break;
     case ui::ApplyResult::None: break;
   }
   return false;
@@ -115,6 +129,7 @@ void replyStatus(uint32_t id) {
   status.audioLatched = health.latched;
   status.stalled = faultAudioStalled();
   status.powerTrips = powerSenseTrips();
+  status.floorDbfs = peakDbfs(audioTakeGatePeak(GateWindow::Status));
   protocol::replyStatus(serialWriter(), id, status);
 }
 
@@ -210,6 +225,7 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
 //      apart, each a bus recovery of about 0.3 ms and one polled wait that gives up within about
 //      15 ms, so 0.2 s at the most) and the HAL's bounded ADC, PLL3, SAI and DMA waits (tens of ms).
 void setup() {
+  flushDenormalsToZero();  // before the audio interrupt can run
   muteInit();  // MUTE_N and XSMT low before anything slow
   powerSenseInit();  // needs the mute pins; a failure prints in the boot report
   inputJackInit();  // PAD_EN low = MIC

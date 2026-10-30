@@ -4,12 +4,14 @@
 #include "support.h"
 
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
 #include "core/bench_ops.h"
+#include "core/gate_floor.h"
 #include "core/layout.h"
 #include "core/protocol.h"
 #include "core/registry.h"
@@ -372,8 +374,14 @@ void checkStatusReply() {
                      "\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,"
                      "\"overruns\":0,\"sai_errors\":0,\"restarts\":0,\"nan_blocks\":0,"
                      "\"power_trips\":0,\"stalled\":false,\"audio_latched\":false,\"reply_overflows\":0,"
-                     "\"update_reason\":\"none\"}\n",
+                     "\"floor_dbfs\":-120,\"update_reason\":\"none\"}\n",
         "proto: status reply");
+
+  w = StringWriter();
+  s.floorDbfs = -62.374f;
+  protocol::replyStatus(w, 16, s);
+  check(JsonReader(w.out).valid() && has(w.out, "\"reply_overflows\":0,\"floor_dbfs\":-62.37,\"update_reason\""),
+        "proto: status carries the input gate's floor in dBFS to two decimals");
 
   w = StringWriter();
   s.bootFails = 2;
@@ -416,10 +424,27 @@ void checkStatusWidest() {
   s.late = s.seq = s.recordErrors = s.serialDropped = s.strayBytes = s.bootFails = 0xFFFFFFFFu;
   s.overruns = s.saiErrors = s.restarts = s.nanBlocks = s.powerTrips = 0xFFFFFFFFu;
   s.stalled = s.audioLatched = true;
+  s.floorDbfs = -123.456f;
   s.updateReason = "ImageUnreadable";
   protocol::replyStatus(w, 0xFFFFFFFFu, s);
   check(JsonReader(w.out).valid() && w.overflows() == 0 && has(w.out, "\"update_reason\":\"ImageUnreadable\"}\n"),
         "proto: the widest status reply fits every piece");
+}
+
+// The Input gate's detector peak reads as dBFS for the status reply and for GATE LEARN. Silence, a
+// NaN and anything under -120 dBFS read as the floor of the scale.
+void checkGateFloorLevel() {
+  check(peakDbfs(1.0f) == 0.0f && std::fabs(peakDbfs(0.5f) - (-6.0206f)) < 1e-3f && std::fabs(peakDbfs(0.001f) - (-60.0f)) < 1e-3f,
+        "floor: a linear peak reads as 20 log10 in dBFS");
+  check(peakDbfs(0.0f) == kFloorSilentDb && peakDbfs(-1.0f) == kFloorSilentDb && peakDbfs(NAN) == kFloorSilentDb &&
+            peakDbfs(1e-9f) == kFloorSilentDb && peakDbfs(1e-6f) == kFloorSilentDb,
+        "floor: silence, a NaN and a peak under -120 dBFS read as -120 dBFS");
+  StringWriter w;
+  protocol::Status s;
+  check(s.floorDbfs == kFloorSilentDb, "floor: a status reply that was never given a peak reads -120 dBFS");
+  s.floorDbfs = peakDbfs(0.00123f);
+  protocol::replyStatus(w, 20, s);
+  check(has(w.out, "\"floor_dbfs\":-58.2,"), "floor: status carries 0.00123 as -58.2 dBFS");
 }
 
 void checkHelloReply() {
@@ -516,6 +541,7 @@ void checkProtocolReplies() {
   checkStatusReply();
   checkStatusFaults();
   checkStatusWidest();
+  checkGateFloorLevel();
   checkHelloReply();
   checkHelloSerial();
   checkReplyEscapes();

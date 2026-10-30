@@ -55,9 +55,9 @@ cutoffs stay as the noisy-room options. Broadband hiss removed against OFF, flat
 | Detector | Peak, 0.1 ms attack, 5 ms release, on the conditioned signal |
 | THRESHOLD pot | -80 to -30 dBFS, shown in whole dB |
 | Hysteresis | 3 dB: opens at the threshold, closes 3 dB under it |
-| Attack | 0.5 ms, one-pole on the gain |
+| Attack | 0.5 ms, the time the gain takes from -80 dB to within 1 dB of open (as built; see below) |
 | Hold | 50 ms after the detector falls under the close level |
-| DECAY pot | the release time, 20 ms to 2 s, log (amended; the draft fixed 150 ms) |
+| DECAY pot | the release time, 20 ms to 2 s, log, the time the gain takes to fall 60 dB (amended; the draft fixed 150 ms) |
 | Range | -80 dB, fixed |
 | Lookahead | none; zero latency |
 
@@ -95,6 +95,18 @@ Bench, all slots bypassed, COMP and EQ off, LINE, Input Gain max, XLR pins 2 and
 150 Ω, MIC: 2 noise at the output tap with and without HPF 120 and LPF 12k, from `floor_dbfs`
 (4.5 dB unweighted expected at LPF 8k; record the 12k figure); 5 LEARN shows the floor within
 2 dB of the status field at Input Gain min, mid, max.
+
+## As built (2026-10-30, v2.00.45)
+1. Attack and release are travel times, not time constants. A one-pole read as a time constant needs 4.4 of them to cross 80 dB to within 1 dB, so a 0.5 ms constant could not meet the 1 ms acceptance. The Input gate's tuning carries `travelTimes`; attack 0.5 ms is the rise from -80 dB to within 1 dB of open (time constant 0.114 ms) and DECAY is the fall of 60 dB (time constant DECAY / 1.386). The panel GATE keeps its time constants and its code path. Measured: open within 0.63 ms, under -60 dB within 77 ms at DECAY 20 ms and 2060 ms at DECAY 2 s.
+2. Acceptance 4 runs on binary noise whose level wobbles ± 1.5 dB, which the peak detector reads exactly. Gaussian noise through a 0.1 / 5 ms peak detector spreads 3 to 8.6 dB around its mean, so a mean 1.5 dB under the threshold flipped the gate 38 times in 10 s; that is the detector, not a fault. A second test shows the LEARN rule, threshold = floor + 8 dB, holds the gate shut on Gaussian noise for 10 s.
+3. Acceptance 7 holds the spec's wording (difference against the settled new filter under -40 dBFS) for every high-pass change, and holds the difference against the ideal blend of the two settled outputs under -40 dBFS for every change (worst 43.1 dB under). A low-pass jump or a change to OFF cannot meet the first wording because the settled filters already differ at 1 kHz by up to 27.6 dB.
+4. Flush-to-zero is set in `FPDSCR` as well as `FPSCR`, because the FPU loads `FPDSCR` on exception entry and the audio interrupt would otherwise run without it.
+5. Level rule: the default HPF takes the level test's program down 0.51 dB (its 180 Hz fundamental by 0.8 dB). A filter cannot reach 0 to +0.5 dB from below without a trim that would be wrong on other material, so the conditioning rows of `level_test` hold -1.0 to +0.1 dB and carry no trim. The Input gate at its box tuning holds +0.00 dB.
+6. Cost: `kInputConditioning{2, 3, false}` in the fixed term of `costs.h` (host bench 0.96 to 0.99 of POLISH EQ, about 8.9k cycles mean, 17k on a crossfade block). The Input gate row keeps its board figures `{4, 5, true}` as an upper bound; the host puts the revised gate at 0.97 of them. The board prints a `COND` cycle bucket in the audio line for the rerun that replaces the estimate.
+7. Record bytes 6 and 7 are always written as list index + 1 (OFF is 1). A 0 only comes from an older record and reads as the default.
+8. HPF and LPF are not in the serial protocol's `settings` object; the Mac app is parked. `floor_dbfs` is in the status reply, the highest detector level since the previous status, -120 when no block ran the Input gate.
+9. LEARN: the measuring screen shows `Measuring the floor.` and `Keep the input quiet.`; a click or turn during it drops it. The result stays until a click or a turn, with no timeout, because the player sets the pot by eye against it; THRESHOLD follows the pot live. With no Input gate card in the layout the threshold line reads `THRESHOLD NONE`.
+10. The emulator and `cubevox-render` have their own chains and carry the conditioning by hand at the box defaults (`render --hpf`, `--lpf` in Hz). The emulator's Input gate pots follow the box so the parity test holds. The BYPASS dry copy is taken before the conditioning.
 
 ## Hardware, out of scope
 Lower floor rather than mask it: the instrumentation amp's gain resistor RG at 1 kΩ adds about

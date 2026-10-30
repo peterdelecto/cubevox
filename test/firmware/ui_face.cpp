@@ -370,7 +370,7 @@ void checkMenuMovesAndCloses() {
   check(sameCanvas(r.live, moved) && !sameCanvas(moved, menuScreen), "face: a cursor move shows at the next tick, with no dissolve");
 
   UiInput toExit;
-  toExit.detents = 7;  // from the second item to Exit, the ninth
+  toExit.detents = 10;  // from the second item to Exit, the twelfth
   r.menu.update(toExit, r.now);
   r.menu.update(clickInput(), r.now);
   check(!r.menu.open(), "face: Exit closed the menu");
@@ -418,7 +418,7 @@ void checkMenuReopens() {
   UiInput click;
   click.click = true;
   UiInput toExit;
-  toExit.detents = 8;  // from the first item to Exit, the ninth
+  toExit.detents = 11;  // from the first item to Exit, the twelfth
   for (int round = 0; round < 3; ++round) {
     r.menu.update(click, r.now);
     ref.update(click, r.now);

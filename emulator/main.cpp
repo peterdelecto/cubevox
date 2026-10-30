@@ -31,6 +31,7 @@
 #include "../emulator/open_panel.h"
 #include "../emulator/stage_feedback.h"
 #include "engine/common.h"
+#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
@@ -64,19 +65,13 @@ constexpr int kStartKey = 11;  // F / Dm (kKeyName runs round the circle of fift
 constexpr float kStartSlapMix = 0.25f;
 constexpr float kStartDrive = 0.65f;
 constexpr float kStartTone = 1.0f;
-// Input soft gate: live-stage defaults (owner 2026-10-01). Range stays partial so a
-// mis-trigger never reads as a dropout; release is short by owner choice.
-constexpr float kInputGateThresholdDb = -12.0f;
-constexpr float kInputGateRangeDb = -12.0f;
-constexpr float kInputGateHoldMs = 100.0f;
-constexpr float kInputGateReleaseMs = 10.0f;
+// Input gate: the box's slot-1 tuning (engine/gate.h inputGateTuning), with THRESHOLD at the
+// middle of its range.
+constexpr float kInputGateThresholdDb = -55.0f;
 
 void applyInputGateDefaults(cv::GateParams& g) {
   g.thresholdDb = kInputGateThresholdDb;
-  g.tuning = cv::GateTuning{};
-  g.tuning.rangeDb = kInputGateRangeDb;
-  g.tuning.holdMs = kInputGateHoldMs;
-  g.tuning.releaseMs = kInputGateReleaseMs;
+  g.tuning = cv::inputGateTuning();
 }
 
 struct ProtoParams {
@@ -85,6 +80,7 @@ struct ProtoParams {
   // Settings > Sound > Input) through the chain.
   int source = 0;
   float inputGainDb = 0.0f;  // mic only, -12..+24
+  cv::ConditioningParams conditioning;  // the box's HPF 120 Hz and LPF 12 kHz; menu settings on the box
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -169,6 +165,7 @@ std::string gInputName;                  // UI-thread-only; current capture devi
 unsigned gInputRate = 0;                 // UI-thread-only; its sample rate
 
 // Audio-thread-only.
+cv::InputConditioning gConditioning;
 cv::Gate gInputGate;
 cv::Gate gGate;
 cv::PitchFx gPitchFx;
@@ -262,6 +259,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
   if (loop != gLastLoop) {
     gLastLoop = loop;
     gReadPos = 0;
+    gConditioning.reset();
     gInputGate.reset();
     gGate.reset();
     gPitchFx.reset();
@@ -303,6 +301,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     if (feedback) {
       for (int i = 0; i < n; ++i) in[i] += gStageFeedback.returnSample(in[i]);
     }
+    gConditioning.process(in.data(), in.data(), n, params.conditioning);
     gInputGate.process(in.data(), mono.data(), n, params.inputGate);
     gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
     gUnison.process(tmp.data(), mono.data(), n, params.unison);
@@ -431,11 +430,13 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
-      "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
-      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff}"
+      "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff, %s}"
+      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff, %s}"
       "\nAutotuneTuning{%.1ff, %.1ff, %.0ff}",
       ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
+      ig.detectorAttackMs, ig.detectorReleaseMs, ig.travelTimes ? "true" : "false",
       g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
+      g.detectorAttackMs, g.detectorReleaseMs, g.travelTimes ? "true" : "false",
       at.trimDb, at.maxCorrectSemis, at.grainDelay);
 }
 
@@ -446,7 +447,8 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
   formatTuning(o, t, s, d, c, e, ig, g, at, params);
   std::printf(
       "// AutotuneTuning: trimDb, maxCorrectSemis, grainDelay\n"
-      "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb\n"
+      "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb, "
+      "detectorAttackMs, detectorReleaseMs, travelTimes\n"
       "// OctaveTuning: levelDb, glideMs, grainWindowMs, grainCount, trimDb\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, trimDb\n"
@@ -691,10 +693,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
     params.reverb.chasm.tuning = cv::ChasmTuning{};
     params.reverb.spring.tuning = cv::SpringTuning{};
     params.eq.tuning = cv::PolishTuning{};
-    params.inputGate.tuning = cv::GateTuning{};
-    params.inputGate.tuning.rangeDb = kInputGateRangeDb;
-    params.inputGate.tuning.holdMs = kInputGateHoldMs;
-    params.inputGate.tuning.releaseMs = kInputGateReleaseMs;
+    params.inputGate.tuning = cv::inputGateTuning();
     params.gate.tuning = cv::GateTuning{};
     params.reverb.chasm.wobble = cv::ChasmParams{}.wobble;  // the CHASM Wobble macro writes it
     params.macros = cv::macros::State{};
@@ -1237,12 +1236,19 @@ void gateLed(bool on, float gainDb) {
 // The input gate is always on and keeps its threshold under Tuning.
 // Both gates carry the same controls (owner 2026-10-02): THRESHOLD and DECAY on the
 // face, Mute amount / Fade in / Stay open under Tuning.
-void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float gainDb) {
+struct GatePots {
+  float thresholdMinDb, thresholdMaxDb, decayMinMs, decayMaxMs;
+};
+constexpr GatePots kPanelGatePots = {-70.0f, -10.0f, 5.0f, 1000.0f};
+constexpr GatePots kInputGatePots = {cv::kInputGateThresholdMinDb, cv::kInputGateThresholdMaxDb,
+                                     cv::kInputGateDecayMinMs, cv::kInputGateDecayMaxMs};
+
+void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float gainDb, const GatePots& pots) {
   ImGui::PushID(id);
   gateLed(g.on, gainDb);
   ImGui::Checkbox(label, &g.on);
-  ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, -70.0f, -10.0f, "%.0f dB");
-  ImGui::SliderFloat("DECAY", &g.tuning.releaseMs, 5.0f, 1000.0f, "%.0f ms",
+  ImGui::SliderFloat("THRESHOLD", &g.thresholdDb, pots.thresholdMinDb, pots.thresholdMaxDb, "%.0f dB");
+  ImGui::SliderFloat("DECAY", &g.tuning.releaseMs, pots.decayMinMs, pots.decayMaxMs, "%.0f ms",
                      ImGuiSliderFlags_Logarithmic);
   ImGui::Text("Gain: %.1f dB", static_cast<double>(gainDb));
   drawGateTuning(g, id);
@@ -1485,8 +1491,10 @@ void drawPedals(ProtoParams& params) {
   std::snprintf(semis, sizeof(semis), "%+d st", o.semitones);
 
   pedal("INPUT GATE", params.inputGate.on, w, [&] {
-    pedalRange("THRESHOLD", params.inputGate.thresholdDb, -70.0f, -10.0f, false, "%.0f dB");
-    pedalRange("DECAY", params.inputGate.tuning.releaseMs, 5.0f, 1000.0f, true, "%.0f ms");
+    pedalRange("THRESHOLD", params.inputGate.thresholdDb, cv::kInputGateThresholdMinDb,
+               cv::kInputGateThresholdMaxDb, false, "%.0f dB");
+    pedalRange("DECAY", params.inputGate.tuning.releaseMs, cv::kInputGateDecayMinMs, cv::kInputGateDecayMaxMs, true,
+               "%.0f ms");
   });
   next();
   pedal("AUTOTUNE", at.on, w, [&] {
@@ -1631,7 +1639,7 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
       (ImGui::GetContentRegionAvail().x - kWideColumnW - 3.0f * kColumnGap) / 3.0f;
   column(0, colW, [&] {
     moduleBox("ingateBox", true,
-              [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb); });
+              [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb, kInputGatePots); });
     moduleBox("autotuneBox", false, [&] { drawAutotuneBlock(params.pitchFx.autotune, state); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
@@ -1645,7 +1653,7 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
     moduleBox("slapbackBox", true, [&] { drawSlapbackBlock(params.slapback); });
     moduleBox("distortionBox", false, [&] { drawDistortionBlock(params.distortion, params.macros); });
     moduleBox("gateBox", false,
-              [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb); });
+              [&] { drawGateBlock("gate", "GATE", params.gate, state.gateDb, kPanelGatePots); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
   column(3, colW, [&] {

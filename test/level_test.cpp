@@ -11,6 +11,7 @@
 
 #include "core/chain_params.h"
 #include "core/registry.h"
+#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
@@ -159,13 +160,12 @@ bool slapbackRow(const char* name, const Signal& in, cv::SlapbackParams p) {
   return verdict(name, sum / count);
 }
 
+// The Input gate as the box sets it, both pots at mid travel (-55 dBFS, 200 ms).
 cv::GateParams inputGate() {
-  cv::GateParams g;
-  g.thresholdDb = -40.0f;
-  g.tuning.rangeDb = -12.0f;  // the emulator's live-stage input gate
-  g.tuning.holdMs = 100.0f;
-  g.tuning.releaseMs = 25.0f;
-  return g;
+  ChainParams chain;
+  applyKnob(Card::InputGate, 0, 0.5f, chain);
+  applyKnob(Card::InputGate, 1, 0.5f, chain);
+  return chain.inputGate;
 }
 
 cv::PitchFxParams pitchOff() {
@@ -206,10 +206,49 @@ bool midRow(const char* name, const Signal& in, const P& p) {
   return verdict(name, db, kMidLoDb, kMidHiDb);
 }
 
+// The input conditioning at its defaults, HPF 120 Hz and LPF 12 kHz, alone and ahead of the Input
+// gate as slot 1 hears it. A filter has no trim and the spec fixes its response, so these rows read
+// what the filters take off this program, whose 180 Hz fundamental sits near the high-pass corner.
+// Their band stops at the slack above 0 dB, because a filter adds no level, and at kHeadLoDb below.
+constexpr double kHeadLoDb = -1.0;
+
+bool headRows(const Signal& in) {
+  bool ok = true;
+  const cv::ConditioningParams defaults;
+  {
+    auto s = std::make_unique<Stage<cv::InputConditioning>>();
+    ok &= verdict("conditioning HPF 120 + LPF 12k", gainDb(in, run(in, [&](const float* i, float* o, int n) {
+                                                             s->fx.process(i, o, n, defaults);
+                                                           })),
+                  kHeadLoDb, kSlackDb);
+  }
+  {
+    auto s = std::make_unique<Stage<cv::InputConditioning>>();
+    cv::ConditioningParams off;
+    off.set(0, 0);
+    ok &= verdict("conditioning both OFF", gainDb(in, run(in, [&](const float* i, float* o, int n) {
+                                                    s->fx.process(i, o, n, off);
+                                                  })),
+                  0.0, 0.0);
+  }
+  {
+    auto head = std::make_unique<Stage<cv::InputConditioning>>();
+    auto gate = std::make_unique<Stage<cv::Gate>>();
+    const cv::GateParams g = inputGate();
+    ok &= verdict("conditioning + input gate -55", gainDb(in, run(in, [&](const float* i, float* o, int n) {
+                                                      float tmp[cv::kBlock];
+                                                      head->fx.process(i, tmp, n, defaults);
+                                                      gate->fx.process(tmp, o, n, g);
+                                                    })),
+                  kHeadLoDb, kSlackDb);
+  }
+  return ok;
+}
+
 // The slot stages at their default engaged settings.
 bool slotRows(const Signal& in) {
   bool ok = true;
-  ok &= simple<cv::Gate>("input gate -40", in, inputGate());
+  ok &= simple<cv::Gate>("input gate -55", in, inputGate());
   cv::GateParams panelGate;
   panelGate.thresholdDb = -40.0f;
   ok &= simple<cv::Gate>("panel gate -40", in, panelGate);
@@ -266,7 +305,8 @@ bool tailRows(const Signal& in) {
 
 int main() {
   const Signal in = program();
-  bool ok = slotRows(in);
+  bool ok = headRows(in);
+  ok &= slotRows(in);
   ok &= tailRows(in);
   std::printf("%s level\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

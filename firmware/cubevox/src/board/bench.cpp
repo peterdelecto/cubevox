@@ -12,7 +12,7 @@
 
 namespace {
 
-// The eight slots in order, then the two polish stages under their names.
+// The eight slots in order, then the two polish stages and the input conditioning under their names.
 void printSlotRow(const char* label, const std::array<uint32_t, kStatBuckets>& values) {
   serialOut().print(label);
   for (int s = 0; s < kSlotCount; ++s) {
@@ -23,6 +23,8 @@ void printSlotRow(const char* label, const std::array<uint32_t, kStatBuckets>& v
   serialOut().print(values[kStatComp]);
   serialOut().print(" EQ ");
   serialOut().print(values[kStatEq]);
+  serialOut().print(" COND ");
+  serialOut().print(values[kStatCond]);
 }
 
 }  // namespace

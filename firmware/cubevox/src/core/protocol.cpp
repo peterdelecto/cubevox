@@ -740,8 +740,10 @@ void replyLayout(Writer& w, uint32_t id, const char* layoutName, const Layout& l
 void replyStatus(Writer& w, uint32_t id, const Status& s) {
   char mean[16];
   char worst[16];
+  char floorDb[16];
   formatNumber(s.cpuMeanPercent, mean, sizeof mean);
   formatNumber(s.cpuWorstPercent, worst, sizeof worst);
+  formatNumber(s.floorDbfs, floorDb, sizeof floorDb);
   w.format("{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"muted\":%s,\"seq\":%lu,",
            static_cast<unsigned long>(id), mean, worst, static_cast<unsigned long>(s.late),
            s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
@@ -751,9 +753,10 @@ void replyStatus(Writer& w, uint32_t id, const Status& s) {
   w.format("\"overruns\":%lu,\"sai_errors\":%lu,\"restarts\":%lu,\"nan_blocks\":%lu,",
            static_cast<unsigned long>(s.overruns), static_cast<unsigned long>(s.saiErrors),
            static_cast<unsigned long>(s.restarts), static_cast<unsigned long>(s.nanBlocks));
-  w.format("\"power_trips\":%lu,\"stalled\":%s,\"audio_latched\":%s,\"reply_overflows\":%lu,\"update_reason\":",
+  w.format("\"power_trips\":%lu,\"stalled\":%s,\"audio_latched\":%s,\"reply_overflows\":%lu,\"floor_dbfs\":%s,"
+           "\"update_reason\":",
            static_cast<unsigned long>(s.powerTrips), s.stalled ? "true" : "false", s.audioLatched ? "true" : "false",
-           static_cast<unsigned long>(w.overflows()));
+           static_cast<unsigned long>(w.overflows()), floorDb);
   writeString(w, s.updateReason);
   w.write("}\n", 2);
 }

@@ -153,7 +153,15 @@ void checkDescriptors() {
 void checkKnobTargets() {
   ChainParams p;
   applyKnob(Card::InputGate, 0, 1.0f, p);
-  check(std::fabs(p.inputGate.thresholdDb - (-10.0f)) < 1e-4f, "input gate threshold max -10 dB");
+  check(std::fabs(p.inputGate.thresholdDb - (-30.0f)) < 1e-4f, "input gate threshold max -30 dB");
+  applyKnob(Card::InputGate, 0, 0.0f, p);
+  check(std::fabs(p.inputGate.thresholdDb - (-80.0f)) < 1e-4f, "input gate threshold min -80 dB");
+  applyKnob(Card::InputGate, 1, 0.0f, p);
+  check(std::fabs(p.inputGate.tuning.releaseMs - 20.0f) < 1e-3f, "input gate decay min 20 ms");
+  applyKnob(Card::InputGate, 1, 1.0f, p);
+  check(std::fabs(p.inputGate.tuning.releaseMs - 2000.0f) < 1e-1f, "input gate decay max 2000 ms");
+  check(knobShown(*knobDesc(Card::InputGate, 0), 0.5f) == -55 && knobShown(*knobDesc(Card::InputGate, 0), 0.02f) == -79,
+        "input gate threshold shows in whole dB");
   applyKnob(Card::Gate, 0, 0.0f, p);
   check(std::fabs(p.gate.thresholdDb - (-70.0f)) < 1e-4f, "gate threshold min -70 dB");
   applyKnob(Card::Gate, 1, 1.0f, p);
@@ -210,11 +218,21 @@ void checkRegistryBounds() {
 
 void checkChainDefaults() {
   const ChainParams p;
-  check(p.inputGate.on && std::fabs(p.inputGate.thresholdDb - (-12.0f)) < 1e-6f &&
-            std::fabs(p.inputGate.tuning.rangeDb - (-12.0f)) < 1e-6f &&
-            std::fabs(p.inputGate.tuning.holdMs - 100.0f) < 1e-6f &&
-            std::fabs(p.inputGate.tuning.releaseMs - 10.0f) < 1e-6f,
-        "defaults: input gate on with the live-vocal settings");
+  const cv::GateTuning& t = p.inputGate.tuning;
+  check(p.inputGate.on && std::fabs(p.inputGate.thresholdDb - (-55.0f)) < 1e-6f &&
+            std::fabs(t.rangeDb - (-80.0f)) < 1e-6f && t.kneeDb == 0.0f &&
+            std::fabs(t.holdMs - 50.0f) < 1e-6f && std::fabs(t.hysteresisDb - 3.0f) < 1e-6f &&
+            std::fabs(t.attackMs - 0.5f) < 1e-6f && std::fabs(t.releaseMs - 200.0f) < 1e-6f &&
+            std::fabs(t.detectorAttackMs - 0.1f) < 1e-6f && std::fabs(t.detectorReleaseMs - 5.0f) < 1e-6f &&
+            t.detectorHpHz == 0.0f && t.travelTimes,
+        "defaults: input gate on with the hard -80 dB range, 3 dB hysteresis and 50 ms hold");
+  const cv::GateTuning& g = p.gate.tuning;
+  check(g.kneeDb == cv::GateTuning{}.kneeDb && g.detectorAttackMs == 0.0f && g.detectorReleaseMs == 20.0f &&
+            g.detectorHpHz == 120.0f && !g.travelTimes,
+        "defaults: the panel gate keeps its soft-knee tuning");
+  check(p.conditioning.hpf == cv::kHpfDefaultIndex && p.conditioning.lpf == cv::kLpfDefaultIndex &&
+            cv::kHpfCutoffHz[p.conditioning.hpf] == 120.0f && cv::kLpfCutoffHz[p.conditioning.lpf] == 12000.0f,
+        "defaults: the input conditioning starts at HPF 120 Hz and LPF 12 kHz");
   check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
             !p.slapback.on && !p.distortion.on && !p.reverb.on,
         "defaults: every other stage off");
@@ -338,6 +356,8 @@ void checkCells() {
       {Card::Octave, 1, 3},      // 0..100 %
       {Card::Gate, 0, 3},        // -70..-10 dB is a sign cell and 2 digits
       {Card::Gate, 1, 4},        // 5..1000 ms
+      {Card::InputGate, 0, 3},   // -80..-30 dB is a sign cell and 2 digits
+      {Card::InputGate, 1, 4},   // 20..2000 ms
       {Card::Slapback, 1, 3},    // 60..250 ms
       {Card::Autotune, 1, 3},    // 5..500 ms response
       {Card::Distortion, 0, 3},  // 0..100 %
