@@ -75,8 +75,8 @@ The floor measurement stays as a field of the serial status reply, `floor_dbfs`,
 detector level since the previous status, so the bench tests below can read it.
 
 ## Menu and settings
-Two rows join the list, which scrolls: `HPF: 120` and `LPF: 12k` after DEBUG, before UPDATE
-FIRMWARE. HPF and LPF take settings bytes 6 and 7 of the layout record,
+Two rows join the list, which scrolls: `HPF  120 Hz` and `LPF  12 kHz` after DEBUG, before UPDATE
+FIRMWARE, the value with its unit (owner 2026-10-30). HPF and LPF take settings bytes 6 and 7 of the layout record,
 schema unchanged: 0 means not set and reads as the default, otherwise the byte is the cutoff
 list index plus one (HPF list OFF, 80, 100, 120, 150; LPF list OFF, 4k, 5k, 6k, 8k, 10k, 12k),
 and a byte past the list makes the record invalid as the other settings bytes do. They are
