@@ -12,12 +12,13 @@ the model for the construction, not for any dimension; its module is the 1.54".
 
 | # | Need | Target |
 |---|---|---|
-| 1 | Hold the module at the height the socket wants | module PCB underside `oledSeat` 9.0 mm above the board, so the pins enter the 5 mm socket 6.5 mm (hardware spec item 22) |
-| 2 | Put the module's holes where the module's holes are | posts on the board's 30.4 x 28.5 grid slid `oledOffset` 1.0 mm toward the rear edge; `oledOffset` is a user parameter, changed after the first print |
-| 3 | Hold the module without screws | posts with crush ribs in the module's Ø3.0 holes, as DrumSynth; the module presses on and pulls off by hand |
-| 4 | Locate on the board without fighting the socket | four seats on the board's four Ø3.2 holes; nothing within 1 mm of the socket or the module's back-side parts |
-| 5 | Be one printed PETG part, no supports | circles and rectangles in plan, every face rising from the bed or solid below; printed seat face down |
-| 6 | Be adjustable by parameter | every figure in section 3.6 is a user parameter |
+| 1 | Hold the module at the height the socket wants | module PCB underside `oledSeat` 8.0 mm above the board (owner 2026-10-28; was 9.0, then 8.5); by the drawing's 8.5 mm pins the tips would reach 0.5 below the board top, so the real pins must be shorter than drawn for the module to reach the seats |
+| 2 | Put the module's holes where the module's holes are | posts on the board's 30.4 x 28.5 grid slid `oledOffset` 1.0 mm toward the rear edge; `oledOffset` is a user parameter |
+| 3 | Hold the module without screws | split pins drawn at the hole diameter in the module's Ø3.0 holes, 0.5 slot (owner 2026-10-30, printed, fits and holds) |
+| 4 | Stay on the board by itself | split pins drawn at the hole diameter in the board's four Ø3.2 holes, 0.5 slot (owner 2026-10-30); nothing within 1 mm of the socket or the module's back-side parts |
+| 5 | Be one printed PETG part | circles and rectangles in plan, extrudes and tapers only; the frame stands on columns both ways, so it prints with supports from the bed under the frame (6) |
+| 6 | Fit on the first print | every fit carries the printer's swell (2.7); no feature under the nozzle width; no reprint to calibrate (owner 2026-10-28) |
+| 7 | Be adjustable by parameter | every figure in section 3.6 is a user parameter |
 
 ## 2. Fixed facts
 
@@ -41,92 +42,116 @@ toward the front, so "toward the rear edge" is +y there.
    show the offset.
 6. The board underside under the module is bare. The nearest underside part is the combo at
    x 105 to 131.
+7. Printer allowances, 0.4 mm nozzle, PETG: a small column prints 0.1 to 0.2 mm over its drawn
+   diameter; a hole prints under; the layer on the bed flares up to 0.3 mm outward; nothing
+   narrower than 0.4 mm prints as drawn. The first adapter print (2026-10-28) showed it: crush
+   ribs 0.25 to 0.35 mm proud of their cores printed as one solid column at the crest diameter
+   and entered no hole.
 
 ## 3. Design
 
-1. **Seats.** Four round bosses `oledBoss` Ø7 mm centred on the board's four holes, from the
-   board top to `oledSeat` 9.0 mm. The module's PCB rests on their tops. Each boss also carries
-   the post, which sits `oledOffset` off the boss centre; at 1.0 mm the post crest reaches
-   2.7 mm from the boss centre, inside the Ø7.
-2. **Posts.** On each boss top a post for the module hole: core `oledPostCore` Ø2.7, height
-   `oledPostHeight` 2.0 mm above the seat, with four crush ribs `oledRibWidth` 0.9 mm wide to a
-   crest `oledPostCrest` Ø3.4, straight, no taper. The core clears the Ø3.0 hole by 0.15 mm a
-   side and the ribs interfere 0.2 mm a side; the ribs yield, the core never binds, so the
-   offset may be wrong by 0.15 mm before anything fights. The post top stands 0.8 mm above
-   the module PCB and 0.7 mm under the glass top, and the holes lie outside the glass in y.
+1. **Seats.** Four round bosses `oledBoss` Ø8 mm centred on the board's four holes, from the
+   board top to `oledSeat` 8.0 mm. The module's PCB rests on their tops. Each boss also carries
+   the post, which sits `oledOffset` off the boss centre; at 1.0 mm the post edge reaches
+   2.25 mm from the boss centre, inside the Ø8.
+2. **Posts.** On each boss top a split pin for the module hole: `oledPostCore` Ø3.0, the hole's
+   own diameter, `oledPostShank` 2.5 tall, slot `oledPegSlot` 0.5 east to west through the pin
+   and `oledSlotRise` 1.0 down into the boss, halves 1.25 thick. The print's swell (2.7) makes
+   the pin a press in the hole and the slot lets the halves close by that much; the owner set
+   these values by print (2026-10-30) and the module presses on and holds. The post top stands
+   1.3 above the module PCB and 0.2 under the glass top; the holes lie outside the glass in y.
+   A barb feature `post barbs` (Ø3.2 tapering over 0.65 to Ø2.55) remains in the timeline and
+   fails: with the shank at Ø3.0 its tapered ring is 0.1 wide and collapses. The printed part
+   has no barb.
 3. **Frame.** Three bars `oledBar` 3 mm wide and `oledBarHeight` 6 mm tall join the bosses: one
    along each side (west and east, north boss to south boss) and one along the south row. No
-   bar along the north row, where the socket stands. The bars stop 3 mm under the module, so
-   the module's back-side parts clear them, and the module touches the adapter at the four
-   boss tops and the posts only.
-4. **Locating on the board.** Four pegs under the bosses (owner 2026-10-27, pegs over
-   screws): core `oledPegCore` Ø3.0 with four crush ribs `oledRibWidth` wide to a crest
-   `oledPegCrest` Ø3.5, `oledPegHeight` 4 mm, pressed into the board's Ø3.2 holes from above.
-   The core clears the hole by 0.1 mm a side and the ribs interfere 0.15 mm a side. The pegs
-   stand 4 mm under a 1.6 mm board, so 2.4 mm shows underneath, clear of the bare underside.
-   Printed only, nothing bought. The seat stays at 9.0 and 7 mm of solid boss sits between the
-   peg and the post.
+   bar along the north row, where the socket stands. The bars stop 2.0 mm under the module at
+   the 8.0 seat (3 mm at the first 9.0), so the module's back-side parts clear them, and the
+   module touches the adapter at the four boss tops and the posts only. The owner added
+   (2026-10-28) a wall along the south row between the south bosses, outside the south bar at
+   y -60.75 to -58.25, rising to the seat with its top inner edge chamfered 2.5 mm, and 1 mm
+   chamfers where the six bar ends meet the bosses; both are feature `Chamfer1`.
+4. **Holding on the board.** Four split pins under the bosses (owner 2026-10-27, pegs over
+   screws; owner 2026-10-28, they must retain; owner 2026-10-30, final values by print).
+   Each pin is `oledPegCore` Ø3.2, the hole's own diameter, `oledPegShank` 2.5 long, with the
+   slot `oledPegSlot` 0.5 east to west through the whole pin and `oledSlotRise` 1.0 up into
+   the boss, halves 1.35 thick. The swell makes it a press and the slot gives the halves room
+   to close; the adapter presses on and stays. The pin shows 0.9 under a 1.6 board. Printed
+   only, nothing bought. A barb feature `barbs` (Ø3.4 tapering over 1.0 to Ø2.4) remains in
+   the timeline and fails for the same reason as the post barbs; the printed part has no barb.
+   Crush ribs on pegs and posts were the first design and printed solid (2.7); plain Ø2.8 pegs
+   were the second and held nothing; tapered barbs on Ø2.8 and Ø2.5 shanks were the third,
+   superseded by the owner's values before a print.
 5. **Model truth.** The module occurrence in the Fusion document moves `oledOffset` toward the
    rear edge so its holes sit on the posts, and the later lid work sees the glass where it is.
-   As built the move is a captured position, timeline item `module offset`, +1.0 mm in y; the
-   Fusion API cannot drive an occurrence from a parameter, so a change to `oledOffset` moves the
-   posts and the module is moved by hand to match. The moved model's header pins stand 1.0 mm
-   north of the socket's pin row; on the real module the pins stay in the socket and the PCB,
+   As built the move is a captured position, timeline item `module offset`, +1.0 mm in y and
+   -0.585 in z, which put the module's PCB on the seats when they stood at 8.5; the Fusion API
+   cannot drive an occurrence from a parameter, so a change to `oledOffset` or `oledSeat`
+   moves the adapter and the module is moved by hand to match. With the seat at 8.0 the module
+   model floats 0.5 above the seats and its pin tips touch the board top, which is where the
+   drawing's 8.5 mm pins would stop it. The module is left there until the pin length is known.
+   The moved model's header pins stand 1.0 mm north of the socket's pin row; on the real module
+   the pins stay in the socket and the PCB,
    holes and glass sit north, which is what the drawing gets wrong (2.4).
-6. **Parameters**, in mm. `oledOffset` 1.0, `oledSeat` 9.0, `oledBoss` 7, `oledPostCore` 2.7,
-   `oledPostCrest` 3.4, `oledPostHeight` 2.0, `oledRibWidth` 0.9, `oledBar` 3,
-   `oledBarHeight` 6, `oledPegCore` 3.0, `oledPegCrest` 3.5, `oledPegHeight` 4.
+6. **Parameters**, in mm, the owner's values of 2026-10-30. `oledOffset` 1.0, `oledSeat` 8.0,
+   `oledBoss` 8, `oledBar` 3, `oledBarHeight` 6; posts `oledPostCore` 3.0, `oledPostShank` 2.5;
+   pegs `oledPegCore` 3.2, `oledPegShank` 2.5; slots `oledPegSlot` 0.5, `oledSlotRise` 1.0.
+   The failed barb features keep `oledPostBarb` 3.2, `oledPostTaper` 0.65, `oledPostTip` 2.55,
+   `oledBarb` 3.4, `oledBarbTaper` 1.0, `oledBarbTip` 2.4; `oledPostHeight` (3.15) and
+   `oledPegHeight` (3.5) are shank plus taper and size only the slot cuts.
 
 ## 4. Build steps in Fusion
 
-Built 2026-10-27 as below: component `oled-adapter`, one body `oled adapter`, 154 faces,
-2777.98 mm³, x 61.085 to 98.485, y -60.25 to -24.75, z -2.484 to 12.516 in the board frame;
-`adapter sketch` fully constrained, 19 rectangles, 12 circles, 86 dimensions, 94 constraints, the
-four board holes projected as construction circles; six features `bars`, `bosses`, `posts`,
-`post ribs`, `pegs`, `peg ribs`; timeline 201, none unhealthy; the 12 parameters of 3.6. The
-ribs are two crossing rectangles per post and per peg, each spanning the crest diameter.
+Built 2026-10-27 with ribs, reworked 2026-10-28 to plain chamfered columns, then to split snap
+pegs with a banded barb, then to eight split snap pegs with tapered barbs; the owner then set
+the final values and printed (2026-10-30). As saved: component `oled-adapter`, one body
+`oled adapter`, 96 faces, 3326.93 mm³, z -0.984 to 12.016 in the board frame; `adapter sketch`
+fully constrained; features in timeline order `bars`, `bosses`, `posts`, `pegs`, `Chamfer1`
+(owner), `barbs` (fails), `peg slots`, `post barbs` (fails), `post slots`; timeline 204, the
+two barb features in error; the 19 parameters of 3.6.
 
 1. Component `oled-adapter` in `cubevox-enclosure`, beside `PCB:1`.
 2. One sketch on the board's top face, `adapter sketch`: the four board holes projected; the
-   four boss circles concentric with them; the four post core circles `oledOffset` toward the
-   rear edge from them; the rib rectangles on each post; the three bar rectangles between the
-   bosses; the four peg core circles concentric with the holes; and the rib rectangles on each
-   peg. Rectangles and circles only, every one dimensioned to a projected hole or a parameter,
-   fully constrained.
+   four boss circles concentric with them; the four post circles `oledOffset` toward the rear
+   edge from them, with their four barb circles `oledPostBarb`; the three bar rectangles
+   between the bosses; the four peg circles and four barb circles `oledBarb` concentric with
+   the holes; and eight slot rectangles `oledPegSlot` by 4 mm centred on the pegs and posts,
+   long side east to west. Rectangles and circles only, every one dimensioned to a projected
+   hole or a parameter, fully constrained.
 3. Extrudes: `bars` to `oledBarHeight`; `bosses` to `oledSeat`; `posts` from the seat by
-   `oledPostHeight`; `post ribs` the same; `pegs` downward `oledPegHeight` from the board's
-   top face; `peg ribs` the same.
+   `oledPostShank`; `post barbs` from the post shank end upward `oledPostTaper`, tapered so
+   the tip is `oledPostTip`; `pegs` downward `oledPegShank` from the board's top face; `barbs`
+   from the shank end downward `oledBarbTaper`, tapered to `oledBarbTip`. Last, `peg slots`
+   and `post slots`, cuts of the eight rectangles from each tip to `oledSlotRise` inside the
+   boss, the adapter body the only participant. No chamfers but the owner's `Chamfer1`.
 4. The module occurrence moves `oledOffset` toward the rear edge (3.5).
 5. Named sketch, features and parameters; no save; no KiCad; no STEP or STL.
 
 ## 5. Verification
 
-1. **Model.** One body. Interference with the board: the peg rib crests into the hole walls
-   by 0.15 mm a side, and nothing else. Interference with the moved module: the post
-   crests into its holes by 0.2 mm a side, and nothing else. Seat tops at 9.000 above the
-   board. Post cores concentric with the moved module's holes. Bars 3.000 under the module.
-   Nearest adapter face to the socket at least 1.0 mm. Post tops under the glass top.
+1. **Model.** One body. Pins drawn at the hole diameters, so the model shows a touching fit;
+   the print's swell makes the press. Slots 0.5 wide, roofs 1.0 inside the bosses. Seat tops
+   at `oledSeat` above the board. Nearest adapter face to the socket at least 1.0 mm. Post
+   tips under the glass top.
 
-   Measured 2026-10-27, agent build and a second read-only audit, in mm:
+   Read 2026-10-30 from the saved document, in mm:
 
    | Check | Target | Measured |
    |---|---|---|
-   | bodies | 1 | 1 |
-   | interference with the board | peg ribs into the hole walls only | 1 pair, 3.741 mm³, z 0 to 1.516, crest r 1.75 in r 1.6 holes |
-   | interference with the moved module | post ribs into its holes only | 1 pair, 3.850 mm³, z 10.601 to 11.801, crest r 1.7 in r 1.5 holes |
-   | interference with the other 93 bodies on `PCB:1` | none | none; nearest is 14.2 away |
-   | seat tops above the board top face | 9.000 | 9.000, four faces at z 10.516 |
-   | post cores to the moved module's holes | concentric | 0.000 at all four |
-   | bar tops under the module PCB underside | 3.000 | 3.085 (see below) |
-   | nearest adapter face to the socket | ≥ 1.0 | 6.62 in plan to the socket outline and pads; 6.623 to the module's header body, which passes between the two north bosses |
-   | post tops against the glass top | below | 0.785 below (post top z 12.516, glass top 13.301); 0.715 above the module PCB top |
-   | pegs below the board underside | 2.4 | 2.484 (board body 1.516 thick) |
+   | bodies | 1 | 1, 96 faces |
+   | peg pins | Ø3.2, 2.5 long | eight half-cylinders r 1.6, z -0.984 to 1.516 |
+   | post pins | Ø3.0, 2.5 tall | eight half-cylinders r 1.5, z 9.516 to 12.016 |
+   | slot roofs | 1.0 inside the bosses | four faces at z 2.516 (board top + 1.0) and four at 8.516 (seat - 1.0) |
+   | tapers | none in the printed part | no conical faces but `Chamfer1`'s six; `barbs` and `post barbs` in error |
+   | seat tops above the board top face | 8.000 | 8.000 |
+   | module PCB underside to seat tops | 0 | 0.500 float (3.5; the module stays at the drawing's pin stop) |
+   | nearest adapter face to the socket | ≥ 1.0 | 6.12 in plan to the socket outline and pads; the module's header passes between the two north bosses |
+   | post tips against the glass top | below | seat + 2.5; 0.2 under the glass when seated |
+   | first print of these values | fits and holds | owner 2026-10-30: "perfect" |
 
-   The board body in the document is 1.516 thick, against the board's nominal 1.6, while the
-   module model stands on the KiCad board top at z 1.601. In the model the module therefore
-   floats 0.085 above the seats and the bars read 3.085 under it. The print is unaffected; the
-   seat is 9.0 above the board's real top face. The socket J117 has no body in the document;
-   its clearance is taken in plan from the footprint's socket outline and pads.
+   The board body in the document is 1.516 thick, against the board's nominal 1.6. The socket
+   J117 has no body in the document; its clearance is taken in plan from the footprint's socket
+   outline and pads.
 2. **First print.** The adapter seats on the board by hand. The module presses onto the posts
    with light thumb pressure and its pins enter the socket fully. A post that will not enter
    its hole means the offset is off; `oledOffset` moves by 0.1 toward the side the hole shows
@@ -135,9 +160,11 @@ ribs are two crossing rectangles per post and per peg, each spanning the crest d
 
 ## 6. Printing
 
-PETG, seat face down (the frame upside down, posts on the bed), no supports. The posts and ribs
-print first and the bosses and bars rise from them; the pegs print last, upward, from the boss
-tops. Everything is a column or a bar; nothing overhangs.
+PETG, seat face down (the frame upside down, posts on the bed), supports from the bed under the
+frame. The frame carries columns on both faces, so whichever face is down the bosses and bars
+stand 2.0 or 2.75 mm above the bed on the columns and need support there; the earlier claim
+of a support-free print was wrong. The post tips meet the bed, where the first layer flares.
+The 1.0 mm slot roofs inside the bosses are 0.5 mm bridges.
 
 ## 7. Open
 
@@ -146,8 +173,12 @@ tops. Everything is a column or a bar; nothing overhangs.
 2. `oledOffset` is the owner's estimate of about 1 mm; the first print sets it.
 3. The module's back-side part heights are not in the drawing; 3 mm clearance under the module
    is assumed enough.
-4. Peg fit in a Ø3.2 drilled hole is untested; if the pegs will not enter, `oledPegCrest`
-   drops 0.1 and the adapter is reprinted; if the adapter lifts off, it rises 0.1.
+4. Resolved 2026-10-28: the ribbed pegs and posts of the first print entered no hole (2.7).
+   The second print's plain Ø2.8 pegs entered every hole and held nothing. Tapered barbs
+   followed (owner 2026-10-28, no band, all eight). The owner then set the pins to the hole
+   diameters with a 0.5 slot and printed: fits and holds (2026-10-30). The two barb features
+   stay in the timeline in error; deleting them, with their six parameters, would leave the
+   printed geometry unchanged.
 
 ## Files
 
