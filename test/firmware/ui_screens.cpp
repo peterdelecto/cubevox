@@ -1075,10 +1075,10 @@ Ribbon ribbonOf(std::initializer_list<float> oldestFirst) {
 void checkRibbonHeight() {
   check(ribbonHalfHeight(0.0f) == 0 && ribbonHalfHeight(-1.0f) == 0 && ribbonHalfHeight(0.005f) == 0,
         "voice: no level, a negative one and a hair above zero are the line alone");
-  check(ribbonHalfHeight(level::kSilence) == 1, "voice: the smallest level the meter reports is 1 px");
+  check(ribbonHalfHeight(0.02f) == 0 && ribbonHalfHeight(0.03f) == 1, "voice: a level of 0.02 is the line and one of 0.03 is 1 px");
   check(ribbonHalfHeight(1.0f) == kRibbonHalfMax && kRibbonHalfMax == 22 && ribbonHalfHeight(5.0f) == 22,
         "voice: full level is 22 px each side of the horizon");
-  check(ribbonHalfHeight(0.5f) == 13, "voice: half level lifts to 13 px on the 0.8 curve");
+  check(ribbonHalfHeight(0.5f) == 11 && ribbonHalfHeight(0.1f) == 2, "voice: the height is the level times 22 px, with no curve");
   bool rising = true;
   int prev = 0;
   for (int i = 0; i <= 100; ++i) {
@@ -1092,7 +1092,7 @@ void checkRibbonHeight() {
 
 void checkRibbonHistory() {
   Ribbon r = ribbonOf({1.0f, 0.5f, 0.0f});
-  check(r.half(0) == 0 && r.half(1) == 13 && r.half(2) == 22 && r.half(3) == 0, "ribbon: levels read newest first");
+  check(r.half(0) == 0 && r.half(1) == 11 && r.half(2) == 22 && r.half(3) == 0, "ribbon: levels read newest first");
   check(r.half(-1) == 0 && r.half(kRibbonLevels) == 0 && r.half(1000) == 0, "ribbon: ages outside the history read zero");
   for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
   check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 61 levels");
@@ -1203,12 +1203,12 @@ void checkVoiceShape() {
   Ribbon r;
   for (int i = 0; i < kRibbonLevels; ++i) r.push(0.0f);
   r.push(1.0f);  // 22 px, columns 123 and 124 after the next push
-  r.push(0.5f);  // 13 px, columns 125 and 126
+  r.push(0.5f);  // 11 px, columns 125 and 126
   Canvas c;
   renderVoice(c, r, 0, Walk{0, 0});
 
   bool solid = true;
-  for (int y = 32 - 13; y <= 32 + 13; ++y) solid = solid && lit(c, 125, y) && lit(c, 126, y);
+  for (int y = 32 - 11; y <= 32 + 11; ++y) solid = solid && lit(c, 125, y) && lit(c, 126, y);
   for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, 123, y) && lit(c, 124, y);
   check(solid, "voice: each level spans two columns and is solid from the horizon out, the newest at column 126");
   check(lit(c, 100, 32) && !lit(c, 100, 31) && !lit(c, 100, 33), "voice: older silence is the line");
@@ -1217,8 +1217,8 @@ void checkVoiceShape() {
   // A 1 px rim of 50 % Bayer dither caps each column, and nothing lies beyond it.
   bool rim = true;
   for (int x = 125; x <= 126; ++x) {
-    rim = rim && lit(c, x, 32 - 14) == bayerLit(x, 32 - 14, 32) && lit(c, x, 32 + 14) == bayerLit(x, 32 + 14, 32);
-    rim = rim && !lit(c, x, 32 - 15) && !lit(c, x, 32 + 15);
+    rim = rim && lit(c, x, 32 - 12) == bayerLit(x, 32 - 12, 32) && lit(c, x, 32 + 12) == bayerLit(x, 32 + 12, 32);
+    rim = rim && !lit(c, x, 32 - 13) && !lit(c, x, 32 + 13);
   }
   for (int x = 123; x <= 124; ++x) {
     rim = rim && lit(c, x, 32 - 23) == bayerLit(x, 32 - 23, 32) && lit(c, x, 32 + 23) == bayerLit(x, 32 + 23, 32);
