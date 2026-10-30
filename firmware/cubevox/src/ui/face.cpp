@@ -53,6 +53,7 @@ void Face::render(const GuiFrame& frame, const UiContext& ctx, Menu& menu) {
       menu.draw(ctx, target_);
       break;
   }
+  if (frame.screen == Screen::Voice && ctx.settings.debug) drawLoad(target_, ctx.loadPercent);
   targetHoldsMenu_ = frame.screen == Screen::Menu;
 }
 

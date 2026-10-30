@@ -116,12 +116,41 @@ void checkRecordSchemaV2() {
   check(decodeRecord(junk.data(), out) && out.settings.polishComp && out.settings.topSwitch == TopSwitch::Mute,
         "record v1: bytes past the two settings are ignored");
 
-  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffPolishComp, kOffPolishEq, kOffTopSwitch}) {
+  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffPolishComp, kOffPolishEq, kOffTopSwitch, kOffDebug}) {
     RecordBytes bad = b;
     bad[off] = 2;
     reseal(bad);
     check(!decodeRecord(bad.data(), out), "record v2: a settings byte out of range is rejected");
   }
+}
+
+// DEBUG sits in the first reserved settings byte, so the schema stays 2. A record that holds 0 there,
+// as every record written before the byte existed does, reads as OFF.
+void checkRecordDebugByte() {
+  RecordData on = makeRec(3);
+  on.settings.debug = true;
+  const RecordBytes b = encodeRecord(on);
+  RecordData out;
+  check(b[kOffSchema] == kRecordSchema && b[kOffDebug] == 1 && kOffDebug == kOffTopSwitch + 1,
+        "record v2: DEBUG ON is byte 1 right after the top switch, and the schema stays 2");
+  check(decodeRecord(b.data(), out) && out.settings.debug, "record v2: DEBUG ON survives a save and a reload");
+
+  const RecordBytes off = encodeRecord(makeRec(3));
+  check(off[kOffDebug] == 0 && decodeRecord(off.data(), out) && !out.settings.debug,
+        "record v2: DEBUG OFF is the zero byte, which is also what an older record holds");
+
+  RecordBytes before = b;  // an older v2 record: the same bytes with the byte at 0
+  before[kOffDebug] = 0;
+  reseal(before);
+  check(decodeRecord(before.data(), out) && !out.settings.debug && out.sequence == 3,
+        "record v2: a record written before the byte existed loads with DEBUG OFF");
+
+  RecordBytes v1 = asV1(b);  // a v1 record has no such setting, whatever sits in the byte
+  v1[kOffDebug] = 1;
+  reseal(v1);
+  check(decodeRecord(v1.data(), out) && !out.settings.debug, "record v1: the DEBUG byte is ignored");
+
+  check(!sameRecordContent(b.data(), off.data()), "record v2: a DEBUG change is new content, so it writes a record");
 }
 
 void checkRecordUnknownCard() {
@@ -580,6 +609,7 @@ void checkRecoverCopyFails() {
 void checkRecords() {
   checkRecordCodec();
   checkRecordSchemaV2();
+  checkRecordDebugByte();
   checkStoreFlushPending();
   checkRecordUnknownCard();
   checkRecordEntryStates();

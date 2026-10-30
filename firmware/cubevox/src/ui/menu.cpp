@@ -13,7 +13,9 @@ constexpr uint32_t kMenuTimeoutMs = 15000;
 // Menu list: one row per item, no title row.
 constexpr int kRowListFirstItem = 0;
 
-// Seven rows leave breathing room, so the list rows sit 9 px apart (owner 2026-10-24).
+// The list shows seven rows at a time, which leaves breathing room, so they sit 9 px apart (owner
+// 2026-10-24). The list holds more items than that and scrolls.
+constexpr int kVisibleRows = 7;
 constexpr int kListRowPitchPx = 9;
 
 // The text sits 1 px below its row top, so the cursor bar keeps 1 px clear above and below it
@@ -34,8 +36,10 @@ enum class Item : uint8_t {
   InputJack,
   Output,
   TopSwitch,
+  Reverb,
   PolishComp,
   PolishEq,
+  Debug,
   UpdateFirmware,
   Exit,
   Count,
@@ -43,9 +47,10 @@ enum class Item : uint8_t {
 
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
-static_assert(kRowListFirstItem + kItemCount <= kDisplayRows, "the menu items must fit on the screen");
-static_assert((kRowListFirstItem + kItemCount) * kListRowPitchPx < kCanvasHeight,
-              "the menu items must fit at their pitch and leave the last pixel line blank");
+static_assert(kItemCount >= kVisibleRows, "the list scrolls only when it holds more items than it shows");
+static_assert(kRowListFirstItem + kVisibleRows <= kDisplayRows, "the visible menu rows must fit on the screen");
+static_assert((kRowListFirstItem + kVisibleRows) * kListRowPitchPx < kCanvasHeight,
+              "the visible menu rows must fit at their pitch and leave the last pixel line blank");
 
 // Rows past the screen are dropped; text clips to the row width.
 void putRow(MenuFrame& frame, int r, const char* text) {
@@ -63,8 +68,10 @@ const char* itemLabel(Item it) {
     case Item::InputJack: return "INPUT:";
     case Item::Output: return "OUTPUT:";
     case Item::TopSwitch: return "TOP SWITCH:";
+    case Item::Reverb: return "REVERB:";
     case Item::PolishComp: return "POLISH COMP:";
     case Item::PolishEq: return "POLISH EQ:";
+    case Item::Debug: return "DEBUG:";
     case Item::UpdateFirmware: return "UPDATE FIRMWARE >";
     case Item::Exit: return "EXIT";
     case Item::Count: break;
@@ -74,25 +81,37 @@ const char* itemLabel(Item it) {
 
 const char* onOff(bool on) { return on ? "ON" : "OFF"; }
 
-const char* itemValue(Item it, const Settings& s) {
+// The reverb card the layout holds, or NONE when no slot has one.
+const char* reverbValue(const Layout& layout) {
+  const int slot = reverbSlot(layout);
+  if (slot < 0) return "NONE";
+  return layout.card[slot] == Card::ReverbSpring ? "SPRING" : "CHASM";
+}
+
+const char* itemValue(Item it, const UiContext& ctx) {
+  const Settings& s = ctx.settings;
   switch (it) {
     case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "LINE";
     case Item::Output: return s.outputLevel == OutputLevel::Mic ? "MIC" : "LINE";
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
+    case Item::Reverb: return reverbValue(ctx.layout);
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::PolishEq: return onOff(s.polishEq);
+    case Item::Debug: return onOff(s.debug);
     default: return "";
   }
 }
 
-void drawList(MenuFrame& f, const UiContext& ctx, int cursor) {
-  for (int i = 0; i < kItemCount; ++i) {
+// Draws the kVisibleRows items from `top` on, with the cursor mark in front of item `cursor`.
+void drawList(MenuFrame& f, const UiContext& ctx, int cursor, int top) {
+  for (int row = 0; row < kVisibleRows; ++row) {
+    const int i = top + row;
     const Item it = static_cast<Item>(i);
-    const char* value = itemValue(it, ctx.settings);
+    const char* value = itemValue(it, ctx);
     char line[kDisplayCols + 1];
     snprintf(line, sizeof(line), "%s%s%s%s", i == cursor ? ">" : " ", itemLabel(it), value[0] != '\0' ? " " : "",
              value);
-    putRow(f, kRowListFirstItem + i, line);
+    putRow(f, kRowListFirstItem + row, line);
   }
 }
 
@@ -129,14 +148,17 @@ UiAction Menu::onClick() {
     case Mode::Idle:
       mode_ = Mode::List;
       cursor_ = 0;
+      top_ = 0;
       break;
     case Mode::List:
       switch (static_cast<Item>(cursor_)) {
         case Item::InputJack: return UiAction::ToggleInputJack;
         case Item::Output: return UiAction::ToggleOutput;
         case Item::TopSwitch: return UiAction::CycleTopSwitch;
+        case Item::Reverb: return UiAction::SwapReverb;
         case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::PolishEq: return UiAction::TogglePolishEq;
+        case Item::Debug: return UiAction::ToggleDebug;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;
         case Item::Count: break;
@@ -154,6 +176,12 @@ UiAction Menu::onClick() {
 void Menu::onTurn(int32_t detents) {
   if (mode_ == Mode::List) {
     cursor_ = static_cast<uint8_t>((cursor_ + detents % kItemCount + kItemCount) % kItemCount);
+    // The window moves just far enough to keep the cursor in view, so a step past an edge scrolls one row.
+    if (cursor_ < top_) {
+      top_ = cursor_;
+    } else if (cursor_ >= top_ + kVisibleRows) {
+      top_ = static_cast<uint8_t>(cursor_ - kVisibleRows + 1);
+    }
   } else if (mode_ == Mode::ConfirmDfu) {
     mode_ = Mode::List;
   }
@@ -173,7 +201,7 @@ void Menu::draw(const UiContext& ctx, Canvas& canvas) {
   MenuFrame frame = {};
   switch (mode_) {
     case Mode::Idle: break;
-    case Mode::List: drawList(frame, ctx, cursor_); break;
+    case Mode::List: drawList(frame, ctx, cursor_, top_); break;
     case Mode::ChainView: drawChainView(frame, ctx.layout); break;
     case Mode::ConfirmDfu: drawConfirmDfu(frame); break;
     case Mode::Starting: drawStarting(frame); break;
@@ -189,6 +217,6 @@ void Menu::draw(const UiContext& ctx, Canvas& canvas) {
     if (frame[r][0]) canvas.drawText(0, r * pitch + textTop, font5x7(), frame[r].data());
   }
   if (list) {
-    canvas.invertRect(0, (kRowListFirstItem + cursor_) * pitch, kCanvasWidth, kListRowPitchPx);
+    canvas.invertRect(0, (kRowListFirstItem + cursor_ - top_) * pitch, kCanvasWidth, kListRowPitchPx);
   }
 }

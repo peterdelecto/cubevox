@@ -1,6 +1,7 @@
 // Checks the runtime face end to end on the host. Covers the dissolve frames against the proof
 // renderer, the readout flowing in and out and leaving with its card, the menu on top and the input
-// it takes once the face draws, the tick gate, the burn-in walk and the voice at three input levels.
+// it takes once the face draws, the tick gate, the burn-in walk, the DEBUG load figure and the voice at
+// three input levels.
 // The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
@@ -11,6 +12,7 @@
 #include <string>
 
 #include "core/canvas.h"
+#include "core/fonts.h"
 #include "core/layout.h"
 #include "core/level.h"
 #include "core/panel.h"
@@ -80,8 +82,9 @@ struct FaceRig {
   Canvas live;
   uint32_t now = 1000;
   bool switchOn = false;
+  int loadPercent = 0;
 
-  UiContext ctx() const { return UiContext{layout, panel, settings, switchOn}; }
+  UiContext ctx() const { return UiContext{layout, panel, settings, switchOn, loadPercent}; }
 
   // One UI tick, 40 ms on, with the input at `rms`.
   void tick(float rms = 0.0f) {
@@ -350,7 +353,7 @@ void checkMenuMovesAndCloses() {
   check(sameCanvas(r.live, moved) && !sameCanvas(moved, menuScreen), "face: a cursor move shows at the next tick, with no dissolve");
 
   UiInput toExit;
-  toExit.detents = 5;
+  toExit.detents = 7;  // from the second item to Exit, the ninth
   r.menu.update(toExit, r.now);
   r.menu.update(clickInput(), r.now);
   check(!r.menu.open(), "face: Exit closed the menu");
@@ -398,7 +401,7 @@ void checkMenuReopens() {
   UiInput click;
   click.click = true;
   UiInput toExit;
-  toExit.detents = 6;
+  toExit.detents = 8;  // from the first item to Exit, the ninth
   for (int round = 0; round < 3; ++round) {
     r.menu.update(click, r.now);
     ref.update(click, r.now);
@@ -514,6 +517,120 @@ void checkWalkOnPanel() {
   check(sameCanvas(r.live, again), "face: after 120 s it moves 1 px more");
 }
 
+// Pixels of `a` that differ from `b`, as the box (x0, y0, x1, y1) that holds them all, or false when
+// the canvases are the same. Lets a test say where a figure went without drawing it again.
+bool diffBox(const Canvas& a, const Canvas& b, int& x0, int& y0, int& x1, int& y1) {
+  x0 = kCanvasWidth;
+  y0 = kCanvasHeight;
+  x1 = -1;
+  y1 = -1;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) {
+      if (lit(a, x, y) == lit(b, x, y)) continue;
+      x0 = x < x0 ? x : x0;
+      y0 = y < y0 ? y : y0;
+      x1 = x > x1 ? x : x1;
+      y1 = y > y1 ? y : y1;
+    }
+  }
+  return x1 >= 0;
+}
+
+// The DEBUG load figure on the voice screen: its text in 5x7 with the last column at 126 and the top
+// row at 56, so it keeps 1 px from the right and bottom edges. The text goes at literal places, x 116,
+// 110 and 104 for 7%, 42% and 100%, which are 11, 17 and 23 px wide on the 6 px pitch.
+void checkLoadFigure() {
+  struct Case {
+    int percent;
+    const char* text;
+    int x;
+  };
+  const Case cases[] = {{7, "7%", 116}, {42, "42%", 110}, {100, "100%", 104}};
+  const Canvas line = lineScreen();
+
+  FaceRig r;
+  r.settings.debug = true;
+  r.ticks(3);
+  for (const Case& c : cases) {
+    r.loadPercent = c.percent;
+    r.tick();  // the same screen, so the new figure shows at once with no dissolve
+    Canvas want = line;
+    want.drawText(c.x, 56, font5x7(), c.text);
+    const std::string what = std::string("face: DEBUG ON, ") + c.text;
+    check(sameCanvas(r.live, want), (what + " shows at its place on the next tick").c_str());
+
+    int x0 = 0;
+    int y0 = 0;
+    int x1 = 0;
+    int y1 = 0;
+    check(diffBox(r.live, line, x0, y0, x1, y1) && x0 >= c.x && x1 <= 126 && y0 >= 56 && y1 <= 62,
+          (what + " lies inside columns " + std::to_string(c.x) + " to 126 and rows 56 to 62").c_str());
+    writePgm(r.live, (std::string("oled-voice-load-") + std::to_string(c.percent) + ".pgm").c_str());
+  }
+
+  r.loadPercent = 42;
+  r.ticks(static_cast<int>(kWalkStepMs / kUiTickMs) + 10);
+  Canvas shifted;
+  shifted.fillRect(1, 32, kCanvasWidth - 1, 1, true);
+  shifted.drawText(110, 56, font5x7(), "42%");
+  check(sameCanvas(r.live, shifted), "face: the ribbon walks 1 px after 60 s and the figure stays where it was");
+}
+
+// With DEBUG off nothing is drawn, and with it on only the voice screen shows the figure. The readout,
+// the toggle readout, MUTED, BYPASS and the menu keep their own frames.
+void checkLoadFigureAbsent() {
+  FaceRig off;
+  off.loadPercent = 42;
+  off.ticks(4);
+  check(sameCanvas(off.live, lineScreen()), "face: with DEBUG off the voice has no figure");
+
+  FaceRig knob;
+  knob.settings.debug = true;
+  knob.loadPercent = 42;
+  knob.ticks(3);
+  knob.turn(4, 1, kTime160);
+  knob.ticks(4);
+  check(sameCanvas(knob.live, readoutScreen(knob.layout, 4, 1, 160.0f)), "face: the knob readout has no figure with DEBUG on");
+
+  FaceRig toggle;
+  toggle.settings.debug = true;
+  toggle.loadPercent = 42;
+  toggle.ticks(3);
+  toggle.flip(5, true);
+  toggle.ticks(4);
+  check(sameCanvas(toggle.live, toggleScreen(toggle.layout, 5, true)), "face: the toggle readout has no figure with DEBUG on");
+
+  FaceRig muted;
+  muted.settings.debug = true;
+  muted.loadPercent = 42;
+  muted.switchOn = true;
+  muted.ticks(5);
+  check(matchesGolden(muted.live, "muted-3"), "face: the MUTED screen has no figure with DEBUG on");
+
+  FaceRig bypass;
+  bypass.settings.debug = true;
+  bypass.settings.topSwitch = TopSwitch::Bypass;
+  bypass.loadPercent = 42;
+  bypass.switchOn = true;
+  bypass.ticks(5);
+  Canvas word;
+  renderMuted(word, "BYPASS");
+  check(sameCanvas(bypass.live, word), "face: the BYPASS screen has no figure with DEBUG on");
+
+  FaceRig menu;
+  Menu ref;
+  ref.listen();
+  menu.settings.debug = true;
+  menu.loadPercent = 42;
+  menu.ticks(3);
+  menu.menu.update(clickInput(), menu.now);
+  ref.update(clickInput(), menu.now);
+  Canvas menuScreen;
+  ref.draw(menu.ctx(), menuScreen);
+  menu.ticks(4);
+  check(sameCanvas(menu.live, menuScreen), "face: the menu has no figure with DEBUG on");
+}
+
 // The voice at three input levels, as an RMS through the whole path: energy, meter, ribbon.
 void checkVoiceLevels() {
   struct Case {
@@ -568,5 +685,7 @@ void checkFace() {
   checkKnobMovedGuards();
   checkLateTick();
   checkWalkOnPanel();
+  checkLoadFigure();
+  checkLoadFigureAbsent();
   checkVoiceLevels();
 }

@@ -29,17 +29,21 @@ enum class UiAction : uint8_t {
   ToggleOutput,
   ToggleInputJack,
   CycleTopSwitch,
+  ToggleDebug,
+  SwapReverb,  // the layout's reverb card changes between Spring and Chasm
   EnterDfu,
 };
 
 // Read-only state the screens draw. `layout` names the cards, `panel` holds the knob readings and
 // `settings` the menu values. `topSwitchOn` says the top switch sits in its engaged position,
-// whether it mutes or bypasses.
+// whether it mutes or bypasses. `loadPercent` is the audio load the voice screen shows while the
+// DEBUG setting is on.
 struct UiContext {
   const Layout& layout;
   const PanelReading& panel;
   const Settings& settings;
   bool topSwitchOn;
+  int loadPercent = 0;
 };
 
 // The text of one screen: kDisplayRows rows of up to kDisplayCols characters, each NUL-terminated.
@@ -77,7 +81,8 @@ class Menu {
 
   Mode mode_ = Mode::Idle;
   bool listening_ = false;
-  uint8_t cursor_ = 0;
+  uint8_t cursor_ = 0;  // the item under the cursor
+  uint8_t top_ = 0;     // the first item the list shows; it scrolls to keep the cursor in view
   uint32_t lastActivityMs_ = 0;
   MenuFrame shown_ = {};
   bool shownValid_ = false;

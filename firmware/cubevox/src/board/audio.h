@@ -80,6 +80,10 @@ struct AudioLoad {
 };
 AudioLoad audioTakeLoad();
 
+// The worst block of the last whole second as a percent of the block budget, 0 to 999. It has its own
+// one-second window, so audioTakeLoad() does not disturb it. Reads 0 for the first second after boot.
+int audioWorstLoadPercent();
+
 // Cost of the last layout swap in CPU cycles: the swap block (where the engine clears land) and the
 // worst block from the swap to the end of the fade-in. Zero until a swap has happened.
 struct AudioSwapStats {

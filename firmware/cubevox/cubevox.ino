@@ -55,6 +55,8 @@ PublishGate gPublish;
 FallingEdge gMenuClosed;
 Every gHeartbeat{kHeartbeatMs};
 Every gStats{kStatsMs};
+Every gLoadRefresh{kUiTickMs};  // the DEBUG figure moves once per UI tick
+int gLoadPercent = 0;
 
 void reportBoot() { bootReport(sh1106Present()); }
 
@@ -68,10 +70,15 @@ UiInput menuInput(uint32_t nowMs) {
   return plannedResetPending() ? UiInput{} : input;
 }
 
-// Applies what the menu asked for. Returns true when a setting changed.
+// Applies what the menu asked for. Returns true when a setting or the layout changed. A new layout
+// takes the same path as one from the app: the snapshot goes out stale, the audio fades and resets
+// the engines whose card changed, and the save writes the layout record.
 bool applyAction(UiAction action, uint32_t nowMs) {
-  switch (ui::applyAction(action, gSettings)) {
+  switch (ui::applyAction(action, gSettings, gLayout)) {
     case ui::ApplyResult::SettingsChanged: return true;
+    case ui::ApplyResult::LayoutChanged:
+      gPublish.markStale();
+      return true;
     case ui::ApplyResult::EnterDfu: enterDfu(nowMs); break;
     case ui::ApplyResult::None: break;
   }
@@ -253,7 +260,8 @@ void loop() {
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
   const bool switchOn = topSwitchEngaged(gSettings.topSwitch, muteActive(), muteBypassOn());
-  const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn};
+  if (gLoadRefresh.due(nowMs)) gLoadPercent = gSettings.debug ? audioWorstLoadPercent() : 0;
+  const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn, gLoadPercent};
   LastMoved touch;
   if (controlsTakeTouch(touch)) gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
   ToggleFlip flip;

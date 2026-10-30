@@ -1,5 +1,5 @@
-// User settings: signal level, the input jack, the polish stages and the top switch. Defaults match
-// the hardware at power-up.
+// User settings: signal level, the input jack, the polish stages, the top switch and the debug
+// readout. Defaults match the hardware at power-up.
 
 #pragma once
 
@@ -15,6 +15,7 @@ struct Settings {
   bool polishComp = true;  // POLISH COMP stage
   bool polishEq = true;    // POLISH EQ stage
   TopSwitch topSwitch = TopSwitch::Mute;
+  bool debug = false;  // DEBUG: the voice screen shows the audio load
 };
 
 // MIC output is a -30 dB digital trim before the DAC that puts the output near the level of the mic

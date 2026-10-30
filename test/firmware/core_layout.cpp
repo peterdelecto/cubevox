@@ -157,21 +157,45 @@ void checkSettings() {
 
 void checkApplyAction() {
   Settings s;
-  check(ui::applyAction(UiAction::ToggleOutput, s) == ui::ApplyResult::SettingsChanged &&
+  Layout layout = defaultLayout();
+  check(ui::applyAction(UiAction::ToggleOutput, s, layout) == ui::ApplyResult::SettingsChanged &&
             s.outputLevel == OutputLevel::Mic,
         "action: ToggleOutput flips LINE to MIC");
-  check(ui::applyAction(UiAction::ToggleOutput, s) == ui::ApplyResult::SettingsChanged && s.outputLevel == OutputLevel::Line,
+  check(ui::applyAction(UiAction::ToggleOutput, s, layout) == ui::ApplyResult::SettingsChanged &&
+            s.outputLevel == OutputLevel::Line,
         "action: ToggleOutput flips back");
-  check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Line,
+  check(ui::applyAction(UiAction::ToggleInputJack, s, layout) == ui::ApplyResult::SettingsChanged &&
+            s.inputJack == InputJack::Line,
         "action: ToggleInputJack flips MIC to LINE");
-  check(ui::applyAction(UiAction::ToggleInputJack, s) == ui::ApplyResult::SettingsChanged && s.inputJack == InputJack::Mic,
+  check(ui::applyAction(UiAction::ToggleInputJack, s, layout) == ui::ApplyResult::SettingsChanged &&
+            s.inputJack == InputJack::Mic,
         "action: ToggleInputJack flips back");
+  check(ui::applyAction(UiAction::ToggleDebug, s, layout) == ui::ApplyResult::SettingsChanged && s.debug,
+        "action: ToggleDebug turns DEBUG on");
+  check(ui::applyAction(UiAction::ToggleDebug, s, layout) == ui::ApplyResult::SettingsChanged && !s.debug,
+        "action: ToggleDebug turns it off again");
   const Settings before = s;
-  check(ui::applyAction(UiAction::EnterDfu, s) == ui::ApplyResult::EnterDfu && s.outputLevel == before.outputLevel &&
+  check(ui::applyAction(UiAction::EnterDfu, s, layout) == ui::ApplyResult::EnterDfu && s.outputLevel == before.outputLevel &&
             s.inputJack == before.inputJack,
         "action: EnterDfu asks for the reset and changes nothing");
-  check(ui::applyAction(UiAction::None, s) == ui::ApplyResult::None && s.inputJack == before.inputJack,
+  check(ui::applyAction(UiAction::None, s, layout) == ui::ApplyResult::None && s.inputJack == before.inputJack,
         "action: None does nothing");
+  check(layout == defaultLayout(), "action: the setting actions leave the layout alone");
+
+  check(ui::applyAction(UiAction::SwapReverb, s, layout) == ui::ApplyResult::LayoutChanged &&
+            layout.card[7] == Card::ReverbChasm && s.outputLevel == before.outputLevel && s.debug == before.debug,
+        "action: SwapReverb changes the layout and no setting");
+}
+
+void checkReverbSlot() {
+  Layout layout = defaultLayout();
+  check(reverbSlot(layout) == 7, "reverbSlot: the default layout has its reverb card in slot 8");
+  layout.card[7] = Card::ReverbChasm;
+  check(reverbSlot(layout) == 7, "reverbSlot: Chasm counts as a reverb card");
+  layout.card[7] = Card::Empty;
+  check(reverbSlot(layout) == -1, "reverbSlot: -1 when no slot holds one");
+  layout.card[2] = Card::ReverbChasm;
+  check(reverbSlot(layout) == 2, "reverbSlot: the slot that holds it, wherever it is");
 }
 
 void checkRecoverLayout() {
@@ -205,6 +229,7 @@ void checkLayoutAndCompose() {
   checkLayoutReasons();
   checkLayoutName();
   checkApplyAction();
+  checkReverbSlot();
   checkComposeToggles();
   checkComposeBench();
   checkOutputGain();

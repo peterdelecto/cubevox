@@ -78,3 +78,8 @@ const char* topSwitchWord(TopSwitch role);
 
 // The word centred on the panel, nothing else.
 void renderMuted(Canvas& canvas, const char* word);
+
+// The DEBUG load figure, for example 42%, in 5x7 at the bottom right. Its last column is 126 and its
+// top row is 56, so it keeps kScreenPad from both edges. It draws over the canvas without clearing it,
+// and blanks the box behind the text first. `percent` is held to 0 to kMaxLoadPercent.
+void drawLoad(Canvas& canvas, int percent);

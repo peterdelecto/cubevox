@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "core/fonts.h"
+#include "core/load_window.h"
 
 namespace {
 
@@ -166,4 +167,16 @@ const char* topSwitchWord(TopSwitch role) { return role == TopSwitch::Bypass ? "
 void renderMuted(Canvas& canvas, const char* word) {
   canvas.clear();
   drawCentred(canvas, (kCanvasHeight - font16x24().height) / 2, font16x24(), word);
+}
+
+void drawLoad(Canvas& canvas, int percent) {
+  const FontDesc& font = font5x7();
+  const int shown = percent < 0 ? 0 : (percent > kMaxLoadPercent ? kMaxLoadPercent : percent);
+  char text[16];
+  snprintf(text, sizeof(text), "%d%%", shown);
+  const int width = Canvas::textWidth(font, text);
+  const int x = kCanvasWidth - kScreenPad - width;
+  const int y = kCanvasHeight - kScreenPad - font.height;
+  canvas.fillRect(x, y, width, font.height, false);
+  canvas.drawText(x, y, font, text);
 }

@@ -161,6 +161,7 @@ add_executable(firmware_test
                test/firmware/core_layout.cpp
                test/firmware/core_layout_fade.cpp
                test/firmware/core_level.cpp
+               test/firmware/core_load.cpp
                test/firmware/core_panel_test.cpp
                test/firmware/core_protocol.cpp
                test/firmware/core_protocol_fuzz.cpp

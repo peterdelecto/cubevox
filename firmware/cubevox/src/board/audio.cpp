@@ -14,6 +14,7 @@
 #include "core/audio_recovery.h"
 #include "core/chain_run.h"
 #include "core/layout_fade.h"
+#include "core/load_window.h"
 #include "core/output_stage.h"
 #include "core/registry.h"
 #include "engine/common.h"
@@ -131,6 +132,10 @@ volatile uint32_t gSwapCount = 0;
 volatile uint64_t gWindowSum = 0;  // since the last audioTakeLoad()
 volatile uint32_t gWindowBlocks = 0;
 volatile uint32_t gWindowMax = 0;
+
+// Worst block of each second, for the OLED's DEBUG figure. A second is this many blocks.
+constexpr uint32_t kLoadWindowBlocks = cv::kSampleRate / kFramesPerHalf;
+LoadWindow gLoad;
 
 // SAI and DMA errors, counted from the HAL error callback.
 volatile uint32_t gSaiErrors = 0;
@@ -462,6 +467,7 @@ void recordBlock(uint32_t cycles, bool readTooSoon) {
   gWindowSum = gWindowSum + cycles;
   gWindowBlocks = gWindowBlocks + 1;
   if (cycles > gWindowMax) gWindowMax = cycles;
+  gLoad.add(cycles, kLoadWindowBlocks);
   if (gSwapStarted) {
     gSwapStarted = false;
     gSwapBlockCycles = cycles;
@@ -768,6 +774,8 @@ AudioLoad audioTakeLoad() {
   load.worstPercent = 100.0f * static_cast<float>(worst) / static_cast<float>(budget);
   return load;
 }
+
+int audioWorstLoadPercent() { return loadPercent(gLoad.worst(), gCounts.budgetCycles); }
 
 #if CUBEVOX_BENCH
 void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }
