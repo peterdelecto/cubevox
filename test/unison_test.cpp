@@ -1,5 +1,5 @@
-// Unison checks: passthrough, detune, level, no-alloc, the LFO against its analytic sine, and a
-// RATE step that glides instead of jumping. No window, no audio device.
+// Unison checks: passthrough, detune, the top of the knob, level, no-alloc, the LFO against its
+// analytic sine, and a RATE step that glides instead of jumping. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -147,11 +147,137 @@ bool testDetune() {
   // Expected peak follows the shipped tuning, so retuning by ear moves the band instead of
   // breaking it.
   const cv::UnisonTuning t;
-  const float swingSec = t.swingMaxMs * 0.001f;
+  const float swingSec = t.swingMaxMs * t.topSwingGain * 0.001f;
   const float expect = 1200.0f * std::log2(1.0f + 2.0f * kPi * t.lfoHz[1] * swingSec);
   const float tol = 0.15f * expect;
   return report("detune", std::fabs(cents - expect) <= tol,
                 "peak=%.2f cents (expect %.1f +-%.1f)", cents, expect, tol);
+}
+
+// The tuning without the top of the knob, which is the law as it stood before topFrom existed.
+cv::UnisonParams flatTop(cv::UnisonParams p) {
+  p.tuning.topSwingGain = 1.0f;
+  p.tuning.topWetDb = 0.0f;
+  return p;
+}
+
+// Fraction of the top reach in use at DEPTH d.
+double overAt(const cv::UnisonTuning& t, double d) {
+  return d > t.topFrom ? (d - t.topFrom) / (1.0 - t.topFrom) : 0.0;
+}
+
+// Runs blocks at depth d0 for the first half of the signal and d1 for the second.
+std::vector<float> runStepped(cv::Unison& u, const std::vector<float>& in, cv::UnisonParams p, float d0,
+                              float d1) {
+  std::vector<float> out(in.size());
+  const int total = static_cast<int>(in.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    const int n = total - i < cv::kBlock ? total - i : cv::kBlock;
+    p.depth = i < total / 2 ? d0 : d1;
+    u.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, p);
+  }
+  return out;
+}
+
+// DEPTH 0.3 to 0.6: both top terms are exact neutrals, so the whole output equals the tuning
+// without them, sample for sample, at the shipped swing, at the RATE 50 % swing, and across a
+// depth step that ends at 0.6.
+bool testBelowTop() {
+  const std::vector<float> in = sine(cv::kSampleRate);
+  const float depths[3] = {0.3f, 0.5f, 0.6f};
+  bool same = true;
+  for (float depth : depths) {
+    for (int rate = 0; rate < 2; ++rate) {
+      cv::UnisonParams p = params(depth);
+      if (rate) unisonrate::apply(p.tuning, 50.0f);
+      cv::Unison a, b;
+      const std::vector<float> top = run(a, in, p);
+      const std::vector<float> flat = run(b, in, flatTop(p));
+      for (size_t i = 0; i < in.size(); ++i)
+        if (top[i] != flat[i]) same = false;
+      if (a.swingSamples() != b.swingSamples()) same = false;
+    }
+  }
+  cv::Unison a, b;
+  const cv::UnisonParams p = params(0.0f);
+  const std::vector<float> top = runStepped(a, in, p, 0.2f, 0.6f);
+  const std::vector<float> flat = runStepped(b, in, flatTop(p), 0.2f, 0.6f);
+  for (size_t i = 0; i < in.size(); ++i)
+    if (top[i] != flat[i]) same = false;
+  std::printf("%s below-top  DEPTH 0.3, 0.5, 0.6 and a 0.2 to 0.6 step equal the tuning without the top (==): %s\n",
+              same ? "PASS" : "FAIL", same ? "yes" : "NO");
+  return same;
+}
+
+// Swing at the end of a run long enough for the depth glide to settle, in ms.
+double settledSwingMs(const cv::UnisonParams& p) {
+  const std::vector<float> in = sine(cv::kSampleRate);
+  cv::Unison u;
+  run(u, in, p);
+  return static_cast<double>(u.swingSamples()) * 1000.0 / cv::kSampleRate;
+}
+
+// The swing grows from 1 to topSwingGain over DEPTH topFrom to 1, linearly.
+bool testTopSwing() {
+  const cv::UnisonTuning t;
+  const float depths[5] = {0.3f, 0.5f, 0.6f, 0.8f, 1.0f};
+  bool ok = true;
+  for (float depth : depths) {
+    const double was = settledSwingMs(flatTop(params(depth)));
+    const double now = settledSwingMs(params(depth));
+    const double want = 1.0 + (static_cast<double>(t.topSwingGain) - 1.0) * overAt(t, depth);
+    const bool row = std::fabs(now / was - want) < 1e-3;
+    ok &= row;
+    char name[40];
+    std::snprintf(name, sizeof name, "top swing %.1f", static_cast<double>(depth));
+    char detail[96];
+    std::snprintf(detail, sizeof detail, "was %.4f ms, now %.4f ms, x%.4f (want x%.4f +-1e-3)", was, now,
+                  now / was, want);
+    std::printf("%s %s  %s\n", row ? "PASS" : "FAIL", name, detail);
+  }
+  return ok;
+}
+
+// RMS of the wet path alone (dry subtracted, no trim) once the depth glide has settled.
+double wetRms(const cv::UnisonParams& p) {
+  const int n = 3 * cv::kSampleRate;
+  const std::vector<float> in = sine(n);
+  cv::Unison u;
+  const std::vector<float> out = run(u, in, p);
+  std::vector<float> wet;
+  for (int i = cv::kSampleRate; i < n; ++i) wet.push_back(out[static_cast<size_t>(i)] - in[static_cast<size_t>(i)]);
+  return static_cast<double>(rms(wet));
+}
+
+// The per-voice wet level rises by topWetDb x over, in dB. Both sides keep the same swing, so the
+// taps match and the ratio of the wet RMS is the gain alone. The last figure is the shipped
+// tuning against the tuning without the top, where the wider swing moves the two voices against
+// each other a little as well.
+bool testTopWet() {
+  const cv::UnisonTuning t;
+  const float depths[5] = {0.3f, 0.5f, 0.6f, 0.8f, 1.0f};
+  bool ok = true;
+  for (float depth : depths) {
+    cv::UnisonParams a = untrimmed(depth);
+    a.tuning.topSwingGain = 1.0f;
+    cv::UnisonParams b = a;
+    b.tuning.topWetDb = 0.0f;
+    const double ratio = wetRms(a) / wetRms(b);
+    const double want = std::pow(10.0, static_cast<double>(t.topWetDb) * overAt(t, depth) / 20.0);
+    const bool row = std::fabs(ratio / want - 1.0) < 1e-3;
+    ok &= row;
+    const double was = wetRms(flatTop(untrimmed(depth)));
+    const double now = wetRms(untrimmed(depth));
+    char name[40];
+    std::snprintf(name, sizeof name, "top wet %.1f", static_cast<double>(depth));
+    char detail[160];
+    std::snprintf(detail, sizeof detail,
+                  "wet gain +%.4f dB (want +%.4f dB, +-1e-3 of the ratio); shipped wet RMS %.2f dBFS to %.2f dBFS",
+                  20.0 * std::log10(ratio), 20.0 * std::log10(want), 20.0 * std::log10(was),
+                  20.0 * std::log10(now));
+    std::printf("%s %s  %s\n", row ? "PASS" : "FAIL", name, detail);
+  }
+  return ok;
 }
 
 // Largest |second difference| of x over [from, to): a jump of the taps shows as a spike here.
@@ -191,9 +317,9 @@ bool testLevel() {
   const std::vector<float> out = run(gUnison, in, params(1.0f));
   const float db = 20.0f * log10f(rms(out) / rms(in));
   // Default wetMaxDb is -4.0 dB (owner ear tuning) and trimDb -1.4 dB scales with depth
-  // (level rule at DEPTH 0.5). At DEPTH 1 on this sine the output measures 0.91 dB;
-  // band is that +-1.5.
-  return report("level", std::fabs(db - 0.91f) <= 1.5f, "out/in=%.2f dB (0.91 +-1.5)", db);
+  // (level rule at DEPTH 0.5). At DEPTH 1 on this sine the output measures 2.24 dB, which
+  // includes the +2.5 dB of the top of the knob (0.91 dB without it); band is 2.24 +-1.5.
+  return report("level", std::fabs(db - 2.24f) <= 1.5f, "out/in=%.2f dB (2.24 +-1.5)", db);
 }
 
 bool testNoAlloc() {
@@ -246,6 +372,9 @@ int main() {
   bool ok = true;
   ok &= testPassthrough();
   ok &= testDetune();
+  ok &= testBelowTop();
+  ok &= testTopSwing();
+  ok &= testTopWet();
   ok &= testLevel();
   ok &= testNoAlloc();
   ok &= testLfoAnalytic();

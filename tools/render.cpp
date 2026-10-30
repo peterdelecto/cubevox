@@ -77,6 +77,7 @@ int usage() {
                "  switch them out for A/B listening; --eq is accepted and changes nothing\n"
                "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
+               "     topFrom topSwingGain topWetDb\n"
                "     octGrainWindowMs octGrainCount (2|4) octTrimDb eqTrimDb\n"
                "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distTopBoostDb\n"
@@ -179,6 +180,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
       {"swingMinMs", &t.swingMinMs},       {"swingMaxMs", &t.swingMaxMs},
       {"wetMaxDb", &t.wetMaxDb},
+      {"topFrom", &t.topFrom},             {"topSwingGain", &t.topSwingGain},
+      {"topWetDb", &t.topWetDb},
       {"octGrainWindowMs", &ot.grainWindowMs}, {"octGrainCount", &octGrains},
       {"octTrimDb", &ot.trimDb},
       {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},

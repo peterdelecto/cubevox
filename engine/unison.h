@@ -10,9 +10,10 @@
 #include "engine/smooth.h"
 
 // Unison: two copies of the voice, each with a slow LFO wobble on its delay
-// (chorus). DEPTH scales the swing and the wet level together. A RATE move
-// changes the tuning's swing; the swing glides to it with the depth smoother,
-// so the taps never jump.
+// (chorus). DEPTH scales the swing and the wet level together. Over the top of
+// the knob, from topFrom to DEPTH 1, the swing grows by up to topSwingGain and
+// the wet level by up to topWetDb. A RATE move changes the tuning's swing; the
+// swing glides to it with the depth smoother, so the taps never jump.
 
 namespace cv {
 
@@ -25,6 +26,10 @@ struct UnisonTuning {
   float wetMaxDb = -4.0f;   // per-voice level at DEPTH 1
   // Whole-output gain (dry + wet) at DEPTH 1, scaled by depth in dB; level rule at DEPTH 0.5.
   float trimDb = -1.4f;
+  // Top of the knob (owner 2026-10-30). Both terms are exactly neutral up to topFrom.
+  float topFrom = 0.6f;         // DEPTH where the extra reach starts
+  float topSwingGain = 1.333f;  // swing multiplier at DEPTH 1, ramped linearly from topFrom
+  float topWetDb = 2.5f;        // extra per-voice level at DEPTH 1, ramped in dB from topFrom
 };
 
 struct UnisonParams {
@@ -80,6 +85,8 @@ class Unison {
     r.swing1 = swingEnd;
     r.trim0 = powf(10.0f, t.trimDb * r.depth0 / 20.0f);
     r.trim1 = powf(10.0f, t.trimDb * r.depth1 / 20.0f);
+    r.wetTop0 = powf(10.0f, t.topWetDb * topOver(t, r.depth0) / 20.0f);
+    r.wetTop1 = powf(10.0f, t.topWetDb * topOver(t, r.depth1) / 20.0f);
     render(in, out, n, t, r);
     depth_ = depthEnd;
     swingSmp_ = swingEnd;
@@ -92,17 +99,28 @@ class Unison {
   static constexpr float kLfoMaxHz = 20.0f;
   static constexpr float kTurn = 4294967296.0f;
   static constexpr float kClampMargin = 0.01f;
+  static constexpr float kMinTopSpan = 1e-4f;
 
   // Block-edge values of everything that follows the smoothers.
   struct Ramp {
     float depth0 = 0.0f, depth1 = 0.0f;
     float swing0 = 0.0f, swing1 = 0.0f;
     float trim0 = 1.0f, trim1 = 1.0f;
+    float wetTop0 = 1.0f, wetTop1 = 1.0f;
   };
+
+  // How far DEPTH has climbed from topFrom to 1, 0..1. Exactly 0.0f at or below topFrom, so
+  // every top term built on it is an exact 0 (or an exact 1 as a factor) there.
+  static float topOver(const UnisonTuning& t, float depth) {
+    const float from = clampf(t.topFrom, 0.0f, 1.0f);
+    const float room = 1.0f - from;
+    return depth > from ? (depth - from) / (room < kMinTopSpan ? kMinTopSpan : room) : 0.0f;
+  }
 
   // LFO swing (peak) in samples at a given depth.
   static float swingAt(const UnisonTuning& t, float depth) {
-    return (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth) * kSmpPerMs;
+    const float top = 1.0f + (t.topSwingGain - 1.0f) * topOver(t, depth);
+    return (t.swingMinMs + (t.swingMaxMs - t.swingMinMs) * depth) * kSmpPerMs * top;
   }
 
   void setLfoRates(const UnisonTuning& t) {
@@ -159,7 +177,8 @@ class Unison {
     for (int i = 0; i < n; ++i) {
       const float f = static_cast<float>(i + 1) * inv;
       const float swing = r.swing0 + (r.swing1 - r.swing0) * f;
-      const float wetGain = (r.depth0 + (r.depth1 - r.depth0) * f) * wetMax;
+      const float wetTop = r.wetTop0 + (r.wetTop1 - r.wetTop0) * f;
+      const float wetGain = (r.depth0 + (r.depth1 - r.depth0) * f) * wetMax * wetTop;
       line[wp] = in[i];
       const float s0 = read(line, wp, base0 + swing * sinTurns(lfo0));
       const float s1 = read(line, wp, base1 + swing * sinTurns(lfo1));

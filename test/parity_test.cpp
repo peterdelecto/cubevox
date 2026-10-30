@@ -93,6 +93,9 @@ void cmpUnison(const std::string& p, float pos, const cv::UnisonParams& f, const
   CMP(p, pos, f.tuning, e.tuning, baseDelayMs[1]);
   CMP(p, pos, f.tuning, e.tuning, wetMaxDb);
   CMP(p, pos, f.tuning, e.tuning, trimDb);
+  CMP(p, pos, f.tuning, e.tuning, topFrom);
+  CMP(p, pos, f.tuning, e.tuning, topSwingGain);
+  CMP(p, pos, f.tuning, e.tuning, topWetDb);
 }
 
 void cmpGate(const std::string& p, float pos, const cv::GateParams& f, const cv::GateParams& e, bool rest) {

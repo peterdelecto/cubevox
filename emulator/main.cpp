@@ -399,7 +399,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   std::snprintf(
       gTuningText + prefix, sizeof(gTuningText) - static_cast<size_t>(prefix),
       "OctaveTuning{%.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
-      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.1ff}\n"
+      "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.1ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, %.2ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff}\n"
@@ -409,7 +409,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       "// PolishParams: hpHz %.0f, dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB, air %.1f dB",
       o.levelDb, o.glideMs, o.grainWindowMs, o.grainCount, o.trimDb,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
-      t.swingMaxMs, t.wetMaxDb, t.trimDb,
+      t.swingMaxMs, t.wetMaxDb, t.trimDb, t.topFrom, t.topSwingGain, t.topWetDb,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.topBoostDb, d.topBoostFrom, d.stackBassHz, d.stackBassDb,
       d.stackTrebleHz, d.stackTrebleDb, d.stackLossDb, d.s2HpHz, d.s2LpHz, d.gain2Max,
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneMinDb, d.toneMaxDb, d.bassPeakHz,
@@ -451,7 +451,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "detectorAttackMs, detectorReleaseMs, travelTimes\n"
       "// OctaveTuning: levelDb, glideMs, grainWindowMs, grainCount, trimDb\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
-      "swingMaxMs, wetMaxDb, trimDb\n"
+      "swingMaxMs, wetMaxDb, trimDb, topFrom, topSwingGain, topWetDb\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb, trimDb\n"
       "// DistortionTuning: inputHpHz, s1BassHz, s1BassDb, s1LpHz, gain1Max, topBoostDb, topBoostFrom, stackBassHz, "
       "stackBassDb, stackTrebleHz, stackTrebleDb, stackLossDb, s2HpHz, s2LpHz, gain2Max, "
@@ -560,6 +560,9 @@ void drawUnisonRaw(cv::UnisonTuning& t) {
   }
   if (tuningNode("Shared")) {
     ImGui::SliderFloat("Wet level at depth 1", &t.wetMaxDb, -24.0f, 0.0f, "%.1f dB");
+    ImGui::SliderFloat("Top reach starts", &t.topFrom, 0.0f, 0.95f, "%.2f");
+    ImGui::SliderFloat("Top swing gain at depth 1", &t.topSwingGain, 1.0f, 2.0f, "%.3f x");
+    ImGui::SliderFloat("Top wet boost at depth 1", &t.topWetDb, 0.0f, 6.0f, "%.1f dB");
     ImGui::TreePop();
   }
 }
