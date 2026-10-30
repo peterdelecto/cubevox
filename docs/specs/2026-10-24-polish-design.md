@@ -22,33 +22,42 @@ slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → s
    EQ state stay finite. The output cuts to zero, every engine clears in the silent blocks that
    follow, and the output fades back in; `status` counts it as `nan_blocks`.
 
-## Menu, final order (9 rows, 7 visible, 5x7, no title row, cursor `>` in column 0, 9 px row pitch)
-| Row | Text | Click |
-|---|---|---|
-| 1 | `INPUT: MIC` | cycles MIC / LINE. LINE puts the 25.7 dB pad of relay K103 in circuit (hardware spec row 15) |
-| 2 | `OUTPUT: LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
-| 3 | `TOP SWITCH: MUTE` | cycles MUTE / BYPASS |
-| 4 | `REVERB: SPRING` | cycles SPRING / CHASM (owner 2026-10-30). The value is the reverb card in the layout; a click swaps that slot's card and saves the layout record through the path a layout from the app takes, so the audio fades, resets and comes back. With no reverb card in the layout the row reads NONE and a click does nothing |
-| 5 | `POLISH COMP: ON` | cycles ON / OFF |
-| 6 | `POLISH EQ: ON` | cycles ON / OFF |
-| 7 | `DEBUG: OFF` | cycles OFF / ON (owner 2026-10-30). ON draws the audio load figure on the voice screen, OLED GUI spec, Voice item 9 |
-| 8 | `UPDATE FIRMWARE >` | opens the confirm screen |
-| 9 | `EXIT` | closes the menu |
+## Menu, final order (11 rows, 4 visible, Myrtle 7X12, no title row, 16 px row pitch)
+Owner 2026-10-30, proof A3 of `tools/oled-proof/menu-font-proof-2.png` ("the menu item text is too small", then "these are quite crammed" of the 12 and 13 px pitches): the list draws in the 7X12 font. Each row is a label at the left edge and a value right-aligned to the right edge, no colon. The row's label and value are:
+
+| Row | Label | Value | Click |
+|---|---|---|---|
+| 1 | `INPUT` | `MIC` | cycles MIC / LINE. LINE puts the 25.7 dB pad of relay K103 in circuit (hardware spec row 15) |
+| 2 | `OUTPUT` | `LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
+| 3 | `TOP SWITCH` | `MUTE` | cycles MUTE / BYPASS |
+| 4 | `REVERB` | `SPRING` | cycles SPRING / CHASM (owner 2026-10-30). The value is the reverb card in the layout; a click swaps that slot's card and saves the layout record through the path a layout from the app takes, so the audio fades, resets and comes back. With no reverb card in the layout the row reads NONE and a click does nothing |
+| 5 | `POLISH COMP` | `ON` | cycles ON / OFF |
+| 6 | `POLISH EQ` | `ON` | cycles ON / OFF |
+| 7 | `DEBUG` | `OFF` | cycles OFF / ON (owner 2026-10-30). ON draws the audio load figure on the voice screen, OLED GUI spec, Voice item 9 |
+| 8 | `HPF` | `120 Hz` | cycles OFF, 80 Hz, 100 Hz, 120 Hz, 150 Hz (`2026-10-30-input-conditioning-design.md`); units on the value (owner 2026-10-30) |
+| 9 | `LPF` | `12 kHz` | cycles OFF, 4 kHz, 5 kHz, 6 kHz, 8 kHz, 10 kHz, 12 kHz |
+| 10 | `UPDATE FIRMWARE` | `>` | opens the confirm screen |
+| 11 | `EXIT` | | closes the menu |
 
 The owner's `[A \ B]` notation names the value set. A row shows the current value and a click
-cycles it, because the longest row with both values does not fit 21 columns. The list has no
-CHAIN ORDER row (owner 2026-10-24, no-op for now). `drawChainView` and its proof stay in the
-firmware, and no row opens the view. Turn moves the cursor. Seven rows show at a time; when the
+cycles it. The list has no CHAIN ORDER row (owner 2026-10-24, no-op for now). `drawChainView` and
+its proof stay in the firmware, and no row opens the view. Turn moves the cursor. Four rows show
+at a time, so the list is three pages (owner 2026-10-30, "its ok to have 2 or 3 pages"); when the
 cursor moves past the top or bottom of the window the list scrolls by one row, only as far as the
 cursor needs, and there is no scroll mark. The window starts at row 1 each time the menu opens, and
 a cancelled update confirm returns to the same cursor and window. Every change saves through the
 layout record's existing debounce. Screens are approved per numbered proof, as always.
 
-The list rows sit on a 9 px pitch, so row r spans pixel lines 9r to 9r + 8, because seven rows
-leave breathing room (owner 2026-10-24). The 7 px text starts at y = 9r + 1, which is y = 1, 10,
-19, 28, 37, 46 and 55, so it keeps 1 px clear above and below inside the cursor bar (owner rule
-of 2026-10-12, an inverted row is text height + 2 px). The cursor bar spans the 9 px row. The
-last pixel line stays blank. The confirm, chain, idle and update screens keep the 8 px grid.
+The list rows sit on a 16 px pitch, row r from pixel line 16r. The 12 px text starts at y = 16r + 1,
+which is y = 1, 17, 33 and 49. The label starts at x = 1 and the value ends at x = 126, measured in
+the font's own widths at its 2 px ink gap (a long card name in the readout title bar uses the same
+font). The cursor row is inverted full width over 14 px, from 16r to 16r + 13, so it keeps 1 px
+clear above and below the ink (owner rule of 2026-10-12) and leaves 2 px of dark between one bar
+and the next row's; there is no `>` in front of the cursor item. Every full label fits beside its
+widest value with 7 px to spare on the tightest row (TOP SWITCH BYPASS). The 7X12 font gains three
+glyphs for the list, `>`, `k` and `z`, drafted for the owner to refine in the font editor as the
+flat sign was; nothing else in the font changes. The confirm, chain, idle and update screens keep
+the 5x7 font on the 8 px grid.
 
 ## POLISH COMP, a gentle live vocal compressor
 Feed-forward, mono, no lookahead, log-domain gain computer, in `engine/polish_comp.h`.
