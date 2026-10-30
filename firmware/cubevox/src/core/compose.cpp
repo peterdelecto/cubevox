@@ -14,14 +14,17 @@ float topPosition(Card c, int knob) {
 }
 
 void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, int slot,
-               ChainParams& out) {
+               ChainSnapshot& snap) {
   const Card c = layout.card[slot];
+  ChainParams& out = snap.params;
   applyPlacement(c, out);
   for (int k = 0; k < kKnobsPerCard; ++k) {
     applyKnob(c, k, bench.knobsPinned ? topPosition(c, k) : panel.knob[slot][k], out);
   }
   const bool forcedOff = (bench.slotsOff >> slot) & 1u;
-  applyToggle(c, panel.toggle[slot] && !forcedOff, out);
+  const bool on = panel.toggle[slot] && !forcedOff;
+  applyToggle(c, on, out);
+  snap.slotOn[static_cast<size_t>(slot)] = on;
 }
 
 }  // namespace
@@ -30,7 +33,7 @@ ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, c
                               const BenchOverrides& bench) {
   ChainSnapshot snap;
   snap.layout = layout;
-  for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, s, snap.params);
+  for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, s, snap);
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
   snap.params.conditioning.set(settings.hpf, settings.lpf);
   snap.params.comp.on = settings.polishComp;

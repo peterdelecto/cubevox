@@ -112,6 +112,7 @@ void replyStatus(uint32_t id) {
   status.cpuMeanPercent = load.meanPercent;
   status.cpuWorstPercent = load.worstPercent;
   status.late = load.late;
+  status.dryBlocks = load.dryBlocks;
   status.muted = muteActive();
   status.seq = recordSequence();
   status.recordErrors = recordErrors();
@@ -240,7 +241,7 @@ void setup() {
   inputInit();
 
   gAudioRunning = audioInit();
-  if (gAudioRunning) muteClocksRunning(millis());
+  if (gAudioRunning) muteClocksRunning();
   faultWatchdogStart();  // every init is behind us; from here loop() must keep running
   bootHealthInit();  // after the watchdog: a start only counts as healthy with both running
   diagInit();  // after recordBoot (ECC recovery) and bootHealthInit (failed starts, bootloader reason)

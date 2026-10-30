@@ -390,41 +390,97 @@ MuteOutputs runMute(MuteSequence& m, uint32_t from, uint32_t to, bool released) 
   return out;
 }
 
+// Brings a sequence through the power-on release: clocks at 100 ms, the relay closing at
+// kRelayCloseAfterPowerOnMs, Unmuted kRelaySettleMs later. Returns the time it reached Unmuted.
+uint32_t powerOnRelease(MuteSequence& m) {
+  m.reset(true, 0);
+  m.clocksRunning();
+  const uint32_t unmutedAt = kRelayCloseAfterPowerOnMs + kRelaySettleMs;
+  runMute(m, 0, unmutedAt, true);
+  return unmutedAt;
+}
+
+// The power-on release: XSMT rises as soon as the clocks run, into the open relay with the output
+// held at zero, MUTE_N rises no earlier than 6.0 s after reset, the relay settles, and then the hold
+// lifts so the output fades up.
 void checkMuteSequence() {
   MuteSequence m;
   m.reset(true, 0);
-  MuteOutputs out = runMute(m, 0, kBootUnmuteDelayMs - 1, true);
-  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: stays muted before the clocks run");
-  m.clocksRunning(100);
-  out = runMute(m, 100, 100 + kBootUnmuteDelayMs - 1, true);
-  check(!out.xsmtHigh && !out.muteNHigh, "mute: boot delay holds the output muted");
+  MuteOutputs out = runMute(m, 0, 99, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted() && m.outputHeld(), "mute: stays muted before the clocks run");
+  m.clocksRunning();
+  out = m.update(100, true);
+  check(out.xsmtHigh && !out.muteNHigh && !m.fullyMuted() && m.outputHeld(),
+        "mute: XSMT rises as soon as the clocks run, with MUTE_N low and the output held at zero");
+  out = runMute(m, 101, kRelayCloseAfterPowerOnMs - 1, true);
+  check(out.xsmtHigh && !out.muteNHigh && m.outputHeld(), "mute: MUTE_N waits for 6.0 s after reset");
+  out = m.update(kRelayCloseAfterPowerOnMs, true);
+  check(out.xsmtHigh && out.muteNHigh && m.active() && m.outputHeld(),
+        "mute: MUTE_N rises at 6.0 s and the output is still held");
+  out = runMute(m, kRelayCloseAfterPowerOnMs + 1, kRelayCloseAfterPowerOnMs + kRelaySettleMs - 1, true);
+  check(out.xsmtHigh && out.muteNHigh && m.outputHeld(), "mute: the output stays held while the relay settles");
+  out = m.update(kRelayCloseAfterPowerOnMs + kRelaySettleMs, true);
+  check(out.xsmtHigh && out.muteNHigh && !m.active() && !m.outputHeld(),
+        "mute: after the settle the sequence is unmuted and the hold lifts for the fade up");
 
-  uint32_t t = 100 + kBootUnmuteDelayMs;
-  out = m.update(t, true);
-  check(out.muteNHigh && !out.xsmtHigh && !m.fullyMuted(), "mute: release raises MUTE_N first");
-  out = runMute(m, t + 1, t + kRelaySettleMs - 1, true);
-  check(out.muteNHigh && !out.xsmtHigh, "mute: XSMT waits for the relay to settle");
-  out = m.update(t + kRelaySettleMs, true);
-  check(out.muteNHigh && out.xsmtHigh && !m.active(), "mute: XSMT rises after the settle");
-
-  t += kRelaySettleMs + 100;
+  // The mute order is unchanged: XSMT falls, 5 ms, MUTE_N falls. The hold stays down until fully muted.
+  uint32_t t = kRelayCloseAfterPowerOnMs + kRelaySettleMs + 100;
   runMute(m, t, t + kSwitchDebounceMs - 1, false);
   out = m.update(t + kSwitchDebounceMs, false);
-  check(!out.xsmtHigh && out.muteNHigh, "mute: XSMT falls first, MUTE_N still high");
+  check(!out.xsmtHigh && out.muteNHigh && !m.outputHeld(), "mute: XSMT falls first, MUTE_N still high");
   out = runMute(m, t + kSwitchDebounceMs + 1, t + kSwitchDebounceMs + kXsmtLeadMs - 1, false);
-  check(!out.xsmtHigh && out.muteNHigh && !m.fullyMuted(), "mute: MUTE_N waits out the XSMT lead");
+  check(!out.xsmtHigh && out.muteNHigh && !m.fullyMuted() && !m.outputHeld(), "mute: MUTE_N waits out the XSMT lead");
   out = m.update(t + kSwitchDebounceMs + kXsmtLeadMs, false);
-  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: MUTE_N falls after the lead");
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted() && m.outputHeld(),
+        "mute: MUTE_N falls after the lead and the output is held at zero");
+
+  // A later release has the same order without the 6 s wait: XSMT, 5 ms, MUTE_N, 20 ms, hold lifts.
+  t += 1000;
+  m.update(t, true);
+  runMute(m, t + 1, t + kSwitchDebounceMs - 1, true);
+  out = m.update(t + kSwitchDebounceMs, true);
+  check(out.xsmtHigh && !out.muteNHigh && m.outputHeld(), "mute: a later release raises XSMT first");
+  const uint32_t xsmtAt = t + kSwitchDebounceMs;
+  out = runMute(m, xsmtAt + 1, xsmtAt + kXsmtLeadMs - 1, true);
+  check(out.xsmtHigh && !out.muteNHigh, "mute: a later release waits only the XSMT lead, not 6 s");
+  out = m.update(xsmtAt + kXsmtLeadMs, true);
+  check(out.xsmtHigh && out.muteNHigh && m.outputHeld(), "mute: a later release raises MUTE_N after the lead");
+  out = runMute(m, xsmtAt + kXsmtLeadMs + 1, xsmtAt + kXsmtLeadMs + kRelaySettleMs - 1, true);
+  check(m.outputHeld(), "mute: a later release holds the output through the relay settle");
+  out = m.update(xsmtAt + kXsmtLeadMs + kRelaySettleMs, true);
+  check(!m.active() && !m.outputHeld(), "mute: a later release lifts the hold after the relay settle");
+}
+
+// A switch held muted at power-on and released at 2 s still waits for 6.0 s, and clocks that start
+// after 6.0 s release at once.
+void checkMutePowerOnWait() {
+  MuteSequence early;
+  early.reset(false, 0);
+  early.clocksRunning();
+  runMute(early, 0, 1999, false);
+  MuteOutputs out = runMute(early, 2000, 2000 + kSwitchDebounceMs, true);
+  check(out.xsmtHigh && !out.muteNHigh, "mute: a switch released at 2 s raises XSMT and keeps MUTE_N low");
+  out = runMute(early, 2000 + kSwitchDebounceMs + 1, kRelayCloseAfterPowerOnMs - 1, true);
+  check(out.xsmtHigh && !out.muteNHigh, "mute: the relay still waits for 6.0 s after reset");
+  out = early.update(kRelayCloseAfterPowerOnMs, true);
+  check(out.xsmtHigh && out.muteNHigh, "mute: MUTE_N rises at 6.0 s");
+
+  MuteSequence late;
+  late.reset(true, 0);
+  runMute(late, 0, 7999, true);
+  late.clocksRunning();
+  out = late.update(8000, true);
+  check(out.xsmtHigh && !out.muteNHigh, "mute: clocks starting after 6.0 s raise XSMT at once");
+  out = late.update(8000 + kXsmtLeadMs, true);
+  check(out.xsmtHigh && out.muteNHigh, "mute: and MUTE_N follows after the XSMT lead");
 }
 
 void checkMuteLatchAndHold() {
   MuteSequence m;
-  m.reset(true, 0);
-  m.clocksRunning(0);
-  runMute(m, 0, kBootUnmuteDelayMs + kRelaySettleMs + 1, true);
-  check(!m.active(), "mute: unmuted after the boot delay and settle");
+  uint32_t t = powerOnRelease(m);
+  check(!m.active(), "mute: unmuted after the power-on release");
 
-  uint32_t t = 1000;
+  t += 1000;
   m.hold(true);
   MuteOutputs out = runMute(m, t, t + kXsmtLeadMs, true);
   check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: a hold mutes through the sequence");
@@ -433,8 +489,8 @@ void checkMuteLatchAndHold() {
   check(!out.xsmtHigh && !out.muteNHigh, "mute: the output stays muted while held");
   m.hold(false);
   t += 100;
-  out = runMute(m, t, t + kRelaySettleMs + 1, true);
-  check(out.xsmtHigh && out.muteNHigh, "mute: releasing the hold runs the release sequence");
+  out = runMute(m, t, t + kXsmtLeadMs + kRelaySettleMs + 1, true);
+  check(out.xsmtHigh && out.muteNHigh && !m.active(), "mute: releasing the hold runs the release sequence");
 
   t += 100;
   m.latch();
@@ -444,62 +500,85 @@ void checkMuteLatchAndHold() {
   check(!out.xsmtHigh && !out.muteNHigh, "mute: a latch ignores a released switch");
 }
 
+// Muted again while XSMT is up and the relay still open: XSMT drops, MUTE_N never rose.
 void checkMuteMidRelease() {
   MuteSequence mid;
   mid.reset(true, 0);
-  mid.clocksRunning(0);
-  runMute(mid, 0, kBootUnmuteDelayMs, true);
+  mid.clocksRunning();
+  runMute(mid, 0, 500, true);
   mid.hold(true);
-  MuteOutputs out = mid.update(kBootUnmuteDelayMs + 1, true);
-  check(!out.xsmtHigh && out.muteNHigh, "mute: muted again mid-release keeps XSMT low");
-  out = runMute(mid, kBootUnmuteDelayMs + 2, kBootUnmuteDelayMs + kXsmtLeadMs + 2, true);
-  check(!out.muteNHigh && mid.fullyMuted(), "mute: a mid-release mute ends fully muted");
+  MuteOutputs out = mid.update(501, true);
+  check(!out.xsmtHigh && !out.muteNHigh && mid.fullyMuted() && mid.outputHeld(),
+        "mute: muted again before the relay closes drops XSMT and keeps MUTE_N low");
+
+  // Muted again after MUTE_N rose: XSMT drops first, MUTE_N follows after the lead, and the output
+  // stays held through it.
+  MuteSequence closing;
+  closing.reset(true, 0);
+  closing.clocksRunning();
+  runMute(closing, 0, kRelayCloseAfterPowerOnMs + 1, true);
+  closing.hold(true);
+  const uint32_t t = kRelayCloseAfterPowerOnMs + 2;
+  out = closing.update(t, true);
+  check(!out.xsmtHigh && out.muteNHigh && closing.outputHeld(), "mute: muted again mid-release keeps XSMT low");
+  out = runMute(closing, t + 1, t + kXsmtLeadMs, true);
+  check(!out.muteNHigh && closing.fullyMuted() && closing.outputHeld(), "mute: a mid-release mute ends fully muted");
 }
 
-// reset() returns to the fully muted start: no latch, hold or running clocks survive it.
+// reset() returns to the fully muted start: no latch, hold or running clocks survive it, and the
+// power-on wait counts from the reset.
 void checkMuteReset() {
   MuteSequence m;
   m.reset(true, 0);
-  m.clocksRunning(0);
+  m.clocksRunning();
   m.latch();
   m.hold(true);
   m.reset(true, 5000);
-  const MuteOutputs out = runMute(m, 5000, 5000 + 2 * kBootUnmuteDelayMs, true);
-  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute: reset waits for the clocks again");
-  m.clocksRunning(20000);
-  runMute(m, 20000, 20000 + kBootUnmuteDelayMs + kRelaySettleMs + 1, true);
+  const MuteOutputs out = runMute(m, 5000, 20000, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted() && m.outputHeld(), "mute: reset waits for the clocks again");
+  m.clocksRunning();
+  runMute(m, 20001, 20001 + kXsmtLeadMs + kRelaySettleMs + 1, true);
   check(!m.active(), "mute: after reset a released switch and running clocks unmute");
+
+  MuteSequence fresh;
+  fresh.reset(true, 5000);
+  fresh.clocksRunning();
+  const MuteOutputs wait = runMute(fresh, 5000, 5000 + kRelayCloseAfterPowerOnMs - 1, true);
+  check(wait.xsmtHigh && !wait.muteNHigh, "mute: the power-on wait counts from the reset");
 }
 
 // An interrupt has already pulled both pins low. The sequence counts as muted at once, holds there
 // while the trip lasts, and then releases in the usual order.
 void checkMuteTrip() {
   MuteSequence m;
-  m.reset(true, 0);
-  m.clocksRunning(0);
-  runMute(m, 0, kBootUnmuteDelayMs + kRelaySettleMs + 1, true);
+  powerOnRelease(m);
   m.trip(true);
-  MuteOutputs out = m.update(1000, true);
-  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute trip: both pins low and fully muted at once");
-  out = runMute(m, 1001, 1500, true);
-  check(!out.xsmtHigh && !out.muteNHigh && m.active(), "mute trip: holds while the trip lasts");
+  const uint32_t t = kRelayCloseAfterPowerOnMs + 1000;
+  MuteOutputs out = m.update(t, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted() && m.outputHeld(),
+        "mute trip: both pins low, fully muted and the output held at once");
+  out = runMute(m, t + 1, t + 500, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.active() && m.outputHeld(), "mute trip: holds while the trip lasts");
   m.trip(false);
-  out = m.update(1501, true);
-  check(out.muteNHigh && !out.xsmtHigh, "mute trip: the release raises MUTE_N first");
-  out = runMute(m, 1502, 1501 + kRelaySettleMs, true);
-  check(out.muteNHigh && out.xsmtHigh && !m.active(), "mute trip: XSMT follows after the settle");
+  out = m.update(t + 501, true);
+  check(out.xsmtHigh && !out.muteNHigh && m.outputHeld(), "mute trip: the release raises XSMT first");
+  out = runMute(m, t + 502, t + 501 + kXsmtLeadMs, true);
+  check(out.muteNHigh && out.xsmtHigh && m.outputHeld(), "mute trip: MUTE_N follows after the lead");
+  out = runMute(m, t + 502 + kXsmtLeadMs, t + 501 + kXsmtLeadMs + kRelaySettleMs, true);
+  check(out.muteNHigh && out.xsmtHigh && !m.active() && !m.outputHeld(), "mute trip: the hold lifts after the settle");
 
-  // Mid-release the trip still wins at once, and a stream restart re-arms the settle delay.
+  // Mid-release the trip still wins at once, and a restart's release runs in the usual order.
+  const uint32_t u = t + 2000;
   m.hold(true);
-  m.update(2000, true);
+  m.update(u, true);
   m.hold(false);
   m.trip(true);
-  out = m.update(2001, true);
-  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted(), "mute trip: a trip mid-mute drops both pins");
-  m.clocksRunning(2100);
+  out = m.update(u + 1, true);
+  check(!out.xsmtHigh && !out.muteNHigh && m.fullyMuted() && m.outputHeld(), "mute trip: a trip mid-mute drops both pins");
+  m.clocksRunning();
   m.trip(false);
-  out = runMute(m, 2100, 2100 + kBootUnmuteDelayMs - 1, true);
-  check(!out.muteNHigh && !out.xsmtHigh, "mute trip: a restart waits out the DAC settle again");
+  out = m.update(u + 2, true);
+  check(out.xsmtHigh && !out.muteNHigh && m.outputHeld(), "mute trip: a restart raises XSMT into the open relay");
 }
 
 void checkPowerFailCounts() {
@@ -551,6 +630,7 @@ void checkInputLogic() {
   checkJackSwitch();
   checkJackRequestWithdrawn();
   checkMuteSequence();
+  checkMutePowerOnWait();
   checkMuteLatchAndHold();
   checkMuteMidRelease();
   checkMuteReset();

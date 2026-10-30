@@ -42,6 +42,31 @@ struct OnePole {
   void clear() { y = 0.0f; }
 };
 
+// Corner of the DC blocker on an engine's wet path.
+constexpr float kWetDcBlockHz = 5.0f;
+
+// Coefficient of a one-pole high-pass with its corner at hz, from the series of 1 - exp(-x). It
+// lands within float rounding (1e-7 relative) of the exact value below 100 Hz. Unlike onePoleCoef it
+// does not clamp the corner to kFilterMinHz, so it can sit below that.
+constexpr float dcBlockCoef(float hz) {
+  const float x = kTwoPi * hz / kSampleRate;
+  return x * (1.0f - x * (0.5f - x * (1.0f / 6.0f)));
+}
+
+// One-pole high-pass at kWetDcBlockHz. It removes the DC an engine's wet path can carry, so the
+// stages after it do not pump on it. The state starts at zero and settles to the input's mean.
+struct DcBlocker {
+  float a = dcBlockCoef(kWetDcBlockHz);
+  float y = 0.0f;
+
+  CV_INLINE float run(float x) {
+    y += a * (x - y);
+    return x - y;
+  }
+
+  void clear() { y = 0.0f; }
+};
+
 // RBJ cookbook biquad in transposed direct form II. Shelves use slope S = 1.
 struct Biquad {
   float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;

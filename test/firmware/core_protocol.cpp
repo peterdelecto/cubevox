@@ -374,12 +374,21 @@ void checkStatusReply() {
   s.strayBytes = 8;
   protocol::replyStatus(w, 15, s);
   check(JsonReader(w.out).valid() &&
-            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"muted\":true,\"seq\":9,"
+            w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"dry_blocks\":0,\"muted\":true,\"seq\":9,"
                      "\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,"
                      "\"overruns\":0,\"sai_errors\":0,\"restarts\":0,\"nan_blocks\":0,"
                      "\"power_trips\":0,\"stalled\":false,\"audio_latched\":false,\"reply_overflows\":0,"
                      "\"floor_dbfs\":-120,\"update_reason\":\"none\"}\n",
         "proto: status reply");
+
+  w = StringWriter();
+  s.late = 3;
+  s.dryBlocks = 2;
+  protocol::replyStatus(w, 20, s);
+  check(JsonReader(w.out).valid() && has(w.out, "\"late\":3,\"dry_blocks\":2,\"muted\":true,"),
+        "proto: status carries the dry blocks beside the late ones");
+  s.late = 0;
+  s.dryBlocks = 0;
 
   w = StringWriter();
   s.floorDbfs = -62.374f;

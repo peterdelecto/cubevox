@@ -37,6 +37,8 @@ void benchReportStats() {
   serialOut().print(s.late);
   serialOut().print(" overruns ");
   serialOut().print(s.overruns);
+  serialOut().print(" dry ");
+  serialOut().print(s.dryBlocks);
   serialOut().print(" avg ");
   serialOut().print(s.avgCycles);
   serialOut().print(" worst ");

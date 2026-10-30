@@ -2,27 +2,18 @@
 
 void MuteSequence::reset(bool switchReleased, uint32_t nowMs) {
   switch_.reset(switchReleased);
+  resetMs_ = nowMs;
   clocksRunning_ = false;
-  clocksSinceMs_ = 0;
   latched_ = false;
   held_ = false;
   tripped_ = false;
   enter(State::Muted, nowMs);
 }
 
-void MuteSequence::clocksRunning(uint32_t nowMs) {
-  clocksRunning_ = true;
-  clocksSinceMs_ = nowMs;
-}
-
-bool MuteSequence::unmuteWanted(uint32_t nowMs) const {
-  const bool clocksReady = clocksRunning_ && nowMs - clocksSinceMs_ >= kBootUnmuteDelayMs;
-  return switch_.level() && clocksReady && !latched_ && !held_;
-}
-
 MuteOutputs MuteSequence::outputs() const {
   switch (state_) {
-    case State::Releasing: return {false, true};
+    case State::Unmuting: return {true, false};
+    case State::Releasing: return {true, true};
     case State::Unmuted: return {true, true};
     case State::Muting: return {false, true};
     case State::Muted: break;
@@ -40,11 +31,18 @@ MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
 
   switch (state_) {
     case State::Muted:
-      if (unmuteWanted(nowMs)) enter(State::Releasing, nowMs);
+      if (unmuteWanted()) enter(State::Unmuting, nowMs);
+      break;
+    case State::Unmuting:
+      if (muteWanted()) {
+        enter(State::Muted, nowMs);  // MUTE_N is still low, so dropping XSMT again is silent
+      } else if (elapsed >= kXsmtLeadMs && relayMayClose(nowMs)) {
+        enter(State::Releasing, nowMs);
+      }
       break;
     case State::Releasing:
       if (muteWanted()) {
-        enter(State::Muting, nowMs);  // muted again mid-release: XSMT is still low
+        enter(State::Muting, nowMs);  // muted again mid-release: XSMT drops, then MUTE_N
       } else if (elapsed >= kRelaySettleMs) {
         enter(State::Unmuted, nowMs);
       }

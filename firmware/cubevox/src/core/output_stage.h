@@ -5,6 +5,20 @@
 
 #include <stdint.h>
 
+#include "engine/soft_ceiling.h"
+
+// Limits to full scale. NaN fails both comparisons and maps to 0, which keeps the int32 cast defined.
+inline float clampSample(float v) {
+  if (v > 1.0f) return 1.0f;
+  if (v < -1.0f) return -1.0f;
+  return __builtin_isnan(v) ? 0.0f : v;
+}
+
+// One output sample. The soft ceiling shapes the full-scale signal first and `gain` (the output trim
+// times the layout fade) scales the result, so a clipped chain keeps its shaped peak at any trim.
+// The clamp comes last. At a gain of exactly 1 the result is the ceiling's alone.
+inline float shapeOutput(float x, float gain) { return clampSample(cv::softCeiling(x) * gain); }
+
 // Zeroes the block and returns false when any sample is a NaN or an infinity, so nothing after it
 // sees one. One running sum covers the block, because a NaN or an infinity in any sample makes the
 // sum non-finite and chain samples stay far below the float range. Reads the sum's exponent bits,

@@ -11,7 +11,8 @@
 
 // Octave: one voice a fixed number of semitones from the input, by an asynchronous granular
 // shifter. Its taps ride a shared sawtooth over a fixed window and are Hann-crossfaded, so no pitch
-// tracker is involved and the formants move with the pitch. PitchFx owns the ring and the mix.
+// tracker is involved and the formants move with the pitch. PitchFx owns the ring and the mix. The
+// voice's output passes a 5 Hz DC blocker before the mix, so the dry path is untouched.
 
 namespace cv {
 
@@ -48,6 +49,7 @@ class OctaveVoice {
     ratioSemis_ = 0.0f;
     windowSmp_ = OctaveTuning{}.grainWindowMs * kSmpPerMs;
     grains_ = OctaveTuning{}.grainCount;
+    dc_.clear();
     fresh_ = true;
   }
 
@@ -71,12 +73,16 @@ class OctaveVoice {
     return on;
   }
 
-  // One sample of the voice, gain and glide applied. A tap at ratio r drifts (1 - r) samples of
-  // delay per sample; the sawtooth is that drift normalised to the window.
+  // One sample of the voice, gain and glide applied, then a DC blocker at kWetDcBlockHz. A tap at
+  // ratio r drifts (1 - r) samples of delay per sample; the sawtooth is that drift normalised to
+  // the window. A silent voice (gain 0) clears the blocker, so it returns exactly 0.
   float tick(const VoiceRing& ring, long writeCount) {
     gain_ = smooth::step(gain_, gainT_, smooth::kSmoothCoef);
     semis_ = smooth::step(semis_, semisT_, aGlide_);
-    if (gain_ == 0.0f) return 0.0f;
+    if (gain_ == 0.0f) {
+      dc_.clear();
+      return 0.0f;
+    }
     updateRatio();
     const int head = static_cast<int>(writeCount);
     const float d0 = 0.5f * windowSmp_ + kMinDelay;
@@ -90,7 +96,7 @@ class OctaveVoice {
       sum += g * readCubic(ring, head, d0 + windowSmp_ * (p - 0.5f));
     }
     phase_ = frac(phase_ + (1.0f - ratio_) / windowSmp_);
-    return gain_ * sum * 2.0f * inv;
+    return dc_.run(gain_ * sum * 2.0f * inv);
   }
 
  private:
@@ -137,6 +143,7 @@ class OctaveVoice {
   float windowSmp_ = 1920.0f;
   int grains_ = 2;
   std::array<HannRotor, kMaxGrains> window_{};
+  DcBlocker dc_;
   bool fresh_ = true;
 };
 

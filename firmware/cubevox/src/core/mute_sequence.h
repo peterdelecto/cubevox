@@ -1,6 +1,9 @@
 // Output mute sequencing, pure. MUTE_SW (low = muted) drives the DAC soft mute (XSMT) and the
-// output relay (MUTE_N). Mute order is XSMT low, wait, MUTE_N low. Release order is MUTE_N high,
-// wait, XSMT high. The chain keeps running while muted. Timing constants live in core/timing.h.
+// output relay (MUTE_N). Mute order is XSMT low, wait, MUTE_N low. Release order is XSMT high with
+// the output held at digital zero, wait, MUTE_N high, wait for the relay, then the output fades up.
+// The DAC therefore unmutes into an open relay and the contacts close on silence. The first release
+// after power-on also waits until kRelayCloseAfterPowerOnMs after reset() before MUTE_N rises.
+// The chain keeps running while muted. Timing constants live in core/timing.h.
 
 #pragma once
 
@@ -17,12 +20,12 @@ struct MuteOutputs {
 
 class MuteSequence {
  public:
-  // Starts fully muted with no latch, hold or running clocks. `switchReleased` is the raw MUTE_SW
-  // level (high = not muted).
+  // Starts fully muted with no latch, hold or running clocks, and counts the power-on wait from
+  // `nowMs`. `switchReleased` is the raw MUTE_SW level (high = not muted).
   void reset(bool switchReleased, uint32_t nowMs);
 
-  // The box stays muted until kBootUnmuteDelayMs after the SAI clocks started.
-  void clocksRunning(uint32_t nowMs);
+  // The SAI clocks run. XSMT may rise from here, into the open relay.
+  void clocksRunning() { clocksRunning_ = true; }
 
   // Mutes and ignores MUTE_SW until reset.
   void latch() { latched_ = true; }
@@ -44,28 +47,39 @@ class MuteSequence {
   // after this, and XSMT keeps the output silent meanwhile.
   bool fullyMuted() const { return state_ == State::Muted; }
 
+  // True while the audio output must sit at digital zero: from the fully muted state until the relay
+  // has closed on a release. It stays up through a mute that cuts a release short, and it comes down
+  // when the sequence reaches Unmuted, where the output fades up. A mute from Unmuted leaves it down
+  // until the sequence is fully muted again.
+  bool outputHeld() const { return outputHeld_; }
+
  private:
   enum class State : uint8_t {
     Muted,      // XSMT low, MUTE_N low
-    Releasing,  // MUTE_N high, waiting for the relay before XSMT goes high
+    Unmuting,   // XSMT high, MUTE_N low: the DAC unmutes into the open relay
+    Releasing,  // XSMT high, MUTE_N high: the relay closes
     Unmuted,    // both high
-    Muting,     // XSMT low, waiting before MUTE_N goes low
+    Muting,     // XSMT low, MUTE_N high: waiting before MUTE_N goes low
   };
 
   void enter(State next, uint32_t nowMs) {
     state_ = next;
     sinceMs_ = nowMs;
+    if (next == State::Unmuted) outputHeld_ = false;
+    if (next == State::Muted || next == State::Unmuting) outputHeld_ = true;
   }
-  bool unmuteWanted(uint32_t nowMs) const;
+  bool unmuteWanted() const { return switch_.level() && clocksRunning_ && !latched_ && !held_; }
   bool muteWanted() const { return !switch_.level() || latched_ || held_; }
+  bool relayMayClose(uint32_t nowMs) const { return nowMs - resetMs_ >= kRelayCloseAfterPowerOnMs; }
   MuteOutputs outputs() const;
 
   State state_ = State::Muted;
   uint32_t sinceMs_ = 0;
+  uint32_t resetMs_ = 0;
   DebouncedInput switch_;
   bool clocksRunning_ = false;
-  uint32_t clocksSinceMs_ = 0;
   bool latched_ = false;
   bool held_ = false;
   bool tripped_ = false;
+  bool outputHeld_ = true;
 };

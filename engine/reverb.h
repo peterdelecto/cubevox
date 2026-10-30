@@ -12,6 +12,8 @@
 // Reverb block: Spring or Chasm behind one on/off smoother.
 // The selected engine runs; the engine left behind is cleared on a switch.
 // While settled off, neither engine runs and the block is a bit-exact copy.
+// The engine's wet output passes a 5 Hz DC blocker (kWetDcBlockHz) before the mix, so the dry path
+// is untouched and MIX 0 stays a bit-exact copy.
 // Each engine keeps its own wetDb, a level trim. The crossfade runs equal-power
 // from dry (0) to wet only (1), smoothed over 20 ms; its gains are evaluated at
 // the block edges and interpolated between.
@@ -57,6 +59,7 @@ class Reverb {
   void reset() {
     chasm_.reset();
     spring_.reset();
+    dc_.clear();
     active_ = 0.0f;
     wet_ = 0.0f;
     gains_ = gainsAt(0.0f);
@@ -114,6 +117,7 @@ class Reverb {
     } else {
       spring_.process(in, scratch_.data(), n, p.spring);
     }
+    for (int i = 0; i < n; ++i) scratch_[static_cast<size_t>(i)] = dc_.run(scratch_[static_cast<size_t>(i)]);
     mixBlock(in, out, n, target, wetTarget);
   }
 
@@ -139,10 +143,12 @@ class Reverb {
       chasm_.reset();
     else
       spring_.reset();
+    dc_.clear();
   }
 
   Chasm chasm_;
   Spring spring_;
+  DcBlocker dc_;                         // high-pass on the engine's wet output, ahead of the mix
   std::array<float, kBlock> scratch_{};  // the engine's wet output
   float active_ = 0.0f;
   float wet_ = 0.0f;  // smoothed crossfade

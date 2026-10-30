@@ -122,6 +122,7 @@ endfunction()
 
 cubevox_engine_test(unison ${CUBEVOX_CORE_DIR}/unison_rate.cpp)
 cubevox_engine_test(reverb_clean)
+cubevox_engine_test(dsp)
 cubevox_engine_test(octave)
 cubevox_engine_test(autotune)
 cubevox_engine_test(pitch)

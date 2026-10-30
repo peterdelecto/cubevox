@@ -146,7 +146,8 @@ and dissolves between them).
    queue), `boot_report` (the report a terminal gets on open).
 6. Safety and storage: `fault` (watchdog, fault handlers, reset cause, clock failure record, audio stall and
    transfer error watch), `power_sense` (VA_SENSE on ADC1: its analog watchdog interrupt mutes at once when 5VA
-   falls under the trip level, and the poll releases the mute once the rail holds), `flash_bank2` (bank 2 erase
+   falls under the trip level, the programmable voltage detector on VDD at 2.85 V does the same from its own
+   interrupt and opens MUTE_N first, and the poll releases the mute once the rail holds), `flash_bank2` (bank 2 erase
    and flash-word program by register, non-blocking erase),
    `record_service` (store wiring: boot load, the ECC recovery that carries the newest intact record out of a
    faulted sector, save requests and the debounce skip), `diag_service` (the diagnostic log in bank 2 sector 2:
@@ -252,7 +253,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   same pass re-seeds every knob whose step count changed, then publishes. The audio block fades the output out over
   50 ms, swaps the snapshot at zero, resets the engines whose slot changed card, and fades back in. The layout name
   is 1 to 31 printable ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own
-  window; the bench peaks are untouched), cumulative `late`, `muted`, the record `seq` and `rec_errors`,
+  window; the bench peaks are untouched), cumulative `late` and `dry_blocks` (the blocks that skipped the chain and
+  passed the dry input after a late one), `muted`, the record `seq` and `rec_errors`,
   `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the audio counters `overruns`, `sai_errors`,
   `restarts` and `nan_blocks`, and `power_trips`, `stalled`, `audio_latched` and `reply_overflows`. All output
   (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue (`core/tx_queue`) that

@@ -23,6 +23,7 @@ constexpr int kStatBuckets = kSlotCount + 3;
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed
   uint32_t late = 0;          // blocks past the budget, or written after the DMA began reading their half
+  uint32_t dryBlocks = 0;     // blocks that skipped the chain and passed the dry input after a late one
   uint32_t overruns = 0;      // blocks that were not even started before the next one arrived
   uint32_t maxCycles = 0;     // worst block time in CPU cycles
   uint32_t avgCycles = 0;     // mean block time since the last peaks reset
@@ -73,11 +74,12 @@ AudioHealth audioHealth();
 void audioPublish(const ChainSnapshot& snapshot);
 
 // CPU load over the blocks since the previous call (or since boot), as percent of the block budget,
-// and the cumulative late-block count. Resets the window; call from the main loop.
+// and the cumulative late-block and dry-block counts. Resets the window; call from the main loop.
 struct AudioLoad {
   float meanPercent = 0.0f;
   float worstPercent = 0.0f;
   uint32_t late = 0;
+  uint32_t dryBlocks = 0;
 };
 AudioLoad audioTakeLoad();
 

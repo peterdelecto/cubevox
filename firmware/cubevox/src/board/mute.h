@@ -10,9 +10,15 @@
 // Drives MUTE_N and XSMT low. Call first in setup(), before anything that takes time.
 void muteInit();
 
-// Tells the mute logic when the SAI clocks started. The box stays muted until
-// kBootUnmuteDelayMs after this, even if MUTE_SW is released.
-void muteClocksRunning(uint32_t nowMs);
+// Tells the mute logic the SAI clocks run. The box stays muted until then, even if MUTE_SW is
+// released. XSMT rises as soon as it can, into the open relay. The first release after power-on
+// closes the relay no earlier than kRelayCloseAfterPowerOnMs after muteInit().
+void muteClocksRunning();
+
+// True while the audio output must sit at digital zero: from the fully muted state until the relay
+// has closed on a release (core/mute_sequence). The audio interrupt reads it once per block and
+// holds the layout fade at zero, then fades up when it clears.
+bool muteOutputHeld();
 
 // Call every loop pass. Reads MUTE_SW, steps the sequence and drives the pins. With TOP SWITCH
 // MUTE the switch runs the mute sequence. With BYPASS the sequence ignores the switch and

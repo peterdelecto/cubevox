@@ -1,7 +1,9 @@
 // Power-fail mute (hardware spec F2 and F3). ADC1 converts VA_SENSE without pause, and its analog
 // watchdog interrupt drops XSMT and MUTE_N by register the moment 5VA falls under the trip level,
-// whatever loop() is doing. The release waits in loop() for the rail to hold (core/power_fail).
-// ADC1 and ADC2 share a reset and a clock, so nothing else may use either of them.
+// whatever loop() is doing. The programmable voltage detector on VDD (2.85 V, the highest internal
+// step) does the same from its own interrupt, ahead of the DMA and the audio block, and opens MUTE_N
+// first. The release waits in loop() for the rail to hold (core/power_fail). ADC1 and ADC2 share a
+// reset and a clock, so nothing else may use either of them.
 
 #pragma once
 

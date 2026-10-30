@@ -14,7 +14,7 @@ uint32_t engineBit(Card c) {
 }  // namespace
 
 LayoutFade::Block LayoutFade::ramp(bool swap) {
-  Block b{gainAt(level_), 0.0f, swap};
+  Block b{gainAt(level_), 0.0f, swap, false};
   level_ += phase_ == Phase::Out ? -1 : 1;
   b.to = gainAt(level_);
   if (phase_ == Phase::In && level_ == kFadeBlocks) phase_ = Phase::Idle;
@@ -22,8 +22,15 @@ LayoutFade::Block LayoutFade::ramp(bool swap) {
 }
 
 LayoutFade::Block LayoutFade::next(bool differs) {
+  if (held_) return nextHeld(differs);
+  Block b = nextRamp(differs);
+  b.silent = b.swap || (b.from == 0.0f && b.to == 0.0f);
+  return b;
+}
+
+LayoutFade::Block LayoutFade::nextRamp(bool differs) {
   if (phase_ == Phase::Idle) {
-    if (!differs) return {1.0f, 1.0f, false};
+    if (!differs) return {1.0f, 1.0f, false, false};
     phase_ = Phase::Out;
   } else if (phase_ == Phase::Out) {
     if (!differs) phase_ = Phase::In;
@@ -34,13 +41,32 @@ LayoutFade::Block LayoutFade::next(bool differs) {
   if (phase_ == Phase::Out && level_ == 0) {
     holdLeft_ = hold_;
     phase_ = hold_ > 0 ? Phase::Hold : Phase::In;
-    return hold_ > 0 ? Block{0.0f, 0.0f, true} : ramp(true);
+    return hold_ > 0 ? Block{0.0f, 0.0f, true, false} : ramp(true);
   }
   if (phase_ == Phase::Hold) {
     if (--holdLeft_ == 0) phase_ = Phase::In;
-    return {0.0f, 0.0f, false};
+    return {0.0f, 0.0f, false, false};
   }
   return ramp(false);
+}
+
+// At zero a layout swaps at once, and the silent hold after the swap counts down here too, so a
+// release soon after finds the engine clears done. Otherwise the phase waits at the start of the
+// fade-in for the release.
+LayoutFade::Block LayoutFade::nextHeld(bool differs) {
+  level_ = 0;
+  if (differs) {
+    holdLeft_ = hold_;
+    phase_ = hold_ > 0 ? Phase::Hold : Phase::In;
+    return {0.0f, 0.0f, true, true};
+  }
+  const bool clearing = phase_ == Phase::Hold;
+  if (clearing) {
+    if (--holdLeft_ == 0) phase_ = Phase::In;
+  } else {
+    phase_ = Phase::In;
+  }
+  return {0.0f, 0.0f, false, clearing};
 }
 
 void LayoutFade::cut() {

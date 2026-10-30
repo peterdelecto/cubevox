@@ -14,7 +14,29 @@ uint32_t stepPhase(uint32_t phase, uint32_t goal) {
   return phase - goal < kBypassStep ? goal : phase - kBypassStep;
 }
 
+// True when any slot whose card runs engine `e` has its toggle on. Only the pitch engine serves two
+// cards, so for every other engine this is the toggle of its one slot.
+bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (engineOf(snap.layout.card[static_cast<size_t>(s)]) == e && snap.slotOn[static_cast<size_t>(s)]) return true;
+  }
+  return false;
+}
+
 }  // namespace
+
+void resetEngine(ChainEngines& engines, Engine e) {
+  switch (e) {
+    case Engine::InputGate: engines.inputGate.reset(); break;
+    case Engine::Pitch: engines.pitch.reset(); break;
+    case Engine::Unison: engines.unison.reset(); break;
+    case Engine::Slapback: engines.slapback.reset(); break;
+    case Engine::Distortion: engines.distortion.reset(); break;
+    case Engine::Gate: engines.gate.reset(); break;
+    case Engine::Reverb: engines.reverb.reset(); break;
+    case Engine::Count: break;
+  }
+}
 
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
               bool& pitchDone) {
@@ -33,6 +55,36 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;
+}
+
+void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
+  const int total = kSlotFadeBlocks * n;
+  const uint32_t step = kBypassFull / static_cast<uint32_t>(total);
+  const int dir = (to > from) - (to < from);
+  int pos = from * n;  // samples of the fade toward the engine reached before this block
+  for (int i = 0; i < n; ++i) {
+    pos += dir;
+    const uint32_t phase = pos <= 0 ? kBypassFull : static_cast<uint32_t>(total - pos) * step;
+    wet[i] = wet[i] * cv::sinTurns(kBypassFull - phase) + dry[i] * cv::sinTurns(phase);
+  }
+}
+
+bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
+             int n, bool& pitchDone) {
+  const Card c = snap.layout.card[static_cast<size_t>(s)];
+  const Engine e = engineOf(c);
+  if (e == kNoEngine || (e == Engine::Pitch && pitchDone)) return false;
+
+  const SlotFades::Step step = fades.step(s, stageToggleOn(snap, e));
+  const bool detectorLive = e == Engine::InputGate;
+  if (step.from == 0 && step.to == 0 && !detectorLive) {
+    if (e == Engine::Pitch) pitchDone = true;  // the stage is stopped, so the second pitch card has nothing to run
+    return false;
+  }
+  if (step.from == 0 && step.to > 0 && !detectorLive) resetEngine(engines, e);
+  const bool wrote = runStage(engines, c, in, out, n, snap.params, pitchDone);
+  if (wrote && step.from != step.to) mixSlotFade(out, in, n, step.from, step.to);
+  return wrote;
 }
 
 void mixBypass(float* a, const float* dry, int n, bool bypassOn, uint32_t& phase) {

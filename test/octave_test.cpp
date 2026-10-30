@@ -255,6 +255,37 @@ bool testFormantMoves() {
                 "centroid/f0 x%.3f of input (+-10%%), f0=%.1f", rC, fC);
 }
 
+// A 0.5 DC step through the wet path at unity trim (MIX 1, so the dry path adds nothing). The voice's
+// DC blocker takes it away: from the output's peak the level falls under -60 dBFS within 200 ms and
+// stays there.
+bool testDcBlocked() {
+  constexpr double kLimit = 1e-3;  // -60 dBFS
+  constexpr double kSettleMs = 200.0;
+  cv::PitchFxParams p = octaveOnly(12);
+  p.octave.tuning.levelDb = 0.0f;
+  p.octave.tuning.trimDb = 0.0f;
+  const std::vector<float> in(static_cast<size_t>(cv::kSampleRate), 0.5f);
+  gFx.reset();
+  const std::vector<float> out = run(gFx, in, p);
+
+  size_t peakAt = 0;
+  double peak = 0.0;
+  for (size_t i = 0; i < out.size(); ++i) {
+    if (std::fabs(out[i]) > peak) {
+      peak = std::fabs(out[i]);
+      peakAt = i;
+    }
+  }
+  size_t lastOver = peakAt;
+  for (size_t i = peakAt; i < out.size(); ++i) {
+    if (std::fabs(out[i]) >= kLimit) lastOver = i;
+  }
+  const double settleMs = 1000.0 * static_cast<double>(lastOver + 1 - peakAt) / cv::kSampleRate;
+  bool ok = report("dc blocked", peak > 0.45 && peak < 0.55, "wet peak %.3f on a 0.5 step (0.45..0.55)", peak);
+  ok &= report("dc blocked", settleMs <= kSettleMs, "under -60 dBFS %.1f ms after the peak (<= 200)", settleMs);
+  return ok;
+}
+
 bool testNoise() {
   const int n = 2 * cv::kSampleRate;
   std::vector<float> in(static_cast<size_t>(n));
@@ -335,6 +366,7 @@ int main() {
   ok &= testNoAlloc();
   ok &= testFormantMoves();
   ok &= testNoise();
+  ok &= testDcBlocked();
   ok &= testThroughZero();
   return ok ? 0 : 1;
 }

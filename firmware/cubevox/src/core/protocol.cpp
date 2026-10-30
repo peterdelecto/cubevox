@@ -744,9 +744,10 @@ void replyStatus(Writer& w, uint32_t id, const Status& s) {
   formatNumber(s.cpuMeanPercent, mean, sizeof mean);
   formatNumber(s.cpuWorstPercent, worst, sizeof worst);
   formatNumber(s.floorDbfs, floorDb, sizeof floorDb);
-  w.format("{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"muted\":%s,\"seq\":%lu,",
+  w.format("{\"id\":%lu,\"ok\":true,\"cpu_mean\":%s,\"cpu_worst\":%s,\"late\":%lu,\"dry_blocks\":%lu,"
+           "\"muted\":%s,\"seq\":%lu,",
            static_cast<unsigned long>(id), mean, worst, static_cast<unsigned long>(s.late),
-           s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
+           static_cast<unsigned long>(s.dryBlocks), s.muted ? "true" : "false", static_cast<unsigned long>(s.seq));
   w.format("\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu,\"boot_fails\":%lu,",
            static_cast<unsigned long>(s.recordErrors), static_cast<unsigned long>(s.serialDropped),
            static_cast<unsigned long>(s.strayBytes), static_cast<unsigned long>(s.bootFails));

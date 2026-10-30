@@ -111,6 +111,7 @@ struct Status {
   float cpuMeanPercent = 0.0f;
   float cpuWorstPercent = 0.0f;
   uint32_t late = 0;
+  uint32_t dryBlocks = 0;  // blocks that skipped the chain and passed the dry input after a late block
   bool muted = false;
   uint32_t seq = 0;
   uint32_t recordErrors = 0;
