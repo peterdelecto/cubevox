@@ -65,20 +65,18 @@ The release went onto the DECAY pot because slot 1 has two pots and a fixed rele
 one doing nothing. The panel GATE card in slot 7 keeps its soft-knee tuning; both are instances of
 the Gate class and the revision is the input gate's tuning.
 
-## LEARN (amended)
-A menu action, `GATE LEARN >`. It measures the peak detector for 2.0 s on a quiet input at the
-current Input Gain and shows two lines, the measured floor and the pot's threshold, for example
-`FLOOR -62 dB` over `THRESHOLD -54 dB`, with a note when the threshold is under the floor + 8 dB.
-It writes nothing: the THRESHOLD pot is absolute and the player sets it by eye about 8 dB above
-the floor. No stale indicator (the draft had LEARN set the threshold and flag it stale after an
-Input Gain move; both fought the pot).
+## LEARN (removed)
+There is no LEARN. The draft had a menu action that measured the floor for 2 s and set the
+threshold from it; the first build (v2.00.45) showed the floor beside the pot's threshold and
+wrote nothing; the owner removed it the same day (2026-10-30, "i dont want gate learn"). The
+THRESHOLD pot is absolute and the player sets it by ear.
 
-The floor measurement is also a field of the serial status reply, `floor_dbfs`, so the bench
-tests below can read it.
+The floor measurement stays as a field of the serial status reply, `floor_dbfs`, the highest
+detector level since the previous status, so the bench tests below can read it.
 
 ## Menu and settings
-Three rows join the list, which scrolls: `HPF: 120` and `LPF: 12k` after DEBUG, `GATE LEARN >`
-after them, before UPDATE FIRMWARE. HPF and LPF take settings bytes 6 and 7 of the layout record,
+Two rows join the list, which scrolls: `HPF: 120` and `LPF: 12k` after DEBUG, before UPDATE
+FIRMWARE. HPF and LPF take settings bytes 6 and 7 of the layout record,
 schema unchanged: 0 means not set and reads as the default, otherwise the byte is the cutoff
 list index plus one (HPF list OFF, 80, 100, 120, 150; LPF list OFF, 4k, 5k, 6k, 8k, 10k, 12k),
 and a byte past the list makes the record invalid as the other settings bytes do. They are
@@ -93,8 +91,8 @@ threshold ± 1.5 dB for 10 s (no transitions) and at + 2 dB (open and stays open
 under -40 dBFS.
 Bench, all slots bypassed, COMP and EQ off, LINE, Input Gain max, XLR pins 2 and 3 bridged with
 150 Ω, MIC: 2 noise at the output tap with and without HPF 120 and LPF 12k, from `floor_dbfs`
-(4.5 dB unweighted expected at LPF 8k; record the 12k figure); 5 LEARN shows the floor within
-2 dB of the status field at Input Gain min, mid, max.
+(4.5 dB unweighted expected at LPF 8k; record the 12k figure); 5 `floor_dbfs` at Input Gain
+min, mid, max, recorded.
 
 ## As built (2026-10-30, v2.00.45)
 1. Attack and release are travel times, not time constants. A one-pole read as a time constant needs 4.4 of them to cross 80 dB to within 1 dB, so a 0.5 ms constant could not meet the 1 ms acceptance. The Input gate's tuning carries `travelTimes`; attack 0.5 ms is the rise from -80 dB to within 1 dB of open (time constant 0.114 ms) and DECAY is the fall of 60 dB (time constant DECAY / 1.386). The panel GATE keeps its time constants and its code path. Measured: open within 0.63 ms, under -60 dB within 77 ms at DECAY 20 ms and 2060 ms at DECAY 2 s.
@@ -105,7 +103,7 @@ Bench, all slots bypassed, COMP and EQ off, LINE, Input Gain max, XLR pins 2 and
 6. Cost: `kInputConditioning{2, 3, false}` in the fixed term of `costs.h` (host bench 0.96 to 0.99 of POLISH EQ, about 8.9k cycles mean, 17k on a crossfade block). The Input gate row keeps its board figures `{4, 5, true}` as an upper bound; the host puts the revised gate at 0.97 of them. The board prints a `COND` cycle bucket in the audio line for the rerun that replaces the estimate.
 7. Record bytes 6 and 7 are always written as list index + 1 (OFF is 1). A 0 only comes from an older record and reads as the default.
 8. HPF and LPF are not in the serial protocol's `settings` object; the Mac app is parked. `floor_dbfs` is in the status reply, the highest detector level since the previous status, -120 when no block ran the Input gate.
-9. LEARN: the measuring screen shows `Measuring the floor.` and `Keep the input quiet.`; a click or turn during it drops it. The result stays until a click or a turn, with no timeout, because the player sets the pot by eye against it; THRESHOLD follows the pot live. With no Input gate card in the layout the threshold line reads `THRESHOLD NONE`.
+9. LEARN was built in v2.00.45 as a measuring screen and a result screen, and removed by the owner the same day (v2.00.48). The detector's status window and `floor_dbfs` stay.
 10. The emulator and `cubevox-render` have their own chains and carry the conditioning by hand at the box defaults (`render --hpf`, `--lpf` in Hz). The emulator's Input gate pots follow the box so the parity test holds. The BYPASS dry copy is taken before the conditioning.
 
 ## Hardware, out of scope
