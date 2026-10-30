@@ -165,8 +165,8 @@ void checkReadoutSettled() {
     const char* pgm;
   };
   const Case cases[] = {
-      {4, 1, 210.0f, "settled-210ms", "oled-readout-210ms.pgm"},
-      {7, 0, 65.0f, "settled-65pct", "oled-readout-65pct.pgm"},
+      {4, 0, 210.0f, "settled-210ms", "oled-readout-210ms.pgm"},
+      {7, 1, 65.0f, "settled-65pct", "oled-readout-65pct.pgm"},
       {2, 0, -12.0f, "settled-m12st", "oled-readout-m12st.pgm"},
       {6, 0, -24.0f, "settled-m24db", "oled-readout-m24db.pgm"},
   };
@@ -179,7 +179,7 @@ void checkReadoutSettled() {
 
 void checkReadoutRolling() {
   for (int frame : {8, 12, 16, 20, 24, 28, 32, 40, 52}) {
-    const Canvas canvas = readoutOf(4, 1, proofShown(120.0f, 210.0f, false, frame));
+    const Canvas canvas = readoutOf(4, 0, proofShown(120.0f, 210.0f, false, frame));
     const std::string name = "roll-time-" + std::to_string(frame);
     check(matchesGolden(canvas, name.c_str()), ("readout: " + name + " matches the proof frame").c_str());
   }
@@ -192,7 +192,7 @@ void checkReadoutRolling() {
 }
 
 void checkReadoutRows() {
-  const Canvas c = readoutOf(4, 1, 210.0f);
+  const Canvas c = readoutOf(4, 0, 210.0f);
   check(sameRows(c, titleBarOf("5 SLAPBACK"), 0, kNameTop),
         "readout: the first rows are the slot, a space and the card in black 7X12 on a bar, top at row 1");
   Canvas name;
@@ -767,17 +767,17 @@ Extent unitPicture(const Canvas& frame, const std::string& unitWithSpace) {
 // cell from below while the other digits roll.
 void checkReadoutGainsDigit() {
   // 99 to 100 on a percent knob. 99 is two 9s, and the roll holds the three cells of 100.
-  const KnobDesc& percent = *knobDesc(defaultLayout().card[7], 0);
+  const KnobDesc& percent = *knobDesc(defaultLayout().card[7], 1);
   const Pair roll = pairCells(false, 99, 100);
   check(ownCells(false, 99) == "99" && ownCells(false, 100) == "100" && roll.from == " 99" && roll.to == "100",
         "readout: 99 is two 9s, 100 is three cells, and the roll between them is a blank and two 9s into 100");
-  const Canvas settled99 = readoutOf(7, 0, 99.0f);
-  const Canvas settled100 = readoutOf(7, 0, 100.0f);
+  const Canvas settled99 = readoutOf(7, 1, 99.0f);
+  const Canvas settled100 = readoutOf(7, 1, 100.0f);
   check(sameRows(settled99, valueBand(percent, 99), kValueTop, kValueBottom), "readout: 99 draws two cells, centred");
   check(sameRows(settled100, valueBand(percent, 100), kValueTop, kValueBottom), "readout: 100 draws three cells, centred");
 
   // The leading cell lights while the 9s roll to 0 in the cells they sit in during the roll.
-  const Canvas half = readoutOf(7, 0, 99.5f);
+  const Canvas half = readoutOf(7, 1, 99.5f);
   check(sameRows(half, valueBand(percent, 99, 12), kValueTop, kValueBottom), "readout: 99.5 rolls the 1 in and the 9s to 0 in the three cells of 100");
   const int x0 = fieldLeft(percent, 3);
   bool leadingTopBlank = true;
@@ -863,8 +863,8 @@ void checkReadoutRecentres() {
   check(rolls > 200 && recentred > 20, "readout: the re-centring was measured on many rolls, those that change the digit count among them");
 
   // The cases the owner named, measured on the unit's pixels.
-  const std::vector<int> nineToTen = unitLeftAcross(7, 0, 9);
-  const std::vector<int> ninetyNineToHundred = unitLeftAcross(7, 0, 99);
+  const std::vector<int> nineToTen = unitLeftAcross(7, 1, 9);
+  const std::vector<int> ninetyNineToHundred = unitLeftAcross(7, 1, 99);
   const std::vector<int> zeroToOne = unitLeftAcross(2, 0, 0);
   check(isHalfCell(nineToTen[1] - nineToTen[0]) && nineToTen[1] == nineToTen[12] && nineToTen[12] == nineToTen[24],
         "readout: 9 to 10 re-centres by half a cell as the roll starts and holds still after");
@@ -888,7 +888,7 @@ void checkReadoutUnitsAndCentre() {
     const char* capitals;
   };
   const Case cases[] = {
-      {2, 0, -12, "-12 st", " ST"}, {4, 1, 250, "250 ms", " MS"}, {6, 0, -40, "-40 dB", " DB"}, {7, 0, 50, "50 %", " %"},
+      {2, 0, -12, "-12 st", " ST"}, {4, 0, 250, "250 ms", " MS"}, {6, 0, -40, "-40 dB", " DB"}, {7, 1, 50, "50 %", " %"},
   };
   std::vector<std::vector<uint32_t>> pictures(128);
   for (const Case& c : cases) {
@@ -931,7 +931,7 @@ void checkReadoutRollClip() {
   bool clipped = true;
   bool dark = true;
   for (int k = 0; k <= 48; ++k) {
-    const Canvas c = readoutOf(4, 1, 120.0f + static_cast<float>(k) / 24.0f);
+    const Canvas c = readoutOf(4, 0, 120.0f + static_cast<float>(k) / 24.0f);
     clipped = clipped && rowsBlank(c, 28, 34) && rowsBlank(c, 58, kCanvasHeight);
     dark = dark && edgesDark(c, kBarRows);
   }

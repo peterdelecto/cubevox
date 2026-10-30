@@ -138,7 +138,7 @@ std::string upper(const char* in) {
 
 std::vector<Candidate> makeScreens() {
   std::vector<Candidate> out;
-  const Reading mix = readingFor(Card::ReverbSpring, 0, 0.5f);
+  const Reading mix = readingFor(Card::ReverbSpring, 1, 0.5f);
   const int slot = mix.view.slot;
   const std::string full = upper(mix.card);
   const std::string numbered = slotText(slot, full.c_str());
@@ -220,7 +220,7 @@ void drawBarRow(Candidate& s, const FontDesc& font, const char* text, Bar bar) {
 
 std::vector<Candidate> makeTitleScreens() {
   std::vector<Candidate> out;
-  const Reading mix = readingFor(Card::ReverbSpring, 0, 0.5f);
+  const Reading mix = readingFor(Card::ReverbSpring, 1, 0.5f);
   const std::string numbered = slotText(mix.view.slot, upper(mix.card).c_str());
 
   {

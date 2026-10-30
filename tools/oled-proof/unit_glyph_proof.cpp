@@ -163,8 +163,8 @@ int main(int argc, char** argv) {
   std::vector<Shot> screens;
   screens.push_back(makeShot(Card::Octave, 0, "-12"));
   screens.push_back(makeShot(Card::InputGate, 0, "-40"));
-  screens.push_back(makeShot(Card::Slapback, 1, "250"));
-  screens.push_back(makeShot(Card::ReverbSpring, 0, "50"));
+  screens.push_back(makeShot(Card::Slapback, 0, "250"));
+  screens.push_back(makeShot(Card::ReverbSpring, 1, "50"));
 
   FILE* manifest = std::fopen((dir + "/unit-screens.txt").c_str(), "w");
   if (!manifest) {

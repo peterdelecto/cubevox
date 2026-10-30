@@ -127,7 +127,7 @@ void checkComposeBench() {
   const ChainSnapshot pinned = composeSnapshot(layout, low, Settings(), bench);
   ChainParams expect;
   applyKnob(Card::Octave, 0, 24.0f, expect);
-  applyKnob(Card::Unison, 0, 1.0f, expect);
+  applyKnob(Card::Unison, 1, 1.0f, expect);
   check(pinned.params.pitchFx.octave.semitones == expect.pitchFx.octave.semitones &&
             pinned.params.pitchFx.octave.semitones == 12,
         "pinned stepped knob sits on its last step");

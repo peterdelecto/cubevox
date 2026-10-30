@@ -333,11 +333,11 @@ const Card kCards[8] = {
     {"INPUT GATE", {"THRESHOLD", "dB", -60, -10, false, -35}, {"DECAY", "ms", 20, 500, false, 150}},
     {"AUTOTUNE", {"KEY", "", 0, 11, true, 5}, {"RESPONSE", "%", 0, 100, false, 50}},
     {"OCTAVE", {"SEMITONES", "st", -12, 12, true, 0}, {"MIX", "%", 0, 100, false, 60}},
-    {"UNISON", {"DEPTH", "%", 0, 100, false, 20}, {"RATE", "hz", 0.1f, 5, false, 1.5f}},
-    {"SLAPBACK", {"MIX", "%", 0, 100, false, 40}, {"TIME", "ms", 60, 250, false, 120}},
-    {"DISTORTION", {"DRIVE", "%", 0, 100, false, 20}, {"TONE", "%", 0, 100, false, 50}},
+    {"UNISON", {"RATE", "hz", 0.1f, 5, false, 1.5f}, {"DEPTH", "%", 0, 100, false, 20}},
+    {"SLAPBACK", {"TIME", "ms", 60, 250, false, 120}, {"MIX", "%", 0, 100, false, 40}},
+    {"DISTORTION", {"TONE", "%", 0, 100, false, 50}, {"DRIVE", "%", 0, 100, false, 20}},
     {"GATE", {"THRESHOLD", "dB", -60, -10, false, -40}, {"DECAY", "ms", 20, 500, false, 150}},
-    {"SPRING REVERB", {"MIX", "%", 0, 100, false, 30}, {"TIME", "%", 0, 100, false, 50}},
+    {"SPRING REVERB", {"TIME", "%", 0, 100, false, 50}, {"MIX", "%", 0, 100, false, 30}},
 };
 
 // The value row is centred on its field. The field holds the cells of the wider of the two numbers a
@@ -557,8 +557,8 @@ struct Effect {
 
 // Scenes 6 and 7 (Distortion, Unison) are gone: without pictures they would repeat 2 and 3.
 const Effect kEffects[] = {
-    {"2", "slapback-time", "SLAPBACK  TIME", {4, 1, 120, 210}},
-    {"3", "reverb-mix", "REVERB  MIX", {7, 0, 30, 65}},
+    {"2", "slapback-time", "SLAPBACK  TIME", {4, 0, 120, 210}},
+    {"3", "reverb-mix", "REVERB  MIX", {7, 1, 30, 65}},
     {"4", "octave-semitones", "OCTAVE  SEMITONES", {2, 0, 0, -12}},
     {"5", "gate-threshold", "GATE  THRESHOLD", {6, 0, -40, -24}},
 };
@@ -617,7 +617,7 @@ Scene mutedScene(Voice& voice) {
 // slot touched while that readout is up, 2 s of stillness, and back to the voice. Every change
 // is the same 2-frame dissolve.
 Scene rulesScene(Voice& voice, float& shown) {
-  static const Turn first{4, 1, 120, 160};
+  static const Turn first{4, 0, 120, 160};
   static const Turn second{2, 0, 0, -3};
   return {"10", "transitions", kRulesSceneS, [&voice, &shown](int i, float t, Caption& cap) {
             voice.delay = 0;

@@ -1478,7 +1478,8 @@ void pedal(const char* name, bool& on, float width, const F& knobs) {
   gPedalBottom = std::max(gPedalBottom, ImGui::GetItemRectMax().y);
 }
 
-// Panel knobs only, signal order left to right. Encoders sit below the knobs.
+// Panel knobs only, signal order left to right. Encoders sit below the knobs. Where a stompbox
+// has two knobs they run in the slot's pot order, upper first, the amount knob last.
 void drawPedals(ProtoParams& params) {
   constexpr int kPedals = 8;
   const float w = (ImGui::GetContentRegionAvail().x - (kPedals - 1) * kPedalGap) / kPedals;
@@ -1514,22 +1515,22 @@ void drawPedals(ProtoParams& params) {
   });
   next();
   pedal("UNISON", params.unison.on, w, [&] {
-    pedalPercent("DEPTH", params.unison.depth);
     float rate = 0.01f * params.macros.pos[cv::macros::UnisonMotion];
     if (pedalPercent("RATE", rate)) {
       params.macros.pos[cv::macros::UnisonMotion] = 100.0f * rate;
       cv::macros::unison(params.unison.tuning, params.macros.pos[cv::macros::UnisonMotion]);
     }
+    pedalPercent("DEPTH", params.unison.depth);
   });
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
-    pedalPercent("MIX", params.slapback.mix);
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
+    pedalPercent("MIX", params.slapback.mix);
   });
   next();
   pedal("DISTORTION", params.distortion.on, w, [&] {
-    pedalPercent("DRIVE", params.distortion.drive);
     pedalPercent("TONE", params.distortion.tone);
+    pedalPercent("DRIVE", params.distortion.drive);
   });
   next();
   pedal("GATE", params.gate.on, w, [&] {
@@ -1539,8 +1540,8 @@ void drawPedals(ProtoParams& params) {
   next();
   cv::ReverbParams& r = params.reverb;
   pedal("REVERB", r.on, w, [&] {  // last pedal; Output EQ lives in the menu
-    pedalPercent("MIX", r.mix);
     pedalPercent("TIME", r.time);
+    pedalPercent("MIX", r.mix);
   });
 }
 

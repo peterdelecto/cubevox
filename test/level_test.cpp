@@ -188,7 +188,7 @@ cv::ReverbParams boxReverb(Card card, float mix) {
   ChainParams chain;
   applyPlacement(card, chain);
   applyToggle(card, true, chain);
-  applyKnob(card, 0, mix, chain);
+  applyKnob(card, 1, mix, chain);
   return chain.reverb;
 }
 

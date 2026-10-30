@@ -178,9 +178,9 @@ void checkMuteDissolveAgainstProof() {
 void checkReadoutReplacedAgainstProof() {
   FaceRig r;
   r.tick();
-  r.turn(4, 1, kTime160);
+  r.turn(4, 0, kTime160);
   r.ticks(5);
-  check(sameCanvas(r.live, readoutScreen(r.layout, 4, 1, 160.0f)), "face: the first readout settles on 160 MS");
+  check(sameCanvas(r.live, readoutScreen(r.layout, 4, 0, 160.0f)), "face: the first readout settles on 160 MS");
 
   r.turn(2, 0, 12.0f);  // octave semitones, step 12 is 0 ST
   r.tick();
@@ -196,9 +196,9 @@ void checkReadoutInAndOut() {
   FaceRig r;
   r.ticks(3);
   const Canvas voice = r.live;
-  r.turn(4, 1, kTime160);
+  r.turn(4, 0, kTime160);
   const uint32_t touched = r.now;
-  const Canvas readout = readoutScreen(r.layout, 4, 1, 160.0f);
+  const Canvas readout = readoutScreen(r.layout, 4, 0, 160.0f);
   r.tick();
   check(sameCanvas(r.live, blend(voice, readout, kStep1Level)), "face: readout in, step 1 lights 21 of 64 thresholds of the new screen");
   r.tick();
@@ -323,7 +323,7 @@ UiInput clickInput() {
 Canvas openMenuOverReadout(FaceRig& r, Menu& ref, Canvas& readout) {
   ref.listen();
   r.ticks(3);
-  r.turn(4, 1, kTime160);
+  r.turn(4, 0, kTime160);
   r.ticks(4);
   readout = r.live;
   r.menu.update(clickInput(), r.now);
@@ -347,7 +347,7 @@ void checkMenuOnTop() {
   writePgm(r.live, "oled-face-menu.pgm");
 
   // A knob under the open menu leaves it alone, and so does the hold running out.
-  r.turn(4, 1, kTime160 + 0.1f);
+  r.turn(4, 0, kTime160 + 0.1f);
   r.ticks(80);
   check(sameCanvas(r.live, menuScreen), "face: the menu stays while a knob moves and the hold runs out");
 }
@@ -396,7 +396,7 @@ void checkMenuListensOnceFaceDraws() {
 void checkReadoutLeavesWithItsCard() {
   FaceRig r;
   r.ticks(3);
-  r.turn(4, 1, kTime160);
+  r.turn(4, 0, kTime160);
   r.ticks(4);
   const Canvas readout = r.live;
   r.layout.card[2] = Card::Unison;
@@ -457,7 +457,7 @@ void checkQuietFrames() {
   r.ticks(3);
   check(r.live.dirtyPages() == 0, "face: a silent voice sends no page to the panel");
 
-  r.turn(4, 1, kTime160);
+  r.turn(4, 0, kTime160);
   r.ticks(4);
   clearAllDirty(r.live);
   r.ticks(10);
@@ -600,9 +600,9 @@ void checkLoadFigureAbsent() {
   knob.settings.debug = true;
   knob.loadPercent = 42;
   knob.ticks(3);
-  knob.turn(4, 1, kTime160);
+  knob.turn(4, 0, kTime160);
   knob.ticks(4);
-  check(sameCanvas(knob.live, readoutScreen(knob.layout, 4, 1, 160.0f)), "face: the knob readout has no figure with DEBUG on");
+  check(sameCanvas(knob.live, readoutScreen(knob.layout, 4, 0, 160.0f)), "face: the knob readout has no figure with DEBUG on");
 
   FaceRig toggle;
   toggle.settings.debug = true;
@@ -775,7 +775,7 @@ void checkNoBarOffTheVoice() {
     int freeFrom;  // first row from which the screen draws nothing of its own at the meter's columns, -1 for none
   };
   const Scene scenes[] = {
-      {"readout", [](FaceRig& r) { r.turn(4, 1, kTime160); }, 14},
+      {"readout", [](FaceRig& r) { r.turn(4, 0, kTime160); }, 14},
       {"toggle", [](FaceRig& r) { r.flip(5, true); }, 14},
       {"MUTED", [](FaceRig& r) { r.switchOn = true; }, 8},
       {"BYPASS", [](FaceRig& r) { r.settings.topSwitch = TopSwitch::Bypass; r.switchOn = true; }, 8},

@@ -34,6 +34,9 @@ constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, 
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 
+// Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
+// A card with an amount knob (Mix, Depth, Drive) puts it on knob B. The apply functions below
+// take the knob index in this order.
 constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Empty, "empty", "Empty", kNoEngine, 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
     {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kInputThreshold, kInputDecay}, Group::None,
@@ -45,16 +48,16 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Octave, "octave", "Octave", Engine::Pitch, 2,
      {{"Semitones", KnobKind::Stepped, kSemitonePositions, kSemitoneMin, kSemitoneMax, "st"}, kPercent("Mix")},
      Group::Pitch, costs::kOctave},
-    {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Depth"), kPercent("Rate")}, Group::None,
+    {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Rate"), kPercent("Depth")}, Group::None,
      costs::kUnison},
-    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kPercent("Mix"), kSlapbackTime}, Group::None,
+    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kSlapbackTime, kPercent("Mix")}, Group::None,
      costs::kSlapback},
-    {Card::Distortion, "distortion", "Distortion", Engine::Distortion, 2, {kPercent("Drive"), kPercent("Tone")},
+    {Card::Distortion, "distortion", "Distortion", Engine::Distortion, 2, {kPercent("Tone"), kPercent("Drive")},
      Group::None, costs::kDistortion},
     {Card::Gate, "gate", "Gate", Engine::Gate, 2, {kThreshold, kDecay}, Group::None, costs::kGate},
-    {Card::ReverbSpring, "reverb_spring", "Spring Reverb", Engine::Reverb, 2, {kPercent("Mix"), kPercent("Time")},
+    {Card::ReverbSpring, "reverb_spring", "Spring Reverb", Engine::Reverb, 2, {kPercent("Time"), kPercent("Mix")},
      Group::Reverb, costs::kReverbSpring},
-    {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Mix"), kPercent("Time")},
+    {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Time"), kPercent("Mix")},
      Group::Reverb, costs::kReverbChasm},
 }};
 
@@ -107,33 +110,33 @@ void applyOctaveKnob(int knob, float v, cv::OctaveParams& o) {
 
 void applyUnisonKnob(int knob, float v, cv::UnisonParams& u) {
   if (knob == 0) {
-    u.depth = v;
-  } else {
     unisonrate::apply(u.tuning, 100.0f * v);
+  } else {
+    u.depth = v;
   }
 }
 
 void applySlapbackKnob(int knob, float v, cv::SlapbackParams& s) {
   if (knob == 0) {
-    s.mix = v;
-  } else {
     s.tuning.timeMs = knobValue(kSlapbackTime, v);
+  } else {
+    s.mix = v;
   }
 }
 
 void applyDistortionKnob(int knob, float v, cv::DistortionParams& d) {
   if (knob == 0) {
-    d.drive = v;
-  } else {
     d.tone = v;
+  } else {
+    d.drive = v;
   }
 }
 
 void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
   if (knob == 0) {
-    r.mix = v;
-  } else {
     r.time = v;
+  } else {
+    r.mix = v;
   }
   cv::applyKnobs(r);
 }

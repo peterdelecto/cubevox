@@ -82,6 +82,33 @@ void checkGroups() {
   check(pitch == 2, "autotune and octave are the pitch group");
 }
 
+// The amount knob (Mix, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
+// still reaches its own engine field through the knob it is listed on.
+void checkAmountKnobIsB() {
+  const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm};
+  for (const Card c : amountCards) {
+    const char* const name = knobDesc(c, 1)->name;
+    char what[96];
+    std::snprintf(what, sizeof(what), "%s: knob B is the amount knob, not %s", cardDesc(c).id, knobDesc(c, 0)->name);
+    check(std::strcmp(name, "Mix") == 0 || std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0, what);
+    const char* const other = knobDesc(c, 0)->name;
+    std::snprintf(what, sizeof(what), "%s: knob A is not an amount knob", cardDesc(c).id);
+    check(std::strcmp(other, "Mix") != 0 && std::strcmp(other, "Depth") != 0 && std::strcmp(other, "Drive") != 0, what);
+  }
+  ChainParams p;
+  applyKnob(Card::Unison, 1, 0.7f, p);
+  check(std::fabs(p.unison.depth - 0.7f) < 1e-6f, "amount: Unison knob B drives Depth");
+  applyKnob(Card::Slapback, 1, 0.7f, p);
+  check(std::fabs(p.slapback.mix - 0.7f) < 1e-6f, "amount: Slapback knob B drives Mix");
+  applyKnob(Card::Distortion, 1, 0.7f, p);
+  check(std::fabs(p.distortion.drive - 0.7f) < 1e-6f, "amount: Distortion knob B drives Drive");
+  applyKnob(Card::ReverbSpring, 1, 0.7f, p);
+  check(std::fabs(p.reverb.mix - 0.7f) < 1e-6f, "amount: Spring Reverb knob B drives Mix");
+  applyKnob(Card::ReverbChasm, 1, 0.4f, p);
+  check(std::fabs(p.reverb.mix - 0.4f) < 1e-6f, "amount: Chasm Reverb knob B drives Mix");
+  check(std::strcmp(knobDesc(Card::Octave, 1)->name, "Mix") == 0, "amount: Octave keeps Mix on knob B");
+}
+
 // Every knob at 0 and at 1 must land on a different engine value.
 void checkKnobsMove() {
   for (int i = 0; i < kCardCount; ++i) {
@@ -106,11 +133,11 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Gate: return knob == 0 ? p.gate.thresholdDb : p.gate.tuning.releaseMs;
     case Card::Autotune: return p.pitchFx.autotune.responseMs;
     case Card::Octave: return p.pitchFx.octave.mix;
-    case Card::Unison: return knob == 0 ? p.unison.depth : p.unison.tuning.lfoHz[0];
-    case Card::Slapback: return knob == 0 ? p.slapback.mix : p.slapback.tuning.timeMs;
-    case Card::Distortion: return knob == 0 ? p.distortion.drive : p.distortion.tone;
+    case Card::Unison: return knob == 0 ? p.unison.tuning.lfoHz[0] : p.unison.depth;
+    case Card::Slapback: return knob == 0 ? p.slapback.tuning.timeMs : p.slapback.mix;
+    case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
-    case Card::ReverbChasm: return knob == 0 ? p.reverb.mix : p.reverb.time;
+    case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -174,9 +201,9 @@ void checkKnobTargets() {
   check(p.pitchFx.octave.semitones == 12, "semitones position 24 is +12");
   check(knobSteps(Card::Octave, 0) == 25, "semitones has 25 positions");
   check(knobSteps(Card::Autotune, 0) == 12, "key has 12 positions");
-  applyKnob(Card::Slapback, 1, 0.0f, p);
+  applyKnob(Card::Slapback, 0, 0.0f, p);
   check(std::fabs(p.slapback.tuning.timeMs - 60.0f) < 1e-4f, "slapback time min 60 ms");
-  applyKnob(Card::Slapback, 1, 1.0f, p);
+  applyKnob(Card::Slapback, 0, 1.0f, p);
   check(std::fabs(p.slapback.tuning.timeMs - 250.0f) < 1e-4f, "slapback time max 250 ms");
 }
 
@@ -259,7 +286,7 @@ void checkUnisonRate() {
   check(std::fabs(t.lfoHz[0] - 4.2f) < 1e-4f && std::fabs(t.swingMaxMs - 6.0f * 2.0f / 7.0f) < 1e-4f,
         "unison rate: fast rates keep the swing from growing");
   ChainParams p;
-  applyKnob(Card::Unison, 1, 0.5f, p);
+  applyKnob(Card::Unison, 0, 0.5f, p);
   check(std::fabs(p.unison.tuning.lfoHz[0] - 0.60f) < 1e-5f, "unison rate: the RATE knob drives the mapping");
 }
 
@@ -316,7 +343,7 @@ void checkShownNumbers() {
         "shown: a percent reads whole numbers and no plus");
   check(knobShown(mix, 5.0f) == 100 && knobShown(mix, -1.0f) == 0 && knobShown(mix, NAN) == 0,
         "shown: a continuous reading clamps to 0..1");
-  const KnobDesc& time = *knobDesc(Card::Slapback, 1);
+  const KnobDesc& time = *knobDesc(Card::Slapback, 0);
   check(knobShown(time, 0.0f) == 60 && knobShown(time, 1.0f) == 250, "shown: slapback time spans 60 to 250 ms");
 }
 
@@ -358,9 +385,9 @@ void checkCells() {
       {Card::Gate, 1, 4},        // 5..1000 ms
       {Card::InputGate, 0, 3},   // -80..-30 dB is a sign cell and 2 digits
       {Card::InputGate, 1, 4},   // 20..2000 ms
-      {Card::Slapback, 1, 3},    // 60..250 ms
+      {Card::Slapback, 0, 3},    // 60..250 ms
       {Card::Autotune, 1, 3},    // 5..500 ms response
-      {Card::Distortion, 0, 3},  // 0..100 %
+      {Card::Distortion, 1, 3},  // 0..100 %
       {Card::Autotune, 0, 0},    // the key has names, not a number
   };
   for (const Case& c : cases) {
@@ -453,6 +480,7 @@ void checkRegistry() {
   checkIds();
   checkCardTable();
   checkGroups();
+  checkAmountKnobIsB();
   checkKnobsMove();
   checkKnobTargets();
   checkKnobClamps();
