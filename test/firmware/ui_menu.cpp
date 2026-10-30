@@ -107,7 +107,7 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kOutput, kTopSwitch, kReverb, kPolishComp, kPolishEq, kDebug, kHpf, kLpf, kLearn, kUpdate, kExit, kRowCount
+  kInput, kOutput, kTopSwitch, kReverb, kPolishComp, kPolishEq, kDebug, kHpf, kLpf, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 7;
 
@@ -120,7 +120,7 @@ std::string defaultRow(int r, bool cursor) {
   static const char* const text[kRowCount] = {"INPUT: MIC",      "OUTPUT: LINE",  "TOP SWITCH: MUTE",
                                               "REVERB: SPRING",  "POLISH COMP: ON", "POLISH EQ: ON",
                                               "DEBUG: OFF",      "HPF: 120",       "LPF: 12k",
-                                              "GATE LEARN >",    "UPDATE FIRMWARE >", "EXIT"};
+                                              "UPDATE FIRMWARE >", "EXIT"};
   return std::string(cursor ? ">" : " ") + text[r];
 }
 
@@ -156,7 +156,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 12, "menu: the list holds twelve items");
+  check(kRowCount == 11, "menu: the list holds eleven items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string want = defaultRow(r, r == kInput);
     check(listRowIs(m.canvas, r, want.c_str(), r == kInput), want.c_str());
@@ -165,7 +165,7 @@ void checkMenuList() {
 
   m.step(-1, false);
   m.draw();
-  check(listRowIs(m.canvas, kVisible - 1, ">EXIT", true) && listRowIs(m.canvas, 0, " POLISH EQ: ON"),
+  check(listRowIs(m.canvas, kVisible - 1, ">EXIT", true) && listRowIs(m.canvas, 0, " POLISH COMP: ON"),
         "menu: turning back from 0 wraps to the last item, which scrolls in at the bottom");
   m.step(1, false);
   m.draw();
@@ -173,11 +173,11 @@ void checkMenuList() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 7 to 11; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 4 to 0. Each expected canvas is composed from literal y values.
+// Going down it scrolls at items 7 to 10; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 3 to 0. Each expected canvas is composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4};
 
   MenuRig m;
   m.step(0, true);
@@ -198,7 +198,7 @@ void checkMenuScroll() {
 
   m.step(-1, false);  // 0 back one wraps to the last item
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: a turn back from item 0 wraps to Exit with the window at its end");
+  check(sameCanvas(m.canvas, listCanvas(4, kExit)), "menu: a turn back from item 0 wraps to Exit with the window at its end");
   m.step(1, false);
   m.draw();
   check(sameCanvas(m.canvas, listCanvas(0, kInput)), "menu: a turn forward from Exit wraps to item 0 with the window at its start");
@@ -214,7 +214,7 @@ void checkMenuScroll() {
   MenuRig jump;
   jump.openListAt(kExit);
   jump.draw();
-  check(sameCanvas(jump.canvas, listCanvas(5, kExit)), "menu: a jump straight to Exit puts it on the last row");
+  check(sameCanvas(jump.canvas, listCanvas(4, kExit)), "menu: a jump straight to Exit puts it on the last row");
 }
 
 // The cursor and the window start over each time the menu opens.
@@ -222,7 +222,7 @@ void checkMenuScrollResets() {
   MenuRig m;
   m.openListAt(kExit);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: the list is scrolled to Exit");
+  check(sameCanvas(m.canvas, listCanvas(4, kExit)), "menu: the list is scrolled to Exit");
   check(m.step(0, true) == UiAction::None && !m.menu.open(), "menu: Exit closes the scrolled list");
   m.step(0, true);
   m.draw();
@@ -250,7 +250,7 @@ void checkMenuListPitch() {
   check(sameCanvas(m.canvas, listCanvas(0, kVisible - 1)), "menu: the cursor bar follows to the last visible row, lines 54 to 62");
   m.step(kExit - (kVisible - 1), false);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: the scrolled window keeps the same pitch and the bar on its last row");
+  check(sameCanvas(m.canvas, listCanvas(4, kExit)), "menu: the scrolled window keeps the same pitch and the bar on its last row");
   bool lastLineBlank = true;
   for (int x = 0; x < kCanvasWidth; ++x) lastLineBlank = lastLineBlank && !pixelOn(m.canvas, x, kCanvasHeight - 1);
   check(lastLineBlank, "menu: the last pixel line stays blank");
@@ -426,8 +426,8 @@ void checkMenuDebugRow() {
 // The HPF and LPF rows sit after DEBUG and show the default cutoffs. A click steps to the next
 // cutoff in the row's list and wraps after the last, so one lap of clicks returns to the default.
 void checkMenuCutoffRows() {
-  check(kHpf == kDebug + 1 && kLpf == kHpf + 1 && kLearn == kLpf + 1 && kUpdate == kLearn + 1,
-        "menu: HPF and LPF follow DEBUG, then GATE LEARN, then UPDATE FIRMWARE");
+  check(kHpf == kDebug + 1 && kLpf == kHpf + 1 && kUpdate == kLpf + 1,
+        "menu: HPF and LPF follow DEBUG, then UPDATE FIRMWARE");
   static const char* const kHpfAfterClick[] = {"150", "OFF", "80", "100", "120"};
   static const char* const kLpfAfterClick[] = {"OFF", "4k", "5k", "6k", "8k", "10k", "12k"};
   check(sizeof(kHpfAfterClick) / sizeof(kHpfAfterClick[0]) == static_cast<size_t>(cv::kHpfCount) &&
@@ -513,106 +513,6 @@ void checkMenuCutoffsSavedAndPlayed() {
   RecordStore reboot(rebooted);
   RecordData out;
   check(reboot.begin(out) && out.settings.hpf == 4 && out.settings.lpf == 1, "menu: the next boot loads HPF 150 and LPF 4k");
-}
-
-// GATE LEARN: a click starts the measurement, 2.0 s later the menu asks the sketch for the floor,
-// and the result screen shows the floor and the pot's threshold. The screen writes no setting.
-void checkMenuLearn() {
-  // The Input gate sits in slot 1 and its THRESHOLD knob maps -80..-30 dB, so -54 dB is position 0.52.
-  const auto knobFor = [](int db) { return (static_cast<float>(db) + 80.0f) / 50.0f; };
-
-  MenuRig m;
-  m.openListAt(kLearn);
-  m.draw();
-  check(listRowIs(m.canvas, rowOnScreen(kLearn), ">GATE LEARN >", true), "menu: the GATE LEARN row has the arrow of an action");
-  const Settings before = m.settings;
-  const Layout layoutBefore = m.layout;
-  const UiAction start = m.step(0, true);
-  check(start == UiAction::StartLearn && ui::applyAction(start, m.settings, m.layout) == ui::ApplyResult::LearnStart,
-        "menu: a click on GATE LEARN starts the measurement and changes nothing");
-  m.draw();
-  check(rowIs(m.canvas, 2, "Measuring the floor.") && rowIs(m.canvas, 4, "Keep the input quiet.") &&
-            rowIs(m.canvas, 0, "") && rowIs(m.canvas, 6, ""),
-        "menu: the measuring screen says so on rows 2 and 4");
-  check(m.step(0, false, kLearnMs - 20) == UiAction::None && m.menu.open(), "menu: before 2.0 s the measurement runs on");
-  const UiAction read = m.step(0, false, 20);
-  check(read == UiAction::ReadLearn && ui::applyAction(read, m.settings, m.layout) == ui::ApplyResult::LearnRead,
-        "menu: at 2.0 s the menu asks the sketch for the floor");
-  check(m.step(0, false) == UiAction::None, "menu: and asks only once");
-  m.menu.setLearnFloor(-62.0f);
-
-  // The pot sits exactly 8 dB over the floor: no note.
-  m.panel.knob[0][0] = knobFor(-54);
-  m.draw();
-  check(rowIs(m.canvas, 2, "FLOOR -62 dB") && rowIs(m.canvas, 4, "THRESHOLD -54 dB") && rowIs(m.canvas, 6, ""),
-        "menu: the result shows FLOOR -62 dB over THRESHOLD -54 dB and no note at floor plus 8 dB");
-  check(rowIs(m.canvas, 0, "") && rowIs(m.canvas, 1, "") && rowIs(m.canvas, 3, "") && rowIs(m.canvas, 5, "") &&
-            rowIs(m.canvas, 7, ""),
-        "menu: the result keeps a blank row between lines");
-  writePgm(m.canvas, "oled-learn-result.pgm");
-
-  // The threshold follows the pot while the screen is up, and the note comes and goes with it.
-  m.panel.knob[0][0] = knobFor(-55);
-  m.draw();
-  check(rowIs(m.canvas, 4, "THRESHOLD -55 dB") && rowIs(m.canvas, 6, "SET POT 8 dB ABOVE"),
-        "menu: a threshold under the floor plus 8 dB adds SET POT 8 dB ABOVE on row 6");
-  writePgm(m.canvas, "oled-learn-note.pgm");
-  m.panel.knob[0][0] = knobFor(-40);
-  m.draw();
-  check(rowIs(m.canvas, 4, "THRESHOLD -40 dB") && rowIs(m.canvas, 6, ""), "menu: and the note leaves when the pot goes up");
-
-  m.step(0, false, 60000);
-  check(m.menu.open(), "menu: the result stays up until a click or a turn");
-  check(m.step(0, true) == UiAction::None, "menu: a click leaves the result");
-  m.draw();
-  check(listRowIs(m.canvas, rowOnScreen(kLearn), ">GATE LEARN >", true), "menu: a click on the result returns to the list");
-  check(std::memcmp(&m.settings, &before, sizeof(Settings)) == 0 && m.layout == layoutBefore,
-        "menu: the whole of LEARN wrote no setting and no layout");
-
-  // A turn leaves too.
-  MenuRig turn;
-  turn.openListAt(kLearn);
-  ui::applyAction(turn.step(0, true), turn.settings, turn.layout);
-  turn.step(0, false, kLearnMs);
-  turn.menu.setLearnFloor(-70.0f);
-  turn.step(1, false);
-  turn.draw();
-  check(listRowIs(turn.canvas, rowOnScreen(kLearn), ">GATE LEARN >", true),
-        "menu: a turn leaves the result for the list, the cursor still on GATE LEARN");
-
-  // A click while it measures drops the measurement.
-  MenuRig cancel;
-  cancel.openListAt(kLearn);
-  cancel.step(0, true);
-  check(cancel.step(0, true, 500) == UiAction::None, "menu: a click during the measurement asks for nothing");
-  cancel.draw();
-  check(listRowIs(cancel.canvas, rowOnScreen(kLearn), ">GATE LEARN >", true) && cancel.step(0, false, 5000) == UiAction::None,
-        "menu: a click during the measurement returns to the list and no floor is asked for later");
-
-  // The floor is whole dB and never wider than the row.
-  MenuRig wide;
-  wide.openListAt(kLearn);
-  wide.step(0, true);
-  wide.step(0, false, kLearnMs);
-  wide.menu.setLearnFloor(-120.0f);
-  wide.panel.knob[0][0] = 0.0f;
-  wide.draw();
-  check(rowIs(wide.canvas, 2, "FLOOR -120 dB") && rowIs(wide.canvas, 4, "THRESHOLD -80 dB") && rowIs(wide.canvas, 6, ""),
-        "menu: a silent input reads FLOOR -120 dB and the lowest pot THRESHOLD -80 dB");
-  wide.menu.setLearnFloor(-61.6f);
-  wide.draw();
-  check(rowIs(wide.canvas, 2, "FLOOR -62 dB"), "menu: the floor rounds to whole dB");
-
-  // With no Input gate card the screen has no pot to read.
-  MenuRig none;
-  none.layout.card[0] = Card::Empty;
-  none.openListAt(kLearn);
-  none.step(0, true);
-  none.step(0, false, kLearnMs);
-  none.menu.setLearnFloor(-62.0f);
-  none.draw();
-  check(rowIs(none.canvas, 2, "FLOOR -62 dB") && rowIs(none.canvas, 4, "THRESHOLD NONE") && rowIs(none.canvas, 6, ""),
-        "menu: with no Input gate card the threshold line reads NONE");
 }
 
 // What the box saves and plays is what the menu showed.
@@ -804,7 +704,7 @@ void checkScreenshots() {
   MenuRig scrolled;
   scrolled.openListAt(kExit);
   scrolled.draw();
-  check(sameCanvas(scrolled.canvas, listCanvas(5, kExit)), "screens: scrolled menu rows");
+  check(sameCanvas(scrolled.canvas, listCanvas(4, kExit)), "screens: scrolled menu rows");
   writePgm(scrolled.canvas, "oled-menu-scrolled.pgm");
 
   m.menu.showChainView();
@@ -842,7 +742,6 @@ void checkMenu() {
   checkMenuDebugRow();
   checkMenuCutoffRows();
   checkMenuCutoffsSavedAndPlayed();
-  checkMenuLearn();
   checkMenuClicksSavedAndPlayed();
   checkMenuSavedThroughStore();
   checkMenuWrapAndCombo();

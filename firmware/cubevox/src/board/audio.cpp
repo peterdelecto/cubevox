@@ -158,9 +158,9 @@ volatile uint32_t gInputSamples = 0;
 volatile float gOutputSumSquares = 0.0f;
 volatile uint32_t gOutputSamples = 0;
 
-// The Input gate's highest detector level in each GateWindow, raised by the block interrupt.
-constexpr size_t kGateWindows = 2;
-std::array<volatile float, kGateWindows> gGatePeak = {};
+// The Input gate's highest detector level since the last audioTakeGatePeak(), raised by the block
+// interrupt.
+volatile float gGatePeak = 0.0f;
 
 #ifdef CUBEVOX_BENCH_CLIP
 volatile bool gClipOn = false;
@@ -185,13 +185,11 @@ void addChainCycles(const ChainCycles& cycles) {
   addSlotTime(kStatCond, cycles.conditioning);
 }
 
-// Moves the Input gate's detector peak from this block into both windows. A compare and a store,
-// no division.
+// Moves the Input gate's detector peak from this block into the running peak. A compare and a
+// store, no division.
 void noteGatePeak() {
   const float peak = gChain.inputGate.takeDetectorPeak();
-  for (size_t w = 0; w < kGateWindows; ++w) {
-    if (peak > gGatePeak[w]) gGatePeak[w] = peak;
-  }
+  if (peak > gGatePeak) gGatePeak = peak;
 }
 
 // Engine clears per silent block. One per block keeps the largest clear inside the block budget.
@@ -862,11 +860,10 @@ level::OutputEnergy audioTakeOutputEnergy() {
   return energy;
 }
 
-float audioTakeGatePeak(GateWindow window) {
-  const size_t w = static_cast<size_t>(window);
+float audioTakeGatePeak() {
   NVIC_DisableIRQ(SWPMI1_IRQn);
-  const float peak = gGatePeak[w];
-  gGatePeak[w] = 0.0f;
+  const float peak = gGatePeak;
+  gGatePeak = 0.0f;
   NVIC_EnableIRQ(SWPMI1_IRQn);
   return peak;
 }

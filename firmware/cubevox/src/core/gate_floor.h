@@ -1,6 +1,5 @@
 // The Input gate's detector peak as a level in dBFS. The audio interrupt keeps the peak as a linear
-// value, so the logarithm runs on the main loop. LEARN and the status reply's `floor_dbfs` both
-// read it.
+// value, so the logarithm runs on the main loop. The status reply's `floor_dbfs` reads it.
 
 #pragma once
 

@@ -92,8 +92,6 @@ bool applyAction(UiAction action, uint32_t nowMs) {
       gPublish.markStale();
       return true;
     case ui::ApplyResult::EnterDfu: enterDfu(nowMs); break;
-    case ui::ApplyResult::LearnStart: audioTakeGatePeak(GateWindow::Learn); break;  // drops the stale peak
-    case ui::ApplyResult::LearnRead: gMenu.setLearnFloor(peakDbfs(audioTakeGatePeak(GateWindow::Learn))); break;
     case ui::ApplyResult::None: break;
   }
   return false;
@@ -129,7 +127,7 @@ void replyStatus(uint32_t id) {
   status.audioLatched = health.latched;
   status.stalled = faultAudioStalled();
   status.powerTrips = powerSenseTrips();
-  status.floorDbfs = peakDbfs(audioTakeGatePeak(GateWindow::Status));
+  status.floorDbfs = peakDbfs(audioTakeGatePeak());
   protocol::replyStatus(serialWriter(), id, status);
 }
 

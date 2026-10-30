@@ -1,5 +1,5 @@
 // Effect registry: the cards Adam can place in a slot, their knobs, groups and costs.
-// Firmware is the only source of truth; the Mac app learns this table over `hello`.
+// Firmware is the only source of truth; the Mac app reads this table over `hello`.
 // Spec: docs/specs/2026-10-08-effect-registry-design.md.
 
 #pragma once

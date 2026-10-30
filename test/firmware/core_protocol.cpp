@@ -431,8 +431,8 @@ void checkStatusWidest() {
         "proto: the widest status reply fits every piece");
 }
 
-// The Input gate's detector peak reads as dBFS for the status reply and for GATE LEARN. Silence, a
-// NaN and anything under -120 dBFS read as the floor of the scale.
+// The Input gate's detector peak reads as dBFS for the status reply's `floor_dbfs`. Silence, a NaN
+// and anything under -120 dBFS read as the floor of the scale.
 void checkGateFloorLevel() {
   check(peakDbfs(1.0f) == 0.0f && std::fabs(peakDbfs(0.5f) - (-6.0206f)) < 1e-3f && std::fabs(peakDbfs(0.001f) - (-60.0f)) < 1e-3f,
         "floor: a linear peak reads as 20 log10 in dBFS");

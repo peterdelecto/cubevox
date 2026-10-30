@@ -43,8 +43,6 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
       settings.lpf = static_cast<uint8_t>((settings.lpf + 1) % cv::kLpfCount);
       return ApplyResult::SettingsChanged;
     case UiAction::SwapReverb: return swapReverb(layout);
-    case UiAction::StartLearn: return ApplyResult::LearnStart;
-    case UiAction::ReadLearn: return ApplyResult::LearnRead;
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;
   }

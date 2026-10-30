@@ -15,8 +15,6 @@ enum class ApplyResult : uint8_t {
   SettingsChanged,  // a setting flipped, so the snapshot and the saved record need updating
   LayoutChanged,    // the layout changed, so the snapshot and the saved record need updating and the audio fades
   EnterDfu,         // nothing changed; the caller mutes and resets into the bootloader
-  LearnStart,       // nothing changed; the caller restarts the floor measurement
-  LearnRead,        // nothing changed; the caller reads the floor and gives it to the menu
 };
 
 // Applies `action` to `settings` and `layout`. Each toggle flips its setting, the top switch cycles,

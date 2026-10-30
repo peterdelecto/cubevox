@@ -1,6 +1,5 @@
 #include "ui/menu.h"
 
-#include <math.h>
 #include <stdio.h>
 
 #include "core/fonts.h"
@@ -33,16 +32,6 @@ constexpr char kHavePrefix[] = "You have ";
 // warn gate can prove the row never truncates.
 constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix) - 1) - 1;
 
-// Gate learn screens, on the same alternate rows. The result shows the measured floor and the
-// pot's threshold, and a note while the threshold sits under the floor plus kLearnMarginDb.
-constexpr int kRowLearnFloor = 2;
-constexpr int kRowLearnThreshold = 4;
-constexpr int kRowLearnNote = 6;
-constexpr int kLearnMarginDb = 8;
-// Levels print inside this range, so a row never outgrows its columns.
-constexpr int kShownDbMin = -999;
-constexpr int kShownDbMax = 999;
-
 enum class Item : uint8_t {
   InputJack,
   Output,
@@ -53,7 +42,6 @@ enum class Item : uint8_t {
   Debug,
   Hpf,
   Lpf,
-  GateLearn,
   UpdateFirmware,
   Exit,
   Count,
@@ -88,7 +76,6 @@ const char* itemLabel(Item it) {
     case Item::Debug: return "DEBUG:";
     case Item::Hpf: return "HPF:";
     case Item::Lpf: return "LPF:";
-    case Item::GateLearn: return "GATE LEARN >";
     case Item::UpdateFirmware: return "UPDATE FIRMWARE >";
     case Item::Exit: return "EXIT";
     case Item::Count: break;
@@ -107,8 +94,6 @@ template <size_t N>
 const char* listText(const std::array<const char*, N>& text, uint8_t index) {
   return text[index < N ? index : N - 1];
 }
-
-int clampShownDb(int db) { return db < kShownDbMin ? kShownDbMin : (db > kShownDbMax ? kShownDbMax : db); }
 
 // The reverb card the layout holds, or NONE when no slot has one.
 const char* reverbValue(const Layout& layout) {
@@ -172,49 +157,9 @@ void drawStarting(MenuFrame& f) {
   putRow(f, kRowConfirmVersion, "Wait a moment.");
 }
 
-// Shows for the 2.0 s the sketch measures the input gate's detector.
-void drawLearning(MenuFrame& f) {
-  putRow(f, kRowLearnFloor, "Measuring the floor.");
-  putRow(f, kRowLearnThreshold, "Keep the input quiet.");
-}
-
-// The THRESHOLD knob of the slot that holds the Input gate card, in whole dB. False when no slot
-// holds the card.
-bool inputGateThresholdShown(const UiContext& ctx, int& shownDb) {
-  const KnobDesc* knob = knobDesc(Card::InputGate, 0);
-  if (knob == nullptr) return false;
-  for (int s = 0; s < kSlotCount; ++s) {
-    if (ctx.layout.card[s] != Card::InputGate) continue;
-    shownDb = knobShown(*knob, ctx.panel.knob[s][0]);
-    return true;
-  }
-  return false;
-}
-
-// The floor the measurement found over the threshold the pot sits at now. Both read in whole dB.
-// The note shows while the pot sits less than kLearnMarginDb above the floor, and never when the
-// layout has no Input gate to set.
-void drawLearnResult(MenuFrame& f, const UiContext& ctx, float floorDb) {
-  const int floorShown = clampShownDb(static_cast<int>(lroundf(floorDb)));
-  char line[kDisplayCols + 1];
-  snprintf(line, sizeof(line), "FLOOR %d dB", floorShown);
-  putRow(f, kRowLearnFloor, line);
-
-  int thresholdShown = 0;
-  const bool hasGate = inputGateThresholdShown(ctx, thresholdShown);
-  thresholdShown = clampShownDb(thresholdShown);
-  if (hasGate) {
-    snprintf(line, sizeof(line), "THRESHOLD %d dB", thresholdShown);
-  } else {
-    snprintf(line, sizeof(line), "THRESHOLD NONE");
-  }
-  putRow(f, kRowLearnThreshold, line);
-  if (hasGate && thresholdShown < floorShown + kLearnMarginDb) putRow(f, kRowLearnNote, "SET POT 8 dB ABOVE");
-}
-
 }  // namespace
 
-UiAction Menu::onClick(uint32_t nowMs) {
+UiAction Menu::onClick() {
   switch (mode_) {
     case Mode::Idle:
       mode_ = Mode::List;
@@ -232,18 +177,12 @@ UiAction Menu::onClick(uint32_t nowMs) {
         case Item::Debug: return UiAction::ToggleDebug;
         case Item::Hpf: return UiAction::CycleHpf;
         case Item::Lpf: return UiAction::CycleLpf;
-        case Item::GateLearn:
-          mode_ = Mode::Learning;
-          learnStartMs_ = nowMs;
-          return UiAction::StartLearn;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;
         case Item::Count: break;
       }
       break;
-    case Mode::ChainView:
-    case Mode::Learning:
-    case Mode::LearnResult: mode_ = Mode::List; break;
+    case Mode::ChainView: mode_ = Mode::List; break;
     case Mode::ConfirmDfu:
       mode_ = Mode::Starting;
       return UiAction::EnterDfu;
@@ -261,7 +200,7 @@ void Menu::onTurn(int32_t detents) {
     } else if (cursor_ >= top_ + kVisibleRows) {
       top_ = static_cast<uint8_t>(cursor_ - kVisibleRows + 1);
     }
-  } else if (mode_ == Mode::ConfirmDfu || mode_ == Mode::Learning || mode_ == Mode::LearnResult) {
+  } else if (mode_ == Mode::ConfirmDfu) {
     mode_ = Mode::List;
   }
 }
@@ -270,14 +209,8 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   if (!listening_) return UiAction::None;
   if (in.detents != 0 || in.click) lastActivityMs_ = nowMs;
   if (in.detents != 0) onTurn(in.detents);
-  UiAction action = in.click ? onClick(nowMs) : UiAction::None;
-  if (mode_ == Mode::Learning && nowMs - learnStartMs_ >= kLearnMs) {
-    mode_ = Mode::LearnResult;
-    action = UiAction::ReadLearn;
-  }
-  // The result stays up until a click or a turn, because the player sets the pot by eye against it.
-  const bool timesOut = mode_ != Mode::Idle && mode_ != Mode::Starting && mode_ != Mode::LearnResult;
-  if (timesOut && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
+  const UiAction action = in.click ? onClick() : UiAction::None;
+  if (mode_ != Mode::Idle && mode_ != Mode::Starting && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
   return action;
 }
 
@@ -290,8 +223,6 @@ void Menu::draw(const UiContext& ctx, Canvas& canvas) {
     case Mode::ChainView: drawChainView(frame, ctx.layout); break;
     case Mode::ConfirmDfu: drawConfirmDfu(frame); break;
     case Mode::Starting: drawStarting(frame); break;
-    case Mode::Learning: drawLearning(frame); break;
-    case Mode::LearnResult: drawLearnResult(frame, ctx, learnFloorDb_); break;
   }
   if (shownValid_ && frame == shown_) return;
   shown_ = frame;

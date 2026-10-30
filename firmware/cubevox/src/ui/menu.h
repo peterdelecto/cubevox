@@ -33,13 +33,8 @@ enum class UiAction : uint8_t {
   CycleHpf,    // the input high-pass moves to the next cutoff in its list
   CycleLpf,    // the same for the low-pass
   SwapReverb,  // the layout's reverb card changes between Spring and Chasm
-  StartLearn,  // GATE LEARN opened; the sketch restarts the floor measurement
-  ReadLearn,   // the 2.0 s measurement ran; the sketch hands the floor to setLearnFloor
   EnterDfu,
 };
-
-// How long GATE LEARN listens to the input gate's detector.
-constexpr uint32_t kLearnMs = 2000;
 
 // Read-only state the screens draw. `layout` names the cards, `panel` holds the knob readings and
 // `settings` the menu values. `topSwitchOn` says the top switch sits in its engaged position,
@@ -80,14 +75,10 @@ class Menu {
   // Opens the read-only chain view. No list row opens it, so only the proof writer calls this.
   void showChainView() { mode_ = Mode::ChainView; }
 
-  // Gives the result screen the floor the 2.0 s measurement found, in dBFS. Call it when update()
-  // returns ReadLearn. The screen shows the threshold live from the panel reading.
-  void setLearnFloor(float floorDb) { learnFloorDb_ = floorDb; }
-
  private:
-  enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu, Starting, Learning, LearnResult };
+  enum class Mode : uint8_t { Idle, List, ChainView, ConfirmDfu, Starting };
 
-  UiAction onClick(uint32_t nowMs);
+  UiAction onClick();
   void onTurn(int32_t detents);
 
   Mode mode_ = Mode::Idle;
@@ -95,8 +86,6 @@ class Menu {
   uint8_t cursor_ = 0;  // the item under the cursor
   uint8_t top_ = 0;     // the first item the list shows; it scrolls to keep the cursor in view
   uint32_t lastActivityMs_ = 0;
-  uint32_t learnStartMs_ = 0;
-  float learnFloorDb_ = 0.0f;
   MenuFrame shown_ = {};
   bool shownValid_ = false;
 };

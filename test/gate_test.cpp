@@ -427,9 +427,9 @@ bool testInputGateNoise() {
   return ok;
 }
 
-// Gaussian white noise follows the LEARN rule: the detector peak over 2 s is the floor, and a
-// threshold 8 dB above it keeps the gate shut for the next 10 s. The peak window restarts on each take.
-bool testInputGateLearnRule() {
+// Gaussian white noise: the detector peak over 2 s is the floor, and a threshold 8 dB above it
+// keeps the gate shut for the next 10 s. The peak window restarts on each take.
+bool testInputGateFloorMargin() {
   class Gauss {
    public:
     float next() {
@@ -449,7 +449,7 @@ bool testInputGateLearnRule() {
   const float rms = dbfs(-62.0);
   Gauss noise;
   cv::GateParams p = boxInputGate(1.0f, 0.0f);
-  p.thresholdDb = 0.0f;  // the learn pass: never opens
+  p.thresholdDb = 0.0f;  // the measuring pass: never opens
   Probe r;
   r.gate.reset();
   for (int n = 0; n < 2 * cv::kSampleRate; ++n) r.step(rms * noise.next(), p);
@@ -464,7 +464,7 @@ bool testInputGateLearnRule() {
   }
   const double second = 20.0 * std::log10(static_cast<double>(r.gate.takeDetectorPeak()));
   const bool ok = peak > 0.0f && again == 0.0f && floorDb > -62.0 && floorDb < -45.0 && maxGain < -79.9f && second < floorDb + 8.0;
-  return report("input gate learn rule", ok,
+  return report("input gate floor margin", ok,
                 "white noise at -62 dB rms: floor %.1f dBFS over 2 s, threshold floor + 8 keeps the gate shut (max gain %.1f dB), the next 10 s peak %.1f dBFS",
                 floorDb, static_cast<double>(maxGain), second);
 }
@@ -496,7 +496,7 @@ int main() {
   ok &= testInputGatePots();
   ok &= testInputGateBurst();
   ok &= testInputGateNoise();
-  ok &= testInputGateLearnRule();
+  ok &= testInputGateFloorMargin();
   ok &= testDetectorPeakWindow();
   return ok ? 0 : 1;
 }
