@@ -51,6 +51,7 @@ LayoutCheck layoutValid(const Layout& layout) {
     if (d.group == Group::Reverb) ++reverbs;
   }
   if (reverbs > 1) return fail(LayoutError::TwoReverbs, 0, Card::Empty, 0);
+  if (reverbs == 0) return fail(LayoutError::NoReverb, 0, Card::Empty, 0);
   if (avg > costs::kBudgetAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, avg);
   if (worst > costs::kBudgetWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, worst);
   return LayoutCheck();
@@ -72,6 +73,7 @@ void layoutReason(const LayoutCheck& check, char* buf, size_t size) {
     case LayoutError::BadCard: snprintf(buf, size, "card id out of range in slot %d", check.slot + 1); break;
     case LayoutError::SameCardTwice: snprintf(buf, size, "same card twice: %s", cardDesc(check.card).id); break;
     case LayoutError::TwoReverbs: snprintf(buf, size, "two reverb cards"); break;
+    case LayoutError::NoReverb: snprintf(buf, size, "no reverb card"); break;
     case LayoutError::OverAvg: snprintf(buf, size, "over CPU budget (mean %d %%)", check.percent); break;
     case LayoutError::OverWorst: snprintf(buf, size, "over CPU budget (worst %d %%)", check.percent); break;
   }

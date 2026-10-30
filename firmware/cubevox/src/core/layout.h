@@ -23,13 +23,14 @@ inline bool operator!=(const Layout& a, const Layout& b) { return !(a == b); }
 // Slot 1 to kSlotCount as shipped.
 Layout defaultLayout();
 
-// The slot that holds a reverb card (Spring or Chasm), or -1 when none does.
+// The slot that holds a reverb card (Spring or Chasm). A valid layout always holds one; -1 only
+// for a layout that failed layoutValid.
 int reverbSlot(const Layout& layout);
 
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
 
-enum class LayoutError : uint8_t { None, BadCard, SameCardTwice, TwoReverbs, OverAvg, OverWorst };
+enum class LayoutError : uint8_t { None, BadCard, SameCardTwice, TwoReverbs, NoReverb, OverAvg, OverWorst };
 
 // Outcome of layoutValid. The fields beside `error` say which slot, card or percentage broke the rule.
 struct LayoutCheck {
@@ -41,7 +42,7 @@ struct LayoutCheck {
   bool ok() const { return error == LayoutError::None; }
 };
 
-// Placement rules of the registry spec: ids in range, no card twice (Empty excepted), at most one reverb card, and the
+// Placement rules of the registry spec: ids in range, no card twice (Empty excepted), exactly one reverb card, and the
 // placed costs plus the fixed term under the average and worst-block lines.
 LayoutCheck layoutValid(const Layout& layout);
 

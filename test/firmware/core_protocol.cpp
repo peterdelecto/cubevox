@@ -223,8 +223,12 @@ void checkResolveErrors() {
             std::strcmp(why, "two reverb cards") == 0, "proto: two reverbs");
   check(!resolveIds((std::string("\"slapback\",\"input_gate\",") + tail).c_str(), l, why, sizeof why) &&
             std::strcmp(why, "same card twice: slapback") == 0, "proto: duplicate card");
-  check(resolveIds("\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\"", l, why, sizeof why) &&
-            l.card[3] == Card::Empty, "proto: all-empty layout is accepted");
+  check(!resolveIds("\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\"", l, why, sizeof why) &&
+            std::strcmp(why, "no reverb card") == 0, "proto: all-empty layout has no reverb card");
+  check(!resolveIds((std::string("\"input_gate\",") + tail + ",\"empty\"").c_str(), l, why, sizeof why) &&
+            std::strcmp(why, "no reverb card") == 0, "proto: a layout without a reverb card is rejected");
+  check(resolveIds("\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"empty\",\"reverb_spring\"", l, why, sizeof why) &&
+            l.card[3] == Card::Empty && l.card[7] == Card::ReverbSpring, "proto: one reverb card among Empty slots is accepted");
 }
 
 // An id longer than the clip width is cut short, and the cut text never matches a real card.

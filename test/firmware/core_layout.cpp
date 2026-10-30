@@ -54,7 +54,24 @@ void checkLayoutValid() {
   twoReverbs.card[0] = Card::ReverbChasm;
   c = layoutValid(twoReverbs);
   layoutReason(c, why, sizeof why);
-  check(!c.ok() && std::strcmp(why, "two reverb cards") == 0, "second reverb card is rejected");
+  check(!c.ok() && c.error == LayoutError::TwoReverbs && std::strcmp(why, "two reverb cards") == 0,
+        "second reverb card is rejected");
+  Layout noReverb = defaultLayout();
+  noReverb.card[7] = Card::Empty;
+  c = layoutValid(noReverb);
+  layoutReason(c, why, sizeof why);
+  check(!c.ok() && c.error == LayoutError::NoReverb && std::strcmp(why, "no reverb card") == 0,
+        "a layout with no reverb card is rejected");
+  Layout allEmpty;
+  allEmpty.card.fill(Card::Empty);
+  check(layoutValid(allEmpty).error == LayoutError::NoReverb, "an all-Empty layout is rejected for its missing reverb card");
+  Layout chasm = defaultLayout();
+  chasm.card[7] = Card::ReverbChasm;
+  check(layoutValid(chasm).ok(), "a layout with Chasm as its one reverb card is accepted");
+  Layout movedReverb = defaultLayout();
+  movedReverb.card[0] = Card::ReverbSpring;
+  movedReverb.card[7] = Card::Empty;
+  check(layoutValid(movedReverb).ok(), "the one reverb card may sit in any slot");
   Layout twice = defaultLayout();
   twice.card[7] = twice.card[4];
   c = layoutValid(twice);
@@ -217,6 +234,12 @@ void checkRecoverLayout() {
   check(badCard.replaced && badCard.why.error == LayoutError::BadCard && badCard.why.slot == 5 &&
             outOfRange == defaultLayout(),
         "recover: a bad card id is replaced and names its slot");
+
+  Layout noReverb = defaultLayout();
+  noReverb.card[7] = Card::Empty;
+  const Recovery missing = recoverLayout(noReverb);
+  check(missing.replaced && missing.why.error == LayoutError::NoReverb && noReverb == defaultLayout(),
+        "recover: a layout with no reverb card becomes the default");
 }
 
 }  // namespace

@@ -149,7 +149,7 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kOutput, kTopSwitch, kReverb, kPolishComp, kPolishEq, kDebug, kHpf, kLpf, kUpdate, kExit, kRowCount
+  kInput, kHpf, kLpf, kReverb, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
 
@@ -159,9 +159,9 @@ constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible -
 
 // The label of each item, and the value it shows for the default settings. Exit has no value and
 // Update firmware shows a chevron.
-const char* const kLabel[kRowCount] = {"INPUT",       "OUTPUT",    "TOP SWITCH", "REVERB", "POLISH COMP", "POLISH EQ",
-                                       "DEBUG",       "HPF",       "LPF",        "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"MIC", "LINE", "MUTE", "SPRING", "ON", "ON", "OFF", "120 Hz", "12 kHz", ">", ""};
+const char* const kLabel[kRowCount] = {"INPUT",  "HPF",    "LPF",    "REVERB", "POLISH COMP", "POLISH EQ",
+                                       "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+const char* const kDefaultValue[kRowCount] = {"MIC", "120 Hz", "12 kHz", "SPRING", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
 
 // The row as the test names it: the label, then the value after a space.
 std::string rowName(int item, const char* value) {
@@ -215,7 +215,7 @@ void checkMenuList() {
 
   m.step(-1, false);
   m.draw();
-  check(listRowIs(m.canvas, kVisible - 1, "EXIT", "", true) && listRowIs(m.canvas, 0, "HPF", "120 Hz"),
+  check(listRowIs(m.canvas, kVisible - 1, "EXIT", "", true) && listRowIs(m.canvas, 0, "TOP SWITCH", "MUTE"),
         "menu: turning back from 0 wraps to the last item, which scrolls in at the bottom");
   m.step(1, false);
   m.draw();
@@ -251,7 +251,7 @@ void checkMenuListGeometry() {
     int thenStep;
     int top;
   };
-  const View views[] = {{kInput, 0, 0}, {kOutput, 0, 0}, {kHpf, 0, 4}, {kExit, 0, 7}, {kExit, -1, 7}};
+  const View views[] = {{kInput, 0, 0}, {kHpf, 0, 0}, {kTopSwitch, 0, 4}, {kExit, 0, 7}, {kExit, -1, 7}};
   bool seen[kRowCount] = {};
   for (const View& v : views) {
     MenuRig row;
@@ -284,14 +284,14 @@ void checkMenuListGeometry() {
   };
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
-      {kOutput, {"LINE", "MIC"}},
-      {kTopSwitch, {"MUTE", "BYPASS"}},
-      {kReverb, {"SPRING", "CHASM", "NONE"}},
-      {kPolishComp, {"ON", "OFF"}},
-      {kPolishEq, {"ON", "OFF"}},
-      {kDebug, {"ON", "OFF"}},
       {kHpf, {"OFF", "80 Hz", "100 Hz", "120 Hz", "150 Hz"}},
       {kLpf, {"OFF", "4 kHz", "5 kHz", "6 kHz", "8 kHz", "10 kHz", "12 kHz"}},
+      {kReverb, {"SPRING", "CHASM"}},
+      {kPolishComp, {"ON", "OFF"}},
+      {kPolishEq, {"ON", "OFF"}},
+      {kOutput, {"LINE", "MIC"}},
+      {kTopSwitch, {"MUTE", "BYPASS"}},
+      {kDebug, {"ON", "OFF"}},
       {kUpdate, {">"}},
   };
   int tightest = 999;
@@ -341,7 +341,7 @@ void checkMenuScroll() {
   m.step(3, false);
   m.step(4, false);  // one pass of four steps leaves the window just far enough to show item 7
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(4, kHpf)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
+  check(sameCanvas(m.canvas, listCanvas(4, kTopSwitch)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
   m.step(-2, false);
   m.draw();
   check(sameCanvas(m.canvas, listCanvas(4, kPolishEq)), "menu: and a multi-step turn back inside the window leaves it where it is");
@@ -418,43 +418,47 @@ bool cursorRowIs(const Canvas& canvas, int r, int item, const char* value) {
   return listRowIs(canvas, r, kLabel[item], value, true);
 }
 
-// What a click on each of the first seven rows asks for, what applying it reports, and the value the
-// row shows once the click is applied and once a second click undoes it. The reverb click changes
-// the layout, so it reports LayoutChanged. The others change a setting.
+// What a click on each of the seven rows that flip a value asks for, what applying it reports, and the
+// value the row shows once the click is applied and once a second click undoes it. The rows are in
+// list order. HPF and LPF step through a longer list, so checkMenuCutoffRows covers them. The reverb
+// click changes the layout, so it reports LayoutChanged. The others change a setting.
 struct Click {
+  int item;
   UiAction action;
   ui::ApplyResult result;
   const char* after;
   const char* back;
 };
 constexpr std::array<Click, 7> kClicks = {{
-    {UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
-    {UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
-    {UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
-    {UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
-    {UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
-    {UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
-    {UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
+    {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
+    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
+    {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
+    {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
+    {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
+    {kTopSwitch, UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
+    {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
 }};
 
-// Opens the list and clicks each of the first seven rows once, top to bottom, applying each action.
-// The cursor walks down one step at a time, so item r sits on list row rowOnScreen(r). Returns the
-// settings the clicks left; the layout stays in `m`.
+// Opens the list and clicks each row of kClicks once, top to bottom, applying each action. The
+// cursor walks down from item 0, so a row past the fourth sits on the last list row, rowOnScreen(item).
+// Returns the settings the clicks left; the layout stays in `m`.
 Settings clickEveryRow(MenuRig& m) {
   m.step(0, true);
-  for (int r = kInput; r <= kDebug; ++r) {
-    if (r > kInput) m.step(1, false);
+  int at = kInput;
+  for (const Click& c : kClicks) {
+    if (c.item != at) m.step(c.item - at, false);
+    at = c.item;
     const UiAction a = m.step(0, true);
-    const std::string name = rowName(r, kClicks[r].after);
-    check(a == kClicks[r].action && ui::applyAction(a, m.settings, m.layout) == kClicks[r].result, name.c_str());
+    const std::string name = rowName(c.item, c.after);
+    check(a == c.action && ui::applyAction(a, m.settings, m.layout) == c.result, name.c_str());
     m.draw();
-    check(cursorRowIs(m.canvas, rowOnScreen(r), r, kClicks[r].after), name.c_str());
+    check(cursorRowIs(m.canvas, rowOnScreen(c.item), c.item, c.after), name.c_str());
   }
   return m.settings;
 }
 
-// Each of the first seven rows asks for its action, applying it flips the row's setting or swaps the
-// reverb card, and a second click flips it back.
+// Each row of kClicks asks for its action, applying it flips the row's setting or swaps the reverb
+// card, and a second click flips it back.
 void checkMenuClicks() {
   MenuRig m;
   const Settings flipped = clickEveryRow(m);
@@ -462,13 +466,17 @@ void checkMenuClicks() {
             flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass && flipped.debug,
         "menu: six clicks flipped the six settings");
   check(m.layout.card[7] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
-  for (int r = kDebug; r >= kInput; --r) {
-    if (r < kDebug) m.step(-1, false);
+  int at = kDebug;
+  const int topAtDebug = kDebug - (kVisible - 1);  // the window the walk down left
+  for (int i = static_cast<int>(kClicks.size()) - 1; i >= 0; --i) {
+    const Click& c = kClicks[i];
+    if (c.item != at) m.step(c.item - at, false);
+    at = c.item;
     const UiAction a = m.step(0, true);
     ui::applyAction(a, m.settings, m.layout);
     m.draw();
-    const int row = r > kVisible - 1 ? r - (kVisible - 1) : 0;  // the window from item 3 holds as the cursor walks back
-    check(cursorRowIs(m.canvas, row, r, kClicks[r].back), rowName(r, kClicks[r].back).c_str());
+    const int row = c.item > topAtDebug ? c.item - topAtDebug : 0;  // the window holds until the cursor passes its top
+    check(cursorRowIs(m.canvas, row, c.item, c.back), rowName(c.item, c.back).c_str());
   }
   check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute && !m.settings.debug &&
@@ -485,16 +493,16 @@ void checkMenuReverbValue() {
   };
   Layout chasm = defaultLayout();
   chasm.card[7] = Card::ReverbChasm;
-  Layout none = defaultLayout();
-  none.card[7] = Card::Empty;
   Layout moved = defaultLayout();  // the reverb card in slot 1, with Empty where it was
   moved.card[0] = Card::ReverbChasm;
   moved.card[7] = Card::Empty;
+  Layout none = defaultLayout();  // never valid; the row still names a card
+  none.card[7] = Card::Empty;
   const Case cases[] = {
       {"Spring", defaultLayout(), "SPRING"},
       {"Chasm", chasm, "CHASM"},
-      {"no reverb card", none, "NONE"},
       {"Chasm in slot 1", moved, "CHASM"},
+      {"a layout with no reverb card", none, "SPRING"},
   };
   for (const Case& c : cases) {
     MenuRig m;
@@ -507,7 +515,7 @@ void checkMenuReverbValue() {
 }
 
 // A click on REVERB swaps the card in the slot that holds it, between Spring and Chasm, and leaves
-// every other slot alone. With no reverb card it asks for the swap and nothing changes.
+// every other slot alone.
 void checkMenuReverbClick() {
   MenuRig m;
   m.openListAt(kReverb);
@@ -533,21 +541,9 @@ void checkMenuReverbClick() {
   check(ui::applyAction(moved.step(0, true), moved.settings, moved.layout) == ui::ApplyResult::LayoutChanged &&
             moved.layout.card[0] == Card::ReverbSpring && moved.layout.card[7] == Card::Empty,
         "menu: the card swaps in the slot that holds it");
-
-  MenuRig none;
-  none.layout.card[7] = Card::Empty;
-  none.openListAt(kReverb);
-  const Layout noneBefore = none.layout;
-  const Settings settingsBefore = none.settings;
-  const UiAction click = none.step(0, true);
-  check(click == UiAction::SwapReverb && ui::applyAction(click, none.settings, none.layout) == ui::ApplyResult::None &&
-            none.layout == noneBefore && std::memcmp(&none.settings, &settingsBefore, sizeof(Settings)) == 0,
-        "menu: with no reverb card a click changes nothing");
-  none.draw();
-  check(cursorRowIs(none.canvas, rowOnScreen(kReverb), kReverb, "NONE"), "menu: and the row still reads NONE");
 }
 
-// The DEBUG row toggles its setting, shows OFF by default and keeps its place below POLISH EQ.
+// The DEBUG row toggles its setting, shows OFF by default and sits below TOP SWITCH.
 void checkMenuDebugRow() {
   MenuRig m;
   m.openListAt(kDebug);
@@ -563,11 +559,11 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The HPF and LPF rows sit after DEBUG and show the default cutoffs. A click steps to the next
+// The HPF and LPF rows sit after INPUT and show the default cutoffs. A click steps to the next
 // cutoff in the row's list and wraps after the last, so one lap of clicks returns to the default.
 void checkMenuCutoffRows() {
-  check(kHpf == kDebug + 1 && kLpf == kHpf + 1 && kUpdate == kLpf + 1,
-        "menu: HPF and LPF follow DEBUG, then UPDATE FIRMWARE");
+  check(kHpf == kInput + 1 && kLpf == kHpf + 1 && kReverb == kLpf + 1,
+        "menu: HPF and LPF follow INPUT, then REVERB");
   static const char* const kHpfAfterClick[] = {"150 Hz", "OFF", "80 Hz", "100 Hz", "120 Hz"};
   static const char* const kLpfAfterClick[] = {"OFF", "4 kHz", "5 kHz", "6 kHz", "8 kHz", "10 kHz", "12 kHz"};
   check(sizeof(kHpfAfterClick) / sizeof(kHpfAfterClick[0]) == static_cast<size_t>(cv::kHpfCount) &&
@@ -722,14 +718,14 @@ void checkMenuWrapAndCombo() {
   MenuRig m;
   m.openListAt(kRowCount + 2);  // a full lap and two more detents lands on item 2
   m.draw();
-  check(cursorRowIs(m.canvas, kTopSwitch, kTopSwitch, "MUTE"), "menu: +13 detents wraps around the list");
+  check(cursorRowIs(m.canvas, rowOnScreen(kLpf), kLpf, "12 kHz"), "menu: +13 detents wraps around the list");
   m.step(-(kRowCount + 2), false);  // back by the same lands on item 0
   m.draw();
   check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: -13 detents wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
-  check(n.step(1, true) == UiAction::ToggleOutput, "menu: a turn and a click in one pass act on the new cursor");
+  check(n.step(1, true) == UiAction::CycleHpf, "menu: a turn and a click in one pass act on the new cursor");
 }
 
 void checkMenuScreens() {
@@ -831,7 +827,7 @@ void checkMenuRedraw() {
   clearAllDirty(m.canvas);
   m.step(1, false);
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, 0, "INPUT", "LINE") && cursorRowIs(m.canvas, 1, kOutput, "LINE"),
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, 0, "INPUT", "LINE") && cursorRowIs(m.canvas, 1, kHpf, "120 Hz"),
         "menu: a cursor move repaints");
   clearAllDirty(m.canvas);
   m.step(4, false);  // the cursor passes the last row to item 5, so the window scrolls to start at item 2

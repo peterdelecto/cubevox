@@ -34,16 +34,17 @@ constexpr char kHavePrefix[] = "You have ";
 // warn gate can prove the row never truncates.
 constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix) - 1) - 1;
 
+// The rows top to bottom.
 enum class Item : uint8_t {
   InputJack,
-  Output,
-  TopSwitch,
+  Hpf,
+  Lpf,
   Reverb,
   PolishComp,
   PolishEq,
+  Output,
+  TopSwitch,
   Debug,
-  Hpf,
-  Lpf,
   UpdateFirmware,
   Exit,
   Count,
@@ -97,11 +98,11 @@ const char* listText(const std::array<const char*, N>& text, uint8_t index) {
   return text[index < N ? index : N - 1];
 }
 
-// The reverb card the layout holds, or NONE when no slot has one.
+// The reverb card the layout holds. A valid layout always holds one; a layout without one reads
+// SPRING, the default.
 const char* reverbValue(const Layout& layout) {
   const int slot = reverbSlot(layout);
-  if (slot < 0) return "NONE";
-  return layout.card[slot] == Card::ReverbSpring ? "SPRING" : "CHASM";
+  return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
 }
 
 const char* itemValue(Item it, const UiContext& ctx) {
