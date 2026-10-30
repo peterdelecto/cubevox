@@ -35,6 +35,11 @@ toward the front, so "toward the rear edge" is +y there.
    holes Ø3.0 on the same 30.4 x 28.5 grid, north edge 2.0 mm north of the pin row, glass
    34.5 x 23.0 x 1.3 centred on the PCB and 0.2 mm above it, header body 2.5 mm tall under the
    PCB at the pin row, pins no more than 8.5 mm below the PCB.
+   Measured on board 1 with the printed adapter (owner 2026-10-30): the top of the glass sits
+   exactly 11.75 mm above the top of the main PCB. The drawing's stack (seat 8.0 + PCB 1.2 +
+   gap 0.2 + glass 1.3) gives 10.7 mm, so the real module stands 1.05 mm higher than the model,
+   in the module's own PCB thickness, glass tape or glass. The enclosure takes the measured
+   11.75 mm, 0.05 mm under the 11.8 mm panel plane.
 4. Observed (owner 2026-10-27): with the module plugged in, its holes sit about 1 mm north of
    the board's holes. The drawing's hole position is wrong by that amount; the grid itself is
    not in question.
