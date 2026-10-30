@@ -131,15 +131,19 @@ void checkCanvasFallback() {
 
 // The key names write a flat as a lowercase b and minor as a lowercase m. The 9X12 and 16X24 fonts
 // ink a flat sign in the b cell, and 16X24 inks a minor-key m in the m cell, so those keep their own
-// glyphs, while every blank lowercase cell still draws as its capital.
+// glyphs. The unit letters d, s and t are inked lowercase in both fonts, and every other blank
+// lowercase cell still draws as its capital.
 void checkFlatGlyph() {
   const auto own = [](const FontDesc& font, char c) { return glyphIndex(font, c) == static_cast<int>(c) - 0x20; };
   check(own(font9x12(), 'b') && own(font16x24(), 'b'), "flat: 9X12 and 16X24 draw b from its own inked cell");
   check(own(font9x12(), 'm') && own(font16x24(), 'm'), "minor: 9X12 and 16X24 draw m from its own inked cell");
+  bool unitsOwn = true;
+  for (const char c : {'d', 's', 't'}) unitsOwn = unitsOwn && own(font9x12(), c) && own(font16x24(), c);
+  check(unitsOwn, "units: 9X12 and 16X24 draw d, s and t from their own inked cells");
   check(glyphIndex(font5x7(), 'b') == glyphIndex(font5x7(), 'B'), "flat: 5x7 has no flat, so b draws as B");
   bool othersMap = true;
   for (char c = 'a'; c <= 'z'; ++c) {
-    if (c == 'b' || c == 'm') continue;
+    if (c == 'b' || c == 'm' || c == 'd' || c == 's' || c == 't') continue;
     othersMap = othersMap && glyphIndex(font9x12(), c) == glyphIndex(font9x12(), static_cast<char>(c - 'a' + 'A'));
     othersMap = othersMap && glyphIndex(font16x24(), c) == glyphIndex(font16x24(), static_cast<char>(c - 'a' + 'A'));
   }
