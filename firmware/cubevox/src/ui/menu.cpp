@@ -10,17 +10,19 @@ namespace {
 
 constexpr uint32_t kMenuTimeoutMs = 15000;
 
-// Menu list: one row per item, no title row.
-constexpr int kRowListFirstItem = 0;
+// Menu list: one row per item, no title row, drawn in the 7X12 font (owner 2026-10-30). The list
+// shows four rows at a time, 16 px apart, and scrolls over the rest.
+constexpr int kVisibleRows = 4;
+constexpr int kListRowPitchPx = 16;
 
-// The list shows seven rows at a time, which leaves breathing room, so they sit 9 px apart (owner
-// 2026-10-24). The list holds more items than that and scrolls.
-constexpr int kVisibleRows = 7;
-constexpr int kListRowPitchPx = 9;
-
-// The text sits 1 px below its row top, so the cursor bar keeps 1 px clear above and below it
-// (owner 2026-10-12).
+// The 12 px text sits 1 px below its row top, so the cursor bar, 14 px tall, keeps 1 px clear above
+// and below it (owner rule of 2026-10-12) and leaves 2 px of dark before the next row.
 constexpr int kListTextTopPx = 1;
+constexpr int kListBarHeightPx = 14;
+
+// The label's first ink column and the value's last one.
+constexpr int kListLabelInkX = 1;
+constexpr int kListValueInkRightX = 126;
 
 // Firmware update confirmation. Prose in the 5x7 font sits on alternate rows (owner rule).
 constexpr int kRowConfirmTitle = 0;
@@ -50,9 +52,8 @@ enum class Item : uint8_t {
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
 static_assert(kItemCount >= kVisibleRows, "the list scrolls only when it holds more items than it shows");
-static_assert(kRowListFirstItem + kVisibleRows <= kDisplayRows, "the visible menu rows must fit on the screen");
-static_assert((kRowListFirstItem + kVisibleRows) * kListRowPitchPx < kCanvasHeight,
-              "the visible menu rows must fit at their pitch and leave the last pixel line blank");
+static_assert((kVisibleRows - 1) * kListRowPitchPx + kListBarHeightPx < kCanvasHeight,
+              "the last cursor bar must fit on the canvas and leave the last pixel line blank");
 
 // Rows past the screen are dropped; text clips to the row width.
 void putRow(MenuFrame& frame, int r, const char* text) {
@@ -67,16 +68,16 @@ void putRow(MenuFrame& frame, int r, const char* text) {
 
 const char* itemLabel(Item it) {
   switch (it) {
-    case Item::InputJack: return "INPUT:";
-    case Item::Output: return "OUTPUT:";
-    case Item::TopSwitch: return "TOP SWITCH:";
-    case Item::Reverb: return "REVERB:";
-    case Item::PolishComp: return "POLISH COMP:";
-    case Item::PolishEq: return "POLISH EQ:";
-    case Item::Debug: return "DEBUG:";
-    case Item::Hpf: return "HPF:";
-    case Item::Lpf: return "LPF:";
-    case Item::UpdateFirmware: return "UPDATE FIRMWARE >";
+    case Item::InputJack: return "INPUT";
+    case Item::Output: return "OUTPUT";
+    case Item::TopSwitch: return "TOP SWITCH";
+    case Item::Reverb: return "REVERB";
+    case Item::PolishComp: return "POLISH COMP";
+    case Item::PolishEq: return "POLISH EQ";
+    case Item::Debug: return "DEBUG";
+    case Item::Hpf: return "HPF";
+    case Item::Lpf: return "LPF";
+    case Item::UpdateFirmware: return "UPDATE FIRMWARE";
     case Item::Exit: return "EXIT";
     case Item::Count: break;
   }
@@ -86,8 +87,9 @@ const char* itemLabel(Item it) {
 const char* onOff(bool on) { return on ? "ON" : "OFF"; }
 
 // The cutoff lists as the rows show them, in the order of cv::kHpfCutoffHz and cv::kLpfCutoffHz.
-constexpr std::array<const char*, cv::kHpfCount> kHpfText = {"OFF", "80", "100", "120", "150"};
-constexpr std::array<const char*, cv::kLpfCount> kLpfText = {"OFF", "4k", "5k", "6k", "8k", "10k", "12k"};
+constexpr std::array<const char*, cv::kHpfCount> kHpfText = {"OFF", "80 Hz", "100 Hz", "120 Hz", "150 Hz"};
+constexpr std::array<const char*, cv::kLpfCount> kLpfText = {"OFF",   "4 kHz", "5 kHz",  "6 kHz",
+                                                             "8 kHz", "10 kHz", "12 kHz"};
 
 // An index past a list reads as the last entry, like the settings do.
 template <size_t N>
@@ -114,20 +116,36 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::Debug: return onOff(s.debug);
     case Item::Hpf: return listText(kHpfText, s.hpf);
     case Item::Lpf: return listText(kLpfText, s.lpf);
+    case Item::UpdateFirmware: return ">";
     default: return "";
   }
 }
 
-// Draws the kVisibleRows items from `top` on, with the cursor mark in front of item `cursor`.
-void drawList(MenuFrame& f, const UiContext& ctx, int cursor, int top) {
-  for (int row = 0; row < kVisibleRows; ++row) {
-    const int i = top + row;
-    const Item it = static_cast<Item>(i);
-    const char* value = itemValue(it, ctx);
-    char line[kDisplayCols + 1];
-    snprintf(line, sizeof(line), "%s%s%s%s", i == cursor ? ">" : " ", itemLabel(it), value[0] != '\0' ? " " : "",
-             value);
-    putRow(f, kRowListFirstItem + row, line);
+// Writes the value of each of the kVisibleRows items from `top` on into row 0 to kVisibleRows - 1 of
+// the frame. A row past the last item stays empty.
+void listValues(MenuFrame& f, const UiContext& ctx, int top) {
+  for (int row = 0; row < kVisibleRows && top + row < kItemCount; ++row) {
+    putRow(f, row, itemValue(static_cast<Item>(top + row), ctx));
+  }
+}
+
+// Paints the list from the values in `f`: each label at the left edge, each value ending at the
+// right ink column, and the cursor row inverted over its bar.
+void paintList(Canvas& canvas, const MenuFrame& f, int cursor, int top) {
+  const FontDesc& font = font7x12();
+  for (int row = 0; row < kVisibleRows && top + row < kItemCount; ++row) {
+    const int y = row * kListRowPitchPx + kListTextTopPx;
+    canvas.drawText(kListLabelInkX, y, font, itemLabel(static_cast<Item>(top + row)));
+    const char* value = f[row].data();
+    if (value[0] != '\0') canvas.drawText(kListValueInkRightX + 1 - Canvas::textWidth(font, value), y, font, value);
+  }
+  canvas.invertRect(0, (cursor - top) * kListRowPitchPx, kCanvasWidth, kListBarHeightPx);
+}
+
+// Paints the 5x7 text rows on the 8 px grid.
+void paintRows(Canvas& canvas, const MenuFrame& f) {
+  for (int r = 0; r < kDisplayRows; ++r) {
+    if (f[r][0]) canvas.drawText(0, r * kDisplayRowPx, font5x7(), f[r].data());
   }
 }
 
@@ -216,25 +234,26 @@ UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
 
 void Menu::draw(const UiContext& ctx, Canvas& canvas) {
   if (mode_ == Mode::Idle) return;
-  MenuFrame frame = {};
+  Drawn now;
+  now.mode = mode_;
   switch (mode_) {
     case Mode::Idle: break;
-    case Mode::List: drawList(frame, ctx, cursor_, top_); break;
-    case Mode::ChainView: drawChainView(frame, ctx.layout); break;
-    case Mode::ConfirmDfu: drawConfirmDfu(frame); break;
-    case Mode::Starting: drawStarting(frame); break;
+    case Mode::List:
+      now.cursor = cursor_;
+      now.top = top_;
+      listValues(now.text, ctx, top_);
+      break;
+    case Mode::ChainView: drawChainView(now.text, ctx.layout); break;
+    case Mode::ConfirmDfu: drawConfirmDfu(now.text); break;
+    case Mode::Starting: drawStarting(now.text); break;
   }
-  if (shownValid_ && frame == shown_) return;
-  shown_ = frame;
+  if (shownValid_ && now == shown_) return;
+  shown_ = now;
   shownValid_ = true;
   canvas.clear();
-  const bool list = mode_ == Mode::List;
-  const int pitch = list ? kListRowPitchPx : kDisplayRowPx;
-  const int textTop = list ? kListTextTopPx : 0;
-  for (int r = 0; r < kDisplayRows; ++r) {
-    if (frame[r][0]) canvas.drawText(0, r * pitch + textTop, font5x7(), frame[r].data());
-  }
-  if (list) {
-    canvas.invertRect(0, (kRowListFirstItem + cursor_ - top_) * pitch, kCanvasWidth, kListRowPitchPx);
+  if (mode_ == Mode::List) {
+    paintList(canvas, now.text, cursor_, top_);
+  } else {
+    paintRows(canvas, now.text);
   }
 }
