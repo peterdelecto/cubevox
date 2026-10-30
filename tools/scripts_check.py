@@ -4,8 +4,9 @@
 It covers the version bump, the output-dir and variant rules of firmware/build.sh, the bench symbol
 check, the boot-line match of term.py, the dfu-util check of bringup.py, the DIAG.TXT blocks line
 that bringup.py parses against the one the bootloader's diag.c writes, the version guard of
-flash.sh, the .clangd rewrite, and the pins and release steps that must agree across build.sh and
-the workflows. Nothing here opens a serial port, a window or a drive.
+flash.sh, the .clangd rewrite, the bootloader's font against the application's 5x7, and the pins
+and release steps that must agree across build.sh and the workflows. Nothing here opens a serial
+port, a window or a drive.
 
   python3 -I tools/scripts_check.py
 """
@@ -290,6 +291,21 @@ def clangd_failures():
     return failed
 
 
+def bootloader_font_failures():
+    """The bootloader's font is the application's 5x7 font, so both draw the same glyphs."""
+    app_rel = "firmware/cubevox/src/core/fonts.cpp"
+    boot_rel = "firmware/bootloader/boards/cubevox/fonts.cpp"
+    app_text = read(os.path.join(ROOT, app_rel))
+    app = re.search(r"^constexpr FontDesc k5x7 = CUBEVOX_DESCRIBE\((\w+),", app_text, re.M)
+    boot = sorted(set(re.findall(r"\bf::(\w+)::", read(os.path.join(ROOT, boot_rel)))))
+    if not app:
+        return [f"{app_rel} has no k5x7 CUBEVOX_DESCRIBE line the check can read"]
+    if boot != [app.group(1)]:
+        return [f"{boot_rel} uses {', '.join(boot) or 'no f:: namespace'}, "
+                f"but {app_rel} names the 5x7 font {app.group(1)}"]
+    return []
+
+
 def workflow_failures():
     """The release gate and the CI test flag stay in the workflows."""
     release = read(os.path.join(WORKFLOWS, "release.yml"))
@@ -328,7 +344,8 @@ def syntax_failures():
 
 
 CHECKS = [bump_failures, build_query_failures, pin_failures, symbol_failures, term_failures,
-          bringup_failures, diag_text_failures, flash_failures, clangd_failures, workflow_failures, syntax_failures]
+          bringup_failures, diag_text_failures, flash_failures, clangd_failures, bootloader_font_failures,
+          workflow_failures, syntax_failures]
 
 
 def main():
