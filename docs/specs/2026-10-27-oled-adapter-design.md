@@ -41,7 +41,12 @@ toward the front, so "toward the rear edge" is +y there.
    The model (`hardware/tools/model_oled_sh1106.py`, the STEP in `cubevox.3dshapes`) now sits on
    the 8.0 mm seat with PCB 1.6, tape 0.65 and glass 1.5, which lands the glass top at 11.75 mm;
    only the total is measured, the split is the usual make-up of these modules. The enclosure
-   takes the measured 11.75 mm, 0.05 mm under the 11.8 mm panel plane.
+   takes the measured 11.75 mm, 0.05 mm under the 11.8 mm panel plane. In the Fusion document
+   (2026-10-30) the regenerated STEP is inserted at the root as `OLED-1.3-SH1106-I2C-4P (2)`,
+   origin on the main PCB's top face at the hand-placed XY (79.785, -42.5), so its PCB rests on
+   the 8.0 seat and its glass top reads 11.75 above the board; the earlier hand-placed
+   occurrence `(1)`, whose glass was raised to 11.78 with the drawing's stack and whose PCB
+   floated 1.08 above the seat, is hidden, not deleted, in case the lid work references it.
 4. Observed (owner 2026-10-27): with the module plugged in, its holes sit about 1 mm north of
    the board's holes. The drawing's hole position is wrong by that amount; the grid itself is
    not in question.
