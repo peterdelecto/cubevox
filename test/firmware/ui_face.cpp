@@ -500,7 +500,9 @@ void checkKnobMovedGuards() {
   check(sameCanvas(r.live, readoutScreen(r.layout, 2, 0, 12.0f)), "face: a stepped knob reads its step as a signed number");
 }
 
-// The 120 ms release runs on real time, so a tick that comes late lets the ribbon fall further.
+// The window top falls in real time, so a tick that comes late reads against a lower top and stands
+// taller. After a full-scale tick the top falls 0.4 dB in 40 ms and 4.8 dB in 480 ms, so a tick at
+// -6 dBFS reads 0.525 (12 px) on time and 0.871 (19 px) late.
 void checkLateTick() {
   FaceRig onTime;
   FaceRig late;
@@ -508,16 +510,16 @@ void checkLateTick() {
   late.ticks(3);
   onTime.tick(1.0f);
   late.tick(1.0f);
-  onTime.tick();
-  late.now += 80;  // this tick lands 120 ms after the loud one
-  late.tick();
+  onTime.tick(dbToLinear(-6.0f));
+  late.now += 440;  // this tick lands 480 ms after the loud one
+  late.tick(dbToLinear(-6.0f));
 
   // The newest column is solid to `h` either side of the horizon, and the rim lies one row beyond.
   const auto reaches = [](const Canvas& c, int h) {
     return lit(c, 126, 32 - h) && lit(c, 126, 32 + h) && !lit(c, 126, 32 - h - 2) && !lit(c, 126, 32 + h + 2);
   };
-  check(reaches(onTime.live, 17), "face: 40 ms after a full-scale tick the ribbon has fallen to 17 px");
-  check(reaches(late.live, 10), "face: 120 ms after it, when the tick came late, the ribbon has fallen to 10 px");
+  check(reaches(onTime.live, 12), "face: 40 ms after a full-scale tick, a tick at -6 dBFS reads 12 px");
+  check(reaches(late.live, 19), "face: 480 ms after it, when the tick came late, a tick at -6 dBFS reads 19 px");
 }
 
 void checkWalkOnPanel() {
@@ -663,10 +665,11 @@ bool meterShows(const Canvas& c, int segments) {
   return ok;
 }
 
-// The voice at three levels, through the whole path. The output feeds the ribbon, which scales to
-// its own peak. The window top sits at -30 dBFS or at the level, whichever is louder, so a steady
-// level under -30 dBFS shows by its place in the 44 dB under that mark and a steady level over it
-// shows full. The input feeds the meter, which reads absolute dB from -50 to 0 on 16 segments.
+// The voice at three levels, through the whole path. The output feeds the ribbon, which reads each
+// tick's amplitude over the window top's. The top sits at -30 dBFS or at the level, whichever is
+// louder, so a steady level under -30 dBFS shows its amplitude over that mark's (-40 dBFS is 0.316
+// and 7 px, -36 dBFS is 0.501 and 11 px) and a steady level over it shows full. The input feeds the
+// meter, which reads absolute dB from -50 to 0 on 16 segments.
 void checkVoiceLevels() {
   struct Case {
     float outDb;
@@ -676,8 +679,8 @@ void checkVoiceLevels() {
     const char* pgm;
   };
   const Case cases[] = {
-      {-50.0f, 13, -40.0f, 3, "oled-voice-quiet.pgm"},
-      {-45.0f, 16, -30.0f, 6, "oled-voice-mid.pgm"},
+      {-40.0f, 7, -40.0f, 3, "oled-voice-quiet.pgm"},
+      {-36.0f, 11, -30.0f, 6, "oled-voice-mid.pgm"},
       {-8.0f, 22, -6.0f, 14, "oled-voice-loud.pgm"},
   };
   for (const Case& c : cases) {
@@ -702,7 +705,7 @@ void checkVoiceLevels() {
 
     r.ticks(14);
     check(lit(r.live, 126, 32) && !lit(r.live, 126, 31) && !lit(r.live, 126, 33) && !lit(r.live, 125, 31),
-          ("voice: 14 ticks after " + out + " the 120 ms release is back on the line").c_str());
+          ("voice: 14 ticks after " + out + " the ribbon is back on the line").c_str());
     check(meterShows(r.live, 0), ("voice: 14 ticks after " + in + " the meter has released to its empty box").c_str());
     writePgm(r.live, c.pgm);
   }

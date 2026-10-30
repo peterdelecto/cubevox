@@ -87,6 +87,24 @@ float easeInOut(float p) {
 }
 int roundInt(float v) { return static_cast<int>(std::lround(v)); }
 
+// The ribbon's level rule, coded here from the spec text (Voice 2 and 3) and not from the firmware,
+// so the host test compares the firmware against an independent model. The top follows the tick's
+// level in dBFS up at once and down at 10 dB/s, never under -30. The floor follows it down at once,
+// never under -60, and up at 3 dB/s, never over the top less 12. A tick under the floor plus 6 dB
+// is 0, and any other tick is its amplitude over the top's.
+struct RibbonWindow {
+  float top = -30.0f;
+  float floor = -60.0f;
+
+  float step(float db, float dt) {
+    top = db > top ? db : std::max(-30.0f, top - 10.0f * dt);
+    floor = db < floor ? std::max(db, -60.0f) : floor + 3.0f * dt;
+    floor = std::min(floor, top - 12.0f);
+    if (db < floor + 6.0f) return 0.0f;
+    return clamp01(std::pow(10.0f, (db - top) / 20.0f));
+  }
+};
+
 constexpr uint8_t kBayer[8][8] = {
     {0, 32, 8, 40, 2, 34, 10, 42},    {48, 16, 56, 24, 50, 18, 58, 26},
     {12, 44, 4, 36, 14, 46, 6, 38},   {60, 28, 52, 20, 62, 30, 54, 22},
@@ -207,7 +225,7 @@ int digitsClipped(Frame& f, int x, int y, const FontDesc& font, const char* s, i
 // frame 0, after `delay` frames of silence, or keeps it silent.
 
 struct Voice {
-  std::vector<float> perf;  // the ribbon's level per frame, 0..1, scaled to the performance's own peak
+  std::vector<float> perf;  // the ribbon's level per frame, 0..1, each frame's amplitude over the recent peak's
   std::vector<float> bar;   // the bar's level per frame, 0..1, absolute and linear in dB from -50 to 0 dBFS
   int delay = 0;
   bool silent = false;
@@ -263,7 +281,7 @@ bool readWav16(const char* path, std::vector<float>& mono, uint32_t& rate) {
   return false;
 }
 
-// RMS per frame, the three takes with breaths between, smoothed for the display.
+// RMS per frame, the three takes with breaths between, turned into the ribbon's and the bar's levels.
 bool buildVoice(Voice& voice) {
   const char* takes[] = {"samples/adam_vox_sample_3s.wav", "samples/adam_vox_sample2_4s.wav",
                          "samples/adam_vox_sample3_5s.wav"};
@@ -284,20 +302,13 @@ bool buildVoice(Voice& voice) {
     }
     raw.insert(raw.end(), breaths[k], 0.0f);
   }
-  std::vector<float> sorted = raw;
-  std::sort(sorted.begin(), sorted.end());
-  const float ref = std::max(1e-6f, sorted[sorted.size() * 98 / 100]);
-
-  float smooth = 0;
+  RibbonWindow window;
   float barSmooth = 0;
-  const float release = std::exp(-kDt / 0.12f);
   const float barRelease = std::exp(-kDt / kBarReleaseS);
   for (float r : raw) {
-    const float level = std::pow(clamp01(r / ref), 0.6f);
-    smooth = level > smooth ? level : level + (smooth - level) * release;
-    voice.perf.push_back(smooth < 0.01f ? 0.0f : smooth);
-
     const float db = r > 0.0f ? 20.0f * std::log10(r) : -200.0f;
+    voice.perf.push_back(window.step(db, kDt));
+
     const float pos = clamp01((db - kBarFloorDb) / -kBarFloorDb);
     barSmooth = pos >= barSmooth ? pos : pos + (barSmooth - pos) * barRelease;
     if (barSmooth < kBarSilence) barSmooth = 0.0f;
@@ -443,7 +454,7 @@ Frame voiceScreen(LevelAt ribbonAt, int segments) {
   }
   for (int x = kRibbonLeft; x <= kRibbonRight; ++x) {
     const float e = ribbonAt((kRibbonRight - x) / kScrollPxPerFrame);
-    const int h = roundInt(std::pow(e, 0.8f) * kHalfMax);
+    const int h = roundInt(clamp01(e) * kHalfMax);
     if (h <= 0) {
       f.set(x, cy);
       continue;
@@ -455,8 +466,8 @@ Frame voiceScreen(LevelAt ribbonAt, int segments) {
   return f;
 }
 
-// The rest screen shows Adam's voice. The ribbon is the performance scaled to its own peak, the way
-// the self-scaling output window shows it, and the meter is the same take at its absolute level.
+// The rest screen shows Adam's voice. The ribbon is each frame's amplitude over the recent peak's,
+// the way the output window shows it, and the meter is the same take at its absolute level.
 Frame restScreen(const Live& L) {
   return voiceScreen([&L](int age) { return L.voice->at(L.frame - age); },
                      roundInt(L.voice->barAt(L.frame) * kSegments));
@@ -465,32 +476,14 @@ Frame restScreen(const Live& L) {
 // ---------------------------------------------------------------------------------------------
 // The scripted drive of scene 12, which test/firmware/ui_face.cpp repeats tick for tick. The input
 // holds kScriptInDb and the output cycles through twelve levels, one per frame. The ribbon level
-// follows the box's rule. The window top jumps to a louder tick and falls 10 dB a second, never
-// below -30 dBFS. The level is the tick's place between the window's bottom and its top, raised to
-// 0.6, with an instant attack and a 120 ms release. The bottom is 44 dB under the top but never
-// under -60 dBFS, so a tick under -60 dBFS is silence.
+// follows the box's rule in RibbonWindow.
 constexpr float kScriptInDb = -23.0f;
 constexpr float kScriptOutDb[12] = {-30, -24, -19, -12, -8, -14, -20, -26, -32, -40, -52, -60};
 
 std::vector<float> scriptedRibbon(int frames) {
   std::vector<float> levels;
-  float top = -30.0f;
-  float level = 0.0f;
-  const float release = std::exp(-kDt / 0.12f);
-  for (int k = 0; k < frames; ++k) {
-    const float d = kScriptOutDb[k % 12];
-    if (d > top) {
-      top = d;
-    } else {
-      top = std::max(-30.0f, top - 10.0f * kDt);
-    }
-    const float bottom = std::max(top - 44.0f, -60.0f);
-    const float position = clamp01((d - bottom) / (top - bottom));
-    const float now = std::pow(position, 0.6f);
-    level = now >= level ? now : now + (level - now) * release;
-    if (level < 0.01f) level = 0.0f;
-    levels.push_back(level);
-  }
+  RibbonWindow window;
+  for (int k = 0; k < frames; ++k) levels.push_back(window.step(kScriptOutDb[k % 12], kDt));
   return levels;
 }
 
@@ -564,7 +557,7 @@ const Effect kEffects[] = {
 };
 
 // Scene 1: the rest screen while Adam sings, from an empty line. The bar reads his level in
-// absolute dB and the ribbon the same take scaled to its own peak, so the two differ.
+// absolute dB and the ribbon the same take against its own recent peak, so the two differ.
 Scene voiceScene(Voice& voice) {
   return {"1", "voice-line", kVoiceSceneS, [&voice](int i, float, Caption& cap) {
             voice.delay = kFps / 2;

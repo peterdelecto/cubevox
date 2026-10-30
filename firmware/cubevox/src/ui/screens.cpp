@@ -10,9 +10,6 @@
 
 namespace {
 
-// Raises the level before it becomes a height, so a quiet voice still shows.
-constexpr float kRibbonCurve = 0.8f;
-
 // Bayer level of the rim above and below the ribbon, which lights half of its pixels.
 constexpr int kRibbonRimLevel = 32;
 
@@ -146,9 +143,8 @@ int unitText(const KnobDesc& knob, char* out, int size) {
 }
 
 int ribbonHalfHeight(float level) {
-  if (!(level > 0.0f)) return 0;
-  const float shaped = powf(level > 1.0f ? 1.0f : level, kRibbonCurve);
-  return static_cast<int>(lroundf(shaped * static_cast<float>(kRibbonHalfMax)));
+  const float held = level > 0.0f ? (level < 1.0f ? level : 1.0f) : 0.0f;  // also catches NaN
+  return static_cast<int>(lroundf(held * static_cast<float>(kRibbonHalfMax)));
 }
 
 int meterSegments(float level) {

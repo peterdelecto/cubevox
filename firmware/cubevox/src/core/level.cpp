@@ -16,11 +16,6 @@ float clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
 
 }  // namespace
 
-float windowBottom(float top) {
-  const float bottom = top - kWindowSpanDb;
-  return bottom > kWindowFloorDbfs ? bottom : kWindowFloorDbfs;
-}
-
 float sumSquares(const float* in, int n) {
   float sum = 0.0f;
   for (int i = 0; i < n; ++i) sum += in[i] * in[i];
@@ -55,10 +50,15 @@ float OutputMeter::update(const OutputEnergy& energy, float dtMs) {
     top_ -= kWindowFallDbPerS * dtMs / 1000.0f;
     if (top_ < kWindowMinTopDbfs) top_ = kWindowMinTopDbfs;
   }
-  const float bottom = windowBottom(top_);
-  const float position = clamp01((db - bottom) / (top_ - bottom));
-  level_ = follow(level_, position > 0.0f ? powf(position, kCurve) : 0.0f, dtMs);
-  return level_;
+  if (db < floor_) {
+    floor_ = db > kWindowFloorDbfs ? db : kWindowFloorDbfs;
+  } else {
+    floor_ += kWindowFloorRiseDbPerS * dtMs / 1000.0f;
+  }
+  const float highest = top_ - kWindowFloorUnderTopDb;
+  if (floor_ > highest) floor_ = highest;
+  if (db < bottom()) return 0.0f;
+  return clamp01(powf(10.0f, (db - top_) / 20.0f));
 }
 
 }  // namespace level
