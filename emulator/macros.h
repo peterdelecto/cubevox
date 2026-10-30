@@ -87,12 +87,12 @@ constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
 constexpr Anchor kChmBassCutTop{200.0f, 100.0f, 40.0f, I::Log};
 
 // Spring
-constexpr Anchor kSbChirpA{0.55f, 0.70f, 0.85f};
-constexpr Anchor kSbChirpSections{12.0f, 24.0f, 32.0f, I::Round};
+constexpr Anchor kSbChirpA{0.65f, 0.80f, 0.90f};
+constexpr Anchor kSbChirpSections{16.0f, 32.0f, 32.0f, I::Round};  // the engine's kMaxSections tops it
 constexpr Anchor kSbWobbleDepth{2.0f, 8.0f, 24.0f};
 constexpr Anchor kSbWobbleRate{1.5f, 3.0f, 5.0f, I::Log};
 constexpr Anchor kSbDiffuse{0.45f, 0.30f, 0.15f};                    // less diffusion = crisper repeats
-constexpr Anchor kSbTrebleLoss{3000.0f, 6000.0f, 10000.0f, I::Log};
+constexpr Anchor kSbTrebleLoss{4500.0f, 9000.0f, 14000.0f, I::Log};
 
 // The default positions reproduce the engine tuning defaults; the --layout
 // probe fails when they drift apart.

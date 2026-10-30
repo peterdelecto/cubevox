@@ -423,11 +423,11 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   size_t used = std::strlen(gTuningText);
   const cv::SpringTuning& sb = params.reverb.spring.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
-                "\nSpringTuning{%.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, %.1ff, "
-                "%.2ff, %.2ff, %.1ff, %.2ff, %.1ff}",
-                sb.halfMs1, sb.halfMs2, sb.timeLo, sb.timeHi, sb.diffuse, sb.chirpSections, sb.chirpA,
-                sb.trebleLossHz, sb.bassCutHz, sb.wobbleDepth, sb.wobbleRateHz, sb.inputTrim,
-                sb.dwellDrive, sb.dwellComp, sb.wetDb);
+                "\nSpringTuning{%.1ff, %.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, "
+                "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff}",
+                sb.springMs1, sb.springMs2, sb.springMs3, sb.timeLo, sb.timeHi, sb.diffuse,
+                sb.chirpSections, sb.chirpA, sb.chirpSign, sb.trebleLossHz, sb.bassCutHz, sb.returnLpHz,
+                sb.wobbleDepth, sb.wobbleRateHz, sb.inputTrim, sb.dwellDrive, sb.dwellComp, sb.wetDb);
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
@@ -458,8 +458,9 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
       "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, airHz, trimDb\n"
-      "// SpringTuning: halfMs1, halfMs2, timeLo, timeHi, diffuse, chirpSections, chirpA, "
-      "trebleLossHz, bassCutHz, wobbleDepth, wobbleRateHz, inputTrim, dwellDrive, dwellComp, wetDb\n%s\n",
+      "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
+      "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
+      "dwellDrive, dwellComp, wetDb\n%s\n",
       gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
@@ -652,15 +653,19 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
     ImGui::TreePop();
   }
   if (tuningNode("Spring")) {
-    ImGui::SliderFloat("Echo spacing 1", &b.halfMs1, 10.0f, 80.0f, "%.1f ms");
-    ImGui::SliderFloat("Echo spacing 2", &b.halfMs2, 10.0f, 80.0f, "%.1f ms");
+    ImGui::SliderFloat("Echo spacing 1", &b.springMs1, 10.0f, 80.0f, "%.1f ms");
+    ImGui::SliderFloat("Echo spacing 2", &b.springMs2, 10.0f, 80.0f, "%.1f ms");
+    ImGui::SliderFloat("Echo spacing 3", &b.springMs3, 10.0f, 80.0f, "%.1f ms");
     ImGui::SliderFloat("Feedback at decay 0", &b.timeLo, 0.1f, 0.95f, "%.2f");
     ImGui::SliderFloat("Feedback at decay 1", &b.timeHi, 0.5f, 0.97f, "%.3f");
     ImGui::SliderFloat("Diffusion", &b.diffuse, 0.0f, 0.9f, "%.2f");
     ImGui::SliderInt("Sweep sections", &b.chirpSections, 0, 32);
     ImGui::SliderFloat("Sweep coefficient", &b.chirpA, 0.0f, 0.95f, "%.2f");
+    bool down = b.chirpSign < 0.0f;
+    if (ImGui::Checkbox("Sweep down", &down)) b.chirpSign = down ? -1.0f : 1.0f;
     ImGui::SliderFloat("Loop treble loss", &b.trebleLossHz, 1000.0f, 16000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Loop bass cut", &b.bassCutHz, 20.0f, 600.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Return low-pass", &b.returnLpHz, 1000.0f, 16000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Wobble depth", &b.wobbleDepth, 0.0f, 32.0f, "%.1f samples");
     ImGui::SliderFloat("Wobble rate", &b.wobbleRateHz, 0.1f, 10.0f, "%.2f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::TreePop();
