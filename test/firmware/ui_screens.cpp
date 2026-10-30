@@ -1,6 +1,6 @@
 // Checks the runtime screens on the host. Covers the readout against the proof renderer byte for
 // byte (settled, rolling and muted), its rows and edges, the key names with their flats, the voice
-// ribbon and the muted word. The proof PGMs go to build/oled-*.pgm.
+// ribbon, the input level bar and the muted word. The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
 
@@ -799,17 +799,46 @@ void checkRibbonHistory() {
   check(r.half(0) == 0 && r.half(1) == 13 && r.half(2) == 22 && r.half(3) == 0, "ribbon: levels read newest first");
   check(r.half(-1) == 0 && r.half(kRibbonLevels) == 0 && r.half(1000) == 0, "ribbon: ages outside the history read zero");
   for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
-  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 64 levels");
+  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 62 levels");
   r.push(0.0f);
   check(r.half(0) == 0 && r.half(1) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: a push drops the oldest level");
+  check(kRibbonLevels == 62 && kRibbonLeftX == 4 && kRibbonLeftX + kRibbonLevels * kRibbonColumnsPerLevel == kCanvasWidth,
+        "ribbon: 62 levels of two columns fill columns 4 to 127");
 }
 
 void checkVoiceSilence() {
   Canvas c;
-  renderVoice(c, Ribbon(), Walk{0, 0});
+  renderVoice(c, Ribbon(), 0, Walk{0, 0});
   Canvas line;
-  line.fillRect(0, 32, kCanvasWidth, 1, true);
-  check(sameRows(c, line, 0, kCanvasHeight), "voice: in silence the screen is the horizon line at row 32 and nothing else");
+  line.fillRect(4, 32, kCanvasWidth - 4, 1, true);
+  check(sameRows(c, line, 0, kCanvasHeight), "voice: in silence the screen is the horizon line from column 4 at row 32 and nothing else");
+}
+
+// The first level of the history, the oldest, sits in columns 4 and 5, and nothing is left of it.
+void checkRibbonFirstColumn() {
+  Ribbon r;
+  for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
+  Canvas c;
+  renderVoice(c, r, 0, Walk{0, 0});
+  bool solid = true;
+  for (int x = 4; x < kCanvasWidth; ++x) {
+    for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, x, y);
+  }
+  check(solid, "ribbon: a full history is solid from column 4 to column 127");
+  bool blank = true;
+  for (int x = 0; x < 4; ++x) {
+    for (int y = 0; y < kCanvasHeight; ++y) blank = blank && !lit(c, x, y);
+  }
+  check(blank, "ribbon: columns 0 to 3 stay blank when the bar is empty");
+
+  // With only the oldest level tall, it fills columns 4 and 5 and the next column is the line.
+  Ribbon oldest;
+  oldest.push(1.0f);
+  for (int i = 1; i < kRibbonLevels; ++i) oldest.push(0.0f);
+  Canvas d;
+  renderVoice(d, oldest, 0, Walk{0, 0});
+  check(lit(d, 4, 32 - 22) && lit(d, 5, 32 + 22) && !lit(d, 6, 32 - 22) && !lit(d, 3, 32) && lit(d, 6, 32),
+        "ribbon: the oldest level fills columns 4 and 5");
 }
 
 void checkVoiceShape() {
@@ -818,7 +847,7 @@ void checkVoiceShape() {
   r.push(1.0f);  // 22 px, columns 124 and 125 after the next push
   r.push(0.5f);  // 13 px, columns 126 and 127
   Canvas c;
-  renderVoice(c, r, Walk{0, 0});
+  renderVoice(c, r, 0, Walk{0, 0});
 
   bool solid = true;
   for (int y = 32 - 13; y <= 32 + 13; ++y) solid = solid && lit(c, 126, y) && lit(c, 127, y);
@@ -842,19 +871,23 @@ void checkVoiceShape() {
         "voice: the tallest column with its rim stays 9 px clear of the top and bottom");
 }
 
-// The ribbon drawn pixel by pixel from its definition, as an independent check of the whole frame:
-// a column of half-height h is solid within h rows of the horizon, a 1 px rim lies one row beyond
-// it where the Bayer threshold of the pixel is under 32, and a column of height 0 is the horizon
-// pixel alone. The walk moves the finished picture.
-Canvas voiceFromDefinition(const Ribbon& ribbon, Walk walk) {
+// The voice screen drawn pixel by pixel from its definition, as an independent check of the whole
+// frame. The ribbon runs from column 4 to 127. A column of half-height h is solid within h rows of
+// the horizon, a 1 px rim lies one row beyond it where the Bayer threshold of the pixel is under
+// 32, and a column of height 0 is the horizon pixel alone. The bar is columns 1 and 2, filled from
+// row 55 up for `rows` rows. The walk moves the finished picture.
+Canvas voiceFromDefinition(const Ribbon& ribbon, int rows, Walk walk) {
   Canvas c;
-  for (int x = 0; x < kCanvasWidth; ++x) {
+  for (int x = 4; x < kCanvasWidth; ++x) {
     const int h = ribbon.half((kCanvasWidth - 1 - x) / 2);
     for (int y = 0; y < kCanvasHeight; ++y) {
       const int d = std::abs(y - 32);
       const bool on = h == 0 ? d == 0 : (d <= h || (d == h + 1 && bayerLit(x, y, 32)));
       if (on) c.setPixel(x + walk.x, y + walk.y, true);
     }
+  }
+  for (int x = 1; x <= 2; ++x) {
+    for (int y = 55 - rows + 1; y <= 55; ++y) c.setPixel(x + walk.x, y + walk.y, true);
   }
   return c;
 }
@@ -868,26 +901,106 @@ void checkVoiceWholeFrame() {
       seed = seed * 1664525u + 1013904223u;
       r.push(static_cast<float>(seed >> 8) / 16777216.0f);
     }
+    const int rows = frame * 9;  // 0, 9, 18, 27, 36, 45
     for (uint32_t step = 0; step < 9; ++step) {
       Canvas c;
-      renderVoice(c, r, walkAt(step));
-      same = same && sameRows(c, voiceFromDefinition(r, walkAt(step)), 0, kCanvasHeight);
+      renderVoice(c, r, rows, walkAt(step));
+      same = same && sameRows(c, voiceFromDefinition(r, rows, walkAt(step)), 0, kCanvasHeight);
     }
   }
-  check(same, "voice: whole frames match a pixel-by-pixel drawing of the ribbon, at every step of the walk");
+  check(same, "voice: whole frames match a pixel-by-pixel drawing of the bar and the ribbon, at every step of the walk");
+}
+
+// The bar's height from the level, through the same map the face uses.
+void checkMeterHeight() {
+  const auto rowsAt = [](float db) { return meterRows(level::displayLevel(std::pow(10.0f, db / 20.0f))); };
+  check(kMeterRows == 47 && kMeterTopY == 9 && kMeterTopY + kMeterRows - 1 == 55, "meter: it spans rows 9 to 55, 47 rows");
+  check(rowsAt(-50.0f) == 0, "meter: -50 dBFS is no rows");
+  check(rowsAt(-6.0f) == 41, "meter: -6 dBFS is 41 rows");
+  check(rowsAt(0.0f) == 47 && rowsAt(6.0f) == 47, "meter: 0 dBFS is all 47 rows and louder stays there");
+  check(rowsAt(-60.0f) == 0, "meter: under -50 dBFS is no rows");
+
+  // -25 dBFS is level 0.5, which is 23.5 rows and rounds up. The level itself is checked in core_level.
+  check(std::fabs(level::displayLevel(std::pow(10.0f, -25.0f / 20.0f)) - 0.5f) < 1e-4f && meterRows(0.5f) == 24,
+        "meter: -25 dBFS is the middle, 24 rows");
+
+  check(meterRows(0.0f) == 0 && meterRows(-1.0f) == 0 && meterRows(0.005f) == 0, "meter: no level, a negative one and a hair above zero are empty");
+  check(meterRows(1.0f) == 47 && meterRows(5.0f) == 47, "meter: full level and louder are 47 rows");
+  check(meterRows(std::numeric_limits<float>::quiet_NaN()) == 0, "meter: NaN is empty");
+  bool rising = true;
+  int prev = 0;
+  for (int i = 0; i <= 200; ++i) {
+    const int rows = meterRows(static_cast<float>(i) / 200.0f);
+    rising = rising && rows >= prev && rows - prev <= 1;
+    prev = rows;
+  }
+  check(rising, "meter: a louder level is never shorter and grows a row at a time");
+}
+
+// The bar is columns 1 and 2, filled up from row 55, and column 3 stays blank.
+void checkMeterPlace() {
+  bool place = true;
+  for (int rows = 0; rows <= kMeterRows; ++rows) {
+    Canvas c;
+    renderVoice(c, Ribbon(), rows, Walk{0, 0});
+    for (int y = 0; y < kCanvasHeight; ++y) {
+      const bool inBar = y >= 55 - rows + 1 && y <= 55;
+      place = place && lit(c, 1, y) == inBar && lit(c, 2, y) == inBar;
+      place = place && !lit(c, 0, y) && !lit(c, 3, y);
+    }
+  }
+  check(place, "meter: columns 1 and 2 are lit from row 55 up for the given rows, and columns 0 and 3 are blank");
+
+  Canvas full;
+  renderVoice(full, Ribbon(), kMeterRows, Walk{0, 0});
+  check(lit(full, 1, 9) && lit(full, 2, 9) && lit(full, 1, 55) && lit(full, 2, 55) && !lit(full, 1, 8) && !lit(full, 1, 56),
+        "meter: the full bar covers rows 9 to 55 and no row more");
+
+  Canvas over;
+  renderVoice(over, Ribbon(), 999, Walk{0, 0});
+  check(sameRows(over, full, 0, kCanvasHeight), "meter: rows past the span stop at row 9");
+
+  // A tall ribbon beside a full bar still leaves column 3 blank.
+  Ribbon loud;
+  for (int i = 0; i < kRibbonLevels; ++i) loud.push(1.0f);
+  Canvas both;
+  renderVoice(both, loud, kMeterRows, Walk{0, 0});
+  bool gap = true;
+  for (int y = 0; y < kCanvasHeight; ++y) gap = gap && !lit(both, 3, y) && !lit(both, 0, y);
+  check(gap && lit(both, 4, 32) && lit(both, 2, 32), "meter: column 3 stays blank between a full bar and a full ribbon");
+}
+
+// The bar walks with the ribbon, so every step of the walk moves both by the same pixel. Columns 0
+// to 3 hold the bar and, when the walk shifts the ribbon left, the start of the horizon line.
+void checkMeterWalks() {
+  bool moves = true;
+  for (uint32_t step = 0; step < 9; ++step) {
+    const Walk w = walkAt(step);
+    Canvas c;
+    renderVoice(c, Ribbon(), 30, w);
+    for (int y = 0; y < kCanvasHeight; ++y) {
+      const bool inBar = y - w.y >= 55 - 30 + 1 && y - w.y <= 55;
+      for (int x = 0; x < 4; ++x) {
+        const bool bar = inBar && (x - w.x == 1 || x - w.x == 2);
+        const bool line = x >= 4 + w.x && y == 32 + w.y;
+        moves = moves && lit(c, x, y) == (bar || line);
+      }
+    }
+  }
+  check(moves, "meter: every step of the walk moves the bar by the ribbon's pixel");
 }
 
 void checkVoiceScroll() {
   Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f});
   Canvas before;
-  renderVoice(before, r, Walk{0, 0});
+  renderVoice(before, r, 0, Walk{0, 0});
   r.push(0.8f);
   Canvas after;
-  renderVoice(after, r, Walk{0, 0});
+  renderVoice(after, r, 0, Walk{0, 0});
 
   // The rim dither is anchored to the panel, so it does not move with the ribbon. The rest does.
   bool moved = true;
-  for (int x = 0; x + kRibbonColumnsPerLevel < kCanvasWidth; ++x) {
+  for (int x = kRibbonLeftX; x + kRibbonColumnsPerLevel < kCanvasWidth; ++x) {
     const int half = r.half((kCanvasWidth - 1 - x) / kRibbonColumnsPerLevel);
     for (int y = 0; y < kCanvasHeight; ++y) {
       if (std::abs(y - kRibbonHorizonY) == half + 1) continue;
@@ -901,12 +1014,12 @@ void checkVoiceScroll() {
 void checkVoiceWalk() {
   const Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f, 0.5f, 0.8f});
   Canvas base;
-  renderVoice(base, r, Walk{0, 0});
+  renderVoice(base, r, 30, Walk{0, 0});
   bool ok = true;
   for (int i = 1; i <= 8; ++i) {
     const Walk w = walkAt(static_cast<uint32_t>(i));
     Canvas moved;
-    renderVoice(moved, r, w);
+    renderVoice(moved, r, 30, w);
     for (int y = 0; y < kCanvasHeight; ++y) {
       for (int x = 0; x < kCanvasWidth; ++x) {
         const int sx = x - w.x;
@@ -1032,8 +1145,12 @@ void checkScreens() {
   checkRibbonHeight();
   checkRibbonHistory();
   checkVoiceSilence();
+  checkRibbonFirstColumn();
   checkVoiceShape();
   checkVoiceWholeFrame();
+  checkMeterHeight();
+  checkMeterPlace();
+  checkMeterWalks();
   checkVoiceScroll();
   checkVoiceWalk();
   checkMuted();

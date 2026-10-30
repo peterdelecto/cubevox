@@ -96,6 +96,10 @@ uint32_t audioBlockCount();
 // is measured on the samples that enter the chain. Resets the window; call from the main loop.
 level::InputEnergy audioTakeInputEnergy();
 
+// The same for the output, measured on the left sample as written to the DAC, after the output
+// gain and the soft ceiling. Resets its own window; call from the main loop.
+level::OutputEnergy audioTakeOutputEnergy();
+
 AudioStats audioStats();
 
 #if CUBEVOX_BENCH

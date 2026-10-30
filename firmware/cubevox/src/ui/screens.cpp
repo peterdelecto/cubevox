@@ -112,6 +112,11 @@ int ribbonHalfHeight(float level) {
   return static_cast<int>(lroundf(shaped * static_cast<float>(kRibbonHalfMax)));
 }
 
+int meterRows(float level) {
+  if (!(level > 0.0f)) return 0;
+  return static_cast<int>(lroundf((level > 1.0f ? 1.0f : level) * static_cast<float>(kMeterRows)));
+}
+
 void Ribbon::push(float level) {
   half_[static_cast<size_t>(head_)] = static_cast<uint8_t>(ribbonHalfHeight(level));
   head_ = (head_ + 1) % kRibbonLevels;
@@ -122,10 +127,14 @@ int Ribbon::half(int age) const {
   return half_[static_cast<size_t>((head_ - 1 - age + 2 * kRibbonLevels) % kRibbonLevels)];
 }
 
-void renderVoice(Canvas& canvas, const Ribbon& ribbon, Walk walk) {
+void renderVoice(Canvas& canvas, const Ribbon& ribbon, int rows, Walk walk) {
   canvas.clear();
+  if (rows > 0) {
+    const int shown = rows < kMeterRows ? rows : kMeterRows;
+    canvas.fillRect(kMeterX + walk.x, kMeterTopY + kMeterRows - shown + walk.y, kMeterWidth, shown, true);
+  }
   const int centre = kRibbonHorizonY + walk.y;
-  for (int x = 0; x < kCanvasWidth; ++x) {
+  for (int x = kRibbonLeftX; x < kCanvasWidth; ++x) {
     const int half = ribbon.half((kCanvasWidth - 1 - x) / kRibbonColumnsPerLevel);
     const int column = x + walk.x;
     if (half <= 0) {

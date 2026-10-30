@@ -734,10 +734,11 @@ void checkDissolveInPlace() {
   check(blank.dirtyPages() == 0x01, "dissolve: only the pages that changed are dirty");
 }
 
-// The proof renderer's dissolve from the silent voice line to MUTED, byte for byte.
+// The proof renderer's dissolve from the silent voice line to MUTED, byte for byte. The line is
+// the ribbon in silence, which starts at column 4.
 void checkDissolveAgainstProof() {
   Canvas line;
-  line.fillRect(0, 32, kCanvasWidth, 1, true);
+  line.fillRect(4, 32, kCanvasWidth - 4, 1, true);
   Canvas muted;
   muted.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), "MUTED")) / 2, (kCanvasHeight - 24) / 2, font16x24(), "MUTED");
   Canvas r;

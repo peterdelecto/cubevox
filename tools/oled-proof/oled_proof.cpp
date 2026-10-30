@@ -1,5 +1,5 @@
 // OLED GUI proof: draws candidate screens with the firmware's own Canvas and fonts and writes
-// one sheet, 2 x 4 screens at 3x, as a PGM. Exploration only; the GUI spec decides the real screens.
+// one sheet, 2 columns of screens at 3x, as a PGM. Exploration only; the GUI spec decides the real screens.
 //
 //   clang++ -std=c++17 -O1 -I . -I firmware/cubevox/src -I tools/font-editor/fonts \
 //     tools/oled-proof/oled_proof.cpp firmware/cubevox/src/core/canvas.cpp \
@@ -7,6 +7,7 @@
 //     firmware/cubevox/src/core/registry.cpp firmware/cubevox/src/core/chain_params.cpp \
 //     firmware/cubevox/src/core/unison_rate.cpp -o build/oled_proof && build/oled_proof build/oled-proof.pgm
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -167,6 +168,18 @@ void toggleScreen(Canvas& c) {
   renderReadout(c, view);
 }
 
+// The runtime voice screen, drawn by the firmware's renderer. The input bar stands 25 rows tall in
+// columns 1 and 2, and the output ribbon runs from column 4 on a swell that fades.
+void voiceScreen(Canvas& c) {
+  Ribbon ribbon;
+  for (int i = 0; i < kRibbonLevels; ++i) {
+    const float age = static_cast<float>(kRibbonLevels - 1 - i) / static_cast<float>(kRibbonLevels);
+    const float swell = 0.5f + 0.5f * std::sin(static_cast<float>(i) * 0.45f);
+    ribbon.push((1.0f - 0.6f * age) * swell);
+  }
+  renderVoice(c, ribbon, 25, Walk{0, 0});
+}
+
 void menu(Canvas& c) {
   struct Row {
     const char* label;
@@ -248,7 +261,7 @@ void knobTime(Canvas& c) { knobScreen(c, 4, 1, "TIME", "120 MS", 0.32f, false); 
 
 int main(int argc, char** argv) {
   const char* out = argc > 1 ? argv[1] : "oled-proof.pgm";
-  writeSheet(out, {home, knobMix, knobSemis, keyScreen, knobTime, toggleScreen, muted, menu});
+  writeSheet(out, {home, knobMix, knobSemis, keyScreen, knobTime, toggleScreen, muted, menu, voiceScreen});
   std::printf("wrote %s\n", out);
   return 0;
 }

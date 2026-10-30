@@ -135,7 +135,7 @@ void checkInputDuringSplash() {
   check(splash.draw(end, kVersion, live) == SplashStep::Ended, "splash: hands over on time");
   face.invalidate();
   check(face.due(end + kUiTickMs, live), "splash: the face ticks once the splash has gone");
-  face.tick(end + kUiTickMs, ctx, level::InputEnergy(), menu, live);
+  face.tick(end + kUiTickMs, ctx, level::InputEnergy(), level::OutputEnergy(), menu, live);
   menu.update(click, end + kUiTickMs + 1);
   check(menu.open(), "splash: the first click once the face shows opens the menu");
 }

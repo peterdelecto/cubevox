@@ -172,8 +172,8 @@ Settings, mute state, Menu::open ───────────────�
 ```
 
 ## Tests and proofs
-1. `test/firmware/golden/*.bin` hold 27 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
-2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, and one readout replaced by another.
+1. `test/firmware/golden/*.bin` hold 30 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
+2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, one readout replaced by another, the two toggle frames and one voice frame (`voice-meter-ribbon`, scene 12).
 3. The fixed field changed 11 of the 27 frames, and the other 16 stayed byte-identical. The proof renderer's `rollValue` follows the same rule, and the goldens were re-cut from it.
 
 | Frames | Why they changed |
