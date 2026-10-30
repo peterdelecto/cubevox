@@ -1,7 +1,8 @@
 // Checks the runtime screens on the host. Covers the readout against the proof renderer byte for
-// byte (settled, rolling and muted), its title bar, rows and edges, the key names with their flats, the voice
-// ribbon, the input level bar, the muted word and the DEBUG load figure. The proof PGMs go to
-// build/oled-*.pgm.
+// byte (settled, rolling and muted), its title bar, rows and edges, the value row centred on what is
+// drawn with its unit in lowercase, the key names centred each on its own width with their flats, the
+// voice ribbon, the boxed input level meter with its 16 segments, the muted word and the DEBUG load figure.
+// The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
 
@@ -202,19 +203,17 @@ void checkReadoutRows() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The value field. These tests build the row from the spec's wording and take nothing from the
-// renderer: a sign cell when the range is signed, one cell for each digit of the widest number, a
-// space and the unit, the whole field centred once. A number is right-aligned in the digit cells and
-// its sign sits in the sign cell.
+// The value field (owner 2026-10-30). These tests build the row from the spec's wording and take
+// nothing from the renderer. A number is its digits, one cell each, with a sign cell in front when
+// the knob's range reaches below zero and the number is not zero. A roll sits between two numbers.
+// Its field holds the cells of the wider one, the digits right-aligned and a sign cell first when
+// either number has a sign, and a digit or sign that only one number has is a blank in the other. A
+// value at rest is one number, so its field is that number's own width. The field, a space and the
+// unit are centred on the panel, and the unit is written as in print (st, ms, dB, %).
 
 constexpr int kValueTop = 34;
 constexpr int kValueBottom = kValueTop + 24;
-
-struct Field {
-  bool signedRange = false;
-  int digits = 1;
-  int cells() const { return digits + (signedRange ? 1 : 0); }
-};
+constexpr int kValueHeight = kValueBottom - kValueTop;
 
 // The lowest and highest number a numeric knob can show. A continuous knob reaches both ends at the
 // readings 0 and 1, and a stepped one at its first and last positions.
@@ -229,45 +228,47 @@ void shownRange(const KnobDesc& k, int& lo, int& hi) {
   }
 }
 
-// Runs through every reading the knob can make to find its widest number and whether any is negative.
-Field fieldOf(const KnobDesc& k) {
-  Field f;
-  const int count = k.kind == KnobKind::Stepped ? k.positions : 101;
-  for (int i = 0; i < count; ++i) {
-    const float reading = k.kind == KnobKind::Stepped ? static_cast<float>(i) : static_cast<float>(i) / 100.0f;
-    const int shown = knobShown(k, reading);
-    f.signedRange = f.signedRange || shown < 0;
-    f.digits = std::max(f.digits, static_cast<int>(std::to_string(std::abs(shown)).size()));
-  }
-  return f;
+// True when any reading of the knob is a negative number, which gives its numbers a sign cell.
+bool signedRange(const KnobDesc& k) {
+  int lo = 0;
+  int hi = 0;
+  shownRange(k, lo, hi);
+  return lo < 0;
 }
 
-// One character per cell for the whole number v.
-std::string cellsFor(const Field& f, int v) {
-  std::string cells(static_cast<size_t>(f.digits), ' ');
-  const std::string magnitude = std::to_string(std::abs(v));
-  for (size_t i = 0; i < magnitude.size() && i < cells.size(); ++i) {
-    cells[cells.size() - 1 - i] = magnitude[magnitude.size() - 1 - i];
-  }
-  if (f.signedRange) cells.insert(cells.begin(), v < 0 ? '-' : (v > 0 ? '+' : ' '));
-  return cells;
+// The two numbers of a roll, one character per cell, both as long as the field.
+struct Pair {
+  std::string from;
+  std::string to;
+};
+
+Pair pairCells(bool signedKnob, int from, int to) {
+  const std::string digitsFrom = std::to_string(std::abs(from));
+  const std::string digitsTo = std::to_string(std::abs(to));
+  const size_t digits = std::max(digitsFrom.size(), digitsTo.size());
+  const bool signCell = signedKnob && (from != 0 || to != 0);
+  const auto lay = [&](const std::string& d, int v) {
+    std::string cells = std::string(digits - d.size(), ' ') + d;
+    if (signCell) cells.insert(cells.begin(), v < 0 ? '-' : (v > 0 ? '+' : ' '));
+    return cells;
+  };
+  return {lay(digitsFrom, from), lay(digitsTo, to)};
 }
+
+// The number alone: its sign if it has one, then its digits.
+std::string ownCells(bool signedKnob, int v) { return pairCells(signedKnob, v, v).from; }
 
 int cellPitch() { return font16x24().width + font16x24().spacing; }
 
-// Left edge of the first cell. The field is as wide as all its cells and the unit with its space.
-// The unit as the readout draws it: a leading space, in capitals, "" when the knob has none.
-std::string unitOf(const KnobDesc& k) {
-  char unit[16];
-  unitText(k, unit, sizeof(unit));
-  return unit;
-}
+// The unit as it is written in print, with the space in front of it. "" when the knob has none.
+std::string unitOf(const KnobDesc& k) { return k.unit[0] == '\0' ? std::string() : std::string(" ") + k.unit; }
 
-int fieldLeft(const KnobDesc& k, const Field& f) {
+// Left edge of the first of `cells` cells when the cells, the space and the unit are centred.
+int fieldLeft(const KnobDesc& k, int cells) {
   const FontDesc& big = font16x24();
   const std::string unit = unitOf(k);
   const int unitWidth = unit.empty() ? 0 : big.spacing + Canvas::textWidth(big, unit.c_str());
-  return (kCanvasWidth - (f.cells() * cellPitch() - big.spacing + unitWidth)) / 2;
+  return (kCanvasWidth - (cells * cellPitch() - big.spacing + unitWidth)) / 2;
 }
 
 void drawUnit(Canvas& c, const KnobDesc& k, int pen) {
@@ -276,31 +277,35 @@ void drawUnit(Canvas& c, const KnobDesc& k, int pen) {
   c.drawText(pen, kValueTop, font16x24(), unit.c_str());
 }
 
-// The value rows of a number at rest, cell by cell, with `rolled` px of roll into the next number.
-// Cells that differ between the two numbers roll up out of the band while the next ones roll in.
-Canvas valueBand(const KnobDesc& k, int v, int rolled = 0) {
+// The value rows when the readout stands `rolled` px of the way from `base` to base + 1, which is
+// shown = base + rolled / 24. At 0 px the number is base alone and at 24 px it is base + 1 alone.
+// In between, the cells that differ between the two numbers roll up out of the band while the next
+// ones roll in.
+Canvas valueBand(const KnobDesc& k, int base, int rolled = 0) {
   const FontDesc& big = font16x24();
-  const Field f = fieldOf(k);
-  const int x0 = fieldLeft(k, f);
-  const std::string from = cellsFor(f, v);
-  const std::string to = cellsFor(f, v + 1);
+  const bool signedKnob = signedRange(k);
+  const bool atRest = rolled <= 0 || rolled >= kValueHeight;
+  const int from = rolled >= kValueHeight ? base + 1 : base;
+  const Pair p = pairCells(signedKnob, from, atRest ? from : base + 1);
+  const int lift = atRest ? 0 : rolled;
+  const int x0 = fieldLeft(k, static_cast<int>(p.from.size()));
   Canvas c;
-  for (size_t j = 0; j < from.size(); ++j) {
+  for (size_t j = 0; j < p.from.size(); ++j) {
     const int x = x0 + static_cast<int>(j) * cellPitch();
-    const char a[2] = {from[j], '\0'};
-    const char b[2] = {to[j], '\0'};
-    if (from[j] == to[j] || rolled == 0) {
+    const char a[2] = {p.from[j], '\0'};
+    const char b[2] = {p.to[j], '\0'};
+    if (p.from[j] == p.to[j]) {
       c.drawDigits(x, kValueTop, big, a);
     } else {
-      c.drawDigitsClipped(x, kValueTop - rolled, big, a, kValueTop, kValueBottom);
-      c.drawDigitsClipped(x, kValueBottom - rolled, big, b, kValueTop, kValueBottom);
+      c.drawDigitsClipped(x, kValueTop - lift, big, a, kValueTop, kValueBottom);
+      c.drawDigitsClipped(x, kValueBottom - lift, big, b, kValueTop, kValueBottom);
     }
   }
-  drawUnit(c, k, x0 + f.cells() * cellPitch());
+  drawUnit(c, k, x0 + static_cast<int>(p.from.size()) * cellPitch());
   return c;
 }
 
-// Every number a knob can show lands in the same cells, whatever its digit count or sign.
+// Every number a knob can show draws as its own cells, centred, whatever its digit count or sign.
 void checkReadoutField() {
   const Layout layout = defaultLayout();
   bool inPlace = true;
@@ -318,47 +323,37 @@ void checkReadoutField() {
       }
     }
   }
-  check(inPlace && numbers > 2000, "readout: every number of every knob sits in its fixed field, cell by cell");
+  check(inPlace && numbers > 2000, "readout: every number of every knob draws as its own cells, centred, cell by cell");
 }
 
-// While the value changes or rolls, nothing in the value rows moves sideways. The unit stays where it
-// is and every pixel stays inside the field.
-void checkReadoutNeverMoves() {
+// Between two neighbouring numbers the readout draws every roll position as the spec says: the
+// wider number's field while a digit or sign is in motion, the one number alone at 0 px and 24 px.
+void checkReadoutRolls() {
   const Layout layout = defaultLayout();
-  const float fractions[] = {0.0f, 0.25f, 0.5f, 0.75f, 0.96f};
-  bool unitStill = true;
-  bool inField = true;
+  bool same = true;
+  int frames = 0;
   for (int slot = 0; slot < kSlotCount; ++slot) {
     for (int knob = 0; knob < kKnobsPerCard; ++knob) {
       const KnobDesc* k = knobDesc(layout.card[static_cast<size_t>(slot)], knob);
       if (!k || k->labels) continue;
-      const Field f = fieldOf(*k);
-      const int x0 = fieldLeft(*k, f);
-      const int pen = x0 + f.cells() * cellPitch();
       int lo = 0;
       int hi = 0;
       shownRange(*k, lo, hi);
-      const Canvas unitOnly = valueBand(*k, lo);
       std::vector<int> bases;
-      for (int b = lo; b < hi; b += std::max(1, (hi - lo) / 40)) bases.push_back(b);
-      for (int b : {-100, -10, -9, -1, 0, 9, 10, 99, 100, 999}) {
+      for (int b = lo; b < hi; b += std::max(1, (hi - lo) / 30)) bases.push_back(b);
+      for (int b : {-100, -11, -10, -9, -2, -1, 0, 1, 8, 9, 10, 98, 99, 100, 999}) {
         if (b >= lo && b < hi) bases.push_back(b);
       }
       for (int b : bases) {
-        for (float t : fractions) {
-          const Canvas c = readoutOf(slot, knob, static_cast<float>(b) + t);
-          for (int y = kValueTop; y < kValueBottom; ++y) {
-            for (int x = 0; x < kCanvasWidth; ++x) {
-              if (x >= pen) unitStill = unitStill && lit(c, x, y) == lit(unitOnly, x, y);
-              if (x < x0) inField = inField && !lit(c, x, y);
-            }
-          }
+        for (int rolled = 0; rolled <= kValueHeight; ++rolled) {
+          const float shown = static_cast<float>(b) + static_cast<float>(rolled) / static_cast<float>(kValueHeight);
+          same = same && sameRows(readoutOf(slot, knob, shown), valueBand(*k, b, rolled), kValueTop, kValueBottom);
+          ++frames;
         }
       }
     }
   }
-  check(unitStill, "readout: the unit never moves while any number changes or rolls");
-  check(inField, "readout: nothing in the value rows lies left of the field");
+  check(same && frames > 5000, "readout: every roll position between neighbouring numbers draws as the wider field, or one number alone at 0 and 24 px");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -487,51 +482,62 @@ bool placeCells(const Columns& cols, const std::string& cells, std::vector<std::
   return true;
 }
 
-// What a sweep remembers from the frames before: the column each cell and the unit first took, and
-// the first and the previous frame.
-struct SweepMemory {
+// What a sweep remembers: the first and the previous settled frame, and, for each count of cells a
+// number can have, where the first frame with that many cells put each cell and the unit. Later
+// frames with the same count must put them in the same columns.
+struct Grid {
+  bool known = false;
   std::vector<int> cellX;
   Extent unit;
-  bool haveUnit = false;
+};
+
+struct SweepMemory {
+  std::vector<Grid> grid = std::vector<Grid>(kMaxKnobCells + 1);
   Canvas first;
   Canvas previous;
 };
 
-// The field the spec gives a knob whose numbers are `values`.
-Field fieldOfValues(const std::vector<int>& values) {
-  Field f;
-  for (int v : values) {
-    f.signedRange = f.signedRange || v < 0;
-    f.digits = std::max(f.digits, static_cast<int>(std::to_string(std::abs(v)).size()));
-  }
-  return f;
-}
-
-// Each character must sit where the first frame that showed it put it. Fills `at` with the columns found.
+// Every cell and the unit must sit where the first frame with this many cells put them, and the
+// cells must stand edge to edge on the cell pitch. Fills `at` with the columns found.
 std::string cellsInPlace(const Columns& cols, const std::string& cells, std::vector<std::vector<uint32_t>>& pictures,
                          SweepMemory& memory, std::vector<int>& at) {
   if (!placeCells(cols, cells, pictures, at)) return "the characters \"" + cells + "\" are not in their cells";
-  for (size_t j = 0; j < at.size(); ++j) {
-    if (at[j] < 0) continue;
-    if (memory.cellX[j] < 0) memory.cellX[j] = at[j];
-    if (at[j] != memory.cellX[j]) {
-      return "cell " + std::to_string(j + 1) + " of " + std::to_string(at.size()) + " moved from x " +
-             std::to_string(memory.cellX[j]) + " to x " + std::to_string(at[j]);
+  for (size_t j = 1; j < at.size(); ++j) {
+    if (at[j] - at[j - 1] != cellPitch()) {
+      return "cell " + std::to_string(j + 1) + " of " + std::to_string(at.size()) + " does not stand a cell pitch after the one before";
     }
+  }
+  // The last cell always holds a digit, so the unit lies to the right of it.
+  const Extent unit = inkFrom(cols, at.back() + font16x24().width);
+  Grid& grid = memory.grid[cells.size()];
+  if (!grid.known) {
+    grid.known = true;
+    grid.cellX = at;
+    grid.unit = unit;
+    return "";
+  }
+  for (size_t j = 0; j < at.size(); ++j) {
+    if (at[j] != grid.cellX[j]) {
+      return "cell " + std::to_string(j + 1) + " of " + std::to_string(at.size()) + " moved from x " +
+             std::to_string(grid.cellX[j]) + " to x " + std::to_string(at[j]);
+    }
+  }
+  if (unit.left != grid.unit.left || unit.right != grid.unit.right) {
+    return "the unit moved from columns " + std::to_string(grid.unit.left) + " to " + std::to_string(grid.unit.right) +
+           " to columns " + std::to_string(unit.left) + " to " + std::to_string(unit.right);
   }
   return "";
 }
 
-// The last cell always holds a digit, so the unit lies to the right of it, on the columns it first took.
-std::string unitInPlace(const Columns& cols, int lastCell, SweepMemory& memory) {
-  const Extent seen = inkFrom(cols, lastCell + font16x24().width);
-  if (!memory.haveUnit) {
-    memory.unit = seen;
-    memory.haveUnit = true;
-  }
-  if (seen.left == memory.unit.left && seen.right == memory.unit.right) return "";
-  return "the unit moved from columns " + std::to_string(memory.unit.left) + " to " + std::to_string(memory.unit.right) +
-         " to columns " + std::to_string(seen.left) + " to " + std::to_string(seen.right);
+// The cells, the space and the unit stand centred: the margin left of the first cell and the one
+// right of the unit's ink (or of the last cell, for a knob without a unit) differ by 1 px at most.
+std::string fieldCentred(const Columns& cols, const std::vector<int>& at) {
+  const Extent unit = inkFrom(cols, at.back() + font16x24().width);
+  const int rightEdge = unit.right >= 0 ? unit.right + 1 : at.back() + font16x24().width;
+  const int left = at.front();
+  const int right = kCanvasWidth - rightEdge;
+  if (std::abs(left - right) <= 1) return "";
+  return "the field is not centred, " + std::to_string(left) + " px left of it and " + std::to_string(right) + " px right";
 }
 
 // The cells at the places found, and the unit after the last one, account for every lit pixel.
@@ -559,23 +565,21 @@ std::string restStill(const Canvas& frame, size_t n, SweepMemory& memory) {
   return "";
 }
 
-// Sweeps a numeric knob and returns what moved first, or "" when nothing did. `steps` counts the
-// frames measured. Every frame must put each digit, the sign and the unit where the first frame that
-// showed them put them. The rest of the screen must not change either, and each step must look new.
-std::string sweepNumber(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
-                        std::vector<std::vector<uint32_t>>& pictures, int& steps) {
-  const Field f = fieldOfValues(values);
-  SweepMemory memory;
-  memory.cellX.assign(static_cast<size_t>(f.cells()), -1);
+// The settled pass of a numeric knob. Every number draws as its own cells, and each cell and the
+// unit must sit where the first number with the same count of cells put them, so within one digit
+// count nothing moves. The field stands centred, the rest of the screen holds still, and each step
+// must look new. Returns what failed first, or "".
+std::string sweepSettled(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values, bool signedKnob,
+                         std::vector<std::vector<uint32_t>>& pictures, SweepMemory& memory, int& steps) {
   for (size_t n = 0; n < values.size(); ++n) {
     const int v = values[n];
     const Canvas frame = settledReadout(cardId, slot, knob, v);
     ++steps;
     const Columns cols = bandColumns(frame);
-    const std::string cells = cellsFor(f, v);
+    const std::string cells = ownCells(signedKnob, v);
     std::vector<int> at;
     std::string moved = cellsInPlace(cols, cells, pictures, memory, at);
-    if (moved.empty()) moved = unitInPlace(cols, at.back(), memory);
+    if (moved.empty()) moved = fieldCentred(cols, at);
     if (moved.empty() && !inkAccounted(frame, k, cells, at)) moved = "the value rows hold ink that is no cell and not the unit";
     if (moved.empty()) moved = restStill(frame, n, memory);
     if (!moved.empty()) return "at " + valueText(k, v) + ", " + moved;
@@ -583,11 +587,87 @@ std::string sweepNumber(Card cardId, int slot, int knob, const KnobDesc& k, cons
   return "";
 }
 
-// Sweeps a labelled knob the same way. Each name must start at the column the first one started at.
+// The row re-centres by half a cell, within half a pixel, between neighbouring counts of cells: the
+// first cell moves left by that much and the unit moves right by the rest of a cell pitch.
+std::string recentresByHalfCell(const SweepMemory& memory) {
+  const int pitch = cellPitch();
+  for (size_t n = 1; n + 1 < memory.grid.size(); ++n) {
+    const Grid& a = memory.grid[n];
+    const Grid& b = memory.grid[n + 1];
+    if (!a.known || !b.known) continue;
+    const int cellMoved = a.cellX.front() - b.cellX.front();
+    const int unitMoved = b.unit.left - a.unit.left;
+    const bool half = cellMoved == pitch / 2 || cellMoved == (pitch + 1) / 2;
+    if (!half || cellMoved + unitMoved != pitch) {
+      return "from " + std::to_string(n) + " cells to " + std::to_string(n + 1) + " the first cell moved " + std::to_string(cellMoved) +
+             " px left and the unit " + std::to_string(unitMoved) + " px right, not half of the " + std::to_string(pitch) + " px cell";
+    }
+  }
+  return "";
+}
+
+// The roll pass of a numeric knob. Between every two neighbouring numbers, at five roll positions,
+// each cell and the unit must sit on the columns the settled pass found for a number with as many
+// cells as the wider of the two, and the value rows must hold the rolling cells there and nothing
+// else. The positions come from the settled frames, never from a model of the layout.
+std::string sweepRolls(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values, bool signedKnob,
+                       const SweepMemory& memory, int& frames) {
+  const FontDesc& big = font16x24();
+  const int lifts[] = {1, 6, 12, 18, 23};
+  for (size_t i = 0; i + 1 < values.size(); ++i) {
+    const int v = values[i];
+    if (values[i + 1] != v + 1) continue;
+    const Pair p = pairCells(signedKnob, v, v + 1);
+    const Grid& grid = memory.grid[p.from.size()];
+    const std::string where = "between " + valueText(k, v) + " and " + valueText(k, v + 1) + ", ";
+    if (!grid.known) return where + "no settled number has the " + std::to_string(p.from.size()) + " cells of the roll";
+    const Canvas reference = settledReadout(cardId, slot, knob, v);
+    for (int lift : lifts) {
+      const float shown = static_cast<float>(v) + static_cast<float>(lift) / static_cast<float>(kValueHeight);
+      ReadoutView view;
+      view.slot = slot;
+      view.card = cardDesc(cardId).name;
+      view.knob = knobDesc(cardId, knob);
+      view.shown = shown;
+      view.target = v;
+      Canvas frame;
+      renderReadout(frame, view);
+      ++frames;
+
+      Canvas rebuilt;
+      for (size_t j = 0; j < p.from.size(); ++j) {
+        const char a[2] = {p.from[j], '\0'};
+        const char b[2] = {p.to[j], '\0'};
+        if (p.from[j] == p.to[j]) {
+          rebuilt.drawDigits(grid.cellX[j], kValueTop, big, a);
+        } else {
+          rebuilt.drawDigitsClipped(grid.cellX[j], kValueTop - lift, big, a, kValueTop, kValueBottom);
+          rebuilt.drawDigitsClipped(grid.cellX[j], kValueBottom - lift, big, b, kValueTop, kValueBottom);
+        }
+      }
+      const std::string unit = unitOf(k);
+      if (!unit.empty()) rebuilt.drawText(grid.cellX.back() + cellPitch(), kValueTop, big, unit.c_str());
+      const std::string at = "at " + std::to_string(lift) + " px, ";
+      if (!sameRows(frame, rebuilt, kValueTop, kValueBottom)) {
+        return where + at + "the value rows are not the " + std::to_string(p.from.size()) + " cells and the unit on the columns of the settled numbers";
+      }
+      const Extent unitInk = inkFrom(bandColumns(frame), grid.cellX.back() + big.width);
+      if (unitInk.left != grid.unit.left || unitInk.right != grid.unit.right) return where + at + "the unit is not where it sits when settled";
+      if (!sameRows(frame, reference, 0, kValueTop) || !sameRows(frame, reference, kValueBottom, kCanvasHeight)) {
+        return where + at + "something outside the value rows changed";
+      }
+    }
+  }
+  return "";
+}
+
+// Sweeps a labelled knob. Each name is drawn on its own width and stands centred, its left and right
+// margins within 1 px, and names of different widths start at different columns.
 std::string sweepLabelled(Card cardId, int slot, int knob, const KnobDesc& k, const std::vector<int>& values,
                           int& steps) {
-  int left = -1;
   SweepMemory memory;
+  bool startsDiffer = false;
+  int firstLeft = -1;
   for (size_t n = 0; n < values.size(); ++n) {
     const int v = values[n];
     const std::string where = "at " + valueText(k, v) + ", ";
@@ -596,26 +676,34 @@ std::string sweepLabelled(Card cardId, int slot, int knob, const KnobDesc& k, co
 
     const Extent ink = inkFrom(bandColumns(frame), 0);
     if (ink.left < 0) return where + "the name draws nothing";
-    if (n == 0) left = ink.left;
-    if (ink.left != left) {
-      return where + "the name moved from x " + std::to_string(left) + " to x " + std::to_string(ink.left);
+    const int leftMargin = ink.left;
+    const int rightMargin = kCanvasWidth - 1 - ink.right;
+    if (std::abs(leftMargin - rightMargin) > 1) {
+      return where + "the name is not centred, " + std::to_string(leftMargin) + " px left of it and " + std::to_string(rightMargin) + " px right";
     }
+    if (ink.right - ink.left + 1 != Canvas::textWidth(font16x24(), knobLabel(k, v))) return where + "the name is not drawn on its own width";
+    if (n == 0) firstLeft = ink.left;
+    startsDiffer = startsDiffer || ink.left != firstLeft;
     Canvas rebuilt;
     rebuilt.drawText(ink.left, kValueTop, font16x24(), knobLabel(k, v));
     if (!sameRows(frame, rebuilt, kValueTop, kValueBottom)) return where + "the value rows hold ink that is not the name";
     const std::string still = restStill(frame, n, memory);
     if (!still.empty()) return where + still;
   }
+  if (!startsDiffer) return "every name starts at the same column, so none is centred on its own width";
   return "";
 }
 
-// Hard gate (owner 2026-10-24, "I don't want anything bouncing around laterally as values change").
-// Prints how many parameters and steps it covered.
+// Hard gate (owner 2026-10-24, "I don't want anything bouncing around laterally as values change",
+// and of 2026-10-30, each value centred on what is drawn). Within one digit count the unit and every
+// cell keep their columns, settled or rolling, and between digit counts the row re-centres by half a
+// cell. Prints how many parameters and steps it covered.
 void checkReadoutSweep() {
   std::vector<std::vector<uint32_t>> pictures(128);
   int expected = 0;
   int parameters = 0;
   int steps = 0;
+  int rolledFrames = 0;
   for (int index = 1; index < kCardCount; ++index) {
     const Card cardId = card(index);
     const CardDesc& desc = cardDesc(cardId);
@@ -634,8 +722,16 @@ void checkReadoutSweep() {
       const std::vector<int> values = sweepValues(*k);
       const int slot = (index - 1) % kSlotCount;
       int done = 0;
-      const std::string moved = k->labels ? sweepLabelled(cardId, slot, knob, *k, values, done)
-                                          : sweepNumber(cardId, slot, knob, *k, values, pictures, done);
+      std::string moved;
+      if (k->labels) {
+        moved = sweepLabelled(cardId, slot, knob, *k, values, done);
+      } else {
+        const bool signedKnob = values.front() < 0;
+        SweepMemory memory;
+        moved = sweepSettled(cardId, slot, knob, *k, values, signedKnob, pictures, memory, done);
+        if (moved.empty()) moved = recentresByHalfCell(memory);
+        if (moved.empty()) moved = sweepRolls(cardId, slot, knob, *k, values, signedKnob, memory, rolledFrames);
+      }
       check(moved.empty(), (who + " " + moved).c_str());
 
       // A sweep that found nothing must also have reached every step between the ends of the travel.
@@ -646,28 +742,44 @@ void checkReadoutSweep() {
     }
   }
   check(parameters == expected && parameters > 0, "readout sweep: every knob of every card was swept");
-  std::printf("readout sweep: %d parameters, %d settled steps\n", parameters, steps);
+  std::printf("readout sweep: %d parameters, %d settled steps, %d rolling frames\n", parameters, steps, rolledFrames);
 }
 
-// A number that gains a digit lights its leading cell in place while the other digits roll.
+// Where the unit's ink sits in the value rows, found by its picture. Both ends are -1 unless the
+// picture appears exactly once.
+Extent unitPicture(const Canvas& frame, const std::string& unitWithSpace) {
+  const std::string unit = unitWithSpace.substr(1);
+  Canvas alone;
+  alone.drawText(0, kValueTop, font16x24(), unit.c_str());
+  const Columns ink = bandColumns(alone);
+  const int width = Canvas::textWidth(font16x24(), unit.c_str());
+  const std::vector<uint32_t> picture(ink.begin(), ink.begin() + width);
+  const std::vector<int> found = picturesIn(bandColumns(frame), picture);
+  Extent e;
+  if (found.size() == 1) {
+    e.left = found[0];
+    e.right = found[0] + width - 1;
+  }
+  return e;
+}
+
+// A number that gains a digit makes room for it as the roll starts, and the new digit lights its
+// cell from below while the other digits roll.
 void checkReadoutGainsDigit() {
-  // 99 to 100 on a percent knob. The field has 3 cells, so 99 is a blank cell and two 9s.
+  // 99 to 100 on a percent knob. 99 is two 9s, and the roll holds the three cells of 100.
   const KnobDesc& percent = *knobDesc(defaultLayout().card[7], 0);
-  check(cellsFor(fieldOf(percent), 99) == " 99" && cellsFor(fieldOf(percent), 100) == "100", "readout: 99 is a blank cell and two 9s, 100 fills the cells");
+  const Pair roll = pairCells(false, 99, 100);
+  check(ownCells(false, 99) == "99" && ownCells(false, 100) == "100" && roll.from == " 99" && roll.to == "100",
+        "readout: 99 is two 9s, 100 is three cells, and the roll between them is a blank and two 9s into 100");
   const Canvas settled99 = readoutOf(7, 0, 99.0f);
   const Canvas settled100 = readoutOf(7, 0, 100.0f);
-  const Field f = fieldOf(percent);
-  const int x0 = fieldLeft(percent, f);
-  bool leadingBlank = true;
-  for (int y = kValueTop; y < kValueBottom; ++y) {
-    for (int x = x0; x < x0 + cellPitch(); ++x) leadingBlank = leadingBlank && !lit(settled99, x, y);
-  }
-  check(leadingBlank && sameRows(settled99, valueBand(percent, 99), kValueTop, kValueBottom), "readout: 99 leaves the leading cell blank");
-  check(sameRows(settled100, valueBand(percent, 100), kValueTop, kValueBottom), "readout: 100 fills all three cells");
+  check(sameRows(settled99, valueBand(percent, 99), kValueTop, kValueBottom), "readout: 99 draws two cells, centred");
+  check(sameRows(settled100, valueBand(percent, 100), kValueTop, kValueBottom), "readout: 100 draws three cells, centred");
 
-  // The leading cell lights while the 9s roll to 0 in the cells they already sit in.
+  // The leading cell lights while the 9s roll to 0 in the cells they sit in during the roll.
   const Canvas half = readoutOf(7, 0, 99.5f);
-  check(sameRows(half, valueBand(percent, 99, 12), kValueTop, kValueBottom), "readout: 99.5 rolls the 1 in and the 9s to 0, in place");
+  check(sameRows(half, valueBand(percent, 99, 12), kValueTop, kValueBottom), "readout: 99.5 rolls the 1 in and the 9s to 0 in the three cells of 100");
+  const int x0 = fieldLeft(percent, 3);
   bool leadingTopBlank = true;
   for (int y = kValueTop; y < kValueTop + 12; ++y) {
     for (int x = x0; x < x0 + cellPitch(); ++x) leadingTopBlank = leadingTopBlank && !lit(half, x, y);
@@ -675,14 +787,143 @@ void checkReadoutGainsDigit() {
   check(leadingTopBlank && !rowsBlank(half, kValueTop + 12, kValueBottom), "readout: the 1 rises into the leading cell from below");
   writePgm(half, "oled-readout-roll-99-100.pgm");
 
-  // -9 to -10 on a signed knob. The sign cell keeps its minus and does not roll.
+  // -9 to -10 on a signed knob. The minus stays in its own cell and does not roll.
   const KnobDesc& semitones = *knobDesc(defaultLayout().card[2], 0);
-  const Field s = fieldOf(semitones);
-  check(s.signedRange && s.digits == 2 && cellsFor(s, -9) == "- 9" && cellsFor(s, 5) == "+ 5" && cellsFor(s, 0) == "  0" &&
-            cellsFor(s, -10) == "-10",
-        "readout: a signed knob has a sign cell, a blank tens cell for one digit, and no sign for zero");
+  check(signedRange(semitones) && ownCells(true, -9) == "-9" && ownCells(true, 5) == "+5" && ownCells(true, 0) == "0" &&
+            ownCells(true, -10) == "-10" && pairCells(true, -10, -9).from == "-10" && pairCells(true, -10, -9).to == "- 9",
+        "readout: a signed knob puts a sign in front of every number but zero, and the roll from -10 to -9 holds a blank beside the minus");
   check(sameRows(readoutOf(2, 0, -9.5f), valueBand(semitones, -10, 12), kValueTop, kValueBottom),
-        "readout: -9.5 rolls the 1 in and the 0 to 9, with the minus in its own cell");
+        "readout: -9.5 rolls the 1 out and the 0 to 9, with the minus in its own cell");
+}
+
+// The unit's left edge at each of the 25 roll positions from `base` to base + 1, 0 px to 24 px.
+std::vector<int> unitLeftAcross(int slot, int knob, int base) {
+  const KnobDesc& k = *knobDesc(defaultLayout().card[static_cast<size_t>(slot)], knob);
+  std::vector<int> lefts;
+  for (int rolled = 0; rolled <= kValueHeight; ++rolled) {
+    const float shown = static_cast<float>(base) + static_cast<float>(rolled) / static_cast<float>(kValueHeight);
+    lefts.push_back(unitPicture(readoutOf(slot, knob, shown), unitOf(k)).left);
+  }
+  return lefts;
+}
+
+// Half a cell, rounded either way, is how far the row re-centres when a digit or sign comes or goes.
+bool isHalfCell(int px) { return px == cellPitch() / 2 || px == (cellPitch() + 1) / 2; }
+
+// Across one roll the unit moves at most once. It moves by half a cell, to the right when the wider
+// number is the one the roll ends on or starts from, at the start of the roll when the roll gains a
+// digit or sign and at its end when the roll loses one.
+std::string recentresOnce(int slot, int knob, int base, bool signedKnob) {
+  const std::vector<int> lefts = unitLeftAcross(slot, knob, base);
+  const size_t before = ownCells(signedKnob, base).size();
+  const size_t after = ownCells(signedKnob, base + 1).size();
+  int jumps = 0;
+  for (size_t i = 0; i + 1 < lefts.size(); ++i) {
+    if (lefts[i] < 0) return "the unit was not found";
+    if (lefts[i] == lefts[i + 1]) continue;
+    ++jumps;
+    const bool atStart = i == 0;
+    const bool atEnd = i + 2 == lefts.size();
+    const int moved = lefts[i + 1] - lefts[i];
+    if (before < after && !(atStart && isHalfCell(moved))) return "the unit moved at roll position " + std::to_string(i) + " by " + std::to_string(moved) + " px";
+    if (before > after && !(atEnd && isHalfCell(-moved))) return "the unit moved at roll position " + std::to_string(i) + " by " + std::to_string(moved) + " px";
+    if (before == after) return "the unit moved though both numbers have " + std::to_string(before) + " cells";
+  }
+  if (lefts.back() < 0) return "the unit was not found";
+  if (before != after && jumps != 1) return "the unit moved " + std::to_string(jumps) + " times, not once";
+  return "";
+}
+
+// The row re-centres by half a cell exactly when a digit or the sign appears or vanishes, once per
+// roll, and never while two numbers of one digit count roll.
+void checkReadoutRecentres() {
+  const Layout layout = defaultLayout();
+  std::string failure;
+  int rolls = 0;
+  int recentred = 0;
+  for (int slot = 0; slot < kSlotCount && failure.empty(); ++slot) {
+    for (int knob = 0; knob < kKnobsPerCard && failure.empty(); ++knob) {
+      const KnobDesc* k = knobDesc(layout.card[static_cast<size_t>(slot)], knob);
+      if (!k || k->labels) continue;
+      int lo = 0;
+      int hi = 0;
+      shownRange(*k, lo, hi);
+      const bool signedKnob = lo < 0;
+      for (int b = lo; b < hi && failure.empty(); ++b) {
+        const bool changes = ownCells(signedKnob, b).size() != ownCells(signedKnob, b + 1).size();
+        if (!changes && (b - lo) % 7 != 0) continue;
+        failure = recentresOnce(slot, knob, b, signedKnob);
+        if (!failure.empty()) failure = std::string(cardDesc(layout.card[static_cast<size_t>(slot)]).name) + " " + k->name + " from " + std::to_string(b) + ", " + failure;
+        ++rolls;
+        recentred += changes ? 1 : 0;
+      }
+    }
+  }
+  check(failure.empty(), ("readout: " + failure).c_str());
+  check(rolls > 200 && recentred > 20, "readout: the re-centring was measured on many rolls, those that change the digit count among them");
+
+  // The cases the owner named, measured on the unit's pixels.
+  const std::vector<int> nineToTen = unitLeftAcross(7, 0, 9);
+  const std::vector<int> ninetyNineToHundred = unitLeftAcross(7, 0, 99);
+  const std::vector<int> zeroToOne = unitLeftAcross(2, 0, 0);
+  check(isHalfCell(nineToTen[1] - nineToTen[0]) && nineToTen[1] == nineToTen[12] && nineToTen[12] == nineToTen[24],
+        "readout: 9 to 10 re-centres by half a cell as the roll starts and holds still after");
+  check(isHalfCell(ninetyNineToHundred[1] - ninetyNineToHundred[0]) && ninetyNineToHundred[1] == ninetyNineToHundred[24],
+        "readout: 99 to 100 re-centres by half a cell as the roll starts and holds still after");
+  check(isHalfCell(zeroToOne[1] - zeroToOne[0]) && zeroToOne[1] == zeroToOne[24],
+        "readout: 0 st to +1 st re-centres by half a cell as the sign appears");
+  const std::vector<int> oneToZero = unitLeftAcross(2, 0, -1);
+  check(oneToZero[0] == oneToZero[23] && isHalfCell(oneToZero[23] - oneToZero[24]),
+        "readout: -1 st to 0 st holds the row until the roll ends, then re-centres by half a cell as the sign goes");
+}
+
+// The four readings the owner named draw their unit as written, lowercase, and stand centred. The
+// margins are measured on the cell field and, for the record, on the ink itself.
+void checkReadoutUnitsAndCentre() {
+  struct Case {
+    int slot;
+    int knob;
+    int value;
+    const char* text;
+    const char* capitals;
+  };
+  const Case cases[] = {
+      {2, 0, -12, "-12 st", " ST"}, {4, 1, 250, "250 ms", " MS"}, {6, 0, -40, "-40 dB", " DB"}, {7, 0, 50, "50 %", " %"},
+  };
+  std::vector<std::vector<uint32_t>> pictures(128);
+  for (const Case& c : cases) {
+    const KnobDesc& k = *knobDesc(defaultLayout().card[static_cast<size_t>(c.slot)], c.knob);
+    const Canvas frame = readoutOf(c.slot, c.knob, static_cast<float>(c.value));
+    const std::string what = std::string("readout: ") + c.text + " ";
+
+    // The unit is the lowercase string as written in print. The capitals are not on the screen.
+    char unit[16];
+    unitText(k, unit, sizeof(unit));
+    const std::string tail = std::strchr(c.text, ' ');
+    check(tail == unit, (what + "takes its unit from unitText as written").c_str());
+    check(unitPicture(frame, tail).left >= 0, (what + "draws its unit lowercase as written").c_str());
+    if (std::string(c.capitals) != tail) check(unitPicture(frame, c.capitals).left < 0, (what + "has no capital letters in its unit").c_str());
+
+    // Centred within 1 px on the cells and the unit, and the cells are the number alone.
+    const Columns cols = bandColumns(frame);
+    std::vector<int> at;
+    const bool signedKnob = signedRange(k);
+    const std::string cells = ownCells(signedKnob, c.value);
+    const bool placed = placeCells(cols, cells, pictures, at);
+    check(placed && fieldCentred(cols, at).empty(), (what + "stands centred within 1 px").c_str());
+    check(placed && inkAccounted(frame, k, cells, at), (what + "holds its cells and its unit and nothing else").c_str());
+    check(sameRows(frame, valueBand(k, c.value), kValueTop, kValueBottom), (what + "is the model's row").c_str());
+
+    const Extent ink = inkFrom(cols, 0);
+    std::printf("readout: %s ink margins %d px left, %d px right\n", c.text, ink.left, kCanvasWidth - 1 - ink.right);
+  }
+
+  // A signed knob at zero draws no sign.
+  const KnobDesc& semitones = *knobDesc(defaultLayout().card[2], 0);
+  Canvas zero;
+  zero.drawDigits(fieldLeft(semitones, 1), kValueTop, font16x24(), "0");
+  drawUnit(zero, semitones, fieldLeft(semitones, 1) + cellPitch());
+  check(sameRows(readoutOf(2, 0, 0.0f), zero, kValueTop, kValueBottom), "readout: 0 st is a lone 0 and its unit, centred, with no sign");
 }
 
 // A rolling digit stays inside the 24 px band of the value.
@@ -717,30 +958,35 @@ void checkReadoutEdges() {
   check(dark, "readout: every value of every default-layout knob keeps its edges dark");
 }
 
-// The autotune key is a name. It draws in 16X24 and does not roll. Its field is as wide as the widest
-// name and sits centred once, and each name starts at the field's left edge.
+// The autotune key is a name. It draws in 16X24, does not roll, and sits centred on its own width.
 const KnobDesc& keyKnob() { return *knobDesc(defaultLayout().card[1], 0); }
 
-constexpr int kKeyFieldLeft = 6;
+// Left column of a key name drawn centred on its own width.
+int centredLeft(const char* name) { return (kCanvasWidth - Canvas::textWidth(font16x24(), name)) / 2; }
 
 void checkKeyField() {
   const KnobDesc& key = keyKnob();
   int widest = 0;
-  for (int i = 0; i < key.positions; ++i) widest = std::max(widest, Canvas::textWidth(font16x24(), key.labels[i]));
-  check(widest == 116 && (kCanvasWidth - widest) / 2 == kKeyFieldLeft,
-        "readout: the widest key name is 116 px, so its field starts at x 6");
+  int narrowest = kCanvasWidth;
+  for (int i = 0; i < key.positions; ++i) {
+    widest = std::max(widest, Canvas::textWidth(font16x24(), key.labels[i]));
+    narrowest = std::min(narrowest, Canvas::textWidth(font16x24(), key.labels[i]));
+  }
+  check(widest == 116 && centredLeft("F# / D#m") == 6, "readout: the widest key name is 116 px, so it starts at x 6");
+  check(narrowest < widest && narrowest < 100, "readout: the key names differ in width, so centring each one gives different columns");
 
   bool inPlace = true;
-  bool startsAtLeft = true;
+  bool centred = true;
   for (int i = 0; i < key.positions; ++i) {
     const Canvas c = readoutOf(1, 0, static_cast<float>(i));
     Canvas want;
-    want.drawText(kKeyFieldLeft, kValueTop, font16x24(), key.labels[i]);
+    want.drawText(centredLeft(key.labels[i]), kValueTop, font16x24(), key.labels[i]);
     inPlace = inPlace && sameRows(c, want, kValueTop, kValueBottom);
-    startsAtLeft = startsAtLeft && inkFrom(bandColumns(c), 0).left == kKeyFieldLeft;
+    const Extent ink = inkFrom(bandColumns(c), 0);
+    centred = centred && ink.left == centredLeft(key.labels[i]) && std::abs(ink.left - (kCanvasWidth - 1 - ink.right)) <= 1;
   }
-  check(inPlace, "readout: each key name is drawn in 16X24 from the left edge of the one fixed field");
-  check(startsAtLeft, "readout: every key name starts at the same column, the shorter ones leave the right of the field blank");
+  check(inPlace, "readout: each key name is drawn in 16X24 on its own width, nothing else on the value rows");
+  check(centred, "readout: every key name stands centred, its left and right margins within 1 px");
 }
 
 void checkKeyRows() {
@@ -756,7 +1002,7 @@ void checkKeyRows() {
   Canvas clamped;
   renderReadout(clamped, stray);
   Canvas last;
-  last.drawText(kKeyFieldLeft, kValueTop, font16x24(), "F / Dm");
+  last.drawText(centredLeft("F / Dm"), kValueTop, font16x24(), "F / Dm");
   check(sameRows(clamped, last, kValueTop, kValueBottom), "readout: a target past the last key clamps to the last name");
 }
 
@@ -849,95 +1095,155 @@ void checkRibbonHistory() {
   check(r.half(0) == 0 && r.half(1) == 13 && r.half(2) == 22 && r.half(3) == 0, "ribbon: levels read newest first");
   check(r.half(-1) == 0 && r.half(kRibbonLevels) == 0 && r.half(1000) == 0, "ribbon: ages outside the history read zero");
   for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
-  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 62 levels");
+  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 61 levels");
   r.push(0.0f);
   check(r.half(0) == 0 && r.half(1) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: a push drops the oldest level");
-  check(kRibbonLevels == 62 && kRibbonLeftX == 4 && kRibbonLeftX + kRibbonLevels * kRibbonColumnsPerLevel == kCanvasWidth,
-        "ribbon: 62 levels of two columns fill columns 4 to 127");
+  check(kRibbonLevels == 57 && kRibbonLeftX == 13 && kRibbonRightX == 126 && kRibbonLeftX + kRibbonLevels * kRibbonColumnsPerLevel == 127,
+        "ribbon: 57 levels of two columns fill columns 13 to 126, and column 127 stays blank");
+}
+
+// The meter box and its segments, drawn from the owner's wording (2026-10-30) and nothing in the
+// renderer. The outline is 1 px wide, its sides are columns 1 and 9 and its top and bottom are rows
+// 8 and 56, so the interior is columns 2 to 8, rows 9 to 55. There are 16 segments, each 2 rows
+// tall at columns 2 to 8, with 1 row of gap above. Segment 1 is rows 54 and 55, segment 2 rows 51
+// and 52, up to segment 16 on rows 9 and 10. Columns 10 to 12 stay blank and the ribbon starts at
+// column 13. The walk moves the finished picture.
+constexpr int kBoxLeft = 1;
+constexpr int kBoxRight = 9;
+constexpr int kBoxTop = 8;
+constexpr int kBoxBottom = 56;
+constexpr int kBoxSegments = 16;
+constexpr int kBoxFootprint = 13;  // columns 0 to 12 belong to the meter and its blank margin
+
+int segmentBottomRow(int n) { return 55 - 3 * (n - 1); }
+int segmentTopRow(int n) { return segmentBottomRow(n) - 1; }
+
+Canvas meterFromDefinition(int segments, Walk walk) {
+  Canvas c;
+  for (int x = kBoxLeft; x <= kBoxRight; ++x) {
+    c.setPixel(x + walk.x, kBoxTop + walk.y, true);
+    c.setPixel(x + walk.x, kBoxBottom + walk.y, true);
+  }
+  for (int y = kBoxTop; y <= kBoxBottom; ++y) {
+    c.setPixel(kBoxLeft + walk.x, y + walk.y, true);
+    c.setPixel(kBoxRight + walk.x, y + walk.y, true);
+  }
+  for (int n = 1; n <= std::min(segments, kBoxSegments); ++n) {
+    for (int y = segmentTopRow(n); y <= segmentBottomRow(n); ++y) {
+      for (int x = kBoxLeft + 1; x < kBoxRight; ++x) c.setPixel(x + walk.x, y + walk.y, true);
+    }
+  }
+  return c;
+}
+
+// True when columns x0 up to kCanvasWidth - 1 of rows y0 up to y1 - 1 are dark.
+bool darkFrom(const Canvas& c, int x0, int y0, int y1) {
+  for (int y = y0; y < y1; ++y) {
+    for (int x = x0; x < kCanvasWidth; ++x) {
+      if (lit(c, x, y)) return false;
+    }
+  }
+  return true;
+}
+
+// True when columns x0 up to x1 - 1 of rows y0 up to y1 - 1 are dark.
+bool darkIn(const Canvas& c, int x0, int x1, int y0, int y1) {
+  for (int y = y0; y < y1; ++y) {
+    for (int x = x0; x < x1; ++x) {
+      if (lit(c, x, y)) return false;
+    }
+  }
+  return true;
 }
 
 void checkVoiceSilence() {
-  Canvas c;
-  renderVoice(c, Ribbon(), 0, Walk{0, 0});
-  Canvas line;
-  line.fillRect(4, 32, kCanvasWidth - 4, 1, true);
-  check(sameRows(c, line, 0, kCanvasHeight), "voice: in silence the screen is the horizon line from column 4 at row 32 and nothing else");
+  // In silence the screen is the horizon line from column 13 to column 126 at row 32 and the empty
+  // meter box. Column 127 stays blank.
+  Canvas line = meterFromDefinition(0, Walk{0, 0});
+  line.fillRect(13, 32, 114, 1, true);
+  for (int segments : {0, -7}) {
+    Canvas c;
+    renderVoice(c, Ribbon(), segments, Walk{0, 0});
+    check(sameRows(c, line, 0, kCanvasHeight),
+          ("voice: in silence, with " + std::to_string(segments) + " segments, the screen is the horizon line from column 13 to 126 at row 32 and the empty meter box").c_str());
+  }
 }
 
-// The first level of the history, the oldest, sits in columns 4 and 5, and nothing is left of it.
+// The first level of the history, the oldest, sits in columns 13 and 14, the newest in columns 125 and
+// 126, and nothing is left of the ribbon but the meter box and the blank columns 10 to 12 and 127.
 void checkRibbonFirstColumn() {
   Ribbon r;
   for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
   Canvas c;
   renderVoice(c, r, 0, Walk{0, 0});
   bool solid = true;
-  for (int x = 4; x < kCanvasWidth; ++x) {
+  for (int x = 13; x <= 126; ++x) {
     for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, x, y);
   }
-  check(solid, "ribbon: a full history is solid from column 4 to column 127");
-  bool blank = true;
-  for (int x = 0; x < 4; ++x) {
-    for (int y = 0; y < kCanvasHeight; ++y) blank = blank && !lit(c, x, y);
+  check(solid, "ribbon: a full history is solid from column 13 to column 126");
+  check(darkFrom(c, 127, 0, kCanvasHeight), "ribbon: column 127 stays blank under a full history");
+  const Canvas box = meterFromDefinition(0, Walk{0, 0});
+  bool boxOnly = true;
+  for (int x = 0; x < kBoxFootprint; ++x) {
+    for (int y = 0; y < kCanvasHeight; ++y) boxOnly = boxOnly && lit(c, x, y) == lit(box, x, y);
   }
-  check(blank, "ribbon: columns 0 to 3 stay blank when the bar is empty");
+  check(boxOnly, "ribbon: columns 0 to 12 hold the empty meter box and nothing else, columns 10 to 12 blank");
 
-  // With only the oldest level tall, it fills columns 4 and 5 and the next column is the line.
+  // With only the oldest level tall, it fills columns 13 and 14 and the next column is the line.
   Ribbon oldest;
   oldest.push(1.0f);
   for (int i = 1; i < kRibbonLevels; ++i) oldest.push(0.0f);
   Canvas d;
   renderVoice(d, oldest, 0, Walk{0, 0});
-  check(lit(d, 4, 32 - 22) && lit(d, 5, 32 + 22) && !lit(d, 6, 32 - 22) && !lit(d, 3, 32) && lit(d, 6, 32),
-        "ribbon: the oldest level fills columns 4 and 5");
+  check(lit(d, 13, 32 - 22) && lit(d, 14, 32 + 22) && !lit(d, 15, 32 - 22) && !lit(d, 12, 32) && lit(d, 15, 32),
+        "ribbon: the oldest level fills columns 13 and 14");
 }
 
 void checkVoiceShape() {
   Ribbon r;
   for (int i = 0; i < kRibbonLevels; ++i) r.push(0.0f);
-  r.push(1.0f);  // 22 px, columns 124 and 125 after the next push
-  r.push(0.5f);  // 13 px, columns 126 and 127
+  r.push(1.0f);  // 22 px, columns 123 and 124 after the next push
+  r.push(0.5f);  // 13 px, columns 125 and 126
   Canvas c;
   renderVoice(c, r, 0, Walk{0, 0});
 
   bool solid = true;
-  for (int y = 32 - 13; y <= 32 + 13; ++y) solid = solid && lit(c, 126, y) && lit(c, 127, y);
-  for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, 124, y) && lit(c, 125, y);
-  check(solid, "voice: each level spans two columns and is solid from the horizon out, the newest at the right edge");
+  for (int y = 32 - 13; y <= 32 + 13; ++y) solid = solid && lit(c, 125, y) && lit(c, 126, y);
+  for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, 123, y) && lit(c, 124, y);
+  check(solid, "voice: each level spans two columns and is solid from the horizon out, the newest at column 126");
   check(lit(c, 100, 32) && !lit(c, 100, 31) && !lit(c, 100, 33), "voice: older silence is the line");
+  check(darkFrom(c, 127, 0, kCanvasHeight), "voice: column 127 stays blank under the newest level");
 
   // A 1 px rim of 50 % Bayer dither caps each column, and nothing lies beyond it.
   bool rim = true;
-  for (int x = 126; x <= 127; ++x) {
+  for (int x = 125; x <= 126; ++x) {
     rim = rim && lit(c, x, 32 - 14) == bayerLit(x, 32 - 14, 32) && lit(c, x, 32 + 14) == bayerLit(x, 32 + 14, 32);
     rim = rim && !lit(c, x, 32 - 15) && !lit(c, x, 32 + 15);
   }
-  for (int x = 124; x <= 125; ++x) {
+  for (int x = 123; x <= 124; ++x) {
     rim = rim && lit(c, x, 32 - 23) == bayerLit(x, 32 - 23, 32) && lit(c, x, 32 + 23) == bayerLit(x, 32 + 23, 32);
     rim = rim && !lit(c, x, 32 - 24) && !lit(c, x, 32 + 24);
   }
   check(rim, "voice: a 1 px 50 % dither caps the column top and bottom");
 
-  check(rowsBlank(c, 0, 9) && rowsBlank(c, 56, kCanvasHeight),
+  check(darkFrom(c, 13, 0, 9) && darkFrom(c, 13, 56, kCanvasHeight),
         "voice: the tallest column with its rim stays 9 px clear of the top and bottom");
 }
 
 // The voice screen drawn pixel by pixel from its definition, as an independent check of the whole
-// frame. The ribbon runs from column 4 to 127. A column of half-height h is solid within h rows of
+// frame. The ribbon runs from column 13 to 126. A column of half-height h is solid within h rows of
 // the horizon, a 1 px rim lies one row beyond it where the Bayer threshold of the pixel is under
-// 32, and a column of height 0 is the horizon pixel alone. The bar is columns 1 and 2, filled from
-// row 55 up for `rows` rows. The walk moves the finished picture.
-Canvas voiceFromDefinition(const Ribbon& ribbon, int rows, Walk walk) {
-  Canvas c;
-  for (int x = 4; x < kCanvasWidth; ++x) {
-    const int h = ribbon.half((kCanvasWidth - 1 - x) / 2);
+// 32, and a column of height 0 is the horizon pixel alone. The meter is its box and `segments`
+// lit segments. The walk moves the finished picture.
+Canvas voiceFromDefinition(const Ribbon& ribbon, int segments, Walk walk) {
+  Canvas c = meterFromDefinition(segments, walk);
+  for (int x = 13; x <= 126; ++x) {
+    const int h = ribbon.half((126 - x) / 2);
     for (int y = 0; y < kCanvasHeight; ++y) {
       const int d = std::abs(y - 32);
       const bool on = h == 0 ? d == 0 : (d <= h || (d == h + 1 && bayerLit(x, y, 32)));
       if (on) c.setPixel(x + walk.x, y + walk.y, true);
     }
-  }
-  for (int x = 1; x <= 2; ++x) {
-    for (int y = 55 - rows + 1; y <= 55; ++y) c.setPixel(x + walk.x, y + walk.y, true);
   }
   return c;
 }
@@ -945,99 +1251,212 @@ Canvas voiceFromDefinition(const Ribbon& ribbon, int rows, Walk walk) {
 void checkVoiceWholeFrame() {
   uint32_t seed = 12345;
   bool same = true;
-  for (int frame = 0; frame < 6; ++frame) {
+  const int counts[] = {0, 3, 6, 9, 12, 15, 16};
+  for (int frame = 0; frame < 7; ++frame) {
     Ribbon r;
     for (int i = 0; i < kRibbonLevels + frame; ++i) {
       seed = seed * 1664525u + 1013904223u;
       r.push(static_cast<float>(seed >> 8) / 16777216.0f);
     }
-    const int rows = frame * 9;  // 0, 9, 18, 27, 36, 45
+    const int segments = counts[frame];
     for (uint32_t step = 0; step < 9; ++step) {
       Canvas c;
-      renderVoice(c, r, rows, walkAt(step));
-      same = same && sameRows(c, voiceFromDefinition(r, rows, walkAt(step)), 0, kCanvasHeight);
+      renderVoice(c, r, segments, walkAt(step));
+      same = same && sameRows(c, voiceFromDefinition(r, segments, walkAt(step)), 0, kCanvasHeight);
     }
   }
-  check(same, "voice: whole frames match a pixel-by-pixel drawing of the bar and the ribbon, at every step of the walk");
+  check(same, "voice: whole frames match a pixel-by-pixel drawing of the meter box, its segments and the ribbon, at every step of the walk");
 }
 
-// The bar's height from the level, through the same map the face uses.
-void checkMeterHeight() {
-  const auto rowsAt = [](float db) { return meterRows(level::displayLevel(std::pow(10.0f, db / 20.0f))); };
-  check(kMeterRows == 47 && kMeterTopY == 9 && kMeterTopY + kMeterRows - 1 == 55, "meter: it spans rows 9 to 55, 47 rows");
-  check(rowsAt(-50.0f) == 0, "meter: -50 dBFS is no rows");
-  check(rowsAt(-6.0f) == 41, "meter: -6 dBFS is 41 rows");
-  check(rowsAt(0.0f) == 47 && rowsAt(6.0f) == 47, "meter: 0 dBFS is all 47 rows and louder stays there");
-  check(rowsAt(-60.0f) == 0, "meter: under -50 dBFS is no rows");
+// The lit segments from the level, through the same map the face uses. The level is linear in dB of
+// the input tick's RMS from -50 dBFS (0 segments) to 0 dBFS (16), and the count is round(level x 16).
+void checkMeterSegments() {
+  const auto segmentsAt = [](float db) { return meterSegments(level::displayLevel(std::pow(10.0f, db / 20.0f))); };
+  check(kMeterSegments == 16 && kMeterSegmentRows == 2 && kMeterSegmentGap == 1, "meter: 16 segments of 2 rows with 1 row of gap");
+  check(kMeterRows == 47 && kMeterTopY == 9 && kMeterTopY + kMeterRows - 1 == 55, "meter: the interior spans rows 9 to 55, 47 rows");
+  check(segmentsAt(-50.0f) == 0, "meter: -50 dBFS lights no segment");
+  check(segmentsAt(-25.0f) == 8, "meter: -25 dBFS lights 8 segments");
+  check(segmentsAt(-6.0f) == 14, "meter: -6 dBFS lights 14 segments");
+  check(segmentsAt(0.0f) == 16 && segmentsAt(6.0f) == 16, "meter: 0 dBFS lights all 16 segments and louder stays there");
+  check(segmentsAt(-60.0f) == 0, "meter: under -50 dBFS lights no segment");
 
-  // -25 dBFS is level 0.5, which is 23.5 rows and rounds up. The level itself is checked in core_level.
-  check(std::fabs(level::displayLevel(std::pow(10.0f, -25.0f / 20.0f)) - 0.5f) < 1e-4f && meterRows(0.5f) == 24,
-        "meter: -25 dBFS is the middle, 24 rows");
+  // -25 dBFS is level 0.5. The level itself is checked in core_level.
+  check(std::fabs(level::displayLevel(std::pow(10.0f, -25.0f / 20.0f)) - 0.5f) < 1e-4f && meterSegments(0.5f) == 8,
+        "meter: -25 dBFS is the middle, 8 segments");
 
-  check(meterRows(0.0f) == 0 && meterRows(-1.0f) == 0 && meterRows(0.005f) == 0, "meter: no level, a negative one and a hair above zero are empty");
-  check(meterRows(1.0f) == 47 && meterRows(5.0f) == 47, "meter: full level and louder are 47 rows");
-  check(meterRows(std::numeric_limits<float>::quiet_NaN()) == 0, "meter: NaN is empty");
+  check(meterSegments(0.0f) == 0 && meterSegments(-1.0f) == 0 && meterSegments(0.02f) == 0, "meter: no level, a negative one and a hair above zero light nothing");
+  check(meterSegments(1.0f) == 16 && meterSegments(5.0f) == 16, "meter: full level and louder light all 16");
+  check(meterSegments(std::numeric_limits<float>::quiet_NaN()) == 0, "meter: NaN lights nothing");
+
+  bool formula = true;
+  for (int i = 0; i <= 1000; ++i) {
+    const float level = static_cast<float>(i) / 1000.0f;
+    formula = formula && meterSegments(level) == static_cast<int>(std::lround(level * 16.0f));
+  }
+  check(formula, "meter: the segments are round(level x 16) at a thousand levels");
   bool rising = true;
   int prev = 0;
-  for (int i = 0; i <= 200; ++i) {
-    const int rows = meterRows(static_cast<float>(i) / 200.0f);
-    rising = rising && rows >= prev && rows - prev <= 1;
-    prev = rows;
+  for (int i = 0; i <= 400; ++i) {
+    const int segments = meterSegments(static_cast<float>(i) / 400.0f);
+    rising = rising && segments >= prev && segments - prev <= 1;
+    prev = segments;
   }
-  check(rising, "meter: a louder level is never shorter and grows a row at a time");
+  check(rising, "meter: a louder level never lights fewer segments and adds one at a time");
 }
 
-// The bar is columns 1 and 2, filled up from row 55, and column 3 stays blank.
-void checkMeterPlace() {
-  bool place = true;
-  for (int rows = 0; rows <= kMeterRows; ++rows) {
-    Canvas c;
-    renderVoice(c, Ribbon(), rows, Walk{0, 0});
-    for (int y = 0; y < kCanvasHeight; ++y) {
-      const bool inBar = y >= 55 - rows + 1 && y <= 55;
-      place = place && lit(c, 1, y) == inBar && lit(c, 2, y) == inBar;
-      place = place && !lit(c, 0, y) && !lit(c, 3, y);
+// The box outline stands exactly on columns 1 and 9 and rows 8 and 56, in silence and at every
+// level. Its interior is columns 2 to 8, rows 9 to 55. Columns 0 and 10 to 12 stay blank, and nothing
+// of the meter lies outside the box.
+void checkMeterBox() {
+  Canvas empty;
+  renderVoice(empty, Ribbon(), 0, Walk{0, 0});
+  bool outline = true;
+  for (int x = 1; x <= 9; ++x) outline = outline && lit(empty, x, 8) && lit(empty, x, 56);
+  for (int y = 8; y <= 56; ++y) outline = outline && lit(empty, 1, y) && lit(empty, 9, y);
+  check(outline, "meter: the empty box has its top at row 8, its bottom at row 56 and its sides at columns 1 and 9, 1 px wide");
+
+  bool interior = true;
+  for (int y = 9; y <= 55; ++y) {
+    for (int x = 2; x <= 8; ++x) interior = interior && !lit(empty, x, y);
+  }
+  check(interior, "meter: the interior, columns 2 to 8 over rows 9 to 55, is dark in silence");
+
+  bool outside = true;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x : {0, 10, 11, 12}) outside = outside && !lit(empty, x, y);
+    if (y < 8 || y > 56) {
+      for (int x = 1; x <= 9; ++x) outside = outside && !lit(empty, x, y);
     }
   }
-  check(place, "meter: columns 1 and 2 are lit from row 55 up for the given rows, and columns 0 and 3 are blank");
+  check(outside, "meter: nothing lies in column 0, in columns 10 to 12, or above row 8 and below row 56");
+
+  int boxPixels = 0;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x = 0; x < kBoxFootprint; ++x) boxPixels += lit(empty, x, y) ? 1 : 0;
+  }
+  check(boxPixels == 2 * 9 + 2 * 47, "meter: the box is 2 x 9 px of top and bottom and 2 x 47 px of sides, 112 px in all");
 
   Canvas full;
-  renderVoice(full, Ribbon(), kMeterRows, Walk{0, 0});
-  check(lit(full, 1, 9) && lit(full, 2, 9) && lit(full, 1, 55) && lit(full, 2, 55) && !lit(full, 1, 8) && !lit(full, 1, 56),
-        "meter: the full bar covers rows 9 to 55 and no row more");
-
+  renderVoice(full, Ribbon(), 16, Walk{0, 0});
   Canvas over;
   renderVoice(over, Ribbon(), 999, Walk{0, 0});
-  check(sameRows(over, full, 0, kCanvasHeight), "meter: rows past the span stop at row 9");
+  check(sameRows(over, full, 0, kCanvasHeight), "meter: segments past 16 stop at the 16th");
 
-  // A tall ribbon beside a full bar still leaves column 3 blank.
+  // A full ribbon beside a full meter leaves columns 10 to 12 blank and the box whole.
   Ribbon loud;
   for (int i = 0; i < kRibbonLevels; ++i) loud.push(1.0f);
   Canvas both;
-  renderVoice(both, loud, kMeterRows, Walk{0, 0});
+  renderVoice(both, loud, 16, Walk{0, 0});
   bool gap = true;
-  for (int y = 0; y < kCanvasHeight; ++y) gap = gap && !lit(both, 3, y) && !lit(both, 0, y);
-  check(gap && lit(both, 4, 32) && lit(both, 2, 32), "meter: column 3 stays blank between a full bar and a full ribbon");
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x : {0, 10, 11, 12, 127}) gap = gap && !lit(both, x, y);
+  }
+  check(gap && lit(both, 13, 32) && lit(both, 9, 32) && lit(both, 8, 31) && lit(both, 126, 32),
+        "meter: columns 10 to 12 stay blank between a full meter and a full ribbon, and column 127 stays blank after it");
 }
 
-// The bar walks with the ribbon, so every step of the walk moves both by the same pixel. Columns 0
-// to 3 hold the bar and, when the walk shifts the ribbon left, the start of the horizon line.
-void checkMeterWalks() {
-  bool moves = true;
-  for (uint32_t step = 0; step < 9; ++step) {
-    const Walk w = walkAt(step);
+// Segment n stands on rows 54 and 55 for n = 1, and each next segment 3 rows higher, so the 16th is
+// on rows 9 and 10. Every gap row between two segments is dark, and lit segments are the lowest ones.
+void checkMeterSegmentRows() {
+  check(segmentBottomRow(1) == 55 && segmentTopRow(1) == 54 && segmentBottomRow(2) == 52 && segmentTopRow(2) == 51 &&
+            segmentBottomRow(16) == 10 && segmentTopRow(16) == 9,
+        "meter: segment 1 is rows 54 and 55, segment 2 rows 51 and 52, segment 16 rows 9 and 10");
+
+  bool segmentsOk = true;
+  bool gapsDark = true;
+  bool countsOk = true;
+  for (int lit16 = 0; lit16 <= 16; ++lit16) {
     Canvas c;
-    renderVoice(c, Ribbon(), 30, w);
-    for (int y = 0; y < kCanvasHeight; ++y) {
-      const bool inBar = y - w.y >= 55 - 30 + 1 && y - w.y <= 55;
-      for (int x = 0; x < 4; ++x) {
-        const bool bar = inBar && (x - w.x == 1 || x - w.x == 2);
-        const bool line = x >= 4 + w.x && y == 32 + w.y;
-        moves = moves && lit(c, x, y) == (bar || line);
+    renderVoice(c, Ribbon(), lit16, Walk{0, 0});
+    int counted = 0;
+    for (int n = 1; n <= 16; ++n) {
+      const bool wantLit = n <= lit16;
+      bool top = true;
+      bool bottom = true;
+      for (int x = 2; x <= 8; ++x) {
+        top = top && lit(c, x, segmentTopRow(n)) == wantLit;
+        bottom = bottom && lit(c, x, segmentBottomRow(n)) == wantLit;
+      }
+      segmentsOk = segmentsOk && top && bottom;
+      counted += (wantLit && top && bottom) ? 1 : 0;
+      if (n < 16) {
+        for (int x = 2; x <= 8; ++x) gapsDark = gapsDark && !lit(c, x, segmentTopRow(n) - 1);
       }
     }
+    countsOk = countsOk && counted == lit16;
   }
-  check(moves, "meter: every step of the walk moves the bar by the ribbon's pixel");
+  check(segmentsOk && countsOk, "meter: with n segments lit, the lowest n are lit at columns 2 to 8, both rows each, and the rest are dark");
+  check(gapsDark, "meter: the gap rows 53, 50, down to 11 are dark whatever the count, since a gap holds no segment");
+
+  Canvas all;
+  renderVoice(all, Ribbon(), 16, Walk{0, 0});
+  bool gapRows = true;
+  for (int y = 11; y <= 53; y += 3) {
+    for (int x = 2; x <= 8; ++x) gapRows = gapRows && !lit(all, x, y);
+  }
+  check(gapRows, "meter: with all 16 lit, rows 11, 14, 17 up to 53 at columns 2 to 8 are dark");
+
+  bool whole = true;
+  for (int lit16 = 0; lit16 <= 16; ++lit16) {
+    Canvas c;
+    renderVoice(c, Ribbon(), lit16, Walk{0, 0});
+    const Canvas want = meterFromDefinition(lit16, Walk{0, 0});
+    for (int x = 0; x < kBoxFootprint; ++x) {
+      for (int y = 0; y < kCanvasHeight; ++y) whole = whole && lit(c, x, y) == lit(want, x, y);
+    }
+  }
+  check(whole, "meter: columns 0 to 12 are the box and the lit segments and nothing else at every count");
+}
+
+// The box, the segments and the ribbon walk together: every step of the walk moves the whole picture
+// by the same pixel.
+void checkMeterWalks() {
+  bool moves = true;
+  const Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f});
+  for (int segments : {0, 9, 16}) {
+    Canvas base;
+    renderVoice(base, r, segments, Walk{0, 0});
+    for (uint32_t step = 1; step < 9; ++step) {
+      const Walk w = walkAt(step);
+      Canvas c;
+      renderVoice(c, r, segments, w);
+      for (int y = 0; y < kCanvasHeight; ++y) {
+        for (int x = 0; x < kCanvasWidth; ++x) {
+          const int sx = x - w.x;
+          const int sy = y - w.y;
+          const bool want = sx >= 0 && sx < kCanvasWidth && sy >= 0 && sy < kCanvasHeight && lit(base, sx, sy);
+          moves = moves && lit(c, x, y) == want;
+        }
+      }
+      moves = moves && sameRows(c, voiceFromDefinition(r, segments, w), 0, kCanvasHeight);
+    }
+  }
+  check(moves, "meter: at every step of the walk the box, its segments and the ribbon move together by one pixel");
+}
+
+Canvas toggleReadout(int slot, bool on);
+
+// The screens that are not the voice screen carry no meter. The box's left side is column 1 and its
+// first segments start at column 2, so a screen without the meter leaves columns 0 to 5 dark below
+// its title bar. A key name may start at column 6, so the readout is held to that. The toggle readout,
+// MUTED and BYPASS hold their word further in, from column 11 at the nearest, and leave columns 0 to
+// 10, the box and its walk, dark.
+void checkMeterAbsentOffVoice() {
+  const Layout layout = defaultLayout();
+  bool dark = true;
+  for (int slot = 0; slot < kSlotCount; ++slot) {
+    for (int knob = 0; knob < kKnobsPerCard; ++knob) {
+      if (!knobDesc(layout.card[static_cast<size_t>(slot)], knob)) continue;
+      dark = dark && darkIn(readoutOf(slot, knob, 0.0f), 0, 6, kBarRows, kCanvasHeight);
+    }
+    dark = dark && darkIn(toggleReadout(slot, true), 0, kBoxRight + 2, kBarRows, kCanvasHeight);
+  }
+  Canvas muted;
+  renderMuted(muted, "MUTED");
+  Canvas bypass;
+  renderMuted(bypass, "BYPASS");
+  dark = dark && darkIn(muted, 0, kBoxRight + 2, 0, kCanvasHeight) && darkIn(bypass, 0, kBoxRight + 2, 0, kCanvasHeight);
+  check(dark, "meter: the readout below its title bar leaves columns 0 to 5 dark, and the toggle readout, MUTED and BYPASS leave columns 0 to 10 dark");
 }
 
 void checkVoiceScroll() {
@@ -1050,8 +1469,8 @@ void checkVoiceScroll() {
 
   // The rim dither is anchored to the panel, so it does not move with the ribbon. The rest does.
   bool moved = true;
-  for (int x = kRibbonLeftX; x + kRibbonColumnsPerLevel < kCanvasWidth; ++x) {
-    const int half = r.half((kCanvasWidth - 1 - x) / kRibbonColumnsPerLevel);
+  for (int x = kRibbonLeftX; x + kRibbonColumnsPerLevel <= kRibbonRightX; ++x) {
+    const int half = r.half((kRibbonRightX - x) / kRibbonColumnsPerLevel);
     for (int y = 0; y < kCanvasHeight; ++y) {
       if (std::abs(y - kRibbonHorizonY) == half + 1) continue;
       moved = moved && lit(after, x, y) == lit(before, x + kRibbonColumnsPerLevel, y);
@@ -1064,12 +1483,12 @@ void checkVoiceScroll() {
 void checkVoiceWalk() {
   const Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f, 0.5f, 0.8f});
   Canvas base;
-  renderVoice(base, r, 30, Walk{0, 0});
+  renderVoice(base, r, 9, Walk{0, 0});
   bool ok = true;
   for (int i = 1; i <= 8; ++i) {
     const Walk w = walkAt(static_cast<uint32_t>(i));
     Canvas moved;
-    renderVoice(moved, r, 30, w);
+    renderVoice(moved, r, 9, w);
     for (int y = 0; y < kCanvasHeight; ++y) {
       for (int x = 0; x < kCanvasWidth; ++x) {
         const int sx = x - w.x;
@@ -1306,9 +1725,11 @@ void checkScreens() {
   checkReadoutRolling();
   checkReadoutRows();
   checkReadoutField();
-  checkReadoutNeverMoves();
+  checkReadoutRolls();
   checkReadoutSweep();
   checkReadoutGainsDigit();
+  checkReadoutRecentres();
+  checkReadoutUnitsAndCentre();
   checkReadoutRollClip();
   checkReadoutEdges();
   checkKeyField();
@@ -1321,9 +1742,11 @@ void checkScreens() {
   checkRibbonFirstColumn();
   checkVoiceShape();
   checkVoiceWholeFrame();
-  checkMeterHeight();
-  checkMeterPlace();
+  checkMeterSegments();
+  checkMeterBox();
+  checkMeterSegmentRows();
   checkMeterWalks();
+  checkMeterAbsentOffVoice();
   checkVoiceScroll();
   checkVoiceWalk();
   checkMuted();

@@ -740,10 +740,15 @@ void checkDissolveInPlace() {
 }
 
 // The proof renderer's dissolve from the silent voice line to MUTED, byte for byte. The line is
-// the ribbon in silence, which starts at column 4.
+// the ribbon in silence, which runs from column 13 to column 126, with the level meter's empty box at
+// the left (columns 1 to 9, rows 8 to 56).
 void checkDissolveAgainstProof() {
   Canvas line;
-  line.fillRect(4, 32, kCanvasWidth - 4, 1, true);
+  line.fillRect(13, 32, 114, 1, true);
+  line.fillRect(1, 8, 9, 1, true);
+  line.fillRect(1, 56, 9, 1, true);
+  line.fillRect(1, 8, 1, 49, true);
+  line.fillRect(9, 8, 1, 49, true);
   Canvas muted;
   muted.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), "MUTED")) / 2, (kCanvasHeight - 24) / 2, font16x24(), "MUTED");
   Canvas r;

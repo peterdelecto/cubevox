@@ -1,6 +1,7 @@
 // Checks the levels behind the voice screen on the host. Covers block energy, the input bar's dB
 // mapping and its instant attack and 120 ms release, and the output ribbon's window, which rises at
-// once, falls 10 dB a second, never sits under -30 dBFS and spans 44 dB.
+// once, falls 10 dB a second, never sits under -30 dBFS and spans 44 dB, but never reaches down
+// past -60 dBFS, so a quieter tick reads as silence.
 
 #include "support.h"
 
@@ -139,6 +140,19 @@ bool near(float a, float b, float tolerance = 1e-3f) { return std::fabs(a - b) <
 void checkWindowConstants() {
   check(level::kWindowSpanDb == 44.0f && level::kWindowMinTopDbfs == -30.0f && level::kWindowFallDbPerS == 10.0f,
         "window: 44 dB span, -30 dBFS minimum top, 10 dB a second");
+  check(level::kWindowFloorDbfs == -60.0f, "window: the silence floor is -60 dBFS");
+
+  // The bottom is max(top - 44, -60) dBFS. A top of -30 would put it at -74, so the floor holds it
+  // at -60 from a top of -16 dBFS down, and from there up it is 44 dB under the top.
+  check(level::windowBottom(-30.0f) == -60.0f && level::windowBottom(-20.0f) == -60.0f && level::windowBottom(-16.0f) == -60.0f,
+        "window: from a top of -16 dBFS down the bottom is held at -60 dBFS");
+  check(level::windowBottom(-10.0f) == -54.0f && level::windowBottom(-15.0f) == -59.0f && level::windowBottom(0.0f) == -44.0f,
+        "window: a top at -10 dBFS gives a bottom at -54 dBFS, and a top at 0 gives -44");
+  level::OutputMeter bottomOfFresh;
+  check(bottomOfFresh.bottom() == -60.0f, "window: a fresh meter, top -30 dBFS, has its bottom at -60 dBFS");
+  level::OutputMeter bottomOfLifted;
+  bottomOfLifted.update(energyOfDb(-10.0f), kTickMs);
+  check(near(bottomOfLifted.top(), -10.0f) && near(bottomOfLifted.bottom(), -54.0f), "window: a tick at -10 dBFS lifts the top to -10 and the bottom to -54 dBFS");
   level::OutputMeter fresh;
   check(fresh.top() == -30.0f, "window: the top starts at the minimum");
 }
@@ -187,23 +201,55 @@ void checkWindowFloor() {
   meter.update(level::OutputEnergy(), 10000.0f);
   check(meter.top() == -30.0f, "window: a long silence leaves the top at -30 dBFS");
 
-  // At the floor the window is -74 to -30 dBFS.
+  // At the floor the window is -60 to -30 dBFS, 30 dB tall, since the silence floor stops it short
+  // of the 44 dB below the top.
   level::OutputMeter low;
-  check(near(low.update(energyOfDb(-52.0f), kTickMs), std::pow(0.5f, level::kCurve)), "window: -52 dBFS sits at the middle of the floor window");
+  check(near(low.update(energyOfDb(-45.0f), kTickMs), std::pow(0.5f, level::kCurve)), "window: -45 dBFS sits at the middle of the floor window");
   level::OutputMeter edge;
   check(near(edge.update(energyOfDb(-30.0f), kTickMs), 1.0f), "window: -30 dBFS fills the floor window");
 }
 
 void checkWindowSpan() {
-  // Fresh meters sit at the -30 dBFS top, so the window is -74 to -30 dBFS.
+  // Fresh meters sit at the -30 dBFS top, so the window is -60 to -30 dBFS.
   level::OutputMeter bottom;
-  check(bottom.update(energyOfDb(-74.0f), kTickMs) == 0.0f, "window: 44 dB under the top reads zero");
+  check(bottom.update(energyOfDb(-60.0f), kTickMs) == 0.0f, "window: the silence floor under the top reads zero");
   level::OutputMeter under;
   check(under.update(energyOfDb(-90.0f), kTickMs) == 0.0f, "window: under the window reads zero");
+  level::OutputMeter hiss;
+  check(hiss.update(energyOfDb(-70.0f), kTickMs) == 0.0f, "window: a -70 dBFS tick, the idle hiss, reads zero");
+  level::OutputMeter faint;
+  check(near(faint.update(energyOfDb(-55.0f), kTickMs), std::pow(5.0f / 30.0f, level::kCurve)),
+        "window: -55 dBFS with the top at -30 reads (5 / 30) on the 0.6 curve");
   level::OutputMeter quarter;
-  check(near(quarter.update(energyOfDb(-63.0f), kTickMs), std::pow(0.25f, level::kCurve)), "window: a quarter of the way up takes the 0.6 curve");
+  check(near(quarter.update(energyOfDb(-52.5f), kTickMs), std::pow(0.25f, level::kCurve)), "window: a quarter of the way up takes the 0.6 curve");
   level::OutputMeter half;
-  check(near(half.update(energyOfDb(-52.0f), kTickMs), std::pow(0.5f, level::kCurve)), "window: the middle takes the 0.6 curve");
+  check(near(half.update(energyOfDb(-45.0f), kTickMs), std::pow(0.5f, level::kCurve)), "window: the middle takes the 0.6 curve");
+
+  // The bottom is max(top - 44, -60) dBFS. A meter is primed with a tick at `topDb`, which puts the
+  // top there and the level at 1, then it takes one tick of `tickDb` over 40 ms. The top has fallen
+  // 0.4 dB by then, and the level releases toward the tick's own position in the window.
+  const auto afterPrime = [](float topDb, float tickDb) {
+    level::OutputMeter meter;
+    meter.update(energyOfDb(topDb), kTickMs);
+    return meter.update(energyOfDb(tickDb), kTickMs);
+  };
+  const auto expected = [](float topDb, float tickDb) {
+    const float top = topDb - 0.4f;
+    const float bottom = std::fmax(top - 44.0f, -60.0f);
+    const float position = std::fmin(1.0f, std::fmax(0.0f, (tickDb - bottom) / (top - bottom)));
+    const float now = position > 0.0f ? std::pow(position, level::kCurve) : 0.0f;
+    return now + (1.0f - now) * std::exp(-kTickMs / level::kReleaseMs);
+  };
+
+  // A top of -20 dBFS would put the bottom at -64 dBFS. The floor holds it at -60, so the window is
+  // 39.6 dB tall after the fall, a tick at -62 dBFS has no position in it, and -40 sits in its middle.
+  check(near(afterPrime(-20.0f, -62.0f), std::exp(-kTickMs / level::kReleaseMs)) && near(afterPrime(-20.0f, -62.0f), expected(-20.0f, -62.0f)),
+        "window: a tick under -60 dBFS reads zero whatever the top is, and only the release remains");
+  check(near(afterPrime(-20.0f, -40.0f), expected(-20.0f, -40.0f)), "window: with the top at -20 dBFS the window is -60 to -20.4 dBFS");
+
+  // From a top of -16 dBFS up, 44 dB under it is -60 dBFS or higher, so the window is the full 44 dB.
+  check(near(afterPrime(-10.0f, -54.0f), expected(-10.0f, -54.0f)) && near(afterPrime(-10.0f, -32.0f), expected(-10.0f, -32.0f)),
+        "window: with the top at -10 dBFS the window is 44 dB, as before the floor");
 
   // A raised top moves the window up with it. After a -10 dBFS tick and a 40 ms fall the top is
   // -10.4 dBFS, so the window is -54.4 to -10.4 dBFS. The previous level releases toward the new one.

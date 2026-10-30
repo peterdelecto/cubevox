@@ -16,7 +16,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Screens
 | Screen | Shows | Rows |
 |---|---|---|
-| Voice | the output as a ribbon scrolling right to left, scaled to its own recent peak, with the input level as a bar at the left and the DEBUG load figure bottom right | ribbon columns 4 to 127, horizon at row 32, up to 22 px each side, 1 px rim; bar columns 1 to 2, rows 9 to 55 |
+| Voice | the output as a ribbon scrolling right to left, scaled to its own recent peak, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 1 to 9, rows 8 to 56, 16 segments inside |
 | Readout | the knob that moved last | title bar rows 0 to 13 with the slot and card name black in 7X12 centred, name 9X12 top at 16, value 16X24 top at 34 |
 | Muted | the word of the top switch, nothing else | 16X24 centred both ways, top at 20 |
 | Menu | the list, chain view or update confirm | as the menu spec, unchanged |
@@ -35,8 +35,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Readout
 1. Row one is a title bar (owner 2026-10-30, proof C2 of `tools/oled-proof/readout-title-proof.png`): the full width lit over rows 0 to 13, with the slot number, a space and the card name in capitals, Myrtle 7X12 spaced by ink with a 2 px gap, black, centred on the width, glyph top at row 1, so 1 px of bar shows above and below the letters. The bar is 12 + 2 × kScreenPad tall. The longest default title, `8 SPRING REVERB`, is 108 px wide; every card name in the registry fits with bar on both sides.
 2. Row two is the parameter name, 9X12, centred, top at row 16.
-3. Row three is the value, a space and the unit, 16X24, with its top at row 34, in a 24 px band that spans rows 34 to 57. It sits in a fixed field, set out under Value field.
-4. A text value (the autotune key) has no unit and does not roll. It is left-aligned in a field as wide as the widest name.
+3. Row three is the value, a space and the unit, 16X24, with its top at row 34, in a 24 px band that spans rows 34 to 57. The unit is written as in print, `st`, `ms`, `dB`, `%` (owner 2026-10-30; the fonts carry lowercase s, t and d for it). The row is centred on what it draws, set out under Value field.
+4. A text value (the autotune key) has no unit and does not roll. It is centred on its own width (owner 2026-10-30; it was left-aligned in a field as wide as the widest name).
 5. The value eases to the knob with a 20 ms time constant, which closes 86.5 % of the gap per tick.
 6. Each tick the value sits between two whole numbers. A cell that differs between them rolls up out of its place while the next glyph rolls in from below. Both are clipped to the band.
 7. The roll offset is `round(fraction * 24)` px. A cell that is equal in both numbers draws plain.
@@ -60,7 +60,7 @@ MUTED word is for the top switch.
    `tools/oled_golden.py`; the sweep gate is unchanged.
 
 ## Value field
-The value row never moves sideways. Each parameter has one field, computed once from its widest possible rendering and centred once. The current value only fills the cells of that field.
+Owner 2026-10-30: the value row is centred on what it draws. The field holds the cells of the wider of the two numbers the roll sits between, the space and the unit, and that field is centred; when the value is settled the field is the number's own width. So nothing moves while two numbers of the same digit count roll, and the row re-centres by half a cell exactly when a digit appears or vanishes (9 to 10, 99 to 100, the sign at 0 on a signed knob), at the start of a roll that gains a digit and at the end of one that loses it. Items 1 to 4 and 7 below still hold; the fixed, widest-rendering field of 2026-10-24 (items 5, 6, 8 and the table, kept for the cell arithmetic) is superseded for the row's position.
 
 1. A numeric field is a sign cell, the digit cells, a space and the unit.
 2. The sign cell exists when the range reaches below zero. It holds `-`, `+` or a blank for zero, and it stays in the leftmost cell.
@@ -99,13 +99,13 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 
 ## Voice
 1. The audio interrupt sums the squares of the input samples of every block where they enter the chain (so the bench clip moves the bar too), and of the left output sample as written to the DAC, after output trim and the soft ceiling. The main loop takes both sums with their sample counts at each UI tick, each in its own masked take.
-2. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The ribbon level is `(d - (t - 44)) / 44` held to 0..1, then raised to the power 0.6. A steady output above -30 dBFS fills the ribbon; a quieter one sits by its place in the 44 dB under the top.
+2. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The window bottom is `max(t - 44, -60)` dBFS, and an output under -60 dBFS is silence (level 0) whatever the top, so idle hiss draws the line and not a voice (owner 2026-10-30, after the first build let the bottom reach -74 dBFS). The ribbon level is `(d - bottom) / (t - bottom)` held to 0..1, then raised to the power 0.6. A steady output above -30 dBFS fills the ribbon; a quieter one sits by its place in the window.
 3. The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further. A level under 0.01 snaps to 0.
-4. A tick turns the level into a half-height of `round(level^0.8 * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 4 to column 127, 62 levels.
+4. A tick turns the level into a half-height of `round(level^0.8 * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 13 to column 126, 57 levels; column 127 and columns 10 to 12 stay blank (owner 2026-10-30, more black around the meter).
 5. A column is solid from `32 - h` to `32 + h`. A 1 px rim above and below it is lit where the Bayer threshold of the pixel is under 32, which is half of them.
-6. At height 0 the column is the one pixel on row 32. In silence the screen is the line, the empty bar and nothing else.
+6. At height 0 the column is the one pixel on row 32. In silence the screen is the line, the empty meter box and nothing else.
 7. The ribbon keeps filling while another screen shows, so the voice returns with its history.
-8. The input bar (owner 2026-10-30, "a minimal, thin input level VU meter on the left"): columns 1 and 2, rows 9 to 55, filled from row 55 upward with `round(level * 47)` rows, where the level is linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (1) with the same rise, 120 ms fall and snap as the ribbon. Column 3 stays blank. The bar walks with the ribbon and shows on the voice screen only.
+8. The input meter (owner 2026-10-30, "a minimal, thin input level VU meter on the left", then "a bounding box, like a thermometer without the bulb, in segments", then "5 px wider with more black around it"): a 1 px outline box with its sides at columns 1 and 9 and its top and bottom at rows 8 and 56, always drawn on the voice screen so the meter is present in silence. Inside, 16 segments across columns 2 to 8, each 2 rows tall with 1 row of gap, segment 1 at rows 54 and 55 up to segment 16 at rows 9 and 10. Lit segments = `round(level * 16)`, the level linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (16), with the same rise, 120 ms fall and snap as the ribbon, so each segment is about 3 dB and the top one is the clip light. The box, the segments and the ribbon walk together, and the meter shows on the voice screen only.
 9. The DEBUG load figure (owner 2026-10-30, polish spec menu row 7): with DEBUG on, the voice screen draws the worst audio block of the last whole second as a percent of the block budget (640000 cycles at 480 MHz) in 5x7, last column 126 and top row 56, so `42%` keeps 1 px from the right and bottom edges. It reads 0 for the first second after boot, is held to 0..999, refreshes each UI tick, does not walk, and never appears on the readout, the toggle readout, MUTED, BYPASS or the menu.
 
 ## Dissolve
