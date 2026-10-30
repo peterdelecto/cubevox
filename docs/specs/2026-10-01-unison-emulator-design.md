@@ -38,6 +38,15 @@ TIME (`2026-10-07-v2-mic-reverb-time-slapback.md`).
 3. One panel knob, DEPTH, drives swing, wet level, and therefore detune together.
    The constants behind that mapping are exposed in the emulator's Tuning section so
    the knob can be tuned by ear against real loops, then baked back as defaults.
+   Owner 2026-10-30, board 1 with Adam's samples: "the unison effect could get a little
+   wider at the top end". From DEPTH 0.6 to 1 the top of the knob gets reach without a change
+   of character, as the distortion's DRIVE did the same day: the swing peak grows by up to
+   `topSwingGain` = 1.333 (6 ms becomes 8 ms at a RATE multiplier of 1, and the RATE scaling of
+   `core/unison_rate` still applies on top) and the per-voice wet level rises by up to
+   `topWetDb` = +2.5 dB (wetMaxDb -4 becomes -1.5 dB at DEPTH 1), both linear over the span
+   (`topFrom` = 0.6). DEPTH 0 to 0.6 is bit-exact against before, so the level rule row at
+   DEPTH 0.5 does not move; the base delays, the LFO rates and the trim law are unchanged.
+   Renders of the three samples at DEPTH 1, before and after, in `build/unison-ab/`.
 4. Own repo at `/Projects/cubevox` with its own `.git`, like Chopper / Splitter /
    fusion3dp. ImGui vendored as a git submodule at the granularbox2 pin
    (`580c00c3`), miniaudio 0.11.25 copied as a single header.
