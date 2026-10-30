@@ -123,6 +123,7 @@ struct Status {
   uint32_t restarts = 0;    // audio stream restarts after a fault
   uint32_t nanBlocks = 0;   // blocks discarded before the polish stages for a NaN or an infinity
   uint32_t powerTrips = 0;  // power-fail mutes, 5VA under its trip level
+  float floorDbfs = -120.0f;  // the Input gate's detector peak over the status interval, in dBFS
   bool stalled = false;       // the stall watch latched the mute
   bool audioLatched = false;  // a fault past the restart budget latched the mute
 

@@ -4,13 +4,8 @@
 
 namespace {
 
-// Input gate tuning the panel never sets: it drops 12 dB when closed and holds 100 ms, so gaps
-// between syllables do not chatter. THRESHOLD and DECAY hold these values only until
-// composeSnapshot applies the card's knobs.
-constexpr float kInputGateThresholdDb = -12.0f;
-constexpr float kInputGateRangeDb = -12.0f;
-constexpr float kInputGateHoldMs = 100.0f;
-constexpr float kInputGateReleaseMs = 10.0f;
+// Input gate THRESHOLD until composeSnapshot applies the card's knobs; the middle of its range.
+constexpr float kInputGateThresholdDb = -55.0f;
 
 // Octave MIX until composeSnapshot reads its pot.
 constexpr float kOctaveStartMix = 0.10f;
@@ -20,9 +15,7 @@ constexpr float kOctaveStartMix = 0.10f;
 ChainParams::ChainParams() {
   inputGate.on = true;
   inputGate.thresholdDb = kInputGateThresholdDb;
-  inputGate.tuning.rangeDb = kInputGateRangeDb;
-  inputGate.tuning.holdMs = kInputGateHoldMs;
-  inputGate.tuning.releaseMs = kInputGateReleaseMs;
+  inputGate.tuning = cv::inputGateTuning();
   gate.on = false;
   pitchFx.autotune.on = false;
   pitchFx.octave.on = false;

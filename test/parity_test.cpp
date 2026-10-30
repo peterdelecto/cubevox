@@ -65,6 +65,9 @@ float emuLog(float lo, float hi, float p) { return lo * std::pow(hi / lo, p); }
 // emulator/main.cpp drawGateBlock and drawPedals: -70..-10 dB, 5..1000 ms log.
 constexpr float kEmuThresholdLoDb = -70.0f, kEmuThresholdHiDb = -10.0f;
 constexpr float kEmuDecayLoMs = 5.0f, kEmuDecayHiMs = 1000.0f;
+// emulator/main.cpp kInputGatePots (the engine's kInputGate* ranges): -80..-30 dB, 20..2000 ms log.
+constexpr float kEmuInThresholdLoDb = -80.0f, kEmuInThresholdHiDb = -30.0f;
+constexpr float kEmuInDecayLoMs = 20.0f, kEmuInDecayHiMs = 2000.0f;
 // emulator/main.cpp drawSlapbackBlock and drawPedals: 60..250 ms linear.
 constexpr float kEmuSlapLoMs = 60.0f, kEmuSlapHiMs = 250.0f;
 // emulator/main.cpp drawPedals: KEY 0..11, SEMITONES -12..12.
@@ -102,6 +105,9 @@ void cmpGate(const std::string& p, float pos, const cv::GateParams& f, const cv:
   CMP(p, pos, f.tuning, e.tuning, kneeDb);
   CMP(p, pos, f.tuning, e.tuning, detectorHpHz);
   CMP(p, pos, f.tuning, e.tuning, hysteresisDb);
+  CMP(p, pos, f.tuning, e.tuning, detectorAttackMs);
+  CMP(p, pos, f.tuning, e.tuning, detectorReleaseMs);
+  EXPECT(std::string(p) + ".travelTimes", pos, f.tuning.travelTimes ? 1.0f : 0.0f, e.tuning.travelTimes ? 1.0f : 0.0f);
 }
 
 void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, const cv::AutotuneParams& e,
@@ -248,11 +254,8 @@ EmuState emuStart() {
   s.distortion = cv::DistortionParams{true, kStartDrive, kStartTone, {}};
   // applyInputGateDefaults, called by the ProtoParams constructor
   s.inputGate.on = true;
-  s.inputGate.thresholdDb = -12.0f;
-  s.inputGate.tuning = cv::GateTuning{};
-  s.inputGate.tuning.rangeDb = -12.0f;
-  s.inputGate.tuning.holdMs = 100.0f;
-  s.inputGate.tuning.releaseMs = 10.0f;
+  s.inputGate.thresholdDb = -55.0f;
+  s.inputGate.tuning = cv::inputGateTuning();
   // The rest of the ProtoParams constructor
   s.gate.on = false;
   s.pitchFx.octave.mix = 0.10f;
@@ -287,8 +290,8 @@ float posLog(float lo, float hi, float v) { return std::log(v / lo) / std::log(h
 // against the same background on both sides.
 ChainParams fwAtEmuStart(const EmuState& em) {
   ChainParams fw;
-  applyKnob(Card::InputGate, 0, posLinear(kEmuThresholdLoDb, kEmuThresholdHiDb, em.inputGate.thresholdDb), fw);
-  applyKnob(Card::InputGate, 1, posLog(kEmuDecayLoMs, kEmuDecayHiMs, em.inputGate.tuning.releaseMs), fw);
+  applyKnob(Card::InputGate, 0, posLinear(kEmuInThresholdLoDb, kEmuInThresholdHiDb, em.inputGate.thresholdDb), fw);
+  applyKnob(Card::InputGate, 1, posLog(kEmuInDecayLoMs, kEmuInDecayHiMs, em.inputGate.tuning.releaseMs), fw);
   applyKnob(Card::Gate, 0, posLinear(kEmuThresholdLoDb, kEmuThresholdHiDb, em.gate.thresholdDb), fw);
   applyKnob(Card::Gate, 1, posLog(kEmuDecayLoMs, kEmuDecayHiMs, em.gate.tuning.releaseMs), fw);
   applyKnob(Card::Autotune, 0, static_cast<float>(em.pitchFx.autotune.key), fw);
@@ -322,8 +325,12 @@ void sweepGate(Card card, const char* name) {
       ChainParams fw = fwAtEmuStart(em);
       cv::GateParams& e = plain ? em.gate : em.inputGate;
       applyKnob(card, knob, p, fw);
-      if (knob == 0) e.thresholdDb = emuLinear(kEmuThresholdLoDb, kEmuThresholdHiDb, p);
-      else e.tuning.releaseMs = emuLog(kEmuDecayLoMs, kEmuDecayHiMs, p);
+      const float thrLo = plain ? kEmuThresholdLoDb : kEmuInThresholdLoDb;
+      const float thrHi = plain ? kEmuThresholdHiDb : kEmuInThresholdHiDb;
+      const float decLo = plain ? kEmuDecayLoMs : kEmuInDecayLoMs;
+      const float decHi = plain ? kEmuDecayHiMs : kEmuInDecayHiMs;
+      if (knob == 0) e.thresholdDb = emuLinear(thrLo, thrHi, p);
+      else e.tuning.releaseMs = emuLog(decLo, decHi, p);
       cmpGate(std::string("sweep.") + name + (knob == 0 ? ".threshold" : ".decay"), p,
               plain ? fw.gate : fw.inputGate, e, false);
     }

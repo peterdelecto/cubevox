@@ -14,10 +14,11 @@
 #include "core/compose.h"
 #include "core/level.h"
 
-// Cycle buckets: one per slot, then one each for the two polish stages.
+// Cycle buckets: one per slot, then one each for the two polish stages and the input conditioning.
 constexpr int kStatComp = kSlotCount;
 constexpr int kStatEq = kSlotCount + 1;
-constexpr int kStatBuckets = kSlotCount + 2;
+constexpr int kStatCond = kSlotCount + 2;
+constexpr int kStatBuckets = kSlotCount + 3;
 
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed
@@ -103,6 +104,15 @@ level::InputEnergy audioTakeInputEnergy();
 // The same for the output, measured on the left sample as written to the DAC, after the output
 // gain and the soft ceiling. Resets its own window; call from the main loop.
 level::OutputEnergy audioTakeOutputEnergy();
+
+// The Input gate's detector keeps its highest level in two windows, so a status request and GATE
+// LEARN each read the peak since their own last read.
+enum class GateWindow : uint8_t { Status, Learn };
+
+// The highest detector level (linear, full scale 1) since the previous call with the same window,
+// or since boot. It reads 0 while no block has run the Input gate. Resets the window; call from the
+// main loop.
+float audioTakeGatePeak(GateWindow window);
 
 AudioStats audioStats();
 

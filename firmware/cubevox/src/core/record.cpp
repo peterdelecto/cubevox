@@ -20,7 +20,8 @@ Card cardFromField(const uint8_t* field, bool& known) {
 
 // Reads the settings bytes. A v1 record carries only the first two, so the polish settings keep
 // the defaults already in `s`. A v2 record written before the debug byte existed holds 0 there,
-// which reads as OFF. False when a byte is out of range.
+// which reads as OFF. A cutoff byte of 0 is not set and reads as the default, and any other value
+// is the list index plus one. False when a byte is out of range.
 bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   const uint8_t output = b[kOffOutputLevel];
   const uint8_t jack = b[kOffInputJack];
@@ -34,12 +35,17 @@ bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   const uint8_t eq = b[kOffPolishEq];
   const uint8_t top = b[kOffTopSwitch];
   const uint8_t debug = b[kOffDebug];
+  const uint8_t hpf = b[kOffHpf];
+  const uint8_t lpf = b[kOffLpf];
   if (comp > 1 || eq > 1 || debug > 1) return false;
   if (top > static_cast<uint8_t>(TopSwitch::Bypass)) return false;
+  if (hpf > cv::kHpfCount || lpf > cv::kLpfCount) return false;
   s.polishComp = comp != 0;
   s.polishEq = eq != 0;
   s.topSwitch = static_cast<TopSwitch>(top);
   s.debug = debug != 0;
+  if (hpf != 0) s.hpf = static_cast<uint8_t>(hpf - 1);
+  if (lpf != 0) s.lpf = static_cast<uint8_t>(lpf - 1);
   return true;
 }
 
@@ -61,6 +67,8 @@ RecordBytes encodeRecord(const RecordData& rec) {
   b[kOffPolishEq] = rec.settings.polishEq ? 1 : 0;
   b[kOffTopSwitch] = static_cast<uint8_t>(rec.settings.topSwitch);
   b[kOffDebug] = rec.settings.debug ? 1 : 0;
+  b[kOffHpf] = static_cast<uint8_t>(rec.settings.hpf + 1);
+  b[kOffLpf] = static_cast<uint8_t>(rec.settings.lpf + 1);
   put32(b.data() + kOffCrc, crc32(b.data(), kOffCrc));
   return b;
 }

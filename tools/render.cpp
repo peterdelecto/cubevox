@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
+#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
@@ -36,6 +37,9 @@ struct RenderParams {
   bool eqOn = true;
   bool compStats = false;  // print the comp's gain reduction after the render
   const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
+  uint8_t hpfIndex = cv::kHpfDefaultIndex;  // the input conditioning ahead of the stages, as on the box
+  uint8_t lpfIndex = cv::kLpfDefaultIndex;
+  cv::ConditioningParams conditioning;
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -56,7 +60,8 @@ int usage() {
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
-               "       [--ingate <-70..-10 dB>] [--gate <-70..-10 dB>]\n"
+               "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
+               "       [--hpf <0|80|100|120|150 Hz>] [--lpf <0|4000|5000|6000|8000|10000|12000 Hz>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
                "  pitch front end runs with --octave or --autotune\n"
@@ -65,6 +70,8 @@ int usage() {
                "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, comp, eq\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
+               "  the input high-pass and low-pass run ahead of every stage at the box's defaults, 120 Hz and\n"
+               "  12 kHz; --hpf and --lpf pick a cutoff in Hz, and 0 switches that filter off\n"
                "  comp and eq are the box's polish tail and run by default, the comp at its firm tuning\n"
                "  --polish-comp gentle|medium|firm picks the comp tuning, and --polish-comp off and --polish-eq off\n"
                "  switch them out for A/B listening; --eq is accepted and changes nothing\n"
@@ -88,6 +95,7 @@ int usage() {
                "     eqDipQ eqPresenceQ eqAirHz\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
+               "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
                "  --decay and --dwell apply to the selected reverb engine\n");
   return 2;
@@ -104,6 +112,18 @@ bool parseOnOff(const char* s, bool* out) {
   if (!on && std::strcmp(s, "off") != 0) return false;
   *out = on;
   return true;
+}
+
+// Finds `s` (a cutoff in Hz, 0 for OFF) in a cutoff list and returns its index.
+bool parseCutoff(const char* s, const float* list, int count, uint8_t* index) {
+  float hz = 0.0f;
+  if (!parseFloat(s, &hz)) return false;
+  for (int i = 0; i < count; ++i) {
+    if (list[i] != hz) continue;
+    *index = static_cast<uint8_t>(i);
+    return true;
+  }
+  return false;
 }
 
 struct CompTuningName {
@@ -198,6 +218,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"ingReleaseMs", &ig.releaseMs},        {"ingRangeDb", &ig.rangeDb},
       {"ingKneeDb", &ig.kneeDb},              {"ingDetectorHpHz", &ig.detectorHpHz},
       {"ingHysteresisDb", &ig.hysteresisDb},
+      {"ingDetectorAttackMs", &ig.detectorAttackMs}, {"ingDetectorReleaseMs", &ig.detectorReleaseMs},
       {"gtAttackMs", &gt.attackMs},           {"gtHoldMs", &gt.holdMs},
       {"gtReleaseMs", &gt.releaseMs},         {"gtRangeDb", &gt.rangeDb},
       {"gtKneeDb", &gt.kneeDb},               {"gtDetectorHpHz", &gt.detectorHpHz},
@@ -264,10 +285,14 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       cv::ReverbParams& r = rp.reverb;
       if (!parseFloat(argv[++i], &r.wet) || r.wet < 0.0f || r.wet > 1.0f) return false;
     } else if (std::strcmp(a, "--ingate") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.inGate.thresholdDb) || rp.inGate.thresholdDb < -70.0f ||
-          rp.inGate.thresholdDb > -10.0f)
+      if (!parseFloat(argv[++i], &rp.inGate.thresholdDb) || rp.inGate.thresholdDb < cv::kInputGateThresholdMinDb ||
+          rp.inGate.thresholdDb > cv::kInputGateThresholdMaxDb)
         return false;
       haveInGate = true;
+    } else if (std::strcmp(a, "--hpf") == 0 && i + 1 < argc) {
+      if (!parseCutoff(argv[++i], cv::kHpfCutoffHz.data(), cv::kHpfCount, &rp.hpfIndex)) return false;
+    } else if (std::strcmp(a, "--lpf") == 0 && i + 1 < argc) {
+      if (!parseCutoff(argv[++i], cv::kLpfCutoffHz.data(), cv::kLpfCount, &rp.lpfIndex)) return false;
     } else if (std::strcmp(a, "--gate") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.gate.thresholdDb) || rp.gate.thresholdDb < -70.0f ||
           rp.gate.thresholdDb > -10.0f)
@@ -363,6 +388,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.reverb.on = haveReverb;
   rp.comp.on = rp.compOn;
   rp.eq.on = rp.eqOn;
+  rp.conditioning.set(rp.hpfIndex, rp.lpfIndex);
   rp.inGateOn = haveInGate;
   rp.inGate.on = haveInGate;
   rp.gateOn = haveGate;
@@ -388,6 +414,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
+  static cv::InputConditioning conditioning;
   static cv::Gate inGate;
   static cv::Gate gate;
   static cv::PitchFx pitchFx;
@@ -397,6 +424,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Reverb reverb;
   static cv::PolishComp polishComp;
   static cv::Polish polish;
+  conditioning.reset();
   inGate.reset();
   gate.reset();
   pitchFx.reset();
@@ -424,6 +452,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     const ma_result r = ma_decoder_read_pcm_frames(&dec, inBuf, cv::kBlock, &got);
     if (got > 0) {
       const int n = static_cast<int>(got);
+      conditioning.process(inBuf, inBuf, n, rp.conditioning);
       // Each stage writes the scratch buffer the previous stage did not.
       const float* src = inBuf;
       int next = 0;
@@ -524,9 +553,7 @@ int main(int argc, char** argv) {
   const char* in = nullptr;
   const char* out = nullptr;
   RenderParams rp;
-  rp.inGate.tuning.rangeDb = -12.0f;    // soft gate: live-stage defaults as in the emulator
-  rp.inGate.tuning.holdMs = 100.0f;
-  rp.inGate.tuning.releaseMs = 25.0f;
+  rp.inGate.tuning = cv::inputGateTuning();  // the box's slot-1 gate, as in the emulator
   if (!parseArgs(argc, argv, &in, &out, rp)) return usage();
   return render(in, out, rp);
 }

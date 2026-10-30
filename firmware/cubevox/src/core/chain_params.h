@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
@@ -13,6 +14,7 @@
 #include "engine/unison.h"
 
 struct ChainParams {
+  cv::ConditioningParams conditioning;  // the head of the chain, ahead of slot 1
   cv::GateParams inputGate;
   cv::PitchFxParams pitchFx;
   cv::UnisonParams unison;

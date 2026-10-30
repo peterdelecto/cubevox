@@ -25,6 +25,10 @@ constexpr int kSemitonePositions = kSemitoneMax - kSemitoneMin + 1;
 constexpr KnobDesc kNoKnob = {"", KnobKind::Continuous, 0, 0.0f, 0.0f, ""};
 constexpr KnobDesc kPercent(const char* name) { return {name, KnobKind::Continuous, 0, 0.0f, 100.0f, "%"}; }
 constexpr KnobDesc kThreshold = {"Threshold", KnobKind::Continuous, 0, kGateThresholdMinDb, kGateThresholdMaxDb, "dB"};
+constexpr KnobDesc kInputThreshold = {"Threshold", KnobKind::Continuous, 0, cv::kInputGateThresholdMinDb,
+                                      cv::kInputGateThresholdMaxDb, "dB"};
+constexpr KnobDesc kInputDecay = {"Decay", KnobKind::Continuous, 0, cv::kInputGateDecayMinMs,
+                                  cv::kInputGateDecayMaxMs, "ms", Curve::Log};
 constexpr KnobDesc kSlapbackTime = {"Time", KnobKind::Continuous, 0, kSlapbackTimeMinMs, kSlapbackTimeMaxMs, "ms"};
 constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, kGateDecayMaxMs, "ms", Curve::Log};
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
@@ -32,7 +36,7 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
 
 constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Empty, "empty", "Empty", kNoEngine, 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
-    {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kThreshold, kDecay}, Group::None,
+    {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kInputThreshold, kInputDecay}, Group::None,
      costs::kInputGate},
     {Card::Autotune, "autotune", "Autotune", Engine::Pitch, 2,
      {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, 0, cv::kKeyName},
@@ -75,12 +79,13 @@ int stepIndex(const KnobDesc& k, float v) {
   return static_cast<int>(v);
 }
 
-// GateParams carries two knobs per stage, so the input gate and the second gate share one setter.
-void applyGateKnob(int knob, float v, cv::GateParams& g) {
+// GateParams carries two knobs per stage, so the input gate and the second gate share one setter
+// and bring their own ranges.
+void applyGateKnob(int knob, float v, cv::GateParams& g, const KnobDesc& threshold, const KnobDesc& decay) {
   if (knob == 0) {
-    g.thresholdDb = knobValue(kThreshold, v);
+    g.thresholdDb = knobValue(threshold, v);
   } else {
-    g.tuning.releaseMs = knobValue(kDecay, v);
+    g.tuning.releaseMs = knobValue(decay, v);
   }
 }
 
@@ -177,8 +182,8 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
   if (!k) return;
   if (k->kind == KnobKind::Stepped) v = static_cast<float>(stepIndex(*k, v));
   switch (c) {
-    case Card::InputGate: applyGateKnob(knob, v, out.inputGate); break;
-    case Card::Gate: applyGateKnob(knob, v, out.gate); break;
+    case Card::InputGate: applyGateKnob(knob, v, out.inputGate, kInputThreshold, kInputDecay); break;
+    case Card::Gate: applyGateKnob(knob, v, out.gate, kThreshold, kDecay); break;
     case Card::Autotune: applyAutotuneKnob(knob, v, out.pitchFx.autotune); break;
     case Card::Octave: applyOctaveKnob(knob, v, out.pitchFx.octave); break;
     case Card::Unison: applyUnisonKnob(knob, v, out.unison); break;

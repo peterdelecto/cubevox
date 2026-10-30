@@ -19,6 +19,7 @@ struct ChainEngines {
   explicit ChainEngines(cv::PitchFx& pitchFx) : pitch(pitchFx) {}
 
   cv::PitchFx& pitch;
+  cv::InputConditioning conditioning;  // the head of the chain, ahead of slot 1
   cv::Gate inputGate;
   cv::Unison unison;
   cv::Slapback slapback;
@@ -30,11 +31,12 @@ struct ChainEngines {
 };
 
 // Holds the cycles each stage of one pass took, with one entry per slot and then one each for
-// POLISH COMP and POLISH EQ.
+// POLISH COMP, POLISH EQ and the input conditioning.
 struct ChainCycles {
   std::array<uint32_t, kSlotCount> slot{};
   uint32_t comp = 0;
   uint32_t eq = 0;
+  uint32_t conditioning = 0;
 };
 
 // Runs the engine of card `c` over `n` samples from `in` into `out`. Returns false when it wrote
@@ -44,8 +46,9 @@ struct ChainCycles {
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
               bool& pitchDone);
 
-// Walks one block through the chain. The slots run in order, then the NaN guard, then POLISH COMP and
-// POLISH EQ. Both polish stages run always, and each is a bit-exact copy once settled off. `a` holds
+// Walks one block through the chain. The input conditioning runs first, ahead of slot 1. The slots
+// run in order, then the NaN guard, then POLISH COMP and POLISH EQ. The conditioning and both polish
+// stages run always, and each is a bit-exact copy once settled off. `a` holds
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. Returns false when a slot produced a NaN or an infinity.
 // The block was then silenced before the polish stages, so the caller cuts the output and clears the
@@ -56,6 +59,9 @@ bool runChain(ChainEngines& engines, float* a, float* b, int n, const ChainSnaps
   const ChainParams& p = snap.params;
   float* const result = a;
   bool pitchDone = false;
+  const uint32_t conditioningStart = cycleClock();
+  engines.conditioning.process(a, a, n, p.conditioning);
+  cycles.conditioning = cycleClock() - conditioningStart;
   for (int s = 0; s < kSlotCount; ++s) {
     const uint32_t start = cycleClock();
     const bool wrote = runStage(engines, snap.layout.card[s], a, b, n, p, pitchDone);
