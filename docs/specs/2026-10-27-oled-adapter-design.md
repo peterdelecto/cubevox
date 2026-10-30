@@ -45,9 +45,11 @@ toward the front, so "toward the rear edge" is +y there.
    (2026-10-30) the regenerated STEP is inserted at the root as `OLED-1.3-SH1106-I2C-4P (2)`,
    origin on the main PCB's top face at XY (79.785, -41.5), the footprint's own position, so
    its PCB rests on the 8.0 seat, its glass top reads 11.75 above the board and its glass runs
-   30.0 to 53.0 mm from the board's rear edge (owner 2026-10-30: the module sits 1 mm north of
-   where it had been placed by hand, because of how the header was mounted; the lit area starts
-   about 30 mm from the rear edge). The earlier hand-placed occurrence `(1)`, at y -42.5 with
+   30.0 to 53.0 mm from the board's rear edge. Owner 2026-10-30: JLC placed the J117 socket off
+   its footprint position, which is what forced the printed adapter in the first place and
+   forces the module 1 mm north of where it had been placed by hand; the lit area starts about
+   30 mm from the rear edge on board 1. This is a placement fact of board 1, not a vendor
+   drawing discrepancy. The earlier hand-placed occurrence `(1)`, at y -42.5 with
    its glass raised to 11.78 on the drawing's stack and its PCB floating 1.08 above the seat,
    is hidden, not deleted, in case the lid work references it.
 4. Observed (owner 2026-10-27): with the module plugged in, its holes sit about 1 mm north of
