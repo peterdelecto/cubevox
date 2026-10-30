@@ -37,9 +37,11 @@ toward the front, so "toward the rear edge" is +y there.
    PCB at the pin row, pins no more than 8.5 mm below the PCB.
    Measured on board 1 with the printed adapter (owner 2026-10-30): the top of the glass sits
    exactly 11.75 mm above the top of the main PCB. The drawing's stack (seat 8.0 + PCB 1.2 +
-   gap 0.2 + glass 1.3) gives 10.7 mm, so the real module stands 1.05 mm higher than the model,
-   in the module's own PCB thickness, glass tape or glass. The enclosure takes the measured
-   11.75 mm, 0.05 mm under the 11.8 mm panel plane.
+   gap 0.2 + glass 1.3) gave 10.7 mm, so the real module stands 1.05 mm higher than the drawing.
+   The model (`hardware/tools/model_oled_sh1106.py`, the STEP in `cubevox.3dshapes`) now sits on
+   the 8.0 mm seat with PCB 1.6, tape 0.65 and glass 1.5, which lands the glass top at 11.75 mm;
+   only the total is measured, the split is the usual make-up of these modules. The enclosure
+   takes the measured 11.75 mm, 0.05 mm under the 11.8 mm panel plane.
 4. Observed (owner 2026-10-27): with the module plugged in, its holes sit about 1 mm north of
    the board's holes. The drawing's hole position is wrong by that amount; the grid itself is
    not in question.

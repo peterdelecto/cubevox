@@ -1,18 +1,24 @@
-"""1.3in SH1106 I2C OLED module on 9 mm standoffs, from the vendor drawing.
+"""1.3in SH1106 I2C OLED module on the printed adapter's 8.0 mm seat.
 
 Model origin is the module centre, y up toward the pin row. The footprint puts the
 pin row at y 0 and offsets the model by 14.75 mm.
+Outline from the vendor drawing. The stack above the seat is measured: the top of the
+glass sits 11.75 mm above the main PCB on board 1 (owner 2026-10-30), 3.75 mm above the
+module PCB's underside. The split below (PCB 1.6, tape 0.65, glass 1.5) is the usual
+make-up of these modules; only the total is measured.
 Run with python3.12 (the only interpreter with CadQuery).
 """
 import cadquery as cq
 
 OUT = "/Users/j/Documents/Claude/Projects/cubevox/hardware/cubevox.3dshapes/OLED-1.3-SH1106-I2C-4P.step"
 
-STANDOFF = 9.0
-PCB_W, PCB_H, PCB_T = 35.4, 33.5, 1.2
+STANDOFF = 8.0
+PCB_W, PCB_H, PCB_T = 35.4, 33.5, 1.6
 HOLE_X, HOLE_Y, HOLE_D = 15.2, 14.25, 3.0
 NOTCH_W, NOTCH_H = 14.0, 3.0
-GLASS_W, GLASS_H, GLASS_GAP, GLASS_T = 34.5, 23.0, 0.2, 1.3
+GLASS_W, GLASS_H, GLASS_GAP, GLASS_T = 34.5, 23.0, 0.65, 1.5
+GLASS_TOP = 11.75  # measured; the stack above must land here
+assert abs(STANDOFF + PCB_T + GLASS_GAP + GLASS_T - GLASS_TOP) < 1e-9
 PIN_Y, PIN_PITCH = 14.75, 2.54
 HEADER_T, PIN_TIP = 2.5, 0.5
 
