@@ -22,6 +22,10 @@ class Face {
   // and so no knob, raises no readout. A readout ends at the next tick once its card leaves the slot.
   void knobMoved(const Layout& layout, const PanelReading& panel, LastMoved moved, uint32_t nowMs);
 
+  // A slot's toggle flipped. Takes its card from `layout`. A slot with no card raises no readout.
+  // The readout ends at the next tick once its card leaves the slot, as for a knob.
+  void toggleFlipped(const Layout& layout, ToggleFlip flip, uint32_t nowMs);
+
   // Something else drew on the panel. The next frame dissolves from whatever it left.
   void invalidate() { gui_.forceChange(); }
 
@@ -39,7 +43,7 @@ class Face {
 
   Gui gui_;
 
-  // The slot of the last knob moved, -1 for none, and the card that slot held then.
+  // The slot of the last knob moved or toggle flipped, -1 for none, and the card that slot held then.
   int readoutSlot_ = -1;
   Card readoutCard_ = Card::Empty;
 

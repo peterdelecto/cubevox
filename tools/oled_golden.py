@@ -22,7 +22,8 @@ STRIDE = SCREEN_BYTES + CAPTION_BYTES
 # name -> (scene number, frame offset in the scene). Scene 2 turns SLAPBACK TIME from 120 to 210
 # MS, 3 turns SPRING REVERB MIX from 30 to 65 %, 4 turns OCTAVE SEMITONES from 0 to -12 ST, 5 turns
 # GATE THRESHOLD from -40 to -24 DB, 9 mutes from the silent voice, and 10 moves from one readout
-# to another at offset 100.
+# to another at offset 100, and 11 flips slot 6's toggle on at 0.4 s and off at 1.4 s, so offsets
+# 30 and 60 are the settled ON and OFF frames.
 GOLDENS = {
     "settled-210ms": ("2", 99),
     "settled-65pct": ("3", 99),
@@ -34,6 +35,8 @@ GOLDENS = {
     "switch-1": ("10", 100),
     "switch-2": ("10", 101),
     "switch-3": ("10", 102),
+    "toggle-on": ("11", 30),
+    "toggle-off": ("11", 60),
 }
 for offset in (8, 12, 16, 20, 24, 28, 32, 40, 52):
     GOLDENS[f"roll-time-{offset}"] = ("2", offset)

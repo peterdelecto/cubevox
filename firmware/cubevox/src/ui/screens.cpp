@@ -143,6 +143,10 @@ void renderReadout(Canvas& canvas, const ReadoutView& view) {
   char head[32];
   snprintf(head, sizeof(head), "%d %s", view.slot + 1, view.card);
   canvas.drawText(kScreenPad, kScreenPad, font5x7(), head);
+  if (view.toggle) {
+    drawCentred(canvas, kReadoutValueY, font16x24(), view.on ? "ON" : "OFF");
+    return;
+  }
   if (!view.knob) return;
   char name[32];
   upperText(view.knob->name, name, sizeof(name));

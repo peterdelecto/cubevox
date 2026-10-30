@@ -10,6 +10,9 @@ namespace {
 constexpr float kEaseTauS = 0.02f;
 constexpr float kTickS = 1.0f / kUiFps;
 
+// A slot's toggle takes the id after its two knobs, so a dissolve tells the three readouts apart.
+constexpr uint8_t kToggleId = 2;
+
 constexpr std::array<Walk, 8> kWalkRing = {{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}}};
 
 }  // namespace
@@ -22,18 +25,27 @@ Walk walkAt(uint32_t step) {
 Gui::Gui() : ease_(1.0f - expf(-kTickS / kEaseTauS)) {}
 
 void Gui::knobMoved(int slot, int knob, float target, uint32_t nowMs) {
-  const bool same = readoutLive_ && slot == slot_ && knob == knob_;
+  const bool same = readoutLive_ && !toggle_ && slot == slot_ && knob == knob_;
   slot_ = static_cast<uint8_t>(slot);
   knob_ = static_cast<uint8_t>(knob);
+  toggle_ = false;
   target_ = target;
   if (!same) value_ = target;
   readoutLive_ = true;
   touchedMs_ = nowMs;
 }
 
+void Gui::toggleFlipped(int slot, bool on, uint32_t nowMs) {
+  slot_ = static_cast<uint8_t>(slot);
+  toggle_ = true;
+  on_ = on;
+  readoutLive_ = true;
+  touchedMs_ = nowMs;
+}
+
 Gui::Id Gui::wanted(bool switchOn, bool menuOpen) const {
   if (menuOpen) return {Screen::Menu, 0, 0};
-  if (readoutLive_) return {Screen::Readout, slot_, knob_};
+  if (readoutLive_) return {Screen::Readout, slot_, toggle_ ? kToggleId : knob_};
   return {switchOn ? Screen::Muted : Screen::Voice, 0, 0};
 }
 
@@ -55,7 +67,7 @@ GuiFrame Gui::tick(uint32_t nowMs, bool switchOn, bool menuOpen) {
     startMs_ = nowMs;
   }
   if (readoutLive_ && nowMs - touchedMs_ >= kReadoutHoldMs) readoutLive_ = false;
-  if (readoutLive_) value_ += (target_ - value_) * ease_;
+  if (readoutLive_ && !toggle_) value_ += (target_ - value_) * ease_;
 
   advanceDissolve(wanted(switchOn, menuOpen));
 
@@ -66,6 +78,8 @@ GuiFrame Gui::tick(uint32_t nowMs, bool switchOn, bool menuOpen) {
   frame.knob = knob_;
   frame.shown = value_;
   frame.target = target_;
+  frame.toggle = toggle_;
+  frame.on = on_;
   frame.walk = walkAt((nowMs - startMs_) / kWalkStepMs);
   return frame;
 }

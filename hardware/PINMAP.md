@@ -104,8 +104,8 @@ Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 92 (PB6)
 | Net | Was | Now |
 |---|---|---|
 | ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 (PE11 is PAD_EN since 2026-10-10) |
-| ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is pot POT15, now on mux I12) |
-| ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is pot POT16 on mux I15) |
+| ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is a stepped knob on whichever pot its card sits on) |
+| ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is a stepped knob on whichever pot its card sits on) |
 | FX_ON_SENSE | PC6 | MUTE_SW on PC6 (K101 removed) |
 | TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PA7, PC4, PB0, PA6, PB2, PA5, PE7, PA4 |
 | MUX_S0-S3 | PD3, PD4, PD6, PB4 | PE12, PE10, PE8, PE9 |
@@ -128,10 +128,10 @@ slots.cpp follows this table.
 | 22 | I9 | POT11 |
 | 21 | I10 | POT14 |
 | 20 | I11 | POT12 |
-| 19 | I12 | POT15 (KEY) |
+| 19 | I12 | POT15 |
 | 18 | I13 | POT09 |
 | 17 | I14 | POT10 |
-| 16 | I15 | POT16 (SEMITONES) |
+| 16 | I15 | POT16 |
 
 RVGAIN1 (Input Gain) is off the mux and sits in the stage 2 gain leg of the preamp. Since
 2026-10-10 it is the same Alps RK09D1130C2P linear part as the slot pots (C361173), wired as a

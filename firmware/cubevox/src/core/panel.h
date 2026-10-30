@@ -13,6 +13,11 @@ struct LastMoved {
   bool knobB = false;
 };
 
+struct ToggleFlip {
+  int8_t slot = -1;  // -1 until a toggle has flipped
+  bool on = false;   // the level the toggle settled on
+};
+
 struct PanelReading {
   // 0..1, or the step index for a stepped knob.
   std::array<std::array<float, kKnobsPerCard>, kSlotCount> knob{};

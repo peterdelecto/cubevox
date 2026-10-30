@@ -106,7 +106,25 @@ struct FaceRig {
     moved.knobB = knob == 1;
     face.knobMoved(layout, panel, moved, now);
   }
+
+  // Flips a slot's toggle and tells the face.
+  void flip(int slot, bool on) {
+    panel.toggle[static_cast<size_t>(slot)] = on;
+    face.toggleFlipped(layout, ToggleFlip{static_cast<int8_t>(slot), on}, now);
+  }
 };
+
+// The toggle readout screen of `slot`.
+Canvas toggleScreen(const Layout& layout, int slot, bool on) {
+  ReadoutView v;
+  v.slot = slot;
+  v.card = cardDesc(layout.card[static_cast<size_t>(slot)]).name;
+  v.toggle = true;
+  v.on = on;
+  Canvas screen;
+  renderReadout(screen, v);
+  return screen;
+}
 
 // The readout screen of `slot` and `knob` at `shown`.
 Canvas readoutScreen(const Layout& layout, int slot, int knob, float shown) {
@@ -177,6 +195,75 @@ void checkReadoutInAndOut() {
   check(sameCanvas(r.live, blend(readout, lineScreen(), kStep2Level)), "face: readout out, step 2");
   r.tick();
   check(sameCanvas(r.live, lineScreen()), "face: readout out ends on the voice");
+}
+
+// Slot 6 is Distortion in the default layout. A flip dissolves the readout in, the next flip on
+// the same slot changes the word in place, and the hold ends on the voice.
+void checkToggleAgainstProof() {
+  FaceRig r;
+  r.ticks(3);
+  r.flip(5, true);
+  const Canvas on = toggleScreen(r.layout, 5, true);
+  r.tick();
+  check(sameCanvas(r.live, blend(lineScreen(), on, kStep1Level)), "face: a flip dissolves the ON readout in, step 1");
+  r.tick();
+  check(sameCanvas(r.live, blend(lineScreen(), on, kStep2Level)), "face: a flip dissolves the ON readout in, step 2");
+  r.tick();
+  check(matchesGolden(r.live, "toggle-on"), "face: the ON readout matches the proof frame");
+  check(sameCanvas(r.live, on), "face: the ON readout is the renderer's toggle screen");
+
+  r.ticks(10);
+  r.flip(5, false);
+  const uint32_t flipped = r.now;
+  r.tick();
+  check(matchesGolden(r.live, "toggle-off"), "face: a second flip on the slot shows OFF in place, matching the proof frame");
+
+  r.runUntil(flipped, kReadoutHoldMs);
+  check(matchesGolden(r.live, "toggle-off"), "face: OFF is still up 1960 ms after the flip");
+  r.ticks(3);
+  check(sameCanvas(r.live, lineScreen()), "face: the toggle readout leaves for the voice 2 s after the flip");
+}
+
+void checkToggleOverMuted() {
+  FaceRig r;
+  r.switchOn = true;
+  r.ticks(5);
+  const Canvas word = r.live;
+  r.flip(3, false);
+  const uint32_t flipped = r.now;
+  r.ticks(3);
+  check(sameCanvas(r.live, toggleScreen(r.layout, 3, false)), "face: a flip while muted shows its readout");
+  r.runUntil(flipped, kReadoutHoldMs);
+  r.ticks(3);
+  check(sameCanvas(r.live, word), "face: the toggle readout falls back to MUTED");
+}
+
+void checkToggleGuards() {
+  FaceRig r;
+  r.ticks(3);
+  r.layout.card[3] = Card::Empty;
+  r.flip(3, true);
+  r.ticks(3);
+  check(sameCanvas(r.live, lineScreen()), "face: a flip on a slot with no card raises no readout");
+
+  const ToggleFlip none;  // slot -1
+  r.face.toggleFlipped(r.layout, none, r.now);
+  r.face.toggleFlipped(r.layout, ToggleFlip{static_cast<int8_t>(kSlotCount), true}, r.now);
+  r.ticks(3);
+  check(sameCanvas(r.live, lineScreen()), "face: a flip with no slot or a slot past the panel raises no readout");
+
+  r.layout = defaultLayout();
+  r.flip(5, true);
+  r.ticks(4);
+  const Canvas readout = r.live;
+  r.layout.card[2] = Card::Unison;
+  r.ticks(2);
+  check(sameCanvas(r.live, readout), "face: a new card in another slot leaves the toggle readout up");
+  r.layout.card[5] = Card::Gate;
+  r.tick();
+  check(sameCanvas(r.live, blend(readout, lineScreen(), kStep1Level)), "face: a new card in the toggle's slot dissolves the readout away at once");
+  r.ticks(2);
+  check(sameCanvas(r.live, lineScreen()), "face: and the voice settles with no readout of the new card");
 }
 
 void checkMutedReadout() {
@@ -465,6 +552,9 @@ void checkFace() {
   checkMuteDissolveAgainstProof();
   checkReadoutReplacedAgainstProof();
   checkReadoutInAndOut();
+  checkToggleAgainstProof();
+  checkToggleOverMuted();
+  checkToggleGuards();
   checkMutedReadout();
   checkBypassWord();
   checkMenuOnTop();

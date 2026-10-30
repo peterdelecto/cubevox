@@ -19,7 +19,7 @@ Today's chain, left to right, slot 1 to 8:
 
 ## Open questions resolved
 
-1. Mux capacity. U101 (CD74HC4067) carries POT01..POT14 on I0..I13; I14 and I15 (pins 16, 17) are grounded spares. KEY and SEMITONES move from encoders to pots on those two inputs. 16 slot knobs fill the 16 channels. RVGAIN1 is analog in the preamp gain leg and never touches the mux. No second mux, no direct ADC pin.
+1. Mux capacity. U101 (CD74HC4067) carries POT01..POT14 on I0..I13; I14 and I15 (pins 16, 17) are grounded spares. KEY and SEMITONES move from encoders to pots on those two inputs. (Superseded 2026-10-30: KEY and SEMITONES are stepped knobs of their cards and ride whichever pot the card sits on. POT15 and POT16 are the lower pots of slots 1 and 2.) 16 slot knobs fill the 16 channels. RVGAIN1 is analog in the preamp gain leg and never touches the mux. No second mux, no direct ADC pin.
 2. Relays. K101 (bypass, dry path PRE_OUT to BUF_IN) leaves with the bypass, with D104 and the dry path. K102 (output mute, MUTE_N on PB5, tip grounded while off and at reset) stays and is the mute.
 3. Mute toggle wiring. Same ST-0-102 part. Common to MUTE_SW on PC6 (the former FX_ON_SENSE, R120 10 k pull-up and C162 100 nF kept), one throw to GND. Firmware soft-mutes the DAC (XSMT), then drops MUTE_N; reverse on release. No MCU-free path is needed because the relay fails to muted.
 4. Input Gain. Stays analog and on the face. A menu item cannot turn the pot, and gain ahead of the ADC keeps quiet singing clear of the noise floor.

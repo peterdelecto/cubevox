@@ -51,3 +51,21 @@ PASS  fault recorded across reset: [ERROR] last reset: fault bus pc=0x8026CF8 lr
 | 11 | no computer, back to the application | SKIPPED |  | needs the operator; --no-prompt |
 | 12 | menu entry and confirm screen | SKIPPED |  | needs the operator; --no-prompt |
 | 13 | release .uf2 copy | PASS | 0.3 s | hello build release, fw v2.00.38, serial 1E0049000351343434393332; the OS reported: [Errno 5] Input/output error |
+
+## 2026-10-30, pots on the wrong slots
+
+1. Seen: on the panel, the two pots under a toggle did not drive that toggle's slot. The toggles were right.
+2. Cause: the slot table in `firmware/cubevox/src/board/slots.cpp` gave slot N+1 the pots of panel column N, and slot 1 the pots of column 8. The board file puts POT03 over POT15 in column 1, POT04 over POT16 in column 2, POT05 over POT06 up to POT13 over POT14 in column 7, and POT01 over POT02 in column 8.
+3. Fix: the table gives slot N the toggle and the pots of column N, with knob A the upper pot (board y 142) and knob B the lower (y 168). The constants for POT15 and POT16 lost their KEY and SEMITONES suffixes, because the card sets those roles. `hardware/PINMAP.md` and the slots and readout specs match.
+4. Still to run on the box: `./bringup.py --board 1 --panel` on the rebuilt bench image. Its pot numbers should read as below.
+
+| Slot | Knob A | Knob B |
+|---|---|---|
+| 1 | 03 | 15 |
+| 2 | 04 | 16 |
+| 3 | 05 | 06 |
+| 4 | 07 | 08 |
+| 5 | 09 | 10 |
+| 6 | 11 | 12 |
+| 7 | 13 | 14 |
+| 8 | 01 | 02 |

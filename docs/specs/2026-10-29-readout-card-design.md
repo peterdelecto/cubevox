@@ -12,7 +12,9 @@ that spec (priority, hold, dissolve, voice, MUTED, panel) stays.
    Dd, DT). Rejected on the way: A0 to A2 (stacked names, one row), B0 and B1 (two columns),
    C0 to C2 (big slot digit, names as bare words). C2 failed because five words in one font gave
    no cue which word was a knob.
-2. Not built. Open decisions below wait on the owner; build items wait for the word.
+2. Set aside by the owner on 2026-10-30 ("forget about the card"), not built. The readout keeps
+   its three rows as `2026-10-24-oled-gui-design.md` sets out, and the toggle flip shows on that
+   readout (its Toggle section). The open decisions and build items below are not pending.
 
 ## Goal
 Adam has no printed names on the panel and eight slots to remember. Every touch of one effect,
@@ -50,10 +52,9 @@ a reminder at the moment of use, not a reference to look up.
 ## Rows follow the panel
 1. The upper row is the upper pot of the slot column, the lower row the lower pot. The panel
    column is toggle, pot, pot from the top (board: switches at y 115, pots at y 142 and y 168).
-2. Pot A of the slot table is the upper pot in slots 1 and 4 to 8 and the lower pot in slots 2
-   and 3, read from `board/slots.cpp` and the POT nets of `hardware/cubevox.kicad_pcb`. So
-   Octave reads MIX over SEMITONES and Autotune reads RESPONSE over KEY. The firmware looks the
-   order up per slot; the wiring does not change.
+2. Pot A of the slot table is the upper pot in every slot, read from `board/slots.cpp` and the
+   POT nets of `hardware/cubevox.kicad_pcb`. So Octave reads SEMITONES over MIX and Autotune
+   reads KEY over RESPONSE, and no slot needs its own row order.
 3. Not yet confirmed on glass: that board y 142 is the physical upper row and that the
    silkscreen numbers match the nets. One look at board 1 settles both.
 

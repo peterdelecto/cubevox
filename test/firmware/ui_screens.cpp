@@ -951,6 +951,68 @@ void checkMuted() {
         "muted: the word follows the top switch setting");
 }
 
+// ---------------------------------------------------------------------------------------------
+// Toggle
+
+// Slot 6 (Distortion) with its toggle at `on`.
+Canvas toggleOf(bool on) {
+  ReadoutView v = viewOf(5, 0, 0.0f);
+  v.knob = nullptr;
+  v.toggle = true;
+  v.on = on;
+  Canvas c;
+  renderReadout(c, v);
+  return c;
+}
+
+void checkToggle() {
+  struct Case {
+    bool on;
+    const char* word;
+    const char* golden;
+    const char* pgm;
+  };
+  const Case cases[] = {{true, "ON", "toggle-on", "oled-toggle-on.pgm"}, {false, "OFF", "toggle-off", "oled-toggle-off.pgm"}};
+  for (const Case& t : cases) {
+    const Canvas c = toggleOf(t.on);
+    const std::string what = std::string("toggle ") + t.word + ": ";
+    check(matchesGolden(c, t.golden), (what + "matches the proof frame").c_str());
+    writePgm(c, t.pgm);
+
+    Canvas head;
+    head.drawText(1, 1, font5x7(), "6 DISTORTION");
+    check(sameRows(c, head, 0, 9), (what + "row one is the slot and card in 5x7 at (1, 1), as on a knob readout").c_str());
+    check(rowsBlank(c, 9, 34), (what + "row two is empty").c_str());
+
+    Canvas word;
+    word.drawText((kCanvasWidth - Canvas::textWidth(font16x24(), t.word)) / 2, 34, font16x24(), t.word);
+    check(sameRows(c, word, 34, 58) && !rowsBlank(c, 34, 58), (what + "the word is 16X24 centred with its top at row 34").c_str());
+    check(rowsBlank(c, 58, kCanvasHeight) && edgesDark(c), (what + "nothing under the word and the edges stay dark").c_str());
+
+    int first = kCanvasWidth;
+    int last = -1;
+    for (int y = 34; y < 58; ++y) {
+      for (int x = 0; x < kCanvasWidth; ++x) {
+        if (!lit(c, x, y)) continue;
+        first = std::min(first, x);
+        last = std::max(last, x);
+      }
+    }
+    check(std::abs(first - (kCanvasWidth - 1 - last)) <= 1, (what + "the ink is centred sideways").c_str());
+  }
+  check(!sameRows(toggleOf(true), toggleOf(false), 34, 58), "toggle: ON and OFF differ on the value row");
+
+  // The word does not depend on a knob descriptor, so the slot's card line alone changes with the slot.
+  Canvas other;
+  ReadoutView v = viewOf(7, 1, 0.0f);
+  v.knob = nullptr;
+  v.toggle = true;
+  v.on = true;
+  renderReadout(other, v);
+  check(sameRows(other, toggleOf(true), 34, kCanvasHeight) && !sameRows(other, toggleOf(true), 0, 9),
+        "toggle: only the card line differs between two slots' readouts");
+}
+
 }  // namespace
 
 void checkScreens() {
@@ -975,4 +1037,5 @@ void checkScreens() {
   checkVoiceScroll();
   checkVoiceWalk();
   checkMuted();
+  checkToggle();
 }

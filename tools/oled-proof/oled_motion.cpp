@@ -1,5 +1,5 @@
-// Animated OLED GUI proof. Eight scenes (Adam's voice, four knob turns, idle, mute, the motion
-// rules) each run on their own clock from a clean screen, through the firmware's own Canvas and
+// Animated OLED GUI proof. Nine scenes (Adam's voice, four knob turns, idle, mute, the motion
+// rules, a toggle flip) each run on their own clock from a clean screen, through the firmware's own Canvas and
 // fonts at 25 frames a second, and come out as raw 1-bit frames with a two-line caption strip
 // per frame plus a scene table. motion_gif.py cuts one GIF per scene from them.
 //
@@ -50,6 +50,10 @@ constexpr float kRulesSceneS = 8.5f;
 constexpr float kRulesTouchS = 2.0f;    // in the rules scene the first knob is touched at this time
 constexpr float kRulesSecondS = 4.0f;   // and a knob on another slot at this time
 constexpr float kRulesTurnS = 1.0f;
+constexpr float kToggleSceneS = 3.0f;
+constexpr float kToggleOnS = 0.4f;      // in the toggle scene slot 6 flips on at this time
+constexpr float kToggleOffS = 1.4f;     // and off, on the readout already up, at this time
+constexpr int kToggleSlot = 5;          // Distortion
 
 float clamp01(float v) { return std::min(1.0f, std::max(0.0f, v)); }
 float lerp(float a, float b, float t) { return a + (b - a) * t; }
@@ -364,6 +368,15 @@ Frame knobScreen(int slot, int knob, float shown) {
   return f;
 }
 
+// The toggle screen: slot and card on top, the parameter row empty, ON or OFF in 16X24 centred on
+// the value row.
+Frame toggleScreen(int slot, bool on) {
+  Frame f;
+  title(f, slot);
+  textCentered(f, 34, font16x24(), on ? "ON" : "OFF");
+  return f;
+}
+
 // The rest screen: Adam's voice scrolling by as a ribbon around a horizon line. In silence the
 // ribbon is the line and nothing else.
 Frame restScreen(const Live& L) {
@@ -536,6 +549,25 @@ Scene rulesScene(Voice& voice, float& shown) {
           }};
 }
 
+// Scene 11: a slot toggle flips on from the silent voice, then off. The first flip dissolves the
+// readout in. The second changes the word in place, since the slot is already shown.
+Scene toggleScene(Voice& voice) {
+  return {"11", "toggle", kToggleSceneS, [&voice](int i, float t, Caption& cap) {
+            voice.silent = true;
+            const Frame rest = restScreen(Live{&voice, i});
+            if (t < kToggleOnS) {
+              setCaption(cap, "11  TOGGLE", "VOICE, NO FLIP");
+              return rest;
+            }
+            if (t < kToggleOffS) {
+              setCaption(cap, "11  TOGGLE", "SLOT 6 FLIPPED ON");
+              return dissolve(rest, toggleScreen(kToggleSlot, true), dissolveProgress(t - kToggleOnS));
+            }
+            setCaption(cap, "11  TOGGLE", "SLOT 6 FLIPPED OFF");
+            return toggleScreen(kToggleSlot, false);
+          }};
+}
+
 void writeCaption(Frame& cap, const Caption& c) {
   Canvas canvas;
   canvas.drawText(kPad, kPad, font5x7(), c.line1);
@@ -574,6 +606,7 @@ int main(int argc, char** argv) {
   scenes.push_back(idleScene(voice));
   scenes.push_back(mutedScene(voice));
   scenes.push_back(rulesScene(voice, shown));
+  scenes.push_back(toggleScene(voice));
 
   int total = 0;
   for (const Scene& s : scenes) total += static_cast<int>(s.seconds * kFps);

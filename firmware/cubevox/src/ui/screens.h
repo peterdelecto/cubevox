@@ -54,11 +54,14 @@ struct ReadoutView {
   const KnobDesc* knob = nullptr;  // null draws the card line only
   float shown = 0.0f;              // the eased value, in the whole steps knobShown counts
   int target = 0;                  // where it settles; picks the name of a labelled knob
+  bool toggle = false;             // the slot's toggle: no parameter row, ON or OFF as the value
+  bool on = false;                 // the toggle's state
 };
 
 // Slot and card, the parameter name, and the value with its unit. The value sits in a field fixed
 // by the parameter, so the row never moves sideways. Each digit that changes rolls vertically from
-// the old glyph to the new one.
+// the old glyph to the new one. A toggle leaves the parameter row empty and centres ON or OFF on
+// the value row.
 void renderReadout(Canvas& canvas, const ReadoutView& view);
 
 // The value row's unit with its leading space, in capitals, or "" for a knob without one. The value

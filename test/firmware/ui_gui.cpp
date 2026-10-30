@@ -38,6 +38,8 @@ struct GuiRig {
   }
 
   void move(int slot, int knob, float target) { gui.knobMoved(slot, knob, target, now); }
+
+  void flip(int slot, bool on) { gui.toggleFlipped(slot, on, now); }
 };
 
 bool isScreen(const GuiFrame& f, Screen s, int dissolve) { return f.screen == s && f.dissolve == dissolve; }
@@ -164,6 +166,100 @@ void checkReadoutReplaced() {
         "gui: a change in the middle of a dissolve restarts it at step 1");
 }
 
+void checkToggleLifecycle() {
+  GuiRig g;
+  g.ticks(3);
+  g.flip(5, true);
+  const uint32_t flipped = g.now;
+  const GuiFrame in = g.tick();
+  check(isScreen(in, Screen::Readout, 1) && in.slot == 5 && in.toggle && in.on,
+        "gui: a flip starts the readout of its slot with dissolve step 1 and the new state");
+  check(isScreen(g.tick(), Screen::Readout, 2) && isScreen(g.tick(), Screen::Readout, 0), "gui: the toggle readout dissolves in over 2 frames");
+
+  const GuiFrame still = g.runUntil(flipped, kReadoutHoldMs);
+  check(g.now - flipped == kReadoutHoldMs - kUiTickMs && isScreen(still, Screen::Readout, 0) && still.toggle,
+        "gui: the toggle readout is still up at 1960 ms after the flip");
+  check(isScreen(g.tick(), Screen::Voice, 1), "gui: at 2000 ms it leaves with a dissolve back to the voice");
+  check(isScreen(g.tick(), Screen::Voice, 2) && isScreen(g.tick(), Screen::Voice, 0), "gui: and the voice settles");
+
+  GuiRig m;
+  m.switchOn = true;
+  m.ticks(5);
+  m.flip(0, false);
+  const uint32_t mutedFlip = m.now;
+  const GuiFrame over = m.tick();
+  check(isScreen(over, Screen::Readout, 1) && over.toggle && !over.on, "gui: a flip raises the readout over MUTED");
+  check(isScreen(m.runUntil(mutedFlip, kReadoutHoldMs), Screen::Readout, 0) && isScreen(m.tick(), Screen::Muted, 1),
+        "gui: after the hold the toggle readout dissolves to MUTED, not the voice");
+}
+
+void checkToggleRefresh() {
+  GuiRig g;
+  g.flip(5, true);
+  g.ticks(5);
+  g.flip(5, false);
+  const GuiFrame off = g.tick();
+  check(isScreen(off, Screen::Readout, 0) && off.slot == 5 && off.toggle && !off.on,
+        "gui: the same slot's toggle flipped again refreshes in place with no dissolve");
+
+  GuiRig hold;
+  hold.flip(5, true);
+  hold.ticks(33);  // 1.3 s
+  hold.flip(5, false);
+  const uint32_t flipped = hold.now;
+  check(isScreen(hold.runUntil(flipped, kReadoutHoldMs), Screen::Readout, 0), "gui: a flip 1.3 s in gives the readout 2 s from that flip");
+  check(isScreen(hold.tick(), Screen::Voice, 1), "gui: the toggle readout leaves 2 s after the last flip");
+}
+
+void checkToggleReplaced() {
+  GuiRig g;
+  g.flip(5, true);
+  g.ticks(5);
+  g.flip(2, true);
+  const GuiFrame other = g.tick();
+  check(isScreen(other, Screen::Readout, 1) && other.slot == 2 && other.toggle, "gui: another slot's flip replaces the readout with a dissolve");
+
+  g.ticks(2);
+  g.move(2, 0, 7.0f);
+  const GuiFrame knob = g.tick();
+  check(isScreen(knob, Screen::Readout, 1) && !knob.toggle && knob.knob == 0 && knob.shown == 7.0f,
+        "gui: a knob on the toggle's slot replaces it with a dissolve and starts at its own reading");
+  g.ticks(2);
+  g.flip(2, false);
+  const GuiFrame back = g.tick();
+  check(isScreen(back, Screen::Readout, 1) && back.toggle && !back.on, "gui: a flip after a knob on the same slot dissolves to the toggle");
+
+  GuiRig mid;
+  mid.move(0, 0, 1.0f);
+  mid.ticks(1);
+  mid.flip(1, true);
+  const GuiFrame restart = mid.tick();
+  check(isScreen(restart, Screen::Readout, 1) && restart.slot == 1 && restart.toggle,
+        "gui: a flip in the middle of a dissolve restarts it at step 1");
+}
+
+void checkToggleMenuWins() {
+  GuiRig g;
+  g.flip(5, true);
+  g.ticks(3);
+  g.menuOpen = true;
+  check(isScreen(g.tick(), Screen::Menu, 1), "gui: an open menu replaces a live toggle readout");
+  g.ticks(2);
+  g.flip(5, false);
+  check(isScreen(g.ticks(5), Screen::Menu, 0), "gui: a flip under the open menu does not show");
+  g.menuOpen = false;
+  const GuiFrame back = g.tick();
+  check(isScreen(back, Screen::Readout, 1) && back.toggle && !back.on, "gui: closing the menu inside the hold shows the new toggle state");
+
+  GuiRig h;
+  h.menuOpen = true;
+  h.ticks(3);
+  h.flip(5, true);
+  h.menuOpen = false;
+  h.ticks(kReadoutHoldMs / kUiTickMs + 5);
+  check(isScreen(h.tick(), Screen::Voice, 0), "gui: closing the menu after the hold lands on the voice");
+}
+
 void checkEasing() {
   GuiRig g;
   g.move(0, 0, 100.0f);
@@ -256,6 +352,10 @@ void checkGui() {
   checkMuteAndReadout();
   checkMenuWins();
   checkReadoutReplaced();
+  checkToggleLifecycle();
+  checkToggleRefresh();
+  checkToggleReplaced();
+  checkToggleMenuWins();
   checkEasing();
   checkForceChange();
   checkWalkTable();

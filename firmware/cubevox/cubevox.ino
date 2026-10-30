@@ -256,6 +256,8 @@ void loop() {
   const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn};
   LastMoved touch;
   if (controlsTakeTouch(touch)) gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
+  ToggleFlip flip;
+  if (controlsTakeToggle(flip)) gFace.toggleFlipped(gLayout, flip, nowMs);
   drawFace(ctx, nowMs);
   gDisplay->flushStep(gCanvas);
   if (gHeartbeat.due(nowMs)) digitalToggle(pins::kUserLed);

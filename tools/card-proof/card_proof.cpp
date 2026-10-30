@@ -483,21 +483,21 @@ int main(int argc, char** argv) {
   }
   std::vector<Scene> scenes;
   if (argc > 3 && std::string(argv[3]) == "d") {
-    // Rows follow the physical pot order. Slots 2 and 3 have pot B in the upper row.
-    const char* oct[2] = {"MIX", "SEMITONES"};
-    const float octP[2] = {0.65f, 0.0f};
+    // Rows follow the physical pot order. Pot A is the upper row in every slot.
+    const char* oct[2] = {"SEMITONES", "MIX"};
+    const float octP[2] = {0.0f, 0.65f};
     const char* gate[2] = {"THRESHOLD", "DECAY"};
     const float gateP[2] = {0.4f, 0.5f};
     const char* spring[2] = {"MIX", "TIME"};
     const float springP[2] = {0.65f, 1.0f};
-    const char* tune[2] = {"RESPONSE", "KEY"};
-    const float tuneP[2] = {0.3f, 0.6f};
-    scenes.push_back(drawn("D", "small slot number in the strip, OCTAVE, SEMITONES moving", 'D', 3, "OCTAVE", oct, octP, 1, "-12", "ST", false, true));
+    const char* tune[2] = {"KEY", "RESPONSE"};
+    const float tuneP[2] = {0.6f, 0.3f};
+    scenes.push_back(drawn("D", "small slot number in the strip, OCTAVE, SEMITONES moving", 'D', 3, "OCTAVE", oct, octP, 0, "-12", "ST", false, true));
     scenes.push_back(drawn("Db", "small slot number, INPUT GATE, DECAY moving", 'D', 1, "INPUT GATE", gate, gateP, 1, "160", "MS", false, true));
     scenes.push_back(drawn("Dc", "small slot number, SPRING REVERB, TIME moving", 'D', 8, "SPRING REVERB", spring, springP, 1, "1000", "MS", false, true));
-    scenes.push_back(drawn("Dd", "small slot number, AUTOTUNE, KEY moving", 'D', 2, "AUTOTUNE", tune, tuneP, 1, "F# / D#M", "", true, true));
+    scenes.push_back(drawn("Dd", "small slot number, AUTOTUNE, KEY moving", 'D', 2, "AUTOTUNE", tune, tuneP, 0, "F# / D#M", "", true, true));
     scenes.push_back(drawn("DT", "small slot number, OCTAVE, toggle flipped off", 'D', 3, "OCTAVE", oct, octP, -1, "", "", false, false));
-    scenes.push_back(drawn("E", "big slot number, OCTAVE, SEMITONES moving", 'E', 3, "OCTAVE", oct, octP, 1, "-12", "ST", false, true));
+    scenes.push_back(drawn("E", "big slot number, OCTAVE, SEMITONES moving", 'E', 3, "OCTAVE", oct, octP, 0, "-12", "ST", false, true));
     scenes.push_back(drawn("Eb", "big slot number, SPRING REVERB, TIME moving", 'E', 8, "SPRING REVERB", spring, springP, 1, "1000", "MS", false, true));
     scenes.push_back(drawn("ET", "big slot number, OCTAVE, toggle flipped off", 'E', 3, "OCTAVE", oct, octP, -1, "", "", false, false));
   } else if (argc > 3 && std::string(argv[3]) == "c2") {

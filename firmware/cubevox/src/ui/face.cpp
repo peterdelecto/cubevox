@@ -10,7 +10,9 @@ ReadoutView readoutView(const GuiFrame& frame, const UiContext& ctx) {
   ReadoutView view;
   view.slot = frame.slot;
   view.card = cardDesc(card).name;
-  view.knob = knobDesc(card, frame.knob);
+  view.toggle = frame.toggle;
+  view.on = frame.on;
+  view.knob = frame.toggle ? nullptr : knobDesc(card, frame.knob);
   view.shown = frame.shown;
   view.target = static_cast<int>(lroundf(frame.target));
   return view;
@@ -27,6 +29,15 @@ void Face::knobMoved(const Layout& layout, const PanelReading& panel, LastMoved 
   const int shown = knobShown(*desc, panel.knob[static_cast<size_t>(moved.slot)][static_cast<size_t>(knob)]);
   gui_.knobMoved(moved.slot, knob, static_cast<float>(shown), nowMs);
   readoutSlot_ = moved.slot;
+  readoutCard_ = card;
+}
+
+void Face::toggleFlipped(const Layout& layout, ToggleFlip flip, uint32_t nowMs) {
+  if (flip.slot < 0 || flip.slot >= kSlotCount) return;
+  const Card card = layout.card[static_cast<size_t>(flip.slot)];
+  if (card == Card::Empty) return;
+  gui_.toggleFlipped(flip.slot, flip.on, nowMs);
+  readoutSlot_ = flip.slot;
   readoutCard_ = card;
 }
 

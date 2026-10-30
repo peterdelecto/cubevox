@@ -39,6 +39,11 @@ PanelReading controlsReading();
 // moves in between report the last. The OLED readout follows it.
 bool controlsTakeTouch(LastMoved& out);
 
+// True once per flip, with the slot whose toggle settled on a new level since the last call and
+// that level. Several flips in between report the last. The level read at power-on is the
+// baseline and raises no flip. The OLED readout follows it.
+bool controlsTakeToggle(ToggleFlip& out);
+
 #if CUBEVOX_BENCH
 // Unfiltered pot read, 0..1, for the panel self-test. `muxChannel` is 0-based; valid once controlsSeeded().
 float controlsRawPot(int muxChannel);

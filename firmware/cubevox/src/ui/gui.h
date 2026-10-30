@@ -14,7 +14,7 @@
 constexpr int kUiFps = 25;
 constexpr uint32_t kUiTickMs = 1000 / kUiFps;
 
-// A readout stays up this long after the last knob move.
+// A readout stays up this long after the last knob move or toggle flip.
 constexpr uint32_t kReadoutHoldMs = 2000;
 
 // The voice screen moves 1 px this often, to spread the wear on the panel.
@@ -22,7 +22,7 @@ constexpr uint32_t kWalkStepMs = 60000;
 
 enum class Screen : uint8_t {
   Voice,    // the input level as a scrolling ribbon
-  Readout,  // the knob that moved last
+  Readout,  // the knob that moved last, or the toggle that flipped last
   Muted,    // the word of the top switch, MUTED or BYPASS
   Menu,
 };
@@ -52,11 +52,14 @@ struct GuiFrame {
   int dissolve = 0;
 
   // Readout only. `target` is the reading the knob holds and `shown` is the value easing toward it,
-  // both in the whole steps that knobShown counts.
+  // both in the whole steps that knobShown counts. A toggle readout sets `toggle` and `on` and has
+  // no value.
   int slot = 0;
   int knob = 0;
   float shown = 0.0f;
   float target = 0.0f;
+  bool toggle = false;
+  bool on = false;
 
   // Voice only.
   Walk walk = {0, 0};
@@ -69,6 +72,10 @@ class Gui {
   // A knob moved. `target` is its reading in the whole steps that knobShown counts. A different
   // knob, or one whose readout had gone, starts at the reading. The same knob eases to it.
   void knobMoved(int slot, int knob, float target, uint32_t nowMs);
+
+  // A slot's toggle flipped to `on`. The same toggle again refreshes in place. A knob, or another
+  // slot, replaces the readout with a dissolve.
+  void toggleFlipped(int slot, bool on, uint32_t nowMs);
 
   // Ends the readout now, as when the card it describes has left its slot.
   void dropReadout() { readoutLive_ = false; }
@@ -99,6 +106,8 @@ class Gui {
   bool readoutLive_ = false;
   uint8_t slot_ = 0;
   uint8_t knob_ = 0;
+  bool toggle_ = false;  // the readout is the slot's toggle, not a knob
+  bool on_ = false;
   float target_ = 0.0f;
   float value_ = 0.0f;
   uint32_t touchedMs_ = 0;

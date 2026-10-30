@@ -9,8 +9,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 1. Host part built and tested 2026-10-24. The readout and MUTED frames equal the proof renderer byte for byte.
 2. The owner approved proofs 3 to 10 on 2026-10-24 with one change, "we don't want re-centering". The value row now sits in a fixed field per parameter, as set out under Value field. The proof renderer and the goldens follow it.
 3. A sweep test measures every parameter of every card for sideways movement and is a hard gate, as set out under Tests and proofs.
-4. The Readout section is superseded by `2026-10-29-readout-card-design.md` (owner approved proof D on 2026-10-29, not yet built). The value field, priority, hold, dissolve, voice, MUTED and panel rules here still stand.
-4. Bench part open. The list is in Bench, below.
+4. The Readout section stands. `2026-10-29-readout-card-design.md` (proof D) was set aside by the owner on 2026-10-30 before it was built; the readout keeps its three rows. The same day the owner asked for an on-screen sign when a slot's toggle is flipped, set out under Toggle.
+5. Bench part open. The list is in Bench, below.
 5. The application drives the panel through `board/sh1106.c`, the driver the bootloader compiles too, with no U8g2 or Wire. Panel, below, sets out how it starts, retries and recovers.
 
 ## Screens
@@ -41,6 +41,23 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 6. Each tick the value sits between two whole numbers. A cell that differs between them rolls up out of its place while the next glyph rolls in from below. Both are clipped to the band.
 7. The roll offset is `round(fraction * 24)` px. A cell that is equal in both numbers draws plain.
 8. A new readout starts at the knob's reading. A different knob, or a readout that had gone, never eases from the old value.
+
+## Toggle
+Owner 2026-10-30, board 1 on the bench: a flipped slot toggle needs a sign on the screen, as the
+MUTED word is for the top switch.
+1. A flip of a slot's toggle raises the readout for that slot as a knob move does, with the same
+   hold, priority, dissolve and card rule (Priority 2, 4, 7, 8). A flip under the open menu is
+   not shown; a flip on a slot with no card raises nothing.
+2. The toggle readout keeps row one, leaves row two empty, and draws ON or OFF on the value row,
+   16X24, centred, top at row 34. The words are ON and OFF, never BYPASS, so the slot's state
+   never reads like the top switch's BYPASS screen.
+3. A flip or a knob on the slot already shown refreshes the readout in place, without a
+   dissolve; another slot replaces it as a knob on another slot does.
+4. The panel hands the face one flip at a time with the slot and the new state, debounced by the
+   20 ms switch debounce. The first debounced level after power-on is the baseline and raises
+   nothing.
+5. Goldens: the on and off frames join the golden set through `oled_motion.cpp` and
+   `tools/oled_golden.py`; the sweep gate is unchanged.
 
 ## Value field
 The value row never moves sideways. Each parameter has one field, computed once from its widest possible rendering and centred once. The current value only fills the cells of that field.

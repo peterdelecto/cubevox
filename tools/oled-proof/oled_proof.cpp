@@ -1,9 +1,11 @@
 // OLED GUI proof: draws candidate screens with the firmware's own Canvas and fonts and writes
 // one sheet, 2 x 4 screens at 3x, as a PGM. Exploration only; the GUI spec decides the real screens.
 //
-//   clang++ -std=c++17 -O1 -I firmware/cubevox/src -I tools/font-editor/fonts \
+//   clang++ -std=c++17 -O1 -I . -I firmware/cubevox/src -I tools/font-editor/fonts \
 //     tools/oled-proof/oled_proof.cpp firmware/cubevox/src/core/canvas.cpp \
-//     firmware/cubevox/src/core/fonts.cpp -o build/oled_proof && build/oled_proof build/oled-proof.pgm
+//     firmware/cubevox/src/core/fonts.cpp firmware/cubevox/src/ui/screens.cpp \
+//     firmware/cubevox/src/core/registry.cpp firmware/cubevox/src/core/chain_params.cpp \
+//     firmware/cubevox/src/core/unison_rate.cpp -o build/oled_proof && build/oled_proof build/oled-proof.pgm
 
 #include <cstdio>
 #include <cstring>
@@ -11,6 +13,8 @@
 
 #include "core/canvas.h"
 #include "core/fonts.h"
+#include "core/registry.h"
+#include "ui/screens.h"
 
 namespace {
 
@@ -153,20 +157,14 @@ void keyScreen(Canvas& c) {
   stepTicks(c, 57, 12, 8);
 }
 
+// The runtime toggle readout, drawn by the firmware's renderer: slot 6 flipped on.
 void toggleScreen(Canvas& c) {
-  c.drawText(kPad, kPad, font5x7(), "6 DISTORTION");
-  slotStrip(c, 9, 5, -1);
-  centered(c, 22, font9x12(), "DISTORTION");
-  c.fillRect(37, 38, 54, 26, true);
-  Canvas label;
-  label.clear();
-  const int w = Canvas::textWidth(font16x24(), "ON");
-  label.drawText(0, 0, font16x24(), "ON");
-  for (int y = 0; y < 24; ++y) {
-    for (int x = 0; x < w; ++x) {
-      if (label.page(y / 8)[x] >> (y % 8) & 1) c.setPixel(64 - w / 2 + x, 39 + y, false);
-    }
-  }
+  ReadoutView view;
+  view.slot = 5;
+  view.card = cardDesc(Card::Distortion).name;
+  view.toggle = true;
+  view.on = true;
+  renderReadout(c, view);
 }
 
 void menu(Canvas& c) {

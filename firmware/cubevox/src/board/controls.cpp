@@ -42,6 +42,7 @@ Every gDropReport{kDropReportMs};
 KnobBank gKnobs;
 std::array<DebouncedInput, kSlotCount> gToggles;
 bool gToggleChanged = false;
+ToggleFlip gFlip;  // the last debounced flip not yet taken; slot -1 for none
 #if CUBEVOX_BENCH
 std::array<float, kPotCount> gRaw;  // last unfiltered read per mux channel
 #endif
@@ -122,7 +123,9 @@ bool readToggleOn(int slot) {
 
 void scanToggles(uint32_t nowMs) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (gToggles[s].update(readToggleOn(s), nowMs, kSwitchDebounceMs)) gToggleChanged = true;
+    if (!gToggles[s].update(readToggleOn(s), nowMs, kSwitchDebounceMs)) continue;
+    gToggleChanged = true;
+    gFlip = ToggleFlip{static_cast<int8_t>(s), gToggles[s].level()};
   }
 }
 
@@ -179,6 +182,13 @@ bool controlsTakeChanged() {
 }
 
 bool controlsTakeTouch(LastMoved& out) { return gKnobs.takeTouch(out); }
+
+bool controlsTakeToggle(ToggleFlip& out) {
+  if (gFlip.slot < 0) return false;
+  out = gFlip;
+  gFlip = ToggleFlip{};
+  return true;
+}
 
 #if CUBEVOX_BENCH
 float controlsRawPot(int muxChannel) { return gRaw[muxChannel]; }
