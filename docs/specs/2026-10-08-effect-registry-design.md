@@ -32,7 +32,7 @@ Files: `firmware/cubevox/src/core/registry.h/.cpp` (cards, knob descriptors, gro
 
 ## Open questions resolved
 
-1. Two reverb cards: not allowed (one `Reverb` object serves all engines; RAM is at 71 %).
+1. Two reverb cards: not allowed (one `Reverb` object serves all engines; RAM is at 71 %). No reverb card: not allowed either (owner 2026-10-30, the REVERB menu row never reads NONE), so every valid layout holds exactly one.
 2. Bench input: built-in signal, not live mic, so costs are repeatable.
 3. Costs before boards: flagged estimates, not zeros, so the budget check is exercised (measured since 2026-10-08).
 4. Reverb id naming: all under `reverb_*`; nothing had shipped.
