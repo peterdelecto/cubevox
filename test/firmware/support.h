@@ -39,6 +39,7 @@ void checkGui();               // ui_gui.cpp
 void checkScreens();           // ui_screens.cpp
 void checkFace();              // ui_face.cpp
 void checkLevel();             // core_level.cpp
+void checkLoadWindow();        // core_load.cpp
 void checkCanvas();            // core_canvas.cpp
 void checkPanelTest();         // core_panel_test.cpp
 void checkRecords();           // core_record.cpp

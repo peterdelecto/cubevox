@@ -24,7 +24,7 @@ constexpr size_t kOffSequence = 8;
 constexpr size_t kOffName = 12;
 constexpr size_t kOffSlots = kOffName + kLayoutNameBytes;
 constexpr size_t kOffSettings = kOffSlots + kSlotCount * kRecordCardFieldBytes;
-constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, polish eq, top switch, 11 reserved
+constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, polish eq, top switch, debug, 10 reserved
 constexpr size_t kOffCrc = kOffSettings + kSettingsBytes;
 
 // Byte offsets of the settings, in file order. A v1 record has the first two.
@@ -33,6 +33,7 @@ constexpr size_t kOffInputJack = kOffSettings + 1;
 constexpr size_t kOffPolishComp = kOffSettings + 2;
 constexpr size_t kOffPolishEq = kOffSettings + 3;
 constexpr size_t kOffTopSwitch = kOffSettings + 4;
+constexpr size_t kOffDebug = kOffSettings + 5;  // a record written before it existed holds 0 here, which reads as OFF
 
 constexpr uint16_t kRecordSchema = 2;
 constexpr uint16_t kRecordSchemaV1 = 1;  // still read; the v2 settings take their defaults

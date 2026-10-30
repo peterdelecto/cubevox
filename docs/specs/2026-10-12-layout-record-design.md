@@ -37,7 +37,11 @@ the 256-byte size stay, and the three new bytes come out of the reserved ones.
 | 2 | polish comp | 0 off, 1 on | on |
 | 3 | polish EQ | 0 off, 1 on | on |
 | 4 | top switch | 0 MUTE, 1 BYPASS | MUTE |
-| 5 to 15 | reserved, zero | | |
+| 5 | debug | 0 off, 1 on (owner 2026-10-30, `2026-10-24-polish-design.md` menu row 7) | off |
+| 6 to 15 | reserved, zero | | |
+
+Byte 5 came out of the reserved bytes on 2026-10-30 and the schema stays 2: no earlier decoder
+read that byte, every record written before holds 0 there, and 0 is off.
 
 1. A v1 record still decodes. Its bytes 2 to 4 were reserved, so they are ignored and the three
    new settings take their defaults, not the zeros.

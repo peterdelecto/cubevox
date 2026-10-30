@@ -23,6 +23,9 @@ inline bool operator!=(const Layout& a, const Layout& b) { return !(a == b); }
 // Slot 1 to kSlotCount as shipped.
 Layout defaultLayout();
 
+// The slot that holds a reverb card (Spring or Chasm), or -1 when none does.
+int reverbSlot(const Layout& layout);
+
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
 

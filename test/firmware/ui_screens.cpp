@@ -1,6 +1,6 @@
 // Checks the runtime screens on the host. Covers the readout against the proof renderer byte for
 // byte (settled, rolling and muted), its rows and edges, the key names with their flats, the voice
-// ribbon and the muted word. The proof PGMs go to build/oled-*.pgm.
+// ribbon, the muted word and the DEBUG load figure. The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
 
@@ -1013,6 +1013,61 @@ void checkToggle() {
         "toggle: only the card line differs between two slots' readouts");
 }
 
+// ---------------------------------------------------------------------------------------------
+// Load figure
+
+// The DEBUG figure in 5x7 with its last column at 126 and its top row at 56, 1 px from the right and
+// bottom edges. The text goes at literal places, x 116, 110 and 104 for 7%, 42% and 100%.
+void checkLoad() {
+  struct Case {
+    int percent;
+    const char* text;
+    int x;
+  };
+  const Case cases[] = {{0, "0%", 116}, {7, "7%", 116}, {42, "42%", 110}, {100, "100%", 104}, {999, "999%", 104}};
+  for (const Case& c : cases) {
+    Canvas drawn;
+    drawLoad(drawn, c.percent);
+    Canvas want;
+    want.drawText(c.x, 56, font5x7(), c.text);
+    const std::string what = std::string("load ") + c.text + ": ";
+    check(sameRows(drawn, want, 0, kCanvasHeight), (what + "the text sits with its top at row 56, its last column at 126").c_str());
+    check(rowsBlank(drawn, 0, 56) && edgesDark(drawn), (what + "nothing above row 56 and the edges stay dark").c_str());
+    if (c.percent == 7 || c.percent == 42 || c.percent == 100) {
+      writePgm(drawn, (std::string("oled-load-") + std::to_string(c.percent) + ".pgm").c_str());
+    }
+  }
+
+  Canvas high;
+  drawLoad(high, 1500);
+  Canvas cap;
+  drawLoad(cap, 999);
+  Canvas low;
+  drawLoad(low, -5);
+  Canvas zero;
+  drawLoad(zero, 0);
+  check(sameRows(high, cap, 0, kCanvasHeight) && sameRows(low, zero, 0, kCanvasHeight),
+        "load: a figure past 999 reads 999% and one below 0 reads 0%");
+
+  // Over a lit canvas, the box behind the text is blanked first, so only the text's own pixels stay lit
+  // there and the rest of the canvas is untouched.
+  Canvas full;
+  full.fillRect(0, 0, kCanvasWidth, kCanvasHeight, true);
+  drawLoad(full, 42);
+  Canvas text;
+  text.drawText(110, 56, font5x7(), "42%");
+  bool boxIsText = true;
+  bool restLit = true;
+  for (int y = 0; y < kCanvasHeight; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) {
+      const bool inBox = x >= 110 && x <= 126 && y >= 56 && y <= 62;
+      if (inBox) boxIsText = boxIsText && lit(full, x, y) == lit(text, x, y);
+      else restLit = restLit && lit(full, x, y);
+    }
+  }
+  check(boxIsText && restLit, "load: the box behind the figure is blanked and nothing outside it changes");
+}
+
 }  // namespace
 
 void checkScreens() {
@@ -1038,4 +1093,5 @@ void checkScreens() {
   checkVoiceWalk();
   checkMuted();
   checkToggle();
+  checkLoad();
 }

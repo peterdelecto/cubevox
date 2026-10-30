@@ -22,6 +22,7 @@ int main() {
   checkInputLogic();
   checkMenu();
   checkLevel();
+  checkLoadWindow();
   checkGui();
   checkScreens();
   checkFace();

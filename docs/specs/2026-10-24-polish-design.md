@@ -22,23 +22,27 @@ slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (LINE/MIC) → s
    EQ state stay finite. The output cuts to zero, every engine clears in the silent blocks that
    follow, and the output fades back in; `status` counts it as `nan_blocks`.
 
-## Menu, final order (7 rows, 5x7, no title row, cursor `>` in column 0, 9 px row pitch)
+## Menu, final order (9 rows, 7 visible, 5x7, no title row, cursor `>` in column 0, 9 px row pitch)
 | Row | Text | Click |
 |---|---|---|
 | 1 | `INPUT: MIC` | cycles MIC / LINE. LINE puts the 25.7 dB pad of relay K103 in circuit (hardware spec row 15) |
 | 2 | `OUTPUT: LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
 | 3 | `TOP SWITCH: MUTE` | cycles MUTE / BYPASS |
-| 4 | `POLISH COMP: ON` | cycles ON / OFF |
-| 5 | `POLISH EQ: ON` | cycles ON / OFF |
-| 6 | `UPDATE FIRMWARE >` | opens the confirm screen |
-| 7 | `EXIT` | closes the menu |
+| 4 | `REVERB: SPRING` | cycles SPRING / CHASM (owner 2026-10-30). The value is the reverb card in the layout; a click swaps that slot's card and saves the layout record through the path a layout from the app takes, so the audio fades, resets and comes back. With no reverb card in the layout the row reads NONE and a click does nothing |
+| 5 | `POLISH COMP: ON` | cycles ON / OFF |
+| 6 | `POLISH EQ: ON` | cycles ON / OFF |
+| 7 | `DEBUG: OFF` | cycles OFF / ON (owner 2026-10-30). ON draws the audio load figure on the voice screen, OLED GUI spec, Voice item 9 |
+| 8 | `UPDATE FIRMWARE >` | opens the confirm screen |
+| 9 | `EXIT` | closes the menu |
 
 The owner's `[A \ B]` notation names the value set. A row shows the current value and a click
 cycles it, because the longest row with both values does not fit 21 columns. The list has no
 CHAIN ORDER row (owner 2026-10-24, no-op for now). `drawChainView` and its proof stay in the
-firmware, and no row opens the view. Turn moves the cursor; the list does not scroll. Every
-change saves through the layout record's existing debounce. Screens are approved per numbered
-proof, as always.
+firmware, and no row opens the view. Turn moves the cursor. Seven rows show at a time; when the
+cursor moves past the top or bottom of the window the list scrolls by one row, only as far as the
+cursor needs, and there is no scroll mark. The window starts at row 1 each time the menu opens, and
+a cancelled update confirm returns to the same cursor and window. Every change saves through the
+layout record's existing debounce. Screens are approved per numbered proof, as always.
 
 The list rows sit on a 9 px pitch, so row r spans pixel lines 9r to 9r + 8, because seven rows
 leave breathing room (owner 2026-10-24). The 7 px text starts at y = 9r + 1, which is y = 1, 10,

@@ -10,6 +10,13 @@ Layout defaultLayout() {
            Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring}};
 }
 
+int reverbSlot(const Layout& layout) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (layout.card[s] == Card::ReverbSpring || layout.card[s] == Card::ReverbChasm) return s;
+  }
+  return -1;
+}
+
 const char* layoutDisplayName(const char* stored) { return stored != nullptr && stored[0] != '\0' ? stored : "Default"; }
 
 namespace {
