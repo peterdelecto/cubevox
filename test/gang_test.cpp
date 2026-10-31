@@ -1,6 +1,6 @@
-// Gang card checks: bit-exact off, no allocation, pitch held, formant moved, the level law across
-// VOICES, the lead leaving, the voice count, DISTANCE timing, the tracker running without Autotune,
-// and a host timing against Unison. Every run feeds a PitchFx through its pass-through path first,
+// Gang card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
+// of different colour, the level law across VOICES, the lead leaving, the voice count, DISTANCE
+// timing, the tracker running without Autotune, and a host timing against Unison. Every run feeds a PitchFx through its pass-through path first,
 // so the ring is written and the tracker runs, as the chain does. No window, no audio device.
 
 #include <algorithm>
@@ -223,17 +223,29 @@ cv::GangParams knobs(float voices, float distance) {
 }
 
 // Voice 0 alone with nothing around it. voiceDb 0 gives one voice the whole level, so the lead is
-// 0, and the filters and the room are flat or silent.
+// 0, and the filters and the room are flat or silent. The voice sits on the lead's pitch with a
+// flat tone, so only its formant move is left.
 cv::GangParams isolated(float formantSt) {
   cv::GangParams p = knobs(0.2f, 0.5f);
   cv::GangTuning& t = p.tuning;
   t.voiceDb = 0.0f;
   t.formantSt[0] = formantSt;
-  t.detuneCents[0] = 0.0f;
+  t.pitchSt[0] = 0.0f;
+  t.tiltDb[0] = 0.0f;
   t.lfoCents = 0.0f;
   t.hpNearHz = t.hpFarHz = cv::kFilterMinHz;
   t.shelfNearDb = t.shelfFarDb = 0.0f;
   t.roomNearDb = t.roomFarDb = -120.0f;
+  return p;
+}
+
+// Voice v of the default tuning, moved into slot 0 and played alone.
+cv::GangParams alone(size_t v) {
+  cv::GangParams p = isolated(0.0f);
+  const cv::GangTuning d;
+  p.tuning.pitchSt[0] = d.pitchSt[v];
+  p.tuning.formantSt[0] = d.formantSt[v];
+  p.tuning.tiltDb[0] = d.tiltDb[v];
   return p;
 }
 
@@ -350,28 +362,48 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
-// The one live voice is isolated, so the output is that voice alone. A formant move must leave
-// the pitch where it was.
-bool testPitchStays() {
+// One voice alone lands on the lead's pitch moved by its pitchSt, with the voice's own formant and
+// tone shelf in place (lfoCents 0).
+bool testPitchMoves() {
   const Signal in = tone(220.0, 2 * kRate);
   bool ok = true;
-  for (float st : {1.5f, -1.5f, 0.0f}) {
-    const double hz = medianHz(run(in, isolated(st)));
-    const double err = hz > 0.0 ? cents(hz, 220.0) : 9999.0;
+  for (size_t v = 0; v < 2; ++v) {
+    const cv::GangParams p = alone(v);
+    const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
+    const double hz = medianHz(run(in, p));
+    const double err = hz > 0.0 ? cents(hz, want) : 9999.0;
     char name[40];
-    std::snprintf(name, sizeof name, "pitch stays, formant %+.1f st", static_cast<double>(st));
-    ok &= report(name, std::fabs(err) <= 10.0, "f0=%.2f Hz, err=%.2f cents (+-10)", hz, err);
+    std::snprintf(name, sizeof name, "pitch moves, voice %zu", v);
+    ok &= report(name, std::fabs(err) <= 10.0, "f0=%.2f Hz, want %.2f Hz, err=%.2f cents (+-10)", hz, want, err);
   }
   return ok;
 }
 
+// The formant moves of voices 0 and 1 against a flat voice, pitch on the lead.
 bool testFormantMoves() {
   const Signal in = vowel(220.0, 2 * kRate);
+  const cv::GangTuning d;
   const double flat = centroidHz(run(in, isolated(0.0f)), 220.0, 1, 10);
-  const double up = centroidHz(run(in, isolated(1.5f)), 220.0, 1, 10);
-  const double down = centroidHz(run(in, isolated(-1.5f)), 220.0, 1, 10);
+  const double up = centroidHz(run(in, isolated(d.formantSt[1])), 220.0, 1, 10);
+  const double down = centroidHz(run(in, isolated(d.formantSt[0])), 220.0, 1, 10);
   return report("formant moves", up >= 1.06 * flat && down <= 0.94 * flat,
-                "centroid 0 st=%.1f Hz, +1.5 st x%.3f (>=1.06), -1.5 st x%.3f (<=0.94)", flat, up / flat, down / flat);
+                "centroid 0 st=%.1f Hz, voice 1 formant x%.3f (>=1.06), voice 0 formant x%.3f (<=0.94)", flat,
+                up / flat, down / flat);
+}
+
+// Voice 0 alone and voice 1 alone are two different colours: the spectral centroid of each, over
+// the harmonics of its own f0 up to the 20th, differs by at least 10 %.
+bool testVoicesDiffer() {
+  const Signal in = tone(220.0, 2 * kRate);
+  double c[2];
+  for (size_t v = 0; v < 2; ++v) {
+    const cv::GangParams p = alone(v);
+    const double f0 = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
+    c[v] = centroidHz(run(in, p), f0, 1, 20);
+  }
+  const double diff = std::fabs(c[1] - c[0]) / std::min(c[0], c[1]);
+  return report("voices differ", diff >= 0.10, "centroid voice 0 %.1f Hz, voice 1 %.1f Hz, differ %.1f %% (>=10)", c[0],
+                c[1], 100.0 * diff);
 }
 
 double levelDb(const Signal& in, const Signal& out) {
@@ -430,15 +462,16 @@ bool testVoiceCount() {
   cv::GangParams a = knobs(0.2f, 0.5f);
   cv::GangParams b = a;
   for (size_t v = 1; v < 4; ++v) {
-    b.tuning.detuneCents[v] = 400.0f;
+    b.tuning.pitchSt[v] = 4.0f;
     b.tuning.formantSt[v] = 5.0f;
+    b.tuning.tiltDb[v] = 6.0f;
   }
   const Signal outA = run(in, a);
   const Signal outB = run(in, b);
   size_t differ = 0;
   for (size_t i = 0; i < outA.size(); ++i) differ += outA[i] != outB[i] ? 1 : 0;
   b = a;
-  b.tuning.detuneCents[0] = 400.0f;
+  b.tuning.pitchSt[0] = 4.0f;
   const Signal outC = run(in, b);
   size_t moved = 0;
   for (size_t i = 0; i < outA.size(); ++i) moved += outA[i] != outC[i] ? 1 : 0;
@@ -458,8 +491,8 @@ bool testDistanceTiming() {
   const int lagFar = peakLag(in, run(in, far), kRate, kRate + kRate / 2, 4000);
   const double msNear = 1000.0 * lagNear / kRate;
   const double msFar = 1000.0 * lagFar / kRate;
-  const double wantNear = 28.0 * 0.8;
-  const double wantFar = 28.0 * 1.3;
+  const double wantNear = 30.0 * 0.8;
+  const double wantFar = 30.0 * 1.3;
   return report("distance timing", std::fabs(msNear - wantNear) <= 0.5 && std::fabs(msFar - wantFar) <= 0.5,
                 "peak at d=0 %.2f ms (%.1f), at d=1 %.2f ms (%.1f), +-0.5", msNear, wantNear, msFar, wantFar);
 }
@@ -575,8 +608,9 @@ int main() {
   ok &= testOffExact();
   ok &= testReset();
   ok &= testNoAlloc();
-  ok &= testPitchStays();
+  ok &= testPitchMoves();
   ok &= testFormantMoves();
+  ok &= testVoicesDiffer();
   ok &= testLevelLaw();
   ok &= testLeadLeaves();
   ok &= testVoiceCount();

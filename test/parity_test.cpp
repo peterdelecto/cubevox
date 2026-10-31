@@ -230,10 +230,12 @@ void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv:
   for (size_t v = 0; v < a.formantSt.size(); ++v) {
     const std::string at = p + "[" + std::to_string(v) + "]";
     EXPECT(at + ".formantSt", pos, a.formantSt[v], b.formantSt[v]);
-    EXPECT(at + ".detuneCents", pos, a.detuneCents[v], b.detuneCents[v]);
+    EXPECT(at + ".pitchSt", pos, a.pitchSt[v], b.pitchSt[v]);
+    EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
     EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
     EXPECT(at + ".lfoHz", pos, a.lfoHz[v], b.lfoHz[v]);
   }
+  CMP(p, pos, a, b, tiltHz);
   CMP(p, pos, a, b, lfoCents);
   CMP(p, pos, a, b, voiceDb);
   CMP(p, pos, a, b, trimDb);

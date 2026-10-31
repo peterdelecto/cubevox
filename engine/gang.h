@@ -12,11 +12,12 @@
 #include "engine/psola.h"
 #include "engine/smooth.h"
 
-// The Gang card adds up to four copies of the voice, as if four other singers stood a step back from
-// the mic. Each copy has its own throat (a grain playback rate), its own detune with a slow
-// wobble, its own delay behind the lead, and less bass and top than the lead. One small room sits
-// on the gang. The copies never read a key. They read the pitch period and Autotune's correction
-// from PitchFx and cut their grains from its input ring.
+// The Gang card adds up to four copies of the voice, each a different person standing a step back
+// from the mic. Each copy sits a few semitones off the lead, has its own throat (a grain playback
+// rate) and its own tone shelf, wobbles slowly in pitch, and lags the lead by its own delay. The
+// gang as a whole has less bass and top than the lead. One small room sits on the gang. The copies
+// never read a key. They read the pitch period and Autotune's correction from PitchFx and cut
+// their grains from its input ring.
 //
 // VOICES fades the copies in one at a time, then fades the lead out, so the top of the knob is the
 // gang alone. Total power is unity at every position. DISTANCE moves the copies' delay, bass cut,
@@ -25,18 +26,20 @@
 namespace cv {
 
 struct GangTuning {
-  std::array<float, 4> formantSt = {0.6f, -0.6f, 1.5f, -1.5f};   // grain playback rate 2^(st / 12)
-  std::array<float, 4> detuneCents = {7.0f, -6.0f, 12.0f, -14.0f};
-  std::array<float, 4> delayMs = {28.0f, 36.0f, 44.0f, 52.0f};  // behind the lead, before the DISTANCE scale
-  std::array<float, 4> lfoHz = {0.11f, 0.17f, 0.23f, 0.29f};
-  float lfoCents = 6.0f;       // peak wobble on each voice's detune
+  std::array<float, 4> pitchSt = {-2.85f, 2.15f, -4.75f, 4.25f};  // pitch ratio 2^(st / 12) against the lead
+  std::array<float, 4> formantSt = {-2.0f, 1.5f, -3.5f, 3.0f};     // grain playback rate 2^(st / 12)
+  std::array<float, 4> tiltDb = {-3.0f, 3.0f, -4.0f, 5.0f};        // high shelf gain above tiltHz
+  std::array<float, 4> delayMs = {30.0f, 40.0f, 50.0f, 54.0f};     // behind the lead, before the DISTANCE scale
+  std::array<float, 4> lfoHz = {0.23f, 0.31f, 0.41f, 0.53f};
+  float tiltHz = 2500.0f;
+  float lfoCents = 12.0f;      // peak wobble on each voice's pitch
   float voiceDb = -9.0f;       // one voice against the lead at unity
-  float trimDb = 1.0f;         // level rule residue
+  float trimDb = 3.1f;         // level rule residue
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
   float hpNearHz = 120.0f, hpFarHz = 250.0f;
   float shelfHz = 6000.0f, shelfNearDb = -1.0f, shelfFarDb = -5.0f;
-  float roomNearDb = -18.0f, roomFarDb = -6.0f;
+  float roomNearDb = -14.0f, roomFarDb = -3.0f;
   float roomLpHz = 4000.0f;    // tail darkness
   float roomFeedback = 0.6f;   // 35 ms loop, about 0.45 s to -60 dB
 };
@@ -448,10 +451,12 @@ class Gang {
     dc_.clear();
     active_ = 0;
     distanceSet_ = false;
+    tiltSet_ = false;
   }
 
   void retire(size_t v) {
     voice_[v].reset();
+    tilt_[v].clear();
     live_[v] = false;
   }
 
@@ -470,6 +475,18 @@ class Gang {
     filtersSet_ = true;
   }
 
+  // One high shelf per voice. The setters run on the first block after a reset and when the
+  // tuning moved.
+  void setTilts(const GangTuning& t) {
+    for (size_t v = 0; v < kVoices; ++v) {
+      if (tiltSet_ && t.tiltDb[v] == tiltDb_[v] && t.tiltHz == tiltHz_) continue;
+      tilt_[v].setHighShelf(t.tiltHz, t.tiltDb[v]);
+      tiltDb_[v] = t.tiltDb[v];
+    }
+    tiltHz_ = t.tiltHz;
+    tiltSet_ = true;
+  }
+
   // Sine of voice v's wobble at the block start, then the phase moves on by n samples.
   float stepLfo(size_t v, float hz, int n) {
     const float s = sinTurns(lfoPhase_[v]);
@@ -484,6 +501,7 @@ class Gang {
   void prepareBlock(const GangParams& p, const PitchFx& pitch, const Plan& plan, float d, int n) {
     const GangTuning& t = p.tuning;
     setFilters(t, d);
+    setTilts(t);
     room_.setTail(t.roomLpHz, t.roomFeedback);
     const float period = pitch.pitch().period;
     const float corr = pitch.correctionSemis() * (1.0f / 12.0f);
@@ -492,28 +510,31 @@ class Gang {
         gang_detail::kSmpPerMs;
     active_ = 0;
     for (size_t v = 0; v < kVoices; ++v) {
-      const float cents = t.detuneCents[v] + t.lfoCents * stepLfo(v, t.lfoHz[v], n);
+      const float wobble = t.lfoCents * stepLfo(v, t.lfoHz[v], n);
       if (gain_[v] <= 0.0f && plan.voice[v] <= 0.0f) {
         if (live_[v]) retire(v);
         continue;
       }
       live_[v] = true;
       ++active_;
-      voice_[v].prepare(period, exp2Fast(cents * (1.0f / 1200.0f) + corr), exp2Fast(t.formantSt[v] * (1.0f / 12.0f)),
-                        t.delayMs[v] * timing);
+      voice_[v].prepare(period, exp2Fast(t.pitchSt[v] * (1.0f / 12.0f) + wobble * (1.0f / 1200.0f) + corr),
+                        exp2Fast(t.formantSt[v] * (1.0f / 12.0f)), t.delayMs[v] * timing);
     }
   }
 
-  // Adds voice v into gang, its gain ramping to the block-end target.
+  // Adds voice v into gang. The voice's tone shelf runs first, then its gain ramps to the
+  // block-end target. The shelf runs on a local copy so its state stays in registers.
   void mixVoice(size_t v, const VoiceRing& ring, int first, int n, float target, float* gang) {
     std::array<float, kBlock> raw{};
     voice_[v].render(ring, first, n, raw.data());
+    Biquad tilt = tilt_[v];
     const float step = (target - gain_[v]) / static_cast<float>(n);
     float g = gain_[v];
     for (int i = 0; i < n; ++i) {
       g += step;
-      gang[i] += g * raw[static_cast<size_t>(i)];
+      gang[i] += g * tilt.run(raw[static_cast<size_t>(i)]);
     }
+    tilt_[v] = tilt;
   }
 
   // Highpass then shelf on the gang sum, in place. The filters run on local copies so their state
@@ -550,6 +571,8 @@ class Gang {
   std::array<FormantPsolaVoice, kVoices> voice_{};
   Biquad hp_;
   Biquad shelf_;
+  std::array<Biquad, kVoices> tilt_{};
+  std::array<float, kVoices> tiltDb_{};
   std::array<float, kVoices> gain_{};
   std::array<bool, kVoices> live_{};
   std::array<uint32_t, kVoices> lfoPhase_ = {0u, 0x40000000u, 0x80000000u, 0xC0000000u};
@@ -561,9 +584,11 @@ class Gang {
   float hpHz_ = 0.0f;
   float shelfHz_ = 0.0f;
   float shelfDb_ = 0.0f;
+  float tiltHz_ = 0.0f;
   float distance_ = 0.5f;  // DISTANCE after the smoother
   uint8_t active_ = 0;
   bool filtersSet_ = false;
+  bool tiltSet_ = false;
   bool distanceSet_ = false;
   bool idle_ = true;
 };
