@@ -4,9 +4,7 @@
 // burst, timing scatter, pitch drift, the tracker running without Autotune, the three enhancements
 // (every control at its default is the pinned engine bit for bit, level scatter, contour, the
 // shadow ring, the pulse marks and the pulse cut on a glottal pulse train and the human-voice ranges),
-// the bottom tenth of WIDTH staying in tune (pitch, drift and contour), the owner's higher voice (voice
-// index 1: its pitch and throat, its per-cycle shimmer and its tilt, and tilt 0 and shimmer 0 being the
-// engine before them bit for bit), and a host timing against Unison. Every run feeds a PitchFx
+// the bottom tenth of WIDTH staying in tune (pitch, drift and contour), and a host timing against Unison. Every run feeds a PitchFx
 // through its pass-through path first, so the ring is written and the tracker runs, as the chain
 // does. No window, no audio device.
 
@@ -290,8 +288,6 @@ cv::CrowdParams lagProbe(size_t v, float lagScale, float width = 1.0f) {
   p.tuning.pitchSt[v] = 0.0f;
   p.tuning.formantSt[v] = 0.0f;
   p.tuning.tiltDb[v] = 0.0f;
-  p.tuning.tilt[v] = 0.0f;
-  p.tuning.shimmer[v] = 0.0f;
   return p;
 }
 
@@ -302,43 +298,6 @@ cv::CrowdParams alone(size_t v) {
   p.tuning.pitchSt[0] = d.pitchSt[v];
   p.tuning.formantSt[0] = d.formantSt[v];
   p.tuning.tiltDb[0] = d.tiltDb[v];
-  p.tuning.tilt[0] = d.tilt[v];
-  p.tuning.shimmer[0] = d.shimmer[v];
-  return p;
-}
-
-// The owner's higher voice (index 1) alone on its shipped tuning at WIDTH 1: pitch +3 st, formant +1.65
-// st, tilt +2 dB, shimmer 1 dB. Only the working set's other controls are off. A solo of voice 1 at
-// voiceDb 0 gives it the whole level, and the low cut sits at the bottom of the filter band.
-cv::CrowdParams voiceOne() {
-  cv::CrowdParams p = knobs(0.2f, 1.0f);
-  p.tuning.voiceDb = 0.0f;
-  p.tuning.hpHz = cv::kFilterMinHz;
-  p.solo = 0b0010;
-  return p;
-}
-
-// voiceOne() with what makes it the owner's voice taken off: no pitch or formant offset, no tilt, no
-// shimmer. The lag is the same, so the two differ only in that colour.
-cv::CrowdParams plainOne() {
-  cv::CrowdParams p = voiceOne();
-  p.tuning.pitchSt[1] = 0.0f;
-  p.tuning.formantSt[1] = 0.0f;
-  p.tuning.tiltDb[1] = 0.0f;
-  p.tuning.tilt[1] = 0.0f;
-  p.tuning.shimmer[1] = 0.0f;
-  return p;
-}
-
-// The four copies as they were tuned before voice 1 became the owner's higher voice and before tilt and
-// shimmer existed. The recorded hashes belong to this tuning, and a copy at tilt 0 and shimmer 0 must
-// reproduce them to the bit.
-cv::CrowdParams pinned(cv::CrowdParams p) {
-  p.tuning.pitchSt[1] = 2.75f;
-  p.tuning.formantSt[1] = -1.0f;
-  p.tuning.tiltDb[1] = -4.0f;
-  p.tuning.tilt = {0.0f, 0.0f, 0.0f, 0.0f};
-  p.tuning.shimmer = {0.0f, 0.0f, 0.0f, 0.0f};
   return p;
 }
 
@@ -473,20 +432,6 @@ bool testNoAlloc() {
   moving.tuning.scatterMs = 20.0f;
   moving.tuning.driftCents = 30.0f;
   run(in, moving);
-
-  // Every copy with its tilt and shimmer at the limits, on the shipped cut.
-  cv::CrowdParams lean = knobs(0.9f, 0.9f);
-  lean.tuning.epochAlign = true;
-  lean.tuning.tilt = {6.0f, -6.0f, 6.0f, -6.0f};
-  lean.tuning.shimmer = {1.0f, 1.0f, 1.0f, 1.0f};
-  run(in, lean);
-
-  // Voice 5 with every control working: breath, fry on the pulse cut, jitter, shimmer, the tilt.
-  cv::CrowdParams trial = knobs(0.6f, 0.9f);
-  trial.tuning.voice5On = true;
-  trial.tuning.epochAlign = true;
-  trial.tuning = cv::voice5OlderMan(trial.tuning);
-  run(in, trial);
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
@@ -603,7 +548,7 @@ bool testWidthLaw() {
 }
 
 // VOICES 20, 40, 60 and 80 % bring in the copies in index order, the -1.75 st copy first, then the
-// +3 st, the -3 st and the +1 st. At each step the output carries a line at the f0 of every
+// +2.75 st, the -3 st and the +1 st. At each step the output carries a line at the f0 of every
 // copy that has come in and none at the f0 of the copies still to come. It runs at WIDTH 1 and at
 // WIDTH 0.5, where the offsets are the width factor 0.454 of their full values.
 bool testFadeOrder() {
@@ -613,17 +558,11 @@ bool testFadeOrder() {
   for (float width : {1.0f, 0.5f}) {
     for (int n = 1; n <= 4; ++n) {
       const Signal out = run(in, knobs(0.2f * static_cast<float>(n), width));
-
-      // The second second under a Hann window: a line of the lead 6 Hz from a copy's f0 would leak
-      // into a rectangular window's bin for that copy.
-      Signal seg(out.begin() + kRate, out.begin() + 2 * kRate);
-      for (size_t i = 0; i < seg.size(); ++i)
-        seg[i] *= static_cast<float>(0.5 - 0.5 * std::cos(2.0 * kPi * static_cast<double>(i) / static_cast<double>(seg.size())));
       double amp[4];
       double top = 0.0;
       for (size_t v = 0; v < 4; ++v) {
         const double st = static_cast<double>(d.pitchSt[v]) * widthFactor(static_cast<double>(width));
-        amp[v] = goertzel(seg.data(), kRate, 220.0 * std::pow(2.0, st / 12.0));
+        amp[v] = goertzel(&out[kRate], kRate, 220.0 * std::pow(2.0, st / 12.0));
         top = std::max(top, amp[v]);
       }
       bool order = true;
@@ -651,8 +590,8 @@ cv::CrowdParams formantProbe(float formantSt) {
   return p;
 }
 
-// The formant moves of a throat shorter than the lead's (+1 st) and of voice 0 (the longest default,
-// -1.75 st) against a flat voice, pitch on the lead.
+// The formant moves of a throat shorter than the lead's (+1 st, no default copy has one) and of
+// voice 0 (the longest, -1.75 st) against a flat voice, pitch on the lead.
 bool testFormantMoves() {
   const Signal in = vowel(220.0, 2 * kRate);
   const cv::CrowdTuning d;
@@ -664,11 +603,11 @@ bool testFormantMoves() {
                 up / flat, down / flat);
 }
 
-// Voice 0 alone (the longest throat, -1.75 st) and voice 1 alone (the owner's higher voice, +3 st and
-// a throat 1.65 st shorter) are two different colours: the spectral centroid of each, over the
-// harmonics of its own f0 up to the 20th, differs by at least 5 %. The centroid of a steady tone
-// depends on how the grain reads line up with the period grid (see formantProbe), so the WIDTH
-// multiplier on the lag is held at 1.
+// Voice 0 alone (the longest throat, -1.75 st) and voice 1 alone (the highest centroid of the
+// four) are two different colours: the spectral centroid of each, over the harmonics of its own
+// f0 up to the 20th, differs by at least 5 %. All four default formants are below the lead's. The
+// centroid of a steady tone depends on how the grain reads line up with the period grid (see
+// formantProbe), so the WIDTH multiplier on the lag is held at 1 and both voices sit at 48 ms.
 bool testVoicesDiffer() {
   const Signal in = tone(220.0, 2 * kRate);
   const size_t pick[2] = {0, 1};
@@ -744,8 +683,6 @@ bool testVoiceCount() {
     b.tuning.pitchSt[v] = 4.0f;
     b.tuning.formantSt[v] = 5.0f;
     b.tuning.tiltDb[v] = 6.0f;
-    b.tuning.tilt[v] = 5.0f;
-    b.tuning.shimmer[v] = 0.5f;
   }
   const Signal outA = run(in, a);
   const Signal outB = run(in, b);
@@ -777,8 +714,6 @@ bool testSolo() {
   b.tuning.pitchSt[0] = 4.0f;
   b.tuning.formantSt[0] = 5.0f;
   b.tuning.tiltDb[0] = 6.0f;
-  b.tuning.tilt[0] = 5.0f;
-  b.tuning.shimmer[0] = 1.0f;
   const Signal outB = run(in, b);
   cv::CrowdParams c = a;
   c.tuning.pitchSt[1] = 4.0f;
@@ -1032,19 +967,27 @@ size_t differing(const Signal& a, const Signal& b) {
   return n;
 }
 
+// What the three runs of testEnhancementsDefaultExact hashed to on the engine of v2.00.68 (Mac build),
+// on the default tuning. The default tuning must reproduce them to the bit. Update them only when the
+// sound of a default copy changes on purpose.
+constexpr uint64_t kBeforeProgram = 0x12873f20ed548ec8ULL;
+constexpr uint64_t kBeforeBurst = 0x8ff1eb8ee12b722cULL;
+constexpr uint64_t kBeforeBurstScatter = 0xd9de9308d8365971ULL;
+
 // With every enhancement neutral the engine runs the code it ran without them, and a setting that
-// only matters while its control is on moves no sample. The hashes are for the record.
+// only matters while its control is on moves no sample. The three recorded runs hash to the values
+// of v2.00.68.
 bool testEnhancementsDefaultExact() {
   const Signal prog = program(3);
   const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
-  const cv::CrowdParams base = pinned(knobs(0.7f, 0.5f));
+  const cv::CrowdParams base = knobs(0.7f, 0.5f);
   cv::CrowdParams idle = base;
   idle.tuning.epochSearch = 0.1f;     // matters only while epochAlign is on
   idle.tuning.levelScatterDb = -1.0f; // clamps to 0
   idle.tuning.contour = {1.0f, 1.0f, 1.0f, 1.0f};
   const Signal a = run(prog, base);
   const Signal b = run(prog, idle);
-  cv::CrowdParams burstBase = pinned(knobs(0.6f, 0.8f));
+  cv::CrowdParams burstBase = knobs(0.6f, 0.8f);
   burstBase.tuning.scatterMs = 15.0f;
   burstBase.tuning.driftCents = 20.0f;
   cv::CrowdParams burstIdle = burstBase;
@@ -1055,14 +998,24 @@ bool testEnhancementsDefaultExact() {
   const Signal d = run(burst, burstIdle);
   const size_t diffProg = differing(a, b);
   const size_t diffBurst = differing(c, d);
-  std::printf("info hash 180 Hz program VOICES 70 WIDTH 50 %016llx\n", static_cast<unsigned long long>(fnv(a)));
-  std::printf("info hash burst program VOICES 80 WIDTH 50 %016llx\n",
-               static_cast<unsigned long long>(fnv(run(burst, pinned(knobs(0.8f, 0.5f))))));
+  const uint64_t hashes[3] = {fnv(a), fnv(run(burst, knobs(0.8f, 0.5f))), fnv(c)};
+  const uint64_t before[3] = {kBeforeProgram, kBeforeBurst, kBeforeBurstScatter};
+  std::printf("info hash 180 Hz program VOICES 70 WIDTH 50 %016llx\n", static_cast<unsigned long long>(hashes[0]));
+  std::printf("info hash burst program VOICES 80 WIDTH 50 %016llx\n", static_cast<unsigned long long>(hashes[1]));
   std::printf("info hash burst program VOICES 60 WIDTH 80 scatter 15 drift 20 %016llx\n",
-               static_cast<unsigned long long>(fnv(c)));
-  return report("enhancements neutral", diffProg == 0 && diffBurst == 0,
-                "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
-                static_cast<double>(diffProg), static_cast<double>(diffBurst));
+               static_cast<unsigned long long>(hashes[2]));
+  bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
+                   "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
+                   static_cast<double>(diffProg), static_cast<double>(diffBurst));
+  for (int i = 0; i < 3; ++i) {
+    char name[40];
+    std::snprintf(name, sizeof name, "default hash, run %d", i + 1);
+    const bool same = hashes[i] == before[i];
+    std::printf("info hash run %d: v2.00.68 %016llx, default tuning %016llx\n", i + 1,
+                static_cast<unsigned long long>(before[i]), static_cast<unsigned long long>(hashes[i]));
+    ok &= report(name, same, "output hash equals the v2.00.68 value: %.0f (1)", same ? 1.0 : 0.0);
+  }
+  return ok;
 }
 
 // The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
@@ -1073,18 +1026,9 @@ bool testWorkingSetDefaults() {
                       d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && d.epochAlign &&
                       d.widthKnee == 0.1f && d.widthKneeFrac == 0.012f && d.widthLagBottom == 0.5f &&
                       d.widthLagMs == 20.0f;
-
-  // The owner's higher voice (index 1, 2026-10-31), and the voices that carry no tilt and no shimmer.
-  const bool owner = d.pitchSt[1] == 3.0f && d.formantSt[1] == 1.65f && d.contour[1] == 1.2f && d.tiltDb[1] == 0.0f &&
-                     d.tilt[1] == 2.0f && d.shimmer[1] == 1.0f && d.delayMs[1] == 100.0f &&
-                     d.tilt[0] == 0.0f && d.tilt[2] == 0.0f && d.tilt[3] == 0.0f && d.shimmer[0] == 0.0f &&
-                     d.shimmer[2] == 0.0f && d.shimmer[3] == 0.0f;
   bool ok = report("working set values", values,
                    "contour %.1f %.1f %.1f %.1f (0.8 1.2 0.7 1.1)", static_cast<double>(d.contour[0]),
                    static_cast<double>(d.contour[1]), static_cast<double>(d.contour[2]), static_cast<double>(d.contour[3]));
-  ok &= report("owner voice values", owner, "voice 1: pitch %+.2f st (+3), formant %+.2f st (+1.65), tilt %+.1f dB (+2), shimmer %.1f dB (1)",
-               static_cast<double>(d.pitchSt[1]), static_cast<double>(d.formantSt[1]), static_cast<double>(d.tilt[1]),
-               static_cast<double>(d.shimmer[1]));
   const Signal in = program(3);
   cv::CrowdParams worked = knobs(0.7f, 0.5f);
   worked.tuning = d;
@@ -1413,9 +1357,8 @@ bool testWidthLag() {
 // At WIDTH 0 a copy is the input delayed by its lag and nothing else. Each copy alone at the top of
 // VOICES, on the shipped set (offsets, drift, contour, level scatter, timing scatter and epoch align
 // all on), has every sample of a steady tone equal to the gain-scaled input at the lag the copy took.
-// The tone shelf is flat and the trim is off. The shipped tilt and shimmer stay in place (voice 1 carries
-// +2 dB and 1 dB), and they scale to exactly 0 at WIDTH 0. The reference goes through the same low cut
-// and DC blocker, since those are filters on the copy and not the slicing. A copy whose ratio and rate are
+// The tone shelf is flat and the trim is off, and the reference goes through the same low cut and DC
+// blocker, since those are filters on the copy and not the slicing. A copy whose ratio and rate are
 // both exactly 1 skips the epoch snap, so the shipped epoch align does not move its grains. The lag
 // comes from a search over the input read by linear interpolation as the engine reads its ring, within
 // half a period of the lag the engine reports (timing scatter makes it fractional), and the gain by
@@ -1811,684 +1754,10 @@ bool testEnhancementsStable() {
   return ok;
 }
 
-// Voice 5, the trial voice (owner 2026-10-31).
-
-// What the three runs of testEnhancementsDefaultExact hashed to on the engine before voice 5 existed
-// (v2.00.68, Mac build), on the pinned() tuning. Voice 5 off, and every tilt and shimmer at 0, must
-// reproduce them to the bit. Update them only when the sound of a copy at tilt 0 and shimmer 0 changes
-// on purpose.
-constexpr uint64_t kBeforeProgram = 0x12873f20ed548ec8ULL;
-constexpr uint64_t kBeforeBurst = 0x8ff1eb8ee12b722cULL;
-constexpr uint64_t kBeforeBurstScatter = 0xd9de9308d8365971ULL;
-
-using Preset = cv::CrowdTuning (*)(cv::CrowdTuning);
-
-// Voice 5 alone at the lead's level: the others are silent through the solo, the lead is gone, the low
-// cut sits at the bottom of the filter band and the other copies' enhancements are off, so what comes
-// out is voice 5 and its preset.
-cv::CrowdParams trialAlone(Preset preset, float width = 1.0f) {
-  cv::CrowdParams p = knobs(0.2f, width);
-  p.tuning = preset(p.tuning);
-  p.tuning.voice5On = true;
-  p.tuning.voice5Db = 0.0f;
-  p.tuning.hpHz = cv::kFilterMinHz;
-  p.solo = 0x10;
-  return p;
-}
-
-// Voice 5 off reproduces the engine before it existed, whatever its fields say and whether or not the
-// solo mask names it.
-bool testVoice5Off() {
-  const Signal prog = program(3);
-  const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
-  auto armed = [](cv::CrowdParams p) {
-    p.tuning = cv::voice5OlderMan(p.tuning);
-    p.tuning.voice5Db = -3.0f;
-    p.tuning.delayMs5 = 120.0f;
-    p.tuning.voice5On = false;
-    p.solo |= 0x10;
-    return p;
-  };
-  cv::CrowdParams scatter = pinned(knobs(0.6f, 0.8f));
-  scatter.tuning.scatterMs = 15.0f;
-  scatter.tuning.driftCents = 20.0f;
-  const cv::CrowdParams a = pinned(knobs(0.7f, 0.5f));
-  const cv::CrowdParams b = pinned(knobs(0.8f, 0.5f));
-  const uint64_t after[3] = {fnv(run(prog, a)), fnv(run(burst, b)), fnv(run(burst, scatter))};
-  const uint64_t armedAfter[3] = {fnv(run(prog, armed(a))), fnv(run(burst, armed(b))), fnv(run(burst, armed(scatter)))};
-  const uint64_t before[3] = {kBeforeProgram, kBeforeBurst, kBeforeBurstScatter};
-  bool ok = true;
-  for (int i = 0; i < 3; ++i) {
-    std::printf("info hash voice 5 off, run %d: before %016llx, after %016llx, voice 5 set and off %016llx\n", i + 1,
-                static_cast<unsigned long long>(before[i]), static_cast<unsigned long long>(after[i]),
-                static_cast<unsigned long long>(armedAfter[i]));
-    char name[48];
-    std::snprintf(name, sizeof name, "voice 5 off, run %d", i + 1);
-    const bool same = after[i] == before[i] && armedAfter[i] == before[i];
-    ok &= report(name, same, "output hashes equal the engine before voice 5, with its fields set or not: %.0f (1)", same ? 1.0 : 0.0);
-  }
-  return ok;
-}
-
-// Times in samples of the steepest rise of each cycle of x in [from, to), following the cycle from the
-// last time so a cycle with two edges does not flip between them. The rise is found on the three-point
-// slope and refined by a parabola.
-std::vector<double> riseTimes(const Signal& x, int from, int to, double period) {
-  const auto slope = [&](int i) { return static_cast<double>(x[static_cast<size_t>(i + 1)]) - x[static_cast<size_t>(i - 1)]; };
-  std::vector<double> times;
-  int best = from + 1;
-  for (int i = from + 1; i < from + static_cast<int>(1.2 * period) && i + 1 < to; ++i) best = slope(i) > slope(best) ? i : best;
-  for (;;) {
-    const double sm = slope(best - 1);
-    const double sp = slope(best + 1);
-    const double den = sm - 2.0 * slope(best) + sp;
-    const double at = best + (den < 0.0 ? 0.5 * (sm - sp) / den : 0.0);
-    times.push_back(at);
-    const int lo = std::max(from + 1, static_cast<int>(at + 0.7 * period));
-    const int hi = std::min(to - 2, static_cast<int>(at + 1.3 * period));
-    if (lo >= hi) break;
-    best = lo;
-    for (int i = lo; i <= hi; ++i) best = slope(i) > slope(best) ? i : best;
-  }
-  return times;
-}
-
-// Standard deviation of the cycle length, as a share of its mean, from the rise times.
-double cycleSpreadPct(const std::vector<double>& t) {
-  if (t.size() < 8) return 0.0;
-  std::vector<double> len;
-  for (size_t i = 1; i < t.size(); ++i) len.push_back(t[i] - t[i - 1]);
-  double mean = 0.0;
-  for (double l : len) mean += l;
-  mean /= static_cast<double>(len.size());
-  double var = 0.0;
-  for (double l : len) var += (l - mean) * (l - mean);
-  return 100.0 * std::sqrt(var / static_cast<double>(len.size())) / mean;
-}
-
-// A band-limited RMS: x high-passed at hz by two Butterworth sections, over [from, to).
-double highRms(const Signal& x, double hz, double fromS, double toS) {
-  cv::Biquad a;
-  cv::Biquad b;
-  a.setHighPass(static_cast<float>(hz), cv::kButterworthQ);
-  b.setHighPass(static_cast<float>(hz), cv::kButterworthQ);
-  Signal y(x.size());
-  for (size_t i = 0; i < x.size(); ++i) y[i] = b.run(a.run(x[i]));
-  return rms(y, static_cast<size_t>(fromS * kRate), static_cast<size_t>(toS * kRate));
-}
-
-// The woman preset on a 220 Hz tone: the f0 sits +6 st up, the spectrum sits higher than a copy
-// with no offsets, the breath is under the copy and follows its envelope, and the cycle length
-// varies by the jitter setting.
-bool testVoice5Woman() {
-  const Signal in = tone(220.0, 2 * kRate);
-  const double want = 220.0 * std::pow(2.0, 6.0 / 12.0);
-  const Signal out = run(in, trialAlone(cv::voice5Woman));
-  const double hz = copyHz(out, want);
-  const double err = cents(hz, want);
-  bool ok = report("voice 5 woman pitch", std::fabs(err) <= 10.0, "f0=%.2f Hz, want %.2f Hz, err=%.2f cents (+-10)", hz, want, err);
-  const double cWoman = centroidHz(out, want, 1, 10);
-  const double cFlat = centroidHz(run(in, trialAlone(cv::voice5Neutral)), 220.0, 1, 10);
-  ok &= report("voice 5 woman centroid", cWoman > cFlat, "centroid %.1f Hz against the unshifted copy's %.1f Hz (higher)", cWoman,
-               cFlat);
-
-  // Breath is the difference between the preset and the same preset with the breath off, since it is
-  // an additive noise on its own random stream. Windows sit well inside the loud, the quiet (-6 dB)
-  // and the silent parts of the input, a lag later.
-  Signal wave = tone(220.0, 4 * kRate);
-  for (int i = 0; i < 4 * kRate; ++i) {
-    if (i >= kRate * 5 / 2) wave[static_cast<size_t>(i)] = 0.0f;
-    else if (i >= kRate * 3 / 2) wave[static_cast<size_t>(i)] *= 0.5f;
-  }
-  cv::CrowdParams dry = trialAlone(cv::voice5Woman);
-  dry.tuning.v5Breath = 0.0f;
-  const Signal with = run(wave, trialAlone(cv::voice5Woman));
-  const Signal without = run(wave, dry);
-  Signal breath(with.size());
-  for (size_t i = 0; i < with.size(); ++i) breath[i] = with[i] - without[i];
-  const double loud = highRms(breath, 4000.0, 0.6, 1.3);
-  const double quiet = highRms(breath, 4000.0, 1.8, 2.4);
-  const double gap = highRms(breath, 4000.0, 3.0, 3.8);
-  const double copy = rms(without, static_cast<size_t>(0.6 * kRate), static_cast<size_t>(1.3 * kRate));
-  const double underDb = 20.0 * std::log10(loud / copy);
-  const double stepDb = 20.0 * std::log10(loud / quiet);
-  const double gapDb = 20.0 * std::log10(gap / loud);
-  ok &= report("voice 5 breath under the copy", underDb <= -15.0, "breath above 4 kHz is %.1f dB re the copy's RMS (<= -15)", underDb);
-  ok &= report("voice 5 breath follows", std::fabs(stepDb - 6.0) <= 2.5 && gapDb <= -30.0,
-               "a 6 dB drop of the copy moves the breath by %.1f dB (6 +-2.5); in a gap it sits %.1f dB down (<= -30)", stepDb, gapDb);
-
-  // Jitter is measured with the breath off, since noise would blur the rise. The same run without
-  // jitter gives the floor of the measurement.
-  cv::CrowdParams steady = dry;
-  steady.tuning.v5Jitter = 0.0f;
-  const Signal jit = run(in, dry);
-  const Signal flat = run(in, steady);
-  const double period = kRate / want;
-  const double spread = cycleSpreadPct(riseTimes(jit, kRate / 2, 2 * kRate - kRate / 10, period));
-  const double noise = cycleSpreadPct(riseTimes(flat, kRate / 2, 2 * kRate - kRate / 10, period));
-  ok &= report("voice 5 jitter", spread >= 0.2 && spread <= 0.5 && noise < 0.05,
-               "cycle length spread %.3f %% at jitter 0.3 (0.2..0.5); the same run with jitter 0 reads %.3f %% (< 0.05)", spread, noise);
-  return ok;
-}
-
-// Voice 5 and the lead law. A solo of bit 4 leaves voice 5 and the lead, and the lead follows the law.
-// Another voice's solo silences voice 5. Voice 5 adds its power to the others', so the level holds.
-bool testVoice5Law() {
-  const Signal in = program(3);
-  const cv::CrowdTuning d;
-  const double g2 = std::pow(10.0, d.voice5Db / 10.0);
-  const double gv = std::pow(10.0, d.voiceDb / 10.0);
-  cv::CrowdParams a = knobs(0.2f, 0.5f);
-  a.tuning.voice5On = true;
-  a.solo = 0x10;
-  Probe lone;
-  const Signal outA = run(in, a, &lone);
-  bool ok = report("voice 5 solo", lone.active == 1 && std::fabs(lone.lead - std::sqrt(1.0 - g2)) < 0.01,
-                   "%.0f voices ticking (1), lead %.3f (want %.3f)", lone.active, static_cast<double>(lone.lead), std::sqrt(1.0 - g2));
-  cv::CrowdParams top = a;
-  top.voices = 1.0f;
-  Probe topProbe;
-  run(in, top, &topProbe);
-  ok &= report("voice 5 solo, top", topProbe.active == 1 && topProbe.lead == 0.0f, "%.0f voices ticking (1), lead gain %.3g (0)",
-               topProbe.active, static_cast<double>(topProbe.lead));
-
-  cv::CrowdParams retuneOthers = a;
-  for (size_t v = 0; v < 4; ++v) retuneOthers.tuning.pitchSt[v] = 4.0f;
-  cv::CrowdParams retuneFive = a;
-  retuneFive.tuning.v5PitchSt = 3.0f;
-  size_t othersMove = differing(outA, run(in, retuneOthers));
-  size_t fiveMoves = differing(outA, run(in, retuneFive));
-  ok &= report("voice 5 solo alone", othersMove == 0 && fiveMoves > 0,
-               "voices 1..4 retuned change %.0f samples (0), voice 5 retuned changes %.0f (>0)", static_cast<double>(othersMove),
-               static_cast<double>(fiveMoves));
-
-  cv::CrowdParams other = knobs(0.2f, 0.5f);
-  other.tuning.voice5On = true;
-  other.solo = 0b0001;
-  Probe oneProbe;
-  const Signal outO = run(in, other, &oneProbe);
-  cv::CrowdParams otherRetuned = other;
-  otherRetuned.tuning.v5PitchSt = 3.0f;
-  otherRetuned.tuning.voice5Db = -3.0f;
-  ok &= report("voice 5 silent under another solo", oneProbe.active == 1 && differing(outO, run(in, otherRetuned)) == 0,
-               "%.0f voices ticking (1), voice 5 retuned changes %.0f samples (0)", oneProbe.active,
-               static_cast<double>(differing(outO, run(in, otherRetuned))));
-
-  cv::CrowdParams offSolo = knobs(0.2f, 0.5f);
-  const Signal plain = run(in, offSolo);
-  offSolo.solo = 0x10;
-  ok &= report("voice 5 solo needs it on", differing(plain, run(in, offSolo)) == 0,
-               "bit 4 with voice 5 off changes %.0f samples (0)", static_cast<double>(differing(plain, run(in, offSolo))));
-
-  // The lead counts voice 5's power with the four: 80 % of the knob, then the level at each position.
-  cv::CrowdParams five = knobs(0.8f, 0.5f);
-  five.tuning.voice5On = true;
-  Probe fiveProbe;
-  run(in, five, &fiveProbe);
-  const double wantLead = std::sqrt(1.0 - 4.0 * gv - g2);
-  ok &= report("voice 5 lead law", std::fabs(fiveProbe.lead - wantLead) < 0.01 && fiveProbe.active == 5,
-               "lead at 80 %% %.3f (want %.3f), %.0f voices ticking (5)", static_cast<double>(fiveProbe.lead), wantLead,
-               fiveProbe.active);
-  for (float k : {0.0f, 0.2f, 0.5f, 0.8f, 1.0f}) {
-    cv::CrowdParams p = knobs(k, 0.5f);
-    p.tuning = cv::voice5Woman(p.tuning);
-    p.tuning.voice5On = true;
-    const double db = levelDb(in, run(in, p));
-    char name[48];
-    std::snprintf(name, sizeof name, "voice 5 level VOICES %.0f %%", static_cast<double>(k * 100.0f));
-    ok &= report(name, db >= -1.5 && db <= 1.0, "%+.2f dB re input (-1.5..+1.0)", db);
-  }
-  return ok;
-}
-
-// Every voice 5 control but the on switch, in the order of the fields.
-struct Shape {
-  float db, delayMs, pitchSt, formantSt, contour, tiltDb, breath, fry, jitter, shimmer;
-};
-
-void setShape(cv::CrowdTuning& t, const Shape& s) {
-  t.voice5Db = s.db;
-  t.delayMs5 = s.delayMs;
-  t.v5PitchSt = s.pitchSt;
-  t.v5FormantSt = s.formantSt;
-  t.v5Contour = s.contour;
-  t.v5TiltDb = s.tiltDb;
-  t.v5Breath = s.breath;
-  t.v5Fry = s.fry;
-  t.v5Jitter = s.jitter;
-  t.v5Shimmer = s.shimmer;
-}
-
-// Voice 5's pitch and formant take the WIDTH factor of the others. The woman preset's +6 st reads 0 at
-// WIDTH 0 and 6 x 0.451 st at WIDTH 0.5, and each control clamps to its range.
-bool testVoice5WidthAndRanges() {
-  const Signal in = tone(220.0, 2 * kRate);
-  bool ok = true;
-  for (float w : {0.0f, 0.5f}) {
-    const double st = 6.0 * widthFactor(static_cast<double>(w));
-    const double near = 220.0 * std::pow(2.0, st / 12.0);
-    const double err = cents(copyHz(run(in, trialAlone(cv::voice5Woman, w)), near), near);
-    char name[48];
-    std::snprintf(name, sizeof name, "voice 5 WIDTH %.0f %%", static_cast<double>(w * 100.0f));
-    ok &= report(name, std::fabs(err) <= 10.0, "f0 %+.2f cents from %.2f st (+-10)", err, st);
-  }
-
-  const Signal prog = program(2);
-  cv::CrowdParams over = knobs(0.5f, 0.7f);
-  over.tuning.voice5On = true;
-  over.tuning.epochAlign = true;
-  cv::CrowdParams edge = over;
-  setShape(over.tuning, {10.0f, 1000.0f, 40.0f, -20.0f, 3.0f, 20.0f, 2.0f, 5.0f, 7.0f, 9.0f});
-  setShape(edge.tuning, {0.0f, 200.0f, 12.0f, -6.0f, 1.4f, 6.0f, 0.3f, 1.0f, 1.0f, 1.0f});
-
-  // The same past-the-range check on the four copies' tilt and shimmer.
-  over.tuning.tilt = {40.0f, -40.0f, 9.0f, -9.0f};
-  over.tuning.shimmer = {5.0f, -5.0f, 3.0f, 2.0f};
-  edge.tuning.tilt = {6.0f, -6.0f, 6.0f, -6.0f};
-  edge.tuning.shimmer = {1.0f, 0.0f, 1.0f, 1.0f};
-  const Signal atEdge = run(prog, edge);
-  const size_t differ = differing(run(prog, over), atEdge);
-  ok &= report("ranges, voice 5 and tilt and shimmer", differ == 0,
-               "values past every range differ from the range ends in %.0f samples (0)",
-               static_cast<double>(differ));
-
-  // Every control at the end of its range stays finite and bounded.
-  bool finite = true;
-  float peak = 0.0f;
-  for (float v : atEdge) {
-    finite &= std::isfinite(v);
-    peak = std::max(peak, std::fabs(v));
-  }
-  ok &= report("voice 5 at its limits", finite && peak < 4.0f, "finite %.0f, peak %.2f (< 4)", finite ? 1.0 : 0.0,
-               static_cast<double>(peak));
-  return ok;
-}
-
-// Harmonics of hz at 1/sqrt(k) up to 4.5 kHz, peak-normalised to 0.5, so the tilt has lines to act on.
-Signal richTone(double hz, int n) {
-  std::vector<double> x(static_cast<size_t>(n), 0.0);
-  double peak = 0.0;
-  for (int i = 0; i < n; ++i) {
-    double s = 0.0;
-    for (int k = 1; hz * k < 4500.0; ++k) s += std::sin(2.0 * kPi * hz * k * i / kRate) / std::sqrt(static_cast<double>(k));
-    x[static_cast<size_t>(i)] = s;
-    peak = std::max(peak, std::fabs(s));
-  }
-  Signal out(x.size());
-  for (size_t i = 0; i < x.size(); ++i) out[i] = static_cast<float>(0.5 * x[i] / peak);
-  return out;
-}
-
-// Level in dB of the line at hz in the second second of x.
-double lineDb(const Signal& x, double hz) { return 20.0 * std::log10(goertzel(&x[kRate], kRate, hz) + 1e-12); }
-
-// Voice 5's tilt acts where it is set. On a flat copy of a 150 Hz tone, the tilt moves the low line
-// down and the high line up by about half its value each.
-bool testVoice5Shape() {
-  const Signal in = richTone(150.0, 2 * kRate);
-  const Signal flat = run(in, trialAlone(cv::voice5Neutral));
-  bool ok = true;
-  for (float tilt : {6.0f, -6.0f}) {
-    cv::CrowdParams p = trialAlone(cv::voice5Neutral);
-    p.tuning.v5TiltDb = tilt;
-    const Signal out = run(in, p);
-    const double low = lineDb(out, 300.0) - lineDb(flat, 300.0);
-    const double high = lineDb(out, 2400.0) - lineDb(flat, 2400.0);
-    const double sign = tilt > 0.0f ? 1.0 : -1.0;
-    char name[48];
-    std::snprintf(name, sizeof name, "voice 5 tilt %+.0f dB", static_cast<double>(tilt));
-    ok &= report(name, sign * (high - low) >= 4.5 && sign * high > 1.5 && sign * low < -1.5,
-                 "300 Hz line %+.2f dB, 2.4 kHz line %+.2f dB, spread %+.2f dB (at least 4.5 in the sign of the tilt)", low, high,
-                 high - low);
-  }
-  return ok;
-}
-
-// The owner's higher voice (voice index 1, 2026-10-31), the trial's voice kept as the second copy.
-
-// Voice 1 alone at WIDTH 1 lands at +3 st. On a vowel its centroid over the harmonics of its own f0
-// sits above the unshifted copy's, and above that of a copy moved +3 st with the throat left alone,
-// since the throat is 1.65 st shorter.
-bool testOwnerVoicePitch() {
-  const Signal in = tone(220.0, 2 * kRate);
-  const double want = 220.0 * std::pow(2.0, 3.0 / 12.0);
-  const double hz = medianHz(run(in, voiceOne()));
-  const double err = hz > 0.0 ? cents(hz, want) : 9999.0;
-  bool ok = report("owner voice pitch", std::fabs(err) <= 10.0, "f0=%.2f Hz, want %.2f Hz, err=%.2f cents (+-10)", hz, want, err);
-
-  const Signal vow = vowel(220.0, 2 * kRate);
-  cv::CrowdParams pitchOnly = voiceOne();
-  pitchOnly.tuning.formantSt[1] = 0.0f;
-  const double owner = centroidHz(run(vow, voiceOne()), want, 1, 10);
-  const double flat = centroidHz(run(vow, plainOne()), 220.0, 1, 10);
-  const double moved = centroidHz(run(vow, pitchOnly), want, 1, 10);
-  ok &= report("owner voice centroid", owner > flat && owner > moved,
-               "centroid %.1f Hz against the unshifted copy's %.1f Hz and the +3 st copy's %.1f Hz (higher than both)", owner, flat,
-               moved);
-  return ok;
-}
-
-// Energy of x above 1 kHz against below it, in dB, over the harmonics of f0 up to 4.4 kHz.
-double highOverLowDb(const Signal& x, double f0) {
-  double lo = 0.0;
-  double hi = 0.0;
-  for (int k = 1; k * f0 < 4400.0; ++k) {
-    const double a = bandAmp(x, k * f0, 0.3 * f0);
-    (k * f0 < 1000.0 ? lo : hi) += a * a;
-  }
-  return 10.0 * std::log10(hi / lo);
-}
-
-// The shipped tilt of +2 dB leans voice 1: the energy above 1 kHz against the energy below it rises
-// by 1.5 to 2.5 dB over the same voice at tilt 0. The shimmer is off in both so the cycles match.
-bool testOwnerVoiceTilt() {
-  const Signal in = richTone(220.0, 2 * kRate);
-  const double f0 = 220.0 * std::pow(2.0, 3.0 / 12.0);
-  cv::CrowdParams leaned = voiceOne();
-  leaned.tuning.shimmer[1] = 0.0f;
-  cv::CrowdParams flat = leaned;
-  flat.tuning.tilt[1] = 0.0f;
-  const double tilted = highOverLowDb(run(in, leaned), f0);
-  const double level = highOverLowDb(run(in, flat), f0);
-  const double rise = tilted - level;
-  bool ok = report("owner voice tilt", rise >= 1.5 && rise <= 2.5,
-                   "above 1 kHz against below %+.2f dB at tilt +%.0f dB, %+.2f dB at tilt 0, rise %.2f dB (1.5..2.5)", tilted,
-                   static_cast<double>(leaned.tuning.tilt[1]), level, rise);
-  return ok;
-}
-
-// Gain in dB of each cycle of `out` against `ref`, read at the sample where the cycle of `ref` peaks.
-// `ref` is the same voice without luck, so the ratio at a cycle's peak is that cycle's grain gain.
-std::vector<double> cycleGainsDb(const Signal& ref, const Signal& out, int from, int to, double period) {
-  std::vector<double> g;
-  int lo = from;
-  int hi = from + static_cast<int>(1.2 * period);
-  while (hi < to) {
-    int best = lo;
-    for (int i = lo; i < hi; ++i) {
-      if (std::fabs(ref[static_cast<size_t>(i)]) > std::fabs(ref[static_cast<size_t>(best)])) best = i;
-    }
-    const double r = std::fabs(ref[static_cast<size_t>(best)]);
-    const double o = std::fabs(out[static_cast<size_t>(best)]);
-    if (r > 0.05 && o > 0.0) g.push_back(20.0 * std::log10(o / r));
-    lo = best + static_cast<int>(0.7 * period);
-    hi = best + static_cast<int>(1.3 * period);
-  }
-  return g;
-}
-
-// How much the gain of neighbouring cycles of `out` differs on average, and its standard deviation, both
-// in dB, read against `ref` at the f0 whose period is given.
-struct Spread {
-  size_t cycles = 0;
-  double local = 0.0;
-  double sd = 0.0;
-};
-
-Spread cycleSpread(const Signal& ref, const Signal& out, double period) {
-  const std::vector<double> g = cycleGainsDb(ref, out, kRate, static_cast<int>(ref.size()) - kRate / 10, period);
-  Spread s;
-  s.cycles = g.size();
-  if (g.size() < 2) return s;
-  double mean = 0.0;
-  for (size_t i = 0; i < g.size(); ++i) {
-    mean += g[i];
-    if (i > 0) s.local += std::fabs(g[i] - g[i - 1]);
-  }
-  mean /= static_cast<double>(g.size());
-  s.local /= static_cast<double>(g.size() - 1);
-  double var = 0.0;
-  for (double x : g) var += (x - mean) * (x - mean);
-  s.sd = std::sqrt(var / static_cast<double>(g.size()));
-  return s;
-}
-
-// Voice 1 on a 4 s tone at WIDTH `width`, cut on the pulses with the tilt off: the shipped shimmer, and
-// the same run at shimmer 0 to read it against.
-struct ShimmerRuns {
-  Signal ref;
-  Signal out;
-  double period = 0.0;
-};
-
-ShimmerRuns shimmerRuns(float width) {
-  const Signal in = tone(220.0, 4 * kRate);
-  cv::CrowdParams shaken = voiceOne();
-  shaken.width = width;
-  shaken.tuning.tilt[1] = 0.0f;
-  shaken.tuning.epochAlign = true;
-  cv::CrowdParams still = shaken;
-  still.tuning.shimmer[1] = 0.0f;
-  ShimmerRuns r;
-  r.ref = run(in, still);
-  r.out = run(in, shaken);
-  r.period = kRate / (220.0 * std::pow(2.0, 3.0 * widthFactor(static_cast<double>(width)) / 12.0));
-  return r;
-}
-
-// Shimmer of 1 dB on voice 1 gives each cycle a random gain. Cut on the pulses, the gain of a cycle is
-// read at its peak against the same voice with shimmer 0. Neighbouring cycles differ by 0.3 to 1.5 dB on
-// average, and so does the standard deviation of the gains. Shimmer 0, and a negative shimmer that
-// clamps to 0, give the same samples.
-bool testOwnerVoiceShimmer() {
-  const Signal in = tone(220.0, 4 * kRate);
-  const ShimmerRuns full = shimmerRuns(1.0f);
-  const Signal& ref = full.ref;
-  const Signal& out = full.out;
-  const Spread s = cycleSpread(ref, out, full.period);
-  const double local = s.local;
-  const double sd = s.sd;
-  bool ok = report("owner voice shimmer", s.cycles >= 100 && local >= 0.3 && local <= 1.5 && sd >= 0.3 && sd <= 1.5,
-                   "%.0f cycles, neighbouring cycles differ by %.2f dB, standard deviation %.2f dB (both 0.3..1.5)",
-                   static_cast<double>(s.cycles), local, sd);
-
-  cv::CrowdParams negative = voiceOne();
-  negative.tuning.tilt[1] = 0.0f;
-  negative.tuning.epochAlign = true;
-  negative.tuning.shimmer[1] = -1.0f;
-  const size_t moved = differing(ref, out);
-  const size_t clamped = differing(ref, run(in, negative));
-  ok &= report("owner voice shimmer 0", clamped == 0 && moved > 0,
-               "shimmer -1 against 0 differs in %.0f samples (0), shimmer 1 against 0 in %.0f (>0)", static_cast<double>(clamped),
-               static_cast<double>(moved));
-  return ok;
-}
-
-// Tilt and shimmer take the WIDTH factor f(w). At WIDTH 0 voice 1 with its shipped tilt and shimmer
-// gives the samples of voice 1 with both at 0, and so does voice 5 with a tilt and a shimmer set. At WIDTH
-// 0.5 the tilt rise and the shimmer spread are the WIDTH 1 values times f(0.5) = 0.451, to within 0.12 of
-// that ratio.
-bool testTiltShimmerFollowWidth() {
-  const Signal prog = program(2);
-  cv::CrowdParams shipped = voiceOne();
-  shipped.width = 0.0f;
-  shipped.tuning.epochAlign = true;
-  cv::CrowdParams bare = shipped;
-  bare.tuning.tilt[1] = 0.0f;
-  bare.tuning.shimmer[1] = 0.0f;
-  const size_t diffOne = differing(run(prog, shipped), run(prog, bare));
-  cv::CrowdParams five = trialAlone(cv::voice5Neutral, 0.0f);
-  const cv::CrowdParams fiveBare = five;
-  five.tuning.v5TiltDb = 4.0f;
-  five.tuning.v5Shimmer = 1.0f;
-  const size_t diffFive = differing(run(prog, five), run(prog, fiveBare));
-  bool ok = report("tilt and shimmer at WIDTH 0", diffOne == 0 && diffFive == 0,
-                   "voice 1 with its tilt and shimmer differs from voice 1 with none in %.0f samples (0); voice 5 with 4 dB and "
-                   "1 dB in %.0f (0)",
-                   static_cast<double>(diffOne), static_cast<double>(diffFive));
-
-  const Signal rich = richTone(220.0, 2 * kRate);
-  double rise[2];
-  const float widths[2] = {1.0f, 0.5f};
-  for (int i = 0; i < 2; ++i) {
-    cv::CrowdParams leaned = voiceOne();
-    leaned.width = widths[i];
-    leaned.tuning.shimmer[1] = 0.0f;
-    cv::CrowdParams flat = leaned;
-    flat.tuning.tilt[1] = 0.0f;
-    const double f0 = 220.0 * std::pow(2.0, 3.0 * widthFactor(static_cast<double>(widths[i])) / 12.0);
-    rise[i] = highOverLowDb(run(rich, leaned), f0) - highOverLowDb(run(rich, flat), f0);
-  }
-  const double factor = widthFactor(0.5);
-  const double tiltRatio = rise[1] / rise[0];
-  ok &= report("tilt follows WIDTH", std::fabs(tiltRatio - factor) <= 0.12,
-               "tilt rise %.2f dB at WIDTH 1 and %.2f dB at 0.5, ratio %.3f against f(0.5) = %.3f (within 0.12)", rise[0], rise[1],
-               tiltRatio, factor);
-
-  const ShimmerRuns wide = shimmerRuns(1.0f);
-  const ShimmerRuns half = shimmerRuns(0.5f);
-  const Spread sWide = cycleSpread(wide.ref, wide.out, wide.period);
-  const Spread sHalf = cycleSpread(half.ref, half.out, half.period);
-  const double localRatio = sHalf.local / sWide.local;
-  const double sdRatio = sHalf.sd / sWide.sd;
-  ok &= report("shimmer follows WIDTH", std::fabs(localRatio - factor) <= 0.12 && std::fabs(sdRatio - factor) <= 0.12,
-               "cycle spread %.2f dB at WIDTH 1 and %.2f dB at 0.5 (ratio %.3f), standard deviation ratio %.3f, against f(0.5) = "
-               "0.451 (within 0.12)",
-               sWide.local, sHalf.local, localRatio, sdRatio);
-  return ok;
-}
-
-// A copy at tilt 0 and shimmer 0 runs the code it ran before they existed. On the pinned tuning the
-// three recorded runs hash to the recorded values with every tilt and shimmer at 0, and still do when
-// they sit under their thresholds (a tilt under 0.005 dB, a shimmer that clamps to 0).
-bool testTiltShimmerNeutral() {
-  const Signal prog = program(3);
-  const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
-  const auto inert = [](cv::CrowdParams p) {
-    p.tuning.tilt = {0.003f, -0.004f, 0.0f, 0.002f};
-    p.tuning.shimmer = {-1.0f, -0.5f, -2.0f, 0.0f};
-    return p;
-  };
-  cv::CrowdParams scatter = pinned(knobs(0.6f, 0.8f));
-  scatter.tuning.scatterMs = 15.0f;
-  scatter.tuning.driftCents = 20.0f;
-  const cv::CrowdParams a = pinned(knobs(0.7f, 0.5f));
-  const cv::CrowdParams b = pinned(knobs(0.8f, 0.5f));
-  const uint64_t got[3] = {fnv(run(prog, inert(a))), fnv(run(burst, inert(b))), fnv(run(burst, inert(scatter)))};
-  const uint64_t want[3] = {kBeforeProgram, kBeforeBurst, kBeforeBurstScatter};
-  bool ok = true;
-  for (int i = 0; i < 3; ++i) {
-    char name[56];
-    std::snprintf(name, sizeof name, "tilt and shimmer neutral, run %d", i + 1);
-    ok &= report(name, got[i] == want[i], "hash %.0f of the recorded one (1 = equal)", got[i] == want[i] ? 1.0 : 0.0);
-  }
-  return ok;
-}
-
-// A phrase on a 220 Hz sawtooth-like tone: 900 ms steady, then 350 ms in which the level fades to 0.15
-// and, when falls is set, the pitch falls 20 %. It ends there.
-Signal phrase(double hz, bool falls, int* endAt, std::vector<double>* freq) {
-  const int lead = msToSamples(200);
-  const int steady = msToSamples(900);
-  const int fall = msToSamples(350);
-  const int n = lead + steady + fall + msToSamples(900);
-  *endAt = lead + steady + fall;
-  std::vector<double> x(static_cast<size_t>(n), 0.0);
-  freq->assign(static_cast<size_t>(n), hz);
-  double phase = 0.0;
-  double peak = 0.0;
-  for (int i = lead; i < *endAt; ++i) {
-    const double s = std::max(0.0, static_cast<double>(i - lead - steady) / fall);
-    const double f = falls ? hz * (1.0 - 0.2 * s) : hz;
-    (*freq)[static_cast<size_t>(i)] = f;
-    phase += 2.0 * kPi * f / kRate;
-    double v = 0.0;
-    for (int k = 1; k <= 10; ++k) v += std::sin(k * phase) / k;
-    x[static_cast<size_t>(i)] = v * (1.0 - 0.85 * s);
-    peak = std::max(peak, std::fabs(v));
-  }
-  Signal out(x.size());
-  for (size_t i = 0; i < x.size(); ++i) out[i] = static_cast<float>(0.5 * x[i] / peak);
-  return out;
-}
-
-// Positions of the peaks of x after an 800 Hz one-pole, over [from, to): the local maxima within 0.4
-// of `period` that stand above 0.35 of the tallest peak within three periods.
-std::vector<double> pulsePeaks(const Signal& x, int from, int to, double period) {
-  Signal y(x.size());
-  const float a = 1.0f - std::exp(-2.0f * static_cast<float>(kPi) * 800.0f / kRate);
-  float s = 0.0f;
-  for (size_t i = 0; i < x.size(); ++i) {
-    s += a * (x[i] - s);
-    y[i] = s;
-  }
-  const int reach = static_cast<int>(0.4 * period);
-  const int wide = static_cast<int>(3.0 * period);
-  const int size = static_cast<int>(y.size());
-  std::vector<double> peaks;
-  for (int i = std::max(from, wide); i < to && i + wide < size; ++i) {
-    float local = y[static_cast<size_t>(i)];
-    float around = local;
-    for (int j = -reach; j <= reach; ++j) local = std::max(local, y[static_cast<size_t>(i + j)]);
-    for (int j = -wide; j <= wide; ++j) around = std::max(around, y[static_cast<size_t>(i + j)]);
-    if (y[static_cast<size_t>(i)] == local && local > 0.35f * around) {
-      peaks.push_back(i);
-      i += reach;
-    }
-  }
-  return peaks;
-}
-
-// Count of intervals between neighbouring pulses in the last 150 ms of the copy's phrase that are
-// about twice the period the input's pitch gives (1.7 to 2.3 times), and the count of all intervals.
-void doubledPulses(const Signal& out, int endAt, double lagSmp, const std::vector<double>& freq, double ratio, int* doubled,
-                   int* all) {
-  const int to = endAt + static_cast<int>(lagSmp);
-  const int from = to - msToSamples(150.0);
-  const std::vector<double> peaks = pulsePeaks(out, from, to, kRate / (freq[static_cast<size_t>(endAt - 1)] * ratio));
-  *doubled = 0;
-  *all = 0;
-  for (size_t i = 1; i < peaks.size(); ++i) {
-    const double mid = 0.5 * (peaks[i] + peaks[i - 1]) - lagSmp;
-    const double nominal = kRate / (freq[static_cast<size_t>(std::max(0.0, mid))] * ratio);
-    const double r = (peaks[i] - peaks[i - 1]) / nominal;
-    *doubled += r >= 1.7 && r <= 2.3 ? 1 : 0;
-    ++*all;
-  }
-}
-
-// The older man's fry: at the end of a phrase whose pitch falls 20 % while the level fades, alternate
-// pulses drop out in the last 150 ms, so some intervals are twice the period. A steady phrase has
-// none, and neither does the same fall with the pulse cut off or with the fry at 0.
-bool testVoice5Fry() {
-  const double ratio = std::pow(2.0, -2.0 / 12.0);
-  bool ok = true;
-  struct Row {
-    const char* name;
-    bool falls;
-    bool epoch;
-    float fry;
-    bool wantFry;
-  };
-  const Row rows[] = {{"voice 5 fry, pitch falls", true, true, 0.5f, true},
-                      {"voice 5 no fry, steady pitch", false, true, 0.5f, false},
-                      {"voice 5 no fry, pulse cut off", true, false, 0.5f, false},
-                      {"voice 5 no fry, fry 0", true, true, 0.0f, false}};
-  for (const Row& r : rows) {
-    int endAt = 0;
-    std::vector<double> freq;
-    const Signal in = phrase(220.0, r.falls, &endAt, &freq);
-    cv::CrowdParams p = trialAlone(cv::voice5OlderMan);
-    p.tuning.v5Breath = 0.0f;
-    p.tuning.v5Fry = r.fry;
-    p.tuning.epochAlign = r.epoch;
-    const Signal out = run(in, p);
-    int doubled = 0;
-    int all = 0;
-    doubledPulses(out, endAt, gCrowd.lagSamples(4), freq, ratio, &doubled, &all);
-    ok &= report(r.name, r.wantFry ? doubled >= 2 : doubled == 0,
-                 r.wantFry ? "%.0f doubled intervals of %.0f in the last 150 ms (>= 2)"
-                           : "%.0f doubled intervals of %.0f in the last 150 ms (0)",
-                 static_cast<double>(doubled), static_cast<double>(all));
-  }
-  return ok;
-}
-
 // Host timing, printed and not asserted. Unison is 46.9k cycles per block on the board, so the
 // ratio gives the first board estimate for the Crowd card. PitchFx runs outside the timed calls.
 // Which 0 is Unison, 1 the Crowd card with every enhancement at its default, 2 the Crowd card with
-// every enhancement on, 3 the working set, and 4 to 6 the working set with voice 5 on at the woman,
-// older man and big man presets.
+// every enhancement on, 3 the working set.
 double secondsOfBlocks(const Signal& in, int which) {
   using Clock = std::chrono::steady_clock;
   cv::PitchFx* fx = new cv::PitchFx();
@@ -2500,11 +1769,6 @@ double secondsOfBlocks(const Signal& in, int which) {
   cv::CrowdParams dp = knobs(0.8f, 0.5f);
   if (which == 2) allEnhancements(dp.tuning);
   if (which == 3) dp.tuning = cv::CrowdTuning{};
-  if (which >= 4) {
-    const Preset presets[3] = {cv::voice5Woman, cv::voice5OlderMan, cv::voice5BigMan};
-    dp.tuning = presets[which - 4](cv::CrowdTuning{});
-    dp.tuning.voice5On = true;
-  }
   cv::UnisonParams up;
   up.on = true;
   up.depth = 0.5f;
@@ -2532,7 +1796,7 @@ double secondsOfBlocks(const Signal& in, int which) {
 
 void printTiming() {
   const Signal in = program(10);
-  for (int which = 0; which < 7; ++which) secondsOfBlocks(in, which);  // warm-up
+  for (int which = 0; which < 4; ++which) secondsOfBlocks(in, which);  // warm-up
   const double d = std::min(secondsOfBlocks(in, 1), secondsOfBlocks(in, 1));
   const double u = std::min(secondsOfBlocks(in, 0), secondsOfBlocks(in, 0));
   const double a = std::min(secondsOfBlocks(in, 2), secondsOfBlocks(in, 2));
@@ -2545,15 +1809,6 @@ void printTiming() {
   std::printf("info timing enhancements off %.2f us per block, all on %.2f us per block (x%.2f)\n", 1e6 * d / blocks,
               1e6 * a / blocks, a / d);
   std::printf("info timing working set defaults %.2f us per block (x%.2f over enhancements off)\n", 1e6 * w / blocks, w / d);
-
-  // The fifth voice is the working set with voice 5 on, less the working set. Its board estimate
-  // scales the host difference by Unison's 46.9k cycles.
-  const char* names[3] = {"woman", "older man", "big man"};
-  for (int which = 4; which < 7; ++which) {
-    const double t = std::min(secondsOfBlocks(in, which), secondsOfBlocks(in, which));
-    std::printf("info timing voice 5 %s: %.2f us per block, %+.2f us over the working set (x%.2f), about %.0fk board cycles\n",
-                names[which - 4], 1e6 * t / blocks, 1e6 * (t - w) / blocks, t / w, 46.9 * (t - w) / u);
-  }
 }
 
 }  // namespace
@@ -2591,17 +1846,6 @@ int main() {
   ok &= testEpochPitch();
   ok &= testEpochLag();
   ok &= testEnhancementsStable();
-  ok &= testVoice5Off();
-  ok &= testVoice5Woman();
-  ok &= testVoice5Shape();
-  ok &= testVoice5Fry();
-  ok &= testVoice5Law();
-  ok &= testVoice5WidthAndRanges();
-  ok &= testOwnerVoicePitch();
-  ok &= testOwnerVoiceTilt();
-  ok &= testOwnerVoiceShimmer();
-  ok &= testTiltShimmerFollowWidth();
-  ok &= testTiltShimmerNeutral();
   printTiming();
   std::printf("%s crowd\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

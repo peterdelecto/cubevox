@@ -234,8 +234,6 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
     EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
     EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
     EXPECT(at + ".contour", pos, a.contour[v], b.contour[v]);
-    EXPECT(at + ".tilt", pos, a.tilt[v], b.tilt[v]);
-    EXPECT(at + ".shimmer", pos, a.shimmer[v], b.shimmer[v]);
   }
   CMP(p, pos, a, b, lagScale);
   CMP(p, pos, a, b, tiltHz);
@@ -256,17 +254,6 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
   CMP(p, pos, a, b, levelScatterDb);
   CMP(p, pos, a, b, epochAlign);
   CMP(p, pos, a, b, epochSearch);
-  CMP(p, pos, a, b, voice5On);
-  CMP(p, pos, a, b, voice5Db);
-  CMP(p, pos, a, b, delayMs5);
-  CMP(p, pos, a, b, v5PitchSt);
-  CMP(p, pos, a, b, v5FormantSt);
-  CMP(p, pos, a, b, v5Contour);
-  CMP(p, pos, a, b, v5TiltDb);
-  CMP(p, pos, a, b, v5Breath);
-  CMP(p, pos, a, b, v5Fry);
-  CMP(p, pos, a, b, v5Jitter);
-  CMP(p, pos, a, b, v5Shimmer);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
