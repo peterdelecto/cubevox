@@ -59,8 +59,8 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Reverb, costs::kReverbSpring},
     {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Time"), kPercent("Mix")},
      Group::Reverb, costs::kReverbChasm},
-    {Card::Doubler, "doubler", "Doubler", Engine::Doubler, 2, {kPercent("DISTANCE"), kPercent("VOICES")}, Group::Pitch,
-     costs::kDoubler},
+    {Card::Gang, "gang", "Gang", Engine::Gang, 2, {kPercent("DISTANCE"), kPercent("VOICES")}, Group::Pitch,
+     costs::kGang},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -134,7 +134,7 @@ void applyDistortionKnob(int knob, float v, cv::DistortionParams& d) {
   }
 }
 
-void applyDoublerKnob(int knob, float v, cv::DoublerParams& d) {
+void applyGangKnob(int knob, float v, cv::GangParams& d) {
   if (knob == 0) {
     d.distance = v;
   } else {
@@ -206,7 +206,7 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::ReverbChasm:
       applyReverbKnob(knob, v, out.reverb);
       break;
-    case Card::Doubler: applyDoublerKnob(knob, v, out.doubler); break;
+    case Card::Gang: applyGangKnob(knob, v, out.gang); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -223,10 +223,10 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::Gate: out.gate.on = on; break;
     case Card::ReverbSpring:
     case Card::ReverbChasm: out.reverb.on = on; break;
-    case Card::Doubler:
-      // The pitch stage reads doublerOn to keep its tracker and ring running for the Doubler.
-      out.doubler.on = on;
-      out.pitchFx.doublerOn = on;
+    case Card::Gang:
+      // The pitch stage reads gangOn to keep its tracker and ring running for the Gang card.
+      out.gang.on = on;
+      out.pitchFx.gangOn = on;
       break;
     case Card::Empty:
     case Card::Count: break;

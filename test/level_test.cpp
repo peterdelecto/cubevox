@@ -12,7 +12,7 @@
 #include "core/chain_params.h"
 #include "core/registry.h"
 #include "engine/distortion.h"
-#include "engine/doubler.h"
+#include "engine/gang.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -206,21 +206,21 @@ bool midRow(const char* name, const Signal& in, const P& p) {
   return verdict(name, db, kMidLoDb, kMidHiDb);
 }
 
-// The Doubler at mid travel on both pots, behind the PitchFx that fills its ring and runs the
+// The Gang card at mid travel on both pots, behind the PitchFx that fills its ring and runs the
 // tracker, as the chain runs them.
-bool doublerRow(const Signal& in) {
+bool gangRow(const Signal& in) {
   auto pitch = std::make_unique<Stage<cv::PitchFx>>();
-  auto doubler = std::make_unique<Stage<cv::Doubler>>();
+  auto gang = std::make_unique<Stage<cv::Gang>>();
   cv::PitchFxParams pp = pitchOff();
-  pp.doublerOn = true;
-  cv::DoublerParams dp;
+  pp.gangOn = true;
+  cv::GangParams dp;
   dp.on = true;
   dp.voices = 0.5f;
   dp.distance = 0.5f;
-  return verdict("doubler VOICES .5 DISTANCE .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
+  return verdict("gang VOICES .5 DISTANCE .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
                                                      float tmp[cv::kBlock];
                                                      pitch->fx.process(i, tmp, n, pp);
-                                                     doubler->fx.process(i, o, n, dp, pitch->fx);
+                                                     gang->fx.process(i, o, n, dp, pitch->fx);
                                                    })));
 }
 
@@ -243,7 +243,7 @@ bool slotRows(const Signal& in) {
   unison.on = true;
   unison.depth = 0.5f;  // Adam default
   ok &= simple<cv::Unison>("unison depth .5", in, unison);
-  ok &= doublerRow(in);
+  ok &= gangRow(in);
 
   cv::SlapbackParams slap;
   slap.on = true;

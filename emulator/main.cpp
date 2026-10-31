@@ -32,7 +32,7 @@
 #include "../emulator/stage_feedback.h"
 #include "engine/common.h"
 #include "engine/distortion.h"
-#include "engine/doubler.h"
+#include "engine/gang.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/slapback.h"
@@ -83,7 +83,7 @@ struct ProtoParams {
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
-  cv::DoublerParams doubler;  // drawFrame copies its on flag to pitchFx.doublerOn
+  cv::GangParams gang;  // drawFrame copies its on flag to pitchFx.gangOn
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartSlapMix, {}};
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
@@ -168,7 +168,7 @@ unsigned gInputRate = 0;                 // UI-thread-only; its sample rate
 cv::Gate gInputGate;
 cv::Gate gGate;
 cv::PitchFx gPitchFx;
-cv::Doubler gDoubler;
+cv::Gang gGang;
 cv::Unison gUnison;
 cv::Slapback gSlapback;
 cv::Distortion gDistortion;
@@ -262,7 +262,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gInputGate.reset();
     gGate.reset();
     gPitchFx.reset();
-    gDoubler.reset();
+    gGang.reset();
     gUnison.reset();
     gSlapback.reset();
     gDistortion.reset();
@@ -304,9 +304,9 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gPolish.processFront(in.data(), in.data(), n, params.eq);
     gInputGate.process(in.data(), mono.data(), n, params.inputGate);
     gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
-    // The Doubler reads the ring the pitch stage just wrote and takes the stage's output as its
-    // lead. `in` is free once the input gate has read it, so it holds the Doubler's output.
-    gDoubler.process(tmp.data(), in.data(), n, params.doubler, gPitchFx);
+    // The Gang card reads the ring the pitch stage just wrote and takes the stage's output as its
+    // lead. `in` is free once the input gate has read it, so it holds the Gang card's output.
+    gGang.process(tmp.data(), in.data(), n, params.gang, gPitchFx);
     gUnison.process(in.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
@@ -364,14 +364,14 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const int n = std::snprintf(
       buf, size,
       "%s\n"
-      "Choices: Input gate on; Gate %s; Autotune %s; Octave %s; Doubler %s; Unison %s; Slapback %s; "
+      "Choices: Input gate on; Gate %s; Autotune %s; Octave %s; Gang %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Doubler DISTANCE "
+      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Gang DISTANCE "
       "%.0f %%, VOICES %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback MIX %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
       "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
-      macros, onOff(p.gate.on), onOff(at.on), onOff(o.on), onOff(p.doubler.on), onOff(p.unison.on),
+      macros, onOff(p.gate.on), onOff(at.on), onOff(o.on), onOff(p.gang.on), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
       static_cast<double>(p.inputGate.thresholdDb),
       static_cast<double>(p.inputGate.tuning.releaseMs), static_cast<double>(p.gate.thresholdDb),
@@ -381,7 +381,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
       static_cast<double>(o.mix * 100.0f),
-      static_cast<double>(p.doubler.distance * 100.0f), static_cast<double>(p.doubler.voices * 100.0f),
+      static_cast<double>(p.gang.distance * 100.0f), static_cast<double>(p.gang.voices * 100.0f),
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.mix * 100.0f),
@@ -434,9 +434,9 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
                 sb.chirpSections, sb.chirpA, sb.chirpSign, sb.trebleLossHz, sb.bassCutHz, sb.returnLpHz,
                 sb.wobbleDepth, sb.wobbleRateHz, sb.inputTrim, sb.dwellDrive, sb.dwellComp, sb.wetDb);
   used = std::strlen(gTuningText);
-  const cv::DoublerTuning& dt = params.doubler.tuning;
+  const cv::GangTuning& dt = params.gang.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
-                "\nDoublerTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, %.1ff}, {%.0ff, %.0ff, %.0ff, "
+                "\nGangTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, %.1ff}, {%.0ff, %.0ff, %.0ff, "
                 "%.0ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
                 "%.1ff, %.1ff, %.1ff, %.1ff, %.0ff, %.2ff}",
                 dt.formantSt[0], dt.formantSt[1], dt.formantSt[2], dt.formantSt[3], dt.detuneCents[0],
@@ -481,7 +481,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
-      "// DoublerTuning: {formantSt[0..3]}, {detuneCents[0..3]}, {delayMs[0..3]}, {lfoHz[0..3]}, lfoCents, "
+      "// GangTuning: {formantSt[0..3]}, {detuneCents[0..3]}, {delayMs[0..3]}, {lfoHz[0..3]}, lfoCents, "
       "voiceDb, trimDb, leadFadeFrom, holdFrom, hpNearHz, hpFarHz, shelfHz, shelfNearDb, shelfFarDb, roomNearDb, "
       "roomFarDb, roomLpHz, roomFeedback\n%s\n",
       gTuningText);
@@ -578,9 +578,9 @@ void voiceSliders(const char* name, std::array<float, 4>& v, float lo, float hi,
   }
 }
 
-// The Doubler's tuning is split into sub-nodes so no column ever needs a scroll bar: the four
+// The Gang card's tuning is split into sub-nodes so no column ever needs a scroll bar: the four
 // voices' own settings first, then the shared ones.
-void drawDoublerVoiceNodes(cv::DoublerTuning& t) {
+void drawGangVoiceNodes(cv::GangTuning& t) {
   if (tuningNode("Throats")) {
     voiceSliders("Throat", t.formantSt, -4.0f, 4.0f, "%+.2f st");
     ImGui::TreePop();
@@ -597,7 +597,7 @@ void drawDoublerVoiceNodes(cv::DoublerTuning& t) {
   }
 }
 
-void drawDoublerSharedNodes(cv::DoublerTuning& t) {
+void drawGangSharedNodes(cv::GangTuning& t) {
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
   if (tuningNode("Levels")) {
     ImGui::SliderFloat("Voice level", &t.voiceDb, -24.0f, 0.0f, "%.1f dB");
@@ -773,7 +773,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
   if (ImGui::Button("Reset to defaults", ImVec2(resetW, 0.0f))) {
     ot = cv::OctaveTuning{};
     params.pitchFx.autotune.tuning = cv::AutotuneTuning{};
-    params.doubler.tuning = cv::DoublerTuning{};
+    params.gang.tuning = cv::GangTuning{};
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
     params.distortion.tuning = cv::DistortionTuning{};
@@ -971,9 +971,9 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("octave.on", &o.on);
   add("octave.semitones", &o.semitones);
   add("octave.mix", &o.mix);
-  add("doubler.on", &p.doubler.on);
-  add("doubler.distance", &p.doubler.distance);
-  add("doubler.voices", &p.doubler.voices);
+  add("gang.on", &p.gang.on);
+  add("gang.distance", &p.gang.distance);
+  add("gang.voices", &p.gang.voices);
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
   add("slapback.on", &p.slapback.on);
@@ -1159,11 +1159,11 @@ void drawAutotuneTuning(cv::AutotuneParams& a) {
   if (gAdvanced) drawAutotuneRaw(a.tuning);
 }
 
-// The Doubler has no macros, so its tuning is the raw fields in both views.
-void drawDoublerTuning(cv::DoublerTuning& t) {
-  if (!tuningHeader("doubler")) return;
-  drawDoublerVoiceNodes(t);
-  drawDoublerSharedNodes(t);
+// The Gang card has no macros, so its tuning is the raw fields in both views.
+void drawGangTuning(cv::GangTuning& t) {
+  if (!tuningHeader("gang")) return;
+  drawGangVoiceNodes(t);
+  drawGangSharedNodes(t);
 }
 
 void drawUnisonTuning(cv::UnisonTuning& t) {
@@ -1352,12 +1352,12 @@ void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float g
   ImGui::PopID();
 }
 
-void drawDoublerBlock(cv::DoublerParams& d) {
-  ImGui::PushID("doubler");
-  ImGui::Checkbox("DOUBLER", &d.on);
+void drawGangBlock(cv::GangParams& d) {
+  ImGui::PushID("gang");
+  ImGui::Checkbox("GANG", &d.on);
   percentSlider("DISTANCE", d.distance);
   percentSlider("VOICES", d.voices);
-  drawDoublerTuning(d.tuning);
+  drawGangTuning(d.tuning);
   ImGui::PopID();
 }
 
@@ -1707,9 +1707,9 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   else drawColumns(params, state);
   drawModeButton(params);
   ImGui::End();
-  // The pitch stage keeps its tracker and ring running while the Doubler is on, with Autotune and
-  // Octave off, and a saved state or pedal mode reaches the Doubler without its checkbox.
-  params.pitchFx.doublerOn = params.doubler.on;
+  // The pitch stage keeps its tracker and ring running while the Gang card is on, with Autotune and
+  // Octave off, and a saved state or pedal mode reaches the Gang card without its checkbox.
+  params.pitchFx.gangOn = params.gang.on;
 }
 
 // Bottom-right switch between the full face and pedal mode, at headline size.
@@ -1756,7 +1756,7 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
   column(1, kWideColumnW, [&] {
     moduleBox("octaveBox", true,
               [&] { drawOctaveBlock(params.pitchFx.octave, params.macros); });
-    moduleBox("doublerBox", false, [&] { drawDoublerBlock(params.doubler); });
+    moduleBox("gangBox", false, [&] { drawGangBlock(params.gang); });
     moduleBox("unisonBox", false, [&] { drawUnisonBlock(params.unison, params.macros); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
@@ -1807,10 +1807,10 @@ int runLayoutProbe() {
       {true, nullptr, nullptr},
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
-      {true, "doubler", nullptr},
-      {true, "doubler", "Throats"},  {true, "doubler", "Detune"},
-      {true, "doubler", "Timing"},   {true, "doubler", "Levels"},
-      {true, "doubler", "Distance"}, {true, "doubler", "Room"},
+      {true, "gang", nullptr},
+      {true, "gang", "Throats"},     {true, "gang", "Detune"},
+      {true, "gang", "Timing"},      {true, "gang", "Levels"},
+      {true, "gang", "Distance"},    {true, "gang", "Room"},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr},
       {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpring},

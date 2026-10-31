@@ -42,12 +42,12 @@ void checkDefaultLayout() {
   }
 }
 
-// The Doubler sits outside the default layout, so its cost may stay an estimate. layoutValid counts
-// the estimate like a measurement, so a layout with the Doubler in slot 4 and Unison out is judged
+// The Gang card sits outside the default layout, so its cost may stay an estimate. layoutValid counts
+// the estimate like a measurement, so a layout with the Gang card in slot 4 and Unison out is judged
 // by the sums, and the verdict follows the row once a board bench replaces it.
-void checkDoublerLayout() {
+void checkGangLayout() {
   Layout layout = defaultLayout();
-  layout.card[3] = Card::Doubler;
+  layout.card[3] = Card::Gang;
   int avg = costs::kFixed.avg;
   int worst = costs::kFixed.worst;
   for (int s = 0; s < kSlotCount; ++s) {
@@ -61,9 +61,9 @@ void checkDoublerLayout() {
     expected = LayoutError::OverWorst;
   }
   const LayoutCheck verdict = layoutValid(layout);
-  check(verdict.error == expected, "doubler layout: slot 4 with Unison out is judged by the cost sums");
+  check(verdict.error == expected, "gang layout: slot 4 with Unison out is judged by the cost sums");
   check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? avg : worst),
-        "doubler layout: a refusal reports the sum that went over");
+        "gang layout: a refusal reports the sum that went over");
 }
 
 void checkLayoutValid() {
@@ -149,22 +149,22 @@ void checkComposeToggles() {
   check(on.layout.card == layout.card, "snapshot carries the layout");
 }
 
-// The Doubler's toggle turns on its stage and the pitch stage's feed, and its knobs reach the stage.
-void checkComposeDoubler() {
+// The Gang card's toggle turns on its stage and the pitch stage's feed, and its knobs reach the stage.
+void checkComposeGang() {
   Layout layout = defaultLayout();
-  layout.card[3] = Card::Doubler;
+  layout.card[3] = Card::Gang;
   PanelReading panel = panelWithToggles(false);
   panel.knob[3] = {0.25f, 0.75f};
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(!snap.params.doubler.on && !snap.params.pitchFx.doublerOn, "compose: Doubler off leaves both flags off");
-  check(std::fabs(snap.params.doubler.distance - 0.25f) < 1e-6f && std::fabs(snap.params.doubler.voices - 0.75f) < 1e-6f,
-        "compose: Doubler knob A is DISTANCE and knob B is VOICES");
+  check(!snap.params.gang.on && !snap.params.pitchFx.gangOn, "compose: Gang card off leaves both flags off");
+  check(std::fabs(snap.params.gang.distance - 0.25f) < 1e-6f && std::fabs(snap.params.gang.voices - 0.75f) < 1e-6f,
+        "compose: Gang knob A is DISTANCE and knob B is VOICES");
   panel.toggle[3] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.doubler.on && snap.params.pitchFx.doublerOn && !snap.params.pitchFx.autotune.on &&
+  check(snap.params.gang.on && snap.params.pitchFx.gangOn && !snap.params.pitchFx.autotune.on &&
             !snap.params.pitchFx.octave.on,
-        "compose: Doubler on sets its flag and the pitch stage's, and no other pitch toggle");
-  check(snap.slotOn[3], "compose: the Doubler's slot reads on");
+        "compose: Gang card on sets its flag and the pitch stage's, and no other pitch toggle");
+  check(snap.slotOn[3], "compose: the Gang card's slot reads on");
 }
 
 void checkComposeBench() {
@@ -301,13 +301,13 @@ void checkLayoutAndCompose() {
   checkRecoverLayout();
   checkSettings();
   checkLayoutValid();
-  checkDoublerLayout();
+  checkGangLayout();
   checkLayoutReasons();
   checkLayoutName();
   checkApplyAction();
   checkReverbSlot();
   checkComposeToggles();
-  checkComposeDoubler();
+  checkComposeGang();
   checkComposeBench();
   checkOutputGain();
 }

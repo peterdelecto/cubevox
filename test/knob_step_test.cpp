@@ -68,11 +68,11 @@ Signal runFx(const Signal& in, const ChainParams& a, const ChainParams& b, P Cha
   return out;
 }
 
-// Runs `in` through the Doubler as the chain does when it sits alone: the pitch stage first, which
-// writes the ring and feeds the tracker, then the Doubler on that stage's output.
-Signal runDoubler(const Signal& in, const ChainParams& a, const ChainParams& b) {
+// Runs `in` through the Gang card as the chain does when it sits alone: the pitch stage first, which
+// writes the ring and feeds the tracker, then the Gang card on that stage's output.
+Signal runGang(const Signal& in, const ChainParams& a, const ChainParams& b) {
   auto pitch = std::make_unique<cv::PitchFx>();
-  auto fx = std::make_unique<cv::Doubler>();
+  auto fx = std::make_unique<cv::Gang>();
   pitch->reset();
   fx->reset();
   Signal out(in.size());
@@ -81,7 +81,7 @@ Signal runDoubler(const Signal& in, const ChainParams& a, const ChainParams& b) 
     const size_t k = static_cast<size_t>(i);
     const ChainParams& p = i < kStepAt ? a : b;
     pitch->process(&in[k], lead.data(), cv::kBlock, p.pitchFx);
-    fx->process(lead.data(), &out[k], cv::kBlock, p.doubler, *pitch);
+    fx->process(lead.data(), &out[k], cv::kBlock, p.gang, *pitch);
   }
   return out;
 }
@@ -96,7 +96,7 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Distortion: return runFx<cv::Distortion>(in, a, b, &ChainParams::distortion);
     case Engine::Gate: return runFx<cv::Gate>(in, a, b, &ChainParams::gate);
     case Engine::Reverb: return runFx<cv::Reverb>(in, a, b, &ChainParams::reverb);
-    case Engine::Doubler: return runDoubler(in, a, b);
+    case Engine::Gang: return runGang(in, a, b);
     case Engine::Count: break;
   }
   return in;

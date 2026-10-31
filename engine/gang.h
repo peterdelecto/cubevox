@@ -12,7 +12,7 @@
 #include "engine/psola.h"
 #include "engine/smooth.h"
 
-// Doubler adds up to four copies of the voice, as if four other singers stood a step back from
+// The Gang card adds up to four copies of the voice, as if four other singers stood a step back from
 // the mic. Each copy has its own throat (a grain playback rate), its own detune with a slow
 // wobble, its own delay behind the lead, and less bass and top than the lead. One small room sits
 // on the gang. The copies never read a key. They read the pitch period and Autotune's correction
@@ -24,7 +24,7 @@
 
 namespace cv {
 
-struct DoublerTuning {
+struct GangTuning {
   std::array<float, 4> formantSt = {0.6f, -0.6f, 1.5f, -1.5f};   // grain playback rate 2^(st / 12)
   std::array<float, 4> detuneCents = {7.0f, -6.0f, 12.0f, -14.0f};
   std::array<float, 4> delayMs = {28.0f, 36.0f, 44.0f, 52.0f};  // behind the lead, before the DISTANCE scale
@@ -41,14 +41,14 @@ struct DoublerTuning {
   float roomFeedback = 0.6f;   // 35 ms loop, about 0.45 s to -60 dB
 };
 
-struct DoublerParams {
+struct GangParams {
   bool on = false;
   float distance = 0.5f;  // knob A, 0..1
   float voices = 0.5f;    // knob B, 0..1
-  DoublerTuning tuning;
+  GangTuning tuning;
 };
 
-namespace doubler_detail {
+namespace gang_detail {
 
 constexpr size_t kVoices = 4;
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
@@ -254,7 +254,7 @@ class FormantPsolaVoice {
 
 // Six early reflections on one delay line, then a 35 ms feedback loop with a lowpass inside it.
 // The reflections feed the loop through two allpasses.
-class DoublerRoom {
+class GangRoom {
  public:
   void reset() {
     early_.fill(0.0f);
@@ -316,7 +316,7 @@ struct VoicesLaw {
   float mul = 1.0f;
 };
 
-inline VoicesLaw voicesLaw(float k, const DoublerTuning& t) {
+inline VoicesLaw voicesLaw(float k, const GangTuning& t) {
   VoicesLaw law;
   const float g = dbToGainFast(t.voiceDb);
   const float from = clampf(t.leadFadeFrom, 0.05f, 0.99f);
@@ -345,13 +345,13 @@ inline VoicesLaw voicesLaw(float k, const DoublerTuning& t) {
   return law;
 }
 
-}  // namespace doubler_detail
+}  // namespace gang_detail
 
-class Doubler {
+class Gang {
  public:
   // The constructor runs reset(), which keeps the object out of .data: the room's 17 KB of zeros
   // would otherwise sit in flash beside the few non-zero defaults.
-  Doubler() { reset(); }
+  Gang() { reset(); }
 
   void reset() {
     clearDsp();
@@ -365,7 +365,7 @@ class Doubler {
 
   // in is this slot's input, the lead. pitch has already run this block, so the block's samples
   // sit at ring index head() - n + i. Off and settled, out equals in bit for bit.
-  void process(const float* in, float* out, int n, const DoublerParams& p, const PitchFx& pitch) {
+  void process(const float* in, float* out, int n, const GangParams& p, const PitchFx& pitch) {
     if (settledOff(p)) {
       passThrough(in, out, n);
       return;
@@ -387,8 +387,8 @@ class Doubler {
   uint8_t activeVoices() const { return active_; }
 
  private:
-  using FormantPsolaVoice = doubler_detail::FormantPsolaVoice;
-  static constexpr size_t kVoices = doubler_detail::kVoices;
+  using FormantPsolaVoice = gang_detail::FormantPsolaVoice;
+  static constexpr size_t kVoices = gang_detail::kVoices;
 
   // Block-end targets for everything the knobs and the tuning set.
   struct Plan {
@@ -412,11 +412,11 @@ class Doubler {
   }
 
   // d is the smoothed DISTANCE.
-  static Plan makePlan(const DoublerParams& p, float d) {
+  static Plan makePlan(const GangParams& p, float d) {
     Plan plan;
     if (!p.on) return plan;
-    const DoublerTuning& t = p.tuning;
-    const doubler_detail::VoicesLaw law = doubler_detail::voicesLaw(smooth::clamp01(p.voices), t);
+    const GangTuning& t = p.tuning;
+    const gang_detail::VoicesLaw law = gang_detail::voicesLaw(smooth::clamp01(p.voices), t);
     plan.voice = law.weight;
     plan.lead = law.lead;
     plan.wet = law.mul * dbToGainFast(t.trimDb);
@@ -424,7 +424,7 @@ class Doubler {
     return plan;
   }
 
-  bool settledOff(const DoublerParams& p) const {
+  bool settledOff(const GangParams& p) const {
     if (p.on || lead_ != 1.0f || wet_ != 0.0f) return false;
     for (float g : gain_) {
       if (g != 0.0f) return false;
@@ -458,7 +458,7 @@ class Doubler {
   // All four voices share one filter setting and the filters are linear, so one highpass and one
   // shelf on the gang sum equal one pair per voice. The setters run only when DISTANCE or the
   // tuning moved.
-  void setFilters(const DoublerTuning& t, float d) {
+  void setFilters(const GangTuning& t, float d) {
     const float hz = t.hpNearHz + (t.hpFarHz - t.hpNearHz) * d;
     const float db = t.shelfNearDb + (t.shelfFarDb - t.shelfNearDb) * d;
     if (filtersSet_ && hz == hpHz_ && db == shelfDb_ && t.shelfHz == shelfHz_) return;
@@ -473,23 +473,23 @@ class Doubler {
   // Sine of voice v's wobble at the block start, then the phase moves on by n samples.
   float stepLfo(size_t v, float hz, int n) {
     const float s = sinTurns(lfoPhase_[v]);
-    const uint32_t inc = static_cast<uint32_t>(clampf(hz, 0.0f, doubler_detail::kLfoMaxHz) / kSampleRate *
-                                                    doubler_detail::kTurn + 0.5f);
+    const uint32_t inc = static_cast<uint32_t>(clampf(hz, 0.0f, gang_detail::kLfoMaxHz) / kSampleRate *
+                                                    gang_detail::kTurn + 0.5f);
     lfoPhase_[v] += inc * static_cast<uint32_t>(n);
     return s;
   }
 
   // Per block: filters, room, wobble, and each live voice's pitch ratio, playback rate and delay.
   // A voice whose gain sits at 0 across the block is cleared and does not tick.
-  void prepareBlock(const DoublerParams& p, const PitchFx& pitch, const Plan& plan, float d, int n) {
-    const DoublerTuning& t = p.tuning;
+  void prepareBlock(const GangParams& p, const PitchFx& pitch, const Plan& plan, float d, int n) {
+    const GangTuning& t = p.tuning;
     setFilters(t, d);
     room_.setTail(t.roomLpHz, t.roomFeedback);
     const float period = pitch.pitch().period;
     const float corr = pitch.correctionSemis() * (1.0f / 12.0f);
     const float timing =
-        (doubler_detail::kTimingNear + (doubler_detail::kTimingFar - doubler_detail::kTimingNear) * d) *
-        doubler_detail::kSmpPerMs;
+        (gang_detail::kTimingNear + (gang_detail::kTimingFar - gang_detail::kTimingNear) * d) *
+        gang_detail::kSmpPerMs;
     active_ = 0;
     for (size_t v = 0; v < kVoices; ++v) {
       const float cents = t.detuneCents[v] + t.lfoCents * stepLfo(v, t.lfoHz[v], n);
@@ -553,7 +553,7 @@ class Doubler {
   std::array<float, kVoices> gain_{};
   std::array<bool, kVoices> live_{};
   std::array<uint32_t, kVoices> lfoPhase_ = {0u, 0x40000000u, 0x80000000u, 0xC0000000u};
-  doubler_detail::DoublerRoom room_;
+  gang_detail::GangRoom room_;
   DcBlocker dc_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;

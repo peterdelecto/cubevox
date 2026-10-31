@@ -767,36 +767,36 @@ void checkPitchStageToggles() {
 
 // 200 ms of the tone: the tracker finds its period in about 32 ms and the voices sound at least
 // 22 ms after that.
-constexpr int kDoublerBlocks = 150;
+constexpr int kGangBlocks = 150;
 
-// The pitch stage, then the Doubler on its output, on `rig`'s own engines. This is the order the
+// The pitch stage, then the Gang card on its output, on `rig`'s own engines. This is the order the
 // chain makes the two calls when nothing else sits between them.
-Block pitchThenDoubler(Rig& rig, const ChainSnapshot& snap, const Block& in) {
+Block pitchThenGang(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block mid{};
   Block out{};
   rig.engines.pitch.process(in.data(), mid.data(), kN, snap.params.pitchFx);
-  rig.engines.doubler.process(mid.data(), out.data(), kN, snap.params.doubler, rig.engines.pitch);
+  rig.engines.gang.process(mid.data(), out.data(), kN, snap.params.gang, rig.engines.pitch);
   return out;
 }
 
-struct DoublerOutcome {
-  bool sameAsHand = true;  // every block equals the pitch call then the Doubler
+struct GangOutcome {
+  bool sameAsHand = true;  // every block equals the pitch call then the Gang card
   bool heard = false;      // the second half of the run differs from the input
   bool live = false;       // the tracker holds a period and a voice sounds
 };
 
-DoublerOutcome runDoublerLayout(const Layout& layout, const Toggles& on) {
+GangOutcome runGangLayout(const Layout& layout, const Toggles& on) {
   const ChainSnapshot snap = snapshotToggles(layout, 0.5f, on);
   auto chain = newRig();
   auto hand = newRig();
-  DoublerOutcome o;
-  for (int b = 0; b < kDoublerBlocks; ++b) {
+  GangOutcome o;
+  for (int b = 0; b < kGangBlocks; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*chain, snap, in, StillClock());
-    o.sameAsHand = o.sameAsHand && run.out == pitchThenDoubler(*hand, snap, in);
-    if (b >= kDoublerBlocks / 2) o.heard = o.heard || run.out != in;
+    o.sameAsHand = o.sameAsHand && run.out == pitchThenGang(*hand, snap, in);
+    if (b >= kGangBlocks / 2) o.heard = o.heard || run.out != in;
   }
-  o.live = chain->engines.pitch.pitch().period > 0.0f && chain->engines.doubler.activeVoices() > 0;
+  o.live = chain->engines.pitch.pitch().period > 0.0f && chain->engines.gang.activeVoices() > 0;
   return o;
 }
 
@@ -806,76 +806,76 @@ Toggles togglesOn(std::initializer_list<int> slots) {
   return t;
 }
 
-void checkDoublerStage() {
+void checkGangStage() {
   auto rig = newRig();
   ChainParams p;
   const Block in = tone(0, 0.3f);
   Block out;
   out.fill(7.0f);
   bool done = false;
-  check(runStage(rig->engines, Card::Doubler, in.data(), out.data(), kN, p, done) && done && out == in,
-        "stage: a Doubler that is off makes the pitch call and passes the block untouched");
+  check(runStage(rig->engines, Card::Gang, in.data(), out.data(), kN, p, done) && done && out == in,
+        "stage: a Gang card that is off makes the pitch call and passes the block untouched");
 
-  // With the pitch stage already run this pass, the Doubler runs alone and nothing feeds the tracker.
-  p.doubler.on = true;
-  p.pitchFx.doublerOn = true;
+  // With the pitch stage already run this pass, the Gang card runs alone and nothing feeds the tracker.
+  p.gang.on = true;
+  p.pitchFx.gangOn = true;
   bool wrote = true;
   bool changed = false;
   for (int b = 0; b < 20; ++b) {
     done = true;
-    wrote = wrote && runStage(rig->engines, Card::Doubler, tone(b, 0.3f).data(), out.data(), kN, p, done);
+    wrote = wrote && runStage(rig->engines, Card::Gang, tone(b, 0.3f).data(), out.data(), kN, p, done);
     changed = changed || out != tone(b, 0.3f);
   }
   check(wrote && changed && rig->engines.pitch.pitch().period == 0.0f,
-        "stage: a Doubler after the pitch stage ran runs only its own engine");
+        "stage: a Gang card after the pitch stage ran runs only its own engine");
 }
 
-// Wherever the Doubler sits against Autotune and Octave, the pitch stage runs at the first of the
-// three, while the Doubler is on, even with both pitch toggles off, and the Doubler works on its output.
-void checkDoublerPitchStage() {
-  const DoublerOutcome alone = runDoublerLayout(layoutOf({Card::Doubler}), togglesOn({0}));
-  check(alone.sameAsHand && alone.heard && alone.live, "doubler: alone in a layout it gets a live ring and tracker");
+// Wherever the Gang card sits against Autotune and Octave, the pitch stage runs at the first of the
+// three, while the Gang card is on, even with both pitch toggles off, and the Gang card works on its output.
+void checkGangPitchStage() {
+  const GangOutcome alone = runGangLayout(layoutOf({Card::Gang}), togglesOn({0}));
+  check(alone.sameAsHand && alone.heard && alone.live, "gang: alone in a layout it gets a live ring and tracker");
 
-  const DoublerOutcome ahead = runDoublerLayout(layoutOf({Card::Doubler, Card::Autotune}), togglesOn({0}));
+  const GangOutcome ahead = runGangLayout(layoutOf({Card::Gang, Card::Autotune}), togglesOn({0}));
   check(ahead.sameAsHand && ahead.heard && ahead.live,
-        "doubler: ahead of Autotune with Autotune off it still gets a live ring and tracker");
+        "gang: ahead of Autotune with Autotune off it still gets a live ring and tracker");
 
-  const DoublerOutcome aheadBoth = runDoublerLayout(layoutOf({Card::Doubler, Card::Autotune}), togglesOn({0, 1}));
+  const GangOutcome aheadBoth = runGangLayout(layoutOf({Card::Gang, Card::Autotune}), togglesOn({0, 1}));
   check(aheadBoth.sameAsHand && aheadBoth.heard && aheadBoth.live,
-        "doubler: ahead of Autotune with both on, the pitch stage runs at the Doubler's slot and feeds it");
+        "gang: ahead of Autotune with both on, the pitch stage runs at the Gang card's slot and feeds it");
 
-  const DoublerOutcome behind =
-      runDoublerLayout(layoutOf({Card::Autotune, Card::Octave, Card::Doubler}), togglesOn({2}));
+  const GangOutcome behind =
+      runGangLayout(layoutOf({Card::Autotune, Card::Octave, Card::Gang}), togglesOn({2}));
   check(behind.sameAsHand && behind.heard && behind.live,
-        "doubler: behind both pitch cards with both off, the pitch stage still runs and feeds it");
+        "gang: behind both pitch cards with both off, the pitch stage still runs and feeds it");
 
-  const DoublerOutcome all = runDoublerLayout(layoutOf({Card::Autotune, Card::Doubler}), togglesOn({0, 1}));
-  check(all.sameAsHand && all.heard && all.live, "doubler: behind Autotune with both on, one pitch call per block");
+  const GangOutcome all = runGangLayout(layoutOf({Card::Autotune, Card::Gang}), togglesOn({0, 1}));
+  check(all.sameAsHand && all.heard && all.live, "gang: behind Autotune with both on, one pitch call per block");
 
   auto rig = newRig();
-  const ChainSnapshot snap = snapshotToggles(layoutOf({Card::Autotune, Card::Octave, Card::Doubler}), 0.5f,
+  const ChainSnapshot snap = snapshotToggles(layoutOf({Card::Autotune, Card::Octave, Card::Gang}), 0.5f,
                                              togglesOn({2}));
-  for (int b = 0; b < kDoublerBlocks; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
+  for (int b = 0; b < kGangBlocks; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
   check(rig->fades.level(0) == kSlotFadeBlocks,
-        "doubler: the pitch stage's slot stays on the engine while only the Doubler's toggle is on");
+        "gang: the pitch stage's slot stays on the engine while only the Gang card's toggle is on");
 }
 
-// The Doubler's toggle off fades its slot out, and the pitch stage with it. After the fade the dry
+// The Gang's toggle off fades its slot out, and the pitch stage with it. After the fade the dry
 // input passes bit for bit.
-void checkDoublerToggleOff() {
-  const Layout layout = layoutOf({Card::Doubler});
+void checkGangToggleOff() {
+  const Layout layout = layoutOf({Card::Gang});
   const ChainSnapshot on = snapshotToggles(layout, 0.5f, togglesOn({0}));
   const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
   auto rig = newRig();
-  for (int b = 0; b < kDoublerBlocks; ++b) runBlock(*rig, on, tone(b, 0.3f), StillClock());
+  for (int b = 0; b < kGangBlocks; ++b) runBlock(*rig, on, tone(b, 0.3f), StillClock());
   bool dryAfter = true;
-  for (int b = kDoublerBlocks; b < kDoublerBlocks + 14; ++b) {
+  for (int b = kGangBlocks; b < kGangBlocks + 14; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*rig, off, in, StillClock());
-    if (b >= kDoublerBlocks + kSlotFadeBlocks) dryAfter = dryAfter && run.out == in;
+    if (b >= kGangBlocks + kSlotFadeBlocks) dryAfter = dryAfter && run.out == in;
   }
-  check(dryAfter, "doubler: with its toggle off the slot fades out in 6 blocks, then passes the dry input bit for bit");
-  check(rig->engines.doubler.leadGain() == 1.0f, "doubler: the engine ramped back to the lead alone before its slot stopped");
+  check(dryAfter, "gang: with its toggle off the slot fades out in 6 blocks, then passes the dry input bit for bit");
+  check(rig->engines.gang.leadGain() == 1.0f, "gang: the engine ramped back to the lead alone before its slot stopped");
 }
 
 // The shipped layout with every toggle on is the plain chain: the crossfade changes nothing while no
@@ -997,9 +997,9 @@ void checkChainRun() {
   checkSlotFlipReverses();
   checkInputGateKeepsDetector();
   checkPitchStageToggles();
-  checkDoublerStage();
-  checkDoublerPitchStage();
-  checkDoublerToggleOff();
+  checkGangStage();
+  checkGangPitchStage();
+  checkGangToggleOff();
   checkSettledSlotsAreInert();
   checkLateBlockPassesDry();
 }
