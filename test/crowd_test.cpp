@@ -4,7 +4,7 @@
 // burst, timing scatter, pitch drift, the tracker running without Autotune, the three enhancements
 // (every control at its default is the pinned engine bit for bit, level scatter, contour, the
 // shadow ring, the pulse marks and the pulse cut on a glottal pulse train and the human-voice ranges),
-// and a host timing against Unison. Every run feeds a PitchFx
+// the bottom tenth of WIDTH staying in tune (pitch, drift and contour), and a host timing against Unison. Every run feeds a PitchFx
 // through its pass-through path first, so the ring is written and the tracker runs, as the chain
 // does. No window, no audio device.
 
@@ -452,19 +452,19 @@ bool testPitchMoves() {
 }
 
 // The WIDTH factors of the owner's law, written out here so the test does not lean on the engine's
-// code. Both are linear through (0, floor), (0.1, 0.08) and (1, 1), the pitch floor 0.003 and the
+// code. Both are linear through (0, floor), (0.1, 0.025) and (1, 1), the pitch floor 0.003 and the
 // formant floor 0.
-double pitchFactor(double w) { return w <= 0.1 ? 0.003 + 0.077 * (w / 0.1) : 0.08 + 0.92 * ((w - 0.1) / 0.9); }
-double formantFactor(double w) { return w <= 0.1 ? 0.08 * (w / 0.1) : 0.08 + 0.92 * ((w - 0.1) / 0.9); }
+double pitchFactor(double w) { return w <= 0.1 ? 0.003 + 0.022 * (w / 0.1) : 0.025 + 0.975 * ((w - 0.1) / 0.9); }
+double formantFactor(double w) { return w <= 0.1 ? 0.025 * (w / 0.1) : 0.025 + 0.975 * ((w - 0.1) / 0.9); }
 
 // f0 of a copy of the 220 Hz tone, read at its second harmonic over second 1..2 and halved, near
 // the f0 wanted.
 double copyHz(const Signal& out, double want) { return peakHz(out, kRate, kRate, 2.0 * want) / 2.0; }
 
 // The -3 st copy (index 2, formant -1 st) alone at WIDTH 0, 0.1, 0.5 and 1. Its pitch offset is -3 st
-// times the pitch factor, about 1 cent at 0, 24 cents at 0.1 (the knee) and 0.489 of the full offset
+// times the pitch factor, about 1 cent at 0, 7.5 cents at 0.1 (the knee) and 0.458 of the full offset
 // at 0.5. Its formant move is the log of its grain playback rate over the same log at WIDTH 1, read
-// from the engine: none at 0, 8 % at 0.1 and 0.489 at 0.5. (A spectral centroid does not read it,
+// from the engine: none at 0, 2.5 % at 0.1 and 0.458 at 0.5. (A spectral centroid does not read it,
 // because the grain windows make the centroid's slope depend on the pitch ratio; at WIDTH 0 the
 // output itself shows it, which equals the output of a copy with no formant offset.) Lag and tone
 // shelf stay where they are, so the lag reads the same at every WIDTH.
@@ -478,7 +478,7 @@ bool testWidthLaw() {
     float width;
     double tolCents;
   } rows[] = {{0.0f, 2.0}, {0.1f, 3.0}, {0.5f, 10.0}, {1.0f, 10.0}};
-  constexpr double kMoveTol = 0.02;
+  constexpr double kMoveTol = 0.005;
   bool ok = true;
   float lagAt[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   double rate[4] = {0.0, 0.0, 0.0, 0.0};
@@ -505,7 +505,7 @@ bool testWidthLaw() {
     const double move = std::log(rate[k]) / std::log(rate[3]);
     char name[48];
     std::snprintf(name, sizeof name, "width law formant, WIDTH %.0f %%", w * 100.0);
-    ok &= report(name, std::fabs(move - formantFactor(w)) <= kMoveTol, "formant move %.3f of full, want %.3f (+-%.2f)", move,
+    ok &= report(name, std::fabs(move - formantFactor(w)) <= kMoveTol, "formant move %.3f of full, want %.3f (+-%.3f)", move,
                  formantFactor(w), kMoveTol);
     std::printf("info width %.2f copy 3 f0 %.3f Hz, %+.2f cents from the 220 Hz lead, formant move %.1f %% of full\n", w, hz[k],
                 cents(hz[k], 220.0), 100.0 * move);
@@ -534,7 +534,7 @@ bool testWidthLaw() {
 // VOICES 20, 40, 60 and 80 % bring in the copies in index order, the -1.75 st copy first, then the
 // +2.75 st, the -3 st and the +1 st. At each step the output carries a line at the f0 of every
 // copy that has come in and none at the f0 of the copies still to come. It runs at WIDTH 1 and at
-// WIDTH 0.5, where the offsets are the pitch factor 0.489 of their full values.
+// WIDTH 0.5, where the offsets are the pitch factor 0.458 of their full values.
 bool testFadeOrder() {
   const Signal in = tone(220.0, 2 * kRate);
   const cv::CrowdTuning d;
@@ -986,7 +986,7 @@ bool testWorkingSetDefaults() {
   const cv::CrowdTuning d;
   const bool values = d.contour[0] == 0.8f && d.contour[1] == 1.2f && d.contour[2] == 0.7f && d.contour[3] == 1.1f &&
                       d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && d.epochAlign &&
-                      d.widthKnee == 0.1f && d.widthKneeFrac == 0.08f;
+                      d.widthKnee == 0.1f && d.widthKneeFrac == 0.025f;
   bool ok = report("working set values", values,
                    "contour %.1f %.1f %.1f %.1f (0.8 1.2 0.7 1.1)", static_cast<double>(d.contour[0]),
                    static_cast<double>(d.contour[1]), static_cast<double>(d.contour[2]), static_cast<double>(d.contour[3]));
@@ -1132,6 +1132,136 @@ bool testContour() {
   ok &= report("contour range", beyond == 0, "contour 3.0 and 0.0 differ from 1.4 and 0.6 in %.0f samples (0)",
                static_cast<double>(beyond));
   return ok;
+}
+
+// Copy v alone with the shipped human-voice set (timing scatter, drift, level scatter, contour and
+// epoch align) on, at WIDTH `width`.
+cv::CrowdParams humanCopy(size_t v, float width) {
+  const cv::CrowdTuning d;
+  cv::CrowdParams p = alone(v);
+  p.width = width;
+  p.tuning.scatterMs = d.scatterMs;
+  p.tuning.driftCents = d.driftCents;
+  p.tuning.levelScatterDb = d.levelScatterDb;
+  p.tuning.contour[0] = d.contour[v];
+  p.tuning.epochAlign = d.epochAlign;
+  return p;
+}
+
+// f0 of a copy in each 0.5 s window from second 1 to second 6, in cents from `base`.
+std::vector<double> windowCents(const Signal& out, double base) {
+  std::vector<double> c;
+  for (int k = 2; k < 12; ++k) c.push_back(cents(peakHz(out, k * kRate / 2, kRate / 2, 2.0 * base) / 2.0, base));
+  return c;
+}
+
+// The bottom tenth of WIDTH is for a melodic line, so a copy there is a plain double a few cents off
+// the lead. The -3 st copy on the shipped set sits within 2 cents of the lead at WIDTH 0, 8 +- 2 cents
+// flat of it at 0.1, and 300 +- 10 cents flat at 1. Drift scales with the pitch factor, so at WIDTH
+// 0.05 a copy's f0 moves less than 1 cent from one 0.5 s window to the next, and at WIDTH 1 it
+// moves as the drift test expects. Contour scales with the formant factor, so at WIDTH 0.05 a copy
+// with contour 0.6 or 1.4 swings within 2 % of the input's swing, and at WIDTH 1 within the contour
+// test's bounds of its contour.
+bool testMelodicBottom() {
+  bool ok = true;
+  const Signal tn = tone(220.0, 2 * kRate);
+  const cv::CrowdTuning d;
+  const double full = static_cast<double>(d.pitchSt[2]);
+  const struct {
+    float width;
+    double wantCents;
+    double tolCents;
+  } rows[] = {{0.0f, 0.0, 2.0}, {0.1f, -8.0, 2.0}, {1.0f, 100.0 * full, 10.0}};
+  double measured[3] = {0.0, 0.0, 0.0};
+  size_t i = 0;
+  for (const auto& r : rows) {
+    const double near = 220.0 * std::pow(2.0, full * pitchFactor(static_cast<double>(r.width)) / 12.0);
+    measured[i] = cents(copyHz(run(tn, humanCopy(2, r.width)), near), 220.0);
+    char name[48];
+    std::snprintf(name, sizeof name, "melodic f0, WIDTH %.0f %%", static_cast<double>(r.width) * 100.0);
+    ok &= report(name, std::fabs(measured[i] - r.wantCents) <= r.tolCents,
+                 "-3 st copy f0 %+.2f cents from the lead, want %+.1f (+-%.0f)", measured[i], r.wantCents, r.tolCents);
+    ++i;
+  }
+
+  const Signal long6 = tone(220.0, 6 * kRate);
+  double moveAt[2] = {0.0, 0.0};
+  double spreadAt[2] = {0.0, 0.0};
+  double peakAt[2] = {0.0, 0.0};
+  size_t j = 0;
+  for (float width : {0.05f, 1.0f}) {
+    cv::CrowdParams p = lagProbe(0, d.lagScale);
+    p.width = width;
+    p.tuning.pitchSt[0] = d.pitchSt[0];
+    p.tuning.driftCents = 15.0f;
+    Probe probe;
+    const Signal out = run(long6, p, &probe);
+    const double base = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[0]) * pitchFactor(static_cast<double>(width)) / 12.0);
+    const std::vector<double> c = windowCents(out, base);
+    for (size_t k = 1; k < c.size(); ++k) moveAt[j] = std::max(moveAt[j], std::fabs(c[k] - c[k - 1]));
+    spreadAt[j] = *std::max_element(c.begin(), c.end()) - *std::min_element(c.begin(), c.end());
+    peakAt[j] = *std::max_element(c.begin(), c.end(), [](double a, double b) { return std::fabs(a) < std::fabs(b); });
+    peakAt[j] = std::fabs(peakAt[j]);
+    if (j == 0) {
+      const double limit = 15.0 * pitchFactor(static_cast<double>(width));
+      ok &= report("melodic drift range", static_cast<double>(probe.drift) <= limit + 1e-3,
+                   "largest drift %.3f cents against 15 x %.4f = %.3f (<=)", static_cast<double>(probe.drift),
+                   pitchFactor(static_cast<double>(width)), limit);
+    }
+    ++j;
+  }
+  ok &= report("melodic drift, WIDTH 5 %", moveAt[0] < 1.0, "f0 moves at most %.2f cents from window to window (< 1)", moveAt[0]);
+  ok &= report("drift at WIDTH 100 %", peakAt[1] <= 18.0 && spreadAt[1] >= 2.0,
+               "worst %.2f cents from the offset (<= 15 + 3), spread %.2f cents (>= 2)", peakAt[1], spreadAt[1]);
+
+  for (double sweepHz : {1.0, 3.0}) {
+    const Signal in = sweepTone(220.0, 1.0, sweepHz, 7 * kRate);
+    const double inSt = sweepDepthSt(in, sweepHz, 2.0, static_cast<int>(3.0 * sweepHz));
+    const struct {
+      float width;
+      float contour;
+      double tol;
+    } cases[] = {{0.05f, 0.6f, 0.02}, {0.05f, 1.4f, 0.02}, {1.0f, 0.6f, 0.15}, {1.0f, 1.4f, 0.15}};
+    for (const auto& k : cases) {
+      cv::CrowdParams p = lagProbe(0, d.lagScale);
+      p.width = k.width;
+      p.tuning.contour[0] = k.contour;
+      const double ratio = sweepDepthSt(run(in, p), sweepHz, 2.0, static_cast<int>(3.0 * sweepHz)) / inSt;
+      const double want = k.width < 1.0f ? 1.0 : static_cast<double>(k.contour);
+      char name[56];
+      std::snprintf(name, sizeof name, "melodic contour %.1f, WIDTH %.0f %%, %.0f Hz", static_cast<double>(k.contour),
+                    static_cast<double>(k.width) * 100.0, sweepHz);
+      ok &= report(name, std::fabs(ratio / want - 1.0) <= k.tol, "copy swing %.3f of the input's, want %.2f (within %.2f)",
+                   ratio, want, k.tol);
+    }
+  }
+  std::printf("info melodic f0 from the lead, cents, -3 st copy: WIDTH 0 %+.2f, 0.1 %+.2f, 1 %+.2f\n", measured[0], measured[1],
+              measured[2]);
+  return ok;
+}
+
+// A WIDTH step moves the copy's grain playback rate over a few blocks and not in one jump. 512
+// samples after a step from 0.1 to 1 the rate sits strictly between its two settled values, and a
+// second later it equals the settled value of a run that held WIDTH 1 throughout, bit for bit.
+bool testWidthGlides() {
+  const Signal tn = tone(220.0, 2 * kRate);
+  const int switchAt = kRate / cv::kBlock * cv::kBlock;
+  cv::CrowdParams lo = alone(2);
+  lo.width = 0.1f;
+  cv::CrowdParams hi = alone(2);
+  hi.width = 1.0f;
+  run(tn, lo);
+  const double rateLo = static_cast<double>(gCrowd.grainRate(0));
+  run(tn, hi);
+  const double rateHi = static_cast<double>(gCrowd.grainRate(0));
+  const Signal soon(tn.begin(), tn.begin() + switchAt + 512);
+  runSwitch(soon, lo, hi, switchAt);
+  const double rateSoon = static_cast<double>(gCrowd.grainRate(0));
+  runSwitch(tn, lo, hi, switchAt);
+  const double rateLate = static_cast<double>(gCrowd.grainRate(0));
+  return report("width glides", rateSoon < rateLo && rateSoon > rateHi && rateLate == rateHi,
+                "grain rate %.5f at WIDTH 0.1, %.5f at 1; 512 samples after the step %.5f, a second later %.5f (equals the settled)",
+                rateLo, rateHi, rateSoon, rateLate);
 }
 
 // A glottal pulse train: the derivative of a Rosenberg flow pulse at each period, through two formant
@@ -1468,6 +1598,8 @@ int main() {
   ok &= testWorkingSetDefaults();
   ok &= testLevelScatter();
   ok &= testContour();
+  ok &= testMelodicBottom();
+  ok &= testWidthGlides();
   ok &= testShadowRing();
   ok &= testEpochMarks();
   ok &= testEpochAlign();

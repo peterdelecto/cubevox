@@ -21,7 +21,8 @@
 // VOICES fades the copies in one at a time (low, high, low, high), then fades the lead out, so the
 // top of the knob is the crowd alone. Total power is unity at every position. WIDTH spreads the
 // copies' pitch and formant offsets from almost none to their full values. The bottom tenth of the
-// knob is for instruments and melodic lines, where the copies are plain detuned doubles. A copy
+// knob is for instruments and melodic lines, where the copies are plain doubles a few cents off the
+// lead. WIDTH also scales the drift and the contour, so nothing else moves a copy there. A copy
 // changes its lag only in a quiet gap, so it never bends in pitch mid-word. Scatter gives each
 // copy a fresh timing offset at every gap, and drift walks each copy's pitch slowly around its
 // offset.
@@ -56,9 +57,11 @@ struct CrowdTuning {
 
   // WIDTH scales a copy's pitch and formant offsets by a factor that is linear between three
   // points. Both factors are 1 at WIDTH 1 and widthKneeFrac at WIDTH widthKnee. At WIDTH 0 the pitch
-  // factor is 0.003 (the -3 st copy sits 1 cent off the lead) and the formant factor is 0.
+  // factor is 0.003 (the -3 st copy sits 1 cent off the lead) and the formant factor is 0. The pitch
+  // factor also scales the drift range, and the formant factor pulls each contour toward 1, so the
+  // bottom of the knob stays in tune for a melodic line.
   float widthKnee = 0.1f;
-  float widthKneeFrac = 0.08f;
+  float widthKneeFrac = 0.025f;
 
   // Each copy takes a new loudness at every gap, uniform in +- this many dB (0..4).
   float levelScatterDb = 2.0f;
@@ -646,6 +649,7 @@ class Crowd {
     epochs_.reset();
     active_ = 0;
     tiltSet_ = false;
+    widthSet_ = false;
   }
 
   void retire(size_t v) {
@@ -709,6 +713,17 @@ class Crowd {
     return &epochs_;
   }
 
+  // The WIDTH the factors read. It follows the knob through the 20 ms one-pole, so a knob step moves
+  // the copies' pitch over a few blocks and not in one jump, and it takes the knob value outright on
+  // the first block after a reset. A settled value equals the knob bit for bit.
+  float smoothedWidth(float width, int n) {
+    const float target = smooth::clamp01(width);
+    const float a = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * smooth::kSmoothSec));
+    widthSm_ = widthSet_ ? smooth::step(widthSm_, target, a) : target;
+    widthSet_ = true;
+    return widthSm_;
+  }
+
   // Per block: filters, the contour track and the pulse marks, then each live voice. first is the
   // ring index of the block's first sample.
   void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
@@ -723,7 +738,7 @@ class Crowd {
                   {pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)},
                   pr.period,
                   pitch.correctionSemis() * (1.0f / 12.0f),
-                  crowd_detail::widthFactors(smooth::clamp01(p.width), t.widthKnee, t.widthKneeFrac),
+                  crowd_detail::widthFactors(smoothedWidth(p.width, n), t.widthKnee, t.widthKneeFrac),
                   (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * crowd_detail::kSmpPerMs,
                   clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
                   slew,
@@ -746,19 +761,21 @@ class Crowd {
     const bool roll = b.levelDb > 0.0f;
     if (lag_[v].settle(b.view, lagTarget(t, v), b.scatterSmp, b.period, roll)) voice_[v].markReset();
     levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
-    const float drift = drift_[v].step(driftRng_[v], t.driftCents, t.driftHoldS, b.slew, b.n);
+    const float drift = drift_[v].step(driftRng_[v], t.driftCents * b.width.pitch, t.driftHoldS, b.slew, b.n);
     const float st = t.pitchSt[v] * b.width.pitch;
     const float oct = st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
-    voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t)),
+    voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t, b.width.formant)),
                       exp2Fast(t.formantSt[v] * b.width.formant * (1.0f / 12.0f)), lag_[v].samples());
     voice_[v].setEpochs(b.epochs);
   }
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
-  // The copy then sits contour times as far from his mean as he does. Contour 1 adds exactly 0.
-  float contourOctaves(size_t v, const CrowdTuning& t) const {
+  // The copy then sits contour times as far from his mean as he does. Contour 1 adds exactly 0. The
+  // formant factor ff pulls the contour toward 1, so it is exactly 1 at the bottom of WIDTH and the
+  // slider value at WIDTH 1.
+  float contourOctaves(size_t v, const CrowdTuning& t, float ff) const {
     const float c = clampf(t.contour[v], crowd_detail::kMinContour, crowd_detail::kMaxContour);
-    return c == 1.0f ? 0.0f : (c - 1.0f) * contour_.deviation();
+    return c == 1.0f ? 0.0f : (c - 1.0f) * ff * contour_.deviation();
   }
 
   // One chunk of the call: kBlock samples at most.
@@ -828,7 +845,9 @@ class Crowd {
   float wet_ = 0.0f;
   float hpHz_ = 0.0f;
   float tiltHz_ = 0.0f;
+  float widthSm_ = 1.0f;
   uint8_t active_ = 0;
+  bool widthSet_ = false;
   bool hpSet_ = false;
   bool tiltSet_ = false;
   bool idle_ = true;
