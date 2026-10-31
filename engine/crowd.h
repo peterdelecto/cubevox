@@ -38,7 +38,7 @@
 namespace cv {
 
 struct CrowdTuning {
-  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -3.0f, 1.0f};     // full pitch offset 2^(st / 12) at WIDTH 1
+  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -2.5f, 1.0f};     // full pitch offset 2^(st / 12) at WIDTH 1
   std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at WIDTH 1
   std::array<float, 4> tiltDb = {-3.0f, -4.0f, 3.0f, 5.0f};        // high shelf gain above tiltHz
   std::array<float, 4> delayMs = {40.0f, 100.0f, 70.0f, 75.0f};    // lag behind the lead before lagScale
