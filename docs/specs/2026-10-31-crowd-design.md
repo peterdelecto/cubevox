@@ -67,8 +67,11 @@ percent knob with no decimals, so the readout sweep test holds as it is.
    rule holds by construction; trimDb in tuning takes up the residue level_test measures on the
    180 Hz program.
 4. Fade order, low, high, low, high, by voice index (full pitch, throat, delay before the lag scale):
-   0 (−1.75 st, −1.75 st, 40 ms), 1 (+2.75 st, −1 st, 100 ms), 2 (−3 st, −1 st, 70 ms),
-   3 (+1 st, −1.5 st, 75 ms). One voice is a second singer, two a pair, four the crowd.
+   0 (−1.75 st, −1.75 st, 40 ms), 1 (+3 st, +1.65 st, 100 ms), 2 (−3 st, −1 st, 70 ms),
+   3 (+1 st, −1.5 st, 75 ms). One voice is a second singer, two a pair, four the crowd. Voice 1 is the
+   owner's higher voice (owner 2026-10-31, "voice 2" in the owner's count): its tone shelf is flat, and
+   it carries a tilt of +2 dB and a shimmer of 1 dB (Per-copy tilt and shimmer, below). The other three
+   carry neither.
 5. Gains are computed per block and ramped per sample across the block, as Octave and the reverb
    MIX do. A voice whose ramped gain sits at 0 is reset and does not tick, so one voice costs a
    quarter of four.
@@ -117,6 +120,9 @@ away from the lead would sound out of tune on a melodic line.
 2. Contour follows f. The contour a copy uses is 1 + (contour[v] − 1) × f(w): exactly 1.0 at w = 0,
    within 0.5 % of 1.0 at the knee and the slider value at w = 1.
 
+The tilt and the shimmer of every copy, voice 5 included, scale by the same f(w) (owner 2026-10-31): the tilt
+in dB and the shimmer in dB applied are the settings times f(w), exactly 0 at w = 0 and the settings at w = 1.
+
 At w = 1 f is exactly 1, so the drift and the contour are what they were before the scaling. Timing
 scatter, loudness scatter, the tone shelves, epoch alignment, VOICES and solo do not follow the knob.
 
@@ -164,9 +170,11 @@ Filter coefficients update per block only, since the setters call libm.
 ```
 namespace cv {
 struct CrowdTuning {
-  std::array<float, 4> pitchSt     = {-1.75f, 2.75f, -3.0f, 1.0f};   // full pitch offset 2^(st / 12) at WIDTH 1
-  std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, -1.5f}; // grain playback rate 2^(st / 12)
-  std::array<float, 4> tiltDb      = {-3.0f, -4.0f, 3.0f, 5.0f};     // high shelf gain above tiltHz
+  std::array<float, 4> pitchSt     = {-1.75f, 3.0f, -3.0f, 1.0f};    // full pitch offset 2^(st / 12) at WIDTH 1
+  std::array<float, 4> formantSt   = {-1.75f, 1.65f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12)
+  std::array<float, 4> tiltDb      = {-3.0f, 0.0f, 3.0f, 5.0f};       // high shelf gain above tiltHz
+  std::array<float, 4> tilt        = {0.0f, 2.0f, 0.0f, 0.0f};        // whole-spectrum tilt in dB at WIDTH 1, -6..6, 0 skips it
+  std::array<float, 4> shimmer     = {0.0f, 1.0f, 0.0f, 0.0f};        // per-cycle random gain in dB at WIDTH 1, 0..1, 0 draws nothing
   std::array<float, 4> delayMs     = {40.0f, 100.0f, 70.0f, 75.0f};  // lag behind the lead before lagScale
   float lagScale     = 1.2f;      // a copy's lag is delayMs times this times the WIDTH multiplier
   float tiltHz       = 2500.0f;
@@ -205,8 +213,9 @@ Off: out equals in bit for bit.
 
 ### Per-voice chain
 
-ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D_v) → tone shelf →
-× g w_v → crowd sum.
+ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D_v) → tilt → tone shelf →
+× g w_v → crowd sum. The tilt and the shimmer (a random gain on each grain) are described under
+Per-copy tilt and shimmer, below; at 0 the tilt stage is skipped and the voice draws no shimmer.
 
 1. Voice. A new class in crowd.h, a PSOLA voice with a grain playback rate. It is built from the
    deleted `EpochPsolaVoice` (`git show 9b715ec^:engine/shifters.h`, launch at its lines 143-152,
@@ -279,8 +288,8 @@ wet sum before it meets the lead, per the output-safety spec.
    unchanged by this spec; the owner listens to the card in the module view.
    `--layout` must print ok. The tuning nodes are Formants (4 sliders, −4..+4 st), Pitch (4,
    −12..+12 st, the full values), Delay (4, 5..200 ms, lagScale 0.5..2, Lag at bottom 0.2..1 and Lag at top
-   0..60 ms), Tone (4 tiltDb and
-   tiltHz), Scatter (scatterMs 0..30 ms, driftCents 0..50) and Solo (4 checkboxes). Print tuning lists every CrowdTuning field. The Crowd
+   0..60 ms), Tone (4 tiltDb, tiltHz and the 4 tilts in one row, -6..+6 dB), Scatter (scatterMs 0..30 ms,
+   driftCents 0..50 and 4 shimmers, 0..1 dB) and Solo (4 checkboxes). Print tuning lists every CrowdTuning field. The Crowd
    tuning has no state keys.
 2. cubevox-render: `--crowd`, `--width <0..1>`, `--voices <0..1>`; tuning keys prefixed `crowd`
    (`crowdVoiceDb`, `crowdTrimDb`, `crowdFormantSt0..3`, `crowdPitchSt0..3`, `crowdTiltDb0..3`,
@@ -297,9 +306,8 @@ wet sum before it meets the lead, per the output-safety spec.
    3. pitch moves by pitchSt: one voice alone (VOICES 0.2, WIDTH 1): output f0 within 10 cents
       of 220 × 2^(pitchSt / 12) on a 220 Hz tone, for each of the four voices (Goertzel helpers
       copied from octave_test.cpp).
-   4. formant moves: centroid over harmonics 1..10 at +1 st (no default copy has a shorter throat;
-      the probe holds the lag at 90 ms) at least 1.03 × the formant-0 centroid, and at voice 0's
-      (−1.75 st) at most 0.94 ×.
+   4. formant moves: centroid over harmonics 1..10 at +1 st (the probe holds the lag at 90 ms) at
+      least 1.03 × the formant-0 centroid, and at voice 0's (−1.75 st) at most 0.94 ×.
    5. level law: total RMS at VOICES 0.2, 0.4, 0.6, 0.8 and 1.0 within −1.5..+1.0 dB of the input
       on the 180 Hz program.
    6. the lead leaves: at VOICES 1.0 a probe accessor reports lead gain 0 after the ramp.
@@ -313,7 +321,7 @@ wet sum before it meets the lead, per the output-safety spec.
    9. tracker runs without Autotune: PitchFxParams with autotune.on false and crowdOn true gives
       period > 0 on the tone within 60 ms.
    10. voices differ: voice 0 alone and voice 1 alone on the 220 Hz tone differ in spectral
-      centroid (harmonics 1..20 of each voice's own f0) by at least 5 % (8.9 % at the defaults).
+      centroid (harmonics 1..20 of each voice's own f0) by at least 5 % (25.6 % at the defaults).
    11. scatter: scatterMs 15 on copy 4 over ten bursts at WIDTH 1, each burst's lag within ±15 ms of 105 ms
       and varying from burst to burst; f0 inside each burst within 10 cents of the copy's offset.
    12. drift: driftCents 20 on a 6 s tone, the copy's f0 in 0.5 s windows within ±20 cents of its
@@ -327,8 +335,10 @@ wet sum before it meets the lead, per the output-safety spec.
       all four.
    14. fade order: at WIDTH 1 and at WIDTH 0.5, at VOICES 0.2, 0.4, 0.6 and 0.8 the output has a
       spectral line at the f0 of each voice that has come in (at least 0.4 of the loudest line) and
-      none at the f0 of the voices still to come (at most 0.1), so the order is −1.75 st, +2.75 st,
-      −3 st, +1 st (their offsets times f(w)).
+      none at the f0 of the voices still to come (at most 0.1), so the order is −1.75 st, +3 st,
+      −3 st, +1 st (their offsets times f(w)). The lines are read through a Hann window, since the lead's
+      line sits 6 Hz from the +1 st copy's at WIDTH 0.5 and leaks 0.11 of a copy's line into a
+      rectangular window.
    15. working set: the defaults hold the working set below, and a run on them stays finite and
       within 2.5 dB of the level of the neutral card. Every other test starts from a neutral tuning
       (no scatter, no drift, no level scatter, contour 1, epoch align off) and turns on only what it
@@ -347,14 +357,32 @@ wet sum before it meets the lead, per the output-safety spec.
       sounds in copy 2's output leaves its lag at 60 ms to the end of that burst and puts the next
       burst at 140 ms.
    19. width 0 is a delay: at WIDTH 0 each copy alone at VOICES 1.0 on the working set, with the tone
-      shelf flat and the trim off, turns a steady 220 Hz tone into the gain-scaled input at the lag it
-      took, through the same low cut and DC blocker. The lag is searched within half a period of the
+      shelf flat and the trim off and the shipped tilt and shimmer in place (they scale to 0), turns a
+      steady 220 Hz tone into the gain-scaled input at the lag it took, through the same low cut and DC blocker. The lag is searched within half a period of the
       engine's lag and the gain fitted, since level scatter draws one. With the shipped epoch align on
       the worst sample error is under 1e-4 (4.2e-5, the float rounding of the 120 Hz low cut). The same
       copy at WIDTH 0.1 is more than 100 times further from the delayed input.
    20. epoch snap at WIDTH 0 and 0.1: on the jittery 150 Hz pulse train a copy with formant +2 st and
       pitch 0 at WIDTH 0 has the same samples with epoch align on and off. At WIDTH 0.1 the two differ
       and the pulse cut is cleaner than the grid by at least 2 dB (4.1 dB).
+   21. owner voice pitch and throat (voice 1 alone at WIDTH 1, VOICES 0.2, solo bit 1): f0 on the 220
+      Hz tone within 10 cents of 220 × 2^(3 / 12), and its centroid over harmonics 1..10 of its own f0
+      on the vowel above the unshifted copy's and above a +3 st copy with no throat move.
+   22. owner voice tilt: with the shimmer off, the energy above 1 kHz against the energy below 1 kHz
+      (harmonics of its f0 up to 4.4 kHz) rises by 1.5 to 2.5 dB over the same voice at tilt 0
+      (1.59 dB).
+   23. owner voice shimmer: with the tilt off and the pulse cut on, the gain of each cycle read at its
+      peak against the same voice at shimmer 0. Neighbouring cycles differ by 0.3 to 1.5 dB on average
+      and so does the standard deviation (0.93 and 0.85 dB over 758 cycles). A negative shimmer clamps
+      to 0 and gives the samples of shimmer 0.
+   24. tilt and shimmer follow WIDTH: at WIDTH 0 voice 1 with its shipped tilt and shimmer gives the
+      samples of voice 1 with both at 0, and so does voice 5 with a tilt of 4 dB and a shimmer of 1 dB.
+      At WIDTH 0.5 the tilt rise of test 22 and the cycle spread of test 23 are the WIDTH 1 values times
+      f(0.5) = 0.451, to within 0.12 of that ratio (0.444, and 0.464 with 0.456 for the standard
+      deviation).
+   25. tilt and shimmer neutral: the three recorded runs of Measured item 1 (the pinned tuning, with
+      voice 1 as it was before the owner's voice) hash to the recorded values with every tilt and
+      shimmer at 0, and still do with tilts under 0.005 dB and negative shimmers.
 2. level_test: a Crowd card row at VOICES 0.5 and WIDTH 0.5 on the default tuning (the working set) in
    the 0..+0.5 dB band, as a lambda row driving PitchFx then Crowd (the two-stage row pattern at
    level_test.cpp:235-243).
@@ -522,6 +550,10 @@ range.
 ### Tuning
 
 ```
+pitchSt        = {-1.75, 3, -3, 1}      // st at WIDTH 1; voice 1 is the owner's voice (2026-10-31)
+formantSt      = {-1.75, 1.65, -1, -1.5} // st at WIDTH 1
+tiltDb         = {-3, 0, 3, 5}          // dB, the tone shelf above tiltHz
+delayMs        = {40, 100, 70, 75}      // ms before lagScale
 scatterMs      = 12       // 0..30 ms
 driftCents     = 15       // 0..50 cents
 widthKnee      = 0.1      // 0.02..0.9
@@ -530,6 +562,8 @@ widthLagBottom = 0.5      // 0.2..1
 widthLagMs     = 20       // 0..60 ms
 levelScatterDb = 2        // 0..4 dB
 contour        = {0.8, 1.2, 0.7, 1.1}   // 0.6..1.4
+tilt           = {0, 2, 0, 0}           // -6..6 dB at WIDTH 1, whole-spectrum tilt, times f(w)
+shimmer        = {0, 1, 0, 0}           // 0..1 dB at WIDTH 1, per-cycle random gain, times f(w)
 epochAlign     = true
 epochSearch    = 0.25     // 0..0.3 periods
 trimDb         = 1.0      // dB
@@ -607,8 +641,9 @@ Host, -O2, 48 kHz, `test/crowd_test.cpp` unless noted.
    gains Width knee and Offsets at knee sliders, an Epoch align checkbox and an Epoch search slider.
    The Delay node gains Lag at bottom (0.2..1) and Lag at top (0..60 ms). Print tuning lists every new field.
 2. cubevox-render keys `crowdWidthKnee`, `crowdWidthKneeFrac`, `crowdWidthLagBottom` (0.2..1),
-   `crowdWidthLagMs` (0..60), `crowdLevelScatterDb`, `crowdContour0..3`, `crowdEpochAlign` (0 or 1) and
-   `crowdEpochSearch`. A value outside its range is refused.
+   `crowdWidthLagMs` (0..60), `crowdLevelScatterDb`, `crowdContour0..3`, `crowdTilt0..3` (-6..6 dB),
+   `crowdShimmer0..3` (0..1 dB), `crowdEpochAlign` (0 or 1) and `crowdEpochSearch`. A value outside its
+   range is refused.
 3. The firmware never sets any of them.
 
 ## Voice 5 trial (owner 2026-10-31)
@@ -618,6 +653,8 @@ trial for a fifth voice? and expose sliders and a solo button for that voice?" T
 the formant paired the natural way, prosody, the source (pressed or lax, breath, creak), individual
 formants, and jitter and shimmer. The Rule above holds, so the copy must sound like an actual person
 and every range below is bounded for one. Code is `engine/crowd.h` and `engine/crowd_trial.h`.
+
+Voice 2 (owner 2026-10-31): the trial's higher voice, pitch +3, formant +1.65, contour 1.2, tilt +2, shimmer 1, replaces the second copy; peak and notch removed as inaudible.
 
 ### What it is
 
@@ -629,8 +666,8 @@ and every range below is bounded for one. Code is `engine/crowd.h` and `engine/c
 3. Its lag follows the Lag law from `delayMs5` and the same WIDTH multiplier m(w) as the four, which is
    computed from the four's delays and does not read `delayMs5`. Timing scatter, level scatter, drift and the
    quiet-gap rule apply to it as to the others.
-4. Its pitch, formant, contour and jitter take the WIDTH factor f(w). At WIDTH 0 its pitch is the lead's
-   exactly. The tilt, peak, notch, breath and shimmer do not follow the knob, as the tone shelves do not.
+4. Its pitch, formant, contour, jitter, tilt and shimmer take the WIDTH factor f(w). At WIDTH 0 its pitch is
+   the lead's exactly. The breath does not follow the knob, as the tone shelves do not.
 5. Float only, no heap, no libm per sample. Filter coefficients are set on the first block and when a
    value moves. It reads the same ring and tracker as the others, so it costs no extra PitchFx work.
 
@@ -649,8 +686,6 @@ The fields sit in `CrowdTuning`, and the engine clamps each to its range.
 | `v5TiltDb` | -6..+6 dB | 0 | spectral tilt, pressed when positive and lax when negative |
 | `v5Breath` | 0..0.3 | 0 | noise under the copy |
 | `v5Fry` | 0..1 | 0 | vocal fry at the end of a phrase |
-| `v5PeakHz`, `v5PeakDb` | 2000..4000 Hz, -6..+6 dB | 3000, 0 | one peak, Q 2, for the third formant |
-| `v5NotchHz`, `v5NotchDb` | 800..2000 Hz, -12..0 dB | 1200, 0 | one cut, Q 3, for a nasal anti-resonance |
 | `v5Jitter` | 0..1 % | 0 | random length of each cycle |
 | `v5Shimmer` | 0..1 dB | 0 | random loudness of each cycle |
 
@@ -667,19 +702,19 @@ The fields sit in `CrowdTuning`, and the engine clamps each to its range.
 ### Controls
 
 1. Tilt. A low shelf at -v5TiltDb / 2 and a high shelf at +v5TiltDb / 2, both at 1 kHz, so the high end
-   sits v5TiltDb above the low end. Stages whose gain is under 0.005 dB are skipped.
-2. Peak and notch. Two peaking biquads from `engine/dsp.h`, Q 2 at 2..4 kHz and Q 3 at 0.8..2 kHz, skipped at
-   0 dB.
-3. Breath. White noise from an xorshift through a 2 kHz high-pass, times an envelope follower on the copy
-   (10 ms attack, 60 ms release), times `v5Breath`, added after the filters. The follower rides the copy, so
+   sits v5TiltDb above the low end. Stages whose gain is under 0.005 dB are skipped. The four other copies
+   have the same tilt (Per-copy tilt and shimmer, below).
+2. Breath. White noise from an xorshift through a 2 kHz high-pass, times an envelope follower on the copy
+   (10 ms attack, 60 ms release), times `v5Breath`, added after the tilt. The follower rides the copy, so
    the noise swells with a syllable, dies with it and stays under the copy. The part above 4 kHz sits 26 dB
    under the copy at 0.08 and about 15 dB under at 0.3. At 0 none of it runs.
-4. Jitter and shimmer. Each grain draws a length scale and a gain from its own xorshift. The length scale is
+3. Jitter and shimmer. Each grain draws a length scale and a gain from its own xorshift. The length scale is
    1 + 1.5 x (v5Jitter / 100) x f(w) x u and the gain is 10^(1.5 x v5Shimmer x u / 20), with u uniform in
    -1..1. A uniform draw within +-1.5 x s makes neighbouring cycles differ by s on average, which is how local
    jitter and local shimmer are quoted. The launch clock allows for the longest cycle. Both at 0 give the
-   grains the four other copies get, bit for bit.
-5. Fry (needs `epochAlign`). A phrase is ending when the tracker's period passes 1.15 x its running mean (the
+   grains the four other copies get, bit for bit. The four other copies draw their shimmer the same way
+   (Per-copy tilt and shimmer, below).
+4. Fry (needs `epochAlign`). A phrase is ending when the tracker's period passes 1.15 x its running mean (the
    contour track's 1 s mean) while the lead's level falls (a 10 / 60 ms follower under 0.85 x a 150 ms one).
    The window then opens for 150 ms and rearms once the pitch comes back up. In the window every other
    pulse is dropped with probability `v5Fry`, so the spacing doubles where one goes, and the kept pulses
@@ -702,16 +737,15 @@ the neutral shape, so one after another leaves nothing of the last behind. They 
 ### Emulator and render
 
 1. The Crowd block gains a header "Voice 5" under its Tuning header. It holds On, Level (-40..0 dB), Lag
-   (5..200 ms), three buttons Woman, Older man and Big man, and three nodes of four sliders ("Pitch and
-   throat", "Breath and roughness", "Peak and notch") with the ranges above. The two headers share the
+   (5..200 ms), three buttons Woman, Older man and Big man, and two nodes of four sliders ("Pitch and
+   throat", "Breath and roughness") with the ranges above. The two headers share the
    column's accordion. They are two headers, because a Voice 5 node beside the Tuning header's seven
    nodes would push the Pitch node past the column by 2 px. The Solo node gains a fifth box. Print tuning
    lists every new field. `--layout` prints ok.
 2. cubevox-render keys `crowdV5On` (0 or 1), `crowdV5Db`, `crowdDelayMs5`, `crowdV5PitchSt`,
-   `crowdV5FormantSt`, `crowdV5Contour`, `crowdV5TiltDb`, `crowdV5Breath`, `crowdV5Fry`, `crowdV5PeakHz`,
-   `crowdV5PeakDb`, `crowdV5NotchHz`, `crowdV5NotchDb`, `crowdV5Jitter` and `crowdV5Shimmer`. A value outside
-   its range is refused. `--crowd-v5 woman|older|big` applies a preset and turns voice 5 on, and a later
-   `crowdV5On=0` turns it off.
+   `crowdV5FormantSt`, `crowdV5Contour`, `crowdV5TiltDb`, `crowdV5Breath`, `crowdV5Fry`, `crowdV5Jitter` and
+   `crowdV5Shimmer`. A value outside its range is refused. `--crowd-v5 woman|older|big` applies a preset
+   and turns voice 5 on, and a later `crowdV5On=0` turns it off.
 3. The firmware never sets any of it.
 
 ### Measured
@@ -721,7 +755,8 @@ Host, -O2, 48 kHz, `test/crowd_test.cpp`.
 1. Voice 5 off. The 180 Hz program at VOICES 70 % and WIDTH 50 %, the burst program at 80 % and 50 %, and
    the burst program at 60 % and 80 % with scatter 15 ms and drift 20 cents hash to 12873f20ed548ec8,
    8ff1eb8ee12b722c and d9de9308d8365971 on the engine before voice 5 and after it, and with voice 5's
-   fields set to the older man and its solo bit set but `voice5On` off. The test holds the three values.
+   fields set to the older man and its solo bit set but `voice5On` off. The test holds the three values,
+   on the pinned tuning (voice 1 as it was before the owner's voice, with every tilt and shimmer at 0).
 2. Woman on a 220 Hz tone. The f0 reads 311.15 Hz against 311.13 Hz (0.15 cents). The centroid over
    harmonics 1..10 reads 898.0 Hz against 751.1 Hz for the copy with no offsets. The breath above 4 kHz is
    26.1 dB under the copy, moves 6.0 dB for a 6 dB drop of the copy, and sits 79.5 dB down in a gap. The
@@ -729,21 +764,23 @@ Host, -O2, 48 kHz, `test/crowd_test.cpp`.
 3. Older man on a 220 Hz phrase of 900 ms steady then 350 ms of a 20 % pitch fall with the level fading
    to 0.15. The last 150 ms of the copy holds 7 intervals of twice the period out of 17. The same phrase at
    steady pitch holds 0 of 29, and the same fall holds 0 with the pulse cut off or with `v5Fry` at 0.
-4. Shape. Tilt +6 dB moves the 300 Hz line -2.95 dB and the 2.4 kHz line +2.83 dB. A +6 dB peak at 3 kHz
-   reads +6.00 dB, and a -12 dB notch at 1.2 kHz reads -12.00 dB.
+4. Shape. Tilt +6 dB moves the 300 Hz line -2.95 dB and the 2.4 kHz line +2.83 dB.
 5. Law. Solo bit 4 leaves 1 voice ticking and the lead at 0.935 (the law's sqrt(1 - g5^2)). With all five on
-   at 80 % the lead reads 0.609 and 5 voices tick. The level with the woman preset on reads -0.12, -0.05,
-   -0.05, +0.10 and -0.16 dB at VOICES 0, 20, 50, 80 and 100 % (WIDTH 50 %, neutral four). A plain voice 5
+   at 80 % the lead reads 0.609 and 5 voices tick. The level with the woman preset on reads -0.07, -0.00,
+   +0.00, +0.13 and -0.10 dB at VOICES 0, 20, 50, 80 and 100 % (WIDTH 50 %, neutral four with the
+   owner's voice 2). A plain voice 5
    (no offsets) is a delayed double of the lead, so it combs against it and reads -1.77 dB at VOICES 0, which
    is why the level check runs on a preset.
 6. WIDTH. The woman preset's f0 reads +0.00 cents from the lead at WIDTH 0 and +0.37 cents from +2.71 st at
    WIDTH 50 %.
 7. Ranges. Values past every range give the same samples as the range ends.
-8. Host cost, working set at VOICES 80 % and WIDTH 50 %, 3.78 us per block with four copies. Voice 5 adds
-   1.29 us (woman, x1.34), 1.40 us (older man, x1.37) and 1.04 us (big man, x1.28), which is about 68k, 74k
-   and 55k board cycles at Unison's 46.9k. `costs.h` is not re-benched.
+8. Host cost, working set at VOICES 80 % and WIDTH 50 %, 4.18 us per block with four copies (the owner's
+   voice 2 added a tilt and a shimmer; it was 3.78 us). Voice 5 adds 1.25 us (woman, x1.30), 1.35 us (older
+   man, x1.32) and 0.99 us (big man, x1.24), which is about 67k, 72k and 53k board cycles at Unison's 46.9k.
+   `costs.h` is not re-benched.
 9. Firmware. The build ends `[warn-gate] 62 files ... ok`, DTCM 121,088 of 130,816 B (unchanged, since the
-   Crowd card is a plain global), D1 SRAM 191,320 B.
+   Crowd card is a plain global), D1 SRAM 191,320 B when voice 5 landed and 191,632 B after the per-copy
+   tilt and shimmer.
 
 ### Where the code differs from the brief
 
@@ -757,3 +794,81 @@ Host, -O2, 48 kHz, `test/crowd_test.cpp`.
    between the ends.
 5. The level check of item 5 runs on the woman preset and not on a plain voice 5.
 6. The Voice 5 controls sit under their own header (Emulator and render, item 1).
+
+## Per-copy tilt and shimmer, and the owner's voice 2 (owner 2026-10-31)
+
+Owner, 2026-10-31, after trying the fifth voice: "adding a higher pitched voice with these attributes is
+convincing: pitch +3 st, formant +1.65 st, contour 1.2, tilt +2, breath 0, fry 0, jitter 0, shimmer 1.
+peak and notch didn't seem to make a ton of difference to me... we can sub this for voice 2."
+
+### What changed
+
+1. The four main copies gain the two controls the trial proved, per copy. `tilt[4]` is the whole-spectrum
+   tilt of voice 5 (a low shelf at -tilt / 2 and a high shelf at +tilt / 2, both at 1 kHz, -6..+6 dB).
+   `shimmer[4]` is the per-cycle random gain of voice 5 (each grain takes a gain within +-1.5 x shimmer dB,
+   0..1 dB). Both defaults are 0 except on voice 1.
+2. Voice index 1, the second in line, is the owner's higher voice: pitchSt +3, formantSt +1.65, contour 1.2,
+   tone shelf tiltDb 0, tilt +2, shimmer 1. Its lag (delayMs 100, the 140 ms top of the lag table) and its
+   place in the fade order are unchanged. The tone shelf was -4 dB and the pitch and throat +2.75 and -1 st.
+3. Voice 5 loses its peak and notch (`v5PeakHz`, `v5PeakDb`, `v5NotchHz`, `v5NotchDb`), their two biquads, sliders,
+   render keys, tests and spec lines. It stays the trial slot, off by default.
+
+### How it runs
+
+1. A copy at tilt 0 and shimmer 0 runs exactly the code it ran before (bit exact, test 25). A tilt under 0.005
+   dB skips the two shelves. A shimmer of 0 leaves the voice without a luck source, so its launch clock and
+   grain gains are the old ones. Both clamp to their ranges.
+2. The tilt filters run on the voice's output before the tone shelf. A stage that wakes from off starts with
+   empty filter state. The shelves are set on the first block and when the tilt moves, never per sample.
+3. Each copy draws its shimmer from its own xorshift, seeded at reset and when the copy is retired. Voice 5
+   keeps the seed it had.
+4. Both controls take the WIDTH factor f(w), voice 5's included (WIDTH law, above): the tilt and the shimmer
+   applied are the settings times f(w). Voice 1 therefore has its +2 dB tilt and 1 dB shimmer only as WIDTH
+   rises, and at WIDTH 0 it is a plain delayed double of the lead. Test 19 runs with the shipped tilt and
+   shimmer in place and still meets its bound. Both are set per block, so the shelves move through the
+   20 ms WIDTH one-pole and not in a jump.
+5. Memory: the Crowd card's plain global grows by about 0.3 KB (four tilt pairs and five luck sources), and the
+   firmware build reports D1 SRAM at 191,632 B against the 191,320 B recorded with voice 5. DTCM is
+   unchanged at 121,088 B.
+
+### Emulator and render
+
+1. The Tone node gains the four tilts in one row (`SliderFloat4`, "Tilt 1-4 dB"). Four stacked sliders put the
+   node at 733 px and overran the column (the Pitch node, the tallest before, reads 710 px). The Scatter node gains Shimmer 1..4 (0..1 dB). Print tuning lists
+   `tilt` and `shimmer` after `contour`, and no longer lists the four peak and notch fields. The "Peak and
+   notch" node and its probe scenario are gone. `--layout` prints ok.
+2. cubevox-render keys `crowdTilt0..3` and `crowdShimmer0..3`, refused outside -6..6 and 0..1. The four
+   `crowdV5Peak*` and `crowdV5Notch*` keys are gone. The parity test compares both arrays.
+
+### Measured
+
+Host, -O2, 48 kHz, `test/crowd_test.cpp`.
+
+1. Voice 1 alone at WIDTH 1 reads f0 261.63 Hz against 261.63 Hz (0.01 cents). On the vowel its centroid over
+   harmonics 1..10 reads 1239.6 Hz, against 1100.1 Hz for the unshifted copy and 1116.7 Hz for the +3 st copy
+   with no throat move.
+2. Tilt +2 dB on voice 1 moves the energy above 1 kHz against the energy below by +1.59 dB (+0.47 dB at tilt 2,
+   -1.12 dB at tilt 0). Less than the 2 dB between the shelf ends, because the harmonics near 1 kHz sit
+   half way up the shelves.
+3. Shimmer 1 dB on voice 1, cut on the pulses: over 758 cycles neighbouring cycles differ by 0.93 dB and the
+   gains have a standard deviation of 0.85 dB (the draw is uniform within +-1.5 dB). Shimmer 0 and a clamped
+   -1 give the same samples.
+4. The three recorded runs of Voice 5 trial, Measured item 1 hash to 12873f20ed548ec8, 8ff1eb8ee12b722c and
+   d9de9308d8365971 with every tilt and shimmer at 0 on the pinned tuning, and still do with tilts of
+   0.003, -0.004 and 0.002 dB and shimmers under 0.
+5. Level. `trimDb` stays 1.0 dB. The level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.16 dB, inside the
+   0 to +0.5 dB band. The level law reads +0.07, +0.09, +0.07, +0.23 and +0.01 dB at VOICES 20, 40, 60, 80 and
+   100 % at WIDTH 0.5, and the crowd alone at VOICES 100 % reads -5.14 dB at WIDTH 0 and -0.37 dB at WIDTH 100 %.
+6. Voices differ: the spectral centroids of voice 0 and voice 1 alone differ by 25.6 % (8.9 % before).
+7. WIDTH. Test 19 with the shipped tilt and shimmer in place reads a worst error of 2.43e-05, 4.23e-05
+   (voice 1), 1.83e-05 and 1.43e-05 for the four copies at WIDTH 0, inside the 1e-4 bound and equal to the
+   readings with both zeroed, since both scale to exactly 0. At WIDTH 0.5 voice 1's tilt rise reads 0.71 dB
+   (0.444 of its 1.59 dB at WIDTH 1) and its cycle spread 0.43 dB (0.464 of 0.93 dB, and 0.456 for the
+   standard deviation), against f(0.5) = 0.451.
+
+### Where the code differs from the brief
+
+1. The four tilts share one row in the Tone node (Emulator and render, item 1).
+2. The fade-order test reads its lines through a Hann window. At WIDTH 0.5 and VOICES 60 % the +1 st copy's
+   f0 sits 6 Hz from the lead's, and the lead's line leaked 0.11 of a copy's line into a rectangular
+   window (0.06 before the owner's voice moved another line). Windowed, the silent copy reads 0.01.

@@ -36,17 +36,23 @@
 // 1, epoch align off), and the output is then bit for bit the output without it. The defaults are
 // the owner's working set.
 //
+// Two more controls, tilt and shimmer, are per copy and neutral at 0. Tilt leans the whole spectrum of
+// a copy, and shimmer gives each of its cycles a random loudness. WIDTH scales both, so a copy is a
+// plain delayed double of the lead at WIDTH 0. Voice index 1 is the owner's higher
+// voice (owner 2026-10-31), the one the trial voice proved: +3 st, a shorter throat, contour 1.2, tilt
+// +2 dB and shimmer 1 dB.
+//
 // Voice 5 is a trial copy outside the VOICES law (owner 2026-10-31). It tries to sound like a person of
 // another sex, age or body size, with its own pitch, throat, contour, spectral tilt, breath, vocal fry,
-// peak, notch, jitter and shimmer. It is off by default, and off it does not tick and moves no sample
-// of the other four.
+// jitter and shimmer. It is off by default, and off it does not tick and moves no sample of the other
+// four.
 
 namespace cv {
 
 struct CrowdTuning {
-  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -3.0f, 1.0f};     // full pitch offset 2^(st / 12) at WIDTH 1
-  std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at WIDTH 1
-  std::array<float, 4> tiltDb = {-3.0f, -4.0f, 3.0f, 5.0f};        // high shelf gain above tiltHz
+  std::array<float, 4> pitchSt = {-1.75f, 3.0f, -3.0f, 1.0f};      // full pitch offset 2^(st / 12) at WIDTH 1
+  std::array<float, 4> formantSt = {-1.75f, 1.65f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at WIDTH 1
+  std::array<float, 4> tiltDb = {-3.0f, 0.0f, 3.0f, 5.0f};         // high shelf gain above tiltHz
   std::array<float, 4> delayMs = {40.0f, 100.0f, 70.0f, 75.0f};    // lag behind the lead before lagScale
   float lagScale = 1.2f;       // a copy's lag is delayMs times this
   float tiltHz = 2500.0f;
@@ -82,6 +88,16 @@ struct CrowdTuning {
   // the copy's rises and falls to 70 % of his, 1.3 exaggerates them.
   std::array<float, 4> contour = {0.8f, 1.2f, 0.7f, 1.1f};
 
+  // Per-copy tilt of the whole spectrum in dB (-6..6): a low shelf at -tilt / 2 and a high shelf at
+  // +tilt / 2, both at 1 kHz, so the high end sits tilt above the low end. 0 skips the stage. The tilt
+  // applied is this times the WIDTH factor, so it is 0 at WIDTH 0 and the setting at WIDTH 1.
+  std::array<float, 4> tilt = {0.0f, 2.0f, 0.0f, 0.0f};
+
+  // Per-copy shimmer in dB (0..1): each grain takes a random gain within +-1.5 x shimmer, so
+  // neighbouring cycles differ by shimmer on average. 0 draws nothing. The shimmer applied is this
+  // times the WIDTH factor, so it is 0 at WIDTH 0 and the setting at WIDTH 1.
+  std::array<float, 4> shimmer = {0.0f, 1.0f, 0.0f, 0.0f};
+
   // True cuts each grain on the glottal pulse nearest its grid mark, except in a copy whose pitch
   // ratio and grain playback rate are both exactly 1 (WIDTH 0), which stays on the grid. epochSearch
   // is the half-width in periods of the peak search around each expected pulse (0..0.3).
@@ -90,7 +106,7 @@ struct CrowdTuning {
 
   // Voice 5. It adds to the crowd at voice5Db against the lead whatever VOICES says, and the lead
   // law counts its power with the others. Its lag follows the same law from delayMs5, and its pitch,
-  // formant, contour and jitter take the same WIDTH factor. The fields below it shape the person.
+  // formant, contour, jitter, tilt and shimmer take the same WIDTH factor. The fields below it shape the person.
   bool voice5On = false;
   float voice5Db = -9.0f;       // -40..0
   float delayMs5 = 65.0f;       // 5..200
@@ -100,10 +116,6 @@ struct CrowdTuning {
   float v5TiltDb = 0.0f;        // -6..6, high shelf up and low shelf down by half each at 1 kHz
   float v5Breath = 0.0f;        // 0..0.3, noise under the copy
   float v5Fry = 0.0f;           // 0..1, vocal fry at phrase ends; needs epochAlign
-  float v5PeakHz = 3000.0f;     // 2000..4000, the third formant
-  float v5PeakDb = 0.0f;        // -6..6
-  float v5NotchHz = 1200.0f;    // 800..2000, a nasal anti-resonance
-  float v5NotchDb = 0.0f;       // -12..0
   float v5Jitter = 0.0f;        // 0..1 %, local jitter of the cycle length
   float v5Shimmer = 0.0f;       // 0..1 dB, local shimmer of the cycle loudness
 };
@@ -132,10 +144,6 @@ inline CrowdTuning voice5Neutral(CrowdTuning t) {
   t.v5TiltDb = d.v5TiltDb;
   t.v5Breath = d.v5Breath;
   t.v5Fry = d.v5Fry;
-  t.v5PeakHz = d.v5PeakHz;
-  t.v5PeakDb = d.v5PeakDb;
-  t.v5NotchHz = d.v5NotchHz;
-  t.v5NotchDb = d.v5NotchDb;
   t.v5Jitter = d.v5Jitter;
   t.v5Shimmer = d.v5Shimmer;
   return t;
@@ -217,22 +225,18 @@ constexpr float kMaxLevelScatterDb = 4.0f;
 constexpr float kMinContour = 0.6f;
 constexpr float kMaxContour = 1.4f;
 
-// The ranges of voice 5's controls. The engine clamps to them.
+// The ranges of the tilt and the shimmer, which every copy has. The engine clamps to them.
+constexpr float kMaxTiltDb = 6.0f;
+constexpr float kMaxShimmerDb = 1.0f;
+
+// The ranges of voice 5's own controls. The engine clamps to them.
 constexpr float kMinV5Db = -40.0f;
 constexpr float kMinV5DelayMs = 5.0f;
 constexpr float kMaxV5DelayMs = 200.0f;
 constexpr float kMaxV5PitchSt = 12.0f;
 constexpr float kMaxV5FormantSt = 6.0f;
-constexpr float kMaxV5TiltDb = 6.0f;
 constexpr float kMaxV5Breath = 0.3f;
-constexpr float kMinV5PeakHz = 2000.0f;
-constexpr float kMaxV5PeakHz = 4000.0f;
-constexpr float kMaxV5PeakDb = 6.0f;
-constexpr float kMinV5NotchHz = 800.0f;
-constexpr float kMaxV5NotchHz = 2000.0f;
-constexpr float kMinV5NotchDb = -12.0f;
 constexpr float kMaxV5JitterPct = 1.0f;
-constexpr float kMaxV5ShimmerDb = 1.0f;
 constexpr float kFryLoudnessDb = 3.0f;  // the peak swing of a kept pulse at v5Fry 1
 
 // Samples in a whole number of milliseconds.
@@ -728,7 +732,7 @@ class Crowd {
   float grainRate(size_t v) const { return voice_[v].rate(); }
 
   // Whether voice 5's fry window was open in the last block.
-  bool fryActive() const { return luck_.frying; }
+  bool fryActive() const { return luck_[kTrial].frying; }
 
  private:
   using FormantPsolaVoice = crowd_detail::FormantPsolaVoice;
@@ -788,14 +792,17 @@ class Crowd {
     drift_[v].reset();
     levelMul_[v] = 1.0f;
     live_[v] = false;
+
+    // Voice 5 keeps the seed it has always had, and each main copy draws its shimmer from its own.
+    luck_[v].seed(0xA511B2D7u ^ (0x9E3779B9u * static_cast<uint32_t>(kTrial - v)));
+    luck_[v].frying = false;
     if (v == kTrial) {
       trial_.clear();
       fry_.reset();
-      luck_.seed(0xA511B2D7u);
-      luck_.frying = false;
       return;
     }
     tilt_[v].clear();
+    spectrum_[v].clear();
   }
 
   // The low cut on the crowd sum. The setter runs on the first block after a reset and when the
@@ -917,7 +924,11 @@ class Crowd {
     const CrowdTuning& t = b.t;
     live_[v] = true;
     ++active_;
-    if (v == kTrial) prepareTrial(t, b);
+    if (v == kTrial) {
+      prepareTrial(t, b);
+    } else {
+      prepareMain(v, t, b);
+    }
     const bool roll = b.levelDb > 0.0f;
     if (lag_[v].settle(b.view, lagTarget(t, v, b.lagMul), b.scatterSmp, b.period, roll)) voice_[v].markReset();
     levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
@@ -929,28 +940,37 @@ class Crowd {
     voice_[v].setEpochs(b.epochs);
   }
 
-  // Voice 5 only. Hands the cutting its jitter, shimmer and fry, and the chain its colour. Fry needs
-  // the pulse cut, since it drops pulses, and watches the lead only while it is on.
+  // A main copy's tilt and shimmer, each its setting times the WIDTH factor, so both are exactly 0 at
+  // WIDTH 0. A shimmer of 0 leaves the voice without luck, so it cuts exactly as it does without the
+  // control, and a tilt of 0 skips the filters.
+  void prepareMain(size_t v, const CrowdTuning& t, const Block& b) {
+    namespace cd = crowd_detail;
+    const float shimmer = clampf(t.shimmer[v], 0.0f, cd::kMaxShimmerDb) * b.width;
+    luck_[v].shimmerDb = shimmer;
+    voice_[v].setLuck(shimmer > 0.0f ? &luck_[v] : nullptr);
+    spectrum_[v].set(clampf(t.tilt[v], -cd::kMaxTiltDb, cd::kMaxTiltDb) * b.width);
+  }
+
+  // Voice 5 only. Hands the cutting its jitter, shimmer and fry, and the chain its colour. Jitter,
+  // shimmer and tilt take the WIDTH factor. Fry needs the pulse cut, since it drops pulses, and watches
+  // the lead only while it is on.
   void prepareTrial(const CrowdTuning& t, const Block& b) {
     namespace cd = crowd_detail;
+    crowd_detail::GrainLuck& luck = luck_[kTrial];
     const float fry = clampf(t.v5Fry, 0.0f, 1.0f);
-    luck_.jitter = clampf(t.v5Jitter, 0.0f, cd::kMaxV5JitterPct) * 0.01f * b.width;
-    luck_.shimmerDb = clampf(t.v5Shimmer, 0.0f, cd::kMaxV5ShimmerDb);
-    luck_.dropChance = fry;
-    luck_.fryDb = cd::kFryLoudnessDb * fry;
+    luck.jitter = clampf(t.v5Jitter, 0.0f, cd::kMaxV5JitterPct) * 0.01f * b.width;
+    luck.shimmerDb = clampf(t.v5Shimmer, 0.0f, cd::kMaxShimmerDb) * b.width;
+    luck.dropChance = fry;
+    luck.fryDb = cd::kFryLoudnessDb * fry;
     if (fry > 0.0f && t.epochAlign) {
-      luck_.frying = fry_.step(b.in, b.n, contour_.deviation());
+      luck.frying = fry_.step(b.in, b.n, contour_.deviation());
     } else {
       fry_.reset();
-      luck_.frying = false;
+      luck.frying = false;
     }
-    voice_[kTrial].setLuck(&luck_);
+    voice_[kTrial].setLuck(&luck);
     breath_ = clampf(t.v5Breath, 0.0f, cd::kMaxV5Breath);
-    trial_.set(clampf(t.v5TiltDb, -cd::kMaxV5TiltDb, cd::kMaxV5TiltDb),
-               clampf(t.v5PeakHz, cd::kMinV5PeakHz, cd::kMaxV5PeakHz),
-               clampf(t.v5PeakDb, -cd::kMaxV5PeakDb, cd::kMaxV5PeakDb),
-               clampf(t.v5NotchHz, cd::kMinV5NotchHz, cd::kMaxV5NotchHz),
-               clampf(t.v5NotchDb, cd::kMinV5NotchDb, 0.0f));
+    trial_.set(clampf(t.v5TiltDb, -cd::kMaxTiltDb, cd::kMaxTiltDb) * b.width);
   }
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
@@ -970,7 +990,7 @@ class Crowd {
     uint32_t clock;  // epoch clock of that sample
   };
 
-  // Adds voice v into crowd. The voice's tone shelf runs first, then its gain ramps to the
+  // Adds voice v into crowd. The voice's tilt and tone shelf run first, then its gain ramps to the
   // block-end target. The shelf runs on a local copy so its state stays in registers.
   void mixVoice(size_t v, const Chunk& k, float target, float* crowd) {
     if (v == kTrial) {
@@ -979,6 +999,7 @@ class Crowd {
     }
     std::array<float, kBlock> raw{};
     voice_[v].render(k.ring, k.first, k.n, raw.data(), k.clock);
+    spectrum_[v].run(raw.data(), k.n);
     Biquad tilt = tilt_[v];
     const float step = (target - gain_[v]) / static_cast<float>(k.n);
     float g = gain_[v];
@@ -989,8 +1010,8 @@ class Crowd {
     tilt_[v] = tilt;
   }
 
-  // Adds voice 5 into crowd. Its chain (tilt, peak, notch, breath) replaces the tone shelf the other
-  // four share, then its gain ramps to the block-end target.
+  // Adds voice 5 into crowd. Its chain (tilt, breath) replaces the tone shelf the other four share,
+  // then its gain ramps to the block-end target.
   void mixTrial(const Chunk& k, float target, float* crowd) {
     std::array<float, kBlock> raw{};
     voice_[kTrial].render(k.ring, k.first, k.n, raw.data(), k.clock);
@@ -1033,8 +1054,9 @@ class Crowd {
   // Copies 0..3 are the VOICES law's; copy 4 is voice 5.
   std::array<FormantPsolaVoice, kCopies> voice_{};
   Biquad hp_;
-  std::array<Biquad, kVoices> tilt_{};
+  std::array<Biquad, kVoices> tilt_{};  // the tone shelf above tiltHz
   std::array<float, kVoices> tiltDb_{};
+  std::array<crowd_detail::SpectralTilt, kVoices> spectrum_{};  // the whole-spectrum tilt
   std::array<float, kCopies> gain_{};
   std::array<bool, kCopies> live_{};
   std::array<crowd_detail::CopyLag, kCopies> lag_{};
@@ -1044,7 +1066,7 @@ class Crowd {
   crowd_detail::ContourTrack contour_;
   crowd_detail::EpochTrack epochs_;
   crowd_detail::TrialChain trial_;
-  crowd_detail::GrainLuck luck_;
+  std::array<crowd_detail::GrainLuck, kCopies> luck_{};  // a main copy uses its shimmer only
   crowd_detail::FryGate fry_;
   DcBlocker dc_;
   float lead_ = 1.0f;
