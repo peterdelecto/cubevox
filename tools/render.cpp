@@ -100,8 +100,8 @@ int usage() {
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
-               "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangDetuneCents0..3 gangDelayMs0..3 gangLfoHz0..3\n"
-               "     gangLfoCents gangRoomFeedback gangRoomLpHz gangRoomNearDb gangRoomFarDb\n"
+               "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangPitchSt0..3 gangTiltDb0..3 gangTiltHz\n"
+               "     gangDelayMs0..3 gangLfoHz0..3 gangLfoCents gangRoomFeedback gangRoomLpHz gangRoomNearDb gangRoomFarDb\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -184,8 +184,11 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gangVoiceDb", &gn.voiceDb},              {"gangTrimDb", &gn.trimDb},
       {"gangFormantSt0", &gn.formantSt[0]},      {"gangFormantSt1", &gn.formantSt[1]},
       {"gangFormantSt2", &gn.formantSt[2]},      {"gangFormantSt3", &gn.formantSt[3]},
-      {"gangDetuneCents0", &gn.detuneCents[0]},  {"gangDetuneCents1", &gn.detuneCents[1]},
-      {"gangDetuneCents2", &gn.detuneCents[2]},  {"gangDetuneCents3", &gn.detuneCents[3]},
+      {"gangPitchSt0", &gn.pitchSt[0]},          {"gangPitchSt1", &gn.pitchSt[1]},
+      {"gangPitchSt2", &gn.pitchSt[2]},          {"gangPitchSt3", &gn.pitchSt[3]},
+      {"gangTiltDb0", &gn.tiltDb[0]},            {"gangTiltDb1", &gn.tiltDb[1]},
+      {"gangTiltDb2", &gn.tiltDb[2]},            {"gangTiltDb3", &gn.tiltDb[3]},
+      {"gangTiltHz", &gn.tiltHz},
       {"gangDelayMs0", &gn.delayMs[0]},          {"gangDelayMs1", &gn.delayMs[1]},
       {"gangDelayMs2", &gn.delayMs[2]},          {"gangDelayMs3", &gn.delayMs[3]},
       {"gangLfoHz0", &gn.lfoHz[0]},              {"gangLfoHz1", &gn.lfoHz[1]},

@@ -436,14 +436,15 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   used = std::strlen(gTuningText);
   const cv::GangTuning& dt = params.gang.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
-                "\nGangTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, %.1ff}, {%.0ff, %.0ff, %.0ff, "
-                "%.0ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
-                "%.1ff, %.1ff, %.1ff, %.1ff, %.0ff, %.2ff}",
-                dt.formantSt[0], dt.formantSt[1], dt.formantSt[2], dt.formantSt[3], dt.detuneCents[0],
-                dt.detuneCents[1], dt.detuneCents[2], dt.detuneCents[3], dt.delayMs[0], dt.delayMs[1], dt.delayMs[2],
-                dt.delayMs[3], dt.lfoHz[0], dt.lfoHz[1], dt.lfoHz[2], dt.lfoHz[3], dt.lfoCents, dt.voiceDb, dt.trimDb,
-                dt.leadFadeFrom, dt.holdFrom, dt.hpNearHz, dt.hpFarHz, dt.shelfHz, dt.shelfNearDb, dt.shelfFarDb,
-                dt.roomNearDb, dt.roomFarDb, dt.roomLpHz, dt.roomFeedback);
+                "\nGangTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
+                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, %.0ff, %.1ff, %.1ff, %.1ff, "
+                "%.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.1ff, %.1ff, %.1ff, %.1ff, %.0ff, %.2ff}",
+                dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
+                dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
+                dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lfoHz[0], dt.lfoHz[1], dt.lfoHz[2],
+                dt.lfoHz[3], dt.tiltHz, dt.lfoCents, dt.voiceDb, dt.trimDb, dt.leadFadeFrom, dt.holdFrom,
+                dt.hpNearHz, dt.hpFarHz, dt.shelfHz, dt.shelfNearDb, dt.shelfFarDb, dt.roomNearDb, dt.roomFarDb,
+                dt.roomLpHz, dt.roomFeedback);
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
@@ -481,8 +482,8 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
-      "// GangTuning: {formantSt[0..3]}, {detuneCents[0..3]}, {delayMs[0..3]}, {lfoHz[0..3]}, lfoCents, "
-      "voiceDb, trimDb, leadFadeFrom, holdFrom, hpNearHz, hpFarHz, shelfHz, shelfNearDb, shelfFarDb, roomNearDb, "
+      "// GangTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, {lfoHz[0..3]}, tiltHz, "
+      "lfoCents, voiceDb, trimDb, leadFadeFrom, holdFrom, hpNearHz, hpFarHz, shelfHz, shelfNearDb, shelfFarDb, roomNearDb, "
       "roomFarDb, roomLpHz, roomFeedback\n%s\n",
       gTuningText);
   std::fflush(stdout);
@@ -585,10 +586,15 @@ void drawGangVoiceNodes(cv::GangTuning& t) {
     voiceSliders("Throat", t.formantSt, -4.0f, 4.0f, "%+.2f st");
     ImGui::TreePop();
   }
-  if (tuningNode("Detune")) {
-    voiceSliders("Detune", t.detuneCents, -30.0f, 30.0f, "%+.1f cents");
+  if (tuningNode("Pitch")) {
+    voiceSliders("Pitch", t.pitchSt, -12.0f, 12.0f, "%+.2f st");
     voiceSliders("Wobble rate", t.lfoHz, 0.0f, 1.0f, "%.2f Hz");
-    ImGui::SliderFloat("Wobble depth", &t.lfoCents, 0.0f, 20.0f, "%.1f cents");
+    ImGui::SliderFloat("Wobble depth", &t.lfoCents, 0.0f, 30.0f, "%.1f cents");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Tone")) {
+    voiceSliders("Tone", t.tiltDb, -12.0f, 12.0f, "%+.1f dB");
+    ImGui::SliderFloat("Tone shelf at", &t.tiltHz, 500.0f, 8000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::TreePop();
   }
   if (tuningNode("Timing")) {
@@ -1808,9 +1814,10 @@ int runLayoutProbe() {
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
       {true, "gang", nullptr},
-      {true, "gang", "Throats"},     {true, "gang", "Detune"},
-      {true, "gang", "Timing"},      {true, "gang", "Levels"},
-      {true, "gang", "Distance"},    {true, "gang", "Room"},
+      {true, "gang", "Throats"},     {true, "gang", "Pitch"},
+      {true, "gang", "Tone"},        {true, "gang", "Timing"},
+      {true, "gang", "Levels"},      {true, "gang", "Distance"},
+      {true, "gang", "Room"},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr},
       {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpring},
