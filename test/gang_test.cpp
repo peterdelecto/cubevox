@@ -1,6 +1,6 @@
 // Gang card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
-// of different colour, the level law across VOICES, the lead leaving, the voice count, DISTANCE
-// timing, the tracker running without Autotune, and a host timing against Unison. Every run feeds a PitchFx through its pass-through path first,
+// of different colour, the level law across VOICES, the lead leaving, the voice count, the solo,
+// DISTANCE timing, the tracker running without Autotune, and a host timing against Unison. Every run feeds a PitchFx through its pass-through path first,
 // so the ring is written and the tracker runs, as the chain does. No window, no audio device.
 
 #include <algorithm>
@@ -481,6 +481,63 @@ bool testVoiceCount() {
   return ok;
 }
 
+// A solo sounds the soloed voices and nothing else, whatever VOICES says. Solo 0 leaves the plain
+// law untouched, and all four voices soloed at the top of the knob are that law's gang.
+bool testSolo() {
+  const Signal in = program(1);
+  Probe p;
+  cv::GangParams a = knobs(0.2f, 0.5f);
+  a.solo = 0b0010;
+  const Signal outA = run(in, a, &p);
+  bool ok = report("solo count", p.active == 1, "%.0f voices ticking at solo 0b0010, VOICES 20 %% (1)", p.active);
+
+  // Voice 0 is silent and voice 1 sounds: retuning voice 0 moves no sample, retuning voice 1 moves some.
+  cv::GangParams b = a;
+  b.tuning.pitchSt[0] = 4.0f;
+  b.tuning.formantSt[0] = 5.0f;
+  b.tuning.tiltDb[0] = 6.0f;
+  const Signal outB = run(in, b);
+  cv::GangParams c = a;
+  c.tuning.pitchSt[1] = 4.0f;
+  const Signal outC = run(in, c);
+  size_t silent = 0;
+  size_t sounds = 0;
+  for (size_t i = 0; i < outA.size(); ++i) {
+    silent += outA[i] != outB[i] ? 1 : 0;
+    sounds += outA[i] != outC[i] ? 1 : 0;
+  }
+  ok &= report("solo voice", silent == 0 && sounds > 0,
+               "voice 0 retuned changes %.0f samples (0), voice 1 retuned changes %.0f (>0)",
+               static_cast<double>(silent), static_cast<double>(sounds));
+
+  // At the top the lead is gone and the one soloed copy stands alone.
+  cv::GangParams top = knobs(1.0f, 0.5f);
+  top.solo = 0b0100;
+  run(in, top, &p);
+  ok &= report("solo top", p.active == 1 && p.lead == 0.0f, "%.0f voices ticking (1), lead gain %.3g (0)", p.active, p.lead);
+
+  // Solo 0 is the plain law bit for bit, and all four voices soloed at the top give the same gang.
+  const cv::GangParams plain = knobs(0.2f, 0.5f);
+  cv::GangParams zero = plain;
+  zero.solo = 0;
+  const Signal outP = run(in, plain);
+  const Signal outZ = run(in, zero);
+  cv::GangParams all = knobs(1.0f, 0.5f);
+  const Signal outTop = run(in, all);
+  all.solo = 0b1111;
+  const Signal outAll = run(in, all);
+  size_t differ = 0;
+  size_t differTop = 0;
+  for (size_t i = 0; i < outP.size(); ++i) {
+    differ += outP[i] != outZ[i] ? 1 : 0;
+    differTop += outTop[i] != outAll[i] ? 1 : 0;
+  }
+  ok &= report("solo off", differ == 0 && differTop == 0,
+               "solo 0 differs in %.0f samples (0), solo 0b1111 at VOICES 100 %% differs in %.0f (0)",
+               static_cast<double>(differ), static_cast<double>(differTop));
+  return ok;
+}
+
 bool testDistanceTiming() {
   const Signal in = irregular(220.0, 2 * kRate);
   cv::GangParams near = isolated(0.0f);
@@ -614,6 +671,7 @@ int main() {
   ok &= testLevelLaw();
   ok &= testLeadLeaves();
   ok &= testVoiceCount();
+  ok &= testSolo();
   ok &= testDistanceTiming();
   ok &= testTrackerRuns();
   ok &= testCorrectionReleases();

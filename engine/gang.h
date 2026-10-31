@@ -49,6 +49,11 @@ struct GangParams {
   float distance = 0.5f;  // knob A, 0..1
   float voices = 0.5f;    // knob B, 0..1
   GangTuning tuning;
+
+  // A bit per voice (bit 0 is voice 0), 0 for no solo. A soloed voice sits fully faded in and the
+  // others are silent, whatever the VOICES position. The lead gain follows from the soloed power.
+  // This is a tuning hook for the emulator. The firmware never sets it.
+  uint8_t solo = 0;
 };
 
 namespace gang_detail {
@@ -319,16 +324,24 @@ struct VoicesLaw {
   float mul = 1.0f;
 };
 
-inline VoicesLaw voicesLaw(float k, const GangTuning& t) {
+// solo is a bit per voice. When a bit in 0..3 is set, each soloed voice takes fade 1 and the others
+// 0 at every k, and the rest of the law runs on that gang. The lead and the gang multiplier then
+// follow from the soloed power, so a single copy at the top of the knob stands alone at unity.
+inline VoicesLaw voicesLaw(float k, const GangTuning& t, uint8_t solo = 0) {
   VoicesLaw law;
   const float g = dbToGainFast(t.voiceDb);
   const float from = clampf(t.leadFadeFrom, 0.05f, 0.99f);
   const float hold = clampf(t.holdFrom, 0.05f, 1.0f);
   const float u = k / (from * 0.25f);
+  const unsigned mask = solo & 0x0Fu;
+  unsigned count = 0;
   float sumSq = 0.0f;
   for (size_t v = 0; v < kVoices; ++v) {
+    const unsigned bit = (mask >> v) & 1u;
+    count += bit;
     const float x = smooth::clamp01((u - static_cast<float>(v)) / hold);
-    law.weight[v] = g * sinf(kHalfPi * x);
+    const float fade = mask == 0 ? sinf(kHalfPi * x) : static_cast<float>(bit);
+    law.weight[v] = g * fade;
     sumSq += law.weight[v] * law.weight[v];
   }
   if (k <= from) {
@@ -336,15 +349,16 @@ inline VoicesLaw voicesLaw(float k, const GangTuning& t) {
     return law;
   }
 
-  // Past the fade point every voice holds at g. Gang power runs from four voices up to unity
-  // while the lead falls to nothing, and the gang multiplier makes up the difference.
+  // Past the fade point every sounding voice holds at g. Gang power runs from the sounding voices'
+  // power (four voices without a solo) up to unity while the lead falls to nothing, and the gang
+  // multiplier makes up the difference.
   const float s = smooth::clamp01((k - from) / (1.0f - from));
-  const float p4 = 4.0f * g * g;
+  const float p0 = static_cast<float>(mask == 0 ? kVoices : count) * g * g;
   const float sn = sinf(kHalfPi * s);
-  const float power = s >= 1.0f ? 1.0f : p4 + (1.0f - p4) * sn * sn;
-  law.weight.fill(g);
+  const float power = s >= 1.0f ? 1.0f : p0 + (1.0f - p0) * sn * sn;
+  for (size_t v = 0; v < kVoices; ++v) law.weight[v] = mask == 0 || ((mask >> v) & 1u) ? g : 0.0f;
   law.lead = sqrtf(power < 1.0f ? 1.0f - power : 0.0f);
-  law.mul = p4 > 1e-6f ? sqrtf(power / p4) : 1.0f;
+  law.mul = p0 > 1e-6f ? sqrtf(power / p0) : 1.0f;
   return law;
 }
 
@@ -419,7 +433,7 @@ class Gang {
     Plan plan;
     if (!p.on) return plan;
     const GangTuning& t = p.tuning;
-    const gang_detail::VoicesLaw law = gang_detail::voicesLaw(smooth::clamp01(p.voices), t);
+    const gang_detail::VoicesLaw law = gang_detail::voicesLaw(smooth::clamp01(p.voices), t, p.solo);
     plan.voice = law.weight;
     plan.lead = law.lead;
     plan.wet = law.mul * dbToGainFast(t.trimDb);
