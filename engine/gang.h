@@ -7,6 +7,7 @@
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
+#include "engine/gang_epoch.h"
 #include "engine/pitch_fx.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
@@ -23,6 +24,13 @@
 // A copy changes its lag only in a quiet gap, so it never bends in pitch mid-word. Scatter gives
 // each copy a fresh timing offset at every gap, and drift walks each copy's pitch slowly around
 // its offset.
+//
+// Four more controls make a copy read as a person and not as Adam shifted. Each is neutral at its
+// default, and the output is then bit for bit the output without it. Level scatter gives a copy a
+// new loudness at every gap. Contour sets how much of Adam's rises and falls a copy follows. Breath
+// adds air under a copy. Epoch align cuts every grain on a glottal pulse instead of on the period
+// grid, which removes the buzz and the doubled pulses a grid cut leaves when a copy's throat moves.
+// All four stay inside what a human voice does, and the engine clamps each to that range.
 
 namespace cv {
 
@@ -43,6 +51,23 @@ struct GangTuning {
   float scatterMs = 0.0f;      // peak random lag offset a copy takes at each gap
   float driftCents = 0.0f;     // peak of each copy's slow random pitch walk
   float driftHoldS = 2.0f;     // time between new drift targets
+
+  // Each copy takes a new loudness at every gap, uniform in +- this many dB (0..4).
+  float levelScatterDb = 0.0f;
+
+  // The share of Adam's pitch deviation a copy follows (0.6..1.4). 1 follows him exactly, 0.7 flattens
+  // the copy's rises and falls to 70 % of his, 1.3 exaggerates them.
+  std::array<float, 4> contour = {1.0f, 1.0f, 1.0f, 1.0f};
+
+  // Breath noise under each copy (0..0.15), high-passed at breathHz and shaped by the copy's own
+  // envelope. 0 leaves the copy as it is.
+  std::array<float, 4> breath = {0.0f, 0.0f, 0.0f, 0.0f};
+  float breathHz = 2000.0f;
+
+  // True cuts each grain on the glottal pulse nearest its grid mark. epochSearch is the half-width
+  // in periods of the peak search around each expected pulse (0..0.3).
+  bool epochAlign = false;
+  float epochSearch = 0.25f;
 };
 
 struct GangParams {
@@ -84,6 +109,16 @@ constexpr int kMaxMarkSteps = 128;
 constexpr int kQuietBlocks = 2;        // blocks under the gap floor before a copy changes its lag
 constexpr float kDriftSlewS = 1.0f;    // time constant of the drift toward its target
 constexpr float kMinDriftHoldS = 0.05f;
+
+// The ranges the four human-voice controls keep to. The engine clamps to them.
+constexpr float kMaxLevelScatterDb = 4.0f;
+constexpr float kMinContour = 0.6f;
+constexpr float kMaxContour = 1.4f;
+constexpr float kMaxBreath = 0.15f;
+
+// Breath follows the copy's level with these one-pole coefficients, computed once at start.
+inline const float kBreathAttack = smooth::coef(0.010f);
+inline const float kBreathRelease = smooth::coef(0.060f);
 
 // Samples in a whole number of milliseconds.
 constexpr int ms(int v) { return v * kSampleRate / 1000; }
@@ -155,11 +190,15 @@ class FormantPsolaVoice {
     }
   }
 
+  // The pulses to cut on, or null to cut on the period grid. The tracker must outlive the calls.
+  void setEpochs(const EpochTrack* epochs) { epochs_ = epochs; }
+
   // Adds n samples of the voice into out. first is the ring index of the block's first sample;
-  // the voice reads nothing newer than it. Launches are placed sample by sample, then each grain
-  // plays through the block on its own.
-  void render(const VoiceRing& ring, int first, int n, float* out) {
+  // the voice reads nothing newer than it. clock is the epoch clock of that sample. Launches are
+  // placed sample by sample, then each grain plays through the block on its own.
+  void render(const VoiceRing& ring, int first, int n, float* out, uint32_t clock = 0) {
     if (!voiced_) return;
+    clock_ = clock;
     for (size_t k = 0; k < count_; ++k) grains_[k].start = 0;
     for (int i = 0; i < n; ++i) {
       advanceMarks();
@@ -225,6 +264,7 @@ class FormantPsolaVoice {
   void launch(int head, float lead, int at) {
     float centre = markDelay_;
     if (centre - ref_ > 0.5f * p_) centre -= p_;
+    if (epochs_) centre = epochs_->snap(clock_ + static_cast<uint32_t>(at), centre, p_);
     const float lo = kMinReadDelay + (drift_ < 0.0f ? -drift_ : 0.0f);
     const float hi = kMaxReadDelay - (drift_ > 0.0f ? drift_ : 0.0f);
     const float delay = clampf(centre + p_ - rate_ * lead, lo, hi);
@@ -279,6 +319,8 @@ class FormantPsolaVoice {
   float ref_ = 0.0f;
   float markDelay_ = 0.0f;
   float countdown_ = 0.0f;
+  const EpochTrack* epochs_ = nullptr;
+  uint32_t clock_ = 0;  // epoch clock of the block's first sample
   bool voiced_ = false;
   bool fresh_ = true;
 };
@@ -329,6 +371,40 @@ class PitchDrift {
   float left_ = 0.0f;
 };
 
+// Adam's pitch against his own running mean, in octaves. The grains of every copy are laid down at the
+// tracker's current period, so a copy's pitch follows the deviation of the moment and not the one its
+// lag ago, and nothing is kept but the mean.
+class ContourTrack {
+ public:
+  void reset() {
+    mean_ = 0.0f;
+    dev_ = 0.0f;
+    have_ = false;
+  }
+
+  // Per block. period is the tracker's (held through unvoiced frames, 0 before the first voiced
+  // one), voiced says the frame is fresh, and slew is the one-pole coefficient of the mean for the
+  // block. The mean moves only while the voice is voiced and holds through the rest. The first
+  // voiced frame sets it, so the deviation starts at 0.
+  void step(float period, bool voiced, float slew) {
+    if (!(period > 0.0f)) return;
+    const float l = log2Fast(period);
+    if (voiced) {
+      mean_ = have_ ? mean_ + slew * (l - mean_) : l;
+      have_ = true;
+    }
+    dev_ = have_ ? mean_ - l : 0.0f;
+  }
+
+  // Octaves above the mean: positive when the voice is sharper than its average.
+  float deviation() const { return dev_; }
+
+ private:
+  float mean_ = 0.0f;  // log2 of the period, averaged
+  float dev_ = 0.0f;
+  bool have_ = false;
+};
+
 // The block being prepared, as the gap rule sees it.
 struct BlockView {
   const VoiceRing& ring;
@@ -358,6 +434,7 @@ class CopyLag {
   void seed(uint32_t s) {
     rng_.seed(s);
     offset_ = rng_.next();
+    level_ = 0.0f;
   }
 
   // Unsets the lag and keeps the random stream.
@@ -369,13 +446,18 @@ class CopyLag {
 
   float samples() const { return lag_; }
 
-  // Per block. base is the target in samples before scatter. True when the lag landed on a new
-  // value, so the voice restarts its marks there.
-  bool settle(const BlockView& b, float base, float scatterSmp, float period) {
+  // The loudness draw of the current gap, -1..1. It is 0 until a gap has drawn one, and it only
+  // draws while level scatter is on.
+  float levelUnit() const { return level_; }
+
+  // Per block. base is the target in samples before scatter. rollLevel says level scatter is on,
+  // so each gap also draws a loudness, which keeps the gap rule running when the timing scatter is
+  // 0. True when the lag landed on a new value, so the voice restarts its marks there.
+  bool settle(const BlockView& b, float base, float scatterSmp, float period, bool rollLevel) {
     const float want = clampLag(base + offset_ * scatterSmp, period);
-    if (!set_) return land(base, want);
+    if (!set_) return land(base, want, rollLevel);
     const bool moved = base != base_;
-    if (!moved && scatterSmp <= 0.0f) {
+    if (!moved && scatterSmp <= 0.0f && !rollLevel) {
       quiet_ = 0;
       landed_ = false;
       return false;
@@ -385,22 +467,24 @@ class CopyLag {
     const bool pending = moved || !landed_;
     const bool calm = here && (!pending || b.quietAt(want));
     quiet_ = calm ? quiet_ + 1 : 0;
-    return quiet_ >= kQuietBlocks && pending && land(base, want);
+    return quiet_ >= kQuietBlocks && pending && land(base, want, rollLevel);
   }
 
  private:
-  bool land(float base, float want) {
+  bool land(float base, float want, bool rollLevel) {
     lag_ = want;
     base_ = base;
     set_ = true;
     landed_ = true;
     quiet_ = 0;
     offset_ = rng_.next();
+    if (rollLevel) level_ = rng_.next();
     return true;
   }
 
   XorShift rng_;
   float offset_ = 0.0f;  // the next scatter draw, -1..1
+  float level_ = 0.0f;   // this gap's loudness draw, -1..1
   float lag_ = 0.0f;
   float base_ = 0.0f;
   int quiet_ = 0;
@@ -469,6 +553,7 @@ class Gang {
     for (size_t v = 0; v < kVoices; ++v) {
       lag_[v].seed(0x2545F491u * static_cast<uint32_t>(v + 1));
       driftRng_[v].seed(0x9E3779B9u * static_cast<uint32_t>(v + 1) ^ 0x85EBCA6Bu);
+      breath_[v].rng.seed(0xC2B2AE35u * static_cast<uint32_t>(v + 1) ^ 0x27D4EB2Fu);
     }
     idle_ = true;
   }
@@ -484,9 +569,10 @@ class Gang {
     const Plan plan = makePlan(p);
     const int first = pitch.head() - n;
     prepareBlock(p, pitch, plan, first, n);
+    const uint32_t clock = epochs_.clock() - static_cast<uint32_t>(n);
     for (int c = 0; c < n; c += kBlock) {
       const int m = n - c < kBlock ? n - c : kBlock;
-      renderChunk(in + c, out + c, m, first + c, plan, pitch.ring());
+      renderChunk(in + c, out + c, plan, Chunk{pitch.ring(), first + c, m, clock + static_cast<uint32_t>(c)});
     }
   }
 
@@ -539,8 +625,11 @@ class Gang {
     for (size_t v = 0; v < kVoices; ++v) retire(v);
     hp_.clear();
     dc_.clear();
+    contour_.reset();
+    epochs_.reset();
     active_ = 0;
     tiltSet_ = false;
+    breathSet_ = false;
   }
 
   void retire(size_t v) {
@@ -548,6 +637,11 @@ class Gang {
     tilt_[v].clear();
     lag_[v].restart();
     drift_[v].reset();
+    breath_[v].env = 0.0f;
+    breath_[v].amt = 0.0f;
+    breath_[v].hp.clear();
+    breathTarget_[v] = 0.0f;
+    levelMul_[v] = 1.0f;
     live_[v] = false;
   }
 
@@ -577,47 +671,147 @@ class Gang {
     return (lagMs < t.maxLagMs ? lagMs : t.maxLagMs) * gang_detail::kSmpPerMs;
   }
 
-  // Per block: filters, then each live voice's lag, pitch ratio and playback rate. A voice whose
-  // gain sits at 0 across the block is cleared and does not tick. first is the ring index of the
-  // block's first sample.
+  // The breath high-pass of each copy, set on the first block after a reset and when breathHz moved.
+  void setBreathFilters(const GangTuning& t) {
+    if (breathSet_ && t.breathHz == breathHz_) return;
+    for (size_t v = 0; v < kVoices; ++v) breath_[v].hp.setHighPass(t.breathHz, kButterworthQ);
+    breathHz_ = t.breathHz;
+    breathSet_ = true;
+  }
+
+  // What every voice of one block reads.
+  struct Block {
+    const GangTuning& t;
+    gang_detail::BlockView view;
+    float period;
+    float corr;        // Autotune's correction in octaves
+    float width;
+    float scatterSmp;  // timing scatter in samples
+    float levelDb;     // level scatter, clamped to its range
+    float slew;        // one-pole coefficient of the slow walks for this block
+    int n;
+    const gang_detail::EpochTrack* epochs;  // null cuts on the period grid
+  };
+
+  // The shared pulse marks of this block, or null when the grid cuts. Off drops the marks, so a
+  // later on starts a fresh search.
+  const gang_detail::EpochTrack* prepareEpochs(const GangTuning& t, const PitchFx& pitch, float period, int n) {
+    if (!t.epochAlign) {
+      epochs_.reset();
+      return nullptr;
+    }
+    const float p = period > 0.0f ? clampf(period, gang_detail::kMinPeriod, gang_detail::kMaxPeriod) : 0.0f;
+    epochs_.advance(pitch.shadow(), pitch.head(), n, p, t.epochSearch);
+    return &epochs_;
+  }
+
+  // Per block: filters, the contour track and the pulse marks, then each live voice. first is the
+  // ring index of the block's first sample.
   void prepareBlock(const GangParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
     const GangTuning& t = p.tuning;
     setLowCut(t);
     setTilts(t);
-    const float period = pitch.pitch().period;
-    const float corr = pitch.correctionSemis() * (1.0f / 12.0f);
-    const float w = smooth::clamp01(p.width);
-    const float scatter = (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * gang_detail::kSmpPerMs;
+    setBreathFilters(t);
+    const PitchResult& pr = pitch.pitch();
     const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * gang_detail::kDriftSlewS));
-    const gang_detail::BlockView view{pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)};
+    contour_.step(pr.period, pr.voiced, slew);
+    const gang_detail::EpochTrack* epochs = prepareEpochs(t, pitch, pr.period, n);
+    const Block b{t,
+                  {pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)},
+                  pr.period,
+                  pitch.correctionSemis() * (1.0f / 12.0f),
+                  smooth::clamp01(p.width),
+                  (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * gang_detail::kSmpPerMs,
+                  clampf(t.levelScatterDb, 0.0f, gang_detail::kMaxLevelScatterDb),
+                  slew,
+                  n,
+                  epochs};
     active_ = 0;
-    for (size_t v = 0; v < kVoices; ++v) {
-      if (gain_[v] <= 0.0f && plan.voice[v] <= 0.0f) {
-        if (live_[v]) retire(v);
-        continue;
-      }
-      live_[v] = true;
-      ++active_;
-      if (lag_[v].settle(view, lagTarget(t, v), scatter, period)) voice_[v].markReset();
-      const float drift = drift_[v].step(driftRng_[v], t.driftCents, t.driftHoldS, slew, n);
-      const float st = gang_detail::widthSt(t.pitchSt[v], w);
-      voice_[v].prepare(period, exp2Fast(st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + corr),
-                        exp2Fast(t.formantSt[v] * (1.0f / 12.0f)), lag_[v].samples());
-    }
+    for (size_t v = 0; v < kVoices; ++v) prepareVoice(v, plan, b);
   }
+
+  // Copy v's lag, loudness, breath, pitch ratio and playback rate. A voice whose gain sits at 0
+  // across the block is cleared and does not tick.
+  void prepareVoice(size_t v, const Plan& plan, const Block& b) {
+    if (gain_[v] <= 0.0f && plan.voice[v] <= 0.0f) {
+      if (live_[v]) retire(v);
+      return;
+    }
+    const GangTuning& t = b.t;
+    live_[v] = true;
+    ++active_;
+    const bool roll = b.levelDb > 0.0f;
+    if (lag_[v].settle(b.view, lagTarget(t, v), b.scatterSmp, b.period, roll)) voice_[v].markReset();
+    levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
+    breathTarget_[v] = clampf(t.breath[v], 0.0f, gang_detail::kMaxBreath);
+    const float drift = drift_[v].step(driftRng_[v], t.driftCents, t.driftHoldS, b.slew, b.n);
+    const float st = gang_detail::widthSt(t.pitchSt[v], b.width);
+    const float oct = st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
+    voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t)), exp2Fast(t.formantSt[v] * (1.0f / 12.0f)),
+                      lag_[v].samples());
+    voice_[v].setEpochs(b.epochs);
+  }
+
+  // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
+  // The copy then sits contour times as far from his mean as he does. Contour 1 adds exactly 0.
+  float contourOctaves(size_t v, const GangTuning& t) const {
+    const float c = clampf(t.contour[v], gang_detail::kMinContour, gang_detail::kMaxContour);
+    return c == 1.0f ? 0.0f : (c - 1.0f) * contour_.deviation();
+  }
+
+  // One chunk of the call: kBlock samples at most.
+  struct Chunk {
+    const VoiceRing& ring;
+    int first;       // ring index of the chunk's first sample
+    int n;
+    uint32_t clock;  // epoch clock of that sample
+  };
 
   // Adds voice v into gang. The voice's tone shelf runs first, then its gain ramps to the
   // block-end target. The shelf runs on a local copy so its state stays in registers.
-  void mixVoice(size_t v, const VoiceRing& ring, int first, int n, float target, float* gang) {
+  void mixVoice(size_t v, const Chunk& k, float target, float* gang) {
     std::array<float, kBlock> raw{};
-    voice_[v].render(ring, first, n, raw.data());
+    voice_[v].render(k.ring, k.first, k.n, raw.data(), k.clock);
+    if (breath_[v].amt > 0.0f || breathTarget_[v] > 0.0f) {
+      mixBreathy(v, raw.data(), k.n, target, gang);
+      return;
+    }
     Biquad tilt = tilt_[v];
-    const float step = (target - gain_[v]) / static_cast<float>(n);
+    const float step = (target - gain_[v]) / static_cast<float>(k.n);
     float g = gain_[v];
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < k.n; ++i) {
       g += step;
       gang[i] += g * tilt.run(raw[static_cast<size_t>(i)]);
     }
+    tilt_[v] = tilt;
+  }
+
+  // The same mix with breath. The noise follows the level of the copy's own tone, so it sounds under
+  // the copy and falls silent with it, and the breath amount ramps to its target across the chunk. A
+  // breath that has ramped to 0 clears its filter and follower, so it starts clean next time.
+  void mixBreathy(size_t v, const float* raw, int n, float target, float* gang) {
+    Breath b = breath_[v];
+    Biquad tilt = tilt_[v];
+    const float inv = 1.0f / static_cast<float>(n);
+    const float step = (target - gain_[v]) * inv;
+    const float bStep = (breathTarget_[v] - b.amt) * inv;
+    float g = gain_[v];
+    for (int i = 0; i < n; ++i) {
+      const float x = tilt.run(raw[i]);
+      const float a = fabsf(x);
+      b.env += (a > b.env ? gang_detail::kBreathAttack : gang_detail::kBreathRelease) * (a - b.env);
+      b.amt += bStep;
+      g += step;
+      gang[i] += g * (x + b.amt * b.env * b.hp.run(b.rng.next()));
+    }
+    b.amt = breathTarget_[v];
+    if (b.amt == 0.0f) {
+      b.env = 0.0f;
+      b.hp.clear();
+    } else if (b.env < kEnvFloor) {
+      b.env = 0.0f;  // a long silence would otherwise decay the follower into subnormals
+    }
+    breath_[v] = b;
     tilt_[v] = tilt;
   }
 
@@ -629,24 +823,36 @@ class Gang {
     hp_ = hp;
   }
 
-  // first is the ring index of the chunk's first sample. Lead and gang ramp linearly from the last
-  // chunk's values to the plan.
-  void renderChunk(const float* in, float* out, int n, int first, const Plan& plan, const VoiceRing& ring) {
+  // Lead and gang ramp linearly from the last chunk's values to the plan. A voice's gain target is
+  // its plan gain times the loudness its last gap drew, which is exactly 1 with level scatter off.
+  void renderChunk(const float* in, float* out, const Plan& plan, const Chunk& k) {
     std::array<float, kBlock> gang{};
     for (size_t v = 0; v < kVoices; ++v) {
-      if (live_[v]) mixVoice(v, ring, first, n, plan.voice[v], gang.data());
+      if (live_[v]) mixVoice(v, k, plan.voice[v] * levelMul_[v], gang.data());
     }
-    filterGang(gang.data(), n);
-    const float inv = 1.0f / static_cast<float>(n);
-    for (int i = 0; i < n; ++i) {
+    filterGang(gang.data(), k.n);
+    const float inv = 1.0f / static_cast<float>(k.n);
+    for (int i = 0; i < k.n; ++i) {
       const float f = static_cast<float>(i + 1) * inv;
       const float wet = dc_.run(gang[static_cast<size_t>(i)]);
       out[i] = (lead_ + (plan.lead - lead_) * f) * in[i] + (wet_ + (plan.wet - wet_) * f) * wet;
     }
-    for (size_t v = 0; v < kVoices; ++v) gain_[v] = plan.voice[v];
+    for (size_t v = 0; v < kVoices; ++v) gain_[v] = plan.voice[v] * levelMul_[v];
     lead_ = plan.lead;
     wet_ = plan.wet;
   }
+
+  // The follower is far under any audible level below this and snaps to 0.
+  static constexpr float kEnvFloor = 1e-9f;
+
+  // A copy's breath noise: its high-pass, its random stream, the follower on its own tone and the
+  // breath amount at the end of the last chunk.
+  struct Breath {
+    Biquad hp;
+    gang_detail::XorShift rng;
+    float env = 0.0f;
+    float amt = 0.0f;
+  };
 
   std::array<FormantPsolaVoice, kVoices> voice_{};
   Biquad hp_;
@@ -657,14 +863,21 @@ class Gang {
   std::array<gang_detail::CopyLag, kVoices> lag_{};
   std::array<gang_detail::PitchDrift, kVoices> drift_{};
   std::array<gang_detail::XorShift, kVoices> driftRng_{};
+  std::array<Breath, kVoices> breath_{};
+  std::array<float, kVoices> breathTarget_{};
+  std::array<float, kVoices> levelMul_ = {1.0f, 1.0f, 1.0f, 1.0f};
+  gang_detail::ContourTrack contour_;
+  gang_detail::EpochTrack epochs_;
   DcBlocker dc_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;
   float hpHz_ = 0.0f;
   float tiltHz_ = 0.0f;
+  float breathHz_ = 0.0f;
   uint8_t active_ = 0;
   bool hpSet_ = false;
   bool tiltSet_ = false;
+  bool breathSet_ = false;
   bool idle_ = true;
 };
 

@@ -372,3 +372,136 @@ Timing scatter stays under about 25 ms, pitch drift under about 30 cents, loudne
 4 dB, breath mixed under a copy and never over it. The cutting of the copies must not add buzz or
 doubling that reads as a machine; epoch alignment exists for that. The pinned sound is the tag
 `gang-pin-2026-10-31` on main at v2.00.63.
+
+## Enhancements (owner 2026-10-31)
+
+Four controls make a copy read as a person and not as Adam shifted. The sound the owner pinned is the
+tag `gang-pin-2026-10-31` (v2.00.63). Every control defaults to off or neutral, and with all four at
+their defaults the output is bit for bit the pinned engine's. Each range stays inside the Rule above,
+and the engine clamps a value to its range.
+
+### Controls
+
+1. Loudness scatter, `levelScatterDb`, default 0, range 0..4 dB. At each copy's quiet gap, where the
+   timing scatter already re-rolls, the copy also draws a gain offset uniform in
+   [-levelScatterDb, +levelScatterDb] from its own xorshift stream and holds it to the next gap. The
+   offset multiplies the copy's gain through `dbToGainFast`. The gap rule runs while level scatter is
+   on even when timing scatter is 0, and a gap that draws no new lag still draws a new loudness. At 0
+   no draw is taken, so the stream and the timing scatter match the pinned engine.
+2. Contour, `contour[4]`, default {1, 1, 1, 1}, range 0.6..1.4. A running mean of log2(period) follows
+   the tracker's period with a time constant of about 1 s, updated while the tracker reports a voiced
+   frame and held otherwise. Adam's deviation is mean - log2(period), in octaves, positive when he is
+   sharp of his mean. A copy's ratio gains 2^((contour - 1) x deviation), so the copy sits `contour`
+   times as far from its own mean as Adam sits from his. 1 follows him exactly, 0.7 flattens the
+   copy's rises and falls to 70 % of his, 1.3 exaggerates them. The term is added to the exponent
+   that `exp2Fast` takes once per block, and a contour of exactly 1 adds exactly 0.
+3. Breath, `breath[4]`, default {0, 0, 0, 0}, range 0..0.15, and `breathHz` 2000 Hz. For a copy with
+   breath above 0, white noise from the copy's own xorshift goes through one Butterworth high-pass at
+   `breathHz`, then is multiplied by an envelope follower on the copy's own output (one-pole on the
+   absolute value, 10 ms attack and 60 ms release) and by the breath amount, and is added to the copy
+   after its tone shelf and before its gain. The follower reads the copy before the noise joins it, so
+   the noise sits under the copy and falls silent with it. At full breath the noise reads 20 dB under
+   the copy. The amount ramps across a chunk, and a copy at breath 0 runs the pinned code.
+4. Epoch align, `epochAlign`, default false, with `epochSearch` 0.25 (range 0..0.3 periods). The cut
+   of every grain moves from the period grid to the glottal pulse nearest the grid mark.
+   1. PitchFx writes a shadow ring beside the input ring on every sample. It holds the input through
+      a one-pole at 800 Hz at the same index and is exposed as `shadow()`. It costs one multiply-add
+      per sample and moves no other output, so the toggle is bit exact whether or not the ring is read.
+   2. A shared `EpochTrack` (`engine/gang_epoch.h`) finds the pulses once per period for all four
+      copies. It expects the next pulse one tracker period after the last, takes the tallest sample of
+      the track's sign within +-`epochSearch` periods of that spot, and places the pulse at the
+      centroid of the lobe above half its height. The first search of a track takes the largest
+      absolute sample of a whole period and keeps its sign. A ringing voice has positive and negative
+      lobes nearly as tall, and following one sign keeps the track from flipping between them.
+   3. A copy's launch asks the track for the pulse nearest its grid mark and cuts the grain there. A
+      pulse more than half a period from the mark leaves the grain on the grid. The grid still decides
+      when a grain is laid down, so the copy's pitch is unchanged.
+   4. A copy cut on the pulses sits at most half a period (measured 0.7 ms at 220 Hz) from the lag it
+      has on the grid, since it takes the nearest pulse.
+
+### Tuning
+
+```
+levelScatterDb = 0        // 0..4 dB
+contour        = {1, 1, 1, 1}   // 0.6..1.4
+breath         = {0, 0, 0, 0}   // 0..0.15
+breathHz       = 2000
+epochAlign     = false
+epochSearch    = 0.25     // 0..0.3 periods
+```
+
+### Why the grid cut buzzes
+
+This is the reading that fits the numbers below. A copy whose pitch ratio differs from its grain
+playback rate lays each input pulse down twice, once from each of the two grains that cover it, at two
+output times a fixed distance apart. Where the grid mark falls in the pulse cycle sets how the two
+shares split, and a mark that slides across the cycle (the tracker's period is never exact) moves the
+split. That reads as buzz and a doubled pulse. A grain centred on its pulse holds one pulse at full
+weight and the neighbours at zero, so the split never forms. Copy 1 at the defaults has a ratio
+nearly equal to its rate and gains least (2 to 3 dB on the recordings). Copy 2, the furthest from
+equal, gains most (12 to 14 dB).
+
+### Where the code differs from the first brief
+
+1. Contour reads the deviation of the current block, not of the moment a copy's lag ago. The grains of
+   every copy are laid down at the tracker's current period, so the copy's pitch follows the voice's
+   pitch of the moment while only its content is late. A first cut that read the deviation a lag back
+   (plus the tracker's delay) missed by about 50 degrees at a 3 Hz glide, and a contour of 0.6 gave a
+   swing ratio of 0.82.
+2. Breath draws from its own xorshift per copy, not the copy's lag or drift stream, so the scatter and
+   drift sequences stay put when breath turns on.
+3. The tests range over the Rule's ranges (contour 0.6 and 1.4, breath 0.15, loudness scatter 3 dB),
+   and the breath test measures above 4 kHz, since the tone's tenth harmonic sits at 2.2 kHz.
+4. The pulse search follows one sign and takes a centroid. A first cut that took the largest absolute
+   sample and a parabola flipped between the positive and negative lobe of the ring, 30 samples apart,
+   and read 26 dB worse than the grid on the pulse train.
+
+### Measured
+
+Host, -O2, 48 kHz, `test/gang_test.cpp` unless noted.
+
+1. Bit exactness. The 180 Hz program at VOICES 70 % and WIDTH 50 % hashes to b5704f6967ce7680 before
+   and after; the burst program at 80 % and 50 % to e8ec16a472153926; the burst program at 60 % and
+   80 % with timing scatter 15 ms and drift 20 cents to d6b873e27ac6a7d8. The test prints these three.
+   A scratch set of seven runs (those three, the program at 100 % and 100 %, at 20 % and 100 %, with
+   scatter and drift, and with a solo) hashes to 02532a5f1bdc5ad1 combined on the tag and on the edited
+   engine. Inactive settings (breathHz, epochSearch, negative values that clamp to 0) move no sample.
+2. Loudness scatter 3 dB over ten bursts: per-burst gain -2.97, +2.90, +2.88, +2.79, -0.23, -1.09,
+   +0.10, +2.47, -1.41, +1.93 dB against the same run with no scatter.
+3. Contour on a 220 Hz tone swinging 1 st either side: copy swing over input swing 0.624 at 0.6 and
+   1.000 at 1.0 and 1.385 at 1.4 at 1 Hz; 0.627, 1.000 and 1.383 at 3 Hz.
+4. Breath 0.15: +20.3 dB above 4 kHz over the no-breath run in the bursts, -13.5 dB at the end of a
+   120 ms gap re the bursts (the follower releases over 60 ms), and the noise alone -20.0 dB re the
+   copy.
+5. Epoch align on a 150 Hz Rosenberg pulse train through two formants with 0.4 % period jitter,
+   harmonics 2..10: formant +2 st copy 31.5 dB harmonic to interharmonic cut on the grid, 34.7 dB cut
+   on the pulses (+3.2 dB). A copy at -3 st and formant -1.5 st reads 31.0 dB cut on the pulses and
+   23.7 dB on the grid against 32.1 dB for the input, so the pulse cut stays 1.2 dB under the input.
+   The marks sit within 0.16 samples (spread) of the pulses, which jitter 1.3 samples themselves.
+6. Epoch align on Adam's three recordings (`samples/`, scratch measurement outside the test), the
+   four default copies alone, harmonics 2..4 in steady 120 ms windows. Each row gives the harmonic to
+   interharmonic ratio on the three recordings, grid cut then pulse cut. Copy 1 (-1.75 st, -1.75 st)
+   33.3, 36.6, 33.1 then 36.2, 38.8, 35.1 dB. Copy 2 (+2.75 st, -1 st) 19.4, 17.3, 13.5 then 31.3,
+   28.9, 27.6 dB. Copy 3 (-3 st, -1 st) 28.0, 26.4, 23.5 then 35.3, 36.1, 32.5 dB. Copy 4 (+1 st,
+   -1.5 st) 27.5, 26.8, 25.4 then 34.7, 34.9, 32.9 dB. The pulse cut is better in all twelve cases, by
+   2.0 to 14.2 dB, and reads 0.0 to +1.2 dB louder.
+7. Host timing, Gang alone at VOICES 80 %, WIDTH 50 %: 3.36 us per block on the pinned engine, 3.44 us
+   with every control at its default, 3.92 us with all four on. PitchFx pass-through 1.38 us per
+   block on the pinned engine and 1.60 us with the shadow ring.
+
+### Memory and cost
+
+1. The shadow ring adds 44,160 B to `gPitchFx`. The firmware build prints DTCM at 121,088 of
+   130,816 B (92.6 %), 9,728 B free; `gPitchFx` is 121,080 B. The Gang card's plain global grows by
+   about 2.3 KB (the pulse track and the breath state).
+2. The shadow write moves every pitch card's cycles by a few per sample, and the pulse track and the
+   breath add cost only while they are on. `costs.h` keeps its estimate until a board bench.
+
+### Emulator and render
+
+1. The Scatter node gains Level scatter. New nodes Contour (four sliders, 0.6..1.4) and Breath (four
+   sliders, 0..0.15, and Breath above in Hz). The Pitch node gains an Epoch align checkbox and an
+   Epoch search slider. Print tuning lists every new field.
+2. cubevox-render keys `gangLevelScatterDb`, `gangContour0..3`, `gangBreath0..3`, `gangBreathHz`,
+   `gangEpochAlign` (0 or 1) and `gangEpochSearch`. A value outside its range is refused.
+3. The firmware never sets any of them.

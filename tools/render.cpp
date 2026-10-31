@@ -102,6 +102,8 @@ int usage() {
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangPitchSt0..3 gangTiltDb0..3 gangTiltHz\n"
                "     gangDelayMs0..3 gangLagScale gangScatterMs (0..30) gangDriftCents (0..50) gangHpHz gangMaxLagMs\n"
+               "     gangLevelScatterDb (0..4) gangContour0..3 (0.6..1.4) gangBreath0..3 (0..0.15) gangBreathHz\n"
+               "     gangEpochAlign (0 or 1) gangEpochSearch (0..0.3)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -156,6 +158,20 @@ bool parsePair(const char* s, float* hz, float* db) {
   return parseFloat(end + 1, db);
 }
 
+// The Gang card's human-voice controls refuse a value outside the range the engine clamps to, so a
+// typo in a key does not pass for a setting. epochAlign arrives as 0 or 1.
+bool gangMannerInRange(const cv::GangTuning& g, float epochAlign) {
+  namespace gd = cv::gang_detail;
+  if (g.levelScatterDb < 0.0f || g.levelScatterDb > gd::kMaxLevelScatterDb) return false;
+  if (g.epochSearch < 0.0f || g.epochSearch > gd::EpochTrack::kMaxSearch) return false;
+  if (epochAlign != 0.0f && epochAlign != 1.0f) return false;
+  for (size_t v = 0; v < g.contour.size(); ++v) {
+    if (g.contour[v] < gd::kMinContour || g.contour[v] > gd::kMaxContour) return false;
+    if (g.breath[v] < 0.0f || g.breath[v] > gd::kMaxBreath) return false;
+  }
+  return true;
+}
+
 bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
@@ -170,6 +186,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::GateTuning& gt = rp.gate.tuning;
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
+  float gangEpoch = gn.epochAlign ? 1.0f : 0.0f;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -194,6 +211,13 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gangLagScale", &gn.lagScale},
       {"gangScatterMs", &gn.scatterMs},          {"gangDriftCents", &gn.driftCents},
       {"gangHpHz", &gn.hpHz},                    {"gangMaxLagMs", &gn.maxLagMs},
+      {"gangLevelScatterDb", &gn.levelScatterDb},
+      {"gangContour0", &gn.contour[0]},          {"gangContour1", &gn.contour[1]},
+      {"gangContour2", &gn.contour[2]},          {"gangContour3", &gn.contour[3]},
+      {"gangBreath0", &gn.breath[0]},            {"gangBreath1", &gn.breath[1]},
+      {"gangBreath2", &gn.breath[2]},            {"gangBreath3", &gn.breath[3]},
+      {"gangBreathHz", &gn.breathHz},
+      {"gangEpochAlign", &gangEpoch},            {"gangEpochSearch", &gn.epochSearch},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -256,6 +280,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
+    if (!gangMannerInRange(gn, gangEpoch)) return false;
+    gn.epochAlign = gangEpoch == 1.0f;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }
