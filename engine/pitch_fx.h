@@ -31,6 +31,8 @@ class PitchFx {
 
   void reset() {
     ring_.fill(0.0f);
+    shadow_.fill(0.0f);
+    shadowZ_ = 0.0f;
     writeCount_ = 0;
     tracker_.reset();
     autotune_.reset();
@@ -80,6 +82,13 @@ class PitchFx {
   const VoiceRing& ring() const { return ring_; }
   int head() const { return static_cast<int>(writeCount_); }
 
+  // The input ring low-passed at kShadowHz, written at the same index as ring() on every sample. The
+  // Gang card finds glottal pulses in it. Writing it costs one multiply-add per sample and moves no
+  // other output.
+  const VoiceRing& shadow() const { return shadow_; }
+
+  static constexpr float kShadowHz = 800.0f;
+
  private:
   // Where the three smoothers head this block.
   struct Targets {
@@ -125,6 +134,7 @@ class PitchFx {
     gains_ = gainsNow();
     for (int i = 0; i < n; ++i) {
       ring_[static_cast<size_t>(writeCount_)] = in[i];
+      writeShadow(in[i]);
       out[i] = in[i];
       advance();
     }
@@ -145,6 +155,7 @@ class PitchFx {
     const float inv = 1.0f / static_cast<float>(n);
     for (int i = 0; i < n; ++i) {
       ring_[static_cast<size_t>(writeCount_)] = in[i];
+      writeShadow(in[i]);
       const float oct = octave_.tick(ring_, writeCount_);
       const float f = static_cast<float>(i + 1) * inv;
       const float at = g0.at + (g1.at - g0.at) * f;
@@ -168,7 +179,15 @@ class PitchFx {
   // Voices only use writeCount modulo the ring, so wrapping here is exact.
   void advance() { writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1; }
 
+  CV_INLINE void writeShadow(float x) {
+    shadowZ_ += shadowA_ * (x - shadowZ_);
+    shadow_[static_cast<size_t>(writeCount_)] = shadowZ_;
+  }
+
   VoiceRing ring_{};
+  VoiceRing shadow_{};
+  float shadowZ_ = 0.0f;
+  float shadowA_ = onePoleCoef(kShadowHz);
   PitchTracker tracker_;
   AutotuneVoice autotune_;
   OctaveVoice octave_;

@@ -233,6 +233,8 @@ void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv:
     EXPECT(at + ".pitchSt", pos, a.pitchSt[v], b.pitchSt[v]);
     EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
     EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
+    EXPECT(at + ".contour", pos, a.contour[v], b.contour[v]);
+    EXPECT(at + ".breath", pos, a.breath[v], b.breath[v]);
   }
   CMP(p, pos, a, b, lagScale);
   CMP(p, pos, a, b, tiltHz);
@@ -246,6 +248,10 @@ void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv:
   CMP(p, pos, a, b, scatterMs);
   CMP(p, pos, a, b, driftCents);
   CMP(p, pos, a, b, driftHoldS);
+  CMP(p, pos, a, b, levelScatterDb);
+  CMP(p, pos, a, b, breathHz);
+  CMP(p, pos, a, b, epochAlign);
+  CMP(p, pos, a, b, epochSearch);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
