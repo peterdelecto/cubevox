@@ -376,7 +376,7 @@ bool runEq(cv::Polish& eq, bool guarded, bool injectNan) {
     }
     if (injectNan && block == 10) x[17] = NAN;
     if (guarded) guardBlock(x.data(), cv::kBlock);
-    eq.process(x.data(), y.data(), cv::kBlock, params);
+    eq.processBack(x.data(), y.data(), cv::kBlock, params);
     finite = true;
     sound = false;
     for (float v : y) {

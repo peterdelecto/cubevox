@@ -31,7 +31,6 @@
 #include "../emulator/open_panel.h"
 #include "../emulator/stage_feedback.h"
 #include "engine/common.h"
-#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/doubler.h"
 #include "engine/gate.h"
@@ -81,7 +80,6 @@ struct ProtoParams {
   // Settings > Sound > Input) through the chain.
   int source = 0;
   float inputGainDb = 0.0f;  // mic only, -12..+24
-  cv::ConditioningParams conditioning;  // the box's HPF 120 Hz and LPF 12 kHz; menu settings on the box
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -167,7 +165,6 @@ std::string gInputName;                  // UI-thread-only; current capture devi
 unsigned gInputRate = 0;                 // UI-thread-only; its sample rate
 
 // Audio-thread-only.
-cv::InputConditioning gConditioning;
 cv::Gate gInputGate;
 cv::Gate gGate;
 cv::PitchFx gPitchFx;
@@ -262,7 +259,6 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
   if (loop != gLastLoop) {
     gLastLoop = loop;
     gReadPos = 0;
-    gConditioning.reset();
     gInputGate.reset();
     gGate.reset();
     gPitchFx.reset();
@@ -305,7 +301,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     if (feedback) {
       for (int i = 0; i < n; ++i) in[i] += gStageFeedback.returnSample(in[i]);
     }
-    gConditioning.process(in.data(), in.data(), n, params.conditioning);
+    gPolish.processFront(in.data(), in.data(), n, params.eq);
     gInputGate.process(in.data(), mono.data(), n, params.inputGate);
     gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
     // The Doubler reads the ring the pitch stage just wrote and takes the stage's output as its
@@ -317,7 +313,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
     gPolishComp.process(mono.data(), tmp.data(), n, params.comp);
-    gPolish.process(tmp.data(), mono.data(), n, params.eq);
+    gPolish.processBack(tmp.data(), mono.data(), n, params.eq);
     // The box's output ceiling, last in the chain.
     for (int i = 0; i < n; ++i) mono[i] = cv::softCeiling(mono[i]);
     // Mute: silence out, so the wedge loop hears exactly what a muted box would send.
@@ -414,8 +410,8 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff}\n"
       "ChasmTuning{%.2ff, %.2ff, %.0ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.2ff, %.2ff, %.2ff, "
       "%.1ff, %.1ff, %.1ff, %.1ff}\n"
-      "PolishTuning{%.2ff, %.2ff, %.0ff, %.1ff}\n"
-      "// PolishParams: hpHz %.0f, dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB, air %.1f dB",
+      "PolishTuning{%.2ff, %.2ff, %.1ff, {%.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.0ff, %.1ff}}\n"
+      "// PolishParams: dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB",
       o.levelDb, o.glideMs, o.grainWindowMs, o.grainCount, o.trimDb,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.trimDb, t.topFrom, t.topSwingGain, t.topWetDb,
@@ -426,8 +422,9 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       c.timeLo, c.timeHi, c.trebleLossHz,
       c.loopTrebleCut, c.inputTrebleCut, c.bassCutHz, c.bassCutHzTop, c.wobbleDepthMax,
       c.wobbleRateLo, c.wobbleRateHi, c.inputTrim, c.wobbleLevelDb, c.dwellDrive, c.dwellComp, c.wetDb, e.tuning.dipQ,
-      e.tuning.presenceQ, e.tuning.airHz, e.tuning.trimDb, e.hpHz, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb,
-      e.airDb);
+      e.tuning.presenceQ, e.tuning.trimDb, e.tuning.deEsser.bandLoHz, e.tuning.deEsser.bandHiHz,
+      e.tuning.deEsser.thresholdDb, e.tuning.deEsser.maxCutDb, e.tuning.deEsser.releaseMs,
+      e.tuning.deEsser.notchHz, e.tuning.deEsser.notchQ, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb);
   size_t used = std::strlen(gTuningText);
   const cv::SpringTuning& sb = params.reverb.spring.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
@@ -479,7 +476,8 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "bassPeakQ, trimDb, fadeDrive\n"
       "// ChasmTuning: timeLo, timeHi, trebleLossHz, loopTrebleCut, inputTrebleCut, bassCutHz, "
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
-      "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, airHz, trimDb\n"
+      "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, trimDb, "
+      "{bandLoHz, bandHiHz, thresholdDb, maxCutDb, releaseMs, notchHz, notchQ}\n"
       "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
@@ -709,9 +707,14 @@ void drawGateRaw(cv::GateTuning& t) {
 void drawPolishRaw(cv::PolishTuning& t) {
   ImGui::SliderFloat("Low-mid Q", &t.dipQ, 0.3f, 3.0f, "%.2f");
   ImGui::SliderFloat("Presence Q", &t.presenceQ, 0.3f, 3.0f, "%.2f");
-  ImGui::SliderFloat("Air corner", &t.airHz, 4000.0f, 16000.0f, "%.0f Hz",
-                     ImGuiSliderFlags_Logarithmic);
   ImGui::SliderFloat("Output trim", &t.trimDb, -6.0f, 6.0f, "%.1f dB");
+  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
+  cv::DeEsserTuning& d = t.deEsser;
+  ImGui::SliderFloat("Ess band low", &d.bandLoHz, 2000.0f, 8000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Ess band high", &d.bandHiHz, 3000.0f, 12000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Ess release", &d.releaseMs, 5.0f, 400.0f, "%.0f ms", log);
+  ImGui::SliderFloat("Ess cut centre", &d.notchHz, 3000.0f, 10000.0f, "%.0f Hz", log);
+  ImGui::SliderFloat("Ess cut Q", &d.notchQ, 0.5f, 6.0f, "%.1f");
 }
 
 void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
@@ -991,12 +994,12 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("reverb.springb.decay", &r.spring.decay);
   add("reverb.springb.dwell", &r.spring.dwell);
   add("eq.on", &p.eq.on);
-  add("eq.lowcut", &p.eq.hpHz);
   add("eq.dipHz", &p.eq.dipHz);
   add("eq.dipDb", &p.eq.dipDb);
   add("eq.presenceHz", &p.eq.presenceHz);
   add("eq.presenceDb", &p.eq.presenceDb);
-  add("eq.air", &p.eq.airDb);
+  add("eq.essThreshold", &p.eq.tuning.deEsser.thresholdDb);
+  add("eq.essMaxCut", &p.eq.tuning.deEsser.maxCutDb);
   for (int i = 0; i < cv::macros::kCount; ++i)
     f.push_back({std::string("macro.") + cv::macros::kStateKey[i], 'f',
                  &p.macros.pos[static_cast<size_t>(i)]});
@@ -1220,19 +1223,19 @@ void drawGateTuning(cv::GateParams& g, const char* block) {
 }
 
 // Four plain controls; the band frequencies live under Advanced. Mud cut runs
-// right = more cut.
+// right = more cut. The two de-esser controls act ahead of slot 1, the others after the comp.
 void drawEqTuning(cv::PolishParams& e) {
   if (!tuningHeader("eq")) return;
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
-  ImGui::SliderFloat("Low cut", &e.hpHz, 40.0f, 200.0f, "%.0f Hz", log);
-  hint("removes boom and handling thumps");
   float cut = -e.dipDb;
   if (ImGui::SliderFloat("Mud cut", &cut, 0.0f, 6.0f, "%.1f dB")) e.dipDb = -cut;
   hint("scoops out boxy low-mids");
   ImGui::SliderFloat("Presence", &e.presenceDb, 0.0f, 6.0f, "%+.1f dB");
   hint("pushes the words forward");
-  ImGui::SliderFloat("Air", &e.airDb, 0.0f, 4.0f, "%+.1f dB");
-  hint("breathy sparkle on top");
+  ImGui::SliderFloat("S catch", &e.tuning.deEsser.thresholdDb, -24.0f, 0.0f, "%.0f dB");
+  hint("how loud an s gets before it is turned down (threshold)");
+  ImGui::SliderFloat("S cut", &e.tuning.deEsser.maxCutDb, 0.0f, 12.0f, "%.1f dB");
+  hint("the most an s is turned down (max cut)");
   if (!gAdvanced) return;
   ImGui::SliderFloat("Mud cut centre", &e.dipHz, 150.0f, 600.0f, "%.0f Hz", log);
   ImGui::SliderFloat("Presence centre", &e.presenceHz, 2000.0f, 6000.0f, "%.0f Hz", log);

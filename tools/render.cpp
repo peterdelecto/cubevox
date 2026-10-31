@@ -1,5 +1,6 @@
-// cubevox-render: loop in, gates + autotune + octave + doubler + unison + slapback + distortion + reverb,
-// then the polish tail (comp, eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + doubler + unison +
+// slapback + distortion + reverb, then the polish tail (comp, the back half of eq) and the output
+// ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -7,7 +8,6 @@
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
-#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/doubler.h"
 #include "engine/gate.h"
@@ -39,9 +39,6 @@ struct RenderParams {
   bool eqOn = true;
   bool compStats = false;  // print the comp's gain reduction after the render
   const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
-  uint8_t hpfIndex = cv::kHpfDefaultIndex;  // the input conditioning ahead of the stages, as on the box
-  uint8_t lpfIndex = cv::kLpfDefaultIndex;
-  cv::ConditioningParams conditioning;
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -65,21 +62,22 @@ int usage() {
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
-               "       [--hpf <0|80|100|120|150 Hz>] [--lpf <0|4000|5000|6000|8000|10000|12000 Hz>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
-               "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
+               "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune or --doubler\n"
                "  doubler runs only with --doubler; --distance and --voices set its knobs (default 0.5 each)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
-               "  at least one stage must run; order is ingate, pitch, doubler, unison, slapback, distortion, gate, reverb, comp, eq\n"
+               "  at least one stage must run; order is eq front, ingate, pitch, doubler, unison, slapback, distortion,\n"
+               "  gate, reverb, comp, eq back\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
-               "  the input high-pass and low-pass run ahead of every stage at the box's defaults, 120 Hz and\n"
-               "  12 kHz; --hpf and --lpf pick a cutoff in Hz, and 0 switches that filter off\n"
+               "  the eq's front half (70 Hz high-pass, 6 kHz low-pass, de-esser) runs ahead of every stage and its\n"
+               "  back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp, both on by default\n"
                "  comp and eq are the box's polish tail and run by default, the comp at its firm tuning\n"
                "  --polish-comp gentle|medium|firm picks the comp tuning, and --polish-comp off and --polish-eq off\n"
-               "  switch them out for A/B listening; --eq is accepted and changes nothing\n"
+               "  switch them out for A/B listening, --polish-eq off for both halves; --eq is accepted and changes\n"
+               "  nothing\n"
                "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
                "     topFrom topSwingGain topWetDb\n"
@@ -99,7 +97,8 @@ int usage() {
                "     sbSpringMs1 sbSpringMs2 sbSpringMs3 sbTimeLo sbTimeHi sbDiffuse sbChirpSections (0..32)\n"
                "     sbChirpA sbChirpSign (1 sweeps up, -1 sweeps down) sbTrebleLossHz sbBassCutHz sbReturnLpHz\n"
                "     sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive sbDwellComp sbWetDb\n"
-               "     eqDipQ eqPresenceQ eqAirHz\n"
+               "     eqDipQ eqPresenceQ\n"
+               "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     dblVoiceDb dblTrimDb dblFormantSt0..3 dblDetuneCents0..3 dblDelayMs0..3 dblLfoHz0..3\n"
                "     dblLfoCents dblRoomFeedback dblRoomLpHz dblRoomNearDb dblRoomFarDb\n"
@@ -121,18 +120,6 @@ bool parseOnOff(const char* s, bool* out) {
   if (!on && std::strcmp(s, "off") != 0) return false;
   *out = on;
   return true;
-}
-
-// Finds `s` (a cutoff in Hz, 0 for OFF) in a cutoff list and returns its index.
-bool parseCutoff(const char* s, const float* list, int count, uint8_t* index) {
-  float hz = 0.0f;
-  if (!parseFloat(s, &hz)) return false;
-  for (int i = 0; i < count; ++i) {
-    if (list[i] != hz) continue;
-    *index = static_cast<uint8_t>(i);
-    return true;
-  }
-  return false;
 }
 
 struct CompTuningName {
@@ -240,7 +227,11 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"sbWobbleRateHz", &sb.wobbleRateHz},   {"sbInputTrim", &sb.inputTrim},
       {"sbDwellDrive", &sb.dwellDrive},       {"sbDwellComp", &sb.dwellComp},
       {"sbWetDb", &sb.wetDb},
-      {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqAirHz", &et.airHz}, {"eqTrimDb", &et.trimDb},
+      {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqTrimDb", &et.trimDb},
+      {"eqEssBandLoHz", &et.deEsser.bandLoHz}, {"eqEssBandHiHz", &et.deEsser.bandHiHz},
+      {"eqEssThresholdDb", &et.deEsser.thresholdDb}, {"eqEssMaxCutDb", &et.deEsser.maxCutDb},
+      {"eqEssReleaseMs", &et.deEsser.releaseMs}, {"eqEssNotchHz", &et.deEsser.notchHz},
+      {"eqEssNotchQ", &et.deEsser.notchQ},
       {"ingAttackMs", &ig.attackMs},          {"ingHoldMs", &ig.holdMs},
       {"ingReleaseMs", &ig.releaseMs},        {"ingRangeDb", &ig.rangeDb},
       {"ingKneeDb", &ig.kneeDb},              {"ingDetectorHpHz", &ig.detectorHpHz},
@@ -319,10 +310,6 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
           rp.inGate.thresholdDb > cv::kInputGateThresholdMaxDb)
         return false;
       haveInGate = true;
-    } else if (std::strcmp(a, "--hpf") == 0 && i + 1 < argc) {
-      if (!parseCutoff(argv[++i], cv::kHpfCutoffHz.data(), cv::kHpfCount, &rp.hpfIndex)) return false;
-    } else if (std::strcmp(a, "--lpf") == 0 && i + 1 < argc) {
-      if (!parseCutoff(argv[++i], cv::kLpfCutoffHz.data(), cv::kLpfCount, &rp.lpfIndex)) return false;
     } else if (std::strcmp(a, "--gate") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.gate.thresholdDb) || rp.gate.thresholdDb < -70.0f ||
           rp.gate.thresholdDb > -10.0f)
@@ -336,14 +323,10 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (!parseCompChoice(argv[++i], &rp)) return false;
     } else if (std::strcmp(a, "--polish-eq") == 0 && i + 1 < argc) {
       if (!parseOnOff(argv[++i], &rp.eqOn)) return false;
-    } else if (std::strcmp(a, "--eqhp") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.eq.hpHz)) return false;
     } else if (std::strcmp(a, "--eqdip") == 0 && i + 1 < argc) {
       if (!parsePair(argv[++i], &rp.eq.dipHz, &rp.eq.dipDb)) return false;
     } else if (std::strcmp(a, "--eqpres") == 0 && i + 1 < argc) {
       if (!parsePair(argv[++i], &rp.eq.presenceHz, &rp.eq.presenceDb)) return false;
-    } else if (std::strcmp(a, "--eqair") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.eq.airDb)) return false;
     } else if (std::strcmp(a, "--reverb") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
       if (std::strcmp(v, "chasm") == 0)
@@ -429,7 +412,6 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.reverb.on = haveReverb;
   rp.comp.on = rp.compOn;
   rp.eq.on = rp.eqOn;
-  rp.conditioning.set(rp.hpfIndex, rp.lpfIndex);
   rp.inGateOn = haveInGate;
   rp.inGate.on = haveInGate;
   rp.gateOn = haveGate;
@@ -455,7 +437,6 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
-  static cv::InputConditioning conditioning;
   static cv::Gate inGate;
   static cv::Gate gate;
   static cv::PitchFx pitchFx;
@@ -466,7 +447,6 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Reverb reverb;
   static cv::PolishComp polishComp;
   static cv::Polish polish;
-  conditioning.reset();
   inGate.reset();
   gate.reset();
   pitchFx.reset();
@@ -495,7 +475,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     const ma_result r = ma_decoder_read_pcm_frames(&dec, inBuf, cv::kBlock, &got);
     if (got > 0) {
       const int n = static_cast<int>(got);
-      conditioning.process(inBuf, inBuf, n, rp.conditioning);
+      polish.processFront(inBuf, inBuf, n, rp.eq);
       // Each stage writes the scratch buffer the previous stage did not.
       const float* src = inBuf;
       int next = 0;
@@ -549,7 +529,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         next ^= 1;
       }
       if (rp.eqOn) {
-        polish.process(src, scratch[next], n, rp.eq);
+        polish.processBack(src, scratch[next], n, rp.eq);
         src = scratch[next];
         next ^= 1;
       }

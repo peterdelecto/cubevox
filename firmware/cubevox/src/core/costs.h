@@ -11,7 +11,8 @@
 // inside Autotune; Octave is the pitch slot with Octave on minus with it off. Chasm is costed in
 // the reverb slot. The tail after the slots (comp, EQ, ceiling, BYPASS mix, conversion) has its
 // own rows, read from the kStatComp and kStatEq buckets and the block total minus the slots. The
-// input conditioning ahead of the slots has one row, read from the kStatCond bucket.
+// kStatEq bucket holds both halves of POLISH EQ, the front half ahead of the slots and the back
+// half after the comp.
 //
 // A layout is accepted when both column sums over its cards, plus the fixed term, stay under
 // their lines. The trailing comments give the measured cycles, mean then worst; a row marked
@@ -46,14 +47,13 @@ constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the bo
 constexpr Cost kReverbChasm{16, 16, true};   // 97.6k / 98.4k
 constexpr Cost kDoubler{19, 21, false};      // estimate: four voices at ~28k, EQ ~6k, room ~14k
 
-// What every block spends whatever the layout: the tail after the slots, and the input conditioning
-// ahead of them.
-constexpr Cost kInputConditioning{2, 3, false};  // 8.9k / 17k est.: three biquads, 0.97 of POLISH EQ's 9.2k on the host; a crossfade block runs two sets
-constexpr Cost kOutputEq{3, 3, true};      // POLISH EQ and the sample conversion: 13.8k cycles
+// What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
+// tail after them.
+constexpr Cost kOutputEq{6, 7, false};     // est. 32.7k / 38k for both POLISH EQ halves and the sample conversion; 18.1k on the board for 7 biquads (9.2k measured, 8.9k est.) times the host ratio 1.55 for 9 biquads and the detector, plus 4.6k conversion; the worst adds the coefficient work of a block that switches on
 constexpr Cost kPolishComp{1, 1, false};   // two biquads and the fast log and exp per sample
 constexpr Cost kSoftCeiling{1, 1, false};  // a compare per sample; tanh only past -2 dBFS
 constexpr Cost kBypassMix{1, 1, false};    // the dry copy, the input energy sum, the BYPASS fade
-constexpr Cost kFixed = kInputConditioning + kOutputEq + kPolishComp + kSoftCeiling + kBypassMix;
+constexpr Cost kFixed = kOutputEq + kPolishComp + kSoftCeiling + kBypassMix;
 
 constexpr uint8_t kBudgetAvgPercent = 75;
 constexpr uint8_t kBudgetWorstPercent = 95;

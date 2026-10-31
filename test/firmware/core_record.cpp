@@ -153,75 +153,49 @@ void checkRecordDebugByte() {
   check(!sameRecordContent(b.data(), off.data()), "record v2: a DEBUG change is new content, so it writes a record");
 }
 
-// HPF and LPF sit in settings bytes 6 and 7, so the schema stays 2. A byte of 0 is not set and reads
-// as the default cutoff, any other value is the cutoff list index plus one, and a value past the list
-// makes the record invalid.
-void checkRecordCutoffBytes() {
-  check(kOffHpf == kOffSettings + 6 && kOffLpf == kOffSettings + 7 && kOffLpf < kOffCrc,
-        "record: HPF and LPF are settings bytes 6 and 7");
+// Settings bytes 6 and 7 are retired, so the schema stays 2. They are written 0 and ignored on read,
+// whatever they hold. A record from the firmware that kept the input cutoffs there loads here, and
+// a record from this firmware reads on that firmware as its default cutoffs, because that firmware
+// reads a 0 as not set.
+void checkRecordRetiredBytes() {
+  check(kOffRetired == kOffSettings + 6 && kRetiredBytes == 2 && kOffRetired + kRetiredBytes <= kOffCrc,
+        "record: settings bytes 6 and 7 are the retired pair");
 
-  bool roundTrip = true;
-  bool plusOne = true;
-  for (int h = 0; h < cv::kHpfCount; ++h) {
-    for (int l = 0; l < cv::kLpfCount; ++l) {
-      RecordData in = makeRec(2);
-      in.settings.hpf = static_cast<uint8_t>(h);
-      in.settings.lpf = static_cast<uint8_t>(l);
-      const RecordBytes b = encodeRecord(in);
-      RecordData out;
-      plusOne = plusOne && b[kOffSchema] == kRecordSchema && b[kOffHpf] == h + 1 && b[kOffLpf] == l + 1;
-      roundTrip = roundTrip && decodeRecord(b.data(), out) && out.settings.hpf == h && out.settings.lpf == l;
-    }
-  }
-  check(plusOne, "record: a saved cutoff is its list index plus one, so OFF is 1 and never reads as not set");
-  check(roundTrip, "record: every HPF and LPF pair survives a save and a reload");
+  RecordData in = makeRec(2);
+  in.settings.polishEq = false;
+  in.settings.debug = true;
+  const RecordBytes saved = encodeRecord(in);
+  check(saved[kOffSchema] == kRecordSchema && saved[kOffRetired] == 0 && saved[kOffRetired + 1] == 0,
+        "record: bytes 6 and 7 are written 0 and the schema stays 2");
 
   RecordData out;
-  const RecordBytes saved = encodeRecord(makeRec(2));
-  RecordBytes notSet = saved;
-  notSet[kOffHpf] = 0;
-  notSet[kOffLpf] = 0;
-  reseal(notSet);
-  check(decodeRecord(notSet.data(), out) && out.settings.hpf == cv::kHpfDefaultIndex && out.settings.lpf == cv::kLpfDefaultIndex,
-        "record: 0 in both cutoff bytes, as every older record holds, reads as HPF 120 and LPF 12k");
+  RecordBytes earlier = saved;  // the earlier firmware wrote the cutoff list index plus one here
+  earlier[kOffRetired] = 4;
+  earlier[kOffRetired + 1] = 7;
+  reseal(earlier);
+  check(decodeRecord(earlier.data(), out) && out.settings.polishEq == in.settings.polishEq &&
+            out.settings.polishComp == in.settings.polishComp && out.settings.debug && out.layout == in.layout &&
+            out.sequence == in.sequence,
+        "record: a record from the earlier firmware loads with every other setting intact");
 
-  RecordData moved = makeRec(2);
-  moved.settings.hpf = 1;
-  moved.settings.lpf = 2;
-  RecordBytes onlyLpf = encodeRecord(moved);
-  onlyLpf[kOffHpf] = 0;
-  reseal(onlyLpf);
-  check(decodeRecord(onlyLpf.data(), out) && out.settings.hpf == cv::kHpfDefaultIndex && out.settings.lpf == 2,
-        "record: each cutoff byte is read on its own");
-
-  RecordBytes last = saved;
-  last[kOffHpf] = static_cast<uint8_t>(cv::kHpfCount);
-  last[kOffLpf] = static_cast<uint8_t>(cv::kLpfCount);
-  reseal(last);
-  check(decodeRecord(last.data(), out) && out.settings.hpf == cv::kHpfCount - 1 && out.settings.lpf == cv::kLpfCount - 1,
-        "record: the last entry of each list is the largest valid byte");
-  for (const uint8_t over : {static_cast<uint8_t>(cv::kHpfCount + 1), uint8_t{0x7F}, uint8_t{0xFF}}) {
-    RecordBytes bad = saved;
-    bad[kOffHpf] = over;
-    reseal(bad);
-    check(!decodeRecord(bad.data(), out) && classifyRecordEntry(bad.data()) == EntryState::Torn,
-          "record: an HPF byte past the list makes the record invalid");
-  }
-  for (const uint8_t over : {static_cast<uint8_t>(cv::kLpfCount + 1), uint8_t{0x7F}, uint8_t{0xFF}}) {
-    RecordBytes bad = saved;
-    bad[kOffLpf] = over;
-    reseal(bad);
-    check(!decodeRecord(bad.data(), out), "record: an LPF byte past the list makes the record invalid");
+  for (const uint8_t byte : {uint8_t{1}, uint8_t{5}, uint8_t{0x7F}, uint8_t{0xFF}}) {
+    RecordBytes odd = saved;
+    odd[kOffRetired] = byte;
+    odd[kOffRetired + 1] = byte;
+    reseal(odd);
+    check(decodeRecord(odd.data(), out) && out.settings.polishEq == in.settings.polishEq && out.settings.debug,
+          "record: whatever bytes 6 and 7 hold, the record stays valid");
   }
 
-  RecordBytes v1 = asV1(encodeRecord(moved));  // a v1 record has no such setting, whatever sits in the bytes
-  v1[kOffHpf] = 1;
-  v1[kOffLpf] = 2;
+  RecordBytes v1 = asV1(saved);  // a v1 record has no such setting, whatever sits in the bytes
+  v1[kOffRetired] = 1;
+  v1[kOffRetired + 1] = 2;
   reseal(v1);
-  check(decodeRecord(v1.data(), out) && out.settings.hpf == cv::kHpfDefaultIndex && out.settings.lpf == cv::kLpfDefaultIndex,
-        "record v1: the cutoff bytes are ignored");
+  check(decodeRecord(v1.data(), out), "record v1: the retired bytes are ignored");
 
-  check(!sameRecordContent(saved.data(), encodeRecord(moved).data()), "record: a cutoff change is new content, so it writes a record");
+  RecordBytes reencoded = encodeRecord(out);
+  check(reencoded[kOffRetired] == 0 && reencoded[kOffRetired + 1] == 0,
+        "record: a record loaded with those bytes set is written back with 0");
 }
 
 void checkRecordUnknownCard() {
@@ -681,7 +655,7 @@ void checkRecords() {
   checkRecordCodec();
   checkRecordSchemaV2();
   checkRecordDebugByte();
-  checkRecordCutoffBytes();
+  checkRecordRetiredBytes();
   checkStoreFlushPending();
   checkRecordUnknownCard();
   checkRecordEntryStates();

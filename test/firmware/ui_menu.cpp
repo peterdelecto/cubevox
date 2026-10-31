@@ -149,7 +149,7 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kHpf, kLpf, kReverb, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug, kUpdate, kExit, kRowCount
+  kInput, kReverb, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
 
@@ -159,9 +159,9 @@ constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible -
 
 // The label of each item, and the value it shows for the default settings. Exit has no value and
 // Update firmware shows a chevron.
-const char* const kLabel[kRowCount] = {"INPUT",  "HPF",    "LPF",    "REVERB", "POLISH COMP", "POLISH EQ",
-                                       "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"MIC", "120 Hz", "12 kHz", "SPRING", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
+const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "POLISH COMP", "POLISH EQ", "OUTPUT",
+                                       "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
 
 // The row as the test names it: the label, then the value after a space.
 std::string rowName(int item, const char* value) {
@@ -206,7 +206,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 11, "menu: the list holds eleven items");
+  check(kRowCount == 9, "menu: the list holds nine items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string name = rowName(r, kDefaultValue[r]);
     check(listRowIs(m.canvas, r, kLabel[r], kDefaultValue[r], r == kInput), name.c_str());
@@ -245,13 +245,13 @@ void checkMenuListGeometry() {
         "menu: a bar on row 2 covers lines 32 to 45 and no line beside them");
 
   // Every item shown on a row without the bar, so its ink is measured as lit pixels. Five views,
-  // each a cursor position and the window top it gives, put each of the eleven items on such a row.
+  // each a cursor position and the window top it gives, put each of the nine items on such a row.
   struct View {
     int jumpTo;
     int thenStep;
     int top;
   };
-  const View views[] = {{kInput, 0, 0}, {kHpf, 0, 0}, {kTopSwitch, 0, 4}, {kExit, 0, 7}, {kExit, -1, 7}};
+  const View views[] = {{kInput, 0, 0}, {kReverb, 0, 0}, {kTopSwitch, 0, 2}, {kExit, 0, 5}, {kExit, -1, 5}};
   bool seen[kRowCount] = {};
   for (const View& v : views) {
     MenuRig row;
@@ -274,18 +274,16 @@ void checkMenuListGeometry() {
   }
   bool allSeen = true;
   for (bool s : seen) allSeen = allSeen && s;
-  check(allSeen, "menu: the views measured all eleven items");
+  check(allSeen, "menu: the views measured all nine items");
 
   // Every value an item can show clears the label by 7 px or more. The tightest are TOP SWITCH
   // BYPASS and UPDATE FIRMWARE >.
   struct Values {
     int item;
-    std::array<const char*, 7> value;
+    std::array<const char*, 2> value;
   };
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
-      {kHpf, {"OFF", "80 Hz", "100 Hz", "120 Hz", "150 Hz"}},
-      {kLpf, {"OFF", "4 kHz", "5 kHz", "6 kHz", "8 kHz", "10 kHz", "12 kHz"}},
       {kReverb, {"SPRING", "CHASM"}},
       {kPolishComp, {"ON", "OFF"}},
       {kPolishEq, {"ON", "OFF"}},
@@ -307,12 +305,12 @@ void checkMenuListGeometry() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 4 to 10; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 6 to 0. The window top runs from 0 to 7. Each expected canvas is
+// Going down it scrolls at items 4 to 8; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 4 to 0. The window top runs from 0 to 5. Each expected canvas is
 // composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 5, 5, 5};
 
   MenuRig m;
   m.step(0, true);
@@ -333,23 +331,23 @@ void checkMenuScroll() {
 
   m.step(-1, false);  // 0 back one wraps to the last item
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(7, kExit)), "menu: a turn back from item 0 wraps to Exit with the window at its end");
+  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: a turn back from item 0 wraps to Exit with the window at its end");
   m.step(1, false);
   m.draw();
   check(sameCanvas(m.canvas, listCanvas(0, kInput)), "menu: a turn forward from Exit wraps to item 0 with the window at its start");
 
-  m.step(3, false);
-  m.step(4, false);  // one pass of four steps leaves the window just far enough to show item 7
+  m.step(2, false);
+  m.step(3, false);  // one pass of three steps leaves the window just far enough to show item 5
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(4, kTopSwitch)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
+  check(sameCanvas(m.canvas, listCanvas(2, kTopSwitch)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
   m.step(-2, false);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(4, kPolishEq)), "menu: and a multi-step turn back inside the window leaves it where it is");
+  check(sameCanvas(m.canvas, listCanvas(2, kPolishEq)), "menu: and a multi-step turn back inside the window leaves it where it is");
 
   MenuRig jump;
   jump.openListAt(kExit);
   jump.draw();
-  check(sameCanvas(jump.canvas, listCanvas(7, kExit)), "menu: a jump straight to Exit puts it on the last row");
+  check(sameCanvas(jump.canvas, listCanvas(5, kExit)), "menu: a jump straight to Exit puts it on the last row");
 }
 
 // The cursor and the window start over each time the menu opens.
@@ -357,7 +355,7 @@ void checkMenuScrollResets() {
   MenuRig m;
   m.openListAt(kExit);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(7, kExit)), "menu: the list is scrolled to Exit");
+  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: the list is scrolled to Exit");
   check(m.step(0, true) == UiAction::None && !m.menu.open(), "menu: Exit closes the scrolled list");
   m.step(0, true);
   m.draw();
@@ -385,7 +383,7 @@ void checkMenuListPitch() {
   check(sameCanvas(m.canvas, listCanvas(0, kVisible - 1)), "menu: the cursor bar follows to the last visible row, lines 48 to 61");
   m.step(kExit - (kVisible - 1), false);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(7, kExit)), "menu: the scrolled window keeps the same pitch and the bar on its last row");
+  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: the scrolled window keeps the same pitch and the bar on its last row");
   check(lineIs(m.canvas, 62, false) && lineIs(m.canvas, 63, false), "menu: the last two pixel lines stay blank");
 }
 
@@ -420,8 +418,8 @@ bool cursorRowIs(const Canvas& canvas, int r, int item, const char* value) {
 
 // What a click on each of the seven rows that flip a value asks for, what applying it reports, and the
 // value the row shows once the click is applied and once a second click undoes it. The rows are in
-// list order. HPF and LPF step through a longer list, so checkMenuCutoffRows covers them. The reverb
-// click changes the layout, so it reports LayoutChanged. The others change a setting.
+// list order. The reverb click changes the layout, so it reports LayoutChanged. The others change a
+// setting.
 struct Click {
   int item;
   UiAction action;
@@ -559,82 +557,47 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The HPF and LPF rows sit after INPUT and show the default cutoffs. A click steps to the next
-// cutoff in the row's list and wraps after the last, so one lap of clicks returns to the default.
-void checkMenuCutoffRows() {
-  check(kHpf == kInput + 1 && kLpf == kHpf + 1 && kReverb == kLpf + 1,
-        "menu: HPF and LPF follow INPUT, then REVERB");
-  static const char* const kHpfAfterClick[] = {"150 Hz", "OFF", "80 Hz", "100 Hz", "120 Hz"};
-  static const char* const kLpfAfterClick[] = {"OFF", "4 kHz", "5 kHz", "6 kHz", "8 kHz", "10 kHz", "12 kHz"};
-  check(sizeof(kHpfAfterClick) / sizeof(kHpfAfterClick[0]) == static_cast<size_t>(cv::kHpfCount) &&
-            sizeof(kLpfAfterClick) / sizeof(kLpfAfterClick[0]) == static_cast<size_t>(cv::kLpfCount),
-        "menu: one lap of clicks covers each list");
-
+// The nine rows, in the order of the polish spec, with the labels written out and the cursor
+// walked down one step at a time. The input filters are not on the list.
+void checkMenuRowOrder() {
+  static const char* const kSpecOrder[kRowCount] = {"INPUT", "REVERB", "POLISH COMP", "POLISH EQ", "OUTPUT",
+                                                    "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
-  m.openListAt(kHpf);
-  m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kHpf), kHpf, "120 Hz"), "menu: HPF starts at 120 Hz");
-  for (int i = 0; i < cv::kHpfCount; ++i) {
-    const UiAction a = m.step(0, true);
-    const std::string row = rowName(kHpf, kHpfAfterClick[i]);
-    check(a == UiAction::CycleHpf && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::SettingsChanged,
-          (row + " click asks for the next cutoff").c_str());
+  m.step(0, true);
+  bool inOrder = true;
+  for (int cursor = 0; cursor < kRowCount; ++cursor) {
+    if (cursor > 0) m.step(1, false);
     m.draw();
-    check(cursorRowIs(m.canvas, rowOnScreen(kHpf), kHpf, kHpfAfterClick[i]), row.c_str());
+    inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
-  check(m.settings.hpf == cv::kHpfDefaultIndex, "menu: one lap of clicks returns HPF to 120 Hz");
-
-  m.step(1, false);
-  m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kLpf), kLpf, "12 kHz"), "menu: LPF starts at 12 kHz");
-  for (int i = 0; i < cv::kLpfCount; ++i) {
-    const UiAction a = m.step(0, true);
-    const std::string row = rowName(kLpf, kLpfAfterClick[i]);
-    check(a == UiAction::CycleLpf && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::SettingsChanged,
-          (row + " click asks for the next cutoff").c_str());
-    m.draw();
-    check(cursorRowIs(m.canvas, rowOnScreen(kLpf), kLpf, kLpfAfterClick[i]), row.c_str());
-  }
-  check(m.settings.lpf == cv::kLpfDefaultIndex && m.layout == defaultLayout() && m.settings.polishComp &&
-            m.settings.polishEq && !m.settings.debug,
-        "menu: one lap of clicks returns LPF to 12 kHz and touches no other setting");
+  check(inOrder && kRowCount == 9, "menu: the rows run INPUT, REVERB, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, UPDATE FIRMWARE, EXIT");
 }
 
-// The cutoffs the menu set are what the box saves and plays: the record stores the list index plus
-// one, a reload shows the same rows, and the audio snapshot carries the same cutoffs.
-void checkMenuCutoffsSavedAndPlayed() {
+// The POLISH EQ row drives both halves of the stage: one click turns the one `on` off for the front
+// half ahead of slot 1 and the back half after the comp, the record keeps it, and a reload shows
+// the row OFF.
+void checkMenuPolishEqSavedAndPlayed() {
   MenuRig m;
-  m.openListAt(kHpf);
-  ui::applyAction(m.step(0, true), m.settings, m.layout);  // 120 to 150
-  m.step(1, false);
-  ui::applyAction(m.step(0, true), m.settings, m.layout);  // 12k to OFF
-  ui::applyAction(m.step(0, true), m.settings, m.layout);  // OFF to 4k
-  check(m.settings.hpf == 4 && m.settings.lpf == 1, "menu: the clicks left HPF 150 and LPF 4k");
+  m.openListAt(kPolishEq);
+  const UiAction a = m.step(0, true);
+  check(a == UiAction::TogglePolishEq && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::SettingsChanged,
+        "menu: a click on POLISH EQ asks for the toggle");
+  const ChainSnapshot snap = composeSnapshot(m.layout, m.panel, m.settings, BenchOverrides());
+  check(!snap.params.eq.on && snap.params.comp.on, "menu: the one eq.on goes off and POLISH COMP stays on");
 
   RecordData saved;
   saved.settings = m.settings;
   saved.layout = m.layout;
   const RecordBytes bytes = encodeRecord(saved);
   RecordData loaded;
-  check(bytes[kOffHpf] == 5 && bytes[kOffLpf] == 2 && decodeRecord(bytes.data(), loaded) && loaded.settings.hpf == 4 &&
-            loaded.settings.lpf == 1,
-        "menu: the record holds the list index plus one, 5 for 150 and 2 for 4k, and a reload reads them back");
+  check(decodeRecord(bytes.data(), loaded) && !loaded.settings.polishEq && loaded.settings.polishComp,
+        "menu: the record keeps POLISH EQ OFF");
 
   MenuRig again;
   again.settings = loaded.settings;
-  again.openListAt(kHpf);
+  again.openListAt(kPolishEq);
   again.draw();
-  check(cursorRowIs(again.canvas, rowOnScreen(kHpf), kHpf, "150 Hz"), "menu: after the reload the HPF row reads 150 Hz");
-  again.step(1, false);
-  again.draw();
-  check(cursorRowIs(again.canvas, rowOnScreen(kLpf), kLpf, "4 kHz"), "menu: and the LPF row reads 4 kHz");
-
-  const ChainSnapshot snap = composeSnapshot(m.layout, m.panel, m.settings, BenchOverrides());
-  check(snap.params.conditioning.hpf == 4 && snap.params.conditioning.lpf == 1,
-        "menu: the audio snapshot carries the cutoffs the rows show");
-  const ChainSnapshot fresh = composeSnapshot(m.layout, m.panel, Settings(), BenchOverrides());
-  check(fresh.params.conditioning.hpf == cv::kHpfDefaultIndex && fresh.params.conditioning.lpf == cv::kLpfDefaultIndex,
-        "menu: the default snapshot runs HPF 120 and LPF 12k");
+  check(cursorRowIs(again.canvas, rowOnScreen(kPolishEq), kPolishEq, "OFF"), "menu: after the reload the POLISH EQ row reads OFF");
 
   // Through the flash store, the way the sketch saves after the debounce.
   FakeFlash flash;
@@ -648,7 +611,7 @@ void checkMenuCutoffsSavedAndPlayed() {
   std::memcpy(rebooted.mem[0].data(), flash.mem[0].data(), kRecordBytes);
   RecordStore reboot(rebooted);
   RecordData out;
-  check(reboot.begin(out) && out.settings.hpf == 4 && out.settings.lpf == 1, "menu: the next boot loads HPF 150 and LPF 4k");
+  check(reboot.begin(out) && !out.settings.polishEq, "menu: the next boot loads POLISH EQ OFF");
 }
 
 // What the box saves and plays is what the menu showed.
@@ -718,14 +681,14 @@ void checkMenuWrapAndCombo() {
   MenuRig m;
   m.openListAt(kRowCount + 2);  // a full lap and two more detents lands on item 2
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kLpf), kLpf, "12 kHz"), "menu: +13 detents wraps around the list");
+  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: +11 detents wraps around the list");
   m.step(-(kRowCount + 2), false);  // back by the same lands on item 0
   m.draw();
-  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: -13 detents wraps the other way");
+  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: -11 detents wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
-  check(n.step(1, true) == UiAction::CycleHpf, "menu: a turn and a click in one pass act on the new cursor");
+  check(n.step(1, true) == UiAction::SwapReverb, "menu: a turn and a click in one pass act on the new cursor");
 }
 
 void checkMenuScreens() {
@@ -818,7 +781,7 @@ void checkMenuRedraw() {
   check(pagesClean(m.canvas), "menu: an unchanged frame is not redrawn");
 
   // A change to anything the list shows repaints; a change to a row outside the window does not.
-  m.settings.polishEq = false;  // POLISH EQ is item 5, outside the window of items 0 to 3
+  m.settings.outputLevel = OutputLevel::Mic;  // OUTPUT is item 4, outside the window of items 0 to 3
   m.draw();
   check(pagesClean(m.canvas), "menu: a value change outside the window is not redrawn");
   m.settings.inputJack = InputJack::Line;
@@ -827,12 +790,12 @@ void checkMenuRedraw() {
   clearAllDirty(m.canvas);
   m.step(1, false);
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, 0, "INPUT", "LINE") && cursorRowIs(m.canvas, 1, kHpf, "120 Hz"),
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, 0, "INPUT", "LINE") && cursorRowIs(m.canvas, 1, kReverb, "SPRING"),
         "menu: a cursor move repaints");
   clearAllDirty(m.canvas);
-  m.step(4, false);  // the cursor passes the last row to item 5, so the window scrolls to start at item 2
+  m.step(3, false);  // the cursor passes the last row to item 4, so the window scrolls to start at item 1
   m.draw();
-  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kPolishEq, "OFF"), "menu: a scroll repaints");
+  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kOutput, "MIC"), "menu: a scroll repaints");
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: and the scrolled window is then skipped when unchanged");
@@ -860,7 +823,7 @@ void checkScreenshots() {
   MenuRig scrolled;
   scrolled.openListAt(kExit);
   scrolled.draw();
-  check(sameCanvas(scrolled.canvas, listCanvas(7, kExit)), "screens: scrolled menu rows");
+  check(sameCanvas(scrolled.canvas, listCanvas(5, kExit)), "screens: scrolled menu rows");
   writePgm(scrolled.canvas, "oled-menu-scrolled.pgm");
 
   m.menu.showChainView();
@@ -897,8 +860,8 @@ void checkMenu() {
   checkMenuReverbValue();
   checkMenuReverbClick();
   checkMenuDebugRow();
-  checkMenuCutoffRows();
-  checkMenuCutoffsSavedAndPlayed();
+  checkMenuRowOrder();
+  checkMenuPolishEqSavedAndPlayed();
   checkMenuClicksSavedAndPlayed();
   checkMenuSavedThroughStore();
   checkMenuWrapAndCombo();

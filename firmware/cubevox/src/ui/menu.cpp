@@ -37,8 +37,6 @@ constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix)
 // The rows top to bottom.
 enum class Item : uint8_t {
   InputJack,
-  Hpf,
-  Lpf,
   Reverb,
   PolishComp,
   PolishEq,
@@ -76,8 +74,6 @@ const char* itemLabel(Item it) {
     case Item::PolishComp: return "POLISH COMP";
     case Item::PolishEq: return "POLISH EQ";
     case Item::Debug: return "DEBUG";
-    case Item::Hpf: return "HPF";
-    case Item::Lpf: return "LPF";
     case Item::UpdateFirmware: return "UPDATE FIRMWARE";
     case Item::Exit: return "EXIT";
     case Item::Count: break;
@@ -86,17 +82,6 @@ const char* itemLabel(Item it) {
 }
 
 const char* onOff(bool on) { return on ? "ON" : "OFF"; }
-
-// The cutoff lists as the rows show them, in the order of cv::kHpfCutoffHz and cv::kLpfCutoffHz.
-constexpr std::array<const char*, cv::kHpfCount> kHpfText = {"OFF", "80 Hz", "100 Hz", "120 Hz", "150 Hz"};
-constexpr std::array<const char*, cv::kLpfCount> kLpfText = {"OFF",   "4 kHz", "5 kHz",  "6 kHz",
-                                                             "8 kHz", "10 kHz", "12 kHz"};
-
-// An index past a list reads as the last entry, like the settings do.
-template <size_t N>
-const char* listText(const std::array<const char*, N>& text, uint8_t index) {
-  return text[index < N ? index : N - 1];
-}
 
 // The reverb card the layout holds. A valid layout always holds one; a layout without one reads
 // SPRING, the default.
@@ -115,8 +100,6 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::PolishEq: return onOff(s.polishEq);
     case Item::Debug: return onOff(s.debug);
-    case Item::Hpf: return listText(kHpfText, s.hpf);
-    case Item::Lpf: return listText(kLpfText, s.lpf);
     case Item::UpdateFirmware: return ">";
     default: return "";
   }
@@ -194,8 +177,6 @@ UiAction Menu::onClick() {
         case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::PolishEq: return UiAction::TogglePolishEq;
         case Item::Debug: return UiAction::ToggleDebug;
-        case Item::Hpf: return UiAction::CycleHpf;
-        case Item::Lpf: return UiAction::CycleLpf;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;
         case Item::Count: break;

@@ -19,7 +19,6 @@ struct ChainEngines {
   explicit ChainEngines(cv::PitchFx& pitchFx) : pitch(pitchFx) {}
 
   cv::PitchFx& pitch;
-  cv::InputConditioning conditioning;  // the head of the chain, ahead of slot 1
   cv::Gate inputGate;
   cv::Unison unison;
   cv::Slapback slapback;
@@ -35,12 +34,11 @@ struct ChainEngines {
 void resetEngine(ChainEngines& engines, Engine e);
 
 // Holds the cycles each stage of one pass took, with one entry per slot and then one each for
-// POLISH COMP, POLISH EQ and the input conditioning.
+// POLISH COMP and POLISH EQ. The EQ entry sums its front half ahead of slot 1 and its back half.
 struct ChainCycles {
   std::array<uint32_t, kSlotCount> slot{};
   uint32_t comp = 0;
   uint32_t eq = 0;
-  uint32_t conditioning = 0;
 };
 
 // Runs the engine of card `c` over `n` samples from `in` into `out`. Returns false when it wrote
@@ -113,9 +111,9 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
              int n, bool& pitchDone);
 
-// Walks one block through the chain. The input conditioning runs first, ahead of slot 1. The slots
-// run in order, then the NaN guard, then POLISH COMP and POLISH EQ. The conditioning and both polish
-// stages run always, and each is a bit-exact copy once settled off. `a` holds
+// Walks one block through the chain. The front half of POLISH EQ runs first, ahead of slot 1. The
+// slots run in order, then the NaN guard, then POLISH COMP and the back half of POLISH EQ. POLISH
+// COMP and both EQ halves run always, and each is a bit-exact copy once settled off. `a` holds
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
 // block. Returns false when a slot produced a NaN or an infinity. The block was then silenced before
@@ -126,9 +124,9 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
   const ChainParams& p = snap.params;
   float* const result = a;
   bool pitchDone = false;
-  const uint32_t conditioningStart = cycleClock();
-  engines.conditioning.process(a, a, n, p.conditioning);
-  cycles.conditioning = cycleClock() - conditioningStart;
+  const uint32_t frontStart = cycleClock();
+  engines.polish.processFront(a, a, n, p.eq);
+  const uint32_t frontCycles = cycleClock() - frontStart;
   for (int s = 0; s < kSlotCount; ++s) {
     const uint32_t start = cycleClock();
     const bool wrote = runSlot(engines, fades, s, snap, a, b, n, pitchDone);
@@ -139,9 +137,9 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
   const uint32_t compStart = cycleClock();
   engines.comp.process(a, b, n, p.comp);
   const uint32_t eqStart = cycleClock();
-  engines.polish.process(b, a, n, p.eq);
+  engines.polish.processBack(b, a, n, p.eq);
   cycles.comp = eqStart - compStart;
-  cycles.eq = cycleClock() - eqStart;
+  cycles.eq = frontCycles + (cycleClock() - eqStart);
   if (a != result) {
     for (int i = 0; i < n; ++i) result[i] = a[i];
   }

@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "engine/conditioning.h"
 #include "engine/distortion.h"
 #include "engine/doubler.h"
 #include "engine/gate.h"
@@ -15,7 +14,6 @@
 #include "engine/unison.h"
 
 struct ChainParams {
-  cv::ConditioningParams conditioning;  // the head of the chain, ahead of slot 1
   cv::GateParams inputGate;
   cv::PitchFxParams pitchFx;
   cv::DoublerParams doubler;  // its toggle also sets pitchFx.doublerOn
@@ -24,8 +22,8 @@ struct ChainParams {
   cv::DistortionParams distortion;
   cv::GateParams gate;
   cv::ReverbParams reverb;
-  cv::PolishCompParams comp;  // the chain tail: comp, then eq
-  cv::PolishParams eq;
+  cv::PolishCompParams comp;  // the chain tail: comp, then the back half of eq
+  cv::PolishParams eq;        // its front half runs ahead of slot 1
 
   ChainParams();
 };
