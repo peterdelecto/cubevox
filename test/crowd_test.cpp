@@ -246,8 +246,8 @@ Signal run(const Signal& in, const cv::CrowdParams& p, Probe* probe = nullptr) {
   return runSwitch(in, p, p, static_cast<int>(in.size()), probe);
 }
 
-// The shipped defaults are the owner's working set (contour, level scatter, timing scatter, drift and
-// epoch align all on). A test starts from this neutral tuning and turns on only what it measures.
+// The shipped defaults are the owner's working set (contour, level scatter, timing scatter and drift
+// on, epoch align off). A test starts from this neutral tuning and turns on only what it measures.
 void neutralize(cv::CrowdTuning& t) {
   t.scatterMs = 0.0f;
   t.driftCents = 0.0f;
@@ -435,14 +435,17 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
-// One voice alone lands on the lead's pitch moved by its pitchSt at WIDTH 1, with the voice's own
-// formant and tone shelf in place.
+// The top of the WIDTH factor on pitch offsets, drift and contour (owner 2026-10-31).
+constexpr double kPitchTop = 2.0 / 3.0;
+
+// One voice alone lands on the lead's pitch moved by two thirds of its pitchSt at WIDTH 1, with the
+// voice's own formant and tone shelf in place.
 bool testPitchMoves() {
   const Signal in = tone(220.0, 2 * kRate);
   bool ok = true;
   for (size_t v = 0; v < 4; ++v) {
     const cv::CrowdParams p = alone(v);
-    const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
+    const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) * kPitchTop / 12.0);
     const double hz = medianHz(run(in, p));
     const double err = hz > 0.0 ? cents(hz, want) : 9999.0;
     char name[40];
@@ -453,8 +456,12 @@ bool testPitchMoves() {
 }
 
 // The WIDTH law of the owner, written out here so the test does not lean on the engine's code. The
-// factor on the pitch and formant offsets is linear through (0, 0), (0.1, 0.012) and (1, 1).
+// factor on the formant offsets is linear through (0, 0), (0.1, 0.012) and (1, 1).
 double widthFactor(double w) { return w <= 0.1 ? 0.012 * (w / 0.1) : 0.012 + 0.988 * ((w - 0.1) / 0.9); }
+
+// The factor on the pitch offsets, the drift and the contour deviation is the same law with a top of
+// 2/3 (owner 2026-10-31), so the knee value is 0.008 and WIDTH 1 reaches two thirds.
+double pitchFactor(double w) { return widthFactor(w) * kPitchTop; }
 
 // Copy v's lag in ms on the default delays at WIDTH w. The multiplier on delayMs times lagScale is
 // 0.5 at WIDTH 0 and 1 + 20 ms / (the longest base lag) at WIDTH 1, linear between, and maxLagMs
@@ -472,9 +479,10 @@ double lagMsAt(size_t v, double w, double lagScale) {
 double copyHz(const Signal& out, double want) { return peakHz(out, kRate, kRate, 2.0 * want) / 2.0; }
 
 // The -2.5 st copy (index 2, formant -1 st) alone at WIDTH 0, 0.1, 0.5 and 1. Its pitch offset is -2.5 st
-// times the width factor, exactly 0 at 0, 3.0 cents at 0.1 (the knee) and 0.454 of the full offset
-// at 0.5. Its formant move is the log of its grain playback rate over the same log at WIDTH 1, read
-// from the engine: none at 0, 1.2 % at 0.1 and 0.454 at 0.5. (A spectral centroid does not read it,
+// times the pitch factor, exactly 0 at 0, 2.0 cents at 0.1 (the knee), 0.303 of the full offset at
+// 0.5 and 0.667 of it (-1.667 st) at 1. Its formant move is the log of its grain playback rate over
+// the same log at WIDTH 1, read from the engine, and follows the full width factor: none at 0, 1.2 %
+// at 0.1 and 0.454 at 0.5. (A spectral centroid does not read it,
 // because the grain windows make the centroid's slope depend on the pitch ratio; at WIDTH 0 the
 // output itself shows it, which equals the output of a copy with no pitch or formant offset.) The
 // tone shelf stays where it is, and the lag follows the lag multiplier of the WIDTH law.
@@ -501,7 +509,7 @@ bool testWidthLaw() {
     const Signal out = run(tn, p);
     lagAt[i] = gCrowd.lagSamples(0);
     rate[i] = static_cast<double>(gCrowd.grainRate(0));
-    const double want = 220.0 * std::pow(2.0, full * widthFactor(w) / 12.0);
+    const double want = 220.0 * std::pow(2.0, full * pitchFactor(w) / 12.0);
     hz[i] = copyHz(out, want);
     const double err = cents(hz[i], want);
     char name[40];
@@ -550,18 +558,19 @@ bool testWidthLaw() {
 // VOICES 20, 40, 60 and 80 % bring in the copies in index order, the -1.75 st copy first, then the
 // +2.75 st, the -2.5 st and the +1 st. At each step the output carries a line at the f0 of every
 // copy that has come in and none at the f0 of the copies still to come. It runs at WIDTH 1 and at
-// WIDTH 0.5, where the offsets are the width factor 0.454 of their full values.
+// WIDTH 0.8, where the offsets are the pitch factor 0.520 of their full values. (At WIDTH 0.5 the
+// -1.75 st and -2.5 st copies sit 23 cents apart and their lines overlap.)
 bool testFadeOrder() {
   const Signal in = tone(220.0, 2 * kRate);
   const cv::CrowdTuning d;
   bool ok = true;
-  for (float width : {1.0f, 0.5f}) {
+  for (float width : {1.0f, 0.8f}) {
     for (int n = 1; n <= 4; ++n) {
       const Signal out = run(in, knobs(0.2f * static_cast<float>(n), width));
       double amp[4];
       double top = 0.0;
       for (size_t v = 0; v < 4; ++v) {
-        const double st = static_cast<double>(d.pitchSt[v]) * widthFactor(static_cast<double>(width));
+        const double st = static_cast<double>(d.pitchSt[v]) * pitchFactor(static_cast<double>(width));
         amp[v] = goertzel(&out[kRate], kRate, 220.0 * std::pow(2.0, st / 12.0));
         top = std::max(top, amp[v]);
       }
@@ -605,7 +614,8 @@ bool testFormantMoves() {
 
 // Voice 0 alone (the longest throat, -1.75 st) and voice 1 alone (the highest centroid of the
 // four) are two different colours: the spectral centroid of each, over the harmonics of its own
-// f0 up to the 20th, differs by at least 5 %. All four default formants are below the lead's. The
+// f0 up to the 20th, differs by at least 4 % (4.8 % with the pitch top at 2/3, 5.0 % before). All
+// four default formants are below the lead's. The
 // centroid of a steady tone depends on how the grain reads line up with the period grid (see
 // formantProbe), so the WIDTH multiplier on the lag is held at 1 and both voices sit at 48 ms.
 bool testVoicesDiffer() {
@@ -616,11 +626,11 @@ bool testVoicesDiffer() {
     cv::CrowdParams p = alone(pick[i]);
     p.tuning.widthLagBottom = 1.0f;
     p.tuning.widthLagMs = 0.0f;
-    const double f0 = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
+    const double f0 = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) * kPitchTop / 12.0);
     c[i] = centroidHz(run(in, p), f0, 1, 20);
   }
   const double diff = std::fabs(c[1] - c[0]) / std::min(c[0], c[1]);
-  return report("voices differ", diff >= 0.05, "centroid voice 0 %.1f Hz, voice 1 %.1f Hz, differ %.1f %% (>=5)", c[0],
+  return report("voices differ", diff >= 0.04, "centroid voice 0 %.1f Hz, voice 1 %.1f Hz, differ %.1f %% (>=4)", c[0],
                 c[1], 100.0 * diff);
 }
 
@@ -830,7 +840,7 @@ bool testScatter() {
   cv::CrowdParams pitched = flat;
   pitched.tuning.pitchSt[v] = d.pitchSt[v];
   const Signal outP = run(in, pitched);
-  const double want = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[v]) / 12.0);
+  const double want = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[v]) * kPitchTop / 12.0);
   double worstCents = 0.0;
   for (int k = 0; k < tr.count; ++k) {
     const int from = tr.start(k) + msToSamples(target + 15.0 + 30.0);
@@ -842,9 +852,10 @@ bool testScatter() {
   return ok;
 }
 
-// Pitch drift of 20 cents on copy 1 over a 6 s tone. Its f0 over each 0.5 s window after the first
-// second stays within 20 cents of its pitch offset, with 3 cents of slack for the measurement, and
-// differs from window to window. With the drift at 0 the walk never moves off 0, whatever its hold.
+// Pitch drift of 20 cents on copy 1 over a 6 s tone at WIDTH 1. The pitch factor puts the walk's peak
+// at 20 x 2/3 cents. Its f0 over each 0.5 s window after the first second stays within that of its
+// pitch offset, with 3 cents of slack for the measurement, and differs from window to window. With
+// the drift at 0 the walk never moves off 0, whatever its hold.
 bool testDrift() {
   const Signal in = tone(220.0, 6 * kRate);
   const cv::CrowdTuning d;
@@ -852,7 +863,7 @@ bool testDrift() {
   p.tuning.pitchSt[0] = d.pitchSt[0];
   p.tuning.driftCents = 20.0f;
   const Signal out = run(in, p);
-  const double base = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[0]) / 12.0);
+  const double base = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[0]) * kPitchTop / 12.0);
   double worst = 0.0;
   double lo = 1e9;
   double hi = -1e9;
@@ -865,8 +876,8 @@ bool testDrift() {
     hi = std::max(hi, c);
   }
   std::printf("\n");
-  bool ok = report("drift range", worst <= 23.0 && hi - lo >= 2.0, "worst %.2f cents from the offset (<= 20 + 3), spread %.2f cents (>= 2)",
-                   worst, hi - lo);
+  bool ok = report("drift range", worst <= 20.0 * kPitchTop + 3.0 && hi - lo >= 2.0,
+                   "worst %.2f cents from the offset (<= 20 x 2/3 + 3), spread %.2f cents (>= 2)", worst, hi - lo);
 
   const Signal prog = program(3);
   cv::CrowdParams a = knobs(0.7f, 0.5f);
@@ -967,12 +978,14 @@ size_t differing(const Signal& a, const Signal& b) {
   return n;
 }
 
-// What the three runs of testEnhancementsDefaultExact hash to on the default tuning as of v2.00.73
-// (Mac build), with voice 3 at -2.5 st. The default tuning must reproduce them to the bit. Update
-// them only when the sound of a default copy changes on purpose.
-constexpr uint64_t kDefaultProgram = 0x60425f790f1430acULL;
-constexpr uint64_t kDefaultBurst = 0xb2459d9e32a38036ULL;
-constexpr uint64_t kDefaultBurstScatter = 0x5a48a65e907c1993ULL;
+// What the three runs of testEnhancementsDefaultExact hash to on the default tuning as of v2.00.74
+// (Mac build, epoch align off, WIDTH pitch top 2/3), with voice 3 at -2.5 st. The runs start from
+// knobs(), which neutralizes the human-voice set, so the shipped epoch align default does not enter
+// them. The default tuning must reproduce them to the bit. Update them only when the sound of a
+// default copy changes on purpose.
+constexpr uint64_t kDefaultProgram = 0x94026732e260ad75ULL;
+constexpr uint64_t kDefaultBurst = 0x232a52dcbafd3aa6ULL;
+constexpr uint64_t kDefaultBurstScatter = 0xcfd096e135f9fa29ULL;
 
 // With every enhancement neutral the engine runs the code it ran without them, and a setting that
 // only matters while its control is on moves no sample. The three recorded runs hash to the values
@@ -1011,9 +1024,9 @@ bool testEnhancementsDefaultExact() {
     char name[40];
     std::snprintf(name, sizeof name, "default hash, run %d", i + 1);
     const bool same = hashes[i] == pinned[i];
-    std::printf("info hash run %d: pinned v2.00.73 %016llx, default tuning %016llx\n", i + 1,
+    std::printf("info hash run %d: pinned v2.00.74 %016llx, default tuning %016llx\n", i + 1,
                 static_cast<unsigned long long>(pinned[i]), static_cast<unsigned long long>(hashes[i]));
-    ok &= report(name, same, "output hash equals the pinned v2.00.73 value: %.0f (1)", same ? 1.0 : 0.0);
+    ok &= report(name, same, "output hash equals the pinned v2.00.74 value: %.0f (1)", same ? 1.0 : 0.0);
   }
   return ok;
 }
@@ -1023,7 +1036,7 @@ bool testEnhancementsDefaultExact() {
 bool testWorkingSetDefaults() {
   const cv::CrowdTuning d;
   const bool values = d.contour[0] == 0.8f && d.contour[1] == 1.2f && d.contour[2] == 0.7f && d.contour[3] == 1.1f &&
-                      d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && d.epochAlign &&
+                      d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && !d.epochAlign &&
                       d.widthKnee == 0.1f && d.widthKneeFrac == 0.012f && d.widthLagBottom == 0.5f &&
                       d.widthLagMs == 20.0f;
   bool ok = report("working set values", values,
@@ -1135,9 +1148,10 @@ double sweepDepthSt(const Signal& x, double sweepHz, double fromS, int cycles) {
   return count > 0 ? 2.0 * std::hypot(re, im) / count : 0.0;
 }
 
-// Copy 1 alone, with contour c, on a 220 Hz tone swinging 1 st either side. The copy's pitch swing
-// against the input's is c. The sweep runs at 1 Hz and at 3 Hz, since the copy's lag is a fifth of a
-// cycle at 3 Hz and a copy that read the deviation its lag ago would miss by that much.
+// Copy 1 alone at WIDTH 1, with contour c, on a 220 Hz tone swinging 1 st either side. The copy's pitch
+// swing against the input's is the contour pulled toward 1 by the pitch factor at the top of WIDTH,
+// 1 + (c - 1) x 2/3. The sweep runs at 1 Hz and at 3 Hz, since the copy's lag is a fifth of a cycle
+// at 3 Hz and a copy that read the deviation its lag ago would miss by that much.
 bool testContour() {
   bool ok = true;
   for (double sweepHz : {1.0, 3.0}) {
@@ -1150,11 +1164,12 @@ bool testContour() {
       const double outSt = sweepDepthSt(out, sweepHz, 2.0, static_cast<int>(3.0 * sweepHz));
       const double ratio = outSt / inSt;
       const double tol = c == 1.0f ? 0.10 : 0.15;
+      const double want = 1.0 + (static_cast<double>(c) - 1.0) * pitchFactor(1.0);
       char name[48];
       std::snprintf(name, sizeof name, "contour %.1f at %.0f Hz", static_cast<double>(c), sweepHz);
-      ok &= report(name, std::fabs(ratio / static_cast<double>(c) - 1.0) <= tol,
-                   "input swing %.3f st, copy swing %.3f st, ratio %.3f (the contour within %.2f)", inSt, outSt, ratio,
-                   tol);
+      ok &= report(name, std::fabs(ratio / want - 1.0) <= tol,
+                   "input swing %.3f st, copy swing %.3f st, ratio %.3f (want %.3f within 10-15 %%)", inSt, outSt, ratio,
+                   want);
     }
   }
 
@@ -1174,7 +1189,7 @@ bool testContour() {
 }
 
 // Copy v alone with the shipped human-voice set (timing scatter, drift, level scatter, contour and
-// epoch align) on, at WIDTH `width`.
+// the shipped epoch align, which is off), at WIDTH `width`.
 cv::CrowdParams humanCopy(size_t v, float width) {
   const cv::CrowdTuning d;
   cv::CrowdParams p = alone(v);
@@ -1195,12 +1210,12 @@ std::vector<double> windowCents(const Signal& out, double base) {
 }
 
 // The bottom tenth of WIDTH is for a melodic line, so a copy there is a plain double on the lead's
-// pitch. The -2.5 st copy on the shipped set sits within 1 cent of the lead at WIDTH 0, 3.0 +- 1.5 cents
-// flat of it at 0.1, and 250 +- 10 cents flat at 1. Drift scales with the width factor, so at WIDTH
-// 0.05 a copy's f0 moves less than 1 cent from one 0.5 s window to the next, and at WIDTH 1 it
-// moves as the drift test expects. Contour scales with the same factor, so at WIDTH 0.05 a copy
-// with contour 0.6 or 1.4 swings within 2 % of the input's swing, and at WIDTH 1 within the contour
-// test's bounds of its contour.
+// pitch. The -2.5 st copy on the shipped set sits within 1 cent of the lead at WIDTH 0, 2.0 +- 1.5 cents
+// flat of it at 0.1, and 166.7 +- 10 cents flat at 1 (two thirds of its offset). Drift scales with the
+// pitch factor, so at WIDTH 0.05 a copy's f0 moves less than 1 cent from one 0.5 s window to the next,
+// and at WIDTH 1 it moves as the drift test expects. Contour scales with the same factor, so at WIDTH
+// 0.05 a copy with contour 0.6 or 1.4 swings within 2 % of the input's swing, and at WIDTH 1 within the
+// contour test's bounds of 1 + (contour - 1) x 2/3.
 bool testMelodicBottom() {
   bool ok = true;
   const Signal tn = tone(220.0, 2 * kRate);
@@ -1210,11 +1225,11 @@ bool testMelodicBottom() {
     float width;
     double wantCents;
     double tolCents;
-  } rows[] = {{0.0f, 0.0, 1.0}, {0.1f, -3.0, 1.5}, {1.0f, 100.0 * full, 10.0}};
+  } rows[] = {{0.0f, 0.0, 1.0}, {0.1f, -2.0, 1.5}, {1.0f, 100.0 * full * pitchFactor(1.0), 10.0}};
   double measured[3] = {0.0, 0.0, 0.0};
   size_t i = 0;
   for (const auto& r : rows) {
-    const double near = 220.0 * std::pow(2.0, full * widthFactor(static_cast<double>(r.width)) / 12.0);
+    const double near = 220.0 * std::pow(2.0, full * pitchFactor(static_cast<double>(r.width)) / 12.0);
     measured[i] = cents(copyHz(run(tn, humanCopy(2, r.width)), near), 220.0);
     char name[48];
     std::snprintf(name, sizeof name, "melodic f0, WIDTH %.0f %%", static_cast<double>(r.width) * 100.0);
@@ -1235,23 +1250,23 @@ bool testMelodicBottom() {
     p.tuning.driftCents = 15.0f;
     Probe probe;
     const Signal out = run(long6, p, &probe);
-    const double base = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[0]) * widthFactor(static_cast<double>(width)) / 12.0);
+    const double base = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[0]) * pitchFactor(static_cast<double>(width)) / 12.0);
     const std::vector<double> c = windowCents(out, base);
     for (size_t k = 1; k < c.size(); ++k) moveAt[j] = std::max(moveAt[j], std::fabs(c[k] - c[k - 1]));
     spreadAt[j] = *std::max_element(c.begin(), c.end()) - *std::min_element(c.begin(), c.end());
     peakAt[j] = *std::max_element(c.begin(), c.end(), [](double a, double b) { return std::fabs(a) < std::fabs(b); });
     peakAt[j] = std::fabs(peakAt[j]);
     if (j == 0) {
-      const double limit = 15.0 * widthFactor(static_cast<double>(width));
+      const double limit = 15.0 * pitchFactor(static_cast<double>(width));
       ok &= report("melodic drift range", static_cast<double>(probe.drift) <= limit + 1e-3,
                    "largest drift %.3f cents against 15 x %.4f = %.3f (<=)", static_cast<double>(probe.drift),
-                   widthFactor(static_cast<double>(width)), limit);
+                   pitchFactor(static_cast<double>(width)), limit);
     }
     ++j;
   }
   ok &= report("melodic drift, WIDTH 5 %", moveAt[0] < 1.0, "f0 moves at most %.2f cents from window to window (< 1)", moveAt[0]);
-  ok &= report("drift at WIDTH 100 %", peakAt[1] <= 18.0 && spreadAt[1] >= 2.0,
-               "worst %.2f cents from the offset (<= 15 + 3), spread %.2f cents (>= 2)", peakAt[1], spreadAt[1]);
+  ok &= report("drift at WIDTH 100 %", peakAt[1] <= 13.0 && spreadAt[1] >= 2.0,
+               "worst %.2f cents from the offset (<= 10 + 3), spread %.2f cents (>= 2)", peakAt[1], spreadAt[1]);
 
   for (double sweepHz : {1.0, 3.0}) {
     const Signal in = sweepTone(220.0, 1.0, sweepHz, 7 * kRate);
@@ -1266,7 +1281,7 @@ bool testMelodicBottom() {
       p.width = k.width;
       p.tuning.contour[0] = k.contour;
       const double ratio = sweepDepthSt(run(in, p), sweepHz, 2.0, static_cast<int>(3.0 * sweepHz)) / inSt;
-      const double want = k.width < 1.0f ? 1.0 : static_cast<double>(k.contour);
+      const double want = k.width < 1.0f ? 1.0 : 1.0 + (static_cast<double>(k.contour) - 1.0) * pitchFactor(1.0);
       char name[56];
       std::snprintf(name, sizeof name, "melodic contour %.1f, WIDTH %.0f %%, %.0f Hz", static_cast<double>(k.contour),
                     static_cast<double>(k.width) * 100.0, sweepHz);
@@ -1274,8 +1289,10 @@ bool testMelodicBottom() {
                    ratio, want, k.tol);
     }
   }
-  std::printf("info melodic f0 from the lead, cents, -2.5 st copy: WIDTH 0 %+.2f, 0.1 %+.2f, 1 %+.2f\n", measured[0], measured[1],
-              measured[2]);
+  const double nearHalf = 220.0 * std::pow(2.0, full * pitchFactor(0.5) / 12.0);
+  const double halfCents = cents(copyHz(run(tn, humanCopy(2, 0.5f)), nearHalf), 220.0);
+  std::printf("info melodic f0 from the lead, cents, -2.5 st copy, drift on: WIDTH 0 %+.2f, 0.1 %+.2f, 0.5 %+.2f, 1 %+.2f\n",
+              measured[0], measured[1], halfCents, measured[2]);
   return ok;
 }
 
@@ -1355,11 +1372,11 @@ bool testWidthLag() {
 }
 
 // At WIDTH 0 a copy is the input delayed by its lag and nothing else. Each copy alone at the top of
-// VOICES, on the shipped set (offsets, drift, contour, level scatter, timing scatter and epoch align
-// all on), has every sample of a steady tone equal to the gain-scaled input at the lag the copy took.
-// The tone shelf is flat and the trim is off, and the reference goes through the same low cut and DC
-// blocker, since those are filters on the copy and not the slicing. A copy whose ratio and rate are
-// both exactly 1 skips the epoch snap, so the shipped epoch align does not move its grains. The lag
+// VOICES, on the shipped set (offsets, drift, contour, level scatter and timing scatter on) with epoch
+// align switched on, has every sample of a steady tone equal to the gain-scaled input at the lag the
+// copy took. The tone shelf is flat and the trim is off, and the reference goes through the same low
+// cut and DC blocker, since those are filters on the copy and not the slicing. A copy whose ratio and
+// rate are both exactly 1 skips the epoch snap, so epoch align does not move its grains. The lag
 // comes from a search over the input read by linear interpolation as the engine reads its ring, within
 // half a period of the lag the engine reports (timing scatter makes it fractional), and the gain by
 // least squares (level scatter draws one per copy). A copy at WIDTH 0.1 is the control: 3.0 cents of
@@ -1429,6 +1446,7 @@ Shift fitShift(const Signal& in, const Signal& out, int from, int to, double nea
 cv::CrowdParams delayedCopy(size_t v, float width) {
   cv::CrowdParams p = knobs(1.0f, width);
   p.tuning = cv::CrowdTuning{};
+  p.tuning.epochAlign = true;
   p.tuning.tiltDb = {0.0f, 0.0f, 0.0f, 0.0f};
   p.tuning.trimDb = 0.0f;
   p.solo = static_cast<uint8_t>(1u << v);
@@ -1544,10 +1562,11 @@ double harmonicRatioDb(const Signal& x, double f0, int from, int to) {
   return 10.0 * std::log10(harmonic / between);
 }
 
-// One copy of the pulse train: copy 1 alone with the given pitch and formant, grid or pulse cut.
+// One copy of the pulse train: copy 1 alone with the given pitch and formant, grid or pulse cut. The
+// pitch is the offset heard at WIDTH 1, so the tuning asks for it divided by the pitch top.
 Signal epochCopy(const Signal& in, float pitchSt, float formantSt, bool epoch, float search = 0.25f, float width = 1.0f) {
   cv::CrowdParams p = lagProbe(0, cv::CrowdTuning{}.lagScale, width);
-  p.tuning.pitchSt[0] = pitchSt;
+  p.tuning.pitchSt[0] = static_cast<float>(static_cast<double>(pitchSt) / kPitchTop);
   p.tuning.formantSt[0] = formantSt;
   p.tuning.epochAlign = epoch;
   p.tuning.epochSearch = search;
@@ -1687,7 +1706,7 @@ bool testEpochPitch() {
   for (size_t v = 0; v < 4; ++v) {
     cv::CrowdParams p = alone(v);
     p.tuning.epochAlign = true;
-    const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
+    const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) * kPitchTop / 12.0);
     const double hz = medianHz(run(steady, p));
     worst = std::max(worst, hz > 0.0 ? std::fabs(cents(hz, want)) : 9999.0);
   }

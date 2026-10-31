@@ -33,7 +33,7 @@
 // buzz and the doubled pulses a grid cut leaves when a copy's throat moves. All three stay inside
 // what a human voice does, and the engine clamps each to that range. Each is neutral at 0 (contour
 // 1, epoch align off), and the output is then bit for bit the output without it. The defaults are
-// the owner's working set.
+// the owner's working set, with epoch align off (owner 2026-10-31).
 
 namespace cv {
 
@@ -59,6 +59,8 @@ struct CrowdTuning {
   // points. It is 0 at WIDTH 0, widthKneeFrac at WIDTH widthKnee and 1 at WIDTH 1. At WIDTH 0 every
   // copy sits exactly on the lead's pitch with the lead's throat. The same factor scales the drift
   // range and pulls each contour toward 1, so the bottom of the knob stays in tune for a melodic line.
+  // The pitch offsets, the drift and the contour take the factor times kWidthPitchTop (2/3), so the
+  // top of WIDTH reaches two thirds of the listed pitch offsets. The formant offsets take it whole.
   float widthKnee = 0.1f;
   float widthKneeFrac = 0.012f;
 
@@ -79,7 +81,7 @@ struct CrowdTuning {
   // True cuts each grain on the glottal pulse nearest its grid mark, except in a copy whose pitch
   // ratio and grain playback rate are both exactly 1 (WIDTH 0), which stays on the grid. epochSearch
   // is the half-width in periods of the peak search around each expected pulse (0..0.3).
-  bool epochAlign = true;
+  bool epochAlign = false;
   float epochSearch = 0.25f;
 };
 
@@ -144,6 +146,11 @@ inline float clampLag(float lag, float period) {
 // (knee, kneeFrac) and on to (1, 1), so it is exactly 0 at WIDTH 0 and exactly 1 at WIDTH 1.
 constexpr float kMinWidthKnee = 0.02f;
 constexpr float kMaxWidthKnee = 0.9f;
+
+// The pitch offsets, the drift and the contour deviation take the WIDTH factor times this top, so
+// WIDTH 1 reaches two thirds of the pitch move the tuning lists (owner 2026-10-31). The formant
+// offsets and the lag law keep the full factor.
+constexpr float kWidthPitchTop = 2.0f / 3.0f;
 
 inline float widthFactor(float width, float knee, float kneeFrac) {
   const float k = clampf(knee, kMinWidthKnee, kMaxWidthKnee);
@@ -703,7 +710,8 @@ class Crowd {
     crowd_detail::BlockView view;
     float period;
     float corr;        // Autotune's correction in octaves
-    float width;       // factor on the pitch and formant offsets, 0 at WIDTH 0
+    float width;       // factor on the formant offsets, 0 at WIDTH 0
+    float pitchWidth;  // width times kWidthPitchTop, the factor on the pitch offsets, drift and contour
     float lagMul;      // WIDTH multiplier on every lag target
     float scatterSmp;  // timing scatter in samples
     float levelDb;     // level scatter, clamped to its range
@@ -745,11 +753,13 @@ class Crowd {
     const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * crowd_detail::kDriftSlewS));
     contour_.step(pr.period, pr.voiced, slew);
     const crowd_detail::EpochTrack* epochs = prepareEpochs(t, pitch, pr.period, n);
+    const float widthF = crowd_detail::widthFactor(smoothedWidth(p.width, n), t.widthKnee, t.widthKneeFrac);
     const Block b{t,
                   {pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)},
                   pr.period,
                   pitch.correctionSemis() * (1.0f / 12.0f),
-                  crowd_detail::widthFactor(smoothedWidth(p.width, n), t.widthKnee, t.widthKneeFrac),
+                  widthF,
+                  widthF * crowd_detail::kWidthPitchTop,
                   crowd_detail::lagMultiplier(t, smooth::clamp01(p.width)),
                   (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * crowd_detail::kSmpPerMs,
                   clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
@@ -773,10 +783,10 @@ class Crowd {
     const bool roll = b.levelDb > 0.0f;
     if (lag_[v].settle(b.view, lagTarget(t, v, b.lagMul), b.scatterSmp, b.period, roll)) voice_[v].markReset();
     levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
-    const float drift = drift_[v].step(driftRng_[v], t.driftCents * b.width, t.driftHoldS, b.slew, b.n);
-    const float st = t.pitchSt[v] * b.width;
+    const float drift = drift_[v].step(driftRng_[v], t.driftCents * b.pitchWidth, t.driftHoldS, b.slew, b.n);
+    const float st = t.pitchSt[v] * b.pitchWidth;
     const float oct = st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
-    voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t, b.width)),
+    voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t, b.pitchWidth)),
                       exp2Fast(t.formantSt[v] * b.width * (1.0f / 12.0f)), lag_[v].samples());
     voice_[v].setEpochs(b.epochs);
   }
