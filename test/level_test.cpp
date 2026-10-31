@@ -66,8 +66,8 @@ class Lcg {
 // 180 Hz tone, 10 harmonics at 1/k, 5 Hz vibrato of +-20 cents, 2 Hz
 // raised-cosine phrase envelope, plus pink-ish noise at -40 dBFS, then the
 // whole signal normalised to -18 dBFS RMS.
-Signal program() {
-  const size_t n = static_cast<size_t>(kSeconds) * cv::kSampleRate;
+Signal program(int seconds = kSeconds) {
+  const size_t n = static_cast<size_t>(seconds) * cv::kSampleRate;
   Signal tone(n), noise(n);
   double phase = 0.0;
   for (size_t i = 0; i < n; ++i) {
@@ -206,9 +206,9 @@ bool midRow(const char* name, const Signal& in, const P& p) {
   return verdict(name, db, kMidLoDb, kMidHiDb);
 }
 
-// The Crowd card at mid travel on both pots, behind the PitchFx that fills its ring and runs the
+// The Crowd card at VOICES 0.5 and WIDTH `width`, behind the PitchFx that fills its ring and runs the
 // tracker, as the chain runs them.
-bool crowdRow(const Signal& in) {
+bool crowdRow(const Signal& in, float width) {
   auto pitch = std::make_unique<Stage<cv::PitchFx>>();
   auto crowd = std::make_unique<Stage<cv::Crowd>>();
   cv::PitchFxParams pp = pitchOff();
@@ -216,12 +216,26 @@ bool crowdRow(const Signal& in) {
   cv::CrowdParams dp;
   dp.on = true;
   dp.voices = 0.5f;
-  dp.width = 0.5f;
-  return verdict("crowd VOICES .5 WIDTH .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
-                                                     float tmp[cv::kBlock];
-                                                     pitch->fx.process(i, tmp, n, pp);
-                                                     crowd->fx.process(i, o, n, dp, pitch->fx);
-                                                   })));
+  dp.width = width;
+  char name[40];
+  std::snprintf(name, sizeof name, "crowd VOICES .5 WIDTH %g", static_cast<double>(width));
+  return verdict(name, gainDb(in, run(in, [&](const float* i, float* o, int n) {
+                   float tmp[cv::kBlock];
+                   pitch->fx.process(i, tmp, n, pp);
+                   crowd->fx.process(i, o, n, dp, pitch->fx);
+                 })));
+}
+
+// The Crowd card's copies at the bottom of WIDTH are exact doubles of the lead, a comb whose level on a
+// steady tone hangs on each lag times f0. The gap rule redraws the lags twice a second on the program,
+// so its rows run 30 s of it, 60 gaps, for the comb to average out. WIDTH 1 is the engine default.
+constexpr int kCrowdSeconds = 30;
+
+bool crowdRows() {
+  const Signal in = program(kCrowdSeconds);
+  bool ok = true;
+  for (float width : {0.0f, 0.5f, 1.0f}) ok &= crowdRow(in, width);
+  return ok;
 }
 
 // The slot stages at their default engaged settings.
@@ -243,7 +257,7 @@ bool slotRows(const Signal& in) {
   unison.on = true;
   unison.depth = 0.5f;  // Adam default
   ok &= simple<cv::Unison>("unison depth .5", in, unison);
-  ok &= crowdRow(in);
+  ok &= crowdRows();
 
   cv::SlapbackParams slap;
   slap.on = true;

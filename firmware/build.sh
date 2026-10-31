@@ -11,12 +11,12 @@
 #   CLEAN=1 ./build.sh      # rebuild everything, so the image matches what CI builds from the same commit
 #   CLIP=loop.wav BENCH=1 ./build.sh   # bake a 48 kHz 16-bit WAV into the bench image for the clip op
 #   OPT=-O3 EXTRA_FLAGS=-ffast-math ./build.sh   # experiments; the release build is -O2
-#   ./build.sh --variant    # print release or bench for the current environment and exit
+#   ./build.sh --variant    # print release, bench or crowdtest for the current environment and exit
 #   ./build.sh --outdir     # print the output dir for the current environment and exit
 #   ./build.sh --toolchain  # print the bin/ dir of the pinned compiler and exit
 #   ./build.sh --help       # print this text and exit
 #
-# VARIANT=release|bench names the variant outright; BENCH=1 implies bench. This script is the
+# VARIANT=release|bench|crowdtest names the variant outright; BENCH=1 implies bench. This script is the
 # one place that rule lives; flash.sh and bringup.py ask it, and so does the CI.
 # Each output dir has its own lock, so two builds into one dir queue up and builds into
 # different dirs run side by side.

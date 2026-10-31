@@ -18,6 +18,10 @@ struct PitchResult {
   float hz = 0.0f;
   float rawHz = 0.0f;    // newest frame before the median; one hop fresher than hz
   bool voiced = false;
+
+  // The newest voiced frame repeats faster than kMaxHz, so the period read is a multiple of the
+  // note's, or its dip runs off the slow end of the search. The period stays as read.
+  bool outOfRange = false;
 };
 
 class PitchTracker {
@@ -209,9 +213,20 @@ class PitchTracker {
     const bool periodic = coarse(tau);
     if (periodic && frameRms() > kMinRms) {
       publishVoiced(fine_ ? refine(tau) : tau * static_cast<float>(kDecim));
+      result_.outOfRange = lastOutOfRange_;
     } else {
       result_.voiced = false;
+      result_.outOfRange = false;
     }
+  }
+
+  // A dip under the threshold at a lag below kCoarseMin means the frame repeats faster than kMaxHz.
+  // The normalised difference already holds those lags, so the test costs ten compares.
+  bool dipsBelowRange() const {
+    for (int t = 2; t < kCoarseMin; ++t) {
+      if (cmnd_[t] < kVoicedThreshold) return true;
+    }
+    return false;
   }
 
   // YIN on the 12 kHz frame. Returns whether min d' is below kVoicedThreshold
@@ -243,6 +258,7 @@ class PitchTracker {
     tau = static_cast<float>(pick) + off;
     lastTau_ = tau;
     lastPeriodic_ = cmnd_[best] < threshold;
+    lastOutOfRange_ = pick == kCoarseMax || dipsBelowRange();
     return lastPeriodic_;
   }
 
@@ -335,6 +351,7 @@ class PitchTracker {
   int panesThisPush_ = 0;
   float lastTau_ = 0.0f;
   bool lastPeriodic_ = false;
+  bool lastOutOfRange_ = false;
   std::array<float, 3> periods_{};
   int nPeriods_ = 0;
   int nextPeriod_ = 0;

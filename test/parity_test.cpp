@@ -239,6 +239,7 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
   CMP(p, pos, a, b, tiltHz);
   CMP(p, pos, a, b, voiceDb);
   CMP(p, pos, a, b, trimDb);
+  CMP(p, pos, a, b, trimBottomDb);
   CMP(p, pos, a, b, leadFadeFrom);
   CMP(p, pos, a, b, holdFrom);
   CMP(p, pos, a, b, hpHz);

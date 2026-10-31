@@ -437,12 +437,12 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const cv::CrowdTuning& dt = params.crowd.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nCrowdTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
-                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
-                "%.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}}",
+                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, "
+                "%.0ff, %.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}}",
                 dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
                 dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
                 dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lagScale, dt.tiltHz, dt.voiceDb, dt.trimDb,
-                dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
+                dt.trimBottomDb, dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
                 dt.driftHoldS, dt.widthKnee, dt.widthKneeFrac, dt.widthLagBottom, dt.widthLagMs, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3]);
   used = std::strlen(gTuningText);
   std::snprintf(
@@ -482,7 +482,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
       "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, lagScale, tiltHz, voiceDb, "
-      "trimDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
+      "trimDb, trimBottomDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
       "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}\n%s\n",
       gTuningText);
   std::fflush(stdout);
@@ -579,28 +579,29 @@ void voiceSliders(const char* name, std::array<float, 4>& v, float lo, float hi,
 }
 
 // The Crowd card's tuning is split into sub-nodes so no column ever needs a scroll bar. These are
-// the four voices' own settings.
+// the four voices' own settings. Each slider spans the range the engine clamps to, except Formant and
+// Tone shelf at, which keep a finer stretch inside it.
 void drawCrowdVoiceNodes(cv::CrowdTuning& t) {
+  namespace cd = cv::crowd_detail;
   if (tuningNode("Formants")) {
     voiceSliders("Formant", t.formantSt, -4.0f, 4.0f, "%+.2f st");
     ImGui::TreePop();
   }
   if (tuningNode("Pitch")) {
-    voiceSliders("Pitch", t.pitchSt, -12.0f, 12.0f, "%+.2f st");
-    ImGui::SliderFloat("Width knee", &t.widthKnee, cv::crowd_detail::kMinWidthKnee, 0.5f, "%.2f");
-    ImGui::SliderFloat("Offsets at knee", &t.widthKneeFrac, 0.0f, 0.5f, "%.3f x");
+    voiceSliders("Pitch", t.pitchSt, -cd::kMaxOffsetSt, cd::kMaxOffsetSt, "%+.2f st");
+    ImGui::SliderFloat("Width knee", &t.widthKnee, cd::kMinWidthKnee, cd::kMaxWidthKnee, "%.2f");
+    ImGui::SliderFloat("Offsets at knee", &t.widthKneeFrac, 0.0f, cd::kMaxWidthKneeFrac, "%.3f x");
     ImGui::TreePop();
   }
   if (tuningNode("Delay")) {
-    voiceSliders("Delay", t.delayMs, 5.0f, static_cast<float>(cv::kCrowdMaxLagMs), "%.0f ms");
-    ImGui::SliderFloat("Lag scale", &t.lagScale, 0.5f, 2.0f, "%.2f x");
-    ImGui::SliderFloat("Lag at bottom", &t.widthLagBottom, cv::crowd_detail::kMinLagBottom, cv::crowd_detail::kMaxLagBottom,
-                       "%.2f x");
-    ImGui::SliderFloat("Lag at top", &t.widthLagMs, 0.0f, cv::crowd_detail::kMaxWidthLagMs, "%.0f ms");
+    voiceSliders("Delay", t.delayMs, cd::kMinDelayMs, static_cast<float>(cv::kCrowdMaxLagMs), "%.0f ms");
+    ImGui::SliderFloat("Lag scale", &t.lagScale, cd::kMinLagScale, cd::kMaxLagScale, "%.2f x");
+    ImGui::SliderFloat("Lag at bottom", &t.widthLagBottom, cd::kMinLagBottom, cd::kMaxLagBottom, "%.2f x");
+    ImGui::SliderFloat("Lag at top", &t.widthLagMs, 0.0f, cd::kMaxWidthLagMs, "%.0f ms");
     ImGui::TreePop();
   }
   if (tuningNode("Tone")) {
-    voiceSliders("Tone", t.tiltDb, -12.0f, 12.0f, "%+.1f dB");
+    voiceSliders("Tone", t.tiltDb, -cd::kMaxTiltDb, cd::kMaxTiltDb, "%+.1f dB");
     ImGui::SliderFloat("Tone shelf at", &t.tiltHz, 500.0f, 8000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::TreePop();
   }
@@ -624,9 +625,9 @@ void drawCrowdSoloNode(uint8_t& solo) {
 // Drift walks each copy's pitch slowly around its offset. All three are off at 0.
 void drawCrowdScatterNode(cv::CrowdTuning& t) {
   if (!tuningNode("Scatter")) return;
-  ImGui::SliderFloat("Timing scatter", &t.scatterMs, 0.0f, 30.0f, "%.1f ms");
+  ImGui::SliderFloat("Timing scatter", &t.scatterMs, 0.0f, cv::crowd_detail::kMaxScatterMs, "%.1f ms");
   ImGui::SliderFloat("Level scatter", &t.levelScatterDb, 0.0f, cv::crowd_detail::kMaxLevelScatterDb, "%.1f dB");
-  ImGui::SliderFloat("Pitch drift", &t.driftCents, 0.0f, 50.0f, "%.1f cents");
+  ImGui::SliderFloat("Pitch drift", &t.driftCents, 0.0f, cv::crowd_detail::kMaxDriftCents, "%.1f cents");
   ImGui::TreePop();
 }
 
