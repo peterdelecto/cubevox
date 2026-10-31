@@ -12,7 +12,7 @@ Layout defaultLayout() {
 
 Layout gangTestLayout() {
   Layout layout = defaultLayout();
-  layout.card[1] = Card::Doubler;
+  layout.card[1] = Card::Gang;
   return layout;
 }
 
