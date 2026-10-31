@@ -438,12 +438,12 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nCrowdTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
                 "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
-                "%.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}, %s, %.2ff}",
+                "%.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}, %s, %.2ff}",
                 dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
                 dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
                 dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lagScale, dt.tiltHz, dt.voiceDb, dt.trimDb,
                 dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
-                dt.driftHoldS, dt.widthKnee, dt.widthKneeFrac, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3],
+                dt.driftHoldS, dt.widthKnee, dt.widthKneeFrac, dt.widthLagBottom, dt.widthLagMs, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3],
                 dt.epochAlign ? "true" : "false", dt.epochSearch);
   used = std::strlen(gTuningText);
   std::snprintf(
@@ -484,7 +484,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "dwellDrive, dwellComp, wetDb\n"
       "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, lagScale, tiltHz, voiceDb, "
       "trimDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
-      "widthKnee, widthKneeFrac, levelScatterDb, {contour[0..3]}, epochAlign, epochSearch\n%s\n",
+      "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}, epochAlign, epochSearch\n%s\n",
       gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
@@ -597,6 +597,9 @@ void drawCrowdVoiceNodes(cv::CrowdTuning& t) {
   if (tuningNode("Delay")) {
     voiceSliders("Delay", t.delayMs, 5.0f, 200.0f, "%.0f ms");
     ImGui::SliderFloat("Lag scale", &t.lagScale, 0.5f, 2.0f, "%.2f x");
+    ImGui::SliderFloat("Lag at bottom", &t.widthLagBottom, cv::crowd_detail::kMinLagBottom, cv::crowd_detail::kMaxLagBottom,
+                       "%.2f x");
+    ImGui::SliderFloat("Lag at top", &t.widthLagMs, 0.0f, cv::crowd_detail::kMaxWidthLagMs, "%.0f ms");
     ImGui::TreePop();
   }
   if (tuningNode("Tone")) {

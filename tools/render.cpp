@@ -103,6 +103,7 @@ int usage() {
                "     crowdVoiceDb crowdTrimDb crowdFormantSt0..3 crowdPitchSt0..3 crowdTiltDb0..3 crowdTiltHz\n"
                "     crowdDelayMs0..3 crowdLagScale crowdScatterMs (0..30) crowdDriftCents (0..50) crowdHpHz crowdMaxLagMs\n"
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
+               "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
                "     crowdEpochAlign (0 or 1) crowdEpochSearch (0..0.3)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
@@ -167,6 +168,8 @@ bool crowdMannerInRange(const cv::CrowdTuning& g, float epochAlign) {
   if (g.epochSearch < 0.0f || g.epochSearch > gd::EpochTrack::kMaxSearch) return false;
   if (g.widthKnee < gd::kMinWidthKnee || g.widthKnee > gd::kMaxWidthKnee) return false;
   if (g.widthKneeFrac < 0.0f || g.widthKneeFrac > 1.0f) return false;
+  if (g.widthLagBottom < gd::kMinLagBottom || g.widthLagBottom > gd::kMaxLagBottom) return false;
+  if (g.widthLagMs < 0.0f || g.widthLagMs > gd::kMaxWidthLagMs) return false;
   if (epochAlign != 0.0f && epochAlign != 1.0f) return false;
   for (size_t v = 0; v < g.contour.size(); ++v) {
     if (g.contour[v] < gd::kMinContour || g.contour[v] > gd::kMaxContour) return false;
@@ -214,6 +217,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"crowdScatterMs", &gn.scatterMs},          {"crowdDriftCents", &gn.driftCents},
       {"crowdHpHz", &gn.hpHz},                    {"crowdMaxLagMs", &gn.maxLagMs},
       {"crowdWidthKnee", &gn.widthKnee},          {"crowdWidthKneeFrac", &gn.widthKneeFrac},
+      {"crowdWidthLagBottom", &gn.widthLagBottom}, {"crowdWidthLagMs", &gn.widthLagMs},
       {"crowdLevelScatterDb", &gn.levelScatterDb},
       {"crowdContour0", &gn.contour[0]},          {"crowdContour1", &gn.contour[1]},
       {"crowdContour2", &gn.contour[2]},          {"crowdContour3", &gn.contour[3]},
