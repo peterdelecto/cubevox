@@ -45,6 +45,7 @@ constexpr Cost kDistortion{8, 10, true};   // 46.4k / 62.1k
 constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
 constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the board's boot worst 107.4k against the two-half engine's 72.0k (1.49x of 61.9k); two-pass bench pending
 constexpr Cost kReverbChasm{16, 16, true};   // 97.6k / 98.4k
+constexpr Cost kDoubler{19, 21, false};      // estimate: four voices at ~28k, EQ ~6k, room ~14k
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.

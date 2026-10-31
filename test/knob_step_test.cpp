@@ -4,6 +4,7 @@
 // difference. Settings come from the registry, as the box applies them. No window, no audio device.
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -67,6 +68,24 @@ Signal runFx(const Signal& in, const ChainParams& a, const ChainParams& b, P Cha
   return out;
 }
 
+// Runs `in` through the Doubler as the chain does when it sits alone: the pitch stage first, which
+// writes the ring and feeds the tracker, then the Doubler on that stage's output.
+Signal runDoubler(const Signal& in, const ChainParams& a, const ChainParams& b) {
+  auto pitch = std::make_unique<cv::PitchFx>();
+  auto fx = std::make_unique<cv::Doubler>();
+  pitch->reset();
+  fx->reset();
+  Signal out(in.size());
+  std::array<float, cv::kBlock> lead{};
+  for (int i = 0; i < kTotal; i += cv::kBlock) {
+    const size_t k = static_cast<size_t>(i);
+    const ChainParams& p = i < kStepAt ? a : b;
+    pitch->process(&in[k], lead.data(), cv::kBlock, p.pitchFx);
+    fx->process(lead.data(), &out[k], cv::kBlock, p.doubler, *pitch);
+  }
+  return out;
+}
+
 // The engine a card runs, mapped as runStage in core/chain_run.cpp maps it.
 Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams& b) {
   switch (engineOf(c)) {
@@ -77,6 +96,7 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Distortion: return runFx<cv::Distortion>(in, a, b, &ChainParams::distortion);
     case Engine::Gate: return runFx<cv::Gate>(in, a, b, &ChainParams::gate);
     case Engine::Reverb: return runFx<cv::Reverb>(in, a, b, &ChainParams::reverb);
+    case Engine::Doubler: return runDoubler(in, a, b);
     case Engine::Count: break;
   }
   return in;

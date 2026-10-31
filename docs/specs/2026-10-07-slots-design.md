@@ -17,6 +17,8 @@ Today's chain, left to right, slot 1 to 8:
 | 7 | Gate | Threshold | Decay |
 | 8 | Reverb | Mix | Time |
 
+The library also holds the Doubler (Distance, Voices), a pitch-group card that goes in any slot and sits outside this chain (`2026-10-31-doubler-design.md`).
+
 ## Open questions resolved
 
 1. Mux capacity. U101 (CD74HC4067) carries POT01..POT14 on I0..I13; I14 and I15 (pins 16, 17) are grounded spares. KEY and SEMITONES move from encoders to pots on those two inputs. (Superseded 2026-10-30: KEY and SEMITONES are stepped knobs of their cards and ride whichever pot the card sits on. POT15 and POT16 are the lower pots of slots 1 and 2.) 16 slot knobs fill the 16 channels. RVGAIN1 is analog in the preamp gain leg and never touches the mux. No second mux, no direct ADC pin.

@@ -14,8 +14,9 @@ the tracker Autotune uses.
 
 ## Decisions (owner 2026-10-31)
 
-1. A new library card, not a change to Unison. It goes head to head with Unison in slot 4 by ear
-   before the default layout changes. This spec leaves the default layout as it is.
+1. A new library card and its own effect. It is not a replacement for Unison and is not compared
+   against it (owner 2026-10-31); which slot it takes is a layout decision for the owner. This
+   spec leaves the default layout as it is.
 2. Lower pot VOICES, the amount knob. 0 is dry. The four voices fade in one at a time, then the
    lead fades out, so the top of the knob is the gang alone. Owner: "if the effect is dimed, we
    don't hear Adam, we hear the gang."
@@ -189,7 +190,7 @@ gangMul ramped per sample from the previous block's values to this block's.
    with the DoublerTuning fields raw) in whichever column the layout probe accepts; state keys
    `doubler.on`, `doubler.distance`, `doubler.voices`; a `gDoubler` global reset with the others;
    chain position after the pitch stage and before Unison, with gPitchFx passed in. Pedal mode is
-   unchanged by this spec; the A/B against Unison is the two checkboxes in the module view.
+   unchanged by this spec; the owner listens to the card in the module view.
    `--layout` must print ok.
 2. cubevox-render: `--doubler`, `--distance <0..1>`, `--voices <0..1>`; tuning keys prefixed `dbl`
    (`dblVoiceDb`, `dblTrimDb`, `dblFormantSt0..3`, `dblDetuneCents0..3`, `dblDelayMs0..3`,
@@ -235,7 +236,7 @@ gangMul ramped per sample from the previous block's values to this block's.
 | eight biquads | ~6k, 1 % | POLISH EQ's three biquads at 9.2k on the host |
 | room | ~14k, 2 % | six taps, two allpasses, one loop |
 | card | ~19 % mean, ~21 % worst | |
-| available in a default layout with Unison out | 12 % mean, 20 % worst | costs.h sums 71 / 83 against 75 / 95, Unison 8 / 8 |
+| room under the lines in today's default layout | 4 % mean, 12 % worst | costs.h sums 71 / 83 against 75 / 95; a layout with the Doubler gives up whatever cards the owner chooses |
 
 The bench decides, on the board per the costs.h method with the Doubler placed in slot 4 by
 `set_layout`. Fit order if over: three voices (−4.4 %); then the voices at half rate, reading
@@ -250,9 +251,27 @@ plus four voices' grain state, in the plain global, not DTCM.
 2. The agent working the wiring files, on top of step 1: registry, chain, costs, firmware tests,
    emulator block, render flags, engine_ab.sh, hello.json, app test counts. Gates: all four.
 3. The lead merges per the worktree rule (cpu-pass-3 spec item 6), bumps VERSION.txt in the merge
-   commit; the owner listens in the emulator against Unison; a board bench fills the cost row.
+   commit; the owner listens in the emulator; a board bench fills the cost row.
 
 ## For the owner
 
 1. 80 % against your 85 % for the lead fade point (decision 7).
 2. The card name on glass is "Doubler" until you say otherwise.
+
+## Built 2026-10-31, where the code differs from the text above
+
+1. One highpass and one shelf run on the gang sum after the per-voice gains, not one pair per voice.
+   The four voices share one filter setting, so the sound is the same and six biquad runs go.
+2. `trimDb` defaults to +1.0 dB; the level_test row at VOICES 0.5 and DISTANCE 0.5 reads +0.28 dB.
+3. The room carries a fixed 0.58 scale so white noise leaves it at its own power; the send is then a
+   level against the gang.
+4. The DISTANCE knob is smoothed with the engine's 20 ms smoother before anything reads it; a 1.5 %
+   step reads 0.87 of the steady curvature against the 1.05 limit (2.31 unsmoothed). VOICES reads 0.79.
+5. `PitchFx::correctionSemis()` follows Autotune's fade down and reads 0 once it has settled off, so
+   the voices return to the sung pitch within 200 ms of the switch; before, it held the last value.
+6. The read delay is the output lag; the correlation peaks sit at 22.4 ms and 36.4 ms for voice 0.
+7. Host cost at -O2: 0.70 us per block at VOICES 0, then 1.30 / 1.88 / 2.45 / 3.05 us for one to four
+   voices, against Unison's 0.93 us measured the same way. Scaled by Unison's 46.9k board cycles, four
+   voices land near 150k cycles (about 23 % mean), three near 120k (about 19 %). The cost row stays
+   the 19 / 21 estimate until a board bench; layoutValid refuses the card in today's default layout
+   with Unison out at 82 / 96 against 75 / 95, so the bench needs a bench op or a lighter layout.
