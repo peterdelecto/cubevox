@@ -67,6 +67,12 @@ void checkCardTable() {
         "table: both pitch cards share the pitch engine");
   check(engineOf(Card::ReverbSpring) == Engine::Reverb && engineOf(Card::ReverbChasm) == Engine::Reverb,
         "table: both reverb cards share the reverb engine");
+  check(engineOf(Card::Doubler) == Engine::Doubler && cardDesc(Card::Doubler).group == Group::Pitch,
+        "table: the Doubler has its own engine and sits in the pitch group");
+  check(std::strcmp(cardDesc(Card::Doubler).id, "doubler") == 0 && std::strcmp(cardDesc(Card::Doubler).name, "Doubler") == 0 &&
+            std::strcmp(knobDesc(Card::Doubler, 0)->name, "DISTANCE") == 0 &&
+            std::strcmp(knobDesc(Card::Doubler, 1)->name, "VOICES") == 0,
+        "table: the Doubler card reads DISTANCE then VOICES");
   check(kFadeHoldBlocks == kEngineCount - 1, "table: one silent block per engine after the swap block");
 }
 
@@ -79,21 +85,26 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb cards");
-  check(pitch == 2, "autotune and octave are the pitch group");
+  check(pitch == 3, "autotune, octave and the doubler are the pitch group");
 }
 
 // The amount knob (Mix, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
 // still reaches its own engine field through the knob it is listed on.
 void checkAmountKnobIsB() {
-  const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm};
+  const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
+                              Card::Doubler};
   for (const Card c : amountCards) {
     const char* const name = knobDesc(c, 1)->name;
     char what[96];
     std::snprintf(what, sizeof(what), "%s: knob B is the amount knob, not %s", cardDesc(c).id, knobDesc(c, 0)->name);
-    check(std::strcmp(name, "Mix") == 0 || std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0, what);
+    check(std::strcmp(name, "Mix") == 0 || std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 ||
+              std::strcmp(name, "VOICES") == 0,
+          what);
     const char* const other = knobDesc(c, 0)->name;
     std::snprintf(what, sizeof(what), "%s: knob A is not an amount knob", cardDesc(c).id);
-    check(std::strcmp(other, "Mix") != 0 && std::strcmp(other, "Depth") != 0 && std::strcmp(other, "Drive") != 0, what);
+    check(std::strcmp(other, "Mix") != 0 && std::strcmp(other, "Depth") != 0 && std::strcmp(other, "Drive") != 0 &&
+              std::strcmp(other, "VOICES") != 0,
+          what);
   }
   ChainParams p;
   applyKnob(Card::Unison, 1, 0.7f, p);
@@ -106,6 +117,12 @@ void checkAmountKnobIsB() {
   check(std::fabs(p.reverb.mix - 0.7f) < 1e-6f, "amount: Spring Reverb knob B drives Mix");
   applyKnob(Card::ReverbChasm, 1, 0.4f, p);
   check(std::fabs(p.reverb.mix - 0.4f) < 1e-6f, "amount: Chasm Reverb knob B drives Mix");
+  applyKnob(Card::Doubler, 1, 0.7f, p);
+  check(std::fabs(p.doubler.voices - 0.7f) < 1e-6f && std::fabs(p.doubler.distance - 0.5f) < 1e-6f,
+        "amount: Doubler knob B drives VOICES and leaves DISTANCE alone");
+  applyKnob(Card::Doubler, 0, 0.3f, p);
+  check(std::fabs(p.doubler.distance - 0.3f) < 1e-6f && std::fabs(p.doubler.voices - 0.7f) < 1e-6f,
+        "amount: Doubler knob A drives DISTANCE and leaves VOICES alone");
   check(std::strcmp(knobDesc(Card::Octave, 1)->name, "Mix") == 0, "amount: Octave keeps Mix on knob B");
 }
 
@@ -138,6 +155,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
+    case Card::Doubler: return knob == 0 ? p.doubler.distance : p.doubler.voices;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -261,7 +279,7 @@ void checkChainDefaults() {
             cv::kHpfCutoffHz[p.conditioning.hpf] == 120.0f && cv::kLpfCutoffHz[p.conditioning.lpf] == 12000.0f,
         "defaults: the input conditioning starts at HPF 120 Hz and LPF 12 kHz");
   check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
-            !p.slapback.on && !p.distortion.on && !p.reverb.on,
+            !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.doubler.on && !p.pitchFx.doublerOn,
         "defaults: every other stage off");
   check(std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
         "defaults: octave at 10 % mix");
@@ -299,6 +317,11 @@ void checkToggles() {
   applyToggle(Card::Autotune, true, p);
   applyToggle(Card::Octave, false, p);
   check(p.pitchFx.autotune.on && !p.pitchFx.octave.on, "pitch toggles are independent");
+  applyToggle(Card::Doubler, true, p);
+  check(p.doubler.on && p.pitchFx.doublerOn && p.pitchFx.autotune.on && !p.pitchFx.octave.on,
+        "doubler toggle on sets its stage and the pitch stage's feed, and leaves the other pitch toggles alone");
+  applyToggle(Card::Doubler, false, p);
+  check(!p.doubler.on && !p.pitchFx.doublerOn && p.pitchFx.autotune.on, "doubler toggle off clears both flags");
 }
 
 void checkPlacement() {

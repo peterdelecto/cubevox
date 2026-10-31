@@ -221,6 +221,35 @@ void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& sa
   CMP(p + ".spring", pos, sa, sb, wetDb);
 }
 
+void cmpDoubler(const std::string& p, float pos, const cv::DoublerParams& f, const cv::DoublerParams& e, bool rest) {
+  CMP(p, pos, f, e, distance);
+  CMP(p, pos, f, e, voices);
+  if (!rest) return;
+  const cv::DoublerTuning& a = f.tuning;
+  const cv::DoublerTuning& b = e.tuning;
+  for (size_t v = 0; v < a.formantSt.size(); ++v) {
+    const std::string at = p + "[" + std::to_string(v) + "]";
+    EXPECT(at + ".formantSt", pos, a.formantSt[v], b.formantSt[v]);
+    EXPECT(at + ".detuneCents", pos, a.detuneCents[v], b.detuneCents[v]);
+    EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
+    EXPECT(at + ".lfoHz", pos, a.lfoHz[v], b.lfoHz[v]);
+  }
+  CMP(p, pos, a, b, lfoCents);
+  CMP(p, pos, a, b, voiceDb);
+  CMP(p, pos, a, b, trimDb);
+  CMP(p, pos, a, b, leadFadeFrom);
+  CMP(p, pos, a, b, holdFrom);
+  CMP(p, pos, a, b, hpNearHz);
+  CMP(p, pos, a, b, hpFarHz);
+  CMP(p, pos, a, b, shelfHz);
+  CMP(p, pos, a, b, shelfNearDb);
+  CMP(p, pos, a, b, shelfFarDb);
+  CMP(p, pos, a, b, roomNearDb);
+  CMP(p, pos, a, b, roomFarDb);
+  CMP(p, pos, a, b, roomLpHz);
+  CMP(p, pos, a, b, roomFeedback);
+}
+
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
   CMP(p, pos, f, e, engine);
   CMP(p, pos, f, e, wet);
@@ -244,6 +273,7 @@ struct EmuState {
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
+  cv::DoublerParams doubler;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
@@ -294,8 +324,8 @@ EmuState emuStart() {
 float posLinear(float lo, float hi, float v) { return (v - lo) / (hi - lo); }
 float posLog(float lo, float hi, float v) { return std::log(v / lo) / std::log(hi / lo); }
 
-// Every default-layout card with its knobs where the emulator opens, so a sweep moves one knob
-// against the same background on both sides.
+// Every card with its knobs where the emulator opens, so a sweep moves one knob against the same
+// background on both sides.
 ChainParams fwAtEmuStart(const EmuState& em) {
   ChainParams fw;
   applyKnob(Card::InputGate, 0, posLinear(kEmuInThresholdLoDb, kEmuInThresholdHiDb, em.inputGate.thresholdDb), fw);
@@ -306,6 +336,8 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(em.pitchFx.autotune.responseMs), fw);
   applyKnob(Card::Octave, 0, static_cast<float>(em.pitchFx.octave.semitones - kEmuSemiLo), fw);
   applyKnob(Card::Octave, 1, em.pitchFx.octave.mix, fw);
+  applyKnob(Card::Doubler, 0, em.doubler.distance, fw);
+  applyKnob(Card::Doubler, 1, em.doubler.voices, fw);
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
   applyKnob(Card::Unison, 1, em.unison.depth, fw);
   applyKnob(Card::Slapback, 0, posLinear(kEmuSlapLoMs, kEmuSlapHiMs, em.slapback.tuning.timeMs), fw);
@@ -378,6 +410,24 @@ void sweepOctave() {
     applyKnob(Card::Octave, 1, p, fw);
     em.pitchFx.octave.mix = p;  // drawPedals MIX, pedalPercent
     cmpOctave("sweep.octave.mix", p, fw.pitchFx.octave, em.pitchFx.octave, false);
+  }
+}
+
+// emulator/main.cpp drawDoublerBlock: DISTANCE and VOICES are percentSlider, so the knob position is
+// the engine field.
+void sweepDoubler() {
+  for (int i = 0; i <= kSweepSteps; ++i) {
+    const float p = sweepPos(i);
+    EmuState em = emuStart();
+    ChainParams fw = fwAtEmuStart(em);
+    applyKnob(Card::Doubler, 0, p, fw);
+    em.doubler.distance = p;
+    cmpDoubler("sweep.doubler.distance", p, fw.doubler, em.doubler, false);
+    EmuState em2 = emuStart();
+    ChainParams fw2 = fwAtEmuStart(em2);
+    applyKnob(Card::Doubler, 1, p, fw2);
+    em2.doubler.voices = p;
+    cmpDoubler("sweep.doubler.voices", p, fw2.doubler, em2.doubler, false);
   }
 }
 
@@ -454,6 +504,7 @@ void defaults() {
   cmpGate("default.gate", 0.0f, fw.gate, em.gate, true);
   cmpAutotune("default.autotune", 0.0f, fw.pitchFx.autotune, em.pitchFx.autotune, true);
   cmpOctave("default.octave", 0.0f, fw.pitchFx.octave, em.pitchFx.octave, true);
+  cmpDoubler("default.doubler", 0.0f, fw.doubler, em.doubler, true);
   cmpUnison("default.unison", 0.0f, fw.unison, em.unison, true);
   cmpSlapback("default.slapback", 0.0f, fw.slapback, em.slapback, true);
   cmpDistortion("default.distortion", 0.0f, fw.distortion, em.distortion, true);
@@ -496,6 +547,7 @@ int main() {
   sweepGate(Card::Gate, "gate");
   sweepAutotune();
   sweepOctave();
+  sweepDoubler();
   sweepUnison();
   sweepSlapback();
   sweepDistortion();

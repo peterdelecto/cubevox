@@ -22,6 +22,7 @@ namespace cv {
 struct PitchFxParams {
   AutotuneParams autotune;
   OctaveParams octave;
+  bool doublerOn = false;  // the Doubler reads the ring and the tracker, so both run
 };
 
 class PitchFx {
@@ -45,8 +46,9 @@ class PitchFx {
 
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
     // The tracker's buffers fill every block; it analyses while Autotune is on or still fading,
-    // so the voice keeps its period through the crossfade. Octave shifts without a pitch.
-    tracker_.push(in, n, p.autotune.on || activeAt_ > 0.0f);
+    // so the voice keeps its period through the crossfade, and while the Doubler is on. Octave
+    // shifts without a pitch.
+    tracker_.push(in, n, p.autotune.on || p.doublerOn || activeAt_ > 0.0f);
     const Targets t = prepareVoices(p);
     if (fresh_) {
       mix_ = t.mix;
@@ -64,8 +66,19 @@ class PitchFx {
 
   const PitchResult& pitch() const { return tracker_.result(); }
 
-  // Autotune's smoothed correction in semitones.
-  float correctionSemis() const { return autotune_.correctionSemis(); }
+  // Autotune's smoothed correction in semitones. It is the live value while Autotune is on, runs
+  // down with the crossfade after Autotune goes off, and is exactly 0 once the crossfade settles.
+  // The crossfade takes about 280 ms to settle, so the scaling lets a reader follow the dry voice
+  // back instead of holding the old correction until then.
+  float correctionSemis() const {
+    const float live = autotune_.correctionSemis();
+    return autotuneWas_ ? live : live * activeAt_;
+  }
+
+  // The input ring and the index the next sample writes to (already wrapped). After process(),
+  // the block's last sample sits at head() - 1.
+  const VoiceRing& ring() const { return ring_; }
+  int head() const { return static_cast<int>(writeCount_); }
 
  private:
   // Where the three smoothers head this block.

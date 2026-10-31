@@ -30,6 +30,7 @@ void checkDefaultLayout() {
     avg += d.cost.avg;
     worst += d.cost.worst;
     if (d.group == Group::Reverb) ++reverbs;
+    check(d.cost.measured, "a default layout card's cost comes from the board");
   }
   check(avg <= costs::kBudgetAvgPercent, "default layout within the average line");
   check(worst <= costs::kBudgetWorstPercent, "default layout within the worst-block line");
@@ -37,9 +38,32 @@ void checkDefaultLayout() {
   check(cardDesc(Card::Empty).cost.avg == 0 && cardDesc(Card::Empty).cost.worst == 0, "empty card costs nothing");
   for (int i = 0; i < kCardCount; ++i) {
     const CardDesc& d = cardDesc(card(i));
-    check(d.cost.measured, "every card's cost comes from the board");
     check(d.cost.worst >= d.cost.avg, "worst block is never under the mean");
   }
+}
+
+// The Doubler sits outside the default layout, so its cost may stay an estimate. layoutValid counts
+// the estimate like a measurement, so a layout with the Doubler in slot 4 and Unison out is judged
+// by the sums, and the verdict follows the row once a board bench replaces it.
+void checkDoublerLayout() {
+  Layout layout = defaultLayout();
+  layout.card[3] = Card::Doubler;
+  int avg = costs::kFixed.avg;
+  int worst = costs::kFixed.worst;
+  for (int s = 0; s < kSlotCount; ++s) {
+    avg += cardDesc(layout.card[s]).cost.avg;
+    worst += cardDesc(layout.card[s]).cost.worst;
+  }
+  LayoutError expected = LayoutError::None;
+  if (avg > costs::kBudgetAvgPercent) {
+    expected = LayoutError::OverAvg;
+  } else if (worst > costs::kBudgetWorstPercent) {
+    expected = LayoutError::OverWorst;
+  }
+  const LayoutCheck verdict = layoutValid(layout);
+  check(verdict.error == expected, "doubler layout: slot 4 with Unison out is judged by the cost sums");
+  check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? avg : worst),
+        "doubler layout: a refusal reports the sum that went over");
 }
 
 void checkLayoutValid() {
@@ -123,6 +147,24 @@ void checkComposeToggles() {
             on.params.pitchFx.autotune.on && on.params.pitchFx.octave.on,
         "toggles on turn every stage on");
   check(on.layout.card == layout.card, "snapshot carries the layout");
+}
+
+// The Doubler's toggle turns on its stage and the pitch stage's feed, and its knobs reach the stage.
+void checkComposeDoubler() {
+  Layout layout = defaultLayout();
+  layout.card[3] = Card::Doubler;
+  PanelReading panel = panelWithToggles(false);
+  panel.knob[3] = {0.25f, 0.75f};
+  ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
+  check(!snap.params.doubler.on && !snap.params.pitchFx.doublerOn, "compose: Doubler off leaves both flags off");
+  check(std::fabs(snap.params.doubler.distance - 0.25f) < 1e-6f && std::fabs(snap.params.doubler.voices - 0.75f) < 1e-6f,
+        "compose: Doubler knob A is DISTANCE and knob B is VOICES");
+  panel.toggle[3] = true;
+  snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
+  check(snap.params.doubler.on && snap.params.pitchFx.doublerOn && !snap.params.pitchFx.autotune.on &&
+            !snap.params.pitchFx.octave.on,
+        "compose: Doubler on sets its flag and the pitch stage's, and no other pitch toggle");
+  check(snap.slotOn[3], "compose: the Doubler's slot reads on");
 }
 
 void checkComposeBench() {
@@ -249,11 +291,13 @@ void checkLayoutAndCompose() {
   checkRecoverLayout();
   checkSettings();
   checkLayoutValid();
+  checkDoublerLayout();
   checkLayoutReasons();
   checkLayoutName();
   checkApplyAction();
   checkReverbSlot();
   checkComposeToggles();
+  checkComposeDoubler();
   checkComposeBench();
   checkOutputGain();
 }

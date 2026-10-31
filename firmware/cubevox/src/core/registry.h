@@ -23,6 +23,7 @@ enum class Card : uint8_t {
   Gate,
   ReverbSpring,
   ReverbChasm,
+  Doubler,
   Count,
 };
 
@@ -33,8 +34,9 @@ constexpr int kCardCount = static_cast<int>(Card::Count);
 constexpr size_t kCardIdBytes = 16;
 
 // Engines the audio block owns. Cards map onto them: Autotune and Octave share Pitch, and both
-// reverb cards share Reverb. Count ends the list.
-enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Count };
+// reverb cards share Reverb. The Doubler has its own engine and reads the Pitch engine's ring.
+// Count ends the list.
+enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Doubler, Count };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);
 

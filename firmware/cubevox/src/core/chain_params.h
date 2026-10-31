@@ -5,6 +5,7 @@
 
 #include "engine/conditioning.h"
 #include "engine/distortion.h"
+#include "engine/doubler.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -17,6 +18,7 @@ struct ChainParams {
   cv::ConditioningParams conditioning;  // the head of the chain, ahead of slot 1
   cv::GateParams inputGate;
   cv::PitchFxParams pitchFx;
+  cv::DoublerParams doubler;  // its toggle also sets pitchFx.doublerOn
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;

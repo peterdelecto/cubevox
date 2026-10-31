@@ -1,5 +1,5 @@
-// cubevox-render: loop in, gates + autotune + octave + unison + slapback + distortion + reverb, then the
-// polish tail (comp, eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, gates + autotune + octave + doubler + unison + slapback + distortion + reverb,
+// then the polish tail (comp, eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -9,6 +9,7 @@
 #include "../third_party/miniaudio.h"
 #include "engine/conditioning.h"
 #include "engine/distortion.h"
+#include "engine/doubler.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -28,7 +29,8 @@ struct TuningField {
 struct RenderParams {
   bool inGateOn = false;
   bool gateOn = false;
-  bool pitchOn = false;
+  bool pitchOn = false;  // also true when the doubler is on, so its ring and tracker run
+  bool doublerOn = false;
   bool unisonOn = false;
   bool slapOn = false;
   bool distOn = false;
@@ -43,6 +45,7 @@ struct RenderParams {
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
+  cv::DoublerParams doubler;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
@@ -57,6 +60,7 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>, alias --key] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
+               "       [--doubler] [--distance <0..1>] [--voices <0..1>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
@@ -64,10 +68,11 @@ int usage() {
                "       [--hpf <0|80|100|120|150 Hz>] [--lpf <0|4000|5000|6000|8000|10000|12000 Hz>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqhp <hz>] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>] [--eqair <db>]\n"
-               "  pitch front end runs with --octave or --autotune\n"
+               "  pitch front end runs with --octave, --autotune or --doubler\n"
+               "  doubler runs only with --doubler; --distance and --voices set its knobs (default 0.5 each)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
-               "  at least one stage must run; order is ingate, pitch, unison, slapback, distortion, gate, reverb, comp, eq\n"
+               "  at least one stage must run; order is ingate, pitch, doubler, unison, slapback, distortion, gate, reverb, comp, eq\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  the input high-pass and low-pass run ahead of every stage at the box's defaults, 120 Hz and\n"
@@ -96,6 +101,8 @@ int usage() {
                "     sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive sbDwellComp sbWetDb\n"
                "     eqDipQ eqPresenceQ eqAirHz\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
+               "     dblVoiceDb dblTrimDb dblFormantSt0..3 dblDetuneCents0..3 dblDelayMs0..3 dblLfoHz0..3\n"
+               "     dblLfoCents dblRoomFeedback dblRoomLpHz dblRoomNearDb dblRoomFarDb\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -170,6 +177,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringTuning& sb = rp.reverb.spring.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
+  cv::DoublerTuning& db = rp.doubler.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
@@ -186,6 +194,18 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"octTrimDb", &ot.trimDb},
       {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
       {"atGrainDelay", &at.grainDelay},
+      {"dblVoiceDb", &db.voiceDb},            {"dblTrimDb", &db.trimDb},
+      {"dblFormantSt0", &db.formantSt[0]},    {"dblFormantSt1", &db.formantSt[1]},
+      {"dblFormantSt2", &db.formantSt[2]},    {"dblFormantSt3", &db.formantSt[3]},
+      {"dblDetuneCents0", &db.detuneCents[0]}, {"dblDetuneCents1", &db.detuneCents[1]},
+      {"dblDetuneCents2", &db.detuneCents[2]}, {"dblDetuneCents3", &db.detuneCents[3]},
+      {"dblDelayMs0", &db.delayMs[0]},        {"dblDelayMs1", &db.delayMs[1]},
+      {"dblDelayMs2", &db.delayMs[2]},        {"dblDelayMs3", &db.delayMs[3]},
+      {"dblLfoHz0", &db.lfoHz[0]},            {"dblLfoHz1", &db.lfoHz[1]},
+      {"dblLfoHz2", &db.lfoHz[2]},            {"dblLfoHz3", &db.lfoHz[3]},
+      {"dblLfoCents", &db.lfoCents},          {"dblRoomFeedback", &db.roomFeedback},
+      {"dblRoomLpHz", &db.roomLpHz},          {"dblRoomNearDb", &db.roomNearDb},
+      {"dblRoomFarDb", &db.roomFarDb},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -363,6 +383,14 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOctave = true;
     } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
+    } else if (std::strcmp(a, "--doubler") == 0) {
+      rp.doublerOn = true;
+    } else if (std::strcmp(a, "--distance") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.doubler.distance) || rp.doubler.distance < 0.0f || rp.doubler.distance > 1.0f)
+        return false;
+    } else if (std::strcmp(a, "--voices") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.doubler.voices) || rp.doubler.voices < 0.0f || rp.doubler.voices > 1.0f)
+        return false;
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
       while (i + 1 < argc && argv[i + 1][0] != '-' && std::strchr(argv[i + 1], '=')) {
@@ -386,9 +414,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.dwell : rp.reverb.spring.dwell;
     d = dwell;
   }
-  // Each pitch stage runs only when asked for.
+  // Each pitch stage runs only when asked for. The Doubler reads the pitch stage's ring and tracker,
+  // so it turns the stage on and tells it to keep them running, as the registry's toggle does.
   op.on = haveOctave;
-  rp.pitchOn = haveOctave || ap.on;
+  rp.doubler.on = rp.doublerOn;
+  rp.pitchFx.doublerOn = rp.doublerOn;
+  rp.pitchOn = haveOctave || ap.on || rp.doublerOn;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
@@ -428,6 +459,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Gate inGate;
   static cv::Gate gate;
   static cv::PitchFx pitchFx;
+  static cv::Doubler doubler;
   static cv::Unison unison;
   static cv::Slapback slapback;
   static cv::Distortion distortion;
@@ -438,6 +470,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   inGate.reset();
   gate.reset();
   pitchFx.reset();
+  doubler.reset();
   unison.reset();
   slapback.reset();
   distortion.reset();
@@ -473,6 +506,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.pitchOn) {
         pitchFx.process(src, scratch[next], n, rp.pitchFx);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.doublerOn) {
+        doubler.process(src, scratch[next], n, rp.doubler, pitchFx);
         src = scratch[next];
         next ^= 1;
       }
