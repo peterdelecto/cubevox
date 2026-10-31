@@ -49,6 +49,7 @@ CASES=(
   "gate|--gate -40"
   "spring|--reverb springb --decay 0.5 --rmix 0.5"
   "chasm|--reverb chasm --decay 0.5 --rmix 0.5"
+  "polish_eq|--polish-comp off"
   "chain|--ingate -40 --autotune --response 100 --octave -12 --omix 0.5 --on 1 --depth 0.5 --slap 0.5 --drive 0.5 --tone 0.5 --gate -40 --reverb springb --decay 0.5 --rmix 0.5"
 )
 for c in "${CASES[@]}"; do

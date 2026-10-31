@@ -94,17 +94,14 @@ Layout layoutOf(std::initializer_list<Card> cards) {
   return layout;
 }
 
-// Turns every toggle on, puts every knob at `knob` and sets both polish stages to `polish`. The
-// input conditioning is OFF unless `conditioned`, so the checks that compare the slots and the
-// polish stages leave the block alone ahead of them.
-ChainSnapshot snapshotFor(const Layout& layout, float knob, bool polish, bool conditioned = false) {
+// Turns every toggle on, puts every knob at `knob` and sets both polish stages to `polish`.
+ChainSnapshot snapshotFor(const Layout& layout, float knob, bool polish) {
   PanelReading panel;
   panel.toggle.fill(true);
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
   settings.polishComp = polish;
   settings.polishEq = polish;
-  if (!conditioned) settings.hpf = settings.lpf = 0;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -124,11 +121,12 @@ Run runBlock(Rig& rig, const ChainSnapshot& snap, const Block& in, Clock clock) 
 }
 
 // Runs the chain by hand on `rig`'s own engines, with a fresh buffer per stage and a plain copy in
-// between. The input conditioning goes first, then the slots, then POLISH COMP and POLISH EQ.
+// between. The front half of POLISH EQ goes first, then the slots, then POLISH COMP and the back
+// half of POLISH EQ.
 Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block cur = in;
   Block next{};
-  rig.engines.conditioning.process(cur.data(), next.data(), kN, snap.params.conditioning);
+  rig.engines.polish.processFront(cur.data(), next.data(), kN, snap.params.eq);
   cur = next;
   bool pitchDone = false;
   for (int s = 0; s < kSlotCount; ++s) {
@@ -136,7 +134,7 @@ Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
     if (runStage(rig.engines, c, cur.data(), next.data(), kN, snap.params, pitchDone)) cur = next;
   }
   rig.engines.comp.process(cur.data(), next.data(), kN, snap.params.comp);
-  rig.engines.polish.process(next.data(), cur.data(), kN, snap.params.eq);
+  rig.engines.polish.processBack(next.data(), cur.data(), kN, snap.params.eq);
   return cur;
 }
 
@@ -249,17 +247,22 @@ void checkPitchCalledOnce() {
   check(same, "chain: two pitch cards make one PitchFx call per block");
 }
 
+// The poisoned blocks enter through the input, which the empty layout passes to the guard as a slot's
+// output would arrive. The EQ is off for them, because a NaN at the input would reach the front half's
+// filters, and the ADC cannot produce one.
 void checkNanGuard() {
   const ChainSnapshot snap = snapshotFor(layoutOf({}), 0.5f, true);
+  ChainSnapshot eqOff = snap;
+  eqOff.params.eq.on = false;
   auto rig = newRig();
   Block poisoned = tone(0, 0.3f);
   poisoned[17] = NAN;
-  Run run = runBlock(*rig, snap, poisoned, StillClock());
+  Run run = runBlock(*rig, eqOff, poisoned, StillClock());
   check(!run.finite && allZero(run.out), "chain: a NaN out of the slots silences the block and reports it");
 
   poisoned = tone(1, 0.3f);
   poisoned[3] = INFINITY;
-  run = runBlock(*rig, snap, poisoned, StillClock());
+  run = runBlock(*rig, eqOff, poisoned, StillClock());
   check(!run.finite && allZero(run.out), "chain: an infinity is caught the same way");
 
   bool sound = false;
@@ -272,14 +275,13 @@ void checkNanGuard() {
   check(clean && sound, "chain: the polish stages play on after a discarded block");
 }
 
-// The clock reads twice around the input conditioning, twice around each slot, then once before
-// POLISH COMP, once between the polish stages and once after POLISH EQ. Each bucket gets its own
-// pair of reads.
+// The clock reads twice around the front half of POLISH EQ, twice around each slot, then once before
+// POLISH COMP, once between the comp and the back half and once after it. Each bucket gets its own
+// pair of reads, and the EQ bucket adds the front half's pair to the back half's.
 void checkStageTiming() {
   const ChainSnapshot snap = snapshotFor(defaultLayout(), 0.5f, true);
   auto rig = newRig();
   const Run run = runBlock(*rig, snap, tone(0, 0.3f), SquareClock());
-  check(run.cycles.conditioning == 1, "chain: the input conditioning is timed by the first pair of reads");
   bool slots = true;
   for (uint32_t s = 0; s < static_cast<uint32_t>(kSlotCount); ++s) {
     const uint32_t at = 2 + 2 * s;  // read index of the slot's first read
@@ -288,13 +290,14 @@ void checkStageTiming() {
   check(slots, "chain: each slot is timed by its own pair of reads");
   const uint32_t first = 2 + 2 * static_cast<uint32_t>(kSlotCount);  // read index of the first polish read
   check(run.cycles.comp == (first + 1) * (first + 1) - first * first, "chain: POLISH COMP is timed alone");
-  check(run.cycles.eq == (first + 2) * (first + 2) - (first + 1) * (first + 1), "chain: POLISH EQ is timed alone");
+  check(run.cycles.eq == 1 + (first + 2) * (first + 2) - (first + 1) * (first + 1),
+        "chain: POLISH EQ is timed by the first pair of reads and the last pair");
 }
 
-// The conditioning runs ahead of slot 1 in the caller's buffer. With the slots empty and the polish
-// stages off the chain's output is the conditioning's alone, and a 40 Hz tone loses level to the
-// default 120 Hz high-pass while the same tone with the filters OFF passes untouched.
-void checkConditioningHead() {
+// The front half of POLISH EQ runs ahead of slot 1 in the caller's buffer. With the slots empty and
+// POLISH COMP off, the chain's output is the front half then the back half, and a 40 Hz tone loses
+// level to the 70 Hz high-pass while the same tone with POLISH EQ OFF passes untouched.
+void checkFrontHead() {
   constexpr double kPi = 3.14159265358979323846;
   const auto lowTone = [&](int block) {
     Block x{};
@@ -304,7 +307,11 @@ void checkConditioningHead() {
     }
     return x;
   };
-  const ChainSnapshot on = snapshotFor(layoutOf({}), 0.5f, false, true);
+  PanelReading panel;
+  panel.toggle.fill(true);
+  Settings eqOnly;
+  eqOnly.polishComp = false;
+  const ChainSnapshot on = composeSnapshot(layoutOf({}), panel, eqOnly, BenchOverrides());
   const ChainSnapshot off = snapshotFor(layoutOf({}), 0.5f, false);
   auto chain = newRig();
   auto bare = newRig();
@@ -315,23 +322,24 @@ void checkConditioningHead() {
   double inRms = 0.0;
   for (int b = 0; b < 400; ++b) {
     const Block in = lowTone(b);
+    Block mid{};
     Block want{};
-    bare->engines.conditioning.process(in.data(), want.data(), kN, on.params.conditioning);
+    bare->engines.polish.processFront(in.data(), mid.data(), kN, on.params.eq);
+    bare->engines.polish.processBack(mid.data(), want.data(), kN, on.params.eq);
     const Run run = runBlock(*chain, on, in, StillClock());
     same = same && run.out == want;
     passes = passes && runBlock(*plain, off, in, StillClock()).out == in;
     outRms = rms(run.out);
     inRms = rms(in);
   }
-  check(same, "chain: the conditioning runs ahead of slot 1 and its block lands in the caller's buffer");
-  check(passes, "chain: with HPF and LPF OFF the conditioning passes the block bit for bit");
-  check(outRms < 0.2 * inRms, "chain: the default 120 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
+  check(same, "chain: the front half runs ahead of slot 1 and the back half after the comp, in the caller's buffer");
+  check(passes, "chain: with POLISH EQ OFF both halves pass the block bit for bit");
+  check(outRms < 0.2 * inRms, "chain: the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
 }
 
-// Runs the shipped layout with every toggle on, the knobs at mid travel and the input conditioning
-// at its defaults.
+// Runs the shipped layout with every toggle on, the knobs at mid travel and POLISH EQ on.
 void checkDefaultChain() {
-  const ChainSnapshot snap = snapshotFor(defaultLayout(), 0.5f, true, true);
+  const ChainSnapshot snap = snapshotFor(defaultLayout(), 0.5f, true);
   auto first = newRig();
   auto second = newRig();
   bool finite = true;
@@ -457,8 +465,8 @@ Toggles allToggles(bool on) {
   return t;
 }
 
-// Every knob at `knob` and each slot's toggle as given, with both polish stages and the input
-// conditioning off, so a slot's block is the only thing between the input and the output.
+// Every knob at `knob` and each slot's toggle as given, with both polish stages off, so a slot's
+// block is the only thing between the input and the output.
 ChainSnapshot snapshotToggles(const Layout& layout, float knob, const Toggles& on) {
   PanelReading panel;
   panel.toggle = on;
@@ -466,7 +474,6 @@ ChainSnapshot snapshotToggles(const Layout& layout, float knob, const Toggles& o
   Settings settings;
   settings.polishComp = false;
   settings.polishEq = false;
-  settings.hpf = settings.lpf = 0;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -865,7 +872,7 @@ void checkChainRun() {
   checkPitchCalledOnce();
   checkNanGuard();
   checkStageTiming();
-  checkConditioningHead();
+  checkFrontHead();
   checkDefaultChain();
   checkBypassEnds();
   checkBypassFade();
