@@ -10,6 +10,7 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
 
     ./build.sh          # release image, FQBN STMicroelectronics:stm32:GenH7:pnum=GENERIC_H743VITX,usb=CDCgen
     BENCH=1 ./build.sh  # bench image (drills, panel test)
+    VARIANT=gangtest ./build.sh   # test image: Gang in Autotune's slot, CPU budget checks off, label -gang
     OUT=/tmp/mine ./build.sh   # any output dir, so two checkouts or agents do not share one
     CLIP=loop.wav BENCH=1 ./build.sh   # bake a 48 kHz 16-bit WAV into the bench image for the clip op
     TAIL=5 ./build.sh   # last 5 lines of compiler output only
@@ -17,7 +18,7 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
     ./flash.sh          # enter_dfu, copy cubevox.uf2 onto the CUBEVOX drive, print the boot report
     ./flash.sh --rom    # ST ROM DFU (hold BOOT0): dfu-util writes the .bin at 0x08020000
 
-1. **Variant.** `build.sh` is the only place that decides it. `VARIANT=release|bench` names it outright,
+1. **Variant.** `build.sh` is the only place that decides it. `VARIANT=release|bench|gangtest` names it outright,
    `BENCH=1` implies bench, and a conflicting `VARIANT` is an error. `./build.sh --variant`
    prints the variant and `./build.sh --outdir` prints the output dir for the current environment, then
    exit. The dir is `OUT` when set, else `/tmp/cubevox-fw-release` or `/tmp/cubevox-fw-bench`. `flash.sh`,

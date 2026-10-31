@@ -10,6 +10,12 @@ Layout defaultLayout() {
            Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring}};
 }
 
+Layout gangTestLayout() {
+  Layout layout = defaultLayout();
+  layout.card[1] = Card::Doubler;
+  return layout;
+}
+
 int reverbSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
     if (layout.card[s] == Card::ReverbSpring || layout.card[s] == Card::ReverbChasm) return s;
@@ -52,8 +58,14 @@ LayoutCheck layoutValid(const Layout& layout) {
   }
   if (reverbs > 1) return fail(LayoutError::TwoReverbs, 0, Card::Empty, 0);
   if (reverbs == 0) return fail(LayoutError::NoReverb, 0, Card::Empty, 0);
+#ifdef CUBEVOX_GANGTEST
+  // The test image places Gang past the budget lines on purpose.
+  (void)avg;
+  (void)worst;
+#else
   if (avg > costs::kBudgetAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, avg);
   if (worst > costs::kBudgetWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, worst);
+#endif
   return LayoutCheck();
 }
 
