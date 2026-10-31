@@ -35,7 +35,7 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
-// A card with an amount knob (Mix, Depth, Drive) puts it on knob B. The apply functions below
+// A card with an amount knob (Mix, Amount, Depth, Drive) puts it on knob B. The apply functions below
 // take the knob index in this order.
 constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Empty, "empty", "Empty", kNoEngine, 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
@@ -50,7 +50,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Pitch, costs::kOctave},
     {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Rate"), kPercent("Depth")}, Group::None,
      costs::kUnison},
-    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kSlapbackTime, kPercent("Mix")}, Group::None,
+    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kSlapbackTime, kPercent("AMOUNT")}, Group::None,
      costs::kSlapback},
     {Card::Distortion, "distortion", "Distortion", Engine::Distortion, 2, {kPercent("Tone"), kPercent("Drive")},
      Group::None, costs::kDistortion},
