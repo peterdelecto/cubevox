@@ -102,7 +102,8 @@ int usage() {
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangPitchSt0..3 gangTiltDb0..3 gangTiltHz\n"
                "     gangDelayMs0..3 gangLagScale gangScatterMs (0..30) gangDriftCents (0..50) gangHpHz gangMaxLagMs\n"
-               "     gangLevelScatterDb (0..4) gangContour0..3 (0.6..1.4) gangBreath0..3 (0..0.15) gangBreathHz\n"
+               "     gangWidthKnee (0.02..0.9) gangWidthKneeFrac (0..1)\n"
+               "     gangLevelScatterDb (0..4) gangContour0..3 (0.6..1.4)\n"
                "     gangEpochAlign (0 or 1) gangEpochSearch (0..0.3)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
@@ -164,10 +165,11 @@ bool gangMannerInRange(const cv::GangTuning& g, float epochAlign) {
   namespace gd = cv::gang_detail;
   if (g.levelScatterDb < 0.0f || g.levelScatterDb > gd::kMaxLevelScatterDb) return false;
   if (g.epochSearch < 0.0f || g.epochSearch > gd::EpochTrack::kMaxSearch) return false;
+  if (g.widthKnee < gd::kMinWidthKnee || g.widthKnee > gd::kMaxWidthKnee) return false;
+  if (g.widthKneeFrac < 0.0f || g.widthKneeFrac > 1.0f) return false;
   if (epochAlign != 0.0f && epochAlign != 1.0f) return false;
   for (size_t v = 0; v < g.contour.size(); ++v) {
     if (g.contour[v] < gd::kMinContour || g.contour[v] > gd::kMaxContour) return false;
-    if (g.breath[v] < 0.0f || g.breath[v] > gd::kMaxBreath) return false;
   }
   return true;
 }
@@ -211,12 +213,10 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gangLagScale", &gn.lagScale},
       {"gangScatterMs", &gn.scatterMs},          {"gangDriftCents", &gn.driftCents},
       {"gangHpHz", &gn.hpHz},                    {"gangMaxLagMs", &gn.maxLagMs},
+      {"gangWidthKnee", &gn.widthKnee},          {"gangWidthKneeFrac", &gn.widthKneeFrac},
       {"gangLevelScatterDb", &gn.levelScatterDb},
       {"gangContour0", &gn.contour[0]},          {"gangContour1", &gn.contour[1]},
       {"gangContour2", &gn.contour[2]},          {"gangContour3", &gn.contour[3]},
-      {"gangBreath0", &gn.breath[0]},            {"gangBreath1", &gn.breath[1]},
-      {"gangBreath2", &gn.breath[2]},            {"gangBreath3", &gn.breath[3]},
-      {"gangBreathHz", &gn.breathHz},
       {"gangEpochAlign", &gangEpoch},            {"gangEpochSearch", &gn.epochSearch},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},

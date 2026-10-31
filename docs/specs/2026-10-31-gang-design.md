@@ -24,9 +24,10 @@ Adam (owner 2026-10-31, see Simplified under Built).
 2. Lower pot VOICES, the amount knob. 0 is dry. The four voices fade in one at a time, then the
    lead fades out, so the top of the knob is the gang alone. Owner: "if the effect is dimed, we
    don't hear Adam, we hear the gang."
-3. Upper pot WIDTH. It spreads the copies' pitch offsets, so the bottom is four copies a hair off the
-   lead and the top is the gang at its full offsets (owner 2026-10-31, "nix the distance knob and
-   replace it with a 'width knob'. the width knob will spread the voices.").
+3. Upper pot WIDTH. It spreads the copies' pitch and formant offsets, so the bottom is four plain
+   detuned doubles of the lead and the top is the gang at its full offsets (owner 2026-10-31, "nix
+   the distance knob and replace it with a 'width knob'. the width knob will spread the voices.").
+   The bottom tenth is for instruments and melodic lines (WIDTH law below).
 4. Autotune is not expected on with this card. The tracker runs whenever the Gang card is on.
 5. The voices read the pitch front end's ring and add Autotune's correction to their ratio, as
    Octave does. Octave's wet is not doubled.
@@ -70,11 +71,26 @@ percent knob with no decimals, so the readout sweep test holds as it is.
 
 ### WIDTH law, knob w in 0..1
 
-WIDTH is pitch only. Per copy and per block, copy v's pitch offset in semitones is
-sign(pitchSt[v]) × (0.01 + (|pitchSt[v]| − 0.01) × w). At w = 0 every copy sits 0.01 st (1 cent)
-off the lead on its own side, and at w = 1 it sits at pitchSt[v]. An offset already inside 0.01 st
-stays as it is, so a pitchSt of 0 stays on the lead. Formants, lags and tone shelves do not follow
-the knob. The offset moves with the knob continuously, so a knob move glides the copies.
+Owner 2026-10-31: "i'd like 'width' from about 0 to 10 % to be more suitable for instruments or
+melodic lines."
+
+WIDTH scales both the pitch offset and the formant offset of every copy, each through a factor that
+is linear between three points. Per copy and per block, copy v's pitch offset in semitones is
+pitchSt[v] × fp(w) and its formant offset is formantSt[v] × ff(w).
+
+| Point | fp (pitch factor) | ff (formant factor) |
+|---|---|---|
+| w = 0 | 0.003 | 0 |
+| w = `widthKnee` (0.1) | `widthKneeFrac` (0.08) | `widthKneeFrac` (0.08) |
+| w = 1 | 1 | 1 |
+
+Between the points each factor is linear in w, so fp(0.5) = 0.08 + 0.92 × (0.4 / 0.9) = 0.489. At
+w = 0 the −3 st copy sits about 1 cent off the lead (−0.009 st) and no copy carries a formant shift,
+so a melodic line or an instrument gets four plain detuned doubles. At w = 0.1 the −3 st copy sits 24
+cents off the lead and carries 8 % of its formant move. At w = 1 every copy sits at pitchSt[v] and
+formantSt[v]. A pitchSt or formantSt of 0 stays 0. Lags and tone shelves do not follow the knob. The
+offsets move with the knob continuously, so a knob move glides the copies. `widthKnee` is clamped to
+0.02..0.9 and `widthKneeFrac` to 0..1.
 
 ### Lag law
 
@@ -118,15 +134,17 @@ struct GangTuning {
   float lagScale     = 1.2f;      // a copy's lag is delayMs times this
   float tiltHz       = 2500.0f;
   float voiceDb      = -9.0f;     // one voice against the lead at unity
-  float trimDb       = 2.1f;      // level rule residue
+  float trimDb       = 1.0f;      // level rule residue
   float leadFadeFrom = 0.8f;      // VOICES position where the lead starts to leave
   float holdFrom     = 0.75f;     // part of each voice's fifth spent fading; the rest holds
   float hpHz         = 120.0f;    // low cut on the gang sum
   float maxLagMs     = 200.0f;    // ceiling on a copy's lag
   float gapFloorDb   = -50.0f;    // a read point under this level counts as a gap
-  float scatterMs    = 0.0f;      // peak random lag offset taken at each gap, 0..30
-  float driftCents   = 0.0f;      // peak of each copy's slow random pitch walk, 0..50
+  float scatterMs    = 12.0f;     // peak random lag offset taken at each gap, 0..30
+  float driftCents   = 15.0f;     // peak of each copy's slow random pitch walk, 0..50
   float driftHoldS   = 2.0f;      // time between new drift targets
+  float widthKnee    = 0.1f;      // WIDTH where both factors reach widthKneeFrac, 0.02..0.9
+  float widthKneeFrac = 0.08f;    // both WIDTH factors at the knee, 0..1
 };
 struct GangParams {
   bool on = false;
@@ -166,8 +184,9 @@ ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D
    kVoiceRingLen − 2 × kMaxPeriod − 8, which is 9,660 samples (201 ms) on the 230 ms ring. The
    defaults keep every copy above the 21.7 ms floor and the 200 ms ceiling leaves the longest grain
    (686-sample period, rate 0.5) inside the ring.
-3. Ratio r_v = 2^(widthSt(pitchSt[v], w) / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12).
-   The PSOLA voice clamps the ratio to 0.5..2.0.
+3. Ratio r_v = 2^(pitchSt[v] · fp(w) / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12),
+   and the grain playback rate is 2^(formantSt[v] · ff(w) / 12) (WIDTH law above). The PSOLA voice
+   clamps the ratio to 0.5..2.0.
 4. Period from `pitch.pitch().period`. Period 0 gives silence from the voice, as PsolaVoice does
    today. Unvoiced frames keep the last period, as Autotune's voice does.
 5. Biquads from dsp.h. Each voice has one tone shelf, `setHighShelf(tiltHz, tiltDb[v])`, set at
@@ -259,14 +278,22 @@ wet sum before it meets the lead, per the output-safety spec.
    12. drift: driftCents 20 on a 6 s tone, the copy's f0 in 0.5 s windows within ±20 cents of its
       offset (3 cents of measurement slack) and not the same in every window. driftCents 0 leaves
       the drift at exactly 0 and the output unchanged by driftHoldS.
-   13. WIDTH law: voice 0 alone at WIDTH 0 has its f0 within 2 cents of the lead's 220 Hz, at 0.5
-      within 10 cents of half its offset, and at 1 within 10 cents of −1.75 st. Its lag reads the
-      same at all three.
-   14. fade order: at VOICES 0.2, 0.4, 0.6 and 0.8 the output has a spectral line at the f0 of each
-      voice that has come in (at least 0.4 of the loudest line) and none at the f0 of the voices
-      still to come (at most 0.1), so the order is −1.75 st, +2.75 st, −3 st, +1 st.
-2. level_test: a Gang card row at VOICES 0.5 and WIDTH 0.5 in the 0..+0.5 dB band, as a lambda
-   row driving PitchFx then Gang (the two-stage row pattern at level_test.cpp:235-243).
+   13. WIDTH law: the −3 st copy (formant −1 st) alone at WIDTH 0, 0.1, 0.5 and 1 has its f0 at
+      −3 st × fp(w) from the lead's 220 Hz (within 2, 3, 10 and 10 cents; about −1 cent, −24 cents,
+      −147 cents and −300 cents) and its grain playback rate, read from the engine, at ff(w) of its
+      full formant move (within 2 %; 0, 8 %, 48.9 % and 100 %). At WIDTH 0 the output equals the
+      output of a copy with no formant offset sample for sample. Its lag reads the same at all four.
+   14. fade order: at WIDTH 1 and at WIDTH 0.5, at VOICES 0.2, 0.4, 0.6 and 0.8 the output has a
+      spectral line at the f0 of each voice that has come in (at least 0.4 of the loudest line) and
+      none at the f0 of the voices still to come (at most 0.1), so the order is −1.75 st, +2.75 st,
+      −3 st, +1 st (their offsets times fp(w)).
+   15. working set: the defaults hold the working set below, and a run on them stays finite and
+      within 2.5 dB of the level of the neutral card. Every other test starts from a neutral tuning
+      (no scatter, no drift, no level scatter, contour 1, epoch align off) and turns on only what it
+      measures.
+2. level_test: a Gang card row at VOICES 0.5 and WIDTH 0.5 on the default tuning (the working set) in
+   the 0..+0.5 dB band, as a lambda row driving PitchFx then Gang (the two-stage row pattern at
+   level_test.cpp:235-243).
 3. test/firmware: core_registry (amountCards, engineValue, knobs move, pitch group count 3),
    core_chain_run (a Gang card rig; PitchFx runs with the Gang card on and both pitch toggles off; the
    Gang ahead of Autotune in a layout still gets a ring; bit-exact pass when off), core_layout
@@ -314,9 +341,13 @@ Defaults 3 (owner 2026-10-31): copy 4 to formant -1.5 and pitch +1; lags 40, 70,
 
 WIDTH (owner 2026-10-31): the upper pot spreads the copies' pitch offsets from ±0.01 st to their full values; the line order is low, high, low, high; the old lag multiplier is pegged at 1.2.
 
+WIDTH, melodic bottom tenth (owner 2026-10-31): both the pitch and the formant offsets scale with WIDTH through the piecewise-linear factors of the WIDTH law above. Measured on the −3 st copy (formant −1 st) alone: f0 −0.88, −23.92, −146.60 and −300.00 cents from the 220 Hz lead at WIDTH 0, 0.1, 0.5 and 1, and a grain playback rate at 0, 8.0, 48.9 and 100 % of its full formant move.
+
+Working set (owner 2026-10-31): contour 0.8/1.2/0.7/1.1, level scatter 2 dB, timing scatter 12 ms, drift 15 cents, epoch align on. These are the defaults of `GangTuning`, so the box runs them. `trimDb` is 1.0 dB (from 2.1): the level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.25 dB. On the neutral card (every enhancement off) the level law reads +0.00 to +0.45 dB across VOICES 20 % to 80 % and +0.12 dB at 100 % at WIDTH 0.5; at VOICES 100 % it reads −1.60 dB at WIDTH 0 and −0.38 dB at WIDTH 100 %. Host cost: 3.74 us per block on the working set against 3.42 us on the neutral card (x1.09); `costs.h` keeps its estimate until a board bench.
+
 1. The one highpass runs on the gang sum after the per-voice gains, not one per voice. The four
    voices share one setting, so the sound is the same and three biquad runs go.
-2. `trimDb` defaults to +2.1 dB; the level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.26 dB,
+2. `trimDb` was +2.1 dB (now 1.0, see the working set above); the level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.26 dB,
    and the level law reads +0.07 to +0.92 dB across VOICES 20 % to 100 % at WIDTH 0.5. At VOICES
    100 % the gang reads −0.74 dB at WIDTH 0 and +0.72 dB at WIDTH 1.
 3. `PitchFx::correctionSemis()` follows Autotune's fade down and reads 0 once it has settled off, so
@@ -368,41 +399,35 @@ vocal delivery so harmony is not in the question and pitch tracking is not impor
 "They need to sound like actual people though. Not an alien, not a cartoon." Every move a copy
 makes stays inside what a human voice does. Copies read as people inside about ±5 semitones of
 pitch and ±3 semitones of formant, paired the natural way, the lower pitch with the longer throat.
-Timing scatter stays under about 25 ms, pitch drift under about 30 cents, loudness scatter under
-4 dB, breath mixed under a copy and never over it. The cutting of the copies must not add buzz or
-doubling that reads as a machine; epoch alignment exists for that. The pinned sound is the tag
-`gang-pin-2026-10-31` on main at v2.00.63.
+Timing scatter stays under about 25 ms, pitch drift under about 30 cents and loudness scatter under
+4 dB. The cutting of the copies must not add buzz or doubling that reads as a machine; epoch
+alignment exists for that. The pinned sound is the tag `gang-pin-2026-10-31` on main at v2.00.63.
 
 ## Enhancements (owner 2026-10-31)
 
-Four controls make a copy read as a person and not as Adam shifted. The sound the owner pinned is the
-tag `gang-pin-2026-10-31` (v2.00.63). Every control defaults to off or neutral, and with all four at
-their defaults the output is bit for bit the pinned engine's. Each range stays inside the Rule above,
-and the engine clamps a value to its range.
+Three controls make a copy read as a person and not as Adam shifted. The sound the owner pinned is the
+tag `gang-pin-2026-10-31` (v2.00.63). Each control is neutral at 0 (contour 1, epoch align off), where
+the output is bit for bit what it is without the control. The defaults are the owner's working set
+(see Built, above). Each range stays inside the Rule above, and the engine clamps a value to its
+range.
 
 ### Controls
 
-1. Loudness scatter, `levelScatterDb`, default 0, range 0..4 dB. At each copy's quiet gap, where the
+1. Loudness scatter, `levelScatterDb`, default 2, range 0..4 dB. At each copy's quiet gap, where the
    timing scatter already re-rolls, the copy also draws a gain offset uniform in
    [-levelScatterDb, +levelScatterDb] from its own xorshift stream and holds it to the next gap. The
    offset multiplies the copy's gain through `dbToGainFast`. The gap rule runs while level scatter is
    on even when timing scatter is 0, and a gap that draws no new lag still draws a new loudness. At 0
-   no draw is taken, so the stream and the timing scatter match the pinned engine.
-2. Contour, `contour[4]`, default {1, 1, 1, 1}, range 0.6..1.4. A running mean of log2(period) follows
+   no draw is taken, so the stream and the timing scatter match the engine without it.
+2. Contour, `contour[4]`, default {0.8, 1.2, 0.7, 1.1}, range 0.6..1.4. A running mean of log2(period) follows
    the tracker's period with a time constant of about 1 s, updated while the tracker reports a voiced
    frame and held otherwise. Adam's deviation is mean - log2(period), in octaves, positive when he is
    sharp of his mean. A copy's ratio gains 2^((contour - 1) x deviation), so the copy sits `contour`
    times as far from its own mean as Adam sits from his. 1 follows him exactly, 0.7 flattens the
    copy's rises and falls to 70 % of his, 1.3 exaggerates them. The term is added to the exponent
    that `exp2Fast` takes once per block, and a contour of exactly 1 adds exactly 0.
-3. Breath, `breath[4]`, default {0, 0, 0, 0}, range 0..0.15, and `breathHz` 2000 Hz. For a copy with
-   breath above 0, white noise from the copy's own xorshift goes through one Butterworth high-pass at
-   `breathHz`, then is multiplied by an envelope follower on the copy's own output (one-pole on the
-   absolute value, 10 ms attack and 60 ms release) and by the breath amount, and is added to the copy
-   after its tone shelf and before its gain. The follower reads the copy before the noise joins it, so
-   the noise sits under the copy and falls silent with it. At full breath the noise reads 20 dB under
-   the copy. The amount ramps across a chunk, and a copy at breath 0 runs the pinned code.
-4. Epoch align, `epochAlign`, default false, with `epochSearch` 0.25 (range 0..0.3 periods). The cut
+3. Breath removed (owner 2026-10-31).
+4. Epoch align, `epochAlign`, default true, with `epochSearch` 0.25 (range 0..0.3 periods). The cut
    of every grain moves from the period grid to the glottal pulse nearest the grid mark.
    1. PitchFx writes a shadow ring beside the input ring on every sample. It holds the input through
       a one-pole at 800 Hz at the same index and is exposed as `shadow()`. It costs one multiply-add
@@ -422,12 +447,15 @@ and the engine clamps a value to its range.
 ### Tuning
 
 ```
-levelScatterDb = 0        // 0..4 dB
-contour        = {1, 1, 1, 1}   // 0.6..1.4
-breath         = {0, 0, 0, 0}   // 0..0.15
-breathHz       = 2000
-epochAlign     = false
+scatterMs      = 12       // 0..30 ms
+driftCents     = 15       // 0..50 cents
+widthKnee      = 0.1      // 0.02..0.9
+widthKneeFrac  = 0.08     // 0..1
+levelScatterDb = 2        // 0..4 dB
+contour        = {0.8, 1.2, 0.7, 1.1}   // 0.6..1.4
+epochAlign     = true
 epochSearch    = 0.25     // 0..0.3 periods
+trimDb         = 1.0      // dB
 ```
 
 ### Why the grid cut buzzes
@@ -448,11 +476,8 @@ equal, gains most (12 to 14 dB).
    pitch of the moment while only its content is late. A first cut that read the deviation a lag back
    (plus the tracker's delay) missed by about 50 degrees at a 3 Hz glide, and a contour of 0.6 gave a
    swing ratio of 0.82.
-2. Breath draws from its own xorshift per copy, not the copy's lag or drift stream, so the scatter and
-   drift sequences stay put when breath turns on.
-3. The tests range over the Rule's ranges (contour 0.6 and 1.4, breath 0.15, loudness scatter 3 dB),
-   and the breath test measures above 4 kHz, since the tone's tenth harmonic sits at 2.2 kHz.
-4. The pulse search follows one sign and takes a centroid. A first cut that took the largest absolute
+2. The tests range over the Rule's ranges (contour 0.6 and 1.4, loudness scatter 3 dB).
+3. The pulse search follows one sign and takes a centroid. A first cut that took the largest absolute
    sample and a parabola flipped between the positive and negative lobe of the ring, 30 samples apart,
    and read 26 dB worse than the grid on the pulse train.
 
@@ -465,43 +490,43 @@ Host, -O2, 48 kHz, `test/gang_test.cpp` unless noted.
    80 % with timing scatter 15 ms and drift 20 cents to d6b873e27ac6a7d8. The test prints these three.
    A scratch set of seven runs (those three, the program at 100 % and 100 %, at 20 % and 100 %, with
    scatter and drift, and with a solo) hashes to 02532a5f1bdc5ad1 combined on the tag and on the edited
-   engine. Inactive settings (breathHz, epochSearch, negative values that clamp to 0) move no sample.
+   engine. Inactive settings (epochSearch, negative values that clamp to 0) move no sample. These
+   hashes belong to the pinned engine; the melodic WIDTH law moves the output below WIDTH 1, so the
+   test's printed hashes differ from them now.
 2. Loudness scatter 3 dB over ten bursts: per-burst gain -2.97, +2.90, +2.88, +2.79, -0.23, -1.09,
    +0.10, +2.47, -1.41, +1.93 dB against the same run with no scatter.
 3. Contour on a 220 Hz tone swinging 1 st either side: copy swing over input swing 0.624 at 0.6 and
    1.000 at 1.0 and 1.385 at 1.4 at 1 Hz; 0.627, 1.000 and 1.383 at 3 Hz.
-4. Breath 0.15: +20.3 dB above 4 kHz over the no-breath run in the bursts, -13.5 dB at the end of a
-   120 ms gap re the bursts (the follower releases over 60 ms), and the noise alone -20.0 dB re the
-   copy.
-5. Epoch align on a 150 Hz Rosenberg pulse train through two formants with 0.4 % period jitter,
+4. Epoch align on a 150 Hz Rosenberg pulse train through two formants with 0.4 % period jitter,
    harmonics 2..10: formant +2 st copy 31.5 dB harmonic to interharmonic cut on the grid, 34.7 dB cut
    on the pulses (+3.2 dB). A copy at -3 st and formant -1.5 st reads 31.0 dB cut on the pulses and
    23.7 dB on the grid against 32.1 dB for the input, so the pulse cut stays 1.2 dB under the input.
    The marks sit within 0.16 samples (spread) of the pulses, which jitter 1.3 samples themselves.
-6. Epoch align on Adam's three recordings (`samples/`, scratch measurement outside the test), the
+5. Epoch align on Adam's three recordings (`samples/`, scratch measurement outside the test), the
    four default copies alone, harmonics 2..4 in steady 120 ms windows. Each row gives the harmonic to
    interharmonic ratio on the three recordings, grid cut then pulse cut. Copy 1 (-1.75 st, -1.75 st)
    33.3, 36.6, 33.1 then 36.2, 38.8, 35.1 dB. Copy 2 (+2.75 st, -1 st) 19.4, 17.3, 13.5 then 31.3,
    28.9, 27.6 dB. Copy 3 (-3 st, -1 st) 28.0, 26.4, 23.5 then 35.3, 36.1, 32.5 dB. Copy 4 (+1 st,
    -1.5 st) 27.5, 26.8, 25.4 then 34.7, 34.9, 32.9 dB. The pulse cut is better in all twelve cases, by
    2.0 to 14.2 dB, and reads 0.0 to +1.2 dB louder.
-7. Host timing, Gang alone at VOICES 80 %, WIDTH 50 %: 3.36 us per block on the pinned engine, 3.44 us
-   with every control at its default, 3.92 us with all four on. PitchFx pass-through 1.38 us per
+6. Host timing, Gang alone at VOICES 80 %, WIDTH 50 %: 3.36 us per block on the pinned engine, 3.44 us
+   with every control neutral, 3.92 us with all three on. PitchFx pass-through 1.38 us per
    block on the pinned engine and 1.60 us with the shadow ring.
 
 ### Memory and cost
 
 1. The shadow ring adds 44,160 B to `gPitchFx`. The firmware build prints DTCM at 121,088 of
    130,816 B (92.6 %), 9,728 B free; `gPitchFx` is 121,080 B. The Gang card's plain global grows by
-   about 2.3 KB (the pulse track and the breath state).
-2. The shadow write moves every pitch card's cycles by a few per sample, and the pulse track and the
-   breath add cost only while they are on. `costs.h` keeps its estimate until a board bench.
+   about 2.3 KB (the pulse track).
+2. The shadow write moves every pitch card's cycles by a few per sample, and the pulse track adds
+   cost only while epoch align is on. The working set has it on, so the card runs at the working-set
+   cost under Built above. `costs.h` keeps its estimate until a board bench.
 
 ### Emulator and render
 
-1. The Scatter node gains Level scatter. New nodes Contour (four sliders, 0.6..1.4) and Breath (four
-   sliders, 0..0.15, and Breath above in Hz). The Pitch node gains an Epoch align checkbox and an
-   Epoch search slider. Print tuning lists every new field.
-2. cubevox-render keys `gangLevelScatterDb`, `gangContour0..3`, `gangBreath0..3`, `gangBreathHz`,
+1. The Scatter node gains Level scatter. A new node Contour has four sliders, 0.6..1.4. The Pitch node
+   gains Width knee and Offsets at knee sliders, an Epoch align checkbox and an Epoch search slider.
+   Print tuning lists every new field.
+2. cubevox-render keys `gangWidthKnee`, `gangWidthKneeFrac`, `gangLevelScatterDb`, `gangContour0..3`,
    `gangEpochAlign` (0 or 1) and `gangEpochSearch`. A value outside its range is refused.
 3. The firmware never sets any of them.

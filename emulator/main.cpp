@@ -438,14 +438,13 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nGangTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
                 "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
-                "%.1ff, %.1ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.3ff, %.3ff, %.3ff, %.3ff}, %.0ff, %s, %.2ff}",
+                "%.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}, %s, %.2ff}",
                 dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
                 dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
                 dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lagScale, dt.tiltHz, dt.voiceDb, dt.trimDb,
                 dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
-                dt.driftHoldS, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3],
-                dt.breath[0], dt.breath[1], dt.breath[2], dt.breath[3], dt.breathHz, dt.epochAlign ? "true" : "false",
-                dt.epochSearch);
+                dt.driftHoldS, dt.widthKnee, dt.widthKneeFrac, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3],
+                dt.epochAlign ? "true" : "false", dt.epochSearch);
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
@@ -485,7 +484,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "dwellDrive, dwellComp, wetDb\n"
       "// GangTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, lagScale, tiltHz, voiceDb, "
       "trimDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
-      "levelScatterDb, {contour[0..3]}, {breath[0..3]}, breathHz, epochAlign, epochSearch\n%s\n",
+      "widthKnee, widthKneeFrac, levelScatterDb, {contour[0..3]}, epochAlign, epochSearch\n%s\n",
       gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
@@ -589,6 +588,8 @@ void drawGangVoiceNodes(cv::GangTuning& t) {
   }
   if (tuningNode("Pitch")) {
     voiceSliders("Pitch", t.pitchSt, -12.0f, 12.0f, "%+.2f st");
+    ImGui::SliderFloat("Width knee", &t.widthKnee, cv::gang_detail::kMinWidthKnee, 0.5f, "%.2f");
+    ImGui::SliderFloat("Offsets at knee", &t.widthKneeFrac, 0.0f, 0.5f, "%.3f x");
     ImGui::Checkbox("Epoch align", &t.epochAlign);
     ImGui::SliderFloat("Epoch search", &t.epochSearch, 0.05f, cv::gang_detail::EpochTrack::kMaxSearch, "%.2f periods");
     ImGui::TreePop();
@@ -629,16 +630,10 @@ void drawGangScatterNode(cv::GangTuning& t) {
   ImGui::TreePop();
 }
 
-// Contour is the share of Adam's rises and falls a copy follows, per copy. Breath is the air under
-// each copy, and breathHz is where the air starts. A contour of 1 and a breath of 0 are off.
+// Contour is the share of Adam's rises and falls a copy follows, per copy. A contour of 1 is off.
 void drawGangVoiceMannerNodes(cv::GangTuning& t) {
   if (tuningNode("Contour")) {
     voiceSliders("Contour", t.contour, cv::gang_detail::kMinContour, cv::gang_detail::kMaxContour, "%.2f x");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Breath")) {
-    voiceSliders("Breath", t.breath, 0.0f, cv::gang_detail::kMaxBreath, "%.3f");
-    ImGui::SliderFloat("Breath above", &t.breathHz, 1000.0f, 6000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::TreePop();
   }
 }
@@ -1832,8 +1827,7 @@ int runLayoutProbe() {
       {true, "gang", nullptr},        {true, "gang", "Formants"},
       {true, "gang", "Pitch"},        {true, "gang", "Delay"},
       {true, "gang", "Tone"},         {true, "gang", "Scatter"},
-      {true, "gang", "Contour"},      {true, "gang", "Breath"},
-      {true, "gang", "Solo"},
+      {true, "gang", "Contour"},      {true, "gang", "Solo"},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr},
       {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpring},
