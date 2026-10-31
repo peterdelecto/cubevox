@@ -610,3 +610,150 @@ Host, -O2, 48 kHz, `test/crowd_test.cpp` unless noted.
    `crowdWidthLagMs` (0..60), `crowdLevelScatterDb`, `crowdContour0..3`, `crowdEpochAlign` (0 or 1) and
    `crowdEpochSearch`. A value outside its range is refused.
 3. The firmware never sets any of them.
+
+## Voice 5 trial (owner 2026-10-31)
+
+Owner, 2026-10-31: "can we use 1 - 5 to approximate a different sex, age and body size? perhaps as a
+trial for a fifth voice? and expose sliders and a solo button for that voice?" The five were pitch with
+the formant paired the natural way, prosody, the source (pressed or lax, breath, creak), individual
+formants, and jitter and shimmer. The Rule above holds, so the copy must sound like an actual person
+and every range below is bounded for one. Code is `engine/crowd.h` and `engine/crowd_trial.h`.
+
+### What it is
+
+1. A fifth copy, index 4, outside the VOICES law, so the knob neither fades it in nor counts it. It is
+   off by default. Off, it does not tick, and the output is bit for bit the output of the engine before
+   it existed (Measured, item 1).
+2. On, it adds to the crowd sum at `voice5Db` against the lead at every VOICES position, before the 120 Hz
+   low cut and the DC blocker. The lead law counts its power with the others (Law, below).
+3. Its lag follows the Lag law from `delayMs5` and the same WIDTH multiplier m(w) as the four, which is
+   computed from the four's delays and does not read `delayMs5`. Timing scatter, level scatter, drift and the
+   quiet-gap rule apply to it as to the others.
+4. Its pitch, formant, contour and jitter take the WIDTH factor f(w). At WIDTH 0 its pitch is the lead's
+   exactly. The tilt, peak, notch, breath and shimmer do not follow the knob, as the tone shelves do not.
+5. Float only, no heap, no libm per sample. Filter coefficients are set on the first block and when a
+   value moves. It reads the same ring and tracker as the others, so it costs no extra PitchFx work.
+
+### Fields
+
+The fields sit in `CrowdTuning`, and the engine clamps each to its range.
+
+| Field | Range | Default | Sets |
+|---|---|---|---|
+| `voice5On` | off, on | off | whether it sounds |
+| `voice5Db` | -40..0 dB | -9 | its level against the lead |
+| `delayMs5` | 5..200 ms | 65 | lag before `lagScale` and m(w) |
+| `v5PitchSt` | -12..+12 st | 0 | pitch offset at WIDTH 1 |
+| `v5FormantSt` | -6..+6 st | 0 | grain playback rate at WIDTH 1 (the four keep +-4 in the emulator) |
+| `v5Contour` | 0.6..1.4 | 1 | share of Adam's rises and falls it follows |
+| `v5TiltDb` | -6..+6 dB | 0 | spectral tilt, pressed when positive and lax when negative |
+| `v5Breath` | 0..0.3 | 0 | noise under the copy |
+| `v5Fry` | 0..1 | 0 | vocal fry at the end of a phrase |
+| `v5PeakHz`, `v5PeakDb` | 2000..4000 Hz, -6..+6 dB | 3000, 0 | one peak, Q 2, for the third formant |
+| `v5NotchHz`, `v5NotchDb` | 800..2000 Hz, -12..0 dB | 1200, 0 | one cut, Q 3, for a nasal anti-resonance |
+| `v5Jitter` | 0..1 % | 0 | random length of each cycle |
+| `v5Shimmer` | 0..1 dB | 0 | random loudness of each cycle |
+
+### Law
+
+1. Voice 5 holds a fixed gain g5 = 10^(voice5Db / 20) at every k. It does not fade. In span A the lead
+   gain is sqrt(1 - P) with P the four voices' power plus g5^2. In span B the crowd power runs from that sum
+   up to 1, and the crowd multiplier carries voice 5 with the others.
+2. Solo bit 4 (0x10) solos voice 5 while `voice5On` is set. With any of bits 0..3 set it is silent. With
+   voice 5 off, bit 4 is ignored, so the plain law and the old solo masks are untouched.
+3. `activeVoices()` counts voice 5 among the ticking voices (5 at most), and `fryActive()` reports its fry
+   window.
+
+### Controls
+
+1. Tilt. A low shelf at -v5TiltDb / 2 and a high shelf at +v5TiltDb / 2, both at 1 kHz, so the high end
+   sits v5TiltDb above the low end. Stages whose gain is under 0.005 dB are skipped.
+2. Peak and notch. Two peaking biquads from `engine/dsp.h`, Q 2 at 2..4 kHz and Q 3 at 0.8..2 kHz, skipped at
+   0 dB.
+3. Breath. White noise from an xorshift through a 2 kHz high-pass, times an envelope follower on the copy
+   (10 ms attack, 60 ms release), times `v5Breath`, added after the filters. The follower rides the copy, so
+   the noise swells with a syllable, dies with it and stays under the copy. The part above 4 kHz sits 26 dB
+   under the copy at 0.08 and about 15 dB under at 0.3. At 0 none of it runs.
+4. Jitter and shimmer. Each grain draws a length scale and a gain from its own xorshift. The length scale is
+   1 + 1.5 x (v5Jitter / 100) x f(w) x u and the gain is 10^(1.5 x v5Shimmer x u / 20), with u uniform in
+   -1..1. A uniform draw within +-1.5 x s makes neighbouring cycles differ by s on average, which is how local
+   jitter and local shimmer are quoted. The launch clock allows for the longest cycle. Both at 0 give the
+   grains the four other copies get, bit for bit.
+5. Fry (needs `epochAlign`). A phrase is ending when the tracker's period passes 1.15 x its running mean (the
+   contour track's 1 s mean) while the lead's level falls (a 10 / 60 ms follower under 0.85 x a 150 ms one).
+   The window then opens for 150 ms and rearms once the pitch comes back up. In the window every other
+   pulse is dropped with probability `v5Fry`, so the spacing doubles where one goes, and the kept pulses
+   swing in loudness by up to 3 dB x `v5Fry`. The copy plays a lag late, so a window that opens at the
+   detection covers the last words of the phrase. Without `epochAlign` the grains are not on pulses, and
+   nothing happens.
+
+### Presets
+
+The functions in `engine/crowd.h` return a copy of the tuning with the shape fields set. Each starts from
+the neutral shape, so one after another leaves nothing of the last behind. They leave `voice5On`,
+`voice5Db` and `delayMs5` alone.
+
+| Preset | Pitch | Formant | Tilt | Breath | Contour | Fry | Jitter | Shimmer |
+|---|---|---|---|---|---|---|---|---|
+| `voice5Woman` | +6 st | +2.75 st | +2 dB | 0.08 | 1.2 | 0 | 0.3 % | 0.3 dB |
+| `voice5OlderMan` | -2 st | -1 st | -3 dB | 0.1 | 1 | 0.5 | 0.6 % | 0.5 dB |
+| `voice5BigMan` | -4 st | -2.5 st | -4 dB | 0 | 1 | 0 | 0.3 % | 0 |
+
+### Emulator and render
+
+1. The Crowd block gains a header "Voice 5" under its Tuning header. It holds On, Level (-40..0 dB), Lag
+   (5..200 ms), three buttons Woman, Older man and Big man, and three nodes of four sliders ("Pitch and
+   throat", "Breath and roughness", "Peak and notch") with the ranges above. The two headers share the
+   column's accordion. They are two headers, because a Voice 5 node beside the Tuning header's seven
+   nodes would push the Pitch node past the column by 2 px. The Solo node gains a fifth box. Print tuning
+   lists every new field. `--layout` prints ok.
+2. cubevox-render keys `crowdV5On` (0 or 1), `crowdV5Db`, `crowdDelayMs5`, `crowdV5PitchSt`,
+   `crowdV5FormantSt`, `crowdV5Contour`, `crowdV5TiltDb`, `crowdV5Breath`, `crowdV5Fry`, `crowdV5PeakHz`,
+   `crowdV5PeakDb`, `crowdV5NotchHz`, `crowdV5NotchDb`, `crowdV5Jitter` and `crowdV5Shimmer`. A value outside
+   its range is refused. `--crowd-v5 woman|older|big` applies a preset and turns voice 5 on, and a later
+   `crowdV5On=0` turns it off.
+3. The firmware never sets any of it.
+
+### Measured
+
+Host, -O2, 48 kHz, `test/crowd_test.cpp`.
+
+1. Voice 5 off. The 180 Hz program at VOICES 70 % and WIDTH 50 %, the burst program at 80 % and 50 %, and
+   the burst program at 60 % and 80 % with scatter 15 ms and drift 20 cents hash to 12873f20ed548ec8,
+   8ff1eb8ee12b722c and d9de9308d8365971 on the engine before voice 5 and after it, and with voice 5's
+   fields set to the older man and its solo bit set but `voice5On` off. The test holds the three values.
+2. Woman on a 220 Hz tone. The f0 reads 311.15 Hz against 311.13 Hz (0.15 cents). The centroid over
+   harmonics 1..10 reads 898.0 Hz against 751.1 Hz for the copy with no offsets. The breath above 4 kHz is
+   26.1 dB under the copy, moves 6.0 dB for a 6 dB drop of the copy, and sits 79.5 dB down in a gap. The
+   cycle length spread is 0.298 % at jitter 0.3 %, against a floor of 0.023 % at jitter 0.
+3. Older man on a 220 Hz phrase of 900 ms steady then 350 ms of a 20 % pitch fall with the level fading
+   to 0.15. The last 150 ms of the copy holds 7 intervals of twice the period out of 17. The same phrase at
+   steady pitch holds 0 of 29, and the same fall holds 0 with the pulse cut off or with `v5Fry` at 0.
+4. Shape. Tilt +6 dB moves the 300 Hz line -2.95 dB and the 2.4 kHz line +2.83 dB. A +6 dB peak at 3 kHz
+   reads +6.00 dB, and a -12 dB notch at 1.2 kHz reads -12.00 dB.
+5. Law. Solo bit 4 leaves 1 voice ticking and the lead at 0.935 (the law's sqrt(1 - g5^2)). With all five on
+   at 80 % the lead reads 0.609 and 5 voices tick. The level with the woman preset on reads -0.12, -0.05,
+   -0.05, +0.10 and -0.16 dB at VOICES 0, 20, 50, 80 and 100 % (WIDTH 50 %, neutral four). A plain voice 5
+   (no offsets) is a delayed double of the lead, so it combs against it and reads -1.77 dB at VOICES 0, which
+   is why the level check runs on a preset.
+6. WIDTH. The woman preset's f0 reads +0.00 cents from the lead at WIDTH 0 and +0.37 cents from +2.71 st at
+   WIDTH 50 %.
+7. Ranges. Values past every range give the same samples as the range ends.
+8. Host cost, working set at VOICES 80 % and WIDTH 50 %, 3.78 us per block with four copies. Voice 5 adds
+   1.29 us (woman, x1.34), 1.40 us (older man, x1.37) and 1.04 us (big man, x1.28), which is about 68k, 74k
+   and 55k board cycles at Unison's 46.9k. `costs.h` is not re-benched.
+9. Firmware. The build ends `[warn-gate] 62 files ... ok`, DTCM 121,088 of 130,816 B (unchanged, since the
+   Crowd card is a plain global), D1 SRAM 191,320 B.
+
+### Where the code differs from the brief
+
+1. Fry detects at a period 1.15 x its running mean, not 1.3. A pitch fall of 20 % lengthens the period by
+   1.25 x at its end, and the mean follows it, so 1.3 can never be reached by the test's phrase.
+2. Fry's window opens at the detection and not one lag later. The copy plays a lag late, so the detection
+   still sits ahead of the words it covers, and a window one lag late missed the end of the phrase.
+3. Jitter and shimmer are quoted as local values, drawn within +-1.5 x the setting. A literal peak of the
+   setting gives a spread of 0.17 % at 0.3 %, under the 0.2 % the brief asks for.
+4. The tilt is split between a low and a high shelf at half the setting each, so the setting is the spread
+   between the ends.
+5. The level check of item 5 runs on the woman preset and not on a plain voice 5.
+6. The Voice 5 controls sit under their own header (Emulator and render, item 1).

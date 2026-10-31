@@ -57,7 +57,7 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>, alias --key] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
-               "       [--crowd] [--width <0..1>] [--voices <0..1>]\n"
+               "       [--crowd] [--width <0..1>] [--voices <0..1>] [--crowd-v5 woman|older|big]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
@@ -66,6 +66,8 @@ int usage() {
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune or --crowd\n"
                "  crowd runs only with --crowd; --width and --voices set its knobs (default 1 and 0.5)\n"
+               "  --crowd-v5 sets the trial voice 5 to a preset (woman, older man, big man) and turns it on; a later\n"
+               "  crowdV5On=0 or any crowdV5 key changes it\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
@@ -106,6 +108,10 @@ int usage() {
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
                "     crowdEpochAlign (0 or 1) crowdEpochSearch (0..0.3)\n"
+               "     crowdV5On (0 or 1) crowdV5Db (-40..0) crowdDelayMs5 (5..200) crowdV5PitchSt (-12..12)\n"
+               "     crowdV5FormantSt (-6..6) crowdV5Contour (0.6..1.4) crowdV5TiltDb (-6..6) crowdV5Breath (0..0.3)\n"
+               "     crowdV5Fry (0..1) crowdV5PeakHz (2000..4000) crowdV5PeakDb (-6..6) crowdV5NotchHz (800..2000)\n"
+               "     crowdV5NotchDb (-12..0) crowdV5Jitter (0..1 %%) crowdV5Shimmer (0..1 dB)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -160,6 +166,33 @@ bool parsePair(const char* s, float* hz, float* db) {
   return parseFloat(end + 1, db);
 }
 
+bool inRange(float v, float lo, float hi) { return v >= lo && v <= hi; }
+
+// Voice 5's controls refuse a value outside the range the engine clamps to. voice5On arrives as 0 or 1.
+bool crowdVoice5InRange(const cv::CrowdTuning& g, float on) {
+  namespace gd = cv::crowd_detail;
+  return (on == 0.0f || on == 1.0f) && inRange(g.voice5Db, gd::kMinV5Db, 0.0f) &&
+         inRange(g.delayMs5, gd::kMinV5DelayMs, gd::kMaxV5DelayMs) &&
+         inRange(g.v5PitchSt, -gd::kMaxV5PitchSt, gd::kMaxV5PitchSt) &&
+         inRange(g.v5FormantSt, -gd::kMaxV5FormantSt, gd::kMaxV5FormantSt) &&
+         inRange(g.v5Contour, gd::kMinContour, gd::kMaxContour) &&
+         inRange(g.v5TiltDb, -gd::kMaxV5TiltDb, gd::kMaxV5TiltDb) && inRange(g.v5Breath, 0.0f, gd::kMaxV5Breath) &&
+         inRange(g.v5Fry, 0.0f, 1.0f) && inRange(g.v5PeakHz, gd::kMinV5PeakHz, gd::kMaxV5PeakHz) &&
+         inRange(g.v5PeakDb, -gd::kMaxV5PeakDb, gd::kMaxV5PeakDb) &&
+         inRange(g.v5NotchHz, gd::kMinV5NotchHz, gd::kMaxV5NotchHz) && inRange(g.v5NotchDb, gd::kMinV5NotchDb, 0.0f) &&
+         inRange(g.v5Jitter, 0.0f, gd::kMaxV5JitterPct) && inRange(g.v5Shimmer, 0.0f, gd::kMaxV5ShimmerDb);
+}
+
+// --crowd-v5 woman, older or big: the preset's fields, and voice 5 on.
+bool applyVoice5Preset(const char* name, cv::CrowdTuning* t) {
+  if (std::strcmp(name, "woman") == 0) *t = cv::voice5Woman(*t);
+  else if (std::strcmp(name, "older") == 0) *t = cv::voice5OlderMan(*t);
+  else if (std::strcmp(name, "big") == 0) *t = cv::voice5BigMan(*t);
+  else return false;
+  t->voice5On = true;
+  return true;
+}
+
 // The Crowd card's human-voice controls refuse a value outside the range the engine clamps to, so a
 // typo in a key does not pass for a setting. epochAlign arrives as 0 or 1.
 bool crowdMannerInRange(const cv::CrowdTuning& g, float epochAlign) {
@@ -192,6 +225,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
   float crowdEpoch = gn.epochAlign ? 1.0f : 0.0f;
+  float crowdV5On = gn.voice5On ? 1.0f : 0.0f;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -222,6 +256,14 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"crowdContour0", &gn.contour[0]},          {"crowdContour1", &gn.contour[1]},
       {"crowdContour2", &gn.contour[2]},          {"crowdContour3", &gn.contour[3]},
       {"crowdEpochAlign", &crowdEpoch},            {"crowdEpochSearch", &gn.epochSearch},
+      {"crowdV5On", &crowdV5On},                  {"crowdV5Db", &gn.voice5Db},
+      {"crowdDelayMs5", &gn.delayMs5},            {"crowdV5PitchSt", &gn.v5PitchSt},
+      {"crowdV5FormantSt", &gn.v5FormantSt},      {"crowdV5Contour", &gn.v5Contour},
+      {"crowdV5TiltDb", &gn.v5TiltDb},            {"crowdV5Breath", &gn.v5Breath},
+      {"crowdV5Fry", &gn.v5Fry},                  {"crowdV5PeakHz", &gn.v5PeakHz},
+      {"crowdV5PeakDb", &gn.v5PeakDb},            {"crowdV5NotchHz", &gn.v5NotchHz},
+      {"crowdV5NotchDb", &gn.v5NotchDb},          {"crowdV5Jitter", &gn.v5Jitter},
+      {"crowdV5Shimmer", &gn.v5Shimmer},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -284,8 +326,9 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
-    if (!crowdMannerInRange(gn, crowdEpoch)) return false;
+    if (!crowdMannerInRange(gn, crowdEpoch) || !crowdVoice5InRange(gn, crowdV5On)) return false;
     gn.epochAlign = crowdEpoch == 1.0f;
+    gn.voice5On = crowdV5On == 1.0f;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }
@@ -405,6 +448,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--voices") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.crowd.voices) || rp.crowd.voices < 0.0f || rp.crowd.voices > 1.0f)
         return false;
+    } else if (std::strcmp(a, "--crowd-v5") == 0 && i + 1 < argc) {
+      if (!applyVoice5Preset(argv[++i], &rp.crowd.tuning)) return false;
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
       while (i + 1 < argc && argv[i + 1][0] != '-' && std::strchr(argv[i + 1], '=')) {

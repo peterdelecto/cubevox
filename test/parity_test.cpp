@@ -254,6 +254,21 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
   CMP(p, pos, a, b, levelScatterDb);
   CMP(p, pos, a, b, epochAlign);
   CMP(p, pos, a, b, epochSearch);
+  CMP(p, pos, a, b, voice5On);
+  CMP(p, pos, a, b, voice5Db);
+  CMP(p, pos, a, b, delayMs5);
+  CMP(p, pos, a, b, v5PitchSt);
+  CMP(p, pos, a, b, v5FormantSt);
+  CMP(p, pos, a, b, v5Contour);
+  CMP(p, pos, a, b, v5TiltDb);
+  CMP(p, pos, a, b, v5Breath);
+  CMP(p, pos, a, b, v5Fry);
+  CMP(p, pos, a, b, v5PeakHz);
+  CMP(p, pos, a, b, v5PeakDb);
+  CMP(p, pos, a, b, v5NotchHz);
+  CMP(p, pos, a, b, v5NotchDb);
+  CMP(p, pos, a, b, v5Jitter);
+  CMP(p, pos, a, b, v5Shimmer);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
