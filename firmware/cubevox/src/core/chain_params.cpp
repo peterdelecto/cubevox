@@ -20,8 +20,8 @@ ChainParams::ChainParams() {
   pitchFx.autotune.on = false;
   pitchFx.octave.on = false;
   pitchFx.octave.mix = kOctaveStartMix;
-  pitchFx.doublerOn = false;
-  doubler.on = false;
+  pitchFx.gangOn = false;
+  gang.on = false;
   unison.on = false;
   slapback.on = false;
   distortion.on = false;

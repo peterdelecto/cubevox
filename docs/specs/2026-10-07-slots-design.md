@@ -17,7 +17,7 @@ Today's chain, left to right, slot 1 to 8:
 | 7 | Gate | Threshold | Decay |
 | 8 | Reverb | Mix | Time |
 
-The library also holds the Doubler (Distance, Voices), a pitch-group card that goes in any slot and sits outside this chain (`2026-10-31-doubler-design.md`).
+The library also holds the Gang card (Distance, Voices), a pitch-group card that goes in any slot and sits outside this chain (`2026-10-31-gang-design.md`).
 
 ## Open questions resolved
 

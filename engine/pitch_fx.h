@@ -22,7 +22,7 @@ namespace cv {
 struct PitchFxParams {
   AutotuneParams autotune;
   OctaveParams octave;
-  bool doublerOn = false;  // the Doubler reads the ring and the tracker, so both run
+  bool gangOn = false;  // the Gang card reads the ring and the tracker, so both run
 };
 
 class PitchFx {
@@ -46,9 +46,9 @@ class PitchFx {
 
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
     // The tracker's buffers fill every block; it analyses while Autotune is on or still fading,
-    // so the voice keeps its period through the crossfade, and while the Doubler is on. Octave
+    // so the voice keeps its period through the crossfade, and while the Gang card is on. Octave
     // shifts without a pitch.
-    tracker_.push(in, n, p.autotune.on || p.doublerOn || activeAt_ > 0.0f);
+    tracker_.push(in, n, p.autotune.on || p.gangOn || activeAt_ > 0.0f);
     const Targets t = prepareVoices(p);
     if (fresh_) {
       mix_ = t.mix;

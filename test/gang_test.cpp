@@ -1,4 +1,4 @@
-// Doubler checks: bit-exact off, no allocation, pitch held, formant moved, the level law across
+// Gang card checks: bit-exact off, no allocation, pitch held, formant moved, the level law across
 // VOICES, the lead leaving, the voice count, DISTANCE timing, the tracker running without Autotune,
 // and a host timing against Unison. Every run feeds a PitchFx through its pass-through path first,
 // so the ring is written and the tracker runs, as the chain does. No window, no audio device.
@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-#include "engine/doubler.h"
+#include "engine/gang.h"
 #include "engine/unison.h"
 
 namespace {
@@ -162,10 +162,10 @@ Signal program(int seconds) {
   return x;
 }
 
-// Running a PitchFx and then the Doubler on the same blocks, in the chain's order.
+// Running a PitchFx and then the Gang card on the same blocks, in the chain's order.
 
 cv::PitchFx gFx;
-cv::Doubler gDbl;
+cv::Gang gGang;
 
 struct Probe {
   float lead = -1.0f;
@@ -176,17 +176,17 @@ struct Probe {
 cv::PitchFxParams passThrough() {
   cv::PitchFxParams pp;
   pp.octave.on = false;
-  pp.doublerOn = true;
+  pp.gangOn = true;
   return pp;
 }
 
-// Doubler and PitchFx params both switch from their first to their second value at sample
+// Gang card and PitchFx params both switch from their first to their second value at sample
 // `switchAt` (a block boundary).
-Signal runBoth(const Signal& in, const cv::DoublerParams& first, const cv::DoublerParams& second,
+Signal runBoth(const Signal& in, const cv::GangParams& first, const cv::GangParams& second,
                const cv::PitchFxParams& pitchFirst, const cv::PitchFxParams& pitchSecond, int switchAt,
                Probe* probe = nullptr) {
   gFx.reset();
-  gDbl.reset();
+  gGang.reset();
   Signal out(in.size());
   float scratch[cv::kBlock];
   const int total = static_cast<int>(in.size());
@@ -195,27 +195,27 @@ Signal runBoth(const Signal& in, const cv::DoublerParams& first, const cv::Doubl
     const bool after = i >= switchAt;
     gInProcess = true;
     gFx.process(&in[static_cast<size_t>(i)], scratch, n, after ? pitchSecond : pitchFirst);
-    gDbl.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, after ? second : first, gFx);
+    gGang.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, after ? second : first, gFx);
     gInProcess = false;
     if (probe) {
-      probe->lead = gDbl.leadGain();
-      probe->active = gDbl.activeVoices();
+      probe->lead = gGang.leadGain();
+      probe->active = gGang.activeVoices();
     }
   }
   return out;
 }
 
-Signal runSwitch(const Signal& in, const cv::DoublerParams& first, const cv::DoublerParams& second,
+Signal runSwitch(const Signal& in, const cv::GangParams& first, const cv::GangParams& second,
                  int switchAt, Probe* probe = nullptr) {
   return runBoth(in, first, second, passThrough(), passThrough(), switchAt, probe);
 }
 
-Signal run(const Signal& in, const cv::DoublerParams& p, Probe* probe = nullptr) {
+Signal run(const Signal& in, const cv::GangParams& p, Probe* probe = nullptr) {
   return runSwitch(in, p, p, static_cast<int>(in.size()), probe);
 }
 
-cv::DoublerParams knobs(float voices, float distance) {
-  cv::DoublerParams p;
+cv::GangParams knobs(float voices, float distance) {
+  cv::GangParams p;
   p.on = true;
   p.voices = voices;
   p.distance = distance;
@@ -224,9 +224,9 @@ cv::DoublerParams knobs(float voices, float distance) {
 
 // Voice 0 alone with nothing around it. voiceDb 0 gives one voice the whole level, so the lead is
 // 0, and the filters and the room are flat or silent.
-cv::DoublerParams isolated(float formantSt) {
-  cv::DoublerParams p = knobs(0.2f, 0.5f);
-  cv::DoublerTuning& t = p.tuning;
+cv::GangParams isolated(float formantSt) {
+  cv::GangParams p = knobs(0.2f, 0.5f);
+  cv::GangTuning& t = p.tuning;
   t.voiceDb = 0.0f;
   t.formantSt[0] = formantSt;
   t.detuneCents[0] = 0.0f;
@@ -316,7 +316,7 @@ int peakLag(const Signal& in, const Signal& out, int from, int to, int maxLag) {
 
 bool testOffExact() {
   const Signal in = tone(220.0, kRate);
-  cv::DoublerParams off;
+  cv::GangParams off;
   off.on = false;
   const Signal a = run(in, off);
   float worst = 0.0f;
@@ -335,7 +335,7 @@ bool testOffExact() {
 
 bool testReset() {
   const Signal in = program(1);
-  const cv::DoublerParams p = knobs(0.7f, 0.5f);
+  const cv::GangParams p = knobs(0.7f, 0.5f);
   const Signal a = run(in, p);
   const Signal b = run(in, p);
   size_t differ = 0;
@@ -403,7 +403,7 @@ bool testLeadLeaves() {
   run(in, knobs(0.8f, 0.5f), &four);
   Probe one;
   run(in, knobs(0.2f, 0.5f), &one);
-  const cv::DoublerTuning t;
+  const cv::GangTuning t;
   const double g2 = std::pow(10.0, t.voiceDb / 10.0);
   const double wantFour = std::sqrt(1.0 - 4.0 * g2);
   const double wantOne = std::sqrt(1.0 - g2);
@@ -427,8 +427,8 @@ bool testVoiceCount() {
   }
 
   // At 20 % the live voice is voice 0: voices 1..3 can change without moving a sample.
-  cv::DoublerParams a = knobs(0.2f, 0.5f);
-  cv::DoublerParams b = a;
+  cv::GangParams a = knobs(0.2f, 0.5f);
+  cv::GangParams b = a;
   for (size_t v = 1; v < 4; ++v) {
     b.tuning.detuneCents[v] = 400.0f;
     b.tuning.formantSt[v] = 5.0f;
@@ -450,9 +450,9 @@ bool testVoiceCount() {
 
 bool testDistanceTiming() {
   const Signal in = irregular(220.0, 2 * kRate);
-  cv::DoublerParams near = isolated(0.0f);
+  cv::GangParams near = isolated(0.0f);
   near.distance = 0.0f;
-  cv::DoublerParams far = near;
+  cv::GangParams far = near;
   far.distance = 1.0f;
   const int lagNear = peakLag(in, run(in, near), kRate, kRate + kRate / 2, 4000);
   const int lagFar = peakLag(in, run(in, far), kRate, kRate + kRate / 2, 4000);
@@ -464,7 +464,7 @@ bool testDistanceTiming() {
                 "peak at d=0 %.2f ms (%.1f), at d=1 %.2f ms (%.1f), +-0.5", msNear, wantNear, msFar, wantFar);
 }
 
-// The tracker finds a period with Autotune off because the Doubler's flag keeps it running, and
+// The tracker finds a period with Autotune off because the Gang card's flag keeps it running, and
 // stays at 0 without the flag.
 bool testTrackerRuns() {
   const Signal in = tone(220.0, kRate);
@@ -473,7 +473,7 @@ bool testTrackerRuns() {
     cv::PitchFxParams pp;
     pp.octave.on = false;
     pp.autotune.on = false;
-    pp.doublerOn = flag == 1;
+    pp.gangOn = flag == 1;
     gFx.reset();
     float scratch[cv::kBlock];
     for (int i = 0, b = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock, ++b) {
@@ -487,7 +487,7 @@ bool testTrackerRuns() {
                 firstBlock[0]);
 }
 
-// Autotune on, then off, with the Doubler on throughout. The voice reads Autotune's correction
+// Autotune on, then off, with the Gang card on throughout. The voice reads Autotune's correction
 // while it is on and drops it once Autotune is off, so its f0 goes back to the sung pitch within
 // 200 ms of the switch. The tone sits 46 cents sharp of A3 in key C, so the correction is not 0.
 bool testCorrectionReleases() {
@@ -520,20 +520,20 @@ bool testCorrectionReleases() {
 }
 
 // Host timing, printed and not asserted. Unison is 46.9k cycles per block on the board, so the
-// ratio gives the first board estimate for the Doubler. PitchFx runs outside the timed calls.
-double secondsOfBlocks(const Signal& in, bool doubler) {
+// ratio gives the first board estimate for the Gang card. PitchFx runs outside the timed calls.
+double secondsOfBlocks(const Signal& in, bool useGang) {
   using Clock = std::chrono::steady_clock;
   cv::PitchFx* fx = new cv::PitchFx();
-  cv::Doubler* dbl = new cv::Doubler();
+  cv::Gang* gang = new cv::Gang();
   cv::Unison* uni = new cv::Unison();
   cv::PitchFxParams pp;
   pp.octave.on = false;
-  pp.doublerOn = true;
-  const cv::DoublerParams dp = knobs(0.8f, 0.5f);
+  pp.gangOn = true;
+  const cv::GangParams dp = knobs(0.8f, 0.5f);
   cv::UnisonParams up;
   up.on = true;
   up.depth = 0.5f;
-  dbl->reset();
+  gang->reset();
   uni->reset();
   Signal out(in.size());
   float scratch[cv::kBlock];
@@ -542,15 +542,15 @@ double secondsOfBlocks(const Signal& in, bool doubler) {
   for (int i = 0; i + cv::kBlock <= len; i += cv::kBlock) {
     fx->process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, pp);
     const Clock::time_point t0 = Clock::now();
-    if (doubler) {
-      dbl->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, dp, *fx);
+    if (useGang) {
+      gang->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, dp, *fx);
     } else {
       uni->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, up);
     }
     total += std::chrono::duration<double>(Clock::now() - t0).count();
   }
   delete uni;
-  delete dbl;
+  delete gang;
   delete fx;
   return total;
 }
@@ -562,9 +562,9 @@ void printTiming() {
   const double d = std::min(secondsOfBlocks(in, true), secondsOfBlocks(in, true));
   const double u = std::min(secondsOfBlocks(in, false), secondsOfBlocks(in, false));
   const double blocks = 10.0 * kRate / cv::kBlock;
-  std::printf("info timing 10 s: Doubler VOICES 80 %% %.1f ms (%.2f us per block), Unison DEPTH 50 %% %.1f ms (%.2f us per block)\n",
+  std::printf("info timing 10 s: Gang VOICES 80 %% %.1f ms (%.2f us per block), Unison DEPTH 50 %% %.1f ms (%.2f us per block)\n",
               1000.0 * d, 1e6 * d / blocks, 1000.0 * u, 1e6 * u / blocks);
-  std::printf("info timing ratio Doubler / Unison = %.2f  (board estimate %.0fk cycles per block at Unison 46.9k)\n",
+  std::printf("info timing ratio Gang / Unison = %.2f  (board estimate %.0fk cycles per block at Unison 46.9k)\n",
               d / u, 46.9 * d / u);
 }
 
@@ -584,6 +584,6 @@ int main() {
   ok &= testTrackerRuns();
   ok &= testCorrectionReleases();
   printTiming();
-  std::printf("%s doubler\n", ok ? "PASS" : "FAIL");
+  std::printf("%s gang\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }
