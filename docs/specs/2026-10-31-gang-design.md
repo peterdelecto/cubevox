@@ -61,9 +61,9 @@ percent knob with no decimals, so the readout sweep test holds as it is.
    so each voice goes from −9 dB to −6 dB there. Total power is unity at every k, so the level
    rule holds by construction; trimDb in tuning takes up the residue level_test measures on the
    180 Hz program.
-4. Fade order, nearest person first, by voice index: 0 (pitch −1.75 st, throat −1.75 st),
-   1 (−3 st, −1 st), 2 (+3 st, −1 st), 3 (−1 st, +1 st). One voice is a second singer, two a
-   pair, four the gang.
+4. Fade order, nearest person first, by voice index (pitch, throat, lag at DISTANCE 0): 0 (−1.75 st,
+   −1.75 st, 40 ms), 1 (−3 st, −1 st, 70 ms), 2 (+3 st, −1 st, 100 ms), 3 (+1 st, −1.5 st, 75 ms).
+   One voice is a second singer, two a pair, four the gang.
 5. Gains are computed per block and ramped per sample across the block, as Octave and the reverb
    MIX do. A voice whose ramped gain sits at 0 is reset and does not tick, so one voice costs a
    quarter of four.
@@ -72,8 +72,8 @@ percent knob with no decimals, so the readout sweep test holds as it is.
 
 DISTANCE is time only. Copy v's lag target is delayMs[v] × (1 + d), capped at `maxLagMs` (200 ms)
 and floored at the voice's own minimum (1.5 periods plus 4 samples). No other term reads
-DISTANCE. At the defaults the four copies lag 90, 60, 100 and 50 ms at d = 0 and 180, 120, 200
-(capped) and 100 ms at d = 1.
+DISTANCE. At the defaults the four copies lag 40, 70, 100 and 75 ms at d = 0 and 80, 140, 200
+(capped) and 150 ms at d = 1.
 
 A copy changes its lag only in a quiet gap. Each block it measures the mean square of the ring at
 its read point (the block's samples `lag` behind the head). While a new target is pending (a DISTANCE
@@ -104,10 +104,10 @@ Filter coefficients update per block only, since the setters call libm.
 ```
 namespace cv {
 struct GangTuning {
-  std::array<float, 4> pitchSt     = {-1.75f, -3.0f, 3.0f, -1.0f};   // pitch ratio 2^(st / 12) against the lead
-  std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, 1.0f};   // grain playback rate 2^(st / 12)
+  std::array<float, 4> pitchSt     = {-1.75f, -3.0f, 3.0f, 1.0f};    // pitch ratio 2^(st / 12) against the lead
+  std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, -1.5f}; // grain playback rate 2^(st / 12)
   std::array<float, 4> tiltDb      = {-3.0f, 3.0f, -4.0f, 5.0f};     // high shelf gain above tiltHz
-  std::array<float, 4> delayMs     = {90.0f, 60.0f, 100.0f, 50.0f};  // lag behind the lead at DISTANCE 0
+  std::array<float, 4> delayMs     = {40.0f, 70.0f, 100.0f, 75.0f};  // lag behind the lead at DISTANCE 0
   float tiltHz       = 2500.0f;
   float voiceDb      = -9.0f;     // one voice against the lead at unity
   float trimDb       = 2.1f;      // level rule residue
@@ -230,22 +230,23 @@ wet sum before it meets the lead, per the output-safety spec.
    3. pitch moves by pitchSt: one voice alone (VOICES 0.2): output f0 within 10 cents
       of 220 × 2^(pitchSt / 12) on a 220 Hz tone, for voice 0 and voice 1 (Goertzel helpers
       copied from octave_test.cpp).
-   4. formant moves: centroid over harmonics 1..10 at voice 3's formant (+1 st) at least 1.03 ×
-      the formant-0 centroid, and at voice 0's (−1.75 st) at most 0.94 ×.
+   4. formant moves: centroid over harmonics 1..10 at +1 st (no default copy has a shorter throat;
+      the probe holds the lag at 90 ms) at least 1.03 × the formant-0 centroid, and at voice 0's
+      (−1.75 st) at most 0.94 ×.
    5. level law: total RMS at VOICES 0.2, 0.4, 0.6, 0.8 and 1.0 within −1.5..+1.0 dB of the input
       on the 180 Hz program.
    6. the lead leaves: at VOICES 1.0 a probe accessor reports lead gain 0 after the ramp.
    7. voice count: at VOICES 0.2 only voice 0 ticks and at 0.8 all four (probe accessor).
    8. the lag follows DISTANCE across a gap: on 220 Hz bursts of an irregular envelope with 120 ms
       of silence between them, one copy alone (formant 0, pitchSt 0) has its cross-correlation peak
-      at delayMs (50 ms for copy 4, 100 ms for copy 3) at DISTANCE 0 and at delayMs × 2, capped at
+      at delayMs (75 ms for copy 4, 100 ms for copy 3) at DISTANCE 0 and at delayMs × 2, capped at
       200 ms, after DISTANCE goes to 1. The move comes mid-burst, the lag stays unchanged to the
       end of that burst, and the next burst sounds at the new lag (±0.5 ms).
    9. tracker runs without Autotune: PitchFxParams with autotune.on false and gangOn true gives
       period > 0 on the tone within 60 ms.
-   10. voices differ: voice 0 alone and voice 3 alone on the 220 Hz tone differ in spectral
-      centroid (harmonics 1..20 of each voice's own f0) by at least 10 %.
-   11. scatter: scatterMs 15 on copy 4 over ten bursts, each burst's lag within ±15 ms of 50 ms
+   10. voices differ: voice 0 alone and voice 2 alone on the 220 Hz tone differ in spectral
+      centroid (harmonics 1..20 of each voice's own f0) by at least 5 % (7.3 % at the defaults).
+   11. scatter: scatterMs 15 on copy 4 over ten bursts, each burst's lag within ±15 ms of 75 ms
       and varying from burst to burst; f0 inside each burst within 10 cents of the copy's offset.
    12. drift: driftCents 20 on a 6 s tone, the copy's f0 in 0.5 s windows within ±20 cents of its
       offset (3 cents of measurement slack) and not the same in every window. driftCents 0 leaves
@@ -295,14 +296,16 @@ a 200 ms lag plus the longest grain fits. It sits in PitchFx, which is in DTCM, 
 
 Retune 1 (owner 2026-10-31): the copies sounded too similar to the input; each copy now has a pitch offset of a few semitones, a formant offset and its own tone shelf.
 
+Defaults 3 (owner 2026-10-31): copy 4 to formant -1.5 and pitch +1; lags 40, 70, 100, 75 ms.
+
 1. The one highpass runs on the gang sum after the per-voice gains, not one per voice. The four
    voices share one setting, so the sound is the same and three biquad runs go.
-2. `trimDb` defaults to +2.1 dB; the level_test row at VOICES 0.5 and DISTANCE 0.5 reads +0.38 dB,
-   and the level law reads +0.20 to +0.63 dB across VOICES 20 % to 100 % at DISTANCE 0.5.
+2. `trimDb` defaults to +2.1 dB; the level_test row at VOICES 0.5 and DISTANCE 0.5 reads +0.35 dB,
+   and the level law reads +0.19 to +0.86 dB across VOICES 20 % to 100 % at DISTANCE 0.5.
 3. `PitchFx::correctionSemis()` follows Autotune's fade down and reads 0 once it has settled off, so
    the voices return to the sung pitch within 200 ms of the switch; before, it held the last value.
-4. The read delay is the output lag; the correlation peaks sit at the lag the copy holds, 49.98 ms
-   and 99.98 ms for copy 4 and 99.98 ms and 199.98 ms for copy 3.
+4. The read delay is the output lag; the correlation peaks sit at the lag the copy holds, 74.98 ms
+   and 149.98 ms for copy 4 and 99.98 ms and 199.98 ms for copy 3.
 5. Host cost at -O2, same machine and run: Gang at VOICES 0.8 reads 3.3 us per block against Unison's
    0.91 us, a ratio of 3.64 (3.85 for the build with the room). Scaled by Unison's 46.9k board
    cycles, four voices land near 171k cycles. The cost row stays the 19 / 21 estimate until a board
@@ -331,10 +334,10 @@ vocal delivery so harmony is not in the question and pitch tracking is not impor
    mid-word. The gap test reads the ring at the lag the copy plays and at the lag it moves to, not
    only the first, because a lag increase replays the span between the two read points and a
    decrease skips it. A move needs a pause longer than the move itself, which the tests show for
-   moves of 50 and 100 ms across a 120 ms gap.
+   moves of 75 and 100 ms across a 120 ms gap.
 4. New tuning: `scatterMs` and `driftCents`, both 0 by default. With scatterMs 15 on copy 4 the ten
-   burst lags read 35.5, 51.4, 35.1, 52.0, 64.5, 39.4, 64.4, 42.6, 63.9 and 64.7 ms against a
-   50 ms target. With driftCents 20 the copy's f0 over ten 0.5 s windows reads −13.3 to +9.7 cents
+   burst lags read 60.5, 76.4, 60.1, 77.0, 89.5, 64.4, 89.4, 67.6, 88.9 and 89.7 ms against a
+   75 ms target. With driftCents 20 the copy's f0 over ten 0.5 s windows reads −13.3 to +9.7 cents
    from its offset.
 5. New defaults: formantSt {−1.75, −1, −1, +1}, pitchSt {−1.75, −3, +3, −1}, delayMs {90, 60, 100,
    50}, tiltDb unchanged, voiceDb −9, trimDb +2.1. The Gang card's cost row in costs.h is not
