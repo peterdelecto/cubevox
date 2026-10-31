@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdint>
 
-#include "engine/chasm.h"
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
@@ -12,36 +11,36 @@
 #include "engine/psola.h"
 #include "engine/smooth.h"
 
-// The Gang card adds up to four copies of the voice, each a different person standing a step back
-// from the mic. Each copy sits a few semitones off the lead, has its own throat (a grain playback
-// rate) and its own tone shelf, wobbles slowly in pitch, and lags the lead by its own delay. The
-// gang as a whole has less bass and top than the lead. One small room sits on the gang. The copies
-// never read a key. They read the pitch period and Autotune's correction from PitchFx and cut
-// their grains from its input ring.
+// The Gang card adds up to four copies of the voice, each a different person saying the same line
+// a little after Adam. Each copy sits a few semitones off the lead, has its own throat (a grain
+// playback rate) and its own tone shelf, and lags the lead by its own delay. The gang as a whole
+// has a fixed low cut. The copies never read a key. They read the pitch period and Autotune's
+// correction from PitchFx and cut their grains from its input ring.
 //
 // VOICES fades the copies in one at a time, then fades the lead out, so the top of the knob is the
-// gang alone. Total power is unity at every position. DISTANCE moves the copies' delay, bass cut,
-// top cut and room send together.
+// gang alone. Total power is unity at every position. DISTANCE stretches each copy's lag and
+// nothing else. A copy changes its lag only in a quiet gap, so it never bends in pitch mid-word.
+// Scatter gives each copy a fresh timing offset at every gap, and drift walks each copy's pitch
+// slowly around its offset.
 
 namespace cv {
 
 struct GangTuning {
-  std::array<float, 4> pitchSt = {-2.85f, 2.15f, -4.75f, 4.25f};  // pitch ratio 2^(st / 12) against the lead
-  std::array<float, 4> formantSt = {-2.0f, 1.5f, -3.5f, 3.0f};     // grain playback rate 2^(st / 12)
+  std::array<float, 4> pitchSt = {-1.75f, -3.0f, 3.0f, -1.0f};     // pitch ratio 2^(st / 12) against the lead
+  std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, 1.0f};   // grain playback rate 2^(st / 12)
   std::array<float, 4> tiltDb = {-3.0f, 3.0f, -4.0f, 5.0f};        // high shelf gain above tiltHz
-  std::array<float, 4> delayMs = {30.0f, 40.0f, 50.0f, 54.0f};     // behind the lead, before the DISTANCE scale
-  std::array<float, 4> lfoHz = {0.23f, 0.31f, 0.41f, 0.53f};
+  std::array<float, 4> delayMs = {90.0f, 60.0f, 100.0f, 50.0f};    // lag behind the lead at DISTANCE 0
   float tiltHz = 2500.0f;
-  float lfoCents = 12.0f;      // peak wobble on each voice's pitch
   float voiceDb = -9.0f;       // one voice against the lead at unity
-  float trimDb = 3.1f;         // level rule residue
+  float trimDb = 2.1f;         // level rule residue
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
-  float hpNearHz = 120.0f, hpFarHz = 250.0f;
-  float shelfHz = 6000.0f, shelfNearDb = -1.0f, shelfFarDb = -5.0f;
-  float roomNearDb = -14.0f, roomFarDb = -3.0f;
-  float roomLpHz = 4000.0f;    // tail darkness
-  float roomFeedback = 0.6f;   // 35 ms loop, about 0.45 s to -60 dB
+  float hpHz = 120.0f;         // low cut on the gang sum
+  float maxLagMs = 200.0f;     // ceiling on a copy's lag at any DISTANCE
+  float gapFloorDb = -50.0f;   // a copy's read point under this level counts as a gap
+  float scatterMs = 0.0f;      // peak random lag offset a copy takes at each gap
+  float driftCents = 0.0f;     // peak of each copy's slow random pitch walk
+  float driftHoldS = 2.0f;     // time between new drift targets
 };
 
 struct GangParams {
@@ -60,10 +59,6 @@ namespace gang_detail {
 
 constexpr size_t kVoices = 4;
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
-
-// DISTANCE scales every delayMs from kTimingNear at 0 to kTimingFar at 1.
-constexpr float kTimingNear = 0.8f;
-constexpr float kTimingFar = 1.3f;
 
 constexpr float kMinPeriod = 48.0f;
 constexpr float kMaxPeriod = 686.0f;
@@ -84,13 +79,21 @@ constexpr float kFloorPad = 4.0f;
 constexpr float kDelayCeil = kVoiceRingLen - 2.0f * kMaxPeriod - 8.0f;
 
 constexpr int kMaxMarkSteps = 128;
-constexpr float kLfoMaxHz = 20.0f;
-constexpr float kTurn = 4294967296.0f;
+constexpr int kQuietBlocks = 2;        // blocks under the gap floor before a copy changes its lag
+constexpr float kDriftSlewS = 1.0f;    // time constant of the drift toward its target
+constexpr float kMinDriftHoldS = 0.05f;
 
 // Samples in a whole number of milliseconds.
 constexpr int ms(int v) { return v * kSampleRate / 1000; }
 
 static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for a read delay");
+static_assert(ms(200) <= kDelayCeil, "a 200 ms lag and the longest grain do not fit the ring");
+
+// Clamps a lag to what the voice can play at this pitch period.
+inline float clampLag(float lag, float period) {
+  const float p = clampf(period, kMinPeriod, kMaxPeriod);
+  return clampf(lag, kFloorPeriods * p + kFloorPad, kDelayCeil);
+}
 
 // One PSOLA voice with a grain playback rate. Grains two periods long are cut on a grid one period
 // apart and laid down p / ratio apart. A grain plays its input at `rate` samples per output
@@ -110,6 +113,9 @@ class FormantPsolaVoice {
     countdown_ = 0.0f;
   }
 
+  // The next prepare() puts the marks at its lag. Grains in flight finish where they are.
+  void markReset() { fresh_ = true; }
+
   // Per block. period 0 silences the voice. delay is the wanted lag of the output behind the
   // input in samples. The marks sit one period closer than that, because a grain starts one
   // period before its mark.
@@ -127,7 +133,7 @@ class FormantPsolaVoice {
     dur_ = 2.0f * p_ / rate_;
     amp_ = 0.5f * rate_ / r;
     drift_ = (1.0f - rate_) * dur_;
-    ref_ = clampf(delay, kFloorPeriods * p_ + kFloorPad, kDelayCeil) - p_;
+    ref_ = clampLag(delay, p_) - p_;
     if (fresh_) {
       markDelay_ = ref_;
       countdown_ = 0.0f;
@@ -158,10 +164,13 @@ class FormantPsolaVoice {
 
  private:
   // The read position is a fixed-point ring index, so a step of rate samples is one integer add.
-  static constexpr int kFracBits = 18;
+  // The ring length shifted up must stay inside an int.
+  static constexpr int kFracBits = 16;
   static constexpr int kFracMask = (1 << kFracBits) - 1;
   static constexpr int kRingFix = kVoiceRingLen << kFracBits;
   static constexpr float kFracScale = 1.0f / static_cast<float>(1 << kFracBits);
+
+  static_assert(kVoiceRingLen < (1 << (31 - kFracBits)) - 4, "ring index overflows the fixed-point position");
 
   struct Grain {
     HannRotor window;
@@ -260,60 +269,129 @@ class FormantPsolaVoice {
   bool fresh_ = true;
 };
 
-// Six early reflections on one delay line, then a 35 ms feedback loop with a lowpass inside it.
-// The reflections feed the loop through two allpasses.
-class GangRoom {
+// A small random source that repeats from its seed. Each voice owns one per use.
+class XorShift {
  public:
-  void reset() {
-    early_.fill(0.0f);
-    pos_ = 0;
-    ap1_.clear();
-    ap2_.clear();
-    loop_.clear();
-    lp_.clear();
-  }
+  void seed(uint32_t s) { s_ = s != 0u ? s : 1u; }
 
-  // Per block, since the lowpass coefficient calls expf.
-  void setTail(float lpHz, float feedback) {
-    if (!lpSet_ || lpHz != lpHz_) {
-      lp_.set(lpHz);
-      lpHz_ = lpHz;
-      lpSet_ = true;
-    }
-    feedback_ = clampf(feedback, 0.0f, kMaxFeedback);
-  }
-
-  // One sample of the room alone, scaled so white noise comes out at its own power. The send then
-  // reads as the room's level against the gang.
-  float run(float x) {
-    early_[static_cast<size_t>(pos_)] = x;
-    float er = 0.0f;
-    for (size_t k = 0; k < kTapGain.size(); ++k) {
-      const int at = pos_ - kTapSamples[k];
-      er += kTapGain[k] * early_[static_cast<size_t>(at < 0 ? at + kEarlyLen : at)];
-    }
-    pos_ = pos_ + 1 == kEarlyLen ? 0 : pos_ + 1;
-    const float tail = lp_.lp(loop_.buf[static_cast<size_t>(loop_.pos)]);
-    loop_.write(ap2_.run(ap1_.run(er)) + feedback_ * tail);
-    return kNorm * (er + tail);
+  // Returns a uniform value in [-1, 1].
+  float next() {
+    s_ ^= s_ << 13;
+    s_ ^= s_ >> 17;
+    s_ ^= s_ << 5;
+    return static_cast<float>(static_cast<int32_t>(s_)) * (1.0f / 2147483648.0f);
   }
 
  private:
-  static constexpr std::array<int, 6> kTapSamples = {ms(11), ms(17), ms(23), ms(31), ms(37), ms(43)};
-  static constexpr std::array<float, 6> kTapGain = {0.9f, 0.75f, 0.6f, 0.5f, 0.4f, 0.3f};
-  static constexpr int kEarlyLen = ms(43) + ms(1);
-  static constexpr float kMaxFeedback = 0.9f;
-  static constexpr float kNorm = 0.58f;
+  uint32_t s_ = 1u;
+};
 
-  std::array<float, kEarlyLen> early_{};
-  chasm_detail::Allpass<ms(5)> ap1_;
-  chasm_detail::Allpass<ms(7)> ap2_;
-  chasm_detail::Delay<ms(35)> loop_;
-  OnePole lp_;
-  float lpHz_ = 0.0f;
-  float feedback_ = 0.0f;
-  int pos_ = 0;
-  bool lpSet_ = false;
+// A copy's slow pitch walk in cents. A new random target in [-peak, +peak] comes every hold, and the
+// value slews toward it. A peak of 0 holds the value at exactly 0.
+class PitchDrift {
+ public:
+  void reset() {
+    cents_ = 0.0f;
+    unit_ = 0.0f;
+    left_ = 0.0f;
+  }
+
+  // slew is the one-pole coefficient for a block of n samples.
+  float step(XorShift& rng, float peak, float holdS, float slew, int n) {
+    left_ -= static_cast<float>(n) * (1.0f / kSampleRate);
+    if (left_ <= 0.0f) {
+      unit_ = rng.next();
+      left_ += holdS > kMinDriftHoldS ? holdS : kMinDriftHoldS;
+    }
+    cents_ = smooth::step(cents_, peak > 0.0f ? unit_ * peak : 0.0f, slew);
+    return cents_;
+  }
+
+  float cents() const { return cents_; }
+
+ private:
+  float cents_ = 0.0f;
+  float unit_ = 0.0f;
+  float left_ = 0.0f;
+};
+
+// The block being prepared, as the gap rule sees it.
+struct BlockView {
+  const VoiceRing& ring;
+  int first;          // ring index of the block's first sample
+  int n;
+  float quietSq;      // a mean square under this counts as quiet
+
+  // True when the n samples that the ring holds `lag` behind the block are quiet.
+  bool quietAt(float lag) const {
+    int at = (first - static_cast<int>(lag + 0.5f)) % kVoiceRingLen;
+    if (at < 0) at += kVoiceRingLen;
+    float sum = 0.0f;
+    for (int i = 0; i < n; ++i) {
+      const float x = ring[static_cast<size_t>(at)];
+      sum += x * x;
+      at = at + 1 == kVoiceRingLen ? 0 : at + 1;
+    }
+    return sum < quietSq * static_cast<float>(n);
+  }
+};
+
+// One copy's lag. A new target (a DISTANCE or slider move, or the scatter draw of a fresh gap)
+// lands once the ring is quiet at both the lag the copy plays and the lag it moves to. The jump
+// then replays or skips only silence. While material sounds the copy keeps the lag it has.
+class CopyLag {
+ public:
+  void seed(uint32_t s) {
+    rng_.seed(s);
+    offset_ = rng_.next();
+  }
+
+  // Unsets the lag and keeps the random stream.
+  void restart() {
+    set_ = false;
+    landed_ = false;
+    quiet_ = 0;
+  }
+
+  float samples() const { return lag_; }
+
+  // Per block. base is the target in samples before scatter. True when the lag landed on a new
+  // value, so the voice restarts its marks there.
+  bool settle(const BlockView& b, float base, float scatterSmp, float period) {
+    const float want = clampLag(base + offset_ * scatterSmp, period);
+    if (!set_) return land(base, want);
+    const bool moved = base != base_;
+    if (!moved && scatterSmp <= 0.0f) {
+      quiet_ = 0;
+      landed_ = false;
+      return false;
+    }
+    const bool here = b.quietAt(clampLag(lag_, period));
+    if (!here) landed_ = false;
+    const bool pending = moved || !landed_;
+    const bool calm = here && (!pending || b.quietAt(want));
+    quiet_ = calm ? quiet_ + 1 : 0;
+    return quiet_ >= kQuietBlocks && pending && land(base, want);
+  }
+
+ private:
+  bool land(float base, float want) {
+    lag_ = want;
+    base_ = base;
+    set_ = true;
+    landed_ = true;
+    quiet_ = 0;
+    offset_ = rng_.next();
+    return true;
+  }
+
+  XorShift rng_;
+  float offset_ = 0.0f;  // the next scatter draw, -1..1
+  float lag_ = 0.0f;
+  float base_ = 0.0f;
+  int quiet_ = 0;
+  bool set_ = false;
+  bool landed_ = false;  // this gap has taken its landing
 };
 
 // The VOICES law at knob position k. weight[v] is the voice's fixed gain times its fade, lead the
@@ -366,8 +444,7 @@ inline VoicesLaw voicesLaw(float k, const GangTuning& t, uint8_t solo = 0) {
 
 class Gang {
  public:
-  // The constructor runs reset(), which keeps the object out of .data: the room's 17 KB of zeros
-  // would otherwise sit in flash beside the few non-zero defaults.
+  // The constructor runs reset(), so the non-zero defaults below land in .bss with the rest.
   Gang() { reset(); }
 
   void reset() {
@@ -375,8 +452,10 @@ class Gang {
     gain_.fill(0.0f);
     lead_ = 1.0f;
     wet_ = 0.0f;
-    send_ = 0.0f;
-    lfoPhase_ = {0u, 0x40000000u, 0x80000000u, 0xC0000000u};
+    for (size_t v = 0; v < kVoices; ++v) {
+      lag_[v].seed(0x2545F491u * static_cast<uint32_t>(v + 1));
+      driftRng_[v].seed(0x9E3779B9u * static_cast<uint32_t>(v + 1) ^ 0x85EBCA6Bu);
+    }
     idle_ = true;
   }
 
@@ -388,20 +467,21 @@ class Gang {
       return;
     }
     idle_ = false;
-    const float d = stepDistance(p.distance, n);
-    const Plan plan = makePlan(p, d);
-    prepareBlock(p, pitch, plan, d, n);
+    const Plan plan = makePlan(p);
     const int first = pitch.head() - n;
+    prepareBlock(p, pitch, plan, first, n);
     for (int c = 0; c < n; c += kBlock) {
       const int m = n - c < kBlock ? n - c : kBlock;
       renderChunk(in + c, out + c, m, first + c, plan, pitch.ring());
     }
   }
 
-  // Test hooks. leadGain is the lead's gain at the end of the last block. activeVoices counts
-  // the voices that ticked in it.
+  // Test hooks. leadGain is the lead's gain at the end of the last block. activeVoices counts the
+  // voices that ticked in it. lagSamples and driftCents read a copy's current lag and pitch drift.
   float leadGain() const { return lead_; }
   uint8_t activeVoices() const { return active_; }
+  float lagSamples(size_t v) const { return lag_[v].samples(); }
+  float driftCents(size_t v) const { return drift_[v].cents(); }
 
  private:
   using FormantPsolaVoice = gang_detail::FormantPsolaVoice;
@@ -411,25 +491,10 @@ class Gang {
   struct Plan {
     std::array<float, kVoices> voice{};  // fixed gain times fade, per voice
     float lead = 1.0f;
-    float wet = 0.0f;   // gang multiplier times the trim
-    float send = 0.0f;  // room send
+    float wet = 0.0f;  // gang multiplier times the trim
   };
 
-  // DISTANCE follows its knob through the 20 ms smoother, one step per sample of the block, so the
-  // filters, the delays and the room send glide to a new knob value. The first block after a
-  // reset lands on the knob.
-  float stepDistance(float knob, int n) {
-    const float target = smooth::clamp01(knob);
-    if (!distanceSet_) {
-      distance_ = target;
-      distanceSet_ = true;
-    }
-    for (int i = 0; i < n; ++i) distance_ = smooth::step(distance_, target, smooth::kSmoothCoef);
-    return distance_;
-  }
-
-  // d is the smoothed DISTANCE.
-  static Plan makePlan(const GangParams& p, float d) {
+  static Plan makePlan(const GangParams& p) {
     Plan plan;
     if (!p.on) return plan;
     const GangTuning& t = p.tuning;
@@ -437,7 +502,6 @@ class Gang {
     plan.voice = law.weight;
     plan.lead = law.lead;
     plan.wet = law.mul * dbToGainFast(t.trimDb);
-    plan.send = dbToGainFast(t.roomNearDb + (t.roomFarDb - t.roomNearDb) * d);
     return plan;
   }
 
@@ -460,37 +524,29 @@ class Gang {
   void clearDsp() {
     for (size_t v = 0; v < kVoices; ++v) retire(v);
     hp_.clear();
-    shelf_.clear();
-    room_.reset();
     dc_.clear();
     active_ = 0;
-    distanceSet_ = false;
     tiltSet_ = false;
   }
 
   void retire(size_t v) {
     voice_[v].reset();
     tilt_[v].clear();
+    lag_[v].restart();
+    drift_[v].reset();
     live_[v] = false;
   }
 
-  // All four voices share one filter setting and the filters are linear, so one highpass and one
-  // shelf on the gang sum equal one pair per voice. The setters run only when DISTANCE or the
+  // The low cut on the gang sum. The setter runs on the first block after a reset and when the
   // tuning moved.
-  void setFilters(const GangTuning& t, float d) {
-    const float hz = t.hpNearHz + (t.hpFarHz - t.hpNearHz) * d;
-    const float db = t.shelfNearDb + (t.shelfFarDb - t.shelfNearDb) * d;
-    if (filtersSet_ && hz == hpHz_ && db == shelfDb_ && t.shelfHz == shelfHz_) return;
-    hp_.setHighPass(hz, kButterworthQ);
-    shelf_.setHighShelf(t.shelfHz, db);
-    hpHz_ = hz;
-    shelfDb_ = db;
-    shelfHz_ = t.shelfHz;
-    filtersSet_ = true;
+  void setLowCut(const GangTuning& t) {
+    if (hpSet_ && t.hpHz == hpHz_) return;
+    hp_.setHighPass(t.hpHz, kButterworthQ);
+    hpHz_ = t.hpHz;
+    hpSet_ = true;
   }
 
-  // One high shelf per voice. The setters run on the first block after a reset and when the
-  // tuning moved.
+  // One high shelf per voice, set on the first block after a reset and when the tuning moved.
   void setTilts(const GangTuning& t) {
     for (size_t v = 0; v < kVoices; ++v) {
       if (tiltSet_ && t.tiltDb[v] == tiltDb_[v] && t.tiltHz == tiltHz_) continue;
@@ -501,38 +557,37 @@ class Gang {
     tiltSet_ = true;
   }
 
-  // Sine of voice v's wobble at the block start, then the phase moves on by n samples.
-  float stepLfo(size_t v, float hz, int n) {
-    const float s = sinTurns(lfoPhase_[v]);
-    const uint32_t inc = static_cast<uint32_t>(clampf(hz, 0.0f, gang_detail::kLfoMaxHz) / kSampleRate *
-                                                    gang_detail::kTurn + 0.5f);
-    lfoPhase_[v] += inc * static_cast<uint32_t>(n);
-    return s;
+  // Copy v's lag target in samples. DISTANCE stretches the delay and the ceiling caps it.
+  static float lagTarget(const GangTuning& t, size_t v, float distance) {
+    const float lagMs = t.delayMs[v] * (1.0f + distance);
+    return (lagMs < t.maxLagMs ? lagMs : t.maxLagMs) * gang_detail::kSmpPerMs;
   }
 
-  // Per block: filters, room, wobble, and each live voice's pitch ratio, playback rate and delay.
-  // A voice whose gain sits at 0 across the block is cleared and does not tick.
-  void prepareBlock(const GangParams& p, const PitchFx& pitch, const Plan& plan, float d, int n) {
+  // Per block: filters, then each live voice's lag, pitch ratio and playback rate. A voice whose
+  // gain sits at 0 across the block is cleared and does not tick. first is the ring index of the
+  // block's first sample.
+  void prepareBlock(const GangParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
     const GangTuning& t = p.tuning;
-    setFilters(t, d);
+    setLowCut(t);
     setTilts(t);
-    room_.setTail(t.roomLpHz, t.roomFeedback);
     const float period = pitch.pitch().period;
     const float corr = pitch.correctionSemis() * (1.0f / 12.0f);
-    const float timing =
-        (gang_detail::kTimingNear + (gang_detail::kTimingFar - gang_detail::kTimingNear) * d) *
-        gang_detail::kSmpPerMs;
+    const float d = smooth::clamp01(p.distance);
+    const float scatter = (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * gang_detail::kSmpPerMs;
+    const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * gang_detail::kDriftSlewS));
+    const gang_detail::BlockView view{pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)};
     active_ = 0;
     for (size_t v = 0; v < kVoices; ++v) {
-      const float wobble = t.lfoCents * stepLfo(v, t.lfoHz[v], n);
       if (gain_[v] <= 0.0f && plan.voice[v] <= 0.0f) {
         if (live_[v]) retire(v);
         continue;
       }
       live_[v] = true;
       ++active_;
-      voice_[v].prepare(period, exp2Fast(t.pitchSt[v] * (1.0f / 12.0f) + wobble * (1.0f / 1200.0f) + corr),
-                        exp2Fast(t.formantSt[v] * (1.0f / 12.0f)), t.delayMs[v] * timing);
+      if (lag_[v].settle(view, lagTarget(t, v, d), scatter, period)) voice_[v].markReset();
+      const float drift = drift_[v].step(driftRng_[v], t.driftCents, t.driftHoldS, slew, n);
+      voice_[v].prepare(period, exp2Fast(t.pitchSt[v] * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + corr),
+                        exp2Fast(t.formantSt[v] * (1.0f / 12.0f)), lag_[v].samples());
     }
   }
 
@@ -551,18 +606,16 @@ class Gang {
     tilt_[v] = tilt;
   }
 
-  // Highpass then shelf on the gang sum, in place. The filters run on local copies so their state
-  // stays in registers.
+  // The low cut on the gang sum, in place. The filter runs on a local copy so its state stays in
+  // registers.
   void filterGang(float* gang, int n) {
     Biquad hp = hp_;
-    Biquad shelf = shelf_;
-    for (int i = 0; i < n; ++i) gang[i] = shelf.run(hp.run(gang[i]));
+    for (int i = 0; i < n; ++i) gang[i] = hp.run(gang[i]);
     hp_ = hp;
-    shelf_ = shelf;
   }
 
-  // first is the ring index of the chunk's first sample. Lead, gang and send ramp linearly from
-  // the last chunk's values to the plan.
+  // first is the ring index of the chunk's first sample. Lead and gang ramp linearly from the last
+  // chunk's values to the plan.
   void renderChunk(const float* in, float* out, int n, int first, const Plan& plan, const VoiceRing& ring) {
     std::array<float, kBlock> gang{};
     for (size_t v = 0; v < kVoices; ++v) {
@@ -572,38 +625,31 @@ class Gang {
     const float inv = 1.0f / static_cast<float>(n);
     for (int i = 0; i < n; ++i) {
       const float f = static_cast<float>(i + 1) * inv;
-      const float send = send_ + (plan.send - send_) * f;
-      const float wet = dc_.run(gang[static_cast<size_t>(i)] + send * room_.run(gang[static_cast<size_t>(i)]));
+      const float wet = dc_.run(gang[static_cast<size_t>(i)]);
       out[i] = (lead_ + (plan.lead - lead_) * f) * in[i] + (wet_ + (plan.wet - wet_) * f) * wet;
     }
     for (size_t v = 0; v < kVoices; ++v) gain_[v] = plan.voice[v];
     lead_ = plan.lead;
     wet_ = plan.wet;
-    send_ = plan.send;
   }
 
   std::array<FormantPsolaVoice, kVoices> voice_{};
   Biquad hp_;
-  Biquad shelf_;
   std::array<Biquad, kVoices> tilt_{};
   std::array<float, kVoices> tiltDb_{};
   std::array<float, kVoices> gain_{};
   std::array<bool, kVoices> live_{};
-  std::array<uint32_t, kVoices> lfoPhase_ = {0u, 0x40000000u, 0x80000000u, 0xC0000000u};
-  gang_detail::GangRoom room_;
+  std::array<gang_detail::CopyLag, kVoices> lag_{};
+  std::array<gang_detail::PitchDrift, kVoices> drift_{};
+  std::array<gang_detail::XorShift, kVoices> driftRng_{};
   DcBlocker dc_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;
-  float send_ = 0.0f;
   float hpHz_ = 0.0f;
-  float shelfHz_ = 0.0f;
-  float shelfDb_ = 0.0f;
   float tiltHz_ = 0.0f;
-  float distance_ = 0.5f;  // DISTANCE after the smoother
   uint8_t active_ = 0;
-  bool filtersSet_ = false;
+  bool hpSet_ = false;
   bool tiltSet_ = false;
-  bool distanceSet_ = false;
   bool idle_ = true;
 };
 

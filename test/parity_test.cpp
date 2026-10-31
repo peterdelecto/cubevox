@@ -233,23 +233,18 @@ void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv:
     EXPECT(at + ".pitchSt", pos, a.pitchSt[v], b.pitchSt[v]);
     EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
     EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
-    EXPECT(at + ".lfoHz", pos, a.lfoHz[v], b.lfoHz[v]);
   }
   CMP(p, pos, a, b, tiltHz);
-  CMP(p, pos, a, b, lfoCents);
   CMP(p, pos, a, b, voiceDb);
   CMP(p, pos, a, b, trimDb);
   CMP(p, pos, a, b, leadFadeFrom);
   CMP(p, pos, a, b, holdFrom);
-  CMP(p, pos, a, b, hpNearHz);
-  CMP(p, pos, a, b, hpFarHz);
-  CMP(p, pos, a, b, shelfHz);
-  CMP(p, pos, a, b, shelfNearDb);
-  CMP(p, pos, a, b, shelfFarDb);
-  CMP(p, pos, a, b, roomNearDb);
-  CMP(p, pos, a, b, roomFarDb);
-  CMP(p, pos, a, b, roomLpHz);
-  CMP(p, pos, a, b, roomFeedback);
+  CMP(p, pos, a, b, hpHz);
+  CMP(p, pos, a, b, maxLagMs);
+  CMP(p, pos, a, b, gapFloorDb);
+  CMP(p, pos, a, b, scatterMs);
+  CMP(p, pos, a, b, driftCents);
+  CMP(p, pos, a, b, driftHoldS);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {

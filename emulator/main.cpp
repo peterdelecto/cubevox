@@ -437,14 +437,13 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const cv::GangTuning& dt = params.gang.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nGangTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
-                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, %.0ff, %.1ff, %.1ff, %.1ff, "
-                "%.2ff, %.2ff, %.0ff, %.0ff, %.0ff, %.1ff, %.1ff, %.1ff, %.1ff, %.0ff, %.2ff}",
+                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
+                "%.1ff, %.1ff, %.1ff}",
                 dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
                 dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
-                dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lfoHz[0], dt.lfoHz[1], dt.lfoHz[2],
-                dt.lfoHz[3], dt.tiltHz, dt.lfoCents, dt.voiceDb, dt.trimDb, dt.leadFadeFrom, dt.holdFrom,
-                dt.hpNearHz, dt.hpFarHz, dt.shelfHz, dt.shelfNearDb, dt.shelfFarDb, dt.roomNearDb, dt.roomFarDb,
-                dt.roomLpHz, dt.roomFeedback);
+                dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.tiltHz, dt.voiceDb, dt.trimDb,
+                dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
+                dt.driftHoldS);
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
@@ -482,9 +481,8 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
-      "// GangTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, {lfoHz[0..3]}, tiltHz, "
-      "lfoCents, voiceDb, trimDb, leadFadeFrom, holdFrom, hpNearHz, hpFarHz, shelfHz, shelfNearDb, shelfFarDb, roomNearDb, "
-      "roomFarDb, roomLpHz, roomFeedback\n%s\n",
+      "// GangTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, tiltHz, voiceDb, "
+      "trimDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS\n%s\n",
       gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
@@ -579,8 +577,8 @@ void voiceSliders(const char* name, std::array<float, 4>& v, float lo, float hi,
   }
 }
 
-// The Gang card's tuning is split into sub-nodes so no column ever needs a scroll bar: the four
-// voices' own settings first, then the shared ones.
+// The Gang card's tuning is split into sub-nodes so no column ever needs a scroll bar. These are
+// the four voices' own settings.
 void drawGangVoiceNodes(cv::GangTuning& t) {
   if (tuningNode("Formants")) {
     voiceSliders("Formant", t.formantSt, -4.0f, 4.0f, "%+.2f st");
@@ -590,18 +588,13 @@ void drawGangVoiceNodes(cv::GangTuning& t) {
     voiceSliders("Pitch", t.pitchSt, -12.0f, 12.0f, "%+.2f st");
     ImGui::TreePop();
   }
-  if (tuningNode("Wobble")) {
-    voiceSliders("Wobble rate", t.lfoHz, 0.0f, 1.0f, "%.2f Hz");
-    ImGui::SliderFloat("Wobble depth", &t.lfoCents, 0.0f, 30.0f, "%.1f cents");
+  if (tuningNode("Delay")) {
+    voiceSliders("Delay", t.delayMs, 5.0f, 200.0f, "%.0f ms");
     ImGui::TreePop();
   }
   if (tuningNode("Tone")) {
     voiceSliders("Tone", t.tiltDb, -12.0f, 12.0f, "%+.1f dB");
     ImGui::SliderFloat("Tone shelf at", &t.tiltHz, 500.0f, 8000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
-    ImGui::TreePop();
-  }
-  if (tuningNode("Timing")) {
-    voiceSliders("Delay", t.delayMs, 5.0f, 90.0f, "%.0f ms");
     ImGui::TreePop();
   }
 }
@@ -620,30 +613,13 @@ void drawGangSoloNode(uint8_t& solo) {
   ImGui::TreePop();
 }
 
-void drawGangSharedNodes(cv::GangTuning& t) {
-  const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;
-  if (tuningNode("Levels")) {
-    ImGui::SliderFloat("Voice level", &t.voiceDb, -24.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Trim", &t.trimDb, -12.0f, 12.0f, "%.1f dB");
-    ImGui::SliderFloat("Lead leaves from", &t.leadFadeFrom, 0.5f, 0.95f, "%.2f");
-    ImGui::SliderFloat("Fade share", &t.holdFrom, 0.1f, 1.0f, "%.2f");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Distance")) {
-    ImGui::SliderFloat("Low cut near", &t.hpNearHz, 40.0f, 400.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Low cut far", &t.hpFarHz, 40.0f, 400.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Top shelf at", &t.shelfHz, 2000.0f, 10000.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Top shelf near", &t.shelfNearDb, -12.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Top shelf far", &t.shelfFarDb, -12.0f, 0.0f, "%.1f dB");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Room")) {
-    ImGui::SliderFloat("Room send near", &t.roomNearDb, -36.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Room send far", &t.roomFarDb, -36.0f, 0.0f, "%.1f dB");
-    ImGui::SliderFloat("Tail darkness", &t.roomLpHz, 1000.0f, 12000.0f, "%.0f Hz", log);
-    ImGui::SliderFloat("Tail feedback", &t.roomFeedback, 0.0f, 0.9f, "%.2f");
-    ImGui::TreePop();
-  }
+// Scatter gives each copy a fresh timing offset at every gap in the material. Drift walks each
+// copy's pitch slowly around its offset. Both are off at 0.
+void drawGangScatterNode(cv::GangTuning& t) {
+  if (!tuningNode("Scatter")) return;
+  ImGui::SliderFloat("Timing scatter", &t.scatterMs, 0.0f, 30.0f, "%.1f ms");
+  ImGui::SliderFloat("Pitch drift", &t.driftCents, 0.0f, 50.0f, "%.1f cents");
+  ImGui::TreePop();
 }
 
 void drawUnisonRaw(cv::UnisonTuning& t) {
@@ -1185,9 +1161,9 @@ void drawAutotuneTuning(cv::AutotuneParams& a) {
 // The Gang card has no macros, so its tuning is the raw fields in both views.
 void drawGangTuning(cv::GangParams& d) {
   if (!tuningHeader("gang")) return;
-  drawGangSoloNode(d.solo);
   drawGangVoiceNodes(d.tuning);
-  drawGangSharedNodes(d.tuning);
+  drawGangScatterNode(d.tuning);
+  drawGangSoloNode(d.solo);
 }
 
 void drawUnisonTuning(cv::UnisonTuning& t) {
@@ -1831,12 +1807,10 @@ int runLayoutProbe() {
       {true, nullptr, nullptr},
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
-      {true, "gang", nullptr},        {true, "gang", "Solo"},
-      {true, "gang", "Formants"},     {true, "gang", "Pitch"},
-      {true, "gang", "Wobble"},
-      {true, "gang", "Tone"},        {true, "gang", "Timing"},
-      {true, "gang", "Levels"},      {true, "gang", "Distance"},
-      {true, "gang", "Room"},
+      {true, "gang", nullptr},        {true, "gang", "Formants"},
+      {true, "gang", "Pitch"},        {true, "gang", "Delay"},
+      {true, "gang", "Tone"},         {true, "gang", "Scatter"},
+      {true, "gang", "Solo"},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr},
       {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpring},
