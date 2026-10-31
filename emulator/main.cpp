@@ -438,17 +438,13 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nCrowdTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
                 "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
-                "%.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}, "
-                "{%.1ff, %.1ff, %.1ff, %.1ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, %s, %.2ff, "
-                "%s, %.1ff, %.0ff, %.2ff, %.2ff, %.2ff, %.1ff, %.2ff, %.2ff, %.2ff, %.2ff}",
+                "%.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}, %s, %.2ff}",
                 dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
                 dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
                 dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lagScale, dt.tiltHz, dt.voiceDb, dt.trimDb,
                 dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
                 dt.driftHoldS, dt.widthKnee, dt.widthKneeFrac, dt.widthLagBottom, dt.widthLagMs, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3],
-                dt.tilt[0], dt.tilt[1], dt.tilt[2], dt.tilt[3], dt.shimmer[0], dt.shimmer[1], dt.shimmer[2], dt.shimmer[3],
-                dt.epochAlign ? "true" : "false", dt.epochSearch, dt.voice5On ? "true" : "false", dt.voice5Db, dt.delayMs5,
-                dt.v5PitchSt, dt.v5FormantSt, dt.v5Contour, dt.v5TiltDb, dt.v5Breath, dt.v5Fry, dt.v5Jitter, dt.v5Shimmer);
+                dt.epochAlign ? "true" : "false", dt.epochSearch);
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
@@ -488,10 +484,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "dwellDrive, dwellComp, wetDb\n"
       "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, lagScale, tiltHz, voiceDb, "
       "trimDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
-      "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}, {tilt[0..3]}, "
-      "{shimmer[0..3]}, epochAlign, epochSearch, "
-      "voice5On, voice5Db, delayMs5, v5PitchSt, v5FormantSt, v5Contour, v5TiltDb, v5Breath, v5Fry, "
-      "v5Jitter, v5Shimmer\n%s\n",
+      "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}, epochAlign, epochSearch\n%s\n",
       gTuningText);
   std::fflush(stdout);
   ImGui::SetClipboardText(gTuningText);
@@ -521,16 +514,15 @@ constexpr int kColumnCount = 4;
 int gCurrentColumn = 0;
 std::array<const char*, kColumnCount> gOpenTuning{};
 
-// Collapsed Tuning header under one effect block. A block with a second header (the Crowd card's
-// Voice 5) passes its label, and the two share the column's accordion.
-bool tuningHeader(const char* block, const char* label = "Tuning") {
+// Collapsed Tuning header under one effect block.
+bool tuningHeader(const char* block) {
   const char*& openInColumn = gOpenTuning[static_cast<size_t>(gCurrentColumn)];
   if (gProbeOpen.active) {
     ImGui::SetNextItemOpen(probeMatch(gProbeOpen.block, block));
   } else if (openInColumn != nullptr && std::strcmp(openInColumn, block) != 0) {
     ImGui::SetNextItemOpen(false);
   }
-  const bool open = ImGui::CollapsingHeader(label);
+  const bool open = ImGui::CollapsingHeader("Tuning");
   if (!gProbeOpen.active) {
     if (open) openInColumn = block;
     else if (openInColumn != nullptr && std::strcmp(openInColumn, block) == 0) openInColumn = nullptr;
@@ -613,74 +605,31 @@ void drawCrowdVoiceNodes(cv::CrowdTuning& t) {
   if (tuningNode("Tone")) {
     voiceSliders("Tone", t.tiltDb, -12.0f, 12.0f, "%+.1f dB");
     ImGui::SliderFloat("Tone shelf at", &t.tiltHz, 500.0f, 8000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
-
-    // The four tilts share one row, since four more stacked sliders run the node 21 px past the column.
-    ImGui::SliderFloat4("Tilt 1-4 dB", t.tilt.data(), -cv::crowd_detail::kMaxTiltDb, cv::crowd_detail::kMaxTiltDb, "%+.1f");
     ImGui::TreePop();
   }
 }
 
 // One checkbox per copy, each setting its bit in solo. The boxes are independent, so two copies can
-// be heard together. Box 5 is the trial voice and counts only while its On box is ticked. The mask is
-// not saved with the state.
+// be heard together. The mask is not saved with the state.
 void drawCrowdSoloNode(uint8_t& solo) {
   if (!tuningNode("Solo")) return;
-  for (unsigned i = 0; i < 5; ++i) {
+  for (unsigned i = 0; i < 4; ++i) {
     char label[8];
     std::snprintf(label, sizeof(label), "%u", i + 1);
     bool on = ((solo >> i) & 1u) != 0;
     if (ImGui::Checkbox(label, &on)) solo = static_cast<uint8_t>(on ? solo | (1u << i) : solo & ~(1u << i));
-    if (i < 4) ImGui::SameLine();
+    if (i < 3) ImGui::SameLine();
   }
   ImGui::TreePop();
 }
 
-// The trial voice (voice 5) is one more copy that tries to sound like a person of another sex, age or
-// body size. Its controls sit under their own header, since the Tuning header's seven nodes already
-// fill the column when the tallest is open. The header holds the switch, level, lag and three presets,
-// then two nodes of four sliders. A preset sets every slider and leaves the switch, level and lag
-// alone.
-void drawCrowdVoice5Nodes(cv::CrowdTuning& t) {
-  namespace cd = cv::crowd_detail;
-  if (tuningNode("Pitch and throat")) {
-    ImGui::SliderFloat("Pitch", &t.v5PitchSt, -cd::kMaxV5PitchSt, cd::kMaxV5PitchSt, "%+.2f st");
-    ImGui::SliderFloat("Formant", &t.v5FormantSt, -cd::kMaxV5FormantSt, cd::kMaxV5FormantSt, "%+.2f st");
-    ImGui::SliderFloat("Contour", &t.v5Contour, cd::kMinContour, cd::kMaxContour, "%.2f x");
-    ImGui::SliderFloat("Tilt", &t.v5TiltDb, -cd::kMaxTiltDb, cd::kMaxTiltDb, "%+.1f dB");
-    ImGui::TreePop();
-  }
-  if (tuningNode("Breath and roughness")) {
-    ImGui::SliderFloat("Breath", &t.v5Breath, 0.0f, cd::kMaxV5Breath, "%.2f");
-    ImGui::SliderFloat("Fry", &t.v5Fry, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Jitter", &t.v5Jitter, 0.0f, cd::kMaxV5JitterPct, "%.2f %%");
-    ImGui::SliderFloat("Shimmer", &t.v5Shimmer, 0.0f, cd::kMaxShimmerDb, "%.2f dB");
-    ImGui::TreePop();
-  }
-}
-
-void drawCrowdVoice5(cv::CrowdTuning& t) {
-  namespace cd = cv::crowd_detail;
-  if (!tuningHeader("voice5", "Voice 5")) return;
-  ImGui::Checkbox("On", &t.voice5On);
-  ImGui::SliderFloat("Level", &t.voice5Db, cd::kMinV5Db, 0.0f, "%.1f dB");
-  ImGui::SliderFloat("Lag", &t.delayMs5, cd::kMinV5DelayMs, cd::kMaxV5DelayMs, "%.0f ms");
-  if (ImGui::Button("Woman")) t = cv::voice5Woman(t);
-  ImGui::SameLine();
-  if (ImGui::Button("Older man")) t = cv::voice5OlderMan(t);
-  ImGui::SameLine();
-  if (ImGui::Button("Big man")) t = cv::voice5BigMan(t);
-  drawCrowdVoice5Nodes(t);
-}
-
 // Scatter gives each copy a fresh timing offset and a fresh loudness at every gap in the material.
-// Drift walks each copy's pitch slowly around its offset. Shimmer gives each copy a random loudness on
-// every cycle. All four are off at 0.
+// Drift walks each copy's pitch slowly around its offset. All three are off at 0.
 void drawCrowdScatterNode(cv::CrowdTuning& t) {
   if (!tuningNode("Scatter")) return;
   ImGui::SliderFloat("Timing scatter", &t.scatterMs, 0.0f, 30.0f, "%.1f ms");
   ImGui::SliderFloat("Level scatter", &t.levelScatterDb, 0.0f, cv::crowd_detail::kMaxLevelScatterDb, "%.1f dB");
   ImGui::SliderFloat("Pitch drift", &t.driftCents, 0.0f, 50.0f, "%.1f cents");
-  voiceSliders("Shimmer", t.shimmer, 0.0f, cv::crowd_detail::kMaxShimmerDb, "%.2f dB");
   ImGui::TreePop();
 }
 
@@ -1429,7 +1378,6 @@ void drawCrowdBlock(cv::CrowdParams& d) {
   percentSlider("WIDTH", d.width);
   percentSlider("VOICES", d.voices);
   drawCrowdTuning(d);
-  drawCrowdVoice5(d.tuning);
   ImGui::PopID();
 }
 
@@ -1883,8 +1831,6 @@ int runLayoutProbe() {
       {true, "crowd", "Pitch"},        {true, "crowd", "Delay"},
       {true, "crowd", "Tone"},         {true, "crowd", "Scatter"},
       {true, "crowd", "Contour"},      {true, "crowd", "Solo"},
-      {true, "voice5", nullptr},       {true, "voice5", "Pitch and throat"},
-      {true, "voice5", "Breath and roughness"},
       {true, "unison", nullptr},     {true, "slapback", nullptr},
       {true, "distortion", nullptr},
       {true, "reverb", nullptr, false, kChasm},  {true, "reverb", nullptr, false, kSpring},
