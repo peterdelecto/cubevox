@@ -18,7 +18,8 @@
 void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs);
 
 // A settings or layout change. The store writes kSaveDebounceMs after the last call, and writes
-// nothing when flash already holds the same state.
+// nothing when flash already holds the same state. The crowdtest image saves the layout the record
+// held at boot in place of `layout`, so its test layout never reaches flash.
 void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t nowMs);
 
 // A pending save starts on the next poll instead of at the end of the debounce.

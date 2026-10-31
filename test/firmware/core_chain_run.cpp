@@ -817,16 +817,17 @@ void checkCrowdStage() {
         "stage: a Crowd card that is off makes the pitch call and passes the block untouched");
 
   // With the pitch stage already run this pass, the Crowd card runs alone and nothing feeds the tracker.
+  // With no period the card holds its lead at 1 and its copies at 0, so every block comes out as it went in.
   p.crowd.on = true;
   p.pitchFx.crowdOn = true;
   bool wrote = true;
-  bool changed = false;
+  bool unity = true;
   for (int b = 0; b < 20; ++b) {
     done = true;
     wrote = wrote && runStage(rig->engines, Card::Crowd, tone(b, 0.3f).data(), out.data(), kN, p, done);
-    changed = changed || out != tone(b, 0.3f);
+    unity = unity && out == tone(b, 0.3f);
   }
-  check(wrote && changed && rig->engines.pitch.pitch().period == 0.0f,
+  check(wrote && unity && rig->engines.pitch.pitch().period == 0.0f && rig->engines.crowd.leadGain() == 1.0f,
         "stage: a Crowd card after the pitch stage ran runs only its own engine");
 }
 

@@ -4,7 +4,9 @@
 // burst, timing scatter, pitch drift, the tracker running without Autotune, the two enhancements
 // (every control at its default is the pinned engine bit for bit, level scatter, contour and the
 // human-voice ranges), the bottom tenth of WIDTH staying in tune (pitch, drift and contour), the
-// shared tone shelf, and a host timing against Unison. Every run feeds a PitchFx through its
+// shared tone shelf, the correctness pass (the switch with the tracker, the gap rule over a noise
+// floor, WIDTH holding the level, notes outside the tracker's range, the read ceiling, the tuning
+// ranges), and a host timing against Unison. Every run feeds a PitchFx through its
 // pass-through path first, so the ring is written and the tracker runs, as the chain does. No
 // window, no audio device.
 
@@ -18,6 +20,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <new>
 #include <utility>
 #include <vector>
@@ -978,14 +981,15 @@ size_t differing(const Signal& a, const Signal& b) {
   return n;
 }
 
-// What the four runs of testEnhancementsDefaultExact hash to as of v2.00.75 (Mac build), pinned by
-// the Crowd CPU pass (owner 2026-10-31): the window read from a table, the DC blocker gone, one
-// shared tone shelf, the coarse tracker lag while Autotune is off and the 190.75 ms ring. Runs 1 to
-// 3 start from knobs(), which neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{}
+// What the four runs of testEnhancementsDefaultExact hash to (Mac build), pinned by the Crowd
+// correctness pass (owner 2026-10-31). Every run moved for three of its changes: the lead holds at 1
+// until the tracker has a period, a voice that starts from nothing lays a prefill grain, and the trim
+// follows WIDTH. Runs 3 and 4 also moved for the gap floor that follows the phrase level. Runs 1 to 3
+// start from knobs(), which neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{}
 // unchanged. The engine must reproduce them to the bit. Update them only when the sound of a copy
 // changes on purpose.
-constexpr std::array<uint64_t, 4> kPinned = {0x25bfb34508e55900ULL, 0x6b852818940380afULL, 0x07fd3a4d0fd45cc4ULL,
-                                             0x79a8da74a123efc8ULL};
+constexpr std::array<uint64_t, 4> kPinned = {0xd37de60a1c1eca07ULL, 0x041fbfde7aa323feULL, 0xc944b897c6179176ULL,
+                                             0xec216e2ea40ccb9eULL};
 
 // Each run's hash against its pinned value.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {
@@ -997,9 +1001,9 @@ bool checkPinned(const std::array<uint64_t, 4>& hashes) {
     char name[40];
     std::snprintf(name, sizeof name, "default hash, run %zu", i + 1);
     const bool same = hashes[i] == kPinned[i];
-    std::printf("info hash run %zu, %s: pinned v2.00.75 %016llx, engine %016llx\n", i + 1, what[i],
+    std::printf("info hash run %zu, %s: pinned %016llx, engine %016llx\n", i + 1, what[i],
                 static_cast<unsigned long long>(kPinned[i]), static_cast<unsigned long long>(hashes[i]));
-    ok &= report(name, same, "output hash equals the pinned v2.00.75 value: %.0f (1)", same ? 1.0 : 0.0);
+    ok &= report(name, same, "output hash equals the pinned value: %.0f (1)", same ? 1.0 : 0.0);
   }
   return ok;
 }
@@ -1450,6 +1454,7 @@ cv::CrowdParams delayedCopy(size_t v, float width) {
   p.tuning = cv::CrowdTuning{};
   p.tuning.tiltDb = {0.0f, 0.0f, 0.0f, 0.0f};
   p.tuning.trimDb = 0.0f;
+  p.tuning.trimBottomDb = 0.0f;
   p.solo = static_cast<uint8_t>(1u << v);
   return p;
 }
@@ -1562,6 +1567,310 @@ bool testEnhancementsStable() {
   return ok;
 }
 
+// The correctness pass (owner 2026-10-31).
+
+// Largest |x[k + 1] - x[k]| for k in [from, to - 1).
+double maxStep(const Signal& x, int from, int to) {
+  double m = 0.0;
+  for (int k = from; k + 1 < to; ++k)
+    m = std::max(m, static_cast<double>(std::fabs(x[static_cast<size_t>(k + 1)] - x[static_cast<size_t>(k)])));
+  return m;
+}
+
+// The lowest out/in level over five 6 ms windows from `at`, in dB.
+double lowestWindowDb(const Signal& in, const Signal& out, int at) {
+  const int w = msToSamples(6.0);
+  double low = 1e9;
+  for (int k = 0; k < 5; ++k) {
+    const size_t a = static_cast<size_t>(at + k * w);
+    low = std::min(low, 20.0 * std::log10(rms(out, a, a + static_cast<size_t>(w)) / rms(in, a, a + static_cast<size_t>(w))));
+  }
+  return low;
+}
+
+// The card switched with crowdOn, as the registry and the emulator switch them, on the shipped tuning at
+// WIDTH 1. The switch sits 50 ms after a phrase peak, so the 100 ms before it holds the peak's steps. Off:
+// the largest step in the ramp block stays under the largest in the 100 ms before, because the copies
+// keep the held period and ramp out. On: the same over the 10 ms the tracker takes to find a period and
+// the ramp, and every 6 ms window of the 30 ms after the switch stays within 6 dB of the input, because
+// the lead holds until the copies can play.
+bool testSwitchWithTracker() {
+  const Signal in = program(3);
+  const int sw = 975 * cv::kBlock;
+  bool ok = true;
+  for (float voices : {1.0f, 0.5f}) {
+    for (bool turnOn : {false, true}) {
+      cv::CrowdParams on;
+      on.on = true;
+      on.voices = voices;
+      cv::CrowdParams off = on;
+      off.on = false;
+      cv::PitchFxParams pOff = passThrough();
+      pOff.crowdOn = false;
+      const Signal out = turnOn ? runBoth(in, off, on, pOff, passThrough(), sw) : runBoth(in, on, off, passThrough(), pOff, sw);
+      const double before = maxStep(out, sw - kRate / 10, sw);
+      const double at = maxStep(out, sw - 1, sw + (turnOn ? msToSamples(10.0) : cv::kBlock + 1));
+      const double low = turnOn ? lowestWindowDb(in, out, sw) : 0.0;
+      char name[56];
+      std::snprintf(name, sizeof name, "switch %s with the tracker, VOICES %.0f %%", turnOn ? "on" : "off",
+                    static_cast<double>(voices) * 100.0);
+      ok &= report(name, at <= before && low >= -6.0,
+                   "largest step at the switch %.4f, in the 100 ms before %.4f; lowest 6 ms window %+.1f dB (>= -6)", at,
+                   before, low);
+    }
+  }
+  return ok;
+}
+
+// Lag landings per copy at VOICES 1 on the shipped tuning, WIDTH `from` before `switchAt` and `to` from
+// it. The first landing counts.
+struct Landings {
+  std::array<int, 4> total{};
+  std::array<int, 4> after{};
+  std::array<int, 4> firstAfter{-1, -1, -1, -1};  // samples from the switch to the first landing
+  std::array<float, 4> lag{};
+};
+
+Landings countLandings(const Signal& in, float from, float to, int switchAt) {
+  gFx.reset();
+  gCrowd.reset();
+  Landings l;
+  Signal out(cv::kBlock);
+  float scratch[cv::kBlock];
+  cv::CrowdParams p;
+  p.on = true;
+  p.voices = 1.0f;
+  for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
+    p.width = i < switchAt ? from : to;
+    gInProcess = true;
+    gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, passThrough());
+    gCrowd.process(&in[static_cast<size_t>(i)], out.data(), cv::kBlock, p, gFx);
+    gInProcess = false;
+    for (size_t v = 0; v < 4; ++v) {
+      if (gCrowd.lagSamples(v) == l.lag[v]) continue;
+      l.lag[v] = gCrowd.lagSamples(v);
+      ++l.total[v];
+      if (i < switchAt) continue;
+      ++l.after[v];
+      if (l.firstAfter[v] < 0) l.firstAfter[v] = i - switchAt;
+    }
+  }
+  return l;
+}
+
+// The gap rule over a noise floor. On the program, whose gaps sit on its -40 dBFS floor, WIDTH goes from
+// 1 to 0 half way: every copy lands within 3 s of the move, copy 2 ends within its 12 ms of scatter of
+// its 60 ms WIDTH 0 lag, and no copy lands more than 3 times a second, since the program has 2 gaps a
+// second. On bursts with silent gaps every copy still lands in each of the last 9 gaps, and copy 2
+// ends as near its WIDTH 0 lag.
+bool testGapOverFloor() {
+  bool ok = true;
+  for (int which = 0; which < 2; ++which) {
+    const Signal in = which == 0 ? program(10) : bursts(180.0, Train{100, 400, 150, 18});
+    const int half = static_cast<int>(in.size()) / 2 / cv::kBlock * cv::kBlock;
+    const Landings l = countLandings(in, 1.0f, 0.0f, half);
+    int slowest = 0, most = 0, fewestAfter = 1 << 30;
+    for (size_t v = 0; v < 4; ++v) {
+      slowest = l.firstAfter[v] < 0 ? 1 << 30 : std::max(slowest, l.firstAfter[v]);
+      most = std::max(most, l.total[v]);
+      fewestAfter = std::min(fewestAfter, l.after[v]);
+    }
+    const double endMs = static_cast<double>(l.lag[1]) / cv::crowd_detail::kSmpPerMs;
+    const bool lands = which == 0 ? slowest <= 3 * kRate && most <= 30 : fewestAfter >= 9;
+    ok &= report(which == 0 ? "gap over a -40 dBFS floor" : "gap over silence", lands && std::fabs(endMs - 60.0) <= 12.5,
+                 "first landing after the move within %.0f ms, landings per copy at most %.0f, after the move at least %.0f; "
+                 "copy 2 ends at %.1f ms (60 +- 12.5)",
+                 1000.0 * slowest / kRate, static_cast<double>(most), static_cast<double>(fewestAfter), endMs);
+  }
+  return ok;
+}
+
+// WIDTH holds the level. At VOICES 0.5 on the shipped tuning every WIDTH position stays within 0.5 dB of
+// WIDTH 1 on 30 s of the program. The bottom of WIDTH holds exact doubles of the lead, a comb whose level
+// on a steady tone hangs on each lag times f0, and the gaps redraw the lags twice a second, so the comb
+// averages out over the 60 gaps of the run.
+bool testWidthHoldsLevel() {
+  const Signal in = program(30);
+  cv::CrowdParams p;
+  p.on = true;
+  p.voices = 0.5f;
+  p.width = 1.0f;
+  const double top = levelDb(in, run(in, p));
+  double worst = 0.0;
+  std::printf("info level VOICES 50 %% against WIDTH 100 %% (%+.2f dB), dB:", top);
+  for (float w : {0.0f, 0.02f, 0.05f, 0.1f, 0.2f, 0.3f, 0.5f, 0.7f}) {
+    p.width = w;
+    const double d = levelDb(in, run(in, p)) - top;
+    std::printf(" WIDTH %.0f %% %+.2f", static_cast<double>(w) * 100.0, d);
+    worst = std::max(worst, std::fabs(d));
+  }
+  std::printf("\n");
+  return report("width holds the level", worst <= 0.5, "every WIDTH within %.2f dB of WIDTH 100 %% (<= 0.5)", worst);
+}
+
+// Normalised autocorrelation of x over [from, to) at lag.
+double acorrAt(const Signal& x, size_t from, size_t to, int lag) {
+  double s = 0.0, e0 = 0.0, e1 = 0.0;
+  for (size_t i = from; i + static_cast<size_t>(lag) < to; ++i) {
+    const double a = x[i];
+    const double b = x[i + static_cast<size_t>(lag)];
+    s += a * b;
+    e0 += a * a;
+    e1 += b * b;
+  }
+  return s / std::sqrt(e0 * e1 + 1e-30);
+}
+
+// Copy 2 alone at WIDTH 1 with the lead at 0 on `in`. share takes the move share after every block.
+Signal runCopy2(const Signal& in, std::vector<float>& share) {
+  cv::CrowdParams p = knobs(1.0f, 1.0f);
+  p.tuning.voiceDb = 0.0f;
+  p.solo = 1u << 1;
+  gFx.reset();
+  gCrowd.reset();
+  Signal out(in.size());
+  float scratch[cv::kBlock];
+  for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
+    gInProcess = true;
+    gFx.process(&in[i], scratch, cv::kBlock, passThrough());
+    gCrowd.process(&in[i], &out[i], cv::kBlock, p, gFx);
+    gInProcess = false;
+    share.push_back(gCrowd.moveShare());
+  }
+  return out;
+}
+
+// 1 s at 400 Hz, 1 s of the note, 0.5 s at 400 Hz.
+Signal noteBetween(double hz) {
+  Signal x = tone(400.0, kRate);
+  const Signal note = tone(hz, kRate);
+  const Signal back = tone(400.0, kRate / 2);
+  x.insert(x.end(), note.begin(), note.end());
+  x.insert(x.end(), back.begin(), back.end());
+  return x;
+}
+
+// True when share passes strictly between 0 and 1 in blocks [from, to): a glide, not a jump.
+bool glides(const std::vector<float>& share, size_t from, size_t to) {
+  for (size_t b = from; b < to && b < share.size(); ++b) {
+    if (share[b] > 0.0f && share[b] < 1.0f) return true;
+  }
+  return false;
+}
+
+// Notes outside the tracker's 70 Hz to 1 kHz. At 1300 Hz the tracker reads an octave down and at 60 Hz
+// it reads unvoiced, and either way copy 2 goes plain: over the note's last 0.5 s it correlates above
+// 0.95 with itself at the note's period, and its move share glides to 0 on the way in and back to 1
+// on the way out. A 220 Hz voice keeps the share at exactly 1 and correlates above 0.95 at its shifted
+// period.
+bool testOutOfRange() {
+  bool ok = true;
+  const size_t noteFrom = kRate / cv::kBlock;
+  const size_t backFrom = 2 * kRate / cv::kBlock;
+  for (double hz : {1300.0, 60.0, 220.0}) {
+    std::vector<float> share;
+    share.reserve(3 * kRate / cv::kBlock);
+    const Signal out = runCopy2(noteBetween(hz), share);
+    const bool inRange = hz == 220.0;
+    const double shifted = inRange ? std::pow(2.0, 2.75 * kPitchTop / 12.0) : 1.0;
+    const int period = static_cast<int>(kRate / (hz * shifted) + 0.5);
+    const double c = acorrAt(out, 3 * kRate / 2, 2 * kRate, period);
+    const float lowest = *std::min_element(share.begin(), share.end());
+    const bool path = inRange ? lowest == 1.0f
+                              : share[backFrom - 1] == 0.0f && share.back() == 1.0f &&
+                                    glides(share, noteFrom, backFrom) && glides(share, backFrom, share.size());
+    char name[48];
+    std::snprintf(name, sizeof name, "note at %.0f Hz", hz);
+    ok &= report(name, c > 0.95 && path,
+                 "copy 2 correlates %.3f at %.0f samples (> 0.95); move share lowest %.3f, its path as expected %.0f (1)", c,
+                 static_cast<double>(period), static_cast<double>(lowest), path ? 1.0 : 0.0);
+  }
+  return ok;
+}
+
+// One voice on its own ring through calls of the given sizes, as the Crowd card drives it: each call
+// writes its samples, then the voice renders them in kBlock chunks. While it renders, the call's own
+// samples hold NaN. They overwrote the oldest, so a read past the valid span lands on them. Returns the
+// NaN output samples, and the peak in `peak`.
+size_t canaryReads(const Signal& x, const std::vector<int>& sizes, float ratio, double* peak) {
+  namespace cd = cv::crowd_detail;
+  std::unique_ptr<cv::VoiceRing> ring(new cv::VoiceRing());
+  ring->fill(0.0f);
+  cd::FormantPsolaVoice voice;
+  voice.reset();
+  Signal out(x.size(), 0.0f);
+  int head = 0;
+  size_t at = 0;
+  for (size_t call = 0; at + static_cast<size_t>(sizes[call % sizes.size()]) <= x.size(); ++call) {
+    const int n = sizes[call % sizes.size()];
+    const int first = head;
+    for (int j = 0; j < n; ++j) {
+      (*ring)[static_cast<size_t>(head)] = std::nanf("");
+      head = head + 1 == cv::kVoiceRingLen ? 0 : head + 1;
+    }
+    voice.prepare(kRate / 72.0f, ratio, 0.5f, cd::kDelayCeil, n);
+    for (int c = 0; c < n; c += cv::kBlock)
+      voice.render(*ring, cv::wrapOnce<cv::kVoiceRingLen>(first + c), std::min(cv::kBlock, n - c), &out[at + static_cast<size_t>(c)]);
+    for (int j = 0; j < n; ++j) (*ring)[static_cast<size_t>(cv::wrapOnce<cv::kVoiceRingLen>(first + j))] = x[at + static_cast<size_t>(j)];
+    at += static_cast<size_t>(n);
+  }
+  *peak = 0.0;
+  size_t bad = 0;
+  for (float v : out) {
+    bad += std::isnan(v) ? 1 : 0;
+    if (!std::isnan(v)) *peak = std::max(*peak, static_cast<double>(std::fabs(v)));
+  }
+  return bad;
+}
+
+// A grain never reads past the valid ring span. The audit's case at the voice: formant -12 st (rate
+// 0.5), a 72 Hz voice, the lag at kDelayCeil, where a 200 ms delay lands with its scatter. Calls of
+// kBlock, of mixed sizes under it, and of 200 samples. A ceiling of the ring less 4 samples, which
+// leaves out the call's own samples, reads 1,054 NaN samples on the calls of kBlock.
+bool testReadCeiling() {
+  const Signal x = tone(72.0, 3 * kRate);
+  const std::vector<std::vector<int>> patterns = {{cv::kBlock}, {17, cv::kBlock, 40}, {200}};
+  size_t bad = 0;
+  double quietest = 1e9;
+  for (const std::vector<int>& sizes : patterns) {
+    for (float ratio : {1.0f, 1.11f}) {
+      double peak = 0.0;
+      bad += canaryReads(x, sizes, ratio, &peak);
+      quietest = std::min(quietest, peak);
+    }
+  }
+  return report("read ceiling", bad == 0 && quietest > 0.1,
+                "NaN samples read past the valid span %.0f (0); the quietest run peaks at %.2f (> 0.1)",
+                static_cast<double>(bad), quietest);
+}
+
+// Each tuning value the engine clamps, set past its range, plays exactly as the end of its range.
+bool testTuningRanges() {
+  namespace cd = cv::crowd_detail;
+  const Signal in = bursts(220.0, Train{100, 200, 120, 3});
+  using Edit = void (*)(cv::CrowdTuning&, bool);
+  const Edit edits[] = {
+      [](cv::CrowdTuning& t, bool past) { t.scatterMs = past ? 100.0f : cd::kMaxScatterMs; },
+      [](cv::CrowdTuning& t, bool past) { t.driftCents = past ? 200.0f : cd::kMaxDriftCents; },
+      [](cv::CrowdTuning& t, bool past) { t.tiltDb[0] = past ? 40.0f : cd::kMaxTiltDb; },
+      [](cv::CrowdTuning& t, bool past) { t.voiceDb = past ? -60.0f : cd::kMinVoiceDb; },
+      [](cv::CrowdTuning& t, bool past) { t.trimDb = past ? 30.0f : cd::kMaxTrimDb; },
+      [](cv::CrowdTuning& t, bool past) { t.trimBottomDb = past ? -30.0f : -cd::kMaxTrimDb; },
+      [](cv::CrowdTuning& t, bool past) { t.lagScale = past ? 5.0f : cd::kMaxLagScale; },
+      [](cv::CrowdTuning& t, bool past) { t.delayMs[1] = past ? 1.0f : cd::kMinDelayMs; },
+  };
+  size_t moved = 0;
+  for (const Edit edit : edits) {
+    cv::CrowdParams past = knobs(0.8f, 0.6f);
+    cv::CrowdParams end = past;
+    edit(past.tuning, true);
+    edit(end.tuning, false);
+    moved += differing(run(in, past), run(in, end));
+  }
+  return report("tuning ranges", moved == 0, "values past their range differ from the range's end in %.0f samples (0)",
+                static_cast<double>(moved));
+}
+
 // Host timing, printed and not asserted. Unison is 46.9k cycles per block on the board, so the
 // ratio gives the first board estimate for the Crowd card. PitchFx runs outside the timed calls.
 // Which 0 is Unison, 1 the Crowd card with every enhancement at its default, 2 the Crowd card with
@@ -1650,6 +1959,12 @@ int main() {
   ok &= testWidthZeroIsDelay();
   ok &= testSharedShelf();
   ok &= testEnhancementsStable();
+  ok &= testSwitchWithTracker();
+  ok &= testGapOverFloor();
+  ok &= testWidthHoldsLevel();
+  ok &= testOutOfRange();
+  ok &= testReadCeiling();
+  ok &= testTuningRanges();
   printTiming();
   std::printf("%s crowd\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

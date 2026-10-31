@@ -138,18 +138,27 @@ clamped to 0.2..1 and `widthLagMs` to 0..60.
 ### Lag law
 
 Copy v's lag target is delayMs[v] × `lagScale` (1.2) × m(w) (WIDTH law above), capped at `maxLagMs`
-(200 ms) and floored at the voice's own minimum (1.5 periods plus 4 samples). Only WIDTH moves it. At
+(150 ms) and floored at the voice's own minimum (1.5 periods plus 4 samples). Only WIDTH moves it. At
 the defaults the four copies lag 24, 60, 42 and 45 ms at WIDTH 0 and 56, 140, 98 and 105 ms at WIDTH 1.
 
 A copy changes its lag only in a quiet gap. Each block it measures the mean square of the ring at
 its read point (the block's samples `lag` behind the head). While a new target is pending (a tuning
-move, or a fresh scatter draw), the copy counts the blocks in which the ring is under
-`gapFloorDb` (−50 dBFS) both at the lag it plays and at the lag it would move to. After two such
-blocks it takes the new lag at once by resetting its grain marks there, and the grains in flight
-finish. The jump then replays or skips only silence. While material sounds it keeps its lag, so a
-copy never bends in pitch mid-word. The first lag after a reset or a fade-in lands at once, since
-nothing is playing yet. A gap shorter than the move (the gap between the two read points) never
-admits the move, so a large lag step waits for a long pause.
+move, or a fresh scatter draw), the copy counts the blocks in which the ring is under the gap floor
+both at the lag it plays and at the lag it would move to. After two such blocks it takes the new lag
+at once by resetting its grain marks there, and the grains in flight finish. The jump then replays or
+skips only quiet material. While material sounds it keeps its lag, so a copy never bends in pitch
+mid-word. The first lag after a reset or a fade-in lands at once, since nothing is playing yet. A gap
+shorter than the move (the gap between the two read points) never admits the move, so a large lag
+step waits for a long pause.
+
+The gap floor follows the signal (correctness pass item 2). It sits 20 dB (`kGapUnderPhraseDb`)
+under the recent phrase level and never under `gapFloorDb` (−50 dBFS), so lags land between phrases
+over a stage's noise floor as well as over silence. The phrase level is the loudest mean square the
+copies read at their lags for the gap test, through a one-pole that rises in 50 ms and falls in 1 s,
+so it holds a phrase's level through the gap after it and costs no reading of its own. A gap ends
+once the copy's read point sounds 6 dB over the floor (`kGapRearm`), so noise wandering about the
+floor inside one pause counts as one gap and draws once. A program whose gaps sit on a −40 dBFS floor
+lands each copy once per gap, as silent gaps always did.
 
 Scatter. With `scatterMs` above 0, each gap gives the copy a fresh uniform random offset in
 [−scatterMs, +scatterMs] on top of its target, drawn from a per-voice xorshift32 seeded at reset,
@@ -177,7 +186,8 @@ struct CrowdTuning {
   float lagScale     = 1.2f;      // a copy's lag is delayMs times this times the WIDTH multiplier
   float tiltHz       = 2500.0f;
   float voiceDb      = -9.0f;     // one voice against the lead at unity
-  float trimDb       = 1.0f;      // level rule residue
+  float trimDb       = 1.7f;      // level rule residue at WIDTH 1, -12..12
+  float trimBottomDb = 1.0f;      // the same at WIDTH 0; between, the trim follows f(w), -12..12
   float leadFadeFrom = 0.8f;      // VOICES position where the lead starts to leave
   float holdFrom     = 0.75f;     // part of each voice's fifth spent fading; the rest holds
   float hpHz         = 120.0f;    // low cut on the crowd sum
@@ -232,8 +242,10 @@ ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D
 3. Ratio r_v = 2^(pitchSt[v] · fp(w) / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12),
    and the grain playback rate is 2^(formantSt[v] · f(w) / 12) (WIDTH law above). The PSOLA voice
    clamps the ratio to 0.5..2.0.
-4. Period from `pitch.pitch().period`. Period 0 gives silence from the voice, as PsolaVoice does
-   today. Unvoiced frames keep the last period, as Autotune's voice does.
+4. Period from `pitch.pitch().period`, held by the card once the tracker drops it (correctness pass
+   item 1). Until the tracker has given a period the plan holds the lead at 1 and the copies at 0.
+   Unvoiced frames keep the last period, as Autotune's voice does. After an unvoiced run of 162 ms,
+   or while the tracker reads a note outside its range, the copies drop their moves (item 4).
 5. The four tone shelves share one filter. Each copy's shelf is 1 + wh_v HP + wb_v BP, where HP and
    BP share one Butterworth pole pair at 1.05 × tiltHz. A copy adds into the plain crowd sum and,
    weighted, into two sums that one two-input biquad filters for all four. The weights come from a
@@ -243,8 +255,10 @@ ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D
 
 ### Output
 
-out[i] = lead(i) · in[i] + crowdMul(i) · crowd[i] · 10^(trimDb / 20), with lead and crowdMul
-ramped per sample from the previous block's values to this block's. The low cut's numerator sums to
+out[i] = lead(i) · in[i] + crowdMul(i) · crowd[i] · 10^(trim(w) / 20), with lead and crowdMul
+ramped per sample from the previous block's values to this block's. trim(w) = trimDb · f(w) +
+trimBottomDb · (1 − f(w)), exactly trimDb at WIDTH 1 and trimBottomDb at WIDTH 0 (correctness pass
+item 3). The low cut's numerator sums to
 exactly 0, a double zero at DC, so the wet sum carries no DC and needs no DC blocker.
 
 ## Wiring
@@ -294,8 +308,9 @@ exactly 0, a double zero at DC, so the wet sum carries no DC and needs no DC blo
 2. cubevox-render: `--crowd`, `--width <0..1>`, `--voices <0..1>`; tuning keys prefixed `crowd`
    (`crowdVoiceDb`, `crowdTrimDb`, `crowdFormantSt0..3`, `crowdPitchSt0..3`, `crowdTiltDb0..3`,
    `crowdTiltHz`, `crowdDelayMs0..3`, `crowdLagScale`, `crowdScatterMs`, `crowdDriftCents`, `crowdHpHz`,
-   `crowdMaxLagMs`, `crowdWidthLagBottom`, `crowdWidthLagMs`). `crowdDelayMs0..3` and `crowdMaxLagMs`
-   clamp to 150 ms. `pitchOn` becomes true when the crowd card is on. tools/engine_ab.sh gains a
+   `crowdMaxLagMs`, `crowdWidthLagBottom`, `crowdWidthLagMs`, `crowdTrimBottomDb`). Every value must
+   be finite, and every crowd key is refused outside the range the engine clamps to (correctness
+   pass item 6). `pitchOn` becomes true when the crowd card is on. tools/engine_ab.sh gains a
    `crowd` case and a crowd term in the chain case.
 
 ## Tests
@@ -367,9 +382,30 @@ exactly 0, a double zero at DC, so the wet sum carries no DC and needs no DC blo
    20. epoch snap at WIDTH 0 and 0.1: on the jittery 150 Hz pulse train a copy with formant +2 st and
       pitch 0 at WIDTH 0 has the same samples with epoch align on and off. At WIDTH 0.1 the two differ
       and the pulse cut is cleaner than the grid by at least 2 dB (4.1 dB).
-2. level_test: a Crowd card row at VOICES 0.5 and WIDTH 0.5 on the default tuning (the working set) in
-   the 0..+0.5 dB band, as a lambda row driving PitchFx then Crowd (the two-stage row pattern at
-   level_test.cpp:235-243).
+   21. switch with the tracker (correctness pass): `crowd.on` and `crowdOn` switch together on the
+      program at VOICES 100 % and 50 %, WIDTH 1, 50 ms after a phrase peak. The largest output step at
+      the switch (the ramp block off; the 10 ms the tracker takes and the ramp on) stays under the
+      largest step in the 100 ms before it, both ways, and on, every 6 ms window of the 30 ms after the
+      switch stays within 6 dB of the input.
+   22. gap over a noise floor: on the program (−40 dBFS floor), WIDTH 1 to 0 at 5 s, VOICES 100 %, every
+      copy lands within 3 s of the move, copy 2 ends within 12.5 ms of 60 ms, and no copy lands more
+      than 3 times a second. On bursts with silent gaps every copy lands in each of the last 9 gaps
+      and copy 2 ends as near 60 ms.
+   23. WIDTH holds the level: at VOICES 50 % on 30 s of the program, WIDTH 0, 2, 5, 10, 20, 30, 50 and
+      70 % each within 0.5 dB of WIDTH 100 %.
+   24. notes outside the tracker's range: copy 2 alone at WIDTH 1, 1 s at 400 Hz, 1 s of the note,
+      0.5 s at 400 Hz. At 1300 Hz and at 60 Hz the copy correlates above 0.95 with itself at the note's
+      period over the note's last 0.5 s, and its move share glides to exactly 0 and back to exactly 1.
+      At 220 Hz the share stays exactly 1 and the copy correlates above 0.95 at its shifted period.
+   25. read ceiling: one voice on its own ring at rate 0.5 (formant −12 st), 72 Hz and the lag at
+      `kDelayCeil`, through calls of 64, of 17/64/40 and of 200 samples, at ratio 1 and 1.11. Each call's
+      own samples hold NaN while the voice renders, and no output sample is NaN.
+   26. tuning ranges: scatter, drift, a tone shelf, voiceDb, trimDb, trimBottomDb, lagScale and a delay
+      set past their range play exactly as the end of the range.
+2. level_test: Crowd card rows at VOICES 0.5 and WIDTH 0, 0.5 and 1 (the engine default) on the
+   default tuning (the working set) in the 0..+0.5 dB band, as lambda rows driving PitchFx then Crowd.
+   They run 30 s of the program, since the copies at the bottom of WIDTH are a comb that averages out
+   over the gaps (correctness pass item 3).
 3. test/firmware: core_registry (amountCards, engineValue, knobs move, pitch group count 3),
    core_chain_run (a Crowd card rig; PitchFx runs with the Crowd card on and both pitch toggles off; the
    Crowd ahead of Autotune in a layout still gets a ring; bit-exact pass when off), core_layout
@@ -751,3 +787,53 @@ Autotune off, on the crowd_test program. Medians of 33 runs of 10 s, the binarie
    identical. Drift already moves a copy by up to 10 cents at the top of WIDTH.
 6. Step 10 moves the output by float rounding only (89.8 to 97.7 dB under), since the ring indices
    wrap at a new length. The far lag of crowd_test's lag-across-a-gap check is now the 150 ms ceiling.
+
+## Correctness pass (owner 2026-10-31)
+
+Owner, 2026-10-31: "ok lets address all of those", the correctness findings of the Crowd audit
+(`build/audit/2026-10-31-crowd-audit-correctness.md`). Before figures are v2.00.75. Tests are
+crowd_test numbers 21 to 26 and the level_test rows (Tests above).
+
+### Items
+
+| # | What it was | What it is now | Measured, before → after |
+|---|---|---|---|
+| 1 | Off: the tracker stopped in the block the card went off, its period went to 0, and the copies dropped every grain under their ramp, a click. On: the lead left in one block while the copies waited about 6 ms for a period, a hole. | The card holds the tracker's last period through its ramp out. Until the tracker has a period the plan holds the lead at 1 and the copies at 0. A voice that starts with no grain in flight also lays the grain one output period older, so its overlap sums to one from the first sample. The emulator and the registry still switch `crowd.on` and `crowdOn` together. | Test 21, 50 ms after a phrase peak. Off, largest step in the ramp block against the 100 ms before: 0.350 against 0.043 → 0.012 against 0.046 (VOICES 100 %), 0.110 against 0.068 → 0.013 against 0.060 (50 %). On, lowest 6 ms window of the 30 ms after: −10.9 dB → −3.7 dB (100 %), −1.8 → −1.5 dB (50 %). |
+| 2 | The gap floor sat at −50 dBFS. Over a −40 dBFS stage floor no lag ever landed, so timing scatter, level scatter and WIDTH's lag stretch froze at the first draw. | The floor sits 20 dB under the recent phrase level and never under −50 dBFS (Lag law above). A gap ends once the read point is 6 dB over the floor, so one pause draws once. | Test 22. Program, WIDTH 1 to 0 at 5 s: 0 landings per copy in 10 s, copy 2 held at 134.2 ms → first landing 51 ms after the move, 21 to 28 landings per copy in 10 s (2 gaps a second), copy 2 ends at 55.9 ms. Bursts with silent gaps: 10 landings per copy after the move and copy 2 at 51.4 ms, before and after. |
+| 3 | WIDTH 0 read −1.45 dB against +0.10 dB at WIDTH 1 at VOICES 50 % (the audit's −1.58 and +0.11). | A trim that follows WIDTH: `trimDb` 1.7 dB at WIDTH 1 and `trimBottomDb` 1.0 dB at WIDTH 0, linear in f(w) between. With the gap rule of item 2 the comb at the bottom averages out. | Test 23 and the level rows, on 30 s of the program, VOICES 50 %. Widest WIDTH position from WIDTH 1: 1.79 dB (WIDTH 0) → 0.34 dB (WIDTH 10 %). Rows at WIDTH 0, 0.5 and 1: −1.76, +0.12, +0.03 dB → +0.16, +0.29, +0.19 dB. |
+| 4 | A note above 1 kHz read an octave down and a note under 70 Hz read unvoiced on the held period, so above WIDTH 0 the copies buzzed at a wrong period. | After an unvoiced run of 162 ms (the longest lag, so every copy has read past the last voiced sample), or while the tracker flags the note outside its range, the copies' pitch and formant moves glide to 0 through the 20 ms one-pole. Ratio and rate are then exactly 1, the WIDTH 0 path, exact at any period. They glide back when the note returns. The tracker flags a periodic frame whose normalised difference dips under its threshold at a lag below its range (a note over 1 kHz), or whose dip runs off the slow end. Those lags already sit in its difference array, so the flag costs ten compares. | Test 24, copy 2 alone at WIDTH 1, correlation with itself at the note's period over the note's last 0.5 s: 1300 Hz 0.52 → 1.000, 60 Hz 0.41 → 1.000. 220 Hz keeps its share at exactly 1 and correlates 1.000 at its shifted period. |
+| 5 | The read ceiling was the ring less 4 samples. The pitch stage writes the whole call before the copies read it, so a grain could read up to n − 4 samples of this call's audio in place of the oldest. | A voice's far read limit takes off the call's n, or kBlock when the call is shorter, so a grain stays on valid samples through any later call no longer than that. process() still takes any n. | Test 25, one voice at the lag ceiling, rate 0.5, 72 Hz, NaN in the call's own samples: 1,054 NaN reads (calls of 64), 557 (17/64/40), 24,778 (200) → 0. Through the card with 200 ms lags the audit's case no longer reached past the span at v2.00.75, since the CPU pass capped lags at 150 ms. |
+| 6 | The render tool took nan and inf, and left most crowd keys unchecked. Scatter and drift had no engine clamp. | `parseFloat` refuses non-finite values. Every crowd key is refused outside the engine's range: offsets ±12 st (`kMaxOffsetSt`, the ratio and rate clamps), tone ±12 dB, voiceDb −24..0, both trims ±12, delays 5..150 ms, lagScale 0.5..2, tiltHz and hpHz 20..21,600 Hz, maxLagMs 0..150, scatter 0..30 ms (`kMaxScatterMs`), drift 0..50 cents (`kMaxDriftCents`), and the WIDTH and human-voice ranges. The engine clamps to each. The emulator draws Width knee, Offsets at knee, Delay, Lag scale, Pitch, Tone, Timing scatter and Pitch drift from those constants; Formant (±4 st) and Tone shelf at (500..8,000 Hz) keep a finer stretch inside the clamps. | Render exits 2 on `crowdTiltDb0=nan`, `crowdTiltDb0=60`, `--width nan`, `crowdScatterMs=31`, `crowdDelayMs0=200`, `crowdFormantSt0=-13`, `crowdVoiceDb=inf`. Test 26: values past their range play exactly as its end. |
+| 7 | The crowdtest image saved its test layout into the record on any menu change. | On that image the record saves the layout it held at boot, or the default when it held none. The test layout plays from RAM only. `firmware/build.sh`'s header lists crowdtest beside release and bench. | The crowdtest image builds; its warn gate passes. |
+| 8 | Four hashes pinned at v2.00.75. | Re-pinned once by this pass: d37de60a1c1eca07, 041fbfde7aa323fe, c944b897c6179176, ec216e2ea40ccb9e. Every run moved for the held lead, the prefill grain and the WIDTH trim; runs 3 and 4 also for the gap floor. | Every other test passes unchanged, except core_chain_run's check of a Crowd card with no tracker period, which now expects the block to pass at unity (item 1). |
+
+### Why WIDTH 0 lost level
+
+The bottom of WIDTH holds exact doubles of the lead at fixed lags, and the equal-power VOICES law
+assumes the copies are unrelated to the lead and to each other. Exact doubles are a comb, so the sum's
+level on a steady tone hangs on each lag times f0. With the timing scatter off, so each lag stays
+where it first lands, WIDTH 0 at VOICES 50 % read −0.41, +2.26, −2.49, −1.15, +3.45 and +0.11 dB on
+the program pitched at 150, 165, 180, 200, 220 and 247 Hz, so no fixed trim could hold it. The audit's
+−1.58 dB was one such draw, frozen because the gap rule never fired. Once the gaps redraw each copy's
+timing offset (±12 ms, about ±2 periods at 180 Hz) the comb moves at every gap and its level averages
+toward the power sum. Over 30 s of the program, 60 gaps, every WIDTH position sits within 0.34 dB of
+WIDTH 1. Shorter stretches hold too few gaps. Against WIDTH 1, the bottom fifth of WIDTH still swings
+by up to 0.8 dB over 10 s and 2.1 dB over 3 s (WIDTH 2 % reads −1.93 dB there), since its copies sit
+on or near the lead's pitch and beat slowly.
+
+A second, steady part remained. A copy loses level as WIDTH moves its pitch and formant: alone, with
+the lead at 0, the four copies lose 0.30, 1.49, 0.34 and 0.86 dB from WIDTH 0 to WIDTH 1 on the
+program, and 0.5 to 2.3 dB on Adam's three clips. At VOICES 50 % that put WIDTH 0 about 0.5 dB over
+WIDTH 1. The trim now follows WIDTH from `trimBottomDb` to `trimDb`, 0.7 dB apart, the loss of copies
+1 to 3 weighted as VOICES 50 % weights them. `trimDb` rose from 1.0 to 1.7 dB so the engine default,
+WIDTH 1, reads +0.19 dB.
+
+### Cost
+
+`Crowd::process` at VOICES 80 %, WIDTH 50 %, default tuning, Autotune off, on the crowd_test
+program, with the CPU pass's bench (`build-crowd-fix-bench/`): 1.459 → 1.495 us per block, +0.036 us,
+under the pass's 0.05 us bound. `PitchFx` 0.941 → 0.942 us. Medians of 33 runs of 10 s, binaries
+interleaved, load 4 to 5. The landings the gap rule now makes cost about 0.03 us. The phrase level
+reads nothing of its own, since it takes the loudest sum the copies' gap tests already make. Two
+caches pay for part of the rest: each copy's level-scatter gain is worked out only at a landing, and
+the floor's and the trim's gains only when they move. Both are bit-exact. DTCM stays at 69,376 B.

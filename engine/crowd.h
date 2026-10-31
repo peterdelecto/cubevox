@@ -23,8 +23,10 @@
 // bottom tenth of the knob is for instruments and melodic lines, where the copies are plain delayed
 // doubles of the lead, exactly on its pitch at WIDTH 0. WIDTH also scales the drift and the contour,
 // so nothing else moves a copy there. A copy changes its lag only in a quiet gap, so it never bends
-// in pitch mid-word. Scatter gives each copy a fresh timing offset at every gap, and drift walks each
-// copy's pitch slowly around its offset.
+// in pitch mid-word. A gap is quiet against the recent phrase level, so gaps over a stage's noise
+// floor count too. Scatter gives each copy a fresh timing offset at every gap, and drift walks each
+// copy's pitch slowly around its offset. On a note the tracker cannot follow, or after a long
+// unvoiced run, the copies drop their moves and play plain delayed doubles.
 //
 // Two more controls make a copy read as a person and not as Adam shifted. Level scatter gives a
 // copy a new loudness at every gap. Contour sets how much of Adam's rises and falls a copy follows.
@@ -42,7 +44,8 @@ struct CrowdTuning {
   float lagScale = 1.2f;       // a copy's lag is delayMs times this
   float tiltHz = 2500.0f;
   float voiceDb = -9.0f;       // one voice against the lead at unity
-  float trimDb = 1.0f;         // level rule residue
+  float trimDb = 1.7f;         // level rule residue at WIDTH 1
+  float trimBottomDb = 1.0f;   // the same at WIDTH 0; between, the trim follows the formant factor
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
   float hpHz = 120.0f;         // low cut on the crowd sum
@@ -100,7 +103,9 @@ constexpr float kMaxRatio = 2.0f;
 constexpr float kMinRate = 0.5f;
 constexpr float kMaxRate = 2.0f;
 
-// A grain never reads closer to the head than this, or further back than the ring holds.
+// A grain never reads closer to the head than this, or further back than the ring holds. The pitch
+// stage writes a whole call before the copies read it, so a voice takes the call's samples off the
+// far end as well.
 constexpr float kMinReadDelay = 3.0f;
 constexpr float kMaxReadDelay = kVoiceRingLen - 4.0f;
 
@@ -121,6 +126,37 @@ constexpr float kMaxLevelScatterDb = 4.0f;
 constexpr float kMinContour = 0.6f;
 constexpr float kMaxContour = 1.4f;
 
+// The ranges of the rest of the tuning. The engine clamps to them, and the render tool and the
+// emulator's sliders read them. The offsets need no clamp of their own, since the ratio and rate
+// clamps of 0.5..2 stop them at an octave either way.
+constexpr float kMaxOffsetSt = 12.0f;
+constexpr float kMaxTiltDb = 12.0f;
+constexpr float kMinDelayMs = 5.0f;  // up to kCrowdMaxLagMs
+constexpr float kMinLagScale = 0.5f;
+constexpr float kMaxLagScale = 2.0f;
+constexpr float kMinVoiceDb = -24.0f;
+constexpr float kMaxVoiceDb = 0.0f;
+constexpr float kMaxTrimDb = 12.0f;
+constexpr float kMaxScatterMs = 30.0f;
+constexpr float kMaxDriftCents = 50.0f;
+
+// The gap floor sits this far under the recent phrase level, and never under gapFloorDb. The phrase
+// level is the loudest mean square the copies read for the gap rule, through a one-pole that rises
+// in kPhraseRiseS and falls in kPhraseFallS, so it holds a phrase's level through the gap after it.
+// kGapUnderPhraseSq is the same distance as a ratio of mean squares.
+constexpr float kGapUnderPhraseDb = 20.0f;
+constexpr float kPhraseRiseS = 0.05f;
+constexpr float kPhraseFallS = 1.0f;
+inline const float kGapUnderPhraseSq = dbToGainFast(-2.0f * kGapUnderPhraseDb);
+
+// A gap ends once the copy's read point sounds 6 dB over the floor, so noise wandering about the
+// floor inside one pause counts as one gap and draws once.
+constexpr float kGapRearm = 4.0f;
+
+// After an unvoiced run this long every copy has read past the last voiced sample, since no lag is
+// longer, so the copies go plain without bending a word.
+constexpr int kPlainAfter = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000);
+
 // Samples in a whole number of milliseconds.
 constexpr int ms(int v) { return v * kSampleRate / 1000; }
 
@@ -138,6 +174,7 @@ inline float clampLag(float lag, float period) {
 // (knee, kneeFrac) and on to (1, 1), so it is exactly 0 at WIDTH 0 and exactly 1 at WIDTH 1.
 constexpr float kMinWidthKnee = 0.02f;
 constexpr float kMaxWidthKnee = 0.9f;
+constexpr float kMaxWidthKneeFrac = 1.0f;
 
 // The pitch offsets, the drift and the contour deviation take the WIDTH factor times this top, so
 // WIDTH 1 reaches two thirds of the pitch move the tuning lists (owner 2026-10-31). The formant
@@ -146,7 +183,7 @@ constexpr float kWidthPitchTop = 2.0f / 3.0f;
 
 inline float widthFactor(float width, float knee, float kneeFrac) {
   const float k = clampf(knee, kMinWidthKnee, kMaxWidthKnee);
-  const float f = clampf(kneeFrac, 0.0f, 1.0f);
+  const float f = clampf(kneeFrac, 0.0f, kMaxWidthKneeFrac);
   if (width <= k) return f * (width / k);
   const float t = (width - k) / (1.0f - k);
   return f * (1.0f - t) + t;
@@ -158,9 +195,18 @@ constexpr float kMinLagBottom = 0.2f;
 constexpr float kMaxLagBottom = 1.0f;
 constexpr float kMaxWidthLagMs = 60.0f;
 
+// Copy v's lag before WIDTH and the ceiling, delayMs times lagScale, each inside its range.
+inline float baseLagMs(const CrowdTuning& t, size_t v) {
+  return clampf(t.delayMs[v], kMinDelayMs, static_cast<float>(kCrowdMaxLagMs)) *
+         clampf(t.lagScale, kMinLagScale, kMaxLagScale);
+}
+
 inline float lagMultiplier(const CrowdTuning& t, float width) {
   float longest = 0.0f;
-  for (float d : t.delayMs) longest = d * t.lagScale > longest ? d * t.lagScale : longest;
+  for (size_t v = 0; v < kVoices; ++v) {
+    const float lag = baseLagMs(t, v);
+    longest = lag > longest ? lag : longest;
+  }
   const float bottom = clampf(t.widthLagBottom, kMinLagBottom, kMaxLagBottom);
   const float top = longest > 0.0f ? 1.0f + clampf(t.widthLagMs, 0.0f, kMaxWidthLagMs) / longest : 1.0f;
   return bottom * (1.0f - width) + top * width;
@@ -228,10 +274,10 @@ class FormantPsolaVoice {
   // The grain playback rate the last prepare() took, for the tests.
   float rate() const { return rate_; }
 
-  // Per block. period 0 silences the voice. delay is the wanted lag of the output behind the
+  // Per call. period 0 silences the voice. delay is the wanted lag of the output behind the
   // input in samples. The marks sit one period closer than that, because a grain starts one
-  // period before its mark.
-  void prepare(float period, float ratio, float rate, float delay) {
+  // period before its mark. n is the call's length, written to the ring ahead of the read.
+  void prepare(float period, float ratio, float rate, float delay, int n) {
     voiced_ = period > 0.0f;
     if (!voiced_) {
       count_ = 0;
@@ -247,6 +293,7 @@ class FormantPsolaVoice {
     turnStep_ = static_cast<uint32_t>(turn_);
     amp_ = 0.5f * rate_ / r;
     drift_ = (1.0f - rate_) * dur_;
+    setReadSpan(n);
     ref_ = clampLag(delay, p_) - p_;
     if (fresh_) {
       markDelay_ = ref_;
@@ -273,7 +320,9 @@ class FormantPsolaVoice {
       stepMarks(k);
       countdown_ -= static_cast<float>(k);
       i += k;
-      launch(wrapOnce<kVoiceRingLen>(first + i - 1), -countdown_, i - 1);
+      const int head = wrapOnce<kVoiceRingLen>(first + i - 1);
+      if (count_ == 0) prefill(head, -countdown_, i - 1);
+      launch(head, -countdown_, i - 1);
       countdown_ += outPeriod_;
     }
     size_t kept = 0;
@@ -346,25 +395,46 @@ class FormantPsolaVoice {
     return grains_[oldest];
   }
 
+  // The span a launch may read. A grain's delay moves by 1 - rate per sample, so both ends leave
+  // room for that drift. The far end also leaves the call's samples, or kBlock when the call is
+  // shorter, so a grain stays on valid samples through any later call no longer than that.
+  void setReadSpan(int n) {
+    const float written = static_cast<float>(n > kBlock ? n : kBlock);
+    lo_ = kMinReadDelay + (drift_ < 0.0f ? -drift_ : 0.0f);
+    hi_ = kMaxReadDelay - written - (drift_ > 0.0f ? drift_ : 0.0f);
+  }
+
   // lead is how far past the ideal launch instant this tick already is. The grain starts one
-  // period before its mark. Its delay moves by 1 - rate per sample, so the clamp keeps both ends
-  // of that drift inside the ring.
+  // period before its mark.
   void launch(int head, float lead, int at) {
     float centre = markDelay_;
     if (centre - ref_ > 0.5f * p_) centre -= p_;
-    const float lo = kMinReadDelay + (drift_ < 0.0f ? -drift_ : 0.0f);
-    const float hi = kMaxReadDelay - (drift_ > 0.0f ? drift_ : 0.0f);
-    const float delay = clampf(centre + p_ - rate_ * lead, lo, hi);
+    start(head, clampf(centre + p_ - rate_ * lead, lo_, hi_), lead, at);
+  }
+
+  // A voice with no grain in flight also lays the grain that would have started one output period
+  // earlier, cut a period further back, so the overlap sums to one from its first sample and the
+  // copy comes in without a dip. A grain needs a sample left to play.
+  void prefill(int head, float lead, int at) {
+    const float age = lead + outPeriod_;
+    if (age >= dur_ - 1.0f) return;
+    float centre = markDelay_;
+    if (centre - ref_ > 0.5f * p_) centre -= p_;
+    start(head, clampf(centre + 2.0f * p_ - rate_ * age, lo_, hi_), age, at);
+  }
+
+  // A grain that reads `delay` behind head now, age samples into its window.
+  void start(int head, float delay, float age, int at) {
     const float pos = static_cast<float>(head) - delay;
     const float fl = floorf(pos);
     Grain& g = nextSlot();
     g.pos = (wrapOnce<kVoiceRingLen>(static_cast<int>(fl)) << kFracBits) +
             static_cast<int>((pos - fl) * static_cast<float>(1 << kFracBits));
     g.step = step_;
-    g.age = lead;
+    g.age = age;
     g.dur = dur_;
     g.start = at;
-    g.turn = static_cast<uint32_t>(lead * turn_);
+    g.turn = static_cast<uint32_t>(age * turn_);
     g.turnStep = turnStep_;
   }
 
@@ -429,6 +499,8 @@ class FormantPsolaVoice {
   uint32_t turnStep_ = static_cast<uint32_t>(kTurn / (2.0f * kMinPeriod));
   float amp_ = 0.5f;  // half the grain gain, rate / ratio, so the window needs no 0.5
   float drift_ = 0.0f;
+  float lo_ = kMinReadDelay;  // the delays a launch may read, set per call
+  float hi_ = kMinReadDelay;
   float ref_ = 0.0f;
   float markDelay_ = 0.0f;
   float countdown_ = 0.0f;
@@ -524,10 +596,12 @@ struct BlockView {
   float quietSq;      // a mean square under this counts as quiet
 
   // True when the n samples that the ring holds `lag` behind the block are quiet.
-  // A window clear of the ring's end runs on four accumulators through a straight pointer, so the
-  // adds do not wait on one another. A window across the end, and a tail short of four, step one
-  // sample at a time.
-  bool quietAt(float lag) const {
+  bool quietAt(float lag) const { return sumSqAt(lag) < quietSq * static_cast<float>(n); }
+
+  // The sum of squares of the n samples that the ring holds `lag` behind the block. A window clear
+  // of the ring's end runs on four accumulators through a straight pointer, so the adds do not wait
+  // on one another. A window across the end, and a tail short of four, step one sample at a time.
+  float sumSqAt(float lag) const {
     int at = (first - static_cast<int>(lag + 0.5f)) % kVoiceRingLen;
     if (at < 0) at += kVoiceRingLen;
     float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
@@ -547,7 +621,7 @@ struct BlockView {
       s0 += x * x;
       at = at + 1 == kVoiceRingLen ? 0 : at + 1;
     }
-    return (s0 + s1) + (s2 + s3) < quietSq * static_cast<float>(n);
+    return (s0 + s1) + (s2 + s3);
   }
 };
 
@@ -575,10 +649,14 @@ class CopyLag {
   // draws while level scatter is on.
   float levelUnit() const { return level_; }
 
+  // The sum of squares the last settle() read at the copy's lag, or -1 when it read none.
+  float heard() const { return heard_; }
+
   // Per block. base is the target in samples before scatter. rollLevel says level scatter is on,
   // so each gap also draws a loudness, which keeps the gap rule running when the timing scatter is
   // 0. True when the lag landed on a new value, so the voice restarts its marks there.
   bool settle(const BlockView& b, float base, float scatterSmp, float period, bool rollLevel) {
+    heard_ = -1.0f;
     const float want = clampLag(base + offset_ * scatterSmp, period);
     if (!set_) return land(base, want, rollLevel);
     const bool moved = base != base_;
@@ -587,8 +665,11 @@ class CopyLag {
       landed_ = false;
       return false;
     }
-    const bool here = b.quietAt(clampLag(lag_, period));
-    if (!here) landed_ = false;
+    const float sum = b.sumSqAt(clampLag(lag_, period));
+    heard_ = sum;
+    const float quiet = b.quietSq * static_cast<float>(b.n);
+    const bool here = sum < quiet;
+    if (sum >= kGapRearm * quiet) landed_ = false;
     const bool pending = moved || !landed_;
     const bool calm = here && (!pending || b.quietAt(want));
     quiet_ = calm ? quiet_ + 1 : 0;
@@ -612,6 +693,7 @@ class CopyLag {
   float level_ = 0.0f;   // this gap's loudness draw, -1..1
   float lag_ = 0.0f;
   float base_ = 0.0f;
+  float heard_ = -1.0f;
   int quiet_ = 0;
   bool set_ = false;
   bool landed_ = false;  // this gap has taken its landing
@@ -630,7 +712,7 @@ struct VoicesLaw {
 // follow from the soloed power, so a single copy at the top of the knob stands alone at unity.
 inline VoicesLaw voicesLaw(float k, const CrowdTuning& t, uint8_t solo = 0) {
   VoicesLaw law;
-  const float g = dbToGainFast(t.voiceDb);
+  const float g = dbToGainFast(clampf(t.voiceDb, kMinVoiceDb, kMaxVoiceDb));
   const float from = clampf(t.leadFadeFrom, 0.05f, 0.99f);
   const float hold = clampf(t.holdFrom, 0.05f, 1.0f);
   const float u = k / (from * 0.25f);
@@ -775,9 +857,11 @@ class Crowd {
       return;
     }
     idle_ = false;
-    const Plan plan = makePlan(p);
+    setCoefs(n);
+    const float period = holdPeriod(pitch.pitch().period);
+    const Plan plan = makePlan(p, period > 0.0f);
     const int first = pitch.head() - n;
-    prepareBlock(p, pitch, plan, first, n);
+    prepareBlock(p, pitch, plan, period, first, n);
     for (int c = 0; c < n; c += kBlock) {
       const int m = n - c < kBlock ? n - c : kBlock;
       renderChunk(in + c, out + c, plan, Chunk{pitch.ring(), first + c, m});
@@ -786,12 +870,14 @@ class Crowd {
 
   // Test hooks. leadGain is the lead's gain at the end of the last block. activeVoices counts the
   // voices that ticked in it. lagSamples, driftCents and grainRate read a copy's current lag, pitch
-  // drift and grain playback rate.
+  // drift and grain playback rate. moveShare is the share of the copies' pitch and formant moves in
+  // force, 1 on a note in range and 0 once they play plain.
   float leadGain() const { return lead_; }
   uint8_t activeVoices() const { return active_; }
   float lagSamples(size_t v) const { return lag_[v].samples(); }
   float driftCents(size_t v) const { return drift_[v].cents(); }
   float grainRate(size_t v) const { return voice_[v].rate(); }
+  float moveShare() const { return keep_; }
 
  private:
   using FormantPsolaVoice = crowd_detail::FormantPsolaVoice;
@@ -802,17 +888,43 @@ class Crowd {
   struct Plan {
     std::array<float, kVoices> voice{};  // fixed gain times fade, per voice
     float lead = 1.0f;
-    float wet = 0.0f;  // crowd multiplier times the trim
+    float wet = 0.0f;    // crowd multiplier times the trim
+    float width = 0.0f;  // WIDTH's factor on the formant offsets, from the smoothed knob
   };
 
-  Plan makePlan(const CrowdParams& p) {
+  // Until the tracker has a period the copies cannot play, so the plan holds the lead at 1 and the
+  // copies at 0. A switch-on then keeps the lead until the copies can take over. The WIDTH smoother
+  // steps on every block either way.
+  Plan makePlan(const CrowdParams& p, bool havePeriod) {
     Plan plan;
-    if (!p.on) return plan;
+    const CrowdTuning& t = p.tuning;
+    plan.width = crowd_detail::widthFactor(smoothedWidth(p.width), t.widthKnee, t.widthKneeFrac);
+    if (!p.on || !havePeriod) return plan;
     const crowd_detail::VoicesLaw& law = voicesLaw(p);
     plan.voice = law.weight;
     plan.lead = law.lead;
-    plan.wet = law.mul * dbToGainFast(p.tuning.trimDb);
+    const float trim = trimAt(t, plan.width);
+    if (trim != trimDb_) {
+      trimGain_ = dbToGainFast(trim);
+      trimDb_ = trim;
+    }
+    plan.wet = law.mul * trimGain_;
     return plan;
+  }
+
+  // A copy loses level as WIDTH moves its pitch and formant, so the trim moves from trimBottomDb at
+  // WIDTH 0 to trimDb at WIDTH 1 along the formant factor, and each end is exact.
+  static float trimAt(const CrowdTuning& t, float width) {
+    const float top = clampf(t.trimDb, -crowd_detail::kMaxTrimDb, crowd_detail::kMaxTrimDb);
+    const float bottom = clampf(t.trimBottomDb, -crowd_detail::kMaxTrimDb, crowd_detail::kMaxTrimDb);
+    return top * width + bottom * (1.0f - width);
+  }
+
+  // The tracker's period, or the last one it gave. The tracker drops its period when it stops, in
+  // the same block the card goes off, so the copies keep playing through their ramp out.
+  float holdPeriod(float period) {
+    if (period > 0.0f) heldPeriod_ = period;
+    return heldPeriod_;
   }
 
   // What the VOICES law reads. The law's sines and roots run again only when one of them moves.
@@ -840,12 +952,16 @@ class Crowd {
     return law_;
   }
 
-  // The two smoothers' one-pole coefficients for a call of n samples. They hang on n alone, so they
-  // are worked out again only when n changes.
+  // The one-pole coefficients for a call of n samples. They hang on n alone, so they are worked out
+  // again only when n changes.
   void setCoefs(int n) {
     if (n == coefN_) return;
-    widthCoef_ = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * smooth::kSmoothSec));
-    slewCoef_ = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * crowd_detail::kDriftSlewS));
+    const float samples = static_cast<float>(n);
+    widthCoef_ = 1.0f - expf(-samples / (kSampleRate * smooth::kSmoothSec));
+    slewCoef_ = 1.0f - expf(-samples / (kSampleRate * crowd_detail::kDriftSlewS));
+    riseCoef_ = 1.0f - expf(-samples / (kSampleRate * crowd_detail::kPhraseRiseS));
+    fallCoef_ = 1.0f - expf(-samples / (kSampleRate * crowd_detail::kPhraseFallS));
+    perSample_ = 1.0f / samples;
     coefN_ = n;
   }
 
@@ -873,6 +989,11 @@ class Crowd {
     contour_.reset();
     active_ = 0;
     widthSet_ = false;
+    heldPeriod_ = 0.0f;
+    phraseSq_ = 0.0f;
+    unvoiced_ = 0;
+    keep_ = 1.0f;
+    keepSet_ = false;
   }
 
   void retire(size_t v) {
@@ -880,6 +1001,7 @@ class Crowd {
     lag_[v].restart();
     drift_[v].reset();
     levelMul_[v] = 1.0f;
+    levelDb_[v] = 0.0f;
     live_[v] = false;
   }
 
@@ -899,7 +1021,8 @@ class Crowd {
     if (hzMoved) shelf_ = crowd_detail::shelfBasis(t.tiltHz);
     for (size_t v = 0; v < kVoices; ++v) {
       if (!hzMoved && t.tiltDb[v] == tiltDb_[v]) continue;
-      shelfWeights_[v] = crowd_detail::fitShelf(shelf_, t.tiltHz, t.tiltDb[v]);
+      const float db = clampf(t.tiltDb[v], -crowd_detail::kMaxTiltDb, crowd_detail::kMaxTiltDb);
+      shelfWeights_[v] = crowd_detail::fitShelf(shelf_, t.tiltHz, db);
       tiltDb_[v] = t.tiltDb[v];
     }
     tiltHz_ = t.tiltHz;
@@ -909,7 +1032,7 @@ class Crowd {
   // Copy v's lag target in samples. The scale and the WIDTH multiplier stretch the delay and the
   // ceiling caps it. The ceiling itself stops at kCrowdMaxLagMs, the lag the ring was sized for.
   static float lagTarget(const CrowdTuning& t, size_t v, float widthMul) {
-    const float lagMs = t.delayMs[v] * t.lagScale * widthMul;
+    const float lagMs = crowd_detail::baseLagMs(t, v) * widthMul;
     const float top = clampf(t.maxLagMs, 0.0f, static_cast<float>(kCrowdMaxLagMs));
     return (lagMs < top ? lagMs : top) * crowd_detail::kSmpPerMs;
   }
@@ -925,6 +1048,8 @@ class Crowd {
     float lagMul;      // WIDTH multiplier on every lag target
     float scatterSmp;  // timing scatter in samples
     float levelDb;     // level scatter, clamped to its range
+    float driftPeak;   // drift range in cents, clamped and times pitchWidth
+    float keep;        // share of the pitch and formant moves in force, 0 when the copies play plain
     float slew;        // one-pole coefficient of the slow walks for this block
     int n;
   };
@@ -939,34 +1064,72 @@ class Crowd {
     return widthSm_;
   }
 
-  // Per block: filters, coefficients and the contour track, then each live voice. first is the ring
-  // index of the block's first sample.
-  void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
+  // The gap floor for this block, kGapUnderPhraseDb under the phrase level and never under
+  // gapFloorDb, so lags land between phrases over a stage's noise floor as well as over silence.
+  // gapFloorDb as a mean square is worked out again only when it moves.
+  float gapFloor(const CrowdTuning& t) {
+    if (t.gapFloorDb != floorDb_) {
+      floorSq_ = dbToGainFast(2.0f * t.gapFloorDb);
+      floorDb_ = t.gapFloorDb;
+    }
+    const float under = phraseSq_ * crowd_detail::kGapUnderPhraseSq;
+    return under > floorSq_ ? under : floorSq_;
+  }
+
+  // The phrase level follows the loudest read point the copies measured for the gap rule this block,
+  // so it costs no reading of its own. A block where none measured leaves it as it is.
+  void followPhrase() {
+    float loudest = -1.0f;
+    for (size_t v = 0; v < kVoices; ++v) {
+      if (live_[v] && lag_[v].heard() > loudest) loudest = lag_[v].heard();
+    }
+    if (loudest < 0.0f) return;
+    const float sq = loudest * perSample_;
+    phraseSq_ += (sq > phraseSq_ ? riseCoef_ : fallCoef_) * (sq - phraseSq_);
+  }
+
+  // The share of each copy's pitch and formant move in force. It glides to 0 through the 20 ms
+  // one-pole after an unvoiced run of kPlainAfter samples, or while the tracker reads a note outside
+  // its range, so each copy is then a plain delayed double, exact at any period. It takes its target
+  // outright on the first block with a period.
+  float keepShare(const PitchResult& pr, int n) {
+    unvoiced_ = pr.voiced ? 0 : (unvoiced_ < crowd_detail::kPlainAfter ? unvoiced_ + n : unvoiced_);
+    const float target = unvoiced_ >= crowd_detail::kPlainAfter || pr.outOfRange ? 0.0f : 1.0f;
+    keep_ = keepSet_ ? smooth::step(keep_, target, widthCoef_) : target;
+    keepSet_ = true;
+    return keep_;
+  }
+
+  // Per block: filters and the contour track, then each live voice, then the phrase level. first is
+  // the ring index of the block's first sample, and period the tracker's or the one held.
+  void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, float period, int first, int n) {
     const CrowdTuning& t = p.tuning;
     setLowCut(t);
     setTilts(t);
-    setCoefs(n);
     const PitchResult& pr = pitch.pitch();
-    const float slew = slewCoef_;
-    contour_.step(pr.period, pr.voiced, slew);
-    const float widthF = crowd_detail::widthFactor(smoothedWidth(p.width), t.widthKnee, t.widthKneeFrac);
+    contour_.step(period, pr.voiced, slewCoef_);
+    const float pitchWidth = plan.width * crowd_detail::kWidthPitchTop;
     const Block b{t,
-                  {pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)},
-                  pr.period,
+                  {pitch.ring(), first, n, gapFloor(t)},
+                  period,
                   pitch.correctionSemis() * (1.0f / 12.0f),
-                  widthF,
-                  widthF * crowd_detail::kWidthPitchTop,
+                  plan.width,
+                  pitchWidth,
                   crowd_detail::lagMultiplier(t, smooth::clamp01(p.width)),
-                  (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * crowd_detail::kSmpPerMs,
+                  clampf(t.scatterMs, 0.0f, crowd_detail::kMaxScatterMs) * crowd_detail::kSmpPerMs,
                   clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
-                  slew,
+                  clampf(t.driftCents, 0.0f, crowd_detail::kMaxDriftCents) * pitchWidth,
+                  period > 0.0f ? keepShare(pr, n) : 1.0f,
+                  slewCoef_,
                   n};
     active_ = 0;
     for (size_t v = 0; v < kVoices; ++v) prepareVoice(v, plan, b);
+    followPhrase();
   }
 
   // Copy v's lag, loudness, pitch ratio and playback rate. A voice whose gain sits at 0
-  // across the block is cleared and does not tick.
+  // across the block is cleared and does not tick. With keep at 0 the ratio and the rate are
+  // exactly 1.
   void prepareVoice(size_t v, const Plan& plan, const Block& b) {
     if (gain_[v] <= 0.0f && plan.voice[v] <= 0.0f) {
       if (live_[v]) retire(v);
@@ -976,13 +1139,20 @@ class Crowd {
     live_[v] = true;
     ++active_;
     const bool roll = b.levelDb > 0.0f;
-    if (lag_[v].settle(b.view, lagTarget(t, v, b.lagMul), b.scatterSmp, b.period, roll)) voice_[v].markReset();
-    levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
-    const float drift = drift_[v].step(driftRng_[v], t.driftCents * b.pitchWidth, t.driftHoldS, b.slew, b.n);
+    const bool landed = lag_[v].settle(b.view, lagTarget(t, v, b.lagMul), b.scatterSmp, b.period, roll);
+    if (landed) voice_[v].markReset();
+
+    // The loudness draw changes only at a landing, so its gain is worked out again only then or when
+    // the level scatter moves.
+    if (landed || b.levelDb != levelDb_[v]) {
+      levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
+      levelDb_[v] = b.levelDb;
+    }
+    const float drift = drift_[v].step(driftRng_[v], b.driftPeak, t.driftHoldS, b.slew, b.n);
     const float st = t.pitchSt[v] * b.pitchWidth;
     const float oct = st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
-    voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t, b.pitchWidth)),
-                      exp2Fast(t.formantSt[v] * b.width * (1.0f / 12.0f)), lag_[v].samples());
+    voice_[v].prepare(b.period, exp2Fast((oct + contourOctaves(v, t, b.pitchWidth)) * b.keep),
+                      exp2Fast(t.formantSt[v] * b.width * (1.0f / 12.0f) * b.keep), lag_[v].samples(), b.n);
   }
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
@@ -1089,6 +1259,7 @@ class Crowd {
   std::array<crowd_detail::PitchDrift, kVoices> drift_{};
   std::array<crowd_detail::XorShift, kVoices> driftRng_{};
   std::array<float, kVoices> levelMul_ = {1.0f, 1.0f, 1.0f, 1.0f};
+  std::array<float, kVoices> levelDb_{};  // the level scatter levelMul_ was worked out at
   crowd_detail::ContourTrack contour_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;
@@ -1099,7 +1270,19 @@ class Crowd {
   LawKey lawKey_;
   float widthCoef_ = 0.0f;
   float slewCoef_ = 0.0f;
+  float riseCoef_ = 0.0f;   // phrase level, rising
+  float fallCoef_ = 0.0f;   // phrase level, falling
+  float perSample_ = 0.0f;  // 1 / n
   int coefN_ = -1;
+  float trimDb_ = 0.0f;    // the trim trimGain_ was worked out at
+  float trimGain_ = 1.0f;
+  float floorDb_ = 0.0f;   // the gapFloorDb floorSq_ was worked out at
+  float floorSq_ = 1.0f;
+  float heldPeriod_ = 0.0f;
+  float phraseSq_ = 0.0f;  // the recent phrase level, a mean square
+  int unvoiced_ = 0;       // samples since the tracker last read a voiced frame, up to kPlainAfter
+  float keep_ = 1.0f;
+  bool keepSet_ = false;
   uint8_t active_ = 0;
   bool widthSet_ = false;
   bool hpSet_ = false;

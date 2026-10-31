@@ -100,12 +100,13 @@ int usage() {
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
-               "     crowdVoiceDb crowdTrimDb crowdFormantSt0..3 crowdPitchSt0..3 crowdTiltDb0..3 crowdTiltHz\n"
-               "     crowdDelayMs0..3 (to 150) crowdLagScale crowdScatterMs (0..30) crowdDriftCents (0..50) crowdHpHz\n"
-               "     crowdMaxLagMs (to 150)\n"
+               "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
+               "     (-12..12) crowdTiltDb0..3 (-12..12) crowdTiltHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
+               "     crowdLagScale (0.5..2) crowdScatterMs (0..30) crowdDriftCents (0..50) crowdMaxLagMs (0..150)\n"
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
+               "  every value must be finite, and a crowd key outside its range is refused\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -113,10 +114,11 @@ int usage() {
   return 2;
 }
 
+// A finite number and nothing after it. NaN passes every < and > range check, so it is refused here.
 bool parseFloat(const char* s, float* out) {
   char* end = nullptr;
   *out = std::strtof(s, &end);
-  return end != s && *end == '\0';
+  return end != s && *end == '\0' && std::isfinite(*out);
 }
 
 bool parseOnOff(const char* s, bool* out) {
@@ -160,26 +162,37 @@ bool parsePair(const char* s, float* hz, float* db) {
   return parseFloat(end + 1, db);
 }
 
-// The Crowd card's human-voice controls refuse a value outside the range the engine clamps to, so a
-// typo in a key does not pass for a setting.
-bool crowdMannerInRange(const cv::CrowdTuning& g) {
+bool inside(float v, float lo, float hi) { return v >= lo && v <= hi; }
+
+// The Crowd card's per-copy keys, each inside the range the engine takes.
+bool crowdCopiesInRange(const cv::CrowdTuning& g) {
   namespace gd = cv::crowd_detail;
-  if (g.levelScatterDb < 0.0f || g.levelScatterDb > gd::kMaxLevelScatterDb) return false;
-  if (g.widthKnee < gd::kMinWidthKnee || g.widthKnee > gd::kMaxWidthKnee) return false;
-  if (g.widthKneeFrac < 0.0f || g.widthKneeFrac > 1.0f) return false;
-  if (g.widthLagBottom < gd::kMinLagBottom || g.widthLagBottom > gd::kMaxLagBottom) return false;
-  if (g.widthLagMs < 0.0f || g.widthLagMs > gd::kMaxWidthLagMs) return false;
-  for (size_t v = 0; v < g.contour.size(); ++v) {
-    if (g.contour[v] < gd::kMinContour || g.contour[v] > gd::kMaxContour) return false;
+  constexpr float kTopLag = static_cast<float>(cv::kCrowdMaxLagMs);
+  for (size_t v = 0; v < gd::kVoices; ++v) {
+    if (!inside(g.pitchSt[v], -gd::kMaxOffsetSt, gd::kMaxOffsetSt)) return false;
+    if (!inside(g.formantSt[v], -gd::kMaxOffsetSt, gd::kMaxOffsetSt)) return false;
+    if (!inside(g.tiltDb[v], -gd::kMaxTiltDb, gd::kMaxTiltDb)) return false;
+    if (!inside(g.delayMs[v], gd::kMinDelayMs, kTopLag)) return false;
+    if (!inside(g.contour[v], gd::kMinContour, gd::kMaxContour)) return false;
   }
   return true;
 }
 
-// The Crowd card's delays and lag ceiling stop at the lag the shared ring was sized for.
-void clampCrowdLags(cv::CrowdTuning& g) {
-  constexpr float kTop = static_cast<float>(cv::kCrowdMaxLagMs);
-  for (float& d : g.delayMs) d = d > kTop ? kTop : d;
-  g.maxLagMs = g.maxLagMs > kTop ? kTop : g.maxLagMs;
+// Every Crowd key refuses a value outside the range the engine clamps to, so a typo in a key does not
+// pass for a setting.
+bool crowdInRange(const cv::CrowdTuning& g) {
+  namespace gd = cv::crowd_detail;
+  return crowdCopiesInRange(g) && inside(g.voiceDb, gd::kMinVoiceDb, gd::kMaxVoiceDb) &&
+         inside(g.trimDb, -gd::kMaxTrimDb, gd::kMaxTrimDb) && inside(g.trimBottomDb, -gd::kMaxTrimDb, gd::kMaxTrimDb) &&
+         inside(g.tiltHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(g.hpHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(g.lagScale, gd::kMinLagScale, gd::kMaxLagScale) &&
+         inside(g.maxLagMs, 0.0f, static_cast<float>(cv::kCrowdMaxLagMs)) &&
+         inside(g.scatterMs, 0.0f, gd::kMaxScatterMs) && inside(g.driftCents, 0.0f, gd::kMaxDriftCents) &&
+         inside(g.levelScatterDb, 0.0f, gd::kMaxLevelScatterDb) &&
+         inside(g.widthKnee, gd::kMinWidthKnee, gd::kMaxWidthKnee) &&
+         inside(g.widthKneeFrac, 0.0f, gd::kMaxWidthKneeFrac) &&
+         inside(g.widthLagBottom, gd::kMinLagBottom, gd::kMaxLagBottom) &&
+         inside(g.widthLagMs, 0.0f, gd::kMaxWidthLagMs);
 }
 
 bool applyTuning(RenderParams& rp, const char* kv) {
@@ -208,6 +221,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
       {"atGrainDelay", &at.grainDelay},
       {"crowdVoiceDb", &gn.voiceDb},              {"crowdTrimDb", &gn.trimDb},
+      {"crowdTrimBottomDb", &gn.trimBottomDb},
       {"crowdFormantSt0", &gn.formantSt[0]},      {"crowdFormantSt1", &gn.formantSt[1]},
       {"crowdFormantSt2", &gn.formantSt[2]},      {"crowdFormantSt3", &gn.formantSt[3]},
       {"crowdPitchSt0", &gn.pitchSt[0]},          {"crowdPitchSt1", &gn.pitchSt[1]},
@@ -287,8 +301,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
-    if (!crowdMannerInRange(gn)) return false;
-    clampCrowdLags(gn);
+    if (!crowdInRange(gn)) return false;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }
