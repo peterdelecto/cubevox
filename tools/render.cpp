@@ -1,4 +1,4 @@
-// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + gang + unison +
+// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + crowd + unison +
 // slapback + distortion + reverb, then the polish tail (comp, the back half of eq) and the output
 // ceiling like the box, processed mono 48 kHz f32 WAV out.
 
@@ -8,8 +8,8 @@
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
+#include "engine/crowd.h"
 #include "engine/distortion.h"
-#include "engine/gang.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -29,8 +29,8 @@ struct TuningField {
 struct RenderParams {
   bool inGateOn = false;
   bool gateOn = false;
-  bool pitchOn = false;  // also true when the gang card is on, so its ring and tracker run
-  bool gangOn = false;
+  bool pitchOn = false;  // also true when the crowd card is on, so its ring and tracker run
+  bool crowdOn = false;
   bool unisonOn = false;
   bool slapOn = false;
   bool distOn = false;
@@ -42,7 +42,7 @@ struct RenderParams {
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
-  cv::GangParams gang;
+  cv::CrowdParams crowd;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
@@ -57,18 +57,18 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>, alias --key] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
-               "       [--gang] [--width <0..1>] [--voices <0..1>]\n"
+               "       [--crowd] [--width <0..1>] [--voices <0..1>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
-               "  pitch front end runs with --octave, --autotune or --gang\n"
-               "  gang runs only with --gang; --width and --voices set its knobs (default 1 and 0.5)\n"
+               "  pitch front end runs with --octave, --autotune or --crowd\n"
+               "  crowd runs only with --crowd; --width and --voices set its knobs (default 1 and 0.5)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
-               "  at least one stage must run; order is eq front, ingate, pitch, gang, unison, slapback, distortion,\n"
+               "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
                "  gate, reverb, comp, eq back\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
@@ -100,11 +100,11 @@ int usage() {
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
-               "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangPitchSt0..3 gangTiltDb0..3 gangTiltHz\n"
-               "     gangDelayMs0..3 gangLagScale gangScatterMs (0..30) gangDriftCents (0..50) gangHpHz gangMaxLagMs\n"
-               "     gangWidthKnee (0.02..0.9) gangWidthKneeFrac (0..1)\n"
-               "     gangLevelScatterDb (0..4) gangContour0..3 (0.6..1.4)\n"
-               "     gangEpochAlign (0 or 1) gangEpochSearch (0..0.3)\n"
+               "     crowdVoiceDb crowdTrimDb crowdFormantSt0..3 crowdPitchSt0..3 crowdTiltDb0..3 crowdTiltHz\n"
+               "     crowdDelayMs0..3 crowdLagScale crowdScatterMs (0..30) crowdDriftCents (0..50) crowdHpHz crowdMaxLagMs\n"
+               "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
+               "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
+               "     crowdEpochAlign (0 or 1) crowdEpochSearch (0..0.3)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -159,10 +159,10 @@ bool parsePair(const char* s, float* hz, float* db) {
   return parseFloat(end + 1, db);
 }
 
-// The Gang card's human-voice controls refuse a value outside the range the engine clamps to, so a
+// The Crowd card's human-voice controls refuse a value outside the range the engine clamps to, so a
 // typo in a key does not pass for a setting. epochAlign arrives as 0 or 1.
-bool gangMannerInRange(const cv::GangTuning& g, float epochAlign) {
-  namespace gd = cv::gang_detail;
+bool crowdMannerInRange(const cv::CrowdTuning& g, float epochAlign) {
+  namespace gd = cv::crowd_detail;
   if (g.levelScatterDb < 0.0f || g.levelScatterDb > gd::kMaxLevelScatterDb) return false;
   if (g.epochSearch < 0.0f || g.epochSearch > gd::EpochTrack::kMaxSearch) return false;
   if (g.widthKnee < gd::kMinWidthKnee || g.widthKnee > gd::kMaxWidthKnee) return false;
@@ -182,13 +182,13 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringTuning& sb = rp.reverb.spring.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
-  cv::GangTuning& gn = rp.gang.tuning;
+  cv::CrowdTuning& gn = rp.crowd.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
-  float gangEpoch = gn.epochAlign ? 1.0f : 0.0f;
+  float crowdEpoch = gn.epochAlign ? 1.0f : 0.0f;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -200,24 +200,24 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"octTrimDb", &ot.trimDb},
       {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
       {"atGrainDelay", &at.grainDelay},
-      {"gangVoiceDb", &gn.voiceDb},              {"gangTrimDb", &gn.trimDb},
-      {"gangFormantSt0", &gn.formantSt[0]},      {"gangFormantSt1", &gn.formantSt[1]},
-      {"gangFormantSt2", &gn.formantSt[2]},      {"gangFormantSt3", &gn.formantSt[3]},
-      {"gangPitchSt0", &gn.pitchSt[0]},          {"gangPitchSt1", &gn.pitchSt[1]},
-      {"gangPitchSt2", &gn.pitchSt[2]},          {"gangPitchSt3", &gn.pitchSt[3]},
-      {"gangTiltDb0", &gn.tiltDb[0]},            {"gangTiltDb1", &gn.tiltDb[1]},
-      {"gangTiltDb2", &gn.tiltDb[2]},            {"gangTiltDb3", &gn.tiltDb[3]},
-      {"gangTiltHz", &gn.tiltHz},
-      {"gangDelayMs0", &gn.delayMs[0]},          {"gangDelayMs1", &gn.delayMs[1]},
-      {"gangDelayMs2", &gn.delayMs[2]},          {"gangDelayMs3", &gn.delayMs[3]},
-      {"gangLagScale", &gn.lagScale},
-      {"gangScatterMs", &gn.scatterMs},          {"gangDriftCents", &gn.driftCents},
-      {"gangHpHz", &gn.hpHz},                    {"gangMaxLagMs", &gn.maxLagMs},
-      {"gangWidthKnee", &gn.widthKnee},          {"gangWidthKneeFrac", &gn.widthKneeFrac},
-      {"gangLevelScatterDb", &gn.levelScatterDb},
-      {"gangContour0", &gn.contour[0]},          {"gangContour1", &gn.contour[1]},
-      {"gangContour2", &gn.contour[2]},          {"gangContour3", &gn.contour[3]},
-      {"gangEpochAlign", &gangEpoch},            {"gangEpochSearch", &gn.epochSearch},
+      {"crowdVoiceDb", &gn.voiceDb},              {"crowdTrimDb", &gn.trimDb},
+      {"crowdFormantSt0", &gn.formantSt[0]},      {"crowdFormantSt1", &gn.formantSt[1]},
+      {"crowdFormantSt2", &gn.formantSt[2]},      {"crowdFormantSt3", &gn.formantSt[3]},
+      {"crowdPitchSt0", &gn.pitchSt[0]},          {"crowdPitchSt1", &gn.pitchSt[1]},
+      {"crowdPitchSt2", &gn.pitchSt[2]},          {"crowdPitchSt3", &gn.pitchSt[3]},
+      {"crowdTiltDb0", &gn.tiltDb[0]},            {"crowdTiltDb1", &gn.tiltDb[1]},
+      {"crowdTiltDb2", &gn.tiltDb[2]},            {"crowdTiltDb3", &gn.tiltDb[3]},
+      {"crowdTiltHz", &gn.tiltHz},
+      {"crowdDelayMs0", &gn.delayMs[0]},          {"crowdDelayMs1", &gn.delayMs[1]},
+      {"crowdDelayMs2", &gn.delayMs[2]},          {"crowdDelayMs3", &gn.delayMs[3]},
+      {"crowdLagScale", &gn.lagScale},
+      {"crowdScatterMs", &gn.scatterMs},          {"crowdDriftCents", &gn.driftCents},
+      {"crowdHpHz", &gn.hpHz},                    {"crowdMaxLagMs", &gn.maxLagMs},
+      {"crowdWidthKnee", &gn.widthKnee},          {"crowdWidthKneeFrac", &gn.widthKneeFrac},
+      {"crowdLevelScatterDb", &gn.levelScatterDb},
+      {"crowdContour0", &gn.contour[0]},          {"crowdContour1", &gn.contour[1]},
+      {"crowdContour2", &gn.contour[2]},          {"crowdContour3", &gn.contour[3]},
+      {"crowdEpochAlign", &crowdEpoch},            {"crowdEpochSearch", &gn.epochSearch},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -280,8 +280,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
-    if (!gangMannerInRange(gn, gangEpoch)) return false;
-    gn.epochAlign = gangEpoch == 1.0f;
+    if (!crowdMannerInRange(gn, crowdEpoch)) return false;
+    gn.epochAlign = crowdEpoch == 1.0f;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }
@@ -393,13 +393,13 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOctave = true;
     } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
-    } else if (std::strcmp(a, "--gang") == 0) {
-      rp.gangOn = true;
+    } else if (std::strcmp(a, "--crowd") == 0) {
+      rp.crowdOn = true;
     } else if (std::strcmp(a, "--width") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.gang.width) || rp.gang.width < 0.0f || rp.gang.width > 1.0f)
+      if (!parseFloat(argv[++i], &rp.crowd.width) || rp.crowd.width < 0.0f || rp.crowd.width > 1.0f)
         return false;
     } else if (std::strcmp(a, "--voices") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.gang.voices) || rp.gang.voices < 0.0f || rp.gang.voices > 1.0f)
+      if (!parseFloat(argv[++i], &rp.crowd.voices) || rp.crowd.voices < 0.0f || rp.crowd.voices > 1.0f)
         return false;
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
@@ -424,12 +424,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.dwell : rp.reverb.spring.dwell;
     d = dwell;
   }
-  // Each pitch stage runs only when asked for. The Gang card reads the pitch stage's ring and tracker,
+  // Each pitch stage runs only when asked for. The Crowd card reads the pitch stage's ring and tracker,
   // so it turns the stage on and tells it to keep them running, as the registry's toggle does.
   op.on = haveOctave;
-  rp.gang.on = rp.gangOn;
-  rp.pitchFx.gangOn = rp.gangOn;
-  rp.pitchOn = haveOctave || ap.on || rp.gangOn;
+  rp.crowd.on = rp.crowdOn;
+  rp.pitchFx.crowdOn = rp.crowdOn;
+  rp.pitchOn = haveOctave || ap.on || rp.crowdOn;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
@@ -467,7 +467,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Gate inGate;
   static cv::Gate gate;
   static cv::PitchFx pitchFx;
-  static cv::Gang gang;
+  static cv::Crowd crowd;
   static cv::Unison unison;
   static cv::Slapback slapback;
   static cv::Distortion distortion;
@@ -477,7 +477,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   inGate.reset();
   gate.reset();
   pitchFx.reset();
-  gang.reset();
+  crowd.reset();
   unison.reset();
   slapback.reset();
   distortion.reset();
@@ -516,8 +516,8 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         src = scratch[next];
         next ^= 1;
       }
-      if (rp.gangOn) {
-        gang.process(src, scratch[next], n, rp.gang, pitchFx);
+      if (rp.crowdOn) {
+        crowd.process(src, scratch[next], n, rp.crowd, pitchFx);
         src = scratch[next];
         next ^= 1;
       }

@@ -11,8 +11,8 @@
 
 #include "core/chain_params.h"
 #include "core/registry.h"
+#include "engine/crowd.h"
 #include "engine/distortion.h"
-#include "engine/gang.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -206,21 +206,21 @@ bool midRow(const char* name, const Signal& in, const P& p) {
   return verdict(name, db, kMidLoDb, kMidHiDb);
 }
 
-// The Gang card at mid travel on both pots, behind the PitchFx that fills its ring and runs the
+// The Crowd card at mid travel on both pots, behind the PitchFx that fills its ring and runs the
 // tracker, as the chain runs them.
-bool gangRow(const Signal& in) {
+bool crowdRow(const Signal& in) {
   auto pitch = std::make_unique<Stage<cv::PitchFx>>();
-  auto gang = std::make_unique<Stage<cv::Gang>>();
+  auto crowd = std::make_unique<Stage<cv::Crowd>>();
   cv::PitchFxParams pp = pitchOff();
-  pp.gangOn = true;
-  cv::GangParams dp;
+  pp.crowdOn = true;
+  cv::CrowdParams dp;
   dp.on = true;
   dp.voices = 0.5f;
   dp.width = 0.5f;
-  return verdict("gang VOICES .5 WIDTH .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
+  return verdict("crowd VOICES .5 WIDTH .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
                                                      float tmp[cv::kBlock];
                                                      pitch->fx.process(i, tmp, n, pp);
-                                                     gang->fx.process(i, o, n, dp, pitch->fx);
+                                                     crowd->fx.process(i, o, n, dp, pitch->fx);
                                                    })));
 }
 
@@ -243,7 +243,7 @@ bool slotRows(const Signal& in) {
   unison.on = true;
   unison.depth = 0.5f;  // Adam default
   ok &= simple<cv::Unison>("unison depth .5", in, unison);
-  ok &= gangRow(in);
+  ok &= crowdRow(in);
 
   cv::SlapbackParams slap;
   slap.on = true;

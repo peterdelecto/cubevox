@@ -221,12 +221,12 @@ void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& sa
   CMP(p + ".spring", pos, sa, sb, wetDb);
 }
 
-void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv::GangParams& e, bool rest) {
+void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const cv::CrowdParams& e, bool rest) {
   CMP(p, pos, f, e, width);
   CMP(p, pos, f, e, voices);
   if (!rest) return;
-  const cv::GangTuning& a = f.tuning;
-  const cv::GangTuning& b = e.tuning;
+  const cv::CrowdTuning& a = f.tuning;
+  const cv::CrowdTuning& b = e.tuning;
   for (size_t v = 0; v < a.formantSt.size(); ++v) {
     const std::string at = p + "[" + std::to_string(v) + "]";
     EXPECT(at + ".formantSt", pos, a.formantSt[v], b.formantSt[v]);
@@ -277,7 +277,7 @@ struct EmuState {
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
-  cv::GangParams gang;
+  cv::CrowdParams crowd;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
@@ -340,8 +340,8 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(em.pitchFx.autotune.responseMs), fw);
   applyKnob(Card::Octave, 0, static_cast<float>(em.pitchFx.octave.semitones - kEmuSemiLo), fw);
   applyKnob(Card::Octave, 1, em.pitchFx.octave.mix, fw);
-  applyKnob(Card::Gang, 0, em.gang.width, fw);
-  applyKnob(Card::Gang, 1, em.gang.voices, fw);
+  applyKnob(Card::Crowd, 0, em.crowd.width, fw);
+  applyKnob(Card::Crowd, 1, em.crowd.voices, fw);
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
   applyKnob(Card::Unison, 1, em.unison.depth, fw);
   applyKnob(Card::Slapback, 0, posLinear(kEmuSlapLoMs, kEmuSlapHiMs, em.slapback.tuning.timeMs), fw);
@@ -417,21 +417,21 @@ void sweepOctave() {
   }
 }
 
-// emulator/main.cpp drawGangBlock: WIDTH and VOICES are percentSlider, so the knob position is
+// emulator/main.cpp drawCrowdBlock: WIDTH and VOICES are percentSlider, so the knob position is
 // the engine field.
-void sweepGang() {
+void sweepCrowd() {
   for (int i = 0; i <= kSweepSteps; ++i) {
     const float p = sweepPos(i);
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
-    applyKnob(Card::Gang, 0, p, fw);
-    em.gang.width = p;
-    cmpGang("sweep.gang.width", p, fw.gang, em.gang, false);
+    applyKnob(Card::Crowd, 0, p, fw);
+    em.crowd.width = p;
+    cmpCrowd("sweep.crowd.width", p, fw.crowd, em.crowd, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
-    applyKnob(Card::Gang, 1, p, fw2);
-    em2.gang.voices = p;
-    cmpGang("sweep.gang.voices", p, fw2.gang, em2.gang, false);
+    applyKnob(Card::Crowd, 1, p, fw2);
+    em2.crowd.voices = p;
+    cmpCrowd("sweep.crowd.voices", p, fw2.crowd, em2.crowd, false);
   }
 }
 
@@ -508,7 +508,7 @@ void defaults() {
   cmpGate("default.gate", 0.0f, fw.gate, em.gate, true);
   cmpAutotune("default.autotune", 0.0f, fw.pitchFx.autotune, em.pitchFx.autotune, true);
   cmpOctave("default.octave", 0.0f, fw.pitchFx.octave, em.pitchFx.octave, true);
-  cmpGang("default.gang", 0.0f, fw.gang, em.gang, true);
+  cmpCrowd("default.crowd", 0.0f, fw.crowd, em.crowd, true);
   cmpUnison("default.unison", 0.0f, fw.unison, em.unison, true);
   cmpSlapback("default.slapback", 0.0f, fw.slapback, em.slapback, true);
   cmpDistortion("default.distortion", 0.0f, fw.distortion, em.distortion, true);
@@ -551,7 +551,7 @@ int main() {
   sweepGate(Card::Gate, "gate");
   sweepAutotune();
   sweepOctave();
-  sweepGang();
+  sweepCrowd();
   sweepUnison();
   sweepSlapback();
   sweepDistortion();

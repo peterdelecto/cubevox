@@ -767,36 +767,36 @@ void checkPitchStageToggles() {
 
 // 200 ms of the tone: the tracker finds its period in about 32 ms and the voices sound at least
 // 22 ms after that.
-constexpr int kGangBlocks = 150;
+constexpr int kCrowdBlocks = 150;
 
-// The pitch stage, then the Gang card on its output, on `rig`'s own engines. This is the order the
+// The pitch stage, then the Crowd card on its output, on `rig`'s own engines. This is the order the
 // chain makes the two calls when nothing else sits between them.
-Block pitchThenGang(Rig& rig, const ChainSnapshot& snap, const Block& in) {
+Block pitchThenCrowd(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block mid{};
   Block out{};
   rig.engines.pitch.process(in.data(), mid.data(), kN, snap.params.pitchFx);
-  rig.engines.gang.process(mid.data(), out.data(), kN, snap.params.gang, rig.engines.pitch);
+  rig.engines.crowd.process(mid.data(), out.data(), kN, snap.params.crowd, rig.engines.pitch);
   return out;
 }
 
-struct GangOutcome {
-  bool sameAsHand = true;  // every block equals the pitch call then the Gang card
+struct CrowdOutcome {
+  bool sameAsHand = true;  // every block equals the pitch call then the Crowd card
   bool heard = false;      // the second half of the run differs from the input
   bool live = false;       // the tracker holds a period and a voice sounds
 };
 
-GangOutcome runGangLayout(const Layout& layout, const Toggles& on) {
+CrowdOutcome runCrowdLayout(const Layout& layout, const Toggles& on) {
   const ChainSnapshot snap = snapshotToggles(layout, 0.5f, on);
   auto chain = newRig();
   auto hand = newRig();
-  GangOutcome o;
-  for (int b = 0; b < kGangBlocks; ++b) {
+  CrowdOutcome o;
+  for (int b = 0; b < kCrowdBlocks; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*chain, snap, in, StillClock());
-    o.sameAsHand = o.sameAsHand && run.out == pitchThenGang(*hand, snap, in);
-    if (b >= kGangBlocks / 2) o.heard = o.heard || run.out != in;
+    o.sameAsHand = o.sameAsHand && run.out == pitchThenCrowd(*hand, snap, in);
+    if (b >= kCrowdBlocks / 2) o.heard = o.heard || run.out != in;
   }
-  o.live = chain->engines.pitch.pitch().period > 0.0f && chain->engines.gang.activeVoices() > 0;
+  o.live = chain->engines.pitch.pitch().period > 0.0f && chain->engines.crowd.activeVoices() > 0;
   return o;
 }
 
@@ -806,76 +806,76 @@ Toggles togglesOn(std::initializer_list<int> slots) {
   return t;
 }
 
-void checkGangStage() {
+void checkCrowdStage() {
   auto rig = newRig();
   ChainParams p;
   const Block in = tone(0, 0.3f);
   Block out;
   out.fill(7.0f);
   bool done = false;
-  check(runStage(rig->engines, Card::Gang, in.data(), out.data(), kN, p, done) && done && out == in,
-        "stage: a Gang card that is off makes the pitch call and passes the block untouched");
+  check(runStage(rig->engines, Card::Crowd, in.data(), out.data(), kN, p, done) && done && out == in,
+        "stage: a Crowd card that is off makes the pitch call and passes the block untouched");
 
-  // With the pitch stage already run this pass, the Gang card runs alone and nothing feeds the tracker.
-  p.gang.on = true;
-  p.pitchFx.gangOn = true;
+  // With the pitch stage already run this pass, the Crowd card runs alone and nothing feeds the tracker.
+  p.crowd.on = true;
+  p.pitchFx.crowdOn = true;
   bool wrote = true;
   bool changed = false;
   for (int b = 0; b < 20; ++b) {
     done = true;
-    wrote = wrote && runStage(rig->engines, Card::Gang, tone(b, 0.3f).data(), out.data(), kN, p, done);
+    wrote = wrote && runStage(rig->engines, Card::Crowd, tone(b, 0.3f).data(), out.data(), kN, p, done);
     changed = changed || out != tone(b, 0.3f);
   }
   check(wrote && changed && rig->engines.pitch.pitch().period == 0.0f,
-        "stage: a Gang card after the pitch stage ran runs only its own engine");
+        "stage: a Crowd card after the pitch stage ran runs only its own engine");
 }
 
-// Wherever the Gang card sits against Autotune and Octave, the pitch stage runs at the first of the
-// three, while the Gang card is on, even with both pitch toggles off, and the Gang card works on its output.
-void checkGangPitchStage() {
-  const GangOutcome alone = runGangLayout(layoutOf({Card::Gang}), togglesOn({0}));
-  check(alone.sameAsHand && alone.heard && alone.live, "gang: alone in a layout it gets a live ring and tracker");
+// Wherever the Crowd card sits against Autotune and Octave, the pitch stage runs at the first of the
+// three, while the Crowd card is on, even with both pitch toggles off, and the Crowd card works on its output.
+void checkCrowdPitchStage() {
+  const CrowdOutcome alone = runCrowdLayout(layoutOf({Card::Crowd}), togglesOn({0}));
+  check(alone.sameAsHand && alone.heard && alone.live, "crowd: alone in a layout it gets a live ring and tracker");
 
-  const GangOutcome ahead = runGangLayout(layoutOf({Card::Gang, Card::Autotune}), togglesOn({0}));
+  const CrowdOutcome ahead = runCrowdLayout(layoutOf({Card::Crowd, Card::Autotune}), togglesOn({0}));
   check(ahead.sameAsHand && ahead.heard && ahead.live,
-        "gang: ahead of Autotune with Autotune off it still gets a live ring and tracker");
+        "crowd: ahead of Autotune with Autotune off it still gets a live ring and tracker");
 
-  const GangOutcome aheadBoth = runGangLayout(layoutOf({Card::Gang, Card::Autotune}), togglesOn({0, 1}));
+  const CrowdOutcome aheadBoth = runCrowdLayout(layoutOf({Card::Crowd, Card::Autotune}), togglesOn({0, 1}));
   check(aheadBoth.sameAsHand && aheadBoth.heard && aheadBoth.live,
-        "gang: ahead of Autotune with both on, the pitch stage runs at the Gang card's slot and feeds it");
+        "crowd: ahead of Autotune with both on, the pitch stage runs at the Crowd card's slot and feeds it");
 
-  const GangOutcome behind =
-      runGangLayout(layoutOf({Card::Autotune, Card::Octave, Card::Gang}), togglesOn({2}));
+  const CrowdOutcome behind =
+      runCrowdLayout(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), togglesOn({2}));
   check(behind.sameAsHand && behind.heard && behind.live,
-        "gang: behind both pitch cards with both off, the pitch stage still runs and feeds it");
+        "crowd: behind both pitch cards with both off, the pitch stage still runs and feeds it");
 
-  const GangOutcome all = runGangLayout(layoutOf({Card::Autotune, Card::Gang}), togglesOn({0, 1}));
-  check(all.sameAsHand && all.heard && all.live, "gang: behind Autotune with both on, one pitch call per block");
+  const CrowdOutcome all = runCrowdLayout(layoutOf({Card::Autotune, Card::Crowd}), togglesOn({0, 1}));
+  check(all.sameAsHand && all.heard && all.live, "crowd: behind Autotune with both on, one pitch call per block");
 
   auto rig = newRig();
-  const ChainSnapshot snap = snapshotToggles(layoutOf({Card::Autotune, Card::Octave, Card::Gang}), 0.5f,
+  const ChainSnapshot snap = snapshotToggles(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), 0.5f,
                                              togglesOn({2}));
-  for (int b = 0; b < kGangBlocks; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
+  for (int b = 0; b < kCrowdBlocks; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
   check(rig->fades.level(0) == kSlotFadeBlocks,
-        "gang: the pitch stage's slot stays on the engine while only the Gang card's toggle is on");
+        "crowd: the pitch stage's slot stays on the engine while only the Crowd card's toggle is on");
 }
 
-// The Gang's toggle off fades its slot out, and the pitch stage with it. After the fade the dry
+// The Crowd's toggle off fades its slot out, and the pitch stage with it. After the fade the dry
 // input passes bit for bit.
-void checkGangToggleOff() {
-  const Layout layout = layoutOf({Card::Gang});
+void checkCrowdToggleOff() {
+  const Layout layout = layoutOf({Card::Crowd});
   const ChainSnapshot on = snapshotToggles(layout, 0.5f, togglesOn({0}));
   const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
   auto rig = newRig();
-  for (int b = 0; b < kGangBlocks; ++b) runBlock(*rig, on, tone(b, 0.3f), StillClock());
+  for (int b = 0; b < kCrowdBlocks; ++b) runBlock(*rig, on, tone(b, 0.3f), StillClock());
   bool dryAfter = true;
-  for (int b = kGangBlocks; b < kGangBlocks + 14; ++b) {
+  for (int b = kCrowdBlocks; b < kCrowdBlocks + 14; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*rig, off, in, StillClock());
-    if (b >= kGangBlocks + kSlotFadeBlocks) dryAfter = dryAfter && run.out == in;
+    if (b >= kCrowdBlocks + kSlotFadeBlocks) dryAfter = dryAfter && run.out == in;
   }
-  check(dryAfter, "gang: with its toggle off the slot fades out in 6 blocks, then passes the dry input bit for bit");
-  check(rig->engines.gang.leadGain() == 1.0f, "gang: the engine ramped back to the lead alone before its slot stopped");
+  check(dryAfter, "crowd: with its toggle off the slot fades out in 6 blocks, then passes the dry input bit for bit");
+  check(rig->engines.crowd.leadGain() == 1.0f, "crowd: the engine ramped back to the lead alone before its slot stopped");
 }
 
 // The shipped layout with every toggle on is the plain chain: the crossfade changes nothing while no
@@ -997,9 +997,9 @@ void checkChainRun() {
   checkSlotFlipReverses();
   checkInputGateKeepsDetector();
   checkPitchStageToggles();
-  checkGangStage();
-  checkGangPitchStage();
-  checkGangToggleOff();
+  checkCrowdStage();
+  checkCrowdPitchStage();
+  checkCrowdToggleOff();
   checkSettledSlotsAreInert();
   checkLateBlockPassesDry();
 }

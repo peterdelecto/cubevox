@@ -16,12 +16,12 @@ Files: `firmware/cubevox/src/core/registry.h/.cpp` (cards, knob descriptors, gro
 
 | Item | Decision |
 |---|---|
-| Card ids | `empty`, `input_gate`, `autotune`, `octave`, `unison`, `slapback`, `distortion`, `gate`, `reverb_spring`, `reverb_chasm`, `gang`. Never renamed or reused once shipped. |
+| Card ids | `empty`, `input_gate`, `autotune`, `octave`, `unison`, `slapback`, `distortion`, `gate`, `reverb_spring`, `reverb_chasm`, `crowd`. Never renamed or reused once shipped. |
 | Card index | `enum class Card : uint8_t` in id order; the enum value is the table index. |
 | Knob descriptor | name, kind (continuous or stepped), positions, min, max, unit. Bipolar knobs are min below 0, max above. |
-| Knobs | Input gate and Gate: Threshold (-70..-10 dB), Decay (5..1000 ms, log). Autotune: Key (12 positions, `kKeyName`), Response (log between `kMinResponseMs` and `kMaxResponseMs`). Octave: Semitones (-12..+12, 25 positions), Mix (0..100 %). Unison: Depth, Rate (%). Slapback: Mix (%), Time (60..250 ms). Distortion: Drive, Tone (%). Reverb cards: Mix (%), Time (%). Gang: Distance (%), Voices (%). Empty: no knobs. |
-| Display names | "Input gate", "Autotune", "Octave", "Unison", "Slapback", "Distortion", "Gate", "Spring Reverb" (SPRING B engine), "Chasm Reverb", "Gang". |
-| Groups | `reverb`: one card per layout, box rejects a second, page greys the rest. `pitch`: autotune, octave and gang share one pitch stage, which runs once at the first of them in the layout while any of their toggles is on; autotune and octave's relative order has no effect, and the gang card runs its own engine at its own slot on the ring that stage writes. |
+| Knobs | Input gate and Gate: Threshold (-70..-10 dB), Decay (5..1000 ms, log). Autotune: Key (12 positions, `kKeyName`), Response (log between `kMinResponseMs` and `kMaxResponseMs`). Octave: Semitones (-12..+12, 25 positions), Mix (0..100 %). Unison: Depth, Rate (%). Slapback: Mix (%), Time (60..250 ms). Distortion: Drive, Tone (%). Reverb cards: Mix (%), Time (%). Crowd: Distance (%), Voices (%). Empty: no knobs. |
+| Display names | "Input gate", "Autotune", "Octave", "Unison", "Slapback", "Distortion", "Gate", "Spring Reverb" (SPRING B engine), "Chasm Reverb", "Crowd". |
+| Groups | `reverb`: one card per layout, box rejects a second, page greys the rest. `pitch`: autotune, octave and crowd share one pitch stage, which runs once at the first of them in the layout while any of their toggles is on; autotune and octave's relative order has no effect, and the crowd card runs its own engine at its own slot on the ring that stage writes. |
 | Harmony | No card. The engine stays in `engine/` but the firmware keeps it forced off. Removed from the registry because a second Key pot conflicted with Autotune's. |
 | Old Spring | Engine `kReverbSpring` (`engine/spring.h`) removed from engine, emulator, renderer and tests in its own commit before the registry. Chasm and Spring B won the audition. Spring B takes the id `reverb_spring`. |
 | Slot hardware | Toggle pin and the two mux channels stay a fixed per-slot table. The card index is the only runtime part. |

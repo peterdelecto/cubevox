@@ -5,7 +5,7 @@
 #
 #   ./build.sh              # release image into /tmp/cubevox-fw-release
 #   BENCH=1 ./build.sh      # bench image (-DCUBEVOX_BENCH: drills and panel test) into /tmp/cubevox-fw-bench
-#   VARIANT=gangtest ./build.sh   # test image (-DCUBEVOX_GANGTEST: Gang in slot 2, CPU budget off, label -gang) into /tmp/cubevox-fw-gangtest
+#   VARIANT=crowdtest ./build.sh   # test image (-DCUBEVOX_CROWDTEST: Crowd in slot 2, CPU budget off, label -crowd) into /tmp/cubevox-fw-crowdtest
 #   OUT=/tmp/mine ./build.sh   # any output dir; its lock, log and clip header sit beside it
 #   TAIL=5 ./build.sh       # show only the last 5 lines of compiler output
 #   CLEAN=1 ./build.sh      # rebuild everything, so the image matches what CI builds from the same commit
@@ -38,8 +38,8 @@ implied=release
 if [ "${BENCH:-}" = 1 ]; then implied=bench; fi
 VARIANT="${VARIANT:-$implied}"
 case "$VARIANT" in
-  release|bench|gangtest) ;;
-  *) echo "[ERROR] VARIANT is '$VARIANT'; use release, bench or gangtest"; exit 1 ;;
+  release|bench|crowdtest) ;;
+  *) echo "[ERROR] VARIANT is '$VARIANT'; use release, bench or crowdtest"; exit 1 ;;
 esac
 if [ "$implied" = bench ] && [ "$VARIANT" != bench ]; then
   echo "[ERROR] VARIANT=$VARIANT conflicts with BENCH=1, which needs the bench image"
@@ -174,8 +174,8 @@ if ! [[ "$VERSION_TXT" =~ ^[0-9]+\.[0-9][0-9]\.[0-9][0-9]$ ]]; then
   exit 1
 fi
 VERSION="v$VERSION_TXT"
-# The header's version field holds 15 characters, so the test image's suffix is -gang.
-if [ "$VARIANT" = gangtest ]; then VERSION="$VERSION-gang"; fi
+# The header's version field holds 15 characters, so the test image's suffix is -crowd.
+if [ "$VARIANT" = crowdtest ]; then VERSION="$VERSION-crowd"; fi
 GIT_STATE="$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo no-git)"
 echo "[build] core $CORE $CORE_VERSION, firmware $VERSION (git $GIT_STATE)"
 
@@ -204,7 +204,7 @@ INC="-I$REPO -I$FW/cubevox/src -I$REPO/tools/font-editor/fonts"
 # of escaping makes the macro a string literal. A second level put quote characters in the string.
 DEFS="-DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"$VERSION\""
 if [ "$VARIANT" = bench ]; then DEFS="$DEFS -DCUBEVOX_BENCH"; fi
-if [ "$VARIANT" = gangtest ]; then DEFS="$DEFS -DCUBEVOX_GANGTEST"; fi
+if [ "$VARIANT" = crowdtest ]; then DEFS="$DEFS -DCUBEVOX_CROWDTEST"; fi
 OPT="${OPT:--O2}"
 DEFS="$DEFS ${EXTRA_FLAGS:-}"
 echo "[build] $VARIANT image, $OPT ${EXTRA_FLAGS:-}"
@@ -288,7 +288,7 @@ fi
 # Only the bench image holds bench code. The check runs on the release image for the absence and on
 # the bench image for the presence, which keeps its list of names tied to real functions.
 symbols_variant="$VARIANT"
-if [ "$symbols_variant" = gangtest ]; then symbols_variant=release; fi  # it holds no bench code
+if [ "$symbols_variant" = crowdtest ]; then symbols_variant=release; fi  # it holds no bench code
 NM="$NM" "$REPO/tools/check_bench_symbols.sh" "$symbols_variant" "$OUT/cubevox.ino.elf"
 
 # Fill the header's length and CRC in place, write the update file next to the .bin, and read the

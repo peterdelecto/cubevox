@@ -8,7 +8,7 @@
 #include "engine/dsp.h"
 #include "engine/psola.h"
 
-// The glottal pulses of the voice, found once and shared by the Gang card's four copies. Every copy
+// The glottal pulses of the voice, found once and shared by the Crowd card's four copies. Every copy
 // cuts its grains from the same ring, so the pulses are a property of the voice and not of a copy's
 // lag. The search runs on PitchFx's low-passed shadow ring, where each pulse is one broad peak.
 //
@@ -18,7 +18,7 @@
 // cuts its grain there.
 
 namespace cv {
-namespace gang_detail {
+namespace crowd_detail {
 
 class EpochTrack {
  public:
@@ -167,5 +167,5 @@ class EpochTrack {
   float sign_ = 1.0f;  // the sign of the lobe the track follows
 };
 
-}  // namespace gang_detail
+}  // namespace crowd_detail
 }  // namespace cv
