@@ -8,10 +8,11 @@
 #include "engine/fastmath.h"
 
 // The Crowd card's trial voice (voice 5) is one more copy that tries to sound like a person of another
-// sex, age or body size. These are the pieces it has and the four others lack. GrainLuck gives each
-// grain a random length and loudness and drops pulses for vocal fry. FryGate decides when a phrase
-// is ending. TrialChain shapes the copy with a tilt, a peak and a notch and mixes breath under it.
-// Every piece is neutral at its zero, and the engine clamps each control to a human range.
+// sex, age or body size. These are its pieces. GrainLuck gives each grain a random length and loudness
+// and drops pulses for vocal fry. FryGate decides when a phrase is ending. SpectralTilt leans the whole
+// spectrum, and TrialChain adds breath under the copy. The four main copies share SpectralTilt and the
+// shimmer of GrainLuck. Every piece is neutral at its zero, and the engine clamps each control to a
+// human range.
 
 namespace cv {
 namespace crowd_detail {
@@ -63,9 +64,10 @@ constexpr float kBreathDown = tauCoef(60.0f);
 // number voice analysis reports.
 constexpr float kLocalPeak = 1.5f;
 
-// Per-grain luck of the trial voice. The voice asks it once per launch for the grain's loudness (0
-// drops the grain) and for the length of the cycle that follows. With every control at 0 it returns
-// 1 and 1, and the voice lays down the grains it lays down without it.
+// Per-grain luck. A voice asks it once per launch for the grain's loudness (0 drops the grain) and for
+// the length of the cycle that follows. With every control at 0 it returns 1 and 1, and the voice lays
+// down the grains it lays down without it. The trial voice uses all of it. A main copy sets only the
+// shimmer.
 struct GrainLuck {
   XorShift rng;
   float jitter = 0.0f;      // local jitter as a fraction of the cycle
@@ -147,68 +149,79 @@ class FryGate {
   bool armed_ = true;
 };
 
-// The trial voice's own colour. A low shelf and a high shelf of opposite sign at 1 kHz tilt the whole
-// spectrum, a peak stands in for the third formant, a notch for a nasal anti-resonance, and breath
-// noise rides under the copy. A stage whose gain is 0 dB is skipped, so a neutral chain is a copy.
-class TrialChain {
+// A low shelf at -db / 2 and a high shelf at +db / 2, both at 1 kHz, lean the whole spectrum so the high
+// end sits db above the low end. A tilt under kOffDb counts as 0 and the stage is skipped, so a neutral
+// tilt leaves the samples alone.
+class SpectralTilt {
  public:
-  static constexpr float kTiltHz = 1000.0f;
-  static constexpr float kPeakQ = 2.0f;
-  static constexpr float kNotchQ = 3.0f;
-  static constexpr float kBreathHz = 2000.0f;
-  static constexpr float kOffDb = 0.005f;  // a gain this small counts as 0
+  static constexpr float kHz = 1000.0f;
+  static constexpr float kOffDb = 0.005f;
 
   void clear() {
     lo_.clear();
     hi_.clear();
-    peak_.clear();
-    notch_.clear();
-    breathHp_.clear();
-    env_.clear();
-    rng_.seed(0x6D2B79F5u);
-    set_ = false;
-    breathSet_ = false;
+    db_ = 0.0f;
   }
 
-  // Sets the filters on the first block after a clear and whenever a value moved. Each setter runs
-  // libm, so nothing here belongs in a per-sample loop.
-  void set(float tiltDb, float peakHz, float peakDb, float notchHz, float notchDb) {
-    if (!set_ || tiltDb != tiltDb_) {
-      lo_.setLowShelf(kTiltHz, -0.5f * tiltDb);
-      hi_.setHighShelf(kTiltHz, 0.5f * tiltDb);
-      tiltDb_ = tiltDb;
+  // Sets the shelves when the gain moved. Each setter runs libm, so nothing here belongs in a
+  // per-sample loop. A stage that wakes from off starts with empty filter state.
+  void set(float db) {
+    if (db == db_) return;
+    if (!on(db_)) {
+      lo_.clear();
+      hi_.clear();
     }
-    if (!set_ || peakHz != peakHz_ || peakDb != peakDb_) {
-      peak_.setPeak(peakHz, peakDb, kPeakQ);
-      peakHz_ = peakHz;
-      peakDb_ = peakDb;
-    }
-    if (!set_ || notchHz != notchHz_ || notchDb != notchDb_) {
-      notch_.setPeak(notchHz, notchDb, kNotchQ);
-      notchHz_ = notchHz;
-      notchDb_ = notchDb;
-    }
-    set_ = true;
+    lo_.setLowShelf(kHz, -0.5f * db);
+    hi_.setHighShelf(kHz, 0.5f * db);
+    db_ = db;
   }
 
-  // Shapes n samples in place, then mixes breath under them. breath 0 skips the noise entirely.
-  void shape(float* x, int n, float breath) {
-    if (tiltDb_ > kOffDb || tiltDb_ < -kOffDb) {
-      run(lo_, x, n);
-      run(hi_, x, n);
-    }
-    if (peakDb_ > kOffDb || peakDb_ < -kOffDb) run(peak_, x, n);
-    if (notchDb_ > kOffDb || notchDb_ < -kOffDb) run(notch_, x, n);
-    if (breath > 0.0f) addBreath(x, n, breath);
+  bool active() const { return on(db_); }
+
+  // Leans n samples in place.
+  void run(float* x, int n) {
+    if (!active()) return;
+    runOne(lo_, x, n);
+    runOne(hi_, x, n);
   }
 
  private:
-  static void run(Biquad& b, float* x, int n) {
+  static bool on(float db) { return db > kOffDb || db < -kOffDb; }
+
+  static void runOne(Biquad& b, float* x, int n) {
     Biquad f = b;
     for (int i = 0; i < n; ++i) x[i] = f.run(x[i]);
     b = f;
   }
 
+  Biquad lo_;
+  Biquad hi_;
+  float db_ = 0.0f;
+};
+
+// The trial voice's own colour. A spectral tilt leans the whole spectrum and breath noise rides under
+// the copy. A tilt of 0 dB is skipped and breath 0 does not run, so a neutral chain is a copy.
+class TrialChain {
+ public:
+  static constexpr float kBreathHz = 2000.0f;
+
+  void clear() {
+    tilt_.clear();
+    breathHp_.clear();
+    env_.clear();
+    rng_.seed(0x6D2B79F5u);
+    breathSet_ = false;
+  }
+
+  void set(float tiltDb) { tilt_.set(tiltDb); }
+
+  // Shapes n samples in place, then mixes breath under them. breath 0 skips the noise entirely.
+  void shape(float* x, int n, float breath) {
+    tilt_.run(x, n);
+    if (breath > 0.0f) addBreath(x, n, breath);
+  }
+
+ private:
   // White noise through a 2 kHz high-pass, scaled by breath and by the copy's own level, so it never
   // sounds in a gap and stays under the copy at the top of its range.
   void addBreath(float* x, int n, float breath) {
@@ -228,19 +241,10 @@ class TrialChain {
     rng_ = rng;
   }
 
-  Biquad lo_;
-  Biquad hi_;
-  Biquad peak_;
-  Biquad notch_;
+  SpectralTilt tilt_;
   Biquad breathHp_;
   EnvFollower env_;
   XorShift rng_;
-  float tiltDb_ = 0.0f;
-  float peakHz_ = 0.0f;
-  float peakDb_ = 0.0f;
-  float notchHz_ = 0.0f;
-  float notchDb_ = 0.0f;
-  bool set_ = false;
   bool breathSet_ = false;
 };
 

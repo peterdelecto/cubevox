@@ -107,11 +107,11 @@ int usage() {
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
+               "     crowdTilt0..3 (-6..6 dB) crowdShimmer0..3 (0..1 dB)\n"
                "     crowdEpochAlign (0 or 1) crowdEpochSearch (0..0.3)\n"
                "     crowdV5On (0 or 1) crowdV5Db (-40..0) crowdDelayMs5 (5..200) crowdV5PitchSt (-12..12)\n"
                "     crowdV5FormantSt (-6..6) crowdV5Contour (0.6..1.4) crowdV5TiltDb (-6..6) crowdV5Breath (0..0.3)\n"
-               "     crowdV5Fry (0..1) crowdV5PeakHz (2000..4000) crowdV5PeakDb (-6..6) crowdV5NotchHz (800..2000)\n"
-               "     crowdV5NotchDb (-12..0) crowdV5Jitter (0..1 %%) crowdV5Shimmer (0..1 dB)\n"
+               "     crowdV5Fry (0..1) crowdV5Jitter (0..1 %%) crowdV5Shimmer (0..1 dB)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -176,11 +176,9 @@ bool crowdVoice5InRange(const cv::CrowdTuning& g, float on) {
          inRange(g.v5PitchSt, -gd::kMaxV5PitchSt, gd::kMaxV5PitchSt) &&
          inRange(g.v5FormantSt, -gd::kMaxV5FormantSt, gd::kMaxV5FormantSt) &&
          inRange(g.v5Contour, gd::kMinContour, gd::kMaxContour) &&
-         inRange(g.v5TiltDb, -gd::kMaxV5TiltDb, gd::kMaxV5TiltDb) && inRange(g.v5Breath, 0.0f, gd::kMaxV5Breath) &&
-         inRange(g.v5Fry, 0.0f, 1.0f) && inRange(g.v5PeakHz, gd::kMinV5PeakHz, gd::kMaxV5PeakHz) &&
-         inRange(g.v5PeakDb, -gd::kMaxV5PeakDb, gd::kMaxV5PeakDb) &&
-         inRange(g.v5NotchHz, gd::kMinV5NotchHz, gd::kMaxV5NotchHz) && inRange(g.v5NotchDb, gd::kMinV5NotchDb, 0.0f) &&
-         inRange(g.v5Jitter, 0.0f, gd::kMaxV5JitterPct) && inRange(g.v5Shimmer, 0.0f, gd::kMaxV5ShimmerDb);
+         inRange(g.v5TiltDb, -gd::kMaxTiltDb, gd::kMaxTiltDb) && inRange(g.v5Breath, 0.0f, gd::kMaxV5Breath) &&
+         inRange(g.v5Fry, 0.0f, 1.0f) && inRange(g.v5Jitter, 0.0f, gd::kMaxV5JitterPct) &&
+         inRange(g.v5Shimmer, 0.0f, gd::kMaxShimmerDb);
 }
 
 // --crowd-v5 woman, older or big: the preset's fields, and voice 5 on.
@@ -206,6 +204,8 @@ bool crowdMannerInRange(const cv::CrowdTuning& g, float epochAlign) {
   if (epochAlign != 0.0f && epochAlign != 1.0f) return false;
   for (size_t v = 0; v < g.contour.size(); ++v) {
     if (g.contour[v] < gd::kMinContour || g.contour[v] > gd::kMaxContour) return false;
+    if (g.tilt[v] < -gd::kMaxTiltDb || g.tilt[v] > gd::kMaxTiltDb) return false;
+    if (g.shimmer[v] < 0.0f || g.shimmer[v] > gd::kMaxShimmerDb) return false;
   }
   return true;
 }
@@ -255,14 +255,16 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"crowdLevelScatterDb", &gn.levelScatterDb},
       {"crowdContour0", &gn.contour[0]},          {"crowdContour1", &gn.contour[1]},
       {"crowdContour2", &gn.contour[2]},          {"crowdContour3", &gn.contour[3]},
+      {"crowdTilt0", &gn.tilt[0]},                {"crowdTilt1", &gn.tilt[1]},
+      {"crowdTilt2", &gn.tilt[2]},                {"crowdTilt3", &gn.tilt[3]},
+      {"crowdShimmer0", &gn.shimmer[0]},          {"crowdShimmer1", &gn.shimmer[1]},
+      {"crowdShimmer2", &gn.shimmer[2]},          {"crowdShimmer3", &gn.shimmer[3]},
       {"crowdEpochAlign", &crowdEpoch},            {"crowdEpochSearch", &gn.epochSearch},
       {"crowdV5On", &crowdV5On},                  {"crowdV5Db", &gn.voice5Db},
       {"crowdDelayMs5", &gn.delayMs5},            {"crowdV5PitchSt", &gn.v5PitchSt},
       {"crowdV5FormantSt", &gn.v5FormantSt},      {"crowdV5Contour", &gn.v5Contour},
       {"crowdV5TiltDb", &gn.v5TiltDb},            {"crowdV5Breath", &gn.v5Breath},
-      {"crowdV5Fry", &gn.v5Fry},                  {"crowdV5PeakHz", &gn.v5PeakHz},
-      {"crowdV5PeakDb", &gn.v5PeakDb},            {"crowdV5NotchHz", &gn.v5NotchHz},
-      {"crowdV5NotchDb", &gn.v5NotchDb},          {"crowdV5Jitter", &gn.v5Jitter},
+      {"crowdV5Fry", &gn.v5Fry},                  {"crowdV5Jitter", &gn.v5Jitter},
       {"crowdV5Shimmer", &gn.v5Shimmer},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},

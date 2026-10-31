@@ -234,6 +234,8 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
     EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
     EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
     EXPECT(at + ".contour", pos, a.contour[v], b.contour[v]);
+    EXPECT(at + ".tilt", pos, a.tilt[v], b.tilt[v]);
+    EXPECT(at + ".shimmer", pos, a.shimmer[v], b.shimmer[v]);
   }
   CMP(p, pos, a, b, lagScale);
   CMP(p, pos, a, b, tiltHz);
@@ -263,10 +265,6 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
   CMP(p, pos, a, b, v5TiltDb);
   CMP(p, pos, a, b, v5Breath);
   CMP(p, pos, a, b, v5Fry);
-  CMP(p, pos, a, b, v5PeakHz);
-  CMP(p, pos, a, b, v5PeakDb);
-  CMP(p, pos, a, b, v5NotchHz);
-  CMP(p, pos, a, b, v5NotchDb);
   CMP(p, pos, a, b, v5Jitter);
   CMP(p, pos, a, b, v5Shimmer);
 }
