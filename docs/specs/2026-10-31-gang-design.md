@@ -290,3 +290,4 @@ Retune 1 (owner 2026-10-31): the copies sounded too similar to the input; each c
    voices land near 150k cycles (about 23 % mean), three near 120k (about 19 %). The cost row stays
    the 19 / 21 estimate until a board bench; layoutValid refuses the card in today's default layout
    with Unison out at 82 / 96 against 75 / 95, so the bench needs a bench op or a lighter layout.
+8. Solo (owner 2026-10-31): GangParams::solo, a bit per voice, emulator tuning hook; the firmware never sets it.

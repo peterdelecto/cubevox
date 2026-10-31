@@ -588,6 +588,9 @@ void drawGangVoiceNodes(cv::GangTuning& t) {
   }
   if (tuningNode("Pitch")) {
     voiceSliders("Pitch", t.pitchSt, -12.0f, 12.0f, "%+.2f st");
+    ImGui::TreePop();
+  }
+  if (tuningNode("Wobble")) {
     voiceSliders("Wobble rate", t.lfoHz, 0.0f, 1.0f, "%.2f Hz");
     ImGui::SliderFloat("Wobble depth", &t.lfoCents, 0.0f, 30.0f, "%.1f cents");
     ImGui::TreePop();
@@ -601,6 +604,20 @@ void drawGangVoiceNodes(cv::GangTuning& t) {
     voiceSliders("Delay", t.delayMs, 5.0f, 90.0f, "%.0f ms");
     ImGui::TreePop();
   }
+}
+
+// One checkbox per copy, each setting its bit in solo. The boxes are independent, so two copies can
+// be heard together. The mask is not saved with the state.
+void drawGangSoloNode(uint8_t& solo) {
+  if (!tuningNode("Solo")) return;
+  for (unsigned i = 0; i < 4; ++i) {
+    char label[8];
+    std::snprintf(label, sizeof(label), "%u", i + 1);
+    bool on = ((solo >> i) & 1u) != 0;
+    if (ImGui::Checkbox(label, &on)) solo = static_cast<uint8_t>(on ? solo | (1u << i) : solo & ~(1u << i));
+    if (i < 3) ImGui::SameLine();
+  }
+  ImGui::TreePop();
 }
 
 void drawGangSharedNodes(cv::GangTuning& t) {
@@ -1166,10 +1183,11 @@ void drawAutotuneTuning(cv::AutotuneParams& a) {
 }
 
 // The Gang card has no macros, so its tuning is the raw fields in both views.
-void drawGangTuning(cv::GangTuning& t) {
+void drawGangTuning(cv::GangParams& d) {
   if (!tuningHeader("gang")) return;
-  drawGangVoiceNodes(t);
-  drawGangSharedNodes(t);
+  drawGangSoloNode(d.solo);
+  drawGangVoiceNodes(d.tuning);
+  drawGangSharedNodes(d.tuning);
 }
 
 void drawUnisonTuning(cv::UnisonTuning& t) {
@@ -1363,7 +1381,7 @@ void drawGangBlock(cv::GangParams& d) {
   ImGui::Checkbox("GANG", &d.on);
   percentSlider("DISTANCE", d.distance);
   percentSlider("VOICES", d.voices);
-  drawGangTuning(d.tuning);
+  drawGangTuning(d);
   ImGui::PopID();
 }
 
@@ -1813,8 +1831,9 @@ int runLayoutProbe() {
       {true, nullptr, nullptr},
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
-      {true, "gang", nullptr},
+      {true, "gang", nullptr},        {true, "gang", "Solo"},
       {true, "gang", "Formants"},     {true, "gang", "Pitch"},
+      {true, "gang", "Wobble"},
       {true, "gang", "Tone"},        {true, "gang", "Timing"},
       {true, "gang", "Levels"},      {true, "gang", "Distance"},
       {true, "gang", "Room"},
