@@ -582,8 +582,8 @@ void voiceSliders(const char* name, std::array<float, 4>& v, float lo, float hi,
 // The Gang card's tuning is split into sub-nodes so no column ever needs a scroll bar: the four
 // voices' own settings first, then the shared ones.
 void drawGangVoiceNodes(cv::GangTuning& t) {
-  if (tuningNode("Throats")) {
-    voiceSliders("Throat", t.formantSt, -4.0f, 4.0f, "%+.2f st");
+  if (tuningNode("Formants")) {
+    voiceSliders("Formant", t.formantSt, -4.0f, 4.0f, "%+.2f st");
     ImGui::TreePop();
   }
   if (tuningNode("Pitch")) {
@@ -1814,7 +1814,7 @@ int runLayoutProbe() {
       {true, "octave", nullptr},
       {true, "autotune", nullptr},
       {true, "gang", nullptr},
-      {true, "gang", "Throats"},     {true, "gang", "Pitch"},
+      {true, "gang", "Formants"},     {true, "gang", "Pitch"},
       {true, "gang", "Tone"},        {true, "gang", "Timing"},
       {true, "gang", "Levels"},      {true, "gang", "Distance"},
       {true, "gang", "Room"},
