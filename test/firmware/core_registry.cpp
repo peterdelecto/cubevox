@@ -88,7 +88,7 @@ void checkGroups() {
   check(pitch == 3, "autotune, octave and the crowd card are the pitch group");
 }
 
-// The amount knob (Mix, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
+// The amount knob (Mix, Amount, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
 // still reaches its own engine field through the knob it is listed on.
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
@@ -97,20 +97,21 @@ void checkAmountKnobIsB() {
     const char* const name = knobDesc(c, 1)->name;
     char what[96];
     std::snprintf(what, sizeof(what), "%s: knob B is the amount knob, not %s", cardDesc(c).id, knobDesc(c, 0)->name);
-    check(std::strcmp(name, "Mix") == 0 || std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 ||
-              std::strcmp(name, "VOICES") == 0,
+    check(std::strcmp(name, "Mix") == 0 || std::strcmp(name, "AMOUNT") == 0 || std::strcmp(name, "Depth") == 0 ||
+              std::strcmp(name, "Drive") == 0 || std::strcmp(name, "VOICES") == 0,
           what);
     const char* const other = knobDesc(c, 0)->name;
     std::snprintf(what, sizeof(what), "%s: knob A is not an amount knob", cardDesc(c).id);
-    check(std::strcmp(other, "Mix") != 0 && std::strcmp(other, "Depth") != 0 && std::strcmp(other, "Drive") != 0 &&
-              std::strcmp(other, "VOICES") != 0,
+    check(std::strcmp(other, "Mix") != 0 && std::strcmp(other, "AMOUNT") != 0 && std::strcmp(other, "Depth") != 0 &&
+              std::strcmp(other, "Drive") != 0 && std::strcmp(other, "VOICES") != 0,
           what);
   }
   ChainParams p;
   applyKnob(Card::Unison, 1, 0.7f, p);
   check(std::fabs(p.unison.depth - 0.7f) < 1e-6f, "amount: Unison knob B drives Depth");
   applyKnob(Card::Slapback, 1, 0.7f, p);
-  check(std::fabs(p.slapback.mix - 0.7f) < 1e-6f, "amount: Slapback knob B drives Mix");
+  check(std::fabs(p.slapback.mix - 0.7f) < 1e-6f, "amount: Slapback knob B drives the wet level and repeats");
+  check(std::strcmp(knobDesc(Card::Slapback, 1)->name, "AMOUNT") == 0, "amount: Slapback knob B is named AMOUNT");
   applyKnob(Card::Distortion, 1, 0.7f, p);
   check(std::fabs(p.distortion.drive - 0.7f) < 1e-6f, "amount: Distortion knob B drives Drive");
   applyKnob(Card::ReverbSpring, 1, 0.7f, p);

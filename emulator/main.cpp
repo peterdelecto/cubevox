@@ -369,7 +369,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
       "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Crowd WIDTH "
       "%.0f %%, VOICES %.0f %%; Unison DEPTH "
-      "%.0f %%, RATE %.0f %%; Slapback MIX %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
+      "%.0f %%, RATE %.0f %%; Slapback AMOUNT %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
       "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
       macros, onOff(p.gate.on), onOff(at.on), onOff(o.on), onOff(p.crowd.on), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
@@ -1447,7 +1447,7 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
 void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
-  percentSlider("MIX", s.mix);
+  percentSlider("AMOUNT", s.mix);
   ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
@@ -1703,7 +1703,7 @@ void drawPedals(ProtoParams& params) {
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
-    pedalPercent("MIX", params.slapback.mix);
+    pedalPercent("AMOUNT", params.slapback.mix);
   });
   next();
   pedal("DISTORTION", params.distortion.on, w, [&] {

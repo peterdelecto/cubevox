@@ -474,7 +474,7 @@ void sweepSlapback() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Slapback, 1, p, fw);
-    em.slapback.mix = p;  // drawPedals MIX
+    em.slapback.mix = p;  // drawPedals AMOUNT
     cmpSlapback("sweep.slapback.mix", p, fw.slapback, em.slapback, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
