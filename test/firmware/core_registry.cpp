@@ -67,12 +67,12 @@ void checkCardTable() {
         "table: both pitch cards share the pitch engine");
   check(engineOf(Card::ReverbSpring) == Engine::Reverb && engineOf(Card::ReverbChasm) == Engine::Reverb,
         "table: both reverb cards share the reverb engine");
-  check(engineOf(Card::Doubler) == Engine::Doubler && cardDesc(Card::Doubler).group == Group::Pitch,
-        "table: the Doubler has its own engine and sits in the pitch group");
-  check(std::strcmp(cardDesc(Card::Doubler).id, "doubler") == 0 && std::strcmp(cardDesc(Card::Doubler).name, "Doubler") == 0 &&
-            std::strcmp(knobDesc(Card::Doubler, 0)->name, "DISTANCE") == 0 &&
-            std::strcmp(knobDesc(Card::Doubler, 1)->name, "VOICES") == 0,
-        "table: the Doubler card reads DISTANCE then VOICES");
+  check(engineOf(Card::Gang) == Engine::Gang && cardDesc(Card::Gang).group == Group::Pitch,
+        "table: the Gang card has its own engine and sits in the pitch group");
+  check(std::strcmp(cardDesc(Card::Gang).id, "gang") == 0 && std::strcmp(cardDesc(Card::Gang).name, "Gang") == 0 &&
+            std::strcmp(knobDesc(Card::Gang, 0)->name, "DISTANCE") == 0 &&
+            std::strcmp(knobDesc(Card::Gang, 1)->name, "VOICES") == 0,
+        "table: the Gang card reads DISTANCE then VOICES");
   check(kFadeHoldBlocks == kEngineCount - 1, "table: one silent block per engine after the swap block");
 }
 
@@ -85,14 +85,14 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb cards");
-  check(pitch == 3, "autotune, octave and the doubler are the pitch group");
+  check(pitch == 3, "autotune, octave and the gang card are the pitch group");
 }
 
 // The amount knob (Mix, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
 // still reaches its own engine field through the knob it is listed on.
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
-                              Card::Doubler};
+                              Card::Gang};
   for (const Card c : amountCards) {
     const char* const name = knobDesc(c, 1)->name;
     char what[96];
@@ -117,12 +117,12 @@ void checkAmountKnobIsB() {
   check(std::fabs(p.reverb.mix - 0.7f) < 1e-6f, "amount: Spring Reverb knob B drives Mix");
   applyKnob(Card::ReverbChasm, 1, 0.4f, p);
   check(std::fabs(p.reverb.mix - 0.4f) < 1e-6f, "amount: Chasm Reverb knob B drives Mix");
-  applyKnob(Card::Doubler, 1, 0.7f, p);
-  check(std::fabs(p.doubler.voices - 0.7f) < 1e-6f && std::fabs(p.doubler.distance - 0.5f) < 1e-6f,
-        "amount: Doubler knob B drives VOICES and leaves DISTANCE alone");
-  applyKnob(Card::Doubler, 0, 0.3f, p);
-  check(std::fabs(p.doubler.distance - 0.3f) < 1e-6f && std::fabs(p.doubler.voices - 0.7f) < 1e-6f,
-        "amount: Doubler knob A drives DISTANCE and leaves VOICES alone");
+  applyKnob(Card::Gang, 1, 0.7f, p);
+  check(std::fabs(p.gang.voices - 0.7f) < 1e-6f && std::fabs(p.gang.distance - 0.5f) < 1e-6f,
+        "amount: Gang knob B drives VOICES and leaves DISTANCE alone");
+  applyKnob(Card::Gang, 0, 0.3f, p);
+  check(std::fabs(p.gang.distance - 0.3f) < 1e-6f && std::fabs(p.gang.voices - 0.7f) < 1e-6f,
+        "amount: Gang knob A drives DISTANCE and leaves VOICES alone");
   check(std::strcmp(knobDesc(Card::Octave, 1)->name, "Mix") == 0, "amount: Octave keeps Mix on knob B");
 }
 
@@ -155,7 +155,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
-    case Card::Doubler: return knob == 0 ? p.doubler.distance : p.doubler.voices;
+    case Card::Gang: return knob == 0 ? p.gang.distance : p.gang.voices;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -276,7 +276,7 @@ void checkChainDefaults() {
             g.detectorHpHz == 120.0f && !g.travelTimes,
         "defaults: the panel gate keeps its soft-knee tuning");
   check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
-            !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.doubler.on && !p.pitchFx.doublerOn,
+            !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.gang.on && !p.pitchFx.gangOn,
         "defaults: every other stage off");
   check(std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
         "defaults: octave at 10 % mix");
@@ -314,11 +314,11 @@ void checkToggles() {
   applyToggle(Card::Autotune, true, p);
   applyToggle(Card::Octave, false, p);
   check(p.pitchFx.autotune.on && !p.pitchFx.octave.on, "pitch toggles are independent");
-  applyToggle(Card::Doubler, true, p);
-  check(p.doubler.on && p.pitchFx.doublerOn && p.pitchFx.autotune.on && !p.pitchFx.octave.on,
-        "doubler toggle on sets its stage and the pitch stage's feed, and leaves the other pitch toggles alone");
-  applyToggle(Card::Doubler, false, p);
-  check(!p.doubler.on && !p.pitchFx.doublerOn && p.pitchFx.autotune.on, "doubler toggle off clears both flags");
+  applyToggle(Card::Gang, true, p);
+  check(p.gang.on && p.pitchFx.gangOn && p.pitchFx.autotune.on && !p.pitchFx.octave.on,
+        "gang toggle on sets its stage and the pitch stage's feed, and leaves the other pitch toggles alone");
+  applyToggle(Card::Gang, false, p);
+  check(!p.gang.on && !p.pitchFx.gangOn && p.pitchFx.autotune.on, "gang toggle off clears both flags");
 }
 
 void checkPlacement() {

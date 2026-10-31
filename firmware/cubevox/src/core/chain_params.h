@@ -4,7 +4,7 @@
 #pragma once
 
 #include "engine/distortion.h"
-#include "engine/doubler.h"
+#include "engine/gang.h"
 #include "engine/gate.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -16,7 +16,7 @@
 struct ChainParams {
   cv::GateParams inputGate;
   cv::PitchFxParams pitchFx;
-  cv::DoublerParams doubler;  // its toggle also sets pitchFx.doublerOn
+  cv::GangParams gang;  // its toggle also sets pitchFx.gangOn
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
