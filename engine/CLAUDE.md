@@ -16,7 +16,8 @@
   `wrapOnce`, `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole).
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
-- `PitchFx` lives in DTCM: 51,944 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`).
+- `PitchFx` lives in DTCM: 76,912 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`); the 230 ms
+  input ring is 44,160 B of it, sized for the Gang card's 200 ms lag.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

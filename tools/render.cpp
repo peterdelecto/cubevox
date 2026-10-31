@@ -101,7 +101,7 @@ int usage() {
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangPitchSt0..3 gangTiltDb0..3 gangTiltHz\n"
-               "     gangDelayMs0..3 gangLfoHz0..3 gangLfoCents gangRoomFeedback gangRoomLpHz gangRoomNearDb gangRoomFarDb\n"
+               "     gangDelayMs0..3 gangScatterMs (0..30) gangDriftCents (0..50) gangHpHz gangMaxLagMs\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -191,11 +191,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gangTiltHz", &gn.tiltHz},
       {"gangDelayMs0", &gn.delayMs[0]},          {"gangDelayMs1", &gn.delayMs[1]},
       {"gangDelayMs2", &gn.delayMs[2]},          {"gangDelayMs3", &gn.delayMs[3]},
-      {"gangLfoHz0", &gn.lfoHz[0]},              {"gangLfoHz1", &gn.lfoHz[1]},
-      {"gangLfoHz2", &gn.lfoHz[2]},              {"gangLfoHz3", &gn.lfoHz[3]},
-      {"gangLfoCents", &gn.lfoCents},            {"gangRoomFeedback", &gn.roomFeedback},
-      {"gangRoomLpHz", &gn.roomLpHz},            {"gangRoomNearDb", &gn.roomNearDb},
-      {"gangRoomFarDb", &gn.roomFarDb},
+      {"gangScatterMs", &gn.scatterMs},          {"gangDriftCents", &gn.driftCents},
+      {"gangHpHz", &gn.hpHz},                    {"gangMaxLagMs", &gn.maxLagMs},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},

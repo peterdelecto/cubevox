@@ -1,7 +1,9 @@
 // Gang card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
 // of different colour, the level law across VOICES, the lead leaving, the voice count, the solo,
-// DISTANCE timing, the tracker running without Autotune, and a host timing against Unison. Every run feeds a PitchFx through its pass-through path first,
-// so the ring is written and the tracker runs, as the chain does. No window, no audio device.
+// the lag following DISTANCE across a gap and holding inside a burst, timing scatter, pitch drift,
+// the tracker running without Autotune, and a host timing against Unison. Every run feeds a PitchFx
+// through its pass-through path first, so the ring is written and the tracker runs, as the chain
+// does. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -122,6 +124,30 @@ Signal irregular(double hz, int n) {
   return x;
 }
 
+constexpr int msToSamples(double ms) { return static_cast<int>(ms * kRate / 1000.0 + 0.5); }
+
+// A burst train. The irregular tone sounds for burstMs, then silence for gapMs, count times, after
+// leadMs of silence. Burst k starts at leadMs + k * (burstMs + gapMs).
+struct Train {
+  int leadMs;
+  int burstMs;
+  int gapMs;
+  int count;
+
+  int start(int k) const { return msToSamples(leadMs + k * (burstMs + gapMs)); }
+  int size() const { return start(count); }
+};
+
+Signal bursts(double hz, const Train& tr) {
+  Signal x = irregular(hz, tr.size());
+  for (int k = 0; k < tr.count; ++k) {
+    const int from = k == 0 ? 0 : tr.start(k - 1) + msToSamples(tr.burstMs);
+    for (int i = from; i < tr.start(k); ++i) x[static_cast<size_t>(i)] = 0.0f;
+  }
+  for (int i = tr.start(tr.count - 1) + msToSamples(tr.burstMs); i < tr.size(); ++i) x[static_cast<size_t>(i)] = 0.0f;
+  return x;
+}
+
 double rms(const Signal& x, size_t from, size_t to) {
   double s = 0.0;
   for (size_t i = from; i < to; ++i) s += static_cast<double>(x[i]) * x[i];
@@ -170,6 +196,7 @@ cv::Gang gGang;
 struct Probe {
   float lead = -1.0f;
   int active = -1;
+  float drift = 0.0f;  // largest |drift| in cents any copy showed at the end of any block
 };
 
 // The PitchFx params every run uses unless it says otherwise: pass-through with the tracker on.
@@ -200,6 +227,7 @@ Signal runBoth(const Signal& in, const cv::GangParams& first, const cv::GangPara
     if (probe) {
       probe->lead = gGang.leadGain();
       probe->active = gGang.activeVoices();
+      for (size_t v = 0; v < 4; ++v) probe->drift = std::max(probe->drift, std::fabs(gGang.driftCents(v)));
     }
   }
   return out;
@@ -223,8 +251,8 @@ cv::GangParams knobs(float voices, float distance) {
 }
 
 // Voice 0 alone with nothing around it. voiceDb 0 gives one voice the whole level, so the lead is
-// 0, and the filters and the room are flat or silent. The voice sits on the lead's pitch with a
-// flat tone, so only its formant move is left.
+// 0, and the low cut sits at the bottom of the filter band. The voice sits on the lead's pitch with
+// a flat tone, so only its formant move is left.
 cv::GangParams isolated(float formantSt) {
   cv::GangParams p = knobs(0.2f, 0.5f);
   cv::GangTuning& t = p.tuning;
@@ -232,10 +260,18 @@ cv::GangParams isolated(float formantSt) {
   t.formantSt[0] = formantSt;
   t.pitchSt[0] = 0.0f;
   t.tiltDb[0] = 0.0f;
-  t.lfoCents = 0.0f;
-  t.hpNearHz = t.hpFarHz = cv::kFilterMinHz;
-  t.shelfNearDb = t.shelfFarDb = 0.0f;
-  t.roomNearDb = t.roomFarDb = -120.0f;
+  t.hpHz = cv::kFilterMinHz;
+  return p;
+}
+
+// Copy v alone at the lead's pitch and throat, flat, so its output is the lead moved only by its lag.
+cv::GangParams lagProbe(size_t v, float distance) {
+  cv::GangParams p = isolated(0.0f);
+  p.solo = static_cast<uint8_t>(1u << v);
+  p.distance = distance;
+  p.tuning.pitchSt[v] = 0.0f;
+  p.tuning.formantSt[v] = 0.0f;
+  p.tuning.tiltDb[v] = 0.0f;
   return p;
 }
 
@@ -288,26 +324,44 @@ double centroidHz(const Signal& x, double f0, int first, int last) {
   return den > 0.0 ? num / den : 0.0;
 }
 
-// Median f0 of a signal over seconds 1..2, from a fresh tracker.
-double medianHz(const Signal& x) {
+// Median f0 of x over [from, to), from a fresh tracker fed from `warm` on.
+double medianHzIn(const Signal& x, int warm, int from, int to) {
   cv::PitchTracker t;
   std::vector<double> hz;
-  const int total = static_cast<int>(x.size());
-  for (int i = 0; i < total; i += cv::kBlock) {
-    const int n = std::min(cv::kBlock, total - i);
+  for (int i = warm; i < to; i += cv::kBlock) {
+    const int n = std::min(cv::kBlock, to - i);
     t.push(&x[static_cast<size_t>(i)], n);
-    if (i + n > kRate && t.result().voiced) hz.push_back(t.result().hz);
+    if (i + n > from && t.result().voiced) hz.push_back(t.result().hz);
   }
   if (hz.empty()) return 0.0;
   std::sort(hz.begin(), hz.end());
   return hz[hz.size() / 2];
 }
 
-// Lag in samples where out[t] best matches in[t - lag], over the output window [from, to).
-int peakLag(const Signal& in, const Signal& out, int from, int to, int maxLag) {
-  int best = 0;
+// Median f0 of a signal over seconds 1..2, from a fresh tracker.
+double medianHz(const Signal& x) { return medianHzIn(x, 0, kRate, static_cast<int>(x.size())); }
+
+// Frequency of the strongest component within +-2 % of `near` over [from, from + n), found on a
+// 0.1 Hz grid, so a drift of a few cents shows.
+double peakHz(const Signal& x, int from, int n, double near) {
+  double best = near;
+  double bestMag = -1.0;
+  for (double hz = near * 0.98; hz <= near * 1.02; hz += 0.1) {
+    const double m = goertzel(&x[static_cast<size_t>(from)], n, hz);
+    if (m > bestMag) {
+      bestMag = m;
+      best = hz;
+    }
+  }
+  return best;
+}
+
+// Lag in samples within [minLag, maxLag] where out[t] best matches in[t - lag], over the output
+// window [from, to).
+int peakLag(const Signal& in, const Signal& out, int from, int to, int minLag, int maxLag) {
+  int best = minLag;
   double bestScore = -1.0;
-  for (int lag = 0; lag <= maxLag; ++lag) {
+  for (int lag = minLag; lag <= maxLag; ++lag) {
     double num = 0.0;
     double den = 0.0;
     for (int t = from; t < to; ++t) {
@@ -358,12 +412,15 @@ bool testReset() {
 bool testNoAlloc() {
   const Signal in = program(1);
   run(in, knobs(0.9f, 0.5f));  // aborts on any new/delete inside process()
-  run(in, knobs(0.3f, 0.9f));
+  cv::GangParams moving = knobs(0.3f, 0.9f);
+  moving.tuning.scatterMs = 20.0f;
+  moving.tuning.driftCents = 30.0f;
+  run(in, moving);
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
 // One voice alone lands on the lead's pitch moved by its pitchSt, with the voice's own formant and
-// tone shelf in place (lfoCents 0).
+// tone shelf in place.
 bool testPitchMoves() {
   const Signal in = tone(220.0, 2 * kRate);
   bool ok = true;
@@ -379,30 +436,32 @@ bool testPitchMoves() {
   return ok;
 }
 
-// The formant moves of voices 0 and 1 against a flat voice, pitch on the lead.
+// The formant moves of voice 3 (the one throat shorter than the lead's, +1 st) and voice 0 (the
+// longest, -1.75 st) against a flat voice, pitch on the lead.
 bool testFormantMoves() {
   const Signal in = vowel(220.0, 2 * kRate);
   const cv::GangTuning d;
   const double flat = centroidHz(run(in, isolated(0.0f)), 220.0, 1, 10);
-  const double up = centroidHz(run(in, isolated(d.formantSt[1])), 220.0, 1, 10);
+  const double up = centroidHz(run(in, isolated(d.formantSt[3])), 220.0, 1, 10);
   const double down = centroidHz(run(in, isolated(d.formantSt[0])), 220.0, 1, 10);
-  return report("formant moves", up >= 1.06 * flat && down <= 0.94 * flat,
-                "centroid 0 st=%.1f Hz, voice 1 formant x%.3f (>=1.06), voice 0 formant x%.3f (<=0.94)", flat,
+  return report("formant moves", up >= 1.03 * flat && down <= 0.94 * flat,
+                "centroid 0 st=%.1f Hz, voice 3 formant x%.3f (>=1.03), voice 0 formant x%.3f (<=0.94)", flat,
                 up / flat, down / flat);
 }
 
-// Voice 0 alone and voice 1 alone are two different colours: the spectral centroid of each, over
+// Voice 0 alone and voice 3 alone are two different colours: the spectral centroid of each, over
 // the harmonics of its own f0 up to the 20th, differs by at least 10 %.
 bool testVoicesDiffer() {
   const Signal in = tone(220.0, 2 * kRate);
+  const size_t pick[2] = {0, 3};
   double c[2];
-  for (size_t v = 0; v < 2; ++v) {
-    const cv::GangParams p = alone(v);
+  for (size_t i = 0; i < 2; ++i) {
+    const cv::GangParams p = alone(pick[i]);
     const double f0 = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
-    c[v] = centroidHz(run(in, p), f0, 1, 20);
+    c[i] = centroidHz(run(in, p), f0, 1, 20);
   }
   const double diff = std::fabs(c[1] - c[0]) / std::min(c[0], c[1]);
-  return report("voices differ", diff >= 0.10, "centroid voice 0 %.1f Hz, voice 1 %.1f Hz, differ %.1f %% (>=10)", c[0],
+  return report("voices differ", diff >= 0.10, "centroid voice 0 %.1f Hz, voice 3 %.1f Hz, differ %.1f %% (>=10)", c[0],
                 c[1], 100.0 * diff);
 }
 
@@ -538,20 +597,129 @@ bool testSolo() {
   return ok;
 }
 
-bool testDistanceTiming() {
-  const Signal in = irregular(220.0, 2 * kRate);
-  cv::GangParams near = isolated(0.0f);
-  near.distance = 0.0f;
-  cv::GangParams far = near;
-  far.distance = 1.0f;
-  const int lagNear = peakLag(in, run(in, near), kRate, kRate + kRate / 2, 4000);
-  const int lagFar = peakLag(in, run(in, far), kRate, kRate + kRate / 2, 4000);
-  const double msNear = 1000.0 * lagNear / kRate;
-  const double msFar = 1000.0 * lagFar / kRate;
-  const double wantNear = 30.0 * 0.8;
-  const double wantFar = 30.0 * 1.3;
-  return report("distance timing", std::fabs(msNear - wantNear) <= 0.5 && std::fabs(msFar - wantFar) <= 0.5,
-                "peak at d=0 %.2f ms (%.1f), at d=1 %.2f ms (%.1f), +-0.5", msNear, wantNear, msFar, wantFar);
+// The lag in ms of the output over the 150 ms starting at output sample `from`, searched within
+// +-80 ms of `around`.
+double measuredLagMs(const Signal& in, const Signal& out, int from, double around) {
+  const int lo = std::max(0, msToSamples(around - 80.0));
+  const int hi = msToSamples(around + 80.0);
+  return 1000.0 * peakLag(in, out, from, from + msToSamples(150.0), lo, hi) / kRate;
+}
+
+// 220 Hz bursts with 120 ms of silence between them. DISTANCE goes from 0 to 1 in the middle of
+// burst 2. The copy keeps its near lag to the end of that burst and takes the far lag in the gap, so
+// bursts 3 to 5 sound at the far lag.
+bool testLagAcrossGap() {
+  const Train tr{300, 300, 120, 6};
+  const Signal in = bursts(220.0, tr);
+  const cv::GangTuning d;
+  bool ok = true;
+  for (size_t v : {size_t{3}, size_t{2}}) {
+    const double nearMs = d.delayMs[v];
+    const double farMs = std::min(2.0 * static_cast<double>(d.delayMs[v]), static_cast<double>(d.maxLagMs));
+    const int switchAt = (tr.start(2) + msToSamples(120.0)) / cv::kBlock * cv::kBlock;
+    const Signal out = runSwitch(in, lagProbe(v, 0.0f), lagProbe(v, 1.0f), switchAt);
+    double worst = 0.0;
+    double lag[6];
+    for (int k = 0; k < tr.count; ++k) {
+      const double want = k <= 2 ? nearMs : farMs;
+      const int from = k == 2 ? switchAt + msToSamples(20.0) : tr.start(k) + msToSamples(want + 30.0);
+      lag[k] = measuredLagMs(in, out, from, want);
+      worst = std::max(worst, std::fabs(lag[k] - want));
+    }
+    char name[48];
+    std::snprintf(name, sizeof name, "lag across a gap, copy %zu", v + 1);
+    ok &= report(name, worst <= 0.5, "want %.0f ms before the gap and %.0f ms after; worst error %.2f ms (<= 0.5)", nearMs,
+                 farMs, worst);
+    std::printf("info copy %zu lag per burst %.2f %.2f %.2f(mid-burst switch) %.2f %.2f %.2f ms\n", v + 1, lag[0], lag[1],
+                lag[2], lag[3], lag[4], lag[5]);
+  }
+  return ok;
+}
+
+// Timing scatter of 15 ms on copy 4 (50 ms at DISTANCE 0) over ten bursts. Each burst's lag stays
+// within 15 ms of 50 ms and differs from burst to burst. A second run with the copy's own pitch
+// offset keeps its f0 within 10 cents of the offset inside every burst, so no lag change bends it.
+bool testScatter() {
+  const Train tr{300, 300, 120, 10};
+  const Signal in = bursts(220.0, tr);
+  const cv::GangTuning d;
+  const size_t v = 3;
+  const double target = d.delayMs[v];
+  cv::GangParams flat = lagProbe(v, 0.0f);
+  flat.tuning.scatterMs = 15.0f;
+  const Signal out = run(in, flat);
+  double lag[10];
+  double worst = 0.0;
+  double lo = 1e9;
+  double hi = -1e9;
+  int changes = 0;
+  for (int k = 0; k < tr.count; ++k) {
+    lag[k] = measuredLagMs(in, out, tr.start(k) + msToSamples(target + 15.0 + 30.0), target);
+    worst = std::max(worst, std::fabs(lag[k] - target));
+    lo = std::min(lo, lag[k]);
+    hi = std::max(hi, lag[k]);
+    if (k > 0 && std::fabs(lag[k] - lag[k - 1]) > 1.0) ++changes;
+  }
+  std::printf("info scatter lag per burst");
+  for (double l : lag) std::printf(" %.1f", l);
+  std::printf(" ms\n");
+  bool ok = report("scatter lag", worst <= 15.5 && changes >= 6,
+                   "worst |lag - 50| %.2f ms (<= 15.5), spread %.1f ms, %.0f of 9 bursts moved by > 1 ms (>= 6)", worst,
+                   hi - lo, static_cast<double>(changes));
+
+  cv::GangParams pitched = flat;
+  pitched.tuning.pitchSt[v] = d.pitchSt[v];
+  const Signal outP = run(in, pitched);
+  const double want = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[v]) / 12.0);
+  double worstCents = 0.0;
+  for (int k = 0; k < tr.count; ++k) {
+    const int from = tr.start(k) + msToSamples(target + 15.0 + 30.0);
+    const double hz = medianHzIn(outP, tr.start(k), from, from + msToSamples(150.0));
+    worstCents = std::max(worstCents, hz > 0.0 ? std::fabs(cents(hz, want)) : 9999.0);
+  }
+  ok &= report("scatter pitch", worstCents <= 10.0, "worst f0 error in a burst %.2f cents from %.2f Hz (<= 10)", worstCents,
+               want);
+  return ok;
+}
+
+// Pitch drift of 20 cents on copy 1 over a 6 s tone. Its f0 over each 0.5 s window after the first
+// second stays within 20 cents of its pitch offset, with 3 cents of slack for the measurement, and
+// differs from window to window. With the drift at 0 the walk never moves off 0, whatever its hold.
+bool testDrift() {
+  const Signal in = tone(220.0, 6 * kRate);
+  const cv::GangTuning d;
+  cv::GangParams p = lagProbe(0, 0.5f);
+  p.tuning.pitchSt[0] = d.pitchSt[0];
+  p.tuning.driftCents = 20.0f;
+  const Signal out = run(in, p);
+  const double base = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[0]) / 12.0);
+  double worst = 0.0;
+  double lo = 1e9;
+  double hi = -1e9;
+  std::printf("info drift f0 per 0.5 s window, cents from the offset:");
+  for (int k = 2; k < 12; ++k) {
+    const double c = cents(peakHz(out, k * kRate / 2, kRate / 2, 2.0 * base) / 2.0, base);
+    std::printf(" %+.1f", c);
+    worst = std::max(worst, std::fabs(c));
+    lo = std::min(lo, c);
+    hi = std::max(hi, c);
+  }
+  std::printf("\n");
+  bool ok = report("drift range", worst <= 23.0 && hi - lo >= 2.0, "worst %.2f cents from the offset (<= 20 + 3), spread %.2f cents (>= 2)",
+                   worst, hi - lo);
+
+  const Signal prog = program(3);
+  cv::GangParams a = knobs(0.7f, 0.5f);
+  cv::GangParams b = a;
+  b.tuning.driftHoldS = 0.3f;
+  Probe probe;
+  const Signal outA = run(prog, a, &probe);
+  const Signal outB = run(prog, b);
+  size_t differ = 0;
+  for (size_t i = 0; i < outA.size(); ++i) differ += outA[i] != outB[i] ? 1 : 0;
+  ok &= report("drift off", differ == 0 && probe.drift == 0.0f, "drift 0: hold 2 s against 0.3 s differs in %.0f samples (0), largest drift %.3g cents (0)",
+               static_cast<double>(differ), static_cast<double>(probe.drift));
+  return ok;
 }
 
 // The tracker finds a period with Autotune off because the Gang card's flag keeps it running, and
@@ -672,7 +840,9 @@ int main() {
   ok &= testLeadLeaves();
   ok &= testVoiceCount();
   ok &= testSolo();
-  ok &= testDistanceTiming();
+  ok &= testLagAcrossGap();
+  ok &= testScatter();
+  ok &= testDrift();
   ok &= testTrackerRuns();
   ok &= testCorrectionReleases();
   printTiming();
