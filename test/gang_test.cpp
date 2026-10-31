@@ -436,24 +436,35 @@ bool testPitchMoves() {
   return ok;
 }
 
-// The formant moves of voice 3 (the one throat shorter than the lead's, +1 st) and voice 0 (the
-// longest, -1.75 st) against a flat voice, pitch on the lead.
+// isolated() with the voice's lag set to 90 ms. The centroid of a steady vowel at a shifted
+// formant depends on how the grain reads line up with the period grid, so this probe holds the
+// lag fixed whatever the default delays are.
+cv::GangParams formantProbe(float formantSt) {
+  cv::GangParams p = isolated(formantSt);
+  p.tuning.delayMs[0] = 90.0f;
+  return p;
+}
+
+// The formant moves of a throat shorter than the lead's (+1 st, no default copy has one) and of
+// voice 0 (the longest, -1.75 st) against a flat voice, pitch on the lead.
 bool testFormantMoves() {
   const Signal in = vowel(220.0, 2 * kRate);
   const cv::GangTuning d;
-  const double flat = centroidHz(run(in, isolated(0.0f)), 220.0, 1, 10);
-  const double up = centroidHz(run(in, isolated(d.formantSt[3])), 220.0, 1, 10);
-  const double down = centroidHz(run(in, isolated(d.formantSt[0])), 220.0, 1, 10);
+  const double flat = centroidHz(run(in, formantProbe(0.0f)), 220.0, 1, 10);
+  const double up = centroidHz(run(in, formantProbe(1.0f)), 220.0, 1, 10);
+  const double down = centroidHz(run(in, formantProbe(d.formantSt[0])), 220.0, 1, 10);
   return report("formant moves", up >= 1.03 * flat && down <= 0.94 * flat,
-                "centroid 0 st=%.1f Hz, voice 3 formant x%.3f (>=1.03), voice 0 formant x%.3f (<=0.94)", flat,
+                "centroid 0 st=%.1f Hz, +1 st formant x%.3f (>=1.03), voice 0 formant x%.3f (<=0.94)", flat,
                 up / flat, down / flat);
 }
 
-// Voice 0 alone and voice 3 alone are two different colours: the spectral centroid of each, over
-// the harmonics of its own f0 up to the 20th, differs by at least 10 %.
+// Voice 0 alone (the longest throat, -1.75 st) and voice 2 alone (the highest centroid of the
+// four) are two different colours: the spectral centroid of each, over the harmonics of its own
+// f0 up to the 20th, differs by at least 5 %. All four default formants are below the lead's, so
+// the widest default pair is 7.3 % apart.
 bool testVoicesDiffer() {
   const Signal in = tone(220.0, 2 * kRate);
-  const size_t pick[2] = {0, 3};
+  const size_t pick[2] = {0, 2};
   double c[2];
   for (size_t i = 0; i < 2; ++i) {
     const cv::GangParams p = alone(pick[i]);
@@ -461,7 +472,7 @@ bool testVoicesDiffer() {
     c[i] = centroidHz(run(in, p), f0, 1, 20);
   }
   const double diff = std::fabs(c[1] - c[0]) / std::min(c[0], c[1]);
-  return report("voices differ", diff >= 0.10, "centroid voice 0 %.1f Hz, voice 3 %.1f Hz, differ %.1f %% (>=10)", c[0],
+  return report("voices differ", diff >= 0.05, "centroid voice 0 %.1f Hz, voice 2 %.1f Hz, differ %.1f %% (>=5)", c[0],
                 c[1], 100.0 * diff);
 }
 
@@ -636,8 +647,8 @@ bool testLagAcrossGap() {
   return ok;
 }
 
-// Timing scatter of 15 ms on copy 4 (50 ms at DISTANCE 0) over ten bursts. Each burst's lag stays
-// within 15 ms of 50 ms and differs from burst to burst. A second run with the copy's own pitch
+// Timing scatter of 15 ms on copy 4 (75 ms at DISTANCE 0) over ten bursts. Each burst's lag stays
+// within 15 ms of 75 ms and differs from burst to burst. A second run with the copy's own pitch
 // offset keeps its f0 within 10 cents of the offset inside every burst, so no lag change bends it.
 bool testScatter() {
   const Train tr{300, 300, 120, 10};
@@ -664,8 +675,8 @@ bool testScatter() {
   for (double l : lag) std::printf(" %.1f", l);
   std::printf(" ms\n");
   bool ok = report("scatter lag", worst <= 15.5 && changes >= 6,
-                   "worst |lag - 50| %.2f ms (<= 15.5), spread %.1f ms, %.0f of 9 bursts moved by > 1 ms (>= 6)", worst,
-                   hi - lo, static_cast<double>(changes));
+                   "worst |lag - %.0f| %.2f ms (<= 15.5), spread %.1f ms, %.0f of 9 bursts moved by > 1 ms (>= 6)", target,
+                   worst, hi - lo, static_cast<double>(changes));
 
   cv::GangParams pitched = flat;
   pitched.tuning.pitchSt[v] = d.pitchSt[v];

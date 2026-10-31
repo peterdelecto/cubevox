@@ -26,10 +26,10 @@
 namespace cv {
 
 struct GangTuning {
-  std::array<float, 4> pitchSt = {-1.75f, -3.0f, 3.0f, -1.0f};     // pitch ratio 2^(st / 12) against the lead
-  std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, 1.0f};   // grain playback rate 2^(st / 12)
+  std::array<float, 4> pitchSt = {-1.75f, -3.0f, 3.0f, 1.0f};     // pitch ratio 2^(st / 12) against the lead
+  std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12)
   std::array<float, 4> tiltDb = {-3.0f, 3.0f, -4.0f, 5.0f};        // high shelf gain above tiltHz
-  std::array<float, 4> delayMs = {90.0f, 60.0f, 100.0f, 50.0f};    // lag behind the lead at DISTANCE 0
+  std::array<float, 4> delayMs = {40.0f, 70.0f, 100.0f, 75.0f};    // lag behind the lead at DISTANCE 0
   float tiltHz = 2500.0f;
   float voiceDb = -9.0f;       // one voice against the lead at unity
   float trimDb = 2.1f;         // level rule residue
