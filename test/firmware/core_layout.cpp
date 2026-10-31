@@ -257,6 +257,15 @@ void checkReverbSlot() {
   check(reverbSlot(layout) == 2, "reverbSlot: the slot that holds it, wherever it is");
 }
 
+void checkGangTestLayout() {
+  const Layout base = defaultLayout();
+  const Layout test = gangTestLayout();
+  check(test.card[1] == Card::Gang, "gang test layout: Gang sits in slot 2");
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (s != 1) check(test.card[s] == base.card[s], "gang test layout: every other slot is the default");
+  }
+}
+
 void checkRecoverLayout() {
   Layout good = defaultLayout();
   good.card[0] = Card::Empty;
@@ -288,6 +297,7 @@ void checkRecoverLayout() {
 
 void checkLayoutAndCompose() {
   checkDefaultLayout();
+  checkGangTestLayout();
   checkRecoverLayout();
   checkSettings();
   checkLayoutValid();

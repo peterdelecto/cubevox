@@ -94,6 +94,9 @@ void reportRecovery(Print& out) {
     out.print(gRejectReason.data());
     out.println("), using the default layout");
   }
+#ifdef CUBEVOX_GANGTEST
+  out.println("[WARN] test layout in force: Gang replaces Autotune in slot 2, CPU budget checks off");
+#endif
 }
 
 void reportScan(Print& out) {
@@ -113,7 +116,7 @@ void reportScan(Print& out) {
 
 }  // namespace
 
-void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
+static void loadRecord(Layout& layout, Settings& settings, uint32_t nowMs) {
   // The recovery reads the fault record that faultInit() loads; before that it would see no fault.
   gFaultInitMissing = !faultInitDone();
   recoverEcc();
@@ -130,6 +133,15 @@ void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
   if (!recovery.replaced) return;
   layoutReason(recovery.why, gRejectReason.data(), gRejectReason.size());
   gStore.request(layout, settings, nowMs);  // rewrite the record with the default layout
+}
+
+void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
+  loadRecord(layout, settings, nowMs);
+
+#ifdef CUBEVOX_GANGTEST
+  // The test image runs Gang in slot 2. The record keeps the stored layout.
+  layout = gangTestLayout();
+#endif
 }
 
 void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t nowMs) {
