@@ -27,8 +27,9 @@ and a chord does not. The bottom tenth of WIDTH keeps that line in tune (WIDTH l
 2. Lower pot VOICES, the amount knob. 0 is dry. The four voices fade in one at a time, then the
    lead fades out, so the top of the knob is the crowd alone. Owner: "if the effect is dimed, we
    don't hear Adam, we hear the crowd."
-3. Upper pot WIDTH. It spreads the copies' pitch and formant offsets, so the bottom is four plain
-   detuned doubles of the lead and the top is the crowd at its full offsets (owner 2026-10-31, "nix
+3. Upper pot WIDTH. It spreads the copies' pitch and formant offsets and stretches their lags, so the
+   bottom is four plain delayed doubles of the lead on its own pitch and the top is the crowd at its
+   full offsets and longest lags (owner 2026-10-31, "nix
    the distance knob and replace it with a 'width knob'. the width knob will spread the voices.").
    The bottom tenth is for instruments and melodic lines (WIDTH law below).
 4. Autotune is not expected on with this card. The tracker runs whenever the Crowd card is on.
@@ -79,44 +80,60 @@ melodic lines." And: "from about 0 to 10 percent, we need much less detuning. fo
 line, should the user want to pipe an instrument through that effect, we don't want it to be out of
 tune."
 
-WIDTH scales the pitch offset, the formant offset, the drift and the contour of every copy. The pitch
-and formant offsets each take a factor that is linear between three points. Per copy and per block,
-copy v's pitch offset in semitones is pitchSt[v] × fp(w) and its formant offset is
-formantSt[v] × ff(w).
+Owner 2026-10-31, after a piano loop through the bottom tenth sounded discordant: "we might want to
+start with a baseline of 0 st per voice and maybe even 0 formant at 0 on the width slider." And on
+the top of the knob: "at max width, add a little bit more time spread between voices, maybe adding
+20 ms to the max."
 
-| Point | fp (pitch factor) | ff (formant factor) |
-|---|---|---|
-| w = 0 | 0.003 | 0 |
-| w = `widthKnee` (0.1) | `widthKneeFrac` (0.025) | `widthKneeFrac` (0.025) |
-| w = 1 | 1 | 1 |
+WIDTH scales the pitch offset, the formant offset, the drift and the contour of every copy, and it
+stretches the lags. The pitch and formant offsets take the same factor f(w), which is linear between
+three points. Per copy and per block, copy v's pitch offset in semitones is pitchSt[v] × f(w) and its
+formant offset is formantSt[v] × f(w).
 
-Between the points each factor is linear in w, so fp(0.5) = 0.025 + 0.975 × (0.4 / 0.9) = 0.458. At
-w = 0 the −3 st copy sits about 1 cent off the lead (−0.009 st) and no copy carries a formant shift,
-so a melodic line or an instrument gets four plain doubles a cent off the lead. At w = 0.1 the −3 st
-copy sits about 8 cents off the lead (−0.075 st) and carries 2.5 % of its formant move. At w = 1
-every copy sits at pitchSt[v] and formantSt[v]. A pitchSt or formantSt of 0 stays 0. Lags and tone
-shelves do not follow the knob. The w the factors read follows the knob through the 20 ms one-pole
-of `engine/smooth.h`, updated per block, so a knob step glides the copies over a few blocks and does
-not jump their pitch in one. It takes the knob value outright on the first block after a reset, and a
-settled w equals the knob bit for bit. `widthKnee` is clamped to 0.02..0.9 and `widthKneeFrac` to 0..1.
+| Point | f (pitch and formant factor) |
+|---|---|
+| w = 0 | 0 |
+| w = `widthKnee` (0.1) | `widthKneeFrac` (0.012) |
+| w = 1 | 1 |
+
+Between the points f is linear in w, so f(0.5) = 0.012 + 0.988 × (0.4 / 0.9) = 0.451. At w = 0 f is
+exactly 0, so every copy sits at pitch ratio exactly 1 with a grain playback rate of exactly 1, and
+the slicing returns the input delayed by the copy's lag (test 19). A copy whose ratio and rate are both
+exactly 1 keeps its marks on the period grid and skips the epoch snap, so it reproduces the delayed
+input to float rounding with epoch align on, and the snap resumes as soon as either differs from 1.
+A melodic line or an instrument gets four plain delayed doubles on its own pitch. At w = 0.1 the −3 st copy sits 3.6 cents off the
+lead (−0.036 st) and carries 1.2 % of its formant move. At w = 1 every copy sits at pitchSt[v] and
+formantSt[v]. A pitchSt or formantSt of 0 stays 0. Tone shelves do not follow the knob. The w the
+factor reads follows the knob through the 20 ms one-pole of `engine/smooth.h`, updated per block, so a
+knob step glides the copies over a few blocks and does not jump their pitch in one. It takes the knob
+value outright on the first block after a reset, and a settled w equals the knob bit for bit.
+`widthKnee` is clamped to 0.02..0.9 and `widthKneeFrac` to 0..1.
 
 Two more scalings keep the bottom in tune, since a slow pitch walk or a contour that bends a copy
 away from the lead would sound out of tune on a melodic line.
 
-1. Drift follows the pitch factor. The drift range in cents is driftCents × fp(w): 0.045 cents at
-   w = 0, 0.375 cents at the knee and the full driftCents at w = 1.
-2. Contour follows the formant factor. The contour a copy uses is 1 + (contour[v] − 1) × ff(w): exactly
-   1.0 at w = 0, within 2.5 % of 1.0 at the knee and the slider value at w = 1.
+1. Drift follows f. The drift range in cents is driftCents × f(w): 0 cents at w = 0, 0.18 cents at
+   the knee and the full driftCents at w = 1.
+2. Contour follows f. The contour a copy uses is 1 + (contour[v] − 1) × f(w): exactly 1.0 at w = 0,
+   within 0.5 % of 1.0 at the knee and the slider value at w = 1.
 
-At w = 1 both factors are exactly 1, so the drift and the contour are what they were before the
-scaling. Timing scatter, loudness scatter, the lags, the tone shelves, epoch alignment, VOICES and
-solo do not follow the knob.
+At w = 1 f is exactly 1, so the drift and the contour are what they were before the scaling. Timing
+scatter, loudness scatter, the tone shelves, epoch alignment, VOICES and solo do not follow the knob.
+
+Lag multiplier. WIDTH also moves every lag by one multiplier m(w), linear in w. m(0) is
+`widthLagBottom` (0.5). m(1) is 1 + `widthLagMs` / L, where L is the longest delayMs[v] × `lagScale`
+(120 ms at the defaults) and `widthLagMs` is 20 ms, so the longest copy sits 20 ms further back at
+w = 1 than `lagScale` alone puts it and the others sit further back in proportion. At the defaults
+m(1) = 1.1667 and m reaches 1 at w = 0.75. The lags are 24, 60, 42 and 45 ms at WIDTH 0 and 56, 140, 98
+and 105 ms at WIDTH 1. m reads the knob value and not the smoothed w, so the target steps with the
+knob, and each copy takes the new lag at its next quiet gap (Lag law below). `widthLagBottom` is
+clamped to 0.2..1 and `widthLagMs` to 0..60.
 
 ### Lag law
 
-Copy v's lag target is delayMs[v] × `lagScale` (1.2), capped at `maxLagMs` (200 ms) and floored at
-the voice's own minimum (1.5 periods plus 4 samples). No knob reads it. At the defaults the four
-copies lag 48, 120, 84 and 90 ms.
+Copy v's lag target is delayMs[v] × `lagScale` (1.2) × m(w) (WIDTH law above), capped at `maxLagMs`
+(200 ms) and floored at the voice's own minimum (1.5 periods plus 4 samples). Only WIDTH moves it. At
+the defaults the four copies lag 24, 60, 42 and 45 ms at WIDTH 0 and 56, 140, 98 and 105 ms at WIDTH 1.
 
 A copy changes its lag only in a quiet gap. Each block it measures the mean square of the ring at
 its read point (the block's samples `lag` behind the head). While a new target is pending (a tuning
@@ -133,7 +150,7 @@ Scatter. With `scatterMs` above 0, each gap gives the copy a fresh uniform rando
 so a run repeats. The copy takes one offset per gap.
 
 Pitch drift. With `driftCents` above 0, each copy holds a drift in cents that walks inside
-[−driftCents × fp(w), +driftCents × fp(w)] (WIDTH law above). A new random target comes every `driftHoldS` (2 s) and the drift slews
+[−driftCents × f(w), +driftCents × f(w)] (WIDTH law above). A new random target comes every `driftHoldS` (2 s) and the drift slews
 toward it with a time constant of 1 s, updated per block. The pitch ratio gains the term
 2^(drift / 1200) through exp2Fast. With `driftCents` at 0 the term is exactly 0 and the ratio is
 the same as without the code.
@@ -151,7 +168,7 @@ struct CrowdTuning {
   std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, -1.5f}; // grain playback rate 2^(st / 12)
   std::array<float, 4> tiltDb      = {-3.0f, -4.0f, 3.0f, 5.0f};     // high shelf gain above tiltHz
   std::array<float, 4> delayMs     = {40.0f, 100.0f, 70.0f, 75.0f};  // lag behind the lead before lagScale
-  float lagScale     = 1.2f;      // a copy's lag is delayMs times this
+  float lagScale     = 1.2f;      // a copy's lag is delayMs times this times the WIDTH multiplier
   float tiltHz       = 2500.0f;
   float voiceDb      = -9.0f;     // one voice against the lead at unity
   float trimDb       = 1.0f;      // level rule residue
@@ -163,8 +180,10 @@ struct CrowdTuning {
   float scatterMs    = 12.0f;     // peak random lag offset taken at each gap, 0..30
   float driftCents   = 15.0f;     // peak of each copy's slow random pitch walk, 0..50
   float driftHoldS   = 2.0f;      // time between new drift targets
-  float widthKnee    = 0.1f;      // WIDTH where both factors reach widthKneeFrac, 0.02..0.9
-  float widthKneeFrac = 0.025f;   // both WIDTH factors at the knee, 0..1
+  float widthKnee    = 0.1f;      // WIDTH where the pitch and formant factor reaches widthKneeFrac, 0.02..0.9
+  float widthKneeFrac = 0.012f;   // that factor at the knee, 0..1 (it is 0 at WIDTH 0)
+  float widthLagBottom = 0.5f;    // lag multiplier at WIDTH 0, 0.2..1
+  float widthLagMs   = 20.0f;     // the longest lag grows by this at WIDTH 1, 0..60
 };
 struct CrowdParams {
   bool on = false;
@@ -202,10 +221,10 @@ ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D
    set per block, not `PsolaVoice::kGrainDelay`. The voice clamps it to at least 1.5 × the clamped
    period + 4 (the floor kGrainDelay encodes for the lowest pitch) and at most
    kVoiceRingLen − 2 × kMaxPeriod − 8, which is 9,660 samples (201 ms) on the 230 ms ring. The
-   defaults keep every copy above the 21.7 ms floor and the 200 ms ceiling leaves the longest grain
+   defaults keep every copy above the 21.7 ms floor (the shortest lag is 24 ms, at WIDTH 0) and the 200 ms ceiling leaves the longest grain
    (686-sample period, rate 0.5) inside the ring.
-3. Ratio r_v = 2^(pitchSt[v] · fp(w) / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12),
-   and the grain playback rate is 2^(formantSt[v] · ff(w) / 12) (WIDTH law above). The PSOLA voice
+3. Ratio r_v = 2^(pitchSt[v] · f(w) / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12),
+   and the grain playback rate is 2^(formantSt[v] · f(w) / 12) (WIDTH law above). The PSOLA voice
    clamps the ratio to 0.5..2.0.
 4. Period from `pitch.pitch().period`. Period 0 gives silence from the voice, as PsolaVoice does
    today. Unvoiced frames keep the last period, as Autotune's voice does.
@@ -259,13 +278,14 @@ wet sum before it meets the lead, per the output-safety spec.
    chain position after the pitch stage and before Unison, with gPitchFx passed in. Pedal mode is
    unchanged by this spec; the owner listens to the card in the module view.
    `--layout` must print ok. The tuning nodes are Formants (4 sliders, −4..+4 st), Pitch (4,
-   −12..+12 st, the full values), Delay (4, 5..200 ms, and lagScale 0.5..2), Tone (4 tiltDb and
+   −12..+12 st, the full values), Delay (4, 5..200 ms, lagScale 0.5..2, Lag at bottom 0.2..1 and Lag at top
+   0..60 ms), Tone (4 tiltDb and
    tiltHz), Scatter (scatterMs 0..30 ms, driftCents 0..50) and Solo (4 checkboxes). Print tuning lists every CrowdTuning field. The Crowd
    tuning has no state keys.
 2. cubevox-render: `--crowd`, `--width <0..1>`, `--voices <0..1>`; tuning keys prefixed `crowd`
    (`crowdVoiceDb`, `crowdTrimDb`, `crowdFormantSt0..3`, `crowdPitchSt0..3`, `crowdTiltDb0..3`,
    `crowdTiltHz`, `crowdDelayMs0..3`, `crowdLagScale`, `crowdScatterMs`, `crowdDriftCents`, `crowdHpHz`,
-   `crowdMaxLagMs`). `pitchOn` becomes true when the crowd card is on. tools/engine_ab.sh gains a
+   `crowdMaxLagMs`, `crowdWidthLagBottom`, `crowdWidthLagMs`). `pitchOn` becomes true when the crowd card is on. tools/engine_ab.sh gains a
    `crowd` case and a crowd term in the chain case.
 
 ## Tests
@@ -285,41 +305,56 @@ wet sum before it meets the lead, per the output-safety spec.
    6. the lead leaves: at VOICES 1.0 a probe accessor reports lead gain 0 after the ramp.
    7. voice count: at VOICES 0.2 only voice 0 ticks and at 0.8 all four (probe accessor).
    8. the lag follows lagScale across a gap: on 220 Hz bursts of an irregular envelope with 120 ms
-      of silence between them, one copy alone (formant 0, pitchSt 0) has its cross-correlation peak
-      at delayMs × 1.2 (90 ms for copy 4, 120 ms for copy 2) and, after lagScale goes to 2, at
-      delayMs × 2 capped at 200 ms (150 ms and 200 ms). The move comes mid-burst, the lag stays
-      unchanged to the end of that burst, and the next burst sounds at the new lag (±0.5 ms).
+      of silence between them, one copy alone (formant 0, pitchSt 0) at WIDTH 1 has its cross-correlation
+      peak at delayMs × 1.2 × m(1) (105 ms for copy 4, 140 ms for copy 2) and, after lagScale goes to 2,
+      at delayMs × 2 × m(1) capped at 200 ms (165 ms and 200 ms). The move comes while the copy's
+      output sounds the burst, 100 ms after its first sample, the lag stays unchanged to the end of that
+      burst, and the next burst sounds at the new lag (±0.5 ms).
    9. tracker runs without Autotune: PitchFxParams with autotune.on false and crowdOn true gives
       period > 0 on the tone within 60 ms.
    10. voices differ: voice 0 alone and voice 1 alone on the 220 Hz tone differ in spectral
       centroid (harmonics 1..20 of each voice's own f0) by at least 5 % (8.9 % at the defaults).
-   11. scatter: scatterMs 15 on copy 4 over ten bursts, each burst's lag within ±15 ms of 75 ms
+   11. scatter: scatterMs 15 on copy 4 over ten bursts at WIDTH 1, each burst's lag within ±15 ms of 105 ms
       and varying from burst to burst; f0 inside each burst within 10 cents of the copy's offset.
    12. drift: driftCents 20 on a 6 s tone, the copy's f0 in 0.5 s windows within ±20 cents of its
       offset (3 cents of measurement slack) and not the same in every window. driftCents 0 leaves
       the drift at exactly 0 and the output unchanged by driftHoldS.
    13. WIDTH law: the −3 st copy (formant −1 st) alone at WIDTH 0, 0.1, 0.5 and 1 has its f0 at
-      −3 st × fp(w) from the lead's 220 Hz (within 2, 3, 10 and 10 cents; about −1 cent, −7.5 cents,
-      −138 cents and −300 cents) and its grain playback rate, read from the engine, at ff(w) of its
-      full formant move (within 0.5 %; 0, 2.5 %, 45.8 % and 100 %). At WIDTH 0 the output equals the
-      output of a copy with no formant offset sample for sample. Its lag reads the same at all four.
+      −3 st × f(w) from the lead's 220 Hz (within 1, 1.5, 10 and 10 cents; 0 cents, −3.6 cents,
+      −135 cents and −300 cents) and its grain playback rate, read from the engine, at f(w) of its
+      full formant move (within 0.5 %; 0, 1.2 %, 45.1 % and 100 %). At WIDTH 0 the output equals the
+      output of a copy with no pitch or formant offset sample for sample. Its lag follows m(w) at
+      all four.
    14. fade order: at WIDTH 1 and at WIDTH 0.5, at VOICES 0.2, 0.4, 0.6 and 0.8 the output has a
       spectral line at the f0 of each voice that has come in (at least 0.4 of the loudest line) and
       none at the f0 of the voices still to come (at most 0.1), so the order is −1.75 st, +2.75 st,
-      −3 st, +1 st (their offsets times fp(w)).
+      −3 st, +1 st (their offsets times f(w)).
    15. working set: the defaults hold the working set below, and a run on them stays finite and
       within 2.5 dB of the level of the neutral card. Every other test starts from a neutral tuning
       (no scatter, no drift, no level scatter, contour 1, epoch align off) and turns on only what it
       measures.
-   16. melodic bottom: the −3 st copy alone on the working set is within 2 cents of the lead at WIDTH 0,
-      8 ± 2 cents flat of it at 0.1 and 300 ± 10 cents flat at 1. With driftCents 15 on a 6 s tone at
-      WIDTH 0.05 the copy's largest drift is at most 15 × fp(0.05) = 0.21 cents and its f0 moves under 1
+   16. melodic bottom: the −3 st copy alone on the working set is within 1 cent of the lead at WIDTH 0,
+      3.6 ± 1.5 cents flat of it at 0.1 and 300 ± 10 cents flat at 1. With driftCents 15 on a 6 s tone at
+      WIDTH 0.05 the copy's largest drift is at most 15 × f(0.05) = 0.09 cents and its f0 moves under 1
       cent from one 0.5 s window to the next; at WIDTH 1 it moves as test 12 expects. With contour 0.6
       or 1.4 on a copy at WIDTH 0.05, a ±1 st sweep at 1 Hz and at 3 Hz comes out within 2 % of 1.0 × the
       input's swing; at WIDTH 1 within 15 % of the contour.
    17. width glides: 512 samples after a WIDTH step from 0.1 to 1 the copy's grain playback rate sits
       strictly between its two settled values, and a second later it equals the rate of a run that
       held WIDTH 1 throughout.
+   18. width lag: each copy alone on 220 Hz bursts has its lag at 24, 60, 42 and 45 ms at WIDTH 0 and
+      at 56, 140, 98 and 105 ms at WIDTH 1 (within 0.5 ms). A WIDTH move from 0 to 1 while a burst
+      sounds in copy 2's output leaves its lag at 60 ms to the end of that burst and puts the next
+      burst at 140 ms.
+   19. width 0 is a delay: at WIDTH 0 each copy alone at VOICES 1.0 on the working set, with the tone
+      shelf flat and the trim off, turns a steady 220 Hz tone into the gain-scaled input at the lag it
+      took, through the same low cut and DC blocker. The lag is searched within half a period of the
+      engine's lag and the gain fitted, since level scatter draws one. With the shipped epoch align on
+      the worst sample error is under 1e-4 (4.2e-5, the float rounding of the 120 Hz low cut). The same
+      copy at WIDTH 0.1 is more than 100 times further from the delayed input.
+   20. epoch snap at WIDTH 0 and 0.1: on the jittery 150 Hz pulse train a copy with formant +2 st and
+      pitch 0 at WIDTH 0 has the same samples with epoch align on and off. At WIDTH 0.1 the two differ
+      and the pulse cut is cleaner than the grid by at least 2 dB (4.1 dB).
 2. level_test: a Crowd card row at VOICES 0.5 and WIDTH 0.5 on the default tuning (the working set) in
    the 0..+0.5 dB band, as a lambda row driving PitchFx then Crowd (the two-stage row pattern at
    level_test.cpp:235-243).
@@ -375,6 +410,10 @@ WIDTH, melodic bottom tenth (owner 2026-10-31): both the pitch and the formant o
 In tune at the bottom (owner 2026-10-31): knee 0.025; drift and contour scale with WIDTH so an instrument through the bottom tenth stays in tune. On the working set the −3 st copy reads −0.88, −7.35 and −294.86 cents from the lead at WIDTH 0, 0.1 and 1 (the last with 5 cents of drift). At WIDTH 0.05 the largest drift is 0.15 cents against the 0.21-cent limit, the f0 moves at most 0.39 cents from one 0.5 s window to the next, and a copy with contour 0.6 or 1.4 swings 0.995 or 1.005 of the input's swing at 1 Hz and 3 Hz.
 
 WIDTH smoothing: the knob_step test's WIDTH step from 0.2 to 0.215 read 1.50 of steady state with the new knee, a spike at the first sample of the step block from the pitch jump of an unsmoothed knob step. A scan of every 0.015 step from WIDTH 0.02 to 0.97 found the spike (above 1.05) at 13 start points on the old engine and 10 on the new one without smoothing. The 20 ms one-pole on w leaves 2 (0.13 and 0.21), and the 0.2 step reads 0.96.
+
+Clean bottom, wider top (owner 2026-10-31): pitch factor exactly 0 at WIDTH 0, knee 0.012, and the lag multiplier runs from 0.5 at WIDTH 0 to the stretched top, so the longest lag sits 20 ms further back at full WIDTH.
+
+Measured after the clean bottom, on the working set. The −3 st copy reads 0.00, −3.53 and −294.86 cents from the lead at WIDTH 0, 0.1 and 1. Each copy at WIDTH 0 equals the delayed input to 4.2e-5 at worst with epoch align on, because a copy with ratio and rate both exactly 1 skips the epoch snap (it was 1.5e-2 before the skip). The lags read 24, 60, 42 and 45 ms at WIDTH 0 and 56, 140, 98 and 105 ms at WIDTH 1. `trimDb` stays 1.0 dB, and the level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.18 dB. On the neutral card the crowd alone at VOICES 100 % reads −5.20 dB at WIDTH 0 (four copies on one pitch at four lags comb against each other) and −0.50 dB at WIDTH 100 %.
 
 Working set (owner 2026-10-31): contour 0.8/1.2/0.7/1.1, level scatter 2 dB, timing scatter 12 ms, drift 15 cents, epoch align on. These are the defaults of `CrowdTuning`, so the box runs them. `trimDb` is 1.0 dB (from 2.1): the level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.25 dB. On the neutral card (every enhancement off) the level law reads +0.00 to +0.45 dB across VOICES 20 % to 80 % and +0.12 dB at 100 % at WIDTH 0.5; at VOICES 100 % it reads −1.60 dB at WIDTH 0 and −0.38 dB at WIDTH 100 %. Host cost: 3.74 us per block on the working set against 3.42 us on the neutral card (x1.09); `costs.h` keeps its estimate until a board bench.
 
@@ -459,7 +498,7 @@ range.
    times as far from its own mean as Adam sits from his. 1 follows him exactly, 0.7 flattens the
    copy's rises and falls to 70 % of his, 1.3 exaggerates them. The term is added to the exponent
    that `exp2Fast` takes once per block, and a contour of exactly 1 adds exactly 0. The contour a copy
-   uses is 1 + (contour − 1) × ff(w) (WIDTH law above), so it is exactly 1 at WIDTH 0 and the slider
+   uses is 1 + (contour − 1) × f(w) (WIDTH law above), so it is exactly 1 at WIDTH 0 and the slider
    value at WIDTH 1.
 3. Breath removed (owner 2026-10-31).
 4. Epoch align, `epochAlign`, default true, with `epochSearch` 0.25 (range 0..0.3 periods). The cut
@@ -473,7 +512,8 @@ range.
       centroid of the lobe above half its height. The first search of a track takes the largest
       absolute sample of a whole period and keeps its sign. A ringing voice has positive and negative
       lobes nearly as tall, and following one sign keeps the track from flipping between them.
-   3. A copy's launch asks the track for the pulse nearest its grid mark and cuts the grain there. A
+   3. A copy's launch asks the track for the pulse nearest its grid mark and cuts the grain there, unless
+      its ratio and rate are both exactly 1 (WIDTH 0), where it stays on the grid. A
       pulse more than half a period from the mark leaves the grain on the grid. The grid still decides
       when a grain is laid down, so the copy's pitch is unchanged.
    4. A copy cut on the pulses sits at most half a period (measured 0.7 ms at 220 Hz) from the lag it
@@ -485,7 +525,9 @@ range.
 scatterMs      = 12       // 0..30 ms
 driftCents     = 15       // 0..50 cents
 widthKnee      = 0.1      // 0.02..0.9
-widthKneeFrac  = 0.025    // 0..1
+widthKneeFrac  = 0.012    // 0..1
+widthLagBottom = 0.5      // 0.2..1
+widthLagMs     = 20       // 0..60 ms
 levelScatterDb = 2        // 0..4 dB
 contour        = {0.8, 1.2, 0.7, 1.1}   // 0.6..1.4
 epochAlign     = true
@@ -563,7 +605,8 @@ Host, -O2, 48 kHz, `test/crowd_test.cpp` unless noted.
 
 1. The Scatter node gains Level scatter. A new node Contour has four sliders, 0.6..1.4. The Pitch node
    gains Width knee and Offsets at knee sliders, an Epoch align checkbox and an Epoch search slider.
-   Print tuning lists every new field.
-2. cubevox-render keys `crowdWidthKnee`, `crowdWidthKneeFrac`, `crowdLevelScatterDb`, `crowdContour0..3`,
-   `crowdEpochAlign` (0 or 1) and `crowdEpochSearch`. A value outside its range is refused.
+   The Delay node gains Lag at bottom (0.2..1) and Lag at top (0..60 ms). Print tuning lists every new field.
+2. cubevox-render keys `crowdWidthKnee`, `crowdWidthKneeFrac`, `crowdWidthLagBottom` (0.2..1),
+   `crowdWidthLagMs` (0..60), `crowdLevelScatterDb`, `crowdContour0..3`, `crowdEpochAlign` (0 or 1) and
+   `crowdEpochSearch`. A value outside its range is refused.
 3. The firmware never sets any of them.

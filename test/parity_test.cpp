@@ -249,6 +249,8 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
   CMP(p, pos, a, b, driftHoldS);
   CMP(p, pos, a, b, widthKnee);
   CMP(p, pos, a, b, widthKneeFrac);
+  CMP(p, pos, a, b, widthLagBottom);
+  CMP(p, pos, a, b, widthLagMs);
   CMP(p, pos, a, b, levelScatterDb);
   CMP(p, pos, a, b, epochAlign);
   CMP(p, pos, a, b, epochSearch);
