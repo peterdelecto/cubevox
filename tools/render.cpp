@@ -101,7 +101,7 @@ int usage() {
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
-               "     (-12..12) crowdTiltDb0..3 (-12..12) crowdTiltHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
+               "     (-12..12) crowdShelfDb0..3 (-12..12) crowdShelfHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
                "     crowdLagScale (0.5..2) crowdScatterMs (0..30) crowdDriftCents (0..50) crowdMaxLagMs (0..150)\n"
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
@@ -165,34 +165,34 @@ bool parsePair(const char* s, float* hz, float* db) {
 bool inside(float v, float lo, float hi) { return v >= lo && v <= hi; }
 
 // The Crowd card's per-copy keys, each inside the range the engine takes.
-bool crowdCopiesInRange(const cv::CrowdTuning& g) {
-  namespace gd = cv::crowd_detail;
+bool crowdCopiesInRange(const cv::CrowdTuning& t) {
+  namespace cd = cv::crowd_detail;
   constexpr float kTopLag = static_cast<float>(cv::kCrowdMaxLagMs);
-  for (size_t v = 0; v < gd::kVoices; ++v) {
-    if (!inside(g.pitchSt[v], -gd::kMaxOffsetSt, gd::kMaxOffsetSt)) return false;
-    if (!inside(g.formantSt[v], -gd::kMaxOffsetSt, gd::kMaxOffsetSt)) return false;
-    if (!inside(g.tiltDb[v], -gd::kMaxTiltDb, gd::kMaxTiltDb)) return false;
-    if (!inside(g.delayMs[v], gd::kMinDelayMs, kTopLag)) return false;
-    if (!inside(g.contour[v], gd::kMinContour, gd::kMaxContour)) return false;
+  for (size_t v = 0; v < cd::kVoices; ++v) {
+    if (!inside(t.pitchSt[v], -cd::kMaxOffsetSt, cd::kMaxOffsetSt)) return false;
+    if (!inside(t.formantSt[v], -cd::kMaxOffsetSt, cd::kMaxOffsetSt)) return false;
+    if (!inside(t.shelfDb[v], -cd::kMaxShelfDb, cd::kMaxShelfDb)) return false;
+    if (!inside(t.delayMs[v], cd::kMinDelayMs, kTopLag)) return false;
+    if (!inside(t.contour[v], cd::kMinContour, cd::kMaxContour)) return false;
   }
   return true;
 }
 
 // Every Crowd key refuses a value outside the range the engine clamps to, so a typo in a key does not
 // pass for a setting.
-bool crowdInRange(const cv::CrowdTuning& g) {
-  namespace gd = cv::crowd_detail;
-  return crowdCopiesInRange(g) && inside(g.voiceDb, gd::kMinVoiceDb, gd::kMaxVoiceDb) &&
-         inside(g.trimDb, -gd::kMaxTrimDb, gd::kMaxTrimDb) && inside(g.trimBottomDb, -gd::kMaxTrimDb, gd::kMaxTrimDb) &&
-         inside(g.tiltHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(g.hpHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
-         inside(g.lagScale, gd::kMinLagScale, gd::kMaxLagScale) &&
-         inside(g.maxLagMs, 0.0f, static_cast<float>(cv::kCrowdMaxLagMs)) &&
-         inside(g.scatterMs, 0.0f, gd::kMaxScatterMs) && inside(g.driftCents, 0.0f, gd::kMaxDriftCents) &&
-         inside(g.levelScatterDb, 0.0f, gd::kMaxLevelScatterDb) &&
-         inside(g.widthKnee, gd::kMinWidthKnee, gd::kMaxWidthKnee) &&
-         inside(g.widthKneeFrac, 0.0f, gd::kMaxWidthKneeFrac) &&
-         inside(g.widthLagBottom, gd::kMinLagBottom, gd::kMaxLagBottom) &&
-         inside(g.widthLagMs, 0.0f, gd::kMaxWidthLagMs);
+bool crowdTuningInRange(const cv::CrowdTuning& t) {
+  namespace cd = cv::crowd_detail;
+  return crowdCopiesInRange(t) && inside(t.voiceDb, cd::kMinVoiceDb, cd::kMaxVoiceDb) &&
+         inside(t.trimDb, -cd::kMaxTrimDb, cd::kMaxTrimDb) && inside(t.trimBottomDb, -cd::kMaxTrimDb, cd::kMaxTrimDb) &&
+         inside(t.shelfHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.hpHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(t.lagScale, cd::kMinLagScale, cd::kMaxLagScale) &&
+         inside(t.maxLagMs, 0.0f, static_cast<float>(cv::kCrowdMaxLagMs)) &&
+         inside(t.scatterMs, 0.0f, cd::kMaxScatterMs) && inside(t.driftCents, 0.0f, cd::kMaxDriftCents) &&
+         inside(t.levelScatterDb, 0.0f, cd::kMaxLevelScatterDb) &&
+         inside(t.widthKnee, cd::kMinWidthKnee, cd::kMaxWidthKnee) &&
+         inside(t.widthKneeFrac, 0.0f, cd::kMaxWidthKneeFrac) &&
+         inside(t.widthLagBottom, cd::kMinLagBottom, cd::kMaxLagBottom) &&
+         inside(t.widthLagMs, 0.0f, cd::kMaxWidthLagMs);
 }
 
 bool applyTuning(RenderParams& rp, const char* kv) {
@@ -203,7 +203,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringTuning& sb = rp.reverb.spring.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
-  cv::CrowdTuning& gn = rp.crowd.tuning;
+  cv::CrowdTuning& ct = rp.crowd.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
@@ -220,25 +220,25 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"octTrimDb", &ot.trimDb},
       {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
       {"atGrainDelay", &at.grainDelay},
-      {"crowdVoiceDb", &gn.voiceDb},              {"crowdTrimDb", &gn.trimDb},
-      {"crowdTrimBottomDb", &gn.trimBottomDb},
-      {"crowdFormantSt0", &gn.formantSt[0]},      {"crowdFormantSt1", &gn.formantSt[1]},
-      {"crowdFormantSt2", &gn.formantSt[2]},      {"crowdFormantSt3", &gn.formantSt[3]},
-      {"crowdPitchSt0", &gn.pitchSt[0]},          {"crowdPitchSt1", &gn.pitchSt[1]},
-      {"crowdPitchSt2", &gn.pitchSt[2]},          {"crowdPitchSt3", &gn.pitchSt[3]},
-      {"crowdTiltDb0", &gn.tiltDb[0]},            {"crowdTiltDb1", &gn.tiltDb[1]},
-      {"crowdTiltDb2", &gn.tiltDb[2]},            {"crowdTiltDb3", &gn.tiltDb[3]},
-      {"crowdTiltHz", &gn.tiltHz},
-      {"crowdDelayMs0", &gn.delayMs[0]},          {"crowdDelayMs1", &gn.delayMs[1]},
-      {"crowdDelayMs2", &gn.delayMs[2]},          {"crowdDelayMs3", &gn.delayMs[3]},
-      {"crowdLagScale", &gn.lagScale},
-      {"crowdScatterMs", &gn.scatterMs},          {"crowdDriftCents", &gn.driftCents},
-      {"crowdHpHz", &gn.hpHz},                    {"crowdMaxLagMs", &gn.maxLagMs},
-      {"crowdWidthKnee", &gn.widthKnee},          {"crowdWidthKneeFrac", &gn.widthKneeFrac},
-      {"crowdWidthLagBottom", &gn.widthLagBottom}, {"crowdWidthLagMs", &gn.widthLagMs},
-      {"crowdLevelScatterDb", &gn.levelScatterDb},
-      {"crowdContour0", &gn.contour[0]},          {"crowdContour1", &gn.contour[1]},
-      {"crowdContour2", &gn.contour[2]},          {"crowdContour3", &gn.contour[3]},
+      {"crowdVoiceDb", &ct.voiceDb},              {"crowdTrimDb", &ct.trimDb},
+      {"crowdTrimBottomDb", &ct.trimBottomDb},
+      {"crowdFormantSt0", &ct.formantSt[0]},      {"crowdFormantSt1", &ct.formantSt[1]},
+      {"crowdFormantSt2", &ct.formantSt[2]},      {"crowdFormantSt3", &ct.formantSt[3]},
+      {"crowdPitchSt0", &ct.pitchSt[0]},          {"crowdPitchSt1", &ct.pitchSt[1]},
+      {"crowdPitchSt2", &ct.pitchSt[2]},          {"crowdPitchSt3", &ct.pitchSt[3]},
+      {"crowdShelfDb0", &ct.shelfDb[0]},          {"crowdShelfDb1", &ct.shelfDb[1]},
+      {"crowdShelfDb2", &ct.shelfDb[2]},          {"crowdShelfDb3", &ct.shelfDb[3]},
+      {"crowdShelfHz", &ct.shelfHz},
+      {"crowdDelayMs0", &ct.delayMs[0]},          {"crowdDelayMs1", &ct.delayMs[1]},
+      {"crowdDelayMs2", &ct.delayMs[2]},          {"crowdDelayMs3", &ct.delayMs[3]},
+      {"crowdLagScale", &ct.lagScale},
+      {"crowdScatterMs", &ct.scatterMs},          {"crowdDriftCents", &ct.driftCents},
+      {"crowdHpHz", &ct.hpHz},                    {"crowdMaxLagMs", &ct.maxLagMs},
+      {"crowdWidthKnee", &ct.widthKnee},          {"crowdWidthKneeFrac", &ct.widthKneeFrac},
+      {"crowdWidthLagBottom", &ct.widthLagBottom}, {"crowdWidthLagMs", &ct.widthLagMs},
+      {"crowdLevelScatterDb", &ct.levelScatterDb},
+      {"crowdContour0", &ct.contour[0]},          {"crowdContour1", &ct.contour[1]},
+      {"crowdContour2", &ct.contour[2]},          {"crowdContour3", &ct.contour[3]},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -301,7 +301,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
-    if (!crowdInRange(gn)) return false;
+    if (!crowdTuningInRange(ct)) return false;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }

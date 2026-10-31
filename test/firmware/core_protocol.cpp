@@ -471,7 +471,11 @@ void checkHelloReply() {
     check(has(w.out, std::string("{\"id\":\"") + d.id + "\",\"name\":\"" + d.name + "\""), d.id);
     for (int k = 0; k < d.knobCount; ++k) check(has(w.out, std::string("{\"name\":\"") + d.knob[k].name + "\""), d.knob[k].name);
   }
-  check(has(w.out, "\"cost\":{\"avg\":14,\"worst\":21,\"measured\":true}"), "proto: hello carries costs");
+  const CardDesc& autotune = cardDesc(Card::Autotune);
+  check(has(w.out, std::string("\"id\":\"autotune\",\"name\":\"Autotune\",\"group\":\"pitch\",\"cost\":{\"avg\":") +
+                       std::to_string(autotune.cost.avg) + ",\"worst\":" + std::to_string(autotune.cost.worst) +
+                       ",\"measured\":true}"),
+        "proto: hello carries costs");
   check(has(w.out, "\"kind\":\"stepped\",\"positions\":25,\"min\":-12,\"max\":12,\"unit\":\"st\",\"curve\":\"linear\""),
         "proto: hello carries the octave knob");
   check(has(w.out, "\"curve\":\"log\"") && has(w.out, "\"curve\":\"log_reversed\""), "proto: hello carries curves");

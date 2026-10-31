@@ -5,7 +5,7 @@
 #include "engine/common.h"
 
 // Building blocks the engines share: constants, a clamp, the one-pole and RBJ biquad filters, and
-// the Catmull-Rom read every fractional delay uses.
+// the Catmull-Rom read most fractional delays use. The Crowd copies read linearly.
 
 namespace cv {
 

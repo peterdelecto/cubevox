@@ -20,20 +20,19 @@ namespace {
 void checkDefaultLayout() {
   const Card expected[kSlotCount] = {Card::InputGate, Card::Autotune, Card::Octave, Card::Unison,
                                      Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring};
-  int avg = costs::kFixed.avg;
-  int worst = costs::kFixed.worst;
   int reverbs = 0;
   const Layout layout = defaultLayout();
   for (int s = 0; s < kSlotCount; ++s) {
     check(layout.card[s] == expected[s], "default layout slot");
     const CardDesc& d = cardDesc(layout.card[s]);
-    avg += d.cost.avg;
-    worst += d.cost.worst;
     if (d.group == Group::Reverb) ++reverbs;
     check(d.cost.measured, "a default layout card's cost comes from the board");
   }
-  check(avg <= costs::kBudgetAvgPercent, "default layout within the average line");
-  check(worst <= costs::kBudgetWorstPercent, "default layout within the worst-block line");
+  const LayoutCost sums = layoutCost(layout);
+  check(sums.avg <= costs::kBudgetAvgPercent, "default layout within the average line");
+  check(sums.worst <= costs::kBudgetWorstPercent, "default layout within the worst-block line");
+  check(costs::kAutotune.avg + costs::kTracker.avg == 14 && costs::kAutotune.worst + costs::kTracker.worst == 21,
+        "Autotune's row and the tracker add to the board's 14 % mean and 21 % worst");
   check(reverbs == 1, "default layout has one reverb");
   check(cardDesc(Card::Empty).cost.avg == 0 && cardDesc(Card::Empty).cost.worst == 0, "empty card costs nothing");
   for (int i = 0; i < kCardCount; ++i) {
@@ -48,22 +47,40 @@ void checkDefaultLayout() {
 void checkCrowdLayout() {
   Layout layout = defaultLayout();
   layout.card[3] = Card::Crowd;
-  int avg = costs::kFixed.avg;
-  int worst = costs::kFixed.worst;
-  for (int s = 0; s < kSlotCount; ++s) {
-    avg += cardDesc(layout.card[s]).cost.avg;
-    worst += cardDesc(layout.card[s]).cost.worst;
-  }
+  const LayoutCost sums = layoutCost(layout);
   LayoutError expected = LayoutError::None;
-  if (avg > costs::kBudgetAvgPercent) {
+  if (sums.avg > costs::kBudgetAvgPercent) {
     expected = LayoutError::OverAvg;
-  } else if (worst > costs::kBudgetWorstPercent) {
+  } else if (sums.worst > costs::kBudgetWorstPercent) {
     expected = LayoutError::OverWorst;
   }
   const LayoutCheck verdict = layoutValid(layout);
   check(verdict.error == expected, "crowd layout: slot 4 with Unison out is judged by the cost sums");
-  check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? avg : worst),
+  check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? sums.avg : sums.worst),
         "crowd layout: a refusal reports the sum that went over");
+}
+
+// The pitch tracker's row counts once: with Autotune alone, with Crowd alone, and with both. A layout
+// holding neither, and one holding only Octave, pays none.
+void checkTrackerCost() {
+  Layout noPitch = defaultLayout();
+  noPitch.card[1] = Card::Empty;
+  Layout autotune = noPitch;
+  autotune.card[1] = Card::Autotune;
+  Layout crowd = noPitch;
+  crowd.card[1] = Card::Crowd;
+  Layout both = autotune;
+  both.card[3] = Card::Crowd;
+  int cards = costs::kFixed.avg;
+  for (const Card c : noPitch.card) cards += cardDesc(c).cost.avg;
+  const int base = layoutCost(noPitch).avg;
+  check(base == cards, "tracker cost: Octave without Autotune or Crowd pays none");
+  check(layoutCost(autotune).avg == base + costs::kAutotune.avg + costs::kTracker.avg, "tracker cost: Autotune pays it");
+  check(layoutCost(crowd).avg == base + costs::kCrowd.avg + costs::kTracker.avg, "tracker cost: Crowd without Autotune pays it");
+  check(layoutCost(both).avg == layoutCost(autotune).avg - costs::kUnison.avg + costs::kCrowd.avg,
+        "tracker cost: Autotune and Crowd together pay it once");
+  check(layoutCost(autotune).worst == layoutCost(noPitch).worst + costs::kAutotune.worst + costs::kTracker.worst,
+        "tracker cost: the worst column counts it too");
 }
 
 void checkLayoutValid() {
@@ -302,6 +319,7 @@ void checkLayoutAndCompose() {
   checkSettings();
   checkLayoutValid();
   checkCrowdLayout();
+  checkTrackerCost();
   checkLayoutReasons();
   checkLayoutName();
   checkApplyAction();

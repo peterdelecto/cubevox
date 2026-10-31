@@ -434,16 +434,16 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
                 sb.chirpSections, sb.chirpA, sb.chirpSign, sb.trebleLossHz, sb.bassCutHz, sb.returnLpHz,
                 sb.wobbleDepth, sb.wobbleRateHz, sb.inputTrim, sb.dwellDrive, sb.dwellComp, sb.wetDb);
   used = std::strlen(gTuningText);
-  const cv::CrowdTuning& dt = params.crowd.tuning;
+  const cv::CrowdTuning& ct = params.crowd.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nCrowdTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
                 "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, "
                 "%.0ff, %.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}}",
-                dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
-                dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
-                dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lagScale, dt.tiltHz, dt.voiceDb, dt.trimDb,
-                dt.trimBottomDb, dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
-                dt.driftHoldS, dt.widthKnee, dt.widthKneeFrac, dt.widthLagBottom, dt.widthLagMs, dt.levelScatterDb, dt.contour[0], dt.contour[1], dt.contour[2], dt.contour[3]);
+                ct.pitchSt[0], ct.pitchSt[1], ct.pitchSt[2], ct.pitchSt[3], ct.formantSt[0], ct.formantSt[1],
+                ct.formantSt[2], ct.formantSt[3], ct.shelfDb[0], ct.shelfDb[1], ct.shelfDb[2], ct.shelfDb[3],
+                ct.delayMs[0], ct.delayMs[1], ct.delayMs[2], ct.delayMs[3], ct.lagScale, ct.shelfHz, ct.voiceDb, ct.trimDb,
+                ct.trimBottomDb, ct.leadFadeFrom, ct.holdFrom, ct.hpHz, ct.maxLagMs, ct.gapFloorDb, ct.scatterMs, ct.driftCents,
+                ct.driftHoldS, ct.widthKnee, ct.widthKneeFrac, ct.widthLagBottom, ct.widthLagMs, ct.levelScatterDb, ct.contour[0], ct.contour[1], ct.contour[2], ct.contour[3]);
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
@@ -481,7 +481,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
-      "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, lagScale, tiltHz, voiceDb, "
+      "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {shelfDb[0..3]}, {delayMs[0..3]}, lagScale, shelfHz, voiceDb, "
       "trimDb, trimBottomDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
       "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}\n%s\n",
       gTuningText);
@@ -579,7 +579,7 @@ void voiceSliders(const char* name, std::array<float, 4>& v, float lo, float hi,
 }
 
 // The Crowd card's tuning is split into sub-nodes so no column ever needs a scroll bar. These are
-// the four voices' own settings. Each slider spans the range the engine clamps to, except Formant and
+// the copies' settings. Each slider spans the range the engine clamps to, except Formant and
 // Tone shelf at, which keep a finer stretch inside it.
 void drawCrowdVoiceNodes(cv::CrowdTuning& t) {
   namespace cd = cv::crowd_detail;
@@ -601,8 +601,8 @@ void drawCrowdVoiceNodes(cv::CrowdTuning& t) {
     ImGui::TreePop();
   }
   if (tuningNode("Tone")) {
-    voiceSliders("Tone", t.tiltDb, -cd::kMaxTiltDb, cd::kMaxTiltDb, "%+.1f dB");
-    ImGui::SliderFloat("Tone shelf at", &t.tiltHz, 500.0f, 8000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
+    voiceSliders("Tone", t.shelfDb, -cd::kMaxShelfDb, cd::kMaxShelfDb, "%+.1f dB");
+    ImGui::SliderFloat("Tone shelf at", &t.shelfHz, 500.0f, 8000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::TreePop();
   }
 }
@@ -632,7 +632,7 @@ void drawCrowdScatterNode(cv::CrowdTuning& t) {
 }
 
 // Contour is the share of Adam's rises and falls a copy follows, per copy. A contour of 1 is off.
-void drawCrowdVoiceMannerNodes(cv::CrowdTuning& t) {
+void drawCrowdContourNode(cv::CrowdTuning& t) {
   if (tuningNode("Contour")) {
     voiceSliders("Contour", t.contour, cv::crowd_detail::kMinContour, cv::crowd_detail::kMaxContour, "%.2f x");
     ImGui::TreePop();
@@ -1180,7 +1180,7 @@ void drawCrowdTuning(cv::CrowdParams& d) {
   if (!tuningHeader("crowd")) return;
   drawCrowdVoiceNodes(d.tuning);
   drawCrowdScatterNode(d.tuning);
-  drawCrowdVoiceMannerNodes(d.tuning);
+  drawCrowdContourNode(d.tuning);
   drawCrowdSoloNode(d.solo);
 }
 

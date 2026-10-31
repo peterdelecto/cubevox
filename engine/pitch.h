@@ -31,6 +31,10 @@ class PitchTracker {
   static constexpr float kMaxHz = 1000.0f;
   static constexpr float kVoicedThreshold = 0.15f;  // YIN threshold on the coarse search
 
+  // The periods the tracker reports, in samples at kSampleRate. The PSOLA voices read these bounds.
+  static constexpr int kMinPeriod = 48;
+  static constexpr int kMaxPeriod = 686;
+
   // A frame rebuilt on enable takes this many panes per block on top of the block's own pane, so
   // no single block carries the whole rebuild.
   static constexpr int kRebuildPanesPerBlock = 2;
@@ -120,10 +124,8 @@ class PitchTracker {
   static constexpr int kPaneLen = kBlock / kDecim;
   static constexpr int kPanes = kCoarseW / kPaneLen;
   static constexpr int kFineW = 1024;
-  static constexpr int kFineMin = 48;
-  static constexpr int kFineMax = 686;
   static constexpr int kFineReach = 4;
-  static constexpr int kFineSpan = kFineW + kFineMax;
+  static constexpr int kFineSpan = kFineW + kMaxPeriod;
   static constexpr float kMinRms = 0.0031623f;  // -50 dBFS
   static constexpr float kLowpassHz = 2500.0f;
 
@@ -310,8 +312,8 @@ class PitchTracker {
   // Plain difference function at 48 kHz over a few lags around 4 * tau.
   float refine(float tauCoarse) {
     const int centre = static_cast<int>(floorf(tauCoarse * kDecim + 0.5f));
-    const int lo = centre - kFineReach < kFineMin ? kFineMin : centre - kFineReach;
-    const int hi = centre + kFineReach > kFineMax ? kFineMax : centre + kFineReach;
+    const int lo = centre - kFineReach < kMinPeriod ? kMinPeriod : centre - kFineReach;
+    const int hi = centre + kFineReach > kMaxPeriod ? kMaxPeriod : centre + kFineReach;
     std::array<float, 2 * kFineReach + 1> d{};
     int m = 0;
     const float* x = fineFrame();

@@ -213,16 +213,16 @@ bool crowdRow(const Signal& in, float width) {
   auto crowd = std::make_unique<Stage<cv::Crowd>>();
   cv::PitchFxParams pp = pitchOff();
   pp.crowdOn = true;
-  cv::CrowdParams dp;
-  dp.on = true;
-  dp.voices = 0.5f;
-  dp.width = width;
+  cv::CrowdParams params;
+  params.on = true;
+  params.voices = 0.5f;
+  params.width = width;
   char name[40];
   std::snprintf(name, sizeof name, "crowd VOICES .5 WIDTH %g", static_cast<double>(width));
   return verdict(name, gainDb(in, run(in, [&](const float* i, float* o, int n) {
                    float tmp[cv::kBlock];
                    pitch->fx.process(i, tmp, n, pp);
-                   crowd->fx.process(i, o, n, dp, pitch->fx);
+                   crowd->fx.process(i, o, n, params, pitch->fx);
                  })));
 }
 
