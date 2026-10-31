@@ -157,8 +157,8 @@ void checkComposeGang() {
   panel.knob[3] = {0.25f, 0.75f};
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(!snap.params.gang.on && !snap.params.pitchFx.gangOn, "compose: Gang card off leaves both flags off");
-  check(std::fabs(snap.params.gang.distance - 0.25f) < 1e-6f && std::fabs(snap.params.gang.voices - 0.75f) < 1e-6f,
-        "compose: Gang knob A is DISTANCE and knob B is VOICES");
+  check(std::fabs(snap.params.gang.width - 0.25f) < 1e-6f && std::fabs(snap.params.gang.voices - 0.75f) < 1e-6f,
+        "compose: Gang knob A is WIDTH and knob B is VOICES");
   panel.toggle[3] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.gang.on && snap.params.pitchFx.gangOn && !snap.params.pitchFx.autotune.on &&

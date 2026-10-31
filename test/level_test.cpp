@@ -216,8 +216,8 @@ bool gangRow(const Signal& in) {
   cv::GangParams dp;
   dp.on = true;
   dp.voices = 0.5f;
-  dp.distance = 0.5f;
-  return verdict("gang VOICES .5 DISTANCE .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
+  dp.width = 0.5f;
+  return verdict("gang VOICES .5 WIDTH .5", gainDb(in, run(in, [&](const float* i, float* o, int n) {
                                                      float tmp[cv::kBlock];
                                                      pitch->fx.process(i, tmp, n, pp);
                                                      gang->fx.process(i, o, n, dp, pitch->fx);

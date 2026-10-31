@@ -222,7 +222,7 @@ void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& sa
 }
 
 void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv::GangParams& e, bool rest) {
-  CMP(p, pos, f, e, distance);
+  CMP(p, pos, f, e, width);
   CMP(p, pos, f, e, voices);
   if (!rest) return;
   const cv::GangTuning& a = f.tuning;
@@ -234,6 +234,7 @@ void cmpGang(const std::string& p, float pos, const cv::GangParams& f, const cv:
     EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
     EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
   }
+  CMP(p, pos, a, b, lagScale);
   CMP(p, pos, a, b, tiltHz);
   CMP(p, pos, a, b, voiceDb);
   CMP(p, pos, a, b, trimDb);
@@ -333,7 +334,7 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(em.pitchFx.autotune.responseMs), fw);
   applyKnob(Card::Octave, 0, static_cast<float>(em.pitchFx.octave.semitones - kEmuSemiLo), fw);
   applyKnob(Card::Octave, 1, em.pitchFx.octave.mix, fw);
-  applyKnob(Card::Gang, 0, em.gang.distance, fw);
+  applyKnob(Card::Gang, 0, em.gang.width, fw);
   applyKnob(Card::Gang, 1, em.gang.voices, fw);
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
   applyKnob(Card::Unison, 1, em.unison.depth, fw);
@@ -410,7 +411,7 @@ void sweepOctave() {
   }
 }
 
-// emulator/main.cpp drawGangBlock: DISTANCE and VOICES are percentSlider, so the knob position is
+// emulator/main.cpp drawGangBlock: WIDTH and VOICES are percentSlider, so the knob position is
 // the engine field.
 void sweepGang() {
   for (int i = 0; i <= kSweepSteps; ++i) {
@@ -418,8 +419,8 @@ void sweepGang() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Gang, 0, p, fw);
-    em.gang.distance = p;
-    cmpGang("sweep.gang.distance", p, fw.gang, em.gang, false);
+    em.gang.width = p;
+    cmpGang("sweep.gang.width", p, fw.gang, em.gang, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
     applyKnob(Card::Gang, 1, p, fw2);
