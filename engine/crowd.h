@@ -5,21 +5,21 @@
 #include <cstdint>
 
 #include "engine/common.h"
+#include "engine/crowd_epoch.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
-#include "engine/gang_epoch.h"
 #include "engine/pitch_fx.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
 
-// The Gang card adds up to four copies of the voice, each a different person saying the same line
+// The Crowd card adds up to four copies of the voice, each a different person saying the same line
 // a little after Adam. Each copy sits a few semitones off the lead, has its own throat (a grain
-// playback rate) and its own tone shelf, and lags the lead by its own delay. The gang as a whole
+// playback rate) and its own tone shelf, and lags the lead by its own delay. The crowd as a whole
 // has a fixed low cut. The copies never read a key. They read the pitch period and Autotune's
 // correction from PitchFx and cut their grains from its input ring.
 //
 // VOICES fades the copies in one at a time (low, high, low, high), then fades the lead out, so the
-// top of the knob is the gang alone. Total power is unity at every position. WIDTH spreads the
+// top of the knob is the crowd alone. Total power is unity at every position. WIDTH spreads the
 // copies' pitch and formant offsets from almost none to their full values. The bottom tenth of the
 // knob is for instruments and melodic lines, where the copies are plain detuned doubles. A copy
 // changes its lag only in a quiet gap, so it never bends in pitch mid-word. Scatter gives each
@@ -36,7 +36,7 @@
 
 namespace cv {
 
-struct GangTuning {
+struct CrowdTuning {
   std::array<float, 4> pitchSt = {-1.75f, 2.75f, -3.0f, 1.0f};     // full pitch offset 2^(st / 12) at WIDTH 1
   std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at WIDTH 1
   std::array<float, 4> tiltDb = {-3.0f, -4.0f, 3.0f, 5.0f};        // high shelf gain above tiltHz
@@ -47,7 +47,7 @@ struct GangTuning {
   float trimDb = 1.0f;         // level rule residue
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
-  float hpHz = 120.0f;         // low cut on the gang sum
+  float hpHz = 120.0f;         // low cut on the crowd sum
   float maxLagMs = 200.0f;     // ceiling on a copy's lag
   float gapFloorDb = -50.0f;   // a copy's read point under this level counts as a gap
   float scatterMs = 12.0f;     // peak random lag offset a copy takes at each gap
@@ -73,11 +73,11 @@ struct GangTuning {
   float epochSearch = 0.25f;
 };
 
-struct GangParams {
+struct CrowdParams {
   bool on = false;
   float width = 1.0f;   // knob A, 0..1
   float voices = 0.5f;  // knob B, 0..1
-  GangTuning tuning;
+  CrowdTuning tuning;
 
   // A bit per voice (bit 0 is voice 0), 0 for no solo. A soloed voice sits fully faded in and the
   // others are silent, whatever the VOICES position. The lead gain follows from the soloed power.
@@ -85,7 +85,7 @@ struct GangParams {
   uint8_t solo = 0;
 };
 
-namespace gang_detail {
+namespace crowd_detail {
 
 constexpr size_t kVoices = 4;
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
@@ -509,7 +509,7 @@ class CopyLag {
 };
 
 // The VOICES law at knob position k. weight[v] is the voice's fixed gain times its fade, lead the
-// lead's gain, mul the gang multiplier that carries the top of the knob.
+// lead's gain, mul the crowd multiplier that carries the top of the knob.
 struct VoicesLaw {
   std::array<float, kVoices> weight{};
   float lead = 1.0f;
@@ -517,9 +517,9 @@ struct VoicesLaw {
 };
 
 // solo is a bit per voice. When a bit in 0..3 is set, each soloed voice takes fade 1 and the others
-// 0 at every k, and the rest of the law runs on that gang. The lead and the gang multiplier then
+// 0 at every k, and the rest of the law runs on that crowd. The lead and the crowd multiplier then
 // follow from the soloed power, so a single copy at the top of the knob stands alone at unity.
-inline VoicesLaw voicesLaw(float k, const GangTuning& t, uint8_t solo = 0) {
+inline VoicesLaw voicesLaw(float k, const CrowdTuning& t, uint8_t solo = 0) {
   VoicesLaw law;
   const float g = dbToGainFast(t.voiceDb);
   const float from = clampf(t.leadFadeFrom, 0.05f, 0.99f);
@@ -541,8 +541,8 @@ inline VoicesLaw voicesLaw(float k, const GangTuning& t, uint8_t solo = 0) {
     return law;
   }
 
-  // Past the fade point every sounding voice holds at g. Gang power runs from the sounding voices'
-  // power (four voices without a solo) up to unity while the lead falls to nothing, and the gang
+  // Past the fade point every sounding voice holds at g. Crowd power runs from the sounding voices'
+  // power (four voices without a solo) up to unity while the lead falls to nothing, and the crowd
   // multiplier makes up the difference.
   const float s = smooth::clamp01((k - from) / (1.0f - from));
   const float p0 = static_cast<float>(mask == 0 ? kVoices : count) * g * g;
@@ -554,12 +554,12 @@ inline VoicesLaw voicesLaw(float k, const GangTuning& t, uint8_t solo = 0) {
   return law;
 }
 
-}  // namespace gang_detail
+}  // namespace crowd_detail
 
-class Gang {
+class Crowd {
  public:
   // The constructor runs reset(), so the non-zero defaults below land in .bss with the rest.
-  Gang() { reset(); }
+  Crowd() { reset(); }
 
   void reset() {
     clearDsp();
@@ -575,7 +575,7 @@ class Gang {
 
   // in is this slot's input, the lead. pitch has already run this block, so the block's samples
   // sit at ring index head() - n + i. Off and settled, out equals in bit for bit.
-  void process(const float* in, float* out, int n, const GangParams& p, const PitchFx& pitch) {
+  void process(const float* in, float* out, int n, const CrowdParams& p, const PitchFx& pitch) {
     if (settledOff(p)) {
       passThrough(in, out, n);
       return;
@@ -601,28 +601,28 @@ class Gang {
   float grainRate(size_t v) const { return voice_[v].rate(); }
 
  private:
-  using FormantPsolaVoice = gang_detail::FormantPsolaVoice;
-  static constexpr size_t kVoices = gang_detail::kVoices;
+  using FormantPsolaVoice = crowd_detail::FormantPsolaVoice;
+  static constexpr size_t kVoices = crowd_detail::kVoices;
 
   // Block-end targets for everything the knobs and the tuning set.
   struct Plan {
     std::array<float, kVoices> voice{};  // fixed gain times fade, per voice
     float lead = 1.0f;
-    float wet = 0.0f;  // gang multiplier times the trim
+    float wet = 0.0f;  // crowd multiplier times the trim
   };
 
-  static Plan makePlan(const GangParams& p) {
+  static Plan makePlan(const CrowdParams& p) {
     Plan plan;
     if (!p.on) return plan;
-    const GangTuning& t = p.tuning;
-    const gang_detail::VoicesLaw law = gang_detail::voicesLaw(smooth::clamp01(p.voices), t, p.solo);
+    const CrowdTuning& t = p.tuning;
+    const crowd_detail::VoicesLaw law = crowd_detail::voicesLaw(smooth::clamp01(p.voices), t, p.solo);
     plan.voice = law.weight;
     plan.lead = law.lead;
     plan.wet = law.mul * dbToGainFast(t.trimDb);
     return plan;
   }
 
-  bool settledOff(const GangParams& p) const {
+  bool settledOff(const CrowdParams& p) const {
     if (p.on || lead_ != 1.0f || wet_ != 0.0f) return false;
     for (float g : gain_) {
       if (g != 0.0f) return false;
@@ -657,9 +657,9 @@ class Gang {
     live_[v] = false;
   }
 
-  // The low cut on the gang sum. The setter runs on the first block after a reset and when the
+  // The low cut on the crowd sum. The setter runs on the first block after a reset and when the
   // tuning moved.
-  void setLowCut(const GangTuning& t) {
+  void setLowCut(const CrowdTuning& t) {
     if (hpSet_ && t.hpHz == hpHz_) return;
     hp_.setHighPass(t.hpHz, kButterworthQ);
     hpHz_ = t.hpHz;
@@ -667,7 +667,7 @@ class Gang {
   }
 
   // One high shelf per voice, set on the first block after a reset and when the tuning moved.
-  void setTilts(const GangTuning& t) {
+  void setTilts(const CrowdTuning& t) {
     for (size_t v = 0; v < kVoices; ++v) {
       if (tiltSet_ && t.tiltDb[v] == tiltDb_[v] && t.tiltHz == tiltHz_) continue;
       tilt_[v].setHighShelf(t.tiltHz, t.tiltDb[v]);
@@ -678,54 +678,54 @@ class Gang {
   }
 
   // Copy v's lag target in samples. The scale stretches the delay and the ceiling caps it.
-  static float lagTarget(const GangTuning& t, size_t v) {
+  static float lagTarget(const CrowdTuning& t, size_t v) {
     const float lagMs = t.delayMs[v] * t.lagScale;
-    return (lagMs < t.maxLagMs ? lagMs : t.maxLagMs) * gang_detail::kSmpPerMs;
+    return (lagMs < t.maxLagMs ? lagMs : t.maxLagMs) * crowd_detail::kSmpPerMs;
   }
 
   // What every voice of one block reads.
   struct Block {
-    const GangTuning& t;
-    gang_detail::BlockView view;
+    const CrowdTuning& t;
+    crowd_detail::BlockView view;
     float period;
     float corr;        // Autotune's correction in octaves
-    gang_detail::WidthFactors width;
+    crowd_detail::WidthFactors width;
     float scatterSmp;  // timing scatter in samples
     float levelDb;     // level scatter, clamped to its range
     float slew;        // one-pole coefficient of the slow walks for this block
     int n;
-    const gang_detail::EpochTrack* epochs;  // null cuts on the period grid
+    const crowd_detail::EpochTrack* epochs;  // null cuts on the period grid
   };
 
   // The shared pulse marks of this block, or null when the grid cuts. Off drops the marks, so a
   // later on starts a fresh search.
-  const gang_detail::EpochTrack* prepareEpochs(const GangTuning& t, const PitchFx& pitch, float period, int n) {
+  const crowd_detail::EpochTrack* prepareEpochs(const CrowdTuning& t, const PitchFx& pitch, float period, int n) {
     if (!t.epochAlign) {
       epochs_.reset();
       return nullptr;
     }
-    const float p = period > 0.0f ? clampf(period, gang_detail::kMinPeriod, gang_detail::kMaxPeriod) : 0.0f;
+    const float p = period > 0.0f ? clampf(period, crowd_detail::kMinPeriod, crowd_detail::kMaxPeriod) : 0.0f;
     epochs_.advance(pitch.shadow(), pitch.head(), n, p, t.epochSearch);
     return &epochs_;
   }
 
   // Per block: filters, the contour track and the pulse marks, then each live voice. first is the
   // ring index of the block's first sample.
-  void prepareBlock(const GangParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
-    const GangTuning& t = p.tuning;
+  void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
+    const CrowdTuning& t = p.tuning;
     setLowCut(t);
     setTilts(t);
     const PitchResult& pr = pitch.pitch();
-    const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * gang_detail::kDriftSlewS));
+    const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * crowd_detail::kDriftSlewS));
     contour_.step(pr.period, pr.voiced, slew);
-    const gang_detail::EpochTrack* epochs = prepareEpochs(t, pitch, pr.period, n);
+    const crowd_detail::EpochTrack* epochs = prepareEpochs(t, pitch, pr.period, n);
     const Block b{t,
                   {pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)},
                   pr.period,
                   pitch.correctionSemis() * (1.0f / 12.0f),
-                  gang_detail::widthFactors(smooth::clamp01(p.width), t.widthKnee, t.widthKneeFrac),
-                  (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * gang_detail::kSmpPerMs,
-                  clampf(t.levelScatterDb, 0.0f, gang_detail::kMaxLevelScatterDb),
+                  crowd_detail::widthFactors(smooth::clamp01(p.width), t.widthKnee, t.widthKneeFrac),
+                  (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * crowd_detail::kSmpPerMs,
+                  clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
                   slew,
                   n,
                   epochs};
@@ -740,7 +740,7 @@ class Gang {
       if (live_[v]) retire(v);
       return;
     }
-    const GangTuning& t = b.t;
+    const CrowdTuning& t = b.t;
     live_[v] = true;
     ++active_;
     const bool roll = b.levelDb > 0.0f;
@@ -756,8 +756,8 @@ class Gang {
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
   // The copy then sits contour times as far from his mean as he does. Contour 1 adds exactly 0.
-  float contourOctaves(size_t v, const GangTuning& t) const {
-    const float c = clampf(t.contour[v], gang_detail::kMinContour, gang_detail::kMaxContour);
+  float contourOctaves(size_t v, const CrowdTuning& t) const {
+    const float c = clampf(t.contour[v], crowd_detail::kMinContour, crowd_detail::kMaxContour);
     return c == 1.0f ? 0.0f : (c - 1.0f) * contour_.deviation();
   }
 
@@ -769,9 +769,9 @@ class Gang {
     uint32_t clock;  // epoch clock of that sample
   };
 
-  // Adds voice v into gang. The voice's tone shelf runs first, then its gain ramps to the
+  // Adds voice v into crowd. The voice's tone shelf runs first, then its gain ramps to the
   // block-end target. The shelf runs on a local copy so its state stays in registers.
-  void mixVoice(size_t v, const Chunk& k, float target, float* gang) {
+  void mixVoice(size_t v, const Chunk& k, float target, float* crowd) {
     std::array<float, kBlock> raw{};
     voice_[v].render(k.ring, k.first, k.n, raw.data(), k.clock);
     Biquad tilt = tilt_[v];
@@ -779,31 +779,31 @@ class Gang {
     float g = gain_[v];
     for (int i = 0; i < k.n; ++i) {
       g += step;
-      gang[i] += g * tilt.run(raw[static_cast<size_t>(i)]);
+      crowd[i] += g * tilt.run(raw[static_cast<size_t>(i)]);
     }
     tilt_[v] = tilt;
   }
 
-  // The low cut on the gang sum, in place. The filter runs on a local copy so its state stays in
+  // The low cut on the crowd sum, in place. The filter runs on a local copy so its state stays in
   // registers.
-  void filterGang(float* gang, int n) {
+  void filterCrowd(float* crowd, int n) {
     Biquad hp = hp_;
-    for (int i = 0; i < n; ++i) gang[i] = hp.run(gang[i]);
+    for (int i = 0; i < n; ++i) crowd[i] = hp.run(crowd[i]);
     hp_ = hp;
   }
 
-  // Lead and gang ramp linearly from the last chunk's values to the plan. A voice's gain target is
+  // Lead and crowd ramp linearly from the last chunk's values to the plan. A voice's gain target is
   // its plan gain times the loudness its last gap drew, which is exactly 1 with level scatter off.
   void renderChunk(const float* in, float* out, const Plan& plan, const Chunk& k) {
-    std::array<float, kBlock> gang{};
+    std::array<float, kBlock> crowd{};
     for (size_t v = 0; v < kVoices; ++v) {
-      if (live_[v]) mixVoice(v, k, plan.voice[v] * levelMul_[v], gang.data());
+      if (live_[v]) mixVoice(v, k, plan.voice[v] * levelMul_[v], crowd.data());
     }
-    filterGang(gang.data(), k.n);
+    filterCrowd(crowd.data(), k.n);
     const float inv = 1.0f / static_cast<float>(k.n);
     for (int i = 0; i < k.n; ++i) {
       const float f = static_cast<float>(i + 1) * inv;
-      const float wet = dc_.run(gang[static_cast<size_t>(i)]);
+      const float wet = dc_.run(crowd[static_cast<size_t>(i)]);
       out[i] = (lead_ + (plan.lead - lead_) * f) * in[i] + (wet_ + (plan.wet - wet_) * f) * wet;
     }
     for (size_t v = 0; v < kVoices; ++v) gain_[v] = plan.voice[v] * levelMul_[v];
@@ -817,12 +817,12 @@ class Gang {
   std::array<float, kVoices> tiltDb_{};
   std::array<float, kVoices> gain_{};
   std::array<bool, kVoices> live_{};
-  std::array<gang_detail::CopyLag, kVoices> lag_{};
-  std::array<gang_detail::PitchDrift, kVoices> drift_{};
-  std::array<gang_detail::XorShift, kVoices> driftRng_{};
+  std::array<crowd_detail::CopyLag, kVoices> lag_{};
+  std::array<crowd_detail::PitchDrift, kVoices> drift_{};
+  std::array<crowd_detail::XorShift, kVoices> driftRng_{};
   std::array<float, kVoices> levelMul_ = {1.0f, 1.0f, 1.0f, 1.0f};
-  gang_detail::ContourTrack contour_;
-  gang_detail::EpochTrack epochs_;
+  crowd_detail::ContourTrack contour_;
+  crowd_detail::EpochTrack epochs_;
   DcBlocker dc_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;

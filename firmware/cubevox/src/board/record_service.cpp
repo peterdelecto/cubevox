@@ -94,8 +94,8 @@ void reportRecovery(Print& out) {
     out.print(gRejectReason.data());
     out.println("), using the default layout");
   }
-#ifdef CUBEVOX_GANGTEST
-  out.println("[WARN] test layout in force: Gang replaces Autotune in slot 2, CPU budget checks off");
+#ifdef CUBEVOX_CROWDTEST
+  out.println("[WARN] test layout in force: Crowd replaces Autotune in slot 2, CPU budget checks off");
 #endif
 }
 
@@ -138,9 +138,9 @@ static void loadRecord(Layout& layout, Settings& settings, uint32_t nowMs) {
 void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
   loadRecord(layout, settings, nowMs);
 
-#ifdef CUBEVOX_GANGTEST
-  // The test image runs Gang in slot 2. The record keeps the stored layout.
-  layout = gangTestLayout();
+#ifdef CUBEVOX_CROWDTEST
+  // The test image runs Crowd in slot 2. The record keeps the stored layout.
+  layout = crowdTestLayout();
 #endif
 }
 

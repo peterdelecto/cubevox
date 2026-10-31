@@ -42,12 +42,12 @@ void checkDefaultLayout() {
   }
 }
 
-// The Gang card sits outside the default layout, so its cost may stay an estimate. layoutValid counts
-// the estimate like a measurement, so a layout with the Gang card in slot 4 and Unison out is judged
+// The Crowd card sits outside the default layout, so its cost may stay an estimate. layoutValid counts
+// the estimate like a measurement, so a layout with the Crowd card in slot 4 and Unison out is judged
 // by the sums, and the verdict follows the row once a board bench replaces it.
-void checkGangLayout() {
+void checkCrowdLayout() {
   Layout layout = defaultLayout();
-  layout.card[3] = Card::Gang;
+  layout.card[3] = Card::Crowd;
   int avg = costs::kFixed.avg;
   int worst = costs::kFixed.worst;
   for (int s = 0; s < kSlotCount; ++s) {
@@ -61,9 +61,9 @@ void checkGangLayout() {
     expected = LayoutError::OverWorst;
   }
   const LayoutCheck verdict = layoutValid(layout);
-  check(verdict.error == expected, "gang layout: slot 4 with Unison out is judged by the cost sums");
+  check(verdict.error == expected, "crowd layout: slot 4 with Unison out is judged by the cost sums");
   check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? avg : worst),
-        "gang layout: a refusal reports the sum that went over");
+        "crowd layout: a refusal reports the sum that went over");
 }
 
 void checkLayoutValid() {
@@ -149,22 +149,22 @@ void checkComposeToggles() {
   check(on.layout.card == layout.card, "snapshot carries the layout");
 }
 
-// The Gang card's toggle turns on its stage and the pitch stage's feed, and its knobs reach the stage.
-void checkComposeGang() {
+// The Crowd card's toggle turns on its stage and the pitch stage's feed, and its knobs reach the stage.
+void checkComposeCrowd() {
   Layout layout = defaultLayout();
-  layout.card[3] = Card::Gang;
+  layout.card[3] = Card::Crowd;
   PanelReading panel = panelWithToggles(false);
   panel.knob[3] = {0.25f, 0.75f};
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(!snap.params.gang.on && !snap.params.pitchFx.gangOn, "compose: Gang card off leaves both flags off");
-  check(std::fabs(snap.params.gang.width - 0.25f) < 1e-6f && std::fabs(snap.params.gang.voices - 0.75f) < 1e-6f,
-        "compose: Gang knob A is WIDTH and knob B is VOICES");
+  check(!snap.params.crowd.on && !snap.params.pitchFx.crowdOn, "compose: Crowd card off leaves both flags off");
+  check(std::fabs(snap.params.crowd.width - 0.25f) < 1e-6f && std::fabs(snap.params.crowd.voices - 0.75f) < 1e-6f,
+        "compose: Crowd knob A is WIDTH and knob B is VOICES");
   panel.toggle[3] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.gang.on && snap.params.pitchFx.gangOn && !snap.params.pitchFx.autotune.on &&
+  check(snap.params.crowd.on && snap.params.pitchFx.crowdOn && !snap.params.pitchFx.autotune.on &&
             !snap.params.pitchFx.octave.on,
-        "compose: Gang card on sets its flag and the pitch stage's, and no other pitch toggle");
-  check(snap.slotOn[3], "compose: the Gang card's slot reads on");
+        "compose: Crowd card on sets its flag and the pitch stage's, and no other pitch toggle");
+  check(snap.slotOn[3], "compose: the Crowd card's slot reads on");
 }
 
 void checkComposeBench() {
@@ -257,12 +257,12 @@ void checkReverbSlot() {
   check(reverbSlot(layout) == 2, "reverbSlot: the slot that holds it, wherever it is");
 }
 
-void checkGangTestLayout() {
+void checkCrowdTestLayout() {
   const Layout base = defaultLayout();
-  const Layout test = gangTestLayout();
-  check(test.card[1] == Card::Gang, "gang test layout: Gang sits in slot 2");
+  const Layout test = crowdTestLayout();
+  check(test.card[1] == Card::Crowd, "crowd test layout: Crowd sits in slot 2");
   for (int s = 0; s < kSlotCount; ++s) {
-    if (s != 1) check(test.card[s] == base.card[s], "gang test layout: every other slot is the default");
+    if (s != 1) check(test.card[s] == base.card[s], "crowd test layout: every other slot is the default");
   }
 }
 
@@ -297,17 +297,17 @@ void checkRecoverLayout() {
 
 void checkLayoutAndCompose() {
   checkDefaultLayout();
-  checkGangTestLayout();
+  checkCrowdTestLayout();
   checkRecoverLayout();
   checkSettings();
   checkLayoutValid();
-  checkGangLayout();
+  checkCrowdLayout();
   checkLayoutReasons();
   checkLayoutName();
   checkApplyAction();
   checkReverbSlot();
   checkComposeToggles();
-  checkComposeGang();
+  checkComposeCrowd();
   checkComposeBench();
   checkOutputGain();
 }

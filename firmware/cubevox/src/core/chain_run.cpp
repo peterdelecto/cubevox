@@ -23,7 +23,7 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when any pitch-group card (Autotune, Octave, Gang) has its toggle on. The shared pitch stage
+// True when any pitch-group card (Autotune, Octave, Crowd) has its toggle on. The shared pitch stage
 // runs while it is.
 bool pitchGroupOn(const ChainSnapshot& snap) {
   for (int s = 0; s < kSlotCount; ++s) {
@@ -34,16 +34,16 @@ bool pitchGroupOn(const ChainSnapshot& snap) {
   return false;
 }
 
-// Runs the Gang card at its slot. A Gang card ahead of every other pitch-group card also makes the shared
+// Runs the Crowd card at its slot. A Crowd card ahead of every other pitch-group card also makes the shared
 // pitch stage's call, so the ring it reads is written this block. The stage's output is then its
-// lead. Both write into `out`, which the Gang card reads sample by sample ahead of its own write.
-void runGang(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
+// lead. Both write into `out`, which the Crowd card reads sample by sample ahead of its own write.
+void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
   if (!pitchDone) {
     pitchDone = true;
     engines.pitch.process(in, out, n, p.pitchFx);
     in = out;
   }
-  engines.gang.process(in, out, n, p.gang, engines.pitch);
+  engines.crowd.process(in, out, n, p.crowd, engines.pitch);
 }
 
 }  // namespace
@@ -57,7 +57,7 @@ void resetEngine(ChainEngines& engines, Engine e) {
     case Engine::Distortion: engines.distortion.reset(); break;
     case Engine::Gate: engines.gate.reset(); break;
     case Engine::Reverb: engines.reverb.reset(); break;
-    case Engine::Gang: engines.gang.reset(); break;
+    case Engine::Crowd: engines.crowd.reset(); break;
     case Engine::Count: break;
   }
 }
@@ -76,7 +76,7 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Distortion: engines.distortion.process(in, out, n, p.distortion); return true;
     case Engine::Gate: engines.gate.process(in, out, n, p.gate); return true;
     case Engine::Reverb: engines.reverb.process(in, out, n, p.reverb); return true;
-    case Engine::Gang: runGang(engines, in, out, n, p, pitchDone); return true;
+    case Engine::Crowd: runCrowd(engines, in, out, n, p, pitchDone); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;

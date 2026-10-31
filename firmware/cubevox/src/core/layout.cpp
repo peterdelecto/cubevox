@@ -10,9 +10,9 @@ Layout defaultLayout() {
            Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring}};
 }
 
-Layout gangTestLayout() {
+Layout crowdTestLayout() {
   Layout layout = defaultLayout();
-  layout.card[1] = Card::Gang;
+  layout.card[1] = Card::Crowd;
   return layout;
 }
 
@@ -58,8 +58,8 @@ LayoutCheck layoutValid(const Layout& layout) {
   }
   if (reverbs > 1) return fail(LayoutError::TwoReverbs, 0, Card::Empty, 0);
   if (reverbs == 0) return fail(LayoutError::NoReverb, 0, Card::Empty, 0);
-#ifdef CUBEVOX_GANGTEST
-  // The test image places Gang past the budget lines on purpose.
+#ifdef CUBEVOX_CROWDTEST
+  // The test image places Crowd past the budget lines on purpose.
   (void)avg;
   (void)worst;
 #else

@@ -22,7 +22,7 @@ namespace cv {
 struct PitchFxParams {
   AutotuneParams autotune;
   OctaveParams octave;
-  bool gangOn = false;  // the Gang card reads the ring and the tracker, so both run
+  bool crowdOn = false;  // the Crowd card reads the ring and the tracker, so both run
 };
 
 class PitchFx {
@@ -48,9 +48,9 @@ class PitchFx {
 
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
     // The tracker's buffers fill every block; it analyses while Autotune is on or still fading,
-    // so the voice keeps its period through the crossfade, and while the Gang card is on. Octave
+    // so the voice keeps its period through the crossfade, and while the Crowd card is on. Octave
     // shifts without a pitch.
-    tracker_.push(in, n, p.autotune.on || p.gangOn || activeAt_ > 0.0f);
+    tracker_.push(in, n, p.autotune.on || p.crowdOn || activeAt_ > 0.0f);
     const Targets t = prepareVoices(p);
     if (fresh_) {
       mix_ = t.mix;
@@ -83,7 +83,7 @@ class PitchFx {
   int head() const { return static_cast<int>(writeCount_); }
 
   // The input ring low-passed at kShadowHz, written at the same index as ring() on every sample. The
-  // Gang card finds glottal pulses in it. Writing it costs one multiply-add per sample and moves no
+  // Crowd card finds glottal pulses in it. Writing it costs one multiply-add per sample and moves no
   // other output.
   const VoiceRing& shadow() const { return shadow_; }
 

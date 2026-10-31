@@ -13,7 +13,7 @@
 
 namespace cv {
 
-constexpr int kVoiceRingLen = 11040;             // 230 ms shared input ring: a 200 ms Gang lag plus the longest grain
+constexpr int kVoiceRingLen = 11040;             // 230 ms shared input ring: a 200 ms Crowd lag plus the longest grain
 using VoiceRing = std::array<float, kVoiceRingLen>;
 
 class PsolaVoice {

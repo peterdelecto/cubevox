@@ -25,7 +25,7 @@ struct ChainEngines {
   cv::Distortion distortion;
   cv::Gate gate;
   cv::Reverb reverb;
-  cv::Gang gang;  // a plain global like the others; its voices read the ring that `pitch` writes
+  cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes
   cv::PolishComp comp;
   cv::Polish polish;
 };
@@ -43,8 +43,8 @@ struct ChainCycles {
 
 // Runs the engine of card `c` over `n` samples from `in` into `out`. Returns false when it wrote
 // nothing (an Empty slot, or an Autotune or Octave card after the pitch stage ran), so the caller
-// keeps its buffers. Autotune, Octave and the Gang card share one PitchFx call, made at the first
-// pitch-group card's slot; `pitchDone` carries that across the slots of a pass. A Gang card that
+// keeps its buffers. Autotune, Octave and the Crowd card share one PitchFx call, made at the first
+// pitch-group card's slot; `pitchDone` carries that across the slots of a pass. A Crowd card that
 // makes that call runs its own engine on the pitch stage's output, which is its lead.
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
               bool& pitchDone);
@@ -105,8 +105,8 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 // during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot is
 // off, because its detector feeds the status reply's `floor_dbfs`. Returns false when it wrote
 // nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave or
-// Gang) while any pitch-group toggle is on, and its fade follows all of them. A Gang card keeps a
-// live ring and tracker with Autotune and Octave off, wherever it sits against them. The Gang card's
+// Crowd) while any pitch-group toggle is on, and its fade follows all of them. A Crowd card keeps a
+// live ring and tracker with Autotune and Octave off, wherever it sits against them. The Crowd card's
 // own engine runs at its own slot and ramps itself on its own toggle.
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
              int n, bool& pitchDone);

@@ -1,4 +1,4 @@
-// Gang card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
+// Crowd card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
 // of different colour, the WIDTH law, the level law across VOICES, the lead leaving, the voice
 // count and fade order, the solo, the lag following its scale across a gap and holding inside a
 // burst, timing scatter, pitch drift, the tracker running without Autotune, the three enhancements
@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include "engine/gang.h"
+#include "engine/crowd.h"
 #include "engine/unison.h"
 
 namespace {
@@ -192,10 +192,10 @@ Signal program(int seconds) {
   return x;
 }
 
-// Running a PitchFx and then the Gang card on the same blocks, in the chain's order.
+// Running a PitchFx and then the Crowd card on the same blocks, in the chain's order.
 
 cv::PitchFx gFx;
-cv::Gang gGang;
+cv::Crowd gCrowd;
 
 struct Probe {
   float lead = -1.0f;
@@ -207,17 +207,17 @@ struct Probe {
 cv::PitchFxParams passThrough() {
   cv::PitchFxParams pp;
   pp.octave.on = false;
-  pp.gangOn = true;
+  pp.crowdOn = true;
   return pp;
 }
 
-// Gang card and PitchFx params both switch from their first to their second value at sample
+// Crowd card and PitchFx params both switch from their first to their second value at sample
 // `switchAt` (a block boundary).
-Signal runBoth(const Signal& in, const cv::GangParams& first, const cv::GangParams& second,
+Signal runBoth(const Signal& in, const cv::CrowdParams& first, const cv::CrowdParams& second,
                const cv::PitchFxParams& pitchFirst, const cv::PitchFxParams& pitchSecond, int switchAt,
                Probe* probe = nullptr) {
   gFx.reset();
-  gGang.reset();
+  gCrowd.reset();
   Signal out(in.size());
   float scratch[cv::kBlock];
   const int total = static_cast<int>(in.size());
@@ -226,29 +226,29 @@ Signal runBoth(const Signal& in, const cv::GangParams& first, const cv::GangPara
     const bool after = i >= switchAt;
     gInProcess = true;
     gFx.process(&in[static_cast<size_t>(i)], scratch, n, after ? pitchSecond : pitchFirst);
-    gGang.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, after ? second : first, gFx);
+    gCrowd.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, after ? second : first, gFx);
     gInProcess = false;
     if (probe) {
-      probe->lead = gGang.leadGain();
-      probe->active = gGang.activeVoices();
-      for (size_t v = 0; v < 4; ++v) probe->drift = std::max(probe->drift, std::fabs(gGang.driftCents(v)));
+      probe->lead = gCrowd.leadGain();
+      probe->active = gCrowd.activeVoices();
+      for (size_t v = 0; v < 4; ++v) probe->drift = std::max(probe->drift, std::fabs(gCrowd.driftCents(v)));
     }
   }
   return out;
 }
 
-Signal runSwitch(const Signal& in, const cv::GangParams& first, const cv::GangParams& second,
+Signal runSwitch(const Signal& in, const cv::CrowdParams& first, const cv::CrowdParams& second,
                  int switchAt, Probe* probe = nullptr) {
   return runBoth(in, first, second, passThrough(), passThrough(), switchAt, probe);
 }
 
-Signal run(const Signal& in, const cv::GangParams& p, Probe* probe = nullptr) {
+Signal run(const Signal& in, const cv::CrowdParams& p, Probe* probe = nullptr) {
   return runSwitch(in, p, p, static_cast<int>(in.size()), probe);
 }
 
 // The shipped defaults are the owner's working set (contour, level scatter, timing scatter, drift and
 // epoch align all on). A test starts from this neutral tuning and turns on only what it measures.
-void neutralize(cv::GangTuning& t) {
+void neutralize(cv::CrowdTuning& t) {
   t.scatterMs = 0.0f;
   t.driftCents = 0.0f;
   t.levelScatterDb = 0.0f;
@@ -256,8 +256,8 @@ void neutralize(cv::GangTuning& t) {
   t.epochAlign = false;
 }
 
-cv::GangParams knobs(float voices, float width) {
-  cv::GangParams p;
+cv::CrowdParams knobs(float voices, float width) {
+  cv::CrowdParams p;
   p.on = true;
   p.voices = voices;
   p.width = width;
@@ -268,9 +268,9 @@ cv::GangParams knobs(float voices, float width) {
 // Voice 0 alone with nothing around it. voiceDb 0 gives one voice the whole level, so the lead is
 // 0, and the low cut sits at the bottom of the filter band. The voice sits on the lead's pitch with
 // a flat tone, so only its formant move is left. WIDTH sits at 1, so a pitchSt is the offset heard.
-cv::GangParams isolated(float formantSt) {
-  cv::GangParams p = knobs(0.2f, 1.0f);
-  cv::GangTuning& t = p.tuning;
+cv::CrowdParams isolated(float formantSt) {
+  cv::CrowdParams p = knobs(0.2f, 1.0f);
+  cv::CrowdTuning& t = p.tuning;
   t.voiceDb = 0.0f;
   t.formantSt[0] = formantSt;
   t.pitchSt[0] = 0.0f;
@@ -280,8 +280,8 @@ cv::GangParams isolated(float formantSt) {
 }
 
 // Copy v alone at the lead's pitch and throat, flat, so its output is the lead moved only by its lag.
-cv::GangParams lagProbe(size_t v, float lagScale) {
-  cv::GangParams p = isolated(0.0f);
+cv::CrowdParams lagProbe(size_t v, float lagScale) {
+  cv::CrowdParams p = isolated(0.0f);
   p.solo = static_cast<uint8_t>(1u << v);
   p.tuning.lagScale = lagScale;
   p.tuning.pitchSt[v] = 0.0f;
@@ -291,9 +291,9 @@ cv::GangParams lagProbe(size_t v, float lagScale) {
 }
 
 // Voice v of the default tuning, moved into slot 0 and played alone.
-cv::GangParams alone(size_t v) {
-  cv::GangParams p = isolated(0.0f);
-  const cv::GangTuning d;
+cv::CrowdParams alone(size_t v) {
+  cv::CrowdParams p = isolated(0.0f);
+  const cv::CrowdTuning d;
   p.tuning.pitchSt[0] = d.pitchSt[v];
   p.tuning.formantSt[0] = d.formantSt[v];
   p.tuning.tiltDb[0] = d.tiltDb[v];
@@ -397,7 +397,7 @@ int peakLag(const Signal& in, const Signal& out, int from, int to, int minLag, i
 
 bool testOffExact() {
   const Signal in = tone(220.0, kRate);
-  cv::GangParams off;
+  cv::CrowdParams off;
   off.on = false;
   const Signal a = run(in, off);
   float worst = 0.0f;
@@ -416,7 +416,7 @@ bool testOffExact() {
 
 bool testReset() {
   const Signal in = program(1);
-  const cv::GangParams p = knobs(0.7f, 0.5f);
+  const cv::CrowdParams p = knobs(0.7f, 0.5f);
   const Signal a = run(in, p);
   const Signal b = run(in, p);
   size_t differ = 0;
@@ -427,7 +427,7 @@ bool testReset() {
 bool testNoAlloc() {
   const Signal in = program(1);
   run(in, knobs(0.9f, 0.5f));  // aborts on any new/delete inside process()
-  cv::GangParams moving = knobs(0.3f, 0.9f);
+  cv::CrowdParams moving = knobs(0.3f, 0.9f);
   moving.tuning.scatterMs = 20.0f;
   moving.tuning.driftCents = 30.0f;
   run(in, moving);
@@ -440,7 +440,7 @@ bool testPitchMoves() {
   const Signal in = tone(220.0, 2 * kRate);
   bool ok = true;
   for (size_t v = 0; v < 4; ++v) {
-    const cv::GangParams p = alone(v);
+    const cv::CrowdParams p = alone(v);
     const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
     const double hz = medianHz(run(in, p));
     const double err = hz > 0.0 ? cents(hz, want) : 9999.0;
@@ -471,7 +471,7 @@ double copyHz(const Signal& out, double want) { return peakHz(out, kRate, kRate,
 bool testWidthLaw() {
   const Signal tn = tone(220.0, 2 * kRate);
   const Signal vow = vowel(220.0, 2 * kRate);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   const size_t v = 2;
   const double full = static_cast<double>(d.pitchSt[v]);
   const struct {
@@ -486,11 +486,11 @@ bool testWidthLaw() {
   size_t i = 0;
   for (const auto& r : rows) {
     const double w = static_cast<double>(r.width);
-    cv::GangParams p = alone(v);
+    cv::CrowdParams p = alone(v);
     p.width = r.width;
     const Signal out = run(tn, p);
-    lagAt[i] = gGang.lagSamples(0);
-    rate[i] = static_cast<double>(gGang.grainRate(0));
+    lagAt[i] = gCrowd.lagSamples(0);
+    rate[i] = static_cast<double>(gCrowd.grainRate(0));
     const double want = 220.0 * std::pow(2.0, full * pitchFactor(w) / 12.0);
     hz[i] = copyHz(out, want);
     const double err = cents(hz[i], want);
@@ -512,9 +512,9 @@ bool testWidthLaw() {
   }
 
   // At WIDTH 0 the vowel through the copy is the vowel through a copy with no formant offset.
-  cv::GangParams withFormant = alone(v);
+  cv::CrowdParams withFormant = alone(v);
   withFormant.width = 0.0f;
-  cv::GangParams noFormant = withFormant;
+  cv::CrowdParams noFormant = withFormant;
   noFormant.tuning.formantSt[0] = 0.0f;
   const Signal a = run(vow, withFormant);
   const Signal b = run(vow, noFormant);
@@ -522,7 +522,7 @@ bool testWidthLaw() {
   for (size_t k = 0; k < a.size(); ++k) differ += a[k] != b[k] ? 1 : 0;
   ok &= report("width law no formant at 0", differ == 0, "WIDTH 0 with a -1 st formant differs from one with none in %.0f samples (0)",
                static_cast<double>(differ));
-  const double wantLag = static_cast<double>(d.delayMs[0] * d.lagScale) * cv::gang_detail::kSmpPerMs;
+  const double wantLag = static_cast<double>(d.delayMs[0] * d.lagScale) * cv::crowd_detail::kSmpPerMs;
   ok &= report("width keeps the lag",
                lagAt[0] == lagAt[1] && lagAt[1] == lagAt[2] && lagAt[2] == lagAt[3] &&
                    std::fabs(static_cast<double>(lagAt[0]) - wantLag) < 1.0,
@@ -537,7 +537,7 @@ bool testWidthLaw() {
 // WIDTH 0.5, where the offsets are the pitch factor 0.489 of their full values.
 bool testFadeOrder() {
   const Signal in = tone(220.0, 2 * kRate);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   bool ok = true;
   for (float width : {1.0f, 0.5f}) {
     for (int n = 1; n <= 4; ++n) {
@@ -568,8 +568,8 @@ bool testFadeOrder() {
 // isolated() with the voice's lag set to 90 ms. The centroid of a steady vowel at a shifted
 // formant depends on how the grain reads line up with the period grid, so this probe holds the
 // lag fixed whatever the default delays are.
-cv::GangParams formantProbe(float formantSt) {
-  cv::GangParams p = isolated(formantSt);
+cv::CrowdParams formantProbe(float formantSt) {
+  cv::CrowdParams p = isolated(formantSt);
   p.tuning.delayMs[0] = 90.0f;
   return p;
 }
@@ -578,7 +578,7 @@ cv::GangParams formantProbe(float formantSt) {
 // voice 0 (the longest, -1.75 st) against a flat voice, pitch on the lead.
 bool testFormantMoves() {
   const Signal in = vowel(220.0, 2 * kRate);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   const double flat = centroidHz(run(in, formantProbe(0.0f)), 220.0, 1, 10);
   const double up = centroidHz(run(in, formantProbe(1.0f)), 220.0, 1, 10);
   const double down = centroidHz(run(in, formantProbe(d.formantSt[0])), 220.0, 1, 10);
@@ -595,7 +595,7 @@ bool testVoicesDiffer() {
   const size_t pick[2] = {0, 1};
   double c[2];
   for (size_t i = 0; i < 2; ++i) {
-    const cv::GangParams p = alone(pick[i]);
+    const cv::CrowdParams p = alone(pick[i]);
     const double f0 = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
     c[i] = centroidHz(run(in, p), f0, 1, 20);
   }
@@ -633,7 +633,7 @@ bool testLeadLeaves() {
   run(in, knobs(0.8f, 0.5f), &four);
   Probe one;
   run(in, knobs(0.2f, 0.5f), &one);
-  const cv::GangTuning t;
+  const cv::CrowdTuning t;
   const double g2 = std::pow(10.0, t.voiceDb / 10.0);
   const double wantFour = std::sqrt(1.0 - 4.0 * g2);
   const double wantOne = std::sqrt(1.0 - g2);
@@ -657,8 +657,8 @@ bool testVoiceCount() {
   }
 
   // At 20 % the live voice is voice 0: voices 1..3 can change without moving a sample.
-  cv::GangParams a = knobs(0.2f, 0.5f);
-  cv::GangParams b = a;
+  cv::CrowdParams a = knobs(0.2f, 0.5f);
+  cv::CrowdParams b = a;
   for (size_t v = 1; v < 4; ++v) {
     b.tuning.pitchSt[v] = 4.0f;
     b.tuning.formantSt[v] = 5.0f;
@@ -680,22 +680,22 @@ bool testVoiceCount() {
 }
 
 // A solo sounds the soloed voices and nothing else, whatever VOICES says. Solo 0 leaves the plain
-// law untouched, and all four voices soloed at the top of the knob are that law's gang.
+// law untouched, and all four voices soloed at the top of the knob are that law's crowd.
 bool testSolo() {
   const Signal in = program(1);
   Probe p;
-  cv::GangParams a = knobs(0.2f, 0.5f);
+  cv::CrowdParams a = knobs(0.2f, 0.5f);
   a.solo = 0b0010;
   const Signal outA = run(in, a, &p);
   bool ok = report("solo count", p.active == 1, "%.0f voices ticking at solo 0b0010, VOICES 20 %% (1)", p.active);
 
   // Voice 0 is silent and voice 1 sounds: retuning voice 0 moves no sample, retuning voice 1 moves some.
-  cv::GangParams b = a;
+  cv::CrowdParams b = a;
   b.tuning.pitchSt[0] = 4.0f;
   b.tuning.formantSt[0] = 5.0f;
   b.tuning.tiltDb[0] = 6.0f;
   const Signal outB = run(in, b);
-  cv::GangParams c = a;
+  cv::CrowdParams c = a;
   c.tuning.pitchSt[1] = 4.0f;
   const Signal outC = run(in, c);
   size_t silent = 0;
@@ -709,18 +709,18 @@ bool testSolo() {
                static_cast<double>(silent), static_cast<double>(sounds));
 
   // At the top the lead is gone and the one soloed copy stands alone.
-  cv::GangParams top = knobs(1.0f, 0.5f);
+  cv::CrowdParams top = knobs(1.0f, 0.5f);
   top.solo = 0b0100;
   run(in, top, &p);
   ok &= report("solo top", p.active == 1 && p.lead == 0.0f, "%.0f voices ticking (1), lead gain %.3g (0)", p.active, p.lead);
 
-  // Solo 0 is the plain law bit for bit, and all four voices soloed at the top give the same gang.
-  const cv::GangParams plain = knobs(0.2f, 0.5f);
-  cv::GangParams zero = plain;
+  // Solo 0 is the plain law bit for bit, and all four voices soloed at the top give the same crowd.
+  const cv::CrowdParams plain = knobs(0.2f, 0.5f);
+  cv::CrowdParams zero = plain;
   zero.solo = 0;
   const Signal outP = run(in, plain);
   const Signal outZ = run(in, zero);
-  cv::GangParams all = knobs(1.0f, 0.5f);
+  cv::CrowdParams all = knobs(1.0f, 0.5f);
   const Signal outTop = run(in, all);
   all.solo = 0b1111;
   const Signal outAll = run(in, all);
@@ -751,7 +751,7 @@ bool testLagAcrossGap() {
   constexpr float kFarScale = 2.0f;
   const Train tr{300, 300, 120, 6};
   const Signal in = bursts(220.0, tr);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   bool ok = true;
   for (size_t v : {size_t{3}, size_t{1}}) {
     const double nearMs = static_cast<double>(d.delayMs[v] * d.lagScale);
@@ -782,10 +782,10 @@ bool testLagAcrossGap() {
 bool testScatter() {
   const Train tr{300, 300, 120, 10};
   const Signal in = bursts(220.0, tr);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   const size_t v = 3;
   const double target = static_cast<double>(d.delayMs[v] * d.lagScale);
-  cv::GangParams flat = lagProbe(v, d.lagScale);
+  cv::CrowdParams flat = lagProbe(v, d.lagScale);
   flat.tuning.scatterMs = 15.0f;
   const Signal out = run(in, flat);
   double lag[10];
@@ -807,7 +807,7 @@ bool testScatter() {
                    "worst |lag - %.0f| %.2f ms (<= 15.5), spread %.1f ms, %.0f of 9 bursts moved by > 1 ms (>= 6)", target,
                    worst, hi - lo, static_cast<double>(changes));
 
-  cv::GangParams pitched = flat;
+  cv::CrowdParams pitched = flat;
   pitched.tuning.pitchSt[v] = d.pitchSt[v];
   const Signal outP = run(in, pitched);
   const double want = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[v]) / 12.0);
@@ -827,8 +827,8 @@ bool testScatter() {
 // differs from window to window. With the drift at 0 the walk never moves off 0, whatever its hold.
 bool testDrift() {
   const Signal in = tone(220.0, 6 * kRate);
-  const cv::GangTuning d;
-  cv::GangParams p = lagProbe(0, d.lagScale);
+  const cv::CrowdTuning d;
+  cv::CrowdParams p = lagProbe(0, d.lagScale);
   p.tuning.pitchSt[0] = d.pitchSt[0];
   p.tuning.driftCents = 20.0f;
   const Signal out = run(in, p);
@@ -849,8 +849,8 @@ bool testDrift() {
                    worst, hi - lo);
 
   const Signal prog = program(3);
-  cv::GangParams a = knobs(0.7f, 0.5f);
-  cv::GangParams b = a;
+  cv::CrowdParams a = knobs(0.7f, 0.5f);
+  cv::CrowdParams b = a;
   b.tuning.driftHoldS = 0.3f;
   Probe probe;
   const Signal outA = run(prog, a, &probe);
@@ -862,7 +862,7 @@ bool testDrift() {
   return ok;
 }
 
-// The tracker finds a period with Autotune off because the Gang card's flag keeps it running, and
+// The tracker finds a period with Autotune off because the Crowd card's flag keeps it running, and
 // stays at 0 without the flag.
 bool testTrackerRuns() {
   const Signal in = tone(220.0, kRate);
@@ -871,7 +871,7 @@ bool testTrackerRuns() {
     cv::PitchFxParams pp;
     pp.octave.on = false;
     pp.autotune.on = false;
-    pp.gangOn = flag == 1;
+    pp.crowdOn = flag == 1;
     gFx.reset();
     float scratch[cv::kBlock];
     for (int i = 0, b = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock, ++b) {
@@ -885,7 +885,7 @@ bool testTrackerRuns() {
                 firstBlock[0]);
 }
 
-// Autotune on, then off, with the Gang card on throughout. The voice reads Autotune's correction
+// Autotune on, then off, with the Crowd card on throughout. The voice reads Autotune's correction
 // while it is on and drops it once Autotune is off, so its f0 goes back to the sung pitch within
 // 200 ms of the switch. The tone sits 46 cents sharp of A3 in key C, so the correction is not 0.
 bool testCorrectionReleases() {
@@ -935,7 +935,7 @@ uint64_t fnv(const Signal& x) {
 }
 
 // Every enhancement on at once, for the timing.
-void allEnhancements(cv::GangTuning& t) {
+void allEnhancements(cv::CrowdTuning& t) {
   t.levelScatterDb = 4.0f;
   t.contour = {0.8f, 0.8f, 0.8f, 0.8f};
   t.epochAlign = true;
@@ -952,17 +952,17 @@ size_t differing(const Signal& a, const Signal& b) {
 bool testEnhancementsDefaultExact() {
   const Signal prog = program(3);
   const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
-  const cv::GangParams base = knobs(0.7f, 0.5f);
-  cv::GangParams idle = base;
+  const cv::CrowdParams base = knobs(0.7f, 0.5f);
+  cv::CrowdParams idle = base;
   idle.tuning.epochSearch = 0.1f;     // matters only while epochAlign is on
   idle.tuning.levelScatterDb = -1.0f; // clamps to 0
   idle.tuning.contour = {1.0f, 1.0f, 1.0f, 1.0f};
   const Signal a = run(prog, base);
   const Signal b = run(prog, idle);
-  cv::GangParams burstBase = knobs(0.6f, 0.8f);
+  cv::CrowdParams burstBase = knobs(0.6f, 0.8f);
   burstBase.tuning.scatterMs = 15.0f;
   burstBase.tuning.driftCents = 20.0f;
-  cv::GangParams burstIdle = burstBase;
+  cv::CrowdParams burstIdle = burstBase;
   burstIdle.tuning = idle.tuning;
   burstIdle.tuning.scatterMs = 15.0f;
   burstIdle.tuning.driftCents = 20.0f;
@@ -983,7 +983,7 @@ bool testEnhancementsDefaultExact() {
 // The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
 // within 2.5 dB of the neutral card's level.
 bool testWorkingSetDefaults() {
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   const bool values = d.contour[0] == 0.8f && d.contour[1] == 1.2f && d.contour[2] == 0.7f && d.contour[3] == 1.1f &&
                       d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && d.epochAlign &&
                       d.widthKnee == 0.1f && d.widthKneeFrac == 0.08f;
@@ -991,7 +991,7 @@ bool testWorkingSetDefaults() {
                    "contour %.1f %.1f %.1f %.1f (0.8 1.2 0.7 1.1)", static_cast<double>(d.contour[0]),
                    static_cast<double>(d.contour[1]), static_cast<double>(d.contour[2]), static_cast<double>(d.contour[3]));
   const Signal in = program(3);
-  cv::GangParams worked = knobs(0.7f, 0.5f);
+  cv::CrowdParams worked = knobs(0.7f, 0.5f);
   worked.tuning = d;
   const Signal a = run(in, knobs(0.7f, 0.5f));
   const Signal b = run(in, worked);
@@ -1013,11 +1013,11 @@ double rmsIn(const Signal& x, int from, int to) { return rms(x, static_cast<size
 bool testLevelScatter() {
   const Train tr{300, 300, 120, 10};
   const Signal in = bursts(220.0, tr);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   const size_t v = 3;
   const double lagMs = static_cast<double>(d.delayMs[v] * d.lagScale);
-  const cv::GangParams flat = lagProbe(v, d.lagScale);
-  cv::GangParams scattered = flat;
+  const cv::CrowdParams flat = lagProbe(v, d.lagScale);
+  cv::CrowdParams scattered = flat;
   scattered.tuning.levelScatterDb = 3.0f;
   const Signal ref = run(in, flat);
   const Signal out = run(in, scattered);
@@ -1037,18 +1037,18 @@ bool testLevelScatter() {
                    "per-burst gain %+.2f to %+.2f dB (inside +-3), spread %.2f dB (>= 1)", lo, hi, hi - lo);
 
   // Scatter off, and a scatter that clamps to off, give the same samples.
-  cv::GangParams off = flat;
+  cv::CrowdParams off = flat;
   off.tuning.levelScatterDb = 0.0f;
-  cv::GangParams neg = flat;
+  cv::CrowdParams neg = flat;
   neg.tuning.levelScatterDb = -2.0f;
   ok &= report("level scatter off", differing(ref, run(in, off)) == 0 && differing(ref, run(in, neg)) == 0,
                "0 dB and -2 dB differ from the default run in %.0f samples (0)",
                static_cast<double>(differing(ref, run(in, neg))));
 
   // The range stops at 4 dB, so 12 dB asked for is no wider than 4.
-  cv::GangParams wide = flat;
+  cv::CrowdParams wide = flat;
   wide.tuning.levelScatterDb = 12.0f;
-  cv::GangParams four = flat;
+  cv::CrowdParams four = flat;
   four.tuning.levelScatterDb = 4.0f;
   ok &= report("level scatter range", differing(run(in, wide), run(in, four)) == 0,
                "12 dB asked for differs from 4 dB in %.0f samples (0)",
@@ -1105,7 +1105,7 @@ bool testContour() {
     const Signal in = sweepTone(220.0, 1.0, sweepHz, 7 * kRate);
     const double inSt = sweepDepthSt(in, sweepHz, 2.0, static_cast<int>(3.0 * sweepHz));
     for (float c : {0.6f, 1.0f, 1.4f}) {
-      cv::GangParams p = lagProbe(0, cv::GangTuning{}.lagScale);
+      cv::CrowdParams p = lagProbe(0, cv::CrowdTuning{}.lagScale);
       p.tuning.contour[0] = c;
       const Signal out = run(in, p);
       const double outSt = sweepDepthSt(out, sweepHz, 2.0, static_cast<int>(3.0 * sweepHz));
@@ -1123,8 +1123,8 @@ bool testContour() {
   const Signal in = sweepTone(220.0, 1.0, 1.0, 3 * kRate);
   size_t beyond = 0;
   for (const auto& pair : {std::make_pair(3.0f, 1.4f), std::make_pair(0.0f, 0.6f)}) {
-    cv::GangParams asked = lagProbe(0, cv::GangTuning{}.lagScale);
-    cv::GangParams limit = asked;
+    cv::CrowdParams asked = lagProbe(0, cv::CrowdTuning{}.lagScale);
+    cv::CrowdParams limit = asked;
     asked.tuning.contour[0] = pair.first;
     limit.tuning.contour[0] = pair.second;
     beyond += differing(run(in, asked), run(in, limit));
@@ -1197,7 +1197,7 @@ double harmonicRatioDb(const Signal& x, double f0, int from, int to) {
 
 // One copy of the pulse train: copy 1 alone with the given pitch and formant, grid or pulse cut.
 Signal epochCopy(const Signal& in, float pitchSt, float formantSt, bool epoch, float search = 0.25f) {
-  cv::GangParams p = lagProbe(0, cv::GangTuning{}.lagScale);
+  cv::CrowdParams p = lagProbe(0, cv::CrowdTuning{}.lagScale);
   p.tuning.pitchSt[0] = pitchSt;
   p.tuning.formantSt[0] = formantSt;
   p.tuning.epochAlign = epoch;
@@ -1275,7 +1275,7 @@ bool testEpochMarks() {
   std::vector<double> closures;
   const Signal in = pulseTrain(150.0, 0.004, 3 * kRate, &closures);
   gFx.reset();
-  cv::gang_detail::EpochTrack track;
+  cv::crowd_detail::EpochTrack track;
   float scratch[cv::kBlock];
   for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
     gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, passThrough());
@@ -1319,7 +1319,7 @@ bool testEpochPitch() {
   bool ok = true;
   double worst = 0.0;
   for (size_t v = 0; v < 4; ++v) {
-    cv::GangParams p = alone(v);
+    cv::CrowdParams p = alone(v);
     p.tuning.epochAlign = true;
     const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) / 12.0);
     const double hz = medianHz(run(steady, p));
@@ -1329,7 +1329,7 @@ bool testEpochPitch() {
                worst);
 
   const Signal glide = sweepTone(220.0, 1.0, 1.0, 7 * kRate);
-  cv::GangParams p = lagProbe(0, cv::GangTuning{}.lagScale);
+  cv::CrowdParams p = lagProbe(0, cv::CrowdTuning{}.lagScale);
   p.tuning.epochAlign = true;
   const double inSt = sweepDepthSt(glide, 1.0, 2.0, 3);
   const double outSt = sweepDepthSt(run(glide, p), 1.0, 2.0, 3);
@@ -1343,10 +1343,10 @@ bool testEpochPitch() {
 bool testEpochLag() {
   const Train tr{300, 300, 120, 6};
   const Signal in = bursts(220.0, tr);
-  const cv::GangTuning d;
+  const cv::CrowdTuning d;
   const size_t v = 3;
   const double lagMs = static_cast<double>(d.delayMs[v] * d.lagScale);
-  cv::GangParams p = lagProbe(v, d.lagScale);
+  cv::CrowdParams p = lagProbe(v, d.lagScale);
   p.tuning.epochAlign = true;
   const Signal out = run(in, p);
   double worst = 0.0;
@@ -1365,8 +1365,8 @@ bool testEnhancementsStable() {
   bool ok = true;
   for (int which = 0; which < 2; ++which) {
     const Signal in = which == 0 ? program(3) : bursts(220.0, Train{300, 300, 120, 10});
-    cv::GangParams plain = knobs(0.7f, 0.5f);
-    cv::GangParams all = plain;
+    cv::CrowdParams plain = knobs(0.7f, 0.5f);
+    cv::CrowdParams all = plain;
     allEnhancements(all.tuning);
     all.tuning.contour = {0.6f, 1.4f, 0.6f, 1.4f};
     const Signal a = run(in, plain);
@@ -1387,24 +1387,24 @@ bool testEnhancementsStable() {
 }
 
 // Host timing, printed and not asserted. Unison is 46.9k cycles per block on the board, so the
-// ratio gives the first board estimate for the Gang card. PitchFx runs outside the timed calls.
-// Which 0 is Unison, 1 the Gang card with every enhancement at its default, 2 the Gang card with
+// ratio gives the first board estimate for the Crowd card. PitchFx runs outside the timed calls.
+// Which 0 is Unison, 1 the Crowd card with every enhancement at its default, 2 the Crowd card with
 // every enhancement on.
 double secondsOfBlocks(const Signal& in, int which) {
   using Clock = std::chrono::steady_clock;
   cv::PitchFx* fx = new cv::PitchFx();
-  cv::Gang* gang = new cv::Gang();
+  cv::Crowd* crowd = new cv::Crowd();
   cv::Unison* uni = new cv::Unison();
   cv::PitchFxParams pp;
   pp.octave.on = false;
-  pp.gangOn = true;
-  cv::GangParams dp = knobs(0.8f, 0.5f);
+  pp.crowdOn = true;
+  cv::CrowdParams dp = knobs(0.8f, 0.5f);
   if (which == 2) allEnhancements(dp.tuning);
-  if (which == 3) dp.tuning = cv::GangTuning{};
+  if (which == 3) dp.tuning = cv::CrowdTuning{};
   cv::UnisonParams up;
   up.on = true;
   up.depth = 0.5f;
-  gang->reset();
+  crowd->reset();
   uni->reset();
   Signal out(in.size());
   float scratch[cv::kBlock];
@@ -1414,14 +1414,14 @@ double secondsOfBlocks(const Signal& in, int which) {
     fx->process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, pp);
     const Clock::time_point t0 = Clock::now();
     if (which > 0) {
-      gang->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, dp, *fx);
+      crowd->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, dp, *fx);
     } else {
       uni->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, up);
     }
     total += std::chrono::duration<double>(Clock::now() - t0).count();
   }
   delete uni;
-  delete gang;
+  delete crowd;
   delete fx;
   return total;
 }
@@ -1434,9 +1434,9 @@ void printTiming() {
   const double a = std::min(secondsOfBlocks(in, 2), secondsOfBlocks(in, 2));
   const double w = std::min(secondsOfBlocks(in, 3), secondsOfBlocks(in, 3));
   const double blocks = 10.0 * kRate / cv::kBlock;
-  std::printf("info timing 10 s: Gang VOICES 80 %% %.1f ms (%.2f us per block), Unison DEPTH 50 %% %.1f ms (%.2f us per block)\n",
+  std::printf("info timing 10 s: Crowd VOICES 80 %% %.1f ms (%.2f us per block), Unison DEPTH 50 %% %.1f ms (%.2f us per block)\n",
               1000.0 * d, 1e6 * d / blocks, 1000.0 * u, 1e6 * u / blocks);
-  std::printf("info timing ratio Gang / Unison = %.2f  (board estimate %.0fk cycles per block at Unison 46.9k)\n",
+  std::printf("info timing ratio Crowd / Unison = %.2f  (board estimate %.0fk cycles per block at Unison 46.9k)\n",
               d / u, 46.9 * d / u);
   std::printf("info timing enhancements off %.2f us per block, all on %.2f us per block (x%.2f)\n", 1e6 * d / blocks,
               1e6 * a / blocks, a / d);
@@ -1475,6 +1475,6 @@ int main() {
   ok &= testEpochLag();
   ok &= testEnhancementsStable();
   printTiming();
-  std::printf("%s gang\n", ok ? "PASS" : "FAIL");
+  std::printf("%s crowd\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }
