@@ -67,7 +67,7 @@ percent knob with no decimals, so the readout sweep test holds as it is.
    rule holds by construction; trimDb in tuning takes up the residue level_test measures on the
    180 Hz program.
 4. Fade order, low, high, low, high, by voice index (full pitch, throat, delay before the lag scale):
-   0 (−1.75 st, −1.75 st, 40 ms), 1 (+2.75 st, −1 st, 100 ms), 2 (−3 st, −1 st, 70 ms),
+   0 (−1.75 st, −1.75 st, 40 ms), 1 (+2.75 st, −1 st, 100 ms), 2 (−2.5 st, −1 st, 70 ms),
    3 (+1 st, −1.5 st, 75 ms). One voice is a second singer, two a pair, four the crowd.
 5. Gains are computed per block and ramped per sample across the block, as Octave and the reverb
    MIX do. A voice whose ramped gain sits at 0 is reset and does not tick, so one voice costs a
@@ -101,8 +101,8 @@ exactly 0, so every copy sits at pitch ratio exactly 1 with a grain playback rat
 the slicing returns the input delayed by the copy's lag (test 19). A copy whose ratio and rate are both
 exactly 1 keeps its marks on the period grid and skips the epoch snap, so it reproduces the delayed
 input to float rounding with epoch align on, and the snap resumes as soon as either differs from 1.
-A melodic line or an instrument gets four plain delayed doubles on its own pitch. At w = 0.1 the −3 st copy sits 3.6 cents off the
-lead (−0.036 st) and carries 1.2 % of its formant move. At w = 1 every copy sits at pitchSt[v] and
+A melodic line or an instrument gets four plain delayed doubles on its own pitch. At w = 0.1 the −2.5 st copy sits 3.0 cents off the
+lead (−0.030 st) and carries 1.2 % of its formant move. At w = 1 every copy sits at pitchSt[v] and
 formantSt[v]. A pitchSt or formantSt of 0 stays 0. Tone shelves do not follow the knob. The w the
 factor reads follows the knob through the 20 ms one-pole of `engine/smooth.h`, updated per block, so a
 knob step glides the copies over a few blocks and does not jump their pitch in one. It takes the knob
@@ -164,7 +164,7 @@ Filter coefficients update per block only, since the setters call libm.
 ```
 namespace cv {
 struct CrowdTuning {
-  std::array<float, 4> pitchSt     = {-1.75f, 2.75f, -3.0f, 1.0f};   // full pitch offset 2^(st / 12) at WIDTH 1
+  std::array<float, 4> pitchSt     = {-1.75f, 2.75f, -2.5f, 1.0f};   // full pitch offset 2^(st / 12) at WIDTH 1
   std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, -1.5f}; // grain playback rate 2^(st / 12)
   std::array<float, 4> tiltDb      = {-3.0f, -4.0f, 3.0f, 5.0f};     // high shelf gain above tiltHz
   std::array<float, 4> delayMs     = {40.0f, 100.0f, 70.0f, 75.0f};  // lag behind the lead before lagScale
@@ -319,22 +319,22 @@ wet sum before it meets the lead, per the output-safety spec.
    12. drift: driftCents 20 on a 6 s tone, the copy's f0 in 0.5 s windows within ±20 cents of its
       offset (3 cents of measurement slack) and not the same in every window. driftCents 0 leaves
       the drift at exactly 0 and the output unchanged by driftHoldS.
-   13. WIDTH law: the −3 st copy (formant −1 st) alone at WIDTH 0, 0.1, 0.5 and 1 has its f0 at
-      −3 st × f(w) from the lead's 220 Hz (within 1, 1.5, 10 and 10 cents; 0 cents, −3.6 cents,
-      −135 cents and −300 cents) and its grain playback rate, read from the engine, at f(w) of its
+   13. WIDTH law: the −2.5 st copy (formant −1 st) alone at WIDTH 0, 0.1, 0.5 and 1 has its f0 at
+      −2.5 st × f(w) from the lead's 220 Hz (within 1, 1.5, 10 and 10 cents; 0 cents, −3.0 cents,
+      −113 cents and −250 cents) and its grain playback rate, read from the engine, at f(w) of its
       full formant move (within 0.5 %; 0, 1.2 %, 45.1 % and 100 %). At WIDTH 0 the output equals the
       output of a copy with no pitch or formant offset sample for sample. Its lag follows m(w) at
       all four.
    14. fade order: at WIDTH 1 and at WIDTH 0.5, at VOICES 0.2, 0.4, 0.6 and 0.8 the output has a
       spectral line at the f0 of each voice that has come in (at least 0.4 of the loudest line) and
       none at the f0 of the voices still to come (at most 0.1), so the order is −1.75 st, +2.75 st,
-      −3 st, +1 st (their offsets times f(w)).
+      −2.5 st, +1 st (their offsets times f(w)).
    15. working set: the defaults hold the working set below, and a run on them stays finite and
       within 2.5 dB of the level of the neutral card. Every other test starts from a neutral tuning
       (no scatter, no drift, no level scatter, contour 1, epoch align off) and turns on only what it
       measures.
-   16. melodic bottom: the −3 st copy alone on the working set is within 1 cent of the lead at WIDTH 0,
-      3.6 ± 1.5 cents flat of it at 0.1 and 300 ± 10 cents flat at 1. With driftCents 15 on a 6 s tone at
+   16. melodic bottom: the −2.5 st copy alone on the working set is within 1 cent of the lead at WIDTH 0,
+      3.0 ± 1.5 cents flat of it at 0.1 and 250 ± 10 cents flat at 1. With driftCents 15 on a 6 s tone at
       WIDTH 0.05 the copy's largest drift is at most 15 × f(0.05) = 0.09 cents and its f0 moves under 1
       cent from one 0.5 s window to the next; at WIDTH 1 it moves as test 12 expects. With contour 0.6
       or 1.4 on a copy at WIDTH 0.05, a ±1 st sweep at 1 Hz and at 3 Hz comes out within 2 % of 1.0 × the
@@ -522,7 +522,7 @@ range.
 ### Tuning
 
 ```
-pitchSt        = {-1.75, 2.75, -3, 1}   // st at WIDTH 1
+pitchSt        = {-1.75, 2.75, -2.5, 1} // st at WIDTH 1, voice 3 at -2.5 (owner 2026-10-31)
 formantSt      = {-1.75, -1, -1, -1.5}  // st at WIDTH 1
 tiltDb         = {-3, -4, 3, 5}         // dB, the tone shelf above tiltHz
 delayMs        = {40, 100, 70, 75}      // ms before lagScale

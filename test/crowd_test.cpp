@@ -471,8 +471,8 @@ double lagMsAt(size_t v, double w, double lagScale) {
 // the f0 wanted.
 double copyHz(const Signal& out, double want) { return peakHz(out, kRate, kRate, 2.0 * want) / 2.0; }
 
-// The -3 st copy (index 2, formant -1 st) alone at WIDTH 0, 0.1, 0.5 and 1. Its pitch offset is -3 st
-// times the width factor, exactly 0 at 0, 3.6 cents at 0.1 (the knee) and 0.454 of the full offset
+// The -2.5 st copy (index 2, formant -1 st) alone at WIDTH 0, 0.1, 0.5 and 1. Its pitch offset is -2.5 st
+// times the width factor, exactly 0 at 0, 3.0 cents at 0.1 (the knee) and 0.454 of the full offset
 // at 0.5. Its formant move is the log of its grain playback rate over the same log at WIDTH 1, read
 // from the engine: none at 0, 1.2 % at 0.1 and 0.454 at 0.5. (A spectral centroid does not read it,
 // because the grain windows make the centroid's slope depend on the pitch ratio; at WIDTH 0 the
@@ -532,7 +532,7 @@ bool testWidthLaw() {
   size_t differ = 0;
   for (size_t k = 0; k < a.size(); ++k) differ += a[k] != b[k] ? 1 : 0;
   ok &= report("width law no offsets at 0", differ == 0,
-               "WIDTH 0 with a -3 st pitch and a -1 st formant differs from one with none in %.0f samples (0)",
+               "WIDTH 0 with a -2.5 st pitch and a -1 st formant differs from one with none in %.0f samples (0)",
                static_cast<double>(differ));
 
   // The slot-0 copy's lag follows the lag multiplier: 0.5 at WIDTH 0, 1.1667 at WIDTH 1.
@@ -548,7 +548,7 @@ bool testWidthLaw() {
 }
 
 // VOICES 20, 40, 60 and 80 % bring in the copies in index order, the -1.75 st copy first, then the
-// +2.75 st, the -3 st and the +1 st. At each step the output carries a line at the f0 of every
+// +2.75 st, the -2.5 st and the +1 st. At each step the output carries a line at the f0 of every
 // copy that has come in and none at the f0 of the copies still to come. It runs at WIDTH 1 and at
 // WIDTH 0.5, where the offsets are the width factor 0.454 of their full values.
 bool testFadeOrder() {
@@ -967,16 +967,16 @@ size_t differing(const Signal& a, const Signal& b) {
   return n;
 }
 
-// What the three runs of testEnhancementsDefaultExact hashed to on the engine of v2.00.68 (Mac build),
-// on the default tuning. The default tuning must reproduce them to the bit. Update them only when the
-// sound of a default copy changes on purpose.
-constexpr uint64_t kBeforeProgram = 0x12873f20ed548ec8ULL;
-constexpr uint64_t kBeforeBurst = 0x8ff1eb8ee12b722cULL;
-constexpr uint64_t kBeforeBurstScatter = 0xd9de9308d8365971ULL;
+// What the three runs of testEnhancementsDefaultExact hash to on the default tuning as of v2.00.73
+// (Mac build), with voice 3 at -2.5 st. The default tuning must reproduce them to the bit. Update
+// them only when the sound of a default copy changes on purpose.
+constexpr uint64_t kDefaultProgram = 0x60425f790f1430acULL;
+constexpr uint64_t kDefaultBurst = 0xb2459d9e32a38036ULL;
+constexpr uint64_t kDefaultBurstScatter = 0x5a48a65e907c1993ULL;
 
 // With every enhancement neutral the engine runs the code it ran without them, and a setting that
 // only matters while its control is on moves no sample. The three recorded runs hash to the values
-// of v2.00.68.
+// pinned above.
 bool testEnhancementsDefaultExact() {
   const Signal prog = program(3);
   const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
@@ -999,7 +999,7 @@ bool testEnhancementsDefaultExact() {
   const size_t diffProg = differing(a, b);
   const size_t diffBurst = differing(c, d);
   const uint64_t hashes[3] = {fnv(a), fnv(run(burst, knobs(0.8f, 0.5f))), fnv(c)};
-  const uint64_t before[3] = {kBeforeProgram, kBeforeBurst, kBeforeBurstScatter};
+  const uint64_t pinned[3] = {kDefaultProgram, kDefaultBurst, kDefaultBurstScatter};
   std::printf("info hash 180 Hz program VOICES 70 WIDTH 50 %016llx\n", static_cast<unsigned long long>(hashes[0]));
   std::printf("info hash burst program VOICES 80 WIDTH 50 %016llx\n", static_cast<unsigned long long>(hashes[1]));
   std::printf("info hash burst program VOICES 60 WIDTH 80 scatter 15 drift 20 %016llx\n",
@@ -1010,10 +1010,10 @@ bool testEnhancementsDefaultExact() {
   for (int i = 0; i < 3; ++i) {
     char name[40];
     std::snprintf(name, sizeof name, "default hash, run %d", i + 1);
-    const bool same = hashes[i] == before[i];
-    std::printf("info hash run %d: v2.00.68 %016llx, default tuning %016llx\n", i + 1,
-                static_cast<unsigned long long>(before[i]), static_cast<unsigned long long>(hashes[i]));
-    ok &= report(name, same, "output hash equals the v2.00.68 value: %.0f (1)", same ? 1.0 : 0.0);
+    const bool same = hashes[i] == pinned[i];
+    std::printf("info hash run %d: pinned v2.00.73 %016llx, default tuning %016llx\n", i + 1,
+                static_cast<unsigned long long>(pinned[i]), static_cast<unsigned long long>(hashes[i]));
+    ok &= report(name, same, "output hash equals the pinned v2.00.73 value: %.0f (1)", same ? 1.0 : 0.0);
   }
   return ok;
 }
@@ -1195,8 +1195,8 @@ std::vector<double> windowCents(const Signal& out, double base) {
 }
 
 // The bottom tenth of WIDTH is for a melodic line, so a copy there is a plain double on the lead's
-// pitch. The -3 st copy on the shipped set sits within 1 cent of the lead at WIDTH 0, 3.6 +- 1.5 cents
-// flat of it at 0.1, and 300 +- 10 cents flat at 1. Drift scales with the width factor, so at WIDTH
+// pitch. The -2.5 st copy on the shipped set sits within 1 cent of the lead at WIDTH 0, 3.0 +- 1.5 cents
+// flat of it at 0.1, and 250 +- 10 cents flat at 1. Drift scales with the width factor, so at WIDTH
 // 0.05 a copy's f0 moves less than 1 cent from one 0.5 s window to the next, and at WIDTH 1 it
 // moves as the drift test expects. Contour scales with the same factor, so at WIDTH 0.05 a copy
 // with contour 0.6 or 1.4 swings within 2 % of the input's swing, and at WIDTH 1 within the contour
@@ -1210,7 +1210,7 @@ bool testMelodicBottom() {
     float width;
     double wantCents;
     double tolCents;
-  } rows[] = {{0.0f, 0.0, 1.0}, {0.1f, -3.6, 1.5}, {1.0f, 100.0 * full, 10.0}};
+  } rows[] = {{0.0f, 0.0, 1.0}, {0.1f, -3.0, 1.5}, {1.0f, 100.0 * full, 10.0}};
   double measured[3] = {0.0, 0.0, 0.0};
   size_t i = 0;
   for (const auto& r : rows) {
@@ -1219,7 +1219,7 @@ bool testMelodicBottom() {
     char name[48];
     std::snprintf(name, sizeof name, "melodic f0, WIDTH %.0f %%", static_cast<double>(r.width) * 100.0);
     ok &= report(name, std::fabs(measured[i] - r.wantCents) <= r.tolCents,
-                 "-3 st copy f0 %+.2f cents from the lead, want %+.1f (+-%.0f)", measured[i], r.wantCents, r.tolCents);
+                 "-2.5 st copy f0 %+.2f cents from the lead, want %+.1f (+-%.0f)", measured[i], r.wantCents, r.tolCents);
     ++i;
   }
 
@@ -1274,7 +1274,7 @@ bool testMelodicBottom() {
                    ratio, want, k.tol);
     }
   }
-  std::printf("info melodic f0 from the lead, cents, -3 st copy: WIDTH 0 %+.2f, 0.1 %+.2f, 1 %+.2f\n", measured[0], measured[1],
+  std::printf("info melodic f0 from the lead, cents, -2.5 st copy: WIDTH 0 %+.2f, 0.1 %+.2f, 1 %+.2f\n", measured[0], measured[1],
               measured[2]);
   return ok;
 }
@@ -1362,7 +1362,7 @@ bool testWidthLag() {
 // both exactly 1 skips the epoch snap, so the shipped epoch align does not move its grains. The lag
 // comes from a search over the input read by linear interpolation as the engine reads its ring, within
 // half a period of the lag the engine reports (timing scatter makes it fractional), and the gain by
-// least squares (level scatter draws one per copy). A copy at WIDTH 0.1 is the control: 3.6 cents of
+// least squares (level scatter draws one per copy). A copy at WIDTH 0.1 is the control: 3.0 cents of
 // pitch offset moves it off the delayed input by far more.
 struct Shift {
   double lag = 0.0;   // samples
@@ -1472,7 +1472,7 @@ bool testWidthZeroIsDelay() {
                  s.lag, s.gain, s.worst);
   }
 
-  // The control: the -3 st copy at WIDTH 0.1 is 3.6 cents off the lead and drifts away from any delayed
+  // The control: the -2.5 st copy at WIDTH 0.1 is 3.0 cents off the lead and drifts away from any delayed
   // copy of it.
   const cv::CrowdParams pc = delayedCopy(2, 0.1f);
   const Signal out = run(in, pc);
