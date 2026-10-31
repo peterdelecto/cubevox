@@ -362,3 +362,13 @@ vocal delivery so harmony is not in the question and pitch tracking is not impor
 6. The emulator's Gang tuning nodes are Formants, Pitch, Delay, Tone, Scatter and Solo. The Levels
    node (voice level, trim, lead leaves from, fade share) went with the others; those four fields
    keep their defaults and print with the tuning.
+
+## Rule (owner 2026-10-31)
+
+"They need to sound like actual people though. Not an alien, not a cartoon." Every move a copy
+makes stays inside what a human voice does. Copies read as people inside about ±5 semitones of
+pitch and ±3 semitones of formant, paired the natural way, the lower pitch with the longer throat.
+Timing scatter stays under about 25 ms, pitch drift under about 30 cents, loudness scatter under
+4 dB, breath mixed under a copy and never over it. The cutting of the copies must not add buzz or
+doubling that reads as a machine; epoch alignment exists for that. The pinned sound is the tag
+`gang-pin-2026-10-31` on main at v2.00.63.
