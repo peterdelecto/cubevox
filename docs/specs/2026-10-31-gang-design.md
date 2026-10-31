@@ -1,4 +1,4 @@
-# cubevox — Gang card (four formant-shifted voices, DISTANCE and VOICES)
+# cubevox — Gang card (four formant-shifted voices, WIDTH and VOICES)
 
 Date 2026-10-31. Owner design in chat 2026-10-31; this file is the implementation reference.
 The wiring map with file and line references is `build/audit/2026-10-31-doubler-map.md` (gitignored).
@@ -24,9 +24,9 @@ Adam (owner 2026-10-31, see Simplified under Built).
 2. Lower pot VOICES, the amount knob. 0 is dry. The four voices fade in one at a time, then the
    lead fades out, so the top of the knob is the gang alone. Owner: "if the effect is dimed, we
    don't hear Adam, we hear the gang."
-3. Upper pot DISTANCE. It adds time between the lead and each copy, so the bottom is four close
-   doubles and the top a gang that comes in late (owner 2026-10-31, "distance should add more time
-   between each voice and also add delay (not an echo but a lag) with a ceiling of 200 ms").
+3. Upper pot WIDTH. It spreads the copies' pitch offsets, so the bottom is four copies a hair off the
+   lead and the top is the gang at its full offsets (owner 2026-10-31, "nix the distance knob and
+   replace it with a 'width knob'. the width knob will spread the voices.").
 4. Autotune is not expected on with this card. The tracker runs whenever the Gang card is on.
 5. The voices read the pitch front end's ring and add Autotune's correction to their ratio, as
    Octave does. Octave's wet is not doubled.
@@ -41,7 +41,7 @@ Adam (owner 2026-10-31, see Simplified under Built).
 
 | Pot | Name | Kind | Readout |
 |---|---|---|---|
-| upper (knob A) | DISTANCE | continuous, 0..100 % | `DISTANCE 35 %` |
+| upper (knob A) | WIDTH | continuous, 0..100 % | `WIDTH 35 %` |
 | lower (knob B) | VOICES | continuous, 0..100 % | `VOICES 60 %` |
 
 Card id `gang`, name `Gang`, Group Pitch, Engine Gang. Both knobs are the registry's
@@ -61,29 +61,36 @@ percent knob with no decimals, so the readout sweep test holds as it is.
    so each voice goes from −9 dB to −6 dB there. Total power is unity at every k, so the level
    rule holds by construction; trimDb in tuning takes up the residue level_test measures on the
    180 Hz program.
-4. Fade order, nearest person first, by voice index (pitch, throat, lag at DISTANCE 0): 0 (−1.75 st,
-   −1.75 st, 40 ms), 1 (−3 st, −1 st, 70 ms), 2 (+3 st, −1 st, 100 ms), 3 (+1 st, −1.5 st, 75 ms).
-   One voice is a second singer, two a pair, four the gang.
+4. Fade order, low, high, low, high, by voice index (full pitch, throat, delay before the lag scale):
+   0 (−1.75 st, −1.75 st, 40 ms), 1 (+2.75 st, −1 st, 100 ms), 2 (−3 st, −1 st, 70 ms),
+   3 (+1 st, −1.5 st, 75 ms). One voice is a second singer, two a pair, four the gang.
 5. Gains are computed per block and ramped per sample across the block, as Octave and the reverb
    MIX do. A voice whose ramped gain sits at 0 is reset and does not tick, so one voice costs a
    quarter of four.
 
-### DISTANCE law, knob d in 0..1
+### WIDTH law, knob w in 0..1
 
-DISTANCE is time only. Copy v's lag target is delayMs[v] × (1 + d), capped at `maxLagMs` (200 ms)
-and floored at the voice's own minimum (1.5 periods plus 4 samples). No other term reads
-DISTANCE. At the defaults the four copies lag 40, 70, 100 and 75 ms at d = 0 and 80, 140, 200
-(capped) and 150 ms at d = 1.
+WIDTH is pitch only. Per copy and per block, copy v's pitch offset in semitones is
+sign(pitchSt[v]) × (0.01 + (|pitchSt[v]| − 0.01) × w). At w = 0 every copy sits 0.01 st (1 cent)
+off the lead on its own side, and at w = 1 it sits at pitchSt[v]. An offset already inside 0.01 st
+stays as it is, so a pitchSt of 0 stays on the lead. Formants, lags and tone shelves do not follow
+the knob. The offset moves with the knob continuously, so a knob move glides the copies.
+
+### Lag law
+
+Copy v's lag target is delayMs[v] × `lagScale` (1.2), capped at `maxLagMs` (200 ms) and floored at
+the voice's own minimum (1.5 periods plus 4 samples). No knob reads it. At the defaults the four
+copies lag 48, 120, 84 and 90 ms.
 
 A copy changes its lag only in a quiet gap. Each block it measures the mean square of the ring at
-its read point (the block's samples `lag` behind the head). While a new target is pending (a DISTANCE
-or slider move, or a fresh scatter draw), the copy counts the blocks in which the ring is under
+its read point (the block's samples `lag` behind the head). While a new target is pending (a tuning
+move, or a fresh scatter draw), the copy counts the blocks in which the ring is under
 `gapFloorDb` (−50 dBFS) both at the lag it plays and at the lag it would move to. After two such
 blocks it takes the new lag at once by resetting its grain marks there, and the grains in flight
 finish. The jump then replays or skips only silence. While material sounds it keeps its lag, so a
 copy never bends in pitch mid-word. The first lag after a reset or a fade-in lands at once, since
 nothing is playing yet. A gap shorter than the move (the gap between the two read points) never
-admits the move, so a large DISTANCE step waits for a long pause.
+admits the move, so a large lag step waits for a long pause.
 
 Scatter. With `scatterMs` above 0, each gap gives the copy a fresh uniform random offset in
 [−scatterMs, +scatterMs] on top of its target, drawn from a per-voice xorshift32 seeded at reset,
@@ -104,17 +111,18 @@ Filter coefficients update per block only, since the setters call libm.
 ```
 namespace cv {
 struct GangTuning {
-  std::array<float, 4> pitchSt     = {-1.75f, -3.0f, 3.0f, 1.0f};    // pitch ratio 2^(st / 12) against the lead
+  std::array<float, 4> pitchSt     = {-1.75f, 2.75f, -3.0f, 1.0f};   // full pitch offset 2^(st / 12) at WIDTH 1
   std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, -1.5f}; // grain playback rate 2^(st / 12)
-  std::array<float, 4> tiltDb      = {-3.0f, 3.0f, -4.0f, 5.0f};     // high shelf gain above tiltHz
-  std::array<float, 4> delayMs     = {40.0f, 70.0f, 100.0f, 75.0f};  // lag behind the lead at DISTANCE 0
+  std::array<float, 4> tiltDb      = {-3.0f, -4.0f, 3.0f, 5.0f};     // high shelf gain above tiltHz
+  std::array<float, 4> delayMs     = {40.0f, 100.0f, 70.0f, 75.0f};  // lag behind the lead before lagScale
+  float lagScale     = 1.2f;      // a copy's lag is delayMs times this
   float tiltHz       = 2500.0f;
   float voiceDb      = -9.0f;     // one voice against the lead at unity
   float trimDb       = 2.1f;      // level rule residue
   float leadFadeFrom = 0.8f;      // VOICES position where the lead starts to leave
   float holdFrom     = 0.75f;     // part of each voice's fifth spent fading; the rest holds
   float hpHz         = 120.0f;    // low cut on the gang sum
-  float maxLagMs     = 200.0f;    // ceiling on a copy's lag at any DISTANCE
+  float maxLagMs     = 200.0f;    // ceiling on a copy's lag
   float gapFloorDb   = -50.0f;    // a read point under this level counts as a gap
   float scatterMs    = 0.0f;      // peak random lag offset taken at each gap, 0..30
   float driftCents   = 0.0f;      // peak of each copy's slow random pitch walk, 0..50
@@ -122,7 +130,7 @@ struct GangTuning {
 };
 struct GangParams {
   bool on = false;
-  float distance = 0.5f;   // knob A, 0..1
+  float width    = 1.0f;   // knob A, 0..1
   float voices   = 0.5f;   // knob B, 0..1
   GangTuning tuning;
 };
@@ -152,13 +160,13 @@ ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D
    Catmull-Rom (decision 6). No epoch search in the first cut: grains sit on the period grid as
    today's PsolaVoice does. If the gang sounds rough in the emulator, the fallback is one shared
    low-passed ring and the old peak search, with the marks shared across the four voices.
-2. Read delay D_v is the copy's adopted lag in samples (DISTANCE law above), a per-voice member
+2. Read delay D_v is the copy's adopted lag in samples (lag law above), a per-voice member
    set per block, not `PsolaVoice::kGrainDelay`. The voice clamps it to at least 1.5 × the clamped
    period + 4 (the floor kGrainDelay encodes for the lowest pitch) and at most
    kVoiceRingLen − 2 × kMaxPeriod − 8, which is 9,660 samples (201 ms) on the 230 ms ring. The
    defaults keep every copy above the 21.7 ms floor and the 200 ms ceiling leaves the longest grain
    (686-sample period, rate 0.5) inside the ring.
-3. Ratio r_v = 2^(pitchSt[v] / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12).
+3. Ratio r_v = 2^(widthSt(pitchSt[v], w) / 12) · 2^(drift_v / 1200) · 2^(pitch.correctionSemis() / 12).
    The PSOLA voice clamps the ratio to 0.5..2.0.
 4. Period from `pitch.pitch().period`. Period 0 gives silence from the voice, as PsolaVoice does
    today. Unvoiced frames keep the last period, as Autotune's voice does.
@@ -179,8 +187,8 @@ wet sum before it meets the lead, per the output-safety spec.
    a case: registry.cpp applyKnob and applyToggle, chain_run.cpp resetEngine and runStage,
    test/knob_step_test.cpp runCard, test/firmware/core_registry.cpp engineValue.
 2. Registry row: card Gang, id "gang", name "Gang", Engine Gang, two knobs
-   kPercent("DISTANCE") and kPercent("VOICES"), Group Pitch, costs::kGang. applyGangKnob maps
-   knob 0 to distance and knob 1 to voices. applyToggle sets `params.gang.on` and
+   kPercent("WIDTH") and kPercent("VOICES"), Group Pitch, costs::kGang. applyGangKnob maps
+   knob 0 to width and knob 1 to voices. applyToggle sets `params.gang.on` and
    `params.pitch.gangOn`.
 3. `PitchFxParams::gangOn` (new, default false). pitch_fx.h line 49 becomes
    `tracker_.push(in, n, p.autotune.on || p.gangOn || activeAt_ > 0.0f)`. PitchFx gains
@@ -206,18 +214,18 @@ wet sum before it meets the lead, per the output-safety spec.
 
 ## Emulator and render tool
 
-1. cubevox-proto: a GANG block (checkbox, DISTANCE and VOICES percent sliders, a Tuning header
+1. cubevox-proto: a GANG block (checkbox, WIDTH and VOICES percent sliders, a Tuning header
    with tuning nodes) in whichever column the layout probe accepts; state keys
-   `gang.on`, `gang.distance`, `gang.voices`; a `gGang` global reset with the others;
+   `gang.on`, `gang.width`, `gang.voices`; a `gGang` global reset with the others;
    chain position after the pitch stage and before Unison, with gPitchFx passed in. Pedal mode is
    unchanged by this spec; the owner listens to the card in the module view.
    `--layout` must print ok. The tuning nodes are Formants (4 sliders, −4..+4 st), Pitch (4,
-   −12..+12 st), Delay (4, 5..200 ms), Tone (4 tiltDb and tiltHz), Scatter (scatterMs 0..30 ms,
-   driftCents 0..50) and Solo (4 checkboxes). Print tuning lists every GangTuning field. The Gang
+   −12..+12 st, the full values), Delay (4, 5..200 ms, and lagScale 0.5..2), Tone (4 tiltDb and
+   tiltHz), Scatter (scatterMs 0..30 ms, driftCents 0..50) and Solo (4 checkboxes). Print tuning lists every GangTuning field. The Gang
    tuning has no state keys.
-2. cubevox-render: `--gang`, `--distance <0..1>`, `--voices <0..1>`; tuning keys prefixed `gang`
+2. cubevox-render: `--gang`, `--width <0..1>`, `--voices <0..1>`; tuning keys prefixed `gang`
    (`gangVoiceDb`, `gangTrimDb`, `gangFormantSt0..3`, `gangPitchSt0..3`, `gangTiltDb0..3`,
-   `gangTiltHz`, `gangDelayMs0..3`, `gangScatterMs`, `gangDriftCents`, `gangHpHz`,
+   `gangTiltHz`, `gangDelayMs0..3`, `gangLagScale`, `gangScatterMs`, `gangDriftCents`, `gangHpHz`,
    `gangMaxLagMs`). `pitchOn` becomes true when the gang card is on. tools/engine_ab.sh gains a
    `gang` case and a gang term in the chain case.
 
@@ -227,8 +235,8 @@ wet sum before it meets the lead, per the output-safety spec.
    signal through its pass-through path so the ring and tracker are live:
    1. off is bit exact (`==`, after 100 ms).
    2. no allocation inside process (the operator new abort pattern of octave_test.cpp).
-   3. pitch moves by pitchSt: one voice alone (VOICES 0.2): output f0 within 10 cents
-      of 220 × 2^(pitchSt / 12) on a 220 Hz tone, for voice 0 and voice 1 (Goertzel helpers
+   3. pitch moves by pitchSt: one voice alone (VOICES 0.2, WIDTH 1): output f0 within 10 cents
+      of 220 × 2^(pitchSt / 12) on a 220 Hz tone, for each of the four voices (Goertzel helpers
       copied from octave_test.cpp).
    4. formant moves: centroid over harmonics 1..10 at +1 st (no default copy has a shorter throat;
       the probe holds the lag at 90 ms) at least 1.03 × the formant-0 centroid, and at voice 0's
@@ -237,21 +245,27 @@ wet sum before it meets the lead, per the output-safety spec.
       on the 180 Hz program.
    6. the lead leaves: at VOICES 1.0 a probe accessor reports lead gain 0 after the ramp.
    7. voice count: at VOICES 0.2 only voice 0 ticks and at 0.8 all four (probe accessor).
-   8. the lag follows DISTANCE across a gap: on 220 Hz bursts of an irregular envelope with 120 ms
+   8. the lag follows lagScale across a gap: on 220 Hz bursts of an irregular envelope with 120 ms
       of silence between them, one copy alone (formant 0, pitchSt 0) has its cross-correlation peak
-      at delayMs (75 ms for copy 4, 100 ms for copy 3) at DISTANCE 0 and at delayMs × 2, capped at
-      200 ms, after DISTANCE goes to 1. The move comes mid-burst, the lag stays unchanged to the
-      end of that burst, and the next burst sounds at the new lag (±0.5 ms).
+      at delayMs × 1.2 (90 ms for copy 4, 120 ms for copy 2) and, after lagScale goes to 2, at
+      delayMs × 2 capped at 200 ms (150 ms and 200 ms). The move comes mid-burst, the lag stays
+      unchanged to the end of that burst, and the next burst sounds at the new lag (±0.5 ms).
    9. tracker runs without Autotune: PitchFxParams with autotune.on false and gangOn true gives
       period > 0 on the tone within 60 ms.
-   10. voices differ: voice 0 alone and voice 2 alone on the 220 Hz tone differ in spectral
-      centroid (harmonics 1..20 of each voice's own f0) by at least 5 % (7.3 % at the defaults).
+   10. voices differ: voice 0 alone and voice 1 alone on the 220 Hz tone differ in spectral
+      centroid (harmonics 1..20 of each voice's own f0) by at least 5 % (8.9 % at the defaults).
    11. scatter: scatterMs 15 on copy 4 over ten bursts, each burst's lag within ±15 ms of 75 ms
       and varying from burst to burst; f0 inside each burst within 10 cents of the copy's offset.
    12. drift: driftCents 20 on a 6 s tone, the copy's f0 in 0.5 s windows within ±20 cents of its
       offset (3 cents of measurement slack) and not the same in every window. driftCents 0 leaves
       the drift at exactly 0 and the output unchanged by driftHoldS.
-2. level_test: a Gang card row at VOICES 0.5 and DISTANCE 0.5 in the 0..+0.5 dB band, as a lambda
+   13. WIDTH law: voice 0 alone at WIDTH 0 has its f0 within 2 cents of the lead's 220 Hz, at 0.5
+      within 10 cents of half its offset, and at 1 within 10 cents of −1.75 st. Its lag reads the
+      same at all three.
+   14. fade order: at VOICES 0.2, 0.4, 0.6 and 0.8 the output has a spectral line at the f0 of each
+      voice that has come in (at least 0.4 of the loudest line) and none at the f0 of the voices
+      still to come (at most 0.1), so the order is −1.75 st, +2.75 st, −3 st, +1 st.
+2. level_test: a Gang card row at VOICES 0.5 and WIDTH 0.5 in the 0..+0.5 dB band, as a lambda
    row driving PitchFx then Gang (the two-stage row pattern at level_test.cpp:235-243).
 3. test/firmware: core_registry (amountCards, engineValue, knobs move, pitch group count 3),
    core_chain_run (a Gang card rig; PitchFx runs with the Gang card on and both pitch toggles off; the
@@ -298,14 +312,17 @@ Retune 1 (owner 2026-10-31): the copies sounded too similar to the input; each c
 
 Defaults 3 (owner 2026-10-31): copy 4 to formant -1.5 and pitch +1; lags 40, 70, 100, 75 ms.
 
+WIDTH (owner 2026-10-31): the upper pot spreads the copies' pitch offsets from ±0.01 st to their full values; the line order is low, high, low, high; the old lag multiplier is pegged at 1.2.
+
 1. The one highpass runs on the gang sum after the per-voice gains, not one per voice. The four
    voices share one setting, so the sound is the same and three biquad runs go.
-2. `trimDb` defaults to +2.1 dB; the level_test row at VOICES 0.5 and DISTANCE 0.5 reads +0.35 dB,
-   and the level law reads +0.19 to +0.86 dB across VOICES 20 % to 100 % at DISTANCE 0.5.
+2. `trimDb` defaults to +2.1 dB; the level_test row at VOICES 0.5 and WIDTH 0.5 reads +0.26 dB,
+   and the level law reads +0.07 to +0.92 dB across VOICES 20 % to 100 % at WIDTH 0.5. At VOICES
+   100 % the gang reads −0.74 dB at WIDTH 0 and +0.72 dB at WIDTH 1.
 3. `PitchFx::correctionSemis()` follows Autotune's fade down and reads 0 once it has settled off, so
    the voices return to the sung pitch within 200 ms of the switch; before, it held the last value.
-4. The read delay is the output lag; the correlation peaks sit at the lag the copy holds, 74.98 ms
-   and 149.98 ms for copy 4 and 99.98 ms and 199.98 ms for copy 3.
+4. The read delay is the output lag; the correlation peaks sit at the lag the copy holds, 89.98 ms
+   and 149.98 ms for copy 4 and 119.98 ms and 199.98 ms for copy 2.
 5. Host cost at -O2, same machine and run: Gang at VOICES 0.8 reads 3.3 us per block against Unison's
    0.91 us, a ratio of 3.64 (3.85 for the build with the room). Scaled by Unison's 46.9k board
    cycles, four voices land near 171k cycles. The cost row stays the 19 / 21 estimate until a board

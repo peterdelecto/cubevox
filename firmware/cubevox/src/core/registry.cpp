@@ -59,7 +59,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Reverb, costs::kReverbSpring},
     {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Time"), kPercent("Mix")},
      Group::Reverb, costs::kReverbChasm},
-    {Card::Gang, "gang", "Gang", Engine::Gang, 2, {kPercent("DISTANCE"), kPercent("VOICES")}, Group::Pitch,
+    {Card::Gang, "gang", "Gang", Engine::Gang, 2, {kPercent("WIDTH"), kPercent("VOICES")}, Group::Pitch,
      costs::kGang},
 }};
 
@@ -136,7 +136,7 @@ void applyDistortionKnob(int knob, float v, cv::DistortionParams& d) {
 
 void applyGangKnob(int knob, float v, cv::GangParams& d) {
   if (knob == 0) {
-    d.distance = v;
+    d.width = v;
   } else {
     d.voices = v;
   }

@@ -17,26 +17,28 @@
 // has a fixed low cut. The copies never read a key. They read the pitch period and Autotune's
 // correction from PitchFx and cut their grains from its input ring.
 //
-// VOICES fades the copies in one at a time, then fades the lead out, so the top of the knob is the
-// gang alone. Total power is unity at every position. DISTANCE stretches each copy's lag and
-// nothing else. A copy changes its lag only in a quiet gap, so it never bends in pitch mid-word.
-// Scatter gives each copy a fresh timing offset at every gap, and drift walks each copy's pitch
-// slowly around its offset.
+// VOICES fades the copies in one at a time (low, high, low, high), then fades the lead out, so the
+// top of the knob is the gang alone. Total power is unity at every position. WIDTH spreads the
+// copies' pitch offsets from a hair off the lead to their full values and moves nothing else.
+// A copy changes its lag only in a quiet gap, so it never bends in pitch mid-word. Scatter gives
+// each copy a fresh timing offset at every gap, and drift walks each copy's pitch slowly around
+// its offset.
 
 namespace cv {
 
 struct GangTuning {
-  std::array<float, 4> pitchSt = {-1.75f, -3.0f, 3.0f, 1.0f};     // pitch ratio 2^(st / 12) against the lead
+  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -3.0f, 1.0f};     // full pitch offset 2^(st / 12) at WIDTH 1
   std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12)
-  std::array<float, 4> tiltDb = {-3.0f, 3.0f, -4.0f, 5.0f};        // high shelf gain above tiltHz
-  std::array<float, 4> delayMs = {40.0f, 70.0f, 100.0f, 75.0f};    // lag behind the lead at DISTANCE 0
+  std::array<float, 4> tiltDb = {-3.0f, -4.0f, 3.0f, 5.0f};        // high shelf gain above tiltHz
+  std::array<float, 4> delayMs = {40.0f, 100.0f, 70.0f, 75.0f};    // lag behind the lead before lagScale
+  float lagScale = 1.2f;       // a copy's lag is delayMs times this
   float tiltHz = 2500.0f;
   float voiceDb = -9.0f;       // one voice against the lead at unity
   float trimDb = 2.1f;         // level rule residue
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
   float hpHz = 120.0f;         // low cut on the gang sum
-  float maxLagMs = 200.0f;     // ceiling on a copy's lag at any DISTANCE
+  float maxLagMs = 200.0f;     // ceiling on a copy's lag
   float gapFloorDb = -50.0f;   // a copy's read point under this level counts as a gap
   float scatterMs = 0.0f;      // peak random lag offset a copy takes at each gap
   float driftCents = 0.0f;     // peak of each copy's slow random pitch walk
@@ -45,8 +47,8 @@ struct GangTuning {
 
 struct GangParams {
   bool on = false;
-  float distance = 0.5f;  // knob A, 0..1
-  float voices = 0.5f;    // knob B, 0..1
+  float width = 1.0f;   // knob A, 0..1
+  float voices = 0.5f;  // knob B, 0..1
   GangTuning tuning;
 
   // A bit per voice (bit 0 is voice 0), 0 for no solo. A soloed voice sits fully faded in and the
@@ -93,6 +95,18 @@ static_assert(ms(200) <= kDelayCeil, "a 200 ms lag and the longest grain do not 
 inline float clampLag(float lag, float period) {
   const float p = clampf(period, kMinPeriod, kMaxPeriod);
   return clampf(lag, kFloorPeriods * p + kFloorPad, kDelayCeil);
+}
+
+// A copy's pitch offset in semitones at WIDTH `width`. At 0 it sits kWidthFloorSt off the lead on its
+// own side, at 1 it sits at its full offset, and it moves linearly between. An offset already
+// inside the floor stays as it is, so an offset of 0 stays on the lead.
+constexpr float kWidthFloorSt = 0.01f;
+
+inline float widthSt(float full, float width) {
+  const float a = full < 0.0f ? -full : full;
+  if (a <= kWidthFloorSt) return full;
+  const float st = kWidthFloorSt + (a - kWidthFloorSt) * width;
+  return full < 0.0f ? -st : st;
 }
 
 // One PSOLA voice with a grain playback rate. Grains two periods long are cut on a grid one period
@@ -336,7 +350,7 @@ struct BlockView {
   }
 };
 
-// One copy's lag. A new target (a DISTANCE or slider move, or the scatter draw of a fresh gap)
+// One copy's lag. A new target (a tuning move, or the scatter draw of a fresh gap)
 // lands once the ring is quiet at both the lag the copy plays and the lag it moves to. The jump
 // then replays or skips only silence. While material sounds the copy keeps the lag it has.
 class CopyLag {
@@ -557,9 +571,9 @@ class Gang {
     tiltSet_ = true;
   }
 
-  // Copy v's lag target in samples. DISTANCE stretches the delay and the ceiling caps it.
-  static float lagTarget(const GangTuning& t, size_t v, float distance) {
-    const float lagMs = t.delayMs[v] * (1.0f + distance);
+  // Copy v's lag target in samples. The scale stretches the delay and the ceiling caps it.
+  static float lagTarget(const GangTuning& t, size_t v) {
+    const float lagMs = t.delayMs[v] * t.lagScale;
     return (lagMs < t.maxLagMs ? lagMs : t.maxLagMs) * gang_detail::kSmpPerMs;
   }
 
@@ -572,7 +586,7 @@ class Gang {
     setTilts(t);
     const float period = pitch.pitch().period;
     const float corr = pitch.correctionSemis() * (1.0f / 12.0f);
-    const float d = smooth::clamp01(p.distance);
+    const float w = smooth::clamp01(p.width);
     const float scatter = (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * gang_detail::kSmpPerMs;
     const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * gang_detail::kDriftSlewS));
     const gang_detail::BlockView view{pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)};
@@ -584,9 +598,10 @@ class Gang {
       }
       live_[v] = true;
       ++active_;
-      if (lag_[v].settle(view, lagTarget(t, v, d), scatter, period)) voice_[v].markReset();
+      if (lag_[v].settle(view, lagTarget(t, v), scatter, period)) voice_[v].markReset();
       const float drift = drift_[v].step(driftRng_[v], t.driftCents, t.driftHoldS, slew, n);
-      voice_[v].prepare(period, exp2Fast(t.pitchSt[v] * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + corr),
+      const float st = gang_detail::widthSt(t.pitchSt[v], w);
+      voice_[v].prepare(period, exp2Fast(st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + corr),
                         exp2Fast(t.formantSt[v] * (1.0f / 12.0f)), lag_[v].samples());
     }
   }

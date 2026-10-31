@@ -70,9 +70,9 @@ void checkCardTable() {
   check(engineOf(Card::Gang) == Engine::Gang && cardDesc(Card::Gang).group == Group::Pitch,
         "table: the Gang card has its own engine and sits in the pitch group");
   check(std::strcmp(cardDesc(Card::Gang).id, "gang") == 0 && std::strcmp(cardDesc(Card::Gang).name, "Gang") == 0 &&
-            std::strcmp(knobDesc(Card::Gang, 0)->name, "DISTANCE") == 0 &&
+            std::strcmp(knobDesc(Card::Gang, 0)->name, "WIDTH") == 0 &&
             std::strcmp(knobDesc(Card::Gang, 1)->name, "VOICES") == 0,
-        "table: the Gang card reads DISTANCE then VOICES");
+        "table: the Gang card reads WIDTH then VOICES");
   check(kFadeHoldBlocks == kEngineCount - 1, "table: one silent block per engine after the swap block");
 }
 
@@ -118,11 +118,11 @@ void checkAmountKnobIsB() {
   applyKnob(Card::ReverbChasm, 1, 0.4f, p);
   check(std::fabs(p.reverb.mix - 0.4f) < 1e-6f, "amount: Chasm Reverb knob B drives Mix");
   applyKnob(Card::Gang, 1, 0.7f, p);
-  check(std::fabs(p.gang.voices - 0.7f) < 1e-6f && std::fabs(p.gang.distance - 0.5f) < 1e-6f,
-        "amount: Gang knob B drives VOICES and leaves DISTANCE alone");
+  check(std::fabs(p.gang.voices - 0.7f) < 1e-6f && std::fabs(p.gang.width - cv::GangParams().width) < 1e-6f,
+        "amount: Gang knob B drives VOICES and leaves WIDTH alone");
   applyKnob(Card::Gang, 0, 0.3f, p);
-  check(std::fabs(p.gang.distance - 0.3f) < 1e-6f && std::fabs(p.gang.voices - 0.7f) < 1e-6f,
-        "amount: Gang knob A drives DISTANCE and leaves VOICES alone");
+  check(std::fabs(p.gang.width - 0.3f) < 1e-6f && std::fabs(p.gang.voices - 0.7f) < 1e-6f,
+        "amount: Gang knob A drives WIDTH and leaves VOICES alone");
   check(std::strcmp(knobDesc(Card::Octave, 1)->name, "Mix") == 0, "amount: Octave keeps Mix on knob B");
 }
 
@@ -155,7 +155,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
-    case Card::Gang: return knob == 0 ? p.gang.distance : p.gang.voices;
+    case Card::Gang: return knob == 0 ? p.gang.width : p.gang.voices;
     case Card::Empty:
     case Card::Count: break;
   }

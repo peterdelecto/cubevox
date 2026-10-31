@@ -57,7 +57,7 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>, alias --key] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
-               "       [--gang] [--distance <0..1>] [--voices <0..1>]\n"
+               "       [--gang] [--width <0..1>] [--voices <0..1>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
@@ -65,7 +65,7 @@ int usage() {
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune or --gang\n"
-               "  gang runs only with --gang; --distance and --voices set its knobs (default 0.5 each)\n"
+               "  gang runs only with --gang; --width and --voices set its knobs (default 1 and 0.5)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  at least one stage must run; order is eq front, ingate, pitch, gang, unison, slapback, distortion,\n"
@@ -101,7 +101,7 @@ int usage() {
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     gangVoiceDb gangTrimDb gangFormantSt0..3 gangPitchSt0..3 gangTiltDb0..3 gangTiltHz\n"
-               "     gangDelayMs0..3 gangScatterMs (0..30) gangDriftCents (0..50) gangHpHz gangMaxLagMs\n"
+               "     gangDelayMs0..3 gangLagScale gangScatterMs (0..30) gangDriftCents (0..50) gangHpHz gangMaxLagMs\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -191,6 +191,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gangTiltHz", &gn.tiltHz},
       {"gangDelayMs0", &gn.delayMs[0]},          {"gangDelayMs1", &gn.delayMs[1]},
       {"gangDelayMs2", &gn.delayMs[2]},          {"gangDelayMs3", &gn.delayMs[3]},
+      {"gangLagScale", &gn.lagScale},
       {"gangScatterMs", &gn.scatterMs},          {"gangDriftCents", &gn.driftCents},
       {"gangHpHz", &gn.hpHz},                    {"gangMaxLagMs", &gn.maxLagMs},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
@@ -368,8 +369,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
     } else if (std::strcmp(a, "--gang") == 0) {
       rp.gangOn = true;
-    } else if (std::strcmp(a, "--distance") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.gang.distance) || rp.gang.distance < 0.0f || rp.gang.distance > 1.0f)
+    } else if (std::strcmp(a, "--width") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.gang.width) || rp.gang.width < 0.0f || rp.gang.width > 1.0f)
         return false;
     } else if (std::strcmp(a, "--voices") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.gang.voices) || rp.gang.voices < 0.0f || rp.gang.voices > 1.0f)

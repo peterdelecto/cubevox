@@ -367,7 +367,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Choices: Input gate on; Gate %s; Autotune %s; Octave %s; Gang %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Gang DISTANCE "
+      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Gang WIDTH "
       "%.0f %%, VOICES %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback MIX %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
       "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
@@ -381,7 +381,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(at.responseMs),
       static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
       static_cast<double>(o.mix * 100.0f),
-      static_cast<double>(p.gang.distance * 100.0f), static_cast<double>(p.gang.voices * 100.0f),
+      static_cast<double>(p.gang.width * 100.0f), static_cast<double>(p.gang.voices * 100.0f),
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.mix * 100.0f),
@@ -437,11 +437,11 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const cv::GangTuning& dt = params.gang.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nGangTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
-                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
+                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, %.0ff, "
                 "%.1ff, %.1ff, %.1ff}",
                 dt.pitchSt[0], dt.pitchSt[1], dt.pitchSt[2], dt.pitchSt[3], dt.formantSt[0], dt.formantSt[1],
                 dt.formantSt[2], dt.formantSt[3], dt.tiltDb[0], dt.tiltDb[1], dt.tiltDb[2], dt.tiltDb[3],
-                dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.tiltHz, dt.voiceDb, dt.trimDb,
+                dt.delayMs[0], dt.delayMs[1], dt.delayMs[2], dt.delayMs[3], dt.lagScale, dt.tiltHz, dt.voiceDb, dt.trimDb,
                 dt.leadFadeFrom, dt.holdFrom, dt.hpHz, dt.maxLagMs, dt.gapFloorDb, dt.scatterMs, dt.driftCents,
                 dt.driftHoldS);
   used = std::strlen(gTuningText);
@@ -481,7 +481,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
-      "// GangTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, tiltHz, voiceDb, "
+      "// GangTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {tiltDb[0..3]}, {delayMs[0..3]}, lagScale, tiltHz, voiceDb, "
       "trimDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS\n%s\n",
       gTuningText);
   std::fflush(stdout);
@@ -590,6 +590,7 @@ void drawGangVoiceNodes(cv::GangTuning& t) {
   }
   if (tuningNode("Delay")) {
     voiceSliders("Delay", t.delayMs, 5.0f, 200.0f, "%.0f ms");
+    ImGui::SliderFloat("Lag scale", &t.lagScale, 0.5f, 2.0f, "%.2f x");
     ImGui::TreePop();
   }
   if (tuningNode("Tone")) {
@@ -971,7 +972,7 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("octave.semitones", &o.semitones);
   add("octave.mix", &o.mix);
   add("gang.on", &p.gang.on);
-  add("gang.distance", &p.gang.distance);
+  add("gang.width", &p.gang.width);
   add("gang.voices", &p.gang.voices);
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
@@ -1355,7 +1356,7 @@ void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float g
 void drawGangBlock(cv::GangParams& d) {
   ImGui::PushID("gang");
   ImGui::Checkbox("GANG", &d.on);
-  percentSlider("DISTANCE", d.distance);
+  percentSlider("WIDTH", d.width);
   percentSlider("VOICES", d.voices);
   drawGangTuning(d);
   ImGui::PopID();
