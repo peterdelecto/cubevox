@@ -110,9 +110,36 @@ CV_INLINE float tanhFast(float x) {
   return p / q;
 }
 
+// sin and cos of x radians for |x| <= 16 pi, to float rounding, with no libm.
+// x folds onto r within pi / 4 of q quarter turns, with pi / 2 in three parts
+// so the fold itself rounds nothing (Cody and Waite). The Taylor series through
+// r^9 and r^10 finish it; the first dropped terms are under 3e-9. Under 0.14 rad
+// q is 0, r is x, and only the series runs.
+CV_INLINE void sinCosFast(float x, float& s, float& c) {
+  constexpr float kTwoOverPi = 0.636619772f;
+  constexpr float kQuarterA = 1.5703125f;
+  constexpr float kQuarterB = 4.837512969970703125e-4f;
+  constexpr float kQuarterC = 7.549789948768648e-8f;
+  const int q = static_cast<int>(x * kTwoOverPi + (x < 0.0f ? -0.5f : 0.5f));
+  const float qf = static_cast<float>(q);
+  const float r = ((x - qf * kQuarterA) - qf * kQuarterB) - qf * kQuarterC;
+  const float r2 = r * r;
+  constexpr float s3 = -1.0f / 6.0f, s5 = 1.0f / 120.0f, s7 = -1.0f / 5040.0f, s9 = 1.0f / 362880.0f;
+  constexpr float c4 = 1.0f / 24.0f, c6 = -1.0f / 720.0f, c8 = 1.0f / 40320.0f, c10 = -1.0f / 3628800.0f;
+  const float sr = r + r * r2 * (s3 + r2 * (s5 + r2 * (s7 + r2 * s9)));
+  const float cr = 1.0f + r2 * (-0.5f + r2 * (c4 + r2 * (c6 + r2 * (c8 + r2 * c10))));
+  switch (q & 3) {
+    case 0: s = sr; c = cr; break;
+    case 1: s = cr; c = -sr; break;
+    case 2: s = -sr; c = -cr; break;
+    default: s = -cr; c = sr; break;
+  }
+}
+
 // Hann window by rotation: one complex multiply per sample in place of a
-// cosine. init() costs two sines and two cosines; drift over a grain is
-// about n * 1e-7, so callers re-init at each grain or each block.
+// cosine. init() runs sinCosFast twice and no libm, so it can sit in a grain
+// launch. Drift over a grain is about n * 1e-7, so callers re-init at each
+// grain or each block.
 struct HannRotor {
   float c = 1.0f;
   float s = 0.0f;
@@ -120,10 +147,8 @@ struct HannRotor {
   float ds = 0.0f;
 
   void init(float phase, float step) {
-    c = cosf(phase);
-    s = sinf(phase);
-    dc = cosf(step);
-    ds = sinf(step);
+    sinCosFast(phase, s, c);
+    sinCosFast(step, ds, dc);
   }
 
   // 0.5 * (1 - cos(phase)) at the current phase.

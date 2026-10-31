@@ -1,17 +1,19 @@
 // Crowd card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
 // of different colour, the WIDTH law, the level law across VOICES, the lead leaving, the voice
 // count and fade order, the solo, the lag following its scale across a gap and holding inside a
-// burst, timing scatter, pitch drift, the tracker running without Autotune, the three enhancements
-// (every control at its default is the pinned engine bit for bit, level scatter, contour, the
-// shadow ring, the pulse marks and the pulse cut on a glottal pulse train and the human-voice ranges),
-// the bottom tenth of WIDTH staying in tune (pitch, drift and contour), and a host timing against Unison. Every run feeds a PitchFx
-// through its pass-through path first, so the ring is written and the tracker runs, as the chain
-// does. No window, no audio device.
+// burst, timing scatter, pitch drift, the tracker running without Autotune, the two enhancements
+// (every control at its default is the pinned engine bit for bit, level scatter, contour and the
+// human-voice ranges), the bottom tenth of WIDTH staying in tune (pitch, drift and contour), the
+// shared tone shelf, and a host timing against Unison. Every run feeds a PitchFx through its
+// pass-through path first, so the ring is written and the tracker runs, as the chain does. No
+// window, no audio device.
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -247,13 +249,12 @@ Signal run(const Signal& in, const cv::CrowdParams& p, Probe* probe = nullptr) {
 }
 
 // The shipped defaults are the owner's working set (contour, level scatter, timing scatter and drift
-// on, epoch align off). A test starts from this neutral tuning and turns on only what it measures.
+// on). A test starts from this neutral tuning and turns on only what it measures.
 void neutralize(cv::CrowdTuning& t) {
   t.scatterMs = 0.0f;
   t.driftCents = 0.0f;
   t.levelScatterDb = 0.0f;
   t.contour = {1.0f, 1.0f, 1.0f, 1.0f};
-  t.epochAlign = false;
 }
 
 cv::CrowdParams knobs(float voices, float width) {
@@ -948,8 +949,8 @@ bool testCorrectionReleases() {
                 beforeErr, worstAfter);
 }
 
-// Enhancements: level scatter, contour and epoch alignment. Each is neutral at 0 (contour 1, epoch
-// align off), and each stays inside the range of a human voice.
+// Enhancements: level scatter and contour. Each is neutral at 0 (contour 1), and each stays inside
+// the range of a human voice.
 
 // FNV-1a over the bits of the samples, to compare runs.
 uint64_t fnv(const Signal& x) {
@@ -969,7 +970,6 @@ uint64_t fnv(const Signal& x) {
 void allEnhancements(cv::CrowdTuning& t) {
   t.levelScatterDb = 4.0f;
   t.contour = {0.8f, 0.8f, 0.8f, 0.8f};
-  t.epochAlign = true;
 }
 
 size_t differing(const Signal& a, const Signal& b) {
@@ -978,24 +978,40 @@ size_t differing(const Signal& a, const Signal& b) {
   return n;
 }
 
-// What the three runs of testEnhancementsDefaultExact hash to on the default tuning as of v2.00.74
-// (Mac build, epoch align off, WIDTH pitch top 2/3), with voice 3 at -2.5 st. The runs start from
-// knobs(), which neutralizes the human-voice set, so the shipped epoch align default does not enter
-// them. The default tuning must reproduce them to the bit. Update them only when the sound of a
-// default copy changes on purpose.
-constexpr uint64_t kDefaultProgram = 0x94026732e260ad75ULL;
-constexpr uint64_t kDefaultBurst = 0x232a52dcbafd3aa6ULL;
-constexpr uint64_t kDefaultBurstScatter = 0xcfd096e135f9fa29ULL;
+// What the four runs of testEnhancementsDefaultExact hash to as of v2.00.75 (Mac build), pinned by
+// the Crowd CPU pass (owner 2026-10-31): the window read from a table, the DC blocker gone, one
+// shared tone shelf, the coarse tracker lag while Autotune is off and the 190.75 ms ring. Runs 1 to
+// 3 start from knobs(), which neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{}
+// unchanged. The engine must reproduce them to the bit. Update them only when the sound of a copy
+// changes on purpose.
+constexpr std::array<uint64_t, 4> kPinned = {0x25bfb34508e55900ULL, 0x6b852818940380afULL, 0x07fd3a4d0fd45cc4ULL,
+                                             0x79a8da74a123efc8ULL};
+
+// Each run's hash against its pinned value.
+bool checkPinned(const std::array<uint64_t, 4>& hashes) {
+  const char* what[4] = {"180 Hz program VOICES 70 WIDTH 50", "burst program VOICES 80 WIDTH 50",
+                         "burst program VOICES 60 WIDTH 80 scatter 15 drift 20",
+                         "180 Hz program VOICES 70 WIDTH 50 on the shipped tuning"};
+  bool ok = true;
+  for (size_t i = 0; i < hashes.size(); ++i) {
+    char name[40];
+    std::snprintf(name, sizeof name, "default hash, run %zu", i + 1);
+    const bool same = hashes[i] == kPinned[i];
+    std::printf("info hash run %zu, %s: pinned v2.00.75 %016llx, engine %016llx\n", i + 1, what[i],
+                static_cast<unsigned long long>(kPinned[i]), static_cast<unsigned long long>(hashes[i]));
+    ok &= report(name, same, "output hash equals the pinned v2.00.75 value: %.0f (1)", same ? 1.0 : 0.0);
+  }
+  return ok;
+}
 
 // With every enhancement neutral the engine runs the code it ran without them, and a setting that
-// only matters while its control is on moves no sample. The three recorded runs hash to the values
+// only matters while its control is on moves no sample. The four recorded runs hash to the values
 // pinned above.
 bool testEnhancementsDefaultExact() {
   const Signal prog = program(3);
   const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
   const cv::CrowdParams base = knobs(0.7f, 0.5f);
   cv::CrowdParams idle = base;
-  idle.tuning.epochSearch = 0.1f;     // matters only while epochAlign is on
   idle.tuning.levelScatterDb = -1.0f; // clamps to 0
   idle.tuning.contour = {1.0f, 1.0f, 1.0f, 1.0f};
   const Signal a = run(prog, base);
@@ -1011,24 +1027,12 @@ bool testEnhancementsDefaultExact() {
   const Signal d = run(burst, burstIdle);
   const size_t diffProg = differing(a, b);
   const size_t diffBurst = differing(c, d);
-  const uint64_t hashes[3] = {fnv(a), fnv(run(burst, knobs(0.8f, 0.5f))), fnv(c)};
-  const uint64_t pinned[3] = {kDefaultProgram, kDefaultBurst, kDefaultBurstScatter};
-  std::printf("info hash 180 Hz program VOICES 70 WIDTH 50 %016llx\n", static_cast<unsigned long long>(hashes[0]));
-  std::printf("info hash burst program VOICES 80 WIDTH 50 %016llx\n", static_cast<unsigned long long>(hashes[1]));
-  std::printf("info hash burst program VOICES 60 WIDTH 80 scatter 15 drift 20 %016llx\n",
-               static_cast<unsigned long long>(hashes[2]));
-  bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
-                   "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
-                   static_cast<double>(diffProg), static_cast<double>(diffBurst));
-  for (int i = 0; i < 3; ++i) {
-    char name[40];
-    std::snprintf(name, sizeof name, "default hash, run %d", i + 1);
-    const bool same = hashes[i] == pinned[i];
-    std::printf("info hash run %d: pinned v2.00.74 %016llx, default tuning %016llx\n", i + 1,
-                static_cast<unsigned long long>(pinned[i]), static_cast<unsigned long long>(hashes[i]));
-    ok &= report(name, same, "output hash equals the pinned v2.00.74 value: %.0f (1)", same ? 1.0 : 0.0);
-  }
-  return ok;
+  cv::CrowdParams shipped = base;
+  shipped.tuning = cv::CrowdTuning{};
+  const bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
+                         "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
+                         static_cast<double>(diffProg), static_cast<double>(diffBurst));
+  return checkPinned({fnv(a), fnv(run(burst, knobs(0.8f, 0.5f))), fnv(c), fnv(run(prog, shipped))}) && ok;
 }
 
 // The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
@@ -1036,7 +1040,7 @@ bool testEnhancementsDefaultExact() {
 bool testWorkingSetDefaults() {
   const cv::CrowdTuning d;
   const bool values = d.contour[0] == 0.8f && d.contour[1] == 1.2f && d.contour[2] == 0.7f && d.contour[3] == 1.1f &&
-                      d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && !d.epochAlign &&
+                      d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f &&
                       d.widthKnee == 0.1f && d.widthKneeFrac == 0.012f && d.widthLagBottom == 0.5f &&
                       d.widthLagMs == 20.0f;
   bool ok = report("working set values", values,
@@ -1188,8 +1192,8 @@ bool testContour() {
   return ok;
 }
 
-// Copy v alone with the shipped human-voice set (timing scatter, drift, level scatter, contour and
-// the shipped epoch align, which is off), at WIDTH `width`.
+// Copy v alone with the shipped human-voice set (timing scatter, drift, level scatter and contour),
+// at WIDTH `width`.
 cv::CrowdParams humanCopy(size_t v, float width) {
   const cv::CrowdTuning d;
   cv::CrowdParams p = alone(v);
@@ -1198,7 +1202,6 @@ cv::CrowdParams humanCopy(size_t v, float width) {
   p.tuning.driftCents = d.driftCents;
   p.tuning.levelScatterDb = d.levelScatterDb;
   p.tuning.contour[0] = d.contour[v];
-  p.tuning.epochAlign = d.epochAlign;
   return p;
 }
 
@@ -1372,15 +1375,14 @@ bool testWidthLag() {
 }
 
 // At WIDTH 0 a copy is the input delayed by its lag and nothing else. Each copy alone at the top of
-// VOICES, on the shipped set (offsets, drift, contour, level scatter and timing scatter on) with epoch
-// align switched on, has every sample of a steady tone equal to the gain-scaled input at the lag the
-// copy took. The tone shelf is flat and the trim is off, and the reference goes through the same low
-// cut and DC blocker, since those are filters on the copy and not the slicing. A copy whose ratio and
-// rate are both exactly 1 skips the epoch snap, so epoch align does not move its grains. The lag
-// comes from a search over the input read by linear interpolation as the engine reads its ring, within
-// half a period of the lag the engine reports (timing scatter makes it fractional), and the gain by
-// least squares (level scatter draws one per copy). A copy at WIDTH 0.1 is the control: 3.0 cents of
-// pitch offset moves it off the delayed input by far more.
+// VOICES, on the shipped set (offsets, drift, contour, level scatter and timing scatter on), has every
+// sample of a steady tone equal to the gain-scaled input at the lag the copy took. The tone shelf is
+// flat and the trim is off, and the reference goes through the same low cut, since that is a filter
+// on the copy and not the slicing. The lag comes from a search over the input read by linear
+// interpolation as the engine reads its ring, within half a period of the lag the engine reports
+// (timing scatter makes it fractional), and the gain by least squares (level scatter draws one per
+// copy). A copy at WIDTH 0.1 is the control: 3.0 cents of pitch offset moves it off the delayed input
+// by far more.
 struct Shift {
   double lag = 0.0;   // samples
   double gain = 0.0;
@@ -1446,23 +1448,19 @@ Shift fitShift(const Signal& in, const Signal& out, int from, int to, double nea
 cv::CrowdParams delayedCopy(size_t v, float width) {
   cv::CrowdParams p = knobs(1.0f, width);
   p.tuning = cv::CrowdTuning{};
-  p.tuning.epochAlign = true;
   p.tuning.tiltDb = {0.0f, 0.0f, 0.0f, 0.0f};
   p.tuning.trimDb = 0.0f;
   p.solo = static_cast<uint8_t>(1u << v);
   return p;
 }
 
-// The input through the filters the copy's output passes (a flat tone shelf, the low cut and the wet DC
-// blocker), so the engine's output compares with this signal delayed.
+// The input through the filter the copy's output passes, the low cut, so the engine's output compares
+// with this signal delayed. A flat tone shelf takes weights of exactly 0 and adds nothing.
 Signal throughOutputFilters(const Signal& in, const cv::CrowdTuning& t) {
-  cv::Biquad shelf;
-  shelf.setHighShelf(t.tiltHz, 0.0f);
   cv::Biquad cut;
   cut.setHighPass(t.hpHz, cv::kButterworthQ);
-  cv::DcBlocker dc;
   Signal out(in.size());
-  for (size_t i = 0; i < in.size(); ++i) out[i] = dc.run(cut.run(shelf.run(in[i])));
+  for (size_t i = 0; i < in.size(); ++i) out[i] = cut.run(in[i]);
   return out;
 }
 
@@ -1501,249 +1499,40 @@ bool testWidthZeroIsDelay() {
   return ok;
 }
 
-// A glottal pulse train: the derivative of a Rosenberg flow pulse at each period, through two formant
-// resonators. jitter is the relative standard deviation of the period.
-Signal pulseTrain(double f0, double jitter, int n, std::vector<double>* closures = nullptr) {
-  const double period = kRate / f0;
-  const double tp = 0.45 * period;
-  const double tn = 0.12 * period;
-  std::vector<double> x(static_cast<size_t>(n), 0.0);
-  uint64_t s = 0x2545F4914F6CDD1DULL;
-  for (double t0 = 0.0; t0 < n;) {
-    if (closures) closures->push_back(t0 + tp + 0.5 * tn);
-    for (int i = std::max(0, static_cast<int>(std::ceil(t0))); i < n && i < t0 + tp + tn; ++i) {
-      const double u = i - t0;
-      x[static_cast<size_t>(i)] += u < tp ? kPi / (2.0 * tp) * std::sin(kPi * u / tp)
-                                          : -kPi / (2.0 * tn) * std::sin(kPi * (u - tp) / (2.0 * tn));
-    }
-    s = s * 6364136223846793005ULL + 1442695040888963407ULL;
-    const double r = static_cast<double>(s >> 11) / 4503599627370496.0 - 1.0;
-    t0 += period * (1.0 + jitter * std::sqrt(3.0) * r);
-  }
-  const double formants[2][2] = {{700.0, 90.0}, {1200.0, 110.0}};
-  for (const auto& f : formants) {
-    const double r = std::exp(-kPi * f[1] / kRate);
-    const double a1 = 2.0 * r * std::cos(2.0 * kPi * f[0] / kRate);
-    const double a2 = -r * r;
-    double y1 = 0.0;
-    double y2 = 0.0;
-    for (double& v : x) {
-      const double y = (1.0 - r) * v + a1 * y1 + a2 * y2;
-      y2 = y1;
-      y1 = y;
-      v = y;
-    }
-  }
-  double peak = 0.0;
-  for (double v : x) peak = std::max(peak, std::fabs(v));
-  Signal out(x.size());
-  for (size_t i = 0; i < x.size(); ++i) out[i] = static_cast<float>(0.4 * x[i] / peak);
-  return out;
+// (b0 + b1 z^-1 + b2 z^-2) / (1 + a1 z^-1 + a2 z^-2) at hz, in double.
+std::complex<double> biquadAt(double b0, double b1, double b2, double a1, double a2, double hz) {
+  const std::complex<double> z = std::polar(1.0, -2.0 * kPi * hz / kRate);
+  return (b0 + z * (b1 + z * b2)) / (1.0 + z * (a1 + z * a2));
 }
 
-// Harmonic to interharmonic energy over harmonics 2..10 of f0, in dB, on x[from, to) under a Hann
-// window. Each band is +-0.1 f0 wide on a 1 Hz grid, harmonic bands centred on h f0 and interharmonic
-// ones on (h + 0.5) f0, and the ratio is of the mean power per grid point.
-double harmonicRatioDb(const Signal& x, double f0, int from, int to) {
-  const int n = to - from;
-  Signal w(static_cast<size_t>(n));
-  for (int i = 0; i < n; ++i)
-    w[static_cast<size_t>(i)] = static_cast<float>(x[static_cast<size_t>(from + i)] * (0.5 - 0.5 * std::cos(2.0 * kPi * i / n)));
-  double harmonic = 0.0;
-  double between = 0.0;
-  for (int h = 2; h <= 10; ++h) {
-    for (double df = -0.1 * f0; df <= 0.1 * f0; df += 1.0) {
-      const double a = goertzel(w.data(), n, h * f0 + df);
-      const double b = goertzel(w.data(), n, (h + 0.5) * f0 + df);
-      harmonic += a * a;
-      between += b * b;
-    }
-  }
-  return 10.0 * std::log10(harmonic / between);
-}
-
-// One copy of the pulse train: copy 1 alone with the given pitch and formant, grid or pulse cut. The
-// pitch is the offset heard at WIDTH 1, so the tuning asks for it divided by the pitch top.
-Signal epochCopy(const Signal& in, float pitchSt, float formantSt, bool epoch, float search = 0.25f, float width = 1.0f) {
-  cv::CrowdParams p = lagProbe(0, cv::CrowdTuning{}.lagScale, width);
-  p.tuning.pitchSt[0] = static_cast<float>(static_cast<double>(pitchSt) / kPitchTop);
-  p.tuning.formantSt[0] = formantSt;
-  p.tuning.epochAlign = epoch;
-  p.tuning.epochSearch = search;
-  return run(in, p);
-}
-
-// On a jittery 150 Hz glottal pulse train, a copy with its throat 2 st short sounds cleaner cut on
-// the pulses than on the period grid. And a copy at the pitch and throat of a lower, longer-throated
-// person (-3 st, -1.5 st) keeps the input's harmonic-to-interharmonic ratio to within 3 dB.
-bool testEpochAlign() {
-  constexpr double kJitter = 0.004;
-  const Signal in = pulseTrain(150.0, kJitter, 5 * kRate);
-  const int from = kRate;
-  const int to = 4 * kRate;
-  const double inDb = harmonicRatioDb(in, 150.0, from, to);
-
-  const Signal grid = epochCopy(in, 0.0f, 2.0f, false);
-  const Signal pulse = epochCopy(in, 0.0f, 2.0f, true);
-  const double gridDb = harmonicRatioDb(grid, 150.0, from, to);
-  const double pulseDb = harmonicRatioDb(pulse, 150.0, from, to);
-  bool ok = report("epoch align cleaner", pulseDb - gridDb >= 2.0,
-                   "formant +2 st: harmonic to interharmonic %.1f dB cut on the grid, %.1f dB cut on the pulses, better by "
-                   "%.1f dB (>= 2)",
-                   gridDb, pulseDb, pulseDb - gridDb);
-
-  // A copy whose pitch ratio and grain rate are both exactly 1 stays on the grid. At WIDTH 0 the
-  // offsets scale to 0, so the pulse cut moves no sample. At WIDTH 0.1 the rate is 1.0014, the copy
-  // snaps again, and the pulse cut is cleaner than the grid by the same margin as at WIDTH 1.
-  const Signal flatGrid = epochCopy(in, 0.0f, 2.0f, false, 0.25f, 0.0f);
-  const Signal flatPulse = epochCopy(in, 0.0f, 2.0f, true, 0.25f, 0.0f);
-  const Signal kneeGrid = epochCopy(in, 0.0f, 2.0f, false, 0.25f, 0.1f);
-  const Signal kneePulse = epochCopy(in, 0.0f, 2.0f, true, 0.25f, 0.1f);
-  const double kneeGridDb = harmonicRatioDb(kneeGrid, 150.0, from, to);
-  const double kneePulseDb = harmonicRatioDb(kneePulse, 150.0, from, to);
-  ok &= report("epoch align at WIDTH 0", differing(flatGrid, flatPulse) == 0,
-               "WIDTH 0 with formant +2 st: the pulse cut differs from the grid cut in %.0f samples (0)",
-               static_cast<double>(differing(flatGrid, flatPulse)));
-  ok &= report("epoch align at WIDTH 0.1", differing(kneeGrid, kneePulse) > 0 && kneePulseDb - kneeGridDb >= 2.0,
-               "formant +2 st: pulse cut differs in %.0f samples (> 0); %.1f dB on the grid, %.1f dB on the pulses, better by %.1f "
-               "dB (>= 2)",
-               static_cast<double>(differing(kneeGrid, kneePulse)), kneeGridDb, kneePulseDb, kneePulseDb - kneeGridDb);
-
-  const double lowHz = 150.0 * std::pow(2.0, -3.0 / 12.0);
-  const Signal low = epochCopy(in, -3.0f, -1.5f, true);
-  const Signal lowGrid = epochCopy(in, -3.0f, -1.5f, false);
-  const double lowDb = harmonicRatioDb(low, lowHz, from, to);
-  const double lowGridDb = harmonicRatioDb(lowGrid, lowHz, from, to);
-  ok &= report("epoch align keeps the voice", inDb - lowDb <= 3.0,
-               "input %.1f dB; copy at -3 st, formant -1.5 st %.1f dB cut on the pulses (%.1f dB on the grid), %.1f dB under the "
-               "input (<= 3)",
-               inDb, lowDb, lowGridDb, inDb - lowDb);
-
-  // The search stops at 0.3 of a period either side, and the grid copy does not read the search.
-  ok &= report("epoch search range",
-               differing(epochCopy(in, 0.0f, 2.0f, true, 0.9f), epochCopy(in, 0.0f, 2.0f, true, 0.3f)) == 0 &&
-                   differing(epochCopy(in, 0.0f, 2.0f, false, 0.1f), grid) == 0,
-               "0.9 against 0.3 differs in %.0f samples (0); a grid cut with another search differs in %.0f (0)",
-               static_cast<double>(differing(epochCopy(in, 0.0f, 2.0f, true, 0.9f), epochCopy(in, 0.0f, 2.0f, true, 0.3f))),
-               static_cast<double>(differing(epochCopy(in, 0.0f, 2.0f, false, 0.1f), grid)));
-  return ok;
-}
-
-// The shadow ring is the input ring through a one-pole at 800 Hz, written at the same index, and
-// the input ring itself is untouched.
-bool testShadowRing() {
-  const Signal in = program(1);
-  gFx.reset();
-  float scratch[cv::kBlock];
-  for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock)
-    gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, passThrough());
-  const double a = 1.0 - std::exp(-2.0 * kPi * cv::PitchFx::kShadowHz / kRate);
-  double y = 0.0;
-  double worst = 0.0;
-  size_t ringDiffers = 0;
-  const int total = static_cast<int>(in.size()) / cv::kBlock * cv::kBlock;
-  for (int i = 0; i < total; ++i) {
-    y += a * (static_cast<double>(in[static_cast<size_t>(i)]) - y);
-    if (i < total - cv::kVoiceRingLen + 100) continue;
-    const size_t at = static_cast<size_t>(i % cv::kVoiceRingLen);
-    worst = std::max(worst, std::fabs(static_cast<double>(gFx.shadow()[at]) - y));
-    ringDiffers += gFx.ring()[at] != in[static_cast<size_t>(i)] ? 1 : 0;
-  }
-  return report("shadow ring", worst <= 1e-5 && ringDiffers == 0,
-                "shadow against a one-pole at 800 Hz: worst error %.3g (<= 1e-5), input ring differs in %.0f samples (0)",
-                worst, static_cast<double>(ringDiffers));
-}
-
-// The track puts a mark on every glottal closure of a jittery 150 Hz pulse train, to within a
-// sample of where the jittery pulse really falls.
-bool testEpochMarks() {
-  std::vector<double> closures;
-  const Signal in = pulseTrain(150.0, 0.004, 3 * kRate, &closures);
-  gFx.reset();
-  cv::crowd_detail::EpochTrack track;
-  float scratch[cv::kBlock];
-  for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
-    gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, passThrough());
-    track.advance(gFx.shadow(), gFx.head(), cv::kBlock, gFx.pitch().period, 0.25f);
-  }
-  const uint32_t now = track.clock() - 1;
-  std::vector<double> marks;
-  float last = -1.0f;
-  for (float centre = 1000.0f; centre < 10000.0f; centre += 1.0f) {
-    const float d = track.snap(now, centre, 320.0f);
-    if (d != last && d != centre) marks.push_back(static_cast<double>(now) - static_cast<double>(d));
-    last = d;
-  }
-  double sum = 0.0;
-  double sum2 = 0.0;
-  for (double m : marks) {
-    double best = 1e9;
-    double off = 0.0;
-    for (double c : closures) {
-      if (std::fabs(m - c) < best) {
-        best = std::fabs(m - c);
-        off = m - c;
-      }
-    }
-    sum += off;
-    sum2 += off * off;
-  }
-  const double n = static_cast<double>(marks.size());
-  const double mean = n > 0.0 ? sum / n : 0.0;
-  const double sd = n > 0.0 ? std::sqrt(std::max(0.0, sum2 / n - mean * mean)) : 99.0;
-  return report("epoch marks", n >= 25.0 && sd <= 1.0,
-                "%.0f marks sit %.2f samples after a closure on average, spread %.2f samples (<= 1; the pulses themselves jitter 1.3)",
-                n, mean, sd);
-}
-
-// The pulses decide where a grain is cut and the grid decides when it is laid down, so each copy keeps
-// its pitch cut on the pulses: the f0 of every default copy on a steady tone, and the swing of a copy
-// on a gliding tone.
-bool testEpochPitch() {
-  const Signal steady = tone(220.0, 2 * kRate);
-  bool ok = true;
-  double worst = 0.0;
-  for (size_t v = 0; v < 4; ++v) {
-    cv::CrowdParams p = alone(v);
-    p.tuning.epochAlign = true;
-    const double want = 220.0 * std::pow(2.0, static_cast<double>(p.tuning.pitchSt[0]) * kPitchTop / 12.0);
-    const double hz = medianHz(run(steady, p));
-    worst = std::max(worst, hz > 0.0 ? std::fabs(cents(hz, want)) : 9999.0);
-  }
-  ok &= report("epoch pitch steady", worst <= 10.0, "worst f0 error of the four copies cut on the pulses %.2f cents (<= 10)",
-               worst);
-
-  const Signal glide = sweepTone(220.0, 1.0, 1.0, 7 * kRate);
-  cv::CrowdParams p = lagProbe(0, cv::CrowdTuning{}.lagScale);
-  p.tuning.formantSt[0] = 0.3f;  // a copy with ratio and rate both 1 stays on the grid
-  p.tuning.epochAlign = true;
-  const double inSt = sweepDepthSt(glide, 1.0, 2.0, 3);
-  const double outSt = sweepDepthSt(run(glide, p), 1.0, 2.0, 3);
-  ok &= report("epoch pitch glide", std::fabs(outSt / inSt - 1.0) <= 0.1,
-               "input swing %.3f st, copy swing cut on the pulses %.3f st (within 10 %%)", inSt, outSt);
-  return ok;
-}
-
-// Cut on the pulses, a copy sits on the nearest pulse to its grid mark, so its lag moves by at most
-// half a period from the lag it has on the grid. Copy 4 on 220 Hz bursts (a 4.5 ms period).
-bool testEpochLag() {
-  const Train tr{300, 300, 120, 6};
-  const Signal in = bursts(220.0, tr);
+// The four copies share one shelf filter. At the default tuning each copy's 1 + wh HP + wb BP stays
+// within 0.15 dB and 1 degree of the RBJ high shelf it stands in for, from 20 Hz to 20 kHz, and a
+// 0 dB shelf takes weights of exactly 0.
+bool testSharedShelf() {
+  namespace cd = cv::crowd_detail;
   const cv::CrowdTuning d;
-  const size_t v = 3;
-  const double lagMs = lagMsAt(v, 1.0, static_cast<double>(d.lagScale));
-  cv::CrowdParams p = lagProbe(v, d.lagScale);
-  p.tuning.formantSt[v] = 0.3f;  // a copy with ratio and rate both 1 stays on the grid
-  p.tuning.epochAlign = true;
-  const Signal out = run(in, p);
-  double worst = 0.0;
-  for (int k = 1; k < tr.count; ++k) {
-    const int from = tr.start(k) + msToSamples(lagMs + 30.0);
-    worst = std::max(worst, std::fabs(measuredLagMs(in, out, from, lagMs) - lagMs));
+  const cd::ShelfBasis b = cd::shelfBasis(d.tiltHz);
+  double worstDb = 0.0;
+  double worstDeg = 0.0;
+  for (size_t v = 0; v < 4; ++v) {
+    const cd::ShelfWeights w = cd::fitShelf(b, d.tiltHz, d.tiltDb[v]);
+    cv::Biquad ref;
+    ref.setHighShelf(d.tiltHz, d.tiltDb[v]);
+    for (double hz = 20.0; hz <= 20000.0; hz *= 1.005) {
+      const std::complex<double> high = biquadAt(b.h0, b.h1, b.h0, b.a1, b.a2, hz);
+      const std::complex<double> band = biquadAt(b.q0, 0.0, -b.q0, b.a1, b.a2, hz);
+      const std::complex<double> shared = 1.0 + static_cast<double>(w.high) * high + static_cast<double>(w.band) * band;
+      const std::complex<double> ratio = shared / biquadAt(ref.b0, ref.b1, ref.b2, ref.a1, ref.a2, hz);
+      worstDb = std::max(worstDb, std::fabs(20.0 * std::log10(std::abs(ratio))));
+      worstDeg = std::max(worstDeg, std::fabs(std::arg(ratio)) * 180.0 / kPi);
+    }
   }
-  const double halfPeriodMs = 500.0 / 220.0;
-  return report("epoch lag", worst <= halfPeriodMs + 0.5, "worst lag error cut on the pulses %.2f ms (<= half a period + 0.5 = %.2f)",
-                worst, halfPeriodMs + 0.5);
+  const cd::ShelfWeights flat = cd::fitShelf(b, d.tiltHz, 0.0f);
+  const bool zero = flat.high == 0.0f && flat.band == 0.0f;
+  return report("shared shelf", worstDb <= 0.15 && worstDeg <= 1.0 && zero,
+                "four default shelves: worst %.3f dB (<= 0.15) and %.3f deg (<= 1) from 20 Hz to 20 kHz; 0 dB weights "
+                "exactly 0: %.0f (1)",
+                worstDb, worstDeg, zero ? 1.0 : 0.0);
 }
 
 // Every enhancement at its limit on the program and on the burst program: finite, bounded, and within
@@ -1859,11 +1648,7 @@ int main() {
   ok &= testWidthGlides();
   ok &= testWidthLag();
   ok &= testWidthZeroIsDelay();
-  ok &= testShadowRing();
-  ok &= testEpochMarks();
-  ok &= testEpochAlign();
-  ok &= testEpochPitch();
-  ok &= testEpochLag();
+  ok &= testSharedShelf();
   ok &= testEnhancementsStable();
   printTiming();
   std::printf("%s crowd\n", ok ? "PASS" : "FAIL");

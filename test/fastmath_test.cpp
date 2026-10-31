@@ -1,6 +1,6 @@
 // Error bounds for engine/fastmath.h against the double libm: exp2Fast, the dB
-// conversions, sinTurns, tanhFast, and the Hann rotor over the longest grain
-// either voice runs.
+// conversions, sinCosFast, sinTurns, tanhFast, and the Hann rotor over the
+// longest grain either voice runs.
 
 #include <cmath>
 #include <cstdio>
@@ -69,7 +69,37 @@ bool testRotorBlock() {
   return report("rotor block", worst <= 1e-5, "worst window error over 64 samples=%.3g (<= 1e-5)", worst);
 }
 
-// 4. sinTurns against the double sine over the full phase range.
+// 4. sinCosFast, which seeds the rotor, against the double sine and cosine. Under 0.14 rad (a
+// grain's start and step angle) the error is relative and within float rounding of the true value;
+// over the full turn either way (an Octave rotor's restart phase) it is absolute.
+bool testSinCosFast() {
+  double worstSmall = 0.0;
+  for (int k = -140000; k <= 140000; ++k) {
+    const float x = static_cast<float>(k * 1e-6);
+    float s = 0.0f;
+    float c = 0.0f;
+    cv::sinCosFast(x, s, c);
+    const double xd = static_cast<double>(x);
+    const double sinErr = std::fabs(static_cast<double>(s) - std::sin(xd));
+    if (k != 0) worstSmall = std::fmax(worstSmall, sinErr / std::fabs(std::sin(xd)));
+    worstSmall = std::fmax(worstSmall, std::fabs(static_cast<double>(c) - std::cos(xd)) / std::cos(xd));
+  }
+  double worstTurn = 0.0;
+  for (int k = -200000; k <= 200000; ++k) {
+    const float x = static_cast<float>(2.0 * kPi * k / 200000.0);
+    float s = 0.0f;
+    float c = 0.0f;
+    cv::sinCosFast(x, s, c);
+    const double xd = static_cast<double>(x);
+    worstTurn = std::fmax(worstTurn, std::fabs(static_cast<double>(s) - std::sin(xd)));
+    worstTurn = std::fmax(worstTurn, std::fabs(static_cast<double>(c) - std::cos(xd)));
+  }
+  return report("sinCosFast", worstSmall <= 1.2e-7 && worstTurn <= 1.2e-7,
+                "worst relative error under 0.14 rad=%.3g (<= 1.2e-7), absolute over +-2 pi=%.3g (<= 1.2e-7)", worstSmall,
+                worstTurn);
+}
+
+// 5. sinTurns against the double sine over the full phase range.
 bool testSinTurns() {
   double worst = 0.0;
   auto check = [&](uint32_t p) {
@@ -85,7 +115,7 @@ bool testSinTurns() {
                 exact ? 1.0 : 0.0);
 }
 
-// 5. tanhFast against the double tanh over -10..10, exact saturation at +-9,
+// 6. tanhFast against the double tanh over -10..10, exact saturation at +-9,
 // and bit-exact odd symmetry on random inputs.
 bool testTanhFast() {
   double worst = 0.0;
@@ -107,7 +137,7 @@ bool testTanhFast() {
                 (sat && odd) ? 1.0 : 0.0);
 }
 
-// 6. dbFast against 20 log10 from the gate's detector floor (1e-9) to +12 dBFS, log-spaced.
+// 7. dbFast against 20 log10 from the gate's detector floor (1e-9) to +12 dBFS, log-spaced.
 bool testDbFast() {
   double worst = 0.0;
   double at = 0.0;
@@ -123,7 +153,7 @@ bool testDbFast() {
   return report("dbFast", worst < 2e-4, "worst error=%.3g dB at %.2f dB (< 2e-4)", worst, at);
 }
 
-// 7. dbToGainFast against 10^(dB / 20) over -140..+24 dB, relative.
+// 8. dbToGainFast against 10^(dB / 20) over -140..+24 dB, relative.
 bool testDbToGainFast() {
   double worst = 0.0;
   double at = 0.0;
@@ -146,6 +176,7 @@ int main() {
   ok &= testExp2();
   ok &= testRotorGrain();
   ok &= testRotorBlock();
+  ok &= testSinCosFast();
   ok &= testSinTurns();
   ok &= testTanhFast();
   ok &= testDbFast();
