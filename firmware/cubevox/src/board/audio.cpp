@@ -184,7 +184,6 @@ void addChainCycles(const ChainCycles& cycles) {
   for (int s = 0; s < kSlotCount; ++s) addSlotTime(s, cycles.slot[s]);
   addSlotTime(kStatComp, cycles.comp);
   addSlotTime(kStatEq, cycles.eq);
-  addSlotTime(kStatCond, cycles.conditioning);
 }
 
 // Moves the Input gate's detector peak from this block into the running peak. A compare and a

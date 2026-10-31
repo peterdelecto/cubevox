@@ -17,8 +17,8 @@ enum class ApplyResult : uint8_t {
   EnterDfu,         // nothing changed; the caller mutes and resets into the bootloader
 };
 
-// Applies `action` to `settings` and `layout`. Each toggle flips its setting, the top switch cycles,
-// and HPF and LPF step to the next cutoff in their lists and wrap.
+// Applies `action` to `settings` and `layout`. Each toggle flips its setting and the top switch
+// cycles.
 // The reverb action swaps the reverb card between Spring and Chasm in its slot. It changes nothing
 // when no slot holds a reverb card, or when the other card would push the layout past the CPU budget.
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout);

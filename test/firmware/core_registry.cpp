@@ -257,9 +257,6 @@ void checkChainDefaults() {
   check(g.kneeDb == cv::GateTuning{}.kneeDb && g.detectorAttackMs == 0.0f && g.detectorReleaseMs == 20.0f &&
             g.detectorHpHz == 120.0f && !g.travelTimes,
         "defaults: the panel gate keeps its soft-knee tuning");
-  check(p.conditioning.hpf == cv::kHpfDefaultIndex && p.conditioning.lpf == cv::kLpfDefaultIndex &&
-            cv::kHpfCutoffHz[p.conditioning.hpf] == 120.0f && cv::kLpfCutoffHz[p.conditioning.lpf] == 12000.0f,
-        "defaults: the input conditioning starts at HPF 120 Hz and LPF 12 kHz");
   check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
             !p.slapback.on && !p.distortion.on && !p.reverb.on,
         "defaults: every other stage off");

@@ -14,11 +14,10 @@
 #include "core/compose.h"
 #include "core/level.h"
 
-// Cycle buckets: one per slot, then one each for the two polish stages and the input conditioning.
+// Cycle buckets: one per slot, then one each for POLISH COMP and POLISH EQ (both of its halves).
 constexpr int kStatComp = kSlotCount;
 constexpr int kStatEq = kSlotCount + 1;
-constexpr int kStatCond = kSlotCount + 2;
-constexpr int kStatBuckets = kSlotCount + 3;
+constexpr int kStatBuckets = kSlotCount + 2;
 
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed

@@ -5,8 +5,6 @@
 
 #include <stdint.h>
 
-#include "engine/conditioning.h"
-
 enum class OutputLevel : uint8_t { Line, Mic };
 enum class InputJack : uint8_t { Mic, Line };  // Mic = relay K103 coil off, pad shorted
 enum class TopSwitch : uint8_t { Mute, Bypass };  // what the top-left switch does
@@ -15,11 +13,9 @@ struct Settings {
   OutputLevel outputLevel = OutputLevel::Line;
   InputJack inputJack = InputJack::Mic;
   bool polishComp = true;  // POLISH COMP stage
-  bool polishEq = true;    // POLISH EQ stage
+  bool polishEq = true;    // POLISH EQ stage, both halves
   TopSwitch topSwitch = TopSwitch::Mute;
   bool debug = false;  // DEBUG: the voice screen shows the audio load
-  uint8_t hpf = cv::kHpfDefaultIndex;  // input high-pass cutoff, an index into cv::kHpfCutoffHz
-  uint8_t lpf = cv::kLpfDefaultIndex;  // input low-pass cutoff, an index into cv::kLpfCutoffHz
 };
 
 // MIC output is a -30 dB digital trim before the DAC that puts the output near the level of the mic

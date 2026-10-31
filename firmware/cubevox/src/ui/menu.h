@@ -31,8 +31,6 @@ enum class UiAction : uint8_t {
   ToggleInputJack,
   CycleTopSwitch,
   ToggleDebug,
-  CycleHpf,    // the input high-pass moves to the next cutoff in its list
-  CycleLpf,    // the same for the low-pass
   SwapReverb,  // the layout's reverb card changes between Spring and Chasm
   EnterDfu,
 };
