@@ -101,11 +101,11 @@ int usage() {
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
                "     crowdVoiceDb crowdTrimDb crowdFormantSt0..3 crowdPitchSt0..3 crowdTiltDb0..3 crowdTiltHz\n"
-               "     crowdDelayMs0..3 crowdLagScale crowdScatterMs (0..30) crowdDriftCents (0..50) crowdHpHz crowdMaxLagMs\n"
+               "     crowdDelayMs0..3 (to 150) crowdLagScale crowdScatterMs (0..30) crowdDriftCents (0..50) crowdHpHz\n"
+               "     crowdMaxLagMs (to 150)\n"
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
-               "     crowdEpochAlign (0 or 1) crowdEpochSearch (0..0.3)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -161,20 +161,25 @@ bool parsePair(const char* s, float* hz, float* db) {
 }
 
 // The Crowd card's human-voice controls refuse a value outside the range the engine clamps to, so a
-// typo in a key does not pass for a setting. epochAlign arrives as 0 or 1.
-bool crowdMannerInRange(const cv::CrowdTuning& g, float epochAlign) {
+// typo in a key does not pass for a setting.
+bool crowdMannerInRange(const cv::CrowdTuning& g) {
   namespace gd = cv::crowd_detail;
   if (g.levelScatterDb < 0.0f || g.levelScatterDb > gd::kMaxLevelScatterDb) return false;
-  if (g.epochSearch < 0.0f || g.epochSearch > gd::EpochTrack::kMaxSearch) return false;
   if (g.widthKnee < gd::kMinWidthKnee || g.widthKnee > gd::kMaxWidthKnee) return false;
   if (g.widthKneeFrac < 0.0f || g.widthKneeFrac > 1.0f) return false;
   if (g.widthLagBottom < gd::kMinLagBottom || g.widthLagBottom > gd::kMaxLagBottom) return false;
   if (g.widthLagMs < 0.0f || g.widthLagMs > gd::kMaxWidthLagMs) return false;
-  if (epochAlign != 0.0f && epochAlign != 1.0f) return false;
   for (size_t v = 0; v < g.contour.size(); ++v) {
     if (g.contour[v] < gd::kMinContour || g.contour[v] > gd::kMaxContour) return false;
   }
   return true;
+}
+
+// The Crowd card's delays and lag ceiling stop at the lag the shared ring was sized for.
+void clampCrowdLags(cv::CrowdTuning& g) {
+  constexpr float kTop = static_cast<float>(cv::kCrowdMaxLagMs);
+  for (float& d : g.delayMs) d = d > kTop ? kTop : d;
+  g.maxLagMs = g.maxLagMs > kTop ? kTop : g.maxLagMs;
 }
 
 bool applyTuning(RenderParams& rp, const char* kv) {
@@ -191,7 +196,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::GateTuning& gt = rp.gate.tuning;
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
-  float crowdEpoch = gn.epochAlign ? 1.0f : 0.0f;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -221,7 +225,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"crowdLevelScatterDb", &gn.levelScatterDb},
       {"crowdContour0", &gn.contour[0]},          {"crowdContour1", &gn.contour[1]},
       {"crowdContour2", &gn.contour[2]},          {"crowdContour3", &gn.contour[3]},
-      {"crowdEpochAlign", &crowdEpoch},            {"crowdEpochSearch", &gn.epochSearch},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -284,8 +287,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
-    if (!crowdMannerInRange(gn, crowdEpoch)) return false;
-    gn.epochAlign = crowdEpoch == 1.0f;
+    if (!crowdMannerInRange(gn)) return false;
+    clampCrowdLags(gn);
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }

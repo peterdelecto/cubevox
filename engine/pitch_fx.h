@@ -31,8 +31,6 @@ class PitchFx {
 
   void reset() {
     ring_.fill(0.0f);
-    shadow_.fill(0.0f);
-    shadowZ_ = 0.0f;
     writeCount_ = 0;
     tracker_.reset();
     autotune_.reset();
@@ -49,8 +47,10 @@ class PitchFx {
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
     // The tracker's buffers fill every block; it analyses while Autotune is on or still fading,
     // so the voice keeps its period through the crossfade, and while the Crowd card is on. Octave
-    // shifts without a pitch.
-    tracker_.push(in, n, p.autotune.on || p.crowdOn || activeAt_ > 0.0f);
+    // shifts without a pitch. The 48 kHz fine pass runs only for Autotune; the Crowd card's copies
+    // drift by more than the coarse lag misses.
+    const bool autotune = p.autotune.on || activeAt_ > 0.0f;
+    tracker_.push(in, n, autotune || p.crowdOn, autotune);
     const Targets t = prepareVoices(p);
     if (fresh_) {
       mix_ = t.mix;
@@ -81,13 +81,6 @@ class PitchFx {
   // the block's last sample sits at head() - 1.
   const VoiceRing& ring() const { return ring_; }
   int head() const { return static_cast<int>(writeCount_); }
-
-  // The input ring low-passed at kShadowHz, written at the same index as ring() on every sample. The
-  // Crowd card finds glottal pulses in it. Writing it costs one multiply-add per sample and moves no
-  // other output.
-  const VoiceRing& shadow() const { return shadow_; }
-
-  static constexpr float kShadowHz = 800.0f;
 
  private:
   // Where the three smoothers head this block.
@@ -134,7 +127,6 @@ class PitchFx {
     gains_ = gainsNow();
     for (int i = 0; i < n; ++i) {
       ring_[static_cast<size_t>(writeCount_)] = in[i];
-      writeShadow(in[i]);
       out[i] = in[i];
       advance();
     }
@@ -155,7 +147,6 @@ class PitchFx {
     const float inv = 1.0f / static_cast<float>(n);
     for (int i = 0; i < n; ++i) {
       ring_[static_cast<size_t>(writeCount_)] = in[i];
-      writeShadow(in[i]);
       const float oct = octave_.tick(ring_, writeCount_);
       const float f = static_cast<float>(i + 1) * inv;
       const float at = g0.at + (g1.at - g0.at) * f;
@@ -179,15 +170,7 @@ class PitchFx {
   // Voices only use writeCount modulo the ring, so wrapping here is exact.
   void advance() { writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1; }
 
-  CV_INLINE void writeShadow(float x) {
-    shadowZ_ += shadowA_ * (x - shadowZ_);
-    shadow_[static_cast<size_t>(writeCount_)] = shadowZ_;
-  }
-
   VoiceRing ring_{};
-  VoiceRing shadow_{};
-  float shadowZ_ = 0.0f;
-  float shadowA_ = onePoleCoef(kShadowHz);
   PitchTracker tracker_;
   AutotuneVoice autotune_;
   OctaveVoice octave_;

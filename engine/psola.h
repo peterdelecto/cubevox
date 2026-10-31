@@ -13,7 +13,13 @@
 
 namespace cv {
 
-constexpr int kVoiceRingLen = 11040;             // 230 ms shared input ring: a 200 ms Crowd lag plus the longest grain
+// The shared input ring holds the Crowd card's longest lag, the timing scatter its working set rides
+// on top of that lag, and the reach of its longest grain (two 686-sample periods and a pad) behind
+// both. 9,156 samples, 190.75 ms. Autotune reads under 2,100 samples back and Octave under 3,850.
+constexpr int kCrowdMaxLagMs = 150;
+constexpr int kCrowdScatterMs = 12;
+constexpr int kCrowdGrainReach = 2 * 686 + 8;
+constexpr int kVoiceRingLen = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000) + kCrowdGrainReach;
 using VoiceRing = std::array<float, kVoiceRingLen>;
 
 class PsolaVoice {

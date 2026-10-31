@@ -5,7 +5,6 @@
 #include <cstdint>
 
 #include "engine/common.h"
-#include "engine/crowd_epoch.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/pitch_fx.h"
@@ -27,13 +26,11 @@
 // in pitch mid-word. Scatter gives each copy a fresh timing offset at every gap, and drift walks each
 // copy's pitch slowly around its offset.
 //
-// Three more controls make a copy read as a person and not as Adam shifted. Level scatter gives a
+// Two more controls make a copy read as a person and not as Adam shifted. Level scatter gives a
 // copy a new loudness at every gap. Contour sets how much of Adam's rises and falls a copy follows.
-// Epoch align cuts every grain on a glottal pulse instead of on the period grid, which removes the
-// buzz and the doubled pulses a grid cut leaves when a copy's throat moves. All three stay inside
-// what a human voice does, and the engine clamps each to that range. Each is neutral at 0 (contour
-// 1, epoch align off), and the output is then bit for bit the output without it. The defaults are
-// the owner's working set, with epoch align off (owner 2026-10-31).
+// Both stay inside what a human voice does, and the engine clamps each to that range. Each is
+// neutral at 0 (contour 1), and the output is then bit for bit the output without it. The defaults
+// are the owner's working set (owner 2026-10-31). Grains are cut on the period grid.
 
 namespace cv {
 
@@ -49,7 +46,7 @@ struct CrowdTuning {
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
   float hpHz = 120.0f;         // low cut on the crowd sum
-  float maxLagMs = 200.0f;     // ceiling on a copy's lag
+  float maxLagMs = 150.0f;     // ceiling on a copy's lag before scatter, up to kCrowdMaxLagMs
   float gapFloorDb = -50.0f;   // a copy's read point under this level counts as a gap
   float scatterMs = 12.0f;     // peak random lag offset a copy takes at each gap
   float driftCents = 15.0f;    // peak of each copy's slow random pitch walk
@@ -77,12 +74,6 @@ struct CrowdTuning {
   // The share of Adam's pitch deviation a copy follows (0.6..1.4). 1 follows him exactly, 0.7 flattens
   // the copy's rises and falls to 70 % of his, 1.3 exaggerates them.
   std::array<float, 4> contour = {0.8f, 1.2f, 0.7f, 1.1f};
-
-  // True cuts each grain on the glottal pulse nearest its grid mark, except in a copy whose pitch
-  // ratio and grain playback rate are both exactly 1 (WIDTH 0), which stays on the grid. epochSearch
-  // is the half-width in periods of the peak search around each expected pulse (0..0.3).
-  bool epochAlign = false;
-  float epochSearch = 0.25f;
 };
 
 struct CrowdParams {
@@ -134,7 +125,8 @@ constexpr float kMaxContour = 1.4f;
 constexpr int ms(int v) { return v * kSampleRate / 1000; }
 
 static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for a read delay");
-static_assert(ms(200) <= kDelayCeil, "a 200 ms lag and the longest grain do not fit the ring");
+static_assert(ms(kCrowdMaxLagMs + kCrowdScatterMs) <= kDelayCeil,
+              "the longest lag, its scatter and the longest grain do not fit the ring");
 
 // Clamps a lag to what the voice can play at this pitch period.
 inline float clampLag(float lag, float period) {
@@ -174,6 +166,44 @@ inline float lagMultiplier(const CrowdTuning& t, float width) {
   return bottom * (1.0f - width) + top * width;
 }
 
+// The grain window, 1 - cos(2 pi k / 1024) for k in 0..1024, made at compile time as
+// 2 sin^2(pi k / 1024) from a double series, so it sits in flash and a launch runs no libm. A grain
+// keeps a 32-bit turn counter. Its top kHannBits pick an entry and the rest interpolate to the next,
+// so the window stays smooth. A plain table read steps the window by up to 0.006, which raised
+// knob_step's curvature for VOICES from x0.92 to x1.13.
+constexpr int kHannBits = 10;
+constexpr int kHannShift = 32 - kHannBits;
+constexpr uint32_t kHannFracMask = (1u << kHannShift) - 1u;
+constexpr float kHannFracScale = 1.0f / static_cast<float>(1u << kHannShift);
+constexpr float kTurn = 4294967296.0f;  // one turn of the counter
+
+// sin x for x in [0, pi / 2], to double rounding.
+constexpr double hannSine(double x) {
+  double term = x;
+  double sum = x;
+  for (int k = 1; k < 14; ++k) {
+    term *= -x * x / static_cast<double>((2 * k) * (2 * k + 1));
+    sum += term;
+  }
+  return sum;
+}
+
+using HannTable = std::array<float, (size_t{1} << kHannBits) + 1>;
+
+constexpr HannTable makeHannTable() {
+  constexpr double kPiD = 3.14159265358979323846;
+  constexpr size_t kLen = size_t{1} << kHannBits;
+  HannTable t{};
+  for (size_t k = 0; k <= kLen; ++k) {
+    const size_t fold = k <= kLen / 2 ? k : kLen - k;
+    const double s = hannSine(kPiD * static_cast<double>(fold) / static_cast<double>(kLen));
+    t[k] = static_cast<float>(2.0 * s * s);
+  }
+  return t;
+}
+
+inline constexpr HannTable kHannTable = makeHannTable();
+
 // One PSOLA voice with a grain playback rate. Grains two periods long are cut on a grid one period
 // apart and laid down p / ratio apart. A grain plays its input at `rate` samples per output
 // sample, so its spectrum moves by `rate` while the pitch follows `ratio`. The read position
@@ -211,9 +241,10 @@ class FormantPsolaVoice {
     rate_ = clampf(rate, kMinRate, kMaxRate);
     step_ = static_cast<int>(rate_ * static_cast<float>(1 << kFracBits) + 0.5f);
     const float r = clampf(ratio, kMinRatio, kMaxRatio);
-    plain_ = r == 1.0f && rate_ == 1.0f;
     outPeriod_ = p_ / r;
     dur_ = 2.0f * p_ / rate_;
+    turn_ = kTurn / dur_;
+    turnStep_ = static_cast<uint32_t>(turn_);
     amp_ = 0.5f * rate_ / r;
     drift_ = (1.0f - rate_) * dur_;
     ref_ = clampLag(delay, p_) - p_;
@@ -224,22 +255,25 @@ class FormantPsolaVoice {
     }
   }
 
-  // The pulses to cut on, or null to cut on the period grid. The tracker must outlive the calls.
-  void setEpochs(const EpochTrack* epochs) { epochs_ = epochs; }
-
   // Adds n samples of the voice into out. first is the ring index of the block's first sample;
-  // the voice reads nothing newer than it. clock is the epoch clock of that sample. Launches are
-  // placed sample by sample, then each grain plays through the block on its own.
-  void render(const VoiceRing& ring, int first, int n, float* out, uint32_t clock = 0) {
+  // the voice reads nothing newer than it. The countdown jumps from launch to launch, then each
+  // grain plays through the block on its own. outPeriod_ holds for the block, so one clamp at its
+  // start does what a clamp on every sample would.
+  void render(const VoiceRing& ring, int first, int n, float* out) {
     if (!voiced_) return;
-    clock_ = clock;
     for (size_t k = 0; k < count_; ++k) grains_[k].start = 0;
-    for (int i = 0; i < n; ++i) {
-      advanceMarks();
-      if (countdown_ > outPeriod_) countdown_ = outPeriod_;
-      countdown_ -= 1.0f;
-      if (countdown_ > 0.0f) continue;
-      launch(wrapOnce<kVoiceRingLen>(first + i), -countdown_, i);
+    if (countdown_ > outPeriod_) countdown_ = outPeriod_;
+    for (int i = 0;;) {
+      const int k = countdown_ > 1.0f ? static_cast<int>(ceilf(countdown_)) : 1;
+      if (k > n - i) {
+        stepMarks(n - i);
+        countdown_ -= static_cast<float>(n - i);
+        break;
+      }
+      stepMarks(k);
+      countdown_ -= static_cast<float>(k);
+      i += k;
+      launch(wrapOnce<kVoiceRingLen>(first + i - 1), -countdown_, i - 1);
       countdown_ += outPeriod_;
     }
     size_t kept = 0;
@@ -255,18 +289,38 @@ class FormantPsolaVoice {
   static constexpr int kFracBits = 16;
   static constexpr int kFracMask = (1 << kFracBits) - 1;
   static constexpr int kRingFix = kVoiceRingLen << kFracBits;
+  static constexpr int kLastFix = (kVoiceRingLen - 1) << kFracBits;  // a read here pairs the last sample with the first
   static constexpr float kFracScale = 1.0f / static_cast<float>(1 << kFracBits);
 
   static_assert(kVoiceRingLen < (1 << (31 - kFracBits)) - 4, "ring index overflows the fixed-point position");
 
   struct Grain {
-    HannRotor window;
+    uint32_t turn = 0;      // window phase, a full turn over the grain
+    uint32_t turnStep = 0;  // turn advance per output sample
     float age = 0.0f;
     float dur = 0.0f;
     int pos = 0;    // ring index of the next read, in 1 / 2^kFracBits samples
     int step = 0;   // pos advance per output sample
     int start = 0;  // first sample of the block it sounds in
   };
+
+  // k samples of advanceMarks(). A stretch that stays two samples clear of ref_ + p_ cannot trip
+  // the realign test, so it goes in one add, and whole-sample adds round as single steps do. The
+  // samples around a wrap step one at a time, so the marks match a walk sample by sample bit for bit.
+  void stepMarks(int k) {
+    while (k > 0) {
+      const float room = ref_ + p_ - markDelay_;
+      const int clear = markDelay_ >= ref_ && room > 3.0f ? static_cast<int>(room) - 2 : 0;
+      if (clear > 0) {
+        const int run = clear < k ? clear : k;
+        markDelay_ += static_cast<float>(run);
+        k -= run;
+      } else {
+        advanceMarks();
+        --k;
+      }
+    }
+  }
 
   // Marks are delays behind the head, kept in [ref_, ref_ + p_).
   void advanceMarks() {
@@ -298,7 +352,6 @@ class FormantPsolaVoice {
   void launch(int head, float lead, int at) {
     float centre = markDelay_;
     if (centre - ref_ > 0.5f * p_) centre -= p_;
-    if (epochs_ && !plain_) centre = epochs_->snap(clock_ + static_cast<uint32_t>(at), centre, p_);
     const float lo = kMinReadDelay + (drift_ < 0.0f ? -drift_ : 0.0f);
     const float hi = kMaxReadDelay - (drift_ > 0.0f ? drift_ : 0.0f);
     const float delay = clampf(centre + p_ - rate_ * lead, lo, hi);
@@ -311,32 +364,56 @@ class FormantPsolaVoice {
     g.age = lead;
     g.dur = dur_;
     g.start = at;
-    g.window.init(kTwoPi * lead / dur_, kTwoPi / dur_);
+    g.turn = static_cast<uint32_t>(lead * turn_);
+    g.turnStep = turnStep_;
   }
 
+  // A grain's read state while it plays, held in locals. tap() gives one output sample from ring
+  // samples i0 and i1 (the sample after i0) and steps the window and the read position.
+  struct Cursor {
+    uint32_t turn;
+    uint32_t turnStep;
+    int pos;
+    int step;
+    float amp;
+
+    CV_INLINE float tap(const float* ring, int i0, int i1) {
+      const float x0 = ring[i0];
+      const float t = static_cast<float>(pos & kFracMask) * kFracScale;
+      const uint32_t k = turn >> kHannShift;
+      const float f = static_cast<float>(turn & kHannFracMask) * kHannFracScale;
+      const float w = kHannTable[k] + f * (kHannTable[k + 1] - kHannTable[k]);
+      turn += turnStep;
+      pos += step;
+      return amp * w * (x0 + t * (ring[i1] - x0));
+    }
+  };
+
   // Plays the grain's share of this block into out and returns true if it lives on into the next.
-  // The loop keeps the window rotor and the read position in locals.
+  // The last table entry closes the turn, so the window read needs no wrap. The run splits where
+  // the read reaches the ring's last sample, worked out once per stretch, so the plain stretches
+  // carry no wrap test. Only a read on that last sample pairs it with the ring's first.
   bool play(const float* ring, Grain& g, float* out, int n) const {
     const int room = n - g.start;
     const float left = g.dur - g.age;
     const int remain = left > 0.0f ? static_cast<int>(ceilf(left)) : 0;
     const int m = remain < room ? remain : room;
-    HannRotor w = g.window;
-    int pos = g.pos;
-    const int step = g.step;
+    Cursor c{g.turn, g.turnStep, g.pos, g.step, amp_};
     float* o = out + g.start;
-    for (int j = 0; j < m; ++j) {
-      const int i0 = pos >> kFracBits;
-      const int i1 = i0 + 1 == kVoiceRingLen ? 0 : i0 + 1;
-      const float x0 = ring[i0];
-      const float t = static_cast<float>(pos & kFracMask) * kFracScale;
-      o[j] += amp_ * (1.0f - w.c) * (x0 + t * (ring[i1] - x0));
-      w.advance();
-      pos += step;
-      if (pos >= kRingFix) pos -= kRingFix;
+    for (int j = 0; j < m;) {
+      const int plain = c.pos < kLastFix ? (kLastFix - c.pos + c.step - 1) / c.step : 0;
+      for (const int end = plain < m - j ? j + plain : m; j < end; ++j) {
+        const int i0 = c.pos >> kFracBits;
+        o[j] += c.tap(ring, i0, i0 + 1);
+      }
+      if (c.pos >= kRingFix) c.pos -= kRingFix;
+      if (j < m && c.pos >= kLastFix) {
+        o[j++] += c.tap(ring, kVoiceRingLen - 1, 0);
+        if (c.pos >= kRingFix) c.pos -= kRingFix;
+      }
     }
-    g.window = w;
-    g.pos = pos;
+    g.turn = c.turn;
+    g.pos = c.pos;
     g.age += static_cast<float>(m);
     return remain > room;
   }
@@ -348,16 +425,15 @@ class FormantPsolaVoice {
   float rate_ = 1.0f;
   float outPeriod_ = kMinPeriod;
   float dur_ = 2.0f * kMinPeriod;
+  float turn_ = kTurn / (2.0f * kMinPeriod);  // window turn per sample of grain, as a float
+  uint32_t turnStep_ = static_cast<uint32_t>(kTurn / (2.0f * kMinPeriod));
   float amp_ = 0.5f;  // half the grain gain, rate / ratio, so the window needs no 0.5
   float drift_ = 0.0f;
   float ref_ = 0.0f;
   float markDelay_ = 0.0f;
   float countdown_ = 0.0f;
-  const EpochTrack* epochs_ = nullptr;
-  uint32_t clock_ = 0;  // epoch clock of the block's first sample
   bool voiced_ = false;
   bool fresh_ = true;
-  bool plain_ = false;  // ratio and rate are both exactly 1, so the marks stay on the grid
 };
 
 // A small random source that repeats from its seed. Each voice owns one per use.
@@ -448,16 +524,30 @@ struct BlockView {
   float quietSq;      // a mean square under this counts as quiet
 
   // True when the n samples that the ring holds `lag` behind the block are quiet.
+  // A window clear of the ring's end runs on four accumulators through a straight pointer, so the
+  // adds do not wait on one another. A window across the end, and a tail short of four, step one
+  // sample at a time.
   bool quietAt(float lag) const {
     int at = (first - static_cast<int>(lag + 0.5f)) % kVoiceRingLen;
     if (at < 0) at += kVoiceRingLen;
-    float sum = 0.0f;
-    for (int i = 0; i < n; ++i) {
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    int i = 0;
+    if (at + n <= kVoiceRingLen) {
+      const float* r = ring.data() + at;
+      for (; i + 4 <= n; i += 4) {
+        s0 += r[i] * r[i];
+        s1 += r[i + 1] * r[i + 1];
+        s2 += r[i + 2] * r[i + 2];
+        s3 += r[i + 3] * r[i + 3];
+      }
+      at += i;
+    }
+    for (; i < n; ++i) {
       const float x = ring[static_cast<size_t>(at)];
-      sum += x * x;
+      s0 += x * x;
       at = at + 1 == kVoiceRingLen ? 0 : at + 1;
     }
-    return sum < quietSq * static_cast<float>(n);
+    return (s0 + s1) + (s2 + s3) < quietSq * static_cast<float>(n);
   }
 };
 
@@ -573,6 +663,91 @@ inline VoicesLaw voicesLaw(float k, const CrowdTuning& t, uint8_t solo = 0) {
   return law;
 }
 
+// The four tone shelves share one filter. A shelf is linear, so each copy's shelf is written as
+// 1 + wh HP + wb BP, where HP and BP are the high-pass and band-pass of one Butterworth pole pair at
+// kShelfPoleScale times tiltHz. Each copy then adds into a plain sum and two weighted sums, and one
+// two-input biquad filters the weighted sums for all four.
+constexpr float kShelfPoleScale = 1.05f;
+constexpr int kShelfFitPoints = 24;
+constexpr float kShelfFitBelow = 0.2f;    // the fit spans 0.2 to 4.8 times tiltHz, the shelf's turn
+constexpr float kShelfFitAbove = 4.8f;
+constexpr float kShelfFitTopHz = 20000.0f;
+
+// The shared poles and the two numerators: HP is h0 h1 h0, BP is q0 0 -q0.
+struct ShelfBasis {
+  float h0 = 0.0f, h1 = 0.0f, q0 = 0.0f, a1 = 0.0f, a2 = 0.0f;
+};
+
+// A copy's two weights. Both are exactly 0 for a 0 dB shelf.
+struct ShelfWeights {
+  float high = 0.0f;
+  float band = 0.0f;
+};
+
+// Runs when the tuning moves, so libm is fine here.
+inline ShelfBasis shelfBasis(float hz) {
+  const float w0 = kTwoPi * clampf(kShelfPoleScale * hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
+  const float cw = cosf(w0);
+  const float alpha = sinf(w0) / (2.0f * kButterworthQ);
+  const float a0 = 1.0f + alpha;
+  ShelfBasis b;
+  b.h0 = 0.5f * (1.0f + cw) / a0;
+  b.h1 = -(1.0f + cw) / a0;
+  b.q0 = alpha / a0;
+  b.a1 = -2.0f * cw / a0;
+  b.a2 = (1.0f - alpha) / a0;
+  return b;
+}
+
+struct Cplx {
+  float re = 0.0f;
+  float im = 0.0f;
+};
+
+inline Cplx divide(const Cplx& num, const Cplx& den) {
+  const float mag = den.re * den.re + den.im * den.im;
+  return {(num.re * den.re + num.im * den.im) / mag, (num.im * den.re - num.re * den.im) / mag};
+}
+
+// (b0 + b1 z^-1 + b2 z^-2) / (1 + a1 z^-1 + a2 z^-2) at z^-1 = c - j s, where c and s are cos and sin
+// of the frequency in radians per sample.
+inline Cplx biquadAt(float b0, float b1, float b2, float a1, float a2, float c, float s) {
+  const float c2 = c * c - s * s;
+  const float s2 = 2.0f * s * c;
+  return divide({b0 + b1 * c + b2 * c2, -(b1 * s + b2 * s2)}, {1.0f + a1 * c + a2 * c2, -(a1 * s + a2 * s2)});
+}
+
+// Least squares over kShelfFitPoints log-spaced frequencies across the shelf's turn: the real wh and
+// wb that bring 1 + wh HP + wb BP closest to the RBJ high shelf of db at hz. Each point's error is
+// taken relative to the shelf there, so it reads as dB and degrees. Over 100 Hz to 20 kHz with plain
+// errors the fit missed the default shelves by 0.150 dB and 1.05 degrees; this one by 0.141 and 0.94.
+inline ShelfWeights fitShelf(const ShelfBasis& b, float hz, float db) {
+  if (db == 0.0f) return {};
+  Biquad ref;
+  ref.setHighShelf(hz, db);
+  const float lo = kShelfFitBelow * hz;
+  const float hi = kShelfFitAbove * hz < kShelfFitTopHz ? kShelfFitAbove * hz : kShelfFitTopHz;
+  const float octaves = log2Fast(hi / lo);
+  float uu = 0.0f, uw = 0.0f, ww = 0.0f, du = 0.0f, dw = 0.0f;
+  for (int k = 0; k < kShelfFitPoints; ++k) {
+    const float f = lo * exp2Fast(octaves * static_cast<float>(k) / (kShelfFitPoints - 1));
+    float s = 0.0f;
+    float c = 1.0f;
+    sinCosFast(kTwoPi * f / kSampleRate, s, c);
+    const Cplx r = biquadAt(ref.b0, ref.b1, ref.b2, ref.a1, ref.a2, c, s);
+    const Cplx u = divide(biquadAt(b.h0, b.h1, b.h0, b.a1, b.a2, c, s), r);
+    const Cplx w = divide(biquadAt(b.q0, 0.0f, -b.q0, b.a1, b.a2, c, s), r);
+    const Cplx d = divide({r.re - 1.0f, r.im}, r);
+    uu += u.re * u.re + u.im * u.im;
+    ww += w.re * w.re + w.im * w.im;
+    uw += u.re * w.re + u.im * w.im;
+    du += d.re * u.re + d.im * u.im;
+    dw += d.re * w.re + d.im * w.im;
+  }
+  const float det = uu * ww - uw * uw;
+  return {(du * ww - dw * uw) / det, (dw * uu - du * uw) / det};
+}
+
 }  // namespace crowd_detail
 
 class Crowd {
@@ -603,10 +778,9 @@ class Crowd {
     const Plan plan = makePlan(p);
     const int first = pitch.head() - n;
     prepareBlock(p, pitch, plan, first, n);
-    const uint32_t clock = epochs_.clock() - static_cast<uint32_t>(n);
     for (int c = 0; c < n; c += kBlock) {
       const int m = n - c < kBlock ? n - c : kBlock;
-      renderChunk(in + c, out + c, plan, Chunk{pitch.ring(), first + c, m, clock + static_cast<uint32_t>(c)});
+      renderChunk(in + c, out + c, plan, Chunk{pitch.ring(), first + c, m});
     }
   }
 
@@ -622,6 +796,7 @@ class Crowd {
  private:
   using FormantPsolaVoice = crowd_detail::FormantPsolaVoice;
   static constexpr size_t kVoices = crowd_detail::kVoices;
+  static constexpr float kShelfFloor = 1e-20f;  // a shared shelf state under this is silence, 400 dB down
 
   // Block-end targets for everything the knobs and the tuning set.
   struct Plan {
@@ -630,15 +805,48 @@ class Crowd {
     float wet = 0.0f;  // crowd multiplier times the trim
   };
 
-  static Plan makePlan(const CrowdParams& p) {
+  Plan makePlan(const CrowdParams& p) {
     Plan plan;
     if (!p.on) return plan;
-    const CrowdTuning& t = p.tuning;
-    const crowd_detail::VoicesLaw law = crowd_detail::voicesLaw(smooth::clamp01(p.voices), t, p.solo);
+    const crowd_detail::VoicesLaw& law = voicesLaw(p);
     plan.voice = law.weight;
     plan.lead = law.lead;
-    plan.wet = law.mul * dbToGainFast(t.trimDb);
+    plan.wet = law.mul * dbToGainFast(p.tuning.trimDb);
     return plan;
+  }
+
+  // What the VOICES law reads. The law's sines and roots run again only when one of them moves.
+  struct LawKey {
+    float voices = -1.0f;
+    float voiceDb = 0.0f;
+    float leadFadeFrom = 0.0f;
+    float holdFrom = 0.0f;
+    uint8_t solo = 0;
+    bool set = false;
+
+    bool operator==(const LawKey& o) const {
+      return set == o.set && voices == o.voices && voiceDb == o.voiceDb && leadFadeFrom == o.leadFadeFrom &&
+             holdFrom == o.holdFrom && solo == o.solo;
+    }
+  };
+
+  const crowd_detail::VoicesLaw& voicesLaw(const CrowdParams& p) {
+    const CrowdTuning& t = p.tuning;
+    const LawKey key{smooth::clamp01(p.voices), t.voiceDb, t.leadFadeFrom, t.holdFrom, p.solo, true};
+    if (!(key == lawKey_)) {
+      law_ = crowd_detail::voicesLaw(key.voices, t, p.solo);
+      lawKey_ = key;
+    }
+    return law_;
+  }
+
+  // The two smoothers' one-pole coefficients for a call of n samples. They hang on n alone, so they
+  // are worked out again only when n changes.
+  void setCoefs(int n) {
+    if (n == coefN_) return;
+    widthCoef_ = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * smooth::kSmoothSec));
+    slewCoef_ = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * crowd_detail::kDriftSlewS));
+    coefN_ = n;
   }
 
   bool settledOff(const CrowdParams& p) const {
@@ -660,17 +868,15 @@ class Crowd {
   void clearDsp() {
     for (size_t v = 0; v < kVoices; ++v) retire(v);
     hp_.clear();
-    dc_.clear();
+    shelfZ1_ = 0.0f;
+    shelfZ2_ = 0.0f;
     contour_.reset();
-    epochs_.reset();
     active_ = 0;
-    tiltSet_ = false;
     widthSet_ = false;
   }
 
   void retire(size_t v) {
     voice_[v].reset();
-    tilt_[v].clear();
     lag_[v].restart();
     drift_[v].reset();
     levelMul_[v] = 1.0f;
@@ -686,11 +892,14 @@ class Crowd {
     hpSet_ = true;
   }
 
-  // One high shelf per voice, set on the first block after a reset and when the tuning moved.
+  // The shared shelf's poles and each copy's weights, set on the first block and when the tuning
+  // moved. They depend on the tuning alone, so a reset keeps them.
   void setTilts(const CrowdTuning& t) {
+    const bool hzMoved = !tiltSet_ || t.tiltHz != tiltHz_;
+    if (hzMoved) shelf_ = crowd_detail::shelfBasis(t.tiltHz);
     for (size_t v = 0; v < kVoices; ++v) {
-      if (tiltSet_ && t.tiltDb[v] == tiltDb_[v] && t.tiltHz == tiltHz_) continue;
-      tilt_[v].setHighShelf(t.tiltHz, t.tiltDb[v]);
+      if (!hzMoved && t.tiltDb[v] == tiltDb_[v]) continue;
+      shelfWeights_[v] = crowd_detail::fitShelf(shelf_, t.tiltHz, t.tiltDb[v]);
       tiltDb_[v] = t.tiltDb[v];
     }
     tiltHz_ = t.tiltHz;
@@ -698,10 +907,11 @@ class Crowd {
   }
 
   // Copy v's lag target in samples. The scale and the WIDTH multiplier stretch the delay and the
-  // ceiling caps it.
+  // ceiling caps it. The ceiling itself stops at kCrowdMaxLagMs, the lag the ring was sized for.
   static float lagTarget(const CrowdTuning& t, size_t v, float widthMul) {
     const float lagMs = t.delayMs[v] * t.lagScale * widthMul;
-    return (lagMs < t.maxLagMs ? lagMs : t.maxLagMs) * crowd_detail::kSmpPerMs;
+    const float top = clampf(t.maxLagMs, 0.0f, static_cast<float>(kCrowdMaxLagMs));
+    return (lagMs < top ? lagMs : top) * crowd_detail::kSmpPerMs;
   }
 
   // What every voice of one block reads.
@@ -717,43 +927,29 @@ class Crowd {
     float levelDb;     // level scatter, clamped to its range
     float slew;        // one-pole coefficient of the slow walks for this block
     int n;
-    const crowd_detail::EpochTrack* epochs;  // null cuts on the period grid
   };
-
-  // The shared pulse marks of this block, or null when the grid cuts. Off drops the marks, so a
-  // later on starts a fresh search.
-  const crowd_detail::EpochTrack* prepareEpochs(const CrowdTuning& t, const PitchFx& pitch, float period, int n) {
-    if (!t.epochAlign) {
-      epochs_.reset();
-      return nullptr;
-    }
-    const float p = period > 0.0f ? clampf(period, crowd_detail::kMinPeriod, crowd_detail::kMaxPeriod) : 0.0f;
-    epochs_.advance(pitch.shadow(), pitch.head(), n, p, t.epochSearch);
-    return &epochs_;
-  }
 
   // The WIDTH the factors read. It follows the knob through the 20 ms one-pole, so a knob step moves
   // the copies' pitch over a few blocks and not in one jump, and it takes the knob value outright on
   // the first block after a reset. A settled value equals the knob bit for bit.
-  float smoothedWidth(float width, int n) {
+  float smoothedWidth(float width) {
     const float target = smooth::clamp01(width);
-    const float a = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * smooth::kSmoothSec));
-    widthSm_ = widthSet_ ? smooth::step(widthSm_, target, a) : target;
+    widthSm_ = widthSet_ ? smooth::step(widthSm_, target, widthCoef_) : target;
     widthSet_ = true;
     return widthSm_;
   }
 
-  // Per block: filters, the contour track and the pulse marks, then each live voice. first is the
-  // ring index of the block's first sample.
+  // Per block: filters, coefficients and the contour track, then each live voice. first is the ring
+  // index of the block's first sample.
   void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, int first, int n) {
     const CrowdTuning& t = p.tuning;
     setLowCut(t);
     setTilts(t);
+    setCoefs(n);
     const PitchResult& pr = pitch.pitch();
-    const float slew = 1.0f - expf(-static_cast<float>(n) / (kSampleRate * crowd_detail::kDriftSlewS));
+    const float slew = slewCoef_;
     contour_.step(pr.period, pr.voiced, slew);
-    const crowd_detail::EpochTrack* epochs = prepareEpochs(t, pitch, pr.period, n);
-    const float widthF = crowd_detail::widthFactor(smoothedWidth(p.width, n), t.widthKnee, t.widthKneeFrac);
+    const float widthF = crowd_detail::widthFactor(smoothedWidth(p.width), t.widthKnee, t.widthKneeFrac);
     const Block b{t,
                   {pitch.ring(), first, n, dbToGainFast(2.0f * t.gapFloorDb)},
                   pr.period,
@@ -764,8 +960,7 @@ class Crowd {
                   (t.scatterMs > 0.0f ? t.scatterMs : 0.0f) * crowd_detail::kSmpPerMs,
                   clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
                   slew,
-                  n,
-                  epochs};
+                  n};
     active_ = 0;
     for (size_t v = 0; v < kVoices; ++v) prepareVoice(v, plan, b);
   }
@@ -788,7 +983,6 @@ class Crowd {
     const float oct = st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
     voice_[v].prepare(b.period, exp2Fast(oct + contourOctaves(v, t, b.pitchWidth)),
                       exp2Fast(t.formantSt[v] * b.width * (1.0f / 12.0f)), lag_[v].samples());
-    voice_[v].setEpochs(b.epochs);
   }
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
@@ -803,28 +997,52 @@ class Crowd {
   // One chunk of the call: kBlock samples at most.
   struct Chunk {
     const VoiceRing& ring;
-    int first;       // ring index of the chunk's first sample
+    int first;  // ring index of the chunk's first sample
     int n;
-    uint32_t clock;  // epoch clock of that sample
   };
 
-  // Adds voice v into crowd. The voice's tone shelf runs first, then its gain ramps to the
-  // block-end target. The shelf runs on a local copy so its state stays in registers.
+  // Adds voice v into crowd with its gain ramping to the block-end target, and into the two sums the
+  // shared shelf filters, weighted by the copy's shelf weights.
   void mixVoice(size_t v, const Chunk& k, float target, float* crowd) {
     std::array<float, kBlock> raw{};
-    voice_[v].render(k.ring, k.first, k.n, raw.data(), k.clock);
-    Biquad tilt = tilt_[v];
+    voice_[v].render(k.ring, k.first, k.n, raw.data());
     const float step = (target - gain_[v]) / static_cast<float>(k.n);
+    const float wh = shelfWeights_[v].high;
+    const float wb = shelfWeights_[v].band;
     float g = gain_[v];
-    for (int i = 0; i < k.n; ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(k.n); ++i) {
       g += step;
-      crowd[i] += g * tilt.run(raw[static_cast<size_t>(i)]);
+      const float y = g * raw[i];
+      crowd[i] += y;
+      high_[i] += wh * y;
+      band_[i] += wb * y;
     }
-    tilt_[v] = tilt;
+  }
+
+  // The shared shelf: one two-input biquad on the weighted sums, added into the crowd sum. With no
+  // copy live and the state at 0 it has nothing to add. Its tail on silence would settle into a
+  // limit cycle of a few subnormals and never reach 0, so with no copy live a state under
+  // kShelfFloor goes to 0.
+  void shelfCrowd(float* crowd, int n, bool live) {
+    if (!live && shelfZ1_ == 0.0f && shelfZ2_ == 0.0f) return;
+    const crowd_detail::ShelfBasis b = shelf_;
+    float z1 = shelfZ1_;
+    float z2 = shelfZ2_;
+    for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
+      const float xh = high_[i];
+      const float xb = band_[i];
+      const float y = b.h0 * xh + b.q0 * xb + z1;
+      z1 = b.h1 * xh - b.a1 * y + z2;
+      z2 = b.h0 * xh - b.q0 * xb - b.a2 * y;
+      crowd[i] += y;
+    }
+    const bool settled = !live && fabsf(z1) < kShelfFloor && fabsf(z2) < kShelfFloor;
+    shelfZ1_ = settled ? 0.0f : z1;
+    shelfZ2_ = settled ? 0.0f : z2;
   }
 
   // The low cut on the crowd sum, in place. The filter runs on a local copy so its state stays in
-  // registers.
+  // registers. Its numerator sums to exactly 0, a double zero at DC, so the sum needs no DC blocker.
   void filterCrowd(float* crowd, int n) {
     Biquad hp = hp_;
     for (int i = 0; i < n; ++i) crowd[i] = hp.run(crowd[i]);
@@ -835,14 +1053,20 @@ class Crowd {
   // its plan gain times the loudness its last gap drew, which is exactly 1 with level scatter off.
   void renderChunk(const float* in, float* out, const Plan& plan, const Chunk& k) {
     std::array<float, kBlock> crowd{};
+    high_.fill(0.0f);
+    band_.fill(0.0f);
+    bool live = false;
     for (size_t v = 0; v < kVoices; ++v) {
-      if (live_[v]) mixVoice(v, k, plan.voice[v] * levelMul_[v], crowd.data());
+      if (!live_[v]) continue;
+      mixVoice(v, k, plan.voice[v] * levelMul_[v], crowd.data());
+      live = true;
     }
+    shelfCrowd(crowd.data(), k.n, live);
     filterCrowd(crowd.data(), k.n);
     const float inv = 1.0f / static_cast<float>(k.n);
     for (int i = 0; i < k.n; ++i) {
       const float f = static_cast<float>(i + 1) * inv;
-      const float wet = dc_.run(crowd[static_cast<size_t>(i)]);
+      const float wet = crowd[static_cast<size_t>(i)];
       out[i] = (lead_ + (plan.lead - lead_) * f) * in[i] + (wet_ + (plan.wet - wet_) * f) * wet;
     }
     for (size_t v = 0; v < kVoices; ++v) gain_[v] = plan.voice[v] * levelMul_[v];
@@ -852,7 +1076,12 @@ class Crowd {
 
   std::array<FormantPsolaVoice, kVoices> voice_{};
   Biquad hp_;
-  std::array<Biquad, kVoices> tilt_{};
+  crowd_detail::ShelfBasis shelf_;
+  std::array<crowd_detail::ShelfWeights, kVoices> shelfWeights_{};
+  std::array<float, kBlock> high_{};  // the copies weighted by wh, for the shared shelf's high-pass
+  std::array<float, kBlock> band_{};  // the copies weighted by wb, for its band-pass
+  float shelfZ1_ = 0.0f;
+  float shelfZ2_ = 0.0f;
   std::array<float, kVoices> tiltDb_{};
   std::array<float, kVoices> gain_{};
   std::array<bool, kVoices> live_{};
@@ -861,13 +1090,16 @@ class Crowd {
   std::array<crowd_detail::XorShift, kVoices> driftRng_{};
   std::array<float, kVoices> levelMul_ = {1.0f, 1.0f, 1.0f, 1.0f};
   crowd_detail::ContourTrack contour_;
-  crowd_detail::EpochTrack epochs_;
-  DcBlocker dc_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;
   float hpHz_ = 0.0f;
   float tiltHz_ = 0.0f;
   float widthSm_ = 1.0f;
+  crowd_detail::VoicesLaw law_;
+  LawKey lawKey_;
+  float widthCoef_ = 0.0f;
+  float slewCoef_ = 0.0f;
+  int coefN_ = -1;
   uint8_t active_ = 0;
   bool widthSet_ = false;
   bool hpSet_ = false;

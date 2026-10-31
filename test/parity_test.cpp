@@ -252,8 +252,6 @@ void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const c
   CMP(p, pos, a, b, widthLagBottom);
   CMP(p, pos, a, b, widthLagMs);
   CMP(p, pos, a, b, levelScatterDb);
-  CMP(p, pos, a, b, epochAlign);
-  CMP(p, pos, a, b, epochSearch);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {

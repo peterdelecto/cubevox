@@ -7,7 +7,9 @@
 #include "engine/dsp.h"
 
 // Monophonic pitch tracker. Two-stage YIN: a coarse search on a 12 kHz copy
-// finds the period cheaply, then a narrow search at 48 kHz refines it.
+// finds the period cheaply, then a narrow search at 48 kHz refines it when the
+// caller asks for the fine pass (Autotune's hard tune needs it; the Crowd card
+// does not).
 
 namespace cv {
 
@@ -57,9 +59,12 @@ class PitchTracker {
   // Feed n <= kBlock samples. The rings always fill, so the frame is warm. Analysis runs every
   // kHop samples while active and the panes are current. An enable rebuilds the panes over the
   // next few blocks and analyses at the end of the block that makes them whole, unless a hop
-  // already did in that block. Inactive, the result reads unvoiced.
-  void push(const float* in, int n, bool active = true) {
+  // already did in that block. Inactive, the result reads unvoiced. fine runs the 48 kHz refine on
+  // the coarse lag; without it an analysis publishes the coarse lag times kDecim. A change takes
+  // effect at the next analysis, with nothing to rebuild.
+  void push(const float* in, int n, bool active = true, bool fine = true) {
     panesThisPush_ = 0;
+    fine_ = fine;
     if (active != active_) {
       active_ = active;
       result_ = PitchResult{};
@@ -203,7 +208,7 @@ class PitchTracker {
     float tau = 0.0f;
     const bool periodic = coarse(tau);
     if (periodic && frameRms() > kMinRms) {
-      publishVoiced(refine(tau));
+      publishVoiced(fine_ ? refine(tau) : tau * static_cast<float>(kDecim));
     } else {
       result_.voiced = false;
     }
@@ -338,6 +343,7 @@ class PitchTracker {
   int decPhase_ = 0;
   int hopCount_ = 0;
   bool active_ = false;
+  bool fine_ = true;
   PitchResult result_;
 };
 
