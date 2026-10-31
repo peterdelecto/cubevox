@@ -38,7 +38,8 @@ cmake --build "$REPO/build" --target cubevox-render -j >/dev/null
 A="$WT/build/cubevox-render"
 B="$REPO/build/cubevox-render"
 
-# One case per stage at a mid setting, then the whole default layout.
+# One case per stage at a mid setting, then every stage at once, Crowd included. The default layout
+# leaves Crowd out.
 CASES=(
   "ingate|--ingate -40"
   "autotune|--autotune --response 100"
@@ -51,7 +52,7 @@ CASES=(
   "spring|--reverb springb --decay 0.5 --rmix 0.5"
   "chasm|--reverb chasm --decay 0.5 --rmix 0.5"
   "polish_eq|--polish-comp off"
-  "chain|--ingate -40 --autotune --response 100 --octave -12 --omix 0.5 --crowd --width 0.5 --voices 0.5 --on 1 --depth 0.5 --slap 0.5 --drive 0.5 --tone 0.5 --gate -40 --reverb springb --decay 0.5 --rmix 0.5"
+  "full_chain|--ingate -40 --autotune --response 100 --octave -12 --omix 0.5 --crowd --width 0.5 --voices 0.5 --on 1 --depth 0.5 --slap 0.5 --drive 0.5 --tone 0.5 --gate -40 --reverb springb --decay 0.5 --rmix 0.5"
 )
 for c in "${CASES[@]}"; do
   name="${c%%|*}"

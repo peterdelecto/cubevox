@@ -38,9 +38,24 @@ LayoutCheck fail(LayoutError error, int slot, Card card, int percent) {
 
 }  // namespace
 
+LayoutCost layoutCost(const Layout& layout) {
+  LayoutCost sum;
+  sum.avg = costs::kFixed.avg;
+  sum.worst = costs::kFixed.worst;
+  bool tracker = false;  // Autotune or Crowd is placed, so the pitch tracker runs
+  for (const Card c : layout.card) {
+    sum.avg += cardDesc(c).cost.avg;
+    sum.worst += cardDesc(c).cost.worst;
+    tracker = tracker || c == Card::Autotune || c == Card::Crowd;
+  }
+  if (tracker) {
+    sum.avg += costs::kTracker.avg;
+    sum.worst += costs::kTracker.worst;
+  }
+  return sum;
+}
+
 LayoutCheck layoutValid(const Layout& layout) {
-  int avg = costs::kFixed.avg;
-  int worst = costs::kFixed.worst;
   int reverbs = 0;
   uint32_t placed = 0;  // bit per non-Empty card already seen
   for (int s = 0; s < kSlotCount; ++s) {
@@ -51,20 +66,15 @@ LayoutCheck layoutValid(const Layout& layout) {
       if (placed & bit) return fail(LayoutError::SameCardTwice, s, c, 0);
       placed |= bit;
     }
-    const CardDesc& d = cardDesc(c);
-    avg += d.cost.avg;
-    worst += d.cost.worst;
-    if (d.group == Group::Reverb) ++reverbs;
+    if (cardDesc(c).group == Group::Reverb) ++reverbs;
   }
   if (reverbs > 1) return fail(LayoutError::TwoReverbs, 0, Card::Empty, 0);
   if (reverbs == 0) return fail(LayoutError::NoReverb, 0, Card::Empty, 0);
-#ifdef CUBEVOX_CROWDTEST
+#ifndef CUBEVOX_CROWDTEST
   // The test image places Crowd past the budget lines on purpose.
-  (void)avg;
-  (void)worst;
-#else
-  if (avg > costs::kBudgetAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, avg);
-  if (worst > costs::kBudgetWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, worst);
+  const LayoutCost cost = layoutCost(layout);
+  if (cost.avg > costs::kBudgetAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, cost.avg);
+  if (cost.worst > costs::kBudgetWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, cost.worst);
 #endif
   return LayoutCheck();
 }

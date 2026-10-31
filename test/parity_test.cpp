@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <map>
 #include <string>
+#include <type_traits>
 
 #include "core/chain_params.h"
 #include "core/registry.h"
@@ -221,38 +222,14 @@ void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& sa
   CMP(p + ".spring", pos, sa, sb, wetDb);
 }
 
-void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const cv::CrowdParams& e, bool rest) {
+// Neither side sets CrowdTuning, so both run the struct's own defaults and a tuning field needs no
+// line here. The firmware's Crowd tuning is the engine's struct.
+static_assert(std::is_same<decltype(ChainParams::crowd.tuning), cv::CrowdTuning>::value,
+              "the firmware's Crowd params carry the engine's CrowdTuning");
+
+void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const cv::CrowdParams& e) {
   CMP(p, pos, f, e, width);
   CMP(p, pos, f, e, voices);
-  if (!rest) return;
-  const cv::CrowdTuning& a = f.tuning;
-  const cv::CrowdTuning& b = e.tuning;
-  for (size_t v = 0; v < a.formantSt.size(); ++v) {
-    const std::string at = p + "[" + std::to_string(v) + "]";
-    EXPECT(at + ".formantSt", pos, a.formantSt[v], b.formantSt[v]);
-    EXPECT(at + ".pitchSt", pos, a.pitchSt[v], b.pitchSt[v]);
-    EXPECT(at + ".tiltDb", pos, a.tiltDb[v], b.tiltDb[v]);
-    EXPECT(at + ".delayMs", pos, a.delayMs[v], b.delayMs[v]);
-    EXPECT(at + ".contour", pos, a.contour[v], b.contour[v]);
-  }
-  CMP(p, pos, a, b, lagScale);
-  CMP(p, pos, a, b, tiltHz);
-  CMP(p, pos, a, b, voiceDb);
-  CMP(p, pos, a, b, trimDb);
-  CMP(p, pos, a, b, trimBottomDb);
-  CMP(p, pos, a, b, leadFadeFrom);
-  CMP(p, pos, a, b, holdFrom);
-  CMP(p, pos, a, b, hpHz);
-  CMP(p, pos, a, b, maxLagMs);
-  CMP(p, pos, a, b, gapFloorDb);
-  CMP(p, pos, a, b, scatterMs);
-  CMP(p, pos, a, b, driftCents);
-  CMP(p, pos, a, b, driftHoldS);
-  CMP(p, pos, a, b, widthKnee);
-  CMP(p, pos, a, b, widthKneeFrac);
-  CMP(p, pos, a, b, widthLagBottom);
-  CMP(p, pos, a, b, widthLagMs);
-  CMP(p, pos, a, b, levelScatterDb);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
@@ -427,12 +404,12 @@ void sweepCrowd() {
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Crowd, 0, p, fw);
     em.crowd.width = p;
-    cmpCrowd("sweep.crowd.width", p, fw.crowd, em.crowd, false);
+    cmpCrowd("sweep.crowd.width", p, fw.crowd, em.crowd);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
     applyKnob(Card::Crowd, 1, p, fw2);
     em2.crowd.voices = p;
-    cmpCrowd("sweep.crowd.voices", p, fw2.crowd, em2.crowd, false);
+    cmpCrowd("sweep.crowd.voices", p, fw2.crowd, em2.crowd);
   }
 }
 
@@ -509,7 +486,7 @@ void defaults() {
   cmpGate("default.gate", 0.0f, fw.gate, em.gate, true);
   cmpAutotune("default.autotune", 0.0f, fw.pitchFx.autotune, em.pitchFx.autotune, true);
   cmpOctave("default.octave", 0.0f, fw.pitchFx.octave, em.pitchFx.octave, true);
-  cmpCrowd("default.crowd", 0.0f, fw.crowd, em.crowd, true);
+  cmpCrowd("default.crowd", 0.0f, fw.crowd, em.crowd);
   cmpUnison("default.unison", 0.0f, fw.unison, em.unison, true);
   cmpSlapback("default.slapback", 0.0f, fw.slapback, em.slapback, true);
   cmpDistortion("default.distortion", 0.0f, fw.distortion, em.distortion, true);

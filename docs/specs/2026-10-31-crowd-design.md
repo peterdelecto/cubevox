@@ -181,10 +181,10 @@ namespace cv {
 struct CrowdTuning {
   std::array<float, 4> pitchSt     = {-1.75f, 2.75f, -2.5f, 1.0f};   // pitch offset 2^(st / 12); WIDTH 1 sounds 2/3 of it
   std::array<float, 4> formantSt   = {-1.75f, -1.0f, -1.0f, -1.5f}; // grain playback rate 2^(st / 12)
-  std::array<float, 4> tiltDb      = {-3.0f, -4.0f, 3.0f, 5.0f};     // high shelf gain above tiltHz
+  std::array<float, 4> shelfDb     = {-3.0f, -4.0f, 3.0f, 5.0f};     // high shelf gain above shelfHz
   std::array<float, 4> delayMs     = {40.0f, 100.0f, 70.0f, 75.0f};  // lag behind the lead before lagScale
   float lagScale     = 1.2f;      // a copy's lag is delayMs times this times the WIDTH multiplier
-  float tiltHz       = 2500.0f;
+  float shelfHz      = 2500.0f;
   float voiceDb      = -9.0f;     // one voice against the lead at unity
   float trimDb       = 1.7f;      // level rule residue at WIDTH 1, -12..12
   float trimBottomDb = 1.0f;      // the same at WIDTH 0; between, the trim follows f(w), -12..12
@@ -247,9 +247,9 @@ ring → voice (PSOLA grains at playback rate f_v, pitch ratio r_v, read delay D
    Unvoiced frames keep the last period, as Autotune's voice does. After an unvoiced run of 162 ms,
    or while the tracker reads a note outside its range, the copies drop their moves (item 4).
 5. The four tone shelves share one filter. Each copy's shelf is 1 + wh_v HP + wb_v BP, where HP and
-   BP share one Butterworth pole pair at 1.05 × tiltHz. A copy adds into the plain crowd sum and,
+   BP share one Butterworth pole pair at 1.05 × shelfHz. A copy adds into the plain crowd sum and,
    weighted, into two sums that one two-input biquad filters for all four. The weights come from a
-   least-squares fit to the copy's RBJ `setHighShelf(tiltHz, tiltDb[v])` when the tuning moves, and
+   least-squares fit to the copy's RBJ `setHighShelf(shelfHz, shelfDb[v])` when the tuning moves, and
    are exactly 0 at 0 dB. The crowd sum has one `setHighPass(hpHz, kButterworthQ)`, set at reset and
    when the tuning changes.
 
@@ -302,12 +302,12 @@ exactly 0, a double zero at DC, so the wet sum carries no DC and needs no DC blo
    unchanged by this spec; the owner listens to the card in the module view.
    `--layout` must print ok. The tuning nodes are Formants (4 sliders, −4..+4 st), Pitch (4,
    −12..+12 st, the full values), Delay (4, 5..150 ms, lagScale 0.5..2, Lag at bottom 0.2..1 and Lag at top
-   0..60 ms), Tone (4 tiltDb and
-   tiltHz), Scatter (scatterMs 0..30 ms, driftCents 0..50) and Solo (4 checkboxes). Print tuning lists every CrowdTuning field. The Crowd
+   0..60 ms), Tone (4 shelfDb and
+   shelfHz), Scatter (scatterMs 0..30 ms, driftCents 0..50) and Solo (4 checkboxes). Print tuning lists every CrowdTuning field. The Crowd
    tuning has no state keys.
 2. cubevox-render: `--crowd`, `--width <0..1>`, `--voices <0..1>`; tuning keys prefixed `crowd`
-   (`crowdVoiceDb`, `crowdTrimDb`, `crowdFormantSt0..3`, `crowdPitchSt0..3`, `crowdTiltDb0..3`,
-   `crowdTiltHz`, `crowdDelayMs0..3`, `crowdLagScale`, `crowdScatterMs`, `crowdDriftCents`, `crowdHpHz`,
+   (`crowdVoiceDb`, `crowdTrimDb`, `crowdFormantSt0..3`, `crowdPitchSt0..3`, `crowdShelfDb0..3`,
+   `crowdShelfHz`, `crowdDelayMs0..3`, `crowdLagScale`, `crowdScatterMs`, `crowdDriftCents`, `crowdHpHz`,
    `crowdMaxLagMs`, `crowdWidthLagBottom`, `crowdWidthLagMs`, `crowdTrimBottomDb`). Every value must
    be finite, and every crowd key is refused outside the range the engine clamps to (correctness
    pass item 6). `pitchOn` becomes true when the crowd card is on. tools/engine_ab.sh gains a
@@ -589,7 +589,7 @@ range.
 pitchSt        = {-1.75, 2.75, -2.5, 1} // st before the WIDTH pitch top; WIDTH 1 sounds 2/3 of them:
                                         // -1.167, +1.833, -1.667, +0.667 st (owner 2026-10-31)
 formantSt      = {-1.75, -1, -1, -1.5}  // st at WIDTH 1, whole
-tiltDb         = {-3, -4, 3, 5}         // dB, the tone shelf above tiltHz
+shelfDb        = {-3, -4, 3, 5}         // dB, the tone shelf above shelfHz
 delayMs        = {40, 100, 70, 75}      // ms before lagScale, each 5..150
 maxLagMs       = 150      // ms, the ceiling before scatter; the ring holds 150 + 12 ms and the longest grain
 scatterMs      = 12       // 0..30 ms

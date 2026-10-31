@@ -7,16 +7,20 @@
 // pins every knob at its top position. The second catches loads pinned knobs cannot show: it
 // switches Autotune on with the clip playing, and sweeps reverb MIX and SEMITONES end to end. A
 // card's worst is the larger of the two passes. The worst figure is the lowest worst over repeated
-// runs, so interrupt time landing in a block does not count. The pitch tracker is costed once,
-// inside Autotune; Octave is the pitch slot with Octave on minus with it off. Chasm is costed in
-// the reverb slot. The tail after the slots (comp, EQ, ceiling, BYPASS mix, conversion) has its
-// own rows, read from the kStatComp and kStatEq buckets and the block total minus the slots. The
-// kStatEq bucket holds both halves of POLISH EQ, the front half ahead of the slots and the back
-// half after the comp.
+// runs, so interrupt time landing in a block does not count. The pitch tracker is costed once, as
+// kTracker, and Autotune's row holds the rest of its measured total; Octave is the pitch slot with
+// Octave on minus with it off. Chasm is costed in the reverb slot. The tail after the slots (comp,
+// EQ, ceiling, BYPASS mix, conversion) has its own rows, read from the kStatComp and kStatEq
+// buckets and the block total minus the slots. The kStatEq bucket holds both halves of POLISH EQ,
+// the front half ahead of the slots and the back half after the comp.
 //
-// A layout is accepted when both column sums over its cards, plus the fixed term, stay under
-// their lines. The trailing comments give the measured cycles, mean then worst; a row marked
-// measured=false is an estimate until a board measures it.
+// A host figure converts to a board estimate at 50.4k board cycles per host microsecond, which is
+// 7.875 % of a block (the ratio Unison's host time gives against its 46.9k on the board).
+//
+// A layout is accepted when both column sums over its cards, plus the fixed term and, once, the
+// tracker when Autotune or Crowd is placed, stay under their lines. The trailing comments give the
+// measured cycles, mean then worst; a row marked measured=false is an estimate until a board
+// measures it.
 
 #pragma once
 
@@ -37,7 +41,7 @@ constexpr Cost operator+(Cost a, Cost b) {
 
 constexpr Cost kEmpty{0, 0, true};
 constexpr Cost kInputGate{4, 5, true};     // 23.7k / 26.0k, the board's figures for the earlier tuning; the revised one runs at 0.97 of them on the host, so they bound it until a rerun
-constexpr Cost kAutotune{14, 21, true};    // 83.2k / 131.9k, tracker included
+constexpr Cost kAutotune{5, 5, true};      // 83.2k / 131.9k less kTracker: its voice and what the fine pass adds
 constexpr Cost kOctave{5, 5, true};        // 25.7k / 27.2k, its own voice only
 constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
 constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
@@ -45,7 +49,20 @@ constexpr Cost kDistortion{8, 10, true};   // 46.4k / 62.1k
 constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
 constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the board's boot worst 107.4k against the two-half engine's 72.0k (1.49x of 61.9k); two-pass bench pending
 constexpr Cost kReverbChasm{16, 16, true};   // 97.6k / 98.4k
-constexpr Cost kCrowd{19, 21, false};          // estimate: four voices at ~28k, EQ ~6k, room ~14k
+
+// The pitch tracker, its history fill and its coarse analysis, which Autotune and Crowd share and a
+// layout pays once. Estimate of 2026-10-31 from the host after the CPU pass: PitchFx at 1.04 us per
+// block with Crowd on is 8.2 points, rounded up to 9. Autotune's row loses the same, so its total
+// holds. The worst is the mean plus the 7 points that Autotune's row showed between its mean and its
+// worst, taken as the tracker's hop block; no worst block was measured. A board bench is still owed.
+constexpr Cost kTracker{9, 16, false};
+
+// Estimate of 2026-10-31 from the host after the CPU pass: Crowd::process at 1.61 us per block (VOICES
+// 80 %, WIDTH 50 %, default tuning, Autotune off) is 12.7 points, rounded up to 13. The parts are the
+// four copies' grains, the shared tone shelf, the low cut, the gap rule and the mix; the tracker is
+// kTracker. The worst is the mean plus the 2 points the earlier row carried; no worst block was
+// measured. A board bench is still owed.
+constexpr Cost kCrowd{13, 15, false};
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.

@@ -6,6 +6,7 @@
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
+#include "engine/pitch.h"
 
 // One pitch-shifted voice by pitch-synchronous overlap-add (Lent 1989 form).
 // Grains two periods long are cut on a grid spaced one input period apart
@@ -14,13 +15,22 @@
 namespace cv {
 
 // The shared input ring holds the Crowd card's longest lag, the timing scatter its working set rides
-// on top of that lag, and the reach of its longest grain (two 686-sample periods and a pad) behind
-// both. 9,156 samples, 190.75 ms. Autotune reads under 2,100 samples back and Octave under 3,850.
+// on top of that lag, and the reach of its longest grain (two periods at the tracker's longest, and
+// a pad) behind both. 9,156 samples, 190.75 ms. Autotune reads under 2,100 samples back and Octave
+// under 3,850.
 constexpr int kCrowdMaxLagMs = 150;
 constexpr int kCrowdScatterMs = 12;
-constexpr int kCrowdGrainReach = 2 * 686 + 8;
+constexpr int kCrowdGrainReach = 2 * PitchTracker::kMaxPeriod + 8;
 constexpr int kVoiceRingLen = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000) + kCrowdGrainReach;
 using VoiceRing = std::array<float, kVoiceRingLen>;
+
+// The pitch ratio a PSOLA voice clamps to, and the delays a grain reads at. A grain never reads
+// closer to the head than the near bound or further back than the ring holds. The periods a voice
+// plays are the tracker's, PitchTracker::kMinPeriod to kMaxPeriod.
+constexpr float kMinPitchRatio = 0.5f;
+constexpr float kMaxPitchRatio = 2.0f;
+constexpr float kMinReadDelay = 3.0f;
+constexpr float kMaxReadDelay = kVoiceRingLen - 4.0f;
 
 class PsolaVoice {
  public:
@@ -35,7 +45,7 @@ class PsolaVoice {
 
   // Output latency in samples. Each grain reads the input at a fixed delay;
   // kGrainDelay keeps a grain at the longest period behind the write head.
-  void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinDelay + 1.0f, kGrainDelay); }
+  void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinReadDelay + 1.0f, kGrainDelay); }
   float grainDelay() const { return grainDelay_; }
 
   // One output sample. writeCount is the ring index of the sample just
@@ -44,7 +54,7 @@ class PsolaVoice {
   float tick(const VoiceRing& ring, long writeCount, float period, float ratio) {
     if (period <= 0.0f) return 0.0f;
     const float p = clampf(period, kMinPeriod, kMaxPeriod);
-    const float r = clampf(ratio, kMinRatio, kMaxRatio);
+    const float r = clampf(ratio, kMinPitchRatio, kMaxPitchRatio);
     const float outPeriod = p / r;
     const int head = static_cast<int>(writeCount);
 
@@ -71,12 +81,8 @@ class PsolaVoice {
     bool active = false;
   };
 
-  static constexpr float kMinPeriod = 48.0f;
-  static constexpr float kMaxPeriod = 686.0f;
-  static constexpr float kMinRatio = 0.5f;
-  static constexpr float kMaxRatio = 2.0f;
-  static constexpr float kMinDelay = 3.0f;
-  static constexpr float kMaxDelay = kVoiceRingLen - 4.0f;
+  static constexpr float kMinPeriod = static_cast<float>(PitchTracker::kMinPeriod);
+  static constexpr float kMaxPeriod = static_cast<float>(PitchTracker::kMaxPeriod);
 
   static_assert(kGrainDelay >= 1.5f * kMaxPeriod + 4.0f, "grains would cross the write head");
 
@@ -101,7 +107,7 @@ class PsolaVoice {
       if (g.age > slot->age) slot = &g;
     }
     // The delay stays constant over the grain, so the fraction is fixed.
-    const float delay = clampf(centre + p - lead, kMinDelay, kMaxDelay);
+    const float delay = clampf(centre + p - lead, kMinReadDelay, kMaxReadDelay);
     const float pos = static_cast<float>(head) - delay;
     const float fl = floorf(pos);
     slot->idx = wrap(static_cast<int>(fl));

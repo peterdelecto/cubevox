@@ -7,6 +7,7 @@
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
+#include "engine/pitch.h"
 #include "engine/pitch_fx.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
@@ -19,35 +20,36 @@
 //
 // VOICES fades the copies in one at a time (low, high, low, high), then fades the lead out, so the
 // top of the knob is the crowd alone. Total power is unity at every position. WIDTH spreads the
-// copies' pitch and formant offsets from none to their full values, and stretches their lags. The
-// bottom tenth of the knob is for instruments and melodic lines, where the copies are plain delayed
-// doubles of the lead, exactly on its pitch at WIDTH 0. WIDTH also scales the drift and the contour,
-// so nothing else moves a copy there. A copy changes its lag only in a quiet gap, so it never bends
-// in pitch mid-word. A gap is quiet against the recent phrase level, so gaps over a stage's noise
-// floor count too. Scatter gives each copy a fresh timing offset at every gap, and drift walks each
-// copy's pitch slowly around its offset. On a note the tracker cannot follow, or after a long
-// unvoiced run, the copies drop their moves and play plain delayed doubles.
+// copies' formant offsets from none to their full values and their pitch offsets from none to two
+// thirds of the listed ones (kWidthPitchTop), and it stretches their lags. The bottom tenth of the
+// knob is for instruments and melodic lines, where the copies are plain delayed doubles of the lead,
+// exactly on its pitch at WIDTH 0. WIDTH also scales the drift and the contour, so nothing else
+// moves a copy there. A copy changes its lag only in a quiet gap, so it never bends in pitch
+// mid-word. A gap is quiet against the recent phrase level, so gaps over a stage's noise floor
+// count too. Scatter gives each copy a fresh timing offset at every gap, and drift walks each copy's
+// pitch slowly around its offset. On a note the tracker cannot follow, or after a long unvoiced
+// run, the copies drop their moves and play plain delayed doubles.
 //
 // Two more controls make a copy read as a person and not as Adam shifted. Level scatter gives a
 // copy a new loudness at every gap. Contour sets how much of Adam's rises and falls a copy follows.
 // Both stay inside what a human voice does, and the engine clamps each to that range. Each is
-// neutral at 0 (contour 1), and the output is then bit for bit the output without it. The defaults
-// are the owner's working set (owner 2026-10-31). Grains are cut on the period grid.
+// neutral at 0 (contour 1), where it adds nothing. The defaults are the owner's working set (owner
+// 2026-10-31). Grains are cut on the period grid.
 
 namespace cv {
 
 struct CrowdTuning {
-  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -2.5f, 1.0f};     // full pitch offset 2^(st / 12) at WIDTH 1
+  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -2.5f, 1.0f};     // offset before the WIDTH pitch top (2/3 sounds at WIDTH 1)
   std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at WIDTH 1
-  std::array<float, 4> tiltDb = {-3.0f, -4.0f, 3.0f, 5.0f};        // high shelf gain above tiltHz
+  std::array<float, 4> shelfDb = {-3.0f, -4.0f, 3.0f, 5.0f};       // high shelf gain above shelfHz
   std::array<float, 4> delayMs = {40.0f, 100.0f, 70.0f, 75.0f};    // lag behind the lead before lagScale
   float lagScale = 1.2f;       // a copy's lag is delayMs times this
-  float tiltHz = 2500.0f;
+  float shelfHz = 2500.0f;
   float voiceDb = -9.0f;       // one voice against the lead at unity
   float trimDb = 1.7f;         // level rule residue at WIDTH 1
   float trimBottomDb = 1.0f;   // the same at WIDTH 0; between, the trim follows the formant factor
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
-  float holdFrom = 0.75f;      // part of each voice's fifth spent fading; the rest holds
+  float holdFrom = 0.75f;      // part of each voice's share of the knob below leadFadeFrom spent fading; the rest holds
   float hpHz = 120.0f;         // low cut on the crowd sum
   float maxLagMs = 150.0f;     // ceiling on a copy's lag before scatter, up to kCrowdMaxLagMs
   float gapFloorDb = -50.0f;   // a copy's read point under this level counts as a gap
@@ -96,25 +98,20 @@ namespace crowd_detail {
 constexpr size_t kVoices = 4;
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
 
-constexpr float kMinPeriod = 48.0f;
-constexpr float kMaxPeriod = 686.0f;
-constexpr float kMinRatio = 0.5f;
-constexpr float kMaxRatio = 2.0f;
+// The periods a copy plays are the ones the tracker reports.
+constexpr float kMinPeriod = static_cast<float>(PitchTracker::kMinPeriod);
+constexpr float kMaxPeriod = static_cast<float>(PitchTracker::kMaxPeriod);
+
+// The range of a grain's playback rate, 2^(formant / 12).
 constexpr float kMinRate = 0.5f;
 constexpr float kMaxRate = 2.0f;
-
-// A grain never reads closer to the head than this, or further back than the ring holds. The pitch
-// stage writes a whole call before the copies read it, so a voice takes the call's samples off the
-// far end as well.
-constexpr float kMinReadDelay = 3.0f;
-constexpr float kMaxReadDelay = kVoiceRingLen - 4.0f;
 
 // The output lags the input by the read delay. A grain centred on a mark needs one and a half
 // periods of lookahead, so the delay never drops below that plus a pad, and never rises past what
 // leaves room in the ring for the grain's reach and drift.
 constexpr float kFloorPeriods = 1.5f;
 constexpr float kFloorPad = 4.0f;
-constexpr float kDelayCeil = kVoiceRingLen - 2.0f * kMaxPeriod - 8.0f;
+constexpr float kDelayCeil = static_cast<float>(kVoiceRingLen - kCrowdGrainReach);
 
 constexpr int kMaxMarkSteps = 128;
 constexpr int kQuietBlocks = 2;        // blocks under the gap floor before a copy changes its lag
@@ -130,7 +127,7 @@ constexpr float kMaxContour = 1.4f;
 // emulator's sliders read them. The offsets need no clamp of their own, since the ratio and rate
 // clamps of 0.5..2 stop them at an octave either way.
 constexpr float kMaxOffsetSt = 12.0f;
-constexpr float kMaxTiltDb = 12.0f;
+constexpr float kMaxShelfDb = 12.0f;
 constexpr float kMinDelayMs = 5.0f;  // up to kCrowdMaxLagMs
 constexpr float kMinLagScale = 0.5f;
 constexpr float kMaxLagScale = 2.0f;
@@ -157,11 +154,8 @@ constexpr float kGapRearm = 4.0f;
 // longer, so the copies go plain without bending a word.
 constexpr int kPlainAfter = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000);
 
-// Samples in a whole number of milliseconds.
-constexpr int ms(int v) { return v * kSampleRate / 1000; }
-
 static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for a read delay");
-static_assert(ms(kCrowdMaxLagMs + kCrowdScatterMs) <= kDelayCeil,
+static_assert(static_cast<float>(kCrowdMaxLagMs + kCrowdScatterMs) * kSmpPerMs <= kDelayCeil,
               "the longest lag, its scatter and the longest grain do not fit the ring");
 
 // Clamps a lag to what the voice can play at this pitch period.
@@ -286,7 +280,7 @@ class FormantPsolaVoice {
     p_ = clampf(period, kMinPeriod, kMaxPeriod);
     rate_ = clampf(rate, kMinRate, kMaxRate);
     step_ = static_cast<int>(rate_ * static_cast<float>(1 << kFracBits) + 0.5f);
-    const float r = clampf(ratio, kMinRatio, kMaxRatio);
+    const float r = clampf(ratio, kMinPitchRatio, kMaxPitchRatio);
     outPeriod_ = p_ / r;
     dur_ = 2.0f * p_ / rate_;
     turn_ = kTurn / dur_;
@@ -747,11 +741,11 @@ inline VoicesLaw voicesLaw(float k, const CrowdTuning& t, uint8_t solo = 0) {
 
 // The four tone shelves share one filter. A shelf is linear, so each copy's shelf is written as
 // 1 + wh HP + wb BP, where HP and BP are the high-pass and band-pass of one Butterworth pole pair at
-// kShelfPoleScale times tiltHz. Each copy then adds into a plain sum and two weighted sums, and one
+// kShelfPoleScale times shelfHz. Each copy then adds into a plain sum and two weighted sums, and one
 // two-input biquad filters the weighted sums for all four.
 constexpr float kShelfPoleScale = 1.05f;
 constexpr int kShelfFitPoints = 24;
-constexpr float kShelfFitBelow = 0.2f;    // the fit spans 0.2 to 4.8 times tiltHz, the shelf's turn
+constexpr float kShelfFitBelow = 0.2f;    // the fit spans 0.2 to 4.8 times shelfHz, the shelf's turn
 constexpr float kShelfFitAbove = 4.8f;
 constexpr float kShelfFitTopHz = 20000.0f;
 
@@ -956,12 +950,11 @@ class Crowd {
   // again only when n changes.
   void setCoefs(int n) {
     if (n == coefN_) return;
-    const float samples = static_cast<float>(n);
-    widthCoef_ = 1.0f - expf(-samples / (kSampleRate * smooth::kSmoothSec));
-    slewCoef_ = 1.0f - expf(-samples / (kSampleRate * crowd_detail::kDriftSlewS));
-    riseCoef_ = 1.0f - expf(-samples / (kSampleRate * crowd_detail::kPhraseRiseS));
-    fallCoef_ = 1.0f - expf(-samples / (kSampleRate * crowd_detail::kPhraseFallS));
-    perSample_ = 1.0f / samples;
+    widthCoef_ = smooth::blockCoef(smooth::kSmoothSec, n);
+    slewCoef_ = smooth::blockCoef(crowd_detail::kDriftSlewS, n);
+    riseCoef_ = smooth::blockCoef(crowd_detail::kPhraseRiseS, n);
+    fallCoef_ = smooth::blockCoef(crowd_detail::kPhraseFallS, n);
+    perSample_ = 1.0f / static_cast<float>(n);
     coefN_ = n;
   }
 
@@ -1005,8 +998,8 @@ class Crowd {
     live_[v] = false;
   }
 
-  // The low cut on the crowd sum. The setter runs on the first block after a reset and when the
-  // tuning moved.
+  // The low cut on the crowd sum. The setter runs on the first block and when the tuning moved. A
+  // reset keeps the coefficients, since they depend on the tuning alone.
   void setLowCut(const CrowdTuning& t) {
     if (hpSet_ && t.hpHz == hpHz_) return;
     hp_.setHighPass(t.hpHz, kButterworthQ);
@@ -1014,19 +1007,19 @@ class Crowd {
     hpSet_ = true;
   }
 
-  // The shared shelf's poles and each copy's weights, set on the first block and when the tuning
-  // moved. They depend on the tuning alone, so a reset keeps them.
-  void setTilts(const CrowdTuning& t) {
-    const bool hzMoved = !tiltSet_ || t.tiltHz != tiltHz_;
-    if (hzMoved) shelf_ = crowd_detail::shelfBasis(t.tiltHz);
+  // The shared shelf's poles and each copy's weights. The setter runs on the first block and when
+  // the tuning moved. A reset keeps them, since they depend on the tuning alone.
+  void setShelves(const CrowdTuning& t) {
+    const bool hzMoved = !shelfSet_ || t.shelfHz != shelfHz_;
+    if (hzMoved) shelf_ = crowd_detail::shelfBasis(t.shelfHz);
     for (size_t v = 0; v < kVoices; ++v) {
-      if (!hzMoved && t.tiltDb[v] == tiltDb_[v]) continue;
-      const float db = clampf(t.tiltDb[v], -crowd_detail::kMaxTiltDb, crowd_detail::kMaxTiltDb);
-      shelfWeights_[v] = crowd_detail::fitShelf(shelf_, t.tiltHz, db);
-      tiltDb_[v] = t.tiltDb[v];
+      if (!hzMoved && t.shelfDb[v] == shelfDb_[v]) continue;
+      const float db = clampf(t.shelfDb[v], -crowd_detail::kMaxShelfDb, crowd_detail::kMaxShelfDb);
+      shelfWeights_[v] = crowd_detail::fitShelf(shelf_, t.shelfHz, db);
+      shelfDb_[v] = t.shelfDb[v];
     }
-    tiltHz_ = t.tiltHz;
-    tiltSet_ = true;
+    shelfHz_ = t.shelfHz;
+    shelfSet_ = true;
   }
 
   // Copy v's lag target in samples. The scale and the WIDTH multiplier stretch the delay and the
@@ -1105,7 +1098,7 @@ class Crowd {
   void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, float period, int first, int n) {
     const CrowdTuning& t = p.tuning;
     setLowCut(t);
-    setTilts(t);
+    setShelves(t);
     const PitchResult& pr = pitch.pitch();
     contour_.step(period, pr.voiced, slewCoef_);
     const float pitchWidth = plan.width * crowd_detail::kWidthPitchTop;
@@ -1157,8 +1150,8 @@ class Crowd {
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
   // The copy then sits contour times as far from his mean as he does. Contour 1 adds exactly 0. The
-  // WIDTH factor pulls the contour toward 1, so it is exactly 1 at the bottom of WIDTH and the
-  // slider value at WIDTH 1.
+  // WIDTH factor pulls the contour toward 1, so it is exactly 1 at the bottom of WIDTH and
+  // 1 + (contour - 1) * kWidthPitchTop at WIDTH 1.
   float contourOctaves(size_t v, const CrowdTuning& t, float factor) const {
     const float c = clampf(t.contour[v], crowd_detail::kMinContour, crowd_detail::kMaxContour);
     return c == 1.0f ? 0.0f : (c - 1.0f) * factor * contour_.deviation();
@@ -1252,7 +1245,7 @@ class Crowd {
   std::array<float, kBlock> band_{};  // the copies weighted by wb, for its band-pass
   float shelfZ1_ = 0.0f;
   float shelfZ2_ = 0.0f;
-  std::array<float, kVoices> tiltDb_{};
+  std::array<float, kVoices> shelfDb_{};
   std::array<float, kVoices> gain_{};
   std::array<bool, kVoices> live_{};
   std::array<crowd_detail::CopyLag, kVoices> lag_{};
@@ -1264,7 +1257,7 @@ class Crowd {
   float lead_ = 1.0f;
   float wet_ = 0.0f;
   float hpHz_ = 0.0f;
-  float tiltHz_ = 0.0f;
+  float shelfHz_ = 0.0f;
   float widthSm_ = 1.0f;
   crowd_detail::VoicesLaw law_;
   LawKey lawKey_;
@@ -1286,7 +1279,7 @@ class Crowd {
   uint8_t active_ = 0;
   bool widthSet_ = false;
   bool hpSet_ = false;
-  bool tiltSet_ = false;
+  bool shelfSet_ = false;
   bool idle_ = true;
 };
 

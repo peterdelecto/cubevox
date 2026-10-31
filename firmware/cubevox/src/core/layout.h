@@ -45,8 +45,17 @@ struct LayoutCheck {
   bool ok() const { return error == LayoutError::None; }
 };
 
+// The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
+// placed card's row, and the pitch tracker's row once when Autotune or Crowd is placed. Every card id
+// must be in range.
+struct LayoutCost {
+  int avg = 0;
+  int worst = 0;
+};
+LayoutCost layoutCost(const Layout& layout);
+
 // Placement rules of the registry spec: ids in range, no card twice (Empty excepted), exactly one reverb card, and the
-// placed costs plus the fixed term under the average and worst-block lines.
+// layoutCost sums under the average and worst-block lines.
 LayoutCheck layoutValid(const Layout& layout);
 
 // Short readable reason for a failed check, for example "two reverb cards". Empty string when ok.

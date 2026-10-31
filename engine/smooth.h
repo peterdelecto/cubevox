@@ -19,6 +19,11 @@ inline float coef(float sec) {
   return sec <= 0.0f ? 1.0f : 1.0f - expf(-1.0f / (sec * kSampleRate));
 }
 
+// Coefficient for a smoother that steps once per block of n samples, with time constant sec.
+inline float blockCoef(float sec, int n) {
+  return sec <= 0.0f ? 1.0f : 1.0f - expf(-static_cast<float>(n) / (sec * kSampleRate));
+}
+
 // The 20 ms coefficient, computed once; per-sample callers must not call coef().
 inline const float kSmoothCoef = coef(kSmoothSec);
 
