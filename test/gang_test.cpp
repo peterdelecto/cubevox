@@ -1,8 +1,8 @@
 // Gang card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
 // of different colour, the WIDTH law, the level law across VOICES, the lead leaving, the voice
 // count and fade order, the solo, the lag following its scale across a gap and holding inside a
-// burst, timing scatter, pitch drift, the tracker running without Autotune, the four enhancements
-// (every control at its default is the pinned engine bit for bit, level scatter, contour, breath, the
+// burst, timing scatter, pitch drift, the tracker running without Autotune, the three enhancements
+// (every control at its default is the pinned engine bit for bit, level scatter, contour, the
 // shadow ring, the pulse marks and the pulse cut on a glottal pulse train and the human-voice ranges),
 // and a host timing against Unison. Every run feeds a PitchFx
 // through its pass-through path first, so the ring is written and the tracker runs, as the chain
@@ -246,11 +246,22 @@ Signal run(const Signal& in, const cv::GangParams& p, Probe* probe = nullptr) {
   return runSwitch(in, p, p, static_cast<int>(in.size()), probe);
 }
 
+// The shipped defaults are the owner's working set (contour, level scatter, timing scatter, drift and
+// epoch align all on). A test starts from this neutral tuning and turns on only what it measures.
+void neutralize(cv::GangTuning& t) {
+  t.scatterMs = 0.0f;
+  t.driftCents = 0.0f;
+  t.levelScatterDb = 0.0f;
+  t.contour = {1.0f, 1.0f, 1.0f, 1.0f};
+  t.epochAlign = false;
+}
+
 cv::GangParams knobs(float voices, float width) {
   cv::GangParams p;
   p.on = true;
   p.voices = voices;
   p.width = width;
+  neutralize(p.tuning);
   return p;
 }
 
@@ -440,69 +451,116 @@ bool testPitchMoves() {
   return ok;
 }
 
-// Copy 0 alone at WIDTH 0, 0.5 and 1. Its f0 sits a hair (0.01 st) off the 220 Hz lead at 0, at
-// half its full offset at 0.5 and at the full offset at 1. Formants, lag and tone shelf stay where
-// they are, so the lag reads the same at every WIDTH.
+// The WIDTH factors of the owner's law, written out here so the test does not lean on the engine's
+// code. Both are linear through (0, floor), (0.1, 0.08) and (1, 1), the pitch floor 0.003 and the
+// formant floor 0.
+double pitchFactor(double w) { return w <= 0.1 ? 0.003 + 0.077 * (w / 0.1) : 0.08 + 0.92 * ((w - 0.1) / 0.9); }
+double formantFactor(double w) { return w <= 0.1 ? 0.08 * (w / 0.1) : 0.08 + 0.92 * ((w - 0.1) / 0.9); }
+
+// f0 of a copy of the 220 Hz tone, read at its second harmonic over second 1..2 and halved, near
+// the f0 wanted.
+double copyHz(const Signal& out, double want) { return peakHz(out, kRate, kRate, 2.0 * want) / 2.0; }
+
+// The -3 st copy (index 2, formant -1 st) alone at WIDTH 0, 0.1, 0.5 and 1. Its pitch offset is -3 st
+// times the pitch factor, about 1 cent at 0, 24 cents at 0.1 (the knee) and 0.489 of the full offset
+// at 0.5. Its formant move is the log of its grain playback rate over the same log at WIDTH 1, read
+// from the engine: none at 0, 8 % at 0.1 and 0.489 at 0.5. (A spectral centroid does not read it,
+// because the grain windows make the centroid's slope depend on the pitch ratio; at WIDTH 0 the
+// output itself shows it, which equals the output of a copy with no formant offset.) Lag and tone
+// shelf stay where they are, so the lag reads the same at every WIDTH.
 bool testWidthLaw() {
-  const Signal in = tone(220.0, 2 * kRate);
+  const Signal tn = tone(220.0, 2 * kRate);
+  const Signal vow = vowel(220.0, 2 * kRate);
   const cv::GangTuning d;
-  const double full = static_cast<double>(d.pitchSt[0]);
+  const size_t v = 2;
+  const double full = static_cast<double>(d.pitchSt[v]);
   const struct {
     float width;
-    double wantSt;
     double tolCents;
-  } rows[] = {{0.0f, 0.0, 2.0}, {0.5f, 0.5 * full, 10.0}, {1.0f, full, 10.0}};
+  } rows[] = {{0.0f, 2.0}, {0.1f, 3.0}, {0.5f, 10.0}, {1.0f, 10.0}};
+  constexpr double kMoveTol = 0.02;
   bool ok = true;
-  float lagAt[3] = {0.0f, 0.0f, 0.0f};
+  float lagAt[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  double rate[4] = {0.0, 0.0, 0.0, 0.0};
+  double hz[4] = {0.0, 0.0, 0.0, 0.0};
   size_t i = 0;
   for (const auto& r : rows) {
-    cv::GangParams p = alone(0);
+    const double w = static_cast<double>(r.width);
+    cv::GangParams p = alone(v);
     p.width = r.width;
-    const Signal out = run(in, p);
-    lagAt[i++] = gGang.lagSamples(0);
-    const double want = 220.0 * std::pow(2.0, r.wantSt / 12.0);
-    const double hz = medianHz(out);
-    const double err = hz > 0.0 ? cents(hz, want) : 9999.0;
+    const Signal out = run(tn, p);
+    lagAt[i] = gGang.lagSamples(0);
+    rate[i] = static_cast<double>(gGang.grainRate(0));
+    const double want = 220.0 * std::pow(2.0, full * pitchFactor(w) / 12.0);
+    hz[i] = copyHz(out, want);
+    const double err = cents(hz[i], want);
     char name[40];
-    std::snprintf(name, sizeof name, "width law, WIDTH %.0f %%", static_cast<double>(r.width * 100.0f));
-    ok &= report(name, std::fabs(err) <= r.tolCents, "f0=%.3f Hz, want %.3f Hz, err=%.2f cents", hz, want, err);
-    std::printf("info width %.2f copy 0 f0 %.3f Hz, %+.2f cents from the 220 Hz lead\n", static_cast<double>(r.width), hz,
-                hz > 0.0 ? cents(hz, 220.0) : 9999.0);
+    std::snprintf(name, sizeof name, "width law, WIDTH %.0f %%", w * 100.0);
+    ok &= report(name, std::fabs(err) <= r.tolCents, "f0=%.3f Hz, want %.3f Hz, err=%.2f cents (+-%.0f)", hz[i], want, err,
+                 r.tolCents);
+    ++i;
   }
+  for (size_t k = 0; k < 4; ++k) {
+    const double w = static_cast<double>(rows[k].width);
+    const double move = std::log(rate[k]) / std::log(rate[3]);
+    char name[48];
+    std::snprintf(name, sizeof name, "width law formant, WIDTH %.0f %%", w * 100.0);
+    ok &= report(name, std::fabs(move - formantFactor(w)) <= kMoveTol, "formant move %.3f of full, want %.3f (+-%.2f)", move,
+                 formantFactor(w), kMoveTol);
+    std::printf("info width %.2f copy 3 f0 %.3f Hz, %+.2f cents from the 220 Hz lead, formant move %.1f %% of full\n", w, hz[k],
+                cents(hz[k], 220.0), 100.0 * move);
+  }
+
+  // At WIDTH 0 the vowel through the copy is the vowel through a copy with no formant offset.
+  cv::GangParams withFormant = alone(v);
+  withFormant.width = 0.0f;
+  cv::GangParams noFormant = withFormant;
+  noFormant.tuning.formantSt[0] = 0.0f;
+  const Signal a = run(vow, withFormant);
+  const Signal b = run(vow, noFormant);
+  size_t differ = 0;
+  for (size_t k = 0; k < a.size(); ++k) differ += a[k] != b[k] ? 1 : 0;
+  ok &= report("width law no formant at 0", differ == 0, "WIDTH 0 with a -1 st formant differs from one with none in %.0f samples (0)",
+               static_cast<double>(differ));
   const double wantLag = static_cast<double>(d.delayMs[0] * d.lagScale) * cv::gang_detail::kSmpPerMs;
   ok &= report("width keeps the lag",
-               lagAt[0] == lagAt[1] && lagAt[1] == lagAt[2] && std::fabs(static_cast<double>(lagAt[0]) - wantLag) < 1.0,
-               "lag at WIDTH 0 / 0.5 / 1 = %.1f / %.1f / %.1f samples, want %.1f", static_cast<double>(lagAt[0]),
-               static_cast<double>(lagAt[1]), static_cast<double>(lagAt[2]), wantLag);
+               lagAt[0] == lagAt[1] && lagAt[1] == lagAt[2] && lagAt[2] == lagAt[3] &&
+                   std::fabs(static_cast<double>(lagAt[0]) - wantLag) < 1.0,
+               "lag at WIDTH 0 / 0.1 / 0.5 / 1 = %.1f / %.1f / %.1f / %.1f samples", static_cast<double>(lagAt[0]),
+               static_cast<double>(lagAt[1]), static_cast<double>(lagAt[2]), static_cast<double>(lagAt[3]));
   return ok;
 }
 
 // VOICES 20, 40, 60 and 80 % bring in the copies in index order, the -1.75 st copy first, then the
 // +2.75 st, the -3 st and the +1 st. At each step the output carries a line at the f0 of every
-// copy that has come in and none at the f0 of the copies still to come.
+// copy that has come in and none at the f0 of the copies still to come. It runs at WIDTH 1 and at
+// WIDTH 0.5, where the offsets are the pitch factor 0.489 of their full values.
 bool testFadeOrder() {
   const Signal in = tone(220.0, 2 * kRate);
   const cv::GangTuning d;
   bool ok = true;
-  for (int n = 1; n <= 4; ++n) {
-    const Signal out = run(in, knobs(0.2f * static_cast<float>(n), 1.0f));
-    double amp[4];
-    double top = 0.0;
-    for (size_t v = 0; v < 4; ++v) {
-      const double hz = 220.0 * std::pow(2.0, static_cast<double>(d.pitchSt[v]) / 12.0);
-      amp[v] = goertzel(&out[kRate], kRate, hz);
-      top = std::max(top, amp[v]);
+  for (float width : {1.0f, 0.5f}) {
+    for (int n = 1; n <= 4; ++n) {
+      const Signal out = run(in, knobs(0.2f * static_cast<float>(n), width));
+      double amp[4];
+      double top = 0.0;
+      for (size_t v = 0; v < 4; ++v) {
+        const double st = static_cast<double>(d.pitchSt[v]) * pitchFactor(static_cast<double>(width));
+        amp[v] = goertzel(&out[kRate], kRate, 220.0 * std::pow(2.0, st / 12.0));
+        top = std::max(top, amp[v]);
+      }
+      bool order = true;
+      double rel[4];
+      for (size_t v = 0; v < 4; ++v) {
+        rel[v] = amp[v] / top;
+        order &= static_cast<int>(v) < n ? rel[v] >= 0.4 : rel[v] <= 0.1;
+      }
+      char name[48];
+      std::snprintf(name, sizeof name, "fade order, WIDTH %.0f %%, VOICES %d %%", static_cast<double>(width * 100.0f), 20 * n);
+      ok &= report(name, order,
+                   "line at each copy's f0 re the loudest %.2f %.2f %.2f %.2f (sounding >= 0.4, silent <= 0.1)", rel[0],
+                   rel[1], rel[2], rel[3]);
     }
-    bool order = true;
-    double rel[4];
-    for (size_t v = 0; v < 4; ++v) {
-      rel[v] = amp[v] / top;
-      order &= static_cast<int>(v) < n ? rel[v] >= 0.4 : rel[v] <= 0.1;
-    }
-    char name[40];
-    std::snprintf(name, sizeof name, "fade order, VOICES %d %%", 20 * n);
-    ok &= report(name, order, "line at each copy's f0 re the loudest %.2f %.2f %.2f %.2f (sounding >= 0.4, silent <= 0.1)",
-                 rel[0], rel[1], rel[2], rel[3]);
   }
   return ok;
 }
@@ -859,10 +917,10 @@ bool testCorrectionReleases() {
                 beforeErr, worstAfter);
 }
 
-// Enhancements: level scatter, contour, breath and epoch alignment. Each is neutral at its
-// default, and each stays inside the range of a human voice.
+// Enhancements: level scatter, contour and epoch alignment. Each is neutral at 0 (contour 1, epoch
+// align off), and each stays inside the range of a human voice.
 
-// FNV-1a over the bits of the samples, to compare a run against the engine before the enhancements.
+// FNV-1a over the bits of the samples, to compare runs.
 uint64_t fnv(const Signal& x) {
   uint64_t h = 0xCBF29CE484222325ULL;
   for (float v : x) {
@@ -880,7 +938,6 @@ uint64_t fnv(const Signal& x) {
 void allEnhancements(cv::GangTuning& t) {
   t.levelScatterDb = 4.0f;
   t.contour = {0.8f, 0.8f, 0.8f, 0.8f};
-  t.breath = {0.15f, 0.15f, 0.15f, 0.15f};
   t.epochAlign = true;
 }
 
@@ -890,19 +947,16 @@ size_t differing(const Signal& a, const Signal& b) {
   return n;
 }
 
-// With every new control at its default the engine runs the code it ran before, and a setting that
-// only matters while its control is on moves no sample. The hashes are the pinned runs, to compare
-// with the same two runs on the engine at the tag gang-pin-2026-10-31.
+// With every enhancement neutral the engine runs the code it ran without them, and a setting that
+// only matters while its control is on moves no sample. The hashes are for the record.
 bool testEnhancementsDefaultExact() {
   const Signal prog = program(3);
   const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
   const cv::GangParams base = knobs(0.7f, 0.5f);
   cv::GangParams idle = base;
-  idle.tuning.breathHz = 5000.0f;     // matters only while a breath is above 0
   idle.tuning.epochSearch = 0.1f;     // matters only while epochAlign is on
   idle.tuning.levelScatterDb = -1.0f; // clamps to 0
   idle.tuning.contour = {1.0f, 1.0f, 1.0f, 1.0f};
-  idle.tuning.breath = {-0.1f, 0.0f, 0.0f, 0.0f};  // clamps to 0
   const Signal a = run(prog, base);
   const Signal b = run(prog, idle);
   cv::GangParams burstBase = knobs(0.6f, 0.8f);
@@ -921,9 +975,33 @@ bool testEnhancementsDefaultExact() {
                static_cast<unsigned long long>(fnv(run(burst, knobs(0.8f, 0.5f)))));
   std::printf("info hash burst program VOICES 60 WIDTH 80 scatter 15 drift 20 %016llx\n",
                static_cast<unsigned long long>(fnv(c)));
-  return report("enhancements default", diffProg == 0 && diffBurst == 0,
+  return report("enhancements neutral", diffProg == 0 && diffBurst == 0,
                 "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
                 static_cast<double>(diffProg), static_cast<double>(diffBurst));
+}
+
+// The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
+// within 2.5 dB of the neutral card's level.
+bool testWorkingSetDefaults() {
+  const cv::GangTuning d;
+  const bool values = d.contour[0] == 0.8f && d.contour[1] == 1.2f && d.contour[2] == 0.7f && d.contour[3] == 1.1f &&
+                      d.levelScatterDb == 2.0f && d.scatterMs == 12.0f && d.driftCents == 15.0f && d.epochAlign &&
+                      d.widthKnee == 0.1f && d.widthKneeFrac == 0.08f;
+  bool ok = report("working set values", values,
+                   "contour %.1f %.1f %.1f %.1f (0.8 1.2 0.7 1.1)", static_cast<double>(d.contour[0]),
+                   static_cast<double>(d.contour[1]), static_cast<double>(d.contour[2]), static_cast<double>(d.contour[3]));
+  const Signal in = program(3);
+  cv::GangParams worked = knobs(0.7f, 0.5f);
+  worked.tuning = d;
+  const Signal a = run(in, knobs(0.7f, 0.5f));
+  const Signal b = run(in, worked);
+  bool finite = true;
+  for (float x : b) finite &= std::isfinite(x) && std::fabs(x) < 4.0f;
+  const double dbA = levelDb(in, a);
+  const double dbB = levelDb(in, b);
+  ok &= report("working set run", finite && std::fabs(dbB - dbA) <= 2.5 && differing(a, b) > 0,
+               "finite %.0f, level %+.2f dB against the neutral card's %+.2f dB (within 2.5)", finite ? 1.0 : 0.0, dbB, dbA);
+  return ok;
 }
 
 // RMS of x over [from, to).
@@ -1053,75 +1131,6 @@ bool testContour() {
   }
   ok &= report("contour range", beyond == 0, "contour 3.0 and 0.0 differ from 1.4 and 0.6 in %.0f samples (0)",
                static_cast<double>(beyond));
-  return ok;
-}
-
-// x through a fourth-order high-pass at 4 kHz, above the tenth harmonic of the 220 Hz tone.
-Signal highPassed(const Signal& x) {
-  cv::Biquad a;
-  cv::Biquad b;
-  a.setHighPass(4000.0f, cv::kButterworthQ);
-  b.setHighPass(4000.0f, cv::kButterworthQ);
-  Signal y(x.size());
-  for (size_t i = 0; i < x.size(); ++i) y[i] = b.run(a.run(x[i]));
-  return y;
-}
-
-// Breath at its top (0.15) on copy 4. Above 4 kHz the tone has nothing, so the breath is all the
-// copy carries there. It follows the burst, so the end of each gap is quiet (the follower releases
-// over 60 ms and a gap lasts 120 ms), and it sits well under the copy.
-bool testBreath() {
-  const Train tr{300, 300, 120, 10};
-  const Signal in = bursts(220.0, tr);
-  const cv::GangTuning d;
-  const size_t v = 3;
-  const double lagMs = static_cast<double>(d.delayMs[v] * d.lagScale);
-  const cv::GangParams flat = lagProbe(v, d.lagScale);
-  cv::GangParams breathy = flat;
-  breathy.tuning.breath[v] = 0.15f;
-  const Signal ref = run(in, flat);
-  const Signal out = run(in, breathy);
-  const Signal outHigh = highPassed(out);
-  const Signal refHigh = highPassed(ref);
-  double burstHigh = 0.0;
-  double burstRef = 0.0;
-  double gapHigh = 0.0;
-  double burstAll = 0.0;
-  double burstNoise = 0.0;
-  Signal noise(out.size());
-  for (size_t i = 0; i < out.size(); ++i) noise[i] = out[i] - ref[i];
-  for (int k = 1; k + 1 < tr.count; ++k) {
-    const int from = tr.start(k) + msToSamples(lagMs + 30.0);
-    const int to = from + msToSamples(150.0);
-    const int gapTo = tr.start(k + 1) + msToSamples(lagMs - 5.0);
-    const int gapFrom = gapTo - msToSamples(40.0);
-    burstHigh += rmsIn(outHigh, from, to);
-    burstRef += rmsIn(refHigh, from, to);
-    gapHigh += rmsIn(outHigh, gapFrom, gapTo);
-    burstAll += rmsIn(ref, from, to);
-    burstNoise += rmsIn(noise, from, to);
-  }
-  const double aboveDb = 20.0 * std::log10(burstHigh / burstRef);
-  const double gapDb = 20.0 * std::log10(gapHigh / burstHigh);
-  const double underDb = 20.0 * std::log10(burstNoise / burstAll);
-  bool ok = report("breath adds air", aboveDb >= 12.0,
-                   "above 4 kHz the breath run reads %+.1f dB over the no-breath run in the bursts (>= 12)", aboveDb);
-  ok &= report("breath follows the tone", gapDb <= -12.0, "above 4 kHz the end of a gap reads %+.1f dB re the bursts (<= -12)",
-               gapDb);
-  ok &= report("breath sits under", underDb <= -15.0, "the breath alone reads %+.1f dB re the copy in the bursts (<= -15)",
-               underDb);
-
-  // Breath at 0 leaves the copy as it was, and 1.0 asked for is no wider than 0.15.
-  cv::GangParams zero = flat;
-  zero.tuning.breath[v] = 0.0f;
-  cv::GangParams wide = flat;
-  wide.tuning.breath[v] = 1.0f;
-  cv::GangParams top = flat;
-  top.tuning.breath[v] = 0.15f;
-  ok &= report("breath range", differing(ref, run(in, zero)) == 0 && differing(run(in, wide), run(in, top)) == 0,
-               "breath 0 differs from the default in %.0f samples (0), 1.0 from 0.15 in %.0f (0)",
-               static_cast<double>(differing(ref, run(in, zero))),
-               static_cast<double>(differing(run(in, wide), run(in, top))));
   return ok;
 }
 
@@ -1391,6 +1400,7 @@ double secondsOfBlocks(const Signal& in, int which) {
   pp.gangOn = true;
   cv::GangParams dp = knobs(0.8f, 0.5f);
   if (which == 2) allEnhancements(dp.tuning);
+  if (which == 3) dp.tuning = cv::GangTuning{};
   cv::UnisonParams up;
   up.on = true;
   up.depth = 0.5f;
@@ -1418,10 +1428,11 @@ double secondsOfBlocks(const Signal& in, int which) {
 
 void printTiming() {
   const Signal in = program(10);
-  for (int which = 0; which < 3; ++which) secondsOfBlocks(in, which);  // warm-up
+  for (int which = 0; which < 4; ++which) secondsOfBlocks(in, which);  // warm-up
   const double d = std::min(secondsOfBlocks(in, 1), secondsOfBlocks(in, 1));
   const double u = std::min(secondsOfBlocks(in, 0), secondsOfBlocks(in, 0));
   const double a = std::min(secondsOfBlocks(in, 2), secondsOfBlocks(in, 2));
+  const double w = std::min(secondsOfBlocks(in, 3), secondsOfBlocks(in, 3));
   const double blocks = 10.0 * kRate / cv::kBlock;
   std::printf("info timing 10 s: Gang VOICES 80 %% %.1f ms (%.2f us per block), Unison DEPTH 50 %% %.1f ms (%.2f us per block)\n",
               1000.0 * d, 1e6 * d / blocks, 1000.0 * u, 1e6 * u / blocks);
@@ -1429,6 +1440,7 @@ void printTiming() {
               d / u, 46.9 * d / u);
   std::printf("info timing enhancements off %.2f us per block, all on %.2f us per block (x%.2f)\n", 1e6 * d / blocks,
               1e6 * a / blocks, a / d);
+  std::printf("info timing working set defaults %.2f us per block (x%.2f over enhancements off)\n", 1e6 * w / blocks, w / d);
 }
 
 }  // namespace
@@ -1453,9 +1465,9 @@ int main() {
   ok &= testTrackerRuns();
   ok &= testCorrectionReleases();
   ok &= testEnhancementsDefaultExact();
+  ok &= testWorkingSetDefaults();
   ok &= testLevelScatter();
   ok &= testContour();
-  ok &= testBreath();
   ok &= testShadowRing();
   ok &= testEpochMarks();
   ok &= testEpochAlign();
