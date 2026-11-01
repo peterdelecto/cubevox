@@ -23,9 +23,10 @@ enum class ApplyResult : uint8_t {
 // when no slot holds a reverb card, or when the other card would push the layout past the CPU budget.
 // The Unison and Crowd action does the same between Unison and Crowd in the slot that holds either,
 // and changes nothing when no slot does or when the other card fails the placement rules.
-// The slot 7 action moves the slot that holds Gate, Formant, Lo-fi or Bloom to the next of the four in
-// that order, wrapping, and passes over a card the placement rules refuse. It changes nothing when no
-// slot holds one of the four or when all three others are refused.
+// The Octave and Formant action does the same between Octave and Formant.
+// The slot 7 action moves the slot that holds Gate, Lo-fi or Bloom to the next of the three in that
+// order, wrapping, and passes over a card the placement rules refuse. It changes nothing when no slot
+// holds one of the three or when both others are refused.
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout);
 
 }  // namespace ui

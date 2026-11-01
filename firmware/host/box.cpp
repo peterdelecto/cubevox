@@ -100,14 +100,16 @@ bool Box::applyAction(UiAction action) {
   return false;
 }
 
+void Box::swapOctaveFormant() { applyAction(UiAction::SwapOctaveFormant); }
+
 void Box::swapUnisonMob() { applyAction(UiAction::SwapUnisonCrowd); }
 
 void Box::swapReverb() { applyAction(UiAction::SwapReverb); }
 
-// The cycle visits at most the four cards, so three steps reach any card it can reach. The steps run
+// The cycle visits at most the three cards, so two steps reach any card it can reach. The steps run
 // on a copy, and the box takes the copy only when it holds the card.
 void Box::pickSlot7Card(Card card) {
-  constexpr int kCycleSteps = 3;
+  constexpr int kCycleSteps = 2;
   Layout trial = layout_;
   Settings scratch = settings_;
   for (int step = 0; step < kCycleSteps; ++step) {

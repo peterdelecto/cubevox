@@ -1,9 +1,9 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot7 gate|formant|lofi|bloom]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant] [--slot7 gate|lofi|bloom]
 //                                             one frame of the window as a P6 PPM, no audio device,
-//                                             with that card in slot 7 (Gate when omitted)
+//                                             with those cards in slots 3 and 7 (Octave and Gate when omitted)
 
 #include <array>
 #include <cmath>
@@ -45,7 +45,8 @@ constexpr uint32_t kProofMs = 2500;        // the splash is over and the ribbon 
 constexpr uint32_t kPassMs = 10;  // one scan of the 16 pots takes about this long on the board
 constexpr int kMaxCatchUpPasses = 50;
 constexpr int kCheckMinDbfs = -40;
-constexpr int kMobSlot = 3;    // slot 4, counted from 0
+constexpr int kSlot3 = 2;      // slot 3, counted from 0
+constexpr int kMobSlot = 3;    // slot 4
 constexpr int kSlot7 = 6;      // slot 7
 constexpr int kChasmSlot = 7;  // slot 8
 constexpr uint32_t kCheckSlot7Ms = 1500;  // after a pick: the layout fade, then more than a second of audio
@@ -79,27 +80,28 @@ struct Rig {
 
 // What the default layout costs, from the cost table's own rows, and what it costs with MOB in
 // slot 4 and Chasm in slot 8. The tracker is paid once, because Autotune is placed. Each "rest" is
-// every row but slot 7's, which is Gate in the default layout and one of four cards after a pick.
-constexpr costs::Cost kDefaultRest = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kUnison +
-                                     costs::kSlapback + costs::kDistortion + costs::kReverbSpring + costs::kFixed +
-                                     costs::kTracker;
-constexpr costs::Cost kSwappedRest = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kCrowd +
-                                     costs::kSlapback + costs::kDistortion + costs::kReverbChasm + costs::kFixed +
-                                     costs::kTracker;
-constexpr costs::Cost kDefaultSum = kDefaultRest + costs::kGate;
-constexpr costs::Cost kSwappedSum = kSwappedRest + costs::kGate;
+// every row but slot 3's and slot 7's, which are Octave and Gate in the default layout and one of two
+// cards each after a swap or a pick.
+constexpr costs::Cost kDefaultRest = costs::kInputGate + costs::kAutotune + costs::kUnison + costs::kSlapback +
+                                     costs::kDistortion + costs::kReverbSpring + costs::kFixed + costs::kTracker;
+constexpr costs::Cost kSwappedRest = costs::kInputGate + costs::kAutotune + costs::kCrowd + costs::kSlapback +
+                                     costs::kDistortion + costs::kReverbChasm + costs::kFixed + costs::kTracker;
+constexpr costs::Cost kDefaultSum = kDefaultRest + costs::kOctave + costs::kGate;
+constexpr costs::Cost kSwappedSum = kSwappedRest + costs::kOctave + costs::kGate;
 
-// The slot 7 cards in the menu's cycle order, with the row each costs.
-struct Slot7Row {
+// The slot 3 cards in the menu's swap order, and the slot 7 cards in its cycle order, with the row
+// each costs.
+struct CardRow {
   Card card;
   const char* id;
   const char* name;
   costs::Cost cost;
 };
-constexpr std::array<Slot7Row, 4> kSlot7Rows = {{{Card::Formant, "formant", "FORMANT", costs::kFormant},
-                                                 {Card::Lofi, "lofi", "LO-FI", costs::kLofi},
-                                                 {Card::Bloom, "bloom", "BLOOM", costs::kBloom},
-                                                 {Card::Gate, "gate", "GATE", costs::kGate}}};
+constexpr std::array<CardRow, 2> kSlot3Rows = {{{Card::Formant, "formant", "FORMANT", costs::kFormant},
+                                                {Card::Octave, "octave", "OCTAVE", costs::kOctave}}};
+constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "LO-FI", costs::kLofi},
+                                                {Card::Bloom, "bloom", "BLOOM", costs::kBloom},
+                                                {Card::Gate, "gate", "GATE", costs::kGate}}};
 
 bool costIs(const LayoutCost& cost, const costs::Cost& expected) {
   return cost.avg == expected.avg && cost.worst == expected.worst;
@@ -125,11 +127,51 @@ float lastSecondDbfs(const std::vector<float>& output) {
   return level::toDbfs(level::rms(energy));
 }
 
-// The four slot 7 cards through the box's card switch, round the menu's cycle and back to Gate. After
-// each pick the layout holds the card in slot 7, its cost is the rest of the layout's rows plus the
-// card's own, and the audio through the box is finite and above the floor. `swapped` puts MOB in
-// slot 4 and Chasm in slot 8 first, the heaviest layout the cards share. A card outside the cycle
-// leaves the layout as it was.
+// The Octave and Formant swap through the box's switch, to Formant and back. After each swap slot 3
+// holds the card, the layout's cost is the rest of its rows plus the card's own and Gate's, and the
+// audio through the box is finite and above the floor. `swapped` puts MOB in slot 4 and Chasm in
+// slot 8 first.
+void checkSlot3(const char* argv0, bool swapped, std::vector<std::string>& failed) {
+  const char* const where = swapped ? "MOB and Chasm" : "default layout";
+  const costs::Cost rest = swapped ? kSwappedRest : kDefaultRest;
+  const auto expect = [&](bool ok, const std::string& what) {
+    if (!ok) failed.push_back(std::string(where) + ": " + what);
+  };
+
+  Rig rig;
+  expect(rig.source.findClip(argv0), "the clip loads");
+  if (swapped) {
+    rig.box.swapUnisonMob();
+    rig.box.swapReverb();
+  }
+  rig.run(kCheckSlot7Ms, true);
+  expect(cardIs(rig.box.layout(), kSlot3, "octave") && costIs(rig.box.cost(), rest + costs::kOctave + costs::kGate),
+         "slot 3 starts on Octave at the sum of its rows");
+
+  for (const CardRow& row : kSlot3Rows) {
+    const size_t from = rig.output.size();
+    rig.box.swapOctaveFormant();
+    rig.run(kCheckSlot7Ms, true);
+    const LayoutCost cost = rig.box.cost();
+    bool finite = true;
+    for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);
+    const float dbfs = lastSecondDbfs(rig.output);
+    const std::string name = std::string("slot 3 ") + row.name;
+    expect(cardIs(rig.box.layout(), kSlot3, row.id), name + " is in slot 3 after the swap");
+    expect(costIs(cost, rest + row.cost + costs::kGate), name + " costs the sum of its rows, kFixed and kTracker");
+    expect(layoutValid(rig.box.layout()).ok(), name + " layout passes the placement rules");
+    expect(finite, name + " output is finite");
+    expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
+    std::printf("%-14s slot 3 %-8s cost %d / %d, output %.1f dBFS\n", where, row.name, cost.avg, cost.worst,
+                static_cast<double>(dbfs));
+  }
+}
+
+// The three slot 7 cards through the box's card switch, round the menu's cycle and back to Gate.
+// After each pick the layout holds the card in slot 7, its cost is the rest of the layout's rows
+// plus Octave's and the card's own, and the audio through the box is finite and above the floor.
+// `swapped` puts MOB in slot 4 and Chasm in slot 8 first, the heaviest layout the cards share. A
+// card outside the cycle leaves the layout as it was.
 void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& failed) {
   const char* const where = swapped ? "MOB and Chasm" : "default layout";
   const costs::Cost rest = swapped ? kSwappedRest : kDefaultRest;
@@ -144,10 +186,10 @@ void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& faile
     rig.box.swapReverb();
   }
   rig.run(kCheckSlot7Ms, true);
-  expect(cardIs(rig.box.layout(), kSlot7, "gate") && costIs(rig.box.cost(), rest + costs::kGate),
+  expect(cardIs(rig.box.layout(), kSlot7, "gate") && costIs(rig.box.cost(), rest + costs::kOctave + costs::kGate),
          "slot 7 starts on Gate at the sum of its rows");
 
-  for (const Slot7Row& row : kSlot7Rows) {
+  for (const CardRow& row : kSlot7Rows) {
     const size_t from = rig.output.size();
     rig.box.pickSlot7Card(row.card);
     rig.run(kCheckSlot7Ms, true);
@@ -157,7 +199,7 @@ void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& faile
     const float dbfs = lastSecondDbfs(rig.output);
     const std::string name = std::string("slot 7 ") + row.name;
     expect(cardIs(rig.box.layout(), kSlot7, row.id), name + " is in slot 7 after the pick");
-    expect(costIs(cost, rest + row.cost), name + " costs the sum of its rows, kFixed and kTracker");
+    expect(costIs(cost, rest + costs::kOctave + row.cost), name + " costs the sum of its rows, kFixed and kTracker");
     expect(layoutValid(rig.box.layout()).ok(), name + " layout passes the placement rules");
     expect(finite, name + " output is finite");
     expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
@@ -166,7 +208,7 @@ void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& faile
   }
 
   const Layout kept = rig.box.layout();
-  rig.box.pickSlot7Card(Card::Octave);
+  rig.box.pickSlot7Card(Card::Formant);
   expect(rig.box.layout() == kept, "a card outside the cycle leaves the layout as it was");
 }
 
@@ -216,6 +258,8 @@ int runCheck(const char* argv0) {
   expect(rig.box.splashEnded(), "the splash ended");
   expect(anyLit(rig.box.pixels()), "the face rendered (the canvas is not blank)");
 
+  checkSlot3(argv0, false, failed);
+  checkSlot3(argv0, true, failed);
   checkSlot7(argv0, false, failed);
   checkSlot7(argv0, true, failed);
 
@@ -230,9 +274,10 @@ int runCheck(const char* argv0) {
   return 0;
 }
 
-int runProof(const char* argv0, const char* path, bool micAvailable, Card slot7) {
+int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot7) {
   Rig rig;
   if (!rig.source.findClip(argv0)) return 1;
+  if (slot3 == Card::Formant) rig.box.swapOctaveFormant();
   rig.box.pickSlot7Card(slot7);
   rig.run(kProofMs, false);
   Window window(false);
@@ -296,13 +341,15 @@ int runLive(const char* argv0) {
 
 int usage() {
   std::fprintf(stderr,
-               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot7 gate|formant|lofi|bloom]]\n");
+               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant] "
+               "[--slot7 gate|lofi|bloom]]\n");
   return 2;
 }
 
-// The slot 7 card with this id, from the same rows --check walks.
-bool slot7FromId(const char* id, Card& out) {
-  for (const Slot7Row& row : kSlot7Rows) {
+// The card with this id among `rows`, the same rows --check walks.
+template <size_t N>
+bool cardFromRows(const std::array<CardRow, N>& rows, const char* id, Card& out) {
+  for (const CardRow& row : rows) {
     if (std::strcmp(id, row.id) == 0) {
       out = row.card;
       return true;
@@ -318,17 +365,20 @@ int main(int argc, char** argv) {
   if (argc == 2 && std::strcmp(argv[1], "--check") == 0) return runCheck(argv[0]);
   if (argc >= 3 && std::strcmp(argv[1], "--proof") == 0) {
     bool noMic = false;
+    Card slot3 = Card::Octave;
     Card slot7 = Card::Gate;
     for (int i = 3; i < argc; ++i) {
       if (std::strcmp(argv[i], "--no-mic") == 0) {
         noMic = true;
-      } else if (std::strcmp(argv[i], "--slot7") == 0 && i + 1 < argc && slot7FromId(argv[i + 1], slot7)) {
+      } else if (std::strcmp(argv[i], "--slot3") == 0 && i + 1 < argc && cardFromRows(kSlot3Rows, argv[i + 1], slot3)) {
+        ++i;
+      } else if (std::strcmp(argv[i], "--slot7") == 0 && i + 1 < argc && cardFromRows(kSlot7Rows, argv[i + 1], slot7)) {
         ++i;
       } else {
         return usage();
       }
     }
-    return runProof(argv[0], argv[2], !noMic, slot7);
+    return runProof(argv[0], argv[2], !noMic, slot3, slot7);
   }
   return usage();
 }

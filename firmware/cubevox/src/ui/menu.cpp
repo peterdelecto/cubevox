@@ -38,6 +38,7 @@ constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix)
 enum class Item : uint8_t {
   InputJack,
   Reverb,
+  OctaveFormant,
   UnisonCrowd,
   Slot7Card,
   PolishComp,
@@ -78,14 +79,15 @@ const char* slotLabel(int slot, char* buf, size_t size) {
   return buf;
 }
 
-// The label of `it`. The Unison and Crowd row and the slot 7 row name the slot that holds their card,
-// or a dash when none does, and build the text in `buf`.
+// The label of `it`. The Octave and Formant row, the Unison and Crowd row and the slot 7 row name the
+// slot that holds their card, or a dash when none does, and build the text in `buf`.
 const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
   switch (it) {
     case Item::InputJack: return "INPUT";
     case Item::Output: return "OUTPUT";
     case Item::TopSwitch: return "TOP SWITCH";
     case Item::Reverb: return "REVERB";
+    case Item::OctaveFormant: return slotLabel(octaveFormantSlot(layout), buf, size);
     case Item::UnisonCrowd: return slotLabel(unisonCrowdSlot(layout), buf, size);
     case Item::Slot7Card: return slotLabel(slot7CardSlot(layout), buf, size);
     case Item::PolishComp: return "POLISH COMP";
@@ -107,6 +109,12 @@ const char* reverbValue(const Layout& layout) {
   return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
 }
 
+// The card the Octave and Formant slot holds. A layout with neither reads OCTAVE, the default.
+const char* octaveFormantValue(const Layout& layout) {
+  const int slot = octaveFormantSlot(layout);
+  return slot >= 0 && layout.card[slot] == Card::Formant ? "FORMANT" : "OCTAVE";
+}
+
 // The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with neither
 // reads UNISON, the default.
 const char* unisonCrowdValue(const Layout& layout) {
@@ -114,12 +122,11 @@ const char* unisonCrowdValue(const Layout& layout) {
   return slot >= 0 && layout.card[slot] == Card::Crowd ? "MOB" : "UNISON";
 }
 
-// The card the slot 7 row holds. A layout with none of the four reads GATE, the default.
+// The card the slot 7 row holds. A layout with none of the three reads GATE, the default.
 const char* slot7CardValue(const Layout& layout) {
   const int slot = slot7CardSlot(layout);
   if (slot < 0) return "GATE";
   switch (layout.card[slot]) {
-    case Card::Formant: return "FORMANT";
     case Card::Lofi: return "LO-FI";
     case Card::Bloom: return "BLOOM";
     default: return "GATE";
@@ -133,6 +140,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::Output: return s.outputLevel == OutputLevel::Mic ? "MIC" : "LINE";
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     case Item::Reverb: return reverbValue(ctx.layout);
+    case Item::OctaveFormant: return octaveFormantValue(ctx.layout);
     case Item::UnisonCrowd: return unisonCrowdValue(ctx.layout);
     case Item::Slot7Card: return slot7CardValue(ctx.layout);
     case Item::PolishComp: return onOff(s.polishComp);
@@ -216,6 +224,7 @@ UiAction Menu::onClick() {
         case Item::Output: return UiAction::ToggleOutput;
         case Item::TopSwitch: return UiAction::CycleTopSwitch;
         case Item::Reverb: return UiAction::SwapReverb;
+        case Item::OctaveFormant: return UiAction::SwapOctaveFormant;
         case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
         case Item::Slot7Card: return UiAction::CycleSlot7Card;
         case Item::PolishComp: return UiAction::TogglePolishComp;
