@@ -56,13 +56,15 @@ class AutotuneVoice {
     trimDb_ = kUnset;
     degreeHz_ = kUnset;
     haveNote_ = false;
+    keyGlide_ = false;
   }
 
   // Per block: sets the target correction from pr and returns the smoothed correction in
   // semitones, 0 when off. Unvoiced frames hold the target. A clamped frame reads the tracker's
   // edge, not the note, so its target is 0 and the note passes uncorrected. The correction starts
-  // from 0 after reset() and always glides at RESPONSE. libm runs only when its input moved:
-  // RESPONSE and the trim when they change, the scale note when a hop publishes a new frame.
+  // from 0 after reset() and glides at RESPONSE, or at the 20 ms knob smoother when that is slower
+  // and a KEY change moved the target. libm runs only when its input moved: RESPONSE and the trim
+  // when they change, the scale note when a hop publishes a new frame.
   float prepare(const PitchResult& pr, const AutotuneParams& p) {
     const AutotuneTuning& t = p.tuning;
     if (p.responseMs != responseMs_) {
@@ -74,7 +76,11 @@ class AutotuneVoice {
       gain_ = powf(10.0f, t.trimDb / 20.0f);
     }
     psola_.setGrainDelay(t.grainDelay);
-    if (!p.on) return 0.0f;
+    if (!p.on) {
+      stepCoef_ = a_;
+      return 0.0f;
+    }
+    if (keyGlide_ && fabsf(corr_ - target_) < kKeyGlideDoneSemis) keyGlide_ = false;
     if (pr.voiced && pr.clamped) {
       target_ = 0.0f;
     } else if (pr.voiced) {
@@ -82,6 +88,7 @@ class AutotuneVoice {
       if (hz != degreeHz_ || p.key != degreeKey_) pullTo(hz, p.key);
       target_ = -deviation_;
     }
+    stepCoef_ = keyGlide_ && smooth::kSmoothCoef < a_ ? smooth::kSmoothCoef : a_;
     return corr_;
   }
 
@@ -89,7 +96,7 @@ class AutotuneVoice {
   // multiplies where it would divide. PitchFx fades it in only once the tracker has a period, so the
   // grains start on the sung pitch.
   float tick(const VoiceRing& ring, int head, float period) {
-    corr_ = smooth::step(corr_, target_, a_);
+    corr_ = smooth::step(corr_, target_, stepCoef_);
     return gain_ * psola_.tick(ring, head, period, exp2Fast(corr_ * (-1.0f / 12.0f)));
   }
 
@@ -108,6 +115,12 @@ class AutotuneVoice {
   static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();
   static constexpr float kFifthRatio = 1.49830708f;  // 2^(7/12)
 
+  // A KEY change that moves the target note moves it by up to a semitone at once. At hard tune the
+  // correction would cover 99 % of that in 4 ms, inside one grain (9 ms at 220 Hz), and the grains
+  // laid at the old and new spacing sum 6 % over the steady level. The 20 ms glide keeps the step
+  // under x1.02. The glide ends once the correction sits this close to the target, 2 cents.
+  static constexpr float kKeyGlideDoneSemis = 0.02f;
+
   // The pitch the target follows. The newest frame is one hop fresher than the median, so it leads
   // while it sits within a fifth of the median; past that the median stands in, so a frame read at
   // two or three times the period never reaches the target. A sung leap stays inside the fifth and
@@ -122,6 +135,7 @@ class AutotuneVoice {
   // kHoldSemis past the halfway point (scale.h).
   void pullTo(float hz, int key) {
     const float midi = midiOf(hz);
+    if (haveNote_ && key != degreeKey_) keyGlide_ = true;
     note_ = haveNote_ && key == degreeKey_ ? heldNote(midi, key, note_) : midi - degreeOfMidi(midi, key).dev;
     haveNote_ = true;
     degreeHz_ = hz;
@@ -133,6 +147,7 @@ class AutotuneVoice {
   float corr_ = 0.0f;
   float target_ = 0.0f;
   float a_ = 1.0f;
+  float stepCoef_ = 1.0f;  // a_, or the 20 ms knob smoother's coefficient while a KEY change glides
   float gain_ = 1.0f;
   float responseMs_ = kUnset;  // the inputs a_, gain_ and deviation_ were computed from
   float trimDb_ = kUnset;
@@ -141,6 +156,7 @@ class AutotuneVoice {
   float deviation_ = 0.0f;  // the sung pitch's distance from its scale note, semitones
   float note_ = 0.0f;       // the scale note the last pick pulled to, as a MIDI pitch
   bool haveNote_ = false;
+  bool keyGlide_ = false;  // a KEY change moved the target and the correction has not reached it
 };
 
 }  // namespace cv
