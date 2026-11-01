@@ -1,4 +1,4 @@
-# cubevox — Crowd card (eight copies of the lead, WIDTH and VOICES)
+# cubevox — Crowd card, MOB on the box (eight copies of the lead, DIVERGE and VOICES)
 
 Date 2026-10-31. Owner design in chat 2026-10-31 and 2026-11-01; this file is the implementation
 reference. The first part states the card as it is at v2.00.79. The log at the end records how it got
@@ -54,7 +54,11 @@ The engine clamps every tuning value to its range, and the render tool refuses a
    "if the effect is dimed, we don't hear Adam, we hear the crowd." The lead leaves from 80 % of the
    knob, so each pair owns a round fifth of the travel and the percent readout tells the count (20 %
    one pair, 40 % two, 60 % three, 80 % all eight). The owner tuned on 80 % all day.
-3. Upper pot WIDTH. It spreads the copies' pitch and formant offsets and stretches their lags, so
+   Superseded 2026-11-01 (owner: "0 - 8 - MOB"): VOICES is a stepped knob of ten positions, 0 to 8
+   copies one at a time, then MOB with the lead gone; the readout shows the count, or MOB. The
+   stepped law is under "VOICES law" below.
+3. Upper pot DIVERGE, named WIDTH until 2026-11-01 (owner: "width should possibly be called
+   DIVERGE"; WIDTH suggested stereo, and the knob moves the copies away from the lead). It spreads the copies' pitch and formant offsets and stretches their lags, so
    the bottom is eight plain delayed doubles of the lead on its own pitch and the top is the crowd at
    its full offsets and longest lags. Owner: "nix the distance knob and replace it with a 'width
    knob'. the width knob will spread the voices." The bottom tenth is for instruments and melodic
@@ -80,13 +84,29 @@ The engine clamps every tuning value to its range, and the render tool refuses a
 
 | Pot | Name | Kind | Readout |
 |---|---|---|---|
-| upper (knob A) | WIDTH | continuous, 0..100 % | `WIDTH 35 %` |
-| lower (knob B) | VOICES | continuous, 0..100 % | `VOICES 60 %` |
+| upper (knob A) | DIVERGE | continuous, 0..100 % | `DIVERGE 35 %` |
+| lower (knob B) | VOICES | stepped, 10 positions | `VOICES 3`, `VOICES MOB` |
 
-Card id `crowd`, name `Crowd`, Group Pitch, Engine Crowd. Both knobs are the registry's percent knob
-with no decimals, so the readout sweep test holds as it is.
+Card id `crowd`, name `Mob` on the box, Group Pitch, Engine Crowd. DIVERGE is the registry's percent
+knob with no decimals. VOICES is a stepped knob with named positions, as Autotune's KEY is: `0` to
+`8`, then `MOB` (owner 2026-11-01).
 
-### VOICES law, knob position k in 0..1
+### VOICES law, position k in 0..9 (2026-11-01)
+
+1. Position k in 0..8 has exactly k copies in and the lead playing; position 9, MOB, has all eight
+   in and the lead gone. 0 is Adam alone, the same sound as the toggle off, with the tracker
+   running so the first copy enters clean.
+2. Copies enter one at a time, each tuned copy followed by its own raised partner: tuned 0, raised
+   4, tuned 1, raised 5, tuned 2, raised 6, tuned 3, raised 7. A copy not in is silent and does
+   not tick.
+3. Total power is unity at every position. The copies keep the fixed gain g of the earlier law; the
+   lead gain is sqrt(1 − Σ g²) over the copies in, never below 0. At MOB the lead is 0 and the
+   eight copies are scaled together to unity power, as span B's top was.
+4. A step change glides on the engine's existing per-sample gain ramps, so a copy entering or
+   leaving and the lead moving take the fade they took before; nothing clicks.
+5. The engine takes the position as `voicesStep` (0..9), not a float. `solo` is unchanged.
+
+### VOICES law until 2026-11-01, knob position k in 0..1 (superseded)
 
 1. Span A, k in [0, 0.8]. u = k / 0.2 runs 0..4. Pair v (0..3, fade order below), tuned copy v and
    raised copy v + 4, has weight w_v = sin(π/2 · clamp01((u − v) / holdFrom)). Each pair fades in
