@@ -43,16 +43,17 @@ constexpr float kValueTauS = 0.02f;     // the readout eases toward the knob
 constexpr int kScrollPxPerFrame = 2;    // voice history scrolls 50 px/s
 constexpr float kSilence = 0.03f;       // env below this counts as silence
 
-// The voice screen. The ribbon (the output) runs from column 13 to 126 about the horizon, 57 levels
-// of 2 columns, and column 127 stays blank. The input meter is a 1 px outline box in columns 1 to 9
-// and rows 8 to 56, with 16 segments inside it, each 2 rows tall at columns 2 to 8 with 1 row of gap
-// above it. The lowest segment sits on rows 54 and 55 and the highest on rows 9 and 10. Columns 10
-// to 12 stay blank.
-constexpr int kRibbonLeft = 13;
+// The voice screen. The ribbon (the output) runs from column 24 to 126 about the horizon, 52 levels
+// of 2 columns with the oldest in the one column 24, and column 127 stays blank. The input meter is a
+// 1 px outline box in columns 5 to 20 and rows 8 to 56, with 16 segments inside it, each 2 rows tall at
+// columns 6 to 19 with 1 row of gap above it. The lowest segment sits on rows 54 and 55 and the highest
+// on rows 9 and 10. Columns 21 to 23 stay blank.
+constexpr int kRibbonLeft = 24;
 constexpr int kRibbonRight = 126;
+constexpr int kRibbonLevels = (kRibbonRight - kRibbonLeft + kScrollPxPerFrame) / kScrollPxPerFrame;
 constexpr int kHalfMax = 22;
-constexpr int kBoxLeft = 1;
-constexpr int kBoxRight = 9;
+constexpr int kBoxLeft = 5;
+constexpr int kBoxRight = 20;
 constexpr int kBoxTop = 8;
 constexpr int kBoxBottom = 56;
 constexpr int kSegments = 16;
@@ -436,7 +437,7 @@ Frame toggleScreen(int slot, bool on) {
   return f;
 }
 
-// The voice screen. The output scrolls by as a ribbon around a horizon line, from column 13, and
+// The voice screen. The output scrolls by as a ribbon around a horizon line, from column 24, and
 // the input stands as a boxed meter at the left edge. `ribbonAt(age)` is the ribbon's level `age`
 // frames back and `segments` the number of lit meter segments, counted from the bottom. In silence
 // the ribbon is the line and the meter is its empty box.
@@ -453,7 +454,8 @@ Frame voiceScreen(LevelAt ribbonAt, int segments) {
     f.fill(kBoxLeft + 1, bottomRow - kSegmentRows + 1, kBoxRight - kBoxLeft - 1, kSegmentRows);
   }
   for (int x = kRibbonLeft; x <= kRibbonRight; ++x) {
-    const float e = ribbonAt((kRibbonRight - x) / kScrollPxPerFrame);
+    const int age = (kRibbonRight - x) / kScrollPxPerFrame;
+    const float e = age < kRibbonLevels ? ribbonAt(age) : 0.0f;  // older than the history reads 0
     const int h = roundInt(clamp01(e) * kHalfMax);
     if (h <= 0) {
       f.set(x, cy);

@@ -1095,25 +1095,26 @@ void checkRibbonHistory() {
   check(r.half(0) == 0 && r.half(1) == 11 && r.half(2) == 22 && r.half(3) == 0, "ribbon: levels read newest first");
   check(r.half(-1) == 0 && r.half(kRibbonLevels) == 0 && r.half(1000) == 0, "ribbon: ages outside the history read zero");
   for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
-  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 61 levels");
+  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 52 levels");
   r.push(0.0f);
   check(r.half(0) == 0 && r.half(1) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: a push drops the oldest level");
-  check(kRibbonLevels == 57 && kRibbonLeftX == 13 && kRibbonRightX == 126 && kRibbonLeftX + kRibbonLevels * kRibbonColumnsPerLevel == 127,
-        "ribbon: 57 levels of two columns fill columns 13 to 126, and column 127 stays blank");
+  check(kRibbonLevels == (kRibbonRightX - kRibbonLeftX + kRibbonColumnsPerLevel) / kRibbonColumnsPerLevel &&
+            kRibbonRightX == 126 && kRibbonLevels * kRibbonColumnsPerLevel >= kRibbonRightX - kRibbonLeftX + 1,
+        "ribbon: the level count rounds the ribbon's columns up in pairs and covers every one of them");
 }
 
 // The meter box and its segments, drawn from the owner's wording (2026-10-30) and nothing in the
-// renderer. The outline is 1 px wide, its sides are columns 1 and 9 and its top and bottom are rows
-// 8 and 56, so the interior is columns 2 to 8, rows 9 to 55. There are 16 segments, each 2 rows
-// tall at columns 2 to 8, with 1 row of gap above. Segment 1 is rows 54 and 55, segment 2 rows 51
-// and 52, up to segment 16 on rows 9 and 10. Columns 10 to 12 stay blank and the ribbon starts at
-// column 13. The walk moves the finished picture.
-constexpr int kBoxLeft = 1;
-constexpr int kBoxRight = 9;
+// renderer. The outline is 1 px wide, its sides are columns 5 and 20 and its top and bottom are rows
+// 8 and 56, so the interior is columns 6 to 19, rows 9 to 55. There are 16 segments, each 2 rows
+// tall at columns 6 to 19, with 1 row of gap above. Segment 1 is rows 54 and 55, segment 2 rows 51
+// and 52, up to segment 16 on rows 9 and 10. Columns 21 to 23 stay blank and the ribbon starts at
+// column 24. The walk moves the finished picture.
+constexpr int kBoxLeft = 5;
+constexpr int kBoxRight = 20;
 constexpr int kBoxTop = 8;
 constexpr int kBoxBottom = 56;
 constexpr int kBoxSegments = 16;
-constexpr int kBoxFootprint = 13;  // columns 0 to 12 belong to the meter and its blank margin
+constexpr int kBoxFootprint = 24;  // columns 0 to 23 belong to the meter and its blank margin
 
 int segmentBottomRow(int n) { return 55 - 3 * (n - 1); }
 int segmentTopRow(int n) { return segmentBottomRow(n) - 1; }
@@ -1157,46 +1158,48 @@ bool darkIn(const Canvas& c, int x0, int x1, int y0, int y1) {
 }
 
 void checkVoiceSilence() {
-  // In silence the screen is the horizon line from column 13 to column 126 at row 32 and the empty
+  // In silence the screen is the horizon line from column 24 to column 126 at row 32 and the empty
   // meter box. Column 127 stays blank.
   Canvas line = meterFromDefinition(0, Walk{0, 0});
-  line.fillRect(13, 32, 114, 1, true);
+  line.fillRect(kRibbonLeftX, 32, kRibbonRightX - kRibbonLeftX + 1, 1, true);
   for (int segments : {0, -7}) {
     Canvas c;
     renderVoice(c, Ribbon(), segments, Walk{0, 0});
     check(sameRows(c, line, 0, kCanvasHeight),
-          ("voice: in silence, with " + std::to_string(segments) + " segments, the screen is the horizon line from column 13 to 126 at row 32 and the empty meter box").c_str());
+          ("voice: in silence, with " + std::to_string(segments) + " segments, the screen is the horizon line from column 24 to 126 at row 32 and the empty meter box").c_str());
   }
 }
 
-// The first level of the history, the oldest, sits in columns 13 and 14, the newest in columns 125 and
-// 126, and nothing is left of the ribbon but the meter box and the blank columns 10 to 12 and 127.
+// The first level of the history, the oldest, fills the one column kRibbonLeftX, the newest sits in
+// columns 125 and 126, and nothing is left of the ribbon but the meter box, the blank columns before
+// kRibbonLeftX and the blank column 127.
 void checkRibbonFirstColumn() {
   Ribbon r;
   for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
   Canvas c;
   renderVoice(c, r, 0, Walk{0, 0});
   bool solid = true;
-  for (int x = 13; x <= 126; ++x) {
+  for (int x = kRibbonLeftX; x <= kRibbonRightX; ++x) {
     for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, x, y);
   }
-  check(solid, "ribbon: a full history is solid from column 13 to column 126");
+  check(solid, "ribbon: a full history is solid from column 24, right after the blank columns, to column 126");
   check(darkFrom(c, 127, 0, kCanvasHeight), "ribbon: column 127 stays blank under a full history");
   const Canvas box = meterFromDefinition(0, Walk{0, 0});
   bool boxOnly = true;
   for (int x = 0; x < kBoxFootprint; ++x) {
     for (int y = 0; y < kCanvasHeight; ++y) boxOnly = boxOnly && lit(c, x, y) == lit(box, x, y);
   }
-  check(boxOnly, "ribbon: columns 0 to 12 hold the empty meter box and nothing else, columns 10 to 12 blank");
+  check(boxOnly, "ribbon: columns 0 to 23 hold the empty meter box and nothing else, columns 21 to 23 blank");
 
-  // With only the oldest level tall, it fills columns 13 and 14 and the next column is the line.
+  // With only the oldest level tall, it fills column 24 alone and column 25 holds the line.
   Ribbon oldest;
   oldest.push(1.0f);
   for (int i = 1; i < kRibbonLevels; ++i) oldest.push(0.0f);
   Canvas d;
   renderVoice(d, oldest, 0, Walk{0, 0});
-  check(lit(d, 13, 32 - 22) && lit(d, 14, 32 + 22) && !lit(d, 15, 32 - 22) && !lit(d, 12, 32) && lit(d, 15, 32),
-        "ribbon: the oldest level fills columns 13 and 14");
+  check(lit(d, kRibbonLeftX, 32 - 22) && lit(d, kRibbonLeftX, 32 + 22) && !lit(d, kRibbonLeftX + 1, 32 - 22) &&
+            !lit(d, kRibbonLeftX - 1, 32) && lit(d, kRibbonLeftX + 1, 32),
+        "ribbon: the oldest level fills column 24 alone, and column 25 and the blank column 23 hold the line");
 }
 
 void checkVoiceShape() {
@@ -1226,18 +1229,18 @@ void checkVoiceShape() {
   }
   check(rim, "voice: a 1 px 50 % dither caps the column top and bottom");
 
-  check(darkFrom(c, 13, 0, 9) && darkFrom(c, 13, 56, kCanvasHeight),
+  check(darkFrom(c, kRibbonLeftX, 0, 9) && darkFrom(c, kRibbonLeftX, 56, kCanvasHeight),
         "voice: the tallest column with its rim stays 9 px clear of the top and bottom");
 }
 
 // The voice screen drawn pixel by pixel from its definition, as an independent check of the whole
-// frame. The ribbon runs from column 13 to 126. A column of half-height h is solid within h rows of
+// frame. The ribbon runs from column 24 to 126. A column of half-height h is solid within h rows of
 // the horizon, a 1 px rim lies one row beyond it where the Bayer threshold of the pixel is under
 // 32, and a column of height 0 is the horizon pixel alone. The meter is its box and `segments`
 // lit segments. The walk moves the finished picture.
 Canvas voiceFromDefinition(const Ribbon& ribbon, int segments, Walk walk) {
   Canvas c = meterFromDefinition(segments, walk);
-  for (int x = 13; x <= 126; ++x) {
+  for (int x = 24; x <= 126; ++x) {
     const int h = ribbon.half((126 - x) / 2);
     for (int y = 0; y < kCanvasHeight; ++y) {
       const int d = std::abs(y - 32);
@@ -1304,37 +1307,43 @@ void checkMeterSegments() {
   check(rising, "meter: a louder level never lights fewer segments and adds one at a time");
 }
 
-// The box outline stands exactly on columns 1 and 9 and rows 8 and 56, in silence and at every
-// level. Its interior is columns 2 to 8, rows 9 to 55. Columns 0 and 10 to 12 stay blank, and nothing
-// of the meter lies outside the box.
+// The box outline stands exactly on columns 5 and 20 and rows 8 and 56, in silence and at every
+// level. Its interior is columns 6 to 19, rows 9 to 55. Columns 0 to 4 and 21 to 23 stay blank, and
+// nothing of the meter lies outside the box.
 void checkMeterBox() {
   Canvas empty;
   renderVoice(empty, Ribbon(), 0, Walk{0, 0});
   bool outline = true;
-  for (int x = 1; x <= 9; ++x) outline = outline && lit(empty, x, 8) && lit(empty, x, 56);
-  for (int y = 8; y <= 56; ++y) outline = outline && lit(empty, 1, y) && lit(empty, 9, y);
-  check(outline, "meter: the empty box has its top at row 8, its bottom at row 56 and its sides at columns 1 and 9, 1 px wide");
+  for (int x = kMeterBoxLeftX; x <= kMeterBoxRightX; ++x) {
+    outline = outline && lit(empty, x, kMeterBoxTopY) && lit(empty, x, kMeterBoxBottomY);
+  }
+  for (int y = kMeterBoxTopY; y <= kMeterBoxBottomY; ++y) {
+    outline = outline && lit(empty, kMeterBoxLeftX, y) && lit(empty, kMeterBoxRightX, y);
+  }
+  check(outline, "meter: the empty box has its top at row 8, its bottom at row 56 and its sides at columns 5 and 20, 1 px wide");
 
   bool interior = true;
-  for (int y = 9; y <= 55; ++y) {
-    for (int x = 2; x <= 8; ++x) interior = interior && !lit(empty, x, y);
+  for (int y = kMeterTopY; y < kMeterTopY + kMeterRows; ++y) {
+    for (int x = kMeterX; x < kMeterX + kMeterWidth; ++x) interior = interior && !lit(empty, x, y);
   }
-  check(interior, "meter: the interior, columns 2 to 8 over rows 9 to 55, is dark in silence");
+  check(interior, "meter: the interior, columns 6 to 19 over rows 9 to 55, is dark in silence");
 
   bool outside = true;
   for (int y = 0; y < kCanvasHeight; ++y) {
-    for (int x : {0, 10, 11, 12}) outside = outside && !lit(empty, x, y);
-    if (y < 8 || y > 56) {
-      for (int x = 1; x <= 9; ++x) outside = outside && !lit(empty, x, y);
+    for (int x = 0; x < kMeterBoxLeftX; ++x) outside = outside && !lit(empty, x, y);
+    for (int x = kMeterBoxRightX + 1; x < kRibbonLeftX; ++x) outside = outside && !lit(empty, x, y);
+    if (y < kMeterBoxTopY || y > kMeterBoxBottomY) {
+      for (int x = kMeterBoxLeftX; x <= kMeterBoxRightX; ++x) outside = outside && !lit(empty, x, y);
     }
   }
-  check(outside, "meter: nothing lies in column 0, in columns 10 to 12, or above row 8 and below row 56");
+  check(outside, "meter: nothing lies in columns 0 to 4, in columns 21 to 23, or above row 8 and below row 56");
 
   int boxPixels = 0;
   for (int y = 0; y < kCanvasHeight; ++y) {
     for (int x = 0; x < kBoxFootprint; ++x) boxPixels += lit(empty, x, y) ? 1 : 0;
   }
-  check(boxPixels == 2 * 9 + 2 * 47, "meter: the box is 2 x 9 px of top and bottom and 2 x 47 px of sides, 112 px in all");
+  check(boxPixels == 2 * (kMeterBoxRightX - kMeterBoxLeftX + 1) + 2 * kMeterRows,
+        "meter: the box is 2 x 16 px of top and bottom and 2 x 47 px of sides, 126 px in all");
 
   Canvas full;
   renderVoice(full, Ribbon(), 16, Walk{0, 0});
@@ -1342,17 +1351,19 @@ void checkMeterBox() {
   renderVoice(over, Ribbon(), 999, Walk{0, 0});
   check(sameRows(over, full, 0, kCanvasHeight), "meter: segments past 16 stop at the 16th");
 
-  // A full ribbon beside a full meter leaves columns 10 to 12 blank and the box whole.
+  // A full ribbon beside a full meter leaves columns 21 to 23 blank and the box whole.
   Ribbon loud;
   for (int i = 0; i < kRibbonLevels; ++i) loud.push(1.0f);
   Canvas both;
   renderVoice(both, loud, 16, Walk{0, 0});
   bool gap = true;
   for (int y = 0; y < kCanvasHeight; ++y) {
-    for (int x : {0, 10, 11, 12, 127}) gap = gap && !lit(both, x, y);
+    for (int x : {0, 127}) gap = gap && !lit(both, x, y);
+    for (int x = kMeterBoxRightX + 1; x < kRibbonLeftX; ++x) gap = gap && !lit(both, x, y);
   }
-  check(gap && lit(both, 13, 32) && lit(both, 9, 32) && lit(both, 8, 31) && lit(both, 126, 32),
-        "meter: columns 10 to 12 stay blank between a full meter and a full ribbon, and column 127 stays blank after it");
+  check(gap && lit(both, kRibbonLeftX + 1, 32) && lit(both, kMeterBoxRightX, 32) && lit(both, kMeterBoxRightX - 1, 31) &&
+            lit(both, kRibbonRightX, 32),
+        "meter: columns 21 to 23 stay blank between a full meter and a full ribbon, and column 127 stays blank after it");
 }
 
 // Segment n stands on rows 54 and 55 for n = 1, and each next segment 3 rows higher, so the 16th is
@@ -1373,28 +1384,28 @@ void checkMeterSegmentRows() {
       const bool wantLit = n <= lit16;
       bool top = true;
       bool bottom = true;
-      for (int x = 2; x <= 8; ++x) {
+      for (int x = kMeterX; x < kMeterX + kMeterWidth; ++x) {
         top = top && lit(c, x, segmentTopRow(n)) == wantLit;
         bottom = bottom && lit(c, x, segmentBottomRow(n)) == wantLit;
       }
       segmentsOk = segmentsOk && top && bottom;
       counted += (wantLit && top && bottom) ? 1 : 0;
       if (n < 16) {
-        for (int x = 2; x <= 8; ++x) gapsDark = gapsDark && !lit(c, x, segmentTopRow(n) - 1);
+        for (int x = kMeterX; x < kMeterX + kMeterWidth; ++x) gapsDark = gapsDark && !lit(c, x, segmentTopRow(n) - 1);
       }
     }
     countsOk = countsOk && counted == lit16;
   }
-  check(segmentsOk && countsOk, "meter: with n segments lit, the lowest n are lit at columns 2 to 8, both rows each, and the rest are dark");
+  check(segmentsOk && countsOk, "meter: with n segments lit, the lowest n are lit at columns 6 to 19, both rows each, and the rest are dark");
   check(gapsDark, "meter: the gap rows 53, 50, down to 11 are dark whatever the count, since a gap holds no segment");
 
   Canvas all;
   renderVoice(all, Ribbon(), 16, Walk{0, 0});
   bool gapRows = true;
   for (int y = 11; y <= 53; y += 3) {
-    for (int x = 2; x <= 8; ++x) gapRows = gapRows && !lit(all, x, y);
+    for (int x = kMeterX; x < kMeterX + kMeterWidth; ++x) gapRows = gapRows && !lit(all, x, y);
   }
-  check(gapRows, "meter: with all 16 lit, rows 11, 14, 17 up to 53 at columns 2 to 8 are dark");
+  check(gapRows, "meter: with all 16 lit, rows 11, 14, 17 up to 53 at columns 6 to 19 are dark");
 
   bool whole = true;
   for (int lit16 = 0; lit16 <= 16; ++lit16) {
@@ -1405,7 +1416,7 @@ void checkMeterSegmentRows() {
       for (int y = 0; y < kCanvasHeight; ++y) whole = whole && lit(c, x, y) == lit(want, x, y);
     }
   }
-  check(whole, "meter: columns 0 to 12 are the box and the lit segments and nothing else at every count");
+  check(whole, "meter: columns 0 to 23 are the box and the lit segments and nothing else at every count");
 }
 
 // The box, the segments and the ribbon walk together: every step of the walk moves the whole picture
@@ -1436,27 +1447,28 @@ void checkMeterWalks() {
 
 Canvas toggleReadout(int slot, bool on);
 
-// The screens that are not the voice screen carry no meter. The box's left side is column 1 and its
-// first segments start at column 2, so a screen without the meter leaves columns 0 to 5 dark below
-// its title bar. A key name may start at column 6, so the readout is held to that. The toggle readout,
-// MUTED and BYPASS hold their word further in, from column 11 at the nearest, and leave columns 0 to
-// 10, the box and its walk, dark.
+// The screens that are not the voice screen carry no meter. The box's left side is column 5 and its
+// first segments start at column 6, so a screen without the meter leaves columns 0 to 5 dark below
+// its title bar. A key name starts at column 6 or later, so the readout is held to that. The toggle
+// readout, MUTED and BYPASS hold their word further in, BYPASS from column 11, which lies inside the
+// box's span, so they are held to the box's left side and no further.
 void checkMeterAbsentOffVoice() {
   const Layout layout = defaultLayout();
+  const int clearTo = kMeterBoxLeftX + 1;  // exclusive bound: columns 0 to kMeterBoxLeftX
   bool dark = true;
   for (int slot = 0; slot < kSlotCount; ++slot) {
     for (int knob = 0; knob < kKnobsPerCard; ++knob) {
       if (!knobDesc(layout.card[static_cast<size_t>(slot)], knob)) continue;
-      dark = dark && darkIn(readoutOf(slot, knob, 0.0f), 0, 6, kBarRows, kCanvasHeight);
+      dark = dark && darkIn(readoutOf(slot, knob, 0.0f), 0, clearTo, kBarRows, kCanvasHeight);
     }
-    dark = dark && darkIn(toggleReadout(slot, true), 0, kBoxRight + 2, kBarRows, kCanvasHeight);
+    dark = dark && darkIn(toggleReadout(slot, true), 0, clearTo, kBarRows, kCanvasHeight);
   }
   Canvas muted;
   renderMuted(muted, "MUTED");
   Canvas bypass;
   renderMuted(bypass, "BYPASS");
-  dark = dark && darkIn(muted, 0, kBoxRight + 2, 0, kCanvasHeight) && darkIn(bypass, 0, kBoxRight + 2, 0, kCanvasHeight);
-  check(dark, "meter: the readout below its title bar leaves columns 0 to 5 dark, and the toggle readout, MUTED and BYPASS leave columns 0 to 10 dark");
+  dark = dark && darkIn(muted, 0, clearTo, 0, kCanvasHeight) && darkIn(bypass, 0, clearTo, 0, kCanvasHeight);
+  check(dark, "meter: the readouts, the toggle, MUTED and BYPASS leave columns 0 to 5 dark, through the box's left side");
 }
 
 void checkVoiceScroll() {
