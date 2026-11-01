@@ -2,7 +2,7 @@
 // the spectrum's centroid, a SHIFT step moves the spectral envelope's first peak by 2^(st / 12), the
 // sung pitch holds with Autotune off and on, the formant voice lines up with Autotune's corrected
 // voice, a quick off and on keeps the running voice, SHIFT and MIX steps hold steady-state curvature,
-// the equal-power MIX law, the trim, any call length, and no allocation. No window, no audio device.
+// the MIX level, the trim, any call length, and no allocation. No window, no audio device.
 
 #include <algorithm>
 #include <array>
@@ -168,12 +168,15 @@ Signal program(int seconds) {
   return x;
 }
 
-// A pure 220 Hz sine, whose second difference is small and steady, so any cut stands out.
-Signal sine(int n) {
+// A pure sine at hz, amplitude 0.25.
+Signal tone(double hz, int n) {
   Signal x(static_cast<size_t>(n));
-  for (int i = 0; i < n; ++i) x[static_cast<size_t>(i)] = static_cast<float>(0.25 * std::sin(2.0 * kPi * 220.0 * i / kRate));
+  for (int i = 0; i < n; ++i) x[static_cast<size_t>(i)] = static_cast<float>(0.25 * std::sin(2.0 * kPi * hz * i / kRate));
   return x;
 }
+
+// A pure 220 Hz sine, whose second difference is small and steady, so any cut stands out.
+Signal sine(int n) { return tone(220.0, n); }
 
 // Runs.
 
@@ -535,20 +538,49 @@ bool testToggleSteps() {
                 "peak curvature after the step: off to on x%.4f, on to off x%.4f of steady state (<= 1.05)", up, down);
 }
 
-// MIX is equal-power: the dry and shifted gains are cos and sin of the quarter turn. At SHIFT 0 the
-// shifted voice is the input delayed by the grain delay plus one period. A 208 sample period (230.8 Hz)
-// makes that delay 1248 samples, six whole periods, so the two voices are one waveform and the output
-// level over the input's is cos + sin.
+// MIX holds the input's level whether the two voices are one waveform or unrelated. At SHIFT 0 with
+// Autotune off the shifted voice is the input delayed by the grain delay plus one period.
+// 1. A 208 sample period (230.8 Hz) makes that delay 1248 samples, six whole periods, so the voices are
+//    one waveform and the linear gains give (1 - m) + m = 1 of the input's level.
+// 2. A 150 Hz sine makes the delay 1360 samples, 4.25 cycles, so the voices sit a quarter cycle apart and
+//    add in power. Linear gains alone read 1/sqrt(2) at MIX 50 %; the level gain restores 1.
 bool testMixLaw() {
   constexpr double kHz = static_cast<double>(kRate) / 208.0;
-  const Signal in = vowel(kHz, 3 * kRate);
-  const double inRms = rms(in, kRate, 3 * kRate);
-  double worst = 0.0;
-  for (float m : {0.25f, 0.5f, 0.75f}) {
-    const double want = std::cos(m * kPi / 2.0) + std::sin(m * kPi / 2.0);
-    worst = std::max(worst, std::fabs(db(rms(run(in, formantOn(0, m)), kRate, 3 * kRate) / inRms / want)));
+  bool ok = true;
+  for (int pass = 0; pass < 2; ++pass) {
+    const Signal in = pass == 0 ? vowel(kHz, 3 * kRate) : tone(kSungHz, 3 * kRate);
+    const double inRms = rms(in, kRate, 3 * kRate);
+    double worst = 0.0;
+    for (float m : {0.25f, 0.5f, 0.75f}) {
+      worst = std::max(worst, std::fabs(db(rms(run(in, formantOn(0, m)), kRate, 3 * kRate) / inRms)));
+    }
+    ok &= report(pass == 0 ? "mix level, one waveform" : "mix level, quarter cycle apart", worst <= 0.1,
+                 "level over the input at MIX 25, 50, 75 %% is within %.3f dB of 0 dB (0.1)", worst);
   }
-  return report("mix law", worst <= 0.1, "level over the input at MIX 25, 50, 75 %% is cos + sin to within %.3f dB (0.1)", worst);
+  return ok;
+}
+
+// On the program at SHIFT -3 with the shipped trim, MIX 25, 50 and 75 % read within 1 dB of MIX 100 %,
+// Autotune off and on. The voices sit anywhere from correlated to unrelated here, so a fixed linear or
+// equal-power law leaves the middle of the knob 1 to 3 dB off.
+bool testMixHoldsLevel() {
+  const Signal in = program(3);
+  bool ok = true;
+  for (int pass = 0; pass < 2; ++pass) {
+    auto level = [&](float m) {
+      cv::PitchFxParams p;
+      p.formant.on = true;
+      p.formant.mix = m;
+      if (pass == 1) autotuneOn(p);
+      return rms(run(in, p), kRate, 3 * kRate);
+    };
+    const double top = level(1.0f);
+    double worst = 0.0;
+    for (float m : {0.25f, 0.5f, 0.75f}) worst = std::max(worst, std::fabs(db(level(m) / top)));
+    ok &= report(pass == 0 ? "mix holds level, autotune off" : "mix holds level, autotune on", worst <= 1.0,
+                 "MIX 25, 50, 75 %% read within %.2f dB of MIX 100 %% on the program at SHIFT -3 (1)", worst);
+  }
+  return ok;
 }
 
 // The shipped trim: SHIFT -3 at MIX 100 % lands 0 to +0.5 dB over the input on level_test's program,
@@ -599,6 +631,7 @@ int main() {
   ok &= testShiftSteps();
   ok &= testToggleSteps();
   ok &= testMixLaw();
+  ok &= testMixHoldsLevel();
   ok &= testDefaultLevel();
   ok &= testTrim();
   ok &= testAnyLength();
