@@ -253,3 +253,20 @@ be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where th
    that is about 3.2 %; the {5, 6} row stands. D1 SRAM 242,648 B, 46.3 % (v2.00.99 292,560 B).
 6. `tools/render.cpp` takes `bloomDriveWord`, `bloomDriveBell` and `bloomDrift` for tuning by ear.
    Renders `build/audition/chatter-{a,b,c}.wav`.
+
+## 16. LINGER 20 ms to 3 s (owner 2026-11-01, option B)
+
+Owner: "let's allow it to run from a minimum of 20ms to 3s." The 2.5 s age limit cut every tail
+above about 1.5 s, so a longer LINGER only made the cutoff more abrupt. The owner picked B: the
+limit stays while a word lasts, where a slice can stick, and a tail runs its whole fade, which
+always ends. This section overrides section 13 item 6's tail rule and section 14 item 5's range.
+
+1. Range. LINGER runs 20 ms to 3 s on the log curve. The default stays 300 ms.
+2. Low end. τ = max(D, min(1.5·D, 300)) ms, without the 120 ms floor, and the static fade runs
+   min(80, D) ms. Both match today at D ≥ 80 ms, so the sound from 80 ms up does not change. At
+   20 ms τ is 30 ms and the tail ends about 70 ms after the word. LINGER's 0.8 cap on the slice and
+   the 35 ms slice floor stand, so below 44 ms the slices sit at 35 ms.
+3. Age limit in a word. Unchanged: a slice that reaches 2.5 s is replaced at the next re-capture
+   even when quieter; with no re-capture it closes over 80 ms.
+4. Tail. No age limit. The tail repeats its one slice until LINGER's law ends it, or a new word
+   fades it over 150 ms. At LINGER 3 s it rings about 5 s.
