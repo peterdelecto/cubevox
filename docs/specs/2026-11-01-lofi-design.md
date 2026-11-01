@@ -88,3 +88,11 @@ Signal path, in order:
 3. The filter coefficients ramp linearly across each block while a knob moves, so a step does not
    click (knob_step 1.003 and 1.011 against 1.05).
 4. level_test's synthetic program reads −2.1 dB through the band; Lo-fi's level rows run on the clips.
+
+## 8. AMOUNT capped at the engine's 60 % (owner 2026-11-01, v2.00.97)
+
+Owner: "cap lo-fi amount at whatever value its at at 60 percent." The pot's full travel now covers
+the engine's AMOUNT from 0 to 0.6 (`kLofiAmountTop`, `core/registry.h`), so there is no dead travel.
+The band closes and drives over the first 83 % of the knob; the last 17 % adds the start of the
+crush, at most a hold of 32 kHz and 14 bits. The default (knob 50 %) is the engine's 30 %: −0.06,
+−0.01, −0.22 dB on the three clips.

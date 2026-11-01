@@ -491,8 +491,8 @@ void checkSlot7Cards() {
 
   applyKnob(Card::Lofi, 0, 0.3f, p);
   applyKnob(Card::Lofi, 1, 0.8f, p);
-  check(std::fabs(p.lofi.tone - 0.3f) < 1e-6f && std::fabs(p.lofi.amount - 0.8f) < 1e-6f,
-        "lofi: TONE and AMOUNT drive their own fields");
+  check(std::fabs(p.lofi.tone - 0.3f) < 1e-6f && std::fabs(p.lofi.amount - 0.8f * kLofiAmountTop) < 1e-6f,
+        "lofi: TONE and AMOUNT drive their own fields, AMOUNT up to the engine's 60 %");
 
   applyKnob(Card::Bloom, 0, 0.0f, p);
   const float tailLow = p.bloom.tailMs;

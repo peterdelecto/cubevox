@@ -298,7 +298,7 @@ void checkComposeSlot7Cards() {
   panel.knob[6] = {0.25f, 0.75f};
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.lofi.on && std::fabs(snap.params.lofi.tone - 0.25f) < 1e-6f &&
-            std::fabs(snap.params.lofi.amount - 0.75f) < 1e-6f && !snap.params.pitchFx.formant.on,
+            std::fabs(snap.params.lofi.amount - 0.75f * kLofiAmountTop) < 1e-6f && !snap.params.pitchFx.formant.on,
         "compose: Lo-fi in slot 7 reads TONE and AMOUNT, and Formant's flag is not set by the slot");
 
   layout.card[6] = Card::Bloom;
