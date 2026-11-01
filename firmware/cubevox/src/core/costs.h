@@ -3,6 +3,10 @@
 // single block. Each is rounded up. kTracker and kAutotune describe one measurement, the pitch
 // slot with Autotune on, and only their sum stands for it; see kTracker.
 //
+// Method of record: firmware/stress.py runs the passes below on four layouts (default, crowd, chasm,
+// crowd-chasm) on a clip bench image, two runs each, and gates every placed card against its row
+// here. A row dated "stress run" takes its worst from the lowest run worst per layout.
+//
 // Method: default layout on the voice clip with per-slot cycle counters, in two passes. The first
 // pins every knob at its top position. The second catches loads pinned knobs cannot show: it
 // switches Autotune on with the clip playing, and sweeps reverb MIX and SEMITONES end to end. A
@@ -49,14 +53,14 @@ constexpr Cost operator+(Cost a, Cost b) {
 
 constexpr Cost kEmpty{0, 0, true};
 constexpr Cost kInputGate{4, 5, true};     // 23.7k / 26.0k, the board's figures for the earlier tuning; the revised one runs at 0.97 of them on the host, so they bound it until a rerun
-constexpr Cost kAutotune{5, 6, false};     // the pair's estimate less kTracker: its voice, mix and fine pass; see kTracker
+constexpr Cost kAutotune{5, 7, false};     // the pair's estimate less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
 constexpr Cost kOctave{5, 5, true};        // 25.7k / 27.2k, its own voice only
 constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
 constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
-constexpr Cost kDistortion{8, 10, true};   // 46.4k / 62.1k
+constexpr Cost kDistortion{8, 11, true};   // 45.5k to 46.8k / 64.5k to 67.7k, stress run 2026-11-01 (worst 10.1 to 10.6 %, lowest run worst per layout)
 constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
 constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the board's boot worst 107.4k against the two-half engine's 72.0k (1.49x of 61.9k); two-pass bench pending
-constexpr Cost kReverbChasm{16, 16, true};   // 97.6k / 98.4k
+constexpr Cost kReverbChasm{17, 17, true};   // 102.2k to 102.5k / 105.5k to 108.2k, stress run 2026-11-01 in the reverb slot (mean 16.0 %, worst 16.5 to 16.9 %)
 
 // The pitch tracker, its history fill and its coarse analysis, which Autotune and Crowd share and a
 // layout pays once. kTracker and kAutotune are one estimate split in two. The pair was measured on
@@ -81,8 +85,10 @@ constexpr Cost kTracker{4, 5, false};
 // Octave's slot, which cost 47.5k (7.4 %), so this row holds the card without the tracker. The host
 // gave 2.40 us per block (VOICES 80 %, WIDTH 50 %, default tuning), which reads 19 points at the
 // 50.4k ratio and 11 points at the pitch code's 29k. The board's 12.3 % sits at the pitch code's
-// ratio, so that ratio holds for Crowd too.
-constexpr Cost kCrowd{13, 15, true};  // 78.7k / 94.97k, board 2026-11-01, crowd bench layout slot 3, Adam's 5.5 s clip, knobs at top, two runs; run 2's worst was 101.0k; the tracker ran in Octave's slot, 47.5k
+// ratio, so that ratio holds for Crowd too. The mean comes from knobs at top. The worst comes from
+// the two-pass stress run, where the WIDTH and VOICES sweeps raise it to a lowest run worst of 15.6 %
+// in the crowd layout and 15.9 % in crowd-chasm.
+constexpr Cost kCrowd{13, 16, true};  // 78.7k / 99.6k to 101.6k, board 2026-11-01; mean from the crowd bench layout slot 3 with knobs at top, worst from the stress run's sweeps; the tracker ran in Octave's slot, 47.5k
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.
