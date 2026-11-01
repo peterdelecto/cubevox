@@ -391,7 +391,10 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 # -- gates and reports
 
 def judge(result, rows):
-    """Fills result['table'], result['gates'] and result['block'] from the aggregate."""
+    """Fills result['table'], result['gates'] and result['carrier'] from the aggregate.
+
+    Every check is a gate, passed or not, so the count in the output is the number of checks made.
+    """
     agg = result["agg"]
     bounds, carrier = slot_bounds(result["slots"], result["chasm"], rows)
     table, gates = [], []
@@ -404,14 +407,12 @@ def judge(result, rows):
         mean, worst = agg["slot_mean"][i], agg["slot_worst"][i]
         row_mean, row_worst = bounds[i]
         over = []
-        if mean / CYCLES_PER_PERCENT > row_mean:
-            over.append("mean")
-        if worst / CYCLES_PER_PERCENT > row_worst:
-            over.append("worst")
-        for kind in over:
-            value, row = (mean, row_mean) if kind == "mean" else (worst, row_worst)
-            gates.append(Gate(f"{label}: slot {i + 1} {card} {kind} within its row", False,
-                              f"{value / CYCLES_PER_PERCENT:.2f} % over {row} %"))
+        for kind, value, row in (("mean", mean, row_mean), ("worst", worst, row_worst)):
+            within = value / CYCLES_PER_PERCENT <= row
+            if not within:
+                over.append(kind)
+            gates.append(Gate(f"{label}: slot {i + 1} {card} {kind} within its row", within,
+                              f"{value / CYCLES_PER_PERCENT:.2f} % {'within' if within else 'over'} {row} %"))
         table.append((i + 1, card + ("*" if i == carrier else ""), mean, row_mean, worst, row_worst,
                       "ok" if not over else "FAIL " + " and ".join(over)))
     block_mean, block_worst = agg["block_mean"], agg["block_worst"]
