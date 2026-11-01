@@ -57,12 +57,14 @@ constexpr Cost kReverbChasm{16, 16, true};   // 97.6k / 98.4k
 // worst, taken as the tracker's hop block; no worst block was measured. A board bench is still owed.
 constexpr Cost kTracker{9, 16, false};
 
-// Estimate of 2026-10-31 from the host after the CPU pass: Crowd::process at 1.61 us per block (VOICES
-// 80 %, WIDTH 50 %, default tuning, Autotune off) is 12.7 points, rounded up to 13. The parts are the
-// four copies' grains, the shared tone shelf, the low cut, the gap rule and the mix; the tracker is
-// kTracker. The worst is the mean plus the 2 points the earlier row carried; no worst block was
-// measured. A board bench is still owed.
-constexpr Cost kCrowd{13, 15, false};
+// Estimate of 2026-11-01 from the host for the eight-copy card: Crowd::process at 2.40 us per block
+// (VOICES 80 %, WIDTH 50 %, default tuning, Autotune off) is 18.9 points, rounded up to 19. The parts
+// are the eight copies' grains (four tuned, four raised), the shared tone shelf, the low cut, the gap
+// rule and the mix; the tracker is kTracker. The worst is the mean plus the 2 points the earlier row
+// carried; no worst block was measured. Both pitch audits measured about 28k board cycles per host
+// us for grain and tracker code against the 50.4k used here, so a board bench is owed before the row
+// is trusted.
+constexpr Cost kCrowd{19, 21, false};
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.

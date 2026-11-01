@@ -607,8 +607,9 @@ void drawCrowdVoiceNodes(cv::CrowdTuning& t) {
   }
 }
 
-// One checkbox per copy, each setting its bit in solo. The boxes are independent, so two copies can
-// be heard together. The mask is not saved with the state.
+// One checkbox per tuned copy, each setting its bit in solo; a soloed tuned copy plays without its
+// raised copy. The boxes are independent, so two copies can be heard together. The mask is not saved
+// with the state.
 void drawCrowdSoloNode(uint8_t& solo) {
   if (!tuningNode("Solo")) return;
   for (unsigned i = 0; i < 4; ++i) {
