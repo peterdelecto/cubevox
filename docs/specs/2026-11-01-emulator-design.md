@@ -73,9 +73,14 @@ Top band: MUTE toggle at the left; the OLED at 4x in the centre; the MENU knob a
 the LED and the CPU line under it: `CPU  67 % mean   76 % worst   lines 75 / 95`, a figure in the
 danger colour when over its line.
 
-Slot band: eight columns, slot 1 to 8, each with the card's name, the upper knob and its label,
-the lower knob and its label, and the bypass toggle. Slots 4 and 8 carry the card toggle under
-the bypass toggle. Knobs show no value text; the OLED readout shows the value, as on the box.
+Toggle row: the eight bypass toggles, one above each slot strip, drawn as the box's bat toggles,
+a vertical lever with its tip up for on and down for off (owner 2026-11-01: "vertical toggles
+above the effect strip as they are laid out on the actual unit"). MUTE is the same toggle, top
+left. No ON or OFF words on a toggle; the lever and its colour say it.
+
+Slot band: eight strips, slot 1 to 8, each with the card's name, the upper knob and its label,
+and the lower knob and its label. Slots 4 and 8 carry the card switch at the foot. Knobs show no
+value text; the OLED readout shows the value, as on the box.
 
 Bottom band: the source switch at the left and the version under it.
 

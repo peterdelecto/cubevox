@@ -170,25 +170,32 @@ void encoderKnob(Frame& f, ImVec2 center) {
 
 // ---- Switches
 
-// A slide switch. On is the accent with a fill and the thumb at the right; off is dim with the
-// thumb at the left. Returns true when it was clicked.
-bool slideSwitch(Frame& f, const char* id, ImVec2 topLeft, bool& on) {
+// A bat toggle, standing on its bushing. The lever stands up for on, in the accent with a filled
+// tip, and hangs down for off, dim with a hollow tip. A click anywhere on its hit area flips it.
+// Returns true when it was clicked.
+bool batToggle(Frame& f, const char* id, ImVec2 center, bool& on) {
+  const ImVec2 size(kBatW, kBatH);
+  const ImVec2 topLeft = center - size * half(1);
   ImGui::SetCursorScreenPos(topLeft);
-  const bool clicked = ImGui::InvisibleButton(id, ImVec2(kSwitchW, kSwitchH));
+  const bool clicked = ImGui::InvisibleButton(id, size);
   const bool hovered = ImGui::IsItemHovered();
   const bool active = ImGui::IsItemActive();
   if (clicked) on = !on;
 
   ImDrawList* dl = f.dl;
-  const ImVec2 bottomRight = topLeft + ImVec2(kSwitchW, kSwitchH);
-  const float rr = half(kSwitchH);
-  dl->AddRectFilled(topLeft, bottomRight, on ? kAccent : kCtrl, rr);
-  dl->AddRect(topLeft, bottomRight, on ? kAccent : active ? kAccent : hovered ? kHover : kBorder, rr, ImDrawFlags_None,
-              kRimW);
-  const float thumbX = on ? bottomRight.x - rr : topLeft.x + rr;
-  dl->AddCircleFilled(ImVec2(thumbX, topLeft.y + rr), rr - kThumbInset, on ? kAccentInk : kDim, kCircleSegments);
-  const float wordX = on ? topLeft.x + half(kSwitchW - kSwitchH) : bottomRight.x - half(kSwitchW - kSwitchH);
-  drawTextCentered(dl, ImVec2(wordX, topLeft.y + rr), kFontLabel, on ? kAccentInk : kDim, on ? "ON" : "OFF");
+  if (hovered || active) dl->AddRect(topLeft, topLeft + size, active ? kAccent : kHover, kRadiusSm, ImDrawFlags_None, kBorderW);
+  const ImVec2 bush(half(kBushW), half(kBushH));
+  dl->AddRectFilled(center - bush, center + bush, kCtrl, kRadiusSm);
+  dl->AddRect(center - bush, center + bush, kBorder, kRadiusSm, ImDrawFlags_None, kBorderW);
+  const ImU32 ink = on ? kAccent : kOff;
+  const ImVec2 tip = center + ImVec2(0, on ? -kLeverLen : kLeverLen);
+  dl->AddLine(center, tip, ink, kLeverW);
+  if (on) {
+    dl->AddCircleFilled(tip, kTipR, ink, kCircleSegments);
+  } else {
+    dl->AddCircleFilled(tip, kTipR, kBg, kCircleSegments);
+    dl->AddCircle(tip, kTipR, ink, kCircleSegments, kRimW);
+  }
   return clicked;
 }
 
@@ -264,10 +271,11 @@ void drawTopBand(Frame& f) {
   ImDrawList* dl = f.dl;
   const float midY = kTopY + half(kOledH);
 
-  // MUTE, at the box's top left.
-  const float muteTop = midY - half(kLabelH + kSwitchH);
-  drawTextCentered(dl, ImVec2(kPad + half(kSwitchW), muteTop + half(kLabelH)), kFontLabel, kText, "MUTE");
-  slideSwitch(f, "mute", ImVec2(kPad, muteTop + kLabelH), f.panel.input.mute);
+  // MUTE, at the box's top left: its label over a bat toggle.
+  const float muteTop = midY - half(kLabelH + kBatH);
+  const float muteX = kPad + half(kMuteW);
+  drawTextCentered(dl, ImVec2(muteX, muteTop + half(kLabelH)), kFontLabel, kText, "MUTE");
+  batToggle(f, "mute", ImVec2(muteX, muteTop + kLabelH + half(kBatH)), f.panel.input.mute);
 
   // The OLED at 4x, nearest neighbour, on its bezel.
   const ImVec2 oledMin(kOledX, kTopY);
@@ -287,8 +295,8 @@ void drawTopBand(Frame& f) {
   drawCpuLine(f, kRightX + 2 * kLedR + kLedGap, rowY);
 }
 
-// The switch under a slot's bypass toggle, which follows the layout: the column that holds the
-// Unison or MOB card, and the column that holds a reverb.
+// The card switch at the foot of a slot, which follows the layout: the column that holds the Unison
+// or MOB card, and the column that holds a reverb.
 void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   const Layout& layout = f.box.layout();
   if (slot == unisonCrowdSlot(layout)) {
@@ -324,13 +332,18 @@ void drawSlot(Frame& f, int slot) {
     upper(desc.knob[k].name, label, sizeof label);
     drawTextCentered(dl, ImVec2(centerX, boxTop + kKnobBoxD + half(kLabelH)), kFontLabel, kDim, label);
   }
-  const float segTop = y + kColH - kColPad - kSegH;
-  const float switchTop = segTop - kGapTight - kSwitchH;
-  bool on = f.panel.input.toggle[static_cast<size_t>(slot)];
-  slideSwitch(f, "bypass", ImVec2(centerX - half(kSwitchW), switchTop), on);
-  f.panel.input.toggle[static_cast<size_t>(slot)] = on;
-  drawSwapSwitch(f, slot, ImVec2(x + kColPad, segTop));
+  drawSwapSwitch(f, slot, ImVec2(x + kColPad, y + kColH - kColPad - kSegH));
   ImGui::PopID();
+}
+
+// The eight bypass toggles, each centred over its column.
+void drawToggleRow(Frame& f) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    const float centerX = kPad + static_cast<float>(s) * (kColW + kGap) + half(kColW);
+    ImGui::PushID(s);
+    batToggle(f, "bypass", ImVec2(centerX, kToggleY + half(kBatH)), f.panel.input.toggle[static_cast<size_t>(s)]);
+    ImGui::PopID();
+  }
 }
 
 void drawBottomBand(Frame& f) {
@@ -454,6 +467,7 @@ void Window::draw(Box& box, Panel& panel, bool micAvailable) {
   ImGui::Begin(kWindowTitle, nullptr, kFaceFlags);
   Frame frame{box, panel, encoder_, ImGui::GetWindowDrawList(), oledTexture_, micAvailable};
   drawTopBand(frame);
+  drawToggleRow(frame);
   for (int s = 0; s < kSlotCount; ++s) drawSlot(frame, s);
   drawBottomBand(frame);
   ImGui::End();
