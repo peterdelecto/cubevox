@@ -215,7 +215,7 @@ bool testGrainLaw() {
   struct Point {
     double k, tail;
   };
-  const Point pts[4] = {{0.5, 300.0}, {1.0, 1000.0}, {0.5, 60.0}, {0.0525, 300.0}};
+  const Point pts[4] = {{0.5, 300.0}, {1.0, 2000.0}, {0.5, 60.0}, {0.0525, 300.0}};
   bool ok = true;
   double got[4];
   for (int j = 0; j < 4; ++j) {
@@ -240,7 +240,7 @@ bool testGrainLaw() {
     got[j] = (done - t.writes[0] + 1) / double(kMs);
     if (std::fabs(got[j] - lawAt(pts[j].k, pts[j].tail).grainMs) > 0.1) ok = false;
   }
-  return report("grain-law", ok, "grain ms at (0.5, 300)/(1, 1000)/(0.5, 60)/(0.0525, 300) = %.2f / %.2f / %.2f / %.2f", got[0],
+  return report("grain-law", ok, "grain ms at (0.5, 300)/(1, 2000)/(0.5, 60)/(0.0525, 300) = %.2f / %.2f / %.2f / %.2f", got[0],
                 got[1], got[2], got[3]);
 }
 
@@ -295,9 +295,9 @@ bool testTail() {
   const int ms = 4000;
   bool ok = true;
   double worstRel = 0.0, endMs = 0.0, wantEndMs = 0.0;
-  const double tails[3] = {300.0, 60.0, 1000.0};
+  const double tails[4] = {300.0, 60.0, 1000.0, 2000.0};
   for (double tail : tails) {
-    const int span = tail > 500.0 ? 4500 : ms;
+    const int span = tail > 1500.0 ? 6000 : (tail > 500.0 ? 4500 : ms);
     const Signal in = vowel(span, 0, 700);
     cv::BloomParams p;
     p.tailMs = static_cast<float>(tail);

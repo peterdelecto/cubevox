@@ -1,9 +1,11 @@
-// Lo-fi checks: settled off, silence, band corners, honk, crush law, chunking, enable edge, level, no-alloc.
+// Lo-fi checks: settled off, silence, band corners, honk, crush law, chunking, enable edge, hold floor,
+// foldback, TONE steps with the crush, level, no-alloc.
 // No window, no audio device. The level check reads Adam's clips from samples/ and skips when they are absent.
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -49,7 +51,7 @@ constexpr int kSecond = cv::kSampleRate;
 using Signal = std::vector<float>;
 
 bool report(const char* name, bool ok, const char* fmt, double a = 0.0, double b = 0.0, double c = 0.0) {
-  char detail[200];
+  char detail[320];
   std::snprintf(detail, sizeof detail, fmt, a, b, c);
   std::printf("%s %s  %s\n", ok ? "PASS" : "FAIL", name, detail);
   return ok;
@@ -338,6 +340,216 @@ bool testEnableEdge() {
                 static_cast<double>(quick), static_cast<double>(settled));
 }
 
+// The tuning with only the hold left of the crush: the band at its law, no drive, honk or makeup, and
+// 16 bits so the quantiser adds no noise of its own.
+cv::LofiParams holdOnly(float tone, float amount, float over) {
+  cv::LofiParams p = bandOnly(tone, amount);
+  p.tuning.bitsMin = 16.0f;
+  p.tuning.holdOverBand = over;
+  return p;
+}
+
+// Held values per second at the output, from the changes in 1 s of noise.
+double heldRateHz(const cv::LofiParams& p) {
+  const Signal in = noise(kSecond, 0.5f);
+  gLofi.reset();
+  const Signal out = run(gLofi, in, p);
+  const size_t from = static_cast<size_t>(kSecond / 4);
+  size_t changes = 0;
+  for (size_t i = from + 1; i < out.size(); ++i) changes += out[i] != out[i - 1];
+  return static_cast<double>(changes) * kSecond / static_cast<double>(out.size() - from - 1);
+}
+
+// The held rate sits at 2.2 times the low-pass corner or above it, in the law and at the output.
+// TONE 50 % and below keep 6 kHz, since their floor sits under it.
+bool testHoldFloor() {
+  bool ok = true;
+  double worstRatio = 1e9, worstRate = 0.0;
+  for (const float tone : {0.0f, 0.5f, 0.75f, 1.0f}) {
+    const cv::LofiParams p = holdOnly(tone, 1.0f, cv::kHoldOverBand);
+    const cv::Lofi::Law law = cv::Lofi::lawAt(tone, 1.0f, p.tuning);
+    const double holdHz = static_cast<double>(law.holdRatio) * cv::kSampleRate;
+    const double ratio = holdHz / law.lpHz;
+    const double measured = heldRateHz(p);
+    worstRatio = std::min(worstRatio, ratio);
+    worstRate = std::max(worstRate, std::fabs(measured / holdHz - 1.0));
+    ok &= ratio >= 2.2 - 1e-4 && std::fabs(measured / holdHz - 1.0) < 0.01;
+    if (tone <= 0.5f) ok &= std::fabs(holdHz - 6000.0) < 0.5;
+    std::printf("     tone %.2f: low-pass %.0f Hz, held rate %.0f Hz (%.2f x), at the output %.0f Hz\n", tone,
+                static_cast<double>(law.lpHz), holdHz, ratio, measured);
+  }
+  // TONE 50 % and below sit above the floor at every AMOUNT, so the floor changes nothing there.
+  size_t differ = 0;
+  const Signal in = noise(kSecond, 0.5f);
+  for (const float tone : {0.0f, 0.25f, 0.5f}) {
+    for (const float amount : {0.55f, 0.75f, 1.0f}) {
+      cv::LofiParams with, without;
+      with.tone = without.tone = tone;
+      with.amount = without.amount = amount;
+      without.tuning.holdOverBand = 0.0f;
+      gLofi.reset();
+      const Signal a = run(gLofi, in, with);
+      gLofi.reset();
+      const Signal b = run(gLofi, in, without);
+      for (size_t i = 0; i < in.size(); ++i) differ += a[i] != b[i];
+    }
+  }
+  ok &= differ == 0;
+  return report("hold floor", ok,
+                "AMOUNT 100 %%: held rate >= 2.2 x the low-pass corner (worst %.3f x), output within %.2f %% of the law (<= 1); "
+                "TONE 0, 25, 50 %% x AMOUNT 55, 75, 100 %% differ from the floor-free engine in %.0f samples (0)",
+                worstRatio, 100.0 * worstRate, static_cast<double>(differ));
+}
+
+// In-place radix-2 FFT.
+void fft(std::vector<std::complex<double>>& a) {
+  const size_t n = a.size();
+  for (size_t i = 1, j = 0; i < n; ++i) {
+    size_t bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) std::swap(a[i], a[j]);
+  }
+  for (size_t len = 2; len <= n; len <<= 1) {
+    const double ang = -2.0 * kPi / static_cast<double>(len);
+    const std::complex<double> step(std::cos(ang), std::sin(ang));
+    for (size_t i = 0; i < n; i += len) {
+      std::complex<double> w(1.0, 0.0);
+      for (size_t k = 0; k < len / 2; ++k) {
+        const std::complex<double> u = a[i + k], v = a[i + k + len / 2] * w;
+        a[i + k] = u + v;
+        a[i + k + len / 2] = u - v;
+        w *= step;
+      }
+    }
+  }
+}
+
+constexpr size_t kFftN = 65536;
+constexpr double kBinHz = static_cast<double>(cv::kSampleRate) / kFftN;
+constexpr int kToneBins = 4;  // bins either side of the tone that count as the tone (Hann main lobe)
+
+// Power per bin of the last kFftN samples under a Hann window.
+std::vector<double> powerSpectrum(const Signal& x) {
+  std::vector<std::complex<double>> a(kFftN);
+  const size_t off = x.size() - kFftN;
+  for (size_t i = 0; i < kFftN; ++i)
+    a[i] = static_cast<double>(x[off + i]) * (0.5 - 0.5 * std::cos(2.0 * kPi * static_cast<double>(i) / kFftN));
+  fft(a);
+  std::vector<double> p(kFftN / 2);
+  for (size_t i = 0; i < p.size(); ++i) p[i] = std::norm(a[i]);
+  return p;
+}
+
+struct Fold {
+  double keptDb;      // the tone's power at the output over its power out of the band, dB
+  double residualDb;  // everything else under the hold's Nyquist over the same, dB
+};
+
+// A sine at the band's top (the low-pass corner) through the hold. The reference is the same band at
+// AMOUNT 50 %, which has no crush. Without a fold the tone stays and little else lands under the hold's
+// Nyquist; a fold moves the tone to |f - k * rate| and leaves the bins around f empty.
+Fold foldAtBandTop(float tone, float over) {
+  const cv::LofiParams p = holdOnly(tone, 1.0f, over);
+  cv::LofiParams band = p;
+  band.amount = 0.5f;
+  const cv::Lofi::Law law = cv::Lofi::lawAt(tone, 1.0f, p.tuning);
+  const size_t kb = static_cast<size_t>(std::lround(static_cast<double>(law.lpHz) / kBinHz));
+  const double hz = static_cast<double>(kb) * kBinHz;
+  const Signal in = sine(static_cast<int>(kFftN) + kSecond / 2, hz, 0.05f);
+  gLofi.reset();
+  const auto out = powerSpectrum(run(gLofi, in, p));
+  gLofi.reset();
+  const auto ref = powerSpectrum(run(gLofi, in, band));
+  const size_t nyqBin = static_cast<size_t>(static_cast<double>(law.holdRatio) * cv::kSampleRate / 2.0 / kBinHz);
+  double refTone = 0.0, kept = 0.0, rest = 0.0;
+  for (size_t i = 1; i < out.size(); ++i) {
+    const bool inTone = i + kToneBins >= kb && i <= kb + kToneBins;
+    if (inTone) {
+      refTone += ref[i];
+      kept += out[i];
+    } else if (i < nyqBin) {
+      rest += out[i];
+    }
+  }
+  return {10.0 * std::log10(kept / refTone + 1e-30), 10.0 * std::log10(rest / refTone + 1e-30)};
+}
+
+// A tone at the band's top holds its place under the hold's Nyquist. Without the floor, TONE 75 and 100 %
+// hold at 6 kHz (a Nyquist of 3 kHz under a band that reaches 3.4 and 4.8 kHz) and the tone folds away.
+// The residue under the Nyquist is not all fold: a hold period that is not a whole number of samples
+// (the floored rates 7467 and 10560 Hz) lands each sample on the audio clock, and that jitter alone
+// leaves about -14 to -17 dB under the tone. -40 dB is therefore out of reach, and the gate sits at -10 dB,
+// 7 dB over the jitter and 7 dB under the fold it replaces.
+bool testFoldback() {
+  bool ok = true;
+  double worstRest = -1e9, worstKept = 1e9;
+  for (const float tone : {0.0f, 0.5f, 0.75f, 1.0f}) {
+    const Fold f = foldAtBandTop(tone, cv::kHoldOverBand);
+    worstRest = std::max(worstRest, f.residualDb);
+    worstKept = std::min(worstKept, f.keptDb);
+    ok &= f.keptDb >= -4.0 && f.residualDb <= -10.0;
+    std::printf("     tone %.2f: tone at the band top keeps %.1f dB, %.1f dB elsewhere under the Nyquist\n", tone, f.keptDb,
+                f.residualDb);
+  }
+  double controlRest = 1e9;
+  for (const float tone : {0.75f, 1.0f}) {
+    const Fold f = foldAtBandTop(tone, 0.0f);
+    controlRest = std::min(controlRest, f.residualDb);
+    ok &= f.residualDb >= -6.0;
+    std::printf("     no floor, tone %.2f: %.1f dB elsewhere under the Nyquist (the tone's own image above it adds to the %.1f dB at its pitch)\n",
+                tone, f.residualDb, f.keptDb);
+  }
+  return report("foldback", ok,
+                "tone at the band top, AMOUNT 100 %%: kept >= %.1f dB (>= -4), residue under the Nyquist <= %.1f dB (<= -10); "
+                "without the floor residue >= %.1f dB (>= -6)",
+                worstKept, worstRest, controlRest);
+}
+
+// Largest |second difference| of x over [from, to).
+double peakCurvature(const Signal& x, size_t from, size_t to) {
+  double worst = 0.0;
+  for (size_t i = std::max<size_t>(from, 2); i < to; ++i)
+    worst = std::max(worst, std::fabs(static_cast<double>(x[i]) - 2.0 * x[i - 1] + x[i - 2]));
+  return worst;
+}
+
+// TONE steps with AMOUNT up. The band and the hold rate ramp across the block, so the output bends no
+// harder just after a step than it does at either setting in steady state (knob_step_test's rule).
+bool testToneStepWithCrush() {
+  constexpr size_t kStepAt = 2 * kSecond, kTotal = 4 * kSecond;
+  const Signal in = sine(static_cast<int>(kTotal), 1000.0, 0.25f);
+  struct Step {
+    float from, to;
+  };
+  double worst = 0.0;
+  Step at{};
+  for (const Step s : {Step{0.2f, 0.215f}, Step{0.5f, 0.515f}, Step{0.8f, 0.815f}, Step{0.45f, 0.75f}}) {
+    for (const float amount : {0.75f, 1.0f}) {
+      cv::LofiParams a, b;
+      a.tone = s.from;
+      b.tone = s.to;
+      a.amount = b.amount = amount;
+      gLofi.reset();
+      Signal out = run(gLofi, Signal(in.begin(), in.begin() + static_cast<std::ptrdiff_t>(kStepAt)), a);
+      const Signal tail = run(gLofi, Signal(in.begin() + static_cast<std::ptrdiff_t>(kStepAt), in.end()), b);
+      out.insert(out.end(), tail.begin(), tail.end());
+      const double steady = std::max(peakCurvature(out, kStepAt - kSecond / 2, kStepAt),
+                                     peakCurvature(out, kTotal - kSecond / 2, kTotal));
+      const double ratio = peakCurvature(out, kStepAt, kStepAt + kSecond / 10) / steady;
+      std::printf("     TONE %.3f to %.3f at AMOUNT %.0f %%: x%.4f\n", static_cast<double>(s.from),
+                  static_cast<double>(s.to), 100.0 * static_cast<double>(amount), ratio);
+      if (ratio >= worst) {
+        worst = ratio;
+        at = s;
+      }
+    }
+  }
+  return report("tone step, crush", worst <= 1.05,
+                "TONE steps at AMOUNT 75 and 100 %%, worst %.2f to %.2f (peak curvature x%.4f of steady state, <= 1.05)",
+                static_cast<double>(at.from), static_cast<double>(at.to), worst);
+}
+
 // 16-bit mono PCM WAV, any chunks before data. Empty on a missing or other file.
 Signal readWav(const std::string& path) {
   std::ifstream f(path, std::ios::binary);
@@ -457,6 +669,9 @@ int main() {
   ok &= testCrush();
   ok &= testChunking();
   ok &= testEnableEdge();
+  ok &= testHoldFloor();
+  ok &= testFoldback();
+  ok &= testToneStepWithCrush();
   ok &= testLevel();
   ok &= testNoAlloc();
   return ok ? 0 : 1;

@@ -72,7 +72,7 @@ int usage() {
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
-               "       [--bloom <0..1>] [--tail <60..1000 ms>]\n"
+               "       [--bloom <0..1>] [--tail <60..2000 ms>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
@@ -84,7 +84,7 @@ int usage() {
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
-               "  bloom runs with --bloom (BLOOM, default 0.5) or --tail (TAIL, default 300 ms); with --ingate its word key\n"
+               "  bloom runs with --bloom (AMOUNT, default 0.5) or --tail (TAIL, default 300 ms); with --ingate its word key\n"
                "  is the input gate's open state, otherwise bloom listens to its own input\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
@@ -129,6 +129,7 @@ int usage() {
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
                "     lofiFcLoHz lofiFcHiHz lofiHpStartHz lofiHpEndRatio lofiLpStartHz lofiLpEndRatio lofiHonkDb lofiHonkQ\n"
                "     lofiDriveDb lofiHoldMaxHz lofiHoldMinHz lofiBitsMax lofiBitsMin lofiTrimDb\n"
+               "     lofiHoldOverBand (floor on the held rate in low-pass corners, 0 = none)\n"
                "     lofiMakeup<tone 0..4>_<amount 0..10> (dB, the makeup table by TONE 0, 25 ... 100 %% and AMOUNT 0, 10 ... 100 %%)\n"
                "  a lofi key outside its range is refused\n"
                "  --decay and --dwell apply to the selected reverb engine\n");
@@ -226,7 +227,7 @@ bool lofiTuningInRange(const cv::LofiTuning& t) {
          inside(t.lpStartHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.hpEndRatio, 0.05f, 4.0f) &&
          inside(t.lpEndRatio, 0.25f, 20.0f) && inside(t.honkDb, -24.0f, 24.0f) && inside(t.honkQ, 0.1f, 20.0f) &&
          inside(t.driveDb, -24.0f, 48.0f) && inside(t.holdMaxHz, 480.0f, 48000.0f) &&
-         inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
+         inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.holdOverBand, 0.0f, 20.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
          inside(t.trimDb, -24.0f, 24.0f);
 }
 
@@ -332,6 +333,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"lofiDriveDb", &lt.driveDb},           {"lofiHoldMaxHz", &lt.holdMaxHz},
       {"lofiHoldMinHz", &lt.holdMinHz},       {"lofiBitsMax", &lt.bitsMax},
       {"lofiBitsMin", &lt.bitsMin},           {"lofiTrimDb", &lt.trimDb},
+      {"lofiHoldOverBand", &lt.holdOverBand},
       {"bloomTrimDb", &bt.trimDb},            {"bloomFirstCaptureMs", &bt.firstCaptureMs},
       {"bloomSkipDb", &bt.skipDb},            {"bloomTailOnly", &bloomTailOnly},
   };

@@ -17,14 +17,20 @@
 // the crush, then the inverse of the drive gain times the makeup gain.
 // The crush runs ahead of the inverse, where the drive output fills the range, so 5 bits means 5 bits.
 // After the inverse the voice peaks near 1/8 of full scale and a 5-bit step leaves it five levels.
+// The held rate stops at 2.2 times the low-pass corner, so the hold's Nyquist stays over the band and
+// the crush adds grit without folding the band's top back into it.
 // Filter coefficients, the crush law and the gains are set once per block from the 20 ms knob
-// smoothers; the sample loop runs no libm. The two gains and the five filters' coefficients ramp
-// linearly across the block, so a moving knob never hands a section a coefficient step.
+// smoothers; the sample loop runs no libm. The two gains, the held rate and the five filters'
+// coefficients ramp linearly across the block, so a moving knob never hands a section a step.
 
 namespace cv {
 
 constexpr size_t kLofiMakeupTones = 5;      // rows: TONE 0, 25, 50, 75, 100 %
 constexpr size_t kLofiMakeupAmounts = 11;   // columns: AMOUNT 0, 10, ... 100 %
+
+// The held rate never falls under this multiple of the low-pass corner, so the hold's Nyquist sits 10 %
+// over the band's top and the band does not fold.
+constexpr float kHoldOverBand = 2.2f;
 
 struct LofiTuning {
   float fcLoHz = 600.0f;       // band centre at TONE 0
@@ -37,7 +43,8 @@ struct LofiTuning {
   float honkQ = 1.4f;
   float driveDb = 18.0f;       // gain ahead of the tanh from AMOUNT 50 % up
   float holdMaxHz = 48000.0f;  // held rate at AMOUNT 50 %
-  float holdMinHz = 6000.0f;   // held rate at AMOUNT 100 %
+  float holdMinHz = 6000.0f;   // held rate at AMOUNT 100 %, before the floor below
+  float holdOverBand = kHoldOverBand;  // floor on the held rate, times the low-pass corner; 0 turns it off
   float bitsMax = 16.0f;       // bit depth at AMOUNT 50 %
   float bitsMin = 5.0f;        // bit depth at AMOUNT 100 %
 
@@ -89,7 +96,8 @@ class Lofi {
     law.honkDb = t.honkDb * a;
     law.drive = dbToGainFast(t.driveDb * a);
     law.makeup = dbToGainFast(makeupDbAt(tone, amount, t) + t.trimDb);
-    const float holdHz = t.holdMaxHz * powf(t.holdMinHz / t.holdMaxHz, c);
+    const float holdLawHz = t.holdMaxHz * powf(t.holdMinHz / t.holdMaxHz, c);
+    const float holdHz = holdLawHz > t.holdOverBand * law.lpHz ? holdLawHz : t.holdOverBand * law.lpHz;
     law.holdRatio = clampf(holdHz / kSampleRate, kMinHoldRatio, 1.0f);
     law.bits = clampf(t.bitsMax + (t.bitsMin - t.bitsMax) * c, kMinBits, kMaxBits);
     law.step = exp2f(1.0f - law.bits);
@@ -143,9 +151,10 @@ class Lofi {
     return lo + tf * (row(ti + 1) - lo);
   }
 
-  // Gains the sample loop ramps between. post is the inverse of the drive times the makeup.
+  // Values the sample loop ramps between. post is the inverse of the drive times the makeup; ratio is
+  // the held rate over the sample rate.
   struct Gains {
-    float drive, post;
+    float drive, post, ratio;
   };
 
   void clearVoice() {
@@ -191,7 +200,7 @@ class Lofi {
     goal_[2].setLowPass(law_.lpHz, kQ1);
     goal_[3].setLowPass(law_.lpHz, kQ2);
     goal_[4].setPeak(law_.fcHz, law_.honkDb, t.honkQ);
-    next_ = {law_.drive, law_.makeup / law_.drive};
+    next_ = {law_.drive, law_.makeup / law_.drive, law_.holdRatio};
     if (!lawValid_) {
       cur_ = next_;
       hp1_.setCoefsFrom(goal_[0]);
@@ -254,11 +263,12 @@ class Lofi {
       s3 = stepsTo(lp2, goal_[3], inv);
       s4 = stepsTo(honk, goal_[4], inv);
     }
-    float g = cur_.drive, post = cur_.post;
+    float g = cur_.drive, post = cur_.post, ratio = cur_.ratio;
     const float dg = (next_.drive - g) * inv;
     const float dpost = (next_.post - post) * inv;
+    const float dratio = (next_.ratio - ratio) * inv;
     const bool crush = law_.crush;
-    const float ratio = law_.holdRatio, step = law_.step, invStep = invQ_;
+    const float step = law_.step, invStep = invQ_;
     float phase = phase_, held = held_, mix = onMix_;
     for (int i = 0; i < n; ++i) {
       const float x = in[i];
@@ -285,6 +295,7 @@ class Lofi {
       out[i] = mix >= 1.0f ? v : x + mix * (v - x);
       g += dg;
       post += dpost;
+      ratio += dratio;
     }
     if constexpr (kRamp) {  // land on the goals exactly, whatever the steps added up to
       hp1.setCoefsFrom(goal_[0]);
@@ -309,8 +320,8 @@ class Lofi {
   Biquad hp1_, hp2_, lp1_, lp2_, honk_;
   std::array<Biquad, 5> goal_;  // the coefficients the block ends on; the states are unused
   Law law_{};
-  Gains cur_{1.0f, 1.0f};
-  Gains next_{1.0f, 1.0f};
+  Gains cur_{1.0f, 1.0f, 1.0f};
+  Gains next_{1.0f, 1.0f, 1.0f};
   LofiTuning applied_;
   float invQ_ = 1.0f;
   float tone_ = 0.5f;
