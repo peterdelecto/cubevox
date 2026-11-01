@@ -19,18 +19,26 @@
 // period, and Octave adds Autotune's correction to its interval. The Formant card
 // adds a second voice that follows the same correction and lags the input by the
 // same amount as Autotune's, so the two line up. It mixes with the base (the dry
-// voice, or Autotune's crossfade) ahead of Octave. Every crossfade and MIX is
-// equal-power. A voice resets on its enable edge only once its crossfade has
-// settled at zero, so a quick off and on keeps the running voice instead of
-// cutting to fresh grains. The tracker's frame is warm only while the stage runs.
-// The chain resets the stage when every pitch card is off, so the first voiced
-// frame after such a switch-on comes about 32 ms in, where a running stage gives
-// it in 8 ms.
+// voice, or Autotune's crossfade) ahead of Octave. Autotune's crossfade and
+// Octave's MIX are equal-power. Formant's MIX uses linear gains and a level gain
+// that follows how far its two voices correlate (see formantCompAt). A voice
+// resets on its enable edge only once its crossfade has settled at zero, so a
+// quick off and on keeps the running voice instead of cutting to fresh grains.
+// The tracker's frame is warm only while the stage runs. The chain resets the
+// stage when every pitch card is off, so the first voiced frame after such a
+// switch-on comes about 32 ms in, where a running stage gives it in 8 ms.
 
 namespace cv {
 
 // The panel's SHIFT range, whole semitones.
 constexpr int kFormantMaxShiftSt = 7;
+
+// The averaging time of the running powers behind the Formant mix's level gain, and that gain's
+// ceiling (+6 dB).
+constexpr float kFormantPowerSec = 0.12f;
+constexpr float kFormantCompMax = 2.0f;
+constexpr float kFormantPowerFloor = 1e-20f;  // below this a power is silence
+inline const float kFormantPowerCoef = smooth::coef(kFormantPowerSec);
 
 struct FormantTuning {
   float trimDb = 1.92f;  // level rule at SHIFT -3, MIX 100 %: the shifted voice alone lands 0 to +0.5 dB
@@ -66,6 +74,7 @@ class PitchFx {
     autotune_.reset();
     octave_.reset();
     formant_.reset();
+    resetFormantPower();
     octaveMix_ = 0.0f;
     octaveFade_ = 0.0f;
     autotuneFade_ = 0.0f;
@@ -138,9 +147,9 @@ class PitchFx {
     float formantFade;     // Formant on with a period, 0 or 1
   };
 
-  // Equal-power gains at the smoothers' current values: Octave's dry and wet, the crossfade from
-  // the dry input to Autotune's corrected voice, and Formant's share of the base and of the shifted
-  // voice. A stage that is off contributes exactly 1 and 0.
+  // Gains at the smoothers' current values: Octave's dry and wet and the crossfade from the dry
+  // input to Autotune's corrected voice (equal-power), and Formant's share of the base and of the
+  // shifted voice (linear). A stage that is off contributes exactly 1 and 0.
   struct Gains {
     float dry = 1.0f;
     float wet = 0.0f;
@@ -163,7 +172,10 @@ class PitchFx {
       octaveOn = octave_.prepare(p.octave, corr);
     }
     octaveWas_ = octaveOn;
-    if (p.formant.on && !formantWas_ && formantFade_ == 0.0f) formant_.reset();
+    if (p.formant.on && !formantWas_ && formantFade_ == 0.0f) {
+      formant_.reset();
+      resetFormantPower();
+    }
     formantWas_ = p.formant.on;
     if (p.formant.tuning.trimDb != formantTrimDb_) {
       formantTrimDb_ = p.formant.tuning.trimDb;
@@ -253,6 +265,9 @@ class PitchFx {
     const Gains g1 = gains_;
     const bool formant = formantUp || formantFade_ > 0.0f;
     if (formant) prepareFormant(fp, n);
+    const float comp0 = formantComp_;
+    const float comp1 = formant ? formantCompAt(formantMix_ * formantFade_) : 1.0f;
+    formantComp_ = comp1;
     const float period = tracker_.result().period;
     const float inv = 1.0f / static_cast<float>(n);
     const bool octave = !octave_.silent();
@@ -269,7 +284,11 @@ class PitchFx {
         if (formant) {
           const float keep = g0.formantBase + (g1.formantBase - g0.formantBase) * f;
           const float shifted = g0.formantWet + (g1.formantWet - g0.formantWet) * f;
-          base = keep * base + shifted * formantBuf_[static_cast<size_t>(i - c)];
+          const float voice = formantBuf_[static_cast<size_t>(i - c)];
+          baseSq_ += kFormantPowerCoef * (base * base - baseSq_);
+          voiceSq_ += kFormantPowerCoef * (voice * voice - voiceSq_);
+          baseVoice_ += kFormantPowerCoef * (base * voice - baseVoice_);
+          base = (keep * base + shifted * voice) * (comp0 + (comp1 - comp0) * f);
         }
         const float dry = g0.dry + (g1.dry - g0.dry) * f;
         const float wet = g0.wet + (g1.wet - g0.wet) * f;
@@ -281,18 +300,46 @@ class PitchFx {
 
   // The corrected voice lags the dry input by 23 to 36 ms and may sit a semitone away, so the two
   // add in power. Each crossfade gain is the sine of its own share of the quarter turn, which lands
-  // exactly on 0 and 1 at both ends. Formant's MIX is equal-power in the same way, and its toggle
-  // fades the mix in linearly, as Octave's does.
+  // exactly on 0 and 1 at both ends. Formant's gains are mix and 1 - mix, scaled by the toggle's
+  // fade, and formantCompAt() corrects the level they leave.
   Gains gainsNow() const {
     Gains g;
     g.autotune = sinf(autotuneFade_ * kHalfPi);
     g.autotuneDry = sinf((1.0f - autotuneFade_) * kHalfPi);
     g.dry = 1.0f + (cosf(octaveMix_ * kHalfPi) - 1.0f) * octaveFade_;
     g.wet = sinf(octaveMix_ * kHalfPi) * octaveFade_;
-    g.formantBase = 1.0f + (cosf(formantMix_ * kHalfPi) - 1.0f) * formantFade_;
-    g.formantWet = sinf(formantMix_ * kHalfPi) * formantFade_ * formantTrim_;
+    g.formantBase = 1.0f - formantMix_ * formantFade_;
+    g.formantWet = formantMix_ * formantFade_ * formantTrim_;
     g.formantTrim = formantTrim_;
     return g;
+  }
+
+  // The base and the shifted voice share a pitch, so how they add depends on SHIFT. Near 0 they are
+  // almost one waveform and add in amplitude. A few semitones out they are unrelated and add in
+  // power. No fixed pair of gains holds the level across both. The running powers of the two voices
+  // and of their product give the power the linear gains produce. This returns the gain that raises
+  // it to the voices' own powers averaged at weight x, the mix scaled by the toggle's fade. The
+  // gain is 1 for identical voices and 1.41 at x = 0.5 for unrelated ones of equal level. It is
+  // exactly 1 at x = 0 and 1, so MIX 0 and MIX 100 % pass the plain voices.
+  float formantCompAt(float x) {
+    // Digital silence would decay the running powers into the denormal range.
+    if (baseSq_ < kFormantPowerFloor && voiceSq_ < kFormantPowerFloor) resetFormantPower();
+    if (x <= 0.0f || x >= 1.0f) return 1.0f;
+    const float keep = 1.0f - x;
+    const float shifted = x * formantTrim_;
+    const float want = keep * baseSq_ + x * formantTrim_ * formantTrim_ * voiceSq_;
+    const float got = keep * keep * baseSq_ + shifted * shifted * voiceSq_ + 2.0f * keep * shifted * baseVoice_;
+    if (got < kFormantPowerFloor || want < kFormantPowerFloor) return 1.0f;
+    const float comp = sqrtf(want / got);
+    return comp < 1.0f ? 1.0f : (comp > kFormantCompMax ? kFormantCompMax : comp);
+  }
+
+  // Clears the running powers and the level gain.
+  void resetFormantPower() {
+    baseSq_ = 0.0f;
+    voiceSq_ = 0.0f;
+    baseVoice_ = 0.0f;
+    formantComp_ = 1.0f;
   }
 
   // Voices only use head modulo the ring, so wrapping here is exact.
@@ -304,6 +351,10 @@ class PitchFx {
   OctaveVoice octave_;
   formant_detail::FormantPsolaVoice formant_;
   std::array<float, kBlock> formantBuf_{};  // the Formant voice's chunk
+  float baseSq_ = 0.0f;       // running power of the base
+  float voiceSq_ = 0.0f;      // running power of the shifted voice before its trim
+  float baseVoice_ = 0.0f;    // running mean of base * voice
+  float formantComp_ = 1.0f;  // the level gain at the end of the last block
   float octaveMix_ = 0.0f;
   float octaveFade_ = 0.0f;    // Octave crossfade, 0 off .. 1 on
   float autotuneFade_ = 0.0f;  // Autotune crossfade, 0 dry .. 1 corrected

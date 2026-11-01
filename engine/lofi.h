@@ -226,12 +226,17 @@ class Lofi {
             (to.a2 - from.a2) * inv};
   }
 
-  static void advance(Biquad& b, const CoefStep& s) {
-    b.b0 += s.b0;
-    b.b1 += s.b1;
-    b.b2 += s.b2;
-    b.a1 += s.a1;
-    b.a2 += s.a2;
+  // The coefficients k samples into a block that began at `from`. Each is the block's start plus k
+  // steps. Adding a step to the previous value would drop part of every step smaller than the
+  // coefficient's last bit, so the ramp would end short of its goal and the snap onto the goal would
+  // hand the section a step. With a low tone in the high-pass states and a quiet output, that step
+  // reads as a click.
+  static void rampTo(Biquad& b, const Biquad& from, const CoefStep& s, float k) {
+    b.b0 = from.b0 + s.b0 * k;
+    b.b1 = from.b1 + s.b1 * k;
+    b.b2 = from.b2 + s.b2 * k;
+    b.a1 = from.a1 + s.a1 * k;
+    b.a2 = from.a2 + s.a2 * k;
   }
 
   static bool apart(const Biquad& a, const Biquad& b) {
@@ -254,6 +259,7 @@ class Lofi {
   template <bool kRamp>
   void run(const float* in, float* out, int n, float target) {
     Biquad hp1 = hp1_, hp2 = hp2_, lp1 = lp1_, lp2 = lp2_, honk = honk_;
+    const std::array<Biquad, 5> from = {hp1_, hp2_, lp1_, lp2_, honk_};
     const float inv = 1.0f / static_cast<float>(n);
     CoefStep s0{}, s1{}, s2{}, s3{}, s4{};
     if constexpr (kRamp) {
@@ -273,11 +279,12 @@ class Lofi {
     for (int i = 0; i < n; ++i) {
       const float x = in[i];
       if constexpr (kRamp) {
-        advance(hp1, s0);
-        advance(hp2, s1);
-        advance(lp1, s2);
-        advance(lp2, s3);
-        advance(honk, s4);
+        const float k = static_cast<float>(i + 1);
+        rampTo(hp1, from[0], s0, k);
+        rampTo(hp2, from[1], s1, k);
+        rampTo(lp1, from[2], s2, k);
+        rampTo(lp2, from[3], s3, k);
+        rampTo(honk, from[4], s4, k);
       }
       float v = honk.run(lp2.run(lp1.run(hp2.run(hp1.run(x)))));
       v = tanhFast(v * g);
