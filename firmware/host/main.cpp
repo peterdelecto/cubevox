@@ -18,6 +18,7 @@
 #include "core/layout.h"
 #include "core/level.h"
 #include "core/registry.h"
+#include "file_menu.h"
 #include "source.h"
 #include "ui/gui.h"
 #include "window.h"
@@ -34,6 +35,10 @@ static_assert(static_cast<uint32_t>(kBlocksPerTick * cv::kBlock) * 1000 == kTick
 
 constexpr uint32_t kCheckBeforeMs = 3000;  // the default layout
 constexpr uint32_t kCheckAfterMs = 2000;   // after MOB and Chasm
+constexpr uint32_t kCheckOpenMs = 2000;    // the second clip, after the open
+constexpr uint32_t kCheckKeptMs = 1000;    // after a load that fails
+constexpr const char* kSecondClip = "adam_vox_sample_3s.wav";
+constexpr const char* kMissingClip = "/nonexistent/cubevox-missing.wav";
 constexpr uint32_t kProofMs = 2500;        // the splash is over and the ribbon has history
 constexpr uint32_t kPassMs = 10;  // one scan of the 16 pots takes about this long on the board
 constexpr int kMaxCatchUpPasses = 50;
@@ -121,6 +126,23 @@ int runCheck(const char* argv0) {
   for (const float v : rig.output) finite = finite && std::isfinite(v);
   const float dbfs = lastSecondDbfs(rig.output);
 
+  // File > Open: a second clip swaps in and plays, and a path that does not decode leaves it playing.
+  const size_t openedAt = rig.output.size();
+  const std::string second = rig.source.locate(argv0, kSecondClip);
+  expect(!second.empty() && rig.source.loadClip(second.c_str()), "the second clip loads through loadClip");
+  rig.run(kCheckOpenMs, true);
+  bool openFinite = true;
+  for (size_t i = openedAt; i < rig.output.size(); ++i) openFinite = openFinite && std::isfinite(rig.output[i]);
+  const float openDbfs = lastSecondDbfs(rig.output);
+  expect(std::strcmp(rig.source.clipName(), kSecondClip) == 0, "clipName reads the second clip's file name");
+  expect(openFinite, "every output sample after the open is finite");
+  expect(openDbfs > static_cast<float>(kCheckMinDbfs), "the output RMS of the second clip's last second is above -40 dBFS");
+  expect(!rig.source.loadClip(kMissingClip), "loadClip on a missing path returns false");
+  rig.run(kCheckKeptMs, true);
+  const float keptDbfs = lastSecondDbfs(rig.output);
+  expect(std::strcmp(rig.source.clipName(), kSecondClip) == 0, "a failed load keeps the clip name");
+  expect(keptDbfs > static_cast<float>(kCheckMinDbfs), "the previous clip keeps playing after a failed load");
+
   expect(finite, "every output sample is finite");
   expect(dbfs > static_cast<float>(kCheckMinDbfs), "the output RMS of the last second is above -40 dBFS");
   expect(costIs(before, kDefaultSum), "the default layout costs the sum of its rows, kFixed and kTracker");
@@ -132,8 +154,9 @@ int runCheck(const char* argv0) {
 
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,
               after.worst);
-  std::printf("output RMS of the last second %.1f dBFS over %zu samples\n", static_cast<double>(dbfs),
-              rig.output.size());
+  std::printf("output RMS of the last second %.1f dBFS over %zu samples\n", static_cast<double>(dbfs), openedAt);
+  std::printf("after File > Open of %s %.1f dBFS, after a failed open %.1f dBFS\n", rig.source.clipName(),
+              static_cast<double>(openDbfs), static_cast<double>(keptDbfs));
   for (const std::string& what : failed) std::printf("emulator check: FAILED: %s\n", what.c_str());
   if (!failed.empty()) return 1;
   std::printf("emulator check: ok\n");
@@ -167,6 +190,16 @@ int runLive(const char* argv0) {
     return 1;
   }
   Panel panel;
+  window.setClip(source.clipName());
+
+  // File > Open picks the clip. A file that decodes plays from its start and sets the source to CLIP;
+  // one that does not leaves the old clip playing.
+  installFileMenu([&source, &panel, &window](const char* path) {
+    if (!source.loadClip(path)) return;
+    panel.useMic = false;
+    window.setClip(source.clipName());
+  });
+
   uint32_t passMs = millis();
   while (!window.shouldClose()) {
     window.begin();

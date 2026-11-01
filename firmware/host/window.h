@@ -31,6 +31,9 @@ class Window {
   bool ok() const { return window_ != nullptr; }
   bool shouldClose() const;
 
+  // Titles the window "cubevox - <clip name>", or "cubevox" when the name is empty.
+  void setClip(const char* name);
+
   // One frame is begin(), draw(), the box tick, then end().
   void begin();
 

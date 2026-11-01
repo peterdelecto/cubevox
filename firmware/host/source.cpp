@@ -16,7 +16,16 @@ namespace host {
 
 namespace {
 
-constexpr const char* kClipFile = "samples/adam_vox_sample3_5s.wav";
+constexpr const char* kSampleDir = "samples/";
+constexpr const char* kClipFile = "adam_vox_sample3_5s.wav";
+
+// Longest clip kept, so a long file cannot take the Mac's memory.
+constexpr ma_uint64 kMaxClipFrames = 600ull * cv::kSampleRate;
+constexpr ma_uint64 kReadChunkFrames = 4096;
+
+// The callbacks that must pass after a swap before the old clip may be freed. One may be reading it
+// when the swap lands, and the next starts after that one returns.
+constexpr uint64_t kRetireCallbacks = 2;
 
 // From the executable inside the bundle to the directory that holds samples/. Three levels up is the
 // bundle's parent; four reach the repository root when the bundle sits in build/.
@@ -59,34 +68,59 @@ void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 
 
 Source::Source() = default;
 
-Source::~Source() { stopDevice(); }
-
-bool Source::loadClip(const std::string& path) {
-  ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, kChannelsCapture, cv::kSampleRate);
-  ma_decoder decoder;
-  if (ma_decoder_init_file(path.c_str(), &cfg, &decoder) != MA_SUCCESS) {
-    std::fprintf(stderr, "[ERROR] clip: cannot open %s\n", path.c_str());
-    return false;
-  }
-  ma_uint64 frames = 0;
-  ma_decoder_get_length_in_pcm_frames(&decoder, &frames);
-  if (frames == 0) {
-    ma_decoder_uninit(&decoder);
-    std::fprintf(stderr, "[ERROR] clip: %s is empty\n", path.c_str());
-    return false;
-  }
-  std::vector<float> samples(frames);
-  ma_uint64 read = 0;
-  ma_decoder_read_pcm_frames(&decoder, samples.data(), frames, &read);
-  ma_decoder_uninit(&decoder);
-  samples.resize(read);
-  clip_ = std::move(samples);
-  clipPos_ = 0;
-  clipPath_ = path;
-  return !clip_.empty();
+Source::~Source() {
+  stopDevice();
+  reclaim();
+  delete clip_.load();
 }
 
-bool Source::findClip(const char* argv0) {
+// Frees the retired clips that no callback can still be reading.
+void Source::reclaim() {
+  const uint64_t passed = callbacks_.load(std::memory_order_acquire);
+  for (size_t i = 0; i < retired_.size();) {
+    if (device_ == nullptr || passed >= retired_[i].freeAtCallback) {
+      delete retired_[i].clip;
+      retired_[i] = retired_.back();
+      retired_.pop_back();
+    } else {
+      ++i;
+    }
+  }
+}
+
+bool Source::loadClip(const char* path) {
+  ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, kChannelsCapture, cv::kSampleRate);
+  ma_decoder decoder;
+  if (ma_decoder_init_file(path, &cfg, &decoder) != MA_SUCCESS) {
+    std::fprintf(stderr, "[ERROR] clip: cannot open %s\n", path);
+    return false;
+  }
+  std::unique_ptr<Clip> clip = std::make_unique<Clip>();
+  std::vector<float>& samples = clip->samples;
+  for (;;) {
+    const size_t at = samples.size();
+    samples.resize(at + kReadChunkFrames);
+    ma_uint64 read = 0;
+    ma_decoder_read_pcm_frames(&decoder, samples.data() + at, kReadChunkFrames, &read);
+    samples.resize(at + read);
+    if (read < kReadChunkFrames || samples.size() >= kMaxClipFrames) break;
+  }
+  ma_decoder_uninit(&decoder);
+  if (samples.empty()) {
+    std::fprintf(stderr, "[ERROR] clip: %s holds no audio\n", path);
+    return false;
+  }
+  clip->id = nextId_++;
+  Clip* old = clip_.exchange(clip.release(), std::memory_order_acq_rel);
+  if (old != nullptr) retired_.push_back({old, callbacks_.load(std::memory_order_acquire) + kRetireCallbacks});
+  const char* slash = std::strrchr(path, '/');
+  clipName_ = slash != nullptr ? slash + 1 : path;
+  reclaim();
+  return true;
+}
+
+std::string Source::locate(const char* argv0, const char* file) const {
+  const std::string relative = std::string(kSampleDir) + file;
   std::vector<std::string> candidates;
   char raw[PATH_MAX] = {};
   uint32_t size = sizeof raw;
@@ -100,28 +134,44 @@ bool Source::findClip(const char* argv0) {
   }
   for (const std::string& dir : exeDirs) {
     if (!endsWith(dir, kInsideBundle)) continue;  // a bare executable has no bundle to climb out of
-    for (const char* up : kUpFromBundle) candidates.push_back(dir + up + kClipFile);
+    for (const char* up : kUpFromBundle) candidates.push_back(dir + up + relative);
   }
-  candidates.push_back(kClipFile);  // the working directory
+  candidates.push_back(relative);  // the working directory
   for (const std::string& path : candidates) {
-    if (access(path.c_str(), R_OK) == 0) return loadClip(path);
+    if (access(path.c_str(), R_OK) == 0) return path;
   }
-  std::fprintf(stderr, "[ERROR] clip: %s not found beside the app or in the working directory\n", kClipFile);
-  return false;
+  return std::string();
 }
 
+bool Source::findClip(const char* argv0) {
+  const std::string path = locate(argv0, kClipFile);
+  if (path.empty()) {
+    std::fprintf(stderr, "[ERROR] clip: %s%s not found beside the app or in the working directory\n", kSampleDir,
+                 kClipFile);
+    return false;
+  }
+  return loadClip(path.c_str());
+}
+
+// Takes the clip now in place, and starts it over when it is not the one played last.
 void Source::readClip(float* dst, int n) {
-  if (clip_.empty()) {
+  const Clip* clip = clip_.load(std::memory_order_acquire);
+  if (clip == nullptr) {
     std::memset(dst, 0, sizeof(float) * static_cast<size_t>(n));
     return;
   }
+  if (clip->id != playingId_) {
+    playingId_ = clip->id;
+    clipPos_ = 0;
+  }
   for (int i = 0; i < n; ++i) {
-    dst[i] = clip_[clipPos_];
-    if (++clipPos_ >= clip_.size()) clipPos_ = 0;
+    dst[i] = clip->samples[clipPos_];
+    if (++clipPos_ >= clip->samples.size()) clipPos_ = 0;
   }
 }
 
 void Source::onAudio(float* playback, const float* capture, uint32_t frames) {
+  callbacks_.fetch_add(1, std::memory_order_acq_rel);
   const bool mic = capture != nullptr && useMic_.load(std::memory_order_relaxed);
   for (uint32_t i = 0; i < frames; ++i) {
     if (mic) {

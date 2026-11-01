@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #define GLFW_INCLUDE_NONE
@@ -430,6 +431,13 @@ Window::~Window() {
 }
 
 bool Window::shouldClose() const { return window_ == nullptr || glfwWindowShouldClose(window_) != 0; }
+
+void Window::setClip(const char* name) {
+  if (window_ == nullptr) return;
+  std::string title = kWindowTitle;
+  if (name != nullptr && name[0] != '\0') title += std::string(kWindowTitleSep) + name;
+  glfwSetWindowTitle(window_, title.c_str());
+}
 
 void Window::begin() {
   glfwPollEvents();
