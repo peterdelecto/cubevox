@@ -76,3 +76,15 @@ Signal path, in order:
 | default, Lo-fi in slot 7 | 65 | 73 |
 | MOB and Chasm, Lo-fi in slot 7 | 72 | 83 |
 | lines | 75 | 95 |
+
+## 7. Built 2026-11-01 (v2.00.95)
+
+1. The crush runs ahead of the drive's inverse (item 3.3), so the 5-bit step lands on the driven
+   signal: in the written order the step was five levels wide on the clips and 81 to 90 % of the
+   samples were zero at AMOUNT 100 %; now 33 levels.
+2. The makeup is a TONE by AMOUNT table (5 by 11, bilinear in dB), because TONE moved the level by
+   ±4 to 6 dB and a sum of two one-knob tables could not hold. Every clip stays within 0.8 dB of
+   unity at every position; the default reads +0.10, +0.37, −0.77 dB.
+3. The filter coefficients ramp linearly across each block while a knob moves, so a step does not
+   click (knob_step 1.003 and 1.011 against 1.05).
+4. level_test's synthetic program reads −2.1 dB through the band; Lo-fi's level rows run on the clips.

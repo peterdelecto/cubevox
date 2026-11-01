@@ -109,9 +109,9 @@ TAIL `D` (60..1000 ms):
    `applyToggle`.
 2. `chain_params.h`, `chain_run.h` and `.cpp`: `cv::BloomParams bloom`, `cv::Bloom bloom` in
    `ChainEngines`, the `Engine::Bloom` cases, and the word key from the Input gate.
-3. `costs.h`: `kBloom{1, 2, false}`, an estimate: a loop read (two during a splice), two biquads,
-   the clip and the gain ramp, about 40 cycles a sample, 2.6k a block, 0.4 %; the worst covers a
-   capture block's copy.
+3. `costs.h`: `kBloom{5, 6, false}`, an estimate from the host bench (2026-11-01, word key open):
+   Bloom 9.4 ns a sample against Echo's 8.1 and Gate's 7.8, so 1.17 and 1.21 times rows of 5 / 5
+   and 4 / 5. The first estimate here, 40 cycles a sample and {1, 2}, did not hold.
 
 ## 9. Checks
 
@@ -135,6 +135,13 @@ TAIL `D` (60..1000 ms):
 
 | Layout | Mean % | Worst % |
 |---|---|---|
-| default, Bloom in slot 7 | 64 | 73 |
-| MOB and Chasm, Bloom in slot 7 | 71 | 83 |
+| default, Bloom in slot 7 | 68 | 77 |
+| MOB and Chasm, Bloom in slot 7 | 75 | 87 |
 | lines | 75 | 95 |
+
+## 12. Built 2026-11-01 (v2.00.95)
+
+1. The trim scales the whole output with the wet level, as Echo's does, so BLOOM 0 is bit-exact dry.
+2. The 80 ms static fade is a time constant; a 300 ms tail ends about 2 s after the word.
+3. Level at the default: +0.05 to +0.34 dB on the clips with either key.
+4. The host bench put the card at 1.2 times Echo's cost; the row is {5, 6} (section 8).

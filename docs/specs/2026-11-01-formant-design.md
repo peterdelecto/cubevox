@@ -98,3 +98,14 @@ slot 7 in place of Gate (owner: "in case a second backup gate is overkill"), thr
 | default, Formant in slot 7 | 66 | 75 |
 | MOB and Chasm, Formant in slot 7 | 73 | 85 |
 | lines | 75 | 95 |
+
+## 8. Built 2026-11-01 (v2.00.95)
+
+1. SHIFT glides on the 20 ms one-pole, against item 2.2's "no extra smoothing": without it, steps
+   near 0 read 1.13 to 1.23 times steady-state curvature against the 1.05 gate; with it 1.017.
+2. A grain's gain latches at its launch; the play-time gain clicked a SHIFT step.
+3. The envelope test uses a 150 Hz vowel under a 1.1 kHz Gaussian, fitted over 8 grid placements;
+   a plain sawtooth has no envelope peak to find.
+4. Level at the default on the clips: +0.44, +0.33, +0.01 dB (trimDb 1.92). MIX 50 % reads +2.6 dB
+   on level_test's program, because the two voices are one waveform 28 ms apart and add coherently.
+5. DTCM 76,288 B, +640 B.

@@ -25,17 +25,20 @@ only, not built.
 
 ## 3. CPU, every combination
 
-Rows from `costs.h` plus the three new estimates (`kFormant{3, 4}`, `kLofi{2, 2}`, `kBloom{1, 2}`).
-Each sum holds `kFixed` and `kTracker`.
+Rows from `costs.h` plus the three new estimates (`kFormant{3, 4}`, `kLofi{2, 2}`, `kBloom{5, 6}`;
+Bloom's from the host bench against Echo and Gate, 2026-11-01, where the spec's first estimate of
+{1, 2} did not hold). Each sum holds `kFixed` and `kTracker`.
 
 | Slot 4 / slot 8 | Gate | Formant | Lo-fi | Bloom |
 |---|---|---|---|---|
-| Unison / Spring | 67 / 76 | 66 / 75 | 65 / 73 | 64 / 73 |
-| MOB / Spring | 72 / 84 | 71 / 83 | 70 / 81 | 69 / 81 |
-| Unison / Chasm | 69 / 78 | 68 / 77 | 67 / 75 | 66 / 75 |
-| MOB / Chasm | 74 / 86 | 73 / 85 | 72 / 83 | 71 / 83 |
+| Unison / Spring | 67 / 76 | 66 / 75 | 65 / 73 | 68 / 77 |
+| MOB / Spring | 72 / 84 | 71 / 83 | 70 / 81 | 73 / 85 |
+| Unison / Chasm | 69 / 78 | 68 / 77 | 67 / 75 | 70 / 79 |
+| MOB / Chasm | 74 / 86 | 73 / 85 | 72 / 83 | 75 / 87 |
 
-Every cell is mean / worst %, under the 75 / 95 lines. The stress run measures each new card once
+Every cell is mean / worst %, at or under the 75 / 95 lines (`layoutValid` refuses over, not at).
+MOB, Chasm and Bloom together sit exactly on the mean line, so a board figure for Bloom above its
+estimate would make the row pass over Bloom in that layout. The stress run measures each new card once
 built, and its row replaces the estimate.
 
 ## 4. Order of building
