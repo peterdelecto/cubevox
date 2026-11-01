@@ -31,8 +31,12 @@ better if the led flashes to show mcu processing." Build order: "just build it n
    `UiAction::SwapReverb`), so the layout fade and the engine resets run as on the box, and a
    swap the box would not load leaves the layout unchanged. The toggle's position follows the
    layout, so a swap made in the menu moves it.
-3. One source switch, `CLIP | MIC`. The clip is `samples/adam_vox_sample3_5s.wav`, looped. MIC is
-   whatever macOS has chosen as input; no picker; no mic or no permission dims the switch.
+3. One source switch, `CLIP | MIC`. The clip starts as `samples/adam_vox_sample3_5s.wav`, looped;
+   File > Open (Cmd+O) in the Mac's menu bar loads another wav or mp3 in its place (what the
+   decoder takes) and sets the switch to CLIP, and the window title carries the clip's name (owner 2026-11-01: "i need a
+   file>open for the file"). MIC is whatever macOS has chosen as input; no picker; no mic or no
+   permission dims the switch. The audio device opens playback-only until MIC is picked, because a
+   duplex open takes a Bluetooth headset's capture side and drops every Mac sound to phone quality.
    Playback is the default output, both channels the same.
 4. Nothing else on the window. No tuning panels, sliders, state file or menus. Layout and settings
    live in memory for the run.
