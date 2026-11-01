@@ -52,20 +52,20 @@ struct BloomTuning {
   // The change rides the 20 ms smoother.
   float pairDb = -3.0f;
 
-  // Age and fades. No slice plays longer than maxAgeMs after it was cut, closeMs ends a loop that
-  // has nothing newer to play, nextWordMs is the fade a new word puts on the tail it finds, and
-  // yieldMs is the faster fade a tail already fading takes when another word follows.
+  // Age and fades. During a word no slice plays longer than maxAgeMs after it was cut, and closeMs
+  // ends a loop that has nothing newer to play. A tail has no age limit and runs LINGER's law out.
+  // nextWordMs is the fade a new word puts on the tail it finds, and yieldMs is the faster fade a
+  // tail already fading takes when another word follows.
   float maxAgeMs = 2500.0f;
   float closeMs = 80.0f;
   float nextWordMs = 150.0f;
   float yieldMs = 20.0f;
 
   // LINGER laws.
-  float tauScale = 1.5f;  // life time constant is max(LINGER, clamp(tauScale * LINGER, tauMinMs, tauMaxMs))
-  float tauMinMs = 120.0f;
+  float tauScale = 1.5f;  // life time constant is max(LINGER, min(tauScale * LINGER, tauMaxMs))
   float tauMaxMs = 300.0f;
   float staticStart = 0.20f;  // life where the faster fade takes over
-  float staticFadeMs = 80.0f;
+  float staticFadeMs = 80.0f;  // its time constant, or LINGER when that is shorter
   float closeGain = 0.001f;  // under this the wet gain writes 0 and the loop stops
 
   // Wet tone. The drive doubles through the word and swells by driveBell in the middle of the tail.
@@ -88,7 +88,7 @@ struct BloomTuning {
 
 struct BloomParams {
   bool on = true;
-  float tailMs = 300.0f;  // panel LINGER, 60..2000
+  float tailMs = 300.0f;  // panel LINGER, 20..3000
   float bloom = 0.5f;     // panel AMOUNT, 0..1
   bool keyOpen = false;   // the Input gate's detector state for this call
   bool keyFromGate = false;  // false makes the engine listen to its own input
@@ -101,8 +101,8 @@ class Bloom {
   static constexpr int kSliceMax = 80 * kSampleRate / 1000;   // 80 ms, 3,840 samples
   static constexpr int kPlaysPerSlice = 2;
   static constexpr int kVoices = 4;  // word, tail, and two fading tails
-  static constexpr float kTailMinMs = 60.0f;
-  static constexpr float kTailMaxMs = 2000.0f;
+  static constexpr float kTailMinMs = 20.0f;
+  static constexpr float kTailMaxMs = 3000.0f;
 
   void reset() {
     closeAll();
@@ -211,7 +211,7 @@ class Bloom {
     int prevLen = 0;
     int prevPos = 0;
     uint32_t splicedAt = 0;
-    uint32_t staleAt = 0;  // clock where the slice has used its age and the close fade starts
+    uint32_t staleAt = 0;  // clock where the word's slice has used its age and the close fade starts
     float refPeak = 0.0f;  // peak of the looping slice
     float life = 1.0f;
     float gain = 0.0f;
@@ -308,15 +308,15 @@ class Bloom {
   void prepareTail(const BloomParams& p) {
     const BloomTuning& t = p.tuning;
     const float tail = clampf(p.tailMs, kTailMinMs, kTailMaxMs);
-    if (!prepared_ || tail != tailMs_ || t.tauScale != tauScale_ || t.tauMinMs != tauMin_ ||
-        t.tauMaxMs != tauMax_ || t.staticFadeMs != staticMs_) {
-      const float scaled = clampf(t.tauScale * tail, t.tauMinMs, t.tauMaxMs);
+    if (!prepared_ || tail != tailMs_ || t.tauScale != tauScale_ || t.tauMaxMs != tauMax_ ||
+        t.staticFadeMs != staticMs_) {
+      const float scaled = t.tauScale * tail < t.tauMaxMs ? t.tauScale * tail : t.tauMaxMs;
       const float tauMs = tail > scaled ? tail : scaled;
+      const float staticMs = t.staticFadeMs < tail ? t.staticFadeMs : tail;
       aTail_ = expf(-1.0f / (tauMs * kSmpPerMs));
-      aStatic_ = expf(-1.0f / (clampf(t.staticFadeMs, 1.0f, 2000.0f) * kSmpPerMs));
+      aStatic_ = expf(-1.0f / (clampf(staticMs, 1.0f, 2000.0f) * kSmpPerMs));
       tailMs_ = tail;
       tauScale_ = t.tauScale;
-      tauMin_ = t.tauMinMs;
       tauMax_ = t.tauMaxMs;
       staticMs_ = t.staticFadeMs;
     }
@@ -624,11 +624,11 @@ class Bloom {
   }
 
   // Life stays 1 through the word and decays over the tail. The wet gain rides toward its target, or
-  // falls straight to 0 in a fade. A slice that has used its age starts the close fade. Returns false
-  // when the voice closed or lost its slice.
+  // falls straight to 0 in a fade. During a word, a slice that has used its age starts the close fade;
+  // a tail has no age limit. Returns false when the voice closed or lost its slice.
   bool stepGain(int k, const BloomTuning& t) {
     Voice& v = v_[static_cast<size_t>(k)];
-    if (v.slice >= 0 && v.fadeStep == 0.0f && due(v.staleAt)) beginFade(v, closeSmp_);
+    if (k == kWord && v.slice >= 0 && v.fadeStep == 0.0f && due(v.staleAt)) beginFade(v, closeSmp_);
     if (v.fadeStep > 0.0f) {
       v.gain -= v.fadeStep;
       if (v.gain > 0.0f) return true;
@@ -768,7 +768,7 @@ class Bloom {
   float aStatic_ = 0.0f;
   float lpHz_ = 0.0f, lpQ_ = 0.0f;
   float shHz_ = 0.0f, shDb_ = 0.0f, shSlope_ = 0.0f;
-  float tailMs_ = 0.0f, tauScale_ = 0.0f, tauMin_ = 0.0f, tauMax_ = 0.0f, staticMs_ = 0.0f;
+  float tailMs_ = 0.0f, tauScale_ = 0.0f, tauMax_ = 0.0f, staticMs_ = 0.0f;
   float wet_ = 0.0f, wetAmount_ = -1.0f, wetHiKey_ = 0.0f, wetExpKey_ = 0.0f;
   float trim_ = 1.0f;
   float trimWl_ = -1.0f;

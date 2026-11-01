@@ -365,7 +365,7 @@ void checkComposeSlot7Cards() {
   layout.card[6] = Card::Bloom;
   panel.knob[6] = {0.5f, 0.6f};
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.bloom.on && std::fabs(snap.params.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f &&
+  check(snap.params.bloom.on && std::fabs(snap.params.bloom.tailMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f &&
             std::fabs(snap.params.bloom.bloom - 0.6f) < 1e-6f && snap.params.bloom.keyFromGate,
         "compose: Bloom in slot 7 reads LINGER and AMOUNT, and keys on the Input gate the default layout places");
 

@@ -1,7 +1,8 @@
 // Chatter checks (the Bloom engine): the word schedule (first capture, zero crossings, the 12 dB skip),
 // the AMOUNT laws (slice length and loudness), two plays per slice with the cut drift, the LINGER tail
-// law and its close, the one slice that repeats in the tail, the 150 ms fade a new word puts on the
-// tail, the capture source against the dry path, the 2.5 s age limit, the own key, determinism, chunk
+// law (20 ms to 3 s) and its close, the one slice that repeats in the tail, the 150 ms fade a new word
+// puts on the tail, the capture source against the dry path, the 2.5 s age limit in a word and none in
+// a tail, the own key, determinism, chunk
 // independence, settled off, no-alloc. No window, no audio device.
 
 #include <algorithm>
@@ -184,9 +185,22 @@ SliceRange sliceRange(double amount, double tailMs) {
   return {static_cast<int>(clampMs(nominalMs(amount) * 0.97) * kMs) - 1, static_cast<int>(clampMs(nominalMs(amount) * 1.03) * kMs) + 1};
 }
 
+// The tail's life time constant and its faster fade's, both in ms.
 double tauMs(double tailMs) {
-  const double scaled = std::fmin(300.0, std::fmax(120.0, 1.5 * tailMs));
+  const double scaled = std::fmin(300.0, 1.5 * tailMs);
   return std::fmax(tailMs, scaled);
+}
+
+double staticTauMs(double tailMs) { return std::fmin(80.0, tailMs); }
+
+// How far a tail's end may sit from the law's: 5 ms, or 0.5 % of the law's end when that is more. The
+// decay step is a float one-pole, so its time constant lands within 0.5 % of the law's.
+double endTolMs(double wantMs) { return std::fmax(5.0, 0.005 * wantMs); }
+
+// Where the law ends the tail, in ms after the word: life falls to 0.2 on the first constant, then the
+// faster fade runs the wet from 0.2 of its level to the close at 0.001.
+double lawEndMs(double tailMs, double wet) {
+  return tauMs(tailMs) * std::log(5.0) + staticTauMs(tailMs) * std::log(wet * 0.2 / 0.001);
 }
 
 bool crossingAt(const Signal& in, int i) { return i > 0 && ((in[static_cast<size_t>(i - 1)] < 0.0f) != (in[static_cast<size_t>(i)] < 0.0f)); }
@@ -400,8 +414,9 @@ bool testLoop() {
                 len, worst, peak, silentSkipped ? 1.0 : 0.0);
 }
 
-// After the word the wet gain follows wet * e^(-t/tau), switches to the 80 ms fade at life 0.2, and
-// ends at exactly 0 with the loop stopped. The tails here end before the age limit takes over.
+// After the word the wet gain follows wet * e^(-t/tau), switches to the faster fade (80 ms, or LINGER
+// when that is shorter) at life 0.2, and ends at exactly 0 with the loop stopped. LINGER 20, 40, 80,
+// 300, 2000 and 3000 ms each end at the law's own end. The age limit does not reach a tail.
 bool testTail() {
   bool ok = true;
   double worstRel = 0.0, endMs = 0.0, wantEndMs = 0.0;
@@ -409,7 +424,8 @@ bool testTail() {
     double tail;
     int wordMs, spanMs;
   };
-  const Case cases[3] = {{300.0, 700, 4000}, {60.0, 700, 4000}, {1000.0, 200, 4500}};
+  const Case cases[6] = {{20.0, 700, 1500},  {40.0, 700, 1500},  {80.0, 700, 2000},
+                         {300.0, 700, 4000}, {2000.0, 200, 4500}, {3000.0, 200, 6500}};
   for (const Case& c : cases) {
     const Signal in = vowel(c.spanMs, 0, c.wordMs);
     cv::BloomParams p;
@@ -435,7 +451,7 @@ bool testTail() {
       worstRel = std::fmax(worstRel, rel);
       if (rel > 0.015) ok = false;
     }
-    const double staticTau = 80.0 * kMs;
+    const double staticTau = staticTauMs(c.tail) * kMs;
     for (int j = sw; j < static_cast<int>(sw + 5 * staticTau); j += 211) {
       const double want = wet * 0.2 * std::exp(-(j - sw) / staticTau);
       if (want < 0.002) break;
@@ -449,17 +465,60 @@ bool testTail() {
         zero = static_cast<int>(i) - w;
         break;
       }
-    wantEndMs = (tSwitch + staticTau * std::log(wet * 0.2 / 0.001)) / kMs;
+    wantEndMs = lawEndMs(c.tail, wet);
     endMs = zero < 0 ? -1.0 : zero / double(kMs);
+    std::printf("NOTE tail-law  LINGER %.0f ms: the tail closes %.0f ms after the word, the law %.0f ms\n", c.tail, endMs, wantEndMs);
     bool stays = zero >= 0;
     for (size_t i = static_cast<size_t>(w + zero + 1); stays && i < t.total.size(); ++i)
       if (t.total[i] != 0.0f || t.loop[i]) stays = false;
     for (size_t i = static_cast<size_t>(w) + 1; i < static_cast<size_t>(w + (zero < 0 ? 0 : zero)); ++i)
       if (t.total[i] > t.total[i - 1]) ok = false;
-    if (!stays || std::fabs(endMs - wantEndMs) > 5.0) ok = false;
+    if (!stays || std::fabs(endMs - wantEndMs) > endTolMs(wantEndMs)) ok = false;
   }
-  return report("tail-law", ok, "gain vs wet*life: worst %.2f%% off (<1.5%%), fade switch at life 0.2 within 0.5%%; last tail ends at %.0f ms, law %.0f ms",
+  return report("tail-law", ok, "LINGER 20/40/80/300/2000/3000 ms: gain vs wet*life worst %.2f%% off (<1.5%%), fade switch at life 0.2 within 0.5%%; last tail (3 s) ends at %.0f ms, law %.0f ms",
                 worstRel * 100.0, endMs, wantEndMs);
+}
+
+// LINGER 20 ms: the life constant is 30 ms and the faster fade 20 ms, so the tail closes at the law's end,
+// about 139 ms after the word. The word ends at nine offsets, so the close lands at different points of
+// the pass. The input is silent by then, so the output is the wet alone, and the last sample before the
+// close sits under the engine's close level of 0.001 (-60 dBFS).
+bool testShortTail() {
+  const int ms = 1200;
+  const int offsets[9] = {0, 5, 9, 14, 20, 27, 33, 41, 52};
+  const double wantMs = lawEndMs(20.0, wetAt(0.5));
+  bool ok = true;
+  double worstEnd = 0.0, worstClose = 0.0, wordStep = 0.0;
+  for (const int off : offsets) {
+    const int wordMs = 700 + off;
+    const Signal in = vowel(ms, 0, wordMs);
+    cv::BloomParams p;
+    p.tailMs = 20.0f;
+    gBloom.reset();
+    const Trace t = trace(gBloom, in, keyOver(ms, 0, wordMs), p);
+    const int w = fallAfter(t.word, 0);
+    int end = -1;
+    for (size_t i = static_cast<size_t>(w < 0 ? 0 : w); i < t.total.size(); ++i)
+      if (t.total[i] == 0.0f) {
+        end = static_cast<int>(i);
+        break;
+      }
+    if (w < 0 || end < 0) {
+      ok = false;
+      continue;
+    }
+    const double endMs = (end - w) / double(kMs);
+    worstEnd = std::fmax(worstEnd, std::fabs(endMs - wantMs));
+    const size_t e = static_cast<size_t>(end);
+    worstClose = std::fmax(worstClose, std::fmax(std::fabs(t.out[e - 1]), std::fabs(static_cast<double>(t.out[e]) - t.out[e - 1])));
+    for (int i = 300 * kMs; i < 650 * kMs; ++i) {
+      const size_t k = static_cast<size_t>(i);
+      wordStep = std::fmax(wordStep, std::fabs(static_cast<double>(t.out[k]) - t.out[k - 1]));
+    }
+  }
+  return report("tail-20ms", ok && worstEnd <= 5.0 && worstClose < 0.001,
+                "LINGER 20 ms tail closes within %.1f ms of the law's end (%.1f ms after the word, <= 5), the last sample before the close and the step at it stay under %.5f (< 0.001; the word's largest sample step is %.4f)",
+                worstEnd, wantMs, worstClose, wordStep);
 }
 
 // The tail repeats one slice, the newest the word cut, with no splice and no rotation. The word ends at
@@ -574,16 +633,16 @@ Signal readWav(const std::string& path) {
 }
 
 // Adam's clips through the Input gate at -55 dBFS with Decay 20 ms and 2 s, the gate's detector as the
-// word key and its output as the source, as the box runs them with no pitch card, at LINGER 60 ms,
-// 300 ms and 2 s. Between a word's end and its tail's close the tail plays one slice and never
-// changes it, and the one it plays is the newest cut, which carries the voice and not the gate's
+// word key and its output as the source, as the box runs them with no pitch card, at LINGER 20 ms,
+// 60 ms, 300 ms, 2 s and 3 s. Between a word's end and its tail's close the tail plays one slice and
+// never changes it, and the one it plays is the newest cut, which carries the voice and not the gate's
 // silence after it. The same holds for a tail that fades under the next word.
 bool testTailOnClips() {
   const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
-  const float lingers[3] = {60.0f, 300.0f, 2000.0f};
+  const float lingers[5] = {20.0f, 60.0f, 300.0f, 2000.0f, 3000.0f};
   const float decays[2] = {20.0f, 2000.0f};
   constexpr size_t kPad = cv::kSampleRate * 2 / 5;
-  constexpr size_t kRoom = static_cast<size_t>(cv::kSampleRate) * 4;
+  constexpr size_t kRoom = static_cast<size_t>(cv::kSampleRate) * 6;
   int rows = 0, tails = 0, changes = 0, notNewest = 0, withTail = 0;
   double worstDb = 0.0, bestDb = -200.0;
   for (const char* name : names) {
@@ -661,7 +720,7 @@ bool testTailOnClips() {
   }
   if (rows == 0) return report("tail-on-clips", true, "skipped, samples/ is not in this checkout (%.0f rows)", 0.0);
   const bool ok = report("tail-on-clips", changes == 0 && notNewest == 0 && tails >= rows,
-                         "%.0f rows (3 clips x LINGER 60/300/2000 ms x Decay 20/2000 ms), %.0f tails: slice changes after a word's end %.0f (0), tails that are not the newest cut %.0f (0)",
+                         "%.0f rows (3 clips x LINGER 20/60/300/2000/3000 ms x Decay 20/2000 ms), %.0f tails: slice changes after a word's end %.0f (0), tails that are not the newest cut %.0f (0)",
                          rows, tails, changes, notNewest);
   std::printf("NOTE tail-on-clips  the tail slice's peak runs %.1f to %.1f dB against the loudest sample the gate passed in its word, over %d tails\n",
               worstDb, bestDb, withTail);
@@ -820,9 +879,10 @@ bool testSource() {
                 checked, match ? 1.0 : 0.0, dry && wetDiffers ? 1.0 : 0.0, equalCall ? 1.0 : 0.0);
 }
 
-// No slice plays more than 2.5 s after it was cut. A loud slice with a quieter tone held after it
-// loops while every later slice is skipped, and is replaced before the limit. A tail's one slice
-// closes at the limit over 80 ms.
+// During a word no slice plays more than 2.5 s after it was cut. A loud slice with a quieter tone held
+// after it loops while every later slice is skipped, and is replaced before the limit. A tail has no
+// limit: at LINGER 2 s and 3 s its one slice plays past 2.5 s of age and the tail runs the law's whole
+// fade.
 bool testAgeLimit() {
   const int ms = 4500;
   const float quiet = 0.5f * std::pow(10.0f, -20.0f / 20.0f);
@@ -846,37 +906,47 @@ bool testAgeLimit() {
   const bool replaced = changeAt > 0 && static_cast<uint32_t>(changeAt) < loudCut + limit && static_cast<uint32_t>(changeAt) > loudCut + limit - 400 * kMs &&
                         t.seq[kWord][static_cast<size_t>(3500 * kMs)] > loud && t.on[kWord][static_cast<size_t>(3500 * kMs)];
 
-  // A tail at LINGER 2 s: its slice closes at the limit, short of the 3.58 s the law gives, in an 80
-  // ms straight fall.
-  const int span = 6000;
+  // A tail at LINGER 2 s and 3 s: its slice plays past the limit, the gain follows the law at the clock
+  // where the limit would have closed it (the slice's cut plus 2.5 s less the 80 ms close), and the
+  // tail closes at the law's end, 3.58 s and 5.19 s after the word.
+  const int span = 7000;
   const Signal tin = vowel(span, 0, 900);
-  cv::BloomParams q;
-  q.tailMs = 2000.0f;
-  gBloom.reset();
-  const Trace u = trace(gBloom, tin, keyOver(span, 0, 800), q);
-  const int w = fallAfter(u.word, 0);
-  const uint32_t tailCut = u.cut[kTail][static_cast<size_t>(w)];
-  int end = -1;
-  for (size_t i = static_cast<size_t>(w); i < u.gain[kTail].size(); ++i)
-    if (u.gain[kTail][i] == 0.0f && !u.on[kTail][i]) {
-      end = static_cast<int>(i);
-      break;
+  const double wet = wetAt(0.5);
+  bool tailsOk = true;
+  double endMs[2] = {0.0, 0.0}, ageMs[2] = {0.0, 0.0}, lawRel[2] = {0.0, 0.0};
+  const double lingers[2] = {2000.0, 3000.0};
+  for (int j = 0; j < 2; ++j) {
+    cv::BloomParams q;
+    q.tailMs = static_cast<float>(lingers[j]);
+    gBloom.reset();
+    const Trace u = trace(gBloom, tin, keyOver(span, 0, 800), q);
+    const int w = fallAfter(u.word, 0);
+    if (w < 0) {
+      tailsOk = false;
+      continue;
     }
-  bool fall = end > 4000;
-  for (int i = end - 3700; fall && i < end - 2; ++i) {
-    const double d0 = u.gain[kTail][static_cast<size_t>(i)] - u.gain[kTail][static_cast<size_t>(i + 1)];
-    const double d1 = u.gain[kTail][static_cast<size_t>(i + 1)] - u.gain[kTail][static_cast<size_t>(i + 2)];
-    if (d0 <= 0.0 || std::fabs(d0 - d1) > 1e-6) fall = false;
+    const uint32_t tailCut = u.cut[kTail][static_cast<size_t>(w)];
+    int end = -1;
+    for (size_t i = static_cast<size_t>(w); i < u.gain[kTail].size(); ++i)
+      if (u.gain[kTail][i] == 0.0f && !u.on[kTail][i]) {
+        end = static_cast<int>(i);
+        break;
+      }
+    uint32_t tailAge = 0;
+    for (size_t i = static_cast<size_t>(w); end > 0 && i < static_cast<size_t>(end); ++i)
+      if (u.seq[kTail][i] != 0) tailAge = std::max<uint32_t>(tailAge, static_cast<uint32_t>(i) - u.cut[kTail][i]);
+    const size_t at = tailCut + limit - 80 * kMs;
+    const double want = wet * std::exp(-(static_cast<double>(at) - w) / (tauMs(lingers[j]) * kMs));
+    lawRel[j] = at < u.gain[kTail].size() ? std::fabs(u.gain[kTail][at] - want) / want : 1.0;
+    endMs[j] = end < 0 ? -1.0 : (end - w) / double(kMs);
+    ageMs[j] = tailAge / double(kMs);
+    if (end < 0 || tailAge <= limit || lawRel[j] > 0.015 ||
+        std::fabs(endMs[j] - lawEndMs(lingers[j], wet)) > endTolMs(lawEndMs(lingers[j], wet)))
+      tailsOk = false;
   }
-  uint32_t tailAge = 0;
-  for (size_t i = static_cast<size_t>(w); i < u.cut[kTail].size(); ++i)
-    if (u.seq[kTail][i] != 0) tailAge = std::max<uint32_t>(tailAge, static_cast<uint32_t>(i) - u.cut[kTail][i]);
-  const double tailMsEnd = (end - w) / double(kMs);
-  const bool inLimit = end > 0 && static_cast<uint32_t>(end) <= tailCut + limit && tailAge <= limit;
-  const bool shorter = tailMsEnd < 3000.0 && tailMsEnd > 1500.0;
-  return report("age-limit", worstAge <= limit && stillLoud && replaced && fall && inLimit && shorter,
-                "held quieter tone: oldest slice played %.0f ms at most (<= 2500), loud slice still loops at 2 s and is replaced at %.0f ms; LINGER 2 s tail closes %.0f ms after the word (law 3581), last 80 ms a straight fall: %.0f",
-                worstAge / double(kMs), changeAt / double(kMs), tailMsEnd, fall ? 1.0 : 0.0);
+  return report("age-limit", worstAge <= limit && stillLoud && replaced && tailsOk,
+                "held quieter tone: oldest slice played %.0f ms at most (<= 2500), loud slice still loops at 2 s and is replaced at %.0f ms; tails run past the limit, LINGER 2 s closes %.0f ms after the word (law 3581) and 3 s closes %.0f ms (law 5190), the 3 s tail's slice played %.0f ms",
+                worstAge / double(kMs), changeAt / double(kMs), endMs[0], endMs[1], ageMs[1]);
 }
 
 // With tailOnly the loop stays silent under the word and blooms when the word ends.
@@ -1104,6 +1174,7 @@ int main() {
   ok &= testSkip();
   ok &= testLoop();
   ok &= testTail();
+  ok &= testShortTail();
   ok &= testTailSlice();
   ok &= testTailAfterStop();
   ok &= testTailOnClips();

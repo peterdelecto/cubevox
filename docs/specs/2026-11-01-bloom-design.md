@@ -262,11 +262,18 @@ limit stays while a word lasts, where a slice can stick, and a tail runs its who
 always ends. This section overrides section 13 item 6's tail rule and section 14 item 5's range.
 
 1. Range. LINGER runs 20 ms to 3 s on the log curve. The default stays 300 ms.
-2. Low end. τ = max(D, min(1.5·D, 300)) ms, without the 120 ms floor, and the static fade runs
-   min(80, D) ms. Both match today at D ≥ 80 ms, so the sound from 80 ms up does not change. At
-   20 ms τ is 30 ms and the tail ends about 70 ms after the word. LINGER's 0.8 cap on the slice and
-   the 35 ms slice floor stand, so below 44 ms the slices sit at 35 ms.
+2. Low end. τ = max(D, min(1.5·D, 300)) ms, without the 120 ms floor, and the static fade's time
+   constant is min(80, D) ms. Both match today at D ≥ 80 ms, so the sound from 80 ms up does not
+   change. At 20 ms τ is 30 ms: life reaches 0.2 at 48 ms and the 20 ms fade takes 91 ms more to
+   the close, so the tail ends 139 ms after the word. LINGER's 0.8 cap on the slice and the 35 ms
+   slice floor stand, so below 44 ms the slices sit at 35 ms.
 3. Age limit in a word. Unchanged: a slice that reaches 2.5 s is replaced at the next re-capture
    even when quieter; with no re-capture it closes over 80 ms.
 4. Tail. No age limit. The tail repeats its one slice until LINGER's law ends it, or a new word
    fades it over 150 ms. At LINGER 3 s it rings about 5 s.
+5. Built (v2.01.03). Measured tail ends after the word's end at AMOUNT 50 %: 20 ms → 139 ms,
+   40 ms → 278, 80 ms → 555, 300 ms → 845, 2 s → 3,576, 3 s → 5,170 (law 5,190). Renders at LINGER
+   80, 300 and 1,000 ms are byte-identical to v2.01.02; at 2 s they part only past the old age-limit
+   close. The knob's mid travel is now 245 ms (was 346). `bloom_test` covers the law at six
+   settings, a click-free 20 ms close, 2 s and 3 s tails running past 2.5 s, and `tail-on-clips` at
+   LINGER 20 / 60 / 300 / 2,000 / 3,000 ms (72 tails, 0 slice changes after the word's end).
