@@ -135,7 +135,8 @@ volatile uint64_t gWindowSum = 0;  // since the last audioTakeLoad()
 volatile uint32_t gWindowBlocks = 0;
 volatile uint32_t gWindowMax = 0;
 
-// Worst block of each second, for the OLED's DEBUG figure. A second is this many blocks.
+// Worst and mean block of each second, for the OLED's DEBUG figure and the user LED. A second is
+// this many blocks.
 constexpr uint32_t kLoadWindowBlocks = cv::kSampleRate / kFramesPerHalf;
 LoadWindow gLoad;
 
@@ -799,6 +800,8 @@ AudioLoad audioTakeLoad() {
 }
 
 int audioWorstLoadPercent() { return loadPercent(gLoad.worst(), gCounts.budgetCycles); }
+
+int audioMeanLoadPercent() { return loadPercent(gLoad.mean(), gCounts.budgetCycles); }
 
 #if CUBEVOX_BENCH
 void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }
