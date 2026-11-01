@@ -43,23 +43,28 @@ void checkDefaultLayout() {
   }
 }
 
-// The Crowd card sits outside the default layout, so its cost may stay an estimate. layoutValid counts
-// the estimate like a measurement, so a layout with the Crowd card in slot 4 and Unison out is judged
-// by the sums, and the verdict follows the row once a board bench replaces it.
+// The default layout with the Crowd card in slot 4 in place of Unison is accepted. Its sums come
+// from the card rows (fixed term, the seven cards that stay, Crowd, and the tracker once), so a row
+// that moves the layout past a line makes this check fail instead of passing on a recomputed verdict.
 void checkCrowdLayout() {
   Layout layout = defaultLayout();
   layout.card[3] = Card::Crowd;
-  const LayoutCost sums = layoutCost(layout);
-  LayoutError expected = LayoutError::None;
-  if (sums.avg > costs::kBudgetAvgPercent) {
-    expected = LayoutError::OverAvg;
-  } else if (sums.worst > costs::kBudgetWorstPercent) {
-    expected = LayoutError::OverWorst;
+  const costs::Cost rows[] = {
+      costs::kFixed,    costs::kInputGate,  costs::kAutotune,    costs::kOctave,  costs::kCrowd,
+      costs::kSlapback, costs::kDistortion, costs::kReverbSpring, costs::kGate,   costs::kTracker,
+  };
+  int avg = 0;
+  int worst = 0;
+  for (const costs::Cost& row : rows) {
+    avg += row.avg;
+    worst += row.worst;
   }
+  const LayoutCost sums = layoutCost(layout);
+  check(sums.avg == avg && sums.worst == worst, "crowd layout: slot 4 with Unison out sums to its rows");
+  check(avg <= costs::kBudgetAvgPercent && worst <= costs::kBudgetWorstPercent,
+        "crowd layout: the row sums sit within both lines");
   const LayoutCheck verdict = layoutValid(layout);
-  check(verdict.error == expected, "crowd layout: slot 4 with Unison out is judged by the cost sums");
-  check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? sums.avg : sums.worst),
-        "crowd layout: a refusal reports the sum that went over");
+  check(verdict.ok(), "crowd layout: slot 4 with Unison out is accepted");
 }
 
 // The pitch tracker's row counts once: with Autotune alone, with Crowd alone, and with both. A layout
