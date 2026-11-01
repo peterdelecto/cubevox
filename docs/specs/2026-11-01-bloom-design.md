@@ -188,3 +188,5 @@ knob named LINGER.
    level runs from 0 at AMOUNT 0 to 0.70 at 100 % as 0.70 · AMOUNT^0.6, which puts 50 % at 0.46,
    the default loudness the owner auditioned. Eight slices of 3,000 samples are 96,000 B, which
    replaces item 5's figure.
+8. Built in v2.00.98: TAIL to 2 s (the tail at 2 s ends 3.58 s after the word, today's law) and the
+   lower knob named AMOUNT. Items 2 to 7 and the LINGER name are the next build.

@@ -95,8 +95,7 @@ void checkAmountKnobIsB() {
                               Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom};
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
-           std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "VOICES") == 0 ||
-           std::strcmp(name, "BLOOM") == 0;
+           std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "VOICES") == 0;
   };
   for (const Card c : amountCards) {
     char what[96];
@@ -452,10 +451,10 @@ void checkSlot7Cards() {
         "bloom: id bloom, name Bloom, its own engine, no group");
   const KnobDesc& tail = *knobDesc(Card::Bloom, 0);
   check(std::strcmp(tail.name, "TAIL") == 0 && tail.kind == KnobKind::Continuous && tail.curve == Curve::Log &&
-            tail.min == 60.0f && tail.max == 1000.0f && std::strcmp(tail.unit, "ms") == 0,
-        "bloom: knob A is TAIL, 60 to 1000 ms on a log curve");
-  check(std::strcmp(knobDesc(Card::Bloom, 1)->name, "BLOOM") == 0 && std::strcmp(knobDesc(Card::Bloom, 1)->unit, "%") == 0,
-        "bloom: knob B is BLOOM, a percent");
+            tail.min == 60.0f && tail.max == 2000.0f && std::strcmp(tail.unit, "ms") == 0,
+        "bloom: knob A is TAIL, 60 to 2000 ms on a log curve");
+  check(std::strcmp(knobDesc(Card::Bloom, 1)->name, "AMOUNT") == 0 && std::strcmp(knobDesc(Card::Bloom, 1)->unit, "%") == 0,
+        "bloom: knob B is AMOUNT, a percent");
 
   check(cardDesc(Card::Formant).cost.avg == costs::kFormant.avg && cardDesc(Card::Formant).cost.worst == costs::kFormant.worst &&
             !cardDesc(Card::Formant).cost.measured && !cardDesc(Card::Lofi).cost.measured &&
@@ -499,14 +498,14 @@ void checkSlot7Cards() {
   applyKnob(Card::Bloom, 0, 1.0f, p);
   const float tailHigh = p.bloom.tailMs;
   applyKnob(Card::Bloom, 0, 0.5f, p);
-  check(std::fabs(tailLow - 60.0f) < 1e-3f && std::fabs(tailHigh - 1000.0f) < 1e-1f &&
-            std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 1000.0f)) < 1e-2f,
-        "bloom: TAIL runs 60 to 1000 ms with its middle at the geometric mean");
+  check(std::fabs(tailLow - 60.0f) < 1e-3f && std::fabs(tailHigh - 2000.0f) < 1e-1f &&
+            std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f,
+        "bloom: TAIL runs 60 to 2000 ms with its middle at the geometric mean");
   applyKnob(Card::Bloom, 1, 0.65f, p);
-  check(std::fabs(p.bloom.bloom - 0.65f) < 1e-6f && std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 1000.0f)) < 1e-2f,
-        "bloom: BLOOM drives its own field and leaves TAIL alone");
-  check(shownText(tail, 0.0f) == "60" && shownText(tail, 1.0f) == "1000" && knobCells(tail) == 4,
-        "bloom: TAIL reads 60 to 1000 in four cells");
+  check(std::fabs(p.bloom.bloom - 0.65f) < 1e-6f && std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f,
+        "bloom: AMOUNT drives the bloom field and leaves TAIL alone");
+  check(shownText(tail, 0.0f) == "60" && shownText(tail, 1.0f) == "2000" && knobCells(tail) == 4,
+        "bloom: TAIL reads 60 to 2000 in four cells");
 
   // The toggles reach their own stage. Formant's toggle sits inside the pitch parameters and touches no
   // other pitch toggle.

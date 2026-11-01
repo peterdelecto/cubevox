@@ -73,7 +73,7 @@ struct BloomTuning {
 
 struct BloomParams {
   bool on = true;
-  float tailMs = 300.0f;  // panel TAIL, 60..1000
+  float tailMs = 300.0f;  // panel TAIL, 60..2000
   float bloom = 0.5f;     // panel BLOOM, 0..1
   bool keyOpen = false;   // the Input gate's detector state for this call
   bool keyFromGate = false;  // false makes the engine listen to its own input
@@ -84,7 +84,7 @@ class Bloom {
  public:
   static constexpr int kGrainMax = 80 * kSampleRate / 1000;  // 3,840 samples
   static constexpr float kTailMinMs = 60.0f;
-  static constexpr float kTailMaxMs = 1000.0f;
+  static constexpr float kTailMaxMs = 2000.0f;
 
   void reset() {
     for (std::array<float, kGrainMax>& g : grain_) g.fill(0.0f);

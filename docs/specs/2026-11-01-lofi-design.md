@@ -96,3 +96,16 @@ the engine's AMOUNT from 0 to 0.6 (`kLofiAmountTop`, `core/registry.h`), so ther
 The band closes and drives over the first 83 % of the knob; the last 17 % adds the start of the
 crush, at most a hold of 32 kHz and 14 bits. The default (knob 50 %) is the engine's 30 %: −0.06,
 −0.01, −0.22 dB on the three clips.
+
+## 9. The hold never folds the band (owner 2026-11-01, option A, v2.00.98)
+
+The hold rate stays at least 2.2 times the band's low-pass corner (`holdOverBand`), so its Nyquist
+sits 10 % over the band's top: at full engine AMOUNT, TONE 75 % holds at 7.5 kHz and TONE 100 % at
+10.6 kHz instead of 6 kHz; TONE 50 % and below are bit-identical. The hold ratio ramps across the
+block like the coefficients. `lofi_test` checks a tone at the band's top keeps everything else under
+the Nyquist at most −14 dB (gate −10 dB; with the floor off it reads −0.6 to −2.8 dB, the whine).
+A −40 dB bound cannot hold: a tone above the Nyquist folds at the band's skirt level, and a hold
+period that is not a whole number of samples lands each held sample on the audio clock, which
+leaves −14 to −17 dB of its own. Since section 8's cap the knob reaches at most a 32 kHz hold, so
+the floor only guards the engine's upper range. Open: TONE's last step, 98.5 to 100 %, reads 1.12
+times steady-state curvature on knob_step's 220 Hz probe (the gate does not walk that step).
