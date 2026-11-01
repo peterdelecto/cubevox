@@ -59,7 +59,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Reverb, costs::kReverbSpring},
     {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Time"), kPercent("Mix")},
      Group::Reverb, costs::kReverbChasm},
-    {Card::Crowd, "crowd", "Crowd", Engine::Crowd, 2, {kPercent("WIDTH"), kPercent("VOICES")}, Group::Pitch,
+    {Card::Crowd, "crowd", "Mob", Engine::Crowd, 2, {kPercent("WIDTH"), kPercent("VOICES")}, Group::Pitch,
      costs::kCrowd},
 }};
 

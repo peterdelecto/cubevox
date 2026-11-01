@@ -30,6 +30,9 @@ Layout crowdTestLayout();
 // for a layout that failed layoutValid.
 int reverbSlot(const Layout& layout);
 
+// The slot that holds Unison or Crowd, the first one when both are placed; -1 when neither is.
+int unisonCrowdSlot(const Layout& layout);
+
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
 

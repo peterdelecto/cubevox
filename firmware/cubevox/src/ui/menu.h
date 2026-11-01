@@ -31,7 +31,8 @@ enum class UiAction : uint8_t {
   ToggleInputJack,
   CycleTopSwitch,
   ToggleDebug,
-  SwapReverb,  // the layout's reverb card changes between Spring and Chasm
+  SwapReverb,       // the layout's reverb card changes between Spring and Chasm
+  SwapUnisonCrowd,  // the slot that holds Unison or Crowd takes the other card
   EnterDfu,
 };
 
@@ -48,7 +49,8 @@ struct UiContext {
 };
 
 // The text of one screen: kDisplayRows rows of up to kDisplayCols characters, each NUL-terminated.
-// A 5x7 screen draws its rows as they stand. The list keeps the value of each visible row here.
+// A 5x7 screen draws its rows as they stand. The list keeps the value of each visible row in the
+// first rows and the label of each in the rows after them, because a label can follow the layout.
 using MenuFrame = std::array<std::array<char, kDisplayCols + 1>, kDisplayRows>;
 
 class Menu {

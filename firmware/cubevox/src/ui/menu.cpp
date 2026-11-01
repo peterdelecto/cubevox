@@ -38,6 +38,7 @@ constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix)
 enum class Item : uint8_t {
   InputJack,
   Reverb,
+  UnisonCrowd,
   PolishComp,
   PolishEq,
   Output,
@@ -51,6 +52,7 @@ enum class Item : uint8_t {
 constexpr int kItemCount = static_cast<int>(Item::Count);
 
 static_assert(kItemCount >= kVisibleRows, "the list scrolls only when it holds more items than it shows");
+static_assert(2 * kVisibleRows <= kDisplayRows, "the frame holds a value row and a label row per visible item");
 static_assert((kVisibleRows - 1) * kListRowPitchPx + kListBarHeightPx < kCanvasHeight,
               "the last cursor bar must fit on the canvas and leave the last pixel line blank");
 
@@ -65,12 +67,23 @@ void putRow(MenuFrame& frame, int r, const char* text) {
   frame[r][n] = '\0';
 }
 
-const char* itemLabel(Item it) {
+// The label of `it`. The Unison and Crowd row names the slot that holds the card, or a dash when
+// none does, and builds the text in `buf`.
+const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
   switch (it) {
     case Item::InputJack: return "INPUT";
     case Item::Output: return "OUTPUT";
     case Item::TopSwitch: return "TOP SWITCH";
     case Item::Reverb: return "REVERB";
+    case Item::UnisonCrowd: {
+      const int slot = unisonCrowdSlot(layout);
+      if (slot >= 0) {
+        snprintf(buf, size, "SLOT %d", slot + 1);
+      } else {
+        snprintf(buf, size, "SLOT -");
+      }
+      return buf;
+    }
     case Item::PolishComp: return "POLISH COMP";
     case Item::PolishEq: return "POLISH EQ";
     case Item::Debug: return "DEBUG";
@@ -90,6 +103,13 @@ const char* reverbValue(const Layout& layout) {
   return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
 }
 
+// The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with neither
+// reads UNISON, the default.
+const char* unisonCrowdValue(const Layout& layout) {
+  const int slot = unisonCrowdSlot(layout);
+  return slot >= 0 && layout.card[slot] == Card::Crowd ? "MOB" : "UNISON";
+}
+
 const char* itemValue(Item it, const UiContext& ctx) {
   const Settings& s = ctx.settings;
   switch (it) {
@@ -97,6 +117,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::Output: return s.outputLevel == OutputLevel::Mic ? "MIC" : "LINE";
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     case Item::Reverb: return reverbValue(ctx.layout);
+    case Item::UnisonCrowd: return unisonCrowdValue(ctx.layout);
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::PolishEq: return onOff(s.polishEq);
     case Item::Debug: return onOff(s.debug);
@@ -106,20 +127,24 @@ const char* itemValue(Item it, const UiContext& ctx) {
 }
 
 // Writes the value of each of the kVisibleRows items from `top` on into row 0 to kVisibleRows - 1 of
-// the frame. A row past the last item stays empty.
-void listValues(MenuFrame& f, const UiContext& ctx, int top) {
+// the frame, and the label of each into the kVisibleRows rows after them. A row past the last item
+// stays empty.
+void listRows(MenuFrame& f, const UiContext& ctx, int top) {
   for (int row = 0; row < kVisibleRows && top + row < kItemCount; ++row) {
-    putRow(f, row, itemValue(static_cast<Item>(top + row), ctx));
+    const Item it = static_cast<Item>(top + row);
+    char buf[kDisplayCols + 1];
+    putRow(f, row, itemValue(it, ctx));
+    putRow(f, kVisibleRows + row, itemLabel(it, ctx.layout, buf, sizeof(buf)));
   }
 }
 
-// Paints the list from the values in `f`: each label at the left edge, each value ending at the
-// right ink column, and the cursor row inverted over its bar.
+// Paints the list from the labels and values in `f`: each label at the left edge, each value ending
+// at the right ink column, and the cursor row inverted over its bar.
 void paintList(Canvas& canvas, const MenuFrame& f, int cursor, int top) {
   const FontDesc& font = font7x12();
   for (int row = 0; row < kVisibleRows && top + row < kItemCount; ++row) {
     const int y = row * kListRowPitchPx + kListTextTopPx;
-    canvas.drawText(kListLabelInkX, y, font, itemLabel(static_cast<Item>(top + row)));
+    canvas.drawText(kListLabelInkX, y, font, f[kVisibleRows + row].data());
     const char* value = f[row].data();
     if (value[0] != '\0') canvas.drawText(kListValueInkRightX + 1 - Canvas::textWidth(font, value), y, font, value);
   }
@@ -174,6 +199,7 @@ UiAction Menu::onClick() {
         case Item::Output: return UiAction::ToggleOutput;
         case Item::TopSwitch: return UiAction::CycleTopSwitch;
         case Item::Reverb: return UiAction::SwapReverb;
+        case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
         case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::PolishEq: return UiAction::TogglePolishEq;
         case Item::Debug: return UiAction::ToggleDebug;
@@ -223,7 +249,7 @@ void Menu::draw(const UiContext& ctx, Canvas& canvas) {
     case Mode::List:
       now.cursor = cursor_;
       now.top = top_;
-      listValues(now.text, ctx, top_);
+      listRows(now.text, ctx, top_);
       break;
     case Mode::ChainView: drawChainView(now.text, ctx.layout); break;
     case Mode::ConfirmDfu: drawConfirmDfu(now.text); break;

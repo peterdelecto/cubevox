@@ -276,6 +276,70 @@ void checkReverbSlot() {
   check(reverbSlot(layout) == 2, "reverbSlot: the slot that holds it, wherever it is");
 }
 
+void checkUnisonCrowdSlot() {
+  Layout layout = defaultLayout();
+  check(unisonCrowdSlot(layout) == 3, "unisonCrowdSlot: the default layout has Unison in slot 4");
+  layout.card[3] = Card::Crowd;
+  check(unisonCrowdSlot(layout) == 3, "unisonCrowdSlot: Crowd counts as well");
+  layout.card[3] = Card::Empty;
+  check(unisonCrowdSlot(layout) == -1, "unisonCrowdSlot: -1 when no slot holds either");
+  layout.card[5] = Card::Crowd;
+  check(unisonCrowdSlot(layout) == 5, "unisonCrowdSlot: the slot that holds it, wherever it is");
+  layout.card[1] = Card::Unison;
+  check(unisonCrowdSlot(layout) == 1, "unisonCrowdSlot: the first slot when both cards are placed");
+}
+
+void checkSwapUnisonCrowd() {
+  Settings s;
+  const Settings before = s;
+
+  // The default layout: the outcome follows layoutValid, whatever the Crowd cost row says.
+  Layout layout = defaultLayout();
+  Layout crowd = layout;
+  crowd.card[3] = Card::Crowd;
+  const bool crowdFits = layoutValid(crowd).ok();
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, layout) ==
+                (crowdFits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None) &&
+            layout == (crowdFits ? crowd : defaultLayout()),
+        "action: SwapUnisonCrowd on the default layout follows layoutValid");
+
+  // A sparse layout that holds Crowd under any cost row: Unison to Crowd and back.
+  Layout sparse = {{Card::Empty, Card::Empty, Card::Empty, Card::Unison, Card::Empty, Card::Empty, Card::Empty,
+                    Card::ReverbSpring}};
+  Layout sparseCrowd = sparse;
+  sparseCrowd.card[3] = Card::Crowd;
+  check(layoutValid(sparse).ok() && layoutValid(sparseCrowd).ok(), "action: the sparse layouts pass the placement rules");
+  Layout swap = sparse;
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparseCrowd,
+        "action: SwapUnisonCrowd turns Unison into Crowd in its slot and touches no other slot");
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparse,
+        "action: and turns Crowd back into Unison");
+
+  Layout moved = sparse;  // the card in slot 6
+  moved.card[3] = Card::Empty;
+  moved.card[5] = Card::Unison;
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, moved) == ui::ApplyResult::LayoutChanged &&
+            moved.card[5] == Card::Crowd && moved.card[3] == Card::Empty,
+        "action: SwapUnisonCrowd swaps in the slot that holds the card, wherever it is");
+
+  Layout neither = sparse;
+  neither.card[3] = Card::Empty;
+  const Layout neitherBefore = neither;
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, neither) == ui::ApplyResult::None && neither == neitherBefore,
+        "action: SwapUnisonCrowd changes nothing when no slot holds either card");
+
+  Layout both = sparse;
+  both.card[1] = Card::Crowd;
+  const Layout bothBefore = both;
+  check(layoutValid(both).ok() && ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::None &&
+            both == bothBefore,
+        "action: SwapUnisonCrowd changes nothing when the other card would repeat");
+
+  check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack && s.polishComp == before.polishComp &&
+            s.polishEq == before.polishEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
+        "action: SwapUnisonCrowd changes no setting");
+}
+
 void checkCrowdTestLayout() {
   const Layout base = defaultLayout();
   const Layout test = crowdTestLayout();
@@ -326,6 +390,8 @@ void checkLayoutAndCompose() {
   checkLayoutName();
   checkApplyAction();
   checkReverbSlot();
+  checkUnisonCrowdSlot();
+  checkSwapUnisonCrowd();
   checkComposeToggles();
   checkComposeCrowd();
   checkComposeBench();
