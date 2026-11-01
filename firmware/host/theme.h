@@ -166,6 +166,13 @@ constexpr float kEncoderIndicatorIn = 0.45f;
 constexpr float kSegH = units(4);
 constexpr float kSegInset = 2.0f;
 
+// The slot 7 card switch is a grid of two rows of two cells in the column's foot. Each row is a
+// segment high. A word keeps this much room to each side in the right-hand column, which the grid
+// sizes to its longer word.
+constexpr int kGridRows = 2;
+constexpr float kGridH = kGridRows * kSegH;
+constexpr float kGridPad = units(1);
+
 // ---- Bat toggle: a short bushing with a lever that stands up for on and hangs down for off.
 
 constexpr float kBatW = units(4);          // hit area, over the 24 px desktop pointer floor
@@ -184,7 +191,7 @@ constexpr float kColPad = units(1);
 constexpr float kColInnerW = kColW - 2 * kColPad;
 constexpr float kNameH = units(3);
 constexpr float kLabelH = units(3);
-constexpr float kColH = kColPad + kNameH + kGap + 2 * (kKnobBoxD + kLabelH) + kGap + kSegH + kColPad;
+constexpr float kColH = kColPad + kNameH + kGap + 2 * (kKnobBoxD + kLabelH) + kGap + kGridH + kColPad;
 
 // ---- LED and CPU line
 
@@ -202,9 +209,9 @@ constexpr float kRightX = kOledX + kOledW + kBezel + kGapWide;  // the MENU colu
 constexpr float kToggleY = kTopY + kOledH + kGapWide;  // the row of eight bat toggles
 constexpr float kSlotY = kToggleY + kBatH + kGapTight;
 constexpr float kBottomY = kSlotY + kColH + kGapWide;
-constexpr float kVersionH = units(2);
-constexpr float kBottomEndY = kBottomY + kSegH + kGapTight + kVersionH;
 constexpr float kSourceW = kColInnerW;
+constexpr float kVersionX = kPad + kSourceW + kGap;  // the version sits beside the source switch
+constexpr float kBottomEndY = kBottomY + kSegH;
 
 static_assert(kBottomEndY + kPad <= kWindowH, "the three bands must fit the window");
 

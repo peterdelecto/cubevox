@@ -68,3 +68,9 @@ struct ChainSnapshot {
 
 ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, const Settings& settings,
                               const BenchOverrides& bench);
+
+// The same snapshot built in `out`, which the caller owns. A snapshot is over a kilobyte, so a caller
+// on the firmware's shared stack builds it here and keeps the object off its own frame. `out` takes
+// the default state first, so a reused object keeps nothing from the layout before.
+void composeSnapshotInto(ChainSnapshot& out, const Layout& layout, const PanelReading& panel, const Settings& settings,
+                         const BenchOverrides& bench);

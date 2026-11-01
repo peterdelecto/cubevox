@@ -1,19 +1,28 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
-// (out/in RMS) on vocal-like program material. The reverb rows take every
-// setting from the registry, as the box runs them. No window, no audio device.
+// (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Bloom rows take every
+// setting from the registry, as the box runs them. The Lo-fi and Bloom rows run on Adam's clips in
+// samples/ and skip when they are absent: the synthetic program puts its energy where the telephone
+// band cuts, and its noise floor holds Bloom's word open. No window, no audio device.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <fstream>
 #include <functional>
+#include <iterator>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "core/chain_params.h"
 #include "core/registry.h"
+#include "engine/bloom.h"
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
+#include "engine/lofi.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
@@ -238,6 +247,155 @@ bool crowdRows() {
   return ok;
 }
 
+// The Formant card at its default, SHIFT -3 st and MIX 100 %, with Autotune off, as the registry sets
+// it. MIX 50 % is reported without a verdict: the dry voice and the shifted voice are one waveform
+// 28 ms apart, so they add coherently and the crossfade reads high on this program. The card's trim
+// is set for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are.
+cv::PitchFxParams boxFormant(float mix) {
+  ChainParams chain;
+  applyPlacement(Card::Formant, chain);
+  applyToggle(Card::Formant, true, chain);
+  applyKnob(Card::Formant, 0, 4.0f, chain);  // position 4 is -3 st
+  applyKnob(Card::Formant, 1, mix, chain);
+  return chain.pitchFx;
+}
+
+bool formantRows(const Signal& in) {
+  bool ok = simple<cv::PitchFx>("formant -3 st mix 1", in, boxFormant(1.0f));
+  auto s = std::make_unique<Stage<cv::PitchFx>>();
+  const cv::PitchFxParams half = boxFormant(0.5f);
+  const double db = gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); }));
+  std::printf("NOTE %-30s %+6.2f dB  (no verdict: the voices add coherently)\n", "formant -3 st mix .5", db);
+  return ok;
+}
+
+// 16-bit mono PCM WAV, any chunks before data. Empty on a missing or other file.
+Signal readWav(const std::string& path) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f) return {};
+  std::vector<char> b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+  if (b.size() < 12 || std::memcmp(b.data(), "RIFF", 4) != 0) return {};
+  size_t pos = 12;
+  while (pos + 8 <= b.size()) {
+    uint32_t len;
+    std::memcpy(&len, &b[pos + 4], 4);
+    if (std::memcmp(&b[pos], "data", 4) == 0) {
+      const size_t n = std::min<size_t>(len, b.size() - pos - 8) / 2;
+      Signal x(n);
+      for (size_t i = 0; i < n; ++i) {
+        int16_t s;
+        std::memcpy(&s, &b[pos + 8 + 2 * i], 2);
+        x[i] = static_cast<float>(s) / 32768.0f;
+      }
+      return x;
+    }
+    pos += 8 + len + (len & 1);
+  }
+  return {};
+}
+
+// A stage's input and its output over one padded clip.
+struct Through {
+  Signal in;
+  Signal out;
+};
+using ClipFn = std::function<Through(const Signal& padded)>;
+
+// Runs `through` over each of Adam's clips, as lofi_test and bloom's level check do. 0.4 s of silence
+// ahead of a clip lets an enable fade settle and the stage's engines start clear, and the RMS runs over
+// the clip alone, the stage's output against its own input. Each clip is a row held to [lo, hi].
+// Returns false when a row fails; `mean` takes the mean of the rows that ran, in dB, and `count` how
+// many ran (0 when samples/ is absent, which skips).
+bool clipRows(const char* label, const ClipFn& through, double lo, double hi, double& mean, int& count) {
+  constexpr size_t kPad = cv::kSampleRate * 2 / 5;
+  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  bool ok = true;
+  double sum = 0.0;
+  count = 0;
+  for (const char* name : names) {
+    const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
+    if (clip.empty()) {
+      std::printf("SKIP %s %s  samples/ is not in this checkout\n", label, name);
+      continue;
+    }
+    Signal padded(kPad, 0.0f);
+    padded.insert(padded.end(), clip.begin(), clip.end());
+    const Through t = through(padded);
+    const double db = 20.0 * std::log10(rmsRange(t.out, kPad, t.out.size()) / rmsRange(t.in, kPad, t.in.size()));
+    ok &= verdict((std::string(label) + " " + name).c_str(), db, lo, hi);
+    sum += db;
+    ++count;
+  }
+  mean = count > 0 ? sum / count : 0.0;
+  return ok;
+}
+
+// The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips. The synthetic program
+// puts its energy where the telephone band cuts and reads -2.1 dB. The three clips differ by 1.14 dB
+// under one gain, so no trim puts all three inside 0 to +0.5 dB: each clip is held to the mid band, and
+// the mean of the three is reported against the rule.
+bool lofiRows() {
+  ChainParams chain;
+  applyPlacement(Card::Lofi, chain);
+  applyToggle(Card::Lofi, true, chain);
+  applyKnob(Card::Lofi, 0, 0.5f, chain);
+  applyKnob(Card::Lofi, 1, 0.5f, chain);
+  double mean = 0.0;
+  int count = 0;
+  const bool ok = clipRows(
+      "lofi 50/50",
+      [&](const Signal& padded) {
+        auto s = std::make_unique<Stage<cv::Lofi>>();
+        return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, chain.lofi); })};
+      },
+      kMidLoDb, kMidHiDb, mean, count);
+  if (count > 0) {
+    std::printf("NOTE %-30s %+6.2f dB  (mean of %d clips against the rule %+.1f..%+.1f)\n", "lofi 50/50 mean", mean, count,
+                kLoDb, kHiDb);
+  }
+  return ok;
+}
+
+// The Bloom card at its default, TAIL 300 ms and BLOOM 50 %, on Adam's clips, once listening to its own
+// input and once keyed by the Input gate at the registry's mid-travel setting (-55 dBFS), with the gate
+// ahead of it as the box runs them. The synthetic program carries a -40 dBFS noise floor that holds
+// Bloom's word open for the whole run, which the trim is not set for (-0.74 dB), so it has no row there.
+bool bloomRows() {
+  ChainParams chain;
+  applyPlacement(Card::Bloom, chain);
+  applyToggle(Card::Bloom, true, chain);
+  chain.bloom.tailMs = 300.0f;
+  applyKnob(Card::Bloom, 1, 0.5f, chain);
+  const cv::GateParams gate = inputGate();
+  double mean = 0.0;
+  int count = 0;
+  bool ok = clipRows(
+      "bloom own key",
+      [&](const Signal& padded) {
+        auto s = std::make_unique<Stage<cv::Bloom>>();
+        return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, chain.bloom); })};
+      },
+      kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+  ok &= clipRows(
+      "bloom gate key",
+      [&](const Signal& padded) {
+        auto g = std::make_unique<Stage<cv::Gate>>();
+        auto s = std::make_unique<Stage<cv::Bloom>>();
+        cv::BloomParams keyed = chain.bloom;
+        keyed.keyFromGate = true;
+        Through t{Signal(padded.size()), Signal(padded.size())};
+        for (size_t i = 0; i < padded.size(); i += cv::kBlock) {
+          const int n = static_cast<int>(std::min<size_t>(cv::kBlock, padded.size() - i));
+          g->fx.process(&padded[i], &t.in[i], n, gate);
+          keyed.keyOpen = g->fx.open();
+          s->fx.process(&t.in[i], &t.out[i], n, keyed);
+        }
+        return t;
+      },
+      kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+  return ok;
+}
+
 // The slot stages at their default engaged settings.
 bool slotRows(const Signal& in) {
   bool ok = true;
@@ -258,6 +416,9 @@ bool slotRows(const Signal& in) {
   unison.depth = 0.5f;  // Adam default
   ok &= simple<cv::Unison>("unison depth .5", in, unison);
   ok &= crowdRows();
+  ok &= formantRows(in);
+  ok &= lofiRows();
+  ok &= bloomRows();
 
   cv::SlapbackParams slap;
   slap.on = true;

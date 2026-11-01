@@ -104,6 +104,23 @@ void Box::swapUnisonMob() { applyAction(UiAction::SwapUnisonCrowd); }
 
 void Box::swapReverb() { applyAction(UiAction::SwapReverb); }
 
+// The cycle visits at most the four cards, so three steps reach any card it can reach. The steps run
+// on a copy, and the box takes the copy only when it holds the card.
+void Box::pickSlot7Card(Card card) {
+  constexpr int kCycleSteps = 3;
+  Layout trial = layout_;
+  Settings scratch = settings_;
+  for (int step = 0; step < kCycleSteps; ++step) {
+    const int slot = slot7CardSlot(trial);
+    if (slot < 0 || trial.card[static_cast<size_t>(slot)] == card) break;
+    if (ui::applyAction(UiAction::CycleSlot7Card, scratch, trial) != ui::ApplyResult::LayoutChanged) break;
+  }
+  const int slot = slot7CardSlot(trial);
+  if (slot < 0 || trial.card[static_cast<size_t>(slot)] != card || trial == layout_) return;
+  layout_ = trial;
+  publish_.markStale();
+}
+
 // The splash owns the canvas until it ends; the face then dissolves in from what it left.
 void Box::drawFace(const UiContext& ctx, uint32_t nowMs) {
   switch (splash_.draw(nowMs, kFirmwareVersion, canvas_)) {

@@ -20,11 +20,14 @@ ChainParams::ChainParams() {
   pitchFx.autotune.on = false;
   pitchFx.octave.on = false;
   pitchFx.octave.mix = kOctaveStartMix;
+  pitchFx.formant.on = false;
   pitchFx.crowdOn = false;
   crowd.on = false;
   unison.on = false;
   slapback.on = false;
   distortion.on = false;
+  lofi.on = false;
+  bloom.on = false;
   reverb.on = false;
   applyPlacement(Card::ReverbSpring, *this);
   eq.on = true;

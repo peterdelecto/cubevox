@@ -24,6 +24,33 @@ ApplyResult swapUnisonCrowd(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
+// The card after `c` in the slot 7 cycle, Gate to Formant to Lo-fi to Bloom and back to Gate.
+Card nextSlot7Card(Card c) {
+  switch (c) {
+    case Card::Gate: return Card::Formant;
+    case Card::Formant: return Card::Lofi;
+    case Card::Lofi: return Card::Bloom;
+    default: return Card::Gate;
+  }
+}
+
+// Moves the slot that holds one of the four to the next card in the cycle that layoutValid accepts,
+// so a card over the CPU lines or already placed in another slot is passed over. When none of the
+// other three fits the layout stays as it is.
+ApplyResult cycleSlot7Card(Layout& layout) {
+  const int slot = slot7CardSlot(layout);
+  if (slot < 0) return ApplyResult::None;
+  Layout next = layout;
+  for (Card c = nextSlot7Card(layout.card[slot]); c != layout.card[slot]; c = nextSlot7Card(c)) {
+    next.card[slot] = c;
+    if (layoutValid(next).ok()) {
+      layout = next;
+      return ApplyResult::LayoutChanged;
+    }
+  }
+  return ApplyResult::None;
+}
+
 }  // namespace
 
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout) {
@@ -48,6 +75,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
       return ApplyResult::SettingsChanged;
     case UiAction::SwapReverb: return swapReverb(layout);
     case UiAction::SwapUnisonCrowd: return swapUnisonCrowd(layout);
+    case UiAction::CycleSlot7Card: return cycleSlot7Card(layout);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;
   }

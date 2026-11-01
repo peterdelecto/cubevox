@@ -38,10 +38,10 @@ constexpr double kMaxRatio = 1.05;
 static_assert(kStepAt % cv::kBlock == 0, "the step lands on a block edge");
 
 // A pure sine: its second difference is small and steady, so any cut stands out.
-Signal tone() {
+Signal tone(double hz) {
   Signal x(static_cast<size_t>(kTotal));
   for (int i = 0; i < kTotal; ++i)
-    x[static_cast<size_t>(i)] = static_cast<float>(kToneAmp * std::sin(2.0 * kPi * kToneHz * i / cv::kSampleRate));
+    x[static_cast<size_t>(i)] = static_cast<float>(kToneAmp * std::sin(2.0 * kPi * hz * i / cv::kSampleRate));
   return x;
 }
 
@@ -97,6 +97,8 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Gate: return runFx<cv::Gate>(in, a, b, &ChainParams::gate);
     case Engine::Reverb: return runFx<cv::Reverb>(in, a, b, &ChainParams::reverb);
     case Engine::Crowd: return runCrowd(in, a, b);
+    case Engine::Lofi: return runFx<cv::Lofi>(in, a, b, &ChainParams::lofi);
+    case Engine::Bloom: return runFx<cv::Bloom>(in, a, b, &ChainParams::bloom);
     case Engine::Count: break;
   }
   return in;
@@ -117,8 +119,8 @@ struct Step {
 };
 
 // Continuous knobs step at a low, a middle and a high setting. A stepped knob of up to ten detents
-// (the Mob card's VOICES) moves across every detent in turn, and a longer one moves one detent at a
-// quarter and at three quarters of its travel.
+// (the Mob card's VOICES) moves across every detent in turn, as does the Formant card's SHIFT with
+// its fifteen, and a longer one moves one detent at a quarter and at three quarters of its travel.
 constexpr int kWalkedDetents = 10;
 
 std::vector<Step> stepsFor(Card c, int knob) {
@@ -128,7 +130,7 @@ std::vector<Step> stepsFor(Card c, int knob) {
     for (float p : {0.2f, 0.5f, 0.8f}) s.push_back({p, p + kContinuousStep});
     return s;
   }
-  if (detents <= kWalkedDetents) {
+  if (detents <= kWalkedDetents || c == Card::Formant) {
     std::vector<Step> s;
     for (int d = 0; d + 1 < detents; ++d) s.push_back({static_cast<float>(d), static_cast<float>(d + 1)});
     return s;
@@ -171,10 +173,10 @@ bool checkKnob(Card c, int knob, const Signal& in) {
 }  // namespace
 
 int main() {
-  const Signal in = tone();
   bool ok = true;
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
+    const Signal in = tone(kToneHz);
     for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= checkKnob(c, k, in);
   }
   std::printf("%s knob step\n", ok ? "PASS" : "FAIL");

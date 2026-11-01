@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include <new>
+
 #include "core/registry.h"
 
 namespace {
@@ -40,16 +42,28 @@ void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverr
   snap.slotOn[static_cast<size_t>(slot)] = on;
 }
 
-}  // namespace
-
-ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, const Settings& settings,
-                              const BenchOverrides& bench) {
-  ChainSnapshot snap;
+// Fills a snapshot that holds its default state.
+void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, const Settings& settings,
+          const BenchOverrides& bench) {
   snap.layout = layout;
   for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, s, snap);
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
   snap.params.comp.on = settings.polishComp;
   snap.params.eq.on = settings.polishEq;
   snap.outputGain = powf(10.0f, outputTrimDb(settings) / kDbPerDecade);
+}
+
+}  // namespace
+
+ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, const Settings& settings,
+                              const BenchOverrides& bench) {
+  ChainSnapshot snap;
+  fill(snap, layout, panel, settings, bench);
   return snap;
+}
+
+void composeSnapshotInto(ChainSnapshot& out, const Layout& layout, const PanelReading& panel, const Settings& settings,
+                         const BenchOverrides& bench) {
+  new (&out) ChainSnapshot();
+  fill(out, layout, panel, settings, bench);
 }

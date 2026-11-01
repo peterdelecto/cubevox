@@ -73,8 +73,15 @@ void flushDenormalsToZero() {
 
 void reportBoot() { bootReport(sh1106Present()); }
 
+// The snapshot publishSnapshot builds. It is over a kilobyte, so it lives here and not on the stack the
+// interrupts share.
+ChainSnapshot gCompose;
+
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
-void publishSnapshot() { audioPublish(composeSnapshot(gLayout, controlsReading(), gSettings, benchOverrides())); }
+void publishSnapshot() {
+  composeSnapshotInto(gCompose, gLayout, controlsReading(), gSettings, benchOverrides());
+  audioPublish(gCompose);
+}
 
 // The encoder's turns and clicks for the menu. While a planned reset waits on the flash the menu
 // takes none, so a turn cannot leave the confirm screen behind an update that is already starting.

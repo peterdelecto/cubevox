@@ -145,6 +145,7 @@ cubevox_engine_test(gate ${CUBEVOX_REGISTRY_SOURCES})
 cubevox_engine_test(bloom)
 cubevox_engine_test(deesser)
 cubevox_engine_test(level ${CUBEVOX_REGISTRY_SOURCES})
+target_compile_definitions(level_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(knob_step ${CUBEVOX_REGISTRY_SOURCES})
 cubevox_engine_test(stage_feedback)
 

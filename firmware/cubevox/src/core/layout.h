@@ -33,6 +33,10 @@ int reverbSlot(const Layout& layout);
 // The slot that holds Unison or Crowd, the first one when both are placed; -1 when neither is.
 int unisonCrowdSlot(const Layout& layout);
 
+// The slot that holds Gate, Formant, Lo-fi or Bloom, the first one when several are placed; -1 when
+// none is. The menu's slot 7 row cycles the card in it.
+int slot7CardSlot(const Layout& layout);
+
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
 
@@ -49,7 +53,7 @@ struct LayoutCheck {
 };
 
 // The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
-// placed card's row, and the pitch tracker's row once when Autotune or Crowd is placed. Every card id
+// placed card's row, and the pitch tracker's row once when Autotune, Crowd or Formant is placed. Every card id
 // must be in range.
 struct LayoutCost {
   int avg = 0;
