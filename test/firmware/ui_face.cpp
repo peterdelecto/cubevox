@@ -48,25 +48,25 @@ Canvas blend(const Canvas& from, const Canvas& to, int level) {
 constexpr int kStep1Level = 21;
 constexpr int kStep2Level = 43;
 
-// The input meter, drawn from its definition. The box is columns 1 to 9 and rows 8 to 56, 1 px wide.
-// Each segment is 2 rows tall at columns 2 to 8, the lowest on rows 54 and 55, with 1 row of gap
+// The input meter, drawn from its definition. The box is columns 5 to 20 and rows 8 to 56, 1 px wide.
+// Each segment is 2 rows tall at columns 6 to 19, the lowest on rows 54 and 55, with 1 row of gap
 // above it. The walk moves the whole meter by (dx, dy).
 void addMeterBox(Canvas& c, int dx = 0, int dy = 0) {
-  c.fillRect(1 + dx, 8 + dy, 9, 1, true);
-  c.fillRect(1 + dx, 56 + dy, 9, 1, true);
-  c.fillRect(1 + dx, 8 + dy, 1, 49, true);
-  c.fillRect(9 + dx, 8 + dy, 1, 49, true);
+  c.fillRect(5 + dx, 8 + dy, 16, 1, true);
+  c.fillRect(5 + dx, 56 + dy, 16, 1, true);
+  c.fillRect(5 + dx, 8 + dy, 1, 49, true);
+  c.fillRect(20 + dx, 8 + dy, 1, 49, true);
 }
 
 void addSegments(Canvas& c, int lit, int dx = 0, int dy = 0) {
-  for (int n = 0; n < lit; ++n) c.fillRect(2 + dx, 54 - 3 * n + dy, 7, 2, true);
+  for (int n = 0; n < lit; ++n) c.fillRect(6 + dx, 54 - 3 * n + dy, 14, 2, true);
 }
 
-// The voice screen in silence, which is the horizon line from the ribbon's first column, column 13,
+// The voice screen in silence, which is the horizon line from the ribbon's first column, column 24,
 // to its last, column 126, and the empty meter box. The walk moves both.
 Canvas lineScreen(int dx = 0, int dy = 0) {
   Canvas c;
-  c.fillRect(13 + dx, 32 + dy, 114, 1, true);
+  c.fillRect(24 + dx, 32 + dy, 103, 1, true);
   addMeterBox(c, dx, dy);
   return c;
 }
@@ -653,14 +653,14 @@ bool darkFrom127(const Canvas& c) {
   return true;
 }
 
-// Columns 0 to 12 hold the meter box and `segments` lit segments, the lowest ones, and nothing else.
+// Columns 0 to 23 hold the meter box and `segments` lit segments, the lowest ones, and nothing else.
 bool meterShows(const Canvas& c, int segments) {
   Canvas want;
   addMeterBox(want);
   addSegments(want, segments);
   bool ok = true;
   for (int y = 0; y < kCanvasHeight; ++y) {
-    for (int x = 0; x < 13; ++x) ok = ok && lit(c, x, y) == lit(want, x, y);
+    for (int x = 0; x < 24; ++x) ok = ok && lit(c, x, y) == lit(want, x, y);
   }
   return ok;
 }
@@ -692,7 +692,7 @@ void checkVoiceLevels() {
     check(meterSegments(level::displayLevel(dbToLinear(c.inDb))) == c.segments,
           ("voice: " + in + " reads " + std::to_string(c.segments) + " segments").c_str());
 
-    // 20 ticks of silence, 30 at the levels, 14 of silence again fill the 57 levels of history.
+    // 20 ticks of silence, 30 at the levels, 14 of silence again fill the 52 levels of history.
     FaceRig r;
     r.ticks(20);
     r.ticks(30, dbToLinear(c.outDb), dbToLinear(c.inDb));
@@ -737,7 +737,7 @@ void checkOutputHissIsSilence() {
 
 // The scripted drive of proof scene 12 in tools/oled-proof/oled_motion.cpp. The input holds
 // -23 dBFS (9 segments) and the output cycles through twelve levels, one per tick. The golden is the
-// frame after tick 80, when the 57 levels of the ribbon all come from the cycle.
+// frame after tick 80, when the 52 levels of the ribbon all come from the cycle.
 constexpr float kScriptInDb = -23.0f;
 constexpr float kScriptOutDb[12] = {-30.0f, -24.0f, -19.0f, -12.0f, -8.0f, -14.0f, -20.0f, -26.0f, -32.0f, -40.0f, -52.0f, -60.0f};
 constexpr int kScriptTicks = 80;
@@ -764,7 +764,7 @@ Canvas settledOff(void (*setUp)(FaceRig&), float inRms) {
 
 bool meterPlaceDark(const Canvas& c, int fromRow = 8) {
   for (int y = fromRow; y <= 56; ++y) {
-    for (int x = 0; x < 6; ++x) {
+    for (int x = 0; x <= kMeterBoxLeftX; ++x) {
       if (lit(c, x, y)) return false;
     }
   }

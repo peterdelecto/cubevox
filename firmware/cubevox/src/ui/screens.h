@@ -26,22 +26,23 @@ constexpr int kReadoutValueY = 34;
 
 // The voice ribbon is mirrored about the horizon, and each level it holds spans two columns, so it
 // scrolls 50 px/s at 25 frames a second. It runs from kRibbonLeftX to kRibbonRightX, and the last
-// column of the panel stays blank.
+// column of the panel stays blank. The level count rounds up, so the oldest level fills the one
+// column at kRibbonLeftX and every other level fills two.
 constexpr int kRibbonHorizonY = kCanvasHeight / 2;
 constexpr int kRibbonHalfMax = 22;
 constexpr int kRibbonColumnsPerLevel = 2;
-constexpr int kRibbonLeftX = 13;
+constexpr int kRibbonLeftX = 24;
 constexpr int kRibbonRightX = kCanvasWidth - 2;
-constexpr int kRibbonLevels = (kRibbonRightX - kRibbonLeftX + 1) / kRibbonColumnsPerLevel;
+constexpr int kRibbonLevels = (kRibbonRightX - kRibbonLeftX + kRibbonColumnsPerLevel) / kRibbonColumnsPerLevel;
 
 // The input level meter is a 1 px outline box at the left edge with 16 segments inside, like a
 // thermometer without the bulb. The box stands on the voice screen in silence too. Its sides are
 // columns kMeterBoxLeftX and kMeterBoxRightX and its top and bottom are rows kMeterBoxTopY and
-// kMeterBoxBottomY. The interior is columns 2 to 8, rows 9 to 55. Each segment is 2 rows tall with
-// 1 row of gap above it, and the lowest one sits on the interior's last row. Columns 10 to 12,
+// kMeterBoxBottomY. The interior is columns 6 to 19, rows 9 to 55. Each segment is 2 rows tall with
+// 1 row of gap above it, and the lowest one sits on the interior's last row. Columns 21 to 23,
 // between the box and the ribbon, stay blank.
-constexpr int kMeterBoxLeftX = 1;
-constexpr int kMeterBoxRightX = 9;
+constexpr int kMeterBoxLeftX = 5;
+constexpr int kMeterBoxRightX = 20;
 constexpr int kMeterBoxTopY = 8;
 constexpr int kMeterBoxBottomY = 56;
 constexpr int kMeterX = kMeterBoxLeftX + 1;
@@ -54,7 +55,9 @@ constexpr int kMeterSegmentGap = 1;
 static_assert(kMeterRows == kMeterSegments * kMeterSegmentRows + (kMeterSegments - 1) * kMeterSegmentGap,
               "the segments and their gaps fill the box exactly");
 static_assert(kRibbonLeftX - kMeterBoxRightX - 1 == 3, "three blank columns lie between the box and the ribbon");
-static_assert(kMeterWidth == 7, "the interior is 7 columns wide");
+static_assert(kMeterWidth == 14, "the interior is 14 columns wide");
+static_assert(kRibbonLevels * kRibbonColumnsPerLevel >= kRibbonRightX - kRibbonLeftX + 1,
+              "the levels cover every ribbon column");
 
 // Half-height of the ribbon, in pixels, for a level of 0..1.
 int ribbonHalfHeight(float level);

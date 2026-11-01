@@ -133,7 +133,7 @@ void toggleScreen(Canvas& c) {
 }
 
 // The runtime voice screen, drawn by the firmware's renderer. The input meter is a box at the left
-// with 9 of its 16 segments lit, and the output ribbon runs from column 13 on a swell that fades.
+// with 9 of its 16 segments lit, and the output ribbon runs from column 24 on a swell that fades.
 void voiceScreen(Canvas& c) {
   Ribbon ribbon;
   for (int i = 0; i < kRibbonLevels; ++i) {
