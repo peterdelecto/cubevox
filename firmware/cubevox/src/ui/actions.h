@@ -21,6 +21,8 @@ enum class ApplyResult : uint8_t {
 // cycles.
 // The reverb action swaps the reverb card between Spring and Chasm in its slot. It changes nothing
 // when no slot holds a reverb card, or when the other card would push the layout past the CPU budget.
+// The Unison and Crowd action does the same between Unison and Crowd in the slot that holds either,
+// and changes nothing when no slot does or when the other card fails the placement rules.
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout);
 
 }  // namespace ui

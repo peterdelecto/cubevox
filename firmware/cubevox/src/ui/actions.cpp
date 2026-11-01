@@ -14,6 +14,16 @@ ApplyResult swapReverb(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
+ApplyResult swapUnisonCrowd(Layout& layout) {
+  const int slot = unisonCrowdSlot(layout);
+  if (slot < 0) return ApplyResult::None;
+  Layout next = layout;
+  next.card[slot] = layout.card[slot] == Card::Unison ? Card::Crowd : Card::Unison;
+  if (!layoutValid(next).ok()) return ApplyResult::None;
+  layout = next;
+  return ApplyResult::LayoutChanged;
+}
+
 }  // namespace
 
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout) {
@@ -37,6 +47,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
       settings.debug = !settings.debug;
       return ApplyResult::SettingsChanged;
     case UiAction::SwapReverb: return swapReverb(layout);
+    case UiAction::SwapUnisonCrowd: return swapUnisonCrowd(layout);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;
   }

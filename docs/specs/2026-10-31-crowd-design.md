@@ -4,6 +4,15 @@ Date 2026-10-31. Owner design in chat 2026-10-31 and 2026-11-01; this file is th
 reference. The first part states the card as it is at v2.00.79. The log at the end records how it got
 there, with the commit that holds each thing that was built and then removed.
 
+Name (owner 2026-11-01): the card is **MOB** on the box. The registry's display name is Mob from
+v2.00.82; the card id `crowd`, the engine, the cost row and the file names keep the old name until
+a rename pass. The menu row after REVERB swaps the slot that holds Unison or MOB between the two
+(`2026-10-24-polish-design.md`, menu section). Board bench 2026-11-01 (bench image with Adam's
+5.5 s clip, knobs at top, all slots on, two runs of 24 s): MOB in slot 3 of the crowd bench layout
+78.7k cycles mean (12.3 %), lowest worst block 94.97k (14.8 %), second run worst 101.0k; Octave's
+slot carried the tracker at 47.5k; zero late, overrun or dry blocks. The row becomes
+`kCrowd{13, 15, true}` with the hands-free bench work.
+
 ## Purpose
 
 Adam sings in a speaky, near-monotone style, so effects that need a key do not serve him. The Crowd

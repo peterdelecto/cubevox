@@ -69,7 +69,7 @@ void checkCardTable() {
         "table: both reverb cards share the reverb engine");
   check(engineOf(Card::Crowd) == Engine::Crowd && cardDesc(Card::Crowd).group == Group::Pitch,
         "table: the Crowd card has its own engine and sits in the pitch group");
-  check(std::strcmp(cardDesc(Card::Crowd).id, "crowd") == 0 && std::strcmp(cardDesc(Card::Crowd).name, "Crowd") == 0 &&
+  check(std::strcmp(cardDesc(Card::Crowd).id, "crowd") == 0 && std::strcmp(cardDesc(Card::Crowd).name, "Mob") == 0 &&
             std::strcmp(knobDesc(Card::Crowd, 0)->name, "WIDTH") == 0 &&
             std::strcmp(knobDesc(Card::Crowd, 1)->name, "VOICES") == 0,
         "table: the Crowd card reads WIDTH then VOICES");
