@@ -180,9 +180,11 @@ knob named LINGER.
      80 ms.
    - So LINGER's top end rings for at most 2.5 s after the word's last slice was cut, short of the
      law's natural fade at 2 s.
-7. AMOUNT sets loudness only (owner 2026-11-01, option A). Grains are a fixed 63 ms and a fresh one
-   is cut every 118 ms (±5 %), the default the owner auditioned and liked. LINGER still caps a grain
-   at 0.8 of its setting, so LINGER under 79 ms shortens it, never under 35 ms. The wet level runs
-   from 0 at AMOUNT 0 to 0.70 at 100 % as 0.70 · AMOUNT^0.6, which puts 50 % at 0.46, today's
-   default loudness. Slices of 63 ms, 3,024 samples: eight of them are 96,768 B, which replaces
-   item 5's figure.
+7. AMOUNT sets loudness only (owner 2026-11-01, option A). Grains are a fixed 62.5 ms, 3,000 samples
+   (owner: "62.5"), which falls exactly on the beat at 120 and 160 BPM (8 and 6 a beat) and within
+   25 ms of it from 120 to 180 BPM; no one length fits every tempo. A fresh grain is cut every
+   125 ms, two grains, with no jitter, and splices land on that grid, so each grain plays exactly
+   twice. LINGER still caps a grain at 0.8 of its setting below 78 ms, never under 35 ms. The wet
+   level runs from 0 at AMOUNT 0 to 0.70 at 100 % as 0.70 · AMOUNT^0.6, which puts 50 % at 0.46,
+   the default loudness the owner auditioned. Eight slices of 3,000 samples are 96,000 B, which
+   replaces item 5's figure.
