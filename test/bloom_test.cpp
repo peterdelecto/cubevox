@@ -1,8 +1,8 @@
-// Bloom checks: the word schedule (first capture, the 125 ms grid, zero crossings, the 12 dB skip), the
-// AMOUNT and LINGER laws, the tail law and its close, the rotation of the word's last four slices,
-// a word during a tail, the third word's 20 ms fade, the capture source against the dry path, the
-// 2.5 s age limit, the own key, determinism, chunk independence, settled off, no-alloc. No window,
-// no audio device.
+// Chatter checks (the Bloom engine): the word schedule (first capture, zero crossings, the 12 dB skip),
+// the AMOUNT laws (slice length and loudness), two plays per slice with the cut drift, the LINGER tail
+// law and its close, the one slice that repeats in the tail, the 150 ms fade a new word puts on the
+// tail, the capture source against the dry path, the 2.5 s age limit, the own key, determinism, chunk
+// independence, settled off, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <array>
@@ -12,11 +12,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <new>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "engine/bloom.h"
+#include "engine/gate.h"
 
 namespace {
 
@@ -48,12 +52,15 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kMs = cv::kSampleRate / 1000;
-constexpr int kInterval = 6000;  // 125 ms, two slices of 3,000 samples
+constexpr int kWord = 0;   // voice numbers, as the engine counts them
+constexpr int kTail = 1;
+constexpr int kFade = 2;
+constexpr int kVoices = cv::Bloom::kVoices;
 
 bool report(const char* name, bool ok, const char* fmt, double a = 0.0, double b = 0.0, double c = 0.0,
-            double d = 0.0) {
-  char detail[220];
-  std::snprintf(detail, sizeof detail, fmt, a, b, c, d);
+            double d = 0.0, double e = 0.0) {
+  char detail[300];
+  std::snprintf(detail, sizeof detail, fmt, a, b, c, d, e);
   std::printf("%s %s  %s\n", ok ? "PASS" : "FAIL", name, detail);
   return ok;
 }
@@ -108,14 +115,16 @@ std::vector<char> keyOver(int ms, const std::vector<std::pair<int, int>>& runs) 
 
 std::vector<char> keyOver(int ms, int fromMs, int toMs) { return keyOver(ms, {{fromMs, toMs}}); }
 
-// What a run records after each sample: the output, each player's gain and state and the slice it
-// plays (commit number, cut clock, splice clock), the word and loop flags, the commit and skip
-// counters, and the clocks of every capture arm and write start.
+// What a run records after each sample: the output, the summed gain and the pair scale, and for each
+// voice its gain, whether it runs, the slice it plays (commit number, cut clock, length) and its
+// latest splice clock; the word and loop flags, the commit and skip counters, and the clocks of
+// every capture arm and write start.
 struct Trace {
   Signal out, total, pair;
-  std::array<Signal, 2> gain;
-  std::array<std::vector<uint32_t>, 2> seq, cut, spliced;
-  std::array<std::vector<char>, 2> active, tail, kept;
+  std::array<Signal, kVoices> gain;
+  std::array<std::vector<uint32_t>, kVoices> seq, cut, spliced;
+  std::array<std::vector<int>, kVoices> len;
+  std::array<std::vector<char>, kVoices> on;
   std::vector<char> word, loop;
   std::vector<int> taken, skipped, arms, writes;
 };
@@ -141,15 +150,14 @@ Trace trace(cv::Bloom& b, const Signal& in, const std::vector<char>& key, cv::Bl
     t.out.push_back(y);
     t.total.push_back(b.wetGain());
     t.pair.push_back(b.pairScale());
-    for (int k = 0; k < 2; ++k) {
+    for (int k = 0; k < kVoices; ++k) {
       const size_t j = static_cast<size_t>(k);
-      t.gain[j].push_back(b.playerGain(k));
+      t.gain[j].push_back(b.voiceGain(k));
       t.seq[j].push_back(b.playingSeq(k));
       t.cut[j].push_back(b.playingCutAt(k));
+      t.len[j].push_back(b.playingLen(k));
       t.spliced[j].push_back(b.spliceAt(k));
-      t.active[j].push_back(b.playerActive(k) ? 1 : 0);
-      t.tail[j].push_back(b.playerInTail(k) ? 1 : 0);
-      t.kept[j].push_back(static_cast<char>(b.keptCount(k)));
+      t.on[j].push_back(b.voiceOn(k) ? 1 : 0);
     }
     t.word.push_back(b.inWord() ? 1 : 0);
     t.loop.push_back(b.looping() ? 1 : 0);
@@ -159,13 +167,21 @@ Trace trace(cv::Bloom& b, const Signal& in, const std::vector<char>& key, cv::Bl
   return t;
 }
 
-// The laws at AMOUNT a and LINGER tailMs, written out again here.
+// The laws at AMOUNT a, written out again here.
 double wetAt(double amount) { return amount > 0.0 ? 0.70 * std::pow(amount, 0.6) : 0.0; }
 
-int sliceSamples(double tailMs) {
-  double ms = std::fmin(62.5, 0.8 * tailMs);
-  ms = std::fmax(ms, 35.0);
-  return static_cast<int>(ms * kMs);
+// AMOUNT's slice length in ms, before drift and LINGER's cap.
+double nominalMs(double amount) { return 80.0 + (45.0 - 80.0) * amount; }
+
+// The slice lengths in samples the laws allow: AMOUNT's length drifting by 3 % either way, under
+// LINGER's cap (0.8 of its setting) and the 80 ms buffer, over the 35 ms floor, to within a sample.
+struct SliceRange {
+  int lo, hi;
+};
+
+SliceRange sliceRange(double amount, double tailMs) {
+  auto clampMs = [&](double ms) { return std::fmin(std::fmax(std::fmin(ms, 0.8 * tailMs), 35.0), 80.0); };
+  return {static_cast<int>(clampMs(nominalMs(amount) * 0.97) * kMs) - 1, static_cast<int>(clampMs(nominalMs(amount) * 1.03) * kMs) + 1};
 }
 
 double tauMs(double tailMs) {
@@ -182,18 +198,27 @@ int fallAfter(const std::vector<char>& f, int from) {
   return -1;
 }
 
-// One splice: the clock a player started a slice and the commit number of that slice.
+// One splice: the clock a voice started a slice, the commit number of that slice and its length.
 struct Splice {
   int at;
   uint32_t seq;
+  int len;
 };
 
-std::vector<Splice> splicesOf(const Trace& t, int player) {
-  const size_t k = static_cast<size_t>(player);
+std::vector<Splice> splicesOf(const Trace& t, int voice) {
+  const size_t k = static_cast<size_t>(voice);
   std::vector<Splice> v;
   for (size_t i = 1; i < t.spliced[k].size(); ++i)
-    if (t.spliced[k][i] != t.spliced[k][i - 1] && t.seq[k][i] != 0) v.push_back({static_cast<int>(t.spliced[k][i]), t.seq[k][i]});
+    if (t.spliced[k][i] != t.spliced[k][i - 1] && t.seq[k][i] != 0)
+      v.push_back({static_cast<int>(t.spliced[k][i]), t.seq[k][i], t.len[k][i]});
   return v;
+}
+
+// The first value in `v` at or after `from`; -1 when there is none.
+int firstAtOrAfter(const std::vector<int>& v, int from) {
+  for (int a : v)
+    if (a >= from) return a;
+  return -1;
 }
 
 // The first capture waits 40 ms, then up to 10 ms for a zero crossing, and the write starts on one.
@@ -212,75 +237,104 @@ bool testFirstCapture() {
                 arm / double(kMs), write / double(kMs), onCrossing ? 1.0 : 0.0);
 }
 
-// Re-captures arm exactly one interval apart, two slice lengths, whatever AMOUNT is, each write
-// starts within 10 ms of its arm, and none arm after the key closes.
-bool testInterval() {
-  bool ok = true;
-  double worstLo = 1e9, worstHi = 0.0;
+// The slice runs 80 ms at AMOUNT 0 to 45 ms at 100 %, linear, drifting 3 % either way from cut to
+// cut; LINGER caps it at 0.8 of its setting, so a capped slice does not drift.
+bool testSliceLaw() {
   struct Point {
     double amount, tail;
   };
-  const Point pts[4] = {{0.5, 300.0}, {0.05, 300.0}, {1.0, 300.0}, {0.5, 60.0}};
-  for (const Point& pt : pts) {
-    const int ms = 1500;
-    const Signal in = sine(ms, {{0, 1200, 0.5f}});
-    cv::BloomParams p;
-    p.bloom = static_cast<float>(pt.amount);
-    p.tailMs = static_cast<float>(pt.tail);
-    gBloom.reset();
-    const Trace t = trace(gBloom, in, keyOver(ms, 0, 1200), p);
-    const int want = 2 * sliceSamples(pt.tail);
-    const int end = fallAfter(t.word, 0);
-    if (t.arms.size() < 6 || end < 0) {
-      ok = false;
-      continue;
-    }
-    for (size_t i = 1; i < t.arms.size(); ++i) {
-      const int gap = t.arms[i] - t.arms[i - 1];
-      worstLo = std::fmin(worstLo, gap);
-      worstHi = std::fmax(worstHi, gap);
-      if (gap != want) ok = false;
-    }
-    for (size_t i = 0; i < t.writes.size() && i < t.arms.size(); ++i)
-      if (t.writes[i] < t.arms[i] || t.writes[i] > t.arms[i] + 10 * kMs) ok = false;
-    if (t.arms.back() >= end) ok = false;  // no arm after the word closed
-  }
-  return report("interval", ok, "arm gaps at AMOUNT 0.05/0.5/1 and LINGER 300, and AMOUNT 0.5 at LINGER 60: %.0f..%.0f samples, each equal to two slices (6000, and 4608), none after the key closes",
-                worstLo, worstHi);
-}
-
-// The slice is 62.5 ms whatever AMOUNT is; LINGER caps it at 0.8 of its setting below 78 ms.
-bool testGrainLaw() {
-  struct Point {
-    double amount, tail;
-  };
-  const Point pts[5] = {{0.5, 300.0}, {1.0, 2000.0}, {0.5, 60.0}, {0.05, 300.0}, {0.5, 75.0}};
+  const Point pts[8] = {{0.02, 300.0}, {0.1, 300.0}, {0.25, 300.0}, {0.5, 300.0},
+                        {0.75, 300.0}, {1.0, 2000.0}, {0.5, 60.0},  {0.5, 75.0}};
   bool ok = true;
-  double got[5];
-  for (int j = 0; j < 5; ++j) {
-    const int ms = 700;
-    const Signal in = sine(ms, {{0, 600, 0.5f}});
+  double meanMs[8] = {0.0}, spreadPct[8] = {0.0};
+  for (int j = 0; j < 8; ++j) {
+    const int ms = 1900;
+    const Signal in = vowel(ms, 0, 1700);
     cv::BloomParams p;
     p.bloom = static_cast<float>(pts[j].amount);
     p.tailMs = static_cast<float>(pts[j].tail);
     gBloom.reset();
-    const Trace t = trace(gBloom, in, keyOver(ms, 0, 600), p);
-    int done = -1;
-    for (size_t i = 0; i < t.taken.size(); ++i)
-      if (t.taken[i] > 0) {
-        done = static_cast<int>(i);
-        break;
-      }
-    if (done < 0 || t.writes.empty()) {
+    const Trace t = trace(gBloom, in, keyOver(ms, 0, 1500), p);
+    const std::vector<Splice> sp = splicesOf(t, kWord);
+    const SliceRange range = sliceRange(pts[j].amount, pts[j].tail);
+    if (sp.size() < 8) {
       ok = false;
-      got[j] = 0.0;
       continue;
     }
-    got[j] = done - t.writes[0] + 1;
-    if (static_cast<int>(got[j]) != sliceSamples(pts[j].tail)) ok = false;
+    int lo = 1 << 30, hi = 0;
+    double sum = 0.0;
+    for (const Splice& s : sp) {
+      lo = std::min(lo, s.len);
+      hi = std::max(hi, s.len);
+      sum += s.len;
+      if (s.len < range.lo || s.len > range.hi) ok = false;
+    }
+    meanMs[j] = sum / double(sp.size()) / kMs;
+    spreadPct[j] = 100.0 * (hi - lo) / (nominalMs(pts[j].amount) * kMs);
+
+    // Free of both ends of the law, the slice drifts, about AMOUNT's length on average. Under LINGER's
+    // cap it holds one length.
+    const bool capped = range.hi - range.lo <= 2;
+    if (capped && hi != lo) ok = false;
+    if (!capped && range.hi < 80 * kMs - 2) {
+      if (spreadPct[j] < 1.0 || std::fabs(meanMs[j] - nominalMs(pts[j].amount)) > 0.015 * nominalMs(pts[j].amount)) ok = false;
+    }
   }
-  return report("grain-law", ok, "slice samples at (AMOUNT, LINGER) (0.5, 300) / (1, 2000) / (0.5, 60) / (0.5, 75) = %.0f / %.0f / %.0f / %.0f (3000, 3000, 2304, 2880)",
-                got[0], got[1], got[2], got[4]);
+  const bool law = report("slice-law", ok,
+                          "mean slice at AMOUNT 0.25/0.5/1 = %.2f / %.2f / %.2f ms (71.25, 62.5, 45), drifting %.1f%% of its length across the word at AMOUNT 0.5 (within 3%% either way)",
+                          meanMs[2], meanMs[3], meanMs[5], spreadPct[3]);
+  const bool caps = report("slice-law-caps", spreadPct[6] == 0.0 && spreadPct[7] == 0.0,
+                           "LINGER 60 and 75 at AMOUNT 0.5 cap the slice at %.2f and %.2f ms (48, 60), with no drift under the cap", meanMs[6], meanMs[7]);
+  return law && caps;
+}
+
+// A slice plays exactly twice and the next one splices in at the slice boundary. The interval between
+// cuts, two plays of the slice, drifts within 3 % of its law and is not constant. Each write starts
+// within 10 ms of its arm, and none arm after the key closes.
+bool testTwoPlays() {
+  struct Point {
+    double amount, tail;
+  };
+  const Point pts[4] = {{0.5, 300.0}, {0.1, 300.0}, {1.0, 300.0}, {0.5, 60.0}};
+  bool ok = true;
+  bool varied = true;
+  double worstLo = 1e9, worstHi = 0.0, worstSpliceGap = 0.0;
+  for (const Point& pt : pts) {
+    const int ms = 1900;
+    const Signal in = vowel(ms, 0, 1700);
+    cv::BloomParams p;
+    p.bloom = static_cast<float>(pt.amount);
+    p.tailMs = static_cast<float>(pt.tail);
+    gBloom.reset();
+    const Trace t = trace(gBloom, in, keyOver(ms, 0, 1500), p);
+    const int end = fallAfter(t.word, 0);
+    const std::vector<Splice> sp = splicesOf(t, kWord);
+    if (t.arms.size() < 8 || sp.size() < 8 || end < 0) {
+      ok = false;
+      continue;
+    }
+
+    // Every splice after the first lands exactly two plays of the slice before it, and the interval
+    // stays within 3 % of two slices at AMOUNT's length (LINGER's cap holds it fixed below that).
+    const SliceRange range = sliceRange(pt.amount, pt.tail);
+    const double nominal = 2.0 * std::fmin(nominalMs(pt.amount), 0.8 * pt.tail) * kMs;
+    bool allSame = true;
+    for (size_t i = 1; i < sp.size(); ++i) {
+      const int gap = sp[i].at - sp[i - 1].at;
+      worstSpliceGap = std::fmax(worstSpliceGap, std::fabs(double(gap - 2 * sp[i - 1].len)));
+      worstLo = std::fmin(worstLo, gap / nominal);
+      worstHi = std::fmax(worstHi, gap / nominal);
+      if (gap != 2 * sp[i - 1].len || sp[i - 1].len < range.lo || sp[i - 1].len > range.hi) ok = false;
+      if (gap != sp[1].at - sp[0].at) allSame = false;
+    }
+    if (allSame && range.hi - range.lo > 2) varied = false;
+    for (size_t i = 0; i < t.writes.size() && i < t.arms.size(); ++i)
+      if (t.writes[i] < t.arms[i] || t.writes[i] > t.arms[i] + 10 * kMs) ok = false;
+    if (t.arms.back() >= end) ok = false;  // no arm after the word closed
+  }
+  return report("two-plays", ok && varied && worstLo >= 0.969 && worstHi <= 1.031,
+                "splices land exactly two plays apart (worst %.0f samples off); the interval runs %.4f..%.4f of two slices at AMOUNT's length (0.97..1.03) and varies: %.0f",
+                worstSpliceGap, worstLo, worstHi, varied ? 1.0 : 0.0);
 }
 
 // The wet level runs 0.70 * AMOUNT^0.6 through the word, and AMOUNT 0 is silent.
@@ -326,21 +380,15 @@ bool testSkip() {
 }
 
 // After a silent stretch the slice keeps looping: a loop plays at unity speed, so the wet repeats at
-// the slice length. The silent slices that follow are all skipped.
+// the slice length. The silent slices that follow are all skipped, and the grid goes on two plays at a time.
 bool testLoop() {
   const int ms = 900;
   const Signal in = sine(ms, {{0, 100, 0.5f}});
   cv::BloomParams p;
   gBloom.reset();
   const Trace t = trace(gBloom, in, keyOver(ms, 0, 800), p);
-  int done = -1;
-  for (size_t i = 0; i < t.taken.size(); ++i)
-    if (t.taken[i] > 0) {
-      done = static_cast<int>(i);
-      break;
-    }
-  if (done < 0 || t.writes.empty()) return report("loop", false, "no slice taken (%.0f)", 0.0);
-  const int len = done - t.writes[0] + 1;
+  const int len = t.len[kWord][static_cast<size_t>(400 * kMs)];
+  if (len == 0) return report("loop", false, "no slice looping at 400 ms (%.0f)", 0.0);
   double peak = 0.0, worst = 0.0;
   for (int i = 400 * kMs; i < 600 * kMs; ++i) {
     peak = std::fmax(peak, std::fabs(t.out[static_cast<size_t>(i)]));
@@ -414,200 +462,305 @@ bool testTail() {
                 worstRel * 100.0, endMs, wantEndMs);
 }
 
-// After the word, the word's last four slices play in the order they were sung, each for one
-// interval, spliced on the word's grid, round and round until the tail closes.
-bool testRotation() {
-  const int ms = 4000;
-  const Signal in = vowel(ms, 0, 900);
+// The tail repeats one slice, the newest the word cut, with no splice and no rotation. The word ends at
+// every offset across two cut intervals, so some ends fall between a cut finishing and its splice.
+bool testTailSlice() {
+  const int ms = 2600;
   cv::BloomParams p;
   p.tailMs = 600.0f;
-  gBloom.reset();
-  const Trace t = trace(gBloom, in, keyOver(ms, 0, 830), p);
-  const int w = fallAfter(t.word, 0);
-  const std::vector<Splice> sp = splicesOf(t, 0);
+  bool one = true, newest = true, noSplice = true, closes = true;
+  int runs = 0, noTail = 0, pending = 0;
+  double worstRepeat = 1.0;
+  for (int closeAt = 480; closeAt < 730; closeAt += 5) {
+    // The input stops with the key, so the tail is the only sound after the word.
+    const Signal in = vowel(ms, 0, closeAt);
+    gBloom.reset();
+    const Trace t = trace(gBloom, in, keyOver(ms, 0, closeAt), p);
+    const int w = fallAfter(t.word, 0);
+    if (w < 0) {
+      one = false;
+      continue;
+    }
+    ++runs;
+    const size_t at = static_cast<size_t>(w);
+    if (t.taken[at] == 0) {
+      ++noTail;
+      if (t.on[kTail][at]) one = false;
+      continue;
+    }
 
-  // Seven slices are cut in the word (commit numbers 1 to 7) and none is under way when it ends at
-  // 880 ms, so 4 to 7 are kept. The word ends with the 7th looping, and the rotation then runs
-  // 4, 5, 6, 7, 4, ... one interval apart, on the grid the word kept.
-  const bool four = w > 0 && t.kept[0][static_cast<size_t>(w)] == 4;
-  const uint32_t want[8] = {4, 5, 6, 7, 4, 5, 6, 7};
-  size_t firstTail = 0;
-  while (firstTail < sp.size() && sp[firstTail].at < w) ++firstTail;
-  bool order = sp.size() >= firstTail + 8 && firstTail >= 1 && sp[firstTail - 1].seq == 7;
-  bool grid = order;
-  for (size_t i = 0; order && i < 8; ++i)
-    if (sp[firstTail + i].seq != want[i]) order = false;
-  for (size_t i = firstTail; grid && i < sp.size(); ++i)
-    if (sp[i].at - sp[i - 1].at != kInterval) grid = false;
-  const bool closed = t.active[0].back() == 0;
+    // The tail plays the newest slice cut before the word ended, from the word's own voice.
+    const uint32_t want = static_cast<uint32_t>(t.taken[at]);
+    if (!t.on[kTail][at] || t.on[kWord][at] || t.seq[kTail][at] != want) newest = false;
+    int last = -1;
+    for (size_t i = at; i < t.on[kTail].size(); ++i) {
+      if (!t.on[kTail][i]) break;
+      last = static_cast<int>(i);
+      if (t.seq[kTail][i] != want) one = false;
+      if (t.spliced[kTail][i] != t.spliced[kTail][at]) noSplice = false;
+    }
+    if (last < 0 || t.on[kTail].back()) closes = false;
 
-  // A capture under way at the word's end is dropped, and it has already overwritten the oldest
-  // slice, so a word that ends there keeps three: 5, 6, 7.
-  gBloom.reset();
-  const Trace d = trace(gBloom, in, keyOver(ms, 0, 900), p);
-  const int wd = fallAfter(d.word, 0);
-  const std::vector<Splice> spd = splicesOf(d, 0);
-  size_t firstDrop = 0;
-  while (firstDrop < spd.size() && spd[firstDrop].at < wd) ++firstDrop;
-  const uint32_t wantDrop[6] = {5, 6, 7, 5, 6, 7};
-  bool dropped = wd > 0 && d.kept[0][static_cast<size_t>(wd)] == 3 && spd.size() >= firstDrop + 6 && firstDrop >= 1 &&
-                 spd[firstDrop - 1].seq == 7;
-  for (size_t i = 0; dropped && i < 6; ++i)
-    if (spd[firstDrop + i].seq != wantDrop[i]) dropped = false;
+    // A cut that was done and waiting for its splice plays at the word's end.
+    if (t.spliced[kTail][at] == static_cast<uint32_t>(w)) ++pending;
 
-  // Fewer than four: a short word keeps two slices and rotates them, 2 then 1 then 2.
-  const int msShort = 2500;
-  const Signal inShort = vowel(msShort, 0, 300);
-  gBloom.reset();
-  const Trace s = trace(gBloom, inShort, keyOver(msShort, 0, 260), p);
-  const std::vector<Splice> sps = splicesOf(s, 0);
-  const int ws = fallAfter(s.word, 0);
-  const bool keptTwo = ws > 0 && s.kept[0][static_cast<size_t>(ws)] == 2;
-  bool two = sps.size() >= 6 && sps[0].seq == 1 && sps[1].seq == 2;
-  for (size_t i = 2; two && i < sps.size(); ++i) {
-    if (sps[i].seq != (i % 2 == 0 ? 1u : 2u)) two = false;
-    if (sps[i].at - sps[i - 1].at != kInterval) two = false;
+    // The wet repeats at the slice length once the splice crossfade is over: the 2,400 samples
+    // starting 20 ms after the word correlate with the 2,400 that follow one slice later.
+    const int len = t.len[kTail][at];
+    double ab = 0.0, aa = 0.0, bb = 0.0;
+    for (int j = 0; j < 2400; ++j) {
+      const double x = t.out[static_cast<size_t>(w + 20 * kMs + j)], y = t.out[static_cast<size_t>(w + 20 * kMs + len + j)];
+      ab += x * y;
+      aa += x * x;
+      bb += y * y;
+    }
+    worstRepeat = std::fmin(worstRepeat, ab / std::sqrt(aa * bb));
   }
-
-  // One slice keeps looping with no splice.
-  const Signal inOne = vowel(msShort, 0, 140);
-  gBloom.reset();
-  const Trace o = trace(gBloom, inOne, keyOver(msShort, 0, 130), p);
-  const std::vector<Splice> spo = splicesOf(o, 0);
-  const bool one = spo.size() == 1 && spo[0].seq == 1 && o.loop[static_cast<size_t>(500 * kMs)] && o.active[0].back() == 0;
-  return report("rotation", order && grid && four && closed && dropped && two && keptTwo && one,
-                "last four of seven slices rotate 4,5,6,7,4,5,6,7 on a 6000-sample grid: %.0f; a capture under way at the end leaves three: %.0f; a two-slice word rotates 2,1,2,1: %.0f; one slice just loops: %.0f",
-                order && grid && four && closed ? 1.0 : 0.0, dropped ? 1.0 : 0.0, two && keptTwo ? 1.0 : 0.0, one ? 1.0 : 0.0);
+  return report("tail-slice", one && newest && noSplice && closes && runs > 40 && pending >= 2 && worstRepeat > 0.99,
+                "%.0f word ends (%.0f cut nothing, %.0f with a finished cut waiting): the tail plays one slice, the newest cut, with no splice: %.0f; one slice later the wet correlates at least %.4f",
+                runs, noTail, pending, one && newest && noSplice ? 1.0 : 0.0, worstRepeat);
 }
 
-// A word during a tail leaves the old tail alone to fade and close on its own while the new word starts
-// its own loop on the other player.
-bool testOverlap() {
-  const int ms = 2400;
-  const Signal in = vowel(ms, 0, 2200);
-  const int second = 1000;
+// The voice stops while the key stays open, as it does through the Input gate's hold and Decay. The cuts
+// taken after the stop hold silence and are skipped, so the tail repeats the last cut that carries the voice.
+bool testTailAfterStop() {
+  const int ms = 1500;
+  const Signal in = vowel(ms, 0, 400);
   cv::BloomParams p;
+  gBloom.reset();
+  const Trace t = trace(gBloom, in, keyOver(ms, 0, 450), p);
+  const int w = fallAfter(t.word, 0);
+  if (w < 0 || !t.on[kTail][static_cast<size_t>(w)]) return report("tail-after-stop", false, "no tail after the word (%.0f)", 0.0);
+  const uint32_t seq = t.seq[kTail][static_cast<size_t>(w)];
+  float peak = 0.0f;
+  uint32_t cutAt = 0;
+  for (int slot = 0; slot < cv::Bloom::kSlices; ++slot) {
+    if (!gBloom.sliceValid(slot) || gBloom.sliceSeq(slot) != seq) continue;
+    cutAt = gBloom.sliceCutAt(slot);
+    for (int k = 0; k < gBloom.sliceLen(slot); ++k) peak = std::fmax(peak, std::fabs(gBloom.sliceData(slot)[k]));
+  }
+  float voicePeak = 0.0f;
+  for (size_t i = 0; i < static_cast<size_t>(400 * kMs); ++i) voicePeak = std::fmax(voicePeak, std::fabs(in[i]));
+  const bool voiced = peak > 0.8f * voicePeak && cutAt < static_cast<uint32_t>(400 * kMs);
+  const int skippedAfter = t.skipped[static_cast<size_t>(w)] - t.skipped[static_cast<size_t>(400 * kMs)];
+  return report("tail-after-stop", voiced && skippedAfter >= 1 && seq == static_cast<uint32_t>(t.taken[static_cast<size_t>(w)]),
+                "the voice stops at 400 ms with the key open to 450 ms: %.0f silent cut(s) skipped, the tail repeats the slice cut at %.1f ms (voiced), peak %.2f of the voice's %.2f",
+                skippedAfter, cutAt / double(kMs), peak, voicePeak);
+}
+
+// 16-bit mono PCM WAV, any chunks before data. Empty on a missing or other file.
+Signal readWav(const std::string& path) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f) return {};
+  std::vector<char> b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+  if (b.size() < 12 || std::memcmp(b.data(), "RIFF", 4) != 0) return {};
+  size_t pos = 12;
+  while (pos + 8 <= b.size()) {
+    uint32_t len;
+    std::memcpy(&len, &b[pos + 4], 4);
+    if (std::memcmp(&b[pos], "data", 4) == 0) {
+      const size_t n = std::min<size_t>(len, b.size() - pos - 8) / 2;
+      Signal x(n);
+      for (size_t i = 0; i < n; ++i) {
+        int16_t s;
+        std::memcpy(&s, &b[pos + 8 + 2 * i], 2);
+        x[i] = static_cast<float>(s) / 32768.0f;
+      }
+      return x;
+    }
+    pos += 8 + len + (len & 1);
+  }
+  return {};
+}
+
+// Adam's clips through the Input gate at -55 dBFS with Decay 20 ms and 2 s, the gate's detector as the
+// word key and its output as the source, as the box runs them with no pitch card, at LINGER 60 ms,
+// 300 ms and 2 s. Between a word's end and its tail's close the tail plays one slice and never
+// changes it, and the one it plays is the newest cut, which carries the voice and not the gate's
+// silence after it. The same holds for a tail that fades under the next word.
+bool testTailOnClips() {
+  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  const float lingers[3] = {60.0f, 300.0f, 2000.0f};
+  const float decays[2] = {20.0f, 2000.0f};
+  constexpr size_t kPad = cv::kSampleRate * 2 / 5;
+  constexpr size_t kRoom = static_cast<size_t>(cv::kSampleRate) * 4;
+  int rows = 0, tails = 0, changes = 0, notNewest = 0, withTail = 0;
+  double worstDb = 0.0, bestDb = -200.0;
+  for (const char* name : names) {
+    const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
+    if (clip.empty()) {
+      std::printf("SKIP tail-on-clips %s  samples/ is not in this checkout\n", name);
+      continue;
+    }
+    Signal in(kPad, 0.0f);
+    in.insert(in.end(), clip.begin(), clip.end());
+    in.resize(in.size() + kRoom, 0.0f);
+    for (const float linger : lingers) {
+      for (const float decay : decays) {
+        cv::Gate gate;
+        cv::GateParams gp;
+        gp.on = true;
+        gp.thresholdDb = -55.0f;
+        gp.tuning = cv::inputGateTuning();
+        gp.tuning.releaseMs = decay;
+        cv::BloomParams bp;
+        bp.keyFromGate = true;
+        bp.tailMs = linger;
+        gate.reset();
+        gBloom.reset();
+        Signal gated(in.size()), out(in.size());
+        uint32_t tailSeq = 0;
+        uint32_t tailSplice = 0;
+        std::array<uint32_t, 2> fadeSeq = {0, 0};
+        float wordPeak = 0.0f;
+        bool wasWord = false;
+        ++rows;
+        for (size_t i = 0; i < in.size(); i += cv::kBlock) {
+          const int n = static_cast<int>(std::min<size_t>(cv::kBlock, in.size() - i));
+          gate.process(&in[i], &gated[i], n, gp);
+          bp.keyOpen = gate.open();
+          gBloom.process(&gated[i], &gated[i], &out[i], n, bp);
+          for (int j = 0; j < n; ++j) wordPeak = std::fmax(wordPeak, std::fabs(gated[i + static_cast<size_t>(j)]));
+          if (gBloom.inWord() && !wasWord) wordPeak = 0.0f;
+          wasWord = gBloom.inWord();
+
+          // A tail starts when the word's voice moves over, and from then on its slice must not change.
+          if (gBloom.voiceOn(kTail)) {
+            if (tailSeq == 0) {
+              tailSeq = gBloom.playingSeq(kTail);
+              tailSplice = gBloom.spliceAt(kTail);
+              ++tails;
+              if (tailSeq != static_cast<uint32_t>(gBloom.taken())) ++notNewest;
+
+              // The slice's peak against the loudest the gate passed during the word.
+              for (int slot = 0; slot < cv::Bloom::kSlices; ++slot) {
+                if (!gBloom.sliceValid(slot) || gBloom.sliceSeq(slot) != tailSeq) continue;
+                float peak = 0.0f;
+                for (int k = 0; k < gBloom.sliceLen(slot); ++k) peak = std::fmax(peak, std::fabs(gBloom.sliceData(slot)[k]));
+                if (wordPeak > 0.0f && peak > 0.0f) {
+                  const double db = 20.0 * std::log10(peak / wordPeak);
+                  worstDb = std::fmin(worstDb, db);
+                  bestDb = std::fmax(bestDb, db);
+                  ++withTail;
+                }
+              }
+            } else if (gBloom.playingSeq(kTail) != tailSeq || gBloom.spliceAt(kTail) != tailSplice) {
+              ++changes;
+            }
+          } else {
+            tailSeq = 0;
+          }
+          for (int k = 0; k < 2; ++k) {
+            const uint32_t seq = gBloom.voiceOn(kFade + k) ? gBloom.playingSeq(kFade + k) : 0u;
+            if (seq != 0 && fadeSeq[static_cast<size_t>(k)] != 0 && seq != fadeSeq[static_cast<size_t>(k)]) ++changes;
+            fadeSeq[static_cast<size_t>(k)] = seq;
+          }
+        }
+      }
+    }
+  }
+  if (rows == 0) return report("tail-on-clips", true, "skipped, samples/ is not in this checkout (%.0f rows)", 0.0);
+  const bool ok = report("tail-on-clips", changes == 0 && notNewest == 0 && tails >= rows,
+                         "%.0f rows (3 clips x LINGER 60/300/2000 ms x Decay 20/2000 ms), %.0f tails: slice changes after a word's end %.0f (0), tails that are not the newest cut %.0f (0)",
+                         rows, tails, changes, notNewest);
+  std::printf("NOTE tail-on-clips  the tail slice's peak runs %.1f to %.1f dB against the loudest sample the gate passed in its word, over %d tails\n",
+              worstDb, bestDb, withTail);
+  return ok;
+}
+
+// A new word starts while a tail sounds. The tail falls to 0 in a straight line over 150 ms while the
+// new word's loop starts, both play 3 dB down while they sound together, and the two never overlap
+// longer than the fade.
+bool testNextWord() {
+  const int ms = 2600;
+  const Signal in = vowel(ms, 0, 2400);
+  const int second = 1000;
+  const int s = second * kMs;
+  cv::BloomParams p;
+  p.bloom = 0.5f;
   gBloom.reset();
   const Trace ref = trace(gBloom, in, keyOver(ms, 0, 600), p);
   gBloom.reset();
-  const Trace t = trace(gBloom, in, keyOver(ms, {{0, 600}, {second, 1500}}), p);
-  const int s = second * kMs;
+  const Trace t = trace(gBloom, in, keyOver(ms, {{0, 600}, {second, 1700}}), p);
   const double wet = wetAt(0.5);
 
-  // The old tail is the player the reference ran, sample for sample.
+  // Until the key returns the run is the reference run, sample for sample.
   bool same = true;
-  for (size_t i = static_cast<size_t>(s) - 100; i < in.size(); ++i)
-    if (t.gain[0][i] != ref.gain[0][i] || t.seq[0][i] != ref.seq[0][i] || t.active[0][i] != ref.active[0][i]) same = false;
-  const bool aliveAtKey = t.tail[0][static_cast<size_t>(s)] && t.gain[0][static_cast<size_t>(s)] > 0.0f;
-  const int tailEnd = fallAfter(t.active[0], s);
-  const bool closesOnItsOwn = tailEnd > s + 100 * kMs && tailEnd == fallAfter(ref.active[0], s);
+  for (size_t i = 0; i < static_cast<size_t>(s); ++i)
+    if (t.out[i] != ref.out[i]) same = false;
+  const bool tailAlive = t.on[kTail][static_cast<size_t>(s - 1)] && t.gain[kTail][static_cast<size_t>(s - 1)] > 0.0f;
 
-  // The new word runs on player 1: gain up in 5 ms, first capture 40 to 50 ms after the key.
-  bool climbs = t.active[1][static_cast<size_t>(s)] != 0;
-  for (int i = s + 1; i < s + 240; ++i)
-    if (t.gain[1][static_cast<size_t>(i)] < t.gain[1][static_cast<size_t>(i - 1)]) climbs = false;
-  const bool reaches = t.gain[1][static_cast<size_t>(s + 245)] > 0.99 * wet;
-  int arm = -1, write = -1;
-  for (int a : t.arms)
-    if (a >= s) {
-      arm = a;
-      break;
-    }
-  for (int w : t.writes)
-    if (w >= s) {
-      write = w;
-      break;
-    }
-  const bool captureOk = arm == s + 40 * kMs && write >= s + 40 * kMs && write <= s + 50 * kMs;
-
-  // Both loops sound together, and the old tail keeps its slices through the new word.
-  bool together = false;
-  for (int i = s + 200 * kMs; i < tailEnd; i += 97)
-    if (t.gain[0][static_cast<size_t>(i)] > 0.0f && t.gain[1][static_cast<size_t>(i)] > 0.0f && t.seq[0][static_cast<size_t>(i)] != 0 &&
-        t.seq[1][static_cast<size_t>(i)] != 0)
-      together = true;
-  const bool differs = [&] {
-    double d = 0.0;
-    for (int i = s + 200 * kMs; i < tailEnd; ++i) d = std::fmax(d, std::fabs(t.out[static_cast<size_t>(i)] - ref.out[static_cast<size_t>(i)]));
-    return d > 0.01;
-  }();
-
-  // Two loops sounding together each play 3 dB down (0.708), one loop plays at unity, and the scale
-  // is back at 1 once the old tail has closed.
-  const double pairWant = std::pow(10.0, -3.0 / 20.0);
-  bool pairDown = true;
-  for (int i = s + 300 * kMs; i < tailEnd - 100 * kMs; i += 97)
-    if (std::fabs(t.pair[static_cast<size_t>(i)] - pairWant) > 0.01) pairDown = false;
-  bool pairOne = true;
-  for (int i = 0; i < s + 100 * kMs; ++i)
-    if (t.pair[static_cast<size_t>(i)] != 1.0f) pairOne = false;
-  const bool pairBack = t.pair[static_cast<size_t>(tailEnd + 400 * kMs)] == 1.0f;
-  return report("overlap", same && aliveAtKey && closesOnItsOwn && climbs && reaches && captureOk && together && differs && pairDown && pairOne && pairBack,
-                "old tail equals the no-second-word run sample for sample and closes at %.0f ms; new word climbs in 5 ms: %.0f, first capture %.2f ms after the key; two loops at -3 dB: %.0f",
-                tailEnd / double(kMs), climbs && reaches ? 1.0 : 0.0, (write - s) / double(kMs), pairDown && pairOne && pairBack ? 1.0 : 0.0);
-}
-
-// A third word fades the oldest tail out over 20 ms, takes its player, and leaves the newer tail alone.
-bool testThirdWord() {
-  const int ms = 3200;
-  const Signal in = vowel(ms, 0, 3000);
-  const int third = 1400;
-  const int s = third * kMs;
-  cv::BloomParams p;
-  p.tailMs = 2000.0f;
-  gBloom.reset();
-  const Trace ref = trace(gBloom, in, keyOver(ms, {{0, 400}, {700, 1100}}), p);
-  gBloom.reset();
-  const Trace t = trace(gBloom, in, keyOver(ms, {{0, 400}, {700, 1100}, {third, 1800}}), p);
-
-  // The newer tail is untouched.
-  bool newer = true;
-  for (size_t i = static_cast<size_t>(s) - 100; i < in.size(); ++i)
-    if (t.gain[1][i] != ref.gain[1][i] || t.seq[1][i] != ref.seq[1][i]) newer = false;
-
-  // The oldest tail falls in a straight line to 0 within 20 ms.
-  const bool bothAlive = t.tail[0][static_cast<size_t>(s - 1)] && t.tail[1][static_cast<size_t>(s - 1)] && t.gain[0][static_cast<size_t>(s - 1)] > 0.0f;
+  // The tail moves to the first fading voice and falls in a straight line to 0 within 150 ms.
+  const bool moved = !t.on[kTail][static_cast<size_t>(s + 1)] && t.on[kFade][static_cast<size_t>(s + 1)] && t.on[kWord][static_cast<size_t>(s + 1)];
   int zero = -1;
-  for (int i = s; i < s + 100 * kMs; ++i)
-    if (t.gain[0][static_cast<size_t>(i)] == 0.0f) {
+  for (int i = s; i < s + 400 * kMs; ++i)
+    if (t.gain[kFade][static_cast<size_t>(i)] == 0.0f && i > s + 1) {
       zero = i - s;
       break;
     }
-  const double step = t.gain[0][static_cast<size_t>(s)] - t.gain[0][static_cast<size_t>(s + 1)];
+  const double step = t.gain[kFade][static_cast<size_t>(s + 1)] - t.gain[kFade][static_cast<size_t>(s + 2)];
   bool straight = zero > 0 && step > 0.0;
-  for (int i = s + 1; straight && i < s + zero - 2; ++i)
-    if (std::fabs((t.gain[0][static_cast<size_t>(i)] - t.gain[0][static_cast<size_t>(i + 1)]) - step) > 1e-6) straight = false;
-  const bool fadeTime = zero >= 20 * kMs - 3 && zero <= 20 * kMs + 3;
+  for (int i = s + 1; straight && i < s + zero - 3; ++i)
+    if (std::fabs((t.gain[kFade][static_cast<size_t>(i)] - t.gain[kFade][static_cast<size_t>(i + 1)]) - step) > 1e-6) straight = false;
+  const bool fadeTime = zero >= 150 * kMs - 4 && zero <= 150 * kMs + 4;
 
-  // The word then opens on that player: gain back at the wet level, first capture 40 to 50 ms after
-  // the key, and every slice it keeps was cut after the key.
-  const bool wordOn = t.word[static_cast<size_t>(s + 30 * kMs)] && t.gain[0][static_cast<size_t>(s + 30 * kMs)] > 0.99 * wetAt(0.5);
-  int arm = -1, write = -1;
-  for (int a : t.arms)
-    if (a >= s) {
-      arm = a;
-      break;
-    }
-  for (int w : t.writes)
-    if (w >= s) {
-      write = w;
-      break;
-    }
+  // The new word climbs in 5 ms, cuts its first slice 40 ms in, and every slice it plays was cut after the key.
+  bool climbs = true;
+  for (int i = s + 1; i < s + 240; ++i)
+    if (t.gain[kWord][static_cast<size_t>(i)] < t.gain[kWord][static_cast<size_t>(i - 1)]) climbs = false;
+  const bool reaches = t.gain[kWord][static_cast<size_t>(s + 245)] > 0.99 * wet;
+  const int arm = firstAtOrAfter(t.arms, s);
+  const int write = firstAtOrAfter(t.writes, s);
   const bool captureOk = arm == s + 40 * kMs && write >= s + 40 * kMs && write <= s + 50 * kMs;
+  bool fresh = true;
+  for (size_t i = static_cast<size_t>(s); i < t.cut[kWord].size(); ++i)
+    if (t.seq[kWord][i] != 0 && t.cut[kWord][i] < static_cast<uint32_t>(s)) fresh = false;
+
+  // Both sound together for less than the fade, 3 dB down while they do (the 20 ms smoother takes
+  // most of that), and the scale is back at 1 afterwards.
+  int together = 0;
+  for (int i = s; i < s + 400 * kMs; ++i)
+    if (t.gain[kFade][static_cast<size_t>(i)] > 0.0f && t.gain[kWord][static_cast<size_t>(i)] > 0.0f && t.seq[kWord][static_cast<size_t>(i)] != 0 &&
+        t.seq[kFade][static_cast<size_t>(i)] != 0)
+      ++together;
+  const double pairWant = std::pow(10.0, -3.0 / 20.0);
+  const bool pairDown = t.pair[static_cast<size_t>(s + 149 * kMs)] < 1.0 - 0.7 * (1.0 - pairWant);
+  const bool pairOne = t.pair[static_cast<size_t>(s + 100 * kMs)] == 1.0f && t.pair[static_cast<size_t>(s + 400 * kMs)] == 1.0f;
+  const bool apart = together > 0 && together <= 150 * kMs;
+  return report("next-word", same && tailAlive && moved && straight && fadeTime && climbs && reaches && captureOk && fresh && pairDown && pairOne && apart,
+                "tail reaches 0 after %.2f ms in a straight line (150): %.0f; both sound %.1f ms (<=150) and the pair is down to %.3f by 149 ms; first capture %.2f ms after the key",
+                zero / double(kMs), straight ? 1.0 : 0.0, together / double(kMs), t.pair[static_cast<size_t>(s + 149 * kMs)], (write - s) / double(kMs));
+}
+
+// A word that starts while an earlier tail still fades gives that fade the 20 ms yield, and the tail it
+// finds takes the 150 ms fade. The engine never holds more than three slices.
+bool testYield() {
+  const int ms = 2000;
+  const Signal in = vowel(ms, 0, 1900);
+  cv::BloomParams p;
+  p.tailMs = 2000.0f;
+  p.bloom = 1.0f;
+
+  // Word one ends at 400 ms and its tail fades from 600 ms, when word two starts. Word two ends at
+  // 700 ms with a slice, and word three starts at 705 ms, 45 ms before the first fade would have ended.
+  const std::vector<std::pair<int, int>> runs = {{0, 350}, {600, 650}, {705, 1500}};
   gBloom.reset();
-  cv::BloomParams q = p;
-  q.keyFromGate = true;
-  Signal y(static_cast<size_t>(s + 400 * kMs));
-  for (int i = 0; i < static_cast<int>(y.size()); ++i) {
-    q.keyOpen = i < 400 * kMs || (i >= 700 * kMs && i < 1100 * kMs) || i >= s;
-    gBloom.process(&in[static_cast<size_t>(i)], &y[static_cast<size_t>(i)], 1, q);
+  const Trace t = trace(gBloom, in, keyOver(ms, runs), p);
+  const int s2 = 600 * kMs, s3 = 705 * kMs;
+  const bool tail1 = t.on[kTail][static_cast<size_t>(s2 - 1)];
+  const bool secondTail = t.on[kTail][static_cast<size_t>(s3 - 1)] && t.on[kFade][static_cast<size_t>(s3 - 1)];
+
+  // The first fade would end 150 ms after 600 ms; at 705 ms it has 45 ms left and is cut to 20 ms.
+  int zeroA = -1, zeroB = -1;
+  for (int i = s3; i < s3 + 400 * kMs; ++i) {
+    if (zeroA < 0 && t.gain[kFade][static_cast<size_t>(i)] == 0.0f) zeroA = i - s3;
+    if (zeroB < 0 && t.gain[kFade + 1][static_cast<size_t>(i)] == 0.0f && i > s3 + 2) zeroB = i - s3;
   }
-  bool fresh = gBloom.keptCount(0) > 0;
-  for (int slot = 0; slot < cv::Bloom::kKept; ++slot)
-    if (gBloom.sliceValid(0, slot) && gBloom.sliceCutAt(0, slot) < static_cast<uint32_t>(s)) fresh = false;
-  return report("third-word", newer && bothAlive && straight && fadeTime && wordOn && captureOk && fresh,
-                "oldest tail reaches 0 after %.2f ms in a straight line (20): %.0f, newer tail equals the two-word run: %.0f, first capture %.2f ms after the key",
-                zero / double(kMs), straight ? 1.0 : 0.0, newer ? 1.0 : 0.0, (write - s) / double(kMs));
+  const bool yielded = zeroA >= 20 * kMs - 4 && zeroA <= 20 * kMs + 4;
+  const bool newFade = zeroB >= 150 * kMs - 4 && zeroB <= 150 * kMs + 4;
+  return report("yield", tail1 && secondTail && yielded && newFade,
+                "an older fade yields to 0 in %.2f ms (20) and the newer tail fades in %.2f ms (150); tails present when word three starts: %.0f",
+                zeroA / double(kMs), zeroB / double(kMs), secondTail ? 1.0 : 0.0);
 }
 
 // Slices come from `src`; the dry path is `in`.
@@ -621,24 +774,25 @@ bool testSource() {
   const Trace split = trace(gBloom, in, key, p, &src);
 
   // Captured slices equal the source through the 11 kHz low-pass, starting clear at their cut clock.
-  // Run to the middle of the word to read them.
-  gBloom.reset();
+  // Run to a dozen points in the word and read the slices that hold a finished cut.
   cv::BloomParams q = p;
   q.keyFromGate = true;
   q.keyOpen = true;
   Signal y(in.size());
-  const size_t mid = 600 * kMs;
-  for (size_t i = 0; i < mid; ++i) gBloom.process(&in[i], &src[i], &y[i], 1, q);
   int checked = 0;
   bool match = true;
-  for (int slot = 0; slot < cv::Bloom::kKept; ++slot) {
-    if (!gBloom.sliceValid(0, slot)) continue;
-    ++checked;
-    const uint32_t cut = gBloom.sliceCutAt(0, slot);
-    cv::Biquad lp;
-    lp.setLowPass(p.tuning.lowpassHz, p.tuning.lowpassQ);
-    for (int j = 0; j < gBloom.sliceLen(0, slot); ++j)
-      if (std::fabs(gBloom.sliceData(0, slot)[j] - lp.run(src[cut + static_cast<uint32_t>(j)])) > 1e-5f) match = false;
+  for (int stopMs = 400; stopMs < 700; stopMs += 25) {
+    gBloom.reset();
+    for (size_t i = 0; i < static_cast<size_t>(stopMs) * kMs; ++i) gBloom.process(&in[i], &src[i], &y[i], 1, q);
+    for (int slot = 0; slot < cv::Bloom::kSlices; ++slot) {
+      if (!gBloom.sliceValid(slot)) continue;
+      ++checked;
+      const uint32_t cut = gBloom.sliceCutAt(slot);
+      cv::Biquad lp;
+      lp.setLowPass(p.tuning.lowpassHz, p.tuning.lowpassQ);
+      for (int j = 0; j < gBloom.sliceLen(slot); ++j)
+        if (std::fabs(gBloom.sliceData(slot)[j] - lp.run(src[cut + static_cast<uint32_t>(j)])) > 1e-5f) match = false;
+    }
   }
 
   // Before the first slice plays the output is the dry input under the trim, whatever `src` is.
@@ -661,14 +815,14 @@ bool testSource() {
   gBloom.reset();
   gBloom.process(in.data(), in.data(), b.data(), static_cast<int>(in.size()), q);
   const bool equalCall = a == b;
-  return report("source", match && checked >= 3 && dry && wetDiffers && equalCall,
-                "%.0f kept slices equal the source at their cut clock: %.0f; output before the first loop is the dry input's, and the loop follows the source: %.0f; src == in equals the short call: %.0f",
+  return report("source", match && checked >= 12 && dry && wetDiffers && equalCall,
+                "%.0f finished slices equal the source at their cut clock: %.0f; output before the first loop is the dry input's, and the loop follows the source: %.0f; src == in equals the short call: %.0f",
                 checked, match ? 1.0 : 0.0, dry && wetDiffers ? 1.0 : 0.0, equalCall ? 1.0 : 0.0);
 }
 
 // No slice plays more than 2.5 s after it was cut. A loud slice with a quieter tone held after it
-// loops while every later slice is skipped, and is replaced before the limit. A tail's slices leave the
-// rotation at the limit and the empty rotation closes over 80 ms.
+// loops while every later slice is skipped, and is replaced before the limit. A tail's one slice
+// closes at the limit over 80 ms.
 bool testAgeLimit() {
   const int ms = 4500;
   const float quiet = 0.5f * std::pow(10.0f, -20.0f / 20.0f);
@@ -679,21 +833,21 @@ bool testAgeLimit() {
   const uint32_t limit = static_cast<uint32_t>(2500 * kMs);
   uint32_t worstAge = 0;
   for (size_t i = 0; i < in.size(); ++i)
-    if (t.seq[0][i] != 0) worstAge = std::max<uint32_t>(worstAge, static_cast<uint32_t>(i) - t.cut[0][i]);
-  const uint32_t loud = t.seq[0][static_cast<size_t>(1000 * kMs)];
-  const bool stillLoud = loud != 0 && t.seq[0][static_cast<size_t>(2000 * kMs)] == loud;
+    if (t.seq[kWord][i] != 0) worstAge = std::max<uint32_t>(worstAge, static_cast<uint32_t>(i) - t.cut[kWord][i]);
+  const uint32_t loud = t.seq[kWord][static_cast<size_t>(1000 * kMs)];
+  const bool stillLoud = loud != 0 && t.seq[kWord][static_cast<size_t>(2000 * kMs)] == loud;
   int changeAt = -1;
   for (size_t i = static_cast<size_t>(1000 * kMs); i < in.size(); ++i)
-    if (t.seq[0][i] != loud) {
+    if (t.seq[kWord][i] != loud) {
       changeAt = static_cast<int>(i);
       break;
     }
-  const uint32_t loudCut = t.cut[0][static_cast<size_t>(1000 * kMs)];
+  const uint32_t loudCut = t.cut[kWord][static_cast<size_t>(1000 * kMs)];
   const bool replaced = changeAt > 0 && static_cast<uint32_t>(changeAt) < loudCut + limit && static_cast<uint32_t>(changeAt) > loudCut + limit - 400 * kMs &&
-                        t.seq[0][static_cast<size_t>(3500 * kMs)] > loud && t.active[0][static_cast<size_t>(3500 * kMs)];
+                        t.seq[kWord][static_cast<size_t>(3500 * kMs)] > loud && t.on[kWord][static_cast<size_t>(3500 * kMs)];
 
-  // A tail at LINGER 2 s: the slices leave the rotation at the limit and the loop closes there, short
-  // of the 3.58 s the law gives, in an 80 ms straight fall.
+  // A tail at LINGER 2 s: its slice closes at the limit, short of the 3.58 s the law gives, in an 80
+  // ms straight fall.
   const int span = 6000;
   const Signal tin = vowel(span, 0, 900);
   cv::BloomParams q;
@@ -701,22 +855,24 @@ bool testAgeLimit() {
   gBloom.reset();
   const Trace u = trace(gBloom, tin, keyOver(span, 0, 800), q);
   const int w = fallAfter(u.word, 0);
-  uint32_t lastCut = 0;
-  for (size_t i = 0; i < u.cut[0].size(); ++i) lastCut = std::max(lastCut, u.cut[0][i]);
+  const uint32_t tailCut = u.cut[kTail][static_cast<size_t>(w)];
   int end = -1;
-  for (size_t i = static_cast<size_t>(w); i < u.gain[0].size(); ++i)
-    if (u.gain[0][i] == 0.0f && !u.active[0][i]) {
+  for (size_t i = static_cast<size_t>(w); i < u.gain[kTail].size(); ++i)
+    if (u.gain[kTail][i] == 0.0f && !u.on[kTail][i]) {
       end = static_cast<int>(i);
       break;
     }
   bool fall = end > 4000;
   for (int i = end - 3700; fall && i < end - 2; ++i) {
-    const double d0 = u.gain[0][static_cast<size_t>(i)] - u.gain[0][static_cast<size_t>(i + 1)];
-    const double d1 = u.gain[0][static_cast<size_t>(i + 1)] - u.gain[0][static_cast<size_t>(i + 2)];
+    const double d0 = u.gain[kTail][static_cast<size_t>(i)] - u.gain[kTail][static_cast<size_t>(i + 1)];
+    const double d1 = u.gain[kTail][static_cast<size_t>(i + 1)] - u.gain[kTail][static_cast<size_t>(i + 2)];
     if (d0 <= 0.0 || std::fabs(d0 - d1) > 1e-6) fall = false;
   }
+  uint32_t tailAge = 0;
+  for (size_t i = static_cast<size_t>(w); i < u.cut[kTail].size(); ++i)
+    if (u.seq[kTail][i] != 0) tailAge = std::max<uint32_t>(tailAge, static_cast<uint32_t>(i) - u.cut[kTail][i]);
   const double tailMsEnd = (end - w) / double(kMs);
-  const bool inLimit = end > 0 && static_cast<uint32_t>(end) <= lastCut + limit;
+  const bool inLimit = end > 0 && static_cast<uint32_t>(end) <= tailCut + limit && tailAge <= limit;
   const bool shorter = tailMsEnd < 3000.0 && tailMsEnd > 1500.0;
   return report("age-limit", worstAge <= limit && stillLoud && replaced && fall && inLimit && shorter,
                 "held quieter tone: oldest slice played %.0f ms at most (<= 2500), loud slice still loops at 2 s and is replaced at %.0f ms; LINGER 2 s tail closes %.0f ms after the word (law 3581), last 80 ms a straight fall: %.0f",
@@ -773,24 +929,31 @@ bool testOwnKey() {
                 loud ? 1.0 : 0.0, quiet && between ? 1.0 : 0.0, closed < 0 ? -1.0 : (closed - 300 * kMs) / double(kMs));
 }
 
-// The wet path stays free of clicks: the splices crossfade and the passes fade.
+// The wet path stays free of clicks: the splices crossfade and the passes fade. The largest wet step
+// within a splice crossfade is compared with the largest wet step everywhere else in the word.
 bool testNoClicks() {
   const int ms = 1200;
   const Signal in = vowel(ms, 0, 1000);
   gBloom.reset();
   const Trace t = trace(gBloom, in, keyOver(ms, 0, 1000), cv::BloomParams{});
-  double inJump = 0.0, wetJump = 0.0;
-  for (size_t i = 1; i < t.out.size(); ++i) {
-    const double w0 = t.out[i - 1] - in[i - 1], w1 = t.out[i] - in[i];
-    wetJump = std::fmax(wetJump, std::fabs(w1 - w0));
-    inJump = std::fmax(inJump, std::fabs(double(in[i]) - in[i - 1]));
+  const std::vector<Splice> sp = splicesOf(t, kWord);
+  std::vector<char> near(t.out.size(), 0);
+  for (const Splice& s : sp)
+    for (int i = s.at - 2; i < s.at + 300 && i < static_cast<int>(near.size()); ++i) near[static_cast<size_t>(i)] = 1;
+  double atSplice = 0.0, elsewhere = 0.0;
+  for (int i = 300 * kMs; i < 900 * kMs; ++i) {
+    const size_t k = static_cast<size_t>(i);
+    const double step = std::fabs((t.out[k] - in[k]) - (t.out[k - 1] - in[k - 1]));
+    if (near[k]) atSplice = std::fmax(atSplice, step);
+    else elsewhere = std::fmax(elsewhere, step);
   }
-  return report("no-clicks", wetJump < 1.5 * inJump, "largest wet step %.4f against the input's own %.4f (<1.5x)", wetJump, inJump);
+  return report("no-clicks", sp.size() >= 5 && atSplice < 1.5 * elsewhere,
+                "largest wet step in a splice crossfade %.4f against %.4f elsewhere in the word (<1.5x)", atSplice, elsewhere);
 }
 
 bool sameBytes(const Signal& a, const Signal& b) { return a.size() == b.size() && std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) == 0; }
 
-// Two renders from reset are byte-identical, also through a rotation and an overlap, and with a
+// Two renders from reset are byte-identical, also through a tail fading under a new word, and with a
 // constant key the call size does not matter.
 bool testDeterminism() {
   const int ms = 4000;
@@ -848,22 +1011,23 @@ bool testSettledOff() {
   for (size_t i = 2000 * kMs; i < in.size(); ++i)
     if (out[i] != in[i]) tailCopy = false;
 
-  // Two players running, then switched off: both stop.
+  // A tail fading under a new word and the new word itself, then switched off: both stop.
   const Signal two = vowel(ms, 0, 2800);
   cv::BloomParams a = on;
   a.tailMs = 2000.0f;
   gBloom.reset();
-  for (size_t i = 0; i < 1800 * kMs; ++i) {
-    a.keyOpen = i < 400 * kMs || (i >= 700 * kMs && i < 1100 * kMs);
+  for (size_t i = 0; i < 760 * kMs; ++i) {
+    a.keyOpen = i < 400 * kMs || i >= 700 * kMs;
     gBloom.process(&two[i], &out[i], 1, a);
   }
-  const bool bothRan = gBloom.playerActive(0) && gBloom.playerActive(1);
+  const bool bothRan = gBloom.voiceOn(kWord) && gBloom.voiceOn(kFade);
   a.on = false;
-  gBloom.process(two.data() + 1800 * kMs, out.data() + 1800 * kMs, 1200 * kMs, a);
+  gBloom.process(two.data() + 760 * kMs, out.data() + 760 * kMs, 2240 * kMs, a);
   bool twoCopy = true;
   for (size_t i = 2800 * kMs; i < two.size(); ++i)
     if (out[i] != two[i]) twoCopy = false;
-  const bool stopped = !gBloom.playerActive(0) && !gBloom.playerActive(1) && !gBloom.looping() && !gBloom.inWord();
+  bool stopped = !gBloom.looping() && !gBloom.inWord();
+  for (int k = 0; k < kVoices; ++k) stopped = stopped && !gBloom.voiceOn(k);
 
   cv::BloomParams zero = on;
   zero.bloom = 0.0f;
@@ -871,7 +1035,7 @@ bool testSettledOff() {
   gBloom.process(in.data(), out.data(), static_cast<int>(in.size()), zero);
   const bool knobZero = out == in;
   return report("settled-off", fromReset && wasWet && tailCopy && bothRan && twoCopy && stopped && knobZero && !gBloom.looping(),
-                "off from reset == input: %.0f, off after running == input and loop stopped: %.0f, two players off == input: %.0f, AMOUNT 0 == input: %.0f",
+                "off from reset == input: %.0f, off after running == input and loop stopped: %.0f, word and fading tail off == input: %.0f, AMOUNT 0 == input: %.0f",
                 fromReset ? 1.0 : 0.0, wasWet && tailCopy ? 1.0 : 0.0, bothRan && twoCopy && stopped ? 1.0 : 0.0, knobZero ? 1.0 : 0.0);
 }
 
@@ -901,17 +1065,18 @@ bool testToggleAndRange() {
   bool finite = true;
   for (size_t i = 0; i < y.size(); ++i) {
     finite = finite && std::isfinite(y[i]);
-    peak = std::fmax(peak, std::fabs(y[i] - loud[i]));
+    peak = std::fmax(peak, std::fabs(y[i]));
   }
-  return report("toggle-range", keeps && finite && peak < 2.0, "off and on within 20 ms keeps the loop: %.0f; loud input stays finite, wet peak %.2f (<2)",
+  return report("toggle-range", keeps && finite && peak < 4.4, "off and on within 20 ms keeps the loop: %.0f; loud input (4.0) stays finite, output peak %.2f (<4.4)",
                 keeps ? 1.0 : 0.0, peak);
 }
 
-// Eight slices of 3,000 samples and the small state around them.
+// Three slices of 3,840 samples and the small state around them.
 bool testStorage() {
-  const size_t slices = static_cast<size_t>(cv::Bloom::kPlayers * cv::Bloom::kKept) * cv::Bloom::kSliceMax * sizeof(float);
-  return report("storage", slices == 96000 && sizeof(cv::Bloom) < 98000, "sizeof(Bloom) %.0f B, of which eight slices %.0f B (<98,000 in all)",
-                static_cast<double>(sizeof(cv::Bloom)), static_cast<double>(slices));
+  const size_t slices = static_cast<size_t>(cv::Bloom::kSlices) * cv::Bloom::kSliceMax * sizeof(float);
+  return report("storage", cv::Bloom::kSlices == 3 && cv::Bloom::kSliceMax == 3840 && slices == 46080 && sizeof(cv::Bloom) < 48000,
+                "sizeof(Bloom) %.0f B, of which three slices of 3,840 samples %.0f B (<48,000 in all)", static_cast<double>(sizeof(cv::Bloom)),
+                static_cast<double>(slices));
 }
 
 bool testNoAlloc() {
@@ -933,15 +1098,17 @@ bool testNoAlloc() {
 int main() {
   bool ok = true;
   ok &= testFirstCapture();
-  ok &= testInterval();
-  ok &= testGrainLaw();
+  ok &= testSliceLaw();
+  ok &= testTwoPlays();
   ok &= testWetLaw();
   ok &= testSkip();
   ok &= testLoop();
   ok &= testTail();
-  ok &= testRotation();
-  ok &= testOverlap();
-  ok &= testThirdWord();
+  ok &= testTailSlice();
+  ok &= testTailAfterStop();
+  ok &= testTailOnClips();
+  ok &= testNextWord();
+  ok &= testYield();
   ok &= testSource();
   ok &= testAgeLimit();
   ok &= testTailOnly();

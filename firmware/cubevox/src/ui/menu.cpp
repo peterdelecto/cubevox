@@ -128,7 +128,7 @@ const char* slot7CardValue(const Layout& layout) {
   if (slot < 0) return "GATE";
   switch (layout.card[slot]) {
     case Card::Lofi: return "LO-FI";
-    case Card::Bloom: return "BLOOM";
+    case Card::Bloom: return "CHATTER";
     default: return "GATE";
   }
 }

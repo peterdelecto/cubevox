@@ -309,7 +309,7 @@ void checkMenuListGeometry() {
       {kReverb, {"SPRING", "CHASM"}},
       {kOctaveFormant, {"OCTAVE", "FORMANT"}},
       {kUnisonCrowd, {"UNISON", "MOB"}},
-      {kSlot7Card, {"GATE", "LO-FI", "BLOOM"}},
+      {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
       {kPolishComp, {"ON", "OFF"}},
       {kPolishEq, {"ON", "OFF"}},
       {kOutput, {"LINE", "MIC"}},
@@ -848,8 +848,8 @@ void checkMenuSlot7Value() {
   const Case cases[] = {
       {"Gate in slot 7", defaultLayout(), "SLOT 7", "GATE"},
       {"Lo-fi in slot 7", with(Card::Lofi), "SLOT 7", "LO-FI"},
-      {"Bloom in slot 7", with(Card::Bloom), "SLOT 7", "BLOOM"},
-      {"Bloom in slot 1", moved, "SLOT 1", "BLOOM"},
+      {"Chatter in slot 7", with(Card::Bloom), "SLOT 7", "CHATTER"},
+      {"Chatter in slot 1", moved, "SLOT 1", "CHATTER"},
       {"Formant in slot 7, which is no slot 7 card", with(Card::Formant), "SLOT -", "GATE"},
       {"a layout with none of the three", none, "SLOT -", "GATE"},
   };
@@ -879,7 +879,7 @@ void checkMenuSlot7Redraw() {
   clearAllDirty(m.canvas);
   m.layout.card[kSlot7Slot - 1] = Card::Bloom;
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kSlot7Card), "SLOT 6", "BLOOM", true),
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kSlot7Card), "SLOT 6", "CHATTER", true),
         "menu: a new card in the same slot repaints the row with the new value");
 }
 
@@ -888,7 +888,7 @@ void checkMenuSlot7Redraw() {
 // survives a save and a reload.
 void checkMenuSlot7Click() {
   const Card order[] = {Card::Lofi, Card::Bloom, Card::Gate};
-  const char* const values[] = {"LO-FI", "BLOOM", "GATE"};
+  const char* const values[] = {"LO-FI", "CHATTER", "GATE"};
   MenuRig m;
   m.openListAt(kSlot7Card);
   for (size_t i = 0; i < 3; ++i) {
@@ -1259,7 +1259,7 @@ void checkScreenshots() {
     const char* file;
   } slot7Shots[] = {{Card::Gate, "GATE", "oled-menu-slot7-gate.pgm"},
                     {Card::Lofi, "LO-FI", "oled-menu-slot7-lofi.pgm"},
-                    {Card::Bloom, "BLOOM", "oled-menu-slot7-bloom.pgm"}};
+                    {Card::Bloom, "CHATTER", "oled-menu-slot7-chatter.pgm"}};
   for (const auto& shot : slot7Shots) {
     MenuRig slot7;
     slot7.layout.card[kSlot7Slot] = shot.card;

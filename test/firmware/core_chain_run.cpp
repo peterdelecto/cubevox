@@ -1100,16 +1100,16 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
   }
   SourceRun r;
   const cv::Bloom& bloom = chain->engines.bloom;
-  for (int slot = 0; slot < cv::Bloom::kKept; ++slot) {
-    if (!bloom.sliceValid(0, slot)) continue;
+  for (int slot = 0; slot < cv::Bloom::kSlices; ++slot) {
+    if (!bloom.sliceValid(slot)) continue;
     ++r.kept;
-    const size_t cut = bloom.sliceCutAt(0, slot);
+    const size_t cut = bloom.sliceCutAt(slot);
 
     // A slice is the pitch stage's output through Bloom's 11 kHz low-pass, started clear at its cut.
     cv::Biquad lp;
     lp.setLowPass(snap.params.bloom.tuning.lowpassHz, snap.params.bloom.tuning.lowpassQ);
-    for (int j = 0; j < bloom.sliceLen(0, slot); ++j) {
-      const float s = bloom.sliceData(0, slot)[j];
+    for (int j = 0; j < bloom.sliceLen(slot); ++j) {
+      const float s = bloom.sliceData(slot)[j];
       if (std::fabs(s - lp.run(lead[cut + static_cast<size_t>(j)])) > 1e-5f) r.matchesLead = false;
       if (std::fabs(s - voiced[cut + static_cast<size_t>(j)]) > 1e-3f) ++r.differs;
       ++r.samples;

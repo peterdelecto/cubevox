@@ -241,7 +241,7 @@ struct GridCell {
 
 // A switch of up to two rows of words, the active one on an accent fill, in the foot of a column.
 // Words that do not fit side by side in the column at the label size take a row each: OCTAVE and
-// FORMANT together are 136 of the column's 144 px, and BLOOM is wider than a third of it. A click
+// FORMANT together are 136 of the column's 144 px, and CHATTER is wider than a third of it. A click
 // on a cell returns its index, and -1 means no click.
 template <size_t N>
 int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, const std::array<GridCell, N>& cells,
@@ -353,14 +353,14 @@ void drawTopBand(Frame& f) {
 }
 
 // The cells of the two grid switches, in the order the menu cycles or swaps their cards. The slot 7
-// switch has GATE and LO-FI side by side over BLOOM. The slot 3 switch has OCTAVE over FORMANT.
-constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"BLOOM", 0.0f, 1, 1.0f}}};
+// switch has GATE and LO-FI side by side over CHATTER. The slot 3 switch has OCTAVE over FORMANT.
+constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"CHATTER", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
 constexpr std::array<GridCell, 2> kSlot3Cells = {{{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}}};
 
 // The card switch at the foot of a slot, which follows the layout: the column that holds the Octave
 // or Formant card, the column that holds the Unison or MOB card, the column that holds a reverb, and
-// the column that holds Gate, Lo-fi or Bloom. The first and last are grids, and a click on the last
+// the column that holds Gate, Lo-fi or Chatter. The first and last are grids, and a click on the last
 // picks its card through the menu's own action.
 void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   const Layout& layout = f.box.layout();

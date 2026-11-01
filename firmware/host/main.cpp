@@ -1,9 +1,10 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant] [--slot7 gate|lofi|bloom]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant] [--slot7 gate|lofi|chatter]
 //                                             one frame of the window as a P6 PPM, no audio device,
-//                                             with those cards in slots 3 and 7 (Octave and Gate when omitted)
+//                                             with those cards in slots 3 and 7 (Octave and Gate when omitted;
+//                                             `bloom`, the card id, also picks Chatter)
 
 #include <array>
 #include <cmath>
@@ -90,18 +91,19 @@ constexpr costs::Cost kDefaultSum = kDefaultRest + costs::kOctave + costs::kGate
 constexpr costs::Cost kSwappedSum = kSwappedRest + costs::kOctave + costs::kGate;
 
 // The slot 3 cards in the menu's swap order, and the slot 7 cards in its cycle order, with the row
-// each costs.
+// each costs. `id` is the card's registry id; `--proof` takes `arg`, or the id as an alias.
 struct CardRow {
   Card card;
   const char* id;
+  const char* arg;
   const char* name;
   costs::Cost cost;
 };
-constexpr std::array<CardRow, 2> kSlot3Rows = {{{Card::Formant, "formant", "FORMANT", costs::kFormant},
-                                                {Card::Octave, "octave", "OCTAVE", costs::kOctave}}};
-constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "LO-FI", costs::kLofi},
-                                                {Card::Bloom, "bloom", "BLOOM", costs::kBloom},
-                                                {Card::Gate, "gate", "GATE", costs::kGate}}};
+constexpr std::array<CardRow, 2> kSlot3Rows = {{{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
+                                                {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
+constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO-FI", costs::kLofi},
+                                                {Card::Bloom, "bloom", "chatter", "CHATTER", costs::kBloom},
+                                                {Card::Gate, "gate", "gate", "GATE", costs::kGate}}};
 
 bool costIs(const LayoutCost& cost, const costs::Cost& expected) {
   return cost.avg == expected.avg && cost.worst == expected.worst;
@@ -342,15 +344,16 @@ int runLive(const char* argv0) {
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant] "
-               "[--slot7 gate|lofi|bloom]]\n");
+               "[--slot7 gate|lofi|chatter]]\n");
   return 2;
 }
 
-// The card with this id among `rows`, the same rows --check walks.
+// The card named by `arg` among `rows`, the same rows --check walks. A row answers to its argument and
+// to its registry id.
 template <size_t N>
-bool cardFromRows(const std::array<CardRow, N>& rows, const char* id, Card& out) {
+bool cardFromRows(const std::array<CardRow, N>& rows, const char* arg, Card& out) {
   for (const CardRow& row : rows) {
-    if (std::strcmp(id, row.id) == 0) {
+    if (std::strcmp(arg, row.arg) == 0 || std::strcmp(arg, row.id) == 0) {
       out = row.card;
       return true;
     }
