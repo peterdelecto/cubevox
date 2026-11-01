@@ -1,6 +1,6 @@
 // cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + crowd + unison +
-// slapback + distortion + gate + bloom + reverb, then the polish tail (comp, the back half of eq) and the
-// output ceiling like the box, processed mono 48 kHz f32 WAV out.
+// slapback + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the back half of eq) and
+// the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -12,6 +12,7 @@
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
+#include "engine/lofi.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
@@ -35,6 +36,7 @@ struct RenderParams {
   bool unisonOn = false;
   bool slapOn = false;
   bool distOn = false;
+  bool lofiOn = false;
   bool bloomOn = false;
   bool reverbOn = false;
   bool compOn = true;  // the polish tail runs as on the box unless switched off
@@ -48,6 +50,7 @@ struct RenderParams {
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
+  cv::LofiParams lofi;
   cv::BloomParams bloom;
   cv::ReverbParams reverb;
   cv::PolishCompParams comp;
@@ -67,6 +70,7 @@ int usage() {
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
+               "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
                "       [--bloom <0..1>] [--tail <60..1000 ms>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
@@ -74,8 +78,9 @@ int usage() {
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
+               "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
-               "  gate, bloom, reverb, comp, eq back\n"
+               "  gate, lofi, bloom, reverb, comp, eq back\n"
                "  bloom runs with --bloom (BLOOM, default 0.5) or --tail (TAIL, default 300 ms); with --ingate its word key\n"
                "  is the input gate's open state, otherwise bloom listens to its own input\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
@@ -119,6 +124,10 @@ int usage() {
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
+               "     lofiFcLoHz lofiFcHiHz lofiHpStartHz lofiHpEndRatio lofiLpStartHz lofiLpEndRatio lofiHonkDb lofiHonkQ\n"
+               "     lofiDriveDb lofiHoldMaxHz lofiHoldMinHz lofiBitsMax lofiBitsMin lofiTrimDb\n"
+               "     lofiMakeup<tone 0..4>_<amount 0..10> (dB, the makeup table by TONE 0, 25 ... 100 %% and AMOUNT 0, 10 ... 100 %%)\n"
+               "  a lofi key outside its range is refused\n"
                "  --decay and --dwell apply to the selected reverb engine\n");
   return 2;
 }
@@ -204,6 +213,20 @@ bool crowdTuningInRange(const cv::CrowdTuning& t) {
          inside(t.widthLagMs, 0.0f, cd::kMaxWidthLagMs);
 }
 
+// Every Lo-fi key refuses a value outside the range the engine takes.
+bool lofiTuningInRange(const cv::LofiTuning& t) {
+  for (const auto& row : t.makeupDb)
+    for (const float m : row)
+      if (!inside(m, -24.0f, 36.0f)) return false;
+  return inside(t.fcLoHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.fcHiHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(t.hpStartHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(t.lpStartHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.hpEndRatio, 0.05f, 4.0f) &&
+         inside(t.lpEndRatio, 0.25f, 20.0f) && inside(t.honkDb, -24.0f, 24.0f) && inside(t.honkQ, 0.1f, 20.0f) &&
+         inside(t.driveDb, -24.0f, 48.0f) && inside(t.holdMaxHz, 480.0f, 48000.0f) &&
+         inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
+         inside(t.trimDb, -24.0f, 24.0f);
+}
+
 bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
@@ -216,6 +239,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
+  cv::LofiTuning& lt = rp.lofi.tuning;
   cv::BloomTuning& bt = rp.bloom.tuning;
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
@@ -297,11 +321,28 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gtReleaseMs", &gt.releaseMs},         {"gtRangeDb", &gt.rangeDb},
       {"gtKneeDb", &gt.kneeDb},               {"gtDetectorHpHz", &gt.detectorHpHz},
       {"gtHysteresisDb", &gt.hysteresisDb},
+      {"lofiFcLoHz", &lt.fcLoHz},             {"lofiFcHiHz", &lt.fcHiHz},
+      {"lofiHpStartHz", &lt.hpStartHz},       {"lofiHpEndRatio", &lt.hpEndRatio},
+      {"lofiLpStartHz", &lt.lpStartHz},       {"lofiLpEndRatio", &lt.lpEndRatio},
+      {"lofiHonkDb", &lt.honkDb},             {"lofiHonkQ", &lt.honkQ},
+      {"lofiDriveDb", &lt.driveDb},           {"lofiHoldMaxHz", &lt.holdMaxHz},
+      {"lofiHoldMinHz", &lt.holdMinHz},       {"lofiBitsMax", &lt.bitsMax},
+      {"lofiBitsMin", &lt.bitsMin},           {"lofiTrimDb", &lt.trimDb},
       {"bloomTrimDb", &bt.trimDb},            {"bloomFirstCaptureMs", &bt.firstCaptureMs},
       {"bloomSkipDb", &bt.skipDb},            {"bloomTailOnly", &bloomTailOnly},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
+  if (std::strncmp(kv, "lofiMakeup", 10) == 0) {
+    // lofiMakeup<tone row 0..4>_<amount column 0..10>=<dB>
+    int row = -1, col = -1, used = 0;
+    if (std::sscanf(kv, "lofiMakeup%d_%d=%n", &row, &col, &used) != 2 || used == 0) return false;
+    if (row < 0 || row >= static_cast<int>(cv::kLofiMakeupTones) || col < 0 ||
+        col >= static_cast<int>(cv::kLofiMakeupAmounts))
+      return false;
+    return parseFloat(kv + used, &lt.makeupDb[static_cast<size_t>(row)][static_cast<size_t>(col)]) &&
+           lofiTuningInRange(lt);
+  }
   const size_t keyLen = static_cast<size_t>(eq - kv);
   for (const TuningField& f : fields) {
     if (std::strlen(f.name) != keyLen || std::strncmp(f.name, kv, keyLen) != 0) continue;
@@ -316,7 +357,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (!inside(bt.firstCaptureMs, 1.0f, 500.0f) || !inside(bt.skipDb, -60.0f, 0.0f) || !inside(bt.trimDb, -24.0f, 24.0f))
       return false;
     bt.tailOnly = bloomTailOnly == 1.0f;
-    if (!crowdTuningInRange(ct)) return false;
+    if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }
@@ -333,6 +374,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveOn = false;
   bool haveSlap = false;
   bool haveDrive = false;
+  bool haveLofi = false;
   bool haveReverb = false;
   bool haveInGate = false;
   bool haveGate = false;
@@ -365,6 +407,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--tone") == 0 && i + 1 < argc) {
       cv::DistortionParams& dp = rp.distortion;
       if (!parseFloat(argv[++i], &dp.tone) || dp.tone < 0.0f || dp.tone > 1.0f) return false;
+    } else if (std::strcmp(a, "--lofi") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.lofi.amount) || rp.lofi.amount < 0.0f || rp.lofi.amount > 1.0f) return false;
+      haveLofi = true;
+    } else if (std::strcmp(a, "--lofi-tone") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.lofi.tone) || rp.lofi.tone < 0.0f || rp.lofi.tone > 1.0f) return false;
+      haveLofi = true;
     } else if (std::strcmp(a, "--rmix") == 0 && i + 1 < argc) {
       cv::ReverbParams& r = rp.reverb;
       if (!parseFloat(argv[++i], &r.wet) || r.wet < 0.0f || r.wet > 1.0f) return false;
@@ -482,6 +530,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   p.on = rp.unisonOn;
   rp.slapOn = haveSlap;
   rp.distOn = haveDrive;
+  rp.lofiOn = haveLofi;
+  rp.lofi.on = haveLofi;
   rp.reverbOn = haveReverb;
   rp.reverb.on = haveReverb;
   rp.comp.on = rp.compOn;
@@ -493,7 +543,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.bloomOn = haveBloom;
   rp.bloom.on = haveBloom;
   rp.bloom.keyFromGate = haveInGate;
-  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.bloomOn || rp.reverbOn ||
+  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.lofiOn || rp.bloomOn ||
+         rp.reverbOn ||
          rp.compOn || rp.eqOn;
 }
 
@@ -521,6 +572,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Unison unison;
   static cv::Slapback slapback;
   static cv::Distortion distortion;
+  static cv::Lofi lofi;
   static cv::Bloom bloom;
   static cv::Reverb reverb;
   static cv::PolishComp polishComp;
@@ -532,6 +584,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   unison.reset();
   slapback.reset();
   distortion.reset();
+  lofi.reset();
   bloom.reset();
   reverb.reset();
   polishComp.reset();
@@ -590,6 +643,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.gateOn) {
         gate.process(src, scratch[next], n, rp.gate);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.lofiOn) {
+        lofi.process(src, scratch[next], n, rp.lofi);
         src = scratch[next];
         next ^= 1;
       }

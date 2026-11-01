@@ -131,6 +131,8 @@ cubevox_engine_test(fastmath)
 cubevox_engine_test(smooth)
 cubevox_engine_test(slapback)
 cubevox_engine_test(distortion)
+cubevox_engine_test(lofi)
+target_compile_definitions(lofi_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 add_test(NAME proto_layout
   COMMAND $<TARGET_FILE:cubevox-proto> --layout)
 cubevox_engine_test(chasm)
