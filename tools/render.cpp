@@ -72,7 +72,7 @@ int usage() {
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
-               "       [--bloom <0..1>] [--linger <60..2000 ms>, alias --tail]\n"
+               "       [--bloom <0..1>] [--linger <20..3000 ms>, alias --tail]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"

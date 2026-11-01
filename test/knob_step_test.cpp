@@ -119,7 +119,8 @@ struct Step {
 };
 
 // Continuous knobs step at a low, a middle and a high setting; both Bloom knobs also step at the last
-// touch below the top of their travel (LINGER 2 s, AMOUNT 100 %). Chatter's AMOUNT sets the slice
+// touch below the top of their travel (LINGER 3 s, AMOUNT 100 %), and LINGER at the first touch above
+// its bottom (20 ms). Chatter's AMOUNT sets the slice
 // length as well as the loudness, so it walks its whole travel in tenths, from the bottom, where the
 // stage is a plain copy. A stepped knob of up to ten detents (the Mob card's VOICES) moves across every
 // detent in turn, as does the Formant card's SHIFT with its fifteen, and a longer one moves one detent
@@ -147,6 +148,7 @@ std::vector<Step> stepsFor(Card c, int knob) {
       for (float p : {0.2f, 0.5f, 0.8f}) s.push_back({p, p + kContinuousStep});
     }
     if (c == Card::Bloom) s.push_back({1.0f - kContinuousStep, 1.0f});
+    if (c == Card::Bloom && knob == 0) s.push_back({0.0f, kContinuousStep});
     // Lo-fi's TONE and AMOUNT also step at the last touch below the top of their travel.
     if (c == Card::Lofi) s.push_back({1.0f - kContinuousStep, 1.0f});
     return s;

@@ -451,8 +451,8 @@ void checkSlot7Cards() {
         "bloom: id bloom, name Chatter, its own engine, no group");
   const KnobDesc& tail = *knobDesc(Card::Bloom, 0);
   check(std::strcmp(tail.name, "LINGER") == 0 && tail.kind == KnobKind::Continuous && tail.curve == Curve::Log &&
-            tail.min == 60.0f && tail.max == 2000.0f && std::strcmp(tail.unit, "ms") == 0,
-        "bloom: knob A is LINGER, 60 to 2000 ms on a log curve");
+            tail.min == 20.0f && tail.max == 3000.0f && std::strcmp(tail.unit, "ms") == 0,
+        "bloom: knob A is LINGER, 20 to 3000 ms on a log curve");
   check(std::strcmp(knobDesc(Card::Bloom, 1)->name, "AMOUNT") == 0 && std::strcmp(knobDesc(Card::Bloom, 1)->unit, "%") == 0,
         "bloom: knob B is AMOUNT, a percent");
 
@@ -498,14 +498,14 @@ void checkSlot7Cards() {
   applyKnob(Card::Bloom, 0, 1.0f, p);
   const float tailHigh = p.bloom.tailMs;
   applyKnob(Card::Bloom, 0, 0.5f, p);
-  check(std::fabs(tailLow - 60.0f) < 1e-3f && std::fabs(tailHigh - 2000.0f) < 1e-1f &&
-            std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f,
-        "bloom: LINGER runs 60 to 2000 ms with its middle at the geometric mean");
+  check(std::fabs(tailLow - 20.0f) < 1e-3f && std::fabs(tailHigh - 3000.0f) < 1e-1f &&
+            std::fabs(p.bloom.tailMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f,
+        "bloom: LINGER runs 20 to 3000 ms with its middle at the geometric mean");
   applyKnob(Card::Bloom, 1, 0.65f, p);
-  check(std::fabs(p.bloom.bloom - 0.65f) < 1e-6f && std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f,
+  check(std::fabs(p.bloom.bloom - 0.65f) < 1e-6f && std::fabs(p.bloom.tailMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f,
         "bloom: AMOUNT drives the bloom field and leaves LINGER alone");
-  check(shownText(tail, 0.0f) == "60" && shownText(tail, 1.0f) == "2000" && knobCells(tail) == 4,
-        "bloom: LINGER reads 60 to 2000 in four cells");
+  check(shownText(tail, 0.0f) == "20" && shownText(tail, 1.0f) == "3000" && knobCells(tail) == 4,
+        "bloom: LINGER reads 20 to 3000 in four cells");
 
   // The toggles reach their own stage. Formant's toggle sits inside the pitch parameters and touches no
   // other pitch toggle.
