@@ -1,6 +1,7 @@
 // Autotune checks: passthrough, scale degrees, correction, out-of-scale notes,
-// response time, Octave builds on the corrected note, hard tune, the toggle,
-// no-alloc. No window, no audio device.
+// response time, Octave builds on the corrected note, hard tune, the toggle and
+// its level, the halfway point, the tracker's range ends, the first note's glide,
+// bleed, call sizes, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -92,21 +93,23 @@ double medianHz(const std::vector<float>& x) {
 // Tracker pitch and Autotune correction read after one block.
 struct Hop {
   int end;
+  bool voiced;
   float hz;
   float corr;
 };
 
-std::vector<float> run(cv::PitchFx& fx, const std::vector<float>& in,
-                       const cv::PitchFxParams& p, std::vector<Hop>* hops = nullptr) {
+// Runs in through fx in calls of callSize samples, recording a Hop after each call.
+std::vector<float> run(cv::PitchFx& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
+                       std::vector<Hop>* hops = nullptr, int callSize = cv::kBlock) {
   std::vector<float> out(in.size());
-  if (hops) hops->reserve(in.size() / cv::kBlock + 1);
+  if (hops) hops->reserve(in.size() / static_cast<size_t>(callSize) + 1);
   const int total = static_cast<int>(in.size());
-  for (int i = 0; i < total; i += cv::kBlock) {
-    const int n = std::min(cv::kBlock, total - i);
+  for (int i = 0; i < total; i += callSize) {
+    const int n = std::min(callSize, total - i);
     gInProcess = true;
     fx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, p);
     gInProcess = false;
-    if (hops) hops->push_back({i + n, fx.pitch().hz, fx.correctionSemis()});
+    if (hops) hops->push_back({i + n, fx.pitch().voiced, fx.pitch().hz, fx.correctionSemis()});
   }
   return out;
 }
@@ -263,15 +266,25 @@ bool testOctaveFollows() {
                 "out=%.2f Hz, err vs C4=%.2f cents (+-15)", got, err);
 }
 
-// 7. Hard tune at the shipped defaults: A3 with a 5 Hz, +-30 cent vibrato comes
-// out held on A3. Adam's own box measures about 2 cents median off the note.
-bool testHardTune() {
+// The process() call sizes every call-size case runs: odd, short, the box's block, and longer.
+constexpr int kCallSizes[] = {17, 40, cv::kBlock, 200};
+
+int countNonFinite(const std::vector<float>& x) {
+  int n = 0;
+  for (float v : x) n += std::isfinite(v) ? 0 : 1;
+  return n;
+}
+
+// 7. Hard tune at the shipped defaults: A3 with a 5 Hz, +-30 cent vibrato comes out held on A3, at
+// every call size. Adam's own box measures about 2 cents median off the note.
+double hardTuneCents(int callSize, int& nonFinite) {
   const std::vector<float> in = tone(3 * cv::kSampleRate, [](int i) {
     return kA3 * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * 5.0 * i / cv::kSampleRate));
   });
   cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
   gFx.reset();
-  const std::vector<float> out = run(gFx, in, p);
+  const std::vector<float> out = run(gFx, in, p, nullptr, callSize);
+  nonFinite += countNonFinite(out);
   cv::PitchTracker t;
   double sum = 0.0;
   int n = 0;
@@ -284,9 +297,21 @@ bool testHardTune() {
       ++n;
     }
   }
-  const double rmsCents = n > 0 ? std::sqrt(sum / n) : 9999.0;
-  return report("hard tune holds vibrato", rmsCents <= 4.0,
-                "+-30 cent vibrato in, %.2f cents RMS off A3 out (<= 4)", rmsCents);
+  return n > 0 ? std::sqrt(sum / n) : 9999.0;
+}
+
+bool testHardTune() {
+  bool ok = true;
+  for (int size : kCallSizes) {
+    int nonFinite = 0;
+    const double rmsCents = hardTuneCents(size, nonFinite);
+    char name[48];
+    std::snprintf(name, sizeof name, "hard tune holds vibrato, calls of %d", size);
+    ok &= report(name, rmsCents <= 4.0 && nonFinite == 0,
+                 "+-30 cent vibrato in, %.2f cents RMS off A3 out (<= 4), non-finite samples %.0f (0)", rmsCents,
+                 nonFinite);
+  }
+  return ok;
 }
 
 // Largest |second difference| of x over [from, to): a cut in the waveform shows as a spike here.
@@ -299,11 +324,22 @@ double peakCurvature(const std::vector<float>& x, int from, int to) {
   return worst;
 }
 
-// Autotune off for gapBlocks and on again over a held A3 + 50 cents. The output crossfades between
-// the corrected voice and the dry input, so it may bend no harder than either does alone. Returns
-// the peak from the off edge to 100 ms past the on edge over the larger steady peak.
-double toggleRatio(int gapBlocks) {
+// Largest |x| over [from, to).
+double peakLevel(const std::vector<float>& x, int from, int to) {
+  double worst = 0.0;
+  for (int i = from; i < to; ++i) worst = std::max(worst, std::fabs(static_cast<double>(x[static_cast<size_t>(i)])));
+  return worst;
+}
+
+// Autotune off for gapBlocks and on again over a held A3 + 50 cents, in calls of callSize samples; a
+// call that overlaps the gap runs off. The output crossfades between the corrected voice and the dry
+// input, so for its level it may bend no harder than either does alone. The equal-power crossfade
+// lifts the level where the two voices add in phase (the toggle level check bounds that rise), so a
+// fade window that peaks above steady state reads against its own peak. Returns the peak curvature
+// from the off edge to 100 ms past the on edge over the larger steady peak, so scaled.
+double toggleRatio(int gapBlocks, int callSize, int& nonFinite) {
   const int offAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
+  const int onAt = offAt + gapBlocks * cv::kBlock;
   const int total = offAt + 2 * cv::kSampleRate;
   const std::vector<float> in = tone(kSharp, total);
   std::vector<float> out(in.size());
@@ -311,35 +347,282 @@ double toggleRatio(int gapBlocks) {
   cv::PitchFxParams off = on;
   off.autotune.on = false;
   gFx.reset();
-  for (int i = 0; i < total; i += cv::kBlock) {
-    const bool gap = i >= offAt && i < offAt + gapBlocks * cv::kBlock;
+  for (int i = 0; i < total; i += callSize) {
+    const int n = std::min(callSize, total - i);
+    const bool gap = i < onAt && i + n > offAt;
     gInProcess = true;
-    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, gap ? off : on);
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, gap ? off : on);
     gInProcess = false;
   }
+  nonFinite += countNonFinite(out);
+  const int offCall = offAt / callSize * callSize;                 // the first call that runs off
+  const int onCall = (onAt + callSize - 1) / callSize * callSize;  // the first call back on
+  const int to = onCall + cv::kSampleRate / 10;
   const int window = cv::kSampleRate / 2;
-  const double steady = std::max({peakCurvature(out, offAt - window, offAt), peakCurvature(out, total - window, total),
-                                  peakCurvature(in, 0, total)});
-  return peakCurvature(out, offAt, offAt + gapBlocks * cv::kBlock + cv::kSampleRate / 10) / steady;
+  const double steady = std::max({peakCurvature(out, offCall - window, offCall),
+                                  peakCurvature(out, total - window, total), peakCurvature(in, 0, total)});
+  const double steadyPeak = std::max({peakLevel(out, offCall - window, offCall), peakLevel(out, total - window, total),
+                                      peakLevel(in, 0, total)});
+  const double rise = std::max(1.0, peakLevel(out, offCall, to) / steadyPeak);
+  return peakCurvature(out, offCall, to) / steady / rise;
 }
 
 // 8. A flick inside the crossfade keeps the running voice; a long gap lets the crossfade settle,
-// and the voice then starts clean once the tracker has rebuilt. The fade's own slope adds under
-// 1 %; a voice that loses its period mid-fade reads about 18 times steady state.
+// and the voice then starts clean once the tracker has rebuilt, at every call size. The fade's own
+// slope adds under 1 %; a voice that loses its period at the off switch reads 1.4 to 5.4 times
+// steady state.
 bool testToggle() {
   constexpr double kMaxRatio = 1.05;
-  double worst = 0.0;
-  int worstGap = 0;
-  for (int gap : {1, 4, 15, 60, 300}) {
-    const double r = toggleRatio(gap);
-    if (r >= worst) {
-      worst = r;
-      worstGap = gap;
+  bool ok = true;
+  for (int size : kCallSizes) {
+    double worst = 0.0;
+    int worstGap = 0;
+    int nonFinite = 0;
+    for (int gap : {1, 4, 15, 60, 300}) {
+      const double r = toggleRatio(gap, size, nonFinite);
+      if (r >= worst) {
+        worst = r;
+        worstGap = gap;
+      }
+    }
+    char name[32];
+    std::snprintf(name, sizeof name, "toggle, calls of %d", size);
+    ok &= report(name, worst <= kMaxRatio && nonFinite == 0,
+                 "off for 1.3 to 400 ms: peak curvature x%.3f of steady state at %.0f blocks off (<= %.2f), "
+                 "non-finite samples %.0f (0)",
+                 worst, worstGap, kMaxRatio, nonFinite);
+  }
+  return ok;
+}
+
+// The crossfade's level over steady tones: Autotune on at 0.5 s and off at 1.25 s while the Crowd card
+// keeps the tracker running, in two-period windows over the 200 ms after each switch. The dip reads
+// against the quieter of the dry input and the corrected voice, the rise against the louder.
+struct ToggleLevel {
+  double dip = 0.0;
+  double rise = -99.0;
+};
+
+void toggleLevelAt(double hz, ToggleLevel& worst) {
+  const int n = 2 * cv::kSampleRate;
+  const std::vector<float> in = tone(hz, n);
+  cv::PitchFxParams on = autotuneOnly(1.0f);
+  on.crowdOn = true;
+  cv::PitchFxParams off = on;
+  off.autotune.on = false;
+  gFx.reset();
+  const std::vector<float> wet = run(gFx, in, on);
+  const double dry = rms(in, cv::kSampleRate / 4, cv::kSampleRate / 2);
+  const double corrected = rms(wet, cv::kSampleRate, cv::kSampleRate * 3 / 2);
+  const int onAt = cv::kSampleRate / 2 / cv::kBlock * cv::kBlock;
+  const int offAt = cv::kSampleRate * 5 / 4 / cv::kBlock * cv::kBlock;
+  std::vector<float> out(in.size());
+  gFx.reset();
+  for (int i = 0; i < n; i += cv::kBlock) {
+    gInProcess = true;
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, i < onAt || i >= offAt ? off : on);
+    gInProcess = false;
+  }
+  const int win = static_cast<int>(std::lround(2.0 * cv::kSampleRate / hz));
+  for (int edge : {onAt, offAt}) {
+    for (int i = edge; i + win < edge + cv::kSampleRate / 5; i += 24) {
+      const double r = rms(out, i, i + win);
+      worst.dip = std::min(worst.dip, 20.0 * std::log10(r / std::min(dry, corrected)));
+      worst.rise = std::max(worst.rise, 20.0 * std::log10(r / std::max(dry, corrected)));
     }
   }
-  return report("toggle", worst <= kMaxRatio,
-                "off for 1.3 to 400 ms: peak curvature x%.3f of steady state at %.0f blocks off (<= %.2f)", worst,
-                worstGap, kMaxRatio);
+}
+
+// 9. Switching Autotune on or off mid-note: the corrected voice lags the dry input by 2 to 5 periods
+// and sits up to a semitone away, so the equal-power crossfade dips where the two cancel and rises
+// where they add. Pinned 0.5 dB over this pass's figures (dip 3.9 dB, rise 2.5 dB); the linear fade
+// before it dipped 6.9 dB.
+bool testToggleLevel() {
+  constexpr double kMaxDipDb = 4.4;
+  constexpr double kMaxRiseDb = 3.0;
+  ToggleLevel worst;
+  for (double hz : {97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 110.0, 130.81, 146.83, 220.0})
+    toggleLevelAt(hz, worst);
+  return report("toggle level", -worst.dip <= kMaxDipDb && worst.rise <= kMaxRiseDb,
+                "tones 97 to 220 Hz, two-period windows: largest dip %.2f dB (<= %.1f), largest rise %.2f dB (<= %.1f)",
+                -worst.dip, kMaxDipDb, worst.rise, kMaxRiseDb);
+}
+
+double midiOf(double hz) { return 69.0 + 12.0 * std::log2(hz / 440.0); }
+
+// The output's note per hop, read by a fresh tracker from 500 ms on.
+struct Notes {
+  double changesPerSec;  // changes of the nearest semitone
+  double lo;             // lowest and highest pitch, MIDI
+  double hi;
+};
+
+Notes outputNotes(const std::vector<float>& out) {
+  cv::PitchTracker t;
+  int changes = 0, prev = -999;
+  double lo = 1e9, hi = -1e9;
+  const int total = static_cast<int>(out.size());
+  for (int i = 0; i + cv::kBlock <= total; i += cv::kBlock) {
+    t.push(&out[static_cast<size_t>(i)], cv::kBlock);
+    const int end = i + cv::kBlock;
+    if (end < cv::kSampleRate / 2 || end % cv::PitchTracker::kHop != 0 || !t.result().voiced) continue;
+    const double m = midiOf(t.result().rawHz);
+    lo = std::min(lo, m);
+    hi = std::max(hi, m);
+    const int note = static_cast<int>(std::lround(m));
+    if (prev != -999 && note != prev) ++changes;
+    prev = note;
+  }
+  return {changes / ((total - cv::kSampleRate / 2) / static_cast<double>(cv::kSampleRate)), lo, hi};
+}
+
+// 10. A pitch near the halfway point between two scale notes holds one note at MECHANICAL. C#4 15
+// cents past halfway in KEY C under a 5 Hz, +-30 cent vibrato crosses the halfway point ten times a
+// second, and before the hold the output jumped C4 to D4 as often. A steady A3 exactly halfway in KEY
+// Eb holds Ab3.
+bool testHalfway() {
+  const double cs4Past = 440.0 * std::exp2((61.15 - 69.0) / 12.0);
+  const std::vector<float> vib = tone(3 * cv::kSampleRate, [cs4Past](int i) {
+    return cs4Past * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * 5.0 * i / cv::kSampleRate));
+  });
+  cv::PitchFxParams p = autotuneOnly(1.0f);
+  gFx.reset();
+  const Notes a = outputNotes(run(gFx, vib, p));
+  p.autotune.key = 9;  // Eb / Cm
+  gFx.reset();
+  const Notes b = outputNotes(run(gFx, tone(kA3, 3 * cv::kSampleRate), p));
+  const bool held = b.changesPerSec == 0.0 && std::fabs(b.lo - 56.0) <= 0.05 && std::fabs(b.hi - 56.0) <= 0.05;
+  return report("halfway holds", a.changesPerSec == 0.0 && held,
+                "C#4 +15 c vibrato in C: %.1f note changes a second (0); A3 in Eb: %.1f a second (0), out MIDI "
+                "%.2f..%.2f (56 +-0.05)",
+                a.changesPerSec, b.changesPerSec, b.lo, b.hi);
+}
+
+// Normalised autocorrelation of x over [from, from + w) against x lag samples ahead.
+double ncorr(const std::vector<float>& x, int from, int w, double lag) {
+  const int li = static_cast<int>(std::floor(lag));
+  const double fr = lag - li;
+  double sxy = 0.0, sxx = 0.0, syy = 0.0;
+  for (int i = from; i < from + w; ++i) {
+    const size_t j = static_cast<size_t>(i + li);
+    const double a = x[static_cast<size_t>(i)];
+    const double b = (1.0 - fr) * x[j] + fr * x[j + 1];
+    sxy += a * b;
+    sxx += a * a;
+    syy += b * b;
+  }
+  return sxy / std::sqrt(std::max(sxx * syy, 1e-30));
+}
+
+// The pitch of x near nearHz over one second from 600 ms, for pitches the tracker cannot read: the
+// best normalised autocorrelation at m periods, m chosen so the lag spans 400 samples or more, in
+// quarter samples within half a period of m periods (3 semitones when m is 1).
+double periodicHz(const std::vector<float>& x, double nearHz) {
+  const double p = cv::kSampleRate / nearHz;
+  const int m = std::max(1, static_cast<int>(400.0 / p));
+  const double span = m == 1 ? std::exp2(3.0 / 12.0) : 1.0 + 0.45 / m;
+  double best = -2.0, bestLag = m * p;
+  for (double lag = std::floor(m * p / span); lag <= m * p * span; lag += 0.25) {
+    const double r = ncorr(x, cv::kSampleRate * 6 / 10, cv::kSampleRate, lag);
+    if (r > best) {
+      best = r;
+      bestLag = lag;
+    }
+  }
+  return m * cv::kSampleRate / bestLag;
+}
+
+// 11. At the ends of the tracker's range the note passes uncorrected. 68 Hz reads at the slow end of
+// the search and 1,030 Hz at the fast end, both flagged clamped, and the output stays on the sung note;
+// before this pass the edge reading pulled them 85 cents sharp and 21 cents flat. 1,200 Hz reads an
+// octave down, unclamped, and still lands D6.
+bool testRangeEnds() {
+  const cv::PitchFxParams p = autotuneOnly(1.0f);
+  gFx.reset();
+  const double low = cents(periodicHz(run(gFx, tone(68.0, 2 * cv::kSampleRate), p), 68.0), 68.0);
+  gFx.reset();
+  const double high = cents(periodicHz(run(gFx, tone(1030.0, 2 * cv::kSampleRate), p), 1030.0), 1030.0);
+  constexpr double kD6 = 1174.66;
+  gFx.reset();
+  const double above = cents(periodicHz(run(gFx, tone(1200.0, 2 * cv::kSampleRate), p), kD6), kD6);
+  return report("range ends", std::fabs(low) <= 15.0 && std::fabs(high) <= 15.0 && std::fabs(above) <= 11.0,
+                "68 Hz out %+.1f c off the sung note, 1,030 Hz %+.1f c (+-15); 1,200 Hz out %+.1f c off D6 (+-11)", low,
+                high, above);
+}
+
+// 12. The first note after a reset glides at RESPONSE like every other note. At 500 ms, A3 + 40 cents
+// from a reset and D4 - 30 cents after 250 ms of silence each move the same share of their way in the
+// 50 ms after the tracker first publishes them, within 10 %. Before, the first note snapped 98 % of
+// its way at once.
+double shareIn50Ms(const std::vector<Hop>& hops, size_t first, double want) {
+  const double start = first > 0 ? hops[first - 1].corr : 0.0;
+  const size_t at = first + static_cast<size_t>(cv::kSampleRate / 20 / cv::kBlock);
+  return (hops[at].corr - start) / (want - start);
+}
+
+bool testFirstNote() {
+  const int n1 = cv::kSampleRate * 6 / 10, gap = cv::kSampleRate / 4, n2 = cv::kSampleRate * 6 / 10;
+  std::vector<float> in = tone(440.0 * std::exp2((57.4 - 69.0) / 12.0), n1);
+  in.insert(in.end(), static_cast<size_t>(gap), 0.0f);
+  const std::vector<float> second = tone(440.0 * std::exp2((61.7 - 69.0) / 12.0), n2);
+  in.insert(in.end(), second.begin(), second.end());
+  std::vector<Hop> hops;
+  gFx.reset();
+  run(gFx, in, autotuneOnly(500.0f), &hops);
+  size_t f1 = 0, f2 = 0;
+  while (f1 < hops.size() && hops[f1].hz <= 0.0f) ++f1;
+  while (f2 < hops.size() && !(hops[f2].end > n1 + gap && hops[f2].hz > 280.0f)) ++f2;
+  if (f2 + cv::kSampleRate / 20 / cv::kBlock >= hops.size()) return report("first note glides", false, "no second note", 0.0);
+  const double s1 = shareIn50Ms(hops, f1, -0.4), s2 = shareIn50Ms(hops, f2, 0.3);
+  return report("first note glides", std::fabs(s1 - s2) <= 0.1 * s2,
+                "RESPONSE 500 ms, share of the way in 50 ms: first note %.1f %%, next note after a gap %.1f %% "
+                "(within 10 %%)",
+                100.0 * s1, 100.0 * s2);
+}
+
+// Pink noise from a seeded LCG through Kellet's three-pole filter, as crowd_test's program makes it,
+// scaled to rmsDb dBFS.
+std::vector<float> pinkNoise(int n, double rmsDb) {
+  std::vector<double> x(static_cast<size_t>(n));
+  uint64_t s = 0x9E3779B97F4A7C15ULL;
+  double b0 = 0.0, b1 = 0.0, b2 = 0.0, sum = 0.0;
+  for (double& v : x) {
+    s = s * 6364136223846793005ULL + 1442695040888963407ULL;
+    const double w = static_cast<double>(s >> 11) / 4503599627370496.0 - 1.0;
+    b0 = 0.99765 * b0 + w * 0.0990460;
+    b1 = 0.96300 * b1 + w * 0.2965164;
+    b2 = 0.57000 * b2 + w * 1.0526913;
+    v = b0 + b1 + b2 + w * 0.1848;
+    sum += v * v;
+  }
+  const double g = std::pow(10.0, rmsDb / 20.0) / std::sqrt(sum / n);
+  std::vector<float> out(x.size());
+  for (size_t i = 0; i < x.size(); ++i) out[i] = static_cast<float>(x[i] * g);
+  return out;
+}
+
+// 13. A wrong tracker frame stays out of the target. A3 at -20 dBFS with pink noise 5 dB under reads a
+// period three times too long on some hops, which in KEY E lands halfway between two notes; the target
+// takes the median there instead. Voiced hops pulled 0.2 st or more off the in-tune A3 over 3 s: 28
+// before this pass, 16 now.
+bool testBleed() {
+  const int n = 3 * cv::kSampleRate;
+  std::vector<float> x = tone(kA3, n);
+  const float toneGain = static_cast<float>(std::pow(10.0, -20.0 / 20.0) / rms(x, 0, n));
+  const std::vector<float> noise = pinkNoise(n, -25.0);
+  for (size_t i = 0; i < x.size(); ++i) x[i] = x[i] * toneGain + noise[i];
+  cv::PitchFxParams p = autotuneOnly(1.0f);
+  p.autotune.key = 4;  // E / C#m
+  std::vector<Hop> hops;
+  gFx.reset();
+  run(gFx, x, p, &hops);
+  int pulled = 0;
+  for (const Hop& h : hops) {
+    if (h.end < kSettle || h.end % cv::PitchTracker::kHop != 0 || !h.voiced) continue;
+    if (std::fabs(h.corr) >= 0.2f) ++pulled;
+  }
+  return report("bleed", pulled <= 18,
+                "A3 with pink noise 5 dB under, KEY E: %.0f voiced hops pulled 0.2 st or more (<= 18)", pulled);
 }
 
 }  // namespace
@@ -354,6 +637,11 @@ int main() {
   ok &= testOctaveFollows();
   ok &= testHardTune();
   ok &= testToggle();
+  ok &= testToggleLevel();
+  ok &= testHalfway();
+  ok &= testRangeEnds();
+  ok &= testFirstNote();
+  ok &= testBleed();
   // Every process() call above ran under the allocation guard.
   ok &= report("no allocation", true, "process() ran under the new/delete guard", 0.0);
   std::printf("%s autotune\n", ok ? "PASS" : "FAIL");

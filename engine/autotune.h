@@ -11,10 +11,10 @@
 #include "engine/scale.h"
 #include "engine/smooth.h"
 
-// Autotune pulls the sung pitch to the nearest note of the key's major scale
-// with a grid PSOLA voice. RESPONSE is the one-pole time constant on the
-// correction. PitchFx owns the ring, the tracker, and the crossfade from the
-// dry voice to the corrected one.
+// Autotune pulls the sung pitch to a note of the key's major scale with a grid
+// PSOLA voice: the nearest note, unless the last one still holds (scale.h).
+// RESPONSE is the one-pole time constant on the correction. PitchFx owns the
+// ring, the tracker, and the crossfade from the dry voice to the corrected one.
 
 namespace cv {
 
@@ -51,16 +51,17 @@ class AutotuneVoice {
     psola_.reset();
     corr_ = 0.0f;
     target_ = 0.0f;
-    fresh_ = true;
     responseMs_ = kUnset;
     trimDb_ = kUnset;
     degreeHz_ = kUnset;
+    haveNote_ = false;
   }
 
   // Per block: sets the target correction from pr and returns the smoothed correction in
-  // semitones, 0 when off. Unvoiced frames hold the target. The first voiced frame after reset()
-  // snaps to the target; after that the correction always glides. libm runs only when its input
-  // moved: RESPONSE and the trim when they change, the scale degree when a hop publishes a new frame.
+  // semitones, 0 when off. Unvoiced frames hold the target. A clamped frame reads the tracker's
+  // edge, not the note, so its target is 0 and the note passes uncorrected. The correction starts
+  // from 0 after reset() and always glides at RESPONSE. libm runs only when its input moved:
+  // RESPONSE and the trim when they change, the scale note when a hop publishes a new frame.
   float prepare(const PitchResult& pr, const AutotuneParams& p) {
     const AutotuneTuning& t = p.tuning;
     if (p.responseMs != responseMs_) {
@@ -73,16 +74,13 @@ class AutotuneVoice {
     }
     psola_.setGrainDelay(t.grainDelay);
     if (!p.on) return 0.0f;
-    if (pr.voiced && pr.hz > 0.0f) {
-      if (pr.rawHz != degreeHz_ || p.key != degreeKey_) {
-        degreeHz_ = pr.rawHz;
-        degreeKey_ = p.key;
-        deviation_ = degreeOf(pr.rawHz, p.key).dev;
-      }
+    if (pr.voiced && pr.clamped) {
+      target_ = 0.0f;
+    } else if (pr.voiced && pr.hz > 0.0f) {
+      const float hz = sungHz(pr);
+      if (hz != degreeHz_ || p.key != degreeKey_) pullTo(hz, p.key);
       const float maxC = t.maxCorrectSemis > 0.0f ? t.maxCorrectSemis : 0.0f;
       target_ = clampf(-deviation_, -maxC, maxC);
-      if (fresh_) corr_ = target_;
-      fresh_ = false;
     }
     return corr_;
   }
@@ -101,18 +99,41 @@ class AutotuneVoice {
  private:
   // NaN equals no input, so a cleared input recomputes on the next prepare().
   static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();
+  static constexpr float kFifthRatio = 1.49830708f;  // 2^(7/12)
+
+  // The pitch the target follows. The newest frame is one hop fresher than the median, so it leads
+  // while it sits within a fifth of the median; past that the median stands in, so a frame read at
+  // two or three times the period never reaches the target. A sung leap stays inside the fifth and
+  // lands on its own hop.
+  static float sungHz(const PitchResult& pr) {
+    const bool withinFifth = pr.rawHz < pr.hz * kFifthRatio && pr.rawHz * kFifthRatio > pr.hz;
+    return withinFifth ? pr.rawHz : pr.hz;
+  }
+
+  // The scale note the pitch hz pulls to, and the pitch's distance from it. The first pick after
+  // reset() or a KEY change takes the nearest note; every later pick holds the last note within
+  // kHoldSemis past the halfway point (scale.h).
+  void pullTo(float hz, int key) {
+    const float midi = midiOf(hz);
+    note_ = haveNote_ && key == degreeKey_ ? heldNote(midi, key, note_) : midi - degreeOfMidi(midi, key).dev;
+    haveNote_ = true;
+    degreeHz_ = hz;
+    degreeKey_ = key;
+    deviation_ = midi - note_;
+  }
 
   PsolaVoice psola_;
   float corr_ = 0.0f;
   float target_ = 0.0f;
   float a_ = 1.0f;
   float gain_ = 1.0f;
-  bool fresh_ = true;
   float responseMs_ = kUnset;  // the inputs a_, gain_ and deviation_ were computed from
   float trimDb_ = kUnset;
   float degreeHz_ = kUnset;
   int degreeKey_ = 0;
   float deviation_ = 0.0f;  // the sung pitch's distance from its scale note, semitones
+  float note_ = 0.0f;       // the scale note the last pick pulled to, as a MIDI pitch
+  bool haveNote_ = false;
 };
 
 }  // namespace cv
