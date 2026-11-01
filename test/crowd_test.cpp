@@ -1,11 +1,11 @@
 // Crowd card checks: bit-exact off, no allocation, pitch moved by pitchSt, formant moved, two copies
-// of different colour, the WIDTH law, the level law across VOICES, the lead leaving, the voice
-// count and fade order, the solo, the lag following its scale across a gap and holding inside a
-// burst, timing scatter, pitch drift, the tracker running without Autotune, the two enhancements
+// of different colour, the DIVERGE law, the level law across VOICES, the lead leaving, the voice
+// count and entry order, a VOICES step gliding, the solo, the lag following its scale across a gap
+// and holding inside a burst, timing scatter, pitch drift, the tracker running without Autotune, the two enhancements
 // (every control at its default is the pinned engine bit for bit, level scatter, contour and the
-// human-voice ranges), the bottom tenth of WIDTH staying in tune (pitch, drift and contour), the
+// human-voice ranges), the bottom tenth of DIVERGE staying in tune (pitch, drift and contour), the
 // shared tone shelf, the correctness pass (the switch with the tracker, the gap rule over a noise
-// floor, WIDTH holding the level, notes outside the tracker's range, the read ceiling, the tuning
+// floor, DIVERGE holding the level, notes outside the tracker's range, the read ceiling, the tuning
 // ranges), and the raised copies (their pitch over the tuned copies, their 75 ms lag, the unvoiced
 // run each copy waits before it plays plain). Every run feeds a PitchFx through its pass-through
 // path first, so the ring is written and the tracker runs, as the chain does. No window, no audio
@@ -211,6 +211,7 @@ cv::Crowd gCrowd;
 struct Probe {
   float lead = -1.0f;
   int active = -1;
+  unsigned mask = 0;   // a bit per copy that ticked in the last block
   float drift = 0.0f;  // largest |drift| in cents any copy showed at the end of any block
 };
 
@@ -242,6 +243,7 @@ Signal runBoth(const Signal& in, const cv::CrowdParams& first, const cv::CrowdPa
     if (probe) {
       probe->lead = gCrowd.leadGain();
       probe->active = gCrowd.activeVoices();
+      probe->mask = gCrowd.activeMask();
       for (size_t v = 0; v < 8; ++v) probe->drift = std::max(probe->drift, std::fabs(gCrowd.driftCents(v)));
     }
   }
@@ -266,21 +268,21 @@ void neutralize(cv::CrowdTuning& t) {
   t.contour = {1.0f, 1.0f, 1.0f, 1.0f};
 }
 
-cv::CrowdParams knobs(float voices, float width) {
+cv::CrowdParams knobs(uint8_t voices, float width) {
   cv::CrowdParams p;
   p.on = true;
-  p.voices = voices;
+  p.voicesStep = voices;
   p.width = width;
   neutralize(p.tuning);
   return p;
 }
 
-// Voice 0 alone with nothing around it. Soloed at the top of VOICES it stands alone at unity, so
-// the lead is 0 and its raised copy is silent, and the low cut sits at the bottom of the filter
-// band. The voice sits on the lead's pitch with a flat tone, so only its formant move is left.
-// WIDTH sits at 1, so a pitchSt is the offset heard.
+// Voice 0 alone with nothing around it. Soloed at MOB it stands alone at unity, so the lead is 0
+// and its raised copy is silent, and the low cut sits at the bottom of the filter band. The voice
+// sits on the lead's pitch with a flat tone, so only its formant move is left. DIVERGE sits at 1,
+// so a pitchSt is the offset heard.
 cv::CrowdParams isolated(float formantSt) {
-  cv::CrowdParams p = knobs(1.0f, 1.0f);
+  cv::CrowdParams p = knobs(cv::kVoicesMob, 1.0f);
   p.solo = 0b0001;
   cv::CrowdTuning& t = p.tuning;
   t.voiceDb = 0.0f;
@@ -428,7 +430,7 @@ bool testOffExact() {
 
   // On, then off: the stage ends bit-exact once its ramp is out.
   const int half = kRate / 2 / cv::kBlock * cv::kBlock;
-  const Signal b = runSwitch(in, knobs(0.7f, 0.5f), off, half);
+  const Signal b = runSwitch(in, knobs(6, 0.5f), off, half);
   float worstAfter = 0.0f;
   for (size_t i = static_cast<size_t>(half + kSettle); i < in.size(); ++i)
     worstAfter = std::max(worstAfter, std::fabs(b[i] - in[i]));
@@ -439,7 +441,7 @@ bool testOffExact() {
 
 bool testReset() {
   const Signal in = program(1);
-  const cv::CrowdParams p = knobs(0.7f, 0.5f);
+  const cv::CrowdParams p = knobs(6, 0.5f);
   const Signal a = run(in, p);
   const Signal b = run(in, p);
   size_t differ = 0;
@@ -449,18 +451,18 @@ bool testReset() {
 
 bool testNoAlloc() {
   const Signal in = program(1);
-  run(in, knobs(0.9f, 0.5f));  // aborts on any new/delete inside process()
-  cv::CrowdParams moving = knobs(0.3f, 0.9f);
+  run(in, knobs(8, 0.5f));  // aborts on any new/delete inside process()
+  cv::CrowdParams moving = knobs(2, 0.9f);
   moving.tuning.scatterMs = 12.0f;
   moving.tuning.driftCents = 30.0f;
   run(in, moving);
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
-// The top of the WIDTH factor on pitch offsets, drift and contour (owner 2026-10-31).
+// The top of the DIVERGE factor on pitch offsets, drift and contour (owner 2026-10-31).
 constexpr double kPitchTop = 2.0 / 3.0;
 
-// One voice alone lands on the lead's pitch moved by two thirds of its pitchSt at WIDTH 1, with the
+// One voice alone lands on the lead's pitch moved by two thirds of its pitchSt at DIVERGE 1, with the
 // voice's own formant and tone shelf in place.
 bool testPitchMoves() {
   const Signal in = tone(220.0, 2 * kRate);
@@ -477,16 +479,16 @@ bool testPitchMoves() {
   return ok;
 }
 
-// The WIDTH law of the owner, written out here so the test does not lean on the engine's code. The
+// The DIVERGE law of the owner, written out here so the test does not lean on the engine's code. The
 // factor on the formant offsets is linear through (0, 0), (0.1, 0.012) and (1, 1).
 double widthFactor(double w) { return w <= 0.1 ? 0.012 * (w / 0.1) : 0.012 + 0.988 * ((w - 0.1) / 0.9); }
 
 // The factor on the pitch offsets, the drift and the contour deviation is the same law with a top of
-// 2/3 (owner 2026-10-31), so the knee value is 0.008 and WIDTH 1 reaches two thirds.
+// 2/3 (owner 2026-10-31), so the knee value is 0.008 and DIVERGE 1 reaches two thirds.
 double pitchFactor(double w) { return widthFactor(w) * kPitchTop; }
 
-// Copy v's lag in ms on the default delays at WIDTH w. The multiplier on delayMs times lagScale is
-// 0.5 at WIDTH 0 and 1 + 20 ms / (the longest base lag) at WIDTH 1, linear between, and maxLagMs
+// Copy v's lag in ms on the default delays at DIVERGE w. The multiplier on delayMs times lagScale is
+// 0.5 at DIVERGE 0 and 1 + 20 ms / (the longest base lag) at DIVERGE 1, linear between, and maxLagMs
 // caps the product.
 double lagMsAt(size_t v, double w, double lagScale) {
   const cv::CrowdTuning d;
@@ -500,14 +502,14 @@ double lagMsAt(size_t v, double w, double lagScale) {
 // the f0 wanted.
 double copyHz(const Signal& out, double want) { return peakHz(out, kRate, kRate, 2.0 * want) / 2.0; }
 
-// The -2.5 st copy (index 2, formant -1 st) alone at WIDTH 0, 0.1, 0.5 and 1. Its pitch offset is -2.5 st
+// The -2.5 st copy (index 2, formant -1 st) alone at DIVERGE 0, 0.1, 0.5 and 1. Its pitch offset is -2.5 st
 // times the pitch factor, exactly 0 at 0, 2.0 cents at 0.1 (the knee), 0.301 of the full offset at
 // 0.5 and 0.667 of it (-1.667 st) at 1. Its formant move is the log of its grain playback rate over
-// the same log at WIDTH 1, read from the engine, and follows the full width factor: none at 0, 1.2 %
+// the same log at DIVERGE 1, read from the engine, and follows the full width factor: none at 0, 1.2 %
 // at 0.1 and 0.451 at 0.5. (A spectral centroid does not read it,
-// because the grain windows make the centroid's slope depend on the pitch ratio; at WIDTH 0 the
+// because the grain windows make the centroid's slope depend on the pitch ratio; at DIVERGE 0 the
 // output itself shows it, which equals the output of a copy with no pitch or formant offset.) The
-// tone shelf stays where it is, and the lag follows the lag multiplier of the WIDTH law.
+// tone shelf stays where it is, and the lag follows the lag multiplier of the DIVERGE law.
 constexpr size_t kWidthCopy = 2;
 
 struct WidthRow {
@@ -517,7 +519,7 @@ struct WidthRow {
 
 constexpr std::array<WidthRow, 4> kWidthRows = {{{0.0f, 1.0}, {0.1f, 1.5}, {0.5f, 10.0}, {1.0f, 10.0}}};
 
-// What the copy showed at a row's WIDTH: its lag in samples, its grain playback rate, its f0 and the
+// What the copy showed at a row's DIVERGE: its lag in samples, its grain playback rate, its f0 and the
 // f0 the law wants.
 struct WidthRun {
   float lag = 0.0f;
@@ -549,7 +551,7 @@ bool reportWidthPitch(const WidthRuns& runs) {
   for (size_t i = 0; i < runs.size(); ++i) {
     const double err = cents(runs[i].hz, runs[i].want);
     char name[40];
-    std::snprintf(name, sizeof name, "width law, WIDTH %.0f %%", static_cast<double>(kWidthRows[i].width) * 100.0);
+    std::snprintf(name, sizeof name, "width law, DIVERGE %.0f %%", static_cast<double>(kWidthRows[i].width) * 100.0);
     ok &= report(name, std::fabs(err) <= kWidthRows[i].tolCents, "f0=%.3f Hz, want %.3f Hz, err=%.2f cents (+-%.0f)",
                  runs[i].hz, runs[i].want, err, kWidthRows[i].tolCents);
   }
@@ -563,7 +565,7 @@ bool reportWidthFormant(const WidthRuns& runs) {
     const double w = static_cast<double>(kWidthRows[k].width);
     const double move = std::log(runs[k].rate) / std::log(runs[3].rate);
     char name[48];
-    std::snprintf(name, sizeof name, "width law formant, WIDTH %.0f %%", w * 100.0);
+    std::snprintf(name, sizeof name, "width law formant, DIVERGE %.0f %%", w * 100.0);
     ok &= report(name, std::fabs(move - widthFactor(w)) <= kMoveTol, "formant move %.3f of full, want %.3f (+-%.3f)", move,
                  widthFactor(w), kMoveTol);
     std::printf("info width %.2f copy 3 f0 %.3f Hz, %+.2f cents from the 220 Hz lead, formant move %.1f %% of full\n", w,
@@ -572,7 +574,7 @@ bool reportWidthFormant(const WidthRuns& runs) {
   return ok;
 }
 
-// At WIDTH 0 the vowel through the copy is the vowel through a copy with no pitch or formant offset.
+// At DIVERGE 0 the vowel through the copy is the vowel through a copy with no pitch or formant offset.
 bool reportWidthNoOffsets() {
   const Signal vow = vowel(220.0, 2 * kRate);
   cv::CrowdParams withOffsets = alone(kWidthCopy);
@@ -582,11 +584,11 @@ bool reportWidthNoOffsets() {
   noOffsets.tuning.formantSt[0] = 0.0f;
   const size_t differ = differing(run(vow, withOffsets), run(vow, noOffsets));
   return report("width law no offsets at 0", differ == 0,
-                "WIDTH 0 with a -2.5 st pitch and a -1 st formant differs from one with none in %.0f samples (0)",
+                "DIVERGE 0 with a -2.5 st pitch and a -1 st formant differs from one with none in %.0f samples (0)",
                 static_cast<double>(differ));
 }
 
-// The slot-0 copy's lag follows the lag multiplier: 0.5 at WIDTH 0, 1.1667 at WIDTH 1.
+// The slot-0 copy's lag follows the lag multiplier: 0.5 at DIVERGE 0, 1.1667 at DIVERGE 1.
 bool reportWidthLagStretch(const WidthRuns& runs) {
   const double lagScale = static_cast<double>(cv::CrowdTuning{}.lagScale);
   double worstLag = 0.0;
@@ -595,7 +597,7 @@ bool reportWidthLagStretch(const WidthRuns& runs) {
     worstLag = std::max(worstLag, std::fabs(static_cast<double>(runs[k].lag) - wantLag));
   }
   return report("width stretches the lag", worstLag < 1.0,
-                "lag at WIDTH 0 / 0.5 / 1 = %.1f / %.1f / %.1f samples, worst error over the four WIDTHs %.2f samples (< 1)",
+                "lag at DIVERGE 0 / 0.5 / 1 = %.1f / %.1f / %.1f samples, worst error over the four DIVERGE positions %.2f samples (< 1)",
                 static_cast<double>(runs[0].lag), static_cast<double>(runs[2].lag), static_cast<double>(runs[3].lag),
                 worstLag);
 }
@@ -609,20 +611,20 @@ bool testWidthLaw() {
   return ok;
 }
 
-// VOICES 20, 40, 60 and 80 % bring in the tuned copies in index order, the -1.75 st copy first, then
-// the +2.75 st, the -2.5 st and the +1 st, each with its raised copy. At each step the output carries
-// a line at the f0 of every tuned copy that has come in and none at the f0 of the copies still to
-// come. It runs at WIDTH 1 and at WIDTH 0.8, where the offsets are the pitch factor 0.520 of their
-// full values. (At WIDTH 0.5 the -1.75 st and -2.5 st copies sit 23 cents apart and their lines
-// overlap.) The lines are read under a Hann window, because the lead's line and the first raised
-// copy's, both at 220 Hz, leak into the +1 st copy's line 8.6 Hz away under a plain one.
+// VOICES 2, 4, 6 and 8 bring in the tuned copies in index order, the -1.75 st copy first, then the
+// +2.75 st, the -2.5 st and the +1 st, each with its raised copy. At each step the output carries a
+// line at the f0 of every tuned copy that has come in and none at the f0 of the copies still to
+// come. It runs at DIVERGE 1 and at DIVERGE 0.8, where the offsets are the pitch factor 0.520 of
+// their full values. (At DIVERGE 0.5 the -1.75 st and -2.5 st copies sit 23 cents apart and their
+// lines overlap.) The lines are read under a Hann window, because the lead's line and the first
+// raised copy's, both at 220 Hz, leak into the +1 st copy's line 8.6 Hz away under a plain one.
 bool testFadeOrder() {
   const Signal in = tone(220.0, 2 * kRate);
   const cv::CrowdTuning d;
   bool ok = true;
   for (float width : {1.0f, 0.8f}) {
     for (int n = 1; n <= 4; ++n) {
-      const Signal out = run(in, knobs(0.2f * static_cast<float>(n), width));
+      const Signal out = run(in, knobs(static_cast<uint8_t>(2 * n), width));
       double amp[4];
       double top = 0.0;
       for (size_t v = 0; v < 4; ++v) {
@@ -637,7 +639,7 @@ bool testFadeOrder() {
         order &= static_cast<int>(v) < n ? rel[v] >= 0.4 : rel[v] <= 0.1;
       }
       char name[48];
-      std::snprintf(name, sizeof name, "fade order, WIDTH %.0f %%, VOICES %d %%", static_cast<double>(width * 100.0f), 20 * n);
+      std::snprintf(name, sizeof name, "fade order, DIVERGE %.0f %%, VOICES %d", static_cast<double>(width * 100.0f), 2 * n);
       ok &= report(name, order,
                    "line at each copy's f0 re the loudest %.2f %.2f %.2f %.2f (sounding >= 0.4, silent <= 0.1)", rel[0],
                    rel[1], rel[2], rel[3]);
@@ -669,7 +671,7 @@ bool testFormantMoves() {
 }
 
 // A raised copy shares its tuned copy's throat and tone shelf and is told apart by its pitch: on the
-// 220 Hz tone at WIDTH 1 it sits two thirds of 1.75 st, 116.7 cents, over the tuned copy.
+// 220 Hz tone at DIVERGE 1 it sits two thirds of 1.75 st, 116.7 cents, over the tuned copy.
 bool testRaisedDiffers() {
   const Signal in = tone(220.0, 2 * kRate);
   double gap[4];
@@ -690,7 +692,7 @@ bool testRaisedDiffers() {
 // colours. Both sit on the lead's pitch, so only the throat and the tone shelf tell them apart, and
 // the spectral centroid of each, over the harmonics of the lead's f0 up to the 20th, differs by at
 // least 5 %. The centroid of a steady tone depends on how the grain reads line up with the period
-// grid (see formantProbe), so the WIDTH multiplier on the lag is held at 1 and both voices sit at
+// grid (see formantProbe), so the DIVERGE multiplier on the lag is held at 1 and both voices sit at
 // 48 ms.
 bool testVoicesDiffer() {
   const Signal in = tone(220.0, 2 * kRate);
@@ -714,57 +716,101 @@ double levelDb(const Signal& in, const Signal& out) {
   return 20.0 * std::log10(rms(out, from, out.size()) / rms(in, from, in.size()));
 }
 
+// Total power is unity at every VOICES position. The law holds it exactly (the lead's power plus the
+// copies' power with the crowd multiplier, to float precision), whatever the tuning, for the default
+// tuning and for a quieter and a louder copy gain (eight copies stay under unity power above -6 dB).
+bool testPowerLaw() {
+  bool ok = true;
+  double worst = 0.0;
+  for (float voiceDb : {-9.0f, -15.0f, -7.0f}) {
+    cv::CrowdTuning t;
+    t.voiceDb = voiceDb;
+    for (uint8_t k = 0; k < cv::kVoicesSteps; ++k) {
+      const cv::crowd_detail::VoicesLaw law = cv::crowd_detail::voicesLaw(k, t);
+      double copies = 0.0;
+      for (float w : law.weight) copies += static_cast<double>(w) * w;
+      const double mul = static_cast<double>(law.mul);
+      const double power = static_cast<double>(law.lead) * law.lead + copies * mul * mul;
+      worst = std::max(worst, std::fabs(power - 1.0));
+    }
+  }
+  ok &= report("power law", worst < 1e-5,
+               "worst |lead^2 + copies^2 - 1| over positions 0..MOB and 3 copy gains %.2g (< 1e-5)", worst);
+  return ok;
+}
+
+// Through the full engine on the program, every position holds the card's level band, -1.5..+1.0 dB.
+// The same positions on a steady 220 Hz tone are an info line, because pitch-shifted and delayed
+// copies of a held tone add as a comb whose level moves with DIVERGE and the copy gains, not with
+// the VOICES law.
 bool testLevelLaw() {
+  const Signal steady = tone(220.0, 3 * kRate);
   const Signal in = program(3);
   bool ok = true;
-  for (float k : {0.2f, 0.4f, 0.6f, 0.8f, 1.0f}) {
+  std::printf("info level steady tone at DIVERGE 50 %%, dB re input:");
+  for (uint8_t k = 0; k < cv::kVoicesSteps; ++k)
+    std::printf(" %s %+.2f", cv::kVoicesName[k], levelDb(steady, run(steady, knobs(k, 0.5f))));
+  std::printf("\n");
+  for (uint8_t k = 0; k < cv::kVoicesSteps; ++k) {
     const double db = levelDb(in, run(in, knobs(k, 0.5f)));
-    char name[40];
-    std::snprintf(name, sizeof name, "level VOICES %.0f %%", static_cast<double>(k * 100.0f));
+    char name[48];
+    std::snprintf(name, sizeof name, "level program VOICES %s", cv::kVoicesName[k]);
     ok &= report(name, db >= -1.5 && db <= 1.0, "%+.2f dB re input (-1.5..+1.0)", db);
   }
   for (float w : {0.0f, 1.0f}) {
-    const double db = levelDb(in, run(in, knobs(1.0f, w)));
-    std::printf("info level VOICES 100 %% WIDTH %.0f %%  %+.2f dB re input\n", static_cast<double>(w * 100.0f), db);
+    const double db = levelDb(in, run(in, knobs(cv::kVoicesMob, w)));
+    std::printf("info level VOICES MOB DIVERGE %.0f %%  %+.2f dB re input\n", static_cast<double>(w * 100.0f), db);
   }
   return ok;
 }
 
+// The lead is 1 at position 0, falls with each copy by unity power, sqrt(1 - k copies' power), and
+// is gone at MOB.
 bool testLeadLeaves() {
   const Signal in = program(1);
-  Probe top;
-  run(in, knobs(1.0f, 0.5f), &top);
-  Probe four;
-  run(in, knobs(0.8f, 0.5f), &four);
-  Probe one;
-  run(in, knobs(0.2f, 0.5f), &one);
   const cv::CrowdTuning t;
-  const double g2 = std::pow(10.0, t.voiceDb / 10.0);
-  const double wantFour = std::sqrt(1.0 - 4.0 * g2);
-  const double wantOne = std::sqrt(1.0 - g2);
-  bool ok = report("lead leaves", top.lead == 0.0f, "lead gain at VOICES 100 %% = %.3g (0)", static_cast<double>(top.lead));
-  ok &= report("lead law", std::fabs(four.lead - wantFour) < 0.01 && std::fabs(one.lead - wantOne) < 0.01,
-               "lead at 80 %% %.3f (want %.3f), at 20 %% %.3f (want %.3f)", static_cast<double>(four.lead), wantFour,
-               static_cast<double>(one.lead), wantOne);
+  const double perCopy = 0.5 * std::pow(10.0, t.voiceDb / 10.0);
+  bool ok = true;
+  float prev = 2.0f;
+  for (uint8_t k = 0; k < cv::kVoicesMob; ++k) {
+    Probe p;
+    run(in, knobs(k, 0.5f), &p);
+    const double want = std::sqrt(1.0 - static_cast<double>(k) * perCopy);
+    char name[40];
+    std::snprintf(name, sizeof name, "lead law VOICES %s", cv::kVoicesName[k]);
+    const bool falls = k == 0 ? p.lead == 1.0f : p.lead < prev;
+    ok &= report(name, falls && std::fabs(static_cast<double>(p.lead) - want) < 1e-4,
+                 "lead gain %.4f (want %.4f), below the one before: %.0f (1)", static_cast<double>(p.lead), want,
+                 falls ? 1.0 : 0.0);
+    prev = p.lead;
+  }
+  Probe top;
+  run(in, knobs(cv::kVoicesMob, 0.5f), &top);
+  ok &= report("lead leaves", top.lead == 0.0f, "lead gain at MOB = %.3g (0)", static_cast<double>(top.lead));
   return ok;
 }
 
-// Each fifth of VOICES brings in one tuned copy and its raised copy.
+// The copies enter one at a time, tuned 0, raised 4, tuned 1, raised 5, tuned 2, raised 6, tuned 3,
+// raised 7. Position k plays the first k, and MOB plays all eight.
 bool testVoiceCount() {
   const Signal in = program(1);
   bool ok = true;
-  const std::pair<float, int> want[] = {{0.0f, 0}, {0.2f, 2}, {0.4f, 4}, {0.6f, 6}, {0.8f, 8}, {1.0f, 8}};
-  for (const auto& w : want) {
+  const std::array<unsigned, 8> order = {0, 4, 1, 5, 2, 6, 3, 7};
+  unsigned want = 0;
+  for (uint8_t k = 0; k < cv::kVoicesSteps; ++k) {
+    if (k >= 1 && k <= order.size()) want |= 1u << order[k - 1];
     Probe p;
-    run(in, knobs(w.first, 0.5f), &p);
+    run(in, knobs(k, 0.5f), &p);
+    const int count = k < cv::kVoicesMob ? k : 8;
     char name[40];
-    std::snprintf(name, sizeof name, "voice count VOICES %.0f %%", static_cast<double>(w.first * 100.0f));
-    ok &= report(name, p.active == w.second, "%.0f copies ticking (%.0f)", p.active, w.second);
+    std::snprintf(name, sizeof name, "voice count VOICES %s", cv::kVoicesName[k]);
+    ok &= report(name, p.active == count && p.mask == want, "%.0f copies ticking (%.0f), copy bits %.0f (%.0f)",
+                 p.active, count, static_cast<double>(p.mask), static_cast<double>(want));
   }
 
-  // At 20 % the live copies are voice 0 and its raised copy, which read the tuning's first entries:
-  // the entries of voices 1..3 can change without moving a sample.
-  cv::CrowdParams a = knobs(0.2f, 0.5f);
+  // At position 2 the live copies are voice 0 and its raised copy, which read the tuning's first
+  // entries: the entries of voices 1..3 can change without moving a sample.
+  cv::CrowdParams a = knobs(2, 0.5f);
   cv::CrowdParams b = a;
   for (size_t v = 1; v < 4; ++v) {
     b.tuning.pitchSt[v] = 4.0f;
@@ -787,10 +833,10 @@ bool testVoiceCount() {
 }
 
 // A solo sounds the soloed copies and nothing else, whatever VOICES says. Solo 0 leaves the plain
-// law untouched, and all eight copies soloed at the top of the knob are that law's crowd.
-// Voice 1 soloed at VOICES 20 %, without its raised copy.
+// law untouched, and all eight copies soloed at MOB are that law's crowd.
+// Voice 1 soloed at VOICES 2, without its raised copy.
 cv::CrowdParams soloOne() {
-  cv::CrowdParams a = knobs(0.2f, 0.5f);
+  cv::CrowdParams a = knobs(2, 0.5f);
   a.solo = 0b0010;
   return a;
 }
@@ -801,7 +847,7 @@ bool soloCountAndVoice(const Signal& in) {
   Probe p;
   const cv::CrowdParams a = soloOne();
   const Signal outA = run(in, a, &p);
-  bool ok = report("solo count", p.active == 1, "%.0f voices ticking at solo 0b0010, VOICES 20 %% (1)", p.active);
+  bool ok = report("solo count", p.active == 1, "%.0f voices ticking at solo 0b0010, VOICES 2 (1)", p.active);
   cv::CrowdParams b = a;
   b.tuning.pitchSt[0] = 4.0f;
   b.tuning.formantSt[0] = 5.0f;
@@ -816,27 +862,27 @@ bool soloCountAndVoice(const Signal& in) {
   return ok;
 }
 
-// At the top the lead is gone and the one soloed copy stands alone.
+// At MOB the lead is gone and the one soloed copy stands alone.
 bool soloTop(const Signal& in) {
   Probe p;
-  cv::CrowdParams top = knobs(1.0f, 0.5f);
+  cv::CrowdParams top = knobs(cv::kVoicesMob, 0.5f);
   top.solo = 0b0100;
   run(in, top, &p);
   return report("solo top", p.active == 1 && p.lead == 0.0f, "%.0f voices ticking (1), lead gain %.3g (0)", p.active, p.lead);
 }
 
-// Solo 0 is the plain law bit for bit, and all eight copies soloed at the top give the same crowd.
+// Solo 0 is the plain law bit for bit, and all eight copies soloed at MOB give the same crowd.
 bool soloOff(const Signal& in) {
-  const cv::CrowdParams plain = knobs(0.2f, 0.5f);
+  const cv::CrowdParams plain = knobs(2, 0.5f);
   cv::CrowdParams zero = plain;
   zero.solo = 0;
   const size_t differ = differing(run(in, plain), run(in, zero));
-  cv::CrowdParams all = knobs(1.0f, 0.5f);
+  cv::CrowdParams all = knobs(cv::kVoicesMob, 0.5f);
   const Signal outTop = run(in, all);
   all.solo = 0xFF;
   const size_t differTop = differing(outTop, run(in, all));
   return report("solo off", differ == 0 && differTop == 0,
-                "solo 0 differs in %.0f samples (0), solo 0xFF at VOICES 100 %% differs in %.0f (0)",
+                "solo 0 differs in %.0f samples (0), solo 0xFF at MOB differs in %.0f (0)",
                 static_cast<double>(differ), static_cast<double>(differTop));
 }
 
@@ -856,7 +902,7 @@ double measuredLagMs(const Signal& in, const Signal& out, int from, double aroun
   return 1000.0 * peakLag(in, out, from, from + msToSamples(150.0), lo, hi) / kRate;
 }
 
-// 220 Hz bursts with 120 ms of silence between them, at WIDTH 1. The lag scale goes from its default to
+// 220 Hz bursts with 120 ms of silence between them, at DIVERGE 1. The lag scale goes from its default to
 // 2 while burst 2 sounds in the copy's output, 100 ms after its first sample. The copy keeps its near
 // lag to the end of that burst and takes the far lag in the gap, so bursts 3 to 5 sound at the far lag.
 bool testLagAcrossGap() {
@@ -888,7 +934,7 @@ bool testLagAcrossGap() {
   return ok;
 }
 
-// Timing scatter of 12 ms on copy 4 (105 ms lag at WIDTH 1) over ten bursts. Each burst's lag stays
+// Timing scatter of 12 ms on copy 4 (105 ms lag at DIVERGE 1) over ten bursts. Each burst's lag stays
 // within 12 ms of 105 ms and differs from burst to burst. A second run with the copy's own pitch
 // offset keeps its f0 within 10 cents of the offset inside every burst, so no lag change bends it.
 struct ScatterCase {
@@ -954,7 +1000,7 @@ bool testScatter() {
   return ok;
 }
 
-// Pitch drift of 20 cents on copy 1 over a 6 s tone at WIDTH 1. The pitch factor puts the walk's peak
+// Pitch drift of 20 cents on copy 1 over a 6 s tone at DIVERGE 1. The pitch factor puts the walk's peak
 // at 20 x 2/3 cents. Its f0 over each 0.5 s window after the first second stays within that of its
 // pitch offset, with 3 cents of slack for the measurement, and differs from window to window. With
 // the drift at 0 the walk never moves off 0, whatever its hold.
@@ -982,7 +1028,7 @@ bool testDrift() {
                    "worst %.2f cents from the offset (<= 20 x 2/3 + 3), spread %.2f cents (>= 2)", worst, hi - lo);
 
   const Signal prog = program(3);
-  cv::CrowdParams a = knobs(0.7f, 0.5f);
+  cv::CrowdParams a = knobs(6, 0.5f);
   cv::CrowdParams b = a;
   b.tuning.driftHoldS = 0.3f;
   Probe probe;
@@ -1080,15 +1126,17 @@ void allEnhancements(cv::CrowdTuning& t) {
 // neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{} unchanged. The engine must
 // reproduce them to the bit. Update them only when the sound of a copy changes on purpose. Run 3 was
 // re-pinned 2026-11-01 because its scatter moved from 15 to 12 ms when the tuning range became the
-// ring's allowance, not for an engine change.
-constexpr std::array<uint64_t, 4> kPinned = {0x9d220333937cb62bULL, 0xd50d29e677f4651fULL, 0x8d7fc1ce41837fb8ULL,
-                                             0xbd5aac8433058c41ULL};
+// ring's allowance, not for an engine change. Runs 1 and 4 were re-pinned when VOICES became ten
+// steps, because their old position fell between two steps. Runs 2 and 3 sit on positions the
+// old law shared (8 and 6 copies) and kept their hashes.
+constexpr std::array<uint64_t, 4> kPinned = {0x160a6132d98f9359ULL, 0xd50d29e677f4651fULL, 0x8d7fc1ce41837fb8ULL,
+                                             0x917938dbd5014f90ULL};
 
 // Each run's hash against its pinned value.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {
-  const char* what[4] = {"180 Hz program VOICES 70 WIDTH 50", "burst program VOICES 80 WIDTH 50",
-                         "burst program VOICES 60 WIDTH 80 scatter 12 drift 20",
-                         "180 Hz program VOICES 70 WIDTH 50 on the shipped tuning"};
+  const char* what[4] = {"180 Hz program VOICES 6 DIVERGE 50", "burst program VOICES 8 DIVERGE 50",
+                         "burst program VOICES 6 DIVERGE 80 scatter 12 drift 20",
+                         "180 Hz program VOICES 6 DIVERGE 50 on the shipped tuning"};
   bool ok = true;
   for (size_t i = 0; i < hashes.size(); ++i) {
     char name[40];
@@ -1107,13 +1155,13 @@ bool checkPinned(const std::array<uint64_t, 4>& hashes) {
 bool testEnhancementsDefaultExact() {
   const Signal prog = program(3);
   const Signal burst = bursts(220.0, Train{300, 300, 120, 10});
-  const cv::CrowdParams base = knobs(0.7f, 0.5f);
+  const cv::CrowdParams base = knobs(6, 0.5f);
   cv::CrowdParams idle = base;
   idle.tuning.levelScatterDb = -1.0f; // clamps to 0
   idle.tuning.contour = {1.0f, 1.0f, 1.0f, 1.0f};
   const Signal a = run(prog, base);
   const Signal b = run(prog, idle);
-  cv::CrowdParams burstBase = knobs(0.6f, 0.8f);
+  cv::CrowdParams burstBase = knobs(6, 0.8f);
   burstBase.tuning.scatterMs = 12.0f;
   burstBase.tuning.driftCents = 20.0f;
   cv::CrowdParams burstIdle = burstBase;
@@ -1129,7 +1177,7 @@ bool testEnhancementsDefaultExact() {
   const bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
                          "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
                          static_cast<double>(diffProg), static_cast<double>(diffBurst));
-  return checkPinned({fnv(a), fnv(run(burst, knobs(0.8f, 0.5f))), fnv(c), fnv(run(prog, shipped))}) && ok;
+  return checkPinned({fnv(a), fnv(run(burst, knobs(8, 0.5f))), fnv(c), fnv(run(prog, shipped))}) && ok;
 }
 
 // The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
@@ -1144,9 +1192,9 @@ bool testWorkingSetDefaults() {
                    "contour %.1f %.1f %.1f %.1f (0.8 1.2 0.7 1.1)", static_cast<double>(d.contour[0]),
                    static_cast<double>(d.contour[1]), static_cast<double>(d.contour[2]), static_cast<double>(d.contour[3]));
   const Signal in = program(3);
-  cv::CrowdParams worked = knobs(0.7f, 0.5f);
+  cv::CrowdParams worked = knobs(6, 0.5f);
   worked.tuning = d;
-  const Signal a = run(in, knobs(0.7f, 0.5f));
+  const Signal a = run(in, knobs(6, 0.5f));
   const Signal b = run(in, worked);
   bool finite = true;
   for (float x : b) finite &= std::isfinite(x) && std::fabs(x) < 4.0f;
@@ -1272,8 +1320,8 @@ double sweepDepthSt(const Signal& x, double sweepHz, double fromS, int cycles) {
   return count > 0 ? 2.0 * std::hypot(re, im) / count : 0.0;
 }
 
-// Copy 1 alone at WIDTH 1, with contour c, on a 220 Hz tone swinging 1 st either side. The copy's pitch
-// swing against the input's is the contour pulled toward 1 by the pitch factor at the top of WIDTH,
+// Copy 1 alone at DIVERGE 1, with contour c, on a 220 Hz tone swinging 1 st either side. The copy's pitch
+// swing against the input's is the contour pulled toward 1 by the pitch factor at the top of DIVERGE,
 // 1 + (c - 1) x 2/3. The sweep runs at 1 Hz and at 3 Hz, since the copy's lag is a fifth of a cycle
 // at 3 Hz and a copy that read the deviation its lag ago would miss by that much.
 bool testContour() {
@@ -1313,7 +1361,7 @@ bool testContour() {
 }
 
 // Copy v alone with the shipped human-voice set (timing scatter, drift, level scatter and contour),
-// at WIDTH `width`.
+// at DIVERGE `width`.
 cv::CrowdParams humanCopy(size_t v, float width) {
   const cv::CrowdTuning d;
   cv::CrowdParams p = alone(v);
@@ -1332,12 +1380,12 @@ std::vector<double> windowCents(const Signal& out, double base) {
   return c;
 }
 
-// The bottom tenth of WIDTH is for a melodic line, so a copy there is a plain double on the lead's
-// pitch. The -2.5 st copy on the shipped set sits within 1 cent of the lead at WIDTH 0, 2.0 +- 1.5 cents
+// The bottom tenth of DIVERGE is for a melodic line, so a copy there is a plain double on the lead's
+// pitch. The -2.5 st copy on the shipped set sits within 1 cent of the lead at DIVERGE 0, 2.0 +- 1.5 cents
 // flat of it at 0.1, and 166.7 +- 10 cents flat at 1 (two thirds of its offset). Drift scales with the
-// pitch factor, so at WIDTH 0.05 a copy's f0 moves less than 1 cent from one 0.5 s window to the next,
-// and at WIDTH 1 it moves as the drift test expects. Contour scales with the same factor, so at WIDTH
-// 0.05 a copy with contour 0.6 or 1.4 swings within 2 % of the input's swing, and at WIDTH 1 within the
+// pitch factor, so at DIVERGE 0.05 a copy's f0 moves less than 1 cent from one 0.5 s window to the next,
+// and at DIVERGE 1 it moves as the drift test expects. Contour scales with the same factor, so at DIVERGE
+// 0.05 a copy with contour 0.6 or 1.4 swings within 2 % of the input's swing, and at DIVERGE 1 within the
 // contour test's bounds of 1 + (contour - 1) x 2/3.
 bool melodicF0() {
   bool ok = true;
@@ -1355,19 +1403,19 @@ bool melodicF0() {
     const double near = 220.0 * std::pow(2.0, full * pitchFactor(static_cast<double>(r.width)) / 12.0);
     measured[i] = cents(copyHz(run(tn, humanCopy(2, r.width)), near), 220.0);
     char name[48];
-    std::snprintf(name, sizeof name, "melodic f0, WIDTH %.0f %%", static_cast<double>(r.width) * 100.0);
+    std::snprintf(name, sizeof name, "melodic f0, DIVERGE %.0f %%", static_cast<double>(r.width) * 100.0);
     ok &= report(name, std::fabs(measured[i] - r.wantCents) <= r.tolCents,
                  "-2.5 st copy f0 %+.2f cents from the lead, want %+.1f (+-%.0f)", measured[i], r.wantCents, r.tolCents);
     ++i;
   }
   const double nearHalf = 220.0 * std::pow(2.0, full * pitchFactor(0.5) / 12.0);
   const double halfCents = cents(copyHz(run(tn, humanCopy(2, 0.5f)), nearHalf), 220.0);
-  std::printf("info melodic f0 from the lead, cents, -2.5 st copy, drift on: WIDTH 0 %+.2f, 0.1 %+.2f, 0.5 %+.2f, 1 %+.2f\n",
+  std::printf("info melodic f0 from the lead, cents, -2.5 st copy, drift on: DIVERGE 0 %+.2f, 0.1 %+.2f, 0.5 %+.2f, 1 %+.2f\n",
               measured[0], measured[1], halfCents, measured[2]);
   return ok;
 }
 
-// Copy 1 alone on a 6 s tone with 15 cents of drift at one WIDTH, and what its f0 did across the
+// Copy 1 alone on a 6 s tone with 15 cents of drift at one DIVERGE, and what its f0 did across the
 // 0.5 s windows after the first second.
 struct DriftRun {
   double move = 0.0;    // largest change of f0 from one window to the next, in cents
@@ -1403,9 +1451,9 @@ bool melodicDrift() {
   const double limit = 15.0 * factor;
   bool ok = report("melodic drift range", bottom.drift <= limit + 1e-3,
                    "largest drift %.3f cents against 15 x %.4f = %.3f (<=)", bottom.drift, factor, limit);
-  ok &= report("melodic drift, WIDTH 5 %", bottom.move < 1.0, "f0 moves at most %.2f cents from window to window (< 1)",
+  ok &= report("melodic drift, DIVERGE 5 %", bottom.move < 1.0, "f0 moves at most %.2f cents from window to window (< 1)",
                bottom.move);
-  ok &= report("drift at WIDTH 100 %", top.peak <= 13.0 && top.spread >= 2.0,
+  ok &= report("drift at DIVERGE 100 %", top.peak <= 13.0 && top.spread >= 2.0,
                "worst %.2f cents from the offset (<= 10 + 3), spread %.2f cents (>= 2)", top.peak, top.spread);
   return ok;
 }
@@ -1428,7 +1476,7 @@ bool melodicContour() {
       const double ratio = sweepDepthSt(run(in, p), sweepHz, 2.0, static_cast<int>(3.0 * sweepHz)) / inSt;
       const double want = k.width < 1.0f ? 1.0 : 1.0 + (static_cast<double>(k.contour) - 1.0) * pitchFactor(1.0);
       char name[56];
-      std::snprintf(name, sizeof name, "melodic contour %.1f, WIDTH %.0f %%, %.0f Hz", static_cast<double>(k.contour),
+      std::snprintf(name, sizeof name, "melodic contour %.1f, DIVERGE %.0f %%, %.0f Hz", static_cast<double>(k.contour),
                     static_cast<double>(k.width) * 100.0, sweepHz);
       ok &= report(name, std::fabs(ratio / want - 1.0) <= k.tol, "copy swing %.3f of the input's, want %.2f (within %.2f)",
                    ratio, want, k.tol);
@@ -1444,9 +1492,9 @@ bool testMelodicBottom() {
   return ok;
 }
 
-// A WIDTH step moves the copy's grain playback rate over a few blocks and not in one jump. 512
+// A DIVERGE step moves the copy's grain playback rate over a few blocks and not in one jump. 512
 // samples after a step from 0.1 to 1 the rate sits strictly between its two settled values, and a
-// second later it equals the settled value of a run that held WIDTH 1 throughout, bit for bit.
+// second later it equals the settled value of a run that held DIVERGE 1 throughout, bit for bit.
 bool testWidthGlides() {
   const Signal tn = tone(220.0, 2 * kRate);
   const int switchAt = kRate / cv::kBlock * cv::kBlock;
@@ -1464,11 +1512,11 @@ bool testWidthGlides() {
   runSwitch(tn, lo, hi, switchAt);
   const double rateLate = static_cast<double>(gCrowd.grainRate(0));
   return report("width glides", rateSoon < rateLo && rateSoon > rateHi && rateLate == rateHi,
-                "grain rate %.5f at WIDTH 0.1, %.5f at 1; 512 samples after the step %.5f, a second later %.5f (equals the settled)",
+                "grain rate %.5f at DIVERGE 0.1, %.5f at 1; 512 samples after the step %.5f, a second later %.5f (equals the settled)",
                 rateLo, rateHi, rateSoon, rateLate);
 }
 
-// Every copy alone on 220 Hz bursts, at WIDTH 0 and at WIDTH 1, sits at the lag of the WIDTH law: 24,
+// Every copy alone on 220 Hz bursts, at DIVERGE 0 and at DIVERGE 1, sits at the lag of the DIVERGE law: 24,
 // 60, 42 and 45 ms at the bottom, 56, 140, 98 and 105 ms at the top (the longest copy 20 ms further
 // back than 120 ms, the others in proportion), each within 0.5 ms.
 constexpr double kWantLagMs[2][4] = {{24.0, 60.0, 42.0, 45.0}, {56.0, 140.0, 98.0, 105.0}};
@@ -1488,11 +1536,11 @@ bool widthLagRows() {
       worst = std::max(worst, std::fabs(lag[v] - wantMs[v]));
     }
     char name[40];
-    std::snprintf(name, sizeof name, "width lag, WIDTH %d %%", end * 100);
+    std::snprintf(name, sizeof name, "width lag, DIVERGE %d %%", end * 100);
     ok &= report(name, worst <= 0.5, "lags %.2f %.2f %.2f %.2f ms, each within 0.5 ms of the law", lag[0], lag[1], lag[2],
                  lag[3]);
     char law[40];
-    std::snprintf(law, sizeof law, "width lag law, WIDTH %d %%", end * 100);
+    std::snprintf(law, sizeof law, "width lag law, DIVERGE %d %%", end * 100);
     double lawErr = 0.0;
     for (size_t v = 0; v < 4; ++v) lawErr = std::max(lawErr, std::fabs(lagMsAt(v, static_cast<double>(end), d.lagScale) - wantMs[v]));
     ok &= report(law, lawErr <= 0.01, "the test's law gives %.0f / %.0f / %.0f / %.0f ms to within 0.01 ms", wantMs[0],
@@ -1501,7 +1549,7 @@ bool widthLagRows() {
   return ok;
 }
 
-// A WIDTH move from 0 to 1 in the middle of a burst changes the lag in the next gap and not before.
+// A DIVERGE move from 0 to 1 in the middle of a burst changes the lag in the next gap and not before.
 // Copy 2 goes from 60 to 140 ms, a move of 80 ms inside a 120 ms gap.
 bool widthLagLandsInGap() {
   const cv::CrowdTuning d;
@@ -1518,7 +1566,7 @@ bool widthLagLandsInGap() {
     lag[k] = measuredLagMs(run5, out, from, want);
     worst = std::max(worst, std::fabs(lag[k] - want));
   }
-  std::printf("info width lag copy 2, WIDTH 0 to 1 mid-burst, lag per burst %.2f %.2f(mid-burst move) %.2f %.2f %.2f ms\n", lag[0],
+  std::printf("info width lag copy 2, DIVERGE 0 to 1 mid-burst, lag per burst %.2f %.2f(mid-burst move) %.2f %.2f %.2f ms\n", lag[0],
               lag[1], lag[2], lag[3], lag[4]);
   return report("width lag lands in the gap", worst <= 0.5,
                 "60 ms until the end of burst 2, 140 ms from burst 3; worst error %.2f ms (<= 0.5)", worst);
@@ -1530,14 +1578,14 @@ bool testWidthLag() {
   return ok;
 }
 
-// At WIDTH 0 a copy is the input delayed by its lag and nothing else. Each copy alone at the top of
+// At DIVERGE 0 a copy is the input delayed by its lag and nothing else. Each copy alone at the top of
 // VOICES, on the shipped set (offsets, drift, contour, level scatter and timing scatter on), has every
 // sample of a steady tone equal to the gain-scaled input at the lag the copy took. The tone shelf is
 // flat and the trim is off, and the reference goes through the same low cut, since that is a filter
 // on the copy and not the slicing. The lag comes from a search over the input read by linear
 // interpolation as the engine reads its ring, within half a period of the lag the engine reports
 // (timing scatter makes it fractional), and the gain by least squares (level scatter draws one per
-// copy). A copy at WIDTH 0.1 is the control: 2.0 cents of pitch offset moves it off the delayed input
+// copy). A copy at DIVERGE 0.1 is the control: 2.0 cents of pitch offset moves it off the delayed input
 // by far more.
 struct Shift {
   double lag = 0.0;   // samples
@@ -1602,7 +1650,7 @@ Shift fitShift(const Signal& in, const Signal& out, int from, int to, double nea
 }
 
 cv::CrowdParams delayedCopy(size_t v, float width) {
-  cv::CrowdParams p = knobs(1.0f, width);
+  cv::CrowdParams p = knobs(cv::kVoicesMob, width);
   p.tuning = cv::CrowdTuning{};
   p.tuning.shelfDb = {0.0f, 0.0f, 0.0f, 0.0f};
   p.tuning.trimDb = 0.0f;
@@ -1645,14 +1693,14 @@ bool testWidthZeroIsDelay() {
                  s.lag, s.gain, s.worst);
   }
 
-  // The control: the -2.5 st copy at WIDTH 0.1 is 2.0 cents off the lead and drifts away from any delayed
+  // The control: the -2.5 st copy at DIVERGE 0.1 is 2.0 cents off the lead and drifts away from any delayed
   // copy of it.
   const cv::CrowdParams pc = delayedCopy(2, 0.1f);
   const Signal out = run(in, pc);
   const Shift control =
       fitShift(throughOutputFilters(in, pc.tuning), out, from, to, static_cast<double>(gCrowd.lagSamples(2)), kHalfRange);
   ok &= report("width 0.1 is not a delay", control.worst > 100.0 * kLimit,
-               "WIDTH 0.1, copy 3: worst |out - gain x delayed input| %.3g against %.3g at WIDTH 0", control.worst, worst);
+               "DIVERGE 0.1, copy 3: worst |out - gain x delayed input| %.3g against %.3g at DIVERGE 0", control.worst, worst);
   return ok;
 }
 
@@ -1698,7 +1746,7 @@ bool testEnhancementsStable() {
   bool ok = true;
   for (int which = 0; which < 2; ++which) {
     const Signal in = which == 0 ? program(3) : bursts(220.0, Train{300, 300, 120, 10});
-    cv::CrowdParams plain = knobs(0.7f, 0.5f);
+    cv::CrowdParams plain = knobs(6, 0.5f);
     cv::CrowdParams all = plain;
     allEnhancements(all.tuning);
     all.tuning.contour = {0.6f, 1.4f, 0.6f, 1.4f};
@@ -1741,7 +1789,7 @@ double lowestWindowDb(const Signal& in, const Signal& out, int at) {
 }
 
 // The card switched with crowdOn, as the registry and the emulator switch them, on the shipped tuning at
-// WIDTH 1. The switch sits 50 ms after a phrase peak, so the 100 ms before it holds the peak's steps. Off:
+// DIVERGE 1. The switch sits 50 ms after a phrase peak, so the 100 ms before it holds the peak's steps. Off:
 // the largest step in the ramp block stays under the largest in the 100 ms before, because the copies
 // keep the held period and ramp out. On: the same over the 10 ms the tracker takes to find a period and
 // the ramp, and every 6 ms window of the 30 ms after the switch stays within 6 dB of the input, because
@@ -1750,11 +1798,11 @@ bool testSwitchWithTracker() {
   const Signal in = program(3);
   const int sw = 975 * cv::kBlock;
   bool ok = true;
-  for (float voices : {1.0f, 0.5f}) {
+  for (uint8_t voices : {cv::kVoicesMob, uint8_t{4}}) {
     for (bool turnOn : {false, true}) {
       cv::CrowdParams on;
       on.on = true;
-      on.voices = voices;
+      on.voicesStep = voices;
       cv::CrowdParams off = on;
       off.on = false;
       cv::PitchFxParams pOff = passThrough();
@@ -1764,8 +1812,8 @@ bool testSwitchWithTracker() {
       const double at = maxStep(out, sw - 1, sw + (turnOn ? msToSamples(10.0) : cv::kBlock + 1));
       const double low = turnOn ? lowestWindowDb(in, out, sw) : 0.0;
       char name[56];
-      std::snprintf(name, sizeof name, "switch %s with the tracker, VOICES %.0f %%", turnOn ? "on" : "off",
-                    static_cast<double>(voices) * 100.0);
+      std::snprintf(name, sizeof name, "switch %s with the tracker, VOICES %s", turnOn ? "on" : "off",
+                    cv::kVoicesName[voices]);
       ok &= report(name, at <= before && low >= -6.0,
                    "largest step at the switch %.4f, in the 100 ms before %.4f; lowest 6 ms window %+.1f dB (>= -6)", at,
                    before, low);
@@ -1774,7 +1822,46 @@ bool testSwitchWithTracker() {
   return ok;
 }
 
-// Lag landings per copy at VOICES 1 on the shipped tuning, WIDTH `from` before `switchAt` and `to` from
+// A VOICES step glides. The knob moves at a block edge 50 ms after a phrase peak, one position up or
+// down and from the bottom to MOB and back, on the shipped tuning at DIVERGE 0.5. A copy entering
+// or leaving, and the lead moving, glide through two 20 ms one-poles, so the largest sample step in
+// the half second after the move stays within 1.25 times the larger of the largest steps over the
+// same samples when the knob stays on either position.
+bool testVoicesStepGlides() {
+  const Signal in = program(3);
+  const int sw = 975 * cv::kBlock;
+  std::vector<std::pair<uint8_t, uint8_t>> moves;
+  for (uint8_t k = 0; k < cv::kVoicesMob; ++k) {
+    moves.push_back({k, static_cast<uint8_t>(k + 1)});
+    moves.push_back({static_cast<uint8_t>(k + 1), k});
+  }
+  moves.push_back({0, cv::kVoicesMob});
+  moves.push_back({cv::kVoicesMob, 0});
+  bool ok = true;
+  double worst = 0.0;
+  for (const auto& m : moves) {
+    cv::CrowdParams first = cv::CrowdParams{};
+    first.on = true;
+    first.voicesStep = m.first;
+    first.width = 0.5f;
+    cv::CrowdParams second = first;
+    second.voicesStep = m.second;
+    const int to = sw + msToSamples(500.0);
+    const double at = maxStep(runSwitch(in, first, second, sw), sw - 1, to);
+    const double stayFirst = maxStep(run(in, first), sw - 1, to);
+    const double staySecond = maxStep(run(in, second), sw - 1, to);
+    const double ratio = at / std::max(stayFirst, staySecond);
+    worst = std::max(worst, ratio);
+    char name[48];
+    std::snprintf(name, sizeof name, "voices step %s to %s glides", cv::kVoicesName[m.first], cv::kVoicesName[m.second]);
+    ok &= report(name, ratio <= 1.25, "largest step at the move %.4f, staying on either side %.4f and %.4f (ratio %.2f <= 1.25)",
+                 at, stayFirst, staySecond, ratio);
+  }
+  std::printf("info voices step worst ratio %.2f\n", worst);
+  return ok;
+}
+
+// Lag landings per copy at MOB on the shipped tuning, DIVERGE `from` before `switchAt` and `to` from
 // it. The first landing counts.
 struct Landings {
   std::array<int, 4> total{};
@@ -1791,7 +1878,7 @@ Landings countLandings(const Signal& in, float from, float to, int switchAt) {
   float scratch[cv::kBlock];
   cv::CrowdParams p;
   p.on = true;
-  p.voices = 1.0f;
+  p.voicesStep = cv::kVoicesMob;
   for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
     p.width = i < switchAt ? from : to;
     gInProcess = true;
@@ -1810,11 +1897,11 @@ Landings countLandings(const Signal& in, float from, float to, int switchAt) {
   return l;
 }
 
-// The gap rule over a noise floor. On the program, whose gaps sit on its -40 dBFS floor, WIDTH goes from
+// The gap rule over a noise floor. On the program, whose gaps sit on its -40 dBFS floor, DIVERGE goes from
 // 1 to 0 half way: every copy lands within 3 s of the move, copy 2 ends within its 12 ms of scatter of
-// its 60 ms WIDTH 0 lag, and no copy lands more than 3 times a second, since the program has 2 gaps a
+// its 60 ms DIVERGE 0 lag, and no copy lands more than 3 times a second, since the program has 2 gaps a
 // second. On bursts with silent gaps every copy still lands in each of the last 9 gaps, and copy 2
-// ends as near its WIDTH 0 lag.
+// ends as near its DIVERGE 0 lag.
 bool testGapOverFloor() {
   bool ok = true;
   for (int which = 0; which < 2; ++which) {
@@ -1837,27 +1924,27 @@ bool testGapOverFloor() {
   return ok;
 }
 
-// WIDTH holds the level. At VOICES 0.5 on the shipped tuning every WIDTH position stays within 0.5 dB of
-// WIDTH 1 on 30 s of the program. The bottom of WIDTH holds exact doubles of the lead, a comb whose level
+// DIVERGE holds the level. At VOICES 4 on the shipped tuning every DIVERGE position stays within 0.5 dB of
+// DIVERGE 1 on 30 s of the program. The bottom of DIVERGE holds exact doubles of the lead, a comb whose level
 // on a steady tone hangs on each lag times f0, and the gaps redraw the lags twice a second, so the comb
 // averages out over the 60 gaps of the run.
 bool testWidthHoldsLevel() {
   const Signal in = program(30);
   cv::CrowdParams p;
   p.on = true;
-  p.voices = 0.5f;
+  p.voicesStep = 4;
   p.width = 1.0f;
   const double top = levelDb(in, run(in, p));
   double worst = 0.0;
-  std::printf("info level VOICES 50 %% against WIDTH 100 %% (%+.2f dB), dB:", top);
+  std::printf("info level VOICES 4 against DIVERGE 100 %% (%+.2f dB), dB:", top);
   for (float w : {0.0f, 0.02f, 0.05f, 0.1f, 0.2f, 0.3f, 0.5f, 0.7f}) {
     p.width = w;
     const double d = levelDb(in, run(in, p)) - top;
-    std::printf(" WIDTH %.0f %% %+.2f", static_cast<double>(w) * 100.0, d);
+    std::printf(" DIVERGE %.0f %% %+.2f", static_cast<double>(w) * 100.0, d);
     worst = std::max(worst, std::fabs(d));
   }
   std::printf("\n");
-  return report("width holds the level", worst <= 0.5, "every WIDTH within %.2f dB of WIDTH 100 %% (<= 0.5)", worst);
+  return report("width holds the level", worst <= 0.5, "every DIVERGE within %.2f dB of DIVERGE 100 %% (<= 0.5)", worst);
 }
 
 // Normalised autocorrelation of x over [from, to) at lag.
@@ -1873,9 +1960,9 @@ double acorrAt(const Signal& x, size_t from, size_t to, int lag) {
   return s / std::sqrt(e0 * e1 + 1e-30);
 }
 
-// Copy 2 alone at WIDTH 1 with the lead at 0 on `in`. share takes the move share after every block.
+// Copy 2 alone at DIVERGE 1 with the lead at 0 on `in`. share takes the move share after every block.
 Signal runCopy2(const Signal& in, std::vector<float>& share) {
-  cv::CrowdParams p = knobs(1.0f, 1.0f);
+  cv::CrowdParams p = knobs(cv::kVoicesMob, 1.0f);
   p.tuning.voiceDb = 0.0f;
   p.solo = 1u << 1;
   gFx.reset();
@@ -2013,7 +2100,7 @@ bool testTuningRanges() {
   };
   size_t moved = 0;
   for (const Edit edit : edits) {
-    cv::CrowdParams past = knobs(0.8f, 0.6f);
+    cv::CrowdParams past = knobs(8, 0.6f);
     cv::CrowdParams end = past;
     edit(past.tuning, true);
     edit(end.tuning, false);
@@ -2034,7 +2121,7 @@ cv::CrowdParams raisedProbe(size_t v, float lagScale) {
   return p;
 }
 
-// Each raised copy lags its tuned copy by 75 ms. On 220 Hz bursts at WIDTH 1 each copy plays alone on
+// Each raised copy lags its tuned copy by 75 ms. On 220 Hz bursts at DIVERGE 1 each copy plays alone on
 // the lead's pitch and its lag is read off the cross-correlation. The raised copies land at 131, 215,
 // 173 and 180 ms.
 bool testRaisedLag() {
@@ -2071,7 +2158,7 @@ Signal toneThenNoise() {
   return x;
 }
 
-// One copy alone at WIDTH 1 on toneThenNoise(): the first unvoiced block after the tone, the first
+// One copy alone at DIVERGE 1 on toneThenNoise(): the first unvoiced block after the tone, the first
 // block whose move share sits under 1, and the voiced blocks after the first unvoiced one.
 struct PlainRun {
   Signal out;
@@ -2081,7 +2168,7 @@ struct PlainRun {
 };
 
 PlainRun runPlain(const Signal& in, size_t c) {
-  cv::CrowdParams p = knobs(1.0f, 1.0f);
+  cv::CrowdParams p = knobs(cv::kVoicesMob, 1.0f);
   p.solo = static_cast<uint8_t>(1u << c);
   gFx.reset();
   gCrowd.reset();
@@ -2135,6 +2222,7 @@ int main() {
   ok &= testFadeOrder();
   ok &= testFormantMoves();
   ok &= testVoicesDiffer();
+  ok &= testPowerLaw();
   ok &= testLevelLaw();
   ok &= testLeadLeaves();
   ok &= testVoiceCount();
@@ -2155,6 +2243,7 @@ int main() {
   ok &= testSharedShelf();
   ok &= testEnhancementsStable();
   ok &= testSwitchWithTracker();
+  ok &= testVoicesStepGlides();
   ok &= testGapOverFloor();
   ok &= testWidthHoldsLevel();
   ok &= testOutOfRange();

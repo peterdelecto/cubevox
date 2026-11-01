@@ -309,7 +309,7 @@ def sweeps(slots):
         if card.startswith("reverb_"):
             found.append((i, 2, "reverb MIX"))
         if card == "crowd":
-            found.append((i, 1, "Crowd WIDTH"))
+            found.append((i, 1, "Crowd DIVERGE"))
             found.append((i, 2, "Crowd VOICES"))
     return found
 

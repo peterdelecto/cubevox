@@ -59,7 +59,7 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
-               "       [--crowd] [--width <0..1>] [--voices <0..1>]\n"
+               "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
@@ -67,7 +67,7 @@ int usage() {
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune or --crowd\n"
-               "  crowd runs only with --crowd; --width and --voices set its knobs (default 1 and 0.5)\n"
+               "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
@@ -419,8 +419,11 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (!parseFloat(argv[++i], &rp.crowd.width) || rp.crowd.width < 0.0f || rp.crowd.width > 1.0f)
         return false;
     } else if (std::strcmp(a, "--voices") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.crowd.voices) || rp.crowd.voices < 0.0f || rp.crowd.voices > 1.0f)
+      float step = 0.0f;
+      if (!parseFloat(argv[++i], &step) || step < 0.0f || step > static_cast<float>(cv::kVoicesMob) ||
+          step != std::floor(step))
         return false;
+      rp.crowd.voicesStep = static_cast<uint8_t>(step);
     } else if (std::strcmp(a, "--tuning") == 0) {
       int taken = 0;
       while (i + 1 < argc && argv[i + 1][0] != '-' && std::strchr(argv[i + 1], '=')) {

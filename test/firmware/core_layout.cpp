@@ -178,11 +178,11 @@ void checkComposeCrowd() {
   Layout layout = defaultLayout();
   layout.card[3] = Card::Crowd;
   PanelReading panel = panelWithToggles(false);
-  panel.knob[3] = {0.25f, 0.75f};
+  panel.knob[3] = {0.25f, 7.0f};
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(!snap.params.crowd.on && !snap.params.pitchFx.crowdOn, "compose: Crowd card off leaves both flags off");
-  check(std::fabs(snap.params.crowd.width - 0.25f) < 1e-6f && std::fabs(snap.params.crowd.voices - 0.75f) < 1e-6f,
-        "compose: Crowd knob A is WIDTH and knob B is VOICES");
+  check(std::fabs(snap.params.crowd.width - 0.25f) < 1e-6f && snap.params.crowd.voicesStep == 7,
+        "compose: Crowd knob A is DIVERGE and knob B is the VOICES step");
   panel.toggle[3] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.crowd.on && snap.params.pitchFx.crowdOn && !snap.params.pitchFx.autotune.on &&

@@ -229,7 +229,7 @@ static_assert(std::is_same<decltype(ChainParams::crowd.tuning), cv::CrowdTuning>
 
 void cmpCrowd(const std::string& p, float pos, const cv::CrowdParams& f, const cv::CrowdParams& e) {
   CMP(p, pos, f, e, width);
-  CMP(p, pos, f, e, voices);
+  CMP(p, pos, f, e, voicesStep);
 }
 
 void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const cv::ReverbParams& e, bool rest) {
@@ -319,7 +319,7 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Octave, 0, static_cast<float>(em.pitchFx.octave.semitones - kEmuSemiLo), fw);
   applyKnob(Card::Octave, 1, em.pitchFx.octave.mix, fw);
   applyKnob(Card::Crowd, 0, em.crowd.width, fw);
-  applyKnob(Card::Crowd, 1, em.crowd.voices, fw);
+  applyKnob(Card::Crowd, 1, static_cast<float>(em.crowd.voicesStep), fw);
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
   applyKnob(Card::Unison, 1, em.unison.depth, fw);
   applyKnob(Card::Slapback, 0, posLinear(kEmuSlapLoMs, kEmuSlapHiMs, em.slapback.tuning.timeMs), fw);
@@ -395,8 +395,8 @@ void sweepOctave() {
   }
 }
 
-// emulator/main.cpp drawCrowdBlock: WIDTH and VOICES are percentSlider, so the knob position is
-// the engine field.
+// emulator/main.cpp drawCrowdBlock: DIVERGE is a percentSlider, so the knob position is the engine
+// field. VOICES is a ten-step slider, so the step index is the engine field.
 void sweepCrowd() {
   for (int i = 0; i <= kSweepSteps; ++i) {
     const float p = sweepPos(i);
@@ -405,11 +405,13 @@ void sweepCrowd() {
     applyKnob(Card::Crowd, 0, p, fw);
     em.crowd.width = p;
     cmpCrowd("sweep.crowd.width", p, fw.crowd, em.crowd);
-    EmuState em2 = emuStart();
-    ChainParams fw2 = fwAtEmuStart(em2);
-    applyKnob(Card::Crowd, 1, p, fw2);
-    em2.crowd.voices = p;
-    cmpCrowd("sweep.crowd.voices", p, fw2.crowd, em2.crowd);
+  }
+  for (int step = 0; step < cv::kVoicesSteps; ++step) {
+    EmuState em = emuStart();
+    ChainParams fw = fwAtEmuStart(em);
+    applyKnob(Card::Crowd, 1, static_cast<float>(step), fw);
+    em.crowd.voicesStep = static_cast<uint8_t>(step);
+    cmpCrowd("sweep.crowd.voices", static_cast<float>(step), fw.crowd, em.crowd);
   }
 }
 

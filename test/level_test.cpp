@@ -206,7 +206,7 @@ bool midRow(const char* name, const Signal& in, const P& p) {
   return verdict(name, db, kMidLoDb, kMidHiDb);
 }
 
-// The Crowd card at VOICES 0.5 and WIDTH `width`, behind the PitchFx that fills its ring and runs the
+// The Crowd card at VOICES 4 and DIVERGE `width`, behind the PitchFx that fills its ring and runs the
 // tracker, as the chain runs them.
 bool crowdRow(const Signal& in, float width) {
   auto pitch = std::make_unique<Stage<cv::PitchFx>>();
@@ -215,10 +215,10 @@ bool crowdRow(const Signal& in, float width) {
   pp.crowdOn = true;
   cv::CrowdParams params;
   params.on = true;
-  params.voices = 0.5f;
+  params.voicesStep = 4;
   params.width = width;
   char name[40];
-  std::snprintf(name, sizeof name, "crowd VOICES .5 WIDTH %g", static_cast<double>(width));
+  std::snprintf(name, sizeof name, "crowd VOICES 4 DIVERGE %g", static_cast<double>(width));
   return verdict(name, gainDb(in, run(in, [&](const float* i, float* o, int n) {
                    float tmp[cv::kBlock];
                    pitch->fx.process(i, tmp, n, pp);
@@ -226,9 +226,9 @@ bool crowdRow(const Signal& in, float width) {
                  })));
 }
 
-// The Crowd card's copies at the bottom of WIDTH are exact doubles of the lead, a comb whose level on a
+// The Crowd card's copies at the bottom of DIVERGE are exact doubles of the lead, a comb whose level on a
 // steady tone hangs on each lag times f0. The gap rule redraws the lags twice a second on the program,
-// so its rows run 30 s of it, 60 gaps, for the comb to average out. WIDTH 1 is the engine default.
+// so its rows run 30 s of it, 60 gaps, for the comb to average out. DIVERGE 1 is the engine default.
 constexpr int kCrowdSeconds = 30;
 
 bool crowdRows() {

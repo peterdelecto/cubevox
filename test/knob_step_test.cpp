@@ -116,13 +116,21 @@ struct Step {
   float to;
 };
 
-// Continuous knobs step at a low, a middle and a high setting; stepped knobs move one detent at a
-// quarter and at three quarters of their travel.
+// Continuous knobs step at a low, a middle and a high setting. A stepped knob of up to ten detents
+// (the Mob card's VOICES) moves across every detent in turn, and a longer one moves one detent at a
+// quarter and at three quarters of its travel.
+constexpr int kWalkedDetents = 10;
+
 std::vector<Step> stepsFor(Card c, int knob) {
   const int detents = knobSteps(c, knob);
   if (detents == 0) {
     std::vector<Step> s;
     for (float p : {0.2f, 0.5f, 0.8f}) s.push_back({p, p + kContinuousStep});
+    return s;
+  }
+  if (detents <= kWalkedDetents) {
+    std::vector<Step> s;
+    for (int d = 0; d + 1 < detents; ++d) s.push_back({static_cast<float>(d), static_cast<float>(d + 1)});
     return s;
   }
   const float lo = static_cast<float>(detents / 4);

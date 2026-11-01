@@ -70,9 +70,9 @@ void checkCardTable() {
   check(engineOf(Card::Crowd) == Engine::Crowd && cardDesc(Card::Crowd).group == Group::Pitch,
         "table: the Crowd card has its own engine and sits in the pitch group");
   check(std::strcmp(cardDesc(Card::Crowd).id, "crowd") == 0 && std::strcmp(cardDesc(Card::Crowd).name, "Mob") == 0 &&
-            std::strcmp(knobDesc(Card::Crowd, 0)->name, "WIDTH") == 0 &&
+            std::strcmp(knobDesc(Card::Crowd, 0)->name, "DIVERGE") == 0 &&
             std::strcmp(knobDesc(Card::Crowd, 1)->name, "VOICES") == 0,
-        "table: the Crowd card reads WIDTH then VOICES");
+        "table: the Crowd card reads DIVERGE then VOICES");
   check(kFadeHoldBlocks == kEngineCount - 1, "table: one silent block per engine after the swap block");
 }
 
@@ -118,12 +118,12 @@ void checkAmountKnobIsB() {
   check(std::fabs(p.reverb.mix - 0.7f) < 1e-6f, "amount: Spring Reverb knob B drives Mix");
   applyKnob(Card::ReverbChasm, 1, 0.4f, p);
   check(std::fabs(p.reverb.mix - 0.4f) < 1e-6f, "amount: Chasm Reverb knob B drives Mix");
-  applyKnob(Card::Crowd, 1, 0.7f, p);
-  check(std::fabs(p.crowd.voices - 0.7f) < 1e-6f && std::fabs(p.crowd.width - cv::CrowdParams().width) < 1e-6f,
-        "amount: Crowd knob B drives VOICES and leaves WIDTH alone");
+  applyKnob(Card::Crowd, 1, 7.0f, p);
+  check(p.crowd.voicesStep == 7 && std::fabs(p.crowd.width - cv::CrowdParams().width) < 1e-6f,
+        "amount: Crowd knob B drives the VOICES step and leaves DIVERGE alone");
   applyKnob(Card::Crowd, 0, 0.3f, p);
-  check(std::fabs(p.crowd.width - 0.3f) < 1e-6f && std::fabs(p.crowd.voices - 0.7f) < 1e-6f,
-        "amount: Crowd knob A drives WIDTH and leaves VOICES alone");
+  check(std::fabs(p.crowd.width - 0.3f) < 1e-6f && p.crowd.voicesStep == 7,
+        "amount: Crowd knob A drives DIVERGE and leaves VOICES alone");
   check(std::strcmp(knobDesc(Card::Octave, 1)->name, "Mix") == 0, "amount: Octave keeps Mix on knob B");
 }
 
@@ -156,7 +156,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
-    case Card::Crowd: return knob == 0 ? p.crowd.width : p.crowd.voices;
+    case Card::Crowd: return knob == 0 ? p.crowd.width : static_cast<float>(p.crowd.voicesStep);
     case Card::Empty:
     case Card::Count: break;
   }
@@ -379,6 +379,38 @@ void checkShownLabels() {
   check(std::strcmp(knobLabel(*knobDesc(Card::Octave, 0), 3), "") == 0, "label: a knob without labels has none");
 }
 
+// The Mob card's knob A is DIVERGE, a percent. Knob B is VOICES, ten positions named 0 to 8 and MOB.
+void checkCrowdVoices() {
+  const KnobDesc& diverge = *knobDesc(Card::Crowd, 0);
+  check(std::strcmp(diverge.name, "DIVERGE") == 0 && diverge.kind == KnobKind::Continuous,
+        "crowd: knob A is the continuous DIVERGE");
+  const KnobDesc& voices = *knobDesc(Card::Crowd, 1);
+  check(std::strcmp(voices.name, "VOICES") == 0 && voices.kind == KnobKind::Stepped && voices.positions == 10 &&
+            knobSteps(Card::Crowd, 1) == 10,
+        "crowd: knob B is VOICES with 10 positions");
+  const char* const names[10] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "MOB"};
+  bool named = voices.labels != nullptr;
+  for (int i = 0; named && i < 10; ++i) {
+    named = std::strcmp(voices.labels[i], names[i]) == 0 && knobShown(voices, static_cast<float>(i)) == i &&
+            shownText(voices, static_cast<float>(i)) == names[i];
+  }
+  check(named, "crowd: VOICES reads 0 to 8 and MOB");
+  check(shownText(voices, 99.0f) == "MOB" && shownText(voices, -2.0f) == "0",
+        "crowd: a VOICES reading clamps to 0 and MOB");
+
+  // Each step index reaches the engine as itself, and the top of the knob is MOB.
+  bool reaches = true;
+  for (int i = 0; i < 10; ++i) {
+    ChainParams p;
+    applyKnob(Card::Crowd, 1, static_cast<float>(i), p);
+    reaches = reaches && p.crowd.voicesStep == i;
+  }
+  check(reaches, "crowd: each VOICES step reaches the engine as its index");
+  ChainParams top;
+  applyKnob(Card::Crowd, 1, 99.0f, top);
+  check(top.crowd.voicesStep == cv::kVoicesMob, "crowd: a VOICES reading past the top lands on MOB");
+}
+
 // No card declares decimals yet, so a made-up knob stands in.
 void checkShownDecimals() {
   const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
@@ -512,6 +544,7 @@ void checkRegistry() {
   checkPlacement();
   checkShownNumbers();
   checkShownLabels();
+  checkCrowdVoices();
   checkShownDecimals();
   checkCells();
   checkFormatCells();
