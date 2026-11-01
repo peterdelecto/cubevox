@@ -45,3 +45,11 @@ built, and its row replaces the estimate.
 
 Formant, Lo-fi and Bloom are independent cards; each lands with its own row in `costs.h` and joins
 the cycle when it lands. The row itself lands with the first of them.
+
+## 5. Formant leaves the row (owner 2026-11-01, v2.00.96)
+
+Formant became Octave's alternate in slot 3 (`2026-11-01-formant-design.md` section 9). The SLOT 7
+row cycles GATE, LO-FI, BLOOM. The menu runs REVERB, SLOT 3 (OCTAVE / FORMANT), SLOT 4 (UNISON /
+MOB), SLOT 7, then the rest. The emulator's slot 7 switch is GATE | LO-FI over a full-width BLOOM.
+A Formant left in slot 7 by an older saved layout no longer counts for this row, which reads SLOT -.
+The Formant column of section 3's table no longer applies.

@@ -109,3 +109,16 @@ slot 7 in place of Gate (owner: "in case a second backup gate is overkill"), thr
 4. Level at the default on the clips: +0.44, +0.33, +0.01 dB (trimDb 1.92). MIX 50 % reads +2.6 dB
    on level_test's program, because the two voices are one waveform 28 ms apart and add coherently.
 5. DTCM 76,288 B, +640 B.
+
+## 9. Moved to slot 3 (owner 2026-11-01, v2.00.96)
+
+Owner: "formant should be an alternate for octave rather than slot 7." Formant swaps with Octave in
+slot 3 through its own SLOT n row (`octaveFormantSlot`, `UiAction::SwapOctaveFormant`, values
+OCTAVE and FORMANT), built like the UNISON / MOB row; the emulator's slot 3 carries an OCTAVE over
+FORMANT switch. It no longer appears in the slot 7 row. Where it acts does not change: inside the
+pitch stage. Sections 1 to 7 stand except where they say slot 7.
+
+| Layout | Mean % | Worst % |
+|---|---|---|
+| default, Formant in slot 3 | 65 | 75 |
+| MOB and Chasm, Formant in slot 3 | 72 | 85 |

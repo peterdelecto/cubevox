@@ -270,17 +270,18 @@ void checkEnginesToReset() {
   check(enginesToReset(empty, empty) == 0 && enginesToReset(Layout{{}}, Layout{{}}) == 0, "reset: empty slots reset nothing");
 
   // The slot 7 choices: Gate and the incoming card's engine reset, and no other. Formant shares the
-  // pitch engine, so the Gate to Formant swap clears the pitch stage in its silent block.
+  // pitch engine with Octave, so the Octave to Formant swap in slot 3 clears the pitch stage once.
   Layout formant = base;
-  formant.card[6] = Card::Formant;
+  formant.card[2] = Card::Formant;
   Layout lofi = base;
   lofi.card[6] = Card::Lofi;
   Layout bloom = base;
   bloom.card[6] = Card::Bloom;
-  check(enginesToReset(base, formant) == (bit(Engine::Gate) | bit(Engine::Pitch)) &&
-            enginesToReset(base, lofi) == (bit(Engine::Gate) | bit(Engine::Lofi)) &&
+  check(enginesToReset(base, formant) == bit(Engine::Pitch),
+        "reset: Octave to Formant in slot 3 resets the pitch engine, which both cards share");
+  check(enginesToReset(base, lofi) == (bit(Engine::Gate) | bit(Engine::Lofi)) &&
             enginesToReset(base, bloom) == (bit(Engine::Gate) | bit(Engine::Bloom)) &&
-            enginesToReset(formant, bloom) == (bit(Engine::Pitch) | bit(Engine::Bloom)),
+            enginesToReset(lofi, bloom) == (bit(Engine::Lofi) | bit(Engine::Bloom)),
         "reset: a slot 7 swap resets the engine it leaves and the engine it enters");
 }
 

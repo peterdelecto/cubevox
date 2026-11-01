@@ -412,8 +412,8 @@ void checkCrowdVoices() {
   check(top.crowd.voicesStep == cv::kVoicesMob, "crowd: a VOICES reading past the top lands on MOB");
 }
 
-// The slot 7 choices after Gate: Formant, Lo-fi and Bloom. They sit after the Crowd card in the table, so
-// every earlier id keeps its meaning in a saved layout.
+// Formant, an alternate for Octave, and Lo-fi and Bloom, alternates for Gate in slot 7. They sit after the
+// Crowd card in the table, so every earlier id keeps its meaning in a saved layout.
 void checkSlot7Cards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
             static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 && kCardCount == 14,
@@ -490,8 +490,8 @@ void checkSlot7Cards() {
 
   applyKnob(Card::Lofi, 0, 0.3f, p);
   applyKnob(Card::Lofi, 1, 0.8f, p);
-  check(std::fabs(p.lofi.tone - 0.3f) < 1e-6f && std::fabs(p.lofi.amount - 0.8f) < 1e-6f,
-        "lofi: TONE and AMOUNT drive their own fields");
+  check(std::fabs(p.lofi.tone - 0.3f) < 1e-6f && std::fabs(p.lofi.amount - 0.8f * kLofiAmountTop) < 1e-6f,
+        "lofi: TONE and AMOUNT drive their own fields, AMOUNT up to the engine's 60 %");
 
   applyKnob(Card::Bloom, 0, 0.0f, p);
   const float tailLow = p.bloom.tailMs;

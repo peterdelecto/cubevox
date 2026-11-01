@@ -30,10 +30,17 @@ int unisonCrowdSlot(const Layout& layout) {
   return -1;
 }
 
+int octaveFormantSlot(const Layout& layout) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (layout.card[s] == Card::Octave || layout.card[s] == Card::Formant) return s;
+  }
+  return -1;
+}
+
 int slot7CardSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
     const Card c = layout.card[s];
-    if (c == Card::Gate || c == Card::Formant || c == Card::Lofi || c == Card::Bloom) return s;
+    if (c == Card::Gate || c == Card::Lofi || c == Card::Bloom) return s;
   }
   return -1;
 }

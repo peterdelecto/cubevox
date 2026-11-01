@@ -110,7 +110,7 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 // off, because its detector feeds the status reply's `floor_dbfs`. Returns false when it wrote
 // nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave,
 // Formant or Crowd) while any pitch-group toggle is on, and its fade follows all of them. A Formant
-// card in slot 7 acts at that first slot, not at its own. A Crowd card keeps a
+// card behind another pitch-group card acts at that first slot, not at its own. A Crowd card keeps a
 // live ring and tracker with Autotune and Octave off, wherever it sits against them. The Crowd card's
 // own engine runs at its own slot and ramps itself on its own toggle.
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,

@@ -24,19 +24,28 @@ ApplyResult swapUnisonCrowd(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
-// The card after `c` in the slot 7 cycle, Gate to Formant to Lo-fi to Bloom and back to Gate.
+ApplyResult swapOctaveFormant(Layout& layout) {
+  const int slot = octaveFormantSlot(layout);
+  if (slot < 0) return ApplyResult::None;
+  Layout next = layout;
+  next.card[slot] = layout.card[slot] == Card::Octave ? Card::Formant : Card::Octave;
+  if (!layoutValid(next).ok()) return ApplyResult::None;
+  layout = next;
+  return ApplyResult::LayoutChanged;
+}
+
+// The card after `c` in the slot 7 cycle, Gate to Lo-fi to Bloom and back to Gate.
 Card nextSlot7Card(Card c) {
   switch (c) {
-    case Card::Gate: return Card::Formant;
-    case Card::Formant: return Card::Lofi;
+    case Card::Gate: return Card::Lofi;
     case Card::Lofi: return Card::Bloom;
     default: return Card::Gate;
   }
 }
 
-// Moves the slot that holds one of the four to the next card in the cycle that layoutValid accepts,
-// so a card over the CPU lines or already placed in another slot is passed over. When none of the
-// other three fits the layout stays as it is.
+// Moves the slot that holds one of the three to the next card in the cycle that layoutValid accepts,
+// so a card over the CPU lines or already placed in another slot is passed over. When neither of the
+// other two fits the layout stays as it is.
 ApplyResult cycleSlot7Card(Layout& layout) {
   const int slot = slot7CardSlot(layout);
   if (slot < 0) return ApplyResult::None;
@@ -74,6 +83,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
       settings.debug = !settings.debug;
       return ApplyResult::SettingsChanged;
     case UiAction::SwapReverb: return swapReverb(layout);
+    case UiAction::SwapOctaveFormant: return swapOctaveFormant(layout);
     case UiAction::SwapUnisonCrowd: return swapUnisonCrowd(layout);
     case UiAction::CycleSlot7Card: return cycleSlot7Card(layout);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;

@@ -168,7 +168,7 @@ void applyLofiKnob(int knob, float v, cv::LofiParams& l) {
   if (knob == 0) {
     l.tone = v;
   } else {
-    l.amount = v;
+    l.amount = v * kLofiAmountTop;
   }
 }
 

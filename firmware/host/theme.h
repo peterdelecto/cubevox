@@ -166,12 +166,10 @@ constexpr float kEncoderIndicatorIn = 0.45f;
 constexpr float kSegH = units(4);
 constexpr float kSegInset = 2.0f;
 
-// The slot 7 card switch is a grid of two rows of two cells in the column's foot. Each row is a
-// segment high. A word keeps this much room to each side in the right-hand column, which the grid
-// sizes to its longer word.
+// The slot 7 card switch is a grid of two rows in the column's foot, two cells over one. Each row is
+// a segment high.
 constexpr int kGridRows = 2;
 constexpr float kGridH = kGridRows * kSegH;
-constexpr float kGridPad = units(1);
 
 // ---- Bat toggle: a short bushing with a lever that stands up for on and hangs down for off.
 
