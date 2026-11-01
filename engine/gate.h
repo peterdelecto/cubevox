@@ -95,6 +95,10 @@ class Gate {
   // Applied gain in dB, 0 while off.
   float gainDb() const { return gainDb_ * onMix_; }
 
+  // The detector's state after the last sample: above the threshold, with the hysteresis. It runs
+  // while the gate is off, so a later stage can use it as a key.
+  bool open() const { return open_; }
+
   // The highest detector level (linear, full scale 1) since the previous call, and the window
   // restarts. No division, so the audio interrupt can call it.
   float takeDetectorPeak() {
