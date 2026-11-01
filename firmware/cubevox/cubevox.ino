@@ -27,6 +27,7 @@
 #include "core/gate_floor.h"
 #include "core/jack_switch.h"
 #include "core/layout.h"
+#include "core/load_led.h"
 #include "core/loop_policy.h"
 #include "core/protocol.h"
 #include "core/settings.h"
@@ -40,7 +41,6 @@
 
 namespace {
 
-constexpr uint32_t kHeartbeatMs = 500;
 constexpr uint32_t kStatsMs = 5000;
 
 Layout gLayout = defaultLayout();
@@ -54,10 +54,11 @@ Canvas gCanvas;
 bool gAudioRunning = false;
 PublishGate gPublish;
 FallingEdge gMenuClosed;
-Every gHeartbeat{kHeartbeatMs};
 Every gStats{kStatsMs};
-Every gLoadRefresh{kUiTickMs};  // the DEBUG figure moves once per UI tick
+Every gLoadRefresh{kUiTickMs};  // the load figures move once a second; the UI tick reads them
 int gLoadPercent = 0;
+int gMeanLoadPercent = 0;
+bool gAudioLive = false;  // audio running, not stalled, not latched; the LED's gate
 
 // FPSCR and FPDSCR bit 24: flush subnormal results and operands to zero. The input filters decay
 // toward silence, and a subnormal state would cost the FPU extra cycles on every sample.
@@ -216,6 +217,22 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
   }
 }
 
+// Reads the DEBUG figure (the worst block, shown only with DEBUG on), the LED's mean and whether
+// audio runs, once per UI tick. audioHealth() masks the audio interrupt briefly, so it is not read
+// every pass; a stall darkens the LED within one tick.
+void refreshLoad(uint32_t nowMs) {
+  if (!gLoadRefresh.due(nowMs)) return;
+  gLoadPercent = gSettings.debug ? audioWorstLoadPercent() : 0;
+  gMeanLoadPercent = audioMeanLoadPercent();
+  gAudioLive = gAudioRunning && !faultAudioStalled() && !audioHealth().latched;
+}
+
+// The user LED blinks the mean audio load (core/load_led.h). A high level lights it (the bootloader
+// board file's LED_STATE_ON). It stays dark while audio is not running, has stalled or is latched.
+void driveLoadLed(uint32_t nowMs) {
+  digitalWrite(pins::kUserLed, loadLedLit(nowMs, gMeanLoadPercent, gAudioLive) ? HIGH : LOW);
+}
+
 }  // namespace
 
 // The bootloader starts the watchdog at 16 s (CV_WATCHDOG_BOOT_MS) right before the jump, and
@@ -281,7 +298,7 @@ void loop() {
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
   const bool switchOn = topSwitchEngaged(gSettings.topSwitch, muteActive(), muteBypassOn());
-  if (gLoadRefresh.due(nowMs)) gLoadPercent = gSettings.debug ? audioWorstLoadPercent() : 0;
+  refreshLoad(nowMs);
   const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn, gLoadPercent};
   LastMoved touch;
   if (controlsTakeTouch(touch)) gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
@@ -289,6 +306,6 @@ void loop() {
   if (controlsTakeToggle(flip)) gFace.toggleFlipped(gLayout, flip, nowMs);
   drawFace(ctx, nowMs);
   gDisplay->flushStep(gCanvas);
-  if (gHeartbeat.due(nowMs)) digitalToggle(pins::kUserLed);
+  driveLoadLed(nowMs);
   if (gStats.due(nowMs)) benchReportStats();
 }
