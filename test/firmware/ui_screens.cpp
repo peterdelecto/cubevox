@@ -193,7 +193,7 @@ void checkReadoutRolling() {
 
 void checkReadoutRows() {
   const Canvas c = readoutOf(4, 0, 210.0f);
-  check(sameRows(c, titleBarOf("5 SLAPBACK"), 0, kNameTop),
+  check(sameRows(c, titleBarOf("5 ECHO"), 0, kNameTop),
         "readout: the first rows are the slot, a space and the card in black 7X12 on a bar, top at row 1");
   Canvas name;
   name.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "TIME")) / 2, kNameTop, font9x12(), "TIME");
@@ -989,6 +989,40 @@ void checkKeyField() {
   check(centred, "readout: every key name stands centred, its left and right margins within 1 px");
 }
 
+// The Mob card's VOICES is a name too, 0 to 8 and then MOB. Each draws in 16X24 on its own width,
+// centred, with the knob's name and the card's title bar as for any knob.
+void checkVoicesField() {
+  const KnobDesc& voices = *knobDesc(Card::Crowd, 1);
+  bool inPlace = true;
+  bool centred = true;
+  for (int i = 0; i < voices.positions; ++i) {
+    const Canvas c = settledReadout(Card::Crowd, 2, 1, i);
+    Canvas want;
+    want.drawText(centredLeft(voices.labels[i]), kValueTop, font16x24(), voices.labels[i]);
+    inPlace = inPlace && sameRows(c, want, kValueTop, kValueBottom);
+    const Extent ink = inkFrom(bandColumns(c), 0);
+    centred = centred && ink.left == centredLeft(voices.labels[i]) && std::abs(ink.left - (kCanvasWidth - 1 - ink.right)) <= 1;
+  }
+  check(inPlace, "readout: each VOICES name is drawn in 16X24 on its own width, nothing else on the value rows");
+  check(centred, "readout: every VOICES name stands centred, its left and right margins within 1 px");
+
+  const Canvas none = settledReadout(Card::Crowd, 2, 1, 0);
+  Canvas zero;
+  zero.drawText(centredLeft("0"), kValueTop, font16x24(), "0");
+  check(sameRows(none, zero, kValueTop, kValueBottom) && !rowsBlank(none, kValueTop, kValueBottom),
+        "readout: VOICES at position 0 shows 0");
+  const Canvas mob = settledReadout(Card::Crowd, 2, 1, 9);
+  Canvas word;
+  word.drawText(centredLeft("MOB"), kValueTop, font16x24(), "MOB");
+  check(sameRows(mob, word, kValueTop, kValueBottom) && !rowsBlank(mob, kValueTop, kValueBottom),
+        "readout: VOICES at position 9 shows MOB");
+
+  Canvas head = titleBarOf("3 MOB");
+  head.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "VOICES")) / 2, kNameTop, font9x12(), "VOICES");
+  check(sameRows(mob, head, 0, kValueTop), "readout: the VOICES title bar and parameter name are as for any knob");
+  check(edgesDark(mob, kBarRows) && edgesDark(none, kBarRows), "readout: the VOICES names keep the edges below the bar dark");
+}
+
 void checkKeyRows() {
   const Canvas key = readoutOf(1, 0, 11.0f);
   Canvas head = titleBarOf("2 AUTOTUNE");
@@ -1745,6 +1779,7 @@ void checkScreens() {
   checkReadoutRollClip();
   checkReadoutEdges();
   checkKeyField();
+  checkVoicesField();
   checkKeyRows();
   checkKeyFlats();
   checkReadoutEdgeCases();

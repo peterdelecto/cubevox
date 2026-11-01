@@ -367,8 +367,8 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Choices: Input gate on; Gate %s; Autotune %s; Octave %s; Crowd %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f %% mechanical (%.0f ms); Octave SEMITONES %+d, MIX %.0f %%; Crowd WIDTH "
-      "%.0f %%, VOICES %.0f %%; Unison DEPTH "
+      "%.0f %% mechanical (%.0f ms); Octave SEMITONES %+d, MIX %.0f %%; Crowd DIVERGE "
+      "%.0f %%, VOICES %s; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback AMOUNT %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
       "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
       macros, onOff(p.gate.on), onOff(at.on), onOff(o.on), onOff(p.crowd.on), onOff(p.unison.on),
@@ -380,7 +380,8 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(cv::AutotuneVoice::mechanicalOf(at.responseMs) * 100.0f),
       static_cast<double>(at.responseMs), o.semitones,
       static_cast<double>(o.mix * 100.0f),
-      static_cast<double>(p.crowd.width * 100.0f), static_cast<double>(p.crowd.voices * 100.0f),
+      static_cast<double>(p.crowd.width * 100.0f),
+      cv::kVoicesName[p.crowd.voicesStep < cv::kVoicesSteps ? p.crowd.voicesStep : cv::kVoicesMob],
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
       static_cast<double>(p.slapback.mix * 100.0f),
@@ -436,12 +437,12 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const cv::CrowdTuning& ct = params.crowd.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nCrowdTuning{{%.2ff, %.2ff, %.2ff, %.2ff}, {%.2ff, %.2ff, %.2ff, %.2ff}, {%.1ff, %.1ff, %.1ff, "
-                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.2ff, %.2ff, %.0ff, %.0ff, "
+                "%.1ff}, {%.0ff, %.0ff, %.0ff, %.0ff}, %.2ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.0ff, "
                 "%.0ff, %.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.2ff, %.1ff, %.1ff, {%.2ff, %.2ff, %.2ff, %.2ff}}",
                 ct.pitchSt[0], ct.pitchSt[1], ct.pitchSt[2], ct.pitchSt[3], ct.formantSt[0], ct.formantSt[1],
                 ct.formantSt[2], ct.formantSt[3], ct.shelfDb[0], ct.shelfDb[1], ct.shelfDb[2], ct.shelfDb[3],
                 ct.delayMs[0], ct.delayMs[1], ct.delayMs[2], ct.delayMs[3], ct.lagScale, ct.shelfHz, ct.voiceDb, ct.trimDb,
-                ct.trimBottomDb, ct.leadFadeFrom, ct.holdFrom, ct.hpHz, ct.maxLagMs, ct.gapFloorDb, ct.scatterMs, ct.driftCents,
+                ct.trimBottomDb, ct.hpHz, ct.maxLagMs, ct.gapFloorDb, ct.scatterMs, ct.driftCents,
                 ct.driftHoldS, ct.widthKnee, ct.widthKneeFrac, ct.widthLagBottom, ct.widthLagMs, ct.levelScatterDb, ct.contour[0], ct.contour[1], ct.contour[2], ct.contour[3]);
   used = std::strlen(gTuningText);
   std::snprintf(
@@ -481,7 +482,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
       "dwellDrive, dwellComp, wetDb\n"
       "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {shelfDb[0..3]}, {delayMs[0..3]}, lagScale, shelfHz, voiceDb, "
-      "trimDb, trimBottomDb, leadFadeFrom, holdFrom, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
+      "trimDb, trimBottomDb, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
       "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}\n%s\n",
       gTuningText);
   std::fflush(stdout);
@@ -988,7 +989,6 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("octave.mix", &o.mix);
   add("crowd.on", &p.crowd.on);
   add("crowd.width", &p.crowd.width);
-  add("crowd.voices", &p.crowd.voices);
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
   add("slapback.on", &p.slapback.on);
@@ -1369,8 +1369,11 @@ void drawGateBlock(const char* id, const char* label, cv::GateParams& g, float g
 void drawCrowdBlock(cv::CrowdParams& d) {
   ImGui::PushID("crowd");
   ImGui::Checkbox("CROWD", &d.on);
-  percentSlider("WIDTH", d.width);
-  percentSlider("VOICES", d.voices);
+  percentSlider("DIVERGE", d.width);
+  int voices = d.voicesStep;
+  if (ImGui::SliderInt("VOICES", &voices, 0, cv::kVoicesMob, cv::kVoicesName[static_cast<size_t>(voices)])) {
+    d.voicesStep = static_cast<uint8_t>(voices);
+  }
   drawCrowdTuning(d);
   ImGui::PopID();
 }

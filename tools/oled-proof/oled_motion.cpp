@@ -346,7 +346,7 @@ const Card kCards[8] = {
     {"AUTOTUNE", {"KEY", "", 0, 11, true, 5}, {"RESPONSE", "%", 0, 100, false, 50}},
     {"OCTAVE", {"SEMITONES", "st", -12, 12, true, 0}, {"MIX", "%", 0, 100, false, 60}},
     {"UNISON", {"RATE", "hz", 0.1f, 5, false, 1.5f}, {"DEPTH", "%", 0, 100, false, 20}},
-    {"SLAPBACK", {"TIME", "ms", 60, 250, false, 120}, {"AMOUNT", "%", 0, 100, false, 40}},
+    {"ECHO", {"TIME", "ms", 60, 250, false, 120}, {"AMOUNT", "%", 0, 100, false, 40}},
     {"DISTORTION", {"TONE", "%", 0, 100, false, 50}, {"DRIVE", "%", 0, 100, false, 20}},
     {"GATE", {"THRESHOLD", "dB", -60, -10, false, -40}, {"DECAY", "ms", 20, 500, false, 150}},
     {"SPRING REVERB", {"TIME", "%", 0, 100, false, 50}, {"MIX", "%", 0, 100, false, 30}},
@@ -552,7 +552,7 @@ struct Effect {
 
 // Scenes 6 and 7 (Distortion, Unison) are gone: without pictures they would repeat 2 and 3.
 const Effect kEffects[] = {
-    {"2", "slapback-time", "SLAPBACK  TIME", {4, 0, 120, 210}},
+    {"2", "echo-time", "ECHO  TIME", {4, 0, 120, 210}},
     {"3", "reverb-mix", "REVERB  MIX", {7, 1, 30, 65}},
     {"4", "octave-semitones", "OCTAVE  SEMITONES", {2, 0, 0, -12}},
     {"5", "gate-threshold", "GATE  THRESHOLD", {6, 0, -40, -24}},

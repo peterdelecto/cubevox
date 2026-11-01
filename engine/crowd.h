@@ -20,21 +20,25 @@
 //
 // The tuning lists four copies, the tuned copies 0 to 3. Copies 4 to 7 are the raised copies: copy
 // v + 4 takes tuned copy v's throat, tone shelf and contour, sits kRaisedSt higher and lags
-// kRaisedLagMs further back, with its own scatter and drift. Each raised copy fades in with its
-// tuned copy, and every copy carries the four-copy gain over sqrt 2, so the crowd's power at each
-// VOICES position is the four-copy card's.
+// kRaisedLagMs further back, with its own scatter and drift. Every copy carries the four-copy gain
+// over sqrt 2, so eight copies hold the power of four.
 //
-// VOICES fades the copies in one pair at a time (low, high, low, high), then fades the lead out, so
-// the top of the knob is the crowd alone. Total power is unity at every position. WIDTH spreads the
-// copies' formant offsets from none to their full values and their pitch offsets from none to two
-// thirds of the listed ones (kWidthPitchTop), and it stretches their lags. The bottom tenth of the
-// knob is for instruments and melodic lines, where the copies are plain delayed doubles of the lead,
-// exactly on its pitch at WIDTH 0. WIDTH also scales the drift and the contour, so nothing else
-// moves a copy there. A copy changes its lag only in a quiet gap, so it never bends in pitch
-// mid-word. A gap is quiet against the recent phrase level, so gaps over a stage's noise floor
-// count too. Scatter gives each copy a fresh timing offset at every gap, and drift walks each copy's
-// pitch slowly around its offset. On a note the tracker cannot follow, or after a long unvoiced
-// run, the copies drop their moves and play plain delayed doubles.
+// VOICES is a stepped knob with ten positions. Position k from 0 to 8 plays k copies and the lead.
+// Position 9 (MOB) plays all eight copies with the lead gone. Copies come in one at a time in the
+// order tuned 0, raised 4, tuned 1, raised 5, tuned 2, raised 6, tuned 3, raised 7, so each tuned
+// copy is followed by its own raised partner. Total power is unity at every position. A step in
+// the knob glides, so a copy enters or leaves, and the lead moves, without a click.
+//
+// DIVERGE (the engine's width field) spreads the copies' formant offsets from none to their full
+// values and their pitch offsets from none to two thirds of the listed ones (kWidthPitchTop), and it
+// stretches their lags. The bottom tenth of the knob is for instruments and melodic lines, where the
+// copies are plain delayed doubles of the lead, exactly on its pitch at DIVERGE 0. DIVERGE also
+// scales the drift and the contour, so nothing else moves a copy there. A copy changes its lag only
+// in a quiet gap, so it never bends in pitch mid-word. A gap is quiet against the recent phrase
+// level, so gaps over a stage's noise floor count too. Scatter gives each copy a fresh timing offset
+// at every gap, and drift walks each copy's pitch slowly around its offset. On a note the tracker
+// cannot follow, or after a long unvoiced run, the copies drop their moves and play plain delayed
+// doubles.
 //
 // Two more controls make a copy read as a person and not as Adam shifted. Level scatter gives a
 // copy a new loudness at every gap. Contour sets how much of Adam's rises and falls a copy follows.
@@ -45,17 +49,15 @@
 namespace cv {
 
 struct CrowdTuning {
-  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -2.5f, 1.0f};     // offset before the WIDTH pitch top (2/3 sounds at WIDTH 1)
-  std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at WIDTH 1
+  std::array<float, 4> pitchSt = {-1.75f, 2.75f, -2.5f, 1.0f};     // offset before the DIVERGE pitch top (2/3 sounds at DIVERGE 1)
+  std::array<float, 4> formantSt = {-1.75f, -1.0f, -1.0f, -1.5f};  // grain playback rate 2^(st / 12) at DIVERGE 1
   std::array<float, 4> shelfDb = {-3.0f, -4.0f, 3.0f, 5.0f};       // high shelf gain above shelfHz
   std::array<float, 4> delayMs = {40.0f, 100.0f, 70.0f, 75.0f};    // lag behind the lead before lagScale
   float lagScale = 1.2f;       // a copy's lag is delayMs times this
   float shelfHz = 2500.0f;
   float voiceDb = -9.0f;       // a tuned copy and its raised copy together against the lead at unity
-  float trimDb = 2.1f;         // level rule residue at WIDTH 1
-  float trimBottomDb = 0.7f;   // the same at WIDTH 0; between, the trim follows the formant factor
-  float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
-  float holdFrom = 0.75f;      // part of each voice's share of the knob below leadFadeFrom spent fading; the rest holds
+  float trimDb = 2.1f;         // level rule residue at DIVERGE 1
+  float trimBottomDb = 0.7f;   // the same at DIVERGE 0; between, the trim follows the formant factor
   float hpHz = 120.0f;         // low cut on the crowd sum
   float maxLagMs = 150.0f;     // ceiling on a copy's lag before scatter, up to kCrowdMaxLagMs
   float gapFloorDb = -50.0f;   // a copy's read point under this level counts as a gap
@@ -63,18 +65,18 @@ struct CrowdTuning {
   float driftCents = 15.0f;    // peak of each copy's slow random pitch walk
   float driftHoldS = 2.0f;     // time between new drift targets
 
-  // WIDTH scales a copy's pitch and formant offsets by a factor that is linear between three
-  // points. It is 0 at WIDTH 0, widthKneeFrac at WIDTH widthKnee and 1 at WIDTH 1. At WIDTH 0 every
+  // DIVERGE scales a copy's pitch and formant offsets by a factor that is linear between three
+  // points. It is 0 at DIVERGE 0, widthKneeFrac at DIVERGE widthKnee and 1 at DIVERGE 1. At DIVERGE 0 every
   // copy sits exactly on the lead's pitch with the lead's throat. The same factor scales the drift
   // range and pulls each contour toward 1, so the bottom of the knob stays in tune for a melodic line.
   // The pitch offsets, the drift and the contour take the factor times kWidthPitchTop (2/3), so the
-  // top of WIDTH reaches two thirds of the listed pitch offsets. The formant offsets take it whole.
+  // top of DIVERGE reaches two thirds of the listed pitch offsets. The formant offsets take it whole.
   float widthKnee = 0.1f;
   float widthKneeFrac = 0.012f;
 
-  // WIDTH also stretches every lag by one multiplier that is widthLagBottom at WIDTH 0 (0.2..1) and
-  // 1 + widthLagMs / (the longest base lag, delayMs times lagScale) at WIDTH 1, linear between. At
-  // WIDTH 1 the longest copy lags widthLagMs (0..60) behind where lagScale alone puts it, and the
+  // DIVERGE also stretches every lag by one multiplier that is widthLagBottom at DIVERGE 0 (0.2..1) and
+  // 1 + widthLagMs / (the longest base lag, delayMs times lagScale) at DIVERGE 1, linear between. At
+  // DIVERGE 1 the longest copy lags widthLagMs (0..60) behind where lagScale alone puts it, and the
   // others in proportion.
   float widthLagBottom = 0.5f;
   float widthLagMs = 20.0f;
@@ -87,16 +89,22 @@ struct CrowdTuning {
   std::array<float, 4> contour = {0.8f, 1.2f, 0.7f, 1.1f};
 };
 
+// VOICES positions: 0 to 8 copies with the lead, then MOB. The readout shows the name.
+constexpr int kVoicesSteps = 10;
+constexpr uint8_t kVoicesMob = 9;
+constexpr std::array<const char*, kVoicesSteps> kVoicesName = {"0", "1", "2", "3", "4",
+                                                               "5", "6", "7", "8", "MOB"};
+
 struct CrowdParams {
   bool on = false;
-  float width = 1.0f;   // knob A, 0..1
-  float voices = 0.5f;  // knob B, 0..1
+  float width = 1.0f;         // knob A (DIVERGE), 0..1
+  uint8_t voicesStep = 4;     // knob B (VOICES), 0..9: that many copies and the lead, 9 is MOB
   CrowdTuning tuning;
 
   // A bit per copy (bit 0 is copy 0, bits 4 to 7 the raised copies), 0 for no solo. A soloed copy
-  // sits fully faded in and the others are silent, whatever the VOICES position. The lead gain
-  // follows from the soloed power. This is a tuning hook for the emulator, whose four boxes set
-  // bits 0 to 3. The firmware never sets it.
+  // plays and the others are silent, whatever the VOICES position. The lead gain follows from the
+  // soloed power, and MOB scales the soloed copies to unity. This is a tuning hook for the
+  // emulator, whose four boxes set bits 0 to 3. The firmware never sets it.
   uint8_t solo = 0;
 };
 
@@ -104,10 +112,15 @@ namespace crowd_detail {
 
 constexpr size_t kVoices = 4;               // the tuned copies, one per entry of the tuning's arrays
 constexpr size_t kCopies = 2 * kVoices;     // the tuned copies, then the raised copies
-constexpr float kRaisedSt = 1.75f;          // a raised copy's pitch over its tuned copy's, before WIDTH
+constexpr float kRaisedSt = 1.75f;          // a raised copy's pitch over its tuned copy's, before DIVERGE
 constexpr float kRaisedLagMs = 75.0f;       // a raised copy's lag past its tuned copy's
 constexpr float kCopyGain = 0.70710678f;    // 1 / sqrt(2): eight copies hold four copies' power
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
+static_assert(kVoicesMob == kCopies + 1, "VOICES runs 0 to kCopies, then MOB");
+
+// The copy that enters at VOICES position j, counting from 1. The order is tuned 0, raised 4,
+// tuned 1, raised 5, and so on.
+constexpr size_t entryCopy(size_t j) { return (j - 1) / 2 + ((j - 1) % 2) * kVoices; }
 
 // The periods a copy plays are the ones the tracker reports.
 constexpr float kMinPeriod = static_cast<float>(PitchTracker::kMinPeriod);
@@ -190,14 +203,14 @@ inline float clampLag(float lag, float period) {
   return clampf(lag, kFloorPeriods * p + kFloorPad, kDelayCeil);
 }
 
-// The factor WIDTH puts on a copy's pitch and formant offsets. It is linear from (0, 0) to
-// (knee, kneeFrac) and on to (1, 1), so it is exactly 0 at WIDTH 0 and exactly 1 at WIDTH 1.
+// The factor DIVERGE puts on a copy's pitch and formant offsets. It is linear from (0, 0) to
+// (knee, kneeFrac) and on to (1, 1), so it is exactly 0 at DIVERGE 0 and exactly 1 at DIVERGE 1.
 constexpr float kMinWidthKnee = 0.02f;
 constexpr float kMaxWidthKnee = 0.9f;
 constexpr float kMaxWidthKneeFrac = 1.0f;
 
-// The pitch offsets, the drift and the contour deviation take the WIDTH factor times this top, so
-// WIDTH 1 reaches two thirds of the pitch move the tuning lists (owner 2026-10-31). The formant
+// The pitch offsets, the drift and the contour deviation take the DIVERGE factor times this top, so
+// DIVERGE 1 reaches two thirds of the pitch move the tuning lists (owner 2026-10-31). The formant
 // offsets and the lag law keep the full factor.
 constexpr float kWidthPitchTop = 2.0f / 3.0f;
 
@@ -209,13 +222,13 @@ inline float widthFactor(float width, float knee, float kneeFrac) {
   return f * (1.0f - t) + t;
 }
 
-// The multiplier WIDTH puts on every lag target. The longest base lag is delayMs times lagScale; at
-// WIDTH 1 it grows by widthLagMs and the rest grow by the same ratio.
+// The multiplier DIVERGE puts on every lag target. The longest base lag is delayMs times lagScale; at
+// DIVERGE 1 it grows by widthLagMs and the rest grow by the same ratio.
 constexpr float kMinLagBottom = 0.2f;
 constexpr float kMaxLagBottom = 1.0f;
 constexpr float kMaxWidthLagMs = 60.0f;
 
-// Copy v's lag before WIDTH and the ceiling, delayMs times lagScale, each inside its range.
+// Copy v's lag before DIVERGE and the ceiling, delayMs times lagScale, each inside its range.
 inline float baseLagMs(const CrowdTuning& t, size_t v) {
   return clampf(t.delayMs[v], kMinDelayMs, static_cast<float>(kCrowdMaxLagMs)) *
          clampf(t.lagScale, kMinLagScale, kMaxLagScale);
@@ -719,53 +732,47 @@ class CopyLag {
   bool landed_ = false;  // this gap has taken its landing
 };
 
-// The VOICES law at knob position k. weight[c] is copy c's fixed gain times its fade, lead the
-// lead's gain, mul the crowd multiplier that carries the top of the knob.
+// The VOICES law at one position. weight[c] is copy c's fixed gain when it plays and 0 when it does
+// not, lead the lead's gain, mul the crowd multiplier that carries MOB.
 struct VoicesLaw {
   std::array<float, kCopies> weight{};
   float lead = 1.0f;
   float mul = 1.0f;
 };
 
-// Each tuned copy owns a fifth of the knob's travel below the fade point and fades in over the
-// first `hold` of it. Its raised copy takes the same fade.
-inline float copyFade(float u, size_t v, float hold) {
-  return sinf(kHalfPi * smooth::clamp01((u - static_cast<float>(v)) / hold));
+// The copies playing at VOICES position `step`, a bit per copy. Position k plays the first k copies
+// in entry order, and MOB plays all eight.
+inline uint8_t playingCopies(uint8_t step) {
+  uint8_t mask = 0;
+  const size_t count = step < kVoicesMob ? step : kCopies;
+  for (size_t j = 1; j <= count; ++j) mask = static_cast<uint8_t>(mask | (1u << entryCopy(j)));
+  return mask;
 }
 
-// solo is a bit per copy. When a bit is set, each soloed copy takes fade 1 and the others 0 at every
-// k, and the rest of the law runs on that crowd. The lead and the crowd multiplier then follow from
-// the soloed power, so a single copy at the top of the knob stands alone at unity.
-inline VoicesLaw voicesLaw(float k, const CrowdTuning& t, uint8_t solo = 0) {
+// solo is a bit per copy. When a bit is set, the soloed copies play at every position and the others
+// stay silent, and the rest of the law runs on that crowd. The lead and the crowd multiplier then
+// follow from the soloed power, so a single copy at MOB stands alone at unity.
+//
+// A playing copy holds the gain g from the tuning, and the lead takes what unity leaves,
+// sqrt(1 - the copies' power), never below 0. MOB drops the lead and scales the copies together to
+// unity power.
+inline VoicesLaw voicesLaw(uint8_t step, const CrowdTuning& t, uint8_t solo = 0) {
   VoicesLaw law;
   const float g = dbToGainFast(clampf(t.voiceDb, kMinVoiceDb, kMaxVoiceDb)) * kCopyGain;
-  const float from = clampf(t.leadFadeFrom, 0.05f, 0.99f);
-  const float hold = clampf(t.holdFrom, 0.05f, 1.0f);
-  const float u = k / (from * 0.25f);
+  const uint8_t mask = solo == 0 ? playingCopies(step) : solo;
   unsigned count = 0;
-  float sumSq = 0.0f;
   for (size_t c = 0; c < kCopies; ++c) {
-    const unsigned bit = (solo >> c) & 1u;
+    const unsigned bit = (mask >> c) & 1u;
     count += bit;
-    const float fade = solo == 0 ? copyFade(u, c % kVoices, hold) : static_cast<float>(bit);
-    law.weight[c] = g * fade;
-    sumSq += law.weight[c] * law.weight[c];
+    law.weight[c] = g * static_cast<float>(bit);
   }
-  if (k <= from) {
-    law.lead = sqrtf(sumSq < 1.0f ? 1.0f - sumSq : 0.0f);
+  const float power = static_cast<float>(count) * g * g;
+  if (step < kVoicesMob) {
+    law.lead = sqrtf(power < 1.0f ? 1.0f - power : 0.0f);
     return law;
   }
-
-  // Past the fade point every sounding copy holds at g. Crowd power runs from the sounding copies'
-  // power (all eight without a solo) up to unity while the lead falls to nothing, and the crowd
-  // multiplier makes up the difference.
-  const float s = smooth::clamp01((k - from) / (1.0f - from));
-  const float p0 = static_cast<float>(solo == 0 ? kCopies : count) * g * g;
-  const float sn = sinf(kHalfPi * s);
-  const float power = s >= 1.0f ? 1.0f : p0 + (1.0f - p0) * sn * sn;
-  for (size_t c = 0; c < kCopies; ++c) law.weight[c] = solo == 0 || ((solo >> c) & 1u) ? g : 0.0f;
-  law.lead = sqrtf(power < 1.0f ? 1.0f - power : 0.0f);
-  law.mul = p0 > 1e-6f ? sqrtf(power / p0) : 1.0f;
+  law.lead = 0.0f;
+  law.mul = power > 1e-6f ? sqrtf(1.0f / power) : 1.0f;
   return law;
 }
 
@@ -866,6 +873,7 @@ class Crowd {
     gain_.fill(0.0f);
     lead_ = 1.0f;
     wet_ = 0.0f;
+    glideSet_ = false;
     for (size_t v = 0; v < kCopies; ++v) {
       lag_[v].seed(0x2545F491u * static_cast<uint32_t>(v + 1));
       driftRng_[v].seed(0x9E3779B9u * static_cast<uint32_t>(v + 1) ^ 0x85EBCA6Bu);
@@ -893,11 +901,16 @@ class Crowd {
   }
 
   // Test hooks. leadGain is the lead's gain at the end of the last block. activeVoices counts the
-  // copies that ticked in it. lagSamples, driftCents and grainRate read copy v's current lag, pitch
-  // drift and grain playback rate. moveShare is the share of copy v's pitch and formant moves in
-  // force, 1 on a note in range and 0 once it plays plain.
+  // copies that ticked in it and activeMask names them, a bit per copy. lagSamples, driftCents and
+  // grainRate read copy v's current lag, pitch drift and grain playback rate. moveShare is the share
+  // of copy v's pitch and formant moves in force, 1 on a note in range and 0 once it plays plain.
   float leadGain() const { return lead_; }
   uint8_t activeVoices() const { return active_; }
+  uint8_t activeMask() const {
+    uint8_t mask = 0;
+    for (size_t v = 0; v < kCopies; ++v) mask = static_cast<uint8_t>(mask | (live_[v] ? 1u << v : 0u));
+    return mask;
+  }
   float lagSamples(size_t v) const { return lag_[v].samples(); }
   float driftCents(size_t v) const { return drift_[v].cents(); }
   float grainRate(size_t v) const { return voice_[v].rate(); }
@@ -911,34 +924,65 @@ class Crowd {
 
   // Block-end targets for everything the knobs and the tuning set.
   struct Plan {
-    std::array<float, kCopies> voice{};  // fixed gain times fade, per copy
+    std::array<float, kCopies> voice{};  // each copy's gain, 0 for a copy not playing
     float lead = 1.0f;
     float wet = 0.0f;    // crowd multiplier times the trim
-    float width = 0.0f;  // WIDTH's factor on the formant offsets, from the smoothed knob
+    float width = 0.0f;  // DIVERGE's factor on the formant offsets, from the smoothed knob
   };
 
   // Until the tracker has a period the copies cannot play, so the plan holds the lead at 1 and the
-  // copies at 0. A switch-on then keeps the lead until the copies can take over. The WIDTH smoother
+  // copies at 0. A switch-on then keeps the lead until the copies can take over. The DIVERGE smoother
   // steps on every block either way.
   Plan makePlan(const CrowdParams& p, bool havePeriod) {
     Plan plan;
     const CrowdTuning& t = p.tuning;
     plan.width = crowd_detail::widthFactor(smoothedWidth(p.width), t.widthKnee, t.widthKneeFrac);
-    if (!p.on || !havePeriod) return plan;
+    if (!p.on || !havePeriod) {
+      glideSet_ = false;
+      return plan;
+    }
     const crowd_detail::VoicesLaw& law = voicesLaw(p);
-    plan.voice = law.weight;
-    plan.lead = law.lead;
+    float mul = 1.0f;
+    glideLaw(law, plan.voice, plan.lead, mul);
     const float trim = trimAt(t, plan.width);
     if (trim != trimDb_) {
       trimGain_ = dbToGainFast(trim);
       trimDb_ = trim;
     }
-    plan.wet = law.mul * trimGain_;
+    plan.wet = mul * trimGain_;
     return plan;
   }
 
-  // A copy loses level as WIDTH moves its pitch and formant, so the trim moves from trimBottomDb at
-  // WIDTH 0 to trimDb at WIDTH 1 along the formant factor, and each end is exact.
+  // A VOICES step moves the law's targets at once. Each target runs through two one-poles of
+  // smooth::kSmoothSec in a row, so it leaves its old value with zero slope and a copy entering or
+  // leaving, the lead and the MOB multiplier glide without a kink. The glide takes a target outright
+  // on the first block that plays, so a switch-on ramps in as it always has.
+  struct Glide {
+    float first = 0.0f;
+    float second = 0.0f;
+
+    void set(float v) { first = second = v; }
+    float step(float target, float coef) {
+      first = smooth::step(first, target, coef);
+      second = smooth::step(second, first, coef);
+      return second;
+    }
+  };
+
+  void glideLaw(const crowd_detail::VoicesLaw& law, std::array<float, kCopies>& voice, float& lead, float& mul) {
+    if (!glideSet_) {
+      for (size_t c = 0; c < kCopies; ++c) weightGlide_[c].set(law.weight[c]);
+      leadGlide_.set(law.lead);
+      mulGlide_.set(law.mul);
+      glideSet_ = true;
+    }
+    for (size_t c = 0; c < kCopies; ++c) voice[c] = weightGlide_[c].step(law.weight[c], smoothCoef_);
+    lead = leadGlide_.step(law.lead, smoothCoef_);
+    mul = mulGlide_.step(law.mul, smoothCoef_);
+  }
+
+  // A copy loses level as DIVERGE moves its pitch and formant, so the trim moves from trimBottomDb at
+  // DIVERGE 0 to trimDb at DIVERGE 1 along the formant factor, and each end is exact.
   static float trimAt(const CrowdTuning& t, float width) {
     const float top = clampf(t.trimDb, -crowd_detail::kMaxTrimDb, crowd_detail::kMaxTrimDb);
     const float bottom = clampf(t.trimBottomDb, -crowd_detail::kMaxTrimDb, crowd_detail::kMaxTrimDb);
@@ -952,26 +996,22 @@ class Crowd {
     return heldPeriod_;
   }
 
-  // What the VOICES law reads. The law's sines and roots run again only when one of them moves.
+  // What the VOICES law reads. The law's roots run again only when one of them changes.
   struct LawKey {
-    float voices = -1.0f;
+    uint8_t step = 0;
     float voiceDb = 0.0f;
-    float leadFadeFrom = 0.0f;
-    float holdFrom = 0.0f;
     uint8_t solo = 0;
     bool set = false;
 
     bool operator==(const LawKey& o) const {
-      return set == o.set && voices == o.voices && voiceDb == o.voiceDb && leadFadeFrom == o.leadFadeFrom &&
-             holdFrom == o.holdFrom && solo == o.solo;
+      return set == o.set && step == o.step && voiceDb == o.voiceDb && solo == o.solo;
     }
   };
 
   const crowd_detail::VoicesLaw& voicesLaw(const CrowdParams& p) {
-    const CrowdTuning& t = p.tuning;
-    const LawKey key{smooth::clamp01(p.voices), t.voiceDb, t.leadFadeFrom, t.holdFrom, p.solo, true};
+    const LawKey key{p.voicesStep < kVoicesMob ? p.voicesStep : kVoicesMob, p.tuning.voiceDb, p.solo, true};
     if (!(key == lawKey_)) {
-      law_ = crowd_detail::voicesLaw(key.voices, t, p.solo);
+      law_ = crowd_detail::voicesLaw(key.step, p.tuning, p.solo);
       lawKey_ = key;
     }
     return law_;
@@ -981,7 +1021,7 @@ class Crowd {
   // again only when n changes.
   void setCoefs(int n) {
     if (n == coefN_) return;
-    widthCoef_ = smooth::blockCoef(smooth::kSmoothSec, n);
+    smoothCoef_ = smooth::blockCoef(smooth::kSmoothSec, n);
     slewCoef_ = smooth::blockCoef(crowd_detail::kDriftSlewS, n);
     riseCoef_ = smooth::blockCoef(crowd_detail::kPhraseRiseS, n);
     fallCoef_ = smooth::blockCoef(crowd_detail::kPhraseFallS, n);
@@ -1053,7 +1093,7 @@ class Crowd {
     shelfSet_ = true;
   }
 
-  // Copy v's lag target in samples. The scale and the WIDTH multiplier stretch the tuned copy's
+  // Copy v's lag target in samples. The scale and the DIVERGE multiplier stretch the tuned copy's
   // delay and the tuning's ceiling caps it. A raised copy lags kRaisedLagMs past that, capped at the
   // ring's ceiling.
   static float lagTarget(const CrowdTuning& t, size_t v, float widthMul) {
@@ -1072,9 +1112,9 @@ class Crowd {
     crowd_detail::BlockView view;
     float period;
     float corr;        // Autotune's correction in octaves
-    float width;       // factor on the formant offsets, 0 at WIDTH 0
+    float width;       // factor on the formant offsets, 0 at DIVERGE 0
     float pitchWidth;  // width times kWidthPitchTop, the factor on the pitch offsets, drift and contour
-    float lagMul;      // WIDTH multiplier on every lag target
+    float lagMul;      // DIVERGE multiplier on every lag target
     float scatterSmp;  // timing scatter in samples
     float levelDb;     // level scatter, clamped to its range
     float driftPeak;   // drift range in cents, clamped and times pitchWidth
@@ -1083,12 +1123,12 @@ class Crowd {
     int n;
   };
 
-  // The WIDTH the factors read. It follows the knob through the 20 ms one-pole, so a knob step moves
+  // The DIVERGE the factors read. It follows the knob through the 20 ms one-pole, so a knob step moves
   // the copies' pitch over a few blocks and not in one jump, and it takes the knob value outright on
   // the first block after a reset. A settled value equals the knob bit for bit.
   float smoothedWidth(float width) {
     const float target = smooth::clamp01(width);
-    widthSm_ = widthSet_ ? smooth::step(widthSm_, target, widthCoef_) : target;
+    widthSm_ = widthSet_ ? smooth::step(widthSm_, target, smoothCoef_) : target;
     widthSet_ = true;
     return widthSm_;
   }
@@ -1129,7 +1169,7 @@ class Crowd {
     for (size_t k = 0; k < 2; ++k) {
       const bool plain = unvoiced_ >= crowd_detail::plainAfter(capMs[k]) || pr.outOfRange;
       const float target = plain ? 0.0f : 1.0f;
-      keep_[k] = keepSet_ ? smooth::step(keep_[k], target, widthCoef_) : target;
+      keep_[k] = keepSet_ ? smooth::step(keep_[k], target, smoothCoef_) : target;
     }
     keepSet_ = true;
     return keep_;
@@ -1195,8 +1235,8 @@ class Crowd {
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
   // The copy then sits contour times as far from his mean as he does. Contour 1 adds exactly 0. The
-  // WIDTH factor pulls the contour toward 1, so it is exactly 1 at the bottom of WIDTH and
-  // 1 + (contour - 1) * kWidthPitchTop at WIDTH 1.
+  // DIVERGE factor pulls the contour toward 1, so it is exactly 1 at the bottom of DIVERGE and
+  // 1 + (contour - 1) * kWidthPitchTop at DIVERGE 1.
   float contourOctaves(size_t v, const CrowdTuning& t, float factor) const {
     const float c = clampf(t.contour[v], crowd_detail::kMinContour, crowd_detail::kMaxContour);
     return c == 1.0f ? 0.0f : (c - 1.0f) * factor * contour_.deviation();
@@ -1347,7 +1387,11 @@ class Crowd {
   float widthSm_ = 1.0f;
   crowd_detail::VoicesLaw law_;
   LawKey lawKey_;
-  float widthCoef_ = 0.0f;
+  std::array<Glide, kCopies> weightGlide_{};
+  Glide leadGlide_;
+  Glide mulGlide_;
+  bool glideSet_ = false;
+  float smoothCoef_ = 0.0f;  // the 20 ms one-pole, per block
   float slewCoef_ = 0.0f;
   float riseCoef_ = 0.0f;   // phrase level, rising
   float fallCoef_ = 0.0f;   // phrase level, falling

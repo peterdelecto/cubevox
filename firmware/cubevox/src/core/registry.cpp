@@ -50,7 +50,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Pitch, costs::kOctave},
     {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Rate"), kPercent("Depth")}, Group::None,
      costs::kUnison},
-    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kSlapbackTime, kPercent("AMOUNT")}, Group::None,
+    {Card::Slapback, "slapback", "Echo", Engine::Slapback, 2, {kSlapbackTime, kPercent("AMOUNT")}, Group::None,
      costs::kSlapback},
     {Card::Distortion, "distortion", "Distortion", Engine::Distortion, 2, {kPercent("Tone"), kPercent("Drive")},
      Group::None, costs::kDistortion},
@@ -59,8 +59,11 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Reverb, costs::kReverbSpring},
     {Card::ReverbChasm, "reverb_chasm", "Chasm Reverb", Engine::Reverb, 2, {kPercent("Time"), kPercent("Mix")},
      Group::Reverb, costs::kReverbChasm},
-    {Card::Crowd, "crowd", "Mob", Engine::Crowd, 2, {kPercent("WIDTH"), kPercent("VOICES")}, Group::Pitch,
-     costs::kCrowd},
+    {Card::Crowd, "crowd", "Mob", Engine::Crowd, 2,
+     {kPercent("DIVERGE"),
+      {"VOICES", KnobKind::Stepped, cv::kVoicesSteps, 0.0f, cv::kVoicesSteps - 1, "", Curve::Linear, 0,
+       cv::kVoicesName.data()}},
+     Group::Pitch, costs::kCrowd},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -138,7 +141,7 @@ void applyCrowdKnob(int knob, float v, cv::CrowdParams& d) {
   if (knob == 0) {
     d.width = v;
   } else {
-    d.voices = v;
+    d.voicesStep = static_cast<uint8_t>(v);
   }
 }
 
