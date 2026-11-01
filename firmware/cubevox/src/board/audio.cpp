@@ -586,8 +586,8 @@ bool checkMemoryAndClock() {
 void resetAudioState() {
   h7_dtcm_bss_zero();
   new (&gPitchFx) cv::PitchFx();
-  gSnapshots[0] = ChainSnapshot();
-  gHeld = ChainSnapshot();
+  new (&gSnapshots[0]) ChainSnapshot();  // in place: a snapshot is over a kilobyte, too big for the stack
+  new (&gHeld) ChainSnapshot();
   enableCycleCounter();
   gCounts.budgetCycles = static_cast<uint32_t>(
       static_cast<uint64_t>(SystemCoreClock) * kFramesPerHalf / cv::kSampleRate);

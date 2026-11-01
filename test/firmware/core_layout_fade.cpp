@@ -268,6 +268,20 @@ void checkEnginesToReset() {
   empty.card[2] = Card::Empty;
   check(enginesToReset(base, empty) == bit(Engine::Pitch), "reset: a card leaving a slot resets its engine");
   check(enginesToReset(empty, empty) == 0 && enginesToReset(Layout{{}}, Layout{{}}) == 0, "reset: empty slots reset nothing");
+
+  // The slot 7 choices: Gate and the incoming card's engine reset, and no other. Formant shares the
+  // pitch engine, so the Gate to Formant swap clears the pitch stage in its silent block.
+  Layout formant = base;
+  formant.card[6] = Card::Formant;
+  Layout lofi = base;
+  lofi.card[6] = Card::Lofi;
+  Layout bloom = base;
+  bloom.card[6] = Card::Bloom;
+  check(enginesToReset(base, formant) == (bit(Engine::Gate) | bit(Engine::Pitch)) &&
+            enginesToReset(base, lofi) == (bit(Engine::Gate) | bit(Engine::Lofi)) &&
+            enginesToReset(base, bloom) == (bit(Engine::Gate) | bit(Engine::Bloom)) &&
+            enginesToReset(formant, bloom) == (bit(Engine::Pitch) | bit(Engine::Bloom)),
+        "reset: a slot 7 swap resets the engine it leaves and the engine it enters");
 }
 
 // A cut drops to zero at once, holds silent long enough to clear every engine, then fades in.

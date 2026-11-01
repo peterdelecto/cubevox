@@ -18,7 +18,8 @@
 // The crush runs ahead of the inverse, where the drive output fills the range, so 5 bits means 5 bits.
 // After the inverse the voice peaks near 1/8 of full scale and a 5-bit step leaves it five levels.
 // Filter coefficients, the crush law and the gains are set once per block from the 20 ms knob
-// smoothers; the sample loop runs no libm. The two gains ramp across the block.
+// smoothers; the sample loop runs no libm. The two gains and the five filters' coefficients ramp
+// linearly across the block, so a moving knob never hands a section a coefficient step.
 
 namespace cv {
 
@@ -181,16 +182,24 @@ class Lofi {
     loop(in, out, n, target);
   }
 
-  // Sets the five filters and the block's end gains from the smoothed knobs.
+  // Sets the five filters' end-of-block coefficients and the block's end gains from the smoothed
+  // knobs. The first law after a reset takes them at once; a later one is reached by the block's ramp.
   void applyLaw(const LofiTuning& t) {
     law_ = lawAt(tone_, amount_, t);
-    hp1_.setHighPass(law_.hpHz, kQ1);
-    hp2_.setHighPass(law_.hpHz, kQ2);
-    lp1_.setLowPass(law_.lpHz, kQ1);
-    lp2_.setLowPass(law_.lpHz, kQ2);
-    honk_.setPeak(law_.fcHz, law_.honkDb, t.honkQ);
+    goal_[0].setHighPass(law_.hpHz, kQ1);
+    goal_[1].setHighPass(law_.hpHz, kQ2);
+    goal_[2].setLowPass(law_.lpHz, kQ1);
+    goal_[3].setLowPass(law_.lpHz, kQ2);
+    goal_[4].setPeak(law_.fcHz, law_.honkDb, t.honkQ);
     next_ = {law_.drive, law_.makeup / law_.drive};
-    if (!lawValid_) cur_ = next_;
+    if (!lawValid_) {
+      cur_ = next_;
+      hp1_.setCoefsFrom(goal_[0]);
+      hp2_.setCoefsFrom(goal_[1]);
+      lp1_.setCoefsFrom(goal_[2]);
+      lp2_.setCoefsFrom(goal_[3]);
+      honk_.setCoefsFrom(goal_[4]);
+    }
     invQ_ = 1.0f / law_.step;
     lawTone_ = tone_;
     lawAmount_ = amount_;
@@ -198,11 +207,53 @@ class Lofi {
     lawValid_ = true;
   }
 
+  // The per-sample steps that take one section's coefficients to its goal over a block.
+  struct CoefStep {
+    float b0, b1, b2, a1, a2;
+  };
+
+  static CoefStep stepsTo(const Biquad& from, const Biquad& to, float inv) {
+    return {(to.b0 - from.b0) * inv, (to.b1 - from.b1) * inv, (to.b2 - from.b2) * inv, (to.a1 - from.a1) * inv,
+            (to.a2 - from.a2) * inv};
+  }
+
+  static void advance(Biquad& b, const CoefStep& s) {
+    b.b0 += s.b0;
+    b.b1 += s.b1;
+    b.b2 += s.b2;
+    b.a1 += s.a1;
+    b.a2 += s.a2;
+  }
+
+  static bool apart(const Biquad& a, const Biquad& b) {
+    return a.b0 != b.b0 || a.b1 != b.b1 || a.b2 != b.b2 || a.a1 != b.a1 || a.a2 != b.a2;
+  }
+
+  // A block whose filters sit on their goals runs the plain loop. One that has a goal to reach ramps
+  // every coefficient to it, so the sections never see a step.
+  void loop(const float* in, float* out, int n, float target) {
+    if (apart(hp1_, goal_[0]) || apart(hp2_, goal_[1]) || apart(lp1_, goal_[2]) || apart(lp2_, goal_[3]) ||
+        apart(honk_, goal_[4])) {
+      run<true>(in, out, n, target);
+    } else {
+      run<false>(in, out, n, target);
+    }
+  }
+
   // Band, honk, drive, crush, makeup, then the dry/wet mix. The filters and the gains run on local
   // copies, so stores to out cannot alias them.
-  void loop(const float* in, float* out, int n, float target) {
+  template <bool kRamp>
+  void run(const float* in, float* out, int n, float target) {
     Biquad hp1 = hp1_, hp2 = hp2_, lp1 = lp1_, lp2 = lp2_, honk = honk_;
     const float inv = 1.0f / static_cast<float>(n);
+    CoefStep s0{}, s1{}, s2{}, s3{}, s4{};
+    if constexpr (kRamp) {
+      s0 = stepsTo(hp1, goal_[0], inv);
+      s1 = stepsTo(hp2, goal_[1], inv);
+      s2 = stepsTo(lp1, goal_[2], inv);
+      s3 = stepsTo(lp2, goal_[3], inv);
+      s4 = stepsTo(honk, goal_[4], inv);
+    }
     float g = cur_.drive, post = cur_.post;
     const float dg = (next_.drive - g) * inv;
     const float dpost = (next_.post - post) * inv;
@@ -211,6 +262,13 @@ class Lofi {
     float phase = phase_, held = held_, mix = onMix_;
     for (int i = 0; i < n; ++i) {
       const float x = in[i];
+      if constexpr (kRamp) {
+        advance(hp1, s0);
+        advance(hp2, s1);
+        advance(lp1, s2);
+        advance(lp2, s3);
+        advance(honk, s4);
+      }
       float v = honk.run(lp2.run(lp1.run(hp2.run(hp1.run(x)))));
       v = tanhFast(v * g);
       if (crush) {
@@ -228,6 +286,13 @@ class Lofi {
       g += dg;
       post += dpost;
     }
+    if constexpr (kRamp) {  // land on the goals exactly, whatever the steps added up to
+      hp1.setCoefsFrom(goal_[0]);
+      hp2.setCoefsFrom(goal_[1]);
+      lp1.setCoefsFrom(goal_[2]);
+      lp2.setCoefsFrom(goal_[3]);
+      honk.setCoefsFrom(goal_[4]);
+    }
     hp1_ = hp1;
     hp2_ = hp2;
     lp1_ = lp1;
@@ -242,6 +307,7 @@ class Lofi {
   }
 
   Biquad hp1_, hp2_, lp1_, lp2_, honk_;
+  std::array<Biquad, 5> goal_;  // the coefficients the block ends on; the states are unused
   Law law_{};
   Gains cur_{1.0f, 1.0f};
   Gains next_{1.0f, 1.0f};

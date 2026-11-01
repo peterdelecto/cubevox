@@ -39,6 +39,7 @@ enum class Item : uint8_t {
   InputJack,
   Reverb,
   UnisonCrowd,
+  Slot7Card,
   PolishComp,
   PolishEq,
   Output,
@@ -67,23 +68,26 @@ void putRow(MenuFrame& frame, int r, const char* text) {
   frame[r][n] = '\0';
 }
 
-// The label of `it`. The Unison and Crowd row names the slot that holds the card, or a dash when
-// none does, and builds the text in `buf`.
+// The text of a SLOT row: the number of `slot` (zero-based), or a dash when no slot holds the card.
+const char* slotLabel(int slot, char* buf, size_t size) {
+  if (slot >= 0) {
+    snprintf(buf, size, "SLOT %d", slot + 1);
+  } else {
+    snprintf(buf, size, "SLOT -");
+  }
+  return buf;
+}
+
+// The label of `it`. The Unison and Crowd row and the slot 7 row name the slot that holds their card,
+// or a dash when none does, and build the text in `buf`.
 const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
   switch (it) {
     case Item::InputJack: return "INPUT";
     case Item::Output: return "OUTPUT";
     case Item::TopSwitch: return "TOP SWITCH";
     case Item::Reverb: return "REVERB";
-    case Item::UnisonCrowd: {
-      const int slot = unisonCrowdSlot(layout);
-      if (slot >= 0) {
-        snprintf(buf, size, "SLOT %d", slot + 1);
-      } else {
-        snprintf(buf, size, "SLOT -");
-      }
-      return buf;
-    }
+    case Item::UnisonCrowd: return slotLabel(unisonCrowdSlot(layout), buf, size);
+    case Item::Slot7Card: return slotLabel(slot7CardSlot(layout), buf, size);
     case Item::PolishComp: return "POLISH COMP";
     case Item::PolishEq: return "POLISH EQ";
     case Item::Debug: return "DEBUG";
@@ -110,6 +114,18 @@ const char* unisonCrowdValue(const Layout& layout) {
   return slot >= 0 && layout.card[slot] == Card::Crowd ? "MOB" : "UNISON";
 }
 
+// The card the slot 7 row holds. A layout with none of the four reads GATE, the default.
+const char* slot7CardValue(const Layout& layout) {
+  const int slot = slot7CardSlot(layout);
+  if (slot < 0) return "GATE";
+  switch (layout.card[slot]) {
+    case Card::Formant: return "FORMANT";
+    case Card::Lofi: return "LO-FI";
+    case Card::Bloom: return "BLOOM";
+    default: return "GATE";
+  }
+}
+
 const char* itemValue(Item it, const UiContext& ctx) {
   const Settings& s = ctx.settings;
   switch (it) {
@@ -118,6 +134,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     case Item::Reverb: return reverbValue(ctx.layout);
     case Item::UnisonCrowd: return unisonCrowdValue(ctx.layout);
+    case Item::Slot7Card: return slot7CardValue(ctx.layout);
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::PolishEq: return onOff(s.polishEq);
     case Item::Debug: return onOff(s.debug);
@@ -200,6 +217,7 @@ UiAction Menu::onClick() {
         case Item::TopSwitch: return UiAction::CycleTopSwitch;
         case Item::Reverb: return UiAction::SwapReverb;
         case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
+        case Item::Slot7Card: return UiAction::CycleSlot7Card;
         case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::PolishEq: return UiAction::TogglePolishEq;
         case Item::Debug: return UiAction::ToggleDebug;

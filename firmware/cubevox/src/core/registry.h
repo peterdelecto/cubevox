@@ -24,6 +24,9 @@ enum class Card : uint8_t {
   ReverbSpring,
   ReverbChasm,
   Crowd,
+  Formant,
+  Lofi,
+  Bloom,
   Count,
 };
 
@@ -33,10 +36,10 @@ constexpr int kCardCount = static_cast<int>(Card::Count);
 // so the registry keeps every id shorter than it by at least two characters.
 constexpr size_t kCardIdBytes = 16;
 
-// Engines the audio block owns. Cards map onto them: Autotune and Octave share Pitch, and both
-// reverb cards share Reverb. The Crowd card has its own engine and reads the Pitch engine's ring.
-// Count ends the list.
-enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Count };
+// Engines the audio block owns. Cards map onto them: Autotune, Octave and Formant share Pitch, and
+// both reverb cards share Reverb. The Crowd card has its own engine and reads the Pitch engine's
+// ring. Count ends the list.
+enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Count };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);
 

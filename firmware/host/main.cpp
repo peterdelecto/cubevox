@@ -1,7 +1,9 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] one frame of the window as a P6 PPM, no audio device
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot7 gate|formant|lofi|bloom]
+//                                             one frame of the window as a P6 PPM, no audio device,
+//                                             with that card in slot 7 (Gate when omitted)
 
 #include <array>
 #include <cmath>
@@ -44,7 +46,9 @@ constexpr uint32_t kPassMs = 10;  // one scan of the 16 pots takes about this lo
 constexpr int kMaxCatchUpPasses = 50;
 constexpr int kCheckMinDbfs = -40;
 constexpr int kMobSlot = 3;    // slot 4, counted from 0
+constexpr int kSlot7 = 6;      // slot 7
 constexpr int kChasmSlot = 7;  // slot 8
+constexpr uint32_t kCheckSlot7Ms = 1500;  // after a pick: the layout fade, then more than a second of audio
 
 // A box and its audio run on the main thread with no device: each UI tick, one box pass, then the
 // blocks that fill the tick pulled from the clip.
@@ -74,13 +78,28 @@ struct Rig {
 };
 
 // What the default layout costs, from the cost table's own rows, and what it costs with MOB in
-// slot 4 and Chasm in slot 8. The tracker is paid once, because Autotune is placed.
-constexpr costs::Cost kDefaultSum = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kUnison +
-                                    costs::kSlapback + costs::kDistortion + costs::kGate + costs::kReverbSpring +
-                                    costs::kFixed + costs::kTracker;
-constexpr costs::Cost kSwappedSum = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kCrowd +
-                                    costs::kSlapback + costs::kDistortion + costs::kGate + costs::kReverbChasm +
-                                    costs::kFixed + costs::kTracker;
+// slot 4 and Chasm in slot 8. The tracker is paid once, because Autotune is placed. Each "rest" is
+// every row but slot 7's, which is Gate in the default layout and one of four cards after a pick.
+constexpr costs::Cost kDefaultRest = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kUnison +
+                                     costs::kSlapback + costs::kDistortion + costs::kReverbSpring + costs::kFixed +
+                                     costs::kTracker;
+constexpr costs::Cost kSwappedRest = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kCrowd +
+                                     costs::kSlapback + costs::kDistortion + costs::kReverbChasm + costs::kFixed +
+                                     costs::kTracker;
+constexpr costs::Cost kDefaultSum = kDefaultRest + costs::kGate;
+constexpr costs::Cost kSwappedSum = kSwappedRest + costs::kGate;
+
+// The slot 7 cards in the menu's cycle order, with the row each costs.
+struct Slot7Row {
+  Card card;
+  const char* id;
+  const char* name;
+  costs::Cost cost;
+};
+constexpr std::array<Slot7Row, 4> kSlot7Rows = {{{Card::Formant, "formant", "FORMANT", costs::kFormant},
+                                                 {Card::Lofi, "lofi", "LO-FI", costs::kLofi},
+                                                 {Card::Bloom, "bloom", "BLOOM", costs::kBloom},
+                                                 {Card::Gate, "gate", "GATE", costs::kGate}}};
 
 bool costIs(const LayoutCost& cost, const costs::Cost& expected) {
   return cost.avg == expected.avg && cost.worst == expected.worst;
@@ -104,6 +123,51 @@ float lastSecondDbfs(const std::vector<float>& output) {
   energy.samples = static_cast<uint32_t>(n);
   energy.sumSquares = level::sumSquares(output.data() + (output.size() - n), static_cast<int>(n));
   return level::toDbfs(level::rms(energy));
+}
+
+// The four slot 7 cards through the box's card switch, round the menu's cycle and back to Gate. After
+// each pick the layout holds the card in slot 7, its cost is the rest of the layout's rows plus the
+// card's own, and the audio through the box is finite and above the floor. `swapped` puts MOB in
+// slot 4 and Chasm in slot 8 first, the heaviest layout the cards share. A card outside the cycle
+// leaves the layout as it was.
+void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& failed) {
+  const char* const where = swapped ? "MOB and Chasm" : "default layout";
+  const costs::Cost rest = swapped ? kSwappedRest : kDefaultRest;
+  const auto expect = [&](bool ok, const std::string& what) {
+    if (!ok) failed.push_back(std::string(where) + ": " + what);
+  };
+
+  Rig rig;
+  expect(rig.source.findClip(argv0), "the clip loads");
+  if (swapped) {
+    rig.box.swapUnisonMob();
+    rig.box.swapReverb();
+  }
+  rig.run(kCheckSlot7Ms, true);
+  expect(cardIs(rig.box.layout(), kSlot7, "gate") && costIs(rig.box.cost(), rest + costs::kGate),
+         "slot 7 starts on Gate at the sum of its rows");
+
+  for (const Slot7Row& row : kSlot7Rows) {
+    const size_t from = rig.output.size();
+    rig.box.pickSlot7Card(row.card);
+    rig.run(kCheckSlot7Ms, true);
+    const LayoutCost cost = rig.box.cost();
+    bool finite = true;
+    for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);
+    const float dbfs = lastSecondDbfs(rig.output);
+    const std::string name = std::string("slot 7 ") + row.name;
+    expect(cardIs(rig.box.layout(), kSlot7, row.id), name + " is in slot 7 after the pick");
+    expect(costIs(cost, rest + row.cost), name + " costs the sum of its rows, kFixed and kTracker");
+    expect(layoutValid(rig.box.layout()).ok(), name + " layout passes the placement rules");
+    expect(finite, name + " output is finite");
+    expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
+    std::printf("%-14s slot 7 %-8s cost %d / %d, output %.1f dBFS\n", where, row.name, cost.avg, cost.worst,
+                static_cast<double>(dbfs));
+  }
+
+  const Layout kept = rig.box.layout();
+  rig.box.pickSlot7Card(Card::Octave);
+  expect(rig.box.layout() == kept, "a card outside the cycle leaves the layout as it was");
 }
 
 int runCheck(const char* argv0) {
@@ -152,6 +216,9 @@ int runCheck(const char* argv0) {
   expect(rig.box.splashEnded(), "the splash ended");
   expect(anyLit(rig.box.pixels()), "the face rendered (the canvas is not blank)");
 
+  checkSlot7(argv0, false, failed);
+  checkSlot7(argv0, true, failed);
+
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,
               after.worst);
   std::printf("output RMS of the last second %.1f dBFS over %zu samples\n", static_cast<double>(dbfs), openedAt);
@@ -163,9 +230,10 @@ int runCheck(const char* argv0) {
   return 0;
 }
 
-int runProof(const char* argv0, const char* path, bool micAvailable) {
+int runProof(const char* argv0, const char* path, bool micAvailable, Card slot7) {
   Rig rig;
   if (!rig.source.findClip(argv0)) return 1;
+  rig.box.pickSlot7Card(slot7);
   rig.run(kProofMs, false);
   Window window(false);
   if (!window.ok()) return 1;
@@ -227,8 +295,20 @@ int runLive(const char* argv0) {
 }
 
 int usage() {
-  std::fprintf(stderr, "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic]]\n");
+  std::fprintf(stderr,
+               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot7 gate|formant|lofi|bloom]]\n");
   return 2;
+}
+
+// The slot 7 card with this id, from the same rows --check walks.
+bool slot7FromId(const char* id, Card& out) {
+  for (const Slot7Row& row : kSlot7Rows) {
+    if (std::strcmp(id, row.id) == 0) {
+      out = row.card;
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -236,9 +316,19 @@ int usage() {
 int main(int argc, char** argv) {
   if (argc == 1) return runLive(argv[0]);
   if (argc == 2 && std::strcmp(argv[1], "--check") == 0) return runCheck(argv[0]);
-  if (argc >= 3 && argc <= 4 && std::strcmp(argv[1], "--proof") == 0) {
-    const bool noMic = argc == 4 && std::strcmp(argv[3], "--no-mic") == 0;
-    if (argc == 3 || noMic) return runProof(argv[0], argv[2], !noMic);
+  if (argc >= 3 && std::strcmp(argv[1], "--proof") == 0) {
+    bool noMic = false;
+    Card slot7 = Card::Gate;
+    for (int i = 3; i < argc; ++i) {
+      if (std::strcmp(argv[i], "--no-mic") == 0) {
+        noMic = true;
+      } else if (std::strcmp(argv[i], "--slot7") == 0 && i + 1 < argc && slot7FromId(argv[i + 1], slot7)) {
+        ++i;
+      } else {
+        return usage();
+      }
+    }
+    return runProof(argv[0], argv[2], !noMic, slot7);
   }
   return usage();
 }

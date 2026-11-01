@@ -21,6 +21,9 @@ constexpr int kKeyPositions = cv::kKeyCount;
 constexpr int kSemitoneMin = -12;
 constexpr int kSemitoneMax = 12;
 constexpr int kSemitonePositions = kSemitoneMax - kSemitoneMin + 1;
+constexpr int kFormantShiftMin = -cv::kFormantMaxShiftSt;
+constexpr int kFormantShiftMax = cv::kFormantMaxShiftSt;
+constexpr int kFormantShiftPositions = kFormantShiftMax - kFormantShiftMin + 1;
 
 constexpr KnobDesc kNoKnob = {"", KnobKind::Continuous, 0, 0.0f, 0.0f, ""};
 constexpr KnobDesc kPercent(const char* name) { return {name, KnobKind::Continuous, 0, 0.0f, 100.0f, "%"}; }
@@ -33,6 +36,10 @@ constexpr KnobDesc kSlapbackTime = {"Time", KnobKind::Continuous, 0, kSlapbackTi
 constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, kGateDecayMaxMs, "ms", Curve::Log};
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
+constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
+                                    kFormantShiftMax, "st"};
+constexpr KnobDesc kBloomTail = {"TAIL", KnobKind::Continuous, 0, cv::Bloom::kTailMinMs, cv::Bloom::kTailMaxMs, "ms",
+                                 Curve::Log};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
 // A card with an amount knob (Mix, Amount, Depth, Drive) puts it on knob B. The apply functions below
@@ -64,6 +71,10 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
       {"VOICES", KnobKind::Stepped, cv::kVoicesSteps, 0.0f, cv::kVoicesSteps - 1, "", Curve::Linear, 0,
        cv::kVoicesName.data()}},
      Group::Pitch, costs::kCrowd},
+    {Card::Formant, "formant", "Formant", Engine::Pitch, 2, {kFormantShift, kPercent("MIX")}, Group::Pitch,
+     costs::kFormant},
+    {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
+    {Card::Bloom, "bloom", "Bloom", Engine::Bloom, 2, {kBloomTail, kPercent("BLOOM")}, Group::None, costs::kBloom},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -145,6 +156,30 @@ void applyCrowdKnob(int knob, float v, cv::CrowdParams& d) {
   }
 }
 
+void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
+  if (knob == 0) {
+    f.shiftSt = kFormantShiftMin + static_cast<int>(v);
+  } else {
+    f.mix = v;
+  }
+}
+
+void applyLofiKnob(int knob, float v, cv::LofiParams& l) {
+  if (knob == 0) {
+    l.tone = v;
+  } else {
+    l.amount = v;
+  }
+}
+
+void applyBloomKnob(int knob, float v, cv::BloomParams& b) {
+  if (knob == 0) {
+    b.tailMs = knobValue(kBloomTail, v);
+  } else {
+    b.bloom = v;
+  }
+}
+
 void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
   if (knob == 0) {
     r.time = v;
@@ -210,6 +245,9 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
       applyReverbKnob(knob, v, out.reverb);
       break;
     case Card::Crowd: applyCrowdKnob(knob, v, out.crowd); break;
+    case Card::Formant: applyFormantKnob(knob, v, out.pitchFx.formant); break;
+    case Card::Lofi: applyLofiKnob(knob, v, out.lofi); break;
+    case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -231,6 +269,9 @@ void applyToggle(Card c, bool on, ChainParams& out) {
       out.crowd.on = on;
       out.pitchFx.crowdOn = on;
       break;
+    case Card::Formant: out.pitchFx.formant.on = on; break;
+    case Card::Lofi: out.lofi.on = on; break;
+    case Card::Bloom: out.bloom.on = on; break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -239,6 +280,8 @@ void applyToggle(Card c, bool on, ChainParams& out) {
 void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbSpring) out.reverb.engine = cv::kReverbSpring;
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
+  // Bloom takes its word key from the Input gate's detector whenever that card is placed.
+  if (c == Card::InputGate) out.bloom.keyFromGate = true;
 }
 
 namespace {

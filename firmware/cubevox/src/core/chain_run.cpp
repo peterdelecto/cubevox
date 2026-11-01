@@ -23,8 +23,8 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when any pitch-group card (Autotune, Octave, Crowd) has its toggle on. The shared pitch stage
-// runs while it is.
+// True when any pitch-group card (Autotune, Octave, Formant, Crowd) has its toggle on. The shared
+// pitch stage runs while it is.
 bool pitchGroupOn(const ChainSnapshot& snap) {
   for (int s = 0; s < kSlotCount; ++s) {
     if (cardDesc(snap.layout.card[static_cast<size_t>(s)]).group == Group::Pitch && snap.slotOn[static_cast<size_t>(s)]) {
@@ -46,6 +46,19 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
   engines.crowd.process(in, out, n, p.crowd, engines.pitch);
 }
 
+// Runs the Bloom card. With an Input gate placed, the gate's detector state is the word key for the
+// block; the gate's engine keeps its detector live while its own slot is off. Otherwise Bloom
+// listens to its own input.
+void runBloom(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
+  if (!p.bloom.keyFromGate) {
+    engines.bloom.process(in, out, n, p.bloom);
+    return;
+  }
+  cv::BloomParams keyed = p.bloom;
+  keyed.keyOpen = engines.inputGate.open();
+  engines.bloom.process(in, out, n, keyed);
+}
+
 }  // namespace
 
 void resetEngine(ChainEngines& engines, Engine e) {
@@ -58,6 +71,8 @@ void resetEngine(ChainEngines& engines, Engine e) {
     case Engine::Gate: engines.gate.reset(); break;
     case Engine::Reverb: engines.reverb.reset(); break;
     case Engine::Crowd: engines.crowd.reset(); break;
+    case Engine::Lofi: engines.lofi.reset(); break;
+    case Engine::Bloom: engines.bloom.reset(); break;
     case Engine::Count: break;
   }
 }
@@ -77,6 +92,8 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Gate: engines.gate.process(in, out, n, p.gate); return true;
     case Engine::Reverb: engines.reverb.process(in, out, n, p.reverb); return true;
     case Engine::Crowd: runCrowd(engines, in, out, n, p, pitchDone); return true;
+    case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); return true;
+    case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;

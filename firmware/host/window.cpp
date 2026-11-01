@@ -230,6 +230,45 @@ bool segmentedSwitch(Frame& f, const char* id, ImVec2 topLeft, float width, cons
   return clicked;
 }
 
+// A switch of four words in two rows of two, read row by row, the active one on an accent fill. The
+// right-hand column is as wide as its longer word needs, and the left-hand column takes the rest. A
+// click on a cell returns its index, and -1 means no click.
+int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, const std::array<const char*, 4>& words,
+                  int active) {
+  const float rightW = std::max(textSize(kFontLabel, words[1]).x, textSize(kFontLabel, words[3]).x) + 2 * kGridPad;
+  const float leftW = width - rightW;
+  const ImVec2 inset(kSegInset, kSegInset);
+  ImDrawList* dl = f.dl;
+  const ImVec2 bottomRight = topLeft + ImVec2(width, kGridH);
+  dl->AddRectFilled(topLeft, bottomRight, kCtrl, kRadiusMd);
+  dl->AddLine(ImVec2(topLeft.x + leftW, topLeft.y), ImVec2(topLeft.x + leftW, bottomRight.y), kBorder, kBorderW);
+  dl->AddLine(ImVec2(topLeft.x, topLeft.y + kSegH), ImVec2(bottomRight.x, topLeft.y + kSegH), kBorder, kBorderW);
+
+  int clicked = -1;
+  ImGui::PushID(id);
+  for (int i = 0; i < 4; ++i) {
+    const bool right = i % 2 == 1;
+    const ImVec2 cellMin = topLeft + ImVec2(right ? leftW : 0.0f, static_cast<float>(i / 2) * kSegH);
+    const ImVec2 cellSize(right ? rightW : leftW, kSegH);
+    ImGui::SetCursorScreenPos(cellMin);
+    ImGui::PushID(i);
+    if (ImGui::InvisibleButton("cell", cellSize)) clicked = i;
+    const bool hovered = ImGui::IsItemHovered();
+    const bool pressed = ImGui::IsItemActive();
+    ImGui::PopID();
+    if (i == active) dl->AddRectFilled(cellMin + inset, cellMin + cellSize - inset, kAccent, kRadiusMd - kSegInset);
+    if (hovered || pressed) {
+      dl->AddRect(cellMin + inset, cellMin + cellSize - inset, pressed ? kAccent : kHover, kRadiusMd - kSegInset,
+                  ImDrawFlags_None, kBorderW);
+    }
+    drawTextCentered(dl, cellMin + cellSize * half(1), kFontLabel, i == active ? kAccentInk : kDim,
+                     words[static_cast<size_t>(i)]);
+  }
+  ImGui::PopID();
+  dl->AddRect(topLeft, bottomRight, kBorder, kRadiusMd, ImDrawFlags_None, kBorderW);
+  return clicked;
+}
+
 // ---- Bands
 
 void drawLed(Frame& f, ImVec2 center, bool lit) {
@@ -295,8 +334,17 @@ void drawTopBand(Frame& f) {
   drawCpuLine(f, kRightX + 2 * kLedR + kLedGap, rowY);
 }
 
+// The slot 7 choices in the order the menu cycles them. Each cell of the card switch picks one.
+struct Slot7Choice {
+  const char* word;
+  Card card;
+};
+constexpr std::array<Slot7Choice, 4> kSlot7Choices = {{
+    {"GATE", Card::Gate}, {"FORMANT", Card::Formant}, {"LO-FI", Card::Lofi}, {"BLOOM", Card::Bloom}}};
+
 // The card switch at the foot of a slot, which follows the layout: the column that holds the Unison
-// or MOB card, and the column that holds a reverb.
+// or MOB card, the column that holds a reverb, and the column that holds Gate, Formant, Lo-fi or
+// Bloom. The last is a grid, and a click picks its card through the menu's own action.
 void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   const Layout& layout = f.box.layout();
   if (slot == unisonCrowdSlot(layout)) {
@@ -305,6 +353,15 @@ void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   } else if (slot == reverbSlot(layout)) {
     const bool chasm = layout.card[static_cast<size_t>(slot)] == Card::ReverbChasm;
     if (segmentedSwitch(f, "swapReverb", topLeft, kColInnerW, "SPRING", "CHASM", chasm, true)) f.box.swapReverb();
+  } else if (slot == slot7CardSlot(layout)) {
+    std::array<const char*, 4> words{};
+    int active = 0;
+    for (size_t i = 0; i < kSlot7Choices.size(); ++i) {
+      words[i] = kSlot7Choices[i].word;
+      if (kSlot7Choices[i].card == layout.card[static_cast<size_t>(slot)]) active = static_cast<int>(i);
+    }
+    const int picked = segmentedGrid(f, "slot7Card", topLeft, kColInnerW, words, active);
+    if (picked >= 0) f.box.pickSlot7Card(kSlot7Choices[static_cast<size_t>(picked)].card);
   }
 }
 
@@ -332,7 +389,7 @@ void drawSlot(Frame& f, int slot) {
     upper(desc.knob[k].name, label, sizeof label);
     drawTextCentered(dl, ImVec2(centerX, boxTop + kKnobBoxD + half(kLabelH)), kFontLabel, kDim, label);
   }
-  drawSwapSwitch(f, slot, ImVec2(x + kColPad, y + kColH - kColPad - kSegH));
+  drawSwapSwitch(f, slot, ImVec2(x + kColPad, y + kColH - kColPad - kGridH));
   ImGui::PopID();
 }
 
@@ -351,7 +408,8 @@ void drawBottomBand(Frame& f) {
   if (segmentedSwitch(f, "source", ImVec2(kPad, kBottomY), kSourceW, "CLIP", "MIC", mic, f.micAvailable)) {
     f.panel.useMic = !f.panel.useMic;
   }
-  drawText(f.dl, ImVec2(kPad, kBottomY + kSegH + kGapTight), kFontSupport, kDim, kFirmwareVersion);
+  const ImVec2 version = textSize(kFontSupport, kFirmwareVersion);
+  drawText(f.dl, ImVec2(kVersionX, kBottomY + half(kSegH) - half(version.y)), kFontSupport, kDim, kFirmwareVersion);
 }
 
 // Writes `rgba` (bottom row first, as GL reads it) as a top-down P6 PPM.

@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "engine/bloom.h"
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
+#include "engine/lofi.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
@@ -15,12 +17,14 @@
 
 struct ChainParams {
   cv::GateParams inputGate;
-  cv::PitchFxParams pitchFx;
-  cv::CrowdParams crowd;  // its toggle also sets pitchFx.crowdOn
+  cv::PitchFxParams pitchFx;  // Autotune, Octave and the Formant card (pitchFx.formant)
+  cv::CrowdParams crowd;      // its toggle also sets pitchFx.crowdOn
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
   cv::GateParams gate;
+  cv::LofiParams lofi;
+  cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runChain fills keyOpen
   cv::ReverbParams reverb;
   cv::PolishCompParams comp;  // the chain tail: comp, then the back half of eq
   cv::PolishParams eq;        // its front half runs ahead of slot 1

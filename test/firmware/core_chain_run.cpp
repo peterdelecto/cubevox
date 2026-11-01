@@ -11,6 +11,8 @@
 #include <cmath>
 #include <initializer_list>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "core/chain_run.h"
@@ -886,6 +888,177 @@ void checkCrowdToggleOff() {
   check(rig->engines.crowd.leadGain() == 1.0f, "crowd: the engine ramped back to the lead alone before its slot stopped");
 }
 
+// Slot 7 is the seventh slot, index 6. Its choices (Formant, Lo-fi and Bloom) run there.
+constexpr int kSlot7 = 6;
+
+// 200 ms of the tone, as for the Crowd card: the tracker finds its period in about 32 ms, the Formant
+// voice sounds 22 ms after that, and Bloom's first capture lands at 40 to 50 ms and loops by about 110 ms.
+constexpr int kSlot7Blocks = 150;
+
+// A layout with `c` in slot 7 and every other slot empty.
+Layout slot7Only(Card c) {
+  Layout layout = layoutOf({});
+  layout.card[kSlot7] = c;
+  return layout;
+}
+
+// The engine of slot 7's card called by hand on `rig`'s own engines with the snapshot's params.
+Block slot7Direct(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) {
+  Block out{};
+  switch (c) {
+    case Card::Formant: rig.engines.pitch.process(in.data(), out.data(), kN, snap.params.pitchFx); break;
+    case Card::Lofi: rig.engines.lofi.process(in.data(), out.data(), kN, snap.params.lofi); break;
+    case Card::Bloom: rig.engines.bloom.process(in.data(), out.data(), kN, snap.params.bloom); break;
+    default: break;
+  }
+  return out;
+}
+
+// Each choice runs its engine in slot 7, changes the tone, and passes the dry input bit for bit once
+// its toggle has been off for the fade. A reset clears the Lo-fi and Bloom engines.
+void checkSlot7CardsRun() {
+  for (const Card c : {Card::Formant, Card::Lofi, Card::Bloom}) {
+    const std::string name = cardDesc(c).name;
+    const ChainSnapshot snap = snapshotToggles(slot7Only(c), 0.5f, allToggles(true));
+    auto chain = newRig();
+    auto hand = newRig();
+    bool same = true;
+    bool finite = true;
+    bool heard = false;
+    for (int b = 0; b < kSlot7Blocks; ++b) {
+      const Block in = tone(b, 0.3f);
+      const Run run = runBlock(*chain, snap, in, StillClock());
+      same = same && run.out == slot7Direct(*hand, c, snap, in);
+      finite = finite && run.finite && allFinite(run.out);
+      if (b >= kSlot7Blocks / 2) heard = heard || run.out != in;
+    }
+    check(same, (name + " in slot 7 runs its engine over the block").c_str());
+    check(finite && heard, (name + " in slot 7 stays finite and changes the tone").c_str());
+
+    const ChainSnapshot off = snapshotToggles(slot7Only(c), 0.5f, allToggles(false));
+    auto settled = newRig();
+    bool dry = true;
+    for (int b = 0; b < 3 * kSlotFadeBlocks; ++b) {
+      const Block in = tone(b, 0.3f);
+      const Run run = runBlock(*settled, off, in, StillClock());
+      if (b >= kSlotFadeBlocks) dry = dry && run.out == in;
+    }
+    check(dry, (name + " in slot 7 with its toggle off passes the dry input bit for bit after the fade").c_str());
+  }
+
+  const ChainSnapshot bloom = snapshotToggles(slot7Only(Card::Bloom), 0.5f, allToggles(true));
+  auto rig = newRig();
+  for (int b = 0; b < kSlot7Blocks; ++b) runBlock(*rig, bloom, tone(b, 0.3f), StillClock());
+  check(rig->engines.bloom.inWord() && rig->engines.bloom.looping(),
+        "Bloom with no Input gate placed keys on its own input, so a word opens and its slice loops");
+  resetEngine(rig->engines, Engine::Bloom);
+  check(!rig->engines.bloom.inWord() && !rig->engines.bloom.looping() && rig->engines.bloom.wetGain() == 0.0f,
+        "resetEngine clears Bloom's word and its loop");
+
+  const ChainSnapshot lofi = snapshotToggles(slot7Only(Card::Lofi), 0.5f, allToggles(true));
+  auto lofiRig = newRig();
+  for (int b = 0; b < 40; ++b) runBlock(*lofiRig, lofi, tone(b, 0.3f), StillClock());
+  resetEngine(lofiRig->engines, Engine::Lofi);
+  check(allZero(runBlock(*lofiRig, lofi, Block{}, StillClock()).out), "resetEngine clears the Lo-fi engine, so silence in is silence out");
+}
+
+// Formant acts at the first pitch-group card's slot, wherever its own card sits. Its toggle alone keeps
+// the stage and its tracker running: with Autotune off, in slot 1 or in slot 7, the pitch call goes
+// through at the first of the two and the Formant card at slot 7 writes nothing of its own.
+void checkFormantPitchStage() {
+  Layout behind = layoutOf({Card::Autotune});
+  behind.card[kSlot7] = Card::Formant;
+  Layout ahead = layoutOf({Card::Formant});
+  ahead.card[kSlot7] = Card::Autotune;
+  const std::initializer_list<std::pair<const char*, Layout>> layouts = {
+      {"Formant in slot 7 behind Autotune in slot 1", behind}, {"Formant in slot 1 ahead of Autotune in slot 7", ahead}};
+  for (const auto& entry : layouts) {
+    const bool formantAtSlot7 = entry.second.card[kSlot7] == Card::Formant;
+    const ChainSnapshot snap = snapshotToggles(entry.second, 0.5f, togglesOn({formantAtSlot7 ? kSlot7 : 0}));
+    auto chain = newRig();
+    auto hand = newRig();
+    bool same = true;
+    bool heard = false;
+    for (int b = 0; b < kSlot7Blocks; ++b) {
+      const Block in = tone(b, 0.3f);
+      const Run run = runBlock(*chain, snap, in, StillClock());
+      Block want{};
+      hand->engines.pitch.process(in.data(), want.data(), kN, snap.params.pitchFx);
+      same = same && run.out == want;
+      if (b >= kSlot7Blocks / 2) heard = heard || run.out != in;
+    }
+    const std::string name = entry.first;
+    check(snap.params.pitchFx.formant.on && !snap.params.pitchFx.autotune.on,
+          (name + ": only Formant's toggle is on").c_str());
+    check(same && heard, (name + ": the stage runs on Formant's toggle alone and the chain equals the pitch call").c_str());
+    check(chain->engines.pitch.pitch().period > 0.0f, (name + ": the tracker holds a period").c_str());
+    check(chain->fades.level(0) == kSlotFadeBlocks,
+          (name + ": the stage's slot, the first pitch-group slot, stays on the engine while only Formant's toggle is on")
+              .c_str());
+  }
+}
+
+// Bloom keys on the Input gate's detector when the layout places that card, whether or not its slot is
+// on, and on its own input when it does not. A gate held shut by a 0 dB threshold keeps Bloom out of a
+// word the tone would open on Bloom's own detector at -45 dBFS.
+void checkBloomKey() {
+  Layout layout = layoutOf({Card::InputGate});
+  layout.card[kSlot7] = Card::Bloom;
+  const Toggles bloomOnly = togglesOn({kSlot7});
+  struct Outcome {
+    bool same = true;      // every block equals the gate's call, then Bloom keyed by its state
+    bool inWord = false;   // Bloom holds a word at the end
+    bool looping = false;  // a slice loops at the end
+    float residual = 0.0f;  // the last block's largest distance from the input under its best single gain
+  };
+  const auto play = [&](float gateDb, bool gatePlaced) {
+    Layout l = layout;
+    if (!gatePlaced) l.card[0] = Card::Empty;
+    ChainSnapshot snap = snapshotToggles(l, 0.5f, bloomOnly);
+    snap.params.inputGate.thresholdDb = gateDb;
+    auto chain = newRig();
+    chain->fades.settle(snap.slotOn);  // the Input gate's slot starts settled off, so it passes the block untouched
+    auto hand = newRig();
+    Outcome o;
+    for (int b = 0; b < kSlot7Blocks; ++b) {
+      const Block in = tone(b, 0.3f);
+      const Run run = runBlock(*chain, snap, in, StillClock());
+      Block gated{};
+      hand->engines.inputGate.process(in.data(), gated.data(), kN, snap.params.inputGate);
+      cv::BloomParams keyed = snap.params.bloom;
+      keyed.keyFromGate = gatePlaced;
+      keyed.keyOpen = gatePlaced && hand->engines.inputGate.open();
+      Block want{};
+      hand->engines.bloom.process(in.data(), want.data(), kN, keyed);
+      o.same = o.same && run.out == want;
+      if (b == kSlot7Blocks - 1) {
+        // Outside a word the block is the dry input under Bloom's trim, one gain. A loop adds to it.
+        double dot = 0.0;
+        double energy = 0.0;
+        for (size_t i = 0; i < in.size(); ++i) {
+          dot += static_cast<double>(run.out[i]) * static_cast<double>(in[i]);
+          energy += static_cast<double>(in[i]) * static_cast<double>(in[i]);
+        }
+        const float gain = static_cast<float>(dot / energy);
+        for (size_t i = 0; i < in.size(); ++i) o.residual = std::max(o.residual, std::fabs(run.out[i] - gain * in[i]));
+      }
+    }
+    o.inWord = chain->engines.bloom.inWord();
+    o.looping = chain->engines.bloom.looping();
+    return o;
+  };
+
+  const Outcome open = play(-55.0f, true);
+  check(open.same && open.inWord && open.looping && open.residual > 0.01f,
+        "Bloom: an open Input gate keys a word, and the chain equals Bloom keyed by the gate's state");
+  const Outcome shut = play(0.0f, true);
+  check(shut.same && !shut.inWord && !shut.looping && shut.residual < 1e-5f,
+        "Bloom: a shut Input gate keeps Bloom out of a word the tone would open on its own detector");
+  const Outcome own = play(0.0f, false);
+  check(own.same && own.inWord && own.looping && own.residual > 0.01f,
+        "Bloom: with no Input gate placed it keys on its own input, whatever the gate's threshold");
+}
+
 // The shipped layout with every toggle on is the plain chain: the crossfade changes nothing while no
 // toggle moves, and a fresh chain given a settled-off slot never starts its engine.
 void checkSettledSlotsAreInert() {
@@ -1008,6 +1181,9 @@ void checkChainRun() {
   checkCrowdStage();
   checkCrowdPitchStage();
   checkCrowdToggleOff();
+  checkSlot7CardsRun();
+  checkFormantPitchStage();
+  checkBloomKey();
   checkSettledSlotsAreInert();
   checkLateBlockPassesDry();
 }

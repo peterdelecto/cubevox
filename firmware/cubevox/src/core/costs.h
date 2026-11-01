@@ -30,9 +30,9 @@
 // layoutCost counts none of it.
 //
 // A layout is accepted when both column sums over its cards, plus the fixed term and, once, the
-// tracker when Autotune or Crowd is placed, stay under their lines. The trailing comments give the
-// measured cycles, mean then worst; a row marked measured=false is an estimate until a board
-// measures it.
+// tracker when Autotune, Crowd or Formant is placed, stay under their lines. The trailing comments
+// give the measured cycles, mean then worst; a row marked measured=false is an estimate until a
+// board measures it.
 
 #pragma once
 
@@ -62,8 +62,8 @@ constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
 constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the board's boot worst 107.4k against the two-half engine's 72.0k (1.49x of 61.9k); two-pass bench pending
 constexpr Cost kReverbChasm{17, 17, true};   // 102.2k to 102.5k / 105.5k to 108.2k, stress run 2026-11-01 in the reverb slot (mean 16.0 %, worst 16.5 to 16.9 %)
 
-// The pitch tracker, its history fill and its coarse analysis, which Autotune and Crowd share and a
-// layout pays once. kTracker and kAutotune are one estimate split in two. The pair was measured on
+// The pitch tracker, its history fill and its coarse analysis, which Autotune, Crowd and Formant
+// share and a layout pays once. kTracker and kAutotune are one estimate split in two. The pair was measured on
 // the board before the pitch CPU pass at 83.2k cycles for the mean block (13.0 %) and 131.9k for
 // the worst (20.6 %); this estimate scales those by the host ratio the CPU pass measured on Adam's
 // clips with Autotune on at the defaults, host us per block: mean 2.83 before, 1.66 after (x0.587);
@@ -89,6 +89,12 @@ constexpr Cost kTracker{4, 5, false};
 // the two-pass stress run, where the WIDTH and VOICES sweeps raise it to a lowest run worst of 15.6 %
 // in the crowd layout and 15.9 % in crowd-chasm.
 constexpr Cost kCrowd{13, 16, true};  // 78.7k / 99.6k to 101.6k, board 2026-11-01; mean from the crowd bench layout slot 3 with knobs at top, worst from the stress run's sweeps; the tracker ran in Octave's slot, 47.5k
+
+// The slot 7 choices (spec 2026-11-01-slot-7-choices-design.md). Each row is an estimate until the
+// stress run measures the card on the board; the run's figure replaces it.
+constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
+constexpr Cost kLofi{2, 2, false};     // est.: five biquads, the tanh and the crush, about 80 cycles a sample (0.8 %), rounded up for a block that moves a knob, which also ramps 25 coefficients a sample (about 30 cycles more); the host has no bench of it
+constexpr Cost kBloom{5, 6, false};    // est. from the host bench of 2026-11-01 with the key open: 9.4 ns a sample against Echo's 8.1 and Gate's 7.8 (1.17x and 1.21x of rows that are 5 / 5 and 4 / 5); the spec's 1 / 2 does not hold
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.

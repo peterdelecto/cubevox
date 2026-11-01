@@ -30,6 +30,14 @@ int unisonCrowdSlot(const Layout& layout) {
   return -1;
 }
 
+int slot7CardSlot(const Layout& layout) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    const Card c = layout.card[s];
+    if (c == Card::Gate || c == Card::Formant || c == Card::Lofi || c == Card::Bloom) return s;
+  }
+  return -1;
+}
+
 const char* layoutDisplayName(const char* stored) { return stored != nullptr && stored[0] != '\0' ? stored : "Default"; }
 
 namespace {
@@ -49,11 +57,11 @@ LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
-  bool tracker = false;  // Autotune or Crowd is placed, so the pitch tracker runs
+  bool tracker = false;  // Autotune, Crowd or Formant is placed, so the pitch tracker runs
   for (const Card c : layout.card) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
-    tracker = tracker || c == Card::Autotune || c == Card::Crowd;
+    tracker = tracker || c == Card::Autotune || c == Card::Crowd || c == Card::Formant;
   }
   if (tracker) {
     sum.avg += costs::kTracker.avg;
