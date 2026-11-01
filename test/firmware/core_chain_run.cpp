@@ -785,8 +785,16 @@ struct CrowdOutcome {
   bool live = false;       // the tracker holds a period and a voice sounds
 };
 
+// Every knob at 0.5 except the Crowd card's VOICES, which stands at step 4 so its copies sound. At 0.5 a
+// stepped knob lands on its first position, where the Crowd card plays no copy.
+ChainSnapshot snapshotCrowd(const Layout& layout, const Toggles& on) {
+  ChainSnapshot snap = snapshotToggles(layout, 0.5f, on);
+  snap.params.crowd.voicesStep = 4;
+  return snap;
+}
+
 CrowdOutcome runCrowdLayout(const Layout& layout, const Toggles& on) {
-  const ChainSnapshot snap = snapshotToggles(layout, 0.5f, on);
+  const ChainSnapshot snap = snapshotCrowd(layout, on);
   auto chain = newRig();
   auto hand = newRig();
   CrowdOutcome o;
@@ -854,8 +862,7 @@ void checkCrowdPitchStage() {
   check(all.sameAsHand && all.heard && all.live, "crowd: behind Autotune with both on, one pitch call per block");
 
   auto rig = newRig();
-  const ChainSnapshot snap = snapshotToggles(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), 0.5f,
-                                             togglesOn({2}));
+  const ChainSnapshot snap = snapshotCrowd(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), togglesOn({2}));
   for (int b = 0; b < kCrowdBlocks; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
   check(rig->fades.level(0) == kSlotFadeBlocks,
         "crowd: the pitch stage's slot stays on the engine while only the Crowd card's toggle is on");
@@ -865,8 +872,8 @@ void checkCrowdPitchStage() {
 // input passes bit for bit.
 void checkCrowdToggleOff() {
   const Layout layout = layoutOf({Card::Crowd});
-  const ChainSnapshot on = snapshotToggles(layout, 0.5f, togglesOn({0}));
-  const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
+  const ChainSnapshot on = snapshotCrowd(layout, togglesOn({0}));
+  const ChainSnapshot off = snapshotCrowd(layout, allToggles(false));
   auto rig = newRig();
   for (int b = 0; b < kCrowdBlocks; ++b) runBlock(*rig, on, tone(b, 0.3f), StillClock());
   bool dryAfter = true;
