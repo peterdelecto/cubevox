@@ -54,7 +54,7 @@ slot 7 in place of Gate (owner: "in case a second backup gate is overkill"), thr
    that Autotune's delay leaves there. The voice's read-span clamp (`setReadSpan`) still guards it.
 4. Mix law. The base is today's output ahead of Octave (the dry voice, or Autotune's crossfade
    to the corrected voice). `base' = cos(mix·π/2)·base + sin(mix·π/2)·formant`, equal power,
-   then Octave's mix as today. The card's toggle drives a 20 ms crossfade (`formantFade_`, the
+   then Octave's mix as today. Superseded by section 10. The card's toggle drives a 20 ms crossfade (`formantFade_`, the
    `kSmoothCoef` one-pole like `octaveFade_`); toggled off and settled, the voice does not tick.
 5. Latency. The formant voice lags the input by 23 to 36 ms, as Autotune's voice does. With
    Autotune off and MIX between 0 and 100 %, Adam's dry voice and the shifted voice sit that far
@@ -122,3 +122,32 @@ pitch stage. Sections 1 to 7 stand except where they say slot 7.
 |---|---|---|
 | default, Formant in slot 3 | 65 | 75 |
 | MOB and Chasm, Formant in slot 3 | 72 | 85 |
+
+## 10. MIX holds its level (v2.01.00)
+
+Replaces item 4.4's equal-power law and item 8.4's reading. How the base and the shifted voice
+add depends on SHIFT. Near 0 they are almost one waveform and add in amplitude, so equal power read
++2.58 dB at MIX 50 % on the program. At SHIFT -3 on Adam's clips they correlate at about 0.06 and
+add in power, so a plain linear crossfade dipped them 2.4 to 3.1 dB. No fixed gain curve holds both.
+
+1. Gains are `1 - mix` and `mix`, times the toggle's fade.
+2. `formantCompAt()` raises the sum to the power-weighted average of the two voices' own powers. It
+   reads running powers of the base, the voice and their product (0.12 s average) and is capped
+   at x2 (+6 dB). It is exactly 1 at MIX 0 and 100 % and for identical voices, and 1.41 at MIX 50 %
+   for unrelated voices of equal level.
+3. Level at SHIFT -3, MIX 50 %, dB over input, program / clip 1 / clip 2 / clip 3:
+
+| Law | Autotune off | Autotune on |
+|---|---|---|
+| plain linear | -0.43 -2.41 -2.70 -2.66 | -1.95 -2.27 -3.10 -3.11 |
+| equal power | +2.58 +0.41 +0.30 +0.11 | +1.06 +0.56 -0.10 -0.36 |
+| built | +0.29 +0.44 +0.13 +0.04 | +0.42 +0.33 -0.22 -0.36 |
+
+4. Over 4 sources, SHIFT -7/-3/0/+3/+7, Autotune off and on, MIX 25/50/75, all 120 readings sit
+   within 1 dB of the range MIX 0 and 100 % span. Plain linear leaves 71 outside, equal power 15.
+5. MIX 100 % itself moves with SHIFT (-2.5, +0.6, +1.9, +1.7, +2.5 dB on the program at
+   -7/-3/0/+3/+7) because trimDb is fit at -3 only. That is a separate SHIFT-trim question.
+6. `formant_test` checks MIX 25/50/75 within 1 dB of MIX 100 % at SHIFT -3 (0.46 dB Autotune off,
+   0.73 dB on). `level_test`'s MIX 50 % row is a real row now.
+7. The level gain costs about 12 flops per sample, roughly 0.2 point of load. `costs.h` is unchanged
+   until the next board run.
