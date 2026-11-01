@@ -11,11 +11,11 @@
 #include "engine/smooth.h"
 
 // Shared pitch front end. The tracker hears only the dry input. Autotune, when
-// on, replaces the dry voice with the corrected one once the tracker has a
-// period, and Octave adds its correction to the interval. Octave has an
-// equal-power MIX. A voice resets on its enable edge only once its crossfade has
-// settled at zero, so a quick off and on keeps the running voice instead of
-// cutting to fresh grains.
+// on, crossfades from the dry voice to the corrected one once the tracker has a
+// period, and Octave adds its correction to the interval. The crossfade and
+// Octave's MIX are equal-power. A voice resets on its enable edge only once its
+// crossfade has settled at zero, so a quick off and on keeps the running voice
+// instead of cutting to fresh grains.
 
 namespace cv {
 
@@ -97,12 +97,13 @@ class PitchFx {
     float activeAt;  // Autotune on with a period, 0 or 1
   };
 
-  // Equal-power dry/wet gains at the smoothers' current values. A stage that is off contributes
-  // exactly 1 and 0.
+  // Equal-power gains at the smoothers' current values: Octave's dry and wet, and the crossfade from
+  // the dry input to Autotune's corrected voice. A stage that is off contributes exactly 1 and 0.
   struct Gains {
     float dry = 1.0f;
     float wet = 0.0f;
     float at = 0.0f;
+    float atDry = 1.0f;
   };
 
   // Each voice's per-block targets. A voice coming on starts clean only when its crossfade has
@@ -161,8 +162,8 @@ class PitchFx {
       const float oct = octave ? octave_.tick(ring_, writeCount_) : 0.0f;
       const float f = static_cast<float>(i + 1) * inv;
       const float at = g0.at + (g1.at - g0.at) * f;
-      const float base =
-          at > 0.0f ? at * autotune_.tick(ring_, writeCount_, period) + (1.0f - at) * in[i] : in[i];
+      const float atDry = g0.atDry + (g1.atDry - g0.atDry) * f;
+      const float base = at > 0.0f ? at * autotune_.tick(ring_, writeCount_, period) + atDry * in[i] : in[i];
       const float dry = g0.dry + (g1.dry - g0.dry) * f;
       const float wet = g0.wet + (g1.wet - g0.wet) * f;
       out[i] = dry * base + wet * oct;
@@ -170,9 +171,13 @@ class PitchFx {
     }
   }
 
+  // The corrected voice lags the dry input by 21 to 35 ms and may sit a semitone away, so the two
+  // add in power. Each crossfade gain is the sine of its own share of the quarter turn, which lands
+  // exactly on 0 and 1 at both ends.
   Gains gainsNow() const {
     Gains g;
-    g.at = activeAt_;
+    g.at = sinf(activeAt_ * kHalfPi);
+    g.atDry = sinf((1.0f - activeAt_) * kHalfPi);
     g.dry = 1.0f + (cosf(mix_ * kHalfPi) - 1.0f) * active_;
     g.wet = sinf(mix_ * kHalfPi) * active_;
     return g;

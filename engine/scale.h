@@ -21,12 +21,14 @@ struct Degree {
   float dev;  // sung pitch minus the scale note, semitones
 };
 
-// Nearest major-scale degree of hz in key `key` (a kKeyRoot index) by circular distance. A pitch
-// halfway between two notes snaps to the lower one.
-inline Degree degreeOf(float hz, int key) {
+// A pitch in semitones on the MIDI numbering, A4 = 69.
+inline float midiOf(float hz) { return 69.0f + 12.0f * log2f(hz / 440.0f); }
+
+// Nearest major-scale degree of the pitch midi in key `key` (a kKeyRoot index) by circular
+// distance. A pitch halfway between two notes snaps to the lower one.
+inline Degree degreeOfMidi(float midi, int key) {
   constexpr float kTieEps = 1e-4f;
   const int k = ((key % kKeyCount) + kKeyCount) % kKeyCount;
-  const float midi = 69.0f + 12.0f * log2f(hz / 440.0f);
   float rel = fmodf(midi - static_cast<float>(kKeyRoot[static_cast<size_t>(k)]), 12.0f);
   if (rel < 0.0f) rel += 12.0f;
   Degree best{0, 0.0f};
@@ -43,6 +45,21 @@ inline Degree degreeOf(float hz, int key) {
     }
   }
   return best;
+}
+
+// The same for a pitch in Hz.
+inline Degree degreeOf(float hz, int key) { return degreeOfMidi(midiOf(hz), key); }
+
+// Autotune keeps its last scale note until the sung pitch sits this far past the halfway point to
+// the next one, so a pitch near the halfway point holds one note instead of trilling between two.
+constexpr float kHoldSemis = 0.15f;
+
+// The scale note, as a MIDI pitch, that the pitch midi pulls to in key, given the last note it pulled
+// to in the same key. The last note holds until the pitch sits more than kHoldSemis past the halfway
+// point to the nearest note; then the nearest note takes over.
+inline float heldNote(float midi, int key, float last) {
+  const float nearest = midi - degreeOfMidi(midi, key).dev;
+  return fabsf(midi - last) - fabsf(midi - nearest) <= 2.0f * kHoldSemis ? last : nearest;
 }
 
 }  // namespace cv

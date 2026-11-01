@@ -24,6 +24,11 @@ struct PitchResult {
   // The newest voiced frame repeats faster than kMaxHz, so the period read is a multiple of the
   // note's, or its dip runs off the slow end of the search. The period stays as read.
   bool outOfRange = false;
+
+  // The newest voiced frame's period sits on the edge of the search: the fine pass's minimum on
+  // kMinPeriod or kMaxPeriod, or the coarse pass's pick at its slow end. The note lies at or past
+  // that edge, so the period read is the edge, not the note.
+  bool clamped = false;
 };
 
 class PitchTracker {
@@ -259,9 +264,11 @@ class PitchTracker {
     if (periodic && loud()) {
       publishVoiced(fine_ ? refine(tau) : tau * static_cast<float>(kDecim));
       result_.outOfRange = lastOutOfRange_;
+      result_.clamped = lastClamped_;
     } else {
       result_.voiced = false;
       result_.outOfRange = false;
+      result_.clamped = false;
     }
   }
 
@@ -311,7 +318,8 @@ class PitchTracker {
     tau = static_cast<float>(pick) + off;
     lastTau_ = tau;
     lastPeriodic_ = cmnd_[best] < threshold;
-    lastOutOfRange_ = pick == kCoarseMax || dipsBelowRange();
+    lastClamped_ = pick == kCoarseMax;
+    lastOutOfRange_ = lastClamped_ || dipsBelowRange();
     return lastPeriodic_;
   }
 
@@ -502,7 +510,8 @@ class PitchTracker {
   // one dip, so the pass sums the centre lag and its two neighbours, then walks one lag at a time
   // toward the lower neighbour while the sum keeps falling, never past lo or hi. A tie goes to the
   // lower lag, as a scan up from lo would pick. Each lag is summed at most once; the parabola reads
-  // the lowest sum and its two neighbours.
+  // the lowest sum and its two neighbours. A minimum on kMinPeriod or kMaxPeriod marks the frame
+  // clamped.
   float refine(float tauCoarse) {
     const int centre = static_cast<int>(floorf(tauCoarse * kDecim + 0.5f));
     const int lo = centre - kFineReach < kMinPeriod ? kMinPeriod : centre - kFineReach;
@@ -521,6 +530,7 @@ class PitchTracker {
     }
     const int k = m - lo;
     const float off = (m > lo && m < hi) ? parabolic(d[k - 1], d[k], d[k + 1]) : 0.0f;
+    if (m == kMinPeriod || m == kMaxPeriod) lastClamped_ = true;
     return static_cast<float>(m) + off;
   }
 
@@ -554,6 +564,7 @@ class PitchTracker {
   float lastTau_ = 0.0f;
   bool lastPeriodic_ = false;
   bool lastOutOfRange_ = false;
+  bool lastClamped_ = false;
   std::array<float, 3> periods_{};
   int nPeriods_ = 0;
   int nextPeriod_ = 0;

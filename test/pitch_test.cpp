@@ -1,6 +1,6 @@
 // PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, the pane
-// oracle, the enable rebuild spread over blocks, the replay after an idle spell, no-alloc.
-// No window, no audio device.
+// oracle, the enable rebuild spread over blocks, the replay after an idle spell, the
+// clamped flag at the range ends, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -367,6 +367,49 @@ bool testIdleReplay() {
                 worstPanes, maxPanes, latest, worstCents);
 }
 
+// Of the voiced hops after 100 ms of a steady tone: how many, and how many read clamped.
+struct ClampCount {
+  int voiced;
+  int clamped;
+};
+
+ClampCount clampCount(double hz, bool fine) {
+  const std::vector<float> x = tone(hz, 2 * cv::kSampleRate);
+  cv::PitchTracker t;
+  ClampCount c{0, 0};
+  const int total = static_cast<int>(x.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    gInProcess = true;
+    t.push(&x[static_cast<size_t>(i)], cv::kBlock, true, fine);
+    gInProcess = false;
+    const int end = i + cv::kBlock;
+    if (end <= kSettle || end % cv::PitchTracker::kHop != 0 || !t.result().voiced) continue;
+    ++c.voiced;
+    c.clamped += t.result().clamped ? 1 : 0;
+  }
+  return c;
+}
+
+// 8. Past either end of the search the period read is the edge, not the note, and the tracker says
+// so. 68 Hz reads at the coarse pass's slow end and the fine pass's kMaxPeriod, 1,030 Hz at the fine
+// pass's kMinPeriod: every voiced hop is clamped, with the fine pass or without it at 68 Hz. 1,200 Hz
+// reads an octave down inside the search and 220 Hz on its note: neither is ever clamped.
+bool testClamped() {
+  const ClampCount low = clampCount(68.0, true), lowCoarse = clampCount(68.0, false);
+  const ClampCount high = clampCount(1030.0, true), above = clampCount(1200.0, true), a3 = clampCount(kA3, true);
+  auto all = [](const ClampCount& c) { return c.voiced > 0 && c.clamped == c.voiced; };
+  auto none = [](const ClampCount& c) { return c.voiced > 0 && c.clamped == 0; };
+  bool ok = report("clamped at 68 Hz", all(low) && all(lowCoarse),
+                   "clamped of voiced hops: %.0f of %.0f (all), coarse pass only %.0f of %.0f (all)", low.clamped,
+                   low.voiced, lowCoarse.clamped, lowCoarse.voiced);
+  ok &= report("clamped at 1,030 Hz", all(high), "clamped of voiced hops: %.0f of %.0f (all)", high.clamped,
+               high.voiced);
+  ok &= report("not clamped inside", none(above) && none(a3),
+               "clamped of voiced hops: 1,200 Hz %.0f of %.0f (0), 220 Hz %.0f of %.0f (0)", above.clamped,
+               above.voiced, a3.clamped, a3.voiced);
+  return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -378,6 +421,7 @@ int main() {
   ok &= testEnableSpread();
   ok &= testEnableReports();
   ok &= testIdleReplay();
+  ok &= testClamped();
   // Every push() call above ran under the allocation guard.
   ok &= report("no allocation", true, "push() ran under the new/delete guard", 0.0);
   std::printf("%s pitch\n", ok ? "PASS" : "FAIL");
