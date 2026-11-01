@@ -28,6 +28,7 @@ constexpr float kGapWide = units(3);   // band to band
 constexpr int kWindowW = 1440;
 constexpr int kWindowH = 840;
 constexpr const char* kWindowTitle = "cubevox";
+constexpr const char* kWindowTitleSep = " - ";  // between the title and the clip's name
 
 // ---- Type. Body floor is 15 px, the support tier is the version line only.
 

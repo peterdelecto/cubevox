@@ -231,8 +231,11 @@ add_test(NAME parity COMMAND parity)
 # firmware tiers; ImGui and miniaudio keep their own. The bundle sits in build/ with a symlink at the
 # project root, and build/cubevox-emulator points at the executable inside it for the command line.
 file(GLOB CUBEVOX_HOST_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/firmware/host/*.cpp)
+file(GLOB CUBEVOX_HOST_OBJCXX CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/firmware/host/*.mm)
+find_library(UTI_FRAMEWORK UniformTypeIdentifiers REQUIRED)
 add_executable(cubevox-emulator
   ${CUBEVOX_HOST_SOURCES}
+  ${CUBEVOX_HOST_OBJCXX}
   ${CUBEVOX_FW_CORE_SOURCES}
   tools/miniaudio_impl.cpp
   ${IMGUI_DIR}/imgui.cpp
@@ -243,6 +246,8 @@ add_executable(cubevox-emulator
   ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
 set_source_files_properties(${CUBEVOX_HOST_SOURCES} ${CUBEVOX_FW_CORE_SOURCES}
                             PROPERTIES COMPILE_OPTIONS "${CUBEVOX_ENGINE_FLAGS}")
+set_source_files_properties(${CUBEVOX_HOST_OBJCXX}
+                            PROPERTIES COMPILE_OPTIONS "${CUBEVOX_ENGINE_FLAGS};-fobjc-arc")
 target_include_directories(cubevox-emulator PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
                                                     ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
 target_include_directories(cubevox-emulator SYSTEM PRIVATE ${IMGUI_DIR} ${IMGUI_DIR}/backends
@@ -253,7 +258,8 @@ target_compile_options(cubevox-emulator PRIVATE -O2 -ffp-contract=fast)
 target_link_libraries(cubevox-emulator PRIVATE engine
   ${COCOA_FRAMEWORK} ${OPENGL_FRAMEWORK} ${IOKIT_FRAMEWORK}
   ${COREAUDIO_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK}
-  ${AUDIOTOOLBOX_FRAMEWORK} ${AUDIOUNIT_FRAMEWORK})
+  ${AUDIOTOOLBOX_FRAMEWORK} ${AUDIOUNIT_FRAMEWORK} ${UTI_FRAMEWORK})
+set_target_properties(cubevox-emulator PROPERTIES OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
 if(glfw3_FOUND)
   target_link_libraries(cubevox-emulator PRIVATE glfw)
 else()

@@ -26,11 +26,20 @@ class Source {
   Source(const Source&) = delete;
   Source& operator=(const Source&) = delete;
 
-  // Decodes a WAV to mono f32 at the engine's sample rate. False when it cannot.
-  bool loadClip(const std::string& path);
+  // Main thread. Decodes a file to mono f32 at the engine's sample rate and swaps it in for the audio
+  // callback, playing from its start. False, with the old clip still playing, when it does not decode.
+  // The old buffer is freed once the callback has run twice since the swap.
+  bool loadClip(const char* path);
 
-  // Looks for the clip beside the app (../../../samples from inside the bundle, also from the bundle
-  // a symlink points at), then in the working directory. `argv0` is the program path as launched.
+  // The base name of the clip now playing, "" before the first load.
+  const char* clipName() const { return clipName_.c_str(); }
+
+  // The path of samples/<file> beside the app (../../../samples from inside the bundle, also from the
+  // bundle a symlink points at), then in the working directory; "" when it is in neither. `argv0` is
+  // the program path as launched.
+  std::string locate(const char* argv0, const char* file) const;
+
+  // Loads Adam's default clip from where locate() finds it.
   bool findClip(const char* argv0);
 
   // Copies the next `n` clip samples, wrapping at the end. Silence when no clip is loaded.
@@ -50,18 +59,35 @@ class Source {
   void setUseMic(bool on);
   bool useMic() const { return useMic_.load(std::memory_order_relaxed); }
 
-  const std::string& clipPath() const { return clipPath_; }
-
   // The device callback. Public so the C trampoline can reach it.
   void onAudio(float* playback, const float* capture, uint32_t frames);
 
  private:
+  // One decoded clip. The id grows with each load, so the reader can tell a new clip from the old
+  // one even when the allocator hands the new one an old address.
+  struct Clip {
+    std::vector<float> samples;
+    uint64_t id = 0;
+  };
+  struct Retired {
+    Clip* clip;
+    uint64_t freeAtCallback;
+  };
+
   bool openDevice(bool duplex);
   void closeDevice();
+  void reclaim();
 
-  std::vector<float> clip_;
-  size_t clipPos_ = 0;
-  std::string clipPath_;
+  // The audio side loads clip_ for each sample and restarts at 0 when the id changes. The main side
+  // swaps the pointer, retires the old clip, and frees it once callbacks_ has passed the retire mark,
+  // so a callback that was reading it has returned. With no device nothing reads, and it frees at once.
+  std::atomic<Clip*> clip_{nullptr};
+  std::atomic<uint64_t> callbacks_{0};
+  std::vector<Retired> retired_;  // main thread only
+  uint64_t nextId_ = 1;           // main thread only
+  uint64_t playingId_ = 0;        // reader only
+  size_t clipPos_ = 0;            // reader only
+  std::string clipName_;
 
   std::unique_ptr<ma_device> device_;
   AudioBlock* block_ = nullptr;
