@@ -75,7 +75,7 @@ constexpr Anchor kDisBassPeakDb{-2.0f, 2.0f, 6.0f};
 constexpr Anchor kDisS1Lp{3000.0f, 6000.0f, 12000.0f, I::Log};
 constexpr Anchor kDisStackTrebleDb{-10.0f, -5.0f, 0.0f};
 constexpr Anchor kDisS2Lp{4000.0f, 6000.0f, 10000.0f, I::Log};
-constexpr Anchor kDisTrebleCutDb{-9.0f, -6.0f, -3.0f};
+constexpr Anchor kDisTrebleCutDb{-6.3f, -3.3f, -0.3f};
 constexpr Anchor kDisRailAsym{0.0f, 0.05f, 0.2f};
 constexpr Anchor kDisRailSoft{0.3f, 0.1f, 0.02f};
 

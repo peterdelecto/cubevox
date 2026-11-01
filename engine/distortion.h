@@ -42,7 +42,7 @@ struct DistortionTuning {
   float railSoft = 0.1f;          // soft edge as a fraction of the rail
   // post
   float trebleCutHz = 1000.0f;    // fixed high shelf cut
-  float trebleCutDb = -5.4f;
+  float trebleCutDb = -2.7f;      // half the BD-2's -5.4 dB, which left the voice dark (owner 2026-11-01)
   float toneMinDb = -12.0f;       // TONE fully down: extra shelf gain above trebleCutHz
   float toneMaxDb = 6.0f;         // TONE fully up
   float bassPeakHz = 120.0f;      // gyrator bump
