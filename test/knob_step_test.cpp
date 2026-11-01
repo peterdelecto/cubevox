@@ -118,8 +118,8 @@ struct Step {
   float to;
 };
 
-// Continuous knobs step at a low, a middle and a high setting; Bloom's TAIL also steps at the last
-// touch below the top of its travel, 2 s. A stepped knob of up to ten detents
+// Continuous knobs step at a low, a middle and a high setting; both Bloom knobs also step at the last
+// touch below the top of their travel (LINGER 2 s, AMOUNT 100 %). A stepped knob of up to ten detents
 // (the Mob card's VOICES) moves across every detent in turn, as does the Formant card's SHIFT with
 // its fifteen, and a longer one moves one detent at a quarter and at three quarters of its travel.
 constexpr int kWalkedDetents = 10;
@@ -129,7 +129,7 @@ std::vector<Step> stepsFor(Card c, int knob) {
   if (detents == 0) {
     std::vector<Step> s;
     for (float p : {0.2f, 0.5f, 0.8f}) s.push_back({p, p + kContinuousStep});
-    if (c == Card::Bloom && knob == 0) s.push_back({1.0f - kContinuousStep, 1.0f});
+    if (c == Card::Bloom) s.push_back({1.0f - kContinuousStep, 1.0f});
     return s;
   }
   if (detents <= kWalkedDetents || c == Card::Formant) {

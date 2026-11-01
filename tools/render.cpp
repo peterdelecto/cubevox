@@ -72,7 +72,7 @@ int usage() {
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
-               "       [--bloom <0..1>] [--tail <60..2000 ms>]\n"
+               "       [--bloom <0..1>] [--linger <60..2000 ms>, alias --tail]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
@@ -84,8 +84,9 @@ int usage() {
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
-               "  bloom runs with --bloom (AMOUNT, default 0.5) or --tail (TAIL, default 300 ms); with --ingate its word key\n"
-               "  is the input gate's open state, otherwise bloom listens to its own input\n"
+               "  bloom runs with --bloom (AMOUNT, default 0.5) or --linger (LINGER, default 300 ms); with --ingate its word key\n"
+               "  is the input gate's open state, otherwise bloom listens to its own input; it cuts its slices from the pitch\n"
+               "  stage's output when one runs (before crowd), else from the input gate's output, and the dry path is its input\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  the eq's front half (70 Hz high-pass, 6 kHz low-pass, de-esser) runs ahead of every stage and its\n"
@@ -437,7 +438,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--bloom") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.bloom.bloom) || rp.bloom.bloom < 0.0f || rp.bloom.bloom > 1.0f) return false;
       haveBloom = true;
-    } else if (std::strcmp(a, "--tail") == 0 && i + 1 < argc) {
+    } else if ((std::strcmp(a, "--linger") == 0 || std::strcmp(a, "--tail") == 0) && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.bloom.tailMs) || rp.bloom.tailMs < cv::Bloom::kTailMinMs ||
           rp.bloom.tailMs > cv::Bloom::kTailMaxMs)
         return false;
@@ -608,6 +609,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   polish.reset();
 
   float inBuf[cv::kBlock];
+  float bloomSrc[cv::kBlock];
   float bufA[cv::kBlock];
   float bufB[cv::kBlock];
   float* const scratch[2] = {bufA, bufB};
@@ -628,15 +630,20 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       // Each stage writes the scratch buffer the previous stage did not.
       const float* src = inBuf;
       int next = 0;
+
+      // Bloom cuts its slices from the pitch stage's output, or from the input gate's output when no
+      // pitch card runs. The copy is taken ahead of the stages that follow.
       if (rp.inGateOn) {
         inGate.process(src, scratch[next], n, rp.inGate);
         src = scratch[next];
         next ^= 1;
       }
+      if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
       if (rp.pitchOn) {
         pitchFx.process(src, scratch[next], n, rp.pitchFx);
         src = scratch[next];
         next ^= 1;
+        if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
       }
       if (rp.crowdOn) {
         crowd.process(src, scratch[next], n, rp.crowd, pitchFx);
@@ -671,7 +678,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       if (rp.bloomOn) {
         cv::BloomParams bp = rp.bloom;
         bp.keyOpen = inGate.open();
-        bloom.process(src, scratch[next], n, bp);
+        bloom.process(src, bloomSrc, scratch[next], n, bp);
         src = scratch[next];
         next ^= 1;
       }

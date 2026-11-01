@@ -27,10 +27,28 @@ struct ChainEngines {
   cv::Reverb reverb;
   cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes
   cv::Lofi lofi;
-  cv::Bloom bloom;  // 31 kB, two grain buffers; reads inputGate's detector as its word key
+  cv::Bloom bloom;  // 96 kB, eight slices; reads inputGate's detector as its word key
+
+  // The signal Bloom cuts its slices from. runChain copies the block leaving the tap slot into
+  // `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch call to
+  // copy the stage's output there ahead of its own voices. Bloom reads its own input while neither is set.
+  std::array<float, cv::kBlock> bloomSrc{};
+  bool bloomSrcLive = false;
+  bool bloomLead = false;
+
   cv::PolishComp comp;
   cv::Polish polish;
 };
+
+// Where Bloom's slices come from: the slot whose output is copied, and whether the layout places an
+// Autotune, Octave or Formant card. The slot is the last one holding such a card, or slot 1 when
+// the layout has none. It is -1 when the layout places no Bloom card or places it at or ahead of that
+// slot, and Bloom then cuts from its own input.
+struct BloomTap {
+  int slot;
+  bool pitchCard;
+};
+BloomTap bloomTap(const Layout& layout);
 
 // Clears the state of engine `e`. Empty (kNoEngine) clears nothing.
 void resetEngine(ChainEngines& engines, Engine e);
@@ -50,6 +68,7 @@ struct ChainCycles {
 // A Crowd card that makes that call runs its own engine on the pitch stage's output, which is its
 // lead. A Bloom card keys on the Input gate's detector when the layout places that card
 // (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when Bloom runs.
+// It cuts its slices from `engines.bloomSrc` while `bloomSrcLive` is set, and from `in` otherwise.
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
               bool& pitchDone);
 
@@ -121,14 +140,19 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
 // COMP and both EQ halves run always, and each is a bit-exact copy once settled off. `a` holds
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
-// block. Returns false when a slot produced a NaN or an infinity. The block was then silenced before
-// the polish stages, so the caller cuts the output and clears the engines.
+// block. A layout that places Bloom after its tap slot (`bloomTap`) has the block leaving that slot
+// copied for Bloom's slices, and no copy is made otherwise. Returns false when a slot produced a NaN
+// or an infinity. The block was then silenced before the polish stages, so the caller cuts the output
+// and clears the engines.
 template <typename Clock>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
               Clock cycleClock, ChainCycles& cycles) {
   const ChainParams& p = snap.params;
   float* const result = a;
   bool pitchDone = false;
+  const BloomTap tap = n <= cv::kBlock ? bloomTap(snap.layout) : BloomTap{-1, false};
+  engines.bloomSrcLive = false;
+  engines.bloomLead = tap.slot >= 0 && tap.pitchCard;
   const uint32_t frontStart = cycleClock();
   engines.polish.processFront(a, a, n, p.eq);
   const uint32_t frontCycles = cycleClock() - frontStart;
@@ -137,7 +161,13 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
     const bool wrote = runSlot(engines, fades, s, snap, a, b, n, pitchDone);
     cycles.slot[static_cast<size_t>(s)] = cycleClock() - start;
     if (wrote) std::swap(a, b);
+    if (s == tap.slot && !engines.bloomSrcLive) {
+      for (int i = 0; i < n; ++i) engines.bloomSrc[static_cast<size_t>(i)] = a[i];
+      engines.bloomSrcLive = true;
+    }
   }
+  engines.bloomSrcLive = false;
+  engines.bloomLead = false;
   const bool finite = guardBlock(a, n);
   const uint32_t compStart = cycleClock();
   engines.comp.process(a, b, n, p.comp);
