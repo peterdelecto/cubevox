@@ -39,7 +39,9 @@ Use these words or a plain description. Never a coined label (owner 2026-10-24).
 ## Build / run
 ```
 cmake -S . -B build && cmake --build build -j && ctest --test-dir build
-open build/cubevox-proto.app
+open build/cubevox-emulator.app   # the emulator: the firmware's core, ui and engine on the Mac behind the panel (2026-11-01 emulator spec)
+build/cubevox-emulator --check    # its headless gate, also ctest emulator_check; --proof out.ppm renders one frame
+open build/cubevox-proto.app      # the prototype, parked
 build/cubevox-render in.wav out.wav --depth 0.7
 node tools/font-editor/serve.js   # font editor; edits save straight to tools/font-editor/fonts/cubevox-fonts.json
 cd app && go run . --fake        # Mac app on a fake box; go test ./... ; app/bundle.sh builds dist/cubevox.app

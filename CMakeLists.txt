@@ -225,3 +225,59 @@ target_compile_options(parity PRIVATE ${CUBEVOX_ENGINE_FLAGS} ${CUBEVOX_SANITIZE
 target_link_options(parity PRIVATE ${CUBEVOX_SANITIZE})
 target_link_libraries(parity PRIVATE engine)
 add_test(NAME parity COMMAND parity)
+
+# cubevox-emulator: the box's src/core, src/ui and engine code unchanged, with firmware/host standing
+# in for src/board (nothing from board/ is included). The engine flags hold on the host files and the
+# firmware tiers; ImGui and miniaudio keep their own. The bundle sits in build/ with a symlink at the
+# project root, and build/cubevox-emulator points at the executable inside it for the command line.
+file(GLOB CUBEVOX_HOST_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/firmware/host/*.cpp)
+add_executable(cubevox-emulator
+  ${CUBEVOX_HOST_SOURCES}
+  ${CUBEVOX_FW_CORE_SOURCES}
+  tools/miniaudio_impl.cpp
+  ${IMGUI_DIR}/imgui.cpp
+  ${IMGUI_DIR}/imgui_draw.cpp
+  ${IMGUI_DIR}/imgui_tables.cpp
+  ${IMGUI_DIR}/imgui_widgets.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
+set_source_files_properties(${CUBEVOX_HOST_SOURCES} ${CUBEVOX_FW_CORE_SOURCES}
+                            PROPERTIES COMPILE_OPTIONS "${CUBEVOX_ENGINE_FLAGS}")
+target_include_directories(cubevox-emulator PRIVATE ${CMAKE_SOURCE_DIR}/firmware/cubevox/src
+                                                    ${CMAKE_SOURCE_DIR}/tools/font-editor/fonts)
+target_include_directories(cubevox-emulator SYSTEM PRIVATE ${IMGUI_DIR} ${IMGUI_DIR}/backends
+                                                           ${CMAKE_SOURCE_DIR}/third_party)
+target_compile_definitions(cubevox-emulator PRIVATE GL_SILENCE_DEPRECATION
+                           CUBEVOX_FW_VERSION="v${CUBEVOX_VERSION}")
+target_compile_options(cubevox-emulator PRIVATE -O2 -ffp-contract=fast)
+target_link_libraries(cubevox-emulator PRIVATE engine
+  ${COCOA_FRAMEWORK} ${OPENGL_FRAMEWORK} ${IOKIT_FRAMEWORK}
+  ${COREAUDIO_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK}
+  ${AUDIOTOOLBOX_FRAMEWORK} ${AUDIOUNIT_FRAMEWORK})
+if(glfw3_FOUND)
+  target_link_libraries(cubevox-emulator PRIVATE glfw)
+else()
+  target_include_directories(cubevox-emulator PRIVATE ${GLFW_INCLUDE_DIRS})
+  target_link_directories(cubevox-emulator PRIVATE ${GLFW_LIBRARY_DIRS})
+  target_link_libraries(cubevox-emulator PRIVATE ${GLFW_LIBRARIES})
+endif()
+set_target_properties(cubevox-emulator PROPERTIES
+  OUTPUT_NAME "cubevox-emulator"
+  MACOSX_BUNDLE TRUE
+  MACOSX_BUNDLE_BUNDLE_NAME "cubevox-emulator"
+  MACOSX_BUNDLE_GUI_IDENTIFIER "com.peterdelecto.cubevox-emulator"
+  MACOSX_BUNDLE_BUNDLE_VERSION "1"
+  MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/firmware/host/Info.plist.in")
+add_custom_command(TARGET cubevox-emulator POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E create_symlink
+          cubevox-emulator.app/Contents/MacOS/cubevox-emulator ${CMAKE_BINARY_DIR}/cubevox-emulator
+  VERBATIM)
+if(NOT CUBEVOX_BUNDLE_GLFW)
+  add_custom_command(TARGET cubevox-emulator POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_BINARY_DIR}/cubevox-emulator.app ${CMAKE_SOURCE_DIR}/cubevox-emulator.app
+    VERBATIM)
+endif()
+add_test(NAME emulator_check COMMAND $<TARGET_FILE:cubevox-emulator> --check
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
