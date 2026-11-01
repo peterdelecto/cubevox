@@ -4,6 +4,7 @@ imgui.ini
 .DS_Store
 *.png
 cubevox-proto.app
+cubevox-emulator.app
 .cache/
 .claude/
 dist/
