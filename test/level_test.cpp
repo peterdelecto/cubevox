@@ -1,7 +1,7 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
 // (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Bloom rows take every
-// setting from the registry, as the box runs them. The Lo-fi and Bloom rows run on Adam's clips in
-// samples/ and skip when they are absent: the synthetic program puts its energy where the telephone
+// setting from the registry, as the box runs them. The Formant MIX, Lo-fi and Bloom rows run on Adam's
+// clips in samples/ and skip when they are absent: the synthetic program puts its energy where the telephone
 // band cuts, and its noise floor holds Bloom's word open. No window, no audio device.
 
 #include <algorithm>
@@ -45,8 +45,8 @@ constexpr double kLoDb = 0.0;
 constexpr double kHiDb = 0.5;
 constexpr double kSlackDb = 0.1;
 
-// A MIX knob at 50 % is reported against a looser band: the equal-power crossfade keeps it near
-// unity without its own trim.
+// A MIX knob at 50 % is reported against a looser band: the crossfade keeps it near unity without
+// its own trim.
 constexpr double kMidLoDb = -1.5;
 constexpr double kMidHiDb = 1.0;
 
@@ -247,10 +247,8 @@ bool crowdRows() {
   return ok;
 }
 
-// The Formant card at its default, SHIFT -3 st and MIX 100 %, with Autotune off, as the registry sets
-// it. MIX 50 % is reported without a verdict: the dry voice and the shifted voice are one waveform
-// 28 ms apart, so they add coherently and the crossfade reads high on this program. The card's trim
-// is set for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are.
+// The Formant card at SHIFT -3 st with Autotune off, as the registry sets it. The card's trim is set
+// for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are.
 cv::PitchFxParams boxFormant(float mix) {
   ChainParams chain;
   applyPlacement(Card::Formant, chain);
@@ -258,15 +256,6 @@ cv::PitchFxParams boxFormant(float mix) {
   applyKnob(Card::Formant, 0, 4.0f, chain);  // position 4 is -3 st
   applyKnob(Card::Formant, 1, mix, chain);
   return chain.pitchFx;
-}
-
-bool formantRows(const Signal& in) {
-  bool ok = simple<cv::PitchFx>("formant -3 st mix 1", in, boxFormant(1.0f));
-  auto s = std::make_unique<Stage<cv::PitchFx>>();
-  const cv::PitchFxParams half = boxFormant(0.5f);
-  const double db = gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); }));
-  std::printf("NOTE %-30s %+6.2f dB  (no verdict: the voices add coherently)\n", "formant -3 st mix .5", db);
-  return ok;
 }
 
 // 16-bit mono PCM WAV, any chunks before data. Empty on a missing or other file.
@@ -327,6 +316,25 @@ bool clipRows(const char* label, const ClipFn& through, double lo, double hi, do
     ++count;
   }
   mean = count > 0 ? sum / count : 0.0;
+  return ok;
+}
+
+// The Formant card at its default, SHIFT -3 st and MIX 100 %, on the program. MIX 50 % is held to
+// the mid band on the program and on Adam's clips: the voices sit from correlated (the program) to
+// unrelated (the clips), and the level gain keeps both inside the band.
+bool formantRows(const Signal& in) {
+  bool ok = simple<cv::PitchFx>("formant -3 st mix 1", in, boxFormant(1.0f));
+  ok &= midRow<cv::PitchFx>("formant -3 st mix .5", in, boxFormant(0.5f));
+  const cv::PitchFxParams half = boxFormant(0.5f);
+  double mean = 0.0;
+  int count = 0;
+  ok &= clipRows(
+      "formant -3 st mix .5",
+      [&](const Signal& padded) {
+        auto s = std::make_unique<Stage<cv::PitchFx>>();
+        return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); })};
+      },
+      kMidLoDb, kMidHiDb, mean, count);
   return ok;
 }
 
