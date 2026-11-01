@@ -75,6 +75,7 @@ constexpr float kShadeBorder = 0.18f;
 constexpr float kShadeHover = 0.34f;
 constexpr float kShadeDim = 0.84f;
 constexpr float kShadeDisabled = 0.45f;
+constexpr float kShadeOff = 0.70f;  // a toggle's lever when it is off
 constexpr float kShadeAccentSoft = 0.30f;
 constexpr float kShadeOled = 0.60f;  // share of black mixed into the ground
 
@@ -86,6 +87,7 @@ constexpr Rgb kHoverRgb = mix(kGround, kInk, kShadeHover);
 constexpr Rgb kTextRgb = kInk;
 constexpr Rgb kDimRgb = mix(kGround, kInk, kShadeDim);
 constexpr Rgb kDisabledRgb = mix(kGround, kInk, kShadeDisabled);
+constexpr Rgb kOffRgb = mix(kGround, kInk, kShadeOff);
 constexpr Rgb kAccentRgb = kAccentBase;
 constexpr Rgb kAccentInkRgb = kGround;  // text on an accent fill
 constexpr Rgb kAccentSoftRgb = mix(kGround, kAccentBase, kShadeAccentSoft);
@@ -102,6 +104,7 @@ constexpr ImU32 kHover = pack(kHoverRgb);
 constexpr ImU32 kText = pack(kTextRgb);
 constexpr ImU32 kDim = pack(kDimRgb);
 constexpr ImU32 kDisabled = pack(kDisabledRgb);
+constexpr ImU32 kOff = pack(kOffRgb);
 constexpr ImU32 kAccent = pack(kAccentRgb);
 constexpr ImU32 kAccentInk = pack(kAccentInkRgb);
 constexpr ImU32 kAccentSoft = pack(kAccentSoftRgb);
@@ -160,11 +163,19 @@ constexpr float kEncoderIndicatorIn = 0.45f;
 
 // ---- Switches
 
-constexpr float kSwitchW = units(9);
-constexpr float kSwitchH = units(4);
-constexpr float kThumbInset = units(0.5f);
 constexpr float kSegH = units(4);
 constexpr float kSegInset = 2.0f;
+
+// ---- Bat toggle: a short bushing with a lever that stands up for on and hangs down for off.
+
+constexpr float kBatW = units(4);          // hit area, over the 24 px desktop pointer floor
+constexpr float kBatH = units(9);
+constexpr float kBushW = units(2.5f);
+constexpr float kBushH = units(3);
+constexpr float kLeverW = units(0.75f);
+constexpr float kLeverLen = units(3);      // pivot to the centre of the tip
+constexpr float kTipR = units(1);
+constexpr float kMuteW = units(6);         // the MUTE label's column, wider than its toggle
 
 // ---- Slot column
 
@@ -173,7 +184,7 @@ constexpr float kColPad = units(1);
 constexpr float kColInnerW = kColW - 2 * kColPad;
 constexpr float kNameH = units(3);
 constexpr float kLabelH = units(3);
-constexpr float kColH = kColPad + kNameH + kGap + 2 * (kKnobBoxD + kLabelH) + kGap + kSwitchH + kGapTight + kSegH + kColPad;
+constexpr float kColH = kColPad + kNameH + kGap + 2 * (kKnobBoxD + kLabelH) + kGap + kSegH + kColPad;
 
 // ---- LED and CPU line
 
@@ -188,11 +199,12 @@ constexpr float kCpuGapLong = units(2);      // one reading to the next
 constexpr float kTopY = kPad;
 constexpr float kOledX = (kWindowW - kOledW) / 2;
 constexpr float kRightX = kOledX + kOledW + kBezel + kGapWide;  // the MENU column
-constexpr float kSlotY = kTopY + kOledH + kGapWide;
+constexpr float kToggleY = kTopY + kOledH + kGapWide;  // the row of eight bat toggles
+constexpr float kSlotY = kToggleY + kBatH + kGapTight;
 constexpr float kBottomY = kSlotY + kColH + kGapWide;
 constexpr float kVersionH = units(2);
 constexpr float kBottomEndY = kBottomY + kSegH + kGapTight + kVersionH;
-constexpr float kSourceW = 2 * kSwitchW;
+constexpr float kSourceW = kColInnerW;
 
 static_assert(kBottomEndY + kPad <= kWindowH, "the three bands must fit the window");
 
