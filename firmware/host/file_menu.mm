@@ -20,7 +20,9 @@ std::function<void(const char*)> gOnOpen;
 - (void)openClip:(id)sender {
   (void)sender;
   NSMutableArray<UTType*>* types = [NSMutableArray array];
-  for (NSString* extension in @[ @"wav", @"aiff", @"aif", @"mp3" ]) {
+  // What the decoder takes (miniaudio: wav and mp3); an offered type that failed to decode would
+  // leave the old clip playing with nothing to say why.
+  for (NSString* extension in @[ @"wav", @"mp3" ]) {
     UTType* type = [UTType typeWithFilenameExtension:extension];
     if (type != nil) [types addObject:type];
   }
