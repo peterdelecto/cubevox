@@ -145,3 +145,44 @@ TAIL `D` (60..1000 ms):
 2. The 80 ms static fade is a time constant; a 300 ms tail ends about 2 s after the word.
 3. Level at the default: +0.05 to +0.34 dB on the clips with either key.
 4. The host bench put the card at 1.2 times Echo's cost; the row is {5, 6} (section 8).
+5. Owner 2026-11-01, after auditioning in the emulator: "it's cool. it's not the effect i intended
+   but we should keep it and refine it." The card stays; refinement waits for the owner's direction.
+
+## 13. Refinement (owner 2026-11-01)
+
+Owner, after the first audition: more time for the stutters, the lower knob named AMOUNT, then:
+"rotate yes", the tail may finish under the next word ("ok"), "it should take its input from
+post-octave at latest (assuming its activated). not mob. mob would just be muddle.", and the upper
+knob named LINGER.
+
+1. Knobs. Upper LINGER, 60 ms to 2 s, log (was TAIL, 60 ms to 1 s; same laws). Lower AMOUNT (was
+   BLOOM).
+2. Rotation. Bloom keeps the word's last four slices. Through the word the newest slice loops, as
+   now. After the word ends the tail plays the kept slices in the order they were sung, each for
+   one re-capture interval (±5 %), spliced over 5.8 ms, round and round until the tail closes. A
+   word that left fewer slices rotates the ones it has.
+3. Overlap. A new word no longer cuts the old tail. The old tail keeps its slices and its own fade
+   and closes on its own, while the new word starts its own loop. At most two run at once: a third
+   word fades the oldest tail out over 20 ms.
+4. Source. Bloom cuts its slices from the chain after the pitch stage: the signal leaving the last
+   slot that holds Autotune, Octave or Formant, before MOB, Unison, Echo and Distortion. A layout
+   with none of those cuts after slot 1. The dry path is still slot 7's own input; the loops add to
+   it. The word key stays the Input gate's.
+5. Memory. Eight float slices of 80 ms, 122,880 B, in D1 SRAM (two tails of four).
+6. Age limit (owner 2026-11-01: "bloom should keep replaying grains for a maximum of 2.5 seconds
+   because if it gets stuck on a grain and nothing ever triggers a new grain, it will continue
+   forever under new material"). No slice plays more than 2.5 s after it was cut. The way it could
+   stick today: through a held word whose later slices sit 12 dB under the looping one, every
+   re-capture is skipped and the loud slice loops for as long as the Input gate stays open.
+   - During a word, a slice that reaches 2.5 s is replaced at the next re-capture even when the new
+     slice is quieter; if no re-capture comes, it fades out over the 80 ms close.
+   - In a tail, a slice that reaches 2.5 s leaves the rotation; with none left, the tail closes over
+     80 ms.
+   - So LINGER's top end rings for at most 2.5 s after the word's last slice was cut, short of the
+     law's natural fade at 2 s.
+7. AMOUNT sets loudness only (owner 2026-11-01, option A). Grains are a fixed 63 ms and a fresh one
+   is cut every 118 ms (±5 %), the default the owner auditioned and liked. LINGER still caps a grain
+   at 0.8 of its setting, so LINGER under 79 ms shortens it, never under 35 ms. The wet level runs
+   from 0 at AMOUNT 0 to 0.70 at 100 % as 0.70 · AMOUNT^0.6, which puts 50 % at 0.46, today's
+   default loudness. Slices of 63 ms, 3,024 samples: eight of them are 96,768 B, which replaces
+   item 5's figure.
