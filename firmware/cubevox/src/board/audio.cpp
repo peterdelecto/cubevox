@@ -77,7 +77,7 @@ DMA_HandleTypeDef gDmaRx;
 DMA_Stream_TypeDef* txStream() { return DMA1_Stream0; }
 DMA_Stream_TypeDef* rxStream() { return DMA1_Stream1; }
 
-// Pitch stage state (69,376 B, 36,624 B of it the input ring) lives in DTCM. The section is NOLOAD and the static constructor ran
+// Pitch stage state (83,776 B, 51,024 B of it the input ring) lives in DTCM. The section is NOLOAD and the static constructor ran
 // before audioInit() zeroes it, so audioInit() constructs the object again in place; a plain reset()
 // would leave the tracker's anti-alias coefficients, which only the constructor sets, zeroed.
 H7_DTCM_BSS cv::PitchFx gPitchFx;

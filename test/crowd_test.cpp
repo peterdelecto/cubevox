@@ -6,8 +6,10 @@
 // human-voice ranges), the bottom tenth of WIDTH staying in tune (pitch, drift and contour), the
 // shared tone shelf, the correctness pass (the switch with the tracker, the gap rule over a noise
 // floor, WIDTH holding the level, notes outside the tracker's range, the read ceiling, the tuning
-// ranges). Every run feeds a PitchFx through its pass-through path first, so the ring is written
-// and the tracker runs, as the chain does. No window, no audio device.
+// ranges), and the raised copies (their pitch over the tuned copies, their 75 ms lag, the unvoiced
+// run each copy waits before it plays plain). Every run feeds a PitchFx through its pass-through
+// path first, so the ring is written and the tracker runs, as the chain does. No window, no audio
+// device.
 
 #include <algorithm>
 #include <array>
@@ -240,7 +242,7 @@ Signal runBoth(const Signal& in, const cv::CrowdParams& first, const cv::CrowdPa
     if (probe) {
       probe->lead = gCrowd.leadGain();
       probe->active = gCrowd.activeVoices();
-      for (size_t v = 0; v < 4; ++v) probe->drift = std::max(probe->drift, std::fabs(gCrowd.driftCents(v)));
+      for (size_t v = 0; v < 8; ++v) probe->drift = std::max(probe->drift, std::fabs(gCrowd.driftCents(v)));
     }
   }
   return out;
@@ -273,11 +275,13 @@ cv::CrowdParams knobs(float voices, float width) {
   return p;
 }
 
-// Voice 0 alone with nothing around it. voiceDb 0 gives one voice the whole level, so the lead is
-// 0, and the low cut sits at the bottom of the filter band. The voice sits on the lead's pitch with
-// a flat tone, so only its formant move is left. WIDTH sits at 1, so a pitchSt is the offset heard.
+// Voice 0 alone with nothing around it. Soloed at the top of VOICES it stands alone at unity, so
+// the lead is 0 and its raised copy is silent, and the low cut sits at the bottom of the filter
+// band. The voice sits on the lead's pitch with a flat tone, so only its formant move is left.
+// WIDTH sits at 1, so a pitchSt is the offset heard.
 cv::CrowdParams isolated(float formantSt) {
-  cv::CrowdParams p = knobs(0.2f, 1.0f);
+  cv::CrowdParams p = knobs(1.0f, 1.0f);
+  p.solo = 0b0001;
   cv::CrowdTuning& t = p.tuning;
   t.voiceDb = 0.0f;
   t.formantSt[0] = formantSt;
@@ -323,6 +327,16 @@ double goertzel(const float* x, int n, double hz) {
     s1 = s0;
   }
   return std::sqrt(s1 * s1 + s2 * s2 - c * s1 * s2);
+}
+
+// The same under a Hann window. Its side lobes fall fast, so over a second a line 8 Hz from a loud
+// one reads near nothing of it.
+double hannGoertzel(const float* x, int n, double hz) {
+  std::vector<float> w(static_cast<size_t>(n));
+  for (int i = 0; i < n; ++i) {
+    w[static_cast<size_t>(i)] = static_cast<float>(x[i] * 0.5 * (1.0 - std::cos(2.0 * kPi * i / n)));
+  }
+  return goertzel(w.data(), n, hz);
 }
 
 // Root-sum-square Goertzel magnitude within +-halfHz of hz over second 1..2.
@@ -595,11 +609,13 @@ bool testWidthLaw() {
   return ok;
 }
 
-// VOICES 20, 40, 60 and 80 % bring in the copies in index order, the -1.75 st copy first, then the
-// +2.75 st, the -2.5 st and the +1 st. At each step the output carries a line at the f0 of every
-// copy that has come in and none at the f0 of the copies still to come. It runs at WIDTH 1 and at
-// WIDTH 0.8, where the offsets are the pitch factor 0.520 of their full values. (At WIDTH 0.5 the
-// -1.75 st and -2.5 st copies sit 23 cents apart and their lines overlap.)
+// VOICES 20, 40, 60 and 80 % bring in the tuned copies in index order, the -1.75 st copy first, then
+// the +2.75 st, the -2.5 st and the +1 st, each with its raised copy. At each step the output carries
+// a line at the f0 of every tuned copy that has come in and none at the f0 of the copies still to
+// come. It runs at WIDTH 1 and at WIDTH 0.8, where the offsets are the pitch factor 0.520 of their
+// full values. (At WIDTH 0.5 the -1.75 st and -2.5 st copies sit 23 cents apart and their lines
+// overlap.) The lines are read under a Hann window, because the lead's line and the first raised
+// copy's, both at 220 Hz, leak into the +1 st copy's line 8.6 Hz away under a plain one.
 bool testFadeOrder() {
   const Signal in = tone(220.0, 2 * kRate);
   const cv::CrowdTuning d;
@@ -611,7 +627,7 @@ bool testFadeOrder() {
       double top = 0.0;
       for (size_t v = 0; v < 4; ++v) {
         const double st = static_cast<double>(d.pitchSt[v]) * pitchFactor(static_cast<double>(width));
-        amp[v] = goertzel(&out[kRate], kRate, 220.0 * std::pow(2.0, st / 12.0));
+        amp[v] = hannGoertzel(&out[kRate], kRate, 220.0 * std::pow(2.0, st / 12.0));
         top = std::max(top, amp[v]);
       }
       bool order = true;
@@ -652,6 +668,24 @@ bool testFormantMoves() {
                 up / flat, down / flat);
 }
 
+// A raised copy shares its tuned copy's throat and tone shelf and is told apart by its pitch: on the
+// 220 Hz tone at WIDTH 1 it sits two thirds of 1.75 st, 116.7 cents, over the tuned copy.
+bool testRaisedDiffers() {
+  const Signal in = tone(220.0, 2 * kRate);
+  double gap[4];
+  double worst = 0.0;
+  for (size_t v = 0; v < 4; ++v) {
+    cv::CrowdParams p = alone(v);
+    const double tunedHz = medianHz(run(in, p));
+    p.solo = 0b10000;  // the raised copy of the tuned copy in slot 0
+    const double raisedHz = medianHz(run(in, p));
+    gap[v] = tunedHz > 0.0 && raisedHz > 0.0 ? cents(raisedHz, tunedHz) : 9999.0;
+    worst = std::max(worst, std::fabs(gap[v] - 175.0 * kPitchTop));
+  }
+  return report("voices differ, raised copies", worst <= 10.0,
+                "raised over tuned copy 1..4 %.1f %.1f %.1f %.1f cents (116.7 +- 10)", gap[0], gap[1], gap[2], gap[3]);
+}
+
 // Voice 0 (formant -1.75 st, tone -3 dB) and voice 2 (formant -1 st, tone +3 dB) are two different
 // colours. Both sit on the lead's pitch, so only the throat and the tone shelf tell them apart, and
 // the spectral centroid of each, over the harmonics of the lead's f0 up to the 20th, differs by at
@@ -670,8 +704,9 @@ bool testVoicesDiffer() {
     c[i] = centroidHz(run(in, p), 220.0, 1, 20);
   }
   const double diff = std::fabs(c[1] - c[0]) / std::min(c[0], c[1]);
-  return report("voices differ", diff >= 0.05, "centroid voice 0 %.1f Hz, voice 2 %.1f Hz, differ %.1f %% (>=5)", c[0],
-                c[1], 100.0 * diff);
+  bool ok = report("voices differ", diff >= 0.05, "centroid voice 0 %.1f Hz, voice 2 %.1f Hz, differ %.1f %% (>=5)", c[0],
+                   c[1], 100.0 * diff);
+  return ok & testRaisedDiffers();
 }
 
 double levelDb(const Signal& in, const Signal& out) {
@@ -714,19 +749,21 @@ bool testLeadLeaves() {
   return ok;
 }
 
+// Each fifth of VOICES brings in one tuned copy and its raised copy.
 bool testVoiceCount() {
   const Signal in = program(1);
   bool ok = true;
-  const std::pair<float, int> want[] = {{0.0f, 0}, {0.2f, 1}, {0.4f, 2}, {0.6f, 3}, {0.8f, 4}, {1.0f, 4}};
+  const std::pair<float, int> want[] = {{0.0f, 0}, {0.2f, 2}, {0.4f, 4}, {0.6f, 6}, {0.8f, 8}, {1.0f, 8}};
   for (const auto& w : want) {
     Probe p;
     run(in, knobs(w.first, 0.5f), &p);
     char name[40];
     std::snprintf(name, sizeof name, "voice count VOICES %.0f %%", static_cast<double>(w.first * 100.0f));
-    ok &= report(name, p.active == w.second, "%.0f voices ticking (%.0f)", p.active, w.second);
+    ok &= report(name, p.active == w.second, "%.0f copies ticking (%.0f)", p.active, w.second);
   }
 
-  // At 20 % the live voice is voice 0: voices 1..3 can change without moving a sample.
+  // At 20 % the live copies are voice 0 and its raised copy, which read the tuning's first entries:
+  // the entries of voices 1..3 can change without moving a sample.
   cv::CrowdParams a = knobs(0.2f, 0.5f);
   cv::CrowdParams b = a;
   for (size_t v = 1; v < 4; ++v) {
@@ -749,9 +786,9 @@ bool testVoiceCount() {
   return ok;
 }
 
-// A solo sounds the soloed voices and nothing else, whatever VOICES says. Solo 0 leaves the plain
-// law untouched, and all four voices soloed at the top of the knob are that law's crowd.
-// Voice 1 soloed at VOICES 20 %.
+// A solo sounds the soloed copies and nothing else, whatever VOICES says. Solo 0 leaves the plain
+// law untouched, and all eight copies soloed at the top of the knob are that law's crowd.
+// Voice 1 soloed at VOICES 20 %, without its raised copy.
 cv::CrowdParams soloOne() {
   cv::CrowdParams a = knobs(0.2f, 0.5f);
   a.solo = 0b0010;
@@ -788,7 +825,7 @@ bool soloTop(const Signal& in) {
   return report("solo top", p.active == 1 && p.lead == 0.0f, "%.0f voices ticking (1), lead gain %.3g (0)", p.active, p.lead);
 }
 
-// Solo 0 is the plain law bit for bit, and all four voices soloed at the top give the same crowd.
+// Solo 0 is the plain law bit for bit, and all eight copies soloed at the top give the same crowd.
 bool soloOff(const Signal& in) {
   const cv::CrowdParams plain = knobs(0.2f, 0.5f);
   cv::CrowdParams zero = plain;
@@ -796,10 +833,10 @@ bool soloOff(const Signal& in) {
   const size_t differ = differing(run(in, plain), run(in, zero));
   cv::CrowdParams all = knobs(1.0f, 0.5f);
   const Signal outTop = run(in, all);
-  all.solo = 0b1111;
+  all.solo = 0xFF;
   const size_t differTop = differing(outTop, run(in, all));
   return report("solo off", differ == 0 && differTop == 0,
-                "solo 0 differs in %.0f samples (0), solo 0b1111 at VOICES 100 %% differs in %.0f (0)",
+                "solo 0 differs in %.0f samples (0), solo 0xFF at VOICES 100 %% differs in %.0f (0)",
                 static_cast<double>(differ), static_cast<double>(differTop));
 }
 
@@ -1036,15 +1073,14 @@ void allEnhancements(cv::CrowdTuning& t) {
   t.contour = {0.8f, 0.8f, 0.8f, 0.8f};
 }
 
-// What the four runs of testEnhancementsDefaultExact hash to (Mac build), pinned by the Crowd
-// correctness pass (owner 2026-10-31). Every run moved for three of its changes: the lead holds at 1
-// until the tracker has a period, a voice that starts from nothing lays a prefill grain, and the trim
-// follows WIDTH. Runs 3 and 4 also moved for the gap floor that follows the phrase level. Runs 1 to 3
-// start from knobs(), which neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{}
-// unchanged. The engine must reproduce them to the bit. Update them only when the sound of a copy
-// changes on purpose.
-constexpr std::array<uint64_t, 4> kPinned = {0xd37de60a1c1eca07ULL, 0x041fbfde7aa323feULL, 0xc944b897c6179176ULL,
-                                             0xec216e2ea40ccb9eULL};
+// What the four runs of testEnhancementsDefaultExact hash to (Mac build), pinned for the eight-copy
+// card (owner 2026-11-01): four raised copies 1.75 st over and 75 ms behind the tuned ones, every copy
+// at the four-copy gain over sqrt 2, the ring at 225 ms and the trims set for the level rule. Runs 1
+// to 3 start from knobs(), which neutralizes the human-voice set. Run 4 plays the shipped
+// CrowdTuning{} unchanged. The engine must reproduce them to the bit. Update them only when the sound
+// of a copy changes on purpose.
+constexpr std::array<uint64_t, 4> kPinned = {0xd6ecad52a43f036bULL, 0xe2a18a3b5b4e2328ULL, 0x2988d608d5fbd31fULL,
+                                             0xec8c75f724c047aaULL};
 
 // Each run's hash against its pinned value.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {
@@ -1849,7 +1885,7 @@ Signal runCopy2(const Signal& in, std::vector<float>& share) {
     gFx.process(&in[i], scratch, cv::kBlock, passThrough());
     gCrowd.process(&in[i], &out[i], cv::kBlock, p, gFx);
     gInProcess = false;
-    share.push_back(gCrowd.moveShare());
+    share.push_back(gCrowd.moveShare(1));
   }
   return out;
 }
@@ -1985,6 +2021,106 @@ bool testTuningRanges() {
                 static_cast<double>(moved));
 }
 
+// The raised copies (owner 2026-11-01).
+
+// Raised copy v + 4 alone, as lagProbe(v) plays tuned copy v. Its tuned copy's pitch entry sits at
+// -1.75 st, so the raised copy plays on the lead's pitch and the cross-correlation has one peak.
+cv::CrowdParams raisedProbe(size_t v, float lagScale) {
+  cv::CrowdParams p = lagProbe(v, lagScale);
+  p.solo = static_cast<uint8_t>(1u << (v + 4));
+  p.tuning.pitchSt[v] = -1.75f;
+  return p;
+}
+
+// Each raised copy lags its tuned copy by 75 ms. On 220 Hz bursts at WIDTH 1 each copy plays alone on
+// the lead's pitch and its lag is read off the cross-correlation. The raised copies land at 131, 215,
+// 173 and 180 ms.
+bool testRaisedLag() {
+  const Train tr{300, 300, 120, 3};
+  const Signal in = bursts(220.0, tr);
+  const cv::CrowdTuning d;
+  double tuned[4];
+  double raised[4];
+  double worst = 0.0;
+  for (size_t v = 0; v < 4; ++v) {
+    const double want = lagMsAt(v, 1.0, static_cast<double>(d.lagScale));
+    const double wantRaised = std::min(want + 75.0, static_cast<double>(cv::kCrowdMaxLagMs));
+    tuned[v] = measuredLagMs(in, run(in, lagProbe(v, d.lagScale)), tr.start(1) + msToSamples(want + 30.0), want);
+    const Signal out = run(in, raisedProbe(v, d.lagScale));
+    raised[v] = measuredLagMs(in, out, tr.start(1) + msToSamples(wantRaised + 30.0), wantRaised);
+    worst = std::max({worst, std::fabs(raised[v] - tuned[v] - 75.0), std::fabs(raised[v] - wantRaised)});
+  }
+  std::printf("info raised lag, tuned copies %.2f %.2f %.2f %.2f ms, raised copies %.2f %.2f %.2f %.2f ms\n", tuned[0],
+              tuned[1], tuned[2], tuned[3], raised[0], raised[1], raised[2], raised[3]);
+  return report("raised copies lag", worst <= 0.5,
+                "worst error of a raised copy against its tuned copy + 75 ms and against the law %.2f ms (<= 0.5)", worst);
+}
+
+// 1 s of the 220 Hz tone, then 1 s of noise at -26 dBFS RMS, which the tracker reads as unvoiced.
+Signal toneThenNoise() {
+  Signal x = tone(220.0, 2 * kRate);
+  uint64_t s = 0x2545F4914F6CDD1DULL;
+  double b = 0.0;
+  for (size_t i = kRate; i < x.size(); ++i) {
+    s = s * 6364136223846793005ULL + 1442695040888963407ULL;
+    b = 0.9 * b + (static_cast<double>(s >> 11) / 4503599627370496.0 - 1.0);
+    x[i] = static_cast<float>(0.05 * 0.436 * b * std::sqrt(3.0));
+  }
+  return x;
+}
+
+// One copy alone at WIDTH 1 on toneThenNoise(): the first unvoiced block after the tone, the first
+// block whose move share sits under 1, and the voiced blocks after the first unvoiced one.
+struct PlainRun {
+  Signal out;
+  int unvoicedAt = -1;
+  int plainAt = -1;
+  int voicedAfter = 0;
+};
+
+PlainRun runPlain(const Signal& in, size_t c) {
+  cv::CrowdParams p = knobs(1.0f, 1.0f);
+  p.solo = static_cast<uint8_t>(1u << c);
+  gFx.reset();
+  gCrowd.reset();
+  PlainRun r;
+  r.out.assign(in.size(), 0.0f);
+  float scratch[cv::kBlock];
+  for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
+    const size_t at = static_cast<size_t>(i);
+    gInProcess = true;
+    gFx.process(&in[at], scratch, cv::kBlock, passThrough());
+    gCrowd.process(&in[at], &r.out[at], cv::kBlock, p, gFx);
+    gInProcess = false;
+    const bool voiced = gFx.pitch().voiced;
+    if (r.unvoicedAt >= 0 && voiced) ++r.voicedAfter;
+    if (r.unvoicedAt < 0 && i >= kRate && !voiced) r.unvoicedAt = i;
+    if (r.plainAt < 0 && gCrowd.moveShare(c) < 1.0f) r.plainAt = i;
+  }
+  return r;
+}
+
+// A copy goes plain once the unvoiced run reaches its lag cap plus 12 ms of scatter: a tuned copy
+// after 162 ms of unvoiced input, a raised copy after 237 ms, within a block. Neither clicks: the
+// largest step over the 60 ms glide stays under the largest over 300 ms of the plain noise after it.
+bool testPlainAfter() {
+  const Signal in = toneThenNoise();
+  bool ok = true;
+  for (const std::pair<size_t, double> c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
+    const PlainRun r = runPlain(in, c.first);
+    const double ms = (r.plainAt - r.unvoicedAt + cv::kBlock) * 1000.0 / kRate;
+    const double glide = maxStep(r.out, r.plainAt - 1, r.plainAt + msToSamples(60.0));
+    const double plain = maxStep(r.out, r.plainAt + msToSamples(100.0), r.plainAt + msToSamples(400.0));
+    char name[48];
+    std::snprintf(name, sizeof name, "plain after, copy %zu, %.0f ms", c.first + 1, c.second);
+    ok &= report(name, r.unvoicedAt > 0 && r.voicedAfter == 0 && std::fabs(ms - c.second) <= 1.5 && glide <= plain,
+                 "plain after %.2f ms unvoiced (+- 1.5), voiced blocks in the noise %.0f (0); largest step in the "
+                 "glide %.4f, in the plain noise %.4f",
+                 ms, static_cast<double>(r.voicedAfter), glide, plain);
+  }
+  return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -2022,6 +2158,8 @@ int main() {
   ok &= testOutOfRange();
   ok &= testReadCeiling();
   ok &= testTuningRanges();
+  ok &= testRaisedLag();
+  ok &= testPlainAfter();
   std::printf("%s crowd\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

@@ -16,9 +16,10 @@ namespace cv {
 
 // The shared input ring holds the Crowd card's longest lag, the timing scatter its working set rides
 // on top of that lag, and the reach of its longest grain (two periods at the tracker's longest, and
-// a pad) behind both. 9,156 samples, 190.75 ms. Autotune reads under 2,100 samples back and Octave
-// under 3,850.
-constexpr int kCrowdMaxLagMs = 150;
+// a pad) behind both. The longest lag is a raised copy's, 75 ms behind a tuned copy at the tuned
+// copies' 150 ms ceiling. 12,756 samples, 265.75 ms. Autotune reads under 2,100 samples back and
+// Octave under 3,850.
+constexpr int kCrowdMaxLagMs = 225;
 constexpr int kCrowdScatterMs = 12;
 constexpr int kCrowdGrainReach = 2 * PitchTracker::kMaxPeriod + 8;
 constexpr int kVoiceRingLen = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000) + kCrowdGrainReach;

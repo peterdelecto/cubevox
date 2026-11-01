@@ -12,14 +12,20 @@
 #include "engine/psola.h"
 #include "engine/smooth.h"
 
-// The Crowd card adds up to four copies of the voice, each a different person saying the same line
+// The Crowd card adds up to eight copies of the voice, each a different person saying the same line
 // a little after Adam. Each copy sits a few semitones off the lead, has its own throat (a grain
 // playback rate) and its own tone shelf, and lags the lead by its own delay. The crowd as a whole
 // has a fixed low cut. The copies never read a key. They read the pitch period and Autotune's
 // correction from PitchFx and cut their grains from its input ring.
 //
-// VOICES fades the copies in one at a time (low, high, low, high), then fades the lead out, so the
-// top of the knob is the crowd alone. Total power is unity at every position. WIDTH spreads the
+// The tuning lists four copies, the tuned copies 0 to 3. Copies 4 to 7 are the raised copies: copy
+// v + 4 takes tuned copy v's throat, tone shelf and contour, sits kRaisedSt higher and lags
+// kRaisedLagMs further back, with its own scatter and drift. Each raised copy fades in with its
+// tuned copy, and every copy carries the four-copy gain over sqrt 2, so the crowd's power at each
+// VOICES position is the four-copy card's.
+//
+// VOICES fades the copies in one pair at a time (low, high, low, high), then fades the lead out, so
+// the top of the knob is the crowd alone. Total power is unity at every position. WIDTH spreads the
 // copies' formant offsets from none to their full values and their pitch offsets from none to two
 // thirds of the listed ones (kWidthPitchTop), and it stretches their lags. The bottom tenth of the
 // knob is for instruments and melodic lines, where the copies are plain delayed doubles of the lead,
@@ -45,9 +51,9 @@ struct CrowdTuning {
   std::array<float, 4> delayMs = {40.0f, 100.0f, 70.0f, 75.0f};    // lag behind the lead before lagScale
   float lagScale = 1.2f;       // a copy's lag is delayMs times this
   float shelfHz = 2500.0f;
-  float voiceDb = -9.0f;       // one voice against the lead at unity
-  float trimDb = 1.7f;         // level rule residue at WIDTH 1
-  float trimBottomDb = 1.0f;   // the same at WIDTH 0; between, the trim follows the formant factor
+  float voiceDb = -9.0f;       // a tuned copy and its raised copy together against the lead at unity
+  float trimDb = 2.1f;         // level rule residue at WIDTH 1
+  float trimBottomDb = 0.7f;   // the same at WIDTH 0; between, the trim follows the formant factor
   float leadFadeFrom = 0.8f;   // VOICES position where the lead starts to leave
   float holdFrom = 0.75f;      // part of each voice's share of the knob below leadFadeFrom spent fading; the rest holds
   float hpHz = 120.0f;         // low cut on the crowd sum
@@ -87,15 +93,20 @@ struct CrowdParams {
   float voices = 0.5f;  // knob B, 0..1
   CrowdTuning tuning;
 
-  // A bit per voice (bit 0 is voice 0), 0 for no solo. A soloed voice sits fully faded in and the
-  // others are silent, whatever the VOICES position. The lead gain follows from the soloed power.
-  // This is a tuning hook for the emulator. The firmware never sets it.
+  // A bit per copy (bit 0 is copy 0, bits 4 to 7 the raised copies), 0 for no solo. A soloed copy
+  // sits fully faded in and the others are silent, whatever the VOICES position. The lead gain
+  // follows from the soloed power. This is a tuning hook for the emulator, whose four boxes set
+  // bits 0 to 3. The firmware never sets it.
   uint8_t solo = 0;
 };
 
 namespace crowd_detail {
 
-constexpr size_t kVoices = 4;
+constexpr size_t kVoices = 4;               // the tuned copies, one per entry of the tuning's arrays
+constexpr size_t kCopies = 2 * kVoices;     // the tuned copies, then the raised copies
+constexpr float kRaisedSt = 1.75f;          // a raised copy's pitch over its tuned copy's, before WIDTH
+constexpr float kRaisedLagMs = 75.0f;       // a raised copy's lag past its tuned copy's
+constexpr float kCopyGain = 0.70710678f;    // 1 / sqrt(2): eight copies hold four copies' power
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
 
 // The periods a copy plays are the ones the tracker reports.
@@ -150,9 +161,23 @@ inline const float kGapUnderPhraseSq = dbToGainFast(-2.0f * kGapUnderPhraseDb);
 // floor inside one pause counts as one gap and draws once.
 constexpr float kGapRearm = 4.0f;
 
-// After an unvoiced run this long every copy has read past the last voiced sample, since no lag is
-// longer, so the copies go plain without bending a word.
-constexpr int kPlainAfter = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000);
+// The ceiling on a tuned copy's lag before scatter, from the tuning, and on its raised copy's, 75 ms
+// further back. Both stop at kCrowdMaxLagMs, the lag the ring was sized for.
+constexpr float kRingLagMs = static_cast<float>(kCrowdMaxLagMs);
+
+inline float tunedCapMs(const CrowdTuning& t) { return clampf(t.maxLagMs, 0.0f, kRingLagMs); }
+
+inline float raisedCapMs(float tunedCap) {
+  const float cap = tunedCap + kRaisedLagMs;
+  return cap < kRingLagMs ? cap : kRingLagMs;
+}
+
+// After an unvoiced run as long as a copy's lag cap plus the scatter the ring holds, the copy has read
+// past the last voiced sample, so it goes plain without bending a word. The run counter stops at the
+// longest run any copy waits for.
+constexpr int kPlainAfterMax = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000);
+
+inline int plainAfter(float capMs) { return static_cast<int>((capMs + static_cast<float>(kCrowdScatterMs)) * kSmpPerMs); }
 
 static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for a read delay");
 static_assert(static_cast<float>(kCrowdMaxLagMs + kCrowdScatterMs) * kSmpPerMs <= kDelayCeil,
@@ -693,47 +718,51 @@ class CopyLag {
   bool landed_ = false;  // this gap has taken its landing
 };
 
-// The VOICES law at knob position k. weight[v] is the voice's fixed gain times its fade, lead the
+// The VOICES law at knob position k. weight[c] is copy c's fixed gain times its fade, lead the
 // lead's gain, mul the crowd multiplier that carries the top of the knob.
 struct VoicesLaw {
-  std::array<float, kVoices> weight{};
+  std::array<float, kCopies> weight{};
   float lead = 1.0f;
   float mul = 1.0f;
 };
 
-// solo is a bit per voice. When a bit in 0..3 is set, each soloed voice takes fade 1 and the others
-// 0 at every k, and the rest of the law runs on that crowd. The lead and the crowd multiplier then
-// follow from the soloed power, so a single copy at the top of the knob stands alone at unity.
+// Each tuned copy owns a fifth of the knob's travel below the fade point and fades in over the
+// first `hold` of it. Its raised copy takes the same fade.
+inline float copyFade(float u, size_t v, float hold) {
+  return sinf(kHalfPi * smooth::clamp01((u - static_cast<float>(v)) / hold));
+}
+
+// solo is a bit per copy. When a bit is set, each soloed copy takes fade 1 and the others 0 at every
+// k, and the rest of the law runs on that crowd. The lead and the crowd multiplier then follow from
+// the soloed power, so a single copy at the top of the knob stands alone at unity.
 inline VoicesLaw voicesLaw(float k, const CrowdTuning& t, uint8_t solo = 0) {
   VoicesLaw law;
-  const float g = dbToGainFast(clampf(t.voiceDb, kMinVoiceDb, kMaxVoiceDb));
+  const float g = dbToGainFast(clampf(t.voiceDb, kMinVoiceDb, kMaxVoiceDb)) * kCopyGain;
   const float from = clampf(t.leadFadeFrom, 0.05f, 0.99f);
   const float hold = clampf(t.holdFrom, 0.05f, 1.0f);
   const float u = k / (from * 0.25f);
-  const unsigned mask = solo & 0x0Fu;
   unsigned count = 0;
   float sumSq = 0.0f;
-  for (size_t v = 0; v < kVoices; ++v) {
-    const unsigned bit = (mask >> v) & 1u;
+  for (size_t c = 0; c < kCopies; ++c) {
+    const unsigned bit = (solo >> c) & 1u;
     count += bit;
-    const float x = smooth::clamp01((u - static_cast<float>(v)) / hold);
-    const float fade = mask == 0 ? sinf(kHalfPi * x) : static_cast<float>(bit);
-    law.weight[v] = g * fade;
-    sumSq += law.weight[v] * law.weight[v];
+    const float fade = solo == 0 ? copyFade(u, c % kVoices, hold) : static_cast<float>(bit);
+    law.weight[c] = g * fade;
+    sumSq += law.weight[c] * law.weight[c];
   }
   if (k <= from) {
     law.lead = sqrtf(sumSq < 1.0f ? 1.0f - sumSq : 0.0f);
     return law;
   }
 
-  // Past the fade point every sounding voice holds at g. Crowd power runs from the sounding voices'
-  // power (four voices without a solo) up to unity while the lead falls to nothing, and the crowd
+  // Past the fade point every sounding copy holds at g. Crowd power runs from the sounding copies'
+  // power (all eight without a solo) up to unity while the lead falls to nothing, and the crowd
   // multiplier makes up the difference.
   const float s = smooth::clamp01((k - from) / (1.0f - from));
-  const float p0 = static_cast<float>(mask == 0 ? kVoices : count) * g * g;
+  const float p0 = static_cast<float>(solo == 0 ? kCopies : count) * g * g;
   const float sn = sinf(kHalfPi * s);
   const float power = s >= 1.0f ? 1.0f : p0 + (1.0f - p0) * sn * sn;
-  for (size_t v = 0; v < kVoices; ++v) law.weight[v] = mask == 0 || ((mask >> v) & 1u) ? g : 0.0f;
+  for (size_t c = 0; c < kCopies; ++c) law.weight[c] = solo == 0 || ((solo >> c) & 1u) ? g : 0.0f;
   law.lead = sqrtf(power < 1.0f ? 1.0f - power : 0.0f);
   law.mul = p0 > 1e-6f ? sqrtf(power / p0) : 1.0f;
   return law;
@@ -836,7 +865,7 @@ class Crowd {
     gain_.fill(0.0f);
     lead_ = 1.0f;
     wet_ = 0.0f;
-    for (size_t v = 0; v < kVoices; ++v) {
+    for (size_t v = 0; v < kCopies; ++v) {
       lag_[v].seed(0x2545F491u * static_cast<uint32_t>(v + 1));
       driftRng_[v].seed(0x9E3779B9u * static_cast<uint32_t>(v + 1) ^ 0x85EBCA6Bu);
     }
@@ -863,24 +892,25 @@ class Crowd {
   }
 
   // Test hooks. leadGain is the lead's gain at the end of the last block. activeVoices counts the
-  // voices that ticked in it. lagSamples, driftCents and grainRate read a copy's current lag, pitch
-  // drift and grain playback rate. moveShare is the share of the copies' pitch and formant moves in
-  // force, 1 on a note in range and 0 once they play plain.
+  // copies that ticked in it. lagSamples, driftCents and grainRate read copy v's current lag, pitch
+  // drift and grain playback rate. moveShare is the share of copy v's pitch and formant moves in
+  // force, 1 on a note in range and 0 once it plays plain.
   float leadGain() const { return lead_; }
   uint8_t activeVoices() const { return active_; }
   float lagSamples(size_t v) const { return lag_[v].samples(); }
   float driftCents(size_t v) const { return drift_[v].cents(); }
   float grainRate(size_t v) const { return voice_[v].rate(); }
-  float moveShare() const { return keep_; }
+  float moveShare(size_t v) const { return keep_[v / kVoices]; }
 
  private:
   using FormantPsolaVoice = crowd_detail::FormantPsolaVoice;
-  static constexpr size_t kVoices = crowd_detail::kVoices;
+  static constexpr size_t kVoices = crowd_detail::kVoices;  // the tuned copies
+  static constexpr size_t kCopies = crowd_detail::kCopies;  // copy v + kVoices is tuned copy v raised
   static constexpr float kShelfFloor = 1e-20f;  // a shared shelf state under this is silence, 400 dB down
 
   // Block-end targets for everything the knobs and the tuning set.
   struct Plan {
-    std::array<float, kVoices> voice{};  // fixed gain times fade, per voice
+    std::array<float, kCopies> voice{};  // fixed gain times fade, per copy
     float lead = 1.0f;
     float wet = 0.0f;    // crowd multiplier times the trim
     float width = 0.0f;  // WIDTH's factor on the formant offsets, from the smoothed knob
@@ -975,7 +1005,7 @@ class Crowd {
   }
 
   void clearDsp() {
-    for (size_t v = 0; v < kVoices; ++v) retire(v);
+    for (size_t v = 0; v < kCopies; ++v) retire(v);
     hp_.clear();
     shelfZ1_ = 0.0f;
     shelfZ2_ = 0.0f;
@@ -985,7 +1015,7 @@ class Crowd {
     heldPeriod_ = 0.0f;
     phraseSq_ = 0.0f;
     unvoiced_ = 0;
-    keep_ = 1.0f;
+    keep_.fill(1.0f);
     keepSet_ = false;
   }
 
@@ -1022,12 +1052,17 @@ class Crowd {
     shelfSet_ = true;
   }
 
-  // Copy v's lag target in samples. The scale and the WIDTH multiplier stretch the delay and the
-  // ceiling caps it. The ceiling itself stops at kCrowdMaxLagMs, the lag the ring was sized for.
+  // Copy v's lag target in samples. The scale and the WIDTH multiplier stretch the tuned copy's
+  // delay and the tuning's ceiling caps it. A raised copy lags kRaisedLagMs past that, capped at the
+  // ring's ceiling.
   static float lagTarget(const CrowdTuning& t, size_t v, float widthMul) {
-    const float lagMs = crowd_detail::baseLagMs(t, v) * widthMul;
-    const float top = clampf(t.maxLagMs, 0.0f, static_cast<float>(kCrowdMaxLagMs));
-    return (lagMs < top ? lagMs : top) * crowd_detail::kSmpPerMs;
+    const float lagMs = crowd_detail::baseLagMs(t, v % kVoices) * widthMul;
+    const float top = crowd_detail::tunedCapMs(t);
+    const float tuned = lagMs < top ? lagMs : top;
+    if (v < kVoices) return tuned * crowd_detail::kSmpPerMs;
+    const float raised = tuned + crowd_detail::kRaisedLagMs;
+    const float ceiling = crowd_detail::kRingLagMs;
+    return (raised < ceiling ? raised : ceiling) * crowd_detail::kSmpPerMs;
   }
 
   // What every voice of one block reads.
@@ -1042,7 +1077,7 @@ class Crowd {
     float scatterSmp;  // timing scatter in samples
     float levelDb;     // level scatter, clamped to its range
     float driftPeak;   // drift range in cents, clamped and times pitchWidth
-    float keep;        // share of the pitch and formant moves in force, 0 when the copies play plain
+    std::array<float, 2> keep;  // share of the moves in force, tuned and raised copies, 0 when plain
     float slew;        // one-pole coefficient of the slow walks for this block
     int n;
   };
@@ -1073,7 +1108,7 @@ class Crowd {
   // so it costs no reading of its own. A block where none measured leaves it as it is.
   void followPhrase() {
     float loudest = -1.0f;
-    for (size_t v = 0; v < kVoices; ++v) {
+    for (size_t v = 0; v < kCopies; ++v) {
       if (live_[v] && lag_[v].heard() > loudest) loudest = lag_[v].heard();
     }
     if (loudest < 0.0f) return;
@@ -1081,14 +1116,20 @@ class Crowd {
     phraseSq_ += (sq > phraseSq_ ? riseCoef_ : fallCoef_) * (sq - phraseSq_);
   }
 
-  // The share of each copy's pitch and formant move in force. It glides to 0 through the 20 ms
-  // one-pole after an unvoiced run of kPlainAfter samples, or while the tracker reads a note outside
-  // its range, so each copy is then a plain delayed double, exact at any period. It takes its target
-  // outright on the first block with a period.
-  float keepShare(const PitchResult& pr, int n) {
-    unvoiced_ = pr.voiced ? 0 : (unvoiced_ < crowd_detail::kPlainAfter ? unvoiced_ + n : unvoiced_);
-    const float target = unvoiced_ >= crowd_detail::kPlainAfter || pr.outOfRange ? 0.0f : 1.0f;
-    keep_ = keepSet_ ? smooth::step(keep_, target, widthCoef_) : target;
+  // The share of the tuned copies' pitch and formant moves in force, and of the raised copies'. Each
+  // glides to 0 through the 20 ms one-pole once the unvoiced run reaches its copies' lag cap plus
+  // scatter, or while the tracker reads a note outside its range, so a copy then plays a plain
+  // delayed double, exact at any period. Each takes its target outright on the first block with a
+  // period.
+  std::array<float, 2> keepShare(const CrowdTuning& t, const PitchResult& pr, int n) {
+    unvoiced_ = pr.voiced ? 0 : (unvoiced_ < crowd_detail::kPlainAfterMax ? unvoiced_ + n : unvoiced_);
+    const float tunedCap = crowd_detail::tunedCapMs(t);
+    const std::array<float, 2> capMs = {tunedCap, crowd_detail::raisedCapMs(tunedCap)};
+    for (size_t k = 0; k < 2; ++k) {
+      const bool plain = unvoiced_ >= crowd_detail::plainAfter(capMs[k]) || pr.outOfRange;
+      const float target = plain ? 0.0f : 1.0f;
+      keep_[k] = keepSet_ ? smooth::step(keep_[k], target, widthCoef_) : target;
+    }
     keepSet_ = true;
     return keep_;
   }
@@ -1112,23 +1153,26 @@ class Crowd {
                   clampf(t.scatterMs, 0.0f, crowd_detail::kMaxScatterMs) * crowd_detail::kSmpPerMs,
                   clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
                   clampf(t.driftCents, 0.0f, crowd_detail::kMaxDriftCents) * pitchWidth,
-                  period > 0.0f ? keepShare(pr, n) : 1.0f,
+                  period > 0.0f ? keepShare(t, pr, n) : std::array<float, 2>{1.0f, 1.0f},
                   slewCoef_,
                   n};
     active_ = 0;
-    for (size_t v = 0; v < kVoices; ++v) prepareVoice(v, plan, b);
+    for (size_t v = 0; v < kCopies; ++v) prepareVoice(v, plan, b);
     followPhrase();
   }
 
-  // Copy v's lag, loudness, pitch ratio and playback rate. A voice whose gain sits at 0
-  // across the block is cleared and does not tick. With keep at 0 the ratio and the rate are
-  // exactly 1.
+  // Copy v's lag, loudness, pitch ratio and playback rate. A copy whose gain sits at 0 across the
+  // block is cleared and does not tick. With keep at 0 the ratio and the rate are exactly 1. A
+  // raised copy reads its tuned copy's entries in the tuning and sits kRaisedSt higher.
   void prepareVoice(size_t v, const Plan& plan, const Block& b) {
     if (gain_[v] <= 0.0f && plan.voice[v] <= 0.0f) {
       if (live_[v]) retire(v);
       return;
     }
     const CrowdTuning& t = b.t;
+    const size_t src = v % kVoices;
+    const bool raised = v >= kVoices;
+    const float keep = b.keep[raised ? 1 : 0];
     live_[v] = true;
     ++active_;
     const bool roll = b.levelDb > 0.0f;
@@ -1142,10 +1186,10 @@ class Crowd {
       levelDb_[v] = b.levelDb;
     }
     const float drift = drift_[v].step(driftRng_[v], b.driftPeak, t.driftHoldS, b.slew, b.n);
-    const float st = t.pitchSt[v] * b.pitchWidth;
-    const float oct = st * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
-    voice_[v].prepare(b.period, exp2Fast((oct + contourOctaves(v, t, b.pitchWidth)) * b.keep),
-                      exp2Fast(t.formantSt[v] * b.width * (1.0f / 12.0f) * b.keep), lag_[v].samples(), b.n);
+    const float offset = raised ? t.pitchSt[src] + crowd_detail::kRaisedSt : t.pitchSt[src];
+    const float oct = offset * b.pitchWidth * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
+    voice_[v].prepare(b.period, exp2Fast((oct + contourOctaves(src, t, b.pitchWidth)) * keep),
+                      exp2Fast(t.formantSt[src] * b.width * (1.0f / 12.0f) * keep), lag_[v].samples(), b.n);
   }
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
@@ -1164,22 +1208,67 @@ class Crowd {
     int n;
   };
 
-  // Adds voice v into crowd with its gain ramping to the block-end target, and into the two sums the
-  // shared shelf filters, weighted by the copy's shelf weights.
-  void mixVoice(size_t v, const Chunk& k, float target, float* crowd) {
-    std::array<float, kBlock> raw{};
+  // One copy's part in a chunk's mix: its rendered voice, its gain ramping to the block-end target,
+  // and its tuned copy's shelf weights.
+  struct MixLane {
+    const float* raw;
+    float g;
+    float step;
+    float wh;
+    float wb;
+  };
+
+  static constexpr size_t kLanes = 4;  // copies mixed in one pass
+
+  MixLane renderLane(size_t v, const Chunk& k, float target) {
+    std::array<float, kBlock>& raw = raw_[v];
+    raw.fill(0.0f);
     voice_[v].render(k.ring, k.first, k.n, raw.data());
-    const float step = (target - gain_[v]) / static_cast<float>(k.n);
-    const float wh = shelfWeights_[v].high;
-    const float wb = shelfWeights_[v].band;
-    float g = gain_[v];
-    for (size_t i = 0; i < static_cast<size_t>(k.n); ++i) {
-      g += step;
-      const float y = g * raw[i];
-      crowd[i] += y;
-      high_[i] += wh * y;
-      band_[i] += wb * y;
+    const crowd_detail::ShelfWeights& w = shelfWeights_[v % kVoices];
+    return {raw.data(), gain_[v], (target - gain_[v]) / static_cast<float>(k.n), w.high, w.band};
+  }
+
+  // Adds K copies into crowd and into the two sums the shared shelf filters, in one pass that takes
+  // the copies in lane order at each sample, so every sum adds its terms in copy order. The three
+  // sums stay in registers across the K copies instead of a load and a store per copy.
+  template <size_t K>
+  void mixLanes(const MixLane* from, float* crowd, int n) {
+    std::array<MixLane, K> lanes;
+    for (size_t j = 0; j < K; ++j) lanes[j] = from[j];
+    for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
+      float c = crowd[i];
+      float h = high_[i];
+      float b = band_[i];
+      for (MixLane& l : lanes) {
+        l.g += l.step;
+        const float y = l.g * l.raw[i];
+        c += y;
+        h += l.wh * y;
+        b += l.wb * y;
+      }
+      crowd[i] = c;
+      high_[i] = h;
+      band_[i] = b;
     }
+  }
+
+  // Renders each live copy and mixes them in copy order, kLanes at a time. True when any copy is live.
+  bool mixCopies(const Plan& plan, const Chunk& k, float* crowd) {
+    std::array<MixLane, kLanes> group{};
+    size_t count = 0;
+    bool live = false;
+    for (size_t v = 0; v < kCopies; ++v) {
+      if (!live_[v]) continue;
+      live = true;
+      group[count++] = renderLane(v, k, plan.voice[v] * levelMul_[v]);
+      if (count < kLanes) continue;
+      mixLanes<kLanes>(group.data(), crowd, k.n);
+      count = 0;
+    }
+    if (count == 1) mixLanes<1>(group.data(), crowd, k.n);
+    if (count == 2) mixLanes<2>(group.data(), crowd, k.n);
+    if (count == 3) mixLanes<3>(group.data(), crowd, k.n);
+    return live;
   }
 
   // The shared shelf: one two-input biquad on the weighted sums, added into the crowd sum. With no
@@ -1218,12 +1307,7 @@ class Crowd {
     std::array<float, kBlock> crowd{};
     high_.fill(0.0f);
     band_.fill(0.0f);
-    bool live = false;
-    for (size_t v = 0; v < kVoices; ++v) {
-      if (!live_[v]) continue;
-      mixVoice(v, k, plan.voice[v] * levelMul_[v], crowd.data());
-      live = true;
-    }
+    const bool live = mixCopies(plan, k, crowd.data());
     shelfCrowd(crowd.data(), k.n, live);
     filterCrowd(crowd.data(), k.n);
     const float inv = 1.0f / static_cast<float>(k.n);
@@ -1232,27 +1316,28 @@ class Crowd {
       const float wet = crowd[static_cast<size_t>(i)];
       out[i] = (lead_ + (plan.lead - lead_) * f) * in[i] + (wet_ + (plan.wet - wet_) * f) * wet;
     }
-    for (size_t v = 0; v < kVoices; ++v) gain_[v] = plan.voice[v] * levelMul_[v];
+    for (size_t v = 0; v < kCopies; ++v) gain_[v] = plan.voice[v] * levelMul_[v];
     lead_ = plan.lead;
     wet_ = plan.wet;
   }
 
-  std::array<FormantPsolaVoice, kVoices> voice_{};
+  std::array<FormantPsolaVoice, kCopies> voice_{};
   Biquad hp_;
   crowd_detail::ShelfBasis shelf_;
-  std::array<crowd_detail::ShelfWeights, kVoices> shelfWeights_{};
+  std::array<crowd_detail::ShelfWeights, kVoices> shelfWeights_{};  // per tuned copy; its raised copy shares them
+  std::array<std::array<float, kBlock>, kCopies> raw_{};  // each copy's voice for the chunk being mixed
   std::array<float, kBlock> high_{};  // the copies weighted by wh, for the shared shelf's high-pass
   std::array<float, kBlock> band_{};  // the copies weighted by wb, for its band-pass
   float shelfZ1_ = 0.0f;
   float shelfZ2_ = 0.0f;
   std::array<float, kVoices> shelfDb_{};
-  std::array<float, kVoices> gain_{};
-  std::array<bool, kVoices> live_{};
-  std::array<crowd_detail::CopyLag, kVoices> lag_{};
-  std::array<crowd_detail::PitchDrift, kVoices> drift_{};
-  std::array<crowd_detail::XorShift, kVoices> driftRng_{};
-  std::array<float, kVoices> levelMul_ = {1.0f, 1.0f, 1.0f, 1.0f};
-  std::array<float, kVoices> levelDb_{};  // the level scatter levelMul_ was worked out at
+  std::array<float, kCopies> gain_{};
+  std::array<bool, kCopies> live_{};
+  std::array<crowd_detail::CopyLag, kCopies> lag_{};
+  std::array<crowd_detail::PitchDrift, kCopies> drift_{};
+  std::array<crowd_detail::XorShift, kCopies> driftRng_{};
+  std::array<float, kCopies> levelMul_ = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+  std::array<float, kCopies> levelDb_{};  // the level scatter levelMul_ was worked out at
   crowd_detail::ContourTrack contour_;
   float lead_ = 1.0f;
   float wet_ = 0.0f;
@@ -1273,8 +1358,8 @@ class Crowd {
   float floorSq_ = 1.0f;
   float heldPeriod_ = 0.0f;
   float phraseSq_ = 0.0f;  // the recent phrase level, a mean square
-  int unvoiced_ = 0;       // samples since the tracker last read a voiced frame, up to kPlainAfter
-  float keep_ = 1.0f;
+  int unvoiced_ = 0;       // samples since the tracker last read a voiced frame, up to kPlainAfterMax
+  std::array<float, 2> keep_ = {1.0f, 1.0f};  // the tuned copies' move share, then the raised copies'
   bool keepSet_ = false;
   uint8_t active_ = 0;
   bool widthSet_ = false;
