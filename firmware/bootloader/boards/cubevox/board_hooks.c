@@ -95,6 +95,13 @@ typedef struct {
   uint32_t timeoutFromMs;
   // Update mode has accepted a UF2 block, so the installed image is partly overwritten.
   bool writeBegun;
+  // The last block of an update is written and the boot block marked. The drive stays mounted
+  // until the host ejects it or the cable comes out, and either restarts the box.
+  bool updateWritten;
+  // The host ejected the drive after that, and when. The restart waits CV_EJECT_SETTLE_MS so the
+  // host receives the status of its eject command first.
+  bool ejectPending;
+  uint32_t ejectedMs;
   // Since the host last mounted the drive, as CvScreenInputs names them.
   bool sessionAccepted;
   bool sessionRefused;
@@ -431,6 +438,7 @@ static bool timeoutArmed(void) {
 
 #if CV_OLED
 static CvScreen screenNow(void) {
+  if (gState.updateWritten) return CvScreenDone;
   const CvScreenInputs in = {gState.decision.reason, gState.image.state == CvImageGood, gState.writeBegun,
                              gState.sessionAccepted, gState.sessionRefused,             gState.sessionFailed,
                              gState.cableOut,        timeoutArmed()};
@@ -495,7 +503,7 @@ static void updateModeStart(void) {
 // A self-powered device holds its D+ pull-up only while the cable carries VBUS. A pull leaves
 // TinyUSB mounted, because the core's own VBUS sensing is off, so the board posts the unplug event
 // that sensing would. Without a write the box may return to the application again, 60 s from the
-// pull.
+// pull. After a complete write the pull restarts the box into the new image.
 static void cableTrack(uint32_t nowMs) {
   const bool first = !gState.cableTracked;
   const bool changed = cvDebounceUpdate(&gState.vbus, vbusPresent(), nowMs, CV_VBUS_DEBOUNCE_MS);
@@ -508,6 +516,7 @@ static void cableTrack(uint32_t nowMs) {
   }
   tud_disconnect();
   if (first) return;
+  if (gState.updateWritten) board_dfu_complete();
   dcd_event_bus_signal(BOARD_TUD_RHPORT, DCD_EVENT_UNPLUGGED, false);
   gState.cableOut = gState.hostSeen;
   if (!gState.writeBegun) {
@@ -535,6 +544,7 @@ static void hostTrack(void) {
 // decision runs the application from a clean reset with USB and I2C untouched.
 void board_dfu_task(void) {
   const uint32_t nowMs = elapsedMs();
+  if (gState.ejectPending && nowMs - gState.ejectedMs >= CV_EJECT_SETTLE_MS) board_dfu_complete();
   cableTrack(nowMs);
   hostTrack();
   if (timeoutArmed() && nowMs - gState.timeoutFromMs >= CV_UPDATE_TIMEOUT_MS) NVIC_SystemReset();
@@ -583,6 +593,8 @@ bool board_uf2_block_accept(UF2_Block const* block, WriteState const* state) {
                                       erased && targetHoldsOtherData(block), gState.sessionFailed};
   if (cvUf2SessionRestart(&session)) {
     uf2_write_state_reset();
+    gState.updateWritten = false;
+    gState.ejectPending = false;
     gState.sessionSectors = 0u;
     gState.sessionRefused = false;
     gState.sessionFailed = false;
@@ -618,12 +630,27 @@ void board_uf2_dir_written(uint8_t const* sector) {
   if (!gState.sessionAccepted) gState.sessionRefused = true;
 }
 
-// After the last block: a fresh start count for the new image, then a reset into the decision.
-void board_dfu_complete(void) {
-#if CV_OLED
-  screenShow(CvScreenDone);
-#endif
+// After the last block: a fresh start count for the new image and the Done screen. The drive stays
+// mounted so the host can finish its own writes. msc.c calls this once per transfer.
+void board_dfu_written(void) {
   cvBootMarkUpdated(CV_BLOCK);
+  gState.updateWritten = true;
+#if CV_OLED
+  screenRefresh();
+#endif
+}
+
+// The host unloaded the drive. After a complete write that ends the session, so the box restarts
+// once the status of the eject command has gone out; before one it changes nothing.
+void board_msc_ejected(void) {
+  if (!gState.updateWritten || gState.ejectPending) return;
+  gState.ejectPending = true;
+  gState.ejectedMs = elapsedMs();
+}
+
+// The restart after a complete write, on eject or on the cable coming out. The boot block is
+// marked, so the decision runs the new image.
+void board_dfu_complete(void) {
   SCB_CleanDCache();
   NVIC_SystemReset();
 }

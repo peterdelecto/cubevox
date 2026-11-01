@@ -1,0 +1,79 @@
+Why: msc.c resets the chip inside the write of the last UF2 block through board_dfu_complete(), which never returns, so the host loses the filesystem writes that follow the block and macOS reports a disk not ejected properly. board_dfu_written() lets a board return, keep the drive mounted and finish later; board_msc_ejected() tells it when the host lets go of the drive. The weak defaults keep upstream behaviour: the last block resets at once and an eject changes nothing.
+
+diff --git a/src/msc.c b/src/msc.c
+--- a/src/msc.c
++++ b/src/msc.c
+@@ -37,13 +37,29 @@
+
+ static WriteState _wr_state = {0};
+
++// The board has heard that the transfer in _wr_state is complete.
++static bool _wr_notified = false;
++
+ // Forgets a copy the last host session cut short: the block count, and the flash driver's record of
+ // which sectors it erased. The next file then counts and erases afresh.
+ void uf2_write_state_reset(void) {
+   memset(&_wr_state, 0, sizeof(_wr_state));
++  _wr_notified = false;
+   board_flash_init();
+ }
+
++// The defaults keep upstream behaviour: the last block ends the update at once, and an eject
++// changes nothing.
++TU_ATTR_WEAK void board_dfu_written(void) {
++  board_dfu_complete();
++
++  // board_dfu_complete() should not return
++  // getting here is an indicator of error
++  while (1) {}
++}
++
++TU_ATTR_WEAK void board_msc_ejected(void) {}
++
+ //--------------------------------------------------------------------+
+ // tinyusb callbacks
+ //--------------------------------------------------------------------+
+@@ -181,11 +197,12 @@
+
+       TUF2_LOG1("Writing finished\r\n");
+       indicator_set(STATE_WRITING_FINISHED);
+-      board_dfu_complete();
+
+-      // board_dfu_complete() should not return
+-      // getting here is an indicator of error
+-      while (1) {}
++      // every later WRITE10 finds the transfer still complete, so the board hears of it once
++      if (!_wr_notified) {
++        _wr_notified = true;
++        board_dfu_written();
++      }
+     }
+   }
+ }
+@@ -211,6 +228,7 @@
+       // load disk storage
+     } else {
+       // unload disk storage
++      board_msc_ejected();
+     }
+   }
+
+diff --git a/src/board_api.h b/src/board_api.h
+--- a/src/board_api.h
++++ b/src/board_api.h
+@@ -218,7 +218,15 @@
+
+ // DFU is complete, should reset or jump to application mode and not return
+ void board_dfu_complete(void);
++
++// The last block of an update is written; called once per transfer. The default calls
++// board_dfu_complete(). A board that defines this may return, keep the drive mounted and finish the
++// update later, for example when the host ejects the drive.
++void board_dfu_written(void);
+
++// The host ejected the drive (start/stop unit with load_eject set and start clear). The default does nothing.
++void board_msc_ejected(void);
++
+ // Reboot into TinyUF2 DFU mode, no return. For applications (apps/dfu_runtime); not called by the bootloader
+ void board_reboot_to_bootloader(void);
+

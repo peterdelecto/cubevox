@@ -13,7 +13,7 @@ extern "C" {
 
 // Shown in INFO_UF2.TXT and DIAG.TXT. Bumped with every bootloader change; independent of
 // VERSION.txt because the two programs ship on different paths.
-#define CV_BOOT_VERSION "0.05"
+#define CV_BOOT_VERSION "0.06"
 
 //--------------------------------------------------------------------+
 // Board identity
@@ -66,6 +66,10 @@ extern "C" {
 #define CV_VBUS_PORT         GPIOA
 #define CV_VBUS_PIN          GPIO_PIN_9
 #define CV_VBUS_DEBOUNCE_MS  50u
+
+// After a complete write the box restarts this long after the host's eject command, so the status
+// of that command reaches the host first.
+#define CV_EJECT_SETTLE_MS   20u
 
 // The drive serves INFO_UF2.TXT and DIAG.TXT only (diag.c). Every UF2 block passes
 // board_uf2_block_accept() and reports its write to board_uf2_block_written(), and every root

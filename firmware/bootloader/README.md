@@ -66,6 +66,7 @@ Each is small, has one purpose and a one-line reason at its top, and is written 
 | `09-ghostfat-failed-write-not-counted` | a block `board_flash_write()` refuses does not count toward the end of the transfer; a board with the filter hears the result through `board_uf2_block_written()` |
 | `10-ghostfat-root-dir-hook` | `TINYUF2_BOARD_DIR_HOOK`: every root directory sector the host writes reaches `board_uf2_dir_written()` |
 | `11-stm32h7-systick-1ms` | SysTick stays at the 1 ms the HAL's tick needs; the board timer divides it for the LED pattern |
+| `12-msc-complete-on-eject` | weak `board_dfu_written()` runs once when the last block is written (default: `board_dfu_complete()`, upstream's immediate reset) and weak `board_msc_ejected()` when the host ejects the drive (default: nothing), so a board can keep the drive mounted and reset on the eject |
 
 With every define at its default the drive is byte-identical to upstream: the upstream
 `ports/test_ghostfat` selftest passes on the patched tree (boards 4k, 4k_favicon, 32k, 512b_favicon),
@@ -143,12 +144,16 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
 5. A root directory entry for a raw image, a hex or elf file or an archive (BIN, HEX, ELF, DFU, ZIP,
    GZ, TGZ, TAR, 7Z) shows the wrong-file screen and goes into DIAG.TXT by its 8.3 name. Finder's own
    files never carry these extensions. Such a file has no UF2 blocks, so nothing else would notice it.
-6. After the last block the screen shows DONE, `cvBootMarkUpdated` clears the counter and the reason,
-   the D-cache is cleaned and the box resets.
+6. After the last block the screen shows DONE (`The update is done.` / `Eject the drive.`) and
+   `cvBootMarkUpdated` clears the counter and the reason. The drive stays mounted, so the host can
+   finish its own writes and the Mac shows no "disk not ejected properly" notice. The box resets
+   when the host ejects the drive, 20 ms after the eject command so its status reaches the host
+   (`CV_EJECT_SETTLE_MS`), or when the cable comes out. DONE has no timeout. An eject before the
+   last block changes nothing, and a new transfer after DONE takes the screen back to the write.
 7. The D+ pull-up follows the cable on VBUS_SENSE. A pull after a host had connected posts the unplug
    TinyUSB's own VBUS sensing would, so the host session ends; with nothing written the 60 s timeout
-   runs again from the pull. With a write begun, or no image to return to, the screen says the cable
-   came out.
+   runs again from the pull. With a write begun but not complete, or no image to return to, the
+   screen says the cable came out. After a complete write the pull resets the box.
 8. With reason MenuHeld, AppRequest or BootFault, a valid image, no host enumerated since the cable
    went in and no block written, update mode resets after 60 s; the request is consumed, so the
    decision then runs the application.
@@ -213,7 +218,9 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
 
 ## Only hardware can verify
 1. USB enumeration as 1209:0001 and the `CUBEVOX` drive mounting on macOS.
-2. A UF2 write, the lazy sector erase, the reset into the new image.
+2. A UF2 write, the lazy sector erase, the DONE screen, and the reset into the new image on the
+   host's eject (Finder's, and `diskutil eject` as flash.sh runs it) and on the cable coming out,
+   with no "disk not ejected properly" notice on the Mac.
 3. The read-fault path: a power cut mid-copy, the ECC fault, the sector erase, `ImageUnreadable`.
 4. The OLED driver: I2C timing at 400 kHz, the init sequence, orientation against the firmware.
 5. The MENU switch at power-on, the 60 s timeout, the LED.

@@ -20,9 +20,11 @@ copies the same `.uf2` file to the same drive. The firmware structure rules of
    clicks, reads the version he has on the confirm screen (`You have vX.YY.ZZ.`), clicks again.
 3. The OLED says `Drop the firmware on / the CUBEVOX drive.` A drive named `CUBEVOX` appears on
    the desktop. He drags the file onto it.
-4. The OLED says `Writing the firmware. / Do not unplug.`, then `The update is done. / Restarting
-   now.` The drive goes away by itself, the box restarts, the boot screen shows the new version,
-   and the layout and settings are as before.
+4. The OLED says `Writing the firmware. / Do not unplug.`, then `The update is done. / Eject the
+   drive.` He ejects the CUBEVOX drive in Finder (or pulls the cable); the box restarts, the boot
+   screen shows the new version, and the layout and settings are as before. The box waits on that
+   screen for as long as it takes, because a reset while the drive is still mounted makes macOS
+   show a "disk not ejected properly" notice (bootloader v0.06, owner 2026-11-01).
 5. If the copy is interrupted, the box comes back in update mode on its own, says why, and he drags
    again. If the box ever fails to start three times in a row it also comes back in update mode.
    Holding MENU while switching the power on forces update mode. No action from outside the box
@@ -269,8 +271,13 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    sector the host writes (patch 10) and treats a regular file with the extension BIN, HEX, ELF, DFU,
    ZIP, GZ, TGZ, TAR or 7Z as a wrong file. The wrong-file screen shows, and `DIAG.TXT` names the
    file by its 8.3 name. Finder's own files never carry these extensions.
-7. Finder's `.fseventsd`, `.Spotlight-V100`, `._*` files and the "disk not ejected properly" notice
-   after the reset are expected and harmless.
+7. Finder's `.fseventsd`, `.Spotlight-V100` and `._*` files are expected and harmless. The box does
+   not reset inside the last block's write; it marks the boot block for the new image, shows the
+   Done screen and keeps the drive mounted until the host ejects it (START STOP UNIT with the
+   eject bit) or the cable comes out (the VBUS pin), then resets. An eject before the last block
+   changes nothing. The restart on eject waits 20 ms so the eject command's status reaches the
+   host. `flash.sh` and `bringup.py` eject the drive themselves after a complete copy; the
+   bring-up drills that copy part of a file or a refused file do not. Bootloader v0.06, patch 12.
 
 ## OLED in update mode
 The bootloader drives the SH1106 over I2C2 (PB10/PB11) through `firmware/cubevox/src/board/sh1106.c`,
@@ -295,7 +302,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | Wrong file: refused blocks or a non-UF2 file | `That is not a cubevox` / `firmware file.` / `Drop the firmware on` / `the CUBEVOX drive.` |
 | Cable pulled after a host connected, when the 60 s timeout cannot run | `The cable came out.` / `Plug it back in and` / `drop the firmware on` / `the CUBEVOX drive.` |
 | Clock failed | `The clock failed.` / `Send the DIAG.TXT` / `file on the CUBEVOX` / `drive for a repair.` |
-| Done | `The update is done.` / `Restarting now.` |
+| Done, until the host ejects the drive or the cable comes out | `The update is done.` / `Eject the drive.` |
 
 1. The screens get a numbered proof set and the owner approves per number, as for every OLED
    screen. The wording above is the approved source; the code matches it. The cable and clock

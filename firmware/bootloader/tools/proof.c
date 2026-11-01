@@ -156,7 +156,7 @@ static const Wording kWording[] = {
     {"writing", CvScreenWriting, false, {"Writing the firmware.", "Do not unplug.", "", ""}},
     {"wrong-file", CvScreenWrongFile, false,
      {"That is not a cubevox", "firmware file.", "Drop the firmware on", "the CUBEVOX drive."}},
-    {"done", CvScreenDone, false, {"The update is done.", "Restarting now.", "", ""}},
+    {"done", CvScreenDone, false, {"The update is done.", "Eject the drive.", "", ""}},
     {"cable-out", CvScreenCableOut, false,
      {"The cable came out.", "Plug it back in and", "drop the firmware on", "the CUBEVOX drive."}},
     {"clock-failed", CvScreenClockFailed, false,

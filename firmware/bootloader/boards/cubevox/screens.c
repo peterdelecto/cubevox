@@ -42,7 +42,7 @@ static const ScreenText kScreens[] = {
     [CvScreenWrongFile] = {{"That is not a cubevox", "firmware file.", "Drop the firmware on",
                             "the CUBEVOX drive."},
                            false},
-    [CvScreenDone] = {{"The update is done.", "Restarting now.", NULL, NULL}, false},
+    [CvScreenDone] = {{"The update is done.", "Eject the drive.", NULL, NULL}, false},
     [CvScreenCableOut] = {{"The cable came out.", "Plug it back in and", "drop the firmware on",
                            "the CUBEVOX drive."},
                           false},

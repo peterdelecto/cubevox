@@ -7,9 +7,10 @@
 #
 # By default the script uses the update drive, the path Adam takes by hand. With a cubevox serial
 # port present it sends enter_dfu, waits for /Volumes/CUBEVOX, copies <out dir>/cubevox.uf2 onto
-# it, waits for the drive to go and the box's port to return, and prints the boot report. With no
-# serial port it waits up to WAIT seconds (default 300) for the drive. A failed start or a MENU
-# held at power-on brings the drive up, and so does a bootloader that has no application yet.
+# it and ejects the drive, which restarts the box, waits for the drive to go and the box's port to
+# return, and prints the boot report. With no serial port it waits up to WAIT seconds (default 300)
+# for the drive. A failed start or a MENU held at power-on brings the drive up, and so does a
+# bootloader that has no application yet.
 #
 # --rom goes through the ST ROM DFU with dfu-util, for a box whose application is unreachable. It
 # writes <out dir>/cubevox.ino.bin at the application start (0x08020000, read from boot_block.h),
@@ -44,7 +45,7 @@ usage() {
   cat <<'USAGE'
 usage: ./flash.sh [--rom | --help]
   (no flag)  update-drive path: send enter_dfu over the serial port if one is present, wait for
-             /Volumes/CUBEVOX, copy <out dir>/cubevox.uf2 onto it,
+             /Volumes/CUBEVOX, copy <out dir>/cubevox.uf2 onto it and eject the drive,
              wait for the drive to go and the box's port to return, print the boot report
   --rom      ST ROM DFU path: hold BOOT0, tap NRST, release; dfu-util writes <out dir>/cubevox.ino.bin
              at the application start from boot_block.h (0x08020000), above the bootloader's sector
@@ -128,7 +129,7 @@ rom_flash() {
 }
 
 drive_flash() {
-  local box_port drive_wait="$WAIT" volume copy_rc=0
+  local box_port drive_wait="$WAIT" volume copy_rc=0 eject_rc=0
   # Fails with the candidates listed when several ports match and none was named.
   box_port="$("${PORT_TOOL[@]}" --allow-none)"
   if [ -n "$box_port" ]; then
@@ -147,16 +148,17 @@ drive_flash() {
     exit 1
   fi
 
-  # The box resets after the last block, so the OS may report an error for a copy that worked. The
-  # drive leaving and the port returning decide.
+  # The box resets when the Mac ejects the drive, so the eject follows the copy. The drive leaving
+  # and the port returning decide, whatever cp and diskutil report.
   copy_log="$(mktemp)"
   echo "[flash] copying $(basename "$IMAGE") to $volume"
   cp -X "$IMAGE" "$volume/" >"$copy_log" 2>&1 || copy_rc=$?
-  if [ "$copy_rc" -ne 0 ]; then
-    echo "[flash] cp reported '$(tr '\n' ' ' < "$copy_log")'"
+  diskutil eject "$volume" >>"$copy_log" 2>&1 || eject_rc=$?
+  if [ "$copy_rc" -ne 0 ] || [ "$eject_rc" -ne 0 ]; then
+    echo "[flash] cp exited $copy_rc and diskutil eject $eject_rc, saying '$(tr '\n' ' ' < "$copy_log")'"
   fi
   if ! "${PORT_TOOL[@]}" --wait-volume "$VOLUME" --gone --wait "$LEAVE_WAIT" >/dev/null; then
-    echo "[ERROR] the drive is still mounted ${LEAVE_WAIT}s after the copy; cp said '$(tr '\n' ' ' < "$copy_log")'"
+    echo "[ERROR] the drive is still mounted ${LEAVE_WAIT}s after the copy and eject; they said '$(tr '\n' ' ' < "$copy_log")'"
     exit 1
   fi
   echo "[flash] the drive left; waiting for the box to restart"
@@ -170,7 +172,7 @@ fi
 
 # The port name can change across the reset, so ask again.
 if ! box_port="$("${PORT_TOOL[@]}" --wait 30)"; then
-  if [ -n "$copy_log" ]; then echo "[ERROR] the box did not come back after the copy; cp said '$(tr '\n' ' ' < "$copy_log")'"; fi
+  if [ -n "$copy_log" ]; then echo "[ERROR] the box did not come back after the copy; cp and diskutil said '$(tr '\n' ' ' < "$copy_log")'"; fi
   exit 1
 fi
 if [ -n "$copy_log" ]; then rm -f "$copy_log"; fi  # exec below skips the EXIT trap

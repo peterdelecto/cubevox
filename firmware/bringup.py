@@ -614,8 +614,9 @@ def flush_to_device(fd):
 def copy_to_drive(volume, src, name, fraction=1.0):
     """Writes src, or its first `fraction` in whole UF2 blocks, to the drive. Returns None or the error text.
 
-    The box resets after the last block, so the OS may report an error for a copy that worked.
-    Callers judge by the drive and the serial port.
+    A complete copy leaves the drive mounted until the host ejects it (eject_drive). A box on the
+    bootloader before v0.06 resets at the last block instead, so the OS may report an error for a
+    copy that worked. Callers judge by the drive and the serial port.
     """
     data = read_bytes(src)
     block = stamp_image.UF2_BLOCK_BYTES
@@ -635,6 +636,18 @@ def copy_to_drive(volume, src, name, fraction=1.0):
         except OSError as e:
             error = error or str(e)
     return error
+
+
+def eject_drive(volume):
+    """Ejects the update drive, which restarts a box that holds a complete update.
+
+    A box on the bootloader before v0.06 has already restarted, so its eject fails. A failure is
+    printed as a note and never raised; the drive leaving and the serial port returning decide.
+    """
+    r = subprocess.run(["diskutil", "eject", volume], capture_output=True, text=True)
+    if r.returncode:
+        text = " ".join((r.stderr or r.stdout).split())
+        print(f"[bringup] diskutil eject {volume} exited {r.returncode}: {text}", flush=True)
 
 
 def read_text(path):
@@ -790,16 +803,18 @@ def restore_app(ctx):
 
 
 def install(ctx, src, name, port_wait_s=UPDATE_WAIT_S):
-    """Drags `src` onto the mounted drive and waits for the box to restart into the application.
+    """Drags `src` onto the mounted drive, ejects it and waits for the box to restart into the application.
 
-    Opens ctx.port. The box resets after the last block, so the OS may report an error for a copy
-    that worked. Only the drive and the serial port decide.
+    Opens ctx.port. The bootloader restarts the box when the host ejects the drive after the last
+    block. Only the drive and the serial port decide, whatever the OS reported.
     """
     ctx.drop_port()
-    copy_error = copy_to_drive(ctx.volume(), src, name)
+    volume = ctx.volume()
+    copy_error = copy_to_drive(volume, src, name)
     done = time.monotonic()
+    eject_drive(volume)
     if not cubevox_port.wait_volume_gone(VOLUME, UPDATE_WAIT_S):
-        raise DrillError(f"{VOLUME} is still mounted {UPDATE_WAIT_S:g} s after the copy"
+        raise DrillError(f"{VOLUME} is still mounted {UPDATE_WAIT_S:g} s after the copy and the eject"
                          f"{os_note(copy_error)}")
     gone_s = time.monotonic() - done
     back_s = wait_port(port_wait_s)
@@ -1067,7 +1082,9 @@ def wait_installed(ctx, want, wait_s):
 
 def drill_flipped_byte(ctx):
     ensure_drive(ctx)
-    copy_error = copy_to_drive(ctx.volume(), ctx.files["flipped"], COPY_NAME)  # the box restarts after the last block
+    volume = ctx.volume()
+    copy_error = copy_to_drive(volume, ctx.files["flipped"], COPY_NAME)
+    eject_drive(volume)  # the eject restarts the box, which finds the image invalid and offers the drive again
     seen, read_error = wait_installed(ctx, "invalid", UPDATE_WAIT_S)
     r = install(ctx, ctx.files["bench"], COPY_NAME)
     got = f"installed '{seen}'" + (f" (last read error: {read_error})" if seen != "invalid" and read_error else "")
