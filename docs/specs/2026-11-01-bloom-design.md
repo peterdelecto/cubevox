@@ -169,3 +169,14 @@ knob named LINGER.
    with none of those cuts after slot 1. The dry path is still slot 7's own input; the loops add to
    it. The word key stays the Input gate's.
 5. Memory. Eight float slices of 80 ms, 122,880 B, in D1 SRAM (two tails of four).
+6. Age limit (owner 2026-11-01: "bloom should keep replaying grains for a maximum of 2.5 seconds
+   because if it gets stuck on a grain and nothing ever triggers a new grain, it will continue
+   forever under new material"). No slice plays more than 2.5 s after it was cut. The way it could
+   stick today: through a held word whose later slices sit 12 dB under the looping one, every
+   re-capture is skipped and the loud slice loops for as long as the Input gate stays open.
+   - During a word, a slice that reaches 2.5 s is replaced at the next re-capture even when the new
+     slice is quieter; if no re-capture comes, it fades out over the 80 ms close.
+   - In a tail, a slice that reaches 2.5 s leaves the rotation; with none left, the tail closes over
+     80 ms.
+   - So LINGER's top end rings for at most 2.5 s after the word's last slice was cut, short of the
+     law's natural fade at 2 s.
