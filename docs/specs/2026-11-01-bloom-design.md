@@ -256,6 +256,9 @@ be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where th
 
 ## 16. LINGER 20 ms to 3 s (owner 2026-11-01, option B)
 
+The knob is named LENGTH from v2.01.04 (owner: "linger should be renamed to LENGTH"); the render
+tool takes `--length`, with `--linger` and `--tail` as aliases. Earlier sections keep the old name.
+
 Owner: "let's allow it to run from a minimum of 20ms to 3s." The 2.5 s age limit cut every tail
 above about 1.5 s, so a longer LINGER only made the cutoff more abrupt. The owner picked B: the
 limit stays while a word lasts, where a slice can stick, and a tail runs its whole fade, which

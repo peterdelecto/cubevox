@@ -72,7 +72,7 @@ int usage() {
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
-               "       [--bloom <0..1>] [--linger <20..3000 ms>, alias --tail]\n"
+               "       [--bloom <0..1>] [--length <20..3000 ms>, aliases --linger, --tail]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
@@ -84,7 +84,7 @@ int usage() {
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
-               "  bloom, the Chatter card, runs with --bloom (AMOUNT, default 0.5) or --linger (LINGER, default 300 ms); with --ingate its word key\n"
+               "  bloom, the Chatter card, runs with --bloom (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its word key\n"
                "  is the input gate's open state, otherwise bloom listens to its own input; it cuts its slices from the pitch\n"
                "  stage's output when one runs (before crowd), else from the input gate's output, and the dry path is its input\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
@@ -442,7 +442,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--bloom") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.bloom.bloom) || rp.bloom.bloom < 0.0f || rp.bloom.bloom > 1.0f) return false;
       haveBloom = true;
-    } else if ((std::strcmp(a, "--linger") == 0 || std::strcmp(a, "--tail") == 0) && i + 1 < argc) {
+    } else if ((std::strcmp(a, "--length") == 0 || std::strcmp(a, "--linger") == 0 || std::strcmp(a, "--tail") == 0) &&
+               i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.bloom.tailMs) || rp.bloom.tailMs < cv::Bloom::kTailMinMs ||
           rp.bloom.tailMs > cv::Bloom::kTailMaxMs)
         return false;

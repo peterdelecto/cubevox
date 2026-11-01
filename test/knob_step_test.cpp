@@ -119,7 +119,7 @@ struct Step {
 };
 
 // Continuous knobs step at a low, a middle and a high setting; both Bloom knobs also step at the last
-// touch below the top of their travel (LINGER 3 s, AMOUNT 100 %), and LINGER at the first touch above
+// touch below the top of their travel (LENGTH 3 s, AMOUNT 100 %), and LENGTH at the first touch above
 // its bottom (20 ms). Chatter's AMOUNT sets the slice
 // length as well as the loudness, so it walks its whole travel in tenths, from the bottom, where the
 // stage is a plain copy. A stepped knob of up to ten detents (the Mob card's VOICES) moves across every

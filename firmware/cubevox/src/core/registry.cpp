@@ -38,7 +38,7 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
-constexpr KnobDesc kBloomLinger = {"LINGER", KnobKind::Continuous, 0, cv::Bloom::kTailMinMs, cv::Bloom::kTailMaxMs, "ms",
+constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kTailMinMs, cv::Bloom::kTailMaxMs, "ms",
                                  Curve::Log};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
@@ -74,7 +74,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Formant, "formant", "Formant", Engine::Pitch, 2, {kFormantShift, kPercent("MIX")}, Group::Pitch,
      costs::kFormant},
     {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
-    {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLinger, kPercent("AMOUNT")}, Group::None, costs::kBloom},
+    {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -174,7 +174,7 @@ void applyLofiKnob(int knob, float v, cv::LofiParams& l) {
 
 void applyBloomKnob(int knob, float v, cv::BloomParams& b) {
   if (knob == 0) {
-    b.tailMs = knobValue(kBloomLinger, v);
+    b.tailMs = knobValue(kBloomLength, v);
   } else {
     b.bloom = v;
   }
