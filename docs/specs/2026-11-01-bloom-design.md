@@ -145,3 +145,5 @@ TAIL `D` (60..1000 ms):
 2. The 80 ms static fade is a time constant; a 300 ms tail ends about 2 s after the word.
 3. Level at the default: +0.05 to +0.34 dB on the clips with either key.
 4. The host bench put the card at 1.2 times Echo's cost; the row is {5, 6} (section 8).
+5. Owner 2026-11-01, after auditioning in the emulator: "it's cool. it's not the effect i intended
+   but we should keep it and refine it." The card stays; refinement waits for the owner's direction.
