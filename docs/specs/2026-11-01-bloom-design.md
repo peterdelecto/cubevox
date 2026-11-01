@@ -204,3 +204,28 @@ knob named LINGER.
    - Memory: `sizeof(Bloom)` 96,628 B; the firmware's D1 SRAM 292,560 B, 55.8 %.
    - CPU on the host: 1.3 times Echo with one word sounding, 2.0 times with two loops. Echo measured
      2.1 % on the board, so about 2.8 % and 4.2 %; the {5, 6} row covers both until a board bench.
+
+## 14. CHATTER, the middle ground (owner 2026-11-01)
+
+Owner, after hearing v2.00.99 against the first build: keep the clean source; bring back the
+variable slice length; the tail repeats one slice; tail length as it is; some dirt back in, from
+Bloom's own clipper (option B, not slot 7's input, which carries MOB and Echo); "this effect should
+be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where they differ.
+
+1. Name. Display name `Chatter`, menu value `CHATTER`, emulator switch `CHATTER`. The code id
+   stays `bloom` so saved layouts load; the engine keeps its file and class names.
+2. Source. Unchanged from section 13 item 4: slices from after the pitch stage.
+3. Slice length follows AMOUNT again: 80 ms at AMOUNT 0 to 45 ms at 100 %, linear, LINGER's 0.8 cap
+   and the 35 ms floor kept. AMOUNT also sets the loudness, 0.70 · AMOUNT^0.6 as now, so the knob
+   runs from quiet and long to loud and choppy. The 62.5 ms beat match holds only where the law
+   passes 62.5 ms (AMOUNT 50 %).
+4. Cut timing. Each slice plays exactly twice, then the next cut splices in at the slice boundary;
+   the interval between cuts drifts ±3 % from a fixed-seed LCG, so renders stay byte-identical.
+5. Tail. One slice repeats, the last good one, as in the first build; no rotation. The 2.5 s age
+   limit (section 13 item 6) and LINGER's 60 ms to 2 s law stand.
+6. Next word. A tail still sounding when a new word starts fades out over 150 ms while the new
+   word's loop starts; the two never overlap longer than that. Each plays 3 dB down while both sound.
+7. Dirt. The clipper drive through the word doubles, 1.4 to 2.8, and over the tail it follows
+   2.8 + 2.0 · 4 · life · (1 − life), peaking at 4.8 mid-tail. `trimDb` holds the default (LINGER
+   300 ms, AMOUNT 50 %) at 0 to +0.5 dB on the clips. The owner tunes the drive by ear afterwards.
+8. Memory. Three slices of 80 ms (the loop, the capture, the fading tail), 11,520 samples, 46,080 B.
