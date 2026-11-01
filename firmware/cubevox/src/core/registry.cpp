@@ -50,7 +50,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Pitch, costs::kOctave},
     {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Rate"), kPercent("Depth")}, Group::None,
      costs::kUnison},
-    {Card::Slapback, "slapback", "Slapback", Engine::Slapback, 2, {kSlapbackTime, kPercent("AMOUNT")}, Group::None,
+    {Card::Slapback, "slapback", "Echo", Engine::Slapback, 2, {kSlapbackTime, kPercent("AMOUNT")}, Group::None,
      costs::kSlapback},
     {Card::Distortion, "distortion", "Distortion", Engine::Distortion, 2, {kPercent("Tone"), kPercent("Drive")},
      Group::None, costs::kDistortion},
