@@ -229,3 +229,27 @@ be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where th
    2.8 + 2.0 · 4 · life · (1 − life), peaking at 4.8 mid-tail. `trimDb` holds the default (LINGER
    300 ms, AMOUNT 50 %) at 0 to +0.5 dB on the clips. The owner tunes the drive by ear afterwards.
 8. Memory. Three slices of 80 ms (the loop, the capture, the fading tail), 11,520 samples, 46,080 B.
+
+## 15. CHATTER as built (v2.01.02)
+
+1. Drift. Each cut's length drifts ±3 % about AMOUNT's length, then LINGER's cap and the 35 ms floor
+   apply. Each slice plays exactly twice and splices at its own end, so the interval drifts with it.
+   A capped slice does not drift.
+2. Tail (owner: "Palms open en en en en open en" should be "Palms open en en en en en en"). At the
+   word's end the word's loop moves whole into the tail, after at most one waiting cut, so the tail
+   repeats the newest slice. Nothing splices, rotates or swaps after that; the age limit only fades
+   and closes it. A cut that lands after the voice stops is near silence and fails the 12 dB test, so
+   the tail repeats the last cut that carries the voice. `bloom_test` `tail-on-clips` runs Adam's
+   three clips through the Input gate at LINGER 60 ms / 300 ms / 2 s and gate Decay 20 ms / 2 s:
+   42 tails, 0 slice changes after the word's end. A cut that straddles the stop can still loop a
+   short gap, and a word held past about 2.3 s can still take a quieter cut to beat the age limit.
+3. Next word. The old tail falls in a straight line over 150 ms, the pair 3 dB down while both sound
+   (36 ms measured). A tail still fading when a third word comes yields in 20 ms.
+4. Level. `trimDb` −5.62 scales the whole output, centring the three clips: +0.25, −0.03, +0.53 dB
+   with the Input gate key, +0.23, −0.03, +0.13 dB on the engine's own key. The dry voice therefore
+   sits about 3.7 dB down at the default and 5.6 dB down at AMOUNT 100 %, because drive 2.8 makes
+   the slices hotter.
+5. Cost. Host bench 11.7 ns a sample, 1.5 times Echo (v2.00.99 was 14.0). From Echo's board 2.1 %
+   that is about 3.2 %; the {5, 6} row stands. D1 SRAM 242,648 B, 46.3 % (v2.00.99 292,560 B).
+6. `tools/render.cpp` takes `bloomDriveWord`, `bloomDriveBell` and `bloomDrift` for tuning by ear.
+   Renders `build/audition/chatter-{a,b,c}.wav`.

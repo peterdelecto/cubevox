@@ -27,7 +27,7 @@ struct ChainEngines {
   cv::Reverb reverb;
   cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes
   cv::Lofi lofi;
-  cv::Bloom bloom;  // 96 kB, eight slices; reads inputGate's detector as its word key
+  cv::Bloom bloom;  // 46 kB, three slices; reads inputGate's detector as its word key
 
   // The signal Bloom cuts its slices from. runChain copies the block leaving the tap slot into
   // `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch call to

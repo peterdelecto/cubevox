@@ -84,7 +84,7 @@ int usage() {
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
-               "  bloom runs with --bloom (AMOUNT, default 0.5) or --linger (LINGER, default 300 ms); with --ingate its word key\n"
+               "  bloom, the Chatter card, runs with --bloom (AMOUNT, default 0.5) or --linger (LINGER, default 300 ms); with --ingate its word key\n"
                "  is the input gate's open state, otherwise bloom listens to its own input; it cuts its slices from the pitch\n"
                "  stage's output when one runs (before crowd), else from the input gate's output, and the dry path is its input\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
@@ -125,6 +125,7 @@ int usage() {
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
                "  every value must be finite, and a crowd key outside its range is refused\n"
                "     bloomTrimDb bloomFirstCaptureMs bloomSkipDb bloomTailOnly (0|1, loop only after the word)\n"
+               "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
@@ -337,6 +338,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"lofiHoldOverBand", &lt.holdOverBand},
       {"bloomTrimDb", &bt.trimDb},            {"bloomFirstCaptureMs", &bt.firstCaptureMs},
       {"bloomSkipDb", &bt.skipDb},            {"bloomTailOnly", &bloomTailOnly},
+      {"bloomDriveWord", &bt.driveWord},      {"bloomDriveBell", &bt.driveBell},
+      {"bloomDrift", &bt.drift},
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
@@ -361,7 +364,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
     if (bloomTailOnly != 0.0f && bloomTailOnly != 1.0f) return false;
-    if (!inside(bt.firstCaptureMs, 1.0f, 500.0f) || !inside(bt.skipDb, -60.0f, 0.0f) || !inside(bt.trimDb, -24.0f, 24.0f))
+    if (!inside(bt.firstCaptureMs, 1.0f, 500.0f) || !inside(bt.skipDb, -60.0f, 0.0f) || !inside(bt.trimDb, -24.0f, 24.0f) ||
+        !inside(bt.driveWord, 0.1f, 20.0f) || !inside(bt.driveBell, 0.0f, 20.0f) || !inside(bt.drift, 0.0f, 0.2f))
       return false;
     bt.tailOnly = bloomTailOnly == 1.0f;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;

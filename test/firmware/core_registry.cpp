@@ -446,9 +446,9 @@ void checkSlot7Cards() {
         "lofi: knob A is TONE and knob B is AMOUNT, both continuous percents");
 
   const CardDesc& bloom = cardDesc(Card::Bloom);
-  check(std::strcmp(bloom.id, "bloom") == 0 && std::strcmp(bloom.name, "Bloom") == 0 && bloom.engine == Engine::Bloom &&
+  check(std::strcmp(bloom.id, "bloom") == 0 && std::strcmp(bloom.name, "Chatter") == 0 && bloom.engine == Engine::Bloom &&
             bloom.group == Group::None && bloom.knobCount == 2,
-        "bloom: id bloom, name Bloom, its own engine, no group");
+        "bloom: id bloom, name Chatter, its own engine, no group");
   const KnobDesc& tail = *knobDesc(Card::Bloom, 0);
   check(std::strcmp(tail.name, "LINGER") == 0 && tail.kind == KnobKind::Continuous && tail.curve == Curve::Log &&
             tail.min == 60.0f && tail.max == 2000.0f && std::strcmp(tail.unit, "ms") == 0,

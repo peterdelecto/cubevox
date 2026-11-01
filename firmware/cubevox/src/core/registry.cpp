@@ -74,7 +74,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Formant, "formant", "Formant", Engine::Pitch, 2, {kFormantShift, kPercent("MIX")}, Group::Pitch,
      costs::kFormant},
     {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
-    {Card::Bloom, "bloom", "Bloom", Engine::Bloom, 2, {kBloomLinger, kPercent("AMOUNT")}, Group::None, costs::kBloom},
+    {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLinger, kPercent("AMOUNT")}, Group::None, costs::kBloom},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
