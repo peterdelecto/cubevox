@@ -450,9 +450,9 @@ void checkSlot7Cards() {
             bloom.group == Group::None && bloom.knobCount == 2,
         "bloom: id bloom, name Bloom, its own engine, no group");
   const KnobDesc& tail = *knobDesc(Card::Bloom, 0);
-  check(std::strcmp(tail.name, "TAIL") == 0 && tail.kind == KnobKind::Continuous && tail.curve == Curve::Log &&
+  check(std::strcmp(tail.name, "LINGER") == 0 && tail.kind == KnobKind::Continuous && tail.curve == Curve::Log &&
             tail.min == 60.0f && tail.max == 2000.0f && std::strcmp(tail.unit, "ms") == 0,
-        "bloom: knob A is TAIL, 60 to 2000 ms on a log curve");
+        "bloom: knob A is LINGER, 60 to 2000 ms on a log curve");
   check(std::strcmp(knobDesc(Card::Bloom, 1)->name, "AMOUNT") == 0 && std::strcmp(knobDesc(Card::Bloom, 1)->unit, "%") == 0,
         "bloom: knob B is AMOUNT, a percent");
 
@@ -500,12 +500,12 @@ void checkSlot7Cards() {
   applyKnob(Card::Bloom, 0, 0.5f, p);
   check(std::fabs(tailLow - 60.0f) < 1e-3f && std::fabs(tailHigh - 2000.0f) < 1e-1f &&
             std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f,
-        "bloom: TAIL runs 60 to 2000 ms with its middle at the geometric mean");
+        "bloom: LINGER runs 60 to 2000 ms with its middle at the geometric mean");
   applyKnob(Card::Bloom, 1, 0.65f, p);
   check(std::fabs(p.bloom.bloom - 0.65f) < 1e-6f && std::fabs(p.bloom.tailMs - std::sqrt(60.0f * 2000.0f)) < 1e-2f,
-        "bloom: AMOUNT drives the bloom field and leaves TAIL alone");
+        "bloom: AMOUNT drives the bloom field and leaves LINGER alone");
   check(shownText(tail, 0.0f) == "60" && shownText(tail, 1.0f) == "2000" && knobCells(tail) == 4,
-        "bloom: TAIL reads 60 to 2000 in four cells");
+        "bloom: LINGER reads 60 to 2000 in four cells");
 
   // The toggles reach their own stage. Formant's toggle sits inside the pitch parameters and touches no
   // other pitch toggle.

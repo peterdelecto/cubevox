@@ -190,3 +190,17 @@ knob named LINGER.
    replaces item 5's figure.
 8. Built in v2.00.98: TAIL to 2 s (the tail at 2 s ends 3.58 s after the word, today's law) and the
    lower knob named AMOUNT. Items 2 to 7 and the LINGER name are the next build.
+9. Built in v2.00.99: section 13 items 1 to 7. As built:
+   - The first loop sounds about 112 ms after a word starts (40 ms wait, up to 10 ms for a zero
+     crossing, then one 62.5 ms slice); each slice plays twice, and splices sit on that grid.
+   - After the word the playing slice finishes its turn, then the rotation runs oldest to newest.
+     A capture under way at the word's end is dropped, so such a word rotates three slices.
+   - A slice plays on only while its age plus one interval and the 80 ms close stays within 2.5 s;
+     the longest play measured is 2.32 s, and a LINGER 2 s tail closes 2.22 s after the word.
+   - While two loops sound, each plays 3 dB down, so the pair stays at one loop's power.
+   - The 11 kHz low-pass runs as a slice is cut, not at playback.
+   - Bloom's own word key, used without an Input gate, still listens to slot 7's input.
+   - Level at the default, Input gate key: −0.01, −0.05, +0.54 dB; own key +0.30, −0.05, +0.27 dB.
+   - Memory: `sizeof(Bloom)` 96,628 B; the firmware's D1 SRAM 292,560 B, 55.8 %.
+   - CPU on the host: 1.3 times Echo with one word sounding, 2.0 times with two loops. Echo measured
+     2.1 % on the board, so about 2.8 % and 4.2 %; the {5, 6} row covers both until a board bench.

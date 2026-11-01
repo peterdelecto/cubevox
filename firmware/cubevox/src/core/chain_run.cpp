@@ -42,24 +42,46 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
     pitchDone = true;
     engines.pitch.process(in, out, n, p.pitchFx);
     in = out;
+
+    // Bloom cuts from the stage's output, not from the voices Crowd adds to it.
+    if (engines.bloomLead) {
+      for (int i = 0; i < n; ++i) engines.bloomSrc[static_cast<size_t>(i)] = out[i];
+      engines.bloomSrcLive = true;
+    }
   }
   engines.crowd.process(in, out, n, p.crowd, engines.pitch);
 }
 
 // Runs the Bloom card. With an Input gate placed, the gate's detector state is the word key for the
 // block; the gate's engine keeps its detector live while its own slot is off. Otherwise Bloom
-// listens to its own input.
+// listens to its own input. Its slices come from the chain's tap when runChain made one.
 void runBloom(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
+  const float* const src = engines.bloomSrcLive ? engines.bloomSrc.data() : in;
   if (!p.bloom.keyFromGate) {
-    engines.bloom.process(in, out, n, p.bloom);
+    engines.bloom.process(in, src, out, n, p.bloom);
     return;
   }
   cv::BloomParams keyed = p.bloom;
   keyed.keyOpen = engines.inputGate.open();
-  engines.bloom.process(in, out, n, keyed);
+  engines.bloom.process(in, src, out, n, keyed);
 }
 
+bool holdsPitchStage(Card c) { return c == Card::Autotune || c == Card::Octave || c == Card::Formant; }
+
 }  // namespace
+
+BloomTap bloomTap(const Layout& layout) {
+  int bloom = -1;
+  int tap = -1;
+  for (int s = 0; s < kSlotCount; ++s) {
+    const Card c = layout.card[static_cast<size_t>(s)];
+    if (c == Card::Bloom) bloom = s;
+    if (holdsPitchStage(c)) tap = s;
+  }
+  const bool pitchCard = tap >= 0;
+  if (tap < 0) tap = 0;
+  return {bloom > tap ? tap : -1, pitchCard};
+}
 
 void resetEngine(ChainEngines& engines, Engine e) {
   switch (e) {
