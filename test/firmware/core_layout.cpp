@@ -26,15 +26,15 @@ void checkDefaultLayout() {
     check(layout.card[s] == expected[s], "default layout slot");
     const CardDesc& d = cardDesc(layout.card[s]);
     if (d.group == Group::Reverb) ++reverbs;
-    // Autotune's row is the board's pair figure scaled by the CPU pass, an estimate until a board
-    // bench of the pair.
+    // Autotune's row is the board's pair figure scaled by the CPU pass, with one extra worst point
+    // from the stress run, so it stays an estimate until a board bench of the pair.
     check(d.cost.measured || layout.card[s] == Card::Autotune, "a default layout card's cost comes from the board");
   }
   const LayoutCost sums = layoutCost(layout);
   check(sums.avg <= costs::kBudgetAvgPercent, "default layout within the average line");
   check(sums.worst <= costs::kBudgetWorstPercent, "default layout within the worst-block line");
-  check(costs::kAutotune.avg + costs::kTracker.avg == 9 && costs::kAutotune.worst + costs::kTracker.worst == 11,
-        "Autotune's row and the tracker add to the pair's estimate, 9 % mean and 11 % worst");
+  check(costs::kAutotune.avg + costs::kTracker.avg == 9 && costs::kAutotune.worst + costs::kTracker.worst == 12,
+        "Autotune's row and the tracker add to the pair's figure, 9 % mean and 12 % worst");
   check(reverbs == 1, "default layout has one reverb");
   check(cardDesc(Card::Empty).cost.avg == 0 && cardDesc(Card::Empty).cost.worst == 0, "empty card costs nothing");
   for (int i = 0; i < kCardCount; ++i) {
@@ -43,23 +43,28 @@ void checkDefaultLayout() {
   }
 }
 
-// The Crowd card sits outside the default layout, so its cost may stay an estimate. layoutValid counts
-// the estimate like a measurement, so a layout with the Crowd card in slot 4 and Unison out is judged
-// by the sums, and the verdict follows the row once a board bench replaces it.
+// The default layout with the Crowd card in slot 4 in place of Unison is accepted. Its sums come
+// from the card rows (fixed term, the seven cards that stay, Crowd, and the tracker once), so a row
+// that moves the layout past a line makes this check fail instead of passing on a recomputed verdict.
 void checkCrowdLayout() {
   Layout layout = defaultLayout();
   layout.card[3] = Card::Crowd;
-  const LayoutCost sums = layoutCost(layout);
-  LayoutError expected = LayoutError::None;
-  if (sums.avg > costs::kBudgetAvgPercent) {
-    expected = LayoutError::OverAvg;
-  } else if (sums.worst > costs::kBudgetWorstPercent) {
-    expected = LayoutError::OverWorst;
+  const costs::Cost rows[] = {
+      costs::kFixed,    costs::kInputGate,  costs::kAutotune,    costs::kOctave,  costs::kCrowd,
+      costs::kSlapback, costs::kDistortion, costs::kReverbSpring, costs::kGate,   costs::kTracker,
+  };
+  int avg = 0;
+  int worst = 0;
+  for (const costs::Cost& row : rows) {
+    avg += row.avg;
+    worst += row.worst;
   }
+  const LayoutCost sums = layoutCost(layout);
+  check(sums.avg == avg && sums.worst == worst, "crowd layout: slot 4 with Unison out sums to its rows");
+  check(avg <= costs::kBudgetAvgPercent && worst <= costs::kBudgetWorstPercent,
+        "crowd layout: the row sums sit within both lines");
   const LayoutCheck verdict = layoutValid(layout);
-  check(verdict.error == expected, "crowd layout: slot 4 with Unison out is judged by the cost sums");
-  check(expected == LayoutError::None || verdict.percent == (expected == LayoutError::OverAvg ? sums.avg : sums.worst),
-        "crowd layout: a refusal reports the sum that went over");
+  check(verdict.ok(), "crowd layout: slot 4 with Unison out is accepted");
 }
 
 // The pitch tracker's row counts once: with Autotune alone, with Crowd alone, and with both. A layout
@@ -212,6 +217,84 @@ void checkComposeBench() {
   check(std::fabs(pinned.params.unison.depth - expect.unison.depth) < 1e-6f, "pinned continuous knob sits at 1.0");
   const ChainSnapshot live = composeSnapshot(layout, low, Settings(), BenchOverrides());
   check(live.params.pitchFx.octave.semitones == -12, "unpinned stepped knob follows the panel");
+}
+
+// The force-on mask turns a slot on against a toggle that reads off, and a force-off bit still wins.
+// slots_live and knobs_live hand the panel back.
+void checkComposeBenchLevers() {
+  const Layout layout = defaultLayout();  // slot index 5 is Distortion, 3 Unison, 2 Octave
+  const PanelReading toggleOff = panelWithToggles(false);
+
+  BenchOverrides bench;
+  bench.slotsForcedOn = 1u << 5;
+  ChainSnapshot snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(snap.params.distortion.on && snap.slotOn[5] && !snap.params.unison.on && !snap.slotOn[3],
+        "slotsForcedOn bit turns only that slot on against an off toggle");
+
+  bench.slotsForcedOn = 0xFF;
+  snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(snap.params.distortion.on && snap.params.unison.on && snap.params.reverb.on && snap.params.gate.on &&
+            snap.params.pitchFx.autotune.on && snap.params.pitchFx.octave.on,
+        "all eight slots forced on turn every stage on");
+
+  bench.slotsOff = 1u << 5;
+  snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(!snap.params.distortion.on && !snap.slotOn[5] && snap.params.unison.on,
+        "a force-off bit wins over the same slot's force-on bit");
+
+  bench.slotsLive();
+  check(bench.slotsOff == 0 && bench.slotsForcedOn == 0, "slotsLive clears both masks");
+  snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(!snap.params.distortion.on && !snap.params.unison.on && !snap.slotOn[5] && !snap.slotOn[3],
+        "slotsLive lets an off toggle turn the slot off again");
+  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  check(snap.params.distortion.on && snap.params.unison.on, "slotsLive lets an on toggle turn the slot on");
+
+  // Octave semitones is stepped (25 steps, slot index 2, knob index 0), Unison depth continuous
+  // (slot index 3, knob index 1).
+  const PanelReading low;
+  bench = BenchOverrides();
+  bench.pinKnob(2, 0, 50);
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  check(snap.params.pitchFx.octave.semitones == 0, "a stepped pin at 50 % lands on the middle step");
+  bench.pinKnob(2, 0, 0);
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == -12,
+        "a stepped pin at 0 % lands on the first step");
+  bench.pinKnob(2, 0, 100);
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == 12,
+        "a stepped pin at 100 % lands on the last step");
+  bench.pinKnob(2, 0, 55);  // 0.55 * 24 = 13.2 rounds to step 13, which is +1 semitone
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == 1,
+        "a stepped pin rounds to the nearest step");
+
+  ChainParams expect;
+  bench.pinKnob(3, 1, 25);
+  applyKnob(Card::Unison, 1, 0.25f, expect);
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  check(std::fabs(snap.params.unison.depth - expect.unison.depth) < 1e-6f, "a continuous pin at 25 % sits at 0.25");
+  PanelReading mixed;
+  mixed.knob[2][1] = 0.4f;  // Octave MIX, the other knob of the pinned Octave semitones
+  snap = composeSnapshot(layout, mixed, Settings(), bench);
+  check(std::fabs(snap.params.pitchFx.octave.mix - 0.4f) < 1e-6f && snap.params.pitchFx.octave.semitones == 1,
+        "a pin on one knob leaves the card's other knob on the panel");
+
+  // A per-knob pin wins over pin-at-top; an unpinned knob still goes to the top.
+  bench = BenchOverrides();
+  bench.knobsPinned = true;
+  bench.pinKnob(2, 0, 50);
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  ChainParams top;
+  applyKnob(Card::Unison, 1, 1.0f, top);
+  check(snap.params.pitchFx.octave.semitones == 0 && std::fabs(snap.params.unison.depth - top.unison.depth) < 1e-6f,
+        "a per-knob pin wins over pin-at-top and the other knobs stay at the top");
+
+  bench.knobsLive();
+  check(!bench.knobsPinned && bench.knobPin[2][0] == kNoPin, "knobsLive clears the pin-at-top and every per-knob pin");
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  ChainParams zero;
+  applyKnob(Card::Unison, 1, 0.0f, zero);
+  check(snap.params.pitchFx.octave.semitones == -12 && std::fabs(snap.params.unison.depth - zero.unison.depth) < 1e-6f,
+        "knobsLive hands the knobs back to the panel");
 }
 
 void checkOutputGain() {
@@ -395,5 +478,6 @@ void checkLayoutAndCompose() {
   checkComposeToggles();
   checkComposeCrowd();
   checkComposeBench();
+  checkComposeBenchLevers();
   checkOutputGain();
 }

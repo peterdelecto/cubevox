@@ -19,8 +19,9 @@ struct BenchResult {
 
 const BenchOverrides& benchOverrides();
 
-// Runs one bench-class op. `slot` is the slot_off target, 1 to 8.
-BenchResult benchDrillRun(BenchOp op, int slot);
+// Runs one bench-class op. `args` holds the slot, knob and value the op takes, already range-checked
+// by the parser.
+BenchResult benchDrillRun(BenchOp op, const BenchArgs& args);
 
 #else
 

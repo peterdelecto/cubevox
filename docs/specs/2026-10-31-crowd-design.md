@@ -10,8 +10,12 @@ a rename pass. The menu row after REVERB swaps the slot that holds Unison or MOB
 (`2026-10-24-polish-design.md`, menu section). Board bench 2026-11-01 (bench image with Adam's
 5.5 s clip, knobs at top, all slots on, two runs of 24 s): MOB in slot 3 of the crowd bench layout
 78.7k cycles mean (12.3 %), lowest worst block 94.97k (14.8 %), second run worst 101.0k; Octave's
-slot carried the tracker at 47.5k; zero late, overrun or dry blocks. The row becomes
-`kCrowd{13, 15, true}` with the hands-free bench work.
+slot carried the tracker at 47.5k; zero late, overrun or dry blocks. The stress run of the same
+day (`2026-11-01-stress-bench-design.md`, all slots forced on, knobs at top then WIDTH and VOICES
+swept) put the lowest run worst at 15.6 % in the default layout with MOB for Unison and 15.9 %
+with Chasm as well, so the row is `kCrowd{13, 16, true}` from v2.00.83: mean from knobs at top,
+worst from the sweeps. That layout sums to 72 % mean and 84 % worst against the 75 / 95 lines,
+and the menu's swap to MOB goes through.
 
 ## Purpose
 

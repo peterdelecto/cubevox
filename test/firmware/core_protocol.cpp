@@ -675,7 +675,8 @@ void checkOpTable() {
     check(static_cast<int>(op) == i, "ops: table index matches the enum");
     check(opFromName(opName(op), back) && back == op, opName(op));
     const std::string line = std::string("{\"id\":4,\"cmd\":\"bench\",\"op\":\"") + opName(op) + "\"" +
-                             (op == BenchOp::SlotOff ? ",\"slot\":3" : "") + "}";
+                             (opTakesSlot(op) ? ",\"slot\":3" : "") +
+                             (opTakesKnob(op) ? ",\"knob\":2,\"value\":40" : "") + "}";
     check(parses(line.c_str(), r, err, true) && r.cmd == protocol::Command::Bench && r.op == op, "ops: every op round-trips in a bench build");
     const bool query = opClass(op) == OpClass::Query;
     queries += query ? 1 : 0;
@@ -726,6 +727,67 @@ void checkOpSlotParsing() {
         "ops: other ops ignore the slot");
 }
 
+// A set_knob request with the given argument text spliced in, so each case names only what differs.
+std::string setKnobLine(const std::string& args) {
+  return "{\"id\":4,\"cmd\":\"bench\",\"op\":\"set_knob\"" + args + "}";
+}
+
+void checkOpSetKnobParsing() {
+  protocol::Request r;
+  std::string err;
+  check(parses(setKnobLine(",\"slot\":6,\"knob\":2,\"value\":75").c_str(), r, err) && r.op == BenchOp::SetKnob &&
+            r.benchSlot == 6 && r.benchKnob == 2 && r.benchValue == 75,
+        "set_knob: slot, knob and value parse");
+  check(parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":0").c_str(), r, err) && r.benchValue == 0, "set_knob: value 0 parses");
+  check(parses(setKnobLine(",\"value\":100,\"knob\":1,\"slot\":8").c_str(), r, err) && r.benchSlot == 8 && r.benchValue == 100,
+        "set_knob: value 100 and slot 8 parse in any key order");
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_on\",\"slot\":5}", r, err) && r.op == BenchOp::SlotOn && r.benchSlot == 5,
+        "slot_on: slot parses");
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"all_on\"}", r, err) && r.op == BenchOp::AllOn, "all_on: takes no argument");
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slots_live\"}", r, err) && r.op == BenchOp::SlotsLive, "slots_live: takes no argument");
+  check(parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"knobs_live\"}", r, err) && r.op == BenchOp::KnobsLive, "knobs_live: takes no argument");
+
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_on\"}", r, err) && err == "missing slot", "slot_on: needs a slot");
+  check(!parses("{\"id\":4,\"cmd\":\"bench\",\"op\":\"slot_on\",\"slot\":9}", r, err) && err == "slot must be 1 to 8",
+        "slot_on: slot 9");
+  check(!parses(setKnobLine(",\"knob\":1,\"value\":50").c_str(), r, err) && err == "missing slot", "set_knob: needs a slot");
+  check(!parses(setKnobLine(",\"slot\":1,\"value\":50").c_str(), r, err) && err == "missing knob", "set_knob: needs a knob");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1").c_str(), r, err) && err == "missing value", "set_knob: needs a value");
+  check(!parses(setKnobLine(",\"slot\":0,\"knob\":1,\"value\":50").c_str(), r, err) && err == "slot must be 1 to 8", "set_knob: slot 0");
+  check(!parses(setKnobLine(",\"slot\":9,\"knob\":1,\"value\":50").c_str(), r, err) && err == "slot must be 1 to 8", "set_knob: slot 9");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":0,\"value\":50").c_str(), r, err) && err == "knob must be 1 to 2", "set_knob: knob 0");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":3,\"value\":50").c_str(), r, err) && err == "knob must be 1 to 2", "set_knob: knob 3");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":101").c_str(), r, err) && err == "value must be 0 to 100", "set_knob: value 101");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":4000000000").c_str(), r, err) && err == "value must be 0 to 100",
+        "set_knob: a huge value is out of range");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":-5").c_str(), r, err) && err == "value must be 0 to 100",
+        "set_knob: a negative value is out of range");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":12.5").c_str(), r, err) && err == "value must be an integer",
+        "set_knob: a fractional value is refused, the wire carries integers");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":\"50\"").c_str(), r, err) && err == "value must be an integer",
+        "set_knob: a string value");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1.5,\"value\":50").c_str(), r, err) && err == "knob must be an integer",
+        "set_knob: a fractional knob");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":-1,\"value\":50").c_str(), r, err) && err == "knob must be an integer",
+        "set_knob: a negative knob");
+  check(!parses(setKnobLine(",\"slot\":1,\"knob\":1,\"value\":-").c_str(), r, err) && err == "malformed json",
+        "set_knob: a lone minus sign is malformed json");
+}
+
+// A release build refuses every new lever before it looks at the arguments.
+void checkOpLeversRefusedInRelease() {
+  protocol::Request r;
+  std::string err;
+  for (const char* op : {"slot_on", "all_on", "slots_live", "set_knob", "knobs_live"}) {
+    const std::string line = std::string("{\"id\":4,\"cmd\":\"bench\",\"op\":\"") + op + "\",\"slot\":1,\"knob\":1,\"value\":50}";
+    check(!parses(line.c_str(), r, err, false) && err == std::string("op not in this build: ") + op && r.id == 4,
+          "release: panel lever refused");
+    check(!parses((std::string("{\"id\":4,\"cmd\":\"bench\",\"op\":\"") + op + "\"}").c_str(), r, err, false) &&
+              err == std::string("op not in this build: ") + op,
+          "release: panel lever refused without its arguments too");
+  }
+}
+
 void checkHelloOps() {
   for (const bool bench : {false, true}) {
     StringWriter w;
@@ -743,6 +805,8 @@ void checkBenchOps() {
   checkOpTable();
   checkOpBounds();
   checkOpSlotParsing();
+  checkOpSetKnobParsing();
+  checkOpLeversRefusedInRelease();
   checkHelloOps();
 }
 

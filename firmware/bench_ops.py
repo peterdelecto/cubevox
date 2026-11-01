@@ -1,7 +1,8 @@
 """The bench letter map and the JSON request builder, shared by the host tools.
 
 The firmware takes no single-byte commands. Every bench action is a framed request,
-{"id":N,"cmd":"bench","op":"<name>"}, plus "slot" for slot_off. The familiar letters stay as
+{"id":N,"cmd":"bench","op":"<name>"}, plus "slot" for slot_off and slot_on, and "slot", "knob" and
+"value" for set_knob. The familiar letters stay as
 host-side shorthand and expand here (op names: core/bench_ops.cpp). DFU is its own command,
 enter_dfu, in every build.
 """
@@ -15,7 +16,10 @@ LETTER_OPS = {
     "q": "record_status",
     "m": "reset_peaks",
     "0": "slots_on",
+    "n": "all_on",
+    "u": "slots_live",
     "k": "pin_knobs",
+    "y": "knobs_live",
     "c": "chasm",
     "v": "clip",
     "a": "stop_audio",
@@ -34,7 +38,8 @@ SLOT_LETTERS = frozenset("12345678")  # slot_off N
 DFU_LETTER = "d"           # the enter_dfu command
 
 QUERY_OPS = {"report", "stats", "record_status"}      # every build
-ALL_OPS = set(LETTER_OPS.values()) | {"slot_off"}      # the bench build lists these
+ARG_OPS = {"slot_off", "slot_on", "set_knob"}          # ops with arguments and no letter of their own
+ALL_OPS = set(LETTER_OPS.values()) | ARG_OPS           # the bench build lists these
 
 _ids = itertools.count(1)
 
@@ -43,11 +48,16 @@ def next_id():
     return next(_ids)
 
 
-def op_line(op, slot=None, req_id=None):
-    """The request line for a bench op, newline included."""
+def op_line(op, slot=None, req_id=None, knob=None, value=None):
+    """The request line for a bench op, newline included. slot_off and slot_on take a slot;
+    set_knob takes a slot, a knob (1 upper, 2 lower) and a value in whole percent of travel."""
     req = {"id": req_id if req_id is not None else next_id(), "cmd": "bench", "op": op}
     if slot is not None:
         req["slot"] = slot
+    if knob is not None:
+        req["knob"] = knob
+    if value is not None:
+        req["value"] = value
     return json.dumps(req) + "\n"
 
 

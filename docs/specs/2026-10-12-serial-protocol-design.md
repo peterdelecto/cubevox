@@ -53,7 +53,17 @@ carries no drill it doesn't need. This realises item 5 of `2026-10-08-effect-reg
 | Class | Ops | Builds |
 |---|---|---|
 | Query | `report`, `stats`, `record_status` | all |
-| Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled` | `CUBEVOX_BENCH` only |
+| Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`, `slot_on`, `all_on`, `slots_live`, `set_knob`, `knobs_live` | `CUBEVOX_BENCH` only |
+
+Panel levers (owner 2026-11-01, "you can control the toggles. we need autonomous stress testing";
+`2026-11-01-stress-bench-design.md`): `slot_on` with `"slot":1..8` forces that slot's toggle on,
+`all_on` forces all eight, `slots_live` clears the forced-on and forced-off masks so the panel
+rules again; `set_knob` with `"slot":1..8`, `"knob":1|2` (upper, lower) and `"value":0..100`, an
+integer percent of travel, pins that one knob (a stepped knob at the nearest step), `knobs_live`
+clears every per-knob pin and the pin-at-top. A slot runs when `(toggle || forcedOn) && !forcedOff`;
+a per-knob pin wins over `pin_knobs`. Out-of-range arguments reply `knob must be 1 to 2` and
+`value must be 0 to 100`. Letters: `n` all_on, `u` slots_live, `y` knobs_live; `slot_on` and
+`set_knob` are sent as JSON.
 
 1. One table in `core/bench_ops` holds each op's wire name and class. `hello` lists the ops the
    build accepts, from that table.

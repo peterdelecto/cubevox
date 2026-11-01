@@ -1,0 +1,665 @@
+#!/usr/bin/env python3
+"""Autonomous CPU stress run for a cubevox box on a clip bench image. Nobody touches the panel.
+
+For each layout the script puts the layout on the box, forces every slot on (bench all_on), plays
+Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
+Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
+to the panel and sweeps SEMITONES (Octave's upper knob), the reverb MIX (the reverb slot's lower
+knob) and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in steps of 10 %, 1 s
+each, reading the counters after each sweep.
+
+Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
+the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
+core/costs.h, so a block that caught an interrupt does not count.
+
+Gates (each named in the output when it fails, exit 1 if any fails):
+  1. late blocks, overruns and dry blocks are 0 for the whole run
+  2. each placed card's mean % and worst % stay at or under its costs.h row
+  3. each layout's block mean stays under 75 % and its block worst under 95 %
+The slot that runs the shared pitch stage (the first Autotune, Octave or Crowd slot) is held to the
+rows of every card that stage runs, plus the tracker row when Autotune or Crowd is placed.
+A layout the box refuses is a result row ("refused: <reason>") and is not measured.
+
+Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm) and
+crowd-chasm. The saved layout is read first and put back at the end, together with slots_live,
+knobs_live, clip off and the reverb engine, even when the run fails.
+
+Output: a summary on stdout and a table per layout appended to build/bench/<YYYY-MM-DD>-stress.md.
+Progress goes to stderr. One percent of a block is 6,400 cycles.
+
+  ./stress.py --flash --runs 2          # build the clip bench image, install it, then run
+  ./stress.py --layouts default,crowd --seconds 10
+"""
+
+import argparse
+import collections
+import datetime
+import os
+import re
+import subprocess
+import sys
+import time
+
+FW = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(FW)
+sys.path.insert(0, FW)  # python3 -I leaves the script dir out
+import bench_ops  # noqa: E402
+import cubevox_port  # noqa: E402
+
+SRC = os.path.join(FW, "cubevox", "src", "core")
+COSTS_H = os.path.join(SRC, "costs.h")
+LAYOUT_CPP = os.path.join(SRC, "layout.cpp")
+REGISTRY_CPP = os.path.join(SRC, "registry.cpp")
+BENCH_DIR = os.path.join(REPO, "build", "bench")
+DEFAULT_CLIP = os.path.join(REPO, "samples", "adam_vox_sample3_5s.wav")
+FLASH_OUT = "/tmp/cubevox-fw-stress"  # the --flash build's own out dir, so no other build shares it
+
+SLOTS = 8
+CYCLES_PER_PERCENT = 6400
+BLOCK_MEAN_LIMIT_PERCENT = 75
+BLOCK_WORST_LIMIT_PERCENT = 95
+SWEEP_VALUES = range(0, 101, 10)  # percent of travel
+SWEEP_STEP_S = 1.0
+SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
+REPLY_WAIT_S = 5.0
+PORT_WAIT_S = 30.0
+TAIL_LINES = 20
+LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm")
+PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
+
+# Card id to the costs.h row that bounds it.
+ROW_OF = {
+    "input_gate": "kInputGate", "autotune": "kAutotune", "octave": "kOctave", "unison": "kUnison",
+    "slapback": "kSlapback", "distortion": "kDistortion", "gate": "kGate",
+    "reverb_spring": "kReverbSpring", "reverb_chasm": "kReverbChasm", "crowd": "kCrowd",
+}
+TRACKER_ROW = "kTracker"
+PITCH_STAGE = ("autotune", "octave")        # cards the shared PitchFx runs
+PITCH_GROUP = ("autotune", "octave", "crowd")  # the first of these carries the stage's cost
+NEEDED_OPS = ("slots_live", "all_on", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats", "clip",
+              "chasm")
+
+COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
+BLOCKS_LINE = re.compile(r"\[audio\] blocks (\d+) late (\d+) overruns (\d+) dry (\d+) avg (\d+) worst (\d+) of (\d+) cycles")
+PER_SLOT_LINE = re.compile(r"\[audio\] per slot ((?:\d+ )+)COMP (\d+) EQ (\d+)")
+SLOT_WORST_LINE = re.compile(r"\[audio\] slot worst ((?:\d+ )+)COMP (\d+) EQ (\d+)")
+CLIP_LINE = re.compile(r"\[bench\] vocal clip (on|off)")
+CHASM_LINE = re.compile(r"\[bench\] reverb slot runs (Chasm|its card's engine)")
+
+Stats = collections.namedtuple("Stats", "blocks late overruns dry avg worst budget slot_avg slot_worst")
+Gate = collections.namedtuple("Gate", "name ok detail")
+
+
+class StressError(Exception):
+    """The run cannot go on; the message says why."""
+
+
+def say(text):
+    print(f"[stress] {text}", file=sys.stderr, flush=True)
+
+
+def fmt_k(cycles):
+    return f"{cycles / 1000:.1f}k"
+
+
+def fmt_pct(cycles):
+    return f"{cycles / CYCLES_PER_PERCENT:.1f} %"
+
+
+# -- the firmware sources the gates read
+
+def read_text(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError as e:
+        raise StressError(f"cannot read {path}: {e}") from e
+
+
+def read_rows():
+    """The costs.h rows as {name: (mean percent, worst percent)}."""
+    rows = {m.group(1): (int(m.group(2)), int(m.group(3))) for m in COST_ROW.finditer(read_text(COSTS_H))}
+    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW) if n not in rows]
+    if missing:
+        raise StressError(f"{COSTS_H}: no row for {', '.join(missing)}")
+    return rows
+
+
+def default_layout():
+    """The default layout's card ids, slot 1 to 8, read from layout.cpp through the registry's ids."""
+    ids = dict(re.findall(r'\{Card::(\w+),\s*"(\w+)"', read_text(REGISTRY_CPP)))
+    body = re.search(r"Layout\s+defaultLayout\(\)\s*\{\s*return\s*\{\{(.*?)\}\};", read_text(LAYOUT_CPP), re.S)
+    if not body:
+        raise StressError(f"{LAYOUT_CPP}: no defaultLayout() to read")
+    names = re.findall(r"Card::(\w+)", body.group(1))
+    if len(names) != SLOTS or any(n not in ids for n in names):
+        raise StressError(f"{LAYOUT_CPP}: defaultLayout() does not name {SLOTS} registry cards")
+    return [ids[n] for n in names]
+
+
+def layout_table():
+    """{name: (card ids, reverb slot runs Chasm)} for the four layouts."""
+    base = default_layout()
+    if "unison" not in base:
+        raise StressError("the default layout has no unison slot for the crowd layout to replace")
+    crowd = ["crowd" if c == "unison" else c for c in base]
+    return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True)}
+
+
+def slot_bounds(slots, chasm, rows):
+    """Per slot, (mean percent, worst percent) it may use, or None for an empty slot.
+
+    The first pitch-group slot runs the shared pitch stage, so it carries every Autotune and Octave row
+    placed and the tracker row when Autotune or Crowd is placed. The reverb slot reads Chasm's row
+    while the chasm op is on.
+    """
+    def row_of(card):
+        return rows[ROW_OF["reverb_chasm" if chasm and card.startswith("reverb_") else card]]
+
+    carrier = next((i for i, c in enumerate(slots) if c in PITCH_GROUP), None)
+    bounds = []
+    for i, card in enumerate(slots):
+        if card == "empty":
+            bounds.append(None)
+            continue
+        mean, worst = row_of(card)
+        if i == carrier:
+            for other in slots:
+                if other in PITCH_STAGE and other != card:
+                    mean, worst = mean + rows[ROW_OF[other]][0], worst + rows[ROW_OF[other]][1]
+            if "autotune" in slots or "crowd" in slots:
+                mean, worst = mean + rows[TRACKER_ROW][0], worst + rows[TRACKER_ROW][1]
+        bounds.append((mean, worst))
+    return bounds, carrier
+
+
+# -- the box
+
+def parse_stats(lines):
+    """The newest block, per-slot and slot-worst lines in `lines` as a Stats."""
+    blocks = per = worst = None
+    for line in lines:
+        blocks = BLOCKS_LINE.match(line) or blocks
+        per = PER_SLOT_LINE.match(line) or per
+        worst = SLOT_WORST_LINE.match(line) or worst
+    if not (blocks and per and worst):
+        raise StressError("the stats reply lacked its [audio] blocks, per slot or slot worst line")
+    slot_avg = [int(v) for v in per.group(1).split()]
+    slot_worst = [int(v) for v in worst.group(1).split()]
+    if len(slot_avg) != SLOTS or len(slot_worst) != SLOTS:
+        raise StressError(f"the stats lines carry {len(slot_avg)} and {len(slot_worst)} slots, not {SLOTS}")
+    b = [int(v) for v in blocks.groups()]
+    return Stats(b[0], b[1], b[2], b[3], b[4], b[5], b[6], slot_avg, slot_worst)
+
+
+class Box:
+    """One open port and the bench requests the run needs."""
+
+    def __init__(self, link):
+        self.link = link
+        self.alerts = []          # [ERROR] and [WARN] lines seen
+        self.chasm = None         # the reverb engine as last printed, True for Chasm
+        self.start_chasm = None   # the engine the box started on
+        self.armed = False        # a bench image with the ops was found, so there is something to restore
+
+    def note(self, line):
+        if line.startswith(("[ERROR]", "[WARN]")):
+            self.alerts.append(line)
+
+    def wait(self, seconds):
+        """Reads for `seconds`, so the port never backs up while the box runs."""
+        end = time.monotonic() + seconds
+        while True:
+            left = end - time.monotonic()
+            if left <= 0:
+                return
+            line = self.link.read_line(left)
+            if line is not None:
+                self.note(line)
+
+    def ask(self, cmd, **fields):
+        reply = self.link.ask(cmd, REPLY_WAIT_S, self.note, **fields)
+        if reply is None:
+            raise StressError(f"{cmd}: no reply in {REPLY_WAIT_S:g} s")
+        return reply
+
+    def bench(self, op, slot=None, knob=None, value=None):
+        """(reply, the text lines that came before it). The box prints, then replies."""
+        rid = self.link.take_id()
+        lines = []
+        self.link.send_line(bench_ops.op_line(op, slot=slot, req_id=rid, knob=knob, value=value))
+        reply = self.link.read_reply(rid, REPLY_WAIT_S, lines.append)
+        for line in lines:
+            self.note(line)
+        if reply is None:
+            raise StressError(f"bench {op}: no reply in {REPLY_WAIT_S:g} s")
+        return reply, lines
+
+    def bench_ok(self, op, **args):
+        reply, lines = self.bench(op, **args)
+        if reply.get("ok") is not True:
+            raise StressError(f"bench {op}: {reply.get('error', reply)}")
+        return lines
+
+    def stats(self):
+        return parse_stats(self.bench_ok("stats"))
+
+    def set_clip(self, want):
+        """Toggles the clip until it reads `want`. Turning it off with none compiled in is already off."""
+        for _ in range(2):
+            reply, lines = self.bench("clip")
+            if reply.get("ok") is not True:
+                if not want and "no clip compiled in" in str(reply.get("error")):
+                    return
+                raise StressError(f"bench clip: {reply.get('error', reply)}")
+            state = [m.group(1) for m in map(CLIP_LINE.match, lines) if m]
+            if not state:
+                raise StressError("bench clip: no '[bench] vocal clip' line came back")
+            if (state[-1] == "on") == want:
+                return
+        raise StressError(f"bench clip: the clip would not turn {'on' if want else 'off'}")
+
+    def toggle_chasm(self):
+        lines = self.bench_ok("chasm")
+        state = [m.group(1) for m in map(CHASM_LINE.match, lines) if m]
+        if not state:
+            raise StressError("bench chasm: no '[bench] reverb slot runs' line came back")
+        self.chasm = state[-1] == "Chasm"
+
+    def set_chasm(self, want):
+        for _ in range(2):
+            if self.chasm == want:
+                return
+            self.toggle_chasm()
+        if self.chasm != want:
+            raise StressError("bench chasm: the reverb engine would not switch")
+
+    def get_layout(self):
+        reply = self.ask("get_layout")
+        layout = reply.get("layout")
+        if reply.get("ok") is not True or not isinstance(layout, dict) or "slots" not in layout:
+            raise StressError(f"get_layout: {str(reply)[:160]}")
+        return layout["name"], layout["slots"]
+
+    def set_layout(self, name, slots):
+        """None on success, else the box's reason for refusing."""
+        reply = self.ask("set_layout", name=name, slots=slots)
+        if reply.get("ok") is True:
+            self.wait(SETTLE_S)
+            return None
+        return str(reply.get("error", reply))
+
+
+def open_box(port, wait_s):
+    path = cubevox_port.find_port(port, wait_s=wait_s)
+    time.sleep(1.0)  # let the port settle after it enumerates
+    box = Box(cubevox_port.Link(path))
+    box.wait(1.0)    # the boot report a fresh open prints
+    return box
+
+
+# -- one measured run
+
+def sweeps(slots):
+    """(slot index, knob 1 or 2, label) for each sweep this layout gets."""
+    found = []
+    for i, card in enumerate(slots):
+        if card == "octave":
+            found.append((i, 1, "SEMITONES"))
+        if card.startswith("reverb_"):
+            found.append((i, 2, "reverb MIX"))
+        if card == "crowd":
+            found.append((i, 1, "Crowd WIDTH"))
+            found.append((i, 2, "Crowd VOICES"))
+    return found
+
+
+def measure_run(box, slots, seconds):
+    """One run: pass 1 at the top, pass 2 swept. Returns the run's numbers."""
+    box.bench_ok("slots_live")
+    box.bench_ok("all_on")
+    box.set_clip(True)
+    box.bench_ok("knobs_live")
+    box.bench_ok("pin_knobs")
+    box.bench_ok("reset_peaks")
+    say(f"pass 1, knobs at top, {seconds:g} s")
+    box.wait(seconds)
+    first = box.stats()
+    box.bench_ok("knobs_live")
+    box.bench_ok("reset_peaks")
+    later = []
+    for slot, knob, label in sweeps(slots):
+        say(f"pass 2, {label} (slot {slot + 1}) 0 % to 100 %")
+        for value in SWEEP_VALUES:
+            box.bench_ok("set_knob", slot=slot + 1, knob=knob, value=value)
+            box.wait(SWEEP_STEP_S)
+        later.append(box.stats())
+        box.bench_ok("knobs_live")
+    every = [first, *later]
+    return {
+        "blocks": first.blocks,
+        "block_mean": first.avg,
+        "block_worst": max(s.worst for s in every),
+        "slot_mean": first.slot_avg,
+        "slot_worst": [max(s.slot_worst[i] for s in every) for i in range(SLOTS)],
+        "late": first.late + (later[-1].late if later else 0),
+        "overruns": first.overruns + (later[-1].overruns if later else 0),
+        "dry": first.dry + (later[-1].dry if later else 0),
+        "budget": first.budget,
+    }
+
+
+def aggregate(runs):
+    """Mean of the means, lowest of the worsts, and the counters summed."""
+    n = len(runs)
+    return {
+        "runs": n,
+        "block_mean": sum(r["block_mean"] for r in runs) / n,
+        "block_worst": min(r["block_worst"] for r in runs),
+        "slot_mean": [sum(r["slot_mean"][i] for r in runs) / n for i in range(SLOTS)],
+        "slot_worst": [min(r["slot_worst"][i] for r in runs) for i in range(SLOTS)],
+        "late": sum(r["late"] for r in runs),
+        "overruns": sum(r["overruns"] for r in runs),
+        "dry": sum(r["dry"] for r in runs),
+        "budget": runs[0]["budget"],
+    }
+
+
+def run_layout(box, name, slots, chasm, runs, seconds):
+    """A result dict for one layout. 'refused' or 'error' replaces the numbers when it applies."""
+    result = {"name": name, "slots": slots, "chasm": chasm}
+    done = []
+    try:
+        refusal = box.set_layout(f"stress {name}", slots)
+        if refusal:
+            result["refused"] = refusal
+            return result
+        box.set_chasm(chasm)
+        for n in range(1, runs + 1):
+            say(f"{name}: run {n} of {runs}")
+            done.append(measure_run(box, slots, seconds))
+    except (StressError, *PORT_ERRORS) as e:
+        result["error"] = str(e)
+        if isinstance(e, PORT_ERRORS):
+            result["lost"] = True
+    if done:
+        result["agg"] = aggregate(done)
+        result["per_run"] = done
+    return result
+
+
+# -- gates and reports
+
+def judge(result, rows):
+    """Fills result['table'], result['gates'] and result['carrier'] from the aggregate.
+
+    Every check is a gate, passed or not, so the count in the output is the number of checks made.
+    """
+    agg = result["agg"]
+    bounds, carrier = slot_bounds(result["slots"], result["chasm"], rows)
+    table, gates = [], []
+    label = result["name"]
+    for what, count in (("late blocks", agg["late"]), ("overruns", agg["overruns"]), ("dry blocks", agg["dry"])):
+        gates.append(Gate(f"{label}: {what} are 0", count == 0, f"{count} over {agg['runs']} run(s)"))
+    for i, card in enumerate(result["slots"]):
+        if bounds[i] is None:
+            continue
+        mean, worst = agg["slot_mean"][i], agg["slot_worst"][i]
+        row_mean, row_worst = bounds[i]
+        over = []
+        for kind, value, row in (("mean", mean, row_mean), ("worst", worst, row_worst)):
+            within = value / CYCLES_PER_PERCENT <= row
+            if not within:
+                over.append(kind)
+            gates.append(Gate(f"{label}: slot {i + 1} {card} {kind} within its row", within,
+                              f"{value / CYCLES_PER_PERCENT:.2f} % {'within' if within else 'over'} {row} %"))
+        table.append((i + 1, card + ("*" if i == carrier else ""), mean, row_mean, worst, row_worst,
+                      "ok" if not over else "FAIL " + " and ".join(over)))
+    block_mean, block_worst = agg["block_mean"], agg["block_worst"]
+    gates.append(Gate(f"{label}: block mean under {BLOCK_MEAN_LIMIT_PERCENT} %",
+                      block_mean / CYCLES_PER_PERCENT < BLOCK_MEAN_LIMIT_PERCENT, fmt_pct(block_mean)))
+    gates.append(Gate(f"{label}: block worst under {BLOCK_WORST_LIMIT_PERCENT} %",
+                      block_worst / CYCLES_PER_PERCENT < BLOCK_WORST_LIMIT_PERCENT, fmt_pct(block_worst)))
+    result["table"], result["gates"], result["carrier"] = table, gates, carrier
+
+
+def block_line(agg):
+    return (f"block total: mean {fmt_k(agg['block_mean'])} ({fmt_pct(agg['block_mean'])}), "
+            f"worst {fmt_k(agg['block_worst'])} ({fmt_pct(agg['block_worst'])}) of {fmt_k(agg['budget'])}, "
+            f"late {agg['late']}, overruns {agg['overruns']}, dry {agg['dry']}")
+
+
+def summary_lines(results):
+    out = []
+    for r in results:
+        title = f"{r['name']} ({' '.join(r['slots'])}{', reverb on Chasm' if r['chasm'] else ''})"
+        out.append(title)
+        if "refused" in r:
+            out.append(f"  refused: {r['refused']}")
+            continue
+        if "error" in r:
+            out.append(f"  error: {r['error']}")
+        if "agg" not in r:
+            continue
+        for slot, card, mean, row_mean, worst, row_worst, verdict in r["table"]:
+            out.append(f"  {slot} {card:<14} mean {fmt_k(mean):>7} {fmt_pct(mean):>7} / {row_mean:>2} %"
+                       f"   worst {fmt_k(worst):>7} {fmt_pct(worst):>7} / {row_worst:>2} %   {verdict}")
+        out.append("  " + block_line(r["agg"]))
+    return out
+
+
+def report_lines(results, header):
+    out = [header, ""]
+    for r in results:
+        out.append(f"### {r['name']}")
+        out.append("")
+        out.append(f"Cards, slot 1 to 8: {', '.join(r['slots'])}{'; the reverb slot runs Chasm' if r['chasm'] else ''}.")
+        out.append("")
+        if "refused" in r:
+            out += [f"refused: {r['refused']}", ""]
+            continue
+        if "error" in r:
+            out += [f"error: {r['error']}", ""]
+        if "agg" not in r:
+            continue
+        out.append("| slot | card | mean cycles | mean % | row mean % | worst cycles | worst % | row worst % | verdict |")
+        out.append("|---|---|---|---|---|---|---|---|---|")
+        for slot, card, mean, row_mean, worst, row_worst, verdict in r["table"]:
+            out.append(f"| {slot} | {card} | {fmt_k(mean)} | {fmt_pct(mean)} | {row_mean} % | "
+                       f"{fmt_k(worst)} | {fmt_pct(worst)} | {row_worst} % | {verdict} |")
+        out.append("")
+        if r["carrier"] is not None:
+            out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
+                       "Autotune and Octave rows placed, plus the tracker row when Autotune or Crowd is placed.")
+            out.append("")
+        out.append(block_line(r["agg"]))
+        out.append("")
+        for n, run in enumerate(r["per_run"], 1):
+            out.append(f"- run {n}: block mean {fmt_k(run['block_mean'])} ({fmt_pct(run['block_mean'])}), "
+                       f"worst {fmt_k(run['block_worst'])} ({fmt_pct(run['block_worst'])}), "
+                       f"late {run['late']}, overruns {run['overruns']}, dry {run['dry']}")
+        out.append("")
+    return out
+
+
+def gate_lines(results):
+    gates = [g for r in results for g in r.get("gates", [])]
+    failed = [g for g in gates if not g.ok]
+    out = [f"gates: {len(gates) - len(failed)} of {len(gates)} passed"]
+    out += [f"  FAIL {g.name} ({g.detail})" for g in failed]
+    return out, failed
+
+
+# -- flashing
+
+def flash(clip, port):
+    """Builds the clip bench image into its own out dir and installs it with flash.sh."""
+    if not os.path.isfile(clip):
+        raise StressError(f"clip {clip} not found; name one with --clip")
+    env = dict(os.environ, BENCH="1", CLIP=clip, OUT=FLASH_OUT, TAIL=str(TAIL_LINES))
+    env.pop("VARIANT", None)
+    if port:
+        env["CUBEVOX_PORT"] = port
+    for script in ("build.sh", "flash.sh"):
+        say(f"{script} (bench image with {os.path.basename(clip)})")
+        r = subprocess.run([os.path.join(FW, script)], env=env, text=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if r.returncode:
+            tail = "\n".join(r.stdout.splitlines()[-TAIL_LINES:])
+            raise StressError(f"{script} exited {r.returncode}:\n{tail}")
+
+
+# -- the run
+
+def preflight(box):
+    """The hello reply, after checking the image. A bench image with the clip answers every needed op."""
+    hello = box.ask("hello")
+    build, fw = hello.get("build"), hello.get("fw")
+    if hello.get("ok") is not True or build != "bench":
+        raise StressError(f"hello says build {build!r} (fw {fw}); the run needs a clip bench image, "
+                          "which ./stress.py --flash builds and installs")
+    missing = [op for op in NEEDED_OPS if op not in hello.get("bench_ops", [])]
+    if missing:
+        raise StressError(f"hello says build 'bench' (fw {fw}) without the ops {', '.join(missing)}; "
+                          "install a current bench image with ./stress.py --flash")
+    box.armed = True
+    try:
+        box.set_clip(True)
+    except StressError as e:
+        raise StressError(f"hello says build 'bench' (fw {fw}) but the clip op failed ({e}); "
+                          "build with CLIP=<wav> BENCH=1 ./build.sh or use --flash") from e
+    box.toggle_chasm()  # the first toggle shows the engine the box started on
+    box.start_chasm = not box.chasm
+    return hello
+
+
+def restore(port, box, name, slots):
+    """Puts the box back as it was and returns the steps that failed. A lost port gets one reopen."""
+    try:
+        box.ask("hello")
+    except (StressError, *PORT_ERRORS):
+        try:
+            box.link.close()
+        except OSError:
+            pass
+        try:
+            fresh = open_box(port, PORT_WAIT_S)
+        except PORT_ERRORS as e:
+            return [f"reopen the port ({e})"]
+        fresh.start_chasm, fresh.chasm = box.start_chasm, None
+        box = fresh
+    failed = []
+    steps = [
+        ("slots_live", lambda: box.bench_ok("slots_live")),
+        ("knobs_live", lambda: box.bench_ok("knobs_live")),
+        ("clip off", lambda: box.set_clip(False)),
+        ("reverb engine", lambda: restore_chasm(box)),
+        ("saved layout", lambda: restore_layout(box, name, slots)),
+    ]
+    for label, step in steps:
+        try:
+            step()
+        except (StressError, *PORT_ERRORS) as e:
+            failed.append(f"{label} ({e})")
+    return failed
+
+
+def restore_chasm(box):
+    """Back to the engine the box started on. A reopened port has not seen the engine, so one toggle shows it."""
+    if box.start_chasm is None:
+        return
+    if box.chasm is None:
+        box.toggle_chasm()
+    box.set_chasm(box.start_chasm)
+
+
+def restore_layout(box, name, slots):
+    if name is None:
+        return
+    if box.get_layout() == (name, slots):
+        return
+    refusal = box.set_layout(name, slots)
+    if refusal:
+        raise StressError(f"the box refused the saved layout: {refusal}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--flash", action="store_true",
+                    help="build the clip bench image (CLIP=<clip> BENCH=1 ./build.sh) and install it with flash.sh first")
+    ap.add_argument("--runs", type=int, default=2, help="runs per layout (default 2)")
+    ap.add_argument("--layouts", default=",".join(LAYOUT_NAMES),
+                    help=f"comma list of {', '.join(LAYOUT_NAMES)} (default all)")
+    ap.add_argument("--seconds", type=float, default=20.0, help="pass 1 read window per run (default 20)")
+    ap.add_argument("--port", default=None, help="serial port path (default CUBEVOX_PORT, else the only cu.usbmodem*)")
+    ap.add_argument("--clip", default=DEFAULT_CLIP, help="WAV for --flash (default samples/adam_vox_sample3_5s.wav)")
+    a = ap.parse_args()
+    wanted = [n for n in a.layouts.split(",") if n]
+    unknown = [n for n in wanted if n not in LAYOUT_NAMES]
+    if unknown or not wanted or a.runs < 1 or a.seconds <= 0:
+        ap.error(f"unknown layout {', '.join(unknown)}" if unknown else "need layouts, --runs >= 1 and --seconds > 0")
+
+    box = start_name = start_slots = hello = None
+    results, failed_restore, code = [], [], 1
+    try:
+        rows = read_rows()
+        table = layout_table()
+        if a.flash:
+            flash(a.clip, a.port)
+        box = open_box(a.port, PORT_WAIT_S)
+        hello = preflight(box)
+        start_name, start_slots = box.get_layout()
+        say(f"box fw {hello.get('fw')}, saved layout {start_name!r}: {' '.join(start_slots)}")
+        for name in wanted:
+            slots, chasm = table[name]
+            result = run_layout(box, name, slots, chasm, a.runs, a.seconds)
+            if "agg" in result:
+                judge(result, rows)
+            results.append(result)
+            if result.get("lost"):
+                break
+        code = 0
+    except StressError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+    except PORT_ERRORS as e:
+        print(f"[ERROR] port: {e}", file=sys.stderr)
+    except KeyboardInterrupt:
+        print("[ERROR] interrupted", file=sys.stderr)
+    finally:
+        if box is not None and box.armed:
+            failed_restore = restore(a.port, box, start_name, start_slots)
+        for step in failed_restore:
+            print(f"[ERROR] restore failed: {step}", file=sys.stderr)
+        if box is not None:
+            try:
+                box.link.close()
+            except OSError:
+                pass
+    if not results:
+        return 1
+
+    gate_out, failed = gate_lines(results)
+    refused = [r["name"] for r in results if "refused" in r]
+    errors = [r["name"] for r in results if "error" in r]
+    out = summary_lines(results) + gate_out
+    if refused:
+        out.append(f"refused, not measured: {', '.join(refused)}")
+    if errors:
+        out.append(f"stopped early: {', '.join(errors)}")
+    if box is not None and box.alerts:
+        out.append(f"box lines with [ERROR] or [WARN]: {len(box.alerts)}, first: {box.alerts[0]}")
+    now = datetime.datetime.now()
+    path = os.path.join(BENCH_DIR, f"{now:%Y-%m-%d}-stress.md")
+    header = (f"## {now:%H:%M:%S} stress run, fw {hello.get('fw')}, {a.runs} run(s), pass 1 read {a.seconds:g} s, "
+              f"layouts {', '.join(wanted)}")
+    os.makedirs(BENCH_DIR, exist_ok=True)
+    follows = os.path.exists(path) and os.path.getsize(path) > 0
+    with open(path, "a") as f:
+        f.write(("\n" if follows else "") + "\n".join(report_lines(results, header) + gate_out) + "\n")
+    out.append(f"report appended to {path}")
+    print("\n".join(out), flush=True)
+    return 1 if (failed or errors or failed_restore or code) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -187,6 +187,19 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   and SAI clock against the firmware through `tools/bench_ops_check.py`. `--dfu` stops at once when dfu-util is
   missing. Drill 1 fails a unit whose option bytes are not BOR level 3 with sector 0 protected. The final summary
   names `hardware/bringup/bench-checklist.md`, the checks that need a person at the bench with a scope or a PA.
+- `stress.py`: the autonomous CPU run on a clip bench image, with nobody at the panel. `./stress.py --flash --runs 2`
+  builds `CLIP=../samples/adam_vox_sample3_5s.wav BENCH=1` into `/tmp/cubevox-fw-stress`, installs it with
+  `flash.sh`, then runs the layouts `default`, `crowd`, `chasm` and `crowd-chasm` (`--layouts a,b` picks some,
+  `--seconds S` sets pass 1's read window, 20 s by default). Each run forces every slot on (`all_on`), turns the clip
+  on and reads the per-slot and per-block cycle counters twice. Pass 1 pins every knob at its top. Pass 2 sweeps
+  SEMITONES, the reverb MIX and, with Crowd placed, both Crowd knobs from 0 % to 100 % in steps of 10 %, 1 s each.
+  A slot's mean is pass 1's mean and its worst is the largest worst over both passes. Across runs the mean is the
+  mean of the means and the worst is the lowest run worst, the rule in `core/costs.h`. The gates are zero late,
+  overrun and dry blocks, each card within its `costs.h` row for mean and worst, and each layout's block mean under
+  75 % and block worst under 95 %. The slot that runs the shared pitch stage is held to the Autotune and Octave
+  rows placed plus the tracker row. The summary goes to stdout and a table per layout is appended to
+  `build/bench/<YYYY-MM-DD>-stress.md`. Exit 1 when any gate fails. The saved layout, `slots_live`, `knobs_live`,
+  clip off and the reverb engine are put back at the end, also after a failure.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20
   for 480 MHz on rev V silicon (360 MHz, N144 Q15, on older revisions), USB from PLL1Q, HSI48 off, PLL2 40 MHz as
   the ADC kernel clock. A failing step records its name in the fault record and resets; the next boot report
@@ -266,27 +279,41 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   block and the worst block through the last fade-in. `python3 -I tools/protocol_check.py` (repo root `tools/`, no
   pyserial needed) runs the checks against a box and prints PASS or FAIL per check; `--no-reset` skips the reset-and-reload
   check, which uses the bench `spin` op (so a release build skips it). On a release build it also checks that bench
-  `fault`, `record_erase` and `stop_audio` are refused; on both builds it sends raw `faewdx1k` outside a line and
+  `fault`, `record_erase`, `stop_audio`, `slot_on`, `all_on`, `set_knob` and `knobs_live` are refused; on both builds it sends raw `faewdx1k` outside a line and
   checks that nothing acts and `stray_bytes` grows by 8.
 - Bench operations (spec `2026-10-12-serial-protocol-design.md`, "Bench operations"): the box takes no single-byte
   commands. A byte outside a JSON line is ignored and counted (`stray_bytes` in `status`). Every bench action is a
-  framed request, `{"id":N,"cmd":"bench","op":"<name>"}`, plus `"slot":1..8` for `slot_off`. The reply comes after
+  framed request, `{"id":N,"cmd":"bench","op":"<name>"}`, plus `"slot":1..8` for `slot_off` and `slot_on`, and
+  `"slot":1..8`, `"knob":1..2` and `"value":0..100` for `set_knob`. The reply comes after
   the op runs: `{"id":N,"ok":true}` or an error such as `record store busy`. Only `fault` and `spin`, which never
   return, reply first. Diagnostic text (`[audio]`, `[record]`, `[panel]`) stays on log lines. One table
   (`core/bench_ops`) holds each op's name and class.
   1. Query ops (every build): `report` (boot report), `stats`, `record_status`.
   2. Bench ops (bench image only; the parser refuses them in a release image with `op not in this build: <op>`, and
-     the release image does not contain the code): `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`,
-     `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`,
-     `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`.
-  3. DFU is `{"id":N,"cmd":"enter_dfu"}` in every build.
+     the release image does not contain the code): `slot_off`, `slots_on`, `slot_on`, `all_on`, `slots_live`,
+     `pin_knobs`, `set_knob`, `knobs_live`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`,
+     `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`,
+     `panel_oled`.
+  3. Panel levers (bench image only, hands-free stress runs). A slot is on when its panel toggle reads on or the
+     bench forces it on, and no bench force-off holds it off. `slot_off` N and `slot_on` N each flip one bit of
+     their force mask. `slots_on` clears the force-off mask. `all_on` forces all eight slots on. `slots_live`
+     clears both masks, so the panel toggles rule again. `slot_on`, `all_on` and `slots_live` each print one
+     `[bench] slots forced on 0x.., forced off 0x..` line, and `stats` prints both masks. `pin_knobs` toggles
+     every knob at its top position. `set_knob` pins one knob, named by `slot` 1..8 and `knob` 1 (upper) or 2
+     (lower), at `value` whole percent of travel, 0..100. A stepped knob lands on
+     `round(value / 100 * (steps - 1))` and a continuous one on `value / 100`. A per-knob pin wins over
+     `pin_knobs`. `knobs_live` clears every per-knob pin and the pin-at-top. The values are integers on the wire.
+  4. DFU is `{"id":N,"cmd":"enter_dfu"}` in every build.
   `hello` reports the box's `serial` (the MCU id the update drive also serves), `build` (`release` or `bench`)
   and `bench_ops` (what this build accepts); the boot report prints `[boot] build release|bench`.
 - Letter map for the host tools (`firmware/bench_ops.py`, used by `term.py -s`, `flash.sh`, `bringup.py` and
-  `tools/protocol_check.py`): `1`-`8` `slot_off` N, `0` `slots_on`, `k` `pin_knobs`, `c` `chasm`, `r` `report`, `p`
+  `tools/protocol_check.py`): `1`-`8` `slot_off` N, `0` `slots_on`, `n` `all_on`, `u` `slots_live`, `k` `pin_knobs`, `y`
+  `knobs_live`, `c` `chasm`, `r` `report`, `p`
   `stats`, `f` `fault`, `w` `spin`, `a` `stop_audio`, `m` `reset_peaks`, `v` `clip`, `s` `record_save`, `q`
   `record_status`, `e` `record_erase`, `d` the `enter_dfu` command, and the panel letters below. `term.py -s p`
-  sends the JSON for `stats`; `term.py -s '{"id":1,"cmd":"status"}'` sends a raw request.
+  sends the JSON for `stats`; `term.py -s '{"id":1,"cmd":"status"}'` sends a raw request. `slot_on` and `set_knob`
+  take arguments and have no letter, so `term.py -s '{"id":1,"cmd":"bench","op":"set_knob","slot":2,"knob":1,"value":50}'`
+  sends them.
 - Panel self-test (bench image, `core/panel_test`): `t` `panel_test` on/off, `l` `panel_summary` (pots and toggles
   still to exercise), `g` `panel_dump` raw dump of all 16 pots and 8 toggles. While on, the box prints
   `[panel] pot NN slot S A|B v.vv` when a pot moves and `[panel] toggle slot S on|off` on each edge. `i`
