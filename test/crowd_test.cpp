@@ -1036,15 +1036,14 @@ void allEnhancements(cv::CrowdTuning& t) {
   t.contour = {0.8f, 0.8f, 0.8f, 0.8f};
 }
 
-// What the four runs of testEnhancementsDefaultExact hash to (Mac build), pinned by the Crowd
-// correctness pass (owner 2026-10-31). Every run moved for three of its changes: the lead holds at 1
-// until the tracker has a period, a voice that starts from nothing lays a prefill grain, and the trim
-// follows WIDTH. Runs 3 and 4 also moved for the gap floor that follows the phrase level. Runs 1 to 3
-// start from knobs(), which neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{}
-// unchanged. The engine must reproduce them to the bit. Update them only when the sound of a copy
-// changes on purpose.
-constexpr std::array<uint64_t, 4> kPinned = {0xd37de60a1c1eca07ULL, 0x041fbfde7aa323feULL, 0xc944b897c6179176ULL,
-                                             0xec216e2ea40ccb9eULL};
+// What the four runs of testEnhancementsDefaultExact hash to (Mac build), pinned by the pitch CPU
+// pass (2026-11-01). The tracker's coarse pass adds four hop sums, so the Crowd card's coarse period
+// differs in its last float bits from a sum of sixteen panes; each run sits 92 to 102 dB under the
+// signal from the values the Crowd correctness pass pinned. Runs 1 to 3 start from knobs(), which
+// neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{} unchanged. The engine must
+// reproduce them to the bit. Update them only when the sound of a copy changes on purpose.
+constexpr std::array<uint64_t, 4> kPinned = {0xc3258b07aaae4afcULL, 0xa79570516989f40aULL, 0xe88885eee3302978ULL,
+                                             0x71b5d51cf2b70b22ULL};
 
 // Each run's hash against its pinned value.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {

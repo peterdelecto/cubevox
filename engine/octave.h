@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
@@ -51,27 +52,41 @@ class OctaveVoice {
     grains_ = OctaveTuning{}.grainCount;
     dc_.clear();
     fresh_ = true;
+    levelDb_ = kUnset;
+    glideMs_ = kUnset;
   }
 
   // Called once per block before ticking. Returns true if the stage is on. corrOffset is
-  // Autotune's correction in semitones.
+  // Autotune's correction in semitones. libm runs only when the level or the glide time moved, and
+  // the taps' windows sync only while the voice sounds.
   bool prepare(const OctaveParams& p, float corrOffset) {
     const int s = p.semitones < -kMaxSemis ? -kMaxSemis : (p.semitones > kMaxSemis ? kMaxSemis : p.semitones);
     const OctaveTuning& t = p.tuning;
     const bool on = p.on && s != 0;
     semisT_ = static_cast<float>(s) + corrOffset;
-    gainT_ = on ? powf(10.0f, (t.levelDb + t.trimDb) / 20.0f) : 0.0f;
+    if (t.levelDb + t.trimDb != levelDb_) {
+      levelDb_ = t.levelDb + t.trimDb;
+      level_ = powf(10.0f, levelDb_ / 20.0f);
+    }
+    gainT_ = on ? level_ : 0.0f;
     // Smoothers start on target after reset; a silent voice jumps to its new interval instead of
     // gliding in from a stale one.
     if (fresh_ || gain_ == 0.0f) semis_ = semisT_;
     if (fresh_) gain_ = gainT_;
     fresh_ = false;
-    aGlide_ = smooth::coef(t.glideMs * 0.001f);
+    if (t.glideMs != glideMs_) {
+      glideMs_ = t.glideMs;
+      aGlide_ = smooth::coef(t.glideMs * 0.001f);
+    }
     windowSmp_ = clampf(t.grainWindowMs, kMinWindowMs, kMaxWindowMs) * kSmpPerMs;
     grains_ = t.grainCount >= kMaxGrains ? kMaxGrains : 2;
-    syncWindows();
+    if (!silent()) syncWindows();
     return on;
   }
+
+  // Gain and target both 0: prepare() has snapped the interval and the blocker sits cleared, so a
+  // tick would change nothing and return exactly 0.
+  bool silent() const { return gain_ == 0.0f && gainT_ == 0.0f; }
 
   // One sample of the voice, gain and glide applied, then a DC blocker at kWetDcBlockHz. A tap at
   // ratio r drifts (1 - r) samples of delay per sample; the sawtooth is that drift normalised to
@@ -106,6 +121,9 @@ class OctaveVoice {
   static constexpr float kMinDelay = 4.0f;
   static_assert(kMaxWindowMs * kSmpPerMs + kMinDelay + 3.0f < kVoiceRingLen, "grains would outrun the ring");
 
+  // NaN equals no input, so a cleared input recomputes on the next prepare().
+  static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();
+
   static float frac(float x) {
     x -= floorf(x);
     return x < 0.0f ? x + 1.0f : x;
@@ -138,6 +156,9 @@ class OctaveVoice {
   float semisT_ = 0.0f;
   float gainT_ = 0.0f;
   float aGlide_ = 1.0f;
+  float glideMs_ = kUnset;  // the glide time aGlide_ was computed from
+  float levelDb_ = kUnset;  // level and trim, and their gain
+  float level_ = 1.0f;
   float ratio_ = 1.0f;
   float ratioSemis_ = 0.0f;
   float windowSmp_ = 1920.0f;

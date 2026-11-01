@@ -26,6 +26,8 @@ struct PitchFxParams {
 };
 
 class PitchFx {
+  static_assert(PitchTracker::kReplaySpan < kVoiceRingLen, "the ring holds a tracker replay's history");
+
  public:
   PitchFx() { reset(); }
 
@@ -45,12 +47,17 @@ class PitchFx {
   }
 
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
-    // The tracker's buffers fill every block; it analyses while Autotune is on or still fading,
-    // so the voice keeps its period through the crossfade, and while the Crowd card is on. Octave
-    // shifts without a pitch. The 48 kHz fine pass runs only for Autotune; the Crowd card's copies
-    // drift by more than the coarse lag misses.
+    // The tracker runs while Autotune is on or still fading, so the voice keeps its period through
+    // the crossfade, and while the Crowd card is on. Octave shifts without a pitch, so with neither
+    // reader the tracker only keeps hop time, and its next start replays its history from the ring.
+    // The 48 kHz fine pass runs only for Autotune; the Crowd card's copies drift by more than the
+    // coarse lag misses.
     const bool autotune = p.autotune.on || activeAt_ > 0.0f;
-    tracker_.push(in, n, autotune || p.crowdOn, autotune);
+    if (autotune || p.crowdOn) {
+      tracker_.push(in, n, autotune, PitchTracker::History{ring_.data(), kVoiceRingLen, head()});
+    } else {
+      tracker_.idle(n);
+    }
     const Targets t = prepareVoices(p);
     if (fresh_) {
       mix_ = t.mix;
@@ -133,21 +140,25 @@ class PitchFx {
   }
 
   // The smoothers step once per sample; the gains they set are evaluated at the block edges and
-  // interpolated between, which is exact once settled.
+  // interpolated between, which is exact once settled. Settled smoothers hold their targets bit for
+  // bit, so their steps and the gains are skipped, and a silent Octave voice would only return 0.
   void mixBlock(const float* in, float* out, int n, const Targets& t) {
     const Gains g0 = gains_;
-    for (int k = 0; k < n; ++k) {
-      activeAt_ = smooth::step(activeAt_, t.activeAt, smooth::kSmoothCoef);
-      mix_ = smooth::step(mix_, t.mix, smooth::kSmoothCoef);
-      active_ = smooth::step(active_, t.active, smooth::kSmoothCoef);
+    if (activeAt_ != t.activeAt || mix_ != t.mix || active_ != t.active) {
+      for (int k = 0; k < n; ++k) {
+        activeAt_ = smooth::step(activeAt_, t.activeAt, smooth::kSmoothCoef);
+        mix_ = smooth::step(mix_, t.mix, smooth::kSmoothCoef);
+        active_ = smooth::step(active_, t.active, smooth::kSmoothCoef);
+      }
+      gains_ = gainsNow();
     }
-    gains_ = gainsNow();
     const Gains g1 = gains_;
     const float period = tracker_.result().period;
     const float inv = 1.0f / static_cast<float>(n);
+    const bool octave = !octave_.silent();
     for (int i = 0; i < n; ++i) {
       ring_[static_cast<size_t>(writeCount_)] = in[i];
-      const float oct = octave_.tick(ring_, writeCount_);
+      const float oct = octave ? octave_.tick(ring_, writeCount_) : 0.0f;
       const float f = static_cast<float>(i + 1) * inv;
       const float at = g0.at + (g1.at - g0.at) * f;
       const float base =
