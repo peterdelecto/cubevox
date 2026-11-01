@@ -147,3 +147,25 @@ TAIL `D` (60..1000 ms):
 4. The host bench put the card at 1.2 times Echo's cost; the row is {5, 6} (section 8).
 5. Owner 2026-11-01, after auditioning in the emulator: "it's cool. it's not the effect i intended
    but we should keep it and refine it." The card stays; refinement waits for the owner's direction.
+
+## 13. Refinement (owner 2026-11-01)
+
+Owner, after the first audition: more time for the stutters, the lower knob named AMOUNT, then:
+"rotate yes", the tail may finish under the next word ("ok"), "it should take its input from
+post-octave at latest (assuming its activated). not mob. mob would just be muddle.", and the upper
+knob named LINGER.
+
+1. Knobs. Upper LINGER, 60 ms to 2 s, log (was TAIL, 60 ms to 1 s; same laws). Lower AMOUNT (was
+   BLOOM).
+2. Rotation. Bloom keeps the word's last four slices. Through the word the newest slice loops, as
+   now. After the word ends the tail plays the kept slices in the order they were sung, each for
+   one re-capture interval (±5 %), spliced over 5.8 ms, round and round until the tail closes. A
+   word that left fewer slices rotates the ones it has.
+3. Overlap. A new word no longer cuts the old tail. The old tail keeps its slices and its own fade
+   and closes on its own, while the new word starts its own loop. At most two run at once: a third
+   word fades the oldest tail out over 20 ms.
+4. Source. Bloom cuts its slices from the chain after the pitch stage: the signal leaving the last
+   slot that holds Autotune, Octave or Formant, before MOB, Unison, Echo and Distortion. A layout
+   with none of those cuts after slot 1. The dry path is still slot 7's own input; the loops add to
+   it. The word key stays the Input gate's.
+5. Memory. Eight float slices of 80 ms, 122,880 B, in D1 SRAM (two tails of four).
