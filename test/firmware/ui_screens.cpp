@@ -193,7 +193,7 @@ void checkReadoutRolling() {
 
 void checkReadoutRows() {
   const Canvas c = readoutOf(4, 0, 210.0f);
-  check(sameRows(c, titleBarOf("5 SLAPBACK"), 0, kNameTop),
+  check(sameRows(c, titleBarOf("5 ECHO"), 0, kNameTop),
         "readout: the first rows are the slot, a space and the card in black 7X12 on a bar, top at row 1");
   Canvas name;
   name.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), "TIME")) / 2, kNameTop, font9x12(), "TIME");
