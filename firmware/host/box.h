@@ -14,6 +14,7 @@
 #include "core/display.h"
 #include "core/knob_filter.h"
 #include "core/layout.h"
+#include "core/load_led.h"
 #include "core/loop_policy.h"
 #include "core/mute_sequence.h"
 #include "core/panel.h"
@@ -58,12 +59,6 @@ class HostDisplay : public Display {
   Pixels pixels_ = {};
 };
 
-// The heartbeat LED: lit for meanPercent of each period, so a heavier layout glows longer. Dark
-// while audio is not running.
-constexpr uint32_t kLedPeriodMs = 500;
-constexpr uint32_t kPercentFull = 100;
-bool ledLit(uint32_t nowMs, int meanPercent, bool audioRunning);
-
 class Box {
  public:
   // `nowMs` is the host clock at power-on; the splash and the boot timers count from it.
@@ -83,7 +78,7 @@ class Box {
   const Layout& layout() const { return layout_; }
   const char* layoutName() const { return kLayoutName; }
   LayoutCost cost() const { return layoutCost(layout_); }
-  bool led() const { return ledLit(nowMs_, cost().avg, audioRunning_); }
+  bool led() const { return loadLedLit(nowMs_, cost().avg, audioRunning_); }
   bool menuOpen() const { return menu_.open(); }
   bool splashEnded() const { return splashEnded_; }
   const Settings& settings() const { return settings_; }

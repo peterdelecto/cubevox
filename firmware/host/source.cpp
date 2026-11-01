@@ -35,6 +35,21 @@ std::string parentDir(const std::string& path) {
   return slash == std::string::npos ? std::string(".") : path.substr(0, slash);
 }
 
+// Lists the devices once and says whether any can capture. Opening none keeps a Bluetooth headset
+// out of its call profile until MIC is chosen.
+bool hasCaptureDevice() {
+  const std::unique_ptr<ma_context> context = std::make_unique<ma_context>();
+  if (ma_context_init(nullptr, 0, nullptr, context.get()) != MA_SUCCESS) return false;
+  ma_device_info* playback = nullptr;
+  ma_uint32 playbackCount = 0;
+  ma_device_info* capture = nullptr;
+  ma_uint32 captureCount = 0;
+  const bool listed =
+      ma_context_get_devices(context.get(), &playback, &playbackCount, &capture, &captureCount) == MA_SUCCESS;
+  ma_context_uninit(context.get());
+  return listed && captureCount > 0;
+}
+
 void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 frames) {
   static_cast<Source*>(device->pUserData)
       ->onAudio(static_cast<float*>(output), static_cast<const float*>(input), frames);
@@ -124,9 +139,10 @@ void Source::onAudio(float* playback, const float* capture, uint32_t frames) {
   }
 }
 
-bool Source::startDevice(AudioBlock& block) {
-  block_ = &block;
-  ma_device_config cfg = ma_device_config_init(ma_device_type_duplex);
+// Opens the device in `duplex` or playback-only form and starts it. The callback accepts any frame
+// count. False, with no device left open, when either step fails.
+bool Source::openDevice(bool duplex) {
+  ma_device_config cfg = ma_device_config_init(duplex ? ma_device_type_duplex : ma_device_type_playback);
   cfg.capture.format = ma_format_f32;
   cfg.capture.channels = kChannelsCapture;
   cfg.playback.format = ma_format_f32;
@@ -137,31 +153,59 @@ bool Source::startDevice(AudioBlock& block) {
   cfg.pUserData = this;
 
   device_ = std::make_unique<ma_device>();
-  micAvailable_ = ma_device_init(nullptr, &cfg, device_.get()) == MA_SUCCESS;
-  if (!micAvailable_) {
-    std::fprintf(stderr, "[WARN] audio: no input device, the clip plays\n");
-    cfg.deviceType = ma_device_type_playback;
-    if (ma_device_init(nullptr, &cfg, device_.get()) != MA_SUCCESS) {
-      std::fprintf(stderr, "[ERROR] audio: no output device\n");
-      device_.reset();
-      return false;
-    }
+  if (ma_device_init(nullptr, &cfg, device_.get()) != MA_SUCCESS) {
+    device_.reset();
+    return false;
   }
   if (ma_device_start(device_.get()) != MA_SUCCESS) {
-    std::fprintf(stderr, "[ERROR] audio: the device did not start\n");
     ma_device_uninit(device_.get());
     device_.reset();
-    micAvailable_ = false;
     return false;
   }
   return true;
 }
 
-void Source::stopDevice() {
+void Source::closeDevice() {
   if (!device_) return;
   ma_device_uninit(device_.get());
   device_.reset();
+}
+
+bool Source::startDevice(AudioBlock& block) {
+  block_ = &block;
+  micAvailable_ = hasCaptureDevice();
+  if (!micAvailable_) std::fprintf(stderr, "[WARN] audio: no input device, the clip plays\n");
+  if (openDevice(false)) return true;
+  std::fprintf(stderr, "[ERROR] audio: no output device\n");
   micAvailable_ = false;
+  return false;
+}
+
+void Source::stopDevice() {
+  closeDevice();
+  micAvailable_ = false;
+}
+
+// The device is closed while it reopens, so the callback never runs across the change. A duplex
+// open that fails (no permission, the input went away) dims MIC and goes back to the clip.
+void Source::setUseMic(bool on) {
+  if (on == useMic_.load(std::memory_order_relaxed)) return;
+  if (!device_) {
+    useMic_.store(on && micAvailable_, std::memory_order_relaxed);
+    return;
+  }
+  if (on && !micAvailable_) return;
+  closeDevice();
+  if (openDevice(on)) {
+    useMic_.store(on, std::memory_order_relaxed);
+    return;
+  }
+  useMic_.store(false, std::memory_order_relaxed);
+  if (on) {
+    std::fprintf(stderr, "[WARN] audio: the input did not open, the clip plays\n");
+    micAvailable_ = false;
+  }
+  if (!openDevice(false)) std::fprintf(stderr, "[ERROR] audio: no output device\n");
 }
 
 }  // namespace host

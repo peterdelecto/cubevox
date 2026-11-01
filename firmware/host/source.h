@@ -36,15 +36,18 @@ class Source {
   // Copies the next `n` clip samples, wrapping at the end. Silence when no clip is loaded.
   void readClip(float* dst, int n);
 
-  // Opens the duplex device and starts it: mic in, mono, and stereo out, 48 kHz, period of one
-  // block. Falls back to playback only when there is no input. False when no device starts.
+  // Starts the device playback only (stereo out, 48 kHz, period of one block), so a Bluetooth
+  // headset keeps its music profile while the clip plays. Looks for a capture device by listing
+  // the devices, without opening one. False when no output device starts.
   bool startDevice(AudioBlock& block);
   void stopDevice();
 
-  // True when the device has a capture side, so the MIC position can be chosen.
+  // True when a capture device exists and the last duplex open did not fail, so MIC can be chosen.
   bool micAvailable() const { return micAvailable_; }
 
-  void setUseMic(bool on) { useMic_.store(on, std::memory_order_relaxed); }
+  // Picks the source. MIC reopens the device duplex (mic in, mono, and stereo out); CLIP reopens it
+  // playback only. A duplex open that fails leaves the clip playing and clears micAvailable().
+  void setUseMic(bool on);
   bool useMic() const { return useMic_.load(std::memory_order_relaxed); }
 
   const std::string& clipPath() const { return clipPath_; }
@@ -53,6 +56,9 @@ class Source {
   void onAudio(float* playback, const float* capture, uint32_t frames);
 
  private:
+  bool openDevice(bool duplex);
+  void closeDevice();
+
   std::vector<float> clip_;
   size_t clipPos_ = 0;
   std::string clipPath_;

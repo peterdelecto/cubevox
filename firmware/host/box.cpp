@@ -24,10 +24,6 @@ void HostDisplay::flushStep(Canvas& canvas) {
   canvas.clearDirty(p);
 }
 
-bool ledLit(uint32_t nowMs, int meanPercent, bool audioRunning) {
-  return audioRunning && (nowMs % kLedPeriodMs) * kPercentFull < kLedPeriodMs * static_cast<uint32_t>(meanPercent);
-}
-
 Box::Box(AudioBlock& audio, uint32_t nowMs) : audio_(audio), nowMs_(nowMs) {
   // The firmware keeps the relay open for kRelayCloseAfterPowerOnMs after power-on so the output
   // capacitor can settle. A Mac has no capacitor, so the sequence starts as if power came on that
