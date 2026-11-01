@@ -1,5 +1,6 @@
 // PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, the pane
-// oracle, the enable rebuild spread over blocks, no-alloc. No window, no audio device.
+// oracle, the enable rebuild spread over blocks, the replay after an idle spell, no-alloc.
+// No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -44,12 +45,11 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kA3 = 220.0;
 constexpr int kSettle = cv::kSampleRate / 10;  // 100 ms
 
-// Mirrors the tracker's private kFineW and kFineSpan. The tracker keeps the
-// newest kFineSpan samples and compares the oldest kFineW of them against a
+// The tracker keeps the newest kFineSpan samples and compares the oldest kFineW of them against a
 // copy one lag newer, so a hop's pitch belongs to the sample at
 // end - kFineSpan + kFineW / 2 + lag / 2.
-constexpr int kFineWindow = 1024;
-constexpr int kFineSpan = 1710;
+constexpr int kFineWindow = cv::PitchTracker::kFineWForTest;
+constexpr int kFineSpan = cv::PitchTracker::kFineSpanForTest;
 
 int pitchCentre(int end, double hz) {
   return end - kFineSpan + kFineWindow / 2 + static_cast<int>(0.5 * cv::kSampleRate / hz);
@@ -332,6 +332,41 @@ bool testEnableReports() {
                 "voiced %.0f blocks after the enable (<= 8) at %.3f cents off A3 (<= 0.5)", firstVoiced, err);
 }
 
+// 7. After an idle spell the tracker replays its history from the caller's ring: no block computes
+// more panes than a rebuild's, the first voiced result comes within 11 blocks of the enable, and it
+// equals a tracker that never went idle. Enables land on each of the hop's four blocks.
+bool testIdleReplay() {
+  constexpr int kRingLen = 4096;
+  const std::vector<float> x = tone(kA3, cv::kSampleRate);
+  int worstPanes = 0, latest = 0;
+  double worstCents = 0.0;
+  for (int idle = 200; idle < 204; ++idle) {
+    cv::PitchTracker t, ref;
+    std::vector<float> ring(kRingLen, 0.0f);
+    int head = 0, first = -1;
+    for (int b = 0; first < 0 && b < 2 * idle; ++b) {
+      const float* in = &x[static_cast<size_t>(b * cv::kBlock)];
+      gInProcess = true;
+      if (b < idle) t.idle(cv::kBlock);
+      if (b >= idle) t.push(in, cv::kBlock, true, cv::PitchTracker::History{ring.data(), kRingLen, head});
+      ref.push(in, cv::kBlock);
+      gInProcess = false;
+      for (int i = 0; i < cv::kBlock; ++i, head = (head + 1) % kRingLen) ring[static_cast<size_t>(head)] = in[i];
+      if (b < idle) continue;
+      worstPanes = std::max(worstPanes, t.panesLastPushForTest());
+      if (!t.result().voiced) continue;
+      first = b - idle + 1;
+      worstCents = std::max(worstCents, std::fabs(cents(t.result().rawHz, ref.result().rawHz)));
+    }
+    latest = first < 0 ? 9999 : std::max(latest, first);
+  }
+  const int maxPanes = cv::PitchTracker::kRebuildPanesPerBlock + 1;
+  return report("idle replay", worstPanes <= maxPanes && latest <= 11 && worstCents <= 0.01,
+                "worst block %.0f panes (<= %.0f), first voiced by %.0f blocks after the enable (<= 11), "
+                "%.4f cents off a tracker that never idled (<= 0.01)",
+                worstPanes, maxPanes, latest, worstCents);
+}
+
 }  // namespace
 
 int main() {
@@ -342,6 +377,7 @@ int main() {
   ok &= testOracle();
   ok &= testEnableSpread();
   ok &= testEnableReports();
+  ok &= testIdleReplay();
   // Every push() call above ran under the allocation guard.
   ok &= report("no allocation", true, "push() ran under the new/delete guard", 0.0);
   std::printf("%s pitch\n", ok ? "PASS" : "FAIL");

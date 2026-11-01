@@ -16,9 +16,9 @@
   `wrapOnce`, `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, and `blockCoef` for a one-pole stepped once per block).
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
-- `PitchFx` lives in DTCM: 69,376 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`); the 190.75 ms
+- `PitchFx` lives in DTCM: 61,236 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`); the 190.75 ms
   input ring is 36,624 B of it, sized in `psola.h` for the Crowd card's 150 ms lag ceiling, 12 ms of
-  scatter and the longest grain. The build prints DTCM at 69,376 B, 53.0 %, 61,440 B free.
+  scatter and the longest grain. The build prints DTCM at 61,248 B, 46.8 %, 69,568 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

@@ -48,14 +48,14 @@ class PsolaVoice {
   void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinReadDelay + 1.0f, kGrainDelay); }
   float grainDelay() const { return grainDelay_; }
 
-  // One output sample. writeCount is the ring index of the sample just
-  // written, already wrapped below kVoiceRingLen by the owner. period is the
-  // sung period in samples (last voiced), ratio the pitch ratio (clamped 0.5..2.0).
-  float tick(const VoiceRing& ring, long writeCount, float period, float ratio) {
+  // One output sample. writeCount is the ring index of the sample just written, already wrapped
+  // below kVoiceRingLen by the owner. period is the sung period in samples (last voiced),
+  // inverseRatio the inverse of the pitch ratio, which clamps to 0.5..2.0 as the ratio does.
+  float tick(const VoiceRing& ring, long writeCount, float period, float inverseRatio) {
     if (period <= 0.0f) return 0.0f;
     const float p = clampf(period, kMinPeriod, kMaxPeriod);
-    const float r = clampf(ratio, kMinPitchRatio, kMaxPitchRatio);
-    const float outPeriod = p / r;
+    const float inv = clampf(inverseRatio, 1.0f / kMaxPitchRatio, 1.0f / kMinPitchRatio);
+    const float outPeriod = p * inv;
     const int head = static_cast<int>(writeCount);
 
     advanceMarks(p);
@@ -68,7 +68,7 @@ class PsolaVoice {
 
     float sum = 0.0f;
     for (Grain& g : grains_) sum += play(ring, g);
-    return sum / r;
+    return sum * inv;
   }
 
  private:
@@ -127,9 +127,17 @@ class PsolaVoice {
     const float w = g.window.window();
     g.window.advance();
     g.age += 1.0f;
-    const float y = g.w.m * ring[wrap(g.idx - 1)] + g.w.z * ring[g.idx] +
-                    g.w.p * ring[wrap(g.idx + 1)] + g.w.q * ring[wrap(g.idx + 2)];
-    g.idx = wrap(g.idx + 1);
+    // One unsigned test keeps the four taps idx - 1 .. idx + 2 inside the ring; only a read across
+    // the ring's seam takes the wrapped path.
+    const int i = g.idx;
+    float y;
+    if (static_cast<unsigned>(i - 1) < static_cast<unsigned>(kVoiceRingLen - 3)) {
+      const float* r = ring.data() + i;
+      y = g.w.m * r[-1] + g.w.z * r[0] + g.w.p * r[1] + g.w.q * r[2];
+    } else {
+      y = g.w.m * ring[wrap(i - 1)] + g.w.z * ring[i] + g.w.p * ring[wrap(i + 1)] + g.w.q * ring[wrap(i + 2)];
+    }
+    g.idx = i + 1 == kVoiceRingLen ? 0 : i + 1;
     return w * y;
   }
 
