@@ -51,11 +51,13 @@ struct RenderParams {
   cv::PolishParams eq;
 };
 
+static_assert(cv::kKeyCount == 12, "the usage text names keys 0..11");
+
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-render <in> <out.wav> [--depth <0..1>] [--on 0|1] "
                "[--tuning k=v ...]\n"
-               "       [--autotune] [--atkey <0..11>, alias --key] [--response <1..500 ms>]\n"
+               "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..1>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
@@ -99,7 +101,7 @@ int usage() {
                "     sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive sbDwellComp sbWetDb\n"
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
-               "     atTrimDb atMaxCorrectSemis (0..12) atGrainDelay\n"
+               "     atTrimDb atGrainDelay\n"
                "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
                "     (-12..12) crowdShelfDb0..3 (-12..12) crowdShelfHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
                "     crowdLagScale (0.5..2) crowdScatterMs (0..30) crowdDriftCents (0..50) crowdMaxLagMs (0..150)\n"
@@ -218,8 +220,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"topWetDb", &t.topWetDb},
       {"octGrainWindowMs", &ot.grainWindowMs}, {"octGrainCount", &octGrains},
       {"octTrimDb", &ot.trimDb},
-      {"atTrimDb", &at.trimDb}, {"atMaxCorrectSemis", &at.maxCorrectSemis},
-      {"atGrainDelay", &at.grainDelay},
+      {"atTrimDb", &at.trimDb}, {"atGrainDelay", &at.grainDelay},
       {"crowdVoiceDb", &ct.voiceDb},              {"crowdTrimDb", &ct.trimDb},
       {"crowdTrimBottomDb", &ct.trimBottomDb},
       {"crowdFormantSt0", &ct.formantSt[0]},      {"crowdFormantSt1", &ct.formantSt[1]},
@@ -300,7 +301,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (sb.chirpSign != 1.0f && sb.chirpSign != -1.0f) return false;
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
-    if (at.maxCorrectSemis < 0.0f || at.maxCorrectSemis > 12.0f) return false;
     if (!crowdTuningInRange(ct)) return false;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
@@ -395,9 +395,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveDwell = true;
     } else if (std::strcmp(a, "--autotune") == 0) {
       ap.on = true;
-    } else if ((std::strcmp(a, "--atkey") == 0 || std::strcmp(a, "--key") == 0) && i + 1 < argc) {
+    } else if (std::strcmp(a, "--atkey") == 0 && i + 1 < argc) {
       float k = 0.0f;
-      if (!parseFloat(argv[++i], &k) || k < 0.0f || k > 11.0f || k != std::floor(k))
+      if (!parseFloat(argv[++i], &k) || k < 0.0f || k > static_cast<float>(cv::kKeyCount - 1) || k != std::floor(k))
         return false;
       ap.key = static_cast<int>(k);
     } else if (std::strcmp(a, "--response") == 0 && i + 1 < argc) {

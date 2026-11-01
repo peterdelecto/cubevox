@@ -16,7 +16,7 @@
 namespace cv {
 
 struct PitchResult {
-  float period = 0.0f;   // samples at kSampleRate; 0 until first voiced frame
+  float period = 0.0f;   // samples at kSampleRate; 0 until the first voiced frame and while the tracker is idle
   float hz = 0.0f;
   float rawHz = 0.0f;    // newest frame before the median; one hop fresher than hz
   bool voiced = false;
@@ -38,7 +38,8 @@ class PitchTracker {
   static constexpr float kMaxHz = 1000.0f;
   static constexpr float kVoicedThreshold = 0.15f;  // YIN threshold on the coarse search
 
-  // The periods the tracker reports, in samples at kSampleRate. The PSOLA voices read these bounds.
+  // The periods the tracker reports, in samples at kSampleRate: kMaxHz and kMinHz rounded outward to
+  // a whole sample (static_asserts below). The PSOLA voices read these bounds.
   static constexpr int kMinPeriod = 48;
   static constexpr int kMaxPeriod = 686;
 
@@ -85,11 +86,13 @@ class PitchTracker {
     warm_ = 0;
   }
 
-  // Feed n <= kBlock samples. The rings always fill, so the frame is warm. Analysis runs every
-  // kHop samples while active and the panes are current. An enable rebuilds the panes over the
-  // next few blocks and analyses at the end of the block that makes them whole, unless a hop
-  // already did in that block. Inactive, the result reads unvoiced. fine runs the 48 kHz refine on
-  // the coarse lag; without it an analysis publishes the coarse lag times kDecim. A change takes
+  // Feed any n samples. The rings fill on every push, so the frame is warm only while the stage
+  // keeps running; the chain resets PitchFx when every pitch card is off, and the first voiced frame
+  // after such a switch-on comes about 32 ms in, where a running stage gives it in 8 ms. Analysis
+  // runs every kHop samples while active and the panes are current. An enable rebuilds the panes
+  // over the next few blocks and analyses at the end of the block that makes them whole, unless a hop
+  // already did in that block. Inactive, the result reads unvoiced. fine runs the 48 kHz fine pass
+  // on the coarse lag; without it an analysis publishes the coarse lag times kDecim. A change takes
   // effect at the next analysis, with nothing to rebuild.
   void push(const float* in, int n, bool active = true, bool fine = true) {
     panesThisPush_ = 0;
@@ -101,7 +104,7 @@ class PitchTracker {
     if (stale && staleFrom_ == kPanes && !analysed) analyse();
   }
 
-  // Feed n <= kBlock samples while a reader is on, as push(in, n, true, fine). After an idle spell
+  // Feed any n samples while a reader is on, as push(in, n, true, fine). After an idle spell
   // the rings first replay from the caller's ring. The low-pass restarts kReplaySpan samples before
   // the first hop at least kReplayBlocks blocks ahead, and the replay's panes come on where that
   // hop's frame starts. The replay catches up in even shares one block before that hop, so the hop's
@@ -135,6 +138,7 @@ class PitchTracker {
   static constexpr int kCoarseMaxForTest = 171;
   static constexpr int kFineWForTest = 512;
   static constexpr int kFineSpanForTest = 1198;
+  static constexpr int kDecimForTest = 4;
   const float* coarseFrameForTest() const { return coarseFrame(); }
   float lastCoarseTau() const { return lastTau_; }
   bool lastCoarsePeriodic() const { return lastPeriodic_; }
@@ -146,6 +150,7 @@ class PitchTracker {
   static constexpr int kDecLen = 512;
   static constexpr int kDecim = 4;
   static constexpr int kCoarseW = 256;
+  // The coarse lags, in decimated samples: kMaxHz and kMinHz rounded inward (static_asserts below).
   static constexpr int kCoarseMin = 12;
   static constexpr int kCoarseMax = 171;
   static constexpr int kCoarseSpan = kCoarseW + kCoarseMax;
@@ -179,6 +184,14 @@ class PitchTracker {
   // as much again as its low-pass step, so the pace counts it twice.
   static constexpr int kPaneWeight = 2;
 
+  static_assert(static_cast<float>(kMinPeriod) == kSampleRate / kMaxHz &&
+                    static_cast<float>(kMaxPeriod) >= kSampleRate / kMinHz &&
+                    static_cast<float>(kMaxPeriod - 1) < kSampleRate / kMinHz,
+                "the periods are the search range kMaxHz to kMinHz in samples, the slow end rounded up");
+  static_assert(static_cast<float>(kCoarseMin) == static_cast<float>(kSampleRate / kDecim) / kMaxHz &&
+                    static_cast<float>(kCoarseMax) <= static_cast<float>(kSampleRate / kDecim) / kMinHz &&
+                    static_cast<float>(kCoarseMax + 1) > static_cast<float>(kSampleRate / kDecim) / kMinHz,
+                "the coarse lags are the search range in decimated samples, the slow end rounded down");
   static_assert(kCoarseW % 4 == 0 && kFineW % 4 == 0, "windows must unroll by four");
   static_assert(kCoarseMax % 2 == 1, "the paired lag loop leaves one lag for the tail");
   static_assert(kCoarseSpan <= kDecLen, "coarse frame exceeds decimated ring");
@@ -191,7 +204,8 @@ class PitchTracker {
   static_assert(kCoarseWForTest == kCoarseW && kCoarseMinForTest == kCoarseMin &&
                     kCoarseMaxForTest == kCoarseMax,
                 "test hooks mirror the coarse constants");
-  static_assert(kFineWForTest == kFineW && kFineSpanForTest == kFineSpan, "test hooks mirror the fine constants");
+  static_assert(kFineWForTest == kFineW && kFineSpanForTest == kFineSpan && kDecimForTest == kDecim,
+                "test hooks mirror the fine and decimation constants");
   static_assert(kFineSpan <= kFullLen, "fine frame exceeds full-rate ring");
   static_assert(kHop % kBlock == 0 && kLevelW % kBlock == 0, "level blocks tile the hop and the window");
   static_assert(kRebuildPanesPerBlock >= 1, "an enable must make progress on its rebuild");
@@ -262,7 +276,7 @@ class PitchTracker {
     float tau = 0.0f;
     const bool periodic = coarse(tau);
     if (periodic && loud()) {
-      publishVoiced(fine_ ? refine(tau) : tau * static_cast<float>(kDecim));
+      publishVoiced(fine_ ? finePass(tau) : tau * static_cast<float>(kDecim));
       result_.outOfRange = lastOutOfRange_;
       result_.clamped = lastClamped_;
     } else {
@@ -295,7 +309,6 @@ class PitchTracker {
   // YIN on the 12 kHz frame. Returns whether min d' is below kVoicedThreshold
   // and writes the interpolated candidate lag in decimated samples.
   bool coarse(float& tau) {
-    constexpr float threshold = kVoicedThreshold;
     std::array<float, kRowLen> d{};
     frameSums(d);
     float running = 0.0f;
@@ -307,7 +320,7 @@ class PitchTracker {
     int first = -1;
     for (int t = kCoarseMin; t <= kCoarseMax; ++t) {
       if (cmnd_[t] < cmnd_[best]) best = t;
-      if (first < 0 && cmnd_[t] < threshold) first = t;
+      if (first < 0 && cmnd_[t] < kVoicedThreshold) first = t;
     }
     if (first >= 0) {
       while (first < kCoarseMax && cmnd_[first + 1] < cmnd_[first]) ++first;
@@ -317,7 +330,7 @@ class PitchTracker {
         pick < kCoarseMax ? parabolic(cmnd_[pick - 1], cmnd_[pick], cmnd_[pick + 1]) : 0.0f;
     tau = static_cast<float>(pick) + off;
     lastTau_ = tau;
-    lastPeriodic_ = cmnd_[best] < threshold;
+    lastPeriodic_ = cmnd_[best] < kVoicedThreshold;
     lastClamped_ = pick == kCoarseMax;
     lastOutOfRange_ = lastClamped_ || dipsBelowRange();
     return lastPeriodic_;
@@ -506,13 +519,13 @@ class PitchTracker {
     ++panesThisPush_;
   }
 
-  // The fine pass: the plain difference function at 48 kHz around 4 * tau. Inside the reach it has
-  // one dip, so the pass sums the centre lag and its two neighbours, then walks one lag at a time
-  // toward the lower neighbour while the sum keeps falling, never past lo or hi. A tie goes to the
-  // lower lag, as a scan up from lo would pick. Each lag is summed at most once; the parabola reads
-  // the lowest sum and its two neighbours. A minimum on kMinPeriod or kMaxPeriod marks the frame
-  // clamped.
-  float refine(float tauCoarse) {
+  // The fine pass: the plain difference function at 48 kHz around kDecim * tauCoarse, kFineReach lags
+  // each side. Inside the reach it has one dip, so the pass sums the centre lag and its two
+  // neighbours, then walks one lag at a time toward the lower neighbour while the sum keeps falling,
+  // never past lo or hi. A tie goes to the lower lag, as a scan up from lo would pick. Each lag is
+  // summed at most once; the parabola reads the lowest sum and its two neighbours. A minimum on
+  // kMinPeriod or kMaxPeriod marks the frame clamped.
+  float finePass(float tauCoarse) {
     const int centre = static_cast<int>(floorf(tauCoarse * kDecim + 0.5f));
     const int lo = centre - kFineReach < kMinPeriod ? kMinPeriod : centre - kFineReach;
     const int hi = centre + kFineReach > kMaxPeriod ? kMaxPeriod : centre + kFineReach;

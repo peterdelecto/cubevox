@@ -26,7 +26,7 @@ struct OctaveTuning {
 };
 
 struct OctaveParams {
-  bool on = true;      // panel toggle; off fades the stage out
+  bool on = false;     // panel toggle, off at the box's start; off fades the stage out
   int semitones = 12;  // panel knob, -12..12, 0 = off
   float mix = 0.15f;   // panel knob
   OctaveTuning tuning;
@@ -91,7 +91,7 @@ class OctaveVoice {
   // One sample of the voice, gain and glide applied, then a DC blocker at kWetDcBlockHz. A tap at
   // ratio r drifts (1 - r) samples of delay per sample; the sawtooth is that drift normalised to
   // the window. A silent voice (gain 0) clears the blocker, so it returns exactly 0.
-  float tick(const VoiceRing& ring, long writeCount) {
+  float tick(const VoiceRing& ring, int head) {
     gain_ = smooth::step(gain_, gainT_, smooth::kSmoothCoef);
     semis_ = smooth::step(semis_, semisT_, aGlide_);
     if (gain_ == 0.0f) {
@@ -99,7 +99,6 @@ class OctaveVoice {
       return 0.0f;
     }
     updateRatio();
-    const int head = static_cast<int>(writeCount);
     const float d0 = 0.5f * windowSmp_ + kMinDelay;
     const float inv = 1.0f / static_cast<float>(grains_);
     float sum = 0.0f;

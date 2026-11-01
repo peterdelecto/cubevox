@@ -1,7 +1,8 @@
 // Autotune checks: passthrough, scale degrees, correction, out-of-scale notes,
 // response time, Octave builds on the corrected note, hard tune, the toggle and
 // its level, the halfway point, the tracker's range ends, the first note's glide,
-// bleed, call sizes, no-alloc. No window, no audio device.
+// bleed, the plain copy after it goes off, call sizes, no-alloc. No window, no
+// audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -130,7 +131,6 @@ cv::PitchFxParams autotuneOnly(float responseMs) {
   p.autotune.on = true;
   p.autotune.key = 0;
   p.autotune.responseMs = responseMs;
-  p.octave.on = false;
   return p;
 }
 
@@ -152,15 +152,17 @@ int countDiff(const std::vector<float>& a, const std::vector<float>& b, int from
   return n;
 }
 
-// 1. Off is bit-exact. On with an in-tune A3, the output matches the input
-// delayed by the shifter latency; the lag is searched around kGrainDelay.
+// 1. Off from the start is bit-exact. On with an in-tune A3, the output matches the input delayed by
+// the voice's latency, the grain delay plus one period. That delay is not a whole number of samples
+// and a steady tone matches at every period of lag, so the test takes the best whole-sample lag within
+// 500 samples of kGrainDelay and prints only the residual.
 bool testPassthrough() {
   const std::vector<float> in = tone(kA3, cv::kSampleRate);
   cv::PitchFxParams off = autotuneOnly(60.0f);
   off.autotune.on = false;
   gFx.reset();
-  const int diff = countDiff(in, run(gFx, in, off), cv::kSampleRate / 10);
-  bool ok = report("passthrough off", diff == 0, "samples differing after 100 ms=%.0f (0)", diff);
+  const int diff = countDiff(in, run(gFx, in, off), 0);
+  bool ok = report("passthrough off", diff == 0, "samples differing=%.0f (0)", diff);
 
   gFx.reset();
   const std::vector<float> out = run(gFx, in, autotuneOnly(60.0f));
@@ -168,7 +170,6 @@ bool testPassthrough() {
   const int to = static_cast<int>(in.size());
   const double ref = rms(in, from, to);
   double bestDb = 999.0;
-  int bestLag = 0;
   for (int lag = cv::PsolaVoice::kGrainDelay - 500; lag <= cv::PsolaVoice::kGrainDelay + 500; ++lag) {
     double s = 0.0;
     for (int i = from; i < to; ++i) {
@@ -176,13 +177,11 @@ bool testPassthrough() {
       s += d * d;
     }
     const double db = 20.0 * std::log10(std::sqrt(s / (to - from)) / ref + 1e-12);
-    if (db < bestDb) {
-      bestDb = db;
-      bestLag = lag;
-    }
+    bestDb = std::min(bestDb, db);
   }
   ok &= report("passthrough in tune", bestDb <= -40.0,
-               "|out - in| RMS=%.1f dB re input at lag %.0f samples (<= -40)", bestDb, bestLag);
+               "|out - in| RMS=%.1f dB re input at the best lag within 500 samples of the grain delay (<= -40)",
+               bestDb);
   return ok;
 }
 
@@ -625,6 +624,34 @@ bool testBleed() {
                 "A3 with pink noise 5 dB under, KEY E: %.0f voiced hops pulled 0.2 st or more (<= 18)", pulled);
 }
 
+// 14. A stage switched off ends as a plain copy of its input (engine/CLAUDE.md). Autotune runs on a held
+// A3 + 50 cents for 1 s, so the corrected voice differs from the input, then goes off. From 300 ms
+// after the off edge every output sample equals its input, with no tolerance.
+bool testSwitchedOff() {
+  const int offAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
+  const int total = offAt + cv::kSampleRate;
+  const std::vector<float> in = tone(kSharp, total);
+  const cv::PitchFxParams on = autotuneOnly(1.0f);
+  cv::PitchFxParams off = on;
+  off.autotune.on = false;
+  std::vector<float> out(in.size());
+  gFx.reset();
+  for (int i = 0; i < total; i += cv::kBlock) {
+    const int n = std::min(cv::kBlock, total - i);
+    gInProcess = true;
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, i < offAt ? on : off);
+    gInProcess = false;
+  }
+  int differingOn = 0, differingOff = 0;
+  for (int i = offAt - kSettle; i < offAt; ++i)
+    differingOn += out[static_cast<size_t>(i)] != in[static_cast<size_t>(i)] ? 1 : 0;
+  for (int i = offAt + kSettle; i < total; ++i)
+    differingOff += out[static_cast<size_t>(i)] != in[static_cast<size_t>(i)] ? 1 : 0;
+  return report("switched off is a plain copy", differingOn > 0 && differingOff == 0,
+                "samples differing in the 300 ms while on=%.0f (> 0), from 300 ms after off=%.0f (0)", differingOn,
+                differingOff);
+}
+
 }  // namespace
 
 int main() {
@@ -642,6 +669,7 @@ int main() {
   ok &= testRangeEnds();
   ok &= testFirstNote();
   ok &= testBleed();
+  ok &= testSwitchedOff();
   // Every process() call above ran under the allocation guard.
   ok &= report("no allocation", true, "process() ran under the new/delete guard", 0.0);
   std::printf("%s autotune\n", ok ? "PASS" : "FAIL");

@@ -39,10 +39,11 @@ A="$WT/build/cubevox-render"
 B="$REPO/build/cubevox-render"
 
 # One case per stage at a mid setting, then every stage at once, Crowd included. The default layout
-# leaves Crowd out.
+# leaves Crowd out. Autotune's case runs at its shipped RESPONSE of 1 ms; the full chain runs 100 ms,
+# which covers a glide.
 CASES=(
   "ingate|--ingate -40"
-  "autotune|--autotune --response 100"
+  "autotune|--autotune --response 1"
   "octave|--octave -12 --omix 0.5"
   "crowd|--crowd --width 0.5 --voices 0.5"
   "unison|--on 1 --depth 0.5"

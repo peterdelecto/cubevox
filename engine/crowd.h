@@ -145,8 +145,9 @@ constexpr float kMaxLagScale = 2.0f;
 constexpr float kMinVoiceDb = -24.0f;
 constexpr float kMaxVoiceDb = 0.0f;
 constexpr float kMaxTrimDb = 12.0f;
-constexpr float kMaxScatterMs = 30.0f;
+constexpr float kMaxScatterMs = static_cast<float>(kCrowdScatterMs);  // the scatter the ring holds
 constexpr float kMaxDriftCents = 50.0f;
+static_assert(CrowdTuning{}.scatterMs <= kMaxScatterMs, "the shipped scatter exceeds what the ring holds");
 
 // The gap floor sits this far under the recent phrase level, and never under gapFloorDb. The phrase
 // level is the loudest mean square the copies read for the gap rule, through a one-pole that rises

@@ -12,10 +12,13 @@
 
 // Shared pitch front end. The tracker hears only the dry input. Autotune, when
 // on, crossfades from the dry voice to the corrected one once the tracker has a
-// period, and Octave adds its correction to the interval. The crossfade and
+// period, and Octave adds Autotune's correction to its interval. The crossfade and
 // Octave's MIX are equal-power. A voice resets on its enable edge only once its
 // crossfade has settled at zero, so a quick off and on keeps the running voice
-// instead of cutting to fresh grains.
+// instead of cutting to fresh grains. The tracker's frame is warm only while the
+// stage runs. The chain resets the stage when every pitch card is off, so the first
+// voiced frame after such a switch-on comes about 32 ms in, where a running stage
+// gives it in 8 ms.
 
 namespace cv {
 
@@ -33,13 +36,13 @@ class PitchFx {
 
   void reset() {
     ring_.fill(0.0f);
-    writeCount_ = 0;
+    head_ = 0;
     tracker_.reset();
     autotune_.reset();
     octave_.reset();
-    mix_ = 0.0f;
-    active_ = 0.0f;
-    activeAt_ = 0.0f;
+    octaveMix_ = 0.0f;
+    octaveFade_ = 0.0f;
+    autotuneFade_ = 0.0f;
     gains_ = Gains{};
     autotuneWas_ = false;
     octaveWas_ = false;
@@ -52,22 +55,22 @@ class PitchFx {
     // reader the tracker only keeps hop time, and its next start replays its history from the ring.
     // The 48 kHz fine pass runs only for Autotune; the Crowd card's copies drift by more than the
     // coarse lag misses.
-    const bool autotune = p.autotune.on || activeAt_ > 0.0f;
+    const bool autotune = p.autotune.on || autotuneFade_ > 0.0f;
     if (autotune || p.crowdOn) {
-      tracker_.push(in, n, autotune, PitchTracker::History{ring_.data(), kVoiceRingLen, head()});
+      tracker_.push(in, n, autotune, PitchTracker::History{ring_.data(), kVoiceRingLen, head_});
     } else {
       tracker_.idle(n);
     }
     const Targets t = prepareVoices(p);
     if (fresh_) {
-      mix_ = t.mix;
-      active_ = t.active;
-      activeAt_ = t.activeAt;
+      octaveMix_ = t.octaveMix;
+      octaveFade_ = t.octaveFade;
+      autotuneFade_ = t.autotuneFade;
       gains_ = gainsNow();
       fresh_ = false;
     }
     if (settledOff(t)) {
-      passThrough(in, out, n, t.mix);
+      passThrough(in, out, n, t.octaveMix);
       return;
     }
     mixBlock(in, out, n, t);
@@ -81,20 +84,20 @@ class PitchFx {
   // back instead of holding the old correction until then.
   float correctionSemis() const {
     const float live = autotune_.correctionSemis();
-    return autotuneWas_ ? live : live * activeAt_;
+    return autotuneWas_ ? live : live * autotuneFade_;
   }
 
   // The input ring and the index the next sample writes to (already wrapped). After process(),
   // the block's last sample sits at head() - 1.
   const VoiceRing& ring() const { return ring_; }
-  int head() const { return static_cast<int>(writeCount_); }
+  int head() const { return head_; }
 
  private:
   // Where the three smoothers head this block.
   struct Targets {
-    float mix;       // Octave MIX
-    float active;    // Octave on, 0 or 1
-    float activeAt;  // Autotune on with a period, 0 or 1
+    float octaveMix;       // Octave MIX
+    float octaveFade;      // Octave on, 0 or 1
+    float autotuneFade;    // Autotune on with a period, 0 or 1
   };
 
   // Equal-power gains at the smoothers' current values: Octave's dry and wet, and the crossfade from
@@ -102,18 +105,18 @@ class PitchFx {
   struct Gains {
     float dry = 1.0f;
     float wet = 0.0f;
-    float at = 0.0f;
-    float atDry = 1.0f;
+    float autotune = 0.0f;     // the corrected voice's share of the crossfade
+    float autotuneDry = 1.0f;  // the dry input's share
   };
 
   // Each voice's per-block targets. A voice coming on starts clean only when its crossfade has
   // settled at zero; while the crossfade is still up the running voice carries on.
   Targets prepareVoices(const PitchFxParams& p) {
-    if (p.autotune.on && !autotuneWas_ && activeAt_ == 0.0f) autotune_.reset();
+    if (p.autotune.on && !autotuneWas_ && autotuneFade_ == 0.0f) autotune_.reset();
     autotuneWas_ = p.autotune.on;
     const float corr = autotune_.prepare(tracker_.result(), p.autotune);
     bool octaveOn = octave_.prepare(p.octave, corr);
-    if (octaveOn && !octaveWas_ && active_ == 0.0f) {
+    if (octaveOn && !octaveWas_ && octaveFade_ == 0.0f) {
       octave_.reset();
       octaveOn = octave_.prepare(p.octave, corr);
     }
@@ -125,16 +128,16 @@ class PitchFx {
   }
 
   bool settledOff(const Targets& t) const {
-    return activeAt_ == 0.0f && t.activeAt == 0.0f && active_ == 0.0f && t.active == 0.0f;
+    return autotuneFade_ == 0.0f && t.autotuneFade == 0.0f && octaveFade_ == 0.0f && t.octaveFade == 0.0f;
   }
 
   // Every stage settled off: the dry gain is exactly 1, so only the ring needs writing. MIX can
   // snap since nothing reads it until a stage comes on.
   void passThrough(const float* in, float* out, int n, float mixTarget) {
-    mix_ = mixTarget;
+    octaveMix_ = mixTarget;
     gains_ = gainsNow();
     for (int i = 0; i < n; ++i) {
-      ring_[static_cast<size_t>(writeCount_)] = in[i];
+      ring_[static_cast<size_t>(head_)] = in[i];
       out[i] = in[i];
       advance();
     }
@@ -145,11 +148,11 @@ class PitchFx {
   // bit, so their steps and the gains are skipped, and a silent Octave voice would only return 0.
   void mixBlock(const float* in, float* out, int n, const Targets& t) {
     const Gains g0 = gains_;
-    if (activeAt_ != t.activeAt || mix_ != t.mix || active_ != t.active) {
+    if (autotuneFade_ != t.autotuneFade || octaveMix_ != t.octaveMix || octaveFade_ != t.octaveFade) {
       for (int k = 0; k < n; ++k) {
-        activeAt_ = smooth::step(activeAt_, t.activeAt, smooth::kSmoothCoef);
-        mix_ = smooth::step(mix_, t.mix, smooth::kSmoothCoef);
-        active_ = smooth::step(active_, t.active, smooth::kSmoothCoef);
+        autotuneFade_ = smooth::step(autotuneFade_, t.autotuneFade, smooth::kSmoothCoef);
+        octaveMix_ = smooth::step(octaveMix_, t.octaveMix, smooth::kSmoothCoef);
+        octaveFade_ = smooth::step(octaveFade_, t.octaveFade, smooth::kSmoothCoef);
       }
       gains_ = gainsNow();
     }
@@ -158,12 +161,12 @@ class PitchFx {
     const float inv = 1.0f / static_cast<float>(n);
     const bool octave = !octave_.silent();
     for (int i = 0; i < n; ++i) {
-      ring_[static_cast<size_t>(writeCount_)] = in[i];
-      const float oct = octave ? octave_.tick(ring_, writeCount_) : 0.0f;
+      ring_[static_cast<size_t>(head_)] = in[i];
+      const float oct = octave ? octave_.tick(ring_, head_) : 0.0f;
       const float f = static_cast<float>(i + 1) * inv;
-      const float at = g0.at + (g1.at - g0.at) * f;
-      const float atDry = g0.atDry + (g1.atDry - g0.atDry) * f;
-      const float base = at > 0.0f ? at * autotune_.tick(ring_, writeCount_, period) + atDry * in[i] : in[i];
+      const float corrected = g0.autotune + (g1.autotune - g0.autotune) * f;
+      const float dryShare = g0.autotuneDry + (g1.autotuneDry - g0.autotuneDry) * f;
+      const float base = corrected > 0.0f ? corrected * autotune_.tick(ring_, head_, period) + dryShare * in[i] : in[i];
       const float dry = g0.dry + (g1.dry - g0.dry) * f;
       const float wet = g0.wet + (g1.wet - g0.wet) * f;
       out[i] = dry * base + wet * oct;
@@ -171,30 +174,30 @@ class PitchFx {
     }
   }
 
-  // The corrected voice lags the dry input by 21 to 35 ms and may sit a semitone away, so the two
+  // The corrected voice lags the dry input by 23 to 36 ms and may sit a semitone away, so the two
   // add in power. Each crossfade gain is the sine of its own share of the quarter turn, which lands
   // exactly on 0 and 1 at both ends.
   Gains gainsNow() const {
     Gains g;
-    g.at = sinf(activeAt_ * kHalfPi);
-    g.atDry = sinf((1.0f - activeAt_) * kHalfPi);
-    g.dry = 1.0f + (cosf(mix_ * kHalfPi) - 1.0f) * active_;
-    g.wet = sinf(mix_ * kHalfPi) * active_;
+    g.autotune = sinf(autotuneFade_ * kHalfPi);
+    g.autotuneDry = sinf((1.0f - autotuneFade_) * kHalfPi);
+    g.dry = 1.0f + (cosf(octaveMix_ * kHalfPi) - 1.0f) * octaveFade_;
+    g.wet = sinf(octaveMix_ * kHalfPi) * octaveFade_;
     return g;
   }
 
-  // Voices only use writeCount modulo the ring, so wrapping here is exact.
-  void advance() { writeCount_ = writeCount_ + 1 == kVoiceRingLen ? 0 : writeCount_ + 1; }
+  // Voices only use head modulo the ring, so wrapping here is exact.
+  void advance() { head_ = head_ + 1 == kVoiceRingLen ? 0 : head_ + 1; }
 
   VoiceRing ring_{};
   PitchTracker tracker_;
   AutotuneVoice autotune_;
   OctaveVoice octave_;
-  float mix_ = 0.0f;       // Octave MIX
-  float active_ = 0.0f;    // Octave crossfade, 0 off .. 1 on
-  float activeAt_ = 0.0f;  // Autotune crossfade, 0 dry .. 1 corrected
-  Gains gains_;            // gains at the end of the last block
-  long writeCount_ = 0;
+  float octaveMix_ = 0.0f;
+  float octaveFade_ = 0.0f;    // Octave crossfade, 0 off .. 1 on
+  float autotuneFade_ = 0.0f;  // Autotune crossfade, 0 dry .. 1 corrected
+  Gains gains_;                // gains at the end of the last block
+  int head_ = 0;
   bool autotuneWas_ = false;  // last block's on-state per card, for enable edges
   bool octaveWas_ = false;
   bool fresh_ = true;
