@@ -1,5 +1,5 @@
 // Checks the OLED menu on the host. Covers the input it drops before the face shows, the closed menu,
-// the list, its scroll window and its click actions, the REVERB and DEBUG rows, the settings and
+// the list, its scroll window and its click actions, the REVERB, Unison and Crowd and DEBUG rows, the settings and
 // layout those clicks save and play, the chain and update screens, the starting screen, the timeout,
 // redraw, the screenshot files, the text grid and the list's geometry. The screens shown while the
 // menu is closed are checked in ui_screens.cpp and ui_face.cpp.
@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <utility>
 
 #include "core/canvas.h"
 #include "core/compose.h"
@@ -110,6 +111,11 @@ bool sameCanvas(const Canvas& a, const Canvas& b) {
   return true;
 }
 
+bool sameSettings(const Settings& a, const Settings& b) {
+  return a.outputLevel == b.outputLevel && a.inputJack == b.inputJack && a.polishComp == b.polishComp &&
+         a.polishEq == b.polishEq && a.topSwitch == b.topSwitch && a.debug == b.debug;
+}
+
 std::string chainRow(const Layout& layout, int slot) {
   char line[kDisplayCols + 1];
   std::snprintf(line, sizeof(line), "%d %s", slot + 1, cardDesc(layout.card[slot]).name);
@@ -149,19 +155,26 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kReverb, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug, kUpdate, kExit, kRowCount
+  kInput, kReverb, kUnisonCrowd, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
+
+// The window top when the cursor jumps straight to the last item.
+constexpr int kLastTop = kRowCount - kVisible;
+
+// The slot the default layout gives Unison, zero-based, and the slot it gives the reverb card.
+constexpr int kUnisonSlot = 3;
+constexpr int kReverbSlot = 7;
 
 // The screen row an item sits on when the cursor walked down to it one step at a time: the window
 // scrolls only once the cursor passes the last visible row.
 constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible - 1; }
 
-// The label of each item, and the value it shows for the default settings. Exit has no value and
-// Update firmware shows a chevron.
-const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "POLISH COMP", "POLISH EQ", "OUTPUT",
-                                       "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
+// The label of each item, and the value it shows for the default settings and the default layout,
+// which holds Unison in slot 4. Exit has no value and Update firmware shows a chevron.
+const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "SLOT 4", "POLISH COMP", "POLISH EQ",
+                                       "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "UNISON", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
 
 // The row as the test names it: the label, then the value after a space.
 std::string rowName(int item, const char* value) {
@@ -206,7 +219,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 9, "menu: the list holds nine items");
+  check(kRowCount == 10, "menu: the list holds ten items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string name = rowName(r, kDefaultValue[r]);
     check(listRowIs(m.canvas, r, kLabel[r], kDefaultValue[r], r == kInput), name.c_str());
@@ -245,13 +258,13 @@ void checkMenuListGeometry() {
         "menu: a bar on row 2 covers lines 32 to 45 and no line beside them");
 
   // Every item shown on a row without the bar, so its ink is measured as lit pixels. Five views,
-  // each a cursor position and the window top it gives, put each of the nine items on such a row.
+  // each a cursor position and the window top it gives, put each of the ten items on such a row.
   struct View {
     int jumpTo;
     int thenStep;
     int top;
   };
-  const View views[] = {{kInput, 0, 0}, {kReverb, 0, 0}, {kTopSwitch, 0, 2}, {kExit, 0, 5}, {kExit, -1, 5}};
+  const View views[] = {{kInput, 0, 0}, {kReverb, 0, 0}, {kTopSwitch, 0, 3}, {kExit, 0, kLastTop}, {kExit, -1, kLastTop}};
   bool seen[kRowCount] = {};
   for (const View& v : views) {
     MenuRig row;
@@ -274,7 +287,7 @@ void checkMenuListGeometry() {
   }
   bool allSeen = true;
   for (bool s : seen) allSeen = allSeen && s;
-  check(allSeen, "menu: the views measured all nine items");
+  check(allSeen, "menu: the views measured all ten items");
 
   // Every value an item can show clears the label by 7 px or more. The tightest are TOP SWITCH
   // BYPASS and UPDATE FIRMWARE >.
@@ -285,6 +298,7 @@ void checkMenuListGeometry() {
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
       {kReverb, {"SPRING", "CHASM"}},
+      {kUnisonCrowd, {"UNISON", "MOB"}},
       {kPolishComp, {"ON", "OFF"}},
       {kPolishEq, {"ON", "OFF"}},
       {kOutput, {"LINE", "MIC"}},
@@ -305,12 +319,12 @@ void checkMenuListGeometry() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 4 to 8; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 4 to 0. The window top runs from 0 to 5. Each expected canvas is
+// Going down it scrolls at items 4 to 9; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 5 to 0. The window top runs from 0 to 6. Each expected canvas is
 // composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 5, 5, 5};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 6, 6, 6};
 
   MenuRig m;
   m.step(0, true);
@@ -331,7 +345,7 @@ void checkMenuScroll() {
 
   m.step(-1, false);  // 0 back one wraps to the last item
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: a turn back from item 0 wraps to Exit with the window at its end");
+  check(sameCanvas(m.canvas, listCanvas(kLastTop, kExit)), "menu: a turn back from item 0 wraps to Exit with the window at its end");
   m.step(1, false);
   m.draw();
   check(sameCanvas(m.canvas, listCanvas(0, kInput)), "menu: a turn forward from Exit wraps to item 0 with the window at its start");
@@ -339,15 +353,15 @@ void checkMenuScroll() {
   m.step(2, false);
   m.step(3, false);  // one pass of three steps leaves the window just far enough to show item 5
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(2, kTopSwitch)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
+  check(sameCanvas(m.canvas, listCanvas(2, kOutput)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
   m.step(-2, false);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(2, kPolishEq)), "menu: and a multi-step turn back inside the window leaves it where it is");
+  check(sameCanvas(m.canvas, listCanvas(2, kPolishComp)), "menu: and a multi-step turn back inside the window leaves it where it is");
 
   MenuRig jump;
   jump.openListAt(kExit);
   jump.draw();
-  check(sameCanvas(jump.canvas, listCanvas(5, kExit)), "menu: a jump straight to Exit puts it on the last row");
+  check(sameCanvas(jump.canvas, listCanvas(kLastTop, kExit)), "menu: a jump straight to Exit puts it on the last row");
 }
 
 // The cursor and the window start over each time the menu opens.
@@ -355,7 +369,7 @@ void checkMenuScrollResets() {
   MenuRig m;
   m.openListAt(kExit);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: the list is scrolled to Exit");
+  check(sameCanvas(m.canvas, listCanvas(kLastTop, kExit)), "menu: the list is scrolled to Exit");
   check(m.step(0, true) == UiAction::None && !m.menu.open(), "menu: Exit closes the scrolled list");
   m.step(0, true);
   m.draw();
@@ -383,7 +397,7 @@ void checkMenuListPitch() {
   check(sameCanvas(m.canvas, listCanvas(0, kVisible - 1)), "menu: the cursor bar follows to the last visible row, lines 48 to 61");
   m.step(kExit - (kVisible - 1), false);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(5, kExit)), "menu: the scrolled window keeps the same pitch and the bar on its last row");
+  check(sameCanvas(m.canvas, listCanvas(kLastTop, kExit)), "menu: the scrolled window keeps the same pitch and the bar on its last row");
   check(lineIs(m.canvas, 62, false) && lineIs(m.canvas, 63, false), "menu: the last two pixel lines stay blank");
 }
 
@@ -416,10 +430,11 @@ bool cursorRowIs(const Canvas& canvas, int r, int item, const char* value) {
   return listRowIs(canvas, r, kLabel[item], value, true);
 }
 
-// What a click on each of the seven rows that flip a value asks for, what applying it reports, and the
+// What a click on each of the eight rows that flip a value asks for, what applying it reports, and the
 // value the row shows once the click is applied and once a second click undoes it. The rows are in
 // list order. The reverb click changes the layout, so it reports LayoutChanged. The others change a
-// setting.
+// setting. The Unison and Crowd click changes the layout only when the placement rules accept Crowd
+// in Unison's slot, so its row follows layoutValid and reads the same after the click when it refuses.
 struct Click {
   int item;
   UiAction action;
@@ -427,15 +442,31 @@ struct Click {
   const char* after;
   const char* back;
 };
-constexpr std::array<Click, 7> kClicks = {{
-    {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
-    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
-    {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
-    {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
-    {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
-    {kTopSwitch, UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
-    {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
-}};
+
+// Whether layoutValid accepts Crowd in Unison's slot beside Chasm, the reverb card the walk down the
+// rows has left by the time it reaches the Unison and Crowd row.
+bool crowdFitsBesideChasm() {
+  Layout walk = defaultLayout();
+  walk.card[kReverbSlot] = Card::ReverbChasm;
+  walk.card[kUnisonSlot] = Card::Crowd;
+  return layoutValid(walk).ok();
+}
+
+std::array<Click, 8> makeClicks() {
+  const bool crowd = crowdFitsBesideChasm();
+  return {{
+      {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
+      {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
+      {kUnisonCrowd, UiAction::SwapUnisonCrowd, crowd ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None,
+       crowd ? "MOB" : "UNISON", "UNISON"},
+      {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
+      {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
+      {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
+      {kTopSwitch, UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
+      {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
+  }};
+}
+const std::array<Click, 8> kClicks = makeClicks();
 
 // Opens the list and clicks each row of kClicks once, top to bottom, applying each action. The
 // cursor walks down from item 0, so a row past the fourth sits on the last list row, rowOnScreen(item).
@@ -456,14 +487,16 @@ Settings clickEveryRow(MenuRig& m) {
 }
 
 // Each row of kClicks asks for its action, applying it flips the row's setting or swaps the reverb
-// card, and a second click flips it back.
+// card or the Unison and Crowd card, and a second click flips it back.
 void checkMenuClicks() {
   MenuRig m;
   const Settings flipped = clickEveryRow(m);
   check(!flipped.polishComp && !flipped.polishEq && flipped.outputLevel == OutputLevel::Mic &&
             flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass && flipped.debug,
         "menu: six clicks flipped the six settings");
-  check(m.layout.card[7] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
+  check(m.layout.card[kReverbSlot] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
+  check(m.layout.card[kUnisonSlot] == (crowdFitsBesideChasm() ? Card::Crowd : Card::Unison),
+        "menu: the Unison and Crowd click swapped the card when the placement rules allow it");
   int at = kDebug;
   const int topAtDebug = kDebug - (kVisible - 1);  // the window the walk down left
   for (int i = static_cast<int>(kClicks.size()) - 1; i >= 0; --i) {
@@ -541,6 +574,135 @@ void checkMenuReverbClick() {
         "menu: the card swaps in the slot that holds it");
 }
 
+// The Unison and Crowd row reads the layout, so its label follows the slot that holds the card and
+// its value follows the card. With neither card placed it reads SLOT - and UNISON, the default.
+void checkMenuUnisonCrowdValue() {
+  struct Case {
+    const char* name;
+    Layout layout;
+    const char* label;
+    const char* value;
+  };
+  Layout crowd = defaultLayout();
+  crowd.card[kUnisonSlot] = Card::Crowd;
+  Layout moved = defaultLayout();  // Unison in slot 1, with Empty where it was
+  moved.card[0] = Card::Unison;
+  moved.card[kUnisonSlot] = Card::Empty;
+  Layout movedCrowd = moved;
+  movedCrowd.card[0] = Card::Crowd;
+  Layout last = defaultLayout();  // Unison in slot 8, where the reverb card was; never valid, the row still names the slot
+  last.card[kUnisonSlot] = Card::Empty;
+  last.card[kReverbSlot] = Card::Unison;
+  Layout none = defaultLayout();
+  none.card[kUnisonSlot] = Card::Empty;
+  const Case cases[] = {
+      {"Unison in slot 4", defaultLayout(), "SLOT 4", "UNISON"},
+      {"Mob in slot 4", crowd, "SLOT 4", "MOB"},
+      {"Unison in slot 1", moved, "SLOT 1", "UNISON"},
+      {"Mob in slot 1", movedCrowd, "SLOT 1", "MOB"},
+      {"Unison in slot 8", last, "SLOT 8", "UNISON"},
+      {"a layout with neither card", none, "SLOT -", "UNISON"},
+  };
+  for (const Case& c : cases) {
+    MenuRig m;
+    m.layout = c.layout;
+    m.openListAt(kUnisonCrowd);
+    m.draw();
+    const std::string name = std::string("menu: the Unison and Crowd row reads ") + c.label + " " + c.value + " for " + c.name;
+    check(listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), c.label, c.value, true), name.c_str());
+  }
+}
+
+// The row repaints when only its label changes, which happens when the card moves to another slot
+// and keeps its kind.
+void checkMenuUnisonCrowdRedraw() {
+  MenuRig m;
+  m.openListAt(kUnisonCrowd);
+  m.draw();
+  clearAllDirty(m.canvas);
+  m.draw();
+  check(pagesClean(m.canvas), "menu: an unchanged Unison and Crowd row is not redrawn");
+  std::swap(m.layout.card[kUnisonSlot], m.layout.card[kUnisonSlot + 1]);  // Unison to slot 5, Slapback to slot 4
+  m.draw();
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT 5", "UNISON", true),
+        "menu: moving Unison to slot 5 repaints the row with the new slot and the same value");
+}
+
+// A click on the Unison and Crowd row swaps the card in the slot that holds it and leaves every other
+// slot alone. Whether the other card is accepted follows layoutValid, so each expected layout is
+// derived from it and the checks hold under any cost row for Crowd.
+void checkMenuUnisonCrowdClick() {
+  const Layout start = defaultLayout();
+  Layout swapped = start;
+  swapped.card[kUnisonSlot] = Card::Crowd;
+  const bool fits = layoutValid(swapped).ok();
+
+  MenuRig m;
+  m.openListAt(kUnisonCrowd);
+  const UiAction a = m.step(0, true);
+  check(a == UiAction::SwapUnisonCrowd, "menu: a click on the Unison and Crowd row asks for the swap");
+  const ui::ApplyResult result = ui::applyAction(a, m.settings, m.layout);
+  check(result == (fits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None),
+        "menu: the swap changes the layout when layoutValid accepts it and reports nothing when it does not");
+  check(m.layout == (fits ? swapped : start), "menu: Unison becomes Mob in its slot with the other slots as they were, or stays");
+  m.draw();
+  check(cursorRowIs(m.canvas, rowOnScreen(kUnisonCrowd), kUnisonCrowd, fits ? "MOB" : "UNISON"),
+        "menu: the row shows the card the layout holds after the click");
+  check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
+
+  const ui::ApplyResult back = ui::applyAction(m.step(0, true), m.settings, m.layout);
+  check(back == (fits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None) && m.layout == start,
+        "menu: a second click swaps Mob back to Unison, or leaves Unison where it was");
+
+  // Mob placed first: the click asks for Unison, which layoutValid decides.
+  MenuRig mob;
+  mob.layout = swapped;
+  mob.openListAt(kUnisonCrowd);
+  const bool unisonFits = layoutValid(start).ok();
+  check(ui::applyAction(mob.step(0, true), mob.settings, mob.layout) ==
+                (unisonFits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None) &&
+            mob.layout == (unisonFits ? start : swapped),
+        "menu: a click with Mob placed swaps it to Unison when layoutValid accepts it");
+
+  // The card sits in slot 1 and slot 4 is empty: the swap happens in slot 1 and leaves slot 4 alone.
+  MenuRig moved;
+  moved.layout.card[0] = Card::Unison;
+  moved.layout.card[kUnisonSlot] = Card::Empty;
+  Layout movedNext = moved.layout;
+  movedNext.card[0] = Card::Crowd;
+  const bool movedFits = layoutValid(movedNext).ok();
+  const Layout movedBefore = moved.layout;
+  moved.openListAt(kUnisonCrowd);
+  check(ui::applyAction(moved.step(0, true), moved.settings, moved.layout) ==
+                (movedFits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None) &&
+            moved.layout == (movedFits ? movedNext : movedBefore),
+        "menu: the card swaps in the slot that holds it");
+
+  // Both cards placed: the finder names the first slot and the other card would repeat, so layoutValid refuses.
+  MenuRig both;
+  both.layout.card[1] = Card::Crowd;
+  both.openListAt(kUnisonCrowd);
+  const Layout bothBefore = both.layout;
+  check(ui::applyAction(both.step(0, true), both.settings, both.layout) == ui::ApplyResult::None && both.layout == bothBefore,
+        "menu: with Unison and Mob both placed the click changes nothing");
+}
+
+// With neither card placed the row reads SLOT - and a click asks for the swap but changes nothing.
+void checkMenuUnisonCrowdNoSlot() {
+  MenuRig m;
+  m.layout.card[kUnisonSlot] = Card::Empty;
+  m.openListAt(kUnisonCrowd);
+  m.draw();
+  check(listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT -", "UNISON", true), "menu: the row reads SLOT - with no card to swap");
+  const Layout before = m.layout;
+  const UiAction a = m.step(0, true);
+  check(a == UiAction::SwapUnisonCrowd && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::None &&
+            m.layout == before && sameSettings(m.settings, Settings()),
+        "menu: a click on SLOT - changes nothing");
+  m.draw();
+  check(listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT -", "UNISON", true), "menu: the row still reads SLOT - after the click");
+}
+
 // The DEBUG row toggles its setting, shows OFF by default and sits below TOP SWITCH.
 void checkMenuDebugRow() {
   MenuRig m;
@@ -557,10 +719,10 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The nine rows, in the order of the polish spec, with the labels written out and the cursor
-// walked down one step at a time. The input filters are not on the list.
+// The ten rows in list order, with the labels written out and the cursor walked down one step at a
+// time. The input filters are not on the list, and the Unison and Crowd row follows REVERB.
 void checkMenuRowOrder() {
-  static const char* const kSpecOrder[kRowCount] = {"INPUT", "REVERB", "POLISH COMP", "POLISH EQ", "OUTPUT",
+  static const char* const kSpecOrder[kRowCount] = {"INPUT", "REVERB", "SLOT 4", "POLISH COMP", "POLISH EQ", "OUTPUT",
                                                     "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
   m.step(0, true);
@@ -570,7 +732,8 @@ void checkMenuRowOrder() {
     m.draw();
     inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
-  check(inOrder && kRowCount == 9, "menu: the rows run INPUT, REVERB, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, UPDATE FIRMWARE, EXIT");
+  check(inOrder && kRowCount == 10,
+        "menu: the rows run INPUT, REVERB, SLOT 4, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, UPDATE FIRMWARE, EXIT");
 }
 
 // The POLISH EQ row drives both halves of the stage: one click turns the one `on` off for the front
@@ -679,12 +842,12 @@ void checkMenuDeafUntilListening() {
 
 void checkMenuWrapAndCombo() {
   MenuRig m;
-  m.openListAt(kRowCount + 2);  // a full lap and two more detents lands on item 2
+  m.openListAt(kRowCount + kPolishComp);  // a full lap and more detents lands on POLISH COMP
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: +11 detents wraps around the list");
-  m.step(-(kRowCount + 2), false);  // back by the same lands on item 0
+  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: a lap and three detents wraps around the list");
+  m.step(-(kRowCount + kPolishComp), false);  // back by the same lands on item 0
   m.draw();
-  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: -11 detents wraps the other way");
+  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: a lap and three detents back wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
@@ -781,7 +944,7 @@ void checkMenuRedraw() {
   check(pagesClean(m.canvas), "menu: an unchanged frame is not redrawn");
 
   // A change to anything the list shows repaints; a change to a row outside the window does not.
-  m.settings.outputLevel = OutputLevel::Mic;  // OUTPUT is item 4, outside the window of items 0 to 3
+  m.settings.outputLevel = OutputLevel::Mic;  // OUTPUT is item 5, outside the window of items 0 to 3
   m.draw();
   check(pagesClean(m.canvas), "menu: a value change outside the window is not redrawn");
   m.settings.inputJack = InputJack::Line;
@@ -795,7 +958,7 @@ void checkMenuRedraw() {
   clearAllDirty(m.canvas);
   m.step(3, false);  // the cursor passes the last row to item 4, so the window scrolls to start at item 1
   m.draw();
-  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kOutput, "MIC"), "menu: a scroll repaints");
+  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kPolishEq, "ON"), "menu: a scroll repaints");
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: and the scrolled window is then skipped when unchanged");
@@ -820,10 +983,27 @@ void checkScreenshots() {
   check(listRows, "screens: menu rows");
   writePgm(m.canvas, "oled-menu.pgm");
 
+  // The first page with the cursor on the Unison and Crowd row, once with each card.
+  MenuRig unison;
+  unison.openListAt(kUnisonCrowd);
+  unison.draw();
+  check(cursorRowIs(unison.canvas, kUnisonCrowd, kUnisonCrowd, "UNISON") &&
+            listRowIs(unison.canvas, kReverb, kLabel[kReverb], kDefaultValue[kReverb]) &&
+            listRowIs(unison.canvas, kPolishComp, kLabel[kPolishComp], kDefaultValue[kPolishComp]),
+        "screens: menu rows with the cursor on SLOT 4 UNISON");
+  writePgm(unison.canvas, "oled-menu-unison.pgm");
+
+  MenuRig mob;
+  mob.layout.card[kUnisonSlot] = Card::Crowd;
+  mob.openListAt(kUnisonCrowd);
+  mob.draw();
+  check(cursorRowIs(mob.canvas, kUnisonCrowd, kUnisonCrowd, "MOB"), "screens: menu rows with the cursor on SLOT 4 MOB");
+  writePgm(mob.canvas, "oled-menu-mob.pgm");
+
   MenuRig scrolled;
   scrolled.openListAt(kExit);
   scrolled.draw();
-  check(sameCanvas(scrolled.canvas, listCanvas(5, kExit)), "screens: scrolled menu rows");
+  check(sameCanvas(scrolled.canvas, listCanvas(kLastTop, kExit)), "screens: scrolled menu rows");
   writePgm(scrolled.canvas, "oled-menu-scrolled.pgm");
 
   m.menu.showChainView();
@@ -859,6 +1039,10 @@ void checkMenu() {
   checkMenuClicks();
   checkMenuReverbValue();
   checkMenuReverbClick();
+  checkMenuUnisonCrowdValue();
+  checkMenuUnisonCrowdRedraw();
+  checkMenuUnisonCrowdClick();
+  checkMenuUnisonCrowdNoSlot();
   checkMenuDebugRow();
   checkMenuRowOrder();
   checkMenuPolishEqSavedAndPlayed();
