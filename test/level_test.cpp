@@ -364,7 +364,7 @@ bool lofiRows() {
   return ok;
 }
 
-// The Bloom card at its default, LINGER 300 ms and AMOUNT 50 %, on Adam's clips, once listening to its own
+// The Bloom card at its default, LENGTH 300 ms and AMOUNT 50 %, on Adam's clips, once listening to its own
 // input and once keyed by the Input gate at the registry's mid-travel setting (-55 dBFS), with the gate
 // ahead of it as the box runs them. The synthetic program carries a -40 dBFS noise floor that holds
 // Bloom's word open for the whole run, which the trim is not set for (-0.74 dB), so it has no row there.

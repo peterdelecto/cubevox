@@ -11,7 +11,7 @@
 
 // Chatter, the engine behind the Bloom card. While a word lasts, short slices of the voice loop
 // under it. Each slice plays twice, then the next cut splices in at the slice boundary. When the word
-// ends, its last good slice keeps repeating and fades over LINGER, gritty in the middle and clean at
+// ends, its last good slice keeps repeating and fades over LENGTH, gritty in the middle and clean at
 // the end (spec 2026-11-01-bloom-design, sections 12 to 14).
 //
 // A word is a key. The Input gate hands its detector state in through BloomParams, or the engine
@@ -36,7 +36,7 @@ struct BloomTuning {
   float skipDb = -12.0f;         // a slice this far under the looping slice is skipped
 
   // AMOUNT laws. The wet level is wetHi * AMOUNT^wetExp, 0 at AMOUNT 0. The slice runs from
-  // sliceLoMs at AMOUNT 0 to sliceHiMs at 100 %, and LINGER caps it at sliceTailFrac of its setting.
+  // sliceLoMs at AMOUNT 0 to sliceHiMs at 100 %, and LENGTH caps it at sliceTailFrac of its setting.
   float wetHi = 0.70f;
   float wetExp = 0.6f;
   float sliceLoMs = 80.0f;
@@ -53,7 +53,7 @@ struct BloomTuning {
   float pairDb = -3.0f;
 
   // Age and fades. During a word no slice plays longer than maxAgeMs after it was cut, and closeMs
-  // ends a loop that has nothing newer to play. A tail has no age limit and runs LINGER's law out.
+  // ends a loop that has nothing newer to play. A tail has no age limit and runs LENGTH's law out.
   // nextWordMs is the fade a new word puts on the tail it finds, and yieldMs is the faster fade a
   // tail already fading takes when another word follows.
   float maxAgeMs = 2500.0f;
@@ -61,11 +61,11 @@ struct BloomTuning {
   float nextWordMs = 150.0f;
   float yieldMs = 20.0f;
 
-  // LINGER laws.
-  float tauScale = 1.5f;  // life time constant is max(LINGER, min(tauScale * LINGER, tauMaxMs))
+  // LENGTH laws.
+  float tauScale = 1.5f;  // life time constant is max(LENGTH, min(tauScale * LENGTH, tauMaxMs))
   float tauMaxMs = 300.0f;
   float staticStart = 0.20f;  // life where the faster fade takes over
-  float staticFadeMs = 80.0f;  // its time constant, or LINGER when that is shorter
+  float staticFadeMs = 80.0f;  // its time constant, or LENGTH when that is shorter
   float closeGain = 0.001f;  // under this the wet gain writes 0 and the loop stops
 
   // Wet tone. The drive doubles through the word and swells by driveBell in the middle of the tail.
@@ -88,7 +88,7 @@ struct BloomTuning {
 
 struct BloomParams {
   bool on = true;
-  float tailMs = 300.0f;  // panel LINGER, 20..3000
+  float tailMs = 300.0f;  // panel LENGTH, 20..3000
   float bloom = 0.5f;     // panel AMOUNT, 0..1
   bool keyOpen = false;   // the Input gate's detector state for this call
   bool keyFromGate = false;  // false makes the engine listen to its own input
@@ -218,8 +218,8 @@ class Bloom {
     float fadeStep = 0.0f;
   };
 
-  // Everything AMOUNT and LINGER set for one call: the wet level, the slice length AMOUNT asks for in
-  // ms, and the longest slice LINGER allows.
+  // Everything AMOUNT and LENGTH set for one call: the wet level, the slice length AMOUNT asks for in
+  // ms, and the longest slice LENGTH allows.
   struct Law {
     float wet;
     float sliceMs;
@@ -248,7 +248,7 @@ class Bloom {
   }
 
   // The length of the next cut in samples. AMOUNT's slice drifts by up to `drift` either way, from
-  // the fixed-seed generator, so renders repeat. LINGER's cap and the floor apply after the drift.
+  // the fixed-seed generator, so renders repeat. LENGTH's cap and the floor apply after the drift.
   int nextSlice(const Law& law) {
     lcg_ = lcg_ * 1664525u + 1013904223u;
     const float r = static_cast<float>(static_cast<int32_t>(lcg_)) * (1.0f / 2147483648.0f);
