@@ -198,3 +198,15 @@ of 2026-11-01. The log at the end records how it got there and what went.
    (`autotuneFade`, `octaveFade`, `octaveMix`, `head`, `finePass`); `OctaveParams::on` defaults to
    false; the parity compare is a `static_assert`; the `--key` alias is gone. No behaviour change:
    the hashes and the printed figures hold.
+8. **2026-11-01, KEY step and the stage's own cost** (v2.01.01).
+   - KEY 4 to 5 and 10 to 9 read 1.059 times steady-state curvature, the two steps where a 220 Hz
+     note gains a semitone of correction. At hard tune the correction moved 99 % of a semitone in
+     4 ms, inside one 9 ms grain. A KEY change that moves the target now glides the correction at
+     the slower of RESPONSE and the 20 ms knob smoother, until it sits within 2 cents of the target
+     (`keyGlide_`). Worst KEY step 1.0167; hard tune on a held note is unchanged. knob_step walks all
+     twelve steps both ways.
+   - `kPitchStage` (4 % mean and worst, `costs.h`) is charged once when Octave or Formant is placed
+     without Autotune, because `kAutotune` and `kTracker` were measured as the whole slot and carry
+     the stage's mix. The figure is the board's 8.2 % for Octave alone less Octave's row. The host
+     bench does not show the gap (Octave alone 1.26 µs a block, Autotune plus Octave 2.85 against
+     Autotune 1.70), so the row is an estimate until a board run of Octave alone.

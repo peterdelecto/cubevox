@@ -126,10 +126,23 @@ constexpr int kWalkedDetents = 10;
 
 std::vector<Step> stepsFor(Card c, int knob) {
   const int detents = knobSteps(c, knob);
+  if (c == Card::Autotune && knob == 0) {
+    // KEY moves the target note, so each of its twelve steps goes up and back, the wrap from the last
+    // key to the first included.
+    std::vector<Step> s;
+    for (int d = 0; d < detents; ++d) {
+      const int next = (d + 1) % detents;
+      s.push_back({static_cast<float>(d), static_cast<float>(next)});
+      s.push_back({static_cast<float>(next), static_cast<float>(d)});
+    }
+    return s;
+  }
   if (detents == 0) {
     std::vector<Step> s;
     for (float p : {0.2f, 0.5f, 0.8f}) s.push_back({p, p + kContinuousStep});
     if (c == Card::Bloom) s.push_back({1.0f - kContinuousStep, 1.0f});
+    // Lo-fi's TONE and AMOUNT also step at the last touch below the top of their travel.
+    if (c == Card::Lofi) s.push_back({1.0f - kContinuousStep, 1.0f});
     return s;
   }
   if (detents <= kWalkedDetents || c == Card::Formant) {

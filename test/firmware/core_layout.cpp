@@ -70,7 +70,9 @@ void checkCrowdLayout() {
 }
 
 // The pitch tracker's row counts once: with Autotune alone, with Crowd alone, and with both. A layout
-// holding neither, and one holding only Octave, pays none.
+// holding neither, and one holding only Octave, pays none. Octave without Autotune pays kPitchStage
+// instead (checkPitchStageCost), so the layouts below that keep Octave in slot 3 without Autotune
+// carry that term as well.
 void checkTrackerCost() {
   Layout noPitch = defaultLayout();
   noPitch.card[1] = Card::Empty;
@@ -83,12 +85,13 @@ void checkTrackerCost() {
   int cards = costs::kFixed.avg;
   for (const Card c : noPitch.card) cards += cardDesc(c).cost.avg;
   const int base = layoutCost(noPitch).avg;
-  check(base == cards, "tracker cost: Octave without Autotune or Crowd pays none");
-  check(layoutCost(autotune).avg == base + costs::kAutotune.avg + costs::kTracker.avg, "tracker cost: Autotune pays it");
+  check(base == cards + costs::kPitchStage.avg, "tracker cost: Octave without Autotune or Crowd pays no tracker");
+  check(layoutCost(autotune).avg == cards + costs::kAutotune.avg + costs::kTracker.avg, "tracker cost: Autotune pays it");
   check(layoutCost(crowd).avg == base + costs::kCrowd.avg + costs::kTracker.avg, "tracker cost: Crowd without Autotune pays it");
   check(layoutCost(both).avg == layoutCost(autotune).avg - costs::kUnison.avg + costs::kCrowd.avg,
         "tracker cost: Autotune and Crowd together pay it once");
-  check(layoutCost(autotune).worst == layoutCost(noPitch).worst + costs::kAutotune.worst + costs::kTracker.worst,
+  check(layoutCost(autotune).worst ==
+            layoutCost(noPitch).worst - costs::kPitchStage.worst + costs::kAutotune.worst + costs::kTracker.worst,
         "tracker cost: the worst column counts it too");
 
   // Formant in slot 3 in Octave's place pays the tracker without Autotune, and once beside it. Lo-fi and
@@ -110,6 +113,64 @@ void checkTrackerCost() {
   bloom.card[6] = Card::Bloom;
   check(layoutCost(lofi).avg == base - gate + costs::kLofi.avg && layoutCost(bloom).avg == base - gate + costs::kBloom.avg,
         "tracker cost: Lo-fi and Bloom pay none");
+}
+
+// The pitch stage's own work, kPitchStage, counts once in both columns when Octave or Formant is placed
+// and Autotune is not, and in no other layout. The default layout and MOB with Chasm place Autotune, so
+// their sums stay the sums of their rows, the fixed term and the tracker.
+void checkPitchStageCost() {
+  const auto pays = [](const Layout& layout, bool tracker, bool stage, const char* what) {
+    costs::Cost want = costs::kFixed;
+    for (const Card c : layout.card) want = want + cardDesc(c).cost;
+    if (tracker) want = want + costs::kTracker;
+    if (stage) want = want + costs::kPitchStage;
+    const LayoutCost got = layoutCost(layout);
+    check(got.avg == want.avg && got.worst == want.worst, what);
+  };
+
+  Layout none = defaultLayout();  // no Autotune, Octave out
+  none.card[1] = Card::Empty;
+  none.card[2] = Card::Empty;
+  pays(none, false, false, "pitch stage cost: no Octave, Formant or Autotune pays none");
+
+  Layout crowd = none;
+  crowd.card[3] = Card::Crowd;
+  pays(crowd, true, false, "pitch stage cost: Crowd alone pays the tracker and not the stage");
+
+  Layout octave = none;
+  octave.card[2] = Card::Octave;
+  pays(octave, false, true, "pitch stage cost: Octave without Autotune pays it, in both columns");
+
+  Layout formant = none;
+  formant.card[2] = Card::Formant;
+  pays(formant, true, true, "pitch stage cost: Formant without Autotune pays it beside the tracker");
+
+  Layout bothCards = formant;
+  bothCards.card[1] = Card::Octave;
+  pays(bothCards, true, true, "pitch stage cost: Octave and Formant without Autotune pay it once");
+
+  Layout octaveCrowd = octave;
+  octaveCrowd.card[3] = Card::Crowd;
+  pays(octaveCrowd, true, true, "pitch stage cost: Octave and Crowd without Autotune pay it once");
+
+  Layout autotuneOctave = octave;
+  autotuneOctave.card[1] = Card::Autotune;
+  pays(autotuneOctave, true, false, "pitch stage cost: Autotune with Octave pays none");
+
+  Layout autotuneFormant = formant;
+  autotuneFormant.card[1] = Card::Autotune;
+  pays(autotuneFormant, true, false, "pitch stage cost: Autotune with Formant pays none");
+
+  Layout heavy = defaultLayout();
+  heavy.card[3] = Card::Crowd;
+  heavy.card[7] = Card::ReverbChasm;
+  pays(defaultLayout(), true, false, "pitch stage cost: the default layout pays none");
+  pays(heavy, true, false, "pitch stage cost: MOB with Chasm pays none");
+
+  // Octave alone on the board is 52.4k cycles, 8.2 %; its row and the stage term cover it.
+  check(costs::kOctave.avg + costs::kPitchStage.avg >= 9 && costs::kOctave.avg + costs::kPitchStage.avg <= 10,
+        "pitch stage cost: Octave's row and the term cover the board's 8.2 % for Octave alone");
+  check(layoutValid(octave).ok() && layoutValid(formant).ok(), "pitch stage cost: the layouts with the term are accepted");
 }
 
 // The sums with each slot 7 card in the default layout and in MOB with Chasm, the heaviest layout the
@@ -754,6 +815,7 @@ void checkLayoutAndCompose() {
   checkLayoutValid();
   checkCrowdLayout();
   checkTrackerCost();
+  checkPitchStageCost();
   checkSlot7Costs();
   checkLayoutReasons();
   checkLayoutName();

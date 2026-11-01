@@ -107,5 +107,13 @@ the Nyquist at most −14 dB (gate −10 dB; with the floor off it reads −0.6 
 A −40 dB bound cannot hold: a tone above the Nyquist folds at the band's skirt level, and a hold
 period that is not a whole number of samples lands each held sample on the audio clock, which
 leaves −14 to −17 dB of its own. Since section 8's cap the knob reaches at most a 32 kHz hold, so
-the floor only guards the engine's upper range. Open: TONE's last step, 98.5 to 100 %, reads 1.12
-times steady-state curvature on knob_step's 220 Hz probe (the gate does not walk that step).
+the floor only guards the engine's upper range. TONE's last step is section 10.
+
+## 10. TONE's last step (v2.01.01)
+
+TONE 98.5 to 100 % read 1.12 times steady-state curvature on knob_step's 220 Hz probe. The ramp
+added its per-sample step in float and ended up to 32 ulp short of the goal. The end-of-block snap
+then stepped the high-pass sections while their states held the full tone. The 220 Hz probe leaks
+through the high-pass at −59 dB, so that small step was 12 % of its curvature. `rampTo` now sets
+each coefficient to the block start plus k steps, in all five sections. The step reads 1.0065, and
+every TONE step reads at most 1.03. knob_step walks TONE's and AMOUNT's top steps at AMOUNT 50 %.
