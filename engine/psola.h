@@ -53,6 +53,9 @@ class PsolaVoice {
   // The grain delay in samples, up to kGrainDelay. Each grain reads the input at this fixed delay.
   void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinReadDelay + 1.0f, kGrainDelay); }
 
+  // The grain delay in force, after the clamp.
+  float grainDelay() const { return grainDelay_; }
+
   // One output sample. head is the ring index of the sample just written, already wrapped below
   // kVoiceRingLen by the owner. period is the sung period in samples (last voiced), inverseRatio the
   // inverse of the pitch ratio, which clamps to 0.5..2.0 as the ratio does.
