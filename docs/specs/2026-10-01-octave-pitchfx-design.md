@@ -4,6 +4,11 @@ Date 2026-10-01. Owner: "make sure the wiring is correct and the fx modules are 
 order graphically. let's do octave now." Builds on the harmony spec; the engine
 contract, emulator skeleton, and threading rules are unchanged.
 
+Status 2026-11-01: the Octave decisions below stand; the front end as this file describes it
+(three voices, analysis while Harmony is on, 51,944 B of DTCM) is history. The present pitch front
+end, with its ring, the tracker's gating and fine flag, the crossfades, the reset rule, the DTCM
+size and the enable behaviour, is "The pitch front end" in `2026-10-01-autotune-design.md`.
+
 ## Why a shared front end
 
 Harmony and Octave may run together (panel rule: up to two pitch effects at once).

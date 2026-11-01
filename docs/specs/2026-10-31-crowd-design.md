@@ -233,7 +233,9 @@ class Crowd {
 
 Off: out equals in bit for bit. The engine's clamps and the render tool's checks share one set of
 constants in `crowd_detail`: offsets ±12 st (`kMaxOffsetSt`), shelf ±12 dB (`kMaxShelfDb`), delays
-5..150 ms, scatter 0..30 ms (`kMaxScatterMs`), drift 0..50 cents (`kMaxDriftCents`), voiceDb −24..0,
+5..150 ms, scatter 0..12 ms (`kMaxScatterMs`, the ring's allowance `kCrowdScatterMs`, so the longest
+lag never shortens at the ring's ceiling; a `static_assert` holds the shipped scatter inside it),
+drift 0..50 cents (`kMaxDriftCents`), voiceDb −24..0,
 both trims ±12 dB, lagScale 0.5..2, shelfHz and hpHz 20..21,600 Hz.
 
 Constants in `crowd_detail`: `kVoices` 4 (the tuned copies, one per entry of the tuning's arrays),
@@ -346,10 +348,11 @@ fifth can still swing by up to 2 dB.
    tracker's history fill and coarse analysis, added once to a layout's sum by `layoutCost()` when
    Autotune or Crowd is placed, and `kAutotune` for the rest of Autotune, both set by the pitch
    slot's passes (`2026-10-01-autotune-design.md`). test/firmware/core_layout.cpp requires
-   `measured` only for cards in `defaultLayout()`. `layoutValid` says ok for the default layout
-   (72 % mean, 84 % worst against 75 / 95) and refuses the crowdtest layout (86 / 100) and a default
-   layout with Crowd in Unison's place (83 / 97) on today's rows. The crowdtest image bypasses the
-   budget check.
+   `measured` only for cards in `defaultLayout()`, and exempts Autotune while its row is an
+   estimate. With the pitch slot's clean-up rows (`kTracker{4, 5}`, `kAutotune{5, 6}`) `layoutValid`
+   says ok for the default layout (67 % mean, 74 % worst against 75 / 95) and refuses the crowdtest
+   layout (81 / 89) and a default layout with Crowd in Unison's place (78 / 87, over on the mean).
+   The crowdtest image bypasses the budget check.
 7. The crowdtest image (`VARIANT=crowdtest ./build.sh`, label `-crowd`) puts Crowd in Autotune's
    slot. On that image the record saves the layout it held at boot, or the default when it held
    none, so the test layout plays from RAM only and a stored custom layout survives the test.
@@ -405,7 +408,7 @@ fifth can still swing by up to 2 dB.
       lagScale goes to 2, at delayMs × 2 × m(1) capped at the 150 ms ceiling. The move comes while
       the copy's output sounds the burst, the lag stays unchanged to the end of that burst, and the
       next burst sounds at the new lag (±0.5 ms).
-   9. scatter: scatterMs 15 on copy 4 over ten bursts at WIDTH 1, each burst's lag within ±15 ms of
+   9. scatter: scatterMs 12 on copy 4 over ten bursts at WIDTH 1, each burst's lag within ±12 ms of
       105 ms and varying from burst to burst; f0 inside each burst within 10 cents of its offset.
    10. drift: driftCents 20 on a 6 s tone at WIDTH 1, the copy's f0 in 0.5 s windows within
        ±20 × 2/3 cents of its offset (3 cents of slack) and not the same in every window;
@@ -414,8 +417,10 @@ fifth can still swing by up to 2 dB.
        releases to 0 within 200 ms of its switch-off.
    12. pinned: four runs hash to fixed values, three from the neutral tuning (the 180 Hz program at
        VOICES 70 %, WIDTH 50 %; the burst program at 80 %, 50 %; the burst program at 60 %, 80 % with
-       scatter 15 and drift 20) and one on `CrowdTuning{}` unchanged. Pinned at v2.00.79 for the
-       eight-copy card: 9d220333937cb62b, d50d29e677f4651f, 1b6fd85bd0ca88e1, bd5aac8433058c41. They
+       scatter 12 and drift 20) and one on `CrowdTuning{}` unchanged. Pinned at v2.00.79 for the
+       eight-copy card: 9d220333937cb62b, d50d29e677f4651f, 1b6fd85bd0ca88e1, bd5aac8433058c41. Run 3
+       was re-pinned at 8d7fc1ce41837fb8 on 2026-11-01 (v2.00.81) because its scatter moved from 15
+       to 12 ms when the tuning range became the ring's allowance, not for an engine change. They
        move only when the sound changes on purpose; a pass that must keep them re-pins only after a
        measured comparison under −80 dB against the previous build.
    13. working set: the defaults hold the working set, and a run on them stays finite and within
@@ -498,9 +503,11 @@ the mix runs four copies at a time with the crowd sum and both shelf sums in reg
 marks, launches or gap sums between a raised copy and its tuned copy (their lags differ, so nothing
 lines up). A bench-only lever that is not in the card: two raised voices each heard at two lags
 (2.40 → 2.12 µs) needs a listen first, because copies 5 and 6 would lose their own pitch and drift.
-With Crowd in Unison's place in the default layout the sums are 83 / 97 on today's rows, refused;
-about 77 / 87 once the pitch slot's clean-up pass re-sets the tracker and Autotune rows; about
-69 / 79 if the board converts Crowd at the 28k ratio the pitch slot measured. The box bench decides.
+With Crowd in Unison's place in the default layout the sums were 83 / 97 on the rows before the pitch
+slot's clean-up pass, and are 78 / 87 on its rows (`kTracker{4, 5}`, `kAutotune{5, 6}`), refused by
+3 on the mean; the default layout itself is 67 / 74. The pair's scaling implies 29.4k board cycles
+per host µs, at which Crowd's 2.40 µs is 11 points and the swap fits at about 70 / 77. The box bench
+decides.
 
 What costs more on the M7 than on the host, from the audits' listings: the shared shelf, the low cut
 and the grain launch are issue-bound rather than latency-bound, so their shares may land differently.
