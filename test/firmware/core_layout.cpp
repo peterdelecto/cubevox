@@ -219,6 +219,84 @@ void checkComposeBench() {
   check(live.params.pitchFx.octave.semitones == -12, "unpinned stepped knob follows the panel");
 }
 
+// The force-on mask turns a slot on against a toggle that reads off, and a force-off bit still wins.
+// slots_live and knobs_live hand the panel back.
+void checkComposeBenchLevers() {
+  const Layout layout = defaultLayout();  // slot index 5 is Distortion, 3 Unison, 2 Octave
+  const PanelReading toggleOff = panelWithToggles(false);
+
+  BenchOverrides bench;
+  bench.slotsForcedOn = 1u << 5;
+  ChainSnapshot snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(snap.params.distortion.on && snap.slotOn[5] && !snap.params.unison.on && !snap.slotOn[3],
+        "slotsForcedOn bit turns only that slot on against an off toggle");
+
+  bench.slotsForcedOn = 0xFF;
+  snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(snap.params.distortion.on && snap.params.unison.on && snap.params.reverb.on && snap.params.gate.on &&
+            snap.params.pitchFx.autotune.on && snap.params.pitchFx.octave.on,
+        "all eight slots forced on turn every stage on");
+
+  bench.slotsOff = 1u << 5;
+  snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(!snap.params.distortion.on && !snap.slotOn[5] && snap.params.unison.on,
+        "a force-off bit wins over the same slot's force-on bit");
+
+  bench.slotsLive();
+  check(bench.slotsOff == 0 && bench.slotsForcedOn == 0, "slotsLive clears both masks");
+  snap = composeSnapshot(layout, toggleOff, Settings(), bench);
+  check(!snap.params.distortion.on && !snap.params.unison.on && !snap.slotOn[5] && !snap.slotOn[3],
+        "slotsLive lets an off toggle turn the slot off again");
+  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  check(snap.params.distortion.on && snap.params.unison.on, "slotsLive lets an on toggle turn the slot on");
+
+  // Octave semitones is stepped (25 steps, slot index 2, knob index 0), Unison depth continuous
+  // (slot index 3, knob index 1).
+  const PanelReading low;
+  bench = BenchOverrides();
+  bench.pinKnob(2, 0, 50);
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  check(snap.params.pitchFx.octave.semitones == 0, "a stepped pin at 50 % lands on the middle step");
+  bench.pinKnob(2, 0, 0);
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == -12,
+        "a stepped pin at 0 % lands on the first step");
+  bench.pinKnob(2, 0, 100);
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == 12,
+        "a stepped pin at 100 % lands on the last step");
+  bench.pinKnob(2, 0, 55);  // 0.55 * 24 = 13.2 rounds to step 13, which is +1 semitone
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == 1,
+        "a stepped pin rounds to the nearest step");
+
+  ChainParams expect;
+  bench.pinKnob(3, 1, 25);
+  applyKnob(Card::Unison, 1, 0.25f, expect);
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  check(std::fabs(snap.params.unison.depth - expect.unison.depth) < 1e-6f, "a continuous pin at 25 % sits at 0.25");
+  PanelReading mixed;
+  mixed.knob[2][1] = 0.4f;  // Octave MIX, the other knob of the pinned Octave semitones
+  snap = composeSnapshot(layout, mixed, Settings(), bench);
+  check(std::fabs(snap.params.pitchFx.octave.mix - 0.4f) < 1e-6f && snap.params.pitchFx.octave.semitones == 1,
+        "a pin on one knob leaves the card's other knob on the panel");
+
+  // A per-knob pin wins over pin-at-top; an unpinned knob still goes to the top.
+  bench = BenchOverrides();
+  bench.knobsPinned = true;
+  bench.pinKnob(2, 0, 50);
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  ChainParams top;
+  applyKnob(Card::Unison, 1, 1.0f, top);
+  check(snap.params.pitchFx.octave.semitones == 0 && std::fabs(snap.params.unison.depth - top.unison.depth) < 1e-6f,
+        "a per-knob pin wins over pin-at-top and the other knobs stay at the top");
+
+  bench.knobsLive();
+  check(!bench.knobsPinned && bench.knobPin[2][0] == kNoPin, "knobsLive clears the pin-at-top and every per-knob pin");
+  snap = composeSnapshot(layout, low, Settings(), bench);
+  ChainParams zero;
+  applyKnob(Card::Unison, 1, 0.0f, zero);
+  check(snap.params.pitchFx.octave.semitones == -12 && std::fabs(snap.params.unison.depth - zero.unison.depth) < 1e-6f,
+        "knobsLive hands the knobs back to the panel");
+}
+
 void checkOutputGain() {
   Settings s;
   const BenchOverrides none;
@@ -334,5 +412,6 @@ void checkLayoutAndCompose() {
   checkComposeToggles();
   checkComposeCrowd();
   checkComposeBench();
+  checkComposeBenchLevers();
   checkOutputGain();
 }

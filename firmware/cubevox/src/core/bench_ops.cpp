@@ -19,7 +19,12 @@ constexpr std::array<OpEntry, kBenchOpCount> kOps = {{
     {BenchOp::RecordStatus, "record_status", OpClass::Query},
     {BenchOp::SlotOff, "slot_off", OpClass::Bench},
     {BenchOp::SlotsOn, "slots_on", OpClass::Bench},
+    {BenchOp::SlotOn, "slot_on", OpClass::Bench},
+    {BenchOp::AllOn, "all_on", OpClass::Bench},
+    {BenchOp::SlotsLive, "slots_live", OpClass::Bench},
     {BenchOp::PinKnobs, "pin_knobs", OpClass::Bench},
+    {BenchOp::SetKnob, "set_knob", OpClass::Bench},
+    {BenchOp::KnobsLive, "knobs_live", OpClass::Bench},
     {BenchOp::Chasm, "chasm", OpClass::Bench},
     {BenchOp::Clip, "clip", OpClass::Bench},
     {BenchOp::ResetPeaks, "reset_peaks", OpClass::Bench},
@@ -75,3 +80,7 @@ bool opFromName(const char* name, BenchOp& out) {
 }
 
 bool opAllowed(BenchOp op, bool benchBuild) { return benchBuild || opClass(op) == OpClass::Query; }
+
+bool opTakesSlot(BenchOp op) { return op == BenchOp::SlotOff || op == BenchOp::SlotOn || op == BenchOp::SetKnob; }
+
+bool opTakesKnob(BenchOp op) { return op == BenchOp::SetKnob; }

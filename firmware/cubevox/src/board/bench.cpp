@@ -44,7 +44,9 @@ void benchReportStats() {
   serialOut().print(" of ");
   serialOut().print(s.budgetCycles);
   serialOut().print(" cycles, slots off 0x");
-  serialOut().println(benchOverrides().slotsOff, HEX);
+  serialOut().print(benchOverrides().slotsOff, HEX);
+  serialOut().print(", forced on 0x");
+  serialOut().println(benchOverrides().slotsForcedOn, HEX);
   printSlotRow("[audio] per slot", s.slotAvg);
   serialOut().println();
   printSlotRow("[audio] slot worst", s.slotWorst);
@@ -64,7 +66,7 @@ void benchReportStats() {
   serialOut().println(" bytes never used since boot");
 }
 
-BenchResult benchRun(BenchOp op, int slot, void (*bootReport)()) {
+BenchResult benchRun(BenchOp op, const BenchArgs& args, void (*bootReport)()) {
   switch (op) {
     case BenchOp::Report: bootReport(); return {};
     case BenchOp::Stats: benchReportStats(); return {};
@@ -72,9 +74,9 @@ BenchResult benchRun(BenchOp op, int slot, void (*bootReport)()) {
     default: break;  // bench-class ops
   }
 #if CUBEVOX_BENCH
-  return benchDrillRun(op, slot);
+  return benchDrillRun(op, args);
 #else
-  (void)slot;
+  (void)args;
   return {false, "op not handled"};  // the parser refuses these ops in a release build
 #endif
 }

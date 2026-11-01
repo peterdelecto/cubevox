@@ -78,7 +78,9 @@ struct Request {
   uint32_t id = 0;
   Command cmd = Command::Hello;
   BenchOp op = BenchOp::Report;  // Bench only
-  int benchSlot = 0;             // Bench only; the slot_off target, 1 to kMaxBenchSlot
+  int benchSlot = 0;             // Bench only; the slot_off, slot_on and set_knob target, 1 to kMaxBenchSlot
+  int benchKnob = 0;             // Bench only; set_knob, 1 to kMaxBenchKnob
+  int benchValue = 0;            // Bench only; set_knob, 0 to kMaxBenchKnobValue percent of travel
   char name[kNameBytes + 1] = {};
   int slotCount = 0;  // ids present in "slots"
   std::array<std::array<char, kIdBytes>, kSlotCount> slot = {};

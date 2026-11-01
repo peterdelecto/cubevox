@@ -153,7 +153,11 @@ void replySetLayout(const protocol::Request& req, uint32_t nowMs) {
 void replyBench(const protocol::Request& req) {
   protocol::Writer& out = serialWriter();
   if (req.op == BenchOp::Fault || req.op == BenchOp::Spin) protocol::replyOk(out, req.id);  // the drill flushes it
-  const BenchResult result = benchRun(req.op, req.benchSlot, reportBoot);
+  BenchArgs args;
+  args.slot = req.benchSlot;
+  args.knob = req.benchKnob;
+  args.value = req.benchValue;
+  const BenchResult result = benchRun(req.op, args, reportBoot);
   if (result.republish) gPublish.markStale();
   if (result.error) {
     protocol::replyError(out, req.id, result.error);

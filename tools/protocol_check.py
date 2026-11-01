@@ -7,8 +7,9 @@ survived. The layout it found is put back at the end. Prints PASS or FAIL per ch
 non-zero on any FAIL.
 
 The checks follow the build hello reports. A bench build runs a query op and the reset check
-(bench spin). A release build must refuse bench fault, record_erase and stop_audio with "op not in
-this build", and has no reset check. Both builds must ignore raw bytes outside a line.
+(bench spin) and checks the argument errors of slot_on and set_knob. A release build must refuse
+bench fault, record_erase, stop_audio, slot_on, all_on, set_knob and knobs_live with "op not in this
+build", and has no reset check. Both builds must ignore raw bytes outside a line.
 
 The port handling comes from firmware/cubevox_port.py and the bench requests from
 firmware/bench_ops.py. With several cu.usbmodem* ports, name one with --port.
@@ -48,10 +49,10 @@ class Link(cubevox_port.Link):
     def ask(self, cmd, **fields):
         return super().ask(cmd, REPLY_WAIT_S, self.text.append, **fields)
 
-    def bench(self, op, slot=None, wait=REPLY_WAIT_S):
+    def bench(self, op, slot=None, wait=REPLY_WAIT_S, knob=None, value=None):
         """Sends a bench op through bench_ops.py and returns its reply."""
         rid = self.take_id()
-        self.send_line(bench_ops.op_line(op, slot, rid))
+        self.send_line(bench_ops.op_line(op, slot, rid, knob, value))
         return self.read_json(rid, wait)
 
     def drain(self, quiet=0.3):
@@ -213,8 +214,21 @@ def check_bench_ops(link, rep, build):
         rep.check("bench slot_off without a slot: error", err_reply(r, "missing slot"), str(r))
         r = link.bench("slot_off", 9)
         rep.check("bench slot_off slot 9: error", err_reply(r, "slot must be 1 to 8"), str(r))
+        # Argument errors only, so the check leaves no override set.
+        r = link.bench("slot_on", 0)
+        rep.check("bench slot_on slot 0: error", err_reply(r, "slot must be 1 to 8"), str(r))
+        r = link.bench("set_knob", knob=1, value=50)
+        rep.check("bench set_knob without a slot: error", err_reply(r, "missing slot"), str(r))
+        r = link.bench("set_knob", 1, value=50)
+        rep.check("bench set_knob without a knob: error", err_reply(r, "missing knob"), str(r))
+        r = link.bench("set_knob", 1, knob=1)
+        rep.check("bench set_knob without a value: error", err_reply(r, "missing value"), str(r))
+        r = link.bench("set_knob", 1, knob=3, value=50)
+        rep.check("bench set_knob knob 3: error", err_reply(r, "knob must be 1 to 2"), str(r))
+        r = link.bench("set_knob", 1, knob=1, value=101)
+        rep.check("bench set_knob value 101: error", err_reply(r, "value must be 0 to 100"), str(r))
     else:
-        for op in ("fault", "record_erase", "stop_audio"):
+        for op in ("fault", "record_erase", "stop_audio", "slot_on", "all_on", "set_knob", "knobs_live"):
             r = link.bench(op)
             rep.check(f"release bench {op}: refused", err_reply(r, f"op not in this build: {op}"), str(r))
     r = link.ask("status")

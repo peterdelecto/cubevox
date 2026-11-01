@@ -7,10 +7,10 @@
 #include "board/bench_drill.h"
 #include "core/bench_ops.h"
 
-// Runs one op the parser already accepted for this build. `slot` is the slot_off target.
-// `bootReport` prints the boot report (op report). The result says whether it failed and whether
-// the caller must republish the snapshot.
-BenchResult benchRun(BenchOp op, int slot, void (*bootReport)());
+// Runs one op the parser already accepted for this build. `args` holds the slot, knob and value
+// the op takes. `bootReport` prints the boot report (op report). The result says whether it failed
+// and whether the caller must republish the snapshot.
+BenchResult benchRun(BenchOp op, const BenchArgs& args, void (*bootReport)());
 
 // Prints the audio counters, total and per slot.
 void benchReportStats();

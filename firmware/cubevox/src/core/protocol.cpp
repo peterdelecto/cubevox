@@ -237,6 +237,8 @@ struct Fields {
   bool hasCmd = false;
   bool hasOp = false;
   bool hasSlot = false;
+  bool hasKnob = false;
+  bool hasValue = false;
   bool hasName = false;
   bool hasSlots = false;
   bool nameClipped = false;
@@ -262,16 +264,23 @@ bool parseId(const char*& p, Fields& f) {
   return skipValue(p, 0);
 }
 
-bool parseBenchSlot(const char*& p, Fields& f) {
+// Reads a bench integer argument into `dest`. A value over kSlotClamp reads as kSlotClamp, so it fails
+// its range check. A negative integer is a type error, unless `negativeOk`, where it reads as a
+// negative value for the range check to refuse. Text, a fraction or an exponent is a type error.
+bool parseBenchInt(const char*& p, Fields& f, int& dest, bool& present, const char* typeMsg, bool negativeOk) {
   const char* start = p;
+  skipWs(p);
+  const bool negative = negativeOk && *p == '-';
+  if (negative) ++p;
   uint32_t v;
   if (readUint(p, v)) {
-    f.req.benchSlot = static_cast<int>(v < kSlotClamp ? v : kSlotClamp);
-    f.hasSlot = true;
+    const int clamped = static_cast<int>(v < kSlotClamp ? v : kSlotClamp);
+    dest = negative ? -clamped : clamped;
+    present = true;
     return true;
   }
   p = start;
-  f.typeFail("slot must be an integer");
+  f.typeFail(typeMsg);
   return skipValue(p, 0);
 }
 
@@ -392,7 +401,15 @@ bool parseField(const char*& p, const char* key, Fields& f) {
     StrOut out{f.op, sizeof f.op};
     return parseText(p, f, out, "op must be a string", f.hasOp);
   }
-  if (strcmp(key, "slot") == 0) return parseBenchSlot(p, f);
+  if (strcmp(key, "slot") == 0) {
+    return parseBenchInt(p, f, f.req.benchSlot, f.hasSlot, "slot must be an integer", false);
+  }
+  if (strcmp(key, "knob") == 0) {
+    return parseBenchInt(p, f, f.req.benchKnob, f.hasKnob, "knob must be an integer", false);
+  }
+  if (strcmp(key, "value") == 0) {
+    return parseBenchInt(p, f, f.req.benchValue, f.hasValue, "value must be an integer", true);
+  }
   if (strcmp(key, "name") == 0) {
     StrOut out{f.req.name, kNameBytes};  // one byte under the buffer: 31 characters fit
     const bool ok = parseText(p, f, out, "name must be a string", f.hasName);
@@ -454,8 +471,15 @@ const char* setLayoutProblem(Fields& f) {
   return nullptr;
 }
 
-// Resolves the bench op and checks the build carries it and slot_off has its target. On failure
-// writes the reason to `err`.
+// True when `v` sits in lo..hi; otherwise writes "<what> must be lo to hi" to `err`.
+bool inBenchRange(int v, int lo, int hi, const char* what, char* err, size_t errSize) {
+  if (v >= lo && v <= hi) return true;
+  snprintf(err, errSize, "%s must be %d to %d", what, lo, hi);
+  return false;
+}
+
+// Resolves the bench op and checks the build carries it and the op has the arguments it takes, in
+// range. On failure writes the reason to `err`.
 bool resolveBenchOp(Fields& f, bool benchBuild, char* err, size_t errSize) {
   if (!f.hasOp) {
     snprintf(err, errSize, "missing op");
@@ -469,14 +493,24 @@ bool resolveBenchOp(Fields& f, bool benchBuild, char* err, size_t errSize) {
     snprintf(err, errSize, "op not in this build: %s", f.op);
     return false;
   }
-  if (f.req.op != BenchOp::SlotOff) return true;
-  if (!f.hasSlot) {
-    snprintf(err, errSize, "missing slot");
-    return false;
+  if (opTakesSlot(f.req.op)) {
+    if (!f.hasSlot) {
+      snprintf(err, errSize, "missing slot");
+      return false;
+    }
+    if (!inBenchRange(f.req.benchSlot, kMinBenchSlot, kMaxBenchSlot, "slot", err, errSize)) return false;
   }
-  if (f.req.benchSlot < kMinBenchSlot || f.req.benchSlot > kMaxBenchSlot) {
-    snprintf(err, errSize, "slot must be %d to %d", kMinBenchSlot, kMaxBenchSlot);
-    return false;
+  if (opTakesKnob(f.req.op)) {
+    if (!f.hasKnob) {
+      snprintf(err, errSize, "missing knob");
+      return false;
+    }
+    if (!f.hasValue) {
+      snprintf(err, errSize, "missing value");
+      return false;
+    }
+    if (!inBenchRange(f.req.benchKnob, kMinBenchKnob, kMaxBenchKnob, "knob", err, errSize)) return false;
+    if (!inBenchRange(f.req.benchValue, 0, kMaxBenchKnobValue, "value", err, errSize)) return false;
   }
   return true;
 }
