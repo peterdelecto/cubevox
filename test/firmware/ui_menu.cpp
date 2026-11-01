@@ -155,16 +155,17 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kReverb, kUnisonCrowd, kSlot7Card, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug, kUpdate, kExit,
-  kRowCount
+  kInput, kReverb, kOctaveFormant, kUnisonCrowd, kSlot7Card, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug,
+  kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
 
 // The window top when the cursor jumps straight to the last item.
 constexpr int kLastTop = kRowCount - kVisible;
 
-// The slot the default layout gives Unison, zero-based, the slot it gives Gate, and the slot it gives
-// the reverb card.
+// The slot the default layout gives Octave, zero-based, the slot it gives Unison, the slot it gives
+// Gate, and the slot it gives the reverb card.
+constexpr int kOctaveSlot = 2;
 constexpr int kUnisonSlot = 3;
 constexpr int kSlot7Slot = 6;
 constexpr int kReverbSlot = 7;
@@ -174,11 +175,11 @@ constexpr int kReverbSlot = 7;
 constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible - 1; }
 
 // The label of each item, and the value it shows for the default settings and the default layout,
-// which holds Unison in slot 4 and Gate in slot 7. Exit has no value and Update firmware shows a
-// chevron.
-const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "SLOT 4", "SLOT 7", "POLISH COMP", "POLISH EQ",
+// which holds Octave in slot 3, Unison in slot 4 and Gate in slot 7. Exit has no value and Update
+// firmware shows a chevron.
+const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "SLOT 3", "SLOT 4", "SLOT 7", "POLISH COMP", "POLISH EQ",
                                        "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "UNISON", "GATE", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
+const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "OCTAVE", "UNISON", "GATE", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
 
 // The row as the test names it: the label, then the value after a space.
 std::string rowName(int item, const char* value) {
@@ -223,7 +224,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 11, "menu: the list holds eleven items");
+  check(kRowCount == 12, "menu: the list holds twelve items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string name = rowName(r, kDefaultValue[r]);
     check(listRowIs(m.canvas, r, kLabel[r], kDefaultValue[r], r == kInput), name.c_str());
@@ -261,8 +262,8 @@ void checkMenuListGeometry() {
             lineIs(m.canvas, 47, false) && lineIs(m.canvas, 48, false),
         "menu: a bar on row 2 covers lines 32 to 45 and no line beside them");
 
-  // Every item shown on a row without the bar, so its ink is measured as lit pixels. Five views,
-  // each a cursor position and the window top it gives, put each of the eleven items on such a row.
+  // Every item shown on a row without the bar, so its ink is measured as lit pixels. Six views,
+  // each a cursor position and the window top it gives, put each of the twelve items on such a row.
   struct View {
     int jumpTo;
     int thenStep;
@@ -270,6 +271,7 @@ void checkMenuListGeometry() {
   };
   const View views[] = {{kInput, 0, 0},
                         {kReverb, 0, 0},
+                        {kPolishComp, 0, kPolishComp - (kVisible - 1)},
                         {kTopSwitch, 0, kTopSwitch - (kVisible - 1)},
                         {kExit, 0, kLastTop},
                         {kExit, -1, kLastTop}};
@@ -295,8 +297,7 @@ void checkMenuListGeometry() {
   }
   bool allSeen = true;
   for (bool s : seen) allSeen = allSeen && s;
-  check(allSeen, "menu: the views measured all eleven items");
-
+  check(allSeen, "menu: the views measured all twelve items");
   // Every value an item can show clears the label by 7 px or more. The tightest are TOP SWITCH
   // BYPASS and UPDATE FIRMWARE >.
   struct Values {
@@ -306,8 +307,9 @@ void checkMenuListGeometry() {
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
       {kReverb, {"SPRING", "CHASM"}},
+      {kOctaveFormant, {"OCTAVE", "FORMANT"}},
       {kUnisonCrowd, {"UNISON", "MOB"}},
-      {kSlot7Card, {"GATE", "FORMANT", "LO-FI", "BLOOM"}},
+      {kSlot7Card, {"GATE", "LO-FI", "BLOOM"}},
       {kPolishComp, {"ON", "OFF"}},
       {kPolishEq, {"ON", "OFF"}},
       {kOutput, {"LINE", "MIC"}},
@@ -328,12 +330,12 @@ void checkMenuListGeometry() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 4 to 10; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 6 to 0. The window top runs from 0 to 7. Each expected canvas is
+// Going down it scrolls at items 4 to 11; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 7 to 0. The window top runs from 0 to 8. Each expected canvas is
 // composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8};
 
   MenuRig m;
   m.step(0, true);
@@ -362,10 +364,10 @@ void checkMenuScroll() {
   m.step(2, false);
   m.step(3, false);  // one pass of three steps leaves the window just far enough to show item 5
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(2, kPolishEq)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
+  check(sameCanvas(m.canvas, listCanvas(2, kPolishComp)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
   m.step(-2, false);
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(2, kSlot7Card)), "menu: and a multi-step turn back inside the window leaves it where it is");
+  check(sameCanvas(m.canvas, listCanvas(2, kUnisonCrowd)), "menu: and a multi-step turn back inside the window leaves it where it is");
 
   MenuRig jump;
   jump.openListAt(kExit);
@@ -439,11 +441,11 @@ bool cursorRowIs(const Canvas& canvas, int r, int item, const char* value) {
   return listRowIs(canvas, r, kLabel[item], value, true);
 }
 
-// The slot 7 row cycles four cards instead of flipping a value, so it has its own checks below.
-// What a click on each of the eight rows that flip a value asks for, what applying it reports, and the
+// The slot 7 row cycles three cards instead of flipping a value, so it has its own checks below.
+// What a click on each of the nine rows that flip a value asks for, what applying it reports, and the
 // value the row shows once the click is applied and once a second click undoes it. The rows are in
-// list order. The reverb click changes the layout, so it reports LayoutChanged. The others change a
-// setting. The Unison and Crowd click changes the layout only when the placement rules accept Crowd
+// list order. The reverb and Octave and Formant clicks change the layout, so they report LayoutChanged.
+// The others change a setting. The Unison and Crowd click changes the layout only when the placement rules accept Crowd
 // in Unison's slot, so its row follows layoutValid and reads the same after the click when it refuses.
 struct Click {
   int item;
@@ -453,20 +455,22 @@ struct Click {
   const char* back;
 };
 
-// Whether layoutValid accepts Crowd in Unison's slot beside Chasm, the reverb card the walk down the
-// rows has left by the time it reaches the Unison and Crowd row.
+// Whether layoutValid accepts Crowd in Unison's slot beside Chasm and Formant, the cards the walk down
+// the rows has left by the time it reaches the Unison and Crowd row.
 bool crowdFitsBesideChasm() {
   Layout walk = defaultLayout();
   walk.card[kReverbSlot] = Card::ReverbChasm;
+  walk.card[kOctaveSlot] = Card::Formant;
   walk.card[kUnisonSlot] = Card::Crowd;
   return layoutValid(walk).ok();
 }
 
-std::array<Click, 8> makeClicks() {
+std::array<Click, 9> makeClicks() {
   const bool crowd = crowdFitsBesideChasm();
   return {{
       {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
       {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
+      {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "OCTAVE"},
       {kUnisonCrowd, UiAction::SwapUnisonCrowd, crowd ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None,
        crowd ? "MOB" : "UNISON", "UNISON"},
       {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
@@ -476,7 +480,7 @@ std::array<Click, 8> makeClicks() {
       {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
   }};
 }
-const std::array<Click, 8> kClicks = makeClicks();
+const std::array<Click, 9> kClicks = makeClicks();
 
 // Opens the list and clicks each row of kClicks once, top to bottom, applying each action. The
 // cursor walks down from item 0, so a row past the fourth sits on the last list row, rowOnScreen(item).
@@ -505,6 +509,7 @@ void checkMenuClicks() {
             flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass && flipped.debug,
         "menu: six clicks flipped the six settings");
   check(m.layout.card[kReverbSlot] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
+  check(m.layout.card[kOctaveSlot] == Card::Formant, "menu: the Octave and Formant click swapped Octave for Formant");
   check(m.layout.card[kUnisonSlot] == (crowdFitsBesideChasm() ? Card::Crowd : Card::Unison),
         "menu: the Unison and Crowd click swapped the card when the placement rules allow it");
   int at = kDebug;
@@ -582,6 +587,114 @@ void checkMenuReverbClick() {
   check(ui::applyAction(moved.step(0, true), moved.settings, moved.layout) == ui::ApplyResult::LayoutChanged &&
             moved.layout.card[0] == Card::ReverbSpring && moved.layout.card[7] == Card::Empty,
         "menu: the card swaps in the slot that holds it");
+}
+
+// The Octave and Formant row reads the layout, so its label follows the slot that holds the card and its
+// value follows the card. With neither card placed it reads SLOT - and OCTAVE, the default.
+void checkMenuOctaveFormantValue() {
+  struct Case {
+    const char* name;
+    Layout layout;
+    const char* label;
+    const char* value;
+  };
+  Layout formant = defaultLayout();
+  formant.card[kOctaveSlot] = Card::Formant;
+  Layout moved = defaultLayout();  // Octave in slot 1, with Empty where it was
+  moved.card[0] = Card::Octave;
+  moved.card[kOctaveSlot] = Card::Empty;
+  Layout movedFormant = moved;
+  movedFormant.card[0] = Card::Formant;
+  Layout none = defaultLayout();
+  none.card[kOctaveSlot] = Card::Empty;
+  const Case cases[] = {
+      {"Octave in slot 3", defaultLayout(), "SLOT 3", "OCTAVE"},
+      {"Formant in slot 3", formant, "SLOT 3", "FORMANT"},
+      {"Octave in slot 1", moved, "SLOT 1", "OCTAVE"},
+      {"Formant in slot 1", movedFormant, "SLOT 1", "FORMANT"},
+      {"a layout with neither card", none, "SLOT -", "OCTAVE"},
+  };
+  for (const Case& c : cases) {
+    MenuRig m;
+    m.layout = c.layout;
+    m.openListAt(kOctaveFormant);
+    m.draw();
+    const std::string name = std::string("menu: the Octave and Formant row reads ") + c.label + " " + c.value + " for " + c.name;
+    check(listRowIs(m.canvas, rowOnScreen(kOctaveFormant), c.label, c.value, true), name.c_str());
+  }
+}
+
+// The row repaints when only its label changes, which happens when the card moves to another slot.
+void checkMenuOctaveFormantRedraw() {
+  MenuRig m;
+  m.openListAt(kOctaveFormant);
+  m.draw();
+  clearAllDirty(m.canvas);
+  m.draw();
+  check(pagesClean(m.canvas), "menu: an unchanged Octave and Formant row is not redrawn");
+  std::swap(m.layout.card[kOctaveSlot], m.layout.card[kOctaveSlot + 1]);  // Octave to slot 4, Unison to slot 3
+  m.draw();
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kOctaveFormant), "SLOT 4", "OCTAVE", true),
+        "menu: moving Octave to slot 4 repaints the row with the new slot and the same value");
+}
+
+// A click on the Octave and Formant row swaps the card in the slot that holds it and leaves every other
+// slot and setting alone. Formant costs less than Octave, so the first swap is taken. The swap back is
+// refused in a layout where Octave would put the mean over its line, and the row then still reads FORMANT.
+void checkMenuOctaveFormantClick() {
+  Layout formant = defaultLayout();
+  formant.card[kOctaveSlot] = Card::Formant;
+  MenuRig m;
+  m.openListAt(kOctaveFormant);
+  const UiAction a = m.step(0, true);
+  check(a == UiAction::SwapOctaveFormant, "menu: a click on the Octave and Formant row asks for the swap");
+  check(ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout == formant,
+        "menu: Octave becomes Formant in its slot with the other slots as they were");
+  m.draw();
+  check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
+        "menu: the row shows the card the layout holds after the click");
+  check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
+  check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
+            m.layout == defaultLayout(),
+        "menu: a second click swaps Formant back to Octave");
+
+  // Octave would take this layout from 74 to 76 percent mean, so the swap back is refused.
+  MenuRig tight;
+  tight.layout = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Unison, Card::ReverbSpring}};
+  Layout octave = tight.layout;
+  octave.card[kOctaveSlot] = Card::Octave;
+  check(layoutValid(tight.layout).ok() && !layoutValid(octave).ok(), "menu: the tight layout fits with Formant and refuses Octave");
+  const Layout tightBefore = tight.layout;
+  tight.openListAt(kOctaveFormant);
+  const UiAction refused = tight.step(0, true);
+  check(refused == UiAction::SwapOctaveFormant &&
+            ui::applyAction(refused, tight.settings, tight.layout) == ui::ApplyResult::None && tight.layout == tightBefore,
+        "menu: a swap the box would not load leaves the layout as it is");
+  tight.draw();
+  check(cursorRowIs(tight.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
+        "menu: and the row still reads FORMANT");
+
+  // Octave in slot 1 and Formant in slot 3: the finder names slot 1 and Formant would repeat.
+  MenuRig both;
+  both.layout.card[0] = Card::Octave;
+  both.layout.card[kOctaveSlot] = Card::Formant;
+  const Layout bothBefore = both.layout;
+  both.openListAt(kOctaveFormant);
+  check(ui::applyAction(both.step(0, true), both.settings, both.layout) == ui::ApplyResult::None && both.layout == bothBefore,
+        "menu: with Octave and Formant both placed the click changes nothing");
+
+  // With neither card placed the row reads SLOT - and a click changes nothing.
+  MenuRig none;
+  none.layout.card[kOctaveSlot] = Card::Empty;
+  none.openListAt(kOctaveFormant);
+  none.draw();
+  check(listRowIs(none.canvas, rowOnScreen(kOctaveFormant), "SLOT -", "OCTAVE", true), "menu: the row reads SLOT - with no card to swap");
+  const Layout noneBefore = none.layout;
+  const UiAction nothing = none.step(0, true);
+  check(nothing == UiAction::SwapOctaveFormant && ui::applyAction(nothing, none.settings, none.layout) == ui::ApplyResult::None &&
+            none.layout == noneBefore,
+        "menu: a click on SLOT - on the Octave and Formant row changes nothing");
 }
 
 // The Unison and Crowd row reads the layout, so its label follows the slot that holds the card and
@@ -734,11 +847,11 @@ void checkMenuSlot7Value() {
   none.card[kSlot7Slot] = Card::Empty;
   const Case cases[] = {
       {"Gate in slot 7", defaultLayout(), "SLOT 7", "GATE"},
-      {"Formant in slot 7", with(Card::Formant), "SLOT 7", "FORMANT"},
       {"Lo-fi in slot 7", with(Card::Lofi), "SLOT 7", "LO-FI"},
       {"Bloom in slot 7", with(Card::Bloom), "SLOT 7", "BLOOM"},
       {"Bloom in slot 1", moved, "SLOT 1", "BLOOM"},
-      {"a layout with none of the four", none, "SLOT -", "GATE"},
+      {"Formant in slot 7, which is no slot 7 card", with(Card::Formant), "SLOT -", "GATE"},
+      {"a layout with none of the three", none, "SLOT -", "GATE"},
   };
   for (const Case& c : cases) {
     MenuRig m;
@@ -770,15 +883,15 @@ void checkMenuSlot7Redraw() {
         "menu: a new card in the same slot repaints the row with the new value");
 }
 
-// A click on the slot 7 row asks for the cycle. Applying it takes Gate to Formant to Lo-fi to Bloom and back to
-// Gate, with every other slot and setting as they were, and the row shows each card. The layout with
-// each card survives a save and a reload.
+// A click on the slot 7 row asks for the cycle. Applying it takes Gate to Lo-fi to Bloom and back to Gate,
+// with every other slot and setting as they were, and the row shows each card. The layout with each card
+// survives a save and a reload.
 void checkMenuSlot7Click() {
-  const Card order[] = {Card::Formant, Card::Lofi, Card::Bloom, Card::Gate};
-  const char* const values[] = {"FORMANT", "LO-FI", "BLOOM", "GATE"};
+  const Card order[] = {Card::Lofi, Card::Bloom, Card::Gate};
+  const char* const values[] = {"LO-FI", "BLOOM", "GATE"};
   MenuRig m;
   m.openListAt(kSlot7Card);
-  for (size_t i = 0; i < 4; ++i) {
+  for (size_t i = 0; i < 3; ++i) {
     const UiAction a = m.step(0, true);
     check(a == UiAction::CycleSlot7Card, "menu: a click on the slot 7 row asks for the cycle");
     check(ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout.card[kSlot7Slot] == order[i],
@@ -794,7 +907,7 @@ void checkMenuSlot7Click() {
           (std::string("menu: a layout with ") + values[i] + " in slot 7 survives a save and a reload").c_str());
   }
   check(m.layout == defaultLayout() && sameSettings(m.settings, Settings()),
-        "menu: four clicks come round to the default layout and touch no setting");
+        "menu: three clicks come round to the default layout and touch no setting");
 
   // A card the layout would refuse is passed over: Bloom would put this layout over the mean line, so
   // the click on Lo-fi lands on Gate.
@@ -812,7 +925,7 @@ void checkMenuSlot7Click() {
   check(cursorRowIs(tight.canvas, rowOnScreen(kSlot7Card), kSlot7Card, "GATE"), "menu: and the row reads the card the cycle landed on");
 }
 
-// With none of the four placed the row reads SLOT - and a click asks for the cycle but changes nothing.
+// With none of the three placed the row reads SLOT - and a click asks for the cycle but changes nothing.
 void checkMenuSlot7NoSlot() {
   MenuRig m;
   m.layout.card[kSlot7Slot] = Card::Empty;
@@ -842,12 +955,12 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The eleven rows in list order, with the labels written out and the cursor walked down one step at a
-// time. The input filters are not on the list, the Unison and Crowd row follows REVERB, and the slot 7
-// row follows that.
+// The twelve rows in list order, with the labels written out and the cursor walked down one step at a
+// time. The input filters are not on the list, the Octave and Formant row follows REVERB, the Unison
+// and Crowd row follows that, and the slot 7 row follows that.
 void checkMenuRowOrder() {
-  static const char* const kSpecOrder[kRowCount] = {"INPUT",       "REVERB", "SLOT 4",          "SLOT 7", "POLISH COMP", "POLISH EQ",
-                                                    "OUTPUT",      "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+  static const char* const kSpecOrder[kRowCount] = {"INPUT",  "REVERB", "SLOT 3",          "SLOT 4",     "SLOT 7", "POLISH COMP",
+                                                    "POLISH EQ", "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
   m.step(0, true);
   bool inOrder = true;
@@ -856,8 +969,9 @@ void checkMenuRowOrder() {
     m.draw();
     inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
-  check(inOrder && kRowCount == 11,
-        "menu: the rows run INPUT, REVERB, SLOT 4, SLOT 7, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, UPDATE FIRMWARE, EXIT");
+  check(inOrder && kRowCount == 12,
+        "menu: the rows run INPUT, REVERB, SLOT 3, SLOT 4, SLOT 7, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, "
+        "UPDATE FIRMWARE, EXIT");
 }
 
 // The POLISH EQ row drives both halves of the stage: one click turns the one `on` off for the front
@@ -968,10 +1082,10 @@ void checkMenuWrapAndCombo() {
   MenuRig m;
   m.openListAt(kRowCount + kPolishComp);  // a full lap and more detents lands on POLISH COMP
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: a lap and four detents wraps around the list");
+  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: a lap and five detents wraps around the list");
   m.step(-(kRowCount + kPolishComp), false);  // back by the same lands on item 0
   m.draw();
-  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: a lap and four detents back wraps the other way");
+  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: a lap and five detents back wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
@@ -1068,7 +1182,7 @@ void checkMenuRedraw() {
   check(pagesClean(m.canvas), "menu: an unchanged frame is not redrawn");
 
   // A change to anything the list shows repaints; a change to a row outside the window does not.
-  m.settings.outputLevel = OutputLevel::Mic;  // OUTPUT is item 6, outside the window of items 0 to 3
+  m.settings.outputLevel = OutputLevel::Mic;  // OUTPUT is item 7, outside the window of items 0 to 3
   m.draw();
   check(pagesClean(m.canvas), "menu: a value change outside the window is not redrawn");
   m.settings.inputJack = InputJack::Line;
@@ -1082,7 +1196,7 @@ void checkMenuRedraw() {
   clearAllDirty(m.canvas);
   m.step(3, false);  // the cursor passes the last row to item 4, so the window scrolls to start at item 1
   m.draw();
-  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kPolishComp, "ON"), "menu: a scroll repaints");
+  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kSlot7Card, "GATE"), "menu: a scroll repaints");
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: and the scrolled window is then skipped when unchanged");
@@ -1113,9 +1227,22 @@ void checkScreenshots() {
   unison.draw();
   check(cursorRowIs(unison.canvas, kUnisonCrowd, kUnisonCrowd, "UNISON") &&
             listRowIs(unison.canvas, kReverb, kLabel[kReverb], kDefaultValue[kReverb]) &&
-            listRowIs(unison.canvas, kSlot7Card, kLabel[kSlot7Card], kDefaultValue[kSlot7Card]),
+            listRowIs(unison.canvas, kOctaveFormant, kLabel[kOctaveFormant], kDefaultValue[kOctaveFormant]),
         "screens: menu rows with the cursor on SLOT 4 UNISON");
   writePgm(unison.canvas, "oled-menu-unison.pgm");
+
+  // The Octave and Formant row with the cursor on it, once with each card.
+  for (const bool formant : {false, true}) {
+    MenuRig octave;
+    octave.layout.card[kOctaveSlot] = formant ? Card::Formant : Card::Octave;
+    octave.openListAt(kOctaveFormant);
+    octave.draw();
+    check(cursorRowIs(octave.canvas, kOctaveFormant, kOctaveFormant, formant ? "FORMANT" : "OCTAVE") &&
+              listRowIs(octave.canvas, kReverb, kLabel[kReverb], kDefaultValue[kReverb]) &&
+              listRowIs(octave.canvas, kUnisonCrowd, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
+          formant ? "screens: menu rows with the cursor on SLOT 3 FORMANT" : "screens: menu rows with the cursor on SLOT 3 OCTAVE");
+    writePgm(octave.canvas, formant ? "oled-menu-formant.pgm" : "oled-menu-octave.pgm");
+  }
 
   MenuRig mob;
   mob.layout.card[kUnisonSlot] = Card::Crowd;
@@ -1124,13 +1251,13 @@ void checkScreenshots() {
   check(cursorRowIs(mob.canvas, kUnisonCrowd, kUnisonCrowd, "MOB"), "screens: menu rows with the cursor on SLOT 4 MOB");
   writePgm(mob.canvas, "oled-menu-mob.pgm");
 
-  // The slot 7 row with the cursor on it, once for each of the four cards.
+  // The slot 7 row with the cursor on it, once for each of the three cards. The window has scrolled one
+  // row, so the cursor sits on the last visible row and the Unison and Crowd row above it.
   const struct {
     Card card;
     const char* value;
     const char* file;
   } slot7Shots[] = {{Card::Gate, "GATE", "oled-menu-slot7-gate.pgm"},
-                    {Card::Formant, "FORMANT", "oled-menu-slot7-formant.pgm"},
                     {Card::Lofi, "LO-FI", "oled-menu-slot7-lofi.pgm"},
                     {Card::Bloom, "BLOOM", "oled-menu-slot7-bloom.pgm"}};
   for (const auto& shot : slot7Shots) {
@@ -1138,8 +1265,8 @@ void checkScreenshots() {
     slot7.layout.card[kSlot7Slot] = shot.card;
     slot7.openListAt(kSlot7Card);
     slot7.draw();
-    check(cursorRowIs(slot7.canvas, kSlot7Card, kSlot7Card, shot.value) &&
-              listRowIs(slot7.canvas, kUnisonCrowd, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
+    check(cursorRowIs(slot7.canvas, rowOnScreen(kSlot7Card), kSlot7Card, shot.value) &&
+              listRowIs(slot7.canvas, rowOnScreen(kSlot7Card) - 1, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
           (std::string("screens: menu rows with the cursor on SLOT 7 ") + shot.value).c_str());
     writePgm(slot7.canvas, shot.file);
   }
@@ -1183,6 +1310,9 @@ void checkMenu() {
   checkMenuClicks();
   checkMenuReverbValue();
   checkMenuReverbClick();
+  checkMenuOctaveFormantValue();
+  checkMenuOctaveFormantRedraw();
+  checkMenuOctaveFormantClick();
   checkMenuUnisonCrowdValue();
   checkMenuUnisonCrowdRedraw();
   checkMenuUnisonCrowdClick();

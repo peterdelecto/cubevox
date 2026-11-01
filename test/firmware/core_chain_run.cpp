@@ -888,21 +888,23 @@ void checkCrowdToggleOff() {
   check(rig->engines.crowd.leadGain() == 1.0f, "crowd: the engine ramped back to the lead alone before its slot stopped");
 }
 
-// Slot 7 is the seventh slot, index 6. Its choices (Formant, Lo-fi and Bloom) run there.
+// Slot 3 is the third slot, index 2, where Formant stands in for Octave. Slot 7 is the seventh, index 6,
+// where Lo-fi and Bloom stand in for Gate.
+constexpr int kSlot3 = 2;
 constexpr int kSlot7 = 6;
 
 // 200 ms of the tone, as for the Crowd card: the tracker finds its period in about 32 ms, the Formant
 // voice sounds 22 ms after that, and Bloom's first capture lands at 40 to 50 ms and loops by about 110 ms.
 constexpr int kSlot7Blocks = 150;
 
-// A layout with `c` in slot 7 and every other slot empty.
+// A layout with `c` in its slot, slot 3 for Formant and slot 7 for the others, and every other slot empty.
 Layout slot7Only(Card c) {
   Layout layout = layoutOf({});
-  layout.card[kSlot7] = c;
+  layout.card[c == Card::Formant ? kSlot3 : kSlot7] = c;
   return layout;
 }
 
-// The engine of slot 7's card called by hand on `rig`'s own engines with the snapshot's params.
+// The engine of the card called by hand on `rig`'s own engines with the snapshot's params.
 Block slot7Direct(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) {
   Block out{};
   switch (c) {
@@ -914,8 +916,9 @@ Block slot7Direct(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) 
   return out;
 }
 
-// Each choice runs its engine in slot 7, changes the tone, and passes the dry input bit for bit once
-// its toggle has been off for the fade. A reset clears the Lo-fi and Bloom engines.
+// Formant in slot 3 and Lo-fi and Bloom in slot 7 each run their engine, change the tone, and pass the
+// dry input bit for bit once their toggle has been off for the fade. A reset clears the Lo-fi and
+// Bloom engines.
 void checkSlot7CardsRun() {
   for (const Card c : {Card::Formant, Card::Lofi, Card::Bloom}) {
     const std::string name = cardDesc(c).name;
@@ -932,8 +935,8 @@ void checkSlot7CardsRun() {
       finite = finite && run.finite && allFinite(run.out);
       if (b >= kSlot7Blocks / 2) heard = heard || run.out != in;
     }
-    check(same, (name + " in slot 7 runs its engine over the block").c_str());
-    check(finite && heard, (name + " in slot 7 stays finite and changes the tone").c_str());
+    check(same, (name + " runs its engine over the block in its slot").c_str());
+    check(finite && heard, (name + " stays finite and changes the tone in its slot").c_str());
 
     const ChainSnapshot off = snapshotToggles(slot7Only(c), 0.5f, allToggles(false));
     auto settled = newRig();
@@ -943,7 +946,7 @@ void checkSlot7CardsRun() {
       const Run run = runBlock(*settled, off, in, StillClock());
       if (b >= kSlotFadeBlocks) dry = dry && run.out == in;
     }
-    check(dry, (name + " in slot 7 with its toggle off passes the dry input bit for bit after the fade").c_str());
+    check(dry, (name + " with its toggle off passes the dry input bit for bit after the fade").c_str());
   }
 
   const ChainSnapshot bloom = snapshotToggles(slot7Only(Card::Bloom), 0.5f, allToggles(true));
@@ -963,18 +966,18 @@ void checkSlot7CardsRun() {
 }
 
 // Formant acts at the first pitch-group card's slot, wherever its own card sits. Its toggle alone keeps
-// the stage and its tracker running: with Autotune off, in slot 1 or in slot 7, the pitch call goes
-// through at the first of the two and the Formant card at slot 7 writes nothing of its own.
+// the stage and its tracker running: with Autotune off, in slot 1 or in slot 3, the pitch call goes
+// through at the first of the two and a Formant card behind Autotune writes nothing of its own.
 void checkFormantPitchStage() {
   Layout behind = layoutOf({Card::Autotune});
-  behind.card[kSlot7] = Card::Formant;
+  behind.card[kSlot3] = Card::Formant;
   Layout ahead = layoutOf({Card::Formant});
-  ahead.card[kSlot7] = Card::Autotune;
+  ahead.card[kSlot3] = Card::Autotune;
   const std::initializer_list<std::pair<const char*, Layout>> layouts = {
-      {"Formant in slot 7 behind Autotune in slot 1", behind}, {"Formant in slot 1 ahead of Autotune in slot 7", ahead}};
+      {"Formant in slot 3 behind Autotune in slot 1", behind}, {"Formant in slot 1 ahead of Autotune in slot 3", ahead}};
   for (const auto& entry : layouts) {
-    const bool formantAtSlot7 = entry.second.card[kSlot7] == Card::Formant;
-    const ChainSnapshot snap = snapshotToggles(entry.second, 0.5f, togglesOn({formantAtSlot7 ? kSlot7 : 0}));
+    const bool formantBehind = entry.second.card[kSlot3] == Card::Formant;
+    const ChainSnapshot snap = snapshotToggles(entry.second, 0.5f, togglesOn({formantBehind ? kSlot3 : 0}));
     auto chain = newRig();
     auto hand = newRig();
     bool same = true;

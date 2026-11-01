@@ -230,26 +230,45 @@ bool segmentedSwitch(Frame& f, const char* id, ImVec2 topLeft, float width, cons
   return clicked;
 }
 
-// A switch of four words in two rows of two, read row by row, the active one on an accent fill. The
-// right-hand column is as wide as its longer word needs, and the left-hand column takes the rest. A
-// click on a cell returns its index, and -1 means no click.
-int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, const std::array<const char*, 4>& words,
+// One cell of a grid switch. `left` and `across` are shares of the switch's width, and `row` is 0 for
+// the top row and 1 for the bottom one.
+struct GridCell {
+  const char* word;
+  float left;
+  int row;
+  float across;
+};
+
+// A switch of up to two rows of words, the active one on an accent fill, in the foot of a column.
+// Words that do not fit side by side in the column at the label size take a row each: OCTAVE and
+// FORMANT together are 136 of the column's 144 px, and BLOOM is wider than a third of it. A click
+// on a cell returns its index, and -1 means no click.
+template <size_t N>
+int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, const std::array<GridCell, N>& cells,
                   int active) {
-  const float rightW = std::max(textSize(kFontLabel, words[1]).x, textSize(kFontLabel, words[3]).x) + 2 * kGridPad;
-  const float leftW = width - rightW;
   const ImVec2 inset(kSegInset, kSegInset);
   ImDrawList* dl = f.dl;
   const ImVec2 bottomRight = topLeft + ImVec2(width, kGridH);
   dl->AddRectFilled(topLeft, bottomRight, kCtrl, kRadiusMd);
-  dl->AddLine(ImVec2(topLeft.x + leftW, topLeft.y), ImVec2(topLeft.x + leftW, bottomRight.y), kBorder, kBorderW);
-  dl->AddLine(ImVec2(topLeft.x, topLeft.y + kSegH), ImVec2(bottomRight.x, topLeft.y + kSegH), kBorder, kBorderW);
+  bool twoRows = false;
+  for (const GridCell& c : cells) {
+    twoRows = twoRows || c.row == 1;
+    if (c.left > 0.0f) {
+      const float x = topLeft.x + c.left * width;
+      const float y = topLeft.y + static_cast<float>(c.row) * kSegH;
+      dl->AddLine(ImVec2(x, y), ImVec2(x, y + kSegH), kBorder, kBorderW);
+    }
+  }
+  if (twoRows) {
+    dl->AddLine(ImVec2(topLeft.x, topLeft.y + kSegH), ImVec2(bottomRight.x, topLeft.y + kSegH), kBorder, kBorderW);
+  }
 
   int clicked = -1;
   ImGui::PushID(id);
-  for (int i = 0; i < 4; ++i) {
-    const bool right = i % 2 == 1;
-    const ImVec2 cellMin = topLeft + ImVec2(right ? leftW : 0.0f, static_cast<float>(i / 2) * kSegH);
-    const ImVec2 cellSize(right ? rightW : leftW, kSegH);
+  for (size_t k = 0; k < N; ++k) {
+    const int i = static_cast<int>(k);
+    const ImVec2 cellMin = topLeft + ImVec2(cells[k].left * width, static_cast<float>(cells[k].row) * kSegH);
+    const ImVec2 cellSize(cells[k].across * width, kSegH);
     ImGui::SetCursorScreenPos(cellMin);
     ImGui::PushID(i);
     if (ImGui::InvisibleButton("cell", cellSize)) clicked = i;
@@ -261,8 +280,7 @@ int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, const s
       dl->AddRect(cellMin + inset, cellMin + cellSize - inset, pressed ? kAccent : kHover, kRadiusMd - kSegInset,
                   ImDrawFlags_None, kBorderW);
     }
-    drawTextCentered(dl, cellMin + cellSize * half(1), kFontLabel, i == active ? kAccentInk : kDim,
-                     words[static_cast<size_t>(i)]);
+    drawTextCentered(dl, cellMin + cellSize * half(1), kFontLabel, i == active ? kAccentInk : kDim, cells[k].word);
   }
   ImGui::PopID();
   dl->AddRect(topLeft, bottomRight, kBorder, kRadiusMd, ImDrawFlags_None, kBorderW);
@@ -334,34 +352,34 @@ void drawTopBand(Frame& f) {
   drawCpuLine(f, kRightX + 2 * kLedR + kLedGap, rowY);
 }
 
-// The slot 7 choices in the order the menu cycles them. Each cell of the card switch picks one.
-struct Slot7Choice {
-  const char* word;
-  Card card;
-};
-constexpr std::array<Slot7Choice, 4> kSlot7Choices = {{
-    {"GATE", Card::Gate}, {"FORMANT", Card::Formant}, {"LO-FI", Card::Lofi}, {"BLOOM", Card::Bloom}}};
+// The cells of the two grid switches, in the order the menu cycles or swaps their cards. The slot 7
+// switch has GATE and LO-FI side by side over BLOOM. The slot 3 switch has OCTAVE over FORMANT.
+constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"BLOOM", 0.0f, 1, 1.0f}}};
+constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
+constexpr std::array<GridCell, 2> kSlot3Cells = {{{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}}};
 
-// The card switch at the foot of a slot, which follows the layout: the column that holds the Unison
-// or MOB card, the column that holds a reverb, and the column that holds Gate, Formant, Lo-fi or
-// Bloom. The last is a grid, and a click picks its card through the menu's own action.
+// The card switch at the foot of a slot, which follows the layout: the column that holds the Octave
+// or Formant card, the column that holds the Unison or MOB card, the column that holds a reverb, and
+// the column that holds Gate, Lo-fi or Bloom. The first and last are grids, and a click on the last
+// picks its card through the menu's own action.
 void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   const Layout& layout = f.box.layout();
-  if (slot == unisonCrowdSlot(layout)) {
+  if (slot == octaveFormantSlot(layout)) {
+    const int active = layout.card[static_cast<size_t>(slot)] == Card::Formant ? 1 : 0;
+    if (segmentedGrid(f, "swapOctave", topLeft, kColInnerW, kSlot3Cells, active) >= 0) f.box.swapOctaveFormant();
+  } else if (slot == unisonCrowdSlot(layout)) {
     const bool mob = layout.card[static_cast<size_t>(slot)] == Card::Crowd;
     if (segmentedSwitch(f, "swapUnison", topLeft, kColInnerW, "UNISON", "MOB", mob, true)) f.box.swapUnisonMob();
   } else if (slot == reverbSlot(layout)) {
     const bool chasm = layout.card[static_cast<size_t>(slot)] == Card::ReverbChasm;
     if (segmentedSwitch(f, "swapReverb", topLeft, kColInnerW, "SPRING", "CHASM", chasm, true)) f.box.swapReverb();
   } else if (slot == slot7CardSlot(layout)) {
-    std::array<const char*, 4> words{};
     int active = 0;
-    for (size_t i = 0; i < kSlot7Choices.size(); ++i) {
-      words[i] = kSlot7Choices[i].word;
-      if (kSlot7Choices[i].card == layout.card[static_cast<size_t>(slot)]) active = static_cast<int>(i);
+    for (size_t i = 0; i < kSlot7Cards.size(); ++i) {
+      if (kSlot7Cards[i] == layout.card[static_cast<size_t>(slot)]) active = static_cast<int>(i);
     }
-    const int picked = segmentedGrid(f, "slot7Card", topLeft, kColInnerW, words, active);
-    if (picked >= 0) f.box.pickSlot7Card(kSlot7Choices[static_cast<size_t>(picked)].card);
+    const int picked = segmentedGrid(f, "slot7Card", topLeft, kColInnerW, kSlot7Cells, active);
+    if (picked >= 0) f.box.pickSlot7Card(kSlot7Cards[static_cast<size_t>(picked)]);
   }
 }
 

@@ -70,13 +70,14 @@ class Box {
   // One pass of loop().
   void tick(const PanelInput& in, uint32_t nowMs);
 
-  // The menu's REVERB and UNISON rows. A layout the box would not load stays as it is.
+  // The menu's REVERB, OCTAVE and UNISON rows. A layout the box would not load stays as it is.
+  void swapOctaveFormant();
   void swapUnisonMob();
   void swapReverb();
 
   // The card switch under slot 7. Applies the menu's slot 7 action until the slot holds `card`
-  // (Gate, Formant, Lofi or Bloom). When no step of the cycle reaches it, because the box would not
-  // load that layout, the layout stays as it was.
+  // (Gate, Lofi or Bloom). When no step of the cycle reaches it, because the box would not load that
+  // layout, the layout stays as it was.
   void pickSlot7Card(Card card);
 
   const Pixels& pixels() const { return display_.pixels(); }
