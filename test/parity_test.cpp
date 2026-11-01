@@ -114,14 +114,14 @@ void cmpGate(const std::string& p, float pos, const cv::GateParams& f, const cv:
   EXPECT(std::string(p) + ".travelTimes", pos, f.tuning.travelTimes ? 1.0f : 0.0f, e.tuning.travelTimes ? 1.0f : 0.0f);
 }
 
-void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, const cv::AutotuneParams& e,
-                 bool rest) {
+// Neither side sets AutotuneTuning, so both run the struct's own defaults and a tuning field needs no
+// line here. The firmware's Autotune tuning is the engine's struct.
+static_assert(std::is_same<decltype(ChainParams::pitchFx.autotune.tuning), cv::AutotuneTuning>::value,
+              "the firmware's Autotune params carry the engine's AutotuneTuning");
+
+void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, const cv::AutotuneParams& e) {
   CMP(p, pos, f, e, key);
   CMP(p, pos, f, e, responseMs);
-  if (!rest) return;
-  CMP(p, pos, f.tuning, e.tuning, trimDb);
-  CMP(p, pos, f.tuning, e.tuning, maxCorrectSemis);
-  CMP(p, pos, f.tuning, e.tuning, grainDelay);
 }
 
 void cmpOctave(const std::string& p, float pos, const cv::OctaveParams& f, const cv::OctaveParams& e, bool rest) {
@@ -365,7 +365,7 @@ void sweepAutotune() {
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Autotune, 0, static_cast<float>(k), fw);
     em.pitchFx.autotune.key = k;  // drawPedals KEY encoder
-    cmpAutotune("sweep.autotune.key", static_cast<float>(k), fw.pitchFx.autotune, em.pitchFx.autotune, false);
+    cmpAutotune("sweep.autotune.key", static_cast<float>(k), fw.pitchFx.autotune, em.pitchFx.autotune);
   }
   for (int i = 0; i <= kSweepSteps; ++i) {
     const float p = sweepPos(i);
@@ -373,7 +373,7 @@ void sweepAutotune() {
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Autotune, 1, p, fw);
     em.pitchFx.autotune.responseMs = cv::AutotuneVoice::responseMsAt(p);  // drawPedals RESPONSE
-    cmpAutotune("sweep.autotune.response", p, fw.pitchFx.autotune, em.pitchFx.autotune, false);
+    cmpAutotune("sweep.autotune.response", p, fw.pitchFx.autotune, em.pitchFx.autotune);
   }
 }
 
@@ -484,7 +484,7 @@ void defaults() {
   const ChainParams fw = fwAtEmuStart(em);
   cmpGate("default.inputGate", 0.0f, fw.inputGate, em.inputGate, true);
   cmpGate("default.gate", 0.0f, fw.gate, em.gate, true);
-  cmpAutotune("default.autotune", 0.0f, fw.pitchFx.autotune, em.pitchFx.autotune, true);
+  cmpAutotune("default.autotune", 0.0f, fw.pitchFx.autotune, em.pitchFx.autotune);
   cmpOctave("default.octave", 0.0f, fw.pitchFx.octave, em.pitchFx.octave, true);
   cmpCrowd("default.crowd", 0.0f, fw.crowd, em.crowd);
   cmpUnison("default.unison", 0.0f, fw.unison, em.unison, true);

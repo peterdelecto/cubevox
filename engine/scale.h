@@ -10,9 +10,9 @@ namespace cv {
 
 constexpr int kKeyCount = 12;
 constexpr std::array<int, kKeyCount> kKeyRoot = {0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5};
-constexpr const char* kKeyName[kKeyCount] = {"C / Am",   "G / Em",   "D / Bm",   "A / F#m",
-                                             "E / C#m",  "B / G#m",  "F# / D#m", "Db / Bbm",
-                                             "Ab / Fm",  "Eb / Cm",  "Bb / Gm",  "F / Dm"};
+constexpr std::array<const char*, kKeyCount> kKeyName = {"C / Am",   "G / Em",   "D / Bm",   "A / F#m",
+                                                         "E / C#m",  "B / G#m",  "F# / D#m", "Db / Bbm",
+                                                         "Ab / Fm",  "Eb / Cm",  "Bb / Gm",  "F / Dm"};
 
 constexpr std::array<int, 7> kMajor = {0, 2, 4, 5, 7, 9, 11};
 

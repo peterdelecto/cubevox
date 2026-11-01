@@ -18,10 +18,11 @@
 
 namespace cv {
 
+// grainDelay lines the voice up with the tracker's frame for hard tune (psola.h). The voice's latency
+// is the grain delay plus one period, 22.7 ms at 1 kHz to 36.0 ms at 70 Hz.
 struct AutotuneTuning {
-  float trimDb = 0.0f;            // level rule
-  float maxCorrectSemis = 6.0f;   // never pull more than this (tracker glitch guard)
-  float grainDelay = 1040.0f;     // output latency, samples
+  float trimDb = 0.0f;  // level rule
+  float grainDelay = static_cast<float>(PsolaVoice::kGrainDelay);  // samples, tracker alignment
 };
 
 struct AutotuneParams {
@@ -76,11 +77,10 @@ class AutotuneVoice {
     if (!p.on) return 0.0f;
     if (pr.voiced && pr.clamped) {
       target_ = 0.0f;
-    } else if (pr.voiced && pr.hz > 0.0f) {
+    } else if (pr.voiced) {
       const float hz = sungHz(pr);
       if (hz != degreeHz_ || p.key != degreeKey_) pullTo(hz, p.key);
-      const float maxC = t.maxCorrectSemis > 0.0f ? t.maxCorrectSemis : 0.0f;
-      target_ = clampf(-deviation_, -maxC, maxC);
+      target_ = -deviation_;
     }
     return corr_;
   }
@@ -88,9 +88,9 @@ class AutotuneVoice {
   // Per sample: the corrected voice, trim applied. The voice takes the inverse pitch ratio, so it
   // multiplies where it would divide. PitchFx fades it in only once the tracker has a period, so the
   // grains start on the sung pitch.
-  float tick(const VoiceRing& ring, long writeCount, float period) {
+  float tick(const VoiceRing& ring, int head, float period) {
     corr_ = smooth::step(corr_, target_, a_);
-    return gain_ * psola_.tick(ring, writeCount, period, exp2Fast(corr_ * (-1.0f / 12.0f)));
+    return gain_ * psola_.tick(ring, head, period, exp2Fast(corr_ * (-1.0f / 12.0f)));
   }
 
   // Smoothed correction in semitones.

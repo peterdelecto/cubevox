@@ -367,7 +367,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "Choices: Input gate on; Gate %s; Autotune %s; Octave %s; Crowd %s; Unison %s; Slapback %s; "
       "Distortion %s; Reverb %s, engine %s; Output EQ %s\n"
       "Knobs: Input gate THRESHOLD %.0f dB, DECAY %.0f ms; Gate THRESHOLD %.0f dB, DECAY %.0f ms; Autotune KEY %s, RESPONSE "
-      "%.0f %% mechanical (%.0f ms), Pull range %.1f st; Octave SEMITONES %+d, MIX %.0f %%; Crowd WIDTH "
+      "%.0f %% mechanical (%.0f ms); Octave SEMITONES %+d, MIX %.0f %%; Crowd WIDTH "
       "%.0f %%, VOICES %.0f %%; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback AMOUNT %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
       "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
@@ -378,8 +378,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(p.gate.tuning.releaseMs),
       cv::kKeyName[at.key],
       static_cast<double>(cv::AutotuneVoice::mechanicalOf(at.responseMs) * 100.0f),
-      static_cast<double>(at.responseMs),
-      static_cast<double>(at.tuning.maxCorrectSemis), o.semitones,
+      static_cast<double>(at.responseMs), o.semitones,
       static_cast<double>(o.mix * 100.0f),
       static_cast<double>(p.crowd.width * 100.0f), static_cast<double>(p.crowd.voices * 100.0f),
       static_cast<double>(p.unison.depth * 100.0f),
@@ -449,12 +448,12 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       gTuningText + used, sizeof(gTuningText) - used,
       "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff, %s}"
       "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff, %s}"
-      "\nAutotuneTuning{%.1ff, %.1ff, %.0ff}",
+      "\nAutotuneTuning{%.1ff, %.0ff}",
       ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
       ig.detectorAttackMs, ig.detectorReleaseMs, ig.travelTimes ? "true" : "false",
       g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
       g.detectorAttackMs, g.detectorReleaseMs, g.travelTimes ? "true" : "false",
-      at.trimDb, at.maxCorrectSemis, at.grainDelay);
+      at.trimDb, at.grainDelay);
 }
 
 void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv::SlapbackTuning& s,
@@ -463,7 +462,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
                  const ProtoParams& params) {
   formatTuning(o, t, s, d, c, e, ig, g, at, params);
   std::printf(
-      "// AutotuneTuning: trimDb, maxCorrectSemis, grainDelay\n"
+      "// AutotuneTuning: trimDb, grainDelay\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb, "
       "detectorAttackMs, detectorReleaseMs, travelTimes\n"
       "// OctaveTuning: levelDb, glideMs, grainWindowMs, grainCount, trimDb\n"
@@ -983,7 +982,6 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("autotune.on", &at.on);
   add("autotune.key", &at.key);
   add("autotune.response", &at.responseMs);
-  add("autotune.pull", &at.tuning.maxCorrectSemis);
   cv::OctaveParams& o = p.pitchFx.octave;
   add("octave.on", &o.on);
   add("octave.semitones", &o.semitones);
@@ -1167,13 +1165,10 @@ void drawOctaveTuning(cv::OctaveParams& o, cv::macros::State& m) {
               [&](float p) { cv::macros::octaveSlide(o.tuning, p); });
 }
 
-// Pull range limits how far a note may be moved; small values fix near-misses and
-// leave deliberate bends alone. The raw nodes follow under Advanced.
+// The Autotune card has no macros, so its tuning is the raw field in both views.
 void drawAutotuneTuning(cv::AutotuneParams& a) {
   if (!tuningHeader("autotune")) return;
-  ImGui::SliderFloat("Pull range", &a.tuning.maxCorrectSemis, 0.5f, 6.0f, "%.1f st");
-  hint("how far off a note it will still fix");
-  if (gAdvanced) drawAutotuneRaw(a.tuning);
+  drawAutotuneRaw(a.tuning);
 }
 
 // The Crowd card has no macros, so its tuning is the raw fields in both views.
@@ -1307,7 +1302,7 @@ void drawAutotuneBlock(cv::AutotuneParams& a, const ProtoState& state) {
   ImGui::PushID("autotune");
   ImGui::Checkbox("AUTOTUNE", &a.on);
   ImGui::SetNextItemWidth(kAutotuneKeyW);
-  ImGui::Combo("KEY", &a.key, cv::kKeyName, cv::kKeyCount);
+  ImGui::Combo("KEY", &a.key, cv::kKeyName.data(), cv::kKeyCount);
   if (gAdvanced) {
     ImGui::SameLine();
     ImGui::Text("Correction: %+.2f st", a.on ? state.correctionSemis : 0.0f);

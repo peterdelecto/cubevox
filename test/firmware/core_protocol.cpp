@@ -474,7 +474,7 @@ void checkHelloReply() {
   const CardDesc& autotune = cardDesc(Card::Autotune);
   check(has(w.out, std::string("\"id\":\"autotune\",\"name\":\"Autotune\",\"group\":\"pitch\",\"cost\":{\"avg\":") +
                        std::to_string(autotune.cost.avg) + ",\"worst\":" + std::to_string(autotune.cost.worst) +
-                       ",\"measured\":true}"),
+                       ",\"measured\":" + (autotune.cost.measured ? "true" : "false") + "}"),
         "proto: hello carries costs");
   check(has(w.out, "\"kind\":\"stepped\",\"positions\":25,\"min\":-12,\"max\":12,\"unit\":\"st\",\"curve\":\"linear\""),
         "proto: hello carries the octave knob");

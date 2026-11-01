@@ -1,6 +1,6 @@
 // PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, the pane
 // oracle, the enable rebuild spread over blocks, the replay after an idle spell, the
-// clamped flag at the range ends, no-alloc. No window, no audio device.
+// clamped flag at the range ends, the coarse-only publish, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <atomic>
@@ -321,7 +321,9 @@ bool testEnableReports() {
   float hz = 0.0f;
   const int idle = cv::kSampleRate / cv::kBlock;
   for (int b = 0; b < 2 * idle && firstVoiced < 0; ++b) {
+    gInProcess = true;
     t.push(&x[static_cast<size_t>(b * cv::kBlock)], cv::kBlock, b >= idle);
+    gInProcess = false;
     if (b >= idle && t.result().voiced) {
       firstVoiced = b - idle + 1;
       hz = t.result().hz;
@@ -410,6 +412,33 @@ bool testClamped() {
   return ok;
 }
 
+// 9. Without the fine pass an analysis publishes the coarse lag times kDecim: every voiced hop of a
+// steady A3 reads a raw pitch equal to the coarse tau's, to the bit, and sits within one coarse lag
+// of the note.
+bool testCoarseOnly() {
+  constexpr float kDecim = static_cast<float>(cv::PitchTracker::kDecimForTest);
+  const std::vector<float> x = tone(kA3, 2 * cv::kSampleRate);
+  cv::PitchTracker t;
+  int voiced = 0, exact = 0;
+  double worst = 0.0;
+  const int total = static_cast<int>(x.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    gInProcess = true;
+    t.push(&x[static_cast<size_t>(i)], cv::kBlock, true, false);
+    gInProcess = false;
+    const int end = i + cv::kBlock;
+    if (end <= kSettle || end % cv::PitchTracker::kHop != 0 || !t.result().voiced) continue;
+    ++voiced;
+    const float want = static_cast<float>(cv::kSampleRate) / (t.lastCoarseTau() * kDecim);
+    exact += t.result().rawHz == want ? 1 : 0;
+    worst = std::max(worst, std::fabs(cents(t.result().rawHz, kA3)));
+  }
+  const double oneLagCents = 1200.0 * std::log2(1.0 + kDecim / (cv::kSampleRate / kA3));
+  return report("coarse only", voiced > 0 && exact == voiced && worst <= oneLagCents,
+                "voiced hops %.0f, rawHz equal to the coarse tau's on %.0f (all), worst error %.1f cents (<= %.1f)",
+                voiced, exact, worst, oneLagCents);
+}
+
 }  // namespace
 
 int main() {
@@ -422,6 +451,7 @@ int main() {
   ok &= testEnableReports();
   ok &= testIdleReplay();
   ok &= testClamped();
+  ok &= testCoarseOnly();
   // Every push() call above ran under the allocation guard.
   ok &= report("no allocation", true, "push() ran under the new/delete guard", 0.0);
   std::printf("%s pitch\n", ok ? "PASS" : "FAIL");

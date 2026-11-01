@@ -192,8 +192,7 @@ void checkDescriptors() {
   }
   check(std::fabs(knobValue(cardDesc(Card::Autotune).knob[1], 0.3f) - cv::AutotuneVoice::responseMsAt(0.3f)) < 1e-3f,
         "response curve matches the engine");
-  check(knobSteps(Card::Autotune, 0) == static_cast<int>(sizeof(cv::kKeyName) / sizeof(cv::kKeyName[0])),
-        "key positions equal cv::kKeyName");
+  check(knobSteps(Card::Autotune, 0) == cv::kKeyCount, "key positions equal cv::kKeyCount");
 }
 
 void checkKnobTargets() {

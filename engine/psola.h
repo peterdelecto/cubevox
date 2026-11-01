@@ -35,8 +35,14 @@ constexpr float kMaxReadDelay = kVoiceRingLen - 4.0f;
 
 class PsolaVoice {
  public:
+  // The default grain delay lines the voice up with the tracker's frame. A shorter delay lets the
+  // measurement trail the audio and loses Adam's 2-cent hard tune (commit ee527fb). The voice's
+  // latency is this delay plus one period, 22.7 ms at 1 kHz to 36.0 ms at 70 Hz.
   static constexpr int kGrainDelay = 1040;
-  static constexpr int kMaxGrains = 6;  // at ratio <= 2 at most ceil(2r) + 1 = 5 are live
+
+  // The pool of 6 holds the clamp's worst case, ceil(2r) + 1 = 5 live grains at ratio 2, and one
+  // spare; Autotune pulls under 1.2 st, so it keeps at most 4 live.
+  static constexpr int kMaxGrains = 6;
 
   void reset() {
     grains_.fill(Grain{});
@@ -44,20 +50,17 @@ class PsolaVoice {
     countdown_ = 0.0f;
   }
 
-  // Output latency in samples. Each grain reads the input at a fixed delay;
-  // kGrainDelay keeps a grain at the longest period behind the write head.
+  // The grain delay in samples, up to kGrainDelay. Each grain reads the input at this fixed delay.
   void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinReadDelay + 1.0f, kGrainDelay); }
-  float grainDelay() const { return grainDelay_; }
 
-  // One output sample. writeCount is the ring index of the sample just written, already wrapped
-  // below kVoiceRingLen by the owner. period is the sung period in samples (last voiced),
-  // inverseRatio the inverse of the pitch ratio, which clamps to 0.5..2.0 as the ratio does.
-  float tick(const VoiceRing& ring, long writeCount, float period, float inverseRatio) {
+  // One output sample. head is the ring index of the sample just written, already wrapped below
+  // kVoiceRingLen by the owner. period is the sung period in samples (last voiced), inverseRatio the
+  // inverse of the pitch ratio, which clamps to 0.5..2.0 as the ratio does.
+  float tick(const VoiceRing& ring, int head, float period, float inverseRatio) {
     if (period <= 0.0f) return 0.0f;
     const float p = clampf(period, kMinPeriod, kMaxPeriod);
     const float inv = clampf(inverseRatio, 1.0f / kMaxPitchRatio, 1.0f / kMinPitchRatio);
     const float outPeriod = p * inv;
-    const int head = static_cast<int>(writeCount);
 
     advanceMarks(p);
     if (countdown_ > outPeriod) countdown_ = outPeriod;
@@ -85,11 +88,14 @@ class PsolaVoice {
   static constexpr float kMinPeriod = static_cast<float>(PitchTracker::kMinPeriod);
   static constexpr float kMaxPeriod = static_cast<float>(PitchTracker::kMaxPeriod);
 
-  static_assert(kGrainDelay >= 1.5f * kMaxPeriod + 4.0f, "grains would cross the write head");
+  // The delay that lines the voice up with the tracker's frame (see kGrainDelay) stays over 1.5
+  // longest periods and a pad.
+  static_assert(kGrainDelay >= 1.5f * kMaxPeriod + 4.0f,
+                "the grain delay that lines up with the tracker's frame fell under 1.5 longest periods and a pad");
 
   // Marks are tracked as delays behind the write head, so they stay bounded
   // floats on a box that runs for hours. markDelay_ is the newest mark at or
-  // before kGrainDelay.
+  // before grainDelay_.
   void advanceMarks(float p) {
     markDelay_ += 1.0f;
     while (markDelay_ - p >= grainDelay_) markDelay_ -= p;

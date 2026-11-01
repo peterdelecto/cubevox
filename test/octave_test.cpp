@@ -94,6 +94,7 @@ static cv::PitchFx gFx;
 
 cv::PitchFxParams octaveOnly(int semis) {
   cv::PitchFxParams p;
+  p.octave.on = true;
   p.octave.semitones = semis;
   p.octave.mix = 1.0f;
   return p;

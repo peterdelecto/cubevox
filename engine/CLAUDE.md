@@ -16,7 +16,7 @@
   `wrapOnce`, `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, and `blockCoef` for a one-pole stepped once per block).
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
-- `PitchFx` lives in DTCM: 75,636 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`); the 265.75 ms
+- `PitchFx` lives in DTCM: 75,644 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`); the 265.75 ms
   input ring is 51,024 B of it, sized in `psola.h` for the Crowd card's 225 ms lag ceiling (a raised
   copy 75 ms behind a tuned copy at 150 ms), 12 ms of scatter and the longest grain. The build prints
   DTCM at 75,648 B, 57.8 %, 55,168 B free.

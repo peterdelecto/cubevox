@@ -17,7 +17,7 @@ constexpr float kGateDecayMinMs = 5.0f;
 constexpr float kGateDecayMaxMs = 1000.0f;
 constexpr float kSlapbackTimeMinMs = 60.0f;
 constexpr float kSlapbackTimeMaxMs = 250.0f;
-constexpr int kKeyPositions = sizeof(cv::kKeyName) / sizeof(cv::kKeyName[0]);
+constexpr int kKeyPositions = cv::kKeyCount;
 constexpr int kSemitoneMin = -12;
 constexpr int kSemitoneMax = 12;
 constexpr int kSemitonePositions = kSemitoneMax - kSemitoneMin + 1;
@@ -42,7 +42,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kInputThreshold, kInputDecay}, Group::None,
      costs::kInputGate},
     {Card::Autotune, "autotune", "Autotune", Engine::Pitch, 2,
-     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, 0, cv::kKeyName},
+     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, 0, cv::kKeyName.data()},
       kResponse},
      Group::Pitch, costs::kAutotune},
     {Card::Octave, "octave", "Octave", Engine::Pitch, 2,

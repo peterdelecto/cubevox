@@ -451,7 +451,7 @@ bool testNoAlloc() {
   const Signal in = program(1);
   run(in, knobs(0.9f, 0.5f));  // aborts on any new/delete inside process()
   cv::CrowdParams moving = knobs(0.3f, 0.9f);
-  moving.tuning.scatterMs = 20.0f;
+  moving.tuning.scatterMs = 12.0f;
   moving.tuning.driftCents = 30.0f;
   run(in, moving);
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
@@ -888,8 +888,8 @@ bool testLagAcrossGap() {
   return ok;
 }
 
-// Timing scatter of 15 ms on copy 4 (105 ms lag at WIDTH 1) over ten bursts. Each burst's lag stays
-// within 15 ms of 105 ms and differs from burst to burst. A second run with the copy's own pitch
+// Timing scatter of 12 ms on copy 4 (105 ms lag at WIDTH 1) over ten bursts. Each burst's lag stays
+// within 12 ms of 105 ms and differs from burst to burst. A second run with the copy's own pitch
 // offset keeps its f0 within 10 cents of the offset inside every burst, so no lag change bends it.
 struct ScatterCase {
   Train tr{300, 300, 120, 10};
@@ -905,7 +905,7 @@ ScatterCase scatterCase() {
   const cv::CrowdTuning d;
   c.target = lagMsAt(c.v, 1.0, static_cast<double>(d.lagScale));
   c.flat = lagProbe(c.v, d.lagScale);
-  c.flat.tuning.scatterMs = 15.0f;
+  c.flat.tuning.scatterMs = 12.0f;
   return c;
 }
 
@@ -926,8 +926,8 @@ bool scatterLag(const ScatterCase& c) {
   std::printf("info scatter lag per burst");
   for (double l : lag) std::printf(" %.1f", l);
   std::printf(" ms\n");
-  return report("scatter lag", worst <= 15.5 && changes >= 6,
-                "worst |lag - %.0f| %.2f ms (<= 15.5), spread %.1f ms, %.0f of 9 bursts moved by > 1 ms (>= 6)", c.target,
+  return report("scatter lag", worst <= 12.5 && changes >= 6,
+                "worst |lag - %.0f| %.2f ms (<= 12.5), spread %.1f ms, %.0f of 9 bursts moved by > 1 ms (>= 6)", c.target,
                 worst, hi - lo, static_cast<double>(changes));
 }
 
@@ -1078,14 +1078,16 @@ void allEnhancements(cv::CrowdTuning& t) {
 // at the four-copy gain over sqrt 2, the ring at 225 ms and the trims set for the level rule, on the
 // tracker of the pitch CPU pass (four hop sums, v2.00.78). Runs 1 to 3 start from knobs(), which
 // neutralizes the human-voice set. Run 4 plays the shipped CrowdTuning{} unchanged. The engine must
-// reproduce them to the bit. Update them only when the sound of a copy changes on purpose.
-constexpr std::array<uint64_t, 4> kPinned = {0x9d220333937cb62bULL, 0xd50d29e677f4651fULL, 0x1b6fd85bd0ca88e1ULL,
+// reproduce them to the bit. Update them only when the sound of a copy changes on purpose. Run 3 was
+// re-pinned 2026-11-01 because its scatter moved from 15 to 12 ms when the tuning range became the
+// ring's allowance, not for an engine change.
+constexpr std::array<uint64_t, 4> kPinned = {0x9d220333937cb62bULL, 0xd50d29e677f4651fULL, 0x8d7fc1ce41837fb8ULL,
                                              0xbd5aac8433058c41ULL};
 
 // Each run's hash against its pinned value.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {
   const char* what[4] = {"180 Hz program VOICES 70 WIDTH 50", "burst program VOICES 80 WIDTH 50",
-                         "burst program VOICES 60 WIDTH 80 scatter 15 drift 20",
+                         "burst program VOICES 60 WIDTH 80 scatter 12 drift 20",
                          "180 Hz program VOICES 70 WIDTH 50 on the shipped tuning"};
   bool ok = true;
   for (size_t i = 0; i < hashes.size(); ++i) {
@@ -1112,11 +1114,11 @@ bool testEnhancementsDefaultExact() {
   const Signal a = run(prog, base);
   const Signal b = run(prog, idle);
   cv::CrowdParams burstBase = knobs(0.6f, 0.8f);
-  burstBase.tuning.scatterMs = 15.0f;
+  burstBase.tuning.scatterMs = 12.0f;
   burstBase.tuning.driftCents = 20.0f;
   cv::CrowdParams burstIdle = burstBase;
   burstIdle.tuning = idle.tuning;
-  burstIdle.tuning.scatterMs = 15.0f;
+  burstIdle.tuning.scatterMs = 12.0f;
   burstIdle.tuning.driftCents = 20.0f;
   const Signal c = run(burst, burstBase);
   const Signal d = run(burst, burstIdle);
