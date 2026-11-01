@@ -96,6 +96,13 @@ class AutotuneVoice {
   // Smoothed correction in semitones.
   float correctionSemis() const { return corr_; }
 
+  // How far the corrected voice lags the input at this period, in samples: the grain delay plus one
+  // period. The Formant card reads it to put its voice on the same sample.
+  float voiceDelay(float period) const {
+    return psola_.grainDelay() +
+           clampf(period, static_cast<float>(PitchTracker::kMinPeriod), static_cast<float>(PitchTracker::kMaxPeriod));
+  }
+
  private:
   // NaN equals no input, so a cleared input recomputes on the next prepare().
   static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();

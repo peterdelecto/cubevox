@@ -1,6 +1,6 @@
-// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + crowd + unison +
-// slapback + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the back half of eq) and
-// the output ceiling like the box, processed mono 48 kHz f32 WAV out.
+// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + formant + crowd +
+// unison + slapback + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the back half
+// of eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -31,7 +31,7 @@ struct TuningField {
 struct RenderParams {
   bool inGateOn = false;
   bool gateOn = false;
-  bool pitchOn = false;  // also true when the crowd card is on, so its ring and tracker run
+  bool pitchOn = false;  // also true when the crowd or formant card is on, so the ring and tracker run
   bool crowdOn = false;
   bool unisonOn = false;
   bool slapOn = false;
@@ -65,6 +65,7 @@ int usage() {
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>]\n"
+               "       [--formant <-7..7>] [--fmix <0..1>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
@@ -74,7 +75,9 @@ int usage() {
                "       [--bloom <0..1>] [--tail <60..1000 ms>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
-               "  pitch front end runs with --octave, --autotune or --crowd\n"
+               "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
+               "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
+               "  --fmix the MIX (default 1); with --autotune its voice follows the tuned note and lines up with it\n"
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
@@ -112,7 +115,7 @@ int usage() {
                "     sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive sbDwellComp sbWetDb\n"
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
-               "     atTrimDb atGrainDelay\n"
+               "     atTrimDb atGrainDelay fmTrimDb\n"
                "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
                "     (-12..12) crowdShelfDb0..3 (-12..12) crowdShelfHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
                "     crowdLagScale (0.5..2) crowdScatterMs (0..30) crowdDriftCents (0..50) crowdMaxLagMs (0..150)\n"
@@ -235,6 +238,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::SpringTuning& sb = rp.reverb.spring.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
+  cv::FormantTuning& ft = rp.pitchFx.formant.tuning;
   cv::CrowdTuning& ct = rp.crowd.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
@@ -253,7 +257,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"topWetDb", &t.topWetDb},
       {"octGrainWindowMs", &ot.grainWindowMs}, {"octGrainCount", &octGrains},
       {"octTrimDb", &ot.trimDb},
-      {"atTrimDb", &at.trimDb}, {"atGrainDelay", &at.grainDelay},
+      {"atTrimDb", &at.trimDb}, {"atGrainDelay", &at.grainDelay}, {"fmTrimDb", &ft.trimDb},
       {"crowdVoiceDb", &ct.voiceDb},              {"crowdTrimDb", &ct.trimDb},
       {"crowdTrimBottomDb", &ct.trimBottomDb},
       {"crowdFormantSt0", &ct.formantSt[0]},      {"crowdFormantSt1", &ct.formantSt[1]},
@@ -369,7 +373,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   cv::UnisonParams& p = rp.unison;
   cv::OctaveParams& op = rp.pitchFx.octave;
   cv::AutotuneParams& ap = rp.pitchFx.autotune;
+  cv::FormantParams& fp = rp.pitchFx.formant;
   bool haveOctave = false;
+  bool haveFormant = false;
   bool haveDepth = false;
   bool haveOn = false;
   bool haveSlap = false;
@@ -485,6 +491,14 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOctave = true;
     } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &op.mix) || op.mix < 0.0f || op.mix > 1.0f) return false;
+    } else if (std::strcmp(a, "--formant") == 0 && i + 1 < argc) {
+      float s = 0.0f;
+      const float top = static_cast<float>(cv::kFormantMaxShiftSt);
+      if (!parseFloat(argv[++i], &s) || s < -top || s > top || s != std::floor(s)) return false;
+      fp.shiftSt = static_cast<int>(s);
+      haveFormant = true;
+    } else if (std::strcmp(a, "--fmix") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &fp.mix) || fp.mix < 0.0f || fp.mix > 1.0f) return false;
     } else if (std::strcmp(a, "--crowd") == 0) {
       rp.crowdOn = true;
     } else if (std::strcmp(a, "--width") == 0 && i + 1 < argc) {
@@ -522,9 +536,10 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   // Each pitch stage runs only when asked for. The Crowd card reads the pitch stage's ring and tracker,
   // so it turns the stage on and tells it to keep them running, as the registry's toggle does.
   op.on = haveOctave;
+  fp.on = haveFormant;
   rp.crowd.on = rp.crowdOn;
   rp.pitchFx.crowdOn = rp.crowdOn;
-  rp.pitchOn = haveOctave || ap.on || rp.crowdOn;
+  rp.pitchOn = haveOctave || haveFormant || ap.on || rp.crowdOn;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
