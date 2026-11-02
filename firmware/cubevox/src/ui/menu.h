@@ -30,6 +30,7 @@ enum class UiAction : uint8_t {
   ToggleOutput,
   ToggleInputJack,
   CycleTopSwitch,
+  CycleBrightness,
   ToggleDebug,
   SwapReverb,       // the layout's reverb card changes between Spring and Chasm
   SwapOctaveFormant,  // the slot that holds Octave or Formant takes the other card

@@ -1,9 +1,11 @@
-// User settings: signal level, the input jack, the polish stages, the top switch and the debug
-// readout. Defaults match the hardware at power-up.
+// User settings: signal level, the input jack, the polish stages, the top switch, the screen
+// brightness and the debug readout. Defaults match the hardware at power-up.
 
 #pragma once
 
 #include <stdint.h>
+
+#include "core/brightness.h"
 
 enum class OutputLevel : uint8_t { Line, Mic };
 enum class InputJack : uint8_t { Mic, Line };  // Mic = relay K103 coil off, pad shorted
@@ -15,6 +17,7 @@ struct Settings {
   bool polishComp = true;  // POLISH COMP stage
   bool polishEq = true;    // POLISH EQ stage, both halves
   TopSwitch topSwitch = TopSwitch::Mute;
+  Brightness brightness = Brightness::High;  // the OLED's contrast while awake; saved, never sent over USB
   bool debug = false;  // DEBUG: the voice screen shows the audio load
 };
 

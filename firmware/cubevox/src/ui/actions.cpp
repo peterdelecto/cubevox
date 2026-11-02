@@ -73,6 +73,9 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
     case UiAction::CycleTopSwitch:
       settings.topSwitch = settings.topSwitch == TopSwitch::Mute ? TopSwitch::Bypass : TopSwitch::Mute;
       return ApplyResult::SettingsChanged;
+    case UiAction::CycleBrightness:
+      settings.brightness = nextBrightness(settings.brightness);
+      return ApplyResult::SettingsChanged;
     case UiAction::ToggleOutput:
       settings.outputLevel = settings.outputLevel == OutputLevel::Line ? OutputLevel::Mic : OutputLevel::Line;
       return ApplyResult::SettingsChanged;

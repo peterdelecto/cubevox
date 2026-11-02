@@ -153,6 +153,52 @@ void checkRecordDebugByte() {
   check(!sameRecordContent(b.data(), off.data()), "record v2: a DEBUG change is new content, so it writes a record");
 }
 
+// The brightness sits in settings byte 8, the first reserved byte after the retired pair, so the schema
+// stays 2. It holds the level's index plus one: 1 LOW, 2 MID, 3 HIGH, 4 MAX. A record that holds 0
+// there, as every record written before the byte existed does, reads as HIGH.
+void checkRecordBrightnessByte() {
+  check(kOffBrightness == kOffSettings + 8, "record: brightness is settings byte 8");
+
+  RecordData out;
+  for (size_t i = 0; i < kBrightnessLevels.size(); ++i) {
+    RecordData in = makeRec(5);
+    in.settings.brightness = static_cast<Brightness>(i);
+    const RecordBytes b = encodeRecord(in);
+    check(b[kOffSchema] == kRecordSchema && b[kOffBrightness] == i + 1,
+          "record: brightness is written as the level plus one, and the schema stays 2");
+    check(decodeRecord(b.data(), out) && out.settings.brightness == in.settings.brightness && out.sequence == 5,
+          "record: each brightness level survives a save and a reload");
+  }
+
+  const RecordBytes high = encodeRecord(makeRec(5));
+  check(high[kOffBrightness] == 3 && decodeRecord(high.data(), out) && out.settings.brightness == Brightness::High,
+        "record: the default settings save HIGH, byte 3");
+
+  RecordBytes before = high;  // a record from before the byte existed: the same bytes with 0 there
+  before[kOffBrightness] = 0;
+  reseal(before);
+  check(decodeRecord(before.data(), out) && out.settings.brightness == Brightness::High && out.sequence == 5,
+        "record: a record with byte 8 at 0 reads HIGH");
+  check(encodeRecord(out)[kOffBrightness] == 3, "record: and the next save writes HIGH as byte 3");
+
+  for (const uint8_t byte : {uint8_t{5}, uint8_t{0x7F}, uint8_t{0xFF}}) {
+    RecordBytes bad = high;
+    bad[kOffBrightness] = byte;
+    reseal(bad);
+    check(!decodeRecord(bad.data(), out), "record: a brightness byte above 4 makes the record invalid");
+    check(classifyRecordEntry(bad.data()) == EntryState::Torn, "record: and the entry reads as torn");
+  }
+
+  RecordData low = makeRec(5);
+  low.settings.brightness = Brightness::Low;
+  const RecordBytes lowBytes = encodeRecord(low);
+  const RecordBytes v1 = asV1(lowBytes);  // a v1 record has no such setting, whatever sits in the byte
+  check(decodeRecord(v1.data(), out) && out.settings.brightness == Brightness::High,
+        "record v1: the brightness byte is ignored");
+  check(!sameRecordContent(high.data(), lowBytes.data()),
+        "record: a brightness change is new content, so it writes a record");
+}
+
 // Settings bytes 6 and 7 are retired, so the schema stays 2. They are written 0 and ignored on read,
 // whatever they hold. A record from the firmware that kept the input cutoffs there loads here, and
 // a record from this firmware reads on that firmware as its default cutoffs, because that firmware
@@ -655,6 +701,7 @@ void checkRecords() {
   checkRecordCodec();
   checkRecordSchemaV2();
   checkRecordDebugByte();
+  checkRecordBrightnessByte();
   checkRecordRetiredBytes();
   checkStoreFlushPending();
   checkRecordUnknownCard();

@@ -5,6 +5,7 @@
 
 #include <cstdint>
 
+#include "core/brightness.h"
 #include "core/canvas.h"
 #include "core/slots.h"
 #include "imgui.h"
@@ -94,7 +95,8 @@ constexpr Rgb kAccentSoftRgb = mix(kGround, kAccentBase, kShadeAccentSoft);
 constexpr Rgb kOkRgb = kGreenBase;
 constexpr Rgb kDangerRgb = kRedBase;
 constexpr Rgb kOledOffRgb = mix(kGround, kBlack, kShadeOled);
-constexpr Rgb kOledOnRgb = kInk;
+constexpr Rgb kOledOnRgb = kInk;              // a lit pixel at HIGH, the contrast the box ships with
+constexpr Rgb kOledMaxRgb{255, 255, 255};     // a lit pixel at contrast 255
 
 constexpr ImU32 kBg = pack(kBgRgb);
 constexpr ImU32 kPanel = pack(kPanelRgb);
@@ -111,7 +113,15 @@ constexpr ImU32 kAccentSoft = pack(kAccentSoftRgb);
 constexpr ImU32 kOk = pack(kOkRgb);
 constexpr ImU32 kDanger = pack(kDangerRgb);
 constexpr ImU32 kOledOff = pack(kOledOffRgb);
-constexpr ImU32 kOledOn = pack(kOledOnRgb);
+
+// A lit OLED pixel at `contrast`, the SH1106 register from 0 to 255. HIGH draws the ink the screen
+// has always had, a lower contrast fades toward the dark glass, and a higher one toward white.
+constexpr ImU32 oledLit(uint8_t contrast) {
+  constexpr float kHigh = brightnessLevel(Brightness::High).contrast;
+  const float c = static_cast<float>(contrast);
+  return c <= kHigh ? pack(mix(kOledOffRgb, kOledOnRgb, c / kHigh))
+                    : pack(mix(kOledOnRgb, kOledMaxRgb, (c - kHigh) / (255.0f - kHigh)));
+}
 
 // ---- Shape
 

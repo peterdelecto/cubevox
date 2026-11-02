@@ -20,6 +20,10 @@ class Display {
   // Sends at most one dirty page of `canvas` and clears its dirty bit once the page went through.
   // Called once per loop pass.
   virtual void flushStep(Canvas& canvas) = 0;
+
+  // Sets the contrast the panel should show, 0 to 255. Called once per loop pass. The backend writes
+  // it ahead of the next page when it differs from what the panel holds, and writes nothing otherwise.
+  virtual void setContrast(uint8_t contrast) = 0;
 };
 
 // While failures go on, the panel gets one restart per window, so a missing panel costs one short

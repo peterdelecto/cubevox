@@ -1,5 +1,5 @@
 // Checks the OLED menu on the host. Covers the input it drops before the face shows, the closed menu,
-// the list, its scroll window and its click actions, the REVERB, Unison and Crowd, slot 7 and DEBUG rows, the settings and
+// the list, its scroll window and its click actions, the REVERB, Unison and Crowd, slot 7, BRIGHTNESS and DEBUG rows, the settings and
 // layout those clicks save and play, the chain and update screens, the starting screen, the timeout,
 // redraw, the screenshot files, the text grid and the list's geometry. The screens shown while the
 // menu is closed are checked in ui_screens.cpp and ui_face.cpp.
@@ -113,7 +113,7 @@ bool sameCanvas(const Canvas& a, const Canvas& b) {
 
 bool sameSettings(const Settings& a, const Settings& b) {
   return a.outputLevel == b.outputLevel && a.inputJack == b.inputJack && a.polishComp == b.polishComp &&
-         a.polishEq == b.polishEq && a.topSwitch == b.topSwitch && a.debug == b.debug;
+         a.polishEq == b.polishEq && a.topSwitch == b.topSwitch && a.brightness == b.brightness && a.debug == b.debug;
 }
 
 std::string chainRow(const Layout& layout, int slot) {
@@ -155,8 +155,8 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kReverb, kOctaveFormant, kUnisonCrowd, kSlot7Card, kPolishComp, kPolishEq, kOutput, kTopSwitch, kDebug,
-  kUpdate, kExit, kRowCount
+  kInput, kReverb, kOctaveFormant, kUnisonCrowd, kSlot7Card, kPolishComp, kPolishEq, kOutput, kTopSwitch, kBrightness,
+  kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
 
@@ -178,8 +178,8 @@ constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible -
 // which holds Octave in slot 3, Unison in slot 4 and Gate in slot 7. Exit has no value and Update
 // firmware shows a chevron.
 const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "SLOT 3", "SLOT 4", "SLOT 7", "POLISH COMP", "POLISH EQ",
-                                       "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "OCTAVE", "UNISON", "GATE", "ON", "ON", "LINE", "MUTE", "OFF", ">", ""};
+                                       "OUTPUT", "TOP SWITCH", "BRIGHTNESS", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "OCTAVE", "UNISON", "GATE", "ON", "ON", "LINE", "MUTE", "HIGH", "OFF", ">", ""};
 
 // The row as the test names it: the label, then the value after a space.
 std::string rowName(int item, const char* value) {
@@ -224,7 +224,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 12, "menu: the list holds twelve items");
+  check(kRowCount == 13, "menu: the list holds thirteen items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string name = rowName(r, kDefaultValue[r]);
     check(listRowIs(m.canvas, r, kLabel[r], kDefaultValue[r], r == kInput), name.c_str());
@@ -233,7 +233,7 @@ void checkMenuList() {
 
   m.step(-1, false);
   m.draw();
-  check(listRowIs(m.canvas, kVisible - 1, "EXIT", "", true) && listRowIs(m.canvas, 0, "TOP SWITCH", "MUTE"),
+  check(listRowIs(m.canvas, kVisible - 1, "EXIT", "", true) && listRowIs(m.canvas, 0, "BRIGHTNESS", "HIGH"),
         "menu: turning back from 0 wraps to the last item, which scrolls in at the bottom");
   m.step(1, false);
   m.draw();
@@ -263,7 +263,7 @@ void checkMenuListGeometry() {
         "menu: a bar on row 2 covers lines 32 to 45 and no line beside them");
 
   // Every item shown on a row without the bar, so its ink is measured as lit pixels. Six views,
-  // each a cursor position and the window top it gives, put each of the twelve items on such a row.
+  // each a cursor position and the window top it gives, put each of the thirteen items on such a row.
   struct View {
     int jumpTo;
     int thenStep;
@@ -273,6 +273,7 @@ void checkMenuListGeometry() {
                         {kReverb, 0, 0},
                         {kPolishComp, 0, kPolishComp - (kVisible - 1)},
                         {kTopSwitch, 0, kTopSwitch - (kVisible - 1)},
+                        {kBrightness, 0, kBrightness - (kVisible - 1)},
                         {kExit, 0, kLastTop},
                         {kExit, -1, kLastTop}};
   bool seen[kRowCount] = {};
@@ -297,7 +298,7 @@ void checkMenuListGeometry() {
   }
   bool allSeen = true;
   for (bool s : seen) allSeen = allSeen && s;
-  check(allSeen, "menu: the views measured all twelve items");
+  check(allSeen, "menu: the views measured all thirteen items");
   // Every value an item can show clears the label by 7 px or more. The tightest are TOP SWITCH
   // BYPASS and UPDATE FIRMWARE >.
   struct Values {
@@ -314,6 +315,7 @@ void checkMenuListGeometry() {
       {kPolishEq, {"ON", "OFF"}},
       {kOutput, {"LINE", "MIC"}},
       {kTopSwitch, {"MUTE", "BYPASS"}},
+      {kBrightness, {"LOW", "MID", "HIGH", "MAX"}},
       {kDebug, {"ON", "OFF"}},
       {kUpdate, {">"}},
   };
@@ -330,12 +332,12 @@ void checkMenuListGeometry() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 4 to 11; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 7 to 0. The window top runs from 0 to 8. Each expected canvas is
+// Going down it scrolls at items 4 to 12; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 8 to 0. The window top runs from 0 to 9. Each expected canvas is
 // composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9};
 
   MenuRig m;
   m.step(0, true);
@@ -942,7 +944,35 @@ void checkMenuSlot7NoSlot() {
   check(listRowIs(m.canvas, rowOnScreen(kSlot7Card), "SLOT -", "GATE", true), "menu: the slot 7 row still reads SLOT - GATE after the click");
 }
 
-// The DEBUG row toggles its setting, shows OFF by default and sits below TOP SWITCH.
+// The BRIGHTNESS row sits below TOP SWITCH and above DEBUG, shows HIGH by default, and each click
+// steps to the next value and wraps from MAX to LOW. A click asks for CycleBrightness, and applying
+// it reports a settings change.
+void checkMenuBrightnessRow() {
+  MenuRig m;
+  m.openListAt(kBrightness);
+  m.draw();
+  check(cursorRowIs(m.canvas, rowOnScreen(kBrightness), kBrightness, "HIGH") && m.settings.brightness == Brightness::High,
+        "menu: BRIGHTNESS starts at HIGH");
+  check(kBrightness == kTopSwitch + 1 && kDebug == kBrightness + 1,
+        "menu: the BRIGHTNESS row sits after TOP SWITCH and before DEBUG");
+
+  const struct {
+    Brightness level;
+    const char* value;
+  } steps[] = {{Brightness::Max, "MAX"}, {Brightness::Low, "LOW"}, {Brightness::Mid, "MID"}, {Brightness::High, "HIGH"}};
+  for (const auto& step : steps) {
+    const UiAction a = m.step(0, true);
+    check(a == UiAction::CycleBrightness && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::SettingsChanged &&
+              m.settings.brightness == step.level,
+          (std::string("menu: a click on BRIGHTNESS steps to ") + step.value).c_str());
+    m.draw();
+    check(cursorRowIs(m.canvas, rowOnScreen(kBrightness), kBrightness, step.value),
+          (std::string("menu: the row shows ") + step.value).c_str());
+  }
+  check(m.layout == defaultLayout() && sameSettings(m.settings, Settings()), "menu: a lap of clicks leaves the layout and the other settings alone");
+}
+
+// The DEBUG row toggles its setting, shows OFF by default and sits below BRIGHTNESS.
 void checkMenuDebugRow() {
   MenuRig m;
   m.openListAt(kDebug);
@@ -958,12 +988,13 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The twelve rows in list order, with the labels written out and the cursor walked down one step at a
-// time. The input filters are not on the list, the Octave and Formant row follows REVERB, the Unison
-// and Crowd row follows that, and the slot 7 row follows that.
+// The thirteen rows in list order, with the labels written out and the cursor walked down one step at
+// a time. The input filters are not on the list, the Octave and Formant row follows REVERB, the Unison
+// and Crowd row follows that, the slot 7 row follows that, and BRIGHTNESS sits between TOP SWITCH and
+// DEBUG.
 void checkMenuRowOrder() {
-  static const char* const kSpecOrder[kRowCount] = {"INPUT",  "REVERB", "SLOT 3",          "SLOT 4",     "SLOT 7", "POLISH COMP",
-                                                    "POLISH EQ", "OUTPUT", "TOP SWITCH", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+  static const char* const kSpecOrder[kRowCount] = {"INPUT",  "REVERB", "SLOT 3", "SLOT 4", "SLOT 7", "POLISH COMP", "POLISH EQ",
+                                                    "OUTPUT", "TOP SWITCH", "BRIGHTNESS", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
   m.step(0, true);
   bool inOrder = true;
@@ -972,9 +1003,9 @@ void checkMenuRowOrder() {
     m.draw();
     inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
-  check(inOrder && kRowCount == 12,
-        "menu: the rows run INPUT, REVERB, SLOT 3, SLOT 4, SLOT 7, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, "
-        "UPDATE FIRMWARE, EXIT");
+  check(inOrder && kRowCount == 13,
+        "menu: the rows run INPUT, REVERB, SLOT 3, SLOT 4, SLOT 7, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, "
+        "BRIGHTNESS, DEBUG, UPDATE FIRMWARE, EXIT");
 }
 
 // The POLISH EQ row drives both halves of the stage: one click turns the one `on` off for the front
@@ -1040,13 +1071,15 @@ void checkMenuClicksSavedAndPlayed() {
   check(fresh.params.comp.on && fresh.params.eq.on && fresh.outputGain == 1.0f, "menu: the default snapshot has both polish stages on");
 }
 
-// A click that changes the layout or DEBUG leaves a record in flash that the next boot loads, the way
-// the sketch's save does after the debounce.
+// A click that changes the layout, BRIGHTNESS or DEBUG leaves a record in flash that the next boot
+// loads, the way the sketch's save does after the debounce.
 void checkMenuSavedThroughStore() {
   MenuRig m;
   m.openListAt(kReverb);
   ui::applyAction(m.step(0, true), m.settings, m.layout);
-  m.step(kDebug - kReverb, false);
+  m.step(kBrightness - kReverb, false);
+  ui::applyAction(m.step(0, true), m.settings, m.layout);
+  m.step(kDebug - kBrightness, false);
   ui::applyAction(m.step(0, true), m.settings, m.layout);
 
   FakeFlash flash;
@@ -1062,8 +1095,9 @@ void checkMenuSavedThroughStore() {
   std::memcpy(again.mem[0].data(), flash.mem[0].data(), kRecordBytes);
   RecordStore reboot(again);
   RecordData out;
-  check(reboot.begin(out) && out.layout.card[7] == Card::ReverbChasm && out.settings.debug,
-        "menu: the next boot loads Chasm and DEBUG ON");
+  check(reboot.begin(out) && out.layout.card[7] == Card::ReverbChasm && out.settings.debug &&
+            out.settings.brightness == Brightness::Max,
+        "menu: the next boot loads Chasm, BRIGHTNESS MAX and DEBUG ON");
 }
 
 // Until the face is on the panel, nobody can see the menu, so a click or a turn must do nothing.
@@ -1324,6 +1358,7 @@ void checkMenu() {
   checkMenuSlot7Redraw();
   checkMenuSlot7Click();
   checkMenuSlot7NoSlot();
+  checkMenuBrightnessRow();
   checkMenuDebugRow();
   checkMenuRowOrder();
   checkMenuPolishEqSavedAndPlayed();

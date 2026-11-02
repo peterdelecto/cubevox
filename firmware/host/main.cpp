@@ -18,13 +18,16 @@
 #include "box.h"
 #include "check_clip.h"
 #include "clock.h"
+#include "core/brightness.h"
 #include "core/costs.h"
 #include "core/layout.h"
 #include "core/level.h"
 #include "core/registry.h"
 #include "file_menu.h"
 #include "source.h"
+#include "theme.h"
 #include "ui/gui.h"
+#include "ui/screen_dim.h"
 #include "window.h"
 
 namespace {
@@ -77,6 +80,23 @@ struct Rig {
       }
       nowMs += kTickMs;
     }
+  }
+
+  // Ticks the box with no audio, which is a silent input, so minutes of idling cost little.
+  void idle(uint32_t ms) {
+    for (uint32_t t = 0; t < ms; t += kTickMs) {
+      box.tick(panel, nowMs);
+      nowMs += kTickMs;
+    }
+  }
+
+  // One tick with the MENU turned `detents` steps and pressed when `click`.
+  void turnMenu(int32_t detents, bool click) {
+    panel.detents = detents;
+    panel.click = click;
+    idle(kTickMs);
+    panel.detents = 0;
+    panel.click = false;
   }
 };
 
@@ -243,6 +263,80 @@ void checkSlot7(const CheckClips& clips, bool swapped, std::vector<std::string>&
   expect(rig.box.layout() == kept, "a card outside the cycle leaves the layout as it was");
 }
 
+// The display's contrast through the box. It starts at HIGH, drops to 8 once the dimming time has
+// passed with nothing touched and no voice, and comes back at once on a knob turn, a MENU press, a
+// slot toggle flip, the top switch or a voice. A click on BRIGHTNESS in the menu sets the awake
+// contrast, and the window draws a lit pixel brighter as the contrast rises.
+void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
+  const auto expect = [&failed](bool ok, const char* what) {
+    if (!ok) failed.push_back(std::string("dim: ") + what);
+  };
+  constexpr uint8_t kHigh = 207;
+  constexpr uint8_t kMax = 255;
+  constexpr uint8_t kLow = 48;
+  constexpr uint8_t kDimmed = 8;
+  constexpr int32_t kBrightnessItem = 9;  // the BRIGHTNESS row of the menu list, counted from 0
+  constexpr uint32_t kSettleMs = 1000;    // long enough for a control to reach the face
+
+  Rig rig;
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
+  rig.idle(kSettleMs);
+  expect(rig.box.contrast() == kHigh, "the screen starts at the HIGH contrast");
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  expect(rig.box.contrast() == kDimmed, "the screen dims after ten minutes with nothing touched");
+
+  rig.panel.knob[0] = 0.9f;
+  rig.idle(kSettleMs);
+  expect(rig.box.contrast() == kHigh, "a knob turn brings the screen back");
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  expect(rig.box.contrast() == kDimmed, "the screen dims again");
+  rig.turnMenu(0, true);
+  expect(rig.box.contrast() == kHigh && rig.box.menuOpen(), "a MENU press wakes the screen in its own pass and opens the menu");
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  expect(rig.box.contrast() == kDimmed, "the screen dims with the menu timed out");
+  rig.turnMenu(1, false);
+  expect(rig.box.contrast() == kHigh, "a MENU turn wakes the screen");
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  rig.panel.toggle[0] = false;
+  rig.idle(kSettleMs);
+  expect(rig.box.contrast() == kHigh, "a slot toggle flip wakes the screen");
+  rig.panel.toggle[0] = true;
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  rig.panel.mute = true;
+  rig.idle(kSettleMs);
+  expect(rig.box.contrast() == kHigh, "the top switch wakes the screen");
+  rig.panel.mute = false;
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  expect(rig.box.contrast() == kDimmed, "the screen dims before the voice test");
+  rig.run(kCheckBeforeMs, false);
+  expect(rig.box.contrast() == kHigh, "a voice at the input wakes the screen");
+
+  rig.idle(kDimAfterMs + kSettleMs);
+  rig.turnMenu(0, true);
+  rig.turnMenu(kBrightnessItem, false);
+  rig.turnMenu(0, true);
+  expect(rig.box.settings().brightness == Brightness::Max && rig.box.contrast() == kMax,
+         "a click on BRIGHTNESS sets MAX and the display takes its contrast");
+  rig.turnMenu(0, true);
+  expect(rig.box.settings().brightness == Brightness::Low && rig.box.contrast() == kLow,
+         "the next click wraps to LOW and the display takes its contrast");
+  rig.idle(kDimAfterMs + kSettleMs);
+  expect(rig.box.contrast() == kDimmed, "a dimmed screen is at 8 whatever the brightness");
+
+  const auto red = [](ImU32 colour) { return colour & 0xFFu; };
+  expect(theme::oledLit(0) == theme::kOledOff && red(theme::oledLit(kDimmed)) < red(theme::oledLit(kLow)) &&
+             red(theme::oledLit(kLow)) < red(theme::oledLit(kHigh)) && red(theme::oledLit(kHigh)) < red(theme::oledLit(kMax)),
+         "a lit pixel is drawn brighter as the contrast rises");
+  expect(theme::oledLit(kHigh) == theme::pack(theme::kOledOnRgb),
+         "HIGH draws the ink the screen had before BRIGHTNESS");
+}
+
 int runCheck(const char* argv0) {
   Rig rig;
   std::vector<std::string> failed;
@@ -294,6 +388,7 @@ int runCheck(const char* argv0) {
   checkSlot3(clips, true, failed);
   checkSlot7(clips, false, failed);
   checkSlot7(clips, true, failed);
+  checkDim(clips, failed);
 
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,
               after.worst);

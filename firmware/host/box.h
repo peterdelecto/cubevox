@@ -10,6 +10,7 @@
 #include "audio_block.h"
 #include "core/canvas.h"
 #include "core/compose.h"
+#include "core/brightness.h"
 #include "core/debounce.h"
 #include "core/display.h"
 #include "core/knob_filter.h"
@@ -22,6 +23,7 @@
 #include "core/slots.h"
 #include "ui/face.h"
 #include "ui/menu.h"
+#include "ui/screen_dim.h"
 #include "ui/splash.h"
 
 namespace host {
@@ -49,14 +51,18 @@ constexpr int kPixelCount = kCanvasWidth * kCanvasHeight;
 using Pixels = std::array<uint8_t, kPixelCount>;
 
 // The panel stand-in. flushStep copies the lowest dirty page into the pixel buffer, as the SH1106
-// backend sends it to the glass, and clears that page's dirty bit.
+// backend sends it to the glass, and clears that page's dirty bit. The window draws the pixels at
+// the contrast set here.
 class HostDisplay : public Display {
  public:
   void flushStep(Canvas& canvas) override;
+  void setContrast(uint8_t contrast) override { contrast_ = contrast; }
   const Pixels& pixels() const { return pixels_; }
+  uint8_t contrast() const { return contrast_; }
 
  private:
   Pixels pixels_ = {};
+  uint8_t contrast_ = brightnessLevel(Brightness::High).contrast;
 };
 
 class Box {
@@ -81,6 +87,7 @@ class Box {
   void pickSlot7Card(Card card);
 
   const Pixels& pixels() const { return display_.pixels(); }
+  uint8_t contrast() const { return display_.contrast(); }
   const Layout& layout() const { return layout_; }
   const char* layoutName() const { return kLayoutName; }
   LayoutCost cost() const { return layoutCost(layout_); }
@@ -105,6 +112,7 @@ class Box {
   Menu menu_;
   Face face_;
   Splash splash_;
+  ScreenDim dim_;
   PublishGate publish_;
   KnobBank knobs_;
   MuteSequence mute_;

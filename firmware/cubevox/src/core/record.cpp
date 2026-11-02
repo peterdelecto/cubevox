@@ -20,7 +20,8 @@ Card cardFromField(const uint8_t* field, bool& known) {
 
 // Reads the settings bytes. A v1 record carries only the first two, so the polish settings keep
 // the defaults already in `s`. A v2 record written before the debug byte existed holds 0 there,
-// which reads as OFF. The retired bytes are not read. False when a byte is out of range.
+// which reads as OFF, and one written before the brightness byte holds 0 there, which reads as the
+// default level. The retired bytes are not read. False when a byte is out of range.
 bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   const uint8_t output = b[kOffOutputLevel];
   const uint8_t jack = b[kOffInputJack];
@@ -34,12 +35,15 @@ bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   const uint8_t eq = b[kOffPolishEq];
   const uint8_t top = b[kOffTopSwitch];
   const uint8_t debug = b[kOffDebug];
+  const uint8_t brightness = b[kOffBrightness];
   if (comp > 1 || eq > 1 || debug > 1) return false;
   if (top > static_cast<uint8_t>(TopSwitch::Bypass)) return false;
+  if (brightness > kBrightnessLevels.size()) return false;
   s.polishComp = comp != 0;
   s.polishEq = eq != 0;
   s.topSwitch = static_cast<TopSwitch>(top);
   s.debug = debug != 0;
+  if (brightness != 0) s.brightness = static_cast<Brightness>(brightness - 1);
   return true;
 }
 
@@ -61,6 +65,7 @@ RecordBytes encodeRecord(const RecordData& rec) {
   b[kOffPolishEq] = rec.settings.polishEq ? 1 : 0;
   b[kOffTopSwitch] = static_cast<uint8_t>(rec.settings.topSwitch);
   b[kOffDebug] = rec.settings.debug ? 1 : 0;
+  b[kOffBrightness] = static_cast<uint8_t>(static_cast<uint8_t>(rec.settings.brightness) + 1);
   put32(b.data() + kOffCrc, crc32(b.data(), kOffCrc));
   return b;
 }

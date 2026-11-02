@@ -37,6 +37,7 @@
 #include "ui/face.h"
 #include "ui/gui.h"
 #include "ui/menu.h"
+#include "ui/screen_dim.h"
 #include "ui/splash.h"
 
 namespace {
@@ -48,6 +49,7 @@ Settings gSettings;
 Menu gMenu;
 Face gFace;
 Splash gSplash;
+ScreenDim gDim;
 JackSwitch gJack{Settings().inputJack};
 Display* gDisplay = nullptr;
 Canvas gCanvas;
@@ -220,7 +222,9 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
     case BenchPattern::Off: break;
   }
   if (gFace.due(nowMs, gCanvas)) {
-    gFace.tick(nowMs, ctx, audioTakeInputEnergy(), audioTakeOutputEnergy(), gMenu, gCanvas);
+    const level::InputEnergy input = audioTakeInputEnergy();
+    gDim.noteVoice(input, nowMs);  // the screen reads the voice from the energy the level bar reads
+    gFace.tick(nowMs, ctx, input, audioTakeOutputEnergy(), gMenu, gCanvas);
   }
 }
 
@@ -266,6 +270,7 @@ void setup() {
 
   controlsInit();
   gDisplay = &sh1106Display();  // starts the panel; one that does not answer is retried once a second
+  gDisplay->setContrast(brightnessLevel(gSettings.brightness).contrast);  // goes out before the splash's first page
   inputInit();
 
   gAudioRunning = audioInit();
@@ -274,6 +279,7 @@ void setup() {
   bootHealthInit();  // after the watchdog: a start only counts as healthy with both running
   diagInit();  // after recordBoot (ECC recovery) and bootHealthInit (failed starts, bootloader reason)
   gSplash.start(millis());
+  gDim.start(millis());
 }
 
 void loop() {
@@ -295,7 +301,9 @@ void loop() {
   powerSensePoll(nowMs);  // before mutePoll, so a trip it clears starts the release this pass
   mutePoll(nowMs, gSettings.topSwitch);
 
-  const bool settingsChanged = applyAction(gMenu.update(menuInput(nowMs), nowMs), nowMs);
+  const UiInput input = menuInput(nowMs);
+  if (input.detents != 0 || input.click) gDim.noteActivity(nowMs);
+  const bool settingsChanged = applyAction(gMenu.update(input, nowMs), nowMs);
   saveSettings(settingsChanged, nowMs);
   recordPoll(nowMs);
   diagPoll();
@@ -305,13 +313,21 @@ void loop() {
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
   const bool switchOn = topSwitchEngaged(gSettings.topSwitch, muteActive(), muteBypassOn());
+  gDim.noteTopSwitch(switchOn, nowMs);
   refreshLoad(nowMs);
   const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn, gLoadPercent};
   LastMoved touch;
-  if (controlsTakeTouch(touch)) gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
+  if (controlsTakeTouch(touch)) {
+    gDim.noteActivity(nowMs);
+    gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
+  }
   ToggleFlip flip;
-  if (controlsTakeToggle(flip)) gFace.toggleFlipped(gLayout, flip, nowMs);
+  if (controlsTakeToggle(flip)) {
+    gDim.noteActivity(nowMs);
+    gFace.toggleFlipped(gLayout, flip, nowMs);
+  }
   drawFace(ctx, nowMs);
+  gDisplay->setContrast(gDim.contrast(nowMs, gSettings.brightness));
   gDisplay->flushStep(gCanvas);
   driveLoadLed(nowMs);
   if (gStats.due(nowMs)) benchReportStats();

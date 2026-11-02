@@ -180,6 +180,7 @@ add_executable(firmware_test
                test/firmware/ui_face.cpp
                test/firmware/ui_gui.cpp
                test/firmware/ui_menu.cpp
+               test/firmware/ui_screen_dim.cpp
                test/firmware/ui_screens.cpp
                test/firmware/ui_splash.cpp
                ${CUBEVOX_FW_CORE_SOURCES}

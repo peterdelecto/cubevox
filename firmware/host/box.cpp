@@ -31,6 +31,7 @@ Box::Box(AudioBlock& audio, uint32_t nowMs) : audio_(audio), nowMs_(nowMs) {
   mute_.reset(true, nowMs - kRelayCloseAfterPowerOnMs);
   bypassSwitch_.reset(true);
   splash_.start(nowMs);
+  dim_.start(nowMs);
 }
 
 void Box::audioStarted() {
@@ -134,7 +135,9 @@ void Box::drawFace(const UiContext& ctx, uint32_t nowMs) {
     case SplashStep::Off: break;
   }
   if (face_.due(nowMs, canvas_)) {
-    face_.tick(nowMs, ctx, audio_.takeInputEnergy(), audio_.takeOutputEnergy(), menu_, canvas_);
+    const level::InputEnergy input = audio_.takeInputEnergy();
+    dim_.noteVoice(input, nowMs);
+    face_.tick(nowMs, ctx, input, audio_.takeOutputEnergy(), menu_, canvas_);
   }
 }
 
@@ -143,22 +146,30 @@ void Box::tick(const PanelInput& in, uint32_t nowMs) {
   readControls(in, nowMs);
   runMute(in, nowMs);
 
-  const bool settingsChanged = applyAction(menu_.update(UiInput{in.detents, in.click}, nowMs));
+  const UiInput menuIn{in.detents, in.click};
+  if (menuIn.detents != 0 || menuIn.click) dim_.noteActivity(nowMs);
+  const bool settingsChanged = applyAction(menu_.update(menuIn, nowMs));
   const bool changed = knobs_.takeChanged() || toggleChanged_;
   toggleChanged_ = false;
   if (publish_.take(knobs_.seeded(), changed || settingsChanged)) publishSnapshot();
 
   const bool switchOn = topSwitchEngaged(settings_.topSwitch, mute_.active(), bypassOn_);
+  dim_.noteTopSwitch(switchOn, nowMs);
   const int loadPercent = settings_.debug ? cost().worst : 0;
   const PanelReading panel = reading();
   const UiContext ctx{layout_, panel, settings_, switchOn, loadPercent};
   LastMoved touch;
-  if (knobs_.takeTouch(touch)) face_.knobMoved(layout_, ctx.panel, touch, nowMs);
+  if (knobs_.takeTouch(touch)) {
+    dim_.noteActivity(nowMs);
+    face_.knobMoved(layout_, ctx.panel, touch, nowMs);
+  }
   if (flip_.slot >= 0) {
+    dim_.noteActivity(nowMs);
     face_.toggleFlipped(layout_, flip_, nowMs);
     flip_ = ToggleFlip();
   }
   drawFace(ctx, nowMs);
+  display_.setContrast(dim_.contrast(nowMs, settings_.brightness));
 
   // The board sends one page per pass and loop() passes run by the thousand each second, so a
   // frame is out long before the next tick. One host tick sends them all.

@@ -8,8 +8,13 @@
 
 #include "board/pins.h"
 #include "board/serial_link.h"
+#include "core/brightness.h"
 
 namespace {
+
+constexpr uint8_t kStartContrast = CV_SH1106_INIT_CONTRAST;
+static_assert(kStartContrast == brightnessLevel(Brightness::High).contrast,
+              "the default brightness is the contrast the panel starts at");
 
 // 400 kHz Fast-mode from a 120 MHz I2C2 kernel clock, the PCLK1 of sysclock.cpp's 480 MHz profile
 // (I2C123SEL keeps its reset value): PRESC 2 (25 ns), SCLDEL 14 (375 ns setup), SDADEL 2 (50 ns hold),
@@ -53,16 +58,20 @@ class Sh1106Display : public Display {
   bool begin();
   bool up() const { return ready_ && link_.up(); }
   void flushStep(Canvas& canvas) override;
+  void setContrast(uint8_t contrast) override { wantedContrast_ = contrast; }
 
  private:
   void restart(Canvas& canvas, uint32_t nowMs);
   void send(Canvas& canvas, uint32_t nowMs);
+  bool sendContrast(uint32_t nowMs);
   void note(PanelEvent event) const;
 
   CvSh1106Bus bus_ = {};
   PanelLink link_;
   bool ready_ = false;      // the bus fits the driver
   bool displayOn_ = false;  // since the last start
+  uint8_t wantedContrast_ = kStartContrast;
+  uint8_t heldContrast_ = kStartContrast;  // what the panel holds; a start sets kStartContrast
 };
 
 // Several starts at boot cover a panel that is still powering up. Then the retry window takes over.
@@ -88,18 +97,31 @@ void Sh1106Display::flushStep(Canvas& canvas) {
   }
 }
 
-// A start leaves the display off and its RAM unknown, so the whole canvas goes out again.
+// A start leaves the display off, its RAM unknown and its contrast at kStartContrast, so the whole
+// canvas goes out again and the wanted contrast goes out before its first page.
 void Sh1106Display::restart(Canvas& canvas, uint32_t nowMs) {
   displayOn_ = false;
+  heldContrast_ = kStartContrast;
   const bool ok = cvSh1106Start(&bus_);
   if (ok) canvas.markAllDirty();
   note(link_.started(ok, nowMs));
 }
 
-// The lowest dirty page goes out, and a failed one stays dirty for the next try. After a start the
-// display turns on in the pass that sends the frame's last page, so a face that draws again at once
-// cannot hold it off.
+// Writes the wanted contrast as its own transfer when the panel holds another. False when the write
+// failed.
+bool Sh1106Display::sendContrast(uint32_t nowMs) {
+  if (heldContrast_ == wantedContrast_) return true;
+  const bool ok = cvSh1106Contrast(&bus_, wantedContrast_);
+  note(link_.wrote(ok, nowMs));
+  if (ok) heldContrast_ = wantedContrast_;
+  return ok;
+}
+
+// A changed contrast goes out first. Then the lowest dirty page goes out, and a failed one stays dirty
+// for the next try. After a start the display turns on in the pass that sends the frame's last page,
+// so a face that draws again at once cannot hold it off.
 void Sh1106Display::send(Canvas& canvas, uint32_t nowMs) {
+  if (!sendContrast(nowMs)) return;
   const int page = canvas.firstDirtyPage();
   if (page >= 0) {
     const bool ok = cvSh1106Page(&bus_, static_cast<uint8_t>(page), canvas.page(page));

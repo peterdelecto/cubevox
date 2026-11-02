@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "core/brightness.h"
 #include "core/fonts.h"
 #include "core/registry.h"
 #include "core/version.h"
@@ -45,6 +46,7 @@ enum class Item : uint8_t {
   PolishEq,
   Output,
   TopSwitch,
+  Brightness,
   Debug,
   UpdateFirmware,
   Exit,
@@ -86,6 +88,7 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
     case Item::InputJack: return "INPUT";
     case Item::Output: return "OUTPUT";
     case Item::TopSwitch: return "TOP SWITCH";
+    case Item::Brightness: return "BRIGHTNESS";
     case Item::Reverb: return "REVERB";
     case Item::OctaveFormant: return slotLabel(octaveFormantSlot(layout), buf, size);
     case Item::UnisonCrowd: return slotLabel(unisonCrowdSlot(layout), buf, size);
@@ -139,6 +142,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "LINE";
     case Item::Output: return s.outputLevel == OutputLevel::Mic ? "MIC" : "LINE";
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
+    case Item::Brightness: return brightnessLevel(s.brightness).name;
     case Item::Reverb: return reverbValue(ctx.layout);
     case Item::OctaveFormant: return octaveFormantValue(ctx.layout);
     case Item::UnisonCrowd: return unisonCrowdValue(ctx.layout);
@@ -223,6 +227,7 @@ UiAction Menu::onClick() {
         case Item::InputJack: return UiAction::ToggleInputJack;
         case Item::Output: return UiAction::ToggleOutput;
         case Item::TopSwitch: return UiAction::CycleTopSwitch;
+        case Item::Brightness: return UiAction::CycleBrightness;
         case Item::Reverb: return UiAction::SwapReverb;
         case Item::OctaveFormant: return UiAction::SwapOctaveFormant;
         case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
