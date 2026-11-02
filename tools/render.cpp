@@ -72,7 +72,7 @@ int usage() {
                "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
-               "       [--bloom <0..1>] [--length <20..3000 ms>, aliases --linger, --tail]\n"
+               "       [--amount <0..1>] [--length <20..3000 ms>]\n"
                "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
@@ -84,9 +84,9 @@ int usage() {
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
-               "  bloom, the Chatter card, runs with --bloom (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its word key\n"
-               "  is the input gate's open state, otherwise bloom listens to its own input; it cuts its slices from the pitch\n"
-               "  stage's output when one runs (before crowd), else from the input gate's output, and the dry path is its input\n"
+               "  bloom, the Chatter card, runs with --amount (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its\n"
+               "  word key is the input gate's open state, otherwise it listens to its own input; it cuts its slices from the\n"
+               "  pitch stage's output when one runs (before crowd), else from the input gate's output, and the dry path is its input\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  the eq's front half (70 Hz high-pass, 6 kHz low-pass, de-esser) runs ahead of every stage and its\n"
@@ -124,7 +124,7 @@ int usage() {
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
                "  every value must be finite, and a crowd key outside its range is refused\n"
-               "     bloomTrimDb bloomFirstCaptureMs bloomSkipDb bloomTailOnly (0|1, loop only after the word)\n"
+               "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
@@ -250,7 +250,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::BloomTuning& bt = rp.bloom.tuning;
   float sbSections = static_cast<float>(sb.chirpSections);
   float octGrains = static_cast<float>(ot.grainCount);
-  float bloomTailOnly = bt.tailOnly ? 1.0f : 0.0f;
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -337,7 +336,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"lofiBitsMin", &lt.bitsMin},           {"lofiTrimDb", &lt.trimDb},
       {"lofiHoldOverBand", &lt.holdOverBand},
       {"bloomTrimDb", &bt.trimDb},            {"bloomFirstCaptureMs", &bt.firstCaptureMs},
-      {"bloomSkipDb", &bt.skipDb},            {"bloomTailOnly", &bloomTailOnly},
+      {"bloomSkipDb", &bt.skipDb},
       {"bloomDriveWord", &bt.driveWord},      {"bloomDriveBell", &bt.driveBell},
       {"bloomDrift", &bt.drift},
   };
@@ -363,11 +362,9 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (sb.chirpSign != 1.0f && sb.chirpSign != -1.0f) return false;
     if (octGrains != 2.0f && octGrains != 4.0f) return false;
     ot.grainCount = static_cast<int>(octGrains);
-    if (bloomTailOnly != 0.0f && bloomTailOnly != 1.0f) return false;
     if (!inside(bt.firstCaptureMs, 1.0f, 500.0f) || !inside(bt.skipDb, -60.0f, 0.0f) || !inside(bt.trimDb, -24.0f, 24.0f) ||
         !inside(bt.driveWord, 0.1f, 20.0f) || !inside(bt.driveBell, 0.0f, 20.0f) || !inside(bt.drift, 0.0f, 0.2f))
       return false;
-    bt.tailOnly = bloomTailOnly == 1.0f;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
@@ -439,13 +436,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
           rp.gate.thresholdDb > -10.0f)
         return false;
       haveGate = true;
-    } else if (std::strcmp(a, "--bloom") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.bloom.bloom) || rp.bloom.bloom < 0.0f || rp.bloom.bloom > 1.0f) return false;
+    } else if (std::strcmp(a, "--amount") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.bloom.amount) || rp.bloom.amount < 0.0f || rp.bloom.amount > 1.0f) return false;
       haveBloom = true;
-    } else if ((std::strcmp(a, "--length") == 0 || std::strcmp(a, "--linger") == 0 || std::strcmp(a, "--tail") == 0) &&
-               i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.bloom.tailMs) || rp.bloom.tailMs < cv::Bloom::kTailMinMs ||
-          rp.bloom.tailMs > cv::Bloom::kTailMaxMs)
+    } else if (std::strcmp(a, "--length") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.bloom.lengthMs) || rp.bloom.lengthMs < cv::Bloom::kLengthMinMs ||
+          rp.bloom.lengthMs > cv::Bloom::kLengthMaxMs)
         return false;
       haveBloom = true;
     } else if (std::strcmp(a, "--eq") == 0) {
@@ -636,7 +632,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       const float* src = inBuf;
       int next = 0;
 
-      // Bloom cuts its slices from the pitch stage's output, or from the input gate's output when no
+      // The Chatter card cuts its slices from the pitch stage's output, or from the input gate's output when no
       // pitch card runs. The copy is taken ahead of the stages that follow.
       if (rp.inGateOn) {
         inGate.process(src, scratch[next], n, rp.inGate);
@@ -681,9 +677,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         next ^= 1;
       }
       if (rp.bloomOn) {
-        cv::BloomParams bp = rp.bloom;
-        bp.keyOpen = inGate.open();
-        bloom.process(src, bloomSrc, scratch[next], n, bp);
+        bloom.process(src, bloomSrc, scratch[next], n, rp.bloom, inGate.open());
         src = scratch[next];
         next ^= 1;
       }

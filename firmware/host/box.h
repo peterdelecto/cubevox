@@ -76,7 +76,7 @@ class Box {
   void swapReverb();
 
   // The card switch under slot 7. Applies the menu's slot 7 action until the slot holds `card`
-  // (Gate, Lofi or Bloom). When no step of the cycle reaches it, because the box would not load that
+  // (Gate, Lofi or Chatter). When no step of the cycle reaches it, because the box would not load that
   // layout, the layout stays as it was.
   void pickSlot7Card(Card card);
 

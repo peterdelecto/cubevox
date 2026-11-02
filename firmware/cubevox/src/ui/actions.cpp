@@ -34,7 +34,7 @@ ApplyResult swapOctaveFormant(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
-// The card after `c` in the slot 7 cycle, Gate to Lo-fi to Bloom and back to Gate.
+// The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
 Card nextSlot7Card(Card c) {
   switch (c) {
     case Card::Gate: return Card::Lofi;

@@ -99,12 +99,12 @@ constexpr Cost kPitchStage{4, 4, false};
 // in the crowd layout and 15.9 % in crowd-chasm.
 constexpr Cost kCrowd{13, 16, true};  // 78.7k / 99.6k to 101.6k, board 2026-11-01; mean from the crowd bench layout slot 3 with knobs at top, worst from the stress run's sweeps; the tracker ran in Octave's slot, 47.5k
 
-// The Formant card, an alternate for Octave in slot 3, and the Lo-fi and Bloom cards, alternates for
+// The Formant card, an alternate for Octave in slot 3, and the Lo-fi and Chatter cards, alternates for
 // Gate in slot 7. Each row is an estimate until the stress run measures the card on the board; the
 // run's figure replaces it.
 constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
 constexpr Cost kLofi{2, 2, false};     // est.: five biquads, the tanh and the crush, about 80 cycles a sample (0.8 %), rounded up for a block that moves a knob, which also ramps 25 coefficients a sample (about 30 cycles more); the host has no bench of it
-constexpr Cost kBloom{5, 6, false};    // est. from the host bench of 2026-11-01 with the key open: 9.4 ns a sample against Echo's 8.1 and Gate's 7.8 (1.17x and 1.21x of rows that are 5 / 5 and 4 / 5); the spec's 1 / 2 does not hold
+constexpr Cost kBloom{5, 6, false};    // est. from the host bench of 2026-11-01 after the CPU pass (bench_chatter and blocks, -O2, minimum of 7 runs, median of 7 interleaved passes, 50.4k board cycles per host us). Adam's clip through the Input gate at -55 dBFS: Apple clang 17 reads 7.80 ns a sample, 25.2k cycles, 3.9 %; g++ 15, the firmware's compiler family, 8.21 ns, 26.5k, 4.1 %, which rounds up to 5. Echo benches 8.06 ns and 8.27 ns, against 26.3k on the board. The busiest block reads 10.42 ns on clang, 33.6k, 5.3 %, which rounds up to 6. A stutter of 60 ms words at AMOUNT 100 % reads 11.1 ns, 5.6 %, which the mean does not carry
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.

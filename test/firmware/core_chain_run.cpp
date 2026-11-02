@@ -889,12 +889,12 @@ void checkCrowdToggleOff() {
 }
 
 // Slot 3 is the third slot, index 2, where Formant stands in for Octave. Slot 7 is the seventh, index 6,
-// where Lo-fi and Bloom stand in for Gate.
+// where Lo-fi and Chatter stand in for Gate.
 constexpr int kSlot3 = 2;
 constexpr int kSlot7 = 6;
 
 // 200 ms of the tone, as for the Crowd card: the tracker finds its period in about 32 ms, the Formant
-// voice sounds 22 ms after that, and Bloom's first capture lands at 40 to 50 ms and loops by about 110 ms.
+// voice sounds 22 ms after that, and the Chatter card's first capture lands at 40 to 50 ms and loops by about 110 ms.
 constexpr int kSlot7Blocks = 150;
 
 // A layout with `c` in its slot, slot 3 for Formant and slot 7 for the others, and every other slot empty.
@@ -916,9 +916,9 @@ Block slot7Direct(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) 
   return out;
 }
 
-// Formant in slot 3 and Lo-fi and Bloom in slot 7 each run their engine, change the tone, and pass the
+// Formant in slot 3 and Lo-fi and Chatter in slot 7 each run their engine, change the tone, and pass the
 // dry input bit for bit once their toggle has been off for the fade. A reset clears the Lo-fi and
-// Bloom engines.
+// Chatter engines.
 void checkSlot7CardsRun() {
   for (const Card c : {Card::Formant, Card::Lofi, Card::Bloom}) {
     const std::string name = cardDesc(c).name;
@@ -953,10 +953,10 @@ void checkSlot7CardsRun() {
   auto rig = newRig();
   for (int b = 0; b < kSlot7Blocks; ++b) runBlock(*rig, bloom, tone(b, 0.3f), StillClock());
   check(rig->engines.bloom.inWord() && rig->engines.bloom.looping(),
-        "Bloom with no Input gate placed keys on its own input, so a word opens and its slice loops");
+        "Chatter with no Input gate placed keys on its own input, so a word opens and its slice loops");
   resetEngine(rig->engines, Engine::Bloom);
   check(!rig->engines.bloom.inWord() && !rig->engines.bloom.looping() && rig->engines.bloom.wetGain() == 0.0f,
-        "resetEngine clears Bloom's word and its loop");
+        "resetEngine clears the Chatter card's word and its loop");
 
   const ChainSnapshot lofi = snapshotToggles(slot7Only(Card::Lofi), 0.5f, allToggles(true));
   auto lofiRig = newRig();
@@ -1001,16 +1001,16 @@ void checkFormantPitchStage() {
   }
 }
 
-// Bloom keys on the Input gate's detector when the layout places that card, whether or not its slot is
-// on, and on its own input when it does not. A gate held shut by a 0 dB threshold keeps Bloom out of a
-// word the tone would open on Bloom's own detector at -45 dBFS.
+// The Chatter card keys on the Input gate's detector when the layout places that card, whether or not
+// its slot is on, and on its own input when it does not. A gate held shut by a 0 dB threshold keeps the
+// card out of a word the tone would open on its own detector at -45 dBFS.
 void checkBloomKey() {
   Layout layout = layoutOf({Card::InputGate});
   layout.card[kSlot7] = Card::Bloom;
   const Toggles bloomOnly = togglesOn({kSlot7});
   struct Outcome {
-    bool same = true;      // every block equals the gate's call, then Bloom keyed by its state
-    bool inWord = false;   // Bloom holds a word at the end
+    bool same = true;      // every block equals the gate's call, then the Chatter card keyed by its state
+    bool inWord = false;   // the card holds a word at the end
     bool looping = false;  // a slice loops at the end
     float residual = 0.0f;  // the last block's largest distance from the input under its best single gain
     float gain = 0.0f;      // that best single gain
@@ -1031,12 +1031,11 @@ void checkBloomKey() {
       hand->engines.inputGate.process(in.data(), gated.data(), kN, snap.params.inputGate);
       cv::BloomParams keyed = snap.params.bloom;
       keyed.keyFromGate = gatePlaced;
-      keyed.keyOpen = gatePlaced && hand->engines.inputGate.open();
       Block want{};
-      hand->engines.bloom.process(in.data(), want.data(), kN, keyed);
+      hand->engines.bloom.process(in.data(), want.data(), kN, keyed, gatePlaced && hand->engines.inputGate.open());
       o.same = o.same && run.out == want;
       if (b == kSlot7Blocks - 1) {
-        // Outside a word the block is the dry input under Bloom's trim, one gain. A loop adds to it.
+        // Outside a word the block is the dry input, one gain. A loop adds to it.
         double dot = 0.0;
         double energy = 0.0;
         for (size_t i = 0; i < in.size(); ++i) {
@@ -1054,23 +1053,24 @@ void checkBloomKey() {
   };
 
   // A loop on a steady tone can land in phase with it, so a loop shows as a residual off the best single
-  // gain or as that gain moving off the trim alone, which the shut gate's run gives.
+  // gain or as that gain moving off the dry's own, which the shut gate's run gives.
   const Outcome shut = play(0.0f, true);
   const auto addsLoop = [&](const Outcome& o) { return o.residual > 0.01f || std::fabs(o.gain - shut.gain) > 0.05f; };
   const Outcome open = play(-55.0f, true);
   check(open.same && open.inWord && open.looping && addsLoop(open),
-        "Bloom: an open Input gate keys a word, and the chain equals Bloom keyed by the gate's state");
+        "Chatter: an open Input gate keys a word, and the chain equals the card keyed by the gate's state");
   check(shut.same && !shut.inWord && !shut.looping && shut.residual < 1e-5f,
-        "Bloom: a shut Input gate keeps Bloom out of a word the tone would open on its own detector");
+        "Chatter: a shut Input gate keeps the card out of a word the tone would open on its own detector");
   const Outcome own = play(0.0f, false);
   check(own.same && own.inWord && own.looping && addsLoop(own),
-        "Bloom: with no Input gate placed it keys on its own input, whatever the gate's threshold");
+        "Chatter: with no Input gate placed it keys on its own input, whatever the gate's threshold");
 }
 
-// What Bloom cut from a run of the chain: how many slices it kept, whether every one equals the pitch
-// stage's output at its cut clock, and how many of their samples differ from the Crowd card's output.
+// What the Chatter card cut from a run of the chain: how many finished slices it holds, whether every
+// one equals the pitch stage's output at its cut clock, and how many of their samples differ from the
+// Crowd card's output.
 struct SourceRun {
-  int kept = 0;
+  int slices = 0;
   bool matchesLead = true;
   int differs = 0;
   int samples = 0;
@@ -1102,15 +1102,19 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
   const cv::Bloom& bloom = chain->engines.bloom;
   for (int slot = 0; slot < cv::Bloom::kSlices; ++slot) {
     if (!bloom.sliceValid(slot)) continue;
-    ++r.kept;
+    ++r.slices;
     const size_t cut = bloom.sliceCutAt(slot);
 
-    // A slice is the pitch stage's output through Bloom's 11 kHz low-pass, started clear at its cut.
+    // A slice is the pitch stage's output through the card's 11 kHz low-pass, started clear at its cut.
+    // Its first and last 300 samples carry the pass window (278 samples) and are left out.
+    constexpr int kEdge = 300;
     cv::Biquad lp;
-    lp.setLowPass(snap.params.bloom.tuning.lowpassHz, snap.params.bloom.tuning.lowpassQ);
+    lp.setLowPass(cv::Bloom::kLowpassHz, cv::Bloom::kLowpassQ);
     for (int j = 0; j < bloom.sliceLen(slot); ++j) {
+      const float want = lp.run(lead[cut + static_cast<size_t>(j)]);
+      if (j < kEdge || j >= bloom.sliceLen(slot) - kEdge) continue;
       const float s = bloom.sliceData(slot)[j];
-      if (std::fabs(s - lp.run(lead[cut + static_cast<size_t>(j)])) > 1e-5f) r.matchesLead = false;
+      if (std::fabs(s - want) > 1e-5f) r.matchesLead = false;
       if (std::fabs(s - voiced[cut + static_cast<size_t>(j)]) > 1e-3f) ++r.differs;
       ++r.samples;
     }
@@ -1119,50 +1123,50 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
   return r;
 }
 
-// Bloom cuts its slices from the block leaving the last Autotune, Octave or Formant slot (slot 1 when
-// the layout has none), and its dry path is slot 7's own input. With MOB in slot 4 the slices match the
-// pitch stage's output and differ from MOB's; with MOB ahead of Octave they still do; with no Bloom
-// placed, or Bloom ahead of the tap, nothing is copied.
+// The Chatter card cuts its slices from the block leaving the last Autotune, Octave or Formant slot (slot
+// 1 when the layout has none), and its dry path is slot 7's own input. With MOB in slot 4 the slices
+// match the pitch stage's output and differ from MOB's; with MOB ahead of Octave they still do; with no
+// Chatter card placed, or the card ahead of the tap, nothing is copied.
 void checkBloomSource() {
   Layout def = defaultLayout();
   def.card[kSlot7] = Card::Bloom;
   const BloomTap defTap = bloomTap(def);
-  check(defTap.slot == 2 && defTap.pitchCard, "bloom tap: the default layout with Bloom in slot 7 taps the block leaving Octave in slot 3");
+  check(defTap.slot == 2 && defTap.pitchCard, "chatter tap: the default layout with Chatter in slot 7 taps the block leaving Octave in slot 3");
 
   Layout formant = layoutOf({Card::Autotune, Card::Empty, Card::Formant});
   formant.card[kSlot7] = Card::Bloom;
-  check(bloomTap(formant).slot == 2, "bloom tap: the last of Autotune, Octave and Formant sets the slot");
+  check(bloomTap(formant).slot == 2, "chatter tap: the last of Autotune, Octave and Formant sets the slot");
 
   Layout none = layoutOf({Card::InputGate, Card::Unison});
   none.card[kSlot7] = Card::Bloom;
   const BloomTap noneTap = bloomTap(none);
-  check(noneTap.slot == 0 && !noneTap.pitchCard, "bloom tap: a layout with no pitch card taps the block leaving slot 1");
+  check(noneTap.slot == 0 && !noneTap.pitchCard, "chatter tap: a layout with no pitch card taps the block leaving slot 1");
 
-  check(bloomTap(defaultLayout()).slot == -1, "bloom tap: a layout with no Bloom copies nothing");
+  check(bloomTap(defaultLayout()).slot == -1, "chatter tap: a layout with no Chatter card copies nothing");
   const BloomTap ahead = bloomTap(layoutOf({Card::Bloom, Card::Empty, Card::Octave}));
-  check(ahead.slot == -1, "bloom tap: Bloom ahead of the tap slot cuts from its own input");
+  check(ahead.slot == -1, "chatter tap: the card ahead of the tap slot cuts from its own input");
 
   Layout behind = layoutOf({Card::InputGate, Card::Autotune, Card::Octave, Card::Crowd});
   behind.card[kSlot7] = Card::Bloom;
   const SourceRun a = runSource(behind, togglesOn({1, 2, 3, kSlot7}));
-  check(a.kept >= 2 && a.matchesLead && a.samples > 0 && a.differs > a.samples / 2,
-        "bloom source: with MOB in slot 4 the captured slices equal the pitch stage's output and differ from MOB's");
+  check(a.slices >= 2 && a.matchesLead && a.samples > 0 && a.differs > a.samples / 2,
+        "chatter source: with MOB in slot 4 the captured slices equal the pitch stage's output and differ from MOB's");
 
   Layout crowdFirst = layoutOf({Card::InputGate, Card::Crowd, Card::Octave});
   crowdFirst.card[kSlot7] = Card::Bloom;
   const SourceRun c = runSource(crowdFirst, togglesOn({1, 2, kSlot7}));
-  check(c.kept >= 2 && c.matchesLead && c.differs > c.samples / 2,
-        "bloom source: with MOB ahead of Octave and making the pitch call, the slices still equal the pitch stage's output");
+  check(c.slices >= 2 && c.matchesLead && c.differs > c.samples / 2,
+        "chatter source: with MOB ahead of Octave and making the pitch call, the slices still equal the pitch stage's output");
 
   const SourceRun plain = runSource(none, togglesOn({1, kSlot7}));
-  check(plain.kept >= 2 && !plain.tapIdle,
-        "bloom source: with no pitch card the slices come from the block leaving slot 1");
+  check(plain.slices >= 2 && !plain.tapIdle,
+        "chatter source: with no pitch card the slices come from the block leaving slot 1");
 
   const SourceRun absent = runSource(defaultLayout(), allToggles(true));
-  check(absent.tapIdle, "bloom source: a layout with no Bloom card never writes the tap");
+  check(absent.tapIdle, "chatter source: a layout with no Chatter card never writes the tap");
   Layout early = layoutOf({Card::Bloom, Card::Empty, Card::Octave});
   const SourceRun first = runSource(early, togglesOn({0, 2}));
-  check(first.tapIdle && first.kept >= 2, "bloom source: Bloom ahead of the tap slot writes no tap and cuts from its own input");
+  check(first.tapIdle && first.slices >= 2, "chatter source: the card ahead of the tap slot writes no tap and cuts from its own input");
 }
 
 // The shipped layout with every toggle on is the plain chain: the crossfade changes nothing while no

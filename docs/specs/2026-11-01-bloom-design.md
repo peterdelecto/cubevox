@@ -5,9 +5,10 @@ Owner 2026-11-01: "let's also adapt the 'bloom' effect from drumsynth as a possi
 in place of Gate, through the slot 7 row (`2026-11-01-slot-7-choices-design.md`).
 
 Status: the card is CHATTER (display name Chatter; card id and engine stay `bloom`). Sections 14
-to 17 are current. Sections 1 to 13 record the first build (v2.00.95) and the rotation build
-(v2.00.99); their knob names (TAIL, BLOOM, LINGER), slice timings, rotation, memory and cost
-figures are history wherever a later section differs.
+to 18 are current; section 18 is the build as of v2.01.05 and wins where it differs. Sections 1 to
+13 record the first build (v2.00.95) and the rotation build (v2.00.99); their knob names (TAIL,
+BLOOM, LINGER), slice timings, rotation, memory and cost figures are history wherever a later
+section differs.
 
 DrumSynthV3 is a reference to read, never to edit, and nothing in cubevox is copied from it (project
 rule). The engine here is written new from the laws below; the Bleep Labs granular code is not
@@ -207,7 +208,8 @@ knob named LINGER.
    - Level at the default, Input gate key: −0.01, −0.05, +0.54 dB; own key +0.30, −0.05, +0.27 dB.
    - Memory: `sizeof(Bloom)` 96,628 B; the firmware's D1 SRAM 292,560 B, 55.8 %.
    - CPU on the host: 1.3 times Echo with one word sounding, 2.0 times with two loops. Echo measured
-     2.1 % on the board, so about 2.8 % and 4.2 %; the {5, 6} row covers both until a board bench.
+     2.1 % on the board (13.1k to 13.4k cycles, stress run 2026-11-01, fw v2.00.81), so about 2.8 %
+     and 4.2 %; the {5, 6} row covers both until a board bench.
 
 ## 14. CHATTER, the middle ground (owner 2026-11-01)
 
@@ -312,8 +314,8 @@ shelf.
 5. Voice-major rewrite (efficiency finding 12) is a second pass after this one lands, held
    byte-identical to this pass's renders.
 6. `kBloom` is set by `costs.h`'s own host-to-board method after the CPU work, and its comment
-   names the bench. The stress run of v2.00.82 measured Echo at 2.1 % on the board, half its row,
-   so the table stays conservative until the board re-bench.
+   names the bench. The board stress run of 2026-11-01 (fw v2.00.81) measured Echo at 13.1k to
+   13.4k cycles, 2.1 %, half its row, so the table stays conservative until the board re-bench.
 7. Level. All six level rows (three clips, two key sources) sit inside 0 to +0.5 dB without the
    test's slack, or the reason they cannot is found and written here.
 8. Names. Code uses the owner's words: `lengthMs` and `amount` for the knobs, `kLengthMinMs` /
@@ -324,3 +326,46 @@ shelf.
    keys; `tailOnly` goes, because the loop plays under the word.
 10. The key reaches `Bloom::process` as an argument, so the chain no longer copies the parameter
     block. One helper writes the pitch-stage source for both chain sites.
+
+## 18. Audit fix pass as built (v2.01.05)
+
+Owner 2026-11-01 on CHATTER's level: the dry holds, as it does for Echo and Unison. This section
+overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2 and 6 where they differ.
+
+1. Level. `trimDb` −14.5 dB scales the slices alone; the dry passes at unity, bit for bit
+   (`bloom_test` `dry-unity`). The six rows, with no slack: gate key +0.31, +0.20, +0.33 dB; own
+   key +0.29, +0.20, +0.27 dB. Gate key at −55 dBFS, LENGTH 300 ms, three clips summed:
+
+   | AMOUNT | Dry | Slices, v2.01.04 | Slices now | Net now |
+   |---|---|---|---|---|
+   | 25 % | 0.00 dB (was −2.45) | −4.12 dB | −15.40 dB | +0.10 dB |
+   | 50 % | 0.00 dB (was −3.71) | −1.89 dB | −12.04 dB | +0.28 dB |
+   | 100 % | 0.00 dB (was −5.62) | −0.96 dB | −8.24 dB | +0.58 dB |
+
+   The slices sit 7 to 11 dB below v2.01.04. The level rule binds the default; AMOUNT 100 % reads
+   +0.58 dB.
+2. CPU. Host bench, Adam's clip through the Input gate at −55 dBFS: 12.09 → 7.80 ns a sample on
+   clang, 9.83 → 8.21 on g++ (Echo 8.06 / 8.27 on the same bench). Clang, before → after: idle 6.15
+   → 0.42, a word 11.70 → 7.44, a tail 10.61 → 7.22, 60 ms words at AMOUNT 100 % 15.21 → 11.13.
+3. `kBloom` stays {5, 6, false}. At `costs.h`'s 50.4k cycles per host µs, g++ gives a 4.1 % mean
+   and the busiest block 5.3 %. Clang's 3.9 % would allow {4, 6}, but that ties Gate's mean line
+   and removes the layout the tests use to show CHATTER turned away; the board re-bench settles it.
+   MOB + Chasm + CHATTER sums 75 % mean, 87 % worst.
+4. Cut with a gap. Straddle sweep at AMOUNT 25 / 50 / 75 / 100 %: 0 of 120 tails over 15 % silence,
+   worst 12.4 % (before 60 / 47 / 44 / 62). Clips: 1 of 68 tails over 15 %, none over 35 % (before
+   21 of 60, up to 73 %).
+5. Key blip. A 3 s tail ends at 5,620 ms with or without a 40 ms blip (before 1,149 ms). On a word
+   the tail runs untouched until the word's first slice, 113.6 ms after the key in `next-word`, then
+   falls over 150 ms.
+6. Voices. Up to four sound. With none free, the word's first slice waits and the quietest fade
+   takes the 20 ms quick fade; nothing is overwritten. Fuzz, 600 seeds of 240 s: 0 faults, 0 gain
+   jumps, longest capture wait 21 ms, slowest tail end 5,253 ms.
+7. A click found and fixed. A fade voice started mid-chunk dropped out of the loop for the rest of
+   the chunk, a 0.17 step. `key-hold` and `fuzz` catch it.
+8. Tuning and names. `BloomTuning` holds the six keys the render tool sets; `tailOnly` and 27
+   other values are constants. `Biquad::setHighShelf(hz, db, slope)` builds the shelf, and every
+   other caller stays bit-exact. `bloom_test` has 34 checks.
+9. Memory. D1 SRAM 242,112 B, 46.2 % (v2.01.04 242,632 B).
+10. Renders `build/audition/chatter-fix-{a,b,c}.wav` (gate key −55 dBFS; AMOUNT / LENGTH 50 % /
+    300 ms, 90 % / 1,200 ms, 25 % / 600 ms).
+11. Next: the voice-major rewrite (section 17 item 5).
