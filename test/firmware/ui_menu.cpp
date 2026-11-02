@@ -909,20 +909,21 @@ void checkMenuSlot7Click() {
   check(m.layout == defaultLayout() && sameSettings(m.settings, Settings()),
         "menu: three clicks come round to the default layout and touch no setting");
 
-  // A card the layout would refuse is passed over: Chatter would put this layout over the mean line, so
-  // the click on Lo-fi lands on Gate.
+  // A card the layout would refuse is passed over: Gate would put this layout over the mean line, so the
+  // click on Chatter lands on Lo-fi. Chatter costs no more than Gate, so no layout refuses Chatter and
+  // takes Gate.
   MenuRig tight;
-  tight.layout = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Lofi, Card::ReverbSpring}};
-  Layout bloom = tight.layout;
-  bloom.card[kSlot7Slot] = Card::Bloom;
-  check(layoutValid(tight.layout).ok() && !layoutValid(bloom).ok(), "menu: the tight layout fits with Lo-fi and refuses Chatter");
+  tight.layout = {{Card::Octave, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Bloom, Card::ReverbSpring}};
+  Layout gate = tight.layout;
+  gate.card[kSlot7Slot] = Card::Gate;
+  check(layoutValid(tight.layout).ok() && !layoutValid(gate).ok(), "menu: the tight layout fits with Chatter and refuses Gate");
   tight.openListAt(kSlot7Card);
   check(ui::applyAction(tight.step(0, true), tight.settings, tight.layout) == ui::ApplyResult::LayoutChanged &&
-            tight.layout.card[kSlot7Slot] == Card::Gate,
+            tight.layout.card[kSlot7Slot] == Card::Lofi,
         "menu: the click passes over the card the layout refuses");
   tight.draw();
-  check(cursorRowIs(tight.canvas, rowOnScreen(kSlot7Card), kSlot7Card, "GATE"), "menu: and the row reads the card the cycle landed on");
+  check(cursorRowIs(tight.canvas, rowOnScreen(kSlot7Card), kSlot7Card, "LO-FI"), "menu: and the row reads the card the cycle landed on");
 }
 
 // With none of the three placed the row reads SLOT - and a click asks for the cycle but changes nothing.

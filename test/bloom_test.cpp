@@ -3,7 +3,7 @@
 // tail-after-stop, tail-on-clips, age-limit, loop-under-word. Cuts with a gap: straddle, clip-gaps. A new word
 // and the key: next-word, yield, key-blip, key-hold, own-key. Output: source, no-clicks, dry-unity,
 // knob-moves.
-// Repeatability: determinism, call-sizes, settled-off, toggle-range, fuzz. Memory: storage, no-alloc.
+// Repeatability: determinism, call-sizes, clock-wrap, settled-off, toggle-range, fuzz. Memory: storage, no-alloc.
 // No window, no audio device.
 
 #include <algorithm>
@@ -1642,6 +1642,95 @@ bool testCallSizes() {
                 sizes ? 1.0 : 0.0, blocks ? 1.0 : 0.0);
 }
 
+// A clock value shifted by the run's start: the same sample of a run that starts at `off` reads `off`
+// more than the same sample of a run that starts at 0. Both runs read 0 for a clock never set.
+bool shifted(const std::vector<uint32_t>& zero, const std::vector<uint32_t>& moved, uint32_t off) {
+  if (zero.size() != moved.size()) return false;
+  for (size_t i = 0; i < zero.size(); ++i)
+    if (!((zero[i] == 0 && moved[i] == 0) || moved[i] == zero[i] + off)) return false;
+  return true;
+}
+
+bool shifted(const std::vector<int>& zero, const std::vector<int>& moved, uint32_t off) {
+  std::vector<uint32_t> a(zero.begin(), zero.end()), b(moved.begin(), moved.end());
+  return shifted(a, b, off);
+}
+
+// Whether a run that starts `off` samples after clock 0 matches the run that starts at 0, sample for
+// sample: the output, every gain and flag, and the clocks of the arms, writes, cuts and splices
+// shifted by `off`.
+bool tracesMatch(const Trace& zero, const Trace& moved, uint32_t off) {
+  bool ok = zero.out == moved.out && zero.total == moved.total && zero.pair == moved.pair;
+  ok = ok && zero.word == moved.word && zero.loop == moved.loop && zero.taken == moved.taken && zero.skipped == moved.skipped;
+  ok = ok && shifted(zero.arms, moved.arms, off) && shifted(zero.writes, moved.writes, off);
+  for (size_t k = 0; k < static_cast<size_t>(kVoices); ++k) {
+    ok = ok && zero.gain[k] == moved.gain[k] && zero.seq[k] == moved.seq[k] && zero.len[k] == moved.len[k] && zero.on[k] == moved.on[k];
+    ok = ok && shifted(zero.cut[k], moved.cut[k], off) && shifted(zero.spliced[k], moved.spliced[k], off);
+  }
+  return ok;
+}
+
+// Renders in calls of `call` samples from a clock that starts at `start`, the gate key read at the first
+// sample of each call.
+Signal renderFrom(const Signal& in, const std::vector<char>& key, cv::BloomParams p, uint32_t start, int call) {
+  p.keyFromGate = true;
+  gBloom.reset();
+  gBloom.startClockAt(start);
+  Signal out(in.size());
+  for (size_t i = 0; i < in.size(); i += static_cast<size_t>(call)) {
+    const int n = static_cast<int>(in.size() - i < static_cast<size_t>(call) ? in.size() - i : static_cast<size_t>(call));
+    gBloom.process(&in[i], &out[i], n, p, key[i] != 0);
+  }
+  return out;
+}
+
+// The 32-bit sample clock wraps after 24.8 hours. A run that starts shortly before the wrap behaves as a
+// run that starts at 0: the schedule (arms, writes, cuts, splices, ends and fades) and the output match
+// sample for sample, in calls of one sample and in calls of 64, with the wrap landing in a word, at its
+// end, in the tail, under the next word, in a pile of quick words and on the first sample.
+bool testClockWrap() {
+  struct Program {
+    Signal in;
+    std::vector<char> key;
+    cv::BloomParams p;
+    std::vector<int> wrapAtSmp;  // samples from the start to the wrap
+  };
+  std::vector<Program> programs(2);
+  {
+    Program& g = programs[0];
+    g.in = vowel(4200, 100, 4000);
+    g.key = keyOver(4200, {{100, 1700}, {2300, 3000}});
+    g.p.lengthMs = 1500.0f;
+    g.wrapAtSmp = {1, 20 * kMs + 7, 640 * kMs + 37, 1720 * kMs + 5, 2000 * kMs + 11, 2650 * kMs + 29, 3300 * kMs + 3};
+  }
+  {
+    Program& g = programs[1];
+    g.in = vowel(3200, 50, 3100);
+    g.key = keyOver(3200, {{100, 260}, {420, 560}, {720, 880}, {1040, 1200}, {1360, 1520}, {1700, 1850}});
+    g.p.lengthMs = 3000.0f;
+    g.p.amount = 1.0f;
+    g.p.tuning.firstCaptureMs = 2.0f;
+    g.wrapAtSmp = {50 * kMs + 9, 500 * kMs + 21, 1100 * kMs + 1, 1900 * kMs + 33};
+  }
+  int runs = 0;
+  bool ok = true;
+  for (Program& g : programs) {
+    g.p.keyFromGate = true;
+    gBloom.reset();
+    const Trace zero = trace(gBloom, g.in, g.key, g.p);
+    const Signal zero64 = renderFrom(g.in, g.key, g.p, 0, 64);
+    for (const int wrap : g.wrapAtSmp) {
+      const uint32_t start = 0u - static_cast<uint32_t>(wrap);
+      gBloom.reset();
+      gBloom.startClockAt(start);
+      const Trace moved = trace(gBloom, g.in, g.key, g.p);
+      ok = ok && tracesMatch(zero, moved, start) && sameBytes(zero64, renderFrom(g.in, g.key, g.p, start, 64));
+      ++runs;
+    }
+  }
+  return report("clock-wrap", ok, "%.0f runs that cross the 32-bit wrap match the run from clock 0, sample for sample, in calls of 1 and of 64: %.0f", runs, ok ? 1.0 : 0.0);
+}
+
 // Settled off is a plain copy, tested with ==, from reset and after a running stage switches off.
 bool offIsCopy(const Signal& in, bool& wasWet) {
   cv::BloomParams off;
@@ -1903,6 +1992,7 @@ int main() {
   ok &= testKnobMoves();
   ok &= testDeterminism();
   ok &= testCallSizes();
+  ok &= testClockWrap();
   ok &= testSettledOff();
   ok &= testToggleAndRange();
   ok &= testStorage();

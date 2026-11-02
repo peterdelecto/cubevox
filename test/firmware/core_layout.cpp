@@ -222,13 +222,13 @@ void checkSlot7Costs() {
             layoutValid(formantHeavy).ok(),
         "slot 3 cost: Formant costs less than Octave and is accepted in both layouts");
 
-  // Chatter's estimate puts MOB and Chasm exactly on the mean line, which layoutValid accepts.
+  // Chatter's estimate puts MOB and Chasm 2 points under the mean line and 9 under the worst line.
   Layout heavyBloom = defaultLayout();
   heavyBloom.card[3] = Card::Crowd;
   heavyBloom.card[6] = Card::Bloom;
   heavyBloom.card[7] = Card::ReverbChasm;
-  check(layoutCost(heavyBloom).avg == costs::kBudgetAvgPercent && layoutValid(heavyBloom).ok(),
-        "slot 7 cost: MOB, Chasm and Chatter sum to exactly the 75 % mean line and layoutValid accepts it");
+  check(layoutCost(heavyBloom).avg == 73 && layoutCost(heavyBloom).worst == 86 && layoutValid(heavyBloom).ok(),
+        "slot 7 cost: MOB, Chasm and Chatter sum to 73 % mean and 86 % worst and layoutValid accepts it");
 }
 
 void checkLayoutValid() {
@@ -752,21 +752,36 @@ void checkCycleSlot7Card() {
   check(ui::applyAction(UiAction::CycleSlot7Card, s, all) == ui::ApplyResult::None && all == allBefore,
         "action: CycleSlot7Card changes nothing when each other card would repeat");
 
-  // MOB beside Spring with Unison in Octave's slot sits on the mean line with Gate in slot 7, so Chatter's
-  // 5 % is refused and the cycle passes it. The expected cards follow layoutValid, not a fixed verdict.
-  Layout tight = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Gate, Card::ReverbSpring}};
-  Layout withBloom = tight;
-  withBloom.card[6] = Card::Bloom;
-  check(layoutValid(tight).ok() && !layoutValid(withBloom).ok() && layoutCost(tight).avg == costs::kBudgetAvgPercent,
-        "action: the tight layout fits with Gate on the mean line and refuses Chatter");
-  Layout atLofi = tight;
-  atLofi.card[6] = Card::Lofi;
-  check(ui::applyAction(UiAction::CycleSlot7Card, s, atLofi) == ui::ApplyResult::LayoutChanged && atLofi == tight,
-        "action: CycleSlot7Card passes over Chatter and wraps from Lo-fi to Gate");
-  check(ui::applyAction(UiAction::CycleSlot7Card, s, atLofi) == ui::ApplyResult::LayoutChanged &&
-            atLofi.card[6] == Card::Lofi,
-        "action: and goes on from Gate to Lo-fi");
+  // Chatter's row, 3 / 5, is no larger than Gate's, 4 / 5, so no layout refuses Chatter and takes Gate.
+  // Octave in slot 1 with MOB beside Spring and Unison in Octave's slot sums to 72 % before slot 7, so
+  // Chatter lands exactly on the mean line at 75 % and Gate would sum to 76 %. The cycle from Chatter
+  // passes over Gate to Lo-fi, and goes on to Chatter. The expected cards follow layoutValid.
+  Layout tight = {{Card::Octave, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Bloom, Card::ReverbSpring}};
+  Layout withGate = tight;
+  withGate.card[6] = Card::Gate;
+  check(layoutValid(tight).ok() && !layoutValid(withGate).ok() && layoutCost(tight).avg == costs::kBudgetAvgPercent,
+        "action: the tight layout fits with Chatter on the mean line and refuses Gate");
+  Layout atChatter = tight;
+  check(ui::applyAction(UiAction::CycleSlot7Card, s, atChatter) == ui::ApplyResult::LayoutChanged &&
+            atChatter.card[6] == Card::Lofi,
+        "action: CycleSlot7Card passes over Gate and goes from Chatter to Lo-fi");
+  check(ui::applyAction(UiAction::CycleSlot7Card, s, atChatter) == ui::ApplyResult::LayoutChanged && atChatter == tight,
+        "action: and goes on from Lo-fi to Chatter");
+
+  // MOB beside Chasm with Unison in Octave's slot sums to 73 % before slot 7: Lo-fi fits on the mean line
+  // at 75 %, Chatter would sum to 76 % and Gate to 77 %, so the cycle from Lo-fi changes nothing.
+  Layout full = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+                  Card::Lofi, Card::ReverbChasm}};
+  Layout fullBloom = full;
+  fullBloom.card[6] = Card::Bloom;
+  Layout fullGate = full;
+  fullGate.card[6] = Card::Gate;
+  check(layoutValid(full).ok() && !layoutValid(fullBloom).ok() && !layoutValid(fullGate).ok(),
+        "action: the full layout fits with Lo-fi and refuses Chatter and Gate");
+  const Layout fullBefore = full;
+  check(ui::applyAction(UiAction::CycleSlot7Card, s, full) == ui::ApplyResult::None && full == fullBefore,
+        "action: CycleSlot7Card changes nothing when both other cards are refused");
 }
 
 void checkCrowdTestLayout() {
