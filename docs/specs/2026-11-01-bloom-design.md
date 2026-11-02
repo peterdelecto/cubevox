@@ -2,8 +2,12 @@
 
 Owner 2026-11-01: "let's also adapt the 'bloom' effect from drumsynth as a possible effect for slot
 7", with DrumSynthV3's BLOOM technical spec (D2, R10, code at a4149ed) pasted in. Offered for slot 7
-in place of Gate, through the slot 7 row (`2026-11-01-slot-7-choices-design.md`). Spec only, not
-built.
+in place of Gate, through the slot 7 row (`2026-11-01-slot-7-choices-design.md`).
+
+Status: the card is CHATTER (display name Chatter; card id and engine stay `bloom`). Sections 14
+to 17 are current. Sections 1 to 13 record the first build (v2.00.95) and the rotation build
+(v2.00.99); their knob names (TAIL, BLOOM, LINGER), slice timings, rotation, memory and cost
+figures are history wherever a later section differs.
 
 DrumSynthV3 is a reference to read, never to edit, and nothing in cubevox is copied from it (project
 rule). The engine here is written new from the laws below; the Bleep Labs granular code is not
@@ -280,3 +284,43 @@ always ends. This section overrides section 13 item 6's tail rule and section 14
    close. The knob's mid travel is now 245 ms (was 346). `bloom_test` covers the law at six
    settings, a click-free 20 ms close, 2 s and 3 s tails running past 2.5 s, and `tail-on-clips` at
    LINGER 20 / 60 / 300 / 2,000 / 3,000 ms (72 tails, 0 slice changes after the word's end).
+
+## 17. Audit fix pass (owner 2026-11-01)
+
+Three read-only audits at v2.01.03 (`build/audit/2026-11-01-chatter-audit-{efficiency,cleanup,
+correctness}.md`). Owner: "we must address all of these", with B for the key blip and A for the
+shelf.
+
+1. Cut with a gap. A cut whose voice stops partway (more than one eighth of it after its last
+   sample within 12 dB of its peak) or starts late (the same share before its first such sample)
+   counts as quiet. While a loop plays it is skipped under the existing rule, so the tail repeats
+   the last full slice. The first cut of a word, which has no loop to keep, re-arms once instead.
+   The 2.5 s age limit still overrides the skip. Before: 37 to 52 % of tails over 15 % silence
+   with no pitch card on; the audit's patch gave 0 of 120.
+2. Key blip (option B). The tail stays where it is when the key opens. It fades over 150 ms only
+   when the new word plays its first slice, so a breath or pop that never gives a slice leaves the
+   tail alone. On a real word the old tail overlaps it 85 to 130 ms longer than before. Word and
+   tail can now sound together, so the four voices stay; a full set of voices never overwrites a
+   sounding one with a click.
+3. Shelf (option A). The RBJ high shelf stays. Its coefficients come from `dsp.h`'s
+   `Biquad::setShelf`, which gains a slope that leaves every other caller bit-exact.
+4. CPU, sound unchanged byte for byte: the per-sample helpers inline, an idle path when nothing
+   sounds, the trim gain stepped instead of recomputed, the voice loop bounded by the highest
+   running voice, the pass window written into the slice as it is cut, the zero-crossing test only
+   while a capture waits, the slice data last in the class, the own key scanned as integers, and
+   `exp2Fast` / `log2Fast` for the block-rate laws (rounding under 1e-5).
+5. Voice-major rewrite (efficiency finding 12) is a second pass after this one lands, held
+   byte-identical to this pass's renders.
+6. `kBloom` is set by `costs.h`'s own host-to-board method after the CPU work, and its comment
+   names the bench. The stress run of v2.00.82 measured Echo at 2.1 % on the board, half its row,
+   so the table stays conservative until the board re-bench.
+7. Level. All six level rows (three clips, two key sources) sit inside 0 to +0.5 dB without the
+   test's slack, or the reason they cannot is found and written here.
+8. Names. Code uses the owner's words: `lengthMs` and `amount` for the knobs, `kLengthMinMs` /
+   `kLengthMaxMs`, plain names for the end fade and the quick fade, "the Chatter card" in comments
+   and test messages (the class, file, `Card::Bloom`, `Engine::Bloom` and the id stay `bloom`).
+   The render tool takes `--amount` and `--length`; the old flags go.
+9. Tuning. The 27 values nothing sets become constants. The render tool keeps six of its seven
+   keys; `tailOnly` goes, because the loop plays under the word.
+10. The key reaches `Bloom::process` as an argument, so the chain no longer copies the parameter
+    block. One helper writes the pitch-stage source for both chain sites.
