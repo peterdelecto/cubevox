@@ -106,7 +106,10 @@ Bottom band: the source switch at the left and the version under it.
    device; the clip through the block path for 3 s on the default layout, then both swaps and 2 s
    more; asserts finite output, output above -40 dBFS RMS in the last second, the cost sums
    before and after the swaps derived from the `costs::` rows, the layout reading `crowd` and
-   `reverb_chasm`, and a rendered face. Prints `emulator check: ok`.
+   `reverb_chasm`, and a rendered face. Prints `emulator check: ok`. Adam's clips stay out of git,
+   so where `samples/` is absent (CI) the check writes two synthetic voiced clips (150 Hz for 4 s,
+   220 Hz for 3 s, harmonics under three formant peaks, 5 Hz vibrato) to a temp directory, runs the
+   same checks on them, and prints a `clip:` line naming the set it used.
 2. `cubevox-emulator --proof <file.ppm>`: one frame of the window after the splash, rendered to a
    hidden window and written as a PPM, for looking at.
 3. `ctest` as a whole, with `proto_layout` still in it.

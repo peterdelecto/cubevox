@@ -143,8 +143,10 @@ std::string Source::locate(const char* argv0, const char* file) const {
   return std::string();
 }
 
+std::string Source::locateDefault(const char* argv0) const { return locate(argv0, kClipFile); }
+
 bool Source::findClip(const char* argv0) {
-  const std::string path = locate(argv0, kClipFile);
+  const std::string path = locateDefault(argv0);
   if (path.empty()) {
     std::fprintf(stderr, "[ERROR] clip: %s%s not found beside the app or in the working directory\n", kSampleDir,
                  kClipFile);

@@ -39,7 +39,10 @@ class Source {
   // the program path as launched.
   std::string locate(const char* argv0, const char* file) const;
 
-  // Loads Adam's default clip from where locate() finds it.
+  // The path of Adam's default clip as locate() finds it, "" when samples/ does not hold it.
+  std::string locateDefault(const char* argv0) const;
+
+  // Loads Adam's default clip from where locateDefault() finds it.
   bool findClip(const char* argv0);
 
   // Copies the next `n` clip samples, wrapping at the end. Silence when no clip is loaded.
