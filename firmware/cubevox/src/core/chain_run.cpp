@@ -43,32 +43,29 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
     engines.pitch.process(in, out, n, p.pitchFx);
     in = out;
 
-    // Bloom cuts from the stage's output, not from the voices Crowd adds to it.
-    if (engines.bloomLead) {
-      for (int i = 0; i < n; ++i) engines.bloomSrc[static_cast<size_t>(i)] = out[i];
-      engines.bloomSrcLive = true;
-    }
+    // The Chatter card cuts from the stage's output, not from the voices Crowd adds to it.
+    if (engines.bloomLead) captureBloomSource(engines, out, n);
   }
   engines.crowd.process(in, out, n, p.crowd, engines.pitch);
 }
 
-// Runs the Bloom card. With an Input gate placed, the gate's detector state is the word key for the
-// block; the gate's engine keeps its detector live while its own slot is off. Otherwise Bloom
-// listens to its own input. Its slices come from the chain's tap when runChain made one.
+// Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is
+// the word key for the block; the gate's engine keeps its detector live while its own slot is off.
+// Otherwise the card listens to its own input and ignores the state. Its slices come from the chain's
+// tap when runChain made one.
 void runBloom(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
   const float* const src = engines.bloomSrcLive ? engines.bloomSrc.data() : in;
-  if (!p.bloom.keyFromGate) {
-    engines.bloom.process(in, src, out, n, p.bloom);
-    return;
-  }
-  cv::BloomParams keyed = p.bloom;
-  keyed.keyOpen = engines.inputGate.open();
-  engines.bloom.process(in, src, out, n, keyed);
+  engines.bloom.process(in, src, out, n, p.bloom, engines.inputGate.open());
 }
 
 bool holdsPitchStage(Card c) { return c == Card::Autotune || c == Card::Octave || c == Card::Formant; }
 
 }  // namespace
+
+void captureBloomSource(ChainEngines& engines, const float* block, int n) {
+  for (int i = 0; i < n; ++i) engines.bloomSrc[static_cast<size_t>(i)] = block[i];
+  engines.bloomSrcLive = true;
+}
 
 BloomTap bloomTap(const Layout& layout) {
   int bloom = -1;

@@ -24,7 +24,7 @@ struct ChainParams {
   cv::DistortionParams distortion;
   cv::GateParams gate;
   cv::LofiParams lofi;
-  cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runChain fills keyOpen
+  cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runBloom passes the gate's state
   cv::ReverbParams reverb;
   cv::PolishCompParams comp;  // the chain tail: comp, then the back half of eq
   cv::PolishParams eq;        // its front half runs ahead of slot 1

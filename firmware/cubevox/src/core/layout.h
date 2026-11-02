@@ -36,7 +36,7 @@ int unisonCrowdSlot(const Layout& layout);
 // The slot that holds Octave or Formant, the first one when both are placed; -1 when neither is.
 int octaveFormantSlot(const Layout& layout);
 
-// The slot that holds Gate, Lo-fi or Bloom, the first one when several are placed; -1 when none is.
+// The slot that holds Gate, Lo-fi or Chatter, the first one when several are placed; -1 when none is.
 // The menu's slot 7 row cycles the card in it.
 int slot7CardSlot(const Layout& layout);
 

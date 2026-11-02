@@ -1,8 +1,9 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
-// (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Bloom rows take every
-// setting from the registry, as the box runs them. The Spring, Formant MIX, Lo-fi and Bloom rows run on Adam's
-// clips in samples/ and skip when they are absent: the synthetic program puts its energy where the telephone
-// band cuts and where the Spring loops cut, and its noise floor holds Bloom's word open. No window, no audio device.
+// (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Chatter rows take every
+// setting from the registry, as the box runs them. The Spring, Formant MIX, Lo-fi and Chatter rows run on
+// Adam's clips in samples/ and skip when they are absent: the synthetic program puts its energy where the
+// telephone band cuts and where the Spring loops cut, and its noise floor holds the Chatter card's word open.
+// No window, no audio device.
 
 #include <algorithm>
 #include <cmath>
@@ -364,15 +365,14 @@ bool lofiRows() {
   return ok;
 }
 
-// The Bloom card at its default, LENGTH 300 ms and AMOUNT 50 %, on Adam's clips, once listening to its own
-// input and once keyed by the Input gate at the registry's mid-travel setting (-55 dBFS), with the gate
-// ahead of it as the box runs them. The synthetic program carries a -40 dBFS noise floor that holds
-// Bloom's word open for the whole run, which the trim is not set for (-0.74 dB), so it has no row there.
+// The Chatter card at its default (the engine's LENGTH and AMOUNT 50 %), on Adam's clips, once listening
+// to its own input and once keyed by the Input gate at the registry's mid-travel setting (-55 dBFS), with
+// the gate ahead of it as the box runs them. The synthetic program carries a -40 dBFS noise floor that
+// holds the card's word open for the whole run, which the trim is not set for, so it has no row there.
 bool bloomRows() {
   ChainParams chain;
   applyPlacement(Card::Bloom, chain);
   applyToggle(Card::Bloom, true, chain);
-  chain.bloom.tailMs = 300.0f;
   applyKnob(Card::Bloom, 1, 0.5f, chain);
   const cv::GateParams gate = inputGate();
   double mean = 0.0;
@@ -383,7 +383,7 @@ bool bloomRows() {
         auto s = std::make_unique<Stage<cv::Bloom>>();
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, chain.bloom); })};
       },
-      kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+      kLoDb, kHiDb, mean, count);
   ok &= clipRows(
       "bloom gate key",
       [&](const Signal& padded) {
@@ -395,12 +395,11 @@ bool bloomRows() {
         for (size_t i = 0; i < padded.size(); i += cv::kBlock) {
           const int n = static_cast<int>(std::min<size_t>(cv::kBlock, padded.size() - i));
           g->fx.process(&padded[i], &t.in[i], n, gate);
-          keyed.keyOpen = g->fx.open();
-          s->fx.process(&t.in[i], &t.out[i], n, keyed);
+          s->fx.process(&t.in[i], &t.out[i], n, keyed, g->fx.open());
         }
         return t;
       },
-      kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+      kLoDb, kHiDb, mean, count);
   return ok;
 }
 

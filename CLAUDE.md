@@ -14,7 +14,9 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
   (Harmony, Octave, Reverb) are trimmed so the WET path alone at MIX 100 % is unity
   (Harmony: one voice at High); the equal-power crossfade then stays near unity at
   every MIX. Trimming at MIX 50 % instead pushed the wet +8 dB and clipped at full mix
-  (owner 2026-10-02).
+  (owner 2026-10-02). Cards that add their wet on top of the dry (Echo, CHATTER,
+  Unison) never lower the dry: their trim sits on the wet alone, so Adam's voice stays
+  at unity at every AMOUNT (owner 2026-11-01).
 - Version (owner 2026-10-02): the face shows `VERSION.txt` bottom left (started v0.01.00).
   Every change that rebuilds the app bumps it first with `tools/bump_version.sh`, in the
   same commit. Not named `VERSION`: the Mac's case-insensitive disk lets `<version>` find it.

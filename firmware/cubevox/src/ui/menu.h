@@ -34,7 +34,7 @@ enum class UiAction : uint8_t {
   SwapReverb,       // the layout's reverb card changes between Spring and Chasm
   SwapOctaveFormant,  // the slot that holds Octave or Formant takes the other card
   SwapUnisonCrowd,    // the slot that holds Unison or Crowd takes the other card
-  CycleSlot7Card,     // the slot that holds Gate, Lo-fi or Bloom takes the next of the three
+  CycleSlot7Card,     // the slot that holds Gate, Lo-fi or Chatter takes the next of the three
   EnterDfu,
 };
 

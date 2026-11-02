@@ -157,7 +157,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Crowd: return knob == 0 ? p.crowd.width : static_cast<float>(p.crowd.voicesStep);
     case Card::Formant: return knob == 0 ? static_cast<float>(p.pitchFx.formant.shiftSt) : p.pitchFx.formant.mix;
     case Card::Lofi: return knob == 0 ? p.lofi.tone : p.lofi.amount;
-    case Card::Bloom: return knob == 0 ? p.bloom.tailMs : p.bloom.bloom;
+    case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -412,7 +412,7 @@ void checkCrowdVoices() {
   check(top.crowd.voicesStep == cv::kVoicesMob, "crowd: a VOICES reading past the top lands on MOB");
 }
 
-// Formant, an alternate for Octave, and Lo-fi and Bloom, alternates for Gate in slot 7. They sit after the
+// Formant, an alternate for Octave, and Lo-fi and Chatter, alternates for Gate in slot 7. They sit after the
 // Crowd card in the table, so every earlier id keeps its meaning in a saved layout.
 void checkSlot7Cards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
@@ -420,7 +420,7 @@ void checkSlot7Cards() {
         "slot 7 cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
             kEngineCount == 10,
-        "slot 7 cards: the engine list appends Lofi and Bloom after the Crowd engine");
+        "slot 7 cards: the engine list appends Lofi and Bloom (the Chatter card's engine) after the Crowd engine");
 
   const CardDesc& formant = cardDesc(Card::Formant);
   check(std::strcmp(formant.id, "formant") == 0 && std::strcmp(formant.name, "Formant") == 0 &&
@@ -448,13 +448,13 @@ void checkSlot7Cards() {
   const CardDesc& bloom = cardDesc(Card::Bloom);
   check(std::strcmp(bloom.id, "bloom") == 0 && std::strcmp(bloom.name, "Chatter") == 0 && bloom.engine == Engine::Bloom &&
             bloom.group == Group::None && bloom.knobCount == 2,
-        "bloom: id bloom, name Chatter, its own engine, no group");
-  const KnobDesc& tail = *knobDesc(Card::Bloom, 0);
-  check(std::strcmp(tail.name, "LENGTH") == 0 && tail.kind == KnobKind::Continuous && tail.curve == Curve::Log &&
-            tail.min == 20.0f && tail.max == 3000.0f && std::strcmp(tail.unit, "ms") == 0,
-        "bloom: knob A is LENGTH, 20 to 3000 ms on a log curve");
+        "chatter: id bloom, name Chatter, its own engine, no group");
+  const KnobDesc& length = *knobDesc(Card::Bloom, 0);
+  check(std::strcmp(length.name, "LENGTH") == 0 && length.kind == KnobKind::Continuous && length.curve == Curve::Log &&
+            length.min == 20.0f && length.max == 3000.0f && std::strcmp(length.unit, "ms") == 0,
+        "chatter: knob A is LENGTH, 20 to 3000 ms on a log curve");
   check(std::strcmp(knobDesc(Card::Bloom, 1)->name, "AMOUNT") == 0 && std::strcmp(knobDesc(Card::Bloom, 1)->unit, "%") == 0,
-        "bloom: knob B is AMOUNT, a percent");
+        "chatter: knob B is AMOUNT, a percent");
 
   check(cardDesc(Card::Formant).cost.avg == costs::kFormant.avg && cardDesc(Card::Formant).cost.worst == costs::kFormant.worst &&
             !cardDesc(Card::Formant).cost.measured && !cardDesc(Card::Lofi).cost.measured &&
@@ -494,18 +494,18 @@ void checkSlot7Cards() {
         "lofi: TONE and AMOUNT drive their own fields, AMOUNT up to the engine's 60 %");
 
   applyKnob(Card::Bloom, 0, 0.0f, p);
-  const float tailLow = p.bloom.tailMs;
+  const float lengthLow = p.bloom.lengthMs;
   applyKnob(Card::Bloom, 0, 1.0f, p);
-  const float tailHigh = p.bloom.tailMs;
+  const float lengthHigh = p.bloom.lengthMs;
   applyKnob(Card::Bloom, 0, 0.5f, p);
-  check(std::fabs(tailLow - 20.0f) < 1e-3f && std::fabs(tailHigh - 3000.0f) < 1e-1f &&
-            std::fabs(p.bloom.tailMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f,
-        "bloom: LENGTH runs 20 to 3000 ms with its middle at the geometric mean");
+  check(std::fabs(lengthLow - 20.0f) < 1e-3f && std::fabs(lengthHigh - 3000.0f) < 1e-1f &&
+            std::fabs(p.bloom.lengthMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f,
+        "chatter: LENGTH runs 20 to 3000 ms with its middle at the geometric mean");
   applyKnob(Card::Bloom, 1, 0.65f, p);
-  check(std::fabs(p.bloom.bloom - 0.65f) < 1e-6f && std::fabs(p.bloom.tailMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f,
-        "bloom: AMOUNT drives the bloom field and leaves LENGTH alone");
-  check(shownText(tail, 0.0f) == "20" && shownText(tail, 1.0f) == "3000" && knobCells(tail) == 4,
-        "bloom: LENGTH reads 20 to 3000 in four cells");
+  check(std::fabs(p.bloom.amount - 0.65f) < 1e-6f && std::fabs(p.bloom.lengthMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f,
+        "chatter: AMOUNT drives the amount field and leaves LENGTH alone");
+  check(shownText(length, 0.0f) == "20" && shownText(length, 1.0f) == "3000" && knobCells(length) == 4,
+        "chatter: LENGTH reads 20 to 3000 in four cells");
 
   // The toggles reach their own stage. Formant's toggle sits inside the pitch parameters and touches no
   // other pitch toggle.
@@ -516,21 +516,21 @@ void checkSlot7Cards() {
         "formant: its toggle sets formant.on and nothing else");
   applyToggle(Card::Lofi, true, t);
   applyToggle(Card::Bloom, true, t);
-  check(t.lofi.on && t.bloom.on && t.pitchFx.formant.on, "lofi and bloom: each toggle sets its own on flag");
+  check(t.lofi.on && t.bloom.on && t.pitchFx.formant.on, "lofi and chatter: each toggle sets its own on flag");
   applyToggle(Card::Formant, false, t);
   check(!t.pitchFx.formant.on && t.lofi.on && t.bloom.on, "formant: its toggle off clears only its own flag");
 
   // The defaults before any card is applied: all three stages off.
   const ChainParams fresh;
   check(!fresh.pitchFx.formant.on && !fresh.lofi.on && !fresh.bloom.on && !fresh.bloom.keyFromGate,
-        "defaults: Formant, Lo-fi and Bloom off, and Bloom listens to its own input");
+        "defaults: Formant, Lo-fi and Chatter off, and Chatter listens to its own input");
 
-  // Placing the Input gate makes it Bloom's word key. Placing Bloom alone does not.
+  // Placing the Input gate makes it the Chatter card's word key. Placing the card alone does not.
   ChainParams keyed;
   applyPlacement(Card::Bloom, keyed);
-  check(!keyed.bloom.keyFromGate, "bloom: placing Bloom alone leaves it on its own detector");
+  check(!keyed.bloom.keyFromGate, "chatter: placing the card alone leaves it on its own detector");
   applyPlacement(Card::InputGate, keyed);
-  check(keyed.bloom.keyFromGate, "bloom: placing the Input gate makes its detector the word key");
+  check(keyed.bloom.keyFromGate, "chatter: placing the Input gate makes its detector the word key");
 }
 
 // No card declares decimals yet, so a made-up knob stands in.

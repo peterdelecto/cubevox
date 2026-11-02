@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
@@ -12,97 +13,55 @@
 // Chatter, the engine behind the Bloom card. While a word lasts, short slices of the voice loop
 // under it. Each slice plays twice, then the next cut splices in at the slice boundary. When the word
 // ends, its last good slice keeps repeating and fades over LENGTH, gritty in the middle and clean at
-// the end (spec 2026-11-01-bloom-design, sections 12 to 14).
+// the end (spec 2026-11-01-bloom-design, sections 14 to 17).
 //
-// A word is a key. The Input gate hands its detector state in through BloomParams, or the engine
-// listens to its own input. Three slices cover a word, its capture and the old tail fading under the
-// next word. Slices are cut from the `src` signal, through the low-pass, and the dry path is `in`,
-// untouched except for one level trim. Each voice's wet path runs drive, soft clip and its gain, then
-// one high shelf runs over their sum.
+// A word is a key. The Input gate hands its detector state to process(), or the engine listens to its
+// own input. Three slices cover a word, its capture and the old tail fading under the next word.
+// Slices are cut from the `src` signal, through the low-pass, and the dry path is `in` at unity. Each
+// voice's wet path runs drive, soft clip and its gain, then one high shelf and one level trim run over
+// their sum, and the result adds to the dry.
 
 namespace cv {
 
+// The values a bench or a listen may change. Everything else the engine fixes in constants.
 struct BloomTuning {
-  // Level. The whole output scales by trimDb times the wet level over wetHi, so AMOUNT at the bottom
-  // of its travel is exactly dry. The three sample clips spread 0.56 dB under one gain with the Input
-  // gate key, wider than the 0.5 dB window, so this value centres them on it at the default.
-  float trimDb = -5.62f;
+  // Level of the wet path alone, the slices and the tail. The dry passes at unity at every AMOUNT, and
+  // AMOUNT at the bottom of its travel adds no wet. At the default setting this puts the three sample
+  // clips at +0.20 to +0.33 dB RMS over the input, with the Input gate key and with the own key.
+  float trimDb = -14.5f;
 
-  // Word timing.
   float firstCaptureMs = 40.0f;  // first slice, after the word starts
-  float crossingWaitMs = 10.0f;  // longest wait for a zero crossing before a capture starts anyway
-  float rampMs = 5.0f;           // wet gain rise to its level
-  float fadeMs = 5.8f;           // pass fade in and out, and the splice crossfade
   float skipDb = -12.0f;         // a slice this far under the looping slice is skipped
 
-  // AMOUNT laws. The wet level is wetHi * AMOUNT^wetExp, 0 at AMOUNT 0. The slice runs from
-  // sliceLoMs at AMOUNT 0 to sliceHiMs at 100 %, and LENGTH caps it at sliceTailFrac of its setting.
-  float wetHi = 0.70f;
-  float wetExp = 0.6f;
-  float sliceLoMs = 80.0f;
-  float sliceHiMs = 45.0f;
-  float sliceMinMs = 35.0f;
-  float sliceTailFrac = 0.8f;
-
-  // Cut timing. Each cut's length drifts by up to this fraction either way, so the interval between
-  // cuts, two plays of the slice, drifts with it.
-  float drift = 0.03f;
-
-  // While two loops sound together each plays this far down, so two loops carry the power of one.
-  // The change rides the 20 ms smoother.
-  float pairDb = -3.0f;
-
-  // Age and fades. During a word no slice plays longer than maxAgeMs after it was cut, and closeMs
-  // ends a loop that has nothing newer to play. A tail has no age limit and runs LENGTH's law out.
-  // nextWordMs is the fade a new word puts on the tail it finds, and yieldMs is the faster fade a
-  // tail already fading takes when another word follows.
-  float maxAgeMs = 2500.0f;
-  float closeMs = 80.0f;
-  float nextWordMs = 150.0f;
-  float yieldMs = 20.0f;
-
-  // LENGTH laws.
-  float tauScale = 1.5f;  // life time constant is max(LENGTH, min(tauScale * LENGTH, tauMaxMs))
-  float tauMaxMs = 300.0f;
-  float staticStart = 0.20f;  // life where the faster fade takes over
-  float staticFadeMs = 80.0f;  // its time constant, or LENGTH when that is shorter
-  float closeGain = 0.001f;  // under this the wet gain writes 0 and the loop stops
-
-  // Wet tone. The drive doubles through the word and swells by driveBell in the middle of the tail.
+  // The clipper's drive through the word, and how far the middle of the tail swells it.
   float driveWord = 2.8f;
   float driveBell = 2.0f;
-  float lowpassHz = 11000.0f;
-  float lowpassQ = 0.70f;
-  float shelfHz = 3000.0f;
-  float shelfDb = 2.2f;
-  float shelfSlope = 0.7f;
 
-  // Word key from the engine's own input, and the hold both key sources share.
-  float ownOpenDb = -45.0f;
-  float ownHysteresisDb = 3.0f;
-  float keyHoldMs = 50.0f;
-
-  // True plays the loop only after the word ends; false plays it under the word.
-  bool tailOnly = false;
+  // Each cut's length drifts by up to this fraction either way, so the interval between cuts, two
+  // plays of the slice, drifts with it.
+  float drift = 0.03f;
 };
 
 struct BloomParams {
   bool on = true;
-  float tailMs = 300.0f;  // panel LENGTH, 20..3000
-  float bloom = 0.5f;     // panel AMOUNT, 0..1
-  bool keyOpen = false;   // the Input gate's detector state for this call
+  float lengthMs = 300.0f;   // panel LENGTH, 20..3000
+  float amount = 0.5f;       // panel AMOUNT, 0..1
   bool keyFromGate = false;  // false makes the engine listen to its own input
   BloomTuning tuning;
 };
 
 class Bloom {
  public:
-  static constexpr int kSlices = 3;                           // the loop, the capture, the fading tail
-  static constexpr int kSliceMax = 80 * kSampleRate / 1000;   // 80 ms, 3,840 samples
-  static constexpr int kPlaysPerSlice = 2;
-  static constexpr int kVoices = 4;  // word, tail, and two fading tails
-  static constexpr float kTailMinMs = 20.0f;
-  static constexpr float kTailMaxMs = 3000.0f;
+  static constexpr int kSlices = 3;                          // the loop, the capture, the fading tail
+  static constexpr int kSliceMax = 80 * kSampleRate / 1000;  // 80 ms, 3,840 samples
+  static constexpr int kVoices = 4;                          // word, tail, and two fading tails
+  static constexpr int kWord = 0;                            // voice numbers
+  static constexpr int kTail = 1;
+  static constexpr int kFade = 2;  // first of the fading voices
+  static constexpr float kLengthMinMs = 20.0f;
+  static constexpr float kLengthMaxMs = 3000.0f;
+  static constexpr float kLowpassHz = 11000.0f;  // the low-pass a slice passes through as it is cut
+  static constexpr float kLowpassQ = 0.70f;
 
   void reset() {
     closeAll();
@@ -116,25 +75,30 @@ class Bloom {
     taken_ = 0;
     skipped_ = 0;
     commitSeq_ = 0;
-    trimWl_ = -1.0f;
     wetAmount_ = -1.0f;
+    top_ = 0;
     prepared_ = false;
   }
 
-  // Cuts its slices from `in`, as a Bloom with nothing ahead of it in the chain does.
-  void process(const float* in, float* out, int n, const BloomParams& p) { process(in, in, out, n, p); }
+  // Cuts its slices from `in`, as a Chatter card with nothing ahead of it in the chain does.
+  void process(const float* in, float* out, int n, const BloomParams& p, bool keyOpen = false) {
+    process(in, in, out, n, p, keyOpen);
+  }
 
   // `in` is the dry path and the own key's input. `src` is the signal the slices are cut from, the
-  // same block time-aligned with `in`. Any n; `out` may be `in`.
-  void process(const float* in, const float* src, float* out, int n, const BloomParams& p) {
-    prepare(p);
+  // same block time-aligned with `in`. `keyOpen` is the Input gate's detector state for this call and
+  // counts only when `p.keyFromGate` is set. Any n; `out` may be `in`.
+  void process(const float* in, const float* src, float* out, int n, const BloomParams& p, bool keyOpen = false) {
+    const float lengthMs = clampf(p.lengthMs, kLengthMinMs, kLengthMaxMs);
+    prepare(p.tuning, lengthMs);
+    const Law law = lawFor(p, lengthMs);
     for (int done = 0; done < n; done += kBlock) {
       const int m = n - done < kBlock ? n - done : kBlock;
-      runChunk(in + done, src + done, out + done, m, p);
+      runChunk(in + done, src + done, out + done, m, p, law, keyOpen);
     }
   }
 
-  // Sum of the voices' wet gains before the trim.
+  // Sum of the voices' wet gains before the shelf and the trim.
   float wetGain() const {
     float sum = 0.0f;
     for (const Voice& v : v_) sum += v.gain;
@@ -144,7 +108,7 @@ class Bloom {
   // True while a word is open (the key plus its hold).
   bool inWord() const { return v_[kWord].on; }
 
-  // The gain on the summed loops: 1 with one loop sounding, pairDb with more.
+  // The gain on the summed loops: 1 with one loop sounding, kPairDb with more.
   float pairScale() const { return pairScale_; }
 
   // True while any voice has a slice looping.
@@ -154,18 +118,20 @@ class Bloom {
     return false;
   }
 
-  // Samples seen since reset(), and the clock at the latest capture arm and write start.
-  uint32_t clock() const { return clock_; }
+  // The accessors below report the engine's state to bloom_test and core_chain_run. The firmware
+  // does not call them.
+
+  // The clock at the latest capture arm and write start, in samples since reset().
   uint32_t armedAt() const { return armedAt_; }
   uint32_t writeStartedAt() const { return writtenAt_; }
 
-  // Slices committed, and slices skipped for sitting too far under the looping one, since reset().
+  // Slices committed, and slices skipped for a gap or for sitting too far under the looping one,
+  // since reset().
   int taken() const { return taken_; }
   int skipped() const { return skipped_; }
 
-  // Per voice (0 the word, 1 the tail, 2 and 3 the tails fading under a new word): whether it
-  // runs, its gain, the commit number, cut clock and length of the slice it plays (0, 0 and 0 when
-  // none), and the clock of its latest splice.
+  // Per voice: whether it runs, its gain, the commit number, cut clock and length of the slice it
+  // plays (0, 0 and 0 when none), and the clock of its latest splice.
   bool voiceOn(int k) const { return v_[static_cast<size_t>(k)].on; }
   float voiceGain(int k) const { return v_[static_cast<size_t>(k)].gain; }
   uint32_t playingSeq(int k) const { return playing(k).seq; }
@@ -183,9 +149,71 @@ class Bloom {
  private:
   static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
   static constexpr uint32_t kSeed = 0x2545F491u;
-  static constexpr int kWord = 0;
-  static constexpr int kTail = 1;
-  static constexpr int kFade = 2;  // first of the fading voices
+  static constexpr float kLog2E = 1.44269504f;
+
+  // Word timing, in ms.
+  static constexpr float kCrossingWaitMs = 10.0f;  // longest wait for a zero crossing before a cut starts anyway
+  static constexpr float kRampMs = 5.0f;           // wet gain rise to its level
+  static constexpr float kFadeMs = 5.8f;           // pass fade in and out, and the splice crossfade
+  static constexpr float kKeyHoldMs = 50.0f;       // both key sources hold a word open this long
+  static constexpr int kPlaysPerSlice = 2;
+  static constexpr int kEdgeShare = 8;  // a cut's edge is one eighth of it
+
+  // AMOUNT laws. The wet level is kWetHi * AMOUNT^kWetExp, 0 at AMOUNT 0. The slice runs from
+  // kSliceLoMs at AMOUNT 0 to kSliceHiMs at 100 %, LENGTH caps it at kSliceLengthFrac of its setting,
+  // and no slice runs under kSliceMinMs.
+  static constexpr float kWetHi = 0.70f;
+  static constexpr float kWetExp = 0.6f;
+  static constexpr float kSliceLoMs = 80.0f;
+  static constexpr float kSliceHiMs = 45.0f;
+  static constexpr float kSliceMinMs = 35.0f;
+  static constexpr float kSliceLengthFrac = 0.8f;
+
+  // While two loops sound together each plays kPairDb down, so two loops carry the power of one. The
+  // change rides the 20 ms smoother.
+  static constexpr float kPairDb = -3.0f;
+
+  // Age and fades. During a word no slice plays longer than kMaxAgeMs after it was cut, and
+  // kCloseMs ends a loop that has nothing newer to play. A tail has no age limit and runs LENGTH's
+  // law out. kNextWordMs is the fade a new word puts on the tail it finds, and kQuickFadeMs the
+  // faster fade a tail already fading takes when another word follows.
+  static constexpr float kMaxAgeMs = 2500.0f;
+  static constexpr float kCloseMs = 80.0f;
+  static constexpr float kNextWordMs = 150.0f;
+  static constexpr float kQuickFadeMs = 20.0f;
+
+  // LENGTH laws. Life falls with a time constant of max(LENGTH, min(kTauScale * LENGTH, kTauMaxMs)).
+  // At kEndFadeLife the end fade takes over with a time constant of kEndFadeMs, or LENGTH when that is
+  // shorter, and under kCloseGain the wet gain writes 0 and the loop stops.
+  static constexpr float kTauScale = 1.5f;
+  static constexpr float kTauMaxMs = 300.0f;
+  static constexpr float kEndFadeLife = 0.20f;
+  static constexpr float kEndFadeMs = 80.0f;
+  static constexpr float kCloseGain = 0.001f;
+
+  // Wet tone: a high shelf over the summed loops.
+  static constexpr float kShelfHz = 3000.0f;
+  static constexpr float kShelfDb = 2.2f;
+  static constexpr float kShelfSlope = 0.7f;
+
+  // Word key from the engine's own input.
+  static constexpr float kOwnOpenDb = -45.0f;
+  static constexpr float kOwnHysteresisDb = 3.0f;
+
+  // The times above in samples.
+  static constexpr int kCrossingWaitSmp = static_cast<int>(kCrossingWaitMs * kSmpPerMs);
+  static constexpr int kFadeSmp = static_cast<int>(kFadeMs * kSmpPerMs + 0.5f);
+  static constexpr int kHoldSmp = static_cast<int>(kKeyHoldMs * kSmpPerMs);
+  static constexpr int kCloseSmp = static_cast<int>(kCloseMs * kSmpPerMs);
+  static constexpr int kNextWordSmp = static_cast<int>(kNextWordMs * kSmpPerMs);
+  static constexpr int kQuickFadeSmp = static_cast<int>(kQuickFadeMs * kSmpPerMs);
+  static constexpr uint32_t kLimitSmp = static_cast<uint32_t>(kMaxAgeMs * kSmpPerMs);
+  static constexpr int kMinSliceSmp = 2 * kFadeSmp + 2;
+  static constexpr float kInvFade = 1.0f / static_cast<float>(kFadeSmp);
+  static constexpr float kInvRampSmp = 1.0f / (kRampMs * kSmpPerMs);
+
+  static_assert(kFadeSmp == 278 && kCrossingWaitSmp == 480 && kHoldSmp == 2400 && kCloseSmp == 3840, "sample counts");
+  static_assert(kNextWordSmp == 7200 && kQuickFadeSmp == 960 && kLimitSmp == 120000 && kMinSliceSmp == 558, "sample counts");
 
   enum class Cap : uint8_t { Idle, Waiting, Writing };
 
@@ -218,12 +246,14 @@ class Bloom {
     float fadeStep = 0.0f;
   };
 
-  // Everything AMOUNT and LENGTH set for one call: the wet level, the slice length AMOUNT asks for in
-  // ms, and the longest slice LENGTH allows.
+  // Everything AMOUNT, LENGTH and the toggle set for one call: the wet level the call heads for (0 when
+  // the card is off), the slice length AMOUNT asks for in ms, the longest slice LENGTH allows, and the
+  // fraction the cut length may drift.
   struct Law {
-    float wet;
+    float target;
     float sliceMs;
     float capMs;
+    float drift;
   };
 
   static float lerp(float a, float b, float t) { return a + (b - a) * t; }
@@ -234,118 +264,62 @@ class Bloom {
     return v.on && v.slice >= 0 ? slice_[static_cast<size_t>(v.slice)] : Slice{};
   }
 
-  Law lawFor(const BloomParams& p) {
-    const BloomTuning& t = p.tuning;
-    const float amount = smooth::clamp01(p.bloom);
-    if (amount != wetAmount_ || t.wetHi != wetHiKey_ || t.wetExp != wetExpKey_) {
-      wet_ = amount > 0.0f ? t.wetHi * powf(amount, t.wetExp) : 0.0f;
+  Law lawFor(const BloomParams& p, float lengthMs) {
+    const float amount = smooth::clamp01(p.amount);
+    if (amount != wetAmount_) {
+      wet_ = amount > 0.0f ? kWetHi * exp2Fast(kWetExp * log2Fast(amount > 1e-12f ? amount : 1e-12f)) : 0.0f;
       wetAmount_ = amount;
-      wetHiKey_ = t.wetHi;
-      wetExpKey_ = t.wetExp;
     }
-    const float tailMs = clampf(p.tailMs, kTailMinMs, kTailMaxMs);
-    return {wet_, lerp(t.sliceLoMs, t.sliceHiMs, amount), t.sliceTailFrac * tailMs};
+    return {p.on ? wet_ : 0.0f, lerp(kSliceLoMs, kSliceHiMs, amount), kSliceLengthFrac * lengthMs, p.tuning.drift};
   }
 
-  // The length of the next cut in samples. AMOUNT's slice drifts by up to `drift` either way, from
-  // the fixed-seed generator, so renders repeat. LENGTH's cap and the floor apply after the drift.
+  // The length of the next cut in samples. AMOUNT's slice drifts by up to the law's drift either way,
+  // from the fixed-seed generator, so renders repeat. LENGTH's cap and the floor apply after the drift.
   int nextSlice(const Law& law) {
     lcg_ = lcg_ * 1664525u + 1013904223u;
     const float r = static_cast<float>(static_cast<int32_t>(lcg_)) * (1.0f / 2147483648.0f);
-    float ms = law.sliceMs * (1.0f + drift_ * r);
+    float ms = law.sliceMs * (1.0f + law.drift * r);
     ms = ms < law.capMs ? ms : law.capMs;
-    ms = ms > sliceMinMs_ ? ms : sliceMinMs_;
+    ms = ms > kSliceMinMs ? ms : kSliceMinMs;
     const int smp = static_cast<int>(ms * kSmpPerMs);
-    return smp < minSliceSmp_ ? minSliceSmp_ : (smp > kSliceMax ? kSliceMax : smp);
+    return smp < kMinSliceSmp ? kMinSliceSmp : (smp > kSliceMax ? kSliceMax : smp);
   }
 
-  // Coefficients that follow the tuning. The cheap ones run every call; the ones that need libm run
-  // when their inputs change.
-  void prepare(const BloomParams& p) {
-    const BloomTuning& t = p.tuning;
-    fadeSmp_ = static_cast<int>(clampf(t.fadeMs, 0.5f, 10.0f) * kSmpPerMs + 0.5f);
-    invFade_ = 1.0f / static_cast<float>(fadeSmp_);
-    firstSmp_ = static_cast<int>(clampf(t.firstCaptureMs, 1.0f, 500.0f) * kSmpPerMs);
-    waitSmp_ = static_cast<int>(clampf(t.crossingWaitMs, 0.0f, 50.0f) * kSmpPerMs);
-    holdSmp_ = static_cast<int>(clampf(t.keyHoldMs, 0.0f, 1000.0f) * kSmpPerMs);
-    invRampSmp_ = 1.0f / (clampf(t.rampMs, 0.1f, 100.0f) * kSmpPerMs);
-    limitSmp_ = static_cast<uint32_t>(clampf(t.maxAgeMs, 100.0f, 60000.0f) * kSmpPerMs);
-    closeSmp_ = static_cast<int>(clampf(t.closeMs, 1.0f, 2000.0f) * kSmpPerMs);
-    nextWordSmp_ = static_cast<int>(clampf(t.nextWordMs, 1.0f, 2000.0f) * kSmpPerMs);
-    yieldSmp_ = static_cast<int>(clampf(t.yieldMs, 1.0f, 500.0f) * kSmpPerMs);
-    drift_ = clampf(t.drift, 0.0f, 0.2f);
-    sliceMinMs_ = t.sliceMinMs;
-    openLin_ = dbToGainFast(t.ownOpenDb);
-    closeLin_ = dbToGainFast(t.ownOpenDb - (t.ownHysteresisDb > 0.0f ? t.ownHysteresisDb : 0.0f));
-    skipLin_ = dbToGainFast(t.skipDb);
-    pairLin_ = dbToGainFast(t.pairDb);
-    minSliceSmp_ = 2 * fadeSmp_ + 2;
-    if (t.trimDb != trimDb_ || t.wetHi != trimHi_) {
-      trimDb_ = t.trimDb;
-      trimHi_ = t.wetHi;
-      trimWl_ = -1.0f;
+  // Coefficients that follow the tuning and LENGTH. The constants' own are set once after a reset; the
+  // ones that need libm run when their inputs change.
+  void prepare(const BloomTuning& t, float lengthMs) {
+    if (!prepared_) {
+      openLin_ = dbToGainFast(kOwnOpenDb);
+      closeLin_ = dbToGainFast(kOwnOpenDb - kOwnHysteresisDb);
+      pairLin_ = dbToGainFast(kPairDb);
+      capLp_.setLowPass(kLowpassHz, kLowpassQ);
+      shelf_.setHighShelf(kShelfHz, kShelfDb, kShelfSlope);
+      trimDb_ = -1000.0f;
+      skipDb_ = -1000.0f;
+      lengthMs_ = 0.0f;
     }
-    prepareFilters(t);
-    prepareTail(p);
+    firstSmp_ = static_cast<int>(t.firstCaptureMs * kSmpPerMs);
+    if (t.skipDb != skipDb_) {
+      skipDb_ = t.skipDb;
+      skipLin_ = dbToGainFast(t.skipDb);
+    }
+    if (t.trimDb != trimDb_) {
+      trimDb_ = t.trimDb;
+      trim_ = dbToGainFast(t.trimDb);
+    }
+    if (lengthMs != lengthMs_) {
+      const float scaled = kTauScale * lengthMs < kTauMaxMs ? kTauScale * lengthMs : kTauMaxMs;
+      const float tauMs = lengthMs > scaled ? lengthMs : scaled;
+      const float endMs = kEndFadeMs < lengthMs ? kEndFadeMs : lengthMs;
+      aTail_ = exp2Fast(-kLog2E / (tauMs * kSmpPerMs));
+      aEnd_ = exp2Fast(-kLog2E / (endMs * kSmpPerMs));
+      lengthMs_ = lengthMs;
+    }
     prepared_ = true;
   }
 
-  void prepareFilters(const BloomTuning& t) {
-    if (!prepared_ || t.lowpassHz != lpHz_ || t.lowpassQ != lpQ_) {
-      capLp_.setLowPass(t.lowpassHz, t.lowpassQ);
-      lpHz_ = t.lowpassHz;
-      lpQ_ = t.lowpassQ;
-    }
-    if (!prepared_ || t.shelfHz != shHz_ || t.shelfDb != shDb_ || t.shelfSlope != shSlope_) {
-      shelf_.setCoefsFrom(highShelf(t.shelfHz, t.shelfDb, t.shelfSlope));
-      shHz_ = t.shelfHz;
-      shDb_ = t.shelfDb;
-      shSlope_ = t.shelfSlope;
-    }
-  }
-
-  // The tail's decay steps, per sample.
-  void prepareTail(const BloomParams& p) {
-    const BloomTuning& t = p.tuning;
-    const float tail = clampf(p.tailMs, kTailMinMs, kTailMaxMs);
-    if (!prepared_ || tail != tailMs_ || t.tauScale != tauScale_ || t.tauMaxMs != tauMax_ ||
-        t.staticFadeMs != staticMs_) {
-      const float scaled = t.tauScale * tail < t.tauMaxMs ? t.tauScale * tail : t.tauMaxMs;
-      const float tauMs = tail > scaled ? tail : scaled;
-      const float staticMs = t.staticFadeMs < tail ? t.staticFadeMs : tail;
-      aTail_ = expf(-1.0f / (tauMs * kSmpPerMs));
-      aStatic_ = expf(-1.0f / (clampf(staticMs, 1.0f, 2000.0f) * kSmpPerMs));
-      tailMs_ = tail;
-      tauScale_ = t.tauScale;
-      tauMax_ = t.tauMaxMs;
-      staticMs_ = t.staticFadeMs;
-    }
-  }
-
-  // RBJ high shelf with a slope other than the shared Biquad's fixed 1.
-  static Biquad highShelf(float hz, float db, float slope) {
-    const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    const float amp = powf(10.0f, db / 40.0f);
-    const float cw = cosf(w0);
-    const float s = clampf(slope, 0.1f, 1.0f);
-    const float alpha = 0.5f * sinf(w0) * sqrtf((amp + 1.0f / amp) * (1.0f / s - 1.0f) + 2.0f);
-    const float beta = 2.0f * sqrtf(amp) * alpha;
-    const float ap = amp + 1.0f, am = amp - 1.0f;
-    const float a0 = ap - am * cw + beta;
-    Biquad b;
-    b.b0 = amp * (ap + am * cw + beta) / a0;
-    b.b1 = -2.0f * amp * (am + ap * cw) / a0;
-    b.b2 = amp * (ap + am * cw - beta) / a0;
-    b.a1 = 2.0f * (am - ap * cw) / a0;
-    b.a2 = (ap - am * cw - beta) / a0;
-    return b;
-  }
-
-  void runChunk(const float* in, const float* src, float* out, int m, const BloomParams& p) {
-    const BloomTuning& t = p.tuning;
-    const Law law = lawFor(p);
-    const float wetTarget = p.on ? law.wet : 0.0f;
-    if (wetTarget == 0.0f && wl_ == 0.0f) {
+  void runChunk(const float* in, const float* src, float* out, int m, const BloomParams& p, const Law& law, bool keyOpen) {
+    if (law.target == 0.0f && wl_ == 0.0f) {
       for (int i = 0; i < m; ++i) out[i] = in[i];
       if (running_) closeAll();
       prevSrc_ = src[m - 1];
@@ -353,27 +327,48 @@ class Bloom {
       return;
     }
     running_ = true;
-    stepKey(in, m, p);
+    stepKey(in, m, p.keyFromGate, keyOpen);
     if (keyHeld_ && !v_[kWord].on) startWord();
     else if (!keyHeld_ && v_[kWord].on) endWord();
-    for (int i = 0; i < m; ++i) out[i] = sample(in[i], src[i], law, wetTarget, t);
+    top_ = 0;
+    for (int k = 0; k < kVoices; ++k)
+      if (v_[static_cast<size_t>(k)].on) top_ = k + 1;
+
+    // With nothing sounding and the levels settled, the call is a copy of the input.
+    if (top_ == 0 && wl_ == law.target && pairScale_ == 1.0f) {
+      if (shelfLive_) {
+        shelf_.clear();
+        shelfLive_ = false;
+      }
+      for (int i = 0; i < m; ++i) out[i] = in[i];
+      prevSrc_ = src[m - 1];
+      clock_ += static_cast<uint32_t>(m);
+      return;
+    }
+    for (int i = 0; i < m; ++i) out[i] = sample(in[i], src[i], law, p.tuning);
   }
 
-  // The key for this chunk: the gate's state or the engine's own detector, then the hold.
-  void stepKey(const float* in, int m, const BloomParams& p) {
-    bool key = p.keyOpen;
-    if (!p.keyFromGate) {
-      float peak = 0.0f;
+  // The key for this chunk: the gate's state or the engine's own detector, then the hold. The own
+  // detector compares the input's magnitude bits as integers, so a NaN sample reads as the largest
+  // value and leaves the detector where it was.
+  void stepKey(const float* in, int m, bool keyFromGate, bool keyOpen) {
+    bool key = keyOpen;
+    if (!keyFromGate) {
+      uint32_t peakBits = 0;
       for (int i = 0; i < m; ++i) {
-        const float a = fabsf(in[i]);
-        peak = a > peak ? a : peak;
+        uint32_t u;
+        std::memcpy(&u, &in[i], sizeof u);
+        u &= 0x7FFFFFFFu;
+        peakBits = u > peakBits ? u : peakBits;
       }
+      float peak;
+      std::memcpy(&peak, &peakBits, sizeof peak);
       if (peak >= openLin_) ownOpen_ = true;
       else if (peak < closeLin_) ownOpen_ = false;
       key = ownOpen_;
     }
     if (key) {
-      keyHold_ = holdSmp_;
+      keyHold_ = kHoldSmp;
       keyHeld_ = true;
     } else {
       keyHold_ = keyHold_ > m ? keyHold_ - m : 0;
@@ -381,23 +376,9 @@ class Bloom {
     }
   }
 
-  // A tail still sounding moves to a fading voice and falls to 0 over the next-word fade, while the
-  // word counts down to its first capture. A tail already fading takes the faster yield fade.
+  // A tail still sounding stays where it is, so a blip of key that never gives a slice leaves it
+  // alone. The word counts down to its first capture.
   void startWord() {
-    if (v_[kTail].on) {
-      int dst = kFade;
-      for (int k = kFade; k < kVoices; ++k) {
-        if (!v_[k].on) {
-          dst = k;
-          break;
-        }
-      }
-      for (int k = kFade; k < kVoices; ++k)
-        if (k != dst && v_[k].on) beginFade(v_[k], yieldSmp_);
-      v_[dst] = v_[kTail];
-      beginFade(v_[dst], nextWordSmp_);
-      v_[kTail] = Voice{};
-    }
     v_[kWord] = Voice{};
     v_[kWord].on = true;
     cap_ = Cap::Idle;
@@ -405,21 +386,46 @@ class Bloom {
     spliceSet_ = false;
     armSet_ = true;
     armAt_ = clock_ + static_cast<uint32_t>(firstSmp_);
+    rearmed_ = false;
   }
 
   // A capture still open at the word's end is dropped. A finished cut that waits for its splice plays
-  // now, so the tail repeats the newest slice. A word that never played a slice has no tail.
+  // now, so the tail repeats the newest slice. A word that never played a slice has no tail, and the
+  // tail it found keeps sounding.
   void endWord() {
     Voice& w = v_[kWord];
     cap_ = Cap::Idle;
     armSet_ = false;
     spliceSet_ = false;
-    if (fresh_ >= 0) {
-      play(w, fresh_);
-      fresh_ = -1;
-    }
+    if (fresh_ >= 0 && (w.slice >= 0 || fadeOldTail())) play(w, fresh_);
+    fresh_ = -1;
     if (w.slice >= 0) v_[kTail] = w;
     w = Voice{};
+  }
+
+  // The tail the word found moves to a fading voice and falls to 0 over the next-word fade, as the
+  // word plays its first slice. A fading tail takes the quick fade. When every fading voice sounds, the
+  // quietest one takes the quick fade and the call returns false, so the slice waits and the sounding
+  // voices are never overwritten.
+  bool fadeOldTail() {
+    if (!v_[kTail].on) return true;
+    int dst = -1;
+    for (int k = kFade; k < kVoices && dst < 0; ++k)
+      if (!v_[k].on) dst = k;
+    if (dst < 0) {
+      int quietest = kFade;
+      for (int k = kFade + 1; k < kVoices; ++k)
+        if (v_[k].gain < v_[quietest].gain) quietest = k;
+      beginFade(v_[quietest], kQuickFadeSmp);
+      return false;
+    }
+    for (int k = kFade; k < kVoices; ++k)
+      if (v_[k].on) beginFade(v_[k], kQuickFadeSmp);
+    v_[dst] = v_[kTail];
+    beginFade(v_[dst], kNextWordSmp);
+    v_[kTail] = Voice{};
+    top_ = top_ > dst + 1 ? top_ : dst + 1;
+    return true;
   }
 
   // Closes every voice and the key.
@@ -457,19 +463,18 @@ class Bloom {
     v.fadeStep = step > v.fadeStep ? step : v.fadeStep;
   }
 
-  float sample(float x, float s, const Law& law, float wetTarget, const BloomTuning& t) {
-    const bool crossing = (prevSrc_ < 0.0f) != (s < 0.0f);
-    prevSrc_ = s;
-    if (wl_ != wetTarget) wl_ = smooth::step(wl_, wetTarget, smooth::kSmoothCoef);
+  CV_INLINE float sample(float x, float s, const Law& law, const BloomTuning& t) {
+    if (wl_ != law.target) wl_ = smooth::step(wl_, law.target, smooth::kSmoothCoef);
     if (v_[kWord].on) {
-      stepCapture(s, crossing, law);
+      stepCapture(s, law);
       stepSplice(law);
     }
+    prevSrc_ = s;
     float wet = 0.0f;
     int loops = 0;
-    for (int k = 0; k < kVoices; ++k) {
+    for (int k = 0; k < top_; ++k) {
       Voice& v = v_[static_cast<size_t>(k)];
-      if (!v.on || !stepGain(k, t)) continue;
+      if (!v.on || !stepGain(k)) continue;
       wet += wetOf(v, t);
       loops += v.slice >= 0 ? 1 : 0;
     }
@@ -487,45 +492,58 @@ class Bloom {
       shelfLive_ = false;
     }
     ++clock_;
-    return (x + wet) * trimGain();
+    return x + wet * trim_;
   }
 
-  // Arms a cut on the plan, waits for a zero crossing, and writes a free slice.
-  void stepCapture(float s, bool crossing, const Law& law) {
+  // Arms a cut on the plan, waits for a zero crossing, and writes a free slice. The slice takes its
+  // pass window as it is written, so playback reads it as it stands.
+  CV_INLINE void stepCapture(float s, const Law& law) {
     if (armSet_ && cap_ == Cap::Idle && due(armAt_)) arm(law);
-    if (cap_ == Cap::Waiting && (crossing || due(waitUntil_))) {
-      const int slot = freeSlice();
-      if (slot >= 0) {
-        cap_ = Cap::Writing;
-        capPos_ = 0;
-        capPeak_ = 0.0f;
-        capCut_ = clock_;
-        capSlot_ = slot;
-        slice_[static_cast<size_t>(slot)].valid = false;
-        capLp_.clear();
-        writtenAt_ = clock_;
-      }
-    }
+    if (cap_ == Cap::Waiting && (((prevSrc_ < 0.0f) != (s < 0.0f)) || due(waitUntil_))) beginCut();
     if (cap_ == Cap::Writing) {
-      data_[static_cast<size_t>(capSlot_)][static_cast<size_t>(capPos_++)] = capLp_.run(s);
+      float v = capLp_.run(s);
+      if (capPos_ < kFadeSmp || capPos_ >= capLen_ - kFadeSmp) v *= passWindow(capPos_, capLen_);
       const float a = fabsf(s);
       capPeak_ = a > capPeak_ ? a : capPeak_;
+
+      // The peaks of the cut's first and last eighths tell finishCapture whether the voice starts late
+      // or stops early.
+      if (capPos_ < capEdge_) capHead_ = a > capHead_ ? a : capHead_;
+      else if (capPos_ >= capLen_ - capEdge_) capTail_ = a > capTail_ ? a : capTail_;
+      data_[static_cast<size_t>(capSlot_)][static_cast<size_t>(capPos_++)] = v;
       if (capPos_ >= capLen_) finishCapture();
     }
   }
 
-  // The word's first cut is armed 40 ms in and splices after the longest wait and its length. Every
-  // later cut takes the length its plan fixed.
+  // Starts writing the armed cut into a free slice, if there is one.
+  void beginCut() {
+    const int slot = freeSlice();
+    if (slot < 0) return;
+    cap_ = Cap::Writing;
+    capPos_ = 0;
+    capPeak_ = 0.0f;
+    capCut_ = clock_;
+    capSlot_ = slot;
+    capEdge_ = capLen_ / kEdgeShare;
+    capHead_ = 0.0f;
+    capTail_ = 0.0f;
+    slice_[static_cast<size_t>(slot)].valid = false;
+    capLp_.clear();
+    writtenAt_ = clock_;
+  }
+
+  // The word's first cut is armed at the first-capture time and splices after the longest wait and
+  // its length. Every later cut takes the length its plan fixed.
   void arm(const Law& law) {
     cap_ = Cap::Waiting;
     armSet_ = false;
-    waitUntil_ = clock_ + static_cast<uint32_t>(waitSmp_);
+    waitUntil_ = clock_ + static_cast<uint32_t>(kCrossingWaitSmp);
     armedAt_ = clock_;
     if (spliceSet_) {
       capLen_ = planLen_;
     } else {
       capLen_ = nextSlice(law);
-      spliceAt_ = clock_ + static_cast<uint32_t>(waitSmp_ + capLen_);
+      spliceAt_ = clock_ + static_cast<uint32_t>(kCrossingWaitSmp + capLen_);
       spliceSet_ = true;
     }
   }
@@ -536,13 +554,13 @@ class Bloom {
   void planNext(uint32_t base, int interval, const Law& law) {
     spliceAt_ = base + static_cast<uint32_t>(interval);
     planLen_ = nextSlice(law);
-    armAt_ = spliceAt_ - static_cast<uint32_t>(waitSmp_ + planLen_);
+    armAt_ = spliceAt_ - static_cast<uint32_t>(kCrossingWaitSmp + planLen_);
     if (static_cast<int32_t>(armAt_ - clock_) < 0) armAt_ = clock_;
     armSet_ = true;
   }
 
   // A free slice, which is not looping, not fading out under a splice and not a finished cut waiting
-  // to play. An empty one goes first, else the oldest cut, so the slices turn over in rotation.
+  // to play. An empty one goes first, else the oldest cut.
   int freeSlice() const {
     int best = -1;
     for (int j = 0; j < kSlices; ++j) {
@@ -564,15 +582,28 @@ class Bloom {
   bool mayPlayOn(const Voice& v, uint32_t ahead, int interval) const {
     if (v.slice < 0) return true;
     const uint32_t age = clock_ + ahead - slice_[static_cast<size_t>(v.slice)].cutAt;
-    return age + static_cast<uint32_t>(interval + closeSmp_) <= limitSmp_;
+    return age + static_cast<uint32_t>(interval + kCloseSmp) <= kLimitSmp;
   }
 
-  // The new slice waits for its splice. A slice more than skipDb under the looping one is skipped,
-  // unless the looping one cannot play another interval, which it replaces even when quieter.
+  // The new slice waits for its splice. A cut has a gap when no sample of its first or last eighth
+  // comes within skipDb of its peak, because the voice starts late or stops early. A gap, or a peak
+  // more than skipDb under the looping slice's, makes the cut quiet, and a quiet cut is skipped
+  // unless the looping slice cannot play another interval, which it replaces even when quieter. The
+  // word's first cut has no loop to keep, so a gap makes it cut again, once.
   void finishCapture() {
     cap_ = Cap::Idle;
     const Voice& w = v_[kWord];
-    const bool quiet = w.slice >= 0 && w.refPeak > 0.0f && capPeak_ < w.refPeak * skipLin_;
+    const float edgeFloor = capPeak_ * skipLin_;
+    const bool gap = capHead_ < edgeFloor || capTail_ < edgeFloor;
+    if (gap && w.slice < 0 && !rearmed_) {
+      rearmed_ = true;
+      ++skipped_;
+      spliceSet_ = false;
+      armSet_ = true;
+      armAt_ = clock_;
+      return;
+    }
+    const bool quiet = w.slice >= 0 && (gap || (w.refPeak > 0.0f && capPeak_ < w.refPeak * skipLin_));
     const uint32_t ahead = due(spliceAt_) ? 0u : spliceAt_ - clock_;
     if (quiet && mayPlayOn(w, ahead, kPlaysPerSlice * capLen_)) {
       ++skipped_;
@@ -589,11 +620,13 @@ class Bloom {
   }
 
   // At the splice the finished cut plays and the next one is planned. With the cut still under way
-  // the loop plays one more pass; with it skipped the loop keeps its slice and the grid moves on two plays.
-  void stepSplice(const Law& law) {
+  // the loop plays one more pass; with it skipped the loop keeps its slice and the grid moves on two
+  // plays. The word's first slice waits, a sample at a time, until the tail it found has a fading voice.
+  CV_INLINE void stepSplice(const Law& law) {
     if (!spliceSet_ || !due(spliceAt_)) return;
     Voice& w = v_[kWord];
     if (fresh_ >= 0) {
+      if (w.slice < 0 && !fadeOldTail()) return;
       play(w, fresh_);
       fresh_ = -1;
       planNext(clock_, kPlaysPerSlice * w.len, law);
@@ -619,16 +652,16 @@ class Bloom {
     v.pos = 0;
     v.refPeak = s.peak;
     v.splicedAt = clock_;
-    v.staleAt = s.cutAt + limitSmp_ - static_cast<uint32_t>(closeSmp_);
+    v.staleAt = s.cutAt + kLimitSmp - static_cast<uint32_t>(kCloseSmp);
     v.fadeStep = 0.0f;
   }
 
   // Life stays 1 through the word and decays over the tail. The wet gain rides toward its target, or
   // falls straight to 0 in a fade. During a word, a slice that has used its age starts the close fade;
   // a tail has no age limit. Returns false when the voice closed or lost its slice.
-  bool stepGain(int k, const BloomTuning& t) {
+  CV_INLINE bool stepGain(int k) {
     Voice& v = v_[static_cast<size_t>(k)];
-    if (k == kWord && v.slice >= 0 && v.fadeStep == 0.0f && due(v.staleAt)) beginFade(v, closeSmp_);
+    if (k == kWord && v.slice >= 0 && v.fadeStep == 0.0f && due(v.staleAt)) beginFade(v, kCloseSmp);
     if (v.fadeStep > 0.0f) {
       v.gain -= v.fadeStep;
       if (v.gain > 0.0f) return true;
@@ -639,19 +672,17 @@ class Bloom {
       }
       return false;
     }
-    float target = 0.0f;
-    if (k == kWord) {
-      target = t.tailOnly ? 0.0f : wl_;
-    } else {
-      v.life *= v.life > t.staticStart ? aTail_ : aStatic_;
+    float target = wl_;
+    if (k != kWord) {
+      v.life *= v.life > kEndFadeLife ? aTail_ : aEnd_;
       target = wl_ * v.life;
-      if (target < t.closeGain) {
+      if (target < kCloseGain) {
         v = Voice{};
         return false;
       }
     }
     if (target > v.gain) {
-      v.gain += wl_ * invRampSmp_;
+      v.gain += wl_ * kInvRampSmp;
       v.gain = v.gain < target ? v.gain : target;
     } else {
       v.gain = target;
@@ -660,7 +691,7 @@ class Bloom {
   }
 
   // The loop through the wet tone, scaled by the voice's gain.
-  float wetOf(Voice& v, const BloomTuning& t) {
+  CV_INLINE float wetOf(Voice& v, const BloomTuning& t) {
     if (v.slice < 0) return 0.0f;
     float y = readLoop(v);
     const float bell = 4.0f * v.life * (1.0f - v.life);
@@ -670,15 +701,15 @@ class Bloom {
     return y * v.gain;
   }
 
-  // The looping slice with its pass window, plus the previous slice fading out for one fade.
-  float readLoop(Voice& v) {
-    float s = data_[static_cast<size_t>(v.slice)][static_cast<size_t>(v.pos)] * passWindow(v.pos, v.len);
+  // The looping slice, plus the previous slice fading out for one fade.
+  CV_INLINE float readLoop(Voice& v) {
+    float s = data_[static_cast<size_t>(v.slice)][static_cast<size_t>(v.pos)];
     if (v.prevOn) {
-      if (v.pos >= fadeSmp_) {
+      if (v.pos >= kFadeSmp) {
         v.prevOn = false;
       } else {
-        const float down = 1.0f - smoothstep(static_cast<float>(v.pos) * invFade_);
-        s += data_[static_cast<size_t>(v.prev)][static_cast<size_t>(v.prevPos)] * passWindow(v.prevPos, v.prevLen) * down;
+        const float down = 1.0f - smoothstep(static_cast<float>(v.pos) * kInvFade);
+        s += data_[static_cast<size_t>(v.prev)][static_cast<size_t>(v.prevPos)] * down;
         if (++v.prevPos >= v.prevLen) v.prevPos = 0;
       }
     }
@@ -686,27 +717,17 @@ class Bloom {
     return s;
   }
 
-  // Fades in over the first fadeSmp_ samples and out over the last.
-  float passWindow(int pos, int len) const {
+  // Fades in over the first kFadeSmp samples and out over the last.
+  static CV_INLINE float passWindow(int pos, int len) {
     const int toEnd = len - 1 - pos;
     const int edge = pos < toEnd ? pos : toEnd;
-    return edge >= fadeSmp_ ? 1.0f : smoothstep(static_cast<float>(edge) * invFade_);
+    return edge >= kFadeSmp ? 1.0f : smoothstep(static_cast<float>(edge) * kInvFade);
   }
 
-  // Whole-output trim, scaled by the wet level so the bottom of AMOUNT is unity.
-  float trimGain() {
-    if (wl_ != trimWl_) {
-      trim_ = dbToGainFast(trimDb_ * (trimHi_ > 0.0f ? wl_ / trimHi_ : 0.0f));
-      trimWl_ = wl_;
-    }
-    return trim_;
-  }
-
-  std::array<std::array<float, kSliceMax>, kSlices> data_{};
   std::array<Slice, kSlices> slice_{};
   std::array<Voice, kVoices> v_{};
   Biquad shelf_;
-  Biquad capLp_;  // the low-pass a slice passes through as it is cut
+  Biquad capLp_;
   bool shelfLive_ = false;
 
   // Word and key.
@@ -734,10 +755,14 @@ class Bloom {
   int capLen_ = 0;
   int capPos_ = 0;
   int capSlot_ = 0;
+  int capEdge_ = 0;  // samples in the cut's first and last eighths
   float capPeak_ = 0.0f;
+  float capHead_ = 0.0f;  // peak of the first eighth
+  float capTail_ = 0.0f;  // peak of the last eighth
   uint32_t capCut_ = 0;
+  bool rearmed_ = false;  // the word's first cut has already been cut again
 
-  // Event log for tests and the wiring.
+  // The generator for the cut drift, and the event log the accessors read.
   uint32_t lcg_ = kSeed;
   uint32_t clock_ = 0;
   uint32_t armedAt_ = 0;
@@ -745,35 +770,25 @@ class Bloom {
   int taken_ = 0;
   int skipped_ = 0;
 
-  // Derived from the tuning in prepare().
+  // Derived from the tuning and LENGTH in prepare().
   bool prepared_ = false;
-  int fadeSmp_ = 278;
   int firstSmp_ = 1920;
-  int waitSmp_ = 480;
-  int holdSmp_ = 2400;
-  int minSliceSmp_ = 558;
-  int closeSmp_ = 3840;
-  int nextWordSmp_ = 7200;
-  int yieldSmp_ = 960;
-  uint32_t limitSmp_ = 120000;
-  float drift_ = 0.03f;
-  float sliceMinMs_ = 35.0f;
-  float invFade_ = 1.0f / 278.0f;
-  float invRampSmp_ = 1.0f / 240.0f;
   float openLin_ = 0.0f;
   float closeLin_ = 0.0f;
   float skipLin_ = 0.0f;
+  float skipDb_ = -1000.0f;
   float pairLin_ = 0.7079f;
   float aTail_ = 0.0f;
-  float aStatic_ = 0.0f;
-  float lpHz_ = 0.0f, lpQ_ = 0.0f;
-  float shHz_ = 0.0f, shDb_ = 0.0f, shSlope_ = 0.0f;
-  float tailMs_ = 0.0f, tauScale_ = 0.0f, tauMax_ = 0.0f, staticMs_ = 0.0f;
-  float wet_ = 0.0f, wetAmount_ = -1.0f, wetHiKey_ = 0.0f, wetExpKey_ = 0.0f;
-  float trim_ = 1.0f;
-  float trimWl_ = -1.0f;
-  float trimDb_ = 0.0f;
-  float trimHi_ = 0.0f;
+  float aEnd_ = 0.0f;
+  float lengthMs_ = 0.0f;
+  float wet_ = 0.0f;
+  float wetAmount_ = -1.0f;
+  float trim_ = 1.0f;  // the wet trim as a gain
+  float trimDb_ = -1000.0f;
+  int top_ = 0;             // one past the highest running voice at the start of a call
+
+  // Last, so every field above sits within a short load offset of the object's base.
+  std::array<std::array<float, kSliceMax>, kSlices> data_{};
 };
 
 }  // namespace cv
