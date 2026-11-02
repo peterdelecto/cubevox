@@ -658,10 +658,10 @@ void checkMenuOctaveFormantClick() {
             m.layout == defaultLayout(),
         "menu: a second click swaps Formant back to Octave");
 
-  // Octave would take this layout from 74 to 76 percent mean, so the swap back is refused.
+  // Octave would take this layout from 75 to 77 percent mean, so the swap back is refused.
   MenuRig tight;
-  tight.layout = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Unison, Card::ReverbSpring}};
+  tight.layout = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Gate, Card::Distortion,
+                   Card::Unison, Card::ReverbChasm}};
   Layout octave = tight.layout;
   octave.card[kOctaveSlot] = Card::Octave;
   check(layoutValid(tight.layout).ok() && !layoutValid(octave).ok(), "menu: the tight layout fits with Formant and refuses Octave");
@@ -912,7 +912,7 @@ void checkMenuSlot7Click() {
   // A card the layout would refuse is passed over: Chatter would put this layout over the mean line, so
   // the click on Lo-fi lands on Gate.
   MenuRig tight;
-  tight.layout = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+  tight.layout = {{Card::Octave, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
                    Card::Lofi, Card::ReverbSpring}};
   Layout bloom = tight.layout;
   bloom.card[kSlot7Slot] = Card::Bloom;

@@ -52,10 +52,12 @@ or cancels with its own echo). The row now averages over TIME 60..250 ms; wetMax
 
 The reverb rows take every setting from the registry: the card placed and switched on, TIME
 and dwell where the box leaves them (TIME 50 %, dwell 0.20), and the crossfade forced to the
-wet alone. There ChasmTuning.wetDb = +19.2 dB reads +0.28 dB and SpringTuning.wetDb = +8.9 dB
-reads +0.22 dB. MIX 50 % rows for Octave -12 and both reverb cards report against the
--1.5..+1.0 dB band (+0.17, +0.35 and -0.12 dB). Harmony and Octave A and B are out of the
-code, so their rows are gone.
+wet alone. There ChasmTuning.wetDb = +19.2 dB reads +0.28 dB. Spring's rows run on Adam's
+three clips and are judged on their mean (owner 2026-11-01: Adam's clips govern the reverb
+level): SpringTuning.wetDb = +0.29 dB, the one gain ahead of the loops since the 2026-11-02 fix
+pass, reads +0.51 / +0.38 / -0.14 dB, mean +0.25 dB. MIX 50 % rows report against the
+-1.5..+1.0 dB band: Octave -12 +0.17 dB, Chasm +0.35 dB, Spring +0.04 / +0.06 / -0.02 dB on the
+clips. Harmony and Octave A and B are out of the code, so their rows are gone.
 
 ## Notes
 

@@ -61,7 +61,7 @@ constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
 constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
 constexpr Cost kDistortion{8, 11, true};   // 45.5k to 46.8k / 64.5k to 67.7k, stress run 2026-11-01 (worst 10.1 to 10.6 %, lowest run worst per layout)
 constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
-constexpr Cost kReverbSpring{15, 15, true};  // ~92k: three springs, from the board's boot worst 107.4k against the two-half engine's 72.0k (1.49x of 61.9k); two-pass bench pending
+constexpr Cost kReverbSpring{14, 14, true};  // 83.4k / 84.0k, board stress run 2026-11-01 (slot 8, knobs at top, two runs of 24 s, no late, overrun or dry block) on the engine before the 2026-11-02 fix pass; the host bench puts the engine after it at 0.69x (clang) to 0.80x (gcc) of that, so the box should read lower; a board rerun is owed
 constexpr Cost kReverbChasm{17, 17, true};   // 102.2k to 102.5k / 105.5k to 108.2k, stress run 2026-11-01 in the reverb slot (mean 16.0 %, worst 16.5 to 16.9 %)
 
 // The pitch tracker, its history fill and its coarse analysis, which Autotune, Crowd and Formant
