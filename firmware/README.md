@@ -113,8 +113,9 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    `output_stage` (the NaN guard and the output gain ramp), `audio_recovery` (when a faulted stream restarts: at
    most 3 times in 60 s, then the mute latches).
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
-   editor's export as `FontDesc`), `display.h` (backend interface, `flushStep`, and `PanelLink`, the restart rule
-   for a panel that is missing or stops answering), `level` (input energy to the voice ribbon's 0..1 level).
+   editor's export as `FontDesc`), `display.h` (backend interface, `flushStep` and `setContrast`, and
+   `PanelLink`, the restart rule for a panel that is missing or stops answering), `brightness.h` (the BRIGHTNESS
+   levels and the dimmed contrast), `level` (input energy to the voice ribbon's 0..1 level).
 5. Protocol and storage: `protocol` (JSON line framing, request parse, reply formatting into a `Writer`),
    `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
    `record_store` (append log, sector switch, debounce, as a state machine over `FlashIo`), `entry_log` (the
@@ -127,7 +128,8 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
 
 **`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the open
 menu and the update's starting screen on the canvas, and drops every click and turn until the face has ticked),
-`actions` (what a `UiAction` does to the settings), `splash` (the version, centred, for 2 s after `setup()`), and
+`actions` (what a `UiAction` does to the settings), `splash` (the version, centred, for 2 s after `setup()`),
+`screen_dim.h` (the contrast to hold: the BRIGHTNESS level, or 8 after 10 minutes with no control or voice), and
 the runtime screens of `docs/specs/2026-10-24-oled-gui-design.md`: `gui` (which screen and
 dissolve step), `screens` (voice ribbon, knob readout, MUTED or BYPASS) and `face` (the 25 fps tick that draws them
 and dissolves between them).
@@ -215,7 +217,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   The clock numbers and the gating were reviewed in `docs/audits/2026-10-08-astra-clock-response.md`.
 - `board/display_sh1106.cpp`: drives the panel through `board/sh1106.c`, the driver the bootloader shares, on I2C2
   PB10/PB11 at 400 kHz. At boot the panel gets 5 starts 20 ms apart, each after nine SCL clocks and a STOP.
-  `flushStep` sends the lowest dirty canvas page once per loop pass and keeps a failed page dirty. `PanelLink`
+  `flushStep` sends the lowest dirty canvas page once per loop pass and keeps a failed page dirty. A contrast
+  change goes out as its own command ahead of the next page, and again after a restart, which puts 207 back.
+  `PanelLink`
   (`core/display.h`) restarts the panel at once after the first failure, then once a second, and prints one
   `[WARN]` per run and one `[oled]` line when the panel is back. The face draws a new frame only once every page
   of the last one has gone out. The fonts come from `tools/font-editor/fonts/cubevox_fonts.h` through an include
