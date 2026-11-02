@@ -224,13 +224,15 @@ void checkSlot7Costs() {
             layoutValid(formantHeavy).ok(),
         "slot 3 cost: Formant costs less than Octave and is accepted in both layouts");
 
-  // With the stress-run rows no layout the registry allows goes over a line: the heaviest set, Input
+  // With the stress-run rows no layout the registry allows goes over a line. The heaviest set, Input
   // gate, Octave without Autotune (which pays the pitch stage), Unison, MOB, Distortion, Gate, Chasm and
-  // Chatter, sits exactly on the mean line, and layoutValid accepts it.
+  // Chatter, sits inside both lines, and layoutValid accepts it.
   const Layout heavyBloom = {{Card::InputGate, Card::Octave, Card::Unison, Card::Crowd, Card::Gate, Card::Distortion,
                               Card::Bloom, Card::ReverbChasm}};
-  check(layoutCost(heavyBloom).avg == costs::kBudgetAvgPercent && layoutValid(heavyBloom).ok(),
-        "slot 7 cost: the heaviest set with MOB, Chasm and Chatter sums to exactly the 75 % mean line and layoutValid accepts it");
+  const LayoutCost heavyCost = layoutCost(heavyBloom);
+  check(heavyCost.avg <= costs::kBudgetAvgPercent && heavyCost.worst <= costs::kBudgetWorstPercent &&
+            layoutValid(heavyBloom).ok(),
+        "slot 7 cost: the heaviest set with MOB, Chasm and Chatter sits inside both lines and layoutValid accepts it");
 }
 
 void checkLayoutValid() {

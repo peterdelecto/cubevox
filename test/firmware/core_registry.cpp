@@ -461,8 +461,8 @@ void checkSlot7Cards() {
   check(cardDesc(Card::Formant).cost.avg == costs::kFormant.avg && cardDesc(Card::Formant).cost.worst == costs::kFormant.worst &&
             !cardDesc(Card::Formant).cost.measured && !cardDesc(Card::Lofi).cost.measured &&
             !cardDesc(Card::Bloom).cost.measured && costs::kFormant.avg == 3 && costs::kFormant.worst == 4 &&
-            costs::kLofi.avg == 2 && costs::kLofi.worst == 2 && costs::kBloom.avg == 5 && costs::kBloom.worst == 6,
-        "slot 7 cards: the rows are the estimates 3 / 4, 2 / 2 and 5 / 6 until the stress run");
+            costs::kLofi.avg == 2 && costs::kLofi.worst == 2 && costs::kBloom.avg == 3 && costs::kBloom.worst == 5,
+        "slot 7 cards: the rows are the estimates 3 / 4, 2 / 2 and 3 / 5 until the stress run");
 
   // SHIFT lands on whole semitones, -7 at the first position, 0 at the middle one and +7 at the last.
   ChainParams p;

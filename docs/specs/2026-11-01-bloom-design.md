@@ -374,3 +374,32 @@ item 4 the trim is now one constant gain on the slices, not a stepped gain.
 10. Renders `build/audition/chatter-fix-{a,b,c}.wav` (gate key −55 dBFS; AMOUNT / LENGTH 50 % /
     300 ms, 90 % / 1,200 ms, 25 % / 600 ms).
 11. Next: the voice-major rewrite (section 17 item 5).
+
+## 19. Voice-major rewrite as built (v2.01.09)
+
+CHATTER efficiency finding 12. This section overrides the cost figures in sections 8, 14, 15, 17
+and 18 (`kBloom` {5, 6}, 7.80 ns, the ratios to Echo) and section 17 item 4's per-sample helpers.
+
+1. Structure. Each voice runs its own loop between schedule instants (a word starting, a slice
+   ending, a fade ending), with the voice's state in registers. The loop folds in the capture
+   low-pass, the pair gain, the shelf and the trim. One loop exists for each kind of voice
+   (steady, decaying, fading, crossing) with and without a capture running. The window factors
+   and edge peaks are taken before the loop, so the engine also runs in place.
+2. Sound. Byte-identical to v2.01.05 on 54 renders (3 clips × gate key and own key × AMOUNT
+   25 / 50 / 100 % × LENGTH 20 / 300 / 3000 ms) and on `chatter-fix-{a,b,c}`, on 100 configs
+   across call sizes 1 to 1,000, and on a differential fuzz (30 seeds × 4 regimes, about 1.2 M
+   calls a run, 0 differences).
+3. CPU, host ns a sample, clang / g++, before → after: Adam's clip through the Input gate
+   7.54 / 8.07 → 5.36 / 5.07; a word 7.34 / 8.00 → 4.93 / 4.88; a tail 7.13 / 7.94 → 4.89 / 4.77;
+   60 ms words at AMOUNT 100 % 10.79 / 9.21 → 9.54 / 7.88; idle 0.41 / 0.69 → 0.29 / 0.59. The
+   busiest block on Adam's clip 10.41 / 10.42 → 9.11 / 8.47.
+4. `kBloom {3, 5, false}` from that bench at `costs.h`'s 50.4k cycles per host µs: mean 17.3k
+   (2.7 %), busiest block 29.4k (4.6 %). A board run replaces it.
+5. Memory. D1 SRAM unchanged. Flash grows 12.8 kB, the loops for each kind of voice. The deepest
+   stack frame is 616 B, inside the warn gate's 1,152 B.
+6. Clock wrap. `Bloom::startClockAt` lets `testClockWrap` start the sample clock 3 s before the
+   uint32 wrap; the schedule and output match a run from 0 through a word, a tail and the wrap.
+   Nothing in the firmware calls it.
+7. Layouts. With CHATTER at 3 / 5 and the 2026-11-01 stress-run rows, no layout the registry
+   allows goes over a CPU line. MOB, Chasm and CHATTER in the default layout sum 68 % mean and
+   82 % worst. The slot 7 cycle now passes over a card only when it would repeat.
