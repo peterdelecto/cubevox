@@ -67,14 +67,14 @@ Signal path, in order:
 3. `level_test`: the default setting lands 0 to +0.5 dB RMS on program; AMOUNT 0 to 100 % stays
    within ±1 dB.
 4. `core_registry`: the card and its knobs.
-5. Stress run with Lo-fi in slot 7 on the default and MOB + Chasm layouts.
+5. Stress run with Lo-fi in slot 7 on the default and Mob + Chasm layouts.
 
 ## 6. CPU
 
 | Layout | Mean % | Worst % |
 |---|---|---|
 | default, Lo-fi in slot 7 | 65 | 73 |
-| MOB and Chasm, Lo-fi in slot 7 | 72 | 83 |
+| Mob and Chasm, Lo-fi in slot 7 | 72 | 83 |
 | lines | 75 | 95 |
 
 ## 7. Built 2026-11-01 (v2.00.95)

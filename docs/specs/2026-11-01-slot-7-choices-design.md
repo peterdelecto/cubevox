@@ -2,12 +2,12 @@
 
 Owner 2026-11-01: "for number 7 gate, is there another effect we could swap into that position as
 an option in case a second backup gate is overkill?" Then the Formant, Lo-fi and Bloom specs. Built
-v2.00.95; Formant left the row at v2.00.96 (section 5); Bloom shows as CHATTER from v2.01.02
+v2.00.95; Formant left the row at v2.00.96 (section 5); Bloom shows as Chatter from v2.01.02
 (section 6).
 
 ## 1. Menu row
 
-1. A row after the SLOT n row for Unison and MOB (polish spec), built the same way: an `Item`, a
+1. A row after the SLOT n row for Unison and Mob (polish spec), built the same way: an `Item`, a
    finder, a `UiAction`, `ui::applyAction`.
 2. Label `SLOT n`, n the slot holding one of the four cards (`SLOT -` when none). Value `GATE`,
    `FORMANT`, `LO-FI` or `BLOOM`.
@@ -33,12 +33,12 @@ Bloom's from the host bench against Echo and Gate, 2026-11-01, where the spec's 
 | Slot 4 / slot 8 | Gate | Formant | Lo-fi | Bloom |
 |---|---|---|---|---|
 | Unison / Spring | 67 / 76 | 66 / 75 | 65 / 73 | 68 / 77 |
-| MOB / Spring | 72 / 84 | 71 / 83 | 70 / 81 | 73 / 85 |
+| Mob / Spring | 72 / 84 | 71 / 83 | 70 / 81 | 73 / 85 |
 | Unison / Chasm | 69 / 78 | 68 / 77 | 67 / 75 | 70 / 79 |
-| MOB / Chasm | 74 / 86 | 73 / 85 | 72 / 83 | 75 / 87 |
+| Mob / Chasm | 74 / 86 | 73 / 85 | 72 / 83 | 75 / 87 |
 
 Every cell is mean / worst %, at or under the 75 / 95 lines (`layoutValid` refuses over, not at).
-MOB, Chasm and Bloom together sit exactly on the mean line, so a board figure for Bloom above its
+Mob, Chasm and Bloom together sit exactly on the mean line, so a board figure for Bloom above its
 estimate would make the row pass over Bloom in that layout. The stress run measures each new card once
 built, and its row replaces the estimate.
 
@@ -55,9 +55,9 @@ MOB), SLOT 7, then the rest. The emulator's slot 7 switch is GATE | LO-FI over a
 A Formant left in slot 7 by an older saved layout no longer counts for this row, which reads SLOT -.
 The Formant column of section 3's table no longer applies.
 
-## 6. CHATTER (v2.01.02 on, as of v2.01.05)
+## 6. Chatter (v2.01.02 on, as of v2.01.05)
 
-The Bloom card shows as CHATTER (`2026-11-01-bloom-design.md` sections 14 to 18). The row's value
+The Bloom card shows as Chatter (`2026-11-01-bloom-design.md` sections 14 to 18). The row's value
 and the emulator's switch read `CHATTER` where sections 1 and 2 say `BLOOM`; the card id stays
 `bloom`.
 
@@ -66,5 +66,5 @@ and the emulator's switch read `CHATTER` where sections 1 and 2 say `BLOOM`; the
 `kBloom` is {3, 5, false} (bloom spec section 19), and the Input gate, Gate and Echo rows took
 the 2026-11-01 stress run (`kInputGate {3, 4}`, `kGate {3, 5}`, `kSlapback {1, 2}`). This
 overrides section 3's Bloom column and section 6's sums. The default layout sums 56 % mean and
-68 % worst; with MOB, Chasm and CHATTER in it, 68 % and 82 %. No layout the registry allows reaches either line, so the cycle passes over
+68 % worst; with Mob, Chasm and Chatter in it, 68 % and 82 %. No layout the registry allows reaches either line, so the cycle passes over
 a card only when it would repeat a card already placed.

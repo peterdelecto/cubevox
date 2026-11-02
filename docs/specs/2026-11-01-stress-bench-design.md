@@ -1,6 +1,6 @@
 # cubevox — hands-free bench and stress run
 
-Date 2026-11-01. Owner, after a MOB measurement waited an hour on the panel toggles: "you can
+Date 2026-11-01. Owner, after a Mob measurement waited an hour on the panel toggles: "you can
 control the toggles. we need autonomous stress testing." Built the same day in v2.00.83. This
 file states what the box and the Mac can do without a hand on the panel, and what the first run
 found.
@@ -31,16 +31,16 @@ wins over `pin_knobs`. `stats` prints both masks. Letters in `bench_ops.py`: `n`
 1. Needs a bench image with the clip baked: `CLIP=../samples/adam_vox_sample3_5s.wav BENCH=1
    ./build.sh`, or `./stress.py --flash`, which builds it into `/tmp/cubevox-fw-stress` and
    installs it through the CUBEVOX drive. Preflight: `hello` says bench and `clip` answers ok.
-2. Layouts by name, `--layouts`: `default`; `crowd` (default with the MOB card in slot 4 for
+2. Layouts by name, `--layouts`: `default`; `crowd` (default with the Mob card in slot 4 for
    Unison); `chasm` (default with the reverb slot on Chasm); `crowd-chasm` (both). A layout the
    box will not load is a result row with the box's reason, not a failure.
 3. Per layout, per run (`--runs`, default 2): all slots forced on, clip on, knobs at top,
    counters reset, a read after `--seconds` (default 20) is pass 1. Pass 2 sweeps SEMITONES, the
-   reverb's lower knob and, when MOB is placed, its two knobs, 0 to 100 % in steps of 10 at 1 s
+   reverb's lower knob and, when Mob is placed, its two knobs, 0 to 100 % in steps of 10 at 1 s
    each, reading after each sweep. A slot's mean is pass 1; its worst is the largest worst over
    both passes; across runs the mean is averaged and the worst is the lowest run worst, the rule
    in `costs.h`.
-4. The first slot holding Autotune, Octave or MOB runs the shared pitch stage, so the slots after
+4. The first slot holding Autotune, Octave or Mob runs the shared pitch stage, so the slots after
    it read near zero. That slot is held to the sum of the placed pitch rows plus the tracker row
    and is marked `*` in the tables.
 5. Gates, every one counted: late, overrun and dry blocks 0 for the run; each placed card's mean
@@ -58,16 +58,16 @@ it, by the lowest run worst rounded up, never the other way without a run.
 | Layout | Block mean | Block worst |
 |---|---|---|
 | default | 48.7 % | 55.5 % |
-| MOB for Unison | 58.1 % | 65.8 % |
+| Mob for Unison | 58.1 % | 65.8 % |
 | default with Chasm | 51.8 % | 58.7 % |
-| MOB with Chasm | 61.1 % | 68.8 % |
+| Mob with Chasm | 61.1 % | 68.8 % |
 
 Lines 75 % and 95 %. Zero late, overrun or dry blocks in every layout. Four worst-block rows were
 a point or two under what the sweeps measured and were raised: Autotune 6 to 7 (the pitch slot
-read 16.5 to 16.8 % against the 16 % sum), Distortion 10 to 11 (10.1 to 10.6 %), MOB 15 to 16
+read 16.5 to 16.8 % against the 16 % sum), Distortion 10 to 11 (10.1 to 10.6 %), Mob 15 to 16
 (15.6 to 15.9 %), Chasm 16 / 16 to 17 / 17 (mean 16.0 %, worst 16.5 to 16.9 %). After the rows,
 `gates: 84 of 84 passed`. Tightest margins: Chasm worst 16.9 % against 17, the pitch slot 16.8 %
-against 17, Distortion 10.6 % against 11, MOB 15.8 % against 16.
+against 17, Distortion 10.6 % against 11, Mob 15.8 % against 16.
 
 ## Verification
 
