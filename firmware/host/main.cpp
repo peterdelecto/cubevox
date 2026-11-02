@@ -50,7 +50,7 @@ constexpr int kCheckMinDbfs = -40;
 constexpr int kSlot3 = 2;      // slot 3, counted from 0
 constexpr int kMobSlot = 3;    // slot 4
 constexpr int kSlot7 = 6;      // slot 7
-constexpr int kChasmSlot = 7;  // slot 8
+constexpr int kReverbSlot = 7;  // slot 8, the reverb slot
 constexpr uint32_t kCheckSwapMs = 1500;  // after a pick: the layout fade, then more than a second of audio
 
 // A box and its audio run on the main thread with no device: each UI tick, one box pass, then the
@@ -286,7 +286,7 @@ int runCheck(const char* argv0) {
   expect(costIs(before, kDefaultSum), "the default layout costs the sum of its rows, kFixed and kTracker");
   expect(costIs(after, kSwappedSum), "the swapped layout costs the sum with kCrowd and kReverbChasm");
   expect(cardIs(layout, kMobSlot, "crowd"), "slot 4 reads crowd after the swap");
-  expect(cardIs(layout, kChasmSlot, "reverb_chasm"), "slot 8 reads reverb_chasm after the swap");
+  expect(cardIs(layout, kReverbSlot, "reverb_chasm"), "slot 8 reads reverb_chasm after the swap");
   expect(rig.box.splashEnded(), "the splash ended");
   expect(anyLit(rig.box.pixels()), "the face rendered (the canvas is not blank)");
 

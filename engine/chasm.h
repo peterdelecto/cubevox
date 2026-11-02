@@ -1,17 +1,5 @@
-#pragma once
-
-#include <array>
-#include <cmath>
-#include <cstdint>
-
-#include "engine/common.h"
-#include "engine/dsp.h"
-#include "engine/reverb_parts.h"
-#include "engine/smooth.h"
-
-// CHASM reverb: one diffuse allpass feedback loop with a downward chirp on its
-// output. Float port of DrumSynthV3 AudioEffectCavernV3, the mono port of
-// hexefx_audiolib_F32 AudioEffectSpringReverb_F32.
+// Float port of DrumSynthV3 AudioEffectCavernV3, the mono port of hexefx_audiolib_F32
+// AudioEffectSpringReverb_F32.
 //
 //   Copyright (c) 2024 Piotr Zapart / www.hexefx.com
 //
@@ -30,38 +18,57 @@
 //   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 //   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //   DEALINGS IN THE SOFTWARE.
+
+#pragma once
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <type_traits>
+
+#include "engine/common.h"
+#include "engine/dsp.h"
+#include "engine/reverb_parts.h"
+#include "engine/smooth.h"
+
+// Chasm Reverb: one diffuse allpass feedback loop with a downward chirp on its output.
 //
-// Loop: dly1 -> allpass 1a..1d -> dly2 -> allpass 2a..2d -> dly1. Each delay
-// read is scaled by the feedback, then passes a treble shelf and a one-pole
-// high-pass. The two filtered taps feed four chirp stages of 16 short
-// allpasses each; lows take longest through them, so the boing runs down.
-// DECAY sets the feedback and slides the bass cut down over its upper half.
-// WOBBLE moves both delay read heads with a sine LFO, 90 degrees apart.
-// Dwell, a tuning value with no knob, drives a soft clip ahead of the loop,
-// level-compensated as in Spring. Delay and allpass lengths are the 44.1 kHz
-// originals scaled to 48 kHz; chirp lengths are not scaled. Output is wet only,
-// at wetDb.
+// The loop runs dly1 -> allpass 1a, 1c -> dly2 -> allpass 2a, 2c -> dly1. Each delay read is scaled
+// by the feedback and passes a one-pole high-pass; the loop has no treble filter. The two filtered
+// reads add and feed four chirp stages of 8 short allpasses each; lows take longest through them,
+// so the boing runs down. TIME sets the feedback and slides the bass cut down over its upper
+// quarter, and the input gain follows the feedback so the wet level holds across TIME. A sine LFO
+// moves both delay read heads, 90 degrees apart. Dwell, a tuning value with no knob, drives a soft
+// clip ahead of the loop with a level compensation, as in Spring. Delay and allpass lengths are the
+// 44.1 kHz originals scaled to 48 kHz; chirp lengths are not scaled. Output is wet only, at wetDb.
+//
+// The loop runs a sample at a time into the output buffer. The chirp stages take the loop's output
+// and never feed it, so each stage then runs over the whole block in place.
 
 namespace cv {
 
+// TIME sets the loop feedback, piecewise linear through these values at 0, 50 and 100 %. Each is
+// the feedback of the loop with eight allpasses, raised to the power 0.627, which is the ratio of the
+// lap of this loop to that one, so the tail lasts as long as it did (T60 0.81, 1.04 and 1.82 s).
+constexpr reverb_parts::KnobCurve kChasmFeedback{0.564f, 0.650f, 0.805f};
+
 struct ChasmTuning {
-  float timeLo = 0.35f, timeHi = 0.86f;  // feedback at DECAY 0 / 1
-  float trebleLossHz = 5429.0f;
-  float loopTrebleCut = 1.0f;            // 1 = off
-  float inputTrebleCut = 0.985f;         // Brightness 85 %, Adam's setting (emulator/macros.h)
-  float bassCutHz = 200.0f, bassCutHzTop = 100.0f;
-  float wobbleDepthMax = 64.0f;          // samples
-  float wobbleRateLo = 0.5f, wobbleRateHi = 7.0f;
+  float bassCutHz = 200.0f;                      // loop high-pass; flat up to TIME 75 %
+  float bassCutHzTop = 151.57f;                  // and sliding to this at TIME 100 %
+  float wobbleDepth = 25.0800629f;               // samples
+  float wobbleRateHz = 4.56899977f;
   float inputTrim = 0.5f;
-  float wobbleLevelDb = 2.0f;            // wet lift, ramps in over WOBBLE 0..0.25
-  float dwellDrive = 8.0f, dwellComp = 0.8f;  // input drive at dwell 1; level comp exponent
-  float wetDb = 19.2f;                   // trim; level rule on the wet alone at the box's TIME and dwell
+  float dwell = 0.20f;                           // input drive into the soft clip, 0..1
+  float dwellDrive = 8.0f, dwellComp = 0.8f;     // input drive at dwell 1; level comp exponent
+  float wetDb = 17.7f;                           // level rule on the wet alone at the box's TIME and dwell, the mean of Adam's clips
 };
 
+static_assert(std::is_trivially_copyable<ChasmTuning>::value && sizeof(ChasmTuning) == 9 * sizeof(float),
+              "the engine compares the tuning bytes to see whether it changed");
+
 struct ChasmParams {
-  float decay = 0.30f;    // set by TIME through applyKnobs
-  float wobble = 0.626f;  // tuning; Adam default (Wobble 85 %)
-  float dwell = 0.20f;    // input drive into the soft clip
+  float feedback = kChasmFeedback.mid;  // set by TIME through applyKnobs
   ChasmTuning tuning;
 };
 
@@ -70,39 +77,88 @@ namespace chasm_detail {
 // 44.1 kHz length rescaled to the engine rate, rounded.
 constexpr int scaled(int len) { return (len * kSampleRate + 22050) / 44100; }
 
-constexpr int kAllp1A = scaled(224), kAllp1B = scaled(420);
-constexpr int kAllp1C = scaled(856), kAllp1D = scaled(1089);
-constexpr int kAllp2A = scaled(156), kAllp2B = scaled(478);
-constexpr int kAllp2C = scaled(956), kAllp2D = scaled(1289);
+constexpr int kAllp1A = scaled(224), kAllp1C = scaled(856);
+constexpr int kAllp2A = scaled(156), kAllp2C = scaled(956);
 constexpr int kDly1 = scaled(1945), kDly2 = scaled(1363);
-constexpr int kChirpDepth = 16;
+constexpr int kChirpDepth = 8;
 
-constexpr float kTimeMax = 0.97f;  // stability ceiling
-constexpr float kLoopK = 0.6f;     // loop allpass coefficient
-constexpr std::array<float, 4> kChirpK = {-0.7f, -0.65f, -0.6f, -0.5f};
+using reverb_parts::kFeedbackMax;
+constexpr float kLoopK = 0.6f;  // loop allpass coefficient
 
-// Read heads advance by at most this much, so they stay inside the shorter line.
-constexpr float kWobbleCap = static_cast<float>(kDly2 / 2);
+// The bass cut starts to slide down where TIME reaches 75 % and has slid all the way at the top.
+constexpr float kBassSlideFrom = kChasmFeedback.at(0.75f);
+constexpr float kBassSlideTo = kChasmFeedback.hi;
+
+// The input gain at the default feedback g, and 1 / (1 - g^2) there, which scales the gain's
+// (1 - g^2) factor to 1 at the default.
+constexpr float kInputGain = 0.3f;
+constexpr float kInvDefaultSpread = 1.0f / (1.0f - kChasmFeedback.mid * kChasmFeedback.mid);
+
+// Each chirp stage's coefficient, for lengths 3, 5, 6 and 7. The fit puts the stages' group delay
+// within 5 ms of the sixteen-unit chirp's between 50 Hz and 6 kHz and shortens the boing.
+constexpr std::array<float, 4> kChirpK = {-0.883f, -0.812f, -0.777f, -0.743f};
+
+constexpr float kMaxWobble = 64.0f;  // samples
+constexpr float kMaxWobbleHz = 10.0f;
+constexpr float kMaxWetDb = 36.0f;   // wetDb clamps to plus and minus this
+constexpr float kMaxInputTrim = 4.0f;
+
+static_assert(reverb_parts::wobbleError(kMaxWobble, kMaxWobbleHz) <= reverb_parts::kMaxWobbleErr,
+              "the widest, fastest wobble must stay within the interpolation's error limit");
 
 using reverb_parts::Allpass;
 using reverb_parts::Delay;
 
-// kChirpDepth allpass units of length L in series, cycling the four coefficients.
-template <int L>
+#define CV_PRAGMA(x) _Pragma(#x)
+#define CV_UNROLL(n) CV_PRAGMA(GCC unroll n)
+
+// kChirpDepth allpass units of length L in series, all with coefficient kChirpK[Stage]. A unit keeps
+// L states, one for each sample of its length. The states sit slot-major so one sample's units are a
+// contiguous run. runBlock takes G samples at a time, which fall in G different slots (G <= L), so
+// their chains are independent and an in-order core overlaps them.
+template <int L, int G, int Stage>
 struct ChirpStage {
+  static_assert(G >= 1 && G <= L, "a group must fit in one length");
+  static constexpr float k = kChirpK[static_cast<size_t>(Stage)];
   std::array<float, kChirpDepth * L> buf{};
   int pos = 0;
 
-  float run(float in) {
-    for (int u = 0; u < kChirpDepth; ++u) {
-      const float k = kChirpK[static_cast<size_t>(u & 3)];
-      float& z = buf[static_cast<size_t>(u * L + pos)];
-      const float out = z + k * in;
-      z = in - k * out;
-      in = out;
+  void runBlock(float* x, int n) {
+    int j = 0;
+    for (; j + G <= n; j += G) {
+      float y[G];
+      float* z[G];
+      CV_UNROLL(4)
+      for (int m = 0; m < G; ++m) {
+        y[m] = x[j + m];
+        int slot = pos + m;
+        if (slot >= L) slot -= L;
+        z[m] = buf.data() + slot * kChirpDepth;
+      }
+      // The allpass step for G chains in lock step: every load and multiply-add comes before any store,
+      // since the compiler cannot tell the G states apart.
+      CV_UNROLL(8)
+      for (int u = 0; u < kChirpDepth; ++u) {
+        float o[G];
+        CV_UNROLL(4)
+        for (int m = 0; m < G; ++m) o[m] = z[m][u] + k * y[m];
+        CV_UNROLL(4)
+        for (int m = 0; m < G; ++m) z[m][u] = y[m] - k * o[m];
+        CV_UNROLL(4)
+        for (int m = 0; m < G; ++m) y[m] = o[m];
+      }
+      CV_UNROLL(4)
+      for (int m = 0; m < G; ++m) x[j + m] = y[m];
+      pos += G;
+      if (pos >= L) pos -= L;
     }
-    if (++pos >= L) pos = 0;
-    return in;
+    for (; j < n; ++j) {
+      float y = x[j];
+      float* z = buf.data() + pos * kChirpDepth;
+      for (int u = 0; u < kChirpDepth; ++u) y = reverb_parts::allpassStep(z[u], k, y);
+      x[j] = y;
+      if (++pos >= L) pos = 0;
+    }
   }
 
   void clear() {
@@ -110,6 +166,9 @@ struct ChirpStage {
     pos = 0;
   }
 };
+
+#undef CV_UNROLL
+#undef CV_PRAGMA
 
 }  // namespace chasm_detail
 
@@ -119,142 +178,184 @@ class Chasm {
 
   void reset() {
     a1a_.clear();
-    a1b_.clear();
     a1c_.clear();
-    a1d_.clear();
     a2a_.clear();
-    a2b_.clear();
     a2c_.clear();
-    a2d_.clear();
     dly1_.clear();
     dly2_.clear();
     c1_.clear();
     c2_.clear();
     c3_.clear();
     c4_.clear();
-    lpIn_ = lp1_ = lp2_ = hp1_ = hp2_ = 0.0f;
+    hp1_.clear();
+    hp2_.clear();
     lfoAcc_ = 0u;
-    decay_ = wobble_ = dwell_ = inputGain_ = 0.0f;
+    feedback_ = 0.0f;
+    hpFeedback_ = 0.0f;
     valid_ = false;
+    built_ = false;
+    hpValid_ = false;
   }
 
-  // Wet only; the caller mixes.
+  // Wet only; the caller mixes. Any n; the engine works in blocks of kBlock.
   void process(const float* in, float* wet, int n, const ChasmParams& p) {
-    const ChasmTuning& t = p.tuning;
-    const float decayTarget = smooth::clamp01(p.decay);
-    const float wobbleTarget = smooth::clamp01(p.wobble);
-    const float dwellTarget = smooth::clamp01(p.dwell);
-    if (!valid_) {
-      decay_ = decayTarget;
-      wobble_ = wobbleTarget;
-      dwell_ = dwellTarget;
+    for (int done = 0; done < n; done += kBlock) {
+      const int m = n - done < kBlock ? n - done : kBlock;
+      run(in + done, wet + done, m, p);
     }
-    const Block b = blockFor(t);
-    if (!valid_) {
-      inputGain_ = gainFor(b.timeLo + decay_ * (b.timeHi - b.timeLo));
-      valid_ = true;
-    }
-
-    // Dwell's drive and level compensation are evaluated at the block edges and interpolated.
-    float dwellEnd = dwell_;
-    for (int i = 0; i < n; ++i) dwellEnd = smooth::step(dwellEnd, dwellTarget, smooth::kSmoothCoef);
-    const float logDrive = logf(t.dwellDrive < 1.0f ? 1.0f : t.dwellDrive);
-    const float drive0 = expf(logDrive * dwell_), drive1 = expf(logDrive * dwellEnd);
-    const float comp0 = expf(-t.dwellComp * logDrive * dwell_);
-    const float comp1 = expf(-t.dwellComp * logDrive * dwellEnd);
-    const float inv = 1.0f / static_cast<float>(n);
-    for (int i = 0; i < n; ++i) {
-      decay_ = smooth::step(decay_, decayTarget, smooth::kSmoothCoef);
-      wobble_ = smooth::step(wobble_, wobbleTarget, smooth::kSmoothCoef);
-      const float f = static_cast<float>(i + 1) * inv;
-      const float drive = drive0 + (drive1 - drive0) * f;
-      const float comp = comp0 + (comp1 - comp0) * f;
-      wet[i] = tick(softClipHeadroom(in[i] * drive, kReverbClipHeadroom) * comp, b);
-    }
-    dwell_ = dwellEnd;
   }
 
  private:
-  // Everything the loop takes from the tuning, once per block. Bass cut and wobble level follow
-  // the smoothed DECAY and WOBBLE per block.
-  struct Block {
-    float timeLo, timeHi, lpF, loopCut, inCut, hpF, depthMax, rateLo, rateSpan, trim, wetGain;
+  // Everything the loop takes from the tuning, once per tuning change.
+  struct Coefs {
+    float bassHz, bassHzTop, depth, drive;
+    float inScale;  // the dwell compensation, the input trim and the wet gain: the loop and the chirp are linear
+    uint32_t lfoStep;
   };
 
-  Block blockFor(const ChasmTuning& t) const {
+  // Rebuilds the coefficients only when the tuning differs from the last block's, which on the box is
+  // the first block alone.
+  void refresh(const ChasmTuning& t) {
+    if (built_ && std::memcmp(&t, &tuning_, sizeof t) == 0) return;
+    coefs_ = coefsFor(t);
+    tuning_ = t;
+    built_ = true;
+    hpValid_ = false;
+  }
+
+  static Coefs coefsFor(const ChasmTuning& t) {
     using namespace chasm_detail;
-    Block b;
-    b.timeHi = clampf(t.timeHi, 0.0f, kTimeMax);
-    b.timeLo = clampf(t.timeLo, 0.0f, b.timeHi);
-    b.lpF = onePoleCoef(t.trebleLossHz);
-    b.loopCut = clampf(t.loopTrebleCut, 0.0f, 1.0f);
-    b.inCut = t.inputTrebleCut;
-    float bassHz = t.bassCutHz;
-    if (decay_ > 0.5f) bassHz *= powf(t.bassCutHzTop / t.bassCutHz, (decay_ - 0.5f) * 2.0f);
-    b.hpF = onePoleCoef(bassHz);
-    b.depthMax = clampf(t.wobbleDepthMax, 0.0f, kWobbleCap);
-    b.rateLo = t.wobbleRateLo;
-    b.rateSpan = t.wobbleRateHi - t.wobbleRateLo;
-    b.trim = t.inputTrim;
-    // Interpolated reads dull the tail once WOBBLE moves; the lift restores its level.
-    const float lift = t.wobbleLevelDb * (wobble_ < 0.25f ? wobble_ * 4.0f : 1.0f);
-    b.wetGain = powf(10.0f, (t.wetDb + lift) / 20.0f);
-    return b;
+    Coefs c;
+    c.bassHz = clampf(t.bassCutHz, kFilterMinHz, kFilterMaxHz);
+    c.bassHzTop = clampf(t.bassCutHzTop, kFilterMinHz, kFilterMaxHz);
+    const float depth = clampf(t.wobbleDepth, 0.0f, kMaxWobble);
+    c.depth = depth;
+    c.lfoStep = static_cast<uint32_t>(clampf(t.wobbleRateHz, 0.0f, kMaxWobbleHz) * reverb_parts::kPhasePerHz);
+    const float wetGain = powf(10.0f, clampf(t.wetDb, -kMaxWetDb, kMaxWetDb) / 20.0f);
+    const reverb_parts::DwellGain dwell = reverb_parts::dwellGain(t.dwell, t.dwellDrive, t.dwellComp);
+    c.drive = dwell.drive;
+    c.inScale = dwell.comp * clampf(t.inputTrim, 0.0f, kMaxInputTrim) * wetGain;
+    return c;
   }
 
-  // Input gain walks down as feedback rises.
-  static float gainFor(float time) { return 0.5f - 0.3f * (time / chasm_detail::kTimeMax); }
+  // The bass cut follows the smoothed feedback once per block: flat up to where TIME reaches 75 %,
+  // then sliding down to bassCutHzTop at the top of the knob.
+  void refreshBassCut() {
+    if (hpValid_ && hpFeedback_ == feedback_) return;
+    using namespace chasm_detail;
+    float hz = coefs_.bassHz;
+    if (feedback_ > kBassSlideFrom) {
+      const float slid = fminf((feedback_ - kBassSlideFrom) / (kBassSlideTo - kBassSlideFrom), 1.0f);
+      hz *= powf(coefs_.bassHzTop / coefs_.bassHz, slid);
+    }
+    hp1_.a = hp2_.a = onePoleCoef(hz);
+    hpFeedback_ = feedback_;
+    hpValid_ = true;
+  }
 
-  // One sample of the loop for the clipped, level-compensated input x.
-  float tick(float x, const Block& b) {
+  // The input gain at a feedback g: kInputGain at the default, falling as (1 - g^2). A loop's energy
+  // grows with the feedback, and this takes its rise out of the wet level.
+  static float gainFor(float feedback) {
+    using namespace chasm_detail;
+    return kInputGain * ((1.0f - feedback * feedback) * kInvDefaultSpread);
+  }
+
+  void run(const float* in, float* wet, int n, const ChasmParams& p) {
+    const float feedbackTarget = clampf(p.feedback, 0.0f, chasm_detail::kFeedbackMax);
+    if (!valid_) {
+      feedback_ = feedbackTarget;
+      valid_ = true;
+    }
+    refresh(p.tuning);
+    refreshBassCut();
+    const Coefs& c = coefs_;
+
+    // The wobble is evaluated at the block edges and the read heads move linearly between them. While
+    // TIME is still the smoother holds its target, so the block runs at one feedback and gain. While
+    // it moves, both are evaluated at the block edges too.
+    const Wobble w = wobbleFor(n);
+    const float inv = 1.0f / static_cast<float>(n);
+    if (feedback_ == feedbackTarget) {
+      const float feedback = feedback_;
+      const float scale = c.inScale * gainFor(feedback);
+      for (int i = 0; i < n; ++i) {
+        const float f = static_cast<float>(i + 1) * inv;
+        wet[i] = tick(clip(in[i]), feedback, scale, w.base1 + w.rise1 * f, w.base2 + w.rise2 * f);
+      }
+    } else {
+      float feedbackEnd = feedback_;
+      // This block loop of smooth::step stays until smooth::advance lands with the Echo merge.
+      for (int i = 0; i < n; ++i) feedbackEnd = smooth::step(feedbackEnd, feedbackTarget, smooth::kSmoothCoef);
+      const float fb0 = feedback_, fb1 = feedbackEnd;
+      const float s0 = c.inScale * gainFor(fb0), s1 = c.inScale * gainFor(fb1);
+      for (int i = 0; i < n; ++i) {
+        const float f = static_cast<float>(i + 1) * inv;
+        wet[i] = tick(clip(in[i]), fb0 + (fb1 - fb0) * f, s0 + (s1 - s0) * f, w.base1 + w.rise1 * f,
+                      w.base2 + w.rise2 * f);
+      }
+      feedback_ = feedbackEnd;
+    }
+    c1_.runBlock(wet, n);
+    c2_.runBlock(wet, n);
+    c3_.runBlock(wet, n);
+    c4_.runBlock(wet, n);
+  }
+
+  // Each read head's advance at the block's start and its change to the block's end. Sample i of n
+  // reads at the fraction (i + 1) / n of the way, so the last sample lands on the end value. Advances
+  // the LFO by the block.
+  struct Wobble {
+    float base1, base2, rise1, rise2;
+  };
+
+  Wobble wobbleFor(int n) {
+    const Coefs& c = coefs_;
+    const uint32_t end = lfoAcc_ + static_cast<uint32_t>(n) * c.lfoStep;
+    const float a1 = reverb_parts::lfo(lfoAcc_, 0u) * c.depth, b1 = reverb_parts::lfo(end, 0u) * c.depth;
+    const float a2 = reverb_parts::lfo(lfoAcc_, 64u) * c.depth, b2 = reverb_parts::lfo(end, 64u) * c.depth;
+    lfoAcc_ = end;
+    return {a1, a2, b1 - a1, b2 - a2};
+  }
+
+  float clip(float x) const { return softClipHeadroom(x * coefs_.drive, kReverbClipHeadroom); }
+
+  // One sample of the loop for the clipped input x at the given input scale. Returns the sum of the
+  // two filtered reads, which feeds the chirp stages.
+  CV_INLINE float tick(float x, float feedback, float scale, float adv1, float adv2) {
     using chasm_detail::kLoopK;
-    const float time = b.timeLo + decay_ * (b.timeHi - b.timeLo);
-    const float depth = wobble_ * wobble_ * b.depthMax;
-    lfoAcc_ += static_cast<uint32_t>((b.rateLo + wobble_ * b.rateSpan) * reverb_parts::kPhasePerHz);
-    inputGain_ += (gainFor(time) - inputGain_) * 0.25f;
-    const float feed = shelf(x * b.trim * inputGain_, lpIn_, b.lpF, b.inCut);
+    const float feed = x * scale;
 
-    float acc = dly1_.read(reverb_parts::lfo(lfoAcc_, 0u) * depth) * time;
-    const float out1 = bassCut(shelf(acc, lp1_, b.lpF, b.loopCut), hp1_, b.hpF);
-    acc = a1d_.run(a1c_.run(a1b_.run(a1a_.run(out1, kLoopK), kLoopK), kLoopK), kLoopK);
-
-    const float d2 = dly2_.read(reverb_parts::lfo(lfoAcc_, 64u) * depth);
-    dly2_.write(acc + feed);
-    const float out2 = bassCut(shelf(d2 * time, lp2_, b.lpF, b.loopCut), hp2_, b.hpF);
-    acc = a2d_.run(a2c_.run(a2b_.run(a2a_.run(out2, kLoopK), kLoopK), kLoopK), kLoopK);
-    dly1_.write(acc + feed);
-
-    return c4_.run(c3_.run(c2_.run(c1_.run(out1 + out2)))) * b.wetGain;
-  }
-  // out = lp + cut*(in - lp); cut 1 passes, cut 0 is the full low-pass.
-  static float shelf(float in, float& lp, float f, float cut) {
-    lp += (in - lp) * f;
-    return lp + cut * (in - lp);
-  }
-
-  static float bassCut(float in, float& lp, float f) {
-    lp += (in - lp) * f;
-    return in - lp;
+    // Both reads come before either write, and the two lanes share no state, so the chains overlap.
+    const float r1 = dly1_.read(adv1) * feedback;
+    const float r2 = dly2_.read(adv2) * feedback;
+    const float out1 = hp1_.hp(r1);
+    const float out2 = hp2_.hp(r2);
+    const float acc1 = a1c_.run(a1a_.run(out1, kLoopK), kLoopK);
+    const float acc2 = a2c_.run(a2a_.run(out2, kLoopK), kLoopK);
+    dly2_.write(acc1 + feed);
+    dly1_.write(acc2 + feed);
+    return out1 + out2;
   }
 
   chasm_detail::Allpass<chasm_detail::kAllp1A> a1a_;
-  chasm_detail::Allpass<chasm_detail::kAllp1B> a1b_;
   chasm_detail::Allpass<chasm_detail::kAllp1C> a1c_;
-  chasm_detail::Allpass<chasm_detail::kAllp1D> a1d_;
   chasm_detail::Allpass<chasm_detail::kAllp2A> a2a_;
-  chasm_detail::Allpass<chasm_detail::kAllp2B> a2b_;
   chasm_detail::Allpass<chasm_detail::kAllp2C> a2c_;
-  chasm_detail::Allpass<chasm_detail::kAllp2D> a2d_;
   chasm_detail::Delay<chasm_detail::kDly1> dly1_;
   chasm_detail::Delay<chasm_detail::kDly2> dly2_;
-  chasm_detail::ChirpStage<3> c1_;
-  chasm_detail::ChirpStage<5> c2_;
-  chasm_detail::ChirpStage<6> c3_;
-  chasm_detail::ChirpStage<7> c4_;
-  float lpIn_ = 0.0f, lp1_ = 0.0f, lp2_ = 0.0f, hp1_ = 0.0f, hp2_ = 0.0f;
+  chasm_detail::ChirpStage<3, 3, 0> c1_;
+  chasm_detail::ChirpStage<5, 4, 1> c2_;
+  chasm_detail::ChirpStage<6, 4, 2> c3_;
+  chasm_detail::ChirpStage<7, 4, 3> c4_;
+  OnePole hp1_, hp2_;      // each read's bass cut, set for hpFeedback_
   uint32_t lfoAcc_ = 0u;
-  float decay_ = 0.0f, wobble_ = 0.0f, dwell_ = 0.0f, inputGain_ = 0.0f;
+  float feedback_ = 0.0f;  // the loop feedback, smoothed
+  float hpFeedback_ = 0.0f;
+  ChasmTuning tuning_;     // the tuning coefs_ was built from
+  Coefs coefs_{};
   bool valid_ = false;
+  bool built_ = false;
+  bool hpValid_ = false;
 };
 
 }  // namespace cv

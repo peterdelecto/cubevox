@@ -1,8 +1,8 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
 // (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Chatter rows take every
-// setting from the registry, as the box runs them. The Spring, Formant MIX, Lo-fi, Chatter, Echo and Unison
+// setting from the registry, as the box runs them. The reverb, Formant MIX, Lo-fi, Chatter, Echo and Unison
 // rows run on Adam's clips in samples/ and skip when they are absent: the synthetic program puts its energy
-// where the telephone band cuts and where the Spring loops cut, its noise floor holds the Chatter card's
+// where the telephone band cuts and where the reverb loops cut, its noise floor holds the Chatter card's
 // word open, and its steady tone beats against its own echo and chorus copies. No window, no audio device.
 
 #include <algorithm>
@@ -523,25 +523,75 @@ bool bloomRows() {
   return ok;
 }
 
-// The Spring card at the registry's TIME on Adam's clips, once with the wet path alone and once at
-// MIX 50 %. The synthetic program puts its energy where the loops cut, below 200 Hz and above 5 kHz,
-// so it reads the card differently from a voice. The clips spread by 0.66 dB under one gain, so no
-// trim puts all three inside 0 to +0.5 dB. Each clip is held to the mid band, and the mean of the
-// three on the wet path alone is held to the rule.
-bool springRows() {
-  const auto through = [](const cv::ReverbParams& p) {
-    return ClipFn([&p](const Signal& padded) {
-      auto s = std::make_unique<Stage<cv::Reverb>>();
-      return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
-    });
+// A reverb block run over each clip with fixed parameters.
+ClipFn reverbThrough(const cv::ReverbParams& p) {
+  return [&p](const Signal& padded) {
+    auto s = std::make_unique<Stage<cv::Reverb>>();
+    return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
   };
+}
+
+// A reverb card at the registry's TIME on Adam's clips, once with the wet path alone and once at
+// MIX 50 %. The synthetic program puts its energy where the loops cut, below 200 Hz and above 5 kHz,
+// so it reads the cards differently from a voice, and the clips govern. The clips spread by up to a
+// dB under one gain, so no trim puts all three inside 0 to +0.5 dB. Each clip is held to the mid
+// band, and the mean of the three on the wet path alone is held to the rule.
+bool reverbRows(Card card, const char* name) {
+  const std::string wetLabel = std::string("reverb ") + name + " wet only";
+  const cv::ReverbParams wetOnly = boxReverbWetOnly(card);
   double mean = 0.0;
   int count = 0;
-  bool ok = clipRows("reverb spring wet only", through(boxReverbWetOnly(Card::ReverbSpring)), kMidLoDb, kMidHiDb, mean,
-                     count);
-  if (count > 0) ok &= verdict("reverb spring wet only mean", mean);
-  ok &= clipRows("reverb spring MIX 50 %", through(boxReverb(Card::ReverbSpring, 0.5f)), kMidLoDb, kMidHiDb, mean,
+  bool ok = clipRows(wetLabel.c_str(), reverbThrough(wetOnly), kMidLoDb, kMidHiDb, mean, count);
+  if (count > 0) ok &= verdict((wetLabel + " mean").c_str(), mean);
+  const cv::ReverbParams half = boxReverb(card, 0.5f);
+  ok &= clipRows((std::string("reverb ") + name + " MIX 50 %").c_str(), reverbThrough(half), kMidLoDb, kMidHiDb, mean,
                  count);
+  return ok;
+}
+
+// The mean over Adam's clips of a stage's output against its input, in dB, and how many clips ran.
+double clipMean(const ClipFn& through, int& count) {
+  constexpr size_t kPad = cv::kSampleRate * 2 / 5;
+  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  double sum = 0.0;
+  count = 0;
+  for (const char* name : names) {
+    const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
+    if (clip.empty()) continue;
+    Signal padded(kPad, 0.0f);
+    padded.insert(padded.end(), clip.begin(), clip.end());
+    const Through t = through(padded);
+    sum += 20.0 * std::log10(rmsRange(t.out, kPad, t.out.size()) / rmsRange(t.in, kPad, t.in.size()));
+    ++count;
+  }
+  return count > 0 ? sum / count : 0.0;
+}
+
+// The wet path alone at the TIME knob's bottom, middle and top. The input gain follows the feedback, so
+// the level holds across the knob: each is held within kTimeBandDb of the middle's.
+bool timeRows(Card card, const char* name) {
+  constexpr double kTimeBandDb = 1.0;
+  double mean[3] = {0.0, 0.0, 0.0};
+  int count = 0;
+  const float times[3] = {0.0f, 0.5f, 1.0f};
+  for (int k = 0; k < 3; ++k) {
+    ChainParams chain;
+    applyPlacement(card, chain);
+    applyToggle(card, true, chain);
+    applyKnob(card, 0, times[k], chain);
+    applyKnob(card, 1, 1.0f, chain);
+    cv::ReverbParams p = chain.reverb;
+    p.wet = 1.0f;
+    mean[k] = clipMean(reverbThrough(p), count);
+  }
+  if (count == 0) {
+    std::printf("SKIP reverb %s TIME rows  samples/ is not in this checkout\n", name);
+    return true;
+  }
+  const double lo = std::fmin(mean[0], mean[2]) - mean[1], hi = std::fmax(mean[0], mean[2]) - mean[1];
+  const bool ok = lo >= -kTimeBandDb && hi <= kTimeBandDb;
+  std::printf("%s reverb %-7s wet only mean at TIME 0 / 50 / 100 %%: %+.2f / %+.2f / %+.2f dB  (ends within %.1f of the middle)\n",
+              ok ? "PASS" : "FAIL", name, mean[0], mean[1], mean[2], kTimeBandDb);
   return ok;
 }
 
@@ -573,9 +623,10 @@ bool slotRows(const Signal& in) {
   dist.tone = 0.5f;
   ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
 
-  ok &= simple<cv::Reverb>("reverb chasm wet only", in, boxReverbWetOnly(Card::ReverbChasm));
-  ok &= midRow<cv::Reverb>("reverb chasm MIX 50 %", in, boxReverb(Card::ReverbChasm, 0.5f));
-  ok &= springRows();
+  ok &= reverbRows(Card::ReverbChasm, "chasm");
+  ok &= reverbRows(Card::ReverbSpring, "spring");
+  ok &= timeRows(Card::ReverbChasm, "chasm");
+  ok &= timeRows(Card::ReverbSpring, "spring");
   return ok;
 }
 

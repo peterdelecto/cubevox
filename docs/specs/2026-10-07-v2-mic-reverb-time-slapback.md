@@ -9,7 +9,8 @@ Owner: ship as v2.n.n through the existing install line; full view and pedal mod
 
 1. Reverb knobs are INTENSITY (mix) and TIME (decay). `ReverbParams::time` drives every
    engine's decay through the existing curves, so TIME 50 % equals the old INTENSITY 50 %
-   decay. DWELL (soft-clip input drive) stays as a tuning field at 0.20, off the face.
+   decay. Since v2.01.11 Chasm's TIME sets its loop feedback straight through `kChasmFeedback`
+   (Chasm spec, "Box code"); Spring keeps `kSpringDecay`. DWELL (soft-clip input drive) stays as a tuning field at 0.20, off the face.
    Adam's starting point sets TIME 100 % so the v0.01 sound is unchanged until he turns it.
 2. Slapback TIME runs 60..250 ms, default 100, linear taper, 260 ms line. The level row was
    a coin flip on TIME; see the slapback spec's level correction (`trimDb` -4.9 dB x INTENSITY).

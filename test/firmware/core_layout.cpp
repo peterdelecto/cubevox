@@ -30,9 +30,10 @@ void checkDefaultLayout() {
     if (d.group == Group::Reverb) ++reverbs;
     // Autotune's row is the board's pair figure scaled by the CPU pass, with one extra worst point
     // from the stress run, so it stays an estimate until a board bench of the pair. Octave's and Echo's
-    // rows are host benches of their rewrites, estimates until a stress run of the new engines.
+    // rows are host benches of their rewrites and Spring's the M7 model of its half-rate engine,
+    // estimates until a stress run of the new engines.
     check(d.cost.measured || layout.card[s] == Card::Autotune || layout.card[s] == Card::Octave ||
-              layout.card[s] == Card::Slapback,
+              layout.card[s] == Card::Slapback || layout.card[s] == Card::ReverbSpring,
           "a default layout card's cost comes from the board");
   }
   const LayoutCost sums = layoutCost(layout);

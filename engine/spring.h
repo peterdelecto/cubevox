@@ -14,11 +14,17 @@
 // Spring reverb: three springs of different lengths in parallel, cheap enough for the H7. The card
 // reads "Spring Reverb".
 //
+// The loops run at half the engine rate, 24 kHz. A 15-tap half-band filter decimates the input and
+// the same filter interpolates the return, so the card pays for half the samples.
+//
 // Each spring is one feedback loop: delay -> treble loss -> bass cut -> diffusers a, b ->
-// disperser -> back into its own delay, plus the input. A spring's taps repeat springMs apart.
+// disperser -> back into its own delay, plus the input. A spring's taps repeat springMs apart, less
+// the disperser's own delay, which is 3 ms on average a pass (24 sections of 3 loop samples) and
+// grows with frequency, from 0.25 ms at 300 Hz to 18 ms at 3.8 kHz.
 // The dispersers are stretched allpasses (a + z^-K) / (1 + a z^-K) with a positive coefficient, so
 // lows arrive first and each echo sweeps up. They sit inside the loops, so every echo picks up more
-// sweep than the last. That growing sweep is the chirp. The three spacings share no short common
+// sweep than the last. That growing sweep is the chirp. The stretch of 3 loop samples puts the sweep
+// at 4 kHz, where 6 samples at the engine rate put it. The three spacings share no short common
 // multiple, so the springs' chirps stack into a splash rather than a periodic boing. Light diffusers
 // keep each echo distinct. The in-loop treble loss and bass cut are light, so the flutter
 // survives in the tail, and a one-pole low-pass on the summed return takes off the metallic top.
@@ -32,39 +38,46 @@ namespace cv {
 
 namespace spring_detail {
 
-constexpr float kMsToSamples = static_cast<float>(kSampleRate) / 1000.0f;
+constexpr int kLoopRate = kSampleRate / 2;
+constexpr float kMsToSamples = static_cast<float>(kLoopRate) / 1000.0f;  // loop samples a millisecond
+constexpr float kMaxFilterHz = 0.45f * static_cast<float>(kLoopRate);    // the loops' filter corners clamp here
 
-constexpr int kDiff1A = 139, kDiff1B = 207;  // 2.9 / 4.3 ms
-constexpr int kDiff2A = 178, kDiff2B = 254;  // 3.7 / 5.3 ms
-constexpr int kDiff3A = 163, kDiff3B = 233;  // 3.4 / 4.9 ms
-constexpr int kStretch = 6;                  // K; the sweep sits below fs / 2K = 4 kHz
+constexpr int kDiff1A = 70, kDiff1B = 104;  // loop samples: 2.9 / 4.3 ms
+constexpr int kDiff2A = 89, kDiff2B = 127;  // 3.7 / 5.3 ms
+constexpr int kDiff3A = 82, kDiff3B = 117;  // 3.4 / 4.9 ms
+constexpr int kStretch = 3;                 // K, loop samples; the sweep sits below kLoopRate / 2K = 4 kHz
 constexpr int kMaxSections = 32;
-constexpr float kMaxWobble = 32.0f;          // samples
+constexpr float kMaxWobble = 32.0f;         // samples at the engine rate
 constexpr float kMaxWobbleHz = 10.0f;
-constexpr int kMinDly = 16;                  // shortest read, samples
-constexpr float kFeedbackMin = 0.10f;        // feedback floor; the input scale divides by it
-constexpr float kFeedbackMax = 0.97f;        // stability ceiling
-constexpr float kMaxWetDb = 24.0f;           // wetDb clamps to plus and minus this
-constexpr float kMaxDwellDrive = 64.0f;      // dwellDrive clamps to 1..this
-constexpr float kMaxDwellComp = 2.0f;        // dwellComp clamps to 0..this
+constexpr int kMinDly = 8;                  // shortest read, loop samples
+constexpr float kFeedbackMin = 0.10f;       // feedback floor; the input scale divides by it
+using reverb_parts::kFeedbackMax;
+constexpr float kMaxWetDb = 24.0f;          // wetDb clamps to plus and minus this
+using reverb_parts::kMaxDwellDrive;
+using reverb_parts::kMaxDwellComp;
 
-// The wobble is evaluated at the block edges and interpolated linearly. The sine's curvature bounds
-// the read position's error at depth / 2 * (2 pi rate)^2 * T^2 / 8 samples for a block of T seconds.
-constexpr float kMaxWobbleErr = 0.05f;  // samples
-constexpr float wobbleError(float depth, float rateHz) {
-  const float w = kTwoPi * rateHz;
-  const float t = static_cast<float>(kBlock) / static_cast<float>(kSampleRate);
-  return 0.5f * depth * w * w * t * t / 8.0f;
-}
-static_assert(wobbleError(kMaxWobble, kMaxWobbleHz) <= kMaxWobbleErr,
+static_assert(reverb_parts::wobbleError(kMaxWobble, kMaxWobbleHz) <= reverb_parts::kMaxWobbleErr,
               "the widest, fastest wobble must stay within the interpolation's error limit");
+
+// The half-band filters. Taps at odd offsets 1, 3, 5 and 7 from a centre of 0.5 (Kaiser window,
+// beta 3): the pair passes 10 kHz at -2.6 dB, 12 kHz at -12 dB and 16 kHz at -97 dB.
+constexpr float kH0 = 0.311908f, kH1 = -0.084593f, kH2 = 0.032044f, kH3 = -0.009359f;
+constexpr int kTaps = 15;
+constexpr int kHistory = kTaps - 1;  // input samples a decimation reaches back
+constexpr int kReturnHistory = 7;    // loop outputs an interpolation reaches back
+constexpr int kMaxTicks = kBlock / 2 + 1;
+
+// Delay the two filters add, 15 engine samples, which the loop lengths give back. A whole number of
+// loop samples keeps the delay reads off the half-sample points, where linear interpolation takes
+// 6 dB at 8 kHz, so the echoes land one engine sample early.
+constexpr float kFilterDelay = 8.0f;
 
 // Default tap-to-tap echo spacing of each spring, ms.
 constexpr float kDefaultMs1 = 37.0f, kDefaultMs2 = 45.0f, kDefaultMs3 = 56.0f;
 
 // Each line holds its spring's default read, which is the spacing less the two diffusers, plus this
 // margin. A spacing tuned longer than the line clamps to it.
-constexpr int kLineMargin = 16;
+constexpr int kLineMargin = 8;
 constexpr int lineLength(float springMs, int diffusers) {
   return static_cast<int>(springMs * kMsToSamples) - diffusers + kLineMargin;
 }
@@ -73,9 +86,9 @@ constexpr int kDly2 = lineLength(kDefaultMs2, kDiff2A + kDiff2B);
 constexpr int kDly3 = lineLength(kDefaultMs3, kDiff3A + kDiff3B);
 
 // Longest spacing each spring takes before its line clamps it, ms.
-constexpr float kMaxMs1 = static_cast<float>(kDly1 + kDiff1A + kDiff1B) / kMsToSamples;
-constexpr float kMaxMs2 = static_cast<float>(kDly2 + kDiff2A + kDiff2B) / kMsToSamples;
-constexpr float kMaxMs3 = static_cast<float>(kDly3 + kDiff3A + kDiff3B) / kMsToSamples;
+constexpr float kMaxMs1 = (static_cast<float>(kDly1 + kDiff1A + kDiff1B) + kFilterDelay) / kMsToSamples;
+constexpr float kMaxMs2 = (static_cast<float>(kDly2 + kDiff2A + kDiff2B) + kFilterDelay) / kMsToSamples;
+constexpr float kMaxMs3 = (static_cast<float>(kDly3 + kDiff3A + kDiff3B) + kFilterDelay) / kMsToSamples;
 
 }  // namespace spring_detail
 
@@ -84,16 +97,16 @@ struct SpringTuning {
         springMs3 = spring_detail::kDefaultMs3;  // tap-to-tap echo spacing
   float feedbackLo = 0.55f, feedbackHi = 0.86f;  // feedback per pass at TIME 0 / 1
   float diffuse = 0.30f;                   // diffuser coefficient
-  int chirpSections = 32;                  // disperser sections per spring
-  float chirpA = 0.80f;                    // disperser coefficient; higher = longer sweep
+  int chirpSections = 24;                  // disperser sections per spring
+  float chirpA = 0.846f;                   // disperser coefficient; higher = longer sweep
   float trebleLossHz = 9000.0f;            // in-loop one-pole low-pass
   float bassCutHz = 200.0f;                // in-loop one-pole high-pass
   float returnLpHz = 5000.0f;              // one-pole low-pass on the summed return
-  float wobbleDepth = 8.0f;                // samples
+  float wobbleDepth = 8.0f;                // samples at the engine rate
   float wobbleRateHz = 3.0f;
   float dwell = 0.20f;                     // input drive into the soft clip, 0..1
   float dwellDrive = 4.0f, dwellComp = 0.8f;  // input drive at dwell 1; level comp exponent
-  float wetDb = 0.29f;                     // gain ahead of the loops; level rule on the wet alone at the box's TIME and dwell, the mean of Adam's clips
+  float wetDb = 0.37f;                  // gain ahead of the loops; level rule on the wet alone at the box's TIME and dwell, the mean of Adam's clips
   float restLevel = 1.0e-6f;               // -120 dBFS; a silent input lets the springs rest once every loop sits below it, 0 never rests
 };
 
@@ -122,29 +135,17 @@ struct Dispersers {
     int u = 0;
     for (; u + 2 <= sections; u += 2, z += 2 * kStep) {
       float* w = z + kStep;
-      const float o1 = z[0] + a * y1;
-      z[0] = y1 - a * o1;
-      y1 = w[0] + a * o1;
-      w[0] = o1 - a * y1;
-      const float o2 = z[1] + a * y2;
-      z[1] = y2 - a * o2;
-      y2 = w[1] + a * o2;
-      w[1] = o2 - a * y2;
-      const float o3 = z[2] + a * y3;
-      z[2] = y3 - a * o3;
-      y3 = w[2] + a * o3;
-      w[2] = o3 - a * y3;
+      y1 = reverb_parts::allpassStep(z[0], a, y1);
+      y1 = reverb_parts::allpassStep(w[0], a, y1);
+      y2 = reverb_parts::allpassStep(z[1], a, y2);
+      y2 = reverb_parts::allpassStep(w[1], a, y2);
+      y3 = reverb_parts::allpassStep(z[2], a, y3);
+      y3 = reverb_parts::allpassStep(w[2], a, y3);
     }
     if (u < sections) {
-      const float o1 = z[0] + a * y1;
-      const float o2 = z[1] + a * y2;
-      const float o3 = z[2] + a * y3;
-      z[0] = y1 - a * o1;
-      z[1] = y2 - a * o2;
-      z[2] = y3 - a * o3;
-      y1 = o1;
-      y2 = o2;
-      y3 = o3;
+      y1 = reverb_parts::allpassStep(z[0], a, y1);
+      y2 = reverb_parts::allpassStep(z[1], a, y2);
+      y3 = reverb_parts::allpassStep(z[2], a, y3);
     }
     x1 = y1;
     x2 = y2;
@@ -180,7 +181,11 @@ class Spring {
     dly1_.clear();
     dly2_.clear();
     dly3_.clear();
-    lp1_ = lp2_ = lp3_ = hp1_ = hp2_ = hp3_ = ret_ = 0.0f;
+    for (OnePole* f : {&lp1_, &lp2_, &lp3_, &hp1_, &hp2_, &hp3_, &ret_}) f->clear();
+    for (float& v : hist_) v = 0.0f;
+    for (float& v : outHist_) v = 0.0f;
+    pend_ = 0.0f;
+    odd_ = false;
     lfoAcc_ = 0u;
     sections_ = 0;
     decay_ = 0.0f;
@@ -196,13 +201,21 @@ class Spring {
   // True while the springs rest, which is test information only.
   bool resting() const { return resting_; }
 
-  // Wet only; the caller mixes.
+  // Wet only; the caller mixes. Any n; the engine works in blocks of kBlock.
   //
   // With a silent input the springs run on until every loop has decayed below restLevel, which a
   // slow scan of their state confirms. Then they rest, output zeros and hold their state, which sits
   // under restLevel. The first block with sound ends the rest and the loops carry on from that state.
   // A tail that is still audible keeps the springs running, whatever the MIX.
   void process(const float* in, float* wet, int n, const SpringParams& p) {
+    for (int done = 0; done < n; done += kBlock) {
+      const int m = n - done < kBlock ? n - done : kBlock;
+      block(in + done, wet + done, m, p);
+    }
+  }
+
+ private:
+  void block(const float* in, float* wet, int n, const SpringParams& p) {
     const float decayTarget = smooth::clamp01(p.decay);
     if (!valid_) {
       decay_ = decayTarget;
@@ -228,18 +241,23 @@ class Spring {
     }
   }
 
- private:
   // A resting block outputs zeros. The wobble and TIME's smoother keep their pace, so the loops pick
   // up in step when sound returns.
   void rest(float* wet, int n, float decayTarget) {
     for (int i = 0; i < n; ++i) wet[i] = 0.0f;
     lfoAcc_ += static_cast<uint32_t>(n) * loop_.lfoStep;
     if (decay_ != decayTarget) {
+      // This block loop of smooth::step stays until smooth::advance lands with the Echo merge.
       for (int i = 0; i < n; ++i) decay_ = smooth::step(decay_, decayTarget, smooth::kSmoothCoef);
     }
   }
 
+  // One block of n <= kBlock samples. Input samples pair up as even then odd, and the loops tick on
+  // each odd one. The decimating half-band reads the input from 14 samples back to the odd sample,
+  // and the interpolating one reads the loops' last 8 outputs, so the output at each odd sample is the
+  // loop output 4 ticks back and the even sample after it lies half a tick on from that.
   void run(const float* in, float* wet, int n, float decayTarget) {
+    using namespace spring_detail;
     const Loop& loop = loop_;
 
     // The feedback and input gain at TIME's smoothed value come from the last block when it ended
@@ -251,27 +269,62 @@ class Spring {
       inputValid_ = true;
     }
     const Input in0 = input_;
-    const float inv = 1.0f / static_cast<float>(n);
-    const Wobble wob = wobbleFor(loop, n);
-    if (decay_ == decayTarget) {
-      for (int i = 0; i < n; ++i) {
-        const float f = static_cast<float>(i + 1) * inv;
-        wet[i] = tick(softClipHeadroom(in[i] * loop.drive, kReverbClipHeadroom) * in0.gain, in0.feedback, f, wob, loop);
-      }
-      return;
-    }
+    Input in1 = in0;
     float decayEnd = decay_;
-    for (int i = 0; i < n; ++i) decayEnd = smooth::step(decayEnd, decayTarget, smooth::kSmoothCoef);
-    const Input in1 = inputAt(loop, decayEnd);
-    for (int i = 0; i < n; ++i) {
-      const float f = static_cast<float>(i + 1) * inv;
-      const float g = in0.feedback + (in1.feedback - in0.feedback) * f;
-      const float gain = in0.gain + (in1.gain - in0.gain) * f;
-      wet[i] = tick(softClipHeadroom(in[i] * loop.drive, kReverbClipHeadroom) * gain, g, f, wob, loop);
+    const bool moving = decay_ != decayTarget;
+    if (moving) {
+      // This block loop of smooth::step stays until smooth::advance lands with the Echo merge.
+      for (int i = 0; i < n; ++i) decayEnd = smooth::step(decayEnd, decayTarget, smooth::kSmoothCoef);
+      in1 = inputAt(loop, decayEnd);
     }
-    decay_ = decayEnd;
-    input_ = in1;
-    inputDecay_ = decayEnd;
+
+    // The first odd sample of the block, and how many odd samples it holds.
+    const int first = odd_ ? 0 : 1;
+    const int ticks = n > first ? (n - first + 1) / 2 : 0;
+
+    float x[kHistory + kBlock];
+    for (int i = 0; i < kHistory; ++i) x[i] = hist_[i];
+    for (int i = 0; i < n; ++i) x[kHistory + i] = in[i];
+
+    float r[kReturnHistory + kMaxTicks];
+    for (int i = 0; i < kReturnHistory; ++i) r[i] = outHist_[i];
+
+    const Wobble wob = wobbleFor(loop, n);
+    const float inv = ticks > 0 ? 1.0f / static_cast<float>(ticks) : 0.0f;
+    for (int j = 0; j < ticks; ++j) {
+      const float f = static_cast<float>(j + 1) * inv;
+      const float* c = x + kHistory + first + 2 * j;  // the odd sample; c[-7] is the filter's centre
+      const float dec = 0.5f * c[-7] + kH0 * (c[-6] + c[-8]) + kH1 * (c[-4] + c[-10]) + kH2 * (c[-2] + c[-12]) +
+                        kH3 * (c[0] + c[-14]);
+      float g = in0.feedback, gain = in0.gain;
+      if (moving) {
+        g += (in1.feedback - in0.feedback) * f;
+        gain += (in1.gain - in0.gain) * f;
+      }
+      r[kReturnHistory + j] = tick(softClipHeadroom(dec * loop.drive, kReverbClipHeadroom) * gain, g, f, wob, loop);
+    }
+
+    // Each odd sample leaves as the loop output 4 ticks back; the even sample after it as the point
+    // half a tick on, from the 8 outputs round it. A block that opens on an even sample first emits
+    // the point left over from the last tick.
+    int i = 0;
+    if (first == 1) wet[i++] = pend_;
+    for (int j = 0; j < ticks; ++j) {
+      const float* u = r + j;  // u[7] is this tick's output
+      wet[i++] = u[3];
+      const float half = 2.0f * (kH0 * (u[3] + u[4]) + kH1 * (u[2] + u[5]) + kH2 * (u[1] + u[6]) + kH3 * (u[0] + u[7]));
+      if (i < n) wet[i++] = half;
+      pend_ = half;
+    }
+
+    for (int k = 0; k < kHistory; ++k) hist_[k] = x[n + k];
+    for (int k = 0; k < kReturnHistory; ++k) outHist_[k] = r[ticks + k];
+    odd_ = ((odd_ ? 1 : 0) + n) % 2 == 1;
+    if (moving) {
+      decay_ = decayEnd;
+      input_ = in1;
+      inputDecay_ = decayEnd;
+    }
   }
 
   // Every sample of the block is under level in magnitude. A NaN is not.
@@ -311,19 +364,19 @@ class Spring {
       }
     }
     if (scanSpan_ < kScanSpans) return false;
-    float filters = fabsf(ret_);
-    for (const float v : {lp1_, lp2_, lp3_, hp1_, hp2_, hp3_}) filters = fmaxf(filters, fabsf(v));
+    float filters = fabsf(ret_.y);
+    for (const OnePole* f : {&lp1_, &lp2_, &lp3_, &hp1_, &hp2_, &hp3_}) filters = fmaxf(filters, fabsf(f->y));
     const bool quiet = scanPeak_ < level && filters < level;
     scanSpan_ = 0;
     scanPeak_ = 0.0f;
     return quiet;
   }
 
-  // Everything the loops take from the tuning, once per block.
+  // Everything the loops take from the tuning, once per tuning change.
   struct Loop {
-    float feedbackLo, feedbackHi, k, chirpA, lpF, hpF, retF, depth, adv1, adv2, adv3;
+    float feedbackLo, feedbackHi, k, chirpA, depth, adv1, adv2, adv3;
     float drive, compWet;
-    uint32_t lfoStep;
+    uint32_t lfoStep;  // per engine sample
     int sections;
   };
 
@@ -332,8 +385,8 @@ class Spring {
     float base1, base2, base3, rise1, rise2, rise3;
   };
 
-  // The three wobble LFOs, evaluated at the block edges. Sample i of n reads at the fraction
-  // (i + 1) / n of the way, so the last sample lands on the end value. Advances the LFO by the block.
+  // The three wobble LFOs, evaluated at the block edges. Tick j of t reads at the fraction (j + 1) / t
+  // of the way, so the last tick lands on the end value. Advances the LFO by the n samples of the block.
   Wobble wobbleFor(const Loop& l, int n) {
     const uint32_t end = lfoAcc_ + static_cast<uint32_t>(n) * l.lfoStep;
     const auto edge = [&](uint32_t phase8, float adv, float& base, float& rise) {
@@ -368,20 +421,21 @@ class Spring {
     if (l.sections > kMaxSections) l.sections = kMaxSections;
     if (l.sections > sections_) disp_.clearFrom(sections_);
     sections_ = l.sections;
-    l.lpF = onePoleCoef(t.trebleLossHz);
-    l.hpF = onePoleCoef(t.bassCutHz);
-    l.retF = onePoleCoef(t.returnLpHz);
-    l.depth = clampf(t.wobbleDepth, 0.0f, kMaxWobble);
+    const float rate = static_cast<float>(kLoopRate);
+    lp1_.setAt(t.trebleLossHz, rate);
+    lp2_.a = lp3_.a = lp1_.a;
+    hp1_.setAt(t.bassCutHz, rate);
+    hp2_.a = hp3_.a = hp1_.a;
+    ret_.setAt(t.returnLpHz, rate);
+    l.depth = 0.5f * clampf(t.wobbleDepth, 0.0f, kMaxWobble);
     l.lfoStep = static_cast<uint32_t>(clampf(t.wobbleRateHz, 0.0f, kMaxWobbleHz) * reverb_parts::kPhasePerHz);
     l.adv1 = advance(t.springMs1, kDiff1A + kDiff1B, kDly1, l.depth);
     l.adv2 = advance(t.springMs2, kDiff2A + kDiff2B, kDly2, l.depth);
     l.adv3 = advance(t.springMs3, kDiff3A + kDiff3B, kDly3, l.depth);
     const float wetGain = powf(10.0f, clampf(t.wetDb, -kMaxWetDb, kMaxWetDb) / 20.0f);
-    const float dwell = smooth::clamp01(t.dwell);
-    const float logDrive = logf(clampf(t.dwellDrive, 1.0f, kMaxDwellDrive));
-    l.drive = expf(logDrive * dwell);
-    const float comp = expf(-clampf(t.dwellComp, 0.0f, kMaxDwellComp) * logDrive * dwell);
-    l.compWet = comp * wetGain;
+    const reverb_parts::DwellGain dwell = reverb_parts::dwellGain(t.dwell, t.dwellDrive, t.dwellComp);
+    l.drive = dwell.drive;
+    l.compWet = dwell.comp * wetGain;
     return l;
   }
 
@@ -400,12 +454,12 @@ class Spring {
     return {g, l.compWet * sqrtf((1.0f - g * g) / g)};
   }
 
-  // One sample of the three loops for the driven input x at feedback g, at fraction f of the way
+  // One tick of the three loops for the driven input x at feedback g, at fraction f of the way
   // through the block's wobble.
   CV_INLINE float tick(float x, float g, float f, const Wobble& w, const Loop& l) {
-    const float out1 = filter(dly1_.read(w.base1 + w.rise1 * f) * g, lp1_, hp1_, l.lpF, l.hpF);
-    const float out2 = filter(dly2_.read(w.base2 + w.rise2 * f) * g, lp2_, hp2_, l.lpF, l.hpF);
-    const float out3 = filter(dly3_.read(w.base3 + w.rise3 * f) * g, lp3_, hp3_, l.lpF, l.hpF);
+    const float out1 = filter(dly1_.read(w.base1 + w.rise1 * f) * g, lp1_, hp1_);
+    const float out2 = filter(dly2_.read(w.base2 + w.rise2 * f) * g, lp2_, hp2_);
+    const float out3 = filter(dly3_.read(w.base3 + w.rise3 * f) * g, lp3_, hp3_);
     float tap1 = d1b_.run(d1a_.run(out1, l.k), l.k);
     float tap2 = d2b_.run(d2a_.run(out2, l.k), l.k);
     float tap3 = d3b_.run(d3a_.run(out3, l.k), l.k);
@@ -413,24 +467,24 @@ class Spring {
     dly1_.write(tap1 + x);
     dly2_.write(tap2 + x);
     dly3_.write(tap3 + x);
-    ret_ += (tap1 + tap2 + tap3 - ret_) * l.retF;
-    return ret_;
+    return ret_.lp(tap1 + tap2 + tap3);
   }
 
-  // Read advance that makes the spring's delay plus its diffusers springMs long, with room left for
-  // the wobble to shorten it further. A longer spacing clamps to the line of lineLen samples.
+  // Read advance that makes the spring's delay, its diffusers and the half-band filters springMs long,
+  // with room left for the wobble to shorten it further. A longer spacing clamps to the line of
+  // lineLen samples.
   static float advance(float springMs, int diffusers, int lineLen, float depth) {
     using namespace spring_detail;
-    const float len = clampf(springMs * kMsToSamples - static_cast<float>(diffusers),
+    const float len = clampf(springMs * kMsToSamples - static_cast<float>(diffusers) - kFilterDelay,
                              static_cast<float>(kMinDly) + depth, static_cast<float>(lineLen));
     return static_cast<float>(lineLen) - len;
   }
 
   // One-pole treble loss, then one-pole bass cut.
-  static float filter(float in, float& lp, float& hp, float lpF, float hpF) {
-    lp += (in - lp) * lpF;
-    hp += (lp - hp) * hpF;
-    return lp - hp;
+  static CV_INLINE float filter(float in, OnePole& lp, OnePole& hp) {
+    const float low = lp.lp(in);
+    hp.lp(low);
+    return low - hp.y;
   }
 
   reverb_parts::Allpass<spring_detail::kDiff1A> d1a_;
@@ -443,8 +497,12 @@ class Spring {
   reverb_parts::Delay<spring_detail::kDly1> dly1_;
   reverb_parts::Delay<spring_detail::kDly2> dly2_;
   reverb_parts::Delay<spring_detail::kDly3> dly3_;
-  float lp1_ = 0.0f, lp2_ = 0.0f, lp3_ = 0.0f, hp1_ = 0.0f, hp2_ = 0.0f, hp3_ = 0.0f;
-  float ret_ = 0.0f;  // return low-pass state
+  OnePole lp1_, lp2_, lp3_, hp1_, hp2_, hp3_;  // each spring's treble loss and bass cut
+  OnePole ret_;                                // low-pass on the summed return
+  float hist_[spring_detail::kHistory] = {};   // the last input samples, for the decimating filter
+  float outHist_[spring_detail::kReturnHistory] = {};  // the last loop outputs, for the interpolating one
+  float pend_ = 0.0f;                          // the point between the last two loop outputs
+  bool odd_ = false;                           // the next input sample is an odd one
   uint32_t lfoAcc_ = 0u;
   int sections_ = 0;
   float decay_ = 0.0f;

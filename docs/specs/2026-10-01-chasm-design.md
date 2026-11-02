@@ -1,5 +1,8 @@
 # cubevox — CHASM reverb (second engine in the reverb block)
 
+Sections "What it is" to "Done when" are the 2026-10-01 port. "Box code" at the end is the box at
+v2.01.11 (the speed pass of 2026-11-02) and wins where they differ.
+
 Date 2026-10-01. Owner: "port in the chasm reverb from drumsynthv3 as a switchable
 option for verb." Panel stage 9 stays two knobs; with CHASM selected they read
 DECAY and WOBBLE. Engine select is a prototype radio (SPRING B | CHASM) and a params
@@ -124,10 +127,10 @@ split further as already specified). `ProtoParams.spring` is replaced by
 
 ## Render CLI
 
-`--reverb <spring|chasm>` selects and enables; `--dwell` sets Chasm's dwell (Spring's is the
-`springDwell` tuning key); `--decay <0..1>`, `--wobble <0..1>` for chasm; `--rmix <0..1>` sets MIX
-(default 0.5). Tuning keys `chm` +
-field name (`chmTimeLo`, `chmWobbleDepthMax`, `chmWetDb`, …).
+`--reverb <spring|chasm>` selects and enables; `--time <0..1>` and `--mix <0..1>` are the panel's
+TIME and MIX positions (default 0.5). Tuning keys are `chm` + the field name (`chmBassCutHz`,
+`chmWobbleDepth`, `chmWobbleRateHz`, `chmDwell`, `chmWetDb`, …); every key refuses a value outside
+the range the engine takes.
 
 ## Tests (`test/chasm_test.cpp`, ctest `chasm`)
 
@@ -155,7 +158,40 @@ Spring's test file is unchanged; it keeps driving `Spring` directly.
 `ctest` passes; REVERB block switches engines with relabelled knobs; owner A/Bs
 Spring and Chasm on a vocal loop.
 
-Level rule (see `2026-10-01-level-rule.md`): `wetDb` +19.2 dB puts the wet alone at +0.28 dB
-out/in at the box's settings, TIME 50 % and dwell 0.20.
+## Box code (v2.01.11, speed pass 2026-11-02)
 
-Box code: the card's knobs are MIX and TIME; dwell is a tuning value with no knob (0.20).
+The card is "Chasm Reverb", knobs TIME (upper) and MIX (lower). Owner picks 2026-11-02: Q1 C (the
+fitted 8-unit chirp) and Q2 B (four loop allpasses, decay-matched).
+
+1. Loop. dly1 → allpass 1a, 1c → dly2 → allpass 2a, 2c → dly1, four allpasses at k 0.6. Each delay
+   read is scaled by the feedback and passes a one-pole high-pass. The loop has no treble filter,
+   and the input has no shelf.
+2. TIME sets the feedback through `kChasmFeedback`, 0.564 / 0.650 / 0.805 at 0 / 50 / 100 %,
+   piecewise linear. The first build mapped TIME through `kChasmDecay` (0.10 / 0.30 / 0.70) to
+   `0.35 + 0.51 × decay`, so 0.401 / 0.503 / 0.707 on the eight-allpass loop. The new values are
+   those raised to the power 0.627, the ratio of the two loops' laps, so the tail keeps its length.
+   T60 at TIME 0 / 50 / 100 %: 0.77 / 0.95 / 1.79 s.
+3. The bass cut is 200 Hz up to TIME 75 % and slides to 151.57 Hz at 100 %, on the same curve.
+4. The input gain is 0.3 × (1 − g²) / (1 − g_mid²) at feedback g, so the wet level holds across
+   TIME within 0.35 dB (the first build moved up to 5 dB).
+5. Chirp. Four stages of 8 allpasses of lengths 3 / 5 / 6 / 7 at k −0.883 / −0.812 / −0.777 /
+   −0.743, fitted so the group delay stays within 5 ms of the 16-unit chirp from 50 Hz to 6 kHz.
+   The chirp lead is 11.52 ms (16.85 ms with 16 units). The stages run over the block in place,
+   3 or 4 samples at a time.
+6. Wobble. The tuning fields `wobbleDepth` (25.08 samples) and `wobbleRateHz` (4.57 Hz). The sine
+   is worked out at the block edges and read linearly between.
+7. Dwell 0.20 drives a soft clip ahead of the loop with a level compensation, as in Spring; it
+   has no knob.
+8. MIX sets the equal-power crossfade through `kReverbWet`, 0 / 0.15 / 0.60 at 0 / 50 / 100 %.
+   MIX 0 leaves the dry path a bit-exact copy, and Chasm keeps running there so its tail is ready
+   when MIX comes up (lead 2026-11-02).
+9. Level. `wetDb` 17.7 dB puts the wet alone (the crossfade forced to wet) at +0.26 dB on the mean
+   of Adam's clips (clips +0.83 / −0.13 / +0.07 dB). TIME rows at 0 / 50 / 100 %: −0.09 / +0.26 /
+   +0.18 dB. MIX 50 % rows sit within ±0.15 dB.
+10. `ChasmTuning` holds 9 floats, and the engine clamps every field.
+11. CPU. Host, ns a sample, knobs at top: 88.6 → 15.9 (clang), 70.5 → 14.0 (g++). The M7 model
+    (llvm-mca on the firmware's GCC build) reads 28.6k cycles a block (4.5 %) and 32.6k with MIX
+    moving. `kReverbChasm` {5, 6, false} until a stress run measures the new engine; the old one
+    read 16.0 % mean on the board.
+12. Ruled out: halving the chirp by doubling L, the chirp and loop at 24 kHz, fast convolution, a
+    Q31 chirp, assembly, skipping the chirp at MIX 0, the division-free soft clip.

@@ -61,12 +61,13 @@ because the rule binds the default.
 
 The reverb rows take every setting from the registry: the card placed and switched on, TIME
 and dwell where the box leaves them (TIME 50 %, dwell 0.20), and the crossfade forced to the
-wet alone. There ChasmTuning.wetDb = +19.2 dB reads +0.28 dB. Spring's rows run on Adam's
-three clips and are judged on their mean (owner 2026-11-01: Adam's clips govern the reverb
-level): SpringTuning.wetDb = +0.29 dB, the one gain ahead of the loops since the 2026-11-02 fix
-pass, reads +0.51 / +0.38 / -0.14 dB, mean +0.25 dB. MIX 50 % rows report against the
--1.5..+1.0 dB band: Octave -12 +0.17 dB, Chasm +0.35 dB, Spring +0.04 / +0.06 / -0.02 dB on the
-clips. Harmony and Octave A and B are out of the code, so their rows are gone.
+wet alone. Both reverbs' rows run on Adam's three clips and are judged on their mean (owner
+2026-11-01: Adam's clips govern the reverb level). After the reverb speed pass (v2.01.11),
+ChasmTuning.wetDb = +17.7 dB reads +0.83 / -0.13 / +0.07 dB, mean +0.26 dB, and
+SpringTuning.wetDb = +0.37 dB, the one gain ahead of the loops, reads +0.92 / +0.23 / -0.54 dB,
+mean +0.20 dB. The table's +19.0 and the later +19.2 dB were Chasm's eight-allpass loop. MIX 50 %
+rows report against the -1.5..+1.0 dB band and sit within ±0.15 dB for both reverbs. Harmony and
+Octave A and B are out of the code, so their rows are gone.
 
 ## Notes
 
