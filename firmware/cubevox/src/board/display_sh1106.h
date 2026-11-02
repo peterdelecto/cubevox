@@ -15,5 +15,6 @@ constexpr uint8_t kOledAddress = CV_SH1106_ADDRESS;  // 7-bit
 bool sh1106Present();
 
 // Canvas display on the SH1106. Starts the bus and the panel on the first call. A panel that is
-// missing or stops answering is restarted on the retry window of core/display.h's PanelLink.
+// missing or stops answering is restarted on the retry window of core/display.h's PanelLink. The
+// wanted contrast goes out ahead of the next page, and again after a restart.
 Display& sh1106Display();

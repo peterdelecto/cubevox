@@ -21,7 +21,7 @@ static const uint8_t kInit[] = {
     0xA1u,         // segment remap
     0xC8u,         // COM scan reversed
     0xDAu, 0x12u,  // COM pins
-    0x81u, 0xCFu,  // contrast
+    0x81u, CV_SH1106_INIT_CONTRAST,  // contrast
     0xD9u, 0xF1u,  // pre-charge
     0xDBu, 0x40u,  // VCOMH deselect
     0x2Eu,         // scroll off
@@ -29,6 +29,7 @@ static const uint8_t kInit[] = {
     0xA6u,         // not inverted
 };
 static const uint8_t kDisplayOn = 0xAFu;
+static const uint8_t kSetContrast = 0x81u;
 
 static void pause(void) {
   for (volatile uint32_t n = 0; n < 1000u; ++n) {}
@@ -113,3 +114,8 @@ bool cvSh1106Page(const CvSh1106Bus* bus, uint8_t page, const uint8_t data[CV_SH
 }
 
 bool cvSh1106DisplayOn(const CvSh1106Bus* bus) { return panelWrite(bus, CV_SH1106_COMMANDS, &kDisplayOn, 1u); }
+
+bool cvSh1106Contrast(const CvSh1106Bus* bus, uint8_t contrast) {
+  const uint8_t command[2] = {kSetContrast, contrast};
+  return panelWrite(bus, CV_SH1106_COMMANDS, command, sizeof command);
+}

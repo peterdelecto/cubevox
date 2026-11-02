@@ -563,7 +563,8 @@ void Window::ensureProofTarget() {
 
 void Window::end(const Box& box) {
   const Pixels& pixels = box.pixels();
-  for (size_t i = 0; i < pixels.size(); ++i) oledRgba_[i] = pixels[i] != 0 ? kOledOn : kOledOff;
+  const ImU32 lit = oledLit(box.contrast());
+  for (size_t i = 0; i < pixels.size(); ++i) oledRgba_[i] = pixels[i] != 0 ? lit : kOledOff;
   glBindTexture(GL_TEXTURE_2D, oledTexture_);
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kCanvasWidth, kCanvasHeight, GL_RGBA, GL_UNSIGNED_BYTE, oledRgba_.data());
 

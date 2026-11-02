@@ -17,8 +17,8 @@ enum class ApplyResult : uint8_t {
   EnterDfu,         // nothing changed; the caller mutes and resets into the bootloader
 };
 
-// Applies `action` to `settings` and `layout`. Each toggle flips its setting and the top switch
-// cycles.
+// Applies `action` to `settings` and `layout`. Each toggle flips its setting, and the top switch and
+// the brightness cycle through their values.
 // The reverb action swaps the reverb card between Spring and Chasm in its slot. It changes nothing
 // when no slot holds a reverb card, or when the other card would push the layout past the CPU budget.
 // The Unison and Crowd action does the same between Unison and Crowd in the slot that holds either,

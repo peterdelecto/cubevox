@@ -24,7 +24,7 @@ constexpr size_t kOffSequence = 8;
 constexpr size_t kOffName = 12;
 constexpr size_t kOffSlots = kOffName + kLayoutNameBytes;
 constexpr size_t kOffSettings = kOffSlots + kSlotCount * kRecordCardFieldBytes;
-constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, polish eq, top switch, debug, 2 retired, 8 reserved
+constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, polish eq, top switch, debug, 2 retired, brightness, 7 reserved
 constexpr size_t kOffCrc = kOffSettings + kSettingsBytes;
 
 // Byte offsets of the settings, in file order. A v1 record has the first two.
@@ -40,10 +40,16 @@ constexpr size_t kOffDebug = kOffSettings + 5;  // a record written before it ex
 constexpr size_t kOffRetired = kOffSettings + 6;
 constexpr size_t kRetiredBytes = 2;
 
+// The brightness is the level's index plus one, so a record written before the byte existed holds 0,
+// which reads as the default level.
+constexpr size_t kOffBrightness = kOffSettings + 8;
+
 constexpr uint16_t kRecordSchema = 2;
 constexpr uint16_t kRecordSchemaV1 = 1;  // still read; the v2 settings take their defaults
 
 static_assert(kOffCrc + 4 == kRecordBytes, "record fields must add up to 256 bytes");
+static_assert(kOffBrightness >= kOffRetired + kRetiredBytes && kOffBrightness < kOffCrc,
+              "the brightness byte sits after the retired pair, inside the settings");
 static_assert(kRecordBytes % kFlashWordBytes == 0, "record must be a whole number of flash words");
 
 struct RecordData {

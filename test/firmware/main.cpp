@@ -32,6 +32,7 @@ int main() {
   checkEntryLog();
   checkCrc32();
   checkBootHealth();
+  checkScreenDim();
   checkSplash();
   checkBootDecide();
   std::printf("firmware_test: version %s, %d failures\n", kFirmwareVersion, gFailures);

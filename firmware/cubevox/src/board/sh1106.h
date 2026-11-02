@@ -20,6 +20,8 @@ extern "C" {
 // A page is one byte per column, bit 0 on top, and the panel is 8 pages tall.
 #define CV_SH1106_PAGE_BYTES 128u
 #define CV_SH1106_PAGES 8u
+// The contrast the init sequence sets.
+#define CV_SH1106_INIT_CONTRAST 0xCFu
 
 // The bus the panel hangs on. The caller enables the I2C kernel clock and the GPIO port clock first.
 typedef struct {
@@ -43,6 +45,9 @@ bool cvSh1106Page(const CvSh1106Bus* bus, uint8_t page, const uint8_t data[CV_SH
 // Turns the display on. The caller sends it once a whole frame is in the panel's RAM, so the panel
 // never shows what a power-up left there.
 bool cvSh1106DisplayOn(const CvSh1106Bus* bus);
+
+// Sets the panel's contrast, 0 to 255. A start sets CV_SH1106_INIT_CONTRAST. Fails like a page write.
+bool cvSh1106Contrast(const CvSh1106Bus* bus, uint8_t contrast);
 
 #ifdef __cplusplus
 }
