@@ -4,11 +4,11 @@
 For each layout the script puts the layout on the box, forces every slot on (bench all_on), plays
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
-to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper knob), the reverb MIX
-(the reverb slot's lower knob), both Echo knobs and, when Crowd is placed, both Crowd knobs from 0 %
-to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep. When Echo is
-placed it then flips Echo's toggle ten times, 0.3 s apart, so the engine starts from reset five
-times, and reads the counters again.
+to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper knob), Formant MIX
+(its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Chatter knobs,
+both Lo-fi knobs and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in steps of
+10 %, 1 s each, reading the counters after each sweep. When Echo is placed it then flips Echo's toggle
+ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
@@ -24,8 +24,10 @@ and the stage row when Octave or Formant is placed without Autotune.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
-crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot) and
-formant-alone (Formant with Autotune's slot empty). The saved layout is read first and put back at the end,
+crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
+formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
+slot) and heaviest (Input gate, Formant, Unison and Crowd, Gate, Distortion, Chatter and the default reverb,
+with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
 
@@ -71,7 +73,8 @@ SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the eng
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
-LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone")
+LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
+                "chatter", "lofi", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -79,7 +82,7 @@ ROW_OF = {
     "input_gate": "kInputGate", "autotune": "kAutotune", "octave": "kOctave", "unison": "kUnison",
     "slapback": "kSlapback", "distortion": "kDistortion", "gate": "kGate",
     "reverb_spring": "kReverbSpring", "reverb_chasm": "kReverbChasm", "crowd": "kCrowd",
-    "formant": "kFormant",
+    "formant": "kFormant", "bloom": "kBloom", "lofi": "kLofi",
 }
 TRACKER_ROW = "kTracker"
 STAGE_ROW = "kPitchStage"  # the stage's own work when Octave or Formant runs without Autotune
@@ -155,13 +158,22 @@ def layout_table():
         raise StressError("the default layout has no unison slot for the crowd layout to replace")
     if "autotune" not in base or "octave" not in base:
         raise StressError("the default layout has no Autotune or Octave slot for the pitch layouts to change")
+    if "gate" not in base:
+        raise StressError("the default layout has no gate slot for the chatter and lofi layouts to replace")
+    reverbs = [c for c in base if c.startswith("reverb_")]
+    if not reverbs:
+        raise StressError("the default layout has no reverb slot for the heaviest layout to keep")
     crowd = ["crowd" if c == "unison" else c for c in base]
     # Octave and Formant alone leave the stage's tracker idle, so their rows show without Autotune's.
     octave_alone = ["empty" if c == "autotune" else c for c in base]
     formant = ["formant" if c == "octave" else c for c in base]
     formant_alone = ["formant" if c == "octave" else ("empty" if c == "autotune" else c) for c in base]
+    chatter = ["bloom" if c == "gate" else c for c in base]
+    lofi = ["lofi" if c == "gate" else c for c in base]
+    heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
-            "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False)}
+            "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
+            "chatter": (chatter, False), "lofi": (lofi, False), "heaviest": (heaviest, True)}
 
 
 def slot_bounds(slots, chasm, rows):
@@ -329,11 +341,18 @@ def sweeps(slots):
             found.append((i, 1, "SEMITONES"))
         if card == "formant":
             found.append((i, 1, "SHIFT"))
+            found.append((i, 2, "Formant MIX"))
         if card.startswith("reverb_"):
             found.append((i, 2, "reverb MIX"))
         if card == "slapback":
             found.append((i, 1, "Echo TIME"))
             found.append((i, 2, "Echo AMOUNT"))
+        if card == "bloom":
+            found.append((i, 1, "Chatter LENGTH"))
+            found.append((i, 2, "Chatter AMOUNT"))
+        if card == "lofi":
+            found.append((i, 1, "Lo-fi TONE"))
+            found.append((i, 2, "Lo-fi AMOUNT"))
         if card == "crowd":
             found.append((i, 1, "Crowd DIVERGE"))
             found.append((i, 2, "Crowd VOICES"))
