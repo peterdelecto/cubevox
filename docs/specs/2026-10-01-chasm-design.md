@@ -124,8 +124,8 @@ split further as already specified). `ProtoParams.spring` is replaced by
 
 ## Render CLI
 
-`--reverb <spring|chasm>` selects and enables; `--tension/--dwell` keep working
-for spring; `--decay <0..1>`, `--wobble <0..1>` for chasm; `--rmix <0..1>` sets MIX
+`--reverb <spring|chasm>` selects and enables; `--dwell` sets Chasm's dwell (Spring's is the
+`springDwell` tuning key); `--decay <0..1>`, `--wobble <0..1>` for chasm; `--rmix <0..1>` sets MIX
 (default 0.5). Tuning keys `chm` +
 field name (`chmTimeLo`, `chmWobbleDepthMax`, `chmWetDb`, …).
 

@@ -6,14 +6,15 @@
 #include "engine/chasm.h"
 #include "engine/common.h"
 #include "engine/dsp.h"
+#include "engine/reverb_parts.h"
 #include "engine/smooth.h"
 #include "engine/spring.h"
 
 // Reverb block: Spring or Chasm behind one on/off smoother.
 // The selected engine runs; the engine left behind is cleared on a switch.
 // While settled off, neither engine runs and the block is a bit-exact copy.
-// The engine's wet output passes a 5 Hz DC blocker (kWetDcBlockHz) before the mix, so the dry path
-// is untouched and MIX 0 stays a bit-exact copy.
+// The engines' loops carry bass cuts, so the wet path holds no DC and needs no blocker (reverb_clean_test
+// holds it under -90 dBFS). MIX 0 leaves the dry path untouched, a bit-exact copy.
 // Each engine keeps its own wetDb, a level trim. The crossfade runs equal-power
 // from dry (0) to wet only (1), smoothed over 20 ms; its gains are evaluated at
 // the block edges and interpolated between.
@@ -56,10 +57,10 @@ class Reverb {
  public:
   Reverb() { reset(); }
 
+  // Clears the engine that holds state. A switch and an idle block clear the engine they leave, so
+  // the other one is clear already.
   void reset() {
-    chasm_.reset();
-    spring_.reset();
-    dc_.clear();
+    clear(engine_);
     active_ = 0.0f;
     wet_ = 0.0f;
     gains_ = gainsAt(0.0f);
@@ -68,7 +69,7 @@ class Reverb {
     valid_ = false;
   }
 
-  // The engines' scratch holds one block, so a longer call runs in block-sized pieces.
+  // Reverb's scratch holds one block, so a longer call runs in block-sized pieces.
   void process(const float* in, float* out, int n, const ReverbParams& p) {
     for (int done = 0; done < n; done += kBlock) {
       const int m = n - done < kBlock ? n - done : kBlock;
@@ -117,16 +118,24 @@ class Reverb {
     } else {
       spring_.process(in, scratch_.data(), n, p.spring);
     }
-    for (int i = 0; i < n; ++i) scratch_[static_cast<size_t>(i)] = dc_.run(scratch_[static_cast<size_t>(i)]);
     mixBlock(in, out, n, target, wetTarget);
   }
 
   void mixBlock(const float* in, float* out, int n, float target, float wetTarget) {
+    // A smoother at its target holds it, so the step loops run only while a value moves.
     float wetEnd = wet_;
-    for (int i = 0; i < n; ++i) wetEnd = smooth::step(wetEnd, wetTarget, smooth::kSmoothCoef);
+    if (wetEnd != wetTarget) {
+      for (int i = 0; i < n; ++i) wetEnd = smooth::step(wetEnd, wetTarget, smooth::kSmoothCoef);
+    }
     const Gains g0 = gains_;
     if (wetEnd != wet_) gains_ = gainsAt(wetEnd);
     const Gains g1 = gains_;
+    if (active_ == target && wetEnd == wet_) {
+      const float dryLess1 = g0.dry - 1.0f;
+      for (int i = 0; i < n; ++i)
+        out[i] = in[i] + active_ * (dryLess1 * in[i] + g0.wet * scratch_[static_cast<size_t>(i)]);
+      return;
+    }
     const float inv = 1.0f / static_cast<float>(n);
     for (int i = 0; i < n; ++i) {
       active_ = smooth::step(active_, target, smooth::kSmoothCoef);
@@ -143,12 +152,10 @@ class Reverb {
       chasm_.reset();
     else
       spring_.reset();
-    dc_.clear();
   }
 
   Chasm chasm_;
   Spring spring_;
-  DcBlocker dc_;                         // high-pass on the engine's wet output, ahead of the mix
   std::array<float, kBlock> scratch_{};  // the engine's wet output
   float active_ = 0.0f;
   float wet_ = 0.0f;  // smoothed crossfade

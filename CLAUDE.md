@@ -11,10 +11,13 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
   near unity, 0 to +0.5 dB RMS over its input on program material. The trim that
   gets a stage there lives in its tuning (wetDb / trimDb); the panel knobs never
   carry a hidden level offset. `level_test` enforces it. Stages with a MIX knob
-  (Harmony, Octave, Reverb) are trimmed so the WET path alone at MIX 100 % is unity
-  (Harmony: one voice at High); the equal-power crossfade then stays near unity at
+  (Harmony, Octave, Formant, Reverb) are trimmed so the WET path alone is unity
+  (Harmony: one voice at High; the reverb's MIX tops at a 0.60 crossfade, so its
+  `level_test` row forces the crossfade to the wet); the equal-power crossfade then stays near unity at
   every MIX. Trimming at MIX 50 % instead pushed the wet +8 dB and clipped at full mix
-  (owner 2026-10-02).
+  (owner 2026-10-02). Cards that add their wet on top of the dry (Echo, CHATTER,
+  Unison) never lower the dry: their trim sits on the wet alone, so Adam's voice stays
+  at unity at every AMOUNT (owner 2026-11-01).
 - Version (owner 2026-10-02): the face shows `VERSION.txt` bottom left (started v0.01.00).
   Every change that rebuilds the app bumps it first with `tools/bump_version.sh`, in the
   same commit. Not named `VERSION`: the Mac's case-insensitive disk lets `<version>` find it.
@@ -52,4 +55,5 @@ Slots (Adam 2026-10-07, `docs/specs/2026-10-07-slots-design.md`): 8 effect slots
 Default layout, slot 1 to 8, each card's knobs as upper pot+lower pot; the amount knob (MIX, DEPTH, DRIVE) is the lower pot of every slot (owner 2026-10-30): Input Gain (analog, off the grid) · Input gate Threshold+Decay (-80..-30 dBFS, 20 ms..2 s, owner 2026-10-30) · Autotune Key+Response (NATURAL → MECHANICAL, no mix) · Harmony has no card (owner 2026-10-08) and no engine in the code since 2026-10-24 ·
 Octave Semitones (-12..+12, 25 positions, owner 2026-10-08)+Mix ·
 Unison Rate+Depth · Echo (was Slapback, owner 2026-11-01; id `slapback`) Time (60..250 ms)+Amount (level + repeats) · Distortion Tone+Drive · Gate Threshold+Decay ·
-Reverb Time (decay; replaced Dwell, owner 2026-10-07)+Mix: each engine is its own library card, "Spring Reverb" (SPRING B) in the default layout, "Chasm Reverb" available; the old Spring engine is removed (owner 2026-10-08; the engine menu item is gone) · EQ (menu) · Output (menu)
+Reverb Time (decay; replaced Dwell, owner 2026-10-07)+Mix: each engine is its own library card, "Spring Reverb" (SPRING B) in the default layout, "Chasm Reverb" available; the old Spring engine is removed (owner 2026-10-08; the engine menu item is gone) · EQ (menu) · Output (menu).
+Library cards that swap in from the menu: Formant (slot 3, with Octave), MOB (slot 4, with Unison), Lo-fi and CHATTER (slot 7, with Gate), Chasm Reverb (slot 8, with Spring).

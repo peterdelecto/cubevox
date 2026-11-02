@@ -1,4 +1,4 @@
-# cubevox — six small firmware additions: slot crossfade, DC blockers, ceiling order, late blocks, brownout, power-on
+# cubevox — six small firmware additions: slot crossfade, Octave's DC blocker, ceiling order, late blocks, brownout, power-on
 
 Owner list 2026-10-30, after board 1's first week on the bench. Six changes to how the box
 treats the edges of its signal path: a toggle flip, a block that runs late, the rails going
@@ -18,13 +18,18 @@ than the fade allows, that the mix sums to unity power at the midpoint, that the
 for exactly the fade blocks after a flip to off, and that a flip back on starts from a cleared
 engine.
 
-## 2. DC blockers after Octave and the reverb
-Octave's granular shifter and the reverb's loops can carry a DC offset into the compressor,
-which then pumps on it. Each gets a one-pole high-pass at 5 Hz on its output, inside the engine
-header (`engine/octave.h`, `engine/reverb.h`) so the emulator and `cubevox-render` carry it too.
-Distortion keeps its own at 10 Hz. Host tests: the engine's test feeds a 0.5 DC step and
-checks the output settles under -60 dBFS within 200 ms, and a 100 Hz tone passes within 0.05 dB;
-the level rule rows of both cards stay within their bands.
+## 2. DC blocker after Octave
+Octave's granular shifter can carry a DC offset into the compressor, which then pumps on it. It
+gets a one-pole high-pass at 5 Hz on its output, inside the engine header (`engine/octave.h`) so
+the emulator and `cubevox-render` carry it too. Distortion keeps its own at 10 Hz. Host tests: the
+engine's test feeds a 0.5 DC step and checks the output settles under -60 dBFS within 200 ms, and
+a 100 Hz tone passes within 0.05 dB; the level rule rows stay within their bands.
+
+The reverb had the same blocker until the 2026-11-02 Spring fix pass. The owner said "we can
+remove the dc blocker if it does nothing", so it was measured first. A 0.5 DC step leaves the wet
+mean at -129 to -145 dBFS on Spring and -141 to -164 dBFS on Chasm (TIME 0 / 50 / 100 %), and
+with Distortion at 100 % ahead of it the DC the blocker took out sat at -104 to -149 dBFS on
+Adam's clips. The blocker went; `reverb_clean_test` holds the wet mean under -90 dBFS.
 
 ## 3. Soft ceiling ahead of the output trim
 Today the output stage applies the trim and then the ceiling, `softCeiling(a[i] * gain)`. With
@@ -86,7 +91,7 @@ without strain. The firmware wait then drops to 1 s.
 
 ## Costs and budget
 Items 1 and 2 add work: six blocks of double running per flipped slot (bounded, not steady), and
-two one-pole filters per block. No `costs.h` card row changes by more than a point; the agent
+one one-pole filter per block (two until the reverb's came out on 2026-11-02). No `costs.h` card row changes by more than a point; the agent
 measures with the host bench method in `costs.h` and says what moved.
 
 ## Bench (owner)

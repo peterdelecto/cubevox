@@ -1,8 +1,9 @@
 # Slot 7 choices: Gate, Formant, Lo-fi or Bloom from the menu
 
 Owner 2026-11-01: "for number 7 gate, is there another effect we could swap into that position as
-an option in case a second backup gate is overkill?" Then the Formant, Lo-fi and Bloom specs. Spec
-only, not built.
+an option in case a second backup gate is overkill?" Then the Formant, Lo-fi and Bloom specs. Built
+v2.00.95; Formant left the row at v2.00.96 (section 5); Bloom shows as CHATTER from v2.01.02
+(section 6).
 
 ## 1. Menu row
 
@@ -53,3 +54,10 @@ row cycles GATE, LO-FI, BLOOM. The menu runs REVERB, SLOT 3 (OCTAVE / FORMANT), 
 MOB), SLOT 7, then the rest. The emulator's slot 7 switch is GATE | LO-FI over a full-width BLOOM.
 A Formant left in slot 7 by an older saved layout no longer counts for this row, which reads SLOT -.
 The Formant column of section 3's table no longer applies.
+
+## 6. CHATTER (v2.01.02 on, as of v2.01.05)
+
+The Bloom card shows as CHATTER (`2026-11-01-bloom-design.md` sections 14 to 18). The row's value
+and the emulator's switch read `CHATTER` where sections 1 and 2 say `BLOOM`; the card id stays
+`bloom`. `kBloom` is still {5, 6, false}, so section 3's Gate, Lo-fi and Bloom columns hold; MOB,
+Chasm and CHATTER still sum 75 / 87, on the mean line.

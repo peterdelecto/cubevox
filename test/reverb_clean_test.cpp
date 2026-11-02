@@ -2,8 +2,9 @@
 // 220 Hz sine, must stay clean. A linear tank returns a sine as a sine, but its
 // gain differs from one harmonic to the next, so each harmonic is divided by the
 // tank's gain at that frequency, read from a -60 dBFS sine the clipper passes
-// untouched. What is left measures the dwell clipper alone. A second check holds the wet path's
-// 5 Hz DC blocker to an exact high-pass over the raw tank output. No window, no audio device.
+// untouched. What is left measures the dwell clipper alone. A second check holds the wet path's DC
+// under -90 dBFS with no blocker on it. A third ties the struct defaults to the knob curves.
+// No window, no audio device.
 
 #include <cmath>
 #include <cstdio>
@@ -62,58 +63,51 @@ double thdPercent(int engine) {
   return 100.0 * std::sqrt(h) / f0;
 }
 
-// The wet path ahead of the mix: a second reverb's own engine, driven the same way through its test
-// hook, gives the raw tank output.
-void rawTank(int engine, const std::vector<float>& in, std::vector<float>& out, const cv::ReverbParams& p) {
-  auto rv = std::make_unique<cv::Reverb>();
-  for (size_t i = 0; i < in.size(); i += cv::kBlock) {
-    if (engine == cv::kReverbChasm) {
-      rv->chasm().process(&in[i], &out[i], cv::kBlock, p.chasm);
-    } else {
-      rv->spring().process(&in[i], &out[i], cv::kBlock, p.spring);
-    }
+// The wet path carries no DC. A 0.5 DC step through the wet path alone (crossfade 1) at TIME 0, 50 and
+// 100 % leaves a mean over the last second under kMaxDcDbfs, because every loop carries a bass cut.
+// The box needs no blocker on the wet path while this holds.
+bool wetCarriesNoDc(int engine, const char* name) {
+  constexpr double kMaxDcDbfs = -90.0;
+  const int total = 3 * cv::kSampleRate;
+  const std::vector<float> in(static_cast<size_t>(total), 0.5f);
+  double worst = -400.0;
+  for (const float time : {0.0f, 0.5f, 1.0f}) {
+    auto rv = std::make_unique<cv::Reverb>();
+    cv::ReverbParams p;
+    p.on = true;
+    p.engine = engine;
+    p.time = time;
+    cv::applyKnobs(p);
+    p.wet = 1.0f;
+    std::vector<float> out(in.size());
+    for (int i = 0; i < total; i += cv::kBlock)
+      rv->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, p);
+    double sum = 0.0;
+    for (size_t i = out.size() - cv::kSampleRate; i < out.size(); ++i) sum += out[i];
+    const double mean = sum / cv::kSampleRate;
+    worst = std::fmax(worst, mean == 0.0 ? -400.0 : 20.0 * std::log10(std::fabs(mean)));
   }
+  const bool ok = worst < kMaxDcDbfs;
+  std::printf("%s %-14s 0.5 DC step: wet mean over the last second %.1f dBFS at worst (< %.0f)\n", ok ? "PASS" : "FAIL",
+              name, worst, kMaxDcDbfs);
+  return ok;
 }
 
-// The reverb's wet-only output against the raw tank output through an exact one-pole high-pass at
-// kWetDcBlockHz (double precision). Checks the corner, and that the blocker sits on the wet path of
-// both engines. Input is a 0.5 DC step for the first half and a 100 Hz sine after it.
-bool dcBlockedOnWetPath(int engine, const char* name) {
-  const int total = 3 * cv::kSampleRate;
-  const int half = total / 2;
-  cv::ReverbParams p;
-  p.on = true;
-  p.engine = engine;
-  p.wet = 1.0f;
-  std::vector<float> in(static_cast<size_t>(total)), raw(in.size()), out(in.size());
-  for (int i = 0; i < total; ++i) {
-    in[static_cast<size_t>(i)] = i < half ? 0.5f
-                                          : static_cast<float>(0.3 * std::sin(2.0 * kPi * 100.0 * (i - half) / cv::kSampleRate));
-  }
-  rawTank(engine, in, raw, p);
-  auto rv = std::make_unique<cv::Reverb>();
-  for (int i = 0; i < total; i += cv::kBlock) rv->process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, p);
-
-  const double a = 1.0 - std::exp(-2.0 * kPi * cv::kWetDcBlockHz / cv::kSampleRate);
-  double lp = 0.0, worst = 0.0;
-  for (size_t i = 0; i < raw.size(); ++i) {
-    lp += a * (raw[i] - lp);
-    worst = std::fmax(worst, std::fabs(static_cast<double>(out[i]) - (raw[i] - lp)));
-  }
-  constexpr double kMaxDiff = 1e-5;
-  const bool matches = worst <= kMaxDiff;
-  std::printf("%s %-14s wet path = raw tank through a %.0f Hz high-pass: worst difference %.2g (<= %.0e)\n",
-              matches ? "PASS" : "FAIL", name, static_cast<double>(cv::kWetDcBlockHz), worst, kMaxDiff);
-
-  // The 100 Hz component of the last two seconds of the sine, before and after the blocker.
-  const std::vector<float> rawTail(raw.end() - cv::kSampleRate, raw.end());
-  const std::vector<float> outTail(out.end() - cv::kSampleRate, out.end());
-  const double db = 20.0 * std::log10(binMag(outTail, 100.0) / binMag(rawTail, 100.0));
-  constexpr double kMaxToneDb = 0.05;
-  const bool tone = std::fabs(db) <= kMaxToneDb;
-  std::printf("%s %-14s 100 Hz passes the blocker at %.4f dB (within %.2f)\n", tone ? "PASS" : "FAIL", name, db,
-              kMaxToneDb);
-  return matches && tone;
+// The struct defaults for the crossfade and both engines' decay are what applyKnobs computes at the
+// knobs' middle position. The render tool runs on the struct values and never calls applyKnobs, so a
+// curve whose middle moves would otherwise leave the two apart.
+bool defaultsMatchKnobs() {
+  const cv::ReverbParams defaults;
+  cv::ReverbParams knobs;
+  cv::applyKnobs(knobs);
+  const bool ok = knobs.wet == defaults.wet && knobs.chasm.decay == defaults.chasm.decay &&
+                  knobs.spring.decay == defaults.spring.decay;
+  std::printf("%s %-14s struct defaults wet %.3f, chasm decay %.3f, spring decay %.3f; applyKnobs gives %.3f, %.3f, %.3f\n",
+              ok ? "PASS" : "FAIL", "defaults", static_cast<double>(defaults.wet),
+              static_cast<double>(defaults.chasm.decay), static_cast<double>(defaults.spring.decay),
+              static_cast<double>(knobs.wet), static_cast<double>(knobs.chasm.decay),
+              static_cast<double>(knobs.spring.decay));
+  return ok;
 }
 
 }  // namespace
@@ -121,8 +115,8 @@ bool dcBlockedOnWetPath(int engine, const char* name) {
 int main() {
   const int engines[2] = {cv::kReverbChasm, cv::kReverbSpring};
   const char* names[2] = {"CHASM", "SPRING"};
-  bool ok = true;
-  for (int e = 0; e < 2; ++e) ok = dcBlockedOnWetPath(engines[e], names[e]) && ok;
+  bool ok = defaultsMatchKnobs();
+  for (int e = 0; e < 2; ++e) ok = wetCarriesNoDc(engines[e], names[e]) && ok;
   for (int e = 0; e < 2; ++e) {
     const double thd = thdPercent(engines[e]);
     const bool pass = thd <= kMaxThdPercent;

@@ -1,41 +1,15 @@
 // Stage feedback checks: off is silent, safety ceiling, ring-on, intermittency,
 // no allocation. No window, no audio device.
 
-#include <atomic>
 #include <cmath>
 #include <complex>
 #include <cstdio>
 #include <cstdlib>
-#include <new>
 #include <vector>
 
 #include "emulator/stage_feedback.h"
 
-namespace {
-
-std::atomic<bool> gInProcess{false};
-
-void guardAlloc() {
-  if (gInProcess.load()) std::abort();
-}
-
-}  // namespace
-
-// Allocation inside the feedback class aborts the test binary.
-void* operator new(std::size_t n) {
-  guardAlloc();
-  void* p = std::malloc(n);
-  if (!p) std::abort();
-  return p;
-}
-void* operator new[](std::size_t n) { return operator new(n); }
-void operator delete(void* p) noexcept {
-  guardAlloc();
-  std::free(p);
-}
-void operator delete[](void* p) noexcept { operator delete(p); }
-void operator delete(void* p, std::size_t) noexcept { operator delete(p); }
-void operator delete[](void* p, std::size_t) noexcept { operator delete(p); }
+#include "alloc_guard.h"
 
 namespace {
 
