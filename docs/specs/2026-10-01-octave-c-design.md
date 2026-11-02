@@ -114,3 +114,8 @@ Option C is the only Octave engine, `OctaveVoice` in `engine/octave.h`. Sections
    MIX 100 % 17.6 / 11.8 before, 4.8 / 4.95 after; the default layout's pitch slot (Autotune and
    Octave) 46.1 / 41.4 before, 30.3 / 31.9 after. `kOctave` is {2, 2, false}, an estimate from
    that bench until a stress run of the new engine.
+9. Small SEMITONES pulse (settled 2026-11-02, the lead's call for the owner). The two taps keep
+   their 20 ms spacing, so at ±1 or ±2 st the comb they form sweeps through a held note once every
+   0.33 to 0.71 s; a steady 220 Hz tone swings up to 6 dB, a 100 Hz tone about 1 dB. Kept: it is
+   how an asynchronous two-tap shifter sounds, the card is for octaves and fifths (+12 the
+   quietest setting), and Unison covers small detunes. A cure would be a pitch-synchronous voice.

@@ -5,7 +5,7 @@
 #include "engine/common.h"
 
 // Building blocks the engines share: constants, a clamp, the one-pole and RBJ biquad filters, and
-// the Catmull-Rom read most fractional delays use. The Crowd copies read linearly.
+// the Catmull-Rom read most fractional delays use. The Crowd copies and the reverbs' Delay read linearly.
 
 namespace cv {
 
@@ -24,10 +24,14 @@ inline float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi 
 // knobs and the RESPONSE knob run on it.
 inline float logTaper(float from, float to, float p) { return from * powf(to / from, p); }
 
-// Coefficient of a one-pole low-pass with its corner at hz.
-inline float onePoleCoef(float hz) {
-  return 1.0f - expf(-kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate);
+// Coefficient of a one-pole low-pass with its corner at hz, for a filter that runs at rate Hz. The
+// corner clamps to 0.45 of that rate.
+inline float onePoleCoefAt(float hz, float rate) {
+  return 1.0f - expf(-kTwoPi * clampf(hz, kFilterMinHz, 0.45f * rate) / rate);
 }
+
+// The same at the engine rate.
+inline float onePoleCoef(float hz) { return onePoleCoefAt(hz, static_cast<float>(kSampleRate)); }
 
 // One-pole low-pass; hp is the input minus the low-pass.
 struct OnePole {
@@ -35,6 +39,9 @@ struct OnePole {
   float y = 0.0f;
 
   void set(float hz) { a = onePoleCoef(hz); }
+
+  // For a filter that runs at rate Hz.
+  void setAt(float hz, float rate) { a = onePoleCoefAt(hz, rate); }
 
   CV_INLINE float lp(float x) {
     y += a * (x - y);

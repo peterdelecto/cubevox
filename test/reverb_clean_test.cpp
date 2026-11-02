@@ -100,12 +100,12 @@ bool defaultsMatchKnobs() {
   const cv::ReverbParams defaults;
   cv::ReverbParams knobs;
   cv::applyKnobs(knobs);
-  const bool ok = knobs.wet == defaults.wet && knobs.chasm.decay == defaults.chasm.decay &&
+  const bool ok = knobs.wet == defaults.wet && knobs.chasm.feedback == defaults.chasm.feedback &&
                   knobs.spring.decay == defaults.spring.decay;
-  std::printf("%s %-14s struct defaults wet %.3f, chasm decay %.3f, spring decay %.3f; applyKnobs gives %.3f, %.3f, %.3f\n",
+  std::printf("%s %-14s struct defaults wet %.3f, chasm feedback %.3f, spring decay %.3f; applyKnobs gives %.3f, %.3f, %.3f\n",
               ok ? "PASS" : "FAIL", "defaults", static_cast<double>(defaults.wet),
-              static_cast<double>(defaults.chasm.decay), static_cast<double>(defaults.spring.decay),
-              static_cast<double>(knobs.wet), static_cast<double>(knobs.chasm.decay),
+              static_cast<double>(defaults.chasm.feedback), static_cast<double>(defaults.spring.decay),
+              static_cast<double>(knobs.wet), static_cast<double>(knobs.chasm.feedback),
               static_cast<double>(knobs.spring.decay));
   return ok;
 }

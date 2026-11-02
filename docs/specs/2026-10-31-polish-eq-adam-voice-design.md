@@ -131,8 +131,12 @@ The parity test holds because both run the same engine.
 7. Bench: load % of the whole stage; the SM58 into a wedge, ON against OFF, gain before ring as a
    listen check; Adam's esses by ear.
 
-## Open items for the owner
-1. Octave at −12 puts his G2 at 48 Hz. Today's two high-passes cut that note 30 dB; the one 70 Hz
-   high-pass cuts it 13 dB, so the octave-down fundamental comes through 17 dB stronger. By ear
-   with the Octave card on.
-2. The de-esser's 6 dB cap, by ear on the render of his clips.
+## Settled 2026-11-02 (owner: the lead's calls)
+1. Octave at −12 puts his G2 at 48 Hz. The 70 Hz high-pass sits ahead of slot 1, so the octave-down
+   fundamental is made after it and passes uncut; the old chain's two high-passes cut it about
+   30 dB. Kept as it is: it is a bass guitar's low G, which a PA carries, and the desk's own vocal
+   high-pass takes it if the engineer wants. Renders on the three clips at Octave −12 (v2.01.10),
+   MIX 50 % and 100 %: output peaks −3.3 to −6.4 dBFS, no sample past the soft ceiling's knee, and
+   POLISH COMP's average gain reduction falls 0.4 to 1.0 dB against no Octave.
+2. The de-esser's 6 dB cap stays. It cuts 5.2 dB on an average ess, so the cap only trims the
+   loudest ones, and a deeper cut risks a lisp after the 3.5 kHz presence lift.

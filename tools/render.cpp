@@ -68,8 +68,7 @@ int usage() {
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|chasm] [--decay <0..1>] [--dwell <0..1>, CHASM]\n"
-               "       [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
+               "       [--reverb spring|chasm] [--time <0..1>] [--mix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
@@ -107,13 +106,11 @@ int usage() {
                "distTrebleCutDb\n"
                "     distToneMinDb distToneMaxDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
                "distFadeDrive\n"
-               "     chmTimeLo chmTimeHi chmTrebleLossHz chmLoopTrebleCut chmInputTrebleCut "
-               "chmBassCutHz\n"
-               "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
-               "     chmWobbleLevelDb chmDwellDrive chmDwellComp chmWetDb\n"
-               "     springMs1 (10..37.3) springMs2 (10..45.3) springMs3 (10..56.3) springFeedbackLo springFeedbackHi (0.1..0.97) springDiffuse (0..0.9)\n"
+               "     chmBassCutHz chmBassCutHzTop (20..21600) chmWobbleDepth (0..64) chmWobbleRateHz (0..10)\n"
+               "     chmInputTrim (0..4) chmDwell (0..1) chmDwellDrive (1..64) chmDwellComp (0..2) chmWetDb (-36..36)\n"
+               "     springMs1 (10..37.6) springMs2 (10..45.6) springMs3 (10..56.6) springFeedbackLo springFeedbackHi (0.1..0.97) springDiffuse (0..0.9)\n"
                "     springChirpSections (0..32) springChirpA (0..0.95) springTrebleLossHz springBassCutHz\n"
-               "     springReturnLpHz (20..21600) springWobbleDepth (0..32) springWobbleRateHz (0..10)\n"
+               "     springReturnLpHz (the three corners 20..10800, the loops' Nyquist is 12000) springWobbleDepth (0..32) springWobbleRateHz (0..10)\n"
                "     springDwell (0..1) springDwellDrive (1..64) springDwellComp (0..2)\n"
                "     springWetDb (-24..24) springRestLevel (0..0.001, a silent input rests the springs below this; 0 never)\n"
                "     eqDipQ eqPresenceQ\n"
@@ -125,7 +122,7 @@ int usage() {
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
-               "  every value must be finite, and a crowd or spring key outside its range is refused\n"
+               "  every value must be finite, and a crowd, chasm or spring key outside its range is refused\n"
                "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
@@ -136,7 +133,8 @@ int usage() {
                "     lofiHoldOverBand (floor on the held rate in low-pass corners, 0 = none)\n"
                "     lofiMakeup<tone 0..4>_<amount 0..10> (dB, the makeup table by TONE 0, 25 ... 100 %% and AMOUNT 0, 10 ... 100 %%)\n"
                "  a lofi key outside its range is refused\n"
-               "  --decay applies to the selected reverb engine; Spring's dwell is the springDwell key\n",
+               "  --time and --mix are the panel's TIME and MIX positions for the selected reverb engine (default 0.5);\n"
+               "  each engine's dwell is its springDwell or chmDwell key\n",
                static_cast<double>(cv::crowd_detail::kMinDelayMs), cv::kCrowdMaxLagMs,
                static_cast<double>(cv::crowd_detail::kMaxScatterMs), cv::kCrowdMaxLagMs);
   return 2;
@@ -255,13 +253,25 @@ bool springTuningInRange(const cv::SpringTuning& t) {
          inside(t.springMs3, kMinMs, sd::kMaxMs3) &&
          inside(t.feedbackLo, sd::kFeedbackMin, sd::kFeedbackMax) &&
          inside(t.feedbackHi, sd::kFeedbackMin, sd::kFeedbackMax) && inside(t.diffuse, 0.0f, 0.9f) &&
-         inside(t.chirpA, 0.0f, 0.95f) && inside(t.trebleLossHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
-         inside(t.bassCutHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
-         inside(t.returnLpHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.wobbleDepth, 0.0f, sd::kMaxWobble) &&
+         inside(t.chirpA, 0.0f, 0.95f) && inside(t.trebleLossHz, cv::kFilterMinHz, sd::kMaxFilterHz) &&
+         inside(t.bassCutHz, cv::kFilterMinHz, sd::kMaxFilterHz) &&
+         inside(t.returnLpHz, cv::kFilterMinHz, sd::kMaxFilterHz) && inside(t.wobbleDepth, 0.0f, sd::kMaxWobble) &&
          inside(t.wobbleRateHz, 0.0f, sd::kMaxWobbleHz) && inside(t.dwell, 0.0f, 1.0f) &&
          inside(t.dwellDrive, 1.0f, sd::kMaxDwellDrive) && inside(t.dwellComp, 0.0f, sd::kMaxDwellComp) &&
          inside(t.wetDb, -sd::kMaxWetDb, sd::kMaxWetDb) &&
          inside(t.restLevel, 0.0f, 1.0e-3f);
+}
+
+// Every Chasm key refuses a value outside the range the engine takes, so a typo in a key does not
+// pass for a setting.
+bool chasmTuningInRange(const cv::ChasmTuning& t) {
+  namespace cd = cv::chasm_detail;
+  return inside(t.bassCutHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(t.bassCutHzTop, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.wobbleDepth, 0.0f, cd::kMaxWobble) &&
+         inside(t.wobbleRateHz, 0.0f, cd::kMaxWobbleHz) && inside(t.inputTrim, 0.0f, cd::kMaxInputTrim) &&
+         inside(t.dwell, 0.0f, 1.0f) && inside(t.dwellDrive, 1.0f, cv::reverb_parts::kMaxDwellDrive) &&
+         inside(t.dwellComp, 0.0f, cv::reverb_parts::kMaxDwellComp) &&
+         inside(t.wetDb, -cd::kMaxWetDb, cd::kMaxWetDb);
 }
 
 bool applyTuning(RenderParams& rp, const char* kv) {
@@ -325,14 +335,11 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"distBassPeakHz", &dt.bassPeakHz},     {"distBassPeakDb", &dt.bassPeakDb},
       {"distBassPeakQ", &dt.bassPeakQ},       {"distTrimDb", &dt.trimDb},
       {"distFadeDrive", &dt.fadeDrive},
-      {"chmTimeLo", &ch.timeLo},              {"chmTimeHi", &ch.timeHi},
-      {"chmTrebleLossHz", &ch.trebleLossHz},  {"chmLoopTrebleCut", &ch.loopTrebleCut},
-      {"chmInputTrebleCut", &ch.inputTrebleCut}, {"chmBassCutHz", &ch.bassCutHz},
-      {"chmBassCutHzTop", &ch.bassCutHzTop},  {"chmWobbleDepthMax", &ch.wobbleDepthMax},
-      {"chmWobbleRateLo", &ch.wobbleRateLo},  {"chmWobbleRateHi", &ch.wobbleRateHi},
-      {"chmInputTrim", &ch.inputTrim},        {"chmWobbleLevelDb", &ch.wobbleLevelDb},
-      {"chmDwellDrive", &ch.dwellDrive}, {"chmDwellComp", &ch.dwellComp},
-      {"chmWetDb", &ch.wetDb},
+      {"chmBassCutHz", &ch.bassCutHz},
+      {"chmBassCutHzTop", &ch.bassCutHzTop},  {"chmWobbleDepth", &ch.wobbleDepth},
+      {"chmWobbleRateHz", &ch.wobbleRateHz},  {"chmInputTrim", &ch.inputTrim},
+      {"chmDwell", &ch.dwell},                {"chmDwellDrive", &ch.dwellDrive},
+      {"chmDwellComp", &ch.dwellComp},        {"chmWetDb", &ch.wetDb},
       {"springMs1", &spr.springMs1},          {"springMs2", &spr.springMs2},
       {"springMs3", &spr.springMs3},
       {"springFeedbackLo", &spr.feedbackLo},  {"springFeedbackHi", &spr.feedbackHi},
@@ -390,7 +397,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (springSections < 0.0f || springSections > static_cast<float>(cv::spring_detail::kMaxSections) ||
         springSections != std::floor(springSections))
       return false;
-    if (!springTuningInRange(spr)) return false;
+    if (!springTuningInRange(spr) || !chasmTuningInRange(ch)) return false;
     if (!inside(ot.trimDb, -24.0f, 24.0f) ||
         !inside(ot.grainWindowMs, cv::OctaveVoice::kMinWindowMs, cv::OctaveVoice::kMaxWindowMs) ||
         !inside(at.trimDb, -24.0f, 24.0f) || !inside(ft.offsetDb, -24.0f, 24.0f))
@@ -423,8 +430,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveInGate = false;
   bool haveGate = false;
   bool haveBloom = false;
-  bool haveDecay = false;
-  float decay = 0.0f;
+  bool haveKnobs = false;  // --time or --mix: the reverb takes the panel's positions through applyKnobs
+  float time = 0.5f, mix = 0.5f;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
     const char* a = argv[i];
@@ -455,9 +462,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--lofi-tone") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.lofi.tone) || rp.lofi.tone < 0.0f || rp.lofi.tone > 1.0f) return false;
       haveLofi = true;
-    } else if (std::strcmp(a, "--rmix") == 0 && i + 1 < argc) {
-      cv::ReverbParams& r = rp.reverb;
-      if (!parseFloat(argv[++i], &r.wet) || r.wet < 0.0f || r.wet > 1.0f) return false;
+    } else if (std::strcmp(a, "--mix") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &mix) || mix < 0.0f || mix > 1.0f) return false;
+      haveKnobs = true;
     } else if (std::strcmp(a, "--ingate") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.inGate.thresholdDb) || rp.inGate.thresholdDb < cv::kInputGateThresholdMinDb ||
           rp.inGate.thresholdDb > cv::kInputGateThresholdMaxDb)
@@ -497,15 +504,9 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       else
         return false;
       haveReverb = true;
-    } else if (std::strcmp(a, "--decay") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &decay) || decay < 0.0f || decay > 1.0f) return false;
-      haveDecay = true;
-    } else if (std::strcmp(a, "--wobble") == 0 && i + 1 < argc) {
-      cv::ChasmParams& c = rp.reverb.chasm;
-      if (!parseFloat(argv[++i], &c.wobble) || c.wobble < 0.0f || c.wobble > 1.0f) return false;
-    } else if (std::strcmp(a, "--dwell") == 0 && i + 1 < argc) {
-      cv::ChasmParams& c = rp.reverb.chasm;
-      if (!parseFloat(argv[++i], &c.dwell) || c.dwell < 0.0f || c.dwell > 1.0f) return false;
+    } else if (std::strcmp(a, "--time") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &time) || time < 0.0f || time > 1.0f) return false;
+      haveKnobs = true;
     } else if (std::strcmp(a, "--autotune") == 0) {
       ap.on = true;
     } else if (std::strcmp(a, "--atkey") == 0 && i + 1 < argc) {
@@ -559,10 +560,11 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     }
   }
   if (positional != 2) return false;
-  // --decay sets whichever engine is selected.
-  if (haveDecay) {
-    float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.decay : rp.reverb.spring.decay;
-    d = decay;
+  // --time and --mix reach the engines the way the panel does.
+  if (haveKnobs) {
+    rp.reverb.time = time;
+    rp.reverb.mix = mix;
+    cv::applyKnobs(rp.reverb);
   }
   // Each pitch stage runs only when asked for. The Crowd card reads the pitch stage's ring and tracker,
   // so it turns the stage on and tells it to keep them running, as the registry's toggle does.

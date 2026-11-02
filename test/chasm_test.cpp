@@ -1,28 +1,50 @@
-// CHASM checks: passthrough, decay, chirp direction, wobble, wobble level,
-// dwell drive, stability, no-alloc. No window, no audio device.
+// Chasm checks: the Reverb block's off and on edges, decay across the TIME knob, chirp direction,
+// wobble, wobble level, dwell drive, stability at the box's gain and top TIME, out-of-range tuning,
+// the size bound and no-alloc. No window, no audio device. Every limit sits about twice the measured
+// value, and the measured value is in the report line.
 
 #include <cmath>
-#include <complex>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
+#include <memory>
 #include <vector>
 
 #include "engine/chasm.h"
 #include "engine/reverb.h"
 
 #include "alloc_guard.h"
+#include "signal_util.h"
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-constexpr int kSr = cv::kSampleRate;
+using namespace testutil;
 
-using Signal = std::vector<float>;
+constexpr int kSr = cv::kSampleRate;
 
 size_t at(int i) { return static_cast<size_t>(i); }
 int ms(double m) { return static_cast<int>(m * kSr / 1000.0); }
 
+bool report(const char* name, bool pass, const char* fmt, ...) {
+  std::printf("%s %-14s ", pass ? "PASS" : "FAIL", name);
+  va_list args;
+  va_start(args, fmt);
+  std::vfprintf(stdout, fmt, args);
+  va_end(args);
+  std::printf("\n");
+  return pass;
+}
+
+// What the panel's TIME knob gives the engine, and the box's tuning for everything else.
+cv::ChasmParams atTime(float time) {
+  cv::ReverbParams r;
+  r.engine = cv::kReverbChasm;
+  r.time = time;
+  cv::applyKnobs(r);
+  return r.chasm;
+}
+
+// Runs the input through an engine or the Reverb block in kBlock chunks, with the allocation guard on.
 template <class Engine, class Params>
 Signal run(Engine& e, const Signal& in, const Params& p) {
   Signal out(in.size());
@@ -36,251 +58,190 @@ Signal run(Engine& e, const Signal& in, const Params& p) {
   return out;
 }
 
-// Uniform white noise, fixed seed.
-Signal noise(int n, float peak) {
-  Signal x(at(n));
-  uint32_t r = 0x2545F491u;
-  for (float& v : x) {
-    r = r * 1664525u + 1013904223u;
-    v = peak * (static_cast<float>(r >> 8) / 8388608.0f - 1.0f);
-  }
-  return x;
-}
-
-Signal sine(int n, double hz, float peak) {
-  Signal x(at(n));
-  for (int i = 0; i < n; ++i) x[at(i)] = peak * static_cast<float>(std::sin(2.0 * kPi * hz * i / kSr));
-  return x;
-}
-
-cv::ChasmParams params(float decay, float wobble) {
-  cv::ChasmParams p;
-  p.decay = decay;
-  p.wobble = wobble;
-  p.tuning.wetDb = 0.0f;
-  return p;
-}
-
-static cv::Chasm gChasm;
-static cv::Reverb gReverb;
-
+// The wet signal of a fresh engine.
 Signal wet(const Signal& in, const cv::ChasmParams& p) {
-  gChasm.reset();
-  return run(gChasm, in, p);
+  auto chasm = std::make_unique<cv::Chasm>();
+  return run(*chasm, in, p);
 }
 
-Signal impulse(float decay, float wobble, int n) {
-  Signal in(at(n), 0.0f);
-  in[0] = 1.0f;
-  return wet(in, params(decay, wobble));
-}
+Signal impulseWet(const cv::ChasmParams& p, size_t n) { return wet(impulse(n), p); }
 
-// RBJ band-pass, 0 dB peak.
-Signal bandPass(const Signal& x, double hz, double q) {
-  const double w0 = 2.0 * kPi * hz / kSr;
-  const double alpha = std::sin(w0) / (2.0 * q);
-  const double a0 = 1.0 + alpha;
-  const double b0 = alpha / a0, b2 = -alpha / a0;
-  const double a1 = -2.0 * std::cos(w0) / a0, a2 = (1.0 - alpha) / a0;
-  Signal y(x.size());
-  double z1 = 0.0, z2 = 0.0;
-  for (size_t i = 0; i < x.size(); ++i) {
-    const double v = b0 * x[i] + z1;
-    z1 = -a1 * v + z2;
-    z2 = b2 * x[i] - a2 * v;
-    y[i] = static_cast<float>(v);
-  }
-  return y;
-}
-
-// Zero-phase RMS envelope: a one-pole on the square, run forward then backward.
-Signal envelope(const Signal& x, double sec) {
-  const double a = 1.0 - std::exp(-1.0 / (sec * kSr));
-  std::vector<double> p(x.size());
-  double s = 0.0;
-  for (size_t i = 0; i < x.size(); ++i) p[i] = s += a * (static_cast<double>(x[i]) * x[i] - s);
-  s = 0.0;
-  for (size_t i = x.size(); i-- > 0;) p[i] = s += a * (p[i] - s);
-  Signal e(x.size());
-  for (size_t i = 0; i < x.size(); ++i) e[i] = static_cast<float>(std::sqrt(p[i]));
-  return e;
-}
-
-// First local maximum in [0, to) within 3 dB of the window's largest value.
-int firstPeak(const Signal& e, int to) {
-  float top = 0.0f;
-  for (int i = 0; i < to; ++i) top = e[at(i)] > top ? e[at(i)] : top;
-  for (int i = 1; i + 1 < to; ++i)
-    if (e[at(i)] >= 0.708f * top && e[at(i)] >= e[at(i - 1)] && e[at(i)] > e[at(i + 1)]) return i;
-  return -1;
-}
-
-double rmsOf(const Signal& x, int from, int to) {
-  double s = 0.0;
-  for (int i = from; i < to; ++i) s += static_cast<double>(x[at(i)]) * x[at(i)];
-  return std::sqrt(s / (to - from));
-}
-
-double db(double ratio) { return 10.0 * std::log10(ratio < 1e-30 ? 1e-30 : ratio); }
-
-void fft(std::vector<std::complex<double>>& a) {
-  const size_t n = a.size();
-  for (size_t i = 1, j = 0; i < n; ++i) {
-    size_t bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) std::swap(a[i], a[j]);
-  }
-  for (size_t len = 2; len <= n; len <<= 1) {
-    const std::complex<double> w = std::polar(1.0, -2.0 * kPi / static_cast<double>(len));
-    for (size_t i = 0; i < n; i += len) {
-      std::complex<double> wk = 1.0;
-      for (size_t k = 0; k < len / 2; ++k) {
-        const std::complex<double> u = a[i + k], v = a[i + k + len / 2] * wk;
-        a[i + k] = u + v;
-        a[i + k + len / 2] = u - v;
-        wk *= w;
-      }
-    }
-  }
-}
-
-// Welch power spectrum over [from, to), Hann window, half overlap.
-std::vector<double> spectrum(const Signal& x, int from, int to, int size) {
-  std::vector<double> p(at(size / 2 + 1), 0.0);
-  std::vector<std::complex<double>> buf(at(size));
-  for (int s = from; s + size <= to; s += size / 2) {
-    for (int i = 0; i < size; ++i) {
-      const double w = 0.5 - 0.5 * std::cos(2.0 * kPi * i / size);
-      buf[at(i)] = w * x[at(s + i)];
-    }
-    fft(buf);
-    for (size_t k = 0; k < p.size(); ++k) p[k] += std::norm(buf[k]);
-  }
-  return p;
-}
-
-bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0,
-            double c = 0.0) {
-  char detail[200];
-  std::snprintf(detail, sizeof detail, fmt, a, b, c);
-  std::printf("%s %s  %s\n", ok ? "PASS" : "FAIL", name, detail);
-  return ok;
-}
-
-bool testPassthrough() {
-  const Signal in = noise(kSr / 2, 0.25f);
-  float maxDiff = 0.0f;
-  for (int engine = 0; engine < 2; ++engine) {
-    cv::ReverbParams p;
-    p.on = false;
-    p.engine = engine;
-    gReverb.reset();
-    const Signal out = run(gReverb, in, p);
-    for (int i = ms(100); i < static_cast<int>(in.size()); ++i) {
-      const float d = std::fabs(out[at(i)] - in[at(i)]);
-      maxDiff = d > maxDiff ? d : maxDiff;
-    }
-  }
+cv::ReverbParams reverbParams(bool on, float wetMix) {
   cv::ReverbParams p;
   p.engine = cv::kReverbChasm;
-  p.chasm = params(1.0f, 1.0f);
-  gReverb.reset();
-  const Signal out = run(gReverb, Signal(at(kSr / 2), 0.0f), p);
-  float maxSilent = 0.0f;
-  for (float v : out) maxSilent = std::fabs(v) > maxSilent ? std::fabs(v) : maxSilent;
-
-  // Wet 0 with the block on and chasm running is a bit-exact copy once settled.
-  cv::ReverbParams m;
-  m.engine = cv::kReverbChasm;
-  m.chasm = params(1.0f, 1.0f);
-  m.wet = 0.0f;
-  gReverb.reset();
-  const Signal mixOut = run(gReverb, in, m);
-  float maxMix = 0.0f;
-  for (int i = ms(100); i < static_cast<int>(in.size()); ++i) {
-    const float d = std::fabs(mixOut[at(i)] - in[at(i)]);
-    maxMix = d > maxMix ? d : maxMix;
-  }
-  return report("passthrough", maxDiff == 0.0f && maxSilent == 0.0f && maxMix == 0.0f,
-                "off max|out-in| %.3g, chasm on silence max|out| %.3g, mix 0 max|out-in| %.3g (all 0)",
-                maxDiff, maxSilent, maxMix);
+  p.on = on;
+  p.wet = wetMix;
+  return p;
 }
 
+// 1. The block's edges. Switched off from the start, and at MIX 0 with the engine running, the output
+// is the input on every sample. Running to off ends as an exact copy. Off for 2 s then on, with
+// silence in, is silent. Off for 5 ms then on keeps the running tail.
+bool testEdges() {
+  const Signal in = noise(kSr / 2, 0.25f);
+  const Signal quiet(at(kSr), 0.0f);
+  const Signal gap(at(ms(5.0)), 0.0f);
+  const auto mismatches = [](const Signal& a, const Signal& b, size_t from) {
+    size_t bad = 0;
+    for (size_t i = from; i < a.size(); ++i) bad += a[i] != b[i];
+    return bad;
+  };
+
+  size_t offBad = 0;
+  for (int engine = 0; engine < 2; ++engine) {
+    auto rv = std::make_unique<cv::Reverb>();
+    cv::ReverbParams p = reverbParams(false, 0.15f);
+    p.engine = engine;
+    offBad += mismatches(run(*rv, in, p), in, 0);
+  }
+
+  auto rv = std::make_unique<cv::Reverb>();
+  const size_t mixBad = mismatches(run(*rv, in, reverbParams(true, 0.0f)), in, 0);
+
+  // Running, then off: the crossfade snaps to 0 within 0.3 s, and the copy is exact from there.
+  rv = std::make_unique<cv::Reverb>();
+  const Signal long2 = noise(2 * kSr, 0.25f);
+  Signal head(long2.begin(), long2.begin() + kSr);
+  Signal tail(long2.begin() + kSr, long2.end());
+  run(*rv, head, reverbParams(true, 0.6f));
+  const Signal settled = run(*rv, tail, reverbParams(false, 0.6f));
+  const size_t settleBad = mismatches(settled, tail, at(kSr / 2));
+
+  rv = std::make_unique<cv::Reverb>();
+  run(*rv, in, reverbParams(true, 0.6f));
+  run(*rv, quiet, reverbParams(false, 0.6f));
+  run(*rv, quiet, reverbParams(false, 0.6f));
+  const float coldPeak = peakOf(run(*rv, quiet, reverbParams(true, 0.6f)));
+
+  rv = std::make_unique<cv::Reverb>();
+  run(*rv, in, reverbParams(true, 0.6f));
+  run(*rv, gap, reverbParams(false, 0.6f));
+  const float keptPeak = peakOf(run(*rv, Signal(at(ms(100.0)), 0.0f), reverbParams(true, 0.6f)));
+
+  constexpr float kMinKept = 0.25f;
+  const bool ok = offBad == 0 && mixBad == 0 && settleBad == 0 && coldPeak == 0.0f && keptPeak > kMinKept;
+  return report("edges", ok,
+                "off %zu, MIX 0 %zu, running to off %zu differing samples (all 0); off 2 s then on peak %.3g (0); "
+                "off 5 ms then on keeps peak %.3g (>%.2f)",
+                offBad, mixBad, settleBad, static_cast<double>(coldPeak), static_cast<double>(keptPeak),
+                static_cast<double>(kMinKept));
+}
+
+// 2. The late tail over the early tail falls further at TIME 0 than at the top of the knob.
 bool testDecay() {
+  constexpr double kMinGap = 20.0;
   double tail[2];
-  const float decays[2] = {0.0f, 1.0f};
+  const float times[2] = {0.0f, 1.0f};
   for (int k = 0; k < 2; ++k) {
-    const Signal w = impulse(decays[k], 0.0f, ms(1500));
-    tail[k] = db(std::pow(rmsOf(w, ms(1000), ms(1500)) / rmsOf(w, 0, ms(500)), 2.0));
+    const Signal w = impulseWet(atTime(times[k]), at(ms(1500)));
+    tail[k] = db(std::pow(rmsOf(w, at(ms(1000)), at(ms(1500))) / rmsOf(w, 0, at(ms(500))), 2.0));
   }
-  return report("decay", tail[1] - tail[0] >= 15.0,
-                "late/early RMS decay 0 %.1f dB, decay 1 %.1f dB, gap %.1f dB (>=15)", tail[0],
-                tail[1], tail[1] - tail[0]);
+  return report("decay", tail[1] - tail[0] >= kMinGap,
+                "late/early RMS TIME 0 %.1f dB, TIME 100 %% %.1f dB, gap %.1f dB (>=%.0f)", tail[0], tail[1],
+                tail[1] - tail[0], kMinGap);
 }
 
+// Seconds for the tail to fall 60 dB: twice the time from -5 to -35 dB on the backward-integrated
+// energy of the impulse response.
+double t60Seconds(const cv::ChasmParams& p) {
+  const Signal ir = impulseWet(p, at(8 * kSr));
+  std::vector<double> edc(ir.size());
+  double acc = 0.0;
+  for (size_t i = ir.size(); i-- > 0;) edc[i] = acc += static_cast<double>(ir[i]) * ir[i];
+  const double total = edc[0];
+  size_t t5 = 0, t35 = 0;
+  for (size_t i = 0; i < edc.size(); ++i) {
+    if (t5 == 0 && edc[i] <= total * std::pow(10.0, -0.5)) t5 = i;
+    if (t35 == 0 && edc[i] <= total * std::pow(10.0, -3.5)) t35 = i;
+  }
+  return 2.0 * static_cast<double>(t35 - t5) / kSr;
+}
+
+// 3. The tail lasts as long as the box's TIME says at three knob points. The pins are the times the
+// loop with four allpasses measures.
+bool testReverbTime() {
+  constexpr double kTol = 0.12;
+  constexpr double kPin[3] = {0.77, 0.95, 1.79};  // seconds at TIME 0, 50 and 100 %
+  const float times[3] = {0.0f, 0.5f, 1.0f};
+  double t60[3];
+  bool ok = true;
+  for (int k = 0; k < 3; ++k) {
+    t60[k] = t60Seconds(atTime(times[k]));
+    ok = ok && std::fabs(t60[k] / kPin[k] - 1.0) <= kTol;
+  }
+  return report("reverb time", ok, "T60 at TIME 0 / 50 / 100 %%: %.2f / %.2f / %.2f s (want %.2f / %.2f / %.2f, +-12 %%)",
+                t60[0], t60[1], t60[2], kPin[0], kPin[1], kPin[2]);
+}
+
+// 4. The chirp runs down: 4 kHz arrives before 500 Hz. The eight-unit chirp measures 11.5 ms.
 bool testChirp() {
-  const Signal w = impulse(0.5f, 0.0f, ms(60));
-  const int lo = firstPeak(envelope(bandPass(w, 500.0, 4.0), 0.010), ms(60));
-  const int hi = firstPeak(envelope(bandPass(w, 4000.0, 4.0), 0.010), ms(60));
-  const double loMs = lo * 1000.0 / kSr, hiMs = hi * 1000.0 / kSr;
-  return report("chirp-down", lo >= 0 && hi >= 0 && hiMs < loMs,
-                "first peak 4 kHz %.2f ms, 500 Hz %.2f ms, lead %.2f ms (>0)", hiMs, loMs,
-                loMs - hiMs);
+  constexpr double kMinLeadMs = 5.5;
+  const Signal w = impulseWet(atTime(0.5f), at(ms(60)));
+  const long lo = firstPeak(envelope(bandPass(w, 500.0, 4.0), 0.010), at(ms(60)));
+  const long hi = firstPeak(envelope(bandPass(w, 4000.0, 4.0), 0.010), at(ms(60)));
+  const double loMs = static_cast<double>(lo) * 1000.0 / kSr, hiMs = static_cast<double>(hi) * 1000.0 / kSr;
+  return report("chirp-down", lo >= 0 && hi >= 0 && loMs - hiMs >= kMinLeadMs,
+                "first peak 4 kHz %.2f ms, 500 Hz %.2f ms, lead %.2f ms (>=%.1f)", hiMs, loMs, loMs - hiMs, kMinLeadMs);
 }
 
 // Energy in 900-1100 Hz, excluding 1 kHz +- 5 Hz.
-double sideband(const std::vector<double>& p, int size) {
+double sideband(const std::vector<double>& p, size_t size) {
   double e = 0.0;
   for (size_t k = 0; k < p.size(); ++k) {
-    const double hz = static_cast<double>(k) * kSr / size;
+    const double hz = static_cast<double>(k) * kSr / static_cast<double>(size);
     if (hz >= 900.0 && hz < 1100.0 && std::fabs(hz - 1000.0) > 5.0) e += p[k];
   }
   return e;
 }
 
+// 5. The wobble puts sidebands round a steady tone.
 bool testWobble() {
-  constexpr int kSize = 32768;
-  const Signal in = sine(2 * kSr, 1000.0, 0.25f);
+  constexpr size_t kSize = 32768;
+  constexpr double kMinRise = 20.0;
+  const Signal in = sine(at(2 * kSr), 1000.0, 0.25f);
   double side[2];
-  const float wobbles[2] = {0.0f, 1.0f};
   for (int k = 0; k < 2; ++k) {
-    const Signal w = wet(in, params(0.5f, wobbles[k]));
-    side[k] = sideband(spectrum(w, kSr / 2, 2 * kSr, kSize), kSize);
+    cv::ChasmParams p = atTime(0.5f);
+    if (k == 0) p.tuning.wobbleDepth = 0.0f;
+    side[k] = sideband(spectrum(wet(in, p), at(kSr / 2), at(2 * kSr), kSize), kSize);
   }
-  return report("wobble", db(side[1] / side[0]) >= 10.0,
-                "900-1100 Hz minus 1 kHz +-5 Hz: wobble 0 %.1f dB, wobble 1 %.1f dB, rise %.1f (>=10)",
-                db(side[0]), db(side[1]), db(side[1] / side[0]));
+  return report("wobble", db(side[1] / side[0]) >= kMinRise,
+                "900-1100 Hz minus 1 kHz +-5 Hz: depth 0 %.1f dB, box depth %.1f dB, rise %.1f (>=%.0f)", db(side[0]),
+                db(side[1]), db(side[1] / side[0]), kMinRise);
 }
 
+// 6. Changing the wobble depth moves the wet level little. The box's depth is the reference.
 bool testWobbleLevel() {
+  constexpr double kMaxDb = 0.4;
   const Signal in = noise(3 * kSr, 0.25f);
-  const float wobbles[4] = {0.0f, 0.25f, 0.5f, 1.0f};
-  double d[4];
-  double ref = 0.0;
+  const cv::ChasmParams box = atTime(0.5f);
+  const double ref = rmsOf(wet(in, box), at(kSr / 2), at(3 * kSr));
+  const float scales[3] = {0.25f, 0.5f, 2.0f};
+  double d[3];
   bool ok = true;
-  for (int k = 0; k < 4; ++k) {
-    const double r = rmsOf(wet(in, params(0.5f, wobbles[k])), kSr / 2, 3 * kSr);
-    if (k == 0) ref = r;
-    d[k] = db(std::pow(r / ref, 2.0));
-    ok = ok && std::fabs(d[k]) <= 1.5;
+  for (int k = 0; k < 3; ++k) {
+    cv::ChasmParams p = box;
+    p.tuning.wobbleDepth = box.tuning.wobbleDepth * scales[k];
+    d[k] = db(std::pow(rmsOf(wet(in, p), at(kSr / 2), at(3 * kSr)) / ref, 2.0));
+    ok = ok && std::fabs(d[k]) <= kMaxDb;
   }
   return report("wobble-level", ok,
-                "noise wet RMS re wobble 0: wobble .25 %.2f dB, .5 %.2f dB, 1 %.2f dB (+-1.5)", d[1],
-                d[2], d[3]);
+                "noise wet RMS re the box depth: x0.25 %.2f dB, x0.5 %.2f dB, x2 %.2f dB (+-%.1f)", d[0], d[1], d[2],
+                kMaxDb);
 }
 
 // Magnitude of a sine's third harmonic re its fundamental, in dB, at one dwell.
 double thirdHarmonicDb(float dwell) {
-  constexpr int kSize = 32768;
-  const Signal in = sine(2 * kSr, 220.0, 0.25f);
-  cv::ChasmParams p = params(0.5f, 0.0f);
-  p.dwell = dwell;
-  const std::vector<double> sp = spectrum(wet(in, p), kSr / 2, 2 * kSr, kSize);
+  constexpr size_t kSize = 32768;
+  const Signal in = sine(at(2 * kSr), 220.0, 0.25f);
+  cv::ChasmParams p = atTime(0.5f);
+  p.tuning.dwell = dwell;
+  p.tuning.wobbleDepth = 0.0f;
+  const std::vector<double> sp = spectrum(wet(in, p), at(kSr / 2), at(2 * kSr), kSize);
   const auto band = [&](double hz) {
     double e = 0.0;
     for (size_t k = 0; k < sp.size(); ++k) {
-      const double f = static_cast<double>(k) * kSr / kSize;
+      const double f = static_cast<double>(k) * kSr / static_cast<double>(kSize);
       if (std::fabs(f - hz) <= 20.0) e += sp[k];
     }
     return e;
@@ -288,56 +249,110 @@ double thirdHarmonicDb(float dwell) {
   return db(band(660.0) / band(220.0));
 }
 
+// 7. Dwell drives the soft clip, so the third harmonic rises with it.
 bool testDwell() {
+  constexpr double kMinRise = 17.0;
   const double lo = thirdHarmonicDb(0.0f), hi = thirdHarmonicDb(1.0f);
-  return report("dwell-drive", hi - lo >= 6.0,
-                "3rd/1st harmonic: dwell 0 %.1f dB, dwell 1 %.1f dB, rise %.1f (>=6)", lo, hi,
-                hi - lo);
+  return report("dwell-drive", hi - lo >= kMinRise, "3rd/1st harmonic: dwell 0 %.1f dB, dwell 1 %.1f dB, rise %.1f (>=%.0f)",
+                lo, hi, hi - lo, kMinRise);
 }
 
+// 8. Burst of loud noise at the top of the TIME knob and the box's gain: finite, bounded, and the
+// tail dies away.
 bool testStable() {
-  Signal in = noise(3 * kSr, 0.5f);
+  constexpr float kMaxPeak = 4.0f;
+  constexpr double kMinFall = 38.0;
+  Signal in = noise(at(3 * kSr), 0.5f);
   in.resize(at(6 * kSr), 0.0f);
-  const Signal w = wet(in, params(1.0f, 1.0f));
-  bool finite = true;
-  float peak = 0.0f;
-  for (float v : w) {
-    finite = finite && std::isfinite(v);
-    peak = std::fabs(v) > peak ? std::fabs(v) : peak;
-  }
-  const double first = rmsOf(w, 3 * kSr, 3 * kSr + kSr / 2);
-  const double last = rmsOf(w, 6 * kSr - kSr / 2, 6 * kSr);
-  return report("stable", finite && peak < 4.0f && last < first,
-                "peak |wet| %.3f (<4), silence RMS first 0.5 s %.3g, last 0.5 s %.3g", peak, first,
-                last);
+  const Signal w = wet(in, atTime(1.0f));
+  const bool finite = [&] {
+    for (const float v : w)
+      if (!std::isfinite(v)) return false;
+    return true;
+  }();
+  const float peak = peakOf(w);
+  const double first = rmsOf(w, at(3 * kSr), at(3 * kSr + kSr / 2));
+  const double last = rmsOf(w, at(6 * kSr - kSr / 2), at(6 * kSr));
+  const double fall = db(std::pow(first / last, 2.0));
+  return report("stable", finite && peak < kMaxPeak && fall >= kMinFall,
+                "peak |wet| %.3f (<%.0f), silence RMS first 0.5 s %.3g, last 0.5 s %.3g, fall %.1f dB (>=%.0f)",
+                static_cast<double>(peak), static_cast<double>(kMaxPeak), first, last, fall, kMinFall);
 }
 
+// 9. A tuning value far outside its range stays finite, because the engine clamps it.
+bool testExtremeTuning() {
+  constexpr float kBigPeak = 100.0f;
+  using Set = void (*)(cv::ChasmTuning&);
+  const Set cases[] = {
+      [](cv::ChasmTuning& t) { t.bassCutHz = 0.0f; },         [](cv::ChasmTuning& t) { t.bassCutHz = -5.0f; },
+      [](cv::ChasmTuning& t) { t.bassCutHzTop = 0.0f; },      [](cv::ChasmTuning& t) { t.bassCutHzTop = 1e9f; },
+      [](cv::ChasmTuning& t) { t.wobbleDepth = 1e6f; },       [](cv::ChasmTuning& t) { t.wobbleDepth = -5.0f; },
+      [](cv::ChasmTuning& t) { t.wobbleRateHz = -3.0f; },     [](cv::ChasmTuning& t) { t.wobbleRateHz = 1e6f; },
+      [](cv::ChasmTuning& t) { t.inputTrim = 1e6f; },         [](cv::ChasmTuning& t) { t.inputTrim = -1e6f; },
+      [](cv::ChasmTuning& t) { t.dwell = -1.0f; },            [](cv::ChasmTuning& t) { t.dwell = 5.0f; },
+      [](cv::ChasmTuning& t) { t.dwellDrive = 1e30f; },       [](cv::ChasmTuning& t) { t.dwellDrive = -5.0f; },
+      [](cv::ChasmTuning& t) { t.dwellComp = -300.0f; },      [](cv::ChasmTuning& t) { t.dwellComp = 1e9f; },
+      [](cv::ChasmTuning& t) { t.wetDb = 400.0f; },           [](cv::ChasmTuning& t) { t.wetDb = -1e6f; },
+  };
+  const Signal x = noise(kSr, 0.5f);
+  int bad = 0;
+  float worst = 0.0f;
+  const auto check = [&](const cv::ChasmParams& p) {
+    const Signal y = wet(x, p);
+    bool ok = true;
+    for (const float v : y) ok = ok && std::isfinite(v) && std::fabs(v) < kBigPeak;
+    bad += ok ? 0 : 1;
+    worst = std::fmax(worst, peakOf(y));
+  };
+  for (const Set set : cases) {
+    cv::ChasmParams p = atTime(1.0f);
+    set(p.tuning);
+    check(p);
+  }
+  // The feedback is a parameter, and the engine holds it to its ceiling.
+  for (const float feedback : {5.0f, -1.0f, 0.97f}) {
+    cv::ChasmParams p = atTime(1.0f);
+    p.feedback = feedback;
+    check(p);
+  }
+  return report("extreme tuning", bad == 0, "%zu out-of-range values stay finite and under %.0f, largest output %.1f",
+                sizeof cases / sizeof cases[0] + 3, static_cast<double>(kBigPeak), static_cast<double>(worst));
+}
+
+// 10. The Reverb block never allocates with Chasm selected from its first pass.
 bool testNoAlloc() {
   const Signal in = noise(cv::kBlock * 8, 0.25f);
-  cv::ReverbParams p;
-  p.chasm = params(0.7f, 0.7f);
-  gReverb.reset();
-  run(gReverb, in, p);  // aborts on any new/delete inside process()
-  p.engine = cv::kReverbChasm;
-  run(gReverb, in, p);
+  auto rv = std::make_unique<cv::Reverb>();
+  cv::ReverbParams p = reverbParams(true, 0.15f);
+  p.chasm = atTime(0.7f);
+  run(*rv, in, p);  // aborts on any new/delete inside process()
   p.on = false;
-  run(gReverb, Signal(at(cv::kBlock * 64), 0.0f), p);
-  return report("no-alloc", true, "%.0f allocations in process()", 0.0);
+  run(*rv, Signal(at(cv::kBlock * 64), 0.0f), p);
+  return report("no-alloc", true, "no allocation inside process() (the guard aborts on one)");
+}
+
+// 11. The Chasm object stays inside its RAM bound.
+bool testSize() {
+  constexpr size_t kMaxBytes = 49152;
+  return report("size", sizeof(cv::Chasm) <= kMaxBytes, "sizeof(cv::Chasm) = %zu bytes (<= %zu), sizeof(cv::Reverb) = %zu",
+                sizeof(cv::Chasm), kMaxBytes, sizeof(cv::Reverb));
 }
 
 }  // namespace
 
 int main() {
   bool ok = true;
-  ok &= testPassthrough();
+  ok &= testEdges();
   ok &= testDecay();
+  ok &= testReverbTime();
   ok &= testChirp();
   ok &= testWobble();
   ok &= testWobbleLevel();
   ok &= testDwell();
   ok &= testStable();
+  ok &= testExtremeTuning();
   ok &= testNoAlloc();
-  std::printf("sizeof(cv::Chasm) = %zu bytes, sizeof(cv::Reverb) = %zu bytes\n", sizeof(cv::Chasm),
-              sizeof(cv::Reverb));
+  ok &= testSize();
+  std::printf("%s chasm\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

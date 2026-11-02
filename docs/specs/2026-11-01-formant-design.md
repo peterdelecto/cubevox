@@ -149,12 +149,12 @@ Host bench 2026-11-02, Adam's clips, ns a sample before and after the fix pass (
 
 At MIX 50 % the three running powers cost about 1.4 ns a sample, 2 to 6 % slower than before.
 
-Layout sums from the cost rows at v2.01.10 (lines 75 % mean, 95 % worst):
+Layout sums from the cost rows at v2.01.11, after the reverb speed pass (lines 75 % mean, 95 % worst):
 
 | Layout | Mean % | Worst % |
 |---|---|---|
-| default, Formant in slot 3 | 54 | 67 |
-| MOB and Chasm, Formant in slot 3 | 66 | 81 |
+| default, Formant in slot 3 | 46 | 60 |
+| MOB and Chasm, Formant in slot 3 | 54 | 70 |
 
 ## 10. History
 

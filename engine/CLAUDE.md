@@ -16,7 +16,11 @@
   setters, OnePole, `catmullRom`, `wrapOnce`, `readRing` and `readRingClamped` for a delay line that may leave
   [2, Len - 3], `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, `blockCoef` for a
   one-pole stepped once per block, and `advance` for n steps of one smoother or of two that share a coefficient).
-  The two reverbs share `engine/reverb_parts.h` (Allpass, Delay, the wobble LFO's sine table and phase step).
+  The two reverbs share `engine/reverb_parts.h` (the allpass step, Allpass, Delay, the wobble LFO's sine table,
+  phase step and error bound, and the Dwell drive terms).
+- Spring runs its loops at 24 kHz between a 15-tap half-band decimator and interpolator. Its
+  delay lengths subtract the filters' delay (`kFilterDelay`), and the tick stays inlined in
+  `Spring::run`, so check the M7 listing for a call to it after any change there.
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
 - `PitchFx` lives in DTCM: about 61,400 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
