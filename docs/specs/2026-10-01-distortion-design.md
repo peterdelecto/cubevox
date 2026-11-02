@@ -64,11 +64,12 @@ Notes from the same author's Boneyard / BD-2w mod write-up (part 4):
    1, before and after, in `build/drive-ab/`.
 3. The only nonlinearity is rail saturation, applied after stage 1 and after stage 2,
    as a clamp with a short soft edge. A small tunable rail asymmetry stands in for
-   imperfect biasing (default 0.05).
-4. No LEVEL knob. A static makeup law keeps output level within a few dB of input
-   across DRIVE for a −12 dBFS vocal; `trimDb` adjusts it.
+   imperfect biasing (default 0.05). The soft edge is a quadratic knee since v2.01.16
+   (audit fixes, item 6).
+4. No LEVEL knob. A static makeup law keeps the output level of Adam's three clips flat
+   across DRIVE; `trimDb` sets where it sits (audit fixes, item 4).
 5. The two saturators run 2× oversampled (small half-band FIR) to keep aliasing off a
-   vocal. Tuning switch to turn it off for A/B.
+   vocal. The box has no non-oversampled path.
 6. Chain order: PitchFx → Unison → Slapback → Distortion.
 
 ## Engine (`engine/distortion.h`)
@@ -77,82 +78,93 @@ Notes from the same author's Boneyard / BD-2w mod write-up (part 4):
 namespace cv {
 
 struct DistortionTuning {
-  float inputHpHz = 20.0f;        // input cap
+  float inputHpHz = 90.0f;        // input cap
   // stage 1 shaping (before its saturator)
   float s1BassHz = 700.0f;        // low shelf cut corner
   float s1BassDb = -12.0f;        // low shelf depth below s1BassHz
-  float s1LpHz = 6000.0f;         // top roll-off (C5)
+  float s1LpHz = 6892.0f;         // top roll-off (C5)
   float gain1Min = 16.0f;         // stage gain at DRIVE 0
   float gain1Max = 45.0f;         // stage gain at DRIVE 1
+  float topBoostDb = 6.0f;        // extra stage 1 gain at DRIVE 1, ramped in dB
+  float topBoostFrom = 0.6f;      // DRIVE where the top boost starts
   // tone stack between the stages (bass 10 / mid 6 / treble 0)
   float stackBassHz = 400.0f;     // low shelf boost corner
   float stackBassDb = 10.0f;
   float stackTrebleHz = 2000.0f;  // high shelf cut corner
-  float stackTrebleDb = -5.0f;   // owner 2026-10-01: TONE was inaudible at 3 kHz / -10 dB (3 kHz sat 12 dB below 300-600 Hz at noon)
+  float stackTrebleDb = -4.0f;
   float stackLossDb = -20.0f;     // insertion loss
   // stage 2
   float s2HpHz = 100.0f;
-  float s2LpHz = 6000.0f;
+  float s2LpHz = 6645.0f;
   float gain2Min = 2.0f;
   float gain2Max = 7.5f;
   float railAsym = 0.05f;         // 0..0.5; positive rail 1, negative -(1 - asym)
   float railSoft = 0.1f;          // soft edge as a fraction of the rail
   // post
-  float trebleCutHz = 1000.0f;    // fixed -6 dB high shelf
-  float trebleCutDb = -6.0f;
+  float trebleCutHz = 1000.0f;    // fixed high shelf cut
+  float trebleCutDb = -2.7f;      // half the BD-2's cut (owner 2026-11-01, "a bit dark")
   float toneMinDb = -12.0f;       // TONE fully down: shelf gain added above trebleCutHz
   float toneMaxDb = 6.0f;         // TONE fully up; noon adds 0 dB
   float bassPeakHz = 120.0f;      // gyrator bump
-  float bassPeakDb = 6.0f;
+  float bassPeakDb = 2.0f;
   float bassPeakQ = 1.0f;
-  float trimDb = 0.0f;
-  float fadeDrive = 0.05f;        // dry->chain crossfade span from DRIVE 0
-  bool oversample = true;
+  float trimDb = 2.87f;           // level rule, fitted on Adam's clips
+  float fadeDrive = 0.05f;        // dry-to-chain fade span from DRIVE 0
 };
 
 struct DistortionParams {
-  bool on = true;                 // menu bypass
+  bool on = true;                 // panel toggle
   float drive = 0.0f;             // panel knob 0..1
   float tone = 0.5f;              // panel knob 0..1; noon is flat
   DistortionTuning tuning;
 };
 
-class Distortion {
- public:
-  void reset();
-  void process(const float* in, float* out, int n, const DistortionParams& p);
-};
-
 }
 ```
 
-Behaviour per sample (coefficients recomputed per block):
+`applyTuning` clamps every dB field to ±24 dB (`topBoostDb` 0 to 24 dB) and the stage gains to
+0.1 to 1000; `cubevox-render` refuses a value outside those limits.
+
+Behaviour per sample:
 
 1. `x = hp1(in, inputHpHz)`.
 2. Stage 1 shaping: `x = lowShelf(x, s1BassHz, s1BassDb)`; `x = lp1(x, s1LpHz)`;
-   `x *= g1`; `x = rail(x)`, with `g1 = gain1Min * (gain1Max / gain1Min)^drive`.
+   `x *= g1`; `x = rail(x)`, with `g1 = gain1Min * (gain1Max / gain1Min)^drive` plus the top boost.
 3. Tone stack: `x = lowShelf(x, stackBassHz, stackBassDb)`;
    `x = highShelf(x, stackTrebleHz, stackTrebleDb)`; `x *= dbToLin(stackLossDb)`.
 4. Stage 2: `x = hp1(x, s2HpHz)`; `x = lp1(x, s2LpHz)`; `x *= g2`; `x = rail(x)`.
 5. Post: `x = highShelf(x, trebleCutHz, trebleCutDb + toneShelfDb)`, where `toneShelfDb` runs
    `toneMinDb`..0 over tone 0..0.5 and 0..`toneMaxDb` over 0.5..1 (`tone` smoothed with the same
-   20 ms one-pole as `drive`; settled tone 0.5 equals the pre-TONE sound exactly);
-   `x = peakEq(x, bassPeakHz, bassPeakDb, bassPeakQ)`; DC blocker `hp1` at 10 Hz.
-6. `rail(x)`: clamp to `[-(1 - railAsym), 1]` with a `tanh` soft edge over the last
-   `railSoft` fraction before each rail. Steps 2 and 4 saturators run inside the 2×
-   oversampler when `oversample` is on (upsample before `*= g1`, downsample after the
-   stage-2 rail; the linear filters in between may run at 2× too, simplest wins).
+   20 ms one-pole as `drive`); `x = peakEq(x, bassPeakHz, bassPeakDb, bassPeakQ)`; DC blocker `hp1`
+   at 20 Hz (the lowest corner `OnePole::set` takes).
+6. `rail(x)`: limits `[-(1 - railAsym), 1]`. Each side is linear up to `limit - edge`
+   (`edge = railSoft * limit`), then the knee `v - t^2 / (4 edge)` over two edge widths, which
+   meets the limit with zero slope. It has no branch. Both rails run inside the 2× oversampler.
+   The half-band's four odd taps sum to exactly 0.25, so each pass is unity at DC.
 7. Makeup: `x *= dbToLin(trimDb) / makeup(g1 * g2)` with
-   `makeup(g) = a*g / sqrt(1 + (a*g / s)^2)`, a = 0.06, s = 10.3. Fitted so a -18 dBFS RMS
-   synthetic vocal (180 Hz, 10 harmonics at 1/k, 5 Hz +-20 cent vibrato) stays within
-   0.1 dB of input from DRIVE 0.1 to 1 at trim 2.9 dB.
-8. `drive_` one-pole smoothed (20 ms) with snap to exact 0; `on == false` → drive 0.
-   Settled drive 0 skips the whole chain and copies input to output exactly. The
-   chain's fixed EQ fades in rather than jumping: `out = lerp(in, chain, f)` with
-   `f = min(drive_ / fadeDrive, 1)`, `fadeDrive = 0.05` (tuning field). Above that
-   the chain is fully in, as on the pedal at any GAIN setting.
-9. Shelves and peak are RBJ biquads. Float only, `std::array`, no heap/I/O,
-   `-Werror` clean. `tanhf` per sample is fine.
+   `makeup(g) = a*g / sqrt(1 + (a*g / s)^2)`, a = 0.06, s = 12.53. Fitted on Adam's three clips:
+   the default (DRIVE 30 %, TONE 50 %) reads +0.25 dB on their mean, and DRIVE 10 % to 100 %
+   stays within -0.32 to +0.34 dB of that.
+8. DRIVE and TONE are smoothed with the 20 ms one-pole. The stage turns on when the knob reaches
+   `fadeDrive` (5 %) and off when it falls under 0.8 × `fadeDrive` (4 %), keeping its last state
+   between the two. On, the smoother aims at the knob or `fadeDrive`, whichever is higher; off, at
+   exactly 0. The dry-to-chain mix moves toward `smoothstep(clamp(drive_ / fadeDrive, 0, 1))` by at
+   most 1 / (16 ms × 48 kHz) a sample, both ways. Drive and mix both at 0 skips the chain and copies
+   the input exactly. While they sit at 0, TONE follows the knob, so an enable starts from the knob.
+9. Shelves and peak are RBJ biquads. While TONE moves, the treble shelf's coefficients interpolate
+   across each 64-sample chunk; settled, they stay fixed.
+10. A NaN knob reads as the clamp's bound. If a block leaves a non-finite filter state, the chain
+    clears.
+
+Box code:
+
+1. A call runs in 64-sample chunks, each stage by stage: five loops, so each recursion keeps its
+   state in registers, with the rails and half-bands working on linear histories in the engine's
+   scratch.
+2. A settled chunk (DRIVE and TONE at their targets) runs with fixed gains, no smoothers and no fade.
+3. `reset()` clears the state and keeps the coefficients, which depend on the tuning alone.
+4. The `Distortion` object sits in DTCM, 2,624 B.
+5. The panel toggle switches the stage, which settles off to a plain copy.
 
 ## Emulator
 
@@ -164,39 +176,73 @@ Distortion.
 
 ## Render CLI
 
-`--drive <0..1>` enables the stage; `--tone <0..1>` sets TONE (default 0.5). Tuning keys via `--tuning k=v`, named
-`dist` + field name in lowerCamel (e.g. `distS1BassHz`, `distGain1Max`,
-`distRailAsym`, `distToneMinDb`, `distToneMaxDb`, `distTrimDb`, `distOversample`).
+`--drive <0..1>` enables the stage; `--tone <0..1>` sets TONE (default 0.5). Tuning keys via
+`--tuning k=v`, named `dist` + field name in lowerCamel (e.g. `distS1BassHz`, `distGain1Min`,
+`distGain1Max`, `distGain2Min`, `distRailAsym`, `distToneMinDb`, `distToneMaxDb`, `distTrimDb`).
+`distortionTuningInRange` refuses a value outside the engine's limits.
 
-## Tests (`test/distortion_test.cpp`, ctest `distortion`)
+## Tests
 
-Test tone = 220 Hz sine at −12 dBFS (amplitude 0.251). Harmonic levels by Goertzel
-over seconds 1–2.
+`test/distortion_test.cpp`, ctest `distortion`. Test tone = 220 Hz sine at −12 dBFS (amplitude
+0.251). Harmonic levels by Goertzel over seconds 1–2. Readings as of v2.01.16.
 
-1. Passthrough: drive 0, and `on = false` with drive 1 → after 100 ms
-   `|out - in| < 1e-6`.
-2. Harmonics grow evenly with drive: 3rd harmonic relative to the fundamental at drive
-   0.1 / 0.3 / 0.5 / 0.7 / 1 is within ±3 dB of −40 / −28 / −20 / −15 / −11.4 and strictly
-   rising. (Old band: drive 1 ≥ −15 and 0.2 < 0.5 < 1; changed on the owner's taper report.)
-3. Clean at low drive: at drive 0.1 the 3rd harmonic is ≤ −38 dB relative to the
-   fundamental. (Old: drive 0.15 ≤ −40.)
-4. Level: output RMS within ±4 dB of input RMS at drive 0.15, 0.5, 1.
-5. Asymmetry, measured just past the stage-1 clipping onset (about drive 0.1 with
-   the defaults), where one rail clips before the other. At full drive the wave is
-   a near-symmetric square and the DC blocker removes the only difference; below
-   onset nothing clips. At drive 0.2 with default `railAsym` 0.05 the 2nd harmonic
-   is ≥ −46 dB relative to the fundamental (measured −43 dB); with `railAsym = 0`
-   it is ≤ −55 dB.
-6. DC: `|mean(out)|` over seconds 1–2 at drive 1 is < 1e-3.
-7. Tone: 8 kHz sine at −12 dBFS, drive 0.5. Output RMS at tone 1 exceeds tone 0 by
-   ≥ 12 dB (measured 18 dB), and tone 0.5 is within 0.5 dB of the result with
-   `toneMinDb = toneMaxDb = 0` (the pre-TONE sound).
-8. No allocation inside `process()`.
+1. Passthrough: drive 0, and `on = false` with drive 1, equal the input exactly (`==`).
+2. Switch-off: off or DRIVE 0 after DRIVE 0.5 and 1 equals the input exactly after 0.5 s.
+3. Engage: DRIVE 4.5 % from fresh stays a copy; 6 % engages; 4.5 % after 6 % stays engaged;
+   3.9 % turns it off.
+4. Call sizes 1, 17, 64, 200 and 1000 from a settled state equal 64-sample calls exactly.
+5. Non-finite: a NaN sample recovers; NaN DRIVE and TONE keep the output finite.
+6. Harmonics: 3rd at drive 0.1 / 0.3 / 0.5 / 0.7 / 1 within ±3 dB of −40 / −28 / −20 / −14 /
+   −11.6 and rising (reads −40.7 / −27.9 / −20.4 / −13.5 / −11.2).
+7. Clean: at drive 0.1 the 3rd is ≤ −38 dB.
+8. Level on the synthetic tone: within ±4 dB at drive 0.15, 0.5, 1.
+9. Asymmetry at drive 0.2: 2nd ≥ −46 dB at `railAsym` 0.05, ≤ −55 dB at 0.
+10. DC: `|mean(out)|` at drive 1 < 1e-3.
+11. Tone: at 8 kHz, tone 1 over tone 0 by ≥ 12 dB (reads 18.0), noon equal to no TONE shelf.
+12. No allocation inside `process()`; the top boost and gain-law cases.
+
+`level_test` holds the default on Adam's three clips, mean 0 to +0.5 dB, and DRIVE 10 % to 100 %
+within 0.5 dB of the default; the synthetic program prints as a note. `knob_step_test` places
+Distortion at DRIVE 30 % and judges 25 rows at ×1.05 of steady-state curvature: the enable edge and
+DRIVE up from 0 at DRIVE 30 / 60 / 100 % × TONE 0 / 50 / 100 %, the four crossings of 5 %, and a
+fast 6 to 3 % jump.
+
+## Audit fixes (2026-11-02, v2.01.16)
+
+Owner 2026-11-02, after the efficiency and correctness audits
+(`build/audit/2026-11-02-distortion-audit-*.md`): "we must address and fix all".
+
+1. Enable edge. An enable, or DRIVE up from 0, replayed a TONE glide from noon or a stale value:
+   the treble started up to 7 dB off, curvature ×48.7 at DRIVE 30 % / TONE 0 %. TONE now follows
+   the knob while the stage is dry, and the 16 ms fade lets the filters settle. Reads ×1.04 / 1.00
+   / 1.00 at DRIVE 30 % and TONE 0 / 50 / 100 %. 16 ms is the shortest of 8, 12, 16 and 20 ms that
+   passes every row; 20 ms reads ×1.27.
+2. TONE zipper. The shelf stepped once a block, a 750 Hz buzz at −33 to −40 dB peak on a fast
+   sweep. The coefficients now interpolate; a TONE sweep reads ×0.99.
+3. Bottom of DRIVE. Parked at 1 to 4 % the dry and the 14-sample-late chain combed (−12 dB at
+   1.5 kHz at 2.5 %). The on/off thresholds keep the knob from parking there. The smoothstep goal
+   keeps a fast 6 to 3 % jump at ×0.99, where a plain clamp read ×1.19 at every fade length.
+4. Level. The default read +0.74 dB on Adam's clips (+1.06 on clip 3) and +2.5 dB at DRIVE 100 %,
+   against a synthetic program that read +0.16. Trim 3.3 → 2.87 dB and makeup s 10.3 → 12.53.
+5. CPU. Stage-major loops, the settled path, fixed rail constants, closed-form smoothers, cached
+   shelf sine and cosine, `exp2Fast` gains, coefficients kept on reset, a word compare of the
+   tuning, the object in DTCM. M7 model: a settled sample 517 → 355 cycles; block 41.5k / 63.7k →
+   23.2k / 29.8k cycles mean / costliest. `kDistortion` is {5, 6} until a box stress run with the
+   Distortion sweeps measures it (it was {8, 11}, measured).
+6. Knee. A branch-free quadratic knee replaces the `tanh` soft edge. It makes the cost flat at every
+   level. Output differs from the `tanh` rail by −68 dB RMS at the default and −57 dB RMS at DRIVE
+   100 % / TONE 100 %. Before and after at DRIVE 100 % in `build/audition/distortion-fix-knee.wav`.
+7. Half-band taps scaled to unity at DC (they summed to 0.49628 a pair, −0.03 dB a pass and a
+   −48.6 dB image leak). DC blocker named 20 Hz, which it always was.
+8. Guards: NaN-proof knobs, a chain that clears on a non-finite state, tuning clamps, render ranges
+   and the two missing render keys.
+9. Tests: clip rows fail on an empty clip when `samples/` exists; passthrough with `==`; switch-off,
+   call-size, engage and NaN cases; the `knob_step_test` rows above.
+10. Not built. Stage 1 at the base rate (it would fold stage 1's harmonics into the band; decision
+    5). Brightness unchanged: at the default the top sits 0.5 to 3 dB under the dry voice and TONE
+    full up puts it 2 to 4 dB over, and the open ear item is closed.
 
 ## Done when
 
 `ctest` passes all stages; face shows DISTORTION under SLAPBACK; owner listens with
 a vocal loop and tunes toward the Blues Driver by ear.
-
-Box code: both clipping stages always run 2x oversampled; there is no non-oversampled path. The
-panel toggle switches the stage, which settles off to a plain copy.
