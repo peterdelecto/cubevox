@@ -118,7 +118,7 @@ struct ProtoParams {
     slapback.on = true;
     eq.on = true;
     pitchFx.autotune.key = kStartKey;
-    pitchFx.octave.mix = 0.10f;
+    pitchFx.octave.mix = cv::kOctaveDefaultMix;
     reverb.engine = cv::kReverbSpring;
     reverb.mix = 1.0f;
     reverb.time = 1.0f;  // full MIX with full decay, Adam's starting sound
@@ -403,7 +403,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const int prefix = static_cast<int>(snapshotLines(params, gTuningText, sizeof(gTuningText)));
   std::snprintf(
       gTuningText + prefix, sizeof(gTuningText) - static_cast<size_t>(prefix),
-      "OctaveTuning{%.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
+      "OctaveTuning{%.1ff, %.0ff, %.1ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.1ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, %.2ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
@@ -412,7 +412,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       "%.1ff, %.1ff, %.1ff, %.1ff}\n"
       "PolishTuning{%.2ff, %.2ff, %.1ff, {%.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.0ff, %.1ff}}\n"
       "// PolishParams: dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB",
-      o.levelDb, o.glideMs, o.grainWindowMs, o.grainCount, o.trimDb,
+      o.glideMs, o.grainWindowMs, o.trimDb,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.trimDb, t.topFrom, t.topSwingGain, t.topWetDb,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.topBoostDb, d.topBoostFrom, d.stackBassHz, d.stackBassDb,
@@ -466,7 +466,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// AutotuneTuning: trimDb, grainDelay\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb, "
       "detectorAttackMs, detectorReleaseMs, travelTimes\n"
-      "// OctaveTuning: levelDb, glideMs, grainWindowMs, grainCount, trimDb\n"
+      "// OctaveTuning: glideMs, grainWindowMs, trimDb\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, trimDb, topFrom, topSwingGain, topWetDb\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb, trimDb\n"
@@ -552,16 +552,9 @@ bool tuningLeaf(const char* probeName, const char* label) {
 
 // Long tuning sections split into sub-nodes so no column ever needs a scroll bar.
 void drawOctaveRaw(cv::OctaveTuning& o) {
-  ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
   ImGui::SliderFloat("Trim", &o.trimDb, -12.0f, 12.0f, "%.1f dB");
   ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
   ImGui::SliderFloat("Grain window", &o.grainWindowMs, 20.0f, 80.0f, "%.0f ms");
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("Grains");
-  ImGui::SameLine();
-  ImGui::RadioButton("2", &o.grainCount, 2);
-  ImGui::SameLine();
-  ImGui::RadioButton("4", &o.grainCount, 4);
 }
 
 void drawAutotuneRaw(cv::AutotuneTuning& t) {

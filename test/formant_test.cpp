@@ -1,8 +1,12 @@
 // Formant card checks: settled off is a plain copy, MIX 0 leaves the input untouched, SHIFT 0 keeps
 // the spectrum's centroid, a SHIFT step moves the spectral envelope's first peak by 2^(st / 12), the
 // sung pitch holds with Autotune off and on, the formant voice lines up with Autotune's corrected
-// voice, a quick off and on keeps the running voice, SHIFT and MIX steps hold steady-state curvature,
-// the MIX level, the trim, any call length, and no allocation. No window, no audio device.
+// voice, a quick off and on keeps the running voice, MIX leaves 0 and 100 % without a click or a dip,
+// the toggle holds steady-state curvature, the MIX level, the trim, any call length, and no
+// allocation. The voice's silence skip returns the plain voice's samples, SHIFT starts at the knob
+// when the card comes up, a voice that starts late takes the other's grain grid, the tracker's range
+// flags put the card aside, and a NaN does not stay in the level gain. SHIFT and MIX steps are
+// knob_step_test's, the default level is level_test's. No window, no audio device.
 
 #include <algorithm>
 #include <array>
@@ -12,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <new>
 #include <vector>
 
@@ -47,6 +52,7 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kRate = cv::kSampleRate;
+constexpr int kShift = cv::kFormantDefaultShiftSt;  // the SHIFT the card starts on
 constexpr double kSungHz = 150.0;                       // a whole 320 samples a period
 constexpr double kTunedHz = 146.8323839587038;          // D3, the C major note nearest 150 Hz
 constexpr double kBumpHz = 1100.0;                      // the vowel's spectral peak
@@ -81,15 +87,21 @@ Signal sawtooth(double hz, int n) {
   return out;
 }
 
-// Flat harmonics under a Gaussian bump at kBumpHz, so a formant move shifts the bump and the log of
-// the harmonic amplitudes is a parabola around its peak. The waveform starts `offset` samples in, so
-// the grain grid meets it at a different phase.
-Signal vowel(double hz, int n, int offset = 0) {
+// The harmonic amplitudes of a vowel at hz: a Gaussian bump at kBumpHz over flat harmonics.
+std::vector<double> bumpAmps(double hz) {
   std::vector<double> amp;
   for (int k = 1; hz * k < 4000.0; ++k) {
     const double z = (hz * k - kBumpHz) / kBumpWidthHz;
     amp.push_back(std::exp(-0.5 * z * z));
   }
+  return amp;
+}
+
+// The vowel's harmonics under that bump, so a formant move shifts the bump and the log of the
+// harmonic amplitudes is a parabola around its peak. The waveform starts `offset` samples in, so
+// the grain grid meets it at a different phase.
+Signal vowel(double hz, int n, int offset = 0) {
+  const std::vector<double> amp = bumpAmps(hz);
   std::vector<double> x(static_cast<size_t>(n), 0.0);
   double peak = 0.0;
   for (int i = 0; i < n; ++i) {
@@ -105,11 +117,11 @@ Signal vowel(double hz, int n, int offset = 0) {
   return out;
 }
 
-// The vowel under a random piecewise-linear envelope (a new level every 20 ms, 0.3 to 1), so a
+// x under a random piecewise-linear envelope (a new level every 20 ms, 0.3 to 1), so a
 // cross-correlation has one peak where a steady tone has one per period.
-Signal irregular(double hz, int n) {
+Signal withEnvelope(Signal x) {
   constexpr int kStep = kRate / 50;
-  Signal x = vowel(hz, n);
+  const int n = static_cast<int>(x.size());
   uint64_t s = 0x9E3779B97F4A7C15ULL;
   double a = 0.6;
   double b = 0.6;
@@ -125,21 +137,31 @@ Signal irregular(double hz, int n) {
   return x;
 }
 
-// level_test's program: a 180 Hz tone of ten harmonics at 1/k with 5 Hz vibrato of +-20 cents under a
-// 2 Hz raised-cosine phrase envelope, plus pink-ish noise at -40 dBFS, the whole at -18 dBFS RMS.
-Signal program(int seconds) {
-  const size_t n = static_cast<size_t>(seconds) * kRate;
-  std::vector<double> tone(n);
-  std::vector<double> noise(n);
+// The vowel under that envelope.
+Signal irregular(double hz, int n) { return withEnvelope(vowel(hz, n)); }
+
+// The vowel with 5 Hz vibrato of +-cents about hz, under that envelope. The harmonic weights stay those
+// of the vowel at hz and the phase runs from the sung frequency.
+Signal vibratoVowel(double hz, int n, double cents) {
+  const std::vector<double> amp = bumpAmps(hz);
+  std::vector<double> x(static_cast<size_t>(n), 0.0);
+  double peak = 0.0;
   double phase = 0.0;
-  for (size_t i = 0; i < n; ++i) {
-    const double t = static_cast<double>(i) / kRate;
-    const double hz = 180.0 * std::pow(2.0, 20.0 * std::sin(2.0 * kPi * 5.0 * t) / 1200.0);
-    phase += 2.0 * kPi * hz / kRate;
-    double v = 0.0;
-    for (int k = 1; k <= 10; ++k) v += std::sin(k * phase) / k;
-    tone[i] = v * 0.5 * (1.0 - std::cos(2.0 * kPi * 2.0 * t));
+  for (int i = 0; i < n; ++i) {
+    phase += 2.0 * kPi * hz * std::exp2(cents * std::sin(2.0 * kPi * 5.0 * i / kRate) / 1200.0) / kRate;
+    double s = 0.0;
+    for (size_t k = 0; k < amp.size(); ++k) s += amp[k] * std::sin(static_cast<double>(k + 1) * phase);
+    x[static_cast<size_t>(i)] = s;
+    peak = std::max(peak, std::fabs(s));
   }
+  Signal out(x.size());
+  for (size_t i = 0; i < x.size(); ++i) out[i] = static_cast<float>(0.5 * x[i] / peak);
+  return withEnvelope(out);
+}
+
+// level_test's pink-ish noise: white noise through a Kellet economy filter.
+std::vector<double> pinkNoise(size_t n) {
+  std::vector<double> noise(n);
   uint64_t s = 0x9E3779B97F4A7C15ULL;
   double b0 = 0.0;
   double b1 = 0.0;
@@ -151,6 +173,24 @@ Signal program(int seconds) {
     b1 = 0.96300 * b1 + w * 0.2965164;
     b2 = 0.57000 * b2 + w * 1.0526913;
     noise[i] = b0 + b1 + b2 + w * 0.1848;
+  }
+  return noise;
+}
+
+// level_test's program: a 180 Hz tone of ten harmonics at 1/k with 5 Hz vibrato of +-20 cents under a
+// 2 Hz raised-cosine phrase envelope, plus pink-ish noise at -40 dBFS, the whole at -18 dBFS RMS.
+Signal program(int seconds) {
+  const size_t n = static_cast<size_t>(seconds) * kRate;
+  std::vector<double> tone(n);
+  const std::vector<double> noise = pinkNoise(n);
+  double phase = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    const double t = static_cast<double>(i) / kRate;
+    const double hz = 180.0 * std::pow(2.0, 20.0 * std::sin(2.0 * kPi * 5.0 * t) / 1200.0);
+    phase += 2.0 * kPi * hz / kRate;
+    double v = 0.0;
+    for (int k = 1; k <= 10; ++k) v += std::sin(k * phase) / k;
+    tone[i] = v * 0.5 * (1.0 - std::cos(2.0 * kPi * 2.0 * t));
   }
   auto rmsOf = [n](const std::vector<double>& x) {
     double e = 0.0;
@@ -182,20 +222,20 @@ Signal sine(int n) { return tone(220.0, n); }
 
 static cv::PitchFx gFx;
 
-// The card on at unity trim, so the checks read the voice itself; testDefaultLevel reads the shipped trim.
+// The card on at unity trim, so the checks read the voice itself. level_test reads the shipped trim.
 cv::PitchFxParams formantOn(int shiftSt, float mix = 1.0f) {
   cv::PitchFxParams p;
   p.formant.on = true;
   p.formant.shiftSt = shiftSt;
   p.formant.mix = mix;
-  p.formant.tuning.trimDb = 0.0f;
+  p.formant.tuning.trimDb.fill(0.0f);
   return p;
 }
 
 // The card off, with the same unity trim as formantOn, so a toggle changes nothing else.
 cv::PitchFxParams formantOff() {
   cv::PitchFxParams p;
-  p.formant.tuning.trimDb = 0.0f;
+  p.formant.tuning.trimDb.fill(0.0f);
   return p;
 }
 
@@ -343,6 +383,18 @@ int bestLag(const Signal& a, const Signal& b, int from, int len, int reach) {
   return best;
 }
 
+// bestLag refined by a parabola through the correlation at the best lag and its two neighbours.
+double bestLagFine(const Signal& a, const Signal& b, int from, int len, int reach) {
+  const int best = bestLag(a, b, from, len, reach);
+  double r[3];
+  for (int k = -1; k <= 1; ++k) {
+    r[k + 1] = 0.0;
+    for (int i = from; i < from + len; ++i) r[k + 1] += static_cast<double>(a[static_cast<size_t>(i)]) * b[static_cast<size_t>(i + best + k)];
+  }
+  const double d = r[0] - 2.0 * r[1] + r[2];
+  return best + (d < 0.0 ? 0.5 * (r[0] - r[2]) / d : 0.0);
+}
+
 // Largest |second difference| of x over [from, to).
 double peakCurvature(const Signal& x, int from, int to) {
   double worst = 0.0;
@@ -366,7 +418,7 @@ bool testOffExact() {
                    static_cast<double>(in.size()));
 
   const Signal long3 = vowel(kSungHz, 3 * kRate);
-  const Signal after = runSteps(long3, formantOn(-3), formantOff(), kRate);
+  const Signal after = runSteps(long3, formantOn(kShift), formantOff(), kRate);
   const bool settled = gFx.formantFade() == 0.0f;
   differs = 0;
   for (int i = 2 * kRate; i < 3 * kRate; ++i) differs += after[static_cast<size_t>(i)] != long3[static_cast<size_t>(i)] ? 1u : 0u;
@@ -390,7 +442,7 @@ bool testShiftZero() {
   const double cIn = centroidHz(harmonics(in, from, kSungHz, 26), kSungHz);
   const double cOut = centroidHz(harmonics(out, from, kSungHz, 26), kSungHz);
   const double err = cOut / cIn - 1.0;
-  return report("shift 0 centroid", std::fabs(err) <= 0.02, "centroid %.1f Hz against the input's %.1f Hz, off by %.3f %% (+-2)",
+  return report("shift 0 centroid", std::fabs(err) <= 0.001, "centroid %.1f Hz against the input's %.1f Hz, off by %.3f %% (+-0.1)",
                 cOut, cIn, 100.0 * err);
 }
 
@@ -444,10 +496,20 @@ bool testPitch() {
         worstSt = st;
       }
     }
-    ok &= report(pass == 0 ? "pitch holds, autotune off" : "pitch holds, autotune on", worst <= 3.0,
-                 "worst %.2f cents (+-3) at SHIFT %+.0f st, against %.2f Hz", worst, static_cast<double>(worstSt), wantHz);
+    ok &= report(pass == 0 ? "pitch holds, autotune off" : "pitch holds, autotune on", worst <= 0.05,
+                 "worst %.3f cents (+-0.05) at SHIFT %+.0f st, against %.2f Hz", worst, static_cast<double>(worstSt), wantHz);
   }
   return ok;
+}
+
+// The lag, within 8 samples, at which the Formant voice (SHIFT 0, MIX 100 %, Autotune on) best matches
+// Autotune's corrected voice alone over the second after 2 s.
+double lagToAutotune(const Signal& in) {
+  cv::PitchFxParams tuned;
+  autotuneOn(tuned);
+  cv::PitchFxParams both = formantOn(0);
+  autotuneOn(both);
+  return bestLagFine(run(in, tuned), run(in, both), 2 * kRate, kRate, 8);
 }
 
 // With Autotune on and SHIFT 0 the two voices are the same sample. With Autotune off the formant
@@ -455,22 +517,15 @@ bool testPitch() {
 bool testAlignment() {
   const Signal in = irregular(kSungHz, 4 * kRate);
   const int from = 2 * kRate;
-  cv::PitchFxParams tuned;
-  autotuneOn(tuned);
-  cv::PitchFxParams both = formantOn(0);
-  autotuneOn(both);
-  const Signal a = run(in, tuned);
-  const Signal f = run(in, both);
-  const int lag = bestLag(a, f, from, kRate, 8);
-  bool ok = report("aligned with autotune", std::abs(lag) <= 1, "cross-correlation peaks at lag %.0f samples (0, +-1)",
-                   static_cast<double>(lag));
+  const double lag = lagToAutotune(in);
+  bool ok = report("aligned with autotune", std::fabs(lag) <= 0.8, "cross-correlation peaks at lag %.2f samples (0, +-0.8)", lag);
 
   const Signal plain = run(in, formantOn(0));
   const double want = static_cast<double>(cv::PsolaVoice::kGrainDelay) + kRate / kSungHz;
   const int reach = static_cast<int>(want) + 8;
   const int dry = bestLag(in, plain, from, kRate, reach);
-  ok &= report("lag behind the input", std::fabs(dry - want) <= 1.5,
-               "peaks at lag %.0f samples against grain delay + period %.1f (+-1.5)", static_cast<double>(dry), want);
+  ok &= report("lag behind the input", std::fabs(dry - want) <= 1.0,
+               "peaks at lag %.0f samples against grain delay + period %.1f (+-1)", static_cast<double>(dry), want);
   return ok;
 }
 
@@ -478,7 +533,7 @@ bool testAlignment() {
 // run that never stopped, bit for bit.
 bool testQuickToggleKeepsVoice() {
   const Signal in = irregular(kSungHz, 4 * kRate);
-  const cv::PitchFxParams on = formantOn(-3);
+  const cv::PitchFxParams on = formantOn(kShift);
   const Signal steady = run(in, on);
   gFx.reset();
   Signal out(in.size());
@@ -505,26 +560,41 @@ double stepRatio(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFx
   return steady > 0.0 ? step / steady : (step > 0.0 ? 1e9 : 0.0);
 }
 
-bool testShiftSteps() {
+// MIX 0 settles the stage off, so it sits out like a card that is switched off. Leaving it by a touch
+// or a jump starts the voice clean: no click on a steady tone.
+bool testMixLeavesZero() {
   const Signal in = sine(4 * kRate);
-  constexpr double kMax = 1.05;
   double worst = 0.0;
-  int worstSt = 0;
-  for (int st = -7; st < 7; ++st) {
-    const double r = stepRatio(in, formantOn(st), formantOn(st + 1));
-    if (r >= worst) {
-      worst = r;
-      worstSt = st;
+  for (float m : {0.015f, 0.5f, 1.0f}) worst = std::max(worst, stepRatio(in, formantOn(kShift, 0.0f), formantOn(kShift, m)));
+  return report("mix leaves 0", worst <= 1.01, "peak curvature after MIX 0 to 1.5, 50, 100 %%: x%.4f of steady state (<= 1.01)", worst);
+}
+
+// The windows of kPeriodSamples after the step, against the same length of steady output before it.
+constexpr int kPeriodSamples = 320;  // one period of kSungHz
+
+// With Autotune on and MIX at 100 % the corrected voice is multiplied by 0, so it sits out. MIX
+// leaving 100 % brings it back clean. The level over the first 20 ms, in windows of one period,
+// stays within a dB of the level before the step, at the default SHIFT and at 0, where the two
+// voices are one waveform.
+bool testMixLeavesFull() {
+  const Signal in = vowel(kSungHz, 4 * kRate);
+  const int stepAt = 2 * kRate;
+  double worst = 0.0;
+  for (int shift : {kShift, 0}) {
+    for (float m : {0.9f, 0.5f}) {
+      cv::PitchFxParams a = formantOn(shift, 1.0f);
+      cv::PitchFxParams b = formantOn(shift, m);
+      autotuneOn(a);
+      autotuneOn(b);
+      const Signal out = runSteps(in, a, b, stepAt);
+      const double ref = rms(out, stepAt - 10 * kPeriodSamples, stepAt);
+      for (int w = 0; w < 3; ++w) {
+        const int from = stepAt + w * kPeriodSamples;
+        worst = std::max(worst, std::fabs(db(rms(out, from, from + kPeriodSamples) / ref)));
+      }
     }
   }
-  bool ok = report("shift steps", worst <= kMax, "worst step %+.0f to %+.0f st: peak curvature x%.4f of steady state (<= 1.05)",
-                   static_cast<double>(worstSt), static_cast<double>(worstSt + 1), worst);
-  double worstMix = 0.0;
-  for (float m : {0.2f, 0.5f, 0.8f}) {
-    worstMix = std::max(worstMix, stepRatio(in, formantOn(-3, m), formantOn(-3, m + 0.015f)));
-  }
-  ok &= report("mix steps", worstMix <= kMax, "worst 1.5 %% step: peak curvature x%.4f of steady state (<= 1.05)", worstMix);
-  return ok;
+  return report("mix leaves 100 %", worst <= 1.0, "level of the first 20 ms after MIX 100 to 90 and 50 %% is within %.2f dB of before (1)", worst);
 }
 
 // The toggle's crossfade, in both directions, on the 220 Hz sine. The dry sine and the shifted voice
@@ -532,10 +602,10 @@ bool testShiftSteps() {
 // next to the knob steps.
 bool testToggleSteps() {
   const Signal in = sine(4 * kRate);
-  const double up = stepRatio(in, formantOff(), formantOn(-3));
-  const double down = stepRatio(in, formantOn(-3), formantOff());
-  return report("toggle steps", up <= 1.05 && down <= 1.05,
-                "peak curvature after the step: off to on x%.4f, on to off x%.4f of steady state (<= 1.05)", up, down);
+  const double up = stepRatio(in, formantOff(), formantOn(kShift));
+  const double down = stepRatio(in, formantOn(kShift), formantOff());
+  return report("toggle steps", up <= 1.01 && down <= 1.01,
+                "peak curvature after the step: off to on x%.4f, on to off x%.4f of steady state (<= 1.01)", up, down);
 }
 
 // MIX holds the input's level whether the two voices are one waveform or unrelated. At SHIFT 0 with
@@ -554,8 +624,8 @@ bool testMixLaw() {
     for (float m : {0.25f, 0.5f, 0.75f}) {
       worst = std::max(worst, std::fabs(db(rms(run(in, formantOn(0, m)), kRate, 3 * kRate) / inRms)));
     }
-    ok &= report(pass == 0 ? "mix level, one waveform" : "mix level, quarter cycle apart", worst <= 0.1,
-                 "level over the input at MIX 25, 50, 75 %% is within %.3f dB of 0 dB (0.1)", worst);
+    ok &= report(pass == 0 ? "mix level, one waveform" : "mix level, quarter cycle apart", worst <= 0.02,
+                 "level over the input at MIX 25, 50, 75 %% is within %.3f dB of 0 dB (0.02)", worst);
   }
   return ok;
 }
@@ -583,24 +653,14 @@ bool testMixHoldsLevel() {
   return ok;
 }
 
-// The shipped trim: SHIFT -3 at MIX 100 % lands 0 to +0.5 dB over the input on level_test's program,
-// within the +-0.1 dB slack that test allows.
-bool testDefaultLevel() {
-  const Signal in = program(3);
-  cv::PitchFxParams p;
-  p.formant.on = true;
-  const double got = db(rms(run(in, p), kRate, 3 * kRate) / rms(in, kRate, 3 * kRate));
-  return report("default level", got >= -0.1 && got <= 0.6, "SHIFT -3, MIX 100 %% reads %+.2f dB over the input (-0.1..+0.6)", got);
-}
-
 // The tuning's trim scales the shifted voice by its dB.
 bool testTrim() {
   const Signal in = irregular(kSungHz, 3 * kRate);
-  cv::PitchFxParams loud = formantOn(-3);
-  loud.formant.tuning.trimDb = 6.0f;
-  const double a = rms(run(in, formantOn(-3)), kRate, 3 * kRate);
+  cv::PitchFxParams loud = formantOn(kShift);
+  loud.formant.tuning.trimDb.fill(6.0f);
+  const double a = rms(run(in, formantOn(kShift)), kRate, 3 * kRate);
   const double b = rms(run(in, loud), kRate, 3 * kRate);
-  return report("trim", std::fabs(db(b / a) - 6.0) <= 0.05, "trim +6 dB reads %.3f dB (+-0.05)", db(b / a));
+  return report("trim", std::fabs(db(b / a) - 6.0) <= 0.01, "trim +6 dB reads %.3f dB (+-0.01)", db(b / a));
 }
 
 // process() takes any n. At SHIFT 0 the voice is the input delayed, whatever the grain grid does, so
@@ -612,10 +672,205 @@ bool testAnyLength() {
   bool sane = true;
   for (int block : {1, 7, 37, 64, 200, 1000, 4096}) {
     worst = std::max(worst, std::fabs(db(rms(run(in, formantOn(0), block), kRate, 3 * kRate) / inRms)));
-    for (float x : run(in, formantOn(-3), block)) sane &= std::isfinite(x) && std::fabs(x) < 2.0f;
+    for (float x : run(in, formantOn(kShift), block)) sane &= std::isfinite(x) && std::fabs(x) < 2.0f;
   }
-  return report("any call length", sane && worst <= 0.1,
-                "SHIFT 0 level within %.3f dB of the input's (0.1), SHIFT -3 finite and under 2: %.0f (1)", worst, sane ? 1.0 : 0.0);
+  return report("any call length", sane && worst <= 0.06,
+                "SHIFT 0 level within %.3f dB of the input's (0.06), SHIFT -3 finite and under 2: %.0f (1)", worst, sane ? 1.0 : 0.0);
+}
+
+// The Formant voice told how many exact zeros sit ahead of each chunk returns, bit for bit, what the
+// voice that plays every tap returns. `heard` is what the ring receives and `told` is what the zero
+// count sees; they are one signal unless a check makes the caller lie. Returns how many output
+// samples differ.
+size_t skipDiffers(const Signal& heard, const Signal& told, float ratio, float rate) {
+  cv::VoiceRing ring{};
+  cv::formant_detail::FormantPsolaVoice skip;
+  cv::formant_detail::FormantPsolaVoice plain;
+  skip.reset();
+  plain.reset();
+  const float period = static_cast<float>(kRate / kSungHz);
+  const float delay = static_cast<float>(cv::PsolaVoice::kGrainDelay) + period;
+  int head = 0;
+  int zeros = cv::kVoiceRingLen;
+  size_t differs = 0;
+  for (size_t i = 0; i + cv::kBlock <= heard.size(); i += cv::kBlock) {
+    int at = head;
+    for (int j = 0; j < cv::kBlock; ++j) {
+      ring[static_cast<size_t>(at)] = heard[i + static_cast<size_t>(j)];
+      at = at + 1 == cv::kVoiceRingLen ? 0 : at + 1;
+    }
+    skip.prepare(period, ratio, rate, delay, cv::kBlock);
+    plain.prepare(period, ratio, rate, delay, cv::kBlock);
+    std::array<float, cv::kBlock> a{};
+    std::array<float, cv::kBlock> b{};
+    skip.render(ring, head, cv::kBlock, a.data(), zeros);
+    plain.render(ring, head, cv::kBlock, b.data());
+    for (size_t j = 0; j < a.size(); ++j) differs += a[j] != b[j] ? 1u : 0u;
+    int run = 0;
+    while (run < cv::kBlock && told[i + static_cast<size_t>(cv::kBlock - 1 - run)] == 0.0f) ++run;
+    zeros = run < cv::kBlock ? run : std::min(zeros + cv::kBlock, cv::kVoiceRingLen);
+    head = at;
+  }
+  return differs;
+}
+
+// Skipping the taps of grains that read only zeros changes nothing: across runs of exact zeros of
+// several lengths and the edge where the vowel returns, with grains in flight on the zeros, the
+// skipping voice returns the plain voice's samples bit for bit. The edge sits inside a chunk. The
+// second half of the check tells the voice the stretch is zeros while the ring holds a constant, and
+// the outputs must then differ, so the first half is not passing without ever skipping.
+bool testSilenceSkip() {
+  struct Setting {
+    float ratio;
+    float rate;
+  };
+  size_t worst = 0;
+  size_t lied = 0;
+  for (int gap : {300, 1000, 2500, 5000}) {
+    Signal heard = vowel(kSungHz, 6400);
+    heard.insert(heard.end(), static_cast<size_t>(gap), 0.0f);
+    const Signal tail = vowel(kSungHz, 6400, 123);
+    heard.insert(heard.end(), tail.begin(), tail.end());
+    Signal liar = heard;
+    for (size_t i = 6400; i < 6400 + static_cast<size_t>(gap); ++i) liar[i] = 0.25f;
+    for (const Setting s : {Setting{1.0f, 0.8409f}, Setting{0.9789f, 1.1892f}}) {
+      worst = std::max(worst, skipDiffers(heard, heard, s.ratio, s.rate));
+      lied += skipDiffers(liar, heard, s.ratio, s.rate);
+    }
+  }
+  return report("silence skip", worst == 0 && lied > 0,
+                "%.0f samples differ from the plain voice across the zeros and the edge (0); with a false zero count %.0f differ (> 0)",
+                static_cast<double>(worst), static_cast<double>(lied));
+}
+
+// The parameters of second `sec` in testShiftOnSwitchOn's script: on at +5, off with the knob moved to
+// -5, on at -5, a step to +3, on at MIX 0 with the knob moved to +6, then MIX 100 % at -6.
+cv::PitchFxParams shiftScript(int sec) {
+  switch (sec) {
+    case 0: return formantOn(5);
+    case 1: {
+      cv::PitchFxParams p = formantOff();
+      p.formant.shiftSt = -5;
+      return p;
+    }
+    case 2: return formantOn(-5);
+    case 3: return formantOn(3);
+    case 4: return formantOn(6, 0.0f);
+    default: return formantOn(-6);
+  }
+}
+
+// SHIFT set while the card is off, or on at MIX 0, does not glide in from an older value: the card
+// comes on at the knob. A SHIFT change while it is on glides.
+bool testShiftOnSwitchOn() {
+  const Signal in = vowel(kSungHz, 6 * kRate);
+  Signal out(in.size());
+  gFx.reset();
+  float fadeBefore = 1.0f;
+  float onFirst = 0.0f;
+  float mixFirst = 0.0f;
+  float stepFirst = 0.0f;
+  float stepLast = 0.0f;
+  for (int i = 0; i < 6 * kRate; i += cv::kBlock) {
+    const int sec = i / kRate;
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, shiftScript(sec));
+    const bool first = i % kRate == 0;
+    const bool last = (i + cv::kBlock) % kRate == 0;
+    if (sec == 1 && last) fadeBefore = gFx.formantFade();
+    if (sec == 3 && first) stepFirst = gFx.shiftSemis();
+    if (sec == 3 && last) stepLast = gFx.shiftSemis();
+    // The card comes up once the tracker has a period, a few calls after the edge.
+    const bool up = gFx.formantFade() > 0.0f;
+    if (sec == 2 && up && onFirst == 0.0f) onFirst = gFx.shiftSemis();
+    if (sec == 5 && up && mixFirst == 0.0f) mixFirst = gFx.shiftSemis();
+  }
+  const bool ok = fadeBefore == 0.0f && onFirst == -5.0f && mixFirst == -6.0f && stepFirst > -5.0f && stepFirst < 3.0f &&
+                  std::fabs(stepLast - 3.0f) < 0.001f;
+  return report("shift on switch-on", ok,
+                "when the card comes up: SHIFT %.2f (-5) off to on, %.2f (-6) MIX 0 to 100 %%; a step from -5 to +3 reads %.2f (between) then %.3f (3)",
+                static_cast<double>(onFirst), static_cast<double>(mixFirst), static_cast<double>(stepFirst),
+                static_cast<double>(stepLast));
+}
+
+// A voice that starts beside a running one takes its grain grid, so the two sum as one waveform. At
+// SHIFT 0 and MIX 50 % the level is one voice's when they line up and falls where they miss by a
+// fraction of a period. Formant starting beside a running Autotune, and Autotune beside a running
+// Formant, read the level of the two starting together.
+bool testLateStart() {
+  const Signal in = vowel(kSungHz, 5 * kRate);
+  const int stepAt = 2 * kRate;
+  cv::PitchFxParams both = formantOn(0, 0.5f);
+  autotuneOn(both);
+  cv::PitchFxParams autotuneOnly = formantOff();
+  autotuneOn(autotuneOnly);
+  const cv::PitchFxParams formantOnly = formantOn(0, 0.5f);
+  const double ref = rms(run(in, both), 3 * kRate, 4 * kRate);
+  double worst[2] = {0.0, 0.0};
+  const cv::PitchFxParams* first[2] = {&autotuneOnly, &formantOnly};
+  for (int k = 0; k < 2; ++k) worst[k] = std::fabs(db(rms(runSteps(in, *first[k], both, stepAt), 3 * kRate, 4 * kRate) / ref));
+  return report("late start lines up", worst[0] <= 0.05 && worst[1] <= 0.05,
+                "level within %.3f dB (Formant beside Autotune) and %.3f dB (Autotune beside Formant) of both starting together (0.05)",
+                worst[0], worst[1]);
+}
+
+// A voiced frame on the tracker's edge or past it reads the edge, not the note, so the card steps
+// aside for the dry voice, and stays aside through the unvoiced frames after it, until a frame
+// inside the range returns. 70 Hz and 1000 Hz sit on the edges, 1300 Hz past the top.
+bool testRangeFlags() {
+  bool ok = true;
+  for (double hz : {70.0, 1000.0, 1300.0}) {
+    Signal in = sawtooth(hz, kRate);
+    in.insert(in.end(), static_cast<size_t>(kRate * 3 / 10), 0.0f);
+    const Signal back = vowel(kSungHz, kRate);
+    in.insert(in.end(), back.begin(), back.end());
+    Signal out(in.size());
+    gFx.reset();
+    float edgeFade = 0.0f;
+    size_t edgeDiffers = 0;
+    for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
+      gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, formantOn(kShift));
+      if (i >= kRate / 2 && i < kRate * 13 / 10) edgeFade = std::max(edgeFade, gFx.formantFade());
+      if (i >= kRate / 2 && i < kRate) {
+        for (int j = 0; j < cv::kBlock; ++j) edgeDiffers += out[static_cast<size_t>(i + j)] != in[static_cast<size_t>(i + j)] ? 1u : 0u;
+      }
+    }
+    const bool back_on = gFx.formantFade() > 0.99f;
+    char name[48];
+    std::snprintf(name, sizeof name, "range flags, %.0f Hz", hz);
+    ok &= report(name, edgeFade == 0.0f && edgeDiffers == 0 && back_on,
+                 "card aside through the note and the silence after it: fade peak %.3f (0), %.0f samples differ from the input (0); back on for the vowel: %.0f (1)",
+                 static_cast<double>(edgeFade), static_cast<double>(edgeDiffers), back_on ? 1.0 : 0.0);
+  }
+  return ok;
+}
+
+// A NaN in the input does not stay behind in the level gain's running powers: once the ring has
+// flushed it, the output is finite and its level is the clean run's.
+bool testNanGuard() {
+  const Signal in = vowel(kSungHz, 5 * kRate);
+  const cv::PitchFxParams p = formantOn(kShift, 0.5f);
+  const Signal clean = run(in, p);
+  gFx.reset();
+  Signal out(in.size());
+  const int poisonAt = 2 * kRate;
+  for (int i = 0; i < 5 * kRate; i += cv::kBlock) {
+    Signal block(in.begin() + i, in.begin() + i + cv::kBlock);
+    if (i == poisonAt) block[5] = std::numeric_limits<float>::quiet_NaN();
+    gFx.process(block.data(), &out[static_cast<size_t>(i)], cv::kBlock, p);
+  }
+  bool finite = true;
+  for (size_t i = static_cast<size_t>(3 * kRate); i < out.size(); ++i) finite = finite && std::isfinite(out[i]);
+  const double off = std::fabs(db(rms(out, 4 * kRate, 5 * kRate) / rms(clean, 4 * kRate, 5 * kRate)));
+  return report("nan guard", finite && off <= 0.05, "output finite from 1 s after the NaN: %.0f (1); level %.3f dB from the clean run (0.05)",
+                finite ? 1.0 : 0.0, off);
+}
+
+// Autotune's correction moves through a vibrato, and the Formant voice holds one ratio for each call
+// of 64 samples. Read at the middle of the call, the ratio keeps the voices on the same sample.
+bool testAlignmentVibrato() {
+  const double lag = lagToAutotune(vibratoVowel(kSungHz, 4 * kRate, 40.0));
+  return report("aligned through vibrato", std::fabs(lag) <= 0.8,
+                "cross-correlation peaks at lag %.2f samples under 5 Hz vibrato of +-40 cents (0, +-0.8)", lag);
 }
 
 }  // namespace
@@ -628,13 +883,19 @@ int main() {
   ok &= testPitch();
   ok &= testAlignment();
   ok &= testQuickToggleKeepsVoice();
-  ok &= testShiftSteps();
+  ok &= testMixLeavesZero();
+  ok &= testMixLeavesFull();
   ok &= testToggleSteps();
   ok &= testMixLaw();
   ok &= testMixHoldsLevel();
-  ok &= testDefaultLevel();
   ok &= testTrim();
   ok &= testAnyLength();
+  ok &= testSilenceSkip();
+  ok &= testShiftOnSwitchOn();
+  ok &= testLateStart();
+  ok &= testRangeFlags();
+  ok &= testNanGuard();
+  ok &= testAlignmentVibrato();
   std::printf("%s formant\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

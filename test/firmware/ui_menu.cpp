@@ -639,8 +639,9 @@ void checkMenuOctaveFormantRedraw() {
 }
 
 // A click on the Octave and Formant row swaps the card in the slot that holds it and leaves every other
-// slot and setting alone. Formant costs less than Octave, so the first swap is taken. The swap back is
-// refused in a layout where Octave would put the mean over its line, and the row then still reads FORMANT.
+// slot and setting alone. The default layout has room for Formant, so the first swap is taken. A swap
+// is refused in a layout where the other card would put the mean over its line, and the row then still
+// reads the card the layout holds.
 void checkMenuOctaveFormantClick() {
   Layout formant = defaultLayout();
   formant.card[kOctaveSlot] = Card::Formant;
@@ -658,13 +659,13 @@ void checkMenuOctaveFormantClick() {
             m.layout == defaultLayout(),
         "menu: a second click swaps Formant back to Octave");
 
-  // Octave would take this layout from 74 to 76 percent mean, so the swap back is refused.
+  // Formant would take this layout from 75 to 76 percent mean, so the swap is refused.
   MenuRig tight;
-  tight.layout = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Unison, Card::ReverbSpring}};
-  Layout octave = tight.layout;
-  octave.card[kOctaveSlot] = Card::Octave;
-  check(layoutValid(tight.layout).ok() && !layoutValid(octave).ok(), "menu: the tight layout fits with Formant and refuses Octave");
+  tight.layout = {{Card::InputGate, Card::Autotune, Card::Octave, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Unison, Card::ReverbChasm}};
+  Layout withFormant = tight.layout;
+  withFormant.card[kOctaveSlot] = Card::Formant;
+  check(layoutValid(tight.layout).ok() && !layoutValid(withFormant).ok(), "menu: the tight layout fits with Octave and refuses Formant");
   const Layout tightBefore = tight.layout;
   tight.openListAt(kOctaveFormant);
   const UiAction refused = tight.step(0, true);
@@ -672,8 +673,8 @@ void checkMenuOctaveFormantClick() {
             ui::applyAction(refused, tight.settings, tight.layout) == ui::ApplyResult::None && tight.layout == tightBefore,
         "menu: a swap the box would not load leaves the layout as it is");
   tight.draw();
-  check(cursorRowIs(tight.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
-        "menu: and the row still reads FORMANT");
+  check(cursorRowIs(tight.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "OCTAVE"),
+        "menu: and the row still reads OCTAVE");
 
   // Octave in slot 1 and Formant in slot 3: the finder names slot 1 and Formant would repeat.
   MenuRig both;

@@ -77,7 +77,7 @@ class AutotuneVoice {
     }
     psola_.setGrainDelay(t.grainDelay);
     if (!p.on) {
-      stepCoef_ = a_;
+      setStepCoef(a_);
       return 0.0f;
     }
     if (keyGlide_ && fabsf(corr_ - target_) < kKeyGlideDoneSemis) keyGlide_ = false;
@@ -88,32 +88,54 @@ class AutotuneVoice {
       if (hz != degreeHz_ || p.key != degreeKey_) pullTo(hz, p.key);
       target_ = -deviation_;
     }
-    stepCoef_ = keyGlide_ && smooth::kSmoothCoef < a_ ? smooth::kSmoothCoef : a_;
+    setStepCoef(keyGlide_ && smooth::kSmoothCoef < a_ ? smooth::kSmoothCoef : a_);
     return corr_;
   }
 
   // Per sample: the corrected voice, trim applied. The voice takes the inverse pitch ratio, so it
   // multiplies where it would divide. PitchFx fades it in only once the tracker has a period, so the
   // grains start on the sung pitch.
-  float tick(const VoiceRing& ring, int head, float period) {
+  CV_INLINE float tick(const VoiceRing& ring, int head, float period) {
     corr_ = smooth::step(corr_, target_, stepCoef_);
     return gain_ * psola_.tick(ring, head, period, exp2Fast(corr_ * (-1.0f / 12.0f)));
   }
 
+  // One sample of the correction's glide without the voice, for a sample whose corrected voice
+  // nobody hears.
+  void glide() { corr_ = smooth::step(corr_, target_, stepCoef_); }
+
+  // Drops the grains in flight. The correction keeps its place.
+  void restartVoice() { psola_.reset(); }
+
+  // The voice's grid, and taking another voice's, so the two launch on the same samples.
+  VoiceGrid grid() const { return psola_.grid(); }
+  void adoptGrid(const VoiceGrid& g) { psola_.adoptGrid(g); }
+
   // Smoothed correction in semitones.
   float correctionSemis() const { return corr_; }
 
+  // The correction after k more samples of its one-pole, which closes on the target by (1 - a)^k.
+  // A reader that holds one ratio for a call of n samples takes it at k = n / 2, the middle of the
+  // call, where the correction sits on average. logDecay_ follows stepCoef_ in prepare().
+  float correctionAfter(float k) const {
+    return target_ + (corr_ - target_) * exp2Fast(k * logDecay_);
+  }
+
   // How far the corrected voice lags the input at this period, in samples: the grain delay plus one
   // period. The Formant card reads it to put its voice on the same sample.
-  float voiceDelay(float period) const {
-    return psola_.grainDelay() +
-           clampf(period, static_cast<float>(PitchTracker::kMinPeriod), static_cast<float>(PitchTracker::kMaxPeriod));
-  }
+  float voiceDelay(float period) const { return psola_.latency(period); }
 
  private:
   // NaN equals no input, so a cleared input recomputes on the next prepare().
   static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();
   static constexpr float kFifthRatio = 1.49830708f;  // 2^(7/12)
+
+  // libm runs only when the coefficient moved.
+  void setStepCoef(float c) {
+    if (c == stepCoef_) return;
+    stepCoef_ = c;
+    logDecay_ = log2f(1.0f - c);
+  }
 
   // A KEY change that moves the target note moves it by up to a semitone at once. At hard tune the
   // correction would cover 99 % of that in 4 ms, inside one grain (9 ms at 220 Hz), and the grains
@@ -148,6 +170,7 @@ class AutotuneVoice {
   float target_ = 0.0f;
   float a_ = 1.0f;
   float stepCoef_ = 1.0f;  // a_, or the 20 ms knob smoother's coefficient while a KEY change glides
+  float logDecay_ = -std::numeric_limits<float>::infinity();  // log2(1 - stepCoef_)
   float gain_ = 1.0f;
   float responseMs_ = kUnset;  // the inputs a_, gain_ and deviation_ were computed from
   float trimDb_ = kUnset;

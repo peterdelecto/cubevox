@@ -124,15 +124,16 @@ void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, c
   CMP(p, pos, f, e, responseMs);
 }
 
+// The prototype sets only the glide (through its Slide macro), so the tuning's other fields run the
+// struct's own defaults on both sides. The firmware's Octave tuning is the engine's struct.
+static_assert(std::is_same<decltype(ChainParams::pitchFx.octave.tuning), cv::OctaveTuning>::value,
+              "the firmware's Octave params carry the engine's OctaveTuning");
+
 void cmpOctave(const std::string& p, float pos, const cv::OctaveParams& f, const cv::OctaveParams& e, bool rest) {
   CMP(p, pos, f, e, semitones);
   CMP(p, pos, f, e, mix);
   if (!rest) return;
-  CMP(p, pos, f.tuning, e.tuning, levelDb);
   CMP(p, pos, f.tuning, e.tuning, glideMs);
-  CMP(p, pos, f.tuning, e.tuning, grainWindowMs);
-  CMP(p, pos, f.tuning, e.tuning, grainCount);
-  CMP(p, pos, f.tuning, e.tuning, trimDb);
 }
 
 void cmpSlapback(const std::string& p, float pos, const cv::SlapbackParams& f, const cv::SlapbackParams& e,
@@ -278,7 +279,7 @@ EmuState emuStart() {
   s.inputGate.tuning = cv::inputGateTuning();
   // The rest of the ProtoParams constructor
   s.gate.on = false;
-  s.pitchFx.octave.mix = 0.10f;
+  s.pitchFx.octave.mix = cv::kOctaveDefaultMix;
   s.pitchFx.autotune.key = kStartKey;
   s.reverb.engine = cv::kReverbSpring;
   s.reverb.mix = 1.0f;

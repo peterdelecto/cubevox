@@ -37,7 +37,7 @@ static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for 
 
 // Clamps a lag to what the voice can play at this pitch period.
 inline float clampLag(float lag, float period) {
-  const float p = clampf(period, kMinPeriod, kMaxPeriod);
+  const float p = PitchTracker::clampPeriod(period);
   return clampf(lag, kFloorPeriods * p + kFloorPad, kDelayCeil);
 }
 
@@ -95,17 +95,22 @@ class FormantPsolaVoice {
     fresh_ = true;
     markDelay_ = 0.0f;
     countdown_ = 0.0f;
+    lastPeriod_ = 0.0f;
   }
 
   // The next prepare() puts the marks at its lag. Grains in flight finish where they are.
   void markReset() { fresh_ = true; }
+
+  // True until a voiced prepare() has put the marks down. That call's first sample launches a grain.
+  bool starting() const { return fresh_; }
 
   // The grain playback rate the last prepare() took, for the tests.
   float rate() const { return rate_; }
 
   // On, a grain keeps the gain it launched with, so a step in rate or ratio reaches only the grains
   // that launch after it. Off, every grain in flight takes the newest gain, as the Crowd copies'
-  // slow glides have it.
+  // slow glides have it. The Crowd card runs it off, and crowd_test's pinned hashes and the MOB
+  // renders hold that sound.
   void latchGain(bool on) { latch_ = on; }
 
   // Per call. period 0 silences the voice. delay is the wanted lag of the output behind the
@@ -115,17 +120,27 @@ class FormantPsolaVoice {
     voiced_ = period > 0.0f;
     if (!voiced_) {
       count_ = 0;
+      lastPeriod_ = 0.0f;
       return;
     }
-    p_ = clampf(period, kMinPeriod, kMaxPeriod);
+    // The tracker publishes a period every fourth block, so most calls repeat the last one's work.
+    if (!fresh_ && period == lastPeriod_ && ratio == lastRatio_ && rate == lastRate_ && delay == lastDelay_ &&
+        n == lastN_) {
+      return;
+    }
+    lastPeriod_ = period;
+    lastRatio_ = ratio;
+    lastRate_ = rate;
+    lastDelay_ = delay;
+    lastN_ = n;
+    p_ = PitchTracker::clampPeriod(period);
     rate_ = clampf(rate, kMinRate, kMaxRate);
     step_ = static_cast<int>(rate_ * static_cast<float>(1 << kFracBits) + 0.5f);
     const float r = clampf(ratio, kMinPitchRatio, kMaxPitchRatio);
     outPeriod_ = p_ / r;
-    dur_ = 2.0f * p_ / rate_;
+    setGrain(r);
     turn_ = kTurn / dur_;
     turnStep_ = static_cast<uint32_t>(turn_);
-    amp_ = 0.5f * rate_ / r;
     drift_ = (1.0f - rate_) * dur_;
     setReadSpan(n);
     ref_ = clampLag(delay, p_) - p_;
@@ -136,11 +151,21 @@ class FormantPsolaVoice {
     }
   }
 
+  VoiceGrid grid() const { return {markDelay_, countdown_}; }
+
+  // Takes another voice's grid, so the two launch on the same samples. Call it after prepare().
+  void adoptGrid(const VoiceGrid& g) {
+    markDelay_ = g.markDelay;
+    countdown_ = g.countdown;
+  }
+
   // Adds n samples of the voice into out. first is the ring index of the block's first sample;
   // the voice reads nothing newer than it. The countdown jumps from launch to launch, then each
   // grain plays through the block on its own. outPeriod_ holds for the block, so one clamp at its
-  // start does what a clamp on every sample would.
-  void render(const VoiceRing& ring, int first, int n, float* out) {
+  // start does what a clamp on every sample would. zeroBefore is how many samples just ahead of the
+  // block the ring holds as exact zeros, if the caller knows. A grain whose reads all fall inside
+  // that run would add exact zeros, so it skips its taps and moves on as if it had played.
+  void render(const VoiceRing& ring, int first, int n, float* out, int zeroBefore = 0) {
     if (!voiced_) return;
     for (size_t k = 0; k < count_; ++k) grains_[k].start = 0;
     if (countdown_ > outPeriod_) countdown_ = outPeriod_;
@@ -161,7 +186,7 @@ class FormantPsolaVoice {
     }
     size_t kept = 0;
     for (size_t k = 0; k < count_; ++k) {
-      if (play(ring.data(), grains_[k], out, n)) grains_[kept++] = grains_[k];
+      if (play(ring.data(), grains_[k], out, n, first, zeroBefore)) grains_[kept++] = grains_[k];
     }
     count_ = kept;
   }
@@ -230,6 +255,22 @@ class FormantPsolaVoice {
     return grains_[oldest];
   }
 
+  // The grain's length and gain. A grain lasts two periods of input at the playback rate, but never
+  // less than two output periods: a Hann window shorter than two spacings leaves the window sum
+  // dipping between grains, which pulses breaths and sibilants at the sung pitch. The gain sets the
+  // window sum to one.
+  void setGrain(float ratio) {
+    const float natural = 2.0f * p_ / rate_;
+    const float floor = 2.0f * outPeriod_;
+    if (natural >= floor) {
+      dur_ = natural;
+      amp_ = 0.5f * rate_ / ratio;
+    } else {
+      dur_ = floor;
+      amp_ = 0.5f;
+    }
+  }
+
   // The span a launch may read. A grain's delay moves by 1 - rate per sample, so both ends leave
   // room for that drift. The far end also leaves the call's samples, or kBlock when the call is
   // shorter, so a grain stays on valid samples through any later call no longer than that.
@@ -295,15 +336,36 @@ class FormantPsolaVoice {
     }
   };
 
+  // True when the m samples the grain plays this block read only the run of zeroBefore zeros that ends
+  // just ahead of the block, and none of the block's own samples. The read delay moves by 1 - rate per
+  // sample, so its ends bound it; the bounds leave a sample either side for the interpolation.
+  bool readsZeros(const Grain& g, int m, int n, int first, int zeroBefore) const {
+    int head = first + g.start;
+    if (head >= kVoiceRingLen) head -= kVoiceRingLen;
+    int delay = head - (g.pos >> kFracBits);
+    if (delay < 0) delay += kVoiceRingLen;
+    const float drift = static_cast<float>(m - 1) * (1.0f - static_cast<float>(g.step) * (1.0f / static_cast<float>(1 << kFracBits)));
+    const float newest = static_cast<float>(delay - 1) + (drift < 0.0f ? drift : 0.0f);
+    const float oldest = static_cast<float>(delay) + (drift > 0.0f ? drift : 0.0f);
+    return newest >= static_cast<float>(n + 4) && oldest + 2.0f <= static_cast<float>(zeroBefore);
+  }
+
   // Plays the grain's share of this block into out and returns true if it lives on into the next.
   // The last table entry closes the turn, so the window read needs no wrap. The run splits where
   // the read reaches the ring's last sample, worked out once per stretch, so the plain stretches
   // carry no wrap test. Only a read on that last sample pairs it with the ring's first.
-  bool play(const float* ring, Grain& g, float* out, int n) const {
+  bool play(const float* CV_RESTRICT ring, Grain& g, float* CV_RESTRICT out, int n, int first, int zeroBefore) const {
     const int room = n - g.start;
     const float left = g.dur - g.age;
     const int remain = left > 0.0f ? static_cast<int>(ceilf(left)) : 0;
     const int m = remain < room ? remain : room;
+    if (zeroBefore > 0 && m > 0 && readsZeros(g, m, n, first, zeroBefore)) {
+      g.turn += g.turnStep * static_cast<uint32_t>(m);
+      g.pos += g.step * m;
+      if (g.pos >= kRingFix) g.pos -= kRingFix;
+      g.age += static_cast<float>(m);
+      return remain > room;
+    }
     Cursor c{g.turn, g.turnStep, g.pos, g.step, latch_ ? g.amp : amp_};
     float* o = out + g.start;
     for (int j = 0; j < m;) {
@@ -327,6 +389,11 @@ class FormantPsolaVoice {
   std::array<Grain, kMaxGrains> grains_{};
   size_t count_ = 0;
   int step_ = 1 << kFracBits;
+  float lastPeriod_ = 0.0f;  // the arguments of the last prepare() that did the work, 0 when it has none
+  float lastRatio_ = 0.0f;
+  float lastRate_ = 0.0f;
+  float lastDelay_ = 0.0f;
+  int lastN_ = 0;
   float p_ = kMinPeriod;
   float rate_ = 1.0f;
   float outPeriod_ = kMinPeriod;

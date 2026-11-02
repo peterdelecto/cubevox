@@ -50,7 +50,7 @@ constexpr int kSlot3 = 2;      // slot 3, counted from 0
 constexpr int kMobSlot = 3;    // slot 4
 constexpr int kSlot7 = 6;      // slot 7
 constexpr int kChasmSlot = 7;  // slot 8
-constexpr uint32_t kCheckSlot7Ms = 1500;  // after a pick: the layout fade, then more than a second of audio
+constexpr uint32_t kCheckSwapMs = 1500;  // after a pick: the layout fade, then more than a second of audio
 
 // A box and its audio run on the main thread with no device: each UI tick, one box pass, then the
 // blocks that fill the tick pulled from the clip.
@@ -146,14 +146,14 @@ void checkSlot3(const char* argv0, bool swapped, std::vector<std::string>& faile
     rig.box.swapUnisonMob();
     rig.box.swapReverb();
   }
-  rig.run(kCheckSlot7Ms, true);
+  rig.run(kCheckSwapMs, true);
   expect(cardIs(rig.box.layout(), kSlot3, "octave") && costIs(rig.box.cost(), rest + costs::kOctave + costs::kGate),
          "slot 3 starts on Octave at the sum of its rows");
 
   for (const CardRow& row : kSlot3Rows) {
     const size_t from = rig.output.size();
     rig.box.swapOctaveFormant();
-    rig.run(kCheckSlot7Ms, true);
+    rig.run(kCheckSwapMs, true);
     const LayoutCost cost = rig.box.cost();
     bool finite = true;
     for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);
@@ -187,14 +187,14 @@ void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& faile
     rig.box.swapUnisonMob();
     rig.box.swapReverb();
   }
-  rig.run(kCheckSlot7Ms, true);
+  rig.run(kCheckSwapMs, true);
   expect(cardIs(rig.box.layout(), kSlot7, "gate") && costIs(rig.box.cost(), rest + costs::kOctave + costs::kGate),
          "slot 7 starts on Gate at the sum of its rows");
 
   for (const CardRow& row : kSlot7Rows) {
     const size_t from = rig.output.size();
     rig.box.pickSlot7Card(row.card);
-    rig.run(kCheckSlot7Ms, true);
+    rig.run(kCheckSwapMs, true);
     const LayoutCost cost = rig.box.cost();
     bool finite = true;
     for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);

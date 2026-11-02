@@ -23,13 +23,15 @@
 // from a board figure and rows converted at 50.4k are not at one ratio. kTracker states both, and
 // the board's Crowd row (kCrowd) shows the pitch ratio holds for the grain code too.
 //
-// Octave alone: PitchFx with only Octave on costs 1.04 host us per block (2026-11-01, Adam's clips,
-// MIX 100 %, host bench of the CPU pass, +-0.05 us), which is 52.4k board cycles, 8.2 %, at 50.4k.
-// CPU pass 2 measured 51.7k (8.1 %) on the board for the same case before the CPU pass. kOctave
-// holds 25.7k (4.0 %), so Octave alone pays about 26.7k cycles, 4 points, beyond its row. That is the
-// pitch stage's own work: the ring write, the per-sample mix and the crossfade gains. The pair behind
-// kAutotune and kTracker was measured as the whole slot with Autotune on, so a layout with Autotune
-// placed already carries it. Without Autotune, Octave and Formant pay it through kPitchStage, once.
+// Octave alone: PitchFx with only Octave on costs 0.32 host us per block (2026-11-02, Adam's clips,
+// MIX 100 %, g++ 15 at -O2, host bench, minimum of 9 interleaved passes, +-0.02 us), which is 15.9k
+// board cycles, 2.5 %, at 50.4k. The same case at MIX 0, where the voice parks, costs 0.11 us (5.4k,
+// 0.9 %). That is the pitch stage's own work: the ring write, the per-sample mix and the crossfade
+// gains. The voice is the other 0.21 us (10.5k, 1.6 %), which kOctave holds rounded up. The M7
+// listing of the voice's loop is 65 instructions a sample, so the board may read lower. The pair
+// behind kAutotune and kTracker was measured as the whole slot with Autotune on, so a layout with
+// Autotune placed already carries the stage. Without Autotune, Octave and Formant pay it through
+// kPitchStage, once.
 //
 // A layout is accepted when both column sums over its cards, plus the fixed term, the tracker once
 // when Autotune, Crowd or Formant is placed, and kPitchStage once when Octave or Formant is placed
@@ -56,7 +58,7 @@ constexpr Cost operator+(Cost a, Cost b) {
 constexpr Cost kEmpty{0, 0, true};
 constexpr Cost kInputGate{4, 5, true};     // 23.7k / 26.0k, the board's figures for the earlier tuning; the revised one runs at 0.97 of them on the host, so they bound it until a rerun
 constexpr Cost kAutotune{5, 7, false};     // the pair's estimate less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
-constexpr Cost kOctave{5, 5, true};        // 25.7k / 27.2k, its own voice only
+constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-02, its own voice only: 0.21 host us a block on g++ 15 (Octave at MIX 100 % less the same case at MIX 0), 10.5k board cycles at 50.4k, rounded up; see "Octave alone"
 constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
 constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
 constexpr Cost kDistortion{8, 11, true};   // 45.5k to 46.8k / 64.5k to 67.7k, stress run 2026-11-01 (worst 10.1 to 10.6 %, lowest run worst per layout)
@@ -81,10 +83,12 @@ constexpr Cost kReverbChasm{17, 17, true};   // 102.2k to 102.5k / 105.5k to 108
 constexpr Cost kTracker{4, 5, false};
 
 // The pitch stage's own work when Octave or Formant runs and Autotune is not placed, which no card row
-// holds. Octave alone is 52.4k board cycles (8.2 %); kOctave's row is 5, so the term is 8.2 less 5,
-// 3.2, rounded up to 4. The stage does not vary block to block, so the worst equals the mean. The
-// layout pays it once; with Autotune placed its rows carry it. An estimate until a board measures
-// Formant alone, whose own row is also an estimate.
+// holds. The term holds 4. Octave alone benches at 2.5 % (see "Octave alone"), so with kOctave's 2 the
+// rows charge a layout with Octave and no Autotune 6 points against it, and the stage itself benches
+// near 1. The held rows overcharge a layout with Octave or Formant and no Autotune by about 3 points
+// until a board run measures Formant, whose own row is also an estimate. The stage does not vary
+// block to block, so the worst equals the mean. The layout pays it once; with Autotune placed its rows
+// carry it.
 constexpr Cost kPitchStage{4, 4, false};
 
 // The eight-copy card, measured on the board on 2026-11-01. The crowd bench layout (Input gate,

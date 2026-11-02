@@ -1,6 +1,7 @@
-// Octave checks: shift up/down, fifth, bypass, shared-tracker wiring, no-alloc,
-// formants that move with the pitch, noise level, and SEMITONES through 0
-// without a cut. No window, no audio device.
+// Octave checks: shift up/down, fifth, settled off is a plain copy (from the start and after an off
+// edge), the tracker hears only the dry input, no allocation, formants that move with the pitch, the
+// wet path's DC blocker, noise level, and SEMITONES through 0 without a cut. No window, no audio
+// device.
 
 #include <algorithm>
 #include <atomic>
@@ -42,7 +43,8 @@ void operator delete[](void* p, std::size_t) noexcept { operator delete(p); }
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
-constexpr int kSettle = cv::kSampleRate / 10;  // 100 ms
+constexpr int kSettle = cv::kSampleRate / 10;  // 100 ms, for the checks that wait out a start-up
+constexpr int kSampleWindow = cv::kSampleRate / 2;  // the steady-state window of a step check
 
 // Ten harmonics at 1/k amplitude, peak-normalised to 0.5.
 std::vector<float> tone(double hz, int n) {
@@ -117,11 +119,12 @@ double outputHz(double inHz, const cv::PitchFxParams& p) {
   return hz[hz.size() / 2];
 }
 
-// The granular shifter spreads each partial into window-rate sidebands, so pitch holds +-15 cents.
+// The granular shifter spreads each partial into window-rate sidebands. The tracker reads the pitch
+// within 3 cents at the worst of the three intervals, so the gate sits at +-5 cents.
 bool checkShift(const char* name, int semis, double expect) {
   const double got = outputHz(220.0, octaveOnly(semis));
   const double err = got > 0.0 ? cents(got, expect) : 9999.0;
-  return report(name, std::fabs(err) <= 15.0, "out=%.2f Hz, expect %.2f, err=%.2f cents (+-15)",
+  return report(name, std::fabs(err) <= 5.0, "out=%.2f Hz, expect %.2f, err=%.2f cents (+-5)",
                 got, expect, err);
 }
 
@@ -142,15 +145,46 @@ bool testBypass() {
     p.octave.mix = mix;
     gFx.reset();
     const std::vector<float> out = run(gFx, in, p);
-    for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
+    for (size_t i = 0; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
   }
   cv::PitchFxParams off = octaveOnly(12);
   off.octave.mix = 0.5f;
   off.octave.on = false;
   gFx.reset();
   const std::vector<float> offOut = run(gFx, in, off);
-  for (size_t i = kSettle; i < in.size(); ++i) worst = std::max(worst, std::fabs(offOut[i] - in[i]));
+  for (size_t i = 0; i < in.size(); ++i) worst = std::max(worst, std::fabs(offOut[i] - in[i]));
   return report("bypass", worst == 0.0f, "semitones 0 at mix 0/0.5/1 and on=false max|out-in|=%.3g (0)", worst);
+}
+
+// Octave on for a second, then off by the toggle and by SEMITONES 0. Once the fades settle (277 ms
+// on the box) the stage is a plain copy, bit for bit, whatever it did before.
+bool testOffEdge() {
+  constexpr int kEdge = cv::kSampleRate;
+  constexpr int kExact = kEdge + cv::kSampleRate * 3 / 10;  // 300 ms after the edge
+  const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
+  bool ok = true;
+  for (int pass = 0; pass < 2; ++pass) {
+    cv::PitchFxParams on = octaveOnly(7);
+    on.octave.mix = 0.5f;
+    cv::PitchFxParams off = on;
+    if (pass == 0) {
+      off.octave.on = false;
+    } else {
+      off.octave.semitones = 0;
+    }
+    gFx.reset();
+    std::vector<float> out(in.size());
+    const int total = static_cast<int>(in.size());
+    for (int i = 0; i < total; i += cv::kBlock) {
+      const int n = std::min(cv::kBlock, total - i);
+      gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, i < kEdge ? on : off);
+    }
+    size_t differs = 0;
+    for (size_t i = kExact; i < in.size(); ++i) differs += out[i] != in[i] ? 1u : 0u;
+    ok &= report(pass == 0 ? "off edge, toggle" : "off edge, semitones 0", differs == 0,
+                 "%.0f samples differ from the input 300 ms after the edge (0)", static_cast<double>(differs));
+  }
+  return ok;
 }
 
 // Octave and Autotune on together; the tracker must still hear only the dry tone.
@@ -186,7 +220,8 @@ bool testNoAlloc() {
   const std::vector<float> in = tone(220.0, cv::kBlock * 64);
   gFx.reset();
   run(gFx, in, p);  // aborts on any new/delete inside process()
-  return report("no-alloc", true, "%.0f allocations in process()", 0.0);
+  return report("no-alloc", true, "%.0f blocks ran without an allocation in process() (it aborts on one)",
+                static_cast<double>(in.size() / cv::kBlock));
 }
 
 // Goertzel magnitude of x at hz.
@@ -258,12 +293,12 @@ bool testFormantMoves() {
 
 // A 0.5 DC step through the wet path at unity trim (MIX 1, so the dry path adds nothing). The voice's
 // DC blocker takes it away: from the output's peak the level falls under -60 dBFS within 200 ms and
-// stays there.
+// stays there. The 5 Hz one-pole falls from a peak of 0.477 to -60 dBFS in 196 ms, so the limit sits
+// 2 % over the filter's own decay.
 bool testDcBlocked() {
   constexpr double kLimit = 1e-3;  // -60 dBFS
   constexpr double kSettleMs = 200.0;
   cv::PitchFxParams p = octaveOnly(12);
-  p.octave.tuning.levelDb = 0.0f;
   p.octave.tuning.trimDb = 0.0f;
   const std::vector<float> in(static_cast<size_t>(cv::kSampleRate), 0.5f);
   gFx.reset();
@@ -305,9 +340,9 @@ bool testNoise() {
     ro += static_cast<double>(out[static_cast<size_t>(i)]) * out[static_cast<size_t>(i)];
   }
   const double gainDb = 10.0 * std::log10(ro / ri);
-  const double wantDb = p.octave.tuning.levelDb + p.octave.tuning.trimDb;
-  return report("noise level", std::fabs(gainDb - wantDb) <= 3.0,
-                "out/in %+.2f dB, expect %+.2f dB (+-3)", gainDb, wantDb);
+  // The trim is set on Adam's clips. White noise reads 1 dB under unity at that trim.
+  constexpr double kExpectDb = -1.0;
+  return report("noise level", std::fabs(gainDb - kExpectDb) <= 1.5, "out/in %+.2f dB (%+.1f +-1.5)", gainDb, kExpectDb);
 }
 
 // Largest |second difference| of x over [from, to): a cut in the waveform shows as a spike here.
@@ -321,39 +356,203 @@ double peakCurvature(const std::vector<float>& x, int from, int to) {
 }
 
 // SEMITONES +1 to 0 to -1 with 0 held for gapBlocks: the stage switches off at 0, and its voice
-// must keep running while the crossfade is up, so no sample bends harder than in steady state.
-double throughZeroRatio(float mix, int gapBlocks) {
-  const int half = cv::kSampleRate;
-  const int stepAt = half / cv::kBlock * cv::kBlock;
-  const std::vector<float> in = tone(220.0, 2 * half);
+// must keep running while the crossfade is up.
+constexpr int kStepAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
+constexpr int kThroughTotal = 2 * cv::kSampleRate;
+
+std::vector<float> throughZeroRun(float mix, int gapBlocks, double hz = 220.0) {
+  const std::vector<float> in = tone(hz, kThroughTotal);
   std::vector<float> out(in.size());
   cv::PitchFxParams p = octaveOnly(1);
   p.octave.mix = mix;
   gFx.reset();
-  const int total = static_cast<int>(in.size());
-  for (int i = 0; i < total; i += cv::kBlock) {
-    const int block = (i - stepAt) / cv::kBlock;
-    p.octave.semitones = i < stepAt ? 1 : (block < gapBlocks ? 0 : -1);
-    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], std::min(cv::kBlock, total - i), p);
+  for (int i = 0; i < kThroughTotal; i += cv::kBlock) {
+    const int block = (i - kStepAt) / cv::kBlock;
+    p.octave.semitones = i < kStepAt ? 1 : (block < gapBlocks ? 0 : -1);
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, p);
   }
-  const int window = cv::kSampleRate / 2;
-  const double steady =
-      std::max(peakCurvature(out, stepAt - window, stepAt), peakCurvature(out, total - window, total));
-  return peakCurvature(out, stepAt, stepAt + gapBlocks * cv::kBlock + cv::kSampleRate / 10) / steady;
+  return out;
+}
+
+// No sample bends harder than in steady state.
+double throughZeroRatio(float mix, int gapBlocks) {
+  const std::vector<float> out = throughZeroRun(mix, gapBlocks);
+  const double steady = std::max(peakCurvature(out, kStepAt - kSampleWindow, kStepAt),
+                                 peakCurvature(out, kThroughTotal - kSampleWindow, kThroughTotal));
+  return peakCurvature(out, kStepAt, kStepAt + gapBlocks * cv::kBlock + cv::kSampleRate / 10) / steady;
+}
+
+// RMS of x over [from, from + len).
+double windowRms(const std::vector<float>& x, int from, int len) {
+  double e = 0.0;
+  for (int i = from; i < from + len; ++i) e += static_cast<double>(x[static_cast<size_t>(i)]) * x[static_cast<size_t>(i)];
+  return std::sqrt(e / len);
+}
+
+// The lowest level from the step to 100 ms after the dwell, in windows of one period of a 100 Hz
+// tone (480 samples, whose wet at +-1 st pulses by about 1 dB), in dB under the wet's RMS before the
+// step. The two voices are unrelated signals, and an equal-power crossfade of those keeps the level;
+// a linear one dips by up to 3 dB at its midpoint.
+double throughZeroDipDb(float mix, int gapBlocks) {
+  constexpr int kPeriod = 480;
+  const std::vector<float> out = throughZeroRun(mix, gapBlocks, 100.0);
+  const double steady = windowRms(out, kStepAt - kSampleWindow, kSampleWindow);
+  double low = 1e9;
+  const int end = kStepAt + gapBlocks * cv::kBlock + cv::kSampleRate / 10;
+  for (int i = kStepAt; i < end; i += 32) low = std::min(low, windowRms(out, i, kPeriod));
+  return -20.0 * std::log10(low / steady);
 }
 
 bool testThroughZero() {
   constexpr double kMaxRatio = 1.0;
+  constexpr double kMaxDipDb = 2.0;
   bool ok = true;
   for (float mix : {1.0f, 0.10f}) {
     double worst = 0.0;
-    for (int gap : {1, 4, 8, 15}) worst = std::max(worst, throughZeroRatio(mix, gap));
+    double dip = -100.0;
+    for (int gap : {1, 4, 8, 15}) {
+      worst = std::max(worst, throughZeroRatio(mix, gap));
+      dip = std::max(dip, throughZeroDipDb(mix, gap));
+    }
     char name[48];
     std::snprintf(name, sizeof name, "through 0 at mix %.0f %%", static_cast<double>(mix * 100.0f));
     ok &= report(name, worst <= kMaxRatio,
                  "0 held 1.3 to 20 ms: peak curvature x%.3f of steady state (<= %.1f)", worst, kMaxRatio);
+    std::snprintf(name, sizeof name, "through 0 level at mix %.0f %%", static_cast<double>(mix * 100.0f));
+    ok &= report(name, dip <= kMaxDipDb, "0 held 1.3 to 20 ms: lowest level %.2f dB under steady state (<= %.1f)", dip,
+                 kMaxDipDb);
   }
   return ok;
+}
+
+// The toggle crossfades the dry tone into the wet and back by the Octave fade alone. A switch off
+// and on, quick or slow, bends no harder than steady state either way.
+bool testToggle() {
+  constexpr int kOffAt = cv::kSampleRate;
+  const std::vector<float> in = tone(220.0, 3 * cv::kSampleRate);
+  double worst = 0.0;
+  for (float mix : {1.0f, 0.10f}) {
+    for (int offBlocks : {2, 20, 400}) {
+      cv::PitchFxParams p = octaveOnly(7);
+      p.octave.mix = mix;
+      gFx.reset();
+      std::vector<float> out(in.size());
+      const int total = static_cast<int>(in.size());
+      const int onAt = kOffAt + offBlocks * cv::kBlock;
+      for (int i = 0; i < total; i += cv::kBlock) {
+        p.octave.on = i < kOffAt || i >= onAt;
+        gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, p);
+      }
+      const double steady = std::max(peakCurvature(out, kOffAt - kSampleWindow, kOffAt),
+                                     peakCurvature(out, total - kSampleWindow, total));
+      const int end = onAt + cv::kSampleRate / 2;
+      worst = std::max(worst, peakCurvature(out, kOffAt, end) / steady);
+    }
+  }
+  return report("toggle off and on", worst <= 1.05,
+                "Octave off for 2, 20 and 400 blocks then on: peak curvature x%.3f of steady state (<= 1.05)", worst);
+}
+
+// A voice whose MIX sits at 0 is not heard, so it sits out. MIX leaving 0, by a touch or a jump, picks
+// it up in step: no click on a steady tone, measured as peak curvature in the 100 ms after the step
+// against the larger of the settled peaks before and after, as knob_step_test does.
+bool testMixLeavesZero() {
+  constexpr int kStepAt = 2 * cv::kSampleRate;
+  constexpr int kTotal = 2 * kStepAt;
+  const std::vector<float> in = tone(220.0, kTotal);  // a longer run than the through-zero checks
+  double worst = 0.0;
+  for (int semis : {12, -5}) {
+    for (float mix : {0.015f, 0.5f, 1.0f}) {
+      cv::PitchFxParams p = octaveOnly(semis);
+      p.octave.mix = 0.0f;
+      gFx.reset();
+      std::vector<float> out(in.size());
+      for (int i = 0; i < kTotal; i += cv::kBlock) {
+        if (i == kStepAt) p.octave.mix = mix;
+        gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, p);
+      }
+      const double steady = std::max(peakCurvature(out, kStepAt - kSampleWindow, kStepAt),
+                                     peakCurvature(out, kTotal - kSampleWindow, kTotal));
+      worst = std::max(worst, peakCurvature(out, kStepAt, kStepAt + cv::kSampleRate / 10) / steady);
+    }
+  }
+  return report("mix leaves 0", worst <= 1.05, "peak curvature after MIX 0 to 1.5, 50, 100 %%: x%.4f of steady state (<= 1.05)", worst);
+}
+
+// process() takes any n. Calls of 1 to 1000 samples stay finite and within -80 dB of the 64-sample run
+// (the voice's glide and window sync step per call, so the runs differ by rounding and a hair of timing).
+bool testAnyLength() {
+  const std::vector<float> in = tone(220.0, cv::kSampleRate);
+  cv::PitchFxParams p = octaveOnly(7);
+  p.octave.mix = 0.5f;
+  gFx.reset();
+  const std::vector<float> ref = run(gFx, in, p);
+  double refPower = 0.0;
+  for (float v : ref) refPower += static_cast<double>(v) * v;
+  bool finite = true;
+  double worstDb = -200.0;
+  for (int size : {1, 7, 100, 1000}) {
+    gFx.reset();
+    std::vector<float> out(in.size());
+    const int total = static_cast<int>(in.size());
+    for (int i = 0; i < total; i += size) {
+      gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], std::min(size, total - i), p);
+    }
+    double diff = 0.0;
+    for (size_t i = 0; i < out.size(); ++i) {
+      finite = finite && std::isfinite(out[i]);
+      diff += (static_cast<double>(out[i]) - ref[i]) * (static_cast<double>(out[i]) - ref[i]);
+    }
+    worstDb = std::max(worstDb, 10.0 * std::log10(diff / refPower + 1e-20));
+  }
+  return report("any call length", finite && worstDb <= -80.0,
+                "calls of 1, 7, 100 and 1000 samples: finite %.0f (1), worst %.1f dB from the 64-sample run (<= -80)",
+                finite ? 1.0 : 0.0, worstDb);
+}
+
+// One NaN in the input latches the voice. The chain's guard cuts that block and resets every engine, so
+// the pitch stage's reset has to bring the voice back: finite and sounding again on the next call.
+bool testNanRecovery() {
+  const std::vector<float> in = tone(220.0, cv::kSampleRate);
+  cv::PitchFxParams p = octaveOnly(12);
+  p.octave.mix = 0.5f;
+  gFx.reset();
+  std::vector<float> out(in.size());
+  const int poisonAt = cv::kSampleRate / 2;
+  bool latched = false;
+  for (int i = 0; i < cv::kSampleRate; i += cv::kBlock) {
+    std::vector<float> block(in.begin() + i, in.begin() + i + cv::kBlock);
+    if (i == poisonAt / cv::kBlock * cv::kBlock) block[5] = NAN;
+    gFx.process(block.data(), &out[static_cast<size_t>(i)], cv::kBlock, p);
+    if (i > poisonAt) latched = latched || !std::isfinite(out[static_cast<size_t>(i)]);
+  }
+  gFx.reset();
+  const std::vector<float> after = run(gFx, in, p);
+  bool finite = true;
+  double peak = 0.0;
+  for (size_t i = static_cast<size_t>(cv::kSampleRate) / 2; i < after.size(); ++i) {
+    finite = finite && std::isfinite(after[i]);
+    peak = std::max(peak, static_cast<double>(std::fabs(after[i])));
+  }
+  return report("nan recovery", latched && finite && peak > 0.1,
+                "a NaN latches the voice (%.0f), and after reset() the output is finite (%.0f) and sounds (peak %.2f)",
+                latched ? 1.0 : 0.0, finite ? 1.0 : 0.0, peak);
+}
+
+// When the input goes to digital silence, the DC blocker's tail falls to exact 0 without passing
+// through subnormal floats, which cost cycles on some cores. The tail would take about 2.5 s to
+// reach the subnormal range, so the silence runs 4 s.
+bool testSilenceRest() {
+  std::vector<float> in = tone(220.0, cv::kSampleRate);
+  in.resize(5 * static_cast<size_t>(cv::kSampleRate), 0.0f);
+  gFx.reset();
+  const std::vector<float> out = run(gFx, in, octaveOnly(12));
+  size_t subnormal = 0;
+  for (const float x : out) subnormal += std::fpclassify(x) == FP_SUBNORMAL ? 1u : 0u;
+  size_t live = 0;
+  for (size_t i = 4 * static_cast<size_t>(cv::kSampleRate); i < out.size(); ++i) live += out[i] != 0.0f ? 1u : 0u;
+  return report("silence rest", subnormal == 0 && live == 0, "%.0f subnormal samples (0); %.0f of the last second's samples are not 0 (0)",
+                static_cast<double>(subnormal), static_cast<double>(live));
 }
 
 }  // namespace
@@ -363,11 +562,17 @@ int main() {
   ok &= testOctave();
   ok &= testFifth();
   ok &= testBypass();
+  ok &= testOffEdge();
   ok &= testWiring();
   ok &= testNoAlloc();
   ok &= testFormantMoves();
   ok &= testNoise();
   ok &= testDcBlocked();
   ok &= testThroughZero();
+  ok &= testToggle();
+  ok &= testMixLeavesZero();
+  ok &= testAnyLength();
+  ok &= testNanRecovery();
+  ok &= testSilenceRest();
   return ok ? 0 : 1;
 }

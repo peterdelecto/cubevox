@@ -183,14 +183,6 @@ cv::PitchFxParams pitchOff() {
   return p;
 }
 
-cv::PitchFxParams octave(float mix) {
-  cv::PitchFxParams p = pitchOff();
-  p.octave.on = true;
-  p.octave.mix = mix;
-  p.octave.semitones = -12;
-  return p;
-}
-
 // The box's reverb card placed and switched on, with its MIX knob at `mix` and every other
 // setting (TIME, dwell, wobble) where the registry leaves it.
 cv::ReverbParams boxReverb(Card card, float mix) {
@@ -247,16 +239,19 @@ bool crowdRows() {
   return ok;
 }
 
-// The Formant card at SHIFT -3 st with Autotune off, as the registry sets it. The card's trim is set
-// for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are.
-cv::PitchFxParams boxFormant(float mix) {
+// The Formant card at SHIFT `shiftSt` with Autotune off, as the registry sets it. The card's trim is
+// set for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are.
+cv::PitchFxParams boxFormantAt(int shiftSt, float mix) {
   ChainParams chain;
   applyPlacement(Card::Formant, chain);
   applyToggle(Card::Formant, true, chain);
-  applyKnob(Card::Formant, 0, 4.0f, chain);  // position 4 is -3 st
+  applyKnob(Card::Formant, 0, static_cast<float>(shiftSt + cv::kFormantMaxShiftSt), chain);
   applyKnob(Card::Formant, 1, mix, chain);
   return chain.pitchFx;
 }
+
+// The card at its default SHIFT.
+cv::PitchFxParams boxFormant(float mix) { return boxFormantAt(cv::kFormantDefaultShiftSt, mix); }
 
 // 16-bit mono PCM WAV, any chunks before data. Empty on a missing or other file.
 Signal readWav(const std::string& path) {
@@ -319,11 +314,20 @@ bool clipRows(const char* label, const ClipFn& through, double lo, double hi, do
   return ok;
 }
 
-// The Formant card at its default, SHIFT -3 st and MIX 100 %, on the program. MIX 50 % is held to
-// the mid band on the program and on Adam's clips: the voices sit from correlated (the program) to
-// unrelated (the clips), and the level gain keeps both inside the band.
+// The Formant card on the program at MIX 50 % and on Adam's clips: the voices sit from correlated (the
+// program) to unrelated (the clips), and the level gain keeps both inside the mid band. The wet path
+// alone (MIX 100 %) runs at every SHIFT on Adam's clips. The grains sum to a level that follows SHIFT
+// and the three clips differ by up to 1.2 dB under one trim, so each clip is held to the mid band and
+// the mean of the three to the rule, which the per-SHIFT trim table is fit to. The synthetic program
+// at the default SHIFT is reported next to them, as Octave's is not held to the rule either.
 bool formantRows(const Signal& in) {
-  bool ok = simple<cv::PitchFx>("formant -3 st mix 1", in, boxFormant(1.0f));
+  bool ok = true;
+  {
+    auto s = std::make_unique<Stage<cv::PitchFx>>();
+    const cv::PitchFxParams full = boxFormant(1.0f);
+    const double programDb = gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, full); }));
+    std::printf("NOTE %-30s %+6.2f dB  (the synthetic program, not held to the rule)\n", "formant -3 st mix 1 program", programDb);
+  }
   ok &= midRow<cv::PitchFx>("formant -3 st mix .5", in, boxFormant(0.5f));
   const cv::PitchFxParams half = boxFormant(0.5f);
   double mean = 0.0;
@@ -335,6 +339,73 @@ bool formantRows(const Signal& in) {
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); })};
       },
       kMidLoDb, kMidHiDb, mean, count);
+  for (int st = -cv::kFormantMaxShiftSt; st <= cv::kFormantMaxShiftSt; ++st) {
+    char label[40];
+    std::snprintf(label, sizeof label, "formant %+d st mix 1", st);
+    const cv::PitchFxParams full = boxFormantAt(st, 1.0f);
+    ok &= clipRows(
+        label,
+        [&](const Signal& padded) {
+          auto s = std::make_unique<Stage<cv::PitchFx>>();
+          return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, full); })};
+        },
+        kMidLoDb, kMidHiDb, mean, count);
+    if (count > 0) {
+      char name[48];
+      std::snprintf(name, sizeof name, "%s mean", label);
+      ok &= verdict(name, mean, kLoDb, kHiDb);
+    }
+  }
+  return ok;
+}
+
+// The Octave card as the registry sets it, at SEMITONES `semis` and MIX `mix`, Autotune off.
+cv::PitchFxParams boxOctave(int semis, float mix) {
+  ChainParams chain;
+  applyPlacement(Card::Octave, chain);
+  applyToggle(Card::Octave, true, chain);
+  applyKnob(Card::Octave, 0, static_cast<float>(semis + cv::OctaveVoice::kMaxSemis), chain);
+  applyKnob(Card::Octave, 1, mix, chain);
+  return chain.pitchFx;
+}
+
+// The Octave card on Adam's clips. Its two taps sit 20 ms apart in the input, so a note adds
+// coherently where 20 ms holds a whole number of periods and cancels in part where it holds a half,
+// and the gain swings 2 dB with the sung pitch. The synthetic program sits between the peaks and
+// cannot stand in for him. The wet path alone (MIX 100 %) is held to the rule on the mean of the
+// three clips at four intervals, each clip to the rule with its slack (they read +0.13 to +0.29 dB).
+// MIX 50 % reads -0.16 to +0.09 dB and is held to +-0.4 dB.
+bool octaveRows() {
+  bool ok = true;
+  for (int semis : {-12, -5, 7, 12}) {
+    char label[40];
+    std::snprintf(label, sizeof label, "octave %+d st mix 1", semis);
+    const cv::PitchFxParams p = boxOctave(semis, 1.0f);
+    double mean = 0.0;
+    int count = 0;
+    ok &= clipRows(
+        label,
+        [&](const Signal& padded) {
+          auto s = std::make_unique<Stage<cv::PitchFx>>();
+          return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
+        },
+        kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+    if (count > 0) {
+      char name[48];
+      std::snprintf(name, sizeof name, "%s mean", label);
+      ok &= verdict(name, mean, kLoDb, kHiDb);
+    }
+  }
+  const cv::PitchFxParams half = boxOctave(-12, 0.5f);
+  double mean = 0.0;
+  int count = 0;
+  ok &= clipRows(
+      "octave -12 st mix .5",
+      [&](const Signal& padded) {
+        auto s = std::make_unique<Stage<cv::PitchFx>>();
+        return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); })};
+      },
+      -0.4, 0.4, mean, count);
   return ok;
 }
 
@@ -414,8 +485,7 @@ bool slotRows(const Signal& in) {
   autotune.autotune.on = true;
   ok &= simple<cv::PitchFx>("autotune key C", in, autotune);
 
-  ok &= simple<cv::PitchFx>("octave -12 mix 1", in, octave(1.0f));
-  ok &= midRow<cv::PitchFx>("octave -12 mix .5", in, octave(0.5f));
+  ok &= octaveRows();
 
   cv::UnisonParams unison;
   unison.on = true;
