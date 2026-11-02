@@ -37,11 +37,14 @@ the 256-byte size stay, and the three new bytes come out of the reserved ones.
 | 2 | polish comp | 0 off, 1 on | on |
 | 3 | polish EQ | 0 off, 1 on | on |
 | 4 | top switch | 0 MUTE, 1 BYPASS | MUTE |
-| 5 | debug | 0 off, 1 on (owner 2026-10-30, `2026-10-24-polish-design.md` menu row 7) | off |
-| 6 to 15 | reserved, zero | | |
+| 5 | debug | 0 off, 1 on (owner 2026-10-30, `2026-10-24-polish-design.md` menu row 11) | off |
+| 6 and 7 | retired, written 0 and ignored on read (the HPF and LPF bytes until POLISH EQ took the filters, 2026-10-31) | | |
+| 8 | brightness | 0 HIGH (a record written before the byte existed), 1 LOW, 2 MID, 3 HIGH, 4 MAX; above 4 the record is invalid (owner 2026-11-02, `2026-10-24-polish-design.md` menu row 10) | HIGH, written as 3 |
+| 9 to 15 | reserved, zero | | |
 
-Byte 5 came out of the reserved bytes on 2026-10-30 and the schema stays 2: no earlier decoder
-read that byte, every record written before holds 0 there, and 0 is off.
+Bytes 5 and 8 came out of the reserved bytes on 2026-10-30 and 2026-11-02 and the schema stays 2:
+no earlier decoder read either byte, every record written before holds 0 there, and 0 reads as the
+default.
 
 1. A v1 record still decodes. Its bytes 2 to 4 were reserved, so they are ignored and the three
    new settings take their defaults, not the zeros.

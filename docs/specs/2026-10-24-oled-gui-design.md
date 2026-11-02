@@ -123,6 +123,16 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 2. The shift moves the finished picture, so the rim dither moves with the ribbon. There is no animation.
 3. The count starts at the first tick and survives the millisecond counter wrapping.
 
+## Brightness and dimming
+Owner 2026-11-02: "lets dim the screen. we also need a menu item that adjusts screens normal brightness."
+1. The menu row BRIGHTNESS sets the normal brightness: LOW, MID, HIGH or MAX, panel contrast 48, 128, 207 or 255. HIGH is the default and the contrast every screen had before. The setting is saved in settings byte 8 of the layout record and does not go over USB.
+2. The screen dims to contrast 8 after 10 minutes with no knob move, slot toggle flip, top switch flip, MENU turn or press, and no voice. Voice is input above −50 dBFS over one UI tick, the input meter's floor. A noisy room that keeps the input above that never dims the screen.
+3. Any of those brings the normal brightness straight back, and the control still does its job: a knob turn moves its parameter, a MENU press opens the menu.
+4. Dimming works on every screen, MUTED and BYPASS included. A dark screen on stage reads as a dead box, so the screen dims and never goes black.
+5. The application sends the contrast as its own command between two page writes, and again after a panel restart, which puts the init sequence's 207 back. The saved level applies before the splash's first page. The bootloader's update screens keep 207.
+6. The emulator draws a lit pixel between the off and on colours by contrast / 255.
+7. The MUTED screen does not walk. The owner named only the dimming on 2026-11-02.
+
 ## Timing
 | Item | Value |
 |---|---|
@@ -133,6 +143,7 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 | Value easing | 20 ms time constant |
 | Input meter release | 120 ms time constant; the ribbon has none |
 | Walk step | 60 s |
+| Dim after | 600 s with no activity |
 | Panel flush | one dirty page per loop pass, about 25 ms for a full frame at 400 kHz |
 
 1. The gate keeps a tick from outrunning the flush, which would tear the picture. A write that fails leaves its page dirty, so ticks wait until it goes through.
