@@ -330,7 +330,8 @@ shelf.
 ## 18. Audit fix pass as built (v2.01.05)
 
 Owner 2026-11-01 on CHATTER's level: the dry holds, as it does for Echo and Unison. This section
-overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2 and 6 where they differ.
+overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2, 4 and 6 where they differ. In 17
+item 4 the trim is now one constant gain on the slices, not a stepped gain.
 
 1. Level. `trimDb` −14.5 dB scales the slices alone; the dry passes at unity, bit for bit
    (`bloom_test` `dry-unity`). The six rows, with no slack: gate key +0.31, +0.20, +0.33 dB; own
