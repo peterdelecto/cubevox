@@ -1,8 +1,8 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
 // (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Bloom rows take every
-// setting from the registry, as the box runs them. The Formant MIX, Lo-fi and Bloom rows run on Adam's
+// setting from the registry, as the box runs them. The Spring, Formant MIX, Lo-fi and Bloom rows run on Adam's
 // clips in samples/ and skip when they are absent: the synthetic program puts its energy where the telephone
-// band cuts, and its noise floor holds Bloom's word open. No window, no audio device.
+// band cuts and where the Spring loops cut, and its noise floor holds Bloom's word open. No window, no audio device.
 
 #include <algorithm>
 #include <cmath>
@@ -404,6 +404,28 @@ bool bloomRows() {
   return ok;
 }
 
+// The Spring card at the registry's TIME on Adam's clips, once with the wet path alone and once at
+// MIX 50 %. The synthetic program puts its energy where the loops cut, below 200 Hz and above 5 kHz,
+// so it reads the card differently from a voice. The clips spread by 0.66 dB under one gain, so no
+// trim puts all three inside 0 to +0.5 dB. Each clip is held to the mid band, and the mean of the
+// three on the wet path alone is held to the rule.
+bool springRows() {
+  const auto through = [](const cv::ReverbParams& p) {
+    return ClipFn([&p](const Signal& padded) {
+      auto s = std::make_unique<Stage<cv::Reverb>>();
+      return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
+    });
+  };
+  double mean = 0.0;
+  int count = 0;
+  bool ok = clipRows("reverb spring wet only", through(boxReverbWetOnly(Card::ReverbSpring)), kMidLoDb, kMidHiDb, mean,
+                     count);
+  if (count > 0) ok &= verdict("reverb spring wet only mean", mean);
+  ok &= clipRows("reverb spring MIX 50 %", through(boxReverb(Card::ReverbSpring, 0.5f)), kMidLoDb, kMidHiDb, mean,
+                 count);
+  return ok;
+}
+
 // The slot stages at their default engaged settings.
 bool slotRows(const Signal& in) {
   bool ok = true;
@@ -440,9 +462,8 @@ bool slotRows(const Signal& in) {
   ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
 
   ok &= simple<cv::Reverb>("reverb chasm wet only", in, boxReverbWetOnly(Card::ReverbChasm));
-  ok &= simple<cv::Reverb>("reverb spring wet only", in, boxReverbWetOnly(Card::ReverbSpring));
   ok &= midRow<cv::Reverb>("reverb chasm MIX 50 %", in, boxReverb(Card::ReverbChasm, 0.5f));
-  ok &= midRow<cv::Reverb>("reverb spring MIX 50 %", in, boxReverb(Card::ReverbSpring, 0.5f));
+  ok &= springRows();
   return ok;
 }
 

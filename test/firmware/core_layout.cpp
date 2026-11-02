@@ -678,11 +678,11 @@ void checkSwapOctaveFormant() {
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::None && both == bothBefore,
         "action: SwapOctaveFormant changes nothing when the other card would repeat");
 
-  // Unison in slot 7 beside MOB and Formant leaves the mean at 74, so Octave's 5 % would take it to 76
-  // and the swap is refused. The checks state the verdicts the rows give, so a row that moves them
-  // fails here and not silently.
-  Layout tight = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Unison, Card::ReverbSpring}};
+  // Unison in slot 7 beside MOB, Formant, Gate and Chasm leaves the mean at 75, so Octave's 5 % would
+  // take it to 77 and the swap is refused. The checks state the verdicts the rows give, so a row that
+  // moves them fails here and not silently.
+  Layout tight = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Gate, Card::Distortion,
+                   Card::Unison, Card::ReverbChasm}};
   Layout withOctave = tight;
   withOctave.card[2] = Card::Octave;
   check(layoutValid(tight).ok() && !layoutValid(withOctave).ok(),
@@ -752,9 +752,10 @@ void checkCycleSlot7Card() {
   check(ui::applyAction(UiAction::CycleSlot7Card, s, all) == ui::ApplyResult::None && all == allBefore,
         "action: CycleSlot7Card changes nothing when each other card would repeat");
 
-  // MOB beside Spring with Unison in Octave's slot sits on the mean line with Gate in slot 7, so Bloom's
-  // 5 % is refused and the cycle passes it. The expected cards follow layoutValid, not a fixed verdict.
-  Layout tight = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+  // MOB beside Spring with Octave in slot 1 and Unison in Octave's usual slot sits on the mean line with
+  // Gate in slot 7, so Bloom's 5 % is refused and the cycle passes it. The expected cards follow
+  // layoutValid, not a fixed verdict.
+  Layout tight = {{Card::Octave, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
                    Card::Gate, Card::ReverbSpring}};
   Layout withBloom = tight;
   withBloom.card[6] = Card::Bloom;

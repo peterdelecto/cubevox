@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cmath>
 #include <complex>
 #include <cstdint>
@@ -21,37 +20,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <new>
 #include <utility>
 #include <vector>
 
 #include "engine/crowd.h"
 
-namespace {
-
-std::atomic<bool> gInProcess{false};
-
-void guardAlloc() {
-  if (gInProcess.load()) std::abort();
-}
-
-}  // namespace
-
-// Allocation in process() aborts the test binary.
-void* operator new(std::size_t n) {
-  guardAlloc();
-  void* p = std::malloc(n);
-  if (!p) std::abort();
-  return p;
-}
-void* operator new[](std::size_t n) { return operator new(n); }
-void operator delete(void* p) noexcept {
-  guardAlloc();
-  std::free(p);
-}
-void operator delete[](void* p) noexcept { operator delete(p); }
-void operator delete(void* p, std::size_t) noexcept { operator delete(p); }
-void operator delete[](void* p, std::size_t) noexcept { operator delete(p); }
+#include "alloc_guard.h"
 
 namespace {
 

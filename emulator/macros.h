@@ -87,12 +87,12 @@ constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
 constexpr Anchor kChmBassCutTop{200.0f, 100.0f, 40.0f, I::Log};
 
 // Spring
-constexpr Anchor kSbChirpA{0.65f, 0.80f, 0.90f};
-constexpr Anchor kSbChirpSections{16.0f, 32.0f, 32.0f, I::Round};  // the engine's kMaxSections tops it
-constexpr Anchor kSbWobbleDepth{2.0f, 8.0f, 24.0f};
-constexpr Anchor kSbWobbleRate{1.5f, 3.0f, 5.0f, I::Log};
-constexpr Anchor kSbDiffuse{0.45f, 0.30f, 0.15f};                    // less diffusion = crisper repeats
-constexpr Anchor kSbTrebleLoss{4500.0f, 9000.0f, 14000.0f, I::Log};
+constexpr Anchor kSpringChirpA{0.65f, 0.80f, 0.90f};
+constexpr Anchor kSpringChirpSections{16.0f, 32.0f, 32.0f, I::Round};  // the engine's kMaxSections tops it
+constexpr Anchor kSpringWobbleDepth{2.0f, 8.0f, 24.0f};
+constexpr Anchor kSpringWobbleRate{1.5f, 3.0f, 5.0f, I::Log};
+constexpr Anchor kSpringDiffuse{0.45f, 0.30f, 0.15f};                    // less diffusion = crisper repeats
+constexpr Anchor kSpringTrebleLoss{4500.0f, 9000.0f, 14000.0f, I::Log};
 
 // The default positions reproduce the engine tuning defaults; the --layout
 // probe fails when they drift apart.
@@ -108,7 +108,7 @@ enum Id : int {
   ChasmWobble,
   ChasmBrightness,
   ChasmBass,
-  SpringDrip,
+  SpringChirp,
   SpringFlutter,
   SpringBrightness,
   kCount
@@ -118,7 +118,7 @@ enum Id : int {
 // nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
     "Slide",       nullptr,          "Body",              "Bite",       "Grit",
-    "Wobble",      "CHASM Brightness", "Bass",            "SPRING Drip", "SPRING Flutter",
+    "Wobble",      "CHASM Brightness", "Bass",            "SPRING Chirp", "SPRING Flutter",
     "SPRING Brightness"};
 
 // Keys for the saved-state file; one word each, stable across builds, so a key keeps the name it
@@ -202,17 +202,17 @@ inline void chasmBass(ChasmTuning& t, float pos) {
   t.bassCutHzTop = at(kChmBassCutTop, pos);
 }
 
-inline void springDrip(SpringTuning& t, float pos) {
-  t.chirpA = at(kSbChirpA, pos);
-  t.chirpSections = atInt(kSbChirpSections, pos);
+inline void springChirp(SpringTuning& t, float pos) {
+  t.chirpA = at(kSpringChirpA, pos);
+  t.chirpSections = atInt(kSpringChirpSections, pos);
 }
 
 inline void springFlutter(SpringTuning& t, float pos) {
-  t.wobbleDepth = at(kSbWobbleDepth, pos);
-  t.wobbleRateHz = at(kSbWobbleRate, pos);
-  t.diffuse = at(kSbDiffuse, pos);
+  t.wobbleDepth = at(kSpringWobbleDepth, pos);
+  t.wobbleRateHz = at(kSpringWobbleRate, pos);
+  t.diffuse = at(kSpringDiffuse, pos);
 }
 
-inline void springBrightness(SpringTuning& t, float pos) { t.trebleLossHz = at(kSbTrebleLoss, pos); }
+inline void springBrightness(SpringTuning& t, float pos) { t.trebleLossHz = at(kSpringTrebleLoss, pos); }
 
 }  // namespace cv::macros
