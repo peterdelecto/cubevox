@@ -4,7 +4,7 @@ Owner 2026-11-01: "let's also adapt the 'bloom' effect from drumsynth as a possi
 7", with DrumSynthV3's BLOOM technical spec (D2, R10, code at a4149ed) pasted in. Offered for slot 7
 in place of Gate, through the slot 7 row (`2026-11-01-slot-7-choices-design.md`).
 
-Status: the card is CHATTER (display name Chatter; card id and engine stay `bloom`). Sections 14
+Status: the card is Chatter (menu value CHATTER; card id and engine stay `bloom`). Sections 14
 to 18 are current; section 18 is the build as of v2.01.05 and wins where it differs. Sections 1 to
 13 record the first build (v2.00.95) and the rotation build (v2.00.99); their knob names (TAIL,
 BLOOM, LINGER), slice timings, rotation, memory and cost figures are history wherever a later
@@ -128,7 +128,7 @@ TAIL `D` (60..1000 ms):
 2. Settled off is a plain copy; `knob_step_test` holds TAIL and BLOOM steps and the toggle.
 3. `level_test`: the default setting lands 0 to +0.5 dB RMS on program.
 4. `core_registry`, `core_chain_run`: the card, its knobs, the key handed from the Input gate.
-5. Stress run with Bloom in slot 7 on the default and MOB + Chasm layouts.
+5. Stress run with Bloom in slot 7 on the default and Mob + Chasm layouts.
 
 ## 10. Open for the owner's ear
 
@@ -141,7 +141,7 @@ TAIL `D` (60..1000 ms):
 | Layout | Mean % | Worst % |
 |---|---|---|
 | default, Bloom in slot 7 | 68 | 77 |
-| MOB and Chasm, Bloom in slot 7 | 75 | 87 |
+| Mob and Chasm, Bloom in slot 7 | 75 | 87 |
 | lines | 75 | 95 |
 
 ## 12. Built 2026-11-01 (v2.00.95)
@@ -170,7 +170,7 @@ knob named LINGER.
    and closes on its own, while the new word starts its own loop. At most two run at once: a third
    word fades the oldest tail out over 20 ms.
 4. Source. Bloom cuts its slices from the chain after the pitch stage: the signal leaving the last
-   slot that holds Autotune, Octave or Formant, before MOB, Unison, Echo and Distortion. A layout
+   slot that holds Autotune, Octave or Formant, before Mob, Unison, Echo and Distortion. A layout
    with none of those cuts after slot 1. The dry path is still slot 7's own input; the loops add to
    it. The word key stays the Input gate's.
 5. Memory. Eight float slices of 80 ms, 122,880 B, in D1 SRAM (two tails of four).
@@ -211,11 +211,11 @@ knob named LINGER.
      2.1 % on the board (13.1k to 13.4k cycles, stress run 2026-11-01, fw v2.00.81), so about 2.8 %
      and 4.2 %; the {5, 6} row covers both until a board bench.
 
-## 14. CHATTER, the middle ground (owner 2026-11-01)
+## 14. Chatter, the middle ground (owner 2026-11-01)
 
 Owner, after hearing v2.00.99 against the first build: keep the clean source; bring back the
 variable slice length; the tail repeats one slice; tail length as it is; some dirt back in, from
-Bloom's own clipper (option B, not slot 7's input, which carries MOB and Echo); "this effect should
+Bloom's own clipper (option B, not slot 7's input, which carries Mob and Echo); "this effect should
 be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where they differ.
 
 1. Name. Display name `Chatter`, menu value `CHATTER`, emulator switch `CHATTER`. The code id
@@ -236,7 +236,7 @@ be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where th
    300 ms, AMOUNT 50 %) at 0 to +0.5 dB on the clips. The owner tunes the drive by ear afterwards.
 8. Memory. Three slices of 80 ms (the loop, the capture, the fading tail), 11,520 samples, 46,080 B.
 
-## 15. CHATTER as built (v2.01.02)
+## 15. Chatter as built (v2.01.02)
 
 1. Drift. Each cut's length drifts ±3 % about AMOUNT's length, then LINGER's cap and the 35 ms floor
    apply. Each slice plays exactly twice and splices at its own end, so the interval drifts with it.
@@ -329,7 +329,7 @@ shelf.
 
 ## 18. Audit fix pass as built (v2.01.05)
 
-Owner 2026-11-01 on CHATTER's level: the dry holds, as it does for Echo and Unison. This section
+Owner 2026-11-01 on Chatter's level: the dry holds, as it does for Echo and Unison. This section
 overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2, 4 and 6 where they differ. In 17
 item 4 the trim is now one constant gain on the slices, not a stepped gain.
 
@@ -354,8 +354,8 @@ item 4 the trim is now one constant gain on the slices, not a stepped gain.
    → 0.42, a word 11.70 → 7.44, a tail 10.61 → 7.22, 60 ms words at AMOUNT 100 % 15.21 → 11.13.
 3. `kBloom` stays {5, 6, false}. At `costs.h`'s 50.4k cycles per host µs, g++ gives a 4.1 % mean
    and the busiest block 5.3 %. Clang's 3.9 % would allow {4, 6}, but that ties Gate's mean line
-   and removes the layout the tests use to show CHATTER turned away; the board re-bench settles it.
-   MOB + Chasm + CHATTER sums 75 % mean, 87 % worst.
+   and removes the layout the tests use to show Chatter turned away; the board re-bench settles it.
+   Mob + Chasm + Chatter sums 75 % mean, 87 % worst.
 4. Cut with a gap. Straddle sweep at AMOUNT 25 / 50 / 75 / 100 %: 0 of 120 tails over 15 % silence,
    worst 12.4 % (before 60 / 47 / 44 / 62). Clips: 1 of 68 tails over 15 %, none over 35 % (before
    21 of 60, up to 73 %).
@@ -377,7 +377,7 @@ item 4 the trim is now one constant gain on the slices, not a stepped gain.
 
 ## 19. Voice-major rewrite as built (v2.01.09)
 
-CHATTER efficiency finding 12. This section overrides the cost figures in sections 8, 14, 15, 17
+Chatter efficiency finding 12. This section overrides the cost figures in sections 8, 14, 15, 17
 and 18 (`kBloom` {5, 6}, 7.80 ns, the ratios to Echo) and section 17 item 4's per-sample helpers.
 
 1. Structure. Each voice runs its own loop between schedule instants (a word starting, a slice
@@ -400,6 +400,6 @@ and 18 (`kBloom` {5, 6}, 7.80 ns, the ratios to Echo) and section 17 item 4's pe
 6. Clock wrap. `Bloom::startClockAt` lets `testClockWrap` start the sample clock 3 s before the
    uint32 wrap; the schedule and output match a run from 0 through a word, a tail and the wrap.
    Nothing in the firmware calls it.
-7. Layouts. With CHATTER at 3 / 5 and the 2026-11-01 stress-run rows, no layout the registry
-   allows goes over a CPU line. MOB, Chasm and CHATTER in the default layout sum 68 % mean and
+7. Layouts. With Chatter at 3 / 5 and the 2026-11-01 stress-run rows, no layout the registry
+   allows goes over a CPU line. Mob, Chasm and Chatter in the default layout sum 68 % mean and
    82 % worst. The slot 7 cycle now passes over a card only when it would repeat.

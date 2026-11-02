@@ -13,7 +13,7 @@ window. This file states the card as built at v2.01.10; section 10 keeps the his
    a smaller one (a child, a female voice, a cartoon at the top).
 2. MIX blends Adam's voice with the shifted voice. Partway, it is two singers with two throats.
 3. With Autotune on, the shifted voice sits on the tuned note, because it takes Autotune's
-   correction as Octave and MOB do.
+   correction as Octave and Mob do.
 
 ## 2. Panel
 
@@ -38,16 +38,16 @@ window. This file states the card as built at v2.01.10; section 10 keeps the his
 
 1. The shift is a second voice inside the pitch stage (`PitchFx`), so it acts at the first
    pitch-group card's slot, slot 2 in the default layout. Its sound comes ahead of Octave's voice,
-   MOB, Echo and Distortion.
+   Mob, Echo and Distortion.
 2. The formant voice reads the pitch stage's input ring, the tracker's period and Autotune's
-   correction, the same three things MOB's copies read.
+   correction, the same three things Mob's copies read.
 
 ## 4. Engine (`engine/pitch_fx.h`, `engine/formant_voice.h`)
 
 1. `FormantParams { bool on; int shiftSt = -3; float mix = 1.0f; FormantTuning tuning; }` sits in
    `PitchFxParams` as `formant`. `FormantTuning` holds the 15-entry `trimDb` table and an
    `offsetDb` added to every entry for the render tool (`fmTrimDb`, ±24 dB, clamped in the engine).
-2. The voice is `FormantPsolaVoice` in `engine/formant_voice.h`, shared with the MOB card. Pitch
+2. The voice is `FormantPsolaVoice` in `engine/formant_voice.h`, shared with the Mob card. Pitch
    ratio = Autotune's correction (1 while Autotune is off), grain playback rate = 2^(shift / 12)
    at the glided SHIFT, read delay = Autotune's voice delay.
 3. Line-up with Autotune. The voice holds one ratio per call, the correction at the call's middle,
@@ -58,7 +58,7 @@ window. This file states the card as built at v2.01.10; section 10 keeps the his
 4. Range. ±7 st covers a gender swap (about ±3 to ±4 st) and a giant or a child (±6 to ±7 st);
    past that the voice turns to a cartoon. A grain lasts two periods of input at the playback
    rate and never less than two output periods. A shorter Hann window leaves the window sum
-   dipping between grains, which pulses breaths and sibilants at the sung pitch; MOB shares the
+   dipping between grains, which pulses breaths and sibilants at the sung pitch; Mob shares the
    same floor. The read stays behind the write head at every shift in range: Autotune's delay is
    1,040 samples plus a period, and at +7 st and 70 Hz the nearest read sits 1,270 samples behind
    the head. The voice's read-span clamp (`setReadSpan`) still guards it.
@@ -67,7 +67,7 @@ window. This file states the card as built at v2.01.10; section 10 keeps the his
 6. Latency. The formant voice lags the input by 23 to 36 ms, as Autotune's voice does. With
    Autotune off and MIX between 0 and 100 %, Adam's dry voice and the shifted voice sit that far
    apart and read as a tight double. With Autotune on they are aligned.
-7. Tracker. It runs while Autotune, MOB or Formant is on, and its 48 kHz fine pass runs while
+7. Tracker. It runs while Autotune, Mob or Formant is on, and its 48 kHz fine pass runs while
    Autotune or Formant is on. The formant voice is the lead, so its pitch must be the sung pitch to
    the cent; the coarse lag alone is off by up to about 14 cents at 200 Hz.
 8. Toggle and enable edge. The toggle drives a 20 ms crossfade (`formantFade_`, the `kSmoothCoef`
@@ -117,8 +117,8 @@ window. This file states the card as built at v2.01.10; section 10 keeps the his
    `mix`), `applyToggle` (`out.pitchFx.formant.on`).
 2. `layout.cpp`: `layoutCost` adds `kTracker` once when Autotune, Crowd or Formant is placed, and
    `kPitchStage` once when Octave or Formant is placed without Autotune.
-3. `costs.h`: `kFormant{3, 4, false}`, an estimate. One `FormantPsolaVoice` is about one MOB copy
-   (MOB's eight measured 12.3 % mean, so about 1.5 % each), plus the mix and the fine pass. The
+3. `costs.h`: `kFormant{3, 4, false}`, an estimate. One `FormantPsolaVoice` is about one Mob copy
+   (Mob's eight measured 12.3 % mean, so about 1.5 % each), plus the mix and the fine pass. The
    fine pass is counted here so a layout without Autotune is covered; with Autotune placed it is
    counted twice, about one point. `firmware/stress.py` places Formant and sweeps SHIFT, so a
    stress run replaces the estimate.
@@ -154,7 +154,7 @@ Layout sums from the cost rows at v2.01.11, after the reverb speed pass (lines 7
 | Layout | Mean % | Worst % |
 |---|---|---|
 | default, Formant in slot 3 | 46 | 60 |
-| MOB and Chasm, Formant in slot 3 | 54 | 70 |
+| Mob and Chasm, Formant in slot 3 | 54 | 70 |
 
 ## 10. History
 

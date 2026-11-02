@@ -47,13 +47,13 @@ A SLOT row's label is the number of the slot that holds its cards, and `SLOT -` 
 
 Owner 2026-11-01, "crowd and unison will be interchangeable in the menu like the two reverb modes
 are": one more row sits right after REVERB. Its label is the number of the slot that holds Unison
-or the MOB card, `SLOT 4` in the default layout, `SLOT -` when no slot holds either. Its value is
+or the Mob card, `SLOT 4` in the default layout, `SLOT -` when no slot holds either. Its value is
 `UNISON` or `MOB`, the card the layout holds. A click swaps that slot's card through the same path
 as the REVERB row, so the layout saves and the audio fades, resets and comes back, and it keeps the
-old card when the new one would put the layout over the CPU lines. The MOB row measured on the
-board 2026-11-01 (13 % mean, 15 % worst) puts the default layout with MOB at 72 % mean and 82 %
+old card when the new one would put the layout over the CPU lines. The Mob row measured on the
+board 2026-11-01 (13 % mean, 15 % worst) puts the default layout with Mob at 72 % mean and 82 %
 worst, under the lines; until that row lands in `costs.h` the old estimate of 19 % holds the swap
-back at 78 %, and the click leaves Unison in place. The MOB card is the
+back at 78 %, and the click leaves Unison in place. The Mob card is the
 registry's `crowd` id under its display name Mob (`2026-10-31-crowd-design.md`). Built v2.00.82,
 proofs `build/proofs/menu/01-menu-slot4-unison.png` and `02-menu-slot4-mob.png`.
 
