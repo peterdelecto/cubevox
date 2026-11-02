@@ -86,8 +86,8 @@ level::InputEnergy energyOfRms(float rms) {
 
 float dbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
 
-// Slapback time of 160 ms, as a knob position.
-constexpr float kTime160 = (160.0f - 60.0f) / 190.0f;
+// Echo time of 160 ms, as a knob position.
+constexpr float kTime160 = (160.0f - cv::Slapback::kTimeMinMs) / (cv::Slapback::kTimeMaxMs - cv::Slapback::kTimeMinMs);
 
 // The face with the state the sketch gives it.
 struct FaceRig {

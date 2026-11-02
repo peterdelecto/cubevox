@@ -19,7 +19,7 @@ SCREEN_BYTES = 128 * 64 // 8
 CAPTION_BYTES = 128 * 16 // 8
 STRIDE = SCREEN_BYTES + CAPTION_BYTES
 
-# name -> (scene number, frame offset in the scene). Scene 2 turns SLAPBACK TIME from 120 to 210
+# name -> (scene number, frame offset in the scene). Scene 2 turns ECHO TIME from 120 to 210
 # MS, 3 turns SPRING REVERB MIX from 30 to 65 %, 4 turns OCTAVE SEMITONES from 0 to -12 ST, 5 turns
 # GATE THRESHOLD from -40 to -24 DB, 9 mutes from the silent voice, and 10 moves from one readout
 # to another at offset 100, and 11 flips slot 6's toggle on at 0.4 s and off at 1.4 s, so offsets

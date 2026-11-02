@@ -192,7 +192,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   `flash.sh`, then runs the layouts `default`, `crowd`, `chasm` and `crowd-chasm` (`--layouts a,b` picks some,
   `--seconds S` sets pass 1's read window, 20 s by default). Each run forces every slot on (`all_on`), turns the clip
   on and reads the per-slot and per-block cycle counters twice. Pass 1 pins every knob at its top. Pass 2 sweeps
-  SEMITONES, the reverb MIX and, with Crowd placed, both Crowd knobs from 0 % to 100 % in steps of 10 %, 1 s each.
+  SEMITONES, the reverb MIX, both Echo knobs and, with Crowd placed, both Crowd knobs from 0 % to 100 % in steps of
+  10 %, 1 s each, then flips Echo's toggle ten times (`slot_off`, 0.3 s apart) so its engine resets five times.
   A slot's mean is pass 1's mean and its worst is the largest worst over both passes. Across runs the mean is the
   mean of the means and the worst is the lowest run worst, the rule in `core/costs.h`. The gates are zero late,
   overrun and dry blocks, each card within its `costs.h` row for mean and worst, and each layout's block mean under

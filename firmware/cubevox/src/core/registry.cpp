@@ -15,8 +15,6 @@ constexpr float kGateThresholdMinDb = -70.0f;
 constexpr float kGateThresholdMaxDb = -10.0f;
 constexpr float kGateDecayMinMs = 5.0f;
 constexpr float kGateDecayMaxMs = 1000.0f;
-constexpr float kSlapbackTimeMinMs = 60.0f;
-constexpr float kSlapbackTimeMaxMs = 250.0f;
 constexpr int kKeyPositions = cv::kKeyCount;
 constexpr int kSemitoneMin = -12;
 constexpr int kSemitoneMax = 12;
@@ -32,7 +30,8 @@ constexpr KnobDesc kInputThreshold = {"Threshold", KnobKind::Continuous, 0, cv::
                                       cv::kInputGateThresholdMaxDb, "dB"};
 constexpr KnobDesc kInputDecay = {"Decay", KnobKind::Continuous, 0, cv::kInputGateDecayMinMs,
                                   cv::kInputGateDecayMaxMs, "ms", Curve::Log};
-constexpr KnobDesc kSlapbackTime = {"Time", KnobKind::Continuous, 0, kSlapbackTimeMinMs, kSlapbackTimeMaxMs, "ms"};
+constexpr KnobDesc kSlapbackTime = {"Time", KnobKind::Continuous, 0, cv::Slapback::kTimeMinMs,
+                                    cv::Slapback::kTimeMaxMs, "ms"};
 constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, kGateDecayMaxMs, "ms", Curve::Log};
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
@@ -136,7 +135,7 @@ void applySlapbackKnob(int knob, float v, cv::SlapbackParams& s) {
   if (knob == 0) {
     s.tuning.timeMs = knobValue(kSlapbackTime, v);
   } else {
-    s.mix = v;
+    s.amount = v;
   }
 }
 

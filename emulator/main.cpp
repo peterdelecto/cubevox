@@ -384,7 +384,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       cv::kVoicesName[p.crowd.voicesStep < cv::kVoicesSteps ? p.crowd.voicesStep : cv::kVoicesMob],
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
-      static_cast<double>(p.slapback.mix * 100.0f),
+      static_cast<double>(p.slapback.amount * 100.0f),
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.mix * 100.0f),
@@ -989,7 +989,7 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
   add("slapback.on", &p.slapback.on);
-  add("slapback.intensity", &p.slapback.mix);
+  add("slapback.intensity", &p.slapback.amount);
   add("slapback.time", &p.slapback.tuning.timeMs);
   add("slapback.repeats", &p.slapback.tuning.feedback);
   add("slapback.lowpass", &p.slapback.tuning.lowpassHz);
@@ -1388,7 +1388,7 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
 void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
-  percentSlider("AMOUNT", s.mix);
+  percentSlider("AMOUNT", s.amount);
   ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
@@ -1644,7 +1644,7 @@ void drawPedals(ProtoParams& params) {
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
-    pedalPercent("AMOUNT", params.slapback.mix);
+    pedalPercent("AMOUNT", params.slapback.amount);
   });
   next();
   pedal("DISTORTION", params.distortion.on, w, [&] {
