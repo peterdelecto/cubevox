@@ -15,7 +15,7 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
   (Harmony: one voice at High; the reverb's MIX tops at a 0.60 crossfade, so its
   `level_test` row forces the crossfade to the wet); the equal-power crossfade then stays near unity at
   every MIX. Trimming at MIX 50 % instead pushed the wet +8 dB and clipped at full mix
-  (owner 2026-10-02). Cards that add their wet on top of the dry (Echo, CHATTER,
+  (owner 2026-10-02). Cards that add their wet on top of the dry (Echo, Chatter,
   Unison) never lower the dry: their trim sits on the wet alone, so Adam's voice stays
   at unity at every AMOUNT (owner 2026-11-01).
 - Version (owner 2026-10-02): the face shows `VERSION.txt` bottom left (started v0.01.00).
@@ -56,4 +56,4 @@ Default layout, slot 1 to 8, each card's knobs as upper pot+lower pot; the amoun
 Octave Semitones (-12..+12, 25 positions, owner 2026-10-08)+Mix ·
 Unison Rate+Depth · Echo (was Slapback, owner 2026-11-01; id `slapback`) Time (60..250 ms)+Amount (level + repeats) · Distortion Tone+Drive · Gate Threshold+Decay ·
 Reverb Time (decay; replaced Dwell, owner 2026-10-07)+Mix: each engine is its own library card, "Spring Reverb" (SPRING B) in the default layout, "Chasm Reverb" available; the old Spring engine is removed (owner 2026-10-08; the engine menu item is gone) · EQ (menu) · Output (menu).
-Library cards that swap in from the menu: Formant (slot 3, with Octave), MOB (slot 4, with Unison), Lo-fi and CHATTER (slot 7, with Gate), Chasm Reverb (slot 8, with Spring).
+Library cards that swap in from the menu: Formant (slot 3, with Octave), Mob (slot 4, with Unison), Lo-fi and Chatter (slot 7, with Gate), Chasm Reverb (slot 8, with Spring).
