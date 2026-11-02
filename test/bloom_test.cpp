@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -42,8 +43,14 @@ bool report(const char* name, bool ok, const char* fmt, double a = 0.0, double b
   return ok;
 }
 
-// A check that needs Adam's clips prints SKIP, never PASS, when samples/ is missing.
+// samples/ is git-ignored, so CI has none. A check that needs Adam's clips prints SKIP, never PASS, when the
+// folder is absent, and FAILS when the folder is there and a clip in it is missing or empty.
 bool skipNoClips(const char* name) {
+  std::error_code ec;
+  if (std::filesystem::is_directory(CUBEVOX_SAMPLES_DIR, ec)) {
+    std::printf("FAIL %s  a clip in samples/ is missing or empty\n", name);
+    return false;
+  }
   std::printf("SKIP %s  samples/ is not in this checkout\n", name);
   return true;
 }
@@ -1607,7 +1614,11 @@ bool testCallSizes() {
     for (size_t i = 0; i < 226000; ++i) sizes = sizes && out[i] == ref[i];
   }
   const std::vector<Signal> clips = loadClips(0);
-  if (clips.empty()) return report("call-sizes", sizes, "calls of 1/7/64/1000 samples agree through a rising key and two knob moves: %.0f (clips skipped)", sizes ? 1.0 : 0.0);
+  if (clips.empty()) {
+    const bool clipsOk = skipNoClips("call-sizes clips");
+    const bool sizesOk = report("call-sizes", sizes, "calls of 1/7/64/1000 samples agree through a rising key and two knob moves: %.0f (clips skipped)", sizes ? 1.0 : 0.0);
+    return sizesOk && clipsOk;
+  }
   Signal all;
   for (const Signal& c : clips) all.insert(all.end(), c.begin(), c.end());
   bool blocks = true;

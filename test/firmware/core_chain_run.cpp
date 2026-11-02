@@ -33,7 +33,8 @@ using Block = std::array<float, kN>;
 // Holds the engines of one chain, built the way the board builds them. It is too big for the stack.
 struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
-  ChainEngines engines{*pitch};
+  std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
+  ChainEngines engines{*pitch, *distortion};
   SlotFades fades;
 };
 

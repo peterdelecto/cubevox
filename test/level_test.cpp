@@ -1,15 +1,19 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
 // (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Chatter rows take every
-// setting from the registry, as the box runs them. The reverb, Formant MIX, Lo-fi, Chatter, Echo and Unison
-// rows run on Adam's clips in samples/ and skip when they are absent: the synthetic program puts its energy
-// where the telephone band cuts and where the reverb loops cut, its noise floor holds the Chatter card's
-// word open, and its steady tone beats against its own echo and chorus copies. No window, no audio device.
+// setting from the registry, as the box runs them. The reverb, Formant MIX, Lo-fi, Chatter, Echo, Unison and
+// Distortion rows run on Adam's clips in samples/: the synthetic program puts its energy where the telephone
+// band cuts and where the reverb loops cut, its noise floor holds the Chatter card's word open, its steady
+// tone beats against its own echo and chorus copies, and it sits 5 to 7 dB louder than the clips, where
+// Distortion's compression reads differently. The clip rows skip when samples/ is absent (it is git-ignored,
+// so CI has none) and fail when the folder is there and a clip in it is missing or empty. No window, no
+// audio device.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iterator>
@@ -265,6 +269,13 @@ Signal readWav(const std::string& path) {
   return {};
 }
 
+// samples/ is wholly git-ignored, so CI has none and the clip rows skip. With the folder there, a clip
+// that is missing or empty fails its row.
+bool samplesFolderPresent() {
+  std::error_code ec;
+  return std::filesystem::is_directory(CUBEVOX_SAMPLES_DIR, ec);
+}
+
 // A stage's input and its output over one padded clip.
 struct Through {
   Signal in;
@@ -287,7 +298,12 @@ bool clipRows(const char* label, const ClipFn& through, double lo, double hi, do
   for (const char* name : names) {
     const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
     if (clip.empty()) {
-      std::printf("SKIP %s %s  samples/ is not in this checkout\n", label, name);
+      if (samplesFolderPresent()) {
+        std::printf("FAIL %s %s  the clip is missing or empty\n", label, name);
+        ok = false;
+      } else {
+        std::printf("SKIP %s %s  samples/ is not in this checkout\n", label, name);
+      }
       continue;
     }
     Signal padded(kPad, 0.0f);
@@ -588,14 +604,22 @@ bool reverbRows(Card card, const char* name) {
 }
 
 // The mean over Adam's clips of a stage's output against its input, in dB, and how many clips ran.
-double clipMean(const ClipFn& through, int& count) {
+// `whole` is false when samples/ is there and a clip in it is missing or empty.
+double clipMean(const ClipFn& through, int& count, bool& whole) {
   constexpr size_t kPad = cv::kSampleRate * 2 / 5;
   const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
   double sum = 0.0;
   count = 0;
+  whole = true;
   for (const char* name : names) {
     const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
-    if (clip.empty()) continue;
+    if (clip.empty()) {
+      if (samplesFolderPresent()) {
+        std::printf("FAIL %s  the clip is missing or empty\n", name);
+        whole = false;
+      }
+      continue;
+    }
     Signal padded(kPad, 0.0f);
     padded.insert(padded.end(), clip.begin(), clip.end());
     const Through t = through(padded);
@@ -611,6 +635,7 @@ bool timeRows(Card card, const char* name) {
   constexpr double kTimeBandDb = 1.0;
   double mean[3] = {0.0, 0.0, 0.0};
   int count = 0;
+  bool whole = true;
   const float times[3] = {0.0f, 0.5f, 1.0f};
   for (int k = 0; k < 3; ++k) {
     ChainParams chain;
@@ -620,7 +645,13 @@ bool timeRows(Card card, const char* name) {
     applyKnob(card, 1, 1.0f, chain);
     cv::ReverbParams p = chain.reverb;
     p.wet = 1.0f;
-    mean[k] = clipMean(reverbThrough(p), count);
+    bool wholeHere = true;
+    mean[k] = clipMean(reverbThrough(p), count, wholeHere);
+    whole = whole && wholeHere;
+  }
+  if (!whole) {
+    std::printf("FAIL reverb %s TIME rows  a clip in samples/ is missing or empty\n", name);
+    return false;
   }
   if (count == 0) {
     std::printf("SKIP reverb %s TIME rows  samples/ is not in this checkout\n", name);
@@ -630,6 +661,63 @@ bool timeRows(Card card, const char* name) {
   const bool ok = lo >= -kTimeBandDb && hi <= kTimeBandDb;
   std::printf("%s reverb %-7s wet only mean at TIME 0 / 50 / 100 %%: %+.2f / %+.2f / %+.2f dB  (ends within %.1f of the middle)\n",
               ok ? "PASS" : "FAIL", name, mean[0], mean[1], mean[2], kTimeBandDb);
+  return ok;
+}
+
+// The Distortion card at DRIVE `drive` and TONE 50 %, as the registry sets it.
+cv::DistortionParams boxDistortion(float drive) {
+  ChainParams chain;
+  applyPlacement(Card::Distortion, chain);
+  applyToggle(Card::Distortion, true, chain);
+  applyKnob(Card::Distortion, 0, 0.5f, chain);
+  applyKnob(Card::Distortion, 1, drive, chain);
+  return chain.distortion;
+}
+
+ClipFn distortionThrough(const cv::DistortionParams& p) {
+  return [p](const Signal& padded) {
+    auto s = std::make_unique<Stage<cv::Distortion>>();
+    return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
+  };
+}
+
+// Distortion compresses, and its makeup follows DRIVE alone, so how loud it comes out depends on the voice:
+// Adam's clips sit 5 to 7 dB under the synthetic program and come out louder. The clips govern. At the
+// default (DRIVE 30 %, TONE 50 %) each clip is held to the mid band and their mean to the rule. The makeup
+// law is fitted so every DRIVE from 10 % to 100 % at TONE 50 % reads within kDriveBandDb of the default's
+// mean. The synthetic program is reported.
+bool distortionRows(const Signal& program) {
+  constexpr double kDriveBandDb = 0.5;
+  const cv::DistortionParams def = boxDistortion(0.3f);
+  double mean = 0.0;
+  int count = 0;
+  bool ok = clipRows("distortion drive .3", distortionThrough(def), kMidLoDb, kMidHiDb, mean, count);
+  if (count > 0) ok &= verdict("distortion drive .3 mean", mean, kLoDb, kHiDb);
+
+  double lo = 0.0, hi = 0.0;
+  bool whole = true;
+  for (int pct = 10; pct <= 100; pct += 10) {
+    bool wholeHere = true;
+    int n = 0;
+    const double m = clipMean(distortionThrough(boxDistortion(static_cast<float>(pct) / 100.0f)), n, wholeHere);
+    whole = whole && wholeHere;
+    if (n == 0) continue;
+    lo = std::fmin(lo, m - mean);
+    hi = std::fmax(hi, m - mean);
+  }
+  if (!whole) {
+    std::printf("FAIL distortion DRIVE spread  a clip in samples/ is missing or empty\n");
+    ok = false;
+  } else if (count > 0) {
+    const bool inBand = lo >= -kDriveBandDb && hi <= kDriveBandDb;
+    std::printf("%s distortion DRIVE 10..100 %% mean vs the default: %+.2f..%+.2f dB  (within %.1f)\n",
+                inBand ? "PASS" : "FAIL", lo, hi, kDriveBandDb);
+    ok &= inBand;
+  }
+
+  auto s = std::make_unique<Stage<cv::Distortion>>();
+  const double programDb = gainDb(program, run(program, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, def); }));
+  std::printf("NOTE %-30s %+6.2f dB  (the synthetic program, not held to the rule)\n", "distortion drive .3 program", programDb);
   return ok;
 }
 
@@ -656,11 +744,7 @@ bool slotRows(const Signal& in) {
 
   ok &= echoRows();
 
-  cv::DistortionParams dist;
-  dist.on = true;
-  dist.drive = 0.3f;
-  dist.tone = 0.5f;
-  ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
+  ok &= distortionRows(in);
 
   ok &= reverbRows(Card::ReverbChasm, "chasm");
   ok &= reverbRows(Card::ReverbSpring, "spring");

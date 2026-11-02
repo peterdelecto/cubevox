@@ -31,8 +31,10 @@ void checkDefaultLayout() {
     // Autotune's row is the board's pair figure scaled by the host benches of the CPU pass and the
     // Autotune fix pass, with one extra worst point from the stress run, so it stays an estimate until
     // a board bench of the pair. Octave's row is the host bench of its rewrite; the stress run reads it
-    // only together with the pitch stage.
-    check(d.cost.measured || layout.card[s] == Card::Autotune || layout.card[s] == Card::Octave,
+    // only together with the pitch stage. Distortion's row is the llvm-mca model of its stage-major
+    // rewrite until a stress run with the Distortion sweeps reads it on the board.
+    check(d.cost.measured || layout.card[s] == Card::Autotune || layout.card[s] == Card::Octave ||
+              layout.card[s] == Card::Distortion,
           "a default layout card's cost comes from the board");
   }
   const LayoutCost sums = layoutCost(layout);
