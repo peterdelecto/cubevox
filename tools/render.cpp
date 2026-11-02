@@ -68,8 +68,8 @@ int usage() {
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
-               "       [--reverb spring|springb|chasm] [--decay <0..1>] [--dwell <0..1>]\n"
-               "       [--tension <0..1>, alias of --decay] [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
+               "       [--reverb spring|chasm] [--decay <0..1>] [--dwell <0..1>, CHASM]\n"
+               "       [--wobble <0..1>, CHASM] [--rmix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
@@ -99,7 +99,7 @@ int usage() {
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
                "     topFrom topSwingGain topWetDb\n"
                "     octGrainWindowMs (20..80) octTrimDb (-24..24) eqTrimDb\n"
-               "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
+               "     slapTimeMs (60..250) slapLowpassHz (500..12000) slapFeedback (0..0.5) slapWetMaxDb slapTrimDb (-24..24)\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distTopBoostDb\n"
                "     distTopBoostFrom distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
@@ -111,9 +111,11 @@ int usage() {
                "chmBassCutHz\n"
                "     chmBassCutHzTop chmWobbleDepthMax chmWobbleRateLo chmWobbleRateHi chmInputTrim\n"
                "     chmWobbleLevelDb chmDwellDrive chmDwellComp chmWetDb\n"
-               "     sbSpringMs1 sbSpringMs2 sbSpringMs3 sbTimeLo sbTimeHi sbDiffuse sbChirpSections (0..32)\n"
-               "     sbChirpA sbChirpSign (1 sweeps up, -1 sweeps down) sbTrebleLossHz sbBassCutHz sbReturnLpHz\n"
-               "     sbWobbleDepth sbWobbleRateHz sbInputTrim sbDwellDrive sbDwellComp sbWetDb\n"
+               "     springMs1 (10..37.3) springMs2 (10..45.3) springMs3 (10..56.3) springFeedbackLo springFeedbackHi (0.1..0.97) springDiffuse (0..0.9)\n"
+               "     springChirpSections (0..32) springChirpA (0..0.95) springTrebleLossHz springBassCutHz\n"
+               "     springReturnLpHz (20..21600) springWobbleDepth (0..32) springWobbleRateHz (0..10)\n"
+               "     springDwell (0..1) springDwellDrive (1..64) springDwellComp (0..2)\n"
+               "     springWetDb (-24..24) springRestLevel (0..0.001, a silent input rests the springs below this; 0 never)\n"
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb (-24..24) atGrainDelay fmTrimDb (-24..24, added to every entry of the SHIFT trim table)\n"
@@ -123,7 +125,7 @@ int usage() {
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
-               "  every value must be finite, and a crowd key outside its range is refused\n"
+               "  every value must be finite, and a crowd or spring key outside its range is refused\n"
                "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
@@ -134,7 +136,7 @@ int usage() {
                "     lofiHoldOverBand (floor on the held rate in low-pass corners, 0 = none)\n"
                "     lofiMakeup<tone 0..4>_<amount 0..10> (dB, the makeup table by TONE 0, 25 ... 100 %% and AMOUNT 0, 10 ... 100 %%)\n"
                "  a lofi key outside its range is refused\n"
-               "  --decay and --dwell apply to the selected reverb engine\n");
+               "  --decay applies to the selected reverb engine; Spring's dwell is the springDwell key\n");
   return 2;
 }
 
@@ -233,12 +235,39 @@ bool lofiTuningInRange(const cv::LofiTuning& t) {
          inside(t.trimDb, -24.0f, 24.0f);
 }
 
+// Every Echo key refuses a value outside the range the engine clamps to.
+bool slapbackTuningInRange(const cv::SlapbackTuning& t) {
+  using Echo = cv::Slapback;
+  return inside(t.timeMs, Echo::kTimeMinMs, Echo::kTimeMaxMs) &&
+         inside(t.lowpassHz, Echo::kCutoffMinHz, Echo::kCutoffMaxHz) && inside(t.feedback, 0.0f, Echo::kFeedbackMax) &&
+         inside(t.wetMaxDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb) &&
+         inside(t.trimDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb);
+}
+
+// Every Spring key refuses a value outside the range the engine takes, so a typo in a key does not
+// pass for a setting.
+bool springTuningInRange(const cv::SpringTuning& t) {
+  namespace sd = cv::spring_detail;
+  constexpr float kMinMs = 10.0f;
+  return inside(t.springMs1, kMinMs, sd::kMaxMs1) && inside(t.springMs2, kMinMs, sd::kMaxMs2) &&
+         inside(t.springMs3, kMinMs, sd::kMaxMs3) &&
+         inside(t.feedbackLo, sd::kFeedbackMin, sd::kFeedbackMax) &&
+         inside(t.feedbackHi, sd::kFeedbackMin, sd::kFeedbackMax) && inside(t.diffuse, 0.0f, 0.9f) &&
+         inside(t.chirpA, 0.0f, 0.95f) && inside(t.trebleLossHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(t.bassCutHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
+         inside(t.returnLpHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.wobbleDepth, 0.0f, sd::kMaxWobble) &&
+         inside(t.wobbleRateHz, 0.0f, sd::kMaxWobbleHz) && inside(t.dwell, 0.0f, 1.0f) &&
+         inside(t.dwellDrive, 1.0f, sd::kMaxDwellDrive) && inside(t.dwellComp, 0.0f, sd::kMaxDwellComp) &&
+         inside(t.wetDb, -sd::kMaxWetDb, sd::kMaxWetDb) &&
+         inside(t.restLevel, 0.0f, 1.0e-3f);
+}
+
 bool applyTuning(RenderParams& rp, const char* kv) {
   cv::UnisonTuning& t = rp.unison.tuning;
   cv::SlapbackTuning& st = rp.slapback.tuning;
   cv::DistortionTuning& dt = rp.distortion.tuning;
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
-  cv::SpringTuning& sb = rp.reverb.spring.tuning;
+  cv::SpringTuning& spr = rp.reverb.spring.tuning;
   cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
   cv::FormantTuning& ft = rp.pitchFx.formant.tuning;
@@ -248,7 +277,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::GateTuning& gt = rp.gate.tuning;
   cv::LofiTuning& lt = rp.lofi.tuning;
   cv::BloomTuning& bt = rp.bloom.tuning;
-  float sbSections = static_cast<float>(sb.chirpSections);
+  float springSections = static_cast<float>(spr.chirpSections);
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -302,16 +331,17 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"chmInputTrim", &ch.inputTrim},        {"chmWobbleLevelDb", &ch.wobbleLevelDb},
       {"chmDwellDrive", &ch.dwellDrive}, {"chmDwellComp", &ch.dwellComp},
       {"chmWetDb", &ch.wetDb},
-      {"sbSpringMs1", &sb.springMs1},         {"sbSpringMs2", &sb.springMs2},
-      {"sbSpringMs3", &sb.springMs3},
-      {"sbTimeLo", &sb.timeLo},               {"sbTimeHi", &sb.timeHi},
-      {"sbDiffuse", &sb.diffuse},             {"sbChirpSections", &sbSections},
-      {"sbChirpA", &sb.chirpA},               {"sbChirpSign", &sb.chirpSign},
-      {"sbTrebleLossHz", &sb.trebleLossHz},   {"sbBassCutHz", &sb.bassCutHz},
-      {"sbReturnLpHz", &sb.returnLpHz},       {"sbWobbleDepth", &sb.wobbleDepth},
-      {"sbWobbleRateHz", &sb.wobbleRateHz},   {"sbInputTrim", &sb.inputTrim},
-      {"sbDwellDrive", &sb.dwellDrive},       {"sbDwellComp", &sb.dwellComp},
-      {"sbWetDb", &sb.wetDb},
+      {"springMs1", &spr.springMs1},          {"springMs2", &spr.springMs2},
+      {"springMs3", &spr.springMs3},
+      {"springFeedbackLo", &spr.feedbackLo},  {"springFeedbackHi", &spr.feedbackHi},
+      {"springDiffuse", &spr.diffuse},        {"springChirpSections", &springSections},
+      {"springChirpA", &spr.chirpA},
+      {"springTrebleLossHz", &spr.trebleLossHz}, {"springBassCutHz", &spr.bassCutHz},
+      {"springReturnLpHz", &spr.returnLpHz},  {"springWobbleDepth", &spr.wobbleDepth},
+      {"springWobbleRateHz", &spr.wobbleRateHz},
+      {"springDwell", &spr.dwell},
+      {"springDwellDrive", &spr.dwellDrive},  {"springDwellComp", &spr.dwellComp},
+      {"springWetDb", &spr.wetDb},            {"springRestLevel", &spr.restLevel},
       {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqTrimDb", &et.trimDb},
       {"eqEssBandLoHz", &et.deEsser.bandLoHz}, {"eqEssBandHiHz", &et.deEsser.bandHiHz},
       {"eqEssThresholdDb", &et.deEsser.thresholdDb}, {"eqEssMaxCutDb", &et.deEsser.maxCutDb},
@@ -355,10 +385,10 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   for (const TuningField& f : fields) {
     if (std::strlen(f.name) != keyLen || std::strncmp(f.name, kv, keyLen) != 0) continue;
     if (!parseFloat(eq + 1, f.value)) return false;
-    if (sbSections < 0.0f || sbSections > static_cast<float>(cv::spring_detail::kMaxSections) ||
-        sbSections != std::floor(sbSections))
+    if (springSections < 0.0f || springSections > static_cast<float>(cv::spring_detail::kMaxSections) ||
+        springSections != std::floor(springSections))
       return false;
-    if (sb.chirpSign != 1.0f && sb.chirpSign != -1.0f) return false;
+    if (!springTuningInRange(spr)) return false;
     if (!inside(ot.trimDb, -24.0f, 24.0f) ||
         !inside(ot.grainWindowMs, cv::OctaveVoice::kMinWindowMs, cv::OctaveVoice::kMaxWindowMs) ||
         !inside(at.trimDb, -24.0f, 24.0f) || !inside(ft.offsetDb, -24.0f, 24.0f))
@@ -367,7 +397,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
         !inside(bt.driveWord, 0.1f, 20.0f) || !inside(bt.driveBell, 0.0f, 20.0f) || !inside(bt.drift, 0.0f, 0.2f))
       return false;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
-    sb.chirpSections = static_cast<int>(sbSections);
+    if (!slapbackTuningInRange(st)) return false;
+    spr.chirpSections = static_cast<int>(springSections);
     return true;
   }
   return false;
@@ -391,9 +422,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   bool haveGate = false;
   bool haveBloom = false;
   bool haveDecay = false;
-  bool haveDwell = false;
   float decay = 0.0f;
-  float dwell = 0.0f;
   int positional = 0;
   for (int i = 1; i < argc; ++i) {
     const char* a = argv[i];
@@ -409,7 +438,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOn = true;
     } else if (std::strcmp(a, "--slap") == 0 && i + 1 < argc) {
       cv::SlapbackParams& sp = rp.slapback;
-      if (!parseFloat(argv[++i], &sp.mix) || sp.mix < 0.0f || sp.mix > 1.0f) return false;
+      if (!parseFloat(argv[++i], &sp.amount) || sp.amount < 0.0f || sp.amount > 1.0f) return false;
       haveSlap = true;
     } else if (std::strcmp(a, "--drive") == 0 && i + 1 < argc) {
       cv::DistortionParams& dp = rp.distortion;
@@ -461,21 +490,20 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       const char* v = argv[++i];
       if (std::strcmp(v, "chasm") == 0)
         rp.reverb.engine = cv::kReverbChasm;
-      else if (std::strcmp(v, "spring") == 0 || std::strcmp(v, "springb") == 0)
+      else if (std::strcmp(v, "spring") == 0)
         rp.reverb.engine = cv::kReverbSpring;
       else
         return false;
       haveReverb = true;
-    } else if ((std::strcmp(a, "--decay") == 0 || std::strcmp(a, "--tension") == 0) &&
-               i + 1 < argc) {
+    } else if (std::strcmp(a, "--decay") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &decay) || decay < 0.0f || decay > 1.0f) return false;
       haveDecay = true;
     } else if (std::strcmp(a, "--wobble") == 0 && i + 1 < argc) {
       cv::ChasmParams& c = rp.reverb.chasm;
       if (!parseFloat(argv[++i], &c.wobble) || c.wobble < 0.0f || c.wobble > 1.0f) return false;
     } else if (std::strcmp(a, "--dwell") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &dwell) || dwell < 0.0f || dwell > 1.0f) return false;
-      haveDwell = true;
+      cv::ChasmParams& c = rp.reverb.chasm;
+      if (!parseFloat(argv[++i], &c.dwell) || c.dwell < 0.0f || c.dwell > 1.0f) return false;
     } else if (std::strcmp(a, "--autotune") == 0) {
       ap.on = true;
     } else if (std::strcmp(a, "--atkey") == 0 && i + 1 < argc) {
@@ -529,14 +557,10 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     }
   }
   if (positional != 2) return false;
-  // --decay and --dwell set whichever engine is selected.
+  // --decay sets whichever engine is selected.
   if (haveDecay) {
     float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.decay : rp.reverb.spring.decay;
     d = decay;
-  }
-  if (haveDwell) {
-    float& d = rp.reverb.engine == cv::kReverbChasm ? rp.reverb.chasm.dwell : rp.reverb.spring.dwell;
-    d = dwell;
   }
   // Each pitch stage runs only when asked for. The Crowd card reads the pitch stage's ring and tracker,
   // so it turns the stage on and tells it to keep them running, as the registry's toggle does.

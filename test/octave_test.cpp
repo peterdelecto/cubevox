@@ -4,41 +4,15 @@
 // device.
 
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <new>
 #include <vector>
 
 #include "engine/pitch_fx.h"
 
-namespace {
-
-std::atomic<bool> gInProcess{false};
-
-void guardAlloc() {
-  if (gInProcess.load()) std::abort();
-}
-
-}  // namespace
-
-// Allocation in process() aborts the test binary.
-void* operator new(std::size_t n) {
-  guardAlloc();
-  void* p = std::malloc(n);
-  if (!p) std::abort();
-  return p;
-}
-void* operator new[](std::size_t n) { return operator new(n); }
-void operator delete(void* p) noexcept {
-  guardAlloc();
-  std::free(p);
-}
-void operator delete[](void* p) noexcept { operator delete(p); }
-void operator delete(void* p, std::size_t) noexcept { operator delete(p); }
-void operator delete[](void* p, std::size_t) noexcept { operator delete(p); }
+#include "alloc_guard.h"
 
 namespace {
 

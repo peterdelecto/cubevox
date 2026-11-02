@@ -12,8 +12,11 @@
   hold every knob step and toggle to steady-state curvature.
 - `process()` takes any `n`. An engine with kBlock-sized scratch (Reverb) runs the call in
   kBlock chunks.
-- Shared pieces live in `engine/dsp.h` (Biquad and its RBJ setters, OnePole, `catmullRom`,
-  `wrapOnce`, `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, and `blockCoef` for a one-pole stepped once per block).
+- Shared pieces live in `engine/common.h` (`kSampleRate`, `kBlock`, `kSmpPerMs`), `engine/dsp.h` (Biquad and its RBJ
+  setters, OnePole, `catmullRom`, `wrapOnce`, `readRing` and `readRingClamped` for a delay line that may leave
+  [2, Len - 3], `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, `blockCoef` for a
+  one-pole stepped once per block, and `advance` for n steps of one smoother or of two that share a coefficient).
+  The two reverbs share `engine/reverb_parts.h` (Allpass, Delay, the wobble LFO's sine table and phase step).
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
 - `PitchFx` lives in DTCM: about 76,600 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the

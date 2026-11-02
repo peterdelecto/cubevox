@@ -1,8 +1,9 @@
 // Level rule: every stage at its default engaged setting lands 0 to +0.5 dB
 // (out/in RMS) on vocal-like program material. The reverb, Formant, Lo-fi and Chatter rows take every
-// setting from the registry, as the box runs them. The Formant MIX, Lo-fi and Chatter rows run on Adam's
-// clips in samples/ and skip when they are absent: the synthetic program puts its energy where the telephone
-// band cuts, and its noise floor holds the Chatter card's word open. No window, no audio device.
+// setting from the registry, as the box runs them. The Spring, Formant MIX, Lo-fi, Chatter, Echo and Unison
+// rows run on Adam's clips in samples/ and skip when they are absent: the synthetic program puts its energy
+// where the telephone band cuts and where the Spring loops cut, its noise floor holds the Chatter card's
+// word open, and its steady tone beats against its own echo and chorus copies. No window, no audio device.
 
 #include <algorithm>
 #include <cmath>
@@ -155,20 +156,6 @@ bool simple(const char* name, const Signal& in, const P& p) {
   return check(name, in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); });
 }
 
-// The program's steady tone adds to its own echo or cancels it depending on
-// TIME, so one time is a coin flip. The mean over the knob's range is the power sum.
-bool slapbackRow(const char* name, const Signal& in, cv::SlapbackParams p) {
-  double sum = 0.0;
-  int count = 0;
-  for (float ms = 60.0f; ms <= 250.0f; ms += 10.0f) {
-    p.tuning.timeMs = ms;
-    auto s = std::make_unique<Stage<cv::Slapback>>();
-    sum += gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); }));
-    ++count;
-  }
-  return verdict(name, sum / count);
-}
-
 // The Input gate as the box sets it, both pots at mid travel (-55 dBFS, 200 ms).
 cv::GateParams inputGate() {
   ChainParams chain;
@@ -289,8 +276,9 @@ using ClipFn = std::function<Through(const Signal& padded)>;
 // ahead of a clip lets an enable fade settle and the stage's engines start clear, and the RMS runs over
 // the clip alone, the stage's output against its own input. Each clip is a row held to [lo, hi].
 // Returns false when a row fails; `mean` takes the mean of the rows that ran, in dB, and `count` how
-// many ran (0 when samples/ is absent, which skips).
-bool clipRows(const char* label, const ClipFn& through, double lo, double hi, double& mean, int& count) {
+// many ran (0 when samples/ is absent, which skips). A row that is not judged prints as a NOTE.
+bool clipRows(const char* label, const ClipFn& through, double lo, double hi, double& mean, int& count,
+              bool judged = true) {
   constexpr size_t kPad = cv::kSampleRate * 2 / 5;
   const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
   bool ok = true;
@@ -306,7 +294,11 @@ bool clipRows(const char* label, const ClipFn& through, double lo, double hi, do
     padded.insert(padded.end(), clip.begin(), clip.end());
     const Through t = through(padded);
     const double db = 20.0 * std::log10(rmsRange(t.out, kPad, t.out.size()) / rmsRange(t.in, kPad, t.in.size()));
-    ok &= verdict((std::string(label) + " " + name).c_str(), db, lo, hi);
+    if (judged) {
+      ok &= verdict((std::string(label) + " " + name).c_str(), db, lo, hi);
+    } else {
+      std::printf("NOTE %-30s %+6.2f dB\n", (std::string(label) + " " + name).c_str(), db);
+    }
     sum += db;
     ++count;
   }
@@ -409,6 +401,64 @@ bool octaveRows() {
   return ok;
 }
 
+// Echo and Unison add their wet on top of the dry voice, which passes at unity at every Amount, so
+// the level is the dry plus whatever the wet adds. Each card has a reference setting, where its
+// trim is tuned and its mean over Adam's clips is held to the rule's band, and a 100 % row, which
+// is reported beside it and not judged: the wet at full Amount is a few dB over the dry, and the
+// trim cannot bring both settings into the band without turning the knob over.
+//
+// An echo adds to its dry voice or cancels it depending on TIME, so an Echo clip row is the power
+// sum over the knob's range, 60 to 250 ms in 10 ms steps, with a fresh engine at each step.
+Through echoThrough(const Signal& padded, float amount) {
+  Through t;
+  for (float ms = cv::Slapback::kTimeMinMs; ms <= cv::Slapback::kTimeMaxMs; ms += 10.0f) {
+    cv::SlapbackParams p;
+    p.amount = amount;
+    p.tuning.timeMs = ms;
+    auto s = std::make_unique<Stage<cv::Slapback>>();
+    const Signal out = run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); });
+    t.in.insert(t.in.end(), padded.begin(), padded.end());
+    t.out.insert(t.out.end(), out.begin(), out.end());
+  }
+  return t;
+}
+
+Through unisonThrough(const Signal& padded, float depth) {
+  cv::UnisonParams p;
+  p.on = true;
+  p.depth = depth;
+  auto s = std::make_unique<Stage<cv::Unison>>();
+  return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
+}
+
+// One card's reference row (judged on the mean, each clip held to the mid band) and its 100 % row.
+bool wetOnDryRows(const char* card, const char* reference, const ClipFn& atReference, const ClipFn& atFull) {
+  double mean = 0.0;
+  int count = 0;
+  bool ok = clipRows((std::string(card) + " " + reference).c_str(), atReference, kMidLoDb, kMidHiDb, mean, count);
+  if (count > 0) ok &= verdict((std::string(card) + " " + reference + " mean").c_str(), mean, kLoDb, kHiDb);
+  clipRows((std::string(card) + " 100 %").c_str(), atFull, kMidLoDb, kMidHiDb, mean, count, false);
+  if (count > 0) {
+    std::printf("NOTE %-30s %+6.2f dB  (rule %+.1f..%+.1f, not judged)\n", (std::string(card) + " 100 % mean").c_str(),
+                mean, kLoDb, kHiDb);
+  }
+  return ok;
+}
+
+// Echo at Amount 25 %, where the repeats are tuned and the emulator starts.
+bool echoRows() {
+  return wetOnDryRows(
+      "echo", "25 %", [](const Signal& padded) { return echoThrough(padded, 0.25f); },
+      [](const Signal& padded) { return echoThrough(padded, 1.0f); });
+}
+
+// Unison at DEPTH 50 %, Adam's default.
+bool unisonRows() {
+  return wetOnDryRows(
+      "unison", "50 %", [](const Signal& padded) { return unisonThrough(padded, 0.5f); },
+      [](const Signal& padded) { return unisonThrough(padded, 1.0f); });
+}
+
 // The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips. The synthetic program
 // puts its energy where the telephone band cuts and reads -2.1 dB. The three clips differ by 1.14 dB
 // under one gain, so no trim puts all three inside 0 to +0.5 dB: each clip is held to the mid band, and
@@ -473,6 +523,28 @@ bool bloomRows() {
   return ok;
 }
 
+// The Spring card at the registry's TIME on Adam's clips, once with the wet path alone and once at
+// MIX 50 %. The synthetic program puts its energy where the loops cut, below 200 Hz and above 5 kHz,
+// so it reads the card differently from a voice. The clips spread by 0.66 dB under one gain, so no
+// trim puts all three inside 0 to +0.5 dB. Each clip is held to the mid band, and the mean of the
+// three on the wet path alone is held to the rule.
+bool springRows() {
+  const auto through = [](const cv::ReverbParams& p) {
+    return ClipFn([&p](const Signal& padded) {
+      auto s = std::make_unique<Stage<cv::Reverb>>();
+      return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
+    });
+  };
+  double mean = 0.0;
+  int count = 0;
+  bool ok = clipRows("reverb spring wet only", through(boxReverbWetOnly(Card::ReverbSpring)), kMidLoDb, kMidHiDb, mean,
+                     count);
+  if (count > 0) ok &= verdict("reverb spring wet only mean", mean);
+  ok &= clipRows("reverb spring MIX 50 %", through(boxReverb(Card::ReverbSpring, 0.5f)), kMidLoDb, kMidHiDb, mean,
+                 count);
+  return ok;
+}
+
 // The slot stages at their default engaged settings.
 bool slotRows(const Signal& in) {
   bool ok = true;
@@ -487,19 +559,13 @@ bool slotRows(const Signal& in) {
 
   ok &= octaveRows();
 
-  cv::UnisonParams unison;
-  unison.on = true;
-  unison.depth = 0.5f;  // Adam default
-  ok &= simple<cv::Unison>("unison depth .5", in, unison);
+  ok &= unisonRows();
   ok &= crowdRows();
   ok &= formantRows(in);
   ok &= lofiRows();
   ok &= bloomRows();
 
-  cv::SlapbackParams slap;
-  slap.on = true;
-  slap.mix = 0.5f;
-  ok &= slapbackRow("slapback .5 mean TIME", in, slap);
+  ok &= echoRows();
 
   cv::DistortionParams dist;
   dist.on = true;
@@ -508,9 +574,8 @@ bool slotRows(const Signal& in) {
   ok &= simple<cv::Distortion>("distortion drive .3", in, dist);
 
   ok &= simple<cv::Reverb>("reverb chasm wet only", in, boxReverbWetOnly(Card::ReverbChasm));
-  ok &= simple<cv::Reverb>("reverb spring wet only", in, boxReverbWetOnly(Card::ReverbSpring));
   ok &= midRow<cv::Reverb>("reverb chasm MIX 50 %", in, boxReverb(Card::ReverbChasm, 0.5f));
-  ok &= midRow<cv::Reverb>("reverb spring MIX 50 %", in, boxReverb(Card::ReverbSpring, 0.5f));
+  ok &= springRows();
   return ok;
 }
 

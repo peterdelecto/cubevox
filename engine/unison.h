@@ -13,7 +13,8 @@
 // (chorus). DEPTH scales the swing and the wet level together. Over the top of
 // the knob, from topFrom to DEPTH 1, the swing grows by up to topSwingGain and
 // the wet level by up to topWetDb. A RATE move changes the tuning's swing; the
-// swing glides to it with the depth smoother, so the taps never jump.
+// swing glides to it with the depth smoother, so the taps never jump. The dry
+// voice passes at unity at every DEPTH, and the trim scales the wet copies alone.
 
 namespace cv {
 
@@ -23,9 +24,9 @@ struct UnisonTuning {
   std::array<float, 2> lfoHz = {0.20f, 0.30f};
   float swingMinMs = 1.0f;  // modulation swing (peak) at DEPTH 0
   float swingMaxMs = 6.0f;  // modulation swing (peak) at DEPTH 1
-  float wetMaxDb = -4.0f;   // per-voice level at DEPTH 1
-  // Whole-output gain (dry + wet) at DEPTH 1, scaled by depth in dB; level rule at DEPTH 0.5.
-  float trimDb = -1.4f;
+  float wetMaxDb = -4.0f;   // per-voice level at DEPTH 1, before the trim
+  // Gain on the wet copies alone, so the dry stays at unity; the level row at DEPTH 50 % sets it.
+  float trimDb = -0.7f;
   // Top of the knob (owner 2026-10-30). Both terms are exactly neutral up to topFrom.
   float topFrom = 0.6f;         // DEPTH where the extra reach starts
   float topSwingGain = 1.333f;  // swing multiplier at DEPTH 1, ramped linearly from topFrom
@@ -69,22 +70,17 @@ class Unison {
       return;
     }
 
-    // Depth and swing step per sample; trim and wet gain depend on depth alone, so everything is
+    // Depth and swing step per sample; the wet gain depends on depth alone, so everything is
     // evaluated at the block edges and interpolated between.
     Ramp r;
     r.depth0 = depth_;
     r.swing0 = swingSmp_;
+    const float swingTarget = swingAt(t, target);
     float depthEnd = depth_;
     float swingEnd = swingSmp_;
-    const float swingTarget = swingAt(t, target);
-    for (int i = 0; i < n; ++i) {
-      depthEnd = smooth::step(depthEnd, target, smooth::kSmoothCoef);
-      swingEnd = smooth::step(swingEnd, swingTarget, smooth::kSmoothCoef);
-    }
+    smooth::advance(depthEnd, target, swingEnd, swingTarget, smooth::kSmoothCoef, n);
     r.depth1 = depthEnd;
     r.swing1 = swingEnd;
-    r.trim0 = powf(10.0f, t.trimDb * r.depth0 / 20.0f);
-    r.trim1 = powf(10.0f, t.trimDb * r.depth1 / 20.0f);
     r.wetTop0 = powf(10.0f, t.topWetDb * topOver(t, r.depth0) / 20.0f);
     r.wetTop1 = powf(10.0f, t.topWetDb * topOver(t, r.depth1) / 20.0f);
     render(in, out, n, t, r);
@@ -95,7 +91,6 @@ class Unison {
  private:
   static constexpr int kDelayMs = 80;
   static constexpr int kLen = kDelayMs * kSampleRate / 1000;
-  static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
   static constexpr float kLfoMaxHz = 20.0f;
   static constexpr float kTurn = 4294967296.0f;
   static constexpr float kClampMargin = 0.01f;
@@ -105,7 +100,6 @@ class Unison {
   struct Ramp {
     float depth0 = 0.0f, depth1 = 0.0f;
     float swing0 = 0.0f, swing1 = 0.0f;
-    float trim0 = 1.0f, trim1 = 1.0f;
     float wetTop0 = 1.0f, wetTop1 = 1.0f;
   };
 
@@ -151,9 +145,9 @@ class Unison {
       const float base = t.baseDelayMs[v] * kSmpPerMs;
       inside = inside && base - swingMax >= kLo && base + swingMax <= kHi;
     }
-    const float wetMax = powf(10.0f, t.wetMaxDb / 20.0f);
-    const auto unclamped = [](const float* l, int w, float d) { return readCubicUnclamped(l, w, d); };
-    const auto clamped = [](const float* l, int w, float d) { return readCubic(l, w, d); };
+    const float wetMax = powf(10.0f, (t.wetMaxDb + t.trimDb) / 20.0f);
+    const auto unclamped = [](const float* l, int w, float d) { return readRing<kLen>(l, w, d); };
+    const auto clamped = [](const float* l, int w, float d) { return readRingClamped<kLen>(l, w, d); };
     if (inside) {
       renderWith(in, out, n, t, r, wetMax, unclamped);
     } else {
@@ -161,7 +155,8 @@ class Unison {
     }
   }
 
-  // The per-sample loop, with the swing, wet gain and trim ramped linearly across the block.
+  // The per-sample loop, with the swing and wet gain ramped linearly across the block. wetMax holds
+  // the per-voice level and the trim.
   template <class Read>
   void renderWith(const float* in, float* out, int n, const UnisonTuning& t, const Ramp& r,
                   float wetMax, const Read& read) {
@@ -184,22 +179,13 @@ class Unison {
       const float s1 = read(line, wp, base1 + swing * sinTurns(lfo1));
       lfo0 += lfoInc_[0];
       lfo1 += lfoInc_[1];
-      out[i] = (in[i] + wetGain * (s0 * en0 + s1 * en1)) * (r.trim0 + (r.trim1 - r.trim0) * f);
+      out[i] = in[i] + wetGain * (s0 * en0 + s1 * en1);
       wp = wp + 1 == kLen ? 0 : wp + 1;
     }
     writePos_ = wp;
     lfoPhase_[0] = lfo0;
     lfoPhase_[1] = lfo1;
   }
-
-  // Catmull-Rom through four taps. Delay is clamped so the newest tap
-  // never crosses the write head and the oldest never wraps onto it.
-  static CV_INLINE float readCubic(const float* line, int wp, float delay) {
-    return readRing<kLen>(line, wp, clampf(delay, 2.0f, kLen - 3.0f));
-  }
-
-  // readCubic for a delay already inside [2, kLen - 3].
-  static CV_INLINE float readCubicUnclamped(const float* line, int wp, float d) { return readRing<kLen>(line, wp, d); }
 
   // Both voices read the same input, so one delay line serves both.
   std::array<float, kLen> line_{};

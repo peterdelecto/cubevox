@@ -6,6 +6,7 @@
 
 #include "engine/common.h"
 #include "engine/dsp.h"
+#include "engine/reverb_parts.h"
 #include "engine/smooth.h"
 
 // CHASM reverb: one diffuse allpass feedback loop with a downward chirp on its
@@ -82,52 +83,9 @@ constexpr std::array<float, 4> kChirpK = {-0.7f, -0.65f, -0.6f, -0.5f};
 
 // Read heads advance by at most this much, so they stay inside the shorter line.
 constexpr float kWobbleCap = static_cast<float>(kDly2 / 2);
-constexpr float kPhasePerHz = 4294967296.0f / static_cast<float>(kSampleRate);
 
-// Schroeder allpass, out = buf + k*in, buf = in - k*out.
-template <int N>
-struct Allpass {
-  std::array<float, N> buf{};
-  int pos = 0;
-
-  float run(float in) {
-    const float out = buf[static_cast<size_t>(pos)] + kLoopK * in;
-    buf[static_cast<size_t>(pos)] = in - kLoopK * out;
-    if (++pos >= N) pos = 0;
-    return out;
-  }
-
-  void clear() {
-    buf.fill(0.0f);
-    pos = 0;
-  }
-};
-
-// Loop delay. read(adv) shortens the line by adv samples, interpolated.
-template <int N>
-struct Delay {
-  std::array<float, N> buf{};
-  int pos = 0;
-
-  float read(float adv) const {
-    const int whole = static_cast<int>(adv);
-    const float fr = adv - static_cast<float>(whole);
-    int a = pos + whole;
-    if (a >= N) a -= N;
-    const int b = a + 1 >= N ? 0 : a + 1;
-    return buf[static_cast<size_t>(a)] * (1.0f - fr) + buf[static_cast<size_t>(b)] * fr;
-  }
-
-  void write(float x) {
-    buf[static_cast<size_t>(pos)] = x;
-    if (++pos >= N) pos = 0;
-  }
-
-  void clear() {
-    buf.fill(0.0f);
-    pos = 0;
-  }
-};
+using reverb_parts::Allpass;
+using reverb_parts::Delay;
 
 // kChirpDepth allpass units of length L in series, cycling the four coefficients.
 template <int L>
@@ -157,11 +115,7 @@ struct ChirpStage {
 
 class Chasm {
  public:
-  Chasm() {
-    for (int i = 0; i < 257; ++i)
-      sine_[static_cast<size_t>(i)] = sinf(static_cast<float>(i) * (kTwoPi / 256.0f));
-    reset();
-  }
+  Chasm() { reset(); }
 
   void reset() {
     a1a_.clear();
@@ -184,7 +138,7 @@ class Chasm {
     valid_ = false;
   }
 
-  // Wet only; the caller mixes. n <= kBlock.
+  // Wet only; the caller mixes.
   void process(const float* in, float* wet, int n, const ChasmParams& p) {
     const ChasmTuning& t = p.tuning;
     const float decayTarget = smooth::clamp01(p.decay);
@@ -215,7 +169,7 @@ class Chasm {
       const float f = static_cast<float>(i + 1) * inv;
       const float drive = drive0 + (drive1 - drive0) * f;
       const float comp = comp0 + (comp1 - comp0) * f;
-      wet[i] = tick(softClipHeadroom(in[i] * drive, kChasmClipHeadroom) * comp, b);
+      wet[i] = tick(softClipHeadroom(in[i] * drive, kReverbClipHeadroom) * comp, b);
     }
     dwell_ = dwellEnd;
   }
@@ -253,20 +207,21 @@ class Chasm {
 
   // One sample of the loop for the clipped, level-compensated input x.
   float tick(float x, const Block& b) {
+    using chasm_detail::kLoopK;
     const float time = b.timeLo + decay_ * (b.timeHi - b.timeLo);
     const float depth = wobble_ * wobble_ * b.depthMax;
-    lfoAcc_ += static_cast<uint32_t>((b.rateLo + wobble_ * b.rateSpan) * chasm_detail::kPhasePerHz);
+    lfoAcc_ += static_cast<uint32_t>((b.rateLo + wobble_ * b.rateSpan) * reverb_parts::kPhasePerHz);
     inputGain_ += (gainFor(time) - inputGain_) * 0.25f;
     const float feed = shelf(x * b.trim * inputGain_, lpIn_, b.lpF, b.inCut);
 
-    float acc = dly1_.read(lfo(0u) * depth) * time;
+    float acc = dly1_.read(reverb_parts::lfo(lfoAcc_, 0u) * depth) * time;
     const float out1 = bassCut(shelf(acc, lp1_, b.lpF, b.loopCut), hp1_, b.hpF);
-    acc = a1d_.run(a1c_.run(a1b_.run(a1a_.run(out1))));
+    acc = a1d_.run(a1c_.run(a1b_.run(a1a_.run(out1, kLoopK), kLoopK), kLoopK), kLoopK);
 
-    const float d2 = dly2_.read(lfo(64u) * depth);
+    const float d2 = dly2_.read(reverb_parts::lfo(lfoAcc_, 64u) * depth);
     dly2_.write(acc + feed);
     const float out2 = bassCut(shelf(d2 * time, lp2_, b.lpF, b.loopCut), hp2_, b.hpF);
-    acc = a2d_.run(a2c_.run(a2b_.run(a2a_.run(out2))));
+    acc = a2d_.run(a2c_.run(a2b_.run(a2a_.run(out2, kLoopK), kLoopK), kLoopK), kLoopK);
     dly1_.write(acc + feed);
 
     return c4_.run(c3_.run(c2_.run(c1_.run(out1 + out2)))) * b.wetGain;
@@ -280,14 +235,6 @@ class Chasm {
   static float bassCut(float in, float& lp, float f) {
     lp += (in - lp) * f;
     return in - lp;
-  }
-
-  // Unipolar sine 0..1; phase8 offsets in 1/256 turns.
-  float lfo(uint32_t phase8) const {
-    const uint32_t i0 = ((lfoAcc_ >> 24) + phase8) & 0xFFu;
-    const float fr = static_cast<float>(lfoAcc_ & 0x00FFFFFFu) * (1.0f / 16777216.0f);
-    const float s = sine_[i0] + fr * (sine_[i0 + 1u] - sine_[i0]);
-    return s * 0.5f + 0.5f;
   }
 
   chasm_detail::Allpass<chasm_detail::kAllp1A> a1a_;
@@ -304,7 +251,6 @@ class Chasm {
   chasm_detail::ChirpStage<5> c2_;
   chasm_detail::ChirpStage<6> c3_;
   chasm_detail::ChirpStage<7> c4_;
-  std::array<float, 257> sine_{};
   float lpIn_ = 0.0f, lp1_ = 0.0f, lp2_ = 0.0f, hp1_ = 0.0f, hp2_ = 0.0f;
   uint32_t lfoAcc_ = 0u;
   float decay_ = 0.0f, wobble_ = 0.0f, dwell_ = 0.0f, inputGain_ = 0.0f;

@@ -26,11 +26,13 @@ better if the led flashes to show mcu processing." Build order: "just build it n
    between the pitch code and the rest. The window shows it on one line; with DEBUG on in the menu,
    the voice screen's figure is the same table's worst. Host timing is measured for nothing and
    shown nowhere.
-2. Two extra toggles, the only controls the box lacks: under slot 4 `UNISON | MOB`, under slot 8
-   `SPRING | CHASM`. Each goes through the menu's own action (`UiAction::SwapUnisonCrowd`,
-   `UiAction::SwapReverb`), so the layout fade and the engine resets run as on the box, and a
-   swap the box would not load leaves the layout unchanged. The toggle's position follows the
-   layout, so a swap made in the menu moves it.
+2. Four card switches, the only controls the box lacks: under slot 3 `OCTAVE | FORMANT`, under
+   slot 4 `UNISON | MOB`, under slot 7 a grid of `GATE`, `LO-FI` and `CHATTER`, under slot 8
+   `SPRING | CHASM`. Each goes through the menu's own action (`UiAction::SwapOctaveFormant`,
+   `UiAction::SwapUnisonCrowd`, `UiAction::CycleSlot7Card`, `UiAction::SwapReverb`), so the
+   layout fade and the engine resets run as on the box, and a swap the box would not load
+   leaves the layout unchanged. The switch position follows the layout, so a swap made in the
+   menu moves it.
 3. One source switch, `CLIP | MIC`. The clip starts as `samples/adam_vox_sample3_5s.wav`, looped;
    File > Open (Cmd+O) in the Mac's menu bar loads another wav or mp3 in its place (what the
    decoder takes) and sets the switch to CLIP, and the window title carries the clip's name (owner 2026-11-01: "i need a
@@ -104,7 +106,10 @@ Bottom band: the source switch at the left and the version under it.
    device; the clip through the block path for 3 s on the default layout, then both swaps and 2 s
    more; asserts finite output, output above -40 dBFS RMS in the last second, the cost sums
    before and after the swaps derived from the `costs::` rows, the layout reading `crowd` and
-   `reverb_chasm`, and a rendered face. Prints `emulator check: ok`.
+   `reverb_chasm`, and a rendered face. Prints `emulator check: ok`. Adam's clips stay out of git,
+   so where `samples/` is absent (CI) the check writes two synthetic voiced clips (150 Hz for 4 s,
+   220 Hz for 3 s, harmonics under three formant peaks, 5 Hz vibrato) to a temp directory, runs the
+   same checks on them, and prints a `clip:` line naming the set it used.
 2. `cubevox-emulator --proof <file.ppm>`: one frame of the window after the splash, rendered to a
    hidden window and written as a PPM, for looking at.
 3. `ctest` as a whole, with `proto_layout` still in it.

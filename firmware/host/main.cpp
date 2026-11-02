@@ -16,6 +16,7 @@
 
 #include "audio_block.h"
 #include "box.h"
+#include "check_clip.h"
 #include "clock.h"
 #include "core/costs.h"
 #include "core/layout.h"
@@ -79,6 +80,34 @@ struct Rig {
   }
 };
 
+// The clips the check plays. Adam's when samples/ holds the default clip, otherwise two synthetic
+// voices written to a temporary directory that `synthetic` removes.
+struct CheckClips {
+  std::string first;       // the clip every rig loads
+  std::string second;      // the clip File > Open loads
+  std::string secondName;  // the file name clipName() reports for it
+  std::unique_ptr<host::SyntheticClips> synthetic;
+};
+
+CheckClips pickCheckClips(const Source& source, const char* argv0) {
+  CheckClips clips;
+  clips.first = source.locateDefault(argv0);
+  if (!clips.first.empty()) {
+    clips.second = source.locate(argv0, kSecondClip);
+    clips.secondName = kSecondClip;
+    std::printf("clip: Adam's clips from samples/, %s then %s\n", clips.first.c_str(),
+                clips.second.empty() ? kSecondClip : clips.second.c_str());
+    return clips;
+  }
+  clips.synthetic = std::make_unique<SyntheticClips>();
+  clips.first = clips.synthetic->first();
+  clips.second = clips.synthetic->second();
+  clips.secondName = SyntheticClips::kSecondName;
+  std::printf("clip: samples/ is absent, so two synthetic voiced clips play, %s then %s, in %s\n",
+              SyntheticClips::kFirstName, SyntheticClips::kSecondName, clips.synthetic->dir().c_str());
+  return clips;
+}
+
 // What the default layout costs, from the cost table's own rows, and what it costs with MOB in
 // slot 4 and Chasm in slot 8. The tracker is paid once, because Autotune is placed. Each "rest" is
 // every row but slot 3's and slot 7's, which are Octave and Gate in the default layout and one of two
@@ -133,7 +162,7 @@ float lastSecondDbfs(const std::vector<float>& output) {
 // holds the card, the layout's cost is the rest of its rows plus the card's own and Gate's, and the
 // audio through the box is finite and above the floor. `swapped` puts MOB in slot 4 and Chasm in
 // slot 8 first.
-void checkSlot3(const char* argv0, bool swapped, std::vector<std::string>& failed) {
+void checkSlot3(const CheckClips& clips, bool swapped, std::vector<std::string>& failed) {
   const char* const where = swapped ? "MOB and Chasm" : "default layout";
   const costs::Cost rest = swapped ? kSwappedRest : kDefaultRest;
   const auto expect = [&](bool ok, const std::string& what) {
@@ -141,7 +170,7 @@ void checkSlot3(const char* argv0, bool swapped, std::vector<std::string>& faile
   };
 
   Rig rig;
-  expect(rig.source.findClip(argv0), "the clip loads");
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
   if (swapped) {
     rig.box.swapUnisonMob();
     rig.box.swapReverb();
@@ -174,7 +203,7 @@ void checkSlot3(const char* argv0, bool swapped, std::vector<std::string>& faile
 // plus Octave's and the card's own, and the audio through the box is finite and above the floor.
 // `swapped` puts MOB in slot 4 and Chasm in slot 8 first, the heaviest layout the cards share. A
 // card outside the cycle leaves the layout as it was.
-void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& failed) {
+void checkSlot7(const CheckClips& clips, bool swapped, std::vector<std::string>& failed) {
   const char* const where = swapped ? "MOB and Chasm" : "default layout";
   const costs::Cost rest = swapped ? kSwappedRest : kDefaultRest;
   const auto expect = [&](bool ok, const std::string& what) {
@@ -182,7 +211,7 @@ void checkSlot7(const char* argv0, bool swapped, std::vector<std::string>& faile
   };
 
   Rig rig;
-  expect(rig.source.findClip(argv0), "the clip loads");
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
   if (swapped) {
     rig.box.swapUnisonMob();
     rig.box.swapReverb();
@@ -221,7 +250,8 @@ int runCheck(const char* argv0) {
     if (!ok) failed.push_back(what);
   };
 
-  expect(rig.source.findClip(argv0), "the clip loads");
+  const CheckClips clips = pickCheckClips(rig.source, argv0);
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
   rig.run(kCheckBeforeMs, true);
   const LayoutCost before = rig.box.cost();
   rig.box.swapUnisonMob();
@@ -236,19 +266,19 @@ int runCheck(const char* argv0) {
 
   // File > Open: a second clip swaps in and plays, and a path that does not decode leaves it playing.
   const size_t openedAt = rig.output.size();
-  const std::string second = rig.source.locate(argv0, kSecondClip);
-  expect(!second.empty() && rig.source.loadClip(second.c_str()), "the second clip loads through loadClip");
+  expect(!clips.second.empty() && rig.source.loadClip(clips.second.c_str()),
+         "the second clip loads through loadClip");
   rig.run(kCheckOpenMs, true);
   bool openFinite = true;
   for (size_t i = openedAt; i < rig.output.size(); ++i) openFinite = openFinite && std::isfinite(rig.output[i]);
   const float openDbfs = lastSecondDbfs(rig.output);
-  expect(std::strcmp(rig.source.clipName(), kSecondClip) == 0, "clipName reads the second clip's file name");
+  expect(clips.secondName == rig.source.clipName(), "clipName reads the second clip's file name");
   expect(openFinite, "every output sample after the open is finite");
   expect(openDbfs > static_cast<float>(kCheckMinDbfs), "the output RMS of the second clip's last second is above -40 dBFS");
   expect(!rig.source.loadClip(kMissingClip), "loadClip on a missing path returns false");
   rig.run(kCheckKeptMs, true);
   const float keptDbfs = lastSecondDbfs(rig.output);
-  expect(std::strcmp(rig.source.clipName(), kSecondClip) == 0, "a failed load keeps the clip name");
+  expect(clips.secondName == rig.source.clipName(), "a failed load keeps the clip name");
   expect(keptDbfs > static_cast<float>(kCheckMinDbfs), "the previous clip keeps playing after a failed load");
 
   expect(finite, "every output sample is finite");
@@ -260,10 +290,10 @@ int runCheck(const char* argv0) {
   expect(rig.box.splashEnded(), "the splash ended");
   expect(anyLit(rig.box.pixels()), "the face rendered (the canvas is not blank)");
 
-  checkSlot3(argv0, false, failed);
-  checkSlot3(argv0, true, failed);
-  checkSlot7(argv0, false, failed);
-  checkSlot7(argv0, true, failed);
+  checkSlot3(clips, false, failed);
+  checkSlot3(clips, true, failed);
+  checkSlot7(clips, false, failed);
+  checkSlot7(clips, true, failed);
 
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,
               after.worst);

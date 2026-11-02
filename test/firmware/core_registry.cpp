@@ -108,7 +108,7 @@ void checkAmountKnobIsB() {
   applyKnob(Card::Unison, 1, 0.7f, p);
   check(std::fabs(p.unison.depth - 0.7f) < 1e-6f, "amount: Unison knob B drives Depth");
   applyKnob(Card::Slapback, 1, 0.7f, p);
-  check(std::fabs(p.slapback.mix - 0.7f) < 1e-6f, "amount: Slapback knob B drives the wet level and repeats");
+  check(std::fabs(p.slapback.amount - 0.7f) < 1e-6f, "amount: Echo knob B drives the wet level and repeats");
   check(std::strcmp(knobDesc(Card::Slapback, 1)->name, "AMOUNT") == 0, "amount: Slapback knob B is named AMOUNT");
   applyKnob(Card::Distortion, 1, 0.7f, p);
   check(std::fabs(p.distortion.drive - 0.7f) < 1e-6f, "amount: Distortion knob B drives Drive");
@@ -150,7 +150,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Autotune: return p.pitchFx.autotune.responseMs;
     case Card::Octave: return p.pitchFx.octave.mix;
     case Card::Unison: return knob == 0 ? p.unison.tuning.lfoHz[0] : p.unison.depth;
-    case Card::Slapback: return knob == 0 ? p.slapback.tuning.timeMs : p.slapback.mix;
+    case Card::Slapback: return knob == 0 ? p.slapback.tuning.timeMs : p.slapback.amount;
     case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
@@ -221,9 +221,9 @@ void checkKnobTargets() {
   check(knobSteps(Card::Octave, 0) == 25, "semitones has 25 positions");
   check(knobSteps(Card::Autotune, 0) == 12, "key has 12 positions");
   applyKnob(Card::Slapback, 0, 0.0f, p);
-  check(std::fabs(p.slapback.tuning.timeMs - 60.0f) < 1e-4f, "slapback time min 60 ms");
+  check(std::fabs(p.slapback.tuning.timeMs - cv::Slapback::kTimeMinMs) < 1e-4f, "echo time min");
   applyKnob(Card::Slapback, 0, 1.0f, p);
-  check(std::fabs(p.slapback.tuning.timeMs - 250.0f) < 1e-4f, "slapback time max 250 ms");
+  check(std::fabs(p.slapback.tuning.timeMs - cv::Slapback::kTimeMaxMs) < 1e-4f, "echo time max");
 }
 
 // A stepped value outside its positions, NaN included, lands on the nearest valid step.
@@ -365,7 +365,9 @@ void checkShownNumbers() {
   check(knobShown(mix, 5.0f) == 100 && knobShown(mix, -1.0f) == 0 && knobShown(mix, NAN) == 0,
         "shown: a continuous reading clamps to 0..1");
   const KnobDesc& time = *knobDesc(Card::Slapback, 0);
-  check(knobShown(time, 0.0f) == 60 && knobShown(time, 1.0f) == 250, "shown: slapback time spans 60 to 250 ms");
+  check(knobShown(time, 0.0f) == static_cast<int>(cv::Slapback::kTimeMinMs) &&
+            knobShown(time, 1.0f) == static_cast<int>(cv::Slapback::kTimeMaxMs),
+        "shown: echo time spans its range");
 }
 
 void checkShownLabels() {

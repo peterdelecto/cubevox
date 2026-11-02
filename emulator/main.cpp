@@ -356,7 +356,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const cv::ReverbParams& r = p.reverb;
   const int re = r.engine == cv::kReverbChasm ? cv::kReverbChasm : cv::kReverbSpring;
   const float decays[2] = {r.spring.decay, r.chasm.decay};
-  const float dwells[2] = {r.spring.dwell, r.chasm.dwell};
+  const float dwells[2] = {r.spring.tuning.dwell, r.chasm.dwell};
   const float decay = decays[re];
   const float dwell = dwells[re];
   char macros[640];
@@ -384,7 +384,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       cv::kVoicesName[p.crowd.voicesStep < cv::kVoicesSteps ? p.crowd.voicesStep : cv::kVoicesMob],
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
-      static_cast<double>(p.slapback.mix * 100.0f),
+      static_cast<double>(p.slapback.amount * 100.0f),
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.mix * 100.0f),
@@ -429,10 +429,10 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const cv::SpringTuning& sb = params.reverb.spring.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nSpringTuning{%.1ff, %.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, "
-                "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.1ff, %.2ff, %.1ff}",
-                sb.springMs1, sb.springMs2, sb.springMs3, sb.timeLo, sb.timeHi, sb.diffuse,
-                sb.chirpSections, sb.chirpA, sb.chirpSign, sb.trebleLossHz, sb.bassCutHz, sb.returnLpHz,
-                sb.wobbleDepth, sb.wobbleRateHz, sb.inputTrim, sb.dwellDrive, sb.dwellComp, sb.wetDb);
+                "%.0ff, %.1ff, %.2ff, %.2ff, %.1ff, %.2ff, %.2ff, %.0ef}",
+                sb.springMs1, sb.springMs2, sb.springMs3, sb.feedbackLo, sb.feedbackHi, sb.diffuse,
+                sb.chirpSections, sb.chirpA, sb.trebleLossHz, sb.bassCutHz, sb.returnLpHz,
+                sb.wobbleDepth, sb.wobbleRateHz, sb.dwell, sb.dwellDrive, sb.dwellComp, sb.wetDb, sb.restLevel);
   used = std::strlen(gTuningText);
   const cv::CrowdTuning& ct = params.crowd.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
@@ -478,9 +478,9 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "bassCutHzTop, wobbleDepthMax, wobbleRateLo, wobbleRateHi, inputTrim, wobbleLevelDb, "
       "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, trimDb, "
       "{bandLoHz, bandHiHz, thresholdDb, maxCutDb, releaseMs, notchHz, notchQ}\n"
-      "// SpringTuning: springMs1, springMs2, springMs3, timeLo, timeHi, diffuse, chirpSections, "
-      "chirpA, chirpSign, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, inputTrim, "
-      "dwellDrive, dwellComp, wetDb\n"
+      "// SpringTuning: springMs1, springMs2, springMs3, feedbackLo, feedbackHi, diffuse, chirpSections, "
+      "chirpA, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, dwell, "
+      "dwellDrive, dwellComp, wetDb, restLevel\n"
       "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {shelfDb[0..3]}, {delayMs[0..3]}, lagScale, shelfHz, voiceDb, "
       "trimDb, trimBottomDb, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
       "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}\n%s\n",
@@ -751,16 +751,14 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
     ImGui::TreePop();
   }
   if (tuningNode("Spring")) {
-    ImGui::SliderFloat("Echo spacing 1", &b.springMs1, 10.0f, 80.0f, "%.1f ms");
-    ImGui::SliderFloat("Echo spacing 2", &b.springMs2, 10.0f, 80.0f, "%.1f ms");
-    ImGui::SliderFloat("Echo spacing 3", &b.springMs3, 10.0f, 80.0f, "%.1f ms");
-    ImGui::SliderFloat("Feedback at decay 0", &b.timeLo, 0.1f, 0.95f, "%.2f");
-    ImGui::SliderFloat("Feedback at decay 1", &b.timeHi, 0.5f, 0.97f, "%.3f");
+    ImGui::SliderFloat("Echo spacing 1", &b.springMs1, 10.0f, cv::spring_detail::kMaxMs1, "%.1f ms");
+    ImGui::SliderFloat("Echo spacing 2", &b.springMs2, 10.0f, cv::spring_detail::kMaxMs2, "%.1f ms");
+    ImGui::SliderFloat("Echo spacing 3", &b.springMs3, 10.0f, cv::spring_detail::kMaxMs3, "%.1f ms");
+    ImGui::SliderFloat("Feedback at decay 0", &b.feedbackLo, 0.1f, 0.95f, "%.2f");
+    ImGui::SliderFloat("Feedback at decay 1", &b.feedbackHi, 0.5f, 0.97f, "%.3f");
     ImGui::SliderFloat("Diffusion", &b.diffuse, 0.0f, 0.9f, "%.2f");
     ImGui::SliderInt("Sweep sections", &b.chirpSections, 0, 32);
     ImGui::SliderFloat("Sweep coefficient", &b.chirpA, 0.0f, 0.95f, "%.2f");
-    bool down = b.chirpSign < 0.0f;
-    if (ImGui::Checkbox("Sweep down", &down)) b.chirpSign = down ? -1.0f : 1.0f;
     ImGui::SliderFloat("Loop treble loss", &b.trebleLossHz, 1000.0f, 16000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Loop bass cut", &b.bassCutHz, 20.0f, 600.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Return low-pass", &b.returnLpHz, 1000.0f, 16000.0f, "%.0f Hz", ImGuiSliderFlags_Logarithmic);
@@ -771,7 +769,6 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
   if (tuningNode("Spring levels")) {
     ImGui::SliderFloat("Drive at dwell 1", &b.dwellDrive, 1.0f, 64.0f, "%.1f x", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Drive compensation", &b.dwellComp, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Input trim", &b.inputTrim, 0.05f, 1.5f, "%.2f", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Wet level", &b.wetDb, -24.0f, 24.0f, "%.1f dB");
     ImGui::TreePop();
   }
@@ -985,7 +982,7 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
   add("slapback.on", &p.slapback.on);
-  add("slapback.intensity", &p.slapback.mix);
+  add("slapback.intensity", &p.slapback.amount);
   add("slapback.time", &p.slapback.tuning.timeMs);
   add("slapback.repeats", &p.slapback.tuning.feedback);
   add("slapback.lowpass", &p.slapback.tuning.lowpassHz);
@@ -1000,7 +997,7 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("reverb.chasm.decay", &r.chasm.decay);
   add("reverb.chasm.dwell", &r.chasm.dwell);
   add("reverb.springb.decay", &r.spring.decay);
-  add("reverb.springb.dwell", &r.spring.dwell);
+  add("reverb.springb.dwell", &r.spring.tuning.dwell);  // the key keeps its name so old saved states load
   add("eq.on", &p.eq.on);
   add("eq.dipHz", &p.eq.dipHz);
   add("eq.dipDb", &p.eq.dipDb);
@@ -1092,7 +1089,7 @@ void applyMacros(ProtoParams& p) {
   mc::chasmWobble(r.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(r.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(r.chasm.tuning, m[mc::ChasmBass]);
-  mc::springDrip(r.spring.tuning, m[mc::SpringDrip]);
+  mc::springChirp(r.spring.tuning, m[mc::SpringChirp]);
   mc::springFlutter(r.spring.tuning, m[mc::SpringFlutter]);
   mc::springBrightness(r.spring.tuning, m[mc::SpringBrightness]);
 }
@@ -1256,11 +1253,10 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
     return;
   }
   namespace mc = cv::macros;
-  // Dwell (input drive into the soft clip) has no panel knob; it binds to the selected engine here.
-  float& dwell = r.engine == cv::kReverbChasm ? r.chasm.dwell : r.spring.dwell;
-  float dwellPct = dwell * 100.0f;
-  if (ImGui::SliderFloat("Dwell", &dwellPct, 0.0f, 100.0f, "%.0f %%")) dwell = dwellPct / 100.0f;
   if (r.engine == cv::kReverbChasm) {
+    // Dwell (input drive into the soft clip) has no panel knob. Spring's is a fixed tuning value.
+    float dwellPct = r.chasm.dwell * 100.0f;
+    if (ImGui::SliderFloat("Dwell", &dwellPct, 0.0f, 100.0f, "%.0f %%")) r.chasm.dwell = dwellPct / 100.0f;
     macroSlider("Wobble", "pitch wobble in the tail", m.pos[mc::ChasmWobble],
                 [&](float p) { mc::chasmWobble(r.chasm, p); });
     macroSlider("Brightness", "brighter tail", m.pos[mc::ChasmBrightness],
@@ -1269,8 +1265,8 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
                 [&](float p) { mc::chasmBass(r.chasm.tuning, p); });
   } else {
     cv::SpringTuning& t = r.spring.tuning;
-    macroSlider("Drip", "the drippy boing on each note", m.pos[mc::SpringDrip],
-                [&](float p) { mc::springDrip(t, p); });
+    macroSlider("Chirp", "the sweep on each echo", m.pos[mc::SpringChirp],
+                [&](float p) { mc::springChirp(t, p); });
     macroSlider("Flutter", "wobble and crisper repeats", m.pos[mc::SpringFlutter],
                 [&](float p) { mc::springFlutter(t, p); });
     macroSlider("Brightness", "brighter tail", m.pos[mc::SpringBrightness],
@@ -1385,7 +1381,7 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
 void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
-  percentSlider("AMOUNT", s.mix);
+  percentSlider("AMOUNT", s.amount);
   ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
@@ -1641,7 +1637,7 @@ void drawPedals(ProtoParams& params) {
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
-    pedalPercent("AMOUNT", params.slapback.mix);
+    pedalPercent("AMOUNT", params.slapback.amount);
   });
   next();
   pedal("DISTORTION", params.distortion.on, w, [&] {

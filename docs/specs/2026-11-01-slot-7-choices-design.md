@@ -59,5 +59,12 @@ The Formant column of section 3's table no longer applies.
 
 The Bloom card shows as CHATTER (`2026-11-01-bloom-design.md` sections 14 to 18). The row's value
 and the emulator's switch read `CHATTER` where sections 1 and 2 say `BLOOM`; the card id stays
-`bloom`. `kBloom` is still {5, 6, false}, so section 3's Gate, Lo-fi and Bloom columns hold; MOB,
-Chasm and CHATTER still sum 75 / 87, on the mean line.
+`bloom`.
+
+## 7. Costs after the 2026-11-02 passes (v2.01.09)
+
+`kBloom` is {3, 5, false} (bloom spec section 19), and the Input gate, Gate and Echo rows took
+the 2026-11-01 stress run (`kInputGate {3, 4}`, `kGate {3, 5}`, `kSlapback {1, 2}`). This
+overrides section 3's Bloom column and section 6's sums. The default layout sums 56 % mean and
+68 % worst; with MOB, Chasm and CHATTER in it, 68 % and 82 %. No layout the registry allows reaches either line, so the cycle passes over
+a card only when it would repeat a card already placed.

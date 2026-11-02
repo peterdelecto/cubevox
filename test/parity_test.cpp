@@ -138,7 +138,7 @@ void cmpOctave(const std::string& p, float pos, const cv::OctaveParams& f, const
 
 void cmpSlapback(const std::string& p, float pos, const cv::SlapbackParams& f, const cv::SlapbackParams& e,
                  bool rest) {
-  CMP(p, pos, f, e, mix);
+  CMP(p, pos, f, e, amount);
   CMP(p, pos, f.tuning, e.tuning, timeMs);
   if (!rest) return;
   CMP(p, pos, f.tuning, e.tuning, lowpassHz);
@@ -202,25 +202,25 @@ void cmpChasmTuning(const std::string& p, float pos, const cv::ChasmTuning& ca, 
   CMP(p + ".chasm", pos, ca, cb, wetDb);
 }
 
-void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& sa, const cv::SpringTuning& sb) {
-  CMP(p + ".spring", pos, sa, sb, springMs1);
-  CMP(p + ".spring", pos, sa, sb, springMs2);
-  CMP(p + ".spring", pos, sa, sb, springMs3);
-  CMP(p + ".spring", pos, sa, sb, timeLo);
-  CMP(p + ".spring", pos, sa, sb, timeHi);
-  CMP(p + ".spring", pos, sa, sb, diffuse);
-  CMP(p + ".spring", pos, sa, sb, chirpSections);
-  CMP(p + ".spring", pos, sa, sb, chirpA);
-  CMP(p + ".spring", pos, sa, sb, chirpSign);
-  CMP(p + ".spring", pos, sa, sb, trebleLossHz);
-  CMP(p + ".spring", pos, sa, sb, bassCutHz);
-  CMP(p + ".spring", pos, sa, sb, returnLpHz);
-  CMP(p + ".spring", pos, sa, sb, wobbleDepth);
-  CMP(p + ".spring", pos, sa, sb, wobbleRateHz);
-  CMP(p + ".spring", pos, sa, sb, inputTrim);
-  CMP(p + ".spring", pos, sa, sb, dwellDrive);
-  CMP(p + ".spring", pos, sa, sb, dwellComp);
-  CMP(p + ".spring", pos, sa, sb, wetDb);
+void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& f, const cv::SpringTuning& e) {
+  CMP(p + ".spring", pos, f, e, springMs1);
+  CMP(p + ".spring", pos, f, e, springMs2);
+  CMP(p + ".spring", pos, f, e, springMs3);
+  CMP(p + ".spring", pos, f, e, feedbackLo);
+  CMP(p + ".spring", pos, f, e, feedbackHi);
+  CMP(p + ".spring", pos, f, e, diffuse);
+  CMP(p + ".spring", pos, f, e, chirpSections);
+  CMP(p + ".spring", pos, f, e, chirpA);
+  CMP(p + ".spring", pos, f, e, trebleLossHz);
+  CMP(p + ".spring", pos, f, e, bassCutHz);
+  CMP(p + ".spring", pos, f, e, returnLpHz);
+  CMP(p + ".spring", pos, f, e, wobbleDepth);
+  CMP(p + ".spring", pos, f, e, wobbleRateHz);
+  CMP(p + ".spring", pos, f, e, dwell);
+  CMP(p + ".spring", pos, f, e, dwellDrive);
+  CMP(p + ".spring", pos, f, e, dwellComp);
+  CMP(p + ".spring", pos, f, e, wetDb);
+  CMP(p + ".spring", pos, f, e, restLevel);
 }
 
 // Neither side sets CrowdTuning, so both run the struct's own defaults and a tuning field needs no
@@ -243,7 +243,6 @@ void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const
   if (!rest) return;
   CMP(p, pos, f.chasm, e.chasm, wobble);
   CMP(p, pos, f.chasm, e.chasm, dwell);
-  CMP(p, pos, f.spring, e.spring, dwell);
   cmpChasmTuning(p, pos, f.chasm.tuning, e.chasm.tuning);
   cmpSpringTuning(p, pos, f.spring.tuning, e.spring.tuning);
 }
@@ -294,7 +293,7 @@ EmuState emuStart() {
   mc::chasmWobble(s.reverb.chasm, m[mc::ChasmWobble]);
   mc::chasmBrightness(s.reverb.chasm.tuning, m[mc::ChasmBrightness]);
   mc::chasmBass(s.reverb.chasm.tuning, m[mc::ChasmBass]);
-  mc::springDrip(s.reverb.spring.tuning, m[mc::SpringDrip]);
+  mc::springChirp(s.reverb.spring.tuning, m[mc::SpringChirp]);
   mc::springFlutter(s.reverb.spring.tuning, m[mc::SpringFlutter]);
   mc::springBrightness(s.reverb.spring.tuning, m[mc::SpringBrightness]);
   cv::applyKnobs(s.reverb);  // drawFrame
@@ -324,7 +323,7 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
   applyKnob(Card::Unison, 1, em.unison.depth, fw);
   applyKnob(Card::Slapback, 0, posLinear(kEmuSlapLoMs, kEmuSlapHiMs, em.slapback.tuning.timeMs), fw);
-  applyKnob(Card::Slapback, 1, em.slapback.mix, fw);
+  applyKnob(Card::Slapback, 1, em.slapback.amount, fw);
   applyKnob(Card::Distortion, 0, em.distortion.tone, fw);
   applyKnob(Card::Distortion, 1, em.distortion.drive, fw);
   applyPlacement(Card::ReverbSpring, fw);
@@ -438,8 +437,8 @@ void sweepSlapback() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Slapback, 1, p, fw);
-    em.slapback.mix = p;  // drawPedals AMOUNT
-    cmpSlapback("sweep.slapback.mix", p, fw.slapback, em.slapback, false);
+    em.slapback.amount = p;  // drawPedals AMOUNT
+    cmpSlapback("sweep.slapback.amount", p, fw.slapback, em.slapback, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
     applyKnob(Card::Slapback, 0, p, fw2);
