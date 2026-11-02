@@ -29,8 +29,10 @@ void checkDefaultLayout() {
     const CardDesc& d = cardDesc(layout.card[s]);
     if (d.group == Group::Reverb) ++reverbs;
     // Autotune's row is the board's pair figure scaled by the CPU pass, with one extra worst point
-    // from the stress run, so it stays an estimate until a board bench of the pair.
-    check(d.cost.measured || layout.card[s] == Card::Autotune, "a default layout card's cost comes from the board");
+    // from the stress run, so it stays an estimate until a board bench of the pair. Echo's row is the
+    // host bench of the rewrite at Echo's own board ratio, an estimate until a stress run of the new engine.
+    check(d.cost.measured || layout.card[s] == Card::Autotune || layout.card[s] == Card::Slapback,
+          "a default layout card's cost comes from the board");
   }
   const LayoutCost sums = layoutCost(layout);
   check(sums.avg <= costs::kBudgetAvgPercent, "default layout within the average line");
@@ -222,13 +224,13 @@ void checkSlot7Costs() {
             layoutValid(formantHeavy).ok(),
         "slot 3 cost: Formant costs less than Octave and is accepted in both layouts");
 
-  // Bloom's estimate puts MOB and Chasm exactly on the mean line, which layoutValid accepts.
-  Layout heavyBloom = defaultLayout();
-  heavyBloom.card[3] = Card::Crowd;
-  heavyBloom.card[6] = Card::Bloom;
-  heavyBloom.card[7] = Card::ReverbChasm;
+  // With the stress-run rows no layout the registry allows goes over a line: the heaviest set, Input
+  // gate, Octave without Autotune (which pays the pitch stage), Unison, MOB, Distortion, Gate, Chasm and
+  // Bloom, sits exactly on the mean line, and layoutValid accepts it.
+  const Layout heavyBloom = {{Card::InputGate, Card::Octave, Card::Unison, Card::Crowd, Card::Gate, Card::Distortion,
+                              Card::Bloom, Card::ReverbChasm}};
   check(layoutCost(heavyBloom).avg == costs::kBudgetAvgPercent && layoutValid(heavyBloom).ok(),
-        "slot 7 cost: MOB, Chasm and Bloom sum to exactly the 75 % mean line and layoutValid accepts it");
+        "slot 7 cost: the heaviest set with MOB, Chasm and Bloom sums to exactly the 75 % mean line and layoutValid accepts it");
 }
 
 void checkLayoutValid() {
@@ -678,17 +680,16 @@ void checkSwapOctaveFormant() {
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::None && both == bothBefore,
         "action: SwapOctaveFormant changes nothing when the other card would repeat");
 
-  // Unison in slot 7 beside MOB and Formant leaves the mean at 74, so Octave's 5 % would take it to 76
-  // and the swap is refused. The checks state the verdicts the rows give, so a row that moves them
-  // fails here and not silently.
-  Layout tight = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Unison, Card::ReverbSpring}};
-  Layout withOctave = tight;
+  // A layout the box would not load stays as it is. No layout goes over a CPU line with the stress-run
+  // rows, so this one holds two reverb cards, which the swap cannot cure.
+  Layout unloadable = {{Card::InputGate, Card::ReverbSpring, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
+                        Card::Unison, Card::ReverbChasm}};
+  Layout withOctave = unloadable;
   withOctave.card[2] = Card::Octave;
-  check(layoutValid(tight).ok() && !layoutValid(withOctave).ok(),
-        "action: the tight layout fits with Formant and refuses Octave");
-  const Layout tightBefore = tight;
-  check(ui::applyAction(UiAction::SwapOctaveFormant, s, tight) == ui::ApplyResult::None && tight == tightBefore,
+  check(!layoutValid(unloadable).ok() && !layoutValid(withOctave).ok(),
+        "action: the layout with two reverb cards would not load with Formant or with Octave");
+  const Layout unloadableBefore = unloadable;
+  check(ui::applyAction(UiAction::SwapOctaveFormant, s, unloadable) == ui::ApplyResult::None && unloadable == unloadableBefore,
         "action: SwapOctaveFormant leaves a layout the box would not load as it is");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack && s.polishComp == before.polishComp &&
@@ -752,14 +753,15 @@ void checkCycleSlot7Card() {
   check(ui::applyAction(UiAction::CycleSlot7Card, s, all) == ui::ApplyResult::None && all == allBefore,
         "action: CycleSlot7Card changes nothing when each other card would repeat");
 
-  // MOB beside Spring with Unison in Octave's slot sits on the mean line with Gate in slot 7, so Bloom's
-  // 5 % is refused and the cycle passes it. The expected cards follow layoutValid, not a fixed verdict.
-  Layout tight = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Gate, Card::ReverbSpring}};
+  // Bloom already sits in slot 8, so the layout refuses it in slot 7 and the cycle passes it over. No
+  // layout goes over a CPU line with the stress-run rows, so a repeat is the refusal that remains. The
+  // expected cards follow layoutValid, not a fixed verdict.
+  Layout tight = {{Card::ReverbSpring, Card::InputGate, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Gate, Card::Bloom}};
   Layout withBloom = tight;
   withBloom.card[6] = Card::Bloom;
-  check(layoutValid(tight).ok() && !layoutValid(withBloom).ok() && layoutCost(tight).avg == costs::kBudgetAvgPercent,
-        "action: the tight layout fits with Gate on the mean line and refuses Bloom");
+  check(layoutValid(tight).ok() && !layoutValid(withBloom).ok(),
+        "action: the layout fits with Gate in slot 7 and refuses a second Bloom");
   Layout atLofi = tight;
   atLofi.card[6] = Card::Lofi;
   check(ui::applyAction(UiAction::CycleSlot7Card, s, atLofi) == ui::ApplyResult::LayoutChanged && atLofi == tight,

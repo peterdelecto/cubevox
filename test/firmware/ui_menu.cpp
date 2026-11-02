@@ -658,13 +658,15 @@ void checkMenuOctaveFormantClick() {
             m.layout == defaultLayout(),
         "menu: a second click swaps Formant back to Octave");
 
-  // Octave would take this layout from 74 to 76 percent mean, so the swap back is refused.
+  // No layout goes over a CPU line with the stress-run rows, so the swap is refused in a layout the box
+  // would not load either way: two reverb cards.
   MenuRig tight;
-  tight.layout = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Unison, Card::ReverbSpring}};
+  tight.layout = {{Card::InputGate, Card::ReverbSpring, Card::Formant, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Unison, Card::ReverbChasm}};
   Layout octave = tight.layout;
   octave.card[kOctaveSlot] = Card::Octave;
-  check(layoutValid(tight.layout).ok() && !layoutValid(octave).ok(), "menu: the tight layout fits with Formant and refuses Octave");
+  check(!layoutValid(tight.layout).ok() && !layoutValid(octave).ok(),
+        "menu: the layout with two reverb cards would not load with Formant or with Octave");
   const Layout tightBefore = tight.layout;
   tight.openListAt(kOctaveFormant);
   const UiAction refused = tight.step(0, true);
@@ -745,7 +747,7 @@ void checkMenuUnisonCrowdRedraw() {
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: an unchanged Unison and Crowd row is not redrawn");
-  std::swap(m.layout.card[kUnisonSlot], m.layout.card[kUnisonSlot + 1]);  // Unison to slot 5, Slapback to slot 4
+  std::swap(m.layout.card[kUnisonSlot], m.layout.card[kUnisonSlot + 1]);  // Unison to slot 5, Echo to slot 4
   m.draw();
   check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT 5", "UNISON", true),
         "menu: moving Unison to slot 5 repaints the row with the new slot and the same value");
@@ -909,14 +911,15 @@ void checkMenuSlot7Click() {
   check(m.layout == defaultLayout() && sameSettings(m.settings, Settings()),
         "menu: three clicks come round to the default layout and touch no setting");
 
-  // A card the layout would refuse is passed over: Bloom would put this layout over the mean line, so
-  // the click on Lo-fi lands on Gate.
+  // A card the layout would refuse is passed over: Bloom already sits in slot 8, so the layout refuses a
+  // second one, and the click on Lo-fi lands on Gate. No layout goes over a CPU line with the
+  // stress-run rows, so a repeat is the refusal that remains.
   MenuRig tight;
-  tight.layout = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Lofi, Card::ReverbSpring}};
+  tight.layout = {{Card::ReverbSpring, Card::InputGate, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
+                   Card::Lofi, Card::Bloom}};
   Layout bloom = tight.layout;
   bloom.card[kSlot7Slot] = Card::Bloom;
-  check(layoutValid(tight.layout).ok() && !layoutValid(bloom).ok(), "menu: the tight layout fits with Lo-fi and refuses Bloom");
+  check(layoutValid(tight.layout).ok() && !layoutValid(bloom).ok(), "menu: the layout fits with Lo-fi and refuses a second Bloom");
   tight.openListAt(kSlot7Card);
   check(ui::applyAction(tight.step(0, true), tight.settings, tight.layout) == ui::ApplyResult::LayoutChanged &&
             tight.layout.card[kSlot7Slot] == Card::Gate,

@@ -638,7 +638,7 @@ void checkSlotFlipToOff() {
   check(worst < 0.5f * hardStep, "slot flip: the largest step is well under the step of a hard switch between the two paths");
 }
 
-// The engine of a slot that comes back on starts cleared. A Slapback that holds a full delay line,
+// The engine of a slot that comes back on starts cleared. An Echo that holds a full delay line,
 // bypassed, then flipped on with silent input must stay silent, where an engine that kept running
 // would still be playing its echo.
 void checkSlotFlipOnClearsEngine() {

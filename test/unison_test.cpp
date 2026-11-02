@@ -316,10 +316,30 @@ bool testLevel() {
   gUnison.reset();
   const std::vector<float> out = run(gUnison, in, params(1.0f));
   const float db = 20.0f * log10f(rms(out) / rms(in));
-  // Default wetMaxDb is -4.0 dB (owner ear tuning) and trimDb -1.4 dB scales with depth
-  // (level rule at DEPTH 0.5). At DEPTH 1 on this sine the output measures 2.24 dB, which
-  // includes the +2.5 dB of the top of the knob (0.91 dB without it); band is 2.24 +-1.5.
-  return report("level", std::fabs(db - 2.24f) <= 1.5f, "out/in=%.2f dB (2.24 +-1.5)", db);
+  // Default wetMaxDb is -4.0 dB (owner ear tuning) and trimDb -0.7 dB on the wet alone (level
+  // row at DEPTH 0.5 on Adam's clips, in level_test). At DEPTH 1 on this sine the output measures
+  // 3.26 dB, which includes the +2.5 dB of the top of the knob; band is 3.26 +-1.5.
+  return report("level", std::fabs(db - 3.26f) <= 1.5f, "out/in=%.2f dB (3.26 +-1.5)", db);
+}
+
+// The dry voice passes at unity at every DEPTH, trim included. A lone impulse after a silent second
+// reads the dry gain before any wet copy returns, since the nearest tap sits well behind it.
+bool testDry() {
+  std::array<double, 3> db{};
+  bool ok = true;
+  const float depths[3] = {0.25f, 0.5f, 1.0f};
+  const int at = cv::kSampleRate;
+  for (size_t k = 0; k < 3; ++k) {
+    std::vector<float> in(static_cast<size_t>(cv::kSampleRate + cv::kSampleRate / 2), 0.0f);
+    in[static_cast<size_t>(at)] = 1.0f;
+    cv::Unison u;
+    u.reset();
+    const std::vector<float> out = run(u, in, params(depths[k]));
+    const float dry = out[static_cast<size_t>(at)];
+    db[k] = 20.0 * std::log10(static_cast<double>(dry));
+    ok = ok && dry == 1.0f;
+  }
+  return report("dry", ok, "dry gain at DEPTH 25/50/100 %%: %.2f, %.2f, %.2f dB (0.00)", db[0], db[1], db[2]);
 }
 
 bool testNoAlloc() {
@@ -376,6 +396,7 @@ int main() {
   ok &= testTopSwing();
   ok &= testTopWet();
   ok &= testLevel();
+  ok &= testDry();
   ok &= testNoAlloc();
   ok &= testLfoAnalytic();
   ok &= testRateStep();

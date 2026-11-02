@@ -99,7 +99,7 @@ int usage() {
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
                "     topFrom topSwingGain topWetDb\n"
                "     octGrainWindowMs octGrainCount (2|4) octTrimDb eqTrimDb\n"
-               "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
+               "     slapTimeMs (60..250) slapLowpassHz (500..12000) slapFeedback (0..0.5) slapWetMaxDb slapTrimDb (-24..24)\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distTopBoostDb\n"
                "     distTopBoostFrom distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
@@ -231,6 +231,15 @@ bool lofiTuningInRange(const cv::LofiTuning& t) {
          inside(t.driveDb, -24.0f, 48.0f) && inside(t.holdMaxHz, 480.0f, 48000.0f) &&
          inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.holdOverBand, 0.0f, 20.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
          inside(t.trimDb, -24.0f, 24.0f);
+}
+
+// Every Echo key refuses a value outside the range the engine clamps to.
+bool slapbackTuningInRange(const cv::SlapbackTuning& t) {
+  using Echo = cv::Slapback;
+  return inside(t.timeMs, Echo::kTimeMinMs, Echo::kTimeMaxMs) &&
+         inside(t.lowpassHz, Echo::kCutoffMinHz, Echo::kCutoffMaxHz) && inside(t.feedback, 0.0f, Echo::kFeedbackMax) &&
+         inside(t.wetMaxDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb) &&
+         inside(t.trimDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb);
 }
 
 bool applyTuning(RenderParams& rp, const char* kv) {
@@ -369,6 +378,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       return false;
     bt.tailOnly = bloomTailOnly == 1.0f;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
+    if (!slapbackTuningInRange(st)) return false;
     sb.chirpSections = static_cast<int>(sbSections);
     return true;
   }
@@ -411,7 +421,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOn = true;
     } else if (std::strcmp(a, "--slap") == 0 && i + 1 < argc) {
       cv::SlapbackParams& sp = rp.slapback;
-      if (!parseFloat(argv[++i], &sp.mix) || sp.mix < 0.0f || sp.mix > 1.0f) return false;
+      if (!parseFloat(argv[++i], &sp.amount) || sp.amount < 0.0f || sp.amount > 1.0f) return false;
       haveSlap = true;
     } else if (std::strcmp(a, "--drive") == 0 && i + 1 < argc) {
       cv::DistortionParams& dp = rp.distortion;

@@ -188,4 +188,10 @@ CV_INLINE float readRing(const float* ring, int head, float delay) {
                     pos - fl);
 }
 
+// readRing for a delay that may leave [2, Len - 3]; it clamps to that span first.
+template <int Len>
+CV_INLINE float readRingClamped(const float* ring, int head, float delay) {
+  return readRing<Len>(ring, head, clampf(delay, 2.0f, Len - 3.0f));
+}
+
 }  // namespace cv

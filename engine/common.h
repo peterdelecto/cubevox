@@ -16,6 +16,7 @@ namespace cv {
 
 constexpr int kSampleRate = 48000;
 constexpr int kBlock = 64;
+constexpr float kSmpPerMs = kSampleRate / 1000.0f;
 
 constexpr float kClipMax = 3.0f;
 
