@@ -109,8 +109,11 @@ struct Biquad {
     a2 = (1.0f - alpha / amp) / a0;
   }
 
-  void setLowShelf(float hz, float db) { setShelf(hz, db, -1.0f); }
-  void setHighShelf(float hz, float db) { setShelf(hz, db, 1.0f); }
+  void setLowShelf(float hz, float db) { setShelf(hz, db, -1.0f, 1.0f); }
+
+  // `slope` is the RBJ shelf slope S, from 1 (the Butterworth width, what every other caller gets)
+  // down to 0.1, which narrows the transition.
+  void setHighShelf(float hz, float db, float slope = 1.0f) { setShelf(hz, db, 1.0f, clampf(slope, 0.1f, 1.0f)); }
 
   // Takes the coefficients of `o` and keeps this section's state.
   void setCoefsFrom(const Biquad& o) {
@@ -131,12 +134,15 @@ struct Biquad {
   void clear() { z1 = z2 = 0.0f; }
 
  private:
-  // sign -1 is the low shelf, +1 the high shelf.
-  void setShelf(float hz, float db, float sign) {
+  // sign -1 is the low shelf, +1 the high shelf. Slope 1 takes the fixed Butterworth width, so a
+  // shelf with that slope is bit-exact with what this setter wrote before it had a slope.
+  void setShelf(float hz, float db, float sign, float slope) {
     const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
     const float amp = powf(10.0f, db / 40.0f);
     const float cw = cosf(w0);
-    const float beta = 2.0f * sqrtf(amp) * (sinf(w0) * kButterworthQ);
+    const float alpha = slope == 1.0f ? sinf(w0) * kButterworthQ
+                                      : 0.5f * sinf(w0) * sqrtf((amp + 1.0f / amp) * (1.0f / slope - 1.0f) + 2.0f);
+    const float beta = 2.0f * sqrtf(amp) * alpha;
     const float ap = amp + 1.0f, am = amp - 1.0f;
     const float a0 = ap - sign * am * cw + beta;
     b0 = amp * (ap + sign * am * cw + beta) / a0;

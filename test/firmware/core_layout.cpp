@@ -95,7 +95,7 @@ void checkTrackerCost() {
         "tracker cost: the worst column counts it too");
 
   // Formant in slot 3 in Octave's place pays the tracker without Autotune, and once beside it. Lo-fi and
-  // Bloom in slot 7 do not pay it.
+  // Chatter in slot 7 do not pay it.
   const int gate = costs::kGate.avg;
   Layout formant = noPitch;
   formant.card[2] = Card::Formant;
@@ -112,7 +112,7 @@ void checkTrackerCost() {
   Layout bloom = noPitch;
   bloom.card[6] = Card::Bloom;
   check(layoutCost(lofi).avg == base - gate + costs::kLofi.avg && layoutCost(bloom).avg == base - gate + costs::kBloom.avg,
-        "tracker cost: Lo-fi and Bloom pay none");
+        "tracker cost: Lo-fi and Chatter pay none");
 }
 
 // The pitch stage's own work, kPitchStage, counts once in both columns when Octave or Formant is placed
@@ -184,7 +184,7 @@ void checkSlot7Costs() {
   };
   const Row rows[] = {{Card::Gate, costs::kGate, "Gate"},
                       {Card::Lofi, costs::kLofi, "Lo-fi"},
-                      {Card::Bloom, costs::kBloom, "Bloom"}};
+                      {Card::Bloom, costs::kBloom, "Chatter"}};
   const costs::Cost defaultRest = costs::kFixed + costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kUnison +
                                   costs::kSlapback + costs::kDistortion + costs::kReverbSpring + costs::kTracker;
   const costs::Cost heavyRest = costs::kFixed + costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kCrowd +
@@ -222,13 +222,13 @@ void checkSlot7Costs() {
             layoutValid(formantHeavy).ok(),
         "slot 3 cost: Formant costs less than Octave and is accepted in both layouts");
 
-  // Bloom's estimate puts MOB and Chasm exactly on the mean line, which layoutValid accepts.
+  // Chatter's estimate puts MOB and Chasm exactly on the mean line, which layoutValid accepts.
   Layout heavyBloom = defaultLayout();
   heavyBloom.card[3] = Card::Crowd;
   heavyBloom.card[6] = Card::Bloom;
   heavyBloom.card[7] = Card::ReverbChasm;
   check(layoutCost(heavyBloom).avg == costs::kBudgetAvgPercent && layoutValid(heavyBloom).ok(),
-        "slot 7 cost: MOB, Chasm and Bloom sum to exactly the 75 % mean line and layoutValid accepts it");
+        "slot 7 cost: MOB, Chasm and Chatter sum to exactly the 75 % mean line and layoutValid accepts it");
 }
 
 void checkLayoutValid() {
@@ -333,7 +333,7 @@ void checkComposeCrowd() {
 }
 
 // Formant in slot 3 and each slot 7 card read their knobs and toggle from their own slot's pots, and
-// Bloom's word key follows the placement of the Input gate.
+// The Chatter card's word key follows the placement of the Input gate.
 void checkComposeSlot7Cards() {
   PanelReading panel = panelWithToggles(false);
   Layout layout = defaultLayout();
@@ -365,14 +365,14 @@ void checkComposeSlot7Cards() {
   layout.card[6] = Card::Bloom;
   panel.knob[6] = {0.5f, 0.6f};
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.bloom.on && std::fabs(snap.params.bloom.tailMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f &&
-            std::fabs(snap.params.bloom.bloom - 0.6f) < 1e-6f && snap.params.bloom.keyFromGate,
-        "compose: Bloom in slot 7 reads LENGTH and AMOUNT, and keys on the Input gate the default layout places");
+  check(snap.params.bloom.on && std::fabs(snap.params.bloom.lengthMs - std::sqrt(20.0f * 3000.0f)) < 1e-2f &&
+            std::fabs(snap.params.bloom.amount - 0.6f) < 1e-6f && snap.params.bloom.keyFromGate,
+        "compose: the Chatter card in slot 7 reads LENGTH and AMOUNT, and keys on the Input gate the default layout places");
 
   layout.card[0] = Card::Empty;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.bloom.on && !snap.params.bloom.keyFromGate,
-        "compose: with no Input gate placed Bloom listens to its own input");
+        "compose: with no Input gate placed the Chatter card listens to its own input");
 }
 
 // composeSnapshotInto builds the snapshot in an object the caller owns, for the firmware's main loop, which
@@ -385,11 +385,11 @@ void checkComposeInto() {
   composeSnapshotInto(*into, bloom, panelWithToggles(true), Settings(), BenchOverrides());
   const ChainSnapshot want = composeSnapshot(bloom, panelWithToggles(true), Settings(), BenchOverrides());
   check(into->layout == bloom && into->params.bloom.on && into->params.bloom.keyFromGate && into->slotOn == want.slotOn &&
-            into->outputGain == want.outputGain && into->params.bloom.tailMs == want.params.bloom.tailMs,
+            into->outputGain == want.outputGain && into->params.bloom.lengthMs == want.params.bloom.lengthMs,
         "composeInto: a snapshot built in place equals the one composeSnapshot returns");
 
   Layout other = defaultLayout();
-  other.card[0] = Card::Empty;  // no Input gate, so nothing keys Bloom
+  other.card[0] = Card::Empty;  // no Input gate, so nothing keys the Chatter card
   const PanelReading off = panelWithToggles(false);
   composeSnapshotInto(*into, other, off, Settings(), BenchOverrides());
   const ChainSnapshot fresh = composeSnapshot(other, off, Settings(), BenchOverrides());
@@ -701,7 +701,7 @@ void checkSlot7CardSlot() {
   check(slot7CardSlot(layout) == 6, "slot7CardSlot: the default layout has Gate in slot 7");
   for (const Card c : {Card::Lofi, Card::Bloom}) {
     layout.card[6] = c;
-    check(slot7CardSlot(layout) == 6, "slot7CardSlot: Lo-fi and Bloom count as well");
+    check(slot7CardSlot(layout) == 6, "slot7CardSlot: Lo-fi and Chatter count as well");
   }
   layout.card[6] = Card::Formant;
   check(slot7CardSlot(layout) == -1, "slot7CardSlot: Formant does not count");
@@ -713,7 +713,7 @@ void checkSlot7CardSlot() {
   check(slot7CardSlot(layout) == 1, "slot7CardSlot: the first slot when several are placed");
 }
 
-// The slot 7 action walks Gate, Lo-fi, Bloom and wraps, in the slot that holds the card and no other,
+// The slot 7 action walks Gate, Lo-fi, Chatter and wraps, in the slot that holds the card and no other,
 // and passes over a card layoutValid refuses.
 void checkCycleSlot7Card() {
   Settings s;
@@ -724,7 +724,7 @@ void checkCycleSlot7Card() {
     const Layout last = layout;
     const bool changed = ui::applyAction(UiAction::CycleSlot7Card, s, layout) == ui::ApplyResult::LayoutChanged;
     for (int slot = 0; slot < kSlotCount; ++slot) others = others && (slot == 6 || layout.card[slot] == last.card[slot]);
-    check(changed && layout.card[6] == want, "action: CycleSlot7Card moves slot 7 on round Gate, Lo-fi, Bloom and back");
+    check(changed && layout.card[6] == want, "action: CycleSlot7Card moves slot 7 on round Gate, Lo-fi, Chatter and back");
   }
   check(others && s.outputLevel == before.outputLevel && s.inputJack == before.inputJack &&
             s.polishComp == before.polishComp && s.polishEq == before.polishEq && s.topSwitch == before.topSwitch &&
@@ -752,18 +752,18 @@ void checkCycleSlot7Card() {
   check(ui::applyAction(UiAction::CycleSlot7Card, s, all) == ui::ApplyResult::None && all == allBefore,
         "action: CycleSlot7Card changes nothing when each other card would repeat");
 
-  // MOB beside Spring with Unison in Octave's slot sits on the mean line with Gate in slot 7, so Bloom's
+  // MOB beside Spring with Unison in Octave's slot sits on the mean line with Gate in slot 7, so Chatter's
   // 5 % is refused and the cycle passes it. The expected cards follow layoutValid, not a fixed verdict.
   Layout tight = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
                    Card::Gate, Card::ReverbSpring}};
   Layout withBloom = tight;
   withBloom.card[6] = Card::Bloom;
   check(layoutValid(tight).ok() && !layoutValid(withBloom).ok() && layoutCost(tight).avg == costs::kBudgetAvgPercent,
-        "action: the tight layout fits with Gate on the mean line and refuses Bloom");
+        "action: the tight layout fits with Gate on the mean line and refuses Chatter");
   Layout atLofi = tight;
   atLofi.card[6] = Card::Lofi;
   check(ui::applyAction(UiAction::CycleSlot7Card, s, atLofi) == ui::ApplyResult::LayoutChanged && atLofi == tight,
-        "action: CycleSlot7Card passes over Bloom and wraps from Lo-fi to Gate");
+        "action: CycleSlot7Card passes over Chatter and wraps from Lo-fi to Gate");
   check(ui::applyAction(UiAction::CycleSlot7Card, s, atLofi) == ui::ApplyResult::LayoutChanged &&
             atLofi.card[6] == Card::Lofi,
         "action: and goes on from Gate to Lo-fi");

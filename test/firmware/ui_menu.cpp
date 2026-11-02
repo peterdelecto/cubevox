@@ -827,7 +827,7 @@ void checkMenuUnisonCrowdNoSlot() {
 }
 
 // The slot 7 row reads the layout, so its label follows the slot that holds Gate, Formant, Lo-fi or
-// Bloom and its value follows the card. With none of the four placed it reads SLOT - and GATE, the default.
+// Chatter and its value follows the card. With none of the four placed it reads SLOT - and GATE, the default.
 void checkMenuSlot7Value() {
   struct Case {
     const char* name;
@@ -840,7 +840,7 @@ void checkMenuSlot7Value() {
     l.card[kSlot7Slot] = c;
     return l;
   };
-  Layout moved = defaultLayout();  // Bloom in slot 1, with Empty where Gate was
+  Layout moved = defaultLayout();  // Chatter in slot 1, with Empty where Gate was
   moved.card[0] = Card::Bloom;
   moved.card[kSlot7Slot] = Card::Empty;
   Layout none = defaultLayout();
@@ -883,7 +883,7 @@ void checkMenuSlot7Redraw() {
         "menu: a new card in the same slot repaints the row with the new value");
 }
 
-// A click on the slot 7 row asks for the cycle. Applying it takes Gate to Lo-fi to Bloom and back to Gate,
+// A click on the slot 7 row asks for the cycle. Applying it takes Gate to Lo-fi to Chatter and back to Gate,
 // with every other slot and setting as they were, and the row shows each card. The layout with each card
 // survives a save and a reload.
 void checkMenuSlot7Click() {
@@ -909,14 +909,14 @@ void checkMenuSlot7Click() {
   check(m.layout == defaultLayout() && sameSettings(m.settings, Settings()),
         "menu: three clicks come round to the default layout and touch no setting");
 
-  // A card the layout would refuse is passed over: Bloom would put this layout over the mean line, so
+  // A card the layout would refuse is passed over: Chatter would put this layout over the mean line, so
   // the click on Lo-fi lands on Gate.
   MenuRig tight;
   tight.layout = {{Card::InputGate, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
                    Card::Lofi, Card::ReverbSpring}};
   Layout bloom = tight.layout;
   bloom.card[kSlot7Slot] = Card::Bloom;
-  check(layoutValid(tight.layout).ok() && !layoutValid(bloom).ok(), "menu: the tight layout fits with Lo-fi and refuses Bloom");
+  check(layoutValid(tight.layout).ok() && !layoutValid(bloom).ok(), "menu: the tight layout fits with Lo-fi and refuses Chatter");
   tight.openListAt(kSlot7Card);
   check(ui::applyAction(tight.step(0, true), tight.settings, tight.layout) == ui::ApplyResult::LayoutChanged &&
             tight.layout.card[kSlot7Slot] == Card::Gate,

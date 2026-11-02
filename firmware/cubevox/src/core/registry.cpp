@@ -38,7 +38,7 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
-constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kTailMinMs, cv::Bloom::kTailMaxMs, "ms",
+constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
@@ -174,9 +174,9 @@ void applyLofiKnob(int knob, float v, cv::LofiParams& l) {
 
 void applyBloomKnob(int knob, float v, cv::BloomParams& b) {
   if (knob == 0) {
-    b.tailMs = knobValue(kBloomLength, v);
+    b.lengthMs = knobValue(kBloomLength, v);
   } else {
-    b.bloom = v;
+    b.amount = v;
   }
 }
 
@@ -280,7 +280,7 @@ void applyToggle(Card c, bool on, ChainParams& out) {
 void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbSpring) out.reverb.engine = cv::kReverbSpring;
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
-  // Bloom takes its word key from the Input gate's detector whenever that card is placed.
+  // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
 }
 
