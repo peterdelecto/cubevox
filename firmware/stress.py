@@ -5,8 +5,10 @@ For each layout the script puts the layout on the box, forces every slot on (ben
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
 to the panel and sweeps SEMITONES (Octave's upper knob), the reverb MIX (the reverb slot's lower
-knob) and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in steps of 10 %, 1 s
-each, reading the counters after each sweep.
+knob), both Echo knobs and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in
+steps of 10 %, 1 s each, reading the counters after each sweep. When Echo is placed it then flips
+Echo's toggle ten times, 0.3 s apart, so the engine starts from reset five times, and reads the
+counters again.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
@@ -60,6 +62,8 @@ BLOCK_MEAN_LIMIT_PERCENT = 75
 BLOCK_WORST_LIMIT_PERCENT = 95
 SWEEP_VALUES = range(0, 101, 10)  # percent of travel
 SWEEP_STEP_S = 1.0
+TOGGLE_FLIPS = 10    # Echo's toggle flips off and on five times
+TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
@@ -76,8 +80,8 @@ ROW_OF = {
 TRACKER_ROW = "kTracker"
 PITCH_STAGE = ("autotune", "octave")        # cards the shared PitchFx runs
 PITCH_GROUP = ("autotune", "octave", "crowd")  # the first of these carries the stage's cost
-NEEDED_OPS = ("slots_live", "all_on", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats", "clip",
-              "chasm")
+NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
+              "clip", "chasm")
 
 COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
 BLOCKS_LINE = re.compile(r"\[audio\] blocks (\d+) late (\d+) overruns (\d+) dry (\d+) avg (\d+) worst (\d+) of (\d+) cycles")
@@ -308,6 +312,9 @@ def sweeps(slots):
             found.append((i, 1, "SEMITONES"))
         if card.startswith("reverb_"):
             found.append((i, 2, "reverb MIX"))
+        if card == "slapback":
+            found.append((i, 1, "Echo TIME"))
+            found.append((i, 2, "Echo AMOUNT"))
         if card == "crowd":
             found.append((i, 1, "Crowd DIVERGE"))
             found.append((i, 2, "Crowd VOICES"))
@@ -335,6 +342,12 @@ def measure_run(box, slots, seconds):
             box.wait(SWEEP_STEP_S)
         later.append(box.stats())
         box.bench_ok("knobs_live")
+    for slot in (i for i, card in enumerate(slots) if card == "slapback"):
+        say(f"pass 2, {TOGGLE_FLIPS} flips of the Echo toggle (slot {slot + 1})")
+        for _ in range(TOGGLE_FLIPS):
+            box.bench_ok("slot_off", slot=slot + 1)  # each call flips the slot's force-off bit
+            box.wait(TOGGLE_STEP_S)
+        later.append(box.stats())
     every = [first, *later]
     return {
         "blocks": first.blocks,

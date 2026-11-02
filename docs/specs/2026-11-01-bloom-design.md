@@ -330,7 +330,8 @@ shelf.
 ## 18. Audit fix pass as built (v2.01.05)
 
 Owner 2026-11-01 on CHATTER's level: the dry holds, as it does for Echo and Unison. This section
-overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2 and 6 where they differ.
+overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2, 4 and 6 where they differ. In 17
+item 4 the trim is now one constant gain on the slices, not a stepped gain.
 
 1. Level. `trimDb` −14.5 dB scales the slices alone; the dry passes at unity, bit for bit
    (`bloom_test` `dry-unity`). The six rows, with no slack: gate key +0.31, +0.20, +0.33 dB; own
@@ -344,6 +345,10 @@ overrides sections 14 item 7, 15 items 4 and 5, and 17 items 2 and 6 where they 
 
    The slices sit 7 to 11 dB below v2.01.04. The level rule binds the default; AMOUNT 100 % reads
    +0.58 dB.
+
+   The CPU comparisons with Echo in sections 14 and 15 use the Echo engine of v2.00.81. The
+   2026-11-02 Echo pass made Echo about four times cheaper, so those ratios no longer convert
+   to board figures.
 2. CPU. Host bench, Adam's clip through the Input gate at −55 dBFS: 12.09 → 7.80 ns a sample on
    clang, 9.83 → 8.21 on g++ (Echo 8.06 / 8.27 on the same bench). Clang, before → after: idle 6.15
    → 0.42, a word 11.70 → 7.44, a tail 10.61 → 7.22, 60 ms words at AMOUNT 100 % 15.21 → 11.13.

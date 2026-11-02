@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cmath>
 #include <complex>
 #include <cstdint>
@@ -21,37 +20,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <new>
 #include <utility>
 #include <vector>
 
 #include "engine/crowd.h"
 
-namespace {
-
-std::atomic<bool> gInProcess{false};
-
-void guardAlloc() {
-  if (gInProcess.load()) std::abort();
-}
-
-}  // namespace
-
-// Allocation in process() aborts the test binary.
-void* operator new(std::size_t n) {
-  guardAlloc();
-  void* p = std::malloc(n);
-  if (!p) std::abort();
-  return p;
-}
-void* operator new[](std::size_t n) { return operator new(n); }
-void operator delete(void* p) noexcept {
-  guardAlloc();
-  std::free(p);
-}
-void operator delete[](void* p) noexcept { operator delete(p); }
-void operator delete(void* p, std::size_t) noexcept { operator delete(p); }
-void operator delete[](void* p, std::size_t) noexcept { operator delete(p); }
+#include "alloc_guard.h"
 
 namespace {
 
@@ -1132,11 +1106,24 @@ void allEnhancements(cv::CrowdTuning& t) {
 constexpr std::array<uint64_t, 4> kPinned = {0x160a6132d98f9359ULL, 0xd50d29e677f4651fULL, 0x8d7fc1ce41837fb8ULL,
                                              0x917938dbd5014f90ULL};
 
-// Each run's hash against its pinned value.
+// The toolchain that produced kPinned. A bit-exact hash follows the compiler's code generation and
+// the system libm, so the pins hold on this toolchain only. Anywhere else checkPinned prints SKIP and
+// the runs still have to agree with each other. To re-pin on another toolchain, copy the engine
+// hashes it prints and its name into kPinned and kPinnedToolchain together.
+constexpr const char* kPinnedToolchain = "17.0.0 (clang-1700.0.13.5) arm64";
+
+#if defined(__clang_version__) && defined(__aarch64__)
+constexpr const char* kToolchain = __clang_version__ " arm64";
+#else
+constexpr const char* kToolchain = "an unrecognised toolchain";
+#endif
+
+// Each run's hash against its pinned value, on the toolchain that pinned them.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {
   const char* what[4] = {"180 Hz program VOICES 6 DIVERGE 50", "burst program VOICES 8 DIVERGE 50",
                          "burst program VOICES 6 DIVERGE 80 scatter 12 drift 20",
                          "180 Hz program VOICES 6 DIVERGE 50 on the shipped tuning"};
+  const bool pinHolds = std::strcmp(kToolchain, kPinnedToolchain) == 0;
   bool ok = true;
   for (size_t i = 0; i < hashes.size(); ++i) {
     char name[40];
@@ -1144,7 +1131,11 @@ bool checkPinned(const std::array<uint64_t, 4>& hashes) {
     const bool same = hashes[i] == kPinned[i];
     std::printf("info hash run %zu, %s: pinned %016llx, engine %016llx\n", i + 1, what[i],
                 static_cast<unsigned long long>(kPinned[i]), static_cast<unsigned long long>(hashes[i]));
-    ok &= report(name, same, "output hash equals the pinned value: %.0f (1)", same ? 1.0 : 0.0);
+    if (pinHolds) ok &= report(name, same, "output hash equals the pinned value: %.0f (1)", same ? 1.0 : 0.0);
+  }
+  if (!pinHolds) {
+    std::printf("SKIP default hash, runs 1..4  pinned on \"%s\", this toolchain is \"%s\"\n", kPinnedToolchain,
+                kToolchain);
   }
   return ok;
 }
@@ -1174,10 +1165,17 @@ bool testEnhancementsDefaultExact() {
   const size_t diffBurst = differing(c, d);
   cv::CrowdParams shipped = base;
   shipped.tuning = cv::CrowdTuning{};
-  const bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
-                         "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
-                         static_cast<double>(diffProg), static_cast<double>(diffBurst));
-  return checkPinned({fnv(a), fnv(run(burst, knobs(8, 0.5f))), fnv(c), fnv(run(prog, shipped))}) && ok;
+  bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
+                   "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
+                   static_cast<double>(diffProg), static_cast<double>(diffBurst));
+
+  // Runs 2 and 4 have no neutral twin above, so each plays twice and the hashes must agree on any toolchain.
+  const uint64_t h2 = fnv(run(burst, knobs(8, 0.5f)));
+  const uint64_t h4 = fnv(run(prog, shipped));
+  const bool repeats = h2 == fnv(run(burst, knobs(8, 0.5f))) && h4 == fnv(run(prog, shipped));
+  ok &= report("default runs repeat", repeats, "a second play of runs 2 and 4 hashes the same: %.0f (1)",
+               repeats ? 1.0 : 0.0);
+  return checkPinned({fnv(a), h2, fnv(c), h4}) && ok;
 }
 
 // The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
@@ -2195,7 +2193,7 @@ PlainRun runPlain(const Signal& in, size_t c) {
 bool testPlainAfter() {
   const Signal in = toneThenNoise();
   bool ok = true;
-  for (const std::pair<size_t, double> c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
+  for (const std::pair<size_t, double>& c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
     const PlainRun r = runPlain(in, c.first);
     const double ms = (r.plainAt - r.unvoicedAt + cv::kBlock) * 1000.0 / kRate;
     const double glide = maxStep(r.out, r.plainAt - 1, r.plainAt + msToSamples(60.0));

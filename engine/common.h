@@ -16,6 +16,7 @@ namespace cv {
 
 constexpr int kSampleRate = 48000;
 constexpr int kBlock = 64;
+constexpr float kSmpPerMs = kSampleRate / 1000.0f;
 
 constexpr float kClipMax = 3.0f;
 
@@ -27,11 +28,13 @@ inline float softClip(float x) {
 }
 
 // The same curve with headroom h: unity gain below the knee, which sits h times
-// higher, so a reverb's input drive saturates only near the top of its range.
-inline float softClipHeadroom(float x, float h) { return h * softClip(x / h); }
+// higher, so a reverb's input drive saturates only near the top of its range. With a constant h the
+// compiler folds 1 / h, so the input scale costs a multiply.
+inline float softClipHeadroom(float x, float h) { return h * softClip(x * (1.0f / h)); }
 
-// Headroom for the Chasm and Spring input drive, set so a 0 dBFS voice at the
-// default dwell of 0.2 (drive 1.5) enters the curve at about a third of its knee.
-constexpr float kChasmClipHeadroom = 4.5f;
+// Headroom for both reverbs' input drive, set so a 0 dBFS voice at each engine's default dwell of
+// 0.2 enters the curve at about a third of its knee. Chasm's drive is 8^0.2 = 1.52, which is 0.34
+// of the knee. Spring's is 4^0.2 = 1.32, which is 0.29.
+constexpr float kReverbClipHeadroom = 4.5f;
 
 }  // namespace cv

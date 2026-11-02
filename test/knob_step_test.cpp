@@ -120,10 +120,11 @@ struct Step {
 
 // Continuous knobs step at a low, a middle and a high setting; both Chatter knobs also step at the last
 // touch below the top of their travel (LENGTH 3 s, AMOUNT 100 %), and LENGTH at the first touch above
-// its bottom (20 ms). Chatter's AMOUNT sets the slice length as well as the loudness, so it walks its
-// whole travel in tenths, from the bottom, where the stage is a plain copy. A stepped knob of up to ten
-// detents (the Mob card's VOICES) moves across every detent in turn, as does the Formant card's SHIFT
-// with its fifteen, and a longer one moves one detent at a quarter and at three quarters of its travel.
+// its bottom (20 ms). Both Spring knobs also move their whole travel in one step, up and down. Chatter's
+// AMOUNT sets the slice length as well as the loudness, so it walks its whole travel in tenths, from the
+// bottom, where the stage is a plain copy. A stepped knob of up to ten detents (the Mob card's VOICES)
+// moves across every detent in turn, as does the Formant card's SHIFT with its fifteen, and a longer one
+// moves one detent at a quarter and at three quarters of its travel.
 constexpr int kWalkedDetents = 10;
 
 std::vector<Step> stepsFor(Card c, int knob) {
@@ -147,6 +148,11 @@ std::vector<Step> stepsFor(Card c, int knob) {
       for (float p : {0.2f, 0.5f, 0.8f}) s.push_back({p, p + kContinuousStep});
     }
     if (c == Card::Bloom) s.push_back({1.0f - kContinuousStep, 1.0f});
+    // The Spring card's knobs also move the whole travel in one step each way, as a fast turn would.
+    if (c == Card::ReverbSpring) {
+      s.push_back({0.0f, 1.0f});
+      s.push_back({1.0f, 0.0f});
+    }
     if (c == Card::Bloom && knob == 0) s.push_back({0.0f, kContinuousStep});
     // Lo-fi's TONE and AMOUNT also step at the last touch below the top of their travel.
     if (c == Card::Lofi) s.push_back({1.0f - kContinuousStep, 1.0f});
@@ -162,16 +168,29 @@ std::vector<Step> stepsFor(Card c, int knob) {
   return {{lo, lo + 1.0f}, {hi, hi + 1.0f}};
 }
 
+// Echo's Amount starts at 0, where the echo has no gain and its Time never reaches the output, so its
+// background holds Amount at half travel.
+constexpr float kEchoBackgroundAmount = 0.5f;
+
 // The registry's defaults with the card placed and switched on.
 ChainParams background(Card c) {
   ChainParams p;
   applyPlacement(c, p);
   applyToggle(c, true, p);
+  if (c == Card::Slapback) applyKnob(c, 1, kEchoBackgroundAmount, p);
   return p;
 }
 
+// Echo's Time bends the repeat while the delay glides, and a pure tone through a comb shows the dry
+// and the echo beating as their phase turns, which is not a click. The Time row reads the echo
+// alone (the output less the input, with the trim off), whose curvature stays at its steady value
+// through the glide and jumps at a click in the delay. The steps are upward touches, as the knob
+// filter delivers them, so the repeat's pitch falls and its curvature stays below the steady value.
+bool readsEchoAlone(Card c, int knob) { return c == Card::Slapback && knob == 0; }
+
 bool checkKnob(Card c, int knob, const Signal& in) {
   const ChainParams base = background(c);
+  const bool echoAlone = readsEchoAlone(c, knob);
   double worst = 0.0;
   Step at{};
   for (const Step& s : stepsFor(c, knob)) {
@@ -179,7 +198,12 @@ bool checkKnob(Card c, int knob, const Signal& in) {
     ChainParams b = base;
     applyKnob(c, knob, s.from, a);
     applyKnob(c, knob, s.to, b);
-    const double r = stepRatio(runCard(c, in, a, b));
+    if (echoAlone) a.slapback.tuning.trimDb = b.slapback.tuning.trimDb = 0.0f;
+    Signal out = runCard(c, in, a, b);
+    if (echoAlone) {
+      for (size_t i = 0; i < out.size(); ++i) out[i] -= in[i];
+    }
+    const double r = stepRatio(out);
     if (r >= worst) {
       worst = r;
       at = s;
