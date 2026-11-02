@@ -24,6 +24,7 @@ constexpr double kBb3 = 233.1;
 constexpr double kB3 = 246.94;
 constexpr double kC4 = 261.63;
 constexpr int kSettle = cv::kSampleRate * 3 / 10;  // 300 ms
+constexpr double kOctaveVibratoCents = 5.5;  // the voice reads 2.7 following the correction, 10.4 behind a 15 ms glide
 
 // Ten harmonics at 1/k amplitude, peak 0.5. hzAt gives the pitch per sample,
 // so a step keeps the phase continuous.
@@ -237,6 +238,39 @@ bool testOctaveFollows() {
   const double err = got > 0.0 ? cents(got, kC4) : 9999.0;
   return report("feeds octave", std::fabs(err) <= 15.0,
                 "out=%.2f Hz, err vs C4=%.2f cents (+-15)", got, err);
+}
+
+// 6b. Octave +12 on a note that hard tune holds on A3 against a 5.5 Hz, +-30 cent vibrato comes out on
+// A4. The correction is what cancels the vibrato, so the voice has to follow it as it moves: the
+// output pitch's RMS distance from A4, read by a fresh tracker.
+bool testOctaveFollowsVibrato() {
+  constexpr double kVibratoHz = 5.5;
+  constexpr double kA4 = 2.0 * kA3;
+  const std::vector<float> in = tone(3 * cv::kSampleRate, [](int i) {
+    return kA3 * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * kVibratoHz * i / cv::kSampleRate));
+  });
+  cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
+  p.octave.on = true;
+  p.octave.mix = 1.0f;
+  p.octave.semitones = 12;
+  gFx.reset();
+  const std::vector<float> out = run(gFx, in, p);
+  cv::PitchTracker t;
+  double sum = 0.0;
+  int n = 0;
+  const int total = static_cast<int>(out.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    t.push(&out[static_cast<size_t>(i)], std::min(cv::kBlock, total - i));
+    if (i > kSettle && t.result().voiced) {
+      const double c = cents(t.result().rawHz, kA4);
+      sum += c * c;
+      ++n;
+    }
+  }
+  const double rmsCents = n > 0 ? std::sqrt(sum / n) : 9999.0;
+  return report("octave follows vibrato", rmsCents <= kOctaveVibratoCents,
+                "octave +12 on hard-tuned A3 under 5.5 Hz vibrato: %.2f cents RMS from A4 (<= %.1f)", rmsCents,
+                kOctaveVibratoCents);
 }
 
 // The process() call sizes every call-size case runs: odd, short, the box's block, and longer.
@@ -636,6 +670,7 @@ int main() {
   ok &= testScale();
   ok &= testResponse();
   ok &= testOctaveFollows();
+  ok &= testOctaveFollowsVibrato();
   ok &= testHardTune();
   ok &= testToggle();
   ok &= testToggleLevel();

@@ -7,9 +7,6 @@ namespace {
 // Input gate THRESHOLD until composeSnapshot applies the card's knobs; the middle of its range.
 constexpr float kInputGateThresholdDb = -55.0f;
 
-// Octave MIX until composeSnapshot reads its pot.
-constexpr float kOctaveStartMix = 0.10f;
-
 }  // namespace
 
 ChainParams::ChainParams() {
@@ -19,7 +16,7 @@ ChainParams::ChainParams() {
   gate.on = false;
   pitchFx.autotune.on = false;
   pitchFx.octave.on = false;
-  pitchFx.octave.mix = kOctaveStartMix;
+  pitchFx.octave.mix = cv::kOctaveDefaultMix;  // until composeSnapshot reads its pot
   pitchFx.formant.on = false;
   pitchFx.crowdOn = false;
   crowd.on = false;

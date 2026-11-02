@@ -33,6 +33,14 @@ constexpr float kMaxPitchRatio = 2.0f;
 constexpr float kMinReadDelay = 3.0f;
 constexpr float kMaxReadDelay = kVoiceRingLen - 4.0f;
 
+// Where a voice's marks and launch countdown stand. A voice that starts beside another takes its
+// grid and launches on the same samples. Both PSOLA voices keep the newest mark in
+// [grainDelay, grainDelay + period) behind the head.
+struct VoiceGrid {
+  float markDelay;
+  float countdown;
+};
+
 class PsolaVoice {
  public:
   // The default grain delay lines the voice up with the tracker's frame. A shorter delay lets the
@@ -56,12 +64,22 @@ class PsolaVoice {
   // The grain delay in force, after the clamp.
   float grainDelay() const { return grainDelay_; }
 
+  VoiceGrid grid() const { return {markDelay_, countdown_}; }
+  void adoptGrid(const VoiceGrid& g) {
+    markDelay_ = g.markDelay;
+    countdown_ = g.countdown;
+  }
+
+  // How far the voice lags the input at this period, in samples: the grain delay plus the period
+  // the voice plays at. The Formant card reads it to put its voice on the same sample.
+  float latency(float period) const { return grainDelay_ + PitchTracker::clampPeriod(period); }
+
   // One output sample. head is the ring index of the sample just written, already wrapped below
   // kVoiceRingLen by the owner. period is the sung period in samples (last voiced), inverseRatio the
   // inverse of the pitch ratio, which clamps to 0.5..2.0 as the ratio does.
   float tick(const VoiceRing& ring, int head, float period, float inverseRatio) {
     if (period <= 0.0f) return 0.0f;
-    const float p = clampf(period, kMinPeriod, kMaxPeriod);
+    const float p = PitchTracker::clampPeriod(period);
     const float inv = clampf(inverseRatio, 1.0f / kMaxPitchRatio, 1.0f / kMinPitchRatio);
     const float outPeriod = p * inv;
 
@@ -88,7 +106,6 @@ class PsolaVoice {
     bool active = false;
   };
 
-  static constexpr float kMinPeriod = static_cast<float>(PitchTracker::kMinPeriod);
   static constexpr float kMaxPeriod = static_cast<float>(PitchTracker::kMaxPeriod);
 
   // The delay that lines the voice up with the tracker's frame (see kGrainDelay) stays over 1.5

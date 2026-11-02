@@ -1102,9 +1102,11 @@ void allEnhancements(cv::CrowdTuning& t) {
 // re-pinned 2026-11-01 because its scatter moved from 15 to 12 ms when the tuning range became the
 // ring's allowance, not for an engine change. Runs 1 and 4 were re-pinned when VOICES became ten
 // steps, because their old position fell between two steps. Runs 2 and 3 sit on positions the
-// old law shared (8 and 6 copies) and kept their hashes.
-constexpr std::array<uint64_t, 4> kPinned = {0x160a6132d98f9359ULL, 0xd50d29e677f4651fULL, 0x8d7fc1ce41837fb8ULL,
-                                             0x917938dbd5014f90ULL};
+// old law shared (8 and 6 copies) and kept their hashes. All four were re-pinned when the grain
+// length took its floor of two output periods (formant_voice.h setGrain). A copy whose pitch ratio
+// sits below its playback rate now lengthens its grains. The MOB program level moved by 0.01 dB.
+constexpr std::array<uint64_t, 4> kPinned = {0x81dc6bbf662e297eULL, 0xb0efcbaf83bf5979ULL, 0xf9246e3b6c9d0344ULL,
+                                             0xfdf2bd9bfb21710bULL};
 
 // The toolchain that produced kPinned. A bit-exact hash follows the compiler's code generation and
 // the system libm, so the pins hold on this toolchain only. Anywhere else checkPinned prints SKIP and
@@ -2030,10 +2032,10 @@ bool testOutOfRange() {
 // samples hold NaN. They overwrote the oldest, so a read past the valid span lands on them. Returns the
 // NaN output samples, and the peak in `peak`.
 size_t canaryReads(const Signal& x, const std::vector<int>& sizes, float ratio, double* peak) {
-  namespace cd = cv::crowd_detail;
+  namespace fd = cv::formant_detail;
   std::unique_ptr<cv::VoiceRing> ring(new cv::VoiceRing());
   ring->fill(0.0f);
-  cd::FormantPsolaVoice voice;
+  fd::FormantPsolaVoice voice;
   voice.reset();
   Signal out(x.size(), 0.0f);
   int head = 0;
@@ -2045,7 +2047,7 @@ size_t canaryReads(const Signal& x, const std::vector<int>& sizes, float ratio, 
       (*ring)[static_cast<size_t>(head)] = std::nanf("");
       head = head + 1 == cv::kVoiceRingLen ? 0 : head + 1;
     }
-    voice.prepare(kRate / 72.0f, ratio, 0.5f, cd::kDelayCeil, n);
+    voice.prepare(kRate / 72.0f, ratio, 0.5f, fd::kDelayCeil, n);
     for (int c = 0; c < n; c += cv::kBlock)
       voice.render(*ring, cv::wrapOnce<cv::kVoiceRingLen>(first + c), std::min(cv::kBlock, n - c), &out[at + static_cast<size_t>(c)]);
     for (int j = 0; j < n; ++j) (*ring)[static_cast<size_t>(cv::wrapOnce<cv::kVoiceRingLen>(first + j))] = x[at + static_cast<size_t>(j)];
@@ -2208,47 +2210,23 @@ bool testPlainAfter() {
   return ok;
 }
 
+// The checks, in the order they run.
+constexpr bool (*kChecks[])() = {
+    testOffExact,        testReset,           testNoAlloc,           testPitchMoves,         testWidthLaw,
+    testFadeOrder,       testFormantMoves,    testVoicesDiffer,      testPowerLaw,           testLevelLaw,
+    testLeadLeaves,      testVoiceCount,      testSolo,              testLagAcrossGap,       testScatter,
+    testDrift,           testTrackerRuns,     testCorrectionReleases, testEnhancementsDefaultExact,
+    testWorkingSetDefaults, testLevelScatter, testContour,           testMelodicBottom,      testWidthGlides,
+    testWidthLag,        testWidthZeroIsDelay, testSharedShelf,      testEnhancementsStable, testSwitchWithTracker,
+    testVoicesStepGlides, testGapOverFloor,   testWidthHoldsLevel,   testOutOfRange,         testReadCeiling,
+    testTuningRanges,    testRaisedLag,       testPlainAfter,
+};
+
 }  // namespace
 
 int main() {
   bool ok = true;
-  ok &= testOffExact();
-  ok &= testReset();
-  ok &= testNoAlloc();
-  ok &= testPitchMoves();
-  ok &= testWidthLaw();
-  ok &= testFadeOrder();
-  ok &= testFormantMoves();
-  ok &= testVoicesDiffer();
-  ok &= testPowerLaw();
-  ok &= testLevelLaw();
-  ok &= testLeadLeaves();
-  ok &= testVoiceCount();
-  ok &= testSolo();
-  ok &= testLagAcrossGap();
-  ok &= testScatter();
-  ok &= testDrift();
-  ok &= testTrackerRuns();
-  ok &= testCorrectionReleases();
-  ok &= testEnhancementsDefaultExact();
-  ok &= testWorkingSetDefaults();
-  ok &= testLevelScatter();
-  ok &= testContour();
-  ok &= testMelodicBottom();
-  ok &= testWidthGlides();
-  ok &= testWidthLag();
-  ok &= testWidthZeroIsDelay();
-  ok &= testSharedShelf();
-  ok &= testEnhancementsStable();
-  ok &= testSwitchWithTracker();
-  ok &= testVoicesStepGlides();
-  ok &= testGapOverFloor();
-  ok &= testWidthHoldsLevel();
-  ok &= testOutOfRange();
-  ok &= testReadCeiling();
-  ok &= testTuningRanges();
-  ok &= testRaisedLag();
-  ok &= testPlainAfter();
+  for (bool (*check)() : kChecks) ok &= check();
   std::printf("%s crowd\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

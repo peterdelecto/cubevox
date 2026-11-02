@@ -137,7 +137,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
   if (e == kNoEngine) return false;
 
   // The first pitch-group card's slot carries the shared pitch stage and fades on every pitch-group
-  // toggle. Autotune and Octave have no engine of their own, so after the stage ran they do nothing.
+  // toggle. Autotune, Octave and Formant have no engine of their own, so after the stage ran they do nothing.
   const bool carriesPitch = !pitchDone && cardDesc(c).group == Group::Pitch;
   if (e == Engine::Pitch && !carriesPitch) return false;
 

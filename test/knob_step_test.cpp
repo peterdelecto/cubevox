@@ -122,10 +122,10 @@ struct Step {
 // touch below the top of their travel (LENGTH 3 s, AMOUNT 100 %), and LENGTH at the first touch above
 // its bottom (20 ms). Both Spring knobs also move their whole travel in one step, up and down. Chatter's
 // AMOUNT sets the slice length as well as the loudness, so it walks its whole travel in tenths, from the
-// bottom, where the stage is a plain copy. A stepped knob of up to ten detents (the Mob card's VOICES)
-// moves across every detent in turn, as does the Formant card's SHIFT with its fifteen, and a longer one
-// moves one detent at a quarter and at three quarters of its travel.
-constexpr int kWalkedDetents = 10;
+// bottom, where the stage is a plain copy. A stepped knob of up to fifteen detents (the Mob card's VOICES,
+// the Formant card's SHIFT) moves across every detent in turn, and a longer one (Octave's SEMITONES) moves
+// one detent at a quarter and at three quarters of its travel.
+constexpr int kWalkedDetents = 15;
 
 std::vector<Step> stepsFor(Card c, int knob) {
   const int detents = knobSteps(c, knob);
@@ -158,7 +158,7 @@ std::vector<Step> stepsFor(Card c, int knob) {
     if (c == Card::Lofi) s.push_back({1.0f - kContinuousStep, 1.0f});
     return s;
   }
-  if (detents <= kWalkedDetents || c == Card::Formant) {
+  if (detents <= kWalkedDetents) {
     std::vector<Step> s;
     for (int d = 0; d + 1 < detents; ++d) s.push_back({static_cast<float>(d), static_cast<float>(d + 1)});
     return s;

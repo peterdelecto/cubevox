@@ -8,8 +8,8 @@
 - Settled off is a plain copy: a stage switched off ends bit-exact on its input. Test it with
   `==`, never a tolerance.
 - A voice resets on its enable edge only when its crossfade sits at exactly 0; a quick off and
-  on keeps the running voice. `knob_step_test`, `octave_test` and `autotune_test` hold every
-  knob step and toggle to steady-state curvature.
+  on keeps the running voice. `knob_step_test`, `octave_test`, `autotune_test` and `formant_test`
+  hold every knob step and toggle to steady-state curvature.
 - `process()` takes any `n`. An engine with kBlock-sized scratch (Reverb) runs the call in
   kBlock chunks.
 - Shared pieces live in `engine/common.h` (`kSampleRate`, `kBlock`, `kSmpPerMs`), `engine/dsp.h` (Biquad and its RBJ
@@ -19,10 +19,10 @@
   The two reverbs share `engine/reverb_parts.h` (Allpass, Delay, the wobble LFO's sine table and phase step).
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
-- `PitchFx` lives in DTCM: about 76,284 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
+- `PitchFx` lives in DTCM: about 76,600 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
   Formant voice included; the 265.75 ms input ring is 51,024 B of it, sized in `psola.h` for the
   Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
-  scatter and the longest grain. The build prints DTCM at 76,288 B, 58.3 %, 54,528 B free.
+  scatter and the longest grain. The build prints DTCM at 76,608 B, 58.6 %, 54,208 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

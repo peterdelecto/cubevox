@@ -639,8 +639,8 @@ void checkMenuOctaveFormantRedraw() {
 }
 
 // A click on the Octave and Formant row swaps the card in the slot that holds it and leaves every other
-// slot and setting alone. Formant costs less than Octave, so the first swap is taken. The swap back is
-// refused in a layout where Octave would put the mean over its line, and the row then still reads FORMANT.
+// slot and setting alone. The default layout has room for Formant, so the first swap is taken. A swap
+// is refused in a layout the box would not load, and the row then still reads the card the layout holds.
 void checkMenuOctaveFormantClick() {
   Layout formant = defaultLayout();
   formant.card[kOctaveSlot] = Card::Formant;

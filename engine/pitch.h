@@ -10,8 +10,8 @@
 
 // Monophonic pitch tracker. Two-stage YIN: a coarse search on a 12 kHz copy
 // finds the period cheaply, then a narrow search at 48 kHz refines it when the
-// caller asks for the fine pass (Autotune's hard tune needs it; the Crowd card
-// does not).
+// caller asks for the fine pass (Autotune's hard tune and the Formant card need
+// it; the Crowd card does not).
 
 namespace cv {
 
@@ -42,6 +42,11 @@ class PitchTracker {
   // a whole sample (static_asserts below). The PSOLA voices read these bounds.
   static constexpr int kMinPeriod = 48;
   static constexpr int kMaxPeriod = 686;
+
+  // The period a voice plays at: the one given, held to the tracker's bounds.
+  static float clampPeriod(float period) {
+    return clampf(period, static_cast<float>(kMinPeriod), static_cast<float>(kMaxPeriod));
+  }
 
   // A frame rebuilt on enable takes this many panes per block on top of the block's own pane, so
   // no single block carries the whole rebuild.

@@ -414,16 +414,24 @@ void checkCrowdVoices() {
   check(top.crowd.voicesStep == cv::kVoicesMob, "crowd: a VOICES reading past the top lands on MOB");
 }
 
-// Formant, an alternate for Octave, and Lo-fi and Chatter, alternates for Gate in slot 7. They sit after the
-// Crowd card in the table, so every earlier id keeps its meaning in a saved layout.
-void checkSlot7Cards() {
+// Formant, an alternate for Octave in slot 3, and Lo-fi and Chatter, alternates for Gate in slot 7. They sit
+// after the Crowd card in the table, so every earlier id keeps its meaning in a saved layout. Each row is
+// the estimate in costs.h until the stress run replaces it.
+void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
             static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 && kCardCount == 14,
-        "slot 7 cards: the table appends them after the Crowd card");
+        "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
             kEngineCount == 10,
-        "slot 7 cards: the engine list appends Lofi and Bloom (the Chatter card's engine) after the Crowd engine");
+        "appended cards: the engine list appends Lofi and Bloom (the Chatter card's engine) after the Crowd engine");
+  const auto sameRow = [](Card c, const costs::Cost& row) {
+    return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
+  };
+  check(sameRow(Card::Formant, costs::kFormant) && sameRow(Card::Lofi, costs::kLofi) && sameRow(Card::Bloom, costs::kBloom),
+        "appended cards: each registry row is its costs.h row");
+}
 
+void checkFormantCard() {
   const CardDesc& formant = cardDesc(Card::Formant);
   check(std::strcmp(formant.id, "formant") == 0 && std::strcmp(formant.name, "Formant") == 0 &&
             formant.engine == Engine::Pitch && formant.group == Group::Pitch && formant.knobCount == 2,
@@ -438,6 +446,27 @@ void checkSlot7Cards() {
             fmix.min == 0.0f && fmix.max == 100.0f,
         "formant: knob B is MIX, a continuous percent");
 
+  // SHIFT lands on whole semitones, -7 at the first position, 0 at the middle one and +7 at the last.
+  ChainParams p;
+  const auto shiftAt = [&p](float position) {
+    applyKnob(Card::Formant, 0, position, p);
+    return p.pitchFx.formant.shiftSt;
+  };
+  check(shiftAt(0.0f) == -7 && shiftAt(7.0f) == 0 && shiftAt(14.0f) == 7, "formant: SHIFT position 0 is -7 st, 7 is 0 and 14 is +7");
+  check(shiftAt(99.0f) == 7, "formant: SHIFT above the last position clamps to +7");
+  check(shiftAt(NAN) == -7, "formant: a NaN SHIFT lands on the first position");
+  bool wholeSteps = true;
+  for (int i = 0; i < 15; ++i) wholeSteps = wholeSteps && shiftAt(static_cast<float>(i)) == i - 7;
+  check(wholeSteps, "formant: every SHIFT position i lands on i - 7 st");
+  check(shownText(shift, 4.0f) == "-3" && shownText(shift, 7.0f) == "0" && shownText(shift, 12.0f) == "+5" &&
+            knobCells(shift) == 2,
+        "formant: SHIFT reads -3, 0 and +5 in two cells");
+  applyKnob(Card::Formant, 1, 0.4f, p);
+  check(std::fabs(p.pitchFx.formant.mix - 0.4f) < 1e-6f, "formant: MIX drives the voice's mix");
+  check(shownText(fmix, 1.0f) == "100", "formant: MIX 100 % reads 100");
+}
+
+void checkLofiCard() {
   const CardDesc& lofi = cardDesc(Card::Lofi);
   check(std::strcmp(lofi.id, "lofi") == 0 && std::strcmp(lofi.name, "Lo-fi") == 0 && lofi.engine == Engine::Lofi &&
             lofi.group == Group::None && lofi.knobCount == 2,
@@ -447,6 +476,14 @@ void checkSlot7Cards() {
             std::strcmp(knobDesc(Card::Lofi, 0)->unit, "%") == 0 && std::strcmp(knobDesc(Card::Lofi, 1)->unit, "%") == 0,
         "lofi: knob A is TONE and knob B is AMOUNT, both continuous percents");
 
+  ChainParams p;
+  applyKnob(Card::Lofi, 0, 0.3f, p);
+  applyKnob(Card::Lofi, 1, 0.8f, p);
+  check(std::fabs(p.lofi.tone - 0.3f) < 1e-6f && std::fabs(p.lofi.amount - 0.8f * kLofiAmountTop) < 1e-6f,
+        "lofi: TONE and AMOUNT drive their own fields, AMOUNT up to the engine's 60 %");
+}
+
+void checkBloomCard() {
   const CardDesc& bloom = cardDesc(Card::Bloom);
   check(std::strcmp(bloom.id, "bloom") == 0 && std::strcmp(bloom.name, "Chatter") == 0 && bloom.engine == Engine::Bloom &&
             bloom.group == Group::None && bloom.knobCount == 2,
@@ -458,43 +495,7 @@ void checkSlot7Cards() {
   check(std::strcmp(knobDesc(Card::Bloom, 1)->name, "AMOUNT") == 0 && std::strcmp(knobDesc(Card::Bloom, 1)->unit, "%") == 0,
         "chatter: knob B is AMOUNT, a percent");
 
-  check(cardDesc(Card::Formant).cost.avg == costs::kFormant.avg && cardDesc(Card::Formant).cost.worst == costs::kFormant.worst &&
-            !cardDesc(Card::Formant).cost.measured && !cardDesc(Card::Lofi).cost.measured &&
-            !cardDesc(Card::Bloom).cost.measured && costs::kFormant.avg == 3 && costs::kFormant.worst == 4 &&
-            costs::kLofi.avg == 2 && costs::kLofi.worst == 2 && costs::kBloom.avg == 3 && costs::kBloom.worst == 5,
-        "slot 7 cards: the rows are the estimates 3 / 4, 2 / 2 and 3 / 5 until the stress run");
-
-  // SHIFT lands on whole semitones, -7 at the first position, 0 at the middle one and +7 at the last.
   ChainParams p;
-  applyKnob(Card::Formant, 0, 0.0f, p);
-  const int first = p.pitchFx.formant.shiftSt;
-  applyKnob(Card::Formant, 0, 7.0f, p);
-  const int middle = p.pitchFx.formant.shiftSt;
-  applyKnob(Card::Formant, 0, 14.0f, p);
-  const int last = p.pitchFx.formant.shiftSt;
-  check(first == -7 && middle == 0 && last == 7, "formant: SHIFT position 0 is -7 st, 7 is 0 and 14 is +7");
-  applyKnob(Card::Formant, 0, 99.0f, p);
-  check(p.pitchFx.formant.shiftSt == 7, "formant: SHIFT above the last position clamps to +7");
-  applyKnob(Card::Formant, 0, NAN, p);
-  check(p.pitchFx.formant.shiftSt == -7, "formant: a NaN SHIFT lands on the first position");
-  bool wholeSteps = true;
-  for (int i = 0; i < 15; ++i) {
-    applyKnob(Card::Formant, 0, static_cast<float>(i), p);
-    wholeSteps = wholeSteps && p.pitchFx.formant.shiftSt == i - 7;
-  }
-  check(wholeSteps, "formant: every SHIFT position i lands on i - 7 st");
-  check(shownText(shift, 4.0f) == "-3" && shownText(shift, 7.0f) == "0" && shownText(shift, 12.0f) == "+5" &&
-            knobCells(shift) == 2,
-        "formant: SHIFT reads -3, 0 and +5 in two cells");
-  applyKnob(Card::Formant, 1, 0.4f, p);
-  check(std::fabs(p.pitchFx.formant.mix - 0.4f) < 1e-6f, "formant: MIX drives the voice's mix");
-  check(shownText(fmix, 1.0f) == "100", "formant: MIX 100 % reads 100");
-
-  applyKnob(Card::Lofi, 0, 0.3f, p);
-  applyKnob(Card::Lofi, 1, 0.8f, p);
-  check(std::fabs(p.lofi.tone - 0.3f) < 1e-6f && std::fabs(p.lofi.amount - 0.8f * kLofiAmountTop) < 1e-6f,
-        "lofi: TONE and AMOUNT drive their own fields, AMOUNT up to the engine's 60 %");
-
   applyKnob(Card::Bloom, 0, 0.0f, p);
   const float lengthLow = p.bloom.lengthMs;
   applyKnob(Card::Bloom, 0, 1.0f, p);
@@ -508,7 +509,9 @@ void checkSlot7Cards() {
         "chatter: AMOUNT drives the amount field and leaves LENGTH alone");
   check(shownText(length, 0.0f) == "20" && shownText(length, 1.0f) == "3000" && knobCells(length) == 4,
         "chatter: LENGTH reads 20 to 3000 in four cells");
+}
 
+void checkAppendedToggles() {
   // The toggles reach their own stage. Formant's toggle sits inside the pitch parameters and touches no
   // other pitch toggle.
   ChainParams t;
@@ -669,7 +672,11 @@ void checkRegistry() {
   checkShownNumbers();
   checkShownLabels();
   checkCrowdVoices();
-  checkSlot7Cards();
+  checkAppendedCards();
+  checkFormantCard();
+  checkLofiCard();
+  checkBloomCard();
+  checkAppendedToggles();
   checkShownDecimals();
   checkCells();
   checkFormatCells();
