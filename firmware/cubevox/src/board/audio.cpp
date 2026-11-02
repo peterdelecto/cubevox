@@ -82,8 +82,12 @@ DMA_Stream_TypeDef* rxStream() { return DMA1_Stream1; }
 // would leave the tracker's anti-alias coefficients, which only the constructor sets, zeroed.
 H7_DTCM_BSS cv::PitchFx gPitchFx;
 
+// Distortion's filters, histories and block scratch (about 2.5 kB) live in DTCM too, and audioInit() constructs
+// the object again in place for the same reason.
+H7_DTCM_BSS cv::Distortion gDistortion;
+
 // Engine objects, constructed in reset state.
-ChainEngines gChain{gPitchFx};
+ChainEngines gChain{gPitchFx, gDistortion};
 
 // Published snapshots alternate between two slots by sequence number, so the main loop only writes
 // the slot the interrupt does not read. The interrupt preempts the main loop and runs to completion,
@@ -586,6 +590,7 @@ bool checkMemoryAndClock() {
 void resetAudioState() {
   h7_dtcm_bss_zero();
   new (&gPitchFx) cv::PitchFx();
+  new (&gDistortion) cv::Distortion();
   new (&gSnapshots[0]) ChainSnapshot();  // in place: a snapshot is over a kilobyte, too big for the stack
   new (&gHeld) ChainSnapshot();
   enableCycleCounter();

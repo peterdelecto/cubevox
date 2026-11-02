@@ -13,16 +13,16 @@
 #include "core/registry.h"
 #include "core/slots.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. PitchFx is a reference
-// because the board places it in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. PitchFx and Distortion are
+// references because the board places them in DTCM.
 struct ChainEngines {
-  explicit ChainEngines(cv::PitchFx& pitchFx) : pitch(pitchFx) {}
+  ChainEngines(cv::PitchFx& pitchFx, cv::Distortion& distortionFx) : pitch(pitchFx), distortion(distortionFx) {}
 
   cv::PitchFx& pitch;
   cv::Gate inputGate;
   cv::Unison unison;
   cv::Slapback slapback;
-  cv::Distortion distortion;
+  cv::Distortion& distortion;
   cv::Gate gate;
   cv::Reverb reverb;
   cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes

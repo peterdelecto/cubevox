@@ -40,6 +40,17 @@ inline float advance(float x, float target, float a, int n) {
   return x;
 }
 
+// What a smoother keeps of its distance to the target over one kBlock of steps: (1 - kSmoothCoef)^kBlock.
+inline const float kSmoothKeepBlock = powf(1.0f - kSmoothCoef, static_cast<float>(kBlock));
+
+// x after kBlock steps toward target, in closed form and without the loop. It lands on the target by the
+// step's rule: within kSnap of it, or once a block no longer moves the float. The loop's per-sample stall
+// comes sooner, so the final approach takes a few blocks more than advance() does.
+inline float advanceBlock(float x, float target) {
+  const float next = target + (x - target) * kSmoothKeepBlock;
+  return next == x || fabsf(target - next) < kSnap ? target : next;
+}
+
 // Two smoothers that share a coefficient, stepped together so their dependent chains overlap.
 inline void advance(float& x, float xTarget, float& y, float yTarget, float a, int n) {
   for (int i = 0; i < n; ++i) {

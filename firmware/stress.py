@@ -5,7 +5,8 @@ For each layout the script puts the layout on the box, forces every slot on (ben
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
 to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper knob), Formant MIX
-(its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Chatter knobs,
+(its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Distortion knobs
+(and TONE again with DRIVE pinned at 100 %, the costliest moving block), both Chatter knobs,
 both Lo-fi knobs and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in steps of
 10 %, 1 s each, reading the counters after each sweep. When Echo is placed it then flips Echo's toggle
 ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again.
@@ -334,28 +335,33 @@ def open_box(port, wait_s):
 # -- one measured run
 
 def sweeps(slots):
-    """(slot index, knob 1 or 2, label) for each sweep this layout gets."""
+    """(slot index, knob 1 or 2, label, held) for each sweep this layout gets. `held` lists the other
+    knobs of the slot the sweep pins first, as (knob, percent of travel) pairs."""
     found = []
     for i, card in enumerate(slots):
         if card == "octave":
-            found.append((i, 1, "SEMITONES"))
+            found.append((i, 1, "SEMITONES", ()))
         if card == "formant":
-            found.append((i, 1, "SHIFT"))
-            found.append((i, 2, "Formant MIX"))
+            found.append((i, 1, "SHIFT", ()))
+            found.append((i, 2, "Formant MIX", ()))
         if card.startswith("reverb_"):
-            found.append((i, 2, "reverb MIX"))
+            found.append((i, 2, "reverb MIX", ()))
         if card == "slapback":
-            found.append((i, 1, "Echo TIME"))
-            found.append((i, 2, "Echo AMOUNT"))
+            found.append((i, 1, "Echo TIME", ()))
+            found.append((i, 2, "Echo AMOUNT", ()))
+        if card == "distortion":
+            found.append((i, 1, "Distortion TONE", ()))
+            found.append((i, 2, "Distortion DRIVE", ()))
+            found.append((i, 1, "Distortion TONE at DRIVE 100 %", ((2, 100),)))
         if card == "bloom":
-            found.append((i, 1, "Chatter LENGTH"))
-            found.append((i, 2, "Chatter AMOUNT"))
+            found.append((i, 1, "Chatter LENGTH", ()))
+            found.append((i, 2, "Chatter AMOUNT", ()))
         if card == "lofi":
-            found.append((i, 1, "Lo-fi TONE"))
-            found.append((i, 2, "Lo-fi AMOUNT"))
+            found.append((i, 1, "Lo-fi TONE", ()))
+            found.append((i, 2, "Lo-fi AMOUNT", ()))
         if card == "crowd":
-            found.append((i, 1, "Crowd DIVERGE"))
-            found.append((i, 2, "Crowd VOICES"))
+            found.append((i, 1, "Crowd DIVERGE", ()))
+            found.append((i, 2, "Crowd VOICES", ()))
     return found
 
 
@@ -373,8 +379,10 @@ def measure_run(box, slots, seconds):
     box.bench_ok("knobs_live")
     box.bench_ok("reset_peaks")
     later = []
-    for slot, knob, label in sweeps(slots):
+    for slot, knob, label, held in sweeps(slots):
         say(f"pass 2, {label} (slot {slot + 1}) 0 % to 100 %")
+        for held_knob, held_value in held:
+            box.bench_ok("set_knob", slot=slot + 1, knob=held_knob, value=held_value)
         for value in SWEEP_VALUES:
             box.bench_ok("set_knob", slot=slot + 1, knob=knob, value=value)
             box.wait(SWEEP_STEP_S)

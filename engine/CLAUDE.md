@@ -15,7 +15,8 @@
 - Shared pieces live in `engine/common.h` (`kSampleRate`, `kBlock`, `kSmpPerMs`), `engine/dsp.h` (Biquad and its RBJ
   setters, OnePole, `catmullRom`, `wrapOnce`, `readRing` and `readRingClamped` for a delay line that may leave
   [2, Len - 3], `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, `blockCoef` for a
-  one-pole stepped once per block, and `advance` for n steps of one smoother or of two that share a coefficient).
+  one-pole stepped once per block, `advance` for n steps of one smoother or of two that share a coefficient, and
+  `advanceBlock` for kBlock steps in closed form).
   The two reverbs share `engine/reverb_parts.h` (the allpass step, Allpass, Delay, the wobble LFO's sine table,
   phase step and error bound, and the Dwell drive terms).
 - Spring runs its loops at 24 kHz between a 15-tap half-band decimator and interpolator. Its
@@ -26,7 +27,8 @@
 - `PitchFx` lives in DTCM: about 61,400 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
   Formant voice included; the 265.75 ms input ring is 51,024 B of it, sized in `psola.h` for the
   Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
-  scatter and the longest grain. The build prints DTCM at 61,440 B, 47.0 %, 69,376 B free.
+  scatter and the longest grain. `Distortion` sits there too (2,624 B: its filters, the rail histories
+  and the block scratch). The build prints DTCM at 64,064 B, 49.0 %, 66,752 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`

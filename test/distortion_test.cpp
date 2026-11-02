@@ -1,4 +1,5 @@
-// Distortion checks: passthrough, top boost, harmonics, clean, level, asymmetry, DC, no-alloc. No window, no audio device.
+// Distortion checks: passthrough, switch-off, call sizes, non-finite input, top boost, harmonics, clean, level,
+// asymmetry, DC, no-alloc. No window, no audio device.
 
 #include <cmath>
 #include <cstdio>
@@ -83,6 +84,7 @@ std::vector<float> render(const cv::DistortionParams& p) {
   return run(gDist, sine(2 * kSecond), p);
 }
 
+// DRIVE 0 and the toggle off give the input back bit for bit from the first sample.
 bool testPassthrough() {
   const int n = kSecond;
   const std::vector<float> in = sine(n);
@@ -93,19 +95,136 @@ bool testPassthrough() {
   for (const cv::DistortionParams& p : {zero, off}) {
     gDist.reset();
     const std::vector<float> out = run(gDist, in, p);
-    for (int i = cv::kSampleRate / 10; i < n; ++i) {
+    for (int i = 0; i < n; ++i) {
       const float d = std::fabs(out[static_cast<size_t>(i)] - in[static_cast<size_t>(i)]);
       if (d > maxDiff) maxDiff = d;
     }
   }
-  return report("passthrough", maxDiff < 1e-6f, "drive 0 and on=false max|out-in|=%.3g (<1e-6)",
+  return report("passthrough", maxDiff == 0.0f, "drive 0 and on=false max|out-in|=%.3g (==0)",
                 maxDiff);
 }
 
+// A stage that ran for a second and is then switched off, or turned down to 0, gives the input back
+// bit for bit once its tail has rung down. The tail lasts under 0.3 s; the check starts at 0.5 s.
+bool testSwitchOff() {
+  constexpr int kEngaged = kSecond;
+  constexpr int kTail = kSecond / 2;
+  const std::vector<float> in = sine(3 * kSecond);
+  const std::vector<float> head(in.begin(), in.begin() + kEngaged);
+  const std::vector<float> rest(in.begin() + kEngaged, in.end());
+  struct Case {
+    float drive;
+    bool offToggle;
+    float afterDrive;
+  };
+  const Case cases[] = {{0.5f, true, 0.5f}, {1.0f, true, 1.0f}, {0.5f, false, 0.0f}, {1.0f, false, 0.0f}};
+  size_t worst = 0;
+  bool ok = true;
+  for (const Case& c : cases) {
+    gDist.reset();
+    run(gDist, head, params(c.drive));
+    cv::DistortionParams after = params(c.afterDrive);
+    after.on = !c.offToggle;
+    const std::vector<float> out = run(gDist, rest, after);
+    size_t differing = 0;
+    for (size_t i = kTail; i < out.size(); ++i)
+      if (out[i] != rest[i]) ++differing;
+    if (differing > worst) worst = differing;
+    if (differing != 0) ok = false;
+  }
+  return report("switch-off", ok, "off or DRIVE 0 after DRIVE 0.5 and 1: %.0f samples differ from the input after 0.5 s (==0)",
+                static_cast<double>(worst));
+}
+
+// The stage turns on when DRIVE reaches 5 % and off when it falls under 4 %, and between the two it keeps its
+// last state. A stage that was off and sits at 4.5 % stays a plain copy; one that was on and comes down to
+// 4.5 % keeps running; under 4 % it rings down to an exact copy. The knob never parks it inside the fade.
+bool testEngage() {
+  const std::vector<float> in = sine(2 * kSecond);
+  auto count = [&](float drive, int from) {
+    const std::vector<float> out = run(gDist, in, params(drive));
+    size_t differing = 0;
+    for (size_t i = static_cast<size_t>(from); i < out.size(); ++i)
+      if (out[i] != in[i]) ++differing;
+    return differing;
+  };
+  gDist.reset();
+  const size_t offAt45 = count(0.045f, 0);              // fresh: off, so no sample differs
+  const size_t on = count(0.06f, kSecond);              // on past 5 %: the second half differs
+  const size_t keeps = count(0.045f, kSecond);          // down to 4.5 %: still on
+  const size_t off = count(0.039f, kSecond);            // under 4 %: off after the ring-down
+  const size_t staysOff = count(0.045f, 0);             // back to 4.5 %: still off
+  const bool ok = offAt45 == 0 && on > 0 && keeps > 0 && off == 0 && staysOff == 0;
+  char detail[200];
+  std::snprintf(detail, sizeof detail,
+                "samples differing from the input: 4.5 %% fresh %zu (0), 6 %% %zu (>0), 4.5 %% after 6 %% %zu (>0), 3.9 %% %zu (0), 4.5 %% after that %zu (0)",
+                offAt45, on, keeps, off, staysOff);
+  std::printf("%s engage  %s\n", ok ? "PASS" : "FAIL", detail);
+  return ok;
+}
+
+// process() takes any call size. From the same settled state a call of 1, 17, 64, 200 or 1000 samples
+// gives the output the 64-sample calls give, bit for bit.
+bool testCallSizes() {
+  constexpr int kWarm = 3 * kSecond / 2;
+  const std::vector<float> in = sine(3 * kSecond);
+  const std::vector<float> warm(in.begin(), in.begin() + kWarm);
+  const std::vector<float> rest(in.begin() + kWarm, in.end());
+  const cv::DistortionParams p = params(0.6f);
+  gDist.reset();
+  run(gDist, warm, p);
+  cv::Distortion ref = gDist;
+  const std::vector<float> want = run(ref, rest, p);
+  size_t worst = 0;
+  const int sizes[] = {1, 17, 64, 200, 1000};
+  for (int size : sizes) {
+    cv::Distortion d = gDist;
+    std::vector<float> got(rest.size());
+    const int total = static_cast<int>(rest.size());
+    for (int i = 0; i < total; i += size) {
+      const int n = total - i < size ? total - i : size;
+      gInProcess = true;
+      d.process(&rest[static_cast<size_t>(i)], &got[static_cast<size_t>(i)], n, p);
+      gInProcess = false;
+    }
+    size_t differing = 0;
+    for (size_t i = 0; i < got.size(); ++i)
+      if (got[i] != want[i]) ++differing;
+    if (differing > worst) worst = differing;
+  }
+  return report("call-sizes", worst == 0, "calls of 1/17/64/200/1000 samples vs 64 from a settled state: %.0f samples differ (==0)",
+                static_cast<double>(worst));
+}
+
+// A NaN input sample, a NaN DRIVE or a NaN TONE does not stick: the output is finite again within
+// three blocks of the NaN, and NaN knobs never put a non-finite sample out.
+bool testNonFinite() {
+  std::vector<float> in = sine(kSecond);
+  const size_t bad = static_cast<size_t>(cv::kBlock * 3 + 10);
+  in[bad] = std::nanf("");
+  gDist.reset();
+  const std::vector<float> out = run(gDist, in, params(0.5f));
+  bool recovered = true;
+  for (size_t i = bad + 3 * cv::kBlock; i < out.size(); ++i)
+    if (!std::isfinite(out[i])) recovered = false;
+
+  const std::vector<float> clean = sine(kSecond);
+  bool knobs = true;
+  for (int which = 0; which < 2; ++which) {
+    cv::DistortionParams p = params(which == 0 ? std::nanf("") : 0.5f);
+    p.tone = which == 1 ? std::nanf("") : 0.5f;
+    gDist.reset();
+    for (float v : run(gDist, clean, p))
+      if (!std::isfinite(v)) knobs = false;
+  }
+  return report("non-finite", recovered && knobs, "NaN sample recovers: %.0f, NaN DRIVE and TONE stay finite: %.0f",
+                recovered ? 1.0 : 0.0, knobs ? 1.0 : 0.0);
+}
+
 // Stage 1 gain before the top boost: the plain exponential sweep, in the same float operations
-// as the engine used before topBoostDb existed.
+// as the engine runs it (exp2Fast, which matches libm to 1e-7 relative).
 float todaysGain1(const cv::DistortionTuning& t, float drive) {
-  return t.gain1Min * expf(logf(t.gain1Max / t.gain1Min) * drive);
+  return t.gain1Min * cv::exp2Fast(log2f(t.gain1Max / t.gain1Min) * drive);
 }
 
 // Applies p's tuning to d, so stage1GainAt() reads it.
@@ -287,6 +406,10 @@ bool testTone() {
 int main() {
   bool ok = true;
   ok &= testPassthrough();
+  ok &= testSwitchOff();
+  ok &= testEngage();
+  ok &= testCallSizes();
+  ok &= testNonFinite();
   ok &= testBelowBoost();
   ok &= testTopBoost();
   ok &= testGainMonotonic();

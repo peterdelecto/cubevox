@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -597,7 +598,15 @@ bool testLevel() {
   for (const char* name : names) {
     const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
     if (clip.empty()) {
-      std::printf("SKIP level, %s  samples/ is not in this checkout\n", name);
+      // samples/ is git-ignored, so CI has none and the row skips. With the folder there, a missing or
+      // empty clip fails it.
+      std::error_code ec;
+      if (std::filesystem::is_directory(CUBEVOX_SAMPLES_DIR, ec)) {
+        std::printf("FAIL level, %s  the clip is missing or empty\n", name);
+        ok = false;
+      } else {
+        std::printf("SKIP level, %s  samples/ is not in this checkout\n", name);
+      }
       continue;
     }
     double worst = 0.0;

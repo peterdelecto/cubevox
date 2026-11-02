@@ -61,6 +61,7 @@ class AudioBlock {
   void discardBlock();
 
   std::unique_ptr<cv::PitchFx> pitch_;  // about 75 KB, so on the heap
+  std::unique_ptr<cv::Distortion> distortion_;
   ChainEngines engines_;
 
   std::array<ChainSnapshot, 2> snapshots_ = {};

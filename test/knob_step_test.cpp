@@ -172,12 +172,17 @@ std::vector<Step> stepsFor(Card c, int knob) {
 // background holds Amount at half travel.
 constexpr float kEchoBackgroundAmount = 0.5f;
 
+// Distortion's DRIVE starts at 0, where the stage is a plain copy and its TONE never reaches the output,
+// so its background holds DRIVE at 30 %, the setting the level rule runs it at.
+constexpr float kDistortionBackgroundDrive = 0.3f;
+
 // The registry's defaults with the card placed and switched on.
 ChainParams background(Card c) {
   ChainParams p;
   applyPlacement(c, p);
   applyToggle(c, true, p);
   if (c == Card::Slapback) applyKnob(c, 1, kEchoBackgroundAmount, p);
+  if (c == Card::Distortion) applyKnob(c, 1, kDistortionBackgroundDrive, p);
   return p;
 }
 
@@ -218,6 +223,70 @@ bool checkKnob(Card c, int knob, const Signal& in, double toneHz = kToneHz) {
   return ok;
 }
 
+// Distortion's enable and the DRIVE moves that start it. The box resets an engine on the enable of a slot
+// that sat settled off, so an enable row resets the engine at the step.
+Signal runDistortionStep(const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b,
+                         bool resetAtStep) {
+  auto fx = std::make_unique<cv::Distortion>();
+  fx->reset();
+  Signal out(in.size());
+  for (int i = 0; i < kTotal; i += cv::kBlock) {
+    if (resetAtStep && i == kStepAt) fx->reset();
+    const size_t k = static_cast<size_t>(i);
+    fx->process(&in[k], &out[k], cv::kBlock, i < kStepAt ? a : b);
+  }
+  return out;
+}
+
+cv::DistortionParams distortionAt(float drive, float tone, bool on = true) {
+  cv::DistortionParams p = background(Card::Distortion).distortion;
+  p.drive = drive;
+  p.tone = tone;
+  p.on = on;
+  return p;
+}
+
+bool distortionRow(const char* label, const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b,
+                   bool resetAtStep) {
+  const double r = stepRatio(runDistortionStep(in, a, b, resetAtStep));
+  const bool ok = r <= kMaxRatio;
+  std::printf("%s %-14s %-40s peak curvature x%.5f of steady state (<= %.2f)\n", ok ? "PASS" : "FAIL", "Distortion",
+              label, r, kMaxRatio);
+  return ok;
+}
+
+// The enable edge and DRIVE up from 0, at DRIVE 30, 60 and 100 % and TONE 0, 50 and 100 %. TONE follows
+// the knob while the stage is dry, so both start from where the knob sits, and the dry-to-wet fade takes
+// 16 ms at the least. DRIVE crossing 5 % turns the stage on, and falling under 4 % turns it off; the
+// last row is a fast turn from 6 % down through both thresholds.
+bool distortionEdgeRows(const Signal& in) {
+  bool ok = true;
+  char label[64];
+  for (float drive : {kDistortionBackgroundDrive, 0.6f, 1.0f}) {
+    for (float tone : {0.0f, 0.5f, 1.0f}) {
+      std::snprintf(label, sizeof label, "enable at DRIVE %.0f %%, TONE %.0f %%", static_cast<double>(drive * 100.0f),
+                    static_cast<double>(tone * 100.0f));
+      ok &= distortionRow(label, in, distortionAt(drive, tone, false), distortionAt(drive, tone), true);
+    }
+    for (float tone : {0.0f, 0.5f, 1.0f}) {
+      std::snprintf(label, sizeof label, "DRIVE 0 to %.0f %%, TONE %.0f %%", static_cast<double>(drive * 100.0f),
+                    static_cast<double>(tone * 100.0f));
+      ok &= distortionRow(label, in, distortionAt(0.0f, tone), distortionAt(drive, tone), false);
+    }
+  }
+  struct Cross {
+    float from;
+    float to;
+  };
+  for (const Cross& c : {Cross{0.045f, 0.06f}, Cross{0.035f, 0.05f}, Cross{0.05f, 0.035f}, Cross{0.06f, 0.045f},
+                         Cross{0.06f, 0.03f}}) {
+    std::snprintf(label, sizeof label, "DRIVE %.1f to %.1f %%", static_cast<double>(c.from * 100.0f),
+                  static_cast<double>(c.to * 100.0f));
+    ok &= distortionRow(label, in, distortionAt(c.from, 0.5f), distortionAt(c.to, 0.5f), false);
+  }
+  return ok;
+}
+
 // KEY moves the target note, and a grain is two periods, so a low voice is the harder case for the
 // glide. Adam sings from 78 Hz, and the KEY gate also runs on sines at 98 Hz, 82 Hz and 74.5 Hz.
 constexpr double kLowTones[] = {98.0, 82.0, 74.5};
@@ -233,6 +302,7 @@ int main() {
     if (c == Card::Autotune) {
       for (double hz : kLowTones) ok &= checkKnob(c, 0, tone(hz), hz);
     }
+    if (c == Card::Distortion) ok &= distortionEdgeRows(in);
   }
   std::printf("%s knob step\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

@@ -99,13 +99,16 @@ int usage() {
                "     topFrom topSwingGain topWetDb\n"
                "     octGrainWindowMs (20..80) octTrimDb (-24..24) eqTrimDb\n"
                "     slapTimeMs (60..250) slapLowpassHz (500..12000) slapFeedback (0..0.5) slapWetMaxDb slapTrimDb (-24..24)\n"
-               "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distTopBoostDb\n"
+               "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Min distGain1Max distTopBoostDb\n"
                "     distTopBoostFrom distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
-               "     distS2LpHz distGain2Max distRailAsym distRailSoft distTrebleCutHz "
+               "     distS2LpHz distGain2Min distGain2Max distRailAsym distRailSoft distTrebleCutHz "
                "distTrebleCutDb\n"
                "     distToneMinDb distToneMaxDb distBassPeakHz distBassPeakDb distBassPeakQ distTrimDb "
                "distFadeDrive\n"
+               "     (the dist dB keys -24..24 and distTopBoostDb 0..24, the gains 0.1..1000, the corners 20..21600,\n"
+               "     distRailAsym 0..0.5, distRailSoft 0.01..1, distTopBoostFrom 0..1, distBassPeakQ 0.1 and up,\n"
+               "     distFadeDrive 0.0001..1)\n"
                "     chmBassCutHz chmBassCutHzTop (20..21600) chmWobbleDepth (0..64) chmWobbleRateHz (0..10)\n"
                "     chmInputTrim (0..4) chmDwell (0..1) chmDwellDrive (1..64) chmDwellComp (0..2) chmWetDb (-36..36)\n"
                "     springMs1 (10..37.6) springMs2 (10..45.6) springMs3 (10..56.6) springFeedbackLo springFeedbackHi (0.1..0.97) springDiffuse (0..0.9)\n"
@@ -244,6 +247,21 @@ bool slapbackTuningInRange(const cv::SlapbackTuning& t) {
          inside(t.trimDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb);
 }
 
+// Every Distortion key refuses a value outside the range the engine clamps to.
+bool distortionTuningInRange(const cv::DistortionTuning& t) {
+  using Dist = cv::Distortion;
+  const auto db = [](float v) { return inside(v, -Dist::kDbLimit, Dist::kDbLimit); };
+  const auto hz = [](float v) { return inside(v, cv::kFilterMinHz, cv::kFilterMaxHz); };
+  const auto gain = [](float v) { return inside(v, Dist::kGainMin, Dist::kGainMax); };
+  return hz(t.inputHpHz) && hz(t.s1BassHz) && db(t.s1BassDb) && hz(t.s1LpHz) && gain(t.gain1Min) &&
+         gain(t.gain1Max) && inside(t.topBoostDb, 0.0f, Dist::kDbLimit) && inside(t.topBoostFrom, 0.0f, 1.0f) &&
+         hz(t.stackBassHz) && db(t.stackBassDb) && hz(t.stackTrebleHz) && db(t.stackTrebleDb) &&
+         db(t.stackLossDb) && hz(t.s2HpHz) && hz(t.s2LpHz) && gain(t.gain2Min) && gain(t.gain2Max) &&
+         inside(t.railAsym, 0.0f, 0.5f) && inside(t.railSoft, 0.01f, 1.0f) && hz(t.trebleCutHz) &&
+         db(t.trebleCutDb) && db(t.toneMinDb) && db(t.toneMaxDb) && hz(t.bassPeakHz) && db(t.bassPeakDb) &&
+         t.bassPeakQ >= 0.1f && db(t.trimDb) && inside(t.fadeDrive, Dist::kFadeDriveMin, 1.0f);
+}
+
 // Every Spring key refuses a value outside the range the engine takes, so a typo in a key does not
 // pass for a setting.
 bool springTuningInRange(const cv::SpringTuning& t) {
@@ -324,12 +342,14 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"slapTrimDb", &st.trimDb},
       {"distInputHpHz", &dt.inputHpHz},       {"distS1BassHz", &dt.s1BassHz},
       {"distS1BassDb", &dt.s1BassDb},         {"distS1LpHz", &dt.s1LpHz},
-      {"distGain1Max", &dt.gain1Max},         {"distTopBoostDb", &dt.topBoostDb},
+      {"distGain1Min", &dt.gain1Min},         {"distGain1Max", &dt.gain1Max},
+      {"distTopBoostDb", &dt.topBoostDb},
       {"distTopBoostFrom", &dt.topBoostFrom}, {"distStackBassHz", &dt.stackBassHz},
       {"distStackBassDb", &dt.stackBassDb},   {"distStackTrebleHz", &dt.stackTrebleHz},
       {"distStackTrebleDb", &dt.stackTrebleDb}, {"distStackLossDb", &dt.stackLossDb},
       {"distS2HpHz", &dt.s2HpHz},             {"distS2LpHz", &dt.s2LpHz},
-      {"distGain2Max", &dt.gain2Max},         {"distRailAsym", &dt.railAsym},
+      {"distGain2Min", &dt.gain2Min},         {"distGain2Max", &dt.gain2Max},
+      {"distRailAsym", &dt.railAsym},
       {"distRailSoft", &dt.railSoft},         {"distTrebleCutHz", &dt.trebleCutHz},
       {"distTrebleCutDb", &dt.trebleCutDb},   {"distToneMinDb", &dt.toneMinDb}, {"distToneMaxDb", &dt.toneMaxDb},
       {"distBassPeakHz", &dt.bassPeakHz},     {"distBassPeakDb", &dt.bassPeakDb},
@@ -406,7 +426,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
         !inside(bt.driveWord, 0.1f, 20.0f) || !inside(bt.driveBell, 0.0f, 20.0f) || !inside(bt.drift, 0.0f, 0.2f))
       return false;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
-    if (!slapbackTuningInRange(st)) return false;
+    if (!slapbackTuningInRange(st) || !distortionTuningInRange(dt)) return false;
     spr.chirpSections = static_cast<int>(springSections);
     return true;
   }

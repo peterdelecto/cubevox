@@ -57,7 +57,10 @@ level::InputEnergy EnergyTally::take() {
   return energy;
 }
 
-AudioBlock::AudioBlock() : pitch_(std::make_unique<cv::PitchFx>()), engines_(*pitch_) {}
+AudioBlock::AudioBlock()
+    : pitch_(std::make_unique<cv::PitchFx>()),
+      distortion_(std::make_unique<cv::Distortion>()),
+      engines_(*pitch_, *distortion_) {}
 
 void AudioBlock::publish(const ChainSnapshot& snapshot) {
   const uint32_t next = published_.load(std::memory_order_relaxed) + 1;
