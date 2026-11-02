@@ -130,8 +130,9 @@ Owner 2026-11-02: "lets dim the screen. we also need a menu item that adjusts sc
 3. Any of those brings the normal brightness straight back, and the control still does its job: a knob turn moves its parameter, a MENU press opens the menu.
 4. Dimming works on every screen, MUTED and BYPASS included. A dark screen on stage reads as a dead box, so the screen dims and never goes black.
 5. The application sends the contrast as its own command between two page writes, and again after a panel restart, which puts the init sequence's 207 back. The saved level applies before the splash's first page. The bootloader's update screens keep 207.
-6. The emulator draws a lit pixel between the off and on colours by contrast / 255.
+6. The emulator draws a lit pixel at HIGH in the ink it always had. A lower contrast fades it toward the dark glass by contrast / 207, and MAX takes it to white.
 7. The MUTED screen does not walk. The owner named only the dimming on 2026-11-02.
+8. Built v2.01.14: `core/brightness.h` holds the four levels and the dimmed contrast, `ui/screen_dim.h` the idle rule. The dimmed screen stays dim until the next activity, even if the millisecond counter laps.
 
 ## Timing
 | Item | Value |
