@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <limits>
 
@@ -19,9 +20,11 @@
 namespace cv {
 
 // grainDelay lines the voice up with the tracker's frame for hard tune (psola.h). The voice's latency
-// is the grain delay plus one period, 22.7 ms at 1 kHz to 36.0 ms at 70 Hz.
+// is the grain delay plus one period, 22.7 ms at 1 kHz to 36.0 ms at 70 Hz. trimDb is the level rule.
+// Without it the voice reads -0.27 to +0.02 dB on the mean of Adam's three clips across the twelve keys
+// and RESPONSE from hard tune to 500 ms, and the rule is 0 to +0.5 dB.
 struct AutotuneTuning {
-  float trimDb = 0.0f;  // level rule
+  float trimDb = 0.35f;
   float grainDelay = static_cast<float>(PsolaVoice::kGrainDelay);  // samples, tracker alignment
 };
 
@@ -39,7 +42,7 @@ class AutotuneVoice {
 
   // The RESPONSE knob runs NATURAL (0, slow glide) to MECHANICAL (1, hard tune), log taper.
   static float responseMsAt(float mechanical) {
-    return kMaxResponseMs * powf(kMinResponseMs / kMaxResponseMs, clampf(mechanical, 0.0f, 1.0f));
+    return logTaper(kMaxResponseMs, kMinResponseMs, clampf(mechanical, 0.0f, 1.0f));
   }
   static float mechanicalOf(float responseMs) {
     const float ms = clampf(responseMs, kMinResponseMs, kMaxResponseMs);
@@ -51,58 +54,56 @@ class AutotuneVoice {
   void reset() {
     psola_.reset();
     corr_ = 0.0f;
+    noteOffset_ = 0.0f;
     target_ = 0.0f;
     responseMs_ = kUnset;
-    trimDb_ = kUnset;
+    trim_ = DbGain{};
     degreeHz_ = kUnset;
     haveNote_ = false;
-    keyGlide_ = false;
+    restSamples_ = kRestSamples;
   }
 
-  // Per block: sets the target correction from pr and returns the smoothed correction in
+  // Per call of n samples: sets the target correction from pr and returns the correction in
   // semitones, 0 when off. Unvoiced frames hold the target. A clamped frame reads the tracker's
   // edge, not the note, so its target is 0 and the note passes uncorrected. The correction starts
-  // from 0 after reset() and glides at RESPONSE, or at the 20 ms knob smoother when that is slower
-  // and a KEY change moved the target. libm runs only when its input moved: RESPONSE and the trim
-  // when they change, the scale note when a hop publishes a new frame.
-  float prepare(const PitchResult& pr, const AutotuneParams& p) {
+  // from 0 after reset() and follows the target at RESPONSE. A KEY change made while a note sounds
+  // moves the note along kKeyGlideSec instead of at once, and the correction still follows the sung
+  // pitch at RESPONSE through it, so hard tune holds. A change made in a rest takes effect at once.
+  // libm runs only when its input moved: RESPONSE when it changes, the scale note when a hop
+  // publishes a new frame.
+  float prepare(const PitchResult& pr, const AutotuneParams& p, int n) {
     const AutotuneTuning& t = p.tuning;
-    if (p.responseMs != responseMs_) {
-      responseMs_ = p.responseMs;
-      a_ = smooth::coef(clampf(p.responseMs, kMinResponseMs, kMaxResponseMs) * 0.001f);
-    }
-    if (t.trimDb != trimDb_) {
-      trimDb_ = t.trimDb;
-      gain_ = powf(10.0f, t.trimDb / 20.0f);
-    }
+    if (p.responseMs != responseMs_) setResponse(p.responseMs);
+    trim_.set(t.trimDb);
+    psola_.setTrim(trim_.gain());
     psola_.setGrainDelay(t.grainDelay);
-    if (!p.on) {
-      setStepCoef(a_);
-      return 0.0f;
-    }
-    if (keyGlide_ && fabsf(corr_ - target_) < kKeyGlideDoneSemis) keyGlide_ = false;
+    if (!p.on) return 0.0f;
+    const bool afterRest = restSamples_ >= kRestSamples;
+    restSamples_ = pr.voiced ? 0 : (restSamples_ + n < kRestSamples ? restSamples_ + n : kRestSamples);
+    if (restSamples_ >= kRestSamples) foldNoteOffset();  // a rest ends the glide
     if (pr.voiced && pr.clamped) {
       target_ = 0.0f;
     } else if (pr.voiced) {
       const float hz = sungHz(pr);
-      if (hz != degreeHz_ || p.key != degreeKey_) pullTo(hz, p.key);
-      target_ = -deviation_;
+      if (hz != degreeHz_ || p.key != degreeKey_) pullTo(hz, p.key, afterRest);
+      target_ = clampf(-deviation_, -kMaxCorrectionSemis, kMaxCorrectionSemis);
     }
-    setStepCoef(keyGlide_ && smooth::kSmoothCoef < a_ ? smooth::kSmoothCoef : a_);
-    return corr_;
+    return correctionSemis();
   }
 
-  // Per sample: the corrected voice, trim applied. The voice takes the inverse pitch ratio, so it
-  // multiplies where it would divide. PitchFx fades it in only once the tracker has a period, so the
-  // grains start on the sung pitch.
-  CV_INLINE float tick(const VoiceRing& ring, int head, float period) {
-    corr_ = smooth::step(corr_, target_, stepCoef_);
-    return gain_ * psola_.tick(ring, head, period, exp2Fast(corr_ * (-1.0f / 12.0f)));
+  // The corrected voice for the n samples, at most kBlock, whose first sits at ring index `first`,
+  // which the ring already holds: the correction steps sample by sample and sets each sample's
+  // inverse pitch ratio, and the voice renders the call with it. The voice takes the inverse ratio,
+  // so it multiplies where it would divide. PitchFx fades it in only once the tracker has a period,
+  // so the grains start on the sung pitch.
+  void render(const VoiceRing& ring, int first, int n, float period, float* out) {
+    stepCorrection<true>(n);
+    psola_.render(ring, first, n, period, inv_.data(), out);
   }
 
-  // One sample of the correction's glide without the voice, for a sample whose corrected voice
-  // nobody hears.
-  void glide() { corr_ = smooth::step(corr_, target_, stepCoef_); }
+  // n samples of the correction's glide without the voice, for a call whose corrected voice nobody
+  // hears.
+  void glide(int n) { stepCorrection<false>(n); }
 
   // Drops the grains in flight. The correction keeps its place.
   void restartVoice() { psola_.reset(); }
@@ -111,14 +112,15 @@ class AutotuneVoice {
   VoiceGrid grid() const { return psola_.grid(); }
   void adoptGrid(const VoiceGrid& g) { psola_.adoptGrid(g); }
 
-  // Smoothed correction in semitones.
-  float correctionSemis() const { return corr_; }
+  // The correction in semitones: the part that follows the sung pitch plus the KEY glide's.
+  float correctionSemis() const { return corr_ + noteOffset_; }
 
-  // The correction after k more samples of its one-pole, which closes on the target by (1 - a)^k.
-  // A reader that holds one ratio for a call of n samples takes it at k = n / 2, the middle of the
-  // call, where the correction sits on average. logDecay_ follows stepCoef_ in prepare().
+  // The correction after k more samples. Its first part closes on the target by (1 - a)^k and its
+  // KEY glide runs down by its own decay. A reader that holds one ratio for a call of n samples
+  // takes it at k = n / 2, the middle of the call, where the correction sits on average.
   float correctionAfter(float k) const {
-    return target_ + (corr_ - target_) * exp2Fast(k * logDecay_);
+    const float glide = noteOffset_ == 0.0f ? 0.0f : noteOffset_ * exp2Fast(k * offsetLog2_);
+    return target_ + (corr_ - target_) * exp2Fast(k * logDecay_) + glide;
   }
 
   // How far the corrected voice lags the input at this period, in samples: the grain delay plus one
@@ -130,18 +132,73 @@ class AutotuneVoice {
   static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();
   static constexpr float kFifthRatio = 1.49830708f;  // 2^(7/12)
 
-  // libm runs only when the coefficient moved.
-  void setStepCoef(float c) {
-    if (c == stepCoef_) return;
-    stepCoef_ = c;
-    logDecay_ = log2f(1.0f - c);
+  // The target holds the pitch's distance from its note, which stays under half the 2 st gap between
+  // scale notes plus kHoldSemis. The correction follows it, and the KEY glide carries the correction
+  // from the old note's side of that, so the sum stays near this bound and the polynomial below
+  // (good to 2e-10 up to 1.25 st, 4e-8 at 3 st) needs no clamp.
+  static constexpr float kMaxCorrectionSemis = 1.25f;
+
+  // 2^(-corr / 12), the inverse of the pitch ratio, as the degree-5 Taylor polynomial of 2^x in
+  // x = -corr / 12.
+  static float inverseRatio(float corr) {
+    const float x = corr * (-1.0f / 12.0f);
+    return 1.0f + x * (0.6931472f + x * (0.2402265f + x * (0.05550411f + x * (0.009618129f + x * 0.001333356f))));
   }
 
   // A KEY change that moves the target note moves it by up to a semitone at once. At hard tune the
-  // correction would cover 99 % of that in 4 ms, inside one grain (9 ms at 220 Hz), and the grains
-  // laid at the old and new spacing sum 6 % over the steady level. The 20 ms glide keeps the step
-  // under x1.02. The glide ends once the correction sits this close to the target, 2 cents.
-  static constexpr float kKeyGlideDoneSemis = 0.02f;
+  // correction would cover 99 % of that in 4 ms, inside one grain (9 ms at 220 Hz, 28 ms at 70 Hz),
+  // and the grains laid at the old and new spacing sum over the steady level. So the correction keeps
+  // the old note's side of the change, noteOffset_, and lets it run down along this time constant,
+  // while the part of the correction that follows the sung pitch moves to the new note at once. A
+  // grain is two periods, so a low voice needs a long glide.
+  static constexpr float kKeyGlideSec = 0.050f;
+
+  // The glide's decay per sample as a power of two, and where it counts as done: the offset is under
+  // this many semitones (a tenth of a cent).
+  static inline const float kKeyGlideLog2 = log2f(1.0f - smooth::coef(kKeyGlideSec));
+  static constexpr float kKeyGlideDoneSemis = 0.001f;
+
+  // A KEY change found after this many samples without a voiced frame, 16 ms, has no note to protect:
+  // the next note takes the new key at once.
+  static constexpr int kRestSamples = 768;
+
+  // RESPONSE sets the one-pole's coefficient. The KEY glide never runs faster than RESPONSE does, so
+  // at a slow RESPONSE the correction moves to a new key at that pace.
+  void setResponse(float responseMs) {
+    responseMs_ = responseMs;
+    a_ = smooth::coef(clampf(responseMs, kMinResponseMs, kMaxResponseMs) * 0.001f);
+    logDecay_ = log2f(1.0f - a_);
+    offsetLog2_ = fmaxf(kKeyGlideLog2, logDecay_);
+    offsetKeep_ = exp2Fast(offsetLog2_);
+  }
+
+  // The KEY glide's offset joins the part that follows the pitch; the sum does not move.
+  void foldNoteOffset() {
+    corr_ += noteOffset_;
+    noteOffset_ = 0.0f;
+  }
+
+  // Steps the correction over n samples, and with Ratios sets each sample's inverse pitch ratio in
+  // inv_. The last step snaps to the target once it is within smooth::kSnap, so a settled correction
+  // holds its target bit for bit.
+  template <bool Ratios>
+  void stepCorrection(int n) {
+    float c = corr_;
+    float o = noteOffset_;
+    for (int i = 0; i < n - 1; ++i) {
+      c += a_ * (target_ - c);
+      o *= offsetKeep_;
+      if (Ratios) inv_[static_cast<size_t>(i)] = inverseRatio(c + o);
+    }
+    if (n > 0) {
+      c = smooth::step(c, target_, a_);
+      o *= offsetKeep_;
+      if (Ratios) inv_[static_cast<size_t>(n - 1)] = inverseRatio(c + o);
+    }
+    corr_ = c;
+    noteOffset_ = o;
+    if (fabsf(o) < kKeyGlideDoneSemis) foldNoteOffset();
+  }
 
   // The pitch the target follows. The newest frame is one hop fresher than the median, so it leads
   // while it sits within a fifth of the median; past that the median stands in, so a frame read at
@@ -154,11 +211,18 @@ class AutotuneVoice {
 
   // The scale note the pitch hz pulls to, and the pitch's distance from it. The first pick after
   // reset() or a KEY change takes the nearest note; every later pick holds the last note within
-  // kHoldSemis past the halfway point (scale.h).
-  void pullTo(float hz, int key) {
+  // kHoldSemis past the halfway point (scale.h). A KEY change while a note sounds starts the glide:
+  // the part of the correction that follows the pitch moves to the new note, and the offset keeps the
+  // old note's side. afterRest is true for the first frame after a rest, which has no note to protect.
+  void pullTo(float hz, int key, bool afterRest) {
     const float midi = midiOf(hz);
-    if (haveNote_ && key != degreeKey_) keyGlide_ = true;
-    note_ = haveNote_ && key == degreeKey_ ? heldNote(midi, key, note_) : midi - degreeOfMidi(midi, key).dev;
+    const float last = note_;
+    const bool changed = haveNote_ && key != degreeKey_;
+    note_ = haveNote_ && !changed ? heldNote(midi, key, note_) : midi - scaleDeviation(midi, key);
+    if (changed && !afterRest) {
+      corr_ += note_ - last;
+      noteOffset_ += last - note_;
+    }
     haveNote_ = true;
     degreeHz_ = hz;
     degreeKey_ = key;
@@ -166,20 +230,22 @@ class AutotuneVoice {
   }
 
   PsolaVoice psola_;
-  float corr_ = 0.0f;
+  std::array<float, kBlock> inv_{};  // the inverse pitch ratio of each sample of a render
+  float corr_ = 0.0f;                // the part of the correction that follows the sung pitch
+  float noteOffset_ = 0.0f;          // the KEY glide's part: the old note's side of the change, running down
   float target_ = 0.0f;
   float a_ = 1.0f;
-  float stepCoef_ = 1.0f;  // a_, or the 20 ms knob smoother's coefficient while a KEY change glides
-  float logDecay_ = -std::numeric_limits<float>::infinity();  // log2(1 - stepCoef_)
-  float gain_ = 1.0f;
-  float responseMs_ = kUnset;  // the inputs a_, gain_ and deviation_ were computed from
-  float trimDb_ = kUnset;
+  float logDecay_ = -std::numeric_limits<float>::infinity();  // log2(1 - a_)
+  float offsetLog2_ = kKeyGlideLog2;                          // the offset's decay per sample, a power of two
+  float offsetKeep_ = 1.0f;                                   // the same as a factor
+  DbGain trim_;
+  float responseMs_ = kUnset;  // the input a_ was computed from
   float degreeHz_ = kUnset;
   int degreeKey_ = 0;
   float deviation_ = 0.0f;  // the sung pitch's distance from its scale note, semitones
   float note_ = 0.0f;       // the scale note the last pick pulled to, as a MIDI pitch
+  int restSamples_ = kRestSamples;  // samples since the last voiced frame, up to kRestSamples
   bool haveNote_ = false;
-  bool keyGlide_ = false;  // a KEY change moved the target and the correction has not reached it
 };
 
 }  // namespace cv

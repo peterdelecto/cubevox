@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 #include "engine/autotune.h"
@@ -118,12 +119,14 @@ class PitchFx {
     // the cent; the Crowd card's copies drift by more than the coarse lag misses.
     const bool autotune = p.autotune.on || autotuneFade_ > 0.0f;
     const bool formant = formantWanted(p.formant) || formantFade_ > 0.0f;
+    writeCall(in, n);
+    tracker_.readOutOfRange(p.crowdOn || formantWanted(p.formant));
     if (autotune || formant || p.crowdOn) {
-      tracker_.push(in, n, autotune || formant, PitchTracker::History{ring_.data(), kVoiceRingLen, head_});
+      tracker_.push(in, n, true, autotune || formant, PitchTracker::History{ring_.data(), kVoiceRingLen, head_});
     } else {
       tracker_.idle(n);
     }
-    const Targets t = prepareVoices(p);
+    const Targets t = prepareVoices(p, n);
     if (fresh_) {
       octaveMix_ = t.octaveMix;
       octaveFade_ = t.octaveFade;
@@ -213,7 +216,7 @@ class PitchFx {
 
   // Each voice's per-block targets. A voice coming on starts clean only when its crossfade has
   // settled at zero; while the crossfade is still up the running voice carries on.
-  Targets prepareVoices(const PitchFxParams& p) {
+  Targets prepareVoices(const PitchFxParams& p, int n) {
     if (p.autotune.on && !autotuneWas_ && autotuneFade_ == 0.0f) {
       autotune_.reset();
       autotuneIdle_ = false;
@@ -221,7 +224,7 @@ class PitchFx {
     }
     autotuneWas_ = p.autotune.on;
     const PitchResult& pr = tracker_.result();
-    const float corr = autotune_.prepare(pr, p.autotune);
+    const float corr = autotune_.prepare(pr, p.autotune, n);
     bool octaveOn = octave_.prepare(p.octave, corr);
     if (octaveOn && !octaveWas_ && octaveFade_ == 0.0f) {
       octave_.reset();
@@ -254,7 +257,22 @@ class PitchFx {
            formantFade_ == 0.0f && t.formantFade == 0.0f;
   }
 
-  // Every stage settled off: the dry gain is exactly 1, so only the ring needs writing. MIX can
+  // The ring takes the whole call before the tracker or a voice reads it: the tracker's fine pass
+  // reads its frame from the ring, and the voices read only samples older than the one they render
+  // (Autotune's grains sit over 1,000 samples back, Octave's under 3,850), so none reads the
+  // call's later samples, and the call overwrites only the oldest ones. head_ stays at the call's
+  // first sample, which the voices step over.
+  void writeCall(const float* in, int n) {
+    int at = head_;
+    for (int done = 0; done < n;) {
+      const int run = n - done < kVoiceRingLen - at ? n - done : kVoiceRingLen - at;
+      std::memcpy(&ring_[static_cast<size_t>(at)], in + done, sizeof(float) * static_cast<size_t>(run));
+      at = at + run == kVoiceRingLen ? 0 : at + run;
+      done += run;
+    }
+  }
+
+  // Every stage settled off: the dry gain is exactly 1, and the ring already holds the call. MIX can
   // snap since nothing reads it until a stage comes on.
   void passThrough(const float* in, float* out, int n, const Targets& t) {
     octaveMix_ = t.octaveMix;
@@ -265,17 +283,14 @@ class PitchFx {
     if (!octave_.idle()) octave_.reset();
     gains_ = Gains{};
     gains_.formantTrim = formantTrim_;
-    for (int i = 0; i < n; ++i) {
-      ring_[static_cast<size_t>(head_)] = in[i];
-      out[i] = in[i];
-      advance();
-    }
+    if (out != in) std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
+    head_ = (head_ + n) % kVoiceRingLen;
     noteZeros(in, n);
   }
 
   // The voice takes Autotune's correction as its pitch ratio (1 with Autotune off), plays its grains
   // at the SHIFT rate and reads at Autotune's voice delay, so the two voices share a sample. The
-  // ring runs at most one chunk ahead of the voice's reads, whatever the call's length.
+  // ring holds the whole call before the voice reads, whatever the call's length.
   //
   // SHIFT glides through the 20 ms one-pole, in semitones. A bare step leaves a bump in the grain
   // window sum that reads x1.23 of steady-state curvature next to SHIFT 0, and the glide holds every
@@ -334,15 +349,10 @@ class PitchFx {
     return autotuneWas_ ? live : live * autotuneFade_;
   }
 
-  // The Octave and Formant voices read a block at a time, so a chunk of at most kBlock samples goes
-  // into the ring ahead of the per-sample loop. The voices read only samples older than the one they
-  // render, and Autotune's grains sit over 1,000 samples back, so none reads the chunk's later samples.
-  void writeChunk(const float* in, int m) {
-    int at = head_;
-    for (int j = 0; j < m; ++j) {
-      ring_[static_cast<size_t>(at)] = in[j];
-      at = at + 1 == kVoiceRingLen ? 0 : at + 1;
-    }
+  // The Octave and Formant voices render a block at a time, in chunks of at most kBlock samples. The
+  // chunk's samples are in the ring already (writeCall), and zeroBefore_ takes the run of exact zeros
+  // that ends just ahead of the chunk.
+  void startChunk(const float* in, int m) {
     zeroBefore_ = zeroRun_;
     noteZeros(in, m);
   }
@@ -460,35 +470,44 @@ class PitchFx {
     Sums sums;
     for (int c = 0; c < n; c += kBlock) {
       const int len = n - c < kBlock ? n - c : kBlock;
-      writeChunk(in + c, len);
+      startChunk(in + c, len);
       if (m.octave) octave_.render(ring_, head_, len, octBuf_.data());
       renderFormant(len);
+      renderAutotune(len, m);
       for (int j = 0; j < len; ++j) {
         const int i = c + j;
-        const float oct = m.octave ? octBuf_[static_cast<size_t>(j)] : 0.0f;
+        const size_t k = static_cast<size_t>(j);
+        const float oct = m.octave ? octBuf_[k] : 0.0f;
         const float f = Settled ? 0.0f : static_cast<float>(i + 1) * m.inv;
-        out[i] = formantSample<Settled>(m, sums, in[i], formantBuf_[static_cast<size_t>(j)], oct, f);
-        advance();
+        out[i] = formantSample<Settled>(m, sums, in[i], voiceBuf_[k], formantBuf_[k], oct, f);
       }
+      advance(len);
     }
     m.sumBB = sums.bb;
     m.sumVV = sums.vv;
     m.sumBV = sums.bv;
   }
 
-  // One output sample at fraction f of the call, from the dry input, the Formant voice's sample and
-  // the Octave voice's. The base and voice powers add into sums.
+  // The corrected voice for a chunk, into voiceBuf_, when anyone hears it. A base the mix leaves
+  // unheard only has its correction step along.
+  void renderAutotune(int len, const MixBlock& m) {
+    if (m.g0.autotune <= 0.0f && m.g1.autotune <= 0.0f) return;
+    if (m.skipAutotune) autotune_.glide(len);
+    else autotune_.render(ring_, head_, len, m.period, voiceBuf_.data());
+  }
+
+  // One output sample at fraction f of the call, from the dry input, the corrected voice's sample av,
+  // the Formant voice's sample and the Octave voice's. The base and voice powers add into sums.
   template <bool Settled>
-  float formantSample(const MixBlock& m, Sums& sums, float in, float voice, float oct, float f) {
+  float formantSample(const MixBlock& m, Sums& sums, float in, float av, float voice, float oct, float f) {
     const float corrected = gainAt<Settled>(m.g0.autotune, m.g1.autotune, f);
     float base = in;
     if (corrected > 0.0f) {
       if (m.skipAutotune) {
-        autotune_.glide();
         base = 0.0f;
       } else {
         const float dryShare = gainAt<Settled>(m.g0.autotuneDry, m.g1.autotuneDry, f);
-        base = corrected * autotune_.tick(ring_, head_, m.period) + dryShare * in;
+        base = corrected * av + dryShare * in;
       }
     }
     const float keep = gainAt<Settled>(m.g0.formantBase, m.g1.formantBase, f);
@@ -530,20 +549,26 @@ class PitchFx {
     }
   }
 
-  // The mix with no Formant, in the loop that fits the voices running. The gains ramp by increments
-  // and a settled gain has an increment of exactly 0, so it costs one add.
+  // The mix with no Formant, in the loop that fits the voices running and whether the gains move.
   void mixPlain(const float* in, float* out, int n, const MixBlock& m) {
     const bool autotune = m.g0.autotune > 0.0f || m.g1.autotune > 0.0f;
     if (m.octave) {
-      if (autotune) plainLoop<true, true>(in, out, n, m);
-      else plainLoop<true, false>(in, out, n, m);
+      if (autotune) plainLoopFor<true, true>(in, out, n, m);
+      else plainLoopFor<true, false>(in, out, n, m);
     } else {
-      if (autotune) plainLoop<false, true>(in, out, n, m);
-      else plainLoop<false, false>(in, out, n, m);
+      if (autotune) plainLoopFor<false, true>(in, out, n, m);
+      else plainLoopFor<false, false>(in, out, n, m);
     }
   }
 
   template <bool Octave, bool Autotune>
+  void plainLoopFor(const float* in, float* out, int n, const MixBlock& m) {
+    if (m.settled) plainLoop<Octave, Autotune, true>(in, out, n, m);
+    else plainLoop<Octave, Autotune, false>(in, out, n, m);
+  }
+
+  // The gains ramp by increments; a settled gain holds one value, so it takes no step.
+  template <bool Octave, bool Autotune, bool Settled>
   void plainLoop(const float* in, float* out, int n, const MixBlock& m) {
     const float dDry = (m.g1.dry - m.g0.dry) * m.inv;
     const float dWet = (m.g1.wet - m.g0.wet) * m.inv;
@@ -551,29 +576,32 @@ class PitchFx {
     const float dDsh = (m.g1.autotuneDry - m.g0.autotuneDry) * m.inv;
     for (int c = 0; c < n; c += kBlock) {
       const int len = n - c < kBlock ? n - c : kBlock;
-      writeChunk(in + c, len);
+      startChunk(in + c, len);
       if (Octave) octave_.render(ring_, head_, len, octBuf_.data());
+      if (Autotune) autotune_.render(ring_, head_, len, m.period, voiceBuf_.data());
       const float at = static_cast<float>(c) * m.inv;  // the chunk's place in the call
       float dry = m.g0.dry + (m.g1.dry - m.g0.dry) * at;
       float wet = m.g0.wet + (m.g1.wet - m.g0.wet) * at;
       float cor = m.g0.autotune + (m.g1.autotune - m.g0.autotune) * at;
       float dsh = m.g0.autotuneDry + (m.g1.autotuneDry - m.g0.autotuneDry) * at;
       for (int j = 0; j < len; ++j) {
-        dry += dDry;
+        if (!Settled) dry += dDry;
         float y = in[c + j];
         if (Autotune) {
-          cor += dCor;
-          dsh += dDsh;
-          if (cor > 0.0f) y = cor * autotune_.tick(ring_, head_, m.period) + dsh * y;
+          if (!Settled) {
+            cor += dCor;
+            dsh += dDsh;
+          }
+          if (cor > 0.0f) y = cor * voiceBuf_[static_cast<size_t>(j)] + dsh * y;
         }
         y *= dry;
         if (Octave) {
-          wet += dWet;
+          if (!Settled) wet += dWet;
           y += wet * octBuf_[static_cast<size_t>(j)];
         }
         out[c + j] = y;
-        advance();
       }
+      advance(len);
     }
   }
 
@@ -641,41 +669,55 @@ class PitchFx {
     levelGain_ = 1.0f;
   }
 
-  // Voices only use head modulo the ring, so wrapping here is exact.
-  void advance() { head_ = head_ + 1 == kVoiceRingLen ? 0 : head_ + 1; }
+  // Steps head_ over m samples, m under the ring's length. Voices only use head modulo the ring, so
+  // wrapping here is exact.
+  void advance(int m) { head_ = head_ + m < kVoiceRingLen ? head_ + m : head_ + m - kVoiceRingLen; }
 
   VoiceRing ring_{};
   PitchTracker tracker_;
   AutotuneVoice autotune_;
   OctaveVoice octave_;
   formant_detail::FormantPsolaVoice formant_;
-  std::array<float, kBlock> formantBuf_{};  // the Formant voice's chunk
-  std::array<float, kBlock> octBuf_{};      // the Octave voice's chunk
-  FormantTuning tuning_;      // the tuning formantTrim_ came from
-  float baseSq_ = 0.0f;       // running power of the base, one step a block
-  float voiceSq_ = 0.0f;      // running power of the shifted voice before its trim
-  float baseVoice_ = 0.0f;    // running mean of base * voice
-  float levelGain_ = 1.0f;    // the level gain at the end of the last block
+
+  // The voices' chunks.
+  std::array<float, kBlock> formantBuf_{};  // the Formant voice's
+  std::array<float, kBlock> octBuf_{};      // the Octave voice's
+  std::array<float, kBlock> voiceBuf_{};    // the corrected voice's
+
+  // The smoothers behind the crossfades, 0 off .. 1 on.
   float octaveMix_ = 0.0f;
-  float octaveFade_ = 0.0f;    // Octave crossfade, 0 off .. 1 on
-  float autotuneFade_ = 0.0f;  // Autotune crossfade, 0 dry .. 1 corrected
+  float octaveFade_ = 0.0f;    // Octave
+  float autotuneFade_ = 0.0f;  // Autotune, 0 dry .. 1 corrected
   float formantMix_ = 0.0f;
-  float formantFade_ = 0.0f;   // Formant crossfade, 0 off .. 1 on
-  float formantTrim_ = 1.0f;   // the trim at the glided SHIFT
-  float trimSemis_ = std::numeric_limits<float>::quiet_NaN();  // the SHIFT formantTrim_ was worked out at
+  float formantFade_ = 0.0f;   // Formant
+  float coef_ = 1.0f;          // their coefficient for steps of coefN_ samples
+  int coefN_ = 0;
+  Gains gains_;                // the gains at the end of the last block
+
+  // Formant: the tuning, the glided SHIFT and what follows from it, and the level gain's running powers.
+  FormantTuning tuning_;
   float shiftSm_ = 0.0f;       // SHIFT in semitones after the glide
   float shiftRate_ = 1.0f;     // the grains' playback rate at shiftSm_
-  float rateSemis_ = std::numeric_limits<float>::quiet_NaN();  // the SHIFT shiftRate_ was worked out at
-  float coef_ = 1.0f;          // the smoothers' coefficient for steps of coefN_ samples
-  int coefN_ = 0;
+  float formantTrim_ = 1.0f;   // the trim at shiftSm_
+  float baseSq_ = 0.0f;        // running power of the base, one step a block
+  float voiceSq_ = 0.0f;       // running power of the shifted voice before its trim
+  float baseVoice_ = 0.0f;     // running mean of base * voice
+  float levelGain_ = 1.0f;     // the level gain at the end of the last block
   float powerCoef_ = 1.0f;     // the powers' coefficient for steps of powerCoefN_ samples
   int powerCoefN_ = 0;
-  int zeroRun_ = kVoiceRingLen;  // samples at the newest end of the ring that are exactly 0
-  int zeroBefore_ = 0;           // the same count just before the chunk being rendered
   bool shiftSet_ = false;      // shiftSm_ holds a live value
-  Gains gains_;               // gains at the end of the last block
+
+  // The SHIFT that rateSemis_ and trimSemis_ were worked out at; NaN until the first.
+  float rateSemis_ = std::numeric_limits<float>::quiet_NaN();
+  float trimSemis_ = std::numeric_limits<float>::quiet_NaN();
+
+  // The ring: where the next sample goes, and how many samples at its newest end are exactly 0.
   int head_ = 0;
-  bool autotuneWas_ = false;  // last block's on-state per card, for enable edges
+  int zeroRun_ = kVoiceRingLen;
+  int zeroBefore_ = 0;  // the same count just before the chunk being rendered
+
+  // Last block's on-state per card, for enable edges, and what the voices wait on.
+  bool autotuneWas_ = false;
   bool octaveWas_ = false;
   bool formantWas_ = false;
   bool formantStart_ = false;  // Formant started and its first call has yet to take Autotune's grid

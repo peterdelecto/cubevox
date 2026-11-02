@@ -117,8 +117,8 @@ int usage() {
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb (-24..24) atGrainDelay fmTrimDb (-24..24, added to every entry of the SHIFT trim table)\n"
                "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
-               "     (-12..12) crowdShelfDb0..3 (-12..12) crowdShelfHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
-               "     crowdLagScale (0.5..2) crowdScatterMs (0..30) crowdDriftCents (0..50) crowdMaxLagMs (0..150)\n"
+               "     (-12..12) crowdShelfDb0..3 (-12..12) crowdShelfHz crowdHpHz (20..21600) crowdDelayMs0..3 (%g..%d)\n"
+               "     crowdLagScale (0.5..2) crowdScatterMs (0..%g) crowdDriftCents (0..50) crowdMaxLagMs (0..%d)\n"
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
@@ -134,7 +134,9 @@ int usage() {
                "     lofiMakeup<tone 0..4>_<amount 0..10> (dB, the makeup table by TONE 0, 25 ... 100 %% and AMOUNT 0, 10 ... 100 %%)\n"
                "  a lofi key outside its range is refused\n"
                "  --time and --mix are the panel's TIME and MIX positions for the selected reverb engine (default 0.5);\n"
-               "  each engine's dwell is its springDwell or chmDwell key\n");
+               "  each engine's dwell is its springDwell or chmDwell key\n",
+               static_cast<double>(cv::crowd_detail::kMinDelayMs), cv::kCrowdMaxLagMs,
+               static_cast<double>(cv::crowd_detail::kMaxScatterMs), cv::kCrowdMaxLagMs);
   return 2;
 }
 

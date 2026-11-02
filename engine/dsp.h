@@ -20,6 +20,10 @@ constexpr float kButterworthQ = 0.70710678f;
 
 inline float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
 
+// A knob position p in [0, 1] mapped geometrically from `from` at 0 to `to` at 1. The panel's log
+// knobs and the RESPONSE knob run on it.
+inline float logTaper(float from, float to, float p) { return from * powf(to / from, p); }
+
 // Coefficient of a one-pole low-pass with its corner at hz, for a filter that runs at rate Hz. The
 // corner clamps to 0.45 of that rate.
 inline float onePoleCoefAt(float hz, float rate) {

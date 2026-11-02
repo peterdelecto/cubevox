@@ -68,7 +68,7 @@ constexpr Cost operator+(Cost a, Cost b) {
 
 constexpr Cost kEmpty{0, 0, true};
 constexpr Cost kInputGate{3, 4, true};     // 17.7k to 17.9k / 21.6k to 25.1k, stress run 2026-11-01 (v2.00.81 and v2.00.82, all four layouts: mean 2.8 %, worst 3.4 to 3.9 %, lowest run worst per layout); the earlier 23.7k / 26.0k was the WeAct bench
-constexpr Cost kAutotune{5, 7, false};     // the pair's estimate less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
+constexpr Cost kAutotune{3, 5, false};     // est. the pair's host-scaled figure less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
 constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-02, its own voice only: 0.21 host us a block on g++ 15 (Octave at MIX 100 % less the same case at MIX 0), 10.5k board cycles at 50.4k, rounded up; see "Octave alone"
 constexpr Cost kUnison{4, 5, true};        // 21.1k to 21.2k / 21.7k to 26.6k, stress run 2026-11-01 (v2.00.81 and v2.00.82, default and chasm layouts: mean 3.3 %, worst 3.4 to 4.2 %); the earlier 46.9k / 47.7k was the WeAct bench. The dry-at-unity rewrite (2026-11-02) costs no more: host 14.4 / 8.5 ns a sample at DEPTH 50 % (clang / gcc) against 14.5 / 9.0, and 14.7 / 11.6 with DEPTH moving against 14.4 / 12.2
 constexpr Cost kSlapback{1, 3, true};      // 2.7k to 2.9k / 13.5k to 13.8k, stress run 2026-11-02 (v2.01.11, all seven layouts, TIME and AMOUNT swept, ten toggle flips: mean 0.4 to 0.5 %, worst 2.1 to 2.15 %, lowest run worst per layout); the host bench estimate of 6.4k to 8.3k worst missed the block after an enable
@@ -78,19 +78,27 @@ constexpr Cost kReverbSpring{6, 7, true};   // 33.4k to 33.7k / 38.3k to 40.5k, 
 constexpr Cost kReverbChasm{5, 6, true};    // 29.6k to 29.7k / 35.1k to 35.3k, stress run 2026-11-02 (v2.01.11, chasm and crowd-chasm layouts, MIX swept: mean 4.6 %, worst 5.5 %, lowest run worst per layout); the M7 model read 28.6k / 32.6k
 
 // The pitch tracker, its history fill and its coarse analysis, which Autotune, Crowd and Formant
-// share and a layout pays once. kTracker and kAutotune are one estimate split in two. The pair was measured on
-// the board before the pitch CPU pass at 83.2k cycles for the mean block (13.0 %) and 131.9k for
-// the worst (20.6 %); this estimate scales those by the host ratio the CPU pass measured on Adam's
-// clips with Autotune on at the defaults, host us per block: mean 2.83 before, 1.66 after (x0.587);
-// voiced hop block 5.58 before, 2.83 after (x0.507). That gives 48.8k cycles (7.6 %) for the mean
-// and 66.9k (10.5 %) for the worst, which is about 29k board cycles per host us on the mean block
-// and 24k on the voiced hop block. The pair splits by the tracker's host share of Autotune on
-// (Crowd on with Autotune off against Autotune on, same clips, 2026-11-01): mean 0.68 of 1.60 us
-// (43 %), voiced hop block 1.21 of 2.75 us (44 %). The tracker takes 3.2 % and 4.6 %, rounded up
-// to 4 and 5; Autotune's row takes the rest, 4.4 % and 5.9 %, rounded up to 5 and 6. Both rows are
-// estimates, and a board bench of the pair after the pass is owed. At the 50.4k ratio the tracker's
-// 0.68 us would read 5.4 points mean and its 1.21 us 9.5 points worst, against the 4 and 5 held
-// here.
+// share and a layout pays once. kTracker and kAutotune are one estimate split in two. The board
+// measured the pair before the pitch CPU pass at 83.2k cycles for the mean block (13.0 %) and 131.9k
+// for the worst (20.6 %). The CPU pass scaled those to 48.8k (7.6 %) and 66.9k (10.5 %) by the host
+// ratio on Adam's clips with Autotune on at the defaults. The Autotune fix pass (2026-11-02, Adam's
+// clips, hard tune, 64-sample blocks, -O2 with the firmware's float contraction, pooled medians of 9
+// interleaved passes) scaled them again by its own host bench against main. Host us per block:
+//
+//   compiler      mean block         voiced hop block    tracker alone, after
+//   g++ 15        1.794 -> 1.408     2.618 -> 1.910      0.867 (mean), 1.136 (hop)
+//   Apple clang   1.629 -> 1.099     2.465 -> 1.632      0.550 (mean), 0.793 (hop)
+//
+// The M7 has no SIMD, and clang vectorizes the tracker's sums where g++ does not, so g++ stands for
+// the board and the rows take its ratios: x0.785 on the mean block (38.3k cycles, 6.0 %) and x0.730 on
+// the voiced hop block (48.8k, 7.6 %), about 27k board cycles per host us on the mean block and 26k on
+// the hop block. The pair splits by the tracker's host share of Autotune on (Crowd on with Autotune
+// off against Autotune on, same clips): mean 0.867 of 1.408 us (62 %), voiced hop block 1.136 of
+// 1.910 us (59 %). The tracker takes 3.7 % and 4.5 %, rounded up to 4 and 5; Autotune's row takes the
+// rest, 2.3 % and 3.1 %, rounded up to 3 and 4, plus the extra worst point its row explains. Both
+// rows are estimates, and a board bench of the pair after the pass is owed. At the 50.4k ratio the
+// tracker's 0.867 us would read 6.8 points mean and its 1.136 us 8.9 points worst, against the 4 and
+// 5 held here.
 constexpr Cost kTracker{4, 5, false};
 
 // The pitch stage's own work when Octave or Formant runs and Autotune is not placed, which no card row

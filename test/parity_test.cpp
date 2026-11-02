@@ -72,7 +72,7 @@ constexpr float kEmuInDecayLoMs = 20.0f, kEmuInDecayHiMs = 2000.0f;
 // emulator/main.cpp drawSlapbackBlock and drawPedals: 60..250 ms linear.
 constexpr float kEmuSlapLoMs = 60.0f, kEmuSlapHiMs = 250.0f;
 // emulator/main.cpp drawPedals: KEY 0..11, SEMITONES -12..12.
-constexpr int kEmuKeys = 12, kEmuSemiLo = -12, kEmuSemiHi = 12;
+constexpr int kEmuKeys = cv::kKeyCount, kEmuSemiLo = -12, kEmuSemiHi = 12;
 
 // emulator/main.cpp drawPedals (RATE knob) -> macros::unison(tuning, rate).
 void emuUnisonRate(float p, cv::UnisonTuning& t) { mc::unison(t, 100.0f * p); }
