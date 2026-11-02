@@ -50,16 +50,13 @@ class OctaveVoice {
   void reset() { *this = OctaveVoice{}; }
 
   // Called once per block before rendering. Returns true if the stage is on. corr is Autotune's
-  // correction in semitones. libm runs only when the trim or the glide time moved.
+  // correction in semitones. libm runs only when the glide time moved.
   bool prepare(const OctaveParams& p, float corr) {
     const int s = p.semitones < -kMaxSemis ? -kMaxSemis : (p.semitones > kMaxSemis ? kMaxSemis : p.semitones);
     const OctaveTuning& t = p.tuning;
     semisT_ = static_cast<float>(s);
     corrT_ = corr;
-    if (t.trimDb != trimDb_) {
-      trimDb_ = t.trimDb;
-      level_ = powf(10.0f, trimDb_ / 20.0f);
-    }
+    level_.set(t.trimDb);
     // A voice that is not running jumps to its new interval instead of gliding in from a stale one.
     if (idle_) {
       semis_ = semisT_;
@@ -175,6 +172,7 @@ class OctaveVoice {
     const float dc = rot.dc, ds = rot.ds;
     float dcY = dc_.y;
     const float dcA = dc_.a;
+    const float level = level_.gain();
     for (int j = 0; j < n; ++j) {
       const float g0 = 0.5f - 0.5f * c;
       const float c2 = c * dc - s * ds;
@@ -191,7 +189,7 @@ class OctaveVoice {
       }
       float x0, x1;
       readTaps<Safe>(r, pos0, pos1, x0, x1);
-      const float y = level_ * (x1 + g0 * (x0 - x1));
+      const float y = level * (x1 + g0 * (x0 - x1));
       dcY += dcA * (y - dcY);
       out[j] = y - dcY;
       ph += static_cast<uint32_t>(dp);
@@ -243,8 +241,7 @@ class OctaveVoice {
   float aGlide_ = 1.0f;
   float glideDecay_ = 0.0f;  // (1 - aGlide_)^kBlock, the glide over one block
   float glideMs_ = kUnset;   // the glide time aGlide_ came from
-  float trimDb_ = kUnset;    // the trim level_ came from
-  float level_ = 1.0f;
+  DbGain level_;
   float ratio_ = 1.0f;
   float ratioSemis_ = 0.0f;
   float rateMean_ = 1.0f;  // the chunk's mean ratio

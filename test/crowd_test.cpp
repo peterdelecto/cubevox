@@ -26,6 +26,7 @@
 #include "engine/crowd.h"
 
 #include "alloc_guard.h"
+#include "ringed_tracker.h"
 
 namespace {
 
@@ -340,7 +341,7 @@ double centroidHz(const Signal& x, double f0, int first, int last) {
 
 // Median f0 of x over [from, to), from a fresh tracker fed from `warm` on.
 double medianHzIn(const Signal& x, int warm, int from, int to) {
-  cv::PitchTracker t;
+  RingedTracker t;
   std::vector<double> hz;
   for (int i = warm; i < to; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, to - i);
@@ -1052,7 +1053,7 @@ bool testCorrectionReleases() {
   const cv::PitchFxParams off = passThrough();
   const Signal out = runBoth(in, isolated(0.0f), isolated(0.0f), on, off, switchAt);
 
-  cv::PitchTracker t;
+  RingedTracker t;
   double beforeErr = 9999.0;
   double worstAfter = 0.0;
   const int total = static_cast<int>(out.size());
@@ -1301,7 +1302,7 @@ Signal sweepTone(double hz, double sweepSt, double sweepHz, int n) {
 // Depth in semitones of the sweepHz component of x's pitch over `cycles` whole cycles from `fromS`,
 // by a lock-in on the tracker's f0.
 double sweepDepthSt(const Signal& x, double sweepHz, double fromS, int cycles) {
-  cv::PitchTracker t;
+  RingedTracker t;
   const int from = static_cast<int>(fromS * kRate);
   const int to = from + static_cast<int>(cycles / sweepHz * kRate);
   double re = 0.0;

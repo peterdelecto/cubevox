@@ -61,6 +61,23 @@ inline float dbFast(float x) { return kDbPerLog2 * log2Fast(x); }
 // 10^(db / 20) to about 1e-7 relative, through exp2Fast.
 inline float dbToGainFast(float db) { return exp2Fast(db * kLog2PerDb); }
 
+// A linear gain from a level in dB, worked out only when the dB moves. 0 dB is exactly 1, so a stage
+// can skip the multiply while trimmed() is false.
+class DbGain {
+ public:
+  void set(float db) {
+    if (db == db_) return;
+    db_ = db;
+    gain_ = dbToGainFast(db);
+  }
+  float gain() const { return gain_; }
+  bool trimmed() const { return gain_ != 1.0f; }
+
+ private:
+  float db_ = 0.0f;
+  float gain_ = 1.0f;
+};
+
 // sin(2 pi phase / 2^32) from a 32-bit turn counter. The phase folds to a
 // quarter turn, then sin(pi t) is the odd Taylor series through t^11 on
 // |t| <= 0.5. The first dropped term is below 1e-7, so absolute error stays

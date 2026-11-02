@@ -401,6 +401,44 @@ bool octaveRows() {
   return ok;
 }
 
+// The Autotune card as the registry sets it, at KEY index `key` and RESPONSE `responseMs`.
+cv::PitchFxParams boxAutotune(int key, float responseMs) {
+  ChainParams chain;
+  applyPlacement(Card::Autotune, chain);
+  applyToggle(Card::Autotune, true, chain);
+  applyKnob(Card::Autotune, 0, static_cast<float>(key), chain);
+  applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(responseMs), chain);
+  return chain.pitchFx;
+}
+
+// The Autotune voice on Adam's clips, which carry the pitches the synthetic program does not (it sits at
+// 180 Hz). The three clips hold the rule with its slack and their mean holds it outright, at hard tune and
+// at two slow RESPONSE settings, where the correction glides and the grain spacing moves. Across the twelve
+// keys and four RESPONSE settings the mean reads +0.08 to +0.37 dB; these rows sit at the ends of that span.
+bool autotuneRows() {
+  bool ok = true;
+  for (float responseMs : {1.0f, 100.0f, 500.0f}) {
+    char label[40];
+    std::snprintf(label, sizeof label, "autotune key C response %g ms", static_cast<double>(responseMs));
+    const cv::PitchFxParams p = boxAutotune(0, responseMs);
+    double mean = 0.0;
+    int count = 0;
+    ok &= clipRows(
+        label,
+        [&](const Signal& padded) {
+          auto s = std::make_unique<Stage<cv::PitchFx>>();
+          return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
+        },
+        kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+    if (count > 0) {
+      char name[48];
+      std::snprintf(name, sizeof name, "%s mean", label);
+      ok &= verdict(name, mean, kLoDb, kHiDb);
+    }
+  }
+  return ok;
+}
+
 // Echo and Unison add their wet on top of the dry voice, which passes at unity at every Amount, so
 // the level is the dry plus whatever the wet adds. Each card has a reference setting, where its
 // trim is tuned and its mean over Adam's clips is held to the rule's band, and a 100 % row, which
@@ -556,6 +594,7 @@ bool slotRows(const Signal& in) {
   cv::PitchFxParams autotune = pitchOff();
   autotune.autotune.on = true;
   ok &= simple<cv::PitchFx>("autotune key C", in, autotune);
+  ok &= autotuneRows();
 
   ok &= octaveRows();
 

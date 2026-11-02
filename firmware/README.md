@@ -189,7 +189,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   names `hardware/bringup/bench-checklist.md`, the checks that need a person at the bench with a scope or a PA.
 - `stress.py`: the autonomous CPU run on a clip bench image, with nobody at the panel. `./stress.py --flash --runs 2`
   builds `CLIP=../samples/adam_vox_sample3_5s.wav BENCH=1` into `/tmp/cubevox-fw-stress`, installs it with
-  `flash.sh`, then runs the layouts `default`, `crowd`, `chasm` and `crowd-chasm` (`--layouts a,b` picks some,
+  `flash.sh`, then runs the layouts `default`, `crowd`, `chasm`, `crowd-chasm`, `octave-alone`, `formant` and
+  `formant-alone` (`--layouts a,b` picks some,
   `--seconds S` sets pass 1's read window, 20 s by default). Each run forces every slot on (`all_on`), turns the clip
   on and reads the per-slot and per-block cycle counters twice. Pass 1 pins every knob at its top. Pass 2 sweeps
   SEMITONES, the reverb MIX, both Echo knobs and, with Crowd placed, both Crowd knobs from 0 % to 100 % in steps of
@@ -197,8 +198,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   A slot's mean is pass 1's mean and its worst is the largest worst over both passes. Across runs the mean is the
   mean of the means and the worst is the lowest run worst, the rule in `core/costs.h`. The gates are zero late,
   overrun and dry blocks, each card within its `costs.h` row for mean and worst, and each layout's block mean under
-  75 % and block worst under 95 %. The slot that runs the shared pitch stage is held to the Autotune and Octave
-  rows placed plus the tracker row. The summary goes to stdout and a table per layout is appended to
+  75 % and block worst under 95 %. The slot that runs the shared pitch stage is held to the rows of the pitch
+  cards placed (Autotune, Octave, Formant) plus the tracker row when Autotune, MOB or Formant runs and the
+  `kPitchStage` row when Octave or Formant runs without Autotune. The summary goes to stdout and a table per layout is appended to
   `build/bench/<YYYY-MM-DD>-stress.md`. Exit 1 when any gate fails. The saved layout, `slots_live`, `knobs_live`,
   clip off and the reverb engine are put back at the end, also after a failure.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20

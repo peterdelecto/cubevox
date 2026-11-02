@@ -13,6 +13,7 @@
 #include "engine/pitch_fx.h"
 
 #include "alloc_guard.h"
+#include "ringed_tracker.h"
 
 namespace {
 
@@ -80,7 +81,7 @@ cv::PitchFxParams octaveOnly(int semis) {
 double outputHz(double inHz, const cv::PitchFxParams& p) {
   gFx.reset();
   const std::vector<float> out = run(gFx, tone(inHz, 2 * cv::kSampleRate), p);
-  cv::PitchTracker t;
+  RingedTracker t;
   std::vector<double> hz;
   const int total = static_cast<int>(out.size());
   for (int i = 0; i < total; i += cv::kBlock) {
@@ -239,7 +240,7 @@ double centroidHz(const std::vector<float>& x, double f0, int first, int last, i
 
 // Median f0 of a signal over seconds 1..2, from a fresh tracker.
 double medianHz(const std::vector<float>& x) {
-  cv::PitchTracker t;
+  RingedTracker t;
   std::vector<double> hz;
   const int total = static_cast<int>(x.size());
   for (int i = 0; i < total; i += cv::kBlock) {

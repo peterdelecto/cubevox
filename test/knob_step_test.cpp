@@ -188,7 +188,7 @@ ChainParams background(Card c) {
 // filter delivers them, so the repeat's pitch falls and its curvature stays below the steady value.
 bool readsEchoAlone(Card c, int knob) { return c == Card::Slapback && knob == 0; }
 
-bool checkKnob(Card c, int knob, const Signal& in) {
+bool checkKnob(Card c, int knob, const Signal& in, double toneHz = kToneHz) {
   const ChainParams base = background(c);
   const bool echoAlone = readsEchoAlone(c, knob);
   double worst = 0.0;
@@ -210,11 +210,17 @@ bool checkKnob(Card c, int knob, const Signal& in) {
     }
   }
   const bool ok = worst <= kMaxRatio;
-  std::printf("%s %-14s %-10s worst step %.3g to %.3g: peak curvature x%.5f of steady state (<= %.2f)\n",
+  char pitch[24] = "";
+  if (toneHz != kToneHz) std::snprintf(pitch, sizeof pitch, " at %g Hz", toneHz);
+  std::printf("%s %-14s %-10s worst step %.3g to %.3g: peak curvature x%.5f of steady state (<= %.2f)%s\n",
               ok ? "PASS" : "FAIL", cardDesc(c).name, cardDesc(c).knob[knob].name, static_cast<double>(at.from),
-              static_cast<double>(at.to), worst, kMaxRatio);
+              static_cast<double>(at.to), worst, kMaxRatio, pitch);
   return ok;
 }
+
+// KEY moves the target note, and a grain is two periods, so a low voice is the harder case for the
+// glide. Adam sings from 78 Hz, and the KEY gate also runs on sines at 98 Hz, 82 Hz and 74.5 Hz.
+constexpr double kLowTones[] = {98.0, 82.0, 74.5};
 
 }  // namespace
 
@@ -224,6 +230,9 @@ int main() {
     const Card c = static_cast<Card>(i);
     const Signal in = tone(kToneHz);
     for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= checkKnob(c, k, in);
+    if (c == Card::Autotune) {
+      for (double hz : kLowTones) ok &= checkKnob(c, 0, tone(hz), hz);
+    }
   }
   std::printf("%s knob step\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

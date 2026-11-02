@@ -1,6 +1,7 @@
-// PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, the pane
+// PitchTracker checks: vibrato tracking, steady-tone accuracy, silence, the block-sum
 // oracle, the enable rebuild spread over blocks, the replay after an idle spell, the
-// clamped flag at the range ends, the coarse-only publish, no-alloc. No window, no audio device.
+// clamped and out-of-range flags at the range ends, the coarse-only publish, no-alloc. No window,
+// no audio device.
 
 #include <algorithm>
 #include <cmath>
@@ -12,6 +13,7 @@
 #include "engine/pitch.h"
 
 #include "alloc_guard.h"
+#include "ringed_tracker.h"
 
 namespace {
 
@@ -54,6 +56,15 @@ std::vector<float> tone(double hz, int n) {
 
 double cents(double hz, double ref) { return 1200.0 * std::log2(hz / ref); }
 
+// Arms the allocation guard for the push() that follows and counts it, so the closing line reports
+// how many calls ran under the guard.
+int gGuardedCalls = 0;
+
+void armGuard() {
+  gInProcess = true;
+  ++gGuardedCalls;
+}
+
 constexpr float kThreshold = cv::PitchTracker::kVoicedThreshold;
 
 // One result per hop, recorded where the hop ends.
@@ -61,21 +72,24 @@ struct Hop {
   int end;
   bool voiced;
   float hz;
+  bool coarseRan;  // the hop's frame passed the level gate, so its coarse pass ran
 };
 
 // Feeds x in kBlock chunks under the allocation guard and records the result
 // after every block that ends on a hop boundary.
-std::vector<Hop> run(cv::PitchTracker& t, const std::vector<float>& x) {
+std::vector<Hop> run(RingedTracker& t, const std::vector<float>& x) {
   std::vector<Hop> hops;
   hops.reserve(x.size() / cv::PitchTracker::kHop + 1);
   const int total = static_cast<int>(x.size());
   for (int i = 0; i < total; i += cv::kBlock) {
     const int n = std::min(cv::kBlock, total - i);
-    gInProcess = true;
+    armGuard();
     t.push(&x[static_cast<size_t>(i)], n);
     gInProcess = false;
     const int end = i + n;
-    if (end % cv::PitchTracker::kHop == 0) hops.push_back({end, t.result().voiced, t.result().rawHz});
+    if (end % cv::PitchTracker::kHop == 0) {
+      hops.push_back({end, t.result().voiced, t.result().rawHz, t.coarseRanForTest()});
+    }
   }
   return hops;
 }
@@ -89,13 +103,13 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
 }
 
 // 1. A3 with 5 Hz, +-30 cent vibrato: each voiced hop's rawHz matches the
-// analytic pitch at the centre of its comparison within 3 cents.
+// analytic pitch at the centre of its comparison within 1.5 cents (it reads 0.99).
 bool testVibrato() {
   auto hzAt = [](int i) {
     return kA3 * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * 5.0 * i / cv::kSampleRate));
   };
   const std::vector<float> x = tone(3 * cv::kSampleRate, hzAt);
-  cv::PitchTracker t;
+  RingedTracker t;
   const std::vector<Hop> hops = run(t, x);
   double worst = 0.0;
   int total = 0;
@@ -108,16 +122,16 @@ bool testVibrato() {
     worst = std::max(worst, std::fabs(cents(h.hz, hzAt(pitchCentre(h.end, h.hz)))));
   }
   const double pct = total > 0 ? 100.0 * voiced / total : 0.0;
-  bool ok = report("vibrato tracks", voiced > 0 && worst <= 3.0,
-                   "worst error vs analytic=%.2f cents (<= 3.0)", worst);
+  bool ok = report("vibrato tracks", voiced > 0 && worst <= 1.5,
+                   "worst error vs analytic=%.2f cents (<= 1.5)", worst);
   ok &= report("vibrato voiced", pct >= 95.0, "voiced hops=%.1f %% (>= 95)", pct);
   return ok;
 }
 
-// 2. Steady 220 Hz: every hop after 100 ms voiced and within 0.5 cent.
+// 2. Steady 220 Hz: every hop after 100 ms voiced and within 0.15 cent (it reads 0.069).
 bool testSteady() {
   const std::vector<float> x = tone(kA3, 2 * cv::kSampleRate);
-  cv::PitchTracker t;
+  RingedTracker t;
   const std::vector<Hop> hops = run(t, x);
   double worst = 0.0;
   int unvoiced = 0;
@@ -129,22 +143,26 @@ bool testSteady() {
     }
     worst = std::max(worst, std::fabs(cents(h.hz, kA3)));
   }
-  return report("steady exact", unvoiced == 0 && worst <= 0.5,
-                "worst error=%.3f cents (<= 0.5), unvoiced hops=%.0f (0)", worst, unvoiced);
+  return report("steady exact", unvoiced == 0 && worst <= 0.15,
+                "worst error=%.3f cents (<= 0.15), unvoiced hops=%.0f (0)", worst, unvoiced);
 }
 
-// 3. Silence is never voiced once the first hop has passed.
+// 3. Silence is never voiced once the first hop has passed, and no hop of it runs the coarse pass: a
+// frame under the level gate publishes nothing, so it skips the search.
 bool testSilence() {
   const std::vector<float> x(static_cast<size_t>(cv::kSampleRate), 0.0f);
-  cv::PitchTracker t;
+  RingedTracker t;
   const std::vector<Hop> hops = run(t, x);
-  int voiced = 0;
-  for (const Hop& h : hops)
+  int voiced = 0, searched = 0;
+  for (const Hop& h : hops) {
     if (h.end > cv::PitchTracker::kHop && h.voiced) ++voiced;
-  return report("silence unvoiced", voiced == 0, "voiced hops after the first=%.0f (0)", voiced);
+    searched += h.coarseRan ? 1 : 0;
+  }
+  return report("silence unvoiced", voiced == 0 && searched == 0,
+                "voiced hops after the first=%.0f (0), hops that ran the coarse pass=%.0f (0)", voiced, searched);
 }
 
-// 4. The pane-sum coarse search matches the direct 256-sample search.
+// 4. The block-sum coarse search matches the direct 256-sample search.
 struct Coarse {
   float tau;
   bool periodic;
@@ -225,14 +243,18 @@ std::vector<float> voiceLike(int n) {
 }
 
 bool oracleCase(const char* name, const std::vector<float>& x) {
-  cv::PitchTracker t;
-  int hops = 0, tauOk = 0, perOk = 0;
+  RingedTracker t;
+  int hops = 0, quiet = 0, tauOk = 0, perOk = 0;
   const int total = static_cast<int>(x.size());
   for (int i = 0; i + cv::kBlock <= total; i += cv::kBlock) {
-    gInProcess = true;
+    armGuard();
     t.push(&x[static_cast<size_t>(i)], cv::kBlock, true);
     gInProcess = false;
     if ((i + cv::kBlock) % cv::PitchTracker::kHop != 0) continue;
+    if (!t.coarseRanForTest()) {  // under the level gate, so there is no search to compare
+      ++quiet;
+      continue;
+    }
     const Coarse o = oracleCoarse(t.coarseFrameForTest(), kThreshold);
     ++hops;
     if (std::fabs(t.lastCoarseTau() - o.tau) <= 1.0f) ++tauOk;
@@ -243,8 +265,9 @@ bool oracleCase(const char* name, const std::vector<float>& x) {
   char label[64];
   std::snprintf(label, sizeof label, "coarse oracle %s", name);
   return report(label, tauPct >= 99.5 && perPct >= 99.0,
-                "hops=%.0f, tau within 1 = %.2f %% (>= 99.5), periodic equal = %.2f %% (>= 99)",
-                hops, tauPct, perPct);
+                "hops=%.0f (+ %.0f under the level gate), tau within 1 = %.2f %% (>= 99.5), periodic equal = %.2f %% "
+                "(>= 99)",
+                hops, quiet, tauPct, perPct);
 }
 
 bool testOracle() {
@@ -256,46 +279,48 @@ bool testOracle() {
   return ok;
 }
 
-// 5. An enable after a long idle rebuilds the panes over a few blocks: no block computes more
-// than the rebuild share plus its own pane, the frame is whole within kMaxRebuildBlocks, the
+// 5. An enable after a long idle rebuilds the block sums over a few blocks: no block computes more
+// than the rebuild share plus its own block sum, the frame is whole within kMaxRebuildBlocks, the
 // first analysis reports the tone, and every hop after it matches the direct coarse search.
 bool testEnableSpread() {
   constexpr int kIdleBlocks = 200;
   constexpr int kMaxRebuildBlocks = 8;
   const std::vector<float> x = voiceLike(4 * cv::kSampleRate);
-  cv::PitchTracker t;
-  int worstPanes = 0, wholeAfter = -1, hops = 0, tauOk = 0;
+  RingedTracker t;
+  int worstSums = 0, wholeAfter = -1, hops = 0, tauOk = 0;
   const int blocks = static_cast<int>(x.size()) / cv::kBlock;
   for (int b = 0; b < blocks; ++b) {
     const bool active = b >= kIdleBlocks;
-    gInProcess = true;
+    armGuard();
     t.push(&x[static_cast<size_t>(b * cv::kBlock)], cv::kBlock, active);
     gInProcess = false;
     if (!active) continue;
-    worstPanes = std::max(worstPanes, t.panesLastPushForTest());
-    if (wholeAfter < 0 && t.panesCurrentForTest()) wholeAfter = b - kIdleBlocks + 1;
-    if (!t.panesCurrentForTest() || ((b + 1) * cv::kBlock) % cv::PitchTracker::kHop != 0) continue;
+    worstSums = std::max(worstSums, t.sumsLastPushForTest());
+    if (wholeAfter < 0 && t.sumsCurrentForTest()) wholeAfter = b - kIdleBlocks + 1;
+    if (!t.sumsCurrentForTest() || ((b + 1) * cv::kBlock) % cv::PitchTracker::kHop != 0 || !t.coarseRanForTest()) {
+      continue;
+    }
     ++hops;
     if (std::fabs(t.lastCoarseTau() - oracleCoarse(t.coarseFrameForTest(), kThreshold).tau) <= 1.0f) ++tauOk;
   }
-  const int maxPanes = cv::PitchTracker::kRebuildPanesPerBlock + 1;
+  const int maxSums = cv::PitchTracker::kRebuildSumsPerBlock + 1;
   const double tauPct = hops > 0 ? 100.0 * tauOk / hops : 0.0;
-  return report("enable spread", worstPanes <= maxPanes && wholeAfter > 0 && wholeAfter <= kMaxRebuildBlocks &&
+  return report("enable spread", worstSums <= maxSums && wholeAfter > 0 && wholeAfter <= kMaxRebuildBlocks &&
                                      tauPct >= 99.5,
-                "worst block %.0f panes (<= %.0f), frame whole after %.0f blocks (<= 8), tau within 1 on %.2f %% "
+                "worst block %.0f block sums (<= %.0f), frame whole after %.0f blocks (<= 8), tau within 1 on %.2f %% "
                 "of hops (>= 99.5)",
-                worstPanes, maxPanes, wholeAfter, tauPct);
+                worstSums, maxSums, wholeAfter, tauPct);
 }
 
 // 6. The first analysis after an enable reports a steady tone at its pitch.
 bool testEnableReports() {
   const std::vector<float> x = tone(kA3, 2 * cv::kSampleRate);
-  cv::PitchTracker t;
+  RingedTracker t;
   int firstVoiced = -1;
   float hz = 0.0f;
   const int idle = cv::kSampleRate / cv::kBlock;
   for (int b = 0; b < 2 * idle && firstVoiced < 0; ++b) {
-    gInProcess = true;
+    armGuard();
     t.push(&x[static_cast<size_t>(b * cv::kBlock)], cv::kBlock, b >= idle);
     gInProcess = false;
     if (b >= idle && t.result().voiced) {
@@ -309,38 +334,40 @@ bool testEnableReports() {
 }
 
 // 7. After an idle spell the tracker replays its history from the caller's ring: no block computes
-// more panes than a rebuild's, the first voiced result comes within 11 blocks of the enable, and it
-// equals a tracker that never went idle. Enables land on each of the hop's four blocks.
+// more block sums than a rebuild's, the first voiced result comes within 11 blocks of the enable, and
+// it equals a tracker that never went idle. Enables land on each of the hop's four blocks.
 bool testIdleReplay() {
   constexpr int kRingLen = 4096;
   const std::vector<float> x = tone(kA3, cv::kSampleRate);
-  int worstPanes = 0, latest = 0;
+  int worstSums = 0, latest = 0;
   double worstCents = 0.0;
   for (int idle = 200; idle < 204; ++idle) {
-    cv::PitchTracker t, ref;
+    cv::PitchTracker t;
+    RingedTracker ref;
     std::vector<float> ring(kRingLen, 0.0f);
     int head = 0, first = -1;
     for (int b = 0; first < 0 && b < 2 * idle; ++b) {
       const float* in = &x[static_cast<size_t>(b * cv::kBlock)];
-      gInProcess = true;
+      const int callHead = head;
+      for (int i = 0; i < cv::kBlock; ++i, head = (head + 1) % kRingLen) ring[static_cast<size_t>(head)] = in[i];
+      armGuard();
       if (b < idle) t.idle(cv::kBlock);
-      if (b >= idle) t.push(in, cv::kBlock, true, cv::PitchTracker::History{ring.data(), kRingLen, head});
+      if (b >= idle) t.push(in, cv::kBlock, true, true, cv::PitchTracker::History{ring.data(), kRingLen, callHead});
       ref.push(in, cv::kBlock);
       gInProcess = false;
-      for (int i = 0; i < cv::kBlock; ++i, head = (head + 1) % kRingLen) ring[static_cast<size_t>(head)] = in[i];
       if (b < idle) continue;
-      worstPanes = std::max(worstPanes, t.panesLastPushForTest());
+      worstSums = std::max(worstSums, t.sumsLastPushForTest());
       if (!t.result().voiced) continue;
       first = b - idle + 1;
       worstCents = std::max(worstCents, std::fabs(cents(t.result().rawHz, ref.result().rawHz)));
     }
     latest = first < 0 ? 9999 : std::max(latest, first);
   }
-  const int maxPanes = cv::PitchTracker::kRebuildPanesPerBlock + 1;
-  return report("idle replay", worstPanes <= maxPanes && latest <= 11 && worstCents <= 0.01,
-                "worst block %.0f panes (<= %.0f), first voiced by %.0f blocks after the enable (<= 11), "
+  const int maxSums = cv::PitchTracker::kRebuildSumsPerBlock + 1;
+  return report("idle replay", worstSums <= maxSums && latest <= 11 && worstCents <= 0.01,
+                "worst block %.0f block sums (<= %.0f), first voiced by %.0f blocks after the enable (<= 11), "
                 "%.4f cents off a tracker that never idled (<= 0.01)",
-                worstPanes, maxPanes, latest, worstCents);
+                worstSums, maxSums, latest, worstCents);
 }
 
 // Of the voiced hops after 100 ms of a steady tone: how many, and how many read clamped.
@@ -351,11 +378,11 @@ struct ClampCount {
 
 ClampCount clampCount(double hz, bool fine) {
   const std::vector<float> x = tone(hz, 2 * cv::kSampleRate);
-  cv::PitchTracker t;
+  RingedTracker t;
   ClampCount c{0, 0};
   const int total = static_cast<int>(x.size());
   for (int i = 0; i < total; i += cv::kBlock) {
-    gInProcess = true;
+    armGuard();
     t.push(&x[static_cast<size_t>(i)], cv::kBlock, true, fine);
     gInProcess = false;
     const int end = i + cv::kBlock;
@@ -392,12 +419,12 @@ bool testClamped() {
 bool testCoarseOnly() {
   constexpr float kDecim = static_cast<float>(cv::PitchTracker::kDecimForTest);
   const std::vector<float> x = tone(kA3, 2 * cv::kSampleRate);
-  cv::PitchTracker t;
+  RingedTracker t;
   int voiced = 0, exact = 0;
   double worst = 0.0;
   const int total = static_cast<int>(x.size());
   for (int i = 0; i < total; i += cv::kBlock) {
-    gInProcess = true;
+    armGuard();
     t.push(&x[static_cast<size_t>(i)], cv::kBlock, true, false);
     gInProcess = false;
     const int end = i + cv::kBlock;
@@ -413,6 +440,51 @@ bool testCoarseOnly() {
                 voiced, exact, worst, oneLagCents);
 }
 
+// Of the voiced hops after 100 ms of a steady tone: how many, and how many read outOfRange, with the
+// range flag asked for or not.
+ClampCount rangeCount(double hz, bool fine, bool flag) {
+  const std::vector<float> x = tone(hz, 2 * cv::kSampleRate);
+  RingedTracker t;
+  t.readOutOfRange(flag);
+  ClampCount c{0, 0};
+  const int total = static_cast<int>(x.size());
+  for (int i = 0; i < total; i += cv::kBlock) {
+    armGuard();
+    t.push(&x[static_cast<size_t>(i)], cv::kBlock, true, fine);
+    gInProcess = false;
+    const int end = i + cv::kBlock;
+    if (end <= kSettle || end % cv::PitchTracker::kHop != 0 || !t.result().voiced) continue;
+    ++c.voiced;
+    c.clamped += t.result().outOfRange ? 1 : 0;
+  }
+  return c;
+}
+
+// 10. outOfRange marks a voiced hop whose period is not the note's: 1,200 Hz repeats faster than
+// kMaxHz and reads an octave down, 68 Hz sits past the slow end. Every voiced hop of either carries
+// the flag, with the fine pass or without it; 220 Hz never does; and with the flag not asked for no
+// hop does, whatever the pitch.
+bool testOutOfRange() {
+  const ClampCount fast = rangeCount(1200.0, true, true), fastCoarse = rangeCount(1200.0, false, true);
+  const ClampCount slow = rangeCount(68.0, true, true), slowCoarse = rangeCount(68.0, false, true);
+  const ClampCount inside = rangeCount(kA3, true, true), off = rangeCount(1200.0, true, false);
+  const ClampCount offSlow = rangeCount(68.0, false, false);
+  auto all = [](const ClampCount& c) { return c.voiced > 0 && c.clamped == c.voiced; };
+  auto none = [](const ClampCount& c) { return c.voiced > 0 && c.clamped == 0; };
+  bool ok = report("out of range at 1,200 Hz", all(fast) && all(fastCoarse),
+                   "outOfRange of voiced hops: %.0f of %.0f (all), coarse pass only %.0f of %.0f (all)", fast.clamped,
+                   fast.voiced, fastCoarse.clamped, fastCoarse.voiced);
+  ok &= report("out of range at 68 Hz", all(slow) && all(slowCoarse),
+               "outOfRange of voiced hops: %.0f of %.0f (all), coarse pass only %.0f of %.0f (all)", slow.clamped,
+               slow.voiced, slowCoarse.clamped, slowCoarse.voiced);
+  ok &= report("in range", none(inside), "outOfRange of voiced hops at 220 Hz: %.0f of %.0f (0)", inside.clamped,
+               inside.voiced);
+  ok &= report("out of range not asked for", none(off) && none(offSlow),
+               "outOfRange with the flag off: 1,200 Hz %.0f of %.0f (0), 68 Hz %.0f of %.0f (0)", off.clamped, off.voiced,
+               offSlow.clamped, offSlow.voiced);
+  return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -426,8 +498,11 @@ int main() {
   ok &= testIdleReplay();
   ok &= testClamped();
   ok &= testCoarseOnly();
-  // Every push() call above ran under the allocation guard.
-  ok &= report("no allocation", true, "push() ran under the new/delete guard", 0.0);
+  ok &= testOutOfRange();
+  // An allocation inside a guarded push() aborts the run, so reaching this line with calls counted
+  // means none happened.
+  ok &= report("no allocation", gGuardedCalls > 0, "%.0f push() calls ran under the new/delete guard (> 0)",
+               gGuardedCalls);
   std::printf("%s pitch\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

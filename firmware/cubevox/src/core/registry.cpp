@@ -216,8 +216,8 @@ bool cardFromId(const char* id, Card& out) {
 
 float knobValue(const KnobDesc& k, float p) {
   switch (k.curve) {
-    case Curve::Log: return k.min * powf(k.max / k.min, p);
-    case Curve::LogReversed: return k.max * powf(k.min / k.max, p);
+    case Curve::Log: return cv::logTaper(k.min, k.max, p);
+    case Curve::LogReversed: return cv::logTaper(k.max, k.min, p);
     case Curve::Linear: break;
   }
   return k.min + (k.max - k.min) * p;
