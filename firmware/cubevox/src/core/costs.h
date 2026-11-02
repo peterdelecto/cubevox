@@ -120,11 +120,12 @@ constexpr Cost kPitchStage{4, 4, false};
 constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stress run 2026-11-02 (v2.01.11)
 
 // The Formant card, an alternate for Octave in slot 3, and the Lo-fi and Chatter cards, alternates for
-// Gate in slot 7. Each row is an estimate until the stress run measures the card on the board; the
-// run's figure replaces it.
+// Gate in slot 7. Formant's row is an estimate: the stress run reads it only together with the
+// tracker and the pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to 8.5 %,
+// 2026-11-02, v2.01.14, against the 11 / 13 the three rows sum to).
 constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
-constexpr Cost kLofi{2, 2, false};     // est.: five biquads, the tanh and the crush, about 80 cycles a sample (0.8 %), rounded up for a block that moves a knob, which also ramps 25 coefficients a sample (about 30 cycles more); the host has no bench of it
-constexpr Cost kBloom{3, 5, false};    // est. from the host bench of 2026-11-02 after the voice-major rewrite (bench_chatter and blocks, -O2, minimum of 12 runs, median of 5 interleaved passes, 50.4k board cycles per host us). Adam's clip through the Input gate at -55 dBFS: Apple clang 17 reads 5.36 ns a sample, 17.3k cycles, 2.7 %; g++ 15, the firmware's compiler family, 5.07 ns, 16.4k, 2.6 %; the higher rounds up to 3. Echo benches 7.83 ns and 8.13 ns in the same run, against 26.3k on the board. The busiest block reads 9.11 ns on clang, 29.4k, 4.6 %, and 8.47 ns on g++, which rounds up to 5. A stutter of 60 ms words at AMOUNT 100 % reads 9.54 ns on clang, 4.8 %, which the mean does not carry
+constexpr Cost kLofi{4, 5, true};      // 19.5k / 31.4k, stress run 2026-11-02 (v2.01.14, lofi layout, TONE and AMOUNT swept: mean 3.04 %, worst 4.9 %, lowest run worst); the estimate of 2 / 2 missed the coefficient ramp of a moving knob
+constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.
