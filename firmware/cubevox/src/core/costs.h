@@ -23,6 +23,14 @@
 // from a board figure and rows converted at 50.4k are not at one ratio. kTracker states both, and
 // the board's Crowd row (kCrowd) shows the pitch ratio holds for the grain code too.
 //
+// The ratio belongs to a card, not to the box. The reverbs are serial chains of allpasses, which the
+// host's out-of-order core hides and the in-order M7 pays for. The old Spring converted at 19.8k to
+// 24.3k board cycles per host microsecond, the old Chasm at 16.1k (2.5 points per host microsecond),
+// so 50.4k read their host time at 2.5 to 3 times the board. A reverb row is sized from the
+// llvm-mca Cortex-M7 model of its per-sample loops, compiled by the firmware's GCC, which read the
+// old Spring 13 % over its board figure (94.5k cycles a block against 83.4k) and the old Chasm 5 %
+// over.
+//
 // Octave alone: PitchFx with only Octave on costs 1.04 host us per block (2026-11-01, Adam's clips,
 // MIX 100 %, host bench of the CPU pass, +-0.05 us), which is 52.4k board cycles, 8.2 %, at 50.4k.
 // CPU pass 2 measured 51.7k (8.1 %) on the board for the same case before the CPU pass. kOctave
@@ -61,8 +69,8 @@ constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
 constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
 constexpr Cost kDistortion{8, 11, true};   // 45.5k to 46.8k / 64.5k to 67.7k, stress run 2026-11-01 (worst 10.1 to 10.6 %, lowest run worst per layout)
 constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
-constexpr Cost kReverbSpring{14, 14, true};  // 83.4k / 84.0k, board stress run 2026-11-01 (slot 8, knobs at top, two runs of 24 s, no late, overrun or dry block) on the engine before the 2026-11-02 fix pass; the host bench puts the engine after it at 0.69x (clang) to 0.80x (gcc) of that, so the box should read lower; a board rerun is owed
-constexpr Cost kReverbChasm{17, 17, true};   // 102.2k to 102.5k / 105.5k to 108.2k, stress run 2026-11-01 in the reverb slot (mean 16.0 %, worst 16.5 to 16.9 %)
+constexpr Cost kReverbSpring{6, 7, false};  // estimate, speed pass bench 2026-11-02, from the M7 model (llvm-mca, firmware GCC): 35.3k a block (5.5 %), 39.3k with MIX moving (6.1 %); the model read the engine it replaced 13 % over its board figure (83.4k / 84.0k, stress run 2026-11-01, 13.0 / 13.1 %); the host bench reads 0.31 to 0.34 of that engine, 4.1 to 4.5 points; a board rerun is owed
+constexpr Cost kReverbChasm{5, 6, false};   // estimate, speed pass bench 2026-11-02, from the M7 model: 28.6k a block (4.5 %), 32.6k with MIX moving (5.1 %), the host ratio left out as above; the engine it replaced read 102.2k to 102.5k / 105.5k to 108.2k on the board (stress run 2026-11-01, 16.0 / 16.5 to 16.9 %); a board rerun is owed
 
 // The pitch tracker, its history fill and its coarse analysis, which Autotune, Crowd and Formant
 // share and a layout pays once. kTracker and kAutotune are one estimate split in two. The pair was measured on
@@ -116,5 +124,11 @@ constexpr Cost kFixed = kOutputEq + kPolishComp + kSoftCeiling + kBypassMix;
 
 constexpr uint8_t kBudgetAvgPercent = 75;
 constexpr uint8_t kBudgetWorstPercent = 95;
+
+// The lines layoutValid holds a layout to. They start at the budget and the firmware never writes them.
+// Since the speed pass of the reverbs no layout the box can build reaches the budget, so a host test
+// lowers them to put a layout on a line and exercise a refusal.
+inline uint8_t gLineAvgPercent = kBudgetAvgPercent;
+inline uint8_t gLineWorstPercent = kBudgetWorstPercent;
 
 }  // namespace costs

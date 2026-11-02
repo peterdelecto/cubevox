@@ -81,18 +81,16 @@ constexpr Anchor kDisRailSoft{0.3f, 0.1f, 0.02f};
 
 // CHASM
 constexpr Anchor kChmWobble{0.0f, 0.15f, 0.83f};                    // 100 % = the old 90 % (owner 2026-10-02)
-constexpr Anchor kChmTrebleLoss{1500.0f, 3000.0f, 7000.0f, I::Log};
-constexpr Anchor kChmInputTrebleCut{0.85f, 0.95f, 1.0f};
 constexpr Anchor kChmBassCut{400.0f, 200.0f, 80.0f, I::Log};
-constexpr Anchor kChmBassCutTop{200.0f, 100.0f, 40.0f, I::Log};
+constexpr Anchor kChmBassCutTop{303.14f, 151.57f, 60.63f, I::Log};  // the bass cut at TIME 100 %, 0.7578 of the bass cut
 
 // Spring
-constexpr Anchor kSpringChirpA{0.65f, 0.80f, 0.90f};
-constexpr Anchor kSpringChirpSections{16.0f, 32.0f, 32.0f, I::Round};  // the engine's kMaxSections tops it
+constexpr Anchor kSpringChirpA{0.65f, 0.846f, 0.92f};
+constexpr Anchor kSpringChirpSections{16.0f, 24.0f, 32.0f, I::Round};  // the engine's kMaxSections tops it
 constexpr Anchor kSpringWobbleDepth{2.0f, 8.0f, 24.0f};
 constexpr Anchor kSpringWobbleRate{1.5f, 3.0f, 5.0f, I::Log};
 constexpr Anchor kSpringDiffuse{0.45f, 0.30f, 0.15f};                    // less diffusion = crisper repeats
-constexpr Anchor kSpringTrebleLoss{4500.0f, 9000.0f, 14000.0f, I::Log};
+constexpr Anchor kSpringTrebleLoss{4500.0f, 9000.0f, 10800.0f, I::Log};  // the loops run at 24 kHz, so 10800 Hz is the top corner
 
 // The default positions reproduce the engine tuning defaults; the --layout
 // probe fails when they drift apart.
@@ -106,7 +104,6 @@ enum Id : int {
   DistBite,
   DistGrit,
   ChasmWobble,
-  ChasmBrightness,
   ChasmBass,
   SpringChirp,
   SpringFlutter,
@@ -118,19 +115,17 @@ enum Id : int {
 // nullptr = a panel knob, printed on the Knobs line instead.
 constexpr const char* kPrintName[kCount] = {
     "Slide",       nullptr,          "Body",              "Bite",       "Grit",
-    "Wobble",      "CHASM Brightness", "Bass",            "SPRING Chirp", "SPRING Flutter",
-    "SPRING Brightness"};
+    "Wobble",      "Bass",           "SPRING Chirp",      "SPRING Flutter", "SPRING Brightness"};
 
 // Keys for the saved-state file; one word each, stable across builds, so a key keeps the name it
 // was first saved under.
 constexpr const char* kStateKey[kCount] = {
     "OctaveSlide",     "UnisonMotion", "DistBody",    "DistBite",       "DistGrit",
-    "ChasmWobble",     "ChasmBrightness", "ChasmBass", "SpringBDrip",   "SpringBFlutter",
-    "SpringBBrightness"};
+    "ChasmWobble",     "ChasmBass",    "SpringBDrip", "SpringBFlutter", "SpringBBrightness"};
 
 // Adam's starting positions (owner 2026-10-02), in Id order.
 constexpr std::array<float, kCount> kDefaultPos = {
-    50.0f, 0.0f, 50.0f, 60.0f, 50.0f, 85.0f, 85.0f, 50.0f, 50.0f, 50.0f, 50.0f};
+    50.0f, 0.0f, 50.0f, 60.0f, 50.0f, 85.0f, 50.0f, 50.0f, 50.0f, 50.0f};
 
 struct State {
   std::array<float, kCount> pos;
@@ -190,11 +185,11 @@ inline void distGrit(DistortionTuning& t, float pos) {
   t.railSoft = at(kDisRailSoft, pos);
 }
 
-inline void chasmWobble(ChasmParams& p, float pos) { p.wobble = at(kChmWobble, pos); }
-
-inline void chasmBrightness(ChasmTuning& t, float pos) {
-  t.trebleLossHz = at(kChmTrebleLoss, pos);
-  t.inputTrebleCut = at(kChmInputTrebleCut, pos);
+// The slider position sets how far the wobble reaches: depth grows with its square, rate linearly.
+inline void chasmWobble(ChasmTuning& t, float pos) {
+  const float w = at(kChmWobble, pos);
+  t.wobbleDepth = w * w * 64.0f;
+  t.wobbleRateHz = 0.5f + w * 6.5f;
 }
 
 inline void chasmBass(ChasmTuning& t, float pos) {

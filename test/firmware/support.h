@@ -4,6 +4,7 @@
 #pragma once
 
 #include "core/canvas.h"
+#include "core/costs.h"
 #include "core/registry.h"
 
 // Counts the failed check() calls.
@@ -14,6 +15,24 @@ void check(bool ok, const char* what);
 
 // Casts a table index to a Card without a range check.
 Card card(int i);
+
+// Holds layoutValid to the given lines for the scope it lives in, then puts the budget lines back. No layout
+// the box can build reaches the budget, so a test that needs a refusal puts a layout on a lowered line.
+struct LinesGuard {
+  LinesGuard(uint8_t avg, uint8_t worst) : savedAvg_(costs::gLineAvgPercent), savedWorst_(costs::gLineWorstPercent) {
+    costs::gLineAvgPercent = avg;
+    costs::gLineWorstPercent = worst;
+  }
+  ~LinesGuard() {
+    costs::gLineAvgPercent = savedAvg_;
+    costs::gLineWorstPercent = savedWorst_;
+  }
+  LinesGuard(const LinesGuard&) = delete;
+  LinesGuard& operator=(const LinesGuard&) = delete;
+
+ private:
+  uint8_t savedAvg_, savedWorst_;
+};
 
 // Clears the dirty flag of every canvas page.
 void clearAllDirty(Canvas& canvas);

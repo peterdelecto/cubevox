@@ -1,8 +1,9 @@
-// Spring reverb checks: three echo spacings, the sweep and its growth, level across TIME, stability
-// at the shipped tuning and at the clamp ceilings, the disperser against a section-by-section
-// reference, the return low-pass, Reverb passthrough, engine switches, the size bound and no-alloc.
-// No window, no audio device.
+// Spring reverb checks: three echo spacings, the sweep and its growth, the half-band pair round the
+// 24 kHz loops, odd chunk sizes, level across TIME, stability at the shipped tuning and at the clamp
+// ceilings, the disperser against a section-by-section reference, the return low-pass, Reverb
+// passthrough, engine switches, the size bound and no-alloc. No window, no audio device.
 
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <cstdarg>
@@ -15,6 +16,7 @@
 #include "engine/spring.h"
 
 #include "alloc_guard.h"
+#include "signal_util.h"
 
 namespace {
 
@@ -54,27 +56,9 @@ Signal run(const Signal& in, const cv::SpringParams& p) {
   return out;
 }
 
-Signal impulse(int n) {
-  Signal x(static_cast<size_t>(n), 0.0f);
-  x[0] = 1.0f;
-  return x;
-}
-
-Signal noise(int n, float amp) {
-  Signal x(static_cast<size_t>(n));
-  uint32_t s = 0x12345678u;
-  for (float& v : x) {
-    s = s * 1664525u + 1013904223u;
-    v = amp * (static_cast<float>(s >> 8) / 8388608.0f - 1.0f);
-  }
-  return x;
-}
-
-double rms(const Signal& x, size_t from, size_t to) {
-  double e = 0.0;
-  for (size_t i = from; i < to; ++i) e += static_cast<double>(x[i]) * x[i];
-  return std::sqrt(e / static_cast<double>(to - from));
-}
+Signal impulse(int n) { return testutil::impulse(static_cast<size_t>(n)); }
+Signal noise(int n, float amp) { return testutil::noise(static_cast<size_t>(n), amp, 0x12345678u); }
+double rms(const Signal& x, size_t from, size_t to) { return testutil::rmsOf(x, from, to); }
 
 std::complex<double> dft(const Signal& x, size_t from, size_t to, double hz) {
   const double w = 2.0 * kPi * hz / cv::kSampleRate;
@@ -139,9 +123,59 @@ bool sweep() {
                 lag1, lag2, growth);
 }
 
+// 2b. The half-band pair. The first echo of the plain loop passes no diffuser or disperser, so its
+// spectrum is the decimating and interpolating filters' response with the loop's two wide one-poles,
+// which take 1.6 dB at 8 kHz. Against 1 kHz it reads -1.5 dB at 8 kHz, -3.2 dB at 10 kHz, -8 dB at
+// 12 kHz and -48 dB at 16 kHz. Above 10 kHz the fold of the input's content round 12 kHz is part of it.
+bool halfBand() {
+  cv::SpringParams p = plain();
+  p.tuning.chirpSections = 0;
+  const Signal y = run(impulse(3000), p);
+  const size_t from = static_cast<size_t>(30.0 * kMs), to = static_cast<size_t>(41.0 * kMs);
+  const auto levelDb = [&](double hz) { return 20.0 * std::log10(std::abs(dft(y, from, to, hz))); };
+  const double ref = levelDb(1000.0);
+  const double d8 = levelDb(8000.0) - ref, d10 = levelDb(10000.0) - ref, d12 = levelDb(12000.0) - ref,
+               d16 = levelDb(16000.0) - ref;
+  const bool ok = d8 > -2.1 && d8 < -1.0 && d10 > -4.2 && d10 < -2.4 && d12 < -6.0 && d16 < -35.0;
+  return report("half-band", ok,
+                "echo 1 against 1 kHz: %+.2f dB at 8 kHz (-2.1..-1.0), %+.2f at 10 kHz (-4.2..-2.4), %+.1f at 12 kHz (<-6), "
+                "%+.1f at 16 kHz (<-35)",
+                d8, d10, d12, d16);
+}
+
+// 2c. Odd chunk sizes, which cut the even and odd input samples at any place, give the output of 64-sample
+// chunks to the last bit when nothing is smoothed or wobbling.
+bool chunkSizes() {
+  const cv::SpringParams p = plain();
+  const Signal x = noise(cv::kSampleRate, 0.25f);
+  const auto runChunks = [&](size_t chunk) {
+    auto spring = std::make_unique<cv::Spring>();
+    Signal out(x.size());
+    for (size_t i = 0; i < x.size(); i += chunk) {
+      const size_t n = std::min(chunk, x.size() - i);
+      spring->process(&x[i], &out[i], static_cast<int>(n), p);
+    }
+    return out;
+  };
+  const Signal ref = runChunks(cv::kBlock);
+  size_t worstChunk = 0;
+  double worst = 0.0;
+  for (const size_t chunk : {size_t{1}, size_t{2}, size_t{7}, size_t{63}, size_t{65}, size_t{100}, size_t{1000}}) {
+    const Signal out = runChunks(chunk);
+    double d = 0.0;
+    for (size_t i = 0; i < out.size(); ++i) d = std::fmax(d, std::fabs(static_cast<double>(out[i]) - ref[i]));
+    if (d > worst) {
+      worst = d;
+      worstChunk = chunk;
+    }
+  }
+  return report("chunk sizes", worst == 0.0, "chunks of 1, 2, 7, 63, 65, 100 and 1000 against 64: worst difference %.3g (chunk %zu)",
+                worst, worstChunk);
+}
+
 // 3. The input scales by sqrt((1 - g^2) / g), so the tail's level holds as TIME moves.
 bool levelAcrossTime() {
-  constexpr double kMaxDb = 0.8;
+  constexpr double kMaxDb = 0.45;
   const Signal x = noise(4 * cv::kSampleRate, 0.25f);
   cv::SpringParams lo, hi;
   lo.decay = 0.0f;
@@ -208,9 +242,11 @@ bool stableAtCeilings() {
 }
 
 // 6. The return low-pass sits on the summed output: the impulse response at the default returnLpHz
-// over the one at the widest corner matches the ratio of the two one-poles at 1 and 12 kHz.
+// over the one at the widest corner matches the ratio of the two one-poles at 1 and 8 kHz. The loops
+// run at 24 kHz, so the one-poles do, and 12 kHz is their Nyquist.
 bool returnLowPass() {
   constexpr double kTolDb = 0.01;
+  constexpr double kLoopHz = sd::kLoopRate;
   cv::SpringParams wide = plain();
   wide.decay = 0.0f;
   cv::SpringParams lp = wide;
@@ -218,22 +254,22 @@ bool returnLowPass() {
   const Signal x = impulse(2 * cv::kSampleRate);
   const Signal yw = run(x, wide), yl = run(x, lp);
   const auto onePoleDb = [](double cornerHz, double hz) {
-    const double c = cv::onePoleCoef(static_cast<float>(cornerHz));
-    const std::complex<double> h = c / (1.0 - (1.0 - c) * std::polar(1.0, -2.0 * kPi * hz / cv::kSampleRate));
+    const double c = cv::onePoleCoefAt(static_cast<float>(cornerHz), static_cast<float>(kLoopHz));
+    const std::complex<double> h = c / (1.0 - (1.0 - c) * std::polar(1.0, -2.0 * kPi * hz / kLoopHz));
     return 20.0 * std::log10(std::abs(h));
   };
   bool ok = true;
   double got[2] = {0.0, 0.0}, want[2] = {0.0, 0.0}, worst = 0.0;
-  const double hz[2] = {1000.0, 12000.0};
+  const double hz[2] = {1000.0, 8000.0};
   for (int i = 0; i < 2; ++i) {
     got[i] = 20.0 * std::log10(std::abs(dft(yl, 0, x.size(), hz[i])) / std::abs(dft(yw, 0, x.size(), hz[i])));
     want[i] = onePoleDb(lp.tuning.returnLpHz, hz[i]) - onePoleDb(wide.tuning.returnLpHz, hz[i]);
     worst = std::fmax(worst, std::fabs(got[i] - want[i]));
     ok = ok && std::fabs(got[i] - want[i]) < kTolDb;
   }
-  ok = ok && want[1] < -5.0;
+  ok = ok && want[1] < -3.0;
   return report("return low-pass", ok,
-                "%.0f Hz corner: %+.2f dB at 1 kHz (want %+.2f), %+.2f dB at 12 kHz (want %+.2f), worst difference %.3f dB",
+                "%.0f Hz corner: %+.2f dB at 1 kHz (want %+.2f), %+.2f dB at 8 kHz (want %+.2f), worst difference %.3f dB",
                 static_cast<double>(lp.tuning.returnLpHz), got[0], want[0], got[1], want[1], worst);
 }
 
@@ -480,10 +516,10 @@ bool rests() {
                 runsAtMixZero ? "yes" : "no");
 }
 
-// 12. The Spring object stays inside its RAM bound. Each line holds its spring's default read, so
-// the three lines take 22 KB where a common 80 ms line would take 46 KB.
+// 12. The Spring object stays inside its RAM bound. The loops run at 24 kHz and each line holds its
+// spring's default read, so the three lines take 11 KB.
 bool sizeBound() {
-  constexpr size_t kMaxBytes = 32768;
+  constexpr size_t kMaxBytes = 16384;
   return report("size", sizeof(cv::Spring) <= kMaxBytes, "sizeof(cv::Spring) = %zu bytes (<= %zu)", sizeof(cv::Spring),
                 kMaxBytes);
 }
@@ -494,6 +530,8 @@ int main() {
   bool ok = true;
   ok &= echoSpacing();
   ok &= sweep();
+  ok &= halfBand();
+  ok &= chunkSizes();
   ok &= levelAcrossTime();
   ok &= stable();
   ok &= stableAtCeilings();

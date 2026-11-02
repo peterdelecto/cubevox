@@ -29,8 +29,10 @@ void checkDefaultLayout() {
     const CardDesc& d = cardDesc(layout.card[s]);
     if (d.group == Group::Reverb) ++reverbs;
     // Autotune's row is the board's pair figure scaled by the CPU pass, with one extra worst point
-    // from the stress run, so it stays an estimate until a board bench of the pair.
-    check(d.cost.measured || layout.card[s] == Card::Autotune, "a default layout card's cost comes from the board");
+    // from the stress run, so it stays an estimate until a board bench of the pair. Spring's row is
+    // the speed pass's estimate from the M7 model until the box is benched with the half-rate engine.
+    check(d.cost.measured || layout.card[s] == Card::Autotune || layout.card[s] == Card::ReverbSpring,
+          "a default layout card's cost comes from the board");
   }
   const LayoutCost sums = layoutCost(layout);
   check(sums.avg <= costs::kBudgetAvgPercent, "default layout within the average line");
@@ -222,13 +224,18 @@ void checkSlot7Costs() {
             layoutValid(formantHeavy).ok(),
         "slot 3 cost: Formant costs less than Octave and is accepted in both layouts");
 
-  // Chatter's estimate puts MOB and Chasm exactly on the mean line, which layoutValid accepts.
+  // MOB, Chasm and Chatter make the heaviest layout of the three, and layoutValid accepts a layout
+  // that sits exactly on the mean line. No row set puts it on the budget's 75 % any more, so the line
+  // is lowered to the layout's own sum.
   Layout heavyBloom = defaultLayout();
   heavyBloom.card[3] = Card::Crowd;
   heavyBloom.card[6] = Card::Bloom;
   heavyBloom.card[7] = Card::ReverbChasm;
-  check(layoutCost(heavyBloom).avg == costs::kBudgetAvgPercent && layoutValid(heavyBloom).ok(),
-        "slot 7 cost: MOB, Chasm and Chatter sum to exactly the 75 % mean line and layoutValid accepts it");
+  const LayoutCost heavyBloomSum = layoutCost(heavyBloom);
+  const LinesGuard lines(heavyBloomSum.avg, costs::kBudgetWorstPercent);
+  check(layoutValid(heavyBloom).ok(), "slot 7 cost: MOB, Chasm and Chatter on a lowered mean line, which layoutValid accepts");
+  costs::gLineAvgPercent = static_cast<uint8_t>(heavyBloomSum.avg - 1);
+  check(!layoutValid(heavyBloom).ok(), "slot 7 cost: and refuses with the line one point lower");
 }
 
 void checkLayoutValid() {
@@ -678,13 +685,14 @@ void checkSwapOctaveFormant() {
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::None && both == bothBefore,
         "action: SwapOctaveFormant changes nothing when the other card would repeat");
 
-  // Unison in slot 7 beside MOB, Formant, Gate and Chasm leaves the mean at 75, so Octave's 5 % would
-  // take it to 77 and the swap is refused. The checks state the verdicts the rows give, so a row that
+  // The mean line is lowered to this layout's own sum, which Formant meets and Octave's higher row
+  // takes past, so the swap is refused. The checks state the verdicts the rows give, so a row that
   // moves them fails here and not silently.
   Layout tight = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Gate, Card::Distortion,
                    Card::Unison, Card::ReverbChasm}};
   Layout withOctave = tight;
   withOctave.card[2] = Card::Octave;
+  const LinesGuard tightLines(layoutCost(tight).avg, costs::kBudgetWorstPercent);
   check(layoutValid(tight).ok() && !layoutValid(withOctave).ok(),
         "action: the tight layout fits with Formant and refuses Octave");
   const Layout tightBefore = tight;
@@ -752,14 +760,15 @@ void checkCycleSlot7Card() {
   check(ui::applyAction(UiAction::CycleSlot7Card, s, all) == ui::ApplyResult::None && all == allBefore,
         "action: CycleSlot7Card changes nothing when each other card would repeat");
 
-  // MOB beside Spring with Octave in slot 1 and Unison in Octave's usual slot sits on the mean line with
-  // Gate in slot 7, so Chatter's 5 % is refused and the cycle passes it. The expected cards follow
-  // layoutValid, not a fixed verdict.
+  // MOB beside Spring with Octave in slot 1 and Unison in Octave's usual slot, on a mean line lowered to
+  // its own sum with Gate in slot 7. Chatter's higher row is refused and the cycle passes it. The expected
+  // cards follow layoutValid, not a fixed verdict.
   Layout tight = {{Card::Octave, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
                    Card::Gate, Card::ReverbSpring}};
   Layout withBloom = tight;
   withBloom.card[6] = Card::Bloom;
-  check(layoutValid(tight).ok() && !layoutValid(withBloom).ok() && layoutCost(tight).avg == costs::kBudgetAvgPercent,
+  const LinesGuard tightLines(layoutCost(tight).avg, costs::kBudgetWorstPercent);
+  check(layoutValid(tight).ok() && !layoutValid(withBloom).ok() && layoutCost(tight).avg == costs::gLineAvgPercent,
         "action: the tight layout fits with Gate on the mean line and refuses Chatter");
   Layout atLofi = tight;
   atLofi.card[6] = Card::Lofi;

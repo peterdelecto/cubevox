@@ -13,7 +13,10 @@
 - `process()` takes any `n`. An engine with kBlock-sized scratch (Reverb) runs the call in
   kBlock chunks.
 - Shared pieces live in `engine/dsp.h` (Biquad and its RBJ setters, OnePole, `catmullRom`,
-  `wrapOnce`, `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, and `blockCoef` for a one-pole stepped once per block). The two reverbs share `engine/reverb_parts.h` (Allpass, Delay, the wobble LFO's sine table and phase step).
+  `wrapOnce`, `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, and `blockCoef` for a one-pole stepped once per block). The two reverbs share `engine/reverb_parts.h` (the allpass step, Allpass, Delay, the wobble LFO's sine table, phase step and error bound, and the Dwell drive terms).
+- Spring runs its loops at 24 kHz between a 15-tap half-band decimator and interpolator. Its
+  delay lengths subtract the filters' delay (`kFilterDelay`), and the tick stays inlined in
+  `Spring::run`, so check the M7 listing for a call to it after any change there.
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
 - `PitchFx` lives in DTCM: about 76,284 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the

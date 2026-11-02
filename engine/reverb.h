@@ -24,6 +24,12 @@ namespace cv {
 constexpr int kReverbSpring = 0;
 constexpr int kReverbChasm = 1;
 
+// MIX sets the crossfade and TIME the decays, each piecewise linear through
+// 0 / 0.5 / 1. 0.5 lands on the default crossfade and decays. Chasm's TIME curve is kChasmFeedback.
+using reverb_parts::KnobCurve;
+constexpr KnobCurve kSpringDecay{0.25f, 0.50f, 0.85f};
+constexpr KnobCurve kReverbWet{0.0f, 0.15f, 0.60f};
+
 struct ReverbParams {
   bool on = true;
   int engine = kReverbSpring;
@@ -31,25 +37,18 @@ struct ReverbParams {
   SpringParams spring;
   float mix = 0.5f;   // panel MIX 0..1; applyKnobs sets wet from it
   float time = 0.5f;  // panel TIME 0..1; applyKnobs sets every engine's decay from it
-  float wet = 0.15f;  // crossfade, 0 dry .. 1 wet only
+  float wet = kReverbWet.mid;  // crossfade, 0 dry .. 1 wet only
 };
 
-// MIX sets the crossfade and TIME the decays, each piecewise linear through
-// 0 / 0.5 / 1. 0.5 lands on the default crossfade and decays.
-struct KnobCurve {
-  float lo, mid, hi;
-  float at(float t) const {
-    t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
-    return t < 0.5f ? lo + (mid - lo) * 2.0f * t : mid + (hi - mid) * (2.0f * t - 1.0f);
-  }
-};
-constexpr KnobCurve kChasmDecay{0.10f, 0.30f, 0.70f};
-constexpr KnobCurve kSpringDecay{0.25f, 0.50f, 0.85f};
-constexpr KnobCurve kReverbWet{0.0f, 0.15f, 0.60f};
+// The struct defaults are the knobs' middle position, so an engine run without applyKnobs sounds as
+// the box does at 12 o'clock.
+static_assert(ChasmParams{}.feedback == kChasmFeedback.mid && SpringParams{}.decay == kSpringDecay.mid &&
+                  ReverbParams{}.mix == 0.5f && ReverbParams{}.time == 0.5f,
+              "the engine defaults are the knob curves' middles");
 
 inline void applyKnobs(ReverbParams& r) {
   r.wet = kReverbWet.at(r.mix);
-  r.chasm.decay = kChasmDecay.at(r.time);
+  r.chasm.feedback = kChasmFeedback.at(r.time);
   r.spring.decay = kSpringDecay.at(r.time);
 }
 

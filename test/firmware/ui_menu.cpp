@@ -658,12 +658,13 @@ void checkMenuOctaveFormantClick() {
             m.layout == defaultLayout(),
         "menu: a second click swaps Formant back to Octave");
 
-  // Octave would take this layout from 75 to 77 percent mean, so the swap back is refused.
+  // The mean line is lowered to this layout's own sum, and Octave's higher row takes it past, so the swap back is refused.
   MenuRig tight;
   tight.layout = {{Card::InputGate, Card::Autotune, Card::Formant, Card::Crowd, Card::Gate, Card::Distortion,
                    Card::Unison, Card::ReverbChasm}};
   Layout octave = tight.layout;
   octave.card[kOctaveSlot] = Card::Octave;
+  const LinesGuard tightLines(layoutCost(tight.layout).avg, costs::kBudgetWorstPercent);
   check(layoutValid(tight.layout).ok() && !layoutValid(octave).ok(), "menu: the tight layout fits with Formant and refuses Octave");
   const Layout tightBefore = tight.layout;
   tight.openListAt(kOctaveFormant);
@@ -909,11 +910,13 @@ void checkMenuSlot7Click() {
   check(m.layout == defaultLayout() && sameSettings(m.settings, Settings()),
         "menu: three clicks come round to the default layout and touch no setting");
 
-  // A card the layout would refuse is passed over: Chatter would put this layout over the mean line, so
-  // the click on Lo-fi lands on Gate.
+  // A card the layout would refuse is passed over: on a mean line lowered to this layout's sum with Gate
+  // in slot 7, Chatter would put it over the line, so the click on Lo-fi lands on Gate.
   MenuRig tight;
   tight.layout = {{Card::Octave, Card::Autotune, Card::Unison, Card::Crowd, Card::Slapback, Card::Distortion,
-                   Card::Lofi, Card::ReverbSpring}};
+                   Card::Gate, Card::ReverbSpring}};
+  const LinesGuard tightLines(layoutCost(tight.layout).avg, costs::kBudgetWorstPercent);
+  tight.layout.card[kSlot7Slot] = Card::Lofi;
   Layout bloom = tight.layout;
   bloom.card[kSlot7Slot] = Card::Bloom;
   check(layoutValid(tight.layout).ok() && !layoutValid(bloom).ok(), "menu: the tight layout fits with Lo-fi and refuses Chatter");

@@ -184,18 +184,12 @@ void cmpDistortion(const std::string& p, float pos, const cv::DistortionParams& 
 }
 
 void cmpChasmTuning(const std::string& p, float pos, const cv::ChasmTuning& ca, const cv::ChasmTuning& cb) {
-  CMP(p + ".chasm", pos, ca, cb, timeLo);
-  CMP(p + ".chasm", pos, ca, cb, timeHi);
-  CMP(p + ".chasm", pos, ca, cb, trebleLossHz);
-  CMP(p + ".chasm", pos, ca, cb, loopTrebleCut);
-  CMP(p + ".chasm", pos, ca, cb, inputTrebleCut);
   CMP(p + ".chasm", pos, ca, cb, bassCutHz);
   CMP(p + ".chasm", pos, ca, cb, bassCutHzTop);
-  CMP(p + ".chasm", pos, ca, cb, wobbleDepthMax);
-  CMP(p + ".chasm", pos, ca, cb, wobbleRateLo);
-  CMP(p + ".chasm", pos, ca, cb, wobbleRateHi);
+  CMP(p + ".chasm", pos, ca, cb, wobbleDepth);
+  CMP(p + ".chasm", pos, ca, cb, wobbleRateHz);
   CMP(p + ".chasm", pos, ca, cb, inputTrim);
-  CMP(p + ".chasm", pos, ca, cb, wobbleLevelDb);
+  CMP(p + ".chasm", pos, ca, cb, dwell);
   CMP(p + ".chasm", pos, ca, cb, dwellDrive);
   CMP(p + ".chasm", pos, ca, cb, dwellComp);
   CMP(p + ".chasm", pos, ca, cb, wetDb);
@@ -237,11 +231,9 @@ void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const
   CMP(p, pos, f, e, wet);
   CMP(p, pos, f, e, mix);
   CMP(p, pos, f, e, time);
-  CMP(p, pos, f.chasm, e.chasm, decay);
+  CMP(p, pos, f.chasm, e.chasm, feedback);
   CMP(p, pos, f.spring, e.spring, decay);
   if (!rest) return;
-  CMP(p, pos, f.chasm, e.chasm, wobble);
-  CMP(p, pos, f.chasm, e.chasm, dwell);
   cmpChasmTuning(p, pos, f.chasm.tuning, e.chasm.tuning);
   cmpSpringTuning(p, pos, f.spring.tuning, e.spring.tuning);
 }
@@ -289,8 +281,7 @@ EmuState emuStart() {
   mc::distBody(s.distortion.tuning, m[mc::DistBody]);
   mc::distBite(s.distortion.tuning, m[mc::DistBite]);
   mc::distGrit(s.distortion.tuning, m[mc::DistGrit]);
-  mc::chasmWobble(s.reverb.chasm, m[mc::ChasmWobble]);
-  mc::chasmBrightness(s.reverb.chasm.tuning, m[mc::ChasmBrightness]);
+  mc::chasmWobble(s.reverb.chasm.tuning, m[mc::ChasmWobble]);
   mc::chasmBass(s.reverb.chasm.tuning, m[mc::ChasmBass]);
   mc::springChirp(s.reverb.spring.tuning, m[mc::SpringChirp]);
   mc::springFlutter(s.reverb.spring.tuning, m[mc::SpringFlutter]);
