@@ -71,11 +71,11 @@ constexpr Cost kInputGate{3, 4, true};     // 17.7k to 17.9k / 21.6k to 25.1k, s
 constexpr Cost kAutotune{5, 7, false};     // the pair's estimate less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
 constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-02, its own voice only: 0.21 host us a block on g++ 15 (Octave at MIX 100 % less the same case at MIX 0), 10.5k board cycles at 50.4k, rounded up; see "Octave alone"
 constexpr Cost kUnison{4, 5, true};        // 21.1k to 21.2k / 21.7k to 26.6k, stress run 2026-11-01 (v2.00.81 and v2.00.82, default and chasm layouts: mean 3.3 %, worst 3.4 to 4.2 %); the earlier 46.9k / 47.7k was the WeAct bench. The dry-at-unity rewrite (2026-11-02) costs no more: host 14.4 / 8.5 ns a sample at DEPTH 50 % (clang / gcc) against 14.5 / 9.0, and 14.7 / 11.6 with DEPTH moving against 14.4 / 12.2
-constexpr Cost kSlapback{1, 2, false};     // est. 2.3k to 3.4k settled, worst 6.4k to 8.3k (0.4 to 0.5 % mean, 1.0 to 1.3 % worst), from the host bench of 2026-11-02 on Adam's clips (clang / gcc ns a sample: settled 2.03 / 1.93, Amount moving 3.13 / 3.11, Time moving 3.87 / 3.55, Amount 0 0.24 / 0.23) at Echo's own ratio of 25.9k board cycles per host us, and from the M7 inner loops (17.5 instructions a sample settled, 62 moving, 69 in the 12,068-sample window after an enable) at 1.84 cycles an instruction. The board read the earlier engine in the stress run of 2026-11-01 at 13.1k to 13.4k mean and 13.7k to 16.7k worst (v2.00.81 and v2.00.82, knobs at top, Echo not swept); the 26.3k / 26.6k before that was the WeAct bench. A stress run of the new engine replaces this row
+constexpr Cost kSlapback{1, 3, true};      // 2.7k to 2.9k / 13.5k to 13.8k, stress run 2026-11-02 (v2.01.11, all seven layouts, TIME and AMOUNT swept, ten toggle flips: mean 0.4 to 0.5 %, worst 2.1 to 2.15 %, lowest run worst per layout); the host bench estimate of 6.4k to 8.3k worst missed the block after an enable
 constexpr Cost kDistortion{8, 11, true};   // 45.5k to 46.8k / 64.5k to 67.7k, stress run 2026-11-01 (worst 10.1 to 10.6 %, lowest run worst per layout)
 constexpr Cost kGate{3, 5, true};          // 18.5k to 18.9k / 21.3k to 25.9k, stress run 2026-11-01 (v2.00.81 and v2.00.82, all four layouts: mean 2.9 to 3.0 %, worst 3.3 to 4.05 %, lowest run worst per layout); the earlier 24.7k / 27.0k was the WeAct bench
-constexpr Cost kReverbSpring{6, 7, false};  // estimate, speed pass bench 2026-11-02, from the M7 model (llvm-mca, firmware GCC): 35.3k a block (5.5 %), 39.3k with MIX moving (6.1 %); the model read the engine it replaced 13 % over its board figure (83.4k / 84.0k, stress run 2026-11-01, 13.0 / 13.1 %); the host bench reads 0.31 to 0.34 of that engine, 4.1 to 4.5 points; a board rerun is owed
-constexpr Cost kReverbChasm{5, 6, false};   // estimate, speed pass bench 2026-11-02, from the M7 model: 28.6k a block (4.5 %), 32.6k with MIX moving (5.1 %), the host ratio left out as above; the engine it replaced read 102.2k to 102.5k / 105.5k to 108.2k on the board (stress run 2026-11-01, 16.0 / 16.5 to 16.9 %); a board rerun is owed
+constexpr Cost kReverbSpring{6, 7, true};   // 33.4k to 33.7k / 38.3k to 40.5k, stress run 2026-11-02 (v2.01.11, the six Spring layouts, MIX swept: mean 5.2 to 5.3 %, worst 6.0 to 6.3 %, lowest run worst per layout); the M7 model read 35.3k / 39.3k
+constexpr Cost kReverbChasm{5, 6, true};    // 29.6k to 29.7k / 35.1k to 35.3k, stress run 2026-11-02 (v2.01.11, chasm and crowd-chasm layouts, MIX swept: mean 4.6 %, worst 5.5 %, lowest run worst per layout); the M7 model read 28.6k / 32.6k
 
 // The pitch tracker, its history fill and its coarse analysis, which Autotune, Crowd and Formant
 // share and a layout pays once. kTracker and kAutotune are one estimate split in two. The pair was measured on
@@ -102,17 +102,14 @@ constexpr Cost kTracker{4, 5, false};
 // carry it.
 constexpr Cost kPitchStage{4, 4, false};
 
-// The eight-copy card, measured on the board on 2026-11-01. The crowd bench layout (Input gate,
-// Octave, Crowd, Echo, Gate, Spring reverb) ran Adam's 5.5 s clip with every knob at its top,
-// two runs of 24 s, with no late, overrun or dry block. Crowd's slot averaged 78.7k cycles (12.3 %).
-// Its worst block was 94.97k (14.8 %) in the lower run and 101.0k in the other. The tracker ran in
-// Octave's slot, which cost 47.5k (7.4 %), so this row holds the card without the tracker. The host
-// gave 2.40 us per block (VOICES 80 %, WIDTH 50 %, default tuning), which reads 19 points at the
-// 50.4k ratio and 11 points at the pitch code's 29k. The board's 12.3 % sits at the pitch code's
-// ratio, so that ratio holds for Crowd too. The mean comes from knobs at top. The worst comes from
-// the two-pass stress run, where the WIDTH and VOICES sweeps raise it to a lowest run worst of 15.6 %
-// in the crowd layout and 15.9 % in crowd-chasm.
-constexpr Cost kCrowd{13, 16, true};  // 78.7k / 99.6k to 101.6k, board 2026-11-01; mean from the crowd bench layout slot 3 with knobs at top, worst from the stress run's sweeps; the tracker ran in Octave's slot, 47.5k
+// The eight-copy card. The stress run of 2026-11-02 (v2.01.11) read Crowd's slot in the crowd and
+// crowd-chasm layouts at 86.3k to 86.5k cycles mean (13.5 %), knobs at top, and 104.3k to 106.9k
+// worst (16.3 to 16.7 %, lowest run worst per layout) with the DIVERGE and VOICES sweeps, with no
+// late, overrun or dry block. The tracker runs in Autotune's slot there, so this row holds the card
+// without the tracker. The same layouts read 79.0k / 99.7k to 101.3k on 2026-11-01 (v2.00.82),
+// before VOICES became ten steps and before the Formant voice and its fix pass changed
+// engine/formant_voice.h, which Crowd shares.
+constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stress run 2026-11-02 (v2.01.11)
 
 // The Formant card, an alternate for Octave in slot 3, and the Lo-fi and Chatter cards, alternates for
 // Gate in slot 7. Each row is an estimate until the stress run measures the card on the board; the
