@@ -2169,7 +2169,7 @@ PlainRun runPlain(const Signal& in, size_t c) {
 bool testPlainAfter() {
   const Signal in = toneThenNoise();
   bool ok = true;
-  for (const std::pair<size_t, double> c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
+  for (const std::pair<size_t, double>& c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
     const PlainRun r = runPlain(in, c.first);
     const double ms = (r.plainAt - r.unvoicedAt + cv::kBlock) * 1000.0 / kRate;
     const double glide = maxStep(r.out, r.plainAt - 1, r.plainAt + msToSamples(60.0));
