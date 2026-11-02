@@ -34,5 +34,19 @@ inline float step(float x, float target, float a) {
   return next == x || fabsf(target - next) < kSnap ? target : next;
 }
 
+// x after n steps toward target.
+inline float advance(float x, float target, float a, int n) {
+  for (int i = 0; i < n; ++i) x = step(x, target, a);
+  return x;
+}
+
+// Two smoothers that share a coefficient, stepped together so their dependent chains overlap.
+inline void advance(float& x, float xTarget, float& y, float yTarget, float a, int n) {
+  for (int i = 0; i < n; ++i) {
+    x = step(x, xTarget, a);
+    y = step(y, yTarget, a);
+  }
+}
+
 }  // namespace smooth
 }  // namespace cv

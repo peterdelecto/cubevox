@@ -50,6 +50,15 @@ Slapback correction 2026-10-07: the slapback row was a coin flip on TIME (the to
 or cancels with its own echo). The row now averages over TIME 60..250 ms; wetMaxDb stays
 +4.9 dB and SlapbackTuning.trimDb = -4.9 dB x INTENSITY lands the mean at +0.25 dB.
 
+Echo and Unison 2026-11-02 (owner 2026-11-01: the dry never drops). Both trims now sit on the
+wet alone, as one constant, and the dry passes at exact unity at every setting; this replaces
+the whole-output trims above. The rows run on Adam's three clips and are judged on the mean:
+Echo at AMOUNT 25 % (SlapbackTuning.trimDb = -5.3 dB, power sum over TIME 60..250 ms) reads
++0.25 dB; Unison at its default DEPTH (UnisonTuning.trimDb = -0.7 dB) reads in band. Because
+the wet adds on top of a unity dry, the output rises with the knob: Echo +1.10 dB at 50 % and
++3.38 dB at 100 %, Unison +2.18 dB at 75 % and +3.03 dB at 100 %. Those rows print as notes,
+because the rule binds the default.
+
 The reverb rows take every setting from the registry: the card placed and switched on, TIME
 and dwell where the box leaves them (TIME 50 %, dwell 0.20), and the crossfade forced to the
 wet alone. There ChasmTuning.wetDb = +19.2 dB reads +0.28 dB. Spring's rows run on Adam's

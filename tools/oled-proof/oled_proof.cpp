@@ -33,7 +33,7 @@ struct Slot {
 const Slot kChain[kSlots] = {
     {"IG", "INPUT GATE", 0.35f, 0.50f, true}, {"AT", "AUTOTUNE", 0.40f, 0.70f, true},
     {"OC", "OCTAVE", 0.25f, 0.50f, false},    {"UN", "UNISON", 0.60f, 0.30f, true},
-    {"SL", "SLAPBACK", 0.45f, 0.20f, true},   {"DS", "DISTORTION", 0.15f, 0.55f, false},
+    {"EC", "ECHO", 0.45f, 0.20f, true},       {"DS", "DISTORTION", 0.15f, 0.55f, false},
     {"GT", "GATE", 0.30f, 0.40f, true},       {"RV", "SPRING REVERB", 0.50f, 0.65f, true},
 };
 

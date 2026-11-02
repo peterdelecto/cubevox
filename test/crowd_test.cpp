@@ -1102,15 +1102,30 @@ void allEnhancements(cv::CrowdTuning& t) {
 // re-pinned 2026-11-01 because its scatter moved from 15 to 12 ms when the tuning range became the
 // ring's allowance, not for an engine change. Runs 1 and 4 were re-pinned when VOICES became ten
 // steps, because their old position fell between two steps. Runs 2 and 3 sit on positions the
-// old law shared (8 and 6 copies) and kept their hashes.
-constexpr std::array<uint64_t, 4> kPinned = {0x160a6132d98f9359ULL, 0xd50d29e677f4651fULL, 0x8d7fc1ce41837fb8ULL,
-                                             0x917938dbd5014f90ULL};
+// old law shared (8 and 6 copies) and kept their hashes. All four were re-pinned when the grain
+// length took its floor of two output periods (formant_voice.h setGrain). A copy whose pitch ratio
+// sits below its playback rate now lengthens its grains. The MOB program level moved by 0.01 dB.
+constexpr std::array<uint64_t, 4> kPinned = {0x81dc6bbf662e297eULL, 0xb0efcbaf83bf5979ULL, 0xf9246e3b6c9d0344ULL,
+                                             0xfdf2bd9bfb21710bULL};
 
-// Each run's hash against its pinned value.
+// The toolchain that produced kPinned. A bit-exact hash follows the compiler's code generation and
+// the system libm, so the pins hold on this toolchain only. Anywhere else checkPinned prints SKIP and
+// the runs still have to agree with each other. To re-pin on another toolchain, copy the engine
+// hashes it prints and its name into kPinned and kPinnedToolchain together.
+constexpr const char* kPinnedToolchain = "17.0.0 (clang-1700.0.13.5) arm64";
+
+#if defined(__clang_version__) && defined(__aarch64__)
+constexpr const char* kToolchain = __clang_version__ " arm64";
+#else
+constexpr const char* kToolchain = "an unrecognised toolchain";
+#endif
+
+// Each run's hash against its pinned value, on the toolchain that pinned them.
 bool checkPinned(const std::array<uint64_t, 4>& hashes) {
   const char* what[4] = {"180 Hz program VOICES 6 DIVERGE 50", "burst program VOICES 8 DIVERGE 50",
                          "burst program VOICES 6 DIVERGE 80 scatter 12 drift 20",
                          "180 Hz program VOICES 6 DIVERGE 50 on the shipped tuning"};
+  const bool pinHolds = std::strcmp(kToolchain, kPinnedToolchain) == 0;
   bool ok = true;
   for (size_t i = 0; i < hashes.size(); ++i) {
     char name[40];
@@ -1118,7 +1133,11 @@ bool checkPinned(const std::array<uint64_t, 4>& hashes) {
     const bool same = hashes[i] == kPinned[i];
     std::printf("info hash run %zu, %s: pinned %016llx, engine %016llx\n", i + 1, what[i],
                 static_cast<unsigned long long>(kPinned[i]), static_cast<unsigned long long>(hashes[i]));
-    ok &= report(name, same, "output hash equals the pinned value: %.0f (1)", same ? 1.0 : 0.0);
+    if (pinHolds) ok &= report(name, same, "output hash equals the pinned value: %.0f (1)", same ? 1.0 : 0.0);
+  }
+  if (!pinHolds) {
+    std::printf("SKIP default hash, runs 1..4  pinned on \"%s\", this toolchain is \"%s\"\n", kPinnedToolchain,
+                kToolchain);
   }
   return ok;
 }
@@ -1148,10 +1167,17 @@ bool testEnhancementsDefaultExact() {
   const size_t diffBurst = differing(c, d);
   cv::CrowdParams shipped = base;
   shipped.tuning = cv::CrowdTuning{};
-  const bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
-                         "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
-                         static_cast<double>(diffProg), static_cast<double>(diffBurst));
-  return checkPinned({fnv(a), fnv(run(burst, knobs(8, 0.5f))), fnv(c), fnv(run(prog, shipped))}) && ok;
+  bool ok = report("enhancements neutral", diffProg == 0 && diffBurst == 0,
+                   "inactive settings move %.0f samples of the 180 Hz program and %.0f of the burst program (0)",
+                   static_cast<double>(diffProg), static_cast<double>(diffBurst));
+
+  // Runs 2 and 4 have no neutral twin above, so each plays twice and the hashes must agree on any toolchain.
+  const uint64_t h2 = fnv(run(burst, knobs(8, 0.5f)));
+  const uint64_t h4 = fnv(run(prog, shipped));
+  const bool repeats = h2 == fnv(run(burst, knobs(8, 0.5f))) && h4 == fnv(run(prog, shipped));
+  ok &= report("default runs repeat", repeats, "a second play of runs 2 and 4 hashes the same: %.0f (1)",
+               repeats ? 1.0 : 0.0);
+  return checkPinned({fnv(a), h2, fnv(c), h4}) && ok;
 }
 
 // The shipped defaults are the owner's working set (2026-10-31), and a run on them stays finite and
@@ -2006,10 +2032,10 @@ bool testOutOfRange() {
 // samples hold NaN. They overwrote the oldest, so a read past the valid span lands on them. Returns the
 // NaN output samples, and the peak in `peak`.
 size_t canaryReads(const Signal& x, const std::vector<int>& sizes, float ratio, double* peak) {
-  namespace cd = cv::crowd_detail;
+  namespace fd = cv::formant_detail;
   std::unique_ptr<cv::VoiceRing> ring(new cv::VoiceRing());
   ring->fill(0.0f);
-  cd::FormantPsolaVoice voice;
+  fd::FormantPsolaVoice voice;
   voice.reset();
   Signal out(x.size(), 0.0f);
   int head = 0;
@@ -2021,7 +2047,7 @@ size_t canaryReads(const Signal& x, const std::vector<int>& sizes, float ratio, 
       (*ring)[static_cast<size_t>(head)] = std::nanf("");
       head = head + 1 == cv::kVoiceRingLen ? 0 : head + 1;
     }
-    voice.prepare(kRate / 72.0f, ratio, 0.5f, cd::kDelayCeil, n);
+    voice.prepare(kRate / 72.0f, ratio, 0.5f, fd::kDelayCeil, n);
     for (int c = 0; c < n; c += cv::kBlock)
       voice.render(*ring, cv::wrapOnce<cv::kVoiceRingLen>(first + c), std::min(cv::kBlock, n - c), &out[at + static_cast<size_t>(c)]);
     for (int j = 0; j < n; ++j) (*ring)[static_cast<size_t>(cv::wrapOnce<cv::kVoiceRingLen>(first + j))] = x[at + static_cast<size_t>(j)];
@@ -2169,7 +2195,7 @@ PlainRun runPlain(const Signal& in, size_t c) {
 bool testPlainAfter() {
   const Signal in = toneThenNoise();
   bool ok = true;
-  for (const std::pair<size_t, double> c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
+  for (const std::pair<size_t, double>& c : {std::pair<size_t, double>{1, 162.0}, {5, 237.0}}) {
     const PlainRun r = runPlain(in, c.first);
     const double ms = (r.plainAt - r.unvoicedAt + cv::kBlock) * 1000.0 / kRate;
     const double glide = maxStep(r.out, r.plainAt - 1, r.plainAt + msToSamples(60.0));
@@ -2184,47 +2210,23 @@ bool testPlainAfter() {
   return ok;
 }
 
+// The checks, in the order they run.
+constexpr bool (*kChecks[])() = {
+    testOffExact,        testReset,           testNoAlloc,           testPitchMoves,         testWidthLaw,
+    testFadeOrder,       testFormantMoves,    testVoicesDiffer,      testPowerLaw,           testLevelLaw,
+    testLeadLeaves,      testVoiceCount,      testSolo,              testLagAcrossGap,       testScatter,
+    testDrift,           testTrackerRuns,     testCorrectionReleases, testEnhancementsDefaultExact,
+    testWorkingSetDefaults, testLevelScatter, testContour,           testMelodicBottom,      testWidthGlides,
+    testWidthLag,        testWidthZeroIsDelay, testSharedShelf,      testEnhancementsStable, testSwitchWithTracker,
+    testVoicesStepGlides, testGapOverFloor,   testWidthHoldsLevel,   testOutOfRange,         testReadCeiling,
+    testTuningRanges,    testRaisedLag,       testPlainAfter,
+};
+
 }  // namespace
 
 int main() {
   bool ok = true;
-  ok &= testOffExact();
-  ok &= testReset();
-  ok &= testNoAlloc();
-  ok &= testPitchMoves();
-  ok &= testWidthLaw();
-  ok &= testFadeOrder();
-  ok &= testFormantMoves();
-  ok &= testVoicesDiffer();
-  ok &= testPowerLaw();
-  ok &= testLevelLaw();
-  ok &= testLeadLeaves();
-  ok &= testVoiceCount();
-  ok &= testSolo();
-  ok &= testLagAcrossGap();
-  ok &= testScatter();
-  ok &= testDrift();
-  ok &= testTrackerRuns();
-  ok &= testCorrectionReleases();
-  ok &= testEnhancementsDefaultExact();
-  ok &= testWorkingSetDefaults();
-  ok &= testLevelScatter();
-  ok &= testContour();
-  ok &= testMelodicBottom();
-  ok &= testWidthGlides();
-  ok &= testWidthLag();
-  ok &= testWidthZeroIsDelay();
-  ok &= testSharedShelf();
-  ok &= testEnhancementsStable();
-  ok &= testSwitchWithTracker();
-  ok &= testVoicesStepGlides();
-  ok &= testGapOverFloor();
-  ok &= testWidthHoldsLevel();
-  ok &= testOutOfRange();
-  ok &= testReadCeiling();
-  ok &= testTuningRanges();
-  ok &= testRaisedLag();
-  ok &= testPlainAfter();
+  for (bool (*check)() : kChecks) ok &= check();
   std::printf("%s crowd\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

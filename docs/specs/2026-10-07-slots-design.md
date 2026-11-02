@@ -12,7 +12,7 @@ Today's chain, left to right, slot 1 to 8:
 | 2 | Autotune | Key | Response |
 | 3 | Octave | Semitones | Mix |
 | 4 | Unison | Depth | Rate |
-| 5 | Slapback | Amount | Time |
+| 5 | Echo (id `slapback`) | Time | Amount |
 | 6 | Distortion | Drive | Tone |
 | 7 | Gate | Threshold | Decay |
 | 8 | Reverb | Mix | Time |

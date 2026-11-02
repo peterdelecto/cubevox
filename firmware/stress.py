@@ -4,9 +4,11 @@
 For each layout the script puts the layout on the box, forces every slot on (bench all_on), plays
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
-to the panel and sweeps SEMITONES (Octave's upper knob), the reverb MIX (the reverb slot's lower
-knob) and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in steps of 10 %, 1 s
-each, reading the counters after each sweep.
+to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper knob), the reverb MIX
+(the reverb slot's lower knob), both Echo knobs and, when Crowd is placed, both Crowd knobs from 0 %
+to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep. When Echo is
+placed it then flips Echo's toggle ten times, 0.3 s apart, so the engine starts from reset five
+times, and reads the counters again.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
@@ -16,12 +18,15 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-The slot that runs the shared pitch stage (the first Autotune, Octave or Crowd slot) is held to the
-rows of every card that stage runs, plus the tracker row when Autotune or Crowd is placed.
+The slot that runs the shared pitch stage (the first Autotune, Octave, Formant or Crowd slot) is held to
+the rows of every card that stage runs, plus the tracker row when Autotune, Crowd or Formant is placed
+and the stage row when Octave or Formant is placed without Autotune.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
-Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm) and
-crowd-chasm. The saved layout is read first and put back at the end, together with slots_live,
+Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
+crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot) and
+formant-alone (Formant with Autotune's slot empty). The saved layout is read first and put back at the end,
+together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
 
 Output: a summary on stdout and a table per layout appended to build/bench/<YYYY-MM-DD>-stress.md.
@@ -60,11 +65,13 @@ BLOCK_MEAN_LIMIT_PERCENT = 75
 BLOCK_WORST_LIMIT_PERCENT = 95
 SWEEP_VALUES = range(0, 101, 10)  # percent of travel
 SWEEP_STEP_S = 1.0
+TOGGLE_FLIPS = 10    # Echo's toggle flips off and on five times
+TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
-LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm")
+LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -72,12 +79,16 @@ ROW_OF = {
     "input_gate": "kInputGate", "autotune": "kAutotune", "octave": "kOctave", "unison": "kUnison",
     "slapback": "kSlapback", "distortion": "kDistortion", "gate": "kGate",
     "reverb_spring": "kReverbSpring", "reverb_chasm": "kReverbChasm", "crowd": "kCrowd",
+    "formant": "kFormant",
 }
 TRACKER_ROW = "kTracker"
-PITCH_STAGE = ("autotune", "octave")        # cards the shared PitchFx runs
-PITCH_GROUP = ("autotune", "octave", "crowd")  # the first of these carries the stage's cost
-NEEDED_OPS = ("slots_live", "all_on", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats", "clip",
-              "chasm")
+STAGE_ROW = "kPitchStage"  # the stage's own work when Octave or Formant runs without Autotune
+PITCH_STAGE = ("autotune", "octave", "formant")        # cards the shared PitchFx runs
+PITCH_GROUP = ("autotune", "octave", "formant", "crowd")  # the first of these carries the stage's cost
+TRACKER_USERS = ("autotune", "crowd", "formant")    # cards that run the pitch tracker
+STAGE_USERS = ("octave", "formant")                 # cards that pay the stage term without Autotune
+NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
+              "clip", "chasm")
 
 COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
 BLOCKS_LINE = re.compile(r"\[audio\] blocks (\d+) late (\d+) overruns (\d+) dry (\d+) avg (\d+) worst (\d+) of (\d+) cycles")
@@ -119,7 +130,7 @@ def read_text(path):
 def read_rows():
     """The costs.h rows as {name: (mean percent, worst percent)}."""
     rows = {m.group(1): (int(m.group(2)), int(m.group(3))) for m in COST_ROW.finditer(read_text(COSTS_H))}
-    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW) if n not in rows]
+    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW, STAGE_ROW) if n not in rows]
     if missing:
         raise StressError(f"{COSTS_H}: no row for {', '.join(missing)}")
     return rows
@@ -138,20 +149,28 @@ def default_layout():
 
 
 def layout_table():
-    """{name: (card ids, reverb slot runs Chasm)} for the four layouts."""
+    """{name: (card ids, reverb slot runs Chasm)} for the layouts."""
     base = default_layout()
     if "unison" not in base:
         raise StressError("the default layout has no unison slot for the crowd layout to replace")
+    if "autotune" not in base or "octave" not in base:
+        raise StressError("the default layout has no Autotune or Octave slot for the pitch layouts to change")
     crowd = ["crowd" if c == "unison" else c for c in base]
-    return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True)}
+    # Octave and Formant alone leave the stage's tracker idle, so their rows show without Autotune's.
+    octave_alone = ["empty" if c == "autotune" else c for c in base]
+    formant = ["formant" if c == "octave" else c for c in base]
+    formant_alone = ["formant" if c == "octave" else ("empty" if c == "autotune" else c) for c in base]
+    return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
+            "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False)}
 
 
 def slot_bounds(slots, chasm, rows):
     """Per slot, (mean percent, worst percent) it may use, or None for an empty slot.
 
-    The first pitch-group slot runs the shared pitch stage, so it carries every Autotune and Octave row
-    placed and the tracker row when Autotune or Crowd is placed. The reverb slot reads Chasm's row
-    while the chasm op is on.
+    The first pitch-group slot runs the shared pitch stage, so it carries every Autotune, Octave and Formant
+    row placed, the tracker row when Autotune, Crowd or Formant is placed, and the stage row when Octave or
+    Formant is placed without Autotune, as layoutCost sums them. The reverb slot reads Chasm's row while the
+    chasm op is on.
     """
     def row_of(card):
         return rows[ROW_OF["reverb_chasm" if chasm and card.startswith("reverb_") else card]]
@@ -167,8 +186,10 @@ def slot_bounds(slots, chasm, rows):
             for other in slots:
                 if other in PITCH_STAGE and other != card:
                     mean, worst = mean + rows[ROW_OF[other]][0], worst + rows[ROW_OF[other]][1]
-            if "autotune" in slots or "crowd" in slots:
+            if any(c in slots for c in TRACKER_USERS):
                 mean, worst = mean + rows[TRACKER_ROW][0], worst + rows[TRACKER_ROW][1]
+            if any(c in slots for c in STAGE_USERS) and "autotune" not in slots:
+                mean, worst = mean + rows[STAGE_ROW][0], worst + rows[STAGE_ROW][1]
         bounds.append((mean, worst))
     return bounds, carrier
 
@@ -306,8 +327,13 @@ def sweeps(slots):
     for i, card in enumerate(slots):
         if card == "octave":
             found.append((i, 1, "SEMITONES"))
+        if card == "formant":
+            found.append((i, 1, "SHIFT"))
         if card.startswith("reverb_"):
             found.append((i, 2, "reverb MIX"))
+        if card == "slapback":
+            found.append((i, 1, "Echo TIME"))
+            found.append((i, 2, "Echo AMOUNT"))
         if card == "crowd":
             found.append((i, 1, "Crowd DIVERGE"))
             found.append((i, 2, "Crowd VOICES"))
@@ -335,6 +361,12 @@ def measure_run(box, slots, seconds):
             box.wait(SWEEP_STEP_S)
         later.append(box.stats())
         box.bench_ok("knobs_live")
+    for slot in (i for i, card in enumerate(slots) if card == "slapback"):
+        say(f"pass 2, {TOGGLE_FLIPS} flips of the Echo toggle (slot {slot + 1})")
+        for _ in range(TOGGLE_FLIPS):
+            box.bench_ok("slot_off", slot=slot + 1)  # each call flips the slot's force-off bit
+            box.wait(TOGGLE_STEP_S)
+        later.append(box.stats())
     every = [first, *later]
     return {
         "blocks": first.blocks,
@@ -470,7 +502,8 @@ def report_lines(results, header):
         out.append("")
         if r["carrier"] is not None:
             out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
-                       "Autotune and Octave rows placed, plus the tracker row when Autotune or Crowd is placed.")
+                       "Autotune, Octave and Formant rows placed, plus the tracker row when Autotune, Crowd or "
+                       "Formant is placed and the stage row when Octave or Formant is placed without Autotune.")
             out.append("")
         out.append(block_line(r["agg"]))
         out.append("")

@@ -118,7 +118,7 @@ struct ProtoParams {
     slapback.on = true;
     eq.on = true;
     pitchFx.autotune.key = kStartKey;
-    pitchFx.octave.mix = 0.10f;
+    pitchFx.octave.mix = cv::kOctaveDefaultMix;
     reverb.engine = cv::kReverbSpring;
     reverb.mix = 1.0f;
     reverb.time = 1.0f;  // full MIX with full decay, Adam's starting sound
@@ -384,7 +384,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       cv::kVoicesName[p.crowd.voicesStep < cv::kVoicesSteps ? p.crowd.voicesStep : cv::kVoicesMob],
       static_cast<double>(p.unison.depth * 100.0f),
       static_cast<double>(p.macros.pos[cv::macros::UnisonMotion]),
-      static_cast<double>(p.slapback.mix * 100.0f),
+      static_cast<double>(p.slapback.amount * 100.0f),
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.mix * 100.0f),
@@ -403,7 +403,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const int prefix = static_cast<int>(snapshotLines(params, gTuningText, sizeof(gTuningText)));
   std::snprintf(
       gTuningText + prefix, sizeof(gTuningText) - static_cast<size_t>(prefix),
-      "OctaveTuning{%.1ff, %.1ff, %.0ff, %d, %.1ff}\n"
+      "OctaveTuning{%.1ff, %.0ff, %.1ff}\n"
       "UnisonTuning{{%.1ff, %.1ff}, {%.2ff, %.2ff}, %.1ff, %.1ff, %.1ff, %.1ff, %.2ff, %.3ff, %.1ff}\n"
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, %.2ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
@@ -411,7 +411,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       "ChasmTuning{%.0ff, %.0ff, %.2ff, %.2ff, %.2ff, %.2ff, %.1ff, %.1ff, %.1ff}\n"
       "PolishTuning{%.2ff, %.2ff, %.1ff, {%.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.0ff, %.1ff}}\n"
       "// PolishParams: dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB",
-      o.levelDb, o.glideMs, o.grainWindowMs, o.grainCount, o.trimDb,
+      o.glideMs, o.grainWindowMs, o.trimDb,
       t.baseDelayMs[0], t.baseDelayMs[1], t.lfoHz[0], t.lfoHz[1], t.swingMinMs,
       t.swingMaxMs, t.wetMaxDb, t.trimDb, t.topFrom, t.topSwingGain, t.topWetDb,
       s.timeMs, s.lowpassHz, s.feedback, s.wetMaxDb, s.trimDb, d.inputHpHz, d.s1BassHz, d.s1BassDb, d.s1LpHz, d.gain1Max, d.topBoostDb, d.topBoostFrom, d.stackBassHz, d.stackBassDb,
@@ -464,7 +464,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "// AutotuneTuning: trimDb, grainDelay\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb, "
       "detectorAttackMs, detectorReleaseMs, travelTimes\n"
-      "// OctaveTuning: levelDb, glideMs, grainWindowMs, grainCount, trimDb\n"
+      "// OctaveTuning: glideMs, grainWindowMs, trimDb\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, trimDb, topFrom, topSwingGain, topWetDb\n"
       "// SlapbackTuning: timeMs, lowpassHz, feedback, wetMaxDb, trimDb\n"
@@ -550,16 +550,9 @@ bool tuningLeaf(const char* probeName, const char* label) {
 
 // Long tuning sections split into sub-nodes so no column ever needs a scroll bar.
 void drawOctaveRaw(cv::OctaveTuning& o) {
-  ImGui::SliderFloat("Level", &o.levelDb, -24.0f, 0.0f, "%.1f dB");
   ImGui::SliderFloat("Trim", &o.trimDb, -12.0f, 12.0f, "%.1f dB");
   ImGui::SliderFloat("Tracking speed (ms)", &o.glideMs, 0.0f, 100.0f, "%.0f ms");
   ImGui::SliderFloat("Grain window", &o.grainWindowMs, 20.0f, 80.0f, "%.0f ms");
-  ImGui::AlignTextToFramePadding();
-  ImGui::TextUnformatted("Grains");
-  ImGui::SameLine();
-  ImGui::RadioButton("2", &o.grainCount, 2);
-  ImGui::SameLine();
-  ImGui::RadioButton("4", &o.grainCount, 4);
 }
 
 void drawAutotuneRaw(cv::AutotuneTuning& t) {
@@ -979,7 +972,7 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("unison.on", &p.unison.on);
   add("unison.depth", &p.unison.depth);
   add("slapback.on", &p.slapback.on);
-  add("slapback.intensity", &p.slapback.mix);
+  add("slapback.intensity", &p.slapback.amount);
   add("slapback.time", &p.slapback.tuning.timeMs);
   add("slapback.repeats", &p.slapback.tuning.feedback);
   add("slapback.lowpass", &p.slapback.tuning.lowpassHz);
@@ -1375,7 +1368,7 @@ void drawUnisonBlock(cv::UnisonParams& u, cv::macros::State& macros) {
 void drawSlapbackBlock(cv::SlapbackParams& s) {
   ImGui::PushID("slapback");
   ImGui::Checkbox("SLAPBACK", &s.on);
-  percentSlider("AMOUNT", s.mix);
+  percentSlider("AMOUNT", s.amount);
   ImGui::SliderFloat("TIME", &s.tuning.timeMs, 60.0f, 250.0f, "%.0f ms");
   drawSlapbackTuning(s.tuning);
   ImGui::PopID();
@@ -1631,7 +1624,7 @@ void drawPedals(ProtoParams& params) {
   next();
   pedal("SLAPBACK", params.slapback.on, w, [&] {
     pedalRange("TIME", params.slapback.tuning.timeMs, 60.0f, 250.0f, false, "%.0f ms");
-    pedalPercent("AMOUNT", params.slapback.mix);
+    pedalPercent("AMOUNT", params.slapback.amount);
   });
   next();
   pedal("DISTORTION", params.distortion.on, w, [&] {

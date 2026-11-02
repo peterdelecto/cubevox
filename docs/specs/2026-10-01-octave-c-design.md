@@ -85,7 +85,32 @@ OCTAVE `Engine` radio A | B | C. FORMANT disabled for A and C. Tuning node gains
 
 `ctest` passes; OCTAVE offers A | B | C; owner A/Bs the three on octave down.
 
-Box code: option C is the only Octave engine, `OctaveVoice` in `engine/octave.h`, with its level
-trim in `OctaveTuning::trimDb` (+2.2 dB; -12 at MIX 1 reads +0.23 dB). Its voice resets on the
-enable edge only once the stage crossfade sits at 0, so SEMITONES through 0 never cuts it
-(`octave_test` through 0).
+## Box code (v2.01.10, audit fix pass 2026-11-02)
+
+Option C is the only Octave engine, `OctaveVoice` in `engine/octave.h`. Sections above are the
+2026-10-01 design; where they differ, this section is the box.
+
+1. Two taps only. The 4-grain option and `grainCount` are gone. The taps share one 32-bit
+   sawtooth counter and one Hann rotor, with delays and ring positions in Q18 samples. The
+   window is 20 to 80 ms (`grainWindowMs`, default 40), rounded to an even number of samples.
+2. One fade. `PitchFx`'s `octaveFade_` is the only fade on the toggle; the voice has no gain fade
+   of its own. The mix turns `MIX × octaveFade_` through a quarter turn, so dry and wet stay
+   equal-power at every fade. SEMITONES 0 switches the voice off through the same fade, so
+   SEMITONES through 0 is an equal-power crossfade to the dry voice and never cuts it.
+3. The voice resets on its enable edge only once `octaveFade_` sits at 0 (`octave_test` through
+   0). A NaN in the voice latches until a reset; the chain's NaN guard (`discardBlock`) resets
+   every engine.
+4. Autotune's correction reaches the voice through its own 2 ms one-pole (`kOctaveCorrCoef`), so
+   the voice follows a vibrato on the tuned note instead of lagging it by the 15 ms SEMITONES
+   glide.
+5. The wet passes a 5 Hz DC blocker before the mix; under 1e-30 its state rests at 0.
+6. Level: `OctaveTuning::trimDb` 1.1 dB, the wet alone at MIX 100 % on Adam's clips. Clip rows
+   (mean) read +0.22, +0.21, +0.23 and +0.23 dB at −12, −5, +7 and +12 st, each clip +0.13 to
+   +0.29 dB; MIX 50 % reads −0.16 to +0.09 dB. The synthetic-program row prints as a NOTE.
+7. MIX starts at 10 % (`kOctaveDefaultMix`); the registry, the render tool and the tests read it
+   there.
+8. CPU: the fast loop is 65 M7 instructions a sample, against 238 for the old per-sample
+   `OctaveVoice::tick`. Host bench on Adam's clips, ns a sample (clang / g++ 15): Octave +12 st
+   MIX 100 % 17.6 / 11.8 before, 4.8 / 4.95 after; the default layout's pitch slot (Autotune and
+   Octave) 46.1 / 41.4 before, 30.3 / 31.9 after. `kOctave` is {2, 2, false}, an estimate from
+   that bench until a stress run of the new engine.

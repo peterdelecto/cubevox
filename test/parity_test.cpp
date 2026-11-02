@@ -124,20 +124,21 @@ void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, c
   CMP(p, pos, f, e, responseMs);
 }
 
+// The prototype sets only the glide (through its Slide macro), so the tuning's other fields run the
+// struct's own defaults on both sides. The firmware's Octave tuning is the engine's struct.
+static_assert(std::is_same<decltype(ChainParams::pitchFx.octave.tuning), cv::OctaveTuning>::value,
+              "the firmware's Octave params carry the engine's OctaveTuning");
+
 void cmpOctave(const std::string& p, float pos, const cv::OctaveParams& f, const cv::OctaveParams& e, bool rest) {
   CMP(p, pos, f, e, semitones);
   CMP(p, pos, f, e, mix);
   if (!rest) return;
-  CMP(p, pos, f.tuning, e.tuning, levelDb);
   CMP(p, pos, f.tuning, e.tuning, glideMs);
-  CMP(p, pos, f.tuning, e.tuning, grainWindowMs);
-  CMP(p, pos, f.tuning, e.tuning, grainCount);
-  CMP(p, pos, f.tuning, e.tuning, trimDb);
 }
 
 void cmpSlapback(const std::string& p, float pos, const cv::SlapbackParams& f, const cv::SlapbackParams& e,
                  bool rest) {
-  CMP(p, pos, f, e, mix);
+  CMP(p, pos, f, e, amount);
   CMP(p, pos, f.tuning, e.tuning, timeMs);
   if (!rest) return;
   CMP(p, pos, f.tuning, e.tuning, lowpassHz);
@@ -269,7 +270,7 @@ EmuState emuStart() {
   s.inputGate.tuning = cv::inputGateTuning();
   // The rest of the ProtoParams constructor
   s.gate.on = false;
-  s.pitchFx.octave.mix = 0.10f;
+  s.pitchFx.octave.mix = cv::kOctaveDefaultMix;
   s.pitchFx.autotune.key = kStartKey;
   s.reverb.engine = cv::kReverbSpring;
   s.reverb.mix = 1.0f;
@@ -313,7 +314,7 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
   applyKnob(Card::Unison, 1, em.unison.depth, fw);
   applyKnob(Card::Slapback, 0, posLinear(kEmuSlapLoMs, kEmuSlapHiMs, em.slapback.tuning.timeMs), fw);
-  applyKnob(Card::Slapback, 1, em.slapback.mix, fw);
+  applyKnob(Card::Slapback, 1, em.slapback.amount, fw);
   applyKnob(Card::Distortion, 0, em.distortion.tone, fw);
   applyKnob(Card::Distortion, 1, em.distortion.drive, fw);
   applyPlacement(Card::ReverbSpring, fw);
@@ -427,8 +428,8 @@ void sweepSlapback() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Slapback, 1, p, fw);
-    em.slapback.mix = p;  // drawPedals AMOUNT
-    cmpSlapback("sweep.slapback.mix", p, fw.slapback, em.slapback, false);
+    em.slapback.amount = p;  // drawPedals AMOUNT
+    cmpSlapback("sweep.slapback.amount", p, fw.slapback, em.slapback, false);
     EmuState em2 = emuStart();
     ChainParams fw2 = fwAtEmuStart(em2);
     applyKnob(Card::Slapback, 0, p, fw2);

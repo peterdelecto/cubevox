@@ -75,7 +75,7 @@ one-pole return low-pass. The reverb wet has no DC blocker (section 9).
 | | Value |
 |---|---|
 | Allpasses / sample | 6 diffusers + 96 disperser sections, interleaved two per pass (CHASM: 8 + 64) |
-| Board, stress run 2026-11-01, before the 2026-11-02 fix pass | 83.4k mean / 84.0k worst cycles (13.0 % / 13.1 %), slot 8, knobs at top |
+| Board, 2026-11-01, before the 2026-11-02 fix pass | 83.4k mean / 84.0k worst cycles (13.0 % / 13.1 %), slot 8, knobs at top; the swept stress run of the same day read 82.9k / 88.6k (13.0 % / 13.8 %), `docs/audits/2026-11-01-stress-run.md` |
 | Host bench after the 2026-11-02 fix pass | 0.80× (gcc) and 0.69× (clang) of the engine before it; silence costs almost nothing once the springs rest |
 | `costs.h` | `kReverbSpring {14, 14, true}`, the board figure; the line drops once the box measures the engine after the pass |
 

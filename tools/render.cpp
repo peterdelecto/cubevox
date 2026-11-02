@@ -64,7 +64,7 @@ int usage() {
                "usage: cubevox-render <in> <out.wav> [--depth <0..1>] [--on 0|1] "
                "[--tuning k=v ...]\n"
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
-               "       [--octave <-12..12>] [--omix <0..1>]\n"
+               "       [--octave <-12..12>] [--omix <0..1>, default 0.1, the box's start]\n"
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
@@ -97,8 +97,8 @@ int usage() {
                "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
                "     topFrom topSwingGain topWetDb\n"
-               "     octGrainWindowMs octGrainCount (2|4) octTrimDb eqTrimDb\n"
-               "     slapTimeMs slapLowpassHz slapFeedback slapWetMaxDb\n"
+               "     octGrainWindowMs (20..80) octTrimDb (-24..24) eqTrimDb\n"
+               "     slapTimeMs (60..250) slapLowpassHz (500..12000) slapFeedback (0..0.5) slapWetMaxDb slapTrimDb (-24..24)\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Max distTopBoostDb\n"
                "     distTopBoostFrom distStackBassHz\n"
                "     distStackBassDb distStackTrebleHz distStackTrebleDb distStackLossDb distS2HpHz\n"
@@ -115,7 +115,7 @@ int usage() {
                "     springWetDb (-24..24) springRestLevel (0..0.001, a silent input rests the springs below this; 0 never)\n"
                "     eqDipQ eqPresenceQ\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
-               "     atTrimDb atGrainDelay fmTrimDb\n"
+               "     atTrimDb (-24..24) atGrainDelay fmTrimDb (-24..24, added to every entry of the SHIFT trim table)\n"
                "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
                "     (-12..12) crowdShelfDb0..3 (-12..12) crowdShelfHz crowdHpHz (20..21600) crowdDelayMs0..3 (5..150)\n"
                "     crowdLagScale (0.5..2) crowdScatterMs (0..30) crowdDriftCents (0..50) crowdMaxLagMs (0..150)\n"
@@ -233,6 +233,15 @@ bool lofiTuningInRange(const cv::LofiTuning& t) {
          inside(t.trimDb, -24.0f, 24.0f);
 }
 
+// Every Echo key refuses a value outside the range the engine clamps to.
+bool slapbackTuningInRange(const cv::SlapbackTuning& t) {
+  using Echo = cv::Slapback;
+  return inside(t.timeMs, Echo::kTimeMinMs, Echo::kTimeMaxMs) &&
+         inside(t.lowpassHz, Echo::kCutoffMinHz, Echo::kCutoffMaxHz) && inside(t.feedback, 0.0f, Echo::kFeedbackMax) &&
+         inside(t.wetMaxDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb) &&
+         inside(t.trimDb, -Echo::kLevelLimitDb, Echo::kLevelLimitDb);
+}
+
 // Every Spring key refuses a value outside the range the engine takes, so a typo in a key does not
 // pass for a setting.
 bool springTuningInRange(const cv::SpringTuning& t) {
@@ -279,7 +288,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::LofiTuning& lt = rp.lofi.tuning;
   cv::BloomTuning& bt = rp.bloom.tuning;
   float springSections = static_cast<float>(spr.chirpSections);
-  float octGrains = static_cast<float>(ot.grainCount);
   const TuningField fields[] = {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
@@ -287,9 +295,9 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"wetMaxDb", &t.wetMaxDb},
       {"topFrom", &t.topFrom},             {"topSwingGain", &t.topSwingGain},
       {"topWetDb", &t.topWetDb},
-      {"octGrainWindowMs", &ot.grainWindowMs}, {"octGrainCount", &octGrains},
+      {"octGrainWindowMs", &ot.grainWindowMs},
       {"octTrimDb", &ot.trimDb},
-      {"atTrimDb", &at.trimDb}, {"atGrainDelay", &at.grainDelay}, {"fmTrimDb", &ft.trimDb},
+      {"atTrimDb", &at.trimDb}, {"atGrainDelay", &at.grainDelay}, {"fmTrimDb", &ft.offsetDb},
       {"crowdVoiceDb", &ct.voiceDb},              {"crowdTrimDb", &ct.trimDb},
       {"crowdTrimBottomDb", &ct.trimBottomDb},
       {"crowdFormantSt0", &ct.formantSt[0]},      {"crowdFormantSt1", &ct.formantSt[1]},
@@ -388,12 +396,15 @@ bool applyTuning(RenderParams& rp, const char* kv) {
         springSections != std::floor(springSections))
       return false;
     if (!springTuningInRange(spr) || !chasmTuningInRange(ch)) return false;
-    if (octGrains != 2.0f && octGrains != 4.0f) return false;
-    ot.grainCount = static_cast<int>(octGrains);
+    if (!inside(ot.trimDb, -24.0f, 24.0f) ||
+        !inside(ot.grainWindowMs, cv::OctaveVoice::kMinWindowMs, cv::OctaveVoice::kMaxWindowMs) ||
+        !inside(at.trimDb, -24.0f, 24.0f) || !inside(ft.offsetDb, -24.0f, 24.0f))
+      return false;
     if (!inside(bt.firstCaptureMs, 1.0f, 500.0f) || !inside(bt.skipDb, -60.0f, 0.0f) || !inside(bt.trimDb, -24.0f, 24.0f) ||
         !inside(bt.driveWord, 0.1f, 20.0f) || !inside(bt.driveBell, 0.0f, 20.0f) || !inside(bt.drift, 0.0f, 0.2f))
       return false;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
+    if (!slapbackTuningInRange(st)) return false;
     spr.chirpSections = static_cast<int>(springSections);
     return true;
   }
@@ -434,7 +445,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveOn = true;
     } else if (std::strcmp(a, "--slap") == 0 && i + 1 < argc) {
       cv::SlapbackParams& sp = rp.slapback;
-      if (!parseFloat(argv[++i], &sp.mix) || sp.mix < 0.0f || sp.mix > 1.0f) return false;
+      if (!parseFloat(argv[++i], &sp.amount) || sp.amount < 0.0f || sp.amount > 1.0f) return false;
       haveSlap = true;
     } else if (std::strcmp(a, "--drive") == 0 && i + 1 < argc) {
       cv::DistortionParams& dp = rp.distortion;
@@ -508,8 +519,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         return false;
     } else if (std::strcmp(a, "--octave") == 0 && i + 1 < argc) {
       float s = 0.0f;
-      if (!parseFloat(argv[++i], &s) || s < -12.0f || s > 12.0f || s != std::floor(s))
-        return false;
+      const float top = static_cast<float>(cv::OctaveVoice::kMaxSemis);
+      if (!parseFloat(argv[++i], &s) || s < -top || s > top || s != std::floor(s)) return false;
       op.semitones = static_cast<int>(s);
       haveOctave = true;
     } else if (std::strcmp(a, "--omix") == 0 && i + 1 < argc) {

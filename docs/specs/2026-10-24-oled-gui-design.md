@@ -76,7 +76,7 @@ Owner 2026-10-30: the value row is centred on what it draws. The field holds the
 | Mix, Depth, Rate, Drive, Tone, Time on reverbs | 0..100 % | 3 | 77 px | 25 |
 | Threshold | -70..-10 dB | sign and 2 | 94 px | 17 |
 | Semitones | -12..+12 ST | sign and 2 | 95 px | 16 |
-| Slapback Time, Response | 60..250 and 1..500 ms | 3 | 95 px | 16 |
+| Echo Time, Autotune Response | 60..250 and 1..500 ms | 3 | 95 px | 16 |
 | Decay | 5..1000 ms | 4 | 113 px | 7 |
 | Key | 12 names | none | 116 px | 6 |
 

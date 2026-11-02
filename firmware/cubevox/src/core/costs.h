@@ -21,7 +21,10 @@
 // 7.875 % of a block (the ratio Unison's host time gives against its 46.9k on the board). The
 // pitch slot's code runs at fewer cycles per host microsecond, 24k to 29k (kTracker), so rows scaled
 // from a board figure and rows converted at 50.4k are not at one ratio. kTracker states both, and
-// the board's Crowd row (kCrowd) shows the pitch ratio holds for the grain code too.
+// the board's Crowd row (kCrowd) shows the pitch ratio holds for the grain code too. Echo's own
+// ratio from the stress run of 2026-11-01 is 25.9k board cycles per host microsecond (13.2k board
+// cycles over 0.509 host us, clang), half of 50.4k. Unison's 21.1k in the same run over the 0.93 host
+// us its old 46.9k implies is 22.7k per host us. The 50.4k reads high against the stress run.
 //
 // The ratio belongs to a card, not to the box. The reverbs are serial chains of allpasses, which the
 // host's out-of-order core hides and the in-order M7 pays for. The old Spring converted at 19.8k to
@@ -31,13 +34,15 @@
 // old Spring 13 % over its board figure (94.5k cycles a block against 83.4k) and the old Chasm 5 %
 // over.
 //
-// Octave alone: PitchFx with only Octave on costs 1.04 host us per block (2026-11-01, Adam's clips,
-// MIX 100 %, host bench of the CPU pass, +-0.05 us), which is 52.4k board cycles, 8.2 %, at 50.4k.
-// CPU pass 2 measured 51.7k (8.1 %) on the board for the same case before the CPU pass. kOctave
-// holds 25.7k (4.0 %), so Octave alone pays about 26.7k cycles, 4 points, beyond its row. That is the
-// pitch stage's own work: the ring write, the per-sample mix and the crossfade gains. The pair behind
-// kAutotune and kTracker was measured as the whole slot with Autotune on, so a layout with Autotune
-// placed already carries it. Without Autotune, Octave and Formant pay it through kPitchStage, once.
+// Octave alone: PitchFx with only Octave on costs 0.32 host us per block (2026-11-02, Adam's clips,
+// MIX 100 %, g++ 15 at -O2, host bench, minimum of 9 interleaved passes, +-0.02 us), which is 15.9k
+// board cycles, 2.5 %, at 50.4k. The same case at MIX 0, where the voice parks, costs 0.11 us (5.4k,
+// 0.9 %). That is the pitch stage's own work: the ring write, the per-sample mix and the crossfade
+// gains. The voice is the other 0.21 us (10.5k, 1.6 %), which kOctave holds rounded up. The M7
+// listing of the voice's loop is 65 instructions a sample, so the board may read lower. The pair
+// behind kAutotune and kTracker was measured as the whole slot with Autotune on, so a layout with
+// Autotune placed already carries the stage. Without Autotune, Octave and Formant pay it through
+// kPitchStage, once.
 //
 // A layout is accepted when both column sums over its cards, plus the fixed term, the tracker once
 // when Autotune, Crowd or Formant is placed, and kPitchStage once when Octave or Formant is placed
@@ -62,13 +67,13 @@ constexpr Cost operator+(Cost a, Cost b) {
 }
 
 constexpr Cost kEmpty{0, 0, true};
-constexpr Cost kInputGate{4, 5, true};     // 23.7k / 26.0k, the board's figures for the earlier tuning; the revised one runs at 0.97 of them on the host, so they bound it until a rerun
+constexpr Cost kInputGate{3, 4, true};     // 17.7k to 17.9k / 21.6k to 25.1k, stress run 2026-11-01 (v2.00.81 and v2.00.82, all four layouts: mean 2.8 %, worst 3.4 to 3.9 %, lowest run worst per layout); the earlier 23.7k / 26.0k was the WeAct bench
 constexpr Cost kAutotune{5, 7, false};     // the pair's estimate less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
-constexpr Cost kOctave{5, 5, true};        // 25.7k / 27.2k, its own voice only
-constexpr Cost kUnison{8, 8, true};        // 46.9k / 47.7k
-constexpr Cost kSlapback{5, 5, true};      // 26.3k / 26.6k
+constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-02, its own voice only: 0.21 host us a block on g++ 15 (Octave at MIX 100 % less the same case at MIX 0), 10.5k board cycles at 50.4k, rounded up; see "Octave alone"
+constexpr Cost kUnison{4, 5, true};        // 21.1k to 21.2k / 21.7k to 26.6k, stress run 2026-11-01 (v2.00.81 and v2.00.82, default and chasm layouts: mean 3.3 %, worst 3.4 to 4.2 %); the earlier 46.9k / 47.7k was the WeAct bench. The dry-at-unity rewrite (2026-11-02) costs no more: host 14.4 / 8.5 ns a sample at DEPTH 50 % (clang / gcc) against 14.5 / 9.0, and 14.7 / 11.6 with DEPTH moving against 14.4 / 12.2
+constexpr Cost kSlapback{1, 2, false};     // est. 2.3k to 3.4k settled, worst 6.4k to 8.3k (0.4 to 0.5 % mean, 1.0 to 1.3 % worst), from the host bench of 2026-11-02 on Adam's clips (clang / gcc ns a sample: settled 2.03 / 1.93, Amount moving 3.13 / 3.11, Time moving 3.87 / 3.55, Amount 0 0.24 / 0.23) at Echo's own ratio of 25.9k board cycles per host us, and from the M7 inner loops (17.5 instructions a sample settled, 62 moving, 69 in the 12,068-sample window after an enable) at 1.84 cycles an instruction. The board read the earlier engine in the stress run of 2026-11-01 at 13.1k to 13.4k mean and 13.7k to 16.7k worst (v2.00.81 and v2.00.82, knobs at top, Echo not swept); the 26.3k / 26.6k before that was the WeAct bench. A stress run of the new engine replaces this row
 constexpr Cost kDistortion{8, 11, true};   // 45.5k to 46.8k / 64.5k to 67.7k, stress run 2026-11-01 (worst 10.1 to 10.6 %, lowest run worst per layout)
-constexpr Cost kGate{4, 5, true};          // 24.7k / 27.0k
+constexpr Cost kGate{3, 5, true};          // 18.5k to 18.9k / 21.3k to 25.9k, stress run 2026-11-01 (v2.00.81 and v2.00.82, all four layouts: mean 2.9 to 3.0 %, worst 3.3 to 4.05 %, lowest run worst per layout); the earlier 24.7k / 27.0k was the WeAct bench
 constexpr Cost kReverbSpring{6, 7, false};  // estimate, speed pass bench 2026-11-02, from the M7 model (llvm-mca, firmware GCC): 35.3k a block (5.5 %), 39.3k with MIX moving (6.1 %); the model read the engine it replaced 13 % over its board figure (83.4k / 84.0k, stress run 2026-11-01, 13.0 / 13.1 %); the host bench reads 0.31 to 0.34 of that engine, 4.1 to 4.5 points; a board rerun is owed
 constexpr Cost kReverbChasm{5, 6, false};   // estimate, speed pass bench 2026-11-02, from the M7 model: 28.6k a block (4.5 %), 32.6k with MIX moving (5.1 %), the host ratio left out as above; the engine it replaced read 102.2k to 102.5k / 105.5k to 108.2k on the board (stress run 2026-11-01, 16.0 / 16.5 to 16.9 %); a board rerun is owed
 
@@ -89,14 +94,16 @@ constexpr Cost kReverbChasm{5, 6, false};   // estimate, speed pass bench 2026-1
 constexpr Cost kTracker{4, 5, false};
 
 // The pitch stage's own work when Octave or Formant runs and Autotune is not placed, which no card row
-// holds. Octave alone is 52.4k board cycles (8.2 %); kOctave's row is 5, so the term is 8.2 less 5,
-// 3.2, rounded up to 4. The stage does not vary block to block, so the worst equals the mean. The
-// layout pays it once; with Autotune placed its rows carry it. An estimate until a board measures
-// Formant alone, whose own row is also an estimate.
+// holds. The term holds 4. Octave alone benches at 2.5 % (see "Octave alone"), so with kOctave's 2 the
+// rows charge a layout with Octave and no Autotune 6 points against it, and the stage itself benches
+// near 1. The held rows overcharge a layout with Octave or Formant and no Autotune by about 3 points
+// until a board run measures Formant, whose own row is also an estimate. The stage does not vary
+// block to block, so the worst equals the mean. The layout pays it once; with Autotune placed its rows
+// carry it.
 constexpr Cost kPitchStage{4, 4, false};
 
 // The eight-copy card, measured on the board on 2026-11-01. The crowd bench layout (Input gate,
-// Octave, Crowd, Slapback, Gate, Spring reverb) ran Adam's 5.5 s clip with every knob at its top,
+// Octave, Crowd, Echo, Gate, Spring reverb) ran Adam's 5.5 s clip with every knob at its top,
 // two runs of 24 s, with no late, overrun or dry block. Crowd's slot averaged 78.7k cycles (12.3 %).
 // Its worst block was 94.97k (14.8 %) in the lower run and 101.0k in the other. The tracker ran in
 // Octave's slot, which cost 47.5k (7.4 %), so this row holds the card without the tracker. The host
@@ -112,7 +119,7 @@ constexpr Cost kCrowd{13, 16, true};  // 78.7k / 99.6k to 101.6k, board 2026-11-
 // run's figure replaces it.
 constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
 constexpr Cost kLofi{2, 2, false};     // est.: five biquads, the tanh and the crush, about 80 cycles a sample (0.8 %), rounded up for a block that moves a knob, which also ramps 25 coefficients a sample (about 30 cycles more); the host has no bench of it
-constexpr Cost kBloom{5, 6, false};    // est. from the host bench of 2026-11-01 after the CPU pass (bench_chatter and blocks, -O2, minimum of 7 runs, median of 7 interleaved passes, 50.4k board cycles per host us). Adam's clip through the Input gate at -55 dBFS: Apple clang 17 reads 7.80 ns a sample, 25.2k cycles, 3.9 %; g++ 15, the firmware's compiler family, 8.21 ns, 26.5k, 4.1 %, which rounds up to 5. Echo benches 8.06 ns and 8.27 ns, against 26.3k on the board. The busiest block reads 10.42 ns on clang, 33.6k, 5.3 %, which rounds up to 6. A stutter of 60 ms words at AMOUNT 100 % reads 11.1 ns, 5.6 %, which the mean does not carry
+constexpr Cost kBloom{3, 5, false};    // est. from the host bench of 2026-11-02 after the voice-major rewrite (bench_chatter and blocks, -O2, minimum of 12 runs, median of 5 interleaved passes, 50.4k board cycles per host us). Adam's clip through the Input gate at -55 dBFS: Apple clang 17 reads 5.36 ns a sample, 17.3k cycles, 2.7 %; g++ 15, the firmware's compiler family, 5.07 ns, 16.4k, 2.6 %; the higher rounds up to 3. Echo benches 7.83 ns and 8.13 ns in the same run, against 26.3k on the board. The busiest block reads 9.11 ns on clang, 29.4k, 4.6 %, and 8.47 ns on g++, which rounds up to 5. A stutter of 60 ms words at AMOUNT 100 % reads 9.54 ns on clang, 4.8 %, which the mean does not carry
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.
@@ -124,11 +131,5 @@ constexpr Cost kFixed = kOutputEq + kPolishComp + kSoftCeiling + kBypassMix;
 
 constexpr uint8_t kBudgetAvgPercent = 75;
 constexpr uint8_t kBudgetWorstPercent = 95;
-
-// The lines layoutValid holds a layout to. They start at the budget and the firmware never writes them.
-// Since the speed pass of the reverbs no layout the box can build reaches the budget, so a host test
-// lowers them to put a layout on a line and exercise a refusal.
-inline uint8_t gLineAvgPercent = kBudgetAvgPercent;
-inline uint8_t gLineWorstPercent = kBudgetWorstPercent;
 
 }  // namespace costs

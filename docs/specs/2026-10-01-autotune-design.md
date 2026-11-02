@@ -20,7 +20,9 @@ of 2026-11-01. The log at the end records how it got there and what went.
    with one hold. After the first pick (after reset or a KEY change) the last note stands until the
    sung pitch sits 0.15 st (`kHoldSemis`) past the halfway point to the next one, so a pitch near the
    halfway point holds one note instead of trilling between two (trills on Adam's clips 8 → 1,
-   correctness pass). Correction c = target − sung in semitones, continuous, through a one-pole with
+   correctness pass). A vibrato wider than ±15 cents centred on the halfway point still flips
+   between the two notes, about 12 times a second at MECHANICAL. Owner 2026-11-02 left it: the
+   cure picks the note from a slower pitch and makes every new note land about 50 ms late. Correction c = target − sung in semitones, continuous, through a one-pole with
    time constant RESPONSE. It starts from 0 after a reset and always glides at RESPONSE, so the first
    note after a switch-on glides in instead of landing corrected.
 4. The pitch the target follows is `PitchResult::rawHz`, the newest frame, while it sits within a

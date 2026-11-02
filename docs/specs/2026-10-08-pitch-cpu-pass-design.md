@@ -30,7 +30,10 @@ stage spends 40k per block doing nothing.
 2. The tracker's input rings and decimation low-pass fill always (about 12 ops per
    sample). Analysis runs only while a consumer is on. Consumers: Autotune, Harmony,
    Octave A or B. Octave C needs no tracker, so the default layout runs the tracker
-   only while Autotune is on. Enable is instant because the frame is already full.
+   only while Autotune is on. The rings are warm only while the stage runs: with every pitch
+   card off the chain skips the stage and resets it on the first fade-in block
+   (`core/chain_run.cpp`), so Autotune switched on alone starts from an empty ring and its
+   first voiced frame lands 32 ms later (8 ms when another pitch card kept the stage running).
 3. All pitch cards off and crossfades settled: `process` copies in to out and writes
    only the shared input ring and the tracker buffers. The three per-engine low-pass
    rings fill only while the engine that reads them is selected (menu action; the

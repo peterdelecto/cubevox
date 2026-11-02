@@ -123,11 +123,6 @@ static_assert(kVoicesMob == kCopies + 1, "VOICES runs 0 to kCopies, then MOB");
 // tuned 1, raised 5, and so on.
 constexpr size_t entryCopy(size_t j) { return (j - 1) / 2 + ((j - 1) % 2) * kVoices; }
 
-// The grain voice, its read-delay ceiling and the lag clamp live in formant_voice.h.
-using formant_detail::FormantPsolaVoice;
-using formant_detail::clampLag;
-using formant_detail::kDelayCeil;
-
 constexpr int kQuietBlocks = 2;        // blocks under the gap floor before a copy changes its lag
 constexpr float kDriftSlewS = 1.0f;    // time constant of the drift toward its target
 constexpr float kMinDriftHoldS = 0.05f;
@@ -183,7 +178,7 @@ constexpr int kPlainAfterMax = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate
 
 inline int plainAfter(float capMs) { return static_cast<int>((capMs + static_cast<float>(kCrowdScatterMs)) * kSmpPerMs); }
 
-static_assert(static_cast<float>(kCrowdMaxLagMs + kCrowdScatterMs) * kSmpPerMs <= kDelayCeil,
+static_assert(static_cast<float>(kCrowdMaxLagMs + kCrowdScatterMs) * kSmpPerMs <= formant_detail::kDelayCeil,
               "the longest lag, its scatter and the longest grain do not fit the ring");
 
 // The factor DIVERGE puts on a copy's pitch and formant offsets. It is linear from (0, 0) to
@@ -377,7 +372,7 @@ class CopyLag {
   // 0. True when the lag landed on a new value, so the voice restarts its marks there.
   bool settle(const BlockView& b, float base, float scatterSmp, float period, bool rollLevel) {
     heard_ = -1.0f;
-    const float want = clampLag(base + offset_ * scatterSmp, period);
+    const float want = formant_detail::clampLag(base + offset_ * scatterSmp, period);
     if (!set_) return land(base, want, rollLevel);
     const bool moved = base != base_;
     if (!moved && scatterSmp <= 0.0f && !rollLevel) {
@@ -385,7 +380,7 @@ class CopyLag {
       landed_ = false;
       return false;
     }
-    const float sum = b.sumSqAt(clampLag(lag_, period));
+    const float sum = b.sumSqAt(formant_detail::clampLag(lag_, period));
     heard_ = sum;
     const float quiet = b.quietSq * static_cast<float>(b.n);
     const bool here = sum < quiet;
@@ -604,7 +599,7 @@ class Crowd {
   float moveShare(size_t v) const { return keep_[v / kVoices]; }
 
  private:
-  using FormantPsolaVoice = crowd_detail::FormantPsolaVoice;
+  using FormantPsolaVoice = formant_detail::FormantPsolaVoice;
   static constexpr size_t kVoices = crowd_detail::kVoices;  // the tuned copies
   static constexpr size_t kCopies = crowd_detail::kCopies;  // copy v + kVoices is tuned copy v raised
   static constexpr float kShelfFloor = 1e-20f;  // a shared shelf state under this is silence, 400 dB down

@@ -103,8 +103,8 @@ LayoutCheck layoutValid(const Layout& layout) {
 #ifndef CUBEVOX_CROWDTEST
   // The test image places Crowd past the budget lines on purpose.
   const LayoutCost cost = layoutCost(layout);
-  if (cost.avg > costs::gLineAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, cost.avg);
-  if (cost.worst > costs::gLineWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, cost.worst);
+  if (cost.avg > costs::kBudgetAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, cost.avg);
+  if (cost.worst > costs::kBudgetWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, cost.worst);
 #endif
   return LayoutCheck();
 }
