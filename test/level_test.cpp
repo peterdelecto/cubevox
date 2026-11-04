@@ -168,6 +168,16 @@ cv::GateParams inputGate() {
   return chain.inputGate;
 }
 
+// The Gate as the box sets it, both pots at mid travel (-40 dBFS, 70.7 ms).
+cv::GateParams gateCard() {
+  ChainParams chain;
+  applyKnob(Card::Gate, 0, 0.5f, chain);
+  applyKnob(Card::Gate, 1, 0.5f, chain);
+  cv::GateParams p = chain.gate;
+  p.on = true;
+  return p;
+}
+
 cv::PitchFxParams pitchOff() {
   cv::PitchFxParams p;
   p.octave.on = false;
@@ -721,13 +731,33 @@ bool distortionRows(const Signal& program) {
   return ok;
 }
 
+// Both gates at their pots' middle on Adam's clips. The synthetic program carries a -40 dBFS noise floor
+// that keeps both gates open, so it cannot show a gate's level; on the clips both close on 8 to 23 % of
+// their blocks. Each clip is held to the rule with its slack.
+bool gateRows() {
+  bool ok = true;
+  const struct {
+    const char* label;
+    cv::GateParams params;
+  } cards[] = {{"input gate -55", inputGate()}, {"gate -40", gateCard()}};
+  for (const auto& card : cards) {
+    double mean = 0.0;
+    int count = 0;
+    ok &= clipRows(
+        card.label,
+        [&](const Signal& padded) {
+          auto s = std::make_unique<Stage<cv::Gate>>();
+          return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, card.params); })};
+        },
+        kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
+  }
+  return ok;
+}
+
 // The slot stages at their default engaged settings.
 bool slotRows(const Signal& in) {
   bool ok = true;
-  ok &= simple<cv::Gate>("input gate -55", in, inputGate());
-  cv::GateParams panelGate;
-  panelGate.thresholdDb = -40.0f;
-  ok &= simple<cv::Gate>("panel gate -40", in, panelGate);
+  ok &= gateRows();
 
   cv::PitchFxParams autotune = pitchOff();
   autotune.autotune.on = true;

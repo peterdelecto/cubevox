@@ -288,6 +288,118 @@ bool distortionEdgeRows(const Signal& in) {
   return ok;
 }
 
+// The gates. A gate that sits open at unity shows nothing, so each gate row runs a short program that
+// leaves the gain moving at the step, and reads the applied gain rather than the tone: a gate closing
+// is an event with a kink in its gain, and the kink would swamp a click in a curvature ratio. A click
+// is a jump of the gain, and the gain obeys a one-pole law, so a sample of the gain's second difference
+// past the largest slope change the law allows (the range times the release coefficient) is a jump.
+// The tone sits at one level throughout.
+//   Input gate Threshold: just inside the hysteresis, where the gate sits open. The step raises the
+//     threshold past the close level and the gain falls through the window after it.
+//   Threshold of the Gate: 3 dB under the close level, inside the soft knee. The hold has run out and
+//     the release is under way, and the step moves its target.
+//   Decay of both: 3 dB under the close level, with the release under way at the step.
+constexpr double kGateAfterMs = 150.0;
+constexpr double kGateLeadInMs = 60.0;
+constexpr double kReleaseUnderwayMs = 12.0;
+
+struct GateProgram {
+  Signal in;
+  int stepAt;
+};
+
+const cv::GateParams& gateOf(Card c, const ChainParams& p) { return c == Card::InputGate ? p.inputGate : p.gate; }
+
+// The first sample at or past `from` where the gain has left 0 dB by more than 0.01 dB, or -1.
+int releaseStart(Card c, const Signal& in, const ChainParams& p, int from) {
+  cv::Gate gate;
+  gate.reset();
+  for (size_t i = 0; i < in.size(); ++i) {
+    float y = 0.0f;
+    gate.process(&in[i], &y, 1, gateOf(c, p));
+    if (static_cast<int>(i) >= from && gate.gainDb() < -0.01f) return static_cast<int>(i);
+  }
+  return -1;
+}
+
+GateProgram gateProgram(Card c, int knob, const Step& s, const ChainParams& base, const ChainParams& a) {
+  const cv::GateParams& g = gateOf(c, base);
+  const double hysteresis = static_cast<double>(g.tuning.hysteresisDb);
+  const double thr = knob == 0 ? static_cast<double>(knobValue(*knobDesc(c, 0), s.from)) : static_cast<double>(g.thresholdDb);
+  const bool closesAtStep = c == Card::InputGate && knob == 0;
+  const double toneDb = closesAtStep ? thr - 0.97 * hysteresis : thr - hysteresis - 3.0;
+  const int leadIn = static_cast<int>(kGateLeadInMs * cv::kSmpPerMs);
+  const int length = static_cast<int>(5000.0 * cv::kSmpPerMs);
+  Signal in(static_cast<size_t>(length));
+  for (int i = 0; i < length; ++i) {
+    const double amp = std::pow(10.0, (i < leadIn ? thr + 10.0 : toneDb) / 20.0);
+    in[static_cast<size_t>(i)] = static_cast<float>(amp * std::sin(2.0 * kPi * kToneHz * i / cv::kSampleRate));
+  }
+  const int stepFrom = closesAtStep ? leadIn + static_cast<int>(100.0 * cv::kSmpPerMs)
+                                    : releaseStart(c, in, a, leadIn) + static_cast<int>(kReleaseUnderwayMs * cv::kSmpPerMs);
+  const int stepAt = stepFrom / cv::kBlock * cv::kBlock;
+  in.resize(static_cast<size_t>(stepAt + static_cast<int>(kGateAfterMs * cv::kSmpPerMs)));
+  return {in, stepAt};
+}
+
+// The release coefficient of a gate's tuning: the time constant is the travel time over ln(range / 1 dB).
+double releaseCoef(const cv::GateParams& g) {
+  const double range = static_cast<double>(g.tuning.rangeDb);
+  return static_cast<double>(cv::smooth::coef(g.tuning.releaseMs / 1000.0f / static_cast<float>(std::log(-range))));
+}
+
+struct GateRead {
+  double peakStep;    // largest change of the gain in one sample over the window, dB
+  double peakCurve;   // largest second difference of the gain over the window, dB
+  double bound;       // the largest second difference the one-pole law allows, dB
+};
+
+GateRead readGateStep(Card c, const GateProgram& prog, const ChainParams& a, const ChainParams& b) {
+  cv::Gate gate;
+  gate.reset();
+  const auto params = [&](const ChainParams& p) -> const cv::GateParams& { return gateOf(c, p); };
+  std::vector<double> gain(prog.in.size());
+  for (size_t i = 0; i < prog.in.size(); ++i) {
+    float y = 0.0f;
+    gate.process(&prog.in[i], &y, 1, params(static_cast<int>(i) < prog.stepAt ? a : b));
+    gain[i] = static_cast<double>(gate.gainDb());
+  }
+  GateRead r{0.0, 0.0, 0.0};
+  for (size_t i = static_cast<size_t>(prog.stepAt); i < gain.size(); ++i) {
+    r.peakStep = std::max(r.peakStep, std::fabs(gain[i] - gain[i - 1]));
+    r.peakCurve = std::max(r.peakCurve, std::fabs(gain[i] - 2.0 * gain[i - 1] + gain[i - 2]));
+  }
+  const double range = -static_cast<double>(params(a).tuning.rangeDb);
+  r.bound = 1.05 * range * std::max(releaseCoef(params(a)), releaseCoef(params(b))) + 1e-4;
+  return r;
+}
+
+bool checkGateKnob(Card c, int knob) {
+  const ChainParams base = background(c);
+  double worst = 0.0;
+  GateRead shown{};
+  Step at{};
+  bool moved = true;
+  for (const Step& s : stepsFor(c, knob)) {
+    ChainParams a = base;
+    ChainParams b = base;
+    applyKnob(c, knob, s.from, a);
+    applyKnob(c, knob, s.to, b);
+    const GateRead r = readGateStep(c, gateProgram(c, knob, s, base, a), a, b);
+    moved = moved && r.peakStep > 0.001;
+    if (r.peakCurve / r.bound >= worst) {
+      worst = r.peakCurve / r.bound;
+      shown = r;
+      at = s;
+    }
+  }
+  const bool ok = worst <= 1.0 && moved;
+  std::printf("%s %-14s %-10s worst step %.3g to %.3g: the gain moves up to %.3f dB a sample through the step and bends at most %.4f dB (law allows %.4f)\n",
+              ok ? "PASS" : "FAIL", cardDesc(c).name, cardDesc(c).knob[knob].name, static_cast<double>(at.from),
+              static_cast<double>(at.to), shown.peakStep, shown.peakCurve, shown.bound);
+  return ok;
+}
+
 // KEY moves the target note, and a grain is two periods, so a low voice is the harder case for the
 // glide. Adam sings from 78 Hz, and the KEY gate also runs on sines at 98 Hz, 82 Hz and 74.5 Hz.
 constexpr double kLowTones[] = {98.0, 82.0, 74.5};
@@ -300,7 +412,8 @@ int main() {
     const Card c = static_cast<Card>(i);
     if (engineOf(c) == Engine::Growl) continue;
     const Signal in = tone(kToneHz);
-    for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= checkKnob(c, k, in);
+    const bool gate = engineOf(c) == Engine::InputGate || engineOf(c) == Engine::Gate;
+    for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= gate ? checkGateKnob(c, k) : checkKnob(c, k, in);
     if (c == Card::Autotune) {
       for (double hz : kLowTones) ok &= checkKnob(c, 0, tone(hz), hz);
     }

@@ -11,10 +11,6 @@
 
 namespace {
 
-constexpr float kGateThresholdMinDb = -70.0f;
-constexpr float kGateThresholdMaxDb = -10.0f;
-constexpr float kGateDecayMinMs = 5.0f;
-constexpr float kGateDecayMaxMs = 1000.0f;
 constexpr int kKeyPositions = cv::kKeyCount;
 constexpr int kSemitoneMin = -cv::OctaveVoice::kMaxSemis;
 constexpr int kSemitoneMax = cv::OctaveVoice::kMaxSemis;
@@ -26,14 +22,16 @@ constexpr int kFormantShiftPositions = kFormantShiftMax - kFormantShiftMin + 1;
 
 constexpr KnobDesc kNoKnob = {"", KnobKind::Continuous, 0, 0.0f, 0.0f, ""};
 constexpr KnobDesc kPercent(const char* name) { return {name, KnobKind::Continuous, 0, 0.0f, 100.0f, "%"}; }
-constexpr KnobDesc kThreshold = {"Threshold", KnobKind::Continuous, 0, kGateThresholdMinDb, kGateThresholdMaxDb, "dB"};
+constexpr KnobDesc kThreshold = {"Threshold", KnobKind::Continuous, 0, cv::kGateThresholdMinDb, cv::kGateThresholdMaxDb,
+                                 "dB"};
 constexpr KnobDesc kInputThreshold = {"Threshold", KnobKind::Continuous, 0, cv::kInputGateThresholdMinDb,
                                       cv::kInputGateThresholdMaxDb, "dB"};
 constexpr KnobDesc kInputDecay = {"Decay", KnobKind::Continuous, 0, cv::kInputGateDecayMinMs,
                                   cv::kInputGateDecayMaxMs, "ms", Curve::Log};
 constexpr KnobDesc kSlapbackTime = {"Time", KnobKind::Continuous, 0, cv::Slapback::kTimeMinMs,
                                     cv::Slapback::kTimeMaxMs, "ms"};
-constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, kGateDecayMaxMs, "ms", Curve::Log};
+constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, cv::kGateDecayMinMs, cv::kGateDecayMaxMs, "ms",
+                             Curve::Log};
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
@@ -103,8 +101,8 @@ int stepIndex(const KnobDesc& k, float v) {
   return static_cast<int>(v);
 }
 
-// GateParams carries two knobs per stage, so the input gate and the second gate share one setter
-// and bring their own ranges.
+// GateParams carries two knobs per stage, so the Input gate and the Gate share one setter and bring
+// their own ranges.
 void applyGateKnob(int knob, float v, cv::GateParams& g, const KnobDesc& threshold, const KnobDesc& decay) {
   if (knob == 0) {
     g.thresholdDb = knobValue(threshold, v);

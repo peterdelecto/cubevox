@@ -8,6 +8,11 @@ namespace {
 
 constexpr uint32_t kBypassStep = kBypassFull / (kFadeMs * cv::kSampleRate / 1000);
 
+// A gate's own on/off fade ends inside the slot fade, so a switched-off gate is a plain copy by the
+// time the slot passes the engine's output alone.
+static_assert(cv::kGateFadeMs * cv::kSmpPerMs <= static_cast<float>(kSlotFadeBlocks * cv::kBlock),
+              "the gate's off fade outlasts the slot fade");
+
 // One step toward `goal`, never past it.
 uint32_t stepPhase(uint32_t phase, uint32_t goal) {
   if (phase < goal) return goal - phase < kBypassStep ? goal : phase + kBypassStep;

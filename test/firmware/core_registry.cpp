@@ -272,15 +272,26 @@ void checkChainDefaults() {
   const cv::GateTuning& t = p.inputGate.tuning;
   check(p.inputGate.on && std::fabs(p.inputGate.thresholdDb - (-55.0f)) < 1e-6f &&
             std::fabs(t.rangeDb - (-80.0f)) < 1e-6f && t.kneeDb == 0.0f &&
-            std::fabs(t.holdMs - 50.0f) < 1e-6f && std::fabs(t.hysteresisDb - 3.0f) < 1e-6f &&
+            std::fabs(t.holdMs - 30.0f) < 1e-6f && std::fabs(t.hysteresisDb - 3.0f) < 1e-6f &&
             std::fabs(t.attackMs - 0.5f) < 1e-6f && std::fabs(t.releaseMs - 200.0f) < 1e-6f &&
             std::fabs(t.detectorAttackMs - 0.1f) < 1e-6f && std::fabs(t.detectorReleaseMs - 5.0f) < 1e-6f &&
-            t.detectorHpHz == 0.0f && t.travelTimes,
-        "defaults: input gate on with the hard -80 dB range, 3 dB hysteresis and 50 ms hold");
+            t.detectorHpHz == 0.0f,
+        "defaults: input gate on with the hard -80 dB range, 3 dB hysteresis and 30 ms hold");
   const cv::GateTuning& g = p.gate.tuning;
-  check(g.kneeDb == cv::GateTuning{}.kneeDb && g.detectorAttackMs == 0.0f && g.detectorReleaseMs == 20.0f &&
-            g.detectorHpHz == 120.0f && !g.travelTimes,
-        "defaults: the panel gate keeps its soft-knee tuning");
+  check(g.kneeDb == 12.0f && g.rangeDb == -40.0f && g.hysteresisDb == 6.0f && g.holdMs == 150.0f &&
+            g.detectorAttackMs == 0.0f && g.detectorReleaseMs == 20.0f && g.detectorHpHz == 120.0f &&
+            t.rangeDb != g.rangeDb,
+        "defaults: the Gate keeps its soft-knee tuning");
+
+  // Both cards start at the middle of their pots.
+  const ChainParams mid = [] {
+    ChainParams m;
+    applyKnob(Card::Gate, 0, 0.5f, m);
+    applyKnob(Card::Gate, 1, 0.5f, m);
+    return m;
+  }();
+  check(p.gate.thresholdDb == mid.gate.thresholdDb && std::fabs(g.releaseMs - mid.gate.tuning.releaseMs) < 1e-4f,
+        "defaults: the Gate starts at its pots' middle, -40 dB and 70.7 ms");
   check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
             !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.crowd.on && !p.pitchFx.crowdOn,
         "defaults: every other stage off");
