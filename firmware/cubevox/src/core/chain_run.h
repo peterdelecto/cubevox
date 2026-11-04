@@ -19,6 +19,7 @@ struct ChainEngines {
   ChainEngines(cv::PitchFx& pitchFx, cv::Distortion& distortionFx) : pitch(pitchFx), distortion(distortionFx) {}
 
   cv::PitchFx& pitch;
+  cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each pitch call while its card is placed
   cv::Gate inputGate;
   cv::Unison unison;
   cv::Slapback slapback;
@@ -46,7 +47,7 @@ struct ChainEngines {
 void captureBloomSource(ChainEngines& engines, const float* block, int n);
 
 // Where the Chatter card's slices come from: the slot whose output is copied, and whether the layout
-// places an Autotune, Octave or Formant card. The slot is the last one holding such a card, or slot 1
+// places an Autotune, Octave or Formant card or the Formant follower. The slot is the last one holding such a card, or slot 1
 // when the layout has none. It is -1 when the layout places no Chatter card or places it at or ahead of
 // that slot, and the card then cuts from its own input.
 struct BloomTap {
@@ -55,7 +56,8 @@ struct BloomTap {
 };
 BloomTap bloomTap(const Layout& layout);
 
-// Clears the state of engine `e`. Empty (kNoEngine) clears nothing.
+// Clears the state of engine `e`. Empty (kNoEngine) clears nothing. The pitch engine's reset clears
+// the Formant follower's envelope too.
 void resetEngine(ChainEngines& engines, Engine e);
 
 // Holds the cycles each stage of one pass took, with one entry per slot and then one each for
@@ -68,8 +70,10 @@ struct ChainCycles {
 
 // Runs the engine of card `c` over `n` samples from `in` into `out`. Returns false when it wrote
 // nothing (an Empty slot, or an Autotune, Octave or Formant card after the pitch stage ran), so the
-// caller keeps its buffers. Autotune, Octave, Formant and the Crowd card share one PitchFx call,
-// made at the first pitch-group card's slot; `pitchDone` carries that across the slots of a pass.
+// caller keeps its buffers. Autotune, Octave, Formant, the Formant follower and the Crowd card share
+// one PitchFx call, made at the first pitch-group card's slot; `pitchDone` carries that across the
+// slots of a pass. With the Formant follower placed, the call takes the Formant voice's SHIFT from
+// the follower's envelope of the call's input.
 // A Crowd card that makes that call runs its own engine on the pitch stage's output, which is its
 // lead, and so does a Growl card. A Chatter card keys on the Input gate's detector when the layout places that card
 // (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when it runs.

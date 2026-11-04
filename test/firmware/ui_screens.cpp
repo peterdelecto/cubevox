@@ -1698,11 +1698,11 @@ void checkReadoutTitleBar() {
   check(margins, "title bar: every title of the default layout keeps at least 1 px of bar on both sides");
   check(toggleSame, "title bar: a toggle readout, ON or OFF, carries the same bar and title as the knob readout of its slot");
 
-  // Any card in any slot fits between the pad on both sides.
+  // Any card in any slot fits between the pad on both sides, under the name the readout shows for it.
   bool allFit = true;
   for (int index = 1; index < kCardCount; ++index) {
     for (int slot = 0; slot < kSlotCount; ++slot) {
-      const std::string title = std::to_string(slot + 1) + " " + capitals(cardDesc(card(index)).name);
+      const std::string title = std::to_string(slot + 1) + " " + capitals(oledName(card(index)));
       allFit = allFit && Canvas::textWidth(font7x12(), title.c_str()) <= kCanvasWidth - 2 * kScreenPad;
     }
   }

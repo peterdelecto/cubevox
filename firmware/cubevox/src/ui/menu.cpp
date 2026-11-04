@@ -115,17 +115,27 @@ const char* reverbValue(const Layout& layout) {
   return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
 }
 
-// The card the Octave and Formant slot holds. A layout with neither reads OCTAVE, the default.
+// The card the slot 3 row holds. A layout with none of the three reads OCTAVE, the default.
 const char* octaveFormantValue(const Layout& layout) {
   const int slot = octaveFormantSlot(layout);
-  return slot >= 0 && layout.card[slot] == Card::Formant ? "FORMANT" : "OCTAVE";
+  if (slot < 0) return "OCTAVE";
+  switch (layout.card[slot]) {
+    case Card::Formant: return "FORMANT";
+    case Card::FormantFollower: return "FOLLOWER";
+    default: return "OCTAVE";
+  }
 }
 
-// The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with neither
-// reads UNISON, the default.
+// The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with none of
+// the three reads UNISON, the default.
 const char* unisonCrowdValue(const Layout& layout) {
   const int slot = unisonCrowdSlot(layout);
-  return slot >= 0 && layout.card[slot] == Card::Crowd ? "MOB" : "UNISON";
+  if (slot < 0) return "UNISON";
+  switch (layout.card[slot]) {
+    case Card::Crowd: return "MOB";
+    case Card::Crowd2: return "MOB 2";
+    default: return "UNISON";
+  }
 }
 
 // The card the Distortion and Growl slot holds. A layout with neither reads DISTORTION, the default.

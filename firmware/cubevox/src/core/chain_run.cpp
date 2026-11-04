@@ -40,7 +40,7 @@ bool pitchGroupOn(const ChainSnapshot& snap) {
 void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
   if (!pitchDone) {
     pitchDone = true;
-    engines.pitch.process(in, out, n, p.pitchFx);
+    engines.pitch.process(in, out, n, engines.follower.follow(in, n, p.pitchFx, p.follower));
     in = out;
 
     // The Chatter card cuts from the stage's output, not from the voices Crowd adds to it.
@@ -69,7 +69,9 @@ void runBloom(ChainEngines& engines, const float* in, float* out, int n, const C
   engines.bloom.process(in, src, out, n, p.bloom, engines.inputGate.open());
 }
 
-bool holdsPitchStage(Card c) { return c == Card::Autotune || c == Card::Octave || c == Card::Formant; }
+bool holdsPitchStage(Card c) {
+  return c == Card::Autotune || c == Card::Octave || c == Card::Formant || c == Card::FormantFollower;
+}
 
 }  // namespace
 
@@ -94,7 +96,10 @@ BloomTap bloomTap(const Layout& layout) {
 void resetEngine(ChainEngines& engines, Engine e) {
   switch (e) {
     case Engine::InputGate: engines.inputGate.reset(); break;
-    case Engine::Pitch: engines.pitch.reset(); break;
+    case Engine::Pitch:
+      engines.pitch.reset();
+      engines.follower.reset();
+      break;
     case Engine::Unison: engines.unison.reset(); break;
     case Engine::Slapback: engines.slapback.reset(); break;
     case Engine::Distortion: engines.distortion.reset(); break;
@@ -115,7 +120,7 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Pitch:
       if (pitchDone) return false;
       pitchDone = true;
-      engines.pitch.process(in, out, n, p.pitchFx);
+      engines.pitch.process(in, out, n, engines.follower.follow(in, n, p.pitchFx, p.follower));
       return true;
     case Engine::Unison: engines.unison.process(in, out, n, p.unison); return true;
     case Engine::Slapback: engines.slapback.process(in, out, n, p.slapback); return true;

@@ -6,6 +6,7 @@
 #include "engine/bloom.h"
 #include "engine/crowd.h"
 #include "engine/distortion.h"
+#include "engine/formant_follower.h"
 #include "engine/gate.h"
 #include "engine/growl.h"
 #include "engine/lofi.h"
@@ -19,6 +20,7 @@
 struct ChainParams {
   cv::GateParams inputGate;
   cv::PitchFxParams pitchFx;  // Autotune, Octave and the Formant card (pitchFx.formant)
+  cv::FormantFollowerParams follower;  // placing the Formant follower hands pitchFx.formant's SHIFT to its envelope
   cv::CrowdParams crowd;      // its toggle also sets pitchFx.crowdOn
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;

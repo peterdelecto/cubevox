@@ -226,6 +226,32 @@ void checkSlot3Costs() {
   check(swapped(octaveLight, formantLight), "slot 3 cost: Formant in Octave's place in the default layout sums to its rows");
   check(swapped(octaveHeavy, formantHeavy), "slot 3 cost: Formant with MOB and Chasm sums to its rows");
   check(layoutValid(formantLight).ok() && layoutValid(formantHeavy).ok(), "slot 3 cost: Formant is accepted in both layouts");
+
+  // The Formant follower pays its own row, the tracker and the stage term as Formant does.
+  Layout followerLight = formantLight;
+  followerLight.card[2] = Card::FormantFollower;
+  Layout followerHeavy = formantHeavy;
+  followerHeavy.card[2] = Card::FormantFollower;
+  const auto followed = [](const Layout& formant, const Layout& follower) {
+    const LayoutCost f = layoutCost(formant);
+    const LayoutCost w = layoutCost(follower);
+    return w.avg == f.avg - costs::kFormant.avg + costs::kFormantFollower.avg &&
+           w.worst == f.worst - costs::kFormant.worst + costs::kFormantFollower.worst;
+  };
+  check(followed(formantLight, followerLight) && followed(formantHeavy, followerHeavy),
+        "slot 3 cost: the Formant follower in Formant's place sums to its rows in both layouts");
+  check(layoutValid(followerLight).ok() && layoutValid(followerHeavy).ok(),
+        "slot 3 cost: the Formant follower is accepted in both layouts");
+  Layout followerAlone = withoutPitchCards();
+  followerAlone.card[2] = Card::FormantFollower;
+  paysFor(followerAlone, true, true, "pitch stage cost: the Formant follower without Autotune pays the tracker and the stage");
+
+  // Formant and the follower play one voice, so a layout holds one of them at most.
+  Layout bothVoices = followerLight;
+  bothVoices.card[6] = Card::Formant;
+  const LayoutCheck twice = layoutValid(bothVoices);
+  check(twice.error == LayoutError::SameCardTwice && twice.slot == 6 && twice.card == Card::Formant,
+        "slot 3 cost: Formant beside the Formant follower is refused as the same card twice");
 }
 
 // The sums with each slot 7 card in the default layout and in MOB with Chasm, the heaviest layout the
@@ -392,6 +418,14 @@ void checkComposeSlot3Formant() {
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.pitchFx.octave.on && !snap.params.pitchFx.formant.on,
         "compose: Octave back in slot 3 sets octave.on and leaves Formant off");
+  check(!snap.params.follower.placed, "compose: with Octave in slot 3 no envelope drives SHIFT");
+
+  layout.card[2] = Card::FormantFollower;
+  panel.knob[2] = {0.75f, 0.6f};
+  snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
+  check(snap.params.follower.placed && snap.params.pitchFx.formant.on && !snap.params.pitchFx.octave.on &&
+            std::fabs(snap.params.follower.depthSt - 3.5f) < 1e-5f && std::fabs(snap.params.pitchFx.formant.mix - 0.6f) < 1e-6f,
+        "compose: the Formant follower in slot 3 reads DEPTH and MIX from slot 3's pots and drives the Formant voice");
 }
 
 // Each slot 7 card reads its knobs and toggle from slot 7's pots, and the Chatter card's word key
@@ -645,11 +679,15 @@ void checkSwapUnisonCrowd() {
   Layout sparseCrowd = sparse;
   sparseCrowd.card[3] = Card::Crowd;
   check(layoutValid(sparse).ok() && layoutValid(sparseCrowd).ok(), "action: the sparse layouts pass the placement rules");
+  Layout sparseMob2 = sparse;
+  sparseMob2.card[3] = Card::Crowd2;
   Layout swap = sparse;
   check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparseCrowd,
         "action: SwapUnisonCrowd turns Unison into Crowd in its slot and touches no other slot");
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparseMob2,
+        "action: then turns Crowd into Mob 2");
   check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparse,
-        "action: and turns Crowd back into Unison");
+        "action: and turns Mob 2 back into Unison");
 
   Layout moved = sparse;  // the card in slot 6
   moved.card[3] = Card::Empty;
@@ -664,12 +702,31 @@ void checkSwapUnisonCrowd() {
   check(ui::applyAction(UiAction::SwapUnisonCrowd, s, neither) == ui::ApplyResult::None && neither == neitherBefore,
         "action: SwapUnisonCrowd changes nothing when no slot holds either card");
 
+  // Crowd in slot 2 ahead of Unison: the cycle passes over Unison, which would repeat.
   Layout both = sparse;
   both.card[1] = Card::Crowd;
   const Layout bothBefore = both;
-  check(layoutValid(both).ok() && ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::None &&
-            both == bothBefore,
-        "action: SwapUnisonCrowd changes nothing when the other card would repeat");
+  check(layoutValid(both).ok() && ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::LayoutChanged &&
+            both.card[1] == Card::Crowd2 && both.card[3] == Card::Unison,
+        "action: SwapUnisonCrowd passes over a card that would repeat");
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::LayoutChanged && both == bothBefore,
+        "action: and comes back to Crowd");
+
+  // Unison in slot 4 with Mob 2 in slot 6: Crowd would join a second Mob card and Mob 2 would repeat.
+  Layout mob2Placed = sparse;
+  mob2Placed.card[5] = Card::Crowd2;
+  const Layout mob2Before = mob2Placed;
+  check(layoutValid(mob2Placed).ok() &&
+            ui::applyAction(UiAction::SwapUnisonCrowd, s, mob2Placed) == ui::ApplyResult::None && mob2Placed == mob2Before,
+        "action: SwapUnisonCrowd changes nothing when both other cards are refused");
+  Layout twoMobs = sparse;
+  twoMobs.card[3] = Card::Crowd;
+  twoMobs.card[5] = Card::Crowd2;
+  check(layoutValid(twoMobs).error == LayoutError::TwoMobs, "layoutValid: Mob and Mob 2 together are refused");
+  Layout mob2Default = defaultLayout();
+  mob2Default.card[3] = Card::Crowd2;
+  check(layoutValid(mob2Default).ok() && unisonCrowdSlot(mob2Default) == 3,
+        "layoutValid: the default layout with Mob 2 in slot 4 is accepted, and slot 4 is the Unison and Crowd slot");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack && s.polishComp == before.polishComp &&
             s.polishEq == before.polishEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
@@ -687,21 +744,28 @@ void checkOctaveFormantSlot() {
   check(octaveFormantSlot(layout) == 5, "octaveFormantSlot: the slot that holds it, wherever it is");
   layout.card[1] = Card::Octave;
   check(octaveFormantSlot(layout) == 1, "octaveFormantSlot: the first slot when both are placed");
+  layout.card[0] = Card::FormantFollower;
+  check(octaveFormantSlot(layout) == 0, "octaveFormantSlot: the Formant follower counts as well");
 }
 
 void checkSwapOctaveFormant() {
   Settings s;
   const Settings before = s;
 
-  // The default layout has room for either card, so the swap is taken, and so is the swap back.
+  // The default layout has room for each card, so every step of the cycle is taken.
   Layout layout = defaultLayout();
   Layout formant = layout;
   formant.card[2] = Card::Formant;
-  check(layoutValid(formant).ok(), "action: the default layout with Formant in slot 3 passes the placement rules");
+  Layout follower = layout;
+  follower.card[2] = Card::FormantFollower;
+  check(layoutValid(formant).ok() && layoutValid(follower).ok(),
+        "action: the default layout with Formant or the Formant follower in slot 3 passes the placement rules");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == formant,
         "action: SwapOctaveFormant turns Octave into Formant in its slot and touches no other slot");
+  check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == follower,
+        "action: then Formant into the Formant follower");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == defaultLayout(),
-        "action: and turns Formant back into Octave");
+        "action: and the Formant follower back into Octave");
 
   Layout moved = defaultLayout();  // Octave in slot 6, with Empty in slot 3
   moved.card[2] = Card::Empty;
@@ -718,11 +782,24 @@ void checkSwapOctaveFormant() {
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, neither) == ui::ApplyResult::None && neither == neitherBefore,
         "action: SwapOctaveFormant changes nothing when no slot holds either card");
 
+  // Formant in slot 2 and Octave in slot 3: the finder names slot 2, and the cycle passes over Octave,
+  // which would repeat.
   Layout both = defaultLayout();
   both.card[1] = Card::Formant;
-  const Layout bothBefore = both;
-  check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::None && both == bothBefore,
-        "action: SwapOctaveFormant changes nothing when the other card would repeat");
+  check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::LayoutChanged &&
+            both.card[1] == Card::FormantFollower && both.card[2] == Card::Octave,
+        "action: SwapOctaveFormant turns Formant into the Formant follower beside Octave");
+  check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::LayoutChanged &&
+            both.card[1] == Card::Formant && both.card[2] == Card::Octave,
+        "action: and passes over Octave, which would repeat, back to Formant");
+
+  // Octave in slot 2 and Formant in slot 3: Formant would repeat, and the follower plays Formant's voice.
+  Layout repeat = defaultLayout();
+  repeat.card[1] = Card::Octave;
+  repeat.card[2] = Card::Formant;
+  const Layout repeatBefore = repeat;
+  check(ui::applyAction(UiAction::SwapOctaveFormant, s, repeat) == ui::ApplyResult::None && repeat == repeatBefore,
+        "action: SwapOctaveFormant changes nothing when each other card would repeat");
 
   // A layout the box would not load stays as it is. No layout goes over a CPU line with the stress-run
   // rows, so this one holds two reverb cards, which the swap cannot cure.

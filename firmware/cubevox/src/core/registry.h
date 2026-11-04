@@ -27,6 +27,8 @@ enum class Card : uint8_t {
   Formant,
   Lofi,
   Bloom,
+  Crowd2,  // Mob 2, an audition card on the Crowd engine
+  FormantFollower,
   Growl,
   Count,
 };
@@ -37,9 +39,10 @@ constexpr int kCardCount = static_cast<int>(Card::Count);
 // so the registry keeps every id shorter than it by at least two characters.
 constexpr size_t kCardIdBytes = 16;
 
-// Engines the audio block owns. Cards map onto them: Autotune, Octave and Formant share Pitch, and
-// both reverb cards share Reverb. The Crowd and Growl cards have engines of their own and read the
-// Pitch engine's ring. Count ends the list.
+// Engines the audio block owns. Cards map onto them: Autotune, Octave, Formant and the Formant
+// follower share Pitch, and both reverb cards share Reverb. The Crowd and Growl cards have engines
+// of their own and read the Pitch engine's ring; the Mob 2 card runs the Crowd engine in its Mob 2
+// mode, so a layout holds one of the two. Count ends the list.
 enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, Count };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);
@@ -74,7 +77,11 @@ struct CardDesc {
   KnobDesc knob[kKnobsPerCard];
   Group group;
   costs::Cost cost;   // percent of one audio block, mean and worst, and whether a board measured it; costs.h
+  const char* oledName = nullptr;  // the readout's title when `name` is too wide for it; nullptr uses `name`
 };
+
+// The name the OLED's readout title shows for `c`.
+const char* oledName(Card c);
 
 // The descriptor of `c`; an out-of-range card reads as Empty.
 const CardDesc& cardDesc(Card c);

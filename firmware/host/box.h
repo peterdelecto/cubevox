@@ -82,9 +82,13 @@ class Box {
   void swapDistortionGrowl();
   void swapReverb();
 
-  // The card switch under slot 7. Applies the menu's slot 7 action until the slot holds `card`
-  // (Gate, Lofi or Chatter). When no step of the cycle reaches it, because the box would not load that
+  // The card switches under slots 3, 4, 6 and 7. Each applies its menu action until the slot holds
+  // `card` (Octave, Formant or the Formant follower; Unison, Mob or Mob 2; Distortion or Growl; Gate,
+  // Lofi or Chatter). When no step of the cycle reaches it, because the box would not load that
   // layout, the layout stays as it was.
+  void pickSlot3Card(Card card);
+  void pickSlot4Card(Card card);
+  void pickSlot6Card(Card card);
   void pickSlot7Card(Card card);
 
   const Pixels& pixels() const { return display_.pixels(); }
@@ -98,6 +102,7 @@ class Box {
   const Settings& settings() const { return settings_; }
 
  private:
+  void pickCycledCard(Card card, UiAction action, int (*slotOf)(const Layout&));
   void readControls(const PanelInput& in, uint32_t nowMs);
   void runMute(const PanelInput& in, uint32_t nowMs);
   bool applyAction(UiAction action);

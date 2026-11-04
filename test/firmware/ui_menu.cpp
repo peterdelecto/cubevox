@@ -311,8 +311,8 @@ void checkMenuListGeometry() {
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
       {kReverb, {"SPRING", "CHASM"}},
-      {kOctaveFormant, {"OCTAVE", "FORMANT"}},
-      {kUnisonCrowd, {"UNISON", "MOB"}},
+      {kOctaveFormant, {"OCTAVE", "FORMANT", "FOLLOWER"}},
+      {kUnisonCrowd, {"UNISON", "MOB", "MOB 2"}},
       {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
       {kPolishComp, {"ON", "OFF"}},
       {kPolishEq, {"ON", "OFF"}},
@@ -446,12 +446,12 @@ bool cursorRowIs(const Canvas& canvas, int r, int item, const char* value) {
   return listRowIs(canvas, r, kLabel[item], value, true);
 }
 
-// The slot 7 row cycles three cards instead of flipping a value, so it has its own checks below.
-// What a click on each of the nine rows that flip a value asks for, what applying it reports, and the
-// value the row shows once the click is applied and once a second click undoes it. The rows are in
-// list order. The reverb and Octave and Formant clicks change the layout, so they report LayoutChanged.
-// The others change a setting. The Unison and Crowd click changes the layout only when the placement rules accept Crowd
-// in Unison's slot, so its row follows layoutValid and reads the same after the click when it refuses.
+// The Unison and Crowd row and the slot 7 row cycle three cards instead of flipping a value, so they
+// have their own checks below. What a click on each of the eight rows that flip a value asks for, what
+// applying it reports, and the value the row shows once the click is applied and once a second click
+// undoes it. The Octave and Formant row cycles three cards, so its second click moves on to FOLLOWER;
+// its own checks below walk the whole cycle. The rows are in list order. The reverb and Octave and
+// Formant clicks change the layout, so they report LayoutChanged. The others change a setting.
 struct Click {
   int item;
   UiAction action;
@@ -460,32 +460,16 @@ struct Click {
   const char* back;
 };
 
-// Whether layoutValid accepts Crowd in Unison's slot beside Chasm and Formant, the cards the walk down
-// the rows has left by the time it reaches the Unison and Crowd row.
-bool crowdFitsBesideChasm() {
-  Layout walk = defaultLayout();
-  walk.card[kReverbSlot] = Card::ReverbChasm;
-  walk.card[kOctaveSlot] = Card::Formant;
-  walk.card[kUnisonSlot] = Card::Crowd;
-  return layoutValid(walk).ok();
-}
-
-std::array<Click, 9> makeClicks() {
-  const bool crowd = crowdFitsBesideChasm();
-  return {{
-      {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
-      {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
-      {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "OCTAVE"},
-      {kUnisonCrowd, UiAction::SwapUnisonCrowd, crowd ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None,
-       crowd ? "MOB" : "UNISON", "UNISON"},
-      {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
-      {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
-      {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
-      {kTopSwitch, UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
-      {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
-  }};
-}
-const std::array<Click, 9> kClicks = makeClicks();
+const std::array<Click, 8> kClicks = {{
+    {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
+    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
+    {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "FOLLOWER"},
+    {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
+    {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
+    {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
+    {kTopSwitch, UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
+    {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
+}};
 
 // Opens the list and clicks each row of kClicks once, top to bottom, applying each action. The
 // cursor walks down from item 0, so a row past the fourth sits on the last list row, rowOnScreen(item).
@@ -506,7 +490,7 @@ Settings clickEveryRow(MenuRig& m) {
 }
 
 // Each row of kClicks asks for its action, applying it flips the row's setting or swaps the reverb
-// card or the Unison and Crowd card, and a second click flips it back.
+// card or the Octave and Formant card, and a second click flips it back.
 void checkMenuClicks() {
   MenuRig m;
   const Settings flipped = clickEveryRow(m);
@@ -515,8 +499,6 @@ void checkMenuClicks() {
         "menu: six clicks flipped the six settings");
   check(m.layout.card[kReverbSlot] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
   check(m.layout.card[kOctaveSlot] == Card::Formant, "menu: the Octave and Formant click swapped Octave for Formant");
-  check(m.layout.card[kUnisonSlot] == (crowdFitsBesideChasm() ? Card::Crowd : Card::Unison),
-        "menu: the Unison and Crowd click swapped the card when the placement rules allow it");
   int at = kDebug;
   const int topAtDebug = kDebug - (kVisible - 1);  // the window the walk down left
   for (int i = static_cast<int>(kClicks.size()) - 1; i >= 0; --i) {
@@ -529,10 +511,12 @@ void checkMenuClicks() {
     const int row = c.item > topAtDebug ? c.item - topAtDebug : 0;  // the window holds until the cursor passes its top
     check(cursorRowIs(m.canvas, row, c.item, c.back), rowName(c.item, c.back).c_str());
   }
+  Layout followed = defaultLayout();
+  followed.card[kOctaveSlot] = Card::FormantFollower;
   check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute && !m.settings.debug &&
-            m.layout == defaultLayout(),
-        "menu: a second click on each row restores the defaults");
+            m.layout == followed,
+        "menu: a second click on each row restores the defaults, and slot 3 moves on to the Formant follower");
 }
 
 // The REVERB row reads the layout, so its value follows the card in whichever slot holds one.
@@ -612,9 +596,12 @@ void checkMenuOctaveFormantValue() {
   movedFormant.card[0] = Card::Formant;
   Layout none = defaultLayout();
   none.card[kOctaveSlot] = Card::Empty;
+  Layout follower = defaultLayout();
+  follower.card[kOctaveSlot] = Card::FormantFollower;
   const Case cases[] = {
       {"Octave in slot 3", defaultLayout(), "SLOT 3", "OCTAVE"},
       {"Formant in slot 3", formant, "SLOT 3", "FORMANT"},
+      {"the Formant follower in slot 3", follower, "SLOT 3", "FOLLOWER"},
       {"Octave in slot 1", moved, "SLOT 1", "OCTAVE"},
       {"Formant in slot 1", movedFormant, "SLOT 1", "FORMANT"},
       {"a layout with neither card", none, "SLOT -", "OCTAVE"},
@@ -659,9 +646,16 @@ void checkMenuOctaveFormantClick() {
   check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
         "menu: the row shows the card the layout holds after the click");
   check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
+  Layout follower = defaultLayout();
+  follower.card[kOctaveSlot] = Card::FormantFollower;
+  check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout == follower,
+        "menu: a second click moves Formant on to the Formant follower");
+  m.draw();
+  check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FOLLOWER"),
+        "menu: the row reads FOLLOWER after the second click");
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == defaultLayout(),
-        "menu: a second click swaps Formant back to Octave");
+        "menu: a third click brings Octave back");
 
   // No layout goes over a CPU line with the stress-run rows, so the swap is refused in a layout the box
   // would not load either way: two reverb cards.
@@ -715,6 +709,8 @@ void checkMenuUnisonCrowdValue() {
   };
   Layout crowd = defaultLayout();
   crowd.card[kUnisonSlot] = Card::Crowd;
+  Layout mob2 = defaultLayout();
+  mob2.card[kUnisonSlot] = Card::Crowd2;
   Layout moved = defaultLayout();  // Unison in slot 1, with Empty where it was
   moved.card[0] = Card::Unison;
   moved.card[kUnisonSlot] = Card::Empty;
@@ -728,6 +724,7 @@ void checkMenuUnisonCrowdValue() {
   const Case cases[] = {
       {"Unison in slot 4", defaultLayout(), "SLOT 4", "UNISON"},
       {"Mob in slot 4", crowd, "SLOT 4", "MOB"},
+      {"Mob 2 in slot 4", mob2, "SLOT 4", "MOB 2"},
       {"Unison in slot 1", moved, "SLOT 1", "UNISON"},
       {"Mob in slot 1", movedCrowd, "SLOT 1", "MOB"},
       {"Unison in slot 8", last, "SLOT 8", "UNISON"},
@@ -758,41 +755,32 @@ void checkMenuUnisonCrowdRedraw() {
         "menu: moving Unison to slot 5 repaints the row with the new slot and the same value");
 }
 
-// A click on the Unison and Crowd row swaps the card in the slot that holds it and leaves every other
-// slot alone. Whether the other card is accepted follows layoutValid, so each expected layout is
-// derived from it and the checks hold under any cost row for Crowd.
+// A click on the Unison and Crowd row asks for the cycle. Applying it takes Unison to Mob to Mob 2 and
+// back to Unison in the slot that holds the card, with every other slot and setting as they were, and
+// the row shows each card. The layout with each card survives a save and a reload.
 void checkMenuUnisonCrowdClick() {
-  const Layout start = defaultLayout();
-  Layout swapped = start;
-  swapped.card[kUnisonSlot] = Card::Crowd;
-  const bool fits = layoutValid(swapped).ok();
-
+  const Card order[] = {Card::Crowd, Card::Crowd2, Card::Unison};
+  const char* const values[] = {"MOB", "MOB 2", "UNISON"};
   MenuRig m;
   m.openListAt(kUnisonCrowd);
-  const UiAction a = m.step(0, true);
-  check(a == UiAction::SwapUnisonCrowd, "menu: a click on the Unison and Crowd row asks for the swap");
-  const ui::ApplyResult result = ui::applyAction(a, m.settings, m.layout);
-  check(result == (fits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None),
-        "menu: the swap changes the layout when layoutValid accepts it and reports nothing when it does not");
-  check(m.layout == (fits ? swapped : start), "menu: Unison becomes Mob in its slot with the other slots as they were, or stays");
-  m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kUnisonCrowd), kUnisonCrowd, fits ? "MOB" : "UNISON"),
-        "menu: the row shows the card the layout holds after the click");
-  check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
-
-  const ui::ApplyResult back = ui::applyAction(m.step(0, true), m.settings, m.layout);
-  check(back == (fits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None) && m.layout == start,
-        "menu: a second click swaps Mob back to Unison, or leaves Unison where it was");
-
-  // Mob placed first: the click asks for Unison, which layoutValid decides.
-  MenuRig mob;
-  mob.layout = swapped;
-  mob.openListAt(kUnisonCrowd);
-  const bool unisonFits = layoutValid(start).ok();
-  check(ui::applyAction(mob.step(0, true), mob.settings, mob.layout) ==
-                (unisonFits ? ui::ApplyResult::LayoutChanged : ui::ApplyResult::None) &&
-            mob.layout == (unisonFits ? start : swapped),
-        "menu: a click with Mob placed swaps it to Unison when layoutValid accepts it");
+  for (size_t i = 0; i < 3; ++i) {
+    const UiAction a = m.step(0, true);
+    check(a == UiAction::SwapUnisonCrowd, "menu: a click on the Unison and Crowd row asks for the cycle");
+    Layout want = defaultLayout();
+    want.card[kUnisonSlot] = order[i];
+    check(ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout == want,
+          (std::string("menu: the cycle moves slot 4 on to ") + values[i]).c_str());
+    m.draw();
+    check(cursorRowIs(m.canvas, rowOnScreen(kUnisonCrowd), kUnisonCrowd, values[i]),
+          (std::string("menu: the row shows ") + values[i] + " after the click").c_str());
+    RecordData saved;
+    saved.settings = m.settings;
+    saved.layout = m.layout;
+    RecordData loaded;
+    check(decodeRecord(encodeRecord(saved).data(), loaded) && loaded.layout == m.layout,
+          (std::string("menu: a layout with ") + values[i] + " in slot 4 survives a save and a reload").c_str());
+  }
+  check(sameSettings(m.settings, Settings()), "menu: the cycle touches no setting");
 
   // The card sits in slot 1 and slot 4 is empty: the swap happens in slot 1 and leaves slot 4 alone.
   MenuRig moved;
@@ -808,13 +796,16 @@ void checkMenuUnisonCrowdClick() {
             moved.layout == (movedFits ? movedNext : movedBefore),
         "menu: the card swaps in the slot that holds it");
 
-  // Both cards placed: the finder names the first slot and the other card would repeat, so layoutValid refuses.
+  // Mob in slot 2 and Unison in slot 4: the finder names slot 2, and the cycle passes over Unison,
+  // which would repeat, to Mob 2.
   MenuRig both;
   both.layout.card[1] = Card::Crowd;
   both.openListAt(kUnisonCrowd);
-  const Layout bothBefore = both.layout;
-  check(ui::applyAction(both.step(0, true), both.settings, both.layout) == ui::ApplyResult::None && both.layout == bothBefore,
-        "menu: with Unison and Mob both placed the click changes nothing");
+  Layout bothNext = both.layout;
+  bothNext.card[1] = Card::Crowd2;
+  check(ui::applyAction(both.step(0, true), both.settings, both.layout) == ui::ApplyResult::LayoutChanged &&
+            both.layout == bothNext,
+        "menu: with Unison and Mob both placed the click passes over Unison to Mob 2");
 }
 
 // With neither card placed the row reads SLOT - and a click asks for the swap but changes nothing.
