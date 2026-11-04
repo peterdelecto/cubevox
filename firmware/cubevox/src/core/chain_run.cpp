@@ -162,15 +162,17 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
   return false;
 }
 
-// The two gains sum to 1. A card whose output carries its input then holds its level across the
-// fade, where an equal-power pair would swell it by 3 dB.
+// The engine gain follows an S curve, 3x^2 - 2x^3 of the fade's progress, and the two gains sum to 1.
+// A card whose output carries its input then holds its level across the fade, where an equal-power
+// pair would swell it by 3 dB.
 void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
   const float total = static_cast<float>(kSlotFadeBlocks * n);
   const int dir = (to > from) - (to < from);
   int pos = from * n;  // samples of the fade toward the engine reached before this block
   for (int i = 0; i < n; ++i) {
     pos += dir;
-    const float toEngine = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
+    const float lin = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
+    const float toEngine = lin * lin * (3.0f - 2.0f * lin);
     wet[i] = wet[i] * toEngine + dry[i] * (1.0f - toEngine);
   }
 }

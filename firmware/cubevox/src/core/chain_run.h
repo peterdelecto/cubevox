@@ -89,8 +89,9 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
 constexpr uint32_t kBypassFull = 1u << 30;
 
 // A slot's toggle crossfades between the engine and the dry input over this many blocks (6 blocks
-// of 64 samples, 8 ms). The engine gain rises linearly and the dry gain is one minus it, so the two
-// sum to 1. An engine output that already holds the dry would gain 3 dB under an equal-power fade.
+// of 64 samples, 8 ms). The engine gain follows an S curve, flat at both ends so the blend does not
+// bend where the fade starts and stops, and the dry gain is one minus it, so the two sum to 1. An
+// engine output that already holds the dry would gain 3 dB under an equal-power fade.
 constexpr int kSlotFadeBlocks = 6;
 
 // Each slot's fade level in blocks, kept by the audio interrupt. 0 plays the dry input with the

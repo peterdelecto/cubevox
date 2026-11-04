@@ -540,11 +540,18 @@ void checkSlotFadeLaw() {
   check(std::fabs(mid.engine.back() - 0.5f) < 1e-6f && std::fabs(mid.dry.back() - 0.5f) < 1e-6f,
         "slot fade: at the midpoint both gains read 0.5");
 
+  // The S curve is steepest at its middle, 1.5 times the straight line's 1/384 a sample, and flat at
+  // both ends.
   const float step = 1.0f / static_cast<float>(ge.size());
+  const float steepest = 1.5f * step;
   float worstStep = 0.0f;
   for (size_t i = 1; i < ge.size(); ++i) worstStep = std::max(worstStep, std::fabs(ge[i] - ge[i - 1]));
-  check(worstStep < 1.01f * step + 2e-7f && step > 0.0026f && step < 0.0027f,
-        "slot fade: every gain moves by 1/384 a sample, 0.0026");
+  const float firstStep = ge[1] - ge[0];
+  const float lastStep = ge[ge.size() - 1] - ge[ge.size() - 2];
+  check(worstStep < 1.01f * steepest + 2e-7f && step > 0.0026f && step < 0.0027f,
+        "slot fade: no gain moves more than 1.5 / 384 a sample, at the middle");
+  check(firstStep < 0.05f * step && lastStep < 0.05f * step,
+        "slot fade: the gains leave and reach their ends flat");
   check(ge.front() < 2.0f * step && ge.back() == 1.0f && gd.back() == 0.0f && gd.front() > 0.9970f,
         "slot fade: the fade in starts at the dry input and ends at the engine alone");
 
@@ -562,8 +569,8 @@ void checkSlotFadeLaw() {
   // A flip during a fade turns it round from where it is: the gains join one sample apart.
   const SlotGains down = slotGains(3, 2);
   const SlotGains up = slotGains(2, 3);
-  check(std::fabs(up.engine.front() - down.engine.back()) < 1.01f * step + 2e-6f &&
-            std::fabs(up.dry.front() - down.dry.back()) < 1.01f * step + 2e-6f,
+  check(std::fabs(up.engine.front() - down.engine.back()) < 1.01f * steepest + 2e-6f &&
+            std::fabs(up.dry.front() - down.dry.back()) < 1.01f * steepest + 2e-6f,
         "slot fade: turning a fade round mid-way joins the gains without a step");
 }
 
