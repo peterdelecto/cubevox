@@ -479,7 +479,7 @@ void checkHelloReply() {
   check(has(w.out, "\"kind\":\"stepped\",\"positions\":25,\"min\":-12,\"max\":12,\"unit\":\"st\",\"curve\":\"linear\""),
         "proto: hello carries the octave knob");
   check(has(w.out, "\"curve\":\"log\"") && has(w.out, "\"curve\":\"log_reversed\"") &&
-            has(w.out, "\"min\":-7,\"max\":3,\"unit\":\"st\",\"curve\":\"zero_at_noon\""),
+            has(w.out, "\"min\":-7,\"max\":0,\"unit\":\"st\",\"curve\":\"linear_reversed\""),
         "proto: hello carries curves");
   check(has(w.out, "\"group\":\"pitch\"") && has(w.out, "\"group\":\"reverb\""), "proto: hello carries groups");
   check(has(w.out, "\"layout\":{\"name\":\"Default\""), "proto: hello carries the layout");

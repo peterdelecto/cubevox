@@ -85,7 +85,8 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb cards");
-  check(pitch == 7, "autotune, octave, formant, the formant follower, the crowd card, Mob 2 and growl are the pitch group");
+  check(pitch == 7 && cardDesc(Card::FormantFollower).group == Group::Pitch,
+        "autotune, octave, formant, Yawn, the crowd card, Mob 2 and growl are the pitch group");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive, Range) sits on knob B, the lower pot of its slot, and each parameter
@@ -178,7 +179,7 @@ void checkDescriptors() {
       if (d.kind != KnobKind::Continuous) continue;
       char what[96];
       check(d.min < d.max, "descriptor min below max");
-      const bool reversed = d.curve == Curve::LogReversed;
+      const bool reversed = d.curve == Curve::LogReversed || d.curve == Curve::LinearReversed;
       std::snprintf(what, sizeof(what), "%s knob %d shows its ends at 0 and 1", cardDesc(c).id, k);
       check(knobShown(d, 0.0f) == std::lround(reversed ? d.max : d.min) && knobShown(d, 1.0f) == std::lround(reversed ? d.min : d.max),
             what);
@@ -464,61 +465,64 @@ void checkAppendedCards() {
         "appended cards: each registry row is its costs.h row");
 }
 
-// The Formant follower: id formant_follow, which keeps under the id clip width, the pitch engine and
-// group, SENSITIVITY on the upper pot, RANGE on the lower from -7 st at 0 through 0 at noon to +3 st at
-// full and never past +3 st, no knob on the Formant voice's MIX, and FOLLOWER on the OLED's readout title.
-// Placing it hands the voice's SHIFT to the follower.
-void checkFollowerCard() {
+// Yawn: id formant_follow, which keeps under the id clip width, the pitch engine and group, SENSITIVITY
+// on the upper pot, RANGE on the lower from 0 st at the pot's bottom in a straight line to -7 st at its
+// top, no knob on the Formant voice's MIX, and Yawn on the OLED's readout title, as Mob's row does.
+// Placing it hands the voice's SHIFT to the card's sweep.
+void checkYawnCard() {
   const CardDesc& d = cardDesc(Card::FormantFollower);
-  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Formant follower") == 0 &&
-            d.engine == Engine::Pitch && d.group == Group::Pitch && d.knobCount == 2,
-        "follower: id formant_follow, name Formant follower, the pitch engine and the pitch group");
-  check(std::strcmp(oledName(Card::FormantFollower), "Follower") == 0 && std::strcmp(oledName(Card::Formant), "Formant") == 0,
-        "follower: the readout title reads Follower, and a card without an OLED name keeps its name");
+  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Yawn") == 0 && d.engine == Engine::Pitch &&
+            d.group == Group::Pitch && d.knobCount == 2,
+        "yawn: id formant_follow, name Yawn, the pitch engine and the pitch group");
+  check(d.oledName == nullptr && std::strcmp(oledName(Card::FormantFollower), "Yawn") == 0,
+        "yawn: the readout title is the card's name, Yawn");
   const KnobDesc& sens = *knobDesc(Card::FormantFollower, 0);
   check(std::strcmp(sens.name, "SENSITIVITY") == 0 && sens.kind == KnobKind::Continuous && sens.min == 0.0f &&
             sens.max == 100.0f && std::strcmp(sens.unit, "%") == 0,
-        "follower: knob A is SENSITIVITY, a percent");
+        "yawn: knob A is SENSITIVITY, a percent");
   const KnobDesc& range = *knobDesc(Card::FormantFollower, 1);
   check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -7.0f &&
-            range.max == 3.0f && range.curve == Curve::ZeroAtNoon && std::strcmp(range.unit, "st") == 0,
-        "follower: knob B is RANGE, continuous from -7 to +3 st with 0 at noon");
+            range.max == 0.0f && range.curve == Curve::LinearReversed && std::strcmp(range.unit, "st") == 0,
+        "yawn: knob B is RANGE, continuous from 0 st at the bottom to -7 st at the top");
 
   ChainParams p;
   const float mixBefore = p.pitchFx.formant.mix;
   applyKnob(Card::FormantFollower, 0, 0.3f, p);
-  check(std::fabs(p.follower.sensitivity - 0.3f) < 1e-6f, "follower: SENSITIVITY hands the follower its position");
+  check(std::fabs(p.follower.sensitivity - 0.3f) < 1e-6f, "yawn: SENSITIVITY hands the card its position");
   const auto rangeAt = [&p](float position) {
     applyKnob(Card::FormantFollower, 1, position, p);
     return p.follower.rangeSt;
   };
-  check(rangeAt(0.0f) == -7.0f && rangeAt(0.25f) == -3.5f && rangeAt(0.5f) == 0.0f && rangeAt(0.75f) == 1.5f &&
-            rangeAt(1.0f) == 3.0f,
-        "follower: RANGE is -7 st at 0, -3.5 st at 25 %, 0 at noon, +1.5 st at 75 % and +3 st at full");
+  check(rangeAt(0.0f) == 0.0f && rangeAt(0.25f) == -1.75f && rangeAt(0.5f) == -3.5f && rangeAt(1.0f) == -7.0f,
+        "yawn: RANGE is 0 st at the bottom, -1.75 st at 25 %, -3.5 st at noon and -7 st at the top");
+  const float defaultPosition = cv::kFollowerDefaultRangeSt / cv::kFollowerMinRangeSt;
+  check(cv::kFollowerDefaultRangeSt == -5.0f && std::fabs(rangeAt(defaultPosition) + 5.0f) < 1e-5f &&
+            shownText(range, defaultPosition) == "-5",
+        "yawn: the default pot position, 5/7 of the travel, reads -5 st");
   bool capped = true;
-  bool rising = true;
-  float before = -8.0f;
+  bool falling = true;
+  float before = 1.0f;
   for (int s = 0; s <= 100; ++s) {
     const float st = rangeAt(static_cast<float>(s) / 100.0f);
-    capped = capped && st >= -7.0f && st <= 3.0f;
-    rising = rising && st > before;
+    capped = capped && st >= -7.0f && st <= 0.0f;
+    falling = falling && st < before;
     before = st;
   }
-  check(capped && rising, "follower: RANGE rises with the pot and never leaves -7 to +3 st");
-  check(shownText(range, 0.0f) == "-7" && shownText(range, 0.25f) == "-4" && shownText(range, 0.5f) == "0" &&
-            shownText(range, 0.75f) == "+2" && shownText(range, 1.0f) == "+3" && knobCells(range) == 2,
-        "follower: RANGE reads its semitones with the sign in two cells");
-  check(p.pitchFx.formant.mix == mixBefore, "follower: no knob sets the Formant voice's mix");
+  check(capped && falling, "yawn: RANGE falls with the pot and never leaves 0 to -7 st");
+  check(shownText(range, 0.0f) == "0" && shownText(range, 0.5f) == "-4" && shownText(range, 1.0f) == "-7" &&
+            knobCells(range) == 2,
+        "yawn: RANGE reads its semitones with the sign in two cells");
+  check(p.pitchFx.formant.mix == mixBefore, "yawn: no knob sets the Formant voice's mix");
 
   ChainParams t;
   applyToggle(Card::FormantFollower, true, t);
   check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.follower.placed,
-        "follower: its toggle sets formant.on and nothing else");
-  check(!ChainParams().follower.placed, "follower: the envelope drives nothing before the card is placed");
+        "yawn: its toggle sets formant.on and nothing else");
+  check(!ChainParams().follower.placed, "yawn: the sweep drives nothing before the card is placed");
   applyPlacement(Card::Formant, t);
-  check(!t.follower.placed, "follower: placing the Formant card leaves SHIFT on its own knob");
+  check(!t.follower.placed, "yawn: placing the Formant card leaves SHIFT on its own knob");
   applyPlacement(Card::FormantFollower, t);
-  check(t.follower.placed, "follower: placing the card hands SHIFT to the envelope");
+  check(t.follower.placed, "yawn: placing the card hands SHIFT to the sweep");
 }
 
 void checkFormantCard() {
@@ -792,7 +796,7 @@ void checkRegistry() {
   checkMob2Card();
   checkAppendedCards();
   checkFormantCard();
-  checkFollowerCard();
+  checkYawnCard();
   checkLofiCard();
   checkBloomCard();
   checkGrowlCard();

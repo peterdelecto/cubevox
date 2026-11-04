@@ -46,9 +46,8 @@ struct RenderParams {
   bool eqOn = true;
   bool compStats = false;  // print the comp's gain reduction after the render
   const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
-  const char* drivePath = nullptr;  // where the Formant follower's drive goes, one value a sample
-  const char* pluckPath = nullptr;  // where the Formant follower's pluck envelope goes, one value a sample
-  const char* shiftPath = nullptr;  // where the glided SHIFT goes, -7..+3 st onto -1..+1, one value a sample
+  const char* drivePath = nullptr;  // where Yawn's drive goes, one value a sample
+  const char* shiftPath = nullptr;  // where the glided SHIFT goes, -7..0 st onto -1..0, one value a sample
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
@@ -74,8 +73,8 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>, default 0.1, the box's start]\n"
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
-               "       [--follower <-7..3>, RANGE] [--sensitivity <0..1>] [--follower-drive <drive.wav>]\n"
-               "       [--follower-pluck <pluck.wav>] [--follower-shift <shift.wav>]\n"
+               "       [--follower <-7..0>, RANGE] [--sensitivity <0..1>] [--follower-drive <drive.wav>]\n"
+               "       [--follower-shift <shift.wav>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>] [--mob2 <0..1>, DRIFT]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--growl <0..1>, GROWL] [--gdrive <0..1>, the Growl card's DRIVE, default 0.5]\n"
@@ -88,12 +87,12 @@ int usage() {
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
                "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
                "  --fmix the MIX (default 1); with --autotune its voice follows the tuned note and lines up with it\n"
-               "  --follower runs the Formant follower card, the formant voice alone with SHIFT set by the input's loudness\n"
-               "  or an LFO; its value is RANGE in semitones, any value from -7 to 3, and --sensitivity is the SENSITIVITY\n"
-               "  pot (default 0.5); the card pins the voice's MIX at 1 and overrides --formant's SHIFT and --fmix.\n"
-               "  --follower-drive writes the follower's drive, 0 to 1, --follower-pluck its pluck envelope, 0 to 1, and\n"
-               "  --follower-shift the voice's glided SHIFT, -7 st to -1, 0 st to 0 and +3 st to +1, each as a mono WAV\n"
-               "  beside the render; the tuning keys mode, pluckDecayMs and lfoHz set the follower's mode\n"
+               "  --follower runs the Yawn card, the formant voice alone with SHIFT swept down on each syllable; its value\n"
+               "  is RANGE in semitones, any value from -7 to 0 (the box's default is -5), and --sensitivity is the\n"
+               "  SENSITIVITY pot (default 0.4); the card pins the voice's MIX at 1 and overrides --formant's SHIFT and\n"
+               "  --fmix.\n"
+               "  --follower-drive writes the card's drive, 0 to 1, and --follower-shift the voice's glided SHIFT, -7 st\n"
+               "  to -1 and 0 st to 0, each as a mono WAV beside the render; the tuning key decayMs sets the sweep's fall\n"
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  --mob2 runs the crowd as Mob 2 at that DRIFT, with DIVERGE fixed at 1; --voices is then 0 to 4 copies or 5 for MOB\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
@@ -149,8 +148,7 @@ int usage() {
                "     growlLowShelfHz growlHighShelfHz (20..21600) growlLowShelfDb growlHighShelfDb (-24..24)\n"
                "     growlDriveDb (0..48) growlMakeupSat (1..1000) growlRailSoft (0.01..1) growlRailAsym (0..0.5)\n"
                "     growlTrimDb (-24..24)\n"
-               "     mode (follow, pluck, lfo or lfoEnv; default pluck) pluckDecayMs (10..2000) lfoHz (0.1..8),\n"
-               "     the Formant follower's mode, its pluck sweep's fall and its LFO's rate\n"
+               "     decayMs (10..2000, default 300), the time Yawn's sweep takes to fall back to 0\n"
                "  every value must be finite, and a crowd, chasm or spring key outside its range is refused\n"
                "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
@@ -384,7 +382,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"growlDriveDb", &grt.driveDb},             {"growlMakeupSat", &grt.makeupSat},
       {"growlRailSoft", &grt.railSoft},           {"growlRailAsym", &grt.railAsym},
       {"growlTrimDb", &grt.trimDb},
-      {"pluckDecayMs", &fft.pluckDecayMs},        {"lfoHz", &fft.lfoHz},
+      {"decayMs", &fft.decayMs},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -448,15 +446,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   };
   const char* eq = std::strchr(kv, '=');
   if (!eq) return false;
-  if (std::strncmp(kv, "mode=", 5) == 0) {
-    const char* name = kv + 5;
-    if (std::strcmp(name, "follow") == 0) fft.mode = cv::FollowerMode::Follow;
-    else if (std::strcmp(name, "pluck") == 0) fft.mode = cv::FollowerMode::Pluck;
-    else if (std::strcmp(name, "lfo") == 0) fft.mode = cv::FollowerMode::Lfo;
-    else if (std::strcmp(name, "lfoEnv") == 0) fft.mode = cv::FollowerMode::LfoEnv;
-    else return false;
-    return true;
-  }
   if (std::strncmp(kv, "lofiMakeup", 10) == 0) {
     // lofiMakeup<tone row 0..4>_<amount column 0..10>=<dB>
     int row = -1, col = -1, used = 0;
@@ -484,9 +473,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       return false;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt) || !growlTuningInRange(grt)) return false;
     if (!slapbackTuningInRange(st) || !distortionTuningInRange(dt)) return false;
-    if (!inside(fft.pluckDecayMs, cv::kFollowerPluckMinDecayMs, cv::kFollowerPluckMaxDecayMs) ||
-        !inside(fft.lfoHz, cv::kFollowerLfoMinHz, cv::kFollowerLfoMaxHz))
-      return false;
+    if (!inside(fft.decayMs, cv::kFollowerMinDecayMs, cv::kFollowerMaxDecayMs)) return false;
     spr.chirpSections = static_cast<int>(springSections);
     return true;
   }
@@ -630,8 +617,6 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       if (!parseFloat(argv[++i], &sens) || sens < 0.0f || sens > 1.0f) return false;
     } else if (std::strcmp(a, "--follower-drive") == 0 && i + 1 < argc) {
       rp.drivePath = argv[++i];
-    } else if (std::strcmp(a, "--follower-pluck") == 0 && i + 1 < argc) {
-      rp.pluckPath = argv[++i];
     } else if (std::strcmp(a, "--follower-shift") == 0 && i + 1 < argc) {
       rp.shiftPath = argv[++i];
     } else if (std::strcmp(a, "--crowd") == 0) {
@@ -671,7 +656,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   }
   // Each pitch stage runs only when asked for. The Crowd and Growl cards read the pitch stage's ring and
   // tracker, so each turns the stage on and tells it to keep them running, as the registry's toggle does.
-  // The Formant follower plays the formant voice, so it switches that on too.
+  // Yawn plays the formant voice, so it switches that on too.
   op.on = haveOctave;
   fp.on = haveFormant || rp.follower.placed;
   rp.crowd.on = rp.crowdOn;
@@ -679,8 +664,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.growl.on = rp.growlOn;
   rp.pitchFx.growlOn = rp.growlOn;
   rp.pitchOn = haveOctave || fp.on || ap.on || rp.crowdOn || rp.growlOn;
-  if ((rp.drivePath != nullptr || rp.pluckPath != nullptr || rp.shiftPath != nullptr) && !rp.follower.placed)
-    return false;
+  if ((rp.drivePath != nullptr || rp.shiftPath != nullptr) && !rp.follower.placed) return false;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
@@ -721,9 +705,8 @@ bool writeHeld(ma_encoder* enc, float v, ma_uint64 frames, const char* path) {
   return false;
 }
 
-// The Formant voice's glided SHIFT as a signal: -7 st at -1, 0 st at 0 and +3 st at +1, as the RANGE pot
-// maps them.
-float shiftSignal(float st) { return st < 0.0f ? st / -cv::kFollowerMinRangeSt : st / cv::kFollowerMaxRangeSt; }
+// The Formant voice's glided SHIFT as a signal: -7 st at -1 and 0 st at 0, RANGE's reach.
+float shiftSignal(float st) { return st / -cv::kFollowerMinRangeSt; }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   ma_decoder dec;
@@ -742,11 +725,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
-  // The Formant follower's drive, pluck envelope and glided SHIFT, each held over its block, when asked for.
-  constexpr int kSides = 3;
-  const char* const sidePath[kSides] = {rp.drivePath, rp.pluckPath, rp.shiftPath};
+  // Yawn's drive and the glided SHIFT, each held over its block, when asked for.
+  constexpr int kSides = 2;
+  const char* const sidePath[kSides] = {rp.drivePath, rp.shiftPath};
   ma_encoder sideEnc[kSides];
-  ma_encoder* side[kSides] = {nullptr, nullptr, nullptr};
+  ma_encoder* side[kSides] = {nullptr, nullptr};
   for (int s = 0; s < kSides; ++s) {
     if (sidePath[s] == nullptr) continue;
     if (ma_encoder_init_file(sidePath[s], &ecfg, &sideEnc[s]) != MA_SUCCESS) {
@@ -823,7 +806,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
       if (rp.pitchOn) {
         pitchFx.process(src, scratch[next], n, follower.follow(src, n, rp.pitchFx, rp.follower));
-        const float sideValue[kSides] = {follower.drive(), follower.pluckEnvelope(), shiftSignal(pitchFx.shiftSemis())};
+        const float sideValue[kSides] = {follower.drive(), shiftSignal(pitchFx.shiftSemis())};
         bool wrote = true;
         for (int s = 0; s < kSides; ++s) wrote = wrote && writeHeld(side[s], sideValue[s], got, sidePath[s]);
         if (!wrote) {

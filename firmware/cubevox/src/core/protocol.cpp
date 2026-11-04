@@ -594,7 +594,7 @@ const char* curveName(Curve c) {
     case Curve::Linear: return "linear";
     case Curve::Log: return "log";
     case Curve::LogReversed: return "log_reversed";
-    case Curve::ZeroAtNoon: return "zero_at_noon";
+    case Curve::LinearReversed: return "linear_reversed";
   }
   return "linear";
 }
