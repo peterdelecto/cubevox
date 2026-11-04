@@ -898,10 +898,11 @@ constexpr int kSlot7 = 6;
 // voice sounds 22 ms after that, and the Chatter card's first capture lands at 40 to 50 ms and loops by about 110 ms.
 constexpr int kCardRunBlocks = 150;
 
-// A layout with `c` in its slot, slot 3 for Formant and slot 7 for the others, and every other slot empty.
+// A layout with `c` in its slot, slot 3 for Formant and the Formant follower and slot 7 for the others,
+// and every other slot empty.
 Layout soloLayout(Card c) {
   Layout layout = layoutOf({});
-  layout.card[c == Card::Formant ? kSlot3 : kSlot7] = c;
+  layout.card[c == Card::Formant || c == Card::FormantFollower ? kSlot3 : kSlot7] = c;
   return layout;
 }
 
@@ -910,6 +911,10 @@ Block soloEngine(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) {
   Block out{};
   switch (c) {
     case Card::Formant: rig.engines.pitch.process(in.data(), out.data(), kN, snap.params.pitchFx); break;
+    case Card::FormantFollower:
+      rig.engines.pitch.process(in.data(), out.data(), kN,
+                                rig.engines.follower.follow(in.data(), kN, snap.params.pitchFx, snap.params.follower));
+      break;
     case Card::Lofi: rig.engines.lofi.process(in.data(), out.data(), kN, snap.params.lofi); break;
     case Card::Bloom: rig.engines.bloom.process(in.data(), out.data(), kN, snap.params.bloom); break;
     default: break;
@@ -917,11 +922,11 @@ Block soloEngine(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) {
   return out;
 }
 
-// Formant in slot 3 and Lo-fi and Chatter in slot 7 each run their engine, change the tone, and pass the
-// dry input bit for bit once their toggle has been off for the fade. A reset clears the Lo-fi and
-// Chatter engines.
+// Formant and the Formant follower in slot 3 and Lo-fi and Chatter in slot 7 each run their engine, change
+// the tone, and pass the dry input bit for bit once their toggle has been off for the fade. A reset clears
+// the Lo-fi and Chatter engines.
 void checkAppendedCardsRun() {
-  for (const Card c : {Card::Formant, Card::Lofi, Card::Bloom}) {
+  for (const Card c : {Card::Formant, Card::FormantFollower, Card::Lofi, Card::Bloom}) {
     const std::string name = cardDesc(c).name;
     const ChainSnapshot snap = snapshotToggles(soloLayout(c), 0.5f, allToggles(true));
     auto chain = newRig();
@@ -958,6 +963,14 @@ void checkAppendedCardsRun() {
   resetEngine(rig->engines, Engine::Bloom);
   check(!rig->engines.bloom.inWord() && !rig->engines.bloom.looping() && rig->engines.bloom.wetGain() == 0.0f,
         "resetEngine clears the Chatter card's word and its loop");
+
+  const ChainSnapshot follower = snapshotToggles(soloLayout(Card::FormantFollower), 0.5f, allToggles(true));
+  auto followerRig = newRig();
+  for (int b = 0; b < 40; ++b) runBlock(*followerRig, follower, tone(b, 0.3f), StillClock());
+  const bool driven = followerRig->engines.follower.drive() > 0.5f;
+  resetEngine(followerRig->engines, Engine::Pitch);
+  check(driven && followerRig->engines.follower.drive() == 0.0f,
+        "the Formant follower's envelope follows the tone, and resetEngine on the pitch engine clears it");
 
   const ChainSnapshot lofi = snapshotToggles(soloLayout(Card::Lofi), 0.5f, allToggles(true));
   auto lofiRig = newRig();

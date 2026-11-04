@@ -24,14 +24,29 @@ ApplyResult swapUnisonCrowd(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
+// The card after `c` in the slot 3 cycle, Octave to Formant to the Formant follower and back to Octave.
+Card nextSlot3Card(Card c) {
+  switch (c) {
+    case Card::Octave: return Card::Formant;
+    case Card::Formant: return Card::FormantFollower;
+    default: return Card::Octave;
+  }
+}
+
+// Moves the slot that holds one of the three to the next card in the cycle that layoutValid accepts,
+// as the slot 7 cycle does.
 ApplyResult swapOctaveFormant(Layout& layout) {
   const int slot = octaveFormantSlot(layout);
   if (slot < 0) return ApplyResult::None;
   Layout next = layout;
-  next.card[slot] = layout.card[slot] == Card::Octave ? Card::Formant : Card::Octave;
-  if (!layoutValid(next).ok()) return ApplyResult::None;
-  layout = next;
-  return ApplyResult::LayoutChanged;
+  for (Card c = nextSlot3Card(layout.card[slot]); c != layout.card[slot]; c = nextSlot3Card(c)) {
+    next.card[slot] = c;
+    if (layoutValid(next).ok()) {
+      layout = next;
+      return ApplyResult::LayoutChanged;
+    }
+  }
+  return ApplyResult::None;
 }
 
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.

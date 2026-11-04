@@ -1,10 +1,11 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant] [--slot7 gate|lofi|chatter]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|follower] [--slot7 gate|lofi|chatter]
 //                                             one frame of the window as a P6 PPM, no audio device,
 //                                             with those cards in slots 3 and 7 (Octave and Gate when omitted;
-//                                             `bloom`, the card id, also picks Chatter)
+//                                             a card id also picks its card, `bloom` Chatter and
+//                                             `formant_follow` the Formant follower)
 
 #include <array>
 #include <cmath>
@@ -148,8 +149,10 @@ struct CardRow {
   const char* name;
   costs::Cost cost;
 };
-constexpr std::array<CardRow, 2> kSlot3Rows = {{{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
-                                                {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
+constexpr std::array<CardRow, 3> kSlot3Rows = {
+    {{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
+     {Card::FormantFollower, "formant_follow", "follower", "FOLLOWER", costs::kFormantFollower},
+     {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
 constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO-FI", costs::kLofi},
                                                 {Card::Bloom, "bloom", "chatter", "CHATTER", costs::kBloom},
                                                 {Card::Gate, "gate", "gate", "GATE", costs::kGate}}};
@@ -178,8 +181,8 @@ float lastSecondDbfs(const std::vector<float>& output) {
   return level::toDbfs(level::rms(energy));
 }
 
-// The Octave and Formant swap through the box's switch, to Formant and back. After each swap slot 3
-// holds the card, the layout's cost is the rest of its rows plus the card's own and Gate's, and the
+// The slot 3 cycle through the menu's action, to Formant, to the Formant follower and back to Octave.
+// After each step slot 3 holds the card, the layout's cost is the rest of its rows plus the card's own and Gate's, and the
 // audio through the box is finite and above the floor. `swapped` puts MOB in slot 4 and Chasm in
 // slot 8 first.
 void checkSlot3(const CheckClips& clips, bool swapped, std::vector<std::string>& failed) {
@@ -404,7 +407,7 @@ int runCheck(const char* argv0) {
 int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot7) {
   Rig rig;
   if (!rig.source.findClip(argv0)) return 1;
-  if (slot3 == Card::Formant) rig.box.swapOctaveFormant();
+  rig.box.pickSlot3Card(slot3);
   rig.box.pickSlot7Card(slot7);
   rig.run(kProofMs, false);
   Window window(false);
@@ -468,7 +471,7 @@ int runLive(const char* argv0) {
 
 int usage() {
   std::fprintf(stderr,
-               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant] "
+               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|follower] "
                "[--slot7 gate|lofi|chatter]]\n");
   return 2;
 }

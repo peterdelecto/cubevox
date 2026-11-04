@@ -11,6 +11,7 @@
 #include "engine/bloom.h"
 #include "engine/crowd.h"
 #include "engine/distortion.h"
+#include "engine/formant_follower.h"
 #include "engine/gate.h"
 #include "engine/lofi.h"
 #include "engine/pitch_fx.h"
@@ -43,9 +44,11 @@ struct RenderParams {
   bool eqOn = true;
   bool compStats = false;  // print the comp's gain reduction after the render
   const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
+  const char* drivePath = nullptr;  // where the Formant follower's drive goes, one value a sample
   cv::GateParams inGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
+  cv::FormantFollowerParams follower;
   cv::CrowdParams crowd;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
@@ -66,6 +69,7 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>, default 0.1, the box's start]\n"
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
+               "       [--follower <-7..7>] [--follower-drive <drive.wav>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm] [--time <0..1>] [--mix <0..1>]\n"
@@ -77,6 +81,9 @@ int usage() {
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
                "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
                "  --fmix the MIX (default 1); with --autotune its voice follows the tuned note and lines up with it\n"
+               "  --follower runs the Formant follower card, the formant voice with SHIFT set by the input's loudness;\n"
+               "  its value is DEPTH in semitones, any value from -7 to 7, and --fmix sets its MIX; it overrides --formant's\n"
+               "  SHIFT. --follower-drive writes the follower's drive, 0 to 1, as a mono WAV beside the render\n"
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
@@ -555,6 +562,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveFormant = true;
     } else if (std::strcmp(a, "--fmix") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &fp.mix) || fp.mix < 0.0f || fp.mix > 1.0f) return false;
+    } else if (std::strcmp(a, "--follower") == 0 && i + 1 < argc) {
+      float& depth = rp.follower.depthSt;
+      if (!parseFloat(argv[++i], &depth) || depth < -cv::kFollowerMaxDepthSt || depth > cv::kFollowerMaxDepthSt) return false;
+      rp.follower.placed = true;
+    } else if (std::strcmp(a, "--follower-drive") == 0 && i + 1 < argc) {
+      rp.drivePath = argv[++i];
     } else if (std::strcmp(a, "--crowd") == 0) {
       rp.crowdOn = true;
     } else if (std::strcmp(a, "--width") == 0 && i + 1 < argc) {
@@ -588,11 +601,13 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   }
   // Each pitch stage runs only when asked for. The Crowd card reads the pitch stage's ring and tracker,
   // so it turns the stage on and tells it to keep them running, as the registry's toggle does.
+  // The Formant follower plays the formant voice, so it switches that on too.
   op.on = haveOctave;
-  fp.on = haveFormant;
+  fp.on = haveFormant || rp.follower.placed;
   rp.crowd.on = rp.crowdOn;
   rp.pitchFx.crowdOn = rp.crowdOn;
-  rp.pitchOn = haveOctave || haveFormant || ap.on || rp.crowdOn;
+  rp.pitchOn = haveOctave || fp.on || ap.on || rp.crowdOn;
+  if (rp.drivePath != nullptr && !rp.follower.placed) return false;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
@@ -616,6 +631,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
          rp.compOn || rp.eqOn;
 }
 
+// Writes `frames` mono frames from `x`; false when the encoder takes fewer.
+bool writeAll(ma_encoder* enc, const float* x, ma_uint64 frames) {
+  ma_uint64 wrote = 0;
+  return ma_encoder_write_pcm_frames(enc, x, frames, &wrote) == MA_SUCCESS && wrote == frames;
+}
+
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   ma_decoder dec;
   const ma_decoder_config dcfg = ma_decoder_config_init(ma_format_f32, 1, cv::kSampleRate);
@@ -633,9 +654,23 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
+  // The Formant follower's drive, held over each block, when asked for.
+  ma_encoder driveEnc;
+  ma_encoder* drive = nullptr;
+  if (rp.drivePath != nullptr) {
+    if (ma_encoder_init_file(rp.drivePath, &ecfg, &driveEnc) != MA_SUCCESS) {
+      std::fprintf(stderr, "cubevox-render: cannot write '%s'\n", rp.drivePath);
+      ma_encoder_uninit(&enc);
+      ma_decoder_uninit(&dec);
+      return 1;
+    }
+    drive = &driveEnc;
+  }
+
   static cv::Gate inGate;
   static cv::Gate gate;
   static cv::PitchFx pitchFx;
+  static cv::FormantFollower follower;
   static cv::Crowd crowd;
   static cv::Unison unison;
   static cv::Slapback slapback;
@@ -648,6 +683,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   inGate.reset();
   gate.reset();
   pitchFx.reset();
+  follower.reset();
   crowd.reset();
   unison.reset();
   slapback.reset();
@@ -690,7 +726,16 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
       if (rp.pitchOn) {
-        pitchFx.process(src, scratch[next], n, rp.pitchFx);
+        pitchFx.process(src, scratch[next], n, follower.follow(src, n, rp.pitchFx, rp.follower));
+        if (drive != nullptr) {
+          float held[cv::kBlock];
+          for (int i = 0; i < n; ++i) held[i] = follower.drive();
+          if (!writeAll(drive, held, got)) {
+            std::fprintf(stderr, "cubevox-render: write failed on '%s'\n", rp.drivePath);
+            rc = 1;
+            break;
+          }
+        }
         src = scratch[next];
         next ^= 1;
         if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
@@ -776,6 +821,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   }
 
   ma_encoder_uninit(&enc);
+  if (drive != nullptr) ma_encoder_uninit(drive);
   ma_decoder_uninit(&dec);
   if (rc == 0 && rp.compStats) {
     if (rp.compOn && reductionSamples > 0.0) {

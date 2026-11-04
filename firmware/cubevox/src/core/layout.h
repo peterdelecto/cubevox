@@ -33,7 +33,8 @@ int reverbSlot(const Layout& layout);
 // The slot that holds Unison or Crowd, the first one when both are placed; -1 when neither is.
 int unisonCrowdSlot(const Layout& layout);
 
-// The slot that holds Octave or Formant, the first one when both are placed; -1 when neither is.
+// The slot that holds Octave, Formant or the Formant follower, the first one when several are placed;
+// -1 when none is. The menu's slot 3 row cycles the card in it.
 int octaveFormantSlot(const Layout& layout);
 
 // The slot that holds Gate, Lo-fi or Chatter, the first one when several are placed; -1 when none is.
@@ -56,16 +57,18 @@ struct LayoutCheck {
 };
 
 // The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
-// placed card's row, the pitch tracker's row once when Autotune, Crowd or Formant is placed, and the pitch
-// stage's row once when Octave or Formant is placed without Autotune. Every card id must be in range.
+// placed card's row, the pitch tracker's row once when Autotune, Crowd, Formant or the Formant follower
+// is placed, and the pitch stage's row once when Octave, Formant or the Formant follower is placed
+// without Autotune. Every card id must be in range.
 struct LayoutCost {
   int avg = 0;
   int worst = 0;
 };
 LayoutCost layoutCost(const Layout& layout);
 
-// Placement rules of the registry spec: ids in range, no card twice (Empty excepted), exactly one reverb card, and the
-// layoutCost sums under the average and worst-block lines.
+// Placement rules of the registry spec: ids in range, no card twice (Empty excepted, and Formant and the
+// Formant follower counting as one card), exactly one reverb card, and the layoutCost sums under the
+// average and worst-block lines.
 LayoutCheck layoutValid(const Layout& layout);
 
 // Short readable reason for a failed check, for example "two reverb cards". Empty string when ok.

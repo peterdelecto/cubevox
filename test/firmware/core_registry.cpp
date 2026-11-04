@@ -85,14 +85,14 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb cards");
-  check(pitch == 4, "autotune, octave, formant and the crowd card are the pitch group");
+  check(pitch == 5, "autotune, octave, formant, the formant follower and the crowd card are the pitch group");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
 // still reaches its own engine field through the knob it is listed on.
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
-                              Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom};
+                              Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom,       Card::FormantFollower};
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
            std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "VOICES") == 0;
@@ -158,6 +158,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Formant: return knob == 0 ? static_cast<float>(p.pitchFx.formant.shiftSt) : p.pitchFx.formant.mix;
     case Card::Lofi: return knob == 0 ? p.lofi.tone : p.lofi.amount;
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
+    case Card::FormantFollower: return knob == 0 ? p.follower.depthSt : p.pitchFx.formant.mix;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -414,12 +415,13 @@ void checkCrowdVoices() {
   check(top.crowd.voicesStep == cv::kVoicesMob, "crowd: a VOICES reading past the top lands on MOB");
 }
 
-// Formant, an alternate for Octave in slot 3, and Lo-fi and Chatter, alternates for Gate in slot 7. They sit
-// after the Crowd card in the table, so every earlier id keeps its meaning in a saved layout. Each row is
-// the estimate in costs.h until the stress run replaces it.
+// Formant and the Formant follower, alternates for Octave in slot 3, and Lo-fi and Chatter, alternates for
+// Gate in slot 7. They sit after the Crowd card in the table, so every earlier id keeps its meaning in a
+// saved layout. Each row is the estimate in costs.h until the stress run replaces it.
 void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
-            static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 && kCardCount == 14,
+            static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 &&
+            static_cast<int>(Card::FormantFollower) == 14 && kCardCount == 15,
         "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
             kEngineCount == 10,
@@ -427,8 +429,50 @@ void checkAppendedCards() {
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
   };
-  check(sameRow(Card::Formant, costs::kFormant) && sameRow(Card::Lofi, costs::kLofi) && sameRow(Card::Bloom, costs::kBloom),
+  check(sameRow(Card::Formant, costs::kFormant) && sameRow(Card::Lofi, costs::kLofi) && sameRow(Card::Bloom, costs::kBloom) &&
+            sameRow(Card::FormantFollower, costs::kFormantFollower),
         "appended cards: each registry row is its costs.h row");
+}
+
+// The Formant follower: id formant_follow, which keeps under the id clip width, the pitch engine and
+// group, DEPTH from -7 st at 0 through 0 at noon to +7 st at full, the Formant voice's MIX, and FOLLOWER
+// on the OLED's readout title. Placing it hands the voice's SHIFT to the envelope.
+void checkFollowerCard() {
+  const CardDesc& d = cardDesc(Card::FormantFollower);
+  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Formant follower") == 0 &&
+            d.engine == Engine::Pitch && d.group == Group::Pitch && d.knobCount == 2,
+        "follower: id formant_follow, name Formant follower, the pitch engine and the pitch group");
+  check(std::strcmp(oledName(Card::FormantFollower), "Follower") == 0 && std::strcmp(oledName(Card::Formant), "Formant") == 0,
+        "follower: the readout title reads Follower, and a card without an OLED name keeps its name");
+  const KnobDesc& depth = *knobDesc(Card::FormantFollower, 0);
+  check(std::strcmp(depth.name, "DEPTH") == 0 && depth.kind == KnobKind::Continuous && depth.min == -7.0f &&
+            depth.max == 7.0f && std::strcmp(depth.unit, "st") == 0,
+        "follower: knob A is DEPTH, continuous from -7 to +7 st");
+  const KnobDesc& mix = *knobDesc(Card::FormantFollower, 1);
+  check(std::strcmp(mix.name, "MIX") == 0 && std::strcmp(mix.unit, "%") == 0, "follower: knob B is MIX, a percent");
+
+  ChainParams p;
+  const auto depthAt = [&p](float position) {
+    applyKnob(Card::FormantFollower, 0, position, p);
+    return p.follower.depthSt;
+  };
+  check(depthAt(0.0f) == -7.0f && depthAt(0.5f) == 0.0f && depthAt(1.0f) == 7.0f,
+        "follower: DEPTH is -7 st at 0, 0 at noon and +7 st at full");
+  check(shownText(depth, 0.0f) == "-7" && shownText(depth, 0.5f) == "0" && shownText(depth, 0.75f) == "+4" &&
+            knobCells(depth) == 2,
+        "follower: DEPTH reads its semitones with the sign in two cells");
+  applyKnob(Card::FormantFollower, 1, 0.4f, p);
+  check(std::fabs(p.pitchFx.formant.mix - 0.4f) < 1e-6f, "follower: MIX drives the Formant voice's mix");
+
+  ChainParams t;
+  applyToggle(Card::FormantFollower, true, t);
+  check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.follower.placed,
+        "follower: its toggle sets formant.on and nothing else");
+  check(!ChainParams().follower.placed, "follower: the envelope drives nothing before the card is placed");
+  applyPlacement(Card::Formant, t);
+  check(!t.follower.placed, "follower: placing the Formant card leaves SHIFT on its own knob");
+  applyPlacement(Card::FormantFollower, t);
+  check(t.follower.placed, "follower: placing the card hands SHIFT to the envelope");
 }
 
 void checkFormantCard() {
@@ -674,6 +718,7 @@ void checkRegistry() {
   checkCrowdVoices();
   checkAppendedCards();
   checkFormantCard();
+  checkFollowerCard();
   checkLofiCard();
   checkBloomCard();
   checkAppendedToggles();
