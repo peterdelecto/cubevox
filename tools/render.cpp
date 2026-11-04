@@ -70,7 +70,7 @@ int usage() {
                "       [--octave <-12..12>] [--omix <0..1>, default 0.1, the box's start]\n"
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
                "       [--follower <-7..7>] [--follower-drive <drive.wav>]\n"
-               "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
+               "       [--crowd] [--width <0..1>] [--voices <0..9>] [--mob2 <0..1>, DRIFT]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
                "       [--reverb spring|chasm] [--time <0..1>] [--mix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
@@ -85,6 +85,7 @@ int usage() {
                "  its value is DEPTH in semitones, any value from -7 to 7, and --fmix sets its MIX; it overrides --formant's\n"
                "  SHIFT. --follower-drive writes the follower's drive, 0 to 1, as a mono WAV beside the render\n"
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
+               "  --mob2 runs the crowd as Mob 2 at that DRIFT, with DIVERGE fixed at 1; --voices is then 0 to 4 copies or 5 for MOB\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
@@ -569,6 +570,10 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--follower-drive") == 0 && i + 1 < argc) {
       rp.drivePath = argv[++i];
     } else if (std::strcmp(a, "--crowd") == 0) {
+      rp.crowdOn = true;
+    } else if (std::strcmp(a, "--mob2") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.crowd.drift) || rp.crowd.drift < 0.0f || rp.crowd.drift > 1.0f) return false;
+      rp.crowd.mob2 = true;
       rp.crowdOn = true;
     } else if (std::strcmp(a, "--width") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.crowd.width) || rp.crowd.width < 0.0f || rp.crowd.width > 1.0f)

@@ -7,7 +7,7 @@
 // shared tone shelf, the correctness pass (the switch with the tracker, the gap rule over a noise
 // floor, DIVERGE holding the level, notes outside the tracker's range, the read ceiling, the tuning
 // ranges), and the raised copies (their pitch over the tuned copies, their 75 ms lag, the unvoiced
-// run each copy waits before it plays plain). Every run feeds a PitchFx through its pass-through
+// run each copy waits before it plays plain), and Mob 2 (four copies at MOB, bit-exact off). Every run feeds a PitchFx through its pass-through
 // path first, so the ring is written and the tracker runs, as the chain does. No window, no audio
 // device.
 
@@ -2211,6 +2211,31 @@ bool testPlainAfter() {
   return ok;
 }
 
+// Mob 2 (the Crowd engine's mob2 mode) at MOB plays the four tuned copies alone with the lead gone,
+// and switched off it ends bit-exact on its input.
+bool testMob2() {
+  const Signal in = program(2);
+  cv::CrowdParams on;
+  on.on = true;
+  on.mob2 = true;
+  on.voicesStep = cv::kVoices2Mob;
+  cv::CrowdParams off = on;
+  off.on = false;
+  Probe probe;
+  const Signal top = run(in, on, &probe);
+  bool finite = true;
+  for (float v : top) finite = finite && std::isfinite(v);
+  bool ok = report("mob 2 at MOB", finite && probe.mask == 0x0Fu && probe.lead == 0.0f,
+                   "finite %.0f (1), copy mask %.0f (15), lead %.3g (0)", finite ? 1.0 : 0.0,
+                   static_cast<double>(probe.mask), static_cast<double>(probe.lead));
+  const int half = kRate / cv::kBlock * cv::kBlock;
+  const Signal b = runSwitch(in, on, off, half);
+  float worst = 0.0f;
+  for (size_t i = static_cast<size_t>(half + kSettle); i < in.size(); ++i) worst = std::max(worst, std::fabs(b[i] - in[i]));
+  ok &= report("mob 2 off exact", worst == 0.0f, "on then off, 100 ms after the switch max|out-in|=%.3g (0)", worst);
+  return ok;
+}
+
 // The checks, in the order they run.
 constexpr bool (*kChecks[])() = {
     testOffExact,        testReset,           testNoAlloc,           testPitchMoves,         testWidthLaw,
@@ -2220,7 +2245,7 @@ constexpr bool (*kChecks[])() = {
     testWorkingSetDefaults, testLevelScatter, testContour,           testMelodicBottom,      testWidthGlides,
     testWidthLag,        testWidthZeroIsDelay, testSharedShelf,      testEnhancementsStable, testSwitchWithTracker,
     testVoicesStepGlides, testGapOverFloor,   testWidthHoldsLevel,   testOutOfRange,         testReadCeiling,
-    testTuningRanges,    testRaisedLag,       testPlainAfter,
+    testTuningRanges,    testRaisedLag,       testPlainAfter,        testMob2,
 };
 
 }  // namespace

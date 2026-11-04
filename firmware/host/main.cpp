@@ -157,6 +157,15 @@ constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO
                                                 {Card::Bloom, "bloom", "chatter", "CHATTER", costs::kBloom},
                                                 {Card::Gate, "gate", "gate", "GATE", costs::kGate}}};
 
+// The slot 4 cards picked out of the menu's cycle order, so each pick takes two steps or one, and
+// what the default layout costs without slot 4's card.
+constexpr std::array<CardRow, 3> kSlot4Rows = {{{Card::Crowd2, "crowd2", "mob2", "MOB 2", costs::kCrowd2},
+                                                {Card::Crowd, "crowd", "mob", "MOB", costs::kCrowd},
+                                                {Card::Unison, "unison", "unison", "UNISON", costs::kUnison}}};
+constexpr costs::Cost kSlot4Rest = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kSlapback +
+                                   costs::kDistortion + costs::kGate + costs::kReverbSpring + costs::kFixed +
+                                   costs::kTracker;
+
 bool costIs(const LayoutCost& cost, const costs::Cost& expected) {
   return cost.avg == expected.avg && cost.worst == expected.worst;
 }
@@ -264,6 +273,34 @@ void checkSlot7(const CheckClips& clips, bool swapped, std::vector<std::string>&
   const Layout kept = rig.box.layout();
   rig.box.pickSlot7Card(Card::Formant);
   expect(rig.box.layout() == kept, "a card outside the cycle leaves the layout as it was");
+}
+
+// The three slot 4 cards through the box's card switch on the default layout. After each pick the
+// layout holds the card in slot 4 at the sum of its rows, and the audio through the box is finite and
+// above the floor.
+void checkSlot4(const CheckClips& clips, std::vector<std::string>& failed) {
+  const auto expect = [&](bool ok, const std::string& what) {
+    if (!ok) failed.push_back("default layout: " + what);
+  };
+  Rig rig;
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
+  rig.run(kCheckSwapMs, true);
+  for (const CardRow& row : kSlot4Rows) {
+    const size_t from = rig.output.size();
+    rig.box.pickSlot4Card(row.card);
+    rig.run(kCheckSwapMs, true);
+    const LayoutCost cost = rig.box.cost();
+    bool finite = true;
+    for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);
+    const float dbfs = lastSecondDbfs(rig.output);
+    const std::string name = std::string("slot 4 ") + row.name;
+    expect(cardIs(rig.box.layout(), kMobSlot, row.id), name + " is in slot 4 after the pick");
+    expect(costIs(cost, kSlot4Rest + row.cost), name + " costs the sum of its rows");
+    expect(finite, name + " output is finite");
+    expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
+    std::printf("%-14s slot 4 %-8s cost %d / %d, output %.1f dBFS\n", "default layout", row.name, cost.avg,
+                cost.worst, static_cast<double>(dbfs));
+  }
 }
 
 // The display's contrast through the box. It starts at HIGH, drops to 8 once the dimming time has
@@ -391,6 +428,7 @@ int runCheck(const char* argv0) {
   checkSlot3(clips, true, failed);
   checkSlot7(clips, false, failed);
   checkSlot7(clips, true, failed);
+  checkSlot4(clips, failed);
   checkDim(clips, failed);
 
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,

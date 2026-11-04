@@ -107,20 +107,22 @@ void Box::swapUnisonMob() { applyAction(UiAction::SwapUnisonCrowd); }
 
 void Box::swapReverb() { applyAction(UiAction::SwapReverb); }
 
-void Box::pickSlot3Card(Card card) { pickByCycle(UiAction::SwapOctaveFormant, octaveFormantSlot, card); }
+void Box::pickSlot3Card(Card card) { pickCycledCard(card, UiAction::SwapOctaveFormant, octaveFormantSlot); }
 
-void Box::pickSlot7Card(Card card) { pickByCycle(UiAction::CycleSlot7Card, slot7CardSlot, card); }
+void Box::pickSlot4Card(Card card) { pickCycledCard(card, UiAction::SwapUnisonCrowd, unisonCrowdSlot); }
+
+void Box::pickSlot7Card(Card card) { pickCycledCard(card, UiAction::CycleSlot7Card, slot7CardSlot); }
 
 // Each cycle visits at most three cards, so two steps reach any card it can reach. The steps run on a
 // copy, and the box takes the copy only when it holds the card.
-void Box::pickByCycle(UiAction cycle, int (*slotOf)(const Layout&), Card card) {
+void Box::pickCycledCard(Card card, UiAction action, int (*slotOf)(const Layout&)) {
   constexpr int kCycleSteps = 2;
   Layout trial = layout_;
   Settings scratch = settings_;
   for (int step = 0; step < kCycleSteps; ++step) {
     const int slot = slotOf(trial);
     if (slot < 0 || trial.card[static_cast<size_t>(slot)] == card) break;
-    if (ui::applyAction(cycle, scratch, trial) != ui::ApplyResult::LayoutChanged) break;
+    if (ui::applyAction(action, scratch, trial) != ui::ApplyResult::LayoutChanged) break;
   }
   const int slot = slotOf(trial);
   if (slot < 0 || trial.card[static_cast<size_t>(slot)] != card || trial == layout_) return;
