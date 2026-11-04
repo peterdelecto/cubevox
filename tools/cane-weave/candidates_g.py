@@ -140,18 +140,26 @@ def stamp(mask, u, v, r, value=True):
   mask[j[ok], i[ok]] = value
 
 
+def stipple_dots(sites, tone, rng, r0, r1, t0, jitter=0.15):
+  """The (u, v, r) dots, mm, that stipple() stamps."""
+  dots = []
+  for u, v, _ in sites:
+    t, x, j = sample(tone, u, v), rng.random(), 1 + jitter * (2 * rng.random() - 1)
+    if t >= t0:
+      dots.append((u, v, max(r0, (r0 + (r1 - r0) * (t - t0) / (1 - t0)) * j)))
+    elif x < t / t0:
+      dots.append((u, v, r0))
+  return dots
+
+
 def stipple(sites, tone, rng, r0, r1, t0, jitter=0.15):
   """Light dots on the sites, from the tone (0 to 1) at each site. Below t0 a
   share t / t0 of the sites lights, each a smallest dot of radius r0 mm. From
   t0 up every site lights and its dot grows toward r1 mm, so neighbours merge
   and the dark between them shrinks to specks."""
   light = np.zeros(U.shape, bool)
-  for u, v, _ in sites:
-    t, x, j = sample(tone, u, v), rng.random(), 1 + jitter * (2 * rng.random() - 1)
-    if t >= t0:
-      stamp(light, u, v, max(r0, (r0 + (r1 - r0) * (t - t0) / (1 - t0)) * j))
-    elif x < t / t0:
-      stamp(light, u, v, r0)
+  for u, v, r in stipple_dots(sites, tone, rng, r0, r1, t0, jitter):
+    stamp(light, u, v, r)
   return light
 
 
@@ -222,11 +230,8 @@ def g0_fine():
   return light
 
 
-def g5_fine_open():
-  """Fine metal flake over a low dome, lit from the upper left, with no solid
-  highlight. The flakes sit where G0's do, and the clear coat's softbox
-  reflection sets each one's size and density. Flakes stay at most 1.04 mm
-  across, so none merge, even where the highlight was."""
+def g5_dots():
+  """G5's (u, v, r) dots, mm, before the face masks."""
   l = light_dir(-1, -1, 1.3)
   su, sv = mirror_slope(l)
   x, y = (U - 104) / 96, (V - 84) / 76
@@ -235,7 +240,30 @@ def g5_fine_open():
   sd = softbox(gu - su, gv - sv, 0.12, 0.07, 0.05, -30)
   sites = scatter(60, lambda _: 0.45, 0.75, 0.45)
   rng = random.Random(62)
-  return stipple(sites, 0.55 * halo(sd, 0.22, 0.4), rng, 0.45, 0.50, 0.35, jitter=0.04)
+  return stipple_dots(sites, 0.55 * halo(sd, 0.22, 0.4), rng, 0.45, 0.50, 0.35, jitter=0.04)
+
+
+def g5_fine_open():
+  """Fine metal flake over a low dome, lit from the upper left, with no solid
+  highlight. The flakes sit where G0's do, and the clear coat's softbox
+  reflection sets each one's size and density. Flakes stay at most 1.04 mm
+  across, so none merge, even where the highlight was."""
+  light = np.zeros(U.shape, bool)
+  for u, v, r in g5_dots():
+    stamp(light, u, v, r)
+  return light
+
+
+def g5_circle_list(edge=0.15):
+  """(u, v, r) circles in mm on the face grid for G5: each dot centred where
+  stamp() centres it, kept only when the dot plus `edge` mm stays in ALLOWED."""
+  from candidates_c import leaves_allowed
+  out = []
+  for u, v, r in g5_dots():
+    u, v = round(u * S) / S, round(v * S) / S
+    if not leaves_allowed(u, v, r + edge):
+      out.append((u, v, r))
+  return out
 
 
 # --- G1: coarse flake with a few big glints -------------------------------------

@@ -17,9 +17,12 @@ import adsk.fusion
 
 JSON_PATH = '/Users/j/Documents/Claude/Projects/cubevox/build/cane/c12-circles.json'
 DOC_NAME = 'cubevox-enclosure'
-FACE_Z_MM = 13.2662
 DEPTH_MM = 0.4         # must equal the user parameter inlayDepth
 STOP_AFTER = None      # 'sketch' | 'cut' | 'dots' | None (run everything)
+
+# The lid's top face is found by size (the largest flat face looking up); its height
+# is read from the model, 13.7662 mm since the owner's window change of 2026-11-03.
+FACE_Z_MM = None
 
 
 def lid_component(design):
@@ -30,14 +33,18 @@ def lid_component(design):
 
 
 def top_face(body):
+  """The largest flat face of the body that looks up; sets FACE_Z_MM from it."""
+  global FACE_Z_MM
   best = None
   for f in body.faces:
     g = f.geometry
     if g.objectType == adsk.core.Plane.classType() and abs(g.normal.z - 1) < 1e-6:
-      if abs(f.pointOnFace.z * 10 - FACE_Z_MM) < 1e-3 and (best is None or f.area > best.area):
+      if best is None or f.area > best.area:
         best = f
   if best is None:
-    raise RuntimeError('no top face at z %.4f mm' % FACE_Z_MM)
+    raise RuntimeError('no flat face looking up')
+  FACE_Z_MM = round(best.pointOnFace.z * 10, 4)
+  print('top face z mm', FACE_Z_MM, 'area mm2 %.1f' % (best.area * 100))
   return best
 
 

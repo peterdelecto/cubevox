@@ -158,7 +158,8 @@ def proof(path):
            + [(8.5 + 24 * i, -108.5, 8.8) for i in range(8)]
            + [(8.5 + 24 * i, -134.5, 8.8) for i in range(8)]
            + [(8.5, -32.0, 6.25), (176.5, -31.5, 8.8), (117.94, -40.75, 7.97)])
-  oled = (61.54, -53.0, 98.03, -28.0)
+  oled = (61.535, -54.75, 98.035, -30.0)     # the window (owner 2026-11-03)
+  pocket = (60.54, -61.0, 99.04, -24.0)       # the 0.5 mm recess round it
   clear = 1.0
   s = 10
   w, h = int((face[2] - face[0]) * s), int((face[3] - face[1]) * s)
@@ -188,8 +189,8 @@ def proof(path):
     d.ellipse([a, b], fill=dark)
     r = dia / 2
     d.ellipse([px(x - r, y + r), px(x + r, y - r)], fill=(255, 255, 255))
-  d.rectangle([px(oled[0] - clear, oled[3] + clear),
-               px(oled[2] + clear, oled[1] - clear)], fill=dark)
+  d.rectangle([px(pocket[0] - clear, pocket[3] + clear),
+               px(pocket[2] + clear, pocket[1] - clear)], fill=dark)
   d.rectangle([px(oled[0], oled[3]), px(oled[2], oled[1])], fill=(255, 255, 255))
   img.save(path)
   print(f'{path}: {w}x{h} px, {narrow} pieces under 0.8 mm wide before clipping')

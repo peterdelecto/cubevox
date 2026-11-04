@@ -30,8 +30,9 @@ HOLES = ([(8.5 + 24 * i, -85.0, 6.25) for i in range(8)]
          + [(8.5 + 24 * i, -108.5, 8.8) for i in range(8)]
          + [(8.5 + 24 * i, -134.5, 8.8) for i in range(8)]
          + [(8.5, -32.0, 6.25), (176.5, -31.5, 8.8), (117.94, -40.75, 7.97)])
-OLED = (61.54, -53.0, 98.03, -28.0)
+OLED = (62.535, -48.75, 97.035, -31.5)      # the window through the lid (owner 2026-11-04)
 CLEAR = 1.0
+EDGE_CLEAR = 0.2        # mm; a pattern run to the hole edges stays this far off each wall
 
 S = 10                                    # px per mm
 W, H = int((FACE[2] - FACE[0]) * S), int((FACE[3] - FACE[1]) * S)
@@ -52,9 +53,9 @@ def to_uv(x, y):
   return x - FACE[0], FACE[3] - y
 
 
-def face_masks():
-  """Where inlay may go (the field less each clearance ring), and the
-  through-holes, drawn white."""
+def face_masks(clear=CLEAR):
+  """Where inlay may go (the field less a clearance ring of `clear` mm round
+  each hole and the window), and the through-holes, drawn white."""
   u0, v0 = to_uv(FIELD[0], FIELD[3])
   u1, v1 = to_uv(FIELD[2], FIELD[1])
   allowed = (U >= u0) & (U <= u1) & (V >= v0) & (V <= v1)
@@ -62,17 +63,18 @@ def face_masks():
   for x, y, dia in HOLES:
     hu, hv = to_uv(x, y)
     d2 = (U - hu) ** 2 + (V - hv) ** 2
-    allowed &= d2 > (dia / 2 + CLEAR) ** 2
+    allowed &= d2 > (dia / 2 + clear) ** 2
     void |= d2 <= (dia / 2) ** 2
   ou0, ov0 = to_uv(OLED[0], OLED[3])
   ou1, ov1 = to_uv(OLED[2], OLED[1])
-  allowed &= ~((U >= ou0 - CLEAR) & (U <= ou1 + CLEAR)
-               & (V >= ov0 - CLEAR) & (V <= ov1 + CLEAR))
+  allowed &= ~((U >= ou0 - clear) & (U <= ou1 + clear)
+               & (V >= ov0 - clear) & (V <= ov1 + clear))
   void |= (U >= ou0) & (U <= ou1) & (V >= ov0) & (V <= ov1)
   return allowed, void
 
 
 ALLOWED, VOID_MASK = face_masks()
+ALLOWED_TO_EDGES, _ = face_masks(EDGE_CLEAR)
 
 
 # --- Shared tools ---------------------------------------------------------
@@ -201,14 +203,14 @@ OPEN_DISC = disc(8)     # light features narrower than 0.8 mm vanish
 CLOSE_DISC = disc(6)    # dark gaps narrower than 0.6 mm fill
 
 
-def printable(light):
+def printable(light, region=ALLOWED):
   """Opening by an 8 px disc, then closing by a 6 px disc, repeated until the
   mask stops changing. Returns the mask and the fraction of the original light
   pixels that changed (removed or added)."""
-  start = light & ALLOWED
+  start = light & region
   m = start
   for _ in range(6):
-    nxt = closing(opening(m, OPEN_DISC), CLOSE_DISC) & ALLOWED
+    nxt = closing(opening(m, OPEN_DISC), CLOSE_DISC) & region
     if np.array_equal(nxt, m):
       break
     m = nxt
@@ -224,7 +226,7 @@ def printable(light):
       break
     m &= ~dilate(thin, CLOSE_DISC)
   assert np.array_equal(opening(m, OPEN_DISC), m)
-  assert np.array_equal(closing(m, CLOSE_DISC) & ALLOWED, m)
+  assert np.array_equal(closing(m, CLOSE_DISC) & region, m)
   return m, np.count_nonzero(m != start) / np.count_nonzero(start)
 
 
