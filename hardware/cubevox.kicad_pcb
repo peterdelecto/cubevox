@@ -54206,15 +54206,15 @@
 			(uuid "7e2534e4-cfc1-4ede-9357-c7cbd70244c0")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/DC-IN-TH_PJ-002A.wrl"
+		(model "${KIPRJMOD}/cubevox.3dshapes/DC-IN-TH_PJ-002A_datasheet.step"
 			(offset
-				(xyz -7 4.3 0)
+				(xyz 0 0 0)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 180)
+				(xyz 0 0 0)
 			)
 		)
 	)
@@ -54806,15 +54806,15 @@
 			(uuid "fa970ee5-095e-4831-8906-a4d41e064720")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/AUDIO-TH_PJ-611E_1_easyeda.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/AUDIO-TH_PJ-611E_1_datasheet.step"
 			(offset
-				(xyz 10.69 -1.4 6.48)
+				(xyz 0 0 0)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 270)
+				(xyz 0 0 0)
 			)
 		)
 	)
@@ -55135,9 +55135,9 @@
 			(uuid "5b6f37e8-d153-4ac6-84c3-e6639ec778e6")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/cubevox.3dshapes/SW-TH_5P-P4.70_SS-12D11-G050.step"
+		(model "${KIPRJMOD}/cubevox.3dshapes/SW-TH_5P-P4.70_SS-12D11-G050_datasheet.step"
 			(offset
-				(xyz 0 2.25 3.3)
+				(xyz 0 0 0)
 			)
 			(scale
 				(xyz 1 1 1)

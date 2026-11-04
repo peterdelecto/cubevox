@@ -293,9 +293,9 @@
 		(uuid "82d53e8b-fbb0-4139-ac6a-a1dd8a7e9caf")
 	)
 	(embedded_fonts no)
-	(model "${KIPRJMOD}/cubevox.3dshapes/SW-TH_5P-P4.70_SS-12D11-G050.step"
+	(model "${KIPRJMOD}/cubevox.3dshapes/SW-TH_5P-P4.70_SS-12D11-G050_datasheet.step"
 		(offset
-			(xyz 0 2.25 3.3)
+			(xyz 0 0 0)
 		)
 		(scale
 			(xyz 1 1 1)
