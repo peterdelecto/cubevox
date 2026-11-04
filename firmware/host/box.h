@@ -76,17 +76,19 @@ class Box {
   // One pass of loop().
   void tick(const PanelInput& in, uint32_t nowMs);
 
-  // The menu's REVERB, OCTAVE and UNISON rows. A layout the box would not load stays as it is.
+  // The menu's REVERB, OCTAVE, UNISON and DISTORTION rows. A layout the box would not load stays as it is.
   void swapOctaveFormant();
   void swapUnisonMob();
+  void swapDistortionGrowl();
   void swapReverb();
 
-  // The card switches under slots 3, 4 and 7. Each applies its menu action until the slot holds
-  // `card` (Octave, Formant or the Formant follower; Unison, Mob or Mob 2; Gate, Lofi or Chatter).
-  // When no step of the cycle reaches it, because the box would not load that layout, the layout
-  // stays as it was.
+  // The card switches under slots 3, 4, 6 and 7. Each applies its menu action until the slot holds
+  // `card` (Octave, Formant or the Formant follower; Unison, Mob or Mob 2; Distortion or Growl; Gate,
+  // Lofi or Chatter). When no step of the cycle reaches it, because the box would not load that
+  // layout, the layout stays as it was.
   void pickSlot3Card(Card card);
   void pickSlot4Card(Card card);
+  void pickSlot6Card(Card card);
   void pickSlot7Card(Card card);
 
   const Pixels& pixels() const { return display_.pixels(); }

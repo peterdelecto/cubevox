@@ -32,6 +32,9 @@ Card nextSlot3Card(Card c) {
   }
 }
 
+// The card after `c` in the slot 6 cycle, Distortion to Growl and back to Distortion.
+Card nextSlot6Card(Card c) { return c == Card::Distortion ? Card::Growl : Card::Distortion; }
+
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
 Card nextSlot7Card(Card c) {
   switch (c) {
@@ -85,6 +88,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
     case UiAction::SwapReverb: return swapReverb(layout);
     case UiAction::SwapOctaveFormant: return cycleCard(layout, octaveFormantSlot(layout), nextSlot3Card);
     case UiAction::SwapUnisonCrowd: return cycleCard(layout, unisonCrowdSlot(layout), nextSlot4Card);
+    case UiAction::SwapDistortionGrowl: return cycleCard(layout, distortionGrowlSlot(layout), nextSlot6Card);
     case UiAction::CycleSlot7Card: return cycleCard(layout, slot7CardSlot(layout), nextSlot7Card);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;

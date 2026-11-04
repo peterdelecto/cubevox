@@ -29,6 +29,7 @@ enum class Card : uint8_t {
   Bloom,
   Crowd2,  // Mob 2, an audition card on the Crowd engine
   FormantFollower,
+  Growl,
   Count,
 };
 
@@ -39,10 +40,10 @@ constexpr int kCardCount = static_cast<int>(Card::Count);
 constexpr size_t kCardIdBytes = 16;
 
 // Engines the audio block owns. Cards map onto them: Autotune, Octave, Formant and the Formant
-// follower share Pitch, and both reverb cards share Reverb. The Crowd card has its own engine and
-// reads the Pitch engine's ring; the Mob 2 card runs the same engine in its Mob 2 mode, so a layout
-// holds one of the two. Count ends the list.
-enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Count };
+// follower share Pitch, and both reverb cards share Reverb. The Crowd and Growl cards have engines
+// of their own and read the Pitch engine's ring; the Mob 2 card runs the Crowd engine in its Mob 2
+// mode, so a layout holds one of the two. Count ends the list.
+enum class Engine : uint8_t { InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, Count };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);
 

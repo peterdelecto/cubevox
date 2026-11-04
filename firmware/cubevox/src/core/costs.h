@@ -135,6 +135,15 @@ constexpr Cost kFormantFollower{4, 5, false};  // est.: kFormant plus the follow
 constexpr Cost kLofi{4, 5, true};      // 19.5k / 31.4k, stress run 2026-11-02 (v2.01.14, lofi layout, TONE and AMOUNT swept: mean 3.04 %, worst 4.9 %, lowest run worst); the estimate of 2 / 2 missed the coefficient ramp of a moving knob
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 
+// The Growl card, Distortion's alternate in slot 6, reads the tracker like Crowd, so a layout with it pays
+// kTracker once. Its row is the card alone from the host bench of 2026-11-04 (g++ 15 at -O2 with the
+// firmware's float contraction, Adam's three clips in 64-sample blocks, the pitch stage running for the
+// ring and the tracker, minimum of 9 interleaved passes, mach_absolute_time per block): 0.478 host us a
+// block at GROWL and DRIVE 100 % (0.430 at 50 / 50, 0.482 with both knobs swept end to end), and 0.666 us
+// for the costliest block, its minimum over the passes. At 50.4k board cycles per host us that is 24.1k /
+// 33.6k cycles, 3.8 % / 5.2 %, rounded up.
+constexpr Cost kGrowl{4, 6, false};  // est. from that host bench; a board run owes the measured row
+
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.
 constexpr Cost kOutputEq{6, 7, false};     // est. 32.7k / 38k for both POLISH EQ halves and the sample conversion; 18.1k on the board for 7 biquads (9.2k measured, 8.9k est.) times the host ratio 1.55 for 9 biquads and the detector, plus 4.6k conversion; the worst adds the coefficient work of a block that switches on

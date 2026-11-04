@@ -272,6 +272,9 @@ class Distortion {
             2.0f * (am - apc) * r, (ap - amc - beta) * r};
   }
 
+ public:
+  // The rail and its parts are public because the Growl card clips with the same knee.
+  //
   // One side of the rail. The soft edge is `edge` wide and ends at the limit; the knee starts at
   // `start` = limit - edge and runs for span = 2 edge, and curve = 1 / (4 edge) is its curvature.
   struct Side {
@@ -307,6 +310,7 @@ class Distortion {
     return knee(r.pos, fmaxf(x, 0.0f)) - knee(r.neg, fmaxf(-x, 0.0f));
   }
 
+ private:
   // The half-bands read 8 samples, so the rail's input and even output keep 7 samples of history ahead
   // of the chunk, and the odd output 4.
   static constexpr int kLead = 7;

@@ -1,11 +1,12 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|follower] [--slot7 gate|lofi|chatter]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|follower] [--slot6 distortion|growl]
+//                                  [--slot7 gate|lofi|chatter]
 //                                             one frame of the window as a P6 PPM, no audio device,
-//                                             with those cards in slots 3 and 7 (Octave and Gate when omitted;
-//                                             a card id also picks its card, `bloom` Chatter and
-//                                             `formant_follow` the Formant follower)
+//                                             with those cards in slots 3, 6 and 7 (Octave, Distortion and
+//                                             Gate when omitted; a card id also picks its card, `bloom`
+//                                             Chatter and `formant_follow` the Formant follower)
 
 #include <array>
 #include <cmath>
@@ -53,6 +54,7 @@ constexpr int kMaxCatchUpPasses = 50;
 constexpr int kCheckMinDbfs = -40;
 constexpr int kSlot3 = 2;      // slot 3, counted from 0
 constexpr int kMobSlot = 3;    // slot 4
+constexpr int kSlot6 = 5;      // slot 6
 constexpr int kSlot7 = 6;      // slot 7
 constexpr int kReverbSlot = 7;  // slot 8, the reverb slot
 constexpr uint32_t kCheckSwapMs = 1500;  // after a pick: the layout fade, then more than a second of audio
@@ -153,6 +155,9 @@ constexpr std::array<CardRow, 3> kSlot3Rows = {
     {{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
      {Card::FormantFollower, "formant_follow", "follower", "FOLLOWER", costs::kFormantFollower},
      {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
+constexpr std::array<CardRow, 2> kSlot6Rows = {{{Card::Growl, "growl", "growl", "GROWL", costs::kGrowl},
+                                                {Card::Distortion, "distortion", "distortion", "DISTORTION",
+                                                 costs::kDistortion}}};
 constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO-FI", costs::kLofi},
                                                 {Card::Bloom, "bloom", "chatter", "CHATTER", costs::kBloom},
                                                 {Card::Gate, "gate", "gate", "GATE", costs::kGate}}};
@@ -226,6 +231,51 @@ void checkSlot3(const CheckClips& clips, bool swapped, std::vector<std::string>&
     expect(finite, name + " output is finite");
     expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
     std::printf("%-14s slot 3 %-8s cost %d / %d, output %.1f dBFS\n", where, row.name, cost.avg, cost.worst,
+                static_cast<double>(dbfs));
+  }
+}
+
+// The Distortion and Growl swap through the box's switch, to Growl and back. After each swap slot 6
+// holds the card, the layout's cost is the rest of its rows less Distortion's plus the card's own,
+// Octave's and Gate's, and the audio through the box is finite and above the floor. `swapped` puts MOB
+// in slot 4 and Chasm in slot 8 first.
+void checkSlot6(const CheckClips& clips, bool swapped, std::vector<std::string>& failed) {
+  const char* const where = swapped ? "MOB and Chasm" : "default layout";
+  const costs::Cost rest = swapped ? kSwappedRest : kDefaultRest;
+  const auto expect = [&](bool ok, const std::string& what) {
+    if (!ok) failed.push_back(std::string(where) + ": " + what);
+  };
+  const auto sumWith = [&rest](const costs::Cost& card) {
+    const costs::Cost others = rest + costs::kOctave + costs::kGate + card;
+    return costs::Cost{static_cast<uint8_t>(others.avg - costs::kDistortion.avg),
+                       static_cast<uint8_t>(others.worst - costs::kDistortion.worst), others.measured};
+  };
+
+  Rig rig;
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
+  if (swapped) {
+    rig.box.swapUnisonMob();
+    rig.box.swapReverb();
+  }
+  rig.run(kCheckSwapMs, true);
+  expect(cardIs(rig.box.layout(), kSlot6, "distortion") && costIs(rig.box.cost(), sumWith(costs::kDistortion)),
+         "slot 6 starts on Distortion at the sum of its rows");
+
+  for (const CardRow& row : kSlot6Rows) {
+    const size_t from = rig.output.size();
+    rig.box.swapDistortionGrowl();
+    rig.run(kCheckSwapMs, true);
+    const LayoutCost cost = rig.box.cost();
+    bool finite = true;
+    for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);
+    const float dbfs = lastSecondDbfs(rig.output);
+    const std::string name = std::string("slot 6 ") + row.name;
+    expect(cardIs(rig.box.layout(), kSlot6, row.id), name + " is in slot 6 after the swap");
+    expect(costIs(cost, sumWith(row.cost)), name + " costs the sum of its rows, kFixed and kTracker");
+    expect(layoutValid(rig.box.layout()).ok(), name + " layout passes the placement rules");
+    expect(finite, name + " output is finite");
+    expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
+    std::printf("%-14s slot 6 %-10s cost %d / %d, output %.1f dBFS\n", where, row.name, cost.avg, cost.worst,
                 static_cast<double>(dbfs));
   }
 }
@@ -315,7 +365,7 @@ void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
   constexpr uint8_t kMax = 255;
   constexpr uint8_t kLow = 48;
   constexpr uint8_t kDimmed = 8;
-  constexpr int32_t kBrightnessItem = 9;  // the BRIGHTNESS row of the menu list, counted from 0
+  constexpr int32_t kBrightnessItem = 10;  // the BRIGHTNESS row of the menu list, counted from 0
   constexpr uint32_t kSettleMs = 1000;    // long enough for a control to reach the face
 
   Rig rig;
@@ -426,6 +476,8 @@ int runCheck(const char* argv0) {
 
   checkSlot3(clips, false, failed);
   checkSlot3(clips, true, failed);
+  checkSlot6(clips, false, failed);
+  checkSlot6(clips, true, failed);
   checkSlot7(clips, false, failed);
   checkSlot7(clips, true, failed);
   checkSlot4(clips, failed);
@@ -442,10 +494,11 @@ int runCheck(const char* argv0) {
   return 0;
 }
 
-int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot7) {
+int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot6, Card slot7) {
   Rig rig;
   if (!rig.source.findClip(argv0)) return 1;
   rig.box.pickSlot3Card(slot3);
+  rig.box.pickSlot6Card(slot6);
   rig.box.pickSlot7Card(slot7);
   rig.run(kProofMs, false);
   Window window(false);
@@ -510,7 +563,7 @@ int runLive(const char* argv0) {
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|follower] "
-               "[--slot7 gate|lofi|chatter]]\n");
+               "[--slot6 distortion|growl] [--slot7 gate|lofi|chatter]]\n");
   return 2;
 }
 
@@ -535,11 +588,14 @@ int main(int argc, char** argv) {
   if (argc >= 3 && std::strcmp(argv[1], "--proof") == 0) {
     bool noMic = false;
     Card slot3 = Card::Octave;
+    Card slot6 = Card::Distortion;
     Card slot7 = Card::Gate;
     for (int i = 3; i < argc; ++i) {
       if (std::strcmp(argv[i], "--no-mic") == 0) {
         noMic = true;
       } else if (std::strcmp(argv[i], "--slot3") == 0 && i + 1 < argc && cardFromRows(kSlot3Rows, argv[i + 1], slot3)) {
+        ++i;
+      } else if (std::strcmp(argv[i], "--slot6") == 0 && i + 1 < argc && cardFromRows(kSlot6Rows, argv[i + 1], slot6)) {
         ++i;
       } else if (std::strcmp(argv[i], "--slot7") == 0 && i + 1 < argc && cardFromRows(kSlot7Rows, argv[i + 1], slot7)) {
         ++i;
@@ -547,7 +603,7 @@ int main(int argc, char** argv) {
         return usage();
       }
     }
-    return runProof(argv[0], argv[2], !noMic, slot3, slot7);
+    return runProof(argv[0], argv[2], !noMic, slot3, slot6, slot7);
   }
   return usage();
 }

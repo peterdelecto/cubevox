@@ -85,17 +85,19 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb cards");
-  check(pitch == 6, "autotune, octave, formant, the formant follower, the crowd card and Mob 2 are the pitch group");
+  check(pitch == 7, "autotune, octave, formant, the formant follower, the crowd card, Mob 2 and growl are the pitch group");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
 // still reaches its own engine field through the knob it is listed on.
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
-                              Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom,       Card::FormantFollower};
+                              Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom,       Card::FormantFollower,
+                              Card::Growl};
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
-           std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "VOICES") == 0;
+           std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "DRIVE") == 0 ||
+           std::strcmp(name, "VOICES") == 0;
   };
   for (const Card c : amountCards) {
     char what[96];
@@ -160,6 +162,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::Crowd2: return knob == 0 ? p.crowd.drift : static_cast<float>(p.crowd.voicesStep);
     case Card::FormantFollower: return knob == 0 ? p.follower.depthSt : p.pitchFx.formant.mix;
+    case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.drive;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -447,11 +450,12 @@ void checkMob2Card() {
 void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
             static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 &&
-            static_cast<int>(Card::Crowd2) == 14 && static_cast<int>(Card::FormantFollower) == 15 && kCardCount == 16,
+            static_cast<int>(Card::Crowd2) == 14 && static_cast<int>(Card::FormantFollower) == 15 &&
+            static_cast<int>(Card::Growl) == 16 && kCardCount == 17,
         "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
-            kEngineCount == 10,
-        "appended cards: the engine list appends Lofi and Bloom (the Chatter card's engine) after the Crowd engine");
+            static_cast<int>(Engine::Growl) == 10 && kEngineCount == 11,
+        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) and Growl after the Crowd engine");
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
   };
@@ -579,6 +583,33 @@ void checkBloomCard() {
         "chatter: AMOUNT drives the amount field and leaves LENGTH alone");
   check(shownText(length, 0.0f) == "20" && shownText(length, 1.0f) == "3000" && knobCells(length) == 4,
         "chatter: LENGTH reads 20 to 3000 in four cells");
+}
+
+// Growl, an alternate for Distortion in slot 6, sits in the pitch group with an engine of its own, and its
+// toggle keeps the pitch stage's ring and tracker running as the Crowd card's does.
+void checkGrowlCard() {
+  const CardDesc& growl = cardDesc(Card::Growl);
+  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Growl") == 0 && growl.engine == Engine::Growl &&
+            growl.group == Group::Pitch && growl.knobCount == 2,
+        "growl: id growl, name Growl, its own engine, the pitch group");
+  check(std::strcmp(knobDesc(Card::Growl, 0)->name, "GROWL") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->name, "DRIVE") == 0 &&
+            knobSteps(Card::Growl, 0) == 0 && knobSteps(Card::Growl, 1) == 0 &&
+            std::strcmp(knobDesc(Card::Growl, 0)->unit, "%") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->unit, "%") == 0,
+        "growl: knob A is GROWL and knob B is DRIVE, both continuous percents");
+  check(growl.cost.avg == costs::kGrowl.avg && growl.cost.worst == costs::kGrowl.worst &&
+            growl.cost.measured == costs::kGrowl.measured,
+        "growl: the registry row is its costs.h row");
+
+  ChainParams p;
+  applyKnob(Card::Growl, 0, 0.3f, p);
+  applyKnob(Card::Growl, 1, 0.8f, p);
+  check(std::fabs(p.growl.growl - 0.3f) < 1e-6f && std::fabs(p.growl.drive - 0.8f) < 1e-6f,
+        "growl: GROWL and DRIVE drive their own fields");
+  applyToggle(Card::Growl, true, p);
+  check(p.growl.on && p.pitchFx.growlOn && !p.pitchFx.crowdOn && !p.crowd.on && !p.distortion.on,
+        "growl: its toggle turns the card and the pitch stage's growlOn on and nothing else");
+  applyToggle(Card::Growl, false, p);
+  check(!p.growl.on && !p.pitchFx.growlOn, "growl: and off again");
 }
 
 void checkAppendedToggles() {
@@ -748,6 +779,7 @@ void checkRegistry() {
   checkFollowerCard();
   checkLofiCard();
   checkBloomCard();
+  checkGrowlCard();
   checkAppendedToggles();
   checkShownDecimals();
   checkCells();

@@ -155,8 +155,8 @@ struct MenuRig {
 // The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
 // at a time and scrolls.
 enum Row {
-  kInput, kReverb, kOctaveFormant, kUnisonCrowd, kSlot7Card, kPolishComp, kPolishEq, kOutput, kTopSwitch, kBrightness,
-  kDebug, kUpdate, kExit, kRowCount
+  kInput, kReverb, kOctaveFormant, kUnisonCrowd, kDistortionGrowl, kSlot7Card, kPolishComp, kPolishEq, kOutput, kTopSwitch,
+  kBrightness, kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
 
@@ -167,6 +167,7 @@ constexpr int kLastTop = kRowCount - kVisible;
 // Gate, and the slot it gives the reverb card.
 constexpr int kOctaveSlot = 2;
 constexpr int kUnisonSlot = 3;
+constexpr int kSlot6Slot = 5;
 constexpr int kSlot7Slot = 6;
 constexpr int kReverbSlot = 7;
 
@@ -175,11 +176,13 @@ constexpr int kReverbSlot = 7;
 constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible - 1; }
 
 // The label of each item, and the value it shows for the default settings and the default layout,
-// which holds Octave in slot 3, Unison in slot 4 and Gate in slot 7. Exit has no value and Update
-// firmware shows a chevron.
-const char* const kLabel[kRowCount] = {"INPUT",  "REVERB", "SLOT 3", "SLOT 4", "SLOT 7", "POLISH COMP", "POLISH EQ",
-                                       "OUTPUT", "TOP SWITCH", "BRIGHTNESS", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "OCTAVE", "UNISON", "GATE", "ON", "ON", "LINE", "MUTE", "HIGH", "OFF", ">", ""};
+// which holds Octave in slot 3, Unison in slot 4, Distortion in slot 6 and Gate in slot 7. Exit has no
+// value and Update firmware shows a chevron.
+const char* const kLabel[kRowCount] = {"INPUT",       "REVERB",    "SLOT 3", "SLOT 4",     "SLOT 6",
+                                       "SLOT 7",      "POLISH COMP", "POLISH EQ", "OUTPUT", "TOP SWITCH",
+                                       "BRIGHTNESS",  "DEBUG",     "UPDATE FIRMWARE", "EXIT"};
+const char* const kDefaultValue[kRowCount] = {"MIC", "SPRING", "OCTAVE", "UNISON", "DISTORTION", "GATE", "ON",
+                                              "ON",  "LINE",   "MUTE",   "HIGH",   "OFF",        ">",    ""};
 
 // The row as the test names it: the label, then the value after a space.
 std::string rowName(int item, const char* value) {
@@ -224,7 +227,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 13, "menu: the list holds thirteen items");
+  check(kRowCount == 14, "menu: the list holds fourteen items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string name = rowName(r, kDefaultValue[r]);
     check(listRowIs(m.canvas, r, kLabel[r], kDefaultValue[r], r == kInput), name.c_str());
@@ -332,12 +335,12 @@ void checkMenuListGeometry() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 4 to 12; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 8 to 0. The window top runs from 0 to 9. Each expected canvas is
+// Going down it scrolls at items 4 to 13; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 9 to 0. The window top runs from 0 to 10. Each expected canvas is
 // composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 
   MenuRig m;
   m.step(0, true);
@@ -366,7 +369,7 @@ void checkMenuScroll() {
   m.step(2, false);
   m.step(3, false);  // one pass of three steps leaves the window just far enough to show item 5
   m.draw();
-  check(sameCanvas(m.canvas, listCanvas(2, kPolishComp)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
+  check(sameCanvas(m.canvas, listCanvas(2, kSlot7Card)), "menu: a multi-step turn past the bottom scrolls only as far as the cursor needs");
   m.step(-2, false);
   m.draw();
   check(sameCanvas(m.canvas, listCanvas(2, kUnisonCrowd)), "menu: and a multi-step turn back inside the window leaves it where it is");
@@ -979,13 +982,14 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The thirteen rows in list order, with the labels written out and the cursor walked down one step at
+// The fourteen rows in list order, with the labels written out and the cursor walked down one step at
 // a time. The input filters are not on the list, the Octave and Formant row follows REVERB, the Unison
-// and Crowd row follows that, the slot 7 row follows that, and BRIGHTNESS sits between TOP SWITCH and
-// DEBUG.
+// and Crowd row follows that, the Distortion and Growl row follows that, the slot 7 row follows that,
+// and BRIGHTNESS sits between TOP SWITCH and DEBUG.
 void checkMenuRowOrder() {
-  static const char* const kSpecOrder[kRowCount] = {"INPUT",  "REVERB", "SLOT 3", "SLOT 4", "SLOT 7", "POLISH COMP", "POLISH EQ",
-                                                    "OUTPUT", "TOP SWITCH", "BRIGHTNESS", "DEBUG", "UPDATE FIRMWARE", "EXIT"};
+  static const char* const kSpecOrder[kRowCount] = {"INPUT",      "REVERB",      "SLOT 3",    "SLOT 4", "SLOT 6",
+                                                    "SLOT 7",     "POLISH COMP", "POLISH EQ", "OUTPUT", "TOP SWITCH",
+                                                    "BRIGHTNESS", "DEBUG",       "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
   m.step(0, true);
   bool inOrder = true;
@@ -994,8 +998,8 @@ void checkMenuRowOrder() {
     m.draw();
     inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
-  check(inOrder && kRowCount == 13,
-        "menu: the rows run INPUT, REVERB, SLOT 3, SLOT 4, SLOT 7, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, "
+  check(inOrder && kRowCount == 14,
+        "menu: the rows run INPUT, REVERB, SLOT 3, SLOT 4, SLOT 6, SLOT 7, POLISH COMP, POLISH EQ, OUTPUT, TOP SWITCH, "
         "BRIGHTNESS, DEBUG, UPDATE FIRMWARE, EXIT");
 }
 
@@ -1110,10 +1114,10 @@ void checkMenuWrapAndCombo() {
   MenuRig m;
   m.openListAt(kRowCount + kPolishComp);  // a full lap and more detents lands on POLISH COMP
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: a lap and five detents wraps around the list");
+  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: a lap and six detents wraps around the list");
   m.step(-(kRowCount + kPolishComp), false);  // back by the same lands on item 0
   m.draw();
-  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: a lap and five detents back wraps the other way");
+  check(cursorRowIs(m.canvas, kInput, kInput, "MIC"), "menu: a lap and six detents back wraps the other way");
 
   MenuRig n;
   n.openListAt(0);
@@ -1224,7 +1228,7 @@ void checkMenuRedraw() {
   clearAllDirty(m.canvas);
   m.step(3, false);  // the cursor passes the last row to item 4, so the window scrolls to start at item 1
   m.draw();
-  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kSlot7Card, "GATE"), "menu: a scroll repaints");
+  check(!pagesClean(m.canvas) && cursorRowIs(m.canvas, 3, kDistortionGrowl, "DISTORTION"), "menu: a scroll repaints");
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: and the scrolled window is then skipped when unchanged");
@@ -1279,8 +1283,21 @@ void checkScreenshots() {
   check(cursorRowIs(mob.canvas, kUnisonCrowd, kUnisonCrowd, "MOB"), "screens: menu rows with the cursor on SLOT 4 MOB");
   writePgm(mob.canvas, "oled-menu-mob.pgm");
 
-  // The slot 7 row with the cursor on it, once for each of the three cards. The window has scrolled one
+  // The slot 6 row with the cursor on it, once for each of its two cards. The window has scrolled one
   // row, so the cursor sits on the last visible row and the Unison and Crowd row above it.
+  for (const Card card : {Card::Distortion, Card::Growl}) {
+    MenuRig slot6;
+    slot6.layout.card[kSlot6Slot] = card;
+    slot6.openListAt(kDistortionGrowl);
+    slot6.draw();
+    const char* value = card == Card::Growl ? "GROWL" : "DISTORTION";
+    check(cursorRowIs(slot6.canvas, rowOnScreen(kDistortionGrowl), kDistortionGrowl, value) &&
+              listRowIs(slot6.canvas, rowOnScreen(kDistortionGrowl) - 1, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
+          (std::string("screens: menu rows with the cursor on SLOT 6 ") + value).c_str());
+  }
+
+  // The slot 7 row with the cursor on it, once for each of the three cards. The window has scrolled two
+  // rows, so the cursor sits on the last visible row and the Distortion and Growl row above it.
   const struct {
     Card card;
     const char* value;
@@ -1294,7 +1311,7 @@ void checkScreenshots() {
     slot7.openListAt(kSlot7Card);
     slot7.draw();
     check(cursorRowIs(slot7.canvas, rowOnScreen(kSlot7Card), kSlot7Card, shot.value) &&
-              listRowIs(slot7.canvas, rowOnScreen(kSlot7Card) - 1, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
+              listRowIs(slot7.canvas, rowOnScreen(kSlot7Card) - 1, kLabel[kDistortionGrowl], kDefaultValue[kDistortionGrowl]),
           (std::string("screens: menu rows with the cursor on SLOT 7 ") + shot.value).c_str());
     writePgm(slot7.canvas, shot.file);
   }

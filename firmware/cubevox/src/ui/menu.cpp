@@ -41,6 +41,7 @@ enum class Item : uint8_t {
   Reverb,
   OctaveFormant,
   UnisonCrowd,
+  DistortionGrowl,
   Slot7Card,
   PolishComp,
   PolishEq,
@@ -81,8 +82,9 @@ const char* slotLabel(int slot, char* buf, size_t size) {
   return buf;
 }
 
-// The label of `it`. The Octave and Formant row, the Unison and Crowd row and the slot 7 row name the
-// slot that holds their card, or a dash when none does, and build the text in `buf`.
+// The label of `it`. The Octave and Formant row, the Unison and Crowd row, the Distortion and Growl row
+// and the slot 7 row name the slot that holds their card, or a dash when none does, and build the text
+// in `buf`.
 const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
   switch (it) {
     case Item::InputJack: return "INPUT";
@@ -92,6 +94,7 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
     case Item::Reverb: return "REVERB";
     case Item::OctaveFormant: return slotLabel(octaveFormantSlot(layout), buf, size);
     case Item::UnisonCrowd: return slotLabel(unisonCrowdSlot(layout), buf, size);
+    case Item::DistortionGrowl: return slotLabel(distortionGrowlSlot(layout), buf, size);
     case Item::Slot7Card: return slotLabel(slot7CardSlot(layout), buf, size);
     case Item::PolishComp: return "POLISH COMP";
     case Item::PolishEq: return "POLISH EQ";
@@ -135,6 +138,12 @@ const char* unisonCrowdValue(const Layout& layout) {
   }
 }
 
+// The card the Distortion and Growl slot holds. A layout with neither reads DISTORTION, the default.
+const char* distortionGrowlValue(const Layout& layout) {
+  const int slot = distortionGrowlSlot(layout);
+  return slot >= 0 && layout.card[slot] == Card::Growl ? "GROWL" : "DISTORTION";
+}
+
 // The card the slot 7 row holds. A layout with none of the three reads GATE, the default.
 const char* slot7CardValue(const Layout& layout) {
   const int slot = slot7CardSlot(layout);
@@ -156,6 +165,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::Reverb: return reverbValue(ctx.layout);
     case Item::OctaveFormant: return octaveFormantValue(ctx.layout);
     case Item::UnisonCrowd: return unisonCrowdValue(ctx.layout);
+    case Item::DistortionGrowl: return distortionGrowlValue(ctx.layout);
     case Item::Slot7Card: return slot7CardValue(ctx.layout);
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::PolishEq: return onOff(s.polishEq);
@@ -241,6 +251,7 @@ UiAction Menu::onClick() {
         case Item::Reverb: return UiAction::SwapReverb;
         case Item::OctaveFormant: return UiAction::SwapOctaveFormant;
         case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
+        case Item::DistortionGrowl: return UiAction::SwapDistortionGrowl;
         case Item::Slot7Card: return UiAction::CycleSlot7Card;
         case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::PolishEq: return UiAction::TogglePolishEq;

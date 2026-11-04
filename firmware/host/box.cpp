@@ -105,11 +105,15 @@ void Box::swapOctaveFormant() { applyAction(UiAction::SwapOctaveFormant); }
 
 void Box::swapUnisonMob() { applyAction(UiAction::SwapUnisonCrowd); }
 
+void Box::swapDistortionGrowl() { applyAction(UiAction::SwapDistortionGrowl); }
+
 void Box::swapReverb() { applyAction(UiAction::SwapReverb); }
 
 void Box::pickSlot3Card(Card card) { pickCycledCard(card, UiAction::SwapOctaveFormant, octaveFormantSlot); }
 
 void Box::pickSlot4Card(Card card) { pickCycledCard(card, UiAction::SwapUnisonCrowd, unisonCrowdSlot); }
+
+void Box::pickSlot6Card(Card card) { pickCycledCard(card, UiAction::SwapDistortionGrowl, distortionGrowlSlot); }
 
 void Box::pickSlot7Card(Card card) { pickCycledCard(card, UiAction::CycleSlot7Card, slot7CardSlot); }
 

@@ -23,7 +23,7 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when any pitch-group card (Autotune, Octave, Formant, Crowd) has its toggle on. The shared
+// True when any pitch-group card (Autotune, Octave, Formant, Crowd, Growl) has its toggle on. The shared
 // pitch stage runs while it is.
 bool pitchGroupOn(const ChainSnapshot& snap) {
   for (int s = 0; s < kSlotCount; ++s) {
@@ -47,6 +47,17 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
     if (engines.bloomLead) captureBloomSource(engines, out, n);
   }
   engines.crowd.process(in, out, n, p.crowd, engines.pitch);
+}
+
+// Runs the Growl card at its slot, making the shared pitch stage's call first when no pitch-group card
+// ahead of it has, as runCrowd does.
+void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
+  if (!pitchDone) {
+    pitchDone = true;
+    engines.pitch.process(in, out, n, p.pitchFx);
+    in = out;
+  }
+  engines.growl.process(in, out, n, p.growl, engines.pitch);
 }
 
 // Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is
@@ -97,6 +108,7 @@ void resetEngine(ChainEngines& engines, Engine e) {
     case Engine::Crowd: engines.crowd.reset(); break;
     case Engine::Lofi: engines.lofi.reset(); break;
     case Engine::Bloom: engines.bloom.reset(); break;
+    case Engine::Growl: engines.growl.reset(); break;
     case Engine::Count: break;
   }
 }
@@ -118,6 +130,7 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Crowd: runCrowd(engines, in, out, n, p, pitchDone); return true;
     case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); return true;
     case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
+    case Engine::Growl: runGrowl(engines, in, out, n, p, pitchDone); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;
