@@ -150,9 +150,9 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
 // block. A layout that places the Chatter card after its tap slot (`bloomTap`) has the block leaving
-// that slot copied for its slices, and no copy is made otherwise. Returns false when a slot produced a NaN
-// or an infinity. The block was then silenced before the polish stages, so the caller cuts the output
-// and clears the engines.
+// that slot copied for its slices, and no copy is made otherwise. Returns false when a slot produced a NaN,
+// an infinity or a sample past the guard's bound. The block was then silenced before the polish stages, so the
+// caller cuts the output and clears the engines, POLISH COMP and POLISH EQ.
 template <typename Clock>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
               Clock cycleClock, ChainCycles& cycles) {

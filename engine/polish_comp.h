@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cmath>
+#include <cstring>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
@@ -14,14 +16,8 @@
 
 namespace cv {
 
-// Three named tunings. FIRM is the default (owner 2026-10-24). The detector window and the sidechain
-// filter are the same in all three, and each has its own makeup, solved by level_test on the
-// -23 dBFS program.
-//
-//           threshold  ratio  knee  attack  release  max
-//   GENTLE  -24 dB     2.2:1  6 dB  10 ms   150 ms   12 dB
-//   MEDIUM  -28 dB     3:1    6 dB   5 ms   120 ms   15 dB
-//   FIRM    -30 dB     4:1    4 dB   3 ms   100 ms   18 dB
+// The tuning is FIRM (owner 2026-10-24): -30 dB threshold, 4:1 ratio, 4 dB knee, 3 ms attack,
+// 100 ms release, 18 dB cap. Its makeup is solved by level_test on the clips and the -23 dBFS program.
 struct PolishCompTuning {
   float rmsMs = 10.0f;          // detector time constant (mean-square one-pole)
   float sidechainHz = 150.0f;   // 4-pole high-pass corner ahead of the detector
@@ -32,32 +28,6 @@ struct PolishCompTuning {
   float releaseMs = 100.0f;     // gain reduction smoothing, falling
   float maxReductionDb = 18.0f;
   float trimDb = 5.9f;          // makeup, active path only; level rule on program material
-
-  static PolishCompTuning gentle() {
-    PolishCompTuning t;
-    t.thresholdDb = -24.0f;
-    t.ratio = 2.2f;
-    t.kneeDb = 6.0f;
-    t.attackMs = 10.0f;
-    t.releaseMs = 150.0f;
-    t.maxReductionDb = 12.0f;
-    t.trimDb = 1.5f;
-    return t;
-  }
-
-  static PolishCompTuning medium() {
-    PolishCompTuning t;
-    t.thresholdDb = -28.0f;
-    t.ratio = 3.0f;
-    t.kneeDb = 6.0f;
-    t.attackMs = 5.0f;
-    t.releaseMs = 120.0f;
-    t.maxReductionDb = 15.0f;
-    t.trimDb = 4.1f;
-    return t;
-  }
-
-  static PolishCompTuning firm() { return PolishCompTuning(); }
 };
 
 struct PolishCompParams {
@@ -83,22 +53,16 @@ class PolishComp {
 
     if (active_ == 0.0f && target == 0.0f) {
       if (dirty_) clearState();
-      for (int i = 0; i < n; ++i) out[i] = in[i];
+      std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
       return;
     }
     dirty_ = true;
     if (!coefsValid_ || !sameTuning(p.tuning, applied_)) applyTuning(p.tuning);
 
-    for (int i = 0; i < n; ++i) {
-      active_ = smooth::step(active_, target, smooth::kSmoothCoef);
-      const float gain = nextGain(in[i], c_);
-      out[i] = in[i] * (1.0f + active_ * (gain - 1.0f));
-    }
+    for (int i = 0; i < n; i += kBlock) chunk(in + i, out + i, n - i < kBlock ? n - i : kBlock, target);
   }
 
  private:
-  static constexpr float kPowerDbPerLog2 = 3.01029995664f;  // 10 log10(2): mean-square to dB
-
   // Added to the input of each high-pass section and to the squared sidechain. They hold the
   // filter states and the detector above the denormal range when the input is digital silence, and
   // floor the detector at -200 dBFS so log2Fast never sees zero.
@@ -117,17 +81,17 @@ class PolishComp {
            a.releaseMs == b.releaseMs && a.maxReductionDb == b.maxReductionDb && a.trimDb == b.trimDb;
   }
 
+  // The sidechain runs two 2-pole Butterworth high-passes in series, which puts 50 Hz 38 dB down for
+  // a 150 Hz corner and the corner itself 6 dB down.
   void applyTuning(const PolishCompTuning& t) {
+    hp1_.setHighPass(t.sidechainHz, kButterworthQ);
+    hp2_.setCoefsFrom(hp1_);
     c_ = coefs(t);
     applied_ = t;
     coefsValid_ = true;
   }
 
-  // The sidechain runs two 2-pole Butterworth high-passes in series, which puts 50 Hz 38 dB down for
-  // a 150 Hz corner and the corner itself 6 dB down.
-  Coefs coefs(const PolishCompTuning& t) {
-    hp1_.setHighPass(t.sidechainHz, kButterworthQ);
-    hp2_.setCoefsFrom(hp1_);
+  static Coefs coefs(const PolishCompTuning& t) {
     const float knee = t.kneeDb > 0.0f ? t.kneeDb : 0.0f;
     const float ratio = t.ratio > 1.0f ? t.ratio : 1.0f;
     Coefs c;
@@ -153,13 +117,45 @@ class PolishComp {
     return gr < c.maxDb ? gr : c.maxDb;
   }
 
-  // Linear gain for one input sample, makeup included.
-  float nextGain(float x, const Coefs& c) {
-    const float side = hp2_.run(hp1_.run(x + kSidechainGuard) + kSidechainGuard);
-    ms_ += c.aDet * (side * side + kPowerFloor - ms_);
-    const float want = reductionDb(kPowerDbPerLog2 * log2Fast(ms_), c);
-    grDb_ = smooth::step(grDb_, want, want > grDb_ ? c.aAtk : c.aRel);
-    return dbToGainFast(c.trimDb - grDb_);
+  // Pass 1 over one chunk: the dB gain of each sample, makeup included. The filter states, the
+  // detector and the smoothed reduction stay in locals for the whole chunk.
+  void gainsDb(const float* in, float* db, int n) {
+    const Coefs c = c_;
+    Biquad h1 = hp1_;
+    Biquad h2 = hp2_;
+    float ms = ms_;
+    float gr = grDb_;
+    for (int i = 0; i < n; ++i) {
+      const float side = h2.run(h1.run(in[i] + kSidechainGuard) + kSidechainGuard);
+      ms += c.aDet * (side * side + kPowerFloor - ms);
+      const float want = reductionDb((kDbPerLog2 / 2) * log2Fast(ms), c);  // mean-square power to dB
+      gr = smooth::step(gr, want, want > gr ? c.aAtk : c.aRel);
+      db[i] = c.trimDb - gr;
+    }
+    hp1_ = h1;
+    hp2_ = h2;
+    ms_ = ms;
+    grDb_ = gr;
+  }
+
+  // Pass 2 over one chunk: turns each dB gain linear and mixes it in by the on/off smoother. A
+  // smoother already on its target is not stepped.
+  void chunk(const float* in, float* out, int n, float target) {
+    std::array<float, kBlock> db;
+    gainsDb(in, db.data(), n);
+    float active = active_;
+    if (active == target) {
+#pragma GCC unroll 2
+      for (int i = 0; i < n; ++i) {
+        out[i] = in[i] * (1.0f + active * (dbToGainFast(db[static_cast<size_t>(i)]) - 1.0f));
+      }
+      return;
+    }
+    for (int i = 0; i < n; ++i) {
+      active = smooth::step(active, target, smooth::kSmoothCoef);
+      out[i] = in[i] * (1.0f + active * (dbToGainFast(db[static_cast<size_t>(i)]) - 1.0f));
+    }
+    active_ = active;
   }
 
   void clearState() {

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 
 #include "engine/common.h"
 #include "engine/fastmath.h"
@@ -16,10 +18,18 @@ constexpr float kSoftCeilingKnee = 0.79432823f;  // 10^(-2/20)
 constexpr float kSoftCeilingRoom = 1.0f - kSoftCeilingKnee;
 constexpr float kSoftCeilingInvRoom = 1.0f / kSoftCeilingRoom;
 
+// True for a NaN of either sign. It reads the exponent and mantissa bits, so the answer holds under
+// -ffast-math and -ffinite-math-only, where a float compare may be folded away.
+CV_INLINE bool isNaNBits(float x) {
+  uint32_t bits;
+  std::memcpy(&bits, &x, sizeof bits);
+  return (bits & 0x7FFFFFFFu) > 0x7F800000u;
+}
+
 CV_INLINE float softCeiling(float x) {
   const float a = std::fabs(x);
   if (a <= kSoftCeilingKnee) return x;
-  if (std::isnan(a)) return 0.0f;
+  if (isNaNBits(a)) return 0.0f;
 
   float y = kSoftCeilingKnee + kSoftCeilingRoom * tanhFast((a - kSoftCeilingKnee) * kSoftCeilingInvRoom);
   if (y > 1.0f) y = 1.0f;

@@ -8,13 +8,6 @@ namespace host {
 
 namespace {
 
-// Engine clears per silent block. One per block keeps the largest clear inside a block's budget.
-constexpr int kResetsPerSilentBlock = 1;
-static_assert(kResetsPerSilentBlock * (1 + kFadeHoldBlocks) >= kEngineCount,
-              "the silent blocks must be enough to clear every engine");
-
-constexpr uint32_t kAllEngines = (1u << kEngineCount) - 1u;
-
 constexpr int kWordBits = 32;
 
 // The clock runChain times each stage with, in nanoseconds. Nothing reads the figures; the host
@@ -79,7 +72,7 @@ void AudioBlock::syncSnapshot() {
   layoutPending_ = !first && pub.layout != held_.layout;
   seenSeq_ = seq;
   if (!layoutPending_) held_ = pub;
-  if (first) slotFades_.settle(held_.slotOn);
+  if (first) flow_.settleSlots(held_.slotOn);
 }
 
 // At the zero point of the fade: adopts the newest snapshot, resets the engines whose slot changed
@@ -87,29 +80,18 @@ void AudioBlock::syncSnapshot() {
 void AudioBlock::swapSnapshot() {
   seenSeq_ = published_.load(std::memory_order_acquire);
   const ChainSnapshot& pub = snapshots_[seenSeq_ & 1];
-  resetMask_ |= enginesToReset(held_.layout, pub.layout);
+  flow_.queueReset(enginesToReset(held_.layout, pub.layout));
   held_ = pub;
-  slotFades_.settle(held_.slotOn);
+  flow_.settleSlots(held_.slotOn);
   layoutPending_ = false;
 }
 
-// Clears up to `count` of the waiting engines, lowest first.
-void AudioBlock::resetWaiting(int count) {
-  for (int e = 0; e < kEngineCount && count > 0; ++e) {
-    if (!(resetMask_ & (1u << e))) continue;
-    resetEngine(engines_, static_cast<Engine>(e));
-    resetMask_ &= ~(1u << e);
-    --count;
+// Raises the gate peak to the Input gate's highest detector level of the block.
+void AudioBlock::noteGatePeak() {
+  const float peak = engines_.inputGate.takeDetectorPeak();
+  float seen = gatePeak_.load(std::memory_order_relaxed);
+  while (peak > seen && !gatePeak_.compare_exchange_weak(seen, peak, std::memory_order_acq_rel)) {
   }
-}
-
-// A NaN or an infinity out of the slots was silenced before the polish stages. The output cuts to
-// zero and every engine clears in the silent blocks that follow, because the one that produced it
-// is not known.
-void AudioBlock::discardBlock() {
-  resetMask_ = kAllEngines;
-  fade_.cut();
-  slotFades_.settle(held_.slotOn);
 }
 
 void AudioBlock::process(const float* in, float* out, int n) {
@@ -118,36 +100,19 @@ void AudioBlock::process(const float* in, float* out, int n) {
     return;
   }
   syncSnapshot();
-  fade_.hold(outputHeld_.load(std::memory_order_relaxed));
-  const LayoutFade::Block fade = fade_.next(layoutPending_);
-  if (fade.swap) swapSnapshot();
+  const BlockFlow::Start start = flow_.begin(outputHeld_.load(std::memory_order_relaxed), layoutPending_);
+  if (start.fade.swap) swapSnapshot();
 
   std::array<float, cv::kBlock> a;
   std::array<float, cv::kBlock> b;
   std::copy(in, in + cv::kBlock, a.begin());
   input_.add(level::sumSquares(a.data(), cv::kBlock), cv::kBlock);
-  const std::array<float, cv::kBlock> dry = a;  // the chain works over `a`; BYPASS needs the input
-  if (fade.silent) {
-    // The output is at zero here. The block skips the chain so the engine clears never land on top
-    // of a full chain pass.
-    resetWaiting(kResetsPerSilentBlock);
-    a.fill(0);
-  } else {
-    ChainCycles cycles;
-    if (!runChain(engines_, slotFades_, a.data(), b.data(), cv::kBlock, held_, NanoClock(), cycles)) discardBlock();
-  }
-  mixBypass(a.data(), dry.data(), cv::kBlock, bypassOn_.load(std::memory_order_relaxed), bypassPhase_);
-
-  const GainRamp ramp = gain_.next(held_.outputGain, fade.from, fade.to, cv::kBlock);
-  float gain = ramp.start;
-  float energy = 0;
-  for (int i = 0; i < cv::kBlock; ++i) {
-    const float v = shapeOutput(a[static_cast<size_t>(i)], gain);
-    gain += ramp.step;
-    energy += v * v;
-    out[i] = v;
-  }
-  output_.add(energy, cv::kBlock);
+  const BlockFlow::Report report = flow_.run(engines_, held_, start, a.data(), b.data(),
+                                             bypassOn_.load(std::memory_order_relaxed), NanoClock(),
+                                             [out](int i, float v) { out[i] = v; });
+  if (report.discarded) nanBlocks_.fetch_add(1, std::memory_order_relaxed);
+  if (report.chainRan) noteGatePeak();
+  output_.add(report.outputEnergy, cv::kBlock);
 }
 
 }  // namespace host

@@ -12,11 +12,10 @@
 #include "board/pins.h"
 #include "board/serial_link.h"
 #include "core/audio_recovery.h"
+#include "core/block_flow.h"
 #include "core/chain_run.h"
-#include "core/late_block.h"
 #include "core/layout_fade.h"
 #include "core/load_window.h"
-#include "core/output_stage.h"
 #include "core/registry.h"
 #include "engine/common.h"
 
@@ -100,11 +99,7 @@ std::atomic<uint32_t> gPublished{0};
 ChainSnapshot gHeld;
 uint32_t gSeenSeq = 0;
 bool gLayoutPending = false;
-LayoutFade gFade;
-OutputGain gOutputGain;
-uint32_t gBypassPhase = 0;  // the BYPASS crossfade position, 0 plays the chain (see mixBypass)
-SlotFades gSlotFades;       // each slot's toggle crossfade level, advanced one step per block
-LateBlocks gLate;           // a late block raises the flag; the next block passes the dry input
+BlockFlow gFlow;  // the layout fade, slot fades, output gain, BYPASS phase and late flag of the block
 
 const char* gError = "audioInit() has not run";
 volatile uint8_t gReadyMask = 0;  // bit h set when RX half h is waiting
@@ -198,34 +193,6 @@ void noteGatePeak() {
   if (peak > gGatePeak) gGatePeak = peak;
 }
 
-// Engine clears per silent block. One per block keeps the largest clear inside the block budget.
-constexpr int kResetsPerSilentBlock = 1;
-static_assert(kResetsPerSilentBlock * (1 + kFadeHoldBlocks) >= kEngineCount,
-              "the silent blocks must be enough to clear every engine");
-
-constexpr uint32_t kAllEngines = (1u << kEngineCount) - 1u;
-uint32_t gResetMask = 0;  // engines waiting for their clear
-
-// Clears up to `count` of the waiting engines, lowest first.
-void resetWaiting(int count) {
-  for (int e = 0; e < kEngineCount && count > 0; ++e) {
-    if (!(gResetMask & (1u << e))) continue;
-    resetEngine(gChain, static_cast<Engine>(e));
-    gResetMask &= ~(1u << e);
-    --count;
-  }
-}
-
-// A NaN or an infinity out of the slots would leave the EQ's filter state non-finite for good, so
-// runChain silences the block before the polish stages. The output cuts to zero, and every engine
-// clears in the silent blocks that follow, because the one that produced it is not known.
-void discardBlock() {
-  gResetMask = kAllEngines;
-  gFade.cut();
-  gSlotFades.settle(gHeld.slotOn);  // the output is cut and the engines clear, so no slot fades
-  gCounts.nanBlocks = gCounts.nanBlocks + 1;
-}
-
 // Picks up a newly published snapshot. The same layout is adopted at once, and a toggle that moved
 // crossfades from the slot's fade level; a different layout waits for the fade's zero point. The
 // first publish after boot has nothing to fade from and is adopted whole, every slot settled.
@@ -237,7 +204,7 @@ void syncSnapshot() {
   gLayoutPending = !first && pub.layout != gHeld.layout;
   gSeenSeq = seq;
   if (!gLayoutPending) gHeld = pub;
-  if (first) gSlotFades.settle(gHeld.slotOn);
+  if (first) gFlow.settleSlots(gHeld.slotOn);
 }
 
 // At the zero point of the fade: adopts the newest snapshot, resets the engines whose slot changed
@@ -245,9 +212,9 @@ void syncSnapshot() {
 void swapSnapshot() {
   gSeenSeq = gPublished.load(std::memory_order_acquire);
   const ChainSnapshot& pub = gSnapshots[gSeenSeq & 1];
-  gResetMask |= enginesToReset(gHeld.layout, pub.layout);
+  gFlow.queueReset(enginesToReset(gHeld.layout, pub.layout));
   gHeld = pub;
-  gSlotFades.settle(gHeld.slotOn);
+  gFlow.settleSlots(gHeld.slotOn);
   gLayoutPending = false;
   gSwapStarted = true;
 }
@@ -278,59 +245,39 @@ void loadInput(float* a, const uint32_t* rx) {
   if (!fillFromClip(a)) fillFromSai(a, rx);
 }
 
-// Shapes each sample with the output ceiling and then the output gain along its ramp (see
-// shapeOutput), and writes both stereo slots. Returns the sum of the squares of the samples
-// written, for the output level.
-float writeOutput(uint32_t* tx, const float* a, GainRamp ramp) {
-  float gain = ramp.start;
-  float energy = 0.0f;
-  for (int i = 0; i < kFramesPerHalf; ++i) {
-    const float v = shapeOutput(a[i], gain);
-    gain += ramp.step;
-    energy += v * v;
+// Packs an output sample into both stereo slots of frame i.
+struct TxWriter {
+  uint32_t* tx;
+
+  void operator()(int i, float v) const {
     const uint32_t word = static_cast<uint32_t>(static_cast<int32_t>(v * kInt32Max));
     tx[2 * i] = word;
     tx[2 * i + 1] = word;
   }
-  return energy;
-}
+};
 
 void processHalf(int half) {
   const uint32_t* rx = gRxRing.data() + half * kWordsPerHalf;
   uint32_t* tx = gTxRing.data() + half * kWordsPerHalf;
 
   syncSnapshot();
-  gFade.hold(muteOutputHeld());  // the mute sequence holds the output at zero until the relay is closed
-  const LayoutFade::Block fade = gFade.next(gLayoutPending);
-  if (fade.swap) swapSnapshot();
-  const bool dryBlock = gLate.takeDry(fade.silent);
+  // The mute sequence holds the output at zero until the relay is closed.
+  const BlockFlow::Start start = gFlow.begin(muteOutputHeld(), gLayoutPending);
+  if (start.fade.swap) swapSnapshot();
 
   std::array<float, cv::kBlock> a;
   std::array<float, cv::kBlock> b;
   loadInput(a.data(), rx);
   gInputSumSquares = gInputSumSquares + level::sumSquares(a.data(), kFramesPerHalf);
   gInputSamples = gInputSamples + kFramesPerHalf;
-  const std::array<float, cv::kBlock> dry = a;  // the chain works over `a`; BYPASS needs the input
-  if (fade.silent) {
-    // The output is at zero here. The block skips the chain so the engine clears never land on top
-    // of a full chain pass.
-    resetWaiting(kResetsPerSilentBlock);
-    a.fill(0.0f);
-  } else if (dryBlock) {
-    // The last block ran late. This one skips the chain and plays the input, by the BYPASS mix
-    // settled at full dry. The BYPASS fade itself does not move.
-    uint32_t atDry = kBypassFull;
-    mixBypass(a.data(), dry.data(), kFramesPerHalf, true, atDry);
-  } else {
-    ChainCycles cycles;
-    const bool finite = runChain(gChain, gSlotFades, a.data(), b.data(), kFramesPerHalf, gHeld, CycleCounter(), cycles);
-    if (!finite) discardBlock();
-    addChainCycles(cycles);
+  const BlockFlow::Report report =
+      gFlow.run(gChain, gHeld, start, a.data(), b.data(), muteBypassOn(), CycleCounter(), TxWriter{tx});
+  if (report.discarded) gCounts.nanBlocks = gCounts.nanBlocks + 1;
+  if (report.chainRan) {
+    addChainCycles(report.cycles);
     noteGatePeak();
   }
-  if (!dryBlock) mixBypass(a.data(), dry.data(), kFramesPerHalf, muteBypassOn(), gBypassPhase);
-  gOutputSumSquares =
-      gOutputSumSquares + writeOutput(tx, a.data(), gOutputGain.next(gHeld.outputGain, fade.from, fade.to, kFramesPerHalf));
+  gOutputSumSquares = gOutputSumSquares + report.outputEnergy;
   gOutputSamples = gOutputSamples + kFramesPerHalf;
 }
 
@@ -486,7 +433,7 @@ void recordBlock(uint32_t cycles, bool readTooSoon) {
   if (cycles > gCounts.maxCycles) gCounts.maxCycles = cycles;
   if (cycles > gCounts.budgetCycles || readTooSoon) {
     gCounts.late = gCounts.late + 1;
-    gLate.markLate();
+    gFlow.markLate();
   }
   gSumCycles = gSumCycles + cycles;
   gSumBlocks = gSumBlocks + 1;
@@ -788,7 +735,7 @@ AudioLoad audioTakeLoad() {
   const uint32_t blocks = gWindowBlocks;
   const uint32_t worst = gWindowMax;
   const uint32_t late = gCounts.late;
-  const uint32_t dryBlocks = gLate.dryBlocks();
+  const uint32_t dryBlocks = gFlow.dryBlocks();
   const uint32_t budget = gCounts.budgetCycles;
   gWindowSum = 0;
   gWindowBlocks = 0;
@@ -832,7 +779,7 @@ bool audioBenchClipOn() {
 void audioResetPeaks() {
   NVIC_DisableIRQ(SWPMI1_IRQn);
   gCounts.late = 0;
-  gLate.clearCount();
+  gFlow.clearLateCount();
   gCounts.overruns = 0;
   gCounts.maxCycles = 0;
   gSumCycles = 0;
@@ -887,7 +834,7 @@ AudioStats audioStats() {
   NVIC_DisableIRQ(SWPMI1_IRQn);
   s.blocks = gCounts.blocks;
   s.late = gCounts.late;
-  s.dryBlocks = gLate.dryBlocks();
+  s.dryBlocks = gFlow.dryBlocks();
   s.overruns = gCounts.overruns;
   s.maxCycles = gCounts.maxCycles;
   s.budgetCycles = gCounts.budgetCycles;

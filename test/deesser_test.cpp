@@ -1,5 +1,5 @@
-// De-esser checks: detector band, trigger and cap, release, floor, silence, no-alloc.
-// No window, no audio device.
+// De-esser checks: detector band, trigger and cap, release, floor, silence, call splitting and the
+// setting ranges, no-alloc. No window, no audio device.
 
 #include <cmath>
 #include <cstdio>
@@ -126,7 +126,7 @@ bool testEssOverVoice() {
                 "5.8 kHz at -30 dBFS over 1 kHz at -20 dBFS: cut %.2f dB (static 1.59, bound 1.1 to 2.2)", r.meanCut);
 }
 
-// An ess of `essMs`, then `after` playing on. Returns the cut `afterMs` after the ess ended.
+// Half a second of ess, then `after` playing on. Returns the cut `afterMs` after the ess ended.
 double cutAfterEss(const std::vector<Tone>& after, int afterMs) {
   cv::DeEsser d;
   const cv::DeEsserTuning t;
@@ -188,10 +188,75 @@ bool testSilence() {
 bool testEdges() {
   cv::DeEsser d;
   const cv::DeEsserTuning t;
-  std::vector<float> x = tones({{5800.0, -20.0}}, 0, 40);
+  std::vector<float> x = tones({{5800.0, -20.0}}, 0, 80);
   d.process(x.data(), 0, t);
-  d.process(x.data(), 40, t);  // a short block is a block
-  return report("short block", finiteAndNormal(x) && d.cutDb() > 0.0f, "40 samples: cut %.2f dB", d.cutDb());
+  d.process(x.data(), 40, t);
+  const float open = d.cutDb();  // the window is 40 samples in, so nothing has moved
+  d.process(x.data() + 40, 40, t);  // the second 40 samples close the window
+  return report("short call", finiteAndNormal(x) && open == 0.0f && d.cutDb() > 0.0f,
+                "40 samples leave the cut at %.2f dB, 80 samples move it to %.2f dB", open, d.cutDb());
+}
+
+// Ess over voice for 20 blocks, voice alone for 20, twice. The cut rises and falls.
+std::vector<float> essBursts() {
+  std::vector<float> x;
+  for (int rep = 0; rep < 2; ++rep) {
+    const std::vector<float> loud = tones({{5800.0, -20.0}, {1000.0, -20.0}}, static_cast<int>(x.size()), 20 * cv::kBlock);
+    x.insert(x.end(), loud.begin(), loud.end());
+    const std::vector<float> voice = tones({{1000.0, -20.0}}, static_cast<int>(x.size()), 20 * cv::kBlock);
+    x.insert(x.end(), voice.begin(), voice.end());
+  }
+  return x;
+}
+
+// The detector windows follow the stream, so the cut after each 64 samples is the same whether the
+// caller makes one call of 64 or two calls that split the block.
+bool testCallSplit() {
+  const std::vector<float> in = essBursts();
+  const cv::DeEsserTuning t;
+  const int blocks = static_cast<int>(in.size()) / cv::kBlock;
+  std::vector<float> want;
+  {
+    cv::DeEsser d;
+    std::vector<float> x = in;
+    for (int b = 0; b < blocks; ++b) {
+      d.process(&x[static_cast<size_t>(b * cv::kBlock)], cv::kBlock, t);
+      want.push_back(d.cutDb());
+    }
+  }
+  bool equal = true;
+  double top = 0.0;
+  for (const float c : want) top = std::fmax(top, c);
+  for (const int first : {1, 7, 32, 63}) {
+    cv::DeEsser d;
+    std::vector<float> x = in;
+    for (int b = 0; b < blocks; ++b) {
+      float* p = &x[static_cast<size_t>(b * cv::kBlock)];
+      d.process(p, first, t);
+      d.process(p + first, cv::kBlock - first, t);
+      equal = equal && d.cutDb() == want[static_cast<size_t>(b)];
+    }
+  }
+  return report("call split", equal && top > 1.0,
+                "the cut after every block is the same for calls split 1/63, 7/57, 32/32, 63/1 (=%.0f), peak cut %.2f dB (>1)",
+                equal ? 1.0 : 0.0, top);
+}
+
+// The tuning default sits inside the ranges, and each field fails alone outside them or as a NaN.
+bool testRanges() {
+  const cv::DeEsserTuning base;
+  bool ok = cv::deEsserTuningInRange(base);
+  const float nan = std::nanf("");
+  const auto bad = [&](float cv::DeEsserTuning::*field, float value) {
+    cv::DeEsserTuning t;
+    t.*field = value;
+    return !cv::deEsserTuningInRange(t);
+  };
+  ok = ok && bad(&cv::DeEsserTuning::bandLoHz, 5.0f) && bad(&cv::DeEsserTuning::bandHiHz, 30000.0f) &&
+       bad(&cv::DeEsserTuning::thresholdDb, -1000.0f) && bad(&cv::DeEsserTuning::maxCutDb, 1000.0f) &&
+       bad(&cv::DeEsserTuning::releaseMs, 0.0f) && bad(&cv::DeEsserTuning::notchHz, nan) &&
+       bad(&cv::DeEsserTuning::notchQ, 0.0f);
+  return report("ranges", ok, "the default is in range and each setting is refused outside it=%.0f (1)", ok ? 1.0 : 0.0);
 }
 
 bool testNoAlloc() {
@@ -217,6 +282,8 @@ int main() {
   ok &= testFloor();
   ok &= testSilence();
   ok &= testEdges();
+  ok &= testCallSplit();
+  ok &= testRanges();
   ok &= testNoAlloc();
   return ok ? 0 : 1;
 }

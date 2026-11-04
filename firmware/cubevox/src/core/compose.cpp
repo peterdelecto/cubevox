@@ -1,14 +1,11 @@
 #include "core/compose.h"
 
-#include <math.h>
-
 #include <new>
 
 #include "core/registry.h"
+#include "engine/dsp.h"
 
 namespace {
-
-constexpr float kDbPerDecade = 20.0f;
 
 float topPosition(Card c, int knob) {
   const int steps = knobSteps(c, knob);
@@ -50,7 +47,7 @@ void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, 
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
   snap.params.comp.on = settings.polishComp;
   snap.params.eq.on = settings.polishEq;
-  snap.outputGain = powf(10.0f, outputTrimDb(settings) / kDbPerDecade);
+  snap.outputGain = cv::dbToGain(outputTrimDb(settings));
 }
 
 }  // namespace
