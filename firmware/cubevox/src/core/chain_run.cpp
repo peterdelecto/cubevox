@@ -11,6 +11,11 @@ namespace {
 // The BYPASS phase moves this far a sample.
 constexpr uint32_t kBypassStep = kBypassFull / (kFadeMs * cv::kSampleRate / 1000);
 
+// A gate's own on/off fade ends inside the slot fade, so a switched-off gate is a plain copy by the
+// time the slot passes the engine's output alone.
+static_assert(cv::kGateFadeMs * cv::kSmpPerMs <= static_cast<float>(kSlotFadeBlocks * cv::kBlock),
+              "the gate's off fade outlasts the slot fade");
+
 // The two gains of the BYPASS mix at a phase.
 struct BypassGains {
   float chain;
@@ -59,7 +64,7 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when any pitch-group card (Autotune, Octave, Formant, Crowd, Growl) has its toggle on. The shared
+// True when any pitch-group card (Autotune, Octave, Formant, Crowd, Growl, Ring mod) has its toggle on. The shared
 // pitch stage runs while it is.
 bool pitchGroupOn(const ChainSnapshot& snap) {
   for (int s = 0; s < kSlotCount; ++s) {
@@ -94,6 +99,23 @@ void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const C
     in = out;
   }
   engines.growl.process(in, out, n, p.growl, engines.pitch);
+}
+
+// Runs the Ring mod card at its slot, making the shared pitch stage's call first when no pitch-group card
+// ahead of it has, as runGrowl does. The card reads the tracker's period, not the ring.
+void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
+  if (!pitchDone) {
+    pitchDone = true;
+    engines.pitch.process(in, out, n, p.pitchFx);
+    in = out;
+  }
+  engines.ringMod.process(in, out, n, p.ringMod, engines.pitch);
+}
+
+// Runs the Strings card. It sits on Autotune's KEY when Autotune is placed (`p.strings.keyed`), and on the
+// chromatic scale otherwise.
+void runStrings(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
+  engines.strings.process(in, out, n, p.strings, p.strings.keyed ? p.pitchFx.autotune.key : -1);
 }
 
 // Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is
@@ -145,6 +167,8 @@ void resetEngine(ChainEngines& engines, Engine e) {
     case Engine::Lofi: engines.lofi.reset(); break;
     case Engine::Bloom: engines.bloom.reset(); break;
     case Engine::Growl: engines.growl.reset(); break;
+    case Engine::RingMod: engines.ringMod.reset(); break;
+    case Engine::Strings: engines.strings.reset(); break;
     case Engine::Count: break;
   }
 }
@@ -167,20 +191,24 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); return true;
     case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
     case Engine::Growl: runGrowl(engines, in, out, n, p, pitchDone); return true;
+    case Engine::RingMod: runRingMod(engines, in, out, n, p, pitchDone); return true;
+    case Engine::Strings: runStrings(engines, in, out, n, p); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;
 }
 
-// The two gains sum to 1. A card whose output carries its input then holds its level across the
-// fade, where an equal-power pair would swell it by 3 dB.
+// The engine gain follows an S curve, 3x^2 - 2x^3 of the fade's progress, and the two gains sum to 1.
+// A card whose output carries its input then holds its level across the fade, where an equal-power
+// pair would swell it by 3 dB.
 void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
   const float total = static_cast<float>(kSlotFadeBlocks * n);
   const int dir = (to > from) - (to < from);
   int pos = from * n;  // samples of the fade toward the engine reached before this block
   for (int i = 0; i < n; ++i) {
     pos += dir;
-    const float toEngine = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
+    const float lin = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
+    const float toEngine = lin * lin * (3.0f - 2.0f * lin);
     wet[i] = wet[i] * toEngine + dry[i] * (1.0f - toEngine);
   }
 }

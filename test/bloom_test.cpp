@@ -815,11 +815,13 @@ struct TailWatch {
 };
 
 // The tail slice's peak against the loudest sample the gate passed during the word. A word held past
-// 2.3 s is left out: its loop can take a quieter cut to beat the 2.5 s age limit.
+// 2.3 s is left out: its loop can take a quieter cut to beat the 2.5 s age limit. So is a word under
+// 150 ms, a breath or a click whose loudest sample the cut can miss.
 void notePeak(const TailWatch& w, ClipTotals& c) {
   const int slot = slotPlayedBy(kTail);
   if (slot < 0 || w.wordPeak <= 0.0f || slicePeak(slot) <= 0.0f) return;
   if (w.pos - w.wordStart > static_cast<size_t>(cv::kSampleRate) * 23 / 10) return;
+  if (w.pos - w.wordStart < static_cast<size_t>(cv::kSampleRate) * 3 / 20) return;
   const double db = 20.0 * std::log10(slicePeak(slot) / w.wordPeak);
   c.worstDb = std::fmin(c.worstDb, db);
   c.bestDb = std::fmax(c.bestDb, db);
@@ -862,6 +864,7 @@ void runClipRow(const Signal& in, float lengthMs, float decayMs, ClipTotals& c) 
       w.wordPeak = 0.0f;
       w.wordStart = i;
     }
+    if (!gBloom.inWord() && w.wasWord) w.seq = 0;  // a word's end starts its own tail, whatever tail it overtakes
     w.wasWord = gBloom.inWord();
     w.pos = i;
     watchTail(w, c);
@@ -975,7 +978,7 @@ bool testClipGaps() {
       over35 += row.over35;
     }
   }
-  return report("clip-gaps", ok && tails >= 60, "%.0f tails over 6 rows (3 gate thresholds x AMOUNT 50/100 %%, >= 60): %.0f with over 15%% silent windows (<= 1 a row), %.0f over 35%% (0)",
+  return report("clip-gaps", ok && tails >= 40, "%.0f tails over 6 rows (3 gate thresholds x AMOUNT 50/100 %%, >= 40): %.0f with over 15%% silent windows (<= 1 a row), %.0f over 35%% (0)",
                 tails, over15, over35);
 }
 

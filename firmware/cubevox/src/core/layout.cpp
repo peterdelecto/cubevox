@@ -18,7 +18,8 @@ Layout crowdTestLayout() {
 
 int reverbSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (layout.card[s] == Card::ReverbSpring || layout.card[s] == Card::ReverbChasm) return s;
+    const Card c = layout.card[s];
+    if (c == Card::ReverbSpring || c == Card::ReverbChasm || c == Card::Strings) return s;
   }
   return -1;
 }
@@ -40,7 +41,8 @@ int octaveFormantSlot(const Layout& layout) {
 
 int distortionGrowlSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (layout.card[s] == Card::Distortion || layout.card[s] == Card::Growl) return s;
+    const Card c = layout.card[s];
+    if (c == Card::Distortion || c == Card::Growl || c == Card::RingMod) return s;
   }
   return -1;
 }
@@ -79,7 +81,7 @@ LayoutCost layoutCost(const Layout& layout) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
     const bool formant = c == Card::Formant || c == Card::FormantFollower;
-    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || formant || c == Card::Growl;
+    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || formant || c == Card::Growl || c == Card::RingMod;
     autotune = autotune || c == Card::Autotune;
     stageUser = stageUser || c == Card::Octave || formant;
   }

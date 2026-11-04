@@ -111,7 +111,6 @@ void cmpGate(const std::string& p, float pos, const cv::GateParams& f, const cv:
   CMP(p, pos, f.tuning, e.tuning, hysteresisDb);
   CMP(p, pos, f.tuning, e.tuning, detectorAttackMs);
   CMP(p, pos, f.tuning, e.tuning, detectorReleaseMs);
-  EXPECT(std::string(p) + ".travelTimes", pos, f.tuning.travelTimes ? 1.0f : 0.0f, e.tuning.travelTimes ? 1.0f : 0.0f);
 }
 
 // Neither side sets AutotuneTuning, so both run the struct's own defaults and a tuning field needs no

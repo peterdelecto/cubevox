@@ -5,7 +5,7 @@
 namespace {
 
 // Input gate THRESHOLD until composeSnapshot applies the card's knobs; the middle of its range.
-constexpr float kInputGateThresholdDb = -55.0f;
+constexpr float kInputGateThresholdDb = 0.5f * (cv::kInputGateThresholdMinDb + cv::kInputGateThresholdMaxDb);
 
 }  // namespace
 
@@ -20,8 +20,11 @@ ChainParams::ChainParams() {
   pitchFx.formant.on = false;
   pitchFx.crowdOn = false;
   pitchFx.growlOn = false;
+  pitchFx.ringModOn = false;
   crowd.on = false;
   growl.on = false;
+  ringMod.on = false;
+  strings.on = false;
   unison.on = false;
   slapback.on = false;
   distortion.on = false;

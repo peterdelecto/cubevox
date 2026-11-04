@@ -445,13 +445,13 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   used = std::strlen(gTuningText);
   std::snprintf(
       gTuningText + used, sizeof(gTuningText) - used,
-      "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff, %s}"
-      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff, %s}"
+      "\nInputGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff}"
+      "\nGateTuning{%.1ff, %.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.1ff, %.1ff, %.1ff}"
       "\nAutotuneTuning{%.1ff, %.0ff}",
       ig.attackMs, ig.holdMs, ig.releaseMs, ig.rangeDb, ig.kneeDb, ig.detectorHpHz, ig.hysteresisDb,
-      ig.detectorAttackMs, ig.detectorReleaseMs, ig.travelTimes ? "true" : "false",
+      ig.detectorAttackMs, ig.detectorReleaseMs,
       g.attackMs, g.holdMs, g.releaseMs, g.rangeDb, g.kneeDb, g.detectorHpHz, g.hysteresisDb,
-      g.detectorAttackMs, g.detectorReleaseMs, g.travelTimes ? "true" : "false",
+      g.detectorAttackMs, g.detectorReleaseMs,
       at.trimDb, at.grainDelay);
 }
 
@@ -463,7 +463,7 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
   std::printf(
       "// AutotuneTuning: trimDb, grainDelay\n"
       "// GateTuning: attackMs, holdMs, releaseMs, rangeDb, kneeDb, detectorHpHz, hysteresisDb, "
-      "detectorAttackMs, detectorReleaseMs, travelTimes\n"
+      "detectorAttackMs, detectorReleaseMs\n"
       "// OctaveTuning: glideMs, grainWindowMs, trimDb\n"
       "// UnisonTuning: {baseDelayMs[0], baseDelayMs[1]}, {lfoHz[0], lfoHz[1]}, swingMinMs, "
       "swingMaxMs, wetMaxDb, trimDb, topFrom, topSwingGain, topWetDb\n"

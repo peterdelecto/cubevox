@@ -13,15 +13,16 @@
 #include "core/registry.h"
 #include "core/slots.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. PitchFx and Distortion are
-// references because the board places them in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. PitchFx, Unison and Distortion
+// are references because the board places them in DTCM.
 struct ChainEngines {
-  ChainEngines(cv::PitchFx& pitchFx, cv::Distortion& distortionFx) : pitch(pitchFx), distortion(distortionFx) {}
+  ChainEngines(cv::PitchFx& pitchFx, cv::Unison& unisonFx, cv::Distortion& distortionFx)
+      : pitch(pitchFx), unison(unisonFx), distortion(distortionFx) {}
 
   cv::PitchFx& pitch;
   cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each pitch call while its card is placed
   cv::Gate inputGate;
-  cv::Unison unison;
+  cv::Unison& unison;
   cv::Slapback slapback;
   cv::Distortion& distortion;
   cv::Gate gate;
@@ -30,6 +31,8 @@ struct ChainEngines {
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
   cv::Growl growl;  // like crowd, its voice reads the ring that `pitch` writes
+  cv::RingMod ringMod;  // reads the tracker that `pitch` runs
+  cv::Strings strings;  // two banks of twelve delay lines, 43 kB, in D1 with the rest of the engines
 
   // The signal the Chatter card cuts its slices from. captureBloomSource copies the block leaving the
   // tap slot into `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch
@@ -86,8 +89,9 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
 constexpr uint32_t kBypassFull = 1u << 30;
 
 // A slot's toggle crossfades between the engine and the dry input over this many blocks (6 blocks
-// of 64 samples, 8 ms). The engine gain rises linearly and the dry gain is one minus it, so the two
-// sum to 1. An engine output that already holds the dry would gain 3 dB under an equal-power fade.
+// of 64 samples, 8 ms). The engine gain follows an S curve, flat at both ends so the blend does not
+// bend where the fade starts and stops, and the dry gain is one minus it, so the two sum to 1. An
+// engine output that already holds the dry would gain 3 dB under an equal-power fade.
 constexpr int kSlotFadeBlocks = 6;
 
 // Each slot's fade level in blocks, kept by the audio interrupt. 0 plays the dry input with the
@@ -135,8 +139,9 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 // crossfade. A slot settled off runs no engine and writes nothing, so the caller keeps its buffers
 // and the dry input passes. A slot that starts a fade in has its engine cleared first. A flip back
 // during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot is
-// off, because its detector feeds the status reply's `floor_dbfs`. Returns false when it wrote
-// nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave,
+// off, because its detector feeds the status reply's `floor_dbfs` and keys the Chatter card; its own
+// off fade ends inside the slot fade, so the settled slot passes the input bit for bit. Returns false
+// when it wrote nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave,
 // Formant or Crowd) while any pitch-group toggle is on, and its fade follows all of them. A Formant
 // card behind another pitch-group card acts at that first slot, not at its own. A Crowd card keeps a
 // live ring and tracker with Autotune and Octave off, wherever it sits against them. The Crowd card's

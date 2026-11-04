@@ -1,5 +1,5 @@
-// Unison RATE knob mapping: the LFO speeds and the swing for a RATE position. The swing sits at
-// twice its base, the chorus voicing the owner tuned.
+// Unison RATE knob mapping: the LFO speeds and the swing for a RATE position. It runs in composeSnapshot
+// from loop(), so its powf never enters the audio interrupt, and the engine holds no copy of it.
 
 #pragma once
 

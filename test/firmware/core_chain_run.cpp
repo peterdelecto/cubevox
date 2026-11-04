@@ -30,8 +30,9 @@ using Block = std::array<float, kN>;
 // Holds the engines of one chain, built the way the board builds them. It is too big for the stack.
 struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
+  std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  ChainEngines engines{*pitch, *distortion};
+  ChainEngines engines{*pitch, *unison, *distortion};
   SlotFades fades;
 };
 
@@ -139,7 +140,7 @@ Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
 }
 
 void checkRouting() {
-  ChainParams p;  // the input gate is on and the panel gate is off
+  ChainParams p;  // the Input gate is on and the Gate is off
   p.inputGate.thresholdDb = 0.0f;
   p.inputGate.tuning.holdMs = 0.0f;
   p.gate.thresholdDb = 0.0f;
@@ -546,11 +547,18 @@ void checkSlotFadeLaw() {
   check(std::fabs(mid.engine.back() - 0.5f) < 1e-6f && std::fabs(mid.dry.back() - 0.5f) < 1e-6f,
         "slot fade: at the midpoint both gains read 0.5");
 
+  // The S curve is steepest at its middle, 1.5 times the straight line's 1/384 a sample, and flat at
+  // both ends.
   const float step = 1.0f / static_cast<float>(ge.size());
+  const float steepest = 1.5f * step;
   float worstStep = 0.0f;
   for (size_t i = 1; i < ge.size(); ++i) worstStep = std::max(worstStep, std::fabs(ge[i] - ge[i - 1]));
-  check(worstStep < 1.01f * step + 2e-7f && step > 0.0026f && step < 0.0027f,
-        "slot fade: every gain moves by 1/384 a sample, 0.0026");
+  const float firstStep = ge[1] - ge[0];
+  const float lastStep = ge[ge.size() - 1] - ge[ge.size() - 2];
+  check(worstStep < 1.01f * steepest + 2e-7f && step > 0.0026f && step < 0.0027f,
+        "slot fade: no gain moves more than 1.5 / 384 a sample, at the middle");
+  check(firstStep < 0.05f * step && lastStep < 0.05f * step,
+        "slot fade: the gains leave and reach their ends flat");
   check(ge.front() < 2.0f * step && ge.back() == 1.0f && gd.back() == 0.0f && gd.front() > 0.9970f,
         "slot fade: the fade in starts at the dry input and ends at the engine alone");
 
@@ -568,8 +576,8 @@ void checkSlotFadeLaw() {
   // A flip during a fade turns it round from where it is: the gains join one sample apart.
   const SlotGains down = slotGains(3, 2);
   const SlotGains up = slotGains(2, 3);
-  check(std::fabs(up.engine.front() - down.engine.back()) < 1.01f * step + 2e-6f &&
-            std::fabs(up.dry.front() - down.dry.back()) < 1.01f * step + 2e-6f,
+  check(std::fabs(up.engine.front() - down.engine.back()) < 1.01f * steepest + 2e-6f &&
+            std::fabs(up.dry.front() - down.dry.back()) < 1.01f * steepest + 2e-6f,
         "slot fade: turning a fade round mid-way joins the gains without a step");
 }
 
@@ -702,6 +710,47 @@ void checkSlotFlipOnClearsEngine() {
   check(steadyEnergy > 0.01, "slot flip: the same engine left running was still playing its echo, so the clear is what silenced it");
 }
 
+// Unison's output carries its input at unity, and right after the reset it equals its input exactly. A
+// flip on then fades two equal signals across the slot fade, which holds the level where an equal-power
+// pair would swell it by 3 dB. The wet stays out until the line holds live audio, so the chain's output
+// equals the chain with Unison off through the fade and for the hold after it. A flip off keeps each
+// block's level between the off and on levels.
+void checkUnisonToggle() {
+  const Layout layout = layoutOf({Card::Unison});
+  const ChainSnapshot on = snapshotToggles(layout, 0.5f, allToggles(true));
+  const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
+  auto flipped = newRig();
+  auto steadyOff = newRig();
+  constexpr int kWarm = 80;
+  constexpr int kOnBlocks = 60;
+  constexpr int kHoldBlocks = 20;  // 1,280 samples, inside the 1,347-sample hold
+  float worstOnDiff = 0.0f;
+  bool wetAfterHold = false;
+  for (int b = 0; b < kWarm + kOnBlocks; ++b) {
+    const bool isOn = b >= kWarm;
+    const Block in = tone(b, 0.3f);
+    const Run a = runBlock(*flipped, isOn ? on : off, in, StillClock());
+    const Run c = runBlock(*steadyOff, off, in, StillClock());
+    if (b >= kWarm && b < kWarm + kHoldBlocks) worstOnDiff = std::max(worstOnDiff, maxAbsDiff(a.out, c.out));
+    if (b >= kWarm + kHoldBlocks + 12) wetAfterHold = wetAfterHold || maxAbsDiff(a.out, c.out) > 1e-3f;
+  }
+  check(worstOnDiff < 1e-6f, "Unison toggle: through the fade in and the hold after it, the output equals the chain with Unison off");
+  check(wetAfterHold, "Unison toggle: the wet arrives after the hold");
+
+  auto down = newRig();
+  auto lo = newRig();
+  auto hi = newRig();
+  double worstRatio = 0.0;
+  for (int b = 0; b < kWarm + 2 * kSlotFadeBlocks; ++b) {
+    const Block in = tone(b, 0.3f);
+    const Run a = runBlock(*down, b < kWarm ? on : off, in, StillClock());
+    const Run l = runBlock(*lo, off, in, StillClock());
+    const Run h = runBlock(*hi, on, in, StillClock());
+    if (b >= kWarm) worstRatio = std::max(worstRatio, rms(a.out) / std::max(rms(l.out), rms(h.out)));
+  }
+  check(worstRatio < 1.03, "Unison toggle: a flip off keeps each block's level at or under the larger of the off and on levels");
+}
+
 // A flip back during the fade out turns the fade round without clearing the running engine.
 void checkSlotFlipReverses() {
   const Layout layout = layoutOf({Card::Slapback});
@@ -739,7 +788,8 @@ void checkSlotFlipReverses() {
 }
 
 // The Input gate's engine runs while its slot is off, because its detector feeds the status reply's
-// floor_dbfs. A Gate card stops with its slot. Either way the dry input passes bit for bit.
+// floor_dbfs and keys the Chatter card. A Gate card stops with its slot. Either way the dry input passes
+// bit for bit.
 void checkInputGateKeepsDetector() {
   const Block in = tone(0, 0.3f);
   for (const bool inputGate : {true, false}) {
@@ -761,6 +811,36 @@ void checkInputGateKeepsDetector() {
       check(peak > 0.0f && after == 0.0f && same, "slot flip: a Gate card stops with its toggle off and the block passes untouched");
     }
   }
+}
+
+// The Input gate switched off in a pause, with the room floor 9 dB under its threshold and the gate
+// shut, brings the floor up to the dry level inside the slot fade and holds it there. The gate's own off
+// fade ends with the slot fade, so the floor does not cut again and swell back after the slot passes the
+// engine's output alone.
+void checkInputGateOffInPause() {
+  const Layout layout = layoutOf({Card::InputGate});
+  const ChainSnapshot on = snapshotToggles(layout, 0.5f, allToggles(true));
+  const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
+  constexpr float kFloorAmp = 0.0006f;  // -64 dBFS against the default threshold of -55 dBFS
+  auto rig = newRig();
+  for (int b = 0; b < 300; ++b) runBlock(*rig, on, tone(b, kFloorAmp), StillClock());
+  const bool shut = rig->engines.inputGate.gainDb() < -60.0f;
+  std::vector<double> gainDb;
+  for (int b = 300; b < 330; ++b) {
+    const Block in = tone(b, kFloorAmp);
+    const Run run = runBlock(*rig, off, in, StillClock());
+    gainDb.push_back(10.0 * std::log10(rms(run.out) * rms(run.out) / (rms(in) * rms(in))));
+  }
+  bool climbs = true;
+  for (int b = 1; b < kSlotFadeBlocks; ++b) climbs = climbs && gainDb[static_cast<size_t>(b)] >= gainDb[static_cast<size_t>(b - 1)] - 0.05;
+  double worstAfter = 0.0;
+  double highest = -200.0;
+  for (size_t b = 0; b < gainDb.size(); ++b) {
+    highest = std::max(highest, gainDb[b]);
+    if (b >= static_cast<size_t>(kSlotFadeBlocks)) worstAfter = std::max(worstAfter, std::fabs(gainDb[b]));
+  }
+  check(shut && climbs && worstAfter < 1.0 && highest < 0.1,
+        "slot flip: the Input gate switched off in a pause brings the floor up inside the fade and holds it within 1 dB");
 }
 
 // Autotune and Octave share one PitchFx call at the first pitch card's slot. The stage follows either
@@ -1257,8 +1337,10 @@ void checkChainRun() {
   checkSlotFadeLevels();
   checkSlotFlipToOff();
   checkSlotFlipOnClearsEngine();
+  checkUnisonToggle();
   checkSlotFlipReverses();
   checkInputGateKeepsDetector();
+  checkInputGateOffInPause();
   checkPitchStageToggles();
   checkCrowdStage();
   checkCrowdPitchStage();

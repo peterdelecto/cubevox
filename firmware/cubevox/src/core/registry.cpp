@@ -11,10 +11,6 @@
 
 namespace {
 
-constexpr float kGateThresholdMinDb = -70.0f;
-constexpr float kGateThresholdMaxDb = -10.0f;
-constexpr float kGateDecayMinMs = 5.0f;
-constexpr float kGateDecayMaxMs = 1000.0f;
 constexpr int kKeyPositions = cv::kKeyCount;
 constexpr int kSemitoneMin = -cv::OctaveVoice::kMaxSemis;
 constexpr int kSemitoneMax = cv::OctaveVoice::kMaxSemis;
@@ -26,14 +22,16 @@ constexpr int kFormantShiftPositions = kFormantShiftMax - kFormantShiftMin + 1;
 
 constexpr KnobDesc kNoKnob = {"", KnobKind::Continuous, 0, 0.0f, 0.0f, ""};
 constexpr KnobDesc kPercent(const char* name) { return {name, KnobKind::Continuous, 0, 0.0f, 100.0f, "%"}; }
-constexpr KnobDesc kThreshold = {"Threshold", KnobKind::Continuous, 0, kGateThresholdMinDb, kGateThresholdMaxDb, "dB"};
+constexpr KnobDesc kThreshold = {"Threshold", KnobKind::Continuous, 0, cv::kGateThresholdMinDb, cv::kGateThresholdMaxDb,
+                                 "dB"};
 constexpr KnobDesc kInputThreshold = {"Threshold", KnobKind::Continuous, 0, cv::kInputGateThresholdMinDb,
                                       cv::kInputGateThresholdMaxDb, "dB"};
 constexpr KnobDesc kInputDecay = {"Decay", KnobKind::Continuous, 0, cv::kInputGateDecayMinMs,
                                   cv::kInputGateDecayMaxMs, "ms", Curve::Log};
 constexpr KnobDesc kSlapbackTime = {"Time", KnobKind::Continuous, 0, cv::Slapback::kTimeMinMs,
                                     cv::Slapback::kTimeMaxMs, "ms"};
-constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, kGateDecayMinMs, kGateDecayMaxMs, "ms", Curve::Log};
+constexpr KnobDesc kDecay = {"Decay", KnobKind::Continuous, 0, cv::kGateDecayMinMs, cv::kGateDecayMaxMs, "ms",
+                             Curve::Log};
 constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::AutotuneVoice::kMinResponseMs,
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
@@ -42,6 +40,10 @@ constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, cv::kFoll
                                      cv::kFollowerMaxRangeSt, "st", Curve::ZeroAtNoon};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
+constexpr KnobDesc kRingModRatioKnob = {"RATIO", KnobKind::Stepped, cv::kRingModRatioCount, 0.0f,
+                                        cv::kRingModRatioCount - 1, "", Curve::Linear, 0, cv::kRingModRatioName.data()};
+constexpr KnobDesc kStringsDecay = {"DECAY", KnobKind::Continuous, 0, cv::kStringsDecayMinMs, cv::kStringsDecayMaxMs,
+                                    "ms", Curve::Log};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
 // A card with an amount knob (Mix, Amount, Depth, Drive) puts it on knob B. The apply functions below
@@ -80,6 +82,10 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("DRIVE")}, Group::Pitch, costs::kGrowl},
+    {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::Pitch,
+     costs::kRingMod},
+    {Card::Strings, "strings", "Strings", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,
+     costs::kStrings},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -103,8 +109,8 @@ int stepIndex(const KnobDesc& k, float v) {
   return static_cast<int>(v);
 }
 
-// GateParams carries two knobs per stage, so the input gate and the second gate share one setter
-// and bring their own ranges.
+// GateParams carries two knobs per stage, so the Input gate and the Gate share one setter and bring
+// their own ranges.
 void applyGateKnob(int knob, float v, cv::GateParams& g, const KnobDesc& threshold, const KnobDesc& decay) {
   if (knob == 0) {
     g.thresholdDb = knobValue(threshold, v);
@@ -184,7 +190,7 @@ void applyLofiKnob(int knob, float v, cv::LofiParams& l) {
   if (knob == 0) {
     l.tone = v;
   } else {
-    l.amount = v * kLofiAmountTop;
+    l.amount = v;
   }
 }
 
@@ -201,6 +207,22 @@ void applyGrowlKnob(int knob, float v, cv::GrowlParams& g) {
     g.growl = v;
   } else {
     g.drive = v;
+  }
+}
+
+void applyRingModKnob(int knob, float v, cv::RingModParams& r) {
+  if (knob == 0) {
+    r.ratio = cv::kRingModRatio[static_cast<size_t>(v)];
+  } else {
+    r.mix = v;
+  }
+}
+
+void applyStringsKnob(int knob, float v, cv::StringsParams& s) {
+  if (knob == 0) {
+    s.decayMs = knobValue(kStringsDecay, v);
+  } else {
+    s.mix = v;
   }
 }
 
@@ -280,6 +302,8 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
     case Card::FormantFollower: applyFollowerKnob(knob, v, out); break;
     case Card::Growl: applyGrowlKnob(knob, v, out.growl); break;
+    case Card::RingMod: applyRingModKnob(knob, v, out.ringMod); break;
+    case Card::Strings: applyStringsKnob(knob, v, out.strings); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -310,6 +334,12 @@ void applyToggle(Card c, bool on, ChainParams& out) {
       out.growl.on = on;
       out.pitchFx.growlOn = on;
       break;
+    case Card::RingMod:
+      // The pitch stage reads ringModOn to keep its tracker running for the Ring mod card.
+      out.ringMod.on = on;
+      out.pitchFx.ringModOn = on;
+      break;
+    case Card::Strings: out.strings.on = on; break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -320,6 +350,8 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
+  // The Strings card sits on the Autotune card's key whenever that card is placed.
+  if (c == Card::Autotune) out.strings.keyed = true;
   // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
   if (c == Card::FormantFollower) out.follower.placed = true;
 }
