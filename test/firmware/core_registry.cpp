@@ -88,7 +88,7 @@ void checkGroups() {
   check(pitch == 7, "autotune, octave, formant, the formant follower, the crowd card, Mob 2 and growl are the pitch group");
 }
 
-// The amount knob (Mix, Amount, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
+// The amount knob (Mix, Amount, Depth, Drive, Range) sits on knob B, the lower pot of its slot, and each parameter
 // still reaches its own engine field through the knob it is listed on.
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
@@ -97,7 +97,7 @@ void checkAmountKnobIsB() {
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
            std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "DRIVE") == 0 ||
-           std::strcmp(name, "VOICES") == 0;
+           std::strcmp(name, "VOICES") == 0 || std::strcmp(name, "RANGE") == 0;
   };
   for (const Card c : amountCards) {
     char what[96];
@@ -161,7 +161,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Lofi: return knob == 0 ? p.lofi.tone : p.lofi.amount;
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::Crowd2: return knob == 0 ? p.crowd.drift : static_cast<float>(p.crowd.voicesStep);
-    case Card::FormantFollower: return knob == 0 ? p.follower.depthSt : p.pitchFx.formant.mix;
+    case Card::FormantFollower: return knob == 0 ? p.follower.sensitivity : p.follower.rangeSt;
     case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.drive;
     case Card::Empty:
     case Card::Count: break;
@@ -465,8 +465,9 @@ void checkAppendedCards() {
 }
 
 // The Formant follower: id formant_follow, which keeps under the id clip width, the pitch engine and
-// group, DEPTH from -7 st at 0 through 0 at noon to +7 st at full, the Formant voice's MIX, and FOLLOWER
-// on the OLED's readout title. Placing it hands the voice's SHIFT to the envelope.
+// group, SENSITIVITY on the upper pot, RANGE on the lower from -7 st at 0 through 0 at noon to +7 st at
+// full, no knob on the Formant voice's MIX, and FOLLOWER on the OLED's readout title. Placing it hands
+// the voice's SHIFT to the follower.
 void checkFollowerCard() {
   const CardDesc& d = cardDesc(Card::FormantFollower);
   check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Formant follower") == 0 &&
@@ -474,25 +475,29 @@ void checkFollowerCard() {
         "follower: id formant_follow, name Formant follower, the pitch engine and the pitch group");
   check(std::strcmp(oledName(Card::FormantFollower), "Follower") == 0 && std::strcmp(oledName(Card::Formant), "Formant") == 0,
         "follower: the readout title reads Follower, and a card without an OLED name keeps its name");
-  const KnobDesc& depth = *knobDesc(Card::FormantFollower, 0);
-  check(std::strcmp(depth.name, "DEPTH") == 0 && depth.kind == KnobKind::Continuous && depth.min == -7.0f &&
-            depth.max == 7.0f && std::strcmp(depth.unit, "st") == 0,
-        "follower: knob A is DEPTH, continuous from -7 to +7 st");
-  const KnobDesc& mix = *knobDesc(Card::FormantFollower, 1);
-  check(std::strcmp(mix.name, "MIX") == 0 && std::strcmp(mix.unit, "%") == 0, "follower: knob B is MIX, a percent");
+  const KnobDesc& sens = *knobDesc(Card::FormantFollower, 0);
+  check(std::strcmp(sens.name, "SENSITIVITY") == 0 && sens.kind == KnobKind::Continuous && sens.min == 0.0f &&
+            sens.max == 100.0f && std::strcmp(sens.unit, "%") == 0,
+        "follower: knob A is SENSITIVITY, a percent");
+  const KnobDesc& range = *knobDesc(Card::FormantFollower, 1);
+  check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -7.0f &&
+            range.max == 7.0f && std::strcmp(range.unit, "st") == 0,
+        "follower: knob B is RANGE, continuous from -7 to +7 st");
 
   ChainParams p;
-  const auto depthAt = [&p](float position) {
-    applyKnob(Card::FormantFollower, 0, position, p);
-    return p.follower.depthSt;
+  const float mixBefore = p.pitchFx.formant.mix;
+  applyKnob(Card::FormantFollower, 0, 0.3f, p);
+  check(std::fabs(p.follower.sensitivity - 0.3f) < 1e-6f, "follower: SENSITIVITY hands the follower its position");
+  const auto rangeAt = [&p](float position) {
+    applyKnob(Card::FormantFollower, 1, position, p);
+    return p.follower.rangeSt;
   };
-  check(depthAt(0.0f) == -7.0f && depthAt(0.5f) == 0.0f && depthAt(1.0f) == 7.0f,
-        "follower: DEPTH is -7 st at 0, 0 at noon and +7 st at full");
-  check(shownText(depth, 0.0f) == "-7" && shownText(depth, 0.5f) == "0" && shownText(depth, 0.75f) == "+4" &&
-            knobCells(depth) == 2,
-        "follower: DEPTH reads its semitones with the sign in two cells");
-  applyKnob(Card::FormantFollower, 1, 0.4f, p);
-  check(std::fabs(p.pitchFx.formant.mix - 0.4f) < 1e-6f, "follower: MIX drives the Formant voice's mix");
+  check(rangeAt(0.0f) == -7.0f && rangeAt(0.5f) == 0.0f && rangeAt(1.0f) == 7.0f,
+        "follower: RANGE is -7 st at 0, 0 at noon and +7 st at full");
+  check(shownText(range, 0.0f) == "-7" && shownText(range, 0.5f) == "0" && shownText(range, 0.75f) == "+4" &&
+            knobCells(range) == 2,
+        "follower: RANGE reads its semitones with the sign in two cells");
+  check(p.pitchFx.formant.mix == mixBefore, "follower: no knob sets the Formant voice's mix");
 
   ChainParams t;
   applyToggle(Card::FormantFollower, true, t);

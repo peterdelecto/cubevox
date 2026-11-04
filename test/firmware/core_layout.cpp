@@ -424,8 +424,8 @@ void checkComposeSlot3Formant() {
   panel.knob[2] = {0.75f, 0.6f};
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.follower.placed && snap.params.pitchFx.formant.on && !snap.params.pitchFx.octave.on &&
-            std::fabs(snap.params.follower.depthSt - 3.5f) < 1e-5f && std::fabs(snap.params.pitchFx.formant.mix - 0.6f) < 1e-6f,
-        "compose: the Formant follower in slot 3 reads DEPTH and MIX from slot 3's pots and drives the Formant voice");
+            std::fabs(snap.params.follower.sensitivity - 0.75f) < 1e-6f && std::fabs(snap.params.follower.rangeSt - 1.4f) < 1e-5f,
+        "compose: the Formant follower in slot 3 reads SENSITIVITY and RANGE from slot 3's pots and drives the Formant voice");
 }
 
 // Each slot 7 card reads its knobs and toggle from slot 7's pots, and the Chatter card's word key
