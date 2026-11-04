@@ -7,16 +7,21 @@
 #include "engine/common.h"
 #include "engine/dsp.h"
 
-// Cheap replacements for libm calls that sit inside per-sample loops. Each has
-// a test that pins its error against libm: test/fastmath_test.cpp, and
-// test/polish_comp_test.cpp for log2Fast.
+// Cheap replacements for libm calls that sit inside per-sample loops, and the gain helper built on
+// them. Each function has a test that pins its error against libm in test/fastmath_test.cpp.
+// A NaN input gives a finite result from every function that casts to int, so a stray NaN never
+// reaches undefined behaviour here.
 
 namespace cv {
 
-// 2^x to about 1e-7 relative: a degree-6 polynomial on the fraction, then the
-// integer part goes straight into the float exponent. x clamps to +-126.
+constexpr float kLog2E = 1.44269504089f;     // log2(e)
+constexpr float kTurn32 = 4294967296.0f;     // one turn of a 32-bit phase counter
+
+// 2^x to 7.5e-8 relative for the float x it is given: a degree-6 polynomial on the
+// fraction, then the integer part goes straight into the float exponent. x clamps to +-126, and NaN
+// reads as -126.
 inline float exp2Fast(float x) {
-  x = x < -126.0f ? -126.0f : (x > 126.0f ? 126.0f : x);
+  x = fminf(fmaxf(x, -126.0f), 126.0f);
   const int r = static_cast<int>(x + 0.5f + 1024.0f) - 1024;  // floor(x + 0.5)
   const float f = x - static_cast<float>(r);                   // -0.5 .. 0.5
   float p = 1.535336188319500e-4f;
@@ -58,11 +63,12 @@ constexpr float kLog2PerDb = 0.16609640474f;  // log2(10) / 20
 // 20 log10(x) to under 2e-4 dB for positive normal x, through log2Fast.
 inline float dbFast(float x) { return kDbPerLog2 * log2Fast(x); }
 
-// 10^(db / 20) to about 1e-7 relative, through exp2Fast.
+// 10^(db / 20) to 7.7e-7 relative on -140 to +24 dB, through exp2Fast. The error is the rounding of
+// db times kLog2PerDb. It is for per-sample use; dbToGain in dsp.h is the exact form for a value
+// computed once a block or on a setting change.
 inline float dbToGainFast(float db) { return exp2Fast(db * kLog2PerDb); }
 
-// A linear gain from a level in dB, worked out only when the dB moves. 0 dB is exactly 1, so a stage
-// can skip the multiply while trimmed() is false.
+// A linear gain from a level in dB, worked out only when the dB moves. 0 dB is exactly 1.
 class DbGain {
  public:
   void set(float db) {
@@ -71,7 +77,6 @@ class DbGain {
     gain_ = dbToGainFast(db);
   }
   float gain() const { return gain_; }
-  bool trimmed() const { return gain_ != 1.0f; }
 
  private:
   float db_ = 0.0f;
@@ -81,7 +86,7 @@ class DbGain {
 // sin(2 pi phase / 2^32) from a 32-bit turn counter. The phase folds to a
 // quarter turn, then sin(pi t) is the odd Taylor series through t^11 on
 // |t| <= 0.5. The first dropped term is below 1e-7, so absolute error stays
-// under 1e-6 with float rounding.
+// under 1e-6 with float rounding (1.6e-7 measured). A quarter turn, 2^30, returns 0.99999994 and not 1.
 CV_INLINE float sinTurns(uint32_t phase) {
   const int32_t p = static_cast<int32_t>(phase);
   float t = static_cast<float>(p) * (1.0f / 2147483648.0f);
@@ -102,7 +107,7 @@ CV_INLINE float sinTurns(uint32_t phase) {
   return t * (c1 + t2 * (c3 + t2 * (c5 + t2 * (c7 + t2 * (c9 + t2 * c11)))));
 }
 
-// tanh to about 1e-6 absolute: Eigen's odd 13/6 rational form. Inputs at or
+// tanh to under 3e-7 absolute: Eigen's odd 13/6 rational form. Inputs at or
 // beyond +-9 return exactly +-1; the polynomial input clamps at +-7.9053111,
 // where the rational already rounds to +-1. The form is odd, so
 // tanhFast(-x) == -tanhFast(x) bit for bit.
@@ -131,9 +136,11 @@ CV_INLINE float tanhFast(float x) {
 // x folds onto r within pi / 4 of q quarter turns, with pi / 2 in three parts
 // so the fold itself rounds nothing (Cody and Waite). The Taylor series through
 // r^9 and r^10 finish it; the first dropped terms are under 3e-9. Under 0.14 rad
-// q is 0, r is x, and only the series runs.
+// q is 0, r is x, and only the series runs. x clamps to +-16 pi, so NaN reads as -16 pi.
 CV_INLINE void sinCosFast(float x, float& s, float& c) {
+  constexpr float kMaxArg = 16.0f * kPi;
   constexpr float kTwoOverPi = 0.636619772f;
+  x = fminf(fmaxf(x, -kMaxArg), kMaxArg);
   constexpr float kQuarterA = 1.5703125f;
   constexpr float kQuarterB = 4.837512969970703125e-4f;
   constexpr float kQuarterC = 7.549789948768648e-8f;
@@ -153,10 +160,10 @@ CV_INLINE void sinCosFast(float x, float& s, float& c) {
   }
 }
 
-// Hann window by rotation: one complex multiply per sample in place of a
-// cosine. init() runs sinCosFast twice and no libm, so it can sit in a grain
-// launch. Drift over a grain is about n * 1e-7, so callers re-init at each
-// grain or each block.
+// Seed of a Hann window by rotation: the cosine and sine of the phase (c, s) and of the per-sample
+// step (dc, ds). The caller turns (c, s) by (dc, ds) once a sample, one complex multiply in place of a
+// cosine, and the window is 0.5 - 0.5 * c. init() runs sinCosFast twice and no libm. The turn drifts
+// about 3e-9 a sample, so callers re-init at each block.
 struct HannRotor {
   float c = 1.0f;
   float s = 0.0f;
@@ -166,15 +173,6 @@ struct HannRotor {
   void init(float phase, float step) {
     sinCosFast(phase, s, c);
     sinCosFast(step, ds, dc);
-  }
-
-  // 0.5 * (1 - cos(phase)) at the current phase.
-  float window() const { return 0.5f * (1.0f - c); }
-
-  void advance() {
-    const float c2 = c * dc - s * ds;
-    s = s * dc + c * ds;
-    c = c2;
   }
 };
 

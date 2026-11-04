@@ -4,8 +4,10 @@
 
 #include "engine/common.h"
 
-// Building blocks the engines share: constants, a clamp, the one-pole and RBJ biquad filters, and
-// the Catmull-Rom read most fractional delays use. The Crowd copies and the reverbs' Delay read linearly.
+// Building blocks the engines share: constants, a clamp, the dB-to-gain law and the log taper, the
+// one-pole and RBJ biquad filters, and the Catmull-Rom forms. Unison reads its delay line with
+// readRing, Echo and the pitch voices call catmullRom or catmullRomWeights on their own taps, and
+// Mob's voices and the reverbs' Delay read linearly.
 
 namespace cv {
 
@@ -18,11 +20,17 @@ constexpr float kFilterMinHz = 20.0f;
 constexpr float kFilterMaxHz = 0.45f * kSampleRate;
 constexpr float kButterworthQ = 0.70710678f;
 
-inline float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
+// x limited to [lo, hi]. NaN reads as lo, so a NaN never passes a boundary clamp. Written with
+// fmin and fmax, which the M7 compiles to vminnm and vmaxnm with no flag transfer.
+constexpr float clampf(float x, float lo, float hi) { return __builtin_fminf(__builtin_fmaxf(x, lo), hi); }
 
 // A knob position p in [0, 1] mapped geometrically from `from` at 0 to `to` at 1. The panel's log
 // knobs and the RESPONSE knob run on it.
 inline float logTaper(float from, float to, float p) { return from * powf(to / from, p); }
+
+// 10^(db / 20) exactly, through libm: for a value computed once a block or when a setting changes.
+// dbToGainFast in fastmath.h is the form for a sample loop.
+inline float dbToGain(float db) { return powf(10.0f, db / 20.0f); }
 
 // Coefficient of a one-pole low-pass with its corner at hz, for a filter that runs at rate Hz. The
 // corner clamps to 0.45 of that rate.
@@ -57,7 +65,7 @@ struct OnePole {
 constexpr float kWetDcBlockHz = 5.0f;
 
 // Coefficient of a one-pole high-pass with its corner at hz, from the series of 1 - exp(-x). It
-// lands within float rounding (1e-7 relative) of the exact value below 100 Hz. Unlike onePoleCoef it
+// lands within 1.2e-7 relative of the exact value at 100 Hz and below. Unlike onePoleCoef it
 // does not clamp the corner to kFilterMinHz, so it can sit below that.
 constexpr float dcBlockCoef(float hz) {
   const float x = kTwoPi * hz / kSampleRate;
@@ -78,15 +86,41 @@ struct DcBlocker {
   void clear() { y = 0.0f; }
 };
 
-// RBJ cookbook biquad in transposed direct form II. Shelves use slope S = 1.
+// The corner of an RBJ section: the cosine and sine of w0 = 2 pi hz / rate, with hz clamped to the
+// filter band. A stage that moves only the gain of a peak or shelf keeps the corner and re-sets the
+// gain through setPeakAmp, setLowShelfAmp or setHighShelfAmp.
+struct RbjCorner {
+  float cw, sw;
+};
+
+inline RbjCorner rbjCorner(float hz) {
+  const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
+  return {cosf(w0), sinf(w0)};
+}
+
+// RBJ alpha = sin(w0) / (2 q).
+inline float rbjAlpha(float sw, float q) { return sw / (2.0f * q); }
+
+// The amplitude A = 10^(db / 40) that the RBJ peak and shelf forms take.
+inline float rbjAmp(float db) { return powf(10.0f, db / 40.0f); }
+
+// Peak Q never goes below this, so a stray tuning value cannot put a pole on the unit circle.
+constexpr float kPeakMinQ = 0.1f;
+
+// Shelf slope S runs from kShelfMaxSlope, the Butterworth width, down to kShelfMinSlope, which narrows
+// the transition.
+constexpr float kShelfMaxSlope = 1.0f;
+constexpr float kShelfMinSlope = 0.1f;
+
+// RBJ cookbook biquad in transposed direct form II.
 struct Biquad {
   float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
   float z1 = 0.0f, z2 = 0.0f;
 
   void setLowPass(float hz, float q) {
-    const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    const float cw = cosf(w0);
-    const float alpha = sinf(w0) / (2.0f * q);
+    const RbjCorner k = rbjCorner(hz);
+    const float cw = k.cw;
+    const float alpha = rbjAlpha(k.sw, q);
     const float a0 = 1.0f + alpha;
     b0 = 0.5f * (1.0f - cw) / a0;
     b1 = (1.0f - cw) / a0;
@@ -96,9 +130,9 @@ struct Biquad {
   }
 
   void setHighPass(float hz, float q) {
-    const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    const float cw = cosf(w0);
-    const float alpha = sinf(w0) / (2.0f * q);
+    const RbjCorner k = rbjCorner(hz);
+    const float cw = k.cw;
+    const float alpha = rbjAlpha(k.sw, q);
     const float a0 = 1.0f + alpha;
     b0 = 0.5f * (1.0f + cw) / a0;
     b1 = -(1.0f + cw) / a0;
@@ -107,24 +141,32 @@ struct Biquad {
     a2 = (1.0f - alpha) / a0;
   }
 
-  void setPeak(float hz, float db, float q) {
-    const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    const float amp = powf(10.0f, db / 40.0f);
-    const float cw = cosf(w0);
-    const float alpha = sinf(w0) / (2.0f * (q < 0.1f ? 0.1f : q));
+  void setPeak(float hz, float db, float q) { setPeakAmp(rbjCorner(hz), rbjAmp(db), q); }
+
+  // The peak at a corner and a linear amplitude A.
+  void setPeakAmp(const RbjCorner& k, float amp, float q) {
+    const float alpha = rbjAlpha(k.sw, fmaxf(q, kPeakMinQ));
     const float a0 = 1.0f + alpha / amp;
     b0 = (1.0f + alpha * amp) / a0;
-    b1 = -2.0f * cw / a0;
+    b1 = -2.0f * k.cw / a0;
     b2 = (1.0f - alpha * amp) / a0;
     a1 = b1;
     a2 = (1.0f - alpha / amp) / a0;
   }
 
-  void setLowShelf(float hz, float db) { setShelf(hz, db, -1.0f, 1.0f); }
+  void setLowShelf(float hz, float db) { setLowShelfAmp(rbjCorner(hz), rbjAmp(db)); }
 
-  // `slope` is the RBJ shelf slope S, from 1 (the Butterworth width, what every other caller gets)
-  // down to 0.1, which narrows the transition.
-  void setHighShelf(float hz, float db, float slope = 1.0f) { setShelf(hz, db, 1.0f, clampf(slope, 0.1f, 1.0f)); }
+  // `slope` is the RBJ shelf slope S. Slope 1, which every other caller gets, takes the Butterworth
+  // width directly, so those shelves keep their coefficients exact.
+  void setHighShelf(float hz, float db, float slope = kShelfMaxSlope) {
+    setHighShelfAmp(rbjCorner(hz), rbjAmp(db), slope);
+  }
+
+  void setLowShelfAmp(const RbjCorner& k, float amp) { setShelf(k, amp, -1.0f, kShelfMaxSlope); }
+
+  void setHighShelfAmp(const RbjCorner& k, float amp, float slope = kShelfMaxSlope) {
+    setShelf(k, amp, 1.0f, clampf(slope, kShelfMinSlope, kShelfMaxSlope));
+  }
 
   // Takes the coefficients of `o` and keeps this section's state.
   void setCoefsFrom(const Biquad& o) {
@@ -145,14 +187,12 @@ struct Biquad {
   void clear() { z1 = z2 = 0.0f; }
 
  private:
-  // sign -1 is the low shelf, +1 the high shelf. Slope 1 takes the fixed Butterworth width, so a
-  // shelf with that slope is bit-exact with what this setter wrote before it had a slope.
-  void setShelf(float hz, float db, float sign, float slope) {
-    const float w0 = kTwoPi * clampf(hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    const float amp = powf(10.0f, db / 40.0f);
-    const float cw = cosf(w0);
-    const float alpha = slope == 1.0f ? sinf(w0) * kButterworthQ
-                                      : 0.5f * sinf(w0) * sqrtf((amp + 1.0f / amp) * (1.0f / slope - 1.0f) + 2.0f);
+  // sign -1 is the low shelf, +1 the high shelf.
+  void setShelf(const RbjCorner& k, float amp, float sign, float slope) {
+    const float cw = k.cw;
+    const float alpha = slope == kShelfMaxSlope
+                            ? k.sw * kButterworthQ
+                            : 0.5f * k.sw * sqrtf((amp + 1.0f / amp) * (1.0f / slope - 1.0f) + 2.0f);
     const float beta = 2.0f * sqrtf(amp) * alpha;
     const float ap = amp + 1.0f, am = amp - 1.0f;
     const float a0 = ap - sign * am * cw + beta;
@@ -194,13 +234,16 @@ CV_INLINE int wrapOnce(int i) {
   return static_cast<unsigned>(i) < static_cast<unsigned>(Len) ? i : 0;
 }
 
-// Catmull-Rom read `delay` samples behind `head` in a ring of Len samples. The caller keeps the
-// delay inside [2, Len - 3], so the four taps never cross the head.
+// Catmull-Rom read `delay` samples behind `head` in a ring of Len samples. With the head on the newest
+// sample, the read is exact for a delay in (1, Len - 2]. The caller keeps it inside [2, Len - 3], so the
+// four taps never cross the head. Below 1 sample the taps pull in the oldest sample. Any delay, NaN
+// included, indexes inside the ring.
 template <int Len>
 CV_INLINE float readRing(const float* ring, int head, float delay) {
+  constexpr float kIndexLimit = 1.0e9f;  // keeps the cast to int defined; wrapOnce sends it to 0
   const float pos = static_cast<float>(head) - delay;
   const float fl = floorf(pos);
-  const int i0 = wrapOnce<Len>(static_cast<int>(fl));
+  const int i0 = wrapOnce<Len>(static_cast<int>(fminf(fmaxf(fl, -kIndexLimit), kIndexLimit)));
   return catmullRom(ring[wrapOnce<Len>(i0 - 1)], ring[i0], ring[wrapOnce<Len>(i0 + 1)], ring[wrapOnce<Len>(i0 + 2)],
                     pos - fl);
 }

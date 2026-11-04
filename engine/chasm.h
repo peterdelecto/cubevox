@@ -283,9 +283,7 @@ class Chasm {
         wet[i] = tick(clip(in[i]), feedback, scale, w.base1 + w.rise1 * f, w.base2 + w.rise2 * f);
       }
     } else {
-      float feedbackEnd = feedback_;
-      // This block loop of smooth::step stays until smooth::advance lands with the Echo merge.
-      for (int i = 0; i < n; ++i) feedbackEnd = smooth::step(feedbackEnd, feedbackTarget, smooth::kSmoothCoef);
+      const float feedbackEnd = smooth::advance(feedback_, feedbackTarget, smooth::kSmoothCoef, n);
       const float fb0 = feedback_, fb1 = feedbackEnd;
       const float s0 = c.inScale * gainFor(fb0), s1 = c.inScale * gainFor(fb1);
       for (int i = 0; i < n; ++i) {

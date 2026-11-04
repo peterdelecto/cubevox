@@ -12,13 +12,34 @@
   hold every knob step and toggle to steady-state curvature.
 - `process()` takes any `n`. An engine with kBlock-sized scratch (Reverb) runs the call in
   kBlock chunks.
-- Shared pieces live in `engine/common.h` (`kSampleRate`, `kBlock`, `kSmpPerMs`), `engine/dsp.h` (Biquad and its RBJ
-  setters, OnePole, `catmullRom`, `wrapOnce`, `readRing` and `readRingClamped` for a delay line that may leave
-  [2, Len - 3], `clampf`, `kTwoPi`) and `engine/smooth.h` (`kSmoothCoef`, the 20 ms one-pole, `blockCoef` for a
-  one-pole stepped once per block, `advance` for n steps of one smoother or of two that share a coefficient, and
-  `advanceBlock` for kBlock steps in closed form).
-  The two reverbs share `engine/reverb_parts.h` (the allpass step, Allpass, Delay, the wobble LFO's sine table,
-  phase step and error bound, and the Dwell drive terms).
+- Shared pieces live in the headers below. A stage uses them and keeps no private copy of a helper or a
+  constant, so a fix lands once. Grep here before writing a clamp, a taper, a dB law, a corner or a smoother.
+  1. `engine/common.h`: `kSampleRate`, `kBlock`, `kSmpPerMs`, `CV_INLINE`, `CV_RESTRICT`.
+  2. `engine/dsp.h`: `kPi`, `kTwoPi`, `kHalfPi`, `kFilterMinHz`, `kFilterMaxHz`, `kButterworthQ`, `clampf`,
+     `logTaper`, `dbToGain` (libm, exact, for a value computed once a block or on a setting change),
+     `onePoleCoef` and `onePoleCoefAt`, `OnePole`, `kWetDcBlockHz`, `dcBlockCoef`, `DcBlocker`, `RbjCorner`
+     with `rbjCorner`, `rbjAlpha` and `rbjAmp`, `kPeakMinQ`, `kShelfMaxSlope`, `kShelfMinSlope`, `Biquad`
+     (the dB setters, the `...Amp` setters that take a kept corner and a linear amplitude, `setCoefsFrom`,
+     `run`), `catmullRom`, `catmullRomWeights`, `wrapOnce`, `readRing`, and `readRingClamped` for a delay
+     that may leave [2, Len - 3].
+  3. `engine/fastmath.h`: `exp2Fast`, `log2Fast`, `dbFast`, `dbToGainFast` (the per-sample dB law),
+     `DbGain`, `sinTurns`, `sinCosFast`, `tanhFast`, `HannRotor`, and the constants `kLog2E`, `kDbPerLog2`,
+     `kLog2PerDb`, `kTurn32`.
+  4. `engine/smooth.h`: `kSmoothSec`, `kSnap`, `kSmoothCoef`, `kSmoothKeepBlock`, `clamp01`, `keep` (what a
+     one-pole keeps over n samples), `blockCoef`, `coef`, `step`, `advance` (n steps of one smoother or of two
+     that share a coefficient), `advanceBy` (n steps in closed form) and `advanceBlock` (kBlock steps of the
+     20 ms smoother).
+  5. `engine/scale.h`: the key tables, `kMajor`, `midiOf`, `scaleDeviation`, `kHoldSemis`, `heldNote`.
+  6. `engine/reverb_parts.h`, for the two reverbs: `softClip`, `softClipHeadroom`, `kReverbClipHeadroom`, the
+     allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, the wobble LFO's sine table, phase step and
+     error bound, and the Dwell drive terms.
+- `clampf`, `clamp01`, `KnobCurve::at` and `exp2Fast` return the lower bound for a NaN, so a NaN stops at the
+  first boundary clamp. The float-to-int casts in `exp2Fast`, `sinCosFast`, `readRing` and `Delay::read` see a
+  finite value for any input.
+- The box sets flush-to-zero in `cubevox.ino`, so the engine adds no flush of its own for filter tails.
+- The slot crossfade (`mixSlotFade` in `chain_run.cpp`) is equal-gain, a linear pair that sums to 1, because
+  nearly every card's output carries its input and an equal-power pair would swell it by 3 dB. The BYPASS mix
+  stays equal-power.
 - Spring runs its loops at 24 kHz between a 15-tap half-band decimator and interpolator. Its
   delay lengths subtract the filters' delay (`kFilterDelay`), and the tick stays inlined in
   `Spring::run`, so check the M7 listing for a call to it after any change there.

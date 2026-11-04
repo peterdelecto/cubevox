@@ -3,15 +3,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstring>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
 
 // Monophonic pitch tracker. Two-stage YIN: a coarse search on a 12 kHz copy
 // finds the period cheaply, then a narrow search at 48 kHz refines it when the
-// caller asks for the fine pass (Autotune's hard tune and the Formant card need
-// it; the Crowd card does not).
+// caller asks for the fine pass (Autotune at every RESPONSE and the Formant card
+// need it; the Mob card does not).
 
 namespace cv {
 
@@ -125,7 +124,7 @@ class PitchTracker {
   }
 
   // Whether an analysis works out PitchResult::outOfRange. It costs ten compares a hop, so only the
-  // callers that read the flag (the Crowd and Formant cards) ask for it. It starts on.
+  // callers that read the flag (the Mob and Formant cards) ask for it. It starts on.
   void readOutOfRange(bool on) { rangeFlag_ = on; }
 
   // n samples with no reader. The hop count keeps time, the rings rest and the result reads

@@ -138,10 +138,7 @@ class OctaveVoice {
   // has the closed form decay. It lands exactly on the target once within kSnap.
   static float glide(float x, float target, float a, float decay, int n) {
     if (x == target) return x;
-    if (n != kBlock) {
-      for (int i = 0; i < n; ++i) x = smooth::step(x, target, a);
-      return x;
-    }
+    if (n != kBlock) return smooth::advance(x, target, a, n);
     x = target + (x - target) * decay;
     return fabsf(target - x) < smooth::kSnap ? target : x;
   }
