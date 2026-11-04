@@ -1,11 +1,10 @@
-// Formant follower checks: settled off is a plain copy in every mode; RANGE maps -7, 0 and +3 st at 0, 50
-// and 100 % and SHIFT never passes +3 st; at SENSITIVITY 50 % the drive reads about 1 on a -21 dBFS note,
-// 0.5 on a -27 dBFS note and 0 on a -33 dBFS note, and the full point moves with the pot; the follower's
-// attack and release measured on a step; in follow mode the voice's SHIFT follows RANGE times the drive
-// between whole semitones; pluck sweeps a held note from the drive to 0 and fires again on the next note;
-// the lfo sweep stays between 0 and RANGE at its rate, sound or silence; lfoEnv rests at 0 in silence and
-// restarts its LFO on each note; the output stays finite on Adam's clips at every knob corner in every
-// mode; and the shifted voice holds the level rule on them. The card is set through the registry, as the
+// Yawn checks: settled off is a plain copy; RANGE maps 0 st at the pot's bottom and -7 st at its top,
+// the default position reads -5 st, and SHIFT never leaves 0 to -7 st; at SENSITIVITY 50 % the drive
+// reads about 1 on a -21 dBFS note, 0.5 on a -27 dBFS note and 0 on a -33 dBFS note, and the full point
+// moves with the pot; the follower's attack and release measured on a step; each onset fires a sweep
+// that opens at the drive, halves at half the decay and rests at 0 while the note holds, and the next
+// note fires it again; silence rests at 0; the output stays finite on Adam's clips at every knob corner;
+// and the card at its default holds the level rule on them. The card is set through the registry, as the
 // box sets it. The clip rows skip when samples/ is absent. No window, no audio device.
 
 #include <algorithm>
@@ -33,9 +32,10 @@ constexpr int kRate = cv::kSampleRate;
 
 using Signal = std::vector<float>;
 
-bool report(const char* name, bool ok, const char* fmt, double a = 0.0, double b = 0.0, double c = 0.0) {
+bool report(const char* name, bool ok, const char* fmt, double a = 0.0, double b = 0.0, double c = 0.0,
+            double d = 0.0) {
   char detail[200];
-  std::snprintf(detail, sizeof detail, fmt, a, b, c);
+  std::snprintf(detail, sizeof detail, fmt, a, b, c, d);
   std::printf("%s %s  %s\n", ok ? "PASS" : "FAIL", name, detail);
   return ok;
 }
@@ -67,38 +67,27 @@ Signal sine(int n, double peakDbfs) {
   return x;
 }
 
-using cv::FollowerMode;
+// The RANGE pot's position for `st`, 0 st at 0 and -7 st at 1.
+float rangePosition(float st) { return st / cv::kFollowerMinRangeSt; }
 
-constexpr FollowerMode kModes[] = {FollowerMode::Follow, FollowerMode::Pluck, FollowerMode::Lfo, FollowerMode::LfoEnv};
-
-const char* modeName(FollowerMode m) {
-  switch (m) {
-    case FollowerMode::Follow: return "follow";
-    case FollowerMode::Pluck: return "pluck";
-    case FollowerMode::Lfo: return "lfo";
-    case FollowerMode::LfoEnv: return "lfoEnv";
-  }
-  return "?";
-}
-
-// The card placed and switched on with its pots at `sens` and `range` (0..1), as compose sets it, in
-// `mode`.
-ChainParams boxFollower(float sens, float range, bool on = true, FollowerMode mode = FollowerMode::Follow) {
+// The card placed and switched on with its pots at `sens` and `range` (0..1), as compose sets it, and
+// its sweep falling over `decayMs`.
+ChainParams boxYawn(float sens, float range, bool on = true, float decayMs = cv::kFollowerDefaultDecayMs) {
   ChainParams chain;
   applyPlacement(Card::FormantFollower, chain);
   applyToggle(Card::FormantFollower, on, chain);
   applyKnob(Card::FormantFollower, 0, sens, chain);
   applyKnob(Card::FormantFollower, 1, range, chain);
-  chain.follower.tuning.mode = mode;
+  chain.follower.tuning.decayMs = decayMs;
   return chain;
 }
 
-// The RANGE pot's position for `st`, -7 st at 0, 0 at noon and +3 st at 1.
-float rangePosition(float st) {
-  return st < 0.0f ? 0.5f * (1.0f - st / cv::kFollowerMinRangeSt) : 0.5f * (1.0f + st / cv::kFollowerMaxRangeSt);
+// The card as it ships: SENSITIVITY 40 %, RANGE -5 st, decay 300 ms.
+ChainParams boxDefault() {
+  return boxYawn(cv::kFollowerDefaultSensitivity, rangePosition(cv::kFollowerDefaultRangeSt));
 }
 
-// The pitch stage and the follower ahead of it, as the chain runs them, on the heap: the ring is large.
+// The pitch stage and the card ahead of it, as the chain runs them, on the heap: the ring is large.
 struct Stage {
   cv::PitchFx pitch;
   cv::FormantFollower follower;
@@ -131,17 +120,15 @@ Signal through(const Signal& in, const ChainParams& p) {
   return through(in, p, [](const Stage&, int) {});
 }
 
-// Settled off, the card placed with its toggle off passes the input bit for bit in every mode. Switched on
-// and then off again, the stage ends on a plain copy once the toggle's fade settles.
+// Settled off, the card placed with its toggle off passes the input bit for bit. Switched on and then
+// off again, the stage ends on a plain copy once the toggle's fade settles.
 bool testOffExact() {
   const Signal in = sawtooth(kRate, 0.5f);
-  bool copies = true;
-  for (const FollowerMode m : kModes) copies = copies && through(in, boxFollower(1.0f, 0.0f, false, m)) == in;
-  bool ok = report("off: placed with its toggle off, a plain copy in every mode", copies, "");
+  bool ok = report("off: placed with its toggle off, a plain copy", through(in, boxYawn(1.0f, 1.0f, false)) == in, "");
 
   auto s = std::make_unique<Stage>();
-  const ChainParams on = boxFollower(1.0f, 0.0f, true);
-  const ChainParams offAgain = boxFollower(1.0f, 0.0f, false);
+  const ChainParams on = boxYawn(1.0f, 1.0f, true);
+  const ChainParams offAgain = boxYawn(1.0f, 1.0f, false);
   Signal out(in.size());
   bool heard = false;
   bool copy = true;
@@ -158,20 +145,46 @@ bool testOffExact() {
   return ok;
 }
 
-// The RANGE pot hands the follower -7 st at 0, 0 at noon and +3 st at full. A RANGE past +3 st set
-// straight on the engine still gives a SHIFT of +3 st at most.
-bool testRangeMap() {
-  const float low = boxFollower(0.5f, 0.0f).follower.rangeSt;
-  const float noon = boxFollower(0.5f, 0.5f).follower.rangeSt;
-  const float high = boxFollower(0.5f, 1.0f).follower.rangeSt;
-  bool ok = report("range: the pot gives -7, 0 and +3 st at 0, 50 and 100 %", low == -7.0f && noon == 0.0f && high == 3.0f,
-                   "%+.2f, %+.2f, %+.2f st", low, noon, high);
+// The glided SHIFT's lowest and highest over a loud 0.5 s note with RANGE set straight on the engine.
+struct Span {
+  float low;
+  float high;
+};
 
-  ChainParams past = boxFollower(0.5f, 1.0f);
-  past.follower.rangeSt = 7.0f;
-  float top = 0.0f;
-  through(sawtooth(kRate / 2, 0.5f), past, [&](const Stage& s, int) { top = std::max(top, s.pitch.shiftSemis()); });
-  ok &= report("range: a RANGE of +7 st on the engine shifts +3 st at most", top <= 3.0f && top > 2.9f, "peak %+.3f st", top);
+Span shiftSpan(float rangeSt) {
+  ChainParams p = boxYawn(0.5f, 0.0f);
+  p.follower.rangeSt = rangeSt;
+  Span s{0.0f, 0.0f};
+  through(sawtooth(kRate / 2, 0.5f), p, [&](const Stage& st, int) {
+    s.low = std::min(s.low, st.pitch.shiftSemis());
+    s.high = std::max(s.high, st.pitch.shiftSemis());
+  });
+  return s;
+}
+
+// The RANGE pot hands the card 0 st at its bottom and -7 st at its top in a straight line, and its
+// default position, 5/7 of the travel, reads the default of -5 st. RANGE 0 st leaves SHIFT at 0. A RANGE
+// past -7 st or above 0 set straight on the engine still keeps SHIFT within 0 to -7 st.
+bool testRangeMap() {
+  const float bottom = boxYawn(0.5f, 0.0f).follower.rangeSt;
+  const float noon = boxYawn(0.5f, 0.5f).follower.rangeSt;
+  const float top = boxYawn(0.5f, 1.0f).follower.rangeSt;
+  const float position = rangePosition(cv::kFollowerDefaultRangeSt);
+  const float dflt = boxYawn(0.5f, position).follower.rangeSt;
+  bool ok = report("range: the pot gives 0, -3.5 and -7 st at 0, 50 and 100 %", bottom == 0.0f && noon == -3.5f && top == -7.0f,
+                   "%+.2f, %+.2f, %+.2f st", bottom, noon, top);
+  ok &= report("range: the default position reads -5 st, the engine's default",
+               std::fabs(dflt + 5.0f) < 1e-5f && cv::FormantFollowerParams().rangeSt == -5.0f,
+               "%.1f %% of the travel reads %+.4f st", 100.0 * position, dflt);
+
+  const Span none = shiftSpan(0.0f);
+  const Span deep = shiftSpan(-12.0f);
+  const Span up = shiftSpan(3.0f);
+  ok &= report("range: 0 st leaves SHIFT at 0 on a loud note", none.low == 0.0f && none.high == 0.0f, "%+.3f to %+.3f st",
+               none.low, none.high);
+  ok &= report("range: -12 st on the engine shifts -7 st at most, +3 st shifts nothing",
+               deep.low >= -7.0f && deep.low < -6.9f && up.low == 0.0f && up.high == 0.0f,
+               "deepest %+.3f st; +3 st spans %+.3f to %+.3f st", deep.low, up.low, up.high);
   return ok;
 }
 
@@ -187,7 +200,7 @@ Reading driveOn(double peakDbfs, float sens) {
   Signal in = sine(kRate / 2, peakDbfs);
   in.resize(kRate, 0.0f);
   Reading r{1.0f, 0.0f, 1.0f};
-  through(in, boxFollower(sens, 1.0f), [&](const Stage& s, int done) {
+  through(in, boxYawn(sens, 1.0f), [&](const Stage& s, int done) {
     if (done > kRate / 4 && done <= kRate / 2) {
       r.low = std::min(r.low, s.follower.drive());
       r.high = std::max(r.high, s.follower.drive());
@@ -264,145 +277,99 @@ bool testAttackRelease() {
   return ok;
 }
 
-// In follow mode with the drive at 1, the voice's glided SHIFT sits on RANGE: on +3 and -7 st exactly,
-// and between whole semitones (+1.5 st at 75 %, -3.5 st at 25 %) within 0.06 st of it on average and
-// 0.1 st at every call.
-bool testShiftFollowsRange() {
-  const Signal in = sawtooth(kRate, 0.5f);
-  bool ok = true;
-  for (const float position : {1.0f, 0.75f, 0.25f, 0.0f}) {
-    const float want = boxFollower(0.5f, position).follower.rangeSt;
-    double sum = 0.0;
-    double worst = 0.0;
-    int count = 0;
-    through(in, boxFollower(0.5f, position), [&](const Stage& s, int done) {
-      if (done < kRate / 2) return;
-      const double err = static_cast<double>(s.pitch.shiftSemis()) - want;
-      sum += err;
-      worst = std::max(worst, std::fabs(err));
-      ++count;
-    });
-    char name[64];
-    std::snprintf(name, sizeof name, "shift: RANGE %+.1f st on a loud note", static_cast<double>(want));
-    ok &= report(name, std::fabs(sum / count) < 0.06 && worst < 0.1, "mean error %+.3f st, worst %.3f st", sum / count, worst);
+// What one note of the sweep test read. Times are in samples from the note's start, each call read at
+// its end.
+struct NoteReading {
+  float open = 0.0f;       // the sweep's highest over the first 30 ms
+  int lastOnset = 0;       // the last call in the first 60 ms whose sweep sat on the drive, the last onset
+  float half = -1.0f;      // the sweep at half the decay after that call
+  float at150 = -1.0f;     // the sweep 150 ms into the note
+  float held = 0.0f;       // the sweep's highest from one call past the decay's end to the note's end
+  float shiftPeak = 0.0f;  // the glided SHIFT's deepest over the first 100 ms, in st
+  float shiftRest = 0.0f;  // its furthest from 0 from 100 ms past the decay's end, five glide times, in st
+};
+
+// Reads one note from its calls' sweeps, drives and SHIFTs. An onset sets the ramp to 1, so the sweep of
+// an onset call equals the drive.
+NoteReading readNote(const std::vector<float>& sweep, const std::vector<float>& drive, const std::vector<float>& shift,
+                     int decay) {
+  NoteReading r;
+  const auto timeOf = [](size_t b) { return static_cast<int>(b + 1) * cv::kBlock; };
+  for (size_t b = 0; b < sweep.size(); ++b) {
+    const int t = timeOf(b);
+    if (t <= kRate * 6 / 100 && drive[b] > 0.0f && sweep[b] == drive[b]) r.lastOnset = t;
+    if (t <= kRate * 3 / 100) r.open = std::max(r.open, sweep[b]);
+    if (std::abs(t - kRate * 15 / 100) <= cv::kBlock / 2) r.at150 = sweep[b];
+    if (t <= kRate / 10) r.shiftPeak = std::min(r.shiftPeak, shift[b]);
   }
-  return ok;
+  for (size_t b = 0; b < sweep.size(); ++b) {
+    const int t = timeOf(b);
+    if (std::abs(t - (r.lastOnset + decay / 2)) <= cv::kBlock / 2) r.half = sweep[b];
+    if (t > r.lastOnset + decay + cv::kBlock) r.held = std::max(r.held, sweep[b]);
+    if (t >= r.lastOnset + decay + kRate / 10) r.shiftRest = std::max(r.shiftRest, std::fabs(shift[b]));
+  }
+  return r;
 }
 
-// Pluck mode at SENSITIVITY 50 % and RANGE -7 st: a -15 dBFS note held 0.6 s, 0.4 s of silence, and the
-// note again. Each onset fires a sweep that opens near the drive, about 1, falls through the middle by
-// 150 ms and reaches 0 by 300 ms, and stays at 0 while the note holds. SHIFT follows it through the
-// stage's 20 ms glide, which rounds the peak off above -7 st.
-bool testPluck() {
+// The sweep at SENSITIVITY 50 % and RANGE -7 st over `decayMs`: a -14 dBFS note held 0.6 s, 0.4 s of
+// silence, and the note again. The rise detector refires the onset for the first 10 ms or so of each
+// note, so the ramp starts from the last of those calls. Also reads the silence between the notes from
+// 300 ms on.
+bool testSweep(float decayMs) {
   constexpr int kNote = kRate * 6 / 10;
   constexpr int kGap = kRate * 4 / 10;
   Signal in = sawtooth(2 * kNote + kGap, 0.2f);
   for (int i = kNote; i < kNote + kGap; ++i) in[static_cast<size_t>(i)] = 0.0f;
-  float open[2] = {0.0f, 0.0f};
-  float middle[2] = {0.0f, 0.0f};
-  float held[2] = {0.0f, 0.0f};
-  float shiftOpen[2] = {0.0f, 0.0f};
-  float shiftHeld[2] = {0.0f, 0.0f};
   const int starts[2] = {0, kNote + kGap};
-  through(in, boxFollower(0.5f, 0.0f, true, FollowerMode::Pluck), [&](const Stage& s, int done) {
+  std::vector<float> sweep[2];
+  std::vector<float> drive[2];
+  std::vector<float> shift[2];
+  float restSweep = 0.0f;
+  float restDrive = 0.0f;
+  float restShift = 0.0f;
+  through(in, boxYawn(0.5f, 1.0f, true, decayMs), [&](const Stage& s, int done) {
+    if (done > kNote + kRate * 3 / 10 && done <= kNote + kGap) {
+      restSweep = std::max(restSweep, s.follower.sweep());
+      restDrive = std::max(restDrive, s.follower.drive());
+      restShift = std::max(restShift, std::fabs(s.pitch.shiftSemis()));
+    }
     for (int k = 0; k < 2; ++k) {
       const int t = done - starts[k];
       if (t <= 0 || t > kNote) continue;
-      const float e = s.follower.pluckEnvelope();
-      const float shift = s.pitch.shiftSemis();
-      if (t <= kRate * 3 / 100) open[k] = std::max(open[k], e);
-      if (t <= kRate / 10) shiftOpen[k] = std::min(shiftOpen[k], shift);
-      if (std::abs(t - kRate * 15 / 100) < cv::kBlock) middle[k] = e;
-      if (t >= kRate * 3 / 10) held[k] = std::max(held[k], e);
-      if (t >= kRate * 35 / 100) shiftHeld[k] = std::max(shiftHeld[k], std::fabs(shift));
+      sweep[k].push_back(s.follower.sweep());
+      drive[k].push_back(s.follower.drive());
+      shift[k].push_back(s.pitch.shiftSemis());
     }
   });
+  const int decay = static_cast<int>(decayMs * cv::kSmpPerMs);
+  const NoteReading note[2] = {readNote(sweep[0], drive[0], shift[0], decay), readNote(sweep[1], drive[1], shift[1], decay)};
+
   bool ok = true;
   for (int k = 0; k < 2; ++k) {
-    char name[96];
-    std::snprintf(name, sizeof name, "pluck: note %d opens near 1, halfway by 150 ms, closed from 300 ms", k + 1);
-    ok &= report(name, open[k] > 0.9f && middle[k] > 0.35f && middle[k] < 0.65f && held[k] == 0.0f,
-                 "open %.3f, at 150 ms %.3f, held %.3f", open[k], middle[k], held[k]);
-    std::snprintf(name, sizeof name, "pluck: note %d SHIFT opens past -5.5 st and rests at 0", k + 1);
-    ok &= report(name, shiftOpen[k] < -5.5f && shiftHeld[k] < 0.1f, "peak %+.2f st, held within %.3f st", shiftOpen[k],
-                 shiftHeld[k]);
-  }
-  return ok;
-}
+    const NoteReading& r = note[k];
+    char name[128];
+    std::snprintf(name, sizeof name, "sweep: decay %.0f ms, note %d opens at 1, halves at half the decay, 0 from its end",
+                  static_cast<double>(decayMs), k + 1);
+    ok &= report(name, r.open > 0.999f && std::fabs(r.half - 0.5f) < 0.02f && r.held == 0.0f,
+                 "open %.3f, last onset at %.1f ms, at half the decay %.3f, held %.3f", r.open,
+                 1000.0 * r.lastOnset / kRate, r.half, r.held);
 
-// LFO mode at RANGE `st` and 2 Hz, 1 s of a -15 dBFS note then 1 s of silence: the sweep stays within 0
-// and 1, the glided SHIFT within 0 and RANGE, both ends reached in sound and in silence alike, and the
-// sweep rises through the middle twice a second.
-bool testLfo() {
-  constexpr int kHalf = kRate;
-  Signal in = sawtooth(2 * kHalf, 0.2f);
-  for (int i = kHalf; i < 2 * kHalf; ++i) in[static_cast<size_t>(i)] = 0.0f;
-  bool ok = true;
-  for (const float st : {-4.0f, 3.0f}) {
-    ChainParams p = boxFollower(0.5f, rangePosition(st), true, FollowerMode::Lfo);
-    p.follower.tuning.lfoHz = 2.0f;
-    const float lo = std::min(st, 0.0f);
-    const float hi = std::max(st, 0.0f);
-    bool inside = true;
-    float least[2] = {100.0f, 100.0f};  // per half, the SHIFT's closest to 0, in st
-    float most[2] = {0.0f, 0.0f};       // and its furthest from 0
-    int rises[2] = {0, 0};
-    float before = 0.0f;
-    through(in, p, [&](const Stage& s, int done) {
-      const float w = s.follower.sweep();
-      const float shift = s.pitch.shiftSemis();
-      inside = inside && w >= 0.0f && w <= 1.0f && shift >= lo - 1e-4f && shift <= hi + 1e-4f;
-      const int h = done <= kHalf ? 0 : 1;
-      if (done - h * kHalf < kRate / 10) return;
-      least[h] = std::min(least[h], std::fabs(shift));
-      most[h] = std::max(most[h], std::fabs(shift));
-      if (before < 0.5f && w >= 0.5f) ++rises[h];
-      before = w;
-    });
-    char name[96];
-    std::snprintf(name, sizeof name, "lfo: RANGE %+.0f st at 2 Hz stays within 0 and RANGE, sound or silence",
-                  static_cast<double>(st));
-    const double near0 = std::max(least[0], least[1]);
-    const double far = std::min(most[0], most[1]);
-    ok &= report(name, inside && near0 < 0.25 && far > std::fabs(st) - 0.25 && rises[0] == 2 && rises[1] == 2,
-                 "nearest 0 %.3f st, furthest %.3f st, %.0f rises a second", near0, far, rises[1]);
+    // The ramp is a straight line from the last onset: 1 - (150 ms - onset) / decay at 150 ms, 0.456 at
+    // the owner's 250 ms pick.
+    const float line = 1.0f - static_cast<float>(kRate * 15 / 100 - r.lastOnset) / static_cast<float>(decay);
+    std::snprintf(name, sizeof name, "sweep: decay %.0f ms, note %d falls in a straight line", static_cast<double>(decayMs),
+                  k + 1);
+    ok &= report(name, std::fabs(r.at150 - line) < 0.01f, "at 150 ms %.3f, the line %.3f", r.at150, line);
+    std::snprintf(name, sizeof name, "sweep: decay %.0f ms, note %d SHIFT opens past -5.5 st and rests within 0.01 st of 0",
+                  static_cast<double>(decayMs), k + 1);
+    ok &= report(name, r.shiftPeak < -5.5f && r.shiftRest < 0.01f, "peak %+.2f st, rests within %.4f st", r.shiftPeak,
+                 r.shiftRest);
   }
-  return ok;
-}
-
-// lfoEnv mode at SENSITIVITY 50 %, RANGE -4 st and 2 Hz: a -15 dBFS note held 0.6 s, 0.6 s of silence and
-// the note again. The SHIFT swings past -3.5 st while each note holds, rests at 0 in the silence from
-// 0.3 s on, and the two notes run the same LFO trace because each onset restarts it at 0.
-bool testLfoEnv() {
-  constexpr int kNote = kRate * 6 / 10;
-  Signal in = sawtooth(3 * kNote, 0.2f);
-  for (int i = kNote; i < 2 * kNote; ++i) in[static_cast<size_t>(i)] = 0.0f;
-  ChainParams p = boxFollower(0.5f, rangePosition(-4.0f), true, FollowerMode::LfoEnv);
-  p.follower.tuning.lfoHz = 2.0f;
-  std::vector<float> trace[2];
-  float deepest[2] = {0.0f, 0.0f};
-  float restShift = 0.0f;
-  float restSweep = 0.0f;
-  through(in, p, [&](const Stage& s, int done) {
-    const int k = done <= kNote ? 0 : (done > 2 * kNote ? 1 : -1);
-    if (k < 0) {
-      if (done - kNote >= kRate * 3 / 10) {
-        restShift = std::max(restShift, std::fabs(s.pitch.shiftSemis()));
-        restSweep = std::max(restSweep, s.follower.sweep());
-      }
-      return;
-    }
-    trace[k].push_back(s.follower.lfo());
-    deepest[k] = std::min(deepest[k], s.pitch.shiftSemis());
-  });
-  float apart = 0.0f;
-  for (size_t i = 0; i < std::min(trace[0].size(), trace[1].size()); ++i)
-    apart = std::max(apart, std::fabs(trace[0][i] - trace[1][i]));
-  bool ok = report("lfoEnv: each note swings past -3.5 st", deepest[0] < -3.5f && deepest[1] < -3.5f,
-                   "deepest %+.2f and %+.2f st", deepest[0], deepest[1]);
-  ok &= report("lfoEnv: rests at 0 in the silence", restSweep == 0.0f && restShift < 0.01f, "sweep %.3f, SHIFT within %.4f st",
-               restSweep, restShift);
-  ok &= report("lfoEnv: each onset restarts the LFO", !trace[1].empty() && apart < 1e-6f, "traces apart by %.2g", apart);
+  char name[96];
+  std::snprintf(name, sizeof name, "sweep: decay %.0f ms, silence from 300 ms reads 0 and SHIFT rests at 0",
+                static_cast<double>(decayMs));
+  ok &= report(name, restSweep == 0.0f && restDrive == 0.0f && restShift < 0.01f, "sweep %.3f, drive %.3f, SHIFT within %.4f st",
+               restSweep, restDrive, restShift);
   return ok;
 }
 
@@ -457,46 +424,48 @@ std::vector<Clip> clips(bool& missing) {
   return out;
 }
 
-// Every knob corner, SENSITIVITY 0 and 100 % by RANGE -7, 0 and +7 st, each with pluck off and on, on
-// each clip.
+// Every knob corner, SENSITIVITY 0 and 100 % by RANGE 0 and -7 st by decay 10 and 2000 ms, on each clip.
 bool testClipCorners(const std::vector<Clip>& all) {
   bool finite = true;
   int runs = 0;
   for (const Clip& c : all) {
     for (const float sens : {0.0f, 1.0f}) {
-      for (const float range : {0.0f, 0.5f, 1.0f}) {
-        for (const FollowerMode m : kModes) {
-          const Signal out = through(c.padded, boxFollower(sens, range, true, m));
+      for (const float range : {0.0f, 1.0f}) {
+        for (const float decayMs : {cv::kFollowerMinDecayMs, cv::kFollowerMaxDecayMs}) {
+          const Signal out = through(c.padded, boxYawn(sens, range, true, decayMs));
           for (const float v : out) finite = finite && std::isfinite(v);
           ++runs;
         }
       }
     }
   }
-  return report("clips: finite at every knob corner in every mode", finite, "%.0f runs", runs);
+  return report("clips: finite at every knob corner", finite, "%.0f runs", runs);
 }
 
-// The shifted voice alone at SENSITIVITY 50 %, at RANGE -7, -4 and +3 st, in every mode: each clip in the
-// mid band (-1.5 to +1 dB), as the Formant card's SHIFT rows hold it, and the mean of the three in the
-// rule, 0 to +0.5 dB with 0.1 dB of slack.
+// The card at its default on each clip, out/in RMS after the pad.
+double levelDb(const Clip& c, const ChainParams& p) {
+  const Signal out = through(c.padded, p);
+  return dbOf(rmsRange(out, kPad, out.size()) / rmsRange(c.padded, kPad, c.padded.size()));
+}
+
+// The level rule: the card at its default reads 0 to +0.5 dB over its input on each clip. The owner's
+// three picks print beside it.
 bool testLevel(const std::vector<Clip>& all) {
   bool ok = true;
-  for (const FollowerMode m : kModes) {
-    for (const float st : {-7.0f, -4.0f, 3.0f}) {
-      double sum = 0.0;
-      bool band = true;
-      for (const Clip& c : all) {
-        const Signal out = through(c.padded, boxFollower(0.5f, rangePosition(st), true, m));
-        const double db = dbOf(rmsRange(out, kPad, out.size()) / rmsRange(c.padded, kPad, c.padded.size()));
-        std::printf("NOTE level %-6s RANGE %+.0f st %-22s %+6.2f dB\n", modeName(m), static_cast<double>(st),
-                    c.name.c_str(), db);
-        band = band && db >= -1.5 && db <= 1.0;
-        sum += db;
-      }
-      const double mean = sum / static_cast<double>(all.size());
-      char name[64];
-      std::snprintf(name, sizeof name, "level: %s RANGE %+.0f st", modeName(m), static_cast<double>(st));
-      ok &= report(name, band && mean >= -0.1 && mean <= 0.6, "mean %+.2f dB (want -0.1..+0.6, each clip -1.5..+1.0)", mean);
+  for (const Clip& c : all) {
+    const double db = levelDb(c, boxDefault());
+    char name[96];
+    std::snprintf(name, sizeof name, "level: the default on %s", c.name.c_str());
+    ok &= report(name, db >= 0.0 && db <= 0.5, "%+.2f dB (want 0..+0.5)", db);
+  }
+  struct Pick {
+    float sens;
+    float decayMs;
+  };
+  for (const Pick& pick : {Pick{0.5f, 250.0f}, Pick{0.5f, 500.0f}, Pick{0.25f, 250.0f}}) {
+    for (const Clip& c : all) {
+      std::printf("NOTE level SENSITIVITY %.0f %% RANGE -7 st decay %.0f ms %-22s %+6.2f dB\n", 100.0 * pick.sens,
+                  static_cast<double>(pick.decayMs), c.name.c_str(), levelDb(c, boxYawn(pick.sens, 1.0f, true, pick.decayMs)));
     }
   }
   return ok;
@@ -509,10 +478,8 @@ int main() {
   ok &= testRangeMap();
   ok &= testDriveReadings();
   ok &= testAttackRelease();
-  ok &= testShiftFollowsRange();
-  ok &= testPluck();
-  ok &= testLfo();
-  ok &= testLfoEnv();
+  ok &= testSweep(250.0f);
+  ok &= testSweep(cv::kFollowerDefaultDecayMs);
   bool missing = false;
   const std::vector<Clip> all = clips(missing);
   if (missing) {

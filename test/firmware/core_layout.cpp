@@ -227,7 +227,7 @@ void checkSlot3Costs() {
   check(swapped(octaveHeavy, formantHeavy), "slot 3 cost: Formant with MOB and Chasm sums to its rows");
   check(layoutValid(formantLight).ok() && layoutValid(formantHeavy).ok(), "slot 3 cost: Formant is accepted in both layouts");
 
-  // The Formant follower pays its own row, the tracker and the stage term as Formant does.
+  // Yawn pays its own row, the tracker and the stage term as Formant does.
   Layout followerLight = formantLight;
   followerLight.card[2] = Card::FormantFollower;
   Layout followerHeavy = formantHeavy;
@@ -239,19 +239,19 @@ void checkSlot3Costs() {
            w.worst == f.worst - costs::kFormant.worst + costs::kFormantFollower.worst;
   };
   check(followed(formantLight, followerLight) && followed(formantHeavy, followerHeavy),
-        "slot 3 cost: the Formant follower in Formant's place sums to its rows in both layouts");
+        "slot 3 cost: Yawn in Formant's place sums to its rows in both layouts");
   check(layoutValid(followerLight).ok() && layoutValid(followerHeavy).ok(),
-        "slot 3 cost: the Formant follower is accepted in both layouts");
+        "slot 3 cost: Yawn is accepted in both layouts");
   Layout followerAlone = withoutPitchCards();
   followerAlone.card[2] = Card::FormantFollower;
-  paysFor(followerAlone, true, true, "pitch stage cost: the Formant follower without Autotune pays the tracker and the stage");
+  paysFor(followerAlone, true, true, "pitch stage cost: Yawn without Autotune pays the tracker and the stage");
 
-  // Formant and the follower play one voice, so a layout holds one of them at most.
+  // Formant and Yawn play one voice, so a layout holds one of them at most.
   Layout bothVoices = followerLight;
   bothVoices.card[6] = Card::Formant;
   const LayoutCheck twice = layoutValid(bothVoices);
   check(twice.error == LayoutError::SameCardTwice && twice.slot == 6 && twice.card == Card::Formant,
-        "slot 3 cost: Formant beside the Formant follower is refused as the same card twice");
+        "slot 3 cost: Formant beside Yawn is refused as the same card twice");
 }
 
 // The sums with each slot 7 card in the default layout and in MOB with Chasm, the heaviest layout the
@@ -424,8 +424,8 @@ void checkComposeSlot3Formant() {
   panel.knob[2] = {0.75f, 0.6f};
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.follower.placed && snap.params.pitchFx.formant.on && !snap.params.pitchFx.octave.on &&
-            std::fabs(snap.params.follower.sensitivity - 0.75f) < 1e-6f && std::fabs(snap.params.follower.rangeSt - 0.6f) < 1e-5f,
-        "compose: the Formant follower in slot 3 reads SENSITIVITY and RANGE from slot 3's pots and drives the Formant voice");
+            std::fabs(snap.params.follower.sensitivity - 0.75f) < 1e-6f && std::fabs(snap.params.follower.rangeSt + 4.2f) < 1e-5f,
+        "compose: Yawn in slot 3 reads SENSITIVITY and RANGE from slot 3's pots and drives the Formant voice");
 }
 
 // Each slot 7 card reads its knobs and toggle from slot 7's pots, and the Chatter card's word key
@@ -745,7 +745,7 @@ void checkOctaveFormantSlot() {
   layout.card[1] = Card::Octave;
   check(octaveFormantSlot(layout) == 1, "octaveFormantSlot: the first slot when both are placed");
   layout.card[0] = Card::FormantFollower;
-  check(octaveFormantSlot(layout) == 0, "octaveFormantSlot: the Formant follower counts as well");
+  check(octaveFormantSlot(layout) == 0, "octaveFormantSlot: Yawn counts as well");
 }
 
 void checkSwapOctaveFormant() {
@@ -759,13 +759,13 @@ void checkSwapOctaveFormant() {
   Layout follower = layout;
   follower.card[2] = Card::FormantFollower;
   check(layoutValid(formant).ok() && layoutValid(follower).ok(),
-        "action: the default layout with Formant or the Formant follower in slot 3 passes the placement rules");
+        "action: the default layout with Formant or Yawn in slot 3 passes the placement rules");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == formant,
         "action: SwapOctaveFormant turns Octave into Formant in its slot and touches no other slot");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == follower,
-        "action: then Formant into the Formant follower");
+        "action: then Formant into Yawn");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == defaultLayout(),
-        "action: and the Formant follower back into Octave");
+        "action: and Yawn back into Octave");
 
   Layout moved = defaultLayout();  // Octave in slot 6, with Empty in slot 3
   moved.card[2] = Card::Empty;
@@ -788,12 +788,12 @@ void checkSwapOctaveFormant() {
   both.card[1] = Card::Formant;
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::LayoutChanged &&
             both.card[1] == Card::FormantFollower && both.card[2] == Card::Octave,
-        "action: SwapOctaveFormant turns Formant into the Formant follower beside Octave");
+        "action: SwapOctaveFormant turns Formant into Yawn beside Octave");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::LayoutChanged &&
             both.card[1] == Card::Formant && both.card[2] == Card::Octave,
         "action: and passes over Octave, which would repeat, back to Formant");
 
-  // Octave in slot 2 and Formant in slot 3: Formant would repeat, and the follower plays Formant's voice.
+  // Octave in slot 2 and Formant in slot 3: Formant would repeat, and Yawn plays Formant's voice.
   Layout repeat = defaultLayout();
   repeat.card[1] = Card::Octave;
   repeat.card[2] = Card::Formant;

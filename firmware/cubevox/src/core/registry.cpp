@@ -39,7 +39,7 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
 constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, cv::kFollowerMinRangeSt,
-                                     cv::kFollowerMaxRangeSt, "st", Curve::ZeroAtNoon};
+                                     cv::kFollowerMaxRangeSt, "st", Curve::LinearReversed};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
 
@@ -82,9 +82,8 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
       {"VOICES", KnobKind::Stepped, cv::kVoices2Steps, 0.0f, cv::kVoices2Steps - 1, "", Curve::Linear, 0,
        cv::kVoices2Name.data()}},
      Group::Pitch, costs::kCrowd2},
-    {Card::FormantFollower, "formant_follow", "Formant follower", Engine::Pitch, 2,
-     {kPercent("SENSITIVITY"), kFollowerRange},
-     Group::Pitch, costs::kFormantFollower, "Follower"},
+    {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
+     Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("DRIVE")}, Group::Pitch, costs::kGrowl},
 }};
 
@@ -183,8 +182,8 @@ void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
   }
 }
 
-// SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach. The follower pins
-// the Formant voice's mix at 1, so no knob sets it.
+// Yawn's SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach, 0 st at the
+// pot's bottom down to -7 st at its top. The card pins the Formant voice's mix at 1, so no knob sets it.
 void applyFollowerKnob(int knob, float v, ChainParams& out) {
   if (knob == 0) {
     out.follower.sensitivity = v;
@@ -260,7 +259,7 @@ float knobValue(const KnobDesc& k, float p) {
   switch (k.curve) {
     case Curve::Log: return cv::logTaper(k.min, k.max, p);
     case Curve::LogReversed: return cv::logTaper(k.max, k.min, p);
-    case Curve::ZeroAtNoon: return p < 0.5f ? k.min * (1.0f - 2.0f * p) : k.max * (2.0f * p - 1.0f);
+    case Curve::LinearReversed: return k.max + (k.min - k.max) * p;
     case Curve::Linear: break;
   }
   return k.min + (k.max - k.min) * p;

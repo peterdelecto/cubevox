@@ -1,12 +1,12 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|follower] [--slot6 distortion|growl]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|yawn] [--slot6 distortion|growl]
 //                                  [--slot7 gate|lofi|chatter]
 //                                             one frame of the window as a P6 PPM, no audio device,
 //                                             with those cards in slots 3, 6 and 7 (Octave, Distortion and
 //                                             Gate when omitted; a card id also picks its card, `bloom`
-//                                             Chatter and `formant_follow` the Formant follower)
+//                                             Chatter and `formant_follow` Yawn)
 
 #include <array>
 #include <cmath>
@@ -153,7 +153,7 @@ struct CardRow {
 };
 constexpr std::array<CardRow, 3> kSlot3Rows = {
     {{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
-     {Card::FormantFollower, "formant_follow", "follower", "FOLLOWER", costs::kFormantFollower},
+     {Card::FormantFollower, "formant_follow", "yawn", "YAWN", costs::kFormantFollower},
      {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
 constexpr std::array<CardRow, 2> kSlot6Rows = {{{Card::Growl, "growl", "growl", "GROWL", costs::kGrowl},
                                                 {Card::Distortion, "distortion", "distortion", "DISTORTION",
@@ -195,7 +195,7 @@ float lastSecondDbfs(const std::vector<float>& output) {
   return level::toDbfs(level::rms(energy));
 }
 
-// The slot 3 cycle through the menu's action, to Formant, to the Formant follower and back to Octave.
+// The slot 3 cycle through the menu's action, to Formant, to Yawn and back to Octave.
 // After each step slot 3 holds the card, the layout's cost is the rest of its rows plus the card's own and Gate's, and the
 // audio through the box is finite and above the floor. `swapped` puts MOB in slot 4 and Chasm in
 // slot 8 first.
@@ -562,7 +562,7 @@ int runLive(const char* argv0) {
 
 int usage() {
   std::fprintf(stderr,
-               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|follower] "
+               "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|yawn] "
                "[--slot6 distortion|growl] [--slot7 gate|lofi|chatter]]\n");
   return 2;
 }
