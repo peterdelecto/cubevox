@@ -1,11 +1,11 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|yawn] [--slot6 distortion|growl]
-//                                  [--slot7 gate|lofi|chatter]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|yawn] [--slot6 distortion|growl|ringmod]
+//                                  [--slot7 gate|lofi|chatter] [--slot8 spring|chasm|strings]
 //                                             one frame of the window as a P6 PPM, no audio device,
-//                                             with those cards in slots 3, 6 and 7 (Octave, Distortion and
-//                                             Gate when omitted; a card id also picks its card, `bloom`
+//                                             with those cards in slots 3, 6, 7 and 8 (Octave, Distortion,
+//                                             Gate and Spring when omitted; a card id also picks its card, `bloom`
 //                                             Chatter and `formant_follow` Yawn)
 
 #include <array>
@@ -155,9 +155,16 @@ constexpr std::array<CardRow, 3> kSlot3Rows = {
     {{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
      {Card::FormantFollower, "formant_follow", "yawn", "YAWN", costs::kFormantFollower},
      {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
-constexpr std::array<CardRow, 2> kSlot6Rows = {{{Card::Growl, "growl", "growl", "GROWL", costs::kGrowl},
+constexpr std::array<CardRow, 3> kSlot6Rows = {{{Card::Growl, "growl", "growl", "GROWL", costs::kGrowl},
+                                                {Card::RingMod, "ringmod", "ringmod", "RING MOD", costs::kRingMod},
                                                 {Card::Distortion, "distortion", "distortion", "DISTORTION",
                                                  costs::kDistortion}}};
+
+// The slot 8 cards in the menu's cycle order, Spring last so the walk ends on the default.
+constexpr std::array<CardRow, 3> kSlot8Rows = {{{Card::ReverbChasm, "reverb_chasm", "chasm", "CHASM", costs::kReverbChasm},
+                                                {Card::Strings, "strings", "strings", "STRINGS", costs::kStrings},
+                                                {Card::ReverbSpring, "reverb_spring", "spring", "SPRING",
+                                                 costs::kReverbSpring}}};
 constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO-FI", costs::kLofi},
                                                 {Card::Bloom, "bloom", "chatter", "CHATTER", costs::kBloom},
                                                 {Card::Gate, "gate", "gate", "GATE", costs::kGate}}};
@@ -275,6 +282,38 @@ void checkSlot6(const CheckClips& clips, bool swapped, std::vector<std::string>&
     expect(finite, name + " output is finite");
     expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
     std::printf("%-14s slot 6 %-10s cost %d / %d, output %.1f dBFS\n", where, row.name, cost.avg, cost.worst,
+                static_cast<double>(dbfs));
+  }
+}
+
+// The three slot 8 cards through the box's card switch on the default layout, round the menu's cycle
+// and back to Spring. After each pick slot 8 holds the card, the layout's cost is the rest of its rows
+// less Spring's plus the card's own, Octave's and Gate's, and the audio through the box is finite and
+// above the floor.
+void checkSlot8(const CheckClips& clips, std::vector<std::string>& failed) {
+  const auto expect = [&](bool ok, const std::string& what) {
+    if (!ok) failed.push_back("default layout: " + what);
+  };
+  Rig rig;
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
+  rig.run(kCheckSwapMs, true);
+  for (const CardRow& row : kSlot8Rows) {
+    const size_t from = rig.output.size();
+    rig.box.pickSlot8Card(row.card);
+    rig.run(kCheckSwapMs, true);
+    const LayoutCost cost = rig.box.cost();
+    bool finite = true;
+    for (size_t i = from; i < rig.output.size(); ++i) finite = finite && std::isfinite(rig.output[i]);
+    const float dbfs = lastSecondDbfs(rig.output);
+    const std::string name = std::string("slot 8 ") + row.name;
+    const costs::Cost others = kDefaultSum + row.cost;
+    expect(cardIs(rig.box.layout(), kReverbSlot, row.id), name + " is in slot 8 after the pick");
+    expect(cost.avg == others.avg - costs::kReverbSpring.avg && cost.worst == others.worst - costs::kReverbSpring.worst,
+           name + " costs the sum of its rows, kFixed and kTracker");
+    expect(layoutValid(rig.box.layout()).ok(), name + " layout passes the placement rules");
+    expect(finite, name + " output is finite");
+    expect(dbfs > static_cast<float>(kCheckMinDbfs), name + " output RMS of the last second is above -40 dBFS");
+    std::printf("default layout slot 8 %-8s cost %d / %d, output %.1f dBFS\n", row.name, cost.avg, cost.worst,
                 static_cast<double>(dbfs));
   }
 }
@@ -480,6 +519,7 @@ int runCheck(const char* argv0) {
   checkSlot7(clips, false, failed);
   checkSlot7(clips, true, failed);
   checkSlot4(clips, failed);
+  checkSlot8(clips, failed);
   checkDim(clips, failed);
 
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,
@@ -493,12 +533,14 @@ int runCheck(const char* argv0) {
   return 0;
 }
 
-int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot6, Card slot7) {
+int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot6, Card slot7,
+             Card slot8) {
   Rig rig;
   if (!rig.source.findClip(argv0)) return 1;
   rig.box.pickSlot3Card(slot3);
   rig.box.pickSlot6Card(slot6);
   rig.box.pickSlot7Card(slot7);
+  rig.box.pickSlot8Card(slot8);
   rig.run(kProofMs, false);
   Window window(false);
   if (!window.ok()) return 1;
@@ -562,7 +604,7 @@ int runLive(const char* argv0) {
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|yawn] "
-               "[--slot6 distortion|growl] [--slot7 gate|lofi|chatter]]\n");
+               "[--slot6 distortion|growl|ringmod] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm|strings]]\n");
   return 2;
 }
 
@@ -589,6 +631,7 @@ int main(int argc, char** argv) {
     Card slot3 = Card::Octave;
     Card slot6 = Card::Distortion;
     Card slot7 = Card::Gate;
+    Card slot8 = Card::ReverbSpring;
     for (int i = 3; i < argc; ++i) {
       if (std::strcmp(argv[i], "--no-mic") == 0) {
         noMic = true;
@@ -598,11 +641,13 @@ int main(int argc, char** argv) {
         ++i;
       } else if (std::strcmp(argv[i], "--slot7") == 0 && i + 1 < argc && cardFromRows(kSlot7Rows, argv[i + 1], slot7)) {
         ++i;
+      } else if (std::strcmp(argv[i], "--slot8") == 0 && i + 1 < argc && cardFromRows(kSlot8Rows, argv[i + 1], slot8)) {
+        ++i;
       } else {
         return usage();
       }
     }
-    return runProof(argv[0], argv[2], !noMic, slot3, slot6, slot7);
+    return runProof(argv[0], argv[2], !noMic, slot3, slot6, slot7, slot8);
   }
   return usage();
 }

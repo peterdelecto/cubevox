@@ -4,14 +4,13 @@ namespace ui {
 
 namespace {
 
-ApplyResult swapReverb(Layout& layout) {
-  const int slot = reverbSlot(layout);
-  if (slot < 0) return ApplyResult::None;
-  Layout next = layout;
-  next.card[slot] = layout.card[slot] == Card::ReverbSpring ? Card::ReverbChasm : Card::ReverbSpring;
-  if (!layoutValid(next).ok()) return ApplyResult::None;
-  layout = next;
-  return ApplyResult::LayoutChanged;
+// The card after `c` in the slot 8 cycle, Spring to Chasm to Strings and back to Spring.
+Card nextSlot8Card(Card c) {
+  switch (c) {
+    case Card::ReverbSpring: return Card::ReverbChasm;
+    case Card::ReverbChasm: return Card::Strings;
+    default: return Card::ReverbSpring;
+  }
 }
 
 // The card after `c` in the slot 4 cycle, Unison to Mob and back to Unison.
@@ -26,8 +25,14 @@ Card nextSlot3Card(Card c) {
   }
 }
 
-// The card after `c` in the slot 6 cycle, Distortion to Growl and back to Distortion.
-Card nextSlot6Card(Card c) { return c == Card::Distortion ? Card::Growl : Card::Distortion; }
+// The card after `c` in the slot 6 cycle, Distortion to Growl to Ring mod and back to Distortion.
+Card nextSlot6Card(Card c) {
+  switch (c) {
+    case Card::Distortion: return Card::Growl;
+    case Card::Growl: return Card::RingMod;
+    default: return Card::Distortion;
+  }
+}
 
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
 Card nextSlot7Card(Card c) {
@@ -79,7 +84,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
     case UiAction::ToggleDebug:
       settings.debug = !settings.debug;
       return ApplyResult::SettingsChanged;
-    case UiAction::SwapReverb: return swapReverb(layout);
+    case UiAction::SwapReverb: return cycleCard(layout, reverbSlot(layout), nextSlot8Card);
     case UiAction::SwapOctaveFormant: return cycleCard(layout, octaveFormantSlot(layout), nextSlot3Card);
     case UiAction::SwapUnisonCrowd: return cycleCard(layout, unisonCrowdSlot(layout), nextSlot4Card);
     case UiAction::SwapDistortionGrowl: return cycleCard(layout, distortionGrowlSlot(layout), nextSlot6Card);

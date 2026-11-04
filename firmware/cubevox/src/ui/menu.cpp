@@ -112,7 +112,12 @@ const char* onOff(bool on) { return on ? "ON" : "OFF"; }
 // SPRING, the default.
 const char* reverbValue(const Layout& layout) {
   const int slot = reverbSlot(layout);
-  return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
+  if (slot < 0) return "SPRING";
+  switch (layout.card[slot]) {
+    case Card::ReverbChasm: return "CHASM";
+    case Card::Strings: return "STRINGS";
+    default: return "SPRING";
+  }
 }
 
 // The card the slot 3 row holds. A layout with none of the three reads OCTAVE, the default.
@@ -140,7 +145,12 @@ const char* unisonCrowdValue(const Layout& layout) {
 // The card the Distortion and Growl slot holds. A layout with neither reads DISTORTION, the default.
 const char* distortionGrowlValue(const Layout& layout) {
   const int slot = distortionGrowlSlot(layout);
-  return slot >= 0 && layout.card[slot] == Card::Growl ? "GROWL" : "DISTORTION";
+  if (slot < 0) return "DISTORTION";
+  switch (layout.card[slot]) {
+    case Card::Growl: return "GROWL";
+    case Card::RingMod: return "RING MOD";
+    default: return "DISTORTION";
+  }
 }
 
 // The card the slot 7 row holds. A layout with none of the three reads GATE, the default.

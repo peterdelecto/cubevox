@@ -14,6 +14,8 @@
 #include "core/chain_params.h"
 #include "core/registry.h"
 
+#include "distortion_rule.h"
+
 namespace {
 
 using Signal = std::vector<float>;
@@ -99,7 +101,9 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Crowd: return runCrowd(in, a, b);
     case Engine::Lofi: return runFx<cv::Lofi>(in, a, b, &ChainParams::lofi);
     case Engine::Bloom: return runFx<cv::Bloom>(in, a, b, &ChainParams::bloom);
-    case Engine::Growl:  // an audition card, with no knob-step rows yet
+    case Engine::Growl:  // the audition cards have no knob-step rows yet
+    case Engine::RingMod:
+    case Engine::Strings:
     case Engine::Count: break;
   }
   return in;
@@ -173,17 +177,15 @@ std::vector<Step> stepsFor(Card c, int knob) {
 // background holds Amount at half travel.
 constexpr float kEchoBackgroundAmount = 0.5f;
 
-// Distortion's DRIVE starts at 0, where the stage is a plain copy and its TONE never reaches the output,
-// so its background holds DRIVE at 30 %, the setting the level rule runs it at.
-constexpr float kDistortionBackgroundDrive = 0.3f;
-
-// The registry's defaults with the card placed and switched on.
+// The registry's defaults with the card placed and switched on. Distortion's DRIVE starts at 0, where the
+// stage is a plain copy and its TONE never reaches the output, so its background holds DRIVE at the level
+// rule's setting.
 ChainParams background(Card c) {
   ChainParams p;
   applyPlacement(c, p);
   applyToggle(c, true, p);
   if (c == Card::Slapback) applyKnob(c, 1, kEchoBackgroundAmount, p);
-  if (c == Card::Distortion) applyKnob(c, 1, kDistortionBackgroundDrive, p);
+  if (c == Card::Distortion) applyKnob(c, 1, kDistortionRuleDrive, p);
   return p;
 }
 
@@ -224,55 +226,46 @@ bool checkKnob(Card c, int knob, const Signal& in, double toneHz = kToneHz) {
   return ok;
 }
 
-// Distortion's enable and the DRIVE moves that start it. The box resets an engine on the enable of a slot
-// that sat settled off, so an enable row resets the engine at the step.
-Signal runDistortionStep(const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b,
-                         bool resetAtStep) {
+// Distortion's DRIVE moves, the ones that start it included. The box's enable edge resets an engine
+// and then moves nothing but the toggle, so distortion_test holds that reset to a fresh engine's output.
+Signal runDistortionStep(const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b) {
   auto fx = std::make_unique<cv::Distortion>();
   fx->reset();
   Signal out(in.size());
   for (int i = 0; i < kTotal; i += cv::kBlock) {
-    if (resetAtStep && i == kStepAt) fx->reset();
     const size_t k = static_cast<size_t>(i);
     fx->process(&in[k], &out[k], cv::kBlock, i < kStepAt ? a : b);
   }
   return out;
 }
 
-cv::DistortionParams distortionAt(float drive, float tone, bool on = true) {
+cv::DistortionParams distortionAt(float drive, float tone) {
   cv::DistortionParams p = background(Card::Distortion).distortion;
   p.drive = drive;
   p.tone = tone;
-  p.on = on;
   return p;
 }
 
-bool distortionRow(const char* label, const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b,
-                   bool resetAtStep) {
-  const double r = stepRatio(runDistortionStep(in, a, b, resetAtStep));
+bool distortionRow(const char* label, const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b) {
+  const double r = stepRatio(runDistortionStep(in, a, b));
   const bool ok = r <= kMaxRatio;
   std::printf("%s %-14s %-40s peak curvature x%.5f of steady state (<= %.2f)\n", ok ? "PASS" : "FAIL", "Distortion",
               label, r, kMaxRatio);
   return ok;
 }
 
-// The enable edge and DRIVE up from 0, at DRIVE 30, 60 and 100 % and TONE 0, 50 and 100 %. TONE follows
-// the knob while the stage is dry, so both start from where the knob sits, and the dry-to-wet fade takes
-// 16 ms at the least. DRIVE crossing 5 % turns the stage on, and falling under 4 % turns it off; the
-// last row is a fast turn from 6 % down through both thresholds.
+// DRIVE up from 0, at DRIVE 30, 60 and 100 % and TONE 0, 50 and 100 %. TONE follows the knob while the
+// stage is dry, so both start from where the knob sits, and the dry-to-wet fade takes 16 ms at the least.
+// DRIVE crossing 5 % turns the stage on, and falling under 4 % turns it off; the last rows are turns
+// across both thresholds, the last a fast one from 6 % down.
 bool distortionEdgeRows(const Signal& in) {
   bool ok = true;
   char label[64];
-  for (float drive : {kDistortionBackgroundDrive, 0.6f, 1.0f}) {
-    for (float tone : {0.0f, 0.5f, 1.0f}) {
-      std::snprintf(label, sizeof label, "enable at DRIVE %.0f %%, TONE %.0f %%", static_cast<double>(drive * 100.0f),
-                    static_cast<double>(tone * 100.0f));
-      ok &= distortionRow(label, in, distortionAt(drive, tone, false), distortionAt(drive, tone), true);
-    }
+  for (float drive : {kDistortionRuleDrive, 0.6f, 1.0f}) {
     for (float tone : {0.0f, 0.5f, 1.0f}) {
       std::snprintf(label, sizeof label, "DRIVE 0 to %.0f %%, TONE %.0f %%", static_cast<double>(drive * 100.0f),
                     static_cast<double>(tone * 100.0f));
-      ok &= distortionRow(label, in, distortionAt(0.0f, tone), distortionAt(drive, tone), false);
+      ok &= distortionRow(label, in, distortionAt(0.0f, tone), distortionAt(drive, tone));
     }
   }
   struct Cross {
@@ -283,7 +276,7 @@ bool distortionEdgeRows(const Signal& in) {
                          Cross{0.06f, 0.03f}}) {
     std::snprintf(label, sizeof label, "DRIVE %.1f to %.1f %%", static_cast<double>(c.from * 100.0f),
                   static_cast<double>(c.to * 100.0f));
-    ok &= distortionRow(label, in, distortionAt(c.from, 0.5f), distortionAt(c.to, 0.5f), false);
+    ok &= distortionRow(label, in, distortionAt(c.from, 0.5f), distortionAt(c.to, 0.5f));
   }
   return ok;
 }
@@ -372,7 +365,7 @@ int main() {
   bool ok = true;
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
-    if (engineOf(c) == Engine::Growl) continue;
+    if (engineOf(c) == Engine::Growl || engineOf(c) == Engine::RingMod || engineOf(c) == Engine::Strings) continue;
     if (c == Card::Unison) {
       ok &= unisonRows();
       continue;

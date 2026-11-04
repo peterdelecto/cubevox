@@ -35,6 +35,8 @@
 #include "engine/slapback.h"
 #include "engine/unison.h"
 
+#include "distortion_rule.h"
+
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -777,7 +779,7 @@ ClipFn distortionThrough(const cv::DistortionParams& p) {
 // mean. The synthetic program is reported.
 bool distortionRows(const Signal& program) {
   constexpr double kDriveBandDb = 0.5;
-  const cv::DistortionParams def = boxDistortion(0.3f);
+  const cv::DistortionParams def = boxDistortion(kDistortionRuleDrive);
   double mean = 0.0;
   int count = 0;
   bool ok = clipRows("distortion drive .3", distortionThrough(def), kMidLoDb, kMidHiDb, mean, count);
