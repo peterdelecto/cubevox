@@ -1,8 +1,7 @@
-// Checks the audio block's chain walk, the slot toggle crossfade, the late-block dry pass and the
-// BYPASS mix on the host. Covers the card to engine routing, the shared PitchFx call, the
-// ping-pong buffers, the NaN guard, the stage timing, the shipped layout over several blocks, the
-// slot crossfade's gain law and its engine start and stop, a late block's dry pass through the
-// output stage, and the BYPASS crossfade.
+// Checks the audio block's chain walk, the slot toggle crossfade and the BYPASS mix on the host.
+// Covers the card to engine routing, the shared PitchFx call, the ping-pong buffers, the NaN guard,
+// the stage timing, the shipped layout over several blocks, the slot crossfade's gain law and its
+// engine start and stop, and the BYPASS crossfade. The late block's dry pass is in core_block_tail.cpp.
 
 #include "support.h"
 
@@ -17,10 +16,8 @@
 
 #include "core/chain_run.h"
 #include "core/compose.h"
-#include "core/late_block.h"
 #include "core/layout.h"
 #include "core/layout_fade.h"
-#include "core/output_stage.h"
 #include "core/panel.h"
 #include "core/registry.h"
 #include "core/settings.h"
@@ -419,17 +416,27 @@ void checkBypassFade() {
   check(phase == kBypassFull && steps >= fadeSamples && steps <= fadeSamples + 2,
         "bypass: the crossfade lasts kFadeMs and lands on the dry end");
 
-  // sinTurns holds 1e-6 absolute, which is all the flat ends of each gain can be trusted to.
+  // sinTurns holds 1e-6 absolute, which is all the flat ends of each gain can be trusted to. Inside a
+  // block the gains follow the chord between the block's end points, which sits up to 2.2e-4 under the
+  // sine and takes the sum of squares up to 4.4e-4 under 1.
   constexpr float kSinTolerance = 1e-6f;
+  constexpr float kChordTolerance = 2.3e-4f;
   const Gains g = gainsOver(0, true, steps);
+  const double phaseStep = static_cast<double>(kBypassFull / static_cast<uint32_t>(fadeSamples));
   bool equalPower = true;
+  bool onSine = true;
   bool monotone = true;
   for (size_t i = 0; i < g.chain.size(); ++i) {
-    equalPower = equalPower && std::fabs(g.chain[i] * g.chain[i] + g.dry[i] * g.dry[i] - 1.0f) < 2e-5f;
+    const double at = std::fmin(static_cast<double>(i + 1) * phaseStep, static_cast<double>(kBypassFull));
+    const double theta = std::acos(-1.0) / 2.0 * at / static_cast<double>(kBypassFull);
+    equalPower = equalPower && std::fabs(g.chain[i] * g.chain[i] + g.dry[i] * g.dry[i] - 1.0f) < 4.6e-4f;
+    onSine = onSine && std::fabs(static_cast<double>(g.chain[i]) - std::cos(theta)) < static_cast<double>(kChordTolerance) &&
+             std::fabs(static_cast<double>(g.dry[i]) - std::sin(theta)) < static_cast<double>(kChordTolerance);
     if (i == 0) continue;
     monotone = monotone && g.chain[i] <= g.chain[i - 1] + kSinTolerance && g.dry[i] >= g.dry[i - 1] - kSinTolerance;
   }
   check(equalPower, "bypass: the two gains keep equal power all the way through");
+  check(onSine, "bypass: each gain stays within 2.3e-4 of the sine law");
   check(monotone, "bypass: the chain gain only falls and the dry gain only rises");
   check(g.chain.front() > 0.999f && g.dry.front() < 0.001f && g.chain.back() == 0.0f && std::fabs(g.dry.back() - 1.0f) < 1e-6f,
         "bypass: the fade starts at the chain and ends at the dry input");
@@ -1310,80 +1317,6 @@ void checkSettledSlotsAreInert() {
   check(worst == 0.0f, "slot flip: a slot settled off runs no engine and the next slot gets the dry input");
 }
 
-// A late block raises the flag. The next block skips the chain and plays the dry input through the
-// output stage, the dry counter reads 1, and the block after runs the chain again.
-void checkLateBlockPassesDry() {
-  const Layout layout = layoutOf({Card::Distortion});
-  const ChainSnapshot snap = snapshotToggles(layout, 1.0f, allToggles(true));
-  auto rig = newRig();
-  auto reference = newRig();
-  auto other = newRig();
-  LateBlocks late;
-  OutputGain gain;
-  const float mic = std::pow(10.0f, kMicTrimDb / 20.0f);
-  gain.next(mic, 1.0f, 1.0f, kN);  // the trim has settled on MIC, so every block's ramp is flat at `mic`
-  uint32_t atFull = kBypassFull;
-
-  // The output stage over a block, as writeOutput applies it.
-  const auto throughStage = [&](const Block& x) {
-    const GainRamp ramp = gain.next(mic, 1.0f, 1.0f, kN);
-    Block shaped{};
-    float g = ramp.start;
-    for (int i = 0; i < kN; ++i) {
-      shaped[static_cast<size_t>(i)] = shapeOutput(x[static_cast<size_t>(i)], g);
-      g += ramp.step;
-    }
-    return shaped;
-  };
-  const auto runOn = [&](Rig& r, Block x) {
-    Block scratch{};
-    ChainCycles cycles;
-    runChain(r.engines, r.fades, x.data(), scratch.data(), kN, snap, StillClock(), cycles);
-    return x;
-  };
-
-  // One block as processHalf does it: take the flag, then the chain or the dry pass by the BYPASS
-  // mix settled at full dry, then the output stage.
-  bool lastWasDry = false;
-  const auto processBlock = [&](const Block& in) {
-    lastWasDry = late.takeDry(false);
-    Block a = in;
-    if (lastWasDry) {
-      mixBypass(a.data(), in.data(), kN, true, atFull);
-    } else {
-      a = runOn(*rig, in);
-    }
-    return throughStage(a);
-  };
-
-  // Loud input, so the ceiling shows in the comparison.
-  const Block in0 = tone(0, 1.5f);
-  const Block in1 = tone(1, 1.5f);
-  const Block in2 = tone(2, 1.5f);
-  const Block out0 = processBlock(in0);
-  check(!lastWasDry && late.dryBlocks() == 0 && out0 == throughStage(runOn(*reference, in0)),
-        "late block: with no flag the block runs the chain");
-  late.markLate();
-  const Block out1 = processBlock(in1);
-  check(lastWasDry && late.dryBlocks() == 1, "late block: the block after a late one passes the dry input and counts 1");
-  check(out1 == throughStage(in1), "late block: its output is the dry input through the output stage, trim and ceiling");
-  check(out1 != throughStage(runOn(*other, in1)), "late block: the dry block is the input, not the chain's output");
-  const Block out2 = processBlock(in2);
-  check(!lastWasDry && late.dryBlocks() == 1, "late block: the flag clears, so the block after the dry one runs the chain");
-
-  // The reference ran blocks 0 and 2 only, so it has the engine history the dry block left behind.
-  check(out2 == throughStage(runOn(*reference, in2)),
-        "late block: the block after the dry one is the chain's output, the engines one block stale");
-
-  // A block that skips the chain anyway takes the flag without counting it.
-  late.markLate();
-  check(!late.takeDry(true) && late.dryBlocks() == 1 && !late.takeDry(false),
-        "late block: a silent block clears the flag and is not counted");
-  late.markLate();
-  late.clearCount();
-  check(late.takeDry(false) && late.dryBlocks() == 1, "late block: the count restarts from clearCount");
-}
-
 }  // namespace
 
 void checkChainRun() {
@@ -1417,5 +1350,4 @@ void checkChainRun() {
   checkBloomKey();
   checkBloomSource();
   checkSettledSlotsAreInert();
-  checkLateBlockPassesDry();
 }

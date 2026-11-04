@@ -8,14 +8,15 @@
 
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 
 #include "core/level.h"
+#include "engine/common.h"
 
 namespace {
 
 constexpr float kPi = 3.14159265358979f;
-constexpr int kBlock = 64;
 constexpr float kTickMs = 40.0f;
 
 float dbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
@@ -23,7 +24,7 @@ float dbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
 // A full-scale sine of the given peak, four whole cycles in a 64-sample block, so one block holds
 // whole cycles and its RMS is exactly peak / sqrt(2).
 void sineBlock(float peak, float* out) {
-  for (int i = 0; i < kBlock; ++i) out[i] = peak * std::sin(2.0f * kPi * 4.0f * static_cast<float>(i) / kBlock);
+  for (int i = 0; i < cv::kBlock; ++i) out[i] = peak * std::sin(2.0f * kPi * 4.0f * static_cast<float>(i) / cv::kBlock);
 }
 
 level::InputEnergy energyOfRms(float rms) {
@@ -36,12 +37,12 @@ level::InputEnergy energyOfRms(float rms) {
 level::InputEnergy energyOfDb(float db) { return energyOfRms(dbToLinear(db)); }
 
 void checkEnergy() {
-  float block[kBlock];
+  float block[cv::kBlock];
   sineBlock(0.5f, block);
   level::InputEnergy e;
   for (int b = 0; b < 30; ++b) {
-    e.sumSquares += level::sumSquares(block, kBlock);
-    e.samples += kBlock;
+    e.sumSquares += level::sumSquares(block, cv::kBlock);
+    e.samples += cv::kBlock;
   }
   check(e.samples == 1920, "level: thirty blocks make one tick of samples");
   check(std::fabs(level::rms(e) - 0.5f / std::sqrt(2.0f)) < 1e-4f, "level: the RMS of a sine is its peak over root two");
@@ -49,6 +50,17 @@ void checkEnergy() {
   const float ramp[4] = {1.0f, -1.0f, 0.5f, 0.0f};
   check(std::fabs(level::sumSquares(ramp, 4) - 2.25f) < 1e-6f && level::sumSquares(ramp, 0) == 0.0f,
         "level: sumSquares adds the squares and an empty block adds nothing");
+
+  // The four running sums give the total to float rounding for any length, the odd tail included.
+  float odd[67];
+  for (int i = 0; i < 67; ++i) odd[i] = 0.3f * std::sin(0.7f * static_cast<float>(i));
+  bool lanes = true;
+  for (const int n : {1, 3, 4, 5, 63, 64, 67}) {
+    double want = 0.0;
+    for (int i = 0; i < n; ++i) want += static_cast<double>(odd[i]) * static_cast<double>(odd[i]);
+    lanes = lanes && std::fabs(static_cast<double>(level::sumSquares(odd, n)) - want) <= 1e-6 * (want + 1e-9);
+  }
+  check(lanes, "level: sumSquares matches the double sum for every length around the four lanes");
   check(level::rms(level::InputEnergy()) == 0.0f, "level: no samples read as silence");
   level::InputEnergy bad;
   bad.samples = 10;

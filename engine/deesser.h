@@ -1,20 +1,33 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
+#include "engine/smooth.h"
 
 // De-esser for POLISH EQ's front half. A 4th-order Butterworth band-pass (two biquads) reads the
-// sibilant band. Once per block the detector compares the band level with the full level, both
+// sibilant band. Once per 64 samples the detector compares the band level with the full level, both
 // in dB, so the singer's volume does not move the trigger. The overshoot past the threshold,
 // capped at maxCutDb, sets the gain of a peaking notch in the signal path. A rising cut applies
-// within the block. A falling cut follows a one-pole release in dB.
+// to the call that completes the window. A falling cut follows a one-pole release in dB. The
+// windows run on across calls, so the cut at each 64th sample is the same however the caller splits
+// the audio. The calls before a window completes keep the cut of the window before.
 // Spec docs/specs/2026-10-31-polish-eq-adam-voice-design.md.
 
 namespace cv {
+
+// The ranges of a de-esser setting. The box and the emulator stay inside them, and cubevox-render
+// refuses a value outside them. A release under the minimum runs at the minimum.
+constexpr float kDeEsserThresholdMinDb = -60.0f;
+constexpr float kDeEsserThresholdMaxDb = 0.0f;
+constexpr float kDeEsserCutMaxDb = 24.0f;
+constexpr float kDeEsserReleaseMinMs = 0.1f;
+constexpr float kDeEsserReleaseMaxMs = 2000.0f;
+constexpr float kDeEsserQMax = 20.0f;
 
 struct DeEsserTuning {
   float bandLoHz = 4500.0f;    // detector band, the -3 dB edges
@@ -26,6 +39,16 @@ struct DeEsserTuning {
   float notchQ = 1.5f;
 };
 
+// True when every field sits inside the ranges above and the filter band.
+inline bool deEsserTuningInRange(const DeEsserTuning& t) {
+  const auto hz = [](float v) { return v >= kFilterMinHz && v <= kFilterMaxHz; };
+  const auto within = [](float v, float lo, float hi) { return v >= lo && v <= hi; };
+  return hz(t.bandLoHz) && hz(t.bandHiHz) && hz(t.notchHz) &&
+         within(t.thresholdDb, kDeEsserThresholdMinDb, kDeEsserThresholdMaxDb) &&
+         within(t.maxCutDb, 0.0f, kDeEsserCutMaxDb) &&
+         within(t.releaseMs, kDeEsserReleaseMinMs, kDeEsserReleaseMaxMs) && within(t.notchQ, kPeakMinQ, kDeEsserQMax);
+}
+
 class DeEsser {
  public:
   DeEsser() { reset(); }
@@ -35,29 +58,29 @@ class DeEsser {
     bp_[1].clear();
     notch_ = Biquad{};
     cutDb_ = 0.0f;
+    sumFull_ = 0.0f;
+    sumBand_ = 0.0f;
+    count_ = 0;
     notchStale_ = true;
   }
 
-  // Gain reduction of the last block, 0 to the tuning's maxCutDb.
+  // Gain reduction of the last window, 0 to the tuning's maxCutDb.
   float cutDb() const { return cutDb_; }
 
-  // De-esses `n` samples in place. Takes n up to kBlock, one detector reading per call.
+  // De-esses `n` samples in place. Takes n up to kBlock.
   void process(float* x, int n, const DeEsserTuning& t) {
-    if (n <= 0) return;
-    if (!designed_ || !sameTuning(t, applied_)) design(t);
+    process(x, n, t, [x](int i, float y) { x[i] = y; });
+  }
 
-    float sumFull = 0.0f;
-    float sumBand = 0.0f;
-    for (int i = 0; i < n; ++i) {
-      const float b = bp_[1].run(bp_[0].run(x[i]));
-      sumFull += x[i] * x[i];
-      sumBand += b * b;
-    }
-    const float scale = 1.0f / static_cast<float>(n);
-    if (sumFull * scale < kSilenceMs) flushQuiet();
-    updateCut(sumBand * scale, sumFull * scale, n, t);
-    if (notchStale_ || cutDb_ != appliedCutDb_) setNotch(cutDb_);
-    for (int i = 0; i < n; ++i) x[i] = notch_.run(x[i]);
+  // De-esses `n` samples (up to kBlock) and hands each result to emit(i, y). The detector reads the
+  // whole call before the notch runs, so `emit` may write over `x`.
+  template <typename Emit>
+  void process(const float* x, int n, const DeEsserTuning& t, Emit&& emit) {
+    if (n <= 0) return;
+    detect(x, n, t);
+    Biquad notch = notch_;
+    for (int i = 0; i < n; ++i) emit(i, notch.run(x[i]));
+    notch_ = notch;
   }
 
  private:
@@ -68,12 +91,52 @@ class DeEsser {
   static constexpr float kFlushLevel = 1.0e-15f;
   static constexpr float kTinyMs = 1.0e-30f;
   static constexpr float kCutSnapDb = 0.01f;
-  static constexpr float kPowerDbPerLog2 = 0.5f * kDbPerLog2;  // 10 log10(2)
+  static constexpr float kInvBlock = 1.0f / static_cast<float>(kBlock);
 
   static bool sameTuning(const DeEsserTuning& a, const DeEsserTuning& b) {
     return a.bandLoHz == b.bandLoHz && a.bandHiHz == b.bandHiHz && a.thresholdDb == b.thresholdDb &&
            a.maxCutDb == b.maxCutDb && a.releaseMs == b.releaseMs && a.notchHz == b.notchHz &&
            a.notchQ == b.notchQ;
+  }
+
+  // Runs the detector over the call and closes the window when it reaches kBlock samples, then
+  // refreshes the notch if the cut moved.
+  void detect(const float* x, int n, const DeEsserTuning& t) {
+    if (!designed_ || !sameTuning(t, applied_)) design(t);
+    const int head = std::min(n, kBlock - count_);
+    accumulate(x, head);
+    if (count_ == kBlock) closeWindow(t);
+    accumulate(x + head, n - head);
+    if (notchStale_ || cutDb_ != appliedCutDb_) setNotch(cutDb_);
+  }
+
+  // Adds the band and full energy of `n` samples to the window. The filter states stay in locals.
+  // The sums are fused multiply-adds by name, so the compiler cannot split them into a separate
+  // multiply and add when it pairs the two sums in one vector.
+  void accumulate(const float* x, int n) {
+    Biquad b0 = bp_[0];
+    Biquad b1 = bp_[1];
+    float sumFull = sumFull_;
+    float sumBand = sumBand_;
+    for (int i = 0; i < n; ++i) {
+      const float b = b1.run(b0.run(x[i]));
+      sumFull = std::fma(x[i], x[i], sumFull);
+      sumBand = std::fma(b, b, sumBand);
+    }
+    bp_[0] = b0;
+    bp_[1] = b1;
+    sumFull_ = sumFull;
+    sumBand_ = sumBand;
+    count_ += n;
+  }
+
+  void closeWindow(const DeEsserTuning& t) {
+    const float msFull = sumFull_ * kInvBlock;
+    if (msFull < kSilenceMs) flushQuiet();
+    updateCut(sumBand_ * kInvBlock, msFull, t);
+    sumFull_ = 0.0f;
+    sumBand_ = 0.0f;
+    count_ = 0;
   }
 
   // Clears each filter whose state has decayed under kFlushLevel. Each filter decays at its own
@@ -84,43 +147,33 @@ class DeEsser {
     }
   }
 
-  void updateCut(float msBand, float msFull, int n, const DeEsserTuning& t) {
+  void updateCut(float msBand, float msFull, const DeEsserTuning& t) {
     float target = 0.0f;
     if (msBand >= kBandFloorMs) {
-      const float levelDb = kPowerDbPerLog2 * (log2Fast(msBand) - log2Fast(msFull + kTinyMs));
+      const float levelDb = (kDbPerLog2 / 2) * (log2Fast(msBand) - log2Fast(msFull + kTinyMs));  // power to dB
       target = clampf(levelDb - t.thresholdDb, 0.0f, t.maxCutDb);
     }
     if (target >= cutDb_) {
       cutDb_ = target;
       return;
     }
-    const float keep = n == kBlock ? releaseKeep_ : exp2Fast(static_cast<float>(n) * releaseLog2_);
-    cutDb_ = target + (cutDb_ - target) * keep;
+    cutDb_ = target + (cutDb_ - target) * releaseKeep_;
     if (cutDb_ - target < kCutSnapDb) cutDb_ = target;
   }
 
-  // RBJ peaking filter at the notch frequency with gain -cutDb. The sine and cosine come from the
-  // tuning, so a block costs one exp2 and one divide.
+  // The peaking notch at the tuning's frequency with gain -cutDb. The corner comes from the tuning,
+  // so a block costs one exp2 and the biquad's divides.
   void setNotch(float cutDb) {
-    const float amp = exp2Fast(-cutDb * (0.5f * kLog2PerDb));
-    const float inv = 1.0f / (1.0f + notchAlpha_ / amp);
-    notch_.b0 = (1.0f + notchAlpha_ * amp) * inv;
-    notch_.b1 = -2.0f * notchCos_ * inv;
-    notch_.b2 = (1.0f - notchAlpha_ * amp) * inv;
-    notch_.a1 = notch_.b1;
-    notch_.a2 = (1.0f - notchAlpha_ / amp) * inv;
+    notch_.setPeakAmp(notchCorner_, exp2Fast(-cutDb * (0.5f * kLog2PerDb)), applied_.notchQ);
     appliedCutDb_ = cutDb;
     notchStale_ = false;
   }
 
   void design(const DeEsserTuning& t) {
     designBand(t.bandLoHz, t.bandHiHz);
-    const float w0 = kTwoPi * clampf(t.notchHz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    notchCos_ = cosf(w0);
-    notchAlpha_ = sinf(w0) / (2.0f * (t.notchQ < 0.1f ? 0.1f : t.notchQ));
-    const float releaseSec = (t.releaseMs < 0.1f ? 0.1f : t.releaseMs) * 0.001f;
-    releaseLog2_ = -1.4426950409f / (releaseSec * kSampleRate);  // log2(e) per sample
-    releaseKeep_ = exp2f(static_cast<float>(kBlock) * releaseLog2_);
+    notchCorner_ = rbjCorner(t.notchHz);
+    const float releaseSec = fmaxf(t.releaseMs, kDeEsserReleaseMinMs) * 0.001f;
+    releaseKeep_ = smooth::keep(releaseSec, kBlock);
     notchStale_ = true;
     applied_ = t;
     designed_ = true;
@@ -160,12 +213,13 @@ class DeEsser {
 
   std::array<Biquad, 2> bp_;
   Biquad notch_;
+  RbjCorner notchCorner_{1.0f, 0.0f};
   float cutDb_ = 0.0f;
   float appliedCutDb_ = 0.0f;
-  float notchCos_ = 1.0f;
-  float notchAlpha_ = 0.0f;
-  float releaseLog2_ = 0.0f;  // log2 of the per-sample release decay
   float releaseKeep_ = 1.0f;  // the release decay over one kBlock
+  float sumFull_ = 0.0f;      // energy sums of the open window
+  float sumBand_ = 0.0f;
+  int count_ = 0;             // samples in the open window
   bool notchStale_ = true;
   bool designed_ = false;
   DeEsserTuning applied_;

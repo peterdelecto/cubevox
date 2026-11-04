@@ -18,6 +18,7 @@ int main() {
   checkTx();
   checkFade();
   checkChainRun();
+  checkBlockTail();
   checkFuzz();
   checkInputLogic();
   checkMenu();

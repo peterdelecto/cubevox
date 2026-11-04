@@ -12,7 +12,6 @@
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
-constexpr int kRate = 48000;
 constexpr double kOneUlp = 1.2e-7;  // one float step in [0.5, 1) is 6e-8; two cover a rounding either way
 
 uint32_t bitsOf(float v) {
@@ -31,7 +30,7 @@ double toDb(double lin) { return 20.0 * std::log10(lin); }
 
 // Sample i of a sine whose peak is peakDb dBFS.
 float sineAt(double hz, double peakDb, int i) {
-  return static_cast<float>(std::pow(10.0, peakDb / 20.0) * std::sin(2.0 * kPi * hz * i / kRate));
+  return static_cast<float>(std::pow(10.0, peakDb / 20.0) * std::sin(2.0 * kPi * hz * i / cv::kSampleRate));
 }
 
 bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0, double c = 0.0, double d = 0.0) {
@@ -46,7 +45,7 @@ bool testBitExact() {
   const double hzList[] = {55.0, 997.0, 5000.0};
   double sineSamples = 0.0, differ = 0.0;
   for (double hz : hzList) {
-    for (int i = 0; i < kRate; ++i) {
+    for (int i = 0; i < cv::kSampleRate; ++i) {
       const float x = sineAt(hz, -3.0, i);
       sineSamples += 1.0;
       if (bitsOf(cv::softCeiling(x)) != bitsOf(x)) differ += 1.0;
@@ -74,7 +73,7 @@ bool testBitExact() {
 // A +6 dBFS transient, as a sine and as a single sample, and a hotter one for the margin.
 bool testTransient() {
   float sinePeak = 0.0f;
-  for (int i = 0; i < kRate; ++i) sinePeak = std::fmax(sinePeak, std::fabs(cv::softCeiling(sineAt(997.0, 6.0, i))));
+  for (int i = 0; i < cv::kSampleRate; ++i) sinePeak = std::fmax(sinePeak, std::fabs(cv::softCeiling(sineAt(997.0, 6.0, i))));
   const float pulse = static_cast<float>(std::pow(10.0, 6.0 / 20.0));
   const float pulsePeak = std::fmax(cv::softCeiling(pulse), -cv::softCeiling(-pulse));
   const float hotPeak = std::fmax(cv::softCeiling(1000.0f), -cv::softCeiling(-1000.0f));
@@ -134,6 +133,22 @@ bool testEveryInput() {
                 inputs, outOfRange, notOdd, nanKept);
 }
 
+// isNaNBits agrees with std::isnan on every float exponent, both signs, and the special values.
+bool testNaNBits() {
+  double inputs = 0.0, wrong = 0.0;
+  auto check = [&](float x) {
+    inputs += 1.0;
+    if (cv::isNaNBits(x) != std::isnan(x)) wrong += 1.0;
+  };
+  for (uint64_t b = 0; b <= 0xFFFFFFFFull; b += 4099) check(floatOf(static_cast<uint32_t>(b)));
+  const float specials[] = {INFINITY, -INFINITY, NAN, -NAN, FLT_MAX, -FLT_MAX, FLT_MIN, 0.0f, -0.0f};
+  for (float x : specials) check(x);
+  const uint32_t nanBits[] = {0x7F800001u, 0xFF800001u, 0x7FC00000u, 0xFFFFFFFFu};
+  for (const uint32_t b : nanBits) check(floatOf(b));
+  return report("isNaNBits", wrong == 0.0, "%.0f floats incl. inf, quiet and signalling NaN of both signs: %.0f disagree (0)",
+                inputs, wrong);
+}
+
 }  // namespace
 
 int main() {
@@ -141,5 +156,6 @@ int main() {
   ok &= testTransient();
   ok &= testSmooth();
   ok &= testEveryInput();
+  ok &= testNaNBits();
   return ok ? 0 : 1;
 }

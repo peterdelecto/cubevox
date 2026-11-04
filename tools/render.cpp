@@ -82,7 +82,7 @@ int usage() {
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
-               "       [--polish-comp gentle|medium|firm|off] [--polish-eq on|off] [--comp-stats]\n"
+               "       [--polish-comp firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
                "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
@@ -110,7 +110,7 @@ int usage() {
                "  the eq's front half (70 Hz high-pass, 6 kHz low-pass, de-esser) runs ahead of every stage and its\n"
                "  back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp, both on by default\n"
                "  comp and eq are the box's polish tail and run by default, the comp at its firm tuning\n"
-               "  --polish-comp gentle|medium|firm picks the comp tuning, and --polish-comp off and --polish-eq off\n"
+               "  --polish-comp off and --polish-eq off\n"
                "  switch them out for A/B listening, --polish-eq off for both halves; --eq is accepted and changes\n"
                "  nothing\n"
                "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
@@ -180,30 +180,14 @@ bool parseOnOff(const char* s, bool* out) {
   return true;
 }
 
-struct CompTuningName {
-  const char* name;
-  cv::PolishCompTuning (*make)();
-};
-
-constexpr CompTuningName kCompTunings[] = {{"gentle", cv::PolishCompTuning::gentle},
-                                           {"medium", cv::PolishCompTuning::medium},
-                                           {"firm", cv::PolishCompTuning::firm}};
-
-// gentle, medium or firm picks a tuning, on keeps the default one, off switches the comp out.
+// firm or on runs the comp at its one tuning, off switches it out.
 bool parseCompChoice(const char* s, RenderParams* rp) {
   if (std::strcmp(s, "off") == 0) {
     rp->compOn = false;
     return true;
   }
   rp->compOn = true;
-  if (std::strcmp(s, "on") == 0) return true;
-  for (const CompTuningName& c : kCompTunings) {
-    if (std::strcmp(s, c.name) != 0) continue;
-    rp->comp.tuning = c.make();
-    rp->compName = c.name;
-    return true;
-  }
-  return false;
+  return std::strcmp(s, "on") == 0 || std::strcmp(s, "firm") == 0;
 }
 
 // "hz,db"

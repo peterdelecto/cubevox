@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstring>
 
 #include "engine/common.h"
 #include "engine/deesser.h"
@@ -27,6 +28,19 @@ constexpr float kPolishLowPassHz = 6000.0f;
 constexpr float kButterworth4Q1 = 0.54119610f;
 constexpr float kButterworth4Q2 = 1.30656296f;
 
+// The ranges of a back-half setting. The box and the emulator stay inside them, and cubevox-render
+// refuses a value outside them.
+constexpr float kPolishDipHzMin = 150.0f;
+constexpr float kPolishDipHzMax = 600.0f;
+constexpr float kPolishDipDbMin = -6.0f;
+constexpr float kPolishDipDbMax = 0.0f;
+constexpr float kPolishPresenceHzMin = 2000.0f;
+constexpr float kPolishPresenceHzMax = 6000.0f;
+constexpr float kPolishPresenceDbMin = 0.0f;
+constexpr float kPolishPresenceDbMax = 6.0f;
+constexpr float kPolishQMax = 10.0f;
+constexpr float kPolishTrimMaxDb = 12.0f;
+
 struct PolishTuning {
   float dipQ = 1.0f;
   float presenceQ = 0.7f;
@@ -36,12 +50,23 @@ struct PolishTuning {
 
 struct PolishParams {
   bool on = true;
-  float dipHz = 300.0f;        // 150..600
-  float dipDb = -2.5f;         // -6..0
-  float presenceHz = 3500.0f;  // 2000..6000
-  float presenceDb = 1.5f;     // 0..6
+  float dipHz = 300.0f;
+  float dipDb = -2.5f;
+  float presenceHz = 3500.0f;
+  float presenceDb = 1.5f;
   PolishTuning tuning;
 };
+
+// True when every back-half and de-esser setting sits inside its range.
+inline bool polishParamsInRange(const PolishParams& p) {
+  const auto within = [](float v, float lo, float hi) { return v >= lo && v <= hi; };
+  const PolishTuning& t = p.tuning;
+  return within(p.dipHz, kPolishDipHzMin, kPolishDipHzMax) && within(p.dipDb, kPolishDipDbMin, kPolishDipDbMax) &&
+         within(p.presenceHz, kPolishPresenceHzMin, kPolishPresenceHzMax) &&
+         within(p.presenceDb, kPolishPresenceDbMin, kPolishPresenceDbMax) && within(t.dipQ, kPeakMinQ, kPolishQMax) &&
+         within(t.presenceQ, kPeakMinQ, kPolishQMax) && within(t.trimDb, -kPolishTrimMaxDb, kPolishTrimMaxDb) &&
+         deEsserTuningInRange(t.deEsser);
+}
 
 class Polish {
  public:
@@ -86,15 +111,28 @@ class Polish {
     backDirty_ = true;
     if (!shapeValid_ || !sameShape(p, applied_)) applyShape(p);
 
-    for (int i = 0; i < n; ++i) {
-      backActive_ = smooth::step(backActive_, target, smooth::kSmoothCoef);
-      const float x = presence_.run(dip_.run(in[i])) * trim_;
-      out[i] = in[i] + backActive_ * (x - in[i]);
+    // The sections and the smoother live in locals for the call, because `out` may alias the
+    // members and would force a reload every sample.
+    Biquad dip = dip_;
+    Biquad presence = presence_;
+    const float trim = trim_;
+    float active = backActive_;
+    if (active == target) {
+      for (int i = 0; i < n; ++i) {
+        const float x = presence.run(dip.run(in[i])) * trim;
+        out[i] = in[i] + active * (x - in[i]);
+      }
+    } else {
+      for (int i = 0; i < n; ++i) {
+        active = smooth::step(active, target, smooth::kSmoothCoef);
+        const float x = presence.run(dip.run(in[i])) * trim;
+        out[i] = in[i] + active * (x - in[i]);
+      }
     }
+    dip_ = dip;
+    presence_ = presence;
+    backActive_ = active;
   }
-
-  // Gain reduction the de-esser holds now.
-  float deEsserCutDb() const { return deEsser_.cutDb(); }
 
  private:
   // The settings the back half's coefficients come from.
@@ -114,21 +152,35 @@ class Polish {
   }
 
   static void copy(const float* in, float* out, int n) {
-    if (out == in) return;
-    for (int i = 0; i < n; ++i) out[i] = in[i];
+    std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
   }
 
-  // Filters and de-esses up to kBlock samples, then mixes them with the input by the smoother.
+  // Filters and de-esses up to kBlock samples, then mixes them with the input by the smoother. The
+  // front filters and the smoother live in locals, and the de-esser's notch feeds the mix directly.
   void frontChunk(const float* in, float* out, int n, float target, const DeEsserTuning& t) {
     std::array<float, kBlock> y;
+    Biquad h0 = hp_[0];
+    Biquad h1 = hp_[1];
+    Biquad l0 = lp_[0];
+    Biquad l1 = lp_[1];
     for (int i = 0; i < n; ++i) {
-      y[static_cast<size_t>(i)] = lp_[1].run(lp_[0].run(hp_[1].run(hp_[0].run(in[i]))));
+      y[static_cast<size_t>(i)] = l1.run(l0.run(h1.run(h0.run(in[i]))));
     }
-    deEsser_.process(y.data(), n, t);
-    for (int i = 0; i < n; ++i) {
-      frontActive_ = smooth::step(frontActive_, target, smooth::kSmoothCoef);
-      out[i] = in[i] + frontActive_ * (y[static_cast<size_t>(i)] - in[i]);
+    hp_[0] = h0;
+    hp_[1] = h1;
+    lp_[0] = l0;
+    lp_[1] = l1;
+
+    float active = frontActive_;
+    if (active == target) {
+      deEsser_.process(y.data(), n, t, [&](int i, float v) { out[i] = in[i] + active * (v - in[i]); });
+      return;
     }
+    deEsser_.process(y.data(), n, t, [&](int i, float v) {
+      active = smooth::step(active, target, smooth::kSmoothCoef);
+      out[i] = in[i] + active * (v - in[i]);
+    });
+    frontActive_ = active;
   }
 
   // Rebuilds the back coefficients and keeps each section's state.
@@ -136,7 +188,7 @@ class Polish {
     const PolishTuning& t = p.tuning;
     dip_.setPeak(p.dipHz, p.dipDb, t.dipQ);
     presence_.setPeak(p.presenceHz, p.presenceDb, t.presenceQ);
-    trim_ = powf(10.0f, t.trimDb / 20.0f);
+    trim_ = dbToGain(t.trimDb);
     applied_ = shapeOf(p);
     shapeValid_ = true;
   }

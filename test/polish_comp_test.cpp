@@ -1,6 +1,6 @@
-// Polish compressor checks: the named tunings, then for each one the static curve, ballistics,
-// sidechain high-pass and cap; bit-exact off, silence, log2Fast error and no-alloc on the default.
-// No window, no audio device.
+// Polish compressor checks on the one tuning the box runs (FIRM): the tuning table, the static curve,
+// ballistics, sidechain high-pass and cap; bit-exact off, silence and no-alloc. No window, no
+// audio device.
 
 #include <cfenv>
 #include <cmath>
@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "engine/fastmath.h"
 #include "engine/polish_comp.h"
 
 #include "alloc_guard.h"
@@ -76,9 +75,7 @@ struct Named {
   cv::PolishCompTuning tuning;
 };
 
-const Named kTunings[] = {{"gentle", cv::PolishCompTuning::gentle()},
-                          {"medium", cv::PolishCompTuning::medium()},
-                          {"firm", cv::PolishCompTuning::firm()}};
+const Named kFirm = {"firm", cv::PolishCompTuning()};
 
 std::string labelled(const char* what, const Named& n) { return std::string(what) + " " + n.name; }
 
@@ -100,31 +97,12 @@ double steadyReductionDb(double hz, double rmsDb, const cv::PolishCompTuning& t)
   return 0.0 - 20.0 * std::log10(rmsOf(out, kSecond, 2 * kSecond) / rmsOf(in, kSecond, 2 * kSecond));
 }
 
-bool sameTuning(const cv::PolishCompTuning& a, const cv::PolishCompTuning& b) {
-  return a.rmsMs == b.rmsMs && a.sidechainHz == b.sidechainHz && a.thresholdDb == b.thresholdDb && a.ratio == b.ratio &&
-         a.kneeDb == b.kneeDb && a.attackMs == b.attackMs && a.releaseMs == b.releaseMs &&
-         a.maxReductionDb == b.maxReductionDb && a.trimDb == b.trimDb;
-}
-
-// The spec's table, pinned. FIRM is the default, and all three share the detector and the sidechain.
-bool testNamedTunings() {
-  struct Row {
-    float threshold, ratio, knee, attack, release, max;
-  };
-  const Row want[] = {{-24.0f, 2.2f, 6.0f, 10.0f, 150.0f, 12.0f},
-                      {-28.0f, 3.0f, 6.0f, 5.0f, 120.0f, 15.0f},
-                      {-30.0f, 4.0f, 4.0f, 3.0f, 100.0f, 18.0f}};
-  bool table = true;
-  for (int i = 0; i < 3; ++i) {
-    const cv::PolishCompTuning& t = kTunings[i].tuning;
-    table = table && t.thresholdDb == want[i].threshold && t.ratio == want[i].ratio && t.kneeDb == want[i].knee &&
-            t.attackMs == want[i].attack && t.releaseMs == want[i].release && t.maxReductionDb == want[i].max &&
-            t.rmsMs == 10.0f && t.sidechainHz == 150.0f;
-  }
-  const bool defaultIsFirm = sameTuning(cv::PolishCompTuning(), cv::PolishCompTuning::firm()) &&
-                             sameTuning(cv::PolishCompParams().tuning, cv::PolishCompTuning::firm());
-  return report("named tunings", table && defaultIsFirm, "table matches the spec=%.0f (1), default is firm=%.0f (1)",
-                table ? 1.0 : 0.0, defaultIsFirm ? 1.0 : 0.0);
+// The spec's FIRM row, pinned with the detector window and the sidechain corner.
+bool testTuning() {
+  const cv::PolishCompTuning& t = kFirm.tuning;
+  const bool table = t.thresholdDb == -30.0f && t.ratio == 4.0f && t.kneeDb == 4.0f && t.attackMs == 3.0f &&
+                     t.releaseMs == 100.0f && t.maxReductionDb == 18.0f && t.rmsMs == 10.0f && t.sidechainHz == 150.0f;
+  return report("tuning", table, "the table matches the spec=%.0f (1)", table ? 1.0 : 0.0);
 }
 
 // The textbook soft-knee curve: none below the knee, quadratic through it, then 1 - 1/ratio per dB.
@@ -144,7 +122,7 @@ double kneeReductionDb(double levelDb, const cv::PolishCompTuning& t) {
 }
 
 // The five levels sit at fixed offsets from the threshold: under the knee, at its centre, just over
-// it, and two steps up the ratio slope. They were -30/-18/-12/-6/0 dBFS for a -18 dBFS threshold.
+// it, and two steps up the ratio slope.
 bool testStaticCurve(const Named& n) {
   const cv::PolishCompTuning& t = n.tuning;
   const double offsets[] = {-12.0, 0.0, 6.0, 12.0, 18.0};
@@ -316,24 +294,6 @@ bool testSilence() {
                 finite ? 1.0 : 0.0);
 }
 
-bool testLog2Fast() {
-  double worst = 0.0;
-  const int steps = 200000;
-  for (int i = 0; i <= steps; ++i) {
-    const double x = std::pow(10.0, -20.0 + 24.0 * i / steps);
-    const double err = std::fabs(static_cast<double>(cv::log2Fast(static_cast<float>(x))) -
-                                 std::log2(static_cast<double>(static_cast<float>(x))));
-    worst = std::fmax(worst, err);
-  }
-  double seam = 0.0;
-  for (int k = -60; k < 60; ++k) {
-    const float below = std::nextafterf(std::ldexp(1.0f, k), 0.0f);
-    seam = std::fmax(seam, std::fabs(static_cast<double>(cv::log2Fast(below)) - static_cast<double>(k)));
-  }
-  return report("log2Fast", worst <= 3e-5 && seam <= 3e-5, "worst error over 1e-20..1e4=%.3g, at octave seams=%.3g (<= 3e-5)",
-                worst, seam);
-}
-
 bool testNoAlloc() {
   static cv::PolishComp comp;
   comp.reset();
@@ -344,17 +304,14 @@ bool testNoAlloc() {
 }  // namespace
 
 int main() {
-  bool ok = testNamedTunings();
-  for (const Named& n : kTunings) {
-    ok &= testStaticCurve(n);
-    ok &= testReductionCap(n);
-    ok &= testBallistics(n);
-    ok &= testStepResponse(n);
-    ok &= testSidechain(n);
-  }
+  bool ok = testTuning();
+  ok &= testStaticCurve(kFirm);
+  ok &= testReductionCap(kFirm);
+  ok &= testBallistics(kFirm);
+  ok &= testStepResponse(kFirm);
+  ok &= testSidechain(kFirm);
   ok &= testOffBitExact();
   ok &= testSilence();
-  ok &= testLog2Fast();
   ok &= testNoAlloc();
   return ok ? 0 : 1;
 }
