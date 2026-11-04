@@ -99,7 +99,9 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Crowd: return runCrowd(in, a, b);
     case Engine::Lofi: return runFx<cv::Lofi>(in, a, b, &ChainParams::lofi);
     case Engine::Bloom: return runFx<cv::Bloom>(in, a, b, &ChainParams::bloom);
-    case Engine::Growl:  // an audition card, with no knob-step rows yet
+    case Engine::Growl:  // the audition cards have no knob-step rows yet
+    case Engine::RingMod:
+    case Engine::Strings:
     case Engine::Count: break;
   }
   return in;
@@ -298,7 +300,7 @@ int main() {
   bool ok = true;
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
-    if (engineOf(c) == Engine::Growl) continue;
+    if (engineOf(c) == Engine::Growl || engineOf(c) == Engine::RingMod || engineOf(c) == Engine::Strings) continue;
     const Signal in = tone(kToneHz);
     for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= checkKnob(c, k, in);
     if (c == Card::Autotune) {

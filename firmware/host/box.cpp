@@ -115,6 +115,8 @@ void Box::pickSlot4Card(Card card) { pickCycledCard(card, UiAction::SwapUnisonCr
 
 void Box::pickSlot6Card(Card card) { pickCycledCard(card, UiAction::SwapDistortionGrowl, distortionGrowlSlot); }
 
+void Box::pickSlot8Card(Card card) { pickCycledCard(card, UiAction::SwapReverb, reverbSlot); }
+
 void Box::pickSlot7Card(Card card) { pickCycledCard(card, UiAction::CycleSlot7Card, slot7CardSlot); }
 
 // Each cycle visits at most three cards, so two steps reach any card it can reach. The steps run on a
