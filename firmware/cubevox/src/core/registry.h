@@ -121,10 +121,6 @@ int knobShown(const KnobDesc& k, float value);
 // The most character cells a knob's number takes.
 constexpr int kMaxKnobCells = 12;
 
-// Lo-fi's AMOUNT pot covers the engine's AMOUNT from 0 to this, so the top of the knob is the
-// engine's 60 % (owner 2026-11-01): the band closed and driven, the crush only just begun.
-constexpr float kLofiAmountTop = 0.6f;
-
 // The character cells the number of knob `k` takes on the OLED, in the widest case. A knob whose
 // range reaches below zero has a sign cell first. The digit cells follow, enough for the widest
 // number of the range, and a knob with decimals adds a cell for the point and one for each decimal.

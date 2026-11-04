@@ -9,9 +9,11 @@
 #include <cstdio>
 #include <limits>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "core/chain_params.h"
+#include "core/chain_run.h"
 #include "core/registry.h"
 
 namespace {
@@ -288,6 +290,71 @@ bool distortionEdgeRows(const Signal& in) {
   return ok;
 }
 
+// Lo-fi's toggle through its slot, run by the chain's own runSlot: the slot resets the engine as it starts
+// to fade in, the engine runs with the toggle as its `on`, and the slot's linear fade mixes the engine
+// against its input. The step is the toggle, and the rows read the curvature around it.
+constexpr size_t kLofiSlot = 6;
+
+Signal runLofiSlot(const Signal& in, const ChainParams& base, bool turnOn) {
+  auto pitch = std::make_unique<cv::PitchFx>();
+  auto distortion = std::make_unique<cv::Distortion>();
+  auto engines = std::make_unique<ChainEngines>(*pitch, *distortion);
+  auto snap = std::make_unique<ChainSnapshot>();
+  snap->layout.card.fill(Card::Empty);
+  snap->layout.card[kLofiSlot] = Card::Lofi;
+  snap->params = base;
+  SlotFades fades;
+  std::array<bool, kSlotCount> start{};
+  start.fill(!turnOn);
+  fades.settle(start);
+  Signal out(in.size());
+  bool pitchDone = false;
+  for (int i = 0; i < kTotal; i += cv::kBlock) {
+    const size_t k = static_cast<size_t>(i);
+    const bool on = i < kStepAt ? !turnOn : turnOn;
+    snap->slotOn[kLofiSlot] = on;
+    snap->params.lofi.on = on;
+    if (!runSlot(*engines, fades, static_cast<int>(kLofiSlot), *snap, &in[k], &out[k], cv::kBlock, pitchDone)) {
+      std::copy(in.begin() + static_cast<std::ptrdiff_t>(k), in.begin() + static_cast<std::ptrdiff_t>(k + cv::kBlock),
+                out.begin() + static_cast<std::ptrdiff_t>(k));
+    }
+  }
+  return out;
+}
+
+// One toggle row. A row that is not judged prints as a NOTE.
+bool toggleRow(bool judged, const std::string& label, double ratio) {
+  const bool pass = ratio <= kMaxRatio;
+  std::printf("%s %-14s %-48s peak curvature x%.5f of steady state (<= %.2f)\n",
+              judged ? (pass ? "PASS" : "FAIL") : "NOTE", "Lo-fi", label.c_str(), ratio, kMaxRatio);
+  return pass || !judged;
+}
+
+// The enable and disable edges through the slot at the default and with AMOUNT at the top of its travel,
+// on a low tone and an in-band one.
+//
+// The slot's fade is linear, so it bends the blend by |wet - dry| / (384 samples) where it starts and
+// where it ends. A 220 Hz tone at the default sits on the skirt of the high-pass, where the wet differs
+// from the dry by a third of the tone's amplitude, so that pair of rows is reported and not judged. A
+// fade with no slope at its ends brings them to x1.01 and x1.06.
+bool lofiToggleRows() {
+  bool ok = true;
+  for (const float amount : {0.5f, 1.0f}) {
+    ChainParams p = background(Card::Lofi);
+    applyKnob(Card::Lofi, 1, amount, p);
+    for (const double hz : {kToneHz, 1000.0}) {
+      for (const bool turnOn : {true, false}) {
+        const std::string where = std::string(turnOn ? "enable" : "disable") + " at AMOUNT " +
+                                  std::to_string(static_cast<int>(amount * 100.0f)) + " %, " +
+                                  std::to_string(static_cast<int>(hz)) + " Hz";
+        const bool judged = amount != 0.5f || hz != kToneHz;
+        ok &= toggleRow(judged, where, stepRatio(runLofiSlot(tone(hz), p, turnOn)));
+      }
+    }
+  }
+  return ok;
+}
+
 // KEY moves the target note, and a grain is two periods, so a low voice is the harder case for the
 // glide. Adam sings from 78 Hz, and the KEY gate also runs on sines at 98 Hz, 82 Hz and 74.5 Hz.
 constexpr double kLowTones[] = {98.0, 82.0, 74.5};
@@ -305,6 +372,7 @@ int main() {
       for (double hz : kLowTones) ok &= checkKnob(c, 0, tone(hz), hz);
     }
     if (c == Card::Distortion) ok &= distortionEdgeRows(in);
+    if (c == Card::Lofi) ok &= lofiToggleRows();
   }
   std::printf("%s knob step\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
