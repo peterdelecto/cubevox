@@ -38,9 +38,9 @@ constexpr double kMaxRatio = 1.05;
 static_assert(kStepAt % cv::kBlock == 0, "the step lands on a block edge");
 
 // A pure sine: its second difference is small and steady, so any cut stands out.
-Signal tone(double hz) {
-  Signal x(static_cast<size_t>(kTotal));
-  for (int i = 0; i < kTotal; ++i)
+Signal tone(double hz, int total = kTotal) {
+  Signal x(static_cast<size_t>(total));
+  for (int i = 0; i < total; ++i)
     x[static_cast<size_t>(i)] = static_cast<float>(kToneAmp * std::sin(2.0 * kPi * hz * i / cv::kSampleRate));
   return x;
 }
@@ -288,6 +288,80 @@ bool distortionEdgeRows(const Signal& in) {
   return ok;
 }
 
+// Unison runs at DEPTH 50 % in the background, where the chorus is audible, and judges each step against
+// steady windows that span a full period of the slowest LFO the steps start from (RATE 20 %, 0.31 Hz and
+// 3.2 s) and against the same run with no step. The swing and the LFO speeds glide on 150 ms, so the
+// second steady window starts 1.5 s after the step.
+constexpr float kUnisonBackgroundDepth = 0.5f;
+constexpr int kUnisonStepAt = 6 * cv::kSampleRate;
+constexpr int kUnisonSteadyWindow = 4 * cv::kSampleRate;
+constexpr int kUnisonSettle = 3 * cv::kSampleRate / 2;
+constexpr int kUnisonTotal = kUnisonStepAt + kUnisonSettle + kUnisonSteadyWindow;
+static_assert(kUnisonStepAt % cv::kBlock == 0, "the step lands on a block edge");
+
+Signal runUnison(const Signal& in, const cv::UnisonParams& a, const cv::UnisonParams& b) {
+  auto fx = std::make_unique<cv::Unison>();
+  fx->reset();
+  Signal out(in.size());
+  for (int i = 0; i < kUnisonTotal; i += cv::kBlock) {
+    const size_t k = static_cast<size_t>(i);
+    fx->process(&in[k], &out[k], cv::kBlock, i < kUnisonStepAt ? a : b);
+  }
+  return out;
+}
+
+// Peak curvature just after the step over the larger steady-state peak of the two settings.
+double unisonStepRatio(const Signal& out) {
+  const double steady = std::max(peakCurvature(out, kUnisonStepAt - kUnisonSteadyWindow, kUnisonStepAt),
+                                 peakCurvature(out, kUnisonTotal - kUnisonSteadyWindow, kUnisonTotal));
+  return peakCurvature(out, kUnisonStepAt, kUnisonStepAt + kStepWindow) / steady;
+}
+
+bool checkUnisonKnob(int knob, const Signal& in) {
+  ChainParams base = background(Card::Unison);
+  applyKnob(Card::Unison, 1, kUnisonBackgroundDepth, base);
+  double worst = 0.0;
+  double worstStill = 0.0;
+  Step at{};
+  std::vector<Step> steps;
+  for (float p : {0.2f, 0.5f, 0.8f}) steps.push_back({p, p + kContinuousStep});
+  if (knob == 0) {
+    // RATE also moves its whole travel in one step each way, as a fast turn would. DEPTH's whole-travel
+    // jump fades the wet itself, which bends the output by the fade's own slope and is no click.
+    steps.push_back({0.0f, 1.0f});
+    steps.push_back({1.0f, 0.0f});
+  }
+  for (const Step& s : steps) {
+    ChainParams a = base;
+    ChainParams b = base;
+    applyKnob(Card::Unison, knob, s.from, a);
+    applyKnob(Card::Unison, knob, s.to, b);
+    const Signal out = runUnison(in, a.unison, b.unison);
+    const double r = unisonStepRatio(out);
+    if (r >= worst) {
+      worst = r;
+      at = s;
+    }
+    // A touch is read against the same run with no step; a whole-travel jump moves the chorus legitimately.
+    if (std::fabs(s.to - s.from) > kContinuousStep * 1.01f) continue;
+    const Signal still = runUnison(in, a.unison, a.unison);
+    const double stillStep = peakCurvature(still, kUnisonStepAt, kUnisonStepAt + kStepWindow);
+    worstStill = std::max(worstStill, peakCurvature(out, kUnisonStepAt, kUnisonStepAt + kStepWindow) / stillStep);
+  }
+  const bool ok = worst <= kMaxRatio && worstStill <= kMaxRatio;
+  std::printf("%s %-14s %-10s worst step %.3g to %.3g: peak curvature x%.5f of steady state, x%.5f of no step (<= %.2f)\n",
+              ok ? "PASS" : "FAIL", cardDesc(Card::Unison).name, cardDesc(Card::Unison).knob[knob].name,
+              static_cast<double>(at.from), static_cast<double>(at.to), worst, worstStill, kMaxRatio);
+  return ok;
+}
+
+bool unisonRows() {
+  const Signal in = tone(kToneHz, kUnisonTotal);
+  bool ok = checkUnisonKnob(0, in);
+  ok &= checkUnisonKnob(1, in);
+  return ok;
+}
+
 // KEY moves the target note, and a grain is two periods, so a low voice is the harder case for the
 // glide. Adam sings from 78 Hz, and the KEY gate also runs on sines at 98 Hz, 82 Hz and 74.5 Hz.
 constexpr double kLowTones[] = {98.0, 82.0, 74.5};
@@ -299,6 +373,10 @@ int main() {
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
     if (engineOf(c) == Engine::Growl) continue;
+    if (c == Card::Unison) {
+      ok &= unisonRows();
+      continue;
+    }
     const Signal in = tone(kToneHz);
     for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= checkKnob(c, k, in);
     if (c == Card::Autotune) {

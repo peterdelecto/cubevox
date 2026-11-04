@@ -13,15 +13,16 @@
 #include "core/registry.h"
 #include "core/slots.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. PitchFx and Distortion are
-// references because the board places them in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. PitchFx, Unison and Distortion
+// are references because the board places them in DTCM.
 struct ChainEngines {
-  ChainEngines(cv::PitchFx& pitchFx, cv::Distortion& distortionFx) : pitch(pitchFx), distortion(distortionFx) {}
+  ChainEngines(cv::PitchFx& pitchFx, cv::Unison& unisonFx, cv::Distortion& distortionFx)
+      : pitch(pitchFx), unison(unisonFx), distortion(distortionFx) {}
 
   cv::PitchFx& pitch;
   cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each pitch call while its card is placed
   cv::Gate inputGate;
-  cv::Unison unison;
+  cv::Unison& unison;
   cv::Slapback slapback;
   cv::Distortion& distortion;
   cv::Gate gate;
