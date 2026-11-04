@@ -105,6 +105,8 @@ void Box::swapOctaveFormant() { applyAction(UiAction::SwapOctaveFormant); }
 
 void Box::swapUnisonMob() { applyAction(UiAction::SwapUnisonCrowd); }
 
+void Box::swapDistortionGrowl() { applyAction(UiAction::SwapDistortionGrowl); }
+
 void Box::swapReverb() { applyAction(UiAction::SwapReverb); }
 
 // The cycle visits at most the three cards, so two steps reach any card it can reach. The steps run

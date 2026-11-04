@@ -741,6 +741,42 @@ void checkSwapOctaveFormant() {
         "action: SwapOctaveFormant changes no setting");
 }
 
+// Growl is Distortion's alternate in slot 6. The layout takes it, pays the tracker once for it (or once
+// with Autotune), and the slot 6 action swaps the two cards in the slot that holds either.
+void checkGrowlSlot6() {
+  Settings s;
+  Layout layout = defaultLayout();
+  check(distortionGrowlSlot(layout) == 5, "distortionGrowlSlot: the default layout has Distortion in slot 6");
+  Layout growl = layout;
+  growl.card[5] = Card::Growl;
+  check(distortionGrowlSlot(growl) == 5, "distortionGrowlSlot: Growl counts as well");
+  check(layoutValid(growl).ok(), "growl: the default layout with Growl in slot 6 passes the placement rules");
+  paysFor(growl, true, false, "growl: Growl in slot 6 adds its row, and the tracker stays paid once");
+
+  Layout alone = withoutPitchCards();
+  alone.card[5] = Card::Growl;
+  check(layoutValid(alone).ok(), "growl: a layout with Growl and no other pitch card passes the placement rules");
+  paysFor(alone, true, false, "growl: Growl alone pays the tracker once and no pitch stage row");
+
+  check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == growl,
+        "action: SwapDistortionGrowl turns Distortion into Growl in its slot and touches no other slot");
+  check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == defaultLayout(),
+        "action: and turns Growl back into Distortion");
+  Layout neither = defaultLayout();
+  neither.card[5] = Card::Empty;
+  const Layout neitherBefore = neither;
+  check(ui::applyAction(UiAction::SwapDistortionGrowl, s, neither) == ui::ApplyResult::None && neither == neitherBefore,
+        "action: SwapDistortionGrowl changes nothing when no slot holds either card");
+
+  PanelReading panel = panelWithToggles(false);
+  panel.knob[5] = {0.25f, 0.75f};
+  panel.toggle[5] = true;
+  const ChainSnapshot snap = composeSnapshot(growl, panel, Settings(), BenchOverrides());
+  check(snap.params.growl.on && snap.params.pitchFx.growlOn && !snap.params.distortion.on &&
+            std::fabs(snap.params.growl.growl - 0.25f) < 1e-6f && std::fabs(snap.params.growl.drive - 0.75f) < 1e-6f,
+        "compose: Growl on in slot 6 sets its flag and the pitch stage's, GROWL from the upper pot and DRIVE from the lower");
+}
+
 void checkSlot7CardSlot() {
   Layout layout = defaultLayout();
   check(slot7CardSlot(layout) == 6, "slot7CardSlot: the default layout has Gate in slot 7");
@@ -874,6 +910,7 @@ void checkLayoutAndCompose() {
   checkSwapUnisonCrowd();
   checkOctaveFormantSlot();
   checkSwapOctaveFormant();
+  checkGrowlSlot6();
   checkSlot7CardSlot();
   checkCycleSlot7Card();
   checkComposeToggles();

@@ -37,6 +37,13 @@ int octaveFormantSlot(const Layout& layout) {
   return -1;
 }
 
+int distortionGrowlSlot(const Layout& layout) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (layout.card[s] == Card::Distortion || layout.card[s] == Card::Growl) return s;
+  }
+  return -1;
+}
+
 int slot7CardSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
     const Card c = layout.card[s];
@@ -64,13 +71,13 @@ LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
-  bool tracker = false;     // Autotune, Crowd or Formant is placed, so the pitch tracker runs
+  bool tracker = false;     // Autotune, Crowd, Formant or Growl is placed, so the pitch tracker runs
   bool autotune = false;
   bool stageUser = false;   // Octave or Formant is placed, so the pitch stage mixes
   for (const Card c : layout.card) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
-    tracker = tracker || c == Card::Autotune || c == Card::Crowd || c == Card::Formant;
+    tracker = tracker || c == Card::Autotune || c == Card::Crowd || c == Card::Formant || c == Card::Growl;
     autotune = autotune || c == Card::Autotune;
     stageUser = stageUser || c == Card::Octave || c == Card::Formant;
   }

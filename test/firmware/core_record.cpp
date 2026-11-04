@@ -54,6 +54,12 @@ void checkRecordCodec() {
             out.layout.card == in.layout.card && !out.unknownCard,
         "record: round trip keeps every field");
 
+  RecordData growl = makeRec(78, OutputLevel::Line, "growl");
+  growl.layout.card[5] = Card::Growl;
+  RecordData growlOut;
+  check(decodeRecord(encodeRecord(growl).data(), growlOut) && growlOut.layout.card[5] == Card::Growl && !growlOut.unknownCard,
+        "record: a layout with Growl in slot 6 round trips under the card's id");
+
   RecordBytes bad = b;
   bad[kOffName] ^= 0x01;
   check(!decodeRecord(bad.data(), out), "record: corrupt byte fails the CRC");

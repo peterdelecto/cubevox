@@ -36,6 +36,9 @@ int unisonCrowdSlot(const Layout& layout);
 // The slot that holds Octave or Formant, the first one when both are placed; -1 when neither is.
 int octaveFormantSlot(const Layout& layout);
 
+// The slot that holds Distortion or Growl, the first one when both are placed; -1 when neither is.
+int distortionGrowlSlot(const Layout& layout);
+
 // The slot that holds Gate, Lo-fi or Chatter, the first one when several are placed; -1 when none is.
 // The menu's slot 7 row cycles the card in it.
 int slot7CardSlot(const Layout& layout);
@@ -56,7 +59,7 @@ struct LayoutCheck {
 };
 
 // The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
-// placed card's row, the pitch tracker's row once when Autotune, Crowd or Formant is placed, and the pitch
+// placed card's row, the pitch tracker's row once when Autotune, Crowd, Formant or Growl is placed, and the pitch
 // stage's row once when Octave or Formant is placed without Autotune. Every card id must be in range.
 struct LayoutCost {
   int avg = 0;

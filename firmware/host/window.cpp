@@ -352,21 +352,27 @@ void drawTopBand(Frame& f) {
   drawCpuLine(f, kRightX + 2 * kLedR + kLedGap, rowY);
 }
 
-// The cells of the two grid switches, in the order the menu cycles or swaps their cards. The slot 7
-// switch has GATE and LO-FI side by side over CHATTER. The slot 3 switch has OCTAVE over FORMANT.
+// The cells of the grid switches, in the order the menu cycles or swaps their cards. The slot 7
+// switch has GATE and LO-FI side by side over CHATTER. The slot 3 switch has OCTAVE over FORMANT, and
+// the slot 6 switch DISTORTION over GROWL.
 constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"CHATTER", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
 constexpr std::array<GridCell, 2> kSlot3Cells = {{{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}}};
+constexpr std::array<GridCell, 2> kSlot6Cells = {{{"DISTORTION", 0.0f, 0, 1.0f}, {"GROWL", 0.0f, 1, 1.0f}}};
 
 // The card switch at the foot of a slot, which follows the layout: the column that holds the Octave
-// or Formant card, the column that holds the Unison or MOB card, the column that holds a reverb, and
-// the column that holds Gate, Lo-fi or Chatter. The first and last are grids, and a click on the last
-// picks its card through the menu's own action.
+// or Formant card, the column that holds the Unison or MOB card, the column that holds Distortion or
+// Growl, the column that holds a reverb, and the column that holds Gate, Lo-fi or Chatter. The
+// Octave, Distortion and slot 7 switches are grids, and a click on the last picks its card through the
+// menu's own action.
 void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   const Layout& layout = f.box.layout();
   if (slot == octaveFormantSlot(layout)) {
     const int active = layout.card[static_cast<size_t>(slot)] == Card::Formant ? 1 : 0;
     if (segmentedGrid(f, "swapOctave", topLeft, kColInnerW, kSlot3Cells, active) >= 0) f.box.swapOctaveFormant();
+  } else if (slot == distortionGrowlSlot(layout)) {
+    const int active = layout.card[static_cast<size_t>(slot)] == Card::Growl ? 1 : 0;
+    if (segmentedGrid(f, "swapDistortion", topLeft, kColInnerW, kSlot6Cells, active) >= 0) f.box.swapDistortionGrowl();
   } else if (slot == unisonCrowdSlot(layout)) {
     const bool mob = layout.card[static_cast<size_t>(slot)] == Card::Crowd;
     if (segmentedSwitch(f, "swapUnison", topLeft, kColInnerW, "UNISON", "MOB", mob, true)) f.box.swapUnisonMob();

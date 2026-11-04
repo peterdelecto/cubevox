@@ -84,7 +84,7 @@ void checkFadeInterrupted() {
     b = fade.next(pending);
     if (b.swap) pending = false;
     if (b.swap) {
-      for (int j = 0; j < 10; ++j) at = fade.next(false).to;
+      for (int j = 0; j < kFadeHoldBlocks + 1; ++j) at = fade.next(false).to;  // the hold, then one block of the fade-in
       break;
     }
   }

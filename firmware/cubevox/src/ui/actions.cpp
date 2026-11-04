@@ -34,6 +34,16 @@ ApplyResult swapOctaveFormant(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
+ApplyResult swapDistortionGrowl(Layout& layout) {
+  const int slot = distortionGrowlSlot(layout);
+  if (slot < 0) return ApplyResult::None;
+  Layout next = layout;
+  next.card[slot] = layout.card[slot] == Card::Distortion ? Card::Growl : Card::Distortion;
+  if (!layoutValid(next).ok()) return ApplyResult::None;
+  layout = next;
+  return ApplyResult::LayoutChanged;
+}
+
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
 Card nextSlot7Card(Card c) {
   switch (c) {
@@ -88,6 +98,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
     case UiAction::SwapReverb: return swapReverb(layout);
     case UiAction::SwapOctaveFormant: return swapOctaveFormant(layout);
     case UiAction::SwapUnisonCrowd: return swapUnisonCrowd(layout);
+    case UiAction::SwapDistortionGrowl: return swapDistortionGrowl(layout);
     case UiAction::CycleSlot7Card: return cycleSlot7Card(layout);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;

@@ -75,6 +75,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      costs::kFormant},
     {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
+    {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("DRIVE")}, Group::Pitch, costs::kGrowl},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -180,6 +181,14 @@ void applyBloomKnob(int knob, float v, cv::BloomParams& b) {
   }
 }
 
+void applyGrowlKnob(int knob, float v, cv::GrowlParams& g) {
+  if (knob == 0) {
+    g.growl = v;
+  } else {
+    g.drive = v;
+  }
+}
+
 void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
   if (knob == 0) {
     r.time = v;
@@ -248,6 +257,7 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::Formant: applyFormantKnob(knob, v, out.pitchFx.formant); break;
     case Card::Lofi: applyLofiKnob(knob, v, out.lofi); break;
     case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
+    case Card::Growl: applyGrowlKnob(knob, v, out.growl); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -272,6 +282,11 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::Formant: out.pitchFx.formant.on = on; break;
     case Card::Lofi: out.lofi.on = on; break;
     case Card::Bloom: out.bloom.on = on; break;
+    case Card::Growl:
+      // The pitch stage reads growlOn to keep its tracker and ring running for the Growl card.
+      out.growl.on = on;
+      out.pitchFx.growlOn = on;
+      break;
     case Card::Empty:
     case Card::Count: break;
   }

@@ -7,6 +7,7 @@
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
+#include "engine/growl.h"
 #include "engine/lofi.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -22,6 +23,7 @@ struct ChainParams {
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
+  cv::GrowlParams growl;  // its toggle also sets pitchFx.growlOn
   cv::GateParams gate;
   cv::LofiParams lofi;
   cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runBloom passes the gate's state

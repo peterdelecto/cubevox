@@ -1,6 +1,6 @@
 // cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + formant + crowd +
-// unison + slapback + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the back half
-// of eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
+// unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the
+// back half of eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -12,6 +12,7 @@
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
+#include "engine/growl.h"
 #include "engine/lofi.h"
 #include "engine/pitch_fx.h"
 #include "engine/polish.h"
@@ -31,8 +32,9 @@ struct TuningField {
 struct RenderParams {
   bool inGateOn = false;
   bool gateOn = false;
-  bool pitchOn = false;  // also true when the crowd or formant card is on, so the ring and tracker run
+  bool pitchOn = false;  // also true when the crowd, formant or growl card is on, so the ring and tracker run
   bool crowdOn = false;
+  bool growlOn = false;
   bool unisonOn = false;
   bool slapOn = false;
   bool distOn = false;
@@ -50,6 +52,7 @@ struct RenderParams {
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
   cv::DistortionParams distortion;
+  cv::GrowlParams growl;
   cv::LofiParams lofi;
   cv::BloomParams bloom;
   cv::ReverbParams reverb;
@@ -68,6 +71,7 @@ int usage() {
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
+               "       [--growl <0..1>, GROWL] [--gdrive <0..1>, the Growl card's DRIVE, default 0.5]\n"
                "       [--reverb spring|chasm] [--time <0..1>] [--mix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
@@ -80,8 +84,10 @@ int usage() {
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
+               "  growl runs with --growl or --gdrive (the other one defaults to 0.5) where slot 6 sits, after slapback; it\n"
+               "  reads the pitch stage's ring, so its voice is the pitch stage's input, and the dry signal is gone\n"
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
-               "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, distortion,\n"
+               "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, growl, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
                "  bloom, the Chatter card, runs with --amount (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its\n"
                "  word key is the input gate's open state, otherwise it listens to its own input; it cuts its slices from the\n"
@@ -125,6 +131,10 @@ int usage() {
                "     crowdWidthKnee (0.02..0.9) crowdWidthKneeFrac (0..1)\n"
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
+               "     growlPitchSt growlFormantSt (-12..12) growlHardTop (0..32) growlThirdTop (0..1)\n"
+               "     growlLowShelfHz growlHighShelfHz (20..21600) growlLowShelfDb growlHighShelfDb (-24..24)\n"
+               "     growlDriveDb (0..48) growlMakeupSat (1..1000) growlRailSoft (0.01..1) growlRailAsym (0..0.5)\n"
+               "     growlTrimDb (-24..24)\n"
                "  every value must be finite, and a crowd, chasm or spring key outside its range is refused\n"
                "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
@@ -262,6 +272,18 @@ bool distortionTuningInRange(const cv::DistortionTuning& t) {
          t.bassPeakQ >= 0.1f && db(t.trimDb) && inside(t.fadeDrive, Dist::kFadeDriveMin, 1.0f);
 }
 
+// Every Growl key refuses a value outside the range the engine clamps to.
+bool growlTuningInRange(const cv::GrowlTuning& t) {
+  namespace gd = cv::growl_detail;
+  const auto hz = [](float v) { return inside(v, cv::kFilterMinHz, cv::kFilterMaxHz); };
+  const auto shelf = [](float v) { return inside(v, -gd::kMaxShelfDb, gd::kMaxShelfDb); };
+  return inside(t.pitchSt, -gd::kMaxSt, gd::kMaxSt) && inside(t.formantSt, -gd::kMaxSt, gd::kMaxSt) &&
+         inside(t.hardTop, 0.0f, gd::kMaxHardTop) && inside(t.thirdTop, 0.0f, 1.0f) && hz(t.lowShelfHz) &&
+         hz(t.highShelfHz) && shelf(t.lowShelfDb) && shelf(t.highShelfDb) && inside(t.driveDb, 0.0f, gd::kMaxDriveDb) &&
+         inside(t.makeupSat, gd::kMinMakeupSat, gd::kMaxMakeupSat) && inside(t.railSoft, gd::kMinRailSoft, 1.0f) &&
+         inside(t.railAsym, 0.0f, gd::kMaxRailAsym) && inside(t.trimDb, -gd::kMaxTrimDb, gd::kMaxTrimDb);
+}
+
 // Every Spring key refuses a value outside the range the engine takes, so a typo in a key does not
 // pass for a setting.
 bool springTuningInRange(const cv::SpringTuning& t) {
@@ -302,6 +324,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
   cv::FormantTuning& ft = rp.pitchFx.formant.tuning;
   cv::CrowdTuning& ct = rp.crowd.tuning;
+  cv::GrowlTuning& grt = rp.growl.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
   cv::GateTuning& ig = rp.inGate.tuning;
   cv::GateTuning& gt = rp.gate.tuning;
@@ -337,6 +360,13 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"crowdLevelScatterDb", &ct.levelScatterDb},
       {"crowdContour0", &ct.contour[0]},          {"crowdContour1", &ct.contour[1]},
       {"crowdContour2", &ct.contour[2]},          {"crowdContour3", &ct.contour[3]},
+      {"growlPitchSt", &grt.pitchSt},             {"growlFormantSt", &grt.formantSt},
+      {"growlHardTop", &grt.hardTop},             {"growlThirdTop", &grt.thirdTop},
+      {"growlLowShelfHz", &grt.lowShelfHz},       {"growlLowShelfDb", &grt.lowShelfDb},
+      {"growlHighShelfHz", &grt.highShelfHz},     {"growlHighShelfDb", &grt.highShelfDb},
+      {"growlDriveDb", &grt.driveDb},             {"growlMakeupSat", &grt.makeupSat},
+      {"growlRailSoft", &grt.railSoft},           {"growlRailAsym", &grt.railAsym},
+      {"growlTrimDb", &grt.trimDb},
       {"slapTimeMs", &st.timeMs},          {"slapLowpassHz", &st.lowpassHz},
       {"slapFeedback", &st.feedback},      {"slapWetMaxDb", &st.wetMaxDb},
       {"slapTrimDb", &st.trimDb},
@@ -425,7 +455,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
     if (!inside(bt.firstCaptureMs, 1.0f, 500.0f) || !inside(bt.skipDb, -60.0f, 0.0f) || !inside(bt.trimDb, -24.0f, 24.0f) ||
         !inside(bt.driveWord, 0.1f, 20.0f) || !inside(bt.driveBell, 0.0f, 20.0f) || !inside(bt.drift, 0.0f, 0.2f))
       return false;
-    if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt)) return false;
+    if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt) || !growlTuningInRange(grt)) return false;
     if (!slapbackTuningInRange(st) || !distortionTuningInRange(dt)) return false;
     spr.chirpSections = static_cast<int>(springSections);
     return true;
@@ -476,6 +506,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     } else if (std::strcmp(a, "--tone") == 0 && i + 1 < argc) {
       cv::DistortionParams& dp = rp.distortion;
       if (!parseFloat(argv[++i], &dp.tone) || dp.tone < 0.0f || dp.tone > 1.0f) return false;
+    } else if (std::strcmp(a, "--growl") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.growl.growl) || rp.growl.growl < 0.0f || rp.growl.growl > 1.0f) return false;
+      rp.growlOn = true;
+    } else if (std::strcmp(a, "--gdrive") == 0 && i + 1 < argc) {
+      if (!parseFloat(argv[++i], &rp.growl.drive) || rp.growl.drive < 0.0f || rp.growl.drive > 1.0f) return false;
+      rp.growlOn = true;
     } else if (std::strcmp(a, "--lofi") == 0 && i + 1 < argc) {
       if (!parseFloat(argv[++i], &rp.lofi.amount) || rp.lofi.amount < 0.0f || rp.lofi.amount > 1.0f) return false;
       haveLofi = true;
@@ -586,13 +622,15 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     rp.reverb.mix = mix;
     cv::applyKnobs(rp.reverb);
   }
-  // Each pitch stage runs only when asked for. The Crowd card reads the pitch stage's ring and tracker,
-  // so it turns the stage on and tells it to keep them running, as the registry's toggle does.
+  // Each pitch stage runs only when asked for. The Crowd and Growl cards read the pitch stage's ring and
+  // tracker, so each turns the stage on and tells it to keep them running, as the registry's toggle does.
   op.on = haveOctave;
   fp.on = haveFormant;
   rp.crowd.on = rp.crowdOn;
   rp.pitchFx.crowdOn = rp.crowdOn;
-  rp.pitchOn = haveOctave || haveFormant || ap.on || rp.crowdOn;
+  rp.growl.on = rp.growlOn;
+  rp.pitchFx.growlOn = rp.growlOn;
+  rp.pitchOn = haveOctave || haveFormant || ap.on || rp.crowdOn || rp.growlOn;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
   p.on = rp.unisonOn;
@@ -611,7 +649,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.bloomOn = haveBloom;
   rp.bloom.on = haveBloom;
   rp.bloom.keyFromGate = haveInGate;
-  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.distOn || rp.lofiOn || rp.bloomOn ||
+  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.growlOn || rp.distOn || rp.lofiOn ||
+         rp.bloomOn ||
          rp.reverbOn ||
          rp.compOn || rp.eqOn;
 }
@@ -640,6 +679,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Unison unison;
   static cv::Slapback slapback;
   static cv::Distortion distortion;
+  static cv::Growl growl;
   static cv::Lofi lofi;
   static cv::Bloom bloom;
   static cv::Reverb reverb;
@@ -652,6 +692,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   unison.reset();
   slapback.reset();
   distortion.reset();
+  growl.reset();
   lofi.reset();
   bloom.reset();
   reverb.reset();
@@ -707,6 +748,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       }
       if (rp.slapOn) {
         slapback.process(src, scratch[next], n, rp.slapback);
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.growlOn) {
+        growl.process(src, scratch[next], n, rp.growl, pitchFx);
         src = scratch[next];
         next ^= 1;
       }

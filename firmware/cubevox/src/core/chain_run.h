@@ -28,6 +28,7 @@ struct ChainEngines {
   cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
+  cv::Growl growl;  // like crowd, its voice reads the ring that `pitch` writes
 
   // The signal the Chatter card cuts its slices from. captureBloomSource copies the block leaving the
   // tap slot into `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch
@@ -70,7 +71,7 @@ struct ChainCycles {
 // caller keeps its buffers. Autotune, Octave, Formant and the Crowd card share one PitchFx call,
 // made at the first pitch-group card's slot; `pitchDone` carries that across the slots of a pass.
 // A Crowd card that makes that call runs its own engine on the pitch stage's output, which is its
-// lead. A Chatter card keys on the Input gate's detector when the layout places that card
+// lead, and so does a Growl card. A Chatter card keys on the Input gate's detector when the layout places that card
 // (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when it runs.
 // It cuts its slices from `engines.bloomSrc` while `bloomSrcLive` is set, and from `in` otherwise.
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,

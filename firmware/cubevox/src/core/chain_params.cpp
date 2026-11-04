@@ -19,7 +19,9 @@ ChainParams::ChainParams() {
   pitchFx.octave.mix = cv::kOctaveDefaultMix;  // until composeSnapshot reads its pot
   pitchFx.formant.on = false;
   pitchFx.crowdOn = false;
+  pitchFx.growlOn = false;
   crowd.on = false;
+  growl.on = false;
   unison.on = false;
   slapback.on = false;
   distortion.on = false;

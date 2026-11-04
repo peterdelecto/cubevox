@@ -76,9 +76,10 @@ class Box {
   // One pass of loop().
   void tick(const PanelInput& in, uint32_t nowMs);
 
-  // The menu's REVERB, OCTAVE and UNISON rows. A layout the box would not load stays as it is.
+  // The menu's REVERB, OCTAVE, UNISON and DISTORTION rows. A layout the box would not load stays as it is.
   void swapOctaveFormant();
   void swapUnisonMob();
+  void swapDistortionGrowl();
   void swapReverb();
 
   // The card switch under slot 7. Applies the menu's slot 7 action until the slot holds `card`
