@@ -38,8 +38,8 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
-constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, -cv::kFollowerMaxRangeSt,
-                                     cv::kFollowerMaxRangeSt, "st"};
+constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, cv::kFollowerMinRangeSt,
+                                     cv::kFollowerMaxRangeSt, "st", Curve::ZeroAtNoon};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
 
@@ -260,6 +260,7 @@ float knobValue(const KnobDesc& k, float p) {
   switch (k.curve) {
     case Curve::Log: return cv::logTaper(k.min, k.max, p);
     case Curve::LogReversed: return cv::logTaper(k.max, k.min, p);
+    case Curve::ZeroAtNoon: return p < 0.5f ? k.min * (1.0f - 2.0f * p) : k.max * (2.0f * p - 1.0f);
     case Curve::Linear: break;
   }
   return k.min + (k.max - k.min) * p;

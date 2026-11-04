@@ -465,9 +465,9 @@ void checkAppendedCards() {
 }
 
 // The Formant follower: id formant_follow, which keeps under the id clip width, the pitch engine and
-// group, SENSITIVITY on the upper pot, RANGE on the lower from -7 st at 0 through 0 at noon to +7 st at
-// full, no knob on the Formant voice's MIX, and FOLLOWER on the OLED's readout title. Placing it hands
-// the voice's SHIFT to the follower.
+// group, SENSITIVITY on the upper pot, RANGE on the lower from -7 st at 0 through 0 at noon to +3 st at
+// full and never past +3 st, no knob on the Formant voice's MIX, and FOLLOWER on the OLED's readout title.
+// Placing it hands the voice's SHIFT to the follower.
 void checkFollowerCard() {
   const CardDesc& d = cardDesc(Card::FormantFollower);
   check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Formant follower") == 0 &&
@@ -481,8 +481,8 @@ void checkFollowerCard() {
         "follower: knob A is SENSITIVITY, a percent");
   const KnobDesc& range = *knobDesc(Card::FormantFollower, 1);
   check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -7.0f &&
-            range.max == 7.0f && std::strcmp(range.unit, "st") == 0,
-        "follower: knob B is RANGE, continuous from -7 to +7 st");
+            range.max == 3.0f && range.curve == Curve::ZeroAtNoon && std::strcmp(range.unit, "st") == 0,
+        "follower: knob B is RANGE, continuous from -7 to +3 st with 0 at noon");
 
   ChainParams p;
   const float mixBefore = p.pitchFx.formant.mix;
@@ -492,10 +492,21 @@ void checkFollowerCard() {
     applyKnob(Card::FormantFollower, 1, position, p);
     return p.follower.rangeSt;
   };
-  check(rangeAt(0.0f) == -7.0f && rangeAt(0.5f) == 0.0f && rangeAt(1.0f) == 7.0f,
-        "follower: RANGE is -7 st at 0, 0 at noon and +7 st at full");
-  check(shownText(range, 0.0f) == "-7" && shownText(range, 0.5f) == "0" && shownText(range, 0.75f) == "+4" &&
-            knobCells(range) == 2,
+  check(rangeAt(0.0f) == -7.0f && rangeAt(0.25f) == -3.5f && rangeAt(0.5f) == 0.0f && rangeAt(0.75f) == 1.5f &&
+            rangeAt(1.0f) == 3.0f,
+        "follower: RANGE is -7 st at 0, -3.5 st at 25 %, 0 at noon, +1.5 st at 75 % and +3 st at full");
+  bool capped = true;
+  bool rising = true;
+  float before = -8.0f;
+  for (int s = 0; s <= 100; ++s) {
+    const float st = rangeAt(static_cast<float>(s) / 100.0f);
+    capped = capped && st >= -7.0f && st <= 3.0f;
+    rising = rising && st > before;
+    before = st;
+  }
+  check(capped && rising, "follower: RANGE rises with the pot and never leaves -7 to +3 st");
+  check(shownText(range, 0.0f) == "-7" && shownText(range, 0.25f) == "-4" && shownText(range, 0.5f) == "0" &&
+            shownText(range, 0.75f) == "+2" && shownText(range, 1.0f) == "+3" && knobCells(range) == 2,
         "follower: RANGE reads its semitones with the sign in two cells");
   check(p.pitchFx.formant.mix == mixBefore, "follower: no knob sets the Formant voice's mix");
 
