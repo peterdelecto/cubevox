@@ -58,7 +58,7 @@ struct DistortionTuning {
   float railSoft = 0.1f;          // soft edge as a fraction of the rail
   // post
   float trebleCutHz = 1000.0f;    // fixed high shelf cut
-  float trebleCutDb = -2.7f;      // half the BD-2's -5.4 dB, which left the voice dark (owner 2026-11-01)
+  float trebleCutDb = -2.7f;      // -5.4 dB left the voice dark (owner 2026-11-01)
   float toneMinDb = -12.0f;       // TONE fully down: extra shelf gain above trebleCutHz
   float toneMaxDb = 6.0f;         // TONE fully up
   float bassPeakHz = 120.0f;      // gyrator bump
@@ -82,6 +82,8 @@ class Distortion {
   static constexpr float kGainMax = 1000.0f;
   static constexpr float kDbLimit = 24.0f;
   static constexpr float kFadeDriveMin = 1e-4f;
+  static constexpr float kRailAsymMax = 0.5f;
+  static constexpr float kRailSoftMin = 0.01f;
 
   // State clears; the coefficients stay, because they depend on the tuning alone and process()
   // compares the tuning on every block.
@@ -89,21 +91,19 @@ class Distortion {
     clearChain();
     drive_ = 0.0f;
     fade_ = 0.0f;
-    tone_ = 0.5f;
     engaged_ = false;
-    shelfTone_ = -1.0f;
   }
 
   void process(const float* CV_RESTRICT in, float* CV_RESTRICT out, int n,
                const DistortionParams& p) {
     const DistortionTuning& t = p.tuning;
-    const float toneTarget = knob(p.tone);
+    const float toneTarget = smooth::clamp01(p.tone);
 
     // The stage turns on when DRIVE reaches fadeDrive and off when it falls under kOffBelow of that,
     // and keeps its last state between the two. On, the smoother aims at the knob or at fadeDrive,
     // whichever is higher, and off it aims at 0, so the knob never parks the stage inside the fade.
-    const float fade = bound(t.fadeDrive, kFadeDriveMin, 1.0f);
-    const float knobDrive = p.on ? knob(p.drive) : 0.0f;
+    const float fade = clampf(t.fadeDrive, kFadeDriveMin, 1.0f);
+    const float knobDrive = p.on ? smooth::clamp01(p.drive) : 0.0f;
     if (knobDrive >= fade) engaged_ = true;
     else if (knobDrive < kOffBelow * fade) engaged_ = false;
     const float target = engaged_ ? fmaxf(knobDrive, fade) : 0.0f;
@@ -127,8 +127,9 @@ class Distortion {
       runChunk(in + off, out + off, m, target, toneTarget);
     }
 
-    // A non-finite input leaves NaN in the filters for good, so the chain starts over.
-    if (!stateFinite()) clearChain();
+    // A NaN or infinity in the input lands in the stage 1 filters first, and the rails turn it into 0
+    // before it reaches the later ones. It would stay in the filters for good, so the chain starts over.
+    if (!chain_.finite()) clearChain();
   }
 
   // Stage 1 gain at DRIVE d for the tuning the last process() call applied.
@@ -148,10 +149,10 @@ class Distortion {
   static constexpr float kFadeMs = 16.0f;
   static constexpr float kFadeStep = 1.0f / (kFadeMs * kSmpPerMs);
 
-  // x inside [lo, hi]. A NaN reads as lo, because fmaxf and fminf return the other argument.
-  static float bound(float x, float lo, float hi) { return fminf(fmaxf(x, lo), hi); }
-  static float knob(float x) { return bound(x, 0.0f, 1.0f); }
-  static float boundDb(float db) { return bound(db, -kDbLimit, kDbLimit); }
+  // Smallest DRIVE span the top boost ramp spreads over, so topBoostFrom at 1 never divides by 0.
+  static constexpr float kBoostSpanMin = 1e-4f;
+
+  static float boundDb(float db) { return clampf(db, -kDbLimit, kDbLimit); }
 
   // Stage gains and the output scale at one DRIVE value.
   struct Gains {
@@ -195,7 +196,6 @@ class Distortion {
   static constexpr float kH5 = 0.01623882f;
   static constexpr float kH7 = -0.00366527f;
 
-  static float dbToLin(float db) { return powf(10.0f, db / 20.0f); }
   // TONE maps min..0 dB over the lower half and 0..max dB over the upper half, so
   // noon adds nothing.
   static float toneDb(const DistortionTuning& t, float tone) {
@@ -231,54 +231,52 @@ class Distortion {
     chain_.stackBass.setLowShelf(t.stackBassHz, boundDb(t.stackBassDb));
     chain_.stackTreble.setHighShelf(t.stackTrebleHz, boundDb(t.stackTrebleDb));
     chain_.bassPeak.setPeak(t.bassPeakHz, boundDb(t.bassPeakDb), t.bassPeakQ);
-    rail_ = makeRail(1.0f - bound(t.railAsym, 0.0f, 0.5f), bound(t.railSoft, 0.01f, 1.0f));
-    stackLoss_ = dbToLin(boundDb(t.stackLossDb));
-    trim_ = dbToLin(boundDb(t.trimDb));
-    g1Min_ = bound(t.gain1Min, kGainMin, kGainMax);
-    g2Min_ = bound(t.gain2Min, kGainMin, kGainMax);
-    log2R1_ = log2f(bound(t.gain1Max, g1Min_, kGainMax) / g1Min_);
-    log2R2_ = log2f(bound(t.gain2Max, g2Min_, kGainMax) / g2Min_);
-    boostFrom_ = bound(t.topBoostFrom, 0.0f, 1.0f);
-    const float boostRoom = 1.0f - boostFrom_;
-    const float boostSpan = boostRoom < kFadeDriveMin ? kFadeDriveMin : boostRoom;
-    boostK_ = bound(t.topBoostDb, 0.0f, kDbLimit) * kLog2PerDb / boostSpan;
-    fadeSpan_ = bound(t.fadeDrive, kFadeDriveMin, 1.0f);
-    const float w0 = kTwoPi * clampf(t.trebleCutHz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-    shelfCos_ = cosf(w0);
-    shelfAlpha_ = sinf(w0) * kButterworthQ;
+    rail_ = makeRail(1.0f - clampf(t.railAsym, 0.0f, kRailAsymMax), clampf(t.railSoft, kRailSoftMin, 1.0f));
+    stackLoss_ = dbToGain(boundDb(t.stackLossDb));
+    trim_ = dbToGain(boundDb(t.trimDb));
+    g1Min_ = clampf(t.gain1Min, kGainMin, kGainMax);
+    g2Min_ = clampf(t.gain2Min, kGainMin, kGainMax);
+    log2R1_ = log2f(clampf(t.gain1Max, g1Min_, kGainMax) / g1Min_);
+    log2R2_ = log2f(clampf(t.gain2Max, g2Min_, kGainMax) / g2Min_);
+    boostFrom_ = smooth::clamp01(t.topBoostFrom);
+    const float boostSpan = fmaxf(1.0f - boostFrom_, kBoostSpanMin);
+    boostK_ = clampf(t.topBoostDb, 0.0f, kDbLimit) * kLog2PerDb / boostSpan;
+    fadeSpan_ = clampf(t.fadeDrive, kFadeDriveMin, 1.0f);
+    invFadeSpan_ = 1.0f / fadeSpan_;
+    shelfCorner_ = rbjCorner(t.trebleCutHz);
     applied_ = t;
     tuningValid_ = true;
     shelfTone_ = -1.0f;
     gainDrive_ = -1.0f;
   }
 
-  // The coefficients of a biquad section.
-  struct Shelf {
-    float b0, b1, b2, a1, a2;
-  };
-
-  // The treble cut's high shelf at TONE `tone`: Biquad::setHighShelf's RBJ design at slope 1, with the
-  // corner's cosine and sine cached by applyTuning and the gain through exp2Fast, so a glide costs one
-  // square root and one divide a chunk and no libm.
-  Shelf shelfAt(float tone) const {
-    const DistortionTuning& t = applied_;
-    const float db = boundDb(t.trebleCutDb) + toneDb(t, tone);
+  // The treble cut's high shelf at TONE `tone`: Biquad::setHighShelfAmp's RBJ design at slope 1 with
+  // one reciprocal in place of its five divides. The corner comes cached from applyTuning and the gain
+  // through exp2Fast, so a glide costs no libm.
+  Biquad shelfAt(float tone) const {
+    const float db = boundDb(applied_.trebleCutDb) + toneDb(applied_, tone);
     const float amp = dbToGainFast(0.5f * db);  // 10^(db / 40)
     const float ap = amp + 1.0f, am = amp - 1.0f;
-    const float beta = 2.0f * sqrtf(amp) * shelfAlpha_;
-    const float apc = ap * shelfCos_, amc = am * shelfCos_;
+    const float beta = 2.0f * sqrtf(amp) * (shelfCorner_.sw * kButterworthQ);
+    const float apc = ap * shelfCorner_.cw, amc = am * shelfCorner_.cw;
     const float r = 1.0f / (ap - amc + beta);
-    return {amp * (ap + amc + beta) * r, -2.0f * amp * (am + apc) * r, amp * (ap + amc - beta) * r,
-            2.0f * (am - apc) * r, (ap - amc - beta) * r};
+    Biquad s;
+    s.b0 = amp * (ap + amc + beta) * r;
+    s.b1 = -2.0f * amp * (am + apc) * r;
+    s.b2 = amp * (ap + amc - beta) * r;
+    s.a1 = 2.0f * (am - apc) * r;
+    s.a2 = (ap - amc - beta) * r;
+    return s;
   }
 
  public:
   // The rail and its parts are public because the Growl card clips with the same knee.
   //
   // One side of the rail. The soft edge is `edge` wide and ends at the limit; the knee starts at
-  // `start` = limit - edge and runs for span = 2 edge, and curve = 1 / (4 edge) is its curvature.
+  // `start` = limit - edge, runs for span = 2 edge and ends at `end` = limit + edge, and
+  // curve = 1 / (4 edge) is its curvature.
   struct Side {
-    float start, span, curve;
+    float start, span, curve, end;
   };
 
   // Positive rail 1, negative rail -(1 - asym).
@@ -288,19 +286,19 @@ class Distortion {
 
   static Side makeSide(float limit, float soft) {
     const float edge = soft * limit;
-    return Side{limit - edge, 2.0f * edge, 0.25f / edge};
+    return Side{limit - edge, 2.0f * edge, 0.25f / edge, limit + edge};
   }
 
   static Rail makeRail(float neg, float soft) { return Rail{makeSide(1.0f, soft), makeSide(neg, soft)}; }
 
   // One side's curve for v >= 0: linear up to the start, then the quadratic knee v - t^2 / (4 edge)
-  // over two edge widths, which meets the limit with zero slope and stays there. With t the distance
-  // past the start and w the part of it inside the knee, the curve is v - (t - w) - curve * w^2, and
-  // min and max pick the segment, so it has no branch.
+  // over two edge widths, which meets the limit with zero slope and stays there. With w the part of the
+  // distance past the start that lies inside the knee, the curve is min(v, end) - curve * w^2, and min
+  // and max pick the segment, so it has no branch. Past the knee it is the constant end - curve *
+  // span^2 for any v, so a huge input cannot cancel against itself.
   static CV_INLINE float knee(const Side& s, float v) {
-    const float t = fmaxf(v - s.start, 0.0f);
-    const float w = fminf(t, s.span);
-    return v - (t - w) - s.curve * (w * w);
+    const float w = fminf(fmaxf(v - s.start, 0.0f), s.span);
+    return fminf(v, s.end) - s.curve * (w * w);
   }
 
   // The rail. The positive part of x runs through the positive side and the negative part through the
@@ -362,7 +360,7 @@ class Distortion {
     for (int i = 0; i < n; ++i) y[i] = halfBand(e + i) + 0.5f * o[i];
   }
 
-  // The signal path's filters. Stage gains g1 and g2 come from DRIVE.
+  // The signal path's filters.
   struct Chain {
     OnePole inHp, s1Lp, s2Hp, s2Lp, dc;
     Biquad s1Bass, stackBass, stackTreble, trebleCut, bassPeak;
@@ -371,10 +369,19 @@ class Distortion {
       for (OnePole* p : {&inHp, &s1Lp, &s2Hp, &s2Lp, &dc}) p->clear();
       for (Biquad* b : {&s1Bass, &stackBass, &stackTreble, &trebleCut, &bassPeak}) b->clear();
     }
+
+    // Every state is finite. A NaN or infinity anywhere makes the sum non-finite, because the states
+    // of a healthy chain stay far under the float range.
+    bool finite() const {
+      float sum = 0.0f;
+      for (const OnePole* p : {&inHp, &s1Lp, &s2Hp, &s2Lp, &dc}) sum += p->y;
+      for (const Biquad* b : {&s1Bass, &stackBass, &stackTreble, &trebleCut, &bassPeak}) sum += b->z1 + b->z2;
+      return std::isfinite(sum);
+    }
   };
 
-  // Input shaping and stage 1 gain, into the first rail's input. The stage gains and makeup are
-  // evaluated at the chunk edges and interpolated across it.
+  // Input shaping and stage 1 gain, into the first rail's input. The gain is evaluated at the chunk
+  // edges and interpolated across it.
   void stage1(const float* CV_RESTRICT in, int n, const Gains& a, const Gains& b, float inv, bool settled) {
     OnePole inHp = chain_.inHp, s1Lp = chain_.s1Lp;
     Biquad s1Bass = chain_.s1Bass;
@@ -420,10 +427,10 @@ class Distortion {
 
   // The second rail's output through the post shaping and makeup, with everything settled and DRIVE
   // at or above fadeDrive: the shelf and the makeup are constants.
-  void stage3Settled(float* CV_RESTRICT out, int n, float k, const Shelf& s) {
+  void stage3Settled(float* CV_RESTRICT out, int n, float k, const Biquad& s) {
     Biquad trebleCut = chain_.trebleCut, bassPeak = chain_.bassPeak;
     OnePole dc = chain_.dc;
-    setCoefs(trebleCut, s);
+    trebleCut.setCoefsFrom(s);
     const float* CV_RESTRICT y = r2_.y.data();
     for (int i = 0; i < n; ++i) out[i] = dc.hp(bassPeak.run(trebleCut.run(y[i]))) * k;
     chain_.trebleCut = trebleCut;
@@ -436,19 +443,35 @@ class Distortion {
   // fadeDrive a sample at a time.
   enum Mix { kWetOnly, kRiseToWet, kFollowDrive };
 
-  // The same with the makeup interpolated across the chunk, the treble shelf interpolated from `sa` to
-  // `sb` while TONE moves (kShelfMoves), and the mix with the dry input (kMix).
+  // What one chunk takes from the knobs: the stage gains and the treble cut at its start (a, sa) and
+  // end (b, sb), 1 / n, the DRIVE and TONE it ends on, and how they move.
+  struct Chunk {
+    int n;
+    float inv;
+    Gains a, b;
+    Biquad sa, sb;
+    float driveEnd, toneEnd;
+    bool driveMoves, toneMoves;
+    Mix mix;
+  };
+
+  // The second rail's output through the post shaping and makeup, with the makeup interpolated across
+  // the chunk, the treble shelf interpolated from sa to sb while TONE moves (kShelfMoves), and the mix
+  // with the dry input (kMix).
   template <bool kShelfMoves, Mix kMix>
-  void stage3Moving(const float* CV_RESTRICT in, float* CV_RESTRICT out, int n, const Gains& a, const Gains& b,
-                    float inv, const Shelf& sa, const Shelf& sb, float target) {
+  void stage3Moving(const float* CV_RESTRICT in, float* CV_RESTRICT out, const Chunk& c) {
     Biquad trebleCut = chain_.trebleCut, bassPeak = chain_.bassPeak;
     OnePole dc = chain_.dc;
-    setCoefs(trebleCut, sa);
+    const Gains& a = c.a;
+    const Gains& b = c.b;
+    const Biquad& sa = c.sa;
+    const Biquad& sb = c.sb;
+    trebleCut.setCoefsFrom(sa);
     const float* CV_RESTRICT y = r2_.y.data();
-    const float fadeSpan = fadeSpan_;
-    float drive = drive_, fade = fade_;
-    for (int i = 0; i < n; ++i) {
-      const float fi = static_cast<float>(i + 1) * inv;
+    const float* CV_RESTRICT driveLine = driveLine_.data();
+    float fade = fade_;
+    for (int i = 0; i < c.n; ++i) {
+      const float fi = static_cast<float>(i + 1) * c.inv;
       if constexpr (kShelfMoves) {
         trebleCut.b0 = sa.b0 + (sb.b0 - sa.b0) * fi;
         trebleCut.b1 = sa.b1 + (sb.b1 - sa.b1) * fi;
@@ -458,10 +481,9 @@ class Distortion {
       }
       const float wet = dc.hp(bassPeak.run(trebleCut.run(y[i]))) * (a.k + (b.k - a.k) * fi);
       if constexpr (kMix == kFollowDrive) {
-        drive = smooth::step(drive, target, smooth::kSmoothCoef);
-        const float x = fminf(drive / fadeSpan, 1.0f);
+        const float x = fminf(driveLine[i] * invFadeSpan_, 1.0f);
         const float goal = x * x * (3.0f - 2.0f * x);
-        fade += fminf(fmaxf(goal - fade, -kFadeStep), kFadeStep);
+        fade += clampf(goal - fade, -kFadeStep, kFadeStep);
         out[i] = fade >= 1.0f ? wet : in[i] + fade * (wet - in[i]);
       } else if constexpr (kMix == kRiseToWet) {
         fade += fminf(1.0f - fade, kFadeStep);
@@ -476,12 +498,66 @@ class Distortion {
     chain_.dc = dc;
   }
 
-  static void setCoefs(Biquad& bq, const Shelf& s) {
-    bq.b0 = s.b0;
-    bq.b1 = s.b1;
-    bq.b2 = s.b2;
-    bq.a1 = s.a1;
-    bq.a2 = s.a2;
+  template <bool kShelfMoves>
+  void stage3Mixed(const float* CV_RESTRICT in, float* CV_RESTRICT out, const Chunk& c) {
+    if (c.mix == kWetOnly) {
+      stage3Moving<kShelfMoves, kWetOnly>(in, out, c);
+    } else if (c.mix == kRiseToWet) {
+      stage3Moving<kShelfMoves, kRiseToWet>(in, out, c);
+    } else {
+      stage3Moving<kShelfMoves, kFollowDrive>(in, out, c);
+    }
+  }
+
+  // Everything settled takes the constant path; any other chunk takes the variant its TONE and mix call for.
+  void stage3(const float* CV_RESTRICT in, float* CV_RESTRICT out, const Chunk& c) {
+    if (!c.driveMoves && !c.toneMoves && c.mix == kWetOnly) {
+      stage3Settled(out, c.n, c.a.k, c.sa);
+    } else if (c.toneMoves) {
+      stage3Mixed<true>(in, out, c);
+    } else {
+      stage3Mixed<false>(in, out, c);
+    }
+  }
+
+  // Steps DRIVE toward target a sample at a time, keeps each sample's value for stage 3, and returns
+  // the DRIVE it ends on.
+  float rampDrive(float target, int n) {
+    float drive = drive_;
+    for (int i = 0; i < n; ++i) {
+      drive = smooth::step(drive, target, smooth::kSmoothCoef);
+      driveLine_[static_cast<size_t>(i)] = drive;
+    }
+    return drive;
+  }
+
+  // The values one chunk of n samples runs on.
+  Chunk planChunk(int n, float target, float toneTarget) {
+    Chunk c{};
+    c.n = n;
+    c.inv = 1.0f / static_cast<float>(n);
+    c.driveMoves = drive_ != target;
+    c.toneMoves = tone_ != toneTarget;
+    c.driveEnd = drive_;
+    c.toneEnd = tone_;
+    if (c.driveMoves || c.toneMoves) {
+      if (n == kBlock) {
+        c.driveEnd = smooth::advanceBlock(drive_, target);
+        c.toneEnd = smooth::advanceBlock(tone_, toneTarget);
+      } else {
+        smooth::advance(c.driveEnd, target, c.toneEnd, toneTarget, smooth::kSmoothCoef, n);
+      }
+    }
+    // DRIVE moves one way, so a chunk with both ends past fadeDrive never has a sample inside it. A chunk
+    // that does steps DRIVE a sample at a time, and its end value is that loop's.
+    const bool pastFade = drive_ >= fadeSpan_ && c.driveEnd >= fadeSpan_;
+    c.mix = pastFade ? (fade_ < 1.0f ? kRiseToWet : kWetOnly) : kFollowDrive;
+    if (!pastFade) c.driveEnd = rampDrive(target, n);
+    c.a = startGains();
+    c.b = c.driveMoves ? gainsAt(c.driveEnd) : c.a;
+    c.sa = shelf_;
+    c.sb = c.toneMoves ? shelfAt(c.toneEnd) : c.sa;
+    return c;
   }
 
   // One chunk of at most kBlock samples.
@@ -490,57 +566,23 @@ class Distortion {
       shelf_ = shelfAt(tone_);
       shelfTone_ = tone_;
     }
-    const bool driveMoves = drive_ != target;
-    const bool toneMoves = tone_ != toneTarget;
-    float driveEnd = drive_, toneEnd = tone_;
-    if (driveMoves || toneMoves) {
-      if (n == kBlock) {
-        driveEnd = smooth::advanceBlock(drive_, target);
-        toneEnd = smooth::advanceBlock(tone_, toneTarget);
-      } else {
-        smooth::advance(driveEnd, target, toneEnd, toneTarget, smooth::kSmoothCoef, n);
-      }
-    }
-    // DRIVE moves one way, so a chunk with both ends past fadeDrive never has a sample inside it. A chunk
-    // that does steps DRIVE a sample at a time, and its end value is that loop's.
-    const bool pastFade = drive_ >= fadeSpan_ && driveEnd >= fadeSpan_;
-    if (!pastFade && driveMoves) driveEnd = smooth::advance(drive_, target, smooth::kSmoothCoef, n);
-    const Mix mix = !pastFade ? kFollowDrive : (fade_ < 1.0f ? kRiseToWet : kWetOnly);
-    const Gains a = startGains();
-    const Gains b = driveMoves ? gainsAt(driveEnd) : a;
-    const float inv = 1.0f / static_cast<float>(n);
-    const Shelf sa = shelf_;
-    const Shelf sb = toneMoves ? shelfAt(toneEnd) : sa;
+    const Chunk c = planChunk(n, target, toneTarget);
 
-    stage1(in, n, a, b, inv, !driveMoves);
+    stage1(in, n, c.a, c.b, c.inv, !c.driveMoves);
     railPass(r1_, rail_, n);
-    stage2(n, a, b, inv, !driveMoves);
+    stage2(n, c.a, c.b, c.inv, !c.driveMoves);
     railPass(r2_, rail_, n);
-    if (!driveMoves && !toneMoves && mix == kWetOnly) {
-      stage3Settled(out, n, a.k, sa);
-    } else if (toneMoves) {
-      if (mix == kWetOnly) stage3Moving<true, kWetOnly>(in, out, n, a, b, inv, sa, sb, target);
-      else if (mix == kRiseToWet) stage3Moving<true, kRiseToWet>(in, out, n, a, b, inv, sa, sb, target);
-      else stage3Moving<true, kFollowDrive>(in, out, n, a, b, inv, sa, sb, target);
-    } else {
-      if (mix == kWetOnly) stage3Moving<false, kWetOnly>(in, out, n, a, b, inv, sa, sb, target);
-      else if (mix == kRiseToWet) stage3Moving<false, kRiseToWet>(in, out, n, a, b, inv, sa, sb, target);
-      else stage3Moving<false, kFollowDrive>(in, out, n, a, b, inv, sa, sb, target);
-    }
+    stage3(in, out, c);
     r1_.carry(n);
     r2_.carry(n);
 
-    drive_ = driveEnd;
-    tone_ = toneEnd;
-    shelf_ = sb;
-    shelfTone_ = toneEnd;
-    gainCache_ = b;
-    gainDrive_ = driveEnd;
+    drive_ = c.driveEnd;
+    tone_ = c.toneEnd;
+    shelf_ = c.sb;
+    shelfTone_ = c.toneEnd;
+    gainCache_ = c.b;
+    gainDrive_ = c.driveEnd;
   }
-
-  // Every filter state the rails do not cut off is finite. A NaN or infinity in the input lands in the
-  // stage 1 filters and the final DC blocker first.
-  bool stateFinite() const { return std::isfinite(chain_.s1Lp.y) && std::isfinite(chain_.dc.y); }
 
   void clearChain() {
     chain_.clear();
@@ -559,15 +601,17 @@ class Distortion {
 
   DistortionTuning applied_;
   bool tuningValid_ = false;
-  Shelf shelf_{1.0f, 0.0f, 0.0f, 0.0f, 0.0f};  // the treble cut at TONE shelfTone_
+  Biquad shelf_;  // the treble cut at TONE shelfTone_
   float shelfTone_ = -1.0f;
-  Rail rail_{{0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}};
+  Rail rail_{{0.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 1.0f, 1.0f}};
   Gains gainCache_{1.0f, 1.0f, 1.0f};
   float gainDrive_ = -1.0f;  // the DRIVE gainCache_ was computed at
   float stackLoss_ = 1.0f, trim_ = 1.0f, g1Min_ = 1.0f, g2Min_ = 1.0f;
-  float log2R1_ = 0.0f, log2R2_ = 0.0f, fadeSpan_ = 1.0f;  // the stage gains' octaves over DRIVE 0 to 1
+  float log2R1_ = 0.0f, log2R2_ = 0.0f;  // the octaves each stage gain spans over DRIVE 0 to 1
+  float fadeSpan_ = 1.0f, invFadeSpan_ = 1.0f;  // fadeDrive and its reciprocal
   float boostFrom_ = 1.0f, boostK_ = 0.0f;  // top boost: start DRIVE, octaves per unit DRIVE past it
-  float shelfCos_ = 1.0f, shelfAlpha_ = 0.0f;  // the treble cut's corner: cos(w0) and sin(w0) / sqrt(2)
+  RbjCorner shelfCorner_{1.0f, 0.0f};  // the treble cut's corner
+  std::array<float, kBlock> driveLine_{};  // DRIVE at each sample of a chunk inside the fade
 };
 
 }  // namespace cv
