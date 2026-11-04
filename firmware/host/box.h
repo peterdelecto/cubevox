@@ -83,7 +83,7 @@ class Box {
   void swapReverb();
 
   // The card switches under slots 3, 4, 6 and 7. Each applies its menu action until the slot holds
-  // `card` (Octave, Formant or the Formant follower; Unison, Mob or Mob 2; Distortion or Growl; Gate,
+  // `card` (Octave, Formant or the Formant follower; Unison or Mob; Distortion or Growl; Gate,
   // Lofi or Chatter). When no step of the cycle reaches it, because the box would not load that
   // layout, the layout stays as it was.
   void pickSlot3Card(Card card);

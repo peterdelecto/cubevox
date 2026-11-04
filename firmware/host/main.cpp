@@ -164,8 +164,7 @@ constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO
 
 // The slot 4 cards picked out of the menu's cycle order, so each pick takes two steps or one, and
 // what the default layout costs without slot 4's card.
-constexpr std::array<CardRow, 3> kSlot4Rows = {{{Card::Crowd2, "crowd2", "mob2", "MOB 2", costs::kCrowd2},
-                                                {Card::Crowd, "crowd", "mob", "MOB", costs::kCrowd},
+constexpr std::array<CardRow, 2> kSlot4Rows = {{{Card::Crowd, "crowd", "mob", "MOB", costs::kCrowd},
                                                 {Card::Unison, "unison", "unison", "UNISON", costs::kUnison}}};
 constexpr costs::Cost kSlot4Rest = costs::kInputGate + costs::kAutotune + costs::kOctave + costs::kSlapback +
                                    costs::kDistortion + costs::kGate + costs::kReverbSpring + costs::kFixed +
@@ -325,7 +324,7 @@ void checkSlot7(const CheckClips& clips, bool swapped, std::vector<std::string>&
   expect(rig.box.layout() == kept, "a card outside the cycle leaves the layout as it was");
 }
 
-// The three slot 4 cards through the box's card switch on the default layout. After each pick the
+// The two slot 4 cards through the box's card switch on the default layout. After each pick the
 // layout holds the card in slot 4 at the sum of its rows, and the audio through the box is finite and
 // above the floor.
 void checkSlot4(const CheckClips& clips, std::vector<std::string>& failed) {

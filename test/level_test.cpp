@@ -513,38 +513,6 @@ bool unisonRows() {
       [](const Signal& padded) { return unisonThrough(padded, 1.0f); });
 }
 
-// The Mob 2 card at its default, DRIFT 100 % and VOICES 4, as the registry sets it, on Adam's clips,
-// behind the PitchFx that fills its ring and runs the tracker. Each clip is held to the band Mob's rows
-// are held to, and every sample must be finite.
-bool crowd2Rows() {
-  ChainParams chain;
-  applyPlacement(Card::Crowd2, chain);
-  applyToggle(Card::Crowd2, true, chain);
-  applyKnob(Card::Crowd2, 0, 1.0f, chain);
-  applyKnob(Card::Crowd2, 1, 4.0f, chain);
-  cv::PitchFxParams pp = pitchOff();
-  pp.crowdOn = true;
-  double mean = 0.0;
-  int count = 0;
-  bool finite = true;
-  const bool ok = clipRows(
-      "mob 2 DRIFT 100 VOICES 4",
-      [&](const Signal& padded) {
-        auto pitch = std::make_unique<Stage<cv::PitchFx>>();
-        auto crowd = std::make_unique<Stage<cv::Crowd>>();
-        Through t{padded, run(padded, [&](const float* i, float* o, int n) {
-                    float tmp[cv::kBlock];
-                    pitch->fx.process(i, tmp, n, pp);
-                    crowd->fx.process(i, o, n, chain.crowd, pitch->fx);
-                  })};
-        for (float v : t.out) finite = finite && std::isfinite(v);
-        return t;
-      },
-      kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
-  if (count > 0) std::printf("%s mob 2 output finite on %d clips, mean %+.2f dB\n", finite ? "PASS" : "FAIL", count, mean);
-  return ok && finite;
-}
-
 // The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips. The synthetic program
 // puts its energy where the telephone band cuts and reads -2.1 dB. The three clips differ by 1.14 dB
 // under one gain, so no trim puts all three inside 0 to +0.5 dB: each clip is held to the mid band, and
@@ -770,7 +738,6 @@ bool slotRows(const Signal& in) {
 
   ok &= unisonRows();
   ok &= crowdRows();
-  ok &= crowd2Rows();
   ok &= formantRows(in);
   ok &= lofiRows();
   ok &= bloomRows();

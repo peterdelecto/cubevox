@@ -119,13 +119,6 @@ constexpr Cost kPitchStage{4, 4, false};
 // engine/formant_voice.h, which Crowd shares.
 constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stress run 2026-11-02 (v2.01.11)
 
-// Mob 2, the Crowd engine with four copies and their vibrato. Host bench 2026-11-04 (g++ 15, -O2 with
-// the firmware's float contraction, Adam's clips, knobs at top, minimum of 9 interleaved passes, the
-// pitch stage's own time taken out): Mob 2 at DRIFT 100 % and MOB 1.625 us a block, Mob at DIVERGE
-// 100 % and MOB 2.659 us, a ratio of 0.611. kCrowd's board cycles times that ratio read 52.9k / 65.3k
-// (8.3 % / 10.2 %), rounded up.
-constexpr Cost kCrowd2{9, 11, false};
-
 // The Formant card and the Formant follower, alternates for Octave in slot 3, and the Lo-fi and Chatter
 // cards, alternates for Gate in slot 7. The follower pays the tracker and the pitch stage as Formant does. Formant's row is an estimate: the stress run reads it only together with the
 // tracker and the pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to 8.5 %,
@@ -142,7 +135,9 @@ constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stres
 // block at GROWL and DRIVE 100 % (0.430 at 50 / 50, 0.482 with both knobs swept end to end), and 0.666 us
 // for the costliest block, its minimum over the passes. At 50.4k board cycles per host us that is 24.1k /
 // 33.6k cycles, 3.8 % / 5.2 %, rounded up.
-constexpr Cost kGrowl{4, 6, false};  // est. from that host bench; a board run owes the measured row
+// With the throat move (2026-11-04), GROWL 100 % / DRIVE 50 %: 8.2 to 9.0 ns a sample, 26.5k to 29.0k
+// cycles, 4.2 to 4.6 %, about 6.2 % worst block.
+constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run owes the measured row
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.
