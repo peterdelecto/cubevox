@@ -20,8 +20,11 @@ ChainParams::ChainParams() {
   pitchFx.formant.on = false;
   pitchFx.crowdOn = false;
   pitchFx.growlOn = false;
+  pitchFx.ringModOn = false;
   crowd.on = false;
   growl.on = false;
+  ringMod.on = false;
+  strings.on = false;
   unison.on = false;
   slapback.on = false;
   distortion.on = false;

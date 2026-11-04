@@ -9,10 +9,14 @@
 #include <cstdio>
 #include <limits>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "core/chain_params.h"
+#include "core/chain_run.h"
 #include "core/registry.h"
+
+#include "distortion_rule.h"
 
 namespace {
 
@@ -38,9 +42,9 @@ constexpr double kMaxRatio = 1.05;
 static_assert(kStepAt % cv::kBlock == 0, "the step lands on a block edge");
 
 // A pure sine: its second difference is small and steady, so any cut stands out.
-Signal tone(double hz) {
-  Signal x(static_cast<size_t>(kTotal));
-  for (int i = 0; i < kTotal; ++i)
+Signal tone(double hz, int total = kTotal) {
+  Signal x(static_cast<size_t>(total));
+  for (int i = 0; i < total; ++i)
     x[static_cast<size_t>(i)] = static_cast<float>(kToneAmp * std::sin(2.0 * kPi * hz * i / cv::kSampleRate));
   return x;
 }
@@ -99,7 +103,9 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Crowd: return runCrowd(in, a, b);
     case Engine::Lofi: return runFx<cv::Lofi>(in, a, b, &ChainParams::lofi);
     case Engine::Bloom: return runFx<cv::Bloom>(in, a, b, &ChainParams::bloom);
-    case Engine::Growl:  // an audition card, with no knob-step rows yet
+    case Engine::Growl:  // the audition cards have no knob-step rows yet
+    case Engine::RingMod:
+    case Engine::Strings:
     case Engine::Count: break;
   }
   return in;
@@ -173,17 +179,15 @@ std::vector<Step> stepsFor(Card c, int knob) {
 // background holds Amount at half travel.
 constexpr float kEchoBackgroundAmount = 0.5f;
 
-// Distortion's DRIVE starts at 0, where the stage is a plain copy and its TONE never reaches the output,
-// so its background holds DRIVE at 30 %, the setting the level rule runs it at.
-constexpr float kDistortionBackgroundDrive = 0.3f;
-
-// The registry's defaults with the card placed and switched on.
+// The registry's defaults with the card placed and switched on. Distortion's DRIVE starts at 0, where the
+// stage is a plain copy and its TONE never reaches the output, so its background holds DRIVE at the level
+// rule's setting.
 ChainParams background(Card c) {
   ChainParams p;
   applyPlacement(c, p);
   applyToggle(c, true, p);
   if (c == Card::Slapback) applyKnob(c, 1, kEchoBackgroundAmount, p);
-  if (c == Card::Distortion) applyKnob(c, 1, kDistortionBackgroundDrive, p);
+  if (c == Card::Distortion) applyKnob(c, 1, kDistortionRuleDrive, p);
   return p;
 }
 
@@ -224,55 +228,46 @@ bool checkKnob(Card c, int knob, const Signal& in, double toneHz = kToneHz) {
   return ok;
 }
 
-// Distortion's enable and the DRIVE moves that start it. The box resets an engine on the enable of a slot
-// that sat settled off, so an enable row resets the engine at the step.
-Signal runDistortionStep(const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b,
-                         bool resetAtStep) {
+// Distortion's DRIVE moves, the ones that start it included. The box's enable edge resets an engine
+// and then moves nothing but the toggle, so distortion_test holds that reset to a fresh engine's output.
+Signal runDistortionStep(const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b) {
   auto fx = std::make_unique<cv::Distortion>();
   fx->reset();
   Signal out(in.size());
   for (int i = 0; i < kTotal; i += cv::kBlock) {
-    if (resetAtStep && i == kStepAt) fx->reset();
     const size_t k = static_cast<size_t>(i);
     fx->process(&in[k], &out[k], cv::kBlock, i < kStepAt ? a : b);
   }
   return out;
 }
 
-cv::DistortionParams distortionAt(float drive, float tone, bool on = true) {
+cv::DistortionParams distortionAt(float drive, float tone) {
   cv::DistortionParams p = background(Card::Distortion).distortion;
   p.drive = drive;
   p.tone = tone;
-  p.on = on;
   return p;
 }
 
-bool distortionRow(const char* label, const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b,
-                   bool resetAtStep) {
-  const double r = stepRatio(runDistortionStep(in, a, b, resetAtStep));
+bool distortionRow(const char* label, const Signal& in, const cv::DistortionParams& a, const cv::DistortionParams& b) {
+  const double r = stepRatio(runDistortionStep(in, a, b));
   const bool ok = r <= kMaxRatio;
   std::printf("%s %-14s %-40s peak curvature x%.5f of steady state (<= %.2f)\n", ok ? "PASS" : "FAIL", "Distortion",
               label, r, kMaxRatio);
   return ok;
 }
 
-// The enable edge and DRIVE up from 0, at DRIVE 30, 60 and 100 % and TONE 0, 50 and 100 %. TONE follows
-// the knob while the stage is dry, so both start from where the knob sits, and the dry-to-wet fade takes
-// 16 ms at the least. DRIVE crossing 5 % turns the stage on, and falling under 4 % turns it off; the
-// last row is a fast turn from 6 % down through both thresholds.
+// DRIVE up from 0, at DRIVE 30, 60 and 100 % and TONE 0, 50 and 100 %. TONE follows the knob while the
+// stage is dry, so both start from where the knob sits, and the dry-to-wet fade takes 16 ms at the least.
+// DRIVE crossing 5 % turns the stage on, and falling under 4 % turns it off; the last rows are turns
+// across both thresholds, the last a fast one from 6 % down.
 bool distortionEdgeRows(const Signal& in) {
   bool ok = true;
   char label[64];
-  for (float drive : {kDistortionBackgroundDrive, 0.6f, 1.0f}) {
-    for (float tone : {0.0f, 0.5f, 1.0f}) {
-      std::snprintf(label, sizeof label, "enable at DRIVE %.0f %%, TONE %.0f %%", static_cast<double>(drive * 100.0f),
-                    static_cast<double>(tone * 100.0f));
-      ok &= distortionRow(label, in, distortionAt(drive, tone, false), distortionAt(drive, tone), true);
-    }
+  for (float drive : {kDistortionRuleDrive, 0.6f, 1.0f}) {
     for (float tone : {0.0f, 0.5f, 1.0f}) {
       std::snprintf(label, sizeof label, "DRIVE 0 to %.0f %%, TONE %.0f %%", static_cast<double>(drive * 100.0f),
                     static_cast<double>(tone * 100.0f));
-      ok &= distortionRow(label, in, distortionAt(0.0f, tone), distortionAt(drive, tone), false);
+      ok &= distortionRow(label, in, distortionAt(0.0f, tone), distortionAt(drive, tone));
     }
   }
   struct Cross {
@@ -283,7 +278,7 @@ bool distortionEdgeRows(const Signal& in) {
                          Cross{0.06f, 0.03f}}) {
     std::snprintf(label, sizeof label, "DRIVE %.1f to %.1f %%", static_cast<double>(c.from * 100.0f),
                   static_cast<double>(c.to * 100.0f));
-    ok &= distortionRow(label, in, distortionAt(c.from, 0.5f), distortionAt(c.to, 0.5f), false);
+    ok &= distortionRow(label, in, distortionAt(c.from, 0.5f), distortionAt(c.to, 0.5f));
   }
   return ok;
 }
@@ -400,6 +395,146 @@ bool checkGateKnob(Card c, int knob) {
   return ok;
 }
 
+// Lo-fi's toggle through its slot, run by the chain's own runSlot: the slot resets the engine as it starts
+// to fade in, the engine runs with the toggle as its `on`, and the slot's linear fade mixes the engine
+// against its input. The step is the toggle, and the rows read the curvature around it.
+constexpr size_t kLofiSlot = 6;
+
+Signal runLofiSlot(const Signal& in, const ChainParams& base, bool turnOn) {
+  auto pitch = std::make_unique<cv::PitchFx>();
+  auto unison = std::make_unique<cv::Unison>();
+  auto distortion = std::make_unique<cv::Distortion>();
+  auto engines = std::make_unique<ChainEngines>(*pitch, *unison, *distortion);
+  auto snap = std::make_unique<ChainSnapshot>();
+  snap->layout.card.fill(Card::Empty);
+  snap->layout.card[kLofiSlot] = Card::Lofi;
+  snap->params = base;
+  SlotFades fades;
+  std::array<bool, kSlotCount> start{};
+  start.fill(!turnOn);
+  fades.settle(start);
+  Signal out(in.size());
+  bool pitchDone = false;
+  for (int i = 0; i < kTotal; i += cv::kBlock) {
+    const size_t k = static_cast<size_t>(i);
+    const bool on = i < kStepAt ? !turnOn : turnOn;
+    snap->slotOn[kLofiSlot] = on;
+    snap->params.lofi.on = on;
+    if (!runSlot(*engines, fades, static_cast<int>(kLofiSlot), *snap, &in[k], &out[k], cv::kBlock, pitchDone)) {
+      std::copy(in.begin() + static_cast<std::ptrdiff_t>(k), in.begin() + static_cast<std::ptrdiff_t>(k + cv::kBlock),
+                out.begin() + static_cast<std::ptrdiff_t>(k));
+    }
+  }
+  return out;
+}
+
+// Unison runs at DEPTH 50 % in the background, where the chorus is audible, and judges each step against
+// steady windows that span a full period of the slowest LFO the steps start from (RATE 20 %, 0.31 Hz and
+// 3.2 s) and against the same run with no step. The swing and the LFO speeds glide on 150 ms, so the
+// second steady window starts 1.5 s after the step.
+constexpr float kUnisonBackgroundDepth = 0.5f;
+constexpr int kUnisonStepAt = 6 * cv::kSampleRate;
+constexpr int kUnisonSteadyWindow = 4 * cv::kSampleRate;
+constexpr int kUnisonSettle = 3 * cv::kSampleRate / 2;
+constexpr int kUnisonTotal = kUnisonStepAt + kUnisonSettle + kUnisonSteadyWindow;
+static_assert(kUnisonStepAt % cv::kBlock == 0, "the step lands on a block edge");
+
+Signal runUnison(const Signal& in, const cv::UnisonParams& a, const cv::UnisonParams& b) {
+  auto fx = std::make_unique<cv::Unison>();
+  fx->reset();
+  Signal out(in.size());
+  for (int i = 0; i < kUnisonTotal; i += cv::kBlock) {
+    const size_t k = static_cast<size_t>(i);
+    fx->process(&in[k], &out[k], cv::kBlock, i < kUnisonStepAt ? a : b);
+  }
+  return out;
+}
+
+// One toggle row. A row that is not judged prints as a NOTE.
+bool toggleRow(bool judged, const std::string& label, double ratio) {
+  const bool pass = ratio <= kMaxRatio;
+  std::printf("%s %-14s %-48s peak curvature x%.5f of steady state (<= %.2f)\n",
+              judged ? (pass ? "PASS" : "FAIL") : "NOTE", "Lo-fi", label.c_str(), ratio, kMaxRatio);
+  return pass || !judged;
+}
+
+// The enable and disable edges through the slot at the default and with AMOUNT at the top of its travel,
+// on a low tone and an in-band one.
+//
+// The slot's fade is linear, so it bends the blend by |wet - dry| / (384 samples) where it starts and
+// where it ends. A 220 Hz tone at the default sits on the skirt of the high-pass, where the wet differs
+// from the dry by a third of the tone's amplitude, so that pair of rows is reported and not judged. A
+// fade with no slope at its ends brings them to x1.01 and x1.06.
+bool lofiToggleRows() {
+  bool ok = true;
+  for (const float amount : {0.5f, 1.0f}) {
+    ChainParams p = background(Card::Lofi);
+    applyKnob(Card::Lofi, 1, amount, p);
+    for (const double hz : {kToneHz, 1000.0}) {
+      for (const bool turnOn : {true, false}) {
+        const std::string where = std::string(turnOn ? "enable" : "disable") + " at AMOUNT " +
+                                  std::to_string(static_cast<int>(amount * 100.0f)) + " %, " +
+                                  std::to_string(static_cast<int>(hz)) + " Hz";
+        const bool judged = amount != 0.5f || hz != kToneHz;
+        ok &= toggleRow(judged, where, stepRatio(runLofiSlot(tone(hz), p, turnOn)));
+      }
+    }
+  }
+  return ok;
+}
+
+// Peak curvature just after the step over the larger steady-state peak of the two settings.
+double unisonStepRatio(const Signal& out) {
+  const double steady = std::max(peakCurvature(out, kUnisonStepAt - kUnisonSteadyWindow, kUnisonStepAt),
+                                 peakCurvature(out, kUnisonTotal - kUnisonSteadyWindow, kUnisonTotal));
+  return peakCurvature(out, kUnisonStepAt, kUnisonStepAt + kStepWindow) / steady;
+}
+
+bool checkUnisonKnob(int knob, const Signal& in) {
+  ChainParams base = background(Card::Unison);
+  applyKnob(Card::Unison, 1, kUnisonBackgroundDepth, base);
+  double worst = 0.0;
+  double worstStill = 0.0;
+  Step at{};
+  std::vector<Step> steps;
+  for (float p : {0.2f, 0.5f, 0.8f}) steps.push_back({p, p + kContinuousStep});
+  if (knob == 0) {
+    // RATE also moves its whole travel in one step each way, as a fast turn would. DEPTH's whole-travel
+    // jump fades the wet itself, which bends the output by the fade's own slope and is no click.
+    steps.push_back({0.0f, 1.0f});
+    steps.push_back({1.0f, 0.0f});
+  }
+  for (const Step& s : steps) {
+    ChainParams a = base;
+    ChainParams b = base;
+    applyKnob(Card::Unison, knob, s.from, a);
+    applyKnob(Card::Unison, knob, s.to, b);
+    const Signal out = runUnison(in, a.unison, b.unison);
+    const double r = unisonStepRatio(out);
+    if (r >= worst) {
+      worst = r;
+      at = s;
+    }
+    // A touch is read against the same run with no step; a whole-travel jump moves the chorus legitimately.
+    if (std::fabs(s.to - s.from) > kContinuousStep * 1.01f) continue;
+    const Signal still = runUnison(in, a.unison, a.unison);
+    const double stillStep = peakCurvature(still, kUnisonStepAt, kUnisonStepAt + kStepWindow);
+    worstStill = std::max(worstStill, peakCurvature(out, kUnisonStepAt, kUnisonStepAt + kStepWindow) / stillStep);
+  }
+  const bool ok = worst <= kMaxRatio && worstStill <= kMaxRatio;
+  std::printf("%s %-14s %-10s worst step %.3g to %.3g: peak curvature x%.5f of steady state, x%.5f of no step (<= %.2f)\n",
+              ok ? "PASS" : "FAIL", cardDesc(Card::Unison).name, cardDesc(Card::Unison).knob[knob].name,
+              static_cast<double>(at.from), static_cast<double>(at.to), worst, worstStill, kMaxRatio);
+  return ok;
+}
+
+bool unisonRows() {
+  const Signal in = tone(kToneHz, kUnisonTotal);
+  bool ok = checkUnisonKnob(0, in);
+  ok &= checkUnisonKnob(1, in);
+  return ok;
+}
+
 // KEY moves the target note, and a grain is two periods, so a low voice is the harder case for the
 // glide. Adam sings from 78 Hz, and the KEY gate also runs on sines at 98 Hz, 82 Hz and 74.5 Hz.
 constexpr double kLowTones[] = {98.0, 82.0, 74.5};
@@ -410,7 +545,11 @@ int main() {
   bool ok = true;
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
-    if (engineOf(c) == Engine::Growl) continue;
+    if (engineOf(c) == Engine::Growl || engineOf(c) == Engine::RingMod || engineOf(c) == Engine::Strings) continue;
+    if (c == Card::Unison) {
+      ok &= unisonRows();
+      continue;
+    }
     const Signal in = tone(kToneHz);
     const bool gate = engineOf(c) == Engine::InputGate || engineOf(c) == Engine::Gate;
     for (int k = 0; k < cardDesc(c).knobCount; ++k) ok &= gate ? checkGateKnob(c, k) : checkKnob(c, k, in);
@@ -418,6 +557,7 @@ int main() {
       for (double hz : kLowTones) ok &= checkKnob(c, 0, tone(hz), hz);
     }
     if (c == Card::Distortion) ok &= distortionEdgeRows(in);
+    if (c == Card::Lofi) ok &= lofiToggleRows();
   }
   std::printf("%s knob step\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

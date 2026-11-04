@@ -35,6 +35,8 @@
 #include "engine/slapback.h"
 #include "engine/unison.h"
 
+#include "distortion_rule.h"
+
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -487,10 +489,18 @@ Through echoThrough(const Signal& padded, float amount) {
   return t;
 }
 
-Through unisonThrough(const Signal& padded, float depth) {
-  cv::UnisonParams p;
-  p.on = true;
-  p.depth = depth;
+// The Unison card as the registry sets it, with RATE at `rate` and DEPTH at `depth` (both 0..1 of travel).
+cv::UnisonParams boxUnison(float rate, float depth) {
+  ChainParams chain;
+  applyPlacement(Card::Unison, chain);
+  applyToggle(Card::Unison, true, chain);
+  applyKnob(Card::Unison, 0, rate, chain);
+  applyKnob(Card::Unison, 1, depth, chain);
+  return chain.unison;
+}
+
+Through unisonThrough(const Signal& padded, float rate, float depth) {
+  const cv::UnisonParams p = boxUnison(rate, depth);
   auto s = std::make_unique<Stage<cv::Unison>>();
   return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
 }
@@ -516,17 +526,97 @@ bool echoRows() {
       [](const Signal& padded) { return echoThrough(padded, 1.0f); });
 }
 
-// Unison at DEPTH 50 %, Adam's default.
+// Unison at RATE 50 % and DEPTH 50 %, where the emulator starts and the wet's trim is tuned. The level moves
+// with RATE, so DEPTH 50 % at RATE 0 and 100 % are reported beside it and not judged.
 bool unisonRows() {
-  return wetOnDryRows(
-      "unison", "50 %", [](const Signal& padded) { return unisonThrough(padded, 0.5f); },
-      [](const Signal& padded) { return unisonThrough(padded, 1.0f); });
+  const bool ok = wetOnDryRows(
+      "unison RATE 50 % DEPTH", "50 %", [](const Signal& padded) { return unisonThrough(padded, 0.5f, 0.5f); },
+      [](const Signal& padded) { return unisonThrough(padded, 0.5f, 1.0f); });
+  for (const float rate : {0.0f, 1.0f}) {
+    char label[40];
+    std::snprintf(label, sizeof label, "unison RATE %.0f %% DEPTH 50 %%", static_cast<double>(rate * 100.0f));
+    double mean = 0.0;
+    int count = 0;
+    clipRows(
+        label, [rate](const Signal& padded) { return unisonThrough(padded, rate, 0.5f); }, kMidLoDb, kMidHiDb, mean,
+        count, false);
+    if (count > 0) std::printf("NOTE %-30s %+6.2f dB  (rule %+.1f..%+.1f, not judged)\n", label, mean, kLoDb, kHiDb);
+  }
+  return ok;
 }
 
-// The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips. The synthetic program
-// puts its energy where the telephone band cuts and reads -2.1 dB. The three clips differ by 1.14 dB
-// under one gain, so no trim puts all three inside 0 to +0.5 dB: each clip is held to the mid band, and
-// the mean of the three is reported against the rule.
+// Largest |second difference| of x over [from, to).
+double peakCurvature(const Signal& x, size_t from, size_t to) {
+  double worst = 0.0;
+  for (size_t i = from; i < to; ++i) {
+    worst = std::max(worst, std::fabs(static_cast<double>(x[i]) - 2.0 * x[i - 1] + x[i - 2]));
+  }
+  return worst;
+}
+
+// The output of an engine that is switched on at sample `at` of the clip. A cold engine is reset there and
+// fed from there, as the chain does on a slot's first fade-in block. A warm one ran off on the clip from the
+// start, so its line holds the voice. Returns the 100 ms from the switch.
+Signal unisonFromSwitch(const Signal& clip, size_t at, bool warm) {
+  const cv::UnisonParams on = boxUnison(0.5f, 0.5f);
+  cv::UnisonParams off = on;
+  off.on = false;
+  constexpr size_t kSpan = cv::kSampleRate / 10;
+  auto u = std::make_unique<Stage<cv::Unison>>();
+  Signal sink(cv::kBlock);
+  if (warm) {
+    for (size_t i = 0; i < at; i += cv::kBlock) u->fx.process(&clip[i], sink.data(), cv::kBlock, off);
+  }
+  Signal out(kSpan);
+  for (size_t i = 0; i < kSpan; i += cv::kBlock) u->fx.process(&clip[at + i], &out[i], cv::kBlock, on);
+  return out;
+}
+
+// Unison switches on partway through each of Adam's clips, at every voiced block-aligned point 0.1 s apart.
+// The curvature of the output from 12 to 70 ms after the switch is read against a warm engine switched on at
+// the same point. A tap that reads the empty edge of a cleared line steps the output and reads several times
+// the warm engine's. The median and the worst point are both held.
+bool unisonSwitchOnRows() {
+  constexpr size_t kFrom = 12 * cv::kSampleRate / 1000;
+  constexpr size_t kTo = 70 * cv::kSampleRate / 1000;
+  constexpr size_t kStride = (cv::kSampleRate / 10 / cv::kBlock) * cv::kBlock;
+  constexpr double kMedianMax = 1.1;
+  constexpr double kWorstMax = 1.3;
+  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  bool ok = true;
+  for (const char* name : names) {
+    const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
+    if (clip.empty()) {
+      if (samplesFolderPresent()) {
+        std::printf("FAIL unison switch-on %s  the clip is missing or empty\n", name);
+        ok = false;
+      } else {
+        std::printf("SKIP unison switch-on %s  samples/ is not in this checkout\n", name);
+      }
+      continue;
+    }
+    std::vector<double> ratios;
+    for (size_t at = kStride; at + 2 * kStride < clip.size(); at += kStride) {
+      if (rmsRange(clip, at, at + kStride) < dbToLin(-40.0)) continue;
+      const Signal cold = unisonFromSwitch(clip, at, false);
+      const Signal warm = unisonFromSwitch(clip, at, true);
+      const double base = peakCurvature(warm, kFrom, kTo);
+      if (base > 0.0) ratios.push_back(peakCurvature(cold, kFrom, kTo) / base);
+    }
+    if (ratios.empty()) continue;
+    std::sort(ratios.begin(), ratios.end());
+    const double median = ratios[ratios.size() / 2];
+    const bool row = median <= kMedianMax && ratios.back() <= kWorstMax;
+    ok &= row;
+    std::printf("%s unison switch-on %s  %zu points: curvature x%.3f median, x%.3f worst of a warm line (<= %.1f, %.1f)\n",
+                row ? "PASS" : "FAIL", name, ratios.size(), median, ratios.back(), kMedianMax, kWorstMax);
+  }
+  return ok;
+}
+
+// The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips, each held to the rule's
+// band. The card has no MIX knob, so the mid band does not apply. The synthetic program puts its energy
+// where the telephone band cuts, so it has no row.
 bool lofiRows() {
   ChainParams chain;
   applyPlacement(Card::Lofi, chain);
@@ -535,18 +625,13 @@ bool lofiRows() {
   applyKnob(Card::Lofi, 1, 0.5f, chain);
   double mean = 0.0;
   int count = 0;
-  const bool ok = clipRows(
+  return clipRows(
       "lofi 50/50",
       [&](const Signal& padded) {
         auto s = std::make_unique<Stage<cv::Lofi>>();
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, chain.lofi); })};
       },
-      kMidLoDb, kMidHiDb, mean, count);
-  if (count > 0) {
-    std::printf("NOTE %-30s %+6.2f dB  (mean of %d clips against the rule %+.1f..%+.1f)\n", "lofi 50/50 mean", mean, count,
-                kLoDb, kHiDb);
-  }
-  return ok;
+      kLoDb, kHiDb, mean, count);
 }
 
 // The Chatter card at its default (the engine's LENGTH and AMOUNT 50 %), on Adam's clips, once listening
@@ -698,7 +783,7 @@ ClipFn distortionThrough(const cv::DistortionParams& p) {
 // mean. The synthetic program is reported.
 bool distortionRows(const Signal& program) {
   constexpr double kDriveBandDb = 0.5;
-  const cv::DistortionParams def = boxDistortion(0.3f);
+  const cv::DistortionParams def = boxDistortion(kDistortionRuleDrive);
   double mean = 0.0;
   int count = 0;
   bool ok = clipRows("distortion drive .3", distortionThrough(def), kMidLoDb, kMidHiDb, mean, count);
@@ -767,6 +852,7 @@ bool slotRows(const Signal& in) {
   ok &= octaveRows();
 
   ok &= unisonRows();
+  ok &= unisonSwitchOnRows();
   ok &= crowdRows();
   ok &= formantRows(in);
   ok &= lofiRows();
