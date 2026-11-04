@@ -46,6 +46,13 @@
 // Both stay inside what a human voice does, and the engine clamps each to that range. Each is
 // neutral at 0 (contour 1), where it adds nothing. The defaults are the owner's working set (owner
 // 2026-10-31). Grains are cut on the period grid.
+//
+// Mob 2 (an audition card, owner 2026-11-04) runs this engine with CrowdParams::mob2 set. It plays the
+// four tuned copies alone at DIVERGE 1, and VOICES runs 0 to 4 copies with the lead, then MOB. Each
+// copy adds its own vibrato, which restarts at each word onset its gap rule reads and fades in after
+// it. The pitch drift is wider and faster, and at each gap a copy draws its lag over a wider jitter and
+// its level over a smaller one. The DRIFT knob scales the vibrato, the drift and both jitters together
+// from 0, where the copies are fixed clones, to the full amounts at 1.
 
 namespace cv {
 
@@ -96,6 +103,11 @@ constexpr uint8_t kVoicesMob = 9;
 constexpr std::array<const char*, kVoicesSteps> kVoicesName = {"0", "1", "2", "3", "4",
                                                                "5", "6", "7", "8", "MOB"};
 
+// Mob 2's VOICES positions: 0 to 4 copies with the lead, then MOB.
+constexpr int kVoices2Steps = 6;
+constexpr uint8_t kVoices2Mob = 5;
+constexpr std::array<const char*, kVoices2Steps> kVoices2Name = {"0", "1", "2", "3", "4", "MOB"};
+
 struct CrowdParams {
   bool on = false;
   float width = 1.0f;         // knob A (DIVERGE), 0..1
@@ -107,6 +119,10 @@ struct CrowdParams {
   // soloed power, and MOB scales the soloed copies to unity. This is a tuning hook for the
   // emulator, whose four boxes set bits 0 to 3. The firmware never sets it.
   uint8_t solo = 0;
+
+  // Mob 2 mode. width is then ignored, voicesStep runs 0..kVoices2Mob, and drift is knob A (DRIFT).
+  bool mob2 = false;
+  float drift = 1.0f;  // 0..1
 };
 
 namespace crowd_detail {
@@ -118,6 +134,21 @@ constexpr float kRaisedLagMs = 75.0f;       // a raised copy's lag past its tune
 constexpr float kCopyGain = 0.70710678f;    // 1 / sqrt(2): eight copies hold four copies' power
 constexpr float kSmpPerMs = kSampleRate / 1000.0f;
 static_assert(kVoicesMob == kCopies + 1, "VOICES runs 0 to kCopies, then MOB");
+static_assert(kVoices2Mob == kVoices + 1, "Mob 2's VOICES runs 0 to kVoices, then MOB");
+
+// Mob 2's fixed tuning, each amount at DRIFT 1. Four copies at gain 1 hold the power of Mob's eight.
+// Copy v's vibrato runs at kMob2VibHz[v], peaks at kMob2VibCents[v] and fades in over
+// kMob2VibFadeMs[v] after each word onset, on a square law.
+constexpr float kMob2CopyGain = 1.0f;
+constexpr std::array<float, kVoices> kMob2VibHz = {4.6f, 5.2f, 5.7f, 6.3f};
+constexpr std::array<float, kVoices> kMob2VibCents = {16.0f, 26.0f, 12.0f, 30.0f};
+constexpr std::array<float, kVoices> kMob2VibFadeMs = {250.0f, 150.0f, 400.0f, 300.0f};
+constexpr float kMob2DriftCents = 20.0f;  // the drift peak heard, with no DIVERGE factor on it
+constexpr float kMob2DriftHoldS = 1.5f;
+constexpr float kMob2JitterMs = 25.0f;    // peak lag offset drawn at each gap
+constexpr float kMob2WordGapMs = 80.0f;   // a gap quiet this long past its landing ends a word
+constexpr float kMob2LevelDb = 1.5f;      // peak level offset drawn at each gap
+constexpr float kMob2TrimDb = 3.0f;       // the level rule's trim at VOICES 4, DRIFT 1, on Adam's clips
 
 // The copy that enters at VOICES position j, counting from 1. The order is tuned 0, raised 4,
 // tuned 1, raised 5, and so on.
@@ -367,11 +398,16 @@ class CopyLag {
   // The sum of squares the last settle() read at the copy's lag, or -1 when it read none.
   float heard() const { return heard_; }
 
+  // True when the last settle() heard the copy's read point sound again after a landing, the word
+  // onset at the copy's own lag.
+  bool onset() const { return onset_; }
+
   // Per block. base is the target in samples before scatter. rollLevel says level scatter is on,
   // so each gap also draws a loudness, which keeps the gap rule running when the timing scatter is
   // 0. True when the lag landed on a new value, so the voice restarts its marks there.
   bool settle(const BlockView& b, float base, float scatterSmp, float period, bool rollLevel) {
     heard_ = -1.0f;
+    onset_ = false;
     const float want = formant_detail::clampLag(base + offset_ * scatterSmp, period);
     if (!set_) return land(base, want, rollLevel);
     const bool moved = base != base_;
@@ -384,7 +420,10 @@ class CopyLag {
     heard_ = sum;
     const float quiet = b.quietSq * static_cast<float>(b.n);
     const bool here = sum < quiet;
-    if (sum >= kGapRearm * quiet) landed_ = false;
+    if (sum >= kGapRearm * quiet) {
+      onset_ = landed_;
+      landed_ = false;
+    }
     const bool pending = moved || !landed_;
     const bool calm = here && (!pending || b.quietAt(want));
     quiet_ = calm ? quiet_ + 1 : 0;
@@ -412,6 +451,7 @@ class CopyLag {
   int quiet_ = 0;
   bool set_ = false;
   bool landed_ = false;  // this gap has taken its landing
+  bool onset_ = false;
 };
 
 // The VOICES law at one position. weight[c] is copy c's fixed gain when it plays and 0 when it does
@@ -423,8 +463,9 @@ struct VoicesLaw {
 };
 
 // The copies playing at VOICES position `step`, a bit per copy. Position k plays the first k copies
-// in entry order, and MOB plays all eight.
-inline uint8_t playingCopies(uint8_t step) {
+// in entry order, and MOB plays all eight. Mob 2 plays tuned copies 0 to k - 1, and all four at MOB.
+inline uint8_t playingCopies(uint8_t step, bool mob2 = false) {
+  if (mob2) return static_cast<uint8_t>((1u << (step < kVoices2Mob ? step : kVoices)) - 1u);
   uint8_t mask = 0;
   const size_t count = step < kVoicesMob ? step : kCopies;
   for (size_t j = 1; j <= count; ++j) mask = static_cast<uint8_t>(mask | (1u << entryCopy(j)));
@@ -438,10 +479,10 @@ inline uint8_t playingCopies(uint8_t step) {
 // A playing copy holds the gain g from the tuning, and the lead takes what unity leaves,
 // sqrt(1 - the copies' power), never below 0. MOB drops the lead and scales the copies together to
 // unity power.
-inline VoicesLaw voicesLaw(uint8_t step, const CrowdTuning& t, uint8_t solo = 0) {
+inline VoicesLaw voicesLaw(uint8_t step, const CrowdTuning& t, uint8_t solo = 0, bool mob2 = false) {
   VoicesLaw law;
-  const float g = dbToGainFast(clampf(t.voiceDb, kMinVoiceDb, kMaxVoiceDb)) * kCopyGain;
-  const uint8_t mask = solo == 0 ? playingCopies(step) : solo;
+  const float g = dbToGainFast(clampf(t.voiceDb, kMinVoiceDb, kMaxVoiceDb)) * (mob2 ? kMob2CopyGain : kCopyGain);
+  const uint8_t mask = solo == 0 ? playingCopies(step, mob2) : solo;
   unsigned count = 0;
   for (size_t c = 0; c < kCopies; ++c) {
     const unsigned bit = (mask >> c) & 1u;
@@ -449,7 +490,7 @@ inline VoicesLaw voicesLaw(uint8_t step, const CrowdTuning& t, uint8_t solo = 0)
     law.weight[c] = g * static_cast<float>(bit);
   }
   const float power = static_cast<float>(count) * g * g;
-  if (step < kVoicesMob) {
+  if (step < (mob2 ? kVoices2Mob : kVoicesMob)) {
     law.lead = sqrtf(power < 1.0f ? 1.0f - power : 0.0f);
     return law;
   }
@@ -618,7 +659,7 @@ class Crowd {
   Plan makePlan(const CrowdParams& p, bool havePeriod) {
     Plan plan;
     const CrowdTuning& t = p.tuning;
-    plan.width = crowd_detail::widthFactor(smoothedWidth(p.width), t.widthKnee, t.widthKneeFrac);
+    plan.width = crowd_detail::widthFactor(smoothedWidth(knobWidth(p)), t.widthKnee, t.widthKneeFrac);
     if (!p.on || !havePeriod) {
       glideSet_ = false;
       return plan;
@@ -626,7 +667,7 @@ class Crowd {
     const crowd_detail::VoicesLaw& law = voicesLaw(p);
     float mul = 1.0f;
     glideLaw(law, plan.voice, plan.lead, mul);
-    const float trim = trimAt(t, plan.width);
+    const float trim = p.mob2 ? crowd_detail::kMob2TrimDb : trimAt(t, plan.width);
     if (trim != trimDb_) {
       trimGain_ = dbToGainFast(trim);
       trimDb_ = trim;
@@ -683,20 +724,35 @@ class Crowd {
     uint8_t step = 0;
     float voiceDb = 0.0f;
     uint8_t solo = 0;
+    bool mob2 = false;
     bool set = false;
 
     bool operator==(const LawKey& o) const {
-      return set == o.set && step == o.step && voiceDb == o.voiceDb && solo == o.solo;
+      return set == o.set && step == o.step && voiceDb == o.voiceDb && solo == o.solo && mob2 == o.mob2;
     }
   };
 
   const crowd_detail::VoicesLaw& voicesLaw(const CrowdParams& p) {
-    const LawKey key{p.voicesStep < kVoicesMob ? p.voicesStep : kVoicesMob, p.tuning.voiceDb, p.solo, true};
+    const uint8_t top = p.mob2 ? kVoices2Mob : kVoicesMob;
+    const LawKey key{p.voicesStep < top ? p.voicesStep : top, p.tuning.voiceDb, p.solo, p.mob2, true};
     if (!(key == lawKey_)) {
-      law_ = crowd_detail::voicesLaw(key.step, p.tuning, p.solo);
+      law_ = crowd_detail::voicesLaw(key.step, p.tuning, p.solo, p.mob2);
       lawKey_ = key;
     }
     return law_;
+  }
+
+  // The DIVERGE the engine reads: the knob, or 1 for Mob 2.
+  static float knobWidth(const CrowdParams& p) { return p.mob2 ? 1.0f : p.width; }
+
+  // Mob 2's DRIFT through the 20 ms one-pole, taken outright on the first block after a reset. Mob
+  // reads 0.
+  float smoothedDrift(const CrowdParams& p) {
+    if (!p.mob2) return 0.0f;
+    const float target = smooth::clamp01(p.drift);
+    driftSm_ = driftSet_ ? smooth::step(driftSm_, target, smoothCoef_) : target;
+    driftSet_ = true;
+    return driftSm_;
   }
 
   // The one-pole coefficients for a call of n samples. They hang on n alone, so they are worked out
@@ -708,6 +764,10 @@ class Crowd {
     riseCoef_ = smooth::blockCoef(crowd_detail::kPhraseRiseS, n);
     fallCoef_ = smooth::blockCoef(crowd_detail::kPhraseFallS, n);
     perSample_ = 1.0f / static_cast<float>(n);
+    for (size_t v = 0; v < kVoices; ++v) {
+      const float turns = crowd_detail::kMob2VibHz[v] * static_cast<float>(n) * (1.0f / kSampleRate);
+      vibStep_[v] = static_cast<uint32_t>((turns - static_cast<float>(static_cast<int>(turns))) * 4294967296.0f);
+    }
     coefN_ = n;
   }
 
@@ -735,6 +795,7 @@ class Crowd {
     contour_.reset();
     active_ = 0;
     widthSet_ = false;
+    driftSet_ = false;
     heldPeriod_ = 0.0f;
     phraseSq_ = 0.0f;
     unvoiced_ = 0;
@@ -749,6 +810,12 @@ class Crowd {
     levelMul_[v] = 1.0f;
     levelDb_[v] = 0.0f;
     live_[v] = false;
+    if (v < kVoices) {
+      vibPhase_[v] = 0u;
+      vibAge_[v] = 0.0f;
+      vibGap_[v] = -1.0f;
+      vibHeld_[v] = false;
+    }
   }
 
   // The low cut on the crowd sum. The setter runs on the first block and when the tuning moved. A
@@ -800,8 +867,11 @@ class Crowd {
     float scatterSmp;  // timing scatter in samples
     float levelDb;     // level scatter, clamped to its range
     float driftPeak;   // drift range in cents, clamped and times pitchWidth
+    float driftHoldS;  // time between new drift targets
     std::array<float, 2> keep;  // share of the moves in force, tuned and raised copies, 0 when plain
     float slew;        // one-pole coefficient of the slow walks for this block
+    float spread;      // Mob 2's DRIFT on the vibrato, 0 for Mob
+    bool mob2;
     int n;
   };
 
@@ -843,11 +913,12 @@ class Crowd {
   // glides to 0 through the 20 ms one-pole once the unvoiced run reaches its copies' lag cap plus
   // scatter, or while the tracker reads a note outside its range, so a copy then plays a plain
   // delayed double, exact at any period. Each takes its target outright on the first block with a
-  // period.
-  std::array<float, 2> keepShare(const CrowdTuning& t, const PitchResult& pr, int n) {
+  // period. Mob 2's tuned copies wait for their wider jitter as well.
+  std::array<float, 2> keepShare(const CrowdTuning& t, const PitchResult& pr, int n, bool mob2) {
     unvoiced_ = pr.voiced ? 0 : (unvoiced_ < crowd_detail::kPlainAfterMax ? unvoiced_ + n : unvoiced_);
     const float tunedCap = crowd_detail::tunedCapMs(t);
-    const std::array<float, 2> capMs = {tunedCap, crowd_detail::raisedCapMs(tunedCap)};
+    const float jitterMs = mob2 ? crowd_detail::kMob2JitterMs - crowd_detail::kMaxScatterMs : 0.0f;
+    const std::array<float, 2> capMs = {tunedCap + jitterMs, crowd_detail::raisedCapMs(tunedCap)};
     for (size_t k = 0; k < 2; ++k) {
       const bool plain = unvoiced_ >= crowd_detail::plainAfter(capMs[k]) || pr.outOfRange;
       const float target = plain ? 0.0f : 1.0f;
@@ -866,18 +937,25 @@ class Crowd {
     const PitchResult& pr = pitch.pitch();
     contour_.step(period, pr.voiced, slewCoef_);
     const float pitchWidth = plan.width * crowd_detail::kWidthPitchTop;
+    const float spread = smoothedDrift(p);
+    const bool mob2 = p.mob2;
+    const float scatterMs = mob2 ? crowd_detail::kMob2JitterMs * spread : clampf(t.scatterMs, 0.0f, crowd_detail::kMaxScatterMs);
     const Block b{t,
                   {pitch.ring(), first, n, gapFloor(t)},
                   period,
                   pitch.correctionSemis() * (1.0f / 12.0f),
                   plan.width,
                   pitchWidth,
-                  crowd_detail::lagMultiplier(t, smooth::clamp01(p.width)),
-                  clampf(t.scatterMs, 0.0f, crowd_detail::kMaxScatterMs) * crowd_detail::kSmpPerMs,
-                  clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
-                  clampf(t.driftCents, 0.0f, crowd_detail::kMaxDriftCents) * pitchWidth,
-                  period > 0.0f ? keepShare(t, pr, n) : std::array<float, 2>{1.0f, 1.0f},
+                  crowd_detail::lagMultiplier(t, smooth::clamp01(knobWidth(p))),
+                  scatterMs * crowd_detail::kSmpPerMs,
+                  mob2 ? crowd_detail::kMob2LevelDb * spread : clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
+                  mob2 ? crowd_detail::kMob2DriftCents * spread
+                       : clampf(t.driftCents, 0.0f, crowd_detail::kMaxDriftCents) * pitchWidth,
+                  mob2 ? crowd_detail::kMob2DriftHoldS : t.driftHoldS,
+                  period > 0.0f ? keepShare(t, pr, n, mob2) : std::array<float, 2>{1.0f, 1.0f},
                   slewCoef_,
+                  spread,
+                  mob2,
                   n};
     active_ = 0;
     for (size_t v = 0; v < kCopies; ++v) prepareVoice(v, plan, b);
@@ -908,11 +986,38 @@ class Crowd {
       levelMul_[v] = roll ? dbToGainFast(lag_[v].levelUnit() * b.levelDb) : 1.0f;
       levelDb_[v] = b.levelDb;
     }
-    const float drift = drift_[v].step(driftRng_[v], b.driftPeak, t.driftHoldS, b.slew, b.n);
+    float drift = drift_[v].step(driftRng_[v], b.driftPeak, b.driftHoldS, b.slew, b.n);
+    if (b.mob2 && !raised) drift += vibratoCents(v, landed, b);
     const float offset = raised ? t.pitchSt[src] + crowd_detail::kRaisedSt : t.pitchSt[src];
     const float oct = offset * b.pitchWidth * (1.0f / 12.0f) + drift * (1.0f / 1200.0f) + b.corr;
     voice_[v].prepare(b.period, exp2Fast((oct + contourOctaves(src, t, b.pitchWidth)) * keep),
                       exp2Fast(t.formantSt[src] * b.width * (1.0f / 12.0f) * keep), lag_[v].samples(), b.n);
+  }
+
+  // Mob 2's vibrato on tuned copy v this block, in cents. A gap that stays quiet kMob2WordGapMs past
+  // its landing ends a word. The vibrato drops to 0 there, where the copy is quiet, and holds. At the
+  // onset that ends such a gap its phase starts from 0 and its depth fades in over the copy's fade
+  // time on a square law. A shorter gap, a dip inside a word, leaves the vibrato running.
+  float vibratoCents(size_t v, bool landed, const Block& b) {
+    if (landed) vibGap_[v] = 0.0f;
+    if (lag_[v].onset()) {
+      vibGap_[v] = -1.0f;
+      vibHeld_[v] = false;
+    } else if (vibGap_[v] >= 0.0f && !vibHeld_[v]) {
+      vibGap_[v] += static_cast<float>(b.n);
+      if (vibGap_[v] >= crowd_detail::kMob2WordGapMs * crowd_detail::kSmpPerMs) {
+        vibHeld_[v] = true;
+        vibPhase_[v] = 0u;
+        vibAge_[v] = 0.0f;
+      }
+    }
+    if (vibHeld_[v]) return 0.0f;
+    const float fade = crowd_detail::kMob2VibFadeMs[v] * crowd_detail::kSmpPerMs;
+    const float x = vibAge_[v] < fade ? vibAge_[v] / fade : 1.0f;
+    const float cents = crowd_detail::kMob2VibCents[v] * b.spread * x * x * sinTurns(vibPhase_[v]);
+    vibPhase_[v] += vibStep_[v];
+    vibAge_[v] = vibAge_[v] < fade ? vibAge_[v] + static_cast<float>(b.n) : fade;
+    return cents;
   }
 
   // How far copy v's pitch moves from the lead's, in octaves: (contour - 1) of Adam's deviation.
@@ -1056,6 +1161,11 @@ class Crowd {
   std::array<float, kVoices> shelfDb_{};
   std::array<float, kCopies> gain_{};
   std::array<bool, kCopies> live_{};
+  std::array<uint32_t, kVoices> vibPhase_{};  // Mob 2's vibrato, per tuned copy, in sinTurns units
+  std::array<uint32_t, kVoices> vibStep_{};   // its phase step per block of coefN_ samples
+  std::array<float, kVoices> vibAge_{};       // samples since the onset, up to the fade time
+  std::array<float, kVoices> vibGap_ = {-1.0f, -1.0f, -1.0f, -1.0f};  // samples since the landing, -1 out of a gap
+  std::array<bool, kVoices> vibHeld_{};       // at 0 from a word's end to the onset after it
   std::array<crowd_detail::CopyLag, kCopies> lag_{};
   std::array<crowd_detail::PitchDrift, kCopies> drift_{};
   std::array<crowd_detail::XorShift, kCopies> driftRng_{};
@@ -1067,6 +1177,7 @@ class Crowd {
   float hpHz_ = 0.0f;
   float shelfHz_ = 0.0f;
   float widthSm_ = 1.0f;
+  float driftSm_ = 1.0f;  // Mob 2's DRIFT, smoothed
   crowd_detail::VoicesLaw law_;
   LawKey lawKey_;
   std::array<Glide, kCopies> weightGlide_{};
@@ -1090,6 +1201,7 @@ class Crowd {
   bool keepSet_ = false;
   uint8_t active_ = 0;
   bool widthSet_ = false;
+  bool driftSet_ = false;
   bool hpSet_ = false;
   bool shelfSet_ = false;
   bool idle_ = true;

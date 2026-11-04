@@ -30,7 +30,7 @@ Layout crowdTestLayout();
 // for a layout that failed layoutValid.
 int reverbSlot(const Layout& layout);
 
-// The slot that holds Unison or Crowd, the first one when both are placed; -1 when neither is.
+// The slot that holds Unison, Crowd or Mob 2, the first one when several are placed; -1 when none is.
 int unisonCrowdSlot(const Layout& layout);
 
 // The slot that holds Octave or Formant, the first one when both are placed; -1 when neither is.
@@ -43,13 +43,13 @@ int slot7CardSlot(const Layout& layout);
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
 
-enum class LayoutError : uint8_t { None, BadCard, SameCardTwice, TwoReverbs, NoReverb, OverAvg, OverWorst };
+enum class LayoutError : uint8_t { None, BadCard, SameCardTwice, TwoReverbs, NoReverb, OverAvg, OverWorst, TwoMobs };
 
 // Outcome of layoutValid. The fields beside `error` say which slot, card or percentage broke the rule.
 struct LayoutCheck {
   LayoutError error = LayoutError::None;
   int slot = 0;      // BadCard: zero-based slot holding the out-of-range id
-  Card card = Card::Empty;  // SameCardTwice: the repeated card
+  Card card = Card::Empty;  // SameCardTwice: the repeated card; TwoMobs: the second of the two
   int percent = 0;   // OverAvg, OverWorst: the layout's sum, including the fixed term
 
   bool ok() const { return error == LayoutError::None; }
@@ -64,8 +64,8 @@ struct LayoutCost {
 };
 LayoutCost layoutCost(const Layout& layout);
 
-// Placement rules of the registry spec: ids in range, no card twice (Empty excepted), exactly one reverb card, and the
-// layoutCost sums under the average and worst-block lines.
+// Placement rules of the registry spec: ids in range, no card twice (Empty excepted), exactly one reverb card, at most
+// one of Mob and Mob 2 (they share the Crowd engine), and the layoutCost sums under the average and worst-block lines.
 LayoutCheck layoutValid(const Layout& layout);
 
 // Short readable reason for a failed check, for example "two reverb cards". Empty string when ok.

@@ -645,11 +645,15 @@ void checkSwapUnisonCrowd() {
   Layout sparseCrowd = sparse;
   sparseCrowd.card[3] = Card::Crowd;
   check(layoutValid(sparse).ok() && layoutValid(sparseCrowd).ok(), "action: the sparse layouts pass the placement rules");
+  Layout sparseMob2 = sparse;
+  sparseMob2.card[3] = Card::Crowd2;
   Layout swap = sparse;
   check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparseCrowd,
         "action: SwapUnisonCrowd turns Unison into Crowd in its slot and touches no other slot");
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparseMob2,
+        "action: then turns Crowd into Mob 2");
   check(ui::applyAction(UiAction::SwapUnisonCrowd, s, swap) == ui::ApplyResult::LayoutChanged && swap == sparse,
-        "action: and turns Crowd back into Unison");
+        "action: and turns Mob 2 back into Unison");
 
   Layout moved = sparse;  // the card in slot 6
   moved.card[3] = Card::Empty;
@@ -664,12 +668,31 @@ void checkSwapUnisonCrowd() {
   check(ui::applyAction(UiAction::SwapUnisonCrowd, s, neither) == ui::ApplyResult::None && neither == neitherBefore,
         "action: SwapUnisonCrowd changes nothing when no slot holds either card");
 
+  // Crowd in slot 2 ahead of Unison: the cycle passes over Unison, which would repeat.
   Layout both = sparse;
   both.card[1] = Card::Crowd;
   const Layout bothBefore = both;
-  check(layoutValid(both).ok() && ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::None &&
-            both == bothBefore,
-        "action: SwapUnisonCrowd changes nothing when the other card would repeat");
+  check(layoutValid(both).ok() && ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::LayoutChanged &&
+            both.card[1] == Card::Crowd2 && both.card[3] == Card::Unison,
+        "action: SwapUnisonCrowd passes over a card that would repeat");
+  check(ui::applyAction(UiAction::SwapUnisonCrowd, s, both) == ui::ApplyResult::LayoutChanged && both == bothBefore,
+        "action: and comes back to Crowd");
+
+  // Unison in slot 4 with Mob 2 in slot 6: Crowd would join a second Mob card and Mob 2 would repeat.
+  Layout mob2Placed = sparse;
+  mob2Placed.card[5] = Card::Crowd2;
+  const Layout mob2Before = mob2Placed;
+  check(layoutValid(mob2Placed).ok() &&
+            ui::applyAction(UiAction::SwapUnisonCrowd, s, mob2Placed) == ui::ApplyResult::None && mob2Placed == mob2Before,
+        "action: SwapUnisonCrowd changes nothing when both other cards are refused");
+  Layout twoMobs = sparse;
+  twoMobs.card[3] = Card::Crowd;
+  twoMobs.card[5] = Card::Crowd2;
+  check(layoutValid(twoMobs).error == LayoutError::TwoMobs, "layoutValid: Mob and Mob 2 together are refused");
+  Layout mob2Default = defaultLayout();
+  mob2Default.card[3] = Card::Crowd2;
+  check(layoutValid(mob2Default).ok() && unisonCrowdSlot(mob2Default) == 3,
+        "layoutValid: the default layout with Mob 2 in slot 4 is accepted, and slot 4 is the Unison and Crowd slot");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack && s.polishComp == before.polishComp &&
             s.polishEq == before.polishEq && s.topSwitch == before.topSwitch && s.debug == before.debug,

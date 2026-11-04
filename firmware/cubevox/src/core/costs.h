@@ -119,6 +119,13 @@ constexpr Cost kPitchStage{4, 4, false};
 // engine/formant_voice.h, which Crowd shares.
 constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stress run 2026-11-02 (v2.01.11)
 
+// Mob 2, the Crowd engine with four copies and their vibrato. Host bench 2026-11-04 (g++ 15, -O2 with
+// the firmware's float contraction, Adam's clips, knobs at top, minimum of 9 interleaved passes, the
+// pitch stage's own time taken out): Mob 2 at DRIFT 100 % and MOB 1.625 us a block, Mob at DIVERGE
+// 100 % and MOB 2.659 us, a ratio of 0.611. kCrowd's board cycles times that ratio read 52.9k / 65.3k
+// (8.3 % / 10.2 %), rounded up.
+constexpr Cost kCrowd2{9, 11, false};
+
 // The Formant card, an alternate for Octave in slot 3, and the Lo-fi and Chatter cards, alternates for
 // Gate in slot 7. Formant's row is an estimate: the stress run reads it only together with the
 // tracker and the pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to 8.5 %,

@@ -25,7 +25,8 @@ int reverbSlot(const Layout& layout) {
 
 int unisonCrowdSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (layout.card[s] == Card::Unison || layout.card[s] == Card::Crowd) return s;
+    const Card c = layout.card[s];
+    if (c == Card::Unison || c == Card::Crowd || c == Card::Crowd2) return s;
   }
   return -1;
 }
@@ -64,13 +65,13 @@ LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
-  bool tracker = false;     // Autotune, Crowd or Formant is placed, so the pitch tracker runs
+  bool tracker = false;     // Autotune, Crowd, Mob 2 or Formant is placed, so the pitch tracker runs
   bool autotune = false;
   bool stageUser = false;   // Octave or Formant is placed, so the pitch stage mixes
   for (const Card c : layout.card) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
-    tracker = tracker || c == Card::Autotune || c == Card::Crowd || c == Card::Formant;
+    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || c == Card::Formant;
     autotune = autotune || c == Card::Autotune;
     stageUser = stageUser || c == Card::Octave || c == Card::Formant;
   }
@@ -87,6 +88,7 @@ LayoutCost layoutCost(const Layout& layout) {
 
 LayoutCheck layoutValid(const Layout& layout) {
   int reverbs = 0;
+  int mobs = 0;         // Mob and Mob 2 share one engine
   uint32_t placed = 0;  // bit per non-Empty card already seen
   for (int s = 0; s < kSlotCount; ++s) {
     const Card c = layout.card[s];
@@ -97,6 +99,7 @@ LayoutCheck layoutValid(const Layout& layout) {
       placed |= bit;
     }
     if (cardDesc(c).group == Group::Reverb) ++reverbs;
+    if (engineOf(c) == Engine::Crowd && ++mobs > 1) return fail(LayoutError::TwoMobs, s, c, 0);
   }
   if (reverbs > 1) return fail(LayoutError::TwoReverbs, 0, Card::Empty, 0);
   if (reverbs == 0) return fail(LayoutError::NoReverb, 0, Card::Empty, 0);
@@ -126,6 +129,7 @@ void layoutReason(const LayoutCheck& check, char* buf, size_t size) {
     case LayoutError::SameCardTwice: snprintf(buf, size, "same card twice: %s", cardDesc(check.card).id); break;
     case LayoutError::TwoReverbs: snprintf(buf, size, "two reverb cards"); break;
     case LayoutError::NoReverb: snprintf(buf, size, "no reverb card"); break;
+    case LayoutError::TwoMobs: snprintf(buf, size, "Mob and Mob 2 together"); break;
     case LayoutError::OverAvg: snprintf(buf, size, "over CPU budget (mean %d %%)", check.percent); break;
     case LayoutError::OverWorst: snprintf(buf, size, "over CPU budget (worst %d %%)", check.percent); break;
   }
