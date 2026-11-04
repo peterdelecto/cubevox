@@ -14,7 +14,7 @@
 
 namespace cv {
 
-// The shared input ring holds the Crowd card's longest lag, the timing scatter its working set rides
+// The shared input ring holds the Mob card's longest lag, the timing scatter its working set rides
 // on top of that lag, and the reach of its longest grain (two periods at the tracker's longest, and
 // a pad) behind both. The longest lag is a raised copy's, 75 ms behind a tuned copy at the tuned
 // copies' 150 ms ceiling. 12,756 samples, 265.75 ms. Autotune reads under 2,100 samples back and
@@ -22,7 +22,7 @@ namespace cv {
 constexpr int kCrowdMaxLagMs = 225;
 constexpr int kCrowdScatterMs = 12;
 constexpr int kCrowdGrainReach = 2 * PitchTracker::kMaxPeriod + 8;
-constexpr int kVoiceRingLen = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000) + kCrowdGrainReach;
+constexpr int kVoiceRingLen = static_cast<int>((kCrowdMaxLagMs + kCrowdScatterMs) * kSmpPerMs) + kCrowdGrainReach;
 using VoiceRing = std::array<float, kVoiceRingLen>;
 
 // The pitch ratio a PSOLA voice clamps to, and the delays a grain reads at. A grain never reads
@@ -64,9 +64,6 @@ class PsolaVoice {
   // The gain of the grains that launch from now on, 1 for none. It rides on their tap weights, so
   // a trim costs nothing per sample.
   void setTrim(float gain) { trim_ = gain; }
-
-  // The grain delay in force, after the clamp.
-  float grainDelay() const { return grainDelay_; }
 
   VoiceGrid grid() const { return {markDelay_, countdown_}; }
   void adoptGrid(const VoiceGrid& g) {

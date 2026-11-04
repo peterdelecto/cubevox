@@ -24,7 +24,7 @@ constexpr std::array<int, 7> kMajor = {0, 2, 4, 5, 7, 9, 11};
 inline float midiOf(float hz) {
   const float x = hz / 440.0f;
   const float y = log2Fast(x);
-  return 69.0f + 12.0f * (y + (x * exp2Fast(-y) - 1.0f) * 1.44269504f);
+  return 69.0f + 12.0f * (y + (x * exp2Fast(-y) - 1.0f) * kLog2E);
 }
 
 // How far the pitch midi sits above the nearest major-scale note of key `key` (a kKeyRoot index), in

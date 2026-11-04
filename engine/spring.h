@@ -246,10 +246,7 @@ class Spring {
   void rest(float* wet, int n, float decayTarget) {
     for (int i = 0; i < n; ++i) wet[i] = 0.0f;
     lfoAcc_ += static_cast<uint32_t>(n) * loop_.lfoStep;
-    if (decay_ != decayTarget) {
-      // This block loop of smooth::step stays until smooth::advance lands with the Echo merge.
-      for (int i = 0; i < n; ++i) decay_ = smooth::step(decay_, decayTarget, smooth::kSmoothCoef);
-    }
+    decay_ = smooth::advance(decay_, decayTarget, smooth::kSmoothCoef, n);
   }
 
   // One block of n <= kBlock samples. Input samples pair up as even then odd, and the loops tick on
@@ -273,8 +270,7 @@ class Spring {
     float decayEnd = decay_;
     const bool moving = decay_ != decayTarget;
     if (moving) {
-      // This block loop of smooth::step stays until smooth::advance lands with the Echo merge.
-      for (int i = 0; i < n; ++i) decayEnd = smooth::step(decayEnd, decayTarget, smooth::kSmoothCoef);
+      decayEnd = smooth::advance(decayEnd, decayTarget, smooth::kSmoothCoef, n);
       in1 = inputAt(loop, decayEnd);
     }
 

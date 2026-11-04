@@ -513,8 +513,8 @@ SlotGains slotGains(int from, int to) {
 }
 
 // The gain law of the slot crossfade. One whole fade in is 6 blocks of 64 samples, 8 ms, with the
-// engine gain rising and the dry gain falling as the sine and cosine of one phase, so the two keep
-// equal power at every sample and meet at 0.7071 in the middle.
+// engine gain rising and the dry gain falling in a straight line, so the two sum to 1 at every sample
+// and meet at 0.5 in the middle. A card whose output equals its input then holds its level.
 void checkSlotFadeLaw() {
   std::vector<float> ge;
   std::vector<float> gd;
@@ -525,27 +525,26 @@ void checkSlotFadeLaw() {
   }
   check(ge.size() == 384 && kSlotFadeBlocks == 6 && kN == 64 && ge.size() * 1000 / cv::kSampleRate == 8,
         "slot fade: six blocks of 64 samples, 8 ms");
-  float worstPower = 0.0f;
+  float worstSum = 0.0f;
   bool monotone = true;
   for (size_t i = 0; i < ge.size(); ++i) {
-    worstPower = std::max(worstPower, std::fabs(ge[i] * ge[i] + gd[i] * gd[i] - 1.0f));
+    worstSum = std::max(worstSum, std::fabs(ge[i] + gd[i] - 1.0f));
     if (i > 0) monotone = monotone && ge[i] >= ge[i - 1] - 1e-6f && gd[i] <= gd[i - 1] + 1e-6f;
   }
-  check(worstPower < 2e-5f, "slot fade: the two gains sum to unity power at every sample");
+  check(worstSum < 2e-7f, "slot fade: the two gains sum to unity gain at every sample");
   check(monotone, "slot fade: the engine gain only rises and the dry gain only falls");
 
   // The midpoint is the last sample of block 3, 192 samples into the 384.
   const SlotGains mid = slotGains(2, 3);
-  check(std::fabs(mid.engine.back() - 0.70710678f) < 1e-5f && std::fabs(mid.dry.back() - 0.70710678f) < 1e-5f &&
-            std::fabs(mid.engine.back() * mid.engine.back() + mid.dry.back() * mid.dry.back() - 1.0f) < 2e-5f,
-        "slot fade: at the midpoint both gains read 0.7071 and sum to unity power");
+  check(std::fabs(mid.engine.back() - 0.5f) < 1e-6f && std::fabs(mid.dry.back() - 0.5f) < 1e-6f,
+        "slot fade: at the midpoint both gains read 0.5");
 
-  const float step = (cv::kHalfPi) / static_cast<float>(ge.size());
+  const float step = 1.0f / static_cast<float>(ge.size());
   float worstStep = 0.0f;
   for (size_t i = 1; i < ge.size(); ++i) worstStep = std::max(worstStep, std::fabs(ge[i] - ge[i - 1]));
-  check(worstStep < 1.01f * step + 2e-6f && step > 0.0040f && step < 0.0042f,
-        "slot fade: no gain moves by more than pi/2 over 384 samples, 0.0041 per sample");
-  check(ge.front() < 2.0f * step && ge.back() > 0.99999f && gd.back() == 0.0f && gd.front() > 0.9999f,
+  check(worstStep < 1.01f * step + 2e-7f && step > 0.0026f && step < 0.0027f,
+        "slot fade: every gain moves by 1/384 a sample, 0.0026");
+  check(ge.front() < 2.0f * step && ge.back() == 1.0f && gd.back() == 0.0f && gd.front() > 0.9970f,
         "slot fade: the fade in starts at the dry input and ends at the engine alone");
 
   // A fade out is the same curve backwards: it runs from the sample before the fade in's last one
@@ -565,6 +564,31 @@ void checkSlotFadeLaw() {
   check(std::fabs(up.engine.front() - down.engine.back()) < 1.01f * step + 2e-6f &&
             std::fabs(up.dry.front() - down.dry.back()) < 1.01f * step + 2e-6f,
         "slot fade: turning a fade round mid-way joins the gains without a step");
+}
+
+// A card whose output equals its input (an open gate, Unison at dry unity, Lo-fi's first blocks) crosses
+// the fade without a swell or a dip: the level of every block, fading in and out, stays within 0.1 dB.
+void checkSlotFadeHoldsLevel() {
+  float worstDb = 0.0f;
+  float worstDiff = 0.0f;
+  for (const bool fadeIn : {true, false}) {
+    for (int k = 0; k < kSlotFadeBlocks; ++k) {
+      const int from = fadeIn ? k : kSlotFadeBlocks - k;
+      const int to = fadeIn ? k + 1 : kSlotFadeBlocks - k - 1;
+      std::vector<float> dry(kN);
+      for (int i = 0; i < kN; ++i) dry[static_cast<size_t>(i)] = 0.5f * std::sin(0.31f * static_cast<float>(k * kN + i));
+      std::vector<float> wet = dry;
+      mixSlotFade(wet.data(), dry.data(), kN, from, to);
+      double in2 = 0.0, out2 = 0.0;
+      for (size_t i = 0; i < dry.size(); ++i) {
+        in2 += static_cast<double>(dry[i]) * static_cast<double>(dry[i]);
+        out2 += static_cast<double>(wet[i]) * static_cast<double>(wet[i]);
+        worstDiff = std::max(worstDiff, std::fabs(wet[i] - dry[i]));
+      }
+      worstDb = std::max(worstDb, static_cast<float>(std::fabs(10.0 * std::log10(out2 / in2))));
+    }
+  }
+  check(worstDb < 0.1f && worstDiff < 1e-6f, "slot fade: a card whose output equals its input holds its level within 0.1 dB across the fade");
 }
 
 void checkSlotFadeLevels() {
@@ -1296,6 +1320,7 @@ void checkChainRun() {
   checkBypassFade();
   checkBypassMidAndReversal();
   checkSlotFadeLaw();
+  checkSlotFadeHoldsLevel();
   checkSlotFadeLevels();
   checkSlotFlipToOff();
   checkSlotFlipOnClearsEngine();

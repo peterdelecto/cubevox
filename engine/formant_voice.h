@@ -6,10 +6,11 @@
 
 #include "engine/common.h"
 #include "engine/dsp.h"
+#include "engine/fastmath.h"
 #include "engine/pitch.h"
 #include "engine/psola.h"
 
-// The grain voice that the Crowd card's copies and the Formant card share. It reads the pitch stage's
+// The grain voice that the Mob card's copies and the Formant card share. It reads the pitch stage's
 // input ring and cuts grains on the tracker's period grid, with a pitch ratio and a grain playback
 // rate of its own. The owner of the ring, the tracker and the mix (PitchFx, Crowd) drives it.
 
@@ -50,7 +51,6 @@ constexpr int kHannBits = 10;
 constexpr int kHannShift = 32 - kHannBits;
 constexpr uint32_t kHannFracMask = (1u << kHannShift) - 1u;
 constexpr float kHannFracScale = 1.0f / static_cast<float>(1u << kHannShift);
-constexpr float kTurn = 4294967296.0f;  // one turn of the counter
 
 // sin x for x in [0, pi / 2], to double rounding.
 constexpr double hannSine(double x) {
@@ -108,8 +108,8 @@ class FormantPsolaVoice {
   float rate() const { return rate_; }
 
   // On, a grain keeps the gain it launched with, so a step in rate or ratio reaches only the grains
-  // that launch after it. Off, every grain in flight takes the newest gain, as the Crowd copies'
-  // slow glides have it. The Crowd card runs it off, and crowd_test's pinned hashes and the MOB
+  // that launch after it. Off, every grain in flight takes the newest gain, as the Mob copies'
+  // slow glides have it. The Mob card runs it off, and crowd_test's pinned hashes and the Mob
   // renders hold that sound.
   void latchGain(bool on) { latch_ = on; }
 
@@ -139,7 +139,7 @@ class FormantPsolaVoice {
     const float r = clampf(ratio, kMinPitchRatio, kMaxPitchRatio);
     outPeriod_ = p_ / r;
     setGrain(r);
-    turn_ = kTurn / dur_;
+    turn_ = kTurn32 / dur_;
     turnStep_ = static_cast<uint32_t>(turn_);
     drift_ = (1.0f - rate_) * dur_;
     setReadSpan(n);
@@ -398,8 +398,8 @@ class FormantPsolaVoice {
   float rate_ = 1.0f;
   float outPeriod_ = kMinPeriod;
   float dur_ = 2.0f * kMinPeriod;
-  float turn_ = kTurn / (2.0f * kMinPeriod);  // window turn per sample of grain, as a float
-  uint32_t turnStep_ = static_cast<uint32_t>(kTurn / (2.0f * kMinPeriod));
+  float turn_ = kTurn32 / (2.0f * kMinPeriod);  // window turn per sample of grain, as a float
+  uint32_t turnStep_ = static_cast<uint32_t>(kTurn32 / (2.0f * kMinPeriod));
   float amp_ = 0.5f;  // half the grain gain, rate / ratio, so the window needs no 0.5
   float drift_ = 0.0f;
   float lo_ = kMinReadDelay;  // the delays a launch may read, set per call
