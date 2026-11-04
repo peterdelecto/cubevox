@@ -7,10 +7,14 @@
 
 // What a silent input reads as, and the lowest level reported.
 constexpr float kFloorSilentDb = -120.0f;
+constexpr float kFloorSilentLinear = 1e-6f;  // 10^(kFloorSilentDb / 20)
 
-// The level of a linear peak (full scale 1) in dBFS, never below kFloorSilentDb.
+// The highest level reported. The detector reads nothing past +80 dBFS, so this is its own ceiling.
+constexpr float kFloorTopDb = 80.0f;
+
+// The level of a linear peak (full scale 1) in dBFS, between kFloorSilentDb and kFloorTopDb.
 inline float peakDbfs(float peak) {
-  if (!(peak > 1e-6f)) return kFloorSilentDb;  // also catches NaN
+  if (!(peak > kFloorSilentLinear)) return kFloorSilentDb;  // also catches NaN
   const float db = 20.0f * log10f(peak);
-  return db > kFloorSilentDb ? db : kFloorSilentDb;
+  return db < kFloorTopDb ? db : kFloorTopDb;
 }

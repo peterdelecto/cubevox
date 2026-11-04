@@ -138,8 +138,9 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 // crossfade. A slot settled off runs no engine and writes nothing, so the caller keeps its buffers
 // and the dry input passes. A slot that starts a fade in has its engine cleared first. A flip back
 // during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot is
-// off, because its detector feeds the status reply's `floor_dbfs`. Returns false when it wrote
-// nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave,
+// off, because its detector feeds the status reply's `floor_dbfs` and keys the Chatter card; its own
+// off fade ends inside the slot fade, so the settled slot passes the input bit for bit. Returns false
+// when it wrote nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave,
 // Formant or Crowd) while any pitch-group toggle is on, and its fade follows all of them. A Formant
 // card behind another pitch-group card acts at that first slot, not at its own. A Crowd card keeps a
 // live ring and tracker with Autotune and Octave off, wherever it sits against them. The Crowd card's

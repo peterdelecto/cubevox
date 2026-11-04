@@ -5,7 +5,7 @@
 namespace {
 
 // Input gate THRESHOLD until composeSnapshot applies the card's knobs; the middle of its range.
-constexpr float kInputGateThresholdDb = -55.0f;
+constexpr float kInputGateThresholdDb = 0.5f * (cv::kInputGateThresholdMinDb + cv::kInputGateThresholdMaxDb);
 
 }  // namespace
 

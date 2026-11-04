@@ -143,7 +143,7 @@ Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
 }
 
 void checkRouting() {
-  ChainParams p;  // the input gate is on and the panel gate is off
+  ChainParams p;  // the Input gate is on and the Gate is off
   p.inputGate.thresholdDb = 0.0f;
   p.inputGate.tuning.holdMs = 0.0f;
   p.gate.thresholdDb = 0.0f;
@@ -774,7 +774,8 @@ void checkSlotFlipReverses() {
 }
 
 // The Input gate's engine runs while its slot is off, because its detector feeds the status reply's
-// floor_dbfs. A Gate card stops with its slot. Either way the dry input passes bit for bit.
+// floor_dbfs and keys the Chatter card. A Gate card stops with its slot. Either way the dry input passes
+// bit for bit.
 void checkInputGateKeepsDetector() {
   const Block in = tone(0, 0.3f);
   for (const bool inputGate : {true, false}) {
@@ -796,6 +797,36 @@ void checkInputGateKeepsDetector() {
       check(peak > 0.0f && after == 0.0f && same, "slot flip: a Gate card stops with its toggle off and the block passes untouched");
     }
   }
+}
+
+// The Input gate switched off in a pause, with the room floor 9 dB under its threshold and the gate
+// shut, brings the floor up to the dry level inside the slot fade and holds it there. The gate's own off
+// fade ends with the slot fade, so the floor does not cut again and swell back after the slot passes the
+// engine's output alone.
+void checkInputGateOffInPause() {
+  const Layout layout = layoutOf({Card::InputGate});
+  const ChainSnapshot on = snapshotToggles(layout, 0.5f, allToggles(true));
+  const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
+  constexpr float kFloorAmp = 0.0006f;  // -64 dBFS against the default threshold of -55 dBFS
+  auto rig = newRig();
+  for (int b = 0; b < 300; ++b) runBlock(*rig, on, tone(b, kFloorAmp), StillClock());
+  const bool shut = rig->engines.inputGate.gainDb() < -60.0f;
+  std::vector<double> gainDb;
+  for (int b = 300; b < 330; ++b) {
+    const Block in = tone(b, kFloorAmp);
+    const Run run = runBlock(*rig, off, in, StillClock());
+    gainDb.push_back(10.0 * std::log10(rms(run.out) * rms(run.out) / (rms(in) * rms(in))));
+  }
+  bool climbs = true;
+  for (int b = 1; b < kSlotFadeBlocks; ++b) climbs = climbs && gainDb[static_cast<size_t>(b)] >= gainDb[static_cast<size_t>(b - 1)] - 0.05;
+  double worstAfter = 0.0;
+  double highest = -200.0;
+  for (size_t b = 0; b < gainDb.size(); ++b) {
+    highest = std::max(highest, gainDb[b]);
+    if (b >= static_cast<size_t>(kSlotFadeBlocks)) worstAfter = std::max(worstAfter, std::fabs(gainDb[b]));
+  }
+  check(shut && climbs && worstAfter < 1.0 && highest < 0.1,
+        "slot flip: the Input gate switched off in a pause brings the floor up inside the fade and holds it within 1 dB");
 }
 
 // Autotune and Octave share one PitchFx call at the first pitch card's slot. The stage follows either
@@ -1369,6 +1400,7 @@ void checkChainRun() {
   checkUnisonToggle();
   checkSlotFlipReverses();
   checkInputGateKeepsDetector();
+  checkInputGateOffInPause();
   checkPitchStageToggles();
   checkCrowdStage();
   checkCrowdPitchStage();
