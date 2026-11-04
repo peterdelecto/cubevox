@@ -81,7 +81,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
-    {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("DRIVE")}, Group::Pitch, costs::kGrowl},
+    {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
     {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::Pitch,
      costs::kRingMod},
     {Card::Strings, "strings", "Strings", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,
@@ -202,11 +202,13 @@ void applyBloomKnob(int knob, float v, cv::BloomParams& b) {
   }
 }
 
+// The GROWL pot sets the rasp and the fold together, each a straight line from 0.
 void applyGrowlKnob(int knob, float v, cv::GrowlParams& g) {
   if (knob == 0) {
-    g.growl = v;
+    g.growl = v * cv::kGrowlRaspTop;
+    g.drive = v * cv::kGrowlDriveTop;
   } else {
-    g.drive = v;
+    g.mix = v;
   }
 }
 
