@@ -80,10 +80,10 @@ int usage() {
                "       [--growl <0..1>, GROWL] [--gdrive <0..1>, the Growl card's DRIVE, default 0.5]\n"
                "       [--reverb spring|chasm] [--time <0..1>] [--mix <0..1>]\n"
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
-               "       [--lofi <0..1>, AMOUNT] [--lofi-tone <0..1>]\n"
+               "       [--lofi <0..1>, the AMOUNT pot] [--lofi-tone <0..1>, the TONE pot]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
                "       [--polish-comp firm|off] [--polish-eq on|off] [--comp-stats]\n"
-               "       [--eq] [--eqdip <hz>,<db>] [--eqpres <hz>,<db>]\n"
+               "       [--eqdip <150..600 hz>,<-6..0 db>] [--eqpres <2000..6000 hz>,<0..6 db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
                "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
                "  --fmix the MIX (default 1); with --autotune its voice follows the tuned note and lines up with it\n"
@@ -111,12 +111,13 @@ int usage() {
                "  back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp, both on by default\n"
                "  comp and eq are the box's polish tail and run by default, the comp at its firm tuning\n"
                "  --polish-comp off and --polish-eq off\n"
-               "  switch them out for A/B listening, --polish-eq off for both halves; --eq is accepted and changes\n"
-               "  nothing\n"
+               "  switch them out for A/B listening, --polish-eq off for both halves\n"
                "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
-               "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb\n"
+               "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb trimDb\n"
                "     topFrom topSwingGain topWetDb\n"
-               "     octGrainWindowMs (20..80) octTrimDb (-24..24) eqTrimDb\n"
+               "     (the Unison keys: the taps must stay on the line, lfoHz 0..20, the dB keys -24..24, topFrom 0..1,\n"
+               "     topSwingGain 0..2)\n"
+               "     octGrainWindowMs (20..80) octTrimDb (-24..24)\n"
                "     slapTimeMs (60..250) slapLowpassHz (500..12000) slapFeedback (0..0.5) slapWetMaxDb slapTrimDb (-24..24)\n"
                "     distInputHpHz distS1BassHz distS1BassDb distS1LpHz distGain1Min distGain1Max distTopBoostDb\n"
                "     distTopBoostFrom distStackBassHz\n"
@@ -135,7 +136,7 @@ int usage() {
                "     springReturnLpHz (the three corners 20..10800, the loops' Nyquist is 12000) springWobbleDepth (0..32) springWobbleRateHz (0..10)\n"
                "     springDwell (0..1) springDwellDrive (1..64) springDwellComp (0..2)\n"
                "     springWetDb (-24..24) springRestLevel (0..0.001, a silent input rests the springs below this; 0 never)\n"
-               "     eqDipQ eqPresenceQ\n"
+               "     eqDipQ eqPresenceQ (0.1..10) eqTrimDb (-12..12)\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
                "     atTrimDb (-24..24) atGrainDelay fmTrimDb (-24..24, added to every entry of the SHIFT trim table)\n"
                "     crowdVoiceDb (-24..0) crowdTrimDb crowdTrimBottomDb (-12..12) crowdFormantSt0..3 crowdPitchSt0..3\n"
@@ -149,16 +150,18 @@ int usage() {
                "     growlDriveDb (0..48) growlMakeupSat (1..1000) growlRailSoft (0.01..1) growlRailAsym (0..0.5)\n"
                "     growlTrimDb (-24..24)\n"
                "     decayMs (10..2000, default 300), the time Yawn's sweep takes to fall back to 0\n"
-               "  every value must be finite, and a crowd, chasm or spring key outside its range is refused\n"
+               "  every value must be finite, and a key outside its range is refused, whichever stage it belongs to\n"
                "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
                "     ingAttackMs ingHoldMs ingReleaseMs ingRangeDb ingKneeDb ingDetectorHpHz ingHysteresisDb\n"
                "     ingDetectorAttackMs ingDetectorReleaseMs\n"
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
+               "     gtDetectorAttackMs gtDetectorReleaseMs\n"
+               "     (the gate keys: the attack and release times above 0, hold 0..10000 ms, the detector times 0 and up,\n"
+               "     the range 0 dB and under, the knee, hysteresis and detector high-pass 0 and up)\n"
                "     lofiFcLoHz lofiFcHiHz lofiHpStartHz lofiHpEndRatio lofiLpStartHz lofiLpEndRatio lofiHonkDb lofiHonkQ\n"
                "     lofiDriveDb lofiHoldMaxHz lofiHoldMinHz lofiBitsMax lofiBitsMin lofiTrimDb\n"
                "     lofiMakeup<tone 0..4>_<amount 0..6> (dB, the makeup table by TONE 0, 25 ... 100 %% and the law's AMOUNT 0, 10 ... 60 %%)\n"
-               "  a lofi key outside its range is refused\n"
                "  --time and --mix are the panel's TIME and MIX positions for the selected reverb engine (default 0.5);\n"
                "  each engine's dwell is its springDwell or chmDwell key\n",
                static_cast<double>(cv::crowd_detail::kMinDelayMs), cv::kCrowdMaxLagMs,
@@ -190,12 +193,14 @@ bool parseCompChoice(const char* s, RenderParams* rp) {
   return std::strcmp(s, "on") == 0 || std::strcmp(s, "firm") == 0;
 }
 
-// "hz,db"
+// "hz,db", each a finite number.
 bool parsePair(const char* s, float* hz, float* db) {
-  char* end = nullptr;
-  *hz = std::strtof(s, &end);
-  if (end == s || *end != ',') return false;
-  return parseFloat(end + 1, db);
+  const char* comma = std::strchr(s, ',');
+  char head[32];
+  if (comma == nullptr || static_cast<size_t>(comma - s) >= sizeof head) return false;
+  std::memcpy(head, s, static_cast<size_t>(comma - s));
+  head[comma - s] = '\0';
+  return parseFloat(head, hz) && parseFloat(comma + 1, db);
 }
 
 bool inside(float v, float lo, float hi) { return v >= lo && v <= hi; }
@@ -233,16 +238,36 @@ bool crowdTuningInRange(const cv::CrowdTuning& t) {
 
 // Every Lo-fi key refuses a value outside the range the engine takes.
 bool lofiTuningInRange(const cv::LofiTuning& t) {
+  using Lofi = cv::Lofi;
+  const auto hold = [](float hz) { return inside(hz / static_cast<float>(cv::kSampleRate), Lofi::kMinHoldRatio, 1.0f); };
   for (const auto& row : t.makeupDb)
     for (const float m : row)
       if (!inside(m, -24.0f, 36.0f)) return false;
   return inside(t.fcLoHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.fcHiHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
          inside(t.hpStartHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
          inside(t.lpStartHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.hpEndRatio, 0.05f, 4.0f) &&
-         inside(t.lpEndRatio, 0.25f, 20.0f) && inside(t.honkDb, -24.0f, 24.0f) && inside(t.honkQ, 0.1f, 20.0f) &&
-         inside(t.driveDb, -24.0f, 48.0f) && inside(t.holdMaxHz, 480.0f, 48000.0f) &&
-         inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
-         inside(t.trimDb, -24.0f, 24.0f);
+         inside(t.lpEndRatio, 0.25f, 20.0f) && inside(t.honkDb, -24.0f, 24.0f) && inside(t.honkQ, cv::kPeakMinQ, 20.0f) &&
+         inside(t.driveDb, -24.0f, 48.0f) && hold(t.holdMaxHz) &&
+         hold(t.holdMinHz) && inside(t.bitsMax, Lofi::kMinBits, Lofi::kMaxBits) &&
+         inside(t.bitsMin, Lofi::kMinBits, Lofi::kMaxBits) && inside(t.trimDb, -24.0f, 24.0f);
+}
+
+// Every gate key refuses a value the engine would clamp or turn into a degenerate time. The two
+// detector times may be 0, which follows at once.
+bool gateTuningInRange(const cv::GateTuning& t) {
+  return t.attackMs > 0.0f && t.releaseMs > 0.0f && inside(t.holdMs, 0.0f, cv::kGateHoldMaxMs) &&
+         t.rangeDb <= 0.0f && t.kneeDb >= 0.0f && inside(t.detectorHpHz, 0.0f, cv::kFilterMaxHz) &&
+         t.hysteresisDb >= 0.0f && t.detectorAttackMs >= 0.0f && t.detectorReleaseMs >= 0.0f;
+}
+
+// Every Unison key refuses a value outside the range the engine takes, and a delay and swing that
+// would carry a tap off the line.
+bool unisonTuningInRange(const cv::UnisonTuning& t) {
+  using Uni = cv::Unison;
+  const auto level = [](float v) { return inside(v, -Uni::kLevelLimitDb, Uni::kLevelLimitDb); };
+  return Uni::tapsFit(t) && inside(t.lfoHz[0], 0.0f, Uni::kLfoMaxHz) && inside(t.lfoHz[1], 0.0f, Uni::kLfoMaxHz) &&
+         t.swingMinMs >= 0.0f && t.swingMaxMs >= 0.0f && level(t.wetMaxDb) && level(t.trimDb) && level(t.topWetDb) &&
+         inside(t.topFrom, 0.0f, 1.0f) && inside(t.topSwingGain, 0.0f, Uni::kTopSwingGainMax);
 }
 
 // Every Echo key refuses a value outside the range the engine clamps to.
@@ -264,9 +289,9 @@ bool distortionTuningInRange(const cv::DistortionTuning& t) {
          gain(t.gain1Max) && inside(t.topBoostDb, 0.0f, Dist::kDbLimit) && inside(t.topBoostFrom, 0.0f, 1.0f) &&
          hz(t.stackBassHz) && db(t.stackBassDb) && hz(t.stackTrebleHz) && db(t.stackTrebleDb) &&
          db(t.stackLossDb) && hz(t.s2HpHz) && hz(t.s2LpHz) && gain(t.gain2Min) && gain(t.gain2Max) &&
-         inside(t.railAsym, 0.0f, 0.5f) && inside(t.railSoft, 0.01f, 1.0f) && hz(t.trebleCutHz) &&
-         db(t.trebleCutDb) && db(t.toneMinDb) && db(t.toneMaxDb) && hz(t.bassPeakHz) && db(t.bassPeakDb) &&
-         t.bassPeakQ >= 0.1f && db(t.trimDb) && inside(t.fadeDrive, Dist::kFadeDriveMin, 1.0f);
+         inside(t.railAsym, 0.0f, Dist::kRailAsymMax) && inside(t.railSoft, Dist::kRailSoftMin, 1.0f) &&
+         hz(t.trebleCutHz) && db(t.trebleCutDb) && db(t.toneMinDb) && db(t.toneMaxDb) && hz(t.bassPeakHz) &&
+         db(t.bassPeakDb) && t.bassPeakQ >= cv::kPeakMinQ && db(t.trimDb) && inside(t.fadeDrive, Dist::kFadeDriveMin, 1.0f);
 }
 
 // Every Growl key refuses a value outside the range the engine clamps to.
@@ -333,7 +358,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"baseDelayMs0", &t.baseDelayMs[0]}, {"baseDelayMs1", &t.baseDelayMs[1]},
       {"lfoHz0", &t.lfoHz[0]},             {"lfoHz1", &t.lfoHz[1]},
       {"swingMinMs", &t.swingMinMs},       {"swingMaxMs", &t.swingMaxMs},
-      {"wetMaxDb", &t.wetMaxDb},
+      {"wetMaxDb", &t.wetMaxDb},   {"trimDb", &t.trimDb},
       {"topFrom", &t.topFrom},             {"topSwingGain", &t.topSwingGain},
       {"topWetDb", &t.topWetDb},
       {"octGrainWindowMs", &ot.grainWindowMs},
@@ -414,6 +439,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"gtReleaseMs", &gt.releaseMs},         {"gtRangeDb", &gt.rangeDb},
       {"gtKneeDb", &gt.kneeDb},               {"gtDetectorHpHz", &gt.detectorHpHz},
       {"gtHysteresisDb", &gt.hysteresisDb},
+      {"gtDetectorAttackMs", &gt.detectorAttackMs}, {"gtDetectorReleaseMs", &gt.detectorReleaseMs},
       {"lofiFcLoHz", &lt.fcLoHz},             {"lofiFcHiHz", &lt.fcHiHz},
       {"lofiHpStartHz", &lt.hpStartHz},       {"lofiHpEndRatio", &lt.hpEndRatio},
       {"lofiLpStartHz", &lt.lpStartHz},       {"lofiLpEndRatio", &lt.lpEndRatio},
@@ -455,6 +481,8 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       return false;
     if (!crowdTuningInRange(ct) || !lofiTuningInRange(lt) || !growlTuningInRange(grt)) return false;
     if (!slapbackTuningInRange(st) || !distortionTuningInRange(dt)) return false;
+    if (!unisonTuningInRange(t) || !gateTuningInRange(ig) || !gateTuningInRange(gt)) return false;
+    if (!cv::polishParamsInRange(rp.eq)) return false;
     if (!inside(fft.decayMs, cv::kFollowerMinDecayMs, cv::kFollowerMaxDecayMs)) return false;
     spr.chirpSections = static_cast<int>(springSections);
     return true;
@@ -490,8 +518,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveDepth = true;
     } else if (std::strcmp(a, "--on") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
-      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0)
-        return false;
+      if (std::strcmp(v, "0") != 0 && std::strcmp(v, "1") != 0) return false;
       p.on = v[0] == '1';
       haveOn = true;
     } else if (std::strcmp(a, "--slap") == 0 && i + 1 < argc) {
@@ -526,8 +553,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
         return false;
       haveInGate = true;
     } else if (std::strcmp(a, "--gate") == 0 && i + 1 < argc) {
-      if (!parseFloat(argv[++i], &rp.gate.thresholdDb) || rp.gate.thresholdDb < -70.0f ||
-          rp.gate.thresholdDb > -10.0f)
+      if (!parseFloat(argv[++i], &rp.gate.thresholdDb) || rp.gate.thresholdDb < cv::kGateThresholdMinDb ||
+          rp.gate.thresholdDb > cv::kGateThresholdMaxDb)
         return false;
       haveGate = true;
     } else if (std::strcmp(a, "--amount") == 0 && i + 1 < argc) {
@@ -538,8 +565,6 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
           rp.bloom.lengthMs > cv::Bloom::kLengthMaxMs)
         return false;
       haveBloom = true;
-    } else if (std::strcmp(a, "--eq") == 0) {
-      // The EQ runs by default; the flag stays so old command lines still parse.
     } else if (std::strcmp(a, "--comp-stats") == 0) {
       rp.compStats = true;
     } else if (std::strcmp(a, "--polish-comp") == 0 && i + 1 < argc) {
@@ -625,7 +650,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       return false;
     }
   }
-  if (positional != 2) return false;
+  if (positional != 2 || !cv::polishParamsInRange(rp.eq)) return false;
   // --time and --mix reach the engines the way the panel does.
   if (haveKnobs) {
     rp.reverb.time = time;

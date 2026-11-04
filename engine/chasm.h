@@ -231,7 +231,7 @@ class Chasm {
     const float depth = clampf(t.wobbleDepth, 0.0f, kMaxWobble);
     c.depth = depth;
     c.lfoStep = static_cast<uint32_t>(clampf(t.wobbleRateHz, 0.0f, kMaxWobbleHz) * reverb_parts::kPhasePerHz);
-    const float wetGain = powf(10.0f, clampf(t.wetDb, -kMaxWetDb, kMaxWetDb) / 20.0f);
+    const float wetGain = dbToGain(clampf(t.wetDb, -kMaxWetDb, kMaxWetDb));
     const reverb_parts::DwellGain dwell = reverb_parts::dwellGain(t.dwell, t.dwellDrive, t.dwellComp);
     c.drive = dwell.drive;
     c.inScale = dwell.comp * clampf(t.inputTrim, 0.0f, kMaxInputTrim) * wetGain;

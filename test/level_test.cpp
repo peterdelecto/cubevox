@@ -36,6 +36,7 @@
 #include "engine/unison.h"
 
 #include "distortion_rule.h"
+#include "signal_util.h"
 
 namespace {
 
@@ -256,30 +257,7 @@ cv::PitchFxParams boxFormantAt(int shiftSt, float mix) {
 // The card at its default SHIFT.
 cv::PitchFxParams boxFormant(float mix) { return boxFormantAt(cv::kFormantDefaultShiftSt, mix); }
 
-// 16-bit mono PCM WAV, any chunks before data. Empty on a missing or other file.
-Signal readWav(const std::string& path) {
-  std::ifstream f(path, std::ios::binary);
-  if (!f) return {};
-  std::vector<char> b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-  if (b.size() < 12 || std::memcmp(b.data(), "RIFF", 4) != 0) return {};
-  size_t pos = 12;
-  while (pos + 8 <= b.size()) {
-    uint32_t len;
-    std::memcpy(&len, &b[pos + 4], 4);
-    if (std::memcmp(&b[pos], "data", 4) == 0) {
-      const size_t n = std::min<size_t>(len, b.size() - pos - 8) / 2;
-      Signal x(n);
-      for (size_t i = 0; i < n; ++i) {
-        int16_t s;
-        std::memcpy(&s, &b[pos + 8 + 2 * i], 2);
-        x[i] = static_cast<float>(s) / 32768.0f;
-      }
-      return x;
-    }
-    pos += 8 + len + (len & 1);
-  }
-  return {};
-}
+using testutil::readWav;
 
 // samples/ is wholly git-ignored, so CI has none and the clip rows skip. With the folder there, a clip
 // that is missing or empty fails its row.

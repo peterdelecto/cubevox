@@ -61,7 +61,7 @@ struct BloomParams {
 class Bloom {
  public:
   static constexpr int kSlices = 3;                          // the loop, the capture, the fading tail
-  static constexpr int kSliceMax = 80 * kSampleRate / 1000;  // 80 ms, 3,840 samples
+  static constexpr int kSliceMax = static_cast<int>(80.0f * kSmpPerMs);  // 80 ms, 3,840 samples
   static constexpr int kVoices = 4;                          // word, tail, and two fading tails
   static constexpr int kWord = 0;                            // voice numbers
   static constexpr int kTail = 1;
@@ -158,9 +158,7 @@ class Bloom {
   const float* sliceData(int slot) const { return data_[static_cast<size_t>(slot)].data(); }
 
  private:
-  static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
   static constexpr uint32_t kSeed = 0x2545F491u;
-  static constexpr float kLog2E = 1.44269504f;
 
   // Word timing, in ms.
   static constexpr float kCrossingWaitMs = 10.0f;  // longest wait for a zero crossing before a cut starts anyway

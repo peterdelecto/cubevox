@@ -79,7 +79,7 @@ func TestState(t *testing.T) {
 	if !st.Connected || st.App != "v9.99.99" || len(st.Cards) != 18 || len(st.Layout.Slots) != 8 {
 		t.Fatalf("state %+v", st)
 	}
-	if st.Limits != (Limits{Mean: 75, Worst: 95, Fixed: 3}) {
+	if st.Limits != (Limits{Mean: 75, Worst: 95, Fixed: 7}) {
 		t.Fatalf("limits %+v", st.Limits)
 	}
 	if st.Update != (UpdateState{Step: "idle"}) {

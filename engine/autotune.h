@@ -155,7 +155,7 @@ class AutotuneVoice {
 
   // The glide's decay per sample as a power of two, and where it counts as done: the offset is under
   // this many semitones (a tenth of a cent).
-  static inline const float kKeyGlideLog2 = log2f(1.0f - smooth::coef(kKeyGlideSec));
+  static inline const float kKeyGlideLog2 = log2f(smooth::keep(kKeyGlideSec, 1));
   static constexpr float kKeyGlideDoneSemis = 0.001f;
 
   // A KEY change found after this many samples without a voiced frame, 16 ms, has no note to protect:
@@ -166,8 +166,9 @@ class AutotuneVoice {
   // at a slow RESPONSE the correction moves to a new key at that pace.
   void setResponse(float responseMs) {
     responseMs_ = responseMs;
-    a_ = smooth::coef(clampf(responseMs, kMinResponseMs, kMaxResponseMs) * 0.001f);
-    logDecay_ = log2f(1.0f - a_);
+    const float sec = clampf(responseMs, kMinResponseMs, kMaxResponseMs) * 0.001f;
+    a_ = smooth::coef(sec);
+    logDecay_ = log2f(smooth::keep(sec, 1));
     offsetLog2_ = fmaxf(kKeyGlideLog2, logDecay_);
     offsetKeep_ = exp2Fast(offsetLog2_);
   }

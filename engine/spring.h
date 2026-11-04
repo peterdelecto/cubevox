@@ -428,7 +428,7 @@ class Spring {
     l.adv1 = advance(t.springMs1, kDiff1A + kDiff1B, kDly1, l.depth);
     l.adv2 = advance(t.springMs2, kDiff2A + kDiff2B, kDly2, l.depth);
     l.adv3 = advance(t.springMs3, kDiff3A + kDiff3B, kDly3, l.depth);
-    const float wetGain = powf(10.0f, clampf(t.wetDb, -kMaxWetDb, kMaxWetDb) / 20.0f);
+    const float wetGain = dbToGain(clampf(t.wetDb, -kMaxWetDb, kMaxWetDb));
     const reverb_parts::DwellGain dwell = reverb_parts::dwellGain(t.dwell, t.dwellDrive, t.dwellComp);
     l.drive = dwell.drive;
     l.compWet = dwell.comp * wetGain;

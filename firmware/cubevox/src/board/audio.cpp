@@ -6,6 +6,7 @@
 #include <atomic>
 #include <new>
 
+#include "board/bench_drill.h"
 #include "board/block_mem.h"
 #include "board/clocks.h"
 #include "board/mute.h"
@@ -81,7 +82,7 @@ DMA_Stream_TypeDef* rxStream() { return DMA1_Stream1; }
 // would leave the tracker's anti-alias coefficients, which only the constructor sets, zeroed.
 H7_DTCM_BSS cv::PitchFx gPitchFx;
 
-// Distortion's filters, histories and block scratch (about 2.5 kB) live in DTCM too, and audioInit() constructs
+// Distortion's filters, histories and block scratch (2,888 B) live in DTCM too, and audioInit() constructs
 // the object again in place for the same reason.
 H7_DTCM_BSS cv::Distortion gDistortion;
 
@@ -248,6 +249,14 @@ void loadInput(float* a, const uint32_t* rx) {
   if (!fillFromClip(a)) fillFromSai(a, rx);
 }
 
+// BYPASS as the top switch reads it, or as the bench holds it.
+bool bypassOn() {
+#if CUBEVOX_BENCH
+  if (benchOverrides().bypassOn) return true;
+#endif
+  return muteBypassOn();
+}
+
 // Packs an output sample into both stereo slots of frame i.
 struct TxWriter {
   uint32_t* tx;
@@ -274,7 +283,7 @@ void processHalf(int half) {
   gInputSumSquares = gInputSumSquares + level::sumSquares(a.data(), kFramesPerHalf);
   gInputSamples = gInputSamples + kFramesPerHalf;
   const BlockFlow::Report report =
-      gFlow.run(gChain, gHeld, start, a.data(), b.data(), muteBypassOn(), CycleCounter(), TxWriter{tx});
+      gFlow.run(gChain, gHeld, start, a.data(), b.data(), bypassOn(), CycleCounter(), TxWriter{tx});
   if (report.discarded) gCounts.nanBlocks = gCounts.nanBlocks + 1;
   if (report.chainRan) {
     addChainCycles(report.cycles);

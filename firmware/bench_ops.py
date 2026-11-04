@@ -39,7 +39,8 @@ DFU_LETTER = "d"           # the enter_dfu command
 
 QUERY_OPS = {"report", "stats", "record_status"}      # every build
 ARG_OPS = {"slot_off", "slot_on", "set_knob"}          # ops with arguments and no letter of their own
-ALL_OPS = set(LETTER_OPS.values()) | ARG_OPS           # the bench build lists these
+FLAG_OPS = {"bypass", "polish_comp", "polish_eq"}      # each call flips a forced state; no letter of their own
+ALL_OPS = set(LETTER_OPS.values()) | ARG_OPS | FLAG_OPS  # the bench build lists these
 
 _ids = itertools.count(1)
 

@@ -38,7 +38,8 @@ struct OctaveParams {
 // Autotune's correction reaches the voice through its own 2 ms one-pole. The correction steps every
 // block, and the 15 ms glide of the SEMITONES step would hold the voice about half a vibrato cycle
 // behind the tuned note; 2 ms follows it and smooths the 64-sample staircase it arrives in.
-inline const float kOctaveCorrCoef = smooth::coef(0.002f);
+constexpr float kOctaveCorrSec = 0.002f;
+inline const float kOctaveCorrCoef = smooth::coef(kOctaveCorrSec);
 inline const float kOctaveCorrDecay = powf(1.0f - kOctaveCorrCoef, static_cast<float>(kBlock));
 
 class OctaveVoice {
@@ -67,7 +68,7 @@ class OctaveVoice {
     if (t.glideMs != glideMs_) {
       glideMs_ = t.glideMs;
       aGlide_ = smooth::coef(t.glideMs * 0.001f);
-      glideDecay_ = powf(1.0f - aGlide_, static_cast<float>(kBlock));
+      glideDecay_ = smooth::keep(t.glideMs * 0.001f, kBlock);
     }
     // The taps sit half a window apart, a whole number of samples, so they share one fraction.
     windowSmp_ = 2.0f * floorf(0.5f * clampf(t.grainWindowMs, kMinWindowMs, kMaxWindowMs) * kSmpPerMs + 0.5f);
@@ -95,9 +96,9 @@ class OctaveVoice {
     idle_ = false;
     advanceInterval(n);
     const float step = (1.0f - rateMean_) * invWindow_;  // turns of sawtooth a sample
-    const int32_t dp = static_cast<int32_t>(step * kTurn + (step >= 0.0f ? 0.5f : -0.5f));
+    const int32_t dp = static_cast<int32_t>(step * kTurn32 + (step >= 0.0f ? 0.5f : -0.5f));
     HannRotor rot;
-    rot.init(static_cast<float>(ph_) * (kTwoPi / kTurn), kTwoPi * step);
+    rot.init(static_cast<float>(ph_) * (kTwoPi / kTurn32), kTwoPi * step);
     // A chunk that stays clear of the ring's seam needs no wrap tests.
     if (head0 >= static_cast<int>(windowSmp_) + 8 && head0 + n <= kVoiceRingLen) {
       renderLoop<false>(ring, head0, n, out, dp, rot);
@@ -107,9 +108,7 @@ class OctaveVoice {
   }
 
  private:
-  static constexpr float kSmpPerMs = kSampleRate / 1000.0f;
   static constexpr float kMinDelay = 4.0f;
-  static constexpr float kTurn = 4294967296.0f;  // one turn of the sawtooth counter
   static constexpr float kDcRest = 1e-30f;       // a blocker state under this rests at 0
 
   // Delays and ring positions are Q18, 18 bits of fraction. The ring must fit 32 bits that way, and
@@ -236,7 +235,7 @@ class OctaveVoice {
   float corr_ = 0.0f;    // Autotune's correction after its 2 ms one-pole
   float corrT_ = 0.0f;
   float aGlide_ = 1.0f;
-  float glideDecay_ = 0.0f;  // (1 - aGlide_)^kBlock, the glide over one block
+  float glideDecay_ = 0.0f;  // what the glide keeps over one block
   float glideMs_ = kUnset;   // the glide time aGlide_ came from
   DbGain level_;
   float ratio_ = 1.0f;

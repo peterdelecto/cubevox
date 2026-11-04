@@ -116,7 +116,6 @@ constexpr size_t kCopies = 2 * kVoices;     // the tuned copies, then the raised
 constexpr float kRaisedSt = 1.75f;          // a raised copy's pitch over its tuned copy's, before DIVERGE
 constexpr float kRaisedLagMs = 75.0f;       // a raised copy's lag past its tuned copy's
 constexpr float kCopyGain = 0.70710678f;    // 1 / sqrt(2): eight copies hold four copies' power
-constexpr float kSmpPerMs = kSampleRate / 1000.0f;
 static_assert(kVoicesMob == kCopies + 1, "VOICES runs 0 to kCopies, then MOB");
 
 // The copy that enters at VOICES position j, counting from 1. The order is tuned 0, raised 4,
@@ -174,7 +173,7 @@ inline float raisedCapMs(float tunedCap) {
 // After an unvoiced run as long as a copy's lag cap plus the scatter the ring holds, the copy has read
 // past the last voiced sample, so it goes plain without bending a word. The run counter stops at the
 // longest run any copy waits for.
-constexpr int kPlainAfterMax = (kCrowdMaxLagMs + kCrowdScatterMs) * (kSampleRate / 1000);
+constexpr int kPlainAfterMax = static_cast<int>(static_cast<float>(kCrowdMaxLagMs + kCrowdScatterMs) * kSmpPerMs);
 
 inline int plainAfter(float capMs) { return static_cast<int>((capMs + static_cast<float>(kCrowdScatterMs)) * kSmpPerMs); }
 
@@ -481,9 +480,9 @@ struct ShelfWeights {
 
 // Runs when the tuning moves, so libm is fine here.
 inline ShelfBasis shelfBasis(float hz) {
-  const float w0 = kTwoPi * clampf(kShelfPoleScale * hz, kFilterMinHz, kFilterMaxHz) / kSampleRate;
-  const float cw = cosf(w0);
-  const float alpha = sinf(w0) / (2.0f * kButterworthQ);
+  const RbjCorner k = rbjCorner(kShelfPoleScale * hz);
+  const float cw = k.cw;
+  const float alpha = rbjAlpha(k.sw, kButterworthQ);
   const float a0 = 1.0f + alpha;
   ShelfBasis b;
   b.h0 = 0.5f * (1.0f + cw) / a0;
@@ -782,10 +781,10 @@ class Crowd {
     const float lagMs = crowd_detail::baseLagMs(t, v % kVoices) * widthMul;
     const float top = crowd_detail::tunedCapMs(t);
     const float tuned = lagMs < top ? lagMs : top;
-    if (v < kVoices) return tuned * crowd_detail::kSmpPerMs;
+    if (v < kVoices) return tuned * kSmpPerMs;
     const float raised = tuned + crowd_detail::kRaisedLagMs;
     const float ceiling = crowd_detail::kRingLagMs;
-    return (raised < ceiling ? raised : ceiling) * crowd_detail::kSmpPerMs;
+    return (raised < ceiling ? raised : ceiling) * kSmpPerMs;
   }
 
   // What every voice of one block reads.
@@ -873,7 +872,7 @@ class Crowd {
                   plan.width,
                   pitchWidth,
                   crowd_detail::lagMultiplier(t, smooth::clamp01(p.width)),
-                  clampf(t.scatterMs, 0.0f, crowd_detail::kMaxScatterMs) * crowd_detail::kSmpPerMs,
+                  clampf(t.scatterMs, 0.0f, crowd_detail::kMaxScatterMs) * kSmpPerMs,
                   clampf(t.levelScatterDb, 0.0f, crowd_detail::kMaxLevelScatterDb),
                   clampf(t.driftCents, 0.0f, crowd_detail::kMaxDriftCents) * pitchWidth,
                   period > 0.0f ? keepShare(t, pr, n) : std::array<float, 2>{1.0f, 1.0f},

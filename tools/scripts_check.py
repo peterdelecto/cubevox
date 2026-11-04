@@ -25,6 +25,7 @@ FW = os.path.join(ROOT, "firmware")
 TOOLS = os.path.join(ROOT, "tools")
 WORKFLOWS = os.path.join(ROOT, ".github", "workflows")
 sys.path.insert(0, FW)  # -I drops the script dir
+import bench_ops  # noqa: E402
 import bringup  # noqa: E402
 import term  # noqa: E402
 
@@ -343,9 +344,62 @@ def syntax_failures():
     return failed
 
 
+STATS_SAMPLE = [
+    "[audio] blocks 1000 late 0 overruns 0 dry 0 avg 320000 worst 360000 of 640000 cycles",
+    "[audio] per slot 10000 20000 30000 40000 50000 60000 70000 80000 COMP 17000 EQ 12000",
+    "[audio] slot worst 11000 21000 31000 41000 51000 61000 71000 81000 COMP 18000 EQ 13000",
+]
+
+
+def stress_failures():
+    """firmware/stress.py: the stats parse, the sweep list, the fixed-stage levers and gates, --dry-run."""
+    stress = load("stress", os.path.join(FW, "stress.py"))
+    failed = []
+    st = stress.parse_stats(STATS_SAMPLE)
+    if (st.comp_avg, st.eq_avg, st.comp_worst, st.eq_worst) != (17000, 12000, 18000, 13000):
+        failed.append(f"stress.py parse_stats reads the COMP and EQ buckets as {st[9:]}")
+    slots = ["input_gate", "autotune", "octave", "unison", "slapback", "distortion", "gate", "reverb_spring"]
+    labels = [s.label for s in stress.sweeps(slots)]
+    for want in ("Input gate Threshold", "Input gate Decay", "Gate Threshold", "Gate Decay", "Unison Rate",
+                 "Unison Depth", "Distortion DRIVE with TONE stepped inside the glide"):
+        if want not in labels:
+            failed.append(f"stress.py sweeps() has no '{want}' for the default slots")
+    glide = [s for s in stress.sweeps(slots) if s.partner is not None]
+    if [(s.knob, s.partner) for s in glide] != [(2, 1)]:
+        failed.append("stress.py: the one glide sweep steps DRIVE (knob 2) with TONE (knob 1) as its partner")
+    if [card for _, card in stress.flipped_slots(slots)] != ["input_gate", "slapback", "gate"]:
+        failed.append("stress.py flipped_slots() does not name the Input gate, Echo and Gate slots")
+    ops = {lever[0] for lever in stress.FIXED_LEVERS}
+    if not ops <= bench_ops.ALL_OPS or not ops <= set(stress.NEEDED_OPS):
+        failed.append(f"stress.py fixed-stage levers {sorted(ops)} are not bench ops it needs")
+    rows = stress.read_rows()
+    if rows["kFixed"] != tuple(sum(rows[n][i] for n in stress.FIXED_PARTS) for i in (0, 1)):
+        failed.append("stress.py read_rows() does not make kFixed the sum of the four fixed rows")
+    failed += stress_judge_failures(stress, rows)
+    code, out = run([sys.executable, "-I", os.path.join(FW, "stress.py"), "--dry-run", "--layouts", "default"])
+    if code != 0 or "bench op polish_eq" not in out or "Gate Threshold" not in out:
+        failed.append(f"stress.py --dry-run: exit {code}, '{out.strip()[-120:]}'")
+    return failed
+
+
+def stress_judge_failures(stress, rows):
+    """judge_fixed() passes a fixed path inside its rows and names a bucket that runs over."""
+    cycles = stress.CYCLES_PER_PERCENT
+    inside = {"eq_mean": 1.0 * cycles, "eq_worst": 1.5 * cycles, "comp_mean": 2.0 * cycles, "comp_worst": 2.5 * cycles,
+              "fixed_mean": 5.0 * cycles, "fixed_worst": 6.0 * cycles}
+    failed = []
+    for what, agg, want in (("inside", inside, True), ("EQ over", {**inside, "eq_worst": 9.0 * cycles}, False)):
+        table, gates = [], []
+        stress.judge_fixed(agg, rows, "check", table, gates)
+        ok = all(g.ok for g in gates)
+        if ok != want or len(gates) != 6 or [row[1] for row in table] != ["POLISH EQ", "POLISH COMP", "fixed path"]:
+            failed.append(f"stress.py judge_fixed() {what}: {len(gates)} gates, all ok {ok}, wanted {want}")
+    return failed
+
+
 CHECKS = [bump_failures, build_query_failures, pin_failures, symbol_failures, term_failures,
           bringup_failures, diag_text_failures, flash_failures, clangd_failures, bootloader_font_failures,
-          workflow_failures, syntax_failures]
+          workflow_failures, stress_failures, syntax_failures]
 
 
 def main():

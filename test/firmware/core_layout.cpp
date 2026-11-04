@@ -32,9 +32,11 @@ void checkDefaultLayout() {
     // Autotune fix pass, with one extra worst point from the stress run, so it stays an estimate until
     // a board bench of the pair. Octave's row is the host bench of its rewrite; the stress run reads it
     // only together with the pitch stage. Distortion's row is the llvm-mca model of its stage-major
-    // rewrite until a stress run with the Distortion sweeps reads it on the board.
+    // rewrite until a stress run with the Distortion sweeps reads it on the board. The Input gate's and
+    // the Gate's rows are the model figures after the gate fix pass, and wait for the same run.
     check(d.cost.measured || layout.card[s] == Card::Autotune || layout.card[s] == Card::Octave ||
-              layout.card[s] == Card::Distortion,
+              layout.card[s] == Card::Distortion || layout.card[s] == Card::InputGate ||
+              layout.card[s] == Card::Gate,
           "a default layout card's cost comes from the board");
   }
   const LayoutCost sums = layoutCost(layout);
@@ -489,6 +491,18 @@ void checkComposeBench() {
   bench.reverbChasm = true;
   snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
   check(snap.params.reverb.engine == cv::kReverbChasm, "reverbChasm selects the chasm engine");
+
+  // The POLISH flags force a stage off against a menu that says on, and leave it on when clear.
+  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), BenchOverrides());
+  check(snap.params.comp.on && snap.params.eq.on, "the default settings run POLISH COMP and POLISH EQ");
+  bench = BenchOverrides();
+  bench.compOff = true;
+  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  check(!snap.params.comp.on && snap.params.eq.on, "compOff forces only POLISH COMP off");
+  bench = BenchOverrides();
+  bench.eqOff = true;
+  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  check(snap.params.comp.on && !snap.params.eq.on, "eqOff forces only POLISH EQ off");
 
   // Octave semitones (stepped, slot index 2) and Unison depth (continuous, index 3) read the top position.
   PanelReading low;
