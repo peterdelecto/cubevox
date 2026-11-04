@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
@@ -8,29 +9,34 @@
 #include "engine/pitch_fx.h"
 #include "engine/smooth.h"
 
-// The Formant follower card: the Formant voice with its SHIFT set by the singer's own loudness, like an
-// envelope-follower bass pedal. A louder note moves the formants further, up for a positive RANGE and
-// down for a negative one, and the pitch stays where it is. The card drives the Formant voice inside
-// PitchFx with its MIX pinned at 1, so the output is the shifted voice alone at the Formant card's trim.
+// The Formant follower card: the Formant voice with its SHIFT moved by the singer's loudness or by an
+// LFO, like an envelope-follower bass pedal. The pitch stays where it is. The card drives the Formant
+// voice inside PitchFx with its MIX pinned at 1, so the output is the shifted voice alone at the Formant
+// card's trim.
 //
 // Each call reads the peak of its block and follows it with a 3 ms attack and a 70 ms release. The
 // follower in dBFS sets the drive. SENSITIVITY puts the full point at -6 dBFS at 0 % and at -36 dBFS at
-// 100 %, and the drive rises from 0 at 12 dB under the full point to 1 at it. The wanted SHIFT is RANGE
-// times the drive.
+// 100 %, and the drive rises from 0 at 12 dB under the full point to 1 at it.
 //
-// Pluck is a tuning switch for the audition. Each onset fires a sweep, the drive times a ramp that falls
-// from 1 to 0 over pluckDecayMs. An onset is the drive rising through 0.5 after it sat under 0.2, or the
-// follower rising more than 6 dB in about 10 ms. The sweep runs until the next onset or until the drive
-// reaches 0, so a held note opens the throat and lets it close. With pluck on, SHIFT follows the sweep
-// while one runs and the drive otherwise.
+// SHIFT is RANGE times a sweep from 0 to 1, and the tuning's mode picks the sweep:
+//   follow  the drive.
+//   pluck   the default. Each onset fires a sweep, the drive times a ramp that falls from 1 to 0 over
+//           pluckDecayMs. The sweep runs until the next onset or until the drive reaches 0, so a held
+//           note opens the throat and lets it close. Before the first onset the sweep is the drive.
+//   lfo     a free-running sine LFO at lfoHz, 0.5 - 0.5 cos(phase), so SHIFT swings between 0 and RANGE.
+//   lfoEnv  the LFO times the drive. Each onset restarts the LFO at 0, so every syllable starts the same
+//           way, and the gaps rest at 0.
+// An onset is the drive rising through 0.5 after it sat under 0.2, or the follower rising more than 6 dB
+// in about 10 ms. RANGE runs from -7 st to +3 st.
 //
-// PitchFx takes SHIFT in whole semitones and glides it through its own 20 ms one-pole. Each call hands it
-// the wanted SHIFT plus what the last call's rounding left over, rounded. The whole semitones then
-// average to the wanted SHIFT, and the stage's glide smooths their steps.
+// PitchFx takes SHIFT in whole semitones and glides it through its own 20 ms one-pole, the only smoothing
+// SHIFT gets. Each call hands it the wanted SHIFT plus what the last call's rounding left over, rounded.
+// The whole semitones then average to the wanted SHIFT, and the stage's glide smooths their steps.
 
 namespace cv {
 
-constexpr float kFollowerMaxRangeSt = static_cast<float>(kFormantMaxShiftSt);
+constexpr float kFollowerMinRangeSt = -static_cast<float>(kFormantMaxShiftSt);  // RANGE at the pot's bottom
+constexpr float kFollowerMaxRangeSt = 3.0f;                                      // RANGE at the pot's top
 constexpr float kFollowerDefaultRangeSt = 3.0f;
 constexpr float kFollowerDefaultSensitivity = 0.5f;
 constexpr float kFollowerAttackSec = 0.003f;
@@ -41,22 +47,29 @@ constexpr float kFollowerWindowDb = 12.0f;       // the drive rises from 0 to 1 
 constexpr float kFollowerLevelFloor = 1e-6f;     // the follower reads no lower than this in dB
 constexpr float kFollowerFloorDb = -120.0f;      // kFollowerLevelFloor in dBFS
 constexpr float kFollowerPluckArmBelow = 0.2f;   // the drive arms the next crossing under this
-constexpr float kFollowerPluckFireAt = 0.5f;     // and fires a sweep rising through this
+constexpr float kFollowerPluckFireAt = 0.5f;     // and fires an onset rising through this
 constexpr float kFollowerPluckRiseDb = 6.0f;     // a rise past this over about kFollowerPluckRiseSec fires one too
 constexpr float kFollowerPluckRiseSec = 0.010f;
 constexpr float kFollowerPluckMinDecayMs = 10.0f;
 constexpr float kFollowerPluckMaxDecayMs = 2000.0f;
 constexpr float kFollowerPluckDefaultDecayMs = 250.0f;
+constexpr float kFollowerLfoMinHz = 0.1f;
+constexpr float kFollowerLfoMaxHz = 8.0f;
+constexpr float kFollowerLfoDefaultHz = 2.0f;
+
+// What SHIFT follows, RANGE times a sweep from 0 to 1.
+enum class FollowerMode : uint8_t { Follow, Pluck, Lfo, LfoEnv };
 
 struct FormantFollowerTuning {
-  bool pluck = false;                                  // each onset fires a sweep; for the audition, on no pot
-  float pluckDecayMs = kFollowerPluckDefaultDecayMs;  // the sweep falls from the drive to 0 over this
+  FollowerMode mode = FollowerMode::Pluck;
+  float pluckDecayMs = kFollowerPluckDefaultDecayMs;  // the pluck sweep falls from the drive to 0 over this
+  float lfoHz = kFollowerLfoDefaultHz;                // the LFO's rate in the lfo and lfoEnv modes
 };
 
 struct FormantFollowerParams {
   bool placed = false;                              // the card is in the layout, so its follower sets the Formant voice's SHIFT
   float sensitivity = kFollowerDefaultSensitivity;  // knob A (SENSITIVITY), 0..1
-  float rangeSt = kFollowerDefaultRangeSt;          // knob B (RANGE), -7..+7 st
+  float rangeSt = kFollowerDefaultRangeSt;          // knob B (RANGE), -7..+3 st
   FormantFollowerTuning tuning;
 };
 
@@ -67,9 +80,12 @@ class FormantFollower {
     lagDb_ = kFollowerFloorDb;
     drive_ = 0.0f;
     ramp_ = 0.0f;
-    sweep_ = 0.0f;
+    pluck_ = 0.0f;
     plucking_ = false;
     armed_ = true;
+    phase_ = 0;
+    lfo_ = 0.0f;
+    sweep_ = 0.0f;
     residue_ = 0.0f;
     last_ = 0.0f;
   }
@@ -100,16 +116,26 @@ class FormantFollower {
     const float levelDb = dbFast(env_ > kFollowerLevelFloor ? env_ : kFollowerLevelFloor);
     const float bottomDb = kFollowerFullDbTop - kFollowerFullDbSpan * smooth::clamp01(f.sensitivity) - kFollowerWindowDb;
     drive_ = smooth::clamp01((levelDb - bottomDb) * (1.0f / kFollowerWindowDb));
-    stepPluck(levelDb > bottomDb ? levelDb : bottomDb, n, f.tuning.pluckDecayMs);
 
-    const float range = clampf(f.rangeSt, -kFollowerMaxRangeSt, kFollowerMaxRangeSt);
-    const float want = range * (f.tuning.pluck ? sweep_ : drive_) + residue_;
-    if (!(want > -kFollowerMaxRangeSt - 1.0f && want < kFollowerMaxRangeSt + 1.0f)) {
+    const FollowerMode mode = f.tuning.mode;
+    const bool onset = stepOnset(levelDb, bottomDb);
+    stepPluck(onset, n, f.tuning.pluckDecayMs);
+    stepLfo(onset && mode == FollowerMode::LfoEnv, n, f.tuning.lfoHz);
+    switch (mode) {
+      case FollowerMode::Follow: sweep_ = drive_; break;
+      case FollowerMode::Pluck: sweep_ = pluck_; break;
+      case FollowerMode::Lfo: sweep_ = lfo_; break;
+      case FollowerMode::LfoEnv: sweep_ = lfo_ * drive_; break;
+    }
+
+    const float range = clampf(f.rangeSt, kFollowerMinRangeSt, kFollowerMaxRangeSt);
+    const float want = range * sweep_ + residue_;
+    if (!(want > kFollowerMinRangeSt - 1.0f && want < kFollowerMaxRangeSt + 1.0f)) {
       residue_ = 0.0f;
       last_ = 0.0f;
       return 0;
     }
-    last_ = clampf(floorf(want + 0.5f), -kFollowerMaxRangeSt, kFollowerMaxRangeSt);
+    last_ = clampf(floorf(want + 0.5f), kFollowerMinRangeSt, kFollowerMaxRangeSt);
     residue_ = clampf(want - last_, -0.5f, 0.5f);
     return static_cast<int>(last_);
   }
@@ -120,11 +146,19 @@ class FormantFollower {
   // The drive, 0 to 1, for the tests and the render tool.
   float drive() const { return drive_; }
 
-  // What SHIFT follows with pluck on, 0 to 1: the sweep while one runs, the drive otherwise.
-  float pluckEnvelope() const { return sweep_; }
+  // The pluck mode's sweep, 0 to 1: the drive times the ramp while one runs, the drive before the first onset.
+  float pluckEnvelope() const { return pluck_; }
+
+  // The LFO's sweep at this call, 0 to 1.
+  float lfo() const { return lfo_; }
+
+  // What SHIFT follows in the current mode, 0 to 1; SHIFT is RANGE times it.
+  float sweep() const { return sweep_; }
 
  private:
   static constexpr float kHugeLevel = 1e15f;
+  static constexpr float kTurnsPerHz = 4294967296.0f / static_cast<float>(kSampleRate);  // phase step a sample per Hz
+  static constexpr uint32_t kQuarterTurn = 0x40000000u;
 
   // The one-poles' coefficients for calls of n samples, kept for the last n.
   void setCoefs(int n) {
@@ -135,11 +169,13 @@ class FormantFollower {
     coefN_ = n;
   }
 
-  // Fires a sweep on an onset and steps the running one down its ramp. `heardDb` is the follower in dBFS,
-  // held at the drive's 0 point from below, so a note out of silence rises from there. The lagged level
-  // trails a rise of R dB/ms by R times kFollowerPluckRiseSec, so a gap past kFollowerPluckRiseDb is a
-  // rise past it over about that time.
-  void stepPluck(float heardDb, int n, float decayMs) {
+  // True on an onset. `levelDb` is the follower in dBFS. It and its lagged copy are held at the drive's 0
+  // point `bottomDb` from below, so a note out of silence rises from there, and neither a reset nor a
+  // SENSITIVITY turn reads as a rise. The lagged level trails a rise of R dB/ms by R times
+  // kFollowerPluckRiseSec, so a gap past kFollowerPluckRiseDb is a rise past it over about that time.
+  bool stepOnset(float levelDb, float bottomDb) {
+    const float heardDb = levelDb > bottomDb ? levelDb : bottomDb;
+    if (lagDb_ < bottomDb) lagDb_ = bottomDb;
     const bool rose = heardDb - lagDb_ > kFollowerPluckRiseDb;
     lagDb_ += lag_ * (heardDb - lagDb_);
     const bool crossed = armed_ && drive_ >= kFollowerPluckFireAt;
@@ -148,7 +184,12 @@ class FormantFollower {
     } else if (drive_ < kFollowerPluckArmBelow) {
       armed_ = true;
     }
-    if (rose || crossed) {
+    return rose || crossed;
+  }
+
+  // Fires a pluck sweep on an onset and steps the running one down its ramp.
+  void stepPluck(bool onset, int n, float decayMs) {
+    if (onset) {
       plucking_ = true;
       ramp_ = 1.0f;
     } else if (plucking_) {
@@ -157,16 +198,28 @@ class FormantFollower {
       ramp_ = ramp_ > fall ? ramp_ - fall : 0.0f;
     }
     if (!(drive_ > 0.0f)) plucking_ = false;
-    sweep_ = plucking_ ? drive_ * ramp_ : drive_;
+    pluck_ = plucking_ ? drive_ * ramp_ : drive_;
+  }
+
+  // Reads the LFO at this call, restarting it at 0 first on `restart`, then steps its phase over n
+  // samples at `hz`. A NaN rate runs at the slowest.
+  void stepLfo(bool restart, int n, float hz) {
+    if (restart) phase_ = 0;
+    lfo_ = 0.5f - 0.5f * sinTurns(phase_ + kQuarterTurn);
+    const float rate = hz >= kFollowerLfoMinHz ? (hz < kFollowerLfoMaxHz ? hz : kFollowerLfoMaxHz) : kFollowerLfoMinHz;
+    phase_ += static_cast<uint32_t>(rate * kTurnsPerHz) * static_cast<uint32_t>(n);
   }
 
   float env_ = 0.0f;                   // the block peak after the attack and release
   float lagDb_ = kFollowerFloorDb;     // the heard level through a kFollowerPluckRiseSec one-pole
   float drive_ = 0.0f;                 // 0 at kFollowerWindowDb under the full point, 1 at it
-  float ramp_ = 0.0f;                  // the running sweep's ramp, 1 at its onset down to 0
-  float sweep_ = 0.0f;                 // what SHIFT follows with pluck on
-  bool plucking_ = false;              // a sweep runs
+  float ramp_ = 0.0f;                  // the running pluck sweep's ramp, 1 at its onset down to 0
+  float pluck_ = 0.0f;                 // the pluck mode's sweep
+  bool plucking_ = false;              // a pluck sweep runs
   bool armed_ = true;                  // the drive sat under kFollowerPluckArmBelow since the last crossing
+  uint32_t phase_ = 0;                 // the LFO's phase in 1/2^32 turns, 0 at the bottom of its sweep
+  float lfo_ = 0.0f;                   // the LFO's sweep at this call
+  float sweep_ = 0.0f;                 // what SHIFT follows in the current mode
   float residue_ = 0.0f;               // what the last call's rounding left over, in semitones
   float last_ = 0.0f;                  // the last SHIFT handed out
   float attack_ = 1.0f;
