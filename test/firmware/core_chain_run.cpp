@@ -33,8 +33,9 @@ using Block = std::array<float, kN>;
 // Holds the engines of one chain, built the way the board builds them. It is too big for the stack.
 struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
+  std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  ChainEngines engines{*pitch, *distortion};
+  ChainEngines engines{*pitch, *unison, *distortion};
   SlotFades fades;
 };
 
@@ -695,6 +696,47 @@ void checkSlotFlipOnClearsEngine() {
   check(steadyEnergy > 0.01, "slot flip: the same engine left running was still playing its echo, so the clear is what silenced it");
 }
 
+// Unison's output carries its input at unity, and right after the reset it equals its input exactly. A
+// flip on then fades two equal signals across the slot fade, which holds the level where an equal-power
+// pair would swell it by 3 dB. The wet stays out until the line holds live audio, so the chain's output
+// equals the chain with Unison off through the fade and for the hold after it. A flip off keeps each
+// block's level between the off and on levels.
+void checkUnisonToggle() {
+  const Layout layout = layoutOf({Card::Unison});
+  const ChainSnapshot on = snapshotToggles(layout, 0.5f, allToggles(true));
+  const ChainSnapshot off = snapshotToggles(layout, 0.5f, allToggles(false));
+  auto flipped = newRig();
+  auto steadyOff = newRig();
+  constexpr int kWarm = 80;
+  constexpr int kOnBlocks = 60;
+  constexpr int kHoldBlocks = 20;  // 1,280 samples, inside the 1,347-sample hold
+  float worstOnDiff = 0.0f;
+  bool wetAfterHold = false;
+  for (int b = 0; b < kWarm + kOnBlocks; ++b) {
+    const bool isOn = b >= kWarm;
+    const Block in = tone(b, 0.3f);
+    const Run a = runBlock(*flipped, isOn ? on : off, in, StillClock());
+    const Run c = runBlock(*steadyOff, off, in, StillClock());
+    if (b >= kWarm && b < kWarm + kHoldBlocks) worstOnDiff = std::max(worstOnDiff, maxAbsDiff(a.out, c.out));
+    if (b >= kWarm + kHoldBlocks + 12) wetAfterHold = wetAfterHold || maxAbsDiff(a.out, c.out) > 1e-3f;
+  }
+  check(worstOnDiff < 1e-6f, "Unison toggle: through the fade in and the hold after it, the output equals the chain with Unison off");
+  check(wetAfterHold, "Unison toggle: the wet arrives after the hold");
+
+  auto down = newRig();
+  auto lo = newRig();
+  auto hi = newRig();
+  double worstRatio = 0.0;
+  for (int b = 0; b < kWarm + 2 * kSlotFadeBlocks; ++b) {
+    const Block in = tone(b, 0.3f);
+    const Run a = runBlock(*down, b < kWarm ? on : off, in, StillClock());
+    const Run l = runBlock(*lo, off, in, StillClock());
+    const Run h = runBlock(*hi, on, in, StillClock());
+    if (b >= kWarm) worstRatio = std::max(worstRatio, rms(a.out) / std::max(rms(l.out), rms(h.out)));
+  }
+  check(worstRatio < 1.03, "Unison toggle: a flip off keeps each block's level at or under the larger of the off and on levels");
+}
+
 // A flip back during the fade out turns the fade round without clearing the running engine.
 void checkSlotFlipReverses() {
   const Layout layout = layoutOf({Card::Slapback});
@@ -1324,6 +1366,7 @@ void checkChainRun() {
   checkSlotFadeLevels();
   checkSlotFlipToOff();
   checkSlotFlipOnClearsEngine();
+  checkUnisonToggle();
   checkSlotFlipReverses();
   checkInputGateKeepsDetector();
   checkPitchStageToggles();

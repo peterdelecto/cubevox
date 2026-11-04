@@ -18,10 +18,10 @@ constexpr float kScaleAtMax = 7.0f;
 constexpr float kLfoBaseHzFirst = 0.60f;
 constexpr float kLfoBaseHzSecond = 0.90f;
 
-// Swing range at a multiplier of 1, its scale, and the cap that stops fast rates from swinging wider.
-constexpr float kSwingBaseMinMs = 0.5f;
-constexpr float kSwingBaseMaxMs = 3.0f;
-constexpr float kSwingScale = 2.0f;
+// Swing range at a multiplier of 1, and the multiplier above which the swing narrows with the speed so
+// the copies' pitch swing stays capped.
+constexpr float kSwingMinMs = 1.0f;
+constexpr float kSwingMaxMs = 6.0f;
 constexpr float kMaxSwingGrowth = 2.0f;
 
 }  // namespace
@@ -39,9 +39,9 @@ float lfoScale(float ratePercent) {
 
 void apply(cv::UnisonTuning& tuning, float ratePercent) {
   const float m = lfoScale(ratePercent);
-  const float swing = kSwingScale * (m > kMaxSwingGrowth ? kMaxSwingGrowth / m : 1.0f);
-  tuning.swingMinMs = kSwingBaseMinMs * swing;
-  tuning.swingMaxMs = kSwingBaseMaxMs * swing;
+  const float narrow = m > kMaxSwingGrowth ? kMaxSwingGrowth / m : 1.0f;
+  tuning.swingMinMs = kSwingMinMs * narrow;
+  tuning.swingMaxMs = kSwingMaxMs * narrow;
   tuning.lfoHz[0] = kLfoBaseHzFirst * m;
   tuning.lfoHz[1] = kLfoBaseHzSecond * m;
 }
