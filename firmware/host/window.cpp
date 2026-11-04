@@ -354,12 +354,12 @@ void drawTopBand(Frame& f) {
 }
 
 // The cells of the four grid switches, in the order the menu cycles their cards. The slot 7 switch
-// has GATE and LO-FI side by side over CHATTER, the slot 4 switch UNISON and MOB over MOB 2, the slot
+// has GATE and LO-FI side by side over CHATTER, the slot 4 switch UNISON and MOB side by side, the slot
 // 6 switch DISTORTION over GROWL, and the slot 3 switch stacks OCTAVE, FORMANT and YAWN.
 constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"CHATTER", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
-constexpr std::array<GridCell, 3> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}, {"MOB 2", 0.0f, 1, 1.0f}}};
-constexpr std::array<Card, 3> kSlot4Cards = {Card::Unison, Card::Crowd, Card::Crowd2};
+constexpr std::array<GridCell, 2> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}}};
+constexpr std::array<Card, 2> kSlot4Cards = {Card::Unison, Card::Crowd};
 constexpr std::array<GridCell, 2> kSlot6Cells = {{{"DISTORTION", 0.0f, 0, 1.0f}, {"GROWL", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 2> kSlot6Cards = {Card::Distortion, Card::Growl};
 constexpr std::array<GridCell, kStackRows> kSlot3Cells = {
@@ -376,7 +376,7 @@ int activeCell(const std::array<Card, N>& cards, Card c) {
 }
 
 // The card switch at the foot of a slot, which follows the layout: the column that holds Octave,
-// Formant or YAWN, the column that holds Unison, MOB or MOB 2, the column that holds
+// Formant or YAWN, the column that holds Unison or MOB, the column that holds
 // Distortion or Growl, the column that holds a reverb, and the column that holds Gate, Lo-fi or
 // Chatter. All but the reverb's are grids, and a click on a grid picks its card through the menu's own
 // action. The slot 3 stack is taller than the foot, so it rises into the gap above it and ends on the

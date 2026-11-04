@@ -14,14 +14,8 @@ ApplyResult swapReverb(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
-// The card after `c` in the slot 4 cycle, Unison to Mob to Mob 2 and back to Unison.
-Card nextSlot4Card(Card c) {
-  switch (c) {
-    case Card::Unison: return Card::Crowd;
-    case Card::Crowd: return Card::Crowd2;
-    default: return Card::Unison;
-  }
-}
+// The card after `c` in the slot 4 cycle, Unison to Mob and back to Unison.
+Card nextSlot4Card(Card c) { return c == Card::Unison ? Card::Crowd : Card::Unison; }
 
 // The card after `c` in the slot 3 cycle, Octave to Formant to the Formant follower and back to Octave.
 Card nextSlot3Card(Card c) {

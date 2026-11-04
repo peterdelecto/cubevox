@@ -14,14 +14,21 @@
 #include "engine/pitch_fx.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
+#include "engine/syllable_sweep.h"
 
 // The Growl card, the gross monster voice of SOPHIE's "Whole New World". It replaces the voice: once
 // the card is up the dry signal is gone, and three parts run in a row.
 //
 // 1. The drop. A grain voice cut from the pitch stage's input ring on the tracker's period grid plays
-//    the voice at a pitch ratio of 2^(pitchSt / 12) and a grain playback rate of 2^(formantSt / 12),
-//    an octave down with the throat 5 st down. It follows Autotune's correction and reads at
+//    the voice at a pitch ratio of 2^(pitchSt / 12) and a grain playback rate of 2^(throatSt / 12),
+//    an octave down with the throat 5 st down at rest. It follows Autotune's correction and reads at
 //    Autotune's lag, where the tracker's frame lines up with the audio.
+//
+//    The throat moves with each syllable. The syllable sweep (`syllable_sweep.h`, Yawn's law) reads the
+//    card's input, and throatSt is formantSt plus the sweep times throatDropTop times GROWL. At GROWL 100 %
+//    a syllable drops the throat from 5 st down to 12 st down, and it returns over DECAY while the note
+//    holds. At GROWL 0 the throat stays at formantSt. The throat reaches the voice through the 20 ms glide
+//    GROWL and DRIVE use.
 // 2. The rasp. A raised wave at half the tracked pitch multiplies the dropped voice, so alternate
 //    periods of the sung note come out loud and quiet, the period doubling of a growl's false folds.
 //    Over the top half of GROWL a wave at a third of the pitch blends in. The wave is a raised sine at
@@ -40,7 +47,10 @@ namespace cv {
 
 struct GrowlTuning {
   float pitchSt = -12.0f;       // the drop; the voice's pitch ratio is 2^(pitchSt / 12)
-  float formantSt = -5.0f;      // the throat; the grains play at 2^(formantSt / 12)
+  float formantSt = -5.0f;      // the throat at rest; the grains play at 2^(throatSt / 12)
+  float throatDropTop = -7.0f;  // the sweep's added throat shift at GROWL 100 %
+  float sensitivity = kSweepDefaultSensitivity;  // the syllable sweep's SENSITIVITY, 0..1
+  float decayMs = kSweepDefaultDecayMs;          // a sweep falls from the drive to 0 over this
   float hardTop = 7.0f;         // the wave's added slope at GROWL 100 %, 1 + hardTop * GROWL^2 times a raised sine's
   float thirdTop = 0.5f;        // the third-of-pitch wave's share at GROWL 100 %
   float lowShelfHz = 200.0f;    // ahead of the knee
@@ -65,6 +75,7 @@ namespace growl_detail {
 
 // The ranges the engine clamps the tuning to. The render tool refuses a value outside them.
 constexpr float kMaxSt = 12.0f;
+constexpr float kMaxThroatDropSt = 24.0f;
 constexpr float kMaxHardTop = 32.0f;
 constexpr float kMaxDriveDb = 48.0f;
 constexpr float kMinMakeupSat = 1.0f;
@@ -210,7 +221,10 @@ class Growl {
   void reset() {
     voice_.reset();
     fold_.clear();
+    sweep_.reset();
     buf_.fill(0.0f);
+    throat_ = 0.0f;
+    throatTarget_ = 0.0f;
     heldPeriod_ = 0.0f;
     phase_ = 0;
     phaseStep_ = 0;
@@ -238,7 +252,7 @@ class Growl {
     }
     idle_ = false;
     applyTuning(p.tuning);
-    const Call c = beginCall(p, pitch, n, wetTarget);
+    const Call c = beginCall(p, pitch, in, n, wetTarget);
     int first = pitch.head() - n;
     if (first < 0) first += kVoiceRingLen;
     for (int at = 0; at < n; at += kBlock) {
@@ -255,6 +269,13 @@ class Growl {
   // Test hooks: the wave's depth fade, 1 with a pitch and 0 without, and the dry-to-voice crossfade.
   float depthFade() const { return depthFade_; }
   float wet() const { return wet_; }
+
+  // Test hooks: the throat the sweep asks for and the throat the voice plays after the glide, in st.
+  float throatTargetSt() const { return throatTarget_; }
+  float throatSt() const { return throat_; }
+
+  // Test hook: the syllable sweep, 0 to 1.
+  float sweep() const { return sweep_.sweep(); }
 
  private:
   using RaspGains = growl_detail::RaspGains;
@@ -278,6 +299,7 @@ class Growl {
     if (!idle_) {
       voice_.reset();
       fold_.clear();
+      sweep_.reset();
       phase_ = 0;
       depthFade_ = 0.0f;
       fresh_ = true;
@@ -292,17 +314,18 @@ class Growl {
     tuningSet_ = true;
     fold_.setTuning(t);
     trim_ = dbToGainFast(clampf(t.trimDb, -growl_detail::kMaxTrimDb, growl_detail::kMaxTrimDb));
-    rate_ = exp2Fast(clampf(t.formantSt, -growl_detail::kMaxSt, growl_detail::kMaxSt) * (1.0f / 12.0f));
     raspAt_ = -1.0f;
   }
 
-  // Steps the knobs, the fades and the wave's rate, prepares the voice and settles the call's gains.
-  Call beginCall(const GrowlParams& p, const PitchFx& pitch, int n, float wetTarget) {
+  // Steps the knobs, the sweep, the fades and the wave's rate, prepares the voice and settles the call's
+  // gains. `in` is read here, before the call writes its output.
+  Call beginCall(const GrowlParams& p, const PitchFx& pitch, const float* in, int n, float wetTarget) {
     const GrowlTuning& t = tuning_;
     const PitchResult& pr = pitch.pitch();
     const float a = smoothCoefFor(n);
     const float growlKnob = smooth::clamp01(p.growl);
     const float driveKnob = smooth::clamp01(p.drive);
+    const bool first = fresh_;
     if (fresh_) {
       growl_ = growlKnob;
       drive_ = driveKnob;
@@ -315,19 +338,26 @@ class Growl {
     wet_ = toward(wet_, wetTarget, ramp);
     c.wetStep = (wet_ - c.wet0) * inv;
 
+    // GROWL glides, and with the sweep it sets the throat, which glides on to the voice.
+    const float growl0 = growl_;
+    growl_ = smooth::step(growl_, growlKnob, a);
+    const float sweep = sweep_.step(in, n, t.sensitivity, t.decayMs);
+    const float rest = clampf(t.formantSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
+    const float dropTop = clampf(t.throatDropTop, -growl_detail::kMaxThroatDropSt, growl_detail::kMaxThroatDropSt);
+    throatTarget_ = clampf(rest + sweep * dropTop * growl_, -growl_detail::kMaxSt, growl_detail::kMaxSt);
+    throat_ = first ? throatTarget_ : smooth::step(throat_, throatTarget_, a);
+
     // The voice, and the wave's rate while the tracker hears a pitch.
     const float corr = pitch.correctionSemis();
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
-    voice_.prepare(heldPeriod_, exp2Fast((drop + corr) * (1.0f / 12.0f)), rate_,
+    voice_.prepare(heldPeriod_, exp2Fast((drop + corr) * (1.0f / 12.0f)), exp2Fast(throat_ * (1.0f / 12.0f)),
                    static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_), n);
     if (pr.voiced && pr.period > 0.0f) {
       const float corrRatio = corr == 0.0f ? 1.0f : exp2Fast(corr * (1.0f / 12.0f));
       phaseStep_ = static_cast<uint32_t>(growl_detail::kSixthTurn * corrRatio / PitchTracker::clampPeriod(pr.period));
     }
 
-    // The rasp: GROWL glides, and the depth fades with the pitch.
-    const float growl0 = growl_;
-    growl_ = smooth::step(growl_, growlKnob, a);
+    // The rasp: the depth fades with the pitch.
     const float fade0 = depthFade_;
     depthFade_ = toward(depthFade_, pr.voiced ? 1.0f : 0.0f, ramp);
     c.rasp0 = raspAt(growl0, fade0);
@@ -451,7 +481,9 @@ class Growl {
   GrowlTuning tuning_;
   bool tuningSet_ = false;
   float trim_ = 1.0f;
-  float rate_ = 1.0f;          // the grains' playback rate
+  SyllableSweep sweep_;        // reads the card's input
+  float throat_ = 0.0f;        // the throat the voice plays after the glide, st
+  float throatTarget_ = 0.0f;  // the throat the sweep asks for, st
   float heldPeriod_ = 0.0f;    // the tracker's period, or the last one it gave
   uint32_t phase_ = 0;         // the wave's counter, at a sixth of the pitch
   uint32_t phaseStep_ = 0;     // its step per sample, held through unvoiced frames
