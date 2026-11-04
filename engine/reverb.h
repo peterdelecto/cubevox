@@ -121,11 +121,8 @@ class Reverb {
   }
 
   void mixBlock(const float* in, float* out, int n, float target, float wetTarget) {
-    // A smoother at its target holds it, so the step loops run only while a value moves.
-    float wetEnd = wet_;
-    if (wetEnd != wetTarget) {
-      for (int i = 0; i < n; ++i) wetEnd = smooth::step(wetEnd, wetTarget, smooth::kSmoothCoef);
-    }
+    // A smoother at its target holds it, and advance returns at once for one that sits there.
+    const float wetEnd = smooth::advance(wet_, wetTarget, smooth::kSmoothCoef, n);
     const Gains g0 = gains_;
     if (wetEnd != wet_) gains_ = gainsAt(wetEnd);
     const Gains g1 = gains_;

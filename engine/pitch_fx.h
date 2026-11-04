@@ -78,7 +78,7 @@ struct PitchFxParams {
   AutotuneParams autotune;
   OctaveParams octave;
   FormantParams formant;
-  bool crowdOn = false;  // the Crowd card reads the ring and the tracker, so both run
+  bool crowdOn = false;  // the Mob card reads the ring and the tracker, so both run
   bool growlOn = false;  // the Growl card reads them too
   bool ringModOn = false;  // so does the Ring mod card
 };
@@ -119,10 +119,10 @@ class PitchFx {
 
   void process(const float* in, float* out, int n, const PitchFxParams& p) {
     // The tracker runs while Autotune or Formant is on or still fading, so the voice keeps its period
-    // through the crossfade, and while the Crowd or Growl card is on. Octave shifts without a pitch, so with no
+    // through the crossfade, and while the Mob or Growl card is on. Octave shifts without a pitch, so with no
     // reader the tracker only keeps hop time, and its next start replays its history from the ring.
     // The 48 kHz fine pass runs for Autotune and Formant, whose voices must sit on the sung pitch to
-    // the cent; the Crowd card's copies drift by more than the coarse lag misses.
+    // the cent; the Mob card's copies drift by more than the coarse lag misses.
     const bool autotune = p.autotune.on || autotuneFade_ > 0.0f;
     const bool formant = formantWanted(p.formant) || formantFade_ > 0.0f;
     writeCall(in, n);
