@@ -851,8 +851,9 @@ void checkGrowlSlot6() {
   panel.toggle[5] = true;
   const ChainSnapshot snap = composeSnapshot(growl, panel, Settings(), BenchOverrides());
   check(snap.params.growl.on && snap.params.pitchFx.growlOn && !snap.params.distortion.on &&
-            std::fabs(snap.params.growl.growl - 0.25f) < 1e-6f && std::fabs(snap.params.growl.drive - 0.75f) < 1e-6f,
-        "compose: Growl on in slot 6 sets its flag and the pitch stage's, GROWL from the upper pot and DRIVE from the lower");
+            std::fabs(snap.params.growl.growl - 0.25f * 0.80f) < 1e-6f &&
+            std::fabs(snap.params.growl.drive - 0.25f * 0.65f) < 1e-6f && std::fabs(snap.params.growl.mix - 0.75f) < 1e-6f,
+        "compose: Growl on in slot 6 sets its flag and the pitch stage's, GROWL from the upper pot and MIX from the lower");
 }
 
 void checkSlot7CardSlot() {
