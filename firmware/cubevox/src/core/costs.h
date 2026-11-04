@@ -18,13 +18,17 @@
 // front half ahead of the slots and the back half after the comp.
 //
 // A host figure converts to a board estimate at 50.4k board cycles per host microsecond, which is
-// 7.875 % of a block (the ratio Unison's host time gives against its 46.9k on the board). The
-// pitch slot's code runs at fewer cycles per host microsecond, 24k to 29k (kTracker), so rows scaled
-// from a board figure and rows converted at 50.4k are not at one ratio. kTracker states both, and
-// the board's Crowd row (kCrowd) shows the pitch ratio holds for the grain code too. Echo's own
-// ratio from the stress run of 2026-11-01 is 25.9k board cycles per host microsecond (13.2k board
-// cycles over 0.509 host us, clang), half of 50.4k. Unison's 21.1k in the same run over the 0.93 host
-// us its old 46.9k implies is 22.7k per host us. The 50.4k reads high against the stress run.
+// 7.875 % of a block. The pitch slot's code runs at fewer cycles per host microsecond, 24k to 29k
+// (kTracker), so rows scaled from a board figure and rows converted at 50.4k are not at one ratio.
+// kTracker states both, and the board's Crowd row (kCrowd) shows the pitch ratio holds for the grain
+// code too. Echo's own ratio from the stress run of 2026-11-01 is 25.9k board cycles per host
+// microsecond (13.2k board cycles over 0.509 host us, clang), half of 50.4k, so the 50.4k reads high
+// against the stress run.
+//
+// A row marked false is an estimate. firmware/stress.py turns one true: it reads the card's slot
+// counters across its sweeps and toggle flips, and the fixed path across its BYPASS, POLISH COMP and
+// POLISH EQ flips, and gates each against its row. The row then takes the stress run's mean and its
+// lowest run worst, rounded up, with the date and the layouts in its comment.
 //
 // The ratio belongs to a card, not to the box. The reverbs are serial chains of allpasses, which the
 // host's out-of-order core hides and the in-order M7 pays for. The old Spring converted at 19.8k to
@@ -67,13 +71,13 @@ constexpr Cost operator+(Cost a, Cost b) {
 }
 
 constexpr Cost kEmpty{0, 0, true};
-constexpr Cost kInputGate{3, 4, true};     // 17.7k to 17.9k / 21.6k to 25.1k, stress run 2026-11-01 (v2.00.81 and v2.00.82, all four layouts: mean 2.8 %, worst 3.4 to 3.9 %, lowest run worst per layout); the earlier 23.7k / 26.0k was the WeAct bench
+constexpr Cost kInputGate{1, 3, false};    // est. 2026-11-04, the llvm-mca Cortex-M7 model after the gate fix pass: a mid block 2.81k cycles (was 12.17k) and the costliest block 8.79k (was 13.1k). The stress run of 2026-11-01 read 17.7k to 17.9k / 21.6k to 25.1k (v2.00.81 and v2.00.82, mean 2.8 %, worst 3.4 to 3.9 %). stress.py sweeps Threshold and Decay and flips the toggle, so its next run owes the measured row
 constexpr Cost kAutotune{3, 5, false};     // est. the pair's host-scaled figure less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
 constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-02, its own voice only: 0.21 host us a block on g++ 15 (Octave at MIX 100 % less the same case at MIX 0), 10.5k board cycles at 50.4k, rounded up; see "Octave alone"
-constexpr Cost kUnison{4, 5, true};        // 21.1k to 21.2k / 21.7k to 26.6k, stress run 2026-11-01 (v2.00.81 and v2.00.82, default and chasm layouts: mean 3.3 %, worst 3.4 to 4.2 %); the earlier 46.9k / 47.7k was the WeAct bench. The dry-at-unity rewrite (2026-11-02) costs no more: host 14.4 / 8.5 ns a sample at DEPTH 50 % (clang / gcc) against 14.5 / 9.0, and 14.7 / 11.6 with DEPTH moving against 14.4 / 12.2
+constexpr Cost kUnison{4, 5, true};        // 21.1k to 21.2k / 21.7k to 26.6k, stress run 2026-11-01 (v2.00.81 and v2.00.82, default and chasm layouts: mean 3.3 %, worst 3.4 to 4.2 %). The Unison fix pass (2026-11-04) proposes {2, 3, false} from the llvm-mca Cortex-M7 model: a block at the top of the knobs 18.9k / 20.1k before, 10.3k / 12.4k after. stress.py sweeps Rate and Depth, and its next run replaces this row
 constexpr Cost kSlapback{1, 3, true};      // 2.7k to 2.9k / 13.5k to 13.8k, stress run 2026-11-02 (v2.01.11, all seven layouts, TIME and AMOUNT swept, ten toggle flips: mean 0.4 to 0.5 %, worst 2.1 to 2.15 %, lowest run worst per layout); the host bench estimate of 6.4k to 8.3k worst missed the block after an enable
-constexpr Cost kDistortion{5, 6, false};   // est. 2026-11-02, the llvm-mca Cortex-M7 model of the stage-major loops (xPack gcc 14.2.1, -O2) times 1.12 for both columns: 23.2k mean (a settled sample is 355 cycles, the knee costs the same at every level) and 29.8k costliest (DRIVE gliding up through the fade zone, 443 cycles a sample plus the sample-by-sample DRIVE step), 26.0k / 33.3k on the board, 4.1 % / 5.2 %. The stress run of 2026-11-01 read the tanh rail at 45.5k to 46.8k / 64.5k to 67.7k (7.1 to 7.3 % / 10.1 to 10.6 %); a board run with the Distortion sweeps owes the measured row
-constexpr Cost kGate{3, 5, true};          // 18.5k to 18.9k / 21.3k to 25.9k, stress run 2026-11-01 (v2.00.81 and v2.00.82, all four layouts: mean 2.9 to 3.0 %, worst 3.3 to 4.05 %, lowest run worst per layout); the earlier 24.7k / 27.0k was the WeAct bench
+constexpr Cost kDistortion{5, 6, false};   // est. 2026-11-02, the llvm-mca Cortex-M7 model of the stage-major loops (xPack gcc 14.2.1, -O2) times 1.12 for both columns: 23.2k mean (a settled sample is 355 cycles, the knee costs the same at every level) and 29.8k costliest (DRIVE gliding up through the fade zone, 443 cycles a sample plus the sample-by-sample DRIVE step), 26.0k / 33.3k on the board, 4.1 % / 5.2 %; after the cleanup pass (2026-11-04) the costliest chunk, TONE stepped inside a DRIVE glide, reads 33.6k board cycles (was 36.2k), 5.3 %. The stress run of 2026-11-01 read the tanh rail at 45.5k to 46.8k / 64.5k to 67.7k (7.1 to 7.3 % / 10.1 to 10.6 %); a board run with the Distortion sweeps owes the measured row
+constexpr Cost kGate{2, 3, false};         // est. 2026-11-04, the llvm-mca Cortex-M7 model after the gate fix pass: a mid block 2.57k cycles (was 12.72k) and the costliest block 9.94k (was 14.8k). The stress run of 2026-11-01 read 18.5k to 18.9k / 21.3k to 25.9k (v2.00.81 and v2.00.82, mean 2.9 to 3.0 %, worst 3.3 to 4.05 %). stress.py sweeps Threshold and Decay and flips the toggle, so its next run owes the measured row
 constexpr Cost kReverbSpring{6, 7, true};   // 33.4k to 33.7k / 38.3k to 40.5k, stress run 2026-11-02 (v2.01.11, the six Spring layouts, MIX swept: mean 5.2 to 5.3 %, worst 6.0 to 6.3 %, lowest run worst per layout); the M7 model read 35.3k / 39.3k
 constexpr Cost kReverbChasm{5, 6, true};    // 29.6k to 29.7k / 35.1k to 35.3k, stress run 2026-11-02 (v2.01.11, chasm and crowd-chasm layouts, MIX swept: mean 4.6 %, worst 5.5 %, lowest run worst per layout); the M7 model read 28.6k / 32.6k
 
@@ -125,7 +129,7 @@ constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stre
 // 2026-11-02, v2.01.14, against the 11 / 13 the three rows sum to).
 constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
 constexpr Cost kFormantFollower{4, 5, false};  // est.: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, SENSITIVITY 50 %, Apple clang -O2, median of 9 interleaved passes, 2 runs; g++ 15 has no SDK here): 15.8 to 15.9 ns a sample at RANGE -12 st, the worst setting, where the grains play at half speed, against Formant's 14.8 at -7 st, at most 1.1 ns more, 3.7k board cycles a block at 50.4k, 0.59 %, rounded up
-constexpr Cost kLofi{4, 5, true};      // 19.5k / 31.4k, stress run 2026-11-02 (v2.01.14, lofi layout, TONE and AMOUNT swept: mean 3.04 %, worst 4.9 %, lowest run worst); the estimate of 2 / 2 missed the coefficient ramp of a moving knob
+constexpr Cost kLofi{2, 4, false};     // est. 2026-11-04, the llvm-mca Cortex-M7 model after the Lo-fi fix pass, as board cycles: mean 12.1k (1.9 %), worst 24.5k (3.8 %); the settled block fell from 15.5k to 9.6k model cycles. The stress run of 2026-11-02 read 19.5k / 31.4k (v2.01.14, lofi layout, TONE and AMOUNT swept: mean 3.04 %, worst 4.9 %), and its next run owes the measured row
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 
 // The Growl card, Distortion's alternate in slot 6, reads the tracker like Crowd, so a layout with it pays
@@ -152,12 +156,16 @@ constexpr Cost kRingMod{2, 2, false};
 constexpr Cost kStrings{13, 31, false};
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
-// tail after them.
-constexpr Cost kOutputEq{6, 7, false};     // est. 32.7k / 38k for both POLISH EQ halves and the sample conversion; 18.1k on the board for 7 biquads (9.2k measured, 8.9k est.) times the host ratio 1.55 for 9 biquads and the detector, plus 4.6k conversion; the worst adds the coefficient work of a block that switches on
-constexpr Cost kPolishComp{1, 1, false};   // two biquads and the fast log and exp per sample
-constexpr Cost kSoftCeiling{1, 1, false};  // a compare per sample; tanh only past -2 dBFS
-constexpr Cost kBypassMix{1, 1, false};    // the dry copy, the input energy sum, the BYPASS fade
-constexpr Cost kFixed = kOutputEq + kPolishComp + kSoftCeiling + kBypassMix;
+// tail after them. The stress logs of 2026-11-01 read POLISH EQ (both halves) at 12.0k to 12.4k cycles
+// (1.9 %), POLISH COMP at 15.2k to 17.0k (2.7 %) and the whole fixed path, the block total less the
+// slots, at 33.1k to 35.9k (5.2 to 5.6 %). The rows below are the POLISH fix pass's estimates of
+// 2026-11-04, rounded up, and stress.py gates the buckets against kPolishEq and kPolishComp and the
+// fixed path against their sum, kFixed.
+constexpr Cost kPolishEq{2, 2, false};     // est.: both halves, the de-esser and the sample conversion
+constexpr Cost kPolishComp{3, 3, false};   // est.: two biquads and the fast log and exp per sample
+constexpr Cost kSoftCeiling{1, 1, false};  // est.: a compare per sample; tanh only past -2 dBFS
+constexpr Cost kBypassMix{1, 1, false};    // est.: the dry copy, the input energy sum, the BYPASS fade
+constexpr Cost kFixed = kPolishEq + kPolishComp + kSoftCeiling + kBypassMix;
 
 constexpr uint8_t kBudgetAvgPercent = 75;
 constexpr uint8_t kBudgetWorstPercent = 95;

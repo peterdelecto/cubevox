@@ -39,6 +39,9 @@ constexpr std::array<OpEntry, kBenchOpCount> kOps = {{
     {BenchOp::PanelJack, "panel_jack", OpClass::Bench},
     {BenchOp::PanelMute, "panel_mute", OpClass::Bench},
     {BenchOp::PanelOled, "panel_oled", OpClass::Bench},
+    {BenchOp::Bypass, "bypass", OpClass::Bench},
+    {BenchOp::PolishComp, "polish_comp", OpClass::Bench},
+    {BenchOp::PolishEq, "polish_eq", OpClass::Bench},
 }};
 
 // Every entry sits at its own enum index, and every name fits the clip width with room to spare,

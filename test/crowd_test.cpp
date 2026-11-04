@@ -568,7 +568,7 @@ bool reportWidthLagStretch(const WidthRuns& runs) {
   const double lagScale = static_cast<double>(cv::CrowdTuning{}.lagScale);
   double worstLag = 0.0;
   for (size_t k = 0; k < runs.size(); ++k) {
-    const double wantLag = lagMsAt(0, static_cast<double>(kWidthRows[k].width), lagScale) * cv::crowd_detail::kSmpPerMs;
+    const double wantLag = lagMsAt(0, static_cast<double>(kWidthRows[k].width), lagScale) * cv::kSmpPerMs;
     worstLag = std::max(worstLag, std::fabs(static_cast<double>(runs[k].lag) - wantLag));
   }
   return report("width stretches the lag", worstLag < 1.0,
@@ -1915,7 +1915,7 @@ bool testGapOverFloor() {
       most = std::max(most, l.total[v]);
       fewestAfter = std::min(fewestAfter, l.after[v]);
     }
-    const double endMs = static_cast<double>(l.lag[1]) / cv::crowd_detail::kSmpPerMs;
+    const double endMs = static_cast<double>(l.lag[1]) / cv::kSmpPerMs;
     const bool lands = which == 0 ? slowest <= 3 * kRate && most <= 30 : fewestAfter >= 9;
     ok &= report(which == 0 ? "gap over a -40 dBFS floor" : "gap over silence", lands && std::fabs(endMs - 60.0) <= 12.5,
                  "first landing after the move within %.0f ms, landings per copy at most %.0f, after the move at least %.0f; "

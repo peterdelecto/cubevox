@@ -52,7 +52,7 @@ func TestValidateRules(t *testing.T) {
 		{"name 31 ok", strings.Repeat("a", 31), empty8, ""},
 		{"non-ASCII name", "café", empty8, "name must be 1 to 31 printable ASCII characters"},
 		{"control char name", "a\nb", empty8, "name must be 1 to 31 printable ASCII characters"},
-		// fixed 3 + 14 + 5 + 8 + 5 + 8 + 4 + 16 = 63 mean, worst 3+21+5+8+5+10+5+16 = 73: both fit.
+		// The fixed term and the eight cards fit both lines.
 		{"under budget", "x", []string{"input_gate", "autotune", "octave", "unison", "slapback", "distortion", "gate", "reverb_chasm"}, ""},
 	}
 	for _, c := range cases {
@@ -68,12 +68,13 @@ func TestValidateRules(t *testing.T) {
 }
 
 func TestBudgetLines(t *testing.T) {
+	left := func(line int) int { return line - box.FixedCost } // what a card may add to the fixed term
 	cards := []box.Card{
 		{ID: "empty"},
-		{ID: "big_mean", Cost: box.Cost{Avg: 73, Worst: 73}},  // 3 + 73 = 76 > 75
-		{ID: "ok_mean", Cost: box.Cost{Avg: 72, Worst: 72}},   // 75 exactly
-		{ID: "big_worst", Cost: box.Cost{Avg: 10, Worst: 93}}, // worst 96 > 95
-		{ID: "ok_worst", Cost: box.Cost{Avg: 10, Worst: 92}},  // worst 95 exactly
+		{ID: "big_mean", Cost: box.Cost{Avg: left(box.BudgetMean) + 1, Worst: 10}},  // the fixed term makes 76 > 75
+		{ID: "ok_mean", Cost: box.Cost{Avg: left(box.BudgetMean), Worst: 10}},       // 75 exactly
+		{ID: "big_worst", Cost: box.Cost{Avg: 10, Worst: left(box.BudgetWorst) + 1}}, // worst 96 > 95
+		{ID: "ok_worst", Cost: box.Cost{Avg: 10, Worst: left(box.BudgetWorst)}},      // worst 95 exactly
 	}
 	pad := func(id string) []string {
 		return []string{id, "empty", "empty", "empty", "empty", "empty", "empty", "empty"}

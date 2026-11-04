@@ -78,11 +78,11 @@ class Slapback {
   static_assert(kTimeMinMs * kSmpPerMs > kBlock + kGuard, "the shortest delay keeps a chunk and its taps behind the write head");
   static_assert(kLen - kMaxDelaySmp >= kBlock, "a segment read never reaches the segment it writes");
 
-  // Per-sample decay of the Time glide's error: 1 minus the 50 ms smoother's coefficient.
-  static inline const float kTimeDecay = 1.0f - smooth::coef(kTimeSec);
+  // Per-sample decay of the Time glide's error: what the 50 ms smoother keeps in one sample.
+  static inline const float kTimeDecay = smooth::keep(kTimeSec, 1);
 
   // log2 of the per-sample decay of the Amount smoother, so a chunk of n samples decays by 2^(n x this).
-  static constexpr float kAmountDecayLog2 = -1.0f / (smooth::kSmoothSec * kSampleRate) * 1.44269504089f;
+  static constexpr float kAmountDecayLog2 = -1.0f / (smooth::kSmoothSec * kSampleRate) * kLog2E;
 
   // The repeat low-pass in direct form I. A low-pass has b1 = 2 b0 and b2 = b0, so the feed-forward
   // sum and the a2 term are ready before y1 arrives, and the recursion through y is one

@@ -48,8 +48,9 @@
 - `PitchFx` lives in DTCM: about 61,400 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
   Formant voice included; the 265.75 ms input ring is 51,024 B of it, sized in `psola.h` for the
   Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
-  scatter and the longest grain. `Distortion` sits there too (2,624 B: its filters, the rail histories
-  and the block scratch). The build prints DTCM at 64,064 B, 49.0 %, 66,752 B free.
+  scatter and the longest grain. `Distortion` sits there too (2,888 B: its filters, the rail histories
+  and the block scratch), and so does `Unison` (10,204 B, mostly its 50 ms line). The build prints DTCM at
+  74,560 B, 57.0 %, 56,256 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`

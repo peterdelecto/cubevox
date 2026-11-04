@@ -29,6 +29,9 @@ struct BenchOverrides {
   uint8_t slotsOff = 0;        // bit s forces slot s off, and wins over slotsForcedOn
   uint8_t slotsForcedOn = 0;   // bit s turns slot s on whatever its panel toggle reads
   bool reverbChasm = false;
+  bool bypassOn = false;       // BYPASS held on, whatever the top switch reads
+  bool compOff = false;        // POLISH COMP forced off, whatever the menu says
+  bool eqOff = false;          // POLISH EQ forced off, whatever the menu says
   bool knobsPinned = false;    // every knob at its top position
   KnobPins knobPin = noKnobPins();  // whole percent of travel per knob; wins over knobsPinned
 

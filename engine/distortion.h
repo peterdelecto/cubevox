@@ -121,7 +121,7 @@ class Distortion {
     }
     dirty_ = true;
 
-    if (!tuningValid_ || !same(t, applied_)) applyTuning(t);
+    if (!tuningValid_ || !sameWords(t, applied_)) applyTuning(t);
     for (int off = 0; off < n; off += kBlock) {
       const int m = n - off < kBlock ? n - off : kBlock;
       runChunk(in + off, out + off, m, target, toneTarget);
@@ -201,23 +201,6 @@ class Distortion {
   static float toneDb(const DistortionTuning& t, float tone) {
     return tone < 0.5f ? boundDb(t.toneMinDb) * (1.0f - 2.0f * tone)
                        : boundDb(t.toneMaxDb) * (2.0f * tone - 1.0f);
-  }
-
-  // The tuning is 28 floats with no padding, so equal words mean an equal tuning. A NaN field reads
-  // as unchanged. The words are compared inline: the board's memcmp is a byte loop.
-  static constexpr size_t kTuningWords = 28;
-  static_assert(std::is_trivially_copyable<DistortionTuning>::value &&
-                    sizeof(DistortionTuning) == kTuningWords * sizeof(uint32_t),
-                "same() compares the tuning as 28 words");
-  static bool same(const DistortionTuning& a, const DistortionTuning& b) {
-    uint32_t diff = 0;
-    for (size_t k = 0; k < kTuningWords; ++k) {
-      uint32_t x, y;
-      std::memcpy(&x, reinterpret_cast<const char*>(&a) + k * sizeof x, sizeof x);
-      std::memcpy(&y, reinterpret_cast<const char*>(&b) + k * sizeof y, sizeof y);
-      diff |= x ^ y;
-    }
-    return diff == 0;
   }
 
   // Recomputes everything that depends on tuning alone.

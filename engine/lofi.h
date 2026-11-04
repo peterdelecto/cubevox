@@ -171,21 +171,6 @@ class Lofi {
     return lo + tf * (row(ti + 1) - lo);
   }
 
-  // The tuning is whole floats with no padding, so equal words mean an equal tuning. The words are
-  // compared inline because the board's memcmp is a byte loop.
-  static_assert(std::is_trivially_copyable<LofiTuning>::value && sizeof(LofiTuning) % sizeof(uint32_t) == 0,
-                "sameTuning compares the tuning as words");
-  static bool sameTuning(const LofiTuning& a, const LofiTuning& b) {
-    uint32_t diff = 0;
-    for (size_t k = 0; k < sizeof(LofiTuning) / sizeof(uint32_t); ++k) {
-      uint32_t x, y;
-      std::memcpy(&x, reinterpret_cast<const char*>(&a) + k * sizeof x, sizeof x);
-      std::memcpy(&y, reinterpret_cast<const char*>(&b) + k * sizeof y, sizeof y);
-      diff |= x ^ y;
-    }
-    return diff == 0;
-  }
-
   // Values the loops ramp between. post is the inverse of the drive times the makeup; ratio is the held
   // rate over the sample rate.
   struct Gains {
@@ -222,7 +207,7 @@ class Lofi {
     const float coef = n == kBlock ? kBlockSmoothCoef : smooth::blockCoef(smooth::kSmoothSec, n);
     tone_ = smooth::step(tone_, tone, coef);
     amount_ = smooth::step(amount_, amount, coef);
-    const bool tuningMoved = !sameTuning(p.tuning, applied_);
+    const bool tuningMoved = !sameWords(p.tuning, applied_);
     if (!lawValid_ || tone_ != lawTone_ || amount_ != lawAmount_ || tuningMoved) applyLaw(p.tuning, tuningMoved);
     play(in, out, n, target);
   }

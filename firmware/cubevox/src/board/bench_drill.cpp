@@ -53,6 +53,12 @@ void toggleReverbChasm() {
                                     : "[bench] reverb slot runs its card's engine");
 }
 
+// Flips a forced state and prints which way it went, in the words the stress run reads.
+void toggleForced(bool& flag, const char* forced, const char* released) {
+  flag = !flag;
+  serialOut().println(flag ? forced : released);
+}
+
 // Null on success; turning the clip on fails when none is compiled in.
 const char* toggleClip() {
   const bool wantOn = !audioBenchClipOn();
@@ -107,6 +113,17 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
     case BenchOp::SetKnob: pinKnob(args); r.republish = true; break;
     case BenchOp::KnobsLive: releaseKnobs(); r.republish = true; break;
     case BenchOp::Chasm: toggleReverbChasm(); r.republish = true; break;
+    case BenchOp::Bypass:
+      toggleForced(gBench.bypassOn, "[bench] BYPASS held on", "[bench] BYPASS follows the top switch");
+      break;
+    case BenchOp::PolishComp:
+      toggleForced(gBench.compOff, "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu");
+      r.republish = true;
+      break;
+    case BenchOp::PolishEq:
+      toggleForced(gBench.eqOff, "[bench] POLISH EQ forced off", "[bench] POLISH EQ follows the menu");
+      r.republish = true;
+      break;
     case BenchOp::Clip: r.error = toggleClip(); break;
     case BenchOp::ResetPeaks: resetPeaks(); break;
     case BenchOp::StopAudio: stopAudio(); break;

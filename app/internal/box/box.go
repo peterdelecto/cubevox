@@ -15,9 +15,10 @@ const (
 	BudgetWorst = 95
 )
 
-// FixedCost is the output EQ and sample conversion share every layout pays. hello does not carry
-// it, so it mirrors firmware/cubevox/src/core/costs.h kFixed (3 % mean and worst).
-const FixedCost = 3
+// FixedCost is the share every layout pays for POLISH EQ, POLISH COMP, the output ceiling, the BYPASS mix
+// and the sample conversion. hello does not carry it, so it mirrors firmware/cubevox/src/core/costs.h
+// kFixed (7 % mean and worst).
+const FixedCost = 7
 
 // ErrNotConnected is returned when no box answers.
 var ErrNotConnected = errors.New("box not connected")

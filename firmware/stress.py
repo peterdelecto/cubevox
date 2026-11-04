@@ -5,24 +5,37 @@ For each layout the script puts the layout on the box, forces every slot on (ben
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
 to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper knob), Formant MIX
-(its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Distortion knobs
-(and TONE again with DRIVE pinned at 100 %, the costliest moving block), both Chatter knobs,
-both Lo-fi knobs and, when Crowd is placed, both Crowd knobs from 0 % to 100 % of travel in steps of
-10 %, 1 s each, reading the counters after each sweep. When Echo is placed it then flips Echo's toggle
-ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again.
+(its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Input gate
+knobs and both Gate knobs (Threshold across the whole knob, then Decay), both Unison knobs (Rate, then
+Depth), both Distortion knobs (TONE again with DRIVE pinned at 100 %, and TONE stepped inside a DRIVE
+glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs and, when Crowd is placed,
+both Crowd knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after
+each sweep. It then flips the toggle of every Echo, Input gate and Gate slot ten times, 0.3 s apart, so
+the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
+POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
+as it found it) and reads the counters once more.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
-core/costs.h, so a block that caught an interrupt does not count.
+core/costs.h, so a block that caught an interrupt does not count. The fixed path is read the same
+way. POLISH COMP and POLISH EQ come from the COMP and EQ buckets of the stats lines. The fixed path
+is the block total less the slot sum for the mean, and for the worst the two buckets at their worst
+plus the rest of the fixed path (ceiling, BYPASS mix, conversion) at its mean.
 
 Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
+  4. each layout's POLISH EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
+     its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
+     kSoftCeiling and kBypassMix
 The slot that runs the shared pitch stage (the first Autotune, Octave, Formant or Crowd slot) is held to
 the rows of every card that stage runs, plus the tracker row when Autotune, Crowd or Formant is placed
 and the stage row when Octave or Formant is placed without Autotune.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
+
+--dry-run prints the layouts, the sweeps, the toggle flips and the fixed-stage flips planned for each,
+with the time they take, and opens no port.
 
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
@@ -68,8 +81,16 @@ BLOCK_MEAN_LIMIT_PERCENT = 75
 BLOCK_WORST_LIMIT_PERCENT = 95
 SWEEP_VALUES = range(0, 101, 10)  # percent of travel
 SWEEP_STEP_S = 1.0
-TOGGLE_FLIPS = 10    # Echo's toggle flips off and on five times
+TOGGLE_FLIPS = 10    # a toggle flips off and on five times
 TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
+GLIDE_LAG_S = 0.02   # a stepped knob starts its partner this long after it, inside the glide
+FLIPPED_CARDS = ("slapback", "input_gate", "gate")  # cards whose toggle the run flips
+# The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
+FIXED_LEVERS = (
+    ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
+    ("polish_comp", "POLISH COMP", "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu"),
+    ("polish_eq", "POLISH EQ", "[bench] POLISH EQ forced off", "[bench] POLISH EQ follows the menu"),
+)
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
@@ -92,7 +113,10 @@ PITCH_GROUP = ("autotune", "octave", "formant", "crowd")  # the first of these c
 TRACKER_USERS = ("autotune", "crowd", "formant")    # cards that run the pitch tracker
 STAGE_USERS = ("octave", "formant")                 # cards that pay the stage term without Autotune
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
-              "clip", "chasm")
+              "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
+# The fixed path's rows: POLISH EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
+FIXED_PARTS = ("kPolishEq", "kPolishComp", "kSoftCeiling", "kBypassMix")
+FIXED_ROW = "kFixed"
 
 COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
 BLOCKS_LINE = re.compile(r"\[audio\] blocks (\d+) late (\d+) overruns (\d+) dry (\d+) avg (\d+) worst (\d+) of (\d+) cycles")
@@ -101,7 +125,11 @@ SLOT_WORST_LINE = re.compile(r"\[audio\] slot worst ((?:\d+ )+)COMP (\d+) EQ (\d
 CLIP_LINE = re.compile(r"\[bench\] vocal clip (on|off)")
 CHASM_LINE = re.compile(r"\[bench\] reverb slot runs (Chasm|its card's engine)")
 
-Stats = collections.namedtuple("Stats", "blocks late overruns dry avg worst budget slot_avg slot_worst")
+Stats = collections.namedtuple("Stats", "blocks late overruns dry avg worst budget slot_avg slot_worst comp_avg eq_avg "
+                                        "comp_worst eq_worst")
+# One sweep: the slot index, the knob (1 or 2) it moves, its label, the other knobs pinned first as (knob,
+# percent of travel) pairs and, for a glide, the partner knob that steps from 0 to 100 % and back inside it.
+Sweep = collections.namedtuple("Sweep", "slot knob label held partner", defaults=((), None))
 Gate = collections.namedtuple("Gate", "name ok detail")
 
 
@@ -121,6 +149,11 @@ def fmt_pct(cycles):
     return f"{cycles / CYCLES_PER_PERCENT:.1f} %"
 
 
+def fmt_row(percent):
+    """A costs.h row cell; a stage with no row of its own shows a dash."""
+    return "-" if percent is None else f"{percent} %"
+
+
 # -- the firmware sources the gates read
 
 def read_text(path):
@@ -134,9 +167,10 @@ def read_text(path):
 def read_rows():
     """The costs.h rows as {name: (mean percent, worst percent)}."""
     rows = {m.group(1): (int(m.group(2)), int(m.group(3))) for m in COST_ROW.finditer(read_text(COSTS_H))}
-    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW, STAGE_ROW) if n not in rows]
+    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW, STAGE_ROW, *FIXED_PARTS) if n not in rows]
     if missing:
         raise StressError(f"{COSTS_H}: no row for {', '.join(missing)}")
+    rows[FIXED_ROW] = (sum(rows[n][0] for n in FIXED_PARTS), sum(rows[n][1] for n in FIXED_PARTS))
     return rows
 
 
@@ -223,7 +257,8 @@ def parse_stats(lines):
     if len(slot_avg) != SLOTS or len(slot_worst) != SLOTS:
         raise StressError(f"the stats lines carry {len(slot_avg)} and {len(slot_worst)} slots, not {SLOTS}")
     b = [int(v) for v in blocks.groups()]
-    return Stats(b[0], b[1], b[2], b[3], b[4], b[5], b[6], slot_avg, slot_worst)
+    return Stats(b[0], b[1], b[2], b[3], b[4], b[5], b[6], slot_avg, slot_worst,
+                 int(per.group(2)), int(per.group(3)), int(worst.group(2)), int(worst.group(3)))
 
 
 class Box:
@@ -308,6 +343,21 @@ class Box:
         if self.chasm != want:
             raise StressError("bench chasm: the reverb engine would not switch")
 
+    def flip_lever(self, op):
+        """Flips a fixed-stage flag and says whether it reads set afterward."""
+        lines = self.bench_ok(op)
+        _, label, set_line, clear_line = next(lever for lever in FIXED_LEVERS if lever[0] == op)
+        state = [line for line in lines if line.startswith((set_line, clear_line))]
+        if not state:
+            raise StressError(f"bench {op}: no '{set_line}' or '{clear_line}' line came back")
+        return state[-1].startswith(set_line)
+
+    def clear_levers(self):
+        """Every fixed-stage flag back to clear. A flip shows the new state, so a set flag takes a second flip."""
+        for op, *_ in FIXED_LEVERS:
+            if self.flip_lever(op):
+                self.flip_lever(op)
+
     def get_layout(self):
         reply = self.ask("get_layout")
         layout = reply.get("layout")
@@ -335,34 +385,93 @@ def open_box(port, wait_s):
 # -- one measured run
 
 def sweeps(slots):
-    """(slot index, knob 1 or 2, label, held) for each sweep this layout gets. `held` lists the other
-    knobs of the slot the sweep pins first, as (knob, percent of travel) pairs."""
+    """The Sweep list this layout gets: each slot's knobs end to end, the Distortion cases that move a
+    block, and the gates and Unison, whose moving blocks cost more than their settled ones."""
     found = []
     for i, card in enumerate(slots):
         if card == "octave":
-            found.append((i, 1, "SEMITONES", ()))
+            found.append(Sweep(i, 1, "SEMITONES"))
         if card == "formant":
-            found.append((i, 1, "SHIFT", ()))
-            found.append((i, 2, "Formant MIX", ()))
+            found.append(Sweep(i, 1, "SHIFT"))
+            found.append(Sweep(i, 2, "Formant MIX"))
         if card.startswith("reverb_"):
-            found.append((i, 2, "reverb MIX", ()))
+            found.append(Sweep(i, 2, "reverb MIX"))
         if card == "slapback":
-            found.append((i, 1, "Echo TIME", ()))
-            found.append((i, 2, "Echo AMOUNT", ()))
+            found.append(Sweep(i, 1, "Echo TIME"))
+            found.append(Sweep(i, 2, "Echo AMOUNT"))
+        if card in ("input_gate", "gate"):
+            name = "Input gate" if card == "input_gate" else "Gate"
+            found.append(Sweep(i, 1, f"{name} Threshold"))
+            found.append(Sweep(i, 2, f"{name} Decay"))
+        if card == "unison":
+            found.append(Sweep(i, 1, "Unison Rate"))
+            found.append(Sweep(i, 2, "Unison Depth"))
         if card == "distortion":
-            found.append((i, 1, "Distortion TONE", ()))
-            found.append((i, 2, "Distortion DRIVE", ()))
-            found.append((i, 1, "Distortion TONE at DRIVE 100 %", ((2, 100),)))
+            found.append(Sweep(i, 1, "Distortion TONE"))
+            found.append(Sweep(i, 2, "Distortion DRIVE"))
+            found.append(Sweep(i, 1, "Distortion TONE at DRIVE 100 %", held=((2, 100),)))
+            found.append(Sweep(i, 2, "Distortion DRIVE with TONE stepped inside the glide", partner=1))
         if card == "bloom":
-            found.append((i, 1, "Chatter LENGTH", ()))
-            found.append((i, 2, "Chatter AMOUNT", ()))
+            found.append(Sweep(i, 1, "Chatter LENGTH"))
+            found.append(Sweep(i, 2, "Chatter AMOUNT"))
         if card == "lofi":
-            found.append((i, 1, "Lo-fi TONE", ()))
-            found.append((i, 2, "Lo-fi AMOUNT", ()))
+            found.append(Sweep(i, 1, "Lo-fi TONE"))
+            found.append(Sweep(i, 2, "Lo-fi AMOUNT"))
         if card == "crowd":
-            found.append((i, 1, "Crowd DIVERGE", ()))
-            found.append((i, 2, "Crowd VOICES", ()))
+            found.append(Sweep(i, 1, "Crowd DIVERGE"))
+            found.append(Sweep(i, 2, "Crowd VOICES"))
     return found
+
+
+def flipped_slots(slots):
+    """(slot index, card) for each slot whose toggle the run flips."""
+    return [(i, card) for i, card in enumerate(slots) if card in FLIPPED_CARDS]
+
+
+def plan_seconds(slots, seconds):
+    """Seconds one run takes: the read, the sweeps, the toggle flips and the fixed-stage flips."""
+    flips = (len(flipped_slots(slots)) + len(FIXED_LEVERS)) * TOGGLE_FLIPS * TOGGLE_STEP_S
+    return seconds + len(sweeps(slots)) * len(SWEEP_VALUES) * SWEEP_STEP_S + flips
+
+
+def run_sweep(box, sweep):
+    """One sweep: the held knobs pinned, then the knob stepped from 0 % to 100 %. A partner knob steps
+    to 100 % and back on alternate steps, a moment after the knob, while its glide runs."""
+    slot = sweep.slot + 1
+    for held_knob, held_value in sweep.held:
+        box.bench_ok("set_knob", slot=slot, knob=held_knob, value=held_value)
+    for n, value in enumerate(SWEEP_VALUES):
+        box.bench_ok("set_knob", slot=slot, knob=sweep.knob, value=value)
+        if sweep.partner is None:
+            box.wait(SWEEP_STEP_S)
+            continue
+        box.wait(GLIDE_LAG_S)
+        box.bench_ok("set_knob", slot=slot, knob=sweep.partner, value=100 if n % 2 == 0 else 0)
+        box.wait(SWEEP_STEP_S - GLIDE_LAG_S)
+
+
+def pass_two(box, slots):
+    """The swept pass: every sweep, the slot toggle flips, then the fixed-stage flips. Each reads the
+    counters after it ends, and the returned list holds those reads."""
+    later = []
+    for sweep in sweeps(slots):
+        say(f"pass 2, {sweep.label} (slot {sweep.slot + 1}) 0 % to 100 %")
+        run_sweep(box, sweep)
+        later.append(box.stats())
+        box.bench_ok("knobs_live")
+    for slot, card in flipped_slots(slots):
+        say(f"pass 2, {TOGGLE_FLIPS} flips of the {card} toggle (slot {slot + 1})")
+        for _ in range(TOGGLE_FLIPS):
+            box.bench_ok("slot_off", slot=slot + 1)  # each call flips the slot's force-off bit
+            box.wait(TOGGLE_STEP_S)
+        later.append(box.stats())
+    for op, label, *_ in FIXED_LEVERS:
+        say(f"pass 2, {TOGGLE_FLIPS} flips of {label}")
+        for _ in range(TOGGLE_FLIPS):
+            box.flip_lever(op)
+            box.wait(TOGGLE_STEP_S)
+        later.append(box.stats())
+    return later
 
 
 def measure_run(box, slots, seconds):
@@ -378,29 +487,24 @@ def measure_run(box, slots, seconds):
     first = box.stats()
     box.bench_ok("knobs_live")
     box.bench_ok("reset_peaks")
-    later = []
-    for slot, knob, label, held in sweeps(slots):
-        say(f"pass 2, {label} (slot {slot + 1}) 0 % to 100 %")
-        for held_knob, held_value in held:
-            box.bench_ok("set_knob", slot=slot + 1, knob=held_knob, value=held_value)
-        for value in SWEEP_VALUES:
-            box.bench_ok("set_knob", slot=slot + 1, knob=knob, value=value)
-            box.wait(SWEEP_STEP_S)
-        later.append(box.stats())
-        box.bench_ok("knobs_live")
-    for slot in (i for i, card in enumerate(slots) if card == "slapback"):
-        say(f"pass 2, {TOGGLE_FLIPS} flips of the Echo toggle (slot {slot + 1})")
-        for _ in range(TOGGLE_FLIPS):
-            box.bench_ok("slot_off", slot=slot + 1)  # each call flips the slot's force-off bit
-            box.wait(TOGGLE_STEP_S)
-        later.append(box.stats())
+    later = pass_two(box, slots)
     every = [first, *later]
+    # The fixed path less its two buckets (ceiling, BYPASS mix, conversion) is read from the mean only.
+    fixed_mean = first.avg - sum(first.slot_avg)
+    rest = max(0, fixed_mean - first.comp_avg - first.eq_avg)
+    comp_worst, eq_worst = max(s.comp_worst for s in every), max(s.eq_worst for s in every)
     return {
         "blocks": first.blocks,
         "block_mean": first.avg,
         "block_worst": max(s.worst for s in every),
         "slot_mean": first.slot_avg,
         "slot_worst": [max(s.slot_worst[i] for s in every) for i in range(SLOTS)],
+        "comp_mean": first.comp_avg,
+        "eq_mean": first.eq_avg,
+        "comp_worst": comp_worst,
+        "eq_worst": eq_worst,
+        "fixed_mean": fixed_mean,
+        "fixed_worst": comp_worst + eq_worst + rest,
         "late": first.late + (later[-1].late if later else 0),
         "overruns": first.overruns + (later[-1].overruns if later else 0),
         "dry": first.dry + (later[-1].dry if later else 0),
@@ -411,10 +515,13 @@ def measure_run(box, slots, seconds):
 def aggregate(runs):
     """Mean of the means, lowest of the worsts, and the counters summed."""
     n = len(runs)
+    mean_of = {key: sum(r[key] for r in runs) / n
+               for key in ("block_mean", "comp_mean", "eq_mean", "fixed_mean")}
+    low_of = {key: min(r[key] for r in runs) for key in ("block_worst", "comp_worst", "eq_worst", "fixed_worst")}
     return {
         "runs": n,
-        "block_mean": sum(r["block_mean"] for r in runs) / n,
-        "block_worst": min(r["block_worst"] for r in runs),
+        **mean_of,
+        **low_of,
         "slot_mean": [sum(r["slot_mean"][i] for r in runs) / n for i in range(SLOTS)],
         "slot_worst": [min(r["slot_worst"][i] for r in runs) for i in range(SLOTS)],
         "late": sum(r["late"] for r in runs),
@@ -449,6 +556,24 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 
 # -- gates and reports
 
+def judge_fixed(agg, rows, label, table, gates):
+    """Adds the fixed stages to the table and holds each to its row: the EQ and COMP buckets to kPolishEq
+    and kPolishComp, and the fixed path to kFixed, the sum of the four fixed rows."""
+    parts = (("POLISH EQ", "eq", "kPolishEq"), ("POLISH COMP", "comp", "kPolishComp"),
+             ("fixed path", "fixed", FIXED_ROW))
+    for name, key, row_name in parts:
+        row_mean, row_worst = rows[row_name]
+        over = []
+        for kind, value, row in (("mean", agg[f"{key}_mean"], row_mean), ("worst", agg[f"{key}_worst"], row_worst)):
+            within = value / CYCLES_PER_PERCENT <= row
+            if not within:
+                over.append(kind)
+            gates.append(Gate(f"{label}: {name} {kind} within {row_name}", within,
+                              f"{value / CYCLES_PER_PERCENT:.2f} % {'within' if within else 'over'} {row} %"))
+        table.append(("-", name, agg[f"{key}_mean"], row_mean, agg[f"{key}_worst"], row_worst,
+                      "ok" if not over else "FAIL " + " and ".join(over)))
+
+
 def judge(result, rows):
     """Fills result['table'], result['gates'] and result['carrier'] from the aggregate.
 
@@ -474,6 +599,7 @@ def judge(result, rows):
                               f"{value / CYCLES_PER_PERCENT:.2f} % {'within' if within else 'over'} {row} %"))
         table.append((i + 1, card + ("*" if i == carrier else ""), mean, row_mean, worst, row_worst,
                       "ok" if not over else "FAIL " + " and ".join(over)))
+    judge_fixed(agg, rows, label, table, gates)
     block_mean, block_worst = agg["block_mean"], agg["block_worst"]
     gates.append(Gate(f"{label}: block mean under {BLOCK_MEAN_LIMIT_PERCENT} %",
                       block_mean / CYCLES_PER_PERCENT < BLOCK_MEAN_LIMIT_PERCENT, fmt_pct(block_mean)))
@@ -501,8 +627,8 @@ def summary_lines(results):
         if "agg" not in r:
             continue
         for slot, card, mean, row_mean, worst, row_worst, verdict in r["table"]:
-            out.append(f"  {slot} {card:<14} mean {fmt_k(mean):>7} {fmt_pct(mean):>7} / {row_mean:>2} %"
-                       f"   worst {fmt_k(worst):>7} {fmt_pct(worst):>7} / {row_worst:>2} %   {verdict}")
+            out.append(f"  {slot} {card:<14} mean {fmt_k(mean):>7} {fmt_pct(mean):>7} / {fmt_row(row_mean):>4}"
+                       f"   worst {fmt_k(worst):>7} {fmt_pct(worst):>7} / {fmt_row(row_worst):>4}   {verdict}")
         out.append("  " + block_line(r["agg"]))
     return out
 
@@ -524,8 +650,8 @@ def report_lines(results, header):
         out.append("| slot | card | mean cycles | mean % | row mean % | worst cycles | worst % | row worst % | verdict |")
         out.append("|---|---|---|---|---|---|---|---|---|")
         for slot, card, mean, row_mean, worst, row_worst, verdict in r["table"]:
-            out.append(f"| {slot} | {card} | {fmt_k(mean)} | {fmt_pct(mean)} | {row_mean} % | "
-                       f"{fmt_k(worst)} | {fmt_pct(worst)} | {row_worst} % | {verdict} |")
+            out.append(f"| {slot} | {card} | {fmt_k(mean)} | {fmt_pct(mean)} | {fmt_row(row_mean)} | "
+                       f"{fmt_k(worst)} | {fmt_pct(worst)} | {fmt_row(row_worst)} | {verdict} |")
         out.append("")
         if r["carrier"] is not None:
             out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
@@ -612,6 +738,7 @@ def restore(port, box, name, slots):
     steps = [
         ("slots_live", lambda: box.bench_ok("slots_live")),
         ("knobs_live", lambda: box.bench_ok("knobs_live")),
+        ("fixed-stage flags", box.clear_levers),
         ("clip off", lambda: box.set_clip(False)),
         ("reverb engine", lambda: restore_chasm(box)),
         ("saved layout", lambda: restore_layout(box, name, slots)),
@@ -643,6 +770,36 @@ def restore_layout(box, name, slots):
         raise StressError(f"the box refused the saved layout: {refusal}")
 
 
+def plan_lines(name, slots, chasm, runs, seconds):
+    """What one layout's runs do, as text."""
+    out = [f"{name} ({' '.join(slots)}{', reverb on Chasm' if chasm else ''}), {runs} run(s) of "
+           f"{plan_seconds(slots, seconds):.0f} s"]
+    out.append(f"  pass 1: knobs at top, {seconds:g} s")
+    for sweep in sweeps(slots):
+        extra = f", partner knob {sweep.partner} stepped inside the glide" if sweep.partner else ""
+        held = "".join(f", knob {k} held at {v} %" for k, v in sweep.held)
+        out.append(f"  sweep: {sweep.label}, slot {sweep.slot + 1} knob {sweep.knob}, 0 % to 100 %{held}{extra}")
+    for slot, card in flipped_slots(slots):
+        out.append(f"  toggle: {TOGGLE_FLIPS} flips of the {card} toggle, slot {slot + 1}")
+    for op, label, *_ in FIXED_LEVERS:
+        out.append(f"  fixed stage: {TOGGLE_FLIPS} flips of {label} (bench op {op})")
+    return out
+
+
+def dry_run(wanted, runs, seconds):
+    """Prints the plan for the named layouts. Reads the firmware sources and opens no port."""
+    try:
+        table = layout_table()
+        read_rows()
+    except StressError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        return 1
+    for name in wanted:
+        slots, chasm = table[name]
+        print("\n".join(plan_lines(name, slots, chasm, runs, seconds)))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--flash", action="store_true",
@@ -653,11 +810,15 @@ def main():
     ap.add_argument("--seconds", type=float, default=20.0, help="pass 1 read window per run (default 20)")
     ap.add_argument("--port", default=None, help="serial port path (default CUBEVOX_PORT, else the only cu.usbmodem*)")
     ap.add_argument("--clip", default=DEFAULT_CLIP, help="WAV for --flash (default samples/adam_vox_sample3_5s.wav)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the sweeps, toggle flips and fixed-stage flips planned for each layout and exit; no port")
     a = ap.parse_args()
     wanted = [n for n in a.layouts.split(",") if n]
     unknown = [n for n in wanted if n not in LAYOUT_NAMES]
     if unknown or not wanted or a.runs < 1 or a.seconds <= 0:
         ap.error(f"unknown layout {', '.join(unknown)}" if unknown else "need layouts, --runs >= 1 and --seconds > 0")
+    if a.dry_run:
+        return dry_run(wanted, a.runs, a.seconds)
 
     box = start_name = start_slots = hello = None
     results, failed_restore, code = [], [], 1

@@ -45,8 +45,8 @@ void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, 
   snap.layout = layout;
   for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, s, snap);
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
-  snap.params.comp.on = settings.polishComp;
-  snap.params.eq.on = settings.polishEq;
+  snap.params.comp.on = settings.polishComp && !bench.compOff;
+  snap.params.eq.on = settings.polishEq && !bench.eqOff;
   snap.outputGain = cv::dbToGain(outputTrimDb(settings));
 }
 

@@ -22,7 +22,7 @@ SKIPPED = "requiredLibraries.cpp"  # arduino-cli's library probe, not our code
 # -Wdouble-promotion matters on the single-precision FPU, -Wshadow and -Wundef catch silent
 # name and macro mistakes, -Wformat=2 checks the printf-style calls. -Wstack-usage bounds every
 # frame on the one stack all interrupts share. processHalf's frame in audio.cpp is the largest at
-# 1016 B, with 768 B of block buffers, so 1152 leaves 136 B for locals and refuses a fourth buffer.
+# 1040 B, with 512 B of block buffers, so 1152 leaves 112 B for locals and refuses a third buffer.
 WARNING_FLAGS = ["-Wall", "-Wextra", "-Wshadow", "-Wdouble-promotion", "-Wundef", "-Wformat=2",
                  "-Wstack-usage=1152", "-Werror"]
 
