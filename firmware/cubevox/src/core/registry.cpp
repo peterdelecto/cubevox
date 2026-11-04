@@ -38,8 +38,8 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
-constexpr KnobDesc kFollowerDepth = {"DEPTH", KnobKind::Continuous, 0, -cv::kFollowerMaxDepthSt,
-                                     cv::kFollowerMaxDepthSt, "st"};
+constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, -cv::kFollowerMaxRangeSt,
+                                     cv::kFollowerMaxRangeSt, "st"};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
 
@@ -82,7 +82,8 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
       {"VOICES", KnobKind::Stepped, cv::kVoices2Steps, 0.0f, cv::kVoices2Steps - 1, "", Curve::Linear, 0,
        cv::kVoices2Name.data()}},
      Group::Pitch, costs::kCrowd2},
-    {Card::FormantFollower, "formant_follow", "Formant follower", Engine::Pitch, 2, {kFollowerDepth, kPercent("MIX")},
+    {Card::FormantFollower, "formant_follow", "Formant follower", Engine::Pitch, 2,
+     {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower, "Follower"},
     {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("DRIVE")}, Group::Pitch, costs::kGrowl},
 }};
@@ -182,12 +183,13 @@ void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
   }
 }
 
-// DEPTH sets the follower's reach and MIX the Formant voice's mix, which the follower drives.
+// SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach. The follower pins
+// the Formant voice's mix at 1, so no knob sets it.
 void applyFollowerKnob(int knob, float v, ChainParams& out) {
   if (knob == 0) {
-    out.follower.depthSt = knobValue(kFollowerDepth, v);
+    out.follower.sensitivity = v;
   } else {
-    out.pitchFx.formant.mix = v;
+    out.follower.rangeSt = knobValue(kFollowerRange, v);
   }
 }
 
