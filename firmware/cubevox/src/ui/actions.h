@@ -21,9 +21,9 @@ enum class ApplyResult : uint8_t {
 // the brightness cycle through their values.
 // The reverb action swaps the reverb card between Spring and Chasm in its slot. It changes nothing
 // when no slot holds a reverb card, or when the other card would push the layout past the CPU budget.
-// The Unison and Crowd action does the same between Unison and Crowd in the slot that holds either,
-// and changes nothing when no slot does or when the other card fails the placement rules.
 // The Octave and Formant action does the same between Octave and Formant.
+// The Unison and Crowd action moves the slot that holds Unison, Mob or Mob 2 to the next of the three
+// in that order, wrapping, as the slot 7 action does below.
 // The slot 7 action moves the slot that holds Gate, Lo-fi or Chatter to the next of the three in that
 // order, wrapping, and passes over a card the placement rules refuse. It changes nothing when no slot
 // holds one of the three or when both others are refused.

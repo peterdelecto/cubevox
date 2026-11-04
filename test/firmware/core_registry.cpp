@@ -85,7 +85,7 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb cards");
-  check(pitch == 4, "autotune, octave, formant and the crowd card are the pitch group");
+  check(pitch == 5, "autotune, octave, formant, the crowd card and Mob 2 are the pitch group");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive) sits on knob B, the lower pot of its slot, and each parameter
@@ -158,6 +158,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Formant: return knob == 0 ? static_cast<float>(p.pitchFx.formant.shiftSt) : p.pitchFx.formant.mix;
     case Card::Lofi: return knob == 0 ? p.lofi.tone : p.lofi.amount;
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
+    case Card::Crowd2: return knob == 0 ? p.crowd.drift : static_cast<float>(p.crowd.voicesStep);
     case Card::Empty:
     case Card::Count: break;
   }
@@ -414,12 +415,38 @@ void checkCrowdVoices() {
   check(top.crowd.voicesStep == cv::kVoicesMob, "crowd: a VOICES reading past the top lands on MOB");
 }
 
+// Mob 2 runs the Crowd engine in its Mob 2 mode: knob A is DRIFT, knob B VOICES with six positions,
+// 0 to 4 and MOB. Placing it sets the mode, and its toggle feeds the pitch stage as Mob's does.
+void checkMob2Card() {
+  const CardDesc& d = cardDesc(Card::Crowd2);
+  check(std::strcmp(d.id, "crowd2") == 0 && std::strcmp(d.name, "Mob 2") == 0 && d.engine == Engine::Crowd &&
+            d.group == Group::Pitch && d.cost.avg == costs::kCrowd2.avg && d.cost.worst == costs::kCrowd2.worst &&
+            !d.cost.measured,
+        "mob 2: id crowd2, name Mob 2, the Crowd engine, the pitch group and its estimated row");
+  const KnobDesc& voices = *knobDesc(Card::Crowd2, 1);
+  check(std::strcmp(knobDesc(Card::Crowd2, 0)->name, "DRIFT") == 0 && std::strcmp(voices.name, "VOICES") == 0 &&
+            knobSteps(Card::Crowd2, 1) == 6 && shownText(voices, 4.0f) == "4" && shownText(voices, 99.0f) == "MOB",
+        "mob 2: knob A is DRIFT and knob B is VOICES, 0 to 4 and MOB");
+  ChainParams p;
+  applyPlacement(Card::Crowd2, p);
+  applyKnob(Card::Crowd2, 0, 0.25f, p);
+  applyKnob(Card::Crowd2, 1, 5.0f, p);
+  applyToggle(Card::Crowd2, true, p);
+  check(p.crowd.mob2 && std::fabs(p.crowd.drift - 0.25f) < 1e-6f && p.crowd.voicesStep == cv::kVoices2Mob &&
+            p.crowd.on && p.pitchFx.crowdOn,
+        "mob 2: placement sets the mode, the knobs reach DRIFT and VOICES, the toggle feeds the pitch stage");
+  ChainParams mob;
+  applyPlacement(Card::Crowd, mob);
+  check(!mob.crowd.mob2, "mob 2: placing Mob leaves the mode off");
+}
+
 // Formant, an alternate for Octave in slot 3, and Lo-fi and Chatter, alternates for Gate in slot 7. They sit
 // after the Crowd card in the table, so every earlier id keeps its meaning in a saved layout. Each row is
 // the estimate in costs.h until the stress run replaces it.
 void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
-            static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 && kCardCount == 14,
+            static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 &&
+            static_cast<int>(Card::Crowd2) == 14 && kCardCount == 15,
         "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
             kEngineCount == 10,
@@ -672,6 +699,7 @@ void checkRegistry() {
   checkShownNumbers();
   checkShownLabels();
   checkCrowdVoices();
+  checkMob2Card();
   checkAppendedCards();
   checkFormantCard();
   checkLofiCard();

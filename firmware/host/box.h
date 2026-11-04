@@ -81,9 +81,10 @@ class Box {
   void swapUnisonMob();
   void swapReverb();
 
-  // The card switch under slot 7. Applies the menu's slot 7 action until the slot holds `card`
-  // (Gate, Lofi or Chatter). When no step of the cycle reaches it, because the box would not load that
-  // layout, the layout stays as it was.
+  // The card switches under slot 4 and slot 7. Each applies its menu action until the slot holds
+  // `card` (Unison, Mob or Mob 2; Gate, Lofi or Chatter). When no step of the cycle reaches it,
+  // because the box would not load that layout, the layout stays as it was.
+  void pickSlot4Card(Card card);
   void pickSlot7Card(Card card);
 
   const Pixels& pixels() const { return display_.pixels(); }
@@ -97,6 +98,7 @@ class Box {
   const Settings& settings() const { return settings_; }
 
  private:
+  void pickCycledCard(Card card, UiAction action, int (*slotOf)(const Layout&));
   void readControls(const PanelInput& in, uint32_t nowMs);
   void runMute(const PanelInput& in, uint32_t nowMs);
   bool applyAction(UiAction action);

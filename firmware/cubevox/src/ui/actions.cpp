@@ -14,14 +14,13 @@ ApplyResult swapReverb(Layout& layout) {
   return ApplyResult::LayoutChanged;
 }
 
-ApplyResult swapUnisonCrowd(Layout& layout) {
-  const int slot = unisonCrowdSlot(layout);
-  if (slot < 0) return ApplyResult::None;
-  Layout next = layout;
-  next.card[slot] = layout.card[slot] == Card::Unison ? Card::Crowd : Card::Unison;
-  if (!layoutValid(next).ok()) return ApplyResult::None;
-  layout = next;
-  return ApplyResult::LayoutChanged;
+// The card after `c` in the slot 4 cycle, Unison to Mob to Mob 2 and back to Unison.
+Card nextSlot4Card(Card c) {
+  switch (c) {
+    case Card::Unison: return Card::Crowd;
+    case Card::Crowd: return Card::Crowd2;
+    default: return Card::Unison;
+  }
 }
 
 ApplyResult swapOctaveFormant(Layout& layout) {
@@ -43,17 +42,16 @@ Card nextSlot7Card(Card c) {
   }
 }
 
-// Moves the slot that holds one of the three to the next card in the cycle that layoutValid accepts,
-// so a card over the CPU lines or already placed in another slot is passed over. When neither of the
-// other two fits the layout stays as it is.
-ApplyResult cycleSlot7Card(Layout& layout) {
-  const int slot = slot7CardSlot(layout);
+// Moves the card in `slot` to the next card in its cycle that layoutValid accepts, so a card over the
+// CPU lines or already placed in another slot is passed over. When none of the others fits the layout
+// stays as it is.
+ApplyResult cycleCard(Layout& layout, int slot, Card (*next)(Card)) {
   if (slot < 0) return ApplyResult::None;
-  Layout next = layout;
-  for (Card c = nextSlot7Card(layout.card[slot]); c != layout.card[slot]; c = nextSlot7Card(c)) {
-    next.card[slot] = c;
-    if (layoutValid(next).ok()) {
-      layout = next;
+  Layout trial = layout;
+  for (Card c = next(layout.card[slot]); c != layout.card[slot]; c = next(c)) {
+    trial.card[slot] = c;
+    if (layoutValid(trial).ok()) {
+      layout = trial;
       return ApplyResult::LayoutChanged;
     }
   }
@@ -87,8 +85,8 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
       return ApplyResult::SettingsChanged;
     case UiAction::SwapReverb: return swapReverb(layout);
     case UiAction::SwapOctaveFormant: return swapOctaveFormant(layout);
-    case UiAction::SwapUnisonCrowd: return swapUnisonCrowd(layout);
-    case UiAction::CycleSlot7Card: return cycleSlot7Card(layout);
+    case UiAction::SwapUnisonCrowd: return cycleCard(layout, unisonCrowdSlot(layout), nextSlot4Card);
+    case UiAction::CycleSlot7Card: return cycleCard(layout, slot7CardSlot(layout), nextSlot7Card);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;
   }

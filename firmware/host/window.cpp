@@ -352,33 +352,41 @@ void drawTopBand(Frame& f) {
   drawCpuLine(f, kRightX + 2 * kLedR + kLedGap, rowY);
 }
 
-// The cells of the two grid switches, in the order the menu cycles or swaps their cards. The slot 7
-// switch has GATE and LO-FI side by side over CHATTER. The slot 3 switch has OCTAVE over FORMANT.
+// The cells of the three grid switches, in the order the menu cycles or swaps their cards. The slot 7
+// switch has GATE and LO-FI side by side over CHATTER, the slot 4 switch UNISON and MOB over MOB 2,
+// and the slot 3 switch OCTAVE over FORMANT.
 constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"CHATTER", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
+constexpr std::array<GridCell, 3> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}, {"MOB 2", 0.0f, 1, 1.0f}}};
+constexpr std::array<Card, 3> kSlot4Cards = {Card::Unison, Card::Crowd, Card::Crowd2};
 constexpr std::array<GridCell, 2> kSlot3Cells = {{{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}}};
 
+// The cell of `cards` that `c` sits in, 0 when it sits in none.
+int activeCell(const std::array<Card, 3>& cards, Card c) {
+  for (size_t i = 0; i < cards.size(); ++i) {
+    if (cards[i] == c) return static_cast<int>(i);
+  }
+  return 0;
+}
+
 // The card switch at the foot of a slot, which follows the layout: the column that holds the Octave
-// or Formant card, the column that holds the Unison or MOB card, the column that holds a reverb, and
-// the column that holds Gate, Lo-fi or Chatter. The first and last are grids, and a click on the last
-// picks its card through the menu's own action.
+// or Formant card, the column that holds Unison, MOB or MOB 2, the column that holds a reverb, and
+// the column that holds Gate, Lo-fi or Chatter. All but the reverb's are grids, and a click on a
+// three-card grid picks its card through the menu's own action.
 void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
   const Layout& layout = f.box.layout();
+  const Card card = layout.card[static_cast<size_t>(slot)];
   if (slot == octaveFormantSlot(layout)) {
-    const int active = layout.card[static_cast<size_t>(slot)] == Card::Formant ? 1 : 0;
+    const int active = card == Card::Formant ? 1 : 0;
     if (segmentedGrid(f, "swapOctave", topLeft, kColInnerW, kSlot3Cells, active) >= 0) f.box.swapOctaveFormant();
   } else if (slot == unisonCrowdSlot(layout)) {
-    const bool mob = layout.card[static_cast<size_t>(slot)] == Card::Crowd;
-    if (segmentedSwitch(f, "swapUnison", topLeft, kColInnerW, "UNISON", "MOB", mob, true)) f.box.swapUnisonMob();
+    const int picked = segmentedGrid(f, "slot4Card", topLeft, kColInnerW, kSlot4Cells, activeCell(kSlot4Cards, card));
+    if (picked >= 0) f.box.pickSlot4Card(kSlot4Cards[static_cast<size_t>(picked)]);
   } else if (slot == reverbSlot(layout)) {
-    const bool chasm = layout.card[static_cast<size_t>(slot)] == Card::ReverbChasm;
+    const bool chasm = card == Card::ReverbChasm;
     if (segmentedSwitch(f, "swapReverb", topLeft, kColInnerW, "SPRING", "CHASM", chasm, true)) f.box.swapReverb();
   } else if (slot == slot7CardSlot(layout)) {
-    int active = 0;
-    for (size_t i = 0; i < kSlot7Cards.size(); ++i) {
-      if (kSlot7Cards[i] == layout.card[static_cast<size_t>(slot)]) active = static_cast<int>(i);
-    }
-    const int picked = segmentedGrid(f, "slot7Card", topLeft, kColInnerW, kSlot7Cells, active);
+    const int picked = segmentedGrid(f, "slot7Card", topLeft, kColInnerW, kSlot7Cells, activeCell(kSlot7Cards, card));
     if (picked >= 0) f.box.pickSlot7Card(kSlot7Cards[static_cast<size_t>(picked)]);
   }
 }
