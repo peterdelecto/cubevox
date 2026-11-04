@@ -604,10 +604,9 @@ bool unisonSwitchOnRows() {
   return ok;
 }
 
-// The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips. The synthetic program
-// puts its energy where the telephone band cuts and reads -2.1 dB. The three clips differ by 1.14 dB
-// under one gain, so no trim puts all three inside 0 to +0.5 dB: each clip is held to the mid band, and
-// the mean of the three is reported against the rule.
+// The Lo-fi card at its default, TONE 50 % and AMOUNT 50 %, on Adam's clips, each held to the rule's
+// band. The card has no MIX knob, so the mid band does not apply. The synthetic program puts its energy
+// where the telephone band cuts, so it has no row.
 bool lofiRows() {
   ChainParams chain;
   applyPlacement(Card::Lofi, chain);
@@ -616,18 +615,13 @@ bool lofiRows() {
   applyKnob(Card::Lofi, 1, 0.5f, chain);
   double mean = 0.0;
   int count = 0;
-  const bool ok = clipRows(
+  return clipRows(
       "lofi 50/50",
       [&](const Signal& padded) {
         auto s = std::make_unique<Stage<cv::Lofi>>();
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, chain.lofi); })};
       },
-      kMidLoDb, kMidHiDb, mean, count);
-  if (count > 0) {
-    std::printf("NOTE %-30s %+6.2f dB  (mean of %d clips against the rule %+.1f..%+.1f)\n", "lofi 50/50 mean", mean, count,
-                kLoDb, kHiDb);
-  }
-  return ok;
+      kLoDb, kHiDb, mean, count);
 }
 
 // The Chatter card at its default (the engine's LENGTH and AMOUNT 50 %), on Adam's clips, once listening

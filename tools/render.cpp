@@ -157,8 +157,7 @@ int usage() {
                "     gtAttackMs gtHoldMs gtReleaseMs gtRangeDb gtKneeDb gtDetectorHpHz gtHysteresisDb\n"
                "     lofiFcLoHz lofiFcHiHz lofiHpStartHz lofiHpEndRatio lofiLpStartHz lofiLpEndRatio lofiHonkDb lofiHonkQ\n"
                "     lofiDriveDb lofiHoldMaxHz lofiHoldMinHz lofiBitsMax lofiBitsMin lofiTrimDb\n"
-               "     lofiHoldOverBand (floor on the held rate in low-pass corners, 0 = none)\n"
-               "     lofiMakeup<tone 0..4>_<amount 0..10> (dB, the makeup table by TONE 0, 25 ... 100 %% and AMOUNT 0, 10 ... 100 %%)\n"
+               "     lofiMakeup<tone 0..4>_<amount 0..6> (dB, the makeup table by TONE 0, 25 ... 100 %% and the law's AMOUNT 0, 10 ... 60 %%)\n"
                "  a lofi key outside its range is refused\n"
                "  --time and --mix are the panel's TIME and MIX positions for the selected reverb engine (default 0.5);\n"
                "  each engine's dwell is its springDwell or chmDwell key\n",
@@ -258,7 +257,7 @@ bool lofiTuningInRange(const cv::LofiTuning& t) {
          inside(t.lpStartHz, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.hpEndRatio, 0.05f, 4.0f) &&
          inside(t.lpEndRatio, 0.25f, 20.0f) && inside(t.honkDb, -24.0f, 24.0f) && inside(t.honkQ, 0.1f, 20.0f) &&
          inside(t.driveDb, -24.0f, 48.0f) && inside(t.holdMaxHz, 480.0f, 48000.0f) &&
-         inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.holdOverBand, 0.0f, 20.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
+         inside(t.holdMinHz, 480.0f, 48000.0f) && inside(t.bitsMax, 1.0f, 20.0f) && inside(t.bitsMin, 1.0f, 20.0f) &&
          inside(t.trimDb, -24.0f, 24.0f);
 }
 
@@ -438,7 +437,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"lofiDriveDb", &lt.driveDb},           {"lofiHoldMaxHz", &lt.holdMaxHz},
       {"lofiHoldMinHz", &lt.holdMinHz},       {"lofiBitsMax", &lt.bitsMax},
       {"lofiBitsMin", &lt.bitsMin},           {"lofiTrimDb", &lt.trimDb},
-      {"lofiHoldOverBand", &lt.holdOverBand},
       {"bloomTrimDb", &bt.trimDb},            {"bloomFirstCaptureMs", &bt.firstCaptureMs},
       {"bloomSkipDb", &bt.skipDb},
       {"bloomDriveWord", &bt.driveWord},      {"bloomDriveBell", &bt.driveBell},
