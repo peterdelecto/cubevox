@@ -1,6 +1,7 @@
 // Growl card checks: off is a bit-exact copy, the voice drops an octave, the wave's depth falls without
-// a pitch, the throat follows each syllable and rests in silence, the output stays finite at every knob
-// corner, the level at the default (GROWL 50 %, DRIVE 50 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. Each run feeds a
+// a pitch, the throat follows each syllable and rests in silence, MIX 100 % is the plain card and MIX 0 is
+// the input at the voice's lag, the output stays finite at every knob corner, the level at the default
+// (GROWL 75 %, MIX 100 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. Each run feeds a
 // PitchFx first, so the ring is written and the tracker runs, as the chain does. The clip rows skip
 // when samples/ is absent. No window, no audio device.
 
@@ -59,12 +60,19 @@ struct Rig {
   }
 };
 
-cv::GrowlParams growlAt(float growl, float drive, bool on = true) {
+// The engine's rasp and fold, not the pot. The pot map is tested with the registry.
+cv::GrowlParams growlAt(float growl, float drive, bool on = true, float mix = 1.0f) {
   cv::GrowlParams g;
   g.on = on;
   g.growl = growl;
   g.drive = drive;
+  g.mix = mix;
   return g;
+}
+
+// The engine at a GROWL pot position and a MIX, through the same map the registry applies.
+cv::GrowlParams potAt(float pot, float mix) {
+  return growlAt(pot * cv::kGrowlRaspTop, pot * cv::kGrowlDriveTop, true, mix);
 }
 
 // A sung note: harmonics at 1/k up to 5 kHz, a 5 Hz vibrato of +-20 cents and a phrase envelope.
@@ -141,6 +149,8 @@ bool checkOff() {
   Rig rig;
   const Signal off = rig.run(in, growlAt(0.5f, 0.5f, false));
   bool exact = off == in;
+  Rig offMixed;
+  exact = exact && offMixed.run(in, growlAt(0.5f, 0.5f, false, 0.3f)) == in;
 
   Rig flip;
   const size_t offAt = in.size() / 2;
@@ -210,24 +220,35 @@ bool checkCorners(const std::vector<Signal>& voices) {
   inputs.push_back(sungNote(180.0, 2.0, -18.0));
   size_t bad = 0;
   for (const Signal& in : inputs) {
+    for (const float pot : {0.0f, 1.0f}) {
+      for (const float mix : {0.0f, 0.5f, 1.0f}) {
+        Rig rig;
+        for (const float v : rig.run(in, potAt(pot, mix))) bad += std::isfinite(v) ? 0 : 1;
+      }
+    }
+    // The engine's own corners, rasp and fold apart, and a MIX that flips every block.
     for (const float growl : {0.0f, 1.0f}) {
       for (const float drive : {0.0f, 1.0f}) {
         Rig rig;
         for (const float v : rig.run(in, growlAt(growl, drive))) bad += std::isfinite(v) ? 0 : 1;
       }
     }
+    Rig flip;
+    const auto flipMix = [](size_t i) { return potAt(1.0f, (i / cv::kBlock) % 2 == 0 ? 0.0f : 1.0f); };
+    for (const float v : flip.run(in, flipMix)) bad += std::isfinite(v) ? 0 : 1;
   }
-  char detail[96];
-  std::snprintf(detail, sizeof detail, "%zu inputs at the four corners: %zu samples not finite (0)", inputs.size(), bad);
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "%zu inputs at the pot and MIX corners and a flipping MIX: %zu samples not finite (0)",
+                inputs.size(), bad);
   return report("finite at the corners", bad == 0, detail);
 }
 
 // The mean level over Adam's clips of the output against the input, over the clip alone, in dB.
-double meanLevelDb(const std::vector<Signal>& voices, float growl, float drive, const char* label) {
+double meanLevelDb(const std::vector<Signal>& voices, float pot, float mix, const char* label) {
   double sum = 0.0;
   for (const Signal& in : voices) {
     Rig rig;
-    const Signal out = rig.run(in, growlAt(growl, drive));
+    const Signal out = rig.run(in, potAt(pot, mix));
     const double db = 20.0 * std::log10(rms(out, kPad, out.size()) / rms(in, kPad, in.size()));
     std::printf("NOTE level %-12s clip           %+6.2f dB\n", label, db);
     sum += db;
@@ -235,17 +256,20 @@ double meanLevelDb(const std::vector<Signal>& voices, float growl, float drive, 
   return sum / static_cast<double>(voices.size());
 }
 
-// The level rule at the default, GROWL 50 % and DRIVE 50 %: the mean over Adam's clips of the output
-// against the input, over the clip alone, lands 0 to +0.5 dB. GROWL 100 % is reported beside it.
+// The level rule at the default, GROWL 75 % and MIX 100 %: the mean over Adam's clips of the output
+// against the input, over the clip alone, lands 0 to +0.5 dB. GROWL 100 % and MIX 50 % are reported
+// beside it.
 bool checkLevel(const std::vector<Signal>& voices, bool whole) {
-  if (!whole) return report("level 50/50", false, "a clip in samples/ is missing or empty");
-  if (voices.empty()) return report("level 50/50", true, "SKIP, samples/ is not in this checkout");
-  const double mean = meanLevelDb(voices, 0.5f, 0.5f, "50/50");
-  const double top = meanLevelDb(voices, 1.0f, 0.5f, "100/50");
-  std::printf("NOTE level GROWL 100 %% DRIVE 50 %%: mean %+.2f dB\n", top);
+  if (!whole) return report("level 75/100", false, "a clip in samples/ is missing or empty");
+  if (voices.empty()) return report("level 75/100", true, "SKIP, samples/ is not in this checkout");
+  const double mean = meanLevelDb(voices, cv::kGrowlDefaultPot, 1.0f, "75/100");
+  const double top = meanLevelDb(voices, 1.0f, 1.0f, "100/100");
+  const double half = meanLevelDb(voices, cv::kGrowlDefaultPot, 0.5f, "75/50");
+  std::printf("NOTE level GROWL 100 %% MIX 100 %%: mean %+.2f dB\n", top);
+  std::printf("NOTE level GROWL 75 %% MIX 50 %%: mean %+.2f dB\n", half);
   char detail[96];
   std::snprintf(detail, sizeof detail, "mean of %zu clips %+.2f dB (0 to +0.5)", voices.size(), mean);
-  return report("level 50/50", mean >= 0.0 && mean <= 0.5, detail);
+  return report("level 75/100", mean >= 0.0 && mean <= 0.5, detail);
 }
 
 // What the card's throat did over one run, a point per block.
@@ -447,6 +471,72 @@ bool checkAlias() {
   return report("fold alias", std::isfinite(aliasDb) && on > 0.0, detail);
 }
 
+// FNV-1a over the samples' bit patterns.
+uint64_t hashOf(const Signal& x) {
+  uint64_t h = 1469598103934665603ull;
+  for (const float v : x) {
+    uint32_t bits;
+    std::memcpy(&bits, &v, sizeof bits);
+    for (int s = 0; s < 32; s += 8) h = (h ^ ((bits >> s) & 0xffu)) * 1099511628211ull;
+  }
+  return h;
+}
+
+constexpr uint64_t kFullMixHash = 0x29f1217abb29799aull;
+
+// MIX at its default 100 % leaves the card as it was before the knob existed. The hash is the output of
+// that engine on a sung note at GROWL 0.80 and DRIVE 0.65.
+bool checkFullMix() {
+  const Signal in = sungNote(220.0, 2.0, -20.0);
+  Rig rig;
+  const uint64_t h = hashOf(rig.run(in, growlAt(0.80f, 0.65f)));
+  std::printf("NOTE full-mix hash %016llx\n", static_cast<unsigned long long>(h));
+  char detail[96];
+  std::snprintf(detail, sizeof detail, "output hash %016llx", static_cast<unsigned long long>(h));
+  return report("MIX 100 % is the plain card", h == kFullMixHash, detail);
+}
+
+// MIX 0 is the card's input delayed by the voice's lag. A mirror ring of the input is read at the
+// delay the card reports, over every block where that delay held still, and the delay itself must be the
+// one the voice plays at (the grain delay plus a period, clamped as the voice clamps it).
+bool checkMixZero() {
+  const Signal in = sungNote(220.0, 2.0, -20.0);
+  Rig rig;
+  std::vector<float> mirror(static_cast<size_t>(cv::kVoiceRingLen), 0.0f);
+  Signal out(in.size());
+  double worst = 0.0;
+  size_t compared = 0, blocks = 0;
+  float period = 0.0f;
+  float lag = 0.0f;
+  bool lagHeld = false;
+  for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
+    const cv::GrowlParams g = potAt(1.0f, 0.0f);
+    cv::PitchFxParams pp;
+    pp.growlOn = true;
+    const float lagBefore = rig.growl->dryLagSamples();
+    rig.pitch->process(&in[i], &out[i], cv::kBlock, pp);
+    rig.growl->process(&out[i], &out[i], cv::kBlock, g, *rig.pitch);
+    for (size_t j = 0; j < static_cast<size_t>(cv::kBlock); ++j) mirror[(i + j) % mirror.size()] = in[i + j];
+    if (rig.pitch->pitch().period > 0.0f) period = rig.pitch->pitch().period;
+    lag = rig.growl->dryLagSamples();
+    lagHeld = lag == lagBefore;
+    ++blocks;
+    if (i < static_cast<size_t>(kRate) || !lagHeld || rig.growl->wet() != 1.0f) continue;
+    for (size_t j = 0; j < static_cast<size_t>(cv::kBlock); ++j) {
+      const float want = cv::readRing<cv::kVoiceRingLen>(mirror.data(), static_cast<int>((i + j) % mirror.size()), lag);
+      worst = std::fmax(worst, std::fabs(static_cast<double>(out[i + j] - want)));
+      ++compared;
+    }
+  }
+  const float voiceLag = cv::formant_detail::clampLag(
+      static_cast<float>(cv::PsolaVoice::kGrainDelay) + cv::PitchTracker::clampPeriod(period), period);
+  char detail[128];
+  std::snprintf(detail, sizeof detail, "%zu samples in %zu blocks differ by %.2e (1e-6); lag %.2f vs the voice's %.2f", compared,
+                blocks, worst, static_cast<double>(lag), static_cast<double>(voiceLag));
+  return report("MIX 0 is the delayed input", compared > 20000 && worst < 1e-6 && std::fabs(lag - voiceLag) < 0.01f,
+                detail);
+}
+
 }  // namespace
 
 int main() {
@@ -463,6 +553,8 @@ int main() {
   ok &= checkCorners(voices);
   ok &= checkLevel(voices, whole);
   ok &= checkAlias();
+  ok &= checkFullMix();
+  ok &= checkMixZero();
   std::printf("%s growl\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

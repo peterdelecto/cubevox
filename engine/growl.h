@@ -16,8 +16,11 @@
 #include "engine/smooth.h"
 #include "engine/syllable_sweep.h"
 
-// The Growl card, the gross monster voice of SOPHIE's "Whole New World". It replaces the voice: once
-// the card is up the dry signal is gone, and three parts run in a row.
+// The Growl card, the gross monster voice of SOPHIE's "Whole New World". Three parts run in a row, and
+// an equal-power MIX crossfades the result against the card's input. At MIX 100 % the dry signal is gone.
+//
+// The panel has two pots. The upper pot is GROWL. It sets the engine's rasp `growl` to kGrowlRaspTop times
+// the pot and its fold `drive` to kGrowlDriveTop times the pot, a straight line each. The lower pot is MIX.
 //
 // 1. The drop. A grain voice cut from the pitch stage's input ring on the tracker's period grid plays
 //    the voice at a pitch ratio of 2^(pitchSt / 12) and a grain playback rate of 2^(throatSt / 12),
@@ -42,8 +45,18 @@
 //
 // The ring holds the input of the slot where the pitch stage runs, so the stages between that slot and
 // this card are not in the growl voice.
+//
+// The dry side of MIX reads that same ring at the lag the voice reads at, so the two line up and the
+// blend does not flam. The lag follows the tracker's period. It moves at most kDryLagSlew samples per
+// sample, so a new period slides the dry's delay and never jumps it. The dry costs a ring read per sample
+// only while MIX sits under 100 %.
 
 namespace cv {
+
+// The pot-to-engine map: the GROWL pot at 100 % sets the rasp to this, and the fold's drive to the other.
+constexpr float kGrowlRaspTop = 0.80f;
+constexpr float kGrowlDriveTop = 0.65f;
+constexpr float kGrowlDefaultPot = 0.75f;
 
 struct GrowlTuning {
   float pitchSt = -12.0f;       // the drop; the voice's pitch ratio is 2^(pitchSt / 12)
@@ -61,13 +74,14 @@ struct GrowlTuning {
   float makeupSat = 10.0f;      // the knee's input gain where the makeup law flattens
   float railSoft = 0.1f;        // the knee's soft edge as a fraction of the rail
   float railAsym = 0.05f;       // the negative rail sits at -(1 - railAsym)
-  float trimDb = 0.87f;         // level rule: Adam's three clips at GROWL 50 % and DRIVE 50 % land +0.25 dB
+  float trimDb = 0.87f;         // level rule: Adam's three clips at GROWL 75 % and MIX 100 % land 0 to +0.5 dB
 };
 
 struct GrowlParams {
   bool on = false;
-  float growl = 0.5f;  // knob A (GROWL), 0..1
-  float drive = 0.5f;  // knob B (DRIVE), 0..1
+  float growl = kGrowlDefaultPot * kGrowlRaspTop;    // the rasp, 0..1 (the GROWL pot times kGrowlRaspTop)
+  float drive = kGrowlDefaultPot * kGrowlDriveTop;   // the fold, 0..1 (the GROWL pot times kGrowlDriveTop)
+  float mix = 1.0f;                                  // knob B (MIX), 0..1
   GrowlTuning tuning;
 };
 
@@ -88,6 +102,9 @@ constexpr float kMaxRailAsym = 0.5f;
 // The depth's fall without a pitch and the dry-to-voice crossfade both take 20 ms, in straight lines.
 constexpr float kFadeMs = 20.0f;
 constexpr float kFadeStep = 1.0f / (kFadeMs * kSmpPerMs);
+
+// The most the dry's delay moves per sample, 0.5 % of a sample, which bends the dry's pitch by 9 cents.
+constexpr float kDryLagSlew = 0.005f;
 
 // GROWL where the third-of-pitch wave starts to blend in.
 constexpr float kThirdFrom = 0.5f;
@@ -232,6 +249,8 @@ class Growl {
     depthFade_ = 0.0f;
     growl_ = 0.0f;
     drive_ = 0.0f;
+    mix_ = 1.0f;
+    dryLag_ = 0.0f;
     rasp_ = growl_detail::RaspGains{};
     raspAt_ = -1.0f;
     raspFadeAt_ = -1.0f;
@@ -261,6 +280,7 @@ class Growl {
       voice_.render(pitch.ring(), wrapOnce<kVoiceRingLen>(first + at), m, buf_.data());
       raspChunk(c, at, m);
       if (c.fold) fold_.run(buf_.data(), m, foldAt(c, at), c.foldStep);
+      if (c.dry) blendDry(c, pitch.ring(), wrapOnce<kVoiceRingLen>(first + at), m, at);
       mixChunk(c, in + at, out + at, m, at);
     }
     if (!fold_.finite()) fold_.clear();
@@ -273,6 +293,9 @@ class Growl {
   // Test hooks: the throat the sweep asks for and the throat the voice plays after the glide, in st.
   float throatTargetSt() const { return throatTarget_; }
   float throatSt() const { return throat_; }
+
+  // Test hook: the delay the dry side reads at, in samples.
+  float dryLagSamples() const { return dryLag_; }
 
   // Test hook: the syllable sweep, 0 to 1.
   float sweep() const { return sweep_.sweep(); }
@@ -290,6 +313,13 @@ class Growl {
     FoldGains foldStep;
     float wet0 = 0.0f;
     float wetStep = 0.0f;
+    float voiceGain0 = 1.0f;  // MIX's equal-power pair: the voice's share and the dry's
+    float voiceGainStep = 0.0f;
+    float dryGain0 = 0.0f;
+    float dryGainStep = 0.0f;
+    float lag0 = 0.0f;  // the dry's delay in samples, and its step per sample
+    float lagStep = 0.0f;
+    bool dry = false;    // MIX sits under 100 % somewhere in the call
     bool rasp = false;   // the wave moves the voice somewhere in the call
     bool third = false;  // the third-of-pitch wave is in the blend somewhere in the call
     bool fold = false;   // DRIVE sits above 0 somewhere in the call
@@ -325,10 +355,12 @@ class Growl {
     const float a = smoothCoefFor(n);
     const float growlKnob = smooth::clamp01(p.growl);
     const float driveKnob = smooth::clamp01(p.drive);
+    const float mixKnob = smooth::clamp01(p.mix);
     const bool first = fresh_;
     if (fresh_) {
       growl_ = growlKnob;
       drive_ = driveKnob;
+      mix_ = mixKnob;
       fresh_ = false;
     }
     const float inv = 1.0f / static_cast<float>(n);
@@ -350,8 +382,16 @@ class Growl {
     // The voice, and the wave's rate while the tracker hears a pitch.
     const float corr = pitch.correctionSemis();
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
-    voice_.prepare(heldPeriod_, exp2Fast((drop + corr) * (1.0f / 12.0f)), exp2Fast(throat_ * (1.0f / 12.0f)),
-                   static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_), n);
+    const float voiceLag = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_);
+    voice_.prepare(heldPeriod_, exp2Fast((drop + corr) * (1.0f / 12.0f)), exp2Fast(throat_ * (1.0f / 12.0f)), voiceLag,
+                   n);
+
+    // The dry reads at the lag the voice plays at, sliding there from where it was.
+    const float lag0 = dryLag_;
+    const float lagWant = formant_detail::clampLag(voiceLag, heldPeriod_);
+    dryLag_ = first ? lagWant : toward(dryLag_, lagWant, growl_detail::kDryLagSlew * static_cast<float>(n));
+    c.lag0 = first ? dryLag_ : lag0;
+    c.lagStep = (dryLag_ - c.lag0) * inv;
     if (pr.voiced && pr.period > 0.0f) {
       const float corrRatio = corr == 0.0f ? 1.0f : exp2Fast(corr * (1.0f / 12.0f));
       phaseStep_ = static_cast<uint32_t>(growl_detail::kSixthTurn * corrRatio / PitchTracker::clampPeriod(pr.period));
@@ -379,7 +419,32 @@ class Growl {
     } else {
       fold_.clear();
     }
+
+    // MIX glides, and its pair of gains splits the voice and the dry. Settled at 100 % the dry is out.
+    const float mix0 = mix_;
+    mix_ = smooth::step(mix_, mixKnob, a);
+    c.dry = mix0 < 1.0f || mix_ < 1.0f;
+    const MixGains m0 = mixGainsAt(mix0);
+    const MixGains m1 = mixGainsAt(mix_);
+    c.voiceGain0 = m0.voice;
+    c.voiceGainStep = (m1.voice - m0.voice) * inv;
+    c.dryGain0 = m0.dry;
+    c.dryGainStep = (m1.dry - m0.dry) * inv;
     return c;
+  }
+
+  // The equal-power pair at MIX x. The ends are exactly 1 and 0, so MIX 100 % is the plain voice.
+  struct MixGains {
+    float voice;
+    float dry;
+  };
+
+  static MixGains mixGainsAt(float x) {
+    if (x >= 1.0f) return {1.0f, 0.0f};
+    if (x <= 0.0f) return {0.0f, 1.0f};
+    MixGains g;
+    sinCosFast(x * kHalfPi, g.voice, g.dry);
+    return g;
   }
 
   // The wave's gains at GROWL g and depth fade f. The level gain is 1 / sqrt(E[(base + swing m)^2]).
@@ -446,17 +511,35 @@ class Growl {
             c.fold0.highShelf + c.foldStep.highShelf * k, c.fold0.post + c.foldStep.post * k};
   }
 
-  // The crossfade from the dry input to the trimmed voice. Settled on, the dry is gone.
+  // Blends the dry into buf_ in place, trim included: the voice at its MIX share plus the ring read at
+  // the lag at its own. `head` is the ring index of the chunk's first sample.
+  void blendDry(const Call& c, const VoiceRing& ring, int head, int m, int at) {
+    const float k = static_cast<float>(at);
+    float voiceGain = c.voiceGain0 + c.voiceGainStep * k;
+    float dryGain = c.dryGain0 + c.dryGainStep * k;
+    float lag = c.lag0 + c.lagStep * k;
+    for (int i = 0; i < m; ++i) {
+      voiceGain += c.voiceGainStep;
+      dryGain += c.dryGainStep;
+      lag += c.lagStep;
+      const float dry = readRing<kVoiceRingLen>(ring.data(), wrapOnce<kVoiceRingLen>(head + i), lag);
+      float& v = buf_[static_cast<size_t>(i)];
+      v = trim_ * voiceGain * v + dryGain * dry;
+    }
+  }
+
+  // The crossfade from the card's input to the trimmed, mixed voice. Settled on, the input is gone.
   void mixChunk(const Call& c, const float* in, float* out, int m, int at) {
+    const float trim = c.dry ? 1.0f : trim_;  // blendDry has applied it
     if (c.wet0 == 1.0f && c.wetStep == 0.0f) {
-      for (int i = 0; i < m; ++i) out[i] = trim_ * buf_[static_cast<size_t>(i)];
+      for (int i = 0; i < m; ++i) out[i] = trim * buf_[static_cast<size_t>(i)];
       return;
     }
     float w = c.wet0 + c.wetStep * static_cast<float>(at);
     for (int i = 0; i < m; ++i) {
       w += c.wetStep;
       const float x = in[i];
-      out[i] = x + w * (trim_ * buf_[static_cast<size_t>(i)] - x);
+      out[i] = x + w * (trim * buf_[static_cast<size_t>(i)] - x);
     }
   }
 
@@ -491,6 +574,8 @@ class Growl {
   float depthFade_ = 0.0f;     // the wave's depth fade, 1 with a pitch
   float growl_ = 0.0f;         // GROWL after its glide
   float drive_ = 0.0f;         // DRIVE after its glide
+  float mix_ = 1.0f;           // MIX after its glide
+  float dryLag_ = 0.0f;        // the delay the dry reads at, samples
   RaspGains rasp_;             // the wave's gains at raspAt_ and raspFadeAt_
   float raspAt_ = -1.0f;
   float raspFadeAt_ = -1.0f;

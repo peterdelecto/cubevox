@@ -162,7 +162,7 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Lofi: return knob == 0 ? p.lofi.tone : p.lofi.amount;
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::FormantFollower: return knob == 0 ? p.follower.sensitivity : p.follower.rangeSt;
-    case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.drive;
+    case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.mix;
     case Card::RingMod: return knob == 0 ? p.ringMod.ratio : p.ringMod.mix;
     case Card::Strings: return knob == 0 ? p.strings.decayMs : p.strings.mix;
     case Card::Empty:
@@ -656,10 +656,10 @@ void checkGrowlCard() {
   check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Growl") == 0 && growl.engine == Engine::Growl &&
             growl.group == Group::Pitch && growl.knobCount == 2,
         "growl: id growl, name Growl, its own engine, the pitch group");
-  check(std::strcmp(knobDesc(Card::Growl, 0)->name, "GROWL") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->name, "DRIVE") == 0 &&
+  check(std::strcmp(knobDesc(Card::Growl, 0)->name, "GROWL") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->name, "MIX") == 0 &&
             knobSteps(Card::Growl, 0) == 0 && knobSteps(Card::Growl, 1) == 0 &&
             std::strcmp(knobDesc(Card::Growl, 0)->unit, "%") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->unit, "%") == 0,
-        "growl: knob A is GROWL and knob B is DRIVE, both continuous percents");
+        "growl: knob A is GROWL and knob B is MIX, both continuous percents");
   check(growl.cost.avg == costs::kGrowl.avg && growl.cost.worst == costs::kGrowl.worst &&
             growl.cost.measured == costs::kGrowl.measured,
         "growl: the registry row is its costs.h row");
@@ -667,8 +667,14 @@ void checkGrowlCard() {
   ChainParams p;
   applyKnob(Card::Growl, 0, 0.3f, p);
   applyKnob(Card::Growl, 1, 0.8f, p);
-  check(std::fabs(p.growl.growl - 0.3f) < 1e-6f && std::fabs(p.growl.drive - 0.8f) < 1e-6f,
-        "growl: GROWL and DRIVE drive their own fields");
+  check(std::fabs(p.growl.growl - 0.3f * 0.80f) < 1e-6f && std::fabs(p.growl.drive - 0.3f * 0.65f) < 1e-6f &&
+            std::fabs(p.growl.mix - 0.8f) < 1e-6f,
+        "growl: the GROWL pot sets the rasp at 0.80 and the fold at 0.65 of its position, and MIX its own field");
+  for (const float pot : {0.0f, 0.5f, 1.0f}) {
+    applyKnob(Card::Growl, 0, pot, p);
+    check(std::fabs(p.growl.growl - 0.80f * pot) < 1e-6f && std::fabs(p.growl.drive - 0.65f * pot) < 1e-6f,
+          "growl: GROWL 0 / 50 / 100 % gives rasp 0 / 0.40 / 0.80 and drive 0 / 0.325 / 0.65");
+  }
   applyToggle(Card::Growl, true, p);
   check(p.growl.on && p.pitchFx.growlOn && !p.pitchFx.crowdOn && !p.crowd.on && !p.distortion.on,
         "growl: its toggle turns the card and the pitch stage's growlOn on and nothing else");
