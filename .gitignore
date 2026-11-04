@@ -3,6 +3,7 @@ build-*/
 imgui.ini
 .DS_Store
 *.png
+!tools/decal/Decal/resources/*.png
 cubevox-proto.app
 cubevox-emulator.app
 .cache/
@@ -20,3 +21,6 @@ tools/font-editor/proofs/
 
 # motion proofs (tools/oled-proof/motion_gif.py output)
 *.gif
+
+# decal add-in run log
+tools/decal/Decal/decal.log

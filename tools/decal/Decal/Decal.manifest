@@ -1,0 +1,13 @@
+{
+	"autodeskProduct": "Fusion360",
+	"type": "addin",
+	"id": "dd506787-ffe0-47e5-b266-a993ad5eacb0",
+	"author": "cubevox",
+	"description": {
+		"": "Cuts a PNG, an SVG or typed text into a flat or cylindrical face as a flush two-colour inlay. The Decal button sits in the Modify panel of the Solid tab."
+	},
+	"version": "1.0.0",
+	"runOnStartup": true,
+	"supportedOS": "windows|mac",
+	"editEnabled": true
+}
