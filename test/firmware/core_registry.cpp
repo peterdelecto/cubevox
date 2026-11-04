@@ -179,7 +179,7 @@ void checkDescriptors() {
       if (d.kind != KnobKind::Continuous) continue;
       char what[96];
       check(d.min < d.max, "descriptor min below max");
-      const bool reversed = d.curve == Curve::LogReversed || d.curve == Curve::LinearReversed;
+      const bool reversed = d.curve == Curve::LogReversed;
       std::snprintf(what, sizeof(what), "%s knob %d shows its ends at 0 and 1", cardDesc(c).id, k);
       check(knobShown(d, 0.0f) == std::lround(reversed ? d.max : d.min) && knobShown(d, 1.0f) == std::lround(reversed ? d.min : d.max),
             what);
@@ -466,9 +466,9 @@ void checkAppendedCards() {
 }
 
 // Yawn: id formant_follow, which keeps under the id clip width, the pitch engine and group, SENSITIVITY
-// on the upper pot, RANGE on the lower from 0 st at the pot's bottom in a straight line to -7 st at its
-// top, no knob on the Formant voice's MIX, and Yawn on the OLED's readout title, as Mob's row does.
-// Placing it hands the voice's SHIFT to the card's sweep.
+// on the upper pot, RANGE on the lower from -12 st at the pot's bottom through 0 at noon to +6 st at its
+// top, a straight line on each side of noon, no knob on the Formant voice's MIX, and Yawn on the OLED's
+// readout title, as Mob's row does. Placing it hands the voice's SHIFT to the card's sweep.
 void checkYawnCard() {
   const CardDesc& d = cardDesc(Card::FormantFollower);
   check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Yawn") == 0 && d.engine == Engine::Pitch &&
@@ -481,9 +481,9 @@ void checkYawnCard() {
             sens.max == 100.0f && std::strcmp(sens.unit, "%") == 0,
         "yawn: knob A is SENSITIVITY, a percent");
   const KnobDesc& range = *knobDesc(Card::FormantFollower, 1);
-  check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -7.0f &&
-            range.max == 0.0f && range.curve == Curve::LinearReversed && std::strcmp(range.unit, "st") == 0,
-        "yawn: knob B is RANGE, continuous from 0 st at the bottom to -7 st at the top");
+  check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -12.0f &&
+            range.max == 6.0f && range.curve == Curve::ZeroAtNoon && std::strcmp(range.unit, "st") == 0,
+        "yawn: knob B is RANGE, continuous from -12 st at the bottom through 0 at noon to +6 st at the top");
 
   ChainParams p;
   const float mixBefore = p.pitchFx.formant.mix;
@@ -493,25 +493,26 @@ void checkYawnCard() {
     applyKnob(Card::FormantFollower, 1, position, p);
     return p.follower.rangeSt;
   };
-  check(rangeAt(0.0f) == 0.0f && rangeAt(0.25f) == -1.75f && rangeAt(0.5f) == -3.5f && rangeAt(1.0f) == -7.0f,
-        "yawn: RANGE is 0 st at the bottom, -1.75 st at 25 %, -3.5 st at noon and -7 st at the top");
-  const float defaultPosition = cv::kFollowerDefaultRangeSt / cv::kFollowerMinRangeSt;
+  check(rangeAt(0.0f) == -12.0f && rangeAt(0.25f) == -6.0f && rangeAt(0.5f) == 0.0f && rangeAt(0.75f) == 3.0f &&
+            rangeAt(1.0f) == 6.0f,
+        "yawn: RANGE is -12 st at the bottom, -6 st at 25 %, 0 at noon, +3 st at 75 % and +6 st at the top");
+  const float defaultPosition = 0.5f * (1.0f - cv::kFollowerDefaultRangeSt / cv::kFollowerMinRangeSt);
   check(cv::kFollowerDefaultRangeSt == -5.0f && std::fabs(rangeAt(defaultPosition) + 5.0f) < 1e-5f &&
-            shownText(range, defaultPosition) == "-5",
-        "yawn: the default pot position, 5/7 of the travel, reads -5 st");
+            std::fabs(defaultPosition - 7.0f / 24.0f) < 1e-6f && shownText(range, defaultPosition) == "-5",
+        "yawn: the default pot position, 7/24 of the travel, reads -5 st");
   bool capped = true;
-  bool falling = true;
-  float before = 1.0f;
+  bool rising = true;
+  float before = -13.0f;
   for (int s = 0; s <= 100; ++s) {
     const float st = rangeAt(static_cast<float>(s) / 100.0f);
-    capped = capped && st >= -7.0f && st <= 0.0f;
-    falling = falling && st < before;
+    capped = capped && st >= -12.0f && st <= 6.0f;
+    rising = rising && st > before;
     before = st;
   }
-  check(capped && falling, "yawn: RANGE falls with the pot and never leaves 0 to -7 st");
-  check(shownText(range, 0.0f) == "0" && shownText(range, 0.5f) == "-4" && shownText(range, 1.0f) == "-7" &&
-            knobCells(range) == 2,
-        "yawn: RANGE reads its semitones with the sign in two cells");
+  check(capped && rising, "yawn: RANGE rises with the pot and never leaves -12 to +6 st");
+  check(shownText(range, 0.0f) == "-12" && shownText(range, 0.25f) == "-6" && shownText(range, 0.5f) == "0" &&
+            shownText(range, 0.75f) == "+3" && shownText(range, 1.0f) == "+6" && knobCells(range) == 3,
+        "yawn: RANGE reads its semitones with the sign in three cells");
   check(p.pitchFx.formant.mix == mixBefore, "yawn: no knob sets the Formant voice's mix");
 
   ChainParams t;

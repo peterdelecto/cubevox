@@ -21,8 +21,9 @@
 // in about 10 ms. Each onset starts a sweep at the drive, the drive times a ramp that falls from 1 to 0
 // over the tuning's decay. A held note then rests at 0 until the next onset, and a new onset restarts the
 // ramp at the drive of that moment. While no sweep runs, before the first onset and once the drive has
-// fallen to 0, the sweep is the drive itself. SHIFT is RANGE times the sweep, and RANGE runs from 0 down
-// to -7 st.
+// fallen to 0, the sweep is the drive itself. SHIFT is RANGE times the sweep. RANGE runs from -12 st at
+// the pot's bottom through 0 at noon to +6 st at its top, so a sweep moves the throat down below noon and
+// up above it.
 //
 // PitchFx takes SHIFT in whole semitones and glides it through its own 20 ms one-pole, the only smoothing
 // SHIFT gets. Each call hands it the wanted SHIFT plus what the last call's rounding left over, rounded.
@@ -30,9 +31,14 @@
 
 namespace cv {
 
-constexpr float kFollowerMinRangeSt = -static_cast<float>(kFormantMaxShiftSt);  // RANGE at the pot's top
-constexpr float kFollowerMaxRangeSt = 0.0f;                                      // RANGE at the pot's bottom, no effect
+constexpr float kFollowerMinRangeSt = -12.0f;  // RANGE at the pot's bottom
+constexpr float kFollowerMaxRangeSt = 6.0f;    // RANGE at the pot's top; noon is 0, no effect
 constexpr float kFollowerDefaultRangeSt = -5.0f;
+
+static_assert(kFollowerMinRangeSt >= -static_cast<float>(kFormantVoiceMaxShiftSt) &&
+                  kFollowerMaxRangeSt <= static_cast<float>(kFormantVoiceMaxShiftSt),
+              "RANGE stays inside the voice's limit");
+
 constexpr float kFollowerDefaultSensitivity = 0.4f;
 constexpr float kFollowerAttackSec = 0.003f;
 constexpr float kFollowerReleaseSec = 0.070f;
@@ -56,7 +62,7 @@ struct FormantFollowerTuning {
 struct FormantFollowerParams {
   bool placed = false;                              // the card is in the layout, so its sweep sets the Formant voice's SHIFT
   float sensitivity = kFollowerDefaultSensitivity;  // knob A (SENSITIVITY), 0..1
-  float rangeSt = kFollowerDefaultRangeSt;          // knob B (RANGE), 0 down to -7 st
+  float rangeSt = kFollowerDefaultRangeSt;          // knob B (RANGE), -12 to +6 st
   FormantFollowerTuning tuning;
 };
 
