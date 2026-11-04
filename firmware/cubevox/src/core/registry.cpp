@@ -39,7 +39,7 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
 constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, cv::kFollowerMinRangeSt,
-                                     cv::kFollowerMaxRangeSt, "st", Curve::LinearReversed};
+                                     cv::kFollowerMaxRangeSt, "st", Curve::ZeroAtNoon};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
 
@@ -182,8 +182,9 @@ void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
   }
 }
 
-// Yawn's SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach, 0 st at the
-// pot's bottom down to -7 st at its top. The card pins the Formant voice's mix at 1, so no knob sets it.
+// Yawn's SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach, -12 st at the
+// pot's bottom through 0 at noon to +6 st at its top. The card pins the Formant voice's mix at 1, so no
+// knob sets it.
 void applyFollowerKnob(int knob, float v, ChainParams& out) {
   if (knob == 0) {
     out.follower.sensitivity = v;
@@ -259,7 +260,7 @@ float knobValue(const KnobDesc& k, float p) {
   switch (k.curve) {
     case Curve::Log: return cv::logTaper(k.min, k.max, p);
     case Curve::LogReversed: return cv::logTaper(k.max, k.min, p);
-    case Curve::LinearReversed: return k.max + (k.min - k.max) * p;
+    case Curve::ZeroAtNoon: return p < 0.5f ? k.min * (1.0f - 2.0f * p) : k.max * (2.0f * p - 1.0f);
     case Curve::Linear: break;
   }
   return k.min + (k.max - k.min) * p;

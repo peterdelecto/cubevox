@@ -38,6 +38,10 @@ constexpr int kFormantShiftSteps = 2 * kFormantMaxShiftSt + 1;
 constexpr int kFormantDefaultShiftSt = -3;
 constexpr float kFormantDefaultMix = 1.0f;
 
+// The voice's limit, whole semitones either way: the stage clamps the SHIFT it is handed to this, and
+// the grains then play at 0.5 to 2 times, the voice's rate range. Yawn's RANGE reaches -12 st.
+constexpr int kFormantVoiceMaxShiftSt = 12;
+
 // The averaging time of the running powers behind the Formant mix's level gain, and that gain's
 // ceiling (+6 dB).
 constexpr float kFormantPowerSec = 0.04f;
@@ -65,7 +69,7 @@ struct FormantTuning {
 
 struct FormantParams {
   bool on = false;
-  int shiftSt = kFormantDefaultShiftSt;  // knob A (SHIFT), -7..+7 st; the grains play at 2^(shiftSt / 12)
+  int shiftSt = kFormantDefaultShiftSt;  // knob A (SHIFT) -7..+7 st, Yawn -12..+6 st; the grains play at 2^(shiftSt / 12)
   float mix = kFormantDefaultMix;        // knob B (MIX), 0..1
   FormantTuning tuning;
 };
@@ -302,8 +306,9 @@ class PitchFx {
   // the marks reads it at the call's start, where the first grain launches. A voice that starts
   // beside a running Autotune takes its grain grid.
   void prepareFormant(const FormantParams& f, int n) {
-    const int st = f.shiftSt < -kFormantMaxShiftSt ? -kFormantMaxShiftSt
-                                                    : (f.shiftSt > kFormantMaxShiftSt ? kFormantMaxShiftSt : f.shiftSt);
+    const int st = f.shiftSt < -kFormantVoiceMaxShiftSt
+                       ? -kFormantVoiceMaxShiftSt
+                       : (f.shiftSt > kFormantVoiceMaxShiftSt ? kFormantVoiceMaxShiftSt : f.shiftSt);
     const float target = static_cast<float>(st);
     if (!shiftSet_) {
       shiftSm_ = target;
@@ -333,7 +338,8 @@ class PitchFx {
     }
   }
 
-  // The trim in dB at the glided SHIFT, read between the two entries around it.
+  // The trim in dB at the glided SHIFT, read between the two entries around it. Past -7 or +7 st it
+  // holds the end entry.
   float trimDbAt(float st) const {
     const float pos = clampf(st + static_cast<float>(kFormantMaxShiftSt), 0.0f, static_cast<float>(kFormantShiftSteps - 1));
     const int i = static_cast<int>(pos);

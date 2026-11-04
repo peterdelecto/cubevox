@@ -73,7 +73,7 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>, default 0.1, the box's start]\n"
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
-               "       [--follower <-7..0>, RANGE] [--sensitivity <0..1>] [--follower-drive <drive.wav>]\n"
+               "       [--follower <-12..6>, RANGE] [--sensitivity <0..1>] [--follower-drive <drive.wav>]\n"
                "       [--follower-shift <shift.wav>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>] [--mob2 <0..1>, DRIFT]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
@@ -87,12 +87,13 @@ int usage() {
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
                "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
                "  --fmix the MIX (default 1); with --autotune its voice follows the tuned note and lines up with it\n"
-               "  --follower runs the Yawn card, the formant voice alone with SHIFT swept down on each syllable; its value\n"
-               "  is RANGE in semitones, any value from -7 to 0 (the box's default is -5), and --sensitivity is the\n"
-               "  SENSITIVITY pot (default 0.4); the card pins the voice's MIX at 1 and overrides --formant's SHIFT and\n"
-               "  --fmix.\n"
-               "  --follower-drive writes the card's drive, 0 to 1, and --follower-shift the voice's glided SHIFT, -7 st\n"
-               "  to -1 and 0 st to 0, each as a mono WAV beside the render; the tuning key decayMs sets the sweep's fall\n"
+               "  --follower runs the Yawn card, the formant voice alone with SHIFT swept on each syllable, down for a\n"
+               "  negative RANGE and up for a positive one; its value is RANGE in semitones, any value from -12 to +6 (the\n"
+               "  box's default is -5), and --sensitivity is the SENSITIVITY pot (default 0.4); the card pins the voice's\n"
+               "  MIX at 1 and overrides --formant's SHIFT and --fmix.\n"
+               "  --follower-drive writes the card's drive, 0 to 1, and --follower-shift the voice's glided SHIFT at 1/12\n"
+               "  of full scale a semitone (-12 st at -1, +6 st at +0.5), each as a mono WAV beside the render; the tuning\n"
+               "  key decayMs sets the sweep's fall\n"
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  --mob2 runs the crowd as Mob 2 at that DRIFT, with DIVERGE fixed at 1; --voices is then 0 to 4 copies or 5 for MOB\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
@@ -705,7 +706,7 @@ bool writeHeld(ma_encoder* enc, float v, ma_uint64 frames, const char* path) {
   return false;
 }
 
-// The Formant voice's glided SHIFT as a signal: -7 st at -1 and 0 st at 0, RANGE's reach.
+// The Formant voice's glided SHIFT as a signal, 1/12 of full scale a semitone: -12 st at -1, +6 st at +0.5.
 float shiftSignal(float st) { return st / -cv::kFollowerMinRangeSt; }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {

@@ -53,9 +53,10 @@ constexpr Engine kNoEngine = Engine::Count;
 enum class KnobKind : uint8_t { Continuous, Stepped };
 enum class Group : uint8_t { None, Pitch, Reverb };
 
-// Maps the knob's 0..1 position onto min..max. LogReversed runs geometrically from max at 0 to min at 1,
-// and LinearReversed in a straight line from max at 0 to min at 1.
-enum class Curve : uint8_t { Linear, Log, LogReversed, LinearReversed };
+// Maps the knob's 0..1 position onto min..max. LogReversed runs geometrically from max at 0 to min at 1.
+// ZeroAtNoon runs in a straight line from min at 0 to 0 at noon and on to max at 1, for a bipolar knob
+// whose two ends sit at different distances from 0.
+enum class Curve : uint8_t { Linear, Log, LogReversed, ZeroAtNoon };
 
 struct KnobDesc {
   const char* name;
