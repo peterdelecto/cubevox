@@ -126,14 +126,13 @@ const char* octaveFormantValue(const Layout& layout) {
   }
 }
 
-// The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with none of
-// the three reads UNISON, the default.
+// The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with neither
+// reads UNISON, the default.
 const char* unisonCrowdValue(const Layout& layout) {
   const int slot = unisonCrowdSlot(layout);
   if (slot < 0) return "UNISON";
   switch (layout.card[slot]) {
     case Card::Crowd: return "MOB";
-    case Card::Crowd2: return "MOB 2";
     default: return "UNISON";
   }
 }

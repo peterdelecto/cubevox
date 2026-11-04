@@ -77,11 +77,6 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      costs::kFormant},
     {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
-    {Card::Crowd2, "crowd2", "Mob 2", Engine::Crowd, 2,
-     {kPercent("DRIFT"),
-      {"VOICES", KnobKind::Stepped, cv::kVoices2Steps, 0.0f, cv::kVoices2Steps - 1, "", Curve::Linear, 0,
-       cv::kVoices2Name.data()}},
-     Group::Pitch, costs::kCrowd2},
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("DRIVE")}, Group::Pitch, costs::kGrowl},
@@ -161,14 +156,6 @@ void applyDistortionKnob(int knob, float v, cv::DistortionParams& d) {
 void applyCrowdKnob(int knob, float v, cv::CrowdParams& d) {
   if (knob == 0) {
     d.width = v;
-  } else {
-    d.voicesStep = static_cast<uint8_t>(v);
-  }
-}
-
-void applyCrowd2Knob(int knob, float v, cv::CrowdParams& d) {
-  if (knob == 0) {
-    d.drift = v;
   } else {
     d.voicesStep = static_cast<uint8_t>(v);
   }
@@ -291,7 +278,6 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::Formant: applyFormantKnob(knob, v, out.pitchFx.formant); break;
     case Card::Lofi: applyLofiKnob(knob, v, out.lofi); break;
     case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
-    case Card::Crowd2: applyCrowd2Knob(knob, v, out.crowd); break;
     case Card::FormantFollower: applyFollowerKnob(knob, v, out); break;
     case Card::Growl: applyGrowlKnob(knob, v, out.growl); break;
     case Card::Empty:
@@ -311,8 +297,7 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::ReverbSpring:
     case Card::ReverbChasm: out.reverb.on = on; break;
     case Card::Crowd:
-    case Card::Crowd2:
-      // The pitch stage reads crowdOn to keep its tracker and ring running for the Crowd engine.
+      // The pitch stage reads crowdOn to keep its tracker and ring running for the Crowd card.
       out.crowd.on = on;
       out.pitchFx.crowdOn = on;
       break;
@@ -335,7 +320,6 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
-  if (c == Card::Crowd2) out.crowd.mob2 = true;
   // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
   if (c == Card::FormantFollower) out.follower.placed = true;
 }
