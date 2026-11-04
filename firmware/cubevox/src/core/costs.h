@@ -139,6 +139,18 @@ constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stres
 // cycles, 4.2 to 4.6 %, about 6.2 % worst block.
 constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run owes the measured row
 
+// The audition cards of 2026-11-04, from the host bench of Growl's method (Apple clang -O2 with the firmware's
+// float contraction, Adam's three clips in 64-sample blocks, minimum of 9 passes, steady_clock around each
+// call, 50.4k board cycles per host us). Ring mod is Distortion's second alternate in slot 6 and reads the
+// tracker like Growl, so a layout with it pays kTracker once: 2.0 ns a sample, 129 ns a block, 6.5k cycles,
+// 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %. Strings is Spring's second alternate in
+// slot 8: 24.9 ns a sample, 1.60 us a block, 80.4k cycles, 12.6 %; the costliest block is a key change, when
+// the old bank rings out beside the new one for 50 ms, 3.88 us, 195k cycles, 30.6 %. The 50.4k
+// ratio was set on other cards, and this loop is a scalar recurrence that may not scale the same; a count of
+// the loop (about 15 cycles a string a sample) says 2 % mean, 4 % worst. A board run owes the measured rows.
+constexpr Cost kRingMod{2, 2, false};
+constexpr Cost kStrings{13, 31, false};
+
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them.
 constexpr Cost kOutputEq{6, 7, false};     // est. 32.7k / 38k for both POLISH EQ halves and the sample conversion; 18.1k on the board for 7 biquads (9.2k measured, 8.9k est.) times the host ratio 1.55 for 9 biquads and the detector, plus 4.6k conversion; the worst adds the coefficient work of a block that switches on

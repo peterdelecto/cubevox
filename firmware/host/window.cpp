@@ -360,8 +360,11 @@ constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
 constexpr std::array<GridCell, 2> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot4Cards = {Card::Unison, Card::Crowd};
-constexpr std::array<GridCell, 2> kSlot6Cells = {{{"DISTORTION", 0.0f, 0, 1.0f}, {"GROWL", 0.0f, 1, 1.0f}}};
-constexpr std::array<Card, 2> kSlot6Cards = {Card::Distortion, Card::Growl};
+constexpr std::array<GridCell, kStackRows> kSlot6Cells = {
+    {{"DISTORTION", 0.0f, 0, 1.0f}, {"GROWL", 0.0f, 1, 1.0f}, {"RING MOD", 0.0f, 2, 1.0f}}};
+constexpr std::array<Card, kStackRows> kSlot6Cards = {Card::Distortion, Card::Growl, Card::RingMod};
+constexpr std::array<GridCell, 3> kSlot8Cells = {{{"SPRING", 0.0f, 0, 0.5f}, {"CHASM", 0.5f, 0, 0.5f}, {"STRINGS", 0.0f, 1, 1.0f}}};
+constexpr std::array<Card, 3> kSlot8Cards = {Card::ReverbSpring, Card::ReverbChasm, Card::Strings};
 constexpr std::array<GridCell, kStackRows> kSlot3Cells = {
     {{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}, {"YAWN", 0.0f, 2, 1.0f}}};
 constexpr std::array<Card, kStackRows> kSlot3Cards = {Card::Octave, Card::Formant, Card::FormantFollower};
@@ -390,16 +393,18 @@ void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
         segmentedGrid(f, "slot3Card", stackTop, kColInnerW, kStackRowH, kSlot3Cells, activeCell(kSlot3Cards, card));
     if (picked >= 0) f.box.pickSlot3Card(kSlot3Cards[static_cast<size_t>(picked)]);
   } else if (slot == distortionGrowlSlot(layout)) {
+    const ImVec2 stackTop = topLeft + ImVec2(0.0f, kGridH - kStackH);
     const int picked =
-        segmentedGrid(f, "slot6Card", topLeft, kColInnerW, kSegH, kSlot6Cells, activeCell(kSlot6Cards, card));
+        segmentedGrid(f, "slot6Card", stackTop, kColInnerW, kStackRowH, kSlot6Cells, activeCell(kSlot6Cards, card));
     if (picked >= 0) f.box.pickSlot6Card(kSlot6Cards[static_cast<size_t>(picked)]);
   } else if (slot == unisonCrowdSlot(layout)) {
     const int picked =
         segmentedGrid(f, "slot4Card", topLeft, kColInnerW, kSegH, kSlot4Cells, activeCell(kSlot4Cards, card));
     if (picked >= 0) f.box.pickSlot4Card(kSlot4Cards[static_cast<size_t>(picked)]);
   } else if (slot == reverbSlot(layout)) {
-    const bool chasm = card == Card::ReverbChasm;
-    if (segmentedSwitch(f, "swapReverb", topLeft, kColInnerW, "SPRING", "CHASM", chasm, true)) f.box.swapReverb();
+    const int picked =
+        segmentedGrid(f, "slot8Card", topLeft, kColInnerW, kSegH, kSlot8Cells, activeCell(kSlot8Cards, card));
+    if (picked >= 0) f.box.pickSlot8Card(kSlot8Cards[static_cast<size_t>(picked)]);
   } else if (slot == slot7CardSlot(layout)) {
     const int picked =
         segmentedGrid(f, "slot7Card", topLeft, kColInnerW, kSegH, kSlot7Cells, activeCell(kSlot7Cards, card));

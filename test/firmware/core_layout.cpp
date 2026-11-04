@@ -814,8 +814,18 @@ void checkGrowlSlot6() {
 
   check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == growl,
         "action: SwapDistortionGrowl turns Distortion into Growl in its slot and touches no other slot");
+  Layout ringMod = defaultLayout();
+  ringMod.card[5] = Card::RingMod;
+  check(distortionGrowlSlot(ringMod) == 5 && layoutValid(ringMod).ok(),
+        "distortionGrowlSlot: Ring mod counts as well, and its layout passes the placement rules");
+  paysFor(ringMod, true, false, "ringmod: Ring mod in slot 6 adds its row, and the tracker stays paid once");
+  Layout ringAlone = withoutPitchCards();
+  ringAlone.card[5] = Card::RingMod;
+  paysFor(ringAlone, true, false, "ringmod: Ring mod alone pays the tracker once and no pitch stage row");
+  check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == ringMod,
+        "action: and turns Growl into Ring mod");
   check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == defaultLayout(),
-        "action: and turns Growl back into Distortion");
+        "action: and turns Ring mod back into Distortion");
   Layout neither = defaultLayout();
   neither.card[5] = Card::Empty;
   const Layout neitherBefore = neither;

@@ -107,8 +107,7 @@ void turn(KnobFilter& f, float from, float to, int reads, uint32_t& nowMs) {
 }
 
 // Turned to a stop, the knob reports exactly that end once it rests, though the one-pole alone
-// would still be short of it. Distortion blends its fuzz in over DRIVE 0 to 0.05, so a few tenths
-// of a percent are audible.
+// would still be short of it, so a stage that is a plain copy at exactly 0 gets the 0 itself.
 void checkKnobRestsAtTheStop() {
   constexpr int kRestReads = static_cast<int>(kKnobRestMs / kReadMs);
   KnobFilter down;

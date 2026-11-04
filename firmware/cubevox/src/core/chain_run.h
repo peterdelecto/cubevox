@@ -13,15 +13,16 @@
 #include "core/registry.h"
 #include "core/slots.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. PitchFx and Distortion are
-// references because the board places them in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. PitchFx, Unison and Distortion
+// are references because the board places them in DTCM.
 struct ChainEngines {
-  ChainEngines(cv::PitchFx& pitchFx, cv::Distortion& distortionFx) : pitch(pitchFx), distortion(distortionFx) {}
+  ChainEngines(cv::PitchFx& pitchFx, cv::Unison& unisonFx, cv::Distortion& distortionFx)
+      : pitch(pitchFx), unison(unisonFx), distortion(distortionFx) {}
 
   cv::PitchFx& pitch;
   cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each pitch call while its card is placed
   cv::Gate inputGate;
-  cv::Unison unison;
+  cv::Unison& unison;
   cv::Slapback slapback;
   cv::Distortion& distortion;
   cv::Gate gate;
@@ -30,6 +31,8 @@ struct ChainEngines {
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
   cv::Growl growl;  // like crowd, its voice reads the ring that `pitch` writes
+  cv::RingMod ringMod;  // reads the tracker that `pitch` runs
+  cv::Strings strings;  // two banks of twelve delay lines, 43 kB, in D1 with the rest of the engines
 
   // The signal the Chatter card cuts its slices from. captureBloomSource copies the block leaving the
   // tap slot into `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch

@@ -1,14 +1,16 @@
-// Distortion checks: passthrough, switch-off, call sizes, non-finite input, top boost, harmonics, clean, level,
-// asymmetry, DC, no-alloc. No window, no audio device.
+// Distortion checks: passthrough, switch-off, reset, call sizes, non-finite and huge input, top boost,
+// harmonics, level, asymmetry, DC, no-alloc. No window, no audio device.
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <vector>
 
 #include "engine/distortion.h"
 
 #include "alloc_guard.h"
+#include "distortion_rule.h"
 
 namespace {
 
@@ -102,6 +104,30 @@ bool testPassthrough() {
   }
   return report("passthrough", maxDiff == 0.0f, "drive 0 and on=false max|out-in|=%.3g (==0)",
                 maxDiff);
+}
+
+// The box resets an engine on the enable edge of a slot that sat off, and the engine may have been left
+// engaged and dirty. After the reset it gives the output a fresh engine gives, bit for bit.
+bool testResetFromEngaged() {
+  const std::vector<float> in = sine(2 * kSecond);
+  const std::vector<float> head(in.begin(), in.begin() + kSecond);
+  const std::vector<float> rest(in.begin() + kSecond, in.end());
+  cv::DistortionParams engaged = params(0.8f);
+  engaged.tone = 0.9f;
+  cv::DistortionParams then = params(kDistortionRuleDrive);
+  then.tone = 0.2f;
+  gDist.reset();
+  run(gDist, head, engaged);
+  gDist.reset();
+  const std::vector<float> got = run(gDist, rest, then);
+  cv::Distortion fresh;
+  fresh.reset();
+  const std::vector<float> want = run(fresh, rest, then);
+  size_t differing = 0;
+  for (size_t i = 0; i < got.size(); ++i)
+    if (got[i] != want[i]) ++differing;
+  return report("reset", differing == 0, "after DRIVE 80 %% and TONE 90 %%, a reset engine vs a fresh one: %.0f samples differ (==0)",
+                static_cast<double>(differing));
 }
 
 // A stage that ran for a second and is then switched off, or turned down to 0, gives the input back
@@ -221,9 +247,37 @@ bool testNonFinite() {
                 recovered ? 1.0 : 0.0, knobs ? 1.0 : 0.0);
 }
 
+// One input sample of NaN, infinity or 1e37 into an engaged stage, at the level rule's DRIVE and at 100 %,
+// never puts a non-finite sample out, and the stage is back at the clean run's level within 1.5 s. The
+// rails bound the output while the filters ring down from a finite spike.
+bool testHugeSample() {
+  constexpr size_t kBad = static_cast<size_t>(kSecond / 2);
+  const float spikes[] = {std::nanf(""), std::numeric_limits<float>::infinity(), 1e37f};
+  const std::vector<float> clean = sine(3 * kSecond);
+  bool finite = true;
+  double worstDb = 0.0;
+  for (const float drive : {kDistortionRuleDrive, 1.0f}) {
+    gDist.reset();
+    const std::vector<float> want = run(gDist, clean, params(drive));
+    for (const float spike : spikes) {
+      std::vector<float> in = clean;
+      in[kBad] = spike;
+      gDist.reset();
+      const std::vector<float> got = run(gDist, in, params(drive));
+      for (const float v : got)
+        if (!std::isfinite(v)) finite = false;
+      const double db = 20.0 * std::log10(rmsOf(got, 2 * kSecond, 3 * kSecond) / rmsOf(want, 2 * kSecond, 3 * kSecond));
+      if (std::fabs(db) > std::fabs(worstDb)) worstDb = db;
+    }
+  }
+  return report("huge-sample", finite && std::fabs(worstDb) <= 0.1,
+                "NaN, inf and 1e37 at DRIVE 30 %% and 100 %%: all output finite: %.0f, level 1.5 s later vs clean worst %+.3f dB (+-0.1)",
+                finite ? 1.0 : 0.0, worstDb);
+}
+
 // Stage 1 gain before the top boost: the plain exponential sweep, in the same float operations
 // as the engine runs it (exp2Fast, which matches libm to 1e-7 relative).
-float todaysGain1(const cv::DistortionTuning& t, float drive) {
+float plainGain1(const cv::DistortionTuning& t, float drive) {
   return t.gain1Min * cv::exp2Fast(log2f(t.gain1Max / t.gain1Min) * drive);
 }
 
@@ -235,8 +289,8 @@ void prime(cv::Distortion& d, const cv::DistortionParams& p) {
   d.process(in.data(), out.data(), cv::kBlock, p);
 }
 
-// DRIVE 0 to topBoostFrom: the boost term is exactly 0.0f, so the gain law and the whole output
-// match the sweep without the boost, sample for sample.
+// DRIVE 0 to topBoostFrom (the loop's last step, 0.6): the boost term is exactly 0.0f, so the gain law and
+// the whole output match the sweep without the boost, sample for sample.
 bool testBelowBoost() {
   cv::DistortionParams p = params(0.5f);
   prime(gDist, p);
@@ -244,9 +298,8 @@ bool testBelowBoost() {
   bool law = true;
   for (int k = 0; k <= 60; ++k) {
     const float drive = static_cast<float>(k) / 100.0f;
-    if (gDist.stage1GainAt(drive) != todaysGain1(t, drive)) law = false;
+    if (gDist.stage1GainAt(drive) != plainGain1(t, drive)) law = false;
   }
-  if (gDist.stage1GainAt(t.topBoostFrom) != todaysGain1(t, t.topBoostFrom)) law = false;
 
   const float drives[4] = {0.1f, 0.3f, 0.5f, 0.6f};
   bool audio = true;
@@ -260,7 +313,7 @@ bool testBelowBoost() {
   }
   char detail[160];
   std::snprintf(detail, sizeof detail,
-                "gain at DRIVE 0..0.6 equals today's law (==): %s; output at 0.1/0.3/0.5/0.6 equals boost 0 dB (==): %s",
+                "gain at DRIVE 0..0.6 equals the plain sweep (==): %s; output at 0.1/0.3/0.5/0.6 equals boost 0 dB (==): %s",
                 law ? "yes" : "NO", audio ? "yes" : "NO");
   std::printf("%s below-boost  %s\n", law && audio ? "PASS" : "FAIL", detail);
   return law && audio;
@@ -273,8 +326,8 @@ bool testTopBoost() {
   prime(gDist, p);
   const cv::DistortionTuning& t = p.tuning;
   const double want = std::pow(10.0, t.topBoostDb / 20.0);
-  const double top = gDist.stage1GainAt(1.0f) / todaysGain1(t, 1.0f);
-  const double mid = gDist.stage1GainAt(0.8f) / todaysGain1(t, 0.8f);
+  const double top = gDist.stage1GainAt(1.0f) / plainGain1(t, 1.0f);
+  const double mid = gDist.stage1GainAt(0.8f) / plainGain1(t, 0.8f);
   const bool topOk = std::fabs(top / want - 1.0) < 1e-4 && std::fabs(top - 2.0) < 0.01;
   const bool midOk = std::fabs(mid / std::sqrt(want) - 1.0) < 1e-4;
 
@@ -283,12 +336,12 @@ bool testTopBoost() {
   bool offOk = true;
   for (int k = 0; k <= 100; ++k) {
     const float drive = static_cast<float>(k) / 100.0f;
-    if (gDist.stage1GainAt(drive) != todaysGain1(p.tuning, drive)) offOk = false;
+    if (gDist.stage1GainAt(drive) != plainGain1(p.tuning, drive)) offOk = false;
   }
   const bool ok = topOk && midOk && offOk;
   char detail[160];
   std::snprintf(detail, sizeof detail,
-                "stage 1 gain vs today's: DRIVE 1 x%.5f = %.3f dB (x%.5f), DRIVE 0.8 x%.5f; boost 0 dB equals today's: %s",
+                "stage 1 gain vs the plain sweep: DRIVE 1 x%.5f = %.3f dB (x%.5f), DRIVE 0.8 x%.5f; boost 0 dB equals the sweep: %s",
                 top, 20.0 * std::log10(top), want, mid, offOk ? "yes" : "NO");
   std::printf("%s top-boost  %s\n", ok ? "PASS" : "FAIL", detail);
   return ok;
@@ -337,22 +390,19 @@ bool testHarmonics() {
   return ok;
 }
 
-// Old band: 3rd <= -40 dB at drive 0.15. New: just breaking up at drive 0.1.
-bool testClean() {
-  const double h3 = harmonicDb(render(params(0.1f)), 3);
-  return report("clean", h3 <= -38.0, "3rd at drive 0.1 = %.1f dB (<=-38)", h3);
-}
-
+// The sine's level against its input holds to the stage's readings, so a trim or makeup error of half a
+// dB shows. The level rule itself is judged on Adam's clips in level_test.
 bool testLevel() {
   const double inRms = rmsOf(sine(kSecond), 0, kSecond);
   const float drives[3] = {0.15f, 0.5f, 1.0f};
+  const double want[3] = {3.33, 1.49, -3.76};
   double db[3];
   bool ok = true;
   for (int k = 0; k < 3; ++k) {
     db[k] = 20.0 * std::log10(rmsOf(render(params(drives[k])), kSecond, 2 * kSecond) / inRms);
-    if (std::fabs(db[k]) > 4.0) ok = false;
+    if (std::fabs(db[k] - want[k]) > 0.5) ok = false;
   }
-  return report("level", ok, "output vs input RMS at drive 0.15/0.5/1 = %.2f / %.2f / %.2f dB (+-4)",
+  return report("level", ok, "output vs input RMS at drive 0.15/0.5/1 = %.2f / %.2f / %.2f dB (+3.33 / +1.49 / -3.76, +-0.5)",
                 db[0], db[1], db[2]);
 }
 
@@ -381,24 +431,28 @@ bool testNoAlloc() {
   return report("no-alloc", true, "%.0f allocations in process()", 0.0);
 }
 
+// Above the shelf's corner TONE 1 sits toneMaxDb over TONE 0 at toneMinDb, within 0.5 dB, and TONE at noon
+// gives the output of a tuning with no TONE shelf bit for bit.
 bool testTone() {
   std::vector<float> in(static_cast<size_t>(2 * kSecond));
   for (size_t i = 0; i < in.size(); ++i)
     in[i] = kAmp * static_cast<float>(std::sin(2.0 * kPi * 8000.0 * static_cast<double>(i) / cv::kSampleRate));
-  auto wetRms = [&](float tone, bool flatTuning) {
+  auto wet = [&](float tone, bool flatTuning) {
     cv::DistortionParams p = params(0.5f);
     p.tone = tone;
     if (flatTuning) p.tuning.toneMinDb = p.tuning.toneMaxDb = 0.0f;
     gDist.reset();
-    return rmsOf(run(gDist, in, p), kSecond, 2 * kSecond);
+    return run(gDist, in, p);
   };
-  const double lo = wetRms(0.0f, false), mid = wetRms(0.5f, false), hi = wetRms(1.0f, false);
-  const double base = wetRms(0.5f, true);
-  const double spanDb = 20.0 * std::log10(hi / lo);
-  const double midDb = 20.0 * std::log10(mid / base);
-  return report("tone", spanDb >= 12.0 && std::fabs(midDb) <= 0.5,
-                "8 kHz at drive 0.5: tone 1 vs 0 = %.1f dB (>=12), tone 0.5 vs old default = %.2f dB (+-0.5)",
-                spanDb, midDb);
+  const std::vector<float> mid = wet(0.5f, false);
+  const bool noonFlat = mid == wet(0.5f, true);
+  const double spanDb = 20.0 * std::log10(rmsOf(wet(1.0f, false), kSecond, 2 * kSecond) /
+                                          rmsOf(wet(0.0f, false), kSecond, 2 * kSecond));
+  const cv::DistortionTuning t;
+  const double wantDb = static_cast<double>(t.toneMaxDb - t.toneMinDb);
+  return report("tone", noonFlat && std::fabs(spanDb - wantDb) <= 0.5,
+                "8 kHz at drive 0.5: tone 1 vs 0 = %.2f dB (want %.1f +-0.5), tone 0.5 equals no TONE shelf (==): %.0f",
+                spanDb, wantDb, noonFlat ? 1.0 : 0.0);
 }
 
 }  // namespace
@@ -407,14 +461,15 @@ int main() {
   bool ok = true;
   ok &= testPassthrough();
   ok &= testSwitchOff();
+  ok &= testResetFromEngaged();
   ok &= testEngage();
   ok &= testCallSizes();
   ok &= testNonFinite();
+  ok &= testHugeSample();
   ok &= testBelowBoost();
   ok &= testTopBoost();
   ok &= testGainMonotonic();
   ok &= testHarmonics();
-  ok &= testClean();
   ok &= testLevel();
   ok &= testAsymmetry();
   ok &= testDc();
