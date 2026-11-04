@@ -81,13 +81,13 @@ struct ChainCycles {
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
               bool& pitchDone);
 
-// A quarter turn in the phase units of cv::sinTurns. The BYPASS mix and the slot crossfade both run
-// a phase from 0 (the chain or engine side) to this (the dry input).
+// A quarter turn in the phase units of cv::sinTurns. The BYPASS mix runs a phase from 0 (the chain
+// side) to this (the dry input).
 constexpr uint32_t kBypassFull = 1u << 30;
 
 // A slot's toggle crossfades between the engine and the dry input over this many blocks (6 blocks
-// of 64 samples, 8 ms), at equal power, with the same law as the BYPASS mix: the dry gain is the sine
-// of the phase and the engine gain its cosine.
+// of 64 samples, 8 ms). The engine gain rises linearly and the dry gain is one minus it, so the two
+// sum to 1. An engine output that already holds the dry would gain 3 dB under an equal-power fade.
 constexpr int kSlotFadeBlocks = 6;
 
 // Each slot's fade level in blocks, kept by the audio interrupt. 0 plays the dry input with the
