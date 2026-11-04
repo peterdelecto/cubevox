@@ -1,6 +1,7 @@
-// POLISH EQ checks: both halves bit-exact when off, the front and back responses, flat, block
-// splitting, no-alloc. No window, no audio device.
+// POLISH EQ checks: both halves bit-exact when off, the front and back responses, the de-esser behind
+// the low-pass, flat, call splitting, the setting ranges, no-alloc. No window, no audio device.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -119,6 +120,88 @@ bool testFrontDeEsserQuiet() {
                 "de-esser live: 97 Hz = %.3f dB, 1 kHz = %.3f dB (0 +-0.5, 0 +-0.1)", g97, g1k);
 }
 
+// A 194 Hz voice at -20 dBFS RMS under noise-like sibilance spread over 4.5 to 7 kHz at -26 dBFS RMS,
+// made of 56 sines with fixed phases.
+std::vector<float> voiceWithEss(int n) {
+  std::vector<float> x = sine(194.0, n);
+  const float voiceScale = 0.1f / kAmp * 1.41421356f;  // peak 0.1414, -20 dBFS RMS
+  for (float& v : x) v *= voiceScale;
+  uint32_t seed = 12345u;
+  const int parts = 56;
+  const double amp = std::pow(10.0, -26.0 / 20.0) * std::sqrt(2.0 / parts);
+  for (int k = 0; k < parts; ++k) {
+    seed = seed * 1664525u + 1013904223u;
+    const double phase = 2.0 * kPi * (seed >> 8) / 16777216.0;
+    const double hz = 4500.0 + 2500.0 * (k + 0.5) / parts;
+    for (int i = 0; i < n; ++i)
+      x[static_cast<size_t>(i)] += static_cast<float>(amp * std::sin(2.0 * kPi * hz * i / cv::kSampleRate + phase));
+  }
+  return x;
+}
+
+// RMS of what is left above 3 kHz, from two Butterworth high-pass sections, over seconds 1-2 of the signal.
+double sibilantRms(const std::vector<float>& x) {
+  cv::Biquad a, b;
+  a.setHighPass(3000.0f, 0.5412f);
+  b.setHighPass(3000.0f, 1.3066f);
+  std::vector<float> hi(x.size());
+  for (size_t i = 0; i < x.size(); ++i) hi[i] = b.run(a.run(x[i]));
+  return rmsOf(hi, kSecond, 2 * kSecond);
+}
+
+// The de-esser as the box runs it, behind the 6 kHz low-pass, which takes 2 to 6 dB off the top of its
+// band before the detector reads it. Sibilance still cuts by about 4.5 dB.
+bool testFrontEss() {
+  const std::vector<float> in = voiceWithEss(2 * kSecond);
+  gEq.reset();
+  const std::vector<float> off = run(gEq, Half::Front, in, filtersOnly());
+  gEq.reset();
+  const std::vector<float> on = run(gEq, Half::Front, in, cv::PolishParams{});
+  const double cut = 20.0 * std::log10(sibilantRms(off) / sibilantRms(on));
+  return report("front ess", cut >= 3.5 && cut <= 5.5, "band noise over a voice: the 3 kHz and up content cuts %.2f dB (4.5 +-1)", cut);
+}
+
+// A call of any size gives the back half the same samples, because it holds no block state.
+bool testBackCallSizes() {
+  const std::vector<float> in = voiceWithEss(6 * cv::kBlock);
+  const cv::PolishParams p;
+  cv::Polish ref;
+  std::vector<float> want(in.size());
+  for (size_t i = 0; i < in.size(); i += cv::kBlock) ref.processBack(&in[i], &want[i], cv::kBlock, p);
+  bool same = true;
+  for (const int size : {1, 7, 63, 100}) {
+    cv::Polish e;
+    std::vector<float> got(in.size());
+    for (size_t i = 0; i < in.size();) {
+      const size_t n = std::min<size_t>(static_cast<size_t>(size), in.size() - i);
+      e.processBack(&in[i], &got[i], static_cast<int>(n), p);
+      i += n;
+    }
+    same = same && got == want;
+  }
+  return report("back call sizes", same, "calls of 1, 7, 63 and 100 samples match kBlock calls=%.0f (1)", same ? 1.0 : 0.0);
+}
+
+// The default settings sit inside the ranges, and a setting outside them or a NaN is refused.
+bool testRanges() {
+  cv::PolishParams p;
+  bool ok = cv::polishParamsInRange(p);
+  const float nan = std::nanf("");
+  const auto refused = [](float cv::PolishParams::*field, float value) {
+    cv::PolishParams q;
+    q.*field = value;
+    return !cv::polishParamsInRange(q);
+  };
+  ok = ok && refused(&cv::PolishParams::dipHz, 1000.0f) && refused(&cv::PolishParams::dipDb, nan) &&
+       refused(&cv::PolishParams::presenceHz, 100.0f) && refused(&cv::PolishParams::presenceDb, 20.0f);
+  p.tuning.trimDb = 400.0f;
+  ok = ok && !cv::polishParamsInRange(p);
+  p = cv::PolishParams{};
+  p.tuning.deEsser.thresholdDb = -1000.0f;
+  ok = ok && !cv::polishParamsInRange(p);
+  return report("ranges", ok, "the default is in range and each setting is refused outside it=%.0f (1)", ok ? 1.0 : 0.0);
+}
+
 bool testBack() {
   // The shape is pinned without the level-rule trim.
   cv::PolishParams p;
@@ -188,6 +271,9 @@ int main() {
   ok &= testPassthrough();
   ok &= testFront();
   ok &= testFrontDeEsserQuiet();
+  ok &= testFrontEss();
+  ok &= testBackCallSizes();
+  ok &= testRanges();
   ok &= testBack();
   ok &= testFlat();
   ok &= testSplit();

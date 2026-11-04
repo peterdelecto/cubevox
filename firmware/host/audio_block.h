@@ -1,6 +1,6 @@
-// The box's audio block path on the host: the board's processHalf without the SAI rings, the cycle
-// counter and the late-block policy. The main thread publishes snapshots and the mute state, and
-// the audio thread (or a headless loop) calls process() once per block.
+// The box's audio block path on the host: the board's processHalf without the SAI rings and the
+// cycle counter, running the same BlockFlow. The main thread publishes snapshots and the mute state,
+// and the audio thread (or a headless loop) calls process() once per block.
 
 #pragma once
 
@@ -10,11 +10,10 @@
 #include <atomic>
 #include <memory>
 
+#include "core/block_flow.h"
 #include "core/chain_run.h"
 #include "core/compose.h"
-#include "core/layout_fade.h"
 #include "core/level.h"
-#include "core/output_stage.h"
 #include "engine/common.h"
 #include "engine/pitch_fx.h"
 
@@ -54,11 +53,21 @@ class AudioBlock {
   level::InputEnergy takeInputEnergy() { return input_.take(); }
   level::OutputEnergy takeOutputEnergy() { return output_.take(); }
 
+  // Audio thread, or the headless loop that calls process(). A block counted late, as the board's
+  // block interrupt counts one. The next block passes the dry input, and dryBlocks() counts it.
+  void markLate() { flow_.markLate(); }
+  uint32_t dryBlocks() const { return flow_.dryBlocks(); }
+
+  // Main thread. The blocks discarded for a NaN, an infinity or a runaway sample since the start.
+  uint32_t nanBlocks() const { return nanBlocks_.load(std::memory_order_relaxed); }
+
+  // Main thread. The Input gate's highest detector level since the last take.
+  float takeGatePeak() { return gatePeak_.exchange(0.0f, std::memory_order_acq_rel); }
+
  private:
   void syncSnapshot();
   void swapSnapshot();
-  void resetWaiting(int count);
-  void discardBlock();
+  void noteGatePeak();
 
   std::unique_ptr<cv::PitchFx> pitch_;  // about 75 KB, so on the heap
   std::unique_ptr<cv::Unison> unison_;
@@ -73,11 +82,9 @@ class AudioBlock {
   ChainSnapshot held_ = {};
   uint32_t seenSeq_ = 0;
   bool layoutPending_ = false;
-  LayoutFade fade_;
-  OutputGain gain_;
-  uint32_t bypassPhase_ = 0;
-  SlotFades slotFades_;
-  uint32_t resetMask_ = 0;
+  BlockFlow flow_;
+  std::atomic<uint32_t> nanBlocks_{0};
+  std::atomic<float> gatePeak_{0.0f};
 
   EnergyTally input_;
   EnergyTally output_;

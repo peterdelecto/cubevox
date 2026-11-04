@@ -1,11 +1,14 @@
 #include "core/chain_run.h"
 
+#include <algorithm>
+
 #include "core/layout_fade.h"
 #include "engine/common.h"
 #include "engine/fastmath.h"
 
 namespace {
 
+// The BYPASS phase moves this far a sample.
 constexpr uint32_t kBypassStep = kBypassFull / (kFadeMs * cv::kSampleRate / 1000);
 
 // A gate's own on/off fade ends inside the slot fade, so a switched-off gate is a plain copy by the
@@ -13,10 +16,43 @@ constexpr uint32_t kBypassStep = kBypassFull / (kFadeMs * cv::kSampleRate / 1000
 static_assert(cv::kGateFadeMs * cv::kSmpPerMs <= static_cast<float>(kSlotFadeBlocks * cv::kBlock),
               "the gate's off fade outlasts the slot fade");
 
-// One step toward `goal`, never past it.
-uint32_t stepPhase(uint32_t phase, uint32_t goal) {
-  if (phase < goal) return goal - phase < kBypassStep ? goal : phase + kBypassStep;
-  return phase - goal < kBypassStep ? goal : phase - kBypassStep;
+// The two gains of the BYPASS mix at a phase.
+struct BypassGains {
+  float chain;
+  float dry;
+};
+
+BypassGains gainsAt(uint32_t phase) { return {cv::sinTurns(kBypassFull - phase), cv::sinTurns(phase)}; }
+
+// Mixes the dry input into up to kBlock chain samples while the phase moves one step a sample toward
+// `goal`, and leaves the phase where the chunk ends. The samples that move a whole step follow the line
+// from the gains at the chunk's start to the gains at the last of them, which stays within 2.2e-4 of
+// the sine. The sample that lands on the goal with a part step and every sample after it take the
+// gains of the phase they sit at, so a chunk's last sample is exact and the next chunk starts from it.
+void fadeChunk(float* a, const float* dry, int n, uint32_t goal, uint32_t& phase) {
+  const bool up = phase < goal;
+  const uint32_t away = up ? goal - phase : phase - goal;
+  const uint32_t toGo = (away + kBypassStep - 1) / kBypassStep;
+  const int steps = toGo < static_cast<uint32_t>(n) ? static_cast<int>(toGo) : n;
+  const bool lands = static_cast<uint32_t>(steps) == toGo;
+  const int whole = lands && away % kBypassStep != 0 ? steps - 1 : steps;
+  const uint32_t wholeMoved = static_cast<uint32_t>(whole) * kBypassStep;
+  const uint32_t wholeAt = up ? phase + wholeMoved : phase - wholeMoved;
+  const uint32_t at = lands ? goal : wholeAt;
+  const BypassGains g0 = gainsAt(phase);
+  const BypassGains gWhole = gainsAt(wholeAt);
+  const BypassGains gEnd = gainsAt(at);
+  if (whole > 0) {
+    const float chainSlope = (gWhole.chain - g0.chain) / static_cast<float>(whole);
+    const float drySlope = (gWhole.dry - g0.dry) / static_cast<float>(whole);
+    for (int i = 0; i < whole - 1; ++i) {
+      const float k = static_cast<float>(i + 1);
+      a[i] = a[i] * (g0.chain + chainSlope * k) + dry[i] * (g0.dry + drySlope * k);
+    }
+    a[whole - 1] = a[whole - 1] * gWhole.chain + dry[whole - 1] * gWhole.dry;
+  }
+  for (int i = whole; i < n; ++i) a[i] = a[i] * gEnd.chain + dry[i] * gEnd.dry;
+  phase = at;
 }
 
 // True when any slot whose card runs engine `e` has its toggle on. Only the reverb engine serves two
@@ -162,15 +198,17 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
   return false;
 }
 
-// The two gains sum to 1. A card whose output carries its input then holds its level across the
-// fade, where an equal-power pair would swell it by 3 dB.
+// The engine gain follows an S curve, 3x^2 - 2x^3 of the fade's progress, and the two gains sum to 1.
+// A card whose output carries its input then holds its level across the fade, where an equal-power
+// pair would swell it by 3 dB.
 void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
   const float total = static_cast<float>(kSlotFadeBlocks * n);
   const int dir = (to > from) - (to < from);
   int pos = from * n;  // samples of the fade toward the engine reached before this block
   for (int i = 0; i < n; ++i) {
     pos += dir;
-    const float toEngine = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
+    const float lin = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
+    const float toEngine = lin * lin * (3.0f - 2.0f * lin);
     wet[i] = wet[i] * toEngine + dry[i] * (1.0f - toEngine);
   }
 }
@@ -209,12 +247,5 @@ void mixBypass(float* a, const float* dry, int n, bool bypassOn, uint32_t& phase
     }
     return;
   }
-  uint32_t at = phase;
-  for (int i = 0; i < n; ++i) {
-    at = stepPhase(at, goal);
-    const float toDry = cv::sinTurns(at);
-    const float toChain = cv::sinTurns(kBypassFull - at);
-    a[i] = a[i] * toChain + dry[i] * toDry;
-  }
-  phase = at;
+  for (int i = 0; i < n; i += cv::kBlock) fadeChunk(a + i, dry + i, std::min(n - i, cv::kBlock), goal, phase);
 }

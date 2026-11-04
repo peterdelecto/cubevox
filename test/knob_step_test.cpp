@@ -396,7 +396,7 @@ bool checkGateKnob(Card c, int knob) {
 }
 
 // Lo-fi's toggle through its slot, run by the chain's own runSlot: the slot resets the engine as it starts
-// to fade in, the engine runs with the toggle as its `on`, and the slot's linear fade mixes the engine
+// to fade in, the engine runs with the toggle as its `on`, and the slot's S-curve fade mixes the engine
 // against its input. The step is the toggle, and the rows read the curvature around it.
 constexpr size_t kLofiSlot = 6;
 
@@ -461,10 +461,9 @@ bool toggleRow(bool judged, const std::string& label, double ratio) {
 // The enable and disable edges through the slot at the default and with AMOUNT at the top of its travel,
 // on a low tone and an in-band one.
 //
-// The slot's fade is linear, so it bends the blend by |wet - dry| / (384 samples) where it starts and
-// where it ends. A 220 Hz tone at the default sits on the skirt of the high-pass, where the wet differs
-// from the dry by a third of the tone's amplitude, so that pair of rows is reported and not judged. A
-// fade with no slope at its ends brings them to x1.01 and x1.06.
+// A 220 Hz tone at the default sits on the skirt of the high-pass, where the wet differs from the dry
+// by a third of the tone's amplitude. The slot's S-curve fade has no slope at its ends, which brings
+// that enable row to about x1.01; its disable row reads about x1.06 and is reported, not judged.
 bool lofiToggleRows() {
   bool ok = true;
   for (const float amount : {0.5f, 1.0f}) {
@@ -475,7 +474,7 @@ bool lofiToggleRows() {
         const std::string where = std::string(turnOn ? "enable" : "disable") + " at AMOUNT " +
                                   std::to_string(static_cast<int>(amount * 100.0f)) + " %, " +
                                   std::to_string(static_cast<int>(hz)) + " Hz";
-        const bool judged = amount != 0.5f || hz != kToneHz;
+        const bool judged = turnOn || amount != 0.5f || hz != kToneHz;
         ok &= toggleRow(judged, where, stepRatio(runLofiSlot(tone(hz), p, turnOn)));
       }
     }

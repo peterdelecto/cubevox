@@ -1,9 +1,10 @@
-// The audio block's tail, pure so the host test covers it: the guard in front of the polish stages
-// and the output gain ramp.
+// The audio block's output side, pure so the host test covers it: the guard in front of the polish
+// stages, the output gain ramp and the loop that shapes a block for the DAC.
 
 #pragma once
 
 #include <stdint.h>
+#include <string.h>
 
 #include "engine/soft_ceiling.h"
 
@@ -11,7 +12,7 @@
 inline float clampSample(float v) {
   if (v > 1.0f) return 1.0f;
   if (v < -1.0f) return -1.0f;
-  return __builtin_isnan(v) ? 0.0f : v;
+  return cv::isNaNBits(v) ? 0.0f : v;
 }
 
 // One output sample. The soft ceiling shapes the full-scale signal first and `gain` (the output trim
@@ -19,10 +20,11 @@ inline float clampSample(float v) {
 // The clamp comes last. At a gain of exactly 1 the result is the ceiling's alone.
 inline float shapeOutput(float x, float gain) { return clampSample(cv::softCeiling(x) * gain); }
 
-// Zeroes the block and returns false when any sample is a NaN or an infinity, so nothing after it
-// sees one. One running sum covers the block, because a NaN or an infinity in any sample makes the
-// sum non-finite and chain samples stay far below the float range. Reads the sum's exponent bits,
-// so the check holds under -ffinite-math-only too.
+// Zeroes the block and returns false when it holds a NaN, an infinity or a sample too loud for the
+// chain. The bound is a mean square of 1e6, +60 dBFS RMS. Chain samples stay 67 dB under it, so
+// nothing else trips it. The test reads the sum of squares through its bits, so a NaN, an
+// infinity and a finite runaway all fail, and samples of opposite sign cannot cancel. A block that
+// passes keeps squares small enough that POLISH COMP's detector stays finite.
 bool guardBlock(float* x, int n);
 
 // The gain at a block's first sample and its step per sample.
@@ -43,3 +45,41 @@ class OutputGain {
  private:
   float trim_ = 1.0f;  // the trim the last block ended on; a snapshot starts at unity
 };
+
+// Shapes the `n` samples of `a` with shapeOutput along `ramp` and hands each result to sink(i, v).
+// Returns the sum of the squares of the samples handed over, for the output level. A block whose
+// peak sits under the ceiling's knee, on a ramp inside [-1, 1], passes the ceiling and the clamp
+// unchanged, so that block skips both. A NaN's bits sort above the knee's, so it takes the full path.
+template <typename Sink>
+float emitOutput(const float* a, int n, GainRamp ramp, Sink&& sink) {
+  uint32_t peak = 0;
+  for (int i = 0; i < n; ++i) {
+    uint32_t bits;
+    memcpy(&bits, &a[i], sizeof bits);
+    bits &= 0x7FFFFFFFu;
+    peak = bits > peak ? bits : peak;
+  }
+  uint32_t kneeBits;
+  memcpy(&kneeBits, &cv::kSoftCeilingKnee, sizeof kneeBits);
+  const float last = ramp.start + static_cast<float>(n - 1) * ramp.step;
+  const bool unitGain = ramp.start >= -1.0f && ramp.start <= 1.0f && last >= -1.0f && last <= 1.0f;
+
+  float gain = ramp.start;
+  float energy = 0.0f;
+  if (peak <= kneeBits && unitGain) {
+    for (int i = 0; i < n; ++i) {
+      const float v = a[i] * gain;
+      gain += ramp.step;
+      energy += v * v;
+      sink(i, v);
+    }
+    return energy;
+  }
+  for (int i = 0; i < n; ++i) {
+    const float v = shapeOutput(a[i], gain);
+    gain += ramp.step;
+    energy += v * v;
+    sink(i, v);
+  }
+  return energy;
+}

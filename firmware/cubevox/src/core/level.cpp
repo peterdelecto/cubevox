@@ -2,6 +2,9 @@
 
 #include <math.h>
 
+#include "engine/dsp.h"
+#include "engine/smooth.h"
+
 namespace level {
 
 namespace {
@@ -12,14 +15,24 @@ float follow(float level, float now, float dtMs) {
   return level < kSilence ? 0.0f : level;
 }
 
-float clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
-
 }  // namespace
 
+// Four sums run side by side, because one serial sum waits on each add. The meter reads the total
+// to display precision.
 float sumSquares(const float* in, int n) {
-  float sum = 0.0f;
-  for (int i = 0; i < n; ++i) sum += in[i] * in[i];
-  return sum;
+  float s0 = 0.0f;
+  float s1 = 0.0f;
+  float s2 = 0.0f;
+  float s3 = 0.0f;
+  int i = 0;
+  for (; i + 4 <= n; i += 4) {
+    s0 += in[i] * in[i];
+    s1 += in[i + 1] * in[i + 1];
+    s2 += in[i + 2] * in[i + 2];
+    s3 += in[i + 3] * in[i + 3];
+  }
+  for (; i < n; ++i) s0 += in[i] * in[i];
+  return (s0 + s1) + (s2 + s3);
 }
 
 float rms(const InputEnergy& energy) {
@@ -34,7 +47,7 @@ float toDbfs(float amplitude) {
 
 float displayLevel(float amplitude) {
   if (!(amplitude > 0.0f)) return 0.0f;  // also catches NaN
-  return clamp01((toDbfs(amplitude) - kFloorDbfs) / (kFullDbfs - kFloorDbfs));
+  return cv::smooth::clamp01((toDbfs(amplitude) - kFloorDbfs) / (kFullDbfs - kFloorDbfs));
 }
 
 float Meter::update(const InputEnergy& energy, float dtMs) {
@@ -58,7 +71,7 @@ float OutputMeter::update(const OutputEnergy& energy, float dtMs) {
   const float highest = top_ - kWindowFloorUnderTopDb;
   if (floor_ > highest) floor_ = highest;
   if (db < bottom()) return 0.0f;
-  return clamp01(powf(10.0f, (db - top_) / 20.0f));
+  return cv::smooth::clamp01(cv::dbToGain(db - top_));
 }
 
 }  // namespace level

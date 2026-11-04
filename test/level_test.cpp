@@ -869,28 +869,69 @@ bool slotRows(const Signal& in) {
   return ok;
 }
 
-// One comp row per named tuning, each with its own makeup; the default params carry FIRM.
-bool tailRows(const Signal& in) {
-  bool ok = true;
-  const Signal compProgram = programAt(kCompProgramDbfs);
-  cv::PolishCompParams comp;
-  comp.on = true;
-  ok &= simple<cv::PolishComp>("polish COMP defaults", compProgram, comp);
-  comp.tuning = cv::PolishCompTuning::gentle();
-  ok &= simple<cv::PolishComp>("polish COMP gentle", compProgram, comp);
-  comp.tuning = cv::PolishCompTuning::medium();
-  ok &= simple<cv::PolishComp>("polish COMP medium", compProgram, comp);
+// The tail's engines in the box's order: the front half of POLISH EQ, POLISH COMP, the back half.
+struct Tail {
+  cv::Polish eq;
+  cv::PolishComp comp;
+  Tail() {
+    eq.reset();
+    comp.reset();
+  }
 
-  // The two halves of POLISH EQ in series. The trim in the tuning is set for the pair.
-  cv::PolishParams eq;
-  eq.on = true;
+  void front(const float* in, float* out, int n) { eq.processFront(in, out, n, cv::PolishParams{}); }
+  void compress(const float* in, float* out, int n) { comp.process(in, out, n, cv::PolishCompParams{}); }
+  void back(const float* in, float* out, int n) { eq.processBack(in, out, n, cv::PolishParams{}); }
+};
+
+// POLISH COMP alone, POLISH EQ alone (both halves) and the whole tail on Adam's clips. The clips sit
+// 1.8 dB apart in level and the comp levels them, so its three readings spread past the mid band. The
+// spread is printed, and the mean holds the rule. The EQ and the whole tail hold the mid band per clip.
+bool tailClipRows() {
+  double mean = 0.0;
+  int count = 0;
+  const auto compOnly = [](const Signal& padded) {
+    auto t = std::make_unique<Tail>();
+    return Through{padded, run(padded, [&](const float* i, float* o, int n) { t->compress(i, o, n); })};
+  };
+  const auto eqOnly = [](const Signal& padded) {
+    auto t = std::make_unique<Tail>();
+    return Through{padded, run(padded, [&](const float* i, float* o, int n) {
+                     float mid[cv::kBlock];
+                     t->front(i, mid, n);
+                     t->back(mid, o, n);
+                   })};
+  };
+  const auto whole = [](const Signal& padded) {
+    auto t = std::make_unique<Tail>();
+    return Through{padded, run(padded, [&](const float* i, float* o, int n) {
+                     float a[cv::kBlock];
+                     float b[cv::kBlock];
+                     t->front(i, a, n);
+                     t->compress(a, b, n);
+                     t->back(b, o, n);
+                   })};
+  };
+  bool ok = clipRows("polish COMP", compOnly, kMidLoDb, kMidHiDb, mean, count, false);
+  if (count > 0) ok &= verdict("polish COMP mean", mean, kLoDb, kHiDb);
+  ok &= clipRows("polish EQ", eqOnly, kMidLoDb, kMidHiDb, mean, count);
+  if (count > 0) ok &= verdict("polish EQ mean", mean, kLoDb, kHiDb);
+  ok &= clipRows("polish tail", whole, kMidLoDb, kMidHiDb, mean, count);
+  if (count > 0) ok &= verdict("polish tail mean", mean, kLoDb, kHiDb);
+  return ok;
+}
+
+// The comp on the -23 dBFS program, and the two EQ halves in series on the -18 dBFS one. The trim in
+// the tuning is set for the pair.
+bool tailRows(const Signal& in) {
+  bool ok = simple<cv::PolishComp>("polish COMP defaults", programAt(kCompProgramDbfs), cv::PolishCompParams{});
+  const cv::PolishParams eq;
   auto polish = std::make_unique<Stage<cv::Polish>>();
   ok &= check("polish EQ defaults", in, [&](const float* i, float* o, int n) {
     float tmp[cv::kBlock];
     polish->fx.processFront(i, tmp, n, eq);
     polish->fx.processBack(tmp, o, n, eq);
   });
-  return ok;
+  return ok & tailClipRows();
 }
 
 }  // namespace

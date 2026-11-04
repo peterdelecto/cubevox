@@ -89,8 +89,9 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
 constexpr uint32_t kBypassFull = 1u << 30;
 
 // A slot's toggle crossfades between the engine and the dry input over this many blocks (6 blocks
-// of 64 samples, 8 ms). The engine gain rises linearly and the dry gain is one minus it, so the two
-// sum to 1. An engine output that already holds the dry would gain 3 dB under an equal-power fade.
+// of 64 samples, 8 ms). The engine gain follows an S curve, flat at both ends so the blend does not
+// bend where the fade starts and stops, and the dry gain is one minus it, so the two sum to 1. An
+// engine output that already holds the dry would gain 3 dB under an equal-power fade.
 constexpr int kSlotFadeBlocks = 6;
 
 // Each slot's fade level in blocks, kept by the audio interrupt. 0 plays the dry input with the
@@ -154,9 +155,9 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
 // block. A layout that places the Chatter card after its tap slot (`bloomTap`) has the block leaving
-// that slot copied for its slices, and no copy is made otherwise. Returns false when a slot produced a NaN
-// or an infinity. The block was then silenced before the polish stages, so the caller cuts the output
-// and clears the engines.
+// that slot copied for its slices, and no copy is made otherwise. Returns false when a slot produced a NaN,
+// an infinity or a sample past the guard's bound. The block was then silenced before the polish stages, so the
+// caller cuts the output and clears the engines, POLISH COMP and POLISH EQ.
 template <typename Clock>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
               Clock cycleClock, ChainCycles& cycles) {
