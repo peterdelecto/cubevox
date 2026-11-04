@@ -38,6 +38,8 @@ constexpr KnobDesc kResponse = {"Response", KnobKind::Continuous, 0, cv::Autotun
                                 cv::AutotuneVoice::kMaxResponseMs, "ms", Curve::LogReversed};
 constexpr KnobDesc kFormantShift = {"SHIFT", KnobKind::Stepped, kFormantShiftPositions, kFormantShiftMin,
                                     kFormantShiftMax, "st"};
+constexpr KnobDesc kFollowerDepth = {"DEPTH", KnobKind::Continuous, 0, -cv::kFollowerMaxDepthSt,
+                                     cv::kFollowerMaxDepthSt, "st"};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
 
@@ -80,6 +82,8 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
       {"VOICES", KnobKind::Stepped, cv::kVoices2Steps, 0.0f, cv::kVoices2Steps - 1, "", Curve::Linear, 0,
        cv::kVoices2Name.data()}},
      Group::Pitch, costs::kCrowd2},
+    {Card::FormantFollower, "formant_follow", "Formant follower", Engine::Pitch, 2, {kFollowerDepth, kPercent("MIX")},
+     Group::Pitch, costs::kFormantFollower, "Follower"},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -177,6 +181,15 @@ void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
   }
 }
 
+// DEPTH sets the follower's reach and MIX the Formant voice's mix, which the follower drives.
+void applyFollowerKnob(int knob, float v, ChainParams& out) {
+  if (knob == 0) {
+    out.follower.depthSt = knobValue(kFollowerDepth, v);
+  } else {
+    out.pitchFx.formant.mix = v;
+  }
+}
+
 void applyLofiKnob(int knob, float v, cv::LofiParams& l) {
   if (knob == 0) {
     l.tone = v;
@@ -215,6 +228,11 @@ const KnobDesc* knobDesc(Card c, int knob) {
 }
 
 Engine engineOf(Card c) { return cardDesc(c).engine; }
+
+const char* oledName(Card c) {
+  const CardDesc& d = cardDesc(c);
+  return d.oledName != nullptr ? d.oledName : d.name;
+}
 
 bool cardFromId(const char* id, Card& out) {
   if (id == nullptr) return false;
@@ -262,6 +280,7 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::Lofi: applyLofiKnob(knob, v, out.lofi); break;
     case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
     case Card::Crowd2: applyCrowd2Knob(knob, v, out.crowd); break;
+    case Card::FormantFollower: applyFollowerKnob(knob, v, out); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -287,6 +306,7 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::Formant: out.pitchFx.formant.on = on; break;
     case Card::Lofi: out.lofi.on = on; break;
     case Card::Bloom: out.bloom.on = on; break;
+    case Card::FormantFollower: out.pitchFx.formant.on = on; break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -298,6 +318,8 @@ void applyPlacement(Card c, ChainParams& out) {
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
   if (c == Card::Crowd2) out.crowd.mob2 = true;
+  // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
+  if (c == Card::FormantFollower) out.follower.placed = true;
 }
 
 namespace {

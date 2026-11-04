@@ -181,6 +181,12 @@ constexpr float kSegInset = 2.0f;
 constexpr int kGridRows = 2;
 constexpr float kGridH = kGridRows * kSegH;
 
+// The slot 3 card switch stacks three words, each too wide to share a row, in rows at the 24 px desktop
+// pointer floor. The stack is taller than the foot, so it rises into the gap above it.
+constexpr int kStackRows = 3;
+constexpr float kStackRowH = units(3);
+constexpr float kStackH = kStackRows * kStackRowH;
+
 // ---- Bat toggle: a short bushing with a lever that stands up for on and hangs down for off.
 
 constexpr float kBatW = units(4);          // hit area, over the 24 px desktop pointer floor
@@ -200,6 +206,7 @@ constexpr float kColInnerW = kColW - 2 * kColPad;
 constexpr float kNameH = units(3);
 constexpr float kLabelH = units(3);
 constexpr float kColH = kColPad + kNameH + kGap + 2 * (kKnobBoxD + kLabelH) + kGap + kGridH + kColPad;
+static_assert(kStackH <= kGridH + kGap - kGapTight, "the slot 3 stack leaves kGapTight under the lower knob's label");
 
 // ---- LED and CPU line
 

@@ -23,14 +23,13 @@ Card nextSlot4Card(Card c) {
   }
 }
 
-ApplyResult swapOctaveFormant(Layout& layout) {
-  const int slot = octaveFormantSlot(layout);
-  if (slot < 0) return ApplyResult::None;
-  Layout next = layout;
-  next.card[slot] = layout.card[slot] == Card::Octave ? Card::Formant : Card::Octave;
-  if (!layoutValid(next).ok()) return ApplyResult::None;
-  layout = next;
-  return ApplyResult::LayoutChanged;
+// The card after `c` in the slot 3 cycle, Octave to Formant to the Formant follower and back to Octave.
+Card nextSlot3Card(Card c) {
+  switch (c) {
+    case Card::Octave: return Card::Formant;
+    case Card::Formant: return Card::FormantFollower;
+    default: return Card::Octave;
+  }
 }
 
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
@@ -84,7 +83,7 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
       settings.debug = !settings.debug;
       return ApplyResult::SettingsChanged;
     case UiAction::SwapReverb: return swapReverb(layout);
-    case UiAction::SwapOctaveFormant: return swapOctaveFormant(layout);
+    case UiAction::SwapOctaveFormant: return cycleCard(layout, octaveFormantSlot(layout), nextSlot3Card);
     case UiAction::SwapUnisonCrowd: return cycleCard(layout, unisonCrowdSlot(layout), nextSlot4Card);
     case UiAction::CycleSlot7Card: return cycleCard(layout, slot7CardSlot(layout), nextSlot7Card);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;

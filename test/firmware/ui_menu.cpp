@@ -308,7 +308,7 @@ void checkMenuListGeometry() {
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
       {kReverb, {"SPRING", "CHASM"}},
-      {kOctaveFormant, {"OCTAVE", "FORMANT"}},
+      {kOctaveFormant, {"OCTAVE", "FORMANT", "FOLLOWER"}},
       {kUnisonCrowd, {"UNISON", "MOB", "MOB 2"}},
       {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
       {kPolishComp, {"ON", "OFF"}},
@@ -446,8 +446,9 @@ bool cursorRowIs(const Canvas& canvas, int r, int item, const char* value) {
 // The Unison and Crowd row and the slot 7 row cycle three cards instead of flipping a value, so they
 // have their own checks below. What a click on each of the eight rows that flip a value asks for, what
 // applying it reports, and the value the row shows once the click is applied and once a second click
-// undoes it. The rows are in list order. The reverb and Octave and Formant clicks change the layout, so
-// they report LayoutChanged. The others change a setting.
+// undoes it. The Octave and Formant row cycles three cards, so its second click moves on to FOLLOWER;
+// its own checks below walk the whole cycle. The rows are in list order. The reverb and Octave and
+// Formant clicks change the layout, so they report LayoutChanged. The others change a setting.
 struct Click {
   int item;
   UiAction action;
@@ -459,7 +460,7 @@ struct Click {
 const std::array<Click, 8> kClicks = {{
     {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
     {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
-    {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "OCTAVE"},
+    {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "FOLLOWER"},
     {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
     {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
     {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "MIC", "LINE"},
@@ -507,10 +508,12 @@ void checkMenuClicks() {
     const int row = c.item > topAtDebug ? c.item - topAtDebug : 0;  // the window holds until the cursor passes its top
     check(cursorRowIs(m.canvas, row, c.item, c.back), rowName(c.item, c.back).c_str());
   }
+  Layout followed = defaultLayout();
+  followed.card[kOctaveSlot] = Card::FormantFollower;
   check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute && !m.settings.debug &&
-            m.layout == defaultLayout(),
-        "menu: a second click on each row restores the defaults");
+            m.layout == followed,
+        "menu: a second click on each row restores the defaults, and slot 3 moves on to the Formant follower");
 }
 
 // The REVERB row reads the layout, so its value follows the card in whichever slot holds one.
@@ -590,9 +593,12 @@ void checkMenuOctaveFormantValue() {
   movedFormant.card[0] = Card::Formant;
   Layout none = defaultLayout();
   none.card[kOctaveSlot] = Card::Empty;
+  Layout follower = defaultLayout();
+  follower.card[kOctaveSlot] = Card::FormantFollower;
   const Case cases[] = {
       {"Octave in slot 3", defaultLayout(), "SLOT 3", "OCTAVE"},
       {"Formant in slot 3", formant, "SLOT 3", "FORMANT"},
+      {"the Formant follower in slot 3", follower, "SLOT 3", "FOLLOWER"},
       {"Octave in slot 1", moved, "SLOT 1", "OCTAVE"},
       {"Formant in slot 1", movedFormant, "SLOT 1", "FORMANT"},
       {"a layout with neither card", none, "SLOT -", "OCTAVE"},
@@ -637,9 +643,16 @@ void checkMenuOctaveFormantClick() {
   check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
         "menu: the row shows the card the layout holds after the click");
   check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
+  Layout follower = defaultLayout();
+  follower.card[kOctaveSlot] = Card::FormantFollower;
+  check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout == follower,
+        "menu: a second click moves Formant on to the Formant follower");
+  m.draw();
+  check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FOLLOWER"),
+        "menu: the row reads FOLLOWER after the second click");
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == defaultLayout(),
-        "menu: a second click swaps Formant back to Octave");
+        "menu: a third click brings Octave back");
 
   // No layout goes over a CPU line with the stress-run rows, so the swap is refused in a layout the box
   // would not load either way: two reverb cards.

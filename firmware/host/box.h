@@ -81,9 +81,11 @@ class Box {
   void swapUnisonMob();
   void swapReverb();
 
-  // The card switches under slot 4 and slot 7. Each applies its menu action until the slot holds
-  // `card` (Unison, Mob or Mob 2; Gate, Lofi or Chatter). When no step of the cycle reaches it,
-  // because the box would not load that layout, the layout stays as it was.
+  // The card switches under slots 3, 4 and 7. Each applies its menu action until the slot holds
+  // `card` (Octave, Formant or the Formant follower; Unison, Mob or Mob 2; Gate, Lofi or Chatter).
+  // When no step of the cycle reaches it, because the box would not load that layout, the layout
+  // stays as it was.
+  void pickSlot3Card(Card card);
   void pickSlot4Card(Card card);
   void pickSlot7Card(Card card);
 

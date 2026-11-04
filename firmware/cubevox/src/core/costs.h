@@ -126,11 +126,12 @@ constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stre
 // (8.3 % / 10.2 %), rounded up.
 constexpr Cost kCrowd2{9, 11, false};
 
-// The Formant card, an alternate for Octave in slot 3, and the Lo-fi and Chatter cards, alternates for
-// Gate in slot 7. Formant's row is an estimate: the stress run reads it only together with the
+// The Formant card and the Formant follower, alternates for Octave in slot 3, and the Lo-fi and Chatter
+// cards, alternates for Gate in slot 7. The follower pays the tracker and the pitch stage as Formant does. Formant's row is an estimate: the stress run reads it only together with the
 // tracker and the pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to 8.5 %,
 // 2026-11-02, v2.01.14, against the 11 / 13 the three rows sum to).
 constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
+constexpr Cost kFormantFollower{4, 5, false};  // est.: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, MIX 100 %, Apple clang -O2, median of 9 interleaved passes; g++ 15 has no SDK here): 15.3 to 16.3 ns a sample against Formant's 14.0 to 15.2 at the matching SHIFT, at most 1.5 ns more, 4.8k board cycles a block at 50.4k, 0.76 %, rounded up
 constexpr Cost kLofi{4, 5, true};      // 19.5k / 31.4k, stress run 2026-11-02 (v2.01.14, lofi layout, TONE and AMOUNT swept: mean 3.04 %, worst 4.9 %, lowest run worst); the estimate of 2 / 2 missed the coefficient ramp of a moving knob
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 

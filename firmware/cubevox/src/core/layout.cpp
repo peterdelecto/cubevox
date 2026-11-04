@@ -33,7 +33,8 @@ int unisonCrowdSlot(const Layout& layout) {
 
 int octaveFormantSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (layout.card[s] == Card::Octave || layout.card[s] == Card::Formant) return s;
+    const Card c = layout.card[s];
+    if (c == Card::Octave || c == Card::Formant || c == Card::FormantFollower) return s;
   }
   return -1;
 }
@@ -65,15 +66,16 @@ LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
-  bool tracker = false;     // Autotune, Crowd, Mob 2 or Formant is placed, so the pitch tracker runs
+  bool tracker = false;     // Autotune, Crowd, Mob 2 or a Formant voice is placed, so the pitch tracker runs
   bool autotune = false;
-  bool stageUser = false;   // Octave or Formant is placed, so the pitch stage mixes
+  bool stageUser = false;   // Octave or a Formant voice is placed, so the pitch stage mixes
   for (const Card c : layout.card) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
-    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || c == Card::Formant;
+    const bool formant = c == Card::Formant || c == Card::FormantFollower;
+    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || formant;
     autotune = autotune || c == Card::Autotune;
-    stageUser = stageUser || c == Card::Octave || c == Card::Formant;
+    stageUser = stageUser || c == Card::Octave || formant;
   }
   if (tracker) {
     sum.avg += costs::kTracker.avg;
@@ -94,7 +96,9 @@ LayoutCheck layoutValid(const Layout& layout) {
     const Card c = layout.card[s];
     if (static_cast<int>(c) >= kCardCount) return fail(LayoutError::BadCard, s, Card::Empty, 0);
     if (c != Card::Empty) {
-      const uint32_t bit = 1u << static_cast<int>(c);
+      // Formant and the Formant follower play one voice, so a layout holds one of them at most.
+      const Card voice = c == Card::FormantFollower ? Card::Formant : c;
+      const uint32_t bit = 1u << static_cast<int>(voice);
       if (placed & bit) return fail(LayoutError::SameCardTwice, s, c, 0);
       placed |= bit;
     }
