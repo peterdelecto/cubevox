@@ -77,6 +77,8 @@ the end records how it got there and what went.
 
 ## The pitch front end, `engine/pitch_fx.h`
 
+Superseded by `2026-11-05-pitch-split-design.md` once that is built (design 2026-11-05, not built).
+
 1. Ring. One input ring of `kVoiceRingLen` samples, 12,756 (265.75 ms, 51,024 B), sized in `psola.h`
    for the Crowd card's 225 ms lag ceiling, 12 ms of scatter and the longest grain. The stage writes
    it every block it runs; `head()` is the index the next sample writes to. Autotune reads under
