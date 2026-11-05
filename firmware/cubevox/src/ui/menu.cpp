@@ -121,7 +121,7 @@ const char* octaveFormantValue(const Layout& layout) {
   if (slot < 0) return "OCTAVE";
   switch (layout.card[slot]) {
     case Card::Formant: return "FORMANT";
-    case Card::FormantFollower: return "YAWN";
+    case Card::FormantFollower: return "APRAXIA";
     default: return "OCTAVE";
   }
 }
