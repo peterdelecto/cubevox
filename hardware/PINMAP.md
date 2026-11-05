@@ -72,7 +72,7 @@ The board decides the ports:
 | 90 | PB4 | spare | NJTRST pull-up at reset; left unconnected |
 | 91 | PB5 | MUTE_N | |
 | 92 | PB6 | spare (was TOGGLE1, moved east 2026-10-08) | |
-| 93 | PB7 | USER_LED | output, R3/D1 west of the pin; dark until init |
+| 93 | PB7 | USER_LED | output, R3/D1 west of the pin; dark until init; TIM4_CH2 PWM at 1 kHz shows the audio load |
 | 94 | BOOT0 | BOOT0 | fixed |
 | 95 | PB8 | spare (was ENC_KEY_A) | |
 | 96 | PB9 | spare (was ENC_SEMI_B) | |

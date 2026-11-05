@@ -1,6 +1,7 @@
 // Checks the arithmetic behind the DEBUG load figure and the user LED: the worst and mean block of
-// each whole second, their percent of the block budget, and the LED's lit share of each period. The
-// block interrupt feeds the window and the main loop reads it.
+// each whole second, their percent of the block budget, and the LED's level: its curve from dark
+// to full, the flash after a late block and the clock that times it. The block interrupt feeds the
+// window and the main loop reads it.
 
 #include "support.h"
 
@@ -88,40 +89,70 @@ void checkWindowMean() {
   check(loadPercent(part.mean(), kBudget) == 100, "load: blocks that use their whole budget average 100%");
 }
 
-// Counts the milliseconds of one period, from `startMs`, that the LED is lit.
-uint32_t litMs(uint32_t startMs, int percent, bool running) {
-  uint32_t lit = 0;
-  for (uint32_t ms = startMs; ms < startMs + kLoadLedPeriodMs; ++ms) {
-    if (loadLedLit(ms, percent, running)) ++lit;
+constexpr uint32_t kLimit = kLoadLedLimitPercent;
+
+// The level when nothing has gone wrong lately.
+float calm(int percent, bool live = true) {
+  return loadLedLevel(percent, kLoadLedLimitPercent, live, kLoadLedNoTrouble);
+}
+
+bool near(float a, float b) { return a - b < 1e-5f && b - a < 1e-5f; }
+
+void checkLedCurve() {
+  check(kLoadLedLimitPercent == 75, "led: full at the 75 % average line a layout is gated against");
+  check(near(calm(0), kLoadLedIdle) && kLoadLedIdle > 0.0f, "led: zero load glows at the idle level, not dark");
+  check(near(calm(static_cast<int>(kLimit)), 1.0f), "led: the layout limit is full");
+  check(near(calm(500), 1.0f) && near(calm(kMaxLoadPercent), 1.0f), "led: a load past the limit is held to full");
+  check(near(calm(-5), kLoadLedIdle), "led: a negative load is held to the idle level");
+
+  float last = calm(0);
+  bool rises = true;
+  for (int p = 1; p <= static_cast<int>(kLimit); ++p) {
+    const float now = calm(p);
+    if (now <= last) rises = false;
+    last = now;
   }
-  return lit;
+  check(rises, "led: every percent of load from 0 to the limit is brighter than the one before");
+
+  const float half = calm(static_cast<int>(kLimit) / 2);
+  check(half > 0.2f && half < 0.3f, "led: half the limit is about a quarter of full, the square of the share");
+  check(near(loadLedLevel(0, 0, true, kLoadLedNoTrouble), 1.0f), "led: a zero limit reads full, not a divide by zero");
 }
 
-void checkLedShare() {
-  check(kLoadLedPeriodMs == 500, "led: the period is 500 ms");
-  check(litMs(0, 0, true) == 0, "led: 0% is never lit");
-  check(litMs(0, 10, true) == 50, "led: 10% is a 50 ms blip");
-  check(litMs(0, 50, true) == 250, "led: 50% is half on");
-  check(litMs(0, 90, true) == 450, "led: 90% is on for 450 ms with a 50 ms dark gap");
-  check(litMs(0, 100, true) == 500, "led: 100% is solid");
-  check(litMs(0, 150, true) == 500, "led: 150% is held to solid");
-  check(litMs(0, -5, true) == 0, "led: a negative percent is held to dark");
-  check(litMs(0, 10, false) == 0 && litMs(0, 50, false) == 0 && litMs(0, 100, false) == 0,
-        "led: audio off is never lit at any load");
+// Audio stopped, stalled or latched keeps the LED dark whatever the load or a recent late block.
+void checkLedDark() {
+  check(near(calm(0, false), 0.0f) && near(calm(50, false), 0.0f) && near(calm(999, false), 0.0f),
+        "led: audio not live is dark at any load");
+  check(near(loadLedLevel(10, kLoadLedLimitPercent, false, 0), 0.0f),
+        "led: a late block does not light the LED while audio is not live");
 }
 
-// The lit stretch opens with each period and closes at the exact millisecond.
-void checkLedEdges() {
-  check(loadLedLit(0, 10, true) && loadLedLit(49, 10, true), "led: 10% is lit at ms 0 and ms 49");
-  check(!loadLedLit(50, 10, true) && !loadLedLit(499, 10, true), "led: 10% is dark from ms 50 to the period's end");
-  check(loadLedLit(500, 10, true) && loadLedLit(549, 10, true) && !loadLedLit(550, 10, true),
-        "led: the next period repeats it");
-  check(loadLedLit(249, 50, true) && !loadLedLit(250, 50, true), "led: 50% turns off at ms 250");
-  check(loadLedLit(449, 90, true) && !loadLedLit(450, 90, true) && !loadLedLit(499, 90, true),
-        "led: 90% turns off at ms 450 and stays off to the period's end");
-  check(loadLedLit(499, 100, true) && loadLedLit(500, 100, true), "led: 100% is lit on both sides of the period edge");
-  check(litMs(123456, 10, true) == 50 && litMs(123456, 50, true) == 250,
-        "led: a period that starts mid-count holds the same share");
+void checkLedFlash() {
+  check(near(loadLedLevel(0, kLoadLedLimitPercent, true, 0), 1.0f), "led: a late block flashes full at once, at idle load");
+  check(near(loadLedLevel(0, kLoadLedLimitPercent, true, kLoadLedFlashMs - 1), 1.0f),
+        "led: the flash holds through its 100th millisecond");
+  check(near(loadLedLevel(0, kLoadLedLimitPercent, true, kLoadLedFlashMs), kLoadLedIdle),
+        "led: and ends at 100 ms, back on the load's level");
+  check(near(loadLedLevel(30, kLoadLedLimitPercent, true, 5000), calm(30)), "led: a late block long ago changes nothing");
+}
+
+void checkTroubleClock() {
+  BlockTroubleClock c;
+  check(c.sinceMs(1000) == kLoadLedNoTrouble, "trouble: none before the first count");
+  c.note(7, 1000);
+  check(c.sinceMs(1000) == kLoadLedNoTrouble, "trouble: the first count only sets the baseline");
+  c.note(7, 1050);
+  check(c.sinceMs(1050) == kLoadLedNoTrouble, "trouble: an unchanged count is none");
+  c.note(8, 1100);
+  check(c.sinceMs(1100) == 0 && c.sinceMs(1150) == 50, "trouble: a count that rose is timed from the pass that saw it");
+  c.note(8, 1200);
+  check(c.sinceMs(1200) == 100, "trouble: it keeps counting while the count holds");
+  c.note(5, 1300);
+  check(c.sinceMs(1300) == 0, "trouble: a count that fell, as a peaks reset does, also restarts it");
+  BlockTroubleClock w;
+  w.note(0, 0xFFFFFF00u);
+  w.note(1, 0xFFFFFFF0u);
+  check(w.sinceMs(0x10u) == 0x20u, "trouble: the time survives the millisecond counter wrapping");
 }
 
 }  // namespace
@@ -131,6 +162,8 @@ void checkLoadWindow() {
   checkWindowSpikes();
   checkWindowMean();
   checkPercent();
-  checkLedShare();
-  checkLedEdges();
+  checkLedCurve();
+  checkLedDark();
+  checkLedFlash();
+  checkTroubleClock();
 }

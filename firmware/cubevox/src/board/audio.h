@@ -90,6 +90,10 @@ int audioWorstLoadPercent();
 // window as audioWorstLoadPercent(). Reads 0 for the first second after boot.
 int audioMeanLoadPercent();
 
+// The late, dry and overrun blocks counted since boot, summed. It changes whenever one of the three
+// counts does. Three word reads with no mask, so the main loop may call it on every pass.
+uint32_t audioTroubleBlocks();
+
 // Cost of the last layout swap in CPU cycles: the swap block (where the engine clears land) and the
 // worst block from the swap to the end of the fade-in. Zero until a swap has happened.
 struct AudioSwapStats {

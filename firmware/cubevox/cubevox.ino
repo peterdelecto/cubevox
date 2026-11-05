@@ -61,6 +61,13 @@ Every gLoadRefresh{kUiTickMs};  // the load figures move once a second; the UI t
 int gLoadPercent = 0;
 int gMeanLoadPercent = 0;
 bool gAudioLive = false;  // audio running, not stalled, not latched; the LED's gate
+BlockTroubleClock gTrouble;  // time since the last late, dry or overrun block, for the LED's flash
+int gLedDuty = -1;  // the last PWM duty written, so an unchanged level costs no timer write
+
+// The user LED (PB7, TIM4_CH2) runs on 12-bit PWM at 1 kHz.
+constexpr int kLedPwmBits = 12;
+constexpr uint32_t kLedPwmHz = 1000;
+constexpr int kLedPwmMax = (1 << kLedPwmBits) - 1;
 
 // FPSCR and FPDSCR bit 24: flush subnormal results and operands to zero. The input filters decay
 // toward silence, and a subnormal state would cost the FPU extra cycles on every sample.
@@ -238,10 +245,17 @@ void refreshLoad(uint32_t nowMs) {
   gAudioLive = gAudioRunning && !faultAudioStalled() && !audioHealth().latched;
 }
 
-// The user LED blinks the mean audio load (core/load_led.h). A high level lights it (the bootloader
-// board file's LED_STATE_ON). It stays dark while audio is not running, has stalled or is latched.
+// Sets the user LED's brightness from the mean audio load (core/load_led.h). A high level lights
+// it (the bootloader board file's LED_STATE_ON), so the duty is the brightness. The LED is dark
+// while audio is not running, has stalled or is latched. The timer is written only when the duty
+// changes, because every analogWrite reloads the timer's period.
 void driveLoadLed(uint32_t nowMs) {
-  digitalWrite(pins::kUserLed, loadLedLit(nowMs, gMeanLoadPercent, gAudioLive) ? HIGH : LOW);
+  gTrouble.note(audioTroubleBlocks(), nowMs);
+  const float level = loadLedLevel(gMeanLoadPercent, kLoadLedLimitPercent, gAudioLive, gTrouble.sinceMs(nowMs));
+  const int duty = static_cast<int>(level * static_cast<float>(kLedPwmMax) + 0.5f);
+  if (duty == gLedDuty) return;
+  gLedDuty = duty;
+  analogWrite(pins::kUserLed, duty);
 }
 
 }  // namespace
@@ -265,7 +279,9 @@ void setup() {
   faultWatchdogKick();  // ends stretch 1 above
   gJack = JackSwitch(gSettings.inputJack);  // output is still muted, so no dip
   inputJackApply(gSettings.inputJack);
-  pinMode(pins::kUserLed, OUTPUT);
+  analogWriteResolution(kLedPwmBits);
+  analogWriteFrequency(kLedPwmHz);
+  driveLoadLed(millis());  // PWM at duty 0: dark until the first load figure
   usbLinkInit();  // USB attaches from loop() once VBUS is seen
 
   controlsInit();
