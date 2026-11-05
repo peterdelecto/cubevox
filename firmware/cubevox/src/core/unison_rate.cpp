@@ -24,6 +24,12 @@ constexpr float kSwingMinMs = 1.0f;
 constexpr float kSwingMaxMs = 6.0f;
 constexpr float kMaxSwingGrowth = 2.0f;
 
+// Wet trim at RATE 100 %, ramped in dB from RATE 50 %. A faster, narrower sweep leaves the copies near
+// their base delays, where they sum with the dry voice more than they did at RATE 50 % (the mean over
+// Adam's clips climbs +0.25 to +0.61 dB with the wet itself 0.4 dB quieter). The trim holds the sum inside
+// the level rule at every RATE.
+constexpr float kTrimDbAtMax = -4.5f;
+
 }  // namespace
 
 float lfoScale(float ratePercent) {
@@ -44,6 +50,8 @@ void apply(cv::UnisonTuning& tuning, float ratePercent) {
   tuning.swingMaxMs = kSwingMaxMs * narrow;
   tuning.lfoHz[0] = kLfoBaseHzFirst * m;
   tuning.lfoHz[1] = kLfoBaseHzSecond * m;
+  const float above = ratePercent > kRateMidPercent ? fminf(ratePercent, kRateMaxPercent) - kRateMidPercent : 0.0f;
+  tuning.rateTrimDb = kTrimDbAtMax * above / (kRateMaxPercent - kRateMidPercent);
 }
 
 }  // namespace unisonrate

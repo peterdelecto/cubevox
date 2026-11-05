@@ -66,6 +66,8 @@ constexpr float kUniSwingScale = 2.0f;                                // x swing
 // Above the middle rate the sweep narrows so the pitch swing stays within about twice
 // the middle's (RATE 100 %: ~60 cents peak instead of ~200).
 constexpr float kUniMaxSwingGrowth = 2.0f;
+// Wet trim at RATE 100 %, ramped in dB from RATE 50 % (firmware/cubevox/src/core/unison_rate.cpp).
+constexpr float kUniTrimDbAtMax = -4.5f;
 
 // Distortion
 constexpr Anchor kDisInputHp{160.0f, 90.0f, 40.0f, I::Log};
@@ -164,6 +166,8 @@ inline void unison(UnisonTuning& t, float ratePos) {
   t.swingMaxMs = base.swingMaxMs * swing;
   t.lfoHz[0] = base.lfoHz[0] * m;
   t.lfoHz[1] = base.lfoHz[1] * m;
+  const float above = ratePos > kCenter ? (ratePos < 100.0f ? ratePos : 100.0f) - kCenter : 0.0f;
+  t.rateTrimDb = kUniTrimDbAtMax * above / (100.0f - kCenter);
 }
 
 inline void distBody(DistortionTuning& t, float pos) {
