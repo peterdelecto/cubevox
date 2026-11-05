@@ -6,6 +6,7 @@
 
 #include "board/pins.h"
 #include "core/debounce.h"
+#include "core/menu_button.h"
 #include "core/timing.h"
 #include "ui/menu.h"
 
@@ -18,6 +19,7 @@ volatile int gCounts = 0;
 volatile uint8_t gQuadState = 0;
 
 DebouncedInput gClick;
+MenuButton gButton;
 
 void encoderIsr() {
   static constexpr std::array<int8_t, 16> kStep = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
@@ -42,6 +44,7 @@ void inputInit() {
   pinMode(pins::kEncMenuB, INPUT_PULLUP);
   pinMode(pins::kEncMenuSw, INPUT_PULLUP);
   gClick.reset(digitalRead(pins::kEncMenuSw) == HIGH);
+  gButton.reset(!gClick.level());
   gQuadState = static_cast<uint8_t>((digitalRead(pins::kEncMenuA) << 1) | digitalRead(pins::kEncMenuB));
   attachInterrupt(digitalPinToInterrupt(pins::kEncMenuA), encoderIsr, CHANGE);
   attachInterrupt(digitalPinToInterrupt(pins::kEncMenuB), encoderIsr, CHANGE);
@@ -50,6 +53,9 @@ void inputInit() {
 UiInput inputPoll(uint32_t nowMs) {
   UiInput in;
   in.detents = takeDetents();
-  in.click = gClick.update(digitalRead(pins::kEncMenuSw) == HIGH, nowMs, kSwitchDebounceMs) && !gClick.level();
+  gClick.update(digitalRead(pins::kEncMenuSw) == HIGH, nowMs, kSwitchDebounceMs);
+  const MenuButtonEvent button = gButton.update(!gClick.level(), nowMs);
+  in.click = button.click;
+  in.hold = button.hold;
   return in;
 }

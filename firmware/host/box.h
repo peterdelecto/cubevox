@@ -41,7 +41,8 @@ struct PanelInput {
   std::array<bool, kSlotCount> toggle;
   bool mute = false;
   int32_t detents = 0;  // encoder turns since the last tick
-  bool click = false;   // encoder press since the last tick
+  bool click = false;   // encoder released after a short press since the last tick
+  bool hold = false;    // encoder press reached kMenuHoldMs since the last tick
 
   PanelInput();
 };
@@ -76,7 +77,7 @@ class Box {
   // One pass of loop().
   void tick(const PanelInput& in, uint32_t nowMs);
 
-  // The menu's REVERB, OCTAVE, UNISON and DISTORTION rows. A layout the box would not load stays as it is.
+  // The menu's SLOT 3, 4, 6 and 8 rows. A layout the box would not load stays as it is.
   void swapOctaveFormant();
   void swapUnisonMob();
   void swapDistortionGrowl();

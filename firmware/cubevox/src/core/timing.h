@@ -7,6 +7,9 @@
 // Every mechanical switch (mute, menu click, slot toggles) must hold a level this long to count.
 constexpr uint32_t kSwitchDebounceMs = 20;
 
+// A MENU press held this long, counted from the debounced press, is a hold and not a click.
+constexpr uint32_t kMenuHoldMs = 600;
+
 // Covers the G6K-2F-Y operate time. Both relays (K102 mute, K103 input jack) wait this long.
 constexpr uint32_t kRelaySettleMs = 20;
 

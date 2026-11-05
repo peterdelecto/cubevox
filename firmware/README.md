@@ -114,7 +114,7 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    most 3 times in 60 s, then the mute latches).
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
    editor's export as `FontDesc`), `display.h` (backend interface, `flushStep` and `setContrast`, and
-   `PanelLink`, the restart rule for a panel that is missing or stops answering), `brightness.h` (the BRIGHTNESS
+   `PanelLink`, the restart rule for a panel that is missing or stops answering), `brightness.h` (the OLED BRIGHT
    levels and the dimmed contrast), `level` (input energy to the voice ribbon's 0..1 level).
 5. Protocol and storage: `protocol` (JSON line framing, request parse, reply formatting into a `Writer`),
    `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
@@ -129,7 +129,7 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
 **`src/ui/`** is pure and also host-compiled: `menu` (state machine, `UiInput` in, `UiAction` out, draws the open
 menu and the update's starting screen on the canvas, and drops every click and turn until the face has ticked),
 `actions` (what a `UiAction` does to the settings), `splash` (the version, centred, for 2 s after `setup()`),
-`screen_dim.h` (the contrast to hold: the BRIGHTNESS level, or 8 after 10 minutes with no control or voice), and
+`screen_dim.h` (the contrast to hold: the OLED BRIGHT level, or 8 after 10 minutes with no control or voice), and
 the runtime screens of `docs/specs/2026-10-24-oled-gui-design.md`: `gui` (which screen and
 dissolve step), `screens` (voice ribbon, knob readout, MUTED or BYPASS) and `face` (the 25 fps tick that draws them
 and dissolves between them).
@@ -142,7 +142,7 @@ and dissolves between them).
 2. Audio: `audio` (SAI, DMA, the audio IRQ, the engines and the published snapshot, fade and engine reset on a
    layout change, per-stage cycle counts, SAI and DMA error handling with the stream restart).
 3. Panel: `controls` (mux scan on ADC3, toggles), `adc_setup` (one ADC brought up once, for `controls` and
-   `power_sense`), `input` (encoder and click to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
+   `power_sense`), `input` (encoder, click and hold to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
 4. Display: `sh1106.c` (the SH1106 driver the bootloader compiles too) and `display_sh1106` (the bus from
    `pins.h`, boot starts with bus recovery, one page per loop pass under `PanelLink`).
 5. USB and protocol: `usb_link` (CDC gated on VBUS), `serial_link` (CDC bytes to JSON lines, reply writer, output

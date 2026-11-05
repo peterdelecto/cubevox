@@ -19,7 +19,8 @@
 // What the encoder did since the last pass.
 struct UiInput {
   int32_t detents = 0;  // signed turn steps
-  bool click = false;
+  bool click = false;   // the button went up after a press shorter than kMenuHoldMs
+  bool hold = false;    // the button has been down for kMenuHoldMs; sent once per press
 };
 
 // What the sketch must do after an update. The menu never edits settings itself.
@@ -59,7 +60,9 @@ using MenuFrame = std::array<std::array<char, kDisplayCols + 1>, kDisplayRows>;
 
 class Menu {
  public:
-  // Takes the encoder's input. Until listen() it drops every click and turn.
+  // Takes the encoder's input. Until listen() it drops every click, hold and turn. A hold closes the
+  // list the way EXIT does, opens the list when the menu is closed the way a click does, and does
+  // nothing on the other screens.
   UiAction update(const UiInput& in, uint32_t nowMs);
 
   // Lets input through. The face calls it on every tick, so a click or a turn during the boot splash,
@@ -98,6 +101,7 @@ class Menu {
   };
 
   UiAction onClick();
+  void onHold();
   void onTurn(int32_t detents);
 
   Mode mode_ = Mode::Idle;

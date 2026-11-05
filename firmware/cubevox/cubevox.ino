@@ -302,7 +302,7 @@ void loop() {
   mutePoll(nowMs, gSettings.topSwitch);
 
   const UiInput input = menuInput(nowMs);
-  if (input.detents != 0 || input.click) gDim.noteActivity(nowMs);
+  if (input.detents != 0 || input.click || input.hold) gDim.noteActivity(nowMs);
   const bool settingsChanged = applyAction(gMenu.update(input, nowMs), nowMs);
   saveSettings(settingsChanged, nowMs);
   recordPoll(nowMs);
