@@ -490,9 +490,9 @@ void checkRingModCard() {
 // curve with the default 2 s at noon, and MIX is a percent. Placing Autotune puts the card on its key.
 void checkStringsCard() {
   const CardDesc& d = cardDesc(Card::Strings);
-  check(std::strcmp(d.id, "strings") == 0 && std::strcmp(d.name, "Strings") == 0 && d.engine == Engine::Strings &&
+  check(std::strcmp(d.id, "strings") == 0 && std::strcmp(d.name, "Sympathetic") == 0 && d.engine == Engine::Strings &&
             d.group == Group::Reverb && d.knobCount == 2,
-        "strings: id strings, name Strings, its own engine, the reverb group");
+        "strings: id strings, name Sympathetic, its own engine, the reverb group");
   const KnobDesc& decay = *knobDesc(Card::Strings, 0);
   check(std::strcmp(decay.name, "DECAY") == 0 && std::strcmp(decay.unit, "ms") == 0 && decay.curve == Curve::Log &&
             decay.min == 500.0f && decay.max == 8000.0f && std::fabs(knobValue(decay, 0.5f) - 2000.0f) < 1.0f &&
@@ -654,9 +654,9 @@ void checkBloomCard() {
 // toggle keeps the pitch stage's ring and tracker running as the Crowd card's does.
 void checkGrowlCard() {
   const CardDesc& growl = cardDesc(Card::Growl);
-  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Growl") == 0 && growl.engine == Engine::Growl &&
+  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Throat") == 0 && growl.engine == Engine::Growl &&
             growl.group == Group::Pitch && growl.knobCount == 2,
-        "growl: id growl, name Growl, its own engine, the pitch group");
+        "growl: id growl, name Throat, its own engine, the pitch group");
   check(std::strcmp(knobDesc(Card::Growl, 0)->name, "GROWL") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->name, "MIX") == 0 &&
             knobSteps(Card::Growl, 0) == 0 && knobSteps(Card::Growl, 1) == 0 &&
             std::strcmp(knobDesc(Card::Growl, 0)->unit, "%") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->unit, "%") == 0,

@@ -14,10 +14,13 @@ struct GLFWwindow;
 
 namespace host {
 
-// What the user has set on the panel and on the source switch.
+// What the user has set on the panel and on the source switch. Every slot toggle starts off, so the
+// window opens with every effect bypassed.
 struct Panel {
   PanelInput input;
   bool useMic = false;
+
+  Panel() { input.toggle.fill(false); }
 };
 
 class Window {
