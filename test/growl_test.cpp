@@ -5,8 +5,12 @@
 // is pinned by hash, the peak reads +10 dB at 2.5 kHz at GROWL 100 %, the lopsided clip lifts the fold's 2nd
 // harmonic and leaves no DC, the jitter repeats from reset, the wet
 // path's high-pass cuts 55 Hz by 10.7 dB, the throat drop leaves the heard pitch within 0.1 st, and an onset
-// leaves the pitch ratio, rasp rate and read lag alone. Each run feeds a
-// PitchFx first, so the ring is written and the tracker runs, as the chain does. The clip rows skip
+// leaves the pitch ratio, rasp rate and read lag alone. The card grows what reaches its slot, so an Octave
+// at +12 st ahead of it leaves the raw voice's pitch (the octave-up voice dropped by pitchSt), a Formant ahead
+// moves the output's spectral centroid with SHIFT as Formant's own output does, and a Unison ahead is in the
+// wet. The Octave and Autotune latencies the card reads are measured, a stopped card clears its ring a slice
+// a block, and with Autotune ahead the heard pitch and the level stay where the card had them. Each run feeds a
+// PitchFx first, so the tracker runs, as the chain does. The clip rows skip
 // when samples/ is absent. No window, no audio device.
 
 #include <algorithm>
@@ -23,6 +27,7 @@
 #include <vector>
 
 #include "engine/growl.h"
+#include "engine/unison.h"
 
 #include "ringed_tracker.h"
 #include "signal_util.h"
@@ -38,22 +43,30 @@ bool report(const char* name, bool ok, const char* detail) {
   return ok;
 }
 
-// The chain's order for a Growl card that makes the pitch call: the pitch stage writes the ring and
-// feeds the tracker, then the card runs on the stage's output.
+// The chain's order for a Growl card that makes the pitch call: the pitch stage feeds the tracker and
+// shifts the voice as `stage` says, then the card runs on the stage's output. `heard` keeps the stage's
+// output, the card's input.
 struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
   std::unique_ptr<cv::Growl> growl = std::make_unique<cv::Growl>();
+  cv::PitchFxParams stage;
+  Signal heard;
+  std::vector<float> latency;  // the stage's outputLatency() after each block
 
   // in through the stage and the card, with the card's params from `at(sample)` per block.
   template <typename ParamsAt>
   Signal run(const Signal& in, ParamsAt at) {
     Signal out(in.size());
+    heard.assign(in.size(), 0.0f);
+    latency.clear();
     for (size_t i = 0; i < in.size(); i += cv::kBlock) {
       const int n = static_cast<int>(in.size() - i < cv::kBlock ? in.size() - i : cv::kBlock);
       const cv::GrowlParams g = at(i);
-      cv::PitchFxParams pp;
+      cv::PitchFxParams pp = stage;
       pp.growlOn = g.on;
       pitch->process(&in[i], &out[i], n, pp);
+      std::copy(&out[i], &out[i] + n, &heard[i]);
+      latency.push_back(pitch->outputLatency());
       growl->process(&out[i], &out[i], n, g, *pitch);
     }
     return out;
@@ -463,10 +476,12 @@ uint64_t hashOf(const Signal& x) {
   return h;
 }
 
-constexpr uint64_t kFullMixHash = 0xb8eb247856ccb92bull;
+constexpr uint64_t kFullMixHash = 0x93b01d5392e7a07eull;
 
 // MIX at its default 100 % is the plain card. The hash is the output on a sung note at GROWL 0.80 and
-// DRIVE 0.65, and it moves with any change to the voice, the rasp or the fold.
+// DRIVE 0.65, and it moves with any change to the voice, the rasp or the fold. It also moves with the
+// ring's length, which sets how the grains' read positions round (the output differs by -88 dB of the
+// signal between a ring of 3,852 samples and one of 12,756).
 bool checkFullMix() {
   const Signal in = sungNote(220.0, 2.0, -20.0);
   Rig rig;
@@ -477,13 +492,14 @@ bool checkFullMix() {
   return report("MIX 100 % is the plain card", h == kFullMixHash, detail);
 }
 
-// MIX 0 is the card's input delayed by the voice's lag. A mirror ring of the input is read at the
+// MIX 0 is the card's input delayed by the voice's lag. A mirror of the card's ring is read at the
 // delay the card reports, over every block where that delay held still, and the delay itself must be the
-// one the voice plays at (the grain delay plus a period, clamped as the voice clamps it).
+// one the voice plays at (with nothing ahead of the card, the grain delay plus a period, clamped as the
+// voice clamps it).
 bool checkMixZero() {
   const Signal in = sungNote(220.0, 2.0, -20.0);
   Rig rig;
-  std::vector<float> mirror(static_cast<size_t>(cv::kVoiceRingLen), 0.0f);
+  std::vector<float> mirror(static_cast<size_t>(cv::growl_detail::kRingLen), 0.0f);
   Signal out(in.size());
   double worst = 0.0;
   size_t compared = 0, blocks = 0;
@@ -504,12 +520,12 @@ bool checkMixZero() {
     ++blocks;
     if (i < static_cast<size_t>(kRate) || !lagHeld || rig.growl->wet() != 1.0f) continue;
     for (size_t j = 0; j < static_cast<size_t>(cv::kBlock); ++j) {
-      const float want = cv::readRing<cv::kVoiceRingLen>(mirror.data(), static_cast<int>((i + j) % mirror.size()), lag);
+      const float want = cv::readRing<cv::growl_detail::kRingLen>(mirror.data(), static_cast<int>((i + j) % mirror.size()), lag);
       worst = std::fmax(worst, std::fabs(static_cast<double>(out[i + j] - want)));
       ++compared;
     }
   }
-  const float voiceLag = cv::formant_detail::clampLag(
+  const float voiceLag = cv::formant_detail::clampLag<cv::growl_detail::kRingLen>(
       static_cast<float>(cv::PsolaVoice::kGrainDelay) + cv::PitchTracker::clampPeriod(period), period);
   char detail[128];
   std::snprintf(detail, sizeof detail, "%zu samples in %zu blocks differ by %.2e (1e-6); lag %.2f vs the voice's %.2f", compared,
@@ -523,7 +539,7 @@ bool checkMixZero() {
 // sits at rest there, so pulse anchoring shifts nothing.
 bool checkGrowlZero() {
   const Signal in = sungNote(220.0, 2.0, -20.0);
-  constexpr uint64_t kWant[] = {0xbc877d0f48b1cd47ull, 0x9e6a7d074016ad4eull, 0x29a92437402dfa30ull};
+  constexpr uint64_t kWant[] = {0xf5892faad19f3526ull, 0x3c9227a8ea073bd7ull, 0x2c0b07b7e38985e3ull};
   const float mixes[] = {1.0f, 0.5f, 0.0f};
   bool same = true;
   float jitter = 1.0f;
@@ -829,6 +845,424 @@ bool checkOnsetHolds() {
   return report("onset holds pitch and lag", ok, detail);
 }
 
+// The tracker's mean pitch over the voiced frames of x from sample `from`, in Hz; 0 with none.
+double trackedHz(const Signal& x, size_t from) {
+  RingedTracker t;
+  double sum = 0.0;
+  int frames = 0;
+  for (size_t i = 0; i + cv::kBlock <= x.size(); i += cv::kBlock) {
+    t.push(&x[i], cv::kBlock);
+    if (i >= from && t.result().voiced && !t.result().clamped) {
+      sum += t.result().hz;
+      ++frames;
+    }
+  }
+  return frames > 0 ? sum / frames : 0.0;
+}
+
+// Octave at +12 st and MIX 100 % ahead of the card. The card's input is the octave-up voice and the card
+// drops it by pitchSt, so the output sings the raw voice's pitch. A card that cut its grains from the raw
+// voice would read 110 Hz here, the raw voice dropped.
+bool checkOctaveAhead() {
+  const Signal in = sungNote(220.0, 2.5, -20.0);
+  Rig rig;
+  rig.stage.octave.on = true;
+  rig.stage.octave.semitones = 12;
+  rig.stage.octave.mix = 1.0f;
+  const Signal out = rig.run(in, growlAt(0.0f, 0.0f));
+  const double stageHz = trackedHz(rig.heard, static_cast<size_t>(kRate));
+  const double outHz = trackedHz(out, static_cast<size_t>(kRate));
+  const double stageCents = 1200.0 * std::log2(stageHz / 440.0);
+  const double outCents = 1200.0 * std::log2(outHz / 220.0);
+  char detail[160];
+  std::snprintf(detail, sizeof detail, "stage %.1f Hz (%+.0f cents from 440), output %.1f Hz (%+.0f cents from the raw 220; the raw voice dropped is 110)",
+                stageHz, stageCents, outHz, outCents);
+  return report("octave ahead", stageHz > 0.0 && outHz > 0.0 && std::fabs(stageCents) < 35.0 && std::fabs(outCents) < 35.0, detail);
+}
+
+// A held vowel at `hz`: harmonics shaped by three resonances at 700, 1200 and 2600 Hz, so a formant shift
+// moves the spectral centroid.
+Signal vowel(double hz, double seconds, double dbfs) {
+  const size_t n = static_cast<size_t>(seconds * kRate);
+  const double centre[3] = {700.0, 1200.0, 2600.0};
+  const double width[3] = {120.0, 160.0, 300.0};
+  Signal x(n, 0.0f);
+  double sum = 0.0;
+  for (int k = 1; k * hz < 6000.0; ++k) {
+    double a = 0.02;
+    for (int f = 0; f < 3; ++f) {
+      const double d = (k * hz - centre[f]) / width[f];
+      a += 1.0 / (1.0 + d * d);
+    }
+    for (size_t i = 0; i < n; ++i) x[i] += static_cast<float>(a * std::sin(2.0 * kPi * k * hz * static_cast<double>(i) / kRate));
+  }
+  for (const float v : x) sum += static_cast<double>(v) * v;
+  const double g = std::pow(10.0, dbfs / 20.0) / std::sqrt(sum / static_cast<double>(n));
+  for (float& v : x) v = static_cast<float>(v * g);
+  return x;
+}
+
+// The power-weighted mean frequency of x over [from, to) up to 8 kHz.
+double centroidHz(const Signal& x, size_t from, size_t to) {
+  constexpr size_t kSize = 4096;
+  const std::vector<double> p = testutil::spectrum(x, from, to, kSize);
+  double num = 0.0, den = 0.0;
+  for (size_t k = 1; k < p.size(); ++k) {
+    const double hz = static_cast<double>(k) * kRate / kSize;
+    if (hz > 8000.0) break;
+    num += hz * p[k];
+    den += p[k];
+  }
+  return den > 0.0 ? num / den : 0.0;
+}
+
+// Formant ahead of the card at SHIFT -5 and +5 st, MIX 100 %. Formant's own output moves its centroid by a
+// ratio; the card's output follows with at least half that move in log terms. A card that cut its grains
+// from the raw voice would hold the ratio at 1 (the throat is the same at both).
+bool checkFormantAhead() {
+  const Signal in = vowel(165.0, 2.5, -20.0);
+  struct Centroids {
+    double stage;
+    double out;
+  };
+  const auto at = [&in](int shift) {
+    Rig rig;
+    rig.stage.formant.on = true;
+    rig.stage.formant.shiftSt = shift;
+    rig.stage.formant.mix = 1.0f;
+    const Signal out = rig.run(in, growlAt(0.0f, 0.0f));
+    const size_t from = static_cast<size_t>(kRate), to = out.size();
+    return Centroids{centroidHz(rig.heard, from, to), centroidHz(out, from, to)};
+  };
+  const Centroids lo = at(-5);
+  const Centroids hi = at(5);
+  const double stageMove = std::log2(hi.stage / lo.stage);
+  const double outMove = std::log2(hi.out / lo.out);
+  char detail[176];
+  std::snprintf(detail, sizeof detail, "centroid %.0f -> %.0f Hz in Formant's output (%+.2f oct), %.0f -> %.0f Hz in the card's (%+.2f oct, >= half)",
+                lo.stage, hi.stage, stageMove, lo.out, hi.out, outMove);
+  return report("formant ahead", stageMove > 0.1 && outMove >= 0.5 * stageMove, detail);
+}
+
+// Unison between the pitch stage and the card, DEPTH 100 %. The copies are in the card's input, so the
+// output differs from the same run without Unison by more than the floor. A card that cut its grains from
+// the pitch stage's ring would give the same output either way.
+Signal runUnisonAhead(const Signal& in, bool unisonOn) {
+  auto pitch = std::make_unique<cv::PitchFx>();
+  auto unison = std::make_unique<cv::Unison>();
+  auto growl = std::make_unique<cv::Growl>();
+  cv::UnisonParams up;
+  up.on = unisonOn;
+  up.depth = 1.0f;
+  const cv::GrowlParams g = growlAt(0.0f, 0.0f);
+  Signal out(in.size());
+  for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
+    cv::PitchFxParams pp;
+    pp.growlOn = true;
+    pitch->process(&in[i], &out[i], cv::kBlock, pp);
+    if (unisonOn) unison->process(&out[i], &out[i], cv::kBlock, up);
+    growl->process(&out[i], &out[i], cv::kBlock, g, *pitch);
+  }
+  return out;
+}
+
+bool checkUnisonAhead() {
+  constexpr double kFloor = 0.2;  // relative RMS of the difference
+  const Signal in = sungNote(220.0, 2.5, -20.0);
+  const Signal with = runUnisonAhead(in, true);
+  const Signal without = runUnisonAhead(in, false);
+  double d = 0.0, e = 0.0;
+  for (size_t i = static_cast<size_t>(kRate); i < in.size(); ++i) {
+    const double x = static_cast<double>(with[i]) - without[i];
+    d += x * x;
+    e += static_cast<double>(without[i]) * without[i];
+  }
+  const double rel = std::sqrt(d / e);
+  char detail[96];
+  std::snprintf(detail, sizeof detail, "output differs from the run without Unison by %.2f of its RMS (> %.2f)", rel, kFloor);
+  return report("unison ahead", rel > kFloor, detail);
+}
+
+// A glottal-like pulse train at `hz`: a short damped burst per period, each at its own random level
+// within 1 +- spread, so a cross-correlation of the train with its delayed copy has one peak.
+Signal pulseTrain(double hz, double seconds, double dbfs, double spread = 0.4) {
+  const size_t n = static_cast<size_t>(seconds * kRate);
+  const double period = kRate / hz;
+  Signal x(n, 0.0f);
+  uint32_t r = 0x1234567u;
+  double sum = 0.0;
+  for (double at = 100.0; at + 80.0 < static_cast<double>(n); at += period) {
+    r = r * 1664525u + 1013904223u;
+    const double level = 1.0 - spread + 2.0 * spread * static_cast<double>(r >> 8) / 16777216.0;
+    const size_t start = static_cast<size_t>(at);
+    for (size_t t = 0; t < 120; ++t) {
+      const double tt = static_cast<double>(t) - (at - static_cast<double>(start));
+      if (tt < 0.0) continue;
+      const double v = level * std::exp(-tt / 25.0) * std::sin(2.0 * kPi * tt / 60.0);
+      x[start + t] += static_cast<float>(v);
+    }
+  }
+  for (const float v : x) sum += static_cast<double>(v) * v;
+  const double g = std::pow(10.0, dbfs / 20.0) / std::sqrt(sum / static_cast<double>(n));
+  for (float& v : x) v = static_cast<float>(v * g);
+  return x;
+}
+
+// The delay of b behind a in samples, by the peak of their cross-correlation over lags [lo, hi] on the
+// samples [from, to).
+long delayOf(const Signal& a, const Signal& b, size_t from, size_t to, long lo, long hi) {
+  long best = lo;
+  double top = -1e300;
+  for (long lag = lo; lag <= hi; ++lag) {
+    double s = 0.0;
+    for (size_t i = from; i < to; ++i) s += static_cast<double>(a[i]) * b[i + static_cast<size_t>(lag)];
+    if (s > top) {
+      top = s;
+      best = lag;
+    }
+  }
+  return best;
+}
+
+// The delays the card reads off the pitch stage, against the stage measured. Autotune: a pulse train
+// at 220 Hz (in tune) comes out of the stage `outputLatency()` samples late, within the half period its
+// grain grid moves it by. Octave at +12 st and MIX 100 %: isolated impulses come out with their energy
+// centred `outputLatency()` samples late, on average over the phases of Octave's sawtooth.
+bool checkStageLatency() {
+  const Signal train = pulseTrain(220.0, 2.5, -20.0);
+  Rig tuned;
+  tuned.stage.autotune.on = true;
+  tuned.run(train, growlAt(0.0f, 0.0f));
+  const long autotuneLag = delayOf(train, tuned.heard, static_cast<size_t>(kRate), static_cast<size_t>(kRate) * 3 / 2, 800, 2200);
+  std::vector<float> window(tuned.latency.begin() + kRate / cv::kBlock, tuned.latency.begin() + kRate * 3 / 2 / cv::kBlock);
+  std::sort(window.begin(), window.end());
+  const float autotuneWant = window[window.size() / 2];
+
+  Signal clicks(static_cast<size_t>(6 * kRate), 0.0f);
+  std::vector<size_t> at;
+  for (size_t t = 4000; t + 4000 < clicks.size(); t += 8123) {
+    clicks[t] = 0.5f;
+    at.push_back(t);
+  }
+  Rig oct;
+  oct.stage.octave.on = true;
+  oct.stage.octave.semitones = 12;
+  oct.stage.octave.mix = 1.0f;
+  oct.run(clicks, growlAt(0.0f, 0.0f));
+  double centroid = 0.0;
+  for (const size_t t : at) {
+    double num = 0.0, den = 0.0;
+    for (size_t i = t; i < t + 2100; ++i) {
+      const double e = static_cast<double>(oct.heard[i]) * oct.heard[i];
+      num += e * static_cast<double>(i - t);
+      den += e;
+    }
+    centroid += den > 0.0 ? num / den : 0.0;
+  }
+  centroid /= static_cast<double>(at.size());
+  const float octaveWant = oct.pitch->outputLatency();
+
+  char detail[200];
+  std::snprintf(detail, sizeof detail, "Autotune: measured %ld samples, stage says %.1f; Octave +12: measured %.0f, stage says %.1f", autotuneLag,
+                static_cast<double>(autotuneWant), centroid, static_cast<double>(octaveWant));
+  // Autotune's grains read a half period either side of the mean, depending on where its grid sits.
+  const double autotuneSlack = 0.5 * (static_cast<double>(autotuneWant) - cv::PsolaVoice::kGrainDelay) + 20.0;
+  return report("stage latency", std::fabs(static_cast<double>(autotuneLag) - autotuneWant) < autotuneSlack &&
+                                     std::fabs(centroid - octaveWant) < 150.0,
+                detail);
+}
+
+// The output stays finite and bounded with the pitch stage at its corners ahead of the card: Octave down and up
+// at MIX 100 %, at the 50 % where the period it carries changes, and just under it, then all three stages
+// on, and an Octave MIX that crosses 50 % every five blocks. Calls of any length, from one sample to more than
+// the ring holds, give the same.
+bool checkStagesFinite(const std::vector<Signal>& voices) {
+  std::vector<Signal> inputs = voices;
+  inputs.push_back(sungNote(180.0, 2.0, -18.0));
+  struct Config {
+    bool octave;
+    int semis;
+    float octaveMix;
+    bool tuned;
+    bool formant;
+  };
+  const Config configs[] = {{true, -12, 1.0f, false, false}, {true, 12, 0.5f, false, false}, {true, 7, 0.49f, false, false},
+                            {true, 12, 1.0f, true, true}};
+  size_t bad = 0;
+  float peak = 0.0f;
+  for (const Signal& in : inputs) {
+    for (const Config& c : configs) {
+      for (const float pot : {0.0f, 1.0f}) {
+        for (const float mix : {0.0f, 0.5f, 1.0f}) {
+          Rig rig;
+          rig.stage.octave.on = c.octave;
+          rig.stage.octave.semitones = c.semis;
+          rig.stage.octave.mix = c.octaveMix;
+          rig.stage.autotune.on = c.tuned;
+          rig.stage.formant.on = c.formant;
+          rig.stage.formant.shiftSt = -4;
+          for (const float v : rig.run(in, potAt(pot, mix))) {
+            bad += std::isfinite(v) ? 0 : 1;
+            peak = std::fmax(peak, std::fabs(v));
+          }
+        }
+      }
+    }
+    Rig flip;
+    flip.stage.octave.on = true;
+    flip.stage.octave.semitones = 12;
+    Signal out(in.size());
+    for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
+      cv::PitchFxParams pp = flip.stage;
+      pp.growlOn = true;
+      pp.octave.mix = (i / cv::kBlock / 5) % 2 == 0 ? 0.4f : 0.6f;
+      flip.pitch->process(&in[i], &out[i], cv::kBlock, pp);
+      flip.growl->process(&out[i], &out[i], cv::kBlock, potAt(1.0f, 0.5f), *flip.pitch);
+    }
+    for (const float v : out) {
+      bad += std::isfinite(v) ? 0 : 1;
+      peak = std::fmax(peak, std::fabs(v));
+    }
+  }
+  const Signal note = sungNote(180.0, 1.5, -18.0);
+  for (const size_t n : {size_t{1}, size_t{17}, size_t{200}, size_t{4000}}) {
+    auto pitch = std::make_unique<cv::PitchFx>();
+    auto growl = std::make_unique<cv::Growl>();
+    cv::PitchFxParams pp;
+    pp.growlOn = true;
+    pp.octave.on = true;
+    pp.octave.semitones = 12;
+    pp.octave.mix = 1.0f;
+    Signal out(note.size());
+    for (size_t i = 0; i < note.size(); i += n) {
+      const int m = static_cast<int>(std::min(n, note.size() - i));
+      pitch->process(&note[i], &out[i], m, pp);
+      growl->process(&out[i], &out[i], m, potAt(1.0f, 0.5f), *pitch);
+    }
+    for (const float v : out) {
+      bad += std::isfinite(v) ? 0 : 1;
+      peak = std::fmax(peak, std::fabs(v));
+    }
+  }
+  char detail[128];
+  std::snprintf(detail, sizeof detail, "%zu inputs, 4 stage settings and a flipping Octave MIX, 4 call lengths: %zu samples not finite (0), peak %.2f (< 8)",
+                inputs.size(), bad, static_cast<double>(peak));
+  return report("finite behind the stages", bad == 0 && peak < 8.0f, detail);
+}
+
+// A stopped card clears its ring a slice a call (1 KB at most), and the reset at its switch-on then finds
+// the ring clear and clears nothing. A reset with no rest before it clears the whole ring.
+bool checkRingRest() {
+  const Signal in = sungNote(220.0, 1.0, -20.0);
+  Rig rig;
+  rig.run(in, growlAt(0.5f, 0.5f));
+  const bool dirty = !rig.growl->ringIsZero() && rig.growl->ringClearedTo() == 0;
+  int calls = 0, worstStep = 0;
+  while (rig.growl->ringClearedTo() < cv::growl_detail::kRingLen && calls < 100) {
+    const int before = rig.growl->ringClearedTo();
+    rig.growl->rest();
+    worstStep = std::max(worstStep, rig.growl->ringClearedTo() - before);
+    ++calls;
+  }
+  const bool restClear = rig.growl->ringIsZero();
+  rig.growl->reset();
+  const bool resetClear = rig.growl->ringIsZero() && rig.growl->ringClearedTo() == cv::growl_detail::kRingLen;
+
+  Rig quick;
+  quick.run(in, growlAt(0.5f, 0.5f));
+  quick.growl->rest();
+  quick.growl->reset();
+  const bool quickClear = quick.growl->ringIsZero();
+  const int want = (cv::growl_detail::kRingLen + cv::growl_detail::kRestClearFloats - 1) / cv::growl_detail::kRestClearFloats;
+  char detail[160];
+  std::snprintf(detail, sizeof detail, "ring %d floats (%d B): clear after %d calls (%d), at most %d B a call (1024), reset after a short rest clears it: %s",
+                cv::growl_detail::kRingLen, cv::growl_detail::kRingLen * 4, calls, want, worstStep * 4, quickClear ? "yes" : "no");
+  return report("ring rest", dirty && restClear && resetClear && quickClear && calls == want && worstStep * 4 <= 1024, detail);
+}
+
+// The default chain: Autotune ahead of the card. On a 190 Hz note, a quarter tone flat of the nearest scale
+// note, the output sings half the corrected pitch, and on Adam's clips at GROWL 75 % and MIX 100 % the mean
+// level against the card's input lands 0 to +0.5 dB.
+bool checkAutotuneAhead(const std::vector<Signal>& voices, bool whole) {
+  const Signal in = sungNote(190.0, 2.5, -20.0);
+  Rig rig;
+  rig.stage.autotune.on = true;
+  const Signal out = rig.run(in, growlAt(0.0f, 0.0f));
+  const double stageHz = trackedHz(rig.heard, static_cast<size_t>(kRate));
+  const double outHz = trackedHz(out, static_cast<size_t>(kRate));
+  const double cents = 1200.0 * std::log2(outHz / (0.5 * stageHz));
+  double sum = 0.0;
+  for (const Signal& clip : voices) {
+    Rig r;
+    r.stage.autotune.on = true;
+    const Signal o = r.run(clip, potAt(cv::kGrowlDefaultPot, 1.0f));
+    sum += 20.0 * std::log10(rms(o, kPad, o.size()) / rms(r.heard, kPad, r.heard.size()));
+  }
+  const double level = voices.empty() ? 0.0 : sum / static_cast<double>(voices.size());
+  char detail[160];
+  std::snprintf(detail, sizeof detail, "corrected %.1f Hz, output %.1f Hz (%+.0f cents from half, 35); level %+.2f dB (0 to +0.5)%s",
+                stageHz, outHz, cents, level, voices.empty() ? " SKIP" : "");
+  const bool levelOk = voices.empty() || (whole && level >= 0.0 && level <= 0.5);
+  return report("autotune ahead", stageHz > 0.0 && outHz > 0.0 && std::fabs(cents) < 35.0 && levelOk, detail);
+}
+
+// The loudest samples of x over [from, to): local maxima of |x| above `thresh` of the region's peak, the
+// larger of any two closer than minDist kept.
+std::vector<long> pulsesOf(const Signal& x, size_t from, size_t to, long minDist, float thresh) {
+  float top = 0.0f;
+  for (size_t i = from; i < to; ++i) top = std::fmax(top, std::fabs(x[i]));
+  std::vector<long> found;
+  for (size_t i = from + 1; i + 1 < to; ++i) {
+    const float a = std::fabs(x[i]);
+    if (a < thresh * top || a < std::fabs(x[i - 1]) || a <= std::fabs(x[i + 1])) continue;
+    const long at = static_cast<long>(i);
+    if (!found.empty() && at - found.back() < minDist) {
+      if (a > std::fabs(x[static_cast<size_t>(found.back())])) found.back() = at;
+      continue;
+    }
+    found.push_back(at);
+  }
+  return found;
+}
+
+// Octave at +12 st and MIX 100 % ahead, the card at GROWL 0 and DRIVE 0 on a pulse train. Each output pulse is
+// traced back to the card's input: it sits the card's read lag plus a stretch of up to two input periods
+// behind the input pulse its grain was cut from (a grain reads from a period past the lag, and the throat
+// stretches it). The stretch, its mean and spread over the second half of the note, is logged. The grains
+// land on the input's pulses when it holds still; a grid at the wrong period walks it round the period.
+bool checkOctavePulses() {
+  const Signal in = pulseTrain(220.0, 3.0, -20.0, 0.0);
+  Rig rig;
+  rig.stage.octave.on = true;
+  rig.stage.octave.semitones = 12;
+  rig.stage.octave.mix = 1.0f;
+  const Signal out = rig.run(in, growlAt(0.0f, 0.0f));
+  const float lag = rig.growl->dryLagSamples();
+  const size_t from = static_cast<size_t>(kRate) * 3 / 2, to = in.size() - 3000;
+  const std::vector<long> src = pulsesOf(rig.heard, from - 4000, to, 70, 0.3f);
+  const std::vector<long> got = pulsesOf(out, from, to, 160, 0.3f);
+  std::vector<double> off;
+  for (const long o : got) {
+    const double want = static_cast<double>(o) - static_cast<double>(lag);
+    long near = -1;
+    for (const long s : src) {
+      if (static_cast<double>(s) <= want) near = s;
+    }
+    if (near >= 0) off.push_back(want - static_cast<double>(near));
+  }
+  double mean = 0.0, spread = 0.0;
+  for (const double v : off) mean += v;
+  mean = off.empty() ? 0.0 : mean / static_cast<double>(off.size());
+  for (const double v : off) spread += (v - mean) * (v - mean);
+  spread = off.empty() ? 0.0 : std::sqrt(spread / static_cast<double>(off.size()));
+  const double period = kRate / 440.0;
+  char detail[200];
+  std::snprintf(detail, sizeof detail,
+                "%zu output pulses on %zu input pulses, read lag %.1f: offset %.1f samples (0 to %.0f), spread %.1f (< %.0f)",
+                got.size(), src.size(), static_cast<double>(lag), mean, 2.0 * period, spread, 0.3 * period);
+  return report("octave pulses", off.size() > 50 && mean >= 0.0 && mean <= 2.0 * period && spread < 0.3 * period, detail);
+}
+
 }  // namespace
 
 int main() {
@@ -854,6 +1288,14 @@ int main() {
   ok &= checkBias();
   ok &= checkJitter();
   ok &= checkOnsetHolds();
+  ok &= checkOctaveAhead();
+  ok &= checkFormantAhead();
+  ok &= checkUnisonAhead();
+  ok &= checkStageLatency();
+  ok &= checkOctavePulses();
+  ok &= checkAutotuneAhead(voices, whole);
+  ok &= checkStagesFinite(voices);
+  ok &= checkRingRest();
   std::printf("%s growl\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

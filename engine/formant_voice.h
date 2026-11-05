@@ -10,9 +10,10 @@
 #include "engine/pitch.h"
 #include "engine/psola.h"
 
-// The grain voice that the Mob card's copies and the Formant card share. It reads the pitch stage's
-// input ring and cuts grains on the tracker's period grid, with a pitch ratio and a grain playback
-// rate of its own. The owner of the ring, the tracker and the mix (PitchFx, Crowd) drives it.
+// The grain voice that the Mob card's copies, the Formant card and the Growl card share. It reads a ring
+// of its owner's and cuts grains on a period grid, with a pitch ratio and a grain playback rate of its
+// own. The owner of the ring, the period and the mix (PitchFx, Crowd, Growl) drives it. The ring's length
+// is a template argument, the pitch stage's ring by default.
 
 namespace cv {
 namespace formant_detail {
@@ -36,10 +37,13 @@ constexpr int kMaxMarkSteps = 128;
 
 static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for a read delay");
 
-// Clamps a lag to what the voice can play at this pitch period.
+// Clamps a lag to what a voice on a ring of RingLen samples can play at this pitch period.
+template <int RingLen = kVoiceRingLen>
 inline float clampLag(float lag, float period) {
+  static_assert(static_cast<float>(RingLen - kCrowdGrainReach) > kFloorPeriods * kMaxPeriod + kFloorPad,
+                "no room for a read delay");
   const float p = PitchTracker::clampPeriod(period);
-  return clampf(lag, kFloorPeriods * p + kFloorPad, kDelayCeil);
+  return clampf(lag, kFloorPeriods * p + kFloorPad, static_cast<float>(RingLen - kCrowdGrainReach));
 }
 
 // The grain window, 1 - cos(2 pi k / 1024) for k in 0..1024, made at compile time as
@@ -83,8 +87,11 @@ inline constexpr HannTable kHannTable = makeHannTable();
 // apart and laid down p / ratio apart. A grain plays its input at `rate` samples per output
 // sample, so its spectrum moves by `rate` while the pitch follows `ratio`. The read position
 // advances by rate per sample and the grain lasts 2p / rate, so it always covers 2p of input.
-class FormantPsolaVoice {
+template <int RingLen = kVoiceRingLen>
+class FormantPsolaVoiceT {
  public:
+  using Ring = std::array<float, static_cast<size_t>(RingLen)>;
+
   // About 2 * ratio / rate grains overlap. Eight cover every ratio and rate the tuning and
   // Autotune's pull reach.
   static constexpr size_t kMaxGrains = 8;
@@ -170,7 +177,7 @@ class FormantPsolaVoice {
   // start does what a clamp on every sample would. zeroBefore is how many samples just ahead of the
   // block the ring holds as exact zeros, if the caller knows. A grain whose reads all fall inside
   // that run would add exact zeros, so it skips its taps and moves on as if it had played.
-  void render(const VoiceRing& ring, int first, int n, float* out, int zeroBefore = 0) {
+  void render(const Ring& ring, int first, int n, float* out, int zeroBefore = 0) {
     if (!voiced_) return;
     ring_ = ring.data();
     for (size_t k = 0; k < count_; ++k) grains_[k].start = 0;
@@ -185,7 +192,7 @@ class FormantPsolaVoice {
       stepMarks(k);
       countdown_ -= static_cast<float>(k);
       i += k;
-      const int head = wrapOnce<kVoiceRingLen>(first + i - 1);
+      const int head = wrapOnce<RingLen>(first + i - 1);
       if (count_ == 0) prefill(head, -countdown_, i - 1);
       launch(head, -countdown_, i - 1);
       countdown_ += outPeriod_;
@@ -202,11 +209,12 @@ class FormantPsolaVoice {
   // The ring length shifted up must stay inside an int.
   static constexpr int kFracBits = 16;
   static constexpr int kFracMask = (1 << kFracBits) - 1;
-  static constexpr int kRingFix = kVoiceRingLen << kFracBits;
-  static constexpr int kLastFix = (kVoiceRingLen - 1) << kFracBits;  // a read here pairs the last sample with the first
+  static constexpr int kRingFix = RingLen << kFracBits;
+  static constexpr int kLastFix = (RingLen - 1) << kFracBits;  // a read here pairs the last sample with the first
+  static constexpr float kMaxDelay = static_cast<float>(RingLen) - 4.0f;  // the furthest back a launch may read
   static constexpr float kFracScale = 1.0f / static_cast<float>(1 << kFracBits);
 
-  static_assert(kVoiceRingLen < (1 << (31 - kFracBits)) - 4, "ring index overflows the fixed-point position");
+  static_assert(RingLen < (1 << (31 - kFracBits)) - 4, "ring index overflows the fixed-point position");
 
   struct Grain {
     uint32_t turn = 0;      // window phase, a full turn over the grain
@@ -283,7 +291,7 @@ class FormantPsolaVoice {
   void setReadSpan(int n) {
     const float written = static_cast<float>(n > kBlock ? n : kBlock);
     lo_ = kMinReadDelay + (drift_ < 0.0f ? -drift_ : 0.0f);
-    hi_ = kMaxReadDelay - written - (drift_ > 0.0f ? drift_ : 0.0f);
+    hi_ = kMaxDelay - written - (drift_ > 0.0f ? drift_ : 0.0f);
   }
 
   // lead is how far past the ideal launch instant this tick already is. The grain starts one
@@ -309,7 +317,7 @@ class FormantPsolaVoice {
     float loudest = -1.0f;
     int pulse = mid;
     for (int d = -half; d <= half; ++d) {
-      const float a = fabsf(ring_[wrapOnce<kVoiceRingLen>(head - mid - d)]);
+      const float a = fabsf(ring_[wrapOnce<RingLen>(head - mid - d)]);
       if (a > loudest) {
         loudest = a;
         pulse = mid + d;
@@ -334,7 +342,7 @@ class FormantPsolaVoice {
     const float pos = static_cast<float>(head) - delay;
     const float fl = floorf(pos);
     Grain& g = nextSlot();
-    g.pos = (wrapOnce<kVoiceRingLen>(static_cast<int>(fl)) << kFracBits) +
+    g.pos = (wrapOnce<RingLen>(static_cast<int>(fl)) << kFracBits) +
             static_cast<int>((pos - fl) * static_cast<float>(1 << kFracBits));
     g.step = step_;
     g.age = age;
@@ -371,9 +379,9 @@ class FormantPsolaVoice {
   // sample, so its ends bound it; the bounds leave a sample either side for the interpolation.
   bool readsZeros(const Grain& g, int m, int n, int first, int zeroBefore) const {
     int head = first + g.start;
-    if (head >= kVoiceRingLen) head -= kVoiceRingLen;
+    if (head >= RingLen) head -= RingLen;
     int delay = head - (g.pos >> kFracBits);
-    if (delay < 0) delay += kVoiceRingLen;
+    if (delay < 0) delay += RingLen;
     const float drift = static_cast<float>(m - 1) * (1.0f - static_cast<float>(g.step) * (1.0f / static_cast<float>(1 << kFracBits)));
     const float newest = static_cast<float>(delay - 1) + (drift < 0.0f ? drift : 0.0f);
     const float oldest = static_cast<float>(delay) + (drift > 0.0f ? drift : 0.0f);
@@ -406,7 +414,7 @@ class FormantPsolaVoice {
       }
       if (c.pos >= kRingFix) c.pos -= kRingFix;
       if (j < m && c.pos >= kLastFix) {
-        o[j++] += c.tap(ring, kVoiceRingLen - 1, 0);
+        o[j++] += c.tap(ring, RingLen - 1, 0);
         if (c.pos >= kRingFix) c.pos -= kRingFix;
       }
     }
@@ -443,6 +451,9 @@ class FormantPsolaVoice {
   float anchorRate_ = 0.0f;       // the rest playback rate pulse anchoring holds pulses at, 0 for off
   const float* ring_ = nullptr;   // the ring the last render read
 };
+
+// The voice on the pitch stage's input ring, which the Mob card's copies and the Formant card read.
+using FormantPsolaVoice = FormantPsolaVoiceT<>;
 
 }  // namespace formant_detail
 }  // namespace cv

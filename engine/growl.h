@@ -22,17 +22,32 @@
 // The panel has two pots. The upper pot is GROWL. It sets the engine's rasp `growl` to kGrowlRaspTop times
 // the pot and its fold `drive` to kGrowlDriveTop times the pot, a straight line each. The lower pot is MIX.
 //
-// 1. The drop. A grain voice cut from the pitch stage's input ring on the tracker's period grid plays
-//    the voice at a pitch ratio of 2^(pitchSt / 12) and a grain playback rate of 2^(throatSt / 12),
-//    an octave down with the throat 5 st down at rest. It follows Autotune's correction and reads at
-//    Autotune's lag, where the tracker's frame lines up with the audio.
+// 1. The drop. A grain voice cut from the card's own ring of its input plays the voice at a pitch ratio
+//    of 2^(pitchSt / 12) and a grain playback rate of 2^(throatSt / 12), an octave down with the throat
+//    5 st down at rest. The ring holds what reaches the slot, so Autotune, Octave, Formant, Unison, Echo
+//    and any other stage ahead of the card are in the growl, at every MIX.
+//
+//    The grains sit on a period grid whose period is the one the slot's input carries. That is the
+//    tracker's period divided by 2^(shift / 12), where the shift (`PitchFx::outputShiftSemis`) is
+//    Autotune's correction. While the Octave voice holds at least half the pitch stage's output power
+//    (its MIX at 50 % or over), the shift is the voice's glided interval instead, SEMITONES plus the
+//    correction. A SEMITONES move follows Octave's own 15 ms glide, and the shift steps when MIX crosses
+//    50 %. Formant moves no pitch, and the Unison and Echo copies sit at the voice's pitch, so none of
+//    them changes the shift.
+//
+//    The voice reads the ring at a lag that puts its read point where the tracker's frame stands. That
+//    is the grain delay plus a period behind the pitch stage's input, less the delay the stage already put
+//    on the audio (`PitchFx::outputLatency`). Autotune and Formant delay it by the grain delay plus a
+//    period, and Octave by half its grain window. The lag never drops under the voice's floor of 1.5
+//    periods and a pad, which a grain centred on a mark needs ahead of its read. With nothing ahead the
+//    lag is the grain delay plus a period, and with Autotune ahead it is the floor.
 //
 //    The throat moves with each syllable. The syllable sweep (`syllable_sweep.h`, Yawn's law) reads the
 //    card's input, and throatSt is formantSt plus the sweep times throatDropTop times GROWL. At GROWL 100 %
 //    a syllable drops the throat from 5 st down to 12 st down, and it returns over DECAY while the note
 //    holds. At GROWL 0 the throat stays at formantSt. The throat reaches the voice through the 20 ms glide
 //    GROWL and DRIVE use.
-// 2. The rasp. A raised wave at half the tracked pitch multiplies the dropped voice, so alternate
+// 2. The rasp. A raised wave at half the pitch of the card's input multiplies the dropped voice, so alternate
 //    periods of the sung note come out loud and quiet, the period doubling of a growl's false folds.
 //    Over the top half of GROWL a wave at a third of the pitch blends in. The wave is a raised sine at
 //    GROWL 0 and hardens toward a square as GROWL rises. A level gain holds the modulated voice at the
@@ -60,13 +75,13 @@
 //    would still shift each new grain's pulse against the grid and bend the pitch, so the voice anchors
 //    each grain's loudest pulse where the rest throat would put it (`FormantPsolaVoice::anchorPulse`).
 //
-// The ring holds the input of the slot where the pitch stage runs, so the stages between that slot and
-// this card are not in the growl voice.
-//
-// The dry side of MIX reads that same ring at the lag the voice reads at, so the two line up and the
+// The dry side of MIX reads the card's ring at the lag the voice reads at, so the two line up and the
 // blend does not flam. The lag follows the tracker's period. It moves at most kDryLagSlew samples per
 // sample, so a new period slides the dry's delay and never jumps it. The dry costs a ring read per sample
 // only while MIX sits under 100 %.
+//
+// The ring is kRingLen samples (15,408 B). It holds the longest lag and the furthest a grain reaches past
+// it. A stopped card clears 1 KB of it a block (`rest`), so the reset at a switch-on finds it clear.
 
 namespace cv {
 
@@ -122,6 +137,18 @@ constexpr float kMaxBiasTop = 1.0f;
 constexpr float kMaxTrimDb = 24.0f;
 constexpr float kMinRailSoft = 0.01f;
 constexpr float kMaxRailAsym = 0.5f;
+
+// The card's ring. The longest lag is the grain delay plus the tracker's longest period. A launch reads up
+// to a period past the lag, a grain that plays at half speed drifts a further two periods back
+// ((1 - rate) of its four-period length), and the voice keeps a call's samples and a pad ahead of the far
+// end.
+constexpr int kMaxPeriodSmp = PitchTracker::kMaxPeriod;
+constexpr int kRingLen = PsolaVoice::kGrainDelay + 4 * kMaxPeriodSmp + kBlock + 4;
+using GrowlVoice = formant_detail::FormantPsolaVoiceT<kRingLen>;
+using GrowlRing = GrowlVoice::Ring;
+
+// The floats of the ring one rest() call zeroes (1 KB), so the ring is clear after 16 calls.
+constexpr int kRestClearFloats = 256;
 
 // The depth's fall without a pitch and the dry-to-voice crossfade both take 20 ms, in straight lines.
 constexpr float kFadeMs = 20.0f;
@@ -285,7 +312,11 @@ class Growl {
     reset();
   }
 
+  // Leaves the ring zero. A card that rested since it last ran (see rest) has cleared most of the ring
+  // already, and this clears what is left.
   void reset() {
+    clearRing(growl_detail::kRingLen);
+    head_ = 0;
     voice_.reset();
     fold_.clear();
     hp_.clear();
@@ -311,30 +342,38 @@ class Growl {
     idle_ = true;
   }
 
-  // in is this slot's input. pitch has already run this block, so the block's samples sit at ring
-  // index head() - n + i. Off and settled, out equals in bit for bit. in and out may be the same
-  // buffer.
+  // A call for each block the card sits stopped (the chain does not run it). It zeroes the next
+  // kRestClearFloats floats of the ring, so the reset that starts the card again finds the ring clear and
+  // the first block after a switch-on carries none of the clear. A card that restarts before the ring is
+  // clear pays for the rest in that reset.
+  void rest() { clearRing(growl_detail::kRestClearFloats); }
+
+  // in is this slot's input, which the card writes to its ring ahead of its voice and the dry side of
+  // MIX. pitch has already run this block. It gives the tracker's period, the shift and the delay the
+  // stages ahead of this slot have put on the pitch. Off and settled, out equals in bit for bit. in
+  // and out may be the same buffer.
   void process(const float* in, float* out, int n, const GrowlParams& p, const PitchFx& pitch) {
     const PitchResult& pr = pitch.pitch();
     if (pr.period > 0.0f) heldPeriod_ = pr.period;
     const float wetTarget = p.on && heldPeriod_ > 0.0f ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
+      writeRing(in, n);
       passThrough(in, out, n);
       return;
     }
     idle_ = false;
     applyTuning(p.tuning);
     const Call c = beginCall(p, pitch, in, n, wetTarget);
-    int first = pitch.head() - n;
-    if (first < 0) first += kVoiceRingLen;
     for (int at = 0; at < n; at += kBlock) {
       const int m = n - at < kBlock ? n - at : kBlock;
+      const int first = head_;
+      writeRing(in + at, m);
       buf_.fill(0.0f);
-      voice_.render(pitch.ring(), wrapOnce<kVoiceRingLen>(first + at), m, buf_.data());
+      voice_.render(ring_, first, m, buf_.data());
       raspChunk(c, at, m);
       if (c.fold) fold_.run(buf_.data(), m, foldAt(c, at), c.foldStep);
       highPass(m);
-      if (c.dry) blendDry(c, pitch.ring(), wrapOnce<kVoiceRingLen>(first + at), m, at);
+      if (c.dry) blendDry(c, first, m, at);
       mixChunk(c, in + at, out + at, m, at);
     }
     if (!fold_.finite()) fold_.clear();
@@ -351,6 +390,18 @@ class Growl {
 
   // Test hook: the delay the dry side reads at, in samples.
   float dryLagSamples() const { return dryLag_; }
+
+  // Test hook: how many floats from the ring's start are known zero. A write drops it to 0, and rest()
+  // and reset() raise it to the ring's length.
+  int ringClearedTo() const { return ringZero_; }
+
+  // Test hook: true when every float of the ring is zero.
+  bool ringIsZero() const {
+    for (const float v : ring_) {
+      if (v != 0.0f) return false;
+    }
+    return true;
+  }
 
   // Test hooks: the voice's pitch ratio, the rasp wave's rate in Hz, the jitter at the last call's end and
   // the running period's depth factor.
@@ -447,23 +498,27 @@ class Growl {
     throatTarget_ = clampf(rest + sweep * dropTop * growl_, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     throat_ = first ? throatTarget_ : smooth::step(throat_, throatTarget_, a);
 
-    // The voice, and the wave's rate while the tracker hears a pitch.
-    const float corr = pitch.correctionSemis();
+    // The voice, and the wave's rate while the tracker hears a pitch. The ring holds the pitch stage's
+    // output, which sits `shift` above the tracker's pitch, so the voice's period is the tracker's
+    // divided by that ratio and its pitch ratio is the drop alone. The read point stands where the
+    // tracker's frame does, less the delay the stage put on the audio.
+    const float shift = pitch.outputShiftSemis();
+    const float up = shift == 0.0f ? 1.0f : exp2Fast(shift * (1.0f / 12.0f));
+    const float period = heldPeriod_ / up;
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
-    const float voiceLag = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_);
-    pitchRatio_ = exp2Fast((drop + corr) * (1.0f / 12.0f));
+    const float aligned = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_) - pitch.outputLatency();
+    const float voiceLag = formant_detail::clampLag<growl_detail::kRingLen>(aligned, period);
+    pitchRatio_ = exp2Fast(drop * (1.0f / 12.0f));
     voice_.anchorPulse(exp2Fast(rest * (1.0f / 12.0f)));
-    voice_.prepare(heldPeriod_, pitchRatio_, exp2Fast(throat_ * (1.0f / 12.0f)), voiceLag, n);
+    voice_.prepare(period, pitchRatio_, exp2Fast(throat_ * (1.0f / 12.0f)), voiceLag, n < kBlock ? n : kBlock);
 
     // The dry reads at the lag the voice plays at, sliding there from where it was.
     const float lag0 = dryLag_;
-    const float lagWant = formant_detail::clampLag(voiceLag, heldPeriod_);
-    dryLag_ = first ? lagWant : toward(dryLag_, lagWant, growl_detail::kDryLagSlew * static_cast<float>(n));
+    dryLag_ = first ? voiceLag : toward(dryLag_, voiceLag, growl_detail::kDryLagSlew * static_cast<float>(n));
     c.lag0 = first ? dryLag_ : lag0;
     c.lagStep = (dryLag_ - c.lag0) * inv;
     if (pr.voiced && pr.period > 0.0f) {
-      const float corrRatio = corr == 0.0f ? 1.0f : exp2Fast(corr * (1.0f / 12.0f));
-      phaseStep_ = static_cast<uint32_t>(growl_detail::kSixthTurn * corrRatio / PitchTracker::clampPeriod(pr.period));
+      phaseStep_ = static_cast<uint32_t>(growl_detail::kSixthTurn * up / PitchTracker::clampPeriod(pr.period));
     }
 
     // The rasp: the depth fades with the pitch.
@@ -613,9 +668,30 @@ class Growl {
             c.fold0.bias + c.foldStep.bias * k};
   }
 
+  // Writes n samples of the card's input to the ring.
+  void writeRing(const float* in, int n) {
+    constexpr int kLen = growl_detail::kRingLen;
+    ringZero_ = 0;
+    int at = head_;
+    for (int done = 0; done < n;) {
+      const int run = n - done < kLen - at ? n - done : kLen - at;
+      std::memcpy(&ring_[static_cast<size_t>(at)], in + done, sizeof(float) * static_cast<size_t>(run));
+      at = at + run == kLen ? 0 : at + run;
+      done += run;
+    }
+    head_ = at;
+  }
+
+  // Zeroes up to `most` more floats of the ring, in index order from ringZero_.
+  void clearRing(int most) {
+    const int n = most < growl_detail::kRingLen - ringZero_ ? most : growl_detail::kRingLen - ringZero_;
+    zeroFloats(&ring_[static_cast<size_t>(ringZero_)], static_cast<size_t>(n));
+    ringZero_ += n;
+  }
+
   // Blends the dry into buf_ in place, trim included: the voice at its MIX share plus the ring read at
   // the lag at its own. `head` is the ring index of the chunk's first sample.
-  void blendDry(const Call& c, const VoiceRing& ring, int head, int m, int at) {
+  void blendDry(const Call& c, int head, int m, int at) {
     const float k = static_cast<float>(at);
     float voiceGain = c.voiceGain0 + c.voiceGainStep * k;
     float dryGain = c.dryGain0 + c.dryGainStep * k;
@@ -624,7 +700,7 @@ class Growl {
       voiceGain += c.voiceGainStep;
       dryGain += c.dryGainStep;
       lag += c.lagStep;
-      const float dry = readRing<kVoiceRingLen>(ring.data(), wrapOnce<kVoiceRingLen>(head + i), lag);
+      const float dry = readRing<growl_detail::kRingLen>(ring_.data(), wrapOnce<growl_detail::kRingLen>(head + i), lag);
       float& v = buf_[static_cast<size_t>(i)];
       v = trim_ * voiceGain * v + dryGain * dry;
     }
@@ -660,7 +736,10 @@ class Growl {
     return coef_;
   }
 
-  formant_detail::FormantPsolaVoice voice_;
+  growl_detail::GrowlRing ring_{};  // the card's input, newest at head_ - 1
+  int head_ = 0;                    // where the next sample goes
+  int ringZero_ = growl_detail::kRingLen;  // the ring is known zero up to this index; a write drops it to 0
+  growl_detail::GrowlVoice voice_;
   growl_detail::Fold fold_;
   Biquad hp_;  // the wet path's high-pass
   std::array<float, kBlock> buf_{};  // the voice's chunk, then the rasp and the fold in place

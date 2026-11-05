@@ -201,6 +201,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
       engines.pitch.rest();
     }
     if (e == Engine::RingMod) engines.ringMod.rest();
+    if (e == Engine::Growl) engines.growl.rest();  // the card keeps a ring of its own input
     return false;
   }
   if (step.from == 0 && step.to > 0 && !detectorLive) {

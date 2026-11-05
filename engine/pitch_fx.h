@@ -177,6 +177,26 @@ class PitchFx {
     return autotuneWas_ ? live : live * autotuneFade_;
   }
 
+  // The semitones the stage's output sits above the pitch the tracker reads in its input. A reader that
+  // runs after the stage divides the tracker's period by 2^(this / 12) to get the period it hears. The
+  // output carries Autotune's correction. Where the Octave voice holds at least half the output's power
+  // (its MIX share, scaled by the toggle's fade, at or over 0.5), the output carries the voice's interval
+  // instead, which already includes the correction. The Octave interval is the 15 ms glided SEMITONES,
+  // so the shift follows a knob move at that rate. Formant moves no pitch.
+  float outputShiftSemis() const { return octaveLeads() ? octave_.intervalSemis() : correctionSemis(); }
+
+  // The delay of the stage's output behind its input in samples, the mean over the voices heard. The dry
+  // input has none. Autotune's corrected voice and the Formant voice both lag by the grain delay plus a
+  // period, and the Octave voice by half its grain window (OctaveVoice::latency). The shares follow the
+  // crossfades' own gains, so the delay glides as they do.
+  float outputLatency() const {
+    const float oct = gains_.wet * gains_.wet;
+    const float tuned = gains_.autotune * gains_.autotune;
+    const float formant = formantMix_ * formantFade_;
+    const float delayed = 1.0f - (1.0f - tuned) * (1.0f - formant);
+    return (1.0f - oct) * delayed * autotune_.voiceDelay(tracker_.result().period) + oct * octave_.latency();
+  }
+
   // The input ring and the index the next sample writes to (already wrapped). After process(),
   // the block's last sample sits at head() - 1.
   const VoiceRing& ring() const { return ring_; }
@@ -236,6 +256,10 @@ class PitchFx {
   };
 
   static bool formantWanted(const FormantParams& f) { return f.on && f.mix > 0.0f; }
+
+  // True when the Octave voice carries at least half the output's power: the wet gain's sine of its share
+  // of the quarter turn reaches 1 / sqrt(2) at a share of 0.5.
+  bool octaveLeads() const { return octaveMix_ * octaveFade_ >= 0.5f; }
 
   // Each voice's per-block targets. A voice coming on starts clean only when its crossfade has
   // settled at zero; while the crossfade is still up the running voice carries on.
