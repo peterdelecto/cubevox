@@ -77,7 +77,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      costs::kFormant},
     {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
-    {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
+    {Card::FormantFollower, "formant_follow", "Apraxia", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
     {Card::RingMod, "ringmod", "Ringer", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::None,
@@ -171,7 +171,7 @@ void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
   }
 }
 
-// Yawn's SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach, -12 st at the
+// Apraxia's SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach, -12 st at the
 // pot's bottom through 0 at noon to +6 st at its top. The card pins the Formant voice's mix at 1, so no
 // knob sets it.
 void applyFollowerKnob(int knob, float v, ChainParams& out) {
