@@ -102,9 +102,10 @@ typedef struct {
 bool cvBootPowerOn(uint32_t resetFlags);
 
 // The first call of every start, before anything reads the block. A pure power-on or a block
-// whose blockVersion is 0 is cleared whole: DTCM holds nothing a reader may trust then. Otherwise
-// the block is kept, the reason is range checked and blockVersion is written. The flags go into
-// resetFlags for the application, which finds RCC_RSR cleared by the jump.
+// without the seal (cvBootBlockSealed) is cleared whole: DTCM holds nothing a reader may trust
+// then, because the ST ROM loader and an older bootloader's block both fail the check. Otherwise
+// the block is kept, the reason is range checked and the version and seal are written. The flags
+// go into resetFlags for the application, which finds RCC_RSR cleared by the jump.
 void cvBootAdopt(struct CvBootBlock* block, uint32_t resetFlags);
 
 // True when a request stands that the decision will honour. Board code then passes CvImageInvalid

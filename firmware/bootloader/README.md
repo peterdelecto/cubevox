@@ -100,8 +100,9 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
    `HAL_RCC_DeInit()` can. `board_init2` adopts the boot block with the saved flags (`cvBootAdopt`),
    which also stores them in `resetFlags` for the application, because the jump's
    `HAL_RCC_DeInit()` clears the register. A pure power-on (PORRSTF or BORRSTF, and none of SFTRSTF,
-   IWDG1RSTF, WWDG1RSTF) clears the block whole, so power cycles never count as failed starts. Each
-   start sees the flags of its own reset only.
+   IWDG1RSTF, WWDG1RSTF) clears the block whole, so power cycles never count as failed starts. So
+   does a block without `blockSeal`, which is what the ST ROM loader leaves in DTCM after a
+   `flash.sh --rom` session. Each start sees the flags of its own reset only.
 3. Next the option bytes: BOR level 3 and write protection of bank 1 sector 0. When either is
    missing they are programmed in one change (unlock, OPTSR_PRG and WPSN_PRG1, OPTSTART, a bounded
    wait on OPT_BUSY, lock), once per power-on. The result is `optionBytes` in the block and a line
