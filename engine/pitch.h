@@ -84,11 +84,11 @@ class PitchTracker {
   }
 
   void reset() {
-    zeroFloats(dec_.data(), dec_.size());
+    dec_.fill(0.0f);
     decPos_ = 0;
-    zeroFloats(hopSums_.data(), hopSums_.size());
+    hopSums_.fill(0.0f);
     hopRow_ = 0;
-    zeroFloats(numer_.data(), numer_.size());
+    numer_.fill(0.0f);
     denom_.fill(1.0f);
     tail_ = false;
     staleFrom_ = kFrameBlocks;
@@ -798,8 +798,8 @@ class PitchTracker {
     clearOnset();
     staleFrom_ = active ? 0 : kFrameBlocks;
     if (!active) return;
-    zeroFloats(hopSums_.data(), hopSums_.size());
-    zeroFloats(numer_.data(), numer_.size());
+    hopSums_.fill(0.0f);
+    numer_.fill(0.0f);
     tail_ = true;
   }
 

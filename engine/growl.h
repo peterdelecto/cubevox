@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -702,7 +703,7 @@ class Growl {
   // Zeroes up to `most` more floats of the ring, in index order from ringZero_.
   void clearRing(int most) {
     const int n = most < growl_detail::kRingLen - ringZero_ ? most : growl_detail::kRingLen - ringZero_;
-    zeroFloats(&ring_[static_cast<size_t>(ringZero_)], static_cast<size_t>(n));
+    std::fill_n(ring_.begin() + ringZero_, n, 0.0f);
     ringZero_ += n;
   }
 

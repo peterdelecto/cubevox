@@ -482,18 +482,19 @@ void toggleLevelAt(double hz, bool formant, ToggleLevel& worst) {
 // scan runs with the Formant card at part MIX behind Autotune. The Formant engine cuts from Autotune's
 // ring and plays a voice for Autotune's input and one for its corrected voice, both at Autotune's delay,
 // so Autotune's crossfade moves it from one voice to the other with no change of delay and no cancellation
-// between the two. The dip reads 1.03 dB against a gate of 1.2 and the rise 0.31 dB.
+// between the two. The dip reads 1.03 dB and the rise 0.31 dB, and the Formant row's gates sit 0.1 dB above
+// each (1.13 and 0.41), so a return of the cancellation fails it.
 bool testToggleLevel() {
-  constexpr double kMaxRiseDb = 3.0;
   bool ok = true;
   for (bool formant : {false, true}) {
-    const double kMaxDipDb = formant ? 1.2 : 4.4;
+    const double kMaxDipDb = formant ? 1.13 : 4.4;
+    const double kMaxRiseDb = formant ? 0.41 : 3.0;
     ToggleLevel worst;
     for (double hz : {97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 110.0, 130.81, 146.83, 220.0})
       toggleLevelAt(hz, formant, worst);
     ok &= report(formant ? "toggle level, Formant -3 st at MIX 50 %" : "toggle level",
                  -worst.dip <= kMaxDipDb && worst.rise <= kMaxRiseDb,
-                 "tones 97 to 220 Hz, two-period windows: largest dip %.2f dB (<= %.1f), largest rise %.2f dB (<= %.1f)",
+                 "tones 97 to 220 Hz, two-period windows: largest dip %.2f dB (<= %.2f), largest rise %.2f dB (<= %.2f)",
                  -worst.dip, kMaxDipDb, worst.rise, kMaxRiseDb);
   }
   return ok;

@@ -31,10 +31,20 @@ constexpr float kFormantMaxTrimDb = 24.0f;
 // target). The trim ramps in over the first semitone of SHIFT.
 constexpr float kFormantGroupTrimDb = -0.3f;
 
-// How far the base and the shifted voice correlate at a SHIFT of 0, 1, 2 and 3 st or more, measured on
-// Adam's three clips. The level gain starts from it when the base has sat out at MIX 100 % and comes
-// back.
-constexpr std::array<float, 4> kFormantCoherence = {0.95f, 0.4f, 0.1f, 0.0f};
+// How far the base and the shifted voice correlate at a SHIFT of 0 to 12 st (the sign does not matter),
+// measured on Adam's three clips. The level gain starts from it when the base has sat out at MIX 100 %
+// and comes back.
+//
+// Method (2026-11-05, with the grain group in place): each clip runs through the engine at MIX 50 %, so
+// the base is heard, at every whole SHIFT from -12 to +12 st, once on its own ring and tracker and once
+// directly behind a running Autotune (hard tune, key C). At the end of every block after the first 0.1 s
+// of the clip, the engine's running powers are summed, the base against the voice before its trim:
+// corr = sum(baseVoice) / sqrt(sum(baseSq) * sum(voiceSq)), pooled over the three clips. The table is the
+// mean of the four runs at each |SHIFT| (alone and behind, both signs). The two placements agree within
+// 0.03, except at SHIFT 0, where the card alone reads 0.97 and behind Autotune 1.00 (the same waveform).
+// Past 3 st the correlation turns negative, to -0.18 at 6 st, and comes back to 0 near 10 st.
+constexpr std::array<float, kFormantVoiceMaxShiftSt + 1> kFormantCoherence = {
+    0.985f, 0.355f, 0.085f, -0.016f, -0.106f, -0.149f, -0.176f, -0.165f, -0.099f, -0.059f, -0.009f, 0.017f, 0.033f};
 
 struct FormantTuning {
   // The shifted voice's trim in dB at each SHIFT from -7 to +7 st, fit on Adam's three clips so that

@@ -541,11 +541,19 @@ double stepRatio(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFx
 
 // MIX 0 settles the stage off, so it sits out like a card that is switched off. Leaving it by a touch
 // or a jump starts the voice clean: no click on a steady tone.
+//
+// The gate is the worst ratio measured, x1.0298 (MIX 0 to 100 %), plus 0.005. A 1 % jump in level
+// on this tone reads 12 times the steady curvature, so the margin does not hide a click. The 3 % is the
+// level gain. The MIX glide passes through the middle of its range, where the base and the voice of a pure tone at
+// -3 st add in power and the gain lifts the sum (x1.12 at 29 ms), and the sum of two unrelated sines
+// peaks above its power. With the gain held at 1 the same step reads x0.9999. The voice's own ripple on
+// this tone is 1.1 % over the input and is already in the steady figure.
 bool testMixLeavesZero() {
+  constexpr double kGate = 1.035;
   const Signal in = sine(4 * kRate);
   double worst = 0.0;
   for (float m : {0.015f, 0.5f, 1.0f}) worst = std::max(worst, stepRatio(in, formantOn(kShift, 0.0f), formantOn(kShift, m)));
-  return report("mix leaves 0", worst <= 1.04, "peak curvature after MIX 0 to 1.5, 50, 100 %%: x%.4f of steady state (<= 1.04)", worst);
+  return report("mix leaves 0", worst <= kGate, "peak curvature after MIX 0 to 1.5, 50, 100 %%: x%.4f of steady state (<= 1.035)", worst);
 }
 
 // The windows of kPeriodSamples after the step, against the same length of steady output before it.
