@@ -56,8 +56,9 @@
   Formant voice included; the 265.75 ms input ring is 51,024 B of it, sized in `psola.h` for the
   Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
   scatter and the longest grain. `Distortion` sits there too (2,888 B: its filters, the rail histories
-  and the block scratch), and so does `Unison` (10,204 B, mostly its 50 ms line). The build prints DTCM at
-  74,592 B, 57.0 %, 56,224 B free.
+  and the block scratch), and so does `Unison` (10,204 B, mostly its 50 ms line). `RingMod` sits there too
+  (13,584 B: a `PitchTracker` of 8,472 B, its 1,260-float ring of 5,040 B, and the card's state). The build
+  prints DTCM at 88,224 B, 67.4 %, 42,592 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - The Growl card (Deepthroat) grows what reaches its slot. It keeps a ring of its own input, `growl_detail::kRingLen`
   samples (15,408 B, a plain global in D1 like Crowd, so DTCM is unchanged), and cuts its grains from that on a
@@ -69,5 +70,10 @@
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`
   (`test/ringed_tracker.h`), which keeps a ring of its own.
+- Ring mod tracks the pitch of its own input, the signal the slot ahead hands it, so it takes no part in the
+  shared pitch stage and sits in no registry group. It owns a `PitchTracker` (coarse search only) fed from a
+  ring of `PitchTracker::kRingNeed` floats, the most a push reads back with calls of up to `kBlock` samples.
+  It clears the ring as `PitchFx` does: `RingMod::rest()` zeroes 512 floats a block while the slot is
+  stopped, and `reset()` clears the rest with `zeroFloats`. `pitch_spikes_test` holds both.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

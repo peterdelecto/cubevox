@@ -82,7 +82,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
-    {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::Pitch,
+    {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::None,
      costs::kRingMod},
     {Card::Strings, "strings", "Sympath", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,
      costs::kStrings},
@@ -336,11 +336,7 @@ void applyToggle(Card c, bool on, ChainParams& out) {
       out.growl.on = on;
       out.pitchFx.growlOn = on;
       break;
-    case Card::RingMod:
-      // The pitch stage reads ringModOn to keep its tracker running for the Ring mod card.
-      out.ringMod.on = on;
-      out.pitchFx.ringModOn = on;
-      break;
+    case Card::RingMod: out.ringMod.on = on; break;
     case Card::Strings: out.strings.on = on; break;
     case Card::Empty:
     case Card::Count: break;
