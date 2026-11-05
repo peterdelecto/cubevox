@@ -28,7 +28,10 @@
 // the running voice instead of cutting to fresh grains. The tracker's frame is
 // warm only while the stage runs. The chain resets the stage when every pitch
 // card is off, so the first voiced frame after such a switch-on comes about 32 ms
-// in, where a running stage gives it in 8 ms.
+// in, where a running stage gives it in 8 ms. At a note that starts after a rest, the
+// period the voices read moves to the new note from the tracker's onset estimate, ahead
+// of its first voiced frame (pitch.h). Autotune's correction still moves only on voiced
+// frames.
 
 namespace cv {
 

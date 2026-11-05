@@ -1106,8 +1106,10 @@ void allEnhancements(cv::CrowdTuning& t) {
 // old law shared (8 and 6 copies) and kept their hashes. All four were re-pinned when the grain
 // length took its floor of two output periods (formant_voice.h setGrain). A copy whose pitch ratio
 // sits below its playback rate now lengthens its grains. The MOB program level moved by 0.01 dB.
-constexpr std::array<uint64_t, 4> kPinned = {0x81dc6bbf662e297eULL, 0xb0efcbaf83bf5979ULL, 0xf9246e3b6c9d0344ULL,
-                                             0xfdf2bd9bfb21710bULL};
+// All four were re-pinned again when the tracker began taking a new note's period from an onset
+// estimate, before it reads voiced (pitch.h): the copies' grains now start on the new pitch at once.
+constexpr std::array<uint64_t, 4> kPinned = {0x9a7862ebf921664eULL, 0xc87b862db119d386ULL, 0x97473e493bad2794ULL,
+                                             0x6895b3252eff14edULL};
 
 // The toolchain that produced kPinned. A bit-exact hash follows the compiler's code generation and
 // the system libm, so the pins hold on this toolchain only. Anywhere else checkPinned prints SKIP and

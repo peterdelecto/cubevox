@@ -628,7 +628,8 @@ bool testRangeEnds() {
 
 // 12. The first note after a reset glides at RESPONSE like every other note. At 500 ms, A3 + 40 cents
 // from a reset and D4 - 30 cents after 250 ms of silence each move the same share of their way in the
-// 50 ms after the tracker first publishes them, within 10 % (both read 9.6 %).
+// 50 ms after the tracker first reads them voiced, within 10 % (both read 9.6 %). The correction moves
+// only on voiced frames, so the second note counts from its voiced frame and not from the onset estimate.
 double shareIn50Ms(const std::vector<Hop>& hops, size_t first, double want) {
   const double start = first > 0 ? hops[first - 1].corr : 0.0;
   const size_t at = first + static_cast<size_t>(cv::kSampleRate / 20 / cv::kBlock);
@@ -646,7 +647,7 @@ bool testFirstNote() {
   run(gFx, in, autotuneOnly(500.0f), &hops);
   size_t f1 = 0, f2 = 0;
   while (f1 < hops.size() && hops[f1].hz <= 0.0f) ++f1;
-  while (f2 < hops.size() && !(hops[f2].end > n1 + gap && hops[f2].hz > 280.0f)) ++f2;
+  while (f2 < hops.size() && !(hops[f2].end > n1 + gap && hops[f2].voiced && hops[f2].hz > 280.0f)) ++f2;
   if (f2 + cv::kSampleRate / 20 / cv::kBlock >= hops.size()) return report("first note glides", false, "no second note", 0.0);
   const double s1 = shareIn50Ms(hops, f1, -0.4), s2 = shareIn50Ms(hops, f2, 0.3);
   return report("first note glides", std::fabs(s1 - s2) <= 0.1 * s2,
