@@ -81,10 +81,10 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
-    {Card::Growl, "growl", "Growl", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
+    {Card::Growl, "growl", "Throat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
     {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::Pitch,
      costs::kRingMod},
-    {Card::Strings, "strings", "Strings", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,
+    {Card::Strings, "strings", "Sympathetic", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,
      costs::kStrings},
 }};
 
@@ -352,8 +352,11 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
-  // The Strings card sits on the Autotune card's key whenever that card is placed.
-  if (c == Card::Autotune) out.strings.keyed = true;
+  // The Strings and Ring mod cards sit on the Autotune card's key whenever that card is placed.
+  if (c == Card::Autotune) {
+    out.strings.keyed = true;
+    out.ringMod.keyed = true;
+  }
   // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
   if (c == Card::FormantFollower) out.follower.placed = true;
 }

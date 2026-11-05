@@ -9,14 +9,18 @@
 #include "engine/fastmath.h"
 #include "engine/pitch.h"
 #include "engine/pitch_fx.h"
+#include "engine/scale.h"
 #include "engine/smooth.h"
 
 namespace cv {
 
-// The Ring mod card. A sine carrier at RATIO times the tracked pitch multiplies the voice, so the clang
-// stays in tune and follows the melody. The carrier is a phase counter read through sinTurns. Its
-// frequency is set once per block from the tracker's period and glides over 10 ms. Unvoiced frames hold
-// the last frequency, and before the first voiced frame the carrier sits at 220 Hz times RATIO.
+// The Ring mod card. A sine carrier at RATIO times a held note multiplies the voice, so the clang stays in
+// tune and follows the melody in steps. The note is the one nearest the tracked pitch. It is a major-scale
+// note of the Autotune card's key when that card is placed, and any semitone (A4 = 440 Hz) when not. The
+// held note changes only when the tracked pitch sits closer to another note by more than 0.2 semitone, so
+// vibrato leaves the carrier still. A new note moves the carrier in the same block, with no glide, and the
+// phase counter carries on. The carrier is a phase counter read through sinTurns. Unvoiced frames hold the
+// last note, and before the first voiced frame the carrier sits at 220 Hz times RATIO.
 // MIX is an equal-power crossfade, and the wet alone is trimmed to unity.
 
 constexpr int kRingModRatioCount = 7;
@@ -26,7 +30,7 @@ constexpr std::array<const char*, kRingModRatioCount> kRingModRatioName = {"X0.5
 constexpr uint8_t kRingModDefaultRatioStep = 2;
 
 struct RingModTuning {
-  float glideMs = 10.0f;    // the carrier's frequency follows the pitch with this time constant
+  float holdSemis = 0.2f;   // the pitch must sit this much closer to another note before the held note changes
   float restHz = 220.0f;    // the pitch the carrier assumes before the first voiced frame
   float trimDb = 3.15f;     // the wet path's gain; a sine carrier alone leaves the voice 3.01 dB down
 };
@@ -35,6 +39,7 @@ struct RingModParams {
   bool on = false;
   float ratio = 1.5f;  // knob A (RATIO), the carrier's frequency over the pitch
   float mix = 0.5f;    // knob B (MIX), 0..1
+  bool keyed = false;  // an Autotune card is placed, so the notes are its key's major scale
   RingModTuning tuning;
 };
 
@@ -62,19 +67,21 @@ class RingMod {
 
   void reset() {
     phase_ = 0;
-    heldHz_ = 0.0f;
+    hasNote_ = false;
+    noteMidi_ = 0.0f;
+    noteHz_ = 0.0f;
     carrierHz_ = 0.0f;
     mix_ = 0.0f;
     wet_ = 0.0f;
     fresh_ = true;
   }
 
-  // `pitch` has run this block. Off and settled, out equals in bit for bit. in and out may be the same
-  // buffer.
-  void process(const float* in, float* out, int n, const RingModParams& p, const PitchFx& pitch) {
+  // `pitch` has run this block. `key` is the Autotune KEY index whose major scale holds the notes, or a
+  // negative number for every semitone. Off and settled, out equals in bit for bit. in and out may be the
+  // same buffer.
+  void process(const float* in, float* out, int n, const RingModParams& p, const PitchFx& pitch, int key) {
     if (n <= 0) return;
-    const PitchResult& pr = pitch.pitch();
-    if (pr.voiced && pr.period > 0.0f) heldHz_ = kSampleRate / PitchTracker::clampPeriod(pr.period);
+    trackNote(pitch.pitch(), key, p.tuning.holdSemis);
     const float wetTarget = p.on ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
       fresh_ = true;
@@ -82,14 +89,10 @@ class RingMod {
       return;
     }
 
-    // The carrier's frequency: a jump on the first call, a 10 ms glide after.
-    const float baseHz = heldHz_ > 0.0f ? heldHz_ : p.tuning.restHz;
-    const float targetHz = clampf(p.ratio * baseHz, 1.0f, ringmod_detail::kMaxCarrierHz);
-    const float hz0 = fresh_ ? targetHz : carrierHz_;
-    carrierHz_ = fresh_ ? targetHz : smooth::step(carrierHz_, targetHz, glideCoefFor(p.tuning.glideMs, n));
-    const uint32_t step0 = stepOf(hz0);
-    const uint32_t step1 = stepOf(carrierHz_);
-    const int32_t dStep = static_cast<int32_t>(step1 - step0) / n;
+    // The carrier sits on RATIO times the held note for the whole block.
+    const float baseHz = hasNote_ ? noteHz_ : p.tuning.restHz;
+    carrierHz_ = clampf(p.ratio * baseHz, 1.0f, ringmod_detail::kMaxCarrierHz);
+    const uint32_t step = stepOf(carrierHz_);
 
     // MIX glides, and the wet fade scales it, so a switch-on starts at the dry input.
     const float mixKnob = smooth::clamp01(p.mix);
@@ -107,10 +110,8 @@ class RingMod {
     const float dWet = (wetGain(e1) * trim - wet) * inv;
 
     uint32_t phase = phase_;
-    uint32_t s = step0;
     for (int i = 0; i < n; ++i) {
-      phase += s;
-      s += static_cast<uint32_t>(dStep);
+      phase += step;
       dry += dDry;
       wet += dWet;
       const float x = in[i];
@@ -119,10 +120,26 @@ class RingMod {
     phase_ = phase;
   }
 
-  // Test hooks: the carrier's frequency after the block's glide, in Hz.
+  // Test hook: the carrier's frequency in the last block, in Hz.
   float carrierHz() const { return carrierHz_; }
 
  private:
+  // Moves the held note to the one nearest a voiced pitch once the pitch sits more than `hold` semitones
+  // closer to it than to the held note. A held note that is not in the scale (the key changed) gives way
+  // at once. Unvoiced frames leave the note alone.
+  void trackNote(const PitchResult& pr, int key, float hold) {
+    if (!pr.voiced || pr.period <= 0.0f) return;
+    const float midi = midiOf(kSampleRate / PitchTracker::clampPeriod(pr.period));
+    const bool keyed = key >= 0;
+    const int k = keyed ? key % kKeyCount : 0;
+    const float nearest = keyed ? roundf(midi - scaleDeviation(midi, k)) : roundf(midi);
+    const bool inScale = !keyed || fabsf(scaleDeviation(noteMidi_, k)) < 1e-3f;
+    if (hasNote_ && inScale && fabsf(midi - noteMidi_) - fabsf(midi - nearest) <= hold) return;
+    hasNote_ = true;
+    noteMidi_ = nearest;
+    noteHz_ = 440.0f * exp2f((nearest - 69.0f) / 12.0f);
+  }
+
   static uint32_t stepOf(float hz) { return static_cast<uint32_t>(hz * (4294967296.0f / kSampleRate)); }
 
   static float dryGain(float e) { return sinTurns(ringmod_detail::kQuarterTurn - phaseOf(e)); }
@@ -131,24 +148,14 @@ class RingMod {
     return static_cast<uint32_t>(smooth::clamp01(e) * static_cast<float>(ringmod_detail::kQuarterTurn));
   }
 
-  float glideCoefFor(float ms, int n) {
-    if (n != coefN_ || ms != coefMs_) {
-      coef_ = smooth::blockCoef(ms * 0.001f, n);
-      coefN_ = n;
-      coefMs_ = ms;
-    }
-    return coef_;
-  }
-
   uint32_t phase_ = 0;
-  float heldHz_ = 0.0f;     // the tracker's pitch, or the last one it gave; 0 before the first
-  float carrierHz_ = 0.0f;  // after the glide
+  bool hasNote_ = false;    // a voiced frame has set the note
+  float noteMidi_ = 0.0f;   // the held note, a whole MIDI number
+  float noteHz_ = 0.0f;
+  float carrierHz_ = 0.0f;  // RATIO times the note, in the last block
   float mix_ = 0.0f;
   float wet_ = 0.0f;        // the dry-to-card fade, 0 dry .. 1 card
-  float coef_ = 1.0f;
-  float coefMs_ = 0.0f;
-  int coefN_ = 0;
-  bool fresh_ = true;       // the next call takes the knobs and the frequency outright
+  bool fresh_ = true;       // the next call takes the knobs outright
 };
 
 }  // namespace cv

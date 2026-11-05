@@ -462,7 +462,7 @@ struct Click {
 
 const std::array<Click, 8> kClicks = {{
     {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
-    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "STRINGS"},
+    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SYMPATHETIC"},
     {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "YAWN"},
     {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
     {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
@@ -570,7 +570,8 @@ void checkMenuReverbClick() {
             m.layout.card[7] == Card::Strings,
         "menu: a second click moves Chasm on to Strings");
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "STRINGS"), "menu: the row shows STRINGS after the second click");
+  check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "SYMPATHETIC"),
+        "menu: the row shows SYMPATHETIC after the second click");
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == before,
         "menu: a third click swaps Strings back to Spring");
@@ -1299,7 +1300,7 @@ void checkScreenshots() {
     slot6.layout.card[kSlot6Slot] = card;
     slot6.openListAt(kDistortionGrowl);
     slot6.draw();
-    const char* value = card == Card::Growl ? "GROWL" : "DISTORTION";
+    const char* value = card == Card::Growl ? "THROAT" : "DISTORTION";
     check(cursorRowIs(slot6.canvas, rowOnScreen(kDistortionGrowl), kDistortionGrowl, value) &&
               listRowIs(slot6.canvas, rowOnScreen(kDistortionGrowl) - 1, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
           (std::string("screens: menu rows with the cursor on SLOT 6 ") + value).c_str());
