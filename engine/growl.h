@@ -38,10 +38,17 @@
 //    GROWL 0 and hardens toward a square as GROWL rises. A level gain holds the modulated voice at the
 //    power of the plain one. Without a pitch (unvoiced, silence) the wave holds its last rate and its
 //    depth falls to 0 over 20 ms, so breath does not buzz.
-// 3. The fold. A low shelf ahead of Distortion's quadratic knee and a high shelf after it tilt the
-//    tone to the low mids. DRIVE sets the knee's input gain and both shelves' depth, and a makeup gain
-//    follows it. At DRIVE 0 the fold is out and the rasped voice passes clean. The knee runs at the
-//    base rate, with no oversampling.
+//
+//    Each period of the half-pitch wave draws its own depth, the set depth times 1 - r * jitter, with r
+//    uniform in 0..1 and jitter rising in a straight line from 0 at GROWL 0 to jitterTop at GROWL 100 %.
+//    A period runs from one crest of the wave to the next. The wave is at gain 1 on a crest whatever the
+//    depth, so the new depth steps nothing. The draws come from a generator seeded at reset, so a render
+//    repeats bit for bit.
+// 3. The fold. A low shelf ahead of Distortion's quadratic knee tilts the tone to the low mids, and a
+//    peak after it adds bite. DRIVE sets the knee's input gain and the low shelf's depth. The peak
+//    sits at peakHz with width peakQ, and its gain rises in a straight line from 0 dB at GROWL 0 to
+//    peakDb at GROWL 100 %. A makeup gain follows the knee. At DRIVE 0 the fold is out and the rasped
+//    voice passes clean. The knee runs at the base rate, with no oversampling.
 //
 // The ring holds the input of the slot where the pitch stage runs, so the stages between that slot and
 // this card are not in the growl voice.
@@ -68,8 +75,10 @@ struct GrowlTuning {
   float thirdTop = 0.5f;        // the third-of-pitch wave's share at GROWL 100 %
   float lowShelfHz = 200.0f;    // ahead of the knee
   float lowShelfDb = 6.0f;      // at DRIVE 100 %
-  float highShelfHz = 4000.0f;  // after the knee
-  float highShelfDb = -6.0f;    // at DRIVE 100 %
+  float peakHz = 2500.0f;       // the bite peak, after the knee
+  float peakQ = 1.4f;           // its width
+  float peakDb = 6.0f;          // its gain at GROWL 100 % (the engine's DRIVE at kGrowlDriveTop)
+  float jitterTop = 0.35f;      // the most a period's depth is cut by, at GROWL 100 %
   float driveDb = 30.0f;        // the knee's input gain at DRIVE 100 %
   float makeupSat = 10.0f;      // the knee's input gain where the makeup law flattens
   float railSoft = 0.1f;        // the knee's soft edge as a fraction of the rail
@@ -95,6 +104,7 @@ constexpr float kMaxDriveDb = 48.0f;
 constexpr float kMinMakeupSat = 1.0f;
 constexpr float kMaxMakeupSat = 1000.0f;
 constexpr float kMaxShelfDb = 24.0f;
+constexpr float kMaxPeakQ = 10.0f;
 constexpr float kMaxTrimDb = 24.0f;
 constexpr float kMinRailSoft = 0.01f;
 constexpr float kMaxRailAsym = 0.5f;
@@ -113,6 +123,10 @@ constexpr float kThirdFrom = 0.5f;
 // three times it is the half-pitch wave and twice it the third-pitch wave, locked together.
 constexpr float kSixthTurn = 4294967296.0f / 6.0f;
 
+// The half-pitch wave's crest, a quarter turn in, and the jitter generator's seed.
+constexpr uint32_t kCrestTurn = 0x40000000u;
+constexpr uint32_t kJitterSeed = 0x9E3779B9u;
+
 // E[c^2] for c = clamp(k sin x, -1, 1) over a turn: k^2 / 2 up to k = 1, then the clipped share.
 // libm, so it runs per block at most.
 inline float clippedSinePower(float k) {
@@ -125,33 +139,36 @@ inline float clippedSinePower(float k) {
 
 // The fold's tilt, gain and makeup at one DRIVE.
 struct FoldGains {
-  float lowShelf = 0.0f;   // the low shelf's gain less 1
-  float pre = 1.0f;        // the knee's input gain
-  float highShelf = 0.0f;  // the high shelf's gain less 1
-  float post = 1.0f;       // the makeup
+  float lowShelf = 0.0f;  // the low shelf's gain less 1
+  float pre = 1.0f;       // the knee's input gain
+  float peak = 0.0f;      // the bite peak's gain less 1
+  float post = 1.0f;      // the makeup
 };
 
 // The rasp's wave and gains at one GROWL and depth fade: m = clamp(0.5 + half * sin, 0, 1) for each
-// wave, the third's share of the blend, and y = voice * (base + swing * m).
+// wave, the third's share of the blend, and y = voice * (base + swing * (1 - u * (1 - m))), where u is
+// the period's depth factor 1 - r * jitter.
 struct RaspGains {
   float half = 0.5f;
   float third = 0.0f;
   float base = 1.0f;
   float swing = 0.0f;
+  float jitter = 0.0f;
 };
 
-// The fold: a first-order low shelf, the knee's input gain, Distortion's rail, a first-order high
-// shelf, the makeup and a DC blocker for the rail's asymmetry. Its gains glide across a call from the
-// last call's to this one's.
+// The fold: a first-order low shelf, the knee's input gain, Distortion's rail, the bite peak, the
+// makeup and a DC blocker for the rail's asymmetry. The peak adds g times a band-pass of fixed width
+// and 0 dB gain at its centre to the signal, so its gain is 1 + g there and it glides without
+// moving a pole. Its gains glide across a call from the last call's to this one's.
 class Fold {
  public:
   void setTuning(const GrowlTuning& t) {
     lowLp_.set(t.lowShelfHz);
-    highLp_.set(t.highShelfHz);
+    setBand(t.peakHz, t.peakQ);
     const float soft = clampf(t.railSoft, kMinRailSoft, 1.0f);
     rail_ = Distortion::makeRail(1.0f - clampf(t.railAsym, 0.0f, kMaxRailAsym), soft);
     lowDb_ = clampf(t.lowShelfDb, -kMaxShelfDb, kMaxShelfDb);
-    highDb_ = clampf(t.highShelfDb, -kMaxShelfDb, kMaxShelfDb);
+    peakDb_ = clampf(t.peakDb, -kMaxShelfDb, kMaxShelfDb);
     driveDb_ = clampf(t.driveDb, 0.0f, kMaxDriveDb);
     sat_ = clampf(t.makeupSat, kMinMakeupSat, kMaxMakeupSat);
     unityMakeup_ = makeup(1.0f);
@@ -164,7 +181,7 @@ class Fold {
       at_ = d;
       gains_.lowShelf = dbToGainFast(lowDb_ * d) - 1.0f;
       gains_.pre = dbToGainFast(driveDb_ * d);
-      gains_.highShelf = dbToGainFast(highDb_ * d) - 1.0f;
+      gains_.peak = dbToGainFast(clampf(peakDb_ * d * peakPerDrive_, -kMaxShelfDb, kMaxShelfDb)) - 1.0f;
       gains_.post = unityMakeup_ / makeup(gains_.pre);
     }
     return gains_;
@@ -174,39 +191,49 @@ class Fold {
   void run(float* x, int m, FoldGains g, const FoldGains& step) {
     const Distortion::Rail r = rail_;
     float lo = lowLp_.y;
-    float hi = highLp_.y;
     float dc = dc_.y;
     const float aLo = lowLp_.a;
-    const float aHi = highLp_.a;
     const float aDc = dc_.a;
+    Biquad band = band_;
     for (int i = 0; i < m; ++i) {
       g.lowShelf += step.lowShelf;
       g.pre += step.pre;
-      g.highShelf += step.highShelf;
+      g.peak += step.peak;
       g.post += step.post;
       const float v = x[i];
       lo += aLo * (v - lo);
       const float c = Distortion::rail(r, (v + g.lowShelf * lo) * g.pre);
-      hi += aHi * (c - hi);
-      const float y = (c + g.highShelf * (c - hi)) * g.post;
+      const float y = (c + g.peak * band.run(c)) * g.post;
       dc += aDc * (y - dc);
       x[i] = y - dc;
     }
     lowLp_.y = lo;
-    highLp_.y = hi;
+    band_ = band;
     dc_.y = dc;
   }
 
   void clear() {
     lowLp_.clear();
-    highLp_.clear();
+    band_.clear();
     dc_.clear();
   }
 
   // False once a NaN or an infinity got into a filter, which no later sample would wash out.
-  bool finite() const { return std::isfinite(lowLp_.y + highLp_.y + dc_.y); }
+  bool finite() const { return std::isfinite(lowLp_.y + band_.z1 + band_.z2 + dc_.y); }
 
  private:
+  // The band-pass at hz and q with 0 dB gain at its centre (RBJ constant-peak form).
+  void setBand(float hz, float q) {
+    const RbjCorner k = rbjCorner(hz);
+    const float alpha = rbjAlpha(k.sw, clampf(q, kPeakMinQ, kMaxPeakQ));
+    const float inv = 1.0f / (1.0f + alpha);
+    band_.b0 = alpha * inv;
+    band_.b1 = 0.0f;
+    band_.b2 = -alpha * inv;
+    band_.a1 = -2.0f * k.cw * inv;
+    band_.a2 = (1.0f - alpha) * inv;
+  }
+
   // The knee's output level against its input gain: linear at first, flat once the gain passes sat_.
   float makeup(float gain) const {
     const float r = gain / sat_;
@@ -214,12 +241,13 @@ class Fold {
   }
 
   OnePole lowLp_;
-  OnePole highLp_;
+  Biquad band_;
   DcBlocker dc_;
   Distortion::Rail rail_ = Distortion::makeRail(0.95f, 0.1f);
   FoldGains gains_;
   float lowDb_ = 0.0f;
-  float highDb_ = 0.0f;
+  float peakDb_ = 0.0f;
+  float peakPerDrive_ = 1.0f / kGrowlDriveTop;  // the peak reaches peakDb where DRIVE reaches kGrowlDriveTop
   float driveDb_ = 0.0f;
   float sat_ = 10.0f;
   float unityMakeup_ = 1.0f;
@@ -245,6 +273,8 @@ class Growl {
     heldPeriod_ = 0.0f;
     phase_ = 0;
     phaseStep_ = 0;
+    rng_ = growl_detail::kJitterSeed;
+    periodDepth_ = 1.0f;
     wet_ = 0.0f;
     depthFade_ = 0.0f;
     growl_ = 0.0f;
@@ -297,6 +327,15 @@ class Growl {
   // Test hook: the delay the dry side reads at, in samples.
   float dryLagSamples() const { return dryLag_; }
 
+  // Test hooks: the voice's pitch ratio, the rasp wave's rate in Hz, the jitter at the last call's end and
+  // the running period's depth factor.
+  float pitchRatio() const { return pitchRatio_; }
+  float raspRateHz() const {
+    return static_cast<float>(static_cast<double>(phaseStep_) * (3.0 * kSampleRate / 4294967296.0));
+  }
+  float jitter() const { return rasp_.jitter; }
+  float periodDepth() const { return periodDepth_; }
+
   // Test hook: the syllable sweep, 0 to 1.
   float sweep() const { return sweep_.sweep(); }
 
@@ -331,6 +370,8 @@ class Growl {
       fold_.clear();
       sweep_.reset();
       phase_ = 0;
+      rng_ = growl_detail::kJitterSeed;
+      periodDepth_ = 1.0f;
       depthFade_ = 0.0f;
       fresh_ = true;
       idle_ = true;
@@ -383,8 +424,8 @@ class Growl {
     const float corr = pitch.correctionSemis();
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     const float voiceLag = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_);
-    voice_.prepare(heldPeriod_, exp2Fast((drop + corr) * (1.0f / 12.0f)), exp2Fast(throat_ * (1.0f / 12.0f)), voiceLag,
-                   n);
+    pitchRatio_ = exp2Fast((drop + corr) * (1.0f / 12.0f));
+    voice_.prepare(heldPeriod_, pitchRatio_, exp2Fast(throat_ * (1.0f / 12.0f)), voiceLag, n);
 
     // The dry reads at the lag the voice plays at, sliding there from where it was.
     const float lag0 = dryLag_;
@@ -403,7 +444,7 @@ class Growl {
     c.rasp0 = raspAt(growl0, fade0);
     const RaspGains r1 = raspAt(growl_, depthFade_);
     c.raspStep = {(r1.half - c.rasp0.half) * inv, (r1.third - c.rasp0.third) * inv, (r1.base - c.rasp0.base) * inv,
-                  (r1.swing - c.rasp0.swing) * inv};
+                  (r1.swing - c.rasp0.swing) * inv, (r1.jitter - c.rasp0.jitter) * inv};
     c.rasp = c.rasp0.swing != 0.0f || r1.swing != 0.0f;
     c.third = c.rasp0.third != 0.0f || r1.third != 0.0f;
 
@@ -415,7 +456,7 @@ class Growl {
       c.fold0 = fold_.gainsAt(drive0);
       const FoldGains f1 = fold_.gainsAt(drive_);
       c.foldStep = {(f1.lowShelf - c.fold0.lowShelf) * inv, (f1.pre - c.fold0.pre) * inv,
-                    (f1.highShelf - c.fold0.highShelf) * inv, (f1.post - c.fold0.post) * inv};
+                    (f1.peak - c.fold0.peak) * inv, (f1.post - c.fold0.post) * inv};
     } else {
       fold_.clear();
     }
@@ -449,8 +490,9 @@ class Growl {
 
   // The wave's gains at GROWL g and depth fade f. The level gain is 1 / sqrt(E[(base + swing m)^2]).
   // E[m] is 1/2 for either wave, so at depth D the gain's mean square before the level gain is
-  // 1 - D + D^2 E[m^2]. The two waves share no harmonic, so E[m2 m3] is 1/4. libm runs only when g or
-  // f moves.
+  // 1 - D + D^2 E[m^2]. The two waves share no harmonic, so E[m2 m3] is 1/4. A period's depth is
+  // D = d u with u = 1 - r jitter and r uniform in 0..1, so E[D] = d (1 - jitter / 2) and
+  // E[D^2] = d^2 (1 - jitter + jitter^2 / 3). libm runs only when g or f moves.
   RaspGains raspAt(float g, float f) {
     if (g == raspAt_ && f == raspFadeAt_) return rasp_;
     raspAt_ = g;
@@ -462,9 +504,18 @@ class Growl {
     const float q = 0.25f + 0.25f * growl_detail::clippedSinePower(slope);  // E[m^2] of either wave
     const float power = (1.0f - b) * (1.0f - b) * q + b * b * q + 2.0f * b * (1.0f - b) * 0.25f;
     const float d = g * f;
-    const float level = d > 0.0f ? 1.0f / sqrtf(1.0f - d + d * d * power) : 1.0f;
-    rasp_ = {0.5f * slope, b, level * (1.0f - d), level * d};
+    const float j = clampf(t.jitterTop, 0.0f, 1.0f) * smooth::clamp01(g * (1.0f / kGrowlRaspTop));
+    const float meanU = 1.0f - 0.5f * j;
+    const float meanU2 = 1.0f - j + j * j * (1.0f / 3.0f);
+    const float level = d > 0.0f ? 1.0f / sqrtf(1.0f - d * meanU + d * d * meanU2 * power) : 1.0f;
+    rasp_ = {0.5f * slope, b, level * (1.0f - d), level * d, j};
     return rasp_;
+  }
+
+  // The next r, uniform in [0, 1), from a 32-bit LCG. Its top 24 bits are the draw.
+  float nextUnit() {
+    rng_ = rng_ * 1664525u + 1013904223u;
+    return static_cast<float>(rng_ >> 8) * (1.0f / 16777216.0f);
   }
 
   // The rasp over the chunk at `at` in the call, in place on buf_. With no depth anywhere in the call
@@ -485,13 +536,23 @@ class Growl {
     float third = c.rasp0.third + c.raspStep.third * k;
     float base = c.rasp0.base + c.raspStep.base * k;
     float swing = c.rasp0.swing + c.raspStep.swing * k;
+    float jitter = c.rasp0.jitter + c.raspStep.jitter * k;
+    float depth = periodDepth_;
     uint32_t phase = phase_;
     const uint32_t step = phaseStep_;
+
+    // The wave's offset from its crest. It wraps from near 2^32 to near 0 as the wave crosses the crest,
+    // which is where a period ends and the next one draws its depth.
+    uint32_t sinceCrest = phase * 3u - growl_detail::kCrestTurn;
     for (int i = 0; i < m; ++i) {
       half += c.raspStep.half;
       base += c.raspStep.base;
       swing += c.raspStep.swing;
+      jitter += c.raspStep.jitter;
       phase += step;
+      const uint32_t crest = phase * 3u - growl_detail::kCrestTurn;
+      if (crest < sinceCrest) depth = 1.0f - nextUnit() * jitter;
+      sinceCrest = crest;
       float w = fminf(fmaxf(0.5f + half * sinTurns(phase * 3u), 0.0f), 1.0f);
       if (Third) {
         third += c.raspStep.third;
@@ -499,16 +560,17 @@ class Growl {
         w += third * (w3 - w);
       }
       const size_t j = static_cast<size_t>(i);
-      buf_[j] *= base + swing * w;
+      buf_[j] *= base + swing * (1.0f - depth * (1.0f - w));
     }
     phase_ = phase;
+    periodDepth_ = depth;
   }
 
   // The fold's gains at sample `at` of the call.
   static FoldGains foldAt(const Call& c, int at) {
     const float k = static_cast<float>(at);
     return {c.fold0.lowShelf + c.foldStep.lowShelf * k, c.fold0.pre + c.foldStep.pre * k,
-            c.fold0.highShelf + c.foldStep.highShelf * k, c.fold0.post + c.foldStep.post * k};
+            c.fold0.peak + c.foldStep.peak * k, c.fold0.post + c.foldStep.post * k};
   }
 
   // Blends the dry into buf_ in place, trim included: the voice at its MIX share plus the ring read at
@@ -570,6 +632,9 @@ class Growl {
   float heldPeriod_ = 0.0f;    // the tracker's period, or the last one it gave
   uint32_t phase_ = 0;         // the wave's counter, at a sixth of the pitch
   uint32_t phaseStep_ = 0;     // its step per sample, held through unvoiced frames
+  uint32_t rng_ = growl_detail::kJitterSeed;  // the jitter generator
+  float periodDepth_ = 1.0f;   // the running period's depth factor, 1 - r * jitter
+  float pitchRatio_ = 0.5f;    // the voice's pitch ratio at the last call
   float wet_ = 0.0f;           // the dry-to-voice crossfade, 0 dry .. 1 voice
   float depthFade_ = 0.0f;     // the wave's depth fade, 1 with a pitch
   float growl_ = 0.0f;         // GROWL after its glide

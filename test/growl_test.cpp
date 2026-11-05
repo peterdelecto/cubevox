@@ -1,7 +1,9 @@
 // Growl card checks: off is a bit-exact copy, the voice drops an octave, the wave's depth falls without
 // a pitch, the throat follows each syllable and rests in silence, MIX 100 % is the plain card and MIX 0 is
 // the input at the voice's lag, the output stays finite at every knob corner, the level at the default
-// (GROWL 75 %, MIX 100 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. Each run feeds a
+// (GROWL 75 %, MIX 100 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. GROWL 0
+// is bit-exact with the card before the bite peak and the jitter, the peak reads +6 dB at 2.5 kHz at GROWL
+// 100 %, the jitter repeats from reset, and an onset leaves the pitch ratio, rasp rate and read lag alone. Each run feeds a
 // PitchFx first, so the ring is written and the tracker runs, as the chain does. The clip rows skip
 // when samples/ is absent. No window, no audio device.
 
@@ -459,10 +461,10 @@ uint64_t hashOf(const Signal& x) {
   return h;
 }
 
-constexpr uint64_t kFullMixHash = 0x29f1217abb29799aull;
+constexpr uint64_t kFullMixHash = 0xe612d0eb66b4d4d4ull;
 
-// MIX at its default 100 % leaves the card as it was before the knob existed. The hash is the output of
-// that engine on a sung note at GROWL 0.80 and DRIVE 0.65.
+// MIX at its default 100 % is the plain card. The hash is the output on a sung note at GROWL 0.80 and
+// DRIVE 0.65, and it moves with any change to the voice, the rasp or the fold.
 bool checkFullMix() {
   const Signal in = sungNote(220.0, 2.0, -20.0);
   Rig rig;
@@ -514,6 +516,149 @@ bool checkMixZero() {
                 detail);
 }
 
+// GROWL 0 is the card as it was before the bite peak and the rasp jitter: the output hashes below come
+// from that engine on a sung note at MIX 100 %, 50 % and 0, and the peak is flat and the jitter 0 there.
+bool checkGrowlZero() {
+  const Signal in = sungNote(220.0, 2.0, -20.0);
+  constexpr uint64_t kWant[] = {0xffe59b253f6206efull, 0x5a8bcd4af6234c4full, 0x29a92437402dfa30ull};
+  const float mixes[] = {1.0f, 0.5f, 0.0f};
+  bool same = true;
+  float jitter = 1.0f;
+  for (size_t k = 0; k < 3; ++k) {
+    Rig rig;
+    same = same && hashOf(rig.run(in, potAt(0.0f, mixes[k]))) == kWant[k];
+    jitter = rig.growl->jitter();
+  }
+  cv::growl_detail::Fold fold;
+  fold.setTuning(cv::GrowlTuning{});
+  const float peak = fold.gainsAt(0.0f).peak;
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "3 MIX settings bit-exact with the old engine: %s; peak gain less 1 %.1f (0), jitter %.1f (0)",
+                same ? "yes" : "no", static_cast<double>(peak), static_cast<double>(jitter));
+  return report("GROWL 0 unchanged", same && peak == 0.0f && jitter == 0.0f, detail);
+}
+
+// The bite peak through the fold with the knee, shelf and makeup set flat: a 2.5 kHz sine comes out +6 dB
+// at DRIVE kGrowlDriveTop (GROWL 100 %), +3 dB at half that and 0 dB at 0, within 0.5 dB, and a sine two
+// octaves off the peak moves less than 1 dB.
+double foldGainDb(double hz, float drive) {
+  cv::GrowlTuning t;
+  t.lowShelfDb = 0.0f;
+  t.driveDb = 0.0f;
+  cv::growl_detail::Fold fold;
+  fold.setTuning(t);
+  const cv::growl_detail::FoldGains gains = fold.gainsAt(drive);
+  const size_t total = 4 * kRate / 10;
+  Signal x(total);
+  for (size_t i = 0; i < total; ++i) x[i] = static_cast<float>(0.05 * std::sin(2.0 * kPi * hz * static_cast<double>(i) / kRate));
+  const Signal ref = x;
+  for (size_t i = 0; i < total; i += cv::kBlock) fold.run(&x[i], cv::kBlock, gains, cv::growl_detail::FoldGains{0, 0, 0, 0});
+  const size_t from = total / 2;
+  return 20.0 * std::log10(rms(x, from, total) / rms(ref, from, total));
+}
+
+bool checkPeak() {
+  const double full = foldGainDb(2500.0, cv::kGrowlDriveTop);
+  const double half = foldGainDb(2500.0, 0.5f * cv::kGrowlDriveTop);
+  const double none = foldGainDb(2500.0, 0.0f);
+  const double low = foldGainDb(625.0, cv::kGrowlDriveTop);
+  const double high = foldGainDb(10000.0, cv::kGrowlDriveTop);
+  char detail[160];
+  std::snprintf(detail, sizeof detail, "2.5 kHz: %+.2f dB at GROWL 100 %% (+6), %+.2f at 50 %% (+3), %+.2f at 0 (0); 625 Hz %+.2f, 10 kHz %+.2f (< 1)",
+                full, half, none, low, high);
+  const bool ok = std::fabs(full - 6.0) < 0.5 && std::fabs(half - 3.0) < 0.5 && std::fabs(none) < 0.01 &&
+                  std::fabs(low) < 1.0 && std::fabs(high) < 1.0;
+  return report("bite peak gain", ok, detail);
+}
+
+// Two runs from reset are bit for bit the same, so the jitter repeats. The jitter is on: the output differs
+// from a run with jitterTop 0. It reads 0.35 at GROWL 100 % and 0.175 at 50 %, and the period depth stays
+// in 1 - jitter .. 1 and takes more than a few values.
+bool checkJitter() {
+  const Signal in = sungNote(220.0, 2.0, -20.0);
+  Rig a;
+  Rig b;
+  const Signal outA = a.run(in, potAt(1.0f, 1.0f));
+  const Signal outB = b.run(in, potAt(1.0f, 1.0f));
+  const bool repeats = outA == outB;
+  cv::GrowlParams flat = potAt(1.0f, 1.0f);
+  flat.tuning.jitterTop = 0.0f;
+  Rig c;
+  const bool active = c.run(in, flat) != outA;
+  const float jitterTop = a.growl->jitter();
+  Rig half;
+  half.run(in, potAt(0.5f, 1.0f));
+  const float jitterHalf = half.growl->jitter();
+
+  Rig watch;
+  float lo = 1.0f, hi = 0.0f;
+  size_t distinct = 0;
+  float last = -1.0f;
+  Signal out(in.size());
+  for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
+    cv::PitchFxParams pp;
+    pp.growlOn = true;
+    watch.pitch->process(&in[i], &out[i], cv::kBlock, pp);
+    watch.growl->process(&out[i], &out[i], cv::kBlock, potAt(1.0f, 1.0f), *watch.pitch);
+    if (i < static_cast<size_t>(kRate)) continue;
+    const float depth = watch.growl->periodDepth();
+    lo = std::fmin(lo, depth);
+    hi = std::fmax(hi, depth);
+    distinct += depth != last ? 1 : 0;
+    last = depth;
+  }
+  char detail[176];
+  std::snprintf(detail, sizeof detail, "repeat bit-exact %s, differs from no jitter %s, jitter %.3f (0.35) and %.3f (0.175), depth %.3f..%.3f in (0.65..1), %zu changes",
+                repeats ? "yes" : "no", active ? "yes" : "no", static_cast<double>(jitterTop), static_cast<double>(jitterHalf),
+                static_cast<double>(lo), static_cast<double>(hi), distinct);
+  const bool ok = repeats && active && std::fabs(jitterTop - 0.35f) < 1e-5f && std::fabs(jitterHalf - 0.175f) < 1e-5f &&
+                  lo >= 0.65f - 1e-5f && hi <= 1.0f && lo < 0.8f && hi > 0.9f && distinct > 20;
+  return report("rasp jitter", ok, detail);
+}
+
+// A steady 220 Hz note with a hard onset out of silence, GROWL 100 %. For the first 150 ms after the voice
+// comes in, the card's own pitch ratio stays at 0.5, the rasp wave stays at half the tracker's pitch and the
+// voice's read lag stays put, each within the bound printed below. The throat is the one thing that moves
+// at an onset, by its law, and stays between -12 and -5 st.
+bool checkOnsetHolds() {
+  Signal in(static_cast<size_t>(0.3 * kRate), 0.0f);
+  constexpr double kHz = 220.0;
+  for (size_t i = 0; i < static_cast<size_t>(kRate); ++i) {
+    double v = 0.0;
+    for (int k = 1; k * kHz < 5000.0; ++k) v += std::sin(2.0 * kPi * k * kHz * static_cast<double>(i) / kRate) / k;
+    in.push_back(static_cast<float>(0.1 * v));
+  }
+  Rig rig;
+  const cv::GrowlParams g = potAt(1.0f, 1.0f);
+  Signal out(in.size());
+  size_t counted = 0;
+  const size_t want = static_cast<size_t>(150 * cv::kSmpPerMs) / cv::kBlock;
+  float ratioWorst = 0.0f, rateWorst = 0.0f, lagLo = 1e9f, lagHi = 0.0f, throatLo = 0.0f, throatHi = -99.0f;
+  for (size_t i = 0; i + cv::kBlock <= in.size() && counted < want; i += cv::kBlock) {
+    cv::PitchFxParams pp;
+    pp.growlOn = true;
+    rig.pitch->process(&in[i], &out[i], cv::kBlock, pp);
+    rig.growl->process(&out[i], &out[i], cv::kBlock, g, *rig.pitch);
+    if (rig.growl->wet() == 0.0f) continue;
+    ++counted;
+    const float period = rig.pitch->pitch().period;
+    ratioWorst = std::fmax(ratioWorst, std::fabs(rig.growl->pitchRatio() - 0.5f));
+    rateWorst = std::fmax(rateWorst, std::fabs(rig.growl->raspRateHz() - 0.5f * static_cast<float>(kRate) / period));
+    const float lag = static_cast<float>(cv::PsolaVoice::kGrainDelay) + cv::PitchTracker::clampPeriod(period);
+    lagLo = std::fmin(lagLo, lag);
+    lagHi = std::fmax(lagHi, lag);
+    throatLo = std::fmin(throatLo, rig.growl->throatSt());
+    throatHi = std::fmax(throatHi, rig.growl->throatSt());
+  }
+  char detail[176];
+  std::snprintf(detail, sizeof detail, "%zu blocks: pitch ratio off 0.5 by %.1e (1e-4), rasp rate off half the pitch by %.3f Hz (0.5), lag spread %.2f samples (0.5), throat %.2f..%.2f st (-12..-5)",
+                counted, static_cast<double>(ratioWorst), static_cast<double>(rateWorst), static_cast<double>(lagHi - lagLo),
+                static_cast<double>(throatLo), static_cast<double>(throatHi));
+  const bool ok = counted == want && ratioWorst < 1e-4f && rateWorst < 0.5f && lagHi - lagLo < 0.5f && throatLo >= -12.0f &&
+                  throatHi <= -5.0f + 1e-3f;
+  return report("onset holds pitch and lag", ok, detail);
+}
+
 }  // namespace
 
 int main() {
@@ -532,6 +677,10 @@ int main() {
   ok &= checkAlias();
   ok &= checkFullMix();
   ok &= checkMixZero();
+  ok &= checkGrowlZero();
+  ok &= checkPeak();
+  ok &= checkJitter();
+  ok &= checkOnsetHolds();
   std::printf("%s growl\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }
