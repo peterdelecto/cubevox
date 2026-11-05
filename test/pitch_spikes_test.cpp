@@ -9,7 +9,7 @@
 //    block. The board's memset stores a byte at a time, about 250k cycles, so the one block read 47 % of
 //    the budget against a settled worst of 7 %. A stopped stage now clears the ring a slice a block, and
 //    the switch-on finds it clear. The host's memset is fast, so the ring work is counted as well as timed.
-//    The Ring mod card keeps a ring and a tracker of its own and rests the same way, so the check runs on
+//    The Ringer card keeps a ring and a tracker of its own and rests the same way, so the check runs on
 //    it too.
 //
 // Block times are the minimum over several passes of one deterministic run, in host nanoseconds. No window,
@@ -138,7 +138,7 @@ bool testOnsetSpread(const std::vector<Signal>& clips) {
 
 // 2. A card switched on that keeps a ring and a tracker. Layout: Input gate, two empty slots, Unison, Echo, the
 // subject, Gate, Spring. The subject is Deepthroat, whose toggle starts and stops the shared pitch stage and
-// nothing else does, or Ring mod, whose toggle starts and stops the card's own tracker.
+// nothing else does, or Ringer, whose toggle starts and stops the card's own tracker.
 struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
@@ -304,7 +304,7 @@ int main() {
   bool ok = true;
   ok &= testOnsetSpread(clips);
   ok &= testSwitchOn(clips, Card::Growl, "Deepthroat");
-  ok &= testSwitchOn(clips, Card::RingMod, "Ring mod");
+  ok &= testSwitchOn(clips, Card::RingMod, "Ringer");
   std::printf("%s pitch_spikes\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

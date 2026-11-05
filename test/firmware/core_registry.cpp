@@ -87,7 +87,7 @@ void checkGroups() {
   check(reverbs == 2, "two reverb-group cards: Spring and Chasm");
   check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch &&
             cardDesc(Card::RingMod).group == Group::None,
-        "autotune, octave, formant, Yawn, the crowd card and growl are the pitch group, and ring mod is not");
+        "autotune, octave, formant, Yawn, the crowd card and growl are the pitch group, and ringer is not");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive, Range) sits on knob B, the lower pot of its slot, and each parameter
@@ -446,7 +446,7 @@ void checkAppendedCards() {
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
             static_cast<int>(Engine::Growl) == 10 && static_cast<int>(Engine::RingMod) == 11 &&
             kEngineCount == 12,
-        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl and Ring mod after the Crowd engine");
+        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl and Ringer after the Crowd engine");
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
   };
@@ -455,13 +455,13 @@ void checkAppendedCards() {
         "appended cards: each registry row is its costs.h row");
 }
 
-// Ring mod, the third card of slot 6, has an engine of its own with a tracker of its own, so it sits in no group.
+// Ringer, the third card of slot 6, has an engine of its own with a tracker of its own, so it sits in no group.
 // RATIO is a stepped knob of seven labelled ratios and MIX a percent.
 void checkRingModCard() {
   const CardDesc& d = cardDesc(Card::RingMod);
-  check(std::strcmp(d.id, "ringmod") == 0 && std::strcmp(d.name, "Ring mod") == 0 && d.engine == Engine::RingMod &&
+  check(std::strcmp(d.id, "ringmod") == 0 && std::strcmp(d.name, "Ringer") == 0 && d.engine == Engine::RingMod &&
             d.group == Group::None && d.knobCount == 2,
-        "ringmod: id ringmod, name Ring mod, its own engine, no group");
+        "ringmod: id ringmod, name Ringer, its own engine, no group");
   const KnobDesc& ratio = *knobDesc(Card::RingMod, 0);
   check(std::strcmp(ratio.name, "RATIO") == 0 && knobSteps(Card::RingMod, 0) == 7 && ratio.labels != nullptr &&
             std::strcmp(knobLabel(ratio, 2), "X1.5") == 0 && std::strcmp(knobDesc(Card::RingMod, 1)->name, "MIX") == 0 &&

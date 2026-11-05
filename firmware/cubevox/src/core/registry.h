@@ -41,7 +41,7 @@ constexpr size_t kCardIdBytes = 16;
 
 // Engines the audio block owns. Cards map onto them: Autotune, Octave, Formant and the Formant
 // follower share Pitch, and both reverb cards share Reverb. The Crowd and Growl cards have engines
-// of their own and read the Pitch engine's ring or tracker. The Ring mod card has an engine of its own with
+// of their own and read the Pitch engine's ring or tracker. The Ringer card has an engine of its own with
 // a tracker and ring of its own. Count ends the list.
 enum class Engine : uint8_t {
   InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, RingMod, Count

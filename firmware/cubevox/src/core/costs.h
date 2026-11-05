@@ -49,7 +49,7 @@
 // kPitchStage, once.
 //
 // A layout is accepted when both column sums over its cards, plus the fixed term, the shared tracker once
-// when Autotune, Crowd, Formant, Yawn or Deepthroat is placed (Ring mod's row holds its own), and kPitchStage once when Octave or Formant is placed
+// when Autotune, Crowd, Formant, Yawn or Deepthroat is placed (Ringer's row holds its own), and kPitchStage once when Octave or Formant is placed
 // without Autotune, stay under their lines. The trailing comments give the measured cycles, mean
 // then worst; a row marked measured=false is an estimate until a board measures it.
 
@@ -145,7 +145,7 @@ constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run o
 
 // The audition cards of 2026-11-04, from the host bench of Growl's method (Apple clang -O2 with the firmware's
 // float contraction, Adam's three clips in 64-sample blocks, minimum of 9 passes, steady_clock around each
-// call, 50.4k board cycles per host us). Ring mod is Distortion's second alternate in slot 6. It runs a pitch
+// call, 50.4k board cycles per host us). Ringer is Distortion's second alternate in slot 6. It runs a pitch
 // tracker of its own (the coarse search) on its input, so its row holds the tracker and a layout with it pays
 // kTracker only for the shared tracker of Autotune, Mob, Formant, Yawn or Deepthroat. The card alone is 2.0 ns
 // a sample, 129 ns a block, 6.5k cycles, 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %; its

@@ -19,7 +19,7 @@ Card nextSlot3Card(Card c) {
   }
 }
 
-// The card after `c` in the slot 6 cycle, Distortion to Growl to Ring mod and back to Distortion.
+// The card after `c` in the slot 6 cycle, Distortion to Growl to Ringer and back to Distortion.
 Card nextSlot6Card(Card c) {
   switch (c) {
     case Card::Distortion: return Card::Growl;

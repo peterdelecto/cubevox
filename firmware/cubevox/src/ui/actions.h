@@ -25,7 +25,7 @@ enum class ApplyResult : uint8_t {
 // next of the three in that order, wrapping, as the slot 7 action does below.
 // The Unison and Crowd action swaps the slot that holds Unison or Mob to the other, as the slot 6
 // action does below.
-// The slot 6 action moves the slot that holds Distortion, Growl or Ring mod to the next of the three in
+// The slot 6 action moves the slot that holds Distortion, Growl or Ringer to the next of the three in
 // that order, wrapping, as the slot 7 action does below.
 // The slot 7 action moves the slot that holds Gate, Lo-fi or Chatter to the next of the three in that
 // order, wrapping, and passes over a card the placement rules refuse. It changes nothing when no slot

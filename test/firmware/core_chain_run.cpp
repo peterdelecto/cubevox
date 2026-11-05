@@ -1115,7 +1115,7 @@ void checkAppendedCardsRun() {
   check(allZero(runBlock(*lofiRig, lofi, Block{}, StillClock()).out), "resetEngine clears the Lo-fi engine, so silence in is silence out");
 }
 
-// Ring mod tracks its own input with a tracker and ring of its own. With only its toggle on, the shared pitch
+// Ringer tracks its own input with a tracker and ring of its own. With only its toggle on, the shared pitch
 // stage never runs (its ring stays unwritten and its tracker unvoiced), and the card's tracker finds the
 // tone. After its toggle goes off and the slot fades out, each block the slot sits stopped clears a slice of
 // the card's ring, and a few blocks leave it clear.
@@ -1128,13 +1128,13 @@ void checkRingModOwnTracker() {
   const cv::PitchResult& own = rig->engines.ringMod.pitch();
   check(rig->engines.pitch.head() == 0 && rig->engines.pitch.pitch().period == 0.0f && own.voiced && own.hz > 215.0f &&
             own.hz < 225.0f,
-        "ring mod: its own tracker reads the tone and the shared pitch stage does not run");
+        "ringer: its own tracker reads the tone and the shared pitch stage does not run");
 
   const ChainSnapshot off = snapshotToggles(layout, 0.5f, togglesOn({}));
   for (int b = 0; b < kSlotFadeBlocks + 4; ++b) runBlock(*rig, off, tone(60 + b, 0.3f), StillClock());
   const auto& ring = rig->engines.ringMod.ringForTest();
   check(std::all_of(ring.begin(), ring.end(), [](float v) { return v == 0.0f; }),
-        "ring mod: a few blocks with the slot stopped leave the card's ring clear");
+        "ringer: a few blocks with the slot stopped leave the card's ring clear");
 }
 
 // Formant acts at the first pitch-group card's slot, wherever its own card sits. Its toggle alone keeps
