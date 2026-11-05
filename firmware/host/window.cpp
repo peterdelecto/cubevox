@@ -355,15 +355,15 @@ void drawTopBand(Frame& f) {
 
 // The cells of the four grid switches, in the order the menu cycles their cards. The slot 7 switch
 // has GATE and LO-FI side by side over CHATTER, the slot 4 switch UNISON and MOB side by side, the slot
-// 6 switch DISTORTION over GROWL, and the slot 3 switch stacks OCTAVE, FORMANT and YAWN.
+// 6 switch DISTORTION over THROAT, and the slot 3 switch stacks OCTAVE, FORMANT and YAWN.
 constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"CHATTER", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
 constexpr std::array<GridCell, 2> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot4Cards = {Card::Unison, Card::Crowd};
 constexpr std::array<GridCell, kStackRows> kSlot6Cells = {
-    {{"DISTORTION", 0.0f, 0, 1.0f}, {"GROWL", 0.0f, 1, 1.0f}, {"RING MOD", 0.0f, 2, 1.0f}}};
+    {{"DISTORTION", 0.0f, 0, 1.0f}, {"THROAT", 0.0f, 1, 1.0f}, {"RING MOD", 0.0f, 2, 1.0f}}};
 constexpr std::array<Card, kStackRows> kSlot6Cards = {Card::Distortion, Card::Growl, Card::RingMod};
-constexpr std::array<GridCell, 3> kSlot8Cells = {{{"SPRING", 0.0f, 0, 0.5f}, {"CHASM", 0.5f, 0, 0.5f}, {"STRINGS", 0.0f, 1, 1.0f}}};
+constexpr std::array<GridCell, 3> kSlot8Cells = {{{"SPRING", 0.0f, 0, 0.5f}, {"CHASM", 0.5f, 0, 0.5f}, {"SYMPATHETIC", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot8Cards = {Card::ReverbSpring, Card::ReverbChasm, Card::Strings};
 constexpr std::array<GridCell, kStackRows> kSlot3Cells = {
     {{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}, {"YAWN", 0.0f, 2, 1.0f}}};
@@ -424,12 +424,12 @@ void drawSlot(Frame& f, int slot) {
 
   const Card card = f.box.layout().card[static_cast<size_t>(slot)];
   const CardDesc& desc = cardDesc(card);
-  drawTextCentered(dl, ImVec2(centerX, y + kColPad + half(kNameH)), kFontName, card == Card::Empty ? kDim : kText,
+  drawTextCentered(dl, ImVec2(centerX, kNameY + half(kNameH)), kFontName, card == Card::Empty ? kDim : kText,
                    desc.name);
 
   ImGui::PushID(slot);
   for (int k = 0; k < desc.knobCount; ++k) {
-    const float boxTop = y + kColPad + kNameH + kGap + static_cast<float>(k) * (kKnobBoxD + kLabelH);
+    const float boxTop = y + kColPad + static_cast<float>(k) * (kKnobBoxD + kLabelH);
     float& v = f.panel.input.knob[static_cast<size_t>(slot * kKnobsPerCard + k)];
     knob(f, k == 0 ? "upper" : "lower", ImVec2(centerX, boxTop + half(kKnobBoxD)), v, knobSteps(card, k));
     char label[kTextBytes];

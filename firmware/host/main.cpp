@@ -155,14 +155,14 @@ constexpr std::array<CardRow, 3> kSlot3Rows = {
     {{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
      {Card::FormantFollower, "formant_follow", "yawn", "YAWN", costs::kFormantFollower},
      {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
-constexpr std::array<CardRow, 3> kSlot6Rows = {{{Card::Growl, "growl", "growl", "GROWL", costs::kGrowl},
+constexpr std::array<CardRow, 3> kSlot6Rows = {{{Card::Growl, "growl", "growl", "THROAT", costs::kGrowl},
                                                 {Card::RingMod, "ringmod", "ringmod", "RING MOD", costs::kRingMod},
                                                 {Card::Distortion, "distortion", "distortion", "DISTORTION",
                                                  costs::kDistortion}}};
 
 // The slot 8 cards in the menu's cycle order, Spring last so the walk ends on the default.
 constexpr std::array<CardRow, 3> kSlot8Rows = {{{Card::ReverbChasm, "reverb_chasm", "chasm", "CHASM", costs::kReverbChasm},
-                                                {Card::Strings, "strings", "strings", "STRINGS", costs::kStrings},
+                                                {Card::Strings, "strings", "strings", "SYMPATHETIC", costs::kStrings},
                                                 {Card::ReverbSpring, "reverb_spring", "spring", "SPRING",
                                                  costs::kReverbSpring}}};
 constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO-FI", costs::kLofi},
@@ -536,6 +536,8 @@ int runCheck(const char* argv0) {
 int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot6, Card slot7,
              Card slot8) {
   Rig rig;
+  Panel panel;
+  rig.panel = panel.input;  // the window's start state, every toggle off
   if (!rig.source.findClip(argv0)) return 1;
   rig.box.pickSlot3Card(slot3);
   rig.box.pickSlot6Card(slot6);
@@ -544,7 +546,6 @@ int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3,
   rig.run(kProofMs, false);
   Window window(false);
   if (!window.ok()) return 1;
-  Panel panel;
   panel.input = rig.panel;
   if (!window.saveProof(rig.box, panel, micAvailable, path)) {
     std::fprintf(stderr, "[ERROR] proof: could not write %s\n", path);

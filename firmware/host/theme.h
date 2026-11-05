@@ -203,9 +203,9 @@ constexpr float kMuteW = units(6);         // the MUTE label's column, wider tha
 constexpr float kColW = (kWindowW - 2 * kPad - (kSlotCount - 1) * kGap) / kSlotCount;
 constexpr float kColPad = units(1);
 constexpr float kColInnerW = kColW - 2 * kColPad;
-constexpr float kNameH = units(3);
+constexpr float kNameH = units(3);  // the card's name, in the row between its toggle and its column
 constexpr float kLabelH = units(3);
-constexpr float kColH = kColPad + kNameH + kGap + 2 * (kKnobBoxD + kLabelH) + kGap + kGridH + kColPad;
+constexpr float kColH = kColPad + 2 * (kKnobBoxD + kLabelH) + kGap + kGridH + kColPad;
 static_assert(kStackH <= kGridH + kGap - kGapTight, "the slot 3 stack leaves kGapTight under the lower knob's label");
 
 // ---- LED and CPU line
@@ -222,7 +222,8 @@ constexpr float kTopY = kPad;
 constexpr float kOledX = (kWindowW - kOledW) / 2;
 constexpr float kRightX = kOledX + kOledW + kBezel + kGapWide;  // the MENU column
 constexpr float kToggleY = kTopY + kOledH + kGapWide;  // the row of eight bat toggles
-constexpr float kSlotY = kToggleY + kBatH + kGapTight;
+constexpr float kNameY = kToggleY + kBatH + kGapTight;  // the row of eight card names, over the columns
+constexpr float kSlotY = kNameY + kNameH + kGapTight;
 constexpr float kBottomY = kSlotY + kColH + kGapWide;
 constexpr float kSourceW = kColInnerW;
 constexpr float kVersionX = kPad + kSourceW + kGap;  // the version sits beside the source switch
