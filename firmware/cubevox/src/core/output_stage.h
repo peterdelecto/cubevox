@@ -33,7 +33,7 @@ struct GainRamp {
   float step;
 };
 
-// The output gain from block to block. A change of the output trim (OUTPUT LINE / MIC is 30 dB)
+// The output gain from block to block. A change of the output trim (OUTPUT PAD OFF / ON is 30 dB)
 // ramps across one block instead of stepping between two samples; the layout fade's own ramp
 // multiplies in.
 class OutputGain {

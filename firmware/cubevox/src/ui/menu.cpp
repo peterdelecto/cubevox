@@ -38,11 +38,11 @@ constexpr int kHaveTagCols = kDisplayCols - static_cast<int>(sizeof(kHavePrefix)
 // The rows top to bottom.
 enum class Item : uint8_t {
   InputJack,
-  Reverb,
   OctaveFormant,
   UnisonCrowd,
   DistortionGrowl,
   Slot7Card,
+  Reverb,
   PolishComp,
   VoxEq,
   Output,
@@ -82,16 +82,16 @@ const char* slotLabel(int slot, char* buf, size_t size) {
   return buf;
 }
 
-// The label of `it`. The Octave and Formant row, the Unison and Crowd row, the Distortion and Growl row
-// and the slot 7 row name the slot that holds their card, or a dash when none does, and build the text
+// The label of `it`. The five card rows (Octave and Formant, Unison and Crowd, Distortion and Growl,
+// slot 7, reverb) name the slot that holds their card, or a dash when none does, and build the text
 // in `buf`.
 const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
   switch (it) {
-    case Item::InputJack: return "INPUT";
-    case Item::Output: return "OUTPUT";
+    case Item::InputJack: return "INPUT PAD";
+    case Item::Output: return "OUTPUT PAD";
     case Item::TopSwitch: return "TOP SWITCH";
-    case Item::Brightness: return "BRIGHTNESS";
-    case Item::Reverb: return "REVERB";
+    case Item::Brightness: return "OLED BRIGHT";
+    case Item::Reverb: return slotLabel(reverbSlot(layout), buf, size);
     case Item::OctaveFormant: return slotLabel(octaveFormantSlot(layout), buf, size);
     case Item::UnisonCrowd: return slotLabel(unisonCrowdSlot(layout), buf, size);
     case Item::DistortionGrowl: return slotLabel(distortionGrowlSlot(layout), buf, size);
@@ -166,8 +166,8 @@ const char* slot7CardValue(const Layout& layout) {
 const char* itemValue(Item it, const UiContext& ctx) {
   const Settings& s = ctx.settings;
   switch (it) {
-    case Item::InputJack: return s.inputJack == InputJack::Mic ? "MIC" : "LINE";
-    case Item::Output: return s.outputLevel == OutputLevel::Mic ? "MIC" : "LINE";
+    case Item::InputJack: return onOff(s.inputJack == InputJack::Line);
+    case Item::Output: return onOff(s.outputLevel == OutputLevel::Mic);
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     case Item::Brightness: return brightnessLevel(s.brightness).name;
     case Item::Reverb: return reverbValue(ctx.layout);
@@ -278,6 +278,16 @@ UiAction Menu::onClick() {
   return UiAction::None;
 }
 
+// A hold on the list closes it, as the EXIT row does. A hold with the menu closed opens it, as a click
+// does. The confirm, chain and starting screens ignore it, so a long press never starts the update.
+void Menu::onHold() {
+  if (mode_ == Mode::Idle) {
+    onClick();
+  } else if (mode_ == Mode::List) {
+    mode_ = Mode::Idle;
+  }
+}
+
 void Menu::onTurn(int32_t detents) {
   if (mode_ == Mode::List) {
     cursor_ = static_cast<uint8_t>((cursor_ + detents % kItemCount + kItemCount) % kItemCount);
@@ -294,9 +304,10 @@ void Menu::onTurn(int32_t detents) {
 
 UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   if (!listening_) return UiAction::None;
-  if (in.detents != 0 || in.click) lastActivityMs_ = nowMs;
+  if (in.detents != 0 || in.click || in.hold) lastActivityMs_ = nowMs;
   if (in.detents != 0) onTurn(in.detents);
   const UiAction action = in.click ? onClick() : UiAction::None;
+  if (in.hold) onHold();
   if (mode_ != Mode::Idle && mode_ != Mode::Starting && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
   return action;
 }

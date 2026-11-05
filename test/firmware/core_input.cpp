@@ -1,4 +1,4 @@
-// Checks the input logic on the host. Covers debouncing, knob filtering, the periodic timer,
+// Checks the input logic on the host. Covers debouncing, the MENU button's click and hold, knob filtering, the periodic timer,
 // the publish gate, the input jack switch, the mute sequence and the power-fail mute policy.
 
 #include "support.h"
@@ -11,6 +11,7 @@
 #include "core/jack_switch.h"
 #include "core/knob_filter.h"
 #include "core/loop_policy.h"
+#include "core/menu_button.h"
 #include "core/mute_sequence.h"
 #include "core/panel.h"
 #include "core/power_fail.h"
@@ -33,6 +34,59 @@ void checkDebounce() {
   in.update(false, 300, 20);
   in.update(true, 310, 20);
   check(!in.update(true, 325, 20) && in.level(), "debounce: glitch shorter than hold ignored");
+}
+
+// A press shorter than kMenuHoldMs is a click on the release, and a press that reaches it is one hold
+// at that moment and nothing on the release.
+void checkMenuButton() {
+  MenuButton b;
+  b.reset(false);
+  uint32_t t = 1000;
+  check(!b.update(true, t).click && !b.update(true, t + 5).hold, "menu button: the press itself is not a click");
+  MenuButtonEvent ev = b.update(false, t + 100);
+  check(ev.click && !ev.hold, "menu button: a short press is a click on the release");
+  ev = b.update(false, t + 200);
+  check(!ev.click && !ev.hold, "menu button: and the click comes once");
+
+  t = 2000;
+  b.update(true, t);
+  ev = b.update(true, t + kMenuHoldMs - 1);
+  check(!ev.hold && !ev.click, "menu button: a press one ms under the hold time is not yet a hold");
+  ev = b.update(false, t + kMenuHoldMs - 1 + 1);
+  check(ev.click && !ev.hold, "menu button: a press that ends just under the hold time is a click");
+
+  t = 3000;
+  b.update(true, t);
+  ev = b.update(true, t + kMenuHoldMs);
+  check(ev.hold && !ev.click, "menu button: a press held for kMenuHoldMs is a hold at that moment");
+  ev = b.update(true, t + kMenuHoldMs + 400);
+  check(!ev.hold && !ev.click, "menu button: and the hold comes once while the button stays down");
+  ev = b.update(false, t + kMenuHoldMs + 500);
+  check(!ev.click && !ev.hold, "menu button: the release after a hold is not a click");
+
+  t = 4000;
+  b.update(true, t);
+  b.update(true, t + 100);
+  ev = b.update(false, t + 150);
+  check(ev.click, "menu button: the next short press is a click again");
+
+  t = 5000;
+  b.update(true, t);
+  b.cancel();
+  ev = b.update(true, t + kMenuHoldMs + 100);
+  check(!ev.hold, "menu button: a cancelled press never holds");
+  ev = b.update(false, t + kMenuHoldMs + 200);
+  check(!ev.click, "menu button: and does not click on the release");
+
+  MenuButton down;
+  down.reset(true);
+  ev = down.update(true, 100000);
+  check(!ev.hold && !ev.click, "menu button: a button already down at start reports no hold");
+  ev = down.update(false, 100010);
+  check(!ev.click, "menu button: and no click when it is released");
+  down.update(true, 100100);
+  ev = down.update(false, 100150);
+  check(ev.click, "menu button: and the next press is a click");
 }
 
 void checkSteppedPosition() {
@@ -619,6 +673,7 @@ void checkPowerFailWatch() {
 
 void checkInputLogic() {
   checkDebounce();
+  checkMenuButton();
   checkSteppedPosition();
   checkKnobFilter();
   checkEvery();

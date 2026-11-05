@@ -9,6 +9,7 @@
 #include <array>
 
 #include "box.h"
+#include "core/menu_button.h"
 
 struct GLFWwindow;
 
@@ -55,6 +56,7 @@ class Window {
     float travel = 0;  // pointer travel since the press, to tell a click from a turn
     float angle = 0;   // how far the knob has turned, for the indicator
     double flashUntil = 0;
+    MenuButton button;  // click and hold detection on the button's pressed level
   };
 
  private:

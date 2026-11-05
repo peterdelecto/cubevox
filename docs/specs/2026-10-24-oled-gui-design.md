@@ -125,9 +125,9 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 
 ## Brightness and dimming
 Owner 2026-11-02: "lets dim the screen. we also need a menu item that adjusts screens normal brightness."
-1. The menu row BRIGHTNESS sets the normal brightness: LOW, MID, HIGH or MAX, panel contrast 48, 128, 207 or 255. HIGH is the default and the contrast every screen had before. The setting is saved in settings byte 8 of the layout record and does not go over USB.
+1. The menu row OLED BRIGHT (was BRIGHTNESS; renamed by the owner 2026-11-05) sets the normal brightness: LOW, MID, HIGH or MAX, panel contrast 48, 128, 207 or 255. HIGH is the default and the contrast every screen had before. The setting is saved in settings byte 8 of the layout record and does not go over USB.
 2. The screen dims to contrast 8 after 10 minutes with no knob move, slot toggle flip, top switch flip, MENU turn or press, and no voice. Voice is input above −50 dBFS over one UI tick, the input meter's floor. A noisy room that keeps the input above that never dims the screen.
-3. Any of those brings the normal brightness straight back, and the control still does its job: a knob turn moves its parameter, a MENU press opens the menu.
+3. Any of those brings the normal brightness straight back, and the control still does its job: a knob turn moves its parameter, a MENU click opens the menu. A MENU hold counts as a touch too (the hold closes an open menu, `2026-10-24-polish-design.md`, "The user's walk").
 4. Dimming works on every screen, MUTED and BYPASS included. A dark screen on stage reads as a dead box, so the screen dims and never goes black.
 5. The application sends the contrast as its own command between two page writes, and again after a panel restart, which puts the init sequence's 207 back. The saved level applies before the splash's first page. The bootloader's update screens keep 207.
 6. The emulator draws a lit pixel at HIGH in the ink it always had. A lower contrast fades it toward the dark glass by contrast / 207, and MAX takes it to white.

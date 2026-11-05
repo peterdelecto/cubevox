@@ -1,4 +1,4 @@
-// How bright the OLED is. The BRIGHTNESS menu item steps through four levels, each one an SH1106
+// How bright the OLED is. The OLED BRIGHT menu item steps through four levels, each one an SH1106
 // contrast value, and a dimmed screen uses a fifth, lower one. The menu text, the saved record and
 // the dim logic all read this table.
 
@@ -28,7 +28,7 @@ constexpr uint8_t kDimmedContrast = 8;
 
 constexpr const BrightnessLevel& brightnessLevel(Brightness b) { return kBrightnessLevels[static_cast<size_t>(b)]; }
 
-// The level a click on the BRIGHTNESS item moves to: the next one, and Low after Max.
+// The level a click on the OLED BRIGHT item moves to: the next one, and Low after Max.
 constexpr Brightness nextBrightness(Brightness b) {
   return static_cast<size_t>(b) + 1 < kBrightnessLevels.size() ? static_cast<Brightness>(static_cast<size_t>(b) + 1)
                                                                 : Brightness::Low;

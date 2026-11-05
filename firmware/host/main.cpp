@@ -93,13 +93,20 @@ struct Rig {
     }
   }
 
-  // One tick with the MENU turned `detents` steps and pressed when `click`.
+  // One tick with the MENU turned `detents` steps and clicked when `click`.
   void turnMenu(int32_t detents, bool click) {
     panel.detents = detents;
     panel.click = click;
     idle(kTickMs);
     panel.detents = 0;
     panel.click = false;
+  }
+
+  // One tick with the MENU held.
+  void holdMenu() {
+    panel.hold = true;
+    idle(kTickMs);
+    panel.hold = false;
   }
 };
 
@@ -390,7 +397,7 @@ void checkSlot4(const CheckClips& clips, std::vector<std::string>& failed) {
 
 // The display's contrast through the box. It starts at HIGH, drops to 8 once the dimming time has
 // passed with nothing touched and no voice, and comes back at once on a knob turn, a MENU press, a
-// slot toggle flip, the top switch or a voice. A click on BRIGHTNESS in the menu sets the awake
+// slot toggle flip, the top switch or a voice. A click on OLED BRIGHT in the menu sets the awake
 // contrast, and the window draws a lit pixel brighter as the contrast rises.
 void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
   const auto expect = [&failed](bool ok, const char* what) {
@@ -400,7 +407,7 @@ void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
   constexpr uint8_t kMax = 255;
   constexpr uint8_t kLow = 48;
   constexpr uint8_t kDimmed = 8;
-  constexpr int32_t kBrightnessItem = 10;  // the BRIGHTNESS row of the menu list, counted from 0
+  constexpr int32_t kBrightnessItem = 10;  // the OLED BRIGHT row of the menu list, counted from 0
   constexpr uint32_t kSettleMs = 1000;    // long enough for a control to reach the face
 
   Rig rig;
@@ -447,7 +454,7 @@ void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
   rig.turnMenu(kBrightnessItem, false);
   rig.turnMenu(0, true);
   expect(rig.box.settings().brightness == Brightness::Max && rig.box.contrast() == kMax,
-         "a click on BRIGHTNESS sets MAX and the display takes its contrast");
+         "a click on OLED BRIGHT sets MAX and the display takes its contrast");
   rig.turnMenu(0, true);
   expect(rig.box.settings().brightness == Brightness::Low && rig.box.contrast() == kLow,
          "the next click wraps to LOW and the display takes its contrast");
@@ -459,7 +466,25 @@ void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
              red(theme::oledLit(kLow)) < red(theme::oledLit(kHigh)) && red(theme::oledLit(kHigh)) < red(theme::oledLit(kMax)),
          "a lit pixel is drawn brighter as the contrast rises");
   expect(theme::oledLit(kHigh) == theme::pack(theme::kOledOnRgb),
-         "HIGH draws the ink the screen had before BRIGHTNESS");
+         "HIGH draws the ink the screen had before OLED BRIGHT");
+}
+
+// A MENU hold closes the open list as the EXIT row does, and a click does not.
+void checkMenuHold(const CheckClips& clips, std::vector<std::string>& failed) {
+  const auto expect = [&failed](bool ok, const char* what) {
+    if (!ok) failed.push_back(std::string("menu hold: ") + what);
+  };
+  constexpr uint32_t kPastSplashMs = 3000;  // the menu hears nothing until the splash ends
+
+  Rig rig;
+  expect(rig.source.loadClip(clips.first.c_str()), "the clip loads");
+  rig.idle(kPastSplashMs);
+  rig.turnMenu(0, true);
+  expect(rig.box.menuOpen(), "a click opens the menu");
+  rig.turnMenu(0, true);
+  expect(rig.box.menuOpen(), "a click on the first row leaves the menu open");
+  rig.holdMenu();
+  expect(!rig.box.menuOpen(), "a hold closes the menu");
 }
 
 int runCheck(const char* argv0) {
@@ -518,6 +543,7 @@ int runCheck(const char* argv0) {
   checkSlot4(clips, failed);
   checkSlot8(clips, failed);
   checkDim(clips, failed);
+  checkMenuHold(clips, failed);
 
   std::printf("cost before %d / %d, after %d / %d (mean / worst, %% of a block)\n", before.avg, before.worst, after.avg,
               after.worst);
@@ -590,6 +616,7 @@ int runLive(const char* argv0) {
       box.tick(input, passMs);
       input.detents = 0;
       input.click = false;
+      input.hold = false;
       ++passes;
     }
     if (nowMs - passMs >= kPassMs) passMs = nowMs;  // the app stalled; drop the backlog

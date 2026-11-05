@@ -26,10 +26,12 @@ better if the led flashes to show mcu processing." Build order: "just build it n
    between the pitch code and the rest. The window shows it on one line; with DEBUG on in the menu,
    the voice screen's figure is the same table's worst. Host timing is measured for nothing and
    shown nowhere.
-2. Four card switches, the only controls the box lacks: under slot 3 `OCTAVE | FORMANT`, under
-   slot 4 `UNISON | MOB`, under slot 7 a grid of `GATE`, `LO-FI` and `CHATTER`, under slot 8
-   `SPRING | CHASM`. Each goes through the menu's own action (`UiAction::SwapOctaveFormant`,
-   `UiAction::SwapUnisonCrowd`, `UiAction::CycleSlot7Card`, `UiAction::SwapReverb`), so the
+2. Five card switches, the only controls the box lacks, one for each SLOT row of the menu (SLOT 3,
+   4, 6, 7, 8): under slot 3 `OCTAVE`, `FORMANT` and `APRAXIA`, under slot 4 `UNISON | MOB`, under
+   slot 6 `DISTORTION | DEEPTHROAT`, under slot 7 a grid of `GATE`, `LO-FI` and `CHATTER`, under
+   slot 8 `SPRING | CHASM`. Each goes through the menu's own action (`UiAction::SwapOctaveFormant`,
+   `UiAction::SwapUnisonCrowd`, `UiAction::SwapDistortionGrowl`, `UiAction::CycleSlot7Card`,
+   `UiAction::SwapReverb`), so the
    layout fade and the engine resets run as on the box, and a swap the box would not load
    leaves the layout unchanged. The switch position follows the layout, so a swap made in the
    menu moves it.
@@ -57,7 +59,7 @@ The firmware's `core/` and `ui/` include nothing from `board/`, so the host supp
 | `cubevox.ino` `loop()` | `firmware/host/box.cpp`, `Box::tick(PanelInput, nowMs)` once per frame |
 | `board/audio.cpp` `processHalf` | `firmware/host/audio_block.cpp`, `process(in, out, 64)` in the audio callback |
 | `board/controls.cpp` | the window's knobs and toggles into `KnobBank` and `PanelReading` |
-| `board/input.cpp` (MENU) | the MENU knob: drag or scroll turns, click presses; arrow keys and Enter too |
+| `board/input.cpp` (MENU) | the MENU knob: drag or scroll turns; a click on the knob, or Enter or Space, is a click when it ends and a hold after 600 ms (`MenuButton`, the same class the box uses), and a hold closes an open menu |
 | `board/mute.cpp` | `MuteSequence` as the board runs it, minus the 6 s power-on wait |
 | `board/display_sh1106.cpp` | a `Display` whose `flushStep` copies the dirty page into a 128x64 buffer drawn at 4x |
 | SAI in and out | miniaudio duplex, 48 kHz, 64-frame period, mono in, stereo out |
@@ -106,7 +108,7 @@ Bottom band: the source switch at the left and the version under it.
    device; the clip through the block path for 3 s on the default layout, then both swaps and 2 s
    more; asserts finite output, output above -40 dBFS RMS in the last second, the cost sums
    before and after the swaps derived from the `costs::` rows, the layout reading `crowd` and
-   `reverb_chasm`, and a rendered face. Prints `emulator check: ok`. Adam's clips stay out of git,
+   `reverb_chasm`, a rendered face, and a MENU hold that closes the open list. Prints `emulator check: ok`. Adam's clips stay out of git,
    so where `samples/` is absent (CI) the check writes two synthetic voiced clips (150 Hz for 4 s,
    220 Hz for 3 s, harmonics under three formant peaks, 5 Hz vibrato) to a temp directory, runs the
    same checks on them, and prints a `clip:` line naming the set it used.

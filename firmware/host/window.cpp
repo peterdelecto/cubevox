@@ -148,13 +148,17 @@ void encoderKnob(Frame& f, ImVec2 center) {
   if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) ++turns;
   if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) --turns;
 
-  bool click = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false) ||
-               ImGui::IsKeyPressed(ImGuiKey_Space, false);
-  if (ImGui::IsItemDeactivated() && hovered && e.travel < kClickSlopPx) click = true;
-  if (click) e.flashUntil = ImGui::GetTime() + kClickFlashSec;
+  // The button is down while the mouse holds it or Enter or Space is held. A press that drags or leaves
+  // the knob is a turn and reports nothing. The firmware's MenuButton tells a click from a hold.
+  const bool keyDown = ImGui::IsKeyDown(ImGuiKey_Enter) || ImGui::IsKeyDown(ImGuiKey_KeypadEnter) ||
+                       ImGui::IsKeyDown(ImGuiKey_Space);
+  if (active && (e.travel >= kClickSlopPx || !hovered)) e.button.cancel();
+  const MenuButtonEvent press = e.button.update(active || keyDown, static_cast<uint32_t>(ImGui::GetTime() * 1000.0));
+  if (press.click) e.flashUntil = ImGui::GetTime() + kClickFlashSec;
   e.angle += static_cast<float>(turns) * kEncoderMarkRad;
   f.panel.input.detents += turns;
-  f.panel.input.click = f.panel.input.click || click;
+  f.panel.input.click = f.panel.input.click || press.click;
+  f.panel.input.hold = f.panel.input.hold || press.hold;
 
   const bool pressed = active || ImGui::GetTime() < e.flashUntil;
   ImDrawList* dl = f.dl;
@@ -566,6 +570,7 @@ void Window::begin() {
 void Window::draw(Box& box, Panel& panel, bool micAvailable) {
   panel.input.detents = 0;
   panel.input.click = false;
+  panel.input.hold = false;
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
   ImGui::Begin(kWindowTitle, nullptr, kFaceFlags);
