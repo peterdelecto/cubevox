@@ -8,10 +8,12 @@ to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper 
 (its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Input gate
 knobs and both Gate knobs (Threshold across the whole knob, then Decay), both Unison knobs (Rate, then
 Depth), both Distortion knobs (TONE again with DRIVE pinned at 100 %, and TONE stepped inside a DRIVE
-glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs and, when Crowd is placed,
-both Crowd knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after
-each sweep. It then flips the toggle of every Echo, Input gate and Gate slot ten times, 0.3 s apart, so
-the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
+glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Yawn knobs (SENSITIVITY,
+RANGE), both Deepthroat knobs (GROWL, MIX), both Ring mod knobs (RATIO, stepped, so each 10 % step lands
+on one of its positions, then MIX), both Sympath knobs (DECAY, MIX) and, when Crowd is placed, both Crowd
+knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
+It then flips the toggle of every Echo, Input gate, Gate, Yawn, Deepthroat, Ring mod and Sympath slot
+ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
 POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
 
@@ -29,9 +31,10 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   4. each layout's POLISH EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
-The slot that runs the shared pitch stage (the first Autotune, Octave, Formant or Crowd slot) is held to
-the rows of every card that stage runs, plus the tracker row when Autotune, Crowd or Formant is placed
-and the stage row when Octave or Formant is placed without Autotune.
+The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Yawn, Crowd, Deepthroat
+or Ring mod slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Yawn),
+plus the tracker row when Autotune, Crowd, Formant, Yawn, Deepthroat or Ring mod is placed and the stage
+row when Octave, Formant or Yawn is placed without Autotune.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
 --dry-run prints the layouts, the sweeps, the toggle flips and the fixed-stage flips planned for each,
@@ -40,8 +43,9 @@ with the time they take, and opens no port.
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
-slot) and heaviest (Input gate, Formant, Unison and Crowd, Gate, Distortion, Chatter and the default reverb,
-with the reverb on Chasm). The saved layout is read first and put back at the end,
+slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ring mod in
+Distortion's slot), sympath (Sympath in the reverb slot) and heaviest (Input gate, Formant, Unison and
+Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
 
@@ -84,7 +88,7 @@ SWEEP_STEP_S = 1.0
 TOGGLE_FLIPS = 10    # a toggle flips off and on five times
 TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
 GLIDE_LAG_S = 0.02   # a stepped knob starts its partner this long after it, inside the glide
-FLIPPED_CARDS = ("slapback", "input_gate", "gate")  # cards whose toggle the run flips
+FLIPPED_CARDS = ("slapback", "input_gate", "gate", "formant_follow", "growl", "ringmod", "strings")  # toggles the run flips
 # The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
@@ -96,7 +100,7 @@ REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "heaviest")
+                "chatter", "lofi", "yawn", "throat", "ringmod", "sympath", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -105,13 +109,14 @@ ROW_OF = {
     "slapback": "kSlapback", "distortion": "kDistortion", "gate": "kGate",
     "reverb_spring": "kReverbSpring", "reverb_chasm": "kReverbChasm", "crowd": "kCrowd",
     "formant": "kFormant", "bloom": "kBloom", "lofi": "kLofi",
+    "formant_follow": "kFormantFollower", "growl": "kGrowl", "ringmod": "kRingMod", "strings": "kStrings",
 }
 TRACKER_ROW = "kTracker"
-STAGE_ROW = "kPitchStage"  # the stage's own work when Octave or Formant runs without Autotune
-PITCH_STAGE = ("autotune", "octave", "formant")        # cards the shared PitchFx runs
-PITCH_GROUP = ("autotune", "octave", "formant", "crowd")  # the first of these carries the stage's cost
-TRACKER_USERS = ("autotune", "crowd", "formant")    # cards that run the pitch tracker
-STAGE_USERS = ("octave", "formant")                 # cards that pay the stage term without Autotune
+STAGE_ROW = "kPitchStage"  # the stage's own work when Octave, Formant or Yawn runs without Autotune
+PITCH_STAGE = ("autotune", "octave", "formant", "formant_follow")  # cards the shared PitchFx runs
+PITCH_GROUP = ("autotune", "octave", "formant", "formant_follow", "crowd", "growl", "ringmod")  # the first carries the stage's cost
+TRACKER_USERS = ("autotune", "crowd", "formant", "formant_follow", "growl", "ringmod")  # cards that run the pitch tracker
+STAGE_USERS = ("octave", "formant", "formant_follow")  # cards that pay the stage term without Autotune
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
 # The fixed path's rows: POLISH EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
@@ -195,6 +200,8 @@ def layout_table():
         raise StressError("the default layout has no Autotune or Octave slot for the pitch layouts to change")
     if "gate" not in base:
         raise StressError("the default layout has no gate slot for the chatter and lofi layouts to replace")
+    if "distortion" not in base:
+        raise StressError("the default layout has no distortion slot for the throat and ringmod layouts to replace")
     reverbs = [c for c in base if c.startswith("reverb_")]
     if not reverbs:
         raise StressError("the default layout has no reverb slot for the heaviest layout to keep")
@@ -205,10 +212,15 @@ def layout_table():
     formant_alone = ["formant" if c == "octave" else ("empty" if c == "autotune" else c) for c in base]
     chatter = ["bloom" if c == "gate" else c for c in base]
     lofi = ["lofi" if c == "gate" else c for c in base]
+    yawn = ["formant_follow" if c == "octave" else c for c in base]
+    throat = ["growl" if c == "distortion" else c for c in base]
+    ringmod = ["ringmod" if c == "distortion" else c for c in base]
+    sympath = ["strings" if c.startswith("reverb_") else c for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
-            "chatter": (chatter, False), "lofi": (lofi, False), "heaviest": (heaviest, True)}
+            "chatter": (chatter, False), "lofi": (lofi, False), "yawn": (yawn, False), "throat": (throat, False),
+            "ringmod": (ringmod, False), "sympath": (sympath, False), "heaviest": (heaviest, True)}
 
 
 def slot_bounds(slots, chasm, rows):
@@ -420,6 +432,18 @@ def sweeps(slots):
         if card == "crowd":
             found.append(Sweep(i, 1, "Crowd DIVERGE"))
             found.append(Sweep(i, 2, "Crowd VOICES"))
+        if card == "formant_follow":
+            found.append(Sweep(i, 1, "Yawn SENSITIVITY"))
+            found.append(Sweep(i, 2, "Yawn RANGE"))
+        if card == "growl":
+            found.append(Sweep(i, 1, "Deepthroat GROWL"))
+            found.append(Sweep(i, 2, "Deepthroat MIX"))
+        if card == "ringmod":
+            found.append(Sweep(i, 1, "Ring mod RATIO"))
+            found.append(Sweep(i, 2, "Ring mod MIX"))
+        if card == "strings":
+            found.append(Sweep(i, 1, "Sympath DECAY"))
+            found.append(Sweep(i, 2, "Sympath MIX"))
     return found
 
 
@@ -655,8 +679,9 @@ def report_lines(results, header):
         out.append("")
         if r["carrier"] is not None:
             out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
-                       "Autotune, Octave and Formant rows placed, plus the tracker row when Autotune, Crowd or "
-                       "Formant is placed and the stage row when Octave or Formant is placed without Autotune.")
+                       "Autotune, Octave, Formant and Yawn rows placed, plus the tracker row when Autotune, Crowd, "
+                       "Formant, Yawn, Deepthroat or Ring mod is placed and the stage row when Octave, Formant "
+                       "or Yawn is placed without Autotune.")
             out.append("")
         out.append(block_line(r["agg"]))
         out.append("")
@@ -770,10 +795,14 @@ def restore_layout(box, name, slots):
         raise StressError(f"the box refused the saved layout: {refusal}")
 
 
-def plan_lines(name, slots, chasm, runs, seconds):
+def plan_lines(name, slots, chasm, runs, seconds, rows):
     """What one layout's runs do, as text."""
     out = [f"{name} ({' '.join(slots)}{', reverb on Chasm' if chasm else ''}), {runs} run(s) of "
            f"{plan_seconds(slots, seconds):.0f} s"]
+    bounds, carrier = slot_bounds(slots, chasm, rows)
+    for i, (card, bound) in enumerate(zip(slots, bounds)):
+        if bound is not None:
+            out.append(f"  bound: slot {i + 1} {card}{'*' if i == carrier else ''} mean {bound[0]} %, worst {bound[1]} %")
     out.append(f"  pass 1: knobs at top, {seconds:g} s")
     for sweep in sweeps(slots):
         extra = f", partner knob {sweep.partner} stepped inside the glide" if sweep.partner else ""
@@ -790,13 +819,13 @@ def dry_run(wanted, runs, seconds):
     """Prints the plan for the named layouts. Reads the firmware sources and opens no port."""
     try:
         table = layout_table()
-        read_rows()
+        rows = read_rows()
     except StressError as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         return 1
     for name in wanted:
         slots, chasm = table[name]
-        print("\n".join(plan_lines(name, slots, chasm, runs, seconds)))
+        print("\n".join(plan_lines(name, slots, chasm, runs, seconds, rows)))
     return 0
 
 
