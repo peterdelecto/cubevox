@@ -772,6 +772,8 @@ int audioWorstLoadPercent() { return loadPercent(gLoad.worst(), gCounts.budgetCy
 
 int audioMeanLoadPercent() { return loadPercent(gLoad.mean(), gCounts.budgetCycles); }
 
+uint32_t audioTroubleBlocks() { return gCounts.late + gCounts.overruns + gFlow.dryBlocks(); }
+
 #if CUBEVOX_BENCH
 void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }
 

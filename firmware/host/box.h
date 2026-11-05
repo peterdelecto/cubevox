@@ -98,7 +98,11 @@ class Box {
   const Layout& layout() const { return layout_; }
   const char* layoutName() const { return kLayoutName; }
   LayoutCost cost() const { return layoutCost(layout_); }
-  bool led() const { return loadLedLit(nowMs_, cost().avg, audioRunning_); }
+  // The user LED's level, 0 to 1, from the cost table's mean. The host never marks a block late, so
+  // the trouble flash never fires here.
+  float ledLevel() const {
+    return loadLedLevel(cost().avg, kLoadLedLimitPercent, audioRunning_, kLoadLedNoTrouble);
+  }
   bool menuOpen() const { return menu_.open(); }
   bool splashEnded() const { return splashEnded_; }
   const Settings& settings() const { return settings_; }
