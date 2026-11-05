@@ -479,14 +479,15 @@ void toggleLevelAt(double hz, bool formant, ToggleLevel& worst) {
 // 9. Switching Autotune on or off mid-note: the corrected voice lags the dry input by 2 to 5 periods
 // and sits up to a semitone away, so the equal-power crossfade dips where the two cancel and rises
 // where they add. The dip reads 3.86 dB against a gate of 4.4, the rise 2.34 dB against 3.0. The same
-// scan runs with the Formant card at part MIX behind Autotune. The Formant engine reads at the grain delay
-// less the delay Autotune has put on the audio, so while Autotune's crossfade moves the Formant lag moves
-// with it, and the dip reads 6.44 dB against a gate of 7.0 and the rise 2.34 dB.
+// scan runs with the Formant card at part MIX behind Autotune. The Formant engine cuts from Autotune's
+// ring and plays a voice for Autotune's input and one for its corrected voice, both at Autotune's delay,
+// so Autotune's crossfade moves it from one voice to the other with no change of delay and no cancellation
+// between the two. The dip reads 1.03 dB against a gate of 1.2 and the rise 0.31 dB.
 bool testToggleLevel() {
   constexpr double kMaxRiseDb = 3.0;
   bool ok = true;
   for (bool formant : {false, true}) {
-    const double kMaxDipDb = formant ? 7.0 : 4.4;
+    const double kMaxDipDb = formant ? 1.2 : 4.4;
     ToggleLevel worst;
     for (double hz : {97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 110.0, 130.81, 146.83, 220.0})
       toggleLevelAt(hz, formant, worst);

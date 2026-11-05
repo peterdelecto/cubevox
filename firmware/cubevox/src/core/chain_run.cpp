@@ -55,6 +55,12 @@ void fadeChunk(float* a, const float* dry, int n, uint32_t goal, uint32_t& phase
   phase = at;
 }
 
+// The S curve of a slot's fade, 3x^2 - 2x^3 of its progress x: the engine's gain against the dry input.
+float fadeCurve(float progress) { return progress * progress * (3.0f - 2.0f * progress); }
+
+// The engine gain of a slot at fade level `level`, 0 for the dry input to kSlotFadeBlocks for the engine.
+float slotEngineGain(int level) { return fadeCurve(static_cast<float>(level) / static_cast<float>(kSlotFadeBlocks)); }
+
 // True when any slot whose card runs engine `e` has its toggle on. Only the reverb engine serves two
 // cards a layout can hold, so for every other engine this is the toggle of its one slot.
 bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
@@ -73,8 +79,10 @@ bool slotLive(const ChainSnapshot& snap, const SlotFades& fades, int s) {
 // What the Autotune slot `s` owes the cards behind it. The tracker runs while a reader behind is live: the
 // Formant engine directly behind the slot (every slot between holds Empty), a Crowd card or a Growl card
 // anywhere behind. The Formant engine reads the 48 kHz fine pass and the out-of-range flag, the Crowd card
-// reads the flag, and Autotune's input goes into the Crowd card's ring while one is placed behind.
-StageContext autotuneContext(const ChainSnapshot& snap, const SlotFades& fades, int s) {
+// reads the flag, and Autotune's input goes into the Crowd card's ring while one is placed behind. A live
+// Formant engine directly behind also takes Autotune's input, which it cuts its grains from, and hands
+// Autotune its grain grid, which a corrected voice that starts takes up.
+StageContext autotuneContext(const ChainEngines& engines, const ChainSnapshot& snap, const SlotFades& fades, int s) {
   StageContext ctx;
   bool onlyEmpty = true;
   for (int t = s + 1; t < kSlotCount; ++t) {
@@ -86,6 +94,8 @@ StageContext autotuneContext(const ChainSnapshot& snap, const SlotFades& fades, 
       ctx.tracker.run = true;
       ctx.tracker.fine = true;
       ctx.tracker.outOfRange = true;
+      ctx.feedsFormant = true;
+      ctx.groupGrid = engines.formant.gridMarks();
     }
     if (e == Engine::Crowd) {
       ctx.feedsCrowd = true;
@@ -109,8 +119,9 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
   engines.crowd.process(in, out, n, p.crowd, pitch);
 }
 
-// Runs the Formant engine at its slot. Directly behind the Autotune slot it reads Autotune's tracker; anywhere
-// else it runs a tracker of its own. With Apraxia placed, the follower's envelope of `in` sets the SHIFT.
+// Runs the Formant engine at its slot. Directly behind the Autotune slot it joins Autotune's grain pass,
+// reading Autotune's tracker and ring; anywhere else it runs a tracker and a ring of its own. With Apraxia
+// placed, the follower's envelope of `in` sets the SHIFT.
 void runFormant(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p,
                 const PitchPath& path) {
   const cv::FormantParams& params = engines.follower.follow(in, n, p.pitchFx.formant, p.follower);
@@ -165,7 +176,8 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::InputGate: engines.inputGate.process(in, out, n, p.inputGate); break;
     case Engine::Autotune:
       if (ctx.feedsCrowd) engines.crowd.write(in, n);
-      engines.autotune.process(in, out, n, p.pitchFx.autotune, ctx.tracker);
+      if (ctx.feedsFormant) engines.formant.feed(in, n);
+      engines.autotune.process(in, out, n, p.pitchFx.autotune, ctx.tracker, ctx.groupGrid);
       break;
     case Engine::Octave: engines.octave.process(in, out, n, p.pitchFx.octave); break;
     case Engine::Formant: runFormant(engines, in, out, n, p, path); break;
@@ -188,7 +200,8 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Autotune:
       path.autotuneAhead = true;
       path.adjacent = true;
-      path.upstream = {&engines.autotune.pitch(), engines.autotune.correctionSemis(), engines.autotune.outputLatency()};
+      path.upstream = {&engines.autotune.pitch(), engines.autotune.correctionSemis(), engines.autotune.outputLatency(),
+                       &engines.autotune, ctx.slotGain0, ctx.slotGain1};
       break;
     case Engine::Octave:
       path.adjacent = false;
@@ -213,7 +226,7 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
   for (int i = 0; i < n; ++i) {
     pos += dir;
     const float lin = pos <= 0 ? 0.0f : static_cast<float>(pos) / total;
-    const float toEngine = lin * lin * (3.0f - 2.0f * lin);
+    const float toEngine = fadeCurve(lin);
     wet[i] = wet[i] * toEngine + dry[i] * (1.0f - toEngine);
   }
 }
@@ -227,7 +240,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
   // The Autotune engine and the Input gate's engine keep running with their slot settled off, the gate for
   // its detector and Autotune for the readers of its tracker.
   StageContext ctx;
-  if (e == Engine::Autotune) ctx = autotuneContext(snap, fades, s);
+  if (e == Engine::Autotune) ctx = autotuneContext(engines, snap, fades, s);
   const bool detectorLive = e == Engine::InputGate;
   const bool trackerLive = ctx.tracker.run;
   const SlotFades::Step step = fades.step(s, stageToggleOn(snap, e));
@@ -237,7 +250,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
         engines.autotune.rest();
         path.autotuneAhead = true;
         path.adjacent = true;
-        path.upstream = {&engines.autotune.pitch(), 0.0f, 0.0f};
+        path.upstream = {&engines.autotune.pitch(), 0.0f, 0.0f, nullptr, 0.0f, 0.0f};
         return false;
       case Engine::Octave: engines.octave.rest(); break;
       case Engine::Formant: engines.formant.rest(); break;
@@ -259,6 +272,8 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
     }
   }
   ctx.slotShare = static_cast<float>(step.to) / static_cast<float>(kSlotFadeBlocks);
+  ctx.slotGain0 = slotEngineGain(step.from);
+  ctx.slotGain1 = slotEngineGain(step.to);
   const bool wrote = runStage(engines, c, in, out, n, snap.params, path, ctx);
   if (trackerLive && step.from == 0 && step.to == 0) {
     // The engine runs for its readers and the slot passes the dry input, which they now hear.

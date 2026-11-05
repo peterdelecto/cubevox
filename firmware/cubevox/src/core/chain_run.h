@@ -25,7 +25,7 @@ struct ChainEngines {
 
   cv::AutotuneFx& autotune;  // its tracker also serves the Formant, Crowd and Growl engines behind it
   cv::OctaveFx& octave;
-  cv::FormantFx formant;  // a plain global like the others; 25 kB with its ring and its own tracker
+  cv::FormantFx formant;  // a plain global like the others; 26 kB with its ring, its own tracker and two voices
   cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each Formant call while Apraxia is placed
   cv::Gate inputGate;
   cv::Unison& unison;
@@ -57,12 +57,15 @@ struct ChainCycles {
 // What one block's walk carries from slot to slot, for the cards that read Autotune's tracker. An Autotune
 // card sets it, and the cards behind it hand their share on:
 //   1. `autotuneAhead` is true once an Autotune slot has been walked.
-//   2. `adjacent` is true while nothing but Empty slots has been walked since it. The Formant engine reads
-//      Autotune's tracker only then.
+//   2. `adjacent` is true while nothing but Empty slots has been walked since it. The Formant engine joins
+//      Autotune's grain pass (its tracker and its input) only then.
 //   3. `upstream` is what Deepthroat and the Formant engine read: Autotune's tracker result, the shift the
 //      slots since have put on the pitch and the delay they have put on the audio. The Octave card adds its
 //      interval to the shift while its voice carries half the power, and its latency to the delay. The
-//      Formant engine adds its lag to the delay.
+//      Formant engine adds the part of its lag that Autotune's latency does not already count: none once
+//      Autotune is settled on, since the Formant engine directly behind it cuts Autotune's input and waits
+//      for its corrected voice once. `upstream.group` names the Autotune engine for it, with the slot's
+//      engine gain.
 struct PitchPath {
   bool autotuneAhead = false;
   bool adjacent = false;
@@ -72,15 +75,19 @@ struct PitchPath {
 // What the layout asks of a slot's engine beyond its own card.
 struct StageContext {
   cv::TrackerNeeds tracker;  // Autotune: what the readers behind it ask of its tracker
+  cv::GridMarks groupGrid;   // Autotune: the grain grid of the Formant voice directly behind it, when one runs
+  bool feedsFormant = false; // Autotune: a live Formant engine sits directly behind it, so Autotune's input goes to it
   bool feedsCrowd = false;   // Autotune: a Mob card sits behind it, so Autotune's input goes into Mob's ring
   float slotShare = 1.0f;    // the slot's toggle fade, 0 dry .. 1 engine
+  float slotGain0 = 1.0f;    // the slot's engine gain at the block's first sample, the S curve of mixSlotFade
+  float slotGain1 = 1.0f;    // and at its last
 };
 
 // Runs the engine of card `c` over `n` samples from `in` into `out`. Returns false when it wrote
 // nothing (an Empty slot), so the caller keeps its buffers. Every card runs its own engine on `in`, the block
-// the slot ahead hands it, and updates `path` for the cards behind it. The Formant engine reads Autotune's
-// tracker when `path` says it sits directly behind it, and runs its own otherwise. With Apraxia placed, the
-// call takes the Formant voice's SHIFT from the follower's envelope of `in`. A Crowd card reads Autotune's
+// the slot ahead hands it, and updates `path` for the cards behind it. The Formant engine joins Autotune's grain
+// pass when `path` says it sits directly behind it, and runs its own tracker and ring otherwise. With Apraxia
+// placed, the call takes the Formant voice's SHIFT from the follower's envelope of `in`. A Crowd card reads Autotune's
 // tracker and correction when one sits ahead, and runs its own tracker on its own ring otherwise. A Growl card
 // reads Autotune's tracker with `path.upstream`. A Chatter card keys on the Input gate's detector when the
 // layout places that card (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when

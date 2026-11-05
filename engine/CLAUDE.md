@@ -68,8 +68,23 @@
 - Autotune's tracker serves the Formant engine directly behind it (only Empty slots between) and any Crowd or
   Growl card behind it. Anywhere else those cards run a tracker of their own on their own ring. The chain hands
   the readers an `UpstreamPitch` (Autotune's tracker result, the shift the slots since have put on the pitch, the
-  delay they have put on the audio) and a `CrowdPitch`. Mob is the one exemption from the chain-order rule: it
-  reads Autotune's input, written into its ring by the Autotune slot.
+  delay they have put on the audio, the Autotune engine for the Formant engine) and a `CrowdPitch`. Mob is the one
+  exemption from the chain-order rule: it reads Autotune's input, written into its ring by the Autotune slot.
+- Grain cards next to each other share one grain pass (`2026-11-05-grain-group-design.md`). The Formant engine
+  directly behind a running Autotune cuts its grains from the audio that entered Autotune, so the
+  formant-shifted voice waits for Autotune's delay once and the chain-order rule still holds. The Autotune slot
+  hands that input to the card (`FormantFx::feed`), which writes it into its own ring, so Autotune's ring and
+  DTCM stay as they were. The audio the card receives is `tuned` times Autotune's corrected voice plus `dry`
+  times Autotune's input (`AutotuneFx::groupFeed()`, with the slot's engine gain from `UpstreamPitch`), and the
+  card renders those shares from the input they came from. `FormantFx::voice_` cuts the input at pitch ratio 1 and `tuned_` at Autotune's
+  ratio, both at the shift's grain rate and Autotune's delay, mixed by Autotune's linear fade, and each runs only
+  while its share is up. All three voices lay their grains on one grid (`GridMarks`): Autotune's corrected voice
+  takes the ratio 1 voice's marks when it starts (the chain passes them to `AutotuneFx::process`), and each Formant
+  voice that starts takes the marks of the Autotune voice. Autotune's toggle then moves the Formant voice from one
+  share to the other at one delay, with no jump in the read position. Settled off, `voice_` alone runs and its
+  output equals the card on its own ring and its own tracker, bit for bit. The base is the audio as it arrives
+  with Autotune's input share read at the voice's delay. A call longer than kBlock, or an `UpstreamPitch` without
+  the engine or without a `feed` of that block, runs the card on its own ring and tracker.
 - The Growl card (Deepthroat) grows what reaches its slot. It keeps a ring of its own input, `growl_detail::kRingLen`
   samples (15,408 B, a plain global in D1 like Crowd, so DTCM is unchanged), and cuts its grains from that on a
   `FormantPsolaVoiceT<kRingLen>`. The period it cuts on is the tracker's period divided by the shift in

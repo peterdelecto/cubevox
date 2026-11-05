@@ -117,11 +117,14 @@ constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stre
 
 // The Formant card and Apraxia, alternates for Octave in slot 3, and the Lo-fi and Chatter cards, alternates
 // for Gate in slot 7. Apraxia runs the Formant engine, so it pays the tracker as Formant does. The row holds
-// the voice, the base read and the mix. Formant's row is an estimate: the stress run read it only together
-// with the tracker and the old pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to
-// 8.5 %, 2026-11-02, v2.01.14, against the 11 / 13 the three rows summed to).
-constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
-constexpr Cost kFormantFollower{4, 5, false};  // est.: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, SENSITIVITY 50 %, Apple clang -O2, median of 9 interleaved passes, 2 runs; g++ 15 has no SDK here): 15.8 to 15.9 ns a sample at RANGE -12 st, the worst setting, where the grains play at half speed, against Formant's 14.8 at -7 st, at most 1.1 ns more, 3.7k board cycles a block at 50.4k, 0.59 %, rounded up
+// the voice, the base and the mix. Directly behind Autotune the card cuts from Autotune's input and runs one
+// voice (the corrected share), and a second while Autotune's crossfade moves the voice from one share to the
+// other; settled off it runs the one voice at ratio 1, and its base is a ring read. Formant's row is an
+// estimate: the stress run read the card only together with the tracker and the old pitch stage (formant-alone
+// 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to 8.5 %, 2026-11-02, v2.01.14, against the 11 / 13 the three
+// rows summed to).
+constexpr Cost kFormant{4, 7, false};  // est. from the host bench of 2026-11-05 (Adam's clips, -3 st, MIX 100 %, Autotune on, Apple clang -O2, minimum of 15 passes per block; g++ 15 has no SDK here): the card adds 0.47 host us a block over Autotune alone, 3.7 % at 50.4k, rounded up to 4; its worst 1 % of blocks add 0.74 us, 5.8 %, and a block of Autotune's crossfade runs a second voice, about 0.85 us, 6.7 %, rounded up to 7
+constexpr Cost kFormantFollower{5, 8, false};  // est.: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, SENSITIVITY 50 %, Apple clang -O2, median of 9 interleaved passes, 2 runs; g++ 15 has no SDK here): 15.8 to 15.9 ns a sample at RANGE -12 st, the worst setting, where the grains play at half speed, against Formant's 14.8 at -7 st, at most 1.1 ns more, 3.7k board cycles a block at 50.4k, 0.59 %, rounded up
 constexpr Cost kLofi{2, 5, true};          // 11.1k / 26.6k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 1.7 %, worst 4.1 %)
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 

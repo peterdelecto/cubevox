@@ -8,6 +8,8 @@
 
 namespace cv {
 
+class AutotuneFx;
+
 struct UpstreamPitch {
   // Autotune's tracker result. It describes the audio that entered Autotune's slot.
   const PitchResult* result = nullptr;
@@ -18,6 +20,17 @@ struct UpstreamPitch {
 
   // The delay, in samples, the slots between Autotune's input and the card put on the audio.
   float latency = 0.0f;
+
+  // The Autotune engine when the card sits directly behind its slot (only Empty slots between) and the
+  // engine ran this block. The Formant engine then cuts its grains from Autotune's input (the chain feeds
+  // it), on Autotune's grid, so it waits for the corrected voice once. Null for every other card and layout.
+  const AutotuneFx* group = nullptr;
+
+  // The Autotune slot's engine gain at the block's first and last sample: the toggle crossfade the chain
+  // mixes in after the engine, 1 settled on and 0 settled off. The audio the card receives is that
+  // fraction of the engine's output plus the rest of Autotune's input.
+  float slotGain0 = 1.0f;
+  float slotGain1 = 1.0f;
 };
 
 }  // namespace cv

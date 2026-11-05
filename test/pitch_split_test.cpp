@@ -1,4 +1,4 @@
-// The Formant engine's base and voice sitting on one lag, and its reuse of Autotune's tracker directly
+// The Formant engine's base and voice sitting on one lag, and its joining of Autotune's grain pass directly
 // behind the Autotune card. No window, no audio device.
 
 #include <algorithm>
@@ -98,8 +98,9 @@ bool testBase() {
   return ok;
 }
 
-// Directly behind Autotune the engine reads Autotune's tracker and lags by the floor alone.
-bool testReuse() {
+// Directly behind Autotune the engine joins Autotune's grain pass: it reads Autotune's tracker, cuts
+// Autotune's input at Autotune's delay, and at SHIFT 0 hands back Autotune's output with no lag of its own.
+bool testGroup() {
   bool ok = true;
   const double hz = 220.0;
   const Signal in = voice(hz, cv::kSampleRate * 2);
@@ -114,11 +115,13 @@ bool testReuse() {
     need.run = true;
     need.fine = true;
     need.outOfRange = true;
-    at->process(i, &mid[static_cast<size_t>(pos)], n, ap, need);
+    fm->feed(i, n);
+    at->process(i, &mid[static_cast<size_t>(pos)], n, ap, need, fm->gridMarks());
     cv::UpstreamPitch up;
     up.result = &at->pitch();
     up.shiftSemis = at->correctionSemis();
     up.latency = at->outputLatency();
+    up.group = at.get();
     cv::FormantParams fp;
     fp.on = true;
     fp.shiftSt = 0;
@@ -126,15 +129,51 @@ bool testReuse() {
     fm->process(&mid[static_cast<size_t>(pos)], o, n, fp, up);
   });
   const double period = 48000.0 / hz;
-  const double floorLag = 1.5 * period + 4.0;
-  ok &= report("formant behind autotune lags the floor", std::fabs(fm->lagForTest() - floorLag) < 3.0, fm->lagForTest(),
-               floorLag);
+  const double grainLag = 1040.0 + period;
+  ok &= report("formant behind autotune reads at autotune's delay", std::fabs(fm->lagForTest() - grainLag) < 3.0,
+               fm->lagForTest(), grainLag);
   const size_t from = static_cast<size_t>(cv::kSampleRate);
-  const int want = static_cast<int>(fm->baseLagForTest() + 0.5f);
   double best = -1.0;
-  for (int lag = want - 8; lag <= want + 8; ++lag) best = std::max(best, corrAt(out, mid, lag, from, out.size()));
-  ok &= report("formant behind autotune rebuilds autotune's output at the lag it reports", best > 0.95, best);
+  int bestLag = 0;
+  for (int lag = -8; lag <= 8; ++lag) {
+    const double c = lag >= 0 ? corrAt(out, mid, lag, from, out.size()) : corrAt(mid, out, -lag, from, out.size());
+    if (c > best) {
+      best = c;
+      bestLag = lag;
+    }
+  }
+  ok &= report("formant behind autotune lands with autotune's output", best > 0.98 && bestLag == 0, best,
+               static_cast<double>(bestLag));
   ok &= report("formant behind autotune ran no tracker of its own", fm->ownPitch().period == 0.0f, fm->ownPitch().period);
+  ok &= report("formant behind autotune adds none of its lag to the delay it hands on", fm->outputLatency() < 0.5f,
+               fm->outputLatency());
+  return ok;
+}
+
+// Without the Autotune engine the same call runs the engine on its own ring and its own tracker, and lags by
+// the grain delay plus a period.
+bool testNoGroupWithoutEngine() {
+  bool ok = true;
+  const double hz = 220.0;
+  const Signal in = voice(hz, cv::kSampleRate * 2);
+  auto at = std::make_unique<cv::AutotuneFx>();
+  auto fm = std::make_unique<cv::FormantFx>();
+  Signal mid(in.size());
+  run(in, [&](const float* i, float* o, int n, int pos) {
+    cv::AutotuneParams ap;
+    ap.on = true;
+    cv::TrackerNeeds need;
+    need.run = true;
+    at->process(i, &mid[static_cast<size_t>(pos)], n, ap, need);
+    cv::UpstreamPitch up;
+    up.result = &at->pitch();
+    cv::FormantParams fp;
+    fp.on = true;
+    fp.mix = 1.0f;
+    fm->process(&mid[static_cast<size_t>(pos)], o, n, fp, up);
+  });
+  ok &= report("formant given a tracker and no engine runs its own", fm->ownPitch().period > 0.0f && !fm->groupedForTest(),
+               fm->ownPitch().period);
   return ok;
 }
 
@@ -143,6 +182,7 @@ bool testReuse() {
 int main() {
   bool ok = true;
   ok &= testBase();
-  ok &= testReuse();
+  ok &= testGroup();
+  ok &= testNoGroupWithoutEngine();
   return ok ? 0 : 1;
 }
