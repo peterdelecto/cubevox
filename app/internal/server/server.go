@@ -41,9 +41,10 @@ type Config struct {
 
 // Limits are the budget lines the page draws its meter against.
 type Limits struct {
-	Mean  int `json:"mean"`
-	Worst int `json:"worst"`
-	Fixed int `json:"fixed"`
+	Mean       int `json:"mean"`
+	Worst      int `json:"worst"`
+	FixedMean  int `json:"fixedMean"`
+	FixedWorst int `json:"fixedWorst"`
 }
 
 // UpdateState is the update progress the bottom bar shows.
@@ -143,7 +144,7 @@ func (s *Server) state() State {
 		App:    s.cfg.App,
 		Cards:  s.cfg.Fixture.Cards,
 		Layout: s.cfg.Fixture.Layout,
-		Limits: Limits{Mean: box.BudgetMean, Worst: box.BudgetWorst, Fixed: box.FixedCost},
+		Limits: Limits{Mean: box.BudgetMean, Worst: box.BudgetWorst, FixedMean: box.FixedMean, FixedWorst: box.FixedWorst},
 	}
 	hello, err := s.cfg.Box.Hello()
 	switch {

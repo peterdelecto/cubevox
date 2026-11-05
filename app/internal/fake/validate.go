@@ -44,7 +44,7 @@ func printableName(s string) bool {
 
 // checkBudget runs layoutValid: duplicates stop at the first repeat, then reverbs, then the sums.
 func checkBudget(byID map[string]box.Card, slots []string) error {
-	mean, worst, reverbs := box.FixedCost, box.FixedCost, 0
+	mean, worst, reverbs := box.FixedMean, box.FixedWorst, 0
 	seen := map[string]bool{}
 	for _, id := range slots {
 		if id != emptyID {

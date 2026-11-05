@@ -67,8 +67,8 @@ export function emptySlot(slots, i) {
 // Meter: the fixed term counts in both sums, each sum is read against its own limit.
 export function meter(slots, byId, limits) {
   if (!limits || !limits.mean || !limits.worst) return null;
-  let mean = limits.fixed || 0;
-  let worst = limits.fixed || 0;
+  let mean = limits.fixedMean || 0;
+  let worst = limits.fixedWorst || 0;
   for (const id of slots) {
     const c = byId.get(id);
     if (!c || !c.cost) continue;
