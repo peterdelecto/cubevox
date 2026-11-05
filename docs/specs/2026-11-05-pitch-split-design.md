@@ -4,6 +4,7 @@ Date 2026-11-05. Owner picked option A for chain-order audit entries 4 and 5
 (`build/audit/2026-11-05-chain-order-audit.md`). Autotune, Octave, Formant and Yawn each run in their
 own slot on that slot's input, in slot order. Mob keeps its exemption (root `CLAUDE.md`, "Chain order").
 Status: design only, not built. Code state read: main at 7b0bf92.
+Ringer (`RingMod`) is removed (owner 2026-11-05); every Ringer row and mention below is void.
 
 ## Goal
 

@@ -1,7 +1,7 @@
 // cubevox-emulator: the box's firmware code on the Mac.
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
-//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|apraxia] [--slot6 distortion|growl|ringmod]
+//   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|apraxia] [--slot6 distortion|growl]
 //                                  [--slot7 gate|lofi|chatter] [--slot8 spring|chasm]
 //                                             one frame of the window as a P6 PPM, no audio device,
 //                                             with those cards in slots 3, 6, 7 and 8 (Octave, Distortion,
@@ -155,8 +155,7 @@ constexpr std::array<CardRow, 3> kSlot3Rows = {
     {{Card::Formant, "formant", "formant", "FORMANT", costs::kFormant},
      {Card::FormantFollower, "formant_follow", "apraxia", "APRAXIA", costs::kFormantFollower},
      {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
-constexpr std::array<CardRow, 3> kSlot6Rows = {{{Card::Growl, "growl", "growl", "DEEPTHROAT", costs::kGrowl},
-                                                {Card::RingMod, "ringmod", "ringmod", "RINGER", costs::kRingMod},
+constexpr std::array<CardRow, 2> kSlot6Rows = {{{Card::Growl, "growl", "growl", "DEEPTHROAT", costs::kGrowl},
                                                 {Card::Distortion, "distortion", "distortion", "DISTORTION",
                                                  costs::kDistortion}}};
 
@@ -603,7 +602,7 @@ int runLive(const char* argv0) {
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|apraxia] "
-               "[--slot6 distortion|growl|ringmod] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm]]\n");
+               "[--slot6 distortion|growl] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm]]\n");
   return 2;
 }
 

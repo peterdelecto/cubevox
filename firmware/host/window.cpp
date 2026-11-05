@@ -360,9 +360,8 @@ constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
 constexpr std::array<GridCell, 2> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot4Cards = {Card::Unison, Card::Crowd};
-constexpr std::array<GridCell, kStackRows> kSlot6Cells = {
-    {{"DISTORTION", 0.0f, 0, 1.0f}, {"DEEPTHROAT", 0.0f, 1, 1.0f}, {"RINGER", 0.0f, 2, 1.0f}}};
-constexpr std::array<Card, kStackRows> kSlot6Cards = {Card::Distortion, Card::Growl, Card::RingMod};
+constexpr std::array<GridCell, 2> kSlot6Cells = {{{"DISTORTION", 0.0f, 0, 1.0f}, {"DEEPTHROAT", 0.0f, 1, 1.0f}}};
+constexpr std::array<Card, 2> kSlot6Cards = {Card::Distortion, Card::Growl};
 constexpr std::array<GridCell, 2> kSlot8Cells = {{{"SPRING", 0.0f, 0, 0.5f}, {"CHASM", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot8Cards = {Card::ReverbSpring, Card::ReverbChasm};
 constexpr std::array<GridCell, kStackRows> kSlot3Cells = {
@@ -393,7 +392,7 @@ void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
         segmentedGrid(f, "slot3Card", stackTop, kColInnerW, kStackRowH, kSlot3Cells, activeCell(kSlot3Cards, card));
     if (picked >= 0) f.box.pickSlot3Card(kSlot3Cards[static_cast<size_t>(picked)]);
   } else if (slot == distortionGrowlSlot(layout)) {
-    const ImVec2 stackTop = topLeft + ImVec2(0.0f, kGridH - kStackH);
+    const ImVec2 stackTop = topLeft + ImVec2(0.0f, kGridH - 2.0f * kStackRowH);
     const int picked =
         segmentedGrid(f, "slot6Card", stackTop, kColInnerW, kStackRowH, kSlot6Cells, activeCell(kSlot6Cards, card));
     if (picked >= 0) f.box.pickSlot6Card(kSlot6Cards[static_cast<size_t>(picked)]);
