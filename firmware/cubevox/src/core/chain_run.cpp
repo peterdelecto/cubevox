@@ -64,7 +64,7 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when any pitch-group card (Autotune, Octave, Formant, Crowd, Growl, Ring mod) has its toggle on. The shared
+// True when any pitch-group card (Autotune, Octave, Formant, Yawn, Crowd, Growl) has its toggle on. The shared
 // pitch stage runs while it is.
 bool pitchGroupOn(const ChainSnapshot& snap) {
   for (int s = 0; s < kSlotCount; ++s) {
@@ -98,16 +98,11 @@ void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const C
   engines.growl.process(in, out, n, p.growl, engines.pitch);
 }
 
-// Runs the Ring mod card at its slot, making the shared pitch stage's call first when no pitch-group card
-// ahead of it has, as runGrowl does. The card reads the tracker's period, not the ring. It snaps to the notes
-// of Autotune's KEY when Autotune is placed (`p.ringMod.keyed`), and to every semitone otherwise.
-void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
-  if (!pitchDone) {
-    pitchDone = true;
-    engines.pitch.process(in, out, n, p.pitchFx);
-    in = out;
-  }
-  engines.ringMod.process(in, out, n, p.ringMod, engines.pitch, p.ringMod.keyed ? p.pitchFx.autotune.key : -1);
+// Runs the Ring mod card at its slot. It tracks the pitch of `in` with a tracker of its own, so the shared
+// pitch stage plays no part. It snaps to the notes of Autotune's KEY when Autotune is placed
+// (`p.ringMod.keyed`), and to every semitone otherwise.
+void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
+  engines.ringMod.process(in, out, n, p.ringMod, p.ringMod.keyed ? p.pitchFx.autotune.key : -1);
 }
 
 // Runs the Sympath card (engine Strings). It tracks the held note itself and reads no Autotune key.
@@ -165,7 +160,7 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); return true;
     case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
     case Engine::Growl: runGrowl(engines, in, out, n, p, pitchDone); return true;
-    case Engine::RingMod: runRingMod(engines, in, out, n, p, pitchDone); return true;
+    case Engine::RingMod: runRingMod(engines, in, out, n, p); return true;
     case Engine::Strings: runStrings(engines, in, out, n, p); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
@@ -205,6 +200,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
       pitchDone = true;  // the stage is stopped, so no later pitch-group card has a ring to read
       engines.pitch.rest();
     }
+    if (e == Engine::RingMod) engines.ringMod.rest();
     return false;
   }
   if (step.from == 0 && step.to > 0 && !detectorLive) {

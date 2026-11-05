@@ -229,7 +229,8 @@ struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  ChainEngines engines{*pitch, *unison, *distortion};
+  std::unique_ptr<cv::RingMod> ringMod = std::make_unique<cv::RingMod>();
+  ChainEngines engines{*pitch, *unison, *distortion, *ringMod};
 };
 
 struct StillClock {

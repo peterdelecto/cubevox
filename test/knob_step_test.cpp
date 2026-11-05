@@ -404,7 +404,8 @@ Signal runLofiSlot(const Signal& in, const ChainParams& base, bool turnOn) {
   auto pitch = std::make_unique<cv::PitchFx>();
   auto unison = std::make_unique<cv::Unison>();
   auto distortion = std::make_unique<cv::Distortion>();
-  auto engines = std::make_unique<ChainEngines>(*pitch, *unison, *distortion);
+  auto ringMod = std::make_unique<cv::RingMod>();
+  auto engines = std::make_unique<ChainEngines>(*pitch, *unison, *distortion, *ringMod);
   auto snap = std::make_unique<ChainSnapshot>();
   snap->layout.card.fill(Card::Empty);
   snap->layout.card[kLofiSlot] = Card::Lofi;

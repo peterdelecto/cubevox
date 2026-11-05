@@ -83,7 +83,6 @@ struct PitchFxParams {
   FormantParams formant;
   bool crowdOn = false;  // the Mob card reads the ring and the tracker, so both run
   bool growlOn = false;  // the Growl card reads them too
-  bool ringModOn = false;  // so does the Ring mod card
 };
 
 class PitchFx {
@@ -136,7 +135,7 @@ class PitchFx {
     const bool formant = formantWanted(p.formant) || formantFade_ > 0.0f;
     writeCall(in, n);
     tracker_.readOutOfRange(p.crowdOn || formantWanted(p.formant));
-    if (autotune || formant || p.crowdOn || p.growlOn || p.ringModOn) {
+    if (autotune || formant || p.crowdOn || p.growlOn) {
       tracker_.push(in, n, true, autotune || formant, PitchTracker::History{ring_.data(), kVoiceRingLen, head_});
     } else {
       tracker_.idle(n);

@@ -20,7 +20,6 @@ ChainParams::ChainParams() {
   pitchFx.formant.on = false;
   pitchFx.crowdOn = false;
   pitchFx.growlOn = false;
-  pitchFx.ringModOn = false;
   crowd.on = false;
   growl.on = false;
   ringMod.on = false;

@@ -8,15 +8,16 @@
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/pitch.h"
-#include "engine/pitch_fx.h"
 #include "engine/scale.h"
 #include "engine/smooth.h"
 
 namespace cv {
 
 // The Ring mod card. A sine carrier at RATIO times a held note multiplies the voice, so the clang stays in
-// tune and follows the melody in steps. The note is the one nearest the tracked pitch. It is a major-scale
-// note of the Autotune card's key when that card is placed, and any semitone (A4 = 440 Hz) when not. The
+// tune and follows the melody in steps. The card tracks the pitch of its own input, the voice the slot
+// ahead of it hands over, with a PitchTracker and a short ring of its own, so an Octave card ahead moves
+// the carrier with the voice. The note is the one nearest the tracked pitch. It is a major-scale note of
+// the Autotune card's key when that card is placed, and any semitone (A4 = 440 Hz) when not. The
 // held note changes only when the tracked pitch sits closer to another note by more than 0.3 semitone, so
 // vibrato leaves the carrier still, and only when that same note has won for 60 ms in a row, so a stray
 // tracker frame at an onset leaves it still too. The count restarts when the candidate changes or the margin
@@ -39,6 +40,12 @@ constexpr std::array<float, kRingModRatioCount> kRingModRatio = {0.5f, 1.0f, 1.5
 constexpr std::array<const char*, kRingModRatioCount> kRingModRatioName = {"X0.5", "X1",   "X1.5", "X2",
                                                                             "X2.5", "X3",   "X4"};
 constexpr uint8_t kRingModDefaultRatioStep = 2;
+
+// The card's input ring holds what its tracker reads and no more, 5,040 B.
+constexpr int kRingModRingLen = PitchTracker::kRingNeed;
+
+// The floats of the ring one rest() call zeroes, so the ring is clear after three calls.
+constexpr int kRingModRestFloats = 512;
 
 struct RingModTuning {
   float holdSemis = 0.3f;   // the pitch must sit this much closer to another note before the held note changes
@@ -84,9 +91,17 @@ inline float toward(float x, float target, float step) {
 
 class RingMod {
  public:
-  RingMod() { reset(); }
+  RingMod() {
+    tracker_.readOutOfRange(false);
+    reset();
+  }
 
+  // Leaves the ring and the tracker clear. A card that rested since it last ran (see rest) has cleared most
+  // of the ring already, and this clears what is left.
   void reset() {
+    clearRing(kRingModRingLen);
+    head_ = 0;
+    tracker_.reset();
     phase_ = 0;
     hasNote_ = false;
     noteMidi_ = 0.0f;
@@ -104,12 +119,18 @@ class RingMod {
     fresh_ = true;
   }
 
-  // `pitch` has run this block. `key` is the Autotune KEY index whose major scale holds the notes, or a
-  // negative number for every semitone. Off and settled, out equals in bit for bit. in and out may be the
-  // same buffer.
-  void process(const float* in, float* out, int n, const RingModParams& p, const PitchFx& pitch, int key) {
+  // `key` is the Autotune KEY index whose major scale holds the notes, or a negative number for every
+  // semitone. The tracker follows `in` while the card is on or its wet is fading out, and rests otherwise.
+  // Off and settled, out equals in bit for bit. in and out may be the same buffer.
+  void process(const float* in, float* out, int n, const RingModParams& p, int key) {
     if (n <= 0) return;
-    trackNote(pitch.pitch(), key, p.tuning, n);
+    const bool tracking = p.on || wet_ > 0.0f;
+    for (int done = 0; done < n;) {
+      const int m = n - done < kBlock ? n - done : kBlock;
+      pushTracker(in + done, m, tracking);
+      done += m;
+    }
+    trackNote(tracker_.result(), key, p.tuning, n);
     const float wetTarget = p.on ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
       fresh_ = true;
@@ -153,6 +174,19 @@ class RingMod {
     }
     phase_ = phase;
   }
+
+  // A call for each block the card sits stopped (the chain does not run it). It zeroes the next
+  // kRingModRestFloats floats of the ring, so the reset that starts the card again finds the ring clear
+  // and no block carries the whole clear. A card that restarts before the ring is clear pays for the rest
+  // in that reset.
+  void rest() { clearRing(kRingModRestFloats); }
+
+  // Test hook: the tracker's reading of the card's input.
+  const PitchResult& pitch() const { return tracker_.result(); }
+
+  // Test hooks: the ring, and the floats the ring clears have zeroed since construction (it wraps).
+  const std::array<float, kRingModRingLen>& ringForTest() const { return ring_; }
+  uint32_t ringClearedForTest() const { return ringCleared_; }
 
   // Test hook: the carrier's frequency in the last block, in Hz.
   float carrierHz() const { return carrierHz_; }
@@ -235,6 +269,32 @@ class RingMod {
   }
 
  private:
+  // Writes m samples (at most kBlock) into the ring, then feeds them to the tracker, which reads its fine
+  // frame and its replay from the ring. A card that is not tracking leaves the tracker idle; its next
+  // push replays what it missed. The tracker runs the coarse search only, which a semitone grid with a
+  // 0.3 semitone hold tolerates.
+  void pushTracker(const float* in, int m, bool tracking) {
+    ringZero_ = 0;
+    const int first = head_;
+    for (int i = 0; i < m; ++i) {
+      ring_[static_cast<size_t>(head_)] = in[i];
+      if (++head_ == kRingModRingLen) head_ = 0;
+    }
+    if (tracking) {
+      tracker_.push(in, m, true, false, PitchTracker::History{ring_.data(), kRingModRingLen, first});
+    } else {
+      tracker_.idle(m);
+    }
+  }
+
+  // Zeroes up to `most` more floats of the ring, in index order from ringZero_.
+  void clearRing(int most) {
+    const int n = most < kRingModRingLen - ringZero_ ? most : kRingModRingLen - ringZero_;
+    zeroFloats(&ring_[static_cast<size_t>(ringZero_)], static_cast<size_t>(n));
+    ringZero_ += n;
+    ringCleared_ += static_cast<uint32_t>(n);
+  }
+
   static uint32_t stepOf(float hz) { return static_cast<uint32_t>(hz * (4294967296.0f / kSampleRate)); }
 
   static float dryGain(float e) { return sinTurns(ringmod_detail::kQuarterTurn - phaseOf(e)); }
@@ -243,6 +303,11 @@ class RingMod {
     return static_cast<uint32_t>(smooth::clamp01(e) * static_cast<float>(ringmod_detail::kQuarterTurn));
   }
 
+  std::array<float, kRingModRingLen> ring_{};  // the card's input, newest at head_ - 1
+  PitchTracker tracker_;
+  int head_ = 0;            // the ring index the next sample takes
+  int ringZero_ = 0;        // the clear has zeroed the ring below this index since the last write
+  uint32_t ringCleared_ = 0;
   uint32_t phase_ = 0;
   bool hasNote_ = false;    // a voiced frame has set the note
   float noteMidi_ = 0.0f;   // the held note, a whole MIDI number
