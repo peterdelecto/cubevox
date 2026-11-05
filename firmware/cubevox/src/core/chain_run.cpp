@@ -227,7 +227,10 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
   const SlotFades::Step step = fades.step(s, carriesPitch ? pitchGroupOn(snap) : stageToggleOn(snap, e));
   const bool detectorLive = e == Engine::InputGate;
   if (step.from == 0 && step.to == 0 && !detectorLive) {
-    if (carriesPitch) pitchDone = true;  // the stage is stopped, so no later pitch-group card has a ring to read
+    if (carriesPitch) {
+      pitchDone = true;  // the stage is stopped, so no later pitch-group card has a ring to read
+      engines.pitch.rest();
+    }
     return false;
   }
   if (step.from == 0 && step.to > 0 && !detectorLive) {

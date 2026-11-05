@@ -84,11 +84,11 @@ class PitchTracker {
   }
 
   void reset() {
-    dec_.fill(0.0f);
+    zeroFloats(dec_.data(), dec_.size());
     decPos_ = 0;
-    hopSums_.fill(0.0f);
+    zeroFloats(hopSums_.data(), hopSums_.size());
     hopRow_ = 0;
-    numer_.fill(0.0f);
+    zeroFloats(numer_.data(), numer_.size());
     denom_.fill(1.0f);
     tail_ = false;
     staleFrom_ = kFrameBlocks;
@@ -129,6 +129,7 @@ class PitchTracker {
     ringLen_ = h.len;
     ringNext_ = h.head;
     sumsThisPush_ = 0;
+    refineLagsThisPush_ = 0;
     fine_ = fine;
     if (active && rested_) startReplay();
     if (active && untilHop_ > 0) {
@@ -174,6 +175,8 @@ class PitchTracker {
   bool sumsCurrentForTest() const { return staleFrom_ == kFrameBlocks; }
   uint32_t onsetRunsForTest() const { return onsetRuns_; }
   float onsetBestDnForTest() const { return onsetBestDn_; }  // the last run's lowest normalised difference
+  int refineLagsLastPushForTest() const { return refineLagsThisPush_; }
+  static constexpr int onsetMaxLagsForTest() { return kOnsetMaxLags; }
 
  private:
   static constexpr int kDecLen = 512;
@@ -214,6 +217,9 @@ class PitchTracker {
   static constexpr int kOnsetReach = 6;
   static constexpr float kOnsetNoiseDn = 0.5f;
   static constexpr int kOnsetSkipBlocks = 3;
+  // The refinement sums this many lags at most (of the 2 * kOnsetReach + 1 it could): the centre and its
+  // neighbours, and up to five more down the slope.
+  static constexpr int kOnsetMaxLags = 8;
 
  public:
   // The history a replay reads: the coarse frame's span at full rate, or the fine frame's if longer.
@@ -263,6 +269,8 @@ class PitchTracker {
                 "the onset window sits in the decimated ring and its sums unroll by four");
   static_assert(kOnsetFineW % 4 == 0 && kOnsetFineW + kMaxPeriod <= kFineSpan,
                 "the refinement unrolls by four and reads no further back than the fine pass does");
+  static_assert(kOnsetMaxLags >= 3 && kOnsetMaxLags <= 2 * kOnsetReach + 1,
+                "the refinement sums the centre lag and both neighbours, and no more lags than it covers");
   static_assert(kOnsetMinLag * kOnsetHalve * kDecim == kMinPeriod && kOnsetMaxLag * kOnsetHalve * kDecim <= kMaxPeriod,
                 "the onset lags run from kMaxHz down");
   static_assert(kDecim * kCoarseW % kHop == 0, "the coarse frame is whole hops, so a replay's block sums start on one");
@@ -392,13 +400,14 @@ class PitchTracker {
     return (s0 + s1) + (s2 + s3);
   }
 
-  // YIN on the newest 20 ms at 6 kHz. The difference at lag t is e0 + e(t) - 2 c(t), with c the
-  // correlation of the newest kOnsetL samples with the ones t back and e0 and e(t) their energies. e(t)
-  // follows from e(t - 1) by one sample in and one out. The normalised difference divides by the mean of
-  // the differences up to t, as YIN does, so a smooth noise has no dip at a short lag. The pick is the
-  // first lag from kOnsetMinLag (kMaxHz) up whose value falls under 1 - kOnsetClarity, walked down to its
-  // bottom. The loop keeps the values around the pick, so the parabola needs no array of them. Returns
-  // the period in samples at kSampleRate, or 0 when no dip is clear.
+  // The coarse half of an estimate: YIN on the newest 20 ms at 6 kHz. The difference at lag t is
+  // e0 + e(t) - 2 c(t), with c the correlation of the newest kOnsetL samples with the ones t back and e0
+  // and e(t) their energies. e(t) follows from e(t - 1) by one sample in and one out. The normalised
+  // difference divides by the mean of the differences up to t, as YIN does, so a smooth noise has no dip
+  // at a short lag. The pick is the first lag from kOnsetMinLag (kMaxHz) up whose value falls under
+  // 1 - kOnsetClarity, walked down to its bottom. The loop keeps the values around the pick, so the
+  // parabola needs no array of them. Returns the coarse period in samples at kSampleRate, or 0 when no
+  // dip is clear.
   float onsetPeriod() {
     ++onsetRuns_;
     const float* src = dec_.data() + decPos_ + kDecLen - kOnsetHalve * kOnsetW;
@@ -446,29 +455,49 @@ class PitchTracker {
     }
     onsetBestDn_ = pickDn;
     const float off = pick < kOnsetMaxLag ? parabolic(before, pickDn, after) : 0.0f;
-    return refineOnset(clampf((static_cast<float>(pick) + off) * static_cast<float>(kOnsetHalve * kDecim),
-                              static_cast<float>(kMinPeriod), static_cast<float>(kMaxPeriod)));
+    return clampf((static_cast<float>(pick) + off) * static_cast<float>(kOnsetHalve * kDecim),
+                  static_cast<float>(kMinPeriod), static_cast<float>(kMaxPeriod));
   }
 
   // The estimate refined at 48 kHz on the same 20 ms: the plain difference of the newest kOnsetFineW
   // samples against the ones lag older, at the lags around the coarse period, and a parabola through the
-  // lowest. It runs once per estimate that passes, and it keeps the coarse period when the lowest lag
-  // sits on an end of the search.
-  float refineOnset(float coarse) const {
+  // lowest. It finds the lowest as the fine pass does: the sums at the centre lag and its two neighbours,
+  // then one lag at a time downhill while the sum keeps falling, each lag summed once. Summing all
+  // 2 * kOnsetReach + 1 lags took 1.6 host us, more than a voiced hop's whole analysis, in the block of the
+  // coarse half. The walk sums three or four lags on Adam's clips and at most kOnsetMaxLags. A walk that
+  // would need more keeps the coarse period, as one that ends on an end of the search does.
+  float refineOnset(float coarse) {
     const int centre = static_cast<int>(floorf(coarse + 0.5f));
     const int lo = centre - kOnsetReach < kMinPeriod ? kMinPeriod : centre - kOnsetReach;
     const int hi = centre + kOnsetReach > kMaxPeriod ? kMaxPeriod : centre + kOnsetReach;
     const int start = ringNext_ >= kOnsetFineW ? ringNext_ - kOnsetFineW : ringNext_ - kOnsetFineW + ringLen_;
     std::array<float, 2 * kOnsetReach + 1> d{};
-    int best = lo;
-    for (int lag = lo; lag <= hi; ++lag) {
+    int summed = 0;
+    auto sum = [&](int lag) {
       const int older = start >= lag ? start - lag : start - lag + ringLen_;
-      d[static_cast<size_t>(lag - lo)] = sumSqDiffRing(ring_, ringLen_, start, older, kOnsetFineW);
-      if (d[static_cast<size_t>(lag - lo)] < d[static_cast<size_t>(best - lo)]) best = lag;
+      ++summed;
+      return d[static_cast<size_t>(lag - lo)] = sumSqDiffRing(ring_, ringLen_, start, older, kOnsetFineW);
+    };
+    int m = centre < lo ? lo : (centre > hi ? hi : centre);
+    const float dm = sum(m);
+    const float dl = m > lo ? sum(m - 1) : dm;
+    const float dr = m < hi ? sum(m + 1) : dm;
+    bool capped = false;
+    if (m > lo && dl <= dm && dl <= dr) {
+      for (--m; m > lo; --m) {
+        capped = summed == kOnsetMaxLags;
+        if (capped || sum(m - 1) > d[static_cast<size_t>(m - lo)]) break;
+      }
+    } else if (dr < dm) {
+      for (++m; m < hi; ++m) {
+        capped = summed == kOnsetMaxLags;
+        if (capped || sum(m + 1) >= d[static_cast<size_t>(m - lo)]) break;
+      }
     }
-    if (best == lo || best == hi) return coarse;
-    const size_t k = static_cast<size_t>(best - lo);
-    return static_cast<float>(best) + parabolic(d[k - 1], d[k], d[k + 1]);
+    refineLagsThisPush_ += summed;
+    if (capped || m == lo || m == hi) return coarse;
+    const size_t k = static_cast<size_t>(m - lo);
+    return static_cast<float>(m) + parabolic(d[k - 1], d[k], d[k + 1]);
   }
 
   // Once a block while the tracker reads unvoiced. A quiet window arms the estimate, and the first clear
@@ -488,11 +517,12 @@ class PitchTracker {
       --onsetWait_;
       return;
     }
-    const float p = onsetPeriod();
-    if (p <= 0.0f) {
+    const float coarse = onsetPeriod();
+    if (coarse <= 0.0f) {
       if (onsetBestDn_ > kOnsetNoiseDn) onsetWait_ = kOnsetSkipBlocks;
       return;
     }
+    const float p = refineOnset(coarse);
     onsetArmed_ = false;
     estimateHeld_ = true;
     slideLeft_ = 0;
@@ -759,8 +789,8 @@ class PitchTracker {
     clearOnset();
     staleFrom_ = active ? 0 : kFrameBlocks;
     if (!active) return;
-    hopSums_.fill(0.0f);
-    numer_.fill(0.0f);
+    zeroFloats(hopSums_.data(), hopSums_.size());
+    zeroFloats(numer_.data(), numer_.size());
     tail_ = true;
   }
 
@@ -860,6 +890,7 @@ class PitchTracker {
   int hopRow_ = 0;                                   // the open hop's sum; it moves on at each hop, active or not
   int staleFrom_ = kFrameBlocks;                     // blocks of this age and older still wait for their rebuild
   int sumsThisPush_ = 0;
+  int refineLagsThisPush_ = 0;  // lags the onset refinement summed in this push
   float lastTau_ = 0.0f;
   bool lastPeriodic_ = false;
   bool lastOutOfRange_ = false;

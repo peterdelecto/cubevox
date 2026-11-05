@@ -90,13 +90,19 @@ class PitchFx {
   static_assert(PitchTracker::kReplaySpan < kVoiceRingLen, "the ring holds a tracker replay's history");
 
  public:
+  // The floats of the ring one rest() call zeroes: the ring is clear after kVoiceRingLen / this calls,
+  // 25 blocks.
+  static constexpr int kRestClearFloats = 512;
+
   PitchFx() {
     formant_.latchGain(true);
     reset();
   }
 
+  // Leaves the ring zero. A stage that rested since it last ran (see rest) has cleared most of it already,
+  // and this clears what is left.
   void reset() {
-    ring_.fill(0.0f);
+    clearRing(kVoiceRingLen);
     zeroRun_ = kVoiceRingLen;
     head_ = 0;
     tracker_.reset();
@@ -151,6 +157,15 @@ class PitchFx {
     }
     mixBlock(in, out, n, t, p.formant);
   }
+
+  // A call for each block the stage sits stopped (the chain does not run it). It zeroes the next
+  // kRestClearFloats floats of the input ring, so the reset that starts the stage again finds the ring
+  // clear and the first block after a switch-on carries none of the 51 kB clear. A stage that restarts
+  // before the ring is clear pays for the rest in that reset.
+  void rest() { clearRing(kRestClearFloats); }
+
+  // The floats the ring clears have zeroed since construction, for the tests. It wraps.
+  uint32_t ringClearedForTest() const { return ringCleared_; }
 
   const PitchResult& pitch() const { return tracker_.result(); }
 
@@ -272,6 +287,7 @@ class PitchFx {
   // call's later samples, and the call overwrites only the oldest ones. head_ stays at the call's
   // first sample, which the voices step over.
   void writeCall(const float* in, int n) {
+    ringZero_ = 0;
     int at = head_;
     for (int done = 0; done < n;) {
       const int run = n - done < kVoiceRingLen - at ? n - done : kVoiceRingLen - at;
@@ -680,6 +696,14 @@ class PitchFx {
     levelGain_ = 1.0f;
   }
 
+  // Zeroes up to `most` more floats of the ring, in index order from ringZero_.
+  void clearRing(int most) {
+    const int n = most < kVoiceRingLen - ringZero_ ? most : kVoiceRingLen - ringZero_;
+    zeroFloats(&ring_[static_cast<size_t>(ringZero_)], static_cast<size_t>(n));
+    ringZero_ += n;
+    ringCleared_ += static_cast<uint32_t>(n);
+  }
+
   // Steps head_ over m samples, m under the ring's length. Voices only use head modulo the ring, so
   // wrapping here is exact.
   void advance(int m) { head_ = head_ + m < kVoiceRingLen ? head_ + m : head_ + m - kVoiceRingLen; }
@@ -722,8 +746,12 @@ class PitchFx {
   float rateSemis_ = std::numeric_limits<float>::quiet_NaN();
   float trimSemis_ = std::numeric_limits<float>::quiet_NaN();
 
-  // The ring: where the next sample goes, and how many samples at its newest end are exactly 0.
+  // The ring: where the next sample goes, how many samples at its newest end are exactly 0, and how far
+  // from index 0 the ring is known to be zero (a write drops it to 0). ringCleared_ counts the floats
+  // the clears have zeroed.
   int head_ = 0;
+  int ringZero_ = kVoiceRingLen;
+  uint32_t ringCleared_ = 0;
   int zeroRun_ = kVoiceRingLen;
   int zeroBefore_ = 0;  // the same count just before the chunk being rendered
 

@@ -20,8 +20,8 @@
      `onePoleCoef` and `onePoleCoefAt`, `OnePole`, `kWetDcBlockHz`, `dcBlockCoef`, `DcBlocker`, `RbjCorner`
      with `rbjCorner`, `rbjAlpha` and `rbjAmp`, `kPeakMinQ`, `kShelfMaxSlope`, `kShelfMinSlope`, `Biquad`
      (the dB setters, the `...Amp` setters that take a kept corner and a linear amplitude, `setCoefsFrom`,
-     `run`), `catmullRom`, `catmullRomWeights`, `wrapOnce`, `readRing`, and `readRingClamped` for a delay
-     that may leave [2, Len - 3].
+     `run`), `catmullRom`, `catmullRomWeights`, `wrapOnce`, `readRing`, `readRingClamped` for a delay
+     that may leave [2, Len - 3], and `zeroFloats`.
   3. `engine/fastmath.h`: `exp2Fast`, `log2Fast`, `dbFast`, `dbToGainFast` (the per-sample dB law),
      `DbGain`, `sinTurns`, `sinCosFast`, `tanhFast`, `HannRotor`, and the constants `kLog2E`, `kDbPerLog2`,
      `kLog2PerDb`, `kTurn32`.
@@ -33,6 +33,13 @@
   6. `engine/reverb_parts.h`, for the two reverbs: `softClip`, `softClipHeadroom`, `kReverbClipHeadroom`, the
      allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, the wobble LFO's sine table, phase step and
      error bound, and the Dwell drive terms.
+- The board's memset and memcpy run a byte at a time (newlib-nano), about 5 cycles a byte, and
+  `std::array::fill(0.0f)` compiles to memset. A clear of more than a few hundred bytes in a block that
+  can land on a switch-on uses `zeroFloats` (a word a store), and a clear the size of the pitch ring
+  (51 kB, 250k cycles by memset) is also spread: `PitchFx::rest()` clears a slice a block while the stage
+  is stopped, so `reset()` at the switch-on finds it clear. `pitch_spikes_test` holds both.
+- The onset estimate's 48 kHz refinement walks downhill from the coarse period and sums at most
+  `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's.
 - `clampf`, `clamp01`, `KnobCurve::at` and `exp2Fast` return the lower bound for a NaN, so a NaN stops at the
   first boundary clamp. The float-to-int casts in `exp2Fast`, `sinCosFast`, `readRing` and `Delay::read` see a
   finite value for any input.

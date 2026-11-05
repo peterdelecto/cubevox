@@ -137,7 +137,8 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 
 // Runs slot `s` for one block from `in` into `out`: the engine of its card with the toggle
 // crossfade. A slot settled off runs no engine and writes nothing, so the caller keeps its buffers
-// and the dry input passes. A slot that starts a fade in has its engine cleared first. A flip back
+// and the dry input passes. A stopped pitch stage clears a slice of its input ring each block (`PitchFx::rest`),
+// so the clear at its next start is already done. A slot that starts a fade in has its engine cleared first. A flip back
 // during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot is
 // off, because its detector feeds the status reply's `floor_dbfs` and keys the Chatter card; its own
 // off fade ends inside the slot fade, so the settled slot passes the input bit for bit. Returns false

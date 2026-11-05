@@ -158,6 +158,9 @@ cubevox_engine_test(deesser)
 cubevox_engine_test(level ${CUBEVOX_REGISTRY_SOURCES})
 target_compile_definitions(level_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(knob_step ${CUBEVOX_REGISTRY_SOURCES} ${CUBEVOX_CORE_DIR}/chain_run.cpp)
+cubevox_engine_test(pitch_spikes ${CUBEVOX_REGISTRY_SOURCES} ${CUBEVOX_CORE_DIR}/chain_run.cpp
+                    ${CUBEVOX_CORE_DIR}/compose.cpp ${CUBEVOX_CORE_DIR}/layout.cpp ${CUBEVOX_CORE_DIR}/output_stage.cpp)
+target_compile_definitions(pitch_spikes_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(stage_feedback)
 
 # firmware core and ui tiers: every src/core/*.cpp and src/ui/*.cpp must compile on the host
