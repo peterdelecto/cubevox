@@ -133,26 +133,15 @@ constexpr Cost kLofi{2, 5, true};          // 11.1k / 26.6k, stress run 2026-11-
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 
 // The Growl card, Distortion's alternate in slot 6, reads the tracker like Crowd, so a layout with it pays
-// kTracker once. Its row is the card alone from the host bench of 2026-11-04 (g++ 15 at -O2 with the
-// firmware's float contraction, Adam's three clips in 64-sample blocks, the pitch stage running for the
-// ring and the tracker, minimum of 9 interleaved passes, mach_absolute_time per block): 0.478 host us a
-// block at GROWL and DRIVE 100 % (0.430 at 50 / 50, 0.482 with both knobs swept end to end), and 0.666 us
-// for the costliest block, its minimum over the passes. At 50.4k board cycles per host us that is 24.1k /
-// 33.6k cycles, 3.8 % / 5.2 %, rounded up.
-// With the throat move (2026-11-04), GROWL 100 % / DRIVE 50 %: 8.2 to 9.0 ns a sample, 26.5k to 29.0k
-// cycles, 4.2 to 4.6 %, about 6.2 % worst block.
-constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run owes the measured row
+// kTracker once. Its row is the card's slot measured on the box. The host bench of 2026-11-04 had put it
+// at 3.8 % / 5.2 %, and 4.2 to 4.6 % mean with the throat move.
+constexpr Cost kGrowl{5, 7, true};  // 25.7k / 42.7k, stress run 2026-11-05 (v2.01.51-bench, throat layout: mean 4.0 %, worst 6.7 %)
 
-// The audition cards of 2026-11-04, from the host bench of Growl's method (Apple clang -O2 with the firmware's
-// float contraction, Adam's three clips in 64-sample blocks, minimum of 9 passes, steady_clock around each
-// call, 50.4k board cycles per host us). Ringer is Distortion's second alternate in slot 6. It runs a pitch
-// tracker of its own (the coarse search) on its input, so its row holds the tracker and a layout with it pays
-// kTracker only for the shared tracker of Autotune, Mob, Formant, Yawn or Deepthroat. The card alone is 2.0 ns
-// a sample, 129 ns a block, 6.5k cycles, 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %; its
-// tracker is about 2.7 % mean and 5 % worst. The host bench of the whole slot on Adam's clips (Apple clang,
-// 2026-11-05) reads 0.69 us a block mean and 1.3 us worst with Autotune placed, 0.71 and 1.5 us without, which
-// is 2.9 % mean and 5.3 to 6.5 % worst at the tracker's 27k cycles per host us.
-constexpr Cost kRingMod{4, 7, false};  // est.: the card 0.9 / 1.6 % plus its own tracker 2.7 / 5 %, rounded up; a board run owes the measured row
+// Ringer is Distortion's second alternate in slot 6. It runs a pitch tracker of its own (the coarse search) on
+// its input, so its row holds the tracker and a layout with it pays kTracker only for the shared tracker of
+// Autotune, Mob, Formant, Yawn or Deepthroat. Its row is the card's slot measured on the box, with its toggle
+// flipped ten times in the run, so the worst holds a switch-on.
+constexpr Cost kRingMod{4, 8, true};  // 22.0k / 50.8k, stress run 2026-11-05 (v2.01.51-bench, ringmod layout: mean 3.4 %, worst 7.9 %)
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them. The stress run of 2026-11-05 measured POLISH EQ (both halves) and POLISH COMP, and
