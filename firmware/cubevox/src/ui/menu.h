@@ -26,7 +26,7 @@ struct UiInput {
 enum class UiAction : uint8_t {
   None,
   TogglePolishComp,
-  TogglePolishEq,
+  CycleVoxEq,
   ToggleOutput,
   ToggleInputJack,
   CycleTopSwitch,

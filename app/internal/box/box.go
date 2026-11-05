@@ -15,7 +15,7 @@ const (
 	BudgetWorst = 95
 )
 
-// FixedMean and FixedWorst are the share every layout pays for POLISH EQ, POLISH COMP, the output ceiling,
+// FixedMean and FixedWorst are the share every layout pays for VOX EQ, POLISH COMP, the output ceiling,
 // the BYPASS mix and the sample conversion. hello does not carry them, so they mirror
 // firmware/cubevox/src/core/costs.h kFixed (7 % mean, 9 % worst).
 const (

@@ -78,7 +78,7 @@ void reseal(RecordBytes& b) {
 RecordBytes asV1(RecordBytes b) {
   b[kOffSchema] = static_cast<uint8_t>(kRecordSchemaV1);
   b[kOffSchema + 1] = 0;
-  for (size_t off : {kOffPolishComp, kOffPolishEq, kOffTopSwitch}) b[off] = 0;
+  for (size_t off : {kOffPolishComp, kOffRetiredPolishEq, kOffTopSwitch, kOffVoxEq}) b[off] = 0;
   reseal(b);
   return b;
 }
@@ -86,30 +86,49 @@ RecordBytes asV1(RecordBytes b) {
 void checkRecordSchemaV2() {
   Settings changed;
   changed.polishComp = false;
-  changed.polishEq = false;
+  changed.voxEq = VoxEq::Cuts;
   changed.topSwitch = TopSwitch::Bypass;
   RecordData in = makeRec(9, OutputLevel::Mic);
   in.settings = changed;
   in.settings.outputLevel = OutputLevel::Mic;
   const RecordBytes b = encodeRecord(in);
   RecordData out;
-  check(b[kOffSchema] == kRecordSchema && b[kOffPolishComp] == 0 && b[kOffPolishEq] == 0 &&
-            b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
-        "record v2: the polish bytes follow the two v1 settings bytes");
-  check(decodeRecord(b.data(), out) && !out.settings.polishComp && !out.settings.polishEq &&
+  check(b[kOffSchema] == kRecordSchema && b[kOffPolishComp] == 0 && b[kOffRetiredPolishEq] == 0 &&
+            b[kOffVoxEq] == static_cast<uint8_t>(VoxEq::Cuts) && b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
+        "record v2: the polish bytes follow the two v1 settings bytes, and VOX EQ sits at byte 9");
+  check(decodeRecord(b.data(), out) && !out.settings.polishComp && out.settings.voxEq == VoxEq::Cuts &&
             out.settings.topSwitch == TopSwitch::Bypass && out.settings.outputLevel == OutputLevel::Mic,
         "record v2: round trip keeps the polish settings");
 
+  for (const VoxEq v : {VoxEq::Off, VoxEq::On, VoxEq::Cuts}) {
+    RecordData each = makeRec(3);
+    each.settings.voxEq = v;
+    const RecordBytes eachBytes = encodeRecord(each);
+    check(decodeRecord(eachBytes.data(), out) && out.settings.voxEq == v, "record v2: each VOX EQ setting round trips");
+  }
+
   const RecordBytes defaults = encodeRecord(makeRec(1));
-  check(decodeRecord(defaults.data(), out) && out.settings.polishComp && out.settings.polishEq &&
+  check(decodeRecord(defaults.data(), out) && out.settings.polishComp && out.settings.voxEq == VoxEq::Off &&
             out.settings.topSwitch == TopSwitch::Mute,
-        "record v2: default settings are comp on, EQ on, MUTE");
+        "record v2: default settings are comp on, VOX EQ off, MUTE");
+
+  RecordBytes oldOn = defaults;  // a record written while POLISH EQ was an ON/OFF row, stored ON
+  oldOn[kOffRetiredPolishEq] = 1;
+  oldOn[kOffVoxEq] = 0;
+  reseal(oldOn);
+  check(decodeRecord(oldOn.data(), out) && out.settings.voxEq == VoxEq::Off,
+        "record v2: an old record with POLISH EQ stored ON loads with VOX EQ OFF");
+  RecordBytes junkRetired = encodeRecord(in);
+  junkRetired[kOffRetiredPolishEq] = 0x7F;
+  reseal(junkRetired);
+  check(decodeRecord(junkRetired.data(), out) && out.settings.voxEq == VoxEq::Cuts,
+        "record v2: the retired POLISH EQ byte is ignored, whatever it holds");
 
   RecordData wasV1 = makeRec(4, OutputLevel::Mic);
   wasV1.settings.inputJack = InputJack::Line;
   const RecordBytes v1 = asV1(encodeRecord(wasV1));
   check(decodeRecord(v1.data(), out) && out.sequence == 4 && out.settings.outputLevel == OutputLevel::Mic &&
-            out.settings.inputJack == InputJack::Line && out.settings.polishComp && out.settings.polishEq &&
+            out.settings.inputJack == InputJack::Line && out.settings.polishComp && out.settings.voxEq == VoxEq::Off &&
             out.settings.topSwitch == TopSwitch::Mute,
         "record v1: decodes with the polish defaults, not the zero bytes");
   check(classifyRecordEntry(v1.data()) == EntryState::Valid, "record v1: still a valid entry");
@@ -122,12 +141,16 @@ void checkRecordSchemaV2() {
   check(decodeRecord(junk.data(), out) && out.settings.polishComp && out.settings.topSwitch == TopSwitch::Mute,
         "record v1: bytes past the two settings are ignored");
 
-  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffPolishComp, kOffPolishEq, kOffTopSwitch, kOffDebug}) {
+  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffPolishComp, kOffTopSwitch, kOffDebug}) {
     RecordBytes bad = b;
     bad[off] = 2;
     reseal(bad);
     check(!decodeRecord(bad.data(), out), "record v2: a settings byte out of range is rejected");
   }
+  RecordBytes badVox = b;
+  badVox[kOffVoxEq] = 3;
+  reseal(badVox);
+  check(!decodeRecord(badVox.data(), out), "record v2: a VOX EQ byte past ON+CUTS is rejected");
 }
 
 // DEBUG sits in the first reserved settings byte, so the schema stays 2. A record that holds 0 there,
@@ -214,7 +237,7 @@ void checkRecordRetiredBytes() {
         "record: settings bytes 6 and 7 are the retired pair");
 
   RecordData in = makeRec(2);
-  in.settings.polishEq = false;
+  in.settings.voxEq = VoxEq::On;
   in.settings.debug = true;
   const RecordBytes saved = encodeRecord(in);
   check(saved[kOffSchema] == kRecordSchema && saved[kOffRetired] == 0 && saved[kOffRetired + 1] == 0,
@@ -225,7 +248,7 @@ void checkRecordRetiredBytes() {
   earlier[kOffRetired] = 4;
   earlier[kOffRetired + 1] = 7;
   reseal(earlier);
-  check(decodeRecord(earlier.data(), out) && out.settings.polishEq == in.settings.polishEq &&
+  check(decodeRecord(earlier.data(), out) && out.settings.voxEq == in.settings.voxEq &&
             out.settings.polishComp == in.settings.polishComp && out.settings.debug && out.layout == in.layout &&
             out.sequence == in.sequence,
         "record: a record from the earlier firmware loads with every other setting intact");
@@ -235,7 +258,7 @@ void checkRecordRetiredBytes() {
     odd[kOffRetired] = byte;
     odd[kOffRetired + 1] = byte;
     reseal(odd);
-    check(decodeRecord(odd.data(), out) && out.settings.polishEq == in.settings.polishEq && out.settings.debug,
+    check(decodeRecord(odd.data(), out) && out.settings.voxEq == in.settings.voxEq && out.settings.debug,
           "record: whatever bytes 6 and 7 hold, the record stays valid");
   }
 

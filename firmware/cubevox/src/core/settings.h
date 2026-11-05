@@ -11,11 +11,18 @@ enum class OutputLevel : uint8_t { Line, Mic };
 enum class InputJack : uint8_t { Mic, Line };  // Mic = relay K103 coil off, pad shorted
 enum class TopSwitch : uint8_t { Mute, Bypass };  // what the top-left switch does
 
+// The VOX EQ row. The values are the saved byte and the order the menu steps through.
+enum class VoxEq : uint8_t {
+  Off,   // the stage does not run
+  On,    // the de-esser ahead of slot 1, the dip, presence and trim after POLISH COMP
+  Cuts,  // On, plus the 70 Hz high-pass and 6 kHz low-pass ahead of slot 1
+};
+
 struct Settings {
   OutputLevel outputLevel = OutputLevel::Line;
   InputJack inputJack = InputJack::Mic;
   bool polishComp = true;  // POLISH COMP stage
-  bool polishEq = true;    // POLISH EQ stage, both halves
+  VoxEq voxEq = VoxEq::Off;  // VOX EQ stage, both halves
   TopSwitch topSwitch = TopSwitch::Mute;
   Brightness brightness = Brightness::High;  // the OLED's contrast while awake; saved, never sent over USB
   bool debug = false;  // DEBUG: the voice screen shows the audio load

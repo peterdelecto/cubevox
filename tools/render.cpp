@@ -1,4 +1,4 @@
-// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + formant + crowd +
+// cubevox-render: loop in, the front half of VOX EQ, gates + autotune + octave + formant + crowd +
 // unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the
 // back half of eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
@@ -82,7 +82,7 @@ int usage() {
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, the AMOUNT pot] [--lofi-tone <0..1>, the TONE pot]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
-               "       [--polish-comp firm|off] [--polish-eq on|off] [--comp-stats]\n"
+               "       [--polish-comp firm|off] [--vox-eq off|on|cuts] [--comp-stats]\n"
                "       [--eqdip <150..600 hz>,<-6..0 db>] [--eqpres <2000..6000 hz>,<0..6 db>]\n"
                "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
                "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
@@ -107,11 +107,11 @@ int usage() {
                "  its own input, which is also its dry path\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
-               "  the eq's front half (70 Hz high-pass, 6 kHz low-pass, de-esser) runs ahead of every stage and its\n"
-               "  back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp, both on by default\n"
-               "  comp and eq are the box's polish tail and run by default, the comp at its firm tuning\n"
-               "  --polish-comp off and --polish-eq off\n"
-               "  switch them out for A/B listening, --polish-eq off for both halves\n"
+               "  VOX EQ's front half (de-esser, and with cuts the 70 Hz high-pass and 6 kHz low-pass) runs ahead of every\n"
+               "  stage and its back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp\n"
+               "  comp and eq run by default, the comp at its firm tuning and the eq at cuts (the box's menu default is off)\n"
+               "  --polish-comp off and --vox-eq off\n"
+               "  switch them out for A/B listening, --vox-eq off for both halves, --vox-eq on for the eq without the cuts\n"
                "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb trimDb\n"
                "     topFrom topSwingGain topWetDb\n"
@@ -174,13 +174,6 @@ bool parseFloat(const char* s, float* out) {
   char* end = nullptr;
   *out = std::strtof(s, &end);
   return end != s && *end == '\0' && std::isfinite(*out);
-}
-
-bool parseOnOff(const char* s, bool* out) {
-  const bool on = std::strcmp(s, "on") == 0;
-  if (!on && std::strcmp(s, "off") != 0) return false;
-  *out = on;
-  return true;
 }
 
 // firm or on runs the comp at its one tuning, off switches it out.
@@ -570,8 +563,19 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       rp.compStats = true;
     } else if (std::strcmp(a, "--polish-comp") == 0 && i + 1 < argc) {
       if (!parseCompChoice(argv[++i], &rp)) return false;
-    } else if (std::strcmp(a, "--polish-eq") == 0 && i + 1 < argc) {
-      if (!parseOnOff(argv[++i], &rp.eqOn)) return false;
+    } else if (std::strcmp(a, "--vox-eq") == 0 && i + 1 < argc) {
+      const char* v = argv[++i];
+      if (std::strcmp(v, "cuts") == 0) {
+        rp.eqOn = true;
+        rp.eq.cuts = true;
+      } else if (std::strcmp(v, "on") == 0) {
+        rp.eqOn = true;
+        rp.eq.cuts = false;
+      } else if (std::strcmp(v, "off") == 0) {
+        rp.eqOn = false;
+      } else {
+        return false;
+      }
     } else if (std::strcmp(a, "--eqdip") == 0 && i + 1 < argc) {
       if (!parsePair(argv[++i], &rp.eq.dipHz, &rp.eq.dipDb)) return false;
     } else if (std::strcmp(a, "--eqpres") == 0 && i + 1 < argc) {

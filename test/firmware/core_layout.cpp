@@ -493,16 +493,24 @@ void checkComposeBench() {
   check(snap.params.reverb.engine == cv::kReverbChasm, "reverbChasm selects the chasm engine");
 
   // The POLISH flags force a stage off against a menu that says on, and leave it on when clear.
+  Settings voxOn;
+  voxOn.voxEq = VoxEq::On;
+  Settings voxCuts;
+  voxCuts.voxEq = VoxEq::Cuts;
   snap = composeSnapshot(layout, panelWithToggles(true), Settings(), BenchOverrides());
-  check(snap.params.comp.on && snap.params.eq.on, "the default settings run POLISH COMP and POLISH EQ");
+  check(snap.params.comp.on && !snap.params.eq.on, "the default settings run POLISH COMP and leave VOX EQ off");
+  snap = composeSnapshot(layout, panelWithToggles(true), voxOn, BenchOverrides());
+  check(snap.params.eq.on && !snap.params.eq.cuts, "VOX EQ ON runs the stage without the cuts");
+  snap = composeSnapshot(layout, panelWithToggles(true), voxCuts, BenchOverrides());
+  check(snap.params.eq.on && snap.params.eq.cuts, "VOX EQ ON+CUTS runs the stage with the cuts");
   bench = BenchOverrides();
   bench.compOff = true;
-  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
+  snap = composeSnapshot(layout, panelWithToggles(true), voxCuts, bench);
   check(!snap.params.comp.on && snap.params.eq.on, "compOff forces only POLISH COMP off");
   bench = BenchOverrides();
   bench.eqOff = true;
-  snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
-  check(snap.params.comp.on && !snap.params.eq.on, "eqOff forces only POLISH EQ off");
+  snap = composeSnapshot(layout, panelWithToggles(true), voxCuts, bench);
+  check(snap.params.comp.on && !snap.params.eq.on, "eqOff forces only VOX EQ off");
 
   // Octave semitones (stepped, slot index 2) and Unison depth (continuous, index 3) read the top position.
   PanelReading low;
@@ -720,7 +728,7 @@ void checkSwapUnisonCrowd() {
         "action: SwapUnisonCrowd changes nothing when the other card would repeat");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack && s.polishComp == before.polishComp &&
-            s.polishEq == before.polishEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
+            s.voxEq == before.voxEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
         "action: SwapUnisonCrowd changes no setting");
 }
 
@@ -805,7 +813,7 @@ void checkSwapOctaveFormant() {
         "action: SwapOctaveFormant leaves a layout the box would not load as it is");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack && s.polishComp == before.polishComp &&
-            s.polishEq == before.polishEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
+            s.voxEq == before.voxEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
         "action: SwapOctaveFormant changes no setting");
 }
 
@@ -887,7 +895,7 @@ void checkCycleSlot7Card() {
     check(changed && layout.card[6] == want, "action: CycleSlot7Card moves slot 7 on round Gate, Lo-fi, Chatter and back");
   }
   check(others && s.outputLevel == before.outputLevel && s.inputJack == before.inputJack &&
-            s.polishComp == before.polishComp && s.polishEq == before.polishEq && s.topSwitch == before.topSwitch &&
+            s.polishComp == before.polishComp && s.voxEq == before.voxEq && s.topSwitch == before.topSwitch &&
             s.debug == before.debug,
         "action: CycleSlot7Card touches no other slot and no setting");
 

@@ -84,6 +84,9 @@ tail after an ess and breathy consonants) and 2 % of silent frames; mean cut on 
 On its own it moves the voiced frames −0.001 dB and the program −0.004 dB.
 
 ## Menu
+Superseded 2026-11-05 by `2026-11-05-vox-eq-design.md`. The row is now `VOX EQ`, default OFF, with the
+settings OFF, ON (no cuts) and ON+CUTS (the filters below), and its record byte is byte 9.
+
 The HPF and LPF rows leave. Nine rows in the polish spec's order: INPUT, REVERB, POLISH COMP,
 POLISH EQ, OUTPUT, TOP SWITCH, DEBUG, UPDATE FIRMWARE, EXIT. POLISH EQ ON / OFF drives both halves.
 Nothing else on the menu changes.
