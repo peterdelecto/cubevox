@@ -50,6 +50,13 @@
 //    peakDb at GROWL 100 %. A makeup gain follows the knee. At DRIVE 0 the fold is out and the rasped
 //    voice passes clean. The knee runs at the base rate, with no oversampling.
 //
+//    A 2nd-order Butterworth high-pass at hpHz ends the wet path, ahead of MIX, so the dropped voice
+//    leaves no rumble under the note.
+//
+//    The throat moves the grains' playback rate, and a grain keeps the rate it launched with. A moving rate
+//    would still shift each new grain's pulse against the grid and bend the pitch, so the voice anchors
+//    each grain's loudest pulse where the rest throat would put it (`FormantPsolaVoice::anchorPulse`).
+//
 // The ring holds the input of the slot where the pitch stage runs, so the stages between that slot and
 // this card are not in the growl voice.
 //
@@ -73,6 +80,7 @@ struct GrowlTuning {
   float decayMs = kSweepDefaultDecayMs;          // a sweep falls from the drive to 0 over this
   float hardTop = 7.0f;         // the wave's added slope at GROWL 100 %, 1 + hardTop * GROWL^2 times a raised sine's
   float thirdTop = 0.5f;        // the third-of-pitch wave's share at GROWL 100 %
+  float hpHz = 100.0f;          // the wet path's 2nd-order Butterworth high-pass, after the fold and ahead of MIX
   float lowShelfHz = 200.0f;    // ahead of the knee
   float lowShelfDb = 6.0f;      // at DRIVE 100 %
   float peakHz = 2500.0f;       // the bite peak, after the knee
@@ -83,7 +91,7 @@ struct GrowlTuning {
   float makeupSat = 10.0f;      // the knee's input gain where the makeup law flattens
   float railSoft = 0.1f;        // the knee's soft edge as a fraction of the rail
   float railAsym = 0.05f;       // the negative rail sits at -(1 - railAsym)
-  float trimDb = 0.87f;         // level rule: Adam's three clips at GROWL 75 % and MIX 100 % land 0 to +0.5 dB
+  float trimDb = 2.40f;         // level rule: Adam's three clips at GROWL 75 % and MIX 100 % land 0 to +0.5 dB
 };
 
 struct GrowlParams {
@@ -266,6 +274,7 @@ class Growl {
   void reset() {
     voice_.reset();
     fold_.clear();
+    hp_.clear();
     sweep_.reset();
     buf_.fill(0.0f);
     throat_ = 0.0f;
@@ -310,10 +319,12 @@ class Growl {
       voice_.render(pitch.ring(), wrapOnce<kVoiceRingLen>(first + at), m, buf_.data());
       raspChunk(c, at, m);
       if (c.fold) fold_.run(buf_.data(), m, foldAt(c, at), c.foldStep);
+      highPass(m);
       if (c.dry) blendDry(c, pitch.ring(), wrapOnce<kVoiceRingLen>(first + at), m, at);
       mixChunk(c, in + at, out + at, m, at);
     }
     if (!fold_.finite()) fold_.clear();
+    if (!std::isfinite(hp_.z1 + hp_.z2)) hp_.clear();
   }
 
   // Test hooks: the wave's depth fade, 1 with a pitch and 0 without, and the dry-to-voice crossfade.
@@ -368,6 +379,7 @@ class Growl {
     if (!idle_) {
       voice_.reset();
       fold_.clear();
+      hp_.clear();
       sweep_.reset();
       phase_ = 0;
       rng_ = growl_detail::kJitterSeed;
@@ -384,6 +396,7 @@ class Growl {
     tuning_ = t;
     tuningSet_ = true;
     fold_.setTuning(t);
+    hp_.setHighPass(t.hpHz, kButterworthQ);
     trim_ = dbToGainFast(clampf(t.trimDb, -growl_detail::kMaxTrimDb, growl_detail::kMaxTrimDb));
     raspAt_ = -1.0f;
   }
@@ -425,6 +438,7 @@ class Growl {
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     const float voiceLag = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_);
     pitchRatio_ = exp2Fast((drop + corr) * (1.0f / 12.0f));
+    voice_.anchorPulse(exp2Fast(rest * (1.0f / 12.0f)));
     voice_.prepare(heldPeriod_, pitchRatio_, exp2Fast(throat_ * (1.0f / 12.0f)), voiceLag, n);
 
     // The dry reads at the lag the voice plays at, sliding there from where it was.
@@ -566,6 +580,16 @@ class Growl {
     periodDepth_ = depth;
   }
 
+  // The wet path's high-pass over the first m samples of buf_, in place.
+  void highPass(int m) {
+    Biquad hp = hp_;
+    for (int i = 0; i < m; ++i) {
+      float& v = buf_[static_cast<size_t>(i)];
+      v = hp.run(v);
+    }
+    hp_ = hp;
+  }
+
   // The fold's gains at sample `at` of the call.
   static FoldGains foldAt(const Call& c, int at) {
     const float k = static_cast<float>(at);
@@ -622,6 +646,7 @@ class Growl {
 
   formant_detail::FormantPsolaVoice voice_;
   growl_detail::Fold fold_;
+  Biquad hp_;  // the wet path's high-pass
   std::array<float, kBlock> buf_{};  // the voice's chunk, then the rasp and the fold in place
   GrowlTuning tuning_;
   bool tuningSet_ = false;
