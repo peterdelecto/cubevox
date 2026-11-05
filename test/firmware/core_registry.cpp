@@ -84,7 +84,7 @@ void checkGroups() {
     if (g == Group::Reverb) ++reverbs;
     if (g == Group::Pitch) ++pitch;
   }
-  check(reverbs == 3, "three reverb-group cards: Spring, Chasm and Strings");
+  check(reverbs == 2, "two reverb-group cards: Spring and Chasm");
   check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch &&
             cardDesc(Card::RingMod).group == Group::None,
         "autotune, octave, formant, Yawn, the crowd card and growl are the pitch group, and ring mod is not");
@@ -95,7 +95,7 @@ void checkGroups() {
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
                               Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom,       Card::FormantFollower,
-                              Card::Growl,  Card::RingMod,  Card::Strings};
+                              Card::Growl,  Card::RingMod};
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
            std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "DRIVE") == 0 ||
@@ -165,7 +165,6 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::FormantFollower: return knob == 0 ? p.follower.sensitivity : p.follower.rangeSt;
     case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.mix;
     case Card::RingMod: return knob == 0 ? p.ringMod.ratio : p.ringMod.mix;
-    case Card::Strings: return knob == 0 ? p.strings.decayMs : p.strings.mix;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -442,12 +441,12 @@ void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
             static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 &&
             static_cast<int>(Card::FormantFollower) == 14 && static_cast<int>(Card::Growl) == 15 && static_cast<int>(Card::RingMod) == 16 &&
-            static_cast<int>(Card::Strings) == 17 && kCardCount == 18,
+            kCardCount == 17,
         "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
             static_cast<int>(Engine::Growl) == 10 && static_cast<int>(Engine::RingMod) == 11 &&
-            static_cast<int>(Engine::Strings) == 12 && kEngineCount == 13,
-        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl, Ring mod and Strings after the Crowd engine");
+            kEngineCount == 12,
+        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl and Ring mod after the Crowd engine");
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
   };
@@ -485,31 +484,7 @@ void checkRingModCard() {
         "ringmod: its toggle turns the card on and no flag of the pitch stage");
   applyToggle(Card::RingMod, false, p);
   check(!p.ringMod.on, "ringmod: and off again");
-}
-
-// Strings, the third card of slot 8, counts as the layout's reverb-group card. DECAY runs 0.5 to 8 s on a log
-// curve with the default 2 s at noon, and MIX is a percent. Placing Autotune leaves the card alone, since it
-// follows the held note.
-void checkStringsCard() {
-  const CardDesc& d = cardDesc(Card::Strings);
-  check(std::strcmp(d.id, "strings") == 0 && std::strcmp(d.name, "Sympath") == 0 && d.engine == Engine::Strings &&
-            d.group == Group::Reverb && d.knobCount == 2,
-        "strings: id strings, name Sympath, its own engine, the reverb group");
-  const KnobDesc& decay = *knobDesc(Card::Strings, 0);
-  check(std::strcmp(decay.name, "DECAY") == 0 && std::strcmp(decay.unit, "ms") == 0 && decay.curve == Curve::Log &&
-            decay.min == 500.0f && decay.max == 8000.0f && std::fabs(knobValue(decay, 0.5f) - 2000.0f) < 1.0f &&
-            std::strcmp(knobDesc(Card::Strings, 1)->name, "MIX") == 0,
-        "strings: DECAY is 500 to 8000 ms on a log curve and reads 2000 ms at noon, MIX is knob B");
-  check(d.cost.avg == costs::kStrings.avg && d.cost.worst == costs::kStrings.worst &&
-            d.cost.measured == costs::kStrings.measured,
-        "strings: the registry row is its costs.h row");
-  ChainParams p;
-  applyToggle(Card::Strings, true, p);
-  check(p.strings.on && !p.reverb.on, "strings: its toggle turns the card on and nothing else");
-  const cv::StringsParams before = p.strings;
   applyPlacement(Card::Autotune, p);
-  check(p.strings.on == before.on && p.strings.decayMs == before.decayMs && p.strings.mix == before.mix,
-        "strings: placing Autotune leaves the card as it was");
   check(p.ringMod.keyed, "ringmod: placing Autotune puts the card on its key");
 }
 
@@ -855,7 +830,6 @@ void checkRegistry() {
   checkBloomCard();
   checkGrowlCard();
   checkRingModCard();
-  checkStringsCard();
   checkAppendedToggles();
   checkShownDecimals();
   checkCells();

@@ -105,7 +105,6 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Bloom: return runFx<cv::Bloom>(in, a, b, &ChainParams::bloom);
     case Engine::Growl:  // the audition cards have no knob-step rows yet
     case Engine::RingMod:
-    case Engine::Strings:
     case Engine::Count: break;
   }
   return in;
@@ -545,7 +544,7 @@ int main() {
   bool ok = true;
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
-    if (engineOf(c) == Engine::Growl || engineOf(c) == Engine::RingMod || engineOf(c) == Engine::Strings) continue;
+    if (engineOf(c) == Engine::Growl || engineOf(c) == Engine::RingMod) continue;
     if (c == Card::Unison) {
       ok &= unisonRows();
       continue;

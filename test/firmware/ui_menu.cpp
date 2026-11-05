@@ -310,7 +310,7 @@ void checkMenuListGeometry() {
   };
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
-      {kReverb, {"SPRING", "CHASM", "SYMPATH"}},
+      {kReverb, {"SPRING", "CHASM"}},
       {kOctaveFormant, {"OCTAVE", "FORMANT", "YAWN"}},
       {kUnisonCrowd, {"UNISON", "MOB"}},
       {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
@@ -462,7 +462,7 @@ struct Click {
 
 const std::array<Click, 8> kClicks = {{
     {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
-    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SYMPATH"},
+    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
     {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "YAWN"},
     {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
     {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
@@ -513,11 +513,10 @@ void checkMenuClicks() {
   }
   Layout followed = defaultLayout();
   followed.card[kOctaveSlot] = Card::FormantFollower;
-  followed.card[kReverbSlot] = Card::Strings;
   check(m.settings.polishComp && m.settings.polishEq && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute && !m.settings.debug &&
             m.layout == followed,
-        "menu: a second click on each row restores the defaults, slot 3 moves on to Yawn and slot 8 to Strings");
+        "menu: a second click on each row restores the defaults, and slot 3 moves on to Yawn");
 }
 
 // The REVERB row reads the layout, so its value follows the card in whichever slot holds one.
@@ -567,21 +566,15 @@ void checkMenuReverbClick() {
   check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "CHASM"), "menu: the row shows CHASM after the swap");
 
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
-            m.layout.card[7] == Card::Strings,
-        "menu: a second click moves Chasm on to Strings");
-  m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "SYMPATH"),
-        "menu: the row shows SYMPATH after the second click");
-  check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == before,
-        "menu: a third click swaps Strings back to Spring");
+        "menu: a second click swaps Chasm back to Spring");
 
   MenuRig moved;
   moved.layout.card[0] = Card::ReverbChasm;
   moved.layout.card[7] = Card::Empty;
   moved.openListAt(kReverb);
   check(ui::applyAction(moved.step(0, true), moved.settings, moved.layout) == ui::ApplyResult::LayoutChanged &&
-            moved.layout.card[0] == Card::Strings && moved.layout.card[7] == Card::Empty,
+            moved.layout.card[0] == Card::ReverbSpring && moved.layout.card[7] == Card::Empty,
         "menu: the card swaps in the slot that holds it");
 }
 

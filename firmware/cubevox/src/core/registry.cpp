@@ -42,8 +42,6 @@ constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom:
                                  Curve::Log};
 constexpr KnobDesc kRingModRatioKnob = {"RATIO", KnobKind::Stepped, cv::kRingModRatioCount, 0.0f,
                                         cv::kRingModRatioCount - 1, "", Curve::Linear, 0, cv::kRingModRatioName.data()};
-constexpr KnobDesc kStringsDecay = {"DECAY", KnobKind::Continuous, 0, cv::kStringsDecayMinMs, cv::kStringsDecayMaxMs,
-                                    "ms", Curve::Log};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
 // A card with an amount knob (Mix, Amount, Depth, Drive) puts it on knob B. The apply functions below
@@ -84,8 +82,6 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
     {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::None,
      costs::kRingMod},
-    {Card::Strings, "strings", "Sympath", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,
-     costs::kStrings},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -220,14 +216,6 @@ void applyRingModKnob(int knob, float v, cv::RingModParams& r) {
   }
 }
 
-void applyStringsKnob(int knob, float v, cv::StringsParams& s) {
-  if (knob == 0) {
-    s.decayMs = knobValue(kStringsDecay, v);
-  } else {
-    s.mix = v;
-  }
-}
-
 void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
   if (knob == 0) {
     r.time = v;
@@ -305,7 +293,6 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::FormantFollower: applyFollowerKnob(knob, v, out); break;
     case Card::Growl: applyGrowlKnob(knob, v, out.growl); break;
     case Card::RingMod: applyRingModKnob(knob, v, out.ringMod); break;
-    case Card::Strings: applyStringsKnob(knob, v, out.strings); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -337,7 +324,6 @@ void applyToggle(Card c, bool on, ChainParams& out) {
       out.pitchFx.growlOn = on;
       break;
     case Card::RingMod: out.ringMod.on = on; break;
-    case Card::Strings: out.strings.on = on; break;
     case Card::Empty:
     case Card::Count: break;
   }

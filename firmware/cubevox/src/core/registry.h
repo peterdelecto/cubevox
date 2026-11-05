@@ -30,7 +30,6 @@ enum class Card : uint8_t {
   FormantFollower,
   Growl,
   RingMod,
-  Strings,
   Count,
 };
 
@@ -45,7 +44,7 @@ constexpr size_t kCardIdBytes = 16;
 // of their own and read the Pitch engine's ring or tracker. The Ring mod card has an engine of its own with
 // a tracker and ring of its own. Count ends the list.
 enum class Engine : uint8_t {
-  InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, RingMod, Strings, Count
+  InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, RingMod, Count
 };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);

@@ -2,7 +2,7 @@
 //   cubevox-emulator                          opens the window
 //   cubevox-emulator --check                  headless check, no window and no audio device
 //   cubevox-emulator --proof f.ppm [--no-mic] [--slot3 octave|formant|yawn] [--slot6 distortion|growl|ringmod]
-//                                  [--slot7 gate|lofi|chatter] [--slot8 spring|chasm|strings]
+//                                  [--slot7 gate|lofi|chatter] [--slot8 spring|chasm]
 //                                             one frame of the window as a P6 PPM, no audio device,
 //                                             with those cards in slots 3, 6, 7 and 8 (Octave, Distortion,
 //                                             Gate and Spring when omitted; a card id also picks its card, `bloom`
@@ -161,8 +161,7 @@ constexpr std::array<CardRow, 3> kSlot6Rows = {{{Card::Growl, "growl", "growl", 
                                                  costs::kDistortion}}};
 
 // The slot 8 cards in the menu's cycle order, Spring last so the walk ends on the default.
-constexpr std::array<CardRow, 3> kSlot8Rows = {{{Card::ReverbChasm, "reverb_chasm", "chasm", "CHASM", costs::kReverbChasm},
-                                                {Card::Strings, "strings", "strings", "SYMPATH", costs::kStrings},
+constexpr std::array<CardRow, 2> kSlot8Rows = {{{Card::ReverbChasm, "reverb_chasm", "chasm", "CHASM", costs::kReverbChasm},
                                                 {Card::ReverbSpring, "reverb_spring", "spring", "SPRING",
                                                  costs::kReverbSpring}}};
 constexpr std::array<CardRow, 3> kSlot7Rows = {{{Card::Lofi, "lofi", "lofi", "LO-FI", costs::kLofi},
@@ -286,10 +285,9 @@ void checkSlot6(const CheckClips& clips, bool swapped, std::vector<std::string>&
   }
 }
 
-// The three slot 8 cards through the box's card switch on the default layout, round the menu's cycle
-// and back to Spring. After each pick slot 8 holds the card, the layout's cost is the rest of its rows
-// less Spring's plus the card's own, Octave's and Gate's, and the audio through the box is finite and
-// above the floor.
+// The two slot 8 cards through the box's card switch on the default layout, Chasm and back to Spring.
+// After each pick slot 8 holds the card, the layout's cost is the rest of its rows less Spring's plus
+// the card's own, Octave's and Gate's, and the audio through the box is finite and above the floor.
 void checkSlot8(const CheckClips& clips, std::vector<std::string>& failed) {
   const auto expect = [&](bool ok, const std::string& what) {
     if (!ok) failed.push_back("default layout: " + what);
@@ -605,7 +603,7 @@ int runLive(const char* argv0) {
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|yawn] "
-               "[--slot6 distortion|growl|ringmod] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm|strings]]\n");
+               "[--slot6 distortion|growl|ringmod] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm]]\n");
   return 2;
 }
 

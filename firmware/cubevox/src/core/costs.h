@@ -151,15 +151,8 @@ constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run o
 // a sample, 129 ns a block, 6.5k cycles, 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %; its
 // tracker is about 2.7 % mean and 5 % worst. The host bench of the whole slot on Adam's clips (Apple clang,
 // 2026-11-05) reads 0.69 us a block mean and 1.3 us worst with Autotune placed, 0.71 and 1.5 us without, which
-// is 2.9 % mean and 5.3 to 6.5 % worst at the tracker's 27k cycles per host us. Sympath (the Strings engine) is Spring's
-// second alternate in slot 8. With eight strings and its own tracker on Adam's clips: 22.8 ns a sample, 1.46
-// us a block, 73.5k cycles, 11.5 %, of which the tracker is 4.1 ns a sample; the costliest block is a retune,
-// when the old bank rings out beside the new one for 200 ms, 2.63 us, 132k cycles, 20.7 %. The 50.4k
-// ratio was set on other cards, and these loops are scalar recurrences that may not scale the same; a count
-// of the loops (about 15 cycles a string a sample, and 1.6M cycles a second for the tracker) says 1.5 %
-// mean, 3 % worst. A board run owes the measured rows.
+// is 2.9 % mean and 5.3 to 6.5 % worst at the tracker's 27k cycles per host us.
 constexpr Cost kRingMod{4, 7, false};  // est.: the card 0.9 / 1.6 % plus its own tracker 2.7 / 5 %, rounded up; a board run owes the measured row
-constexpr Cost kStrings{12, 21, false};
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them. The stress run of 2026-11-05 measured POLISH EQ (both halves) and POLISH COMP, and

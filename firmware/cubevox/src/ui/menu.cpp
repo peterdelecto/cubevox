@@ -112,12 +112,7 @@ const char* onOff(bool on) { return on ? "ON" : "OFF"; }
 // SPRING, the default.
 const char* reverbValue(const Layout& layout) {
   const int slot = reverbSlot(layout);
-  if (slot < 0) return "SPRING";
-  switch (layout.card[slot]) {
-    case Card::ReverbChasm: return "CHASM";
-    case Card::Strings: return "SYMPATH";
-    default: return "SPRING";
-  }
+  return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
 }
 
 // The card the slot 3 row holds. A layout with none of the three reads OCTAVE, the default.

@@ -105,11 +105,6 @@ void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const
   engines.ringMod.process(in, out, n, p.ringMod, p.ringMod.keyed ? p.pitchFx.autotune.key : -1);
 }
 
-// Runs the Sympath card (engine Strings). It tracks the held note itself and reads no Autotune key.
-void runStrings(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
-  engines.strings.process(in, out, n, p.strings);
-}
-
 // Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is
 // the word key for the block; the gate's engine keeps its detector live while its own slot is off.
 // Otherwise the card listens to its own input and ignores the state. Its slices and its dry both come
@@ -137,7 +132,6 @@ void resetEngine(ChainEngines& engines, Engine e) {
     case Engine::Bloom: engines.bloom.reset(); break;
     case Engine::Growl: engines.growl.reset(); break;
     case Engine::RingMod: engines.ringMod.reset(); break;
-    case Engine::Strings: engines.strings.reset(); break;
     case Engine::Count: break;
   }
 }
@@ -161,7 +155,6 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
     case Engine::Growl: runGrowl(engines, in, out, n, p, pitchDone); return true;
     case Engine::RingMod: runRingMod(engines, in, out, n, p); return true;
-    case Engine::Strings: runStrings(engines, in, out, n, p); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;

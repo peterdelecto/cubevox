@@ -4,14 +4,8 @@ namespace ui {
 
 namespace {
 
-// The card after `c` in the slot 8 cycle, Spring to Chasm to Strings and back to Spring.
-Card nextSlot8Card(Card c) {
-  switch (c) {
-    case Card::ReverbSpring: return Card::ReverbChasm;
-    case Card::ReverbChasm: return Card::Strings;
-    default: return Card::ReverbSpring;
-  }
-}
+// The card after `c` in the slot 8 cycle, Spring to Chasm and back to Spring.
+Card nextSlot8Card(Card c) { return c == Card::ReverbSpring ? Card::ReverbChasm : Card::ReverbSpring; }
 
 // The card after `c` in the slot 4 cycle, Unison to Mob and back to Unison.
 Card nextSlot4Card(Card c) { return c == Card::Unison ? Card::Crowd : Card::Unison; }

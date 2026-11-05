@@ -90,7 +90,7 @@ class Box {
   void pickSlot4Card(Card card);
   void pickSlot6Card(Card card);
   void pickSlot7Card(Card card);
-  void pickSlot8Card(Card card);  // Spring, Chasm or Strings
+  void pickSlot8Card(Card card);  // Spring or Chasm
 
   const Pixels& pixels() const { return display_.pixels(); }
   uint8_t contrast() const { return display_.contrast(); }

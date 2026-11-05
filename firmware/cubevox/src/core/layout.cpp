@@ -19,7 +19,7 @@ Layout crowdTestLayout() {
 int reverbSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
     const Card c = layout.card[s];
-    if (c == Card::ReverbSpring || c == Card::ReverbChasm || c == Card::Strings) return s;
+    if (c == Card::ReverbSpring || c == Card::ReverbChasm) return s;
   }
   return -1;
 }
