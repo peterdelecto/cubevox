@@ -79,6 +79,15 @@ class OctaveVoice {
   // True from a reset or a park until the next render: the voice holds no state worth keeping.
   bool idle() const { return idle_; }
 
+  // The interval the voice plays at in semitones: the SEMITONES step after its glide plus Autotune's
+  // correction after its own one-pole.
+  float intervalSemis() const { return semis_ + corr_; }
+
+  // The mean delay of the voice's output behind its input, in samples. A tap's delay sweeps from
+  // kMinDelay across the grain window, and the two taps' Hann weights make the weighted mean half the
+  // window above the floor.
+  float latency() const { return 0.5f * windowSmp_ + kMinDelay; }
+
   // A block whose output nobody hears. The interval lands on its target and the blocker clears, so
   // the voice picks up in step when it is heard again.
   void park() {

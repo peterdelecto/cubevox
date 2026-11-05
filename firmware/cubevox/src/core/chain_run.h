@@ -30,7 +30,7 @@ struct ChainEngines {
   cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
-  cv::Growl growl;  // like crowd, its voice reads the ring that `pitch` writes
+  cv::Growl growl;  // a plain global like crowd; it keeps a 15 kB ring of its own input and reads the tracker that `pitch` runs
   cv::RingMod ringMod;  // reads the tracker that `pitch` runs
   cv::Strings strings;  // the Sympath card: two banks of eight delay lines and its tracker, in D1 with the rest
 

@@ -205,6 +205,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
       pitchDone = true;  // the stage is stopped, so no later pitch-group card has a ring to read
       engines.pitch.rest();
     }
+    if (e == Engine::Growl) engines.growl.rest();  // the card keeps a ring of its own input
     return false;
   }
   if (step.from == 0 && step.to > 0 && !detectorLive) {

@@ -248,6 +248,30 @@ void checkPitchCalledOnce() {
   check(same, "chain: two pitch cards make one PitchFx call per block");
 }
 
+// A Growl card keeps a ring of its own input. While its slot sits settled off, each block clears a slice of
+// it (1 KB at most), so the ring is clear 16 blocks after the fade-out ends and the reset at the next
+// switch-on has nothing left to clear.
+void checkGrowlRingRests() {
+  constexpr int kSlot = 5;
+  ChainSnapshot snap = snapshotFor(layoutOf({Card::Empty, Card::Empty, Card::Empty, Card::Empty, Card::Empty, Card::Growl}), 0.5f, false);
+  auto rig = newRig();
+  rig->fades.settle(snap.slotOn);
+  int b = 0;
+  for (; b < 300; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
+  const bool dirty = !rig->engines.growl.ringIsZero();
+  snap.slotOn[kSlot] = false;
+  int worstStep = 0;
+  for (int k = 0; k < kSlotFadeBlocks + 1; ++k, ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
+  int cleared = rig->engines.growl.ringClearedTo();
+  for (int k = 0; k < 20; ++k, ++b) {
+    runBlock(*rig, snap, tone(b, 0.3f), StillClock());
+    worstStep = std::max(worstStep, rig->engines.growl.ringClearedTo() - cleared);
+    cleared = rig->engines.growl.ringClearedTo();
+  }
+  check(dirty && rig->engines.growl.ringIsZero() && cleared == cv::growl_detail::kRingLen && worstStep <= cv::growl_detail::kRestClearFloats,
+        "chain: a stopped Growl card clears its ring a slice a block, 1 KB at most");
+}
+
 // The poisoned blocks enter through the input, which the empty layout passes to the guard as a slot's
 // output would arrive. The EQ is off for them, because a NaN at the input would reach the front half's
 // filters, and the ADC cannot produce one.
@@ -1315,6 +1339,7 @@ void checkChainRun() {
   checkWalkAgainstHand();
   checkEmptyChain();
   checkPitchCalledOnce();
+  checkGrowlRingRests();
   checkNanGuard();
   checkStageTiming();
   checkFrontHead();
