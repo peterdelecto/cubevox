@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -55,7 +56,7 @@ class InputRing {
   // index 0.
   void clearSome(int most) {
     const int n = most < Len - zero_ ? most : Len - zero_;
-    zeroFloats(&ring_[static_cast<size_t>(zero_)], static_cast<size_t>(n));
+    std::fill_n(ring_.begin() + zero_, n, 0.0f);
     zero_ += n;
     cleared_ += static_cast<uint32_t>(n);
   }

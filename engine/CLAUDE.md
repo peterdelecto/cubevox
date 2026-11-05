@@ -21,7 +21,7 @@
      with `rbjCorner`, `rbjAlpha` and `rbjAmp`, `kPeakMinQ`, `kShelfMaxSlope`, `kShelfMinSlope`, `Biquad`
      (the dB setters, the `...Amp` setters that take a kept corner and a linear amplitude, `setCoefsFrom`,
      `run`), `catmullRom`, `catmullRomWeights`, `wrapOnce`, `readRing`, `readRingClamped` for a delay
-     that may leave [2, Len - 3], and `zeroFloats`.
+     that may leave [2, Len - 3].
   3. `engine/fastmath.h`: `exp2Fast`, `log2Fast`, `dbFast`, `dbToGainFast` (the per-sample dB law),
      `DbGain`, `sinTurns`, `sinCosFast`, `tanhFast`, `HannRotor`, and the constants `kLog2E`, `kDbPerLog2`,
      `kLog2PerDb`, `kTurn32`.
@@ -40,8 +40,8 @@
   `no-tree-loop-distribute-patterns`, or its loops become calls to themselves. A clear the size of the pitch
   ring (51 kB, about 10k to 26k cycles, 2 to 4 % of a 640k-cycle block) is still spread: `InputRing::rest()`
   clears 512 floats a block while a card's slot is stopped (`AutotuneFx`, `OctaveFx`, `FormantFx`, `Crowd`,
-  `Growl`), so the `reset()` at the switch-on finds the ring clear.
-  `zeroFloats` clears at the same speed and remains for its callers. `pitch_spikes_test` holds both.
+  `Growl`), so the `reset()` at the switch-on finds the ring clear. The spread clears and the tracker's
+  resets all use `std::fill_n` or `.fill(0.0f)`. `pitch_spikes_test` holds the spread.
 - The onset estimate's 48 kHz refinement walks downhill from the coarse period and sums at most
   `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's.
 - `clampf`, `clamp01`, `KnobCurve::at` and `exp2Fast` return the lower bound for a NaN, so a NaN stops at the

@@ -98,8 +98,11 @@ shared stage, the first pitch-group slot or the shared grain grid are history.
    NaN or an infinity gets into them.
 3. At MIX 100 % with Autotune on, the corrected voice is not heard and its powers are not read.
    When MIX leaves 100 %, the level gain starts from the shifted voice's power and the correlation
-   SHIFT gives (`kFormantCoherence`, 0.95, 0.4, 0.1 and 0 at 0, 1, 2 and 3 st or more, measured on
-   Adam's clips). Without it, MIX 100 to 50 % at SHIFT 0 jumped +1.78 dB.
+   SHIFT gives (`kFormantCoherence`, one value per whole semitone from 0 to 12 st: 0.985 at 0, 0.355
+   at 1, 0.085 at 2, about 0 at 3, dipping to -0.18 near 6 st and back to 0 by 10 st, re-measured
+   2026-11-05 on Adam's three clips at MIX 50 %, alone and behind Autotune, with the grain group in
+   place; the method is in `engine/formant_params.h`). Without it, MIX 100 to 50 % at SHIFT 0 jumped
+   +1.78 dB.
 4. No fixed gain curve can hold the level. Near SHIFT 0 the two voices are almost one waveform and
    add in amplitude; at SHIFT −3 on Adam's clips they correlate at about 0.06 and add in power.
 5. With Autotune off and MIX in the middle, a sustained note can put the two voices in antiphase,

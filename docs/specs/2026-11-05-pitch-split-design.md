@@ -3,8 +3,7 @@
 Date 2026-11-05. Owner picked option A for chain-order audit entries 4 and 5
 (`build/audit/2026-11-05-chain-order-audit.md`). Autotune, Octave, Formant and Yawn each run in their
 own slot on that slot's input, in slot order. Mob keeps its exemption (root `CLAUDE.md`, "Chain order").
-Status: design only, not built. Code state read: main at 7b0bf92.
-Ringer (`RingMod`) is removed (owner 2026-11-05); every Ringer row and mention below is void.
+Status: built 2026-11-05 (v2.01.59). Ringer (`RingMod`) was removed 2026-11-05. Code state read: main at 7b0bf92.
 
 ## Goal
 
@@ -40,7 +39,6 @@ Ringer (`RingMod`) is removed (owner 2026-11-05); every Ringer row and mention b
 | Formant, Yawn | `FormantFx` (one engine, as Spring and Chasm share `Reverb`) | its own input | 3,852 | 15,408 | own, 8,472 B, runs only when not directly behind Autotune | D1 |
 | Mob | `Crowd` | Autotune's input when Autotune sits ahead, else Mob's own input | 12,756 | 51,024 | Autotune's when ahead, else own, 8,472 B | D1 |
 | Deepthroat | `Growl`, unchanged ring | its own input | 3,852 | 15,408 | Autotune's through the chain (section 2), else own, 8,472 B | D1 |
-| Ringer | `RingMod`, unchanged | its own input | 1,260 | 5,040 | own, coarse | DTCM |
 
 1. `Engine::Pitch` splits into `Engine::Autotune`, `Engine::Octave` and `Engine::Formant`. `PitchFx` goes.
 2. `Group::Pitch` stays only as the protocol's group label (`protocol.cpp:586`). The chain stops reading it.
@@ -49,7 +47,7 @@ Ringer (`RingMod`) is removed (owner 2026-11-05); every Ringer row and mention b
 4. Each engine runs a call in `kBlock` chunks (write the chunk, push the tracker, render), so a ring sized
    for one block of calls holds any `n`.
 5. Each engine with a ring has `rest()`, which zeroes 512 floats a block while its slot is stopped, and
-   `reset()` clears the rest with `zeroFloats`, as `PitchFx` and `RingMod` do now.
+   `reset()` clears the rest with `fill`.
 
 ### Ring lengths
 
@@ -87,7 +85,6 @@ step 6. DTCM is 130,816 B. D1 is 524,288 B.
 | Formant, Yawn | stage tracker, Autotune's correction as pitch ratio, Autotune's grain delay | directly behind Autotune: Autotune's tracker. Anywhere else: its own tracker on its own input. Pitch ratio 1 in both. **Superseded by `2026-11-05-grain-group-design.md`: directly behind Autotune the card also cuts from Autotune's ring, at Autotune's pitch ratio and delay** |
 | Mob (exempt) | stage ring, tracker and correction | Autotune ahead: Autotune's tracker and correction, and a ring Autotune's slot writes from Autotune's input. No Autotune ahead: Mob writes its own input into its ring and runs its own tracker |
 | Deepthroat | stage period, `outputShiftSemis()`, `outputLatency()` | Autotune ahead: Autotune's tracker with the shift and latency the chain sums (below). No Autotune ahead: its own tracker on its own ring, shift 0, latency 0 |
-| Ringer | own tracker on its own input | unchanged |
 
 ### When a card reuses Autotune's tracker
 
@@ -98,7 +95,7 @@ step 6. DTCM is 130,816 B. D1 is 524,288 B.
    holds. While Autotune's crossfade moves, the period is the one the larger share carries, as
    `octaveLeads()` picks today.
 3. Formant anywhere else runs its own tracker. Octave at mixed MIX, Unison's detuned copy, Echo's repeats,
-   Ringer's sidebands and a reverb tail each give the input two pitches at once. Formant plays at pitch
+   a reverb tail each give the input two pitches at once. Formant plays at pitch
    ratio 1 and rebuilds its whole input on one period grid, so a period that fits only one of the pitches
    drags the other onto it. Its own tracker reads the mixture's common period (Octave −12 and the voice
    share the lower note's period), which carries both.
@@ -205,7 +202,7 @@ read high.
 | Layout | Before (mean / worst) | After |
 |---|---|---|
 | Default | 33 / 47 | 33 / 47 |
-| Worst menu layout (Yawn, Mob, Deepthroat or Ringer, Lo-fi or Gate, Spring) | 48 / 67 | 48 / 67 |
+| Worst menu layout (Yawn, Mob, Deepthroat, Lo-fi or Gate, Spring) | 48 / 67 | 48 / 67 |
 | Formant alone, no Autotune (set_layout) | rows + `kTracker` + `kPitchStage` | rows + `kTracker`; 4 / 4 less |
 
 Every menu layout keeps Formant and Yawn directly behind Autotune and Mob and Deepthroat behind Autotune, so
@@ -217,7 +214,7 @@ no menu layout pays a second tracker. A set_layout layout that pays several stay
 | Test | Change | Expected |
 |---|---|---|
 | `pitch_onset_test` | none; it drives the tracker through `RingedTracker` | passes unchanged |
-| `pitch_spikes_test` | one row per ring (Autotune, Octave, Formant, Mob) in place of the `PitchFx` row; Ringer's row stays | every switch-on block below its line |
+| `pitch_spikes_test` | one row per ring (Autotune, Octave, Formant, Mob) in place of the `PitchFx` row | every switch-on block below its line |
 | `parity_test` | `ChainParams::pitchFx` keeps its three card params; `crowdOn` and `growlOn` go | passes; no mapping moves |
 | `crowd_test` pinned hashes | ring and tracker plumbed through the new path | hold: same samples, tracker and correction |
 | `growl_test` `kFullMixHash` | nothing ahead, so Deepthroat runs its own tracker on the same input | holds |
@@ -226,7 +223,7 @@ no menu layout pays a second tracker. A set_layout layout that pays several stay
 | `core_chain_run` | shared-stage checks replaced | new checks below |
 | `core_layout_fade` | `enginesToReset` bits per new engine | rewritten rows |
 | `core_layout` | `layoutCost` tracker terms | rows for each reuse and own-tracker case |
-| `autotune_test`, `octave_test`, `formant_test`, `formant_follower_test`, `knob_step_test`, `ringmod_test`, `fastmath_test`, `core_block_tail` | port from `PitchFx` to the new engines | curvature and level gates hold |
+| `autotune_test`, `octave_test`, `formant_test`, `formant_follower_test`, `knob_step_test`, `fastmath_test`, `core_block_tail` | port from `PitchFx` to the new engines | curvature and level gates hold |
 
 ### New `core_chain_run` checks
 
