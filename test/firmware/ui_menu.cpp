@@ -310,7 +310,7 @@ void checkMenuListGeometry() {
   };
   const Values all[] = {
       {kInput, {"MIC", "LINE"}},
-      {kReverb, {"SPRING", "CHASM"}},
+      {kReverb, {"SPRING", "CHASM", "SYMPATH"}},
       {kOctaveFormant, {"OCTAVE", "FORMANT", "YAWN"}},
       {kUnisonCrowd, {"UNISON", "MOB"}},
       {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
@@ -462,7 +462,7 @@ struct Click {
 
 const std::array<Click, 8> kClicks = {{
     {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "LINE", "MIC"},
-    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SYMPATHETIC"},
+    {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SYMPATH"},
     {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "YAWN"},
     {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
     {kPolishEq, UiAction::TogglePolishEq, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
@@ -570,8 +570,8 @@ void checkMenuReverbClick() {
             m.layout.card[7] == Card::Strings,
         "menu: a second click moves Chasm on to Strings");
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "SYMPATHETIC"),
-        "menu: the row shows SYMPATHETIC after the second click");
+  check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "SYMPATH"),
+        "menu: the row shows SYMPATH after the second click");
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == before,
         "menu: a third click swaps Strings back to Spring");
