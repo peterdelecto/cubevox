@@ -367,8 +367,11 @@ def stress_failures():
     glide = [s for s in stress.sweeps(slots) if s.partner is not None]
     if [(s.knob, s.partner) for s in glide] != [(2, 1)]:
         failed.append("stress.py: the one glide sweep steps DRIVE (knob 2) with TONE (knob 1) as its partner")
-    if [card for _, card in stress.flipped_slots(slots)] != ["input_gate", "slapback", "gate"]:
-        failed.append("stress.py flipped_slots() does not name the Input gate, Echo and Gate slots")
+    if [card for _, card in stress.flipped_slots(slots)] != ["input_gate", "unison", "slapback", "gate"]:
+        failed.append("stress.py flipped_slots() does not name the Input gate, Unison, Echo and Gate slots")
+    chatter = ["input_gate", "autotune", "octave", "unison", "slapback", "distortion", "bloom", "reverb_spring"]
+    if "bloom" not in [card for _, card in stress.flipped_slots(chatter)]:
+        failed.append("stress.py flipped_slots() does not name the Chatter slot")
     ops = {lever[0] for lever in stress.FIXED_LEVERS}
     if not ops <= bench_ops.ALL_OPS or not ops <= set(stress.NEEDED_OPS):
         failed.append(f"stress.py fixed-stage levers {sorted(ops)} are not bench ops it needs")

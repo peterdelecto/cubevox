@@ -158,7 +158,8 @@ and dissolves between them).
    step, one before each update-mode request, and one per audio fault; the bootloader lists them in
    `DIAG.TXT`), `planned_reset` (the reset into update mode and the reset after an audio stall wait in
    `loop()` until both stores are idle, then mute and reset), `block_mem` (where audio memory lives: the RAM_D2
-   MPU region, the DTCM section, adapted from Teensy-H7-Port).
+   MPU region, the DTCM section, adapted from Teensy-H7-Port), `fastmem` (word-wise `memset`, `memcpy` and
+   `memmove` that the link picks over newlib-nano's byte loops; `fastmem_test` checks them on the host).
 7. Bootloader contract: `boot_block.h` (the addresses, magics, name tables and the four structs both programs
    read: boot block, image header, diagnostic entry, fault record; C-compatible, the bootloader and
    `tools/stamp_image.py` read it too), `boot_block` (the shared DTCM block as a variable) with
