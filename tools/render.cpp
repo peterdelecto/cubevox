@@ -146,7 +146,7 @@ int usage() {
                "     crowdWidthLagBottom (0.2..1) crowdWidthLagMs (0..60)\n"
                "     crowdLevelScatterDb (0..4) crowdContour0..3 (0.6..1.4)\n"
                "     growlPitchSt growlFormantSt (-12..12) growlHardTop (0..32) growlThirdTop (0..1)\n"
-               "     growlLowShelfHz growlHighShelfHz (20..21600) growlLowShelfDb growlHighShelfDb (-24..24)\n"
+               "     growlLowShelfHz growlPeakHz (20..21600) growlLowShelfDb growlPeakDb (-24..24)\n"
                "     growlDriveDb (0..48) growlMakeupSat (1..1000) growlRailSoft (0.01..1) growlRailAsym (0..0.5)\n"
                "     growlTrimDb (-24..24)\n"
                "     decayMs (10..2000, default 300), the time Yawn's sweep takes to fall back to 0\n"
@@ -301,7 +301,8 @@ bool growlTuningInRange(const cv::GrowlTuning& t) {
   const auto shelf = [](float v) { return inside(v, -gd::kMaxShelfDb, gd::kMaxShelfDb); };
   return inside(t.pitchSt, -gd::kMaxSt, gd::kMaxSt) && inside(t.formantSt, -gd::kMaxSt, gd::kMaxSt) &&
          inside(t.hardTop, 0.0f, gd::kMaxHardTop) && inside(t.thirdTop, 0.0f, 1.0f) && hz(t.lowShelfHz) &&
-         hz(t.highShelfHz) && shelf(t.lowShelfDb) && shelf(t.highShelfDb) && inside(t.driveDb, 0.0f, gd::kMaxDriveDb) &&
+         hz(t.peakHz) && inside(t.peakQ, cv::kPeakMinQ, gd::kMaxPeakQ) && inside(t.jitterTop, 0.0f, 1.0f) &&
+         shelf(t.lowShelfDb) && shelf(t.peakDb) && inside(t.driveDb, 0.0f, gd::kMaxDriveDb) &&
          inside(t.makeupSat, gd::kMinMakeupSat, gd::kMaxMakeupSat) && inside(t.railSoft, gd::kMinRailSoft, 1.0f) &&
          inside(t.railAsym, 0.0f, gd::kMaxRailAsym) && inside(t.trimDb, -gd::kMaxTrimDb, gd::kMaxTrimDb);
 }
@@ -386,7 +387,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"growlPitchSt", &grt.pitchSt},             {"growlFormantSt", &grt.formantSt},
       {"growlHardTop", &grt.hardTop},             {"growlThirdTop", &grt.thirdTop},
       {"growlLowShelfHz", &grt.lowShelfHz},       {"growlLowShelfDb", &grt.lowShelfDb},
-      {"growlHighShelfHz", &grt.highShelfHz},     {"growlHighShelfDb", &grt.highShelfDb},
+      {"growlPeakHz", &grt.peakHz},               {"growlPeakDb", &grt.peakDb},
       {"growlDriveDb", &grt.driveDb},             {"growlMakeupSat", &grt.makeupSat},
       {"growlRailSoft", &grt.railSoft},           {"growlRailAsym", &grt.railAsym},
       {"growlTrimDb", &grt.trimDb},
