@@ -3,13 +3,12 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/peterdelecto/cubevox/main/tools/install.sh | bash
 #
-# tools/package.sh builds the zip and a person attaches it to a release. The workflows attach
-# firmware files only, so the latest release does not carry the zip, and the URL below names the
-# release that does. Running the script again replaces the app and the shipped clips in place and
-# leaves any other clip in the samples folder alone.
+# The command never changes. tools/publish_emulator.sh replaces the zip on the "emulator" release, and
+# running the command again replaces the app and the shipped clips in place and leaves any other clip
+# in the samples folder alone.
 set -euo pipefail
 
-url="https://github.com/peterdelecto/cubevox/releases/download/RELEASE_TAG/cubevox-emulator.zip"
+url="https://github.com/peterdelecto/cubevox/releases/download/emulator/cubevox-emulator.zip"
 
 name="cubevox emulator"
 dest="$HOME/Desktop/$name"
