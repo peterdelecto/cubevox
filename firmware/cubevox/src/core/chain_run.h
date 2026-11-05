@@ -13,11 +13,11 @@
 #include "core/registry.h"
 #include "core/slots.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. PitchFx, Unison and Distortion
-// are references because the board places them in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. PitchFx, Unison, Distortion
+// and RingMod are references because the board places them in DTCM.
 struct ChainEngines {
-  ChainEngines(cv::PitchFx& pitchFx, cv::Unison& unisonFx, cv::Distortion& distortionFx)
-      : pitch(pitchFx), unison(unisonFx), distortion(distortionFx) {}
+  ChainEngines(cv::PitchFx& pitchFx, cv::Unison& unisonFx, cv::Distortion& distortionFx, cv::RingMod& ringModFx)
+      : pitch(pitchFx), unison(unisonFx), distortion(distortionFx), ringMod(ringModFx) {}
 
   cv::PitchFx& pitch;
   cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each pitch call while its card is placed
@@ -31,7 +31,7 @@ struct ChainEngines {
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
   cv::Growl growl;  // a plain global like crowd; it keeps a 15 kB ring of its own input and reads the tracker that `pitch` runs
-  cv::RingMod ringMod;  // reads the tracker that `pitch` runs
+  cv::RingMod& ringMod;  // tracks the pitch of its own input with a tracker and ring of its own
 
   cv::PolishComp comp;
   cv::Polish polish;
@@ -116,7 +116,8 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 // Runs slot `s` for one block from `in` into `out`: the engine of its card with the toggle
 // crossfade. A slot settled off runs no engine and writes nothing, so the caller keeps its buffers
 // and the dry input passes. A stopped pitch stage clears a slice of its input ring each block (`PitchFx::rest`),
-// so the clear at its next start is already done. A slot that starts a fade in has its engine cleared first. A flip back
+// so the clear at its next start is already done, and a stopped Ring mod card does the same with its own
+// ring (`RingMod::rest`). A slot that starts a fade in has its engine cleared first. A flip back
 // during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot is
 // off, because its detector feeds the status reply's `floor_dbfs` and keys the Chatter card; its own
 // off fade ends inside the slot fade, so the settled slot passes the input bit for bit. Returns false

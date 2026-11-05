@@ -48,8 +48,8 @@
 // Autotune placed already carries the stage. Without Autotune, Octave and Formant pay it through
 // kPitchStage, once.
 //
-// A layout is accepted when both column sums over its cards, plus the fixed term, the tracker once
-// when Autotune, Crowd or Formant is placed, and kPitchStage once when Octave or Formant is placed
+// A layout is accepted when both column sums over its cards, plus the fixed term, the shared tracker once
+// when Autotune, Crowd, Formant, Yawn or Deepthroat is placed (Ring mod's row holds its own), and kPitchStage once when Octave or Formant is placed
 // without Autotune, stay under their lines. The trailing comments give the measured cycles, mean
 // then worst; a row marked measured=false is an estimate until a board measures it.
 
@@ -145,10 +145,14 @@ constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run o
 
 // The audition cards of 2026-11-04, from the host bench of Growl's method (Apple clang -O2 with the firmware's
 // float contraction, Adam's three clips in 64-sample blocks, minimum of 9 passes, steady_clock around each
-// call, 50.4k board cycles per host us). Ring mod is Distortion's second alternate in slot 6 and reads the
-// tracker like Growl, so a layout with it pays kTracker once: 2.0 ns a sample, 129 ns a block, 6.5k cycles,
-// 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %. A board run owes the measured row.
-constexpr Cost kRingMod{2, 2, false};
+// call, 50.4k board cycles per host us). Ring mod is Distortion's second alternate in slot 6. It runs a pitch
+// tracker of its own (the coarse search) on its input, so its row holds the tracker and a layout with it pays
+// kTracker only for the shared tracker of Autotune, Mob, Formant, Yawn or Deepthroat. The card alone is 2.0 ns
+// a sample, 129 ns a block, 6.5k cycles, 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %; its
+// tracker is about 2.7 % mean and 5 % worst. The host bench of the whole slot on Adam's clips (Apple clang,
+// 2026-11-05) reads 0.69 us a block mean and 1.3 us worst with Autotune placed, 0.71 and 1.5 us without, which
+// is 2.9 % mean and 5.3 to 6.5 % worst at the tracker's 27k cycles per host us.
+constexpr Cost kRingMod{4, 7, false};  // est.: the card 0.9 / 1.6 % plus its own tracker 2.7 / 5 %, rounded up; a board run owes the measured row
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them. The stress run of 2026-11-05 measured POLISH EQ (both halves) and POLISH COMP, and

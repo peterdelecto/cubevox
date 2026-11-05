@@ -31,10 +31,11 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   4. each layout's POLISH EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
-The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Yawn, Crowd, Deepthroat
-or Ring mod slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Yawn),
-plus the tracker row when Autotune, Crowd, Formant, Yawn, Deepthroat or Ring mod is placed and the stage
-row when Octave, Formant or Yawn is placed without Autotune.
+The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Yawn, Crowd or Deepthroat
+slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Yawn),
+plus the tracker row when Autotune, Crowd, Formant, Yawn or Deepthroat is placed and the stage
+row when Octave, Formant or Yawn is placed without Autotune. The Ring mod slot runs a tracker of its
+own and takes no part in the stage, so its row alone bounds it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
 --dry-run prints the layouts, the sweeps, the toggle flips and the fixed-stage flips planned for each,
@@ -44,7 +45,7 @@ Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slo
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
 slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ring mod in
-Distortion's slot), tracker (Ring mod in Distortion's slot with Autotune's and Octave's slots empty) and heaviest (Input gate, Formant, Unison and
+Distortion's slot, with a tracker of its own) and heaviest (Input gate, Formant, Unison and
 Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
@@ -100,7 +101,7 @@ REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "yawn", "throat", "ringmod", "tracker", "heaviest")
+                "chatter", "lofi", "yawn", "throat", "ringmod", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -114,8 +115,8 @@ ROW_OF = {
 TRACKER_ROW = "kTracker"
 STAGE_ROW = "kPitchStage"  # the stage's own work when Octave, Formant or Yawn runs without Autotune
 PITCH_STAGE = ("autotune", "octave", "formant", "formant_follow")  # cards the shared PitchFx runs
-PITCH_GROUP = ("autotune", "octave", "formant", "formant_follow", "crowd", "growl", "ringmod")  # the first carries the stage's cost
-TRACKER_USERS = ("autotune", "crowd", "formant", "formant_follow", "growl", "ringmod")  # cards that run the pitch tracker
+PITCH_GROUP = ("autotune", "octave", "formant", "formant_follow", "crowd", "growl")  # the first carries the stage's cost
+TRACKER_USERS = ("autotune", "crowd", "formant", "formant_follow", "growl")  # cards that run the shared pitch tracker
 STAGE_USERS = ("octave", "formant", "formant_follow")  # cards that pay the stage term without Autotune
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
@@ -215,13 +216,11 @@ def layout_table():
     yawn = ["formant_follow" if c == "octave" else c for c in base]
     throat = ["growl" if c == "distortion" else c for c in base]
     ringmod = ["ringmod" if c == "distortion" else c for c in base]
-    # Ring mod alone times the tracker in its own slot, which the ringmod layout hides behind Autotune's.
-    tracker = ["empty" if c in ("autotune", "octave") else ("ringmod" if c == "distortion" else c) for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
             "chatter": (chatter, False), "lofi": (lofi, False), "yawn": (yawn, False), "throat": (throat, False),
-            "ringmod": (ringmod, False), "tracker": (tracker, False),
+            "ringmod": (ringmod, False),
             "heaviest": (heaviest, True)}
 
 
@@ -679,7 +678,7 @@ def report_lines(results, header):
         if r["carrier"] is not None:
             out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
                        "Autotune, Octave, Formant and Yawn rows placed, plus the tracker row when Autotune, Crowd, "
-                       "Formant, Yawn, Deepthroat or Ring mod is placed and the stage row when Octave, Formant "
+                       "Formant, Yawn or Deepthroat is placed and the stage row when Octave, Formant "
                        "or Yawn is placed without Autotune.")
             out.append("")
         out.append(block_line(r["agg"]))

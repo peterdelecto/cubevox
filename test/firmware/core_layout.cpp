@@ -832,10 +832,10 @@ void checkGrowlSlot6() {
   ringMod.card[5] = Card::RingMod;
   check(distortionGrowlSlot(ringMod) == 5 && layoutValid(ringMod).ok(),
         "distortionGrowlSlot: Ring mod counts as well, and its layout passes the placement rules");
-  paysFor(ringMod, true, false, "ringmod: Ring mod in slot 6 adds its row, and the tracker stays paid once");
+  paysFor(ringMod, true, false, "ringmod: Ring mod in slot 6 adds its row, and Autotune's tracker stays paid once");
   Layout ringAlone = withoutPitchCards();
   ringAlone.card[5] = Card::RingMod;
-  paysFor(ringAlone, true, false, "ringmod: Ring mod alone pays the tracker once and no pitch stage row");
+  paysFor(ringAlone, false, false, "ringmod: Ring mod alone pays its row, which holds its own tracker, and no shared tracker or stage row");
   check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == ringMod,
         "action: and turns Growl into Ring mod");
   check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == defaultLayout(),

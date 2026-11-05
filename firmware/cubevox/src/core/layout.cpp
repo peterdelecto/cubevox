@@ -74,14 +74,14 @@ LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
-  bool tracker = false;     // Autotune, Crowd, a Formant voice or Growl is placed, so the pitch tracker runs
+  bool tracker = false;     // Autotune, Crowd, a Formant voice or Growl is placed, so the shared pitch tracker runs
   bool autotune = false;
   bool stageUser = false;   // Octave or a Formant voice is placed, so the pitch stage mixes
   for (const Card c : layout.card) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
     const bool formant = c == Card::Formant || c == Card::FormantFollower;
-    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || formant || c == Card::Growl || c == Card::RingMod;
+    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || formant || c == Card::Growl;
     autotune = autotune || c == Card::Autotune;
     stageUser = stageUser || c == Card::Octave || formant;
   }

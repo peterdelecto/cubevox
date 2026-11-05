@@ -85,8 +85,9 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb-group cards: Spring and Chasm");
-  check(pitch == 7 && cardDesc(Card::FormantFollower).group == Group::Pitch,
-        "autotune, octave, formant, Yawn, the crowd card, growl and ring mod are the pitch group");
+  check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch &&
+            cardDesc(Card::RingMod).group == Group::None,
+        "autotune, octave, formant, Yawn, the crowd card and growl are the pitch group, and ring mod is not");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive, Range) sits on knob B, the lower pot of its slot, and each parameter
@@ -454,13 +455,13 @@ void checkAppendedCards() {
         "appended cards: each registry row is its costs.h row");
 }
 
-// Ring mod, the third card of slot 6, sits in the pitch group with an engine of its own and reads the tracker.
+// Ring mod, the third card of slot 6, has an engine of its own with a tracker of its own, so it sits in no group.
 // RATIO is a stepped knob of seven labelled ratios and MIX a percent.
 void checkRingModCard() {
   const CardDesc& d = cardDesc(Card::RingMod);
   check(std::strcmp(d.id, "ringmod") == 0 && std::strcmp(d.name, "Ring mod") == 0 && d.engine == Engine::RingMod &&
-            d.group == Group::Pitch && d.knobCount == 2,
-        "ringmod: id ringmod, name Ring mod, its own engine, the pitch group");
+            d.group == Group::None && d.knobCount == 2,
+        "ringmod: id ringmod, name Ring mod, its own engine, no group");
   const KnobDesc& ratio = *knobDesc(Card::RingMod, 0);
   check(std::strcmp(ratio.name, "RATIO") == 0 && knobSteps(Card::RingMod, 0) == 7 && ratio.labels != nullptr &&
             std::strcmp(knobLabel(ratio, 2), "X1.5") == 0 && std::strcmp(knobDesc(Card::RingMod, 1)->name, "MIX") == 0 &&
@@ -479,10 +480,10 @@ void checkRingModCard() {
         "ringmod: the registry row is its costs.h row");
   ChainParams p;
   applyToggle(Card::RingMod, true, p);
-  check(p.ringMod.on && p.pitchFx.ringModOn && !p.pitchFx.growlOn && !p.growl.on,
-        "ringmod: its toggle turns the card and the pitch stage's ringModOn on and nothing else");
+  check(p.ringMod.on && !p.pitchFx.growlOn && !p.pitchFx.crowdOn && !p.growl.on,
+        "ringmod: its toggle turns the card on and no flag of the pitch stage");
   applyToggle(Card::RingMod, false, p);
-  check(!p.ringMod.on && !p.pitchFx.ringModOn, "ringmod: and off again");
+  check(!p.ringMod.on, "ringmod: and off again");
   applyPlacement(Card::Autotune, p);
   check(p.ringMod.keyed, "ringmod: placing Autotune puts the card on its key");
 }

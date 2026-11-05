@@ -7,9 +7,9 @@
 // A note that starts after an unvoiced gap scoops into its pitch: the wet ducks for the gap, the carrier moves at
 // most once in the first 250 ms and only while the wet is down (a replay of the worst start in Adam's clips),
 // and no note start on the clips changes the carrier twice.
-// Each run feeds a PitchFx first, so the
-// tracker runs as the chain runs it. `ringmod_test --bench` prints the default card's cost. The clip rows
-// skip when samples/ is absent. No window, no audio device.
+// The card tracks the pitch of its own input, so an Octave stage at +12 st ahead of it moves the note 12
+// semitones up on the clips. `ringmod_test --bench` prints the default card's cost with its tracker. The
+// clip rows skip when samples/ is absent. No window, no audio device.
 
 #include <algorithm>
 #include <chrono>
@@ -21,6 +21,8 @@
 #include <memory>
 #include <vector>
 
+#include "engine/pitch_fx.h"
+#include "engine/psola.h"
 #include "engine/ringmod.h"
 
 #include "clip_util.h"
@@ -38,16 +40,14 @@ bool report(const char* name, bool ok, const char* detail) {
   return ok;
 }
 
-// The chain's order for a Ring mod card that makes the pitch call: the pitch stage writes the ring and feeds
-// the tracker, then the card runs on the stage's output.
+// One Ring mod card, which tracks the pitch of the signal it is given.
 struct Rig {
-  std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
   std::unique_ptr<cv::RingMod> mod = std::make_unique<cv::RingMod>();
   float carrierHz = 0.0f;  // after the last block
   int key = -1;            // the Autotune KEY index the card sits on, or -1 for every semitone
 
-  // Called after each block with the block's first sample, the tracker and the carrier's frequency.
-  std::function<void(size_t, const cv::PitchFx&, float)> each;
+  // Called after each block with the block's first sample, the card and the carrier's frequency.
+  std::function<void(size_t, const cv::RingMod&, float)> each;
 
   template <typename ParamsAt>
   Signal run(const Signal& in, ParamsAt at) {
@@ -55,12 +55,9 @@ struct Rig {
     for (size_t i = 0; i < in.size(); i += cv::kBlock) {
       const int n = static_cast<int>(in.size() - i < cv::kBlock ? in.size() - i : cv::kBlock);
       const cv::RingModParams p = at(i);
-      cv::PitchFxParams pp;
-      pp.ringModOn = p.on;
-      pitch->process(&in[i], &out[i], n, pp);
-      mod->process(&out[i], &out[i], n, p, *pitch, key);
+      mod->process(&in[i], &out[i], n, p, key);
       carrierHz = mod->carrierHz();
-      if (each) each(i, *pitch, carrierHz);
+      if (each) each(i, *mod, carrierHz);
     }
     return out;
   }
@@ -117,8 +114,8 @@ Signal vibrato(double hz, double seconds, double dbfs, double depthSemis, double
 double rms(const Signal& x, size_t from, size_t to) { return testutil::rmsOf(x, from, to); }
 
 // The tracker's pitch in MIDI semitones, or -1 on an unvoiced frame.
-float trackedMidi(const cv::PitchFx& pitch) {
-  const cv::PitchResult& pr = pitch.pitch();
+float trackedMidi(const cv::RingMod& mod) {
+  const cv::PitchResult& pr = mod.pitch();
   if (!pr.voiced || pr.period <= 0.0f) return -1.0f;
   return cv::midiOf(cv::kSampleRate / cv::PitchTracker::clampPeriod(pr.period));
 }
@@ -185,7 +182,7 @@ bool checkNote() {
 bool checkVibrato() {
   Rig rig;
   double worst = 0.0;
-  rig.each = [&worst](size_t, const cv::PitchFx&, float hz) {
+  rig.each = [&worst](size_t, const cv::RingMod&, float hz) {
     worst = std::fmax(worst, std::fabs(static_cast<double>(hz) - kA3Hz));
   };
   rig.run(vibrato(kA3Hz, 1.0, -20.0, 0.4, 5.0), modAt(1.0f, 1.0f));
@@ -204,9 +201,9 @@ bool checkStep() {
   Rig rig;
   long trackerBlock = -1;
   long carrierBlock = -1;
-  rig.each = [&](size_t i, const cv::PitchFx& pitch, float hz) {
+  rig.each = [&](size_t i, const cv::RingMod& mod, float hz) {
     const long block = static_cast<long>(i / cv::kBlock);
-    const float m = trackedMidi(pitch);
+    const float m = trackedMidi(mod);
     if (i >= stepAt && trackerBlock < 0 && std::fabs(m - 60.0f) < 0.1f) trackerBlock = block;
     if (i >= stepAt && carrierBlock < 0 && std::fabs(hz - kC4Hz) < 0.01f) carrierBlock = block;
   };
@@ -302,7 +299,7 @@ bool checkKeyed() {
   Rig rig;
   rig.key = 0;
   float nearest = 1e9f;
-  rig.each = [&nearest, cSharp](size_t i, const cv::PitchFx&, float hz) {
+  rig.each = [&nearest, cSharp](size_t i, const cv::RingMod&, float hz) {
     if (i >= static_cast<size_t>(kRate / 10)) nearest = std::fmin(nearest, std::fabs(hz - cSharp));
   };
   rig.run(tone(cSharp, 1.0, -20.0), modAt(1.0f, 1.0f));
@@ -416,7 +413,7 @@ ChangeStats countChanges(const std::vector<Signal>& sets, int key) {
     rig.key = key;
     float last = 0.0f;
     long lastChange = -1;
-    rig.each = [&](size_t i, const cv::PitchFx&, float hz) {
+    rig.each = [&](size_t i, const cv::RingMod&, float hz) {
       if (std::fabs(hz - last) > 0.01f) {
         if (last > 0.0f && i >= clips::kPad) {
           ++s.changes;
@@ -452,6 +449,120 @@ bool checkClipChanges() {
 }
 
 double midiHz(double midi) { return 440.0 * std::pow(2.0, (midi - 69.0) / 12.0); }
+
+// A tracker over a ring of `len` floats that takes every call, tracked or idle, as the card does.
+class RingTracker : public cv::PitchTracker {
+ public:
+  explicit RingTracker(int len) : len_(len), ring_(static_cast<size_t>(len), 0.0f) {}
+
+  void run(const float* in, int n, bool active, bool fine) {
+    const int first = head_;
+    for (int i = 0; i < n; ++i) {
+      ring_[static_cast<size_t>(head_)] = in[i];
+      if (++head_ == len_) head_ = 0;
+    }
+    if (active) {
+      push(in, n, true, fine, History{ring_.data(), len_, first});
+    } else {
+      idle(n);
+    }
+  }
+
+ private:
+  int len_;
+  std::vector<float> ring_;
+  int head_ = 0;
+};
+
+// The card's ring holds what the tracker reads: through tracked stretches, idle stretches of 5 to 50 blocks and
+// the replays that follow them, the tracker over kRingNeed floats reports the same period, bit for bit, as one
+// over the 51 kB pitch ring, with and without the fine pass.
+bool checkRingHoldsTrackerReach() {
+  bool whole = true;
+  const std::vector<Signal> sets = clips::load(CUBEVOX_SAMPLES_DIR, whole);
+  if (sets.empty()) {
+    std::printf("SKIP ring reach row  samples/ is not in this checkout\n");
+    return true;
+  }
+  const int idleBlocks[] = {5, 13, 29, 50, 8, 21};
+  int blocks = 0;
+  int differ = 0;
+  for (const bool fine : {false, true}) {
+    for (const Signal& padded : sets) {
+      RingTracker tight(cv::PitchTracker::kRingNeed);
+      RingTracker wide(cv::kVoiceRingLen);
+      int idle = 0;
+      bool active = true;
+      int left = 150;
+      for (size_t i = 0; i + cv::kBlock <= padded.size(); i += cv::kBlock, ++blocks) {
+        if (left-- == 0) {
+          active = !active;
+          idle = active ? idle : (idle + 1) % 6;
+          left = active ? 150 : idleBlocks[idle];
+        }
+        tight.run(&padded[i], cv::kBlock, active, fine);
+        wide.run(&padded[i], cv::kBlock, active, fine);
+        differ += tight.result().period != wide.result().period || tight.result().voiced != wide.result().voiced;
+      }
+    }
+  }
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "blocks whose period or voicing differs from the wide ring's: %d of %d (0)", differ,
+                blocks);
+  return report("the ring holds the tracker's reach", whole && differ == 0, detail);
+}
+
+// The held note (MIDI) the card has after each block of a clip that passes through an Octave stage ahead of it,
+// or -1 before the card has a note. Octave runs at +12 st and MIX 100 %, or is off.
+std::vector<float> heldAfterOctave(const Signal& padded, bool octaveUp) {
+  auto pitch = std::make_unique<cv::PitchFx>();
+  Rig rig;
+  cv::PitchFxParams pp;
+  pp.octave.on = octaveUp;
+  pp.octave.semitones = 12;
+  pp.octave.mix = 1.0f;
+  const cv::RingModParams p = modAt(1.0f, 1.0f);
+  Signal shifted(padded.size()), out(padded.size());
+  std::vector<float> held;
+  for (size_t i = 0; i + cv::kBlock <= padded.size(); i += cv::kBlock) {
+    pitch->process(&padded[i], &shifted[i], cv::kBlock, pp);
+    rig.mod->process(&shifted[i], &out[i], cv::kBlock, p, -1);
+    held.push_back(rig.mod->heldHz() > 0.0f ? cv::midiOf(rig.mod->heldHz()) : -1.0f);
+  }
+  return held;
+}
+
+// With Octave at +12 st and MIX 100 % ahead, the card's note follows the octave-up voice: 12 semitones above
+// the note it holds with Octave off, give or take the semitone the snapping can add, in nearly every block of
+// Adam's clips where both hold one. A carrier on the raw voice's pitch would read 0.
+bool checkOctaveAhead() {
+  bool whole = true;
+  const std::vector<Signal> sets = clips::load(CUBEVOX_SAMPLES_DIR, whole);
+  if (sets.empty()) {
+    std::printf("SKIP octave-ahead row  samples/ is not in this checkout\n");
+    return true;
+  }
+  int both = 0;
+  int near = 0;
+  std::vector<float> diffs;
+  for (const Signal& padded : sets) {
+    const std::vector<float> off = heldAfterOctave(padded, false);
+    const std::vector<float> up = heldAfterOctave(padded, true);
+    for (size_t b = clips::kPad / cv::kBlock; b < off.size(); ++b) {
+      if (off[b] < 0.0f || up[b] < 0.0f) continue;
+      ++both;
+      diffs.push_back(up[b] - off[b]);
+      near += std::fabs(up[b] - off[b] - 12.0f) <= 1.0f ? 1 : 0;
+    }
+  }
+  std::sort(diffs.begin(), diffs.end());
+  const float median = diffs.empty() ? 0.0f : diffs[diffs.size() / 2];
+  const double share = both > 0 ? static_cast<double>(near) / both : 0.0;
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "median %.1f st above the Octave-off note, %.1f %% of %d blocks within 1 st of 12 (>= 90 %%)",
+                median, 100.0 * share, both);
+  return report("a carrier follows the Octave voice", whole && median == 12.0f && share >= 0.9, detail);
+}
 
 // The worst note start in Adam's clips (clip 3 at 2.0 s): the voice scoops down 2.9 semitones in the first
 // 230 ms from the tracked pitch, after a 190 ms gap that follows a note at 41.73. Knots are the clip's own
@@ -513,7 +624,7 @@ bool checkScoopStart() {
   Rig rig;
   std::vector<float> carrier;
   std::vector<float> wet;
-  rig.each = [&](size_t, const cv::PitchFx&, float hz) {
+  rig.each = [&](size_t, const cv::RingMod&, float hz) {
     carrier.push_back(hz);
     wet.push_back(rig.mod->wetLevel());
   };
@@ -554,8 +665,8 @@ StartStats countStarts(const std::vector<Signal>& sets, int key) {
     rig.key = key;
     std::vector<char> voiced;
     std::vector<float> carrier;
-    rig.each = [&](size_t, const cv::PitchFx& pitch, float hz) {
-      voiced.push_back(pitch.pitch().voiced ? 1 : 0);
+    rig.each = [&](size_t, const cv::RingMod& mod, float hz) {
+      voiced.push_back(mod.pitch().voiced ? 1 : 0);
       carrier.push_back(hz);
     };
     rig.run(padded, modAt(1.5f, 1.0f));
@@ -640,15 +751,12 @@ int bench() {
     for (const Signal& padded : sets) {
       Rig rig;
       Signal out(padded.size());
-      cv::PitchFxParams pp;
-      pp.ringModOn = true;
       const cv::RingModParams p = modAt(1.5f, 0.5f);
       double spent = 0.0;
       double slowest = 0.0;
       for (size_t i = 0; i + cv::kBlock <= padded.size(); i += cv::kBlock) {
-        rig.pitch->process(&padded[i], &out[i], cv::kBlock, pp);
         const auto t0 = std::chrono::steady_clock::now();
-        rig.mod->process(&out[i], &out[i], cv::kBlock, p, *rig.pitch, -1);
+        rig.mod->process(&padded[i], &out[i], cv::kBlock, p, -1);
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - t0).count();
         spent += ns;
         slowest = std::fmax(slowest, ns);
@@ -657,8 +765,8 @@ int bench() {
       worst = std::fmin(worst, slowest);
     }
   }
-  std::printf("ringmod bench: %.2f ns a sample, %.0f ns the costliest block, at RATIO 1.5, MIX 50 %% (card alone, minimum of 9 "
-              "passes per clip)\n", best, worst);
+  std::printf("ringmod bench: %.2f ns a sample, %.0f ns the costliest block, at RATIO 1.5, MIX 50 %% (card with its own tracker, "
+              "minimum of 9 passes per clip)\n", best, worst);
   return 0;
 }
 
@@ -679,6 +787,8 @@ int main(int argc, char** argv) {
   ok &= checkFinite();
   ok &= checkLevel();
   ok &= checkClipChanges();
+  ok &= checkOctaveAhead();
+  ok &= checkRingHoldsTrackerReach();
   ok &= checkScoopStart();
   ok &= checkClipStarts();
   ok &= checkGate();

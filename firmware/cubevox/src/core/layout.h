@@ -61,8 +61,9 @@ struct LayoutCheck {
 
 // The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
 // placed card's row, the pitch tracker's row once when Autotune, Crowd, Formant, the Formant
-// follower, Growl or Ring mod is placed, and the pitch stage's row once when Octave, Formant or the Formant
-// follower is placed without Autotune. Every card id must be in range.
+// follower or Growl is placed, and the pitch stage's row once when Octave, Formant or the Formant
+// follower is placed without Autotune. The Ring mod row holds the card's own tracker. Every card id must be
+// in range.
 struct LayoutCost {
   int avg = 0;
   int worst = 0;
