@@ -53,7 +53,7 @@ constexpr float kPolishTrimMaxDb = 12.0f;
 struct PolishTuning {
   float dipQ = 1.0f;
   float presenceQ = 0.7f;
-  float trimDb = 1.3f;  // active back half only; level rule on program material
+  float trimDb = 1.15f;  // active back half only; level rule on program material
   DeEsserTuning deEsser;
 };
 

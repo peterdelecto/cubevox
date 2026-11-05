@@ -764,13 +764,14 @@ class PitchTracker {
   }
 
   // A block of the hop ends. Its energy joins the ring the level gate reads and, while active, its
-  // block sum joins the hop's sum.
+  // block sum joins the hop's sum. The onset estimate skips the block that closes a hop, which runs
+  // the analysis, so the estimate's block stays under a voiced hop's and waits one block instead.
   void closeBlock() {
     levels_[static_cast<size_t>(levelRow_)] = energy_;
     levelRow_ = levelRow_ + 1 == kLevelBlocks ? 0 : levelRow_ + 1;
     energy_ = 0.0f;
     if (active_) addBlockSum();
-    if (active_ && staleFrom_ == kFrameBlocks && !result_.voiced) estimateOnset();
+    if (active_ && staleFrom_ == kFrameBlocks && !result_.voiced && hopCount_ < kHop) estimateOnset();
   }
 
   // The block that just completed starts kDecBlock + kCoarseMax back. The hop's first block sum
