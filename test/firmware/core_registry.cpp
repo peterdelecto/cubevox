@@ -506,6 +506,7 @@ void checkStringsCard() {
   check(p.strings.on && !p.strings.keyed && !p.reverb.on, "strings: its toggle turns the card on and nothing else");
   applyPlacement(Card::Autotune, p);
   check(p.strings.keyed, "strings: placing Autotune puts the card on its key");
+  check(p.ringMod.keyed, "ringmod: placing Autotune puts the card on its key");
 }
 
 // Yawn: id formant_follow, which keeps under the id clip width, the pitch engine and group, SENSITIVITY
