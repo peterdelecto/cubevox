@@ -89,12 +89,8 @@ H7_DTCM_BSS cv::Distortion gDistortion;
 // Unison's delay line and scratch (10,204 B) live in DTCM as well, constructed again in place by audioInit().
 H7_DTCM_BSS cv::Unison gUnison;
 
-// Ringer's tracker and its input ring (13,584 B, 5,040 B of it the ring) live in DTCM too, constructed again in
-// place by audioInit() for the tracker's anti-alias coefficients.
-H7_DTCM_BSS cv::RingMod gRingMod;
-
 // Engine objects, constructed in reset state.
-ChainEngines gChain{gPitchFx, gUnison, gDistortion, gRingMod};
+ChainEngines gChain{gPitchFx, gUnison, gDistortion};
 
 // Published snapshots alternate between two slots by sequence number, so the main loop only writes
 // the slot the interrupt does not read. The interrupt preempts the main loop and runs to completion,
@@ -555,7 +551,6 @@ void resetAudioState() {
   new (&gPitchFx) cv::PitchFx();
   new (&gDistortion) cv::Distortion();
   new (&gUnison) cv::Unison();
-  new (&gRingMod) cv::RingMod();
   new (&gSnapshots[0]) ChainSnapshot();  // in place: a snapshot is over a kilobyte, too big for the stack
   new (&gHeld) ChainSnapshot();
   enableCycleCounter();

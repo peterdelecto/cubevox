@@ -32,8 +32,7 @@ struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  std::unique_ptr<cv::RingMod> ringMod = std::make_unique<cv::RingMod>();
-  ChainEngines engines{*pitch, *unison, *distortion, *ringMod};
+  ChainEngines engines{*pitch, *unison, *distortion};
   SlotFades fades;
 };
 
@@ -1115,28 +1114,6 @@ void checkAppendedCardsRun() {
   check(allZero(runBlock(*lofiRig, lofi, Block{}, StillClock()).out), "resetEngine clears the Lo-fi engine, so silence in is silence out");
 }
 
-// Ringer tracks its own input with a tracker and ring of its own. With only its toggle on, the shared pitch
-// stage never runs (its ring stays unwritten and its tracker unvoiced), and the card's tracker finds the
-// tone. After its toggle goes off and the slot fades out, each block the slot sits stopped clears a slice of
-// the card's ring, and a few blocks leave it clear.
-void checkRingModOwnTracker() {
-  const Layout layout = layoutOf({Card::Autotune, Card::Octave, Card::RingMod});
-  auto rig = newRig();
-  const ChainSnapshot on = snapshotToggles(layout, 0.5f, togglesOn({2}));
-  rig->fades.settle(on.slotOn);
-  for (int b = 0; b < 60; ++b) runBlock(*rig, on, tone(b, 0.3f), StillClock());
-  const cv::PitchResult& own = rig->engines.ringMod.pitch();
-  check(rig->engines.pitch.head() == 0 && rig->engines.pitch.pitch().period == 0.0f && own.voiced && own.hz > 215.0f &&
-            own.hz < 225.0f,
-        "ringer: its own tracker reads the tone and the shared pitch stage does not run");
-
-  const ChainSnapshot off = snapshotToggles(layout, 0.5f, togglesOn({}));
-  for (int b = 0; b < kSlotFadeBlocks + 4; ++b) runBlock(*rig, off, tone(60 + b, 0.3f), StillClock());
-  const auto& ring = rig->engines.ringMod.ringForTest();
-  check(std::all_of(ring.begin(), ring.end(), [](float v) { return v == 0.0f; }),
-        "ringer: a few blocks with the slot stopped leave the card's ring clear");
-}
-
 // Formant acts at the first pitch-group card's slot, wherever its own card sits. Its toggle alone keeps
 // the stage and its tracker running: with Autotune off, in slot 1 or in slot 3, the pitch call goes
 // through at the first of the two and a Formant card behind Autotune writes nothing of its own.
@@ -1385,7 +1362,6 @@ void checkChainRun() {
   checkCrowdToggleOff();
   checkAppendedCardsRun();
   checkFormantPitchStage();
-  checkRingModOwnTracker();
   checkBloomKey();
   checkBloomSource();
   checkSettledSlotsAreInert();

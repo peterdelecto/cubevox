@@ -85,9 +85,8 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb-group cards: Spring and Chasm");
-  check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch &&
-            cardDesc(Card::RingMod).group == Group::None,
-        "autotune, octave, formant, Apraxia, the crowd card and growl are the pitch group, and ringer is not");
+  check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch,
+        "autotune, octave, formant, Apraxia, the crowd card and growl are the pitch group");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive, Range) sits on knob B, the lower pot of its slot, and each parameter
@@ -95,7 +94,7 @@ void checkGroups() {
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
                               Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom,       Card::FormantFollower,
-                              Card::Growl,  Card::RingMod};
+                              Card::Growl};
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
            std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "DRIVE") == 0 ||
@@ -164,7 +163,6 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::FormantFollower: return knob == 0 ? p.follower.sensitivity : p.follower.rangeSt;
     case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.mix;
-    case Card::RingMod: return knob == 0 ? p.ringMod.ratio : p.ringMod.mix;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -440,52 +438,19 @@ void checkCrowdVoices() {
 void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
             static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 &&
-            static_cast<int>(Card::FormantFollower) == 14 && static_cast<int>(Card::Growl) == 15 && static_cast<int>(Card::RingMod) == 16 &&
-            kCardCount == 17,
+            static_cast<int>(Card::FormantFollower) == 14 && static_cast<int>(Card::Growl) == 15 &&
+            kCardCount == 16,
         "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
-            static_cast<int>(Engine::Growl) == 10 && static_cast<int>(Engine::RingMod) == 11 &&
-            kEngineCount == 12,
-        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl and Ringer after the Crowd engine");
+            static_cast<int>(Engine::Growl) == 10 &&
+            kEngineCount == 11,
+        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) and Growl after the Crowd engine");
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
   };
   check(sameRow(Card::Formant, costs::kFormant) && sameRow(Card::Lofi, costs::kLofi) && sameRow(Card::Bloom, costs::kBloom) &&
             sameRow(Card::FormantFollower, costs::kFormantFollower),
         "appended cards: each registry row is its costs.h row");
-}
-
-// Ringer, the third card of slot 6, has an engine of its own with a tracker of its own, so it sits in no group.
-// RATIO is a stepped knob of seven labelled ratios and MIX a percent.
-void checkRingModCard() {
-  const CardDesc& d = cardDesc(Card::RingMod);
-  check(std::strcmp(d.id, "ringmod") == 0 && std::strcmp(d.name, "Ringer") == 0 && d.engine == Engine::RingMod &&
-            d.group == Group::None && d.knobCount == 2,
-        "ringmod: id ringmod, name Ringer, its own engine, no group");
-  const KnobDesc& ratio = *knobDesc(Card::RingMod, 0);
-  check(std::strcmp(ratio.name, "RATIO") == 0 && knobSteps(Card::RingMod, 0) == 7 && ratio.labels != nullptr &&
-            std::strcmp(knobLabel(ratio, 2), "X1.5") == 0 && std::strcmp(knobDesc(Card::RingMod, 1)->name, "MIX") == 0 &&
-            knobSteps(Card::RingMod, 1) == 0,
-        "ringmod: RATIO is seven labelled steps, MIX a continuous percent");
-  const float expected[7] = {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f};
-  bool ratios = true;
-  for (int i = 0; i < 7; ++i) {
-    ChainParams p;
-    applyKnob(Card::RingMod, 0, static_cast<float>(i), p);
-    ratios = ratios && p.ringMod.ratio == expected[i];
-  }
-  check(ratios, "ringmod: the seven steps are 0.5, 1, 1.5, 2, 2.5, 3 and 4");
-  check(d.cost.avg == costs::kRingMod.avg && d.cost.worst == costs::kRingMod.worst &&
-            d.cost.measured == costs::kRingMod.measured,
-        "ringmod: the registry row is its costs.h row");
-  ChainParams p;
-  applyToggle(Card::RingMod, true, p);
-  check(p.ringMod.on && !p.pitchFx.growlOn && !p.pitchFx.crowdOn && !p.growl.on,
-        "ringmod: its toggle turns the card on and no flag of the pitch stage");
-  applyToggle(Card::RingMod, false, p);
-  check(!p.ringMod.on, "ringmod: and off again");
-  applyPlacement(Card::Autotune, p);
-  check(p.ringMod.keyed, "ringmod: placing Autotune puts the card on its key");
 }
 
 // Apraxia: id formant_follow, which keeps under the id clip width, the pitch engine and group, SENSITIVITY
@@ -829,7 +794,6 @@ void checkRegistry() {
   checkLofiCard();
   checkBloomCard();
   checkGrowlCard();
-  checkRingModCard();
   checkAppendedToggles();
   checkShownDecimals();
   checkCells();

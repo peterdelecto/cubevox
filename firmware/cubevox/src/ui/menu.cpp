@@ -141,11 +141,7 @@ const char* unisonCrowdValue(const Layout& layout) {
 const char* distortionGrowlValue(const Layout& layout) {
   const int slot = distortionGrowlSlot(layout);
   if (slot < 0) return "DISTORTION";
-  switch (layout.card[slot]) {
-    case Card::Growl: return "DEEPTHROAT";
-    case Card::RingMod: return "RINGER";
-    default: return "DISTORTION";
-  }
+  return layout.card[slot] == Card::Growl ? "DEEPTHROAT" : "DISTORTION";
 }
 
 // The card the slot 7 row holds. A layout with none of the three reads GATE, the default.

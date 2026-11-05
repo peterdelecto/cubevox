@@ -98,13 +98,6 @@ void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const C
   engines.growl.process(in, out, n, p.growl, engines.pitch);
 }
 
-// Runs the Ringer card at its slot. It tracks the pitch of `in` with a tracker of its own, so the shared
-// pitch stage plays no part. It snaps to the notes of Autotune's KEY when Autotune is placed
-// (`p.ringMod.keyed`), and to every semitone otherwise.
-void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
-  engines.ringMod.process(in, out, n, p.ringMod, p.ringMod.keyed ? p.pitchFx.autotune.key : -1);
-}
-
 // Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is
 // the word key for the block; the gate's engine keeps its detector live while its own slot is off.
 // Otherwise the card listens to its own input and ignores the state. Its slices and its dry both come
@@ -131,7 +124,6 @@ void resetEngine(ChainEngines& engines, Engine e) {
     case Engine::Lofi: engines.lofi.reset(); break;
     case Engine::Bloom: engines.bloom.reset(); break;
     case Engine::Growl: engines.growl.reset(); break;
-    case Engine::RingMod: engines.ringMod.reset(); break;
     case Engine::Count: break;
   }
 }
@@ -154,7 +146,6 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); return true;
     case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
     case Engine::Growl: runGrowl(engines, in, out, n, p, pitchDone); return true;
-    case Engine::RingMod: runRingMod(engines, in, out, n, p); return true;
     case Engine::Count: break;  // Empty runs no engine
   }
   return false;
@@ -193,7 +184,6 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
       pitchDone = true;  // the stage is stopped, so no later pitch-group card has a ring to read
       engines.pitch.rest();
     }
-    if (e == Engine::RingMod) engines.ringMod.rest();
     if (e == Engine::Growl) engines.growl.rest();  // the card keeps a ring of its own input
     return false;
   }

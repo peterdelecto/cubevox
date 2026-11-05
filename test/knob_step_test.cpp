@@ -104,7 +104,6 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
     case Engine::Lofi: return runFx<cv::Lofi>(in, a, b, &ChainParams::lofi);
     case Engine::Bloom: return runFx<cv::Bloom>(in, a, b, &ChainParams::bloom);
     case Engine::Growl:  // the audition cards have no knob-step rows yet
-    case Engine::RingMod:
     case Engine::Count: break;
   }
   return in;
@@ -403,8 +402,7 @@ Signal runLofiSlot(const Signal& in, const ChainParams& base, bool turnOn) {
   auto pitch = std::make_unique<cv::PitchFx>();
   auto unison = std::make_unique<cv::Unison>();
   auto distortion = std::make_unique<cv::Distortion>();
-  auto ringMod = std::make_unique<cv::RingMod>();
-  auto engines = std::make_unique<ChainEngines>(*pitch, *unison, *distortion, *ringMod);
+  auto engines = std::make_unique<ChainEngines>(*pitch, *unison, *distortion);
   auto snap = std::make_unique<ChainSnapshot>();
   snap->layout.card.fill(Card::Empty);
   snap->layout.card[kLofiSlot] = Card::Lofi;
@@ -544,7 +542,7 @@ int main() {
   bool ok = true;
   for (int i = 0; i < kCardCount; ++i) {
     const Card c = static_cast<Card>(i);
-    if (engineOf(c) == Engine::Growl || engineOf(c) == Engine::RingMod) continue;
+    if (engineOf(c) == Engine::Growl) continue;
     if (c == Card::Unison) {
       ok &= unisonRows();
       continue;
