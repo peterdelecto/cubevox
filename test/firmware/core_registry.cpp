@@ -654,9 +654,9 @@ void checkBloomCard() {
 // toggle keeps the pitch stage's ring and tracker running as the Crowd card's does.
 void checkGrowlCard() {
   const CardDesc& growl = cardDesc(Card::Growl);
-  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Throat") == 0 && growl.engine == Engine::Growl &&
+  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Deepthroat") == 0 && growl.engine == Engine::Growl &&
             growl.group == Group::Pitch && growl.knobCount == 2,
-        "growl: id growl, name Throat, its own engine, the pitch group");
+        "growl: id growl, name Deepthroat, its own engine, the pitch group");
   check(std::strcmp(knobDesc(Card::Growl, 0)->name, "GROWL") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->name, "MIX") == 0 &&
             knobSteps(Card::Growl, 0) == 0 && knobSteps(Card::Growl, 1) == 0 &&
             std::strcmp(knobDesc(Card::Growl, 0)->unit, "%") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->unit, "%") == 0,
