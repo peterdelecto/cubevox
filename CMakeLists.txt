@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(cubevox C CXX OBJCXX)
+project(cubevox C CXX OBJC OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -293,7 +293,7 @@ endif()
 set_target_properties(cubevox-emulator PROPERTIES
   OUTPUT_NAME "cubevox-emulator"
   MACOSX_BUNDLE TRUE
-  MACOSX_BUNDLE_BUNDLE_NAME "cubevox-emulator"
+  MACOSX_BUNDLE_BUNDLE_NAME "cubevox emulator"
   MACOSX_BUNDLE_GUI_IDENTIFIER "com.peterdelecto.cubevox-emulator"
   MACOSX_BUNDLE_BUNDLE_VERSION "1"
   MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
