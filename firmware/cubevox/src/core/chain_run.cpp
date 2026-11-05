@@ -98,7 +98,7 @@ void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const C
   engines.growl.process(in, out, n, p.growl, engines.pitch);
 }
 
-// Runs the Ring mod card at its slot. It tracks the pitch of `in` with a tracker of its own, so the shared
+// Runs the Ringer card at its slot. It tracks the pitch of `in` with a tracker of its own, so the shared
 // pitch stage plays no part. It snaps to the notes of Autotune's KEY when Autotune is placed
 // (`p.ringMod.keyed`), and to every semitone otherwise.
 void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {

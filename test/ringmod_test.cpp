@@ -1,4 +1,4 @@
-// Ring mod card checks: off is a bit-exact copy, the carrier sits at RATIO times the note nearest the tracked
+// Ringer card checks: off is a bit-exact copy, the carrier sits at RATIO times the note nearest the tracked
 // pitch (read from the card and from the output's spectrum), vibrato of 0.4 semitone leaves it still, a note
 // step moves it 60 ms after the tracker reports it, a flip shorter than that leaves it still, no change on
 // Adam's clips follows another within 60 ms, a keyed card never lands on a note outside the scale, it
@@ -40,7 +40,7 @@ bool report(const char* name, bool ok, const char* detail) {
   return ok;
 }
 
-// One Ring mod card, which tracks the pitch of the signal it is given.
+// One Ringer card, which tracks the pitch of the signal it is given.
 struct Rig {
   std::unique_ptr<cv::RingMod> mod = std::make_unique<cv::RingMod>();
   float carrierHz = 0.0f;  // after the last block

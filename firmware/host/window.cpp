@@ -361,7 +361,7 @@ constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom
 constexpr std::array<GridCell, 2> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot4Cards = {Card::Unison, Card::Crowd};
 constexpr std::array<GridCell, kStackRows> kSlot6Cells = {
-    {{"DISTORTION", 0.0f, 0, 1.0f}, {"DEEPTHROAT", 0.0f, 1, 1.0f}, {"RING MOD", 0.0f, 2, 1.0f}}};
+    {{"DISTORTION", 0.0f, 0, 1.0f}, {"DEEPTHROAT", 0.0f, 1, 1.0f}, {"RINGER", 0.0f, 2, 1.0f}}};
 constexpr std::array<Card, kStackRows> kSlot6Cards = {Card::Distortion, Card::Growl, Card::RingMod};
 constexpr std::array<GridCell, 2> kSlot8Cells = {{{"SPRING", 0.0f, 0, 0.5f}, {"CHASM", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot8Cards = {Card::ReverbSpring, Card::ReverbChasm};

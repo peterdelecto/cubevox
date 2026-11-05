@@ -13,7 +13,7 @@
 
 namespace cv {
 
-// The Ring mod card. A sine carrier at RATIO times a held note multiplies the voice, so the clang stays in
+// The Ringer card. A sine carrier at RATIO times a held note multiplies the voice, so the clang stays in
 // tune and follows the melody in steps. The card tracks the pitch of its own input, the voice the slot
 // ahead of it hands over, with a PitchTracker and a short ring of its own, so an Octave card ahead moves
 // the carrier with the voice. The note is the one nearest the tracked pitch. It is a major-scale note of

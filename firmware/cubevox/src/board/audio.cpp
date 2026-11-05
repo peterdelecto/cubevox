@@ -89,7 +89,7 @@ H7_DTCM_BSS cv::Distortion gDistortion;
 // Unison's delay line and scratch (10,204 B) live in DTCM as well, constructed again in place by audioInit().
 H7_DTCM_BSS cv::Unison gUnison;
 
-// Ring mod's tracker and its input ring (13,584 B, 5,040 B of it the ring) live in DTCM too, constructed again in
+// Ringer's tracker and its input ring (13,584 B, 5,040 B of it the ring) live in DTCM too, constructed again in
 // place by audioInit() for the tracker's anti-alias coefficients.
 H7_DTCM_BSS cv::RingMod gRingMod;
 

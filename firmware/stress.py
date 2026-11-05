@@ -9,10 +9,10 @@ to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper 
 knobs and both Gate knobs (Threshold across the whole knob, then Decay), both Unison knobs (Rate, then
 Depth), both Distortion knobs (TONE again with DRIVE pinned at 100 %, and TONE stepped inside a DRIVE
 glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Yawn knobs (SENSITIVITY,
-RANGE), both Deepthroat knobs (GROWL, MIX), both Ring mod knobs (RATIO, stepped, so each 10 % step lands
+RANGE), both Deepthroat knobs (GROWL, MIX), both Ringer knobs (RATIO, stepped, so each 10 % step lands
 on one of its positions, then MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
-It then flips the toggle of every Echo, Input gate, Gate, Yawn, Deepthroat and Ring mod slot
+It then flips the toggle of every Echo, Input gate, Gate, Yawn, Deepthroat and Ringer slot
 ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
 POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
@@ -34,7 +34,7 @@ Gates (each named in the output when it fails, exit 1 if any fails):
 The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Yawn, Crowd or Deepthroat
 slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Yawn),
 plus the tracker row when Autotune, Crowd, Formant, Yawn or Deepthroat is placed and the stage
-row when Octave, Formant or Yawn is placed without Autotune. The Ring mod slot runs a tracker of its
+row when Octave, Formant or Yawn is placed without Autotune. The Ringer slot runs a tracker of its
 own and takes no part in the stage, so its row alone bounds it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
@@ -44,7 +44,7 @@ with the time they take, and opens no port.
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
-slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ring mod in
+slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ringer in
 Distortion's slot, with a tracker of its own) and heaviest (Input gate, Formant, Unison and
 Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
@@ -440,8 +440,8 @@ def sweeps(slots):
             found.append(Sweep(i, 1, "Deepthroat GROWL"))
             found.append(Sweep(i, 2, "Deepthroat MIX"))
         if card == "ringmod":
-            found.append(Sweep(i, 1, "Ring mod RATIO"))
-            found.append(Sweep(i, 2, "Ring mod MIX"))
+            found.append(Sweep(i, 1, "Ringer RATIO"))
+            found.append(Sweep(i, 2, "Ringer MIX"))
     return found
 
 

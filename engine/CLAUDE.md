@@ -70,7 +70,7 @@
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`
   (`test/ringed_tracker.h`), which keeps a ring of its own.
-- Ring mod tracks the pitch of its own input, the signal the slot ahead hands it, so it takes no part in the
+- Ringer tracks the pitch of its own input, the signal the slot ahead hands it, so it takes no part in the
   shared pitch stage and sits in no registry group. It owns a `PitchTracker` (coarse search only) fed from a
   ring of `PitchTracker::kRingNeed` floats, the most a push reads back with calls of up to `kBlock` samples.
   It clears the ring as `PitchFx` does: `RingMod::rest()` zeroes 512 floats a block while the slot is

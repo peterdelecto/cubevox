@@ -80,7 +80,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
-    {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::None,
+    {Card::RingMod, "ringmod", "Ringer", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::None,
      costs::kRingMod},
 }};
 
@@ -334,7 +334,7 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
-  // The Ring mod card sits on the Autotune card's key whenever that card is placed.
+  // The Ringer card sits on the Autotune card's key whenever that card is placed.
   if (c == Card::Autotune) out.ringMod.keyed = true;
   // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
   if (c == Card::FormantFollower) out.follower.placed = true;

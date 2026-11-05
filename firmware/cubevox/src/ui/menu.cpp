@@ -143,7 +143,7 @@ const char* distortionGrowlValue(const Layout& layout) {
   if (slot < 0) return "DISTORTION";
   switch (layout.card[slot]) {
     case Card::Growl: return "DEEPTHROAT";
-    case Card::RingMod: return "RING MOD";
+    case Card::RingMod: return "RINGER";
     default: return "DISTORTION";
   }
 }

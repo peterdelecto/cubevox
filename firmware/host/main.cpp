@@ -156,7 +156,7 @@ constexpr std::array<CardRow, 3> kSlot3Rows = {
      {Card::FormantFollower, "formant_follow", "yawn", "YAWN", costs::kFormantFollower},
      {Card::Octave, "octave", "octave", "OCTAVE", costs::kOctave}}};
 constexpr std::array<CardRow, 3> kSlot6Rows = {{{Card::Growl, "growl", "growl", "DEEPTHROAT", costs::kGrowl},
-                                                {Card::RingMod, "ringmod", "ringmod", "RING MOD", costs::kRingMod},
+                                                {Card::RingMod, "ringmod", "ringmod", "RINGER", costs::kRingMod},
                                                 {Card::Distortion, "distortion", "distortion", "DISTORTION",
                                                  costs::kDistortion}}};
 
