@@ -103,8 +103,8 @@ int usage() {
                "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, growl, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
                "  bloom, the Chatter card, runs with --amount (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its\n"
-               "  word key is the input gate's open state, otherwise it listens to its own input; it cuts its slices from the\n"
-               "  pitch stage's output when one runs (before crowd), else from the input gate's output, and the dry path is its input\n"
+               "  word key is the input gate's open state, otherwise it listens to its own input; it cuts its slices from\n"
+               "  its own input, which is also its dry path\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  the eq's front half (70 Hz high-pass, 6 kHz low-pass, de-esser) runs ahead of every stage and its\n"
@@ -778,7 +778,6 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   polish.reset();
 
   float inBuf[cv::kBlock];
-  float bloomSrc[cv::kBlock];
   float bufA[cv::kBlock];
   float bufB[cv::kBlock];
   float* const scratch[2] = {bufA, bufB};
@@ -799,15 +798,11 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
       // Each stage writes the scratch buffer the previous stage did not.
       const float* src = inBuf;
       int next = 0;
-
-      // The Chatter card cuts its slices from the pitch stage's output, or from the input gate's output when no
-      // pitch card runs. The copy is taken ahead of the stages that follow.
       if (rp.inGateOn) {
         inGate.process(src, scratch[next], n, rp.inGate);
         src = scratch[next];
         next ^= 1;
       }
-      if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
       if (rp.pitchOn) {
         pitchFx.process(src, scratch[next], n, follower.follow(src, n, rp.pitchFx, rp.follower));
         const float sideValue[kSides] = {follower.drive(), shiftSignal(pitchFx.shiftSemis())};
@@ -819,7 +814,6 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         }
         src = scratch[next];
         next ^= 1;
-        if (rp.bloomOn) std::memcpy(bloomSrc, src, sizeof(float) * static_cast<size_t>(n));
       }
       if (rp.crowdOn) {
         crowd.process(src, scratch[next], n, rp.crowd, pitchFx);
@@ -857,7 +851,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         next ^= 1;
       }
       if (rp.bloomOn) {
-        bloom.process(src, bloomSrc, scratch[next], n, rp.bloom, inGate.open());
+        bloom.process(src, scratch[next], n, rp.bloom, inGate.open());
         src = scratch[next];
         next ^= 1;
       }

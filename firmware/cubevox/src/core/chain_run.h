@@ -34,30 +34,9 @@ struct ChainEngines {
   cv::RingMod ringMod;  // reads the tracker that `pitch` runs
   cv::Strings strings;  // the Sympath card: two banks of eight delay lines and its tracker, in D1 with the rest
 
-  // The signal the Chatter card cuts its slices from. captureBloomSource copies the block leaving the
-  // tap slot into `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch
-  // call to copy the stage's output there ahead of its own voices. The card reads its own input while
-  // neither is set.
-  std::array<float, cv::kBlock> bloomSrc{};
-  bool bloomSrcLive = false;
-  bool bloomLead = false;
-
   cv::PolishComp comp;
   cv::Polish polish;
 };
-
-// Copies the `n` samples of `block` into the Chatter card's source buffer and marks the buffer live.
-void captureBloomSource(ChainEngines& engines, const float* block, int n);
-
-// Where the Chatter card's slices come from: the slot whose output is copied, and whether the layout
-// places an Autotune, Octave or Formant card or the Formant follower. The slot is the last one holding such a card, or slot 1
-// when the layout has none. It is -1 when the layout places no Chatter card or places it at or ahead of
-// that slot, and the card then cuts from its own input.
-struct BloomTap {
-  int slot;
-  bool pitchCard;
-};
-BloomTap bloomTap(const Layout& layout);
 
 // Clears the state of engine `e`. Empty (kNoEngine) clears nothing. The pitch engine's reset clears
 // the Formant follower's envelope too.
@@ -80,7 +59,7 @@ struct ChainCycles {
 // A Crowd card that makes that call runs its own engine on the pitch stage's output, which is its
 // lead, and so does a Growl card. A Chatter card keys on the Input gate's detector when the layout places that card
 // (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when it runs.
-// It cuts its slices from `engines.bloomSrc` while `bloomSrcLive` is set, and from `in` otherwise.
+// It cuts its slices from `in`, the block leaving the slot ahead of it.
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
               bool& pitchDone);
 
@@ -155,9 +134,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
 // COMP and both EQ halves run always, and each is a bit-exact copy once settled off. `a` holds
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
-// block. A layout that places the Chatter card after its tap slot (`bloomTap`) has the block leaving
-// that slot copied for its slices, and no copy is made otherwise. Returns false when a slot produced a NaN,
-// an infinity or a sample past the guard's bound. The block was then silenced before the polish stages, so the
+// block. Returns false when a slot produced a NaN, an infinity or a sample past the guard's bound. The block was then silenced before the polish stages, so the
 // caller cuts the output and clears the engines, POLISH COMP and POLISH EQ.
 template <typename Clock>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
@@ -165,9 +142,6 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
   const ChainParams& p = snap.params;
   float* const result = a;
   bool pitchDone = false;
-  const BloomTap tap = n <= cv::kBlock ? bloomTap(snap.layout) : BloomTap{-1, false};
-  engines.bloomSrcLive = false;
-  engines.bloomLead = tap.slot >= 0 && tap.pitchCard;
   const uint32_t frontStart = cycleClock();
   engines.polish.processFront(a, a, n, p.eq);
   const uint32_t frontCycles = cycleClock() - frontStart;
@@ -176,10 +150,7 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
     const bool wrote = runSlot(engines, fades, s, snap, a, b, n, pitchDone);
     cycles.slot[static_cast<size_t>(s)] = cycleClock() - start;
     if (wrote) std::swap(a, b);
-    if (s == tap.slot && !engines.bloomSrcLive) captureBloomSource(engines, a, n);
   }
-  engines.bloomSrcLive = false;
-  engines.bloomLead = false;
   const bool finite = guardBlock(a, n);
   const uint32_t compStart = cycleClock();
   engines.comp.process(a, b, n, p.comp);

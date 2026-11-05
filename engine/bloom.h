@@ -87,13 +87,14 @@ class Bloom {
     prepared_ = false;
   }
 
-  // Cuts its slices from `in`, as a Chatter card with nothing ahead of it in the chain does.
+  // Cuts its slices from `in`, which is also the dry path. The chain calls this form.
   void process(const float* in, float* out, int n, const BloomParams& p, bool keyOpen = false) {
     process(in, in, out, n, p, keyOpen);
   }
 
-  // `in` is the dry path and the own key's input. `src` is the signal the slices are cut from, the
-  // same block time-aligned with `in`. `keyOpen` is the Input gate's detector state for this call and
+  // `in` is the dry path and the own key's input. `src` is the signal the slices are cut from, time-aligned
+  // with `in`. Only bloom_test calls this form, to drive the dry and the slices apart.
+  // `keyOpen` is the Input gate's detector state for this call and
   // counts only when `p.keyFromGate` is set. Any n; `out` may be `in`.
   void process(const float* in, const float* src, float* out, int n, const BloomParams& p, bool keyOpen = false) {
     const float lengthMs = clampf(p.lengthMs, kLengthMinMs, kLengthMaxMs);

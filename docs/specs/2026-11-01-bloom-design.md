@@ -169,10 +169,11 @@ knob named LINGER.
 3. Overlap. A new word no longer cuts the old tail. The old tail keeps its slices and its own fade
    and closes on its own, while the new word starts its own loop. At most two run at once: a third
    word fades the oldest tail out over 20 ms.
-4. Source. Bloom cuts its slices from the chain after the pitch stage: the signal leaving the last
-   slot that holds Autotune, Octave or Formant, before Mob, Unison, Echo and Distortion. A layout
-   with none of those cuts after slot 1. The dry path is still slot 7's own input; the loops add to
-   it. The word key stays the Input gate's.
+4. Source (owner 2026-11-05, chain order). Bloom cuts its slices from its own input, the block
+   leaving the slot ahead of it, so the slices carry Mob, Unison, Echo, Distortion and every other
+   card ahead of it. The dry path is the same input; the loops add to it. The word key stays the
+   Input gate's. The owner's 2026-11-01 ask, a source from after Octave and not from Mob, gave way to
+   the chain-order rule. The chain makes no copy of any block for the card.
 5. Memory. Eight float slices of 80 ms, 122,880 B, in D1 SRAM (two tails of four).
 6. Age limit (owner 2026-11-01: "bloom should keep replaying grains for a maximum of 2.5 seconds
    because if it gets stuck on a grain and nothing ever triggers a new grain, it will continue
@@ -213,14 +214,14 @@ knob named LINGER.
 
 ## 14. Chatter, the middle ground (owner 2026-11-01)
 
-Owner, after hearing v2.00.99 against the first build: keep the clean source; bring back the
-variable slice length; the tail repeats one slice; tail length as it is; some dirt back in, from
-Bloom's own clipper (option B, not slot 7's input, which carries Mob and Echo); "this effect should
-be called CHATTER". This section overrides sections 13 items 2, 3 and 7 where they differ.
+Owner, after hearing v2.00.99 against the first build: bring back the variable slice length; the
+tail repeats one slice; tail length as it is; some dirt back in, from Bloom's own clipper (option
+B); "this effect should be called CHATTER". This section overrides sections 13 items 2, 3 and 7
+where they differ.
 
 1. Name. Display name `Chatter`, menu value `CHATTER`, emulator switch `CHATTER`. The code id
    stays `bloom` so saved layouts load; the engine keeps its file and class names.
-2. Source. Unchanged from section 13 item 4: slices from after the pitch stage.
+2. Source. Unchanged from section 13 item 4: slices from the card's own input.
 3. Slice length follows AMOUNT again: 80 ms at AMOUNT 0 to 45 ms at 100 %, linear, LINGER's 0.8 cap
    and the 35 ms floor kept. AMOUNT also sets the loudness, 0.70 · AMOUNT^0.6 as now, so the knob
    runs from quiet and long to loud and choppy. The 62.5 ms beat match holds only where the law

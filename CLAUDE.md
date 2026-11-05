@@ -7,6 +7,10 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
 
 ## Rules
 - Engine and emulator rules live in `engine/CLAUDE.md` and `emulator/CLAUDE.md`.
+- Chain order (owner 2026-11-05): every effect takes its input from the effect before it, in
+  slot order, in every layout and at every knob setting. No card builds its output from audio
+  tapped earlier in the chain (the pitch stage's ring, another slot's output), and no card's work
+  runs in another card's slot ahead of the cards between them.
 - Level rule (owner 2026-10-01): every stage engaged at its default setting outputs
   near unity, 0 to +0.5 dB RMS over its input on program material. The trim that
   gets a stage there lives in its tuning (wetDb / trimDb); the panel knobs never
