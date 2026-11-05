@@ -11,10 +11,10 @@
 #include "engine/fastmath.h"
 #include "engine/formant_voice.h"
 #include "engine/pitch.h"
-#include "engine/pitch_fx.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
 #include "engine/syllable_sweep.h"
+#include "engine/upstream_pitch.h"
 
 // The Growl card, the gross monster voice of SOPHIE's "Whole New World". Three parts run in a row, and
 // an equal-power MIX crossfades the result against the card's input. At MIX 100 % the dry signal is gone.
@@ -27,22 +27,23 @@
 //    5 st down at rest. The ring holds what reaches the slot, so Autotune, Octave, Formant, Unison, Echo
 //    and any other stage ahead of the card are in the growl, at every MIX.
 //
-//    The grains sit on a period grid whose period is the one the slot's input carries. That is the
-//    tracker's period divided by 2^(shift / 12), where the shift (`PitchFx::outputShiftSemis`) is
-//    Autotune's correction. While the Octave voice holds at least half the pitch stage's output power
-//    (its MIX at 50 % or over), the shift is the voice's glided interval instead, SEMITONES plus the
-//    correction. A SEMITONES move follows Octave's own 15 ms glide, and the shift steps when MIX crosses
-//    50 %. Formant moves no pitch, and the Unison and Echo copies sit at the voice's pitch, so none of
-//    them changes the shift.
+//    The grains sit on a period grid whose period is the one the slot's input carries. With an Autotune
+//    card ahead, the card reads Autotune's tracker, and the chain hands it the shift the slots between put
+//    on the pitch (`UpstreamPitch`): the period is the tracker's divided by 2^(shift / 12). The shift is
+//    Autotune's correction, plus the Octave card's glided SEMITONES while its voice holds at least half
+//    the card's output power (its MIX at 50 % or over). A SEMITONES move follows Octave's own 15 ms glide,
+//    and the shift steps when MIX crosses 50 %. Formant moves no pitch, and the Unison and Echo copies sit
+//    at the voice's pitch, so none of them changes the shift. With no Autotune ahead, the card runs a
+//    tracker of its own (coarse search) on its own ring, and the shift is 0.
 //
 //    The voice reads the ring at a lag that puts its read point where the tracker's frame stands. That
-//    is the grain delay plus a period behind the pitch stage's input, less the delay the stage already put
-//    on the audio (`PitchFx::outputLatency`). Autotune and Formant delay it by the grain delay plus a
-//    period, and Octave by half its grain window. The lag never drops under the voice's floor of 1.5
-//    periods and a pad, which a grain centred on a mark needs ahead of its read. With nothing ahead the
-//    lag is the grain delay plus a period, and with Autotune ahead it is the floor.
+//    is the grain delay plus a period behind the audio the tracker heard, less the delay the slots
+//    between have put on it (`UpstreamPitch::latency`). Autotune and Formant delay it by the grain delay
+//    plus a period, and Octave by half its grain window. The lag never drops under the voice's floor of
+//    1.5 periods and a pad, which a grain centred on a mark needs ahead of its read. With nothing ahead
+//    the lag is the grain delay plus a period, and with Autotune ahead it is the floor.
 //
-//    The throat moves with each syllable. The syllable sweep (`syllable_sweep.h`, Yawn's law) reads the
+//    The throat moves with each syllable. The syllable sweep (`syllable_sweep.h`, Apraxia's law) reads the
 //    card's input, and throatSt is formantSt plus the sweep times throatDropTop times GROWL. At GROWL 100 %
 //    a syllable drops the throat from 5 st down to 12 st down, and it returns over DECAY while the note
 //    holds. At GROWL 0 the throat stays at formantSt. The throat reaches the voice through the 20 ms glide
@@ -138,12 +139,8 @@ constexpr float kMaxTrimDb = 24.0f;
 constexpr float kMinRailSoft = 0.01f;
 constexpr float kMaxRailAsym = 0.5f;
 
-// The card's ring. The longest lag is the grain delay plus the tracker's longest period. A launch reads up
-// to a period past the lag, a grain that plays at half speed drifts a further two periods back
-// ((1 - rate) of its four-period length), and the voice keeps a call's samples and a pad ahead of the far
-// end.
-constexpr int kMaxPeriodSmp = PitchTracker::kMaxPeriod;
-constexpr int kRingLen = PsolaVoice::kGrainDelay + 4 * kMaxPeriodSmp + kBlock + 4;
+// The card's ring.
+constexpr int kRingLen = formant_detail::kGrainRingLen;
 using GrowlVoice = formant_detail::FormantPsolaVoiceT<kRingLen>;
 using GrowlRing = GrowlVoice::Ring;
 
@@ -154,8 +151,7 @@ constexpr int kRestClearFloats = 256;
 constexpr float kFadeMs = 20.0f;
 constexpr float kFadeStep = 1.0f / (kFadeMs * kSmpPerMs);
 
-// The most the dry's delay moves per sample, 0.5 % of a sample, which bends the dry's pitch by 9 cents.
-constexpr float kDryLagSlew = 0.005f;
+constexpr float kDryLagSlew = formant_detail::kDryLagSlew;
 
 // GROWL where the third-of-pitch wave starts to blend in.
 constexpr float kThirdFrom = 0.5f;
@@ -309,6 +305,7 @@ class Growl {
  public:
   Growl() {
     voice_.latchGain(true);
+    tracker_.readOutOfRange(false);
     reset();
   }
 
@@ -317,6 +314,7 @@ class Growl {
   void reset() {
     clearRing(growl_detail::kRingLen);
     head_ = 0;
+    tracker_.reset();
     voice_.reset();
     fold_.clear();
     hp_.clear();
@@ -349,25 +347,32 @@ class Growl {
   void rest() { clearRing(growl_detail::kRestClearFloats); }
 
   // in is this slot's input, which the card writes to its ring ahead of its voice and the dry side of
-  // MIX. pitch has already run this block. It gives the tracker's period, the shift and the delay the
-  // stages ahead of this slot have put on the pitch. Off and settled, out equals in bit for bit. in
-  // and out may be the same buffer.
-  void process(const float* in, float* out, int n, const GrowlParams& p, const PitchFx& pitch) {
-    const PitchResult& pr = pitch.pitch();
+  // MIX. `up` names Autotune's tracker, which has already run this block, and the shift and the delay the
+  // slots between Autotune and this one have put on the pitch. With no Autotune ahead (`up.result` null)
+  // the card runs a tracker of its own on its ring, one block at a time. Off and settled, out equals in
+  // bit for bit. in and out may be the same buffer.
+  void process(const float* in, float* out, int n, const GrowlParams& p, const UpstreamPitch& up = UpstreamPitch{}) {
+    const bool own = up.result == nullptr;
+    if (own && n > kBlock) {
+      for (int at = 0; at < n; at += kBlock) process(in + at, out + at, n - at < kBlock ? n - at : kBlock, p, up);
+      return;
+    }
+    const int ownFirst = own ? trackOwn(in, n, p) : 0;
+    const PitchResult& pr = own ? tracker_.result() : *up.result;
     if (pr.period > 0.0f) heldPeriod_ = pr.period;
     const float wetTarget = p.on && heldPeriod_ > 0.0f ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
-      writeRing(in, n);
+      if (!own) writeRing(in, n);
       passThrough(in, out, n);
       return;
     }
     idle_ = false;
     applyTuning(p.tuning);
-    const Call c = beginCall(p, pitch, in, n, wetTarget);
+    const Call c = beginCall(p, pr, own ? 0.0f : up.shiftSemis, own ? 0.0f : up.latency, in, n, wetTarget);
     for (int at = 0; at < n; at += kBlock) {
       const int m = n - at < kBlock ? n - at : kBlock;
-      const int first = head_;
-      writeRing(in + at, m);
+      const int first = own ? ownFirst : head_;
+      if (!own) writeRing(in + at, m);
       buf_.fill(0.0f);
       voice_.render(ring_, first, m, buf_.data());
       raspChunk(c, at, m);
@@ -440,6 +445,19 @@ class Growl {
     bool fold = false;   // DRIVE sits above 0 somewhere in the call
   };
 
+  // With no Autotune ahead: writes the call into the ring and feeds it to the card's own tracker, the
+  // coarse search, while the card is on or fading. Returns the ring index of the call's first sample.
+  int trackOwn(const float* in, int n, const GrowlParams& p) {
+    const int first = head_;
+    writeRing(in, n);
+    if (p.on || wet_ > 0.0f) {
+      tracker_.push(in, n, true, false, PitchTracker::History{ring_.data(), growl_detail::kRingLen, first});
+    } else {
+      tracker_.idle(n);
+    }
+    return first;
+  }
+
   void passThrough(const float* in, float* out, int n) {
     if (!idle_) {
       voice_.reset();
@@ -468,9 +486,9 @@ class Growl {
 
   // Steps the knobs, the sweep, the fades and the wave's rate, prepares the voice and settles the call's
   // gains. `in` is read here, before the call writes its output.
-  Call beginCall(const GrowlParams& p, const PitchFx& pitch, const float* in, int n, float wetTarget) {
+  Call beginCall(const GrowlParams& p, const PitchResult& pr, float shift, float latency, const float* in, int n,
+                 float wetTarget) {
     const GrowlTuning& t = tuning_;
-    const PitchResult& pr = pitch.pitch();
     const float a = smoothCoefFor(n);
     const float growlKnob = smooth::clamp01(p.growl);
     const float driveKnob = smooth::clamp01(p.drive);
@@ -486,7 +504,7 @@ class Growl {
     const float ramp = growl_detail::kFadeStep * static_cast<float>(n);
     Call c;
     c.wet0 = wet_;
-    wet_ = toward(wet_, wetTarget, ramp);
+    wet_ = smooth::toward(wet_, wetTarget, ramp);
     c.wetStep = (wet_ - c.wet0) * inv;
 
     // GROWL glides, and with the sweep it sets the throat, which glides on to the voice.
@@ -498,15 +516,14 @@ class Growl {
     throatTarget_ = clampf(rest + sweep * dropTop * growl_, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     throat_ = first ? throatTarget_ : smooth::step(throat_, throatTarget_, a);
 
-    // The voice, and the wave's rate while the tracker hears a pitch. The ring holds the pitch stage's
-    // output, which sits `shift` above the tracker's pitch, so the voice's period is the tracker's
-    // divided by that ratio and its pitch ratio is the drop alone. The read point stands where the
-    // tracker's frame does, less the delay the stage put on the audio.
-    const float shift = pitch.outputShiftSemis();
+    // The voice, and the wave's rate while the tracker hears a pitch. The ring holds audio that sits
+    // `shift` above the tracker's pitch, so the voice's period is the tracker's divided by that ratio and
+    // its pitch ratio is the drop alone. The read point stands where the tracker's frame does, less the
+    // delay the slots ahead put on the audio.
     const float up = shift == 0.0f ? 1.0f : exp2Fast(shift * (1.0f / 12.0f));
     const float period = heldPeriod_ / up;
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
-    const float aligned = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_) - pitch.outputLatency();
+    const float aligned = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(heldPeriod_) - latency;
     const float voiceLag = formant_detail::clampLag<growl_detail::kRingLen>(aligned, period);
     pitchRatio_ = exp2Fast(drop * (1.0f / 12.0f));
     voice_.anchorPulse(exp2Fast(rest * (1.0f / 12.0f)));
@@ -514,7 +531,7 @@ class Growl {
 
     // The dry reads at the lag the voice plays at, sliding there from where it was.
     const float lag0 = dryLag_;
-    dryLag_ = first ? voiceLag : toward(dryLag_, voiceLag, growl_detail::kDryLagSlew * static_cast<float>(n));
+    dryLag_ = first ? voiceLag : smooth::toward(dryLag_, voiceLag, growl_detail::kDryLagSlew * static_cast<float>(n));
     c.lag0 = first ? dryLag_ : lag0;
     c.lagStep = (dryLag_ - c.lag0) * inv;
     if (pr.voiced && pr.period > 0.0f) {
@@ -523,7 +540,7 @@ class Growl {
 
     // The rasp: the depth fades with the pitch.
     const float fade0 = depthFade_;
-    depthFade_ = toward(depthFade_, pr.voiced ? 1.0f : 0.0f, ramp);
+    depthFade_ = smooth::toward(depthFade_, pr.voiced ? 1.0f : 0.0f, ramp);
     c.rasp0 = raspAt(growl0, fade0);
     const RaspGains r1 = raspAt(growl_, depthFade_);
     c.raspStep = {(r1.half - c.rasp0.half) * inv, (r1.third - c.rasp0.third) * inv, (r1.base - c.rasp0.base) * inv,
@@ -721,12 +738,6 @@ class Growl {
     }
   }
 
-  // x moved toward target by at most step; it lands on the target exactly.
-  static float toward(float x, float target, float step) {
-    if (x < target) return target - x <= step ? target : x + step;
-    return x - target <= step ? target : x - step;
-  }
-
   // The 20 ms one-pole's coefficient for one step over n samples, kept for the last n.
   float smoothCoefFor(int n) {
     if (n != coefN_) {
@@ -736,6 +747,7 @@ class Growl {
     return coef_;
   }
 
+  PitchTracker tracker_;            // the card's own, for a card with no Autotune ahead
   growl_detail::GrowlRing ring_{};  // the card's input, newest at head_ - 1
   int head_ = 0;                    // where the next sample goes
   int ringZero_ = growl_detail::kRingLen;  // the ring is known zero up to this index; a write drops it to 0

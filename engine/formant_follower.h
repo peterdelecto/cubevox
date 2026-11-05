@@ -4,22 +4,23 @@
 
 #include "engine/common.h"
 #include "engine/dsp.h"
-#include "engine/pitch_fx.h"
+#include "engine/formant_params.h"
 #include "engine/smooth.h"
 #include "engine/syllable_sweep.h"
 
-// Yawn: the throat drops on every syllable. The card moves the Formant voice's SHIFT with the singing,
+// Apraxia: the throat drops on every syllable. The card moves the Formant voice's SHIFT with the singing,
 // the way an envelope-filter pedal moves its filter with the pluck. The pitch stays where it is. The card
-// drives the Formant voice inside PitchFx with its MIX pinned at 1, so the output is the shifted voice
-// alone at the Formant card's trim.
+// drives the Formant engine with its MIX pinned at 1, so the output is the shifted voice alone at the
+// Formant card's trim.
 //
-// The syllable sweep (`syllable_sweep.h`) reads each block of the card's input. SHIFT is RANGE times the
-// sweep. RANGE runs from -12 st at the pot's bottom through 0 at noon to +6 st at its top, so a sweep
-// moves the throat down below noon and up above it.
+// The syllable sweep (`syllable_sweep.h`) reads each block of the card's input, the block the slot ahead
+// hands it. SHIFT is RANGE times the sweep. RANGE runs from -12 st at the pot's bottom through 0 at noon
+// to +6 st at its top, so a sweep moves the throat down below noon and up above it.
 //
-// PitchFx takes SHIFT in whole semitones and glides it through its own 20 ms one-pole, the only smoothing
-// SHIFT gets. Each call hands it the wanted SHIFT plus what the last call's rounding left over, rounded.
-// The whole semitones then average to the wanted SHIFT, and the stage's glide smooths their steps.
+// The Formant engine takes SHIFT in whole semitones and glides it through its own 20 ms one-pole, the only
+// smoothing SHIFT gets. Each call hands it the wanted SHIFT plus what the last call's rounding left over,
+// rounded. The whole semitones then average to the wanted SHIFT, and the engine's glide smooths their
+// steps.
 
 namespace cv {
 
@@ -55,13 +56,14 @@ class FormantFollower {
     last_ = 0.0f;
   }
 
-  // The pitch stage's parameters for one call of n samples from `in`. With the card placed they are `p`
-  // with the Formant voice's SHIFT taken from the sweep and its MIX at 1; otherwise they are `p` itself.
-  const PitchFxParams& follow(const float* in, int n, const PitchFxParams& p, const FormantFollowerParams& f) {
+  // The Formant engine's parameters for one call of n samples from `in`, the input of the slot that runs
+  // it. With the card placed they are `p` with the voice's SHIFT taken from the sweep and its MIX at 1;
+  // otherwise they are `p` itself.
+  const FormantParams& follow(const float* in, int n, const FormantParams& p, const FormantFollowerParams& f) {
     if (!f.placed) return p;
     params_ = p;
-    params_.formant.shiftSt = shiftFor(in, n, f);
-    params_.formant.mix = 1.0f;
+    params_.shiftSt = shiftFor(in, n, f);
+    params_.mix = 1.0f;
     return params_;
   }
 
@@ -95,7 +97,7 @@ class FormantFollower {
   SyllableSweep sweep_;
   float residue_ = 0.0f;  // what the last call's rounding left over, in semitones
   float last_ = 0.0f;     // the last SHIFT handed out
-  PitchFxParams params_;  // the copy follow() hands the stage
+  FormantParams params_;  // the copy follow() hands the engine
 };
 
 }  // namespace cv

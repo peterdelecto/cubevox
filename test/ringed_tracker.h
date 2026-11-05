@@ -1,8 +1,8 @@
 #pragma once
 
-// A PitchTracker with the ring it reads, for the tests that run a tracker without a PitchFx. The
+// A PitchTracker with the ring it reads, for the tests that run a tracker without a card's engine. The
 // tracker's fine pass reads the caller's ring, so each push writes the call into the ring first, as
-// PitchFx does.
+// the engines do.
 
 #include <vector>
 

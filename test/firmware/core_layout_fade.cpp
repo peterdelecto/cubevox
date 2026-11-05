@@ -258,7 +258,8 @@ void checkEnginesToReset() {
   Layout swapped = base;
   swapped.card[1] = Card::Octave;
   swapped.card[2] = Card::Autotune;
-  check(enginesToReset(base, swapped) == bit(Engine::Pitch), "reset: swapping the two pitch cards resets the pitch engine once");
+  check(enginesToReset(base, swapped) == (bit(Engine::Autotune) | bit(Engine::Octave)),
+        "reset: swapping Autotune and Octave resets each engine once");
 
   Layout chasm = base;
   chasm.card[7] = Card::ReverbChasm;
@@ -273,12 +274,12 @@ void checkEnginesToReset() {
 
   Layout empty = base;
   empty.card[2] = Card::Empty;
-  check(enginesToReset(base, empty) == bit(Engine::Pitch), "reset: a card leaving a slot resets its engine");
+  check(enginesToReset(base, empty) == bit(Engine::Octave), "reset: a card leaving a slot resets its engine");
   check(enginesToReset(empty, empty) == 0 && enginesToReset(Layout{{}}, Layout{{}}) == 0, "reset: empty slots reset nothing");
 }
 
-// The slot 7 choices: Gate and the incoming card's engine reset, and no other. Formant shares the
-// pitch engine with Octave, so the Octave to Formant swap in slot 3 clears the pitch stage once.
+// The slot 7 choices: Gate and the incoming card's engine reset, and no other. The Octave to Formant swap in
+// slot 3 resets both engines, and Formant to Apraxia, which share the Formant engine, resets it once.
 void checkEnginesToResetAtSlot7() {
   const Layout base = defaultLayout();
   auto bit = [](Engine e) { return 1u << static_cast<int>(e); };
@@ -288,8 +289,12 @@ void checkEnginesToResetAtSlot7() {
   lofi.card[6] = Card::Lofi;
   Layout bloom = base;
   bloom.card[6] = Card::Bloom;
-  check(enginesToReset(base, formant) == bit(Engine::Pitch),
-        "reset: Octave to Formant in slot 3 resets the pitch engine, which both cards share");
+  Layout apraxia = base;
+  apraxia.card[2] = Card::FormantFollower;
+  check(enginesToReset(base, formant) == (bit(Engine::Octave) | bit(Engine::Formant)),
+        "reset: Octave to Formant in slot 3 resets the Octave and Formant engines");
+  check(enginesToReset(formant, apraxia) == bit(Engine::Formant),
+        "reset: Formant to Apraxia in slot 3 resets the Formant engine once, which both cards share");
   check(enginesToReset(base, lofi) == (bit(Engine::Gate) | bit(Engine::Lofi)) &&
             enginesToReset(base, bloom) == (bit(Engine::Gate) | bit(Engine::Bloom)) &&
             enginesToReset(lofi, bloom) == (bit(Engine::Lofi) | bit(Engine::Bloom)),

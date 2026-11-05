@@ -38,8 +38,9 @@
   newlib-nano's versions are byte loops at about 5 cycles a byte, so a `fill(0.0f)`, `std::copy` or struct
   copy that GCC turns into a call is fast. Keep the board's fastmem.cpp compiled with
   `no-tree-loop-distribute-patterns`, or its loops become calls to themselves. A clear the size of the pitch
-  ring (51 kB, about 10k to 26k cycles, 2 to 4 % of a 640k-cycle block) is still spread: `PitchFx::rest()`
-  clears a slice a block while the stage is stopped, so `reset()` at the switch-on finds it clear.
+  ring (51 kB, about 10k to 26k cycles, 2 to 4 % of a 640k-cycle block) is still spread: `InputRing::rest()`
+  clears 512 floats a block while a card's slot is stopped (`AutotuneFx`, `OctaveFx`, `FormantFx`, `Crowd`,
+  `Growl`), so the `reset()` at the switch-on finds the ring clear.
   `zeroFloats` clears at the same speed and remains for its callers. `pitch_spikes_test` holds both.
 - The onset estimate's 48 kHz refinement walks downhill from the coarse period and sums at most
   `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's.
@@ -55,22 +56,30 @@
   `Spring::run`, so check the M7 listing for a call to it after any change there.
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
-- `PitchFx` lives in DTCM: 61,468 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
-  Formant voice included; the 265.75 ms input ring is 51,024 B of it, sized in `psola.h` for the
-  Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
-  scatter and the longest grain. `Distortion` sits there too (2,888 B: its filters, the rail histories
-  and the block scratch), and so does `Unison` (10,216 B, mostly its 50 ms line). The build
-  prints DTCM at 74,624 B, 57.0 %, 56,192 B free.
+- Each pitch card runs its own engine on the block the slot ahead hands it, with a ring of that input
+  (`engine/input_ring.h`): `AutotuneFx` (ring 2,176 floats, the tracker, the corrected voice), `OctaveFx` (3,920
+  floats), `FormantFx` (3,852 floats and a tracker of its own, for Formant and Apraxia). `Crowd` keeps a 51,024 B
+  ring of Autotune's input, written by the Autotune slot, and `Growl` a 15,408 B ring. `AutotuneFx` and `OctaveFx`
+  sit in DTCM (the build prints the figure, 130,816 B `.dtcm_bss` region in `cubevox.ld`),
+  `FormantFx`, `Crowd` and `Growl` in D1 inside `gChain`. `Distortion` sits in DTCM too
+  (2,888 B: its filters, the rail histories and the block scratch), and so does `Unison` (10,216 B, mostly
+  its 50 ms line).
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
+- Autotune's tracker serves the Formant engine directly behind it (only Empty slots between) and any Crowd or
+  Growl card behind it. Anywhere else those cards run a tracker of their own on their own ring. The chain hands
+  the readers an `UpstreamPitch` (Autotune's tracker result, the shift the slots since have put on the pitch, the
+  delay they have put on the audio) and a `CrowdPitch`. Mob is the one exemption from the chain-order rule: it
+  reads Autotune's input, written into its ring by the Autotune slot.
 - The Growl card (Deepthroat) grows what reaches its slot. It keeps a ring of its own input, `growl_detail::kRingLen`
   samples (15,408 B, a plain global in D1 like Crowd, so DTCM is unchanged), and cuts its grains from that on a
-  `FormantPsolaVoiceT<kRingLen>`. The period it cuts on is the tracker's period divided by
-  `PitchFx::outputShiftSemis()` (Autotune's correction, or the Octave voice's interval when Octave holds half the
-  output's power), and its read lag is the tracker's alignment less `PitchFx::outputLatency()`. A stopped Growl slot
+  `FormantPsolaVoiceT<kRingLen>`. The period it cuts on is the tracker's period divided by the shift in
+  `UpstreamPitch` (Autotune's correction, or the Octave voice's interval when Octave holds half the output's
+  power), and its read lag is the tracker's alignment less the delay in `UpstreamPitch`. A stopped Growl slot
   calls `Growl::rest()` each block (`runSlot`), which clears 1 KB of the ring, so the reset at the switch-on finds it
-  clear. `growl_test` measures both stage accessors against the stage.
+  clear. `growl_test` measures both values against `OctaveFx` and `FormantFx`.
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
-  `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`
-  (`test/ringed_tracker.h`), which keeps a ring of its own.
+  `PitchTracker::push` runs (each engine writes its ring first). The tests use `RingedTracker`
+  (`test/ringed_tracker.h`), which keeps a ring of its own, and `PitchSeries` (`test/pitch_series.h`), which
+  runs Autotune, Formant and Octave in series as three adjacent slots.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

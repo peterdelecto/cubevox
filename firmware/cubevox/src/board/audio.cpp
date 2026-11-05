@@ -77,10 +77,13 @@ DMA_HandleTypeDef gDmaRx;
 DMA_Stream_TypeDef* txStream() { return DMA1_Stream0; }
 DMA_Stream_TypeDef* rxStream() { return DMA1_Stream1; }
 
-// Pitch stage state (61,420 B, 51,024 B of it the input ring) lives in DTCM. The section is NOLOAD and the static constructor ran
-// before audioInit() zeroes it, so audioInit() constructs the object again in place; a plain reset()
-// would leave the tracker's anti-alias coefficients, which only the constructor sets, zeroed.
-H7_DTCM_BSS cv::PitchFx gPitchFx;
+// The Autotune engine (18,132 B: its tracker, its 2,176-float ring and its voice) and the Octave engine
+// (16,048 B: its 3,920-float ring and its voice) live in DTCM, since the default layout runs both every block.
+// The section is NOLOAD and the static constructor ran before audioInit() zeroes it, so audioInit()
+// constructs each object again in place; a plain reset() would leave the tracker's anti-alias
+// coefficients, which only the constructor sets, zeroed.
+H7_DTCM_BSS cv::AutotuneFx gAutotuneFx;
+H7_DTCM_BSS cv::OctaveFx gOctaveFx;
 
 // Distortion's filters, histories and block scratch (2,888 B) live in DTCM too, and audioInit() constructs
 // the object again in place for the same reason.
@@ -90,7 +93,7 @@ H7_DTCM_BSS cv::Distortion gDistortion;
 H7_DTCM_BSS cv::Unison gUnison;
 
 // Engine objects, constructed in reset state.
-ChainEngines gChain{gPitchFx, gUnison, gDistortion};
+ChainEngines gChain{gAutotuneFx, gOctaveFx, gUnison, gDistortion};
 
 // Published snapshots alternate between two slots by sequence number, so the main loop only writes
 // the slot the interrupt does not read. The interrupt preempts the main loop and runs to completion,
@@ -548,7 +551,8 @@ bool checkMemoryAndClock() {
 // Puts the engines, the snapshots and the block counters in their start state.
 void resetAudioState() {
   h7_dtcm_bss_zero();
-  new (&gPitchFx) cv::PitchFx();
+  new (&gAutotuneFx) cv::AutotuneFx();
+  new (&gOctaveFx) cv::OctaveFx();
   new (&gDistortion) cv::Distortion();
   new (&gUnison) cv::Unison();
   new (&gSnapshots[0]) ChainSnapshot();  // in place: a snapshot is over a kilobyte, too big for the stack

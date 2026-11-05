@@ -13,9 +13,9 @@
 
 // Octave: one voice a fixed number of semitones from the input, by an asynchronous granular
 // shifter. Two taps ride a shared sawtooth over a fixed window and are Hann-crossfaded, so no pitch
-// tracker is involved and the formants move with the pitch. PitchFx owns the ring and the mix, and
-// its Octave fade is the only fade on the toggle. The voice's output passes a 5 Hz DC blocker
-// before the mix, so the dry path is untouched.
+// tracker is involved and the formants move with the pitch. OctaveFx owns the ring and the mix, and
+// its fade is the only fade on the toggle. The voice's output passes a 5 Hz DC blocker before the mix,
+// so the dry path is untouched.
 
 namespace cv {
 
@@ -35,34 +35,27 @@ struct OctaveParams {
   OctaveTuning tuning;
 };
 
-// Autotune's correction reaches the voice through its own 2 ms one-pole. The correction steps every
-// block, and the 15 ms glide of the SEMITONES step would hold the voice about half a vibrato cycle
-// behind the tuned note; 2 ms follows it and smooths the 64-sample staircase it arrives in.
-constexpr float kOctaveCorrSec = 0.002f;
-inline const float kOctaveCorrCoef = smooth::coef(kOctaveCorrSec);
-inline const float kOctaveCorrDecay = powf(1.0f - kOctaveCorrCoef, static_cast<float>(kBlock));
-
-class OctaveVoice {
+// The ring length is a template argument, the Mob card's ring by default.
+template <int RingLen = kVoiceRingLen>
+class OctaveVoiceT {
  public:
+  using Ring = std::array<float, static_cast<size_t>(RingLen)>;
+
   static constexpr int kMaxSemis = 12;
   static constexpr float kMinWindowMs = 20.0f;
   static constexpr float kMaxWindowMs = 80.0f;
 
-  void reset() { *this = OctaveVoice{}; }
+  void reset() { *this = OctaveVoiceT{}; }
 
-  // Called once per block before rendering. Returns true if the stage is on. corr is Autotune's
-  // correction in semitones. libm runs only when the glide time moved.
-  bool prepare(const OctaveParams& p, float corr) {
+  // Called once per block before rendering. Returns true if the stage is on. libm runs only when the
+  // glide time moved.
+  bool prepare(const OctaveParams& p) {
     const int s = p.semitones < -kMaxSemis ? -kMaxSemis : (p.semitones > kMaxSemis ? kMaxSemis : p.semitones);
     const OctaveTuning& t = p.tuning;
     semisT_ = static_cast<float>(s);
-    corrT_ = corr;
     level_.set(t.trimDb);
     // A voice that is not running jumps to its new interval instead of gliding in from a stale one.
-    if (idle_) {
-      semis_ = semisT_;
-      corr_ = corrT_;
-    }
+    if (idle_) semis_ = semisT_;
     // Digital silence leaves the blocker resting on a subnormal.
     if (fabsf(dc_.y) < kDcRest) dc_.y = 0.0f;
     if (t.glideMs != glideMs_) {
@@ -79,9 +72,8 @@ class OctaveVoice {
   // True from a reset or a park until the next render: the voice holds no state worth keeping.
   bool idle() const { return idle_; }
 
-  // The interval the voice plays at in semitones: the SEMITONES step after its glide plus Autotune's
-  // correction after its own one-pole.
-  float intervalSemis() const { return semis_ + corr_; }
+  // The interval the voice plays at in semitones: the SEMITONES step after its glide.
+  float intervalSemis() const { return semis_; }
 
   // The mean delay of the voice's output behind its input, in samples. A tap's delay sweeps from
   // kMinDelay across the grain window, and the two taps' Hann weights make the weighted mean half the
@@ -92,7 +84,6 @@ class OctaveVoice {
   // the voice picks up in step when it is heard again.
   void park() {
     semis_ = semisT_;
-    corr_ = corrT_;
     dc_.clear();
     idle_ = true;
   }
@@ -101,7 +92,7 @@ class OctaveVoice {
   // from ring index head0, and the voice reads only older samples. Two taps share one 32-bit
   // sawtooth counter and one Hann rotor, with delays in Q18 samples. A tap at ratio r drifts
   // (1 - r) samples of delay per sample, and the sawtooth is that drift normalised to the window.
-  void render(const VoiceRing& ring, int head0, int n, float* out) {
+  void render(const Ring& ring, int head0, int n, float* out) {
     idle_ = false;
     advanceInterval(n);
     const float step = (1.0f - rateMean_) * invWindow_;  // turns of sawtooth a sample
@@ -109,7 +100,7 @@ class OctaveVoice {
     HannRotor rot;
     rot.init(static_cast<float>(ph_) * (kTwoPi / kTurn32), kTwoPi * step);
     // A chunk that stays clear of the ring's seam needs no wrap tests.
-    if (head0 >= static_cast<int>(windowSmp_) + 8 && head0 + n <= kVoiceRingLen) {
+    if (head0 >= static_cast<int>(windowSmp_) + 8 && head0 + n <= RingLen) {
       renderLoop<false>(ring, head0, n, out, dp, rot);
     } else {
       renderLoop<true>(ring, head0, n, out, dp, rot);
@@ -124,22 +115,21 @@ class OctaveVoice {
   // readRing's four taps cost 3 samples of reach.
   static constexpr uint32_t kFracBits = 18;
   static constexpr uint32_t kFracMask = (1u << kFracBits) - 1;
-  static constexpr uint32_t kLenQ = static_cast<uint32_t>(kVoiceRingLen) << kFracBits;
+  static constexpr uint32_t kLenQ = static_cast<uint32_t>(RingLen) << kFracBits;
   static constexpr float kFracScale = 1.0f / static_cast<float>(1u << kFracBits);
   static constexpr float kReadReach = 3.0f;
-  static_assert((static_cast<uint64_t>(kVoiceRingLen) << kFracBits) < (uint64_t{1} << 32), "the ring overflows Q18");
-  static_assert(kMaxWindowMs * kSmpPerMs + kMinDelay + kReadReach < kVoiceRingLen, "grains would outrun the ring");
+  static_assert((static_cast<uint64_t>(RingLen) << kFracBits) < (uint64_t{1} << 32), "the ring overflows Q18");
+  static_assert(kMaxWindowMs * kSmpPerMs + kMinDelay + kReadReach < RingLen, "grains would outrun the ring");
 
   // NaN compares unequal to every value, so a cleared input recomputes on the next prepare().
   static constexpr float kUnset = std::numeric_limits<float>::quiet_NaN();
 
-  // exp2 of the interval over 12, recomputed only while the interval glides. The interval is the
-  // glided SEMITONES step and Autotune's smoothed correction.
+  // exp2 of the interval over 12, recomputed only while the interval glides. The interval is the glided
+  // SEMITONES step.
   void updateRatio() {
-    const float interval = semis_ + corr_;
-    if (interval == ratioSemis_) return;
-    ratio_ = exp2Fast(interval / 12.0f);
-    ratioSemis_ = interval;
+    if (semis_ == ratioSemis_) return;
+    ratio_ = exp2Fast(semis_ / 12.0f);
+    ratioSemis_ = semis_;
   }
 
   // x moved n samples toward target by a one-pole with coefficient a, whose block of kBlock samples
@@ -151,22 +141,21 @@ class OctaveVoice {
     return fabsf(target - x) < smooth::kSnap ? target : x;
   }
 
-  // Moves the interval n samples along its two glides and sets rateMean_ to the mean of the ratio at
-  // the two ends of the chunk, which is exact for a ratio that moves linearly.
+  // Moves the interval n samples along its glide and sets rateMean_ to the mean of the ratio at the two
+  // ends of the chunk, which is exact for a ratio that moves linearly.
   void advanceInterval(int n) {
     updateRatio();
     rateMean_ = ratio_;
-    if (semis_ == semisT_ && corr_ == corrT_) return;
+    if (semis_ == semisT_) return;
     const float r0 = ratio_;
     semis_ = glide(semis_, semisT_, aGlide_, glideDecay_, n);
-    corr_ = glide(corr_, corrT_, kOctaveCorrCoef, kOctaveCorrDecay, n);
     updateRatio();
     rateMean_ = 0.5f * (r0 + ratio_);
   }
 
   // Safe adds the wrap tests for a chunk near the ring's seam.
   template <bool Safe>
-  void renderLoop(const VoiceRing& ring, int head0, int n, float* out, int32_t dp, HannRotor rot) {
+  void renderLoop(const Ring& ring, int head0, int n, float* out, int32_t dp, HannRotor rot) {
     const float* r = ring.data();
     const uint32_t wq = static_cast<uint32_t>(windowSmp_ * static_cast<float>(1u << kFracBits));
     const uint32_t halfQ = wq >> 1;
@@ -209,7 +198,7 @@ class OctaveVoice {
   // Safe wraps a read that crosses the ring's seam.
   template <bool Safe>
   static CV_INLINE void readTaps(const float* r, uint32_t pos0, uint32_t pos1, float& x0, float& x1) {
-    constexpr uint32_t kReach = static_cast<uint32_t>(kVoiceRingLen - 3);
+    constexpr uint32_t kReach = static_cast<uint32_t>(RingLen - 3);
     const uint32_t i0 = pos0 >> kFracBits;
     const uint32_t i1 = pos1 >> kFracBits;
     const CatmullRomWeights w = catmullRomWeights(static_cast<float>(pos0 & kFracMask) * kFracScale);
@@ -226,7 +215,7 @@ class OctaveVoice {
 
   // The dot product of four taps at i0 - 1 .. i0 + 2 with the ring wrapping, for a read across its seam.
   static __attribute__((noinline)) float dotWrapped(const float* r, uint32_t i0, const CatmullRomWeights& w) {
-    const uint32_t len = static_cast<uint32_t>(kVoiceRingLen);
+    const uint32_t len = static_cast<uint32_t>(RingLen);
     const uint32_t im = i0 == 0 ? len - 1 : i0 - 1;
     const uint32_t i1 = i0 + 1 >= len ? i0 + 1 - len : i0 + 1;
     const uint32_t i2 = i0 + 2 >= len ? i0 + 2 - len : i0 + 2;
@@ -241,8 +230,6 @@ class OctaveVoice {
   uint32_t ph_ = 0;      // the sawtooth, 2^32 a turn
   float semis_ = 0.0f;   // the SEMITONES step after its glide
   float semisT_ = 0.0f;
-  float corr_ = 0.0f;    // Autotune's correction after its 2 ms one-pole
-  float corrT_ = 0.0f;
   float aGlide_ = 1.0f;
   float glideDecay_ = 0.0f;  // what the glide keeps over one block
   float glideMs_ = kUnset;   // the glide time aGlide_ came from
@@ -255,5 +242,7 @@ class OctaveVoice {
   DcBlocker dc_;
   bool idle_ = true;
 };
+
+using OctaveVoice = OctaveVoiceT<>;
 
 }  // namespace cv

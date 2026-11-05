@@ -160,6 +160,20 @@ CV_INLINE void sinCosFast(float x, float& s, float& c) {
   }
 }
 
+// sin and cos of a share of the quarter turn, share in [0, 1]. They land exactly on 0 and 1 at both
+// ends, which sinCosFast would miss by a hair. An equal-power crossfade takes its two gains from it.
+CV_INLINE void quarterTurn(float share, float& s, float& c) {
+  if (share <= 0.0f) {
+    s = 0.0f;
+    c = 1.0f;
+  } else if (share >= 1.0f) {
+    s = 1.0f;
+    c = 0.0f;
+  } else {
+    sinCosFast(share * kHalfPi, s, c);
+  }
+}
+
 // Seed of a Hann window by rotation: the cosine and sine of the phase (c, s) and of the per-sample
 // step (dc, ds). The caller turns (c, s) by (dc, ds) once a sample, one complex multiply in place of a
 // cosine, and the window is 0.5 - 0.5 * c. init() runs sinCosFast twice and no libm. The turn drifts

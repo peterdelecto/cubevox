@@ -10,9 +10,8 @@
 #include <cstdlib>
 #include <vector>
 
-#include "engine/pitch_fx.h"
-
 #include "alloc_guard.h"
+#include "pitch_series.h"
 #include "ringed_tracker.h"
 
 namespace {
@@ -36,13 +35,13 @@ std::vector<float> tone(double hz, int n) {
   return out;
 }
 
-// PitchFx::pitch() read after one block, stamped with the block's end sample.
+// The series' pitch() read after one block, stamped with the block's end sample.
 struct Hop {
   int end;
   cv::PitchResult r;
 };
 
-std::vector<float> run(cv::PitchFx& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
+std::vector<float> run(PitchSeries& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
                        std::vector<Hop>* hops = nullptr) {
   std::vector<float> out(in.size());
   if (hops) hops->reserve(in.size() / cv::kBlock + 1);
@@ -67,7 +66,7 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
   return ok;
 }
 
-static cv::PitchFx gFx;
+static PitchSeries gFx;
 
 cv::PitchFxParams octaveOnly(int semis) {
   cv::PitchFxParams p;

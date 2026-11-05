@@ -38,20 +38,19 @@
 // old Spring 13 % over its board figure (94.5k cycles a block against 83.4k) and the old Chasm 5 %
 // over.
 //
-// Octave alone: PitchFx with only Octave on costs 0.32 host us per block (2026-11-02, Adam's clips,
-// MIX 100 %, g++ 15 at -O2, host bench, minimum of 9 interleaved passes, +-0.02 us), which is 15.9k
-// board cycles, 2.5 %, at 50.4k. The same case at MIX 0, where the voice parks, costs 0.11 us (5.4k,
-// 0.9 %). That is the pitch stage's own work: the ring write, the per-sample mix and the crossfade
-// gains. The voice is the other 0.21 us (10.5k, 1.6 %), which kOctave holds rounded up. The M7
-// listing of the voice's loop is 65 instructions a sample, so the board may read lower. The pair
-// behind kAutotune and kTracker was measured as the whole slot with Autotune on, so a layout with
-// Autotune placed already carries the stage. Without Autotune, Octave and Formant pay it through
-// kPitchStage, once.
+// Octave alone: the engine with only Octave on costs 0.251 host us per block (2026-11-05, Adam's clips,
+// MIX 100 %, g++ 15 at -O2, host bench, minimum of 9 interleaved passes, +-0.02 us), which is 12.6k
+// board cycles, 2.0 %, at 50.4k: the ring write, the voice, the per-sample mix and the crossfade gains.
+// kOctave holds all of it, and a layout that places Octave pays no other term for it. The M7 listing of
+// the voice's loop is 65 instructions a sample, so the board may read lower. Every engine carries its own
+// mix, so no row charges for work another card does.
 //
-// A layout is accepted when both column sums over its cards, plus the fixed term, the shared tracker once
-// when Autotune, Crowd, Formant, Yawn or Deepthroat is placed, and kPitchStage once when Octave or Formant is placed
-// without Autotune, stay under their lines. The trailing comments give the measured cycles, mean
-// then worst; a row marked measured=false is an estimate until a board measures it.
+// A layout is accepted when both column sums over its cards, plus the fixed term and the trackers, stay
+// under their lines. Autotune pays one tracker. A Formant or Apraxia card directly behind it reads that
+// tracker, and so do the Mob and Deepthroat cards anywhere behind it. A Formant or Apraxia card anywhere
+// else, and a Mob or Deepthroat card with no Autotune ahead, pay a tracker of their own. The trailing
+// comments give the measured cycles, mean then worst; a row marked measured=false is an estimate until a
+// board measures it.
 
 #pragma once
 
@@ -72,8 +71,8 @@ constexpr Cost operator+(Cost a, Cost b) {
 
 constexpr Cost kEmpty{0, 0, true};
 constexpr Cost kInputGate{1, 3, true};     // 5.7k to 6.0k / 15.2k to 17.8k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 0.9 %, worst 2.4 to 2.8 %)
-constexpr Cost kAutotune{3, 5, false};     // est. the pair's host-scaled figure less kTracker: its voice, mix and fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
-constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-02, its own voice only: 0.21 host us a block on g++ 15 (Octave at MIX 100 % less the same case at MIX 0), 10.5k board cycles at 50.4k, rounded up; see "Octave alone"
+constexpr Cost kAutotune{3, 5, false};     // est. the pair's host-scaled figure less kTracker: its voice, its crossfade and the fine pass; see kTracker. The worst carries one extra point because the stress run of 2026-11-01 read the pitch slot (Autotune, Octave and tracker) at 16.5 to 16.8 % worst against the 16 % the rows summed to
+constexpr Cost kOctave{2, 2, false};       // est. from the host bench of 2026-11-05, the whole engine: 0.251 host us a block on g++ 15 (MIX 100 %), 12.6k board cycles at 50.4k, rounded up; see "Octave alone"
 constexpr Cost kUnison{2, 3, true};        // 10.5k / 13.7k to 15.7k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 1.6 %, worst 2.1 to 2.5 %)
 constexpr Cost kSlapback{1, 3, true};      // 2.7k to 2.9k / 13.5k to 13.8k, stress run 2026-11-02 (v2.01.11, all seven layouts, TIME and AMOUNT swept, ten toggle flips: mean 0.4 to 0.5 %, worst 2.1 to 2.15 %, lowest run worst per layout); the host bench estimate of 6.4k to 8.3k worst missed the block after an enable
 constexpr Cost kDistortion{4, 6, true};    // 24.1k to 24.2k / 32.8k to 33.0k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 3.8 %, worst 5.1 to 5.2 %)
@@ -81,8 +80,10 @@ constexpr Cost kGate{3, 4, true};          // 13.4k to 13.6k / 20.5k to 20.7k, s
 constexpr Cost kReverbSpring{6, 7, true};   // 33.4k to 33.7k / 38.3k to 40.5k, stress run 2026-11-02 (v2.01.11, the six Spring layouts, MIX swept: mean 5.2 to 5.3 %, worst 6.0 to 6.3 %, lowest run worst per layout); the M7 model read 35.3k / 39.3k
 constexpr Cost kReverbChasm{5, 6, true};    // 29.6k to 29.7k / 35.1k to 35.3k, stress run 2026-11-02 (v2.01.11, chasm and crowd-chasm layouts, MIX swept: mean 4.6 %, worst 5.5 %, lowest run worst per layout); the M7 model read 28.6k / 32.6k
 
-// The pitch tracker, its history fill and its coarse analysis, which Autotune, Crowd and Formant
-// share and a layout pays once. kTracker and kAutotune are one estimate split in two. The board
+// The pitch tracker, its history fill and its coarse analysis, which Autotune runs, and which the Formant
+// engine directly behind it, Crowd and Growl read. A layout pays one for Autotune's, and one more for each
+// Formant or Apraxia card not directly behind Autotune and each Mob or Deepthroat card with no Autotune
+// ahead, since those run a tracker of their own. kTracker and kAutotune are one estimate split in two. The board
 // measured the pair before the pitch CPU pass at 83.2k cycles for the mean block (13.0 %) and 131.9k
 // for the worst (20.6 %). The CPU pass scaled those to 48.8k (7.6 %) and 66.9k (10.5 %) by the host
 // ratio on Adam's clips with Autotune on at the defaults. The Autotune fix pass (2026-11-02, Adam's
@@ -105,15 +106,6 @@ constexpr Cost kReverbChasm{5, 6, true};    // 29.6k to 29.7k / 35.1k to 35.3k, 
 // 5 held here.
 constexpr Cost kTracker{4, 5, false};
 
-// The pitch stage's own work when Octave or Formant runs and Autotune is not placed, which no card row
-// holds. The term holds 4. Octave alone benches at 2.5 % (see "Octave alone"), so with kOctave's 2 the
-// rows charge a layout with Octave and no Autotune 6 points against it, and the stage itself benches
-// near 1. The held rows overcharge a layout with Octave or Formant and no Autotune by about 3 points
-// until a board run measures Formant, whose own row is also an estimate. The stage does not vary
-// block to block, so the worst equals the mean. The layout pays it once; with Autotune placed its rows
-// carry it.
-constexpr Cost kPitchStage{4, 4, false};
-
 // The eight-copy card. The stress run of 2026-11-02 (v2.01.11) read Crowd's slot in the crowd and
 // crowd-chasm layouts at 86.3k to 86.5k cycles mean (13.5 %), knobs at top, and 104.3k to 106.9k
 // worst (16.3 to 16.7 %, lowest run worst per layout) with the DIVERGE and VOICES sweeps, with no
@@ -123,17 +115,18 @@ constexpr Cost kPitchStage{4, 4, false};
 // engine/formant_voice.h, which Crowd shares.
 constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stress run 2026-11-02 (v2.01.11)
 
-// The Formant card and the Formant follower, alternates for Octave in slot 3, and the Lo-fi and Chatter
-// cards, alternates for Gate in slot 7. The follower pays the tracker and the pitch stage as Formant does. Formant's row is an estimate: the stress run reads it only together with the
-// tracker and the pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to 8.5 %,
-// 2026-11-02, v2.01.14, against the 11 / 13 the three rows sum to).
+// The Formant card and Apraxia, alternates for Octave in slot 3, and the Lo-fi and Chatter cards, alternates
+// for Gate in slot 7. Apraxia runs the Formant engine, so it pays the tracker as Formant does. The row holds
+// the voice, the base read and the mix. Formant's row is an estimate: the stress run read it only together
+// with the tracker and the old pitch stage (formant-alone 29.2k to 29.4k / 52.8k to 54.3k, 4.6 % / 8.2 to
+// 8.5 %, 2026-11-02, v2.01.14, against the 11 / 13 the three rows summed to).
 constexpr Cost kFormant{3, 4, false};  // est.: one formant voice is about one MOB copy (1.5 %), plus the mix and the fine pass; the fine pass counts twice when Autotune is placed, about 1 point
 constexpr Cost kFormantFollower{4, 5, false};  // est.: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, SENSITIVITY 50 %, Apple clang -O2, median of 9 interleaved passes, 2 runs; g++ 15 has no SDK here): 15.8 to 15.9 ns a sample at RANGE -12 st, the worst setting, where the grains play at half speed, against Formant's 14.8 at -7 st, at most 1.1 ns more, 3.7k board cycles a block at 50.4k, 0.59 %, rounded up
 constexpr Cost kLofi{2, 5, true};          // 11.1k / 26.6k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 1.7 %, worst 4.1 %)
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 
-// The Growl card, Distortion's alternate in slot 6, reads the tracker like Crowd, so a layout with it pays
-// kTracker once. Its row is the card's slot measured on the box. The host bench of 2026-11-04 had put it
+// The Growl card, Distortion's alternate in slot 6, reads Autotune's tracker like Crowd, and pays a tracker
+// of its own with no Autotune ahead. Its row is the card's slot measured on the box. The host bench of 2026-11-04 had put it
 // at 3.8 % / 5.2 %, and 4.2 to 4.6 % mean with the throat move.
 constexpr Cost kGrowl{5, 7, true};  // 25.7k / 42.7k, stress run 2026-11-05 (v2.01.51-bench, throat layout: mean 4.0 %, worst 6.7 %)
 

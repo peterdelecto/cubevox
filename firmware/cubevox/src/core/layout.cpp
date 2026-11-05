@@ -74,25 +74,32 @@ LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
-  bool tracker = false;     // Autotune, Crowd, a Formant voice or Growl is placed, so the shared pitch tracker runs
-  bool autotune = false;
-  bool stageUser = false;   // Octave or a Formant voice is placed, so the pitch stage mixes
+  // Autotune pays one tracker. A Formant voice directly behind it (only Empty slots between) reads that
+  // tracker, and so do Crowd and Growl anywhere behind it. A Formant voice anywhere else, and a Crowd or
+  // Growl card with no Autotune ahead, run a tracker of their own.
+  int trackers = 0;
+  bool autotune = false;  // Autotune sits ahead of the slot being counted
+  bool adjacent = false;  // and nothing but Empty slots sits between it and that slot
   for (const Card c : layout.card) {
     sum.avg += cardDesc(c).cost.avg;
     sum.worst += cardDesc(c).cost.worst;
+    if (c == Card::Empty) continue;
     const bool formant = c == Card::Formant || c == Card::FormantFollower;
-    tracker = tracker || c == Card::Autotune || engineOf(c) == Engine::Crowd || formant || c == Card::Growl;
-    autotune = autotune || c == Card::Autotune;
-    stageUser = stageUser || c == Card::Octave || formant;
+    if (c == Card::Autotune) {
+      ++trackers;
+      autotune = true;
+      adjacent = true;
+      continue;
+    }
+    if (formant) {
+      if (!(autotune && adjacent)) ++trackers;
+    } else if ((engineOf(c) == Engine::Crowd || c == Card::Growl) && !autotune) {
+      ++trackers;
+    }
+    adjacent = false;
   }
-  if (tracker) {
-    sum.avg += costs::kTracker.avg;
-    sum.worst += costs::kTracker.worst;
-  }
-  if (stageUser && !autotune) {  // with Autotune placed its rows carry the stage's work
-    sum.avg += costs::kPitchStage.avg;
-    sum.worst += costs::kPitchStage.worst;
-  }
+  sum.avg += trackers * costs::kTracker.avg;
+  sum.worst += trackers * costs::kTracker.worst;
   return sum;
 }
 

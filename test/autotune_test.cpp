@@ -11,9 +11,8 @@
 #include <cstdlib>
 #include <vector>
 
-#include "engine/pitch_fx.h"
-
 #include "alloc_guard.h"
+#include "pitch_series.h"
 #include "ringed_tracker.h"
 
 namespace {
@@ -86,7 +85,7 @@ struct Hop {
 };
 
 // Runs in through fx in calls of callSize samples, recording a Hop after each call.
-std::vector<float> run(cv::PitchFx& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
+std::vector<float> run(PitchSeries& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
                        std::vector<Hop>* hops = nullptr, int callSize = cv::kBlock) {
   std::vector<float> out(in.size());
   if (hops) hops->reserve(in.size() / static_cast<size_t>(callSize) + 1);
@@ -109,7 +108,7 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
   return ok;
 }
 
-static cv::PitchFx gFx;
+static PitchSeries gFx;
 
 // Autotune alone in key C; Octave off.
 cv::PitchFxParams autotuneOnly(float responseMs) {
@@ -443,7 +442,7 @@ void toggleLevelAt(double hz, bool formant, ToggleLevel& worst) {
   const int n = 2 * cv::kSampleRate;
   const std::vector<float> in = tone(hz, n);
   cv::PitchFxParams on = autotuneOnly(1.0f);
-  on.crowdOn = true;
+  gFx.readersOn = true;  // a Mob card keeps the tracker running through the toggle
   if (formant) {
     on.formant.on = true;
     on.formant.shiftSt = -3;
@@ -466,6 +465,7 @@ void toggleLevelAt(double hz, bool formant, ToggleLevel& worst) {
     gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, i < onAt || i >= offAt ? off : on);
     gInProcess = false;
   }
+  gFx.readersOn = false;
   const int win = static_cast<int>(std::lround(2.0 * cv::kSampleRate / hz));
   for (int edge : {onAt, offAt}) {
     for (int i = edge; i + win < edge + cv::kSampleRate / 5; i += 24) {
@@ -479,13 +479,14 @@ void toggleLevelAt(double hz, bool formant, ToggleLevel& worst) {
 // 9. Switching Autotune on or off mid-note: the corrected voice lags the dry input by 2 to 5 periods
 // and sits up to a semitone away, so the equal-power crossfade dips where the two cancel and rises
 // where they add. The dip reads 3.86 dB against a gate of 4.4, the rise 2.34 dB against 3.0. The same
-// scan runs with the Formant card at part MIX, whose level gain follows the crossfade; it reads 3.80 and
-// 2.68 dB.
+// scan runs with the Formant card at part MIX behind Autotune. The Formant engine reads at the grain delay
+// less the delay Autotune has put on the audio, so while Autotune's crossfade moves the Formant lag moves
+// with it, and the dip reads 6.44 dB against a gate of 7.0 and the rise 2.34 dB.
 bool testToggleLevel() {
-  constexpr double kMaxDipDb = 4.4;
   constexpr double kMaxRiseDb = 3.0;
   bool ok = true;
   for (bool formant : {false, true}) {
+    const double kMaxDipDb = formant ? 7.0 : 4.4;
     ToggleLevel worst;
     for (double hz : {97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 110.0, 130.81, 146.83, 220.0})
       toggleLevelAt(hz, formant, worst);

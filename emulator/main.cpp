@@ -34,7 +34,8 @@
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/gate.h"
-#include "engine/pitch_fx.h"
+#include "engine/pitch_params.h"
+#include "test/pitch_series.h"
 #include "engine/slapback.h"
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
@@ -83,7 +84,7 @@ struct ProtoParams {
   cv::GateParams inputGate;
   cv::GateParams gate;
   cv::PitchFxParams pitchFx;
-  cv::CrowdParams crowd;  // drawFrame copies its on flag to pitchFx.crowdOn
+  cv::CrowdParams crowd;
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartSlapMix, {}};
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
@@ -167,7 +168,7 @@ unsigned gInputRate = 0;                 // UI-thread-only; its sample rate
 // Audio-thread-only.
 cv::Gate gInputGate;
 cv::Gate gGate;
-cv::PitchFx gPitchFx;
+PitchSeries gPitchFx;
 cv::Crowd gCrowd;
 cv::Unison gUnison;
 cv::Slapback gSlapback;
@@ -303,10 +304,12 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     }
     gPolish.processFront(in.data(), in.data(), n, params.eq);
     gInputGate.process(in.data(), mono.data(), n, params.inputGate);
-    gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx);
-    // The Crowd card reads the ring the pitch stage just wrote and takes the stage's output as its
-    // lead. `in` is free once the input gate has read it, so it holds the Crowd card's output.
-    gCrowd.process(tmp.data(), in.data(), n, params.crowd, gPitchFx);
+    gCrowd.write(mono.data(), n);
+    gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx, params.crowd.on);
+    // The Crowd card cuts its copies from the ring the pitch cards' input went into and takes their
+    // output as its lead. `in` is free once the input gate has read it, so it holds the Crowd card's
+    // output.
+    gCrowd.process(tmp.data(), in.data(), n, params.crowd, gPitchFx.crowdPitch());
     gUnison.process(in.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
@@ -1700,9 +1703,6 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   else drawColumns(params, state);
   drawModeButton(params);
   ImGui::End();
-  // The pitch stage keeps its tracker and ring running while the Crowd card is on, with Autotune and
-  // Octave off, and a saved state or pedal mode reaches the Crowd card without its checkbox.
-  params.pitchFx.crowdOn = params.crowd.on;
 }
 
 // Bottom-right switch between the full face and pedal mode, at headline size.

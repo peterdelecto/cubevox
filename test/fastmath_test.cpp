@@ -22,7 +22,7 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
   return ok;
 }
 
-// 1. Relative error of exp2Fast over the callers' range of -12..12 (Autotune, Octave, PitchFx, Echo),
+// 1. Relative error of exp2Fast over the callers' range of -12..12 (Autotune, Octave, Formant, Echo),
 // in 1e-4 steps, and over -126..126, which takes in Bloom's -23.9 and Autotune's -15.
 bool testExp2() {
   double worst = 0.0;

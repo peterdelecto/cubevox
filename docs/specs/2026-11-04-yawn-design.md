@@ -2,6 +2,10 @@
 
 Owner 2026-11-04: "for now, just call it yawn and write the spec. we will change the name later."
 
+The card is shown as Apraxia since 2026-11-05; this file keeps the name Yawn it was written under. Since the
+same day it drives `FormantFx` on the block the slot ahead hands it, not the shared stage
+(`2026-11-05-pitch-split-design.md`).
+
 ## Purpose
 
 A card that moves Adam's throat with his singing, the way an envelope filter pedal moves a bass

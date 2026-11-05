@@ -76,140 +76,165 @@ void checkCrowdLayout() {
   check(verdict.ok(), "crowd layout: slot 4 with Unison out is accepted");
 }
 
-// The default layout with slot 2 empty, which holds no Autotune: the base of the tracker cases.
+// The default layout with slot 2 empty, which holds no Autotune.
 Layout withoutAutotune() {
   Layout layout = defaultLayout();
   layout.card[1] = Card::Empty;
   return layout;
 }
 
-// The pitch tracker's row counts once: with Autotune alone, with Crowd alone, and with both. A layout
-// holding neither, and one holding only Octave, pays none. Octave without Autotune pays kPitchStage
-// instead (checkPitchStageCost), so the layouts below that keep Octave in slot 3 without Autotune
-// carry that term as well.
-void checkTrackerCost() {
-  const Layout noPitch = withoutAutotune();
-  Layout autotune = noPitch;
-  autotune.card[1] = Card::Autotune;
-  Layout crowd = noPitch;
-  crowd.card[1] = Card::Crowd;
-  Layout both = autotune;
-  both.card[3] = Card::Crowd;
-  int cards = costs::kFixed.avg;
-  for (const Card c : noPitch.card) cards += cardDesc(c).cost.avg;
-  const int base = layoutCost(noPitch).avg;
-  check(base == cards + costs::kPitchStage.avg, "tracker cost: Octave without Autotune or Crowd pays no tracker");
-  check(layoutCost(autotune).avg == cards + costs::kAutotune.avg + costs::kTracker.avg, "tracker cost: Autotune pays it");
-  check(layoutCost(crowd).avg == base + costs::kCrowd.avg + costs::kTracker.avg, "tracker cost: Crowd without Autotune pays it");
-  check(layoutCost(both).avg == layoutCost(autotune).avg - costs::kUnison.avg + costs::kCrowd.avg,
-        "tracker cost: Autotune and Crowd together pay it once");
-  check(layoutCost(autotune).worst ==
-            layoutCost(noPitch).worst - costs::kPitchStage.worst + costs::kAutotune.worst + costs::kTracker.worst,
-        "tracker cost: the worst column counts it too");
-}
-
-// Formant in slot 3 in Octave's place pays the tracker without Autotune, and once beside it. Lo-fi and
-// Chatter in slot 7 do not pay it.
-void checkTrackerCostOtherCards() {
-  const Layout noPitch = withoutAutotune();
-  Layout autotune = noPitch;
-  autotune.card[1] = Card::Autotune;
-  const int base = layoutCost(noPitch).avg;
-  const int gate = costs::kGate.avg;
-  Layout formant = noPitch;
-  formant.card[2] = Card::Formant;
-  check(layoutCost(formant).avg == base - costs::kOctave.avg + costs::kFormant.avg + costs::kTracker.avg &&
-            layoutCost(formant).worst ==
-                layoutCost(noPitch).worst - costs::kOctave.worst + costs::kFormant.worst + costs::kTracker.worst,
-        "tracker cost: Formant without Autotune pays it, in both columns");
-  Layout formantBesideAutotune = autotune;
-  formantBesideAutotune.card[2] = Card::Formant;
-  check(layoutCost(formantBesideAutotune).avg == layoutCost(autotune).avg - costs::kOctave.avg + costs::kFormant.avg,
-        "tracker cost: Formant and Autotune together pay it once");
-  Layout lofi = noPitch;
-  lofi.card[6] = Card::Lofi;
-  Layout bloom = noPitch;
-  bloom.card[6] = Card::Bloom;
-  check(layoutCost(lofi).avg == base - gate + costs::kLofi.avg && layoutCost(bloom).avg == base - gate + costs::kBloom.avg,
-        "tracker cost: Lo-fi and Chatter pay none");
-}
-
-// The default layout with Autotune and Octave out (slots 2 and 3 empty), the base of the stage cases.
+// The default layout with Autotune and Octave out (slots 2 and 3 empty), the base of the tracker cases.
 Layout withoutPitchCards() {
   Layout layout = withoutAutotune();
   layout.card[2] = Card::Empty;
   return layout;
 }
 
-// A layout's sum is the fixed term, its cards' rows, the tracker row when `tracker` and the stage row
-// when `stage`, in both columns.
-void paysFor(const Layout& layout, bool tracker, bool stage, const char* what) {
+// A layout's sum is the fixed term, its cards' rows and `trackers` tracker rows, in both columns.
+void paysFor(const Layout& layout, int trackers, const char* what) {
   costs::Cost want = costs::kFixed;
   for (const Card c : layout.card) want = want + cardDesc(c).cost;
-  if (tracker) want = want + costs::kTracker;
-  if (stage) want = want + costs::kPitchStage;
+  for (int i = 0; i < trackers; ++i) want = want + costs::kTracker;
   const LayoutCost got = layoutCost(layout);
   check(got.avg == want.avg && got.worst == want.worst, what);
 }
 
-// The pitch stage's own work, kPitchStage, counts once in both columns when Octave or Formant is placed
-// and Autotune is not, and in no other layout. The default layout and MOB with Chasm place Autotune, so
-// their sums stay the sums of their rows, the fixed term and the tracker.
-void checkPitchStageCost() {
+// Autotune pays one tracker. Octave, Lo-fi and Chatter pay none of their own, so a layout of them
+// alone pays none.
+void checkTrackerCost() {
   const Layout none = withoutPitchCards();
-  paysFor(none, false, false, "pitch stage cost: no Octave, Formant or Autotune pays none");
-
-  Layout crowd = none;
-  crowd.card[3] = Card::Crowd;
-  paysFor(crowd, true, false, "pitch stage cost: Crowd alone pays the tracker and not the stage");
+  paysFor(none, 0, "tracker cost: no pitch card pays none");
 
   Layout octave = none;
   octave.card[2] = Card::Octave;
-  paysFor(octave, false, true, "pitch stage cost: Octave without Autotune pays it, in both columns");
+  paysFor(octave, 0, "tracker cost: Octave alone pays no tracker, in both columns");
 
-  Layout formant = none;
-  formant.card[2] = Card::Formant;
-  paysFor(formant, true, true, "pitch stage cost: Formant without Autotune pays it beside the tracker");
+  Layout autotune = none;
+  autotune.card[1] = Card::Autotune;
+  paysFor(autotune, 1, "tracker cost: Autotune pays one");
 
-  Layout bothCards = formant;
-  bothCards.card[1] = Card::Octave;
-  paysFor(bothCards, true, true, "pitch stage cost: Octave and Formant without Autotune pay it once");
+  Layout autotuneOctave = autotune;
+  autotuneOctave.card[2] = Card::Octave;
+  paysFor(autotuneOctave, 1, "tracker cost: Autotune with Octave pays one");
+  paysFor(defaultLayout(), 1, "tracker cost: the default layout pays one");
 
-  Layout octaveCrowd = octave;
-  octaveCrowd.card[3] = Card::Crowd;
-  paysFor(octaveCrowd, true, true, "pitch stage cost: Octave and Crowd without Autotune pay it once");
-
-  Layout autotuneOctave = octave;
-  autotuneOctave.card[1] = Card::Autotune;
-  paysFor(autotuneOctave, true, false, "pitch stage cost: Autotune with Octave pays none");
-
-  Layout autotuneFormant = formant;
-  autotuneFormant.card[1] = Card::Autotune;
-  paysFor(autotuneFormant, true, false, "pitch stage cost: Autotune with Formant pays none");
+  Layout lofi = none;
+  lofi.card[6] = Card::Lofi;
+  Layout bloom = none;
+  bloom.card[6] = Card::Bloom;
+  paysFor(lofi, 0, "tracker cost: Lo-fi pays none");
+  paysFor(bloom, 0, "tracker cost: Chatter pays none");
 }
 
-// The layouts that place Autotune pay no stage term: the default layout and MOB with Chasm. The rows
-// and the term cover Octave alone, and the layouts that carry the term are accepted.
-void checkPitchStageRows() {
+// Mob and Deepthroat read Autotune's tracker when Autotune sits ahead of them, anywhere ahead, and run a
+// tracker of their own otherwise.
+void checkTrackerCostMobAndGrowl() {
+  const Layout none = withoutPitchCards();
+  Layout crowd = none;
+  crowd.card[3] = Card::Crowd;
+  paysFor(crowd, 1, "tracker cost: Mob with no Autotune pays a tracker of its own");
+
+  Layout growl = none;
+  growl.card[5] = Card::Growl;
+  paysFor(growl, 1, "tracker cost: Deepthroat with no Autotune pays a tracker of its own");
+
+  Layout both = crowd;
+  both.card[5] = Card::Growl;
+  paysFor(both, 2, "tracker cost: Mob and Deepthroat with no Autotune pay one each");
+
+  Layout crowdBehind = crowd;
+  crowdBehind.card[1] = Card::Autotune;
+  paysFor(crowdBehind, 1, "tracker cost: Mob behind Autotune reads its tracker, and the layout pays one");
+  Layout bothBehind = both;
+  bothBehind.card[1] = Card::Autotune;
+  paysFor(bothBehind, 1, "tracker cost: Mob and Deepthroat behind Autotune read its tracker, and the layout pays one");
+
+  Layout crowdAhead = none;
+  crowdAhead.card[1] = Card::Crowd;
+  crowdAhead.card[3] = Card::Autotune;
+  paysFor(crowdAhead, 2, "tracker cost: Mob ahead of Autotune runs its own, and Autotune pays its own");
+  Layout growlAhead = none;
+  growlAhead.card[1] = Card::Growl;
+  growlAhead.card[4] = Card::Autotune;
+  paysFor(growlAhead, 2, "tracker cost: Deepthroat ahead of Autotune runs its own, and Autotune pays its own");
+}
+
+// The Formant engine reads Autotune's tracker directly behind it, with Empty slots between allowed, and
+// runs its own anywhere else. Apraxia runs the same engine.
+void checkTrackerCostFormant() {
+  const Layout none = withoutPitchCards();
+  Layout formant = none;
+  formant.card[2] = Card::Formant;
+  paysFor(formant, 1, "tracker cost: Formant with no Autotune pays a tracker of its own");
+
+  Layout behind = formant;
+  behind.card[1] = Card::Autotune;
+  paysFor(behind, 1, "tracker cost: Formant directly behind Autotune reads its tracker, and the layout pays one");
+  check(layoutCost(behind).avg == layoutCost(none).avg + costs::kAutotune.avg + costs::kFormant.avg + costs::kTracker.avg &&
+            layoutCost(behind).worst ==
+                layoutCost(none).worst + costs::kAutotune.worst + costs::kFormant.worst + costs::kTracker.worst,
+        "tracker cost: Formant directly behind Autotune adds its row and Autotune's, and one tracker, in both columns");
+
+  Layout gap = none;
+  gap.card[1] = Card::Autotune;
+  gap.card[3] = Card::Formant;
+  paysFor(gap, 1, "tracker cost: an Empty slot between Autotune and Formant leaves it directly behind");
+
+  Layout between = none;
+  between.card[1] = Card::Autotune;
+  between.card[2] = Card::Octave;
+  between.card[3] = Card::Formant;
+  paysFor(between, 2, "tracker cost: a card between Autotune and Formant gives Formant a tracker of its own");
+
+  Layout ahead = none;
+  ahead.card[1] = Card::Formant;
+  ahead.card[2] = Card::Autotune;
+  paysFor(ahead, 2, "tracker cost: Formant ahead of Autotune pays its own beside Autotune's");
+
+  Layout apraxia = behind;
+  apraxia.card[2] = Card::FormantFollower;
+  paysFor(apraxia, 1, "tracker cost: Apraxia directly behind Autotune reads its tracker");
+  Layout apraxiaAlone = none;
+  apraxiaAlone.card[2] = Card::FormantFollower;
+  paysFor(apraxiaAlone, 1, "tracker cost: Apraxia with no Autotune pays a tracker of its own");
+
+  Layout everything = behind;
+  everything.card[3] = Card::Crowd;
+  everything.card[5] = Card::Growl;
+  paysFor(everything, 1, "tracker cost: Formant, Mob and Deepthroat behind Autotune pay one tracker between them");
+}
+
+// The default layout and MOB with Chasm place Autotune and pay its tracker once, and are accepted, as are
+// Octave alone and Formant alone. Mob and Deepthroat with no Autotune and Apraxia pay a tracker each, and
+// the budget lines judge the sum.
+void checkTrackerLayouts() {
   Layout heavy = defaultLayout();
   heavy.card[3] = Card::Crowd;
   heavy.card[7] = Card::ReverbChasm;
-  paysFor(defaultLayout(), true, false, "pitch stage cost: the default layout pays none");
-  paysFor(heavy, true, false, "pitch stage cost: MOB with Chasm pays none");
+  paysFor(defaultLayout(), 1, "tracker cost: the default layout pays one");
+  paysFor(heavy, 1, "tracker cost: MOB with Chasm pays one");
+  check(layoutValid(defaultLayout()).ok() && layoutValid(heavy).ok(), "tracker cost: both are accepted");
 
-  // Octave alone benches at 2.5 % (15.9k cycles); its row and the stage term cover it, by about 3 points.
-  check(costs::kOctave.avg + costs::kPitchStage.avg >= 3 && costs::kOctave.avg + costs::kPitchStage.avg <= 7,
-        "pitch stage cost: Octave's row and the term cover the benched 2.5 % for Octave alone");
   Layout octave = withoutPitchCards();
   octave.card[2] = Card::Octave;
   Layout formant = withoutPitchCards();
   formant.card[2] = Card::Formant;
-  check(layoutValid(octave).ok() && layoutValid(formant).ok(), "pitch stage cost: the layouts with the term are accepted");
+  check(layoutValid(octave).ok() && layoutValid(formant).ok(), "tracker cost: Octave alone and Formant alone are accepted");
+
+  Layout trackers = withoutPitchCards();
+  trackers.card[1] = Card::Crowd;
+  trackers.card[2] = Card::FormantFollower;
+  trackers.card[5] = Card::Growl;
+  trackers.card[7] = Card::ReverbChasm;
+  const LayoutCost cost = layoutCost(trackers);
+  const LayoutCheck verdict = layoutValid(trackers);
+  check(verdict.ok() == (cost.avg <= costs::kBudgetAvgPercent && cost.worst <= costs::kBudgetWorstPercent),
+        "tracker cost: three trackers of their own are judged by the budget lines");
 }
 
 // Formant in slot 3 in Octave's place, in the default layout and in MOB with Chasm: each sum is the
-// Octave layout's with Formant's row for Octave's. Both layouts keep Autotune, so the tracker is paid
-// once either way and Formant pays no stage term.
+// Octave layout's with Formant's row for Octave's. Both layouts keep Autotune, and Formant sits directly
+// behind it, so the tracker is paid once either way.
 void checkSlot3Costs() {
   Layout octaveLight = defaultLayout();
   Layout octaveHeavy = octaveLight;
@@ -229,7 +254,7 @@ void checkSlot3Costs() {
   check(swapped(octaveHeavy, formantHeavy), "slot 3 cost: Formant with MOB and Chasm sums to its rows");
   check(layoutValid(formantLight).ok() && layoutValid(formantHeavy).ok(), "slot 3 cost: Formant is accepted in both layouts");
 
-  // Yawn pays its own row, the tracker and the stage term as Formant does.
+  // Apraxia pays its own row and reads the tracker as Formant does.
   Layout followerLight = formantLight;
   followerLight.card[2] = Card::FormantFollower;
   Layout followerHeavy = formantHeavy;
@@ -241,19 +266,19 @@ void checkSlot3Costs() {
            w.worst == f.worst - costs::kFormant.worst + costs::kFormantFollower.worst;
   };
   check(followed(formantLight, followerLight) && followed(formantHeavy, followerHeavy),
-        "slot 3 cost: Yawn in Formant's place sums to its rows in both layouts");
+        "slot 3 cost: Apraxia in Formant's place sums to its rows in both layouts");
   check(layoutValid(followerLight).ok() && layoutValid(followerHeavy).ok(),
-        "slot 3 cost: Yawn is accepted in both layouts");
+        "slot 3 cost: Apraxia is accepted in both layouts");
   Layout followerAlone = withoutPitchCards();
   followerAlone.card[2] = Card::FormantFollower;
-  paysFor(followerAlone, true, true, "pitch stage cost: Yawn without Autotune pays the tracker and the stage");
+  paysFor(followerAlone, 1, "slot 3 cost: Apraxia without Autotune pays a tracker of its own");
 
-  // Formant and Yawn play one voice, so a layout holds one of them at most.
+  // Formant and Apraxia play one voice, so a layout holds one of them at most.
   Layout bothVoices = followerLight;
   bothVoices.card[6] = Card::Formant;
   const LayoutCheck twice = layoutValid(bothVoices);
   check(twice.error == LayoutError::SameCardTwice && twice.slot == 6 && twice.card == Card::Formant,
-        "slot 3 cost: Formant beside Yawn is refused as the same card twice");
+        "slot 3 cost: Formant beside Apraxia is refused as the same card twice");
 }
 
 // The sums with each slot 7 card in the default layout and in MOB with Chasm, the heaviest layout the
@@ -389,14 +414,13 @@ void checkComposeCrowd() {
   PanelReading panel = panelWithToggles(false);
   panel.knob[3] = {0.25f, 7.0f};
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(!snap.params.crowd.on && !snap.params.pitchFx.crowdOn, "compose: Crowd card off leaves both flags off");
+  check(!snap.params.crowd.on, "compose: Crowd card off leaves its flag off");
   check(std::fabs(snap.params.crowd.width - 0.25f) < 1e-6f && snap.params.crowd.voicesStep == 7,
         "compose: Crowd knob A is DIVERGE and knob B is the VOICES step");
   panel.toggle[3] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.crowd.on && snap.params.pitchFx.crowdOn && !snap.params.pitchFx.autotune.on &&
-            !snap.params.pitchFx.octave.on,
-        "compose: Crowd card on sets its flag and the pitch stage's, and no other pitch toggle");
+  check(snap.params.crowd.on && !snap.params.pitchFx.autotune.on && !snap.params.pitchFx.octave.on,
+        "compose: Crowd card on sets its flag and no pitch toggle");
   check(snap.slotOn[3], "compose: the Crowd card's slot reads on");
 }
 
@@ -414,7 +438,7 @@ void checkComposeSlot3Formant() {
   panel.toggle[2] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.pitchFx.formant.on && snap.slotOn[2] && !snap.params.pitchFx.autotune.on &&
-            !snap.params.pitchFx.octave.on && !snap.params.pitchFx.crowdOn,
+            !snap.params.pitchFx.octave.on && !snap.params.crowd.on,
         "compose: Formant's toggle sets formant.on alone, beside Autotune and Octave left off");
   layout.card[2] = Card::Octave;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
@@ -427,7 +451,7 @@ void checkComposeSlot3Formant() {
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.follower.placed && snap.params.pitchFx.formant.on && !snap.params.pitchFx.octave.on &&
             std::fabs(snap.params.follower.sensitivity - 0.75f) < 1e-6f && std::fabs(snap.params.follower.rangeSt - 1.2f) < 1e-5f,
-        "compose: Yawn in slot 3 reads SENSITIVITY and RANGE from slot 3's pots and drives the Formant voice");
+        "compose: Apraxia in slot 3 reads SENSITIVITY and RANGE from slot 3's pots and drives the Formant voice");
 }
 
 // Each slot 7 card reads its knobs and toggle from slot 7's pots, and the Chatter card's word key
@@ -744,7 +768,7 @@ void checkOctaveFormantSlot() {
   layout.card[1] = Card::Octave;
   check(octaveFormantSlot(layout) == 1, "octaveFormantSlot: the first slot when both are placed");
   layout.card[0] = Card::FormantFollower;
-  check(octaveFormantSlot(layout) == 0, "octaveFormantSlot: Yawn counts as well");
+  check(octaveFormantSlot(layout) == 0, "octaveFormantSlot: Apraxia counts as well");
 }
 
 void checkSwapOctaveFormant() {
@@ -758,13 +782,13 @@ void checkSwapOctaveFormant() {
   Layout follower = layout;
   follower.card[2] = Card::FormantFollower;
   check(layoutValid(formant).ok() && layoutValid(follower).ok(),
-        "action: the default layout with Formant or Yawn in slot 3 passes the placement rules");
+        "action: the default layout with Formant or Apraxia in slot 3 passes the placement rules");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == formant,
         "action: SwapOctaveFormant turns Octave into Formant in its slot and touches no other slot");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == follower,
-        "action: then Formant into Yawn");
+        "action: then Formant into Apraxia");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, layout) == ui::ApplyResult::LayoutChanged && layout == defaultLayout(),
-        "action: and Yawn back into Octave");
+        "action: and Apraxia back into Octave");
 
   Layout moved = defaultLayout();  // Octave in slot 6, with Empty in slot 3
   moved.card[2] = Card::Empty;
@@ -787,12 +811,12 @@ void checkSwapOctaveFormant() {
   both.card[1] = Card::Formant;
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::LayoutChanged &&
             both.card[1] == Card::FormantFollower && both.card[2] == Card::Octave,
-        "action: SwapOctaveFormant turns Formant into Yawn beside Octave");
+        "action: SwapOctaveFormant turns Formant into Apraxia beside Octave");
   check(ui::applyAction(UiAction::SwapOctaveFormant, s, both) == ui::ApplyResult::LayoutChanged &&
             both.card[1] == Card::Formant && both.card[2] == Card::Octave,
         "action: and passes over Octave, which would repeat, back to Formant");
 
-  // Octave in slot 2 and Formant in slot 3: Formant would repeat, and Yawn plays Formant's voice.
+  // Octave in slot 2 and Formant in slot 3: Formant would repeat, and Apraxia plays Formant's voice.
   Layout repeat = defaultLayout();
   repeat.card[1] = Card::Octave;
   repeat.card[2] = Card::Formant;
@@ -817,8 +841,8 @@ void checkSwapOctaveFormant() {
         "action: SwapOctaveFormant changes no setting");
 }
 
-// Growl is Distortion's alternate in slot 6. The layout takes it, pays the tracker once for it (or once
-// with Autotune), and the slot 6 action swaps the two cards in the slot that holds either.
+// Growl is Distortion's alternate in slot 6. The layout takes it, pays a tracker of its own for it (or reads
+// Autotune's), and the slot 6 action swaps the two cards in the slot that holds either.
 void checkGrowlSlot6() {
   Settings s;
   Layout layout = defaultLayout();
@@ -827,12 +851,12 @@ void checkGrowlSlot6() {
   growl.card[5] = Card::Growl;
   check(distortionGrowlSlot(growl) == 5, "distortionGrowlSlot: Growl counts as well");
   check(layoutValid(growl).ok(), "growl: the default layout with Growl in slot 6 passes the placement rules");
-  paysFor(growl, true, false, "growl: Growl in slot 6 adds its row, and the tracker stays paid once");
+  paysFor(growl, 1, "growl: Growl in slot 6 adds its row, and Autotune's tracker serves it");
 
   Layout alone = withoutPitchCards();
   alone.card[5] = Card::Growl;
   check(layoutValid(alone).ok(), "growl: a layout with Growl and no other pitch card passes the placement rules");
-  paysFor(alone, true, false, "growl: Growl alone pays the tracker once and no pitch stage row");
+  paysFor(alone, 1, "growl: Growl alone pays a tracker of its own");
 
   check(ui::applyAction(UiAction::SwapDistortionGrowl, s, layout) == ui::ApplyResult::LayoutChanged && layout == growl,
         "action: SwapDistortionGrowl turns Distortion into Growl in its slot and touches no other slot");
@@ -848,10 +872,10 @@ void checkGrowlSlot6() {
   panel.knob[5] = {0.25f, 0.75f};
   panel.toggle[5] = true;
   const ChainSnapshot snap = composeSnapshot(growl, panel, Settings(), BenchOverrides());
-  check(snap.params.growl.on && snap.params.pitchFx.growlOn && !snap.params.distortion.on &&
+  check(snap.params.growl.on && !snap.params.distortion.on &&
             std::fabs(snap.params.growl.growl - 0.25f * 0.80f) < 1e-6f &&
             std::fabs(snap.params.growl.drive - 0.25f * 0.65f) < 1e-6f && std::fabs(snap.params.growl.mix - 0.75f) < 1e-6f,
-        "compose: Growl on in slot 6 sets its flag and the pitch stage's, GROWL from the upper pot and MIX from the lower");
+        "compose: Growl on in slot 6 sets its flag, GROWL from the upper pot and MIX from the lower");
 }
 
 void checkSlot7CardSlot() {
@@ -974,9 +998,9 @@ void checkLayoutAndCompose() {
   checkLayoutValid();
   checkCrowdLayout();
   checkTrackerCost();
-  checkTrackerCostOtherCards();
-  checkPitchStageCost();
-  checkPitchStageRows();
+  checkTrackerCostMobAndGrowl();
+  checkTrackerCostFormant();
+  checkTrackerLayouts();
   checkSlot3Costs();
   checkSlot7Costs();
   checkLayoutReasons();

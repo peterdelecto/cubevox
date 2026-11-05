@@ -1,5 +1,5 @@
 // Checks the audio block's chain walk, the slot toggle crossfade and the BYPASS mix on the host.
-// Covers the card to engine routing, the shared PitchFx call, the ping-pong buffers, the NaN guard,
+// Covers the card to engine routing, the pitch path between slots, the ping-pong buffers, the NaN guard,
 // the stage timing, the shipped layout over several blocks, the slot crossfade's gain law and its
 // engine start and stop, and the BYPASS crossfade. The late block's dry pass is in core_block_tail.cpp.
 
@@ -29,10 +29,11 @@ using Block = std::array<float, kN>;
 
 // Holds the engines of one chain, built the way the board builds them. It is too big for the stack.
 struct Rig {
-  std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
+  std::unique_ptr<cv::AutotuneFx> autotune = std::make_unique<cv::AutotuneFx>();
+  std::unique_ptr<cv::OctaveFx> octave = std::make_unique<cv::OctaveFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  ChainEngines engines{*pitch, *unison, *distortion};
+  ChainEngines engines{*autotune, *octave, *unison, *distortion};
   SlotFades fades;
 };
 
@@ -129,10 +130,10 @@ Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block next{};
   rig.engines.polish.processFront(cur.data(), next.data(), kN, snap.params.eq);
   cur = next;
-  bool pitchDone = false;
+  PitchPath path;
   for (int s = 0; s < kSlotCount; ++s) {
     const Card c = snap.layout.card[static_cast<size_t>(s)];
-    if (runStage(rig.engines, c, cur.data(), next.data(), kN, snap.params, pitchDone)) cur = next;
+    if (runStage(rig.engines, c, cur.data(), next.data(), kN, snap.params, path)) cur = next;
   }
   rig.engines.comp.process(cur.data(), next.data(), kN, snap.params.comp);
   rig.engines.polish.processBack(next.data(), cur.data(), kN, snap.params.eq);
@@ -156,11 +157,11 @@ void checkRouting() {
       const bool shouldClose = (c == Card::InputGate) == inputGateCard;
       Block in{};
       Block out{};
-      bool pitchDone = false;
+      PitchPath path;
       bool copied = true;
       for (int b = 0; b < 50; ++b) {
         in = tone(b, 0.3f);
-        const bool wrote = runStage(rig->engines, c, in.data(), out.data(), kN, params, pitchDone);
+        const bool wrote = runStage(rig->engines, c, in.data(), out.data(), kN, params, path);
         check(wrote, "stage: a gate card always writes");
         copied = copied && out == in;
       }
@@ -173,23 +174,26 @@ void checkRouting() {
   }
 }
 
-void checkEmptyAndPitchSharing() {
+void checkEmptyAndPitchCards() {
   auto rig = newRig();
   const ChainParams p;
   const Block in = tone(0, 0.3f);
   Block out;
   out.fill(7.0f);
-  bool done = false;
-  check(!runStage(rig->engines, Card::Empty, in.data(), out.data(), kN, p, done) && out[0] == 7.0f && !done,
+  PitchPath path;
+  check(!runStage(rig->engines, Card::Empty, in.data(), out.data(), kN, p, path) && out[0] == 7.0f && !path.autotuneAhead,
         "stage: an Empty slot writes nothing");
-  check(runStage(rig->engines, Card::Autotune, in.data(), out.data(), kN, p, done) && done,
-        "stage: the first pitch card runs PitchFx");
+  check(runStage(rig->engines, Card::Autotune, in.data(), out.data(), kN, p, path) && path.autotuneAhead && path.adjacent &&
+            path.upstream.result == &rig->engines.autotune.pitch(),
+        "stage: Autotune runs its own engine and hands its tracker on");
   out.fill(7.0f);
-  check(!runStage(rig->engines, Card::Octave, in.data(), out.data(), kN, p, done) && out[0] == 7.0f && out[kN - 1] == 7.0f,
-        "stage: a second pitch card in the same pass writes nothing");
-  done = false;
-  check(runStage(rig->engines, Card::Octave, in.data(), out.data(), kN, p, done) && done,
-        "stage: Octave alone runs PitchFx too");
+  check(runStage(rig->engines, Card::Octave, in.data(), out.data(), kN, p, path) && !path.adjacent && out[0] != 7.0f,
+        "stage: a second pitch card in the same pass runs its own engine");
+  PitchPath octaveOnly;
+  check(runStage(rig->engines, Card::Octave, in.data(), out.data(), kN, p, octaveOnly) && !octaveOnly.autotuneAhead,
+        "stage: Octave alone runs, and hands nothing on with no Autotune ahead");
+  check(runStage(rig->engines, Card::Formant, in.data(), out.data(), kN, p, octaveOnly),
+        "stage: Formant runs its own engine");
 }
 
 // The walk equals the chain run by hand, whichever side the last writing stage left the block on.
@@ -232,20 +236,25 @@ void checkEmptyChain() {
   check(same, "chain: an empty layout with the polish stages off passes the block untouched");
 }
 
-// Autotune and Octave in one layout make one PitchFx call per block.
-void checkPitchCalledOnce() {
+// Autotune and Octave in one layout each run their own engine on the block the slot ahead hands them: the
+// chain's output is Autotune's engine run by hand, then Octave's on its output.
+void checkPitchCardsInSeries() {
   const ChainSnapshot snap = snapshotFor(layoutOf({Card::Autotune, Card::Octave}), 0.5f, false);
   auto chain = newRig();
   auto direct = newRig();
   bool same = true;
-  for (int b = 0; b < 6; ++b) {
+  bool moved = false;
+  for (int b = 0; b < 200; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*chain, snap, in, StillClock());
+    Block tuned{};
     Block want{};
-    direct->engines.pitch.process(in.data(), want.data(), kN, snap.params.pitchFx);
+    direct->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchFx.autotune);
+    direct->engines.octave.process(tuned.data(), want.data(), kN, snap.params.pitchFx.octave);
     same = same && run.out == want;
+    moved = moved || maxAbsDiff(run.out, in) > 0.01f;
   }
-  check(same, "chain: two pitch cards make one PitchFx call per block");
+  check(same && moved, "chain: Autotune and Octave each run their own engine, Octave on Autotune's output");
 }
 
 // A Growl card keeps a ring of its own input. While its slot sits settled off, each block clears a slice of
@@ -875,9 +884,10 @@ void checkInputGateOffInPause() {
         "slot flip: the Input gate switched off in a pause brings the floor up inside the fade and holds it within 1 dB");
 }
 
-// Autotune and Octave share one PitchFx call at the first pitch card's slot. The stage follows either
-// toggle, and stops only when both are off.
-void checkPitchStageToggles() {
+// Each pitch card fades its own slot. With Autotune off and Octave on, Autotune's slot sits on the dry
+// input and Octave's runs its engine. When Octave's toggle goes off its slot runs the 6 fade blocks and
+// then passes the dry input bit for bit, with Autotune's slot untouched.
+void checkPitchCardToggles() {
   const Layout layout = layoutOf({Card::Autotune, Card::Octave});
   Toggles bothOff = allToggles(false);
   Toggles octaveOnly = bothOff;
@@ -896,8 +906,9 @@ void checkPitchStageToggles() {
     const Run run = runBlock(*rig, snapOctave, in, StillClock());
     if (b >= 20) running = running && run.out != in;
   }
-  check(running, "slot flip: with Autotune off and Octave on the pitch stage still runs at Autotune's slot");
-  check(rig->fades.level(0) == kSlotFadeBlocks, "slot flip: the pitch stage's slot stays on the engine while either toggle is on");
+  check(running, "slot flip: with Autotune off and Octave on, Octave's engine runs in its own slot");
+  check(rig->fades.level(0) == 0 && rig->fades.level(1) == kSlotFadeBlocks,
+        "slot flip: Octave's toggle fades Octave's slot only, and Autotune's slot sits on the dry input");
 
   int engineBlocks = 0;
   bool dryAfter = true;
@@ -908,27 +919,68 @@ void checkPitchStageToggles() {
     if (b >= 60 + kSlotFadeBlocks) dryAfter = dryAfter && run.out == in;
   }
   check(engineBlocks == kSlotFadeBlocks && dryAfter,
-        "slot flip: with both pitch toggles off the stage runs for the 6 fade blocks, then passes the dry input bit for bit");
+        "slot flip: with Octave's toggle off its slot runs for the 6 fade blocks, then passes the dry input bit for bit");
+}
+
+// A toggle fades only its own card's slot: Autotune, Octave and Formant side by side, with each toggle flipped
+// in turn, move the level of the one slot and leave the other two where they were.
+void checkPitchTogglesFadeOwnSlot() {
+  const Layout layout = layoutOf({Card::Autotune, Card::Octave, Card::Formant});
+  auto rig = newRig();
+  Toggles t = allToggles(false);
+  rig->fades.settle(t);
+  int b = 0;
+  const auto play = [&](int blocks) {
+    const ChainSnapshot snap = snapshotToggles(layout, 0.5f, t);
+    for (int k = 0; k < blocks; ++k, ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
+  };
+  bool own = true;
+  for (int flip = 0; flip < 3; ++flip) {
+    t[static_cast<size_t>(flip)] = true;
+    play(kSlotFadeBlocks + 2);
+    for (int s = 0; s < 3; ++s) own = own && rig->fades.level(s) == (s <= flip ? kSlotFadeBlocks : 0);
+  }
+  for (int flip = 0; flip < 3; ++flip) {
+    t[static_cast<size_t>(flip)] = false;
+    play(kSlotFadeBlocks + 2);
+    for (int s = 0; s < 3; ++s) own = own && rig->fades.level(s) == (s > flip ? kSlotFadeBlocks : 0);
+  }
+  check(own, "slot flip: each pitch card's toggle fades its own slot and leaves the other pitch slots settled");
 }
 
 // 200 ms of the tone: the tracker finds its period in about 32 ms and the voices sound at least
 // 22 ms after that.
 constexpr int kCrowdBlocks = 150;
 
-// The pitch stage, then the Crowd card on its output, on `rig`'s own engines. This is the order the
-// chain makes the two calls when nothing else sits between them.
-Block pitchThenCrowd(Rig& rig, const ChainSnapshot& snap, const Block& in) {
-  Block mid{};
+// The Crowd card on `rig`'s own engines, by hand. With an Autotune slot ahead, the Autotune slot writes the
+// card's ring, Autotune's engine runs with its tracker kept alive for the card, and the card reads that
+// tracker and Autotune's correction. With none ahead the card writes its own ring and runs its own tracker.
+Block crowdByHand(Rig& rig, const ChainSnapshot& snap, const Block& in, bool autotuneAhead, bool autotuneBehind = false) {
+  Block mid = in;
   Block out{};
-  rig.engines.pitch.process(in.data(), mid.data(), kN, snap.params.pitchFx);
-  rig.engines.crowd.process(mid.data(), out.data(), kN, snap.params.crowd, rig.engines.pitch);
+  cv::CrowdPitch pitch;
+  if (autotuneAhead) {
+    cv::TrackerNeeds need;
+    need.run = true;
+    need.outOfRange = true;
+    rig.engines.crowd.write(in.data(), kN);
+    rig.engines.autotune.process(in.data(), mid.data(), kN, snap.params.pitchFx.autotune, need);
+    pitch = {&rig.engines.autotune.pitch(), rig.engines.autotune.correctionSemis()};
+    if (!snap.params.pitchFx.autotune.on) mid = in;  // the Autotune slot passes the dry input while its toggle is off
+  }
+  rig.engines.crowd.process(mid.data(), out.data(), kN, snap.params.crowd, pitch);
+  if (autotuneBehind) {
+    Block tuned{};
+    rig.engines.autotune.process(out.data(), tuned.data(), kN, snap.params.pitchFx.autotune);
+    return tuned;
+  }
   return out;
 }
 
 struct CrowdOutcome {
-  bool sameAsHand = true;  // every block equals the pitch call then the Crowd card
+  bool sameAsHand = true;  // every block equals the Crowd card run by hand
   bool heard = false;      // the second half of the run differs from the input
-  bool live = false;       // the tracker holds a period and a voice sounds
+  bool live = false;       // a voice sounds
 };
 
 // Every knob at 0.5 except the Crowd card's VOICES, which stands at step 4 so its copies sound. At 0.5 a
@@ -939,18 +991,20 @@ ChainSnapshot snapshotCrowd(const Layout& layout, const Toggles& on) {
   return snap;
 }
 
-CrowdOutcome runCrowdLayout(const Layout& layout, const Toggles& on) {
+CrowdOutcome runCrowdLayout(const Layout& layout, const Toggles& on, bool autotuneAhead, bool autotuneBehind = false) {
   const ChainSnapshot snap = snapshotCrowd(layout, on);
   auto chain = newRig();
   auto hand = newRig();
+  chain->fades.settle(snap.slotOn);
+  hand->fades.settle(snap.slotOn);
   CrowdOutcome o;
   for (int b = 0; b < kCrowdBlocks; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*chain, snap, in, StillClock());
-    o.sameAsHand = o.sameAsHand && run.out == pitchThenCrowd(*hand, snap, in);
+    o.sameAsHand = o.sameAsHand && run.out == crowdByHand(*hand, snap, in, autotuneAhead, autotuneBehind);
     if (b >= kCrowdBlocks / 2) o.heard = o.heard || run.out != in;
   }
-  o.live = chain->engines.pitch.pitch().period > 0.0f && chain->engines.crowd.activeVoices() > 0;
+  o.live = chain->engines.crowd.activeVoices() > 0;
   return o;
 }
 
@@ -966,56 +1020,61 @@ void checkCrowdStage() {
   const Block in = tone(0, 0.3f);
   Block out;
   out.fill(7.0f);
-  bool done = false;
-  check(runStage(rig->engines, Card::Crowd, in.data(), out.data(), kN, p, done) && done && out == in,
-        "stage: a Crowd card that is off makes the pitch call and passes the block untouched");
+  PitchPath none;
+  check(runStage(rig->engines, Card::Crowd, in.data(), out.data(), kN, p, none) && out == in &&
+            rig->engines.crowd.ringForTest().head() == kN,
+        "stage: a Crowd card that is off with no Autotune ahead writes its own ring and passes the block untouched");
 
-  // With the pitch stage already run this pass, the Crowd card runs alone and nothing feeds the tracker.
-  // With no period the card holds its lead at 1 and its copies at 0, so every block comes out as it went in.
+  // Behind an Autotune slot that fed no tracker, the Crowd card has no period. It holds its lead at 1 and
+  // its copies at 0, so every block comes out as it went in.
+  auto behind = newRig();
   p.crowd.on = true;
-  p.pitchFx.crowdOn = true;
+  PitchPath ahead;
+  ahead.autotuneAhead = true;
+  ahead.upstream.result = &behind->engines.autotune.pitch();
   bool wrote = true;
   bool unity = true;
   for (int b = 0; b < 20; ++b) {
-    done = true;
-    wrote = wrote && runStage(rig->engines, Card::Crowd, tone(b, 0.3f).data(), out.data(), kN, p, done);
+    wrote = wrote && runStage(behind->engines, Card::Crowd, tone(b, 0.3f).data(), out.data(), kN, p, ahead);
     unity = unity && out == tone(b, 0.3f);
   }
-  check(wrote && unity && rig->engines.pitch.pitch().period == 0.0f && rig->engines.crowd.leadGain() == 1.0f,
-        "stage: a Crowd card after the pitch stage ran runs only its own engine");
+  check(wrote && unity && behind->engines.autotune.pitch().period == 0.0f && behind->engines.crowd.leadGain() == 1.0f,
+        "stage: a Crowd card behind an Autotune slot with no tracker runs only its own engine");
 }
 
-// Wherever the Crowd card sits against Autotune and Octave, the pitch stage runs at the first of the
-// three, while the Crowd card is on, even with both pitch toggles off, and the Crowd card works on its output.
+// Mob is exempt from the chain order. With an Autotune slot ahead of it, wherever the other cards sit, the
+// Autotune slot writes Mob's ring from Autotune's input and keeps its tracker alive for Mob even with its
+// own toggle off, and Mob reads that tracker and Autotune's correction. With none ahead, Mob writes its own
+// ring and runs its own tracker, whatever sits behind it.
 void checkCrowdPitchStage() {
-  const CrowdOutcome alone = runCrowdLayout(layoutOf({Card::Crowd}), togglesOn({0}));
-  check(alone.sameAsHand && alone.heard && alone.live, "crowd: alone in a layout it gets a live ring and tracker");
+  const CrowdOutcome alone = runCrowdLayout(layoutOf({Card::Crowd}), togglesOn({0}), false);
+  check(alone.sameAsHand && alone.heard && alone.live, "crowd: alone in a layout it gets a live ring and tracker of its own");
 
-  const CrowdOutcome ahead = runCrowdLayout(layoutOf({Card::Crowd, Card::Autotune}), togglesOn({0}));
+  const CrowdOutcome ahead = runCrowdLayout(layoutOf({Card::Crowd, Card::Autotune}), togglesOn({0}), false);
   check(ahead.sameAsHand && ahead.heard && ahead.live,
-        "crowd: ahead of Autotune with Autotune off it still gets a live ring and tracker");
+        "crowd: ahead of Autotune it runs its own ring and tracker, whatever Autotune does");
 
-  const CrowdOutcome aheadBoth = runCrowdLayout(layoutOf({Card::Crowd, Card::Autotune}), togglesOn({0, 1}));
+  const CrowdOutcome aheadBoth = runCrowdLayout(layoutOf({Card::Crowd, Card::Autotune}), togglesOn({0, 1}), false, true);
   check(aheadBoth.sameAsHand && aheadBoth.heard && aheadBoth.live,
-        "crowd: ahead of Autotune with both on, the pitch stage runs at the Crowd card's slot and feeds it");
+        "crowd: ahead of Autotune with both on, Autotune plays no part in Mob's ring or tracker");
 
   const CrowdOutcome behind =
-      runCrowdLayout(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), togglesOn({2}));
+      runCrowdLayout(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), togglesOn({2}), true);
   check(behind.sameAsHand && behind.heard && behind.live,
-        "crowd: behind both pitch cards with both off, the pitch stage still runs and feeds it");
+        "crowd: behind Autotune and Octave with only Mob on, Autotune's slot feeds its ring and tracker");
 
-  const CrowdOutcome all = runCrowdLayout(layoutOf({Card::Autotune, Card::Crowd}), togglesOn({0, 1}));
-  check(all.sameAsHand && all.heard && all.live, "crowd: behind Autotune with both on, one pitch call per block");
+  const CrowdOutcome all = runCrowdLayout(layoutOf({Card::Autotune, Card::Crowd}), togglesOn({0, 1}), true);
+  check(all.sameAsHand && all.heard && all.live, "crowd: behind Autotune with both on, it reads Autotune's tracker and correction");
 
   auto rig = newRig();
   const ChainSnapshot snap = snapshotCrowd(layoutOf({Card::Autotune, Card::Octave, Card::Crowd}), togglesOn({2}));
+  rig->fades.settle(snap.slotOn);
   for (int b = 0; b < kCrowdBlocks; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
-  check(rig->fades.level(0) == kSlotFadeBlocks,
-        "crowd: the pitch stage's slot stays on the engine while only the Crowd card's toggle is on");
+  check(rig->fades.level(0) == 0 && rig->engines.autotune.pitch().period > 0.0f,
+        "crowd: Autotune's slot stays on the dry input while its tracker runs for Mob");
 }
 
-// The Crowd's toggle off fades its slot out, and the pitch stage with it. After the fade the dry
-// input passes bit for bit.
+// The Crowd's toggle off fades its slot out. After the fade the dry input passes bit for bit.
 void checkCrowdToggleOff() {
   const Layout layout = layoutOf({Card::Crowd});
   const ChainSnapshot on = snapshotCrowd(layout, togglesOn({0}));
@@ -1053,10 +1112,14 @@ Layout soloLayout(Card c) {
 Block soloEngine(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) {
   Block out{};
   switch (c) {
-    case Card::Formant: rig.engines.pitch.process(in.data(), out.data(), kN, snap.params.pitchFx); break;
+    case Card::Formant:
+      rig.engines.formant.process(in.data(), out.data(), kN, snap.params.pitchFx.formant, cv::UpstreamPitch{});
+      break;
     case Card::FormantFollower:
-      rig.engines.pitch.process(in.data(), out.data(), kN,
-                                rig.engines.follower.follow(in.data(), kN, snap.params.pitchFx, snap.params.follower));
+      rig.engines.formant.process(
+          in.data(), out.data(), kN,
+          rig.engines.follower.follow(in.data(), kN, snap.params.pitchFx.formant, snap.params.follower),
+          cv::UpstreamPitch{});
       break;
     case Card::Lofi: rig.engines.lofi.process(in.data(), out.data(), kN, snap.params.lofi); break;
     case Card::Bloom: rig.engines.bloom.process(in.data(), out.data(), kN, snap.params.bloom); break;
@@ -1111,9 +1174,9 @@ void checkAppendedCardsRun() {
   auto followerRig = newRig();
   for (int b = 0; b < 40; ++b) runBlock(*followerRig, follower, tone(b, 0.3f), StillClock());
   const bool driven = followerRig->engines.follower.drive() > 0.5f;
-  resetEngine(followerRig->engines, Engine::Pitch);
+  resetEngine(followerRig->engines, Engine::Formant);
   check(driven && followerRig->engines.follower.drive() == 0.0f,
-        "the Formant follower's envelope follows the tone, and resetEngine on the pitch engine clears it");
+        "the Apraxia follower's envelope follows the tone, and resetEngine on the Formant engine clears it");
 
   const ChainSnapshot lofi = snapshotToggles(soloLayout(Card::Lofi), 0.5f, allToggles(true));
   auto lofiRig = newRig();
@@ -1122,40 +1185,192 @@ void checkAppendedCardsRun() {
   check(allZero(runBlock(*lofiRig, lofi, Block{}, StillClock()).out), "resetEngine clears the Lo-fi engine, so silence in is silence out");
 }
 
-// Formant acts at the first pitch-group card's slot, wherever its own card sits. Its toggle alone keeps
-// the stage and its tracker running: with Autotune off, in slot 1 or in slot 3, the pitch call goes
-// through at the first of the two and a Formant card behind Autotune writes nothing of its own.
-void checkFormantPitchStage() {
-  Layout behind = layoutOf({Card::Autotune});
-  behind.card[kSlot3] = Card::Formant;
-  Layout ahead = layoutOf({Card::Formant});
-  ahead.card[kSlot3] = Card::Autotune;
-  const std::initializer_list<std::pair<const char*, Layout>> layouts = {
-      {"Formant in slot 3 behind Autotune in slot 1", behind}, {"Formant in slot 1 ahead of Autotune in slot 3", ahead}};
-  for (const auto& entry : layouts) {
-    const bool formantBehind = entry.second.card[kSlot3] == Card::Formant;
-    const ChainSnapshot snap = snapshotToggles(entry.second, 0.5f, togglesOn({formantBehind ? kSlot3 : 0}));
+// The slots of `snap` run by hand on `rig`'s own engines, each card's engine called on the block the slot
+// ahead hands it. The pitch path is kept as spec section 2 lays it out. It covers Autotune (with a Formant
+// directly behind it asking for its tracker), Octave, Formant, Mob with no Autotune ahead, and Distortion.
+Block walkSlotsByHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
+  Block cur = in;
+  bool autotuneAhead = false;
+  bool adjacent = false;
+  cv::UpstreamPitch up;
+  for (int s = 0; s < kSlotCount; ++s) {
+    const Card c = snap.layout.card[static_cast<size_t>(s)];
+    if (c == Card::Empty) continue;
+    Block next{};
+    switch (c) {
+      case Card::Autotune: {
+        cv::TrackerNeeds need;
+        for (int t = s + 1; t < kSlotCount; ++t) {
+          const Card behind = snap.layout.card[static_cast<size_t>(t)];
+          if (behind == Card::Empty) continue;
+          if (behind == Card::Formant) need = {true, true, true};
+          break;
+        }
+        rig.engines.autotune.process(cur.data(), next.data(), kN, snap.params.pitchFx.autotune, need);
+        autotuneAhead = true;
+        adjacent = true;
+        up = {&rig.engines.autotune.pitch(), rig.engines.autotune.correctionSemis(), rig.engines.autotune.outputLatency()};
+        break;
+      }
+      case Card::Octave:
+        rig.engines.octave.process(cur.data(), next.data(), kN, snap.params.pitchFx.octave);
+        adjacent = false;
+        if (autotuneAhead) {
+          if (rig.engines.octave.leads()) up.shiftSemis += rig.engines.octave.intervalSemis();
+          up.latency += rig.engines.octave.outputLatency();
+        }
+        break;
+      case Card::Formant:
+        rig.engines.formant.process(cur.data(), next.data(), kN, snap.params.pitchFx.formant,
+                                    autotuneAhead && adjacent ? up : cv::UpstreamPitch{});
+        adjacent = false;
+        if (autotuneAhead) up.latency += rig.engines.formant.outputLatency();
+        break;
+      case Card::Crowd: rig.engines.crowd.process(cur.data(), next.data(), kN, snap.params.crowd, cv::CrowdPitch{}); break;
+      case Card::Distortion:
+        rig.engines.distortion.process(cur.data(), next.data(), kN, snap.params.distortion);
+        adjacent = false;
+        break;
+      default: break;
+    }
+    cur = next;
+  }
+  return cur;
+}
+
+// Each card's slot output equals its engine run by hand on that slot's input. The layouts are the audit's
+// 4a (Autotune 2, Distortion 3, Octave 4), 4b (Mob 2, Octave 3), 4c (Octave 2, Autotune 3) and 4d (Autotune 2,
+// Formant 3, Octave 4), where Formant sits directly behind Autotune and reads its tracker.
+void checkSlotsEqualEngines() {
+  struct Case {
+    const char* name;
+    Layout layout;
+  };
+  const Case cases[] = {
+      {"4a Autotune, Distortion, Octave", layoutOf({Card::Empty, Card::Autotune, Card::Distortion, Card::Octave})},
+      {"4b Mob, Octave", layoutOf({Card::Empty, Card::Crowd, Card::Octave})},
+      {"4c Octave, Autotune", layoutOf({Card::Empty, Card::Octave, Card::Autotune})},
+      {"4d Autotune, Formant, Octave", layoutOf({Card::Empty, Card::Autotune, Card::Formant, Card::Octave})},
+  };
+  for (const Case& k : cases) {
+    const ChainSnapshot snap = snapshotToggles(k.layout, 0.5f, allToggles(true));
     auto chain = newRig();
     auto hand = newRig();
+    chain->fades.settle(snap.slotOn);
+    hand->fades.settle(snap.slotOn);
     bool same = true;
     bool heard = false;
     for (int b = 0; b < kCardRunBlocks; ++b) {
       const Block in = tone(b, 0.3f);
       const Run run = runBlock(*chain, snap, in, StillClock());
-      Block want{};
-      hand->engines.pitch.process(in.data(), want.data(), kN, snap.params.pitchFx);
-      same = same && run.out == want;
+      same = same && run.out == walkSlotsByHand(*hand, snap, in);
       if (b >= kCardRunBlocks / 2) heard = heard || run.out != in;
     }
-    const std::string name = entry.first;
-    check(snap.params.pitchFx.formant.on && !snap.params.pitchFx.autotune.on,
-          (name + ": only Formant's toggle is on").c_str());
-    check(same && heard, (name + ": the stage runs on Formant's toggle alone and the chain equals the pitch call").c_str());
-    check(chain->engines.pitch.pitch().period > 0.0f, (name + ": the tracker holds a period").c_str());
-    check(chain->fades.level(0) == kSlotFadeBlocks,
-          (name + ": the stage's slot, the first pitch-group slot, stays on the engine while only Formant's toggle is on")
-              .c_str());
+    check(same && heard, (std::string("slots: ") + k.name + ": every slot equals its engine run by hand on its input").c_str());
   }
+}
+
+// Formant reads Autotune's tracker when it sits directly behind it, so its own tracker stays idle. Anywhere
+// else (Octave between, Autotune behind it, no Autotune) it runs a tracker of its own, and the chain still
+// equals the engines run by hand.
+void checkFormantReusesTracker() {
+  struct Case {
+    const char* name;
+    Layout layout;
+    bool reuses;
+  };
+  const Case cases[] = {
+      {"Formant directly behind Autotune", layoutOf({Card::Autotune, Card::Formant}), true},
+      {"Formant behind Autotune with an Empty slot between", layoutOf({Card::Autotune, Card::Empty, Card::Formant}), true},
+      {"Formant behind Autotune and Octave", layoutOf({Card::Autotune, Card::Octave, Card::Formant}), false},
+      {"Formant ahead of Autotune", layoutOf({Card::Formant, Card::Autotune}), false},
+      {"Formant alone", layoutOf({Card::Formant}), false},
+  };
+  for (const Case& k : cases) {
+    const ChainSnapshot snap = snapshotToggles(k.layout, 0.5f, allToggles(true));
+    auto chain = newRig();
+    auto hand = newRig();
+    chain->fades.settle(snap.slotOn);
+    hand->fades.settle(snap.slotOn);
+    bool same = true;
+    for (int b = 0; b < kCardRunBlocks; ++b) {
+      const Block in = tone(b, 0.3f);
+      same = same && runBlock(*chain, snap, in, StillClock()).out == walkSlotsByHand(*hand, snap, in);
+    }
+    const bool ownRuns = chain->engines.formant.ownPitch().period > 0.0f;
+    check(same, (std::string(k.name) + ": the chain equals the engines run by hand").c_str());
+    check(ownRuns == !k.reuses,
+          (std::string(k.name) + (k.reuses ? ": Formant's own tracker stays idle" : ": Formant runs its own tracker")).c_str());
+  }
+}
+
+// Autotune's tracker runs with Autotune's toggle off while a reader behind it is on, and the slot passes the
+// dry input bit for bit. Formant directly behind reads that tracker and equals its engine run by hand on it.
+void checkAutotuneTrackerForReaders() {
+  const Layout layout = layoutOf({Card::Autotune, Card::Formant});
+  const ChainSnapshot snap = snapshotToggles(layout, 0.5f, togglesOn({1}));
+  auto chain = newRig();
+  auto hand = newRig();
+  chain->fades.settle(snap.slotOn);
+  hand->fades.settle(snap.slotOn);
+  bool same = true;
+  bool dry = true;
+  for (int b = 0; b < kCardRunBlocks; ++b) {
+    const Block in = tone(b, 0.3f);
+    const Run run = runBlock(*chain, snap, in, StillClock());
+
+    // By hand: Autotune runs for its reader and the slot hands on the dry input, Formant reads the tracker.
+    Block tuned{};
+    Block want{};
+    cv::TrackerNeeds need{true, true, true};
+    hand->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchFx.autotune, need);
+    const cv::UpstreamPitch up{&hand->engines.autotune.pitch(), 0.0f, 0.0f};
+    hand->engines.formant.process(in.data(), want.data(), kN, snap.params.pitchFx.formant, up);
+    same = same && run.out == want;
+    dry = dry && chain->fades.level(0) == 0;
+  }
+  check(same && dry, "autotune: with its toggle off and Formant on behind it, the slot passes the dry input and Formant equals its engine");
+  check(chain->engines.autotune.pitch().period > 0.0f && chain->engines.formant.ownPitch().period == 0.0f,
+        "autotune: its tracker holds the period for Formant, whose own tracker stays idle");
+
+  // With Formant off too, no reader is left and the Autotune engine rests.
+  const ChainSnapshot none = snapshotToggles(layout, 0.5f, togglesOn({}));
+  for (int b = 0; b < 3 * kSlotFadeBlocks; ++b) runBlock(*chain, none, tone(300 + b, 0.3f), StillClock());
+  const auto& ring = chain->engines.autotune.ringForTest().data();
+  check(std::all_of(ring.begin(), ring.end(), [](float v) { return v == 0.0f; }),
+        "autotune: with no reader on, a settled-off slot rests its engine and leaves its ring clear");
+}
+
+// Apraxia behind a Deepthroat-first layout: Deepthroat has no Autotune ahead, so Apraxia runs its own tracker
+// on Deepthroat's output, and its SHIFT sweeps with the follower's envelope of that block.
+void checkApraxiaBehindDeepthroat() {
+  const Layout layout = layoutOf({Card::Growl, Card::FormantFollower});
+  const ChainSnapshot snap = snapshotToggles(layout, 1.0f, allToggles(true));  // RANGE at +6 st
+  auto chain = newRig();
+  auto hand = newRig();
+  chain->fades.settle(snap.slotOn);
+  hand->fades.settle(snap.slotOn);
+  bool same = true;
+  bool finite = true;
+  float lowest = 1e9f;
+  float highest = -1e9f;
+  for (int b = 0; b < 240; ++b) {
+    const Block in = tone(b, (b / 40) % 2 == 0 ? 0.3f : 0.0f);
+    const Run run = runBlock(*chain, snap, in, StillClock());
+    Block grown{};
+    Block want{};
+    hand->engines.growl.process(in.data(), grown.data(), kN, snap.params.growl, cv::UpstreamPitch{});
+    hand->engines.formant.process(
+        grown.data(), want.data(), kN,
+        hand->engines.follower.follow(grown.data(), kN, snap.params.pitchFx.formant, snap.params.follower),
+        cv::UpstreamPitch{});
+    same = same && run.out == want;
+    finite = finite && run.finite && allFinite(run.out);
+    lowest = std::min(lowest, chain->engines.formant.shiftSemis());
+    highest = std::max(highest, chain->engines.formant.shiftSemis());
+  }
+  check(same && finite, "apraxia: behind Deepthroat it equals the engines run by hand and stays finite");
+  check(highest - lowest > 0.5f, "apraxia: behind Deepthroat its SHIFT sweeps with the envelope");
 }
 
 // The Chatter card keys on the Input gate's detector when the layout places that card, whether or not
@@ -1235,8 +1450,7 @@ struct SourceRun {
 
 // Runs `layout` through the chain, and the slots ahead of the Chatter card by hand beside it. The hand
 // run on a second rig gives the block entering the Chatter slot.
-SourceRun runSource(const Layout& layout, const Toggles& toggles) {
-  constexpr int kBlocks = 250;
+SourceRun runSource(const Layout& layout, const Toggles& toggles, int kBlocks = 250) {
   const ChainSnapshot snap = snapshotCrowd(layout, toggles);
   int bloomSlot = 0;
   for (int s = 0; s < kSlotCount; ++s) {
@@ -1248,7 +1462,6 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
   hand->fades.settle(snap.slotOn);
   std::vector<float> entering;
   std::vector<float> head;
-  bool pitchDone = false;
   for (int b = 0; b < kBlocks; ++b) {
     const Block in = tone(b, 0.3f);
     runBlock(*chain, snap, in, StillClock());
@@ -1256,9 +1469,9 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
     Block scratch{};
     hand->engines.polish.processFront(in.data(), a.data(), kN, snap.params.eq);
     append(head, a);
-    pitchDone = false;
+    PitchPath path;
     for (int s = 0; s < bloomSlot; ++s) {
-      if (runSlot(hand->engines, hand->fades, s, snap, a.data(), scratch.data(), kN, pitchDone)) std::swap(a, scratch);
+      if (runSlot(hand->engines, hand->fades, s, snap, a.data(), scratch.data(), kN, path)) std::swap(a, scratch);
     }
     append(entering, a);
   }
@@ -1289,7 +1502,7 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
 // The Chatter card cuts its slices from its own input, the block leaving the slot ahead of it, so the
 // slices carry every card between the voice and the slot. With Distortion in slot 2 the slices equal the
 // distorted block and differ from the chain input; with Mob after Octave they equal Mob's output; with
-// Mob ahead of Octave and making the pitch call they still do; with the card in slot 1 they equal the
+// Mob ahead of Octave they equal the block leaving slot 6; with the card in slot 1 they equal the
 // chain input.
 void checkBloomSource() {
   Layout dist = layoutOf({Card::Empty, Card::Distortion});
@@ -1306,9 +1519,9 @@ void checkBloomSource() {
 
   Layout crowdFirst = layoutOf({Card::InputGate, Card::Crowd, Card::Octave});
   crowdFirst.card[kSlot7] = Card::Bloom;
-  const SourceRun c = runSource(crowdFirst, togglesOn({1, 2, kSlot7}));
+  const SourceRun c = runSource(crowdFirst, togglesOn({1, 2, kSlot7}), 600);
   check(c.slices >= 2 && c.matchesSlotInput && c.differs > c.samples / 2,
-        "chatter source: with Mob ahead of Octave and making the pitch call, the slices equal the block leaving slot 6");
+        "chatter source: with Mob ahead of Octave, the slices equal the block leaving slot 6");
 
   Layout early = layoutOf({Card::Bloom, Card::Empty, Card::Octave});
   const SourceRun first = runSource(early, togglesOn({0, 2}));
@@ -1332,8 +1545,8 @@ void checkSettledSlotsAreInert() {
     const Run run = runBlock(*rig, snap, in, StillClock());
     // By hand: slot 0 is off and stopped, slot 1 runs its engine on the input.
     Block next{};
-    bool pitchDone = false;
-    runStage(hand->engines, Card::Distortion, in.data(), next.data(), kN, snap.params, pitchDone);
+    PitchPath path;
+    runStage(hand->engines, Card::Distortion, in.data(), next.data(), kN, snap.params, path);
     worst = std::max(worst, maxAbsDiff(run.out, next));
   }
   check(worst == 0.0f, "slot flip: a slot settled off runs no engine and the next slot gets the dry input");
@@ -1343,10 +1556,10 @@ void checkSettledSlotsAreInert() {
 
 void checkChainRun() {
   checkRouting();
-  checkEmptyAndPitchSharing();
+  checkEmptyAndPitchCards();
   checkWalkAgainstHand();
   checkEmptyChain();
-  checkPitchCalledOnce();
+  checkPitchCardsInSeries();
   checkGrowlRingRests();
   checkNanGuard();
   checkStageTiming();
@@ -1364,12 +1577,16 @@ void checkChainRun() {
   checkSlotFlipReverses();
   checkInputGateKeepsDetector();
   checkInputGateOffInPause();
-  checkPitchStageToggles();
+  checkPitchCardToggles();
+  checkPitchTogglesFadeOwnSlot();
   checkCrowdStage();
   checkCrowdPitchStage();
   checkCrowdToggleOff();
   checkAppendedCardsRun();
-  checkFormantPitchStage();
+  checkSlotsEqualEngines();
+  checkFormantReusesTracker();
+  checkAutotuneTrackerForReaders();
+  checkApraxiaBehindDeepthroat();
   checkBloomKey();
   checkBloomSource();
   checkSettledSlotsAreInert();

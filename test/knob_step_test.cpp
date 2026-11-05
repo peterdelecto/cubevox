@@ -59,33 +59,35 @@ double peakCurvature(const Signal& x, int from, int to) {
   return worst;
 }
 
-// Runs `in` through a fresh engine with `a` before kStepAt and `b` from there on.
-template <typename Fx, typename P>
-Signal runFx(const Signal& in, const ChainParams& a, const ChainParams& b, P ChainParams::*field) {
+// Runs `in` through a fresh engine with `a` before kStepAt and `b` from there on. `get` picks the engine's
+// params out of a ChainParams.
+template <typename Fx, typename Get>
+Signal runFxWith(const Signal& in, const ChainParams& a, const ChainParams& b, Get get) {
   auto fx = std::make_unique<Fx>();
   fx->reset();
   Signal out(in.size());
   for (int i = 0; i < kTotal; i += cv::kBlock) {
     const size_t k = static_cast<size_t>(i);
-    fx->process(&in[k], &out[k], cv::kBlock, (i < kStepAt ? a : b).*field);
+    fx->process(&in[k], &out[k], cv::kBlock, get(i < kStepAt ? a : b));
   }
   return out;
 }
 
-// Runs `in` through the Crowd card as the chain does when it sits alone: the pitch stage first, which
-// writes the ring and feeds the tracker, then the Crowd card on that stage's output.
+template <typename Fx, typename P>
+Signal runFx(const Signal& in, const ChainParams& a, const ChainParams& b, P ChainParams::*field) {
+  return runFxWith<Fx>(in, a, b, [field](const ChainParams& p) -> const P& { return p.*field; });
+}
+
+// Runs `in` through the Crowd card as the chain does when it sits alone: with no Autotune card ahead, the
+// card writes its own ring and runs its own tracker.
 Signal runCrowd(const Signal& in, const ChainParams& a, const ChainParams& b) {
-  auto pitch = std::make_unique<cv::PitchFx>();
   auto fx = std::make_unique<cv::Crowd>();
-  pitch->reset();
   fx->reset();
   Signal out(in.size());
-  std::array<float, cv::kBlock> lead{};
   for (int i = 0; i < kTotal; i += cv::kBlock) {
     const size_t k = static_cast<size_t>(i);
     const ChainParams& p = i < kStepAt ? a : b;
-    pitch->process(&in[k], lead.data(), cv::kBlock, p.pitchFx);
-    fx->process(lead.data(), &out[k], cv::kBlock, p.crowd, *pitch);
+    fx->process(&in[k], &out[k], cv::kBlock, p.crowd, cv::CrowdPitch{});
   }
   return out;
 }
@@ -94,7 +96,12 @@ Signal runCrowd(const Signal& in, const ChainParams& a, const ChainParams& b) {
 Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams& b) {
   switch (engineOf(c)) {
     case Engine::InputGate: return runFx<cv::Gate>(in, a, b, &ChainParams::inputGate);
-    case Engine::Pitch: return runFx<cv::PitchFx>(in, a, b, &ChainParams::pitchFx);
+    case Engine::Autotune:
+      return runFxWith<cv::AutotuneFx>(in, a, b, [](const ChainParams& p) -> const cv::AutotuneParams& { return p.pitchFx.autotune; });
+    case Engine::Octave:
+      return runFxWith<cv::OctaveFx>(in, a, b, [](const ChainParams& p) -> const cv::OctaveParams& { return p.pitchFx.octave; });
+    case Engine::Formant:
+      return runFxWith<cv::FormantFx>(in, a, b, [](const ChainParams& p) -> const cv::FormantParams& { return p.pitchFx.formant; });
     case Engine::Unison: return runFx<cv::Unison>(in, a, b, &ChainParams::unison);
     case Engine::Slapback: return runFx<cv::Slapback>(in, a, b, &ChainParams::slapback);
     case Engine::Distortion: return runFx<cv::Distortion>(in, a, b, &ChainParams::distortion);
@@ -399,10 +406,11 @@ bool checkGateKnob(Card c, int knob) {
 constexpr size_t kLofiSlot = 6;
 
 Signal runLofiSlot(const Signal& in, const ChainParams& base, bool turnOn) {
-  auto pitch = std::make_unique<cv::PitchFx>();
+  auto autotune = std::make_unique<cv::AutotuneFx>();
+  auto octave = std::make_unique<cv::OctaveFx>();
   auto unison = std::make_unique<cv::Unison>();
   auto distortion = std::make_unique<cv::Distortion>();
-  auto engines = std::make_unique<ChainEngines>(*pitch, *unison, *distortion);
+  auto engines = std::make_unique<ChainEngines>(*autotune, *octave, *unison, *distortion);
   auto snap = std::make_unique<ChainSnapshot>();
   snap->layout.card.fill(Card::Empty);
   snap->layout.card[kLofiSlot] = Card::Lofi;
@@ -412,13 +420,13 @@ Signal runLofiSlot(const Signal& in, const ChainParams& base, bool turnOn) {
   start.fill(!turnOn);
   fades.settle(start);
   Signal out(in.size());
-  bool pitchDone = false;
+  PitchPath path;
   for (int i = 0; i < kTotal; i += cv::kBlock) {
     const size_t k = static_cast<size_t>(i);
     const bool on = i < kStepAt ? !turnOn : turnOn;
     snap->slotOn[kLofiSlot] = on;
     snap->params.lofi.on = on;
-    if (!runSlot(*engines, fades, static_cast<int>(kLofiSlot), *snap, &in[k], &out[k], cv::kBlock, pitchDone)) {
+    if (!runSlot(*engines, fades, static_cast<int>(kLofiSlot), *snap, &in[k], &out[k], cv::kBlock, path)) {
       std::copy(in.begin() + static_cast<std::ptrdiff_t>(k), in.begin() + static_cast<std::ptrdiff_t>(k + cv::kBlock),
                 out.begin() + static_cast<std::ptrdiff_t>(k));
     }

@@ -30,10 +30,9 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   4. each layout's VOX EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
-The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Apraxia, Crowd or Deepthroat
-slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Apraxia),
-plus the tracker row when Autotune, Crowd, Formant, Apraxia or Deepthroat is placed and the stage
-row when Octave, Formant or Apraxia is placed without Autotune.
+Each card's slot is held to its own row. A slot that runs a tracker adds the tracker row: Autotune's slot,
+a Formant or Apraxia slot that does not sit directly behind Autotune, and a Mob or Deepthroat slot with no
+Autotune ahead of it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
 --dry-run prints the layouts, the sweeps, the toggle flips and the fixed-stage flips planned for each,
@@ -110,11 +109,8 @@ ROW_OF = {
     "formant_follow": "kFormantFollower", "growl": "kGrowl",
 }
 TRACKER_ROW = "kTracker"
-STAGE_ROW = "kPitchStage"  # the stage's own work when Octave, Formant or Apraxia runs without Autotune
-PITCH_STAGE = ("autotune", "octave", "formant", "formant_follow")  # cards the shared PitchFx runs
-PITCH_GROUP = ("autotune", "octave", "formant", "formant_follow", "crowd", "growl")  # the first carries the stage's cost
-TRACKER_USERS = ("autotune", "crowd", "formant", "formant_follow", "growl")  # cards that run the shared pitch tracker
-STAGE_USERS = ("octave", "formant", "formant_follow")  # cards that pay the stage term without Autotune
+FORMANT_CARDS = ("formant", "formant_follow")  # Formant and Apraxia play one voice
+READERS = ("crowd", "growl")  # cards that read Autotune's tracker when one sits ahead and run their own otherwise
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
 # The fixed path's rows: VOX EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
@@ -170,7 +166,7 @@ def read_text(path):
 def read_rows():
     """The costs.h rows as {name: (mean percent, worst percent)}."""
     rows = {m.group(1): (int(m.group(2)), int(m.group(3))) for m in COST_ROW.finditer(read_text(COSTS_H))}
-    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW, STAGE_ROW, *FIXED_PARTS) if n not in rows]
+    missing = [n for n in (*ROW_OF.values(), TRACKER_ROW, *FIXED_PARTS) if n not in rows]
     if missing:
         raise StressError(f"{COSTS_H}: no row for {', '.join(missing)}")
     rows[FIXED_ROW] = (sum(rows[n][0] for n in FIXED_PARTS), sum(rows[n][1] for n in FIXED_PARTS))
@@ -220,33 +216,42 @@ def layout_table():
 
 
 def slot_bounds(slots, chasm, rows):
-    """Per slot, (mean percent, worst percent) it may use, or None for an empty slot.
+    """Per slot, (mean percent, worst percent) it may use, or None for an empty slot, and the set of slots
+    that run a tracker.
 
-    The first pitch-group slot runs the shared pitch stage, so it carries every Autotune, Octave and Formant
-    row placed, the tracker row when Autotune, Crowd or Formant is placed, and the stage row when Octave or
-    Formant is placed without Autotune, as layoutCost sums them. The reverb slot reads Chasm's row while the
-    chasm op is on.
+    A slot pays the tracker row when it runs one, as layoutCost counts them: Autotune's slot, a Formant or
+    Apraxia slot that does not sit directly behind Autotune (only Empty slots between), and a Mob or
+    Deepthroat slot with no Autotune ahead. The reverb slot reads Chasm's row while the chasm op is on.
     """
     def row_of(card):
         return rows[ROW_OF["reverb_chasm" if chasm and card.startswith("reverb_") else card]]
 
-    carrier = next((i for i, c in enumerate(slots) if c in PITCH_GROUP), None)
+    runs_tracker = set()
+    autotune_ahead = False
+    adjacent = False
+    for i, card in enumerate(slots):
+        if card == "empty":
+            continue
+        if card == "autotune":
+            runs_tracker.add(i)
+            autotune_ahead = adjacent = True
+            continue
+        if card in FORMANT_CARDS:
+            if not (autotune_ahead and adjacent):
+                runs_tracker.add(i)
+        elif card in READERS and not autotune_ahead:
+            runs_tracker.add(i)
+        adjacent = False
     bounds = []
     for i, card in enumerate(slots):
         if card == "empty":
             bounds.append(None)
             continue
         mean, worst = row_of(card)
-        if i == carrier:
-            for other in slots:
-                if other in PITCH_STAGE and other != card:
-                    mean, worst = mean + rows[ROW_OF[other]][0], worst + rows[ROW_OF[other]][1]
-            if any(c in slots for c in TRACKER_USERS):
-                mean, worst = mean + rows[TRACKER_ROW][0], worst + rows[TRACKER_ROW][1]
-            if any(c in slots for c in STAGE_USERS) and "autotune" not in slots:
-                mean, worst = mean + rows[STAGE_ROW][0], worst + rows[STAGE_ROW][1]
+        if i in runs_tracker:
+            mean, worst = mean + rows[TRACKER_ROW][0], worst + rows[TRACKER_ROW][1]
         bounds.append((mean, worst))
-    return bounds, carrier
+    return bounds, runs_tracker
 
 
 # -- the box
@@ -589,12 +594,12 @@ def judge_fixed(agg, rows, label, table, gates):
 
 
 def judge(result, rows):
-    """Fills result['table'], result['gates'] and result['carrier'] from the aggregate.
+    """Fills result['table'], result['gates'] and result['trackers'] from the aggregate.
 
     Every check is a gate, passed or not, so the count in the output is the number of checks made.
     """
     agg = result["agg"]
-    bounds, carrier = slot_bounds(result["slots"], result["chasm"], rows)
+    bounds, trackers = slot_bounds(result["slots"], result["chasm"], rows)
     table, gates = [], []
     label = result["name"]
     for what, count in (("late blocks", agg["late"]), ("overruns", agg["overruns"]), ("dry blocks", agg["dry"])):
@@ -611,7 +616,7 @@ def judge(result, rows):
                 over.append(kind)
             gates.append(Gate(f"{label}: slot {i + 1} {card} {kind} within its row", within,
                               f"{value / CYCLES_PER_PERCENT:.2f} % {'within' if within else 'over'} {row} %"))
-        table.append((i + 1, card + ("*" if i == carrier else ""), mean, row_mean, worst, row_worst,
+        table.append((i + 1, card + ("*" if i in trackers else ""), mean, row_mean, worst, row_worst,
                       "ok" if not over else "FAIL " + " and ".join(over)))
     judge_fixed(agg, rows, label, table, gates)
     block_mean, block_worst = agg["block_mean"], agg["block_worst"]
@@ -619,7 +624,7 @@ def judge(result, rows):
                       block_mean / CYCLES_PER_PERCENT < BLOCK_MEAN_LIMIT_PERCENT, fmt_pct(block_mean)))
     gates.append(Gate(f"{label}: block worst under {BLOCK_WORST_LIMIT_PERCENT} %",
                       block_worst / CYCLES_PER_PERCENT < BLOCK_WORST_LIMIT_PERCENT, fmt_pct(block_worst)))
-    result["table"], result["gates"], result["carrier"] = table, gates, carrier
+    result["table"], result["gates"], result["trackers"] = table, gates, trackers
 
 
 def block_line(agg):
@@ -667,11 +672,10 @@ def report_lines(results, header):
             out.append(f"| {slot} | {card} | {fmt_k(mean)} | {fmt_pct(mean)} | {fmt_row(row_mean)} | "
                        f"{fmt_k(worst)} | {fmt_pct(worst)} | {fmt_row(row_worst)} | {verdict} |")
         out.append("")
-        if r["carrier"] is not None:
-            out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
-                       "Autotune, Octave, Formant and Apraxia rows placed, plus the tracker row when Autotune, Crowd, "
-                       "Formant, Apraxia or Deepthroat is placed and the stage row when Octave, Formant "
-                       "or Apraxia is placed without Autotune.")
+        if r["trackers"]:
+            out.append("`*` The slot runs a pitch tracker, so its row includes the tracker row. Autotune's slot runs "
+                       "one, Formant and Apraxia run one unless they sit directly behind Autotune, and Mob and "
+                       "Deepthroat run one when no Autotune sits ahead of them.")
             out.append("")
         out.append(block_line(r["agg"]))
         out.append("")
@@ -789,10 +793,10 @@ def plan_lines(name, slots, chasm, runs, seconds, rows):
     """What one layout's runs do, as text."""
     out = [f"{name} ({' '.join(slots)}{', reverb on Chasm' if chasm else ''}), {runs} run(s) of "
            f"{plan_seconds(slots, seconds):.0f} s"]
-    bounds, carrier = slot_bounds(slots, chasm, rows)
+    bounds, trackers = slot_bounds(slots, chasm, rows)
     for i, (card, bound) in enumerate(zip(slots, bounds)):
         if bound is not None:
-            out.append(f"  bound: slot {i + 1} {card}{'*' if i == carrier else ''} mean {bound[0]} %, worst {bound[1]} %")
+            out.append(f"  bound: slot {i + 1} {card}{'*' if i in trackers else ''} mean {bound[0]} %, worst {bound[1]} %")
     out.append(f"  pass 1: knobs at top, {seconds:g} s")
     for sweep in sweeps(slots):
         extra = f", partner knob {sweep.partner} stepped inside the glide" if sweep.partner else ""

@@ -42,6 +42,12 @@ inline float step(float x, float target, float a) {
   return next == x || fabsf(target - next) < kSnap ? target : next;
 }
 
+// x moved toward target by at most `delta`, a straight line. It lands on the target exactly.
+inline float toward(float x, float target, float delta) {
+  if (x < target) return target - x <= delta ? target : x + delta;
+  return x - target <= delta ? target : x - delta;
+}
+
 // x after n steps toward target. A smoother that already sits on its target returns at once.
 inline float advance(float x, float target, float a, int n) {
   if (x == target) return target;

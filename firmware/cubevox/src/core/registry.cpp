@@ -48,11 +48,11 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Empty, "empty", "Empty", kNoEngine, 0, {kNoKnob, kNoKnob}, Group::None, costs::kEmpty},
     {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kInputThreshold, kInputDecay}, Group::None,
      costs::kInputGate},
-    {Card::Autotune, "autotune", "Autotune", Engine::Pitch, 2,
+    {Card::Autotune, "autotune", "Autotune", Engine::Autotune, 2,
      {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, 0, cv::kKeyName.data()},
       kResponse},
      Group::Pitch, costs::kAutotune},
-    {Card::Octave, "octave", "Octave", Engine::Pitch, 2,
+    {Card::Octave, "octave", "Octave", Engine::Octave, 2,
      {{"Semitones", KnobKind::Stepped, kSemitonePositions, kSemitoneMin, kSemitoneMax, "st"}, kPercent("Mix")},
      Group::Pitch, costs::kOctave},
     {Card::Unison, "unison", "Unison", Engine::Unison, 2, {kPercent("Rate"), kPercent("Depth")}, Group::None,
@@ -71,11 +71,11 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
       {"VOICES", KnobKind::Stepped, cv::kVoicesSteps, 0.0f, cv::kVoicesSteps - 1, "", Curve::Linear, 0,
        cv::kVoicesName.data()}},
      Group::Pitch, costs::kCrowd},
-    {Card::Formant, "formant", "Formant", Engine::Pitch, 2, {kFormantShift, kPercent("MIX")}, Group::Pitch,
+    {Card::Formant, "formant", "Formant", Engine::Formant, 2, {kFormantShift, kPercent("MIX")}, Group::Pitch,
      costs::kFormant},
     {Card::Lofi, "lofi", "Lo-fi", Engine::Lofi, 2, {kPercent("TONE"), kPercent("AMOUNT")}, Group::None, costs::kLofi},
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
-    {Card::FormantFollower, "formant_follow", "Apraxia", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
+    {Card::FormantFollower, "formant_follow", "Apraxia", Engine::Formant, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
 }};
@@ -296,20 +296,12 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::Gate: out.gate.on = on; break;
     case Card::ReverbSpring:
     case Card::ReverbChasm: out.reverb.on = on; break;
-    case Card::Crowd:
-      // The pitch stage reads crowdOn to keep its tracker and ring running for the Crowd card.
-      out.crowd.on = on;
-      out.pitchFx.crowdOn = on;
-      break;
+    case Card::Crowd: out.crowd.on = on; break;
     case Card::Formant: out.pitchFx.formant.on = on; break;
     case Card::Lofi: out.lofi.on = on; break;
     case Card::Bloom: out.bloom.on = on; break;
     case Card::FormantFollower: out.pitchFx.formant.on = on; break;
-    case Card::Growl:
-      // The pitch stage reads growlOn to keep its tracker and ring running for the Growl card.
-      out.growl.on = on;
-      out.pitchFx.growlOn = on;
-      break;
+    case Card::Growl: out.growl.on = on; break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -320,7 +312,7 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
-  // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
+  // Apraxia's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
   if (c == Card::FormantFollower) out.follower.placed = true;
 }
 
