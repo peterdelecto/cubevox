@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
-# Installs the Vox Processor Prototype into a folder on the Desktop.
+# Installs the cubevox emulator into a folder on the Desktop.
 #
 #   curl -fsSL https://raw.githubusercontent.com/peterdelecto/cubevox/main/tools/install.sh | bash
 #
 # tools/package.sh builds the zip and a person attaches it to a release. The workflows attach
 # firmware files only, so the latest release does not carry the zip, and the URL below names the
-# newest release that does. Running the script again replaces the app and the samples in place.
+# release that does. Running the script again replaces the app and the shipped clips in place and
+# leaves any other clip in the samples folder alone.
 set -euo pipefail
 
-url="https://github.com/peterdelecto/cubevox/releases/download/v2.00.04/vox-processor-prototype.zip"
-name="Vox Processor Prototype"
+url="https://github.com/peterdelecto/cubevox/releases/download/RELEASE_TAG/cubevox-emulator.zip"
+
+name="cubevox emulator"
 dest="$HOME/Desktop/$name"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 echo "Downloading $name..."
-curl -fL --progress-bar "$url" -o "$tmp/vox.zip"
-ditto -x -k "$tmp/vox.zip" "$tmp/x"
+curl -fL --progress-bar "$url" -o "$tmp/emulator.zip"
+ditto -x -k "$tmp/emulator.zip" "$tmp/x"
 
 mkdir -p "$dest"
 rm -rf "$dest/$name.app"
