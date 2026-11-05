@@ -11,11 +11,21 @@
 // finds the period cheaply, then a narrow search at 48 kHz refines it when the
 // caller asks for the fine pass (Autotune at every RESPONSE and the Formant card
 // need it; the Mob card does not).
+//
+// A frame needs a full 21 ms of the new note before it reads voiced, so at a note that starts
+// mid-phrase the period would hold the old note for 25 to 145 ms and then step. While the tracker
+// reads unvoiced and the newest 20 ms are above the level floor, a cheap onset estimate on those 20 ms
+// takes the period as soon as it is clear. When the tracker voices, the period slides from the
+// estimate to the tracker's reading over kSlideSamples. The first note after a reset has no period
+// to step from, so it waits for the tracker.
 
 namespace cv {
 
 struct PitchResult {
-  float period = 0.0f;   // samples at kSampleRate; 0 until the first voiced frame and while the tracker is idle
+  // Samples at kSampleRate; 0 until the first voiced frame or onset estimate and while the tracker is idle.
+  // While unvoiced it holds the last voiced period, or the onset estimate once one is clear, and for
+  // PitchTracker::kSlideSamples after the tracker voices it slides from the estimate to its reading.
+  float period = 0.0f;
   float hz = 0.0f;
   float rawHz = 0.0f;    // newest frame before the median; one hop fresher than hz
   bool voiced = false;
@@ -50,6 +60,14 @@ class PitchTracker {
   // A frame rebuilt on enable takes this many block sums per block on top of the block's own, so
   // no single block carries the whole rebuild.
   static constexpr int kRebuildSumsPerBlock = 2;
+
+  // The onset estimate. It reads the newest 20 ms (kOnsetBlocks blocks) when their rms is above kMinRms,
+  // and it counts as a pitch when its clarity, one minus the normalised difference at the picked lag,
+  // reaches kOnsetClarity. Breath and consonants stay under it. The period slides from the estimate to
+  // the tracker's reading over kSlideSamples, 15 ms.
+  static constexpr float kOnsetClarity = 0.90f;
+  static constexpr int kOnsetBlocks = 15;
+  static constexpr int kSlideSamples = 720;
 
   // The caller's ring of input. The fine pass reads its frame from it, and after an idle spell the
   // tracker replays its history from it. The caller writes a call into the ring before the push, so
@@ -89,6 +107,7 @@ class PitchTracker {
     behind_ = 0;
     untilHop_ = 0;
     warm_ = 0;
+    clearOnset();
   }
 
   // Feed any n samples, which h's ring already holds. The decimated ring fills on every push, so the
@@ -121,6 +140,7 @@ class PitchTracker {
     if (stale) rebuildSome(n);
     const bool analysed = feed(in, n);
     if (stale && staleFrom_ == kFrameBlocks && !analysed) analyse();
+    advanceSlide(n);
   }
 
   // Whether an analysis works out PitchResult::outOfRange. It costs ten compares a hop, so only the
@@ -152,6 +172,8 @@ class PitchTracker {
   bool coarseRanForTest() const { return coarseRan_; }
   int sumsLastPushForTest() const { return sumsThisPush_; }
   bool sumsCurrentForTest() const { return staleFrom_ == kFrameBlocks; }
+  uint32_t onsetRunsForTest() const { return onsetRuns_; }
+  float onsetBestDnForTest() const { return onsetBestDn_; }  // the last run's lowest normalised difference
 
  private:
   static constexpr int kDecLen = 512;
@@ -179,6 +201,19 @@ class PitchTracker {
   static constexpr int kLevelW = 1024;           // the level gate's window, newest samples
   static constexpr int kLevelBlocks = kLevelW / kBlock;
   static constexpr float kLowpassHz = 2500.0f;
+
+  // The onset estimate halves the decimated ring once more, to 6 kHz. Its window is the newest kOnsetW
+  // samples, 20 ms, and its lags run from kMaxHz to 100 Hz. The difference function integrates over the
+  // newest kOnsetL samples, so every lag sees the same number of terms.
+  static constexpr int kOnsetHalve = 2;
+  static constexpr int kOnsetW = 120;
+  static constexpr int kOnsetMinLag = 6;
+  static constexpr int kOnsetMaxLag = 60;
+  static constexpr int kOnsetL = kOnsetW - kOnsetMaxLag;
+  static constexpr int kOnsetFineW = kOnsetL * kOnsetHalve * kDecim;  // the refinement's window at 48 kHz
+  static constexpr int kOnsetReach = 6;
+  static constexpr float kOnsetNoiseDn = 0.5f;
+  static constexpr int kOnsetSkipBlocks = 3;
 
  public:
   // The history a replay reads: the coarse frame's span at full rate, or the fine frame's if longer.
@@ -222,6 +257,14 @@ class PitchTracker {
   static_assert(kRebuildSumsPerBlock >= 1, "an enable must make progress on its rebuild");
   static_assert(kReplaySpan >= kLevelW && kReplayWarm >= 0, "a replay covers every window the analysis reads");
   static_assert(kReplaySpan > kReplayBlocks * kBlock + kHop, "a replay always starts in the caller's ring");
+  static_assert(kOnsetBlocks * kBlock == kOnsetHalve * kDecim * kOnsetW && kOnsetBlocks < kLevelBlocks,
+                "the onset window is whole blocks, fewer than the level gate's");
+  static_assert(kOnsetHalve * kOnsetW <= kDecLen && kOnsetL % 4 == 0 && kOnsetL > 0,
+                "the onset window sits in the decimated ring and its sums unroll by four");
+  static_assert(kOnsetFineW % 4 == 0 && kOnsetFineW + kMaxPeriod <= kFineSpan,
+                "the refinement unrolls by four and reads no further back than the fine pass does");
+  static_assert(kOnsetMinLag * kOnsetHalve * kDecim == kMinPeriod && kOnsetMaxLag * kOnsetHalve * kDecim <= kMaxPeriod,
+                "the onset lags run from kMaxHz down");
   static_assert(kDecim * kCoarseW % kHop == 0, "the coarse frame is whole hops, so a replay's block sums start on one");
 
   // Vertex offset of the parabola through three points, 0 if not a minimum.
@@ -327,6 +370,155 @@ class PitchTracker {
     float energy = 0.0f;
     for (float e : levels_) energy += e;
     return energy > kMinRms * kMinRms * static_cast<float>(kLevelW);
+  }
+
+  // The onset estimate's level gate: the newest kOnsetBlocks blocks, from the energy of each, against kMinRms.
+  // levelRow_ names the oldest block, which the window leaves out.
+  bool onsetLoud() const {
+    float energy = 0.0f;
+    for (float e : levels_) energy += e;
+    energy -= levels_[static_cast<size_t>(levelRow_)];
+    return energy > kMinRms * kMinRms * static_cast<float>(kOnsetBlocks * kBlock);
+  }
+
+  static float dot(const float* a, const float* b, int n) {
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    for (int j = 0; j < n; j += 4) {
+      s0 += a[j] * b[j];
+      s1 += a[j + 1] * b[j + 1];
+      s2 += a[j + 2] * b[j + 2];
+      s3 += a[j + 3] * b[j + 3];
+    }
+    return (s0 + s1) + (s2 + s3);
+  }
+
+  // YIN on the newest 20 ms at 6 kHz. The difference at lag t is e0 + e(t) - 2 c(t), with c the
+  // correlation of the newest kOnsetL samples with the ones t back and e0 and e(t) their energies. e(t)
+  // follows from e(t - 1) by one sample in and one out. The normalised difference divides by the mean of
+  // the differences up to t, as YIN does, so a smooth noise has no dip at a short lag. The pick is the
+  // first lag from kOnsetMinLag (kMaxHz) up whose value falls under 1 - kOnsetClarity, walked down to its
+  // bottom. The loop keeps the values around the pick, so the parabola needs no array of them. Returns
+  // the period in samples at kSampleRate, or 0 when no dip is clear.
+  float onsetPeriod() {
+    ++onsetRuns_;
+    const float* src = dec_.data() + decPos_ + kDecLen - kOnsetHalve * kOnsetW;
+    std::array<float, kOnsetW> y;
+    float e0 = 0.0f;
+    for (int i = 0; i < kOnsetW; ++i) {
+      const float v = 0.5f * (src[kOnsetHalve * i] + src[kOnsetHalve * i + 1]);
+      y[static_cast<size_t>(i)] = v;
+      if (i >= kOnsetW - kOnsetL) e0 += v * v;
+    }
+    onsetBestDn_ = 1.0f;
+    if (e0 <= kMinRms * kMinRms * static_cast<float>(kOnsetL)) return 0.0f;
+    const float* cur = y.data() + (kOnsetW - kOnsetL);
+    const float dip = 1.0f - kOnsetClarity;
+    float et = e0;
+    float running = 0.0f;
+    float prev = 1.0f, before = 1.0f, pickDn = 1.0f, after = 1.0f, best = 1.0f;
+    int pick = 0;
+    for (int t = 1; t <= kOnsetMaxLag; ++t) {
+      const float out = y[static_cast<size_t>(kOnsetW - t)], in = y[static_cast<size_t>(kOnsetW - kOnsetL - t)];
+      et += in * in - out * out;
+      const float d = fmaxf(e0 + et - 2.0f * dot(cur, cur - t, kOnsetL), 0.0f);
+      running += d;
+      const float dn = running > 0.0f ? d * static_cast<float>(t) / running : 1.0f;
+      if (t >= kOnsetMinLag) best = fminf(best, dn);
+      if (pick == 0) {
+        if (t >= kOnsetMinLag && dn < dip) {
+          pick = t;
+          pickDn = dn;
+          before = prev;
+        }
+      } else if (dn < pickDn) {
+        pick = t;
+        pickDn = dn;
+        before = prev;
+      } else {
+        after = dn;
+        break;
+      }
+      prev = dn;
+    }
+    if (pick == 0) {
+      onsetBestDn_ = best;
+      return 0.0f;
+    }
+    onsetBestDn_ = pickDn;
+    const float off = pick < kOnsetMaxLag ? parabolic(before, pickDn, after) : 0.0f;
+    return refineOnset(clampf((static_cast<float>(pick) + off) * static_cast<float>(kOnsetHalve * kDecim),
+                              static_cast<float>(kMinPeriod), static_cast<float>(kMaxPeriod)));
+  }
+
+  // The estimate refined at 48 kHz on the same 20 ms: the plain difference of the newest kOnsetFineW
+  // samples against the ones lag older, at the lags around the coarse period, and a parabola through the
+  // lowest. It runs once per estimate that passes, and it keeps the coarse period when the lowest lag
+  // sits on an end of the search.
+  float refineOnset(float coarse) const {
+    const int centre = static_cast<int>(floorf(coarse + 0.5f));
+    const int lo = centre - kOnsetReach < kMinPeriod ? kMinPeriod : centre - kOnsetReach;
+    const int hi = centre + kOnsetReach > kMaxPeriod ? kMaxPeriod : centre + kOnsetReach;
+    const int start = ringNext_ >= kOnsetFineW ? ringNext_ - kOnsetFineW : ringNext_ - kOnsetFineW + ringLen_;
+    std::array<float, 2 * kOnsetReach + 1> d{};
+    int best = lo;
+    for (int lag = lo; lag <= hi; ++lag) {
+      const int older = start >= lag ? start - lag : start - lag + ringLen_;
+      d[static_cast<size_t>(lag - lo)] = sumSqDiffRing(ring_, ringLen_, start, older, kOnsetFineW);
+      if (d[static_cast<size_t>(lag - lo)] < d[static_cast<size_t>(best - lo)]) best = lag;
+    }
+    if (best == lo || best == hi) return coarse;
+    const size_t k = static_cast<size_t>(best - lo);
+    return static_cast<float>(best) + parabolic(d[k - 1], d[k], d[k + 1]);
+  }
+
+  // Once a block while the tracker reads unvoiced. A quiet window arms the estimate, and the first clear
+  // estimate after that becomes the held period. The period keeps it until the tracker voices. With no
+  // period held yet (the first note after a reset) there is no old note to step from, so the tracker
+  // alone starts the cards. A run whose lowest difference stays above kOnsetNoiseDn is noise, so the next
+  // kOnsetSkipBlocks blocks skip the estimate, which holds a long breath or room noise to a quarter of the
+  // runs.
+  void estimateOnset() {
+    if (!onsetLoud()) {
+      onsetArmed_ = true;
+      onsetWait_ = 0;
+      return;
+    }
+    if (!onsetArmed_ || result_.period <= 0.0f) return;
+    if (onsetWait_ > 0) {
+      --onsetWait_;
+      return;
+    }
+    const float p = onsetPeriod();
+    if (p <= 0.0f) {
+      if (onsetBestDn_ > kOnsetNoiseDn) onsetWait_ = kOnsetSkipBlocks;
+      return;
+    }
+    onsetArmed_ = false;
+    estimateHeld_ = true;
+    slideLeft_ = 0;
+    result_.period = p;
+    result_.hz = kSampleRate / p;
+  }
+
+  // The tracker's period plus what is left of the slide from the estimate.
+  float slidPeriod() const {
+    return base_ + slideOffset_ * (static_cast<float>(slideLeft_) * (1.0f / static_cast<float>(kSlideSamples)));
+  }
+
+  void advanceSlide(int n) {
+    if (slideLeft_ <= 0) return;
+    slideLeft_ = slideLeft_ > n ? slideLeft_ - n : 0;
+    result_.period = slidPeriod();
+    result_.hz = kSampleRate / result_.period;
+  }
+
+  void clearOnset() {
+    estimateHeld_ = false;
+    onsetArmed_ = true;
+    onsetWait_ = 0;
+    slideLeft_ = 0;
+    slideOffset_ = 0.0f;
+    base_ = 0.0f;
   }
 
   // A frame under the level gate publishes nothing, so it skips the coarse pass. The enable's tail
@@ -539,6 +731,7 @@ class PitchTracker {
     levelRow_ = levelRow_ + 1 == kLevelBlocks ? 0 : levelRow_ + 1;
     energy_ = 0.0f;
     if (active_) addBlockSum();
+    if (active_ && staleFrom_ == kFrameBlocks && !result_.voiced) estimateOnset();
   }
 
   // The block that just completed starts kDecBlock + kCoarseMax back. The hop's first block sum
@@ -563,6 +756,7 @@ class PitchTracker {
   void setActive(bool active) {
     active_ = active;
     result_ = PitchResult{};
+    clearOnset();
     staleFrom_ = active ? 0 : kFrameBlocks;
     if (!active) return;
     hopSums_.fill(0.0f);
@@ -622,8 +816,14 @@ class PitchTracker {
     return static_cast<float>(m) + off;
   }
 
-  // Median of the last three voiced periods suppresses single octave jumps.
+  // Median of the last three voiced periods suppresses single octave jumps. After an onset estimate the
+  // median starts over, since the frames it holds belong to the old note, and the period slides from the
+  // estimate to the new reading.
   void publishVoiced(float period) {
+    if (estimateHeld_) {
+      nPeriods_ = 0;
+      nextPeriod_ = 0;
+    }
     periods_[nextPeriod_] = period;
     nextPeriod_ = nextPeriod_ == 2 ? 0 : nextPeriod_ + 1;
     if (nPeriods_ < 3) ++nPeriods_;
@@ -632,8 +832,15 @@ class PitchTracker {
       const float a = periods_[0], b = periods_[1], c = periods_[2];
       p = fmaxf(fminf(a, b), fminf(fmaxf(a, b), c));
     }
-    result_.period = p;
-    result_.hz = kSampleRate / p;
+    if (estimateHeld_) {
+      slideOffset_ = result_.period - p;
+      slideLeft_ = kSlideSamples;
+      estimateHeld_ = false;
+    }
+    base_ = p;
+    const float shown = slidPeriod();
+    result_.period = shown;
+    result_.hz = kSampleRate / shown;
     result_.rawHz = kSampleRate / period;
     result_.voiced = true;
   }
@@ -670,6 +877,19 @@ class PitchTracker {
   bool active_ = false;
   bool fine_ = true;
   PitchResult result_;
+
+  // The onset estimate: whether the period holds an estimate, whether the next clear one may take it
+  // (a quiet window arms it), the median's period as the tracker last gave it, what is left of the
+  // slide from the estimate to it, and the estimates run so far.
+  bool estimateHeld_ = false;
+  bool onsetArmed_ = true;
+  float base_ = 0.0f;
+  float slideOffset_ = 0.0f;
+  int slideLeft_ = 0;
+  int onsetWait_ = 0;  // blocks left before the next run
+  uint32_t onsetRuns_ = 0;  // for the tests; it wraps
+  float onsetBestDn_ = 1.0f;
+
   bool rested_ = false;  // the rings missed an idle spell and replay at the next push with a History
   int behind_ = 0;       // samples a replay still runs behind the caller
   int untilHop_ = 0;     // the caller's samples left until a replay's first analysis

@@ -50,7 +50,7 @@
   Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
   scatter and the longest grain. `Distortion` sits there too (2,888 B: its filters, the rail histories
   and the block scratch), and so does `Unison` (10,204 B, mostly its 50 ms line). The build prints DTCM at
-  74,560 B, 57.0 %, 56,256 B free.
+  74,592 B, 57.0 %, 56,224 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`
