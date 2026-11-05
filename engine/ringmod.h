@@ -24,6 +24,14 @@ namespace cv {
 // reset sets the carrier at once. A settled note moves the carrier in the same block, with no glide, and the
 // phase counter carries on. The carrier is a phase counter read through sinTurns. Unvoiced frames hold the
 // last note, and before the first voiced frame the carrier sits at 220 Hz times RATIO.
+//
+// A note start is the first voiced frame after the tracker has read unvoiced for gapMs. The wet ducks to the
+// dry voice (8 ms) when that gap begins, and the carrier stays on the old note while the voice scoops into
+// the new one. The note lands once the tracked pitch has stayed within landSemis for landMs (or after
+// landMaxMs). The carrier then jumps to the nearest note in one step, and the wet fades back in over 20 ms.
+// A voice that returns to the held note lands after landAgreeMs and leaves the carrier alone. The tracker's
+// first voiced frame after a gap can still carry the old period, so no single frame lands a note. Moves
+// with no gap before them (legato) follow the 60 ms rule above and keep the wet up.
 // MIX is an equal-power crossfade, and the wet alone is trimmed to unity.
 
 constexpr int kRingModRatioCount = 7;
@@ -35,8 +43,13 @@ constexpr uint8_t kRingModDefaultRatioStep = 2;
 struct RingModTuning {
   float holdSemis = 0.3f;   // the pitch must sit this much closer to another note before the held note changes
   float settleMs = 60.0f;   // a new note must win this long in a row before the carrier moves to it
+  float gapMs = 20.0f;      // unvoiced this long ends a note: the wet ducks and the next voiced frame starts a note
+  float landMs = 40.0f;     // a note start lands once the pitch has stayed within landSemis this long
+  float landAgreeMs = 15.0f;  // the same, when the pitch sits on the held note
+  float landSemis = 0.3f;   // the width of the band the pitch must stay in to count as landed
+  float landMaxMs = 140.0f; // a note start lands after this long however the pitch moves
   float restHz = 220.0f;    // the pitch the carrier assumes before the first voiced frame
-  float trimDb = 3.15f;     // the wet path's gain; a sine carrier alone leaves the voice 3.01 dB down
+  float trimDb = 3.30f;     // the wet path's gain; a sine carrier alone leaves the voice 3.01 dB down
 };
 
 struct RingModParams {
@@ -54,6 +67,10 @@ constexpr float kMaxCarrierHz = 0.45f * kSampleRate;
 
 // The dry-to-card crossfade takes 20 ms, in a straight line.
 constexpr float kFadeStep = 1.0f / (20.0f * kSmpPerMs);
+
+// The note-start gate fades the wet in over 20 ms and out over 8 ms.
+constexpr float kGateInStep = 1.0f / (20.0f * kSmpPerMs);
+constexpr float kGateOutStep = 1.0f / (8.0f * kSmpPerMs);
 
 // One quarter turn in the phase units of sinTurns, the equal-power law's span.
 constexpr uint32_t kQuarterTurn = 1u << 30;
@@ -77,6 +94,11 @@ class RingMod {
     pendingMidi_ = 0.0f;
     pendingSamples_ = 0;
     carrierHz_ = 0.0f;
+    unvoicedSamples_ = 0;
+    ducked_ = false;
+    starting_ = false;
+    gate_ = 1.0f;
+    wetLevel_ = 0.0f;
     mix_ = 0.0f;
     wet_ = 0.0f;
     fresh_ = true;
@@ -91,6 +113,8 @@ class RingMod {
     const float wetTarget = p.on ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
       fresh_ = true;
+      gate_ = ducked_ ? 0.0f : 1.0f;
+      wetLevel_ = 0.0f;
       if (out != in) std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
       return;
     }
@@ -100,18 +124,22 @@ class RingMod {
     carrierHz_ = clampf(p.ratio * baseHz, 1.0f, ringmod_detail::kMaxCarrierHz);
     const uint32_t step = stepOf(carrierHz_);
 
-    // MIX glides, and the wet fade scales it, so a switch-on starts at the dry input.
+    // MIX glides, and the wet fade and the note-start gate scale it, so a switch-on starts at the dry input
+    // and a ducked wet leaves the dry voice at unity.
     const float mixKnob = smooth::clamp01(p.mix);
     if (fresh_) mix_ = mixKnob;
-    const float e0 = mix_ * wet_;
+    const float e0 = mix_ * wet_ * gate_;
     mix_ = smooth::step(mix_, mixKnob, smooth::blockCoef(smooth::kSmoothSec, n));
     wet_ = ringmod_detail::toward(wet_, wetTarget, ringmod_detail::kFadeStep * static_cast<float>(n));
+    const float gateStep = ducked_ ? ringmod_detail::kGateOutStep : ringmod_detail::kGateInStep;
+    gate_ = ringmod_detail::toward(gate_, ducked_ ? 0.0f : 1.0f, gateStep * static_cast<float>(n));
     fresh_ = false;
     const float trim = dbToGainFast(clampf(p.tuning.trimDb, -24.0f, 24.0f));
     float dry = dryGain(e0);
     float wet = wetGain(e0) * trim;
     const float inv = 1.0f / static_cast<float>(n);
-    const float e1 = mix_ * wet_;
+    const float e1 = mix_ * wet_ * gate_;
+    wetLevel_ = wetGain(e1);
     const float dDry = (dryGain(e1) - dry) * inv;
     const float dWet = (wetGain(e1) * trim - wet) * inv;
 
@@ -132,18 +160,63 @@ class RingMod {
   // Test hook: the held note's frequency in Hz, or 0 before the first voiced frame.
   float heldHz() const { return hasNote_ ? noteHz_ : 0.0f; }
 
+  // Test hooks: the candidate note that is winning (MIDI number) and how long it has won, in samples.
+  float pendingMidi() const { return pendingMidi_; }
+  int pendingSamples() const { return pendingSamples_; }
+
+  // Test hooks: the wet path's gain at the end of the last block (the equal-power wet gain before the trim,
+  // 1 at MIX 100 % with the gate open), and whether the wet is ducked for a note start.
+  float wetLevel() const { return wetLevel_; }
+  bool ducked() const { return ducked_; }
+
   // Runs once a block. Moves the held note to the one nearest a voiced pitch once the pitch has sat more than `hold` semitones
   // closer to it than to the held note for `settleMs` in a row. `n` is the block's length in samples. The
   // first voiced note, and a held note that is not in the scale (the key changed), take effect at once.
-  // Unvoiced frames pause the count and leave the note alone.
+  // Unvoiced frames pause the count and leave the note alone. After `gapMs` of unvoiced frames the wet ducks
+  // and the next voiced stretch is a note start (see the header comment): the held note stays until the pitch
+  // lands, and then it moves in one step.
   void trackNote(const PitchResult& pr, int key, const RingModTuning& t, int n) {
-    if (!pr.voiced || pr.period <= 0.0f) return;
+    if (!pr.voiced || pr.period <= 0.0f) {
+      unvoicedSamples_ += n;
+      if (static_cast<float>(unvoicedSamples_) >= t.gapMs * kSmpPerMs) {
+        ducked_ = true;
+        starting_ = false;
+      }
+      return;
+    }
+    unvoicedSamples_ = 0;
     const float midi = midiOf(kSampleRate / PitchTracker::clampPeriod(pr.period));
     const bool keyed = key >= 0;
     const int k = keyed ? key % kKeyCount : 0;
     const float nearest = keyed ? roundf(midi - scaleDeviation(midi, k)) : roundf(midi);
     const bool inScale = !keyed || fabsf(scaleDeviation(noteMidi_, k)) < 1e-3f;
-    if (hasNote_ && inScale) {
+    const bool atHeld = hasNote_ && inScale && fabsf(midi - noteMidi_) - fabsf(midi - nearest) <= t.holdSemis;
+    if (ducked_ && !starting_) {
+      starting_ = true;
+      bandLo_ = bandHi_ = midi;
+      stillSamples_ = 0;
+      startSamples_ = 0;
+    }
+    if (starting_) {
+      bandLo_ = fminf(bandLo_, midi);
+      bandHi_ = fmaxf(bandHi_, midi);
+      if (bandHi_ - bandLo_ > t.landSemis) {
+        bandLo_ = bandHi_ = midi;
+        stillSamples_ = 0;
+      }
+      stillSamples_ += n;
+      startSamples_ += n;
+
+      // A pitch that sits on the held note lands sooner, since the carrier does not move.
+      const float needMs = atHeld ? t.landAgreeMs : t.landMs;
+      if (static_cast<float>(stillSamples_) < needMs * kSmpPerMs && static_cast<float>(startSamples_) < t.landMaxMs * kSmpPerMs) {
+        return;
+      }
+      starting_ = false;
+      ducked_ = false;
+      pendingSamples_ = 0;
+      if (atHeld) return;
+    } else if (hasNote_ && inScale) {
       if (fabsf(midi - noteMidi_) - fabsf(midi - nearest) <= t.holdSemis) {
         pendingSamples_ = 0;
         return;
@@ -177,6 +250,15 @@ class RingMod {
   float pendingMidi_ = 0.0f;  // the candidate note that is winning
   int pendingSamples_ = 0;    // how long it has won in a row, in samples; 0 when no candidate is winning
   float carrierHz_ = 0.0f;  // RATIO times the note, in the last block
+  int unvoicedSamples_ = 0;   // how long the tracker has read unvoiced in a row, in samples
+  bool ducked_ = false;       // the wet is down: a gap has passed and the new note has not landed
+  bool starting_ = false;     // a note start is waiting for the pitch to land
+  float bandLo_ = 0.0f;       // the lowest and highest pitch (MIDI) since the pitch last left its band
+  float bandHi_ = 0.0f;
+  int stillSamples_ = 0;      // how long the pitch has stayed in that band, in samples
+  int startSamples_ = 0;      // how long the note start has waited, in samples
+  float gate_ = 1.0f;         // the note-start fade, 0 ducked .. 1 open
+  float wetLevel_ = 0.0f;
   float mix_ = 0.0f;
   float wet_ = 0.0f;        // the dry-to-card fade, 0 dry .. 1 card
   bool fresh_ = true;       // the next call takes the knobs outright

@@ -4,6 +4,9 @@
 // Adam's clips follows another within 60 ms, a keyed card never lands on a note outside the scale, it
 // rests at 220 Hz times RATIO before the first voiced frame and holds through unvoiced frames, the output
 // stays finite at every knob corner, and the level at the defaults (RATIO 1.5, MIX 50 %) on Adam's clips.
+// A note that starts after an unvoiced gap scoops into its pitch: the wet ducks for the gap, the carrier moves at
+// most once in the first 250 ms and only while the wet is down (a replay of the worst start in Adam's clips),
+// and no note start on the clips changes the carrier twice.
 // Each run feeds a PitchFx first, so the
 // tracker runs as the chain runs it. `ringmod_test --bench` prints the default card's cost. The clip rows
 // skip when samples/ is absent. No window, no audio device.
@@ -448,6 +451,185 @@ bool checkClipChanges() {
   return report("no change under 60 ms", whole && open.shorter == 0 && keyed.shorter == 0, detail);
 }
 
+double midiHz(double midi) { return 440.0 * std::pow(2.0, (midi - 69.0) / 12.0); }
+
+// The worst note start in Adam's clips (clip 3 at 2.0 s): the voice scoops down 2.9 semitones in the first
+// 230 ms from the tracked pitch, after a 190 ms gap that follows a note at 41.73. Knots are the clip's own
+// pitch in MIDI semitones, in ms after the voice returns. The carrier used to step from 42 to 44 and on to 43.
+struct Knot {
+  double ms;
+  double midi;
+};
+constexpr Knot kScoop[] = {{0, 45.64}, {11, 45.18}, {21, 44.69}, {32, 44.34}, {43, 44.15}, {53, 44.07}, {64, 44.01},
+                           {75, 43.93}, {85, 43.78}, {96, 43.66}, {107, 43.58}, {117, 43.51}, {128, 43.43}, {139, 43.30},
+                           {149, 43.20}, {160, 43.17}, {171, 43.21}, {181, 43.26}, {192, 43.33}, {203, 43.23},
+                           {213, 43.03}, {224, 42.89}, {235, 42.80}};
+
+double scoopMidi(double ms) {
+  constexpr size_t kCount = sizeof kScoop / sizeof kScoop[0];
+  if (ms <= kScoop[0].ms) return kScoop[0].midi;
+  for (size_t i = 1; i < kCount; ++i) {
+    if (ms <= kScoop[i].ms) {
+      const double f = (ms - kScoop[i - 1].ms) / (kScoop[i].ms - kScoop[i - 1].ms);
+      return kScoop[i - 1].midi + f * (kScoop[i].midi - kScoop[i - 1].midi);
+    }
+  }
+  return kScoop[kCount - 1].midi;
+}
+
+// A note at 41.73 for 0.5 s, 190 ms of silence, then the scoop for 260 ms. `onset` is the scoop's first sample.
+Signal scoopStart(size_t& onset) {
+  Signal x = tone(midiHz(41.73), 0.5, -20.0);
+  x.insert(x.end(), static_cast<size_t>(0.19 * kRate), 0.0f);
+  onset = x.size();
+  const size_t n = static_cast<size_t>(0.26 * kRate);
+  Signal v(n);
+  double ph = 0.0;
+  double sum = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    const double f = midiHz(scoopMidi(1000.0 * static_cast<double>(i) / kRate));
+    ph += 2.0 * kPi * f / kRate;
+    double s = 0.0;
+    for (int k = 1; k * f < 5000.0; ++k) s += std::sin(k * ph) / k;
+    v[i] = static_cast<float>(s);
+    sum += s * s;
+  }
+  const double g = std::pow(10.0, -20.0 / 20.0) / std::sqrt(sum / static_cast<double>(n));
+  const size_t ramp = static_cast<size_t>(0.008 * kRate);
+  for (size_t i = 0; i < n; ++i) {
+    const double attack = i < ramp ? static_cast<double>(i) / static_cast<double>(ramp) : 1.0;
+    const double release = i + ramp > n ? static_cast<double>(n - i) / static_cast<double>(ramp) : 1.0;
+    v[i] = static_cast<float>(v[i] * g * attack * release);
+  }
+  x.insert(x.end(), v.begin(), v.end());
+  return x;
+}
+
+// After the replay's gap the wet stays down while the voice scoops, the carrier changes at most once in the first
+// 250 ms, and the wet heard before that change sits under -30 dB of the settled wet (MIX 100 %, so 1 is settled).
+bool checkScoopStart() {
+  size_t onset = 0;
+  const Signal in = scoopStart(onset);
+  Rig rig;
+  std::vector<float> carrier;
+  std::vector<float> wet;
+  rig.each = [&](size_t, const cv::PitchFx&, float hz) {
+    carrier.push_back(hz);
+    wet.push_back(rig.mod->wetLevel());
+  };
+  rig.run(in, modAt(1.5f, 1.0f));
+  const size_t first = onset / cv::kBlock;
+  const size_t last = std::min(carrier.size(), first + static_cast<size_t>(0.25 * kRate) / cv::kBlock);
+  int changes = 0;
+  size_t firstChange = last;
+  for (size_t b = first + 1; b < last; ++b) {
+    if (std::fabs(carrier[b] - carrier[b - 1]) > 0.01f) {
+      if (changes == 0) firstChange = b;
+      ++changes;
+    }
+  }
+  float before = 0.0f;
+  for (size_t b = first; b < firstChange; ++b) before = std::fmax(before, wet[b]);
+  const float landed = static_cast<float>(1.5 * midiHz(43.0));
+  const bool onNote = std::fabs(carrier[last - 1] - landed) < 0.01f;
+  const float settled = wet[last - 1];
+  char detail[144];
+  std::snprintf(detail, sizeof detail, "%d carrier change(s) in 250 ms (at most 1), wet before it %.1f dB (< -30), wet %.2f at 250 ms, carrier %s",
+                changes, 20.0 * std::log10(std::fmax(static_cast<double>(before), 1e-6)), static_cast<double>(settled),
+                onNote ? "on 43" : "off 43");
+  return report("a scoop lands once", changes <= 1 && before < 0.0316f && settled > 0.9f && onNote, detail);
+}
+
+// Note starts on the clips: a tracker voiced frame that follows 40 ms or more unvoiced, on input above -45 dBFS,
+// after the clip's pad. The count is the starts whose carrier changes more than once in the next 250 ms.
+struct StartStats {
+  int starts = 0;
+  int multi = 0;
+};
+
+StartStats countStarts(const std::vector<Signal>& sets, int key) {
+  StartStats s;
+  for (const Signal& padded : sets) {
+    Rig rig;
+    rig.key = key;
+    std::vector<char> voiced;
+    std::vector<float> carrier;
+    rig.each = [&](size_t, const cv::PitchFx& pitch, float hz) {
+      voiced.push_back(pitch.pitch().voiced ? 1 : 0);
+      carrier.push_back(hz);
+    };
+    rig.run(padded, modAt(1.5f, 1.0f));
+    const size_t window = static_cast<size_t>(0.25 * kRate) / cv::kBlock;
+    const size_t gap = static_cast<size_t>(0.04 * kRate) / cv::kBlock;
+    size_t unvoiced = gap;
+    for (size_t b = 0; b + window < voiced.size(); ++b) {
+      if (!voiced[b]) {
+        ++unvoiced;
+        continue;
+      }
+      const bool start = unvoiced >= gap && b * cv::kBlock >= clips::kPad;
+      unvoiced = 0;
+      if (!start) continue;
+      const size_t end = std::min(padded.size(), (b + 1) * cv::kBlock);
+      const size_t from = end > 480 ? end - 480 : 0;
+      double energy = 0.0;
+      for (size_t i = from; i < end; ++i) energy += static_cast<double>(padded[i]) * padded[i];
+      if (10.0 * std::log10(energy / static_cast<double>(end - from) + 1e-12) <= -45.0) continue;
+      int changes = 0;
+      for (size_t k = b + 1; k <= b + window; ++k) changes += std::fabs(carrier[k] - carrier[k - 1]) > 0.01f ? 1 : 0;
+      ++s.starts;
+      s.multi += changes > 1 ? 1 : 0;
+    }
+  }
+  return s;
+}
+
+// On Adam's clips no note start changes the carrier twice in its first 250 ms (21 starts, 1 such start before the gate).
+bool checkClipStarts() {
+  bool whole = true;
+  const std::vector<Signal> sets = clips::load(CUBEVOX_SAMPLES_DIR, whole);
+  if (sets.empty()) {
+    std::printf("SKIP clip start rows  samples/ is not in this checkout\n");
+    return true;
+  }
+  const StartStats open = countStarts(sets, -1);
+  const StartStats keyed = countStarts(sets, 0);
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "starts with more than one change in 250 ms: %d of %d unkeyed, %d of %d keyed (0)", open.multi,
+                open.starts, keyed.multi, keyed.starts);
+  return report("starts change the carrier once", whole && open.multi == 0 && keyed.multi == 0, detail);
+}
+
+// The wet ducks after 20 ms unvoiced and not before, a voice that comes back on the held note lands without moving
+// the carrier, and a scoop through other notes moves the carrier once, to the note it lands on.
+bool checkGate() {
+  Script s;
+  s.feed(kA3Hz, 100.0);
+  s.feed(0.0, 15.0);
+  const bool shortOpen = !s.mod.ducked();
+  s.feed(0.0, 20.0);
+  const bool longDucked = s.mod.ducked();
+  s.feed(kA3Hz, 8.0);
+  const bool stillDucked = s.mod.ducked();
+  s.feed(kA3Hz, 20.0);
+  const bool backOnHeld = !s.mod.ducked() && s.moves == 1;
+
+  Script scoop;
+  scoop.feed(kA3Hz, 100.0);
+  scoop.feed(0.0, 100.0);
+  scoop.feed(293.66, 25.0);
+  scoop.feed(277.18, 25.0);
+  const bool downDuring = scoop.mod.ducked() && scoop.moves == 1;
+  scoop.feed(kC4Hz, 60.0);
+  const bool landed = !scoop.mod.ducked() && scoop.moves == 2 && std::fabs(scoop.mod.heldHz() - kC4Hz) < 0.01f;
+
+  const bool ok = shortOpen && longDucked && stillDucked && backOnHeld && downDuring && landed;
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "15 ms open %d, 35 ms ducked %d, 8 ms back still ducked %d, 28 ms back open %d; scoop %d %d", shortOpen,
+                longDucked, stillDucked, backOnHeld, downDuring, landed);
+  return report("the gate ducks and lands", ok, detail);
+}
+
 int bench() {
   bool whole = true;
   const std::vector<Signal> sets = clips::load(CUBEVOX_SAMPLES_DIR, whole);
@@ -497,5 +679,8 @@ int main(int argc, char** argv) {
   ok &= checkFinite();
   ok &= checkLevel();
   ok &= checkClipChanges();
+  ok &= checkScoopStart();
+  ok &= checkClipStarts();
+  ok &= checkGate();
   return ok ? 0 : 1;
 }
