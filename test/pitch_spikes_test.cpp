@@ -6,8 +6,9 @@
 //    The refinement now walks downhill from the coarse period, three lags in the usual case and at most
 //    kOnsetMaxLags. The worst block with the estimate must stay within a margin of the worst block without it.
 // 2. A pitch stage switched on (pitch_fx.h, chain_run.cpp). Its reset cleared the 51 kB input ring in one
-//    block. The board's memset stores a byte at a time, about 250k cycles, so the one block read 47 % of
-//    the budget against a settled worst of 7 %. A stopped stage now clears the ring a slice a block, and
+//    block. The board's memset then stored a byte at a time, about 250k cycles, so the one block read 47 % of
+//    the budget against a settled worst of 7 %. Its word-wise memset (board/fastmem.cpp) cuts that to about
+//    4 %, and a stopped stage still clears the ring a slice a block, and
 //    the switch-on finds it clear. The host's memset is fast, so the ring work is counted as well as timed.
 //    The Ringer card keeps a ring and a tracker of its own and rests the same way, so the check runs on
 //    it too.

@@ -24,9 +24,9 @@ constexpr float kButterworthQ = 0.70710678f;
 // fmin and fmax, which the M7 compiles to vminnm and vmaxnm with no flag transfer.
 constexpr float clampf(float x, float lo, float hi) { return __builtin_fminf(__builtin_fmaxf(x, lo), hi); }
 
-// Zeroes n floats a word at a time, eight to a pass. std::array::fill and std::fill compile to memset,
-// which the board's C library runs a byte at a time, about 5 cycles a byte, so a 51 kB ring takes over
-// 250k cycles there. The empty asm keeps the compiler from turning the loops back into a memset call.
+// Zeroes n floats a word at a time, eight to a pass. The board's memset (board/fastmem.cpp) clears at
+// the same speed, so this is a plain loop kept for its callers. The empty asm keeps the compiler from
+// turning the loops into a memset call.
 inline void zeroFloats(float* p, size_t n) {
   size_t i = 0;
   for (; i + 8 <= n; i += 8) {

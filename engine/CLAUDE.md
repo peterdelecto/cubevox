@@ -33,11 +33,14 @@
   6. `engine/reverb_parts.h`, for the two reverbs: `softClip`, `softClipHeadroom`, `kReverbClipHeadroom`, the
      allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, the wobble LFO's sine table, phase step and
      error bound, and the Dwell drive terms.
-- The board's memset and memcpy run a byte at a time (newlib-nano), about 5 cycles a byte, and
-  `std::array::fill(0.0f)` compiles to memset. A clear of more than a few hundred bytes in a block that
-  can land on a switch-on uses `zeroFloats` (a word a store), and a clear the size of the pitch ring
-  (51 kB, 250k cycles by memset) is also spread: `PitchFx::rest()` clears a slice a block while the stage
-  is stopped, so `reset()` at the switch-on finds it clear. `pitch_spikes_test` holds both.
+- The board links its own memset, memcpy and memmove (`firmware/cubevox/src/board/fastmem.cpp`, checked on the
+  host by `fastmem_test`), which move 16 bytes a pass, about 0.3 to 0.5 cycles a byte by instruction count.
+  newlib-nano's versions are byte loops at about 5 cycles a byte, so a `fill(0.0f)`, `std::copy` or struct
+  copy that GCC turns into a call is fast. Keep the board's fastmem.cpp compiled with
+  `no-tree-loop-distribute-patterns`, or its loops become calls to themselves. A clear the size of the pitch
+  ring (51 kB, about 10k to 26k cycles, 2 to 4 % of a 640k-cycle block) is still spread: `PitchFx::rest()`
+  clears a slice a block while the stage is stopped, so `reset()` at the switch-on finds it clear.
+  `zeroFloats` clears at the same speed and remains for its callers. `pitch_spikes_test` holds both.
 - The onset estimate's 48 kHz refinement walks downhill from the coarse period and sums at most
   `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's.
 - `clampf`, `clamp01`, `KnobCurve::at` and `exp2Fast` return the lower bound for a NaN, so a NaN stops at the
@@ -52,11 +55,11 @@
   `Spring::run`, so check the M7 listing for a call to it after any change there.
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
   Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
-- `PitchFx` lives in DTCM: about 61,400 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
+- `PitchFx` lives in DTCM: 61,468 B of the 130,816 B `.dtcm_bss` region (`cubevox.ld`), the
   Formant voice included; the 265.75 ms input ring is 51,024 B of it, sized in `psola.h` for the
   Crowd card's 225 ms lag ceiling (a raised copy 75 ms behind a tuned copy at 150 ms), 12 ms of
   scatter and the longest grain. `Distortion` sits there too (2,888 B: its filters, the rail histories
-  and the block scratch), and so does `Unison` (10,204 B, mostly its 50 ms line). `RingMod` sits there too
+  and the block scratch), and so does `Unison` (10,216 B, mostly its 50 ms line). `RingMod` sits there too
   (13,584 B: a `PitchTracker` of 8,472 B, its 1,260-float ring of 5,040 B, and the card's state). The build
   prints DTCM at 88,224 B, 67.4 %, 42,592 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.

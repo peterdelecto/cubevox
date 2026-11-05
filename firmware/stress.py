@@ -12,8 +12,8 @@ glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Y
 RANGE), both Deepthroat knobs (GROWL, MIX), both Ringer knobs (RATIO, stepped, so each 10 % step lands
 on one of its positions, then MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
-It then flips the toggle of every Echo, Input gate, Gate, Yawn, Deepthroat and Ringer slot
-ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
+It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Yawn, Deepthroat and Ringer
+slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
 POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
 
@@ -89,7 +89,7 @@ SWEEP_STEP_S = 1.0
 TOGGLE_FLIPS = 10    # a toggle flips off and on five times
 TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
 GLIDE_LAG_S = 0.02   # a stepped knob starts its partner this long after it, inside the glide
-FLIPPED_CARDS = ("slapback", "input_gate", "gate", "formant_follow", "growl", "ringmod")  # toggles the run flips
+FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_follow", "growl", "ringmod")  # toggles the run flips
 # The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
