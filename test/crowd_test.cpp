@@ -1116,7 +1116,9 @@ void allEnhancements(cv::CrowdTuning& t) {
 // sits below its playback rate now lengthens its grains. The MOB program level moved by 0.01 dB.
 // All four were re-pinned again when the tracker began taking a new note's period from an onset
 // estimate, before it reads voiced (pitch.h): the copies' grains now start on the new pitch at once.
-constexpr std::array<uint64_t, 4> kPinned = {0x9a7862ebf921664eULL, 0xc87b862db119d386ULL, 0x97473e493bad2794ULL,
+// Runs 2 and 3, the burst program, were re-pinned when the estimate stopped running in the block that
+// closes a hop; a burst whose estimate fell there now gets it one block later.
+constexpr std::array<uint64_t, 4> kPinned = {0x9a7862ebf921664eULL, 0x83e6b32da2e9184eULL, 0x9444a820ca46f0f2ULL,
                                              0x6895b3252eff14edULL};
 
 // The toolchain that produced kPinned. A bit-exact hash follows the compiler's code generation and

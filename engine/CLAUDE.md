@@ -43,7 +43,8 @@
   `Growl`), so the `reset()` at the switch-on finds the ring clear. The spread clears and the tracker's
   resets all use `std::fill_n` or `.fill(0.0f)`. `pitch_spikes_test` holds the spread.
 - The onset estimate's 48 kHz refinement walks downhill from the coarse period and sums at most
-  `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's.
+  `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's. The estimate skips the
+  block that closes a hop, which runs the analysis; run there it put a block 0.4 us over a voiced hop's on clip 3.
 - `clampf`, `clamp01`, `KnobCurve::at` and `exp2Fast` return the lower bound for a NaN, so a NaN stops at the
   first boundary clamp. The float-to-int casts in `exp2Fast`, `sinCosFast`, `readRing` and `Delay::read` see a
   finite value for any input.
@@ -95,6 +96,8 @@
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (each engine writes its ring first). The tests use `RingedTracker`
   (`test/ringed_tracker.h`), which keeps a ring of its own, and `PitchSeries` (`test/pitch_series.h`), which
-  runs Autotune, Formant and Octave in series as three adjacent slots.
+  runs Autotune, Formant and Octave in series as three adjacent slots. The three Adam clips in `samples/` are
+  the cleaned set of 2026-11-05 (4th-order Butterworth high-pass at 40 Hz, zero phase, forward and backward);
+  the originals live in `samples/original/` and no test reads them.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

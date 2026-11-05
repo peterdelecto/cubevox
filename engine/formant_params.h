@@ -47,11 +47,11 @@ constexpr std::array<float, kFormantVoiceMaxShiftSt + 1> kFormantCoherence = {
     0.985f, 0.355f, 0.085f, -0.016f, -0.106f, -0.149f, -0.176f, -0.165f, -0.099f, -0.059f, -0.009f, 0.017f, 0.033f};
 
 struct FormantTuning {
-  // The shifted voice's trim in dB at each SHIFT from -7 to +7 st, fit on Adam's three clips so that
+  // The shifted voice's trim in dB at each SHIFT from -7 to +7 st, fit on Adam's three clips (the cleaned set) so that
   // the mean of the voice alone at MIX 100 % lands on +0.25 dB, the middle of 0 to +0.5. The grains sum
   // to a level that follows SHIFT, and one trim cannot hold it.
-  std::array<float, kFormantShiftSteps> trimDb = {4.29f, 3.87f, 3.12f, 2.36f, 1.98f, 1.72f, 1.01f, 0.20f,
-                                                  0.94f, 1.44f, 1.51f, 1.77f, 1.87f, 1.60f, 1.64f};
+  std::array<float, kFormantShiftSteps> trimDb = {4.42f, 3.93f, 3.23f, 2.52f, 2.21f, 2.02f, 1.11f, 0.26f,
+                                                  1.04f, 1.56f, 1.46f, 1.68f, 1.87f, 1.66f, 1.70f};
   float offsetDb = 0.0f;  // added to every entry, for the render tool
 
   bool operator==(const FormantTuning& o) const { return trimDb == o.trimDb && offsetDb == o.offsetDb; }

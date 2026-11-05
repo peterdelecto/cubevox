@@ -27,7 +27,7 @@ struct PolishCompTuning {
   float attackMs = 3.0f;        // gain reduction smoothing, rising
   float releaseMs = 100.0f;     // gain reduction smoothing, falling
   float maxReductionDb = 18.0f;
-  float trimDb = 5.9f;          // makeup, active path only; level rule on program material
+  float trimDb = 5.85f;         // makeup, active path only; level rule on program material
 };
 
 struct PolishCompParams {
