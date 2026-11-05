@@ -59,6 +59,13 @@
   and the block scratch), and so does `Unison` (10,204 B, mostly its 50 ms line). The build prints DTCM at
   74,592 B, 57.0 %, 56,224 B free.
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
+- The Growl card (Deepthroat) grows what reaches its slot. It keeps a ring of its own input, `growl_detail::kRingLen`
+  samples (15,408 B, a plain global in D1 like Crowd, so DTCM is unchanged), and cuts its grains from that on a
+  `FormantPsolaVoiceT<kRingLen>`. The period it cuts on is the tracker's period divided by
+  `PitchFx::outputShiftSemis()` (Autotune's correction, or the Octave voice's interval when Octave holds half the
+  output's power), and its read lag is the tracker's alignment less `PitchFx::outputLatency()`. A stopped Growl slot
+  calls `Growl::rest()` each block (`runSlot`), which clears 1 KB of the ring, so the reset at the switch-on finds it
+  clear. `growl_test` measures both stage accessors against the stage.
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (PitchFx writes it first). The tests use `RingedTracker`
   (`test/ringed_tracker.h`), which keeps a ring of its own.
