@@ -55,8 +55,7 @@ AudioBlock::AudioBlock()
       octave_(std::make_unique<cv::OctaveFx>()),
       unison_(std::make_unique<cv::Unison>()),
       distortion_(std::make_unique<cv::Distortion>()),
-      ringMod_(std::make_unique<cv::RingMod>()),
-      engines_(*autotune_, *octave_, *unison_, *distortion_, *ringMod_) {}
+      engines_(*autotune_, *octave_, *unison_, *distortion_) {}
 
 void AudioBlock::publish(const ChainSnapshot& snapshot) {
   const uint32_t next = published_.load(std::memory_order_relaxed) + 1;

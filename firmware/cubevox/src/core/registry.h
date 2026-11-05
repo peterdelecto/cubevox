@@ -29,7 +29,6 @@ enum class Card : uint8_t {
   Bloom,
   FormantFollower,
   Growl,
-  RingMod,
   Count,
 };
 
@@ -42,11 +41,9 @@ constexpr size_t kCardIdBytes = 16;
 // Engines the audio block owns. Cards map onto them: the Formant card and Apraxia share Formant, and
 // both reverb cards share Reverb. Every engine with a ring keeps a ring of its own input and runs in its
 // own slot. The Crowd, Growl and Formant engines read Autotune's tracker when an Autotune card sits ahead
-// of them, and run a tracker of their own otherwise. The Ringer card always runs a tracker of its own.
-// Count ends the list.
+// of them, and run a tracker of their own otherwise. Count ends the list.
 enum class Engine : uint8_t {
-  InputGate, Autotune, Octave, Formant, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, RingMod,
-  Count
+  InputGate, Autotune, Octave, Formant, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, Count
 };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);

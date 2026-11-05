@@ -395,7 +395,7 @@ def stress_judge_failures(stress, rows):
         table, gates = [], []
         stress.judge_fixed(agg, rows, "check", table, gates)
         ok = all(g.ok for g in gates)
-        if ok != want or len(gates) != 6 or [row[1] for row in table] != ["POLISH EQ", "POLISH COMP", "fixed path"]:
+        if ok != want or len(gates) != 6 or [row[1] for row in table] != ["VOX EQ", "POLISH COMP", "fixed path"]:
             failed.append(f"stress.py judge_fixed() {what}: {len(gates)} gates, all ok {ok}, wanted {want}")
     return failed
 

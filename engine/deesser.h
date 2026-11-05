@@ -9,7 +9,7 @@
 #include "engine/fastmath.h"
 #include "engine/smooth.h"
 
-// De-esser for POLISH EQ's front half. A 4th-order Butterworth band-pass (two biquads) reads the
+// De-esser for VOX EQ's front half. A 4th-order Butterworth band-pass (two biquads) reads the
 // sibilant band. Once per 64 samples the detector compares the band level with the full level, both
 // in dB, so the singer's volume does not move the trigger. The overshoot past the threshold,
 // capped at maxCutDb, sets the gain of a peaking notch in the signal path. A rising cut applies

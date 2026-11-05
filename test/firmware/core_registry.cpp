@@ -86,9 +86,8 @@ void checkGroups() {
     if (g == Group::Pitch) ++pitch;
   }
   check(reverbs == 2, "two reverb-group cards: Spring and Chasm");
-  check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch &&
-            cardDesc(Card::RingMod).group == Group::None,
-        "autotune, octave, formant, Yawn, the crowd card and growl are the pitch group, and ringer is not");
+  check(pitch == 6 && cardDesc(Card::FormantFollower).group == Group::Pitch,
+        "autotune, octave, formant, Apraxia, the crowd card and growl are the pitch group");
 }
 
 // The amount knob (Mix, Amount, Depth, Drive, Range) sits on knob B, the lower pot of its slot, and each parameter
@@ -96,7 +95,7 @@ void checkGroups() {
 void checkAmountKnobIsB() {
   const Card amountCards[] = {Card::Unison, Card::Slapback, Card::Distortion, Card::ReverbSpring, Card::ReverbChasm,
                               Card::Crowd,  Card::Formant,  Card::Lofi,       Card::Bloom,       Card::FormantFollower,
-                              Card::Growl,  Card::RingMod};
+                              Card::Growl};
   const auto isAmount = [](const char* name) {
     return std::strcmp(name, "Mix") == 0 || std::strcmp(name, "MIX") == 0 || std::strcmp(name, "AMOUNT") == 0 ||
            std::strcmp(name, "Depth") == 0 || std::strcmp(name, "Drive") == 0 || std::strcmp(name, "DRIVE") == 0 ||
@@ -165,7 +164,6 @@ float engineValue(Card c, int knob, const ChainParams& p) {
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::FormantFollower: return knob == 0 ? p.follower.sensitivity : p.follower.rangeSt;
     case Card::Growl: return knob == 0 ? p.growl.growl : p.growl.mix;
-    case Card::RingMod: return knob == 0 ? p.ringMod.ratio : p.ringMod.mix;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -441,13 +439,13 @@ void checkCrowdVoices() {
 void checkAppendedCards() {
   check(static_cast<int>(Card::Gate) == 7 && static_cast<int>(Card::Crowd) == 10 && static_cast<int>(Card::Formant) == 11 &&
             static_cast<int>(Card::Lofi) == 12 && static_cast<int>(Card::Bloom) == 13 &&
-            static_cast<int>(Card::FormantFollower) == 14 && static_cast<int>(Card::Growl) == 15 && static_cast<int>(Card::RingMod) == 16 &&
-            kCardCount == 17,
+            static_cast<int>(Card::FormantFollower) == 14 && static_cast<int>(Card::Growl) == 15 &&
+            kCardCount == 16,
         "appended cards: the table appends them after the Crowd card");
   check(static_cast<int>(Engine::Crowd) == 9 && static_cast<int>(Engine::Lofi) == 10 && static_cast<int>(Engine::Bloom) == 11 &&
-            static_cast<int>(Engine::Growl) == 12 && static_cast<int>(Engine::RingMod) == 13 &&
-            kEngineCount == 14,
-        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl and Ringer after the Crowd engine");
+            static_cast<int>(Engine::Growl) == 12 &&
+            kEngineCount == 13,
+        "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) and Growl after the Crowd engine");
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
   };
@@ -456,74 +454,41 @@ void checkAppendedCards() {
         "appended cards: each registry row is its costs.h row");
 }
 
-// Ringer, the third card of slot 6, has an engine of its own with a tracker of its own, so it sits in no group.
-// RATIO is a stepped knob of seven labelled ratios and MIX a percent.
-void checkRingModCard() {
-  const CardDesc& d = cardDesc(Card::RingMod);
-  check(std::strcmp(d.id, "ringmod") == 0 && std::strcmp(d.name, "Ringer") == 0 && d.engine == Engine::RingMod &&
-            d.group == Group::None && d.knobCount == 2,
-        "ringmod: id ringmod, name Ringer, its own engine, no group");
-  const KnobDesc& ratio = *knobDesc(Card::RingMod, 0);
-  check(std::strcmp(ratio.name, "RATIO") == 0 && knobSteps(Card::RingMod, 0) == 7 && ratio.labels != nullptr &&
-            std::strcmp(knobLabel(ratio, 2), "X1.5") == 0 && std::strcmp(knobDesc(Card::RingMod, 1)->name, "MIX") == 0 &&
-            knobSteps(Card::RingMod, 1) == 0,
-        "ringmod: RATIO is seven labelled steps, MIX a continuous percent");
-  const float expected[7] = {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f};
-  bool ratios = true;
-  for (int i = 0; i < 7; ++i) {
-    ChainParams p;
-    applyKnob(Card::RingMod, 0, static_cast<float>(i), p);
-    ratios = ratios && p.ringMod.ratio == expected[i];
-  }
-  check(ratios, "ringmod: the seven steps are 0.5, 1, 1.5, 2, 2.5, 3 and 4");
-  check(d.cost.avg == costs::kRingMod.avg && d.cost.worst == costs::kRingMod.worst &&
-            d.cost.measured == costs::kRingMod.measured,
-        "ringmod: the registry row is its costs.h row");
-  ChainParams p;
-  applyToggle(Card::RingMod, true, p);
-  check(p.ringMod.on && !p.crowd.on && !p.growl.on && !p.pitchFx.autotune.on,
-        "ringmod: its toggle turns the card on and no Mob, Growl or Autotune flag");
-  applyToggle(Card::RingMod, false, p);
-  check(!p.ringMod.on, "ringmod: and off again");
-  applyPlacement(Card::Autotune, p);
-  check(p.ringMod.keyed, "ringmod: placing Autotune puts the card on its key");
-}
-
-// Yawn: id formant_follow, which keeps under the id clip width, the pitch engine and group, SENSITIVITY
+// Apraxia: id formant_follow, which keeps under the id clip width, the Formant engine and the pitch group, SENSITIVITY
 // on the upper pot, RANGE on the lower from -12 st at the pot's bottom through 0 at noon to +6 st at its
-// top, a straight line on each side of noon, no knob on the Formant voice's MIX, and Yawn on the OLED's
+// top, a straight line on each side of noon, no knob on the Formant voice's MIX, and Apraxia on the OLED's
 // readout title, as Mob's row does. Placing it hands the voice's SHIFT to the card's sweep.
-void checkYawnCard() {
+void checkApraxiaCard() {
   const CardDesc& d = cardDesc(Card::FormantFollower);
-  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Yawn") == 0 && d.engine == Engine::Formant &&
+  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Apraxia") == 0 && d.engine == Engine::Formant &&
             d.group == Group::Pitch && d.knobCount == 2,
-        "yawn: id formant_follow, name Yawn, the Formant engine and the pitch group");
-  check(d.oledName == nullptr && std::strcmp(oledName(Card::FormantFollower), "Yawn") == 0,
-        "yawn: the readout title is the card's name, Yawn");
+        "apraxia: id formant_follow, name Apraxia, the Formant engine and the pitch group");
+  check(d.oledName == nullptr && std::strcmp(oledName(Card::FormantFollower), "Apraxia") == 0,
+        "apraxia: the readout title is the card's name, Apraxia");
   const KnobDesc& sens = *knobDesc(Card::FormantFollower, 0);
   check(std::strcmp(sens.name, "SENSITIVITY") == 0 && sens.kind == KnobKind::Continuous && sens.min == 0.0f &&
             sens.max == 100.0f && std::strcmp(sens.unit, "%") == 0,
-        "yawn: knob A is SENSITIVITY, a percent");
+        "apraxia: knob A is SENSITIVITY, a percent");
   const KnobDesc& range = *knobDesc(Card::FormantFollower, 1);
   check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -12.0f &&
             range.max == 6.0f && range.curve == Curve::ZeroAtNoon && std::strcmp(range.unit, "st") == 0,
-        "yawn: knob B is RANGE, continuous from -12 st at the bottom through 0 at noon to +6 st at the top");
+        "apraxia: knob B is RANGE, continuous from -12 st at the bottom through 0 at noon to +6 st at the top");
 
   ChainParams p;
   const float mixBefore = p.pitchFx.formant.mix;
   applyKnob(Card::FormantFollower, 0, 0.3f, p);
-  check(std::fabs(p.follower.sensitivity - 0.3f) < 1e-6f, "yawn: SENSITIVITY hands the card its position");
+  check(std::fabs(p.follower.sensitivity - 0.3f) < 1e-6f, "apraxia: SENSITIVITY hands the card its position");
   const auto rangeAt = [&p](float position) {
     applyKnob(Card::FormantFollower, 1, position, p);
     return p.follower.rangeSt;
   };
   check(rangeAt(0.0f) == -12.0f && rangeAt(0.25f) == -6.0f && rangeAt(0.5f) == 0.0f && rangeAt(0.75f) == 3.0f &&
             rangeAt(1.0f) == 6.0f,
-        "yawn: RANGE is -12 st at the bottom, -6 st at 25 %, 0 at noon, +3 st at 75 % and +6 st at the top");
+        "apraxia: RANGE is -12 st at the bottom, -6 st at 25 %, 0 at noon, +3 st at 75 % and +6 st at the top");
   const float defaultPosition = 0.5f * (1.0f - cv::kFollowerDefaultRangeSt / cv::kFollowerMinRangeSt);
   check(cv::kFollowerDefaultRangeSt == -5.0f && std::fabs(rangeAt(defaultPosition) + 5.0f) < 1e-5f &&
             std::fabs(defaultPosition - 7.0f / 24.0f) < 1e-6f && shownText(range, defaultPosition) == "-5",
-        "yawn: the default pot position, 7/24 of the travel, reads -5 st");
+        "apraxia: the default pot position, 7/24 of the travel, reads -5 st");
   bool capped = true;
   bool rising = true;
   float before = -13.0f;
@@ -533,21 +498,21 @@ void checkYawnCard() {
     rising = rising && st > before;
     before = st;
   }
-  check(capped && rising, "yawn: RANGE rises with the pot and never leaves -12 to +6 st");
+  check(capped && rising, "apraxia: RANGE rises with the pot and never leaves -12 to +6 st");
   check(shownText(range, 0.0f) == "-12" && shownText(range, 0.25f) == "-6" && shownText(range, 0.5f) == "0" &&
             shownText(range, 0.75f) == "+3" && shownText(range, 1.0f) == "+6" && knobCells(range) == 3,
-        "yawn: RANGE reads its semitones with the sign in three cells");
-  check(p.pitchFx.formant.mix == mixBefore, "yawn: no knob sets the Formant voice's mix");
+        "apraxia: RANGE reads its semitones with the sign in three cells");
+  check(p.pitchFx.formant.mix == mixBefore, "apraxia: no knob sets the Formant voice's mix");
 
   ChainParams t;
   applyToggle(Card::FormantFollower, true, t);
   check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.follower.placed,
-        "yawn: its toggle sets formant.on and nothing else");
-  check(!ChainParams().follower.placed, "yawn: the sweep drives nothing before the card is placed");
+        "apraxia: its toggle sets formant.on and nothing else");
+  check(!ChainParams().follower.placed, "apraxia: the sweep drives nothing before the card is placed");
   applyPlacement(Card::Formant, t);
-  check(!t.follower.placed, "yawn: placing the Formant card leaves SHIFT on its own knob");
+  check(!t.follower.placed, "apraxia: placing the Formant card leaves SHIFT on its own knob");
   applyPlacement(Card::FormantFollower, t);
-  check(t.follower.placed, "yawn: placing the card hands SHIFT to the sweep");
+  check(t.follower.placed, "apraxia: placing the card hands SHIFT to the sweep");
 }
 
 void checkFormantCard() {
@@ -825,11 +790,10 @@ void checkRegistry() {
   checkCrowdVoices();
   checkAppendedCards();
   checkFormantCard();
-  checkYawnCard();
+  checkApraxiaCard();
   checkLofiCard();
   checkBloomCard();
   checkGrowlCard();
-  checkRingModCard();
   checkAppendedToggles();
   checkShownDecimals();
   checkCells();

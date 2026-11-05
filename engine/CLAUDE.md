@@ -60,11 +60,10 @@
   (`engine/input_ring.h`): `AutotuneFx` (ring 2,176 floats, the tracker, the corrected voice), `OctaveFx` (3,920
   floats), `FormantFx` (3,852 floats and a tracker of its own, for Formant and Apraxia). `Crowd` keeps a 51,024 B
   ring of Autotune's input, written by the Autotune slot, and `Growl` a 15,408 B ring. `AutotuneFx` and `OctaveFx`
-  sit in DTCM (60,896 B of the 130,816 B `.dtcm_bss` region, `cubevox.ld`, 46.6 %; the build prints it),
-  `FormantFx`, `Crowd` and `Growl` in D1 inside `gChain` (279,480 B, 53.3 %). `Distortion` sits in DTCM too
+  sit in DTCM (the build prints the figure, 130,816 B `.dtcm_bss` region in `cubevox.ld`),
+  `FormantFx`, `Crowd` and `Growl` in D1 inside `gChain`. `Distortion` sits in DTCM too
   (2,888 B: its filters, the rail histories and the block scratch), and so does `Unison` (10,216 B, mostly
-  its 50 ms line). `RingMod` sits there too (13,584 B: a `PitchTracker` of 8,472 B, its 1,260-float ring of
-  5,040 B, and the card's state).
+  its 50 ms line).
   Check `arm-none-eabi-nm -S` on the firmware elf after any pitch change.
 - Autotune's tracker serves the Formant engine directly behind it (only Empty slots between) and any Crowd or
   Growl card behind it. Anywhere else those cards run a tracker of their own on their own ring. The chain hands
@@ -82,10 +81,5 @@
   `PitchTracker::push` runs (each engine writes its ring first). The tests use `RingedTracker`
   (`test/ringed_tracker.h`), which keeps a ring of its own, and `PitchSeries` (`test/pitch_series.h`), which
   runs Autotune, Formant and Octave in series as three adjacent slots.
-- Ringer tracks the pitch of its own input, the signal the slot ahead hands it, so it takes no part in the
-  shared pitch stage and sits in no registry group. It owns a `PitchTracker` (coarse search only) fed from a
-  ring of `PitchTracker::kRingNeed` floats, the most a push reads back with calls of up to `kBlock` samples.
-  It clears the ring as `PitchFx` does: `RingMod::rest()` zeroes 512 floats a block while the slot is
-  stopped, and `reset()` clears the rest with `zeroFloats`. `pitch_spikes_test` holds both.
 - After an engine change that moves cycles, re-bench `firmware/cubevox/src/core/costs.h` with
   both passes its method comment describes.

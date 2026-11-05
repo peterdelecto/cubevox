@@ -230,8 +230,7 @@ struct Rig {
   std::unique_ptr<cv::OctaveFx> octave = std::make_unique<cv::OctaveFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  std::unique_ptr<cv::RingMod> ringMod = std::make_unique<cv::RingMod>();
-  ChainEngines engines{*autotune, *octave, *unison, *distortion, *ringMod};
+  ChainEngines engines{*autotune, *octave, *unison, *distortion};
 };
 
 struct StillClock {
@@ -245,7 +244,7 @@ ChainSnapshot snapshotOf(const Layout& layout, bool comp, bool eq, bool mic) {
   for (auto& slot : panel.knob) slot.fill(0.5f);
   Settings settings;
   settings.polishComp = comp;
-  settings.polishEq = eq;
+  settings.voxEq = eq ? VoxEq::Cuts : VoxEq::Off;
   if (mic) settings.outputLevel = OutputLevel::Mic;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }

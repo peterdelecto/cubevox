@@ -4,6 +4,15 @@ namespace ui {
 
 namespace {
 
+// The VOX EQ setting after `v`, OFF to ON to ON+CUTS and back to OFF.
+VoxEq nextVoxEq(VoxEq v) {
+  switch (v) {
+    case VoxEq::Off: return VoxEq::On;
+    case VoxEq::On: return VoxEq::Cuts;
+    default: return VoxEq::Off;
+  }
+}
+
 // The card after `c` in the slot 8 cycle, Spring to Chasm and back to Spring.
 Card nextSlot8Card(Card c) { return c == Card::ReverbSpring ? Card::ReverbChasm : Card::ReverbSpring; }
 
@@ -19,14 +28,8 @@ Card nextSlot3Card(Card c) {
   }
 }
 
-// The card after `c` in the slot 6 cycle, Distortion to Growl to Ringer and back to Distortion.
-Card nextSlot6Card(Card c) {
-  switch (c) {
-    case Card::Distortion: return Card::Growl;
-    case Card::Growl: return Card::RingMod;
-    default: return Card::Distortion;
-  }
-}
+// The card after `c` in the slot 6 cycle, Distortion to Growl and back to Distortion.
+Card nextSlot6Card(Card c) { return c == Card::Distortion ? Card::Growl : Card::Distortion; }
 
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
 Card nextSlot7Card(Card c) {
@@ -60,8 +63,8 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
     case UiAction::TogglePolishComp:
       settings.polishComp = !settings.polishComp;
       return ApplyResult::SettingsChanged;
-    case UiAction::TogglePolishEq:
-      settings.polishEq = !settings.polishEq;
+    case UiAction::CycleVoxEq:
+      settings.voxEq = nextVoxEq(settings.voxEq);
       return ApplyResult::SettingsChanged;
     case UiAction::CycleTopSwitch:
       settings.topSwitch = settings.topSwitch == TopSwitch::Mute ? TopSwitch::Bypass : TopSwitch::Mute;

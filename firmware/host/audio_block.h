@@ -72,7 +72,6 @@ class AudioBlock {
   std::unique_ptr<cv::OctaveFx> octave_;      // about 16 KB
   std::unique_ptr<cv::Unison> unison_;
   std::unique_ptr<cv::Distortion> distortion_;
-  std::unique_ptr<cv::RingMod> ringMod_;
   ChainEngines engines_;
 
   std::array<ChainSnapshot, 2> snapshots_ = {};

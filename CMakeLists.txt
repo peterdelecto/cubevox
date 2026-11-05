@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(cubevox C CXX OBJCXX)
+project(cubevox C CXX OBJC OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -154,8 +154,6 @@ cubevox_engine_test(bloom)
 target_compile_definitions(bloom_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(growl)
 target_compile_definitions(growl_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
-cubevox_engine_test(ringmod)
-target_compile_definitions(ringmod_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(deesser)
 cubevox_engine_test(level ${CUBEVOX_REGISTRY_SOURCES})
 target_compile_definitions(level_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
@@ -294,7 +292,7 @@ endif()
 set_target_properties(cubevox-emulator PROPERTIES
   OUTPUT_NAME "cubevox-emulator"
   MACOSX_BUNDLE TRUE
-  MACOSX_BUNDLE_BUNDLE_NAME "cubevox-emulator"
+  MACOSX_BUNDLE_BUNDLE_NAME "cubevox emulator"
   MACOSX_BUNDLE_GUI_IDENTIFIER "com.peterdelecto.cubevox-emulator"
   MACOSX_BUNDLE_BUNDLE_VERSION "1"
   MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"

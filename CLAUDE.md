@@ -38,7 +38,7 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
 Use these words or a plain description. Never a coined label (owner 2026-10-24).
 - Enclosure: the box, lid, floor, front wall, rear wall (the back wall), beads, the TPU boot, coupon, solder jig.
 - Panel: slot, pot, bypass toggle, MUTE toggle, MENU (the one encoder), mux, K102 (mute relay), K103 (pad relay).
-- Effects: effect card (a library card), chain, layout, stage, engine, POLISH COMP, POLISH EQ, output trim, soft ceiling.
+- Effects: effect card (a library card), chain, layout, stage, engine, POLISH COMP, VOX EQ, output trim, soft ceiling.
 - Screens: splash, face, voice ribbon, readout and its fixed field, MUTED and BYPASS screens, menu, the update screens.
 - Update path: bootloader, update mode, the CUBEVOX drive, DIAG.TXT, boot block, boot report, image header, diag log, stall watch, boot-fail counter.
 - People: the owner, Adam (the singer).

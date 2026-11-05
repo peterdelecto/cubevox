@@ -361,14 +361,33 @@ bool parseTopSwitch(const char*& p, Fields& f) {
   return true;
 }
 
+bool parseVoxEq(const char*& p, Fields& f) {
+  constexpr const char* kTypeMsg = "vox_eq must be \"off\", \"on\" or \"cuts\"";
+  char word[kSwitchWordBytes] = {};
+  StrOut out{word, sizeof word};
+  bool present = false;
+  if (!parseText(p, f, out, kTypeMsg, present)) return false;
+  if (!present) return true;  // parseText noted the type error and skipped the value
+  VoxEq v = VoxEq::Off;
+  if (strcmp(word, "on") == 0) {
+    v = VoxEq::On;
+  } else if (strcmp(word, "cuts") == 0) {
+    v = VoxEq::Cuts;
+  } else if (strcmp(word, "off") != 0) {
+    f.typeFail(kTypeMsg);
+    return true;
+  }
+  f.req.settings.voxEq = v;
+  f.req.settingsGiven |= kGivenVoxEq;
+  return true;
+}
+
 bool parseSettingsField(const char*& p, const char* key, Fields& f) {
   Settings& s = f.req.settings;
   if (strcmp(key, "polish_comp") == 0) {
     return parseFlag(p, f, s.polishComp, kGivenPolishComp, "polish_comp must be true or false");
   }
-  if (strcmp(key, "polish_eq") == 0) {
-    return parseFlag(p, f, s.polishEq, kGivenPolishEq, "polish_eq must be true or false");
-  }
+  if (strcmp(key, "vox_eq") == 0) return parseVoxEq(p, f);
   if (strcmp(key, "top_switch") == 0) return parseTopSwitch(p, f);
   return skipValue(p, 1);
 }
@@ -575,9 +594,17 @@ void writeLayout(Writer& w, const char* name, const Layout& layout) {
   w.write("]}", 2);
 }
 
+const char* voxEqWord(VoxEq v) {
+  switch (v) {
+    case VoxEq::On: return "on";
+    case VoxEq::Cuts: return "cuts";
+    default: return "off";
+  }
+}
+
 void writeSettings(Writer& w, const Settings& s) {
-  w.format("{\"polish_comp\":%s,\"polish_eq\":%s,\"top_switch\":\"%s\"}", s.polishComp ? "true" : "false",
-           s.polishEq ? "true" : "false", s.topSwitch == TopSwitch::Bypass ? "bypass" : "mute");
+  w.format("{\"polish_comp\":%s,\"vox_eq\":\"%s\",\"top_switch\":\"%s\"}", s.polishComp ? "true" : "false",
+           voxEqWord(s.voxEq), s.topSwitch == TopSwitch::Bypass ? "bypass" : "mute");
 }
 
 const char* groupName(Group g) {
@@ -698,7 +725,7 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize, boo
 
 void applySettings(const Request& req, Settings& current) {
   if (req.settingsGiven & kGivenPolishComp) current.polishComp = req.settings.polishComp;
-  if (req.settingsGiven & kGivenPolishEq) current.polishEq = req.settings.polishEq;
+  if (req.settingsGiven & kGivenVoxEq) current.voxEq = req.settings.voxEq;
   if (req.settingsGiven & kGivenTopSwitch) current.topSwitch = req.settings.topSwitch;
 }
 

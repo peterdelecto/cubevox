@@ -241,7 +241,7 @@ struct GridCell {
 
 // A switch of rows of words, each `rowH` tall, the active one on an accent fill, in the foot of a
 // column. Words that do not fit side by side in the column at the label size take a row each: OCTAVE
-// and FORMANT together are 136 of the column's 144 px, so OCTAVE, FORMANT and YAWN stack a row each, and
+// and FORMANT together are 136 of the column's 144 px, so OCTAVE, FORMANT and APRAXIA stack a row each, and
 // CHATTER is wider than a third of it. A click on a cell returns its index, and -1 means no click.
 template <size_t N>
 int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, float rowH,
@@ -355,18 +355,17 @@ void drawTopBand(Frame& f) {
 
 // The cells of the four grid switches, in the order the menu cycles their cards. The slot 7 switch
 // has GATE and LO-FI side by side over CHATTER, the slot 4 switch UNISON and MOB side by side, the slot
-// 6 switch DISTORTION over DEEPTHROAT, and the slot 3 switch stacks OCTAVE, FORMANT and YAWN.
+// 6 switch DISTORTION over DEEPTHROAT, and the slot 3 switch stacks OCTAVE, FORMANT and APRAXIA.
 constexpr std::array<GridCell, 3> kSlot7Cells = {{{"GATE", 0.0f, 0, 0.5f}, {"LO-FI", 0.5f, 0, 0.5f}, {"CHATTER", 0.0f, 1, 1.0f}}};
 constexpr std::array<Card, 3> kSlot7Cards = {Card::Gate, Card::Lofi, Card::Bloom};
 constexpr std::array<GridCell, 2> kSlot4Cells = {{{"UNISON", 0.0f, 0, 0.5f}, {"MOB", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot4Cards = {Card::Unison, Card::Crowd};
-constexpr std::array<GridCell, kStackRows> kSlot6Cells = {
-    {{"DISTORTION", 0.0f, 0, 1.0f}, {"DEEPTHROAT", 0.0f, 1, 1.0f}, {"RINGER", 0.0f, 2, 1.0f}}};
-constexpr std::array<Card, kStackRows> kSlot6Cards = {Card::Distortion, Card::Growl, Card::RingMod};
+constexpr std::array<GridCell, 2> kSlot6Cells = {{{"DISTORTION", 0.0f, 0, 1.0f}, {"DEEPTHROAT", 0.0f, 1, 1.0f}}};
+constexpr std::array<Card, 2> kSlot6Cards = {Card::Distortion, Card::Growl};
 constexpr std::array<GridCell, 2> kSlot8Cells = {{{"SPRING", 0.0f, 0, 0.5f}, {"CHASM", 0.5f, 0, 0.5f}}};
 constexpr std::array<Card, 2> kSlot8Cards = {Card::ReverbSpring, Card::ReverbChasm};
 constexpr std::array<GridCell, kStackRows> kSlot3Cells = {
-    {{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}, {"YAWN", 0.0f, 2, 1.0f}}};
+    {{"OCTAVE", 0.0f, 0, 1.0f}, {"FORMANT", 0.0f, 1, 1.0f}, {"APRAXIA", 0.0f, 2, 1.0f}}};
 constexpr std::array<Card, kStackRows> kSlot3Cards = {Card::Octave, Card::Formant, Card::FormantFollower};
 
 // The cell of `cards` that `c` sits in, 0 when it sits in none.
@@ -379,7 +378,7 @@ int activeCell(const std::array<Card, N>& cards, Card c) {
 }
 
 // The card switch at the foot of a slot, which follows the layout: the column that holds Octave,
-// Formant or YAWN, the column that holds Unison or MOB, the column that holds
+// Formant or APRAXIA, the column that holds Unison or MOB, the column that holds
 // Distortion or Growl, the column that holds a reverb, and the column that holds Gate, Lo-fi or
 // Chatter. All but the reverb's are grids, and a click on a grid picks its card through the menu's own
 // action. The slot 3 stack is taller than the foot, so it rises into the gap above it and ends on the
@@ -393,7 +392,7 @@ void drawSwapSwitch(Frame& f, int slot, ImVec2 topLeft) {
         segmentedGrid(f, "slot3Card", stackTop, kColInnerW, kStackRowH, kSlot3Cells, activeCell(kSlot3Cards, card));
     if (picked >= 0) f.box.pickSlot3Card(kSlot3Cards[static_cast<size_t>(picked)]);
   } else if (slot == distortionGrowlSlot(layout)) {
-    const ImVec2 stackTop = topLeft + ImVec2(0.0f, kGridH - kStackH);
+    const ImVec2 stackTop = topLeft + ImVec2(0.0f, kGridH - 2.0f * kStackRowH);
     const int picked =
         segmentedGrid(f, "slot6Card", stackTop, kColInnerW, kStackRowH, kSlot6Cells, activeCell(kSlot6Cards, card));
     if (picked >= 0) f.box.pickSlot6Card(kSlot6Cards[static_cast<size_t>(picked)]);

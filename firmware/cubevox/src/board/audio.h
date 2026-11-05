@@ -14,7 +14,7 @@
 #include "core/compose.h"
 #include "core/level.h"
 
-// Cycle buckets: one per slot, then one each for POLISH COMP and POLISH EQ (both of its halves).
+// Cycle buckets: one per slot, then one each for POLISH COMP and VOX EQ (both of its halves).
 constexpr int kStatComp = kSlotCount;
 constexpr int kStatEq = kSlotCount + 1;
 constexpr int kStatBuckets = kSlotCount + 2;

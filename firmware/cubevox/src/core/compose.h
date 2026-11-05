@@ -31,7 +31,7 @@ struct BenchOverrides {
   bool reverbChasm = false;
   bool bypassOn = false;       // BYPASS held on, whatever the top switch reads
   bool compOff = false;        // POLISH COMP forced off, whatever the menu says
-  bool eqOff = false;          // POLISH EQ forced off, whatever the menu says
+  bool eqOff = false;          // VOX EQ forced off, whatever the menu says
   bool knobsPinned = false;    // every knob at its top position
   KnobPins knobPin = noKnobPins();  // whole percent of travel per knob; wins over knobsPinned
 

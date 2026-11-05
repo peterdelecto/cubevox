@@ -14,7 +14,6 @@
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
 #include "engine/reverb.h"
-#include "engine/ringmod.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
 
@@ -31,7 +30,6 @@ struct ChainParams {
   cv::LofiParams lofi;
   cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runBloom passes the gate's state
   cv::ReverbParams reverb;
-  cv::RingModParams ringMod;  // keyed is set by placing Autotune
   cv::PolishCompParams comp;  // the chain tail: comp, then the back half of eq
   cv::PolishParams eq;        // its front half runs ahead of slot 1
 

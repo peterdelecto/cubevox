@@ -17,12 +17,11 @@
 #include "engine/octave_fx.h"
 #include "engine/upstream_pitch.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. AutotuneFx, OctaveFx, Unison,
-// Distortion and RingMod are references because the board places them in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. AutotuneFx, OctaveFx, Unison
+// and Distortion are references because the board places them in DTCM.
 struct ChainEngines {
-  ChainEngines(cv::AutotuneFx& autotuneFx, cv::OctaveFx& octaveFx, cv::Unison& unisonFx, cv::Distortion& distortionFx,
-               cv::RingMod& ringModFx)
-      : autotune(autotuneFx), octave(octaveFx), unison(unisonFx), distortion(distortionFx), ringMod(ringModFx) {}
+  ChainEngines(cv::AutotuneFx& autotuneFx, cv::OctaveFx& octaveFx, cv::Unison& unisonFx, cv::Distortion& distortionFx)
+      : autotune(autotuneFx), octave(octaveFx), unison(unisonFx), distortion(distortionFx) {}
 
   cv::AutotuneFx& autotune;  // its tracker also serves the Formant, Crowd and Growl engines behind it
   cv::OctaveFx& octave;
@@ -38,7 +37,6 @@ struct ChainEngines {
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
   cv::Growl growl;  // keeps a 15 kB ring of its own input and a tracker for when no Autotune sits ahead
-  cv::RingMod& ringMod;  // tracks the pitch of its own input with a tracker and ring of its own
 
   cv::PolishComp comp;
   cv::Polish polish;
@@ -49,7 +47,7 @@ struct ChainEngines {
 void resetEngine(ChainEngines& engines, Engine e);
 
 // Holds the cycles each stage of one pass took, with one entry per slot and then one each for
-// POLISH COMP and POLISH EQ. The EQ entry sums its front half ahead of slot 1 and its back half.
+// POLISH COMP and VOX EQ. The EQ entry sums its front half ahead of slot 1 and its back half.
 struct ChainCycles {
   std::array<uint32_t, kSlotCount> slot{};
   uint32_t comp = 0;
@@ -158,13 +156,13 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
              int n, PitchPath& path);
 
-// Walks one block through the chain. The front half of POLISH EQ runs first, ahead of slot 1. The
-// slots run in order, then the NaN guard, then POLISH COMP and the back half of POLISH EQ. POLISH
+// Walks one block through the chain. The front half of VOX EQ runs first, ahead of slot 1. The
+// slots run in order, then the NaN guard, then POLISH COMP and the back half of VOX EQ. POLISH
 // COMP and both EQ halves run always, and each is a bit-exact copy once settled off. `a` holds
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
 // block. Returns false when a slot produced a NaN, an infinity or a sample past the guard's bound. The block was then silenced before the polish stages, so the
-// caller cuts the output and clears the engines, POLISH COMP and POLISH EQ.
+// caller cuts the output and clears the engines, POLISH COMP and VOX EQ.
 template <typename Clock>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
               Clock cycleClock, ChainCycles& cycles) {

@@ -8,19 +8,18 @@ to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper 
 (its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Input gate
 knobs and both Gate knobs (Threshold across the whole knob, then Decay), both Unison knobs (Rate, then
 Depth), both Distortion knobs (TONE again with DRIVE pinned at 100 %, and TONE stepped inside a DRIVE
-glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Yawn knobs (SENSITIVITY,
-RANGE), both Deepthroat knobs (GROWL, MIX), both Ringer knobs (RATIO, stepped, so each 10 % step lands
-on one of its positions, then MIX) and, when Crowd is placed, both Crowd
+glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Apraxia knobs (SENSITIVITY,
+RANGE), both Deepthroat knobs (GROWL, MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
-It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Yawn, Deepthroat and Ringer
+It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia and Deepthroat
 slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
-POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
+POLISH COMP and VOX EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
 core/costs.h, so a block that caught an interrupt does not count. The fixed path is read the same
-way. POLISH COMP and POLISH EQ come from the COMP and EQ buckets of the stats lines. The fixed path
+way. POLISH COMP and VOX EQ come from the COMP and EQ buckets of the stats lines. The fixed path
 is the block total less the slot sum for the mean, and for the worst the two buckets at their worst
 plus the rest of the fixed path (ceiling, BYPASS mix, conversion) at its mean.
 
@@ -28,12 +27,12 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-  4. each layout's POLISH EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
+  4. each layout's VOX EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
 Each card's slot is held to its own row. A slot that runs a tracker adds the tracker row: Autotune's slot,
 a Formant or Apraxia slot that does not sit directly behind Autotune, and a Mob or Deepthroat slot with no
-Autotune ahead of it. The Ringer slot runs a tracker of its own, so its row alone bounds it.
+Autotune ahead of it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
 --dry-run prints the layouts, the sweeps, the toggle flips and the fixed-stage flips planned for each,
@@ -42,8 +41,7 @@ with the time they take, and opens no port.
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
-slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ringer in
-Distortion's slot, with a tracker of its own) and heaviest (Input gate, Formant, Unison and
+slot), apraxia (Apraxia in Octave's slot), throat (Deepthroat in Distortion's slot) and heaviest (Input gate, Formant, Unison and
 Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
@@ -87,19 +85,19 @@ SWEEP_STEP_S = 1.0
 TOGGLE_FLIPS = 10    # a toggle flips off and on five times
 TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
 GLIDE_LAG_S = 0.02   # a stepped knob starts its partner this long after it, inside the glide
-FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_follow", "growl", "ringmod")  # toggles the run flips
+FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_follow", "growl")  # toggles the run flips
 # The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
     ("polish_comp", "POLISH COMP", "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu"),
-    ("polish_eq", "POLISH EQ", "[bench] POLISH EQ forced off", "[bench] POLISH EQ follows the menu"),
+    ("polish_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
 )
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "yawn", "throat", "ringmod", "heaviest")
+                "chatter", "lofi", "apraxia", "throat", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -108,14 +106,14 @@ ROW_OF = {
     "slapback": "kSlapback", "distortion": "kDistortion", "gate": "kGate",
     "reverb_spring": "kReverbSpring", "reverb_chasm": "kReverbChasm", "crowd": "kCrowd",
     "formant": "kFormant", "bloom": "kBloom", "lofi": "kLofi",
-    "formant_follow": "kFormantFollower", "growl": "kGrowl", "ringmod": "kRingMod",
+    "formant_follow": "kFormantFollower", "growl": "kGrowl",
 }
 TRACKER_ROW = "kTracker"
 FORMANT_CARDS = ("formant", "formant_follow")  # Formant and Apraxia play one voice
 READERS = ("crowd", "growl")  # cards that read Autotune's tracker when one sits ahead and run their own otherwise
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
-# The fixed path's rows: POLISH EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
+# The fixed path's rows: VOX EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
 FIXED_PARTS = ("kPolishEq", "kPolishComp", "kSoftCeiling", "kBypassMix")
 FIXED_ROW = "kFixed"
 
@@ -197,7 +195,7 @@ def layout_table():
     if "gate" not in base:
         raise StressError("the default layout has no gate slot for the chatter and lofi layouts to replace")
     if "distortion" not in base:
-        raise StressError("the default layout has no distortion slot for the throat and ringmod layouts to replace")
+        raise StressError("the default layout has no distortion slot for the throat layout to replace")
     reverbs = [c for c in base if c.startswith("reverb_")]
     if not reverbs:
         raise StressError("the default layout has no reverb slot for the heaviest layout to keep")
@@ -208,14 +206,12 @@ def layout_table():
     formant_alone = ["formant" if c == "octave" else ("empty" if c == "autotune" else c) for c in base]
     chatter = ["bloom" if c == "gate" else c for c in base]
     lofi = ["lofi" if c == "gate" else c for c in base]
-    yawn = ["formant_follow" if c == "octave" else c for c in base]
+    apraxia = ["formant_follow" if c == "octave" else c for c in base]
     throat = ["growl" if c == "distortion" else c for c in base]
-    ringmod = ["ringmod" if c == "distortion" else c for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
-            "chatter": (chatter, False), "lofi": (lofi, False), "yawn": (yawn, False), "throat": (throat, False),
-            "ringmod": (ringmod, False),
+            "chatter": (chatter, False), "lofi": (lofi, False), "apraxia": (apraxia, False), "throat": (throat, False),
             "heaviest": (heaviest, True)}
 
 
@@ -438,14 +434,11 @@ def sweeps(slots):
             found.append(Sweep(i, 1, "Crowd DIVERGE"))
             found.append(Sweep(i, 2, "Crowd VOICES"))
         if card == "formant_follow":
-            found.append(Sweep(i, 1, "Yawn SENSITIVITY"))
-            found.append(Sweep(i, 2, "Yawn RANGE"))
+            found.append(Sweep(i, 1, "Apraxia SENSITIVITY"))
+            found.append(Sweep(i, 2, "Apraxia RANGE"))
         if card == "growl":
             found.append(Sweep(i, 1, "Deepthroat GROWL"))
             found.append(Sweep(i, 2, "Deepthroat MIX"))
-        if card == "ringmod":
-            found.append(Sweep(i, 1, "Ringer RATIO"))
-            found.append(Sweep(i, 2, "Ringer MIX"))
     return found
 
 
@@ -585,7 +578,7 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 def judge_fixed(agg, rows, label, table, gates):
     """Adds the fixed stages to the table and holds each to its row: the EQ and COMP buckets to kPolishEq
     and kPolishComp, and the fixed path to kFixed, the sum of the four fixed rows."""
-    parts = (("POLISH EQ", "eq", "kPolishEq"), ("POLISH COMP", "comp", "kPolishComp"),
+    parts = (("VOX EQ", "eq", "kPolishEq"), ("POLISH COMP", "comp", "kPolishComp"),
              ("fixed path", "fixed", FIXED_ROW))
     for name, key, row_name in parts:
         row_mean, row_worst = rows[row_name]

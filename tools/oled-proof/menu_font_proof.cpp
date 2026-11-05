@@ -43,7 +43,7 @@ const std::vector<Item>& items() {
       {"TOP SWITCH", "TOGGLE", {"MUTE", "BYPASS"}},
       {"REVERB", nullptr, {"SPRING", "CHASM", "NONE"}},
       {"POLISH COMP", "COMP", {"ON", "OFF"}},
-      {"POLISH EQ", "EQ", {"ON", "OFF"}},
+      {"VOX EQ", "EQ", {"OFF", "ON", "ON+CUTS"}},
       {"DEBUG", nullptr, {"ON", "OFF"}},
       {"HPF", nullptr, {"OFF", "80", "100", "120", "150"}},
       {"LPF", nullptr, {"OFF", "4k", "5k", "6k", "8k", "10k", "12k"}},

@@ -44,7 +44,7 @@ enum class Item : uint8_t {
   DistortionGrowl,
   Slot7Card,
   PolishComp,
-  PolishEq,
+  VoxEq,
   Output,
   TopSwitch,
   Brightness,
@@ -97,7 +97,7 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
     case Item::DistortionGrowl: return slotLabel(distortionGrowlSlot(layout), buf, size);
     case Item::Slot7Card: return slotLabel(slot7CardSlot(layout), buf, size);
     case Item::PolishComp: return "POLISH COMP";
-    case Item::PolishEq: return "POLISH EQ";
+    case Item::VoxEq: return "VOX EQ";
     case Item::Debug: return "DEBUG";
     case Item::UpdateFirmware: return "UPDATE FIRMWARE";
     case Item::Exit: return "EXIT";
@@ -107,6 +107,14 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
 }
 
 const char* onOff(bool on) { return on ? "ON" : "OFF"; }
+
+const char* voxEqValue(VoxEq v) {
+  switch (v) {
+    case VoxEq::On: return "ON";
+    case VoxEq::Cuts: return "ON+CUTS";
+    default: return "OFF";
+  }
+}
 
 // The reverb card the layout holds. A valid layout always holds one; a layout without one reads
 // SPRING, the default.
@@ -121,7 +129,7 @@ const char* octaveFormantValue(const Layout& layout) {
   if (slot < 0) return "OCTAVE";
   switch (layout.card[slot]) {
     case Card::Formant: return "FORMANT";
-    case Card::FormantFollower: return "YAWN";
+    case Card::FormantFollower: return "APRAXIA";
     default: return "OCTAVE";
   }
 }
@@ -141,11 +149,7 @@ const char* unisonCrowdValue(const Layout& layout) {
 const char* distortionGrowlValue(const Layout& layout) {
   const int slot = distortionGrowlSlot(layout);
   if (slot < 0) return "DISTORTION";
-  switch (layout.card[slot]) {
-    case Card::Growl: return "DEEPTHROAT";
-    case Card::RingMod: return "RINGER";
-    default: return "DISTORTION";
-  }
+  return layout.card[slot] == Card::Growl ? "DEEPTHROAT" : "DISTORTION";
 }
 
 // The card the slot 7 row holds. A layout with none of the three reads GATE, the default.
@@ -172,7 +176,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::DistortionGrowl: return distortionGrowlValue(ctx.layout);
     case Item::Slot7Card: return slot7CardValue(ctx.layout);
     case Item::PolishComp: return onOff(s.polishComp);
-    case Item::PolishEq: return onOff(s.polishEq);
+    case Item::VoxEq: return voxEqValue(s.voxEq);
     case Item::Debug: return onOff(s.debug);
     case Item::UpdateFirmware: return ">";
     default: return "";
@@ -258,7 +262,7 @@ UiAction Menu::onClick() {
         case Item::DistortionGrowl: return UiAction::SwapDistortionGrowl;
         case Item::Slot7Card: return UiAction::CycleSlot7Card;
         case Item::PolishComp: return UiAction::TogglePolishComp;
-        case Item::PolishEq: return UiAction::TogglePolishEq;
+        case Item::VoxEq: return UiAction::CycleVoxEq;
         case Item::Debug: return UiAction::ToggleDebug;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;

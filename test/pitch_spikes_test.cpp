@@ -10,7 +10,7 @@
 //    one block read 47 % of the budget against a settled worst of 7 %. Its word-wise memset (board/fastmem.cpp)
 //    cuts that to about 4 %, and a stopped card still clears the ring a slice a block, and the switch-on finds
 //    it clear. The host's memset is fast, so the ring work is counted as well as timed. Autotune, Octave,
-//    Formant, Mob and Ringer each keep a ring and rest the same way, so the check runs on each.
+//    Formant and Mob each keep a ring and rest the same way, so the check runs on each.
 //
 // Block times are the minimum over several passes of one deterministic run, in host nanoseconds. No window,
 // no audio device.
@@ -137,15 +137,14 @@ bool testOnsetSpread(const std::vector<Signal>& clips) {
 }
 
 // 2. A card switched on that keeps a ring. Layout: Input gate, two empty slots, Unison, Echo, the subject, Gate,
-// Spring. The subject is Autotune, Octave, Formant, Mob (each with the ring of its own input) or Ringer
-// (a ring and a tracker of its own). Each toggle starts and stops its card's engine and nothing else does.
+// Spring. The subject is Autotune, Octave, Formant or Mob, each with the ring of its own input. Each toggle
+// starts and stops its card's engine and nothing else does.
 struct Rig {
   std::unique_ptr<cv::AutotuneFx> autotune = std::make_unique<cv::AutotuneFx>();
   std::unique_ptr<cv::OctaveFx> octave = std::make_unique<cv::OctaveFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
-  std::unique_ptr<cv::RingMod> ringMod = std::make_unique<cv::RingMod>();
-  ChainEngines engines{*autotune, *octave, *unison, *distortion, *ringMod};
+  ChainEngines engines{*autotune, *octave, *unison, *distortion};
   SlotFades fades;
 };
 
@@ -185,8 +184,7 @@ uint32_t ringCleared(const Rig& rig, Card subject) {
     case Card::Autotune: return rig.autotune->ringClearedForTest();
     case Card::Octave: return rig.octave->ringClearedForTest();
     case Card::Formant: return rig.engines.formant.ringClearedForTest();
-    case Card::Crowd: return rig.engines.crowd.ringForTest().clearedForTest();
-    default: return rig.ringMod->ringClearedForTest();
+    default: return rig.engines.crowd.ringForTest().clearedForTest();
   }
 }
 
@@ -203,8 +201,7 @@ int ringNonzero(const Rig& rig, Card subject) {
     case Card::Autotune: return nonzeroIn(rig.autotune->ringForTest().data());
     case Card::Octave: return nonzeroIn(rig.octave->ringForTest().data());
     case Card::Formant: return nonzeroIn(rig.engines.formant.ringForTest().data());
-    case Card::Crowd: return nonzeroIn(rig.engines.crowd.ringForTest().data());
-    default: return nonzeroIn(rig.ringMod->ringForTest());
+    default: return nonzeroIn(rig.engines.crowd.ringForTest().data());
   }
 }
 
@@ -246,7 +243,7 @@ SwitchRun switchRun(const Signal& x, int offBlocks, Card subject) {
 }
 
 bool testSwitchOn(const std::vector<Signal>& clips, Card subject, const char* label) {
-  const int restFloats = subject == Card::RingMod ? cv::kRingModRestFloats : cv::InputRing<cv::kOctaveRingLen>::kRestClearFloats;
+  const int restFloats = cv::InputRing<cv::kOctaveRingLen>::kRestClearFloats;
   char name[120];
   Signal x;
   for (const Signal& c : clips) x.insert(x.end(), c.begin(), c.end());
@@ -321,7 +318,6 @@ int main() {
   ok &= testSwitchOn(clips, Card::Octave, "Octave");
   ok &= testSwitchOn(clips, Card::Formant, "Formant");
   ok &= testSwitchOn(clips, Card::Crowd, "Mob");
-  ok &= testSwitchOn(clips, Card::RingMod, "Ringer");
   std::printf("%s pitch_spikes\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }
