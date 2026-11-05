@@ -8,8 +8,8 @@
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/formant_voice.h"
+#include "engine/input_ring.h"
 #include "engine/pitch.h"
-#include "engine/pitch_fx.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
 
@@ -17,7 +17,12 @@
 // a little after Adam. Each copy sits a few semitones off the lead, has its own throat (a grain
 // playback rate) and its own tone shelf, and lags the lead by its own delay. The crowd as a whole
 // has a fixed low cut. The copies never read a key. They read the pitch period and Autotune's
-// correction from PitchFx and cut their grains from its input ring.
+// correction and cut their grains from the card's input ring.
+//
+// With an Autotune card ahead, the ring holds Autotune's input: the chain calls write() at Autotune's slot,
+// and the copies read Autotune's tracker and correction (CrowdPitch). The card is exempt from the chain
+// order for this. With no Autotune ahead, the card writes its own input into the ring and runs a tracker of
+// its own (coarse search only), and the correction is 0.
 //
 // The tuning lists four copies, the tuned copies 0 to 3. Copies 4 to 7 are the raised copies: copy
 // v + 4 takes tuned copy v's throat, tone shelf and contour, sits kRaisedSt higher and lags
@@ -544,42 +549,84 @@ inline ShelfWeights fitShelf(const ShelfBasis& b, float hz, float db) {
 
 }  // namespace crowd_detail
 
+// What the card reads of the pitch. `result` is Autotune's tracker result when an Autotune card sits
+// ahead, with the correction it puts on the pitch; null when none does.
+struct CrowdPitch {
+  const PitchResult* result = nullptr;
+  float correctionSemis = 0.0f;
+};
+
 class Crowd {
  public:
   // The constructor runs reset(), so the non-zero defaults below land in .bss with the rest.
   Crowd() { reset(); }
 
+  // Leaves the ring and the tracker clear as well as the voices. A card that rested since it last ran
+  // (see rest) has cleared most of the ring already, and this clears what is left.
   void reset() {
-    clearDsp();
-    gain_.fill(0.0f);
-    lead_ = 1.0f;
-    wet_ = 0.0f;
-    glideSet_ = false;
-    for (size_t v = 0; v < kCopies; ++v) {
-      lag_[v].seed(0x2545F491u * static_cast<uint32_t>(v + 1));
-      driftRng_[v].seed(0x9E3779B9u * static_cast<uint32_t>(v + 1) ^ 0x85EBCA6Bu);
-    }
-    idle_ = true;
+    restartVoices();
+    ring_.clear();
+    tracker_.reset();
+    written_ = false;
+    rested_ = false;
   }
 
-  // in is this slot's input, the lead. pitch has already run this block, so the block's samples
-  // sit at ring index head() - n + i. Off and settled, out equals in bit for bit.
-  void process(const float* in, float* out, int n, const CrowdParams& p, const PitchFx& pitch) {
+  // The card switches on. The voices start clean. A ring that the Autotune slot fed this block stays,
+  // since the history in it is live; any other ring clears.
+  void switchOn() {
+    if (written_) restartVoices();
+    else reset();
+  }
+
+  // The input of the Autotune slot ahead of the card, n samples, written ahead of process() every block
+  // the Autotune slot runs while the card is placed behind it. A ring left over from a rest clears first.
+  int write(const float* in, int n) {
+    if (rested_) {
+      ring_.clear();
+      tracker_.reset();
+      rested_ = false;
+    }
+    written_ = true;
+    return ring_.write(in, n);
+  }
+
+  // A call for each block the card sits stopped (the chain does not run it). It zeroes a slice of the ring,
+  // so the first write after a switch-on carries little of the 51 kB clear. A block the Autotune slot fed
+  // leaves the ring alone.
+  void rest() {
+    if (written_) {
+      written_ = false;
+      return;
+    }
+    ring_.rest();
+    rested_ = true;
+  }
+
+  // in is this slot's input, the lead. With `pitch.result` set, write() has already put the block's n
+  // samples into the ring. Without it the card writes `in` and runs its own tracker. Off and settled, out
+  // equals in bit for bit.
+  void process(const float* in, float* out, int n, const CrowdParams& p, const CrowdPitch& pitch) {
+    const PitchResult& pr = pitch.result != nullptr ? *pitch.result : ownPitch(in, n, !settledOff(p));
+    written_ = false;
     if (settledOff(p)) {
       passThrough(in, out, n);
       return;
     }
     idle_ = false;
     setCoefs(n);
-    const float period = holdPeriod(pitch.pitch().period);
+    const float period = holdPeriod(pr.period);
     const Plan plan = makePlan(p, period > 0.0f);
-    const int first = pitch.head() - n;
-    prepareBlock(p, pitch, plan, period, first, n);
+    int first = ring_.head() - n;
+    if (first < 0) first += kVoiceRingLen;
+    prepareBlock(p, pr, pitch.correctionSemis, plan, period, first, n);
     for (int c = 0; c < n; c += kBlock) {
       const int m = n - c < kBlock ? n - c : kBlock;
-      renderChunk(in + c, out + c, plan, Chunk{pitch.ring(), first + c, m});
+      renderChunk(in + c, out + c, plan, Chunk{ring_.data(), wrapOnce<kVoiceRingLen>(first + c), m});
     }
   }
+
+  // The ring, for the tests.
+  const InputRing<kVoiceRingLen>& ringForTest() const { return ring_; }
 
   // Test hooks. leadGain is the lead's gain at the end of the last block. activeVoices counts the
   // copies that ticked in it and activeMask names them, a bit per copy. lagSamples, driftCents and
@@ -599,6 +646,34 @@ class Crowd {
 
  private:
   using FormantPsolaVoice = formant_detail::FormantPsolaVoice;
+
+  // With no Autotune ahead: writes the card's input into the ring and feeds it to the card's own tracker,
+  // which runs the coarse search while the card is on. The result is the tracker's.
+  const PitchResult& ownPitch(const float* in, int n, bool active) {
+    const int first = write(in, n);
+    tracker_.readOutOfRange(true);
+    if (active) {
+      tracker_.push(in, n, true, false, PitchTracker::History{ring_.data().data(), kVoiceRingLen, first});
+    } else {
+      tracker_.idle(n);
+    }
+    return tracker_.result();
+  }
+
+  // The voices start clean; the ring and the tracker stay.
+  void restartVoices() {
+    clearDsp();
+    gain_.fill(0.0f);
+    lead_ = 1.0f;
+    wet_ = 0.0f;
+    glideSet_ = false;
+    for (size_t v = 0; v < kCopies; ++v) {
+      lag_[v].seed(0x2545F491u * static_cast<uint32_t>(v + 1));
+      driftRng_[v].seed(0x9E3779B9u * static_cast<uint32_t>(v + 1) ^ 0x85EBCA6Bu);
+    }
+    idle_ = true;
+  }
+
   static constexpr size_t kVoices = crowd_detail::kVoices;  // the tuned copies
   static constexpr size_t kCopies = crowd_detail::kCopies;  // copy v + kVoices is tuned copy v raised
   static constexpr float kShelfFloor = 1e-20f;  // a shared shelf state under this is silence, 400 dB down
@@ -858,17 +933,17 @@ class Crowd {
 
   // Per block: filters and the contour track, then each live voice, then the phrase level. first is
   // the ring index of the block's first sample, and period the tracker's or the one held.
-  void prepareBlock(const CrowdParams& p, const PitchFx& pitch, const Plan& plan, float period, int first, int n) {
+  void prepareBlock(const CrowdParams& p, const PitchResult& pr, float correctionSemis, const Plan& plan, float period,
+                    int first, int n) {
     const CrowdTuning& t = p.tuning;
     setLowCut(t);
     setShelves(t);
-    const PitchResult& pr = pitch.pitch();
     contour_.step(period, pr.voiced, slewCoef_);
     const float pitchWidth = plan.width * crowd_detail::kWidthPitchTop;
     const Block b{t,
-                  {pitch.ring(), first, n, gapFloor(t)},
+                  {ring_.data(), first, n, gapFloor(t)},
                   period,
-                  pitch.correctionSemis() * (1.0f / 12.0f),
+                  correctionSemis * (1.0f / 12.0f),
                   plan.width,
                   pitchWidth,
                   crowd_detail::lagMultiplier(t, smooth::clamp01(p.width)),
@@ -1043,6 +1118,10 @@ class Crowd {
     wet_ = plan.wet;
   }
 
+  InputRing<kVoiceRingLen> ring_;  // the card's input, or Autotune's when an Autotune card sits ahead
+  PitchTracker tracker_;           // the card's own, for a card with no Autotune ahead
+  bool written_ = false;           // the ring took a write since the last process or rest
+  bool rested_ = false;            // the card sat stopped since the ring was last written
   std::array<FormantPsolaVoice, kCopies> voice_{};
   Biquad hp_;
   crowd_detail::ShelfBasis shelf_;

@@ -10,7 +10,7 @@
 // moves the output's spectral centroid with SHIFT as Formant's own output does, and a Unison ahead is in the
 // wet. The Octave and Autotune latencies the card reads are measured, a stopped card clears its ring a slice
 // a block, and with Autotune ahead the heard pitch and the level stay where the card had them. Each run feeds a
-// PitchFx first, so the tracker runs, as the chain does. The clip rows skip
+// pitch series first, so the tracker runs, as the chain does. The clip rows skip
 // when samples/ is absent. No window, no audio device.
 
 #include <algorithm>
@@ -29,6 +29,7 @@
 #include "engine/growl.h"
 #include "engine/unison.h"
 
+#include "pitch_series.h"
 #include "ringed_tracker.h"
 #include "signal_util.h"
 
@@ -43,17 +44,28 @@ bool report(const char* name, bool ok, const char* detail) {
   return ok;
 }
 
-// The chain's order for a Growl card that makes the pitch call: the pitch stage feeds the tracker and
-// shifts the voice as `stage` says, then the card runs on the stage's output. `heard` keeps the stage's
-// output, the card's input.
+// The chain's order for a Growl card behind the pitch cards: Autotune, Formant and Octave run in series as
+// `stage` says, each on the output of the one before, and the card runs on the series' output with the
+// tracker, shift and delay the series hands it. `autotunePlaced` is true in a menu layout, where the Autotune
+// card sits ahead with its toggle on or off and its tracker serves the card, and false in a layout with no
+// Autotune card, where the Growl card runs a tracker of its own. `heard` keeps the series' output, the
+// card's input.
 struct Rig {
-  std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
+  explicit Rig(bool autotunePlaced = true) : pitch(std::make_unique<PitchSeries>(autotunePlaced)) {}
+
+  std::unique_ptr<PitchSeries> pitch;
   std::unique_ptr<cv::Growl> growl = std::make_unique<cv::Growl>();
   cv::PitchFxParams stage;
   Signal heard;
-  std::vector<float> latency;  // the stage's outputLatency() after each block
+  std::vector<float> latency;  // the series' outputLatency() after each block
 
-  // in through the stage and the card, with the card's params from `at(sample)` per block.
+  // One block through the series and the card.
+  void step(const float* in, float* out, int n, const cv::GrowlParams& g) {
+    pitch->process(in, out, n, stage, g.on);
+    growl->process(out, out, n, g, pitch->upstream());
+  }
+
+  // in through the series and the card, with the card's params from `at(sample)` per block.
   template <typename ParamsAt>
   Signal run(const Signal& in, ParamsAt at) {
     Signal out(in.size());
@@ -62,12 +74,10 @@ struct Rig {
     for (size_t i = 0; i < in.size(); i += cv::kBlock) {
       const int n = static_cast<int>(in.size() - i < cv::kBlock ? in.size() - i : cv::kBlock);
       const cv::GrowlParams g = at(i);
-      cv::PitchFxParams pp = stage;
-      pp.growlOn = g.on;
-      pitch->process(&in[i], &out[i], n, pp);
+      pitch->process(&in[i], &out[i], n, stage, g.on);
       std::copy(&out[i], &out[i] + n, &heard[i]);
       latency.push_back(pitch->outputLatency());
-      growl->process(&out[i], &out[i], n, g, *pitch);
+      growl->process(&out[i], &out[i], n, g, pitch->upstream());
     }
     return out;
   }
@@ -192,10 +202,7 @@ bool checkDepthFade() {
   Signal out(in.size());
   for (size_t i = 0; i < in.size(); i += cv::kBlock) {
     const cv::GrowlParams g = growlAt(1.0f, 0.5f);
-    cv::PitchFxParams pp;
-    pp.growlOn = true;
-    rig.pitch->process(&in[i], &out[i], cv::kBlock, pp);
-    rig.growl->process(&out[i], &out[i], cv::kBlock, g, *rig.pitch);
+    rig.step(&in[i], &out[i], cv::kBlock, g);
     if (i == static_cast<size_t>(kRate) - cv::kBlock) onNote = rig.growl->depthFade();
     if (i >= static_cast<size_t>(kRate) && lostAt == 0 && !rig.pitch->pitch().voiced) lostAt = i;
     if (lostAt > 0 && i >= lostAt + static_cast<size_t>(20 * kRate / 1000) + cv::kBlock) {
@@ -278,10 +285,7 @@ ThroatTrace traceThroat(const Signal& in, const cv::GrowlParams& g) {
   ThroatTrace t;
   Signal out(in.size());
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
-    cv::PitchFxParams pp;
-    pp.growlOn = g.on;
-    rig.pitch->process(&in[i], &out[i], cv::kBlock, pp);
-    rig.growl->process(&out[i], &out[i], cv::kBlock, g, *rig.pitch);
+    rig.step(&in[i], &out[i], cv::kBlock, g);
     t.target.push_back(rig.growl->throatTargetSt());
     t.glided.push_back(rig.growl->throatSt());
     t.sweep.push_back(rig.growl->sweep());
@@ -492,6 +496,20 @@ bool checkFullMix() {
   return report("MIX 100 % is the plain card", h == kFullMixHash, detail);
 }
 
+// With no Autotune card ahead the card runs a tracker of its own, and its output is the one it gives behind
+// an Autotune card whose toggle is off and whose tracker serves it: both trackers hear the same input.
+bool checkOwnTracker() {
+  const Signal in = sungNote(220.0, 2.0, -20.0);
+  Rig alone(false);
+  Rig behind(true);
+  const Signal own = alone.run(in, growlAt(0.80f, 0.65f));
+  const Signal shared = behind.run(in, growlAt(0.80f, 0.65f));
+  char detail[96];
+  std::snprintf(detail, sizeof detail, "own tracker %016llx, Autotune's tracker %016llx",
+                static_cast<unsigned long long>(hashOf(own)), static_cast<unsigned long long>(hashOf(shared)));
+  return report("own tracker", own == shared && hashOf(own) == kFullMixHash, detail);
+}
+
 // MIX 0 is the card's input delayed by the voice's lag. A mirror of the card's ring is read at the
 // delay the card reports, over every block where that delay held still, and the delay itself must be the
 // one the voice plays at (with nothing ahead of the card, the grain delay plus a period, clamped as the
@@ -508,11 +526,8 @@ bool checkMixZero() {
   bool lagHeld = false;
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
     const cv::GrowlParams g = potAt(1.0f, 0.0f);
-    cv::PitchFxParams pp;
-    pp.growlOn = true;
     const float lagBefore = rig.growl->dryLagSamples();
-    rig.pitch->process(&in[i], &out[i], cv::kBlock, pp);
-    rig.growl->process(&out[i], &out[i], cv::kBlock, g, *rig.pitch);
+    rig.step(&in[i], &out[i], cv::kBlock, g);
     for (size_t j = 0; j < static_cast<size_t>(cv::kBlock); ++j) mirror[(i + j) % mirror.size()] = in[i + j];
     if (rig.pitch->pitch().period > 0.0f) period = rig.pitch->pitch().period;
     lag = rig.growl->dryLagSamples();
@@ -782,10 +797,7 @@ bool checkJitter() {
   float last = -1.0f;
   Signal out(in.size());
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
-    cv::PitchFxParams pp;
-    pp.growlOn = true;
-    watch.pitch->process(&in[i], &out[i], cv::kBlock, pp);
-    watch.growl->process(&out[i], &out[i], cv::kBlock, potAt(1.0f, 1.0f), *watch.pitch);
+    watch.step(&in[i], &out[i], cv::kBlock, potAt(1.0f, 1.0f));
     if (i < static_cast<size_t>(kRate)) continue;
     const float depth = watch.growl->periodDepth();
     lo = std::fmin(lo, depth);
@@ -821,10 +833,7 @@ bool checkOnsetHolds() {
   const size_t want = static_cast<size_t>(150 * cv::kSmpPerMs) / cv::kBlock;
   float ratioWorst = 0.0f, rateWorst = 0.0f, lagLo = 1e9f, lagHi = 0.0f, throatLo = 0.0f, throatHi = -99.0f;
   for (size_t i = 0; i + cv::kBlock <= in.size() && counted < want; i += cv::kBlock) {
-    cv::PitchFxParams pp;
-    pp.growlOn = true;
-    rig.pitch->process(&in[i], &out[i], cv::kBlock, pp);
-    rig.growl->process(&out[i], &out[i], cv::kBlock, g, *rig.pitch);
+    rig.step(&in[i], &out[i], cv::kBlock, g);
     if (rig.growl->wet() == 0.0f) continue;
     ++counted;
     const float period = rig.pitch->pitch().period;
@@ -944,11 +953,11 @@ bool checkFormantAhead() {
   return report("formant ahead", stageMove > 0.1 && outMove >= 0.5 * stageMove, detail);
 }
 
-// Unison between the pitch stage and the card, DEPTH 100 %. The copies are in the card's input, so the
+// Unison between the pitch cards and the card, DEPTH 100 %. The copies are in the card's input, so the
 // output differs from the same run without Unison by more than the floor. A card that cut its grains from
-// the pitch stage's ring would give the same output either way.
+// the audio ahead of Unison would give the same output either way.
 Signal runUnisonAhead(const Signal& in, bool unisonOn) {
-  auto pitch = std::make_unique<cv::PitchFx>();
+  auto pitch = std::make_unique<PitchSeries>();
   auto unison = std::make_unique<cv::Unison>();
   auto growl = std::make_unique<cv::Growl>();
   cv::UnisonParams up;
@@ -957,11 +966,9 @@ Signal runUnisonAhead(const Signal& in, bool unisonOn) {
   const cv::GrowlParams g = growlAt(0.0f, 0.0f);
   Signal out(in.size());
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
-    cv::PitchFxParams pp;
-    pp.growlOn = true;
-    pitch->process(&in[i], &out[i], cv::kBlock, pp);
+    pitch->process(&in[i], &out[i], cv::kBlock, cv::PitchFxParams{}, true);
     if (unisonOn) unison->process(&out[i], &out[i], cv::kBlock, up);
-    growl->process(&out[i], &out[i], cv::kBlock, g, *pitch);
+    growl->process(&out[i], &out[i], cv::kBlock, g, pitch->upstream());
   }
   return out;
 }
@@ -1113,11 +1120,8 @@ bool checkStagesFinite(const std::vector<Signal>& voices) {
     flip.stage.octave.semitones = 12;
     Signal out(in.size());
     for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
-      cv::PitchFxParams pp = flip.stage;
-      pp.growlOn = true;
-      pp.octave.mix = (i / cv::kBlock / 5) % 2 == 0 ? 0.4f : 0.6f;
-      flip.pitch->process(&in[i], &out[i], cv::kBlock, pp);
-      flip.growl->process(&out[i], &out[i], cv::kBlock, potAt(1.0f, 0.5f), *flip.pitch);
+      flip.stage.octave.mix = (i / cv::kBlock / 5) % 2 == 0 ? 0.4f : 0.6f;
+      flip.step(&in[i], &out[i], cv::kBlock, potAt(1.0f, 0.5f));
     }
     for (const float v : out) {
       bad += std::isfinite(v) ? 0 : 1;
@@ -1126,18 +1130,17 @@ bool checkStagesFinite(const std::vector<Signal>& voices) {
   }
   const Signal note = sungNote(180.0, 1.5, -18.0);
   for (const size_t n : {size_t{1}, size_t{17}, size_t{200}, size_t{4000}}) {
-    auto pitch = std::make_unique<cv::PitchFx>();
+    auto pitch = std::make_unique<PitchSeries>();
     auto growl = std::make_unique<cv::Growl>();
     cv::PitchFxParams pp;
-    pp.growlOn = true;
     pp.octave.on = true;
     pp.octave.semitones = 12;
     pp.octave.mix = 1.0f;
     Signal out(note.size());
     for (size_t i = 0; i < note.size(); i += n) {
       const int m = static_cast<int>(std::min(n, note.size() - i));
-      pitch->process(&note[i], &out[i], m, pp);
-      growl->process(&out[i], &out[i], m, potAt(1.0f, 0.5f), *pitch);
+      pitch->process(&note[i], &out[i], m, pp, true);
+      growl->process(&out[i], &out[i], m, potAt(1.0f, 0.5f), pitch->upstream());
     }
     for (const float v : out) {
       bad += std::isfinite(v) ? 0 : 1;
@@ -1280,6 +1283,7 @@ int main() {
   ok &= checkLevel(voices, whole);
   ok &= checkAlias();
   ok &= checkFullMix();
+  ok &= checkOwnTracker();
   ok &= checkMixZero();
   ok &= checkGrowlZero();
   ok &= checkHighPass();

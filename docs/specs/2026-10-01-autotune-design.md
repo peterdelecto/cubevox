@@ -1,5 +1,13 @@
 # cubevox — Autotune card and the pitch front end
 
+Since 2026-11-05 the shared stage this file calls `PitchFx` is gone (`2026-11-05-pitch-split-design.md`).
+`AutotuneFx` runs the card alone on its own slot's input, with a ring of 2,176 floats, the tracker and the
+crossfade from the dry voice to the corrected one. Octave, Formant and Apraxia run their own engines on the
+block the slot ahead hands them, so Octave no longer adds Autotune's correction to its interval and the
+Formant voice no longer shares Autotune's grain grid. Where the text below says `PitchFx`, the ring, the
+tracker gating, the 61,420 B and the shared crossfades, read the split design. The card's behaviour (KEY,
+RESPONSE, the hold, the glide, the hard-tune gates) is unchanged.
+
 Date 2026-10-01. Owner: "add a simple autotune module with key selection and response time
 parameter." Adam on the V3's: "U can set the general key and the sensitivity ... I mean how
 corrective." This file is the implementation reference. The first part states the card and the

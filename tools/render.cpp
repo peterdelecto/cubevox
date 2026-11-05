@@ -1,4 +1,4 @@
-// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + octave + formant + crowd +
+// cubevox-render: loop in, the front half of POLISH EQ, gates + autotune + formant + octave + crowd +
 // unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the
 // back half of eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
@@ -8,14 +8,17 @@
 #include <cstring>
 
 #include "../third_party/miniaudio.h"
+#include "engine/autotune_fx.h"
 #include "engine/bloom.h"
 #include "engine/crowd.h"
 #include "engine/distortion.h"
 #include "engine/formant_follower.h"
+#include "engine/formant_fx.h"
 #include "engine/gate.h"
 #include "engine/growl.h"
 #include "engine/lofi.h"
-#include "engine/pitch_fx.h"
+#include "engine/octave_fx.h"
+#include "engine/pitch_params.h"
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
 #include "engine/reverb.h"
@@ -33,7 +36,9 @@ struct TuningField {
 struct RenderParams {
   bool inGateOn = false;
   bool gateOn = false;
-  bool pitchOn = false;  // also true when the crowd, formant or growl card is on, so the ring and tracker run
+  bool autotuneOn = false;  // Autotune runs, so Autotune's tracker serves the formant, crowd and growl cards
+  bool formantOn = false;   // also true for Apraxia
+  bool octaveOn = false;
   bool crowdOn = false;
   bool growlOn = false;
   bool unisonOn = false;
@@ -46,7 +51,7 @@ struct RenderParams {
   bool eqOn = true;
   bool compStats = false;  // print the comp's gain reduction after the render
   const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
-  const char* drivePath = nullptr;  // where Yawn's drive goes, one value a sample
+  const char* drivePath = nullptr;  // where Apraxia's drive goes, one value a sample
   const char* shiftPath = nullptr;  // where the glided SHIFT goes, -7..0 st onto -1..0, one value a sample
   cv::GateParams inGate;
   cv::GateParams gate;
@@ -84,10 +89,11 @@ int usage() {
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
                "       [--polish-comp firm|off] [--polish-eq on|off] [--comp-stats]\n"
                "       [--eqdip <150..600 hz>,<-6..0 db>] [--eqpres <2000..6000 hz>,<0..6 db>]\n"
-               "  pitch front end runs with --octave, --autotune, --formant or --crowd\n"
-               "  formant runs inside the pitch front end, ahead of octave's voice; --formant sets SHIFT in whole semitones and\n"
-               "  --fmix the MIX (default 1); with --autotune its voice follows the tuned note and lines up with it\n"
-               "  --follower runs the Yawn card, the formant voice alone with SHIFT swept on each syllable, down for a\n"
+               "  autotune runs with --autotune, formant with --formant, octave with --octave, in that order, each on the\n"
+               "  output of the one before it\n"
+               "  formant sets SHIFT in whole semitones with --formant and the MIX with --fmix (default 1); with --autotune it\n"
+               "  sits directly behind it, reads its tracker and cuts its voice from the tuned note\n"
+               "  --follower runs the Apraxia card, the formant voice alone with SHIFT swept on each syllable, down for a\n"
                "  negative RANGE and up for a positive one; its value is RANGE in semitones, any value from -12 to +6 (the\n"
                "  box's default is -5), and --sensitivity is the SENSITIVITY pot (default 0.4); the card pins the voice's\n"
                "  MIX at 1 and overrides --formant's SHIFT and --fmix.\n"
@@ -98,9 +104,11 @@ int usage() {
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
                "  distortion runs only with --drive; reverb runs only with --reverb\n"
                "  growl runs with --growl or --gdrive (the other one defaults to 0.5) where slot 6 sits, after slapback; it\n"
-               "  reads the pitch stage's ring, so its voice is the pitch stage's input, and the dry signal is gone\n"
+               "  cuts its voice from a ring of its own input, which is also its dry path, and reads Autotune's tracker\n"
+               "  with --autotune and a tracker of its own without it\n"
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
-               "  at least one stage must run; order is eq front, ingate, pitch, crowd, unison, slapback, growl, distortion,\n"
+               "  at least one stage must run; order is eq front, ingate, autotune, formant, octave, crowd, unison, slapback,\n"
+               "  growl, distortion,\n"
                "  gate, lofi, bloom, reverb, comp, eq back\n"
                "  bloom, the Chatter card, runs with --amount (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its\n"
                "  word key is the input gate's open state, otherwise it listens to its own input; it cuts its slices from\n"
@@ -149,7 +157,7 @@ int usage() {
                "     growlLowShelfHz growlPeakHz (20..21600) growlLowShelfDb growlPeakDb (-24..24)\n"
                "     growlDriveDb (0..48) growlMakeupSat (1..1000) growlRailSoft (0.01..1) growlRailAsym (0..0.5)\n"
                "     growlTrimDb (-24..24)\n"
-               "     decayMs (10..2000, default 300), the time Yawn's sweep takes to fall back to 0\n"
+               "     decayMs (10..2000, default 300), the time Apraxia's sweep takes to fall back to 0\n"
                "  every value must be finite, and a key outside its range is refused, whichever stage it belongs to\n"
                "     bloomTrimDb (-24..24) bloomFirstCaptureMs (1..500) bloomSkipDb (-60..0)\n"
                "     bloomDriveWord (0.1..20) bloomDriveBell (0..20) bloomDrift (0..0.2)\n"
@@ -658,16 +666,17 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
     rp.reverb.mix = mix;
     cv::applyKnobs(rp.reverb);
   }
-  // Each pitch stage runs only when asked for. The Crowd and Growl cards read the pitch stage's ring and
-  // tracker, so each turns the stage on and tells it to keep them running, as the registry's toggle does.
-  // Yawn plays the formant voice, so it switches that on too.
+  // Each pitch card runs only when asked for, in the order autotune, formant, octave, so the formant
+  // engine sits directly behind Autotune and reads its tracker. The Crowd and Growl cards read Autotune's
+  // tracker when Autotune runs and run a tracker of their own otherwise. Apraxia plays the formant voice,
+  // so it switches that on too.
   op.on = haveOctave;
   fp.on = haveFormant || rp.follower.placed;
   rp.crowd.on = rp.crowdOn;
-  rp.pitchFx.crowdOn = rp.crowdOn;
   rp.growl.on = rp.growlOn;
-  rp.pitchFx.growlOn = rp.growlOn;
-  rp.pitchOn = haveOctave || fp.on || ap.on || rp.crowdOn || rp.growlOn;
+  rp.autotuneOn = ap.on;
+  rp.formantOn = fp.on;
+  rp.octaveOn = haveOctave;
   if ((rp.drivePath != nullptr || rp.shiftPath != nullptr) && !rp.follower.placed) return false;
   // Unison runs only when asked for; --on 0 with --depth keeps it off.
   rp.unisonOn = haveOn ? p.on : haveDepth;
@@ -687,7 +696,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.bloomOn = haveBloom;
   rp.bloom.on = haveBloom;
   rp.bloom.keyFromGate = haveInGate;
-  return rp.inGateOn || rp.gateOn || rp.pitchOn || rp.unisonOn || rp.slapOn || rp.growlOn || rp.distOn || rp.lofiOn ||
+  return rp.inGateOn || rp.gateOn || rp.autotuneOn || rp.formantOn || rp.octaveOn || rp.crowdOn || rp.unisonOn || rp.slapOn || rp.growlOn || rp.distOn || rp.lofiOn ||
          rp.bloomOn ||
          rp.reverbOn ||
          rp.compOn || rp.eqOn;
@@ -729,7 +738,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     return 1;
   }
 
-  // Yawn's drive and the glided SHIFT, each held over its block, when asked for.
+  // Apraxia's drive and the glided SHIFT, each held over its block, when asked for.
   constexpr int kSides = 2;
   const char* const sidePath[kSides] = {rp.drivePath, rp.shiftPath};
   ma_encoder sideEnc[kSides];
@@ -750,7 +759,9 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
 
   static cv::Gate inGate;
   static cv::Gate gate;
-  static cv::PitchFx pitchFx;
+  static cv::AutotuneFx autotune;
+  static cv::FormantFx formant;
+  static cv::OctaveFx octave;
   static cv::FormantFollower follower;
   static cv::Crowd crowd;
   static cv::Unison unison;
@@ -764,7 +775,9 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Polish polish;
   inGate.reset();
   gate.reset();
-  pitchFx.reset();
+  autotune.reset();
+  formant.reset();
+  octave.reset();
   follower.reset();
   crowd.reset();
   unison.reset();
@@ -803,20 +816,44 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         src = scratch[next];
         next ^= 1;
       }
-      if (rp.pitchOn) {
-        pitchFx.process(src, scratch[next], n, follower.follow(src, n, rp.pitchFx, rp.follower));
-        const float sideValue[kSides] = {follower.drive(), shiftSignal(pitchFx.shiftSemis())};
+      cv::UpstreamPitch up;  // Autotune's tracker and what the cards since have put on the pitch and the audio
+      cv::CrowdPitch crowdPitch;
+      if (rp.autotuneOn) {
+        cv::TrackerNeeds need;
+        need.run = rp.crowdOn || rp.growlOn || rp.formantOn;
+        need.fine = rp.formantOn;
+        need.outOfRange = rp.crowdOn || rp.formantOn;
+        if (rp.crowdOn) crowd.write(src, n);
+        autotune.process(src, scratch[next], n, rp.pitchFx.autotune, need);
+        up = {&autotune.pitch(), autotune.correctionSemis(), autotune.outputLatency()};
+        crowdPitch = {up.result, up.shiftSemis};
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.formantOn) {
+        formant.process(src, scratch[next], n, follower.follow(src, n, rp.pitchFx.formant, rp.follower), up);
+        const float sideValue[kSides] = {follower.drive(), shiftSignal(formant.shiftSemis())};
         bool wrote = true;
         for (int s = 0; s < kSides; ++s) wrote = wrote && writeHeld(side[s], sideValue[s], got, sidePath[s]);
         if (!wrote) {
           rc = 1;
           break;
         }
+        if (up.result != nullptr) up.latency += formant.outputLatency();
+        src = scratch[next];
+        next ^= 1;
+      }
+      if (rp.octaveOn) {
+        octave.process(src, scratch[next], n, rp.pitchFx.octave);
+        if (up.result != nullptr) {
+          if (octave.leads()) up.shiftSemis += octave.intervalSemis();
+          up.latency += octave.outputLatency();
+        }
         src = scratch[next];
         next ^= 1;
       }
       if (rp.crowdOn) {
-        crowd.process(src, scratch[next], n, rp.crowd, pitchFx);
+        crowd.process(src, scratch[next], n, rp.crowd, crowdPitch);
         src = scratch[next];
         next ^= 1;
       }
@@ -831,7 +868,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         next ^= 1;
       }
       if (rp.growlOn) {
-        growl.process(src, scratch[next], n, rp.growl, pitchFx);
+        growl.process(src, scratch[next], n, rp.growl, up);
         src = scratch[next];
         next ^= 1;
       }

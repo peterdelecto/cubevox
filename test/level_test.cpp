@@ -28,7 +28,6 @@
 #include "engine/distortion.h"
 #include "engine/gate.h"
 #include "engine/lofi.h"
-#include "engine/pitch_fx.h"
 #include "engine/polish.h"
 #include "engine/polish_comp.h"
 #include "engine/reverb.h"
@@ -36,6 +35,7 @@
 #include "engine/unison.h"
 
 #include "distortion_rule.h"
+#include "pitch_series.h"
 #include "signal_util.h"
 
 namespace {
@@ -211,13 +211,12 @@ bool midRow(const char* name, const Signal& in, const P& p) {
   return verdict(name, db, kMidLoDb, kMidHiDb);
 }
 
-// The Crowd card at VOICES 4 and DIVERGE `width`, behind the PitchFx that fills its ring and runs the
+// The Crowd card at VOICES 4 and DIVERGE `width`, behind the Autotune slot that fills its ring and runs the
 // tracker, as the chain runs them.
 bool crowdRow(const Signal& in, float width) {
-  auto pitch = std::make_unique<Stage<cv::PitchFx>>();
+  auto pitch = std::make_unique<Stage<PitchSeries>>();
   auto crowd = std::make_unique<Stage<cv::Crowd>>();
-  cv::PitchFxParams pp = pitchOff();
-  pp.crowdOn = true;
+  const cv::PitchFxParams pp = pitchOff();
   cv::CrowdParams params;
   params.on = true;
   params.voicesStep = 4;
@@ -226,8 +225,9 @@ bool crowdRow(const Signal& in, float width) {
   std::snprintf(name, sizeof name, "crowd VOICES 4 DIVERGE %g", static_cast<double>(width));
   return verdict(name, gainDb(in, run(in, [&](const float* i, float* o, int n) {
                    float tmp[cv::kBlock];
-                   pitch->fx.process(i, tmp, n, pp);
-                   crowd->fx.process(i, o, n, params, pitch->fx);
+                   crowd->fx.write(i, n);
+                   pitch->fx.process(i, tmp, n, pp, true);
+                   crowd->fx.process(i, o, n, params, pitch->fx.crowdPitch());
                  })));
 }
 
@@ -321,19 +321,19 @@ bool clipRows(const char* label, const ClipFn& through, double lo, double hi, do
 bool formantRows(const Signal& in) {
   bool ok = true;
   {
-    auto s = std::make_unique<Stage<cv::PitchFx>>();
+    auto s = std::make_unique<Stage<PitchSeries>>();
     const cv::PitchFxParams full = boxFormant(1.0f);
     const double programDb = gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, full); }));
     std::printf("NOTE %-30s %+6.2f dB  (the synthetic program, not held to the rule)\n", "formant -3 st mix 1 program", programDb);
   }
-  ok &= midRow<cv::PitchFx>("formant -3 st mix .5", in, boxFormant(0.5f));
+  ok &= midRow<PitchSeries>("formant -3 st mix .5", in, boxFormant(0.5f));
   const cv::PitchFxParams half = boxFormant(0.5f);
   double mean = 0.0;
   int count = 0;
   ok &= clipRows(
       "formant -3 st mix .5",
       [&](const Signal& padded) {
-        auto s = std::make_unique<Stage<cv::PitchFx>>();
+        auto s = std::make_unique<Stage<PitchSeries>>();
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); })};
       },
       kMidLoDb, kMidHiDb, mean, count);
@@ -344,7 +344,7 @@ bool formantRows(const Signal& in) {
     ok &= clipRows(
         label,
         [&](const Signal& padded) {
-          auto s = std::make_unique<Stage<cv::PitchFx>>();
+          auto s = std::make_unique<Stage<PitchSeries>>();
           return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, full); })};
         },
         kMidLoDb, kMidHiDb, mean, count);
@@ -384,7 +384,7 @@ bool octaveRows() {
     ok &= clipRows(
         label,
         [&](const Signal& padded) {
-          auto s = std::make_unique<Stage<cv::PitchFx>>();
+          auto s = std::make_unique<Stage<PitchSeries>>();
           return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
         },
         kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
@@ -400,7 +400,7 @@ bool octaveRows() {
   ok &= clipRows(
       "octave -12 st mix .5",
       [&](const Signal& padded) {
-        auto s = std::make_unique<Stage<cv::PitchFx>>();
+        auto s = std::make_unique<Stage<PitchSeries>>();
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); })};
       },
       -0.4, 0.4, mean, count);
@@ -432,7 +432,7 @@ bool autotuneRows() {
     ok &= clipRows(
         label,
         [&](const Signal& padded) {
-          auto s = std::make_unique<Stage<cv::PitchFx>>();
+          auto s = std::make_unique<Stage<PitchSeries>>();
           return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, p); })};
         },
         kLoDb - kSlackDb, kHiDb + kSlackDb, mean, count);
@@ -830,7 +830,7 @@ bool slotRows(const Signal& in) {
 
   cv::PitchFxParams autotune = pitchOff();
   autotune.autotune.on = true;
-  ok &= simple<cv::PitchFx>("autotune key C", in, autotune);
+  ok &= simple<PitchSeries>("autotune key C", in, autotune);
   ok &= autotuneRows();
 
   ok &= octaveRows();

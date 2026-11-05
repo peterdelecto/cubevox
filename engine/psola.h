@@ -14,11 +14,10 @@
 
 namespace cv {
 
-// The shared input ring holds the Mob card's longest lag, the timing scatter its working set rides
-// on top of that lag, and the reach of its longest grain (two periods at the tracker's longest, and
-// a pad) behind both. The longest lag is a raised copy's, 75 ms behind a tuned copy at the tuned
-// copies' 150 ms ceiling. 12,756 samples, 265.75 ms. Autotune reads under 2,100 samples back and
-// Octave under 3,850.
+// The Mob card's input ring holds its longest lag, the timing scatter its working set rides on top of
+// that lag, and the reach of its longest grain (two periods at the tracker's longest, and a pad)
+// behind both. The longest lag is a raised copy's, 75 ms behind a tuned copy at the tuned copies'
+// 150 ms ceiling. 12,756 samples, 265.75 ms.
 constexpr int kCrowdMaxLagMs = 225;
 constexpr int kCrowdScatterMs = 12;
 constexpr int kCrowdGrainReach = 2 * PitchTracker::kMaxPeriod + 8;
@@ -31,18 +30,13 @@ using VoiceRing = std::array<float, kVoiceRingLen>;
 constexpr float kMinPitchRatio = 0.5f;
 constexpr float kMaxPitchRatio = 2.0f;
 constexpr float kMinReadDelay = 3.0f;
-constexpr float kMaxReadDelay = kVoiceRingLen - 4.0f;
 
-// Where a voice's marks and launch countdown stand. A voice that starts beside another takes its
-// grid and launches on the same samples. Both PSOLA voices keep the newest mark in
-// [grainDelay, grainDelay + period) behind the head.
-struct VoiceGrid {
-  float markDelay;
-  float countdown;
-};
-
-class PsolaVoice {
+// The ring length is a template argument, the Mob card's ring by default.
+template <int RingLen = kVoiceRingLen>
+class PsolaVoiceT {
  public:
+  using Ring = std::array<float, static_cast<size_t>(RingLen)>;
+
   // The default grain delay lines the voice up with the tracker's frame. A shorter delay lets the
   // measurement trail the audio and loses Adam's 2-cent hard tune (commit ee527fb). The voice's
   // latency is this delay plus one period, 22.7 ms at 1 kHz to 36.0 ms at 70 Hz.
@@ -65,12 +59,6 @@ class PsolaVoice {
   // a trim costs nothing per sample.
   void setTrim(float gain) { trim_ = gain; }
 
-  VoiceGrid grid() const { return {markDelay_, countdown_}; }
-  void adoptGrid(const VoiceGrid& g) {
-    markDelay_ = g.markDelay;
-    countdown_ = g.countdown;
-  }
-
   // How far the voice lags the input at this period, in samples: the grain delay plus the period
   // the voice plays at. The Formant card reads it to put its voice on the same sample.
   float latency(float period) const { return grainDelay_ + PitchTracker::clampPeriod(period); }
@@ -81,7 +69,7 @@ class PsolaVoice {
   // ratio at sample i, between 0.5 and 2.0 as the ratio is. The marks and the launch countdown step
   // sample by sample; the grains between two launches then play their stretch from locals, two at a
   // time so their window chains overlap.
-  void render(const VoiceRing& ring, int first, int n, float period, const float* inv, float* out) {
+  void render(const Ring& ring, int first, int n, float period, const float* inv, float* out) {
     for (int i = 0; i < n; ++i) out[i] = 0.0f;
     if (period <= 0.0f) return;
     const float p = PitchTracker::clampPeriod(period);
@@ -120,6 +108,7 @@ class PsolaVoice {
   };
 
   static constexpr float kMaxPeriod = static_cast<float>(PitchTracker::kMaxPeriod);
+  static constexpr float kMaxReadDelay = static_cast<float>(RingLen) - 4.0f;
 
   // The delay that lines the voice up with the tracker's frame (see kGrainDelay) stays over 1.5
   // longest periods and a pad.
@@ -161,7 +150,7 @@ class PsolaVoice {
   }
 
   // The live grains over count samples, added into acc.
-  void playGrains(const VoiceRing& ring, float* acc, int count) {
+  void playGrains(const Ring& ring, float* acc, int count) {
     if (count <= 0) return;
     Grain* live[kMaxGrains];
     int nLive = 0;
@@ -191,22 +180,22 @@ class PsolaVoice {
 
   // Samples from read index idx before a four-tap read leaves the ring's contiguous part.
   static int plainRun(int idx) {
-    return static_cast<unsigned>(idx - 1) < static_cast<unsigned>(kVoiceRingLen - 3) ? kVoiceRingLen - 2 - idx : 0;
+    return static_cast<unsigned>(idx - 1) < static_cast<unsigned>(RingLen - 3) ? RingLen - 2 - idx : 0;
   }
 
   // One sample of a grain by the wrapped path, for the reads that touch the ring's seam.
-  static float tapWrapped(const VoiceRing& ring, Grain& g) {
+  static float tapWrapped(const Ring& ring, Grain& g) {
     const float win = 0.5f * (1.0f - g.c);
     g.s -= g.eps * g.c;
     g.c += g.s;
     const int i = g.idx;
-    g.idx = i + 1 == kVoiceRingLen ? 0 : i + 1;
+    g.idx = i + 1 == RingLen ? 0 : i + 1;
     return win * (g.w.m * ring[wrap(i - 1)] + g.w.z * ring[static_cast<size_t>(i)] + g.w.p * ring[wrap(i + 1)] +
                   g.w.q * ring[wrap(i + 2)]);
   }
 
   // The grain's next `sounds` samples, added into acc.
-  static void playSolo(const VoiceRing& ring, Grain& g, int sounds, float* acc) {
+  static void playSolo(const Ring& ring, Grain& g, int sounds, float* acc) {
     for (int j = 0; j < sounds;) {
       const int room = plainRun(g.idx);
       if (room == 0) {
@@ -230,7 +219,7 @@ class PsolaVoice {
   }
 
   // Two grains over count samples, their window chains side by side; the longer one finishes alone.
-  static void playPair(const VoiceRing& ring, Grain& a, Grain& b, int count, float* acc) {
+  static void playPair(const Ring& ring, Grain& a, Grain& b, int count, float* acc) {
     const int soundsA = soundsIn(a, count), soundsB = soundsIn(b, count);
     const int both = soundsA < soundsB ? soundsA : soundsB;
     int j = 0;
@@ -273,7 +262,7 @@ class PsolaVoice {
     b.s = sb;
   }
 
-  static int wrap(int i) { return wrapOnce<kVoiceRingLen>(i); }
+  static int wrap(int i) { return wrapOnce<RingLen>(i); }
 
   std::array<Grain, kMaxGrains> grains_{};
   float grainDelay_ = static_cast<float>(kGrainDelay);
@@ -281,5 +270,7 @@ class PsolaVoice {
   float countdown_ = 0.0f;
   float trim_ = 1.0f;
 };
+
+using PsolaVoice = PsolaVoiceT<>;
 
 }  // namespace cv

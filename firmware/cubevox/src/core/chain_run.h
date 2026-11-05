@@ -12,33 +12,40 @@
 #include "core/output_stage.h"
 #include "core/registry.h"
 #include "core/slots.h"
+#include "engine/autotune_fx.h"
+#include "engine/formant_fx.h"
+#include "engine/octave_fx.h"
+#include "engine/upstream_pitch.h"
 
-// Gathers the engines the chain runs, each in reset state once constructed. PitchFx, Unison, Distortion
-// and RingMod are references because the board places them in DTCM.
+// Gathers the engines the chain runs, each in reset state once constructed. AutotuneFx, OctaveFx, Unison,
+// Distortion and RingMod are references because the board places them in DTCM.
 struct ChainEngines {
-  ChainEngines(cv::PitchFx& pitchFx, cv::Unison& unisonFx, cv::Distortion& distortionFx, cv::RingMod& ringModFx)
-      : pitch(pitchFx), unison(unisonFx), distortion(distortionFx), ringMod(ringModFx) {}
+  ChainEngines(cv::AutotuneFx& autotuneFx, cv::OctaveFx& octaveFx, cv::Unison& unisonFx, cv::Distortion& distortionFx,
+               cv::RingMod& ringModFx)
+      : autotune(autotuneFx), octave(octaveFx), unison(unisonFx), distortion(distortionFx), ringMod(ringModFx) {}
 
-  cv::PitchFx& pitch;
-  cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each pitch call while its card is placed
+  cv::AutotuneFx& autotune;  // its tracker also serves the Formant, Crowd and Growl engines behind it
+  cv::OctaveFx& octave;
+  cv::FormantFx formant;  // a plain global like the others; 25 kB with its ring and its own tracker
+  cv::FormantFollower follower;  // sets the Formant voice's SHIFT ahead of each Formant call while Apraxia is placed
   cv::Gate inputGate;
   cv::Unison& unison;
   cv::Slapback slapback;
   cv::Distortion& distortion;
   cv::Gate gate;
   cv::Reverb reverb;
-  cv::Crowd crowd;  // a plain global like the others; its voices read the ring that `pitch` writes
+  cv::Crowd crowd;  // 60 kB: a ring and a tracker of its own, fed by the Autotune slot when one sits ahead
   cv::Lofi lofi;
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
-  cv::Growl growl;  // a plain global like crowd; it keeps a 15 kB ring of its own input and reads the tracker that `pitch` runs
+  cv::Growl growl;  // keeps a 15 kB ring of its own input and a tracker for when no Autotune sits ahead
   cv::RingMod& ringMod;  // tracks the pitch of its own input with a tracker and ring of its own
 
   cv::PolishComp comp;
   cv::Polish polish;
 };
 
-// Clears the state of engine `e`. Empty (kNoEngine) clears nothing. The pitch engine's reset clears
-// the Formant follower's envelope too.
+// Clears the state of engine `e`. Empty (kNoEngine) clears nothing. The Formant engine's reset clears
+// the Apraxia follower's envelope too.
 void resetEngine(ChainEngines& engines, Engine e);
 
 // Holds the cycles each stage of one pass took, with one entry per slot and then one each for
@@ -49,18 +56,39 @@ struct ChainCycles {
   uint32_t eq = 0;
 };
 
+// What one block's walk carries from slot to slot, for the cards that read Autotune's tracker. An Autotune
+// card sets it, and the cards behind it hand their share on:
+//   1. `autotuneAhead` is true once an Autotune slot has been walked.
+//   2. `adjacent` is true while nothing but Empty slots has been walked since it. The Formant engine reads
+//      Autotune's tracker only then.
+//   3. `upstream` is what Deepthroat and the Formant engine read: Autotune's tracker result, the shift the
+//      slots since have put on the pitch and the delay they have put on the audio. The Octave card adds its
+//      interval to the shift while its voice carries half the power, and its latency to the delay. The
+//      Formant engine adds its lag to the delay.
+struct PitchPath {
+  bool autotuneAhead = false;
+  bool adjacent = false;
+  cv::UpstreamPitch upstream;
+};
+
+// What the layout asks of a slot's engine beyond its own card.
+struct StageContext {
+  cv::TrackerNeeds tracker;  // Autotune: what the readers behind it ask of its tracker
+  bool feedsCrowd = false;   // Autotune: a Mob card sits behind it, so Autotune's input goes into Mob's ring
+  float slotShare = 1.0f;    // the slot's toggle fade, 0 dry .. 1 engine
+};
+
 // Runs the engine of card `c` over `n` samples from `in` into `out`. Returns false when it wrote
-// nothing (an Empty slot, or an Autotune, Octave or Formant card after the pitch stage ran), so the
-// caller keeps its buffers. Autotune, Octave, Formant, the Formant follower and the Crowd card share
-// one PitchFx call, made at the first pitch-group card's slot; `pitchDone` carries that across the
-// slots of a pass. With the Formant follower placed, the call takes the Formant voice's SHIFT from
-// the follower's envelope of the call's input.
-// A Crowd card that makes that call runs its own engine on the pitch stage's output, which is its
-// lead, and so does a Growl card. A Chatter card keys on the Input gate's detector when the layout places that card
-// (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when it runs.
-// It cuts its slices from `in`, the block leaving the slot ahead of it.
+// nothing (an Empty slot), so the caller keeps its buffers. Every card runs its own engine on `in`, the block
+// the slot ahead hands it, and updates `path` for the cards behind it. The Formant engine reads Autotune's
+// tracker when `path` says it sits directly behind it, and runs its own otherwise. With Apraxia placed, the
+// call takes the Formant voice's SHIFT from the follower's envelope of `in`. A Crowd card reads Autotune's
+// tracker and correction when one sits ahead, and runs its own tracker on its own ring otherwise. A Growl card
+// reads Autotune's tracker with `path.upstream`. A Chatter card keys on the Input gate's detector when the
+// layout places that card (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when
+// it runs. It cuts its slices from `in`.
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
-              bool& pitchDone);
+              PitchPath& path, const StageContext& ctx = StageContext{});
 
 // A quarter turn in the phase units of cv::sinTurns. The BYPASS mix runs a phase from 0 (the chain
 // side) to this (the dry input).
@@ -115,19 +143,20 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 
 // Runs slot `s` for one block from `in` into `out`: the engine of its card with the toggle
 // crossfade. A slot settled off runs no engine and writes nothing, so the caller keeps its buffers
-// and the dry input passes. A stopped pitch stage clears a slice of its input ring each block (`PitchFx::rest`),
-// so the clear at its next start is already done, and a stopped Ringer card does the same with its own
-// ring (`RingMod::rest`). A slot that starts a fade in has its engine cleared first. A flip back
-// during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot is
-// off, because its detector feeds the status reply's `floor_dbfs` and keys the Chatter card; its own
-// off fade ends inside the slot fade, so the settled slot passes the input bit for bit. Returns false
-// when it wrote nothing. The shared pitch stage runs at the first pitch-group card's slot (Autotune, Octave,
-// Formant or Crowd) while any pitch-group toggle is on, and its fade follows all of them. A Formant
-// card behind another pitch-group card acts at that first slot, not at its own. A Crowd card keeps a
-// live ring and tracker with Autotune and Octave off, wherever it sits against them. The Crowd card's
-// own engine runs at its own slot and ramps itself on its own toggle.
+// and the dry input passes. A stopped engine with a ring clears a slice of it each block (its `rest`), so
+// the clear at its next start is already done. A slot that starts a fade in has its engine cleared first,
+// except Autotune, Octave and the Formant engine, which clear themselves on their first call after a rest.
+// A flip back during a fade-out leaves the running engine alone. The Input gate's engine runs while its slot
+// is off, because its detector feeds the status reply's `floor_dbfs` and keys the Chatter card; its own off
+// fade ends inside the slot fade, so the settled slot passes the input bit for bit.
+//
+// The Autotune engine runs while its toggle is off whenever a reader behind it is on or fading: the
+// Formant engine directly behind it, a Crowd card or a Growl card. It keeps the tracker warm, and the slot
+// then passes the dry input, as an Input gate slot does, once the toggle's fade has run. While Crowd sits
+// behind it, the Autotune slot also writes its own input into the Crowd card's ring. Returns false when it
+// wrote nothing.
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
-             int n, bool& pitchDone);
+             int n, PitchPath& path);
 
 // Walks one block through the chain. The front half of POLISH EQ runs first, ahead of slot 1. The
 // slots run in order, then the NaN guard, then POLISH COMP and the back half of POLISH EQ. POLISH
@@ -141,13 +170,13 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
               Clock cycleClock, ChainCycles& cycles) {
   const ChainParams& p = snap.params;
   float* const result = a;
-  bool pitchDone = false;
+  PitchPath path;
   const uint32_t frontStart = cycleClock();
   engines.polish.processFront(a, a, n, p.eq);
   const uint32_t frontCycles = cycleClock() - frontStart;
   for (int s = 0; s < kSlotCount; ++s) {
     const uint32_t start = cycleClock();
-    const bool wrote = runSlot(engines, fades, s, snap, a, b, n, pitchDone);
+    const bool wrote = runSlot(engines, fades, s, snap, a, b, n, path);
     cycles.slot[static_cast<size_t>(s)] = cycleClock() - start;
     if (wrote) std::swap(a, b);
   }

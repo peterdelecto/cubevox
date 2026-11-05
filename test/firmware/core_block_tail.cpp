@@ -226,11 +226,12 @@ void checkGuardKeepsEqFinite() {
 
 // Holds the engines of one chain, built the way the board builds them. It is too big for the stack.
 struct Rig {
-  std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
+  std::unique_ptr<cv::AutotuneFx> autotune = std::make_unique<cv::AutotuneFx>();
+  std::unique_ptr<cv::OctaveFx> octave = std::make_unique<cv::OctaveFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
   std::unique_ptr<cv::RingMod> ringMod = std::make_unique<cv::RingMod>();
-  ChainEngines engines{*pitch, *unison, *distortion, *ringMod};
+  ChainEngines engines{*autotune, *octave, *unison, *distortion, *ringMod};
 };
 
 struct StillClock {

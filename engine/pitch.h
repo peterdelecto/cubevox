@@ -111,9 +111,9 @@ class PitchTracker {
   }
 
   // Feed any n samples, which h's ring already holds. The decimated ring fills on every push, so the
-  // frame is warm only while the stage keeps running; the chain resets PitchFx when every pitch card
-  // is off, and the first voiced frame after such a switch-on comes about 32 ms in, where a running
-  // stage gives it in 8 ms. Analysis runs every kHop samples while active and the block sums are
+  // frame is warm only while the card keeps running; a card that rested resets on its next call, and
+  // the first voiced frame after such a switch-on comes about 32 ms in, where a running card gives it
+  // in 8 ms. Analysis runs every kHop samples while active and the block sums are
   // current. An enable rebuilds the block sums over the next few blocks and analyses at the end of
   // the block that makes them whole, unless a hop already did in that block. Inactive, the result
   // reads unvoiced. fine runs the 48 kHz fine pass on the coarse lag; without it an analysis

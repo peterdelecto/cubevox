@@ -4,6 +4,12 @@ Date 2026-10-31. Owner design in chat 2026-10-31 and 2026-11-01; this file is th
 reference. The first part states the card as it is at v2.00.79. The log at the end records how it got
 there, with the commit that holds each thing that was built and then removed.
 
+Since 2026-11-05 Mob has a ring and a tracker of its own (`2026-11-05-pitch-split-design.md`). With an
+Autotune slot ahead, that slot writes Autotune's input into Mob's ring each block, keeps its tracker running
+for Mob, and Mob reads the tracker and Autotune's correction through `CrowdPitch`. With none ahead, Mob writes
+its own input and runs its own tracker. `PitchFx`, `PitchFxParams::crowdOn` and the pitch stage's `ring()` and
+`head()` named below are gone. Mob is the one card exempt from the chain-order rule.
+
 Name (owner 2026-11-01): the card is **Mob**; the menu and readout show MOB, in capitals like every menu value (owner 2026-11-02). The registry's display name is Mob from
 v2.00.82; the card id `crowd`, the engine, the cost row and the file names keep the old name until
 a rename pass. The menu row after REVERB swaps the slot that holds Unison or Mob between the two

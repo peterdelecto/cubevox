@@ -4,6 +4,10 @@ Date 2026-10-01. Owner: "do that for option C". A and B are pitch-synchronous
 (PSOLA, formants preserved). C is the classic pedal octaver: fixed-window
 crossfaded grains, no tracker, formants move with pitch.
 
+Since 2026-11-05 `OctaveFx` owns the ring and the mix and runs on the block the slot ahead hands it
+(`2026-11-05-pitch-split-design.md`). The voice takes no correction input from Autotune. With Autotune ahead,
+Octave shifts Autotune's tuned voice. Where the text below names `PitchFx`, read `OctaveFx`.
+
 ## Decisions
 
 1. Same mechanism as Unison's fixed-detune shifter (`readShifted` in `engine/unison.h`):

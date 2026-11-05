@@ -82,11 +82,6 @@ constexpr float kGateOutStep = 1.0f / (8.0f * kSmpPerMs);
 // One quarter turn in the phase units of sinTurns, the equal-power law's span.
 constexpr uint32_t kQuarterTurn = 1u << 30;
 
-inline float toward(float x, float target, float step) {
-  if (x < target) return target - x <= step ? target : x + step;
-  return x - target <= step ? target : x - step;
-}
-
 }  // namespace ringmod_detail
 
 class RingMod {
@@ -151,9 +146,9 @@ class RingMod {
     if (fresh_) mix_ = mixKnob;
     const float e0 = mix_ * wet_ * gate_;
     mix_ = smooth::step(mix_, mixKnob, smooth::blockCoef(smooth::kSmoothSec, n));
-    wet_ = ringmod_detail::toward(wet_, wetTarget, ringmod_detail::kFadeStep * static_cast<float>(n));
+    wet_ = smooth::toward(wet_, wetTarget, ringmod_detail::kFadeStep * static_cast<float>(n));
     const float gateStep = ducked_ ? ringmod_detail::kGateOutStep : ringmod_detail::kGateInStep;
-    gate_ = ringmod_detail::toward(gate_, ducked_ ? 0.0f : 1.0f, gateStep * static_cast<float>(n));
+    gate_ = smooth::toward(gate_, ducked_ ? 0.0f : 1.0f, gateStep * static_cast<float>(n));
     fresh_ = false;
     const float trim = dbToGainFast(clampf(p.tuning.trimDb, -24.0f, 24.0f));
     float dry = dryGain(e0);

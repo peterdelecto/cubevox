@@ -7,9 +7,9 @@
 // shared tone shelf, the correctness pass (the switch with the tracker, the gap rule over a noise
 // floor, DIVERGE holding the level, notes outside the tracker's range, the read ceiling, the tuning
 // ranges), and the raised copies (their pitch over the tuned copies, their 75 ms lag, the unvoiced
-// run each copy waits before it plays plain). Every run feeds a PitchFx through its pass-through
-// path first, so the ring is written and the tracker runs, as the chain does. No window, no audio
-// device.
+// run each copy waits before it plays plain). Every run feeds the Autotune card's engine through its
+// pass-through path first, so the ring is written and the tracker runs, as the chain does. No window,
+// no audio device.
 
 #include <algorithm>
 #include <array>
@@ -26,6 +26,7 @@
 #include "engine/crowd.h"
 
 #include "alloc_guard.h"
+#include "pitch_series.h"
 #include "ringed_tracker.h"
 
 namespace {
@@ -178,10 +179,17 @@ Signal program(int seconds) {
   return x;
 }
 
-// Running a PitchFx and then the Crowd card on the same blocks, in the chain's order.
+// Running the pitch cards and then the Crowd card on the same blocks, in the chain's order.
 
-cv::PitchFx gFx;
+PitchSeries gFx;
 cv::Crowd gCrowd;
+
+// The Crowd card after the pitch cards. Its ring takes the Autotune card's input, as the chain's Autotune
+// slot writes it, and it reads Autotune's tracker and correction.
+void crowdStep(const float* in, float* out, int n, const cv::CrowdParams& p) {
+  gCrowd.write(in, n);
+  gCrowd.process(in, out, n, p, cv::CrowdPitch{&gFx.pitch(), gFx.correctionSemis()});
+}
 
 struct Probe {
   float lead = -1.0f;
@@ -190,19 +198,19 @@ struct Probe {
   float drift = 0.0f;  // largest |drift| in cents any copy showed at the end of any block
 };
 
-// The PitchFx params every run uses unless it says otherwise: pass-through with the tracker on.
+// The pitch params every run uses unless it says otherwise: pass-through. Autotune's tracker runs for the
+// Crowd card (the `readers` flag of PitchSeries::process, true unless a run says otherwise).
 cv::PitchFxParams passThrough() {
   cv::PitchFxParams pp;
   pp.octave.on = false;
-  pp.crowdOn = true;
   return pp;
 }
 
-// Crowd card and PitchFx params both switch from their first to their second value at sample
-// `switchAt` (a block boundary).
+// Crowd card and pitch params both switch from their first to their second value at sample `switchAt` (a
+// block boundary). `readersFirst` and `readersSecond` say whether the Crowd card keeps the tracker running.
 Signal runBoth(const Signal& in, const cv::CrowdParams& first, const cv::CrowdParams& second,
                const cv::PitchFxParams& pitchFirst, const cv::PitchFxParams& pitchSecond, int switchAt,
-               Probe* probe = nullptr) {
+               Probe* probe = nullptr, bool readersFirst = true, bool readersSecond = true) {
   gFx.reset();
   gCrowd.reset();
   Signal out(in.size());
@@ -212,8 +220,9 @@ Signal runBoth(const Signal& in, const cv::CrowdParams& first, const cv::CrowdPa
     const int n = std::min(cv::kBlock, total - i);
     const bool after = i >= switchAt;
     gInProcess = true;
-    gFx.process(&in[static_cast<size_t>(i)], scratch, n, after ? pitchSecond : pitchFirst);
-    gCrowd.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, after ? second : first, gFx);
+    gFx.process(&in[static_cast<size_t>(i)], scratch, n, after ? pitchSecond : pitchFirst,
+                after ? readersSecond : readersFirst);
+    crowdStep(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, after ? second : first);
     gInProcess = false;
     if (probe) {
       probe->lead = gCrowd.leadGain();
@@ -1016,8 +1025,8 @@ bool testDrift() {
   return ok;
 }
 
-// The tracker finds a period with Autotune off because the Crowd card's flag keeps it running, and
-// stays at 0 without the flag.
+// The tracker finds a period with Autotune off because the Crowd card keeps it running, and stays at 0
+// without the card.
 bool testTrackerRuns() {
   const Signal in = tone(220.0, kRate);
   int firstBlock[2] = {-1, -1};
@@ -1025,11 +1034,10 @@ bool testTrackerRuns() {
     cv::PitchFxParams pp;
     pp.octave.on = false;
     pp.autotune.on = false;
-    pp.crowdOn = flag == 1;
     gFx.reset();
     float scratch[cv::kBlock];
     for (int i = 0, b = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock, ++b) {
-      gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, pp);
+      gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, pp, flag == 1);
       if (gFx.pitch().period > 0.0f && firstBlock[flag] < 0) firstBlock[flag] = b;
     }
   }
@@ -1791,7 +1799,7 @@ double lowestWindowDb(const Signal& in, const Signal& out, int at) {
   return low;
 }
 
-// The card switched with crowdOn, as the registry and the emulator switch them, on the shipped tuning at
+// The card switched with its tracker, as the chain switches them, on the shipped tuning at
 // DIVERGE 1. The switch sits 50 ms after a phrase peak, so the 100 ms before it holds the peak's steps. Off:
 // the largest step in the ramp block stays under the largest in the 100 ms before, because the copies
 // keep the held period and ramp out. On: the same over the 10 ms the tracker takes to find a period and
@@ -1808,9 +1816,8 @@ bool testSwitchWithTracker() {
       on.voicesStep = voices;
       cv::CrowdParams off = on;
       off.on = false;
-      cv::PitchFxParams pOff = passThrough();
-      pOff.crowdOn = false;
-      const Signal out = turnOn ? runBoth(in, off, on, pOff, passThrough(), sw) : runBoth(in, on, off, passThrough(), pOff, sw);
+      const Signal out = turnOn ? runBoth(in, off, on, passThrough(), passThrough(), sw, nullptr, false, true)
+                                : runBoth(in, on, off, passThrough(), passThrough(), sw, nullptr, true, false);
       const double before = maxStep(out, sw - kRate / 10, sw);
       const double at = maxStep(out, sw - 1, sw + (turnOn ? msToSamples(10.0) : cv::kBlock + 1));
       const double low = turnOn ? lowestWindowDb(in, out, sw) : 0.0;
@@ -1885,8 +1892,8 @@ Landings countLandings(const Signal& in, float from, float to, int switchAt) {
   for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
     p.width = i < switchAt ? from : to;
     gInProcess = true;
-    gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, passThrough());
-    gCrowd.process(&in[static_cast<size_t>(i)], out.data(), cv::kBlock, p, gFx);
+    gFx.process(&in[static_cast<size_t>(i)], scratch, cv::kBlock, passThrough(), true);
+    crowdStep(&in[static_cast<size_t>(i)], out.data(), cv::kBlock, p);
     gInProcess = false;
     for (size_t v = 0; v < 4; ++v) {
       if (gCrowd.lagSamples(v) == l.lag[v]) continue;
@@ -1974,8 +1981,8 @@ Signal runCopy2(const Signal& in, std::vector<float>& share) {
   float scratch[cv::kBlock];
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
     gInProcess = true;
-    gFx.process(&in[i], scratch, cv::kBlock, passThrough());
-    gCrowd.process(&in[i], &out[i], cv::kBlock, p, gFx);
+    gFx.process(&in[i], scratch, cv::kBlock, passThrough(), true);
+    crowdStep(&in[i], &out[i], cv::kBlock, p);
     gInProcess = false;
     share.push_back(gCrowd.moveShare(1));
   }
@@ -2181,8 +2188,8 @@ PlainRun runPlain(const Signal& in, size_t c) {
   for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
     const size_t at = static_cast<size_t>(i);
     gInProcess = true;
-    gFx.process(&in[at], scratch, cv::kBlock, passThrough());
-    gCrowd.process(&in[at], &r.out[at], cv::kBlock, p, gFx);
+    gFx.process(&in[at], scratch, cv::kBlock, passThrough(), true);
+    crowdStep(&in[at], &r.out[at], cv::kBlock, p);
     gInProcess = false;
     const bool voiced = gFx.pitch().voiced;
     if (r.unvoicedAt >= 0 && voiced) ++r.voicedAfter;

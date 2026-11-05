@@ -64,38 +64,66 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when any pitch-group card (Autotune, Octave, Formant, Yawn, Crowd, Growl) has its toggle on. The shared
-// pitch stage runs while it is.
-bool pitchGroupOn(const ChainSnapshot& snap) {
-  for (int s = 0; s < kSlotCount; ++s) {
-    if (cardDesc(snap.layout.card[static_cast<size_t>(s)]).group == Group::Pitch && snap.slotOn[static_cast<size_t>(s)]) {
-      return true;
+// True when slot `s` runs its engine this block or fades out of it: its toggle is on, or its fade has not
+// reached the dry end.
+bool slotLive(const ChainSnapshot& snap, const SlotFades& fades, int s) {
+  return snap.slotOn[static_cast<size_t>(s)] || fades.level(s) > 0;
+}
+
+// What the Autotune slot `s` owes the cards behind it. The tracker runs while a reader behind is live: the
+// Formant engine directly behind the slot (every slot between holds Empty), a Crowd card or a Growl card
+// anywhere behind. The Formant engine reads the 48 kHz fine pass and the out-of-range flag, the Crowd card
+// reads the flag, and Autotune's input goes into the Crowd card's ring while one is placed behind.
+StageContext autotuneContext(const ChainSnapshot& snap, const SlotFades& fades, int s) {
+  StageContext ctx;
+  bool onlyEmpty = true;
+  for (int t = s + 1; t < kSlotCount; ++t) {
+    const Card c = snap.layout.card[static_cast<size_t>(t)];
+    const Engine e = engineOf(c);
+    if (e == kNoEngine) continue;
+    const bool live = slotLive(snap, fades, t);
+    if (e == Engine::Formant && onlyEmpty && live) {
+      ctx.tracker.run = true;
+      ctx.tracker.fine = true;
+      ctx.tracker.outOfRange = true;
     }
+    if (e == Engine::Crowd) {
+      ctx.feedsCrowd = true;
+      if (live) {
+        ctx.tracker.run = true;
+        ctx.tracker.outOfRange = true;
+      }
+    }
+    if (e == Engine::Growl && live) ctx.tracker.run = true;
+    onlyEmpty = false;
   }
-  return false;
+  return ctx;
 }
 
-// Runs the Crowd card at its slot. A Crowd card ahead of every other pitch-group card also makes the shared
-// pitch stage's call, so the ring it reads is written this block. The stage's output is then its
-// lead. Both write into `out`, which the Crowd card reads sample by sample ahead of its own write.
-void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
-  if (!pitchDone) {
-    pitchDone = true;
-    engines.pitch.process(in, out, n, engines.follower.follow(in, n, p.pitchFx, p.follower));
-    in = out;
-  }
-  engines.crowd.process(in, out, n, p.crowd, engines.pitch);
+// Runs the Crowd card at its slot. With an Autotune slot ahead, the card reads Autotune's tracker and its
+// correction, and the Autotune slot has already written the ring. Otherwise the card writes its own input
+// and runs a tracker of its own.
+void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, const PitchPath& path) {
+  cv::CrowdPitch pitch;
+  if (path.autotuneAhead) pitch = {path.upstream.result, engines.autotune.correctionSemis()};
+  engines.crowd.process(in, out, n, p.crowd, pitch);
 }
 
-// Runs the Growl card at its slot, making the shared pitch stage's call first when no pitch-group card
-// ahead of it has, as runCrowd does.
-void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
-  if (!pitchDone) {
-    pitchDone = true;
-    engines.pitch.process(in, out, n, p.pitchFx);
-    in = out;
-  }
-  engines.growl.process(in, out, n, p.growl, engines.pitch);
+// Runs the Formant engine at its slot. Directly behind the Autotune slot it reads Autotune's tracker; anywhere
+// else it runs a tracker of its own. With Apraxia placed, the follower's envelope of `in` sets the SHIFT.
+void runFormant(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p,
+                const PitchPath& path) {
+  const cv::FormantParams& params = engines.follower.follow(in, n, p.pitchFx.formant, p.follower);
+  const bool reuse = path.autotuneAhead && path.adjacent;
+  engines.formant.process(in, out, n, params, reuse ? path.upstream : cv::UpstreamPitch{});
+}
+
+// Hands the Octave card's share of the pitch on. Its voice moves the pitch only while it carries half the
+// power, and delays the audio by its wet share. With no Autotune ahead nothing reads either.
+void handOnOctave(const ChainEngines& engines, PitchPath& path) {
+  if (!path.autotuneAhead) return;
+  if (engines.octave.leads()) path.upstream.shiftSemis += engines.octave.intervalSemis();
+  path.upstream.latency += engines.octave.outputLatency();
 }
 
 // Runs the Ringer card at its slot. It tracks the pitch of `in` with a tracker of its own, so the shared
@@ -118,8 +146,10 @@ void runBloom(ChainEngines& engines, const float* in, float* out, int n, const C
 void resetEngine(ChainEngines& engines, Engine e) {
   switch (e) {
     case Engine::InputGate: engines.inputGate.reset(); break;
-    case Engine::Pitch:
-      engines.pitch.reset();
+    case Engine::Autotune: engines.autotune.reset(); break;
+    case Engine::Octave: engines.octave.reset(); break;
+    case Engine::Formant:
+      engines.formant.reset();
       engines.follower.reset();
       break;
     case Engine::Unison: engines.unison.reset(); break;
@@ -137,27 +167,49 @@ void resetEngine(ChainEngines& engines, Engine e) {
 }
 
 bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n, const ChainParams& p,
-              bool& pitchDone) {
-  switch (engineOf(c)) {
-    case Engine::InputGate: engines.inputGate.process(in, out, n, p.inputGate); return true;
-    case Engine::Pitch:
-      if (pitchDone) return false;
-      pitchDone = true;
-      engines.pitch.process(in, out, n, engines.follower.follow(in, n, p.pitchFx, p.follower));
-      return true;
-    case Engine::Unison: engines.unison.process(in, out, n, p.unison); return true;
-    case Engine::Slapback: engines.slapback.process(in, out, n, p.slapback); return true;
-    case Engine::Distortion: engines.distortion.process(in, out, n, p.distortion); return true;
-    case Engine::Gate: engines.gate.process(in, out, n, p.gate); return true;
-    case Engine::Reverb: engines.reverb.process(in, out, n, p.reverb); return true;
-    case Engine::Crowd: runCrowd(engines, in, out, n, p, pitchDone); return true;
-    case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); return true;
-    case Engine::Bloom: runBloom(engines, in, out, n, p); return true;
-    case Engine::Growl: runGrowl(engines, in, out, n, p, pitchDone); return true;
-    case Engine::RingMod: runRingMod(engines, in, out, n, p); return true;
-    case Engine::Count: break;  // Empty runs no engine
+              PitchPath& path, const StageContext& ctx) {
+  const Engine e = engineOf(c);
+  switch (e) {
+    case Engine::InputGate: engines.inputGate.process(in, out, n, p.inputGate); break;
+    case Engine::Autotune:
+      if (ctx.feedsCrowd) engines.crowd.write(in, n);
+      engines.autotune.process(in, out, n, p.pitchFx.autotune, ctx.tracker);
+      break;
+    case Engine::Octave: engines.octave.process(in, out, n, p.pitchFx.octave); break;
+    case Engine::Formant: runFormant(engines, in, out, n, p, path); break;
+    case Engine::Unison: engines.unison.process(in, out, n, p.unison); break;
+    case Engine::Slapback: engines.slapback.process(in, out, n, p.slapback); break;
+    case Engine::Distortion: engines.distortion.process(in, out, n, p.distortion); break;
+    case Engine::Gate: engines.gate.process(in, out, n, p.gate); break;
+    case Engine::Reverb: engines.reverb.process(in, out, n, p.reverb); break;
+    case Engine::Crowd: runCrowd(engines, in, out, n, p, path); break;
+    case Engine::Lofi: engines.lofi.process(in, out, n, p.lofi); break;
+    case Engine::Bloom: runBloom(engines, in, out, n, p); break;
+    case Engine::Growl:
+      engines.growl.process(in, out, n, p.growl, path.autotuneAhead ? path.upstream : cv::UpstreamPitch{});
+      break;
+    case Engine::RingMod: runRingMod(engines, in, out, n, p); break;
+    case Engine::Count: return false;  // Empty runs no engine
   }
-  return false;
+
+  // The card hands its share of the pitch on to the cards behind it.
+  switch (e) {
+    case Engine::Autotune:
+      path.autotuneAhead = true;
+      path.adjacent = true;
+      path.upstream = {&engines.autotune.pitch(), engines.autotune.correctionSemis(), engines.autotune.outputLatency()};
+      break;
+    case Engine::Octave:
+      path.adjacent = false;
+      handOnOctave(engines, path);
+      break;
+    case Engine::Formant:
+      path.adjacent = false;
+      if (path.autotuneAhead) path.upstream.latency += ctx.slotShare * engines.formant.outputLatency();
+      break;
+    default: path.adjacent = false; break;
+  }
+  return true;
 }
 
 // The engine gain follows an S curve, 3x^2 - 2x^3 of the fade's progress, and the two gains sum to 1.
@@ -176,32 +228,54 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
 }
 
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
-             int n, bool& pitchDone) {
+             int n, PitchPath& path) {
   const Card c = snap.layout.card[static_cast<size_t>(s)];
   const Engine e = engineOf(c);
   if (e == kNoEngine) return false;
 
-  // The first pitch-group card's slot carries the shared pitch stage and fades on every pitch-group
-  // toggle. Autotune, Octave and Formant have no engine of their own, so after the stage ran they do nothing.
-  const bool carriesPitch = !pitchDone && cardDesc(c).group == Group::Pitch;
-  if (e == Engine::Pitch && !carriesPitch) return false;
-
-  const SlotFades::Step step = fades.step(s, carriesPitch ? pitchGroupOn(snap) : stageToggleOn(snap, e));
+  // The Autotune engine and the Input gate's engine keep running with their slot settled off, the gate for
+  // its detector and Autotune for the readers of its tracker.
+  StageContext ctx;
+  if (e == Engine::Autotune) ctx = autotuneContext(snap, fades, s);
   const bool detectorLive = e == Engine::InputGate;
-  if (step.from == 0 && step.to == 0 && !detectorLive) {
-    if (carriesPitch) {
-      pitchDone = true;  // the stage is stopped, so no later pitch-group card has a ring to read
-      engines.pitch.rest();
+  const bool trackerLive = ctx.tracker.run;
+  const SlotFades::Step step = fades.step(s, stageToggleOn(snap, e));
+  if (step.from == 0 && step.to == 0 && !detectorLive && !trackerLive) {
+    switch (e) {
+      case Engine::Autotune:
+        engines.autotune.rest();
+        path.autotuneAhead = true;
+        path.adjacent = true;
+        path.upstream = {&engines.autotune.pitch(), 0.0f, 0.0f};
+        return false;
+      case Engine::Octave: engines.octave.rest(); break;
+      case Engine::Formant: engines.formant.rest(); break;
+      case Engine::Crowd: engines.crowd.rest(); break;
+      case Engine::Growl: engines.growl.rest(); break;  // the card keeps a ring of its own input
+      case Engine::RingMod: engines.ringMod.rest(); break;
+      default: break;
     }
-    if (e == Engine::RingMod) engines.ringMod.rest();
-    if (e == Engine::Growl) engines.growl.rest();  // the card keeps a ring of its own input
+    path.adjacent = false;
     return false;
   }
-  if (step.from == 0 && step.to > 0 && !detectorLive) {
-    if (carriesPitch) resetEngine(engines, Engine::Pitch);
-    if (e != Engine::Pitch) resetEngine(engines, e);
+  if (step.from == 0 && step.to > 0 && !detectorLive && !trackerLive) {
+    // Autotune, Octave and the Formant engine clear themselves on their first call after a rest.
+    switch (e) {
+      case Engine::Autotune:
+      case Engine::Octave: break;
+      case Engine::Formant: engines.follower.reset(); break;
+      case Engine::Crowd: engines.crowd.switchOn(); break;  // keeps a ring the Autotune slot fed this block
+      default: resetEngine(engines, e); break;
+    }
   }
-  const bool wrote = runStage(engines, c, in, out, n, snap.params, pitchDone);
+  ctx.slotShare = static_cast<float>(step.to) / static_cast<float>(kSlotFadeBlocks);
+  const bool wrote = runStage(engines, c, in, out, n, snap.params, path, ctx);
+  if (trackerLive && step.from == 0 && step.to == 0) {
+    // The engine runs for its readers and the slot passes the dry input, which they now hear.
+    path.upstream.shiftSemis = 0.0f;
+    path.upstream.latency = 0.0f;
+    return false;
+  }
   if (wrote && step.from != step.to) mixSlotFade(out, in, n, step.from, step.to);
   return wrote;
 }

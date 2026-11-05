@@ -5,13 +5,12 @@
 //    estimate's first stage, so the pitch slot's worst block went from the voiced hop's 2.5 us to 3.4 us.
 //    The refinement now walks downhill from the coarse period, three lags in the usual case and at most
 //    kOnsetMaxLags. The worst block with the estimate must stay within a margin of the worst block without it.
-// 2. A pitch stage switched on (pitch_fx.h, chain_run.cpp). Its reset cleared the 51 kB input ring in one
-//    block. The board's memset then stored a byte at a time, about 250k cycles, so the one block read 47 % of
-//    the budget against a settled worst of 7 %. Its word-wise memset (board/fastmem.cpp) cuts that to about
-//    4 %, and a stopped stage still clears the ring a slice a block, and
-//    the switch-on finds it clear. The host's memset is fast, so the ring work is counted as well as timed.
-//    The Ringer card keeps a ring and a tracker of its own and rests the same way, so the check runs on
-//    it too.
+// 2. A card with a ring of its own input switched on (chain_run.cpp). A reset that clears the whole ring in one
+//    block reads high: the board's memset stored a byte at a time, about 250k cycles for a 51 kB ring, so the
+//    one block read 47 % of the budget against a settled worst of 7 %. Its word-wise memset (board/fastmem.cpp)
+//    cuts that to about 4 %, and a stopped card still clears the ring a slice a block, and the switch-on finds
+//    it clear. The host's memset is fast, so the ring work is counted as well as timed. Autotune, Octave,
+//    Formant, Mob and Ringer each keep a ring and rest the same way, so the check runs on each.
 //
 // Block times are the minimum over several passes of one deterministic run, in host nanoseconds. No window,
 // no audio device.
@@ -137,15 +136,16 @@ bool testOnsetSpread(const std::vector<Signal>& clips) {
   return ok;
 }
 
-// 2. A card switched on that keeps a ring and a tracker. Layout: Input gate, two empty slots, Unison, Echo, the
-// subject, Gate, Spring. The subject is Deepthroat, whose toggle starts and stops the shared pitch stage and
-// nothing else does, or Ringer, whose toggle starts and stops the card's own tracker.
+// 2. A card switched on that keeps a ring. Layout: Input gate, two empty slots, Unison, Echo, the subject, Gate,
+// Spring. The subject is Autotune, Octave, Formant, Mob (each with the ring of its own input) or Ringer
+// (a ring and a tracker of its own). Each toggle starts and stops its card's engine and nothing else does.
 struct Rig {
-  std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
+  std::unique_ptr<cv::AutotuneFx> autotune = std::make_unique<cv::AutotuneFx>();
+  std::unique_ptr<cv::OctaveFx> octave = std::make_unique<cv::OctaveFx>();
   std::unique_ptr<cv::Unison> unison = std::make_unique<cv::Unison>();
   std::unique_ptr<cv::Distortion> distortion = std::make_unique<cv::Distortion>();
   std::unique_ptr<cv::RingMod> ringMod = std::make_unique<cv::RingMod>();
-  ChainEngines engines{*pitch, *unison, *distortion, *ringMod};
+  ChainEngines engines{*autotune, *octave, *unison, *distortion, *ringMod};
   SlotFades fades;
 };
 
@@ -181,18 +181,31 @@ struct SwitchRun {
 
 // The floats the subject's ring has cleared since construction.
 uint32_t ringCleared(const Rig& rig, Card subject) {
-  return subject == Card::RingMod ? rig.ringMod->ringClearedForTest() : rig.pitch->ringClearedForTest();
+  switch (subject) {
+    case Card::Autotune: return rig.autotune->ringClearedForTest();
+    case Card::Octave: return rig.octave->ringClearedForTest();
+    case Card::Formant: return rig.engines.formant.ringClearedForTest();
+    case Card::Crowd: return rig.engines.crowd.ringForTest().clearedForTest();
+    default: return rig.ringMod->ringClearedForTest();
+  }
+}
+
+template <typename Ring>
+int nonzeroIn(const Ring& ring) {
+  int stale = 0;
+  for (const float v : ring) stale += v != 0.0f;
+  return stale;
 }
 
 // The nonzero floats in the subject's ring.
 int ringNonzero(const Rig& rig, Card subject) {
-  int stale = 0;
-  if (subject == Card::RingMod) {
-    for (const float v : rig.ringMod->ringForTest()) stale += v != 0.0f;
-  } else {
-    for (const float v : rig.pitch->ring()) stale += v != 0.0f;
+  switch (subject) {
+    case Card::Autotune: return nonzeroIn(rig.autotune->ringForTest().data());
+    case Card::Octave: return nonzeroIn(rig.octave->ringForTest().data());
+    case Card::Formant: return nonzeroIn(rig.engines.formant.ringForTest().data());
+    case Card::Crowd: return nonzeroIn(rig.engines.crowd.ringForTest().data());
+    default: return nonzeroIn(rig.ringMod->ringForTest());
   }
-  return stale;
 }
 
 SwitchRun switchRun(const Signal& x, int offBlocks, Card subject) {
@@ -233,7 +246,7 @@ SwitchRun switchRun(const Signal& x, int offBlocks, Card subject) {
 }
 
 bool testSwitchOn(const std::vector<Signal>& clips, Card subject, const char* label) {
-  const int restFloats = subject == Card::RingMod ? cv::kRingModRestFloats : cv::PitchFx::kRestClearFloats;
+  const int restFloats = subject == Card::RingMod ? cv::kRingModRestFloats : cv::InputRing<cv::kOctaveRingLen>::kRestClearFloats;
   char name[120];
   Signal x;
   for (const Signal& c : clips) x.insert(x.end(), c.begin(), c.end());
@@ -304,7 +317,10 @@ int main() {
   }
   bool ok = true;
   ok &= testOnsetSpread(clips);
-  ok &= testSwitchOn(clips, Card::Growl, "Deepthroat");
+  ok &= testSwitchOn(clips, Card::Autotune, "Autotune");
+  ok &= testSwitchOn(clips, Card::Octave, "Octave");
+  ok &= testSwitchOn(clips, Card::Formant, "Formant");
+  ok &= testSwitchOn(clips, Card::Crowd, "Mob");
   ok &= testSwitchOn(clips, Card::RingMod, "Ringer");
   std::printf("%s pitch_spikes\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

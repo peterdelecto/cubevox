@@ -15,7 +15,6 @@
 #include "core/compose.h"
 #include "core/level.h"
 #include "engine/common.h"
-#include "engine/pitch_fx.h"
 
 namespace host {
 
@@ -69,7 +68,8 @@ class AudioBlock {
   void swapSnapshot();
   void noteGatePeak();
 
-  std::unique_ptr<cv::PitchFx> pitch_;  // about 75 KB, so on the heap
+  std::unique_ptr<cv::AutotuneFx> autotune_;  // about 18 KB, so on the heap
+  std::unique_ptr<cv::OctaveFx> octave_;      // about 16 KB
   std::unique_ptr<cv::Unison> unison_;
   std::unique_ptr<cv::Distortion> distortion_;
   std::unique_ptr<cv::RingMod> ringMod_;

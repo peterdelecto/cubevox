@@ -12,8 +12,8 @@
 
 // The grain voice that the Mob card's copies, the Formant card and the Growl card share. It reads a ring
 // of its owner's and cuts grains on a period grid, with a pitch ratio and a grain playback rate of its
-// own. The owner of the ring, the period and the mix (PitchFx, Crowd, Growl) drives it. The ring's length
-// is a template argument, the pitch stage's ring by default.
+// own. The owner of the ring, the period and the mix (FormantFx, Crowd, Growl) drives it. The ring's length
+// is a template argument, the Mob card's ring by default.
 
 namespace cv {
 namespace formant_detail {
@@ -34,6 +34,16 @@ constexpr float kFloorPad = 4.0f;
 constexpr float kDelayCeil = static_cast<float>(kVoiceRingLen - kCrowdGrainReach);
 
 constexpr int kMaxMarkSteps = 128;
+
+// The ring of a card that cuts grains from its own input. The longest lag is the grain delay plus the
+// tracker's longest period. A launch reads up to a period past the lag, a grain that plays at half speed
+// drifts a further two periods back ((1 - rate) of its four-period length), and the voice keeps a call's
+// samples and a pad ahead of the far end.
+constexpr int kGrainRingLen = PsolaVoice::kGrainDelay + 4 * PitchTracker::kMaxPeriod + kBlock + 4;
+
+// The most a card's dry read moves its delay per sample, 0.5 % of a sample, which bends the dry's pitch by
+// 9 cents. A new period slides the delay and never jumps it.
+constexpr float kDryLagSlew = 0.005f;
 
 static_assert(kDelayCeil > kFloorPeriods * kMaxPeriod + kFloorPad, "no room for a read delay");
 
@@ -163,12 +173,14 @@ class FormantPsolaVoiceT {
     }
   }
 
-  VoiceGrid grid() const { return {markDelay_, countdown_}; }
-
-  // Takes another voice's grid, so the two launch on the same samples. Call it after prepare().
-  void adoptGrid(const VoiceGrid& g) {
-    markDelay_ = g.markDelay;
-    countdown_ = g.countdown;
+  // How far the output lags the input at the next launch, in samples. The grains sit on a period grid whose
+  // phase the voice keeps from its history, so this differs from the lag prepare() was given by up to half
+  // a period (a periodic input hides the difference). Call it after prepare().
+  float outputLag() const {
+    float m = markDelay_ + (countdown_ > 1.0f ? ceilf(countdown_) : 1.0f);
+    for (int k = 0; k < kMaxMarkSteps && m - ref_ >= p_; ++k) m -= p_;
+    for (int k = 0; k < kMaxMarkSteps && m < ref_; ++k) m += p_;
+    return (m - ref_ > 0.5f * p_ ? m - p_ : m) + p_;
   }
 
   // Adds n samples of the voice into out. first is the ring index of the block's first sample;
@@ -452,7 +464,7 @@ class FormantPsolaVoiceT {
   const float* ring_ = nullptr;   // the ring the last render read
 };
 
-// The voice on the pitch stage's input ring, which the Mob card's copies and the Formant card read.
+// The voice on the Mob card's input ring length, which its copies read.
 using FormantPsolaVoice = FormantPsolaVoiceT<>;
 
 }  // namespace formant_detail

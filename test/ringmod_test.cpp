@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-#include "engine/pitch_fx.h"
+#include "engine/octave_fx.h"
 #include "engine/psola.h"
 #include "engine/ringmod.h"
 
@@ -515,17 +515,17 @@ bool checkRingHoldsTrackerReach() {
 // The held note (MIDI) the card has after each block of a clip that passes through an Octave stage ahead of it,
 // or -1 before the card has a note. Octave runs at +12 st and MIX 100 %, or is off.
 std::vector<float> heldAfterOctave(const Signal& padded, bool octaveUp) {
-  auto pitch = std::make_unique<cv::PitchFx>();
+  auto octave = std::make_unique<cv::OctaveFx>();
   Rig rig;
-  cv::PitchFxParams pp;
-  pp.octave.on = octaveUp;
-  pp.octave.semitones = 12;
-  pp.octave.mix = 1.0f;
+  cv::OctaveParams op;
+  op.on = octaveUp;
+  op.semitones = 12;
+  op.mix = 1.0f;
   const cv::RingModParams p = modAt(1.0f, 1.0f);
   Signal shifted(padded.size()), out(padded.size());
   std::vector<float> held;
   for (size_t i = 0; i + cv::kBlock <= padded.size(); i += cv::kBlock) {
-    pitch->process(&padded[i], &shifted[i], cv::kBlock, pp);
+    octave->process(&padded[i], &shifted[i], cv::kBlock, op);
     rig.mod->process(&shifted[i], &out[i], cv::kBlock, p, -1);
     held.push_back(rig.mod->heldHz() > 0.0f ? cv::midiOf(rig.mod->heldHz()) : -1.0f);
   }

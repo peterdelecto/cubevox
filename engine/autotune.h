@@ -14,7 +14,7 @@
 
 // Autotune pulls the sung pitch to a note of the key's major scale with a grid
 // PSOLA voice: the nearest note, unless the last one still holds (scale.h).
-// RESPONSE is the one-pole time constant on the correction. PitchFx owns the
+// RESPONSE is the one-pole time constant on the correction. AutotuneFx owns the
 // ring, the tracker, and the crossfade from the dry voice to the corrected one.
 
 namespace cv {
@@ -35,8 +35,12 @@ struct AutotuneParams {
   AutotuneTuning tuning;
 };
 
-class AutotuneVoice {
+// The ring length is a template argument, the Mob card's ring by default.
+template <int RingLen = kVoiceRingLen>
+class AutotuneVoiceT {
  public:
+  using Ring = typename PsolaVoiceT<RingLen>::Ring;
+
   static constexpr float kMinResponseMs = 1.0f;
   static constexpr float kMaxResponseMs = 500.0f;
 
@@ -49,7 +53,7 @@ class AutotuneVoice {
     return logf(kMaxResponseMs / ms) / logf(kMaxResponseMs / kMinResponseMs);
   }
 
-  AutotuneVoice() { reset(); }
+  AutotuneVoiceT() { reset(); }
 
   void reset() {
     psola_.reset();
@@ -94,9 +98,9 @@ class AutotuneVoice {
   // The corrected voice for the n samples, at most kBlock, whose first sits at ring index `first`,
   // which the ring already holds: the correction steps sample by sample and sets each sample's
   // inverse pitch ratio, and the voice renders the call with it. The voice takes the inverse ratio,
-  // so it multiplies where it would divide. PitchFx fades it in only once the tracker has a period,
+  // so it multiplies where it would divide. AutotuneFx fades it in only once the tracker has a period,
   // so the grains start on the sung pitch.
-  void render(const VoiceRing& ring, int first, int n, float period, float* out) {
+  void render(const Ring& ring, int first, int n, float period, float* out) {
     stepCorrection<true>(n);
     psola_.render(ring, first, n, period, inv_.data(), out);
   }
@@ -107,10 +111,6 @@ class AutotuneVoice {
 
   // Drops the grains in flight. The correction keeps its place.
   void restartVoice() { psola_.reset(); }
-
-  // The voice's grid, and taking another voice's, so the two launch on the same samples.
-  VoiceGrid grid() const { return psola_.grid(); }
-  void adoptGrid(const VoiceGrid& g) { psola_.adoptGrid(g); }
 
   // The correction in semitones: the part that follows the sung pitch plus the KEY glide's.
   float correctionSemis() const { return corr_ + noteOffset_; }
@@ -230,7 +230,7 @@ class AutotuneVoice {
     deviation_ = midi - note_;
   }
 
-  PsolaVoice psola_;
+  PsolaVoiceT<RingLen> psola_;
   std::array<float, kBlock> inv_{};  // the inverse pitch ratio of each sample of a render
   float corr_ = 0.0f;                // the part of the correction that follows the sung pitch
   float noteOffset_ = 0.0f;          // the KEY glide's part: the old note's side of the change, running down
@@ -248,5 +248,7 @@ class AutotuneVoice {
   int restSamples_ = kRestSamples;  // samples since the last voiced frame, up to kRestSamples
   bool haveNote_ = false;
 };
+
+using AutotuneVoice = AutotuneVoiceT<>;
 
 }  // namespace cv

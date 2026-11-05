@@ -7,7 +7,7 @@
 #include "engine/fastmath.h"
 #include "engine/smooth.h"
 
-// The syllable sweep, the law Yawn and Growl share. It reads the peak of each block of its input and
+// The syllable sweep, the law Apraxia and Growl share. It reads the peak of each block of its input and
 // follows it with a 3 ms attack and a 70 ms release. The follower in dBFS sets the drive. SENSITIVITY puts
 // the full point at -6 dBFS at 0 % and at -36 dBFS at 100 %, and the drive rises from 0 at 12 dB under
 // the full point to 1 at it.

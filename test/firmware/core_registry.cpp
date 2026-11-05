@@ -63,8 +63,9 @@ void checkCardTable() {
         "table: an unknown id finds nothing and leaves the output alone");
   check(&cardDesc(Card::Count) == &cardDesc(Card::Empty) && &cardDesc(card(200)) == &cardDesc(Card::Empty),
         "table: an out-of-range card reads as Empty");
-  check(engineOf(Card::Autotune) == Engine::Pitch && engineOf(Card::Octave) == Engine::Pitch,
-        "table: both pitch cards share the pitch engine");
+  check(engineOf(Card::Autotune) == Engine::Autotune && engineOf(Card::Octave) == Engine::Octave &&
+            engineOf(Card::Formant) == Engine::Formant && engineOf(Card::FormantFollower) == Engine::Formant,
+        "table: Autotune and Octave have an engine each, and Formant and Apraxia share the Formant engine");
   check(engineOf(Card::ReverbSpring) == Engine::Reverb && engineOf(Card::ReverbChasm) == Engine::Reverb,
         "table: both reverb cards share the reverb engine");
   check(engineOf(Card::Crowd) == Engine::Crowd && cardDesc(Card::Crowd).group == Group::Pitch,
@@ -297,7 +298,7 @@ void checkChainDefaults() {
   check(p.gate.thresholdDb == mid.gate.thresholdDb && std::fabs(g.releaseMs - mid.gate.tuning.releaseMs) < 1e-4f,
         "defaults: the Gate starts at its pots' middle, -40 dB and 70.7 ms");
   check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
-            !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.crowd.on && !p.pitchFx.crowdOn,
+            !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.crowd.on,
         "defaults: every other stage off");
   check(std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
         "defaults: octave at 10 % mix");
@@ -336,10 +337,10 @@ void checkToggles() {
   applyToggle(Card::Octave, false, p);
   check(p.pitchFx.autotune.on && !p.pitchFx.octave.on, "pitch toggles are independent");
   applyToggle(Card::Crowd, true, p);
-  check(p.crowd.on && p.pitchFx.crowdOn && p.pitchFx.autotune.on && !p.pitchFx.octave.on,
-        "crowd toggle on sets its stage and the pitch stage's feed, and leaves the other pitch toggles alone");
+  check(p.crowd.on && p.pitchFx.autotune.on && !p.pitchFx.octave.on,
+        "crowd toggle on sets its stage and leaves the pitch toggles alone");
   applyToggle(Card::Crowd, false, p);
-  check(!p.crowd.on && !p.pitchFx.crowdOn && p.pitchFx.autotune.on, "crowd toggle off clears both flags");
+  check(!p.crowd.on && p.pitchFx.autotune.on, "crowd toggle off clears its flag");
 }
 
 void checkPlacement() {
@@ -443,9 +444,9 @@ void checkAppendedCards() {
             static_cast<int>(Card::FormantFollower) == 14 && static_cast<int>(Card::Growl) == 15 && static_cast<int>(Card::RingMod) == 16 &&
             kCardCount == 17,
         "appended cards: the table appends them after the Crowd card");
-  check(static_cast<int>(Engine::Crowd) == 7 && static_cast<int>(Engine::Lofi) == 8 && static_cast<int>(Engine::Bloom) == 9 &&
-            static_cast<int>(Engine::Growl) == 10 && static_cast<int>(Engine::RingMod) == 11 &&
-            kEngineCount == 12,
+  check(static_cast<int>(Engine::Crowd) == 9 && static_cast<int>(Engine::Lofi) == 10 && static_cast<int>(Engine::Bloom) == 11 &&
+            static_cast<int>(Engine::Growl) == 12 && static_cast<int>(Engine::RingMod) == 13 &&
+            kEngineCount == 14,
         "appended cards: the engine list appends Lofi, Bloom (the Chatter card's engine) Growl and Ringer after the Crowd engine");
   const auto sameRow = [](Card c, const costs::Cost& row) {
     return cardDesc(c).cost.avg == row.avg && cardDesc(c).cost.worst == row.worst && cardDesc(c).cost.measured == row.measured;
@@ -480,8 +481,8 @@ void checkRingModCard() {
         "ringmod: the registry row is its costs.h row");
   ChainParams p;
   applyToggle(Card::RingMod, true, p);
-  check(p.ringMod.on && !p.pitchFx.growlOn && !p.pitchFx.crowdOn && !p.growl.on,
-        "ringmod: its toggle turns the card on and no flag of the pitch stage");
+  check(p.ringMod.on && !p.crowd.on && !p.growl.on && !p.pitchFx.autotune.on,
+        "ringmod: its toggle turns the card on and no Mob, Growl or Autotune flag");
   applyToggle(Card::RingMod, false, p);
   check(!p.ringMod.on, "ringmod: and off again");
   applyPlacement(Card::Autotune, p);
@@ -494,9 +495,9 @@ void checkRingModCard() {
 // readout title, as Mob's row does. Placing it hands the voice's SHIFT to the card's sweep.
 void checkYawnCard() {
   const CardDesc& d = cardDesc(Card::FormantFollower);
-  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Yawn") == 0 && d.engine == Engine::Pitch &&
+  check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Yawn") == 0 && d.engine == Engine::Formant &&
             d.group == Group::Pitch && d.knobCount == 2,
-        "yawn: id formant_follow, name Yawn, the pitch engine and the pitch group");
+        "yawn: id formant_follow, name Yawn, the Formant engine and the pitch group");
   check(d.oledName == nullptr && std::strcmp(oledName(Card::FormantFollower), "Yawn") == 0,
         "yawn: the readout title is the card's name, Yawn");
   const KnobDesc& sens = *knobDesc(Card::FormantFollower, 0);
@@ -552,8 +553,8 @@ void checkYawnCard() {
 void checkFormantCard() {
   const CardDesc& formant = cardDesc(Card::Formant);
   check(std::strcmp(formant.id, "formant") == 0 && std::strcmp(formant.name, "Formant") == 0 &&
-            formant.engine == Engine::Pitch && formant.group == Group::Pitch && formant.knobCount == 2,
-        "formant: id formant, name Formant, the pitch engine and the pitch group");
+            formant.engine == Engine::Formant && formant.group == Group::Pitch && formant.knobCount == 2,
+        "formant: id formant, name Formant, the Formant engine and the pitch group");
   const KnobDesc& shift = *knobDesc(Card::Formant, 0);
   check(std::strcmp(shift.name, "SHIFT") == 0 && shift.kind == KnobKind::Stepped && shift.positions == 15 &&
             knobSteps(Card::Formant, 0) == 15 && shift.min == -7.0f && shift.max == 7.0f &&
@@ -656,10 +657,9 @@ void checkGrowlCard() {
           "growl: GROWL 0 / 50 / 100 % gives rasp 0 / 0.40 / 0.80 and drive 0 / 0.325 / 0.65");
   }
   applyToggle(Card::Growl, true, p);
-  check(p.growl.on && p.pitchFx.growlOn && !p.pitchFx.crowdOn && !p.crowd.on && !p.distortion.on,
-        "growl: its toggle turns the card and the pitch stage's growlOn on and nothing else");
+  check(p.growl.on && !p.crowd.on && !p.distortion.on, "growl: its toggle turns the card on and nothing else");
   applyToggle(Card::Growl, false, p);
-  check(!p.growl.on && !p.pitchFx.growlOn, "growl: and off again");
+  check(!p.growl.on, "growl: and off again");
 }
 
 void checkAppendedToggles() {
@@ -667,7 +667,7 @@ void checkAppendedToggles() {
   // other pitch toggle.
   ChainParams t;
   applyToggle(Card::Formant, true, t);
-  check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.pitchFx.crowdOn && !t.lofi.on &&
+  check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.crowd.on && !t.lofi.on &&
             !t.bloom.on,
         "formant: its toggle sets formant.on and nothing else");
   applyToggle(Card::Lofi, true, t);

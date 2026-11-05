@@ -6,6 +6,14 @@ owner: "formant should be an alternate for octave rather than slot 7"). MIX hold
 v2.01.00. The audit fix pass of 2026-11-02 (v2.01.10) set the trim per SHIFT and the 0.04 s power
 window. This file states the card as built at v2.01.10; section 10 keeps the history.
 
+Since 2026-11-05 the voice is not inside `PitchFx` (`2026-11-05-pitch-split-design.md`). `FormantFx` serves
+Formant and Apraxia on the block the slot ahead hands it, with a ring of its own. The base, the other half of
+MIX, is that ring read at the voice's lag, so base and voice line up at every setting. The crossfade between
+the card's input and the mix runs through a 5 ms per-sample one-pole, and the level gain follows the 20 ms
+one-pole, so a delayed base puts no kink in the output. Directly behind Autotune the engine reads Autotune's
+tracker and adds its lag floor; anywhere else it runs a tracker of its own. Sections that describe the
+shared stage, the first pitch-group slot or the shared grain grid are history.
+
 ## 1. Sound
 
 1. SHIFT moves the voice's formants, the resonances of the throat and mouth, while the sung pitch

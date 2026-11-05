@@ -201,9 +201,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   A slot's mean is pass 1's mean and its worst is the largest worst over both passes. Across runs the mean is the
   mean of the means and the worst is the lowest run worst, the rule in `core/costs.h`. The gates are zero late,
   overrun and dry blocks, each card within its `costs.h` row for mean and worst, and each layout's block mean under
-  75 % and block worst under 95 %. The slot that runs the shared pitch stage is held to the rows of the pitch
-  cards placed (Autotune, Octave, Formant) plus the tracker row when Autotune, MOB or Formant runs and the
-  `kPitchStage` row when Octave or Formant runs without Autotune. The summary goes to stdout and a table per layout is appended to
+  75 % and block worst under 95 %. Each slot is held to its card's row, plus the tracker row when the slot runs
+  a tracker (Autotune, Formant or Apraxia not directly behind Autotune, Mob or Deepthroat with no Autotune
+  ahead). The summary goes to stdout and a table per layout is appended to
   `build/bench/<YYYY-MM-DD>-stress.md`. Exit 1 when any gate fails. The saved layout, `slots_live`, `knobs_live`,
   clip off and the reverb engine are put back at the end, also after a failure.
 - `board/sysclock.cpp`: `SystemClock_Config` override (spec 2026-10-08 step 0). HSE 25 MHz, PLL1 M5 N192 P2 Q20

@@ -39,12 +39,14 @@ constexpr int kCardCount = static_cast<int>(Card::Count);
 // so the registry keeps every id shorter than it by at least two characters.
 constexpr size_t kCardIdBytes = 16;
 
-// Engines the audio block owns. Cards map onto them: Autotune, Octave, Formant and the Formant
-// follower share Pitch, and both reverb cards share Reverb. The Crowd and Growl cards have engines
-// of their own and read the Pitch engine's ring or tracker. The Ringer card has an engine of its own with
-// a tracker and ring of its own. Count ends the list.
+// Engines the audio block owns. Cards map onto them: the Formant card and Apraxia share Formant, and
+// both reverb cards share Reverb. Every engine with a ring keeps a ring of its own input and runs in its
+// own slot. The Crowd, Growl and Formant engines read Autotune's tracker when an Autotune card sits ahead
+// of them, and run a tracker of their own otherwise. The Ringer card always runs a tracker of its own.
+// Count ends the list.
 enum class Engine : uint8_t {
-  InputGate, Pitch, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, RingMod, Count
+  InputGate, Autotune, Octave, Formant, Unison, Slapback, Distortion, Gate, Reverb, Crowd, Lofi, Bloom, Growl, RingMod,
+  Count
 };
 
 constexpr int kEngineCount = static_cast<int>(Engine::Count);
@@ -53,6 +55,8 @@ constexpr int kEngineCount = static_cast<int>(Engine::Count);
 constexpr Engine kNoEngine = Engine::Count;
 
 enum class KnobKind : uint8_t { Continuous, Stepped };
+// The group is the protocol's label for a card. Pitch is only that label, and the chain does not read it.
+// Reverb counts the reverb cards in a layout.
 enum class Group : uint8_t { None, Pitch, Reverb };
 
 // Maps the knob's 0..1 position onto min..max. LogReversed runs geometrically from max at 0 to min at 1.

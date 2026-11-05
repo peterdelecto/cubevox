@@ -1,4 +1,4 @@
-// Yawn checks: settled off is a plain copy; RANGE maps -12 st at the pot's bottom, 0 at noon and +6 st
+// Apraxia checks: settled off is a plain copy; RANGE maps -12 st at the pot's bottom, 0 at noon and +6 st
 // at its top, the default position reads -5 st, and SHIFT never leaves -12 to +6 st; at SENSITIVITY 50 %
 // the drive reads about 1 on a -21 dBFS note, 0.5 on a -27 dBFS note and 0 on a -33 dBFS note, and the
 // full point moves with the pot; the follower's attack and release measured on a step; each onset fires
@@ -26,7 +26,7 @@
 #include "core/chain_params.h"
 #include "core/registry.h"
 #include "engine/formant_follower.h"
-#include "engine/pitch_fx.h"
+#include "engine/formant_fx.h"
 
 #include "signal_util.h"
 
@@ -92,7 +92,7 @@ float rangePosition(float st) {
 
 // The card placed and switched on with its pots at `sens` and `range` (0..1), as compose sets it, and
 // its sweep falling over `decayMs`.
-ChainParams boxYawn(float sens, float range, bool on = true, float decayMs = cv::kFollowerDefaultDecayMs) {
+ChainParams boxApraxia(float sens, float range, bool on = true, float decayMs = cv::kFollowerDefaultDecayMs) {
   ChainParams chain;
   applyPlacement(Card::FormantFollower, chain);
   applyToggle(Card::FormantFollower, on, chain);
@@ -104,24 +104,25 @@ ChainParams boxYawn(float sens, float range, bool on = true, float decayMs = cv:
 
 // The card as it ships: SENSITIVITY 40 %, RANGE -5 st, decay 300 ms.
 ChainParams boxDefault() {
-  return boxYawn(cv::kFollowerDefaultSensitivity, rangePosition(cv::kFollowerDefaultRangeSt));
+  return boxApraxia(cv::kFollowerDefaultSensitivity, rangePosition(cv::kFollowerDefaultRangeSt));
 }
 
-// The pitch stage and the card ahead of it, as the chain runs them, on the heap: the ring is large.
+// The Formant engine and the card ahead of it, as the chain runs them in one slot, on the heap: the ring is
+// large. The engine runs its own tracker, as it does with no Autotune card ahead.
 struct Stage {
-  cv::PitchFx pitch;
+  cv::FormantFx formant;
   cv::FormantFollower follower;
-  int handed = 0;  // the SHIFT the card handed the stage on the last call, whole semitones
+  int handed = 0;  // the SHIFT the card handed the engine on the last call, whole semitones
   Stage() {
-    pitch.reset();
+    formant.reset();
     follower.reset();
   }
 
   // One call of n samples.
   void run(const float* in, float* out, int n, const ChainParams& p) {
-    const cv::PitchFxParams& fx = follower.follow(in, n, p.pitchFx, p.follower);
-    handed = fx.formant.shiftSt;
-    pitch.process(in, out, n, fx);
+    const cv::FormantParams& fp = follower.follow(in, n, p.pitchFx.formant, p.follower);
+    handed = fp.shiftSt;
+    formant.process(in, out, n, fp);
   }
 };
 
@@ -147,11 +148,11 @@ Signal through(const Signal& in, const ChainParams& p) {
 // off again, the stage ends on a plain copy once the toggle's fade settles.
 bool testOffExact() {
   const Signal in = sawtooth(kRate, 0.5f);
-  bool ok = report("off: placed with its toggle off, a plain copy", through(in, boxYawn(1.0f, 1.0f, false)) == in, "");
+  bool ok = report("off: placed with its toggle off, a plain copy", through(in, boxApraxia(1.0f, 1.0f, false)) == in, "");
 
   auto s = std::make_unique<Stage>();
-  const ChainParams on = boxYawn(1.0f, 1.0f, true);
-  const ChainParams offAgain = boxYawn(1.0f, 1.0f, false);
+  const ChainParams on = boxApraxia(1.0f, 1.0f, true);
+  const ChainParams offAgain = boxApraxia(1.0f, 1.0f, false);
   Signal out(in.size());
   bool heard = false;
   bool copy = true;
@@ -179,14 +180,14 @@ struct Span {
 };
 
 Span shiftSpan(float rangeSt) {
-  ChainParams p = boxYawn(0.5f, 0.0f);
+  ChainParams p = boxApraxia(0.5f, 0.0f);
   p.follower.rangeSt = rangeSt;
   Span s{0, 0, 0.0f, 0.0f};
   through(sawtooth(kRate / 2, 0.5f), p, [&](const Stage& st, int) {
     s.handedLow = std::min(s.handedLow, st.handed);
     s.handedHigh = std::max(s.handedHigh, st.handed);
-    s.low = std::min(s.low, st.pitch.shiftSemis());
-    s.high = std::max(s.high, st.pitch.shiftSemis());
+    s.low = std::min(s.low, st.formant.shiftSemis());
+    s.high = std::max(s.high, st.formant.shiftSemis());
   });
   return s;
 }
@@ -197,9 +198,9 @@ Span shiftSpan(float rangeSt) {
 // the engine still keeps SHIFT within -12 to +6 st.
 bool testRangeMap() {
   float at[5];
-  for (int k = 0; k < 5; ++k) at[k] = boxYawn(0.5f, 0.25f * static_cast<float>(k)).follower.rangeSt;
+  for (int k = 0; k < 5; ++k) at[k] = boxApraxia(0.5f, 0.25f * static_cast<float>(k)).follower.rangeSt;
   const float position = rangePosition(cv::kFollowerDefaultRangeSt);
-  const float dflt = boxYawn(0.5f, position).follower.rangeSt;
+  const float dflt = boxApraxia(0.5f, position).follower.rangeSt;
   bool ok = report("range: the pot gives -12, -6, 0, +3 and +6 st at 0, 25, 50, 75 and 100 %",
                    at[0] == -12.0f && at[1] == -6.0f && at[2] == 0.0f && at[3] == 3.0f && at[4] == 6.0f,
                    "%+.2f, %+.2f, %+.2f, %+.2f st and +6 at the top", at[0], at[1], at[2], at[3]);
@@ -229,11 +230,11 @@ bool testUpSweep() {
   float low = 0.0f;
   float rest = 0.0f;
   const int restFrom = static_cast<int>(cv::kFollowerDefaultDecayMs * cv::kSmpPerMs) + kRate * 15 / 100;
-  through(sawtooth(kRate * 6 / 10, 0.2f), boxYawn(0.5f, 1.0f), [&](const Stage& s, int done) {
+  through(sawtooth(kRate * 6 / 10, 0.2f), boxApraxia(0.5f, 1.0f), [&](const Stage& s, int done) {
     handedTop = std::max(handedTop, s.handed);
-    high = std::max(high, s.pitch.shiftSemis());
-    low = std::min(low, s.pitch.shiftSemis());
-    if (done >= restFrom) rest = std::max(rest, std::fabs(s.pitch.shiftSemis()));
+    high = std::max(high, s.formant.shiftSemis());
+    low = std::min(low, s.formant.shiftSemis());
+    if (done >= restFrom) rest = std::max(rest, std::fabs(s.formant.shiftSemis()));
   });
   return report("range: +6 st opens to +6 st and returns to 0 while the note holds",
                 handedTop == 6 && high > 5.5f && high <= 6.0f && low >= 0.0f && rest < 0.01f,
@@ -252,7 +253,7 @@ Reading driveOn(double peakDbfs, float sens) {
   Signal in = sine(kRate / 2, peakDbfs);
   in.resize(kRate, 0.0f);
   Reading r{1.0f, 0.0f, 1.0f};
-  through(in, boxYawn(sens, 1.0f), [&](const Stage& s, int done) {
+  through(in, boxApraxia(sens, 1.0f), [&](const Stage& s, int done) {
     if (done > kRate / 4 && done <= kRate / 2) {
       r.low = std::min(r.low, s.follower.drive());
       r.high = std::max(r.high, s.follower.drive());
@@ -379,18 +380,18 @@ bool testSweep(float decayMs) {
   float restSweep = 0.0f;
   float restDrive = 0.0f;
   float restShift = 0.0f;
-  through(in, boxYawn(0.5f, rangePosition(-7.0f), true, decayMs), [&](const Stage& s, int done) {
+  through(in, boxApraxia(0.5f, rangePosition(-7.0f), true, decayMs), [&](const Stage& s, int done) {
     if (done > kNote + kRate * 3 / 10 && done <= kNote + kGap) {
       restSweep = std::max(restSweep, s.follower.sweep());
       restDrive = std::max(restDrive, s.follower.drive());
-      restShift = std::max(restShift, std::fabs(s.pitch.shiftSemis()));
+      restShift = std::max(restShift, std::fabs(s.formant.shiftSemis()));
     }
     for (int k = 0; k < 2; ++k) {
       const int t = done - starts[k];
       if (t <= 0 || t > kNote) continue;
       sweep[k].push_back(s.follower.sweep());
       drive[k].push_back(s.follower.drive());
-      shift[k].push_back(s.pitch.shiftSemis());
+      shift[k].push_back(s.formant.shiftSemis());
     }
   });
   const int decay = static_cast<int>(decayMs * cv::kSmpPerMs);
@@ -425,10 +426,10 @@ bool testSweep(float decayMs) {
   return ok;
 }
 
-// One Formant voice at rate 0.5 (-12 st) and ratio 1, driven as the stage drives it at a steady `period`:
-// calls of kBlock for 1 s at the lag the stage hands it, Autotune's voice delay. Its ring holds 1.0 up to
-// `reach` samples behind the newest sample and NaN past that, so the output is the grains' window sum
-// while every read stays within `reach`, and NaN once one reads past it.
+// One Formant voice at rate 0.5 (-12 st) and ratio 1 on the engine's ring, driven as the engine drives it at
+// a steady `period`: calls of kBlock for 1 s at the lag the engine's own tracker gives it, the grain delay
+// plus a period. Its ring holds 1.0 up to `reach` samples behind the newest sample and NaN past that, so
+// the output is the grains' window sum while every read stays within `reach`, and NaN once one reads past it.
 struct WindowSum {
   bool finite;
   double low;   // the sum's lowest and highest after two grain lengths
@@ -436,13 +437,13 @@ struct WindowSum {
 };
 
 WindowSum halfSpeedSum(float period, int reach) {
-  constexpr int kLen = cv::kVoiceRingLen;
+  constexpr int kLen = cv::kFormantRingLen;
   const auto at = [](int i) { return static_cast<size_t>((i % kLen + kLen) % kLen); };
   const float nan = std::nanf("");
-  auto ring = std::make_unique<cv::VoiceRing>();
+  auto ring = std::make_unique<cv::FormantFx::Voice::Ring>();
   ring->fill(nan);
   for (int d = 0; d <= reach; ++d) (*ring)[at(-1 - d)] = 1.0f;
-  cv::formant_detail::FormantPsolaVoice voice;
+  cv::FormantFx::Voice voice;
   voice.reset();
   voice.latchGain(true);
   const float lag = static_cast<float>(cv::PsolaVoice::kGrainDelay) + period;
@@ -473,7 +474,7 @@ WindowSum halfSpeedSum(float period, int reach) {
 // -1 when even the whole ring less a call is not enough.
 int deepestRead(float period) {
   int lo = 0;
-  int hi = cv::kVoiceRingLen - cv::kBlock - 2;
+  int hi = cv::kFormantRingLen - cv::kBlock - 2;
   if (!halfSpeedSum(period, hi).finite) return -1;
   while (hi - lo > 1) {
     const int mid = (lo + hi) / 2;
@@ -493,13 +494,13 @@ bool testHalfSpeedVoice() {
   bool ok = true;
   for (const float period : {static_cast<float>(kRate) / 220.0f, static_cast<float>(cv::PitchTracker::kMaxPeriod)}) {
     const int deepest = deepestRead(period);
-    const WindowSum s = halfSpeedSum(period, cv::kVoiceRingLen - cv::kBlock - 2);
+    const WindowSum s = halfSpeedSum(period, cv::kFormantRingLen - cv::kBlock - 2);
     char name[112];
     std::snprintf(name, sizeof name, "half speed: period %.1f samples, window sum within 0.5 dB, reads inside the ring",
                   static_cast<double>(period));
     ok &= report(name, deepest > 0 && s.finite && dbOf(s.low) >= -0.5 && dbOf(s.high) <= 0.5,
                  "sum %+.3f to %+.3f dB; deepest read %.0f samples behind the newest, ring %.0f", dbOf(s.low), dbOf(s.high),
-                 deepest, cv::kVoiceRingLen);
+                 deepest, cv::kFormantRingLen);
   }
   return ok;
 }
@@ -510,10 +511,10 @@ bool testHalfSpeedVoice() {
 bool testHalfSpeedTone() {
   int handed = 0;
   float deepest = 0.0f;
-  const Signal out = through(sine(kRate, -21.0, 220.0), boxYawn(1.0f, 0.0f, true, cv::kFollowerMaxDecayMs),
+  const Signal out = through(sine(kRate, -21.0, 220.0), boxApraxia(1.0f, 0.0f, true, cv::kFollowerMaxDecayMs),
                              [&](const Stage& s, int) {
                                handed = std::min(handed, s.handed);
-                               deepest = std::min(deepest, s.pitch.shiftSemis());
+                               deepest = std::min(deepest, s.formant.shiftSemis());
                              });
   const double peak = peakOf(out);
   const double voiced = peakOf(Signal(out.begin() + kRate / 10, out.end()));
@@ -560,7 +561,7 @@ bool testClipCorners(const std::vector<Clip>& all) {
     for (const float sens : {0.0f, 1.0f}) {
       for (const float range : {0.0f, 0.5f, 1.0f}) {
         for (const float decayMs : {cv::kFollowerMinDecayMs, cv::kFollowerMaxDecayMs}) {
-          const Signal out = through(c.padded, boxYawn(sens, range, true, decayMs));
+          const Signal out = through(c.padded, boxApraxia(sens, range, true, decayMs));
           for (const float v : out) finite = finite && std::isfinite(v);
           ++runs;
         }
@@ -584,8 +585,8 @@ double levelDb(const Clip& c, const ChainParams& p) { return levelDb(c, through(
 bool testClipEnds(const std::vector<Clip>& all) {
   bool ok = true;
   for (const Clip& c : all) {
-    const Signal deep = through(c.padded, boxYawn(0.5f, 0.0f));
-    const Signal up = through(c.padded, boxYawn(0.5f, 1.0f));
+    const Signal deep = through(c.padded, boxApraxia(0.5f, 0.0f));
+    const Signal up = through(c.padded, boxApraxia(0.5f, 1.0f));
     char name[96];
     std::snprintf(name, sizeof name, "half speed: -12 st on %s, finite and under 0 dBFS", c.name.c_str());
     ok &= report(name, allFinite(deep) && peakOf(deep) <= 1.0 && allFinite(up), "peak %+.2f dBFS, the input's %+.2f dBFS",
@@ -614,7 +615,7 @@ bool testLevel(const std::vector<Clip>& all) {
     for (const Clip& c : all) {
       std::printf("NOTE level SENSITIVITY %.0f %% RANGE -7 st decay %.0f ms %-22s %+6.2f dB\n", 100.0 * pick.sens,
                   static_cast<double>(pick.decayMs), c.name.c_str(),
-                  levelDb(c, boxYawn(pick.sens, rangePosition(-7.0f), true, pick.decayMs)));
+                  levelDb(c, boxApraxia(pick.sens, rangePosition(-7.0f), true, pick.decayMs)));
     }
   }
   return ok;
