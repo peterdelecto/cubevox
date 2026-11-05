@@ -1,4 +1,4 @@
-// POLISH EQ checks: both halves bit-exact when off, the front and back responses, the de-esser behind
+// VOX EQ checks: both halves bit-exact when off, the front response with and without the cuts, the back response, the de-esser behind
 // the low-pass, flat, call splitting, the setting ranges, no-alloc. No window, no audio device.
 
 #include <algorithm>
@@ -113,6 +113,50 @@ bool testFront() {
                 g50, g70, g97, g1k, g6k, g10k);
 }
 
+// ON runs the front half without the cuts: 50 Hz and 10 kHz pass, with the de-esser off and live.
+bool testFrontNoCuts() {
+  cv::PolishParams filters = filtersOnly();
+  filters.cuts = false;
+  cv::PolishParams voiced;
+  voiced.cuts = false;
+  const double f50 = gainDb(Half::Front, 50.0, filters), f10k = gainDb(Half::Front, 10000.0, filters);
+  const double v50 = gainDb(Half::Front, 50.0, voiced), v10k = gainDb(Half::Front, 10000.0, voiced);
+  const bool ok = std::fabs(f50) <= 0.05 && std::fabs(f10k) <= 0.05 && std::fabs(v50) <= 0.1 && std::fabs(v10k) <= 0.5;
+  return report("front no cuts", ok,
+                "cuts off, 50 Hz / 10 kHz: de-esser out %.3f / %.3f dB, live %.3f / %.3f dB (0 +-0.05, 0 +-0.1 and 0 +-0.5)",
+                f50, f10k, v50, v10k);
+}
+
+// Steps from ON to ON+CUTS and back on a 40 Hz sine, which the high-pass takes 19 dB off, and measures the
+// largest sample-to-sample step of the output around each switch against the sine's own largest step.
+bool testCutsFade() {
+  const int half = kSecond;
+  std::vector<float> in = sine(40.0, 3 * half);
+  cv::PolishParams on, cuts;
+  on.cuts = false;
+  cuts.cuts = true;
+  gEq.reset();
+  std::vector<float> out(in.size());
+  const cv::PolishParams* settings[3] = {&on, &cuts, &on};
+  for (int part = 0; part < 3; ++part) {
+    for (int i = part * half; i < (part + 1) * half; i += cv::kBlock) {
+      const int n = std::min(cv::kBlock, (part + 1) * half - i);
+      gInProcess = true;
+      gEq.processFront(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], n, *settings[part]);
+      gInProcess = false;
+    }
+  }
+  const double natural = kAmp * 2.0 * kPi * 40.0 / cv::kSampleRate;
+  double worst = 0.0;
+  for (int i = half - 100; i < 3 * half; ++i) {
+    worst = std::max(worst, static_cast<double>(std::fabs(out[static_cast<size_t>(i)] - out[static_cast<size_t>(i - 1)])));
+  }
+  const double settled = rmsOf(out, half * 2 - 4800, half * 2) / rmsOf(in, half * 2 - 4800, half * 2);
+  return report("cuts fade", worst <= 2.0 * natural && settled < 0.2,
+                "ON to ON+CUTS to ON on 40 Hz: largest step %.5f against the sine's %.5f, ON+CUTS level %.3f of the input (<= 2x, < 0.2)",
+                worst, natural, settled);
+}
+
 bool testFrontDeEsserQuiet() {
   const cv::PolishParams p;  // the de-esser at its tuning
   const double g97 = gainDb(Half::Front, 97.0, p), g1k = gainDb(Half::Front, 1000.0, p);
@@ -159,6 +203,21 @@ bool testFrontEss() {
   const std::vector<float> on = run(gEq, Half::Front, in, cv::PolishParams{});
   const double cut = 20.0 * std::log10(sibilantRms(off) / sibilantRms(on));
   return report("front ess", cut >= 3.5 && cut <= 5.5, "band noise over a voice: the 3 kHz and up content cuts %.2f dB (4.5 +-1)", cut);
+}
+
+// The same voice at ON, where the de-esser reads the band at full level because the 6 kHz low-pass is out.
+bool testFrontEssNoCuts() {
+  const std::vector<float> in = voiceWithEss(2 * kSecond);
+  cv::PolishParams ref = filtersOnly();
+  ref.cuts = false;
+  cv::PolishParams voiced;
+  voiced.cuts = false;
+  gEq.reset();
+  const std::vector<float> off = run(gEq, Half::Front, in, ref);
+  gEq.reset();
+  const std::vector<float> on = run(gEq, Half::Front, in, voiced);
+  const double cut = 20.0 * std::log10(sibilantRms(off) / sibilantRms(on));
+  return report("front ess no cuts", cut >= 3.5 && cut <= 7.0, "same voice at ON: the 3 kHz and up content cuts %.2f dB (3.5 to 7)", cut);
 }
 
 // A call of any size gives the back half the same samples, because it holds no block state.
@@ -270,8 +329,11 @@ int main() {
   bool ok = true;
   ok &= testPassthrough();
   ok &= testFront();
+  ok &= testFrontNoCuts();
+  ok &= testCutsFade();
   ok &= testFrontDeEsserQuiet();
   ok &= testFrontEss();
+  ok &= testFrontEssNoCuts();
   ok &= testBackCallSizes();
   ok &= testRanges();
   ok &= testBack();

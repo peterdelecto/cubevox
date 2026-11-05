@@ -24,14 +24,14 @@ constexpr size_t kOffSequence = 8;
 constexpr size_t kOffName = 12;
 constexpr size_t kOffSlots = kOffName + kLayoutNameBytes;
 constexpr size_t kOffSettings = kOffSlots + kSlotCount * kRecordCardFieldBytes;
-constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, polish eq, top switch, debug, 2 retired, brightness, 7 reserved
+constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, retired, top switch, debug, 2 retired, brightness, VOX EQ, 6 reserved
 constexpr size_t kOffCrc = kOffSettings + kSettingsBytes;
 
 // Byte offsets of the settings, in file order. A v1 record has the first two.
 constexpr size_t kOffOutputLevel = kOffSettings;
 constexpr size_t kOffInputJack = kOffSettings + 1;
 constexpr size_t kOffPolishComp = kOffSettings + 2;
-constexpr size_t kOffPolishEq = kOffSettings + 3;
+constexpr size_t kOffRetiredPolishEq = kOffSettings + 3;  // POLISH EQ's ON/OFF until VOX EQ replaced it; written 0, ignored on read
 constexpr size_t kOffTopSwitch = kOffSettings + 4;
 constexpr size_t kOffDebug = kOffSettings + 5;  // a record written before it existed holds 0 here, which reads as OFF
 
@@ -44,12 +44,17 @@ constexpr size_t kRetiredBytes = 2;
 // which reads as the default level.
 constexpr size_t kOffBrightness = kOffSettings + 8;
 
+// VOX EQ is the setting's value: 0 OFF, 1 ON, 2 ON with the cuts. Every record written before the
+// byte existed holds 0 here, which reads as OFF, whatever its retired POLISH EQ byte says.
+constexpr size_t kOffVoxEq = kOffSettings + 9;
+
 constexpr uint16_t kRecordSchema = 2;
 constexpr uint16_t kRecordSchemaV1 = 1;  // still read; the v2 settings take their defaults
 
 static_assert(kOffCrc + 4 == kRecordBytes, "record fields must add up to 256 bytes");
 static_assert(kOffBrightness >= kOffRetired + kRetiredBytes && kOffBrightness < kOffCrc,
               "the brightness byte sits after the retired pair, inside the settings");
+static_assert(kOffVoxEq == kOffBrightness + 1 && kOffVoxEq < kOffCrc, "the VOX EQ byte follows the brightness byte, inside the settings");
 static_assert(kRecordBytes % kFlashWordBytes == 0, "record must be a whole number of flash words");
 
 struct RecordData {

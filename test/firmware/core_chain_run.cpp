@@ -102,7 +102,7 @@ ChainSnapshot snapshotFor(const Layout& layout, float knob, bool polish) {
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
   settings.polishComp = polish;
-  settings.polishEq = polish;
+  settings.voxEq = polish ? VoxEq::Cuts : VoxEq::Off;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -122,8 +122,8 @@ Run runBlock(Rig& rig, const ChainSnapshot& snap, const Block& in, Clock clock) 
 }
 
 // Runs the chain by hand on `rig`'s own engines, with a fresh buffer per stage and a plain copy in
-// between. The front half of POLISH EQ goes first, then the slots, then POLISH COMP and the back
-// half of POLISH EQ.
+// between. The front half of VOX EQ goes first, then the slots, then POLISH COMP and the back
+// half of VOX EQ.
 Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block cur = in;
   Block next{};
@@ -300,7 +300,7 @@ void checkNanGuard() {
   check(clean && sound, "chain: the polish stages play on after a discarded block");
 }
 
-// The clock reads twice around the front half of POLISH EQ, twice around each slot, then once before
+// The clock reads twice around the front half of VOX EQ, twice around each slot, then once before
 // POLISH COMP, once between the comp and the back half and once after it. Each bucket gets its own
 // pair of reads, and the EQ bucket adds the front half's pair to the back half's.
 void checkStageTiming() {
@@ -316,12 +316,12 @@ void checkStageTiming() {
   const uint32_t first = 2 + 2 * static_cast<uint32_t>(kSlotCount);  // read index of the first polish read
   check(run.cycles.comp == (first + 1) * (first + 1) - first * first, "chain: POLISH COMP is timed alone");
   check(run.cycles.eq == 1 + (first + 2) * (first + 2) - (first + 1) * (first + 1),
-        "chain: POLISH EQ is timed by the first pair of reads and the last pair");
+        "chain: VOX EQ is timed by the first pair of reads and the last pair");
 }
 
-// The front half of POLISH EQ runs ahead of slot 1 in the caller's buffer. With the slots empty and
+// The front half of VOX EQ runs ahead of slot 1 in the caller's buffer. With the slots empty and
 // POLISH COMP off, the chain's output is the front half then the back half, and a 40 Hz tone loses
-// level to the 70 Hz high-pass while the same tone with POLISH EQ OFF passes untouched.
+// level to the 70 Hz high-pass while the same tone with VOX EQ OFF passes untouched.
 void checkFrontHead() {
   constexpr double kPi = 3.14159265358979323846;
   const auto lowTone = [&](int block) {
@@ -336,14 +336,20 @@ void checkFrontHead() {
   panel.toggle.fill(true);
   Settings eqOnly;
   eqOnly.polishComp = false;
+  eqOnly.voxEq = VoxEq::Cuts;
+  Settings noCuts = eqOnly;
+  noCuts.voxEq = VoxEq::On;
   const ChainSnapshot on = composeSnapshot(layoutOf({}), panel, eqOnly, BenchOverrides());
+  const ChainSnapshot onNoCuts = composeSnapshot(layoutOf({}), panel, noCuts, BenchOverrides());
   const ChainSnapshot off = snapshotFor(layoutOf({}), 0.5f, false);
   auto chain = newRig();
+  auto uncut = newRig();
   auto bare = newRig();
   auto plain = newRig();
   bool same = true;
   bool passes = true;
   double outRms = 0.0;
+  double uncutRms = 0.0;
   double inRms = 0.0;
   for (int b = 0; b < 400; ++b) {
     const Block in = lowTone(b);
@@ -355,14 +361,16 @@ void checkFrontHead() {
     same = same && run.out == want;
     passes = passes && runBlock(*plain, off, in, StillClock()).out == in;
     outRms = rms(run.out);
+    uncutRms = rms(runBlock(*uncut, onNoCuts, in, StillClock()).out);
     inRms = rms(in);
   }
   check(same, "chain: the front half runs ahead of slot 1 and the back half after the comp, in the caller's buffer");
-  check(passes, "chain: with POLISH EQ OFF both halves pass the block bit for bit");
-  check(outRms < 0.2 * inRms, "chain: the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
+  check(passes, "chain: with VOX EQ OFF both halves pass the block bit for bit");
+  check(outRms < 0.2 * inRms, "chain: at ON+CUTS the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
+  check(uncutRms > 0.9 * inRms, "chain: at ON the 40 Hz tone keeps its level, with no high-pass");
 }
 
-// Runs the shipped layout with every toggle on, the knobs at mid travel and POLISH EQ on.
+// Runs the shipped layout with every toggle on, the knobs at mid travel and VOX EQ at ON+CUTS.
 void checkDefaultChain() {
   const ChainSnapshot snap = snapshotFor(defaultLayout(), 0.5f, true);
   auto first = newRig();
@@ -508,7 +516,7 @@ ChainSnapshot snapshotToggles(const Layout& layout, float knob, const Toggles& o
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
   settings.polishComp = false;
-  settings.polishEq = false;
+  settings.voxEq = VoxEq::Off;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -1217,7 +1225,7 @@ void checkBloomKey() {
 
 // What the Chatter card cut from a run of the chain: how many finished slices it holds, whether every
 // one equals its slot's input at the cut clock, and how many of their samples differ from the chain's
-// own input after the front half of POLISH EQ.
+// own input after the front half of VOX EQ.
 struct SourceRun {
   int slices = 0;
   bool matchesSlotInput = true;

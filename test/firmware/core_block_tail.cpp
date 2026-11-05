@@ -243,7 +243,7 @@ ChainSnapshot snapshotOf(const Layout& layout, bool comp, bool eq, bool mic) {
   for (auto& slot : panel.knob) slot.fill(0.5f);
   Settings settings;
   settings.polishComp = comp;
-  settings.polishEq = eq;
+  settings.voxEq = eq ? VoxEq::Cuts : VoxEq::Off;
   if (mic) settings.outputLevel = OutputLevel::Mic;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }

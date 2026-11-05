@@ -85,7 +85,7 @@ struct Request {
   int slotCount = 0;  // ids present in "slots"
   std::array<std::array<char, kIdBytes>, kSlotCount> slot = {};
 
-  // The "settings" object: polish_comp, polish_eq and top_switch. `settingsGiven` has a kGiven bit
+  // The "settings" object: polish_comp, vox_eq ("off", "on" or "cuts") and top_switch. `settingsGiven` has a kGiven bit
   // for each field the request carried, and `settings` holds those values. A field the request
   // leaves out stays as the box has it. The output and input settings are not on the wire.
   Settings settings;
@@ -93,7 +93,7 @@ struct Request {
 };
 
 constexpr uint8_t kGivenPolishComp = 1u << 0;
-constexpr uint8_t kGivenPolishEq = 1u << 1;
+constexpr uint8_t kGivenVoxEq = 1u << 1;
 constexpr uint8_t kGivenTopSwitch = 1u << 2;
 
 // Copies the settings fields the request carried onto `current`; the others stay as they are.

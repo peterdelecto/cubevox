@@ -35,7 +35,7 @@ The order (owner 2026-10-30, "looks good") runs from the input to the output and
 | 4 | `SLOT 4` | `UNISON` | swaps UNISON / MOB, below |
 | 5 | `SLOT 7` | `GATE` | cycles GATE, LO-FI, CHATTER, passing over a layout over the CPU lines |
 | 6 | `POLISH COMP` | `ON` | cycles ON / OFF |
-| 7 | `POLISH EQ` | `ON` | cycles ON / OFF |
+| 7 | `VOX EQ` (was `POLISH EQ`, ON/OFF, default ON; superseded by `2026-11-05-vox-eq-design.md`) | `OFF` | cycles OFF / ON / ON+CUTS |
 | 8 | `OUTPUT` | `LINE` | cycles LINE / MIC. MIC is a digital -30 dB trim before the DAC that puts the output near the level of the mic the box received, so a mixer mic channel needs no gain change when the box is inserted (owner 2026-10-24) |
 | 9 | `TOP SWITCH` | `MUTE` | cycles MUTE / BYPASS |
 | 10 | `BRIGHTNESS` | `HIGH` | cycles LOW, MID, HIGH, MAX, the screen's normal brightness (owner 2026-11-02) |

@@ -13,13 +13,13 @@ RANGE), both Deepthroat knobs (GROWL, MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
 It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia and Deepthroat
 slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
-POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
+POLISH COMP and VOX EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
 core/costs.h, so a block that caught an interrupt does not count. The fixed path is read the same
-way. POLISH COMP and POLISH EQ come from the COMP and EQ buckets of the stats lines. The fixed path
+way. POLISH COMP and VOX EQ come from the COMP and EQ buckets of the stats lines. The fixed path
 is the block total less the slot sum for the mean, and for the worst the two buckets at their worst
 plus the rest of the fixed path (ceiling, BYPASS mix, conversion) at its mean.
 
@@ -27,7 +27,7 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-  4. each layout's POLISH EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
+  4. each layout's VOX EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
 The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Apraxia, Crowd or Deepthroat
@@ -91,7 +91,7 @@ FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_f
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
     ("polish_comp", "POLISH COMP", "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu"),
-    ("polish_eq", "POLISH EQ", "[bench] POLISH EQ forced off", "[bench] POLISH EQ follows the menu"),
+    ("polish_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
 )
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
@@ -117,7 +117,7 @@ TRACKER_USERS = ("autotune", "crowd", "formant", "formant_follow", "growl")  # c
 STAGE_USERS = ("octave", "formant", "formant_follow")  # cards that pay the stage term without Autotune
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
-# The fixed path's rows: POLISH EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
+# The fixed path's rows: VOX EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
 FIXED_PARTS = ("kPolishEq", "kPolishComp", "kSoftCeiling", "kBypassMix")
 FIXED_ROW = "kFixed"
 
@@ -573,7 +573,7 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 def judge_fixed(agg, rows, label, table, gates):
     """Adds the fixed stages to the table and holds each to its row: the EQ and COMP buckets to kPolishEq
     and kPolishComp, and the fixed path to kFixed, the sum of the four fixed rows."""
-    parts = (("POLISH EQ", "eq", "kPolishEq"), ("POLISH COMP", "comp", "kPolishComp"),
+    parts = (("VOX EQ", "eq", "kPolishEq"), ("POLISH COMP", "comp", "kPolishComp"),
              ("fixed path", "fixed", FIXED_ROW))
     for name, key, row_name in parts:
         row_mean, row_worst = rows[row_name]

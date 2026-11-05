@@ -34,7 +34,7 @@ settings block and belong to the polish stages travel with the layout, as one ob
 | Field | Values | Default on a fresh box |
 |---|---|---|
 | `polish_comp` | `true`, `false` | `true` |
-| `polish_eq` | `true`, `false` | `true` |
+| `vox_eq` (was `polish_eq`, true/false; owner 2026-11-05, `2026-11-05-vox-eq-design.md`) | `"off"`, `"on"`, `"cuts"` | `"off"` |
 | `top_switch` | `"mute"`, `"bypass"` | `"mute"` |
 
 1. Replies always carry all three. A `set_layout` request may leave out the object or any field in

@@ -23,7 +23,7 @@ the release image carries none of it and answers `op not in this build`.
 | `knobs_live` | | clears every per-knob pin and the pin-at-top |
 | `bypass` | | flips BYPASS held on, whatever the top switch reads (`[bench] BYPASS held on` or `follows the top switch`) |
 | `polish_comp` | | flips POLISH COMP forced off, whatever the menu says (`[bench] POLISH COMP forced off` or `follows the menu`) |
-| `polish_eq` | | flips POLISH EQ forced off, both halves, whatever the menu says (`[bench] POLISH EQ forced off` or `follows the menu`) |
+| `polish_eq` | | flips VOX EQ forced off, both halves, whatever the menu says (`[bench] VOX EQ forced off` or `follows the menu`) |
 
 A slot runs when `(toggle || forcedOn) && !forcedOff`, so `slot_off` still wins. A per-knob pin
 wins over `pin_knobs`. `stats` prints both masks. Letters in `bench_ops.py`: `n` all_on,

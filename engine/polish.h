@@ -9,14 +9,17 @@
 #include "engine/dsp.h"
 #include "engine/smooth.h"
 
-// POLISH EQ voiced for Adam's voice, one stage in two places under one ON/OFF. The front half runs
-// ahead of slot 1 and holds a 70 Hz high-pass, a 6 kHz low-pass and a de-esser. The back half runs
-// after POLISH COMP and holds a 300 Hz dip, a 3.5 kHz presence peak and the trim.
+// VOX EQ voiced for Adam's voice, one stage in two places under one menu row with three settings.
+// The front half runs ahead of slot 1 and holds a de-esser, plus a 70 Hz high-pass and a 6 kHz
+// low-pass (the cuts) when `cuts` is set. The back half runs after POLISH COMP and holds a 300 Hz
+// dip, a 3.5 kHz presence peak and the trim.
 //
-// Each half crossfades with its input through its own 20 ms smoother on the one `on`, so a click
-// fades both together. Settled off, each half is a bit-exact copy and holds no filter state.
+// Each half crossfades with its input through its own 20 ms smoother on `on`, so a click fades both
+// together. The cuts crossfade through a smoother of their own on `on` and `cuts`, so a change
+// between ON and ON+CUTS fades too. Settled off, each half is a bit-exact copy and holds no filter
+// state, and settled without the cuts the front half holds no filter state for them.
 // RBJ biquads, TDF-II. The back half rebuilds its coefficients only when a setting changes.
-// Spec docs/specs/2026-10-31-polish-eq-adam-voice-design.md.
+// Specs docs/specs/2026-10-31-polish-eq-adam-voice-design.md and docs/specs/2026-11-05-vox-eq-design.md.
 
 namespace cv {
 
@@ -50,6 +53,7 @@ struct PolishTuning {
 
 struct PolishParams {
   bool on = true;
+  bool cuts = true;  // the 70 Hz high-pass and 6 kHz low-pass ahead of the de-esser; read only while `on`
   float dipHz = 300.0f;
   float dipDb = -2.5f;
   float presenceHz = 3500.0f;
@@ -89,6 +93,7 @@ class Polish {
   // Front half. `in` and `out` may be the same buffer. Takes any `n`.
   void processFront(const float* in, float* out, int n, const PolishParams& p) {
     const float target = p.on ? 1.0f : 0.0f;
+    const float cutsTarget = p.on && p.cuts ? 1.0f : 0.0f;
     if (frontActive_ == 0.0f && target == 0.0f) {
       if (frontDirty_) clearFront();
       copy(in, out, n);
@@ -96,7 +101,7 @@ class Polish {
     }
     frontDirty_ = true;
     for (int i = 0; i < n; i += kBlock) {
-      frontChunk(in + i, out + i, n - i < kBlock ? n - i : kBlock, target, p.tuning.deEsser);
+      frontChunk(in + i, out + i, n - i < kBlock ? n - i : kBlock, target, cutsTarget, p.tuning.deEsser);
     }
   }
 
@@ -155,21 +160,41 @@ class Polish {
     std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
   }
 
-  // Filters and de-esses up to kBlock samples, then mixes them with the input by the smoother. The
-  // front filters and the smoother live in locals, and the de-esser's notch feeds the mix directly.
-  void frontChunk(const float* in, float* out, int n, float target, const DeEsserTuning& t) {
-    std::array<float, kBlock> y;
+  // Writes up to kBlock samples of the input through the cuts, mixed with the input by the cuts
+  // smoother. Settled without the cuts it copies the input and clears the filters. The filters and the
+  // smoother live in locals for the call.
+  void cutsChunk(const float* in, float* y, int n, float cutsTarget) {
+    float cuts = cutsActive_;
+    if (cuts == 0.0f && cutsTarget == 0.0f) {
+      if (cutsDirty_) clearCuts();
+      copy(in, y, n);
+      return;
+    }
+    cutsDirty_ = true;
     Biquad h0 = hp_[0];
     Biquad h1 = hp_[1];
     Biquad l0 = lp_[0];
     Biquad l1 = lp_[1];
-    for (int i = 0; i < n; ++i) {
-      y[static_cast<size_t>(i)] = l1.run(l0.run(h1.run(h0.run(in[i]))));
+    if (cuts == cutsTarget) {
+      for (int i = 0; i < n; ++i) y[i] = l1.run(l0.run(h1.run(h0.run(in[i]))));
+    } else {
+      for (int i = 0; i < n; ++i) {
+        cuts = smooth::step(cuts, cutsTarget, smooth::kSmoothCoef);
+        y[i] = in[i] + cuts * (l1.run(l0.run(h1.run(h0.run(in[i])))) - in[i]);
+      }
     }
     hp_[0] = h0;
     hp_[1] = h1;
     lp_[0] = l0;
     lp_[1] = l1;
+    cutsActive_ = cuts;
+  }
+
+  // Cuts and de-esses up to kBlock samples, then mixes them with the input by the smoother. The
+  // smoother lives in a local, and the de-esser's notch feeds the mix directly.
+  void frontChunk(const float* in, float* out, int n, float target, float cutsTarget, const DeEsserTuning& t) {
+    std::array<float, kBlock> y;
+    cutsChunk(in, y.data(), n, cutsTarget);
 
     float active = frontActive_;
     if (active == target) {
@@ -194,10 +219,16 @@ class Polish {
   }
 
   void clearFront() {
-    for (Biquad& b : hp_) b.clear();
-    for (Biquad& b : lp_) b.clear();
+    clearCuts();
     deEsser_.reset();
     frontDirty_ = false;
+  }
+
+  void clearCuts() {
+    for (Biquad& b : hp_) b.clear();
+    for (Biquad& b : lp_) b.clear();
+    cutsActive_ = 0.0f;
+    cutsDirty_ = false;
   }
 
   void clearBack() {
@@ -211,8 +242,10 @@ class Polish {
   Biquad dip_, presence_;
   float trim_ = 1.0f;
   float frontActive_ = 0.0f;
+  float cutsActive_ = 0.0f;
   float backActive_ = 0.0f;
   bool frontDirty_ = false;
+  bool cutsDirty_ = false;
   bool backDirty_ = false;
   BackShape applied_{};  // the settings the back coefficients were built from
   bool shapeValid_ = false;

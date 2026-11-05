@@ -14,7 +14,7 @@
 // runs, so interrupt time landing in a block does not count. Octave is the pitch slot with Octave
 // on minus with it off. Chasm is costed in the reverb slot. The tail after the slots (comp, EQ,
 // ceiling, BYPASS mix, conversion) has its own rows, read from the kStatComp and kStatEq buckets
-// and the block total minus the slots. The kStatEq bucket holds both halves of POLISH EQ, the
+// and the block total minus the slots. The kStatEq bucket holds both halves of VOX EQ, the
 // front half ahead of the slots and the back half after the comp.
 //
 // A host figure converts to a board estimate at 50.4k board cycles per host microsecond, which is
@@ -27,7 +27,7 @@
 //
 // A row marked false is an estimate. firmware/stress.py turns one true: it reads the card's slot
 // counters across its sweeps and toggle flips, and the fixed path across its BYPASS, POLISH COMP and
-// POLISH EQ flips, and gates each against its row. The row then takes the stress run's mean and its
+// VOX EQ flips, and gates each against its row. The row then takes the stress run's mean and its
 // lowest run worst, rounded up, with the date and the layouts in its comment.
 //
 // The ratio belongs to a card, not to the box. The reverbs are serial chains of allpasses, which the
@@ -137,8 +137,8 @@ constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stres
 // at 3.8 % / 5.2 %, and 4.2 to 4.6 % mean with the throat move.
 constexpr Cost kGrowl{5, 7, true};  // 25.7k / 42.7k, stress run 2026-11-05 (v2.01.51-bench, throat layout: mean 4.0 %, worst 6.7 %)
 
-// What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
-// tail after them. The stress run of 2026-11-05 measured POLISH EQ (both halves) and POLISH COMP, and
+// What every block spends whatever the layout: VOX EQ's front half ahead of the slots, and the
+// tail after them. The stress run of 2026-11-05 measured VOX EQ at ON+CUTS (both halves) and POLISH COMP, and
 // stress.py gates their buckets against kPolishEq and kPolishComp. The run read the rest of the fixed
 // path, SOFT CEILING and BYPASS mix, at about 0.9 % mean combined. Those two rows stay estimates.
 // stress.py gates the whole fixed path against kFixed, the sum of the four rows.
