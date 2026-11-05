@@ -102,14 +102,15 @@ void runGrowl(ChainEngines& engines, const float* in, float* out, int n, const C
 }
 
 // Runs the Ring mod card at its slot, making the shared pitch stage's call first when no pitch-group card
-// ahead of it has, as runGrowl does. The card reads the tracker's period, not the ring.
+// ahead of it has, as runGrowl does. The card reads the tracker's period, not the ring. It snaps to the notes
+// of Autotune's KEY when Autotune is placed (`p.ringMod.keyed`), and to every semitone otherwise.
 void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p, bool& pitchDone) {
   if (!pitchDone) {
     pitchDone = true;
     engines.pitch.process(in, out, n, p.pitchFx);
     in = out;
   }
-  engines.ringMod.process(in, out, n, p.ringMod, engines.pitch);
+  engines.ringMod.process(in, out, n, p.ringMod, engines.pitch, p.ringMod.keyed ? p.pitchFx.autotune.key : -1);
 }
 
 // Runs the Strings card. It sits on Autotune's KEY when Autotune is placed (`p.strings.keyed`), and on the

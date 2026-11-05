@@ -32,7 +32,7 @@ struct ChainParams {
   cv::LofiParams lofi;
   cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runBloom passes the gate's state
   cv::ReverbParams reverb;
-  cv::RingModParams ringMod;  // its toggle also sets pitchFx.ringModOn
+  cv::RingModParams ringMod;  // its toggle also sets pitchFx.ringModOn; keyed is set by placing Autotune
   cv::StringsParams strings;  // keyed is set by placing Autotune; runStrings passes Autotune's key
   cv::PolishCompParams comp;  // the chain tail: comp, then the back half of eq
   cv::PolishParams eq;        // its front half runs ahead of slot 1
