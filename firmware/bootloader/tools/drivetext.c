@@ -158,7 +158,7 @@ static int writeDiag(const char* dir, const char* name, const CvDriveState* stat
 static void sampleBlock(struct CvBootBlock* block) {
   static const char kSummary[] = "v2.00.10 up 1234 s software none";
   memset(block, 0, sizeof *block);
-  block->blockVersion = CV_BOOT_BLOCK_VERSION;
+  cvBootBlockSeal(block);
   block->lastReason = CvReasonImageUnreadable;
   block->faultAddress = 0x08045000u;
   memcpy(block->appSummary, kSummary, sizeof kSummary - 1u);
@@ -183,7 +183,7 @@ static int writeUnreadable(const char* dir, struct CvBootBlock* block, CvDriveSt
 static int writeCrowded(const char* dir, const CvDriveState* sample) {
   struct CvBootBlock block;
   memset(&block, 0, sizeof block);
-  block.blockVersion = CV_BOOT_BLOCK_VERSION;
+  cvBootBlockSeal(&block);
   block.lastReason = CvReasonImageUnreadable;
   block.faultAddress = 0xFFFFFFFFu;
   memset(block.appSummary, 'w', sizeof block.appSummary);

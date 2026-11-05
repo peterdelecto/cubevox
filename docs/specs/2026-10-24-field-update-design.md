@@ -90,14 +90,15 @@ reset and is random after power-on, so every field is validated before use.
 | 0x2001FF00 | `request` | TinyUF2's double-tap register. `0xF01669EF` (`CV_REQUEST_UPDATE`): the application asks for update mode, then resets. `0x53525643` (`CV_REQUEST_RESUME`): the bootloader's fault handler returns to update mode for `lastReason`. Every decision clears it |
 | 0x2001FF04 | `bootFails` | Jumps to the application with no healthy report since the last good run |
 | 0x2001FF08 | `bootFailsCheck` | `~bootFails`. Disagreement means power-on garbage, read as 0 |
-| 0x2001FF0C | `blockVersion` | 2 since bootloader v0.04 (1 before). The bootloader's alone: names the bootloader fields that exist |
+| 0x2001FF0C | `blockVersion` | 3 with the seal (2 since bootloader v0.04, 1 before). The bootloader's alone: names the bootloader fields that exist |
 | 0x2001FF10 | `lastReason` | Why the bootloader last stayed in update mode (enum, section Boot sequence) |
 | 0x2001FF14 | `faultAddress` | Flash address the bootloader faulted on while reading, else 0 |
 | 0x2001FF18 | `appSummary[40]` | Written by the application before it requests update mode: version, uptime s, reset cause, last fault kind |
 | 0x2001FF40 | `bootFaultPc`, `bootFaultCfsr`, `bootFaultHfsr`, `bootFaultBfar` | The bootloader's own last fault: stacked pc, CFSR, HFSR, BFAR. 0 when none since power-on or the last update |
 | 0x2001FF50 | `optionBytes` | What the option byte step found or did since power-on (enum `CvOptionResult`) |
 | 0x2001FF54 | `resetFlags` | `RCC->RSR` as the bootloader read it at this start (block version 2, bootloader v0.04). The application's boot report reads the reset cause from here, because the jump into the application clears the register (power-on rule) |
-| 0x2001FF58 | `bootReserved` (40 B) | Zero. New bootloader fields |
+| 0x2001FF58 | `blockSeal` | `0x4B425643` (`CV_BOOT_BLOCK_SEAL`, the bytes `CVBK`), block version 3. Written at every start. A block without it holds other data (see the seal rule) |
+| 0x2001FF5C | `bootReserved` (36 B) | Zero. New bootloader fields |
 | 0x2001FF80 | `appFieldsVersion` | 0 until the application adds a field. The bootloader never reads it |
 | 0x2001FF84 | `appReserved` (60 B) | Zero. New application fields |
 | 0x2001FFC0 | fault record (64 B) | `.cv_noinit`, `FAU3`, unchanged. The bootloader reads it for `DIAG.TXT` and never clears it |
@@ -117,8 +118,31 @@ reset and is random after power-on, so every field is validated before use.
    register) and still clears the register. A pure power-on (PORRSTF or BORRSTF, with none of
    SFTRSTF, IWDG1RSTF and WWDG1RSTF) clears the whole block, so power cycles and brown-outs never
    count as failed starts. Each start sees only its own reset's flags, so a reset the bootloader
-   makes shows SFTRSTF alone and never reads as a power-on. A block with `blockVersion` 0 is
-   cleared too. Otherwise the bootloader leaves the application's area alone.
+   makes shows SFTRSTF alone and never reads as a power-on. A block without the seal is cleared
+   too. Otherwise the bootloader leaves the application's area alone.
+4. Seal rule (block version 3, found 2026-11-05). The ST ROM loader uses DTCM
+   and ends a `flash.sh --rom` session with a software reset, so the bootloader starts with
+   other data in the block and no power-on to clear it. Version 2 accepted any `blockVersion`
+   of 1 or more, so that data passed and its words reached the boot report as a bootloader
+   fault. Now the bootloader keeps a block only when `blockVersion` is 3 or more and `blockSeal`
+   holds `CV_BOOT_BLOCK_SEAL`; otherwise it clears the whole block, as at a power-on. It writes
+   the version and the seal at every start and after an update, and a fault before the
+   bootloader adopted the block adopts it first. The application's `cvBootBlockInitialised`
+   (every reader in the application goes through it) takes versions 1 and 2 on the version alone
+   and version 3 and up only with the seal. A real bootloader fault, the boot-fail counter and
+   the update request sit in a sealed block and survive a system reset as before. Data that
+   carries the seal word by chance has a 1 in 2^32 chance. The fault record keeps its single
+   magic word with the same odds.
+
+   | Bootloader | Application | Behaviour |
+   |---|---|---|
+   | new | new | Both check the seal. Junk is cleared at adopt and never reported |
+   | new | old | The old application checks `blockVersion >= 1` and finds 3, which the sealed block always holds. It never writes the seal |
+   | old | new | The block carries version 2 and no seal, so the application trusts it as before. Junk after a ROM session still reports, until the bootloader is reflashed |
+   | old | old | As before |
+
+   The first start of a new bootloader over a block an old one left (version 2, no seal) clears
+   it once, which drops one pending update request or counter value at the bootloader swap.
 
 ## Image header and UF2 family
 A 32-byte header sits at application offset 0x400, after the 0x298-byte vector table.
