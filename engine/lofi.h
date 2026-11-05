@@ -59,15 +59,15 @@ struct LofiTuning {
   // bilinearly in dB. The loss steepens up to AMOUNT 50 %, where the band reaches its full narrowness,
   // and stays flat above.
   std::array<std::array<float, kLofiMakeupAmounts>, kLofiMakeupTones> makeupDb = {{
-      {{0.27f, 0.31f, 0.88f, 1.37f, 2.37f, 3.62f, 3.62f}},
-      {{0.27f, 0.60f, 1.42f, 2.29f, 3.46f, 5.41f, 5.41f}},
-      {{0.27f, 0.87f, 1.82f, 3.11f, 4.61f, 8.02f, 8.02f}},
-      {{0.27f, 1.11f, 2.20f, 3.73f, 6.46f, 10.60f, 10.60f}},
-      {{0.27f, 1.30f, 2.60f, 4.41f, 8.87f, 13.28f, 13.28f}},
+      {{0.16f, 0.19f, 0.76f, 1.25f, 2.25f, 3.50f, 3.50f}},
+      {{0.16f, 0.48f, 1.30f, 2.17f, 3.34f, 5.29f, 5.29f}},
+      {{0.16f, 0.75f, 1.71f, 2.99f, 4.50f, 7.90f, 7.90f}},
+      {{0.16f, 0.99f, 2.08f, 3.62f, 6.34f, 10.48f, 10.48f}},
+      {{0.16f, 1.18f, 2.49f, 4.29f, 8.75f, 13.16f, 13.16f}},
   }};
 
-  // On top of the makeup law. It puts the box default on Adam's three clips at +0.08 to +0.30 dB.
-  float trimDb = 0.2f;
+  // On top of the makeup law. It puts the box default on Adam's three clips at +0.08 to +0.19 dB.
+  float trimDb = 0.15f;
 };
 
 struct LofiParams {

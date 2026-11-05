@@ -907,9 +907,8 @@ struct Tail {
 // POLISH COMP alone, VOX EQ alone (both halves) at ON and at ON+CUTS, and the whole tail at both, on
 // Adam's clips. The clips sit 1.8 dB apart in level and the comp levels them, so its three readings
 // spread past the mid band. The spread is printed, and the mean holds the rule. VOX EQ and the whole
-// tail hold the mid band per clip and the rule on the mean, at both settings. The third clip carries
-// rumble under 40 Hz that the comp's makeup lifts in the pauses, and the stage's subsonic high-pass
-// keeps its ON tail inside the band.
+// tail hold the mid band per clip and the rule on the mean, at both settings. The comp's makeup lifts
+// the pauses of the third clip, which puts its ON tail near the top of the band.
 bool tailClipRows() {
   double mean = 0.0;
   int count = 0;
