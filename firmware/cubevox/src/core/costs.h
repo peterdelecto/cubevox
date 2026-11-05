@@ -49,7 +49,7 @@
 // kPitchStage, once.
 //
 // A layout is accepted when both column sums over its cards, plus the fixed term, the shared tracker once
-// when Autotune, Crowd, Formant, Yawn or Deepthroat is placed (Ringer's row holds its own), and kPitchStage once when Octave or Formant is placed
+// when Autotune, Crowd, Formant, Yawn or Deepthroat is placed, and kPitchStage once when Octave or Formant is placed
 // without Autotune, stay under their lines. The trailing comments give the measured cycles, mean
 // then worst; a row marked measured=false is an estimate until a board measures it.
 
@@ -136,12 +136,6 @@ constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stres
 // kTracker once. Its row is the card's slot measured on the box. The host bench of 2026-11-04 had put it
 // at 3.8 % / 5.2 %, and 4.2 to 4.6 % mean with the throat move.
 constexpr Cost kGrowl{5, 7, true};  // 25.7k / 42.7k, stress run 2026-11-05 (v2.01.51-bench, throat layout: mean 4.0 %, worst 6.7 %)
-
-// Ringer is Distortion's second alternate in slot 6. It runs a pitch tracker of its own (the coarse search) on
-// its input, so its row holds the tracker and a layout with it pays kTracker only for the shared tracker of
-// Autotune, Mob, Formant, Yawn or Deepthroat. Its row is the card's slot measured on the box, with its toggle
-// flipped ten times in the run, so the worst holds a switch-on.
-constexpr Cost kRingMod{4, 8, true};  // 22.0k / 50.8k, stress run 2026-11-05 (v2.01.51-bench, ringmod layout: mean 3.4 %, worst 7.9 %)
 
 // What every block spends whatever the layout: VOX EQ's front half ahead of the slots, and the
 // tail after them. The stress run of 2026-11-05 measured VOX EQ at ON+CUTS (both halves) and POLISH COMP, and

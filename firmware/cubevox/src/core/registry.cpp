@@ -40,8 +40,6 @@ constexpr KnobDesc kFollowerRange = {"RANGE", KnobKind::Continuous, 0, cv::kFoll
                                      cv::kFollowerMaxRangeSt, "st", Curve::ZeroAtNoon};
 constexpr KnobDesc kBloomLength = {"LENGTH", KnobKind::Continuous, 0, cv::Bloom::kLengthMinMs, cv::Bloom::kLengthMaxMs, "ms",
                                  Curve::Log};
-constexpr KnobDesc kRingModRatioKnob = {"RATIO", KnobKind::Stepped, cv::kRingModRatioCount, 0.0f,
-                                        cv::kRingModRatioCount - 1, "", Curve::Linear, 0, cv::kRingModRatioName.data()};
 
 // Knobs are listed in knob order, A then B. Knob A is the upper pot of the slot and knob B the lower.
 // A card with an amount knob (Mix, Amount, Depth, Drive) puts it on knob B. The apply functions below
@@ -80,8 +78,6 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::FormantFollower, "formant_follow", "Apraxia", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
     {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
-    {Card::RingMod, "ringmod", "Ringer", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::None,
-     costs::kRingMod},
 }};
 
 // Every entry sits at its own enum index with an id that fits the clip width with room to spare,
@@ -208,14 +204,6 @@ void applyGrowlKnob(int knob, float v, cv::GrowlParams& g) {
   }
 }
 
-void applyRingModKnob(int knob, float v, cv::RingModParams& r) {
-  if (knob == 0) {
-    r.ratio = cv::kRingModRatio[static_cast<size_t>(v)];
-  } else {
-    r.mix = v;
-  }
-}
-
 void applyReverbKnob(int knob, float v, cv::ReverbParams& r) {
   if (knob == 0) {
     r.time = v;
@@ -292,7 +280,6 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
     case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
     case Card::FormantFollower: applyFollowerKnob(knob, v, out); break;
     case Card::Growl: applyGrowlKnob(knob, v, out.growl); break;
-    case Card::RingMod: applyRingModKnob(knob, v, out.ringMod); break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -323,7 +310,6 @@ void applyToggle(Card c, bool on, ChainParams& out) {
       out.growl.on = on;
       out.pitchFx.growlOn = on;
       break;
-    case Card::RingMod: out.ringMod.on = on; break;
     case Card::Empty:
     case Card::Count: break;
   }
@@ -334,8 +320,6 @@ void applyPlacement(Card c, ChainParams& out) {
   if (c == Card::ReverbChasm) out.reverb.engine = cv::kReverbChasm;
   // The Chatter card takes its word key from the Input gate's detector whenever that card is placed.
   if (c == Card::InputGate) out.bloom.keyFromGate = true;
-  // The Ringer card sits on the Autotune card's key whenever that card is placed.
-  if (c == Card::Autotune) out.ringMod.keyed = true;
   // The Formant follower's envelope sets the Formant voice's SHIFT, through the toggle's fade too.
   if (c == Card::FormantFollower) out.follower.placed = true;
 }

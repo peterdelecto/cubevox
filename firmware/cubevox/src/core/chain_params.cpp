@@ -22,7 +22,6 @@ ChainParams::ChainParams() {
   pitchFx.growlOn = false;
   crowd.on = false;
   growl.on = false;
-  ringMod.on = false;
   unison.on = false;
   slapback.on = false;
   distortion.on = false;

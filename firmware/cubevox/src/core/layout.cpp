@@ -42,7 +42,7 @@ int octaveFormantSlot(const Layout& layout) {
 int distortionGrowlSlot(const Layout& layout) {
   for (int s = 0; s < kSlotCount; ++s) {
     const Card c = layout.card[s];
-    if (c == Card::Distortion || c == Card::Growl || c == Card::RingMod) return s;
+    if (c == Card::Distortion || c == Card::Growl) return s;
   }
   return -1;
 }

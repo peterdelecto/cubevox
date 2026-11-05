@@ -28,14 +28,8 @@ Card nextSlot3Card(Card c) {
   }
 }
 
-// The card after `c` in the slot 6 cycle, Distortion to Growl to Ringer and back to Distortion.
-Card nextSlot6Card(Card c) {
-  switch (c) {
-    case Card::Distortion: return Card::Growl;
-    case Card::Growl: return Card::RingMod;
-    default: return Card::Distortion;
-  }
-}
+// The card after `c` in the slot 6 cycle, Distortion to Growl and back to Distortion.
+Card nextSlot6Card(Card c) { return c == Card::Distortion ? Card::Growl : Card::Distortion; }
 
 // The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
 Card nextSlot7Card(Card c) {
