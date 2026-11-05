@@ -301,7 +301,7 @@ bool growlTuningInRange(const cv::GrowlTuning& t) {
   const auto shelf = [](float v) { return inside(v, -gd::kMaxShelfDb, gd::kMaxShelfDb); };
   return inside(t.pitchSt, -gd::kMaxSt, gd::kMaxSt) && inside(t.formantSt, -gd::kMaxSt, gd::kMaxSt) &&
          inside(t.hardTop, 0.0f, gd::kMaxHardTop) && inside(t.thirdTop, 0.0f, 1.0f) && hz(t.lowShelfHz) &&
-         hz(t.peakHz) && inside(t.peakQ, cv::kPeakMinQ, gd::kMaxPeakQ) && inside(t.jitterTop, 0.0f, 1.0f) &&
+         hz(t.hpHz) && hz(t.peakHz) && inside(t.peakQ, cv::kPeakMinQ, gd::kMaxPeakQ) && inside(t.jitterTop, 0.0f, 1.0f) &&
          shelf(t.lowShelfDb) && shelf(t.peakDb) && inside(t.driveDb, 0.0f, gd::kMaxDriveDb) &&
          inside(t.makeupSat, gd::kMinMakeupSat, gd::kMaxMakeupSat) && inside(t.railSoft, gd::kMinRailSoft, 1.0f) &&
          inside(t.railAsym, 0.0f, gd::kMaxRailAsym) && inside(t.trimDb, -gd::kMaxTrimDb, gd::kMaxTrimDb);

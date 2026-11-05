@@ -113,6 +113,11 @@ class FormantPsolaVoice {
   // renders hold that sound.
   void latchGain(bool on) { latch_ = on; }
 
+  // Pulse anchoring, off at 0. Each launch finds the loudest sample within half a period of its mark and
+  // shifts the grain's read so that sample lands where it would land at the playback rate `restRate`. A
+  // change of rate then moves no pulse in the output, so it bends no pitch. At `restRate` the shift is 0.
+  void anchorPulse(float restRate) { anchorRate_ = restRate; }
+
   // Per call. period 0 silences the voice. delay is the wanted lag of the output behind the
   // input in samples. The marks sit one period closer than that, because a grain starts one
   // period before its mark. n is the call's length, written to the ring ahead of the read.
@@ -167,6 +172,7 @@ class FormantPsolaVoice {
   // that run would add exact zeros, so it skips its taps and moves on as if it had played.
   void render(const VoiceRing& ring, int first, int n, float* out, int zeroBefore = 0) {
     if (!voiced_) return;
+    ring_ = ring.data();
     for (size_t k = 0; k < count_; ++k) grains_[k].start = 0;
     if (countdown_ > outPeriod_) countdown_ = outPeriod_;
     for (int i = 0;;) {
@@ -285,7 +291,31 @@ class FormantPsolaVoice {
   void launch(int head, float lead, int at) {
     float centre = markDelay_;
     if (centre - ref_ > 0.5f * p_) centre -= p_;
-    start(head, clampf(centre + p_ - rate_ * lead, lo_, hi_), lead, at);
+    start(head, clampf(centre + pulseShift(head, centre) + p_ - rate_ * lead, lo_, hi_), lead, at);
+  }
+
+  // The shift of a grain's read delay that holds its pulse where the rest rate would put it. At the rest
+  // rate the grain's window peak reads the input at delay `peak`; the pulse P is the loudest sample within
+  // half a period of that. It sits E = centre + p - P input samples past the grain's start, so it plays
+  // E / rate after the launch. A read start moved back by s = E (rate / rest - 1) plays it E / rest after,
+  // where the rest rate puts it. At the rest rate s is 0.
+  float pulseShift(int head, float centre) const {
+    if (anchorRate_ <= 0.0f || ring_ == nullptr) return 0.0f;
+    const float k = rate_ / anchorRate_ - 1.0f;
+    if (k == 0.0f) return 0.0f;
+    const float restDur = fmaxf(2.0f * p_ / anchorRate_, 2.0f * outPeriod_);
+    const int mid = static_cast<int>(centre + p_ - 0.5f * anchorRate_ * restDur + 0.5f);
+    const int half = static_cast<int>(0.5f * p_);
+    float loudest = -1.0f;
+    int pulse = mid;
+    for (int d = -half; d <= half; ++d) {
+      const float a = fabsf(ring_[wrapOnce<kVoiceRingLen>(head - mid - d)]);
+      if (a > loudest) {
+        loudest = a;
+        pulse = mid + d;
+      }
+    }
+    return (centre + p_ - static_cast<float>(pulse)) * k;
   }
 
   // A voice with no grain in flight also lays the grain that would have started one output period
@@ -296,7 +326,7 @@ class FormantPsolaVoice {
     if (age >= dur_ - 1.0f) return;
     float centre = markDelay_;
     if (centre - ref_ > 0.5f * p_) centre -= p_;
-    start(head, clampf(centre + 2.0f * p_ - rate_ * age, lo_, hi_), age, at);
+    start(head, clampf(centre + pulseShift(head, centre) + 2.0f * p_ - rate_ * age, lo_, hi_), age, at);
   }
 
   // A grain that reads `delay` behind head now, age samples into its window.
@@ -410,6 +440,8 @@ class FormantPsolaVoice {
   bool voiced_ = false;
   bool fresh_ = true;
   bool latch_ = false;
+  float anchorRate_ = 0.0f;       // the rest playback rate pulse anchoring holds pulses at, 0 for off
+  const float* ring_ = nullptr;   // the ring the last render read
 };
 
 }  // namespace formant_detail

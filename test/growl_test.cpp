@@ -2,8 +2,9 @@
 // a pitch, the throat follows each syllable and rests in silence, MIX 100 % is the plain card and MIX 0 is
 // the input at the voice's lag, the output stays finite at every knob corner, the level at the default
 // (GROWL 75 %, MIX 100 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. GROWL 0
-// is bit-exact with the card before the bite peak and the jitter, the peak reads +6 dB at 2.5 kHz at GROWL
-// 100 %, the jitter repeats from reset, and an onset leaves the pitch ratio, rasp rate and read lag alone. Each run feeds a
+// is pinned by hash, the peak reads +6 dB at 2.5 kHz at GROWL 100 %, the jitter repeats from reset, the wet
+// path's high-pass cuts 55 Hz by 10.7 dB, the throat drop leaves the heard pitch within 0.1 st, and an onset
+// leaves the pitch ratio, rasp rate and read lag alone. Each run feeds a
 // PitchFx first, so the ring is written and the tracker runs, as the chain does. The clip rows skip
 // when samples/ is absent. No window, no audio device.
 
@@ -461,7 +462,7 @@ uint64_t hashOf(const Signal& x) {
   return h;
 }
 
-constexpr uint64_t kFullMixHash = 0xe612d0eb66b4d4d4ull;
+constexpr uint64_t kFullMixHash = 0x72ba40cd5abcf51full;
 
 // MIX at its default 100 % is the plain card. The hash is the output on a sung note at GROWL 0.80 and
 // DRIVE 0.65, and it moves with any change to the voice, the rasp or the fold.
@@ -516,26 +517,142 @@ bool checkMixZero() {
                 detail);
 }
 
-// GROWL 0 is the card as it was before the bite peak and the rasp jitter: the output hashes below come
-// from that engine on a sung note at MIX 100 %, 50 % and 0, and the peak is flat and the jitter 0 there.
+// At GROWL 0 the peak is flat and the jitter is 0, and the output is pinned by hash on a sung note at
+// MIX 100 %, 50 % and 0 (the hashes move with the high-pass, the voice and the level trim). The throat
+// sits at rest there, so pulse anchoring shifts nothing.
 bool checkGrowlZero() {
   const Signal in = sungNote(220.0, 2.0, -20.0);
-  constexpr uint64_t kWant[] = {0xffe59b253f6206efull, 0x5a8bcd4af6234c4full, 0x29a92437402dfa30ull};
+  constexpr uint64_t kWant[] = {0xbc877d0f48b1cd47ull, 0x9e6a7d074016ad4eull, 0x29a92437402dfa30ull};
   const float mixes[] = {1.0f, 0.5f, 0.0f};
   bool same = true;
   float jitter = 1.0f;
   for (size_t k = 0; k < 3; ++k) {
     Rig rig;
-    same = same && hashOf(rig.run(in, potAt(0.0f, mixes[k]))) == kWant[k];
+    const uint64_t h = hashOf(rig.run(in, potAt(0.0f, mixes[k])));
+    std::printf("NOTE GROWL 0 hash MIX %.1f %016llx\n", static_cast<double>(mixes[k]), static_cast<unsigned long long>(h));
+    same = same && h == kWant[k];
     jitter = rig.growl->jitter();
   }
   cv::growl_detail::Fold fold;
   fold.setTuning(cv::GrowlTuning{});
   const float peak = fold.gainsAt(0.0f).peak;
   char detail[112];
-  std::snprintf(detail, sizeof detail, "3 MIX settings bit-exact with the old engine: %s; peak gain less 1 %.1f (0), jitter %.1f (0)",
+  std::snprintf(detail, sizeof detail, "3 MIX settings match their hashes: %s; peak gain less 1 %.1f (0), jitter %.1f (0)",
                 same ? "yes" : "no", static_cast<double>(peak), static_cast<double>(jitter));
-  return report("GROWL 0 unchanged", same && peak == 0.0f && jitter == 0.0f, detail);
+  return report("GROWL 0 pinned", same && peak == 0.0f && jitter == 0.0f, detail);
+}
+
+// A bin of x at hz by direct DFT over [from, to), as an amplitude.
+double toneAmp(const Signal& x, double hz, size_t from, size_t to) {
+  double re = 0.0, im = 0.0;
+  for (size_t i = from; i < to; ++i) {
+    const double w = 2.0 * kPi * hz * static_cast<double>(i) / kRate;
+    re += x[i] * std::cos(w);
+    im += x[i] * std::sin(w);
+  }
+  return 2.0 * std::sqrt(re * re + im * im) / static_cast<double>(to - from);
+}
+
+// The wet path's high-pass: a 110 Hz note comes out with its 55 Hz fundamental. At hpHz 100 that
+// fundamental sits 10.7 dB under what it is at hpHz 20, within 1.5 dB, and a 220 Hz note's 110 Hz output
+// moves less than 3 dB.
+bool checkHighPass() {
+  const auto fundamentalDb = [](double noteHz, float hpHz) {
+    const Signal in = sungNote(noteHz, 3.0, -20.0);
+    cv::GrowlParams g = potAt(0.0f, 1.0f);
+    g.tuning.hpHz = hpHz;
+    Rig rig;
+    const Signal out = rig.run(in, g);
+    double best = 0.0;
+    for (double hz = 0.5 * noteHz - 2.0; hz <= 0.5 * noteHz + 2.0; hz += 0.05) {
+      best = std::fmax(best, toneAmp(out, hz, static_cast<size_t>(kRate), out.size()));
+    }
+    return 20.0 * std::log10(best);
+  };
+  const double low = fundamentalDb(110.0, 100.0) - fundamentalDb(110.0, 20.0);
+  const double mid = fundamentalDb(220.0, 100.0) - fundamentalDb(220.0, 20.0);
+  char detail[128];
+  std::snprintf(detail, sizeof detail, "55 Hz fundamental %+.1f dB with hpHz 100 against 20 (-10.7 +- 1.5), 110 Hz %+.1f dB (> -3)", low,
+                mid);
+  return report("wet high-pass", std::fabs(low + 10.7) < 1.5 && mid > -3.0, detail);
+}
+
+// The heard pitch of x around sample c, in Hz: the normalised autocorrelation of a 30 ms window peaks at
+// two output periods (the rasp makes alternate periods differ), found within 15 % of twice `guessHz`'s period
+// and refined by a parabola. 0 when the window is too short or silent.
+double heardHz(const Signal& x, long c, double guessHz) {
+  constexpr long kLen = 1440;
+  const long a = c - kLen / 2;
+  const double guess = 2.0 * kRate / guessHz;
+  const long lo = static_cast<long>(guess * 0.85), hi = static_cast<long>(guess * 1.15);
+  if (a < 0 || a + kLen + hi + 2 >= static_cast<long>(x.size())) return 0.0;
+  double e0 = 0.0;
+  for (long i = 0; i < kLen; ++i) e0 += static_cast<double>(x[a + i]) * x[a + i];
+  if (e0 < 1e-6) return 0.0;
+  std::vector<double> r(static_cast<size_t>(hi + 2), 0.0);
+  long best = lo;
+  for (long l = lo - 1; l <= hi + 1; ++l) {
+    double s = 0.0, e1 = 0.0;
+    for (long i = 0; i < kLen; ++i) {
+      s += static_cast<double>(x[a + i]) * x[a + i + l];
+      e1 += static_cast<double>(x[a + i + l]) * x[a + i + l];
+    }
+    r[static_cast<size_t>(l)] = s / std::sqrt(e0 * e1 + 1e-12);
+    if (l >= lo && l <= hi && r[static_cast<size_t>(l)] > r[static_cast<size_t>(best)]) best = l;
+  }
+  const double y0 = r[static_cast<size_t>(best - 1)], y1 = r[static_cast<size_t>(best)], y2 = r[static_cast<size_t>(best + 1)];
+  const double den = y0 - 2.0 * y1 + y2;
+  const double lag = static_cast<double>(best) + (den != 0.0 ? 0.5 * (y0 - y2) / den : 0.0);
+  return 2.0 * kRate / lag;
+}
+
+// The onset waver. A 220 Hz note, 150 ms of silence, the same note again, GROWL at 30 % with the throat
+// drop widened to -24 st (so the throat falls from -5 to -11 st) and the rasp's wave and the fold otherwise
+// flat. The voice sings 110.0 Hz. From 10 ms after the onset to 150 ms, the heard pitch stays within 0.1 st
+// of that, the pulse anchoring holding it. With the anchoring off it left by 0.25 st and, before the
+// voice had settled, 0.5 st. The same run without the drop reads 110.0 Hz within 0.02 st, which bounds the
+// estimate's own error.
+bool checkThroatPitch() {
+  const auto worstSt = [](float dropTop) {
+    Signal in(static_cast<size_t>(0.3 * kRate), 0.0f);
+    const auto note = [](Signal& to, double sec) {
+      const size_t n = static_cast<size_t>(sec * kRate);
+      std::vector<double> v(n);
+      double sum = 0.0;
+      for (size_t i = 0; i < n; ++i) {
+        double s = 0.0;
+        for (int k = 1; k * 220.0 < 5000.0; ++k) s += std::sin(2.0 * kPi * k * 220.0 * static_cast<double>(i) / kRate) / k;
+        v[i] = s;
+        sum += s * s;
+      }
+      const double gain = std::pow(10.0, -14.0 / 20.0) / std::sqrt(sum / static_cast<double>(n));
+      for (const double s : v) to.push_back(static_cast<float>(s * gain));
+    };
+    note(in, 0.5);
+    in.insert(in.end(), static_cast<size_t>(0.15 * kRate), 0.0f);
+    const size_t onset = in.size();
+    note(in, 0.6);
+    in.insert(in.end(), static_cast<size_t>(0.3 * kRate), 0.0f);
+    cv::GrowlParams g = growlAt(0.3f, 0.0f);
+    g.tuning.throatDropTop = dropTop;
+    g.tuning.hardTop = 0.0f;
+    g.tuning.thirdTop = 0.0f;
+    g.tuning.jitterTop = 0.0f;
+    Rig rig;
+    const Signal out = rig.run(in, g);
+    double worst = 0.0;
+    for (double ms = 10.0; ms <= 150.0; ms += 5.0) {
+      const long c = static_cast<long>(onset) + static_cast<long>(ms * kRate / 1000.0) + 1260;  // the voice trails by its lag
+      const double hz = heardHz(out, c, 110.0);
+      worst = hz > 0.0 ? std::fmax(worst, std::fabs(12.0 * std::log2(hz / 110.0))) : 99.0;
+    }
+    return worst;
+  };
+  const double drop = worstSt(-24.0f);
+  const double flat = worstSt(0.0f);
+  char detail[128];
+  std::snprintf(detail, sizeof detail, "110.0 Hz off by %.3f st with the drop (0.1), %.3f st without (0.02)", drop, flat);
+  return report("throat drop holds pitch", drop < 0.1 && flat < 0.02, detail);
 }
 
 // The bite peak through the fold with the knee, shelf and makeup set flat: a 2.5 kHz sine comes out +6 dB
@@ -678,6 +795,8 @@ int main() {
   ok &= checkFullMix();
   ok &= checkMixZero();
   ok &= checkGrowlZero();
+  ok &= checkHighPass();
+  ok &= checkThroatPitch();
   ok &= checkPeak();
   ok &= checkJitter();
   ok &= checkOnsetHolds();
