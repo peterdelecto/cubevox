@@ -1192,36 +1192,43 @@ void checkBloomKey() {
 }
 
 // What the Chatter card cut from a run of the chain: how many finished slices it holds, whether every
-// one equals the pitch stage's output at its cut clock, and how many of their samples differ from the
-// Crowd card's output.
+// one equals its slot's input at the cut clock, and how many of their samples differ from the chain's
+// own input after the front half of POLISH EQ.
 struct SourceRun {
   int slices = 0;
-  bool matchesLead = true;
+  bool matchesSlotInput = true;
   int differs = 0;
   int samples = 0;
-  bool tapIdle = false;  // the tap buffer was never written
 };
 
-// Runs `layout` through the chain, and the pitch stage and the Crowd card by hand beside it.
+// Runs `layout` through the chain, and the slots ahead of the Chatter card by hand beside it. The hand
+// run on a second rig gives the block entering the Chatter slot.
 SourceRun runSource(const Layout& layout, const Toggles& toggles) {
   constexpr int kBlocks = 250;
   const ChainSnapshot snap = snapshotCrowd(layout, toggles);
+  int bloomSlot = 0;
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (layout.card[static_cast<size_t>(s)] == Card::Bloom) bloomSlot = s;
+  }
   auto chain = newRig();
   auto hand = newRig();
   chain->fades.settle(snap.slotOn);
-  std::vector<float> lead;
-  std::vector<float> voiced;
+  hand->fades.settle(snap.slotOn);
+  std::vector<float> entering;
+  std::vector<float> head;
+  bool pitchDone = false;
   for (int b = 0; b < kBlocks; ++b) {
     const Block in = tone(b, 0.3f);
     runBlock(*chain, snap, in, StillClock());
-    Block front{};
-    hand->engines.polish.processFront(in.data(), front.data(), kN, snap.params.eq);
-    Block p{};
-    hand->engines.pitch.process(front.data(), p.data(), kN, snap.params.pitchFx);
-    Block m{};
-    hand->engines.crowd.process(p.data(), m.data(), kN, snap.params.crowd, hand->engines.pitch);
-    append(lead, p);
-    append(voiced, m);
+    Block a{};
+    Block scratch{};
+    hand->engines.polish.processFront(in.data(), a.data(), kN, snap.params.eq);
+    append(head, a);
+    pitchDone = false;
+    for (int s = 0; s < bloomSlot; ++s) {
+      if (runSlot(hand->engines, hand->fades, s, snap, a.data(), scratch.data(), kN, pitchDone)) std::swap(a, scratch);
+    }
+    append(entering, a);
   }
   SourceRun r;
   const cv::Bloom& bloom = chain->engines.bloom;
@@ -1230,68 +1237,51 @@ SourceRun runSource(const Layout& layout, const Toggles& toggles) {
     ++r.slices;
     const size_t cut = bloom.sliceCutAt(slot);
 
-    // A slice is the pitch stage's output through the card's 11 kHz low-pass, started clear at its cut.
-    // Its first and last 300 samples carry the pass window (278 samples) and are left out.
+    // A slice is the slot's input through the card's 11 kHz low-pass, started clear at its cut. Its
+    // first and last 300 samples carry the pass window (278 samples) and are left out.
     constexpr int kEdge = 300;
     cv::Biquad lp;
     lp.setLowPass(cv::Bloom::kLowpassHz, cv::Bloom::kLowpassQ);
     for (int j = 0; j < bloom.sliceLen(slot); ++j) {
-      const float want = lp.run(lead[cut + static_cast<size_t>(j)]);
+      const float want = lp.run(entering[cut + static_cast<size_t>(j)]);
       if (j < kEdge || j >= bloom.sliceLen(slot) - kEdge) continue;
       const float s = bloom.sliceData(slot)[j];
-      if (std::fabs(s - want) > 1e-5f) r.matchesLead = false;
-      if (std::fabs(s - voiced[cut + static_cast<size_t>(j)]) > 1e-3f) ++r.differs;
+      if (std::fabs(s - want) > 1e-5f) r.matchesSlotInput = false;
+      if (std::fabs(s - head[cut + static_cast<size_t>(j)]) > 1e-3f) ++r.differs;
       ++r.samples;
     }
   }
-  r.tapIdle = std::all_of(chain->engines.bloomSrc.begin(), chain->engines.bloomSrc.end(), [](float v) { return v == 0.0f; });
   return r;
 }
 
-// The Chatter card cuts its slices from the block leaving the last Autotune, Octave or Formant slot (slot
-// 1 when the layout has none), and its dry path is slot 7's own input. With MOB in slot 4 the slices
-// match the pitch stage's output and differ from MOB's; with MOB ahead of Octave they still do; with no
-// Chatter card placed, or the card ahead of the tap, nothing is copied.
+// The Chatter card cuts its slices from its own input, the block leaving the slot ahead of it, so the
+// slices carry every card between the voice and the slot. With Distortion in slot 2 the slices equal the
+// distorted block and differ from the chain input; with Mob after Octave they equal Mob's output; with
+// Mob ahead of Octave and making the pitch call they still do; with the card in slot 1 they equal the
+// chain input.
 void checkBloomSource() {
-  Layout def = defaultLayout();
-  def.card[kSlot7] = Card::Bloom;
-  const BloomTap defTap = bloomTap(def);
-  check(defTap.slot == 2 && defTap.pitchCard, "chatter tap: the default layout with Chatter in slot 7 taps the block leaving Octave in slot 3");
-
-  Layout formant = layoutOf({Card::Autotune, Card::Empty, Card::Formant});
-  formant.card[kSlot7] = Card::Bloom;
-  check(bloomTap(formant).slot == 2, "chatter tap: the last of Autotune, Octave and Formant sets the slot");
-
-  Layout none = layoutOf({Card::InputGate, Card::Unison});
-  none.card[kSlot7] = Card::Bloom;
-  const BloomTap noneTap = bloomTap(none);
-  check(noneTap.slot == 0 && !noneTap.pitchCard, "chatter tap: a layout with no pitch card taps the block leaving slot 1");
-
-  check(bloomTap(defaultLayout()).slot == -1, "chatter tap: a layout with no Chatter card copies nothing");
-  const BloomTap ahead = bloomTap(layoutOf({Card::Bloom, Card::Empty, Card::Octave}));
-  check(ahead.slot == -1, "chatter tap: the card ahead of the tap slot cuts from its own input");
+  Layout dist = layoutOf({Card::Empty, Card::Distortion});
+  dist.card[kSlot7] = Card::Bloom;
+  const SourceRun d = runSource(dist, togglesOn({1, kSlot7}));
+  check(d.slices >= 2 && d.matchesSlotInput && d.samples > 0 && d.differs > d.samples / 2,
+        "chatter source: with Distortion ahead of it the slices equal the distorted block, not the chain input");
 
   Layout behind = layoutOf({Card::InputGate, Card::Autotune, Card::Octave, Card::Crowd});
   behind.card[kSlot7] = Card::Bloom;
   const SourceRun a = runSource(behind, togglesOn({1, 2, 3, kSlot7}));
-  check(a.slices >= 2 && a.matchesLead && a.samples > 0 && a.differs > a.samples / 2,
-        "chatter source: with MOB in slot 4 the captured slices equal the pitch stage's output and differ from MOB's");
+  check(a.slices >= 2 && a.matchesSlotInput && a.samples > 0 && a.differs > a.samples / 2,
+        "chatter source: with Mob in slot 4 the slices equal Mob's output");
 
   Layout crowdFirst = layoutOf({Card::InputGate, Card::Crowd, Card::Octave});
   crowdFirst.card[kSlot7] = Card::Bloom;
   const SourceRun c = runSource(crowdFirst, togglesOn({1, 2, kSlot7}));
-  check(c.slices >= 2 && c.matchesLead && c.differs > c.samples / 2,
-        "chatter source: with MOB ahead of Octave and making the pitch call, the slices still equal the pitch stage's output");
+  check(c.slices >= 2 && c.matchesSlotInput && c.differs > c.samples / 2,
+        "chatter source: with Mob ahead of Octave and making the pitch call, the slices equal the block leaving slot 6");
 
-  const SourceRun plain = runSource(none, togglesOn({1, kSlot7}));
-  check(plain.slices >= 2 && !plain.tapIdle,
-        "chatter source: with no pitch card the slices come from the block leaving slot 1");
-
-  const SourceRun absent = runSource(defaultLayout(), allToggles(true));
-  check(absent.tapIdle, "chatter source: a layout with no Chatter card never writes the tap");
   Layout early = layoutOf({Card::Bloom, Card::Empty, Card::Octave});
   const SourceRun first = runSource(early, togglesOn({0, 2}));
-  check(first.tapIdle && first.slices >= 2, "chatter source: the card ahead of the tap slot writes no tap and cuts from its own input");
+  check(first.slices >= 2 && first.matchesSlotInput && first.samples > 0,
+        "chatter source: with the card in slot 1 the slices equal the chain input");
 }
 
 // The shipped layout with every toggle on is the plain chain: the crossfade changes nothing while no

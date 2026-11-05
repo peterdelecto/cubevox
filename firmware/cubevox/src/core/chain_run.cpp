@@ -83,9 +83,6 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
     pitchDone = true;
     engines.pitch.process(in, out, n, engines.follower.follow(in, n, p.pitchFx, p.follower));
     in = out;
-
-    // The Chatter card cuts from the stage's output, not from the voices Crowd adds to it.
-    if (engines.bloomLead) captureBloomSource(engines, out, n);
   }
   engines.crowd.process(in, out, n, p.crowd, engines.pitch);
 }
@@ -120,36 +117,13 @@ void runStrings(ChainEngines& engines, const float* in, float* out, int n, const
 
 // Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is
 // the word key for the block; the gate's engine keeps its detector live while its own slot is off.
-// Otherwise the card listens to its own input and ignores the state. Its slices come from the chain's
-// tap when runChain made one.
+// Otherwise the card listens to its own input and ignores the state. Its slices and its dry both come
+// from `in`, the block leaving the slot ahead of it.
 void runBloom(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
-  const float* const src = engines.bloomSrcLive ? engines.bloomSrc.data() : in;
-  engines.bloom.process(in, src, out, n, p.bloom, engines.inputGate.open());
-}
-
-bool holdsPitchStage(Card c) {
-  return c == Card::Autotune || c == Card::Octave || c == Card::Formant || c == Card::FormantFollower;
+  engines.bloom.process(in, out, n, p.bloom, engines.inputGate.open());
 }
 
 }  // namespace
-
-void captureBloomSource(ChainEngines& engines, const float* block, int n) {
-  for (int i = 0; i < n; ++i) engines.bloomSrc[static_cast<size_t>(i)] = block[i];
-  engines.bloomSrcLive = true;
-}
-
-BloomTap bloomTap(const Layout& layout) {
-  int bloom = -1;
-  int tap = -1;
-  for (int s = 0; s < kSlotCount; ++s) {
-    const Card c = layout.card[static_cast<size_t>(s)];
-    if (c == Card::Bloom) bloom = s;
-    if (holdsPitchStage(c)) tap = s;
-  }
-  const bool pitchCard = tap >= 0;
-  if (tap < 0) tap = 0;
-  return {bloom > tap ? tap : -1, pitchCard};
-}
 
 void resetEngine(ChainEngines& engines, Engine e) {
   switch (e) {
