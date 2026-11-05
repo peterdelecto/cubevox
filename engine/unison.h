@@ -13,8 +13,9 @@
 // Unison: two copies of the voice, each with a slow LFO wobble on its delay (chorus). DEPTH scales the
 // swing and the wet level together. Over the top of the knob, from topFrom to DEPTH 1, the swing grows by
 // up to topSwingGain and the wet level by up to topWetDb. The wet level follows DEPTH on the 20 ms
-// smoother. The swing and both LFO speeds glide together on 150 ms, so a fast knob move bends the pitch
-// of the copies by a bounded amount and the taps never jump. The dry voice passes at unity at every DEPTH,
+// smoother. The swing, both LFO speeds and the Rate trim glide together on 150 ms, so a fast knob move
+// bends the pitch of the copies by a bounded amount and neither the taps nor the level jump. The Rate trim
+// is a wet gain in dB that fades out over the top of the knob. The dry voice passes at unity at every DEPTH,
 // and the trim scales the wet copies alone. After a reset the wet stays at 0 until the line holds live
 // audio past the farthest tap, and then fades in.
 
@@ -30,6 +31,9 @@ struct UnisonTuning {
   float wetMaxDb = -4.0f;   // per-voice level at DEPTH 1, before the trim
   // Gain on the wet copies alone, so the dry stays at unity; the level row at RATE 50 % and DEPTH 50 % sets it.
   float trimDb = -2.0f;
+  // Extra gain on the wet copies alone, set by the Rate law. It rides the same 150 ms glide as the speeds
+  // and the swing, so a RATE turn never steps the level.
+  float rateTrimDb = 0.0f;
   // Top of the knob (owner 2026-10-30). Both terms are exactly neutral up to topFrom.
   float topFrom = 0.6f;         // DEPTH where the extra reach starts
   float topSwingGain = 1.333f;  // swing multiplier at DEPTH 1, ramped linearly from topFrom
@@ -69,6 +73,7 @@ class Unison {
     lfoPhase_ = {0u, kHalfTurn};
     depth_ = 0.0f;
     swingSmp_ = 0.0f;
+    rateTrim_ = 0.0f;
     writePos_ = 0;
     written_ = 0;
   }
@@ -91,16 +96,18 @@ class Unison {
       hz_ = hzTarget;
       useSpeeds();
       swingSmp_ = swingAt(t, 0.0f);
+      rateTrim_ = rateTrimOf(t);
       passThrough(in, out, n);
       return;
     }
 
     Ramp r = glide(t, target, hzTarget, n);
-    r.wetTop0 = topGain_.of(t.topWetDb * topOver(t, r.depth0));
-    r.wetTop1 = r.depth1 == r.depth0 ? r.wetTop0 : topGain_.of(t.topWetDb * topOver(t, r.depth1));
+    r.wetTop0 = wetTopAt(t, r.depth0, r.trim0);
+    r.wetTop1 = r.depth1 == r.depth0 && r.trim1 == r.trim0 ? r.wetTop0 : wetTopAt(t, r.depth1, r.trim1);
     render(in, out, n, t, r);
     depth_ = r.depth1;
     swingSmp_ = r.swing1;
+    rateTrim_ = r.trim1;
   }
 
  private:
@@ -149,7 +156,8 @@ class Unison {
   struct Ramp {
     float depth0 = 0.0f, depth1 = 0.0f;
     float swing0 = 0.0f, swing1 = 0.0f;
-    float wetTop0 = 1.0f, wetTop1 = 1.0f;
+    float trim0 = 0.0f, trim1 = 0.0f;  // dB
+    float wetTop0 = 1.0f, wetTop1 = 1.0f;  // gain of the top terms and the Rate trim
     bool settled = false;
   };
 
@@ -176,6 +184,15 @@ class Unison {
                   static_cast<float>(kLen));
   }
 
+  // Wet gain from the top terms and the Rate trim at a depth. The trim fades out over the top of the knob,
+  // where the wet is loud enough that the copies' correlation with the dry no longer moves the sum.
+  float wetTopAt(const UnisonTuning& t, float depth, float trimDb) {
+    const float over = topOver(t, depth);
+    return topGain_.of(t.topWetDb * over) * trimGain_.of(trimDb * (1.0f - over));
+  }
+
+  static float rateTrimOf(const UnisonTuning& t) { return clampf(t.rateTrimDb, -kLevelLimitDb, kLevelLimitDb); }
+
   // x after one call of the glide, whose one-pole keeps `decay` of its distance. A swing of 400 samples
   // moves in steps of 3e-5, so the glide would stall up to 0.1 sample short and then snap; landing inside
   // kGlideLand keeps that last step far below the sample.
@@ -192,15 +209,18 @@ class Unison {
     return static_cast<float>(written_) >= reach;
   }
 
-  // Steps the depth on the 20 ms smoother and the swing and the LFO speeds on the 150 ms glide.
+  // Steps the depth on the 20 ms smoother and the swing, the LFO speeds and the Rate trim on the 150 ms glide.
   Ramp glide(const UnisonTuning& t, float target, const std::array<float, 2>& hzTarget, int n) {
     Ramp r;
     r.depth0 = depth_;
     r.swing0 = swingSmp_;
+    r.trim0 = rateTrim_;
     const float swingTarget = swingAt(t, target);
-    r.settled = depth_ == target && swingSmp_ == swingTarget && hz_ == hzTarget;
+    const float trimTarget = rateTrimOf(t);
+    r.settled = depth_ == target && swingSmp_ == swingTarget && hz_ == hzTarget && rateTrim_ == trimTarget;
     r.depth1 = depth_;
     r.swing1 = swingSmp_;
+    r.trim1 = rateTrim_;
     if (r.settled) return r;
     float decay = kGlideKeepBlock;
     if (n == kBlock) {
@@ -210,6 +230,7 @@ class Unison {
       decay = smooth::keep(kGlideSec, n);
     }
     r.swing1 = glideTo(swingSmp_, swingTarget, decay);
+    r.trim1 = glideTo(rateTrim_, trimTarget, decay);
     hz_ = {glideTo(hz_[0], hzTarget[0], decay), glideTo(hz_[1], hzTarget[1], decay)};
     useSpeeds();
     return r;
@@ -348,8 +369,10 @@ class Unison {
   std::array<Rotor, 2> incStep_{};
   GainOf wetMaxGain_;
   GainOf topGain_;
+  GainOf trimGain_;
   float depth_ = 0.0f;
   float swingSmp_ = 0.0f;
+  float rateTrim_ = 0.0f;  // dB, glided toward the tuning's rateTrimDb
   int writePos_ = 0;
   int written_ = 0;
 };

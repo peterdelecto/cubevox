@@ -89,6 +89,7 @@ void cmpUnison(const std::string& p, float pos, const cv::UnisonParams& f, const
   CMP(p, pos, f.tuning, e.tuning, lfoHz[1]);
   CMP(p, pos, f.tuning, e.tuning, swingMinMs);
   CMP(p, pos, f.tuning, e.tuning, swingMaxMs);
+  CMP(p, pos, f.tuning, e.tuning, rateTrimDb);
   if (!rest) return;
   CMP(p, pos, f.tuning, e.tuning, baseDelayMs[0]);
   CMP(p, pos, f.tuning, e.tuning, baseDelayMs[1]);
