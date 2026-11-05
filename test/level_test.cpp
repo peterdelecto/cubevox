@@ -504,10 +504,12 @@ bool echoRows() {
       [](const Signal& padded) { return echoThrough(padded, 1.0f); });
 }
 
-// Unison at RATE 50 % and DEPTH 50 %, where the emulator starts and the wet's trim is tuned. The level moves
-// with RATE, so DEPTH 50 % at RATE 0 and 100 % are reported beside it and not judged.
+// Unison at DEPTH 50 %, judged at RATE 0 %, 50 % and 100 %: the mean of the clips against the rule and each
+// clip against the mid band. RATE 50 % is where the emulator starts and the wet's trim is tuned, and its
+// DEPTH 100 % row is reported beside it and not judged. The Rate law's wet trim holds the top of the RATE
+// knob to the same band.
 bool unisonRows() {
-  const bool ok = wetOnDryRows(
+  bool ok = wetOnDryRows(
       "unison RATE 50 % DEPTH", "50 %", [](const Signal& padded) { return unisonThrough(padded, 0.5f, 0.5f); },
       [](const Signal& padded) { return unisonThrough(padded, 0.5f, 1.0f); });
   for (const float rate : {0.0f, 1.0f}) {
@@ -515,10 +517,14 @@ bool unisonRows() {
     std::snprintf(label, sizeof label, "unison RATE %.0f %% DEPTH 50 %%", static_cast<double>(rate * 100.0f));
     double mean = 0.0;
     int count = 0;
-    clipRows(
+    ok &= clipRows(
         label, [rate](const Signal& padded) { return unisonThrough(padded, rate, 0.5f); }, kMidLoDb, kMidHiDb, mean,
-        count, false);
-    if (count > 0) std::printf("NOTE %-30s %+6.2f dB  (rule %+.1f..%+.1f, not judged)\n", label, mean, kLoDb, kHiDb);
+        count);
+    if (count > 0) {
+      char name[48];
+      std::snprintf(name, sizeof name, "%s mean", label);
+      ok &= verdict(name, mean, kLoDb, kHiDb);
+    }
   }
   return ok;
 }

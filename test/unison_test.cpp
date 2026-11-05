@@ -311,6 +311,55 @@ bool testLevel() {
   return report("level", std::fabs(db - kLevelSineDb) <= 0.05f, "out/in=%.2f dB (%.2f +-0.05)", db, kLevelSineDb);
 }
 
+// The Rate trim scales the wet alone by its dB value up to topFrom, fades out linearly to DEPTH 1, and
+// leaves the dry at unity. Wet RMS ratios are against the same tuning with no trim.
+bool testRateTrim() {
+  constexpr float kTrimDb = -4.5f;
+  const cv::UnisonTuning t;
+  bool ok = true;
+  for (const float depth : {0.3f, 0.6f, 0.8f, 1.0f}) {
+    cv::UnisonParams a = untrimmed(depth);
+    a.tuning.rateTrimDb = kTrimDb;
+    cv::UnisonParams b = a;
+    b.tuning.rateTrimDb = 0.0f;
+    const double ratioDb = 20.0 * std::log10(wetRms(a) / wetRms(b));
+    const double wantDb = static_cast<double>(kTrimDb) * (1.0 - overAt(t, static_cast<double>(depth)));
+    const bool row = std::fabs(ratioDb - wantDb) < 0.01;
+    ok &= row;
+    char name[40];
+    std::snprintf(name, sizeof name, "rate trim %.1f", static_cast<double>(depth));
+    report(name, row, "wet gain %+.3f dB (want %+.3f dB, +-0.01)", ratioDb, wantDb);
+  }
+
+  // A trim that switches on mid-run glides: the output's curvature stays within the larger of the two
+  // steady runs'.
+  const int n = 3 * cv::kSampleRate;
+  const std::vector<float> in = sine(n);
+  cv::UnisonParams off = untrimmed(0.5f);
+  cv::UnisonParams on = off;
+  on.tuning.rateTrimDb = kTrimDb;
+  cv::Unison u;
+  u.reset();
+  const std::vector<float> moved = runSwitch(u, in, off, on, cv::kSampleRate + cv::kSampleRate / 2);
+  u.reset();
+  const std::vector<float> steadyOff = run(u, in, off);
+  u.reset();
+  const std::vector<float> steadyOn = run(u, in, on);
+  const int from = cv::kSampleRate;
+  const double steady = std::max(peakCurvature(steadyOff, from, n), peakCurvature(steadyOn, from, n));
+  const double ratio = peakCurvature(moved, from, n) / steady;
+  ok &= report("rate trim glide", ratio < 1.02, "curvature x%.4f of the steady runs (< 1.02)", ratio);
+
+  // The dry stays at unity with the trim at its full value.
+  std::vector<float> imp(static_cast<size_t>(cv::kSampleRate + cv::kSampleRate / 2), 0.0f);
+  imp[static_cast<size_t>(cv::kSampleRate)] = 1.0f;
+  u.reset();
+  const std::vector<float> dry = run(u, imp, on);
+  ok &= report("rate trim dry", dry[static_cast<size_t>(cv::kSampleRate)] == 1.0f, "dry sample %.4f (1.0000)",
+               static_cast<double>(dry[static_cast<size_t>(cv::kSampleRate)]));
+  return ok;
+}
+
 // The dry voice passes at unity at every DEPTH, trim included. A lone impulse after a silent second
 // reads the dry gain before any wet copy returns, since the nearest tap sits well behind it.
 bool testDry() {
@@ -588,6 +637,7 @@ int main() {
   ok &= testTopSwing();
   ok &= testTopWet();
   ok &= testLevel();
+  ok &= testRateTrim();
   ok &= testDry();
   ok &= testNoAlloc();
   ok &= testLfoAnalytic();
