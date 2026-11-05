@@ -10,12 +10,15 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Clips shipped in samples/, one file name per line, each taken from the repo's
-# samples/ folder. The emulator opens adam_vox_sample3_5s.wav on its own; Adam
-# reaches the others through File > Open (Cmd-O).
+# Clips shipped in samples/ as they are, one path per line. The emulator opens
+# adam_vox_sample3_5s.wav on its own; Adam reaches the others through
+# File > Open (Cmd-O).
 sample_dir="$root/samples"
 samples=(
-  "adam_vox_sample3_5s.wav"
+  "$sample_dir/adam_vox_sample3_5s.wav"
+  "$HOME/Music/samples/Ambition Electric Piano - 80.wav"
+  "$HOME/Music/samples/cw_amen02_165.wav"
+  "$HOME/Music/samples/brokenglass.mp3"
 )
 
 # The headless check also opens this clip. It joins the unpacked copy under
@@ -28,8 +31,8 @@ stage="$root/dist/$name"
 zip="$root/dist/cubevox-emulator.zip"
 target="11.0"  # the file menu uses UTType, which starts at macOS 11
 
-for s in "${samples[@]}" "$check_clip"; do
-  [[ -f "$sample_dir/$s" ]] || { echo "[ERROR] missing $sample_dir/$s" >&2; exit 1; }
+for s in "${samples[@]}" "$sample_dir/$check_clip"; do
+  [[ -f "$s" ]] || { echo "[ERROR] missing $s" >&2; exit 1; }
 done
 
 cmake -S "$root" -B "$build" -DCMAKE_BUILD_TYPE=Release -DCUBEVOX_BUNDLE_GLFW=ON \
@@ -39,7 +42,7 @@ cmake --build "$build" --target "$exe" -j >/dev/null
 rm -rf "$root/dist"
 mkdir -p "$stage/samples"
 ditto "$build/$exe.app" "$stage/$name.app"
-for s in "${samples[@]}"; do cp "$sample_dir/$s" "$stage/samples/"; done
+for s in "${samples[@]}"; do cp "$s" "$stage/samples/"; done
 codesign --force --deep --sign - "$stage/$name.app"
 
 # The app must not reach outside the system for libraries: no links, no
