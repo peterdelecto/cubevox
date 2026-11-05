@@ -1,7 +1,9 @@
-// Ring mod card checks: off is a bit-exact copy, the carrier sits at RATIO times the tracked pitch of a
-// 220 Hz tone (read from the card and from the output's spectrum), it rests at 220 Hz times RATIO before the
-// first voiced frame and holds through unvoiced frames, the output stays finite at every knob corner, and
-// the level at the defaults (RATIO 1.5, MIX 50 %) on Adam's clips. Each run feeds a PitchFx first, so the
+// Ring mod card checks: off is a bit-exact copy, the carrier sits at RATIO times the note nearest the tracked
+// pitch (read from the card and from the output's spectrum), vibrato of 0.4 semitone leaves it still, a note
+// step moves it in the block the tracker reports it, a keyed card never lands on a note outside the scale, it
+// rests at 220 Hz times RATIO before the first voiced frame and holds through unvoiced frames, the output
+// stays finite at every knob corner, and the level at the defaults (RATIO 1.5, MIX 50 %) on Adam's clips.
+// Each run feeds a PitchFx first, so the
 // tracker runs as the chain runs it. `ringmod_test --bench` prints the default card's cost. The clip rows
 // skip when samples/ is absent. No window, no audio device.
 
@@ -11,6 +13,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -37,6 +40,10 @@ struct Rig {
   std::unique_ptr<cv::PitchFx> pitch = std::make_unique<cv::PitchFx>();
   std::unique_ptr<cv::RingMod> mod = std::make_unique<cv::RingMod>();
   float carrierHz = 0.0f;  // after the last block
+  int key = -1;            // the Autotune KEY index the card sits on, or -1 for every semitone
+
+  // Called after each block with the block's first sample, the tracker and the carrier's frequency.
+  std::function<void(size_t, const cv::PitchFx&, float)> each;
 
   template <typename ParamsAt>
   Signal run(const Signal& in, ParamsAt at) {
@@ -47,8 +54,9 @@ struct Rig {
       cv::PitchFxParams pp;
       pp.ringModOn = p.on;
       pitch->process(&in[i], &out[i], n, pp);
-      mod->process(&out[i], &out[i], n, p, *pitch);
+      mod->process(&out[i], &out[i], n, p, *pitch, key);
       carrierHz = mod->carrierHz();
+      if (each) each(i, *pitch, carrierHz);
     }
     return out;
   }
@@ -82,7 +90,38 @@ Signal tone(double hz, double seconds, double dbfs) {
   return x;
 }
 
+// The same harmonic tone with its pitch swung `depthSemis` either side of `hz` at `lfoHz`.
+Signal vibrato(double hz, double seconds, double dbfs, double depthSemis, double lfoHz) {
+  const size_t n = static_cast<size_t>(seconds * kRate);
+  Signal x(n);
+  double sum = 0.0;
+  double ph = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    const double t = static_cast<double>(i) / kRate;
+    const double f = hz * std::pow(2.0, depthSemis * std::sin(2.0 * kPi * lfoHz * t) / 12.0);
+    ph += 2.0 * kPi * f / kRate;
+    double v = 0.0;
+    for (int k = 1; k * hz < 5000.0; ++k) v += std::sin(k * ph) / k;
+    x[i] = static_cast<float>(v);
+    sum += v * v;
+  }
+  const double g = std::pow(10.0, dbfs / 20.0) / std::sqrt(sum / static_cast<double>(n));
+  for (float& v : x) v = static_cast<float>(v * g);
+  return x;
+}
+
 double rms(const Signal& x, size_t from, size_t to) { return testutil::rmsOf(x, from, to); }
+
+// The tracker's pitch in MIDI semitones, or -1 on an unvoiced frame.
+float trackedMidi(const cv::PitchFx& pitch) {
+  const cv::PitchResult& pr = pitch.pitch();
+  if (!pr.voiced || pr.period <= 0.0f) return -1.0f;
+  return cv::midiOf(cv::kSampleRate / cv::PitchTracker::clampPeriod(pr.period));
+}
+
+constexpr float kA3Hz = 220.0f;
+constexpr float kC4Hz = 261.6256f;
+constexpr float kD4Hz = 293.6648f;
 
 bool checkOff() {
   const Signal in = tone(220.0, 2.0, -20.0);
@@ -128,6 +167,69 @@ bool checkCarrier() {
   return report("carrier is RATIO x pitch", ok, detail);
 }
 
+// A tone at 261.6 Hz, unkeyed, RATIO X1: the carrier sits on C4 to 0.01 Hz.
+bool checkNote() {
+  Rig rig;
+  rig.run(tone(kC4Hz, 1.0, -20.0), modAt(1.0f, 1.0f));
+  const double err = std::fabs(static_cast<double>(rig.carrierHz) - kC4Hz);
+  char detail[96];
+  std::snprintf(detail, sizeof detail, "carrier %.3f Hz for a 261.6 Hz tone (261.626 +- 0.01)", static_cast<double>(rig.carrierHz));
+  return report("carrier is the nearest note", err < 0.01, detail);
+}
+
+// Vibrato of 0.4 semitone at 5 Hz around A3 leaves the carrier on 220 Hz for the whole second.
+bool checkVibrato() {
+  Rig rig;
+  double worst = 0.0;
+  rig.each = [&worst](size_t, const cv::PitchFx&, float hz) {
+    worst = std::fmax(worst, std::fabs(static_cast<double>(hz) - kA3Hz));
+  };
+  rig.run(vibrato(kA3Hz, 1.0, -20.0, 0.4, 5.0), modAt(1.0f, 1.0f));
+  char detail[96];
+  std::snprintf(detail, sizeof detail, "largest carrier move %.3f Hz over 1 s (0.01)", worst);
+  return report("vibrato leaves it still", worst < 0.01, detail);
+}
+
+// A step from A3 to C4: the carrier is on C4 by the first block in which the tracker reports C4.
+bool checkStep() {
+  Signal in = tone(kA3Hz, 0.5, -20.0);
+  const Signal next = tone(kC4Hz, 0.5, -20.0);
+  in.insert(in.end(), next.begin(), next.end());
+  const size_t stepAt = in.size() / 2;
+  Rig rig;
+  long trackerBlock = -1;
+  long carrierBlock = -1;
+  rig.each = [&](size_t i, const cv::PitchFx& pitch, float hz) {
+    const long block = static_cast<long>(i / cv::kBlock);
+    const float m = trackedMidi(pitch);
+    if (i >= stepAt && trackerBlock < 0 && std::fabs(m - 60.0f) < 0.1f) trackerBlock = block;
+    if (i >= stepAt && carrierBlock < 0 && std::fabs(hz - kC4Hz) < 0.01f) carrierBlock = block;
+  };
+  rig.run(in, modAt(1.0f, 1.0f));
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "tracker reports C4 in block %ld, carrier on C4 in block %ld (carrier no later)",
+                trackerBlock, carrierBlock);
+  return report("a note step jumps at once", trackerBlock >= 0 && carrierBlock >= 0 && carrierBlock <= trackerBlock, detail);
+}
+
+// Keyed to C major, a sung C#4 sits on C4 or D4, never on C#4.
+bool checkKeyed() {
+  const float cSharp = 277.1826f;
+  Rig rig;
+  rig.key = 0;
+  float nearest = 1e9f;
+  rig.each = [&nearest, cSharp](size_t i, const cv::PitchFx&, float hz) {
+    if (i >= static_cast<size_t>(kRate / 10)) nearest = std::fmin(nearest, std::fabs(hz - cSharp));
+  };
+  rig.run(tone(cSharp, 1.0, -20.0), modAt(1.0f, 1.0f));
+  const bool onScale = std::fabs(rig.carrierHz - kC4Hz) < 0.01f || std::fabs(rig.carrierHz - kD4Hz) < 0.01f;
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "carrier %.2f Hz (C4 %.2f or D4 %.2f); closest it came to C#4: %.1f Hz away",
+                static_cast<double>(rig.carrierHz), static_cast<double>(kC4Hz), static_cast<double>(kD4Hz),
+                static_cast<double>(nearest));
+  return report("keyed card stays in the scale", onScale && nearest > 1.0f, detail);
+}
+
 // Silence has no pitch, so the carrier rests at 220 Hz times RATIO. After a voiced note it keeps that note's
 // frequency through noise, which the tracker calls unvoiced.
 bool checkRestAndHold() {
@@ -161,18 +263,21 @@ bool checkFinite() {
   const Signal silence(static_cast<size_t>(kRate), 0.0f);
   bool ok = true;
   float peak = 0.0f;
-  for (const float ratio : {0.5f, 4.0f}) {
-    for (const float mix : {0.0f, 1.0f}) {
-      for (const Signal* in : {&note, &noise, &silence}) {
-        Rig rig;
-        const Signal out = rig.run(*in, modAt(ratio, mix));
-        ok = ok && allFinite(out);
-        peak = std::fmax(peak, testutil::peakOf(out));
+  for (const int key : {-1, 0}) {
+    for (const float ratio : {0.5f, 4.0f}) {
+      for (const float mix : {0.0f, 1.0f}) {
+        for (const Signal* in : {&note, &noise, &silence}) {
+          Rig rig;
+          rig.key = key;
+          const Signal out = rig.run(*in, modAt(ratio, mix));
+          ok = ok && allFinite(out);
+          peak = std::fmax(peak, testutil::peakOf(out));
+        }
       }
     }
   }
-  char detail[96];
-  std::snprintf(detail, sizeof detail, "ratios 0.5 and 4, MIX 0 and 100 %%, note, noise, silence; peak %.2f (< 2)",
+  char detail[128];
+  std::snprintf(detail, sizeof detail, "ratios 0.5 and 4, MIX 0 and 100 %%, unkeyed and keyed, note, noise, silence; peak %.2f (< 2)",
                 static_cast<double>(peak));
   return report("finite at the corners", ok && peak < 2.0f, detail);
 }
@@ -229,7 +334,7 @@ int bench() {
       for (size_t i = 0; i + cv::kBlock <= padded.size(); i += cv::kBlock) {
         rig.pitch->process(&padded[i], &out[i], cv::kBlock, pp);
         const auto t0 = std::chrono::steady_clock::now();
-        rig.mod->process(&out[i], &out[i], cv::kBlock, p, *rig.pitch);
+        rig.mod->process(&out[i], &out[i], cv::kBlock, p, *rig.pitch, -1);
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - t0).count();
         spent += ns;
         slowest = std::fmax(slowest, ns);
@@ -250,6 +355,10 @@ int main(int argc, char** argv) {
   bool ok = true;
   ok &= checkOff();
   ok &= checkCarrier();
+  ok &= checkNote();
+  ok &= checkVibrato();
+  ok &= checkStep();
+  ok &= checkKeyed();
   ok &= checkRestAndHold();
   ok &= checkFinite();
   ok &= checkLevel();
