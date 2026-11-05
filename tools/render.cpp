@@ -115,7 +115,7 @@ int usage() {
                "  its own input, which is also its dry path\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
-               "  VOX EQ's front half (de-esser, and with cuts the 70 Hz high-pass and 6 kHz low-pass) runs ahead of every\n"
+               "  VOX EQ's front half (40 Hz subsonic high-pass, de-esser, and with cuts the 70 Hz high-pass and 6 kHz low-pass) runs ahead of every\n"
                "  stage and its back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp\n"
                "  comp and eq run by default, the comp at its firm tuning and the eq at cuts (the box's menu default is off)\n"
                "  --polish-comp off and --vox-eq off\n"

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Autonomous CPU stress run for a cubevox box on a clip bench image. Nobody touches the panel.
 
-For each layout the script puts the layout on the box, forces every slot on (bench all_on), plays
+For each layout the script puts the layout on the box with VOX EQ set to ON+CUTS, its heaviest setting
+(set_layout carries settings.vox_eq "cuts"; the shipped default is off, where the stage's bucket reads
+near zero and its gate would measure nothing), forces every slot on (bench all_on), plays
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
 to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper knob), Formant MIX
@@ -14,7 +16,8 @@ knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counte
 It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia and Deepthroat
 slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
 POLISH COMP and VOX EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
-as it found it) and reads the counters once more.
+as it found it) and reads the counters once more. The VOX EQ flips force the stage off and back on
+from ON+CUTS.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
@@ -27,7 +30,7 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-  4. each layout's VOX EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
+  4. each layout's VOX EQ (at ON+CUTS) and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
 Each card's slot is held to its own row. A slot that runs a tracker adds the tracker row: Autotune's slot,
@@ -35,14 +38,14 @@ a Formant or Apraxia slot that does not sit directly behind Autotune, and a Mob 
 Autotune ahead of it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
---dry-run prints the layouts, the sweeps, the toggle flips and the fixed-stage flips planned for each,
-with the time they take, and opens no port.
+--dry-run prints the layouts, the VOX EQ setting step, the sweeps, the toggle flips and the fixed-stage
+flips planned for each, with the time they take, and opens no port.
 
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
 slot), apraxia (Apraxia in Octave's slot), throat (Deepthroat in Distortion's slot) and heaviest (Input gate, Formant, Unison and
-Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
+Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout and VOX EQ setting are read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
 
@@ -92,6 +95,10 @@ FIXED_LEVERS = (
     ("polish_comp", "POLISH COMP", "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu"),
     ("polish_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
 )
+# The words of the protocol's vox_eq setting, and the one every layout runs at: ON+CUTS is the heaviest
+# setting, and at the shipped default (off) the VOX EQ bucket reads near zero and gates nothing.
+VOX_EQ_WORDS = ("off", "on", "cuts")
+STRESS_VOX_EQ = "cuts"
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
@@ -372,15 +379,20 @@ class Box:
                 self.flip_lever(op)
 
     def get_layout(self):
+        """(name, slots, VOX EQ setting word) of the box's saved state."""
         reply = self.ask("get_layout")
         layout = reply.get("layout")
         if reply.get("ok") is not True or not isinstance(layout, dict) or "slots" not in layout:
             raise StressError(f"get_layout: {str(reply)[:160]}")
-        return layout["name"], layout["slots"]
+        settings = reply.get("settings")
+        vox_eq = settings.get("vox_eq") if isinstance(settings, dict) else None
+        if vox_eq not in VOX_EQ_WORDS:
+            raise StressError(f"get_layout: no vox_eq setting in the reply: {str(reply)[:160]}")
+        return layout["name"], layout["slots"], vox_eq
 
-    def set_layout(self, name, slots):
-        """None on success, else the box's reason for refusing."""
-        reply = self.ask("set_layout", name=name, slots=slots)
+    def set_layout(self, name, slots, vox_eq):
+        """Puts the layout and the VOX EQ setting on the box. None on success, else the box's reason for refusing."""
+        reply = self.ask("set_layout", name=name, slots=slots, settings={"vox_eq": vox_eq})
         if reply.get("ok") is True:
             self.wait(SETTLE_S)
             return None
@@ -555,7 +567,7 @@ def run_layout(box, name, slots, chasm, runs, seconds):
     result = {"name": name, "slots": slots, "chasm": chasm}
     done = []
     try:
-        refusal = box.set_layout(f"stress {name}", slots)
+        refusal = box.set_layout(f"stress {name}", slots, STRESS_VOX_EQ)
         if refusal:
             result["refused"] = refusal
             return result
@@ -738,7 +750,7 @@ def preflight(box):
     return hello
 
 
-def restore(port, box, name, slots):
+def restore(port, box, name, slots, vox_eq):
     """Puts the box back as it was and returns the steps that failed. A lost port gets one reopen."""
     try:
         box.ask("hello")
@@ -760,7 +772,7 @@ def restore(port, box, name, slots):
         ("fixed-stage flags", box.clear_levers),
         ("clip off", lambda: box.set_clip(False)),
         ("reverb engine", lambda: restore_chasm(box)),
-        ("saved layout", lambda: restore_layout(box, name, slots)),
+        ("saved layout and VOX EQ", lambda: restore_layout(box, name, slots, vox_eq)),
     ]
     for label, step in steps:
         try:
@@ -779,12 +791,12 @@ def restore_chasm(box):
     box.set_chasm(box.start_chasm)
 
 
-def restore_layout(box, name, slots):
+def restore_layout(box, name, slots, vox_eq):
     if name is None:
         return
-    if box.get_layout() == (name, slots):
+    if box.get_layout() == (name, slots, vox_eq):
         return
-    refusal = box.set_layout(name, slots)
+    refusal = box.set_layout(name, slots, vox_eq)
     if refusal:
         raise StressError(f"the box refused the saved layout: {refusal}")
 
@@ -797,6 +809,7 @@ def plan_lines(name, slots, chasm, runs, seconds, rows):
     for i, (card, bound) in enumerate(zip(slots, bounds)):
         if bound is not None:
             out.append(f"  bound: slot {i + 1} {card}{'*' if i in trackers else ''} mean {bound[0]} %, worst {bound[1]} %")
+    out.append(f'  setting: VOX EQ at ON+CUTS (vox_eq "{STRESS_VOX_EQ}") for the whole run; the box\'s own setting goes back after')
     out.append(f"  pass 1: knobs at top, {seconds:g} s")
     for sweep in sweeps(slots):
         extra = f", partner knob {sweep.partner} stepped inside the glide" if sweep.partner else ""
@@ -843,7 +856,7 @@ def main():
     if a.dry_run:
         return dry_run(wanted, a.runs, a.seconds)
 
-    box = start_name = start_slots = hello = None
+    box = start_name = start_slots = start_vox_eq = hello = None
     results, failed_restore, code = [], [], 1
     try:
         rows = read_rows()
@@ -852,8 +865,8 @@ def main():
             flash(a.clip, a.port)
         box = open_box(a.port, PORT_WAIT_S)
         hello = preflight(box)
-        start_name, start_slots = box.get_layout()
-        say(f"box fw {hello.get('fw')}, saved layout {start_name!r}: {' '.join(start_slots)}")
+        start_name, start_slots, start_vox_eq = box.get_layout()
+        say(f"box fw {hello.get('fw')}, saved layout {start_name!r}: {' '.join(start_slots)}, VOX EQ {start_vox_eq}")
         for name in wanted:
             slots, chasm = table[name]
             result = run_layout(box, name, slots, chasm, a.runs, a.seconds)
@@ -871,7 +884,7 @@ def main():
         print("[ERROR] interrupted", file=sys.stderr)
     finally:
         if box is not None and box.armed:
-            failed_restore = restore(a.port, box, start_name, start_slots)
+            failed_restore = restore(a.port, box, start_name, start_slots, start_vox_eq)
         for step in failed_restore:
             print(f"[ERROR] restore failed: {step}", file=sys.stderr)
         if box is not None:
