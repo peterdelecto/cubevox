@@ -4,6 +4,7 @@
   inlay_export.py C12     circles from candidates_c.c12_circle_list
   inlay_export.py G5      circles from candidates_g.g5_circle_list
   inlay_export.py N5a     polygons traced from candidates_n.n5a_triaxial
+  inlay_export.py cane    weave.py's exact strand polygons, cut to the face rules (cane_polygons.py)
   inlay_export.py <stem>  polygons traced from build/cane/art/<stem>.npy (art_inlay.py)
 
 Lid coordinates: x = u + FACE[0], y = FACE[3] - v. Circles are [x, y, r]. Polygons
@@ -20,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
 
-from candidates_b import ALLOWED, ALLOWED_TO_EDGES, FACE, FIELD, HOLES, OLED, ROOT, S
+from candidates_b import (ALLOWED, ALLOWED_TO_EDGES, FACE, FIELD, FIELD_CENTRES,
+                          FIELD_CORNER_R, HOLES, OLED, ROOT, S)
 
 OUT_DIR = ROOT / 'build' / 'cane'
 
@@ -170,6 +172,21 @@ def inside(pt, poly):
   return bool(np.count_nonzero(cross & (x < xi)) % 2)
 
 
+def clamp_to_field(mm):
+  """Pixel-edge vertices at a field corner can sit up to half a pixel outside the
+  arc. Pull each one back onto the arc, just inside, so none lies beyond the field."""
+  mm = mm.copy()
+  mx, my = (FIELD[0] + FIELD[2]) / 2, (FIELD[1] + FIELD[3]) / 2
+  for cx, cy in FIELD_CENTRES:
+    sx, sy = (1 if cx > mx else -1), (1 if cy > my else -1)
+    dx, dy = mm[:, 0] - cx, mm[:, 1] - cy
+    out = (dx * sx > 0) & (dy * sy > 0) & (np.hypot(dx, dy) > FIELD_CORNER_R - 1e-4)
+    scale = (FIELD_CORNER_R - 1e-4) / np.hypot(dx[out], dy[out])
+    mm[out, 0] = cx + dx[out] * scale
+    mm[out, 1] = cy + dy[out] * scale
+  return mm
+
+
 def polygons_doc(mask, simplify=SIMPLIFY_MM, min_loop=MIN_LOOP_MM2):
   loops, saddles = trace(mask)
 
@@ -178,7 +195,7 @@ def polygons_doc(mask, simplify=SIMPLIFY_MM, min_loop=MIN_LOOP_MM2):
   lid = []
   for pts in loops:
     mm = np.column_stack([(pts[:, 0] + 0.5) / S + FACE[0], FACE[3] - (pts[:, 1] + 0.5) / S])
-    mm = dp_closed(mm, simplify)
+    mm = clamp_to_field(dp_closed(mm, simplify))
     a = signed_area(mm)
     if abs(a) >= min_loop and len(mm) >= 3:
       lid.append((mm, a))
@@ -207,7 +224,7 @@ def polygons_doc(mask, simplify=SIMPLIFY_MM, min_loop=MIN_LOOP_MM2):
            for k, (om, _) in enumerate(outers)]
   area = sum(a for _, a in outers) + sum(a for _, a in holes)
   doc = {'units': 'mm', 'kind': 'polygons', 'face': [float(x) for x in FACE],
-         'field': list(FIELD), 'face_holes': [list(h) for h in HOLES], 'window': list(OLED),
+         'field': list(FIELD), 'field_corner_r': FIELD_CORNER_R, 'face_holes': [list(h) for h in HOLES], 'window': list(OLED),
          'simplify_mm': simplify, 'min_loop_mm2': min_loop,
          'count': len(polys), 'area': round(area, 3), 'polygons': polys}
   stats = {'loops': len(loops), 'saddles': saddles, 'holes': len(holes),
@@ -244,6 +261,11 @@ def export(name, out=None, simplify=SIMPLIFY_MM, min_loop=MIN_LOOP_MM2):
   if uvr is not None:
     doc = circles_doc(uvr)
     circle_report(doc)
+  elif key == 'cane':
+    from cane_polygons import cane_doc
+    doc, stats = cane_doc()
+    print(f"pieces {doc['count']}, points {stats['points']}, area {doc['area']:.2f} mm2, "
+          f"narrowest {stats['narrowest']:.3f} mm")
   else:
     mask = polygon_source(key)
     if mask is None:

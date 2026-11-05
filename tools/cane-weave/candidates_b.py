@@ -26,6 +26,8 @@ OUT = ROOT / 'build' / 'cane' / 'candidates'
 
 FACE = (-3.5, -148.5, 188.5, 3.5)
 FIELD = (-0.5, -145.5, 185.5, 0.5)
+FIELD_CORNER_R = 3.5     # the field's corners follow the lid's: arcs of this radius on these centres
+FIELD_CENTRES = ((3.0, -3.0), (182.0, -3.0), (3.0, -142.0), (182.0, -142.0))
 HOLES = ([(8.5 + 24 * i, -85.0, 6.25) for i in range(8)]
          + [(8.5 + 24 * i, -108.5, 8.8) for i in range(8)]
          + [(8.5 + 24 * i, -134.5, 8.8) for i in range(8)]
@@ -59,6 +61,11 @@ def face_masks(clear=CLEAR):
   u0, v0 = to_uv(FIELD[0], FIELD[3])
   u1, v1 = to_uv(FIELD[2], FIELD[1])
   allowed = (U >= u0) & (U <= u1) & (V >= v0) & (V <= v1)
+  for cx, cy in FIELD_CENTRES:
+    cu, cv = to_uv(cx, cy)
+    out_u = (U > cu) if cx > (FIELD[0] + FIELD[2]) / 2 else (U < cu)
+    out_v = (V > cv) if cy < (FIELD[1] + FIELD[3]) / 2 else (V < cv)
+    allowed &= ~(out_u & out_v & ((U - cu) ** 2 + (V - cv) ** 2 > FIELD_CORNER_R ** 2))
   void = np.zeros(U.shape, bool)
   for x, y, dia in HOLES:
     hu, hv = to_uv(x, y)
