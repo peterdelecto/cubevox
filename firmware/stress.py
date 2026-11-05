@@ -44,7 +44,7 @@ Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slo
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
 slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ring mod in
-Distortion's slot), sympath (Sympath in the reverb slot) and heaviest (Input gate, Formant, Unison and
+Distortion's slot), tracker (Ring mod in Distortion's slot with Autotune's and Octave's slots empty), sympath (Sympath in the reverb slot) and heaviest (Input gate, Formant, Unison and
 Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
@@ -100,7 +100,7 @@ REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "yawn", "throat", "ringmod", "sympath", "heaviest")
+                "chatter", "lofi", "yawn", "throat", "ringmod", "tracker", "sympath", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -215,12 +215,15 @@ def layout_table():
     yawn = ["formant_follow" if c == "octave" else c for c in base]
     throat = ["growl" if c == "distortion" else c for c in base]
     ringmod = ["ringmod" if c == "distortion" else c for c in base]
+    # Ring mod alone times the tracker in its own slot, which the ringmod layout hides behind Autotune's.
+    tracker = ["empty" if c in ("autotune", "octave") else ("ringmod" if c == "distortion" else c) for c in base]
     sympath = ["strings" if c.startswith("reverb_") else c for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
             "chatter": (chatter, False), "lofi": (lofi, False), "yawn": (yawn, False), "throat": (throat, False),
-            "ringmod": (ringmod, False), "sympath": (sympath, False), "heaviest": (heaviest, True)}
+            "ringmod": (ringmod, False), "tracker": (tracker, False), "sympath": (sympath, False),
+            "heaviest": (heaviest, True)}
 
 
 def slot_bounds(slots, chasm, rows):
