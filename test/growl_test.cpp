@@ -2,7 +2,8 @@
 // a pitch, the throat follows each syllable and rests in silence, MIX 100 % is the plain card and MIX 0 is
 // the input at the voice's lag, the output stays finite at every knob corner, the level at the default
 // (GROWL 75 %, MIX 100 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. GROWL 0
-// is pinned by hash, the peak reads +6 dB at 2.5 kHz at GROWL 100 %, the jitter repeats from reset, the wet
+// is pinned by hash, the peak reads +10 dB at 2.5 kHz at GROWL 100 %, the lopsided clip lifts the fold's 2nd
+// harmonic and leaves no DC, the jitter repeats from reset, the wet
 // path's high-pass cuts 55 Hz by 10.7 dB, the throat drop leaves the heard pitch within 0.1 st, and an onset
 // leaves the pitch ratio, rasp rate and read lag alone. Each run feeds a
 // PitchFx first, so the ring is written and the tracker runs, as the chain does. The clip rows skip
@@ -425,7 +426,7 @@ bool checkAlias() {
   cv::growl_detail::Fold fold;
   fold.setTuning(cv::GrowlTuning{});
   const cv::growl_detail::FoldGains gains = fold.gainsAt(1.0f);
-  for (size_t i = 0; i < total; i += cv::kBlock) fold.run(&x[i], cv::kBlock, gains, cv::growl_detail::FoldGains{0, 0, 0, 0});
+  for (size_t i = 0; i < total; i += cv::kBlock) fold.run(&x[i], cv::kBlock, gains, cv::growl_detail::FoldGains{0, 0, 0, 0, 0});
 
   std::vector<std::complex<double>> spec(kN);
   for (size_t i = 0; i < kN; ++i) spec[i] = x[total - kN + i];
@@ -462,7 +463,7 @@ uint64_t hashOf(const Signal& x) {
   return h;
 }
 
-constexpr uint64_t kFullMixHash = 0x72ba40cd5abcf51full;
+constexpr uint64_t kFullMixHash = 0xb8eb247856ccb92bull;
 
 // MIX at its default 100 % is the plain card. The hash is the output on a sung note at GROWL 0.80 and
 // DRIVE 0.65, and it moves with any change to the voice, the rasp or the fold.
@@ -662,6 +663,7 @@ double foldGainDb(double hz, float drive) {
   cv::GrowlTuning t;
   t.lowShelfDb = 0.0f;
   t.driveDb = 0.0f;
+  t.snarlTrimDb = 0.0f;
   cv::growl_detail::Fold fold;
   fold.setTuning(t);
   const cv::growl_detail::FoldGains gains = fold.gainsAt(drive);
@@ -669,7 +671,7 @@ double foldGainDb(double hz, float drive) {
   Signal x(total);
   for (size_t i = 0; i < total; ++i) x[i] = static_cast<float>(0.05 * std::sin(2.0 * kPi * hz * static_cast<double>(i) / kRate));
   const Signal ref = x;
-  for (size_t i = 0; i < total; i += cv::kBlock) fold.run(&x[i], cv::kBlock, gains, cv::growl_detail::FoldGains{0, 0, 0, 0});
+  for (size_t i = 0; i < total; i += cv::kBlock) fold.run(&x[i], cv::kBlock, gains, cv::growl_detail::FoldGains{0, 0, 0, 0, 0});
   const size_t from = total / 2;
   return 20.0 * std::log10(rms(x, from, total) / rms(ref, from, total));
 }
@@ -681,15 +683,66 @@ bool checkPeak() {
   const double low = foldGainDb(625.0, cv::kGrowlDriveTop);
   const double high = foldGainDb(10000.0, cv::kGrowlDriveTop);
   char detail[160];
-  std::snprintf(detail, sizeof detail, "2.5 kHz: %+.2f dB at GROWL 100 %% (+6), %+.2f at 50 %% (+3), %+.2f at 0 (0); 625 Hz %+.2f, 10 kHz %+.2f (< 1)",
+  std::snprintf(detail, sizeof detail, "2.5 kHz: %+.2f dB at GROWL 100 %% (+10), %+.2f at 50 %% (+5), %+.2f at 0 (0); 625 Hz %+.2f, 10 kHz %+.2f (< 1)",
                 full, half, none, low, high);
-  const bool ok = std::fabs(full - 6.0) < 0.5 && std::fabs(half - 3.0) < 0.5 && std::fabs(none) < 0.01 &&
+  const bool ok = std::fabs(full - 10.0) < 0.5 && std::fabs(half - 5.0) < 0.5 && std::fabs(none) < 0.01 &&
                   std::fabs(low) < 1.0 && std::fabs(high) < 1.0;
   return report("bite peak gain", ok, detail);
 }
 
+// The lopsided clip: a 220 Hz sine at -14 dBFS peak through the fold at GROWL 100 % puts its 2nd harmonic at
+// least 10 dB over the same run with biasTop 0, and the fold's output carries no DC (mean under 1e-4). The
+// bias is 0 at GROWL 0, a quarter of the top at GROWL 50 % and the top at 100 %, and the whole card at
+// GROWL 100 % leaves no DC either.
+struct BiasRun {
+  double h2;
+  double mean;
+};
+
+BiasRun biasRun(float biasTop, double amp) {
+  cv::GrowlTuning t;
+  t.biasTop = biasTop;
+  cv::growl_detail::Fold fold;
+  fold.setTuning(t);
+  const cv::growl_detail::FoldGains gains = fold.gainsAt(cv::kGrowlDriveTop);
+  const size_t total = 3 * static_cast<size_t>(kRate);
+  Signal x(total);
+  for (size_t i = 0; i < total; ++i) x[i] = static_cast<float>(amp * std::sin(2.0 * kPi * 220.0 * static_cast<double>(i) / kRate));
+  for (size_t i = 0; i < total; i += cv::kBlock) fold.run(&x[i], cv::kBlock, gains, cv::growl_detail::FoldGains{0, 0, 0, 0, 0});
+  const size_t from = total - static_cast<size_t>(kRate);
+  double sum = 0.0;
+  for (size_t i = from; i < total; ++i) sum += x[i];
+  return {toneAmp(x, 440.0, from, total), sum / kRate};
+}
+
+bool checkBias() {
+  constexpr double kAmp = 0.2;  // -14 dBFS peak, which the fold's input gain drives well into the rail
+  const BiasRun on = biasRun(0.25f, kAmp);
+  const BiasRun off = biasRun(0.0f, kAmp);
+  const double rise = 20.0 * std::log10(on.h2 / off.h2);
+  cv::growl_detail::Fold fold;
+  fold.setTuning(cv::GrowlTuning{});
+  const float b0 = fold.gainsAt(0.0f).bias;
+  const float bHalf = fold.gainsAt(0.5f * cv::kGrowlDriveTop).bias;
+  const float bTop = fold.gainsAt(cv::kGrowlDriveTop).bias;
+
+  const Signal in = sungNote(220.0, 3.0, -20.0);
+  Rig rig;
+  const Signal out = rig.run(in, potAt(1.0f, 1.0f));
+  double cardMean = 0.0;
+  for (size_t i = out.size() - kRate; i < out.size(); ++i) cardMean += out[i];
+  cardMean /= kRate;
+
+  char detail[200];
+  std::snprintf(detail, sizeof detail, "2nd harmonic +%.1f dB over no bias (>= 10), mean %.1e fold and %.1e card (< 1e-4), bias %.4f / %.4f / %.4f at GROWL 0 / 50 / 100 %% (0 / 0.0625 / 0.25)",
+                rise, on.mean, cardMean, static_cast<double>(b0), static_cast<double>(bHalf), static_cast<double>(bTop));
+  const bool ok = rise >= 10.0 && std::fabs(on.mean) < 1e-4 && std::fabs(cardMean) < 1e-4 && b0 == 0.0f &&
+                  std::fabs(bHalf - 0.0625f) < 1e-6f && std::fabs(bTop - 0.25f) < 1e-6f;
+  return report("lopsided clip", ok, detail);
+}
+
 // Two runs from reset are bit for bit the same, so the jitter repeats. The jitter is on: the output differs
-// from a run with jitterTop 0. It reads 0.35 at GROWL 100 % and 0.175 at 50 %, and the period depth stays
+// from a run with jitterTop 0. It reads 0.55 at GROWL 100 % and 0.275 at 50 %, and the period depth stays
 // in 1 - jitter .. 1 and takes more than a few values.
 bool checkJitter() {
   const Signal in = sungNote(220.0, 2.0, -20.0);
@@ -725,11 +778,11 @@ bool checkJitter() {
     last = depth;
   }
   char detail[176];
-  std::snprintf(detail, sizeof detail, "repeat bit-exact %s, differs from no jitter %s, jitter %.3f (0.35) and %.3f (0.175), depth %.3f..%.3f in (0.65..1), %zu changes",
+  std::snprintf(detail, sizeof detail, "repeat bit-exact %s, differs from no jitter %s, jitter %.3f (0.55) and %.3f (0.275), depth %.3f..%.3f in (0.45..1), %zu changes",
                 repeats ? "yes" : "no", active ? "yes" : "no", static_cast<double>(jitterTop), static_cast<double>(jitterHalf),
                 static_cast<double>(lo), static_cast<double>(hi), distinct);
-  const bool ok = repeats && active && std::fabs(jitterTop - 0.35f) < 1e-5f && std::fabs(jitterHalf - 0.175f) < 1e-5f &&
-                  lo >= 0.65f - 1e-5f && hi <= 1.0f && lo < 0.8f && hi > 0.9f && distinct > 20;
+  const bool ok = repeats && active && std::fabs(jitterTop - 0.55f) < 1e-5f && std::fabs(jitterHalf - 0.275f) < 1e-5f &&
+                  lo >= 0.45f - 1e-5f && hi <= 1.0f && lo < 0.7f && hi > 0.9f && distinct > 20;
   return report("rasp jitter", ok, detail);
 }
 
@@ -798,6 +851,7 @@ int main() {
   ok &= checkHighPass();
   ok &= checkThroatPitch();
   ok &= checkPeak();
+  ok &= checkBias();
   ok &= checkJitter();
   ok &= checkOnsetHolds();
   std::printf("%s growl\n", ok ? "PASS" : "FAIL");

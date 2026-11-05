@@ -47,8 +47,11 @@
 // 3. The fold. A low shelf ahead of Distortion's quadratic knee tilts the tone to the low mids, and a
 //    peak after it adds bite. DRIVE sets the knee's input gain and the low shelf's depth. The peak
 //    sits at peakHz with width peakQ, and its gain rises in a straight line from 0 dB at GROWL 0 to
-//    peakDb at GROWL 100 %. A makeup gain follows the knee. At DRIVE 0 the fold is out and the rasped
-//    voice passes clean. The knee runs at the base rate, with no oversampling.
+//    peakDb at GROWL 100 %. A DC bias of biasTop times GROWL squared (in rail units) enters the knee with
+//    the signal, so the knee clips the two sides unevenly and adds even harmonics. The fold's DC blocker
+//    removes the offset after the knee. A makeup gain follows the knee, and snarlTrimDb times GROWL
+//    trims it so the extra bite and bias leave the level where it was. At DRIVE 0 the fold is out and
+//    the rasped voice passes clean. The knee runs at the base rate, with no oversampling.
 //
 //    A 2nd-order Butterworth high-pass at hpHz ends the wet path, ahead of MIX, so the dropped voice
 //    leaves no rumble under the note.
@@ -84,9 +87,11 @@ struct GrowlTuning {
   float lowShelfHz = 200.0f;    // ahead of the knee
   float lowShelfDb = 6.0f;      // at DRIVE 100 %
   float peakHz = 2500.0f;       // the bite peak, after the knee
-  float peakQ = 1.4f;           // its width
-  float peakDb = 6.0f;          // its gain at GROWL 100 % (the engine's DRIVE at kGrowlDriveTop)
-  float jitterTop = 0.35f;      // the most a period's depth is cut by, at GROWL 100 %
+  float peakQ = 1.8f;           // its width
+  float peakDb = 10.0f;         // its gain at GROWL 100 % (the engine's DRIVE at kGrowlDriveTop)
+  float biasTop = 0.25f;        // the DC added ahead of the knee at GROWL 100 %, in rail units (the rail's limit is 1)
+  float snarlTrimDb = -0.45f;   // the fold's added trim at GROWL 100 %, in dB along the pot; holds the level against the bite and the bias
+  float jitterTop = 0.55f;     // the most a period's depth is cut by, at GROWL 100 %
   float driveDb = 30.0f;        // the knee's input gain at DRIVE 100 %
   float makeupSat = 10.0f;      // the knee's input gain where the makeup law flattens
   float railSoft = 0.1f;        // the knee's soft edge as a fraction of the rail
@@ -113,6 +118,7 @@ constexpr float kMinMakeupSat = 1.0f;
 constexpr float kMaxMakeupSat = 1000.0f;
 constexpr float kMaxShelfDb = 24.0f;
 constexpr float kMaxPeakQ = 10.0f;
+constexpr float kMaxBiasTop = 1.0f;
 constexpr float kMaxTrimDb = 24.0f;
 constexpr float kMinRailSoft = 0.01f;
 constexpr float kMaxRailAsym = 0.5f;
@@ -151,6 +157,7 @@ struct FoldGains {
   float pre = 1.0f;       // the knee's input gain
   float peak = 0.0f;      // the bite peak's gain less 1
   float post = 1.0f;      // the makeup
+  float bias = 0.0f;      // the DC added ahead of the knee
 };
 
 // The rasp's wave and gains at one GROWL and depth fade: m = clamp(0.5 + half * sin, 0, 1) for each
@@ -179,6 +186,8 @@ class Fold {
     peakDb_ = clampf(t.peakDb, -kMaxShelfDb, kMaxShelfDb);
     driveDb_ = clampf(t.driveDb, 0.0f, kMaxDriveDb);
     sat_ = clampf(t.makeupSat, kMinMakeupSat, kMaxMakeupSat);
+    biasTop_ = clampf(t.biasTop, 0.0f, kMaxBiasTop);
+    snarlTrimDb_ = clampf(t.snarlTrimDb, -kMaxTrimDb, kMaxTrimDb);
     unityMakeup_ = makeup(1.0f);
     at_ = -1.0f;
   }
@@ -189,8 +198,10 @@ class Fold {
       at_ = d;
       gains_.lowShelf = dbToGainFast(lowDb_ * d) - 1.0f;
       gains_.pre = dbToGainFast(driveDb_ * d);
-      gains_.peak = dbToGainFast(clampf(peakDb_ * d * peakPerDrive_, -kMaxShelfDb, kMaxShelfDb)) - 1.0f;
-      gains_.post = unityMakeup_ / makeup(gains_.pre);
+      gains_.peak = dbToGainFast(clampf(peakDb_ * d * potPerDrive_, -kMaxShelfDb, kMaxShelfDb)) - 1.0f;
+      const float pot = smooth::clamp01(d * potPerDrive_);
+      gains_.post = unityMakeup_ / makeup(gains_.pre) * dbToGainFast(snarlTrimDb_ * pot);
+      gains_.bias = biasTop_ * pot * pot;
     }
     return gains_;
   }
@@ -208,9 +219,10 @@ class Fold {
       g.pre += step.pre;
       g.peak += step.peak;
       g.post += step.post;
+      g.bias += step.bias;
       const float v = x[i];
       lo += aLo * (v - lo);
-      const float c = Distortion::rail(r, (v + g.lowShelf * lo) * g.pre);
+      const float c = Distortion::rail(r, (v + g.lowShelf * lo) * g.pre + g.bias);
       const float y = (c + g.peak * band.run(c)) * g.post;
       dc += aDc * (y - dc);
       x[i] = y - dc;
@@ -255,7 +267,9 @@ class Fold {
   FoldGains gains_;
   float lowDb_ = 0.0f;
   float peakDb_ = 0.0f;
-  float peakPerDrive_ = 1.0f / kGrowlDriveTop;  // the peak reaches peakDb where DRIVE reaches kGrowlDriveTop
+  float biasTop_ = 0.0f;
+  float snarlTrimDb_ = 0.0f;
+  float potPerDrive_ = 1.0f / kGrowlDriveTop;  // the GROWL pot as a share of DRIVE: 1 where DRIVE is kGrowlDriveTop
   float driveDb_ = 0.0f;
   float sat_ = 10.0f;
   float unityMakeup_ = 1.0f;
@@ -470,7 +484,8 @@ class Growl {
       c.fold0 = fold_.gainsAt(drive0);
       const FoldGains f1 = fold_.gainsAt(drive_);
       c.foldStep = {(f1.lowShelf - c.fold0.lowShelf) * inv, (f1.pre - c.fold0.pre) * inv,
-                    (f1.peak - c.fold0.peak) * inv, (f1.post - c.fold0.post) * inv};
+                    (f1.peak - c.fold0.peak) * inv, (f1.post - c.fold0.post) * inv,
+                      (f1.bias - c.fold0.bias) * inv};
     } else {
       fold_.clear();
     }
@@ -594,7 +609,8 @@ class Growl {
   static FoldGains foldAt(const Call& c, int at) {
     const float k = static_cast<float>(at);
     return {c.fold0.lowShelf + c.foldStep.lowShelf * k, c.fold0.pre + c.foldStep.pre * k,
-            c.fold0.peak + c.foldStep.peak * k, c.fold0.post + c.foldStep.post * k};
+            c.fold0.peak + c.foldStep.peak * k, c.fold0.post + c.foldStep.post * k,
+            c.fold0.bias + c.foldStep.bias * k};
   }
 
   // Blends the dry into buf_ in place, trim included: the voice at its MIX share plus the ring read at
