@@ -95,6 +95,8 @@ formant-shifted version of what Autotune hands them.
 2. Apraxia behind Autotune on a held note.
 3. Autotune toggled off and on while Formant is on and singing.
 
+All three passed by the owner in the emulator, 2026-11-05, at v2.01.66.
+
 ## As built (2026-11-05)
 
 Steps 1 to 5 are built. The build differs from the design in these places.

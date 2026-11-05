@@ -280,3 +280,4 @@ Each step ends with `cmake --build build -j && ctest --test-dir build` at 100 % 
    2026-11-05).
 2. Octave's wet now follows the tuned voice, carries Autotune's grain texture and sits 20 ms behind it
    (today it sits 3 to 16 ms ahead). An ear check at MIX 10 % and 100 % in the emulator settles it.
+   Passed by the owner in the emulator, 2026-11-05, at v2.01.66.
