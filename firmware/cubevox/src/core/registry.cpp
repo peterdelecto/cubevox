@@ -81,7 +81,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::Bloom, "bloom", "Chatter", Engine::Bloom, 2, {kBloomLength, kPercent("AMOUNT")}, Group::None, costs::kBloom},
     {Card::FormantFollower, "formant_follow", "Yawn", Engine::Pitch, 2, {kPercent("SENSITIVITY"), kFollowerRange},
      Group::Pitch, costs::kFormantFollower},
-    {Card::Growl, "growl", "Throat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
+    {Card::Growl, "growl", "Deepthroat", Engine::Growl, 2, {kPercent("GROWL"), kPercent("MIX")}, Group::Pitch, costs::kGrowl},
     {Card::RingMod, "ringmod", "Ring mod", Engine::RingMod, 2, {kRingModRatioKnob, kPercent("MIX")}, Group::Pitch,
      costs::kRingMod},
     {Card::Strings, "strings", "Sympath", Engine::Strings, 2, {kStringsDecay, kPercent("MIX")}, Group::Reverb,

@@ -1300,7 +1300,7 @@ void checkScreenshots() {
     slot6.layout.card[kSlot6Slot] = card;
     slot6.openListAt(kDistortionGrowl);
     slot6.draw();
-    const char* value = card == Card::Growl ? "THROAT" : "DISTORTION";
+    const char* value = card == Card::Growl ? "DEEPTHROAT" : "DISTORTION";
     check(cursorRowIs(slot6.canvas, rowOnScreen(kDistortionGrowl), kDistortionGrowl, value) &&
               listRowIs(slot6.canvas, rowOnScreen(kDistortionGrowl) - 1, kLabel[kUnisonCrowd], kDefaultValue[kUnisonCrowd]),
           (std::string("screens: menu rows with the cursor on SLOT 6 ") + value).c_str());
