@@ -36,12 +36,12 @@ bool cvBootPowerOn(uint32_t resetFlags) {
 }
 
 void cvBootAdopt(struct CvBootBlock* block, uint32_t resetFlags) {
-  if (cvBootPowerOn(resetFlags) || !cvBootBlockInitialised(block)) {
+  if (cvBootPowerOn(resetFlags) || !cvBootBlockSealed(block)) {
     memset(block, 0, sizeof *block);
     cvBootFailsSet(block, 0u);
   }
   if (!cvBootReasonKnown(block->lastReason)) block->lastReason = (uint32_t)CvReasonNone;
-  block->blockVersion = CV_BOOT_BLOCK_VERSION;
+  cvBootBlockSeal(block);
   block->resetFlags = resetFlags;
 }
 
@@ -130,7 +130,7 @@ void cvBootMarkUpdated(struct CvBootBlock* block) {
   block->faultAddress = 0u;
   clearSummary(block);
   clearBootFault(block);
-  block->blockVersion = CV_BOOT_BLOCK_VERSION;
+  cvBootBlockSeal(block);
 }
 
 // ---- Option bytes -------------------------------------------------------------------------

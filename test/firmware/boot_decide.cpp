@@ -39,10 +39,15 @@ static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, optionBytes) == 0x2001F
 static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, resetFlags) == 0x2001FF54u &&
                   sizeof(CvBootBlock::resetFlags) == 4,
               "boot: resetFlags");
-static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, bootReserved) == 0x2001FF58u &&
-                  sizeof(CvBootBlock::bootReserved) == 40,
+static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, blockSeal) == 0x2001FF58u &&
+                  sizeof(CvBootBlock::blockSeal) == 4,
+              "boot: blockSeal");
+static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, bootReserved) == 0x2001FF5Cu &&
+                  sizeof(CvBootBlock::bootReserved) == 36,
               "boot: the bootloader's reserved bytes end at +0x80");
-static_assert(CV_BOOT_BLOCK_VERSION == 2u, "boot: block version 2 added resetFlags");
+static_assert(CV_BOOT_BLOCK_VERSION == 3u, "boot: block version 3 added blockSeal");
+static_assert(CV_BOOT_BLOCK_SEAL == (uint32_t{'C'} | uint32_t{'V'} << 8 | uint32_t{'B'} << 16 | uint32_t{'K'} << 24),
+              "boot: the seal reads CVBK");
 static_assert(CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, appFieldsVersion) == 0x2001FF80u &&
                   CV_BOOT_BLOCK_ADDR + offsetof(CvBootBlock, appReserved) == 0x2001FF84u &&
                   sizeof(CvBootBlock::appReserved) == 60,
@@ -98,7 +103,7 @@ constexpr uint32_t kAppSector3 = 0x08065432u;
 CvBootBlock bootBlock() {
   CvBootBlock b;
   std::memset(&b, 0, sizeof b);
-  b.blockVersion = CV_BOOT_BLOCK_VERSION;
+  cvBootBlockSeal(&b);
   cvBootFailsSet(&b, 0);
   return b;
 }
@@ -325,6 +330,80 @@ void checkBootGarbage() {
   check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
             b.appSummary[0] == '\0',
         "boot: a block no bootloader initialised is cleared on any reset");
+}
+
+// The ST ROM loader leaves other data in DTCM and ends its session with a system reset, so the
+// bootloader sees a block of random bytes after a reset that keeps DTCM. It clears the block and
+// reports no fault.
+void checkBootJunkAfterRomSession() {
+  uint32_t state = 0x9E3779B9u;
+  for (int run = 0; run < 256; ++run) {
+    CvBootBlock b;
+    auto* bytes = reinterpret_cast<uint8_t*>(&b);
+    for (size_t i = 0; i < sizeof b; ++i) {
+      state = state * 1664525u + 1013904223u;
+      bytes[i] = static_cast<uint8_t>(state >> 24);
+    }
+    const CvBootDecision d = decide(b, inputs(false, CvImageValid), kSoftware);
+    check(decided(d, CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1,
+          "boot: a junk block after a system reset gives a first start");
+    check(b.bootFaultPc == 0 && b.bootFaultCfsr == 0 && b.bootFaultHfsr == 0 && b.bootFaultBfar == 0,
+          "boot: a junk block after a system reset reports no bootloader fault");
+    bool clean = b.lastReason == CvReasonNone && b.faultAddress == 0 && b.optionBytes == CvOptionUnchecked &&
+                 b.appFieldsVersion == 0 && b.resetFlags == kSoftware;
+    for (const char ch : b.appSummary) clean = clean && ch == '\0';
+    for (const uint8_t byte : b.appReserved) clean = clean && byte == 0;
+    check(clean, "boot: a junk block after a system reset comes out with every field clear");
+  }
+}
+
+// The seal separates a block a cubevox bootloader wrote from other data. The four pairings of old
+// and new bootloader with old and new application each read the block the way they did before, and a
+// real bootloader fault survives the reset that follows it.
+void checkBootSeal() {
+  // The bootloader's own fault, recorded before a system reset, reaches the application.
+  CvBootBlock b = bootBlock();
+  recordFault(b, 0u);
+  decide(b, inputs(false, CvImageValid), kSoftware);
+  check(b.bootFaultPc == 0x08001234u && b.bootFaultCfsr == 0x00008200u && cvBootBlockInitialised(&b),
+        "boot: a real bootloader fault survives the reset and the application accepts the block");
+
+  // Counter and update request survive a system reset as before.
+  b = bootBlock();
+  cvBootFailsSet(&b, 2);
+  b.request = CV_REQUEST_UPDATE;
+  std::strcpy(b.appSummary, "v2.01.52 up 7 s");
+  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonAppRequest) &&
+            cvBootFailsGet(&b) == 2 && std::strcmp(b.appSummary, "v2.01.52 up 7 s") == 0,
+        "boot: a sealed block keeps its counter, request and summary across a system reset");
+
+  // New application, old bootloader: a version 2 block has no seal and is read as before.
+  b = bootBlock();
+  b.blockVersion = 2;
+  b.blockSeal = 0;
+  b.resetFlags = kSoftware;
+  check(cvBootBlockInitialised(&b) && cvBootBlockResetFlags(&b) == kSoftware,
+        "boot: the application still trusts a block from a version 2 bootloader");
+
+  // New application, no bootloader write: version 3 and up without the seal is not a block.
+  b = bootBlock();
+  b.blockSeal = 0;
+  b.resetFlags = kSoftware;
+  check(!cvBootBlockInitialised(&b) && cvBootBlockResetFlags(&b) == 0,
+        "boot: the application rejects a version 3 block without the seal");
+
+  // New bootloader, block left by an old bootloader: no seal, so it is cleared once.
+  b = bootBlock();
+  b.blockVersion = 2;
+  b.blockSeal = 0;
+  cvBootFailsSet(&b, 1);
+  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
+            cvBootBlockSealed(&b),
+        "boot: a version 2 block is cleared by the new bootloader and comes out sealed");
+
+  // Old application, new bootloader: it checks blockVersion >= 1 only and never writes the seal.
+  b = bootBlock();
+  check(b.blockVersion >= 1u, "boot: the version 3 block passes an old application's version check");
 }
 
 // The bootloader hands its reset flags to the application in the block, because the jump clears
@@ -889,6 +968,8 @@ void checkBootDecide() {
   checkBootPowerOn();
   checkBootRestartsCount();
   checkBootGarbage();
+  checkBootJunkAfterRomSession();
+  checkBootSeal();
   checkBootResetFlags();
   checkBootStaleFields();
   checkBootVersions();
