@@ -10,9 +10,9 @@ knobs and both Gate knobs (Threshold across the whole knob, then Decay), both Un
 Depth), both Distortion knobs (TONE again with DRIVE pinned at 100 %, and TONE stepped inside a DRIVE
 glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Yawn knobs (SENSITIVITY,
 RANGE), both Deepthroat knobs (GROWL, MIX), both Ring mod knobs (RATIO, stepped, so each 10 % step lands
-on one of its positions, then MIX), both Sympath knobs (DECAY, MIX) and, when Crowd is placed, both Crowd
+on one of its positions, then MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
-It then flips the toggle of every Echo, Input gate, Gate, Yawn, Deepthroat, Ring mod and Sympath slot
+It then flips the toggle of every Echo, Input gate, Gate, Yawn, Deepthroat and Ring mod slot
 ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
 POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
@@ -44,7 +44,7 @@ Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slo
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
 slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ring mod in
-Distortion's slot), tracker (Ring mod in Distortion's slot with Autotune's and Octave's slots empty), sympath (Sympath in the reverb slot) and heaviest (Input gate, Formant, Unison and
+Distortion's slot), tracker (Ring mod in Distortion's slot with Autotune's and Octave's slots empty) and heaviest (Input gate, Formant, Unison and
 Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
@@ -88,7 +88,7 @@ SWEEP_STEP_S = 1.0
 TOGGLE_FLIPS = 10    # a toggle flips off and on five times
 TOGGLE_STEP_S = 0.3  # past the slot fade, so each enable finds the engine settled off and resets it
 GLIDE_LAG_S = 0.02   # a stepped knob starts its partner this long after it, inside the glide
-FLIPPED_CARDS = ("slapback", "input_gate", "gate", "formant_follow", "growl", "ringmod", "strings")  # toggles the run flips
+FLIPPED_CARDS = ("slapback", "input_gate", "gate", "formant_follow", "growl", "ringmod")  # toggles the run flips
 # The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
@@ -100,7 +100,7 @@ REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "yawn", "throat", "ringmod", "tracker", "sympath", "heaviest")
+                "chatter", "lofi", "yawn", "throat", "ringmod", "tracker", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -109,7 +109,7 @@ ROW_OF = {
     "slapback": "kSlapback", "distortion": "kDistortion", "gate": "kGate",
     "reverb_spring": "kReverbSpring", "reverb_chasm": "kReverbChasm", "crowd": "kCrowd",
     "formant": "kFormant", "bloom": "kBloom", "lofi": "kLofi",
-    "formant_follow": "kFormantFollower", "growl": "kGrowl", "ringmod": "kRingMod", "strings": "kStrings",
+    "formant_follow": "kFormantFollower", "growl": "kGrowl", "ringmod": "kRingMod",
 }
 TRACKER_ROW = "kTracker"
 STAGE_ROW = "kPitchStage"  # the stage's own work when Octave, Formant or Yawn runs without Autotune
@@ -217,12 +217,11 @@ def layout_table():
     ringmod = ["ringmod" if c == "distortion" else c for c in base]
     # Ring mod alone times the tracker in its own slot, which the ringmod layout hides behind Autotune's.
     tracker = ["empty" if c in ("autotune", "octave") else ("ringmod" if c == "distortion" else c) for c in base]
-    sympath = ["strings" if c.startswith("reverb_") else c for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
             "chatter": (chatter, False), "lofi": (lofi, False), "yawn": (yawn, False), "throat": (throat, False),
-            "ringmod": (ringmod, False), "tracker": (tracker, False), "sympath": (sympath, False),
+            "ringmod": (ringmod, False), "tracker": (tracker, False),
             "heaviest": (heaviest, True)}
 
 
@@ -444,9 +443,6 @@ def sweeps(slots):
         if card == "ringmod":
             found.append(Sweep(i, 1, "Ring mod RATIO"))
             found.append(Sweep(i, 2, "Ring mod MIX"))
-        if card == "strings":
-            found.append(Sweep(i, 1, "Sympath DECAY"))
-            found.append(Sweep(i, 2, "Sympath MIX"))
     return found
 
 

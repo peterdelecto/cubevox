@@ -147,15 +147,8 @@ constexpr Cost kGrowl{5, 7, false};  // est. from that host bench; a board run o
 // float contraction, Adam's three clips in 64-sample blocks, minimum of 9 passes, steady_clock around each
 // call, 50.4k board cycles per host us). Ring mod is Distortion's second alternate in slot 6 and reads the
 // tracker like Growl, so a layout with it pays kTracker once: 2.0 ns a sample, 129 ns a block, 6.5k cycles,
-// 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %. Sympath (the Strings engine) is Spring's
-// second alternate in slot 8. With eight strings and its own tracker on Adam's clips: 22.8 ns a sample, 1.46
-// us a block, 73.5k cycles, 11.5 %, of which the tracker is 4.1 ns a sample; the costliest block is a retune,
-// when the old bank rings out beside the new one for 200 ms, 2.63 us, 132k cycles, 20.7 %. The 50.4k
-// ratio was set on other cards, and these loops are scalar recurrences that may not scale the same; a count
-// of the loops (about 15 cycles a string a sample, and 1.6M cycles a second for the tracker) says 1.5 %
-// mean, 3 % worst. A board run owes the measured rows.
+// 1.0 %, and 209 ns for the costliest block, 10.5k cycles, 1.6 %. A board run owes the measured row.
 constexpr Cost kRingMod{2, 2, false};
-constexpr Cost kStrings{12, 21, false};
 
 // What every block spends whatever the layout: POLISH EQ's front half ahead of the slots, and the
 // tail after them. The stress run of 2026-11-05 measured POLISH EQ (both halves) and POLISH COMP, and

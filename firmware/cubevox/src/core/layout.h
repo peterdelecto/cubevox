@@ -26,7 +26,7 @@ Layout defaultLayout();
 // The default layout with the Crowd card in slot 2, Autotune's slot. Only the CUBEVOX_CROWDTEST image uses it.
 Layout crowdTestLayout();
 
-// The slot that holds a reverb card (Spring, Chasm or Strings). A valid layout always holds one; -1 only
+// The slot that holds a reverb card (Spring or Chasm). A valid layout always holds one; -1 only
 // for a layout that failed layoutValid.
 int reverbSlot(const Layout& layout);
 

@@ -1,6 +1,6 @@
 # Sympath (was Strings), tuning decisions
 
-Status: decided with the owner 2026-11-04; build in progress.
+Status: removed (owner 2026-11-05, "sympath has failed the audition"). The box has no Sympath card; it is out of the code: no card, engine, test or emulator controls. The decisions below are kept as the design record.
 
 ## Decided
 1. Name: Sympath everywhere, glass SYMPATH. Code id stays `strings`.

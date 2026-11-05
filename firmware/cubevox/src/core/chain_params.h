@@ -16,7 +16,6 @@
 #include "engine/reverb.h"
 #include "engine/ringmod.h"
 #include "engine/slapback.h"
-#include "engine/strings.h"
 #include "engine/unison.h"
 
 struct ChainParams {
@@ -33,7 +32,6 @@ struct ChainParams {
   cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runBloom passes the gate's state
   cv::ReverbParams reverb;
   cv::RingModParams ringMod;  // its toggle also sets pitchFx.ringModOn; keyed is set by placing Autotune
-  cv::StringsParams strings;  // the Sympath card; it follows the held note and reads no Autotune key
   cv::PolishCompParams comp;  // the chain tail: comp, then the back half of eq
   cv::PolishParams eq;        // its front half runs ahead of slot 1
 

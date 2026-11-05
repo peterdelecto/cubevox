@@ -76,7 +76,7 @@ func getState(t *testing.T, ts *httptest.Server) State {
 
 func TestState(t *testing.T) {
 	st := getState(t, newServer(t, nil, nil))
-	if !st.Connected || st.App != "v9.99.99" || len(st.Cards) != 18 || len(st.Layout.Slots) != 8 {
+	if !st.Connected || st.App != "v9.99.99" || len(st.Cards) != 17 || len(st.Layout.Slots) != 8 {
 		t.Fatalf("state %+v", st)
 	}
 	if st.Limits != (Limits{Mean: 75, Worst: 95, FixedMean: 7, FixedWorst: 9}) {
@@ -89,7 +89,7 @@ func TestState(t *testing.T) {
 
 func TestStateWithoutBoxUsesFixture(t *testing.T) {
 	st := getState(t, newServer(t, offline{}, nil))
-	if st.Connected || st.FW != "" || len(st.Cards) != 18 || len(st.Layout.Slots) != 8 {
+	if st.Connected || st.FW != "" || len(st.Cards) != 17 || len(st.Layout.Slots) != 8 {
 		t.Fatalf("state %+v", st)
 	}
 }
