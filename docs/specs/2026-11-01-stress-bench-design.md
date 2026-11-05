@@ -39,7 +39,10 @@ flips each back before it ends.
 2. Layouts by name, `--layouts`: `default`; `crowd` (default with the Mob card in slot 4 for
    Unison); `chasm` (default with the reverb slot on Chasm); `crowd-chasm` (both). A layout the
    box will not load is a result row with the box's reason, not a failure.
-3. Per layout, per run (`--runs`, default 2): all slots forced on, clip on, knobs at top,
+3. Per layout, per run (`--runs`, default 2): the layout goes on with VOX EQ at ON+CUTS (owner
+   2026-11-05; `set_layout` carries `settings.vox_eq` `"cuts"`, because at the default OFF the
+   stage's bucket reads near zero and its `kPolishEq` gate would pass with nothing measured),
+   all slots forced on, clip on, knobs at top,
    counters reset, a read after `--seconds` (default 20) is pass 1. Pass 2 sweeps SEMITONES, the
    reverb's lower knob and, when Mob is placed, its two knobs, 0 to 100 % in steps of 10 at 1 s
    each, reading after each sweep. A slot's mean is pass 1; its worst is the largest worst over
@@ -53,7 +56,8 @@ flips each back before it ends.
    75 % and worst under 95 %. Exit 1 on any failure. 84 gates over the four layouts.
 6. Output: a summary on stdout and `build/bench/<date>-stress.md`, appended per run. The script
    restores the layout it found, clears the levers, turns the clip off and puts the reverb slot
-   back on its card's engine, in a `finally`.
+   back on its card's engine, in a `finally`. The restore also puts the box's own VOX EQ setting
+   back. `--dry-run` lists the setting step for each layout.
 
 `stress.py` is the method of record for the cost rows: a row changes when the run measures past
 it, by the lowest run worst rounded up, never the other way without a run.

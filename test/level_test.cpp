@@ -907,7 +907,9 @@ struct Tail {
 // POLISH COMP alone, VOX EQ alone (both halves) at ON and at ON+CUTS, and the whole tail at both, on
 // Adam's clips. The clips sit 1.8 dB apart in level and the comp levels them, so its three readings
 // spread past the mid band. The spread is printed, and the mean holds the rule. VOX EQ and the whole
-// tail hold the mid band per clip.
+// tail hold the mid band per clip and the rule on the mean, at both settings. The third clip carries
+// rumble under 40 Hz that the comp's makeup lifts in the pauses, and the stage's subsonic high-pass
+// keeps its ON tail inside the band.
 bool tailClipRows() {
   double mean = 0.0;
   int count = 0;
@@ -944,11 +946,8 @@ bool tailClipRows() {
     const std::string tailName = cuts ? "vox tail ON+CUTS" : "vox tail ON";
     ok &= clipRows(eqName.c_str(), eqOnly(cuts), kMidLoDb, kMidHiDb, mean, count);
     if (count > 0) ok &= verdict((eqName + " mean").c_str(), mean, kLoDb, kHiDb);
-    // At ON the comp's gain on the uncut clips and VOX EQ's own gain add, so the whole tail stands
-    // above the rule's band. Each stage alone holds the rule. The ON tail is printed and not judged.
-    ok &= clipRows(tailName.c_str(), whole(cuts), kMidLoDb, kMidHiDb, mean, count, cuts);
-    if (count > 0 && cuts) ok &= verdict((tailName + " mean").c_str(), mean, kLoDb, kHiDb);
-    if (count > 0 && !cuts) std::printf("NOTE %-30s %+6.2f dB mean\n", tailName.c_str(), mean);
+    ok &= clipRows(tailName.c_str(), whole(cuts), kMidLoDb, kMidHiDb, mean, count);
+    if (count > 0) ok &= verdict((tailName + " mean").c_str(), mean, kLoDb, kHiDb);
   }
   return ok;
 }

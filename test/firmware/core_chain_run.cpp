@@ -376,7 +376,8 @@ void checkFrontHead() {
   check(same, "chain: the front half runs ahead of slot 1 and the back half after the comp, in the caller's buffer");
   check(passes, "chain: with VOX EQ OFF both halves pass the block bit for bit");
   check(outRms < 0.2 * inRms, "chain: at ON+CUTS the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
-  check(uncutRms > 0.9 * inRms, "chain: at ON the 40 Hz tone keeps its level, with no high-pass");
+  check(uncutRms > 0.7 * inRms && uncutRms > 3.0 * outRms,
+        "chain: at ON the 40 Hz tone loses only the subsonic high-pass's 3 dB, and stands well above its ON+CUTS level");
 }
 
 // Runs the shipped layout with every toggle on, the knobs at mid travel and VOX EQ at ON+CUTS.

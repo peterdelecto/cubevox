@@ -113,18 +113,30 @@ bool testFront() {
                 g50, g70, g97, g1k, g6k, g10k);
 }
 
-// ON runs the front half without the cuts: 50 Hz and 10 kHz pass, with the de-esser off and live.
+// ON runs the front half without the cuts: only the 40 Hz subsonic high-pass takes anything off the low
+// end, so 97 Hz and 10 kHz pass, with the de-esser off and live.
 bool testFrontNoCuts() {
   cv::PolishParams filters = filtersOnly();
   filters.cuts = false;
   cv::PolishParams voiced;
   voiced.cuts = false;
-  const double f50 = gainDb(Half::Front, 50.0, filters), f10k = gainDb(Half::Front, 10000.0, filters);
-  const double v50 = gainDb(Half::Front, 50.0, voiced), v10k = gainDb(Half::Front, 10000.0, voiced);
-  const bool ok = std::fabs(f50) <= 0.05 && std::fabs(f10k) <= 0.05 && std::fabs(v50) <= 0.1 && std::fabs(v10k) <= 0.5;
+  const double f97 = gainDb(Half::Front, 97.0, filters), f10k = gainDb(Half::Front, 10000.0, filters);
+  const double v97 = gainDb(Half::Front, 97.0, voiced), v10k = gainDb(Half::Front, 10000.0, voiced);
+  const bool ok = std::fabs(f97) <= 0.05 && std::fabs(f10k) <= 0.05 && std::fabs(v97) <= 0.1 && std::fabs(v10k) <= 0.5;
   return report("front no cuts", ok,
-                "cuts off, 50 Hz / 10 kHz: de-esser out %.3f / %.3f dB, live %.3f / %.3f dB (0 +-0.05, 0 +-0.1 and 0 +-0.5)",
-                f50, f10k, v50, v10k);
+                "cuts off, 97 Hz / 10 kHz: de-esser out %.3f / %.3f dB, live %.3f / %.3f dB (0 +-0.05, 0 +-0.1 and 0 +-0.5)",
+                f97, f10k, v97, v10k);
+}
+
+// The subsonic high-pass at ON: 4th-order Butterworth at 40 Hz, so 3 dB down at 40 Hz and 20 dB or more
+// down at 20 Hz, under any note Adam sings. It takes less than 1 dB off 50 Hz, the octave below his G2.
+bool testSubsonic() {
+  cv::PolishParams p = filtersOnly();
+  p.cuts = false;
+  const double g20 = gainDb(Half::Front, 20.0, p), g40 = gainDb(Half::Front, 40.0, p);
+  const double g50 = gainDb(Half::Front, 50.0, p);
+  const bool ok = g20 <= -20.0 && std::fabs(g40 + 3.0) <= 0.3 && g50 >= -1.0 && g50 <= -0.3;
+  return report("subsonic", ok, "cuts off, 20/40/50 Hz = %.2f / %.2f / %.2f dB (<=-20, -3, -0.3 to -1)", g20, g40, g50);
 }
 
 // Steps from ON to ON+CUTS and back on a 40 Hz sine, which the high-pass takes 19 dB off, and measures the
@@ -330,6 +342,7 @@ int main() {
   ok &= testPassthrough();
   ok &= testFront();
   ok &= testFrontNoCuts();
+  ok &= testSubsonic();
   ok &= testCutsFade();
   ok &= testFrontDeEsserQuiet();
   ok &= testFrontEss();
