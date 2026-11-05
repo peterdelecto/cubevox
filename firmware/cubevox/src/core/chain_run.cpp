@@ -113,10 +113,9 @@ void runRingMod(ChainEngines& engines, const float* in, float* out, int n, const
   engines.ringMod.process(in, out, n, p.ringMod, engines.pitch, p.ringMod.keyed ? p.pitchFx.autotune.key : -1);
 }
 
-// Runs the Strings card. It sits on Autotune's KEY when Autotune is placed (`p.strings.keyed`), and on the
-// chromatic scale otherwise.
+// Runs the Sympath card (engine Strings). It tracks the held note itself and reads no Autotune key.
 void runStrings(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p) {
-  engines.strings.process(in, out, n, p.strings, p.strings.keyed ? p.pitchFx.autotune.key : -1);
+  engines.strings.process(in, out, n, p.strings);
 }
 
 // Runs the Chatter card. With an Input gate placed (`p.bloom.keyFromGate`), the gate's detector state is

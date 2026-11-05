@@ -32,7 +32,7 @@ struct ChainEngines {
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
   cv::Growl growl;  // like crowd, its voice reads the ring that `pitch` writes
   cv::RingMod ringMod;  // reads the tracker that `pitch` runs
-  cv::Strings strings;  // two banks of twelve delay lines, 43 kB, in D1 with the rest of the engines
+  cv::Strings strings;  // the Sympath card: two banks of eight delay lines and its tracker, in D1 with the rest
 
   // The signal the Chatter card cuts its slices from. captureBloomSource copies the block leaving the
   // tap slot into `bloomSrc` and sets `bloomSrcLive`; `bloomLead` asks a Crowd card that makes the pitch
