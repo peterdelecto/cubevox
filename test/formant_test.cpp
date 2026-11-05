@@ -1,12 +1,14 @@
 // Formant card checks: settled off is a plain copy, MIX 0 leaves the input untouched, SHIFT 0 keeps
 // the spectrum's centroid, a SHIFT step moves the spectral envelope's first peak by 2^(st / 12), the
-// sung pitch holds with Autotune off and on, the formant voice lines up with Autotune's corrected
+// sung pitch holds with Autotune off and on, the formant voice lands with Autotune's corrected
 // voice, a quick off and on keeps the running voice, MIX leaves 0 and 100 % without a click or a dip,
 // the toggle holds steady-state curvature, the MIX level, the trim, any call length, and no
 // allocation. The voice's silence skip returns the plain voice's samples, SHIFT starts at the knob
 // when the card comes up, a Formant that starts beside a running Autotune lines up, the tracker's range
-// flags put the card aside, and a NaN does not stay in the level gain. SHIFT and MIX steps are
-// knob_step_test's, the default level is level_test's. No window, no audio device.
+// flags put the card aside, and a NaN does not stay in the level gain. A pitch step reaches the output
+// behind Autotune with Autotune's own, and Autotune's toggle under the card holds the largest step and the
+// pitch of a 440 Hz sine. SHIFT and MIX steps are knob_step_test's, the default level is level_test's. No
+// window, no audio device.
 
 #include <algorithm>
 #include <array>
@@ -475,9 +477,9 @@ bool testPitch() {
   return ok;
 }
 
-// How far, in samples, the Formant voice (SHIFT 0, MIX 100 %, Autotune on) sits from the lag it reports
-// behind Autotune's corrected voice alone, over the second after 2 s. The cross-correlation is searched
-// within 8 samples of the reported lag.
+// How far, in samples, the Formant voice (SHIFT 0, MIX 100 %, Autotune on) sits from Autotune's corrected
+// voice alone, over the second after 2 s. The Formant voice cuts from Autotune's input on Autotune's grid, so
+// the two land together. The cross-correlation is searched within 8 samples either way.
 double lagToAutotune(const Signal& in) {
   cv::PitchFxParams tuned;
   autotuneOn(tuned);
@@ -485,19 +487,17 @@ double lagToAutotune(const Signal& in) {
   autotuneOn(both);
   const Signal a = run(in, tuned);
   const Signal b = run(in, both);
-  const double reported = gFx.formant.baseLagForTest();
-  return bestLagFine(a, b, 2 * kRate, kRate, static_cast<int>(reported) + 8) - reported;
+  return bestLagFine(a, b, 2 * kRate, kRate, 8);
 }
 
-// With Autotune on and SHIFT 0 the Formant voice is Autotune's output delayed by the lag the engine
-// reports, the floor a grain needs. With Autotune off the formant voice lags the input by the grain delay
-// plus one period.
+// With Autotune on and SHIFT 0 the Formant voice is Autotune's output, with no lag of its own. With Autotune
+// off the formant voice lags the input by the grain delay plus one period.
 bool testAlignment() {
   const Signal in = irregular(kSungHz, 4 * kRate);
   const int from = 2 * kRate;
   const double lag = lagToAutotune(in);
   bool ok = report("aligned with autotune", std::fabs(lag) <= 1.5,
-                   "cross-correlation peaks %.2f samples from the reported lag (0, +-1.5)", lag);
+                   "cross-correlation peaks %.2f samples from Autotune's own voice (0, +-1.5)", lag);
 
   const Signal plain = run(in, formantOn(0));
   const double want = static_cast<double>(cv::PsolaVoice::kGrainDelay) + kRate / kSungHz;
@@ -841,12 +841,178 @@ bool testNanGuard() {
 }
 
 // Autotune's correction moves through a vibrato, and the Formant voice holds one ratio for each call
-// of 64 samples. Read at the middle of the call, the ratio keeps the voice on the lag it reports.
+// of 64 samples. Read at the middle of the call, the ratio keeps the voice on Autotune's.
 bool testAlignmentVibrato() {
   const double lag = lagToAutotune(vibratoVowel(kSungHz, 4 * kRate, 40.0));
   return report("aligned through vibrato", std::fabs(lag) <= 4.0,
-                "cross-correlation peaks %.2f samples from the lag reported at the end under 5 Hz vibrato of +-40 cents (0, +-4)",
+                "cross-correlation peaks %.2f samples from Autotune's own voice under 5 Hz vibrato of +-40 cents (0, +-4)",
                 lag);
+}
+
+// A sine of amplitude 0.25 that steps from hz1 to hz2 at sample stepAt with its phase unbroken.
+Signal steppedSine(double hz1, double hz2, int stepAt, int n) {
+  Signal x(static_cast<size_t>(n));
+  double phase = 0.0;
+  for (int i = 0; i < n; ++i) {
+    x[static_cast<size_t>(i)] = static_cast<float>(0.25 * std::sin(phase));
+    phase += 2.0 * kPi * (i < stepAt ? hz1 : hz2) / kRate;
+  }
+  return x;
+}
+
+// The positive-going zero crossings of x in [from, to), in samples. x goes through two one-poles at 300 Hz
+// first, so the sung fundamental alone sets them, and a crossing counts once x has dipped under a tenth of
+// its 0.25 peak below zero.
+std::vector<double> crossings(const Signal& x, int from, int to) {
+  const double a = 1.0 - std::exp(-2.0 * kPi * 300.0 / kRate);
+  double s1 = 0.0;
+  double s2 = 0.0;
+  double prev = 0.0;
+  bool armed = false;
+  std::vector<double> t;
+  for (int i = 0; i < to; ++i) {
+    s1 += a * (x[static_cast<size_t>(i)] - s1);
+    s2 += a * (s1 - s2);
+    if (i >= from) {
+      if (s2 < -0.025) armed = true;
+      if (armed && prev < 0.0 && s2 >= 0.0) {
+        t.push_back(i - 1 + (0.0 - prev) / (s2 - prev));
+        armed = false;
+      }
+    }
+    prev = s2;
+  }
+  return t;
+}
+
+// Where the pitch step of x lands, in samples: the crossings before it fall on one line of time against
+// cycle count and the crossings after it on another, and the step is where the two lines meet. `stepAt` is
+// the step in the input; the old pitch holds to stepAt + 1000 and the new one from stepAt + 2800.
+double stepArrival(const Signal& x, int stepAt) {
+  const std::vector<double> t = crossings(x, stepAt - 4000, stepAt + 7000);
+  auto fit = [&](double lo, double hi, double& offset, double& period) {
+    double n = 0.0, sk = 0.0, st = 0.0, skk = 0.0, skt = 0.0;
+    for (size_t k = 0; k < t.size(); ++k) {
+      if (t[k] < lo || t[k] >= hi) continue;
+      const double kk = static_cast<double>(k);
+      n += 1.0;
+      sk += kk;
+      st += t[k];
+      skk += kk * kk;
+      skt += kk * t[k];
+    }
+    period = (n * skt - sk * st) / (n * skk - sk * sk);
+    offset = (st - period * sk) / n;
+  };
+  double aOff = 0.0, aPer = 1.0, bOff = 0.0, bPer = 1.0;
+  fit(stepAt - 4000, stepAt + 1000, aOff, aPer);
+  fit(stepAt + 2800, stepAt + 7000, bOff, bPer);
+  const double k = (bOff - aOff) / (aPer - bPer);
+  return aOff + aPer * k;
+}
+
+// A pitch step through Autotune on with the Formant card behind it: the shifted voice arrives with Autotune's
+// own, within one block, where cutting from its own input would put it a grain delay and a period later.
+bool testGroupLatency() {
+  constexpr double kFrom = 146.8323839587038;  // D3
+  constexpr double kTo = 164.81377845643496;   // E3, the next note of C major
+  const int stepAt = 3 * kRate / 2;
+  const Signal in = steppedSine(kFrom, kTo, stepAt, 2 * kRate);
+  cv::PitchFxParams tuned;
+  autotuneOn(tuned);
+  cv::PitchFxParams both = formantOn(3);
+  autotuneOn(both);
+  const double alone = stepArrival(run(in, tuned), stepAt);
+  const double behind = stepArrival(run(in, both), stepAt);
+  const double plain = stepArrival(run(in, formantOn(3)), stepAt);
+  const double grain = cv::PsolaVoice::kGrainDelay + kRate / kTo;
+  bool ok = report("group latency", std::fabs(behind - alone) <= cv::kBlock && alone - stepAt > 0.8 * grain,
+                   "SHIFT +3 behind Autotune: the step lands %.0f samples from Autotune's own at %.0f after the input (+-64, "
+                   "above %.0f)",
+                   behind - alone, alone - stepAt, 0.8 * grain);
+  ok &= report("group latency, Autotune off", std::fabs(plain - stepAt - grain) <= 0.25 * grain,
+               "SHIFT +3 alone: the step lands %.0f samples after the input, the grain delay plus a period being %.0f (+-25 %%)",
+               plain - stepAt, grain);
+  return ok;
+}
+
+// Runs `in` with `b` from onAt to offAt and `a` outside, in blocks of kBlock.
+Signal runToggled(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFxParams& b, int onAt, int offAt) {
+  gFx.reset();
+  Signal out(in.size());
+  for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
+    gInProcess = true;
+    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, i >= onAt && i < offAt ? b : a);
+    gInProcess = false;
+  }
+  return out;
+}
+
+// Largest |x[i] - x[i - 1]| over [from, to).
+double largestStep(const Signal& x, int from, int to) {
+  double worst = 0.0;
+  for (int i = std::max(from, 1); i < to; ++i) {
+    worst = std::max(worst, std::fabs(static_cast<double>(x[static_cast<size_t>(i)]) - x[static_cast<size_t>(i - 1)]));
+  }
+  return worst;
+}
+
+// How far, in cents, the frequency of x over [from, to) strays from hz: the phase of x against a carrier at hz,
+// averaged over four periods, advances by the stray each four periods.
+double strayCents(const Signal& x, double hz, int from, int to) {
+  const int taps = 4 * static_cast<int>(std::lround(kRate / hz));
+  const int hop = taps;
+  std::vector<std::complex<double>> z(static_cast<size_t>(to));
+  std::complex<double> sum = 0.0;
+  std::vector<std::complex<double>> lp(static_cast<size_t>(to));
+  for (int i = 0; i < to; ++i) {
+    z[static_cast<size_t>(i)] = static_cast<double>(x[static_cast<size_t>(i)]) * std::polar(1.0, -2.0 * kPi * hz * i / kRate);
+    sum += z[static_cast<size_t>(i)];
+    if (i >= taps) sum -= z[static_cast<size_t>(i - taps)];
+    lp[static_cast<size_t>(i)] = sum;
+  }
+  double worst = 0.0;
+  for (int i = std::max(from, 2 * taps + hop); i < to; ++i) {
+    const double dphi = std::arg(lp[static_cast<size_t>(i)] * std::conj(lp[static_cast<size_t>(i - hop)]));
+    const double off = dphi / (2.0 * kPi) * kRate / hop;
+    worst = std::max(worst, std::fabs(1200.0 * std::log2((hz + off) / hz)));
+  }
+  return worst;
+}
+
+// Autotune toggled on and off under the Formant card, on a 440 Hz sine (A4, a note of C major, so the
+// correction is 0 and any stray pitch is the toggle's). The voice moves from the card's input to Autotune's
+// corrected voice with no jump in its read position, so for 300 ms after each toggle the largest step stays
+// at the settled outputs' and the pitch stays within 5 cents of 440 Hz. The toggle fades of Autotune alone
+// and of the Formant card alone stray by tens of cents here, as a crossfade of two delays does.
+bool testAutotuneToggleUnderFormant() {
+  constexpr double kHz = 440.0;
+  const int onAt = 3 * kRate / 2 / cv::kBlock * cv::kBlock;
+  const int offAt = 2 * kRate / cv::kBlock * cv::kBlock;
+  const int win = 300 * kRate / 1000;
+  const Signal in = tone(kHz, 3 * kRate);
+  bool ok = true;
+  for (int shift : {kShift, 0}) {
+    cv::PitchFxParams off = formantOn(shift);
+    cv::PitchFxParams on = formantOn(shift);
+    autotuneOn(on);
+    const Signal settledOff = runToggled(in, off, off, 0, 0);
+    const Signal settledOn = runToggled(in, on, on, 0, 0);
+    const Signal toggled = runToggled(in, off, on, onAt, offAt);
+    double step = 0.0;
+    double stray = strayCents(settledOn, kHz, kRate, 2 * kRate);
+    for (int edge : {onAt, offAt}) {
+      const double ref = std::max(largestStep(settledOff, edge, edge + win), largestStep(settledOn, edge, edge + win));
+      step = std::max(step, largestStep(toggled, edge, edge + win) / ref);
+      stray = std::max(stray, strayCents(toggled, kHz, edge, edge + win));
+    }
+    char name[56];
+    std::snprintf(name, sizeof name, "toggle under Formant, SHIFT %+d", shift);
+    ok &= report(name, step <= 1.05 && stray <= 5.0,
+                 "440 Hz sine, both toggles: largest step x%.3f of the settled outputs' (<= 1.05), pitch within %.2f cents (5)", step,
+                 stray);
+  }
+  return ok;
 }
 
 }  // namespace
@@ -872,6 +1038,8 @@ int main() {
   ok &= testRangeFlags();
   ok &= testNanGuard();
   ok &= testAlignmentVibrato();
+  ok &= testGroupLatency();
+  ok &= testAutotuneToggleUnderFormant();
   std::printf("%s formant\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

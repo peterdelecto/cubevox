@@ -19,6 +19,11 @@
 // is on, whatever Autotune's own toggle does. Settled off with no reader, the output is the input bit for
 // bit.
 //
+// The Formant engine directly behind the card cuts its grains from this card's input, on this grid, so the
+// formant-shifted voice waits for the corrected voice once. The chain feeds it the input, and groupFeed()
+// hands it what it needs to cut: the tracked period, the pitch ratio, the crossfade's gains and the grain
+// grid.
+//
 // A voice resets on its enable edge only once its crossfade has settled at zero, so a quick off and on
 // keeps the running voice instead of cutting to fresh grains. The tracker's frame is warm only while the
 // engine runs. A stopped engine calls rest() each block, and the next call after it starts clean, so the
@@ -42,6 +47,24 @@ struct TrackerNeeds {
   bool outOfRange = false;  // the reader reads PitchResult::outOfRange
 };
 
+// What the Formant engine directly behind the card reads for the chunk the engine just ran, n samples. The
+// audio that leaves the card is `tuned` times the corrected voice plus `dry` times the card's input, and
+// `fade` is the crossfade's linear position, 0 dry to 1 corrected, at the chunk's first and last sample.
+struct GroupFeed {
+  int n = 0;
+  float period = 0.0f;  // the tracker's period for the chunk
+  float delay = 0.0f;   // the corrected voice's delay behind the input at that period
+  float ratio = 1.0f;   // the pitch ratio of the correction at the middle of the chunk
+  float trim = 1.0f;    // the gain the corrected voice's grains carry
+  float fade0 = 0.0f;
+  float fade1 = 0.0f;
+  float tuned0 = 0.0f;
+  float tuned1 = 0.0f;
+  float dry0 = 1.0f;
+  float dry1 = 1.0f;
+  GridMarks marks;      // the corrected voice's grain grid as the chunk's render started; valid while it renders
+};
+
 class AutotuneFx {
  public:
   AutotuneFx() { reset(); }
@@ -54,6 +77,7 @@ class AutotuneFx {
     voice_.reset();
     fade_ = 0.0f;
     gains_ = Gains{};
+    feed_ = GroupFeed{};
     was_ = false;
     fresh_ = true;
     rested_ = false;
@@ -68,9 +92,12 @@ class AutotuneFx {
   }
 
   // Runs n samples of any call length, in chunks of at most kBlock. in and out may be the same buffer.
-  void process(const float* in, float* out, int n, const AutotuneParams& p, const TrackerNeeds& need = TrackerNeeds{}) {
+  // `grid` is the grain grid of the Formant voice directly behind the card when one is running. A corrected
+  // voice that starts takes its newest mark from it, so the two lay their grains on one grid from the start.
+  void process(const float* in, float* out, int n, const AutotuneParams& p, const TrackerNeeds& need = TrackerNeeds{},
+               const GridMarks& grid = GridMarks{}) {
     if (rested_) reset();
-    for (int c = 0; c < n; c += kBlock) chunk(in + c, out + c, n - c < kBlock ? n - c : kBlock, p, need);
+    for (int c = 0; c < n; c += kBlock) chunk(in + c, out + c, n - c < kBlock ? n - c : kBlock, p, need, grid);
   }
 
   // The tracker's reading of the audio that entered the card.
@@ -92,6 +119,10 @@ class AutotuneFx {
     return gains_.corrected * gains_.corrected * voice_.voiceDelay(tracker_.result().period);
   }
 
+  // What the Formant engine directly behind the card cuts from, for the last chunk the engine ran. A call
+  // longer than kBlock runs several chunks and leaves the last one's.
+  const GroupFeed& groupFeed() const { return feed_; }
+
   // Test hooks: the crossfade, 0 dry .. 1 corrected, the ring, and the floats the ring clears have zeroed.
   float fadeForTest() const { return fade_; }
   const InputRing<kAutotuneRingLen>& ringForTest() const { return ring_; }
@@ -110,7 +141,8 @@ class AutotuneFx {
     return g;
   }
 
-  void chunk(const float* in, float* out, int n, const AutotuneParams& p, const TrackerNeeds& need) {
+  void chunk(const float* in, float* out, int n, const AutotuneParams& p, const TrackerNeeds& need,
+             const GridMarks& grid) {
     // The tracker runs while Autotune is on or still fading, so the voice keeps its period through the
     // crossfade, and while a reader behind is on. The 48 kHz fine pass runs for Autotune's own voice,
     // which must sit on the sung pitch to the cent, and for a reader that asks.
@@ -123,7 +155,10 @@ class AutotuneFx {
       tracker_.idle(n);
     }
     const PitchResult& pr = tracker_.result();
-    if (p.on && !was_ && fade_ == 0.0f) voice_.reset();
+    if (p.on && !was_ && fade_ == 0.0f) {
+      voice_.reset();
+      voice_.adoptMarks(grid);
+    }
     was_ = p.on;
     voice_.prepare(pr, p, n);
 
@@ -137,16 +172,42 @@ class AutotuneFx {
     }
     if (fade_ == 0.0f && target == 0.0f) {
       gains_ = Gains{};
+      feed_ = GroupFeed{};
+      feed_.n = n;
+      feed_.period = pr.period;
+      feed_.delay = voice_.voiceDelay(pr.period);
+      feed_.trim = voice_.trimGain();
       if (out != in) std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
       return;
     }
     const Gains g0 = gains_;
+    const float fade0 = fade_;
     if (fade_ != target) {
       fade_ = smooth::step(fade_, target, smoothCoefFor(n));
       gains_ = gainsNow();
     }
     const Gains g1 = gains_;
+    noteFeed(n, pr.period, fade0, g0, g1);
     mix(in, out, n, first, pr.period, g0, g1);
+  }
+
+  // Records what the Formant engine behind the card reads for this chunk. It runs before the voice
+  // renders, so the pitch ratio and the grid are the chunk's own, not the end of it.
+  void noteFeed(int n, float period, float fade0, const Gains& g0, const Gains& g1) {
+    const bool voiced = g0.corrected > 0.0f || g1.corrected > 0.0f;
+    feed_.n = n;
+    feed_.period = period;
+    feed_.delay = voice_.voiceDelay(period);
+    feed_.ratio = voiced ? exp2Fast(voice_.correctionAfter(0.5f * static_cast<float>(n)) * (1.0f / 12.0f)) : 1.0f;
+    feed_.trim = voice_.trimGain();
+    feed_.fade0 = fade0;
+    feed_.fade1 = fade_;
+    feed_.tuned0 = g0.corrected;
+    feed_.tuned1 = g1.corrected;
+    feed_.dry0 = g0.dry;
+    feed_.dry1 = g1.dry;
+    feed_.marks = voice_.marks();
+    feed_.marks.valid = voiced;
   }
 
   // The corrected voice for the chunk, mixed against the input. The voice is skipped while the crossfade
@@ -181,6 +242,7 @@ class AutotuneFx {
   PitchTracker tracker_;
   AutotuneVoiceT<kAutotuneRingLen> voice_;
   std::array<float, kBlock> buf_{};  // the corrected voice's chunk
+  GroupFeed feed_;                   // what the Formant engine behind the card reads for the last chunk
   float fade_ = 0.0f;                // 0 dry .. 1 corrected
   Gains gains_;                      // the gains at the end of the last chunk
   float coef_ = 1.0f;

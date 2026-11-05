@@ -445,6 +445,39 @@ bool autotuneRows() {
   return ok;
 }
 
+// The Formant card directly behind a running Autotune at every SHIFT, MIX 100 %, on Adam's clips. The card
+// joins Autotune's grain pass, and its stage is the audio it adds on top of Autotune's, so each clip's output is
+// read against Autotune's own output over the same clip. The rows are held as the card alone is: each clip to
+// the mid band and the mean of the three to the rule. The group trim (kFormantGroupTrimDb) keeps the single
+// cut from reading over what the card read cutting Autotune's output a second time.
+bool formantBehindAutotuneRows() {
+  bool ok = true;
+  for (int st = -cv::kFormantMaxShiftSt; st <= cv::kFormantMaxShiftSt; ++st) {
+    char label[48];
+    std::snprintf(label, sizeof label, "formant behind autotune %+d st mix 1", st);
+    cv::PitchFxParams both = boxFormantAt(st, 1.0f);
+    both.autotune = boxAutotune(0, 1.0f).autotune;
+    const cv::PitchFxParams tuned = boxAutotune(0, 1.0f);
+    double mean = 0.0;
+    int count = 0;
+    ok &= clipRows(
+        label,
+        [&](const Signal& padded) {
+          auto a = std::make_unique<Stage<PitchSeries>>();
+          auto b = std::make_unique<Stage<PitchSeries>>();
+          const Signal mid = run(padded, [&](const float* i, float* o, int n) { a->fx.process(i, o, n, tuned); });
+          return Through{mid, run(padded, [&](const float* i, float* o, int n) { b->fx.process(i, o, n, both); })};
+        },
+        kMidLoDb, kMidHiDb, mean, count);
+    if (count > 0) {
+      char name[56];
+      std::snprintf(name, sizeof name, "%s mean", label);
+      ok &= verdict(name, mean, kLoDb, kHiDb);
+    }
+  }
+  return ok;
+}
+
 // Echo and Unison add their wet on top of the dry voice, which passes at unity at every Amount, so
 // the level is the dry plus whatever the wet adds. Each card has a reference setting, where its
 // trim is tuned and its mean over Adam's clips is held to the rule's band, and a 100 % row, which
@@ -839,6 +872,7 @@ bool slotRows(const Signal& in) {
   ok &= unisonSwitchOnRows();
   ok &= crowdRows();
   ok &= formantRows(in);
+  ok &= formantBehindAutotuneRows();
   ok &= lofiRows();
   ok &= bloomRows();
 

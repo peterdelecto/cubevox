@@ -112,6 +112,7 @@ class FormantPsolaVoiceT {
     fresh_ = true;
     markDelay_ = 0.0f;
     countdown_ = 0.0f;
+    pendingLead_ = 0.0f;
     lastPeriod_ = 0.0f;
   }
 
@@ -120,6 +121,23 @@ class FormantPsolaVoiceT {
 
   // True until a voiced prepare() has put the marks down. That call's first sample launches a grain.
   bool starting() const { return fresh_; }
+
+  // The grid as the next render starts from it. A voice that has not been prepared reports it invalid.
+  GridMarks marks() const { return {markDelay_, countdown_, !fresh_}; }
+
+  // Takes up another voice's grid after a prepare(): the newest mark and the samples to the next launch,
+  // held inside the span prepare() set for the marks. The voice then lays its grains at the instants
+  // the other voice lays its own, as long as both play the same period. A voice with no grain in flight
+  // lays, at its first sample, the grain that launched before the call and has played since, at the age it
+  // has there, so its window sum is whole from that sample. An invalid grid changes nothing.
+  void adoptMarks(const GridMarks& m) {
+    if (!m.valid || !voiced_) return;
+    markDelay_ = m.markDelay;
+    countdown_ = m.countdown;
+    fresh_ = false;
+    realignMarks();
+    pendingLead_ = count_ == 0 && m.countdown > 1.0f ? outPeriod_ + 1.0f - m.countdown : 0.0f;
+  }
 
   // The grain playback rate the last prepare() took, for the tests.
   float rate() const { return rate_; }
@@ -193,6 +211,7 @@ class FormantPsolaVoiceT {
     if (!voiced_) return;
     ring_ = ring.data();
     for (size_t k = 0; k < count_; ++k) grains_[k].start = 0;
+    if (pendingLead_ > 0.0f) layLate(first);
     if (countdown_ > outPeriod_) countdown_ = outPeriod_;
     for (int i = 0;;) {
       const int k = countdown_ > 1.0f ? static_cast<int>(ceilf(countdown_)) : 1;
@@ -269,6 +288,18 @@ class FormantPsolaVoiceT {
   void realignMarks() {
     for (int k = 0; k < kMaxMarkSteps && markDelay_ - p_ >= ref_; ++k) markDelay_ -= p_;
     for (int k = 0; k < kMaxMarkSteps && markDelay_ < ref_; ++k) markDelay_ += p_;
+  }
+
+  // The grain that launched pendingLead_ samples before the call, laid at the call's first sample at the age
+  // it has by then, with the one before it. The marks and the countdown stay where the grid put them.
+  void layLate(int first) {
+    const float saved = markDelay_;
+    advanceMarks();
+    const int head = wrapOnce<RingLen>(first);
+    if (count_ == 0) prefill(head, pendingLead_, 0);
+    launch(head, pendingLead_, 0);
+    markDelay_ = saved;
+    pendingLead_ = 0.0f;
   }
 
   // A free slot, or the oldest grain's when all are in use.
@@ -457,6 +488,7 @@ class FormantPsolaVoiceT {
   float ref_ = 0.0f;
   float markDelay_ = 0.0f;
   float countdown_ = 0.0f;
+  float pendingLead_ = 0.0f;  // how long before the next call a grain launched that adoptMarks() asks it to lay
   bool voiced_ = false;
   bool fresh_ = true;
   bool latch_ = false;

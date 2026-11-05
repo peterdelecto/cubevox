@@ -1201,16 +1201,22 @@ Block walkSlotsByHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
     switch (c) {
       case Card::Autotune: {
         cv::TrackerNeeds need;
+        cv::GridMarks grid;
         for (int t = s + 1; t < kSlotCount; ++t) {
           const Card behind = snap.layout.card[static_cast<size_t>(t)];
           if (behind == Card::Empty) continue;
-          if (behind == Card::Formant) need = {true, true, true};
+          if (behind == Card::Formant) {
+            need = {true, true, true};
+            grid = rig.engines.formant.gridMarks();
+            rig.engines.formant.feed(cur.data(), kN);
+          }
           break;
         }
-        rig.engines.autotune.process(cur.data(), next.data(), kN, snap.params.pitchFx.autotune, need);
+        rig.engines.autotune.process(cur.data(), next.data(), kN, snap.params.pitchFx.autotune, need, grid);
         autotuneAhead = true;
         adjacent = true;
-        up = {&rig.engines.autotune.pitch(), rig.engines.autotune.correctionSemis(), rig.engines.autotune.outputLatency()};
+        up = {&rig.engines.autotune.pitch(), rig.engines.autotune.correctionSemis(), rig.engines.autotune.outputLatency(),
+              &rig.engines.autotune, 1.0f, 1.0f};
         break;
       }
       case Card::Octave:
@@ -1271,9 +1277,9 @@ void checkSlotsEqualEngines() {
   }
 }
 
-// Formant reads Autotune's tracker when it sits directly behind it, so its own tracker stays idle. Anywhere
-// else (Octave between, Autotune behind it, no Autotune) it runs a tracker of its own, and the chain still
-// equals the engines run by hand.
+// Formant joins Autotune's grain pass when it sits directly behind it: it reads Autotune's tracker, so its own
+// tracker stays idle, and cuts its grains from Autotune's input. Anywhere else (a card between, Autotune behind
+// it, no Autotune) it runs a tracker and a ring of its own, and the chain still equals the engines run by hand.
 void checkFormantReusesTracker() {
   struct Case {
     const char* name;
@@ -1302,6 +1308,129 @@ void checkFormantReusesTracker() {
     check(same, (std::string(k.name) + ": the chain equals the engines run by hand").c_str());
     check(ownRuns == !k.reuses,
           (std::string(k.name) + (k.reuses ? ": Formant's own tracker stays idle" : ": Formant runs its own tracker")).c_str());
+    check(chain->engines.formant.groupedForTest() == k.reuses,
+          (std::string(k.name) + (k.reuses ? ": Formant cuts from Autotune's input" : ": Formant cuts from its own ring")).c_str());
+  }
+}
+
+// Apraxia runs the Formant engine, so directly behind Autotune it joins the pass too: its sweep sets the rate
+// of the render that cuts from Autotune's input, and its own tracker stays idle.
+void checkApraxiaJoinsAutotunePass() {
+  const ChainSnapshot snap = snapshotFor(layoutOf({Card::Autotune, Card::FormantFollower}), 0.5f, false);
+  auto chain = newRig();
+  chain->fades.settle(snap.slotOn);
+  bool heard = false;
+  for (int b = 0; b < kCardRunBlocks; ++b) {
+    const Block in = tone(b, 0.3f);
+    const Run run = runBlock(*chain, snap, in, StillClock());
+    if (b >= kCardRunBlocks / 2) heard = heard || run.out != in;
+  }
+  check(heard && chain->engines.formant.groupedForTest() && chain->engines.formant.ownPitch().period == 0.0f,
+        "Apraxia directly behind Autotune cuts from Autotune's input and runs no tracker of its own");
+}
+
+// A 220 Hz voice of ten harmonics at 1/k that continues across blocks, peaking near `amp`. A sine would do
+// for a card that passes it, but the Formant card moves its one harmonic and the mix cancels it.
+Block harmonics(int block, float amp) {
+  constexpr double kPi = 3.14159265358979323846;
+  Block x{};
+  for (int i = 0; i < kN; ++i) {
+    const double phase = 2.0 * kPi * 220.0 * static_cast<double>(block * kN + i) / cv::kSampleRate;
+    double s = 0.0;
+    for (int k = 1; k <= 10; ++k) s += std::sin(k * phase) / k;
+    x[static_cast<size_t>(i)] = amp * static_cast<float>(s / 1.9);
+  }
+  return x;
+}
+
+// The Autotune slot flipped on and off under a Formant card directly behind it, through the slot's fade and
+// Autotune's own crossfade. The card plays the share of Autotune's input and the share of its corrected voice
+// at one delay, so for 300 ms after each flip the output's largest step stays at the settled outputs'.
+void checkAutotuneToggleUnderFormant() {
+  const Layout layout = layoutOf({Card::Autotune, Card::Formant});
+  const ChainSnapshot off = snapshotToggles(layout, 0.5f, togglesOn({1}));
+  const ChainSnapshot on = snapshotToggles(layout, 0.5f, togglesOn({0, 1}));
+  constexpr int kWarm = 300;
+  constexpr int kHold = 300;
+  constexpr int kWindow = 225;  // 300 ms
+  auto toggled = newRig();
+  auto settledOff = newRig();
+  auto settledOn = newRig();
+  toggled->fades.settle(off.slotOn);
+  settledOff->fades.settle(off.slotOn);
+  settledOn->fades.settle(on.slotOn);
+  std::vector<float> t;
+  std::vector<float> lo;
+  std::vector<float> hi;
+  for (int b = 0; b < kWarm + 2 * kHold; ++b) {
+    const bool between = b >= kWarm && b < kWarm + kHold;
+    const Block in = harmonics(b, 0.3f);
+    append(t, runBlock(*toggled, between ? on : off, in, StillClock()).out);
+    append(lo, runBlock(*settledOff, off, in, StillClock()).out);
+    append(hi, runBlock(*settledOn, on, in, StillClock()).out);
+  }
+  float worst = 0.0f;
+  for (const int edge : {kWarm, kWarm + kHold}) {
+    const auto from = static_cast<std::ptrdiff_t>(edge) * kN;
+    const auto to = from + static_cast<std::ptrdiff_t>(kWindow) * kN;
+    auto windowStep = [&](const std::vector<float>& x) {
+      return maxStep(std::vector<float>(x.begin() + from, x.begin() + to));
+    };
+    worst = std::max(worst, windowStep(t) / std::max(windowStep(lo), windowStep(hi)));
+  }
+  check(worst < 1.1f, "Autotune slot flipped under Formant: the largest step in 300 ms stays within 10 % of the settled outputs'");
+}
+
+// A Formant engine that joins Autotune's grain pass waits for the corrected voice once, so the delay the path
+// hands on to the cards behind equals Autotune's own latency. Behind a card in between, or ahead of nothing, it
+// cuts from its own ring and adds its whole lag on top.
+void checkGroupedFormantLatency() {
+  struct Case {
+    const char* name;
+    Layout layout;
+    bool grouped;
+  };
+  const Case cases[] = {
+      {"Formant directly behind Autotune", layoutOf({Card::Autotune, Card::Formant}), true},
+      {"Formant behind Autotune with an Empty slot between", layoutOf({Card::Autotune, Card::Empty, Card::Formant}), true},
+      {"Formant behind Autotune and Echo", layoutOf({Card::Autotune, Card::Slapback, Card::Formant}), false},
+  };
+  for (const Case& k : cases) {
+    const ChainSnapshot snap = snapshotFor(k.layout, 0.5f, false);
+    auto withFormant = newRig();
+    auto autotuneOnly = newRig();
+    float behind = 0.0f;
+    float alone = 0.0f;
+    for (int b = 0; b < kCardRunBlocks; ++b) {
+      const Block in = tone(b, 0.3f);
+      Block mid{};
+      Block out{};
+      PitchPath soloPath;
+      runStage(autotuneOnly->engines, Card::Autotune, in.data(), mid.data(), kN, snap.params, soloPath);
+      alone = soloPath.upstream.latency;
+
+      // The chain's walk: Autotune with its reader's needs, then the cards behind it.
+      PitchPath path;
+      StageContext ctx;
+      ctx.tracker = {true, true, true};
+      ctx.feedsFormant = k.grouped;
+      if (k.grouped) ctx.groupGrid = withFormant->engines.formant.gridMarks();
+      runStage(withFormant->engines, Card::Autotune, in.data(), mid.data(), kN, snap.params, path, ctx);
+      Block cur = mid;
+      for (int s = 0; s < kSlotCount; ++s) {
+        const Card c = snap.layout.card[static_cast<size_t>(s)];
+        if (c == Card::Autotune || c == Card::Empty) continue;
+        runStage(withFormant->engines, c, cur.data(), out.data(), kN, snap.params, path);
+        cur = out;
+      }
+      behind = path.upstream.latency;
+    }
+    check(alone > 0.0f, (std::string(k.name) + ": Autotune's own latency is the corrected voice's delay").c_str());
+    if (k.grouped) {
+      check(std::fabs(behind - alone) < 0.5f, (std::string(k.name) + ": the delay handed on equals Autotune's alone").c_str());
+    } else {
+      check(behind > alone + 1000.0f, (std::string(k.name) + ": the delay handed on adds the Formant engine's own lag").c_str());
+    }
   }
 }
 
@@ -1324,8 +1453,10 @@ void checkAutotuneTrackerForReaders() {
     Block tuned{};
     Block want{};
     cv::TrackerNeeds need{true, true, true};
-    hand->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchFx.autotune, need);
-    const cv::UpstreamPitch up{&hand->engines.autotune.pitch(), 0.0f, 0.0f};
+    hand->engines.formant.feed(in.data(), kN);
+    hand->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchFx.autotune, need,
+                                   hand->engines.formant.gridMarks());
+    const cv::UpstreamPitch up{&hand->engines.autotune.pitch(), 0.0f, 0.0f, &hand->engines.autotune, 0.0f, 0.0f};
     hand->engines.formant.process(in.data(), want.data(), kN, snap.params.pitchFx.formant, up);
     same = same && run.out == want;
     dry = dry && chain->fades.level(0) == 0;
@@ -1586,6 +1717,9 @@ void checkChainRun() {
   checkAppendedCardsRun();
   checkSlotsEqualEngines();
   checkFormantReusesTracker();
+  checkGroupedFormantLatency();
+  checkApraxiaJoinsAutotunePass();
+  checkAutotuneToggleUnderFormant();
   checkAutotuneTrackerForReaders();
   checkApraxiaBehindDeepthroat();
   checkBloomKey();

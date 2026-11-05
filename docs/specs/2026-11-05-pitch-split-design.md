@@ -84,7 +84,7 @@ step 6. DTCM is 130,816 B. D1 is 524,288 B.
 |---|---|---|
 | Autotune | stage tracker on the first pitch-group slot's input | its own tracker on its own input, fine pass |
 | Octave | none; adds Autotune's correction to its interval | none; drops the correction, which Autotune's output already carries |
-| Formant, Yawn | stage tracker, Autotune's correction as pitch ratio, Autotune's grain delay | directly behind Autotune: Autotune's tracker. Anywhere else: its own tracker on its own input. Pitch ratio 1 in both |
+| Formant, Yawn | stage tracker, Autotune's correction as pitch ratio, Autotune's grain delay | directly behind Autotune: Autotune's tracker. Anywhere else: its own tracker on its own input. Pitch ratio 1 in both. **Superseded by `2026-11-05-grain-group-design.md`: directly behind Autotune the card also cuts from Autotune's ring, at Autotune's pitch ratio and delay** |
 | Mob (exempt) | stage ring, tracker and correction | Autotune ahead: Autotune's tracker and correction, and a ring Autotune's slot writes from Autotune's input. No Autotune ahead: Mob writes its own input into its ring and runs its own tracker |
 | Deepthroat | stage period, `outputShiftSemis()`, `outputLatency()` | Autotune ahead: Autotune's tracker with the shift and latency the chain sums (below). No Autotune ahead: its own tracker on its own ring, shift 0, latency 0 |
 | Ringer | own tracker on its own input | unchanged |
@@ -154,11 +154,12 @@ Range is 1 kHz to 70 Hz. Adam's G2 (98 Hz, period 490 samples) in brackets.
 | Default layout, the tuned voice (Octave MIX 10 %) | 22.7 to 36.0 ms (31.9) | same |
 | Octave wet behind its own input | 20.1 ms | 20.1 ms |
 | Octave wet behind the mic, Autotune on | 20.1 ms, 2.6 to 15.9 ms ahead of the tuned voice | 42.8 to 56.1 ms (52.0), 20.1 ms behind the tuned voice |
-| Formant or Yawn behind Autotune (menu layouts) | 22.7 to 36.0 ms (31.9) | 24.3 to 57.5 ms (47.3) |
+| Formant or Yawn behind Autotune (menu layouts) | 22.7 to 36.0 ms (31.9) | 24.3 to 57.5 ms (47.3). **Superseded by `2026-11-05-grain-group-design.md`: 22.7 to 36.0 ms (31.9), Autotune's own** |
 | Formant or Yawn on its own tracker | voice 22.7 to 36.0 ms, base 0 | voice and base 22.7 to 36.0 ms |
 
 1. Formant behind Autotune adds its lag floor, 1.5 periods and 4 samples: 1.6 to 21.5 ms (15.4 ms at G2).
-   PSOLA needs that lookahead. Today Formant gets it free inside Autotune's delay.
+   PSOLA needs that lookahead. Today Formant gets it free inside Autotune's delay. (Superseded: the grain
+   group removes this addition.)
 2. Formant on its own tracker reads at the grain delay plus a period, where the tracker's frame stands, as
    Autotune does.
 

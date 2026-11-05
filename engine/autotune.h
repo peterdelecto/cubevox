@@ -112,6 +112,14 @@ class AutotuneVoiceT {
   // Drops the grains in flight. The correction keeps its place.
   void restartVoice() { psola_.reset(); }
 
+  // The voice's grain grid as the next render starts from it, and the grid a voice beside it already
+  // stands on, which a freshly reset voice takes up.
+  GridMarks marks() const { return psola_.marks(); }
+  void adoptMarks(const GridMarks& m) { psola_.adoptMarks(m); }
+
+  // The gain the voice's grains carry, the level rule's trim.
+  float trimGain() const { return trim_.gain(); }
+
   // The correction in semitones: the part that follows the sung pitch plus the KEY glide's.
   float correctionSemis() const { return corr_ + noteOffset_; }
 

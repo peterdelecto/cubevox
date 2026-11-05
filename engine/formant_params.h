@@ -25,6 +25,12 @@ constexpr float kFormantPowerFloor = 1e-20f;  // below this a power is silence
 // The shifted voice's trim, which the engine clamps to this many dB either way.
 constexpr float kFormantMaxTrimDb = 24.0f;
 
+// The trim of the corrected voice's share when the card cuts from Autotune's input, in dB, on top of the table
+// trim and Autotune's own. The table fits the voice cut from the card's own input, and Autotune's trim lifts the
+// corrected voice, so together they read about 0.3 dB over the level rule once SHIFT leaves 0 (SHIFT 0 reads on
+// target). The trim ramps in over the first semitone of SHIFT.
+constexpr float kFormantGroupTrimDb = -0.3f;
+
 // How far the base and the shifted voice correlate at a SHIFT of 0, 1, 2 and 3 st or more, measured on
 // Adam's three clips. The level gain starts from it when the base has sat out at MIX 100 % and comes
 // back.

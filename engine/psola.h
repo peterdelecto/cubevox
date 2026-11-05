@@ -31,6 +31,16 @@ constexpr float kMinPitchRatio = 0.5f;
 constexpr float kMaxPitchRatio = 2.0f;
 constexpr float kMinReadDelay = 3.0f;
 
+// Where a voice's grain grid stands: the delay of its newest mark behind the write head and the samples
+// until its next launch. Two voices that start from the same marks and play the same period lay their
+// grains at the same instants. `valid` is false when the owner has no grid to offer: a voice that has laid
+// no marks, or one that is not running.
+struct GridMarks {
+  float markDelay = 0.0f;
+  float countdown = 0.0f;
+  bool valid = false;
+};
+
 // The ring length is a template argument, the Mob card's ring by default.
 template <int RingLen = kVoiceRingLen>
 class PsolaVoiceT {
@@ -54,6 +64,18 @@ class PsolaVoiceT {
 
   // The grain delay in samples, up to kGrainDelay. Each grain reads the input at this fixed delay.
   void setGrainDelay(float samples) { grainDelay_ = clampf(samples, kMinReadDelay + 1.0f, kGrainDelay); }
+
+  // The grid as the next render starts from it.
+  GridMarks marks() const { return {markDelay_, countdown_, true}; }
+
+  // Takes up the grid another voice reported, so a voice that starts beside it lays its grains at the same
+  // instants. A newest mark under the grain delay is held at it, where render keeps the mark. An invalid
+  // grid changes nothing.
+  void adoptMarks(const GridMarks& m) {
+    if (!m.valid) return;
+    markDelay_ = m.markDelay < grainDelay_ ? grainDelay_ : m.markDelay;
+    countdown_ = m.countdown;
+  }
 
   // The gain of the grains that launch from now on, 1 for none. It rides on their tap weights, so
   // a trim costs nothing per sample.

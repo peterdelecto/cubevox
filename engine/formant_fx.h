@@ -5,6 +5,7 @@
 #include <cstring>
 #include <limits>
 
+#include "engine/autotune_fx.h"
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
@@ -21,11 +22,21 @@
 // moves the formants by the SHIFT rate. The base, the other half of MIX, is the same ring read at the
 // voice's lag, so the two line up at every setting and at SHIFT 0 the voice rebuilds the base.
 //
-// The grains sit on a period grid. Directly behind the Autotune card the engine reads Autotune's tracker:
-// the chain hands it the tracker's result, the shift Autotune put on the pitch and the delay it put on
-// the audio. Anywhere else the engine runs a tracker of its own on its own input, since the input can
-// carry two pitches at once. In both cases the voice reads at the tracker's alignment less the delay
-// already on the audio, held over the floor a grain centred on a mark needs.
+// The grains sit on a period grid. Anywhere but directly behind the Autotune card the engine runs a tracker
+// of its own on its own input, since the input can carry two pitches at once, and the voice reads at the
+// tracker's alignment less the delay already on the audio, held over the floor a grain centred on a mark
+// needs.
+//
+// Directly behind the Autotune card (only Empty slots between) the engine joins Autotune's grain pass. The
+// chain feeds it the audio that entered Autotune (feed), the engine reads Autotune's tracker, and it cuts its
+// grains from that audio, on Autotune's grid, at Autotune's delay. The corrected voice and the formant move
+// then come from one cut, so the voice waits for Autotune's delay once. The audio the engine receives is
+// `tuned` times Autotune's corrected voice plus `dry` times Autotune's input, and the engine renders the same
+// shares: the voice at Autotune's pitch ratio for the first, a voice at ratio 1 for the second. Both start at
+// the same grid, so Autotune's crossfade, whether its toggle or its fade, moves the voice from one to the
+// other with no jump in the read position. Settled off, the ratio 1 voice alone runs, and it equals the voice
+// that cuts the card's own input. The base is the audio as it arrives, with the share of Autotune's input
+// moved to the voice's delay.
 //
 // The toggle's fade crosses the card's input to the mixed output over the 20 ms one-pole. The mix has
 // linear gains, and a level gain that follows how far the base and the voice correlate (see levelGainAt)
@@ -48,6 +59,7 @@ class FormantFx {
 
   FormantFx() {
     voice_.latchGain(true);
+    tuned_.latchGain(true);
     reset();
   }
 
@@ -57,7 +69,7 @@ class FormantFx {
     ring_.clear();
     zeroRun_ = kFormantRingLen;
     tracker_.reset();
-    voice_.reset();
+    resetVoices();
     resetLevelGain();
     mix_ = 0.0f;
     fade_ = 0.0f;
@@ -68,6 +80,9 @@ class FormantFx {
     rangeBad_ = false;
     lagSet_ = false;
     lag_ = 0.0f;
+    grouped_ = false;
+    fedN_ = 0;
+    latencyShare_ = 1.0f;
     fresh_ = true;
     rested_ = false;
   }
@@ -78,9 +93,23 @@ class FormantFx {
     rested_ = true;
   }
 
+  // Puts the n samples that enter the Autotune card into the ring, ahead of the process() call that joins
+  // Autotune's grain pass, which then reads the ring and does not write the audio it is handed. The chain calls
+  // it from the Autotune slot while the card behind is live. Only a call of at most kBlock samples can join,
+  // since Autotune holds the grain feed of its last chunk only; a longer one writes nothing.
+  void feed(const float* in, int n) {
+    if (rested_) reset();
+    if (n <= 0 || n > kBlock) return;
+    fedZeroBefore_ = zeroRun_;
+    noteZeros(in, n);
+    fedFirst_ = ring_.write(in, n);
+    fedN_ = n;
+  }
+
   // Runs n samples of any call length, in chunks of at most kBlock. in and out may be the same buffer.
-  // `up` names Autotune's tracker when the card sits directly behind the Autotune card, and is empty
-  // otherwise.
+  // `up` names the Autotune engine, with its tracker, when the card sits directly behind the Autotune card,
+  // and is empty otherwise. The card joins Autotune's pass only after a feed() of the same n. Without one, or
+  // with an `up` that names no engine, it runs on its own ring and its own tracker.
   void process(const float* in, float* out, int n, const FormantParams& p, const UpstreamPitch& up = UpstreamPitch{}) {
     if (rested_) reset();
     for (int c = 0; c < n; c += kBlock) chunk(in + c, out + c, n - c < kBlock ? n - c : kBlock, p, up);
@@ -92,14 +121,21 @@ class FormantFx {
   float shiftSemis() const { return shiftSm_; }
 
   // The delay of the card's output behind its input in samples: the delay the voice and the base play at,
-  // weighted by the toggle's fade. The input crosses to the mix as the fade rises.
-  float outputLatency() const { return fade_ * baseLag_; }
+  // weighted by the toggle's fade. The input crosses to the mix as the fade rises. Cutting from Autotune's
+  // ring, the card waits for Autotune's corrected voice and adds only the part of its delay that
+  // Autotune's own latency (its corrected share, squared) does not already count.
+  float outputLatency() const { return fade_ * baseLag_ * latencyShare_; }
+
+  // The grain grid of the voice that cuts the audio of Autotune's input, for the Autotune engine to take
+  // up when its corrected voice starts. Invalid unless that voice is running.
+  GridMarks gridMarks() const { return grouped_ && dryRuns_ ? voice_.marks() : GridMarks{}; }
 
   // The tracker of the card's own, for the tests.
   const PitchResult& ownPitch() const { return tracker_.result(); }
 
-  // Test hooks: the ring, the floats the ring clears have zeroed, the lag the voice read at last, and the
-  // level gain.
+  // Test hooks: the card cut from Autotune's input in the last chunk, the ring, the floats the ring clears
+  // have zeroed, the lag the voice read at last, and the level gain.
+  bool groupedForTest() const { return grouped_; }
   const InputRing<kFormantRingLen>& ringForTest() const { return ring_; }
   uint32_t ringClearedForTest() const { return ring_.clearedForTest(); }
   float lagForTest() const { return lag_; }
@@ -122,19 +158,60 @@ class FormantFx {
     float bv = 0.0f;
   };
 
+  // Where a chunk cuts from. With `feed` null the card cuts from the audio it receives. Otherwise it cuts from
+  // Autotune's input, which feed() put in the card's ring: `a0` and `a1` are the corrected voice's share of the voice (linear, 0 for Autotune's
+  // input alone, 1 for the corrected voice alone) at the chunk's first and last sample, and `s0` and `s1`
+  // the gain of the Autotune slot's engine against its input there.
+  struct GroupChunk {
+    const GroupFeed* feed = nullptr;
+    float a0 = 0.0f;
+    float a1 = 0.0f;
+    float s0 = 1.0f;
+    float s1 = 1.0f;
+  };
+
   static bool wantedBy(const FormantParams& f) { return f.on && f.mix > 0.0f; }
+
+  // The chunk's source. The card joins Autotune's pass only when the chain has fed it this chunk's audio and
+  // handed over the Autotune engine, whose last chunk is this one.
+  GroupChunk groupOf(const UpstreamPitch& up, int n) const {
+    GroupChunk g;
+    if (up.group == nullptr || up.result == nullptr || fedN_ != n) return g;
+    const GroupFeed& f = up.group->groupFeed();
+    if (f.n != n) return g;
+    g.feed = &f;
+    g.s0 = up.slotGain0;
+    g.s1 = up.slotGain1;
+    g.a0 = f.fade0 * g.s0;
+    g.a1 = f.fade1 * g.s1;
+    return g;
+  }
 
   void chunk(const float* in, float* out, int n, const FormantParams& p, const UpstreamPitch& up) {
     const bool wanted = wantedBy(p);
-    const int first = ring_.write(in, n);
-    const int zeroBefore = zeroRun_;
-    noteZeros(in, n);
-    const PitchResult& pr = pitchFor(in, n, first, wanted, up);
+    const GroupChunk group = groupOf(up, n);
+    int first = fedFirst_;
+    int zeroBefore = fedZeroBefore_;
+    if (group.feed == nullptr) {
+      first = ring_.write(in, n);
+      zeroBefore = zeroRun_;
+      noteZeros(in, n);
+    }
+    fedN_ = 0;
+    const PitchResult& pr = group.feed != nullptr ? *up.result : ownPitchFor(in, n, first, wanted);
+
+    // The two sources read different rings, so a change of source starts the voices over. The layout
+    // changes that cause one clear the engines anyway.
+    if ((group.feed != nullptr) != grouped_) {
+      grouped_ = group.feed != nullptr;
+      resetVoices();
+      lagSet_ = false;
+    }
 
     // A voice coming on starts clean only when its crossfade has settled at zero; while the crossfade is
     // still up the running voice carries on.
     if (wanted && !was_ && fade_ == 0.0f) {
-      voice_.reset();
+      resetVoices();
       resetLevelGain();
       shiftSet_ = false;
     }
@@ -169,20 +246,26 @@ class FormantFx {
       mix_ = smooth::step(mix_, mixTarget, a);
       fade_ = smooth::step(fade_, fadeTarget, a);
     }
-    prepareVoice(p, n, pr, up);
+    prepareVoice(p, n, pr, group);
     gains_ = gainsNow();
     const Gains g1 = gains_;
     clearIdlePowers();
     const float level0 = levelGain_;
     levelGain_ = smooth::step(level0, levelGainAt(mix_), smoothCoefFor(n));
-    mix(in, out, n, first, zeroBefore, g0, g1, level0);
+    mix(in, out, n, first, zeroBefore, g0, g1, level0, group);
   }
 
-  // The tracker result the chunk reads: Autotune's when the chain hands it over, else the card's own,
-  // which runs while the card is on or fading. The 48 kHz fine pass runs, since the grains must sit on the
-  // sung pitch.
-  const PitchResult& pitchFor(const float* in, int n, int first, bool wanted, const UpstreamPitch& up) {
-    if (up.result != nullptr) return *up.result;
+  // Starts the voices over: the ones that cut from Autotune's input start when the share they serve comes up.
+  void resetVoices() {
+    voice_.reset();
+    tuned_.reset();
+    dryRuns_ = false;
+    tunedRuns_ = false;
+  }
+
+  // The card's own tracker result, for a chunk that cuts from its own ring. The tracker runs while the card
+  // is on or fading. The 48 kHz fine pass runs, since the grains must sit on the sung pitch.
+  const PitchResult& ownPitchFor(const float* in, int n, int first, bool wanted) {
     tracker_.readOutOfRange(wanted);
     if (wanted || fade_ > 0.0f) {
       tracker_.push(in, n, true, true, PitchTracker::History{ring_.data().data(), kFormantRingLen, first});
@@ -197,11 +280,10 @@ class FormantFx {
   // x1.02. It takes the knob outright on the first call after the voice starts. The playback rate and the
   // trim follow the glided SHIFT and are worked out when it moves.
   //
-  // The voice plays at pitch ratio 1 on the period the card's input carries: the tracker's, divided by the
-  // ratio of the shift Autotune put on it. It reads at the tracker's alignment, the grain delay plus a
-  // period, less the delay already on the audio. The base's delay slides toward the voice's at
-  // kDryLagSlew a sample and starts on it.
-  void prepareVoice(const FormantParams& f, int n, const PitchResult& pr, const UpstreamPitch& up) {
+  // Cutting from its own ring the voice plays at pitch ratio 1 on the tracker's period and reads at the
+  // tracker's alignment, the grain delay plus a period. The base's delay slides toward the voice's at
+  // kDryLagSlew a sample and starts on it. Cutting from Autotune's input is prepareGroup's.
+  void prepareVoice(const FormantParams& f, int n, const PitchResult& pr, const GroupChunk& group) {
     const int st = f.shiftSt < -kFormantVoiceMaxShiftSt
                        ? -kFormantVoiceMaxShiftSt
                        : (f.shiftSt > kFormantVoiceMaxShiftSt ? kFormantVoiceMaxShiftSt : f.shiftSt);
@@ -224,14 +306,54 @@ class FormantFx {
       trim_ = dbToGainFast(clampf(trimDbAt(shiftSm_), -kFormantMaxTrimDb, kFormantMaxTrimDb));
       trimSemis_ = shiftSm_;
     }
-    const float shift = up.result != nullptr ? up.shiftSemis : 0.0f;
-    const float delayed = up.result != nullptr ? up.latency : 0.0f;
-    const float period = shift == 0.0f ? pr.period : pr.period / exp2Fast(shift * (1.0f / 12.0f));
-    const float aligned = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(pr.period) - delayed;
-    const float lag = formant_detail::clampLag<kFormantRingLen>(aligned, period);
-    voice_.prepare(period, 1.0f, shiftRate_, lag, kBlock);
+    if (group.feed != nullptr) {
+      prepareGroup(n, pr, group);
+      return;
+    }
+    const float aligned = static_cast<float>(PsolaVoice::kGrainDelay) + PitchTracker::clampPeriod(pr.period);
+    const float lag = formant_detail::clampLag<kFormantRingLen>(aligned, pr.period);
+    voice_.prepare(pr.period, 1.0f, shiftRate_, lag, kBlock);
     lag_ = lag;
-    followVoice(PitchTracker::clampPeriod(period), voice_.outputLag(), n);
+    latencyShare_ = 1.0f;
+    followVoice(PitchTracker::clampPeriod(pr.period), voice_.outputLag(), n);
+  }
+
+  // The voices that cut from Autotune's input. Autotune's input is one voice and the corrected voice
+  // another, and the audio the card receives is a mix of the two that follows Autotune's crossfade, so the
+  // card plays a voice for each share: `voice_` at pitch ratio 1 for the input, `tuned_` at Autotune's ratio
+  // for the corrected voice. Each runs only while its share is up. Both read at the corrected voice's delay.
+  // The one that starts takes its grid from Autotune's corrected voice (or, when that has not started, the
+  // ratio 1 voice sets the grid Autotune takes up), so the two lay their grains on one grid and the
+  // crossfade moves a voice from the first to the second with no jump in the read position.
+  void prepareGroup(int n, const PitchResult& pr, const GroupChunk& group) {
+    const GroupFeed& feed = *group.feed;
+    const float period = pr.period;
+    const float lag = formant_detail::clampLag<kFormantRingLen>(feed.delay, period);
+    const bool needDry = group.a0 < 1.0f || group.a1 < 1.0f;
+    const bool needTuned = group.a0 > 0.0f || group.a1 > 0.0f;
+    if (needDry) {
+      if (!dryRuns_) {
+        voice_.reset();
+        lagSet_ = false;
+      }
+      voice_.prepare(period, 1.0f, shiftRate_, lag, kBlock);
+      if (!dryRuns_) voice_.adoptMarks(feed.marks);
+      followVoice(PitchTracker::clampPeriod(period), voice_.outputLag(), n);
+    }
+    dryRuns_ = needDry;
+    if (needTuned) {
+      if (!tunedRuns_) tuned_.reset();
+      tuned_.prepare(period, feed.ratio, shiftRate_, lag, kBlock);
+      tuned_.adoptMarks(feed.marks);
+    }
+    tunedRuns_ = needTuned;
+    lag_ = lag;
+
+    // Autotune's own latency counts its corrected share squared of the delay the card shares with it.
+    const float tuned = feed.tuned1;
+    latencyShare_ = 1.0f - tuned * tuned;
+    const float off = shiftSm_ < 0.0f ? -shiftSm_ : shiftSm_;
+    groupTrim_ = feed.trim * dbToGainFast(kFormantGroupTrimDb * (off < 1.0f ? off : 1.0f));
   }
 
   // The base reads where the voice actually plays: the grain grid keeps the phase of its history, so the
@@ -261,14 +383,19 @@ class FormantFx {
 
   // The mix of one chunk. The voice renders from the ring. The base is the ring read at the sliding lag,
   // and is skipped when MIX sits at 100 % at both edges: the powers then take a stand-in at the
-  // correlation SHIFT gives.
+  // correlation SHIFT gives. Cutting from Autotune's input, renderGroup makes the voice and the base.
   void mix(const float* in, float* out, int n, int first, int zeroBefore, const Gains& g0, const Gains& g1,
-           float level0) {
+           float level0, const GroupChunk& group) {
     voiceBuf_.fill(0.0f);
-    voice_.render(ring_.data(), first, n, voiceBuf_.data(), zeroBefore);
     const bool needBase = g0.base != 0.0f || g1.base != 0.0f;
     const float inv = 1.0f / static_cast<float>(n);
-    if (needBase) readBase(first, n, inv);
+    const float* baseSrc = baseBuf_.data();
+    if (group.feed == nullptr) {
+      voice_.render(ring_.data(), first, n, voiceBuf_.data(), zeroBefore);
+      if (needBase) readBase(ring_.data(), first, n, inv);
+    } else {
+      baseSrc = renderGroup(in, n, first, zeroBefore, group, needBase, inv);
+    }
     const float dFade = (g1.fade - g0.fade) * inv;
     const float dBase = (g1.base - g0.base) * inv;
     const float dVoice = (g1.voice * g1.trim - g0.voice * g0.trim) * inv;
@@ -288,7 +415,7 @@ class FormantFx {
       level += dLevel;
       const size_t k = static_cast<size_t>(j);
       const float voice = voiceBuf_[k];
-      const float base = needBase ? baseBuf_[k] : 0.0f;
+      const float base = needBase ? baseSrc[k] : 0.0f;
       sums.bb += base * base;
       sums.vv += voice * voice;
       sums.bv += base * voice;
@@ -299,16 +426,74 @@ class FormantFx {
     absorbPowers(sums, inv, needBase, n);
   }
 
-  // The base for the chunk into baseBuf_: the ring read at the sliding lag.
-  void readBase(int first, int n, float inv) {
+  // The base for the chunk into baseBuf_: a ring read at the sliding lag.
+  void readBase(const std::array<float, kFormantRingLen>& ring, int first, int n, float inv) {
     const float lagStep = (baseLag_ - baseLag0_) * inv;
     float at = baseLag0_;
     for (int j = 0; j < n; ++j) {
       at += lagStep;
-      baseBuf_[static_cast<size_t>(j)] =
-          readRing<kFormantRingLen>(ring_.data().data(), wrapOnce<kFormantRingLen>(first + j), at);
+      const int head = wrapOnce<kFormantRingLen>(first + j);
+      baseBuf_[static_cast<size_t>(j)] = readRing<kFormantRingLen>(ring.data(), head, at);
     }
   }
+
+  // The voice into voiceBuf_ and the base for a chunk that cuts the audio fed from Autotune's input, which the
+  // ring holds from `first`. The base is returned as a pointer, which is baseBuf_ or the input itself.
+  //
+  // The voice is the ratio 1 voice (Autotune's input) and the corrected one mixed by their linear shares.
+  // The two share a grid, so at the same pitch they are one waveform and a linear pair holds the level
+  // where an equal-power pair would swell it. The corrected voice carries Autotune's trim, which keeps the
+  // level Autotune's voice holds.
+  //
+  // The audio that arrives is tuned * V + dry * I, with V Autotune's corrected voice and I its input, and
+  // the base is that audio with I moved to the voice's delay and the shares made linear:
+  // alpha * V + (1 - alpha) * I(t - lag). Autotune's input alone (tuned 0) is the ring read at the lag,
+  // the same read the card makes of its own ring. The corrected voice alone (dry 0) is the audio as it
+  // arrives.
+  const float* renderGroup(const float* in, int n, int first, int zeroBefore, const GroupChunk& group,
+                           bool needBase, float inv) {
+    const GroupFeed& feed = *group.feed;
+    const auto& src = ring_.data();
+    const float tuned0 = feed.tuned0 * group.s0;
+    const float tuned1 = feed.tuned1 * group.s1;
+    const bool inputOnly = tuned0 == 0.0f && tuned1 == 0.0f;
+    if (dryRuns_) voice_.render(src, first, n, voiceBuf_.data(), inputOnly ? zeroBefore : 0);
+    if (tunedRuns_) {
+      tunedBuf_.fill(0.0f);
+      tuned_.render(src, first, n, tunedBuf_.data(), 0);
+      const float dA = (group.a1 - group.a0) * inv;
+      for (int j = 0; j < n; ++j) {
+        const float a = group.a0 + dA * static_cast<float>(j + 1);
+        const size_t k = static_cast<size_t>(j);
+        voiceBuf_[k] = (1.0f - a) * voiceBuf_[k] + a * groupTrim_ * tunedBuf_[k];
+      }
+    }
+    if (!needBase) return baseBuf_.data();
+    const float dry0 = feed.dry0 * group.s0 + (1.0f - group.s0);
+    const float dry1 = feed.dry1 * group.s1 + (1.0f - group.s1);
+    if (dry0 == 0.0f && dry1 == 0.0f) return in;
+    readBase(src, first, n, inv);
+    if (inputOnly) return baseBuf_.data();
+    const float k0 = tunedRatio(group.a0, tuned0);
+    const float k1 = tunedRatio(group.a1, tuned1);
+    const float dA = (group.a1 - group.a0) * inv;
+    const float dDry = (dry1 - dry0) * inv;
+    const float dK = (k1 - k0) * inv;
+    for (int j = 0; j < n; ++j) {
+      const float s = static_cast<float>(j + 1);
+      const float a = group.a0 + dA * s;
+      const float dry = dry0 + dDry * s;
+      const float k = k0 + dK * s;
+      const size_t at = static_cast<size_t>(j);
+      const float input = src[static_cast<size_t>(wrapOnce<kFormantRingLen>(first + j))];
+      baseBuf_[at] = k * (in[j] - dry * input) + (1.0f - a) * baseBuf_[at];
+    }
+    return baseBuf_.data();
+  }
+
+  // The corrected voice's linear share over its gain in the audio that arrives, which turns the audio's
+  // corrected part into the base's. It tends to 2 / pi as both fall to 0, where the part it scales is 0.
+  static float tunedRatio(float share, float gain) { return gain > 1e-6f ? share / gain : 2.0f / kPi; }
 
   // How many samples at the newest end of the ring are exactly 0, after m more samples in[]. The count of
   // a voiced chunk ends at its last sample. A grain that reads only the zeros before a chunk adds nothing,
@@ -402,9 +587,19 @@ class FormantFx {
 
   InputRing<kFormantRingLen> ring_;
   PitchTracker tracker_;  // the card's own, for a card that does not sit directly behind Autotune
-  Voice voice_;
+  Voice voice_;           // cuts from the card's ring at pitch ratio 1 (the audio it receives, or Autotune's input)
+  Voice tuned_;           // cuts Autotune's input at Autotune's pitch ratio
   std::array<float, kBlock> voiceBuf_{};  // the shifted voice's chunk
+  std::array<float, kBlock> tunedBuf_{};  // the corrected share of it, before the two are mixed
   std::array<float, kBlock> baseBuf_{};   // the base's chunk
+  int fedFirst_ = 0;          // the ring index of the audio feed() wrote
+  int fedZeroBefore_ = 0;     // the exact zeros that stood at the ring's newest end before it
+  int fedN_ = 0;              // the length of that audio, 0 once a chunk has taken it
+  bool grouped_ = false;      // the last chunk joined Autotune's pass
+  bool dryRuns_ = false;      // voice_ ran in the last chunk that cut from Autotune's input
+  bool tunedRuns_ = false;    // tuned_ ran in it
+  float latencyShare_ = 1.0f; // the part of baseLag_ that outputLatency() counts
+  float groupTrim_ = 1.0f;    // the gain of the corrected voice's share: Autotune's trim and the group trim
 
   float mix_ = 0.0f;   // MIX after its smoothing
   float fade_ = 0.0f;  // the crossfade from the input to the mix, 0 off .. 1 on

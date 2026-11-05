@@ -1,9 +1,10 @@
 #pragma once
 
 // The Autotune, Formant and Octave engines in series, in that order, each on the output of the one before,
-// as the chain runs them in three adjacent slots. The tests that drive the pitch cards together use it. It
-// hands the Formant engine Autotune's tracker, as the chain does when the Formant card sits directly behind
-// the Autotune card, and gathers the shift and the delay the cards put on the pitch for the Growl card.
+// as the chain runs them in three adjacent slots. The tests that drive the pitch cards together use it. As the
+// chain does when the Formant card sits directly behind the Autotune card, it feeds the Formant engine the
+// audio that enters Autotune and hands it Autotune's tracker and engine, and it gathers the shift and the
+// delay the cards put on the pitch for the Growl card.
 // `autotunePlaced` false models a layout with no Autotune card: the Formant engine runs its own tracker and
 // the Growl and Crowd cards run theirs.
 
@@ -63,8 +64,10 @@ class PitchSeries {
       need.run = readers || formantLive;
       need.fine = formantLive;
       need.outOfRange = readers || formantLive;
-      autotune.process(src, a_.data(), n, p.autotune, need);
+      if (formantLive) formant.feed(src, n);
+      autotune.process(src, a_.data(), n, p.autotune, need, formantLive ? formant.gridMarks() : cv::GridMarks{});
       up = {&autotune.pitch(), autotune.correctionSemis(), autotune.outputLatency()};
+      up.group = &autotune;
       src = a_.data();
     }
     formant.process(src, b_.data(), n, p.formant, up);
