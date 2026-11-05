@@ -8,13 +8,15 @@ namespace cv {
 
 // The panel's SHIFT range, whole semitones, and the SHIFT and MIX the card starts on.
 constexpr int kFormantMaxShiftSt = 7;
-constexpr int kFormantShiftSteps = 2 * kFormantMaxShiftSt + 1;
 constexpr int kFormantDefaultShiftSt = -3;
 constexpr float kFormantDefaultMix = 1.0f;
 
 // The voice's limit, whole semitones either way: the engine clamps the SHIFT it is handed to this, and
-// the grains then play at 0.5 to 2 times, the voice's rate range. Apraxia's RANGE reaches -12 st.
+// the grains then play at 0.5 to 2 times, the voice's rate range. Apraxia's RANGE reaches -12 and +12 st.
 constexpr int kFormantVoiceMaxShiftSt = 12;
+
+// The trim table's entries, one per whole semitone from -12 to +12 st.
+constexpr int kFormantShiftSteps = 2 * kFormantVoiceMaxShiftSt + 1;
 
 // The averaging time of the running powers behind the Formant mix's level gain, and that gain's
 // ceiling (+6 dB).
@@ -30,6 +32,10 @@ constexpr float kFormantMaxTrimDb = 24.0f;
 // corrected voice, so together they read about 0.3 dB over the level rule once SHIFT leaves 0 (SHIFT 0 reads on
 // target). The trim ramps in over the first semitone of SHIFT.
 constexpr float kFormantGroupTrimDb = -0.3f;
+
+// The corrected voice's share reads about 0.6 dB under the card alone at +12 st, where the grains play at
+// double speed, so a SHIFT from +11 to +12 st lifts the share's trim by up to this many dB.
+constexpr float kFormantGroupTopTrimDb = 0.5f;
 
 // How far the base and the shifted voice correlate at a SHIFT of 0 to 12 st (the sign does not matter),
 // measured on Adam's three clips. The level gain starts from it when the base has sat out at MIX 100 %
@@ -47,11 +53,15 @@ constexpr std::array<float, kFormantVoiceMaxShiftSt + 1> kFormantCoherence = {
     0.985f, 0.355f, 0.085f, -0.016f, -0.106f, -0.149f, -0.176f, -0.165f, -0.099f, -0.059f, -0.009f, 0.017f, 0.033f};
 
 struct FormantTuning {
-  // The shifted voice's trim in dB at each SHIFT from -7 to +7 st, fit on Adam's three clips (the cleaned set) so that
-  // the mean of the voice alone at MIX 100 % lands on +0.25 dB, the middle of 0 to +0.5. The grains sum
-  // to a level that follows SHIFT, and one trim cannot hold it.
-  std::array<float, kFormantShiftSteps> trimDb = {4.42f, 3.93f, 3.23f, 2.52f, 2.21f, 2.02f, 1.11f, 0.26f,
-                                                  1.04f, 1.56f, 1.46f, 1.68f, 1.87f, 1.66f, 1.70f};
+  // The shifted voice's trim in dB at each SHIFT from -12 to +12 st, fit on Adam's three clips (the cleaned set) so
+  // that the mean of the voice alone at MIX 100 % lands on +0.25 dB, the middle of 0 to +0.5. The grains sum
+  // to a level that follows SHIFT, and one trim cannot hold it. The panel's knob reaches +-7 st and Apraxia's
+  // RANGE +-12 st. The -12 st entry sits 0.15 dB high (+0.40 dB) so the card directly behind Autotune stays
+  // inside the rule there too.
+  std::array<float, kFormantShiftSteps> trimDb = {4.17f, 4.47f, 4.42f, 4.32f, 4.52f,                          // -12 to -8
+                                                  4.42f, 3.93f, 3.23f, 2.52f, 2.21f, 2.02f, 1.11f, 0.26f,  // -7 to 0
+                                                  1.04f, 1.56f, 1.46f, 1.68f, 1.87f, 1.66f, 1.70f,         // +1 to +7
+                                                  1.66f, 1.85f, 1.54f, 1.53f, 0.47f};                      // +8 to +12
   float offsetDb = 0.0f;  // added to every entry, for the render tool
 
   bool operator==(const FormantTuning& o) const { return trimDb == o.trimDb && offsetDb == o.offsetDb; }
@@ -59,7 +69,7 @@ struct FormantTuning {
 
 struct FormantParams {
   bool on = false;
-  int shiftSt = kFormantDefaultShiftSt;  // knob A (SHIFT) -7..+7 st, Apraxia -12..+6 st; the grains play at 2^(shiftSt / 12)
+  int shiftSt = kFormantDefaultShiftSt;  // knob A (SHIFT) -7..+7 st, Apraxia -12..+12 st; the grains play at 2^(shiftSt / 12)
   float mix = kFormantDefaultMix;        // knob B (MIX), 0..1
   FormantTuning tuning;
 };

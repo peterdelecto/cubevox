@@ -16,7 +16,8 @@ RANGE −7 st with a 250 ms decay, the same with a 500 ms decay, and SENSITIVITY
 250 ms. The three picks all go down. The owner heard the shipping build and asked for RANGE to
 spread both ways, −12 st at the pot's bottom and +6 st at its top, zero at noon (owner 2026-11-04,
 "an asymmetrical spread in both directions ... maximum −12 st to +6 st but that would be at the
-far extreme", then "A" for zero at noon).
+far extreme", then "A" for zero at noon). The top then went to +12 st, the same reach each way
+(owner 2026-11-05, "apraxia should go to +12st").
 
 ## Where it sits
 
@@ -32,10 +33,10 @@ registry and YAWN on glass. The code id stays `formant_follow` until a rename pa
 | Pot | Name | Range | Default | What it does |
 |---|---|---|---|---|
 | upper | SENSITIVITY | 0 to 100 % | 40 % | the level that gives a full drop: −6 dBFS at 0 %, −36 dBFS at 100 %, a 12 dB window under it |
-| lower | RANGE | −12 st at the bottom, 0 at noon, +6 st at the top | −5 st (29 % of the travel) | how far the throat moves on a full sweep, down below noon and up above it; noon is no effect; the amount knob of this slot |
+| lower | RANGE | −12 st at the bottom, 0 at noon, +12 st at the top (2026-11-05; +6 st before) | −5 st (29 % of the travel) | how far the throat moves on a full sweep, down below noon and up above it; noon is no effect; the amount knob of this slot |
 
-RANGE is a straight line on each side of noon, so the down side moves twice as many semitones
-per degree as the up side. The readout shows RANGE in semitones with its sign. DECAY, the time a sweep takes to come back, is
+RANGE is a straight line on each side of noon, and both sides move the same semitones per degree.
+The readout shows RANGE in semitones with its sign, up to three cells (`+12`). DECAY, the time a sweep takes to come back, is
 a tuning field at 300 ms, between the two decays the owner liked. The owner's call if Adam wants
 to play the decay: DECAY takes the upper pot (100 ms to 1 s on a log curve) and SENSITIVITY becomes
 a menu row; that is a one-line registry change and the engine does not move.
@@ -81,8 +82,8 @@ across every mode and range at SENSITIVITY 50 %. The level row judges the defaul
    its last onset (the detector refires through the first 15 ms of a note) and 0 from the decay's
    end while the note holds; the shift rests within 0.01 st of 0 after it;
    off is a bit-exact copy with `==`; output finite at every knob corner, −12 st included; RANGE
-   maps −12 st at the pot's bottom, 0 at noon and +6 st at the top, and the default position
-   reads −5 st.
+   maps −12 st at the pot's bottom, 0 at noon and +12 st at the top (2026-11-05), and the default
+   position reads −5 st.
 2. The level row on the clips at the default.
 3. The layout tests: Yawn is slot 3's third choice, one voice with Formant, in the pitch group.
 4. Formant and Octave hashed identical on the three clips before and after any change to the card.
@@ -98,14 +99,15 @@ stress run sweeps SENSITIVITY and RANGE.
 
 ## What ships and what does not
 
-1. Ships: the pluck law above, SENSITIVITY and RANGE (−12 st to +6 st through noon), DECAY as
+1. Ships: the pluck law above, SENSITIVITY and RANGE (−12 st to +12 st through noon, 2026-11-05), DECAY as
    tuning, wet only.
 2. Out, after the audition: the plain follower mode (the throat opens and stays open on a held
    note; the owner heard it as static), the free-running LFO and the envelope-gated LFO (heard,
    not picked), MIX. The code for the three unpicked modes came out in the shipping build; the
    render tool keeps keys only for what ships. The audition WAVs that carried them are listed in
    the log. The upward range was out after the third build (+7 st read as an alien voice) and came
-   back at the owner's ask after the shipping build, capped at +6 st at the pot's top.
+   back at the owner's ask after the shipping build, capped at +6 st at the pot's top, then at +12 st
+   from 2026-11-05.
 
 ## Done when
 
@@ -143,3 +145,16 @@ shipping build within 0.1 dB and 0.05 st of shift; the owner listens on the box.
    at ±7 st and holds its end entry past it). The default renders are sample-identical to the
    shipping build's. Bench: 1.10 ns a sample over Formant at worst (−12 st), so the row stays
    {4, 5, false}.
+6. 2026-11-05, RANGE to +12 st (owner, "apraxia should go to +12st"): `kFollowerMaxRangeSt` 12, so the pot
+   runs −12 st, 0 at noon, +12 st, the same reach each way and the voice's own limit. At +12 st the grains
+   play at double speed and a grain lasts two output periods (the floor), so two overlap. The window sum
+   reads 0.000 dB at periods 48, 218 and 686 samples, and no read reaches a sample the ring has not been
+   given. The trim table grew from 15 to 25 entries, −12 to +12 st (the end entries were held past ±7 st
+   before). Held-end readings on Adam's cleaned clips, voice alone at MIX 100 %, mean of the three, before
+   the new entries: +8 st +0.29, +9 +0.10, +10 +0.41, +11 +0.42, +12 +1.48 dB; −8 +0.15, −9 +0.35, −10
+   +0.25, −11 +0.20, −12 +0.65 dB. After the fit every entry from ±8 to ±11 st reads +0.24 to +0.27 dB, +12 st
+   reads +0.27 dB and −12 st +0.40 dB (set 0.15 dB high so the card behind Autotune holds the rule there).
+   The card directly behind Autotune read −0.32 dB at +12 st and −0.02 dB at −12 st on those entries, so
+   `kFormantGroupTopTrimDb` lifts the corrected voice's share by up to 0.5 dB from +11 to +12 st; behind
+   Autotune the means then read +0.06 to +0.33 dB from ±8 to ±12 st. `level_test` holds every SHIFT from
+   −12 to +12 st, alone and behind Autotune. The default and every setting inside ±7 st render as before.

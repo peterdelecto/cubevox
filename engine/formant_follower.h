@@ -15,7 +15,7 @@
 //
 // The syllable sweep (`syllable_sweep.h`) reads each block of the card's input, the block the slot ahead
 // hands it. SHIFT is RANGE times the sweep. RANGE runs from -12 st at the pot's bottom through 0 at noon
-// to +6 st at its top, so a sweep moves the throat down below noon and up above it.
+// to +12 st at its top, so a sweep moves the throat down below noon and up above it, the same reach each way.
 //
 // The Formant engine takes SHIFT in whole semitones and glides it through its own 20 ms one-pole, the only
 // smoothing SHIFT gets. Each call hands it the wanted SHIFT plus what the last call's rounding left over,
@@ -25,7 +25,7 @@
 namespace cv {
 
 constexpr float kFollowerMinRangeSt = -12.0f;  // RANGE at the pot's bottom
-constexpr float kFollowerMaxRangeSt = 6.0f;    // RANGE at the pot's top; noon is 0, no effect
+constexpr float kFollowerMaxRangeSt = 12.0f;   // RANGE at the pot's top; noon is 0, no effect
 constexpr float kFollowerDefaultRangeSt = -5.0f;
 
 static_assert(kFollowerMinRangeSt >= -static_cast<float>(kFormantVoiceMaxShiftSt) &&
@@ -44,7 +44,7 @@ struct FormantFollowerTuning {
 struct FormantFollowerParams {
   bool placed = false;                              // the card is in the layout, so its sweep sets the Formant voice's SHIFT
   float sensitivity = kFollowerDefaultSensitivity;  // knob A (SENSITIVITY), 0..1
-  float rangeSt = kFollowerDefaultRangeSt;          // knob B (RANGE), -12 to +6 st
+  float rangeSt = kFollowerDefaultRangeSt;          // knob B (RANGE), -12 to +12 st
   FormantFollowerTuning tuning;
 };
 

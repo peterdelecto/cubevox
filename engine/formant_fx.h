@@ -353,7 +353,9 @@ class FormantFx {
     const float tuned = feed.tuned1;
     latencyShare_ = 1.0f - tuned * tuned;
     const float off = shiftSm_ < 0.0f ? -shiftSm_ : shiftSm_;
-    groupTrim_ = feed.trim * dbToGainFast(kFormantGroupTrimDb * (off < 1.0f ? off : 1.0f));
+    const float top = shiftSm_ - static_cast<float>(kFormantVoiceMaxShiftSt - 1);
+    const float lift = top <= 0.0f ? 0.0f : (top < 1.0f ? top : 1.0f);
+    groupTrim_ = feed.trim * dbToGainFast(kFormantGroupTrimDb * (off < 1.0f ? off : 1.0f) + kFormantGroupTopTrimDb * lift);
   }
 
   // The base reads where the voice actually plays: the grain grid keeps the phase of its history, so the
@@ -370,10 +372,10 @@ class FormantFx {
     baseLag_ = smooth::toward(baseLag_, delay, formant_detail::kDryLagSlew * static_cast<float>(n));
   }
 
-  // The trim in dB at the glided SHIFT, read between the two entries around it. Past -7 or +7 st it holds
+  // The trim in dB at the glided SHIFT, read between the two entries around it. Past -12 or +12 st it holds
   // the end entry.
   float trimDbAt(float st) const {
-    const float pos = clampf(st + static_cast<float>(kFormantMaxShiftSt), 0.0f, static_cast<float>(kFormantShiftSteps - 1));
+    const float pos = clampf(st + static_cast<float>(kFormantVoiceMaxShiftSt), 0.0f, static_cast<float>(kFormantShiftSteps - 1));
     const int i = static_cast<int>(pos);
     const int j = i + 1 < kFormantShiftSteps ? i + 1 : i;
     const float a = tuning_.trimDb[static_cast<size_t>(i)];

@@ -168,7 +168,7 @@ void applyFormantKnob(int knob, float v, cv::FormantParams& f) {
 }
 
 // Apraxia's SENSITIVITY sets the level that gives the full sweep and RANGE the sweep's reach, -12 st at the
-// pot's bottom through 0 at noon to +6 st at its top. The card pins the Formant voice's mix at 1, so no
+// pot's bottom through 0 at noon to +12 st at its top. The card pins the Formant voice's mix at 1, so no
 // knob sets it.
 void applyFollowerKnob(int knob, float v, ChainParams& out) {
   if (knob == 0) {

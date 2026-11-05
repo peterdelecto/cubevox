@@ -78,7 +78,7 @@ int usage() {
                "       [--autotune] [--atkey <0..11>] [--response <1..500 ms>]\n"
                "       [--octave <-12..12>] [--omix <0..1>, default 0.1, the box's start]\n"
                "       [--formant <-7..7>] [--fmix <0..1>]\n"
-               "       [--follower <-12..6>, RANGE] [--sensitivity <0..1>] [--follower-drive <drive.wav>]\n"
+               "       [--follower <-12..12>, RANGE] [--sensitivity <0..1>] [--follower-drive <drive.wav>]\n"
                "       [--follower-shift <shift.wav>]\n"
                "       [--crowd] [--width <0..1>] [--voices <0..9>]\n"
                "       [--slap <0..1>] [--drive <0..1>] [--tone <0..1>]\n"
@@ -94,11 +94,11 @@ int usage() {
                "  formant sets SHIFT in whole semitones with --formant and the MIX with --fmix (default 1); with --autotune it\n"
                "  sits directly behind it, reads its tracker and cuts its voice from the tuned note\n"
                "  --follower runs the Apraxia card, the formant voice alone with SHIFT swept on each syllable, down for a\n"
-               "  negative RANGE and up for a positive one; its value is RANGE in semitones, any value from -12 to +6 (the\n"
+               "  negative RANGE and up for a positive one; its value is RANGE in semitones, any value from -12 to +12 (the\n"
                "  box's default is -5), and --sensitivity is the SENSITIVITY pot (default 0.4); the card pins the voice's\n"
                "  MIX at 1 and overrides --formant's SHIFT and --fmix.\n"
                "  --follower-drive writes the card's drive, 0 to 1, and --follower-shift the voice's glided SHIFT at 1/12\n"
-               "  of full scale a semitone (-12 st at -1, +6 st at +0.5), each as a mono WAV beside the render; the tuning\n"
+               "  of full scale a semitone (-12 st at -1, +12 st at +1), each as a mono WAV beside the render; the tuning\n"
                "  key decayMs sets the sweep's fall\n"
                "  crowd runs only with --crowd; --width sets DIVERGE (default 1) and --voices the VOICES step, 0 to 8 copies or 9 for MOB (default 4)\n"
                "  unison runs only with --on 1 or --depth; slapback runs only with --slap\n"
@@ -722,7 +722,7 @@ bool writeHeld(ma_encoder* enc, float v, ma_uint64 frames, const char* path) {
   return false;
 }
 
-// The Formant voice's glided SHIFT as a signal, 1/12 of full scale a semitone: -12 st at -1, +6 st at +0.5.
+// The Formant voice's glided SHIFT as a signal, 1/12 of full scale a semitone: -12 st at -1, +12 st at +1.
 float shiftSignal(float st) { return st / -cv::kFollowerMinRangeSt; }
 
 int render(const char* inPath, const char* outPath, const RenderParams& rp) {

@@ -117,7 +117,9 @@ shared stage, the first pitch-group slot or the shared grain grid are history.
 2. `trimDb` from −7 to +7 st: 4.29, 3.87, 3.12, 2.36, 1.98, 1.72, 1.01, 0.20, 0.94, 1.44, 1.51,
    1.77, 1.87, 1.60, 1.64 dB. Fit on Adam's three clips with Autotune off, iterated because the
    level is not linear in the trim. Each SHIFT's mean over the clips reads +0.245 to +0.25 dB.
-   The glided SHIFT reads the trim between the two entries around it.
+   The glided SHIFT reads the trim between the two entries around it. Since 2026-11-05 the table
+   holds 25 entries, −12 to +12 st, for Apraxia's RANGE (`2026-11-04-yawn-design.md`, log entry 6);
+   the entries from −7 to +7 st are unchanged.
 3. `level_test` holds a clip row per SHIFT (each clip in the mid band, mean 0 to +0.5 dB) and the
    MIX 50 % clip rows. The synthetic-program row at −3 st reads +0.64 dB and prints as a NOTE,
    because the clips govern the level.

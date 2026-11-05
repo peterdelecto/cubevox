@@ -1477,7 +1477,7 @@ void checkAutotuneTrackerForReaders() {
 // on Deepthroat's output, and its SHIFT sweeps with the follower's envelope of that block.
 void checkApraxiaBehindDeepthroat() {
   const Layout layout = layoutOf({Card::Growl, Card::FormantFollower});
-  const ChainSnapshot snap = snapshotToggles(layout, 1.0f, allToggles(true));  // RANGE at +6 st
+  const ChainSnapshot snap = snapshotToggles(layout, 1.0f, allToggles(true));  // RANGE at +12 st
   auto chain = newRig();
   auto hand = newRig();
   chain->fades.settle(snap.slotOn);
