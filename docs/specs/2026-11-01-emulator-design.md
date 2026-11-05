@@ -92,15 +92,31 @@ Bottom band: the source switch at the left and the version under it.
 
 1. Today the LED toggles every 500 ms from the main loop. That says only that the loop runs, and
    the 2 s watchdog already guards that. The board has a separate power LED.
-2. From this change the LED is lit for the mean load's share of each half-second period. The mean
-   is the mean block time over the last whole second as a percent of the block budget, from the
-   same one-second window that feeds the DEBUG figure's worst (`core/load_window.h`, which now
-   keeps a mean beside the worst). 10 % load gives a 50 ms blip every half second, 50 % half on
-   and half off, 90 % near solid with a 50 ms gap. Dark while audio is not running, has stalled,
-   or is latched after a fault.
-3. The rule is `loadLedLit(nowMs, meanPercent, audioRunning)` in `core/load_led.h`, pure and
-   integer, shared by the box and the emulator. The board reads the mean through
-   `audioMeanLoadPercent()`. The emulator passes the cost table's mean.
+2. The LED shows the load as brightness, with no blink (owner 2026-11-05: "why does the mcu
+   indicator light just flash regularly at regular intervals? that provides no information on
+   whether it is processing"). The first build lit it for the mean load's share of each half
+   second, and at a steady load that is a regular blink whose information sits in an on-time the
+   eye cannot read.
+3. The mean is the mean block time over the last whole second as a percent of the block budget,
+   from the same one-second window that feeds the DEBUG figure's worst (`core/load_window.h`).
+   The level is 0.03 + 0.97 x share squared, where share is the mean over the 75 % average line
+   that a layout is gated against (`costs::kBudgetAvgPercent`), held to 0..1. So the LED is a
+   faint glow at no load, about a quarter bright at half the limit and full at the limit. A PWM
+   duty is linear in light and the eye reads light on roughly a square-root scale, so a duty
+   that goes with the square of the load looks like an even climb.
+4. A late, dry or overrun block holds the LED full for 100 ms, so a box in trouble shows it at
+   low load too. The LED is dark while audio is not running, has stalled, or is latched after a
+   fault, and the flash does not light it then.
+5. The rule is `loadLedLevel(meanPercent, limitPercent, audioLive, msSinceTrouble)` in
+   `core/load_led.h`, which returns the level 0..1 and is shared by the box and the emulator.
+   `BlockTroubleClock` turns the running count of late, dry and overrun blocks
+   (`audioTroubleBlocks()`) into the time since it last changed.
+6. On the box, `cubevox.ino` `driveLoadLed` writes the level to PB7 (`USER_LED`) as PWM:
+   TIM4_CH2, 1 kHz, 12 bits, `analogWrite` on the STM32duino core. It writes only when the duty
+   changes. The bootloader's own LED use is unchanged.
+7. The emulator passes the cost table's mean and no trouble, because the host never marks a
+   block late. It draws the dot from the unlit grey to full green along level^(1/2.2), so the
+   light on the screen goes with the duty on the box.
 
 ## 6. Checks
 
@@ -115,8 +131,9 @@ Bottom band: the source switch at the left and the version under it.
 2. `cubevox-emulator --proof <file.ppm>`: one frame of the window after the splash, rendered to a
    hidden window and written as a PPM, for looking at.
 3. `ctest` as a whole, with `proto_layout` still in it.
-4. The LED: host tests for the window mean and `loadLedLit`; the release and bench firmware
-   builds; the box flashed with the merged release and watched.
+4. The LED: host tests for the window mean, the `loadLedLevel` curve and flash and
+   `BlockTroubleClock` (`core_load.cpp`); the release and bench firmware builds; the box flashed
+   with the merged release and watched for the PWM.
 
 ## 7. Out of scope
 

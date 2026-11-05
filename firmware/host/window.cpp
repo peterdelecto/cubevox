@@ -294,9 +294,14 @@ int segmentedGrid(Frame& f, const char* id, ImVec2 topLeft, float width, float r
 
 // ---- Bands
 
-void drawLed(Frame& f, ImVec2 center, bool lit) {
-  f.dl->AddCircleFilled(center, kLedR, lit ? kOk : kCtrl, kCircleSegments);
-  f.dl->AddCircle(center, kLedR, lit ? kOk : kBorder, kCircleSegments, kBorderW);
+// The LED at `level`, 0 dark to 1 full, the box's duty. Colour values on the screen are gamma
+// encoded, so the fill steps from the unlit grey to full green along level^(1/2.2), which puts the
+// light on screen in proportion to the duty.
+void drawLed(Frame& f, ImVec2 center, float level) {
+  constexpr float kScreenGamma = 2.2f;
+  const float t = std::pow(std::clamp(level, 0.0f, 1.0f), 1.0f / kScreenGamma);
+  f.dl->AddCircleFilled(center, kLedR, pack(mix(kCtrlRgb, kOkRgb, t)), kCircleSegments);
+  f.dl->AddCircle(center, kLedR, pack(mix(kBorderRgb, kOkRgb, t)), kCircleSegments, kBorderW);
 }
 
 // CPU  67 % mean   76 % worst   lines 75 / 95, from the cost table. A figure over its line is red.
@@ -353,7 +358,7 @@ void drawTopBand(Frame& f) {
   encoderKnob(f, ImVec2(knobX, menuTop + half(kKnobBoxD)));
   drawTextCentered(dl, ImVec2(knobX, menuTop + kKnobBoxD + half(kLabelH)), kFontLabel, kText, "MENU");
   const float rowY = menuTop + kKnobBoxD + kLabelH + kGap + half(kLedRowH);
-  drawLed(f, ImVec2(kRightX + kLedR, rowY), f.box.led());
+  drawLed(f, ImVec2(kRightX + kLedR, rowY), f.box.ledLevel());
   drawCpuLine(f, kRightX + 2 * kLedR + kLedGap, rowY);
 }
 
