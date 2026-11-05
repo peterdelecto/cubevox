@@ -296,7 +296,7 @@ std::vector<Splice> splicesOf(const Trace& t, int voice) {
   return v;
 }
 
-// The Input gate in front of the Chatter card as the box runs them with no pitch card: the gate's
+// The Input gate in front of the Chatter card as the box runs them: the gate's
 // detector state is the word key and its output is both the dry path and the slice source, 64
 // samples a call.
 struct GatedChatter {
@@ -850,7 +850,7 @@ void runClipRow(const Signal& in, float lengthMs, float decayMs, ClipTotals& c) 
 }
 
 // Adam's clips through the Input gate at -55 dBFS with Decay 20 ms and 2 s, the gate's detector as the
-// word key and its output as the source, as the box runs them with no pitch card, at LENGTH 20 ms,
+// word key and its output as the source, as the box runs them, at LENGTH 20 ms,
 // 60 ms, 300 ms, 2 s and 3 s. Between a word's end and its tail's close the tail plays one slice and
 // never changes it, and the one it plays is the newest cut, which carries the voice and not the gate's
 // silence after it, within 20 dB of the loudest sample of a word shorter than 2.3 s. The same holds
