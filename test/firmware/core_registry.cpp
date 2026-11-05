@@ -487,12 +487,13 @@ void checkRingModCard() {
 }
 
 // Strings, the third card of slot 8, counts as the layout's reverb-group card. DECAY runs 0.5 to 8 s on a log
-// curve with the default 2 s at noon, and MIX is a percent. Placing Autotune puts the card on its key.
+// curve with the default 2 s at noon, and MIX is a percent. Placing Autotune leaves the card alone, since it
+// follows the held note.
 void checkStringsCard() {
   const CardDesc& d = cardDesc(Card::Strings);
-  check(std::strcmp(d.id, "strings") == 0 && std::strcmp(d.name, "Sympathetic") == 0 && d.engine == Engine::Strings &&
+  check(std::strcmp(d.id, "strings") == 0 && std::strcmp(d.name, "Sympath") == 0 && d.engine == Engine::Strings &&
             d.group == Group::Reverb && d.knobCount == 2,
-        "strings: id strings, name Sympathetic, its own engine, the reverb group");
+        "strings: id strings, name Sympath, its own engine, the reverb group");
   const KnobDesc& decay = *knobDesc(Card::Strings, 0);
   check(std::strcmp(decay.name, "DECAY") == 0 && std::strcmp(decay.unit, "ms") == 0 && decay.curve == Curve::Log &&
             decay.min == 500.0f && decay.max == 8000.0f && std::fabs(knobValue(decay, 0.5f) - 2000.0f) < 1.0f &&
@@ -503,9 +504,11 @@ void checkStringsCard() {
         "strings: the registry row is its costs.h row");
   ChainParams p;
   applyToggle(Card::Strings, true, p);
-  check(p.strings.on && !p.strings.keyed && !p.reverb.on, "strings: its toggle turns the card on and nothing else");
+  check(p.strings.on && !p.reverb.on, "strings: its toggle turns the card on and nothing else");
+  const cv::StringsParams before = p.strings;
   applyPlacement(Card::Autotune, p);
-  check(p.strings.keyed, "strings: placing Autotune puts the card on its key");
+  check(p.strings.on == before.on && p.strings.decayMs == before.decayMs && p.strings.mix == before.mix,
+        "strings: placing Autotune leaves the card as it was");
   check(p.ringMod.keyed, "ringmod: placing Autotune puts the card on its key");
 }
 
@@ -654,9 +657,9 @@ void checkBloomCard() {
 // toggle keeps the pitch stage's ring and tracker running as the Crowd card's does.
 void checkGrowlCard() {
   const CardDesc& growl = cardDesc(Card::Growl);
-  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Throat") == 0 && growl.engine == Engine::Growl &&
+  check(std::strcmp(growl.id, "growl") == 0 && std::strcmp(growl.name, "Deepthroat") == 0 && growl.engine == Engine::Growl &&
             growl.group == Group::Pitch && growl.knobCount == 2,
-        "growl: id growl, name Throat, its own engine, the pitch group");
+        "growl: id growl, name Deepthroat, its own engine, the pitch group");
   check(std::strcmp(knobDesc(Card::Growl, 0)->name, "GROWL") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->name, "MIX") == 0 &&
             knobSteps(Card::Growl, 0) == 0 && knobSteps(Card::Growl, 1) == 0 &&
             std::strcmp(knobDesc(Card::Growl, 0)->unit, "%") == 0 && std::strcmp(knobDesc(Card::Growl, 1)->unit, "%") == 0,

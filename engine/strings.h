@@ -8,54 +8,54 @@
 #include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
-#include "engine/scale.h"
 #include "engine/smooth.h"
 
 namespace cv {
 
-// The Strings card. Twelve Karplus-Strong strings ring sympathetically with the voice. Each string is a
-// delay line with a one-pole damping filter and a first-order allpass in its loop. The damping filter and
-// the allpass delays are worked out at the string's frequency, so the loop sums to the note's period.
-// The voice enters each loop at a low send. The strings sit on the Autotune card's key and its major
-// scale when that card is placed, seven notes to the octave from the root at or above 110 Hz, and on the
-// chromatic scale from A2 when it is not. A key change builds the new strings in a second bank, one string
-// a call. When the last is done that bank takes the voice, and the old bank loses its send and fades out
-// over 50 ms.
+// The Sympath card (engine id Strings). Eight Karplus-Strong strings ring sympathetically with the voice.
+// Each string is a delay line with a one-pole damping filter and a first-order allpass in its loop. The
+// damping filter and the allpass delays are worked out at the string's frequency, so the loop sums to the
+// note's period. The voice enters each loop at a low send.
+// The card follows the held note and reads no Autotune key. Its own tracker lowpasses the voice at 1.2 kHz,
+// decimates it to 8 kHz and runs a normalised autocorrelation over 24 ms every 24 ms. A note counts as held
+// when the tracked pitch stays within 0.5 semitone of one semitone for 150 ms. The strings then sit on that
+// note's root and fifth over four octaves, starting at the root at or above 110 Hz. A new held semitone
+// builds the new strings in a second bank, one string a call. When the last is done that bank takes the
+// voice, and the old bank loses its send and fades out over 200 ms. The same semitone held again changes
+// nothing. The strings are silent until the first held note, and unvoiced frames and silence keep the last
+// tuning.
 // DECAY sets the ring time of every string's fundamental (T60). MIX is an equal-power crossfade, and the
 // wet alone is trimmed to unity on Adam's clips at the defaults.
 
-constexpr int kStringCount = 12;
+constexpr int kStringCount = 8;
 constexpr int kStringMaxLen = 440;  // samples; 48000 / 110 Hz is 436.4
 constexpr float kStringsMinHz = 110.0f;
 constexpr float kStringsDecayMinMs = 500.0f;
 constexpr float kStringsDecayMaxMs = 8000.0f;
 
 struct StringsTuning {
-  float trimDb = 10.75f;      // the wet path's gain, set so the wet alone lands at unity on the clips in key C
+  float trimDb = 16.8f;     // the wet path's gain, set so the wet alone lands at unity on the clips
   float dampingShare = 0.25f; // the part of the fundamental's loop loss at 8 s that the damping filter takes
-  float retuneMs = 50.0f;     // the old bank's fade-out when the key changes
+  float retuneMs = 200.0f;    // the old bank's fade-out when the held note changes
 };
 
 struct StringsParams {
   bool on = false;
   float decayMs = 2000.0f;  // knob A (DECAY), the ring time T60
   float mix = 0.4f;       // knob B (MIX), 0..1
-  bool keyed = false;     // an Autotune card is placed, so the strings follow its key
   StringsTuning tuning;
 };
 
 namespace strings_detail {
 
-constexpr int kChromatic = -1;
 constexpr int kUntuned = -2;
 constexpr int kFirstMidi = 45;  // A2, 110 Hz
 
-// The MIDI note of string `i`. key is an Autotune KEY index, or kChromatic.
-inline int stringMidi(int key, int i) {
-  if (key < 0) return kFirstMidi + i;
-  const int pc = kKeyRoot[static_cast<size_t>(key % kKeyCount)];
+// The MIDI note of string `i` for the held pitch class `pc` (0 is C): the root and its fifth, then the same
+// pair an octave up, over four octaves from the root at or above 110 Hz.
+inline int stringMidi(int pc, int i) {
   const int base = kFirstMidi + ((pc - kFirstMidi % 12 + 12) % 12);
-  return base + 12 * (i / 7) + kMajor[static_cast<size_t>(i % 7)];
+  return base + 12 * (i / 2) + 7 * (i % 2);
 }
 
 inline float midiHz(int midi) { return 440.0f * exp2f(static_cast<float>(midi - 69) / 12.0f); }
@@ -66,7 +66,7 @@ constexpr float kMaxLoopGain = 0.99995f;
 constexpr float kLn1000 = 6.907755f;
 constexpr float kTiny = 1e-20f;  // keeps a decayed loop off the subnormals
 
-// One string. tune() runs libm and only runs when the key changes. run() is the per-sample loop.
+// One string. tune() runs libm and only runs when the held note changes. run() is the per-sample loop.
 struct String {
   std::array<float, kStringMaxLen> line;
   int len = 2;
@@ -163,6 +163,179 @@ struct Bank {
   std::array<String, kStringCount> s;
 };
 
+// The card's own pitch tracker. It needs the pitch class only, so an octave error costs nothing. The input
+// drops to 8 kHz through a 6-sample average and a 1.2 kHz lowpass. Every 192 decimated samples (24 ms) a
+// snapshot of the last 229 is taken, and a normalised autocorrelation over 128 of them is worked out for lags
+// 11 to 101 (80 to 667 Hz as candidates), a few lags per call so no block pays for the whole sum. A quiet
+// snapshot skips the sums. The smallest lag whose peak reaches 90 % of the best one, refined by a parabola,
+// gives the pitch. Counting the loops, the sums are 0.49M multiply-adds a second, about 1.1M cycles on the
+// M7 at two cycles each, and the average, lowpass, snapshots and normalising add 0.5M. That is 1.6M cycles a
+// second, 0.33 % of the 480 MHz processor, and less in silence.
+class HeldNote {
+ public:
+  static constexpr int kDecim = 6;
+  static constexpr float kRate = static_cast<float>(kSampleRate) / static_cast<float>(kDecim);
+  static constexpr int kWin = 128;                  // decimated samples in the correlation window
+  static constexpr int kLagLo = 11;                 // lags kLagLo + 1 to kLagHi - 1 are candidates
+  static constexpr int kLagHi = 101;
+  static constexpr int kSpan = kWin + kLagHi;       // decimated samples in a snapshot
+  static constexpr int kHop = 192;                  // decimated samples between snapshots
+  static constexpr uint32_t kHoldSamples = 150u * (kSampleRate / 1000);
+  static constexpr float kHoldSemis = 0.5f;
+  static constexpr float kMinPower = 1e-5f;         // -50 dBFS RMS
+  static constexpr float kVoicedMin = 0.6f;
+  static constexpr float kPeakShare = 0.9f;
+  // Lags worked per input sample: 91 lags in 1152 samples with a third to spare, so a sum ends well before
+  // the next snapshot.
+  static constexpr float kLagsPerSample = 0.105f;
+
+  HeldNote() {
+    lp_.setLowPass(1200.0f * static_cast<float>(kDecim), kButterworthQ);  // a corner at 8 kHz, set at 48 kHz
+    reset();
+  }
+
+  void reset() {
+    lp_.clear();
+    ring_.fill(0.0f);
+    boxSum_ = 0.0f;
+    w_ = 0;
+    filled_ = 0;
+    phase_ = 0;
+    sinceHop_ = 0;
+    pending_ = false;
+    credit_ = 0.0f;
+    clock_ = 0;
+    candidate_ = kNone;
+    pc_ = -1;
+  }
+
+  // Takes `m` samples of the voice. The held pitch class updates when an analysis ends.
+  void push(const float* x, int m) {
+    for (int i = 0; i < m; ++i) {
+      boxSum_ += x[i];
+      if (++phase_ < kDecim) continue;
+      phase_ = 0;
+      const float y = lp_.run(boxSum_ * (1.0f / static_cast<float>(kDecim)));
+      boxSum_ = 0.0f;
+      ring_[static_cast<size_t>(w_)] = y;
+      if (++w_ == kSpan) w_ = 0;
+      if (filled_ < kSpan) ++filled_;
+      if (++sinceHop_ >= kHop && filled_ == kSpan && !pending_) snapshot(clock_ + static_cast<uint32_t>(i) + 1u);
+    }
+    clock_ += static_cast<uint32_t>(m);
+    if (!pending_) return;
+    credit_ += static_cast<float>(m) * kLagsPerSample;
+    while (pending_ && credit_ >= 1.0f) {
+      credit_ -= 1.0f;
+      lagStep();
+    }
+    if (!pending_) credit_ = 0.0f;
+  }
+
+  // The pitch class (0 is C) of the last held note, or -1 before the first.
+  int pitchClass() const { return pc_; }
+
+ private:
+  static constexpr int kNone = -1000;
+
+  // Copies the newest kSpan samples in time order and starts the lag sums.
+  void snapshot(uint32_t at) {
+    sinceHop_ = 0;
+    snapClock_ = at;
+    int r = w_;
+    float sum = 0.0f;
+    cs_[0] = 0.0f;
+    for (int k = 0; k < kSpan; ++k) {
+      const float v = ring_[static_cast<size_t>(r)];
+      if (++r == kSpan) r = 0;
+      snap_[static_cast<size_t>(k)] = v;
+      sum += v * v;
+      cs_[static_cast<size_t>(k) + 1] = sum;
+    }
+    if (!(cs_[kWin] >= kMinPower * static_cast<float>(kWin))) {
+      candidate_ = kNone;
+      return;
+    }
+    lag_ = kLagLo;
+    credit_ = 0.0f;
+    pending_ = true;
+  }
+
+  // Normalised correlation of the window with itself `lag_` samples later.
+  void lagStep() {
+    const float* a = snap_.data();
+    const float* b = a + lag_;
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    for (int i = 0; i < kWin; i += 4) {
+      s0 += a[i] * b[i];
+      s1 += a[i + 1] * b[i + 1];
+      s2 += a[i + 2] * b[i + 2];
+      s3 += a[i + 3] * b[i + 3];
+    }
+    const float s = (s0 + s1) + (s2 + s3);
+    const float den = cs_[kWin] * (cs_[static_cast<size_t>(lag_ + kWin)] - cs_[static_cast<size_t>(lag_)]);
+    ncc_[static_cast<size_t>(lag_)] = (s > 0.0f && den > 1e-20f) ? s / sqrtf(den) : 0.0f;
+    if (++lag_ > kLagHi) {
+      pending_ = false;
+      evaluate();
+    }
+  }
+
+  void evaluate() {
+    float best = 0.0f;
+    for (int l = kLagLo + 1; l < kLagHi; ++l) best = fmaxf(best, ncc_[static_cast<size_t>(l)]);
+    int pick = 0;
+    if (best >= kVoicedMin) {
+      for (int l = kLagLo + 1; l < kLagHi; ++l) {
+        const float v = ncc_[static_cast<size_t>(l)];
+        if (v >= kPeakShare * best && v >= ncc_[static_cast<size_t>(l - 1)] && v >= ncc_[static_cast<size_t>(l + 1)]) {
+          pick = l;
+          break;
+        }
+      }
+    }
+    if (pick == 0) {
+      candidate_ = kNone;
+      return;
+    }
+    const float a = ncc_[static_cast<size_t>(pick - 1)];
+    const float b = ncc_[static_cast<size_t>(pick)];
+    const float c = ncc_[static_cast<size_t>(pick + 1)];
+    const float curve = a - 2.0f * b + c;
+    const float shift = curve < -1e-9f ? clampf(0.5f * (a - c) / curve, -0.5f, 0.5f) : 0.0f;
+    const float hz = kRate / (static_cast<float>(pick) + shift);
+    follow(69.0f + 12.0f * log2Fast(hz * (1.0f / 440.0f)));
+  }
+
+  // Judges one pitch, in semitones from MIDI 0, against the semitone being held.
+  void follow(float midi) {
+    if (candidate_ == kNone || fabsf(midi - static_cast<float>(candidate_)) > kHoldSemis) {
+      candidate_ = static_cast<int>(floorf(midi + 0.5f));
+      candStart_ = snapClock_;
+    }
+    if (snapClock_ - candStart_ >= kHoldSamples) pc_ = (candidate_ % 12 + 12) % 12;
+  }
+
+  Biquad lp_;
+  float boxSum_ = 0.0f;
+  std::array<float, kSpan> ring_{};
+  std::array<float, kSpan> snap_{};
+  std::array<float, kSpan + 1> cs_{};  // running sum of squares of the snapshot
+  std::array<float, kLagHi + 1> ncc_{};
+  int w_ = 0;
+  int filled_ = 0;
+  int phase_ = 0;
+  int sinceHop_ = 0;
+  int lag_ = kLagLo;
+  bool pending_ = false;
+  float credit_ = 0.0f;
+  uint32_t clock_ = 0;      // input samples seen
+  uint32_t snapClock_ = 0;  // the clock at the newest sample of the snapshot
+  uint32_t candStart_ = 0;
+  int candidate_ = kNone;   // the semitone being held, or kNone
+  int pc_ = -1;
+};
+
 }  // namespace strings_detail
 
 class Strings {
@@ -181,6 +354,8 @@ class Strings {
     retiring_ = false;
     retireGain_ = 0.0f;
     tunedKey_ = strings_detail::kUntuned;
+    retunes_ = 0;
+    tracker_.reset();
     dcX_ = dcY_ = 0.0f;
     decay_ = 0.0f;
     mix_ = 0.0f;
@@ -188,9 +363,8 @@ class Strings {
     fresh_ = true;
   }
 
-  // `key` is the Autotune KEY index the strings sit on, or a negative number for the chromatic scale.
   // Off and settled, out equals in bit for bit. in and out may be the same buffer.
-  void process(const float* in, float* out, int n, const StringsParams& p, int key) {
+  void process(const float* in, float* out, int n, const StringsParams& p) {
     if (n <= 0) return;
     const float wetTarget = p.on ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
@@ -203,7 +377,7 @@ class Strings {
       decay_ = clampf(p.decayMs, kStringsDecayMinMs, kStringsDecayMaxMs);
       mix_ = smooth::clamp01(p.mix);
     }
-    retune(key < 0 ? strings_detail::kChromatic : key % kKeyCount, p.tuning);
+    retune(tracker_.pitchClass(), p.tuning);
 
     // DECAY and MIX glide once per call; the wet fade scales MIX, so a switch-on starts at the dry input.
     const float a = smooth::blockCoef(smooth::kSmoothSec, n);
@@ -226,6 +400,7 @@ class Strings {
     for (int at = 0; at < n; at += kBlock) {
       const int m = n - at < kBlock ? n - at : kBlock;
       blockIn(in + at, m);
+      tracker_.push(x_.data(), m);
       acc_.fill(0.0f);
       for (auto& st : live.s) st.run(x_.data(), acc_.data(), m);
       if (retiring_) addRetired(m, retireStep);
@@ -237,11 +412,21 @@ class Strings {
     }
   }
 
-  // Test hooks: the active bank's tuning, and the one string that takes the voice (-1 for all).
+  // Test hooks: the active bank's tuning, the pitch class it sits on, the builds started, the one string that
+  // takes the voice (-1 for all), and an at-once tuning to a pitch class that skips the tracker.
   float noteHz(int i) const { return banks_[static_cast<size_t>(active_)].s[static_cast<size_t>(i)].hz; }
   int tunedKey() const { return tunedKey_; }
+  int retuneCount() const { return retunes_; }
   bool retiring() const { return retiring_; }
   void soloForTest(int i) { solo_ = i; }
+  void tuneForTest(int pc, float share = StringsTuning{}.dampingShare) {
+    for (int i = 0; i < kStringCount; ++i) {
+      banks_[static_cast<size_t>(active_)].s[static_cast<size_t>(i)].tune(
+          strings_detail::midiHz(strings_detail::stringMidi(pc, i)), share);
+    }
+    tunedKey_ = pc;
+    building_ = false;
+  }
 
  private:
   static constexpr float kFadeStep = 1.0f / (20.0f * kSmpPerMs);
@@ -270,16 +455,19 @@ class Strings {
     dcY_ = y1;
   }
 
-  // Builds the strings for `want` when the key differs from the one tuned, one string a call so no block
-  // pays for all twelve. A first build tunes the active bank, whose strings stay silent until tuned. A
-  // change builds the idle bank, and the banks swap when the last string is done. While the old bank is
-  // still fading, a second change waits for it. A new key asked for during a build starts the build over.
+  // Builds the strings for the held pitch class `want` (negative before the first held note) when it differs
+  // from the one tuned, one string a call so no block pays for all eight. A first build tunes the active
+  // bank, whose strings stay silent until tuned. A change builds the idle bank, and the banks swap when the
+  // last string is done. While the old bank is still fading, a second change waits for it. A new note asked
+  // for during a build starts the build over.
   void retune(int want, const StringsTuning& t) {
+    if (want < 0) return;
     if (building_ && want != buildKey_) building_ = false;
     if (!building_) {
       if (want == tunedKey_) return;
       if (tunedKey_ != strings_detail::kUntuned && retiring_) return;
       building_ = true;
+      ++retunes_;
       buildKey_ = want;
       built_ = 0;
       buildBank_ = tunedKey_ == strings_detail::kUntuned ? active_ : active_ ^ 1;
@@ -317,8 +505,10 @@ class Strings {
   std::array<float, kBlock> old_{};
   std::array<float, kBlock> zero_{};
   int active_ = 0;
-  int tunedKey_ = strings_detail::kUntuned;
-  int buildKey_ = strings_detail::kUntuned;  // the key being built, valid while building_
+  strings_detail::HeldNote tracker_;
+  int tunedKey_ = strings_detail::kUntuned;  // the pitch class the active bank sits on
+  int buildKey_ = strings_detail::kUntuned;  // the pitch class being built, valid while building_
+  int retunes_ = 0;
   int buildBank_ = 0;
   int built_ = 0;                            // strings of the build done
   bool building_ = false;

@@ -115,7 +115,7 @@ const char* reverbValue(const Layout& layout) {
   if (slot < 0) return "SPRING";
   switch (layout.card[slot]) {
     case Card::ReverbChasm: return "CHASM";
-    case Card::Strings: return "SYMPATHETIC";
+    case Card::Strings: return "SYMPATH";
     default: return "SPRING";
   }
 }
@@ -147,7 +147,7 @@ const char* distortionGrowlValue(const Layout& layout) {
   const int slot = distortionGrowlSlot(layout);
   if (slot < 0) return "DISTORTION";
   switch (layout.card[slot]) {
-    case Card::Growl: return "THROAT";
+    case Card::Growl: return "DEEPTHROAT";
     case Card::RingMod: return "RING MOD";
     default: return "DISTORTION";
   }

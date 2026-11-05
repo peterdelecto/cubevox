@@ -1,6 +1,7 @@
 // Ring mod card checks: off is a bit-exact copy, the carrier sits at RATIO times the note nearest the tracked
 // pitch (read from the card and from the output's spectrum), vibrato of 0.4 semitone leaves it still, a note
-// step moves it in the block the tracker reports it, a keyed card never lands on a note outside the scale, it
+// step moves it 60 ms after the tracker reports it, a flip shorter than that leaves it still, no change on
+// Adam's clips follows another within 60 ms, a keyed card never lands on a note outside the scale, it
 // rests at 220 Hz times RATIO before the first voiced frame and holds through unvoiced frames, the output
 // stays finite at every knob corner, and the level at the defaults (RATIO 1.5, MIX 50 %) on Adam's clips.
 // Each run feeds a PitchFx first, so the
@@ -190,7 +191,8 @@ bool checkVibrato() {
   return report("vibrato leaves it still", worst < 0.01, detail);
 }
 
-// A step from A3 to C4: the carrier is on C4 by the first block in which the tracker reports C4.
+// A step from A3 to C4: the carrier is on C4 60 ms (45 blocks) after the first block in which the tracker
+// reports C4, give or take one block.
 bool checkStep() {
   Signal in = tone(kA3Hz, 0.5, -20.0);
   const Signal next = tone(kC4Hz, 0.5, -20.0);
@@ -207,9 +209,88 @@ bool checkStep() {
   };
   rig.run(in, modAt(1.0f, 1.0f));
   char detail[112];
-  std::snprintf(detail, sizeof detail, "tracker reports C4 in block %ld, carrier on C4 in block %ld (carrier no later)",
-                trackerBlock, carrierBlock);
-  return report("a note step jumps at once", trackerBlock >= 0 && carrierBlock >= 0 && carrierBlock <= trackerBlock, detail);
+  const long settle = static_cast<long>(60.0f * cv::kSmpPerMs) / cv::kBlock;
+  const long lag = carrierBlock - trackerBlock + 1;
+  std::snprintf(detail, sizeof detail, "tracker reports C4 in block %ld, carrier on C4 in block %ld (%ld to %ld blocks counted)",
+                trackerBlock, carrierBlock, settle, settle + 1);
+  return report("a note step settles", trackerBlock >= 0 && carrierBlock >= 0 && lag >= settle && lag <= settle + 1, detail);
+}
+
+// A tracker frame as the card reads it: voiced at `hz`, or unvoiced when `hz` is 0.
+cv::PitchResult frameAt(double hz) {
+  cv::PitchResult pr;
+  if (hz > 0.0) {
+    pr.voiced = true;
+    pr.hz = static_cast<float>(hz);
+    pr.period = static_cast<float>(kRate / hz);
+  }
+  return pr;
+}
+
+// Drives the card's note tracker with a scripted reading, one block at a time, and records the held note.
+struct Script {
+  cv::RingMod mod;
+  cv::RingModTuning tuning;
+  int moves = 0;
+  float last = 0.0f;
+
+  // Feeds `ms` of reading at `hz` and returns the block count at which the held note moved, or -1.
+  int feed(double hz, double ms) {
+    const int blocks = static_cast<int>(ms * cv::kSmpPerMs) / cv::kBlock;
+    const cv::PitchResult pr = frameAt(hz);
+    int movedAt = -1;
+    for (int b = 0; b < blocks; ++b) {
+      mod.trackNote(pr, -1, tuning, cv::kBlock);
+      if (std::fabs(mod.heldHz() - last) > 0.01f) {
+        last = mod.heldHz();
+        ++moves;
+        movedAt = b + 1;
+      }
+    }
+    return movedAt;
+  }
+};
+
+// A reading that flips to another note for 40 ms and back, or wanders through other notes in 40 ms stretches,
+// leaves the held note still. An unvoiced gap pauses the count without clearing it.
+bool checkFlip() {
+  Script s;
+  s.feed(kA3Hz, 100.0);
+  const int first = s.moves;
+  s.feed(kC4Hz, 40.0);
+  s.feed(kA3Hz, 100.0);
+  s.feed(kD4Hz, 40.0);
+  s.feed(kC4Hz, 40.0);
+  s.feed(kD4Hz, 40.0);
+  s.feed(kA3Hz, 100.0);
+  const bool still = first == 1 && s.moves == 1 && std::fabs(s.mod.heldHz() - kA3Hz) < 0.01f;
+
+  Script gap;
+  gap.feed(kA3Hz, 100.0);
+  gap.feed(kC4Hz, 30.0);
+  gap.feed(0.0, 200.0);
+  const bool heldThrough = gap.moves == 1;
+  gap.feed(kC4Hz, 40.0);
+  const bool paused = gap.moves == 2 && std::fabs(gap.mod.heldHz() - kC4Hz) < 0.01f;
+
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "40 ms flips: %d move (1, the first note); 30 + 40 ms around an unvoiced gap moves: %s",
+                s.moves, heldThrough && paused ? "yes" : "no");
+  return report("a short flip leaves it still", still && heldThrough && paused, detail);
+}
+
+// A real change held 100 ms moves the held note once, 60 ms (45 blocks) in, and the first note sets it at once.
+bool checkSettle() {
+  Script s;
+  const int firstAt = s.feed(kA3Hz, 100.0);
+  s.moves = 0;
+  const int movedAt = s.feed(kC4Hz, 100.0);
+  const long settle = static_cast<long>(60.0f * cv::kSmpPerMs) / cv::kBlock;
+  const bool once = s.moves == 1 && std::fabs(s.mod.heldHz() - kC4Hz) < 0.01f;
+  char detail[112];
+  std::snprintf(detail, sizeof detail, "first note in block %d (1); change moved %d time(s) in block %d (%ld to %ld)", firstAt,
+                s.moves, movedAt, settle, settle + 1);
+  return report("a held change moves once", firstAt == 1 && once && movedAt >= settle && movedAt <= settle + 1, detail);
 }
 
 // Keyed to C major, a sung C#4 sits on C4 or D4, never on C#4.
@@ -316,6 +397,57 @@ bool checkLevel() {
   return report("level at the defaults", ok, detail);
 }
 
+// Carrier note changes on the three clips, unkeyed and keyed to C. A change is a block whose carrier differs
+// from the last block's. The first jump out of the rest pitch counts. A short change is one the next change
+// follows within 60 ms.
+struct ChangeStats {
+  int changes = 0;
+  int shorter = 0;
+  double seconds = 0.0;
+};
+
+ChangeStats countChanges(const std::vector<Signal>& sets, int key) {
+  ChangeStats s;
+  for (const Signal& padded : sets) {
+    Rig rig;
+    rig.key = key;
+    float last = 0.0f;
+    long lastChange = -1;
+    rig.each = [&](size_t i, const cv::PitchFx&, float hz) {
+      if (std::fabs(hz - last) > 0.01f) {
+        if (last > 0.0f && i >= clips::kPad) {
+          ++s.changes;
+          if (lastChange >= 0 && static_cast<double>(i) - static_cast<double>(lastChange) < 0.060 * kRate) ++s.shorter;
+          lastChange = static_cast<long>(i);
+        }
+        last = hz;
+      }
+    };
+    rig.run(padded, modAt(1.0f, 1.0f));
+    s.seconds += static_cast<double>(padded.size() - clips::kPad) / kRate;
+  }
+  return s;
+}
+
+// On Adam's clips no carrier change follows another within 60 ms. The rates print for the record.
+bool checkClipChanges() {
+  bool whole = true;
+  const std::vector<Signal> sets = clips::load(CUBEVOX_SAMPLES_DIR, whole);
+  if (sets.empty()) {
+    std::printf("SKIP clip change rows  samples/ is not in this checkout\n");
+    return true;
+  }
+  const ChangeStats open = countChanges(sets, -1);
+  const ChangeStats keyed = countChanges(sets, 0);
+  std::printf("NOTE ringmod changes unkeyed: %d in %.1f s = %.2f a second, %d under 60 ms\n", open.changes, open.seconds,
+              open.changes / open.seconds, open.shorter);
+  std::printf("NOTE ringmod changes keyed C: %d in %.1f s = %.2f a second, %d under 60 ms\n", keyed.changes, keyed.seconds,
+              keyed.changes / keyed.seconds, keyed.shorter);
+  char detail[96];
+  std::snprintf(detail, sizeof detail, "changes under 60 ms: %d unkeyed, %d keyed (0)", open.shorter, keyed.shorter);
+  return report("no change under 60 ms", whole && open.shorter == 0 && keyed.shorter == 0, detail);
+}
+
 int bench() {
   bool whole = true;
   const std::vector<Signal> sets = clips::load(CUBEVOX_SAMPLES_DIR, whole);
@@ -358,9 +490,12 @@ int main(int argc, char** argv) {
   ok &= checkNote();
   ok &= checkVibrato();
   ok &= checkStep();
+  ok &= checkFlip();
+  ok &= checkSettle();
   ok &= checkKeyed();
   ok &= checkRestAndHold();
   ok &= checkFinite();
   ok &= checkLevel();
+  ok &= checkClipChanges();
   return ok ? 0 : 1;
 }
