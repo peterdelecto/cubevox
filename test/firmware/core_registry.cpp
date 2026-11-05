@@ -455,7 +455,7 @@ void checkAppendedCards() {
 }
 
 // Apraxia: id formant_follow, which keeps under the id clip width, the Formant engine and the pitch group, SENSITIVITY
-// on the upper pot, RANGE on the lower from -12 st at the pot's bottom through 0 at noon to +6 st at its
+// on the upper pot, RANGE on the lower from -12 st at the pot's bottom through 0 at noon to +12 st at its
 // top, a straight line on each side of noon, no knob on the Formant voice's MIX, and Apraxia on the OLED's
 // readout title, as Mob's row does. Placing it hands the voice's SHIFT to the card's sweep.
 void checkApraxiaCard() {
@@ -471,8 +471,8 @@ void checkApraxiaCard() {
         "apraxia: knob A is SENSITIVITY, a percent");
   const KnobDesc& range = *knobDesc(Card::FormantFollower, 1);
   check(std::strcmp(range.name, "RANGE") == 0 && range.kind == KnobKind::Continuous && range.min == -12.0f &&
-            range.max == 6.0f && range.curve == Curve::ZeroAtNoon && std::strcmp(range.unit, "st") == 0,
-        "apraxia: knob B is RANGE, continuous from -12 st at the bottom through 0 at noon to +6 st at the top");
+            range.max == 12.0f && range.curve == Curve::ZeroAtNoon && std::strcmp(range.unit, "st") == 0,
+        "apraxia: knob B is RANGE, continuous from -12 st at the bottom through 0 at noon to +12 st at the top");
 
   ChainParams p;
   const float mixBefore = p.pitchFx.formant.mix;
@@ -482,9 +482,9 @@ void checkApraxiaCard() {
     applyKnob(Card::FormantFollower, 1, position, p);
     return p.follower.rangeSt;
   };
-  check(rangeAt(0.0f) == -12.0f && rangeAt(0.25f) == -6.0f && rangeAt(0.5f) == 0.0f && rangeAt(0.75f) == 3.0f &&
-            rangeAt(1.0f) == 6.0f,
-        "apraxia: RANGE is -12 st at the bottom, -6 st at 25 %, 0 at noon, +3 st at 75 % and +6 st at the top");
+  check(rangeAt(0.0f) == -12.0f && rangeAt(0.25f) == -6.0f && rangeAt(0.5f) == 0.0f && rangeAt(0.75f) == 6.0f &&
+            rangeAt(1.0f) == 12.0f,
+        "apraxia: RANGE is -12 st at the bottom, -6 st at 25 %, 0 at noon, +6 st at 75 % and +12 st at the top");
   const float defaultPosition = 0.5f * (1.0f - cv::kFollowerDefaultRangeSt / cv::kFollowerMinRangeSt);
   check(cv::kFollowerDefaultRangeSt == -5.0f && std::fabs(rangeAt(defaultPosition) + 5.0f) < 1e-5f &&
             std::fabs(defaultPosition - 7.0f / 24.0f) < 1e-6f && shownText(range, defaultPosition) == "-5",
@@ -494,13 +494,13 @@ void checkApraxiaCard() {
   float before = -13.0f;
   for (int s = 0; s <= 100; ++s) {
     const float st = rangeAt(static_cast<float>(s) / 100.0f);
-    capped = capped && st >= -12.0f && st <= 6.0f;
+    capped = capped && st >= -12.0f && st <= 12.0f;
     rising = rising && st > before;
     before = st;
   }
-  check(capped && rising, "apraxia: RANGE rises with the pot and never leaves -12 to +6 st");
+  check(capped && rising, "apraxia: RANGE rises with the pot and never leaves -12 to +12 st");
   check(shownText(range, 0.0f) == "-12" && shownText(range, 0.25f) == "-6" && shownText(range, 0.5f) == "0" &&
-            shownText(range, 0.75f) == "+3" && shownText(range, 1.0f) == "+6" && knobCells(range) == 3,
+            shownText(range, 0.75f) == "+6" && shownText(range, 1.0f) == "+12" && knobCells(range) == 3,
         "apraxia: RANGE reads its semitones with the sign in three cells");
   check(p.pitchFx.formant.mix == mixBefore, "apraxia: no knob sets the Formant voice's mix");
 

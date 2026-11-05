@@ -1,11 +1,11 @@
-// Apraxia checks: settled off is a plain copy; RANGE maps -12 st at the pot's bottom, 0 at noon and +6 st
-// at its top, the default position reads -5 st, and SHIFT never leaves -12 to +6 st; at SENSITIVITY 50 %
+// Apraxia checks: settled off is a plain copy; RANGE maps -12 st at the pot's bottom, 0 at noon and +12 st
+// at its top, the default position reads -5 st, and SHIFT never leaves -12 to +12 st; at SENSITIVITY 50 %
 // the drive reads about 1 on a -21 dBFS note, 0.5 on a -27 dBFS note and 0 on a -33 dBFS note, and the
 // full point moves with the pot; the follower's attack and release measured on a step; each onset fires
 // a sweep that opens at the drive, halves at half the decay and rests at 0 while the note holds, and the
-// next note fires it again; a +6 st sweep opens to +6 st and comes back to 0; silence rests at 0; at
-// -12 st the grains play at half speed, their window sum holds unity and every read stays in the ring,
-// and the output stays finite and under 0 dBFS on a tone and on Adam's clips; the output stays finite
+// next note fires it again; a +12 st sweep opens to +12 st and comes back to 0; silence rests at 0; at
+// -12 st the grains play at half speed and at +12 st at double speed, their window sum holds unity and
+// every read stays in the ring and behind the newest sample, and the output stays finite and under 0 dBFS on a tone and on Adam's clips; the output stays finite
 // on the clips at every knob corner; and the card at its default holds the level rule on them. The card
 // is set through the registry, as the box sets it. The clip rows skip when samples/ is absent. No
 // window, no audio device.
@@ -85,7 +85,7 @@ bool allFinite(const Signal& x) {
   return true;
 }
 
-// The RANGE pot's position for `st`: -12 st at 0, 0 at noon and +6 st at 1, a straight line each side.
+// The RANGE pot's position for `st`: -12 st at 0, 0 at noon and +12 st at 1, a straight line each side.
 float rangePosition(float st) {
   return st < 0.0f ? 0.5f * (1.0f - st / cv::kFollowerMinRangeSt) : 0.5f * (1.0f + st / cv::kFollowerMaxRangeSt);
 }
@@ -192,18 +192,19 @@ Span shiftSpan(float rangeSt) {
   return s;
 }
 
-// The RANGE pot hands the card -12 st at its bottom, -6 st at 25 %, 0 at noon, +3 st at 75 % and +6 st
+// The RANGE pot hands the card -12 st at its bottom, -6 st at 25 %, 0 at noon, +6 st at 75 % and +12 st
 // at its top, a straight line on each side of noon, and its default position, 7/24 of the travel, reads
-// the default of -5 st. RANGE 0 st leaves SHIFT at 0. A RANGE past -12 st or past +6 st set straight on
-// the engine still keeps SHIFT within -12 to +6 st.
+// the default of -5 st. RANGE 0 st leaves SHIFT at 0. A RANGE past -12 st or past +12 st set straight on
+// the engine still keeps SHIFT within -12 to +12 st, the voice's limit.
 bool testRangeMap() {
   float at[5];
   for (int k = 0; k < 5; ++k) at[k] = boxApraxia(0.5f, 0.25f * static_cast<float>(k)).follower.rangeSt;
   const float position = rangePosition(cv::kFollowerDefaultRangeSt);
   const float dflt = boxApraxia(0.5f, position).follower.rangeSt;
-  bool ok = report("range: the pot gives -12, -6, 0, +3 and +6 st at 0, 25, 50, 75 and 100 %",
-                   at[0] == -12.0f && at[1] == -6.0f && at[2] == 0.0f && at[3] == 3.0f && at[4] == 6.0f,
-                   "%+.2f, %+.2f, %+.2f, %+.2f st and +6 at the top", at[0], at[1], at[2], at[3]);
+  bool ok = report("range: the pot gives -12, -6, 0, +6 and +12 st at 0, 25, 50, 75 and 100 %",
+                   at[0] == -12.0f && at[1] == -6.0f && at[2] == 0.0f && at[3] == 6.0f && at[4] == 12.0f &&
+                       cv::kFollowerMaxRangeSt <= static_cast<float>(cv::kFormantVoiceMaxShiftSt),
+                   "%+.2f st at 25 %%, %+.2f at 50 %%, %+.2f at 75 %% and %+.2f at the top", at[1], at[2], at[3], at[4]);
   ok &= report("range: the default position reads -5 st, the engine's default",
                std::fabs(dflt + 5.0f) < 1e-5f && std::fabs(position - 7.0f / 24.0f) < 1e-6f &&
                    cv::FormantFollowerParams().rangeSt == -5.0f,
@@ -211,18 +212,18 @@ bool testRangeMap() {
 
   const Span none = shiftSpan(0.0f);
   const Span deep = shiftSpan(-20.0f);
-  const Span up = shiftSpan(10.0f);
+  const Span up = shiftSpan(20.0f);
   ok &= report("range: 0 st leaves SHIFT at 0 on a loud note", none.low == 0.0f && none.high == 0.0f, "%+.3f to %+.3f st",
                none.low, none.high);
-  ok &= report("range: -20 st on the engine shifts -12 st at most, +10 st shifts +6 st at most",
+  ok &= report("range: -20 st on the engine shifts -12 st at most, +20 st shifts +12 st at most",
                deep.handedLow == -12 && deep.handedHigh == 0 && deep.low >= -12.0f && deep.high <= 0.0f &&
-                   up.handedHigh == 6 && up.handedLow == 0 && up.high <= 6.0f && up.low >= 0.0f,
+                   up.handedHigh == 12 && up.handedLow == 0 && up.high <= 12.0f && up.low >= 0.0f,
                "handed %+.0f and %+.0f st; glided %+.3f and %+.3f st", deep.handedLow, up.handedHigh, deep.low, up.high);
   return ok;
 }
 
-// RANGE +6 st, the pot's top, at SENSITIVITY 50 % on a -14 dBFS note held 0.6 s: the card hands the stage
-// +6 st on the onset, the glided SHIFT opens past +5.5 st, and from 150 ms past the decay's end it rests
+// RANGE +12 st, the pot's top, at SENSITIVITY 50 % on a -14 dBFS note held 0.6 s: the card hands the stage
+// +12 st on the onset, the glided SHIFT opens past +10.5 st, and from 150 ms past the decay's end it rests
 // within 0.01 st of 0.
 bool testUpSweep() {
   int handedTop = 0;
@@ -236,8 +237,9 @@ bool testUpSweep() {
     low = std::min(low, s.formant.shiftSemis());
     if (done >= restFrom) rest = std::max(rest, std::fabs(s.formant.shiftSemis()));
   });
-  return report("range: +6 st opens to +6 st and returns to 0 while the note holds",
-                handedTop == 6 && high > 5.5f && high <= 6.0f && low >= 0.0f && rest < 0.01f,
+  return report("range: +12 st opens to +12 st and returns to 0 while the note holds",
+                handedTop == 12 && high > 10.5f && high <= static_cast<float>(cv::kFormantVoiceMaxShiftSt) && low >= 0.0f &&
+                    rest < 0.01f,
                 "handed %+.0f st, SHIFT peaks %+.3f st, rests within %.4f st", handedTop, high, rest);
 }
 
@@ -426,18 +428,20 @@ bool testSweep(float decayMs) {
   return ok;
 }
 
-// One Formant voice at rate 0.5 (-12 st) and ratio 1 on the engine's ring, driven as the engine drives it at
-// a steady `period`: calls of kBlock for 1 s at the lag the engine's own tracker gives it, the grain delay
-// plus a period. Its ring holds 1.0 up to `reach` samples behind the newest sample and NaN past that, so
-// the output is the grains' window sum while every read stays within `reach`, and NaN once one reads past it.
+// One Formant voice at `rate` (0.5 at -12 st, 2 at +12 st) and ratio 1 on the engine's ring, driven as the
+// engine drives it at a steady `period`: calls of kBlock for 1 s at the lag the engine's own tracker gives
+// it, the grain delay plus a period. Its ring holds 1.0 up to `reach` samples behind the newest sample and
+// NaN past that, and NaN on the samples not yet written, so the output is the grains' window sum while
+// every read stays within `reach` and behind the newest sample, and NaN once one reads outside them.
 struct WindowSum {
   bool finite;
   double low;   // the sum's lowest and highest after two grain lengths
   double high;
 };
 
-WindowSum halfSpeedSum(float period, int reach) {
+WindowSum grainSum(float period, int reach, float rate) {
   constexpr int kLen = cv::kFormantRingLen;
+  constexpr int kAhead = 8;  // the unwritten samples poisoned past the newest
   const auto at = [](int i) { return static_cast<size_t>((i % kLen + kLen) % kLen); };
   const float nan = std::nanf("");
   auto ring = std::make_unique<cv::FormantFx::Voice::Ring>();
@@ -456,7 +460,8 @@ WindowSum halfSpeedSum(float period, int reach) {
     for (int j = 0; j < cv::kBlock; ++j) (*ring)[at(head + j)] = 1.0f;
     head = static_cast<int>(at(head + cv::kBlock));
     for (int j = 0; j < cv::kBlock; ++j) (*ring)[at(head - 2 - reach - j)] = nan;
-    voice.prepare(period, 1.0f, 0.5f, lag, cv::kBlock);
+    for (int j = 0; j < kAhead; ++j) (*ring)[at(head + j)] = nan;
+    voice.prepare(period, 1.0f, rate, lag, cv::kBlock);
     out.fill(0.0f);
     voice.render(*ring, first, cv::kBlock, out.data());
     for (int j = 0; j < cv::kBlock; ++j) {
@@ -475,10 +480,10 @@ WindowSum halfSpeedSum(float period, int reach) {
 int deepestRead(float period) {
   int lo = 0;
   int hi = cv::kFormantRingLen - cv::kBlock - 2;
-  if (!halfSpeedSum(period, hi).finite) return -1;
+  if (!grainSum(period, hi, 0.5f).finite) return -1;
   while (hi - lo > 1) {
     const int mid = (lo + hi) / 2;
-    if (halfSpeedSum(period, mid).finite) {
+    if (grainSum(period, mid, 0.5f).finite) {
       hi = mid;
     } else {
       lo = mid;
@@ -494,13 +499,32 @@ bool testHalfSpeedVoice() {
   bool ok = true;
   for (const float period : {static_cast<float>(kRate) / 220.0f, static_cast<float>(cv::PitchTracker::kMaxPeriod)}) {
     const int deepest = deepestRead(period);
-    const WindowSum s = halfSpeedSum(period, cv::kFormantRingLen - cv::kBlock - 2);
+    const WindowSum s = grainSum(period, cv::kFormantRingLen - cv::kBlock - 2, 0.5f);
     char name[112];
     std::snprintf(name, sizeof name, "half speed: period %.1f samples, window sum within 0.5 dB, reads inside the ring",
                   static_cast<double>(period));
     ok &= report(name, deepest > 0 && s.finite && dbOf(s.low) >= -0.5 && dbOf(s.high) <= 0.5,
                  "sum %+.3f to %+.3f dB; deepest read %.0f samples behind the newest, ring %.0f", dbOf(s.low), dbOf(s.high),
                  deepest, cv::kFormantRingLen);
+  }
+  return ok;
+}
+
+// At +12 st a grain plays at rate 2 and its read delay shrinks by one sample per output sample, so it
+// must not catch the newest sample. At the 220 Hz tone's period, at the tracker's shortest and at its
+// slowest the window sum holds within 0.5 dB of unity through a held second, and no read lands on a
+// sample the ring has not been given yet.
+bool testDoubleSpeedVoice() {
+  bool ok = true;
+  const float periods[] = {static_cast<float>(cv::PitchTracker::kMinPeriod), static_cast<float>(kRate) / 220.0f,
+                           static_cast<float>(cv::PitchTracker::kMaxPeriod)};
+  for (const float period : periods) {
+    const WindowSum s = grainSum(period, cv::kFormantRingLen - cv::kBlock - 2, 2.0f);
+    char name[112];
+    std::snprintf(name, sizeof name, "double speed: period %.1f samples, window sum within 0.5 dB, reads behind the newest",
+                  static_cast<double>(period));
+    ok &= report(name, s.finite && dbOf(s.low) >= -0.5 && dbOf(s.high) <= 0.5, "sum %+.3f to %+.3f dB", dbOf(s.low),
+                 dbOf(s.high));
   }
   return ok;
 }
@@ -521,6 +545,25 @@ bool testHalfSpeedTone() {
   return report("half speed: a -21 dBFS 220 Hz tone at -12 st, finite and under 0 dBFS",
                 handed == -12 && deepest < -11.5f && allFinite(out) && peak <= 1.0,
                 "handed %+.0f st, SHIFT reaches %+.3f st, peak %+.2f dBFS, %+.2f dBFS from 100 ms", handed, deepest,
+                dbOf(peak), dbOf(voiced));
+}
+
+// The same tone at RANGE +12 st: the card hands the stage +12 st, the glided SHIFT passes +11.5 st and
+// stays inside the voice's limit, and the output stays finite and under 0 dBFS.
+bool testDoubleSpeedTone() {
+  int handed = 0;
+  float highest = 0.0f;
+  const Signal out = through(sine(kRate, -21.0, 220.0), boxApraxia(1.0f, 1.0f, true, cv::kFollowerMaxDecayMs),
+                             [&](const Stage& s, int) {
+                               handed = std::max(handed, s.handed);
+                               highest = std::max(highest, s.formant.shiftSemis());
+                             });
+  const double peak = peakOf(out);
+  const double voiced = peakOf(Signal(out.begin() + kRate / 10, out.end()));
+  return report("double speed: a -21 dBFS 220 Hz tone at +12 st, finite and under 0 dBFS",
+                handed == 12 && highest > 11.5f && highest <= static_cast<float>(cv::kFormantVoiceMaxShiftSt) &&
+                    allFinite(out) && peak <= 1.0,
+                "handed %+.0f st, SHIFT reaches %+.3f st, peak %+.2f dBFS, %+.2f dBFS from 100 ms", handed, highest,
                 dbOf(peak), dbOf(voiced));
 }
 
@@ -552,7 +595,7 @@ std::vector<Clip> clips(bool& missing) {
   return out;
 }
 
-// Every knob corner, SENSITIVITY 0 and 100 % by RANGE -12, 0 and +6 st by decay 10 and 2000 ms, on each
+// Every knob corner, SENSITIVITY 0 and 100 % by RANGE -12, 0 and +12 st by decay 10 and 2000 ms, on each
 // clip.
 bool testClipCorners(const std::vector<Clip>& all) {
   bool finite = true;
@@ -580,8 +623,8 @@ double levelDb(const Clip& c, const Signal& out) {
 double levelDb(const Clip& c, const ChainParams& p) { return levelDb(c, through(c.padded, p)); }
 
 // The pot's two ends at SENSITIVITY 50 % and the 300 ms decay on each clip. At -12 st, where the grains
-// play at half speed, the output stays finite and under 0 dBFS. The level at both ends prints beside it;
-// the level rule binds the default only.
+// play at half speed, and at +12 st, where they play at double speed, the output stays finite and under
+// 0 dBFS. The level at both ends prints beside it; the level rule binds the default only.
 bool testClipEnds(const std::vector<Clip>& all) {
   bool ok = true;
   for (const Clip& c : all) {
@@ -589,9 +632,12 @@ bool testClipEnds(const std::vector<Clip>& all) {
     const Signal up = through(c.padded, boxApraxia(0.5f, 1.0f));
     char name[96];
     std::snprintf(name, sizeof name, "half speed: -12 st on %s, finite and under 0 dBFS", c.name.c_str());
-    ok &= report(name, allFinite(deep) && peakOf(deep) <= 1.0 && allFinite(up), "peak %+.2f dBFS, the input's %+.2f dBFS",
+    ok &= report(name, allFinite(deep) && peakOf(deep) <= 1.0, "peak %+.2f dBFS, the input's %+.2f dBFS",
                  dbOf(peakOf(deep)), dbOf(peakOf(c.padded)));
-    std::printf("NOTE level SENSITIVITY 50 %% %-22s RANGE -12 st %+6.2f dB, +6 st %+6.2f dB (peak %+.2f dBFS)\n",
+    std::snprintf(name, sizeof name, "double speed: +12 st on %s, finite and under 0 dBFS", c.name.c_str());
+    ok &= report(name, allFinite(up) && peakOf(up) <= 1.0, "peak %+.2f dBFS, the input's %+.2f dBFS", dbOf(peakOf(up)),
+                 dbOf(peakOf(c.padded)));
+    std::printf("NOTE level SENSITIVITY 50 %% %-22s RANGE -12 st %+6.2f dB, +12 st %+6.2f dB (peak %+.2f dBFS)\n",
                 c.name.c_str(), levelDb(c, deep), levelDb(c, up), dbOf(peakOf(up)));
   }
   return ok;
@@ -633,6 +679,8 @@ int main() {
   ok &= testUpSweep();
   ok &= testHalfSpeedVoice();
   ok &= testHalfSpeedTone();
+  ok &= testDoubleSpeedVoice();
+  ok &= testDoubleSpeedTone();
   bool missing = false;
   const std::vector<Clip> all = clips(missing);
   if (missing) {

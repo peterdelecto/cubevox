@@ -244,13 +244,16 @@ bool crowdRows() {
 }
 
 // The Formant card at SHIFT `shiftSt` with Autotune off, as the registry sets it. The card's trim is
-// set for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are.
+// set for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are. A `shiftSt` past the
+// panel's +-7 st is the voice at Apraxia's reach, which pins MIX at 1 and takes SHIFT up to +-12 st.
 cv::PitchFxParams boxFormantAt(int shiftSt, float mix) {
   ChainParams chain;
   applyPlacement(Card::Formant, chain);
   applyToggle(Card::Formant, true, chain);
-  applyKnob(Card::Formant, 0, static_cast<float>(shiftSt + cv::kFormantMaxShiftSt), chain);
+  const int panelSt = std::clamp(shiftSt, -cv::kFormantMaxShiftSt, cv::kFormantMaxShiftSt);
+  applyKnob(Card::Formant, 0, static_cast<float>(panelSt + cv::kFormantMaxShiftSt), chain);
   applyKnob(Card::Formant, 1, mix, chain);
+  chain.pitchFx.formant.shiftSt = shiftSt;
   return chain.pitchFx;
 }
 
@@ -314,7 +317,7 @@ bool clipRows(const char* label, const ClipFn& through, double lo, double hi, do
 
 // The Formant card on the program at MIX 50 % and on Adam's clips: the voices sit from correlated (the
 // program) to unrelated (the clips), and the level gain keeps both inside the mid band. The wet path
-// alone (MIX 100 %) runs at every SHIFT on Adam's clips. The grains sum to a level that follows SHIFT
+// alone (MIX 100 %) runs at every SHIFT on Adam's clips, to Apraxia's reach of +-12 st. The grains sum to a level that follows SHIFT
 // and the three clips differ by up to 1.2 dB under one trim, so each clip is held to the mid band and
 // the mean of the three to the rule, which the per-SHIFT trim table is fit to. The synthetic program
 // at the default SHIFT is reported next to them, as Octave's is not held to the rule either.
@@ -337,7 +340,7 @@ bool formantRows(const Signal& in) {
         return Through{padded, run(padded, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, half); })};
       },
       kMidLoDb, kMidHiDb, mean, count);
-  for (int st = -cv::kFormantMaxShiftSt; st <= cv::kFormantMaxShiftSt; ++st) {
+  for (int st = -cv::kFormantVoiceMaxShiftSt; st <= cv::kFormantVoiceMaxShiftSt; ++st) {
     char label[40];
     std::snprintf(label, sizeof label, "formant %+d st mix 1", st);
     const cv::PitchFxParams full = boxFormantAt(st, 1.0f);
@@ -449,10 +452,11 @@ bool autotuneRows() {
 // joins Autotune's grain pass, and its stage is the audio it adds on top of Autotune's, so each clip's output is
 // read against Autotune's own output over the same clip. The rows are held as the card alone is: each clip to
 // the mid band and the mean of the three to the rule. The group trim (kFormantGroupTrimDb) keeps the single
-// cut from reading over what the card read cutting Autotune's output a second time.
+// cut from reading over what the card read cutting Autotune's output a second time, and kFormantGroupTopTrimDb
+// lifts it at +12 st. The rows run to Apraxia's reach, +-12 st.
 bool formantBehindAutotuneRows() {
   bool ok = true;
-  for (int st = -cv::kFormantMaxShiftSt; st <= cv::kFormantMaxShiftSt; ++st) {
+  for (int st = -cv::kFormantVoiceMaxShiftSt; st <= cv::kFormantVoiceMaxShiftSt; ++st) {
     char label[48];
     std::snprintf(label, sizeof label, "formant behind autotune %+d st mix 1", st);
     cv::PitchFxParams both = boxFormantAt(st, 1.0f);
