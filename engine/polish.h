@@ -10,9 +10,13 @@
 #include "engine/smooth.h"
 
 // VOX EQ voiced for Adam's voice, one stage in two places under one menu row with three settings.
-// The front half runs ahead of slot 1 and holds a de-esser, plus a 70 Hz high-pass and a 6 kHz
-// low-pass (the cuts) when `cuts` is set. The back half runs after POLISH COMP and holds a 300 Hz
-// dip, a 3.5 kHz presence peak and the trim.
+// The front half runs ahead of slot 1 and holds a 40 Hz subsonic high-pass and a de-esser, plus a
+// 70 Hz high-pass and a 6 kHz low-pass (the cuts) when `cuts` is set. The back half runs after
+// POLISH COMP and holds a 300 Hz dip, a 3.5 kHz presence peak and the trim.
+//
+// The subsonic high-pass sits below any note Adam sings. Rumble and breath wind down there carry
+// no loudness, but they count in RMS and POLISH COMP's makeup lifts them in the pauses, so without
+// the filter the stage reads up to 1 dB high on a rumbly take.
 //
 // Each half crossfades with its input through its own 20 ms smoother on `on`, so a click fades both
 // together. The cuts crossfade through a smoother of their own on `on` and `cuts`, so a change
@@ -23,7 +27,9 @@
 
 namespace cv {
 
-// Front cutoffs. Both filters are 4th-order Butterworth, two biquads each.
+// Front cutoffs. The three filters are 4th-order Butterworth, two biquads each. The subsonic
+// high-pass runs whenever the stage is on, and the 70 Hz high-pass and the low-pass only with the cuts.
+constexpr float kPolishSubsonicHz = 40.0f;
 constexpr float kPolishHighPassHz = 70.0f;
 constexpr float kPolishLowPassHz = 6000.0f;
 
@@ -79,6 +85,7 @@ class Polish {
       const float q = i == 0 ? kButterworth4Q1 : kButterworth4Q2;
       hp_[static_cast<size_t>(i)].setHighPass(kPolishHighPassHz, q);
       lp_[static_cast<size_t>(i)].setLowPass(kPolishLowPassHz, q);
+      sub_[static_cast<size_t>(i)].setHighPass(kPolishSubsonicHz, q);
     }
     reset();
   }
@@ -190,11 +197,21 @@ class Polish {
     cutsActive_ = cuts;
   }
 
-  // Cuts and de-esses up to kBlock samples, then mixes them with the input by the smoother. The
+  // Writes up to kBlock samples of the input through the subsonic high-pass.
+  void subsonicChunk(const float* in, float* y, int n) {
+    Biquad s0 = sub_[0];
+    Biquad s1 = sub_[1];
+    for (int i = 0; i < n; ++i) y[i] = s1.run(s0.run(in[i]));
+    sub_[0] = s0;
+    sub_[1] = s1;
+  }
+
+  // Filters and de-esses up to kBlock samples, then mixes them with the input by the smoother. The
   // smoother lives in a local, and the de-esser's notch feeds the mix directly.
   void frontChunk(const float* in, float* out, int n, float target, float cutsTarget, const DeEsserTuning& t) {
     std::array<float, kBlock> y;
-    cutsChunk(in, y.data(), n, cutsTarget);
+    subsonicChunk(in, y.data(), n);
+    cutsChunk(y.data(), y.data(), n, cutsTarget);
 
     float active = frontActive_;
     if (active == target) {
@@ -219,6 +236,7 @@ class Polish {
   }
 
   void clearFront() {
+    for (Biquad& b : sub_) b.clear();
     clearCuts();
     deEsser_.reset();
     frontDirty_ = false;
@@ -237,7 +255,7 @@ class Polish {
     backDirty_ = false;
   }
 
-  std::array<Biquad, 2> hp_, lp_;
+  std::array<Biquad, 2> sub_, hp_, lp_;
   DeEsser deEsser_;
   Biquad dip_, presence_;
   float trim_ = 1.0f;
