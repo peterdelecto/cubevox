@@ -68,13 +68,14 @@ func TestValidateRules(t *testing.T) {
 }
 
 func TestBudgetLines(t *testing.T) {
-	left := func(line int) int { return line - box.FixedCost } // what a card may add to the fixed term
+	leftMean := func(line int) int { return line - box.FixedMean }   // what a card may add to the fixed mean
+	leftWorst := func(line int) int { return line - box.FixedWorst } // what a card may add to the fixed worst
 	cards := []box.Card{
 		{ID: "empty"},
-		{ID: "big_mean", Cost: box.Cost{Avg: left(box.BudgetMean) + 1, Worst: 10}},  // the fixed term makes 76 > 75
-		{ID: "ok_mean", Cost: box.Cost{Avg: left(box.BudgetMean), Worst: 10}},       // 75 exactly
-		{ID: "big_worst", Cost: box.Cost{Avg: 10, Worst: left(box.BudgetWorst) + 1}}, // worst 96 > 95
-		{ID: "ok_worst", Cost: box.Cost{Avg: 10, Worst: left(box.BudgetWorst)}},      // worst 95 exactly
+		{ID: "big_mean", Cost: box.Cost{Avg: leftMean(box.BudgetMean) + 1, Worst: 10}},    // the fixed mean makes 76 > 75
+		{ID: "ok_mean", Cost: box.Cost{Avg: leftMean(box.BudgetMean), Worst: 10}},         // 75 exactly
+		{ID: "big_worst", Cost: box.Cost{Avg: 10, Worst: leftWorst(box.BudgetWorst) + 1}}, // worst 96 > 95
+		{ID: "ok_worst", Cost: box.Cost{Avg: 10, Worst: leftWorst(box.BudgetWorst)}},      // worst 95 exactly
 	}
 	pad := func(id string) []string {
 		return []string{id, "empty", "empty", "empty", "empty", "empty", "empty", "empty"}
