@@ -8,11 +8,11 @@ to the panel and sweeps SEMITONES (Octave's upper knob), SHIFT (Formant's upper 
 (its lower knob), the reverb MIX (the reverb slot's lower knob), both Echo knobs, both Input gate
 knobs and both Gate knobs (Threshold across the whole knob, then Decay), both Unison knobs (Rate, then
 Depth), both Distortion knobs (TONE again with DRIVE pinned at 100 %, and TONE stepped inside a DRIVE
-glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Yawn knobs (SENSITIVITY,
+glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both Apraxia knobs (SENSITIVITY,
 RANGE), both Deepthroat knobs (GROWL, MIX), both Ringer knobs (RATIO, stepped, so each 10 % step lands
 on one of its positions, then MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
-It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Yawn, Deepthroat and Ringer
+It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia, Deepthroat and Ringer
 slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
 POLISH COMP and POLISH EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
 as it found it) and reads the counters once more.
@@ -31,10 +31,10 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   4. each layout's POLISH EQ and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
      its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
      kSoftCeiling and kBypassMix
-The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Yawn, Crowd or Deepthroat
-slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Yawn),
-plus the tracker row when Autotune, Crowd, Formant, Yawn or Deepthroat is placed and the stage
-row when Octave, Formant or Yawn is placed without Autotune. The Ringer slot runs a tracker of its
+The slot that runs the shared pitch stage (the first Autotune, Octave, Formant, Apraxia, Crowd or Deepthroat
+slot) is held to the rows of every card that stage runs (Autotune, Octave, Formant or Apraxia),
+plus the tracker row when Autotune, Crowd, Formant, Apraxia or Deepthroat is placed and the stage
+row when Octave, Formant or Apraxia is placed without Autotune. The Ringer slot runs a tracker of its
 own and takes no part in the stage, so its row alone bounds it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
@@ -44,7 +44,7 @@ with the time they take, and opens no port.
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
-slot), yawn (Yawn in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ringer in
+slot), apraxia (Apraxia in Octave's slot), throat (Deepthroat in Distortion's slot), ringmod (Ringer in
 Distortion's slot, with a tracker of its own) and heaviest (Input gate, Formant, Unison and
 Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout is read first and put back at the end,
 together with slots_live,
@@ -101,7 +101,7 @@ REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "yawn", "throat", "ringmod", "heaviest")
+                "chatter", "lofi", "apraxia", "throat", "ringmod", "heaviest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -113,7 +113,7 @@ ROW_OF = {
     "formant_follow": "kFormantFollower", "growl": "kGrowl", "ringmod": "kRingMod",
 }
 TRACKER_ROW = "kTracker"
-STAGE_ROW = "kPitchStage"  # the stage's own work when Octave, Formant or Yawn runs without Autotune
+STAGE_ROW = "kPitchStage"  # the stage's own work when Octave, Formant or Apraxia runs without Autotune
 PITCH_STAGE = ("autotune", "octave", "formant", "formant_follow")  # cards the shared PitchFx runs
 PITCH_GROUP = ("autotune", "octave", "formant", "formant_follow", "crowd", "growl")  # the first carries the stage's cost
 TRACKER_USERS = ("autotune", "crowd", "formant", "formant_follow", "growl")  # cards that run the shared pitch tracker
@@ -213,13 +213,13 @@ def layout_table():
     formant_alone = ["formant" if c == "octave" else ("empty" if c == "autotune" else c) for c in base]
     chatter = ["bloom" if c == "gate" else c for c in base]
     lofi = ["lofi" if c == "gate" else c for c in base]
-    yawn = ["formant_follow" if c == "octave" else c for c in base]
+    apraxia = ["formant_follow" if c == "octave" else c for c in base]
     throat = ["growl" if c == "distortion" else c for c in base]
     ringmod = ["ringmod" if c == "distortion" else c for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
     return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
-            "chatter": (chatter, False), "lofi": (lofi, False), "yawn": (yawn, False), "throat": (throat, False),
+            "chatter": (chatter, False), "lofi": (lofi, False), "apraxia": (apraxia, False), "throat": (throat, False),
             "ringmod": (ringmod, False),
             "heaviest": (heaviest, True)}
 
@@ -434,8 +434,8 @@ def sweeps(slots):
             found.append(Sweep(i, 1, "Crowd DIVERGE"))
             found.append(Sweep(i, 2, "Crowd VOICES"))
         if card == "formant_follow":
-            found.append(Sweep(i, 1, "Yawn SENSITIVITY"))
-            found.append(Sweep(i, 2, "Yawn RANGE"))
+            found.append(Sweep(i, 1, "Apraxia SENSITIVITY"))
+            found.append(Sweep(i, 2, "Apraxia RANGE"))
         if card == "growl":
             found.append(Sweep(i, 1, "Deepthroat GROWL"))
             found.append(Sweep(i, 2, "Deepthroat MIX"))
@@ -677,9 +677,9 @@ def report_lines(results, header):
         out.append("")
         if r["carrier"] is not None:
             out.append(f"`*` Slot {r['carrier'] + 1} runs the shared pitch stage, so its row is the sum of the "
-                       "Autotune, Octave, Formant and Yawn rows placed, plus the tracker row when Autotune, Crowd, "
-                       "Formant, Yawn or Deepthroat is placed and the stage row when Octave, Formant "
-                       "or Yawn is placed without Autotune.")
+                       "Autotune, Octave, Formant and Apraxia rows placed, plus the tracker row when Autotune, Crowd, "
+                       "Formant, Apraxia or Deepthroat is placed and the stage row when Octave, Formant "
+                       "or Apraxia is placed without Autotune.")
             out.append("")
         out.append(block_line(r["agg"]))
         out.append("")
