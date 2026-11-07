@@ -84,7 +84,7 @@ func serve(useFake bool, port int, noOpen bool, portFile string) error {
 	srv := server.New(server.Config{
 		Box: b, Fixture: fixture, App: version, Web: web, Idle: idle, OnPageOpen: onOpen,
 		CheckUpdate: update.Check,
-		RunUpdate:   updateRunner(b, version, actual),
+		RunUpdate:   updateRunner(version, actual),
 	})
 	if err := writePortFile(portFile, actual); err != nil {
 		return err
@@ -107,13 +107,10 @@ func serve(useFake bool, port int, noOpen bool, portFile string) error {
 
 // updateRunner builds the real update for one run. The relaunch step ends this process with
 // SIGTERM so wait() shuts the server down and removes the port file.
-func updateRunner(b box.Box, app string, port int) func(context.Context, update.Info, func(string)) error {
+func updateRunner(app string, port int) func(context.Context, update.Info, func(string)) error {
 	quit := func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) }
 	return func(ctx context.Context, info update.Info, step func(string)) error {
-		deps, err := update.SystemDeps(info, app, b, port, quit)
-		if err != nil {
-			return err
-		}
+		deps := update.SystemDeps(info, app, port, quit)
 		deps.Step = step
 		return update.Run(ctx, deps)
 	}

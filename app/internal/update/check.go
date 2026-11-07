@@ -12,34 +12,24 @@ import (
 // ReleaseURL is the latest-release endpoint of the public repo (no token needed).
 const ReleaseURL = "https://api.github.com/repos/peterdelecto/cubevox/releases/latest"
 
-// Release asset names.
-const (
-	FirmwareAsset = "cubevox.bin"
-	AppAsset      = "cubevox.app.tar.gz"
-)
+// AppAsset is the release asset that holds the app bundle.
+const AppAsset = "cubevox.app.tar.gz"
 
 const checkTimeout = 10 * time.Second
 
-// Info is the newest release and how it compares with this app and the box.
+// Info is the newest release and whether this app is behind it.
 type Info struct {
 	Tag     string
-	BinURL  string
-	BinSize int64
 	AppURL  string
 	AppSize int64
 
-	AppBehind bool // this app is older than Tag
-	FWBehind  bool // the box firmware is older than Tag
-	Available bool // either one is behind
+	Available bool // this app is older than Tag
 }
 
-// For returns i with the behind flags recomputed for the given app and firmware versions. The
-// release is fetched once per page open, but the box may connect later, so the page state
-// recomputes the flags on every poll. An empty or unparsable version is never behind.
-func (i Info) For(app, fw string) Info {
-	i.AppBehind = Newer(i.Tag, app)
-	i.FWBehind = Newer(i.Tag, fw)
-	i.Available = i.AppBehind || i.FWBehind
+// For returns i with Available set for the given app version. An unparsable version (a "dev"
+// build) is never behind.
+func (i Info) For(app string) Info {
+	i.Available = Newer(i.Tag, app)
 	return i
 }
 
@@ -50,8 +40,8 @@ type Checker struct {
 }
 
 // Check fetches the latest release with the default Checker.
-func Check(ctx context.Context, current, fw string) (Info, error) {
-	return Checker{}.Check(ctx, current, fw)
+func Check(ctx context.Context, current string) (Info, error) {
+	return Checker{}.Check(ctx, current)
 }
 
 type releaseJSON struct {
@@ -63,9 +53,8 @@ type releaseJSON struct {
 	} `json:"assets"`
 }
 
-// Check makes one GET for the latest release and compares its tag with the app version current
-// and the box firmware version fw (either may be empty).
-func (c Checker) Check(ctx context.Context, current, fw string) (Info, error) {
+// Check makes one GET for the latest release and compares its tag with the app version current.
+func (c Checker) Check(ctx context.Context, current string) (Info, error) {
 	url, client := c.URL, c.Client
 	if url == "" {
 		url = ReleaseURL
@@ -96,12 +85,9 @@ func (c Checker) Check(ctx context.Context, current, fw string) (Info, error) {
 	}
 	info := Info{Tag: rel.TagName}
 	for _, a := range rel.Assets {
-		switch a.Name {
-		case FirmwareAsset:
-			info.BinURL, info.BinSize = a.URL, a.Size
-		case AppAsset:
+		if a.Name == AppAsset {
 			info.AppURL, info.AppSize = a.URL, a.Size
 		}
 	}
-	return info.For(current, fw), nil
+	return info.For(current), nil
 }

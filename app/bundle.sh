@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Builds dist/cubevox.app and dist/cubevox.app.tar.gz from the Go sources.
 #
-#   app/bundle.sh                       # dfu-util taken from PATH
-#   DFU_UTIL=/path/to/static/dfu-util app/bundle.sh
+#   app/bundle.sh
 #
 # The binary is universal (arm64 + amd64) when lipo exists, else the host arch only.
 # The version comes from `git describe` and is stamped into the binary and Info.plist.
@@ -31,17 +30,6 @@ else
   build "$(go env GOARCH)" "$macos/cubevox"
 fi
 rm -rf "$dist/build"
-
-dfu="${DFU_UTIL:-$(command -v dfu-util || true)}"
-if [ -z "$dfu" ] || [ ! -x "$dfu" ]; then
-  echo "dfu-util not found: set DFU_UTIL to a static dfu-util binary" >&2
-  exit 1
-fi
-cp "$dfu" "$macos/dfu-util"
-chmod 755 "$macos/dfu-util"
-if command -v otool >/dev/null 2>&1 && otool -L "$macos/dfu-util" | awk '/^\t/ {print $1}' | grep -qv -e '^/usr/lib/' -e '^/System/'; then
-  echo "warning: $dfu links libraries outside the system; the bundle will not run on other Macs" >&2
-fi
 
 cat >"$bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

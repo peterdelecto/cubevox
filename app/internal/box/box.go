@@ -78,7 +78,6 @@ type Box interface {
 	GetLayout() (Layout, error)
 	SetLayout(name string, slots []string) error
 	Status() (Status, error)
-	EnterDFU() error
 }
 
 // RemoteError carries the box's own error text so the page can show it unchanged.

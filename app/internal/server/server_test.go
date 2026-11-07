@@ -138,7 +138,7 @@ func TestLayoutBadBody(t *testing.T) {
 }
 
 // updateServer is a server whose release check and update run are the given fakes.
-func updateServer(t *testing.T, check func(context.Context, string, string) (update.Info, error),
+func updateServer(t *testing.T, check func(context.Context, string) (update.Info, error),
 	run func(context.Context, update.Info, func(string)) error) *httptest.Server {
 	t.Helper()
 	h, err := fixtures.Hello()
@@ -170,9 +170,9 @@ func waitState(t *testing.T, ts *httptest.Server, ok func(State) bool) State {
 
 func TestUpdateOffered(t *testing.T) {
 	calls := 0
-	ts := updateServer(t, func(_ context.Context, cur, fw string) (update.Info, error) {
+	ts := updateServer(t, func(_ context.Context, cur string) (update.Info, error) {
 		calls++
-		return update.Info{Tag: "v0.02.00"}.For(cur, fw), nil
+		return update.Info{Tag: "v0.02.00"}.For(cur), nil
 	}, nil)
 	for i := 0; i < 3; i++ {
 		post(t, ts.URL+"/api/heartbeat", "")
@@ -187,7 +187,7 @@ func TestUpdateOffered(t *testing.T) {
 }
 
 func TestUpdateCheckFailureIsOnlyText(t *testing.T) {
-	ts := updateServer(t, func(context.Context, string, string) (update.Info, error) {
+	ts := updateServer(t, func(context.Context, string) (update.Info, error) {
 		return update.Info{}, errors.New("offline")
 	}, nil)
 	post(t, ts.URL+"/api/heartbeat", "")
@@ -201,15 +201,15 @@ func TestUpdateRunStepsErrorAndRetry(t *testing.T) {
 	release := make(chan struct{})
 	attempt := 0
 	ts := updateServer(t,
-		func(_ context.Context, cur, fw string) (update.Info, error) {
-			return update.Info{Tag: "v0.02.00"}.For(cur, fw), nil
+		func(_ context.Context, cur string) (update.Info, error) {
+			return update.Info{Tag: "v0.02.00"}.For(cur), nil
 		},
 		func(_ context.Context, info update.Info, step func(string)) error {
 			attempt++
-			step("dfu")
+			step("app")
 			<-release
 			if attempt == 1 {
-				return errors.New("dfu-util output")
+				return errors.New("replace app: disk full")
 			}
 			step("done")
 			return nil
@@ -220,14 +220,14 @@ func TestUpdateRunStepsErrorAndRetry(t *testing.T) {
 	if m := post(t, ts.URL+"/api/update", ""); m["ok"] != true {
 		t.Fatalf("reply %v", m)
 	}
-	waitState(t, ts, func(s State) bool { return s.Update.Step == "dfu" })
+	waitState(t, ts, func(s State) bool { return s.Update.Step == "app" })
 	if m := post(t, ts.URL+"/api/update", ""); m["ok"] != false || m["error"] != "update running" {
 		t.Fatalf("second start while busy: %v", m)
 	}
 
 	release <- struct{}{}
 	st := waitState(t, ts, func(s State) bool { return s.Update.Error != "" })
-	if st.Update.Step != "dfu" || !st.Update.Available || st.Update.Error != "dfu-util output" {
+	if st.Update.Step != "app" || !st.Update.Available || st.Update.Error != "replace app: disk full" {
 		t.Fatalf("after failure %+v", st.Update)
 	}
 

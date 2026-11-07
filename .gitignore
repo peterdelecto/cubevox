@@ -9,7 +9,6 @@ cubevox-emulator.app
 .cache/
 .claude/
 dist/
-build-release/
 .history/
 ~*.lck
 __pycache__/
