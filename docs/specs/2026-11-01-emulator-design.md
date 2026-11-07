@@ -130,7 +130,9 @@ Bottom band: the source switch at the left and the version under it.
    220 Hz for 3 s, harmonics under three formant peaks, 5 Hz vibrato) to a temp directory, runs the
    same checks on them, and prints a `clip:` line naming the set it used.
 2. `cubevox-emulator --proof <file.ppm>`: one frame of the window after the splash, rendered to a
-   hidden window and written as a PPM, for looking at.
+   hidden window and written as a PPM, for looking at. `--on <slot>` (1 to 8, repeatable) runs with
+   that slot's toggle on, every other off; `--at <ms>` takes the frame after that much run time
+   instead of 2500 ms. `--slot3`, `--slot6`, `--slot7` and `--slot8` pick the card in a swappable slot.
 3. `ctest` as a whole, with `proto_layout` still in it.
 4. The LED: host tests for the window mean, the `loadLedLevel` curve and flash and
    `BlockTroubleClock` (`core_load.cpp`); the release and bench firmware builds; the box flashed

@@ -556,17 +556,28 @@ int runCheck(const char* argv0) {
   return 0;
 }
 
-int runProof(const char* argv0, const char* path, bool micAvailable, Card slot3, Card slot6, Card slot7,
-             Card slot8) {
+// What --proof runs: the cards in the swappable slots, which slot toggles are on and how long the box
+// runs before the frame is taken.
+struct ProofSetup {
+  Card slot3 = Card::Octave;
+  Card slot6 = Card::Distortion;
+  Card slot7 = Card::Gate;
+  Card slot8 = Card::ReverbSpring;
+  std::array<bool, kSlotCount> on{};  // every toggle off, the window's start state
+  uint32_t ms = kProofMs;
+};
+
+int runProof(const char* argv0, const char* path, bool micAvailable, const ProofSetup& setup) {
   Rig rig;
   Panel panel;
-  rig.panel = panel.input;  // the window's start state, every toggle off
+  rig.panel = panel.input;
+  rig.panel.toggle = setup.on;
   if (!rig.source.findClip(argv0)) return 1;
-  rig.box.pickSlot3Card(slot3);
-  rig.box.pickSlot6Card(slot6);
-  rig.box.pickSlot7Card(slot7);
-  rig.box.pickSlot8Card(slot8);
-  rig.run(kProofMs, false);
+  rig.box.pickSlot3Card(setup.slot3);
+  rig.box.pickSlot6Card(setup.slot6);
+  rig.box.pickSlot7Card(setup.slot7);
+  rig.box.pickSlot8Card(setup.slot8);
+  rig.run(setup.ms, false);
   Window window(false);
   if (!window.ok()) return 1;
   panel.input = rig.panel;
@@ -629,8 +640,27 @@ int runLive(const char* argv0) {
 int usage() {
   std::fprintf(stderr,
                "usage: cubevox-emulator [--check | --proof file.ppm [--no-mic] [--slot3 octave|formant|apraxia] "
-               "[--slot6 distortion|growl] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm]]\n");
+               "[--slot6 distortion|growl] [--slot7 gate|lofi|chatter] [--slot8 spring|chasm] "
+               "[--on <slot 1..8>]... [--at <ms>]]\n");
   return 2;
+}
+
+// A slot number 1 to 8 from `arg`, as a 0-based index.
+bool slotFromArg(const char* arg, int& out) {
+  char* end = nullptr;
+  const long v = std::strtol(arg, &end, 10);
+  if (end == arg || *end != '\0' || v < 1 || v > kSlotCount) return false;
+  out = static_cast<int>(v - 1);
+  return true;
+}
+
+// A run length in milliseconds from `arg`, one tick or more.
+bool msFromArg(const char* arg, uint32_t& out) {
+  char* end = nullptr;
+  const long v = std::strtol(arg, &end, 10);
+  if (end == arg || *end != '\0' || v < static_cast<long>(kTickMs)) return false;
+  out = static_cast<uint32_t>(v);
+  return true;
 }
 
 // The card named by `arg` among `rows`, the same rows --check walks. A row answers to its argument and
@@ -653,26 +683,30 @@ int main(int argc, char** argv) {
   if (argc == 2 && std::strcmp(argv[1], "--check") == 0) return runCheck(argv[0]);
   if (argc >= 3 && std::strcmp(argv[1], "--proof") == 0) {
     bool noMic = false;
-    Card slot3 = Card::Octave;
-    Card slot6 = Card::Distortion;
-    Card slot7 = Card::Gate;
-    Card slot8 = Card::ReverbSpring;
+    ProofSetup setup;
+    int slot = 0;
     for (int i = 3; i < argc; ++i) {
+      const bool hasValue = i + 1 < argc;
       if (std::strcmp(argv[i], "--no-mic") == 0) {
         noMic = true;
-      } else if (std::strcmp(argv[i], "--slot3") == 0 && i + 1 < argc && cardFromRows(kSlot3Rows, argv[i + 1], slot3)) {
+      } else if (std::strcmp(argv[i], "--slot3") == 0 && hasValue && cardFromRows(kSlot3Rows, argv[i + 1], setup.slot3)) {
         ++i;
-      } else if (std::strcmp(argv[i], "--slot6") == 0 && i + 1 < argc && cardFromRows(kSlot6Rows, argv[i + 1], slot6)) {
+      } else if (std::strcmp(argv[i], "--slot6") == 0 && hasValue && cardFromRows(kSlot6Rows, argv[i + 1], setup.slot6)) {
         ++i;
-      } else if (std::strcmp(argv[i], "--slot7") == 0 && i + 1 < argc && cardFromRows(kSlot7Rows, argv[i + 1], slot7)) {
+      } else if (std::strcmp(argv[i], "--slot7") == 0 && hasValue && cardFromRows(kSlot7Rows, argv[i + 1], setup.slot7)) {
         ++i;
-      } else if (std::strcmp(argv[i], "--slot8") == 0 && i + 1 < argc && cardFromRows(kSlot8Rows, argv[i + 1], slot8)) {
+      } else if (std::strcmp(argv[i], "--slot8") == 0 && hasValue && cardFromRows(kSlot8Rows, argv[i + 1], setup.slot8)) {
+        ++i;
+      } else if (std::strcmp(argv[i], "--on") == 0 && hasValue && slotFromArg(argv[i + 1], slot)) {
+        setup.on[static_cast<size_t>(slot)] = true;
+        ++i;
+      } else if (std::strcmp(argv[i], "--at") == 0 && hasValue && msFromArg(argv[i + 1], setup.ms)) {
         ++i;
       } else {
         return usage();
       }
     }
-    return runProof(argv[0], argv[2], !noMic, slot3, slot6, slot7, slot8);
+    return runProof(argv[0], argv[2], !noMic, setup);
   }
   return usage();
 }
