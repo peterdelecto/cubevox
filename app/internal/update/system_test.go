@@ -7,37 +7,6 @@ import (
 	"testing"
 )
 
-func TestHasDFUDevice(t *testing.T) {
-	const bootloader = `
-  +-o STM32  BOOTLOADER@01100000  <class AppleUSBDevice, id 0x1>
-    | {
-    |   "idProduct" = 57105
-    |   "idVendor" = 1155
-    | }
-`
-	const other = `
-  +-o Keyboard@01200000  <class AppleUSBDevice, id 0x2>
-    | {
-    |   "idProduct" = 57105
-    |   "idVendor" = 1452
-    | }
-  +-o Hub@01300000  <class AppleUSBDevice, id 0x3>
-    | {
-    |   "idProduct" = 5710
-    |   "idVendor" = 11550
-    | }
-`
-	if !hasDFUDevice(bootloader) {
-		t.Error("missed the bootloader")
-	}
-	if hasDFUDevice(other) {
-		t.Error("matched ids from different devices or prefixes")
-	}
-	if hasDFUDevice(other+bootloader) != true {
-		t.Error("missed the bootloader among others")
-	}
-}
-
 func TestBundleOf(t *testing.T) {
 	got, err := bundleOf("/Applications/cubevox.app/Contents/MacOS/cubevox")
 	if err != nil || got != "/Applications/cubevox.app" {

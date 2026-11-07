@@ -3,7 +3,6 @@
 package fake
 
 import (
-	"errors"
 	"sync"
 
 	"cubevox.app/internal/box"
@@ -14,7 +13,6 @@ type Box struct {
 	mu     sync.Mutex
 	hello  box.Hello
 	layout box.Layout
-	dfu    bool
 }
 
 // New builds a fake from a hello reply, normally the fixture.
@@ -56,15 +54,4 @@ func (f *Box) SetLayout(name string, slots []string) error {
 // Status implements box.Box with an idle box.
 func (f *Box) Status() (box.Status, error) {
 	return box.Status{"cpu_mean": 0.0, "cpu_worst": 0.0, "late": 0.0, "muted": false}, nil
-}
-
-// EnterDFU implements box.Box. The fake only records the request.
-func (f *Box) EnterDFU() error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.dfu {
-		return errors.New("already in DFU")
-	}
-	f.dfu = true
-	return nil
 }

@@ -54,7 +54,9 @@ firmware and the app in one click.
    until a flash succeeds.
    Superseded on the box side by `2026-10-24-field-update-design.md` (owner 2026-10-24): the box
    reboots into a UF2 drive, so the app copies the release `.uf2` to `/Volumes/CUBEVOX` instead
-   of running dfu-util. The app is parked until the owner reopens it.
+   of running dfu-util. The app is parked until the owner reopens it. The app's firmware path
+   (the layout backup, `enter_dfu`, dfu-util and the `cubevox.bin` asset) is removed; the app
+   updates itself only, and the firmware steps return as the `.uf2` copy.
 7. **Versions.** One tag per release. `VERSION.txt` holds the tag; `git describe` gives the
    firmware its string; the Go binary gets the same tag by `-ldflags -X`.
 8. **Security.** Listens on 127.0.0.1 only. No request leaves the Mac except the GitHub release
@@ -98,6 +100,10 @@ The page polls `GET /api/state` once a second.
    `Info.plist`, dfu-util and the binary, tar it, attach `cubevox.bin`, `cubevox.app.tar.gz`,
    `install.sh` to the release.
 2. dfu-util is built static against libusb on the runner once per release, universal.
+
+The Release row, the Release section and open questions 11 and 12 describe the first design.
+Written at `0x08000000`, a `cubevox.bin` would destroy the bootloader, so the app no longer
+bundles dfu-util or flashes the box (owner 2026-11-07).
 
 ## Open questions resolved
 

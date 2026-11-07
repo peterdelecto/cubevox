@@ -10,44 +10,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
-
-	"cubevox.app/internal/box"
 )
 
-// The STM32 ROM bootloader's USB id, and the flash address of the firmware image.
 const (
-	dfuID       = "0483:df11"
-	flashTarget = "0x08000000:leave"
-	dfuWait     = 30 * time.Second
-	flashLimit  = 3 * time.Minute
-
 	// pageGrace gives the page time to poll once and see the restart step; handOff keeps the
 	// new process from starting while this one still holds the port and the port file.
 	pageGrace = 2 * time.Second
 	handOff   = 3
 )
 
-// SystemDeps returns Deps wired to this Mac: the network, ioreg, the bundled dfu-util and the
-// running bundle. port is the port this process serves, reused by the relaunched app so the
-// open page reloads onto it; quit ends this process.
-func SystemDeps(info Info, app string, b box.Box, port int, quit func()) (Deps, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return Deps{}, fmt.Errorf("home dir: %w", err)
-	}
-	d := Deps{
-		Info: info, App: app, Box: b,
-		BackupPath: filepath.Join(home, "Library", "Application Support", "cubevox", "last-layout.json"),
-		WorkDir:    filepath.Join(os.TempDir(), "cubevox-update-"+filepath.Base(info.Tag)),
-		Get:        download,
-		InDFU:      dfuPresent,
-		WaitDFU:    waitDFU,
-		Flash:      flasher(DFUUtilPath()),
+// SystemDeps returns Deps wired to this Mac: the network and the running bundle. port is the
+// port this process serves, reused by the relaunched app so the open page reloads onto it;
+// quit ends this process.
+func SystemDeps(info Info, app string, port int, quit func()) Deps {
+	return Deps{
+		Info: info, App: app,
+		WorkDir: filepath.Join(os.TempDir(), "cubevox-update-"+filepath.Base(info.Tag)),
+		Get:     download,
 		Swap: func(_ context.Context, tarball string) error {
 			bundle, err := BundlePath()
 			if err != nil {
@@ -63,7 +45,6 @@ func SystemDeps(info Info, app string, b box.Box, port int, quit func()) (Deps, 
 			return relaunch(bundle, port, quit)
 		},
 	}
-	return d, nil
 }
 
 // BundlePath returns the running .app directory, or an error when the binary runs outside one.
@@ -84,17 +65,6 @@ func bundleOf(exe string) (string, error) {
 		return "", fmt.Errorf("%s is not inside an .app bundle", exe)
 	}
 	return bundle, nil
-}
-
-// DFUUtilPath is the dfu-util shipped inside the bundle, else the one on PATH.
-func DFUUtilPath() string {
-	if bundle, err := BundlePath(); err == nil {
-		return filepath.Join(bundle, "Contents", "MacOS", "dfu-util")
-	}
-	if p, err := exec.LookPath("dfu-util"); err == nil {
-		return p
-	}
-	return "dfu-util"
 }
 
 func download(ctx context.Context, url, dest string) error {
@@ -125,55 +95,6 @@ func download(ctx context.Context, url, dest string) error {
 		return err
 	}
 	return os.Rename(part, dest)
-}
-
-var (
-	vendorRe  = regexp.MustCompile(`"idVendor" = 1155\b`)   // 0x0483
-	productRe = regexp.MustCompile(`"idProduct" = 57105\b`) // 0xdf11
-)
-
-// hasDFUDevice reports whether ioreg output holds one device with the bootloader's ids.
-func hasDFUDevice(ioreg string) bool {
-	for _, dev := range strings.Split(ioreg, "+-o ") {
-		if vendorRe.MatchString(dev) && productRe.MatchString(dev) {
-			return true
-		}
-	}
-	return false
-}
-
-func dfuPresent(ctx context.Context) bool {
-	out, err := exec.CommandContext(ctx, "/usr/sbin/ioreg", "-p", "IOUSB", "-l", "-w0").Output()
-	return err == nil && hasDFUDevice(string(out))
-}
-
-func waitDFU(ctx context.Context) error {
-	deadline := time.Now().Add(dfuWait)
-	for !dfuPresent(ctx) {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("no %s device after %v", dfuID, dfuWait)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(250 * time.Millisecond):
-		}
-	}
-	return nil
-}
-
-// flasher returns a Flash func that runs the given dfu-util and returns its combined output.
-// -d keeps it from touching any other DFU device on the bus.
-func flasher(dfuUtil string) func(context.Context, string) (string, error) {
-	return func(ctx context.Context, bin string) (string, error) {
-		ctx, cancel := context.WithTimeout(ctx, flashLimit)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, dfuUtil, "-d", dfuID, "-a", "0", "-s", flashTarget, "-D", bin)
-		var out bytes.Buffer
-		cmd.Stdout, cmd.Stderr = &out, &out
-		err := cmd.Run()
-		return out.String(), err
-	}
 }
 
 // SwapBundle replaces the bundle directory with the one in tarball (which holds cubevox.app at

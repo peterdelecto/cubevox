@@ -7,14 +7,16 @@ down, the rails coming up. Each is small and gets its own host test where the ho
 ## 1. Slot toggle crossfade
 Today a slot's bypass toggle switches the slot's output hard between the engine and the dry
 copy, which clicks on a loud note. Now the flip crossfades over 8 ms (6 blocks of 64 samples),
-equal power (`sin` / `cos` over the fade, the same law as the BYPASS mix in `core/chain_run`).
+on an S curve (`3x^2 - 2x^3` of the fade's progress for the engine, the rest for the dry copy, so
+the two gains sum to 1 and a card whose output carries its input holds its level; `mixSlotFade`
+in `core/chain_run`).
 During the fade the engine runs and both paths mix; at the end of a fade out the engine stops
 running (no CPU for a bypassed slot, as today); on a fade in the engine is cleared first, so a
 re-engaged reverb or delay starts from silence and not from a tail it held while bypassed. A
 flip during a fade turns the fade round from where it is. The per-slot fade level lives in the
 audio interrupt's state, advanced per block; the main loop only publishes the toggle. Host test:
 `core_chain_run` drives a slot flip on a steady tone and checks the output has no step larger
-than the fade allows, that the mix sums to unity power at the midpoint, that the engine runs
+than the fade allows, that both gains read 0.5 at the midpoint, that the engine runs
 for exactly the fade blocks after a flip to off, and that a flip back on starts from a cleared
 engine.
 

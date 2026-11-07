@@ -14,8 +14,7 @@ Octave shifts Autotune's tuned voice. Where the text below names `PitchFx`, read
    sawtooth read phase over a window, N taps spaced 1/N of a cycle apart, Hann gains
    summing to 1, Catmull-Rom reads from the shared `VoiceRing`. Generalised to N = 2 or
    4 grains and a 20–80 ms window.
-2. No tracker dependency: `prepare` ignores `PitchResult` except that the shared
-   front end still runs it for A/B/Harmony. Works on breath and sibilants.
+2. No tracker dependency: `prepare` ignores `PitchResult`. Works on breath and sibilants.
 3. FORMANT does not apply (greyed in the face when engine C is selected).
 4. Shares SEMITONES, MIX, `levelDb`, `glideMs`, `on` with A and B; `muteUnvoiced` is
    ignored by C (no voiced decision available without trusting the tracker).
