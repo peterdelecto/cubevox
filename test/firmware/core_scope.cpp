@@ -1,5 +1,5 @@
 // Checks the scope on the host: the trigger that holds a vowel still, the column rule that keeps the
-// trace one line, the scale and the silence rule, the ring's order and energy, and a two-thread
+// trace one line, the scale and the silence level, the ring's order, and a two-thread
 // stress that a read never mixes two moments. Spec: docs/specs/2026-11-06-scope-design.md.
 
 #include "support.h"
@@ -16,8 +16,6 @@
 #include <thread>
 #include <vector>
 
-#include "core/level.h"
-#include "core/output_stage.h"
 #include "core/scope.h"
 #include "engine/dsp.h"
 
@@ -236,10 +234,10 @@ void checkColumns() {
   const Samples* inputs[] = {&random, &clipped, &square, &alternating};
   const char* names[] = {"random", "clipped", "full-scale square", "full-scale alternating"};
   for (int n = 0; n < 4; ++n) {
-    const ScopeFrame f = scopeFrame(inputs[n]->data(), 0.0f, false);
+    const ScopeFrame f = scopeFrame(inputs[n]->data(), 0.0f);
     check(connected(f) && inRange(f), (std::string("scope columns: ") + names[n] + " input gives one line, every neighbouring pair sharing a row, inside rows 10 to 54").c_str());
   }
-  const ScopeFrame hard = scopeFrame(alternating.data(), 0.0f, false);
+  const ScopeFrame hard = scopeFrame(alternating.data(), 0.0f);
   check(hard.column[10].lo == -kScopeHalfRows && hard.column[10].hi == kScopeHalfRows,
         "scope columns: a full swing in both directions spans rows 10 and 54");
 
@@ -247,28 +245,30 @@ void checkColumns() {
   Samples flat;
   flat.fill(0.0f);
   bool zeros = true;
-  const ScopeFrame line = scopeFrame(flat.data(), 0.0f, false);
+  const ScopeFrame line = scopeFrame(flat.data(), 0.0f);
   for (const ScopeRun& run : line.column) zeros = zeros && run.lo == 0 && run.hi == 0;
   check(zeros && line.scale == 0.0f, "scope columns: a frame of zeros after a scale of 0 is row 32 in every column");
-  const ScopeFrame held = scopeFrame(flat.data(), 1.0f, false);
+  const ScopeFrame held = scopeFrame(flat.data(), 1.0f);
   bool heldZeros = true;
   for (const ScopeRun& run : held.column) heldZeros = heldZeros && run.lo == 0 && run.hi == 0;
   check(heldZeros, "scope columns: a frame of zeros under a positive last scale is row 32 in every column");
   for (float bad : {-1.0f, std::nanf("")}) {
-    const ScopeFrame fresh = scopeFrame(random.data(), bad, false);
+    const ScopeFrame fresh = scopeFrame(random.data(), bad);
     check(connected(fresh) && inRange(fresh) && fresh.scale > 0.0f,
           "scope columns: a last scale that is negative or not a number is as a scale of 0");
   }
-  const ScopeFrame silent = scopeFrame(random.data(), 1.0f, true);
+  Samples hiss;
+  for (size_t k = 0; k < hiss.size(); ++k) hiss[k] = 0.0019f * next();
+  const ScopeFrame silent = scopeFrame(hiss.data(), 1.0f);
   bool silentZeros = true;
   for (const ScopeRun& run : silent.column) silentZeros = silentZeros && run.lo == 0 && run.hi == 0;
-  check(silentZeros && silent.scale == 0.0f, "scope columns: a tick under the floor gives the line and a scale of 0 whatever the samples hold");
+  check(silentZeros && silent.scale == 0.0f, "scope columns: a frame with its peak under -54 dBFS gives the line and a scale of 0 whatever the last scale");
 
   // Every 8th sample at the top of the scale and the rest at the bottom: each column is tall and the
   // runs still join.
   Samples comb;
   for (int i = 0; i < kScopeReadSamples; ++i) comb[static_cast<size_t>(i)] = (i % 8 == 0) ? 1.0f : -1.0f;
-  check(connected(scopeFrame(comb.data(), 0.0f, false)), "scope columns: a comb across the scale stays joined");
+  check(connected(scopeFrame(comb.data(), 0.0f)), "scope columns: a comb across the scale stays joined");
 }
 
 // A 150 Hz sine of RMS `rms` filling a read.
@@ -301,7 +301,7 @@ void checkScale() {
   // and 54, and the scale handed back is the peak.
   for (float rms : {0.1f, 0.01f}) {
     const Samples tone = sineOfRms(rms);
-    const ScopeFrame f = scopeFrame(tone.data(), 0.0f, false);
+    const ScopeFrame f = scopeFrame(tone.data(), 0.0f);
     const Reach reach = reachOf(f);
     check(reach.up == kScopeHalfRows && reach.down == kScopeHalfRows && std::fabs(f.scale - 1.41421356f * rms) < 1e-4f * rms,
           ("scope scale: a sine of " + std::to_string(rms) + " RMS reaches rows 10 and 54 and returns its peak as the scale").c_str());
@@ -310,15 +310,15 @@ void checkScale() {
   // The scale rises at once: a frame 20 dB over the last one fills the height.
   const Samples quietTone = sineOfRms(0.01f);
   const Samples loudTone = sineOfRms(0.1f);
-  const float quietScale = scopeFrame(quietTone.data(), 0.0f, false).scale;
-  const ScopeFrame rise = scopeFrame(loudTone.data(), quietScale, false);
+  const float quietScale = scopeFrame(quietTone.data(), 0.0f).scale;
+  const ScopeFrame rise = scopeFrame(loudTone.data(), quietScale);
   check(reachOf(rise).up == kScopeHalfRows && std::fabs(rise.scale - 0.141421356f) < 1e-5f,
         "scope scale: a frame 20 dB louder than the last fills the height and sets the scale at once");
 
   // A frame at half the previous frame's peak falls 3 dB and draws at 70 % of the height.
   const Samples half = sineOfRms(0.05f);
-  const float loudScale = scopeFrame(loudTone.data(), 0.0f, false).scale;
-  const ScopeFrame fell = scopeFrame(half.data(), loudScale, false);
+  const float loudScale = scopeFrame(loudTone.data(), 0.0f).scale;
+  const ScopeFrame fell = scopeFrame(half.data(), loudScale);
   const int want = static_cast<int>(std::lround(kScopeHalfRows * 0.5 / static_cast<double>(kFall)));
   check(std::fabs(fell.scale - loudScale * kFall) < 1e-5f && std::abs(reachOf(fell).up - want) <= 1 && reachOf(fell).up < kScopeHalfRows,
         ("scope scale: a frame at half the last peak falls 3 dB and reaches " + std::to_string(want) + " rows").c_str());
@@ -328,7 +328,7 @@ void checkScale() {
   float scale = loudScale;
   int reached[5] = {};
   for (int k = 1; k <= 4; ++k) {
-    const ScopeFrame f = scopeFrame(under.data(), scale, false);
+    const ScopeFrame f = scopeFrame(under.data(), scale);
     scale = f.scale;
     reached[k] = reachOf(f).up;
   }
@@ -340,31 +340,71 @@ void checkScale() {
   const Vowel v = makeVowel(147.0);
   Samples vowel;
   fill(v, 30000, vowel);
-  check(reachOf(scopeFrame(vowel.data(), 0.0f, false)).up >= kScopeHalfRows - 1, "scope scale: a vowel reaches the top within a row");
+  check(reachOf(scopeFrame(vowel.data(), 0.0f)).up >= kScopeHalfRows - 1, "scope scale: a vowel reaches the top within a row");
 
-  // A silent tick is the line and resets the scale. The silent flag comes from the output meter, as
-  // the face reads it: a held note 20 dB under a loud tick goes to the line once the floor has risen
-  // to it, about 5 s on, and is drawn until then.
-  level::OutputMeter meter;
-  const auto energyOf = [](float db) {
-    level::OutputEnergy e;
-    e.samples = kTickSamples;
-    e.sumSquares = std::pow(10.0f, db / 10.0f) * static_cast<float>(e.samples);
-    return e;
-  };
-  for (int i = 0; i < 25; ++i) meter.update(energyOf(-20.0f), 40.0f);
-  const Samples noteTone = sineOfRms(0.01f);
-  float levelNow = meter.update(energyOf(-40.0f), 40.0f);
-  check(levelNow > 0.0f && reachOf(scopeFrame(noteTone.data(), 0.0f, levelNow <= 0.0f)).up > 0,
-        "scope scale: the first tick of a note 20 dB under the top is still drawn");
-  int ticksToLine = 1;
-  while (levelNow > 0.0f && ticksToLine < 1000) {
-    levelNow = meter.update(energyOf(-40.0f), 40.0f);
-    ++ticksToLine;
+  // A sine at -48 dBFS peak is over the silence level and under the minimum scale, so it draws at
+  // 9 rows (22 rows * 10^(-8/20) / 0.01 rounds to 9) and the scale handed back is the minimum.
+  const float minPeak = cv::dbToGain(-48.0f);
+  const Samples faint = sineOfRms(minPeak / 1.41421356f);
+  const ScopeFrame faintFrame = scopeFrame(faint.data(), 0.0f);
+  check(reachOf(faintFrame).up == 9 && reachOf(faintFrame).down == 9 && faintFrame.scale == kScopeMinScale,
+        "scope scale: a sine at -48 dBFS draws at 9 rows on the minimum scale of -40 dBFS");
+
+  // The constants are the levels the spec names.
+  check(std::fabs(kScopeSilencePeak - cv::dbToGain(-54.0f)) < 1e-7f && std::fabs(kScopeMinScale - cv::dbToGain(-40.0f)) < 1e-7f,
+        "scope scale: the silence level is -54 dBFS and the minimum scale is -40 dBFS");
+
+  // A sine just under the silence level is the line, and one just over it is not.
+  const Samples under54 = sineOfRms(cv::dbToGain(-54.2f) / 1.41421356f);
+  const Samples over54 = sineOfRms(cv::dbToGain(-53.8f) / 1.41421356f);
+  const ScopeFrame lineFrame = scopeFrame(under54.data(), 0.5f);
+  check(reachOf(lineFrame).up == 0 && reachOf(lineFrame).down == 0 && lineFrame.scale == 0.0f,
+        "scope scale: a frame with its peak at -54.2 dBFS is the line and returns a scale of 0");
+  check(scopeFrame(over54.data(), 0.0f).scale > 0.0f && reachOf(scopeFrame(over54.data(), 0.0f)).up >= 4,
+        "scope scale: a frame with its peak at -53.8 dBFS draws");
+}
+
+// An echo tail decays from -20 to -60 dBFS over 2 s. The newest sample steps one tick (1920 samples)
+// at a time. The ticks whose read holds nothing over the silence level give the line, the ticks whose
+// newest 824 samples hold something over it draw, and the draw then the line is one switch.
+void checkTail() {
+  constexpr int kTailSamples = 96000;
+  std::vector<float> tail(static_cast<size_t>(kTailSamples));
+  for (int i = 0; i < kTailSamples; ++i) {
+    const float db = -20.0f - 20.0f * static_cast<float>(i) / 48000.0f;
+    tail[static_cast<size_t>(i)] = cv::dbToGain(db) * std::sin(2.0f * 3.14159265f * static_cast<float>(i % 320) / 320.0f);
   }
-  const ScopeFrame gone = scopeFrame(noteTone.data(), 0.14f, levelNow <= 0.0f);
-  check(levelNow == 0.0f && reachOf(gone).up == 0 && reachOf(gone).down == 0 && gone.scale == 0.0f && ticksToLine >= 75 && ticksToLine <= 200,
-        "scope scale: a held note at -40 dBFS under a -20 dBFS top goes to the line in about 5 s");
+  const auto peakOf = [&tail](int from, int to) {
+    float peak = 0.0f;
+    for (int i = from; i < to; ++i) peak = std::max(peak, std::fabs(tail[static_cast<size_t>(i)]));
+    return peak;
+  };
+
+  Samples read;
+  float scale = 0.0f;
+  int drawn = 0;
+  int switches = 0;
+  bool wasDrawn = true;
+  bool follows = true;
+  bool thin = true;
+  for (int newest = kScopeReadSamples; newest <= kTailSamples; newest += kTickSamples) {
+    std::copy(tail.begin() + (newest - kScopeReadSamples), tail.begin() + newest, read.begin());
+    const ScopeFrame f = scopeFrame(read.data(), scale);
+    scale = f.scale;
+    const Reach reach = reachOf(f);
+    const bool draws = f.scale > 0.0f;
+    if (peakOf(newest - kScopeFrameSamples, newest) >= kScopeSilencePeak) follows = follows && draws;
+    if (peakOf(newest - kScopeReadSamples, newest) < kScopeSilencePeak) follows = follows && !draws;
+    if (!draws) follows = follows && reach.up == 0 && reach.down == 0;
+    if (draws) thin = thin && std::max(reach.up, reach.down) >= 1;
+    if (draws) ++drawn;
+    if (draws != wasDrawn) ++switches;
+    wasDrawn = draws;
+  }
+  check(follows, "scope tail: every frame over -54 dBFS draws and every frame under it is the line");
+  check(thin, "scope tail: a drawn frame is at least one row tall");
+  check(drawn >= 40 && drawn <= 44 && switches == 1,
+        ("scope tail: the tail draws for " + std::to_string(drawn) + " ticks, about 1.7 s, then goes to the line once").c_str());
 }
 
 // The ring returns the newest samples in order across the wrap, with zeros ahead of a ring that has
@@ -401,36 +441,6 @@ void checkRingOrder() {
   }
   check(ordered, "scope ring: after wrap-around the read is the newest 1984 samples in order");
   check(ring->blocks() == 105, "scope ring: the block count is the blocks written");
-}
-
-// The energy of a known signal equals what the DAC-side tally summed at unity trim, and the take
-// covers the blocks written since the last one, at most 31.
-void checkRingEnergy() {
-  auto ring = std::make_unique<ScopeRing>();
-  float dac = 0.0f;
-  for (int b = 0; b < 30; ++b) {
-    std::array<float, cv::kBlock> block;
-    for (int i = 0; i < cv::kBlock; ++i) {
-      block[static_cast<size_t>(i)] = 0.4f * std::sin(2.0f * 3.14159265f * 220.0f * static_cast<float>(b * cv::kBlock + i) / 48000.0f);
-    }
-    ring->write(block.data());
-    dac += emitOutput(block.data(), cv::kBlock, GainRamp{1.0f, 0.0f}, [](int, float) {});
-  }
-  const level::OutputEnergy energy = ring->takeEnergy();
-  check(energy.samples == 30u * cv::kBlock && std::fabs(energy.sumSquares - dac) < 1e-3f * dac,
-        "scope ring: the energy of 30 blocks equals the old output tally at unity trim");
-  check(ring->takeEnergy().samples == 0, "scope ring: a second take with no new block is empty");
-
-  std::array<float, cv::kBlock> loud;
-  loud.fill(0.5f);
-  for (int b = 0; b < 50; ++b) ring->write(loud.data());
-  const level::OutputEnergy late = ring->takeEnergy();
-  check(late.samples == static_cast<uint32_t>(kScopeReadBlocks * cv::kBlock) &&
-            std::fabs(late.sumSquares - 0.25f * static_cast<float>(late.samples)) < 1e-3f,
-        "scope ring: a take that came 50 blocks late covers the newest 31");
-  ring->writeSilence();
-  const level::OutputEnergy quiet = ring->takeEnergy();
-  check(quiet.samples == cv::kBlock && quiet.sumSquares == 0.0f, "scope ring: a silent block adds 64 samples of no energy");
 }
 
 // One thread writes blocks whose samples all hold the block number (from 1), the other reads as fast
@@ -474,8 +484,6 @@ void checkRingStress() {
   writer.join();
   check(reads > 100 && torn == 0, ("scope ring: " + std::to_string(reads) + " reads against a writing thread, " +
                                    std::to_string(failed) + " retried out, " + std::to_string(torn) + " torn blocks").c_str());
-  const level::OutputEnergy energy = ring->takeEnergy();
-  check(energy.samples == static_cast<uint32_t>(kScopeReadBlocks * cv::kBlock), "scope ring: the last take covers 31 blocks");
 }
 
 }  // namespace
@@ -485,7 +493,7 @@ void checkScope() {
   checkTriggerEdges();
   checkColumns();
   checkScale();
+  checkTail();
   checkRingOrder();
-  checkRingEnergy();
   checkRingStress();
 }

@@ -427,14 +427,13 @@ Block newestBlock(const ScopeRing& ring) {
 // Every audio block writes one block into the scope's ring, through a layout swap with its silent
 // blocks, a late block and a NaN cut. A chain block writes the chain output, ahead of the output
 // gain, so the fade-out blocks still write the full signal. A silent block, a dry block and a cut
-// block write zeros. The report carries the block's energy.
+// block write zeros.
 void checkScopeRingAdvances() {
   const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false, false);
   Rig rig;
   BlockFlow flow;
   bool advances = true;
   bool content = true;
-  bool energy = true;
   int silent = 0;
   int dry = 0;
   int cut = 0;
@@ -454,7 +453,6 @@ void checkScopeRingAdvances() {
     const bool zeros = start.fade.silent || start.dry || report.discarded;
     const Block got = newestBlock(flow.scope());
     content = content && (zeros ? allZero(got) : got == in);
-    energy = energy && (zeros ? report.outputEnergy == 0.0f : std::fabs(report.outputEnergy - level::sumSquares(in.data(), kN)) < 1e-4f);
     silent += start.fade.silent ? 1 : 0;
     dry += start.dry ? 1 : 0;
     cut += report.discarded ? 1 : 0;
@@ -463,7 +461,6 @@ void checkScopeRingAdvances() {
   check(silent > 0 && dry == 1 && cut == 1 && fading > 0, "scope ring: the run met a swap's silent blocks, one late block, one NaN cut and a fade-out");
   check(advances, "scope ring: the ring advances one block per audio block through a swap, a late block and a NaN cut");
   check(content, "scope ring: chain blocks write the chain output, even while the output fades, and silent, dry and cut blocks write zeros");
-  check(energy, "scope ring: the report carries the written block's energy, 0 for a block of zeros");
 }
 
 // POLISH COMP changes the output and leaves the ring as it was, since the scope reads the chain

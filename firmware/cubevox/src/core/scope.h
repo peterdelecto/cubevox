@@ -10,7 +10,6 @@
 #include <array>
 #include <atomic>
 
-#include "core/level.h"
 #include "engine/common.h"
 
 // The picture. A column covers kScopeColumnSamples samples, and the frame is kScopeColumns columns.
@@ -26,9 +25,14 @@ constexpr int kScopeHalfRows = 22;
 // more of the height. It rises at once.
 constexpr float kScopeFallDb = -3.0f;
 
-// A scale under this (-120 dBFS) is silence, and keeps a near-zero peak from blowing up the row
-// scale.
-constexpr float kScopeMinScale = 1e-6f;
+// A frame whose peak is under this (-54 dBFS) is silence and draws the horizon alone. A fixed level
+// serves where a floor that tracks the quietest recent tick fails, because a decaying echo tail is
+// a run of new quietest ticks and would draw as the line while audible.
+constexpr float kScopeSilencePeak = 1.9952623e-3f;
+
+// The scale never fits below this (-40 dBFS), so a frame between kScopeSilencePeak and this draws
+// 1 to 5 rows tall and a tail shrinks into the line instead of snapping to it.
+constexpr float kScopeMinScale = 0.01f;
 
 // The trigger arms when the signal has gone under this share of the largest sample in the search
 // span.
@@ -68,9 +72,8 @@ struct ScopeFrame {
 // same as plain floats on the box and keep the host's two threads inside the memory model.
 class ScopeRing {
  public:
-  // Audio side. Stores one block of cv::kBlock samples and its energy. Returns the energy, the sum of
-  // the squares of the block.
-  float write(const float* block);
+  // Audio side. Stores one block of cv::kBlock samples.
+  void write(const float* block);
 
   // Audio side. Stores one block of zeros.
   void writeSilence();
@@ -80,21 +83,12 @@ class ScopeRing {
   // attempts in a row, and `out` is then not to be used.
   bool read(float* out) const;
 
-  // Main loop. The energy of the blocks written since the previous call, the newest kScopeReadBlocks
-  // at most. Returns an empty energy, and leaves the blocks for the next call, when three attempts
-  // met the writer.
-  level::OutputEnergy takeEnergy();
-
   // Blocks written so far.
   uint32_t blocks() const { return blocks_.load(std::memory_order_acquire); }
 
  private:
-  void store(const float* block, float energy);
-
   std::array<std::atomic<float>, kScopeRingSamples> samples_{};
-  std::array<std::atomic<float>, kScopeBlocks> energy_{};
   std::atomic<uint32_t> blocks_{0};
-  uint32_t taken_ = 0;  // the block count at the last takeEnergy(), read by the main loop only
 };
 
 // The start of a cycle in `samples`, kScopeReadSamples long and oldest first, as an index. The
@@ -105,10 +99,11 @@ class ScopeRing {
 // returns the start of the newest kScopeFrameSamples samples, which is the frame free-running.
 int scopeStart(const float* samples, float hysteresis);
 
-// The frame for a read: the 103 column runs the voice screen draws. The scale is the larger of the
-// frame's peak magnitude and `lastScale` less kScopeFallDb, so the frame's loudest sample lands on
-// row 10 or 54. The new scale comes back in the frame; pass it as `lastScale` on the next call, and
-// start at 0. A column runs from the lowest to the highest of its samples and is stretched to meet
-// the last sample of the column before it, so the trace is one line. A `silent` tick, and a scale
-// that is not positive, give the horizon alone and a scale of 0.
-ScopeFrame scopeFrame(const float* samples, float lastScale, bool silent);
+// The frame for a read: the 103 column runs the voice screen draws. A frame whose peak magnitude is
+// under kScopeSilencePeak gives the horizon alone and a scale of 0. Otherwise the scale is the
+// largest of the frame's peak, `lastScale` less kScopeFallDb and kScopeMinScale, so the frame's
+// loudest sample lands on row 10 or 54 unless it is under kScopeMinScale. The new scale comes back in
+// the frame; pass it as `lastScale` on the next call, and start at 0. A column runs from the lowest
+// to the highest of its samples and is stretched to meet the last sample of the column before it, so
+// the trace is one line.
+ScopeFrame scopeFrame(const float* samples, float lastScale);

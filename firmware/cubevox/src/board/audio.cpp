@@ -820,8 +820,6 @@ level::InputEnergy audioTakeInputEnergy() {
   return energy;
 }
 
-level::OutputEnergy audioTakeOutputEnergy() { return gFlow.scope().takeEnergy(); }
-
 const ScopeRing& audioScope() { return gFlow.scope(); }
 
 float audioTakeGatePeak() {

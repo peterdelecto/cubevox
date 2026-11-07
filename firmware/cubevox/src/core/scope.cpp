@@ -13,12 +13,6 @@ constexpr int kReadTries = 3;
 constexpr uint32_t kSlotMask = kScopeBlocks - 1;
 static_assert((kScopeBlocks & (kScopeBlocks - 1)) == 0, "the slot index is a mask");
 
-// The newest block count the reader may take, from a count of `blocks` written and `taken` already
-// taken. A count that wrapped still subtracts correctly because the slot mask divides 2^32.
-uint32_t blocksToTake(uint32_t blocks, uint32_t taken) {
-  return std::min<uint32_t>(blocks - taken, kScopeReadBlocks);
-}
-
 // The rows a sample sits above the horizon, in -kScopeHalfRows..kScopeHalfRows, for `rowsPerUnit`
 // rows per unit of sample. The sum with the half-height is positive, so the cast truncates down.
 int rowsAbove(float sample, float rowsPerUnit) {
@@ -43,7 +37,7 @@ float framePeak(const float* samples, int start) {
 
 }  // namespace
 
-void ScopeRing::store(const float* block, float energy) {
+void ScopeRing::write(const float* block) {
   const uint32_t count = blocks_.load(std::memory_order_relaxed);
   const size_t slot = count & kSlotMask;
 
@@ -52,19 +46,12 @@ void ScopeRing::store(const float* block, float energy) {
   std::atomic_thread_fence(std::memory_order_release);
   std::atomic<float>* const out = samples_.data() + slot * cv::kBlock;
   for (int i = 0; i < cv::kBlock; ++i) out[i].store(block[i], std::memory_order_relaxed);
-  energy_[slot].store(energy, std::memory_order_relaxed);
   blocks_.store(count + 1, std::memory_order_release);
-}
-
-float ScopeRing::write(const float* block) {
-  const float energy = level::sumSquares(block, cv::kBlock);
-  store(block, energy);
-  return energy;
 }
 
 void ScopeRing::writeSilence() {
   static const std::array<float, cv::kBlock> kZeros{};
-  store(kZeros.data(), 0.0f);
+  write(kZeros.data());
 }
 
 bool ScopeRing::read(float* out) const {
@@ -84,23 +71,6 @@ bool ScopeRing::read(float* out) const {
   return false;
 }
 
-level::OutputEnergy ScopeRing::takeEnergy() {
-  for (int attempt = 0; attempt < kReadTries; ++attempt) {
-    const uint32_t count = blocks_.load(std::memory_order_acquire);
-    const uint32_t take = blocksToTake(count, taken_);
-    float sum = 0.0f;
-    for (uint32_t j = 0; j < take; ++j) sum += energy_[(count - take + j) & kSlotMask].load(std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_acquire);
-    if (blocks_.load(std::memory_order_relaxed) != count) continue;
-    taken_ = count;
-    level::OutputEnergy energy;
-    energy.sumSquares = sum;
-    energy.samples = take * cv::kBlock;
-    return energy;
-  }
-  return level::OutputEnergy();
-}
-
 int scopeStart(const float* samples, float hysteresis) {
   const int newestFrame = kScopeReadSamples - kScopeFrameSamples;
   const int oldest = kScopeReadSamples - kScopeSearchBack;
@@ -115,14 +85,13 @@ int scopeStart(const float* samples, float hysteresis) {
   return newestFrame;
 }
 
-ScopeFrame scopeFrame(const float* samples, float lastScale, bool silent) {
+ScopeFrame scopeFrame(const float* samples, float lastScale) {
   ScopeFrame frame;
-  if (silent) return frame;
-
   const int start = scopeStart(samples, kScopeHysteresis);
-  const float scale = std::max(framePeak(samples, start), lastScale * cv::dbToGain(kScopeFallDb));
-  if (!(scale >= kScopeMinScale)) return frame;
+  const float peak = framePeak(samples, start);
+  if (!(peak >= kScopeSilencePeak)) return frame;  // also catches NaN
 
+  const float scale = std::max({peak, lastScale * cv::dbToGain(kScopeFallDb), kScopeMinScale});
   frame.scale = scale;
   const float rowsPerUnit = static_cast<float>(kScopeHalfRows) / scale;
   int before = rowsAbove(samples[start], rowsPerUnit);  // the first column meets its own first sample

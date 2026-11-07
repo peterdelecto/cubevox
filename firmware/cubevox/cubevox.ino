@@ -231,7 +231,7 @@ void drawFace(const UiContext& ctx, uint32_t nowMs) {
   if (gFace.due(nowMs, gCanvas)) {
     const level::InputEnergy input = audioTakeInputEnergy();
     gDim.noteVoice(input, nowMs);  // the screen reads the voice from the energy the level bar reads
-    gFace.tick(nowMs, ctx, input, audioTakeOutputEnergy(), audioScope(), gMenu, gCanvas);
+    gFace.tick(nowMs, ctx, input, audioScope(), gMenu, gCanvas);
   }
 }
 

@@ -111,11 +111,6 @@ uint32_t audioBlockCount();
 // is measured on the samples that enter the chain. Resets the window; call from the main loop.
 level::InputEnergy audioTakeInputEnergy();
 
-// The same for the output, measured on the chain output the scope's ring holds, ahead of POLISH
-// COMP, the output trim and the soft ceiling. It covers the blocks written since the previous call;
-// call from the main loop.
-level::OutputEnergy audioTakeOutputEnergy();
-
 // The scope's ring, which holds the newest chain output. Read it from the main loop.
 const ScopeRing& audioScope();
 

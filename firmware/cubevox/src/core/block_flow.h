@@ -42,7 +42,6 @@ class BlockFlow {
     ChainCycles cycles;       // the stage times, when the chain ran
     bool chainRan = false;    // the chain ran, so the Input gate's detector holds this block's peak
     bool discarded = false;   // a slot produced a NaN or an infinity, so the block was cut
-    float outputEnergy = 0.0f;  // sum of squares of the block written to the scope's ring, 0 for a silent or dry one
   };
 
   // Starts a block: moves the layout fade, holding the output at zero while `outputHeld`, and takes the
@@ -98,7 +97,7 @@ class BlockFlow {
       scope_.writeSilence();
     } else {
       report.chainRan = true;
-      auto tap = [this, &report](const float* block) { report.outputEnergy = scope_.write(block); };
+      auto tap = [this](const float* block) { scope_.write(block); };
       if (!runChain(engines, slots_, a, b, n, held, cycleClock, report.cycles, tap)) {
         report.discarded = true;
         discard(engines, held);

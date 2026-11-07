@@ -58,7 +58,7 @@ void Face::render(const GuiFrame& frame, const UiContext& ctx, Menu& menu) {
 }
 
 void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& input,
-                const level::OutputEnergy& output, const ScopeRing& ring, Menu& menu, Canvas& live) {
+                const ScopeRing& ring, Menu& menu, Canvas& live) {
   const uint32_t sinceMs = ticked_ ? nowMs - lastTickMs_ : kUiTickMs;
   ticked_ = true;
   lastTickMs_ = nowMs;
@@ -70,12 +70,11 @@ void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& 
   }
   const float dtMs = static_cast<float>(sinceMs);
   meterSegments_ = meterSegments(inputMeter_.update(input, dtMs));
-  const float outputLevel = outputMeter_.update(output, dtMs);
   const GuiFrame frame = gui_.tick(nowMs, ctx.topSwitchOn, menu.open());
   if (frame.screen != Screen::Voice) {
     scope_.scale = 0.0f;
   } else if (ring.read(samples_.data())) {
-    scope_ = scopeFrame(samples_.data(), scope_.scale, outputLevel <= 0.0f);
+    scope_ = scopeFrame(samples_.data(), scope_.scale);
   }
   render(frame, ctx, menu);
   if (frame.dissolve == 0) {

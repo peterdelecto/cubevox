@@ -37,13 +37,12 @@ class Face {
   // whenever this returns true.
   bool due(uint32_t nowMs, const Canvas& live);
 
-  // One UI tick. `input` and `output` are the energy that went into the chain and came out of it
-  // since the last tick. The level bar shows the input, and the output decides when the scope is
-  // silent. On the voice screen the scope draws the newest samples in `ring`, fitted to the frame's
-  // peak; no other screen reads them. From
-  // the first tick on, the face is on the panel, so the menu listens to the encoder.
+  // One UI tick. `input` is the energy that went into the chain since the last tick, which the level
+  // bar shows. On the voice screen the scope draws the newest samples in `ring`, fitted to the
+  // frame's peak, and the line when that peak is under kScopeSilencePeak; no other screen reads
+  // them. From the first tick on, the face is on the panel, so the menu listens to the encoder.
   void tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& input,
-            const level::OutputEnergy& output, const ScopeRing& ring, Menu& menu, Canvas& live);
+            const ScopeRing& ring, Menu& menu, Canvas& live);
 
  private:
   void render(const GuiFrame& frame, const UiContext& ctx, Menu& menu);
@@ -55,7 +54,6 @@ class Face {
   Card readoutCard_ = Card::Empty;
 
   level::Meter inputMeter_;
-  level::OutputMeter outputMeter_;
   int meterSegments_ = 0;
   ScopeFrame scope_;                                  // the last frame read, kept when a read meets the writer; its scale is the one the next frame falls from
   std::array<float, kScopeReadSamples> samples_{};    // the read buffer, 8 KB, so not on the stack
