@@ -83,9 +83,6 @@ class ScopeRing {
   // attempts in a row, and `out` is then not to be used.
   bool read(float* out) const;
 
-  // Blocks written so far.
-  uint32_t blocks() const { return blocks_.load(std::memory_order_acquire); }
-
  private:
   std::array<std::atomic<float>, kScopeRingSamples> samples_{};
   std::atomic<uint32_t> blocks_{0};

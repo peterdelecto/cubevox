@@ -33,11 +33,11 @@ enum class UiAction : uint8_t {
   CycleTopSwitch,
   CycleBrightness,
   ToggleDebug,
-  SwapReverb,       // the layout's reverb card changes between Spring and Chasm
-  SwapOctaveFormant,  // the slot that holds Octave, Formant or the Formant follower takes the next of the three
-  SwapUnisonCrowd,    // the slot that holds Unison or Crowd takes the other card
-  SwapDistortionGrowl,  // the slot that holds Distortion or Growl takes the other
-  CycleSlot7Card,     // the slot that holds Gate, Lo-fi or Chatter takes the next of the three
+  SwapReverb,           // the layout's reverb card changes between Spring and Chasm
+  SwapOctaveFormant,    // the slot that holds Octave, Formant or Apraxia takes the next of the three
+  SwapUnisonCrowd,      // the slot that holds Unison or Mob takes the other card
+  SwapDistortionGrowl,  // the slot that holds Distortion or Deepthroat takes the other
+  CycleSlot7Card,       // the slot that holds Gate, Lo-fi or Chatter takes the next of the three
   EnterDfu,
 };
 
@@ -81,7 +81,7 @@ class Menu {
   // after something else drew on the canvas.
   void invalidate() { shownValid_ = false; }
 
-  // Opens the read-only chain view. No list row opens it, so only the proof writer calls this.
+  // Opens the read-only chain view. No list row opens it, so only the menu tests call this.
   void showChainView() { mode_ = Mode::ChainView; }
 
  private:

@@ -30,19 +30,40 @@ Layout crowdTestLayout();
 // for a layout that failed layoutValid.
 int reverbSlot(const Layout& layout);
 
-// The slot that holds Unison or Crowd, the first one when both are placed; -1 when neither is.
+// The slot that holds Unison or Mob, the first one when both are placed; -1 when neither is.
 int unisonCrowdSlot(const Layout& layout);
 
 // The slot that holds Octave, Formant or the Formant follower, the first one when several are placed;
 // -1 when none is. The menu's slot 3 row cycles the card in it.
 int octaveFormantSlot(const Layout& layout);
 
-// The slot that holds Distortion or Growl, the first one when several are placed; -1 when none is.
+// The slot that holds Distortion or Deepthroat, the first one when several are placed; -1 when none is.
 int distortionGrowlSlot(const Layout& layout);
 
 // The slot that holds Gate, Lo-fi or Chatter, the first one when several are placed; -1 when none is.
 // The menu's slot 7 row cycles the card in it.
 int slot7CardSlot(const Layout& layout);
+
+// The five slots whose card the menu swaps (slots 3, 4, 6, 7 and 8, in slot order).
+enum class SwapSlot : uint8_t { OctaveFormant, UnisonMob, DistortionDeepthroat, Slot7, Reverb, Count };
+
+// The cards a swappable slot can hold, in the menu's cycle order, and the menu's word for each. The
+// first card is the default: a layout holding none of them reads and cycles as the first.
+struct SwapCards {
+  size_t count;
+  std::array<Card, 3> card;
+  std::array<const char*, 3> word;
+};
+const SwapCards& swapCards(SwapSlot which);
+
+// The slot that holds one of `which`'s cards, the first one when several are placed; -1 when none is.
+int swapSlotOf(const Layout& layout, SwapSlot which);
+
+// The card after `current` in `which`'s cycle, wrapping to the first. A card outside the set gives the first.
+Card nextSwapCard(SwapSlot which, Card current);
+
+// The menu's word for the card of `which` that `layout` holds, the first card's word when it holds none.
+const char* swapWord(const Layout& layout, SwapSlot which);
 
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
@@ -60,9 +81,9 @@ struct LayoutCheck {
 };
 
 // The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
-// placed card's row, the pitch tracker's row once when Autotune, Crowd, Formant, the Formant
-// follower or Growl is placed, and the pitch stage's row once when Octave, Formant or the Formant
-// follower is placed without Autotune. Every card id must be in range.
+// placed card's row, and one tracker row for Autotune plus one for each Formant or Apraxia card not
+// directly behind Autotune and each Mob or Deepthroat card with no Autotune ahead. Every card id must
+// be in range.
 struct LayoutCost {
   int avg = 0;
   int worst = 0;

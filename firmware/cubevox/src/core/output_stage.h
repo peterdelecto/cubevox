@@ -47,11 +47,11 @@ class OutputGain {
 };
 
 // Shapes the `n` samples of `a` with shapeOutput along `ramp` and hands each result to sink(i, v).
-// Returns the sum of the squares of the samples handed over, for the output level. A block whose
-// peak sits under the ceiling's knee, on a ramp inside [-1, 1], passes the ceiling and the clamp
-// unchanged, so that block skips both. A NaN's bits sort above the knee's, so it takes the full path.
+// A block whose peak sits under the ceiling's knee, on a ramp inside [-1, 1], passes the ceiling and
+// the clamp unchanged, so that block skips both. A NaN's bits sort above the knee's, so it takes the
+// full path.
 template <typename Sink>
-float emitOutput(const float* a, int n, GainRamp ramp, Sink&& sink) {
+void emitOutput(const float* a, int n, GainRamp ramp, Sink&& sink) {
   uint32_t peak = 0;
   for (int i = 0; i < n; ++i) {
     uint32_t bits;
@@ -65,21 +65,15 @@ float emitOutput(const float* a, int n, GainRamp ramp, Sink&& sink) {
   const bool unitGain = ramp.start >= -1.0f && ramp.start <= 1.0f && last >= -1.0f && last <= 1.0f;
 
   float gain = ramp.start;
-  float energy = 0.0f;
   if (peak <= kneeBits && unitGain) {
     for (int i = 0; i < n; ++i) {
-      const float v = a[i] * gain;
+      sink(i, a[i] * gain);
       gain += ramp.step;
-      energy += v * v;
-      sink(i, v);
     }
-    return energy;
+    return;
   }
   for (int i = 0; i < n; ++i) {
-    const float v = shapeOutput(a[i], gain);
+    sink(i, shapeOutput(a[i], gain));
     gain += ramp.step;
-    energy += v * v;
-    sink(i, v);
   }
-  return energy;
 }

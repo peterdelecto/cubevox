@@ -79,7 +79,8 @@ class Slapback {
   static_assert(kLen - kMaxDelaySmp >= kBlock, "a segment read never reaches the segment it writes");
 
   // Per-sample decay of the Time glide's error: what the 50 ms smoother keeps in one sample.
-  static inline const float kTimeDecay = smooth::keep(kTimeSec, 1);
+  static_assert(kTimeSec == 0.050f, "kTimeDecay is the 50 ms keep factor");
+  static constexpr float kTimeDecay = smooth::kKeep50msSample;
 
   // log2 of the per-sample decay of the Amount smoother, so a chunk of n samples decays by 2^(n x this).
   static constexpr float kAmountDecayLog2 = -1.0f / (smooth::kSmoothSec * kSampleRate) * kLog2E;

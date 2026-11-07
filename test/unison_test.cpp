@@ -13,6 +13,9 @@
 #include "engine/unison.h"
 
 #include "alloc_guard.h"
+#include "signal_util.h"
+
+using testutil::peakCurvature;
 
 namespace {
 
@@ -288,16 +291,6 @@ bool testTopWet() {
     std::printf("%s %s  %s\n", row ? "PASS" : "FAIL", name, detail);
   }
   return ok;
-}
-
-// Largest |second difference| of x over [from, to): a jump of the taps shows as a spike here.
-double peakCurvature(const std::vector<float>& x, int from, int to) {
-  double worst = 0.0;
-  for (int i = std::max(from, 2); i < to; ++i) {
-    const size_t k = static_cast<size_t>(i);
-    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
-  }
-  return worst;
 }
 
 bool testLevel() {

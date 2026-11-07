@@ -22,14 +22,16 @@ constexpr size_t kPad = cv::kSampleRate * 2 / 5;
 
 using testutil::readWav;
 
+// The file names of the three clips in samples/, without the .wav.
+inline constexpr const char* kNames[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+
 // `whole` is false when samples/ exists but a clip is missing.
 inline std::vector<Signal> load(const char* dir, bool& whole) {
-  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
   std::vector<Signal> out;
   whole = true;
   std::error_code ec;
   if (!std::filesystem::is_directory(dir, ec)) return out;
-  for (const char* name : names) {
+  for (const char* name : kNames) {
     const Signal clip = readWav(std::string(dir) + "/" + name + ".wav");
     if (clip.empty()) {
       whole = false;

@@ -9,7 +9,7 @@ ReadoutView readoutView(const GuiFrame& frame, const UiContext& ctx) {
   const Card card = ctx.layout.card[static_cast<size_t>(frame.slot)];
   ReadoutView view;
   view.slot = frame.slot;
-  view.card = oledName(card);
+  view.card = cardDesc(card).name;
   view.toggle = frame.toggle;
   view.on = frame.on;
   view.knob = frame.toggle ? nullptr : knobDesc(card, frame.knob);

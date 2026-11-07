@@ -249,8 +249,8 @@ void checkPitchCardsInSeries() {
     const Run run = runBlock(*chain, snap, in, StillClock());
     Block tuned{};
     Block want{};
-    direct->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchFx.autotune);
-    direct->engines.octave.process(tuned.data(), want.data(), kN, snap.params.pitchFx.octave);
+    direct->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchCards.autotune);
+    direct->engines.octave.process(tuned.data(), want.data(), kN, snap.params.pitchCards.octave);
     same = same && run.out == want;
     moved = moved || maxAbsDiff(run.out, in) > 0.01f;
   }
@@ -258,27 +258,33 @@ void checkPitchCardsInSeries() {
 }
 
 // A Growl card keeps a ring of its own input. While its slot sits settled off, each block clears a slice of
-// it (1 KB at most), so the ring is clear 16 blocks after the fade-out ends and the reset at the next
+// it (2 KB at most), so the ring is clear 31 blocks after the fade-out ends and the reset at the next
 // switch-on has nothing left to clear.
 void checkGrowlRingRests() {
   constexpr int kSlot = 5;
   ChainSnapshot snap = snapshotFor(layoutOf({Card::Empty, Card::Empty, Card::Empty, Card::Empty, Card::Empty, Card::Growl}), 0.5f, false);
   auto rig = newRig();
   rig->fades.settle(snap.slotOn);
+  const auto ringIsZero = [&rig] {
+    for (const float v : rig->engines.growl.ringForTest().data()) {
+      if (v != 0.0f) return false;
+    }
+    return true;
+  };
   int b = 0;
   for (; b < 300; ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
-  const bool dirty = !rig->engines.growl.ringIsZero();
+  const bool dirty = !ringIsZero();
   snap.slotOn[kSlot] = false;
-  int worstStep = 0;
+  uint32_t worstStep = 0;
   for (int k = 0; k < kSlotFadeBlocks + 1; ++k, ++b) runBlock(*rig, snap, tone(b, 0.3f), StillClock());
-  int cleared = rig->engines.growl.ringClearedTo();
-  for (int k = 0; k < 20; ++k, ++b) {
+  uint32_t cleared = rig->engines.growl.ringClearedForTest();
+  for (int k = 0; k < 40; ++k, ++b) {
     runBlock(*rig, snap, tone(b, 0.3f), StillClock());
-    worstStep = std::max(worstStep, rig->engines.growl.ringClearedTo() - cleared);
-    cleared = rig->engines.growl.ringClearedTo();
+    worstStep = std::max(worstStep, rig->engines.growl.ringClearedForTest() - cleared);
+    cleared = rig->engines.growl.ringClearedForTest();
   }
-  check(dirty && rig->engines.growl.ringIsZero() && cleared == cv::growl_detail::kRingLen && worstStep <= cv::growl_detail::kRestClearFloats,
-        "chain: a stopped Growl card clears its ring a slice a block, 1 KB at most");
+  check(dirty && ringIsZero() && worstStep <= static_cast<uint32_t>(cv::InputRing<cv::growl_detail::kRingLen>::kRestClearFloats),
+        "chain: a stopped Growl card clears its ring a slice a block, 2 KB at most");
 }
 
 // The poisoned blocks enter through the input, which the empty layout passes to the guard as a slot's
@@ -894,11 +900,11 @@ void checkPitchCardToggles() {
   Toggles octaveOnly = bothOff;
   octaveOnly[1] = true;
   ChainSnapshot snapOctave = snapshotToggles(layout, 0.5f, octaveOnly);
-  snapOctave.params.pitchFx.octave.semitones = 12;
-  snapOctave.params.pitchFx.octave.mix = 1.0f;
+  snapOctave.params.pitchCards.octave.semitones = 12;
+  snapOctave.params.pitchCards.octave.mix = 1.0f;
   ChainSnapshot snapOff = snapshotToggles(layout, 0.5f, bothOff);
-  snapOff.params.pitchFx.octave.semitones = 12;
-  snapOff.params.pitchFx.octave.mix = 1.0f;
+  snapOff.params.pitchCards.octave.semitones = 12;
+  snapOff.params.pitchCards.octave.mix = 1.0f;
 
   auto rig = newRig();
   bool running = true;
@@ -965,14 +971,14 @@ Block crowdByHand(Rig& rig, const ChainSnapshot& snap, const Block& in, bool aut
     need.run = true;
     need.outOfRange = true;
     rig.engines.crowd.write(in.data(), kN);
-    rig.engines.autotune.process(in.data(), mid.data(), kN, snap.params.pitchFx.autotune, need);
+    rig.engines.autotune.process(in.data(), mid.data(), kN, snap.params.pitchCards.autotune, need);
     pitch = {&rig.engines.autotune.pitch(), rig.engines.autotune.correctionSemis()};
-    if (!snap.params.pitchFx.autotune.on) mid = in;  // the Autotune slot passes the dry input while its toggle is off
+    if (!snap.params.pitchCards.autotune.on) mid = in;  // the Autotune slot passes the dry input while its toggle is off
   }
   rig.engines.crowd.process(mid.data(), out.data(), kN, snap.params.crowd, pitch);
   if (autotuneBehind) {
     Block tuned{};
-    rig.engines.autotune.process(out.data(), tuned.data(), kN, snap.params.pitchFx.autotune);
+    rig.engines.autotune.process(out.data(), tuned.data(), kN, snap.params.pitchCards.autotune);
     return tuned;
   }
   return out;
@@ -1114,12 +1120,12 @@ Block soloEngine(Rig& rig, Card c, const ChainSnapshot& snap, const Block& in) {
   Block out{};
   switch (c) {
     case Card::Formant:
-      rig.engines.formant.process(in.data(), out.data(), kN, snap.params.pitchFx.formant, cv::UpstreamPitch{});
+      rig.engines.formant.process(in.data(), out.data(), kN, snap.params.pitchCards.formant, cv::UpstreamPitch{});
       break;
     case Card::FormantFollower:
       rig.engines.formant.process(
           in.data(), out.data(), kN,
-          rig.engines.follower.follow(in.data(), kN, snap.params.pitchFx.formant, snap.params.follower),
+          rig.engines.follower.follow(in.data(), kN, snap.params.pitchCards.formant, snap.params.follower),
           cv::UpstreamPitch{});
       break;
     case Card::Lofi: rig.engines.lofi.process(in.data(), out.data(), kN, snap.params.lofi); break;
@@ -1212,7 +1218,7 @@ Block walkSlotsByHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
           }
           break;
         }
-        rig.engines.autotune.process(cur.data(), next.data(), kN, snap.params.pitchFx.autotune, need, grid);
+        rig.engines.autotune.process(cur.data(), next.data(), kN, snap.params.pitchCards.autotune, need, grid);
         autotuneAhead = true;
         adjacent = true;
         up = {&rig.engines.autotune.pitch(), rig.engines.autotune.correctionSemis(), rig.engines.autotune.outputLatency(),
@@ -1220,7 +1226,7 @@ Block walkSlotsByHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
         break;
       }
       case Card::Octave:
-        rig.engines.octave.process(cur.data(), next.data(), kN, snap.params.pitchFx.octave);
+        rig.engines.octave.process(cur.data(), next.data(), kN, snap.params.pitchCards.octave);
         adjacent = false;
         if (autotuneAhead) {
           if (rig.engines.octave.leads()) up.shiftSemis += rig.engines.octave.intervalSemis();
@@ -1228,7 +1234,7 @@ Block walkSlotsByHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
         }
         break;
       case Card::Formant:
-        rig.engines.formant.process(cur.data(), next.data(), kN, snap.params.pitchFx.formant,
+        rig.engines.formant.process(cur.data(), next.data(), kN, snap.params.pitchCards.formant,
                                     autotuneAhead && adjacent ? up : cv::UpstreamPitch{});
         adjacent = false;
         if (autotuneAhead) up.latency += rig.engines.formant.outputLatency();
@@ -1454,10 +1460,10 @@ void checkAutotuneTrackerForReaders() {
     Block want{};
     cv::TrackerNeeds need{true, true, true};
     hand->engines.formant.feed(in.data(), kN);
-    hand->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchFx.autotune, need,
+    hand->engines.autotune.process(in.data(), tuned.data(), kN, snap.params.pitchCards.autotune, need,
                                    hand->engines.formant.gridMarks());
     const cv::UpstreamPitch up{&hand->engines.autotune.pitch(), 0.0f, 0.0f, &hand->engines.autotune, 0.0f, 0.0f};
-    hand->engines.formant.process(in.data(), want.data(), kN, snap.params.pitchFx.formant, up);
+    hand->engines.formant.process(in.data(), want.data(), kN, snap.params.pitchCards.formant, up);
     same = same && run.out == want;
     dry = dry && chain->fades.level(0) == 0;
   }
@@ -1494,7 +1500,7 @@ void checkApraxiaBehindDeepthroat() {
     hand->engines.growl.process(in.data(), grown.data(), kN, snap.params.growl, cv::UpstreamPitch{});
     hand->engines.formant.process(
         grown.data(), want.data(), kN,
-        hand->engines.follower.follow(grown.data(), kN, snap.params.pitchFx.formant, snap.params.follower),
+        hand->engines.follower.follow(grown.data(), kN, snap.params.pitchCards.formant, snap.params.follower),
         cv::UpstreamPitch{});
     same = same && run.out == want;
     finite = finite && run.finite && allFinite(run.out);

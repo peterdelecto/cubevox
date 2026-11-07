@@ -13,6 +13,9 @@
 #include "alloc_guard.h"
 #include "pitch_series.h"
 #include "ringed_tracker.h"
+#include "signal_util.h"
+
+using testutil::peakCurvature;
 
 namespace {
 
@@ -41,7 +44,7 @@ struct Hop {
   cv::PitchResult r;
 };
 
-std::vector<float> run(PitchSeries& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
+std::vector<float> run(PitchSeries& fx, const std::vector<float>& in, const cv::PitchCardParams& p,
                        std::vector<Hop>* hops = nullptr) {
   std::vector<float> out(in.size());
   if (hops) hops->reserve(in.size() / cv::kBlock + 1);
@@ -68,8 +71,8 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
 
 static PitchSeries gFx;
 
-cv::PitchFxParams octaveOnly(int semis) {
-  cv::PitchFxParams p;
+cv::PitchCardParams octaveOnly(int semis) {
+  cv::PitchCardParams p;
   p.octave.on = true;
   p.octave.semitones = semis;
   p.octave.mix = 1.0f;
@@ -77,7 +80,7 @@ cv::PitchFxParams octaveOnly(int semis) {
 }
 
 // Median f0 of the output over seconds 1..2, measured by a fresh tracker.
-double outputHz(double inHz, const cv::PitchFxParams& p) {
+double outputHz(double inHz, const cv::PitchCardParams& p) {
   gFx.reset();
   const std::vector<float> out = run(gFx, tone(inHz, 2 * cv::kSampleRate), p);
   RingedTracker t;
@@ -115,13 +118,13 @@ bool testBypass() {
   const std::vector<float> in = tone(220.0, cv::kSampleRate);
   float worst = 0.0f;
   for (float mix : {0.0f, 0.5f, 1.0f}) {
-    cv::PitchFxParams p = octaveOnly(0);
+    cv::PitchCardParams p = octaveOnly(0);
     p.octave.mix = mix;
     gFx.reset();
     const std::vector<float> out = run(gFx, in, p);
     for (size_t i = 0; i < in.size(); ++i) worst = std::max(worst, std::fabs(out[i] - in[i]));
   }
-  cv::PitchFxParams off = octaveOnly(12);
+  cv::PitchCardParams off = octaveOnly(12);
   off.octave.mix = 0.5f;
   off.octave.on = false;
   gFx.reset();
@@ -138,9 +141,9 @@ bool testOffEdge() {
   const std::vector<float> in = tone(220.0, 2 * cv::kSampleRate);
   bool ok = true;
   for (int pass = 0; pass < 2; ++pass) {
-    cv::PitchFxParams on = octaveOnly(7);
+    cv::PitchCardParams on = octaveOnly(7);
     on.octave.mix = 0.5f;
-    cv::PitchFxParams off = on;
+    cv::PitchCardParams off = on;
     if (pass == 0) {
       off.octave.on = false;
     } else {
@@ -163,7 +166,7 @@ bool testOffEdge() {
 
 // Octave and Autotune on together; the tracker must still hear only the dry tone.
 bool testWiring() {
-  cv::PitchFxParams p = octaveOnly(12);
+  cv::PitchCardParams p = octaveOnly(12);
   p.autotune.on = true;
   p.autotune.responseMs = 20.0f;
   gFx.reset();
@@ -188,7 +191,7 @@ bool testWiring() {
 }
 
 bool testNoAlloc() {
-  cv::PitchFxParams p = octaveOnly(-12);
+  cv::PitchCardParams p = octaveOnly(-12);
   p.octave.mix = 0.5f;
   p.autotune.on = true;
   const std::vector<float> in = tone(220.0, cv::kBlock * 64);
@@ -272,7 +275,7 @@ bool testFormantMoves() {
 bool testDcBlocked() {
   constexpr double kLimit = 1e-3;  // -60 dBFS
   constexpr double kSettleMs = 200.0;
-  cv::PitchFxParams p = octaveOnly(12);
+  cv::PitchCardParams p = octaveOnly(12);
   p.octave.tuning.trimDb = 0.0f;
   const std::vector<float> in(static_cast<size_t>(cv::kSampleRate), 0.5f);
   gFx.reset();
@@ -304,7 +307,7 @@ bool testNoise() {
     s = s * 6364136223846793005ULL + 1442695040888963407ULL;
     v = 0.25f * (static_cast<float>(s >> 40) / 8388608.0f - 1.0f);
   }
-  const cv::PitchFxParams p = octaveOnly(-12);
+  const cv::PitchCardParams p = octaveOnly(-12);
   gFx.reset();
   const std::vector<float> out = run(gFx, in, p);
   double ri = 0.0;
@@ -319,16 +322,6 @@ bool testNoise() {
   return report("noise level", std::fabs(gainDb - kExpectDb) <= 1.5, "out/in %+.2f dB (%+.1f +-1.5)", gainDb, kExpectDb);
 }
 
-// Largest |second difference| of x over [from, to): a cut in the waveform shows as a spike here.
-double peakCurvature(const std::vector<float>& x, int from, int to) {
-  double worst = 0.0;
-  for (int i = std::max(from, 2); i < to; ++i) {
-    const size_t k = static_cast<size_t>(i);
-    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
-  }
-  return worst;
-}
-
 // SEMITONES +1 to 0 to -1 with 0 held for gapBlocks: the stage switches off at 0, and its voice
 // must keep running while the crossfade is up.
 constexpr int kStepAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
@@ -337,7 +330,7 @@ constexpr int kThroughTotal = 2 * cv::kSampleRate;
 std::vector<float> throughZeroRun(float mix, int gapBlocks, double hz = 220.0) {
   const std::vector<float> in = tone(hz, kThroughTotal);
   std::vector<float> out(in.size());
-  cv::PitchFxParams p = octaveOnly(1);
+  cv::PitchCardParams p = octaveOnly(1);
   p.octave.mix = mix;
   gFx.reset();
   for (int i = 0; i < kThroughTotal; i += cv::kBlock) {
@@ -407,7 +400,7 @@ bool testToggle() {
   double worst = 0.0;
   for (float mix : {1.0f, 0.10f}) {
     for (int offBlocks : {2, 20, 400}) {
-      cv::PitchFxParams p = octaveOnly(7);
+      cv::PitchCardParams p = octaveOnly(7);
       p.octave.mix = mix;
       gFx.reset();
       std::vector<float> out(in.size());
@@ -437,7 +430,7 @@ bool testMixLeavesZero() {
   double worst = 0.0;
   for (int semis : {12, -5}) {
     for (float mix : {0.015f, 0.5f, 1.0f}) {
-      cv::PitchFxParams p = octaveOnly(semis);
+      cv::PitchCardParams p = octaveOnly(semis);
       p.octave.mix = 0.0f;
       gFx.reset();
       std::vector<float> out(in.size());
@@ -457,7 +450,7 @@ bool testMixLeavesZero() {
 // (the voice's glide and window sync step per call, so the runs differ by rounding and a hair of timing).
 bool testAnyLength() {
   const std::vector<float> in = tone(220.0, cv::kSampleRate);
-  cv::PitchFxParams p = octaveOnly(7);
+  cv::PitchCardParams p = octaveOnly(7);
   p.octave.mix = 0.5f;
   gFx.reset();
   const std::vector<float> ref = run(gFx, in, p);
@@ -488,7 +481,7 @@ bool testAnyLength() {
 // the pitch stage's reset has to bring the voice back: finite and sounding again on the next call.
 bool testNanRecovery() {
   const std::vector<float> in = tone(220.0, cv::kSampleRate);
-  cv::PitchFxParams p = octaveOnly(12);
+  cv::PitchCardParams p = octaveOnly(12);
   p.octave.mix = 0.5f;
   gFx.reset();
   std::vector<float> out(in.size());

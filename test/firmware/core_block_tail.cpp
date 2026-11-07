@@ -102,31 +102,27 @@ void checkLineIsCeilingAlone() {
   check(tested > 80000, "ceiling: the LINE sweep covers -4 to +4 and the edge cases");
 }
 
-// The reference loop: shapeOutput on every sample along the ramp, and the energy summed in order.
-float referenceEmit(const Block& a, GainRamp ramp, Block& out) {
+// The reference loop: shapeOutput on every sample along the ramp.
+void referenceEmit(const Block& a, GainRamp ramp, Block& out) {
   float gain = ramp.start;
-  float energy = 0.0f;
   for (int i = 0; i < kN; ++i) {
-    const float v = shapeOutput(a[static_cast<size_t>(i)], gain);
+    out[static_cast<size_t>(i)] = shapeOutput(a[static_cast<size_t>(i)], gain);
     gain += ramp.step;
-    energy += v * v;
-    out[static_cast<size_t>(i)] = v;
   }
-  return energy;
 }
 
 bool emitMatches(const Block& a, GainRamp ramp) {
   Block want{};
   Block got{};
-  const float wantEnergy = referenceEmit(a, ramp, want);
-  const float gotEnergy = emitOutput(a.data(), kN, ramp, [&got](int i, float v) { got[static_cast<size_t>(i)] = v; });
-  bool same = sameBits(wantEnergy, gotEnergy);
+  referenceEmit(a, ramp, want);
+  emitOutput(a.data(), kN, ramp, [&got](int i, float v) { got[static_cast<size_t>(i)] = v; });
+  bool same = true;
   for (size_t i = 0; i < want.size(); ++i) same = same && sameBits(want[i], got[i]);
   return same;
 }
 
 // The loop skips the ceiling and the clamp for a quiet block on a ramp inside [-1, 1], and must give the
-// same samples and energy as the reference everywhere else.
+// same samples as the reference everywhere else.
 void checkEmitOutput() {
   const float mic = micGain();
   const Block quiet = tone(0, 0.5f);
@@ -432,7 +428,6 @@ void checkScopeRingAdvances() {
   const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false, false);
   Rig rig;
   BlockFlow flow;
-  bool advances = true;
   bool content = true;
   int silent = 0;
   int dry = 0;
@@ -442,14 +437,12 @@ void checkScopeRingAdvances() {
   for (int b = 0; b < 220; ++b) {
     const Block in = b == 170 ? withSample(NAN) : tone(b, 0.5f);
     if (b == 150) flow.markLate();
-    const uint32_t before = flow.scope().blocks();
     const BlockFlow::Start start = flow.begin(false, b >= 5 && !swapped);
     swapped = swapped || start.fade.swap;
     Block a = in;
     Block scratch{};
     const BlockFlow::Report report =
         flow.run(rig.engines, snap, start, a.data(), scratch.data(), false, StillClock(), [](int, float) {});
-    advances = advances && flow.scope().blocks() == before + 1;
     const bool zeros = start.fade.silent || start.dry || report.discarded;
     const Block got = newestBlock(flow.scope());
     content = content && (zeros ? allZero(got) : got == in);
@@ -459,8 +452,7 @@ void checkScopeRingAdvances() {
     fading += (!zeros && start.fade.to < start.fade.from) ? 1 : 0;
   }
   check(silent > 0 && dry == 1 && cut == 1 && fading > 0, "scope ring: the run met a swap's silent blocks, one late block, one NaN cut and a fade-out");
-  check(advances, "scope ring: the ring advances one block per audio block through a swap, a late block and a NaN cut");
-  check(content, "scope ring: chain blocks write the chain output, even while the output fades, and silent, dry and cut blocks write zeros");
+  check(content, "scope ring: the newest block follows every audio block through a swap, a late block and a NaN cut; chain blocks write the chain output, even while the output fades, and silent, dry and cut blocks write zeros");
 }
 
 // POLISH COMP changes the output and leaves the ring as it was, since the scope reads the chain

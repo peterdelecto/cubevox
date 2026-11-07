@@ -109,9 +109,6 @@ class AutotuneVoiceT {
   // hears.
   void glide(int n) { stepCorrection<false>(n); }
 
-  // Drops the grains in flight. The correction keeps its place.
-  void restartVoice() { psola_.reset(); }
-
   // The voice's grain grid as the next render starts from it, and the grid a voice beside it already
   // stands on, which a freshly reset voice takes up.
   GridMarks marks() const { return psola_.marks(); }
@@ -163,7 +160,8 @@ class AutotuneVoiceT {
 
   // The glide's decay per sample as a power of two, and where it counts as done: the offset is under
   // this many semitones (a tenth of a cent).
-  static inline const float kKeyGlideLog2 = log2f(smooth::keep(kKeyGlideSec, 1));
+  static_assert(kKeyGlideSec == 0.050f, "kKeyGlideLog2 is the log2 of the 50 ms keep factor");
+  static constexpr float kKeyGlideLog2 = smooth::kKeep50msLog2;
   static constexpr float kKeyGlideDoneSemis = 0.001f;
 
   // A KEY change found after this many samples without a voiced frame, 16 ms, has no note to protect:

@@ -28,12 +28,36 @@ inline float blockCoef(float sec, int n) { return 1.0f - keep(sec, n); }
 // Per-sample coefficient for time constant sec; 0 or less means instant.
 inline float coef(float sec) { return blockCoef(sec, 1); }
 
+// The 20 ms smoother's coefficient for a step over n samples. It is rebuilt only when n changes.
+class BlockCoef {
+ public:
+  float at(int n) {
+    if (n != n_) {
+      coef_ = blockCoef(kSmoothSec, n);
+      n_ = n;
+    }
+    return coef_;
+  }
+
+ private:
+  float coef_ = 1.0f;
+  int n_ = 0;
+};
+
 // The 20 ms coefficient and its keep factor over one kBlock, as literals so a sample loop reads them as
 // immediates. smooth_test pins them to coef(kSmoothSec) and keep(kSmoothSec, kBlock). The coefficient
 // is 1 - exp(-1/960) rounded in float, which sits 9.6e-6 under the exact value (a 20.0002 ms time
 // constant), and the stages' hashes pin that value.
 constexpr float kSmoothCoef = 0.00104111433f;
 constexpr float kSmoothKeepBlock = 0.935506999f;
+
+// Further libm results kept as literals for the same reason, each pinned by smooth_test. The first is
+// the 20 ms coefficient for one step over kBlock samples. The next two are what a 50 ms one-pole keeps
+// in one sample and the log2 of that. The last is the 5 ms one-pole's per-sample coefficient.
+constexpr float kSmoothBlockCoef = 1.0f - kSmoothKeepBlock;
+constexpr float kKeep50msSample = 0.999583423f;
+constexpr float kKeep50msLog2 = -0.000601118605f;
+constexpr float kSmooth5msCoef = 0.00415802002f;
 
 // One step toward target. It lands exactly on the target once within kSnap or once a step no
 // longer moves the float, so a settled smoother holds its target bit for bit.

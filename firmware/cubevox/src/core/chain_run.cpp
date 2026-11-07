@@ -124,7 +124,7 @@ void runCrowd(ChainEngines& engines, const float* in, float* out, int n, const C
 // placed, the follower's envelope of `in` sets the SHIFT.
 void runFormant(ChainEngines& engines, const float* in, float* out, int n, const ChainParams& p,
                 const PitchPath& path) {
-  const cv::FormantParams& params = engines.follower.follow(in, n, p.pitchFx.formant, p.follower);
+  const cv::FormantParams& params = engines.follower.follow(in, n, p.pitchCards.formant, p.follower);
   const bool reuse = path.autotuneAhead && path.adjacent;
   engines.formant.process(in, out, n, params, reuse ? path.upstream : cv::UpstreamPitch{});
 }
@@ -177,9 +177,9 @@ bool runStage(ChainEngines& engines, Card c, const float* in, float* out, int n,
     case Engine::Autotune:
       if (ctx.feedsCrowd) engines.crowd.write(in, n);
       if (ctx.feedsFormant) engines.formant.feed(in, n);
-      engines.autotune.process(in, out, n, p.pitchFx.autotune, ctx.tracker, ctx.groupGrid);
+      engines.autotune.process(in, out, n, p.pitchCards.autotune, ctx.tracker, ctx.groupGrid);
       break;
-    case Engine::Octave: engines.octave.process(in, out, n, p.pitchFx.octave); break;
+    case Engine::Octave: engines.octave.process(in, out, n, p.pitchCards.octave); break;
     case Engine::Formant: runFormant(engines, in, out, n, p, path); break;
     case Engine::Unison: engines.unison.process(in, out, n, p.unison); break;
     case Engine::Slapback: engines.slapback.process(in, out, n, p.slapback); break;
@@ -231,6 +231,41 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
   }
 }
 
+namespace {
+
+// A slot settled off with nothing live behind it. The engines that keep a ring of their input clear it a
+// slice a block, and the walk hands no pitch on, except that a settled Autotune still stands in the path.
+void restSlot(ChainEngines& engines, Engine e, PitchPath& path) {
+  switch (e) {
+    case Engine::Autotune:
+      engines.autotune.rest();
+      path.autotuneAhead = true;
+      path.adjacent = true;
+      path.upstream = {&engines.autotune.pitch(), 0.0f, 0.0f, nullptr, 0.0f, 0.0f};
+      return;
+    case Engine::Octave: engines.octave.rest(); break;
+    case Engine::Formant: engines.formant.rest(); break;
+    case Engine::Crowd: engines.crowd.rest(); break;
+    case Engine::Growl: engines.growl.rest(); break;  // the card keeps a ring of its own input
+    default: break;
+  }
+  path.adjacent = false;
+}
+
+// The first block of a slot that sat settled off. Autotune, Octave and the Formant engine clear
+// themselves on their first call after a rest.
+void startSlot(ChainEngines& engines, Engine e) {
+  switch (e) {
+    case Engine::Autotune:
+    case Engine::Octave: break;
+    case Engine::Formant: engines.follower.reset(); break;
+    case Engine::Crowd: engines.crowd.switchOn(); break;  // keeps a ring the Autotune slot fed this block
+    default: resetEngine(engines, e); break;
+  }
+}
+
+}  // namespace
+
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
              int n, PitchPath& path) {
   const Card c = snap.layout.card[static_cast<size_t>(s)];
@@ -245,32 +280,10 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
   const bool trackerLive = ctx.tracker.run;
   const SlotFades::Step step = fades.step(s, stageToggleOn(snap, e));
   if (step.from == 0 && step.to == 0 && !detectorLive && !trackerLive) {
-    switch (e) {
-      case Engine::Autotune:
-        engines.autotune.rest();
-        path.autotuneAhead = true;
-        path.adjacent = true;
-        path.upstream = {&engines.autotune.pitch(), 0.0f, 0.0f, nullptr, 0.0f, 0.0f};
-        return false;
-      case Engine::Octave: engines.octave.rest(); break;
-      case Engine::Formant: engines.formant.rest(); break;
-      case Engine::Crowd: engines.crowd.rest(); break;
-      case Engine::Growl: engines.growl.rest(); break;  // the card keeps a ring of its own input
-      default: break;
-    }
-    path.adjacent = false;
+    restSlot(engines, e, path);
     return false;
   }
-  if (step.from == 0 && step.to > 0 && !detectorLive && !trackerLive) {
-    // Autotune, Octave and the Formant engine clear themselves on their first call after a rest.
-    switch (e) {
-      case Engine::Autotune:
-      case Engine::Octave: break;
-      case Engine::Formant: engines.follower.reset(); break;
-      case Engine::Crowd: engines.crowd.switchOn(); break;  // keeps a ring the Autotune slot fed this block
-      default: resetEngine(engines, e); break;
-    }
-  }
+  if (step.from == 0 && step.to > 0 && !detectorLive && !trackerLive) startSlot(engines, e);
   ctx.slotShare = static_cast<float>(step.to) / static_cast<float>(kSlotFadeBlocks);
   ctx.slotGain0 = slotEngineGain(step.from);
   ctx.slotGain1 = slotEngineGain(step.to);

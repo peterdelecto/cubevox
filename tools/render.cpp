@@ -55,7 +55,7 @@ struct RenderParams {
   const char* shiftPath = nullptr;  // where the glided SHIFT goes, -7..0 st onto -1..0, one value a sample
   cv::GateParams inGate;
   cv::GateParams gate;
-  cv::PitchFxParams pitchFx;
+  cv::PitchCardParams pitchCards;
   cv::FormantFollowerParams follower;
   cv::CrowdParams crowd;
   cv::UnisonParams unison;
@@ -344,9 +344,9 @@ bool applyTuning(RenderParams& rp, const char* kv) {
   cv::DistortionTuning& dt = rp.distortion.tuning;
   cv::ChasmTuning& ch = rp.reverb.chasm.tuning;
   cv::SpringTuning& spr = rp.reverb.spring.tuning;
-  cv::OctaveTuning& ot = rp.pitchFx.octave.tuning;
-  cv::AutotuneTuning& at = rp.pitchFx.autotune.tuning;
-  cv::FormantTuning& ft = rp.pitchFx.formant.tuning;
+  cv::OctaveTuning& ot = rp.pitchCards.octave.tuning;
+  cv::AutotuneTuning& at = rp.pitchCards.autotune.tuning;
+  cv::FormantTuning& ft = rp.pitchCards.formant.tuning;
   cv::CrowdTuning& ct = rp.crowd.tuning;
   cv::GrowlTuning& grt = rp.growl.tuning;
   cv::PolishTuning& et = rp.eq.tuning;
@@ -495,9 +495,9 @@ bool applyTuning(RenderParams& rp, const char* kv) {
 bool parseArgs(int argc, char** argv, const char** in, const char** out,
                RenderParams& rp) {
   cv::UnisonParams& p = rp.unison;
-  cv::OctaveParams& op = rp.pitchFx.octave;
-  cv::AutotuneParams& ap = rp.pitchFx.autotune;
-  cv::FormantParams& fp = rp.pitchFx.formant;
+  cv::OctaveParams& op = rp.pitchCards.octave;
+  cv::AutotuneParams& ap = rp.pitchCards.autotune;
+  cv::FormantParams& fp = rp.pitchCards.formant;
   bool haveOctave = false;
   bool haveFormant = false;
   bool haveDepth = false;
@@ -828,14 +828,14 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         need.fine = rp.formantOn;
         need.outOfRange = rp.crowdOn || rp.formantOn;
         if (rp.crowdOn) crowd.write(src, n);
-        autotune.process(src, scratch[next], n, rp.pitchFx.autotune, need);
+        autotune.process(src, scratch[next], n, rp.pitchCards.autotune, need);
         up = {&autotune.pitch(), autotune.correctionSemis(), autotune.outputLatency()};
         crowdPitch = {up.result, up.shiftSemis};
         src = scratch[next];
         next ^= 1;
       }
       if (rp.formantOn) {
-        formant.process(src, scratch[next], n, follower.follow(src, n, rp.pitchFx.formant, rp.follower), up);
+        formant.process(src, scratch[next], n, follower.follow(src, n, rp.pitchCards.formant, rp.follower), up);
         const float sideValue[kSides] = {follower.drive(), shiftSignal(formant.shiftSemis())};
         bool wrote = true;
         for (int s = 0; s < kSides; ++s) wrote = wrote && writeHeld(side[s], sideValue[s], got, sidePath[s]);
@@ -848,7 +848,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         next ^= 1;
       }
       if (rp.octaveOn) {
-        octave.process(src, scratch[next], n, rp.pitchFx.octave);
+        octave.process(src, scratch[next], n, rp.pitchCards.octave);
         if (up.result != nullptr) {
           if (octave.leads()) up.shiftSemis += octave.intervalSemis();
           up.latency += octave.outputLatency();

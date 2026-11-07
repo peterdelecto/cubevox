@@ -116,7 +116,7 @@ void cmpGate(const std::string& p, float pos, const cv::GateParams& f, const cv:
 
 // Neither side sets AutotuneTuning, so both run the struct's own defaults and a tuning field needs no
 // line here. The firmware's Autotune tuning is the engine's struct.
-static_assert(std::is_same<decltype(ChainParams::pitchFx.autotune.tuning), cv::AutotuneTuning>::value,
+static_assert(std::is_same<decltype(ChainParams::pitchCards.autotune.tuning), cv::AutotuneTuning>::value,
               "the firmware's Autotune params carry the engine's AutotuneTuning");
 
 void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, const cv::AutotuneParams& e) {
@@ -126,7 +126,7 @@ void cmpAutotune(const std::string& p, float pos, const cv::AutotuneParams& f, c
 
 // The prototype sets only the glide (through its Slide macro), so the tuning's other fields run the
 // struct's own defaults on both sides. The firmware's Octave tuning is the engine's struct.
-static_assert(std::is_same<decltype(ChainParams::pitchFx.octave.tuning), cv::OctaveTuning>::value,
+static_assert(std::is_same<decltype(ChainParams::pitchCards.octave.tuning), cv::OctaveTuning>::value,
               "the firmware's Octave params carry the engine's OctaveTuning");
 
 void cmpOctave(const std::string& p, float pos, const cv::OctaveParams& f, const cv::OctaveParams& e, bool rest) {
@@ -246,7 +246,7 @@ void cmpReverb(const std::string& p, float pos, const cv::ReverbParams& f, const
 struct EmuState {
   cv::GateParams inputGate;
   cv::GateParams gate;
-  cv::PitchFxParams pitchFx;
+  cv::PitchCardParams pitchCards;
   cv::CrowdParams crowd;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;
@@ -270,14 +270,14 @@ EmuState emuStart() {
   s.inputGate.tuning = cv::inputGateTuning();
   // The rest of the ProtoParams constructor
   s.gate.on = false;
-  s.pitchFx.octave.mix = cv::kOctaveDefaultMix;
-  s.pitchFx.autotune.key = kStartKey;
+  s.pitchCards.octave.mix = cv::kOctaveDefaultMix;
+  s.pitchCards.autotune.key = kStartKey;
   s.reverb.engine = cv::kReverbSpring;
   s.reverb.mix = 1.0f;
   s.reverb.time = 1.0f;
   // applyMacros at the default positions
   const auto& m = mc::kDefaultPos;
-  mc::octaveSlide(s.pitchFx.octave.tuning, m[mc::OctaveSlide]);
+  mc::octaveSlide(s.pitchCards.octave.tuning, m[mc::OctaveSlide]);
   mc::unison(s.unison.tuning, m[mc::UnisonMotion]);
   mc::distBody(s.distortion.tuning, m[mc::DistBody]);
   mc::distBite(s.distortion.tuning, m[mc::DistBite]);
@@ -305,10 +305,10 @@ ChainParams fwAtEmuStart(const EmuState& em) {
   applyKnob(Card::InputGate, 1, posLog(kEmuInDecayLoMs, kEmuInDecayHiMs, em.inputGate.tuning.releaseMs), fw);
   applyKnob(Card::Gate, 0, posLinear(kEmuThresholdLoDb, kEmuThresholdHiDb, em.gate.thresholdDb), fw);
   applyKnob(Card::Gate, 1, posLog(kEmuDecayLoMs, kEmuDecayHiMs, em.gate.tuning.releaseMs), fw);
-  applyKnob(Card::Autotune, 0, static_cast<float>(em.pitchFx.autotune.key), fw);
-  applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(em.pitchFx.autotune.responseMs), fw);
-  applyKnob(Card::Octave, 0, static_cast<float>(em.pitchFx.octave.semitones - kEmuSemiLo), fw);
-  applyKnob(Card::Octave, 1, em.pitchFx.octave.mix, fw);
+  applyKnob(Card::Autotune, 0, static_cast<float>(em.pitchCards.autotune.key), fw);
+  applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(em.pitchCards.autotune.responseMs), fw);
+  applyKnob(Card::Octave, 0, static_cast<float>(em.pitchCards.octave.semitones - kEmuSemiLo), fw);
+  applyKnob(Card::Octave, 1, em.pitchCards.octave.mix, fw);
   applyKnob(Card::Crowd, 0, em.crowd.width, fw);
   applyKnob(Card::Crowd, 1, static_cast<float>(em.crowd.voicesStep), fw);
   applyKnob(Card::Unison, 0, mc::kDefaultPos[mc::UnisonMotion] / 100.0f, fw);
@@ -355,16 +355,16 @@ void sweepAutotune() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Autotune, 0, static_cast<float>(k), fw);
-    em.pitchFx.autotune.key = k;  // drawPedals KEY encoder
-    cmpAutotune("sweep.autotune.key", static_cast<float>(k), fw.pitchFx.autotune, em.pitchFx.autotune);
+    em.pitchCards.autotune.key = k;  // drawPedals KEY encoder
+    cmpAutotune("sweep.autotune.key", static_cast<float>(k), fw.pitchCards.autotune, em.pitchCards.autotune);
   }
   for (int i = 0; i <= kSweepSteps; ++i) {
     const float p = sweepPos(i);
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Autotune, 1, p, fw);
-    em.pitchFx.autotune.responseMs = cv::AutotuneVoice::responseMsAt(p);  // drawPedals RESPONSE
-    cmpAutotune("sweep.autotune.response", p, fw.pitchFx.autotune, em.pitchFx.autotune);
+    em.pitchCards.autotune.responseMs = cv::AutotuneVoice::responseMsAt(p);  // drawPedals RESPONSE
+    cmpAutotune("sweep.autotune.response", p, fw.pitchCards.autotune, em.pitchCards.autotune);
   }
 }
 
@@ -373,16 +373,16 @@ void sweepOctave() {
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Octave, 0, static_cast<float>(pos), fw);
-    em.pitchFx.octave.semitones = kEmuSemiLo + pos;  // drawPedals SEMITONES
-    cmpOctave("sweep.octave.semitones", static_cast<float>(pos), fw.pitchFx.octave, em.pitchFx.octave, false);
+    em.pitchCards.octave.semitones = kEmuSemiLo + pos;  // drawPedals SEMITONES
+    cmpOctave("sweep.octave.semitones", static_cast<float>(pos), fw.pitchCards.octave, em.pitchCards.octave, false);
   }
   for (int i = 0; i <= kSweepSteps; ++i) {
     const float p = sweepPos(i);
     EmuState em = emuStart();
     ChainParams fw = fwAtEmuStart(em);
     applyKnob(Card::Octave, 1, p, fw);
-    em.pitchFx.octave.mix = p;  // drawPedals MIX, pedalPercent
-    cmpOctave("sweep.octave.mix", p, fw.pitchFx.octave, em.pitchFx.octave, false);
+    em.pitchCards.octave.mix = p;  // drawPedals MIX, pedalPercent
+    cmpOctave("sweep.octave.mix", p, fw.pitchCards.octave, em.pitchCards.octave, false);
   }
 }
 
@@ -477,8 +477,8 @@ void defaults() {
   const ChainParams fw = fwAtEmuStart(em);
   cmpGate("default.inputGate", 0.0f, fw.inputGate, em.inputGate, true);
   cmpGate("default.gate", 0.0f, fw.gate, em.gate, true);
-  cmpAutotune("default.autotune", 0.0f, fw.pitchFx.autotune, em.pitchFx.autotune);
-  cmpOctave("default.octave", 0.0f, fw.pitchFx.octave, em.pitchFx.octave, true);
+  cmpAutotune("default.autotune", 0.0f, fw.pitchCards.autotune, em.pitchCards.autotune);
+  cmpOctave("default.octave", 0.0f, fw.pitchCards.octave, em.pitchCards.octave, true);
   cmpCrowd("default.crowd", 0.0f, fw.crowd, em.crowd);
   cmpUnison("default.unison", 0.0f, fw.unison, em.unison, true);
   cmpSlapback("default.slapback", 0.0f, fw.slapback, em.slapback, true);

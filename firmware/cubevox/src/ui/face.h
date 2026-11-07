@@ -55,11 +55,16 @@ class Face {
 
   level::Meter inputMeter_;
   int meterSegments_ = 0;
-  ScopeFrame scope_;                                  // the last frame read, kept when a read meets the writer; its scale is the one the next frame falls from
-  std::array<float, kScopeReadSamples> samples_{};    // the read buffer, 8 KB, so not on the stack
-  Canvas target_;                 // the screen the gui picked, before it reaches the panel
-  bool targetHoldsMenu_ = false;   // whether the menu's last frame is still in target_
+
+  // The last frame read, kept when a read meets the writer. Its scale is the one the next frame falls from.
+  ScopeFrame scope_;
+
+  // The read buffer, 8 KB, so not on the stack.
+  std::array<float, kScopeReadSamples> samples_{};
+
+  Canvas target_;                // the screen the gui picked, before it reaches the panel
+  bool targetHoldsMenu_ = false; // whether the menu's last frame is still in target_
   Every tick_{kUiTickMs};
   bool ticked_ = false;
-  uint32_t lastTickMs_ = 0;        // the level meters fall by real time, so a late tick falls further
+  uint32_t lastTickMs_ = 0;      // the level meters fall by real time, so a late tick falls further
 };

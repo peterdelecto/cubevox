@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "core/crc32.h"
 #include "core/le_bytes.h"
 #include "core/registry.h"
 

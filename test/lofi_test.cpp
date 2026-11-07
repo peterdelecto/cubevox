@@ -18,6 +18,7 @@
 #include "engine/tanh_cubic.h"
 
 #include "alloc_guard.h"
+#include "clip_util.h"
 #include "signal_util.h"
 
 namespace {
@@ -25,6 +26,7 @@ namespace {
 using testutil::Signal;
 using testutil::kPi;
 using testutil::noise;
+using testutil::peakCurvature;
 using testutil::rmsOf;
 using testutil::sine;
 
@@ -345,14 +347,6 @@ bool testEnableEdge() {
                 static_cast<double>(quick), static_cast<double>(settled));
 }
 
-// Largest |second difference| of x over [from, to).
-double peakCurvature(const Signal& x, size_t from, size_t to) {
-  double worst = 0.0;
-  for (size_t i = std::max<size_t>(from, 2); i < to; ++i)
-    worst = std::max(worst, std::fabs(static_cast<double>(x[i]) - 2.0 * x[i - 1] + x[i - 2]));
-  return worst;
-}
-
 // TONE steps with the crush on. The band and the hold rate ramp across the block, so the output bends no
 // harder just after a step than it does at either setting in steady state (knob_step_test's rule).
 bool testToneStepWithCrush() {
@@ -549,7 +543,7 @@ bool testClipLevel(const char* name) {
 
 bool testLevel() {
   bool ok = testProgramLevel();
-  for (const char* name : {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"}) ok &= testClipLevel(name);
+  for (const char* name : clips::kNames) ok &= testClipLevel(name);
   return ok;
 }
 

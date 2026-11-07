@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "core/level.h"
+
 namespace {
 
 constexpr float kGuardMeanSquare = 1.0e6f;  // +60 dBFS RMS
@@ -9,20 +11,7 @@ constexpr float kGuardMeanSquare = 1.0e6f;  // +60 dBFS RMS
 }  // namespace
 
 bool guardBlock(float* x, int n) {
-  // Four sums run side by side, because one serial sum waits on each add.
-  float s0 = 0.0f;
-  float s1 = 0.0f;
-  float s2 = 0.0f;
-  float s3 = 0.0f;
-  int i = 0;
-  for (; i + 4 <= n; i += 4) {
-    s0 += x[i] * x[i];
-    s1 += x[i + 1] * x[i + 1];
-    s2 += x[i + 2] * x[i + 2];
-    s3 += x[i + 3] * x[i + 3];
-  }
-  for (; i < n; ++i) s0 += x[i] * x[i];
-  const float sum = (s0 + s1) + (s2 + s3);
+  const float sum = level::sumSquares(x, n);
 
   // Squares are never negative, so the sum's bits order like its value. A NaN of either sign and an
   // infinity both sort above the bound.

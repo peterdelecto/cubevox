@@ -85,8 +85,6 @@ constexpr DissolveMasks kDissolveMasks = makeDissolveMasks();
 
 }  // namespace
 
-bool bayerLit(int x, int y, int level) { return kBayer[y & 7][x & 7] < level; }
-
 void Canvas::clear() {
   for (auto& p : pages_) p.fill(0);
   dirty_ = kAllPages;

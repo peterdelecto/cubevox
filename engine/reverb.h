@@ -6,6 +6,7 @@
 #include "engine/chasm.h"
 #include "engine/common.h"
 #include "engine/dsp.h"
+#include "engine/fastmath.h"
 #include "engine/reverb_parts.h"
 #include "engine/smooth.h"
 #include "engine/spring.h"
@@ -86,8 +87,9 @@ class Reverb {
   };
 
   static Gains gainsAt(float wet) {
-    if (wet <= 0.0f) return {1.0f, 0.0f};
-    return {cosf(wet * kHalfPi), sinf(wet * kHalfPi)};
+    Gains g;
+    quarterTurn(wet, g.wet, g.dry);
+    return g;
   }
 
   void processBlock(const float* in, float* out, int n, const ReverbParams& p) {

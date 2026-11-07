@@ -715,10 +715,6 @@ void checkReadoutSweep() {
         continue;
       }
       const std::string who = std::string("readout sweep: ") + desc.name + " " + k->name;
-      if (k->decimals != 0) {
-        check(false, (who + " declares decimals, which the sweep does not model yet").c_str());
-        continue;
-      }
       const std::vector<int> values = sweepValues(*k);
       const int slot = (index - 1) % kSlotCount;
       int done = 0;
@@ -1080,17 +1076,6 @@ void checkReadoutEdgeCases() {
   const float nan = std::numeric_limits<float>::quiet_NaN();
   for (float shown : {nan, inf, -inf, 1.0e9f, -1.0e9f}) stable = stable && sameRows(readoutOf(2, 0, shown), title, 0, kNameTop);
   check(stable, "readout: a wild value still draws the title bar");
-
-  // A knob with decimals rolls through the point. No card has one yet.
-  const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
-  ReadoutView fine;
-  fine.slot = 3;
-  fine.card = "Unison";
-  fine.knob = &rate;
-  fine.shown = 14.5f;
-  Canvas d;
-  renderReadout(d, fine);
-  check(edgesDark(d, kBarRows) && !rowsBlank(d, 34, 58), "readout: a decimal value draws with its point");
 
   // Rolling from -1 to 0, the sign cell rolls through a blank.
   const Canvas across = readoutOf(2, 0, -0.5f);
@@ -1666,7 +1651,7 @@ void checkReadoutTitleBar() {
   bool allFit = true;
   for (int index = 1; index < kCardCount; ++index) {
     for (int slot = 0; slot < kSlotCount; ++slot) {
-      const std::string title = std::to_string(slot + 1) + " " + capitals(oledName(card(index)));
+      const std::string title = std::to_string(slot + 1) + " " + capitals(cardDesc(card(index)).name);
       allFit = allFit && Canvas::textWidth(font7x12(), title.c_str()) <= kCanvasWidth - 2 * kScreenPad;
     }
   }

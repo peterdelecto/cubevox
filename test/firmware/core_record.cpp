@@ -10,6 +10,7 @@
 #include <cstring>
 #include <vector>
 
+#include "core/crc32.h"
 #include "core/layout.h"
 #include "core/record.h"
 #include "core/record_store.h"

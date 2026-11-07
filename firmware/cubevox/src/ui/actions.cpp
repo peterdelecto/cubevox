@@ -13,40 +13,14 @@ VoxEq nextVoxEq(VoxEq v) {
   }
 }
 
-// The card after `c` in the slot 8 cycle, Spring to Chasm and back to Spring.
-Card nextSlot8Card(Card c) { return c == Card::ReverbSpring ? Card::ReverbChasm : Card::ReverbSpring; }
-
-// The card after `c` in the slot 4 cycle, Unison to Mob and back to Unison.
-Card nextSlot4Card(Card c) { return c == Card::Unison ? Card::Crowd : Card::Unison; }
-
-// The card after `c` in the slot 3 cycle, Octave to Formant to the Formant follower and back to Octave.
-Card nextSlot3Card(Card c) {
-  switch (c) {
-    case Card::Octave: return Card::Formant;
-    case Card::Formant: return Card::FormantFollower;
-    default: return Card::Octave;
-  }
-}
-
-// The card after `c` in the slot 6 cycle, Distortion to Growl and back to Distortion.
-Card nextSlot6Card(Card c) { return c == Card::Distortion ? Card::Growl : Card::Distortion; }
-
-// The card after `c` in the slot 7 cycle, Gate to Lo-fi to Chatter and back to Gate.
-Card nextSlot7Card(Card c) {
-  switch (c) {
-    case Card::Gate: return Card::Lofi;
-    case Card::Lofi: return Card::Bloom;
-    default: return Card::Gate;
-  }
-}
-
-// Moves the card in `slot` to the next card in its cycle that layoutValid accepts, so a card over the
-// CPU lines or already placed in another slot is passed over. When none of the others fits the layout
-// stays as it is.
-ApplyResult cycleCard(Layout& layout, int slot, Card (*next)(Card)) {
+// Moves the card of swappable slot `which` to the next card in its cycle that layoutValid accepts, so
+// a card over the CPU lines or already placed in another slot is passed over. When none of the others
+// fits the layout stays as it is.
+ApplyResult cycleCard(Layout& layout, SwapSlot which) {
+  const int slot = swapSlotOf(layout, which);
   if (slot < 0) return ApplyResult::None;
   Layout trial = layout;
-  for (Card c = next(layout.card[slot]); c != layout.card[slot]; c = next(c)) {
+  for (Card c = nextSwapCard(which, layout.card[slot]); c != layout.card[slot]; c = nextSwapCard(which, c)) {
     trial.card[slot] = c;
     if (layoutValid(trial).ok()) {
       layout = trial;
@@ -81,11 +55,11 @@ ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layo
     case UiAction::ToggleDebug:
       settings.debug = !settings.debug;
       return ApplyResult::SettingsChanged;
-    case UiAction::SwapReverb: return cycleCard(layout, reverbSlot(layout), nextSlot8Card);
-    case UiAction::SwapOctaveFormant: return cycleCard(layout, octaveFormantSlot(layout), nextSlot3Card);
-    case UiAction::SwapUnisonCrowd: return cycleCard(layout, unisonCrowdSlot(layout), nextSlot4Card);
-    case UiAction::SwapDistortionGrowl: return cycleCard(layout, distortionGrowlSlot(layout), nextSlot6Card);
-    case UiAction::CycleSlot7Card: return cycleCard(layout, slot7CardSlot(layout), nextSlot7Card);
+    case UiAction::SwapReverb: return cycleCard(layout, SwapSlot::Reverb);
+    case UiAction::SwapOctaveFormant: return cycleCard(layout, SwapSlot::OctaveFormant);
+    case UiAction::SwapUnisonCrowd: return cycleCard(layout, SwapSlot::UnisonMob);
+    case UiAction::SwapDistortionGrowl: return cycleCard(layout, SwapSlot::DistortionDeepthroat);
+    case UiAction::CycleSlot7Card: return cycleCard(layout, SwapSlot::Slot7);
     case UiAction::EnterDfu: return ApplyResult::EnterDfu;
     case UiAction::None: break;
   }

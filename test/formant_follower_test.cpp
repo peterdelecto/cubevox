@@ -28,6 +28,7 @@
 #include "engine/formant_follower.h"
 #include "engine/formant_fx.h"
 
+#include "clip_util.h"
 #include "signal_util.h"
 
 namespace {
@@ -47,11 +48,7 @@ bool report(const char* name, bool ok, const char* fmt, double a = 0.0, double b
 
 double dbOf(double ratio) { return 20.0 * std::log10(ratio); }
 
-double rmsRange(const Signal& x, size_t from, size_t to) {
-  double s = 0.0;
-  for (size_t i = from; i < to; ++i) s += static_cast<double>(x[i]) * x[i];
-  return std::sqrt(s / static_cast<double>(to - from));
-}
+double rmsRange(const Signal& x, size_t from, size_t to) { return testutil::rmsOf(x, from, to); }
 
 // A 150 Hz sawtooth, harmonics at 1/k up to 8 kHz, at peak `peak`.
 Signal sawtooth(int n, float peak) {
@@ -120,7 +117,7 @@ struct Stage {
 
   // One call of n samples.
   void run(const float* in, float* out, int n, const ChainParams& p) {
-    const cv::FormantParams& fp = follower.follow(in, n, p.pitchFx.formant, p.follower);
+    const cv::FormantParams& fp = follower.follow(in, n, p.pitchCards.formant, p.follower);
     handed = fp.shiftSt;
     formant.process(in, out, n, fp);
   }
@@ -577,12 +574,12 @@ struct Clip {
 };
 constexpr size_t kPad = kRate * 2 / 5;
 
-std::vector<Clip> clips(bool& missing) {
+std::vector<Clip> loadClips(bool& missing) {
   std::vector<Clip> out;
   missing = false;
   std::error_code ec;
   const bool folder = std::filesystem::is_directory(CUBEVOX_SAMPLES_DIR, ec);
-  for (const char* name : {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"}) {
+  for (const char* name : ::clips::kNames) {
     const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
     if (clip.empty()) {
       missing = missing || folder;
@@ -682,7 +679,7 @@ int main() {
   ok &= testDoubleSpeedVoice();
   ok &= testDoubleSpeedTone();
   bool missing = false;
-  const std::vector<Clip> all = clips(missing);
+  const std::vector<Clip> all = loadClips(missing);
   if (missing) {
     std::printf("FAIL clips: samples/ is here and a clip in it is missing or empty\n");
     ok = false;

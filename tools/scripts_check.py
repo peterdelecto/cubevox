@@ -381,7 +381,7 @@ def stress_failures():
     failed += stress_judge_failures(stress, rows)
     failed += stress_vox_eq_failures(stress)
     code, out = run([sys.executable, "-I", os.path.join(FW, "stress.py"), "--dry-run", "--layouts", "default"])
-    if code != 0 or "bench op polish_eq" not in out or "Gate Threshold" not in out:
+    if code != 0 or "bench op vox_eq" not in out or "Gate Threshold" not in out:
         failed.append(f"stress.py --dry-run: exit {code}, '{out.strip()[-120:]}'")
     if 'VOX EQ at ON+CUTS (vox_eq "cuts")' not in out:
         failed.append("stress.py --dry-run does not plan the VOX EQ ON+CUTS setting")

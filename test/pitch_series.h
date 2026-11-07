@@ -29,7 +29,7 @@ class PitchSeries {
 
   // n samples of any length, in chunks of at most kBlock. `readers` (or the member readersOn) says a Crowd
   // or Growl card is on, so Autotune's tracker runs for it. in and out may be the same buffer.
-  void process(const float* in, float* out, int n, const cv::PitchFxParams& p, bool readers = false) {
+  void process(const float* in, float* out, int n, const cv::PitchCardParams& p, bool readers = false) {
     for (int c = 0; c < n; c += cv::kBlock)
       chunk(in + c, out + c, n - c < cv::kBlock ? n - c : cv::kBlock, p, readers || readersOn);
   }
@@ -55,7 +55,7 @@ class PitchSeries {
   cv::OctaveFx octave;
 
  private:
-  void chunk(const float* in, float* out, int n, const cv::PitchFxParams& p, bool readers) {
+  void chunk(const float* in, float* out, int n, const cv::PitchCardParams& p, bool readers) {
     const bool formantLive = p.formant.on || formant.fade() > 0.0f;
     cv::UpstreamPitch up;
     const float* src = in;

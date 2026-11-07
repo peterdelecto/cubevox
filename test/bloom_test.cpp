@@ -24,6 +24,7 @@
 #include "engine/gate.h"
 
 #include "alloc_guard.h"
+#include "clip_util.h"
 #include "signal_util.h"
 
 namespace {
@@ -128,22 +129,14 @@ std::vector<char> keyOver(int ms, const std::vector<std::pair<int, int>>& runs) 
 
 std::vector<char> keyOver(int ms, int fromMs, int toMs) { return keyOver(ms, {{fromMs, toMs}}); }
 
-using testutil::readWav;
-
 // Adam's three clips, each with 0.4 s of silence ahead and `roomSmp` samples of it after. Empty when
 // samples/ is missing.
 std::vector<Signal> loadClips(size_t roomSmp) {
-  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
-  std::vector<Signal> clips;
-  for (const char* name : names) {
-    const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
-    if (clip.empty()) return {};
-    Signal x(static_cast<size_t>(cv::kSampleRate) * 2 / 5, 0.0f);
-    x.insert(x.end(), clip.begin(), clip.end());
-    x.resize(x.size() + roomSmp, 0.0f);
-    clips.push_back(std::move(x));
-  }
-  return clips;
+  bool whole = true;
+  std::vector<Signal> loaded = clips::load(CUBEVOX_SAMPLES_DIR, whole);
+  if (!whole) return {};
+  for (Signal& x : loaded) x.resize(x.size() + roomSmp, 0.0f);
+  return loaded;
 }
 
 // xorshift64, for the scripted histories.

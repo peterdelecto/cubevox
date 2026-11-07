@@ -19,8 +19,8 @@
 
 struct ChainParams {
   cv::GateParams inputGate;
-  cv::PitchFxParams pitchFx;  // Autotune, Octave and the Formant card (pitchFx.formant)
-  cv::FormantFollowerParams follower;  // placing Apraxia hands pitchFx.formant's SHIFT to its envelope
+  cv::PitchCardParams pitchCards;  // Autotune, Octave and the Formant card (pitchCards.formant)
+  cv::FormantFollowerParams follower;  // placing Apraxia hands pitchCards.formant's SHIFT to its envelope
   cv::CrowdParams crowd;
   cv::UnisonParams unison;
   cv::SlapbackParams slapback;

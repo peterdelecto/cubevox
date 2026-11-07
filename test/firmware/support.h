@@ -15,6 +15,10 @@ void check(bool ok, const char* what);
 // Casts a table index to a Card without a range check.
 Card card(int i);
 
+// The standard Bayer 8 x 8 ordered dither. A pixel lights at `level` (0..64) when its threshold is
+// below the level, so level 32 lights every other pixel.
+bool bayerLit(int x, int y, int level);
+
 // Clears the dirty flag of every canvas page.
 void clearAllDirty(Canvas& canvas);
 

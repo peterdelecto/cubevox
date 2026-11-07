@@ -508,7 +508,7 @@ bool testInputGateDecayPot() {
 bool testInputGateThresholdPot() {
   const KnobDesc& thr = *knobDesc(Card::InputGate, 0);
   const bool shown = knobShown(thr, 0.0f) == -80 && knobShown(thr, 1.0f) == -30 && knobShown(thr, 0.5f) == -55 &&
-                     thr.decimals == 0 && thr.curve == Curve::Linear;
+                     thr.curve == Curve::Linear;
   ChainParams chain;
   applyKnob(Card::InputGate, 0, 0.0f, chain);
   const double atMin = static_cast<double>(chain.inputGate.thresholdDb);

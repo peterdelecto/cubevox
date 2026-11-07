@@ -440,7 +440,6 @@ void checkRingOrder() {
     ordered = ordered && out[static_cast<size_t>(i)] == static_cast<float>(next - kScopeReadSamples + i);
   }
   check(ordered, "scope ring: after wrap-around the read is the newest 1984 samples in order");
-  check(ring->blocks() == 105, "scope ring: the block count is the blocks written");
 }
 
 // One thread writes blocks whose samples all hold the block number (from 1), the other reads as fast

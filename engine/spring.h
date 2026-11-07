@@ -48,7 +48,7 @@ constexpr int kDiff3A = 82, kDiff3B = 117;  // 3.4 / 4.9 ms
 constexpr int kStretch = 3;                 // K, loop samples; the sweep sits below kLoopRate / 2K = 4 kHz
 constexpr int kMaxSections = 32;
 constexpr float kMaxWobble = 32.0f;         // samples at the engine rate
-constexpr float kMaxWobbleHz = 10.0f;
+using reverb_parts::kMaxWobbleHz;
 constexpr int kMinDly = 8;                  // shortest read, loop samples
 constexpr float kFeedbackMin = 0.10f;       // feedback floor; the input scale divides by it
 using reverb_parts::kFeedbackMax;

@@ -81,6 +81,16 @@ bool testConstants() {
   // 1 - exp(-1/960) rounds near 1, so a libm one ulp off moves the coefficient by 6e-5 relative.
   bool ok = report("smooth constants", aRel < 1e-4 && kRel < 2e-7,
                    "kSmoothCoef off libm by %.2g (< 1e-4), kSmoothKeepBlock by %.2g (< 2e-7)", aRel, kRel);
+  // The 1 - exp(-x) coefficients carry the same ulp amplification; the keep factors and the log2 sit
+  // close to 1 and 0 and carry a smaller one.
+  const double bRel = std::fabs(static_cast<double>(kSmoothBlockCoef) / blockCoef(kSmoothSec, cv::kBlock) - 1.0);
+  const double fRel = std::fabs(static_cast<double>(kSmooth5msCoef) / coef(0.005f) - 1.0);
+  const double sRel = std::fabs(static_cast<double>(kKeep50msSample) / keep(0.050f, 1) - 1.0);
+  const double lRel = std::fabs(static_cast<double>(kKeep50msLog2) / std::log2(keep(0.050f, 1)) - 1.0);
+  ok &= report("smooth literals", bRel < 1e-4 && fRel < 1e-4,
+               "kSmoothBlockCoef off libm by %.2g, kSmooth5msCoef by %.2g (< 1e-4)", bRel, fRel);
+  ok &= report("smooth literals", sRel < 2e-7 && lRel < 1e-3,
+               "kKeep50msSample off libm by %.2g (< 2e-7), kKeep50msLog2 by %.2g (< 1e-3)", sRel, lRel);
   ok &= report("smooth forms", forms && instant, "coef, blockCoef and keep agree and 0 s is instant=%.0f",
                (forms && instant) ? 1.0 : 0.0);
   return ok;

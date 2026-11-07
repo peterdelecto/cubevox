@@ -19,7 +19,7 @@ float pinnedPosition(Card c, int knob, int percent) {
   return static_cast<float>(percent) / 100.0f;
 }
 
-float knobPosition(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, int slot, int knob) {
+float slotKnobPosition(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, int slot, int knob) {
   const Card c = layout.card[slot];
   const int pin = bench.knobPin[static_cast<size_t>(slot)][static_cast<size_t>(knob)];
   if (pin != kNoPin) return pinnedPosition(c, knob, pin);
@@ -31,7 +31,7 @@ void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverr
   const Card c = layout.card[slot];
   ChainParams& out = snap.params;
   applyPlacement(c, out);
-  for (int k = 0; k < kKnobsPerCard; ++k) applyKnob(c, k, knobPosition(layout, panel, bench, slot, k), out);
+  for (int k = 0; k < kKnobsPerCard; ++k) applyKnob(c, k, slotKnobPosition(layout, panel, bench, slot, k), out);
   const bool forcedOn = (bench.slotsForcedOn >> slot) & 1u;
   const bool forcedOff = (bench.slotsOff >> slot) & 1u;
   const bool on = (panel.toggle[slot] || forcedOn) && !forcedOff;

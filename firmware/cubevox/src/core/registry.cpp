@@ -49,7 +49,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
     {Card::InputGate, "input_gate", "Input gate", Engine::InputGate, 2, {kInputThreshold, kInputDecay}, Group::None,
      costs::kInputGate},
     {Card::Autotune, "autotune", "Autotune", Engine::Autotune, 2,
-     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, 0, cv::kKeyName.data()},
+     {{"Key", KnobKind::Stepped, kKeyPositions, 0.0f, kKeyPositions - 1, "", Curve::Linear, cv::kKeyName.data()},
       kResponse},
      Group::Pitch, costs::kAutotune},
     {Card::Octave, "octave", "Octave", Engine::Octave, 2,
@@ -68,7 +68,7 @@ constexpr std::array<CardDesc, kCardCount> kCards = {{
      Group::Reverb, costs::kReverbChasm},
     {Card::Crowd, "crowd", "Mob", Engine::Crowd, 2,
      {kPercent("DIVERGE"),
-      {"VOICES", KnobKind::Stepped, cv::kVoicesSteps, 0.0f, cv::kVoicesSteps - 1, "", Curve::Linear, 0,
+      {"VOICES", KnobKind::Stepped, cv::kVoicesSteps, 0.0f, cv::kVoicesSteps - 1, "", Curve::Linear,
        cv::kVoicesName.data()}},
      Group::Pitch, costs::kCrowd},
     {Card::Formant, "formant", "Formant", Engine::Formant, 2, {kFormantShift, kPercent("MIX")}, Group::Pitch,
@@ -227,11 +227,6 @@ const KnobDesc* knobDesc(Card c, int knob) {
 
 Engine engineOf(Card c) { return cardDesc(c).engine; }
 
-const char* oledName(Card c) {
-  const CardDesc& d = cardDesc(c);
-  return d.oledName != nullptr ? d.oledName : d.name;
-}
-
 bool cardFromId(const char* id, Card& out) {
   if (id == nullptr) return false;
   for (const CardDesc& d : kCards) {
@@ -265,8 +260,8 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
   switch (c) {
     case Card::InputGate: applyGateKnob(knob, v, out.inputGate, kInputThreshold, kInputDecay); break;
     case Card::Gate: applyGateKnob(knob, v, out.gate, kThreshold, kDecay); break;
-    case Card::Autotune: applyAutotuneKnob(knob, v, out.pitchFx.autotune); break;
-    case Card::Octave: applyOctaveKnob(knob, v, out.pitchFx.octave); break;
+    case Card::Autotune: applyAutotuneKnob(knob, v, out.pitchCards.autotune); break;
+    case Card::Octave: applyOctaveKnob(knob, v, out.pitchCards.octave); break;
     case Card::Unison: applyUnisonKnob(knob, v, out.unison); break;
     case Card::Slapback: applySlapbackKnob(knob, v, out.slapback); break;
     case Card::Distortion: applyDistortionKnob(knob, v, out.distortion); break;
@@ -275,7 +270,7 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
       applyReverbKnob(knob, v, out.reverb);
       break;
     case Card::Crowd: applyCrowdKnob(knob, v, out.crowd); break;
-    case Card::Formant: applyFormantKnob(knob, v, out.pitchFx.formant); break;
+    case Card::Formant: applyFormantKnob(knob, v, out.pitchCards.formant); break;
     case Card::Lofi: applyLofiKnob(knob, v, out.lofi); break;
     case Card::Bloom: applyBloomKnob(knob, v, out.bloom); break;
     case Card::FormantFollower: applyFollowerKnob(knob, v, out); break;
@@ -288,8 +283,8 @@ void applyKnob(Card c, int knob, float v, ChainParams& out) {
 void applyToggle(Card c, bool on, ChainParams& out) {
   switch (c) {
     case Card::InputGate: out.inputGate.on = on; break;
-    case Card::Autotune: out.pitchFx.autotune.on = on; break;
-    case Card::Octave: out.pitchFx.octave.on = on; break;
+    case Card::Autotune: out.pitchCards.autotune.on = on; break;
+    case Card::Octave: out.pitchCards.octave.on = on; break;
     case Card::Unison: out.unison.on = on; break;
     case Card::Slapback: out.slapback.on = on; break;
     case Card::Distortion: out.distortion.on = on; break;
@@ -297,10 +292,10 @@ void applyToggle(Card c, bool on, ChainParams& out) {
     case Card::ReverbSpring:
     case Card::ReverbChasm: out.reverb.on = on; break;
     case Card::Crowd: out.crowd.on = on; break;
-    case Card::Formant: out.pitchFx.formant.on = on; break;
+    case Card::Formant: out.pitchCards.formant.on = on; break;
     case Card::Lofi: out.lofi.on = on; break;
     case Card::Bloom: out.bloom.on = on; break;
-    case Card::FormantFollower: out.pitchFx.formant.on = on; break;
+    case Card::FormantFollower: out.pitchCards.formant.on = on; break;
     case Card::Growl: out.growl.on = on; break;
     case Card::Empty:
     case Card::Count: break;
@@ -318,27 +313,13 @@ void applyPlacement(Card c, ChainParams& out) {
 
 namespace {
 
-// 10 to the power n, for the few decimals a knob declares.
-unsigned tenPow(unsigned n) {
-  unsigned p = 1;
-  for (; n > 0; --n) p *= 10;
-  return p;
-}
-
 unsigned magnitudeOf(int shown) {
   return shown < 0 ? 0u - static_cast<unsigned>(shown) : static_cast<unsigned>(shown);
 }
 
-// Writes a magnitude as text, its digits with the point and decimal digits when the knob declares
-// decimals, and returns the length written.
-int magnitudeText(const KnobDesc& k, unsigned magnitude, char* out, size_t size) {
-  const unsigned scale = tenPow(k.decimals);
-  int length;
-  if (k.decimals == 0) {
-    length = snprintf(out, size, "%u", magnitude);
-  } else {
-    length = snprintf(out, size, "%u.%0*u", magnitude / scale, static_cast<int>(k.decimals), magnitude % scale);
-  }
+// Writes a magnitude as decimal digits and returns the length written.
+int magnitudeText(unsigned magnitude, char* out, size_t size) {
+  const int length = snprintf(out, size, "%u", magnitude);
   return length < static_cast<int>(size) ? length : static_cast<int>(size) - 1;
 }
 
@@ -349,7 +330,7 @@ int knobShown(const KnobDesc& k, float v) {
   if (stepped && k.labels) return stepIndex(k, v);
   const float position = v > 0.0f ? (v < 1.0f ? v : 1.0f) : 0.0f;  // also catches NaN
   const float value = stepped ? k.min + static_cast<float>(stepIndex(k, v)) : knobValue(k, position);
-  return static_cast<int>(lroundf(value * static_cast<float>(tenPow(k.decimals))));
+  return static_cast<int>(lroundf(value));
 }
 
 const char* knobLabel(const KnobDesc& k, int shown) {
@@ -360,10 +341,9 @@ const char* knobLabel(const KnobDesc& k, int shown) {
 
 int knobCells(const KnobDesc& k) {
   if (k.labels) return 0;
-  const float scale = static_cast<float>(tenPow(k.decimals));
   char text[16];
-  const int low = magnitudeText(k, magnitudeOf(static_cast<int>(lroundf(k.min * scale))), text, sizeof(text));
-  const int high = magnitudeText(k, magnitudeOf(static_cast<int>(lroundf(k.max * scale))), text, sizeof(text));
+  const int low = magnitudeText(magnitudeOf(static_cast<int>(lroundf(k.min))), text, sizeof(text));
+  const int high = magnitudeText(magnitudeOf(static_cast<int>(lroundf(k.max))), text, sizeof(text));
   const int cells = (k.min < 0.0f ? 1 : 0) + (low > high ? low : high);
   return cells < kMaxKnobCells ? cells : kMaxKnobCells;
 }
@@ -376,7 +356,7 @@ void formatCells(const KnobDesc& k, int shown, char* buf, size_t size) {
 
   const bool signedRange = k.min < 0.0f;
   char text[16];
-  const int length = magnitudeText(k, magnitudeOf(shown), text, sizeof(text));
+  const int length = magnitudeText(magnitudeOf(shown), text, sizeof(text));
   const int digitCells = cells - (signedRange ? 1 : 0);
   const int kept = length < digitCells ? length : digitCells;
   memset(buf, ' ', static_cast<size_t>(cells));

@@ -69,7 +69,6 @@ struct KnobDesc {
   float max;
   const char* unit;   // "", "dB", "ms", "st", "%"
   Curve curve = Curve::Linear;
-  uint8_t decimals = 0;                 // digits after the point on the OLED, 0 for whole numbers
   const char* const* labels = nullptr;  // names of a stepped knob's positions, shown in place of a number
 };
 
@@ -82,11 +81,7 @@ struct CardDesc {
   KnobDesc knob[kKnobsPerCard];
   Group group;
   costs::Cost cost;   // percent of one audio block, mean and worst, and whether a board measured it; costs.h
-  const char* oledName = nullptr;  // the readout's title when `name` is too wide for it; nullptr uses `name`
 };
-
-// The name the OLED's readout title shows for `c`.
-const char* oledName(Card c);
 
 // The descriptor of `c`; an out-of-range card reads as Empty.
 const CardDesc& cardDesc(Card c);
@@ -119,8 +114,8 @@ void applyPlacement(Card c, ChainParams& out);
 const KnobDesc* knobDesc(Card c, int knob);
 
 // The number the OLED shows for a reading `value` (0..1, or the step index for a stepped knob), in
-// whole steps of 10^-decimals of the unit. A stepped value is clamped to the knob's positions. A
-// knob with labels shows a name, so this is the index of that name.
+// whole units. A stepped value is clamped to the knob's positions. A knob with labels shows a name,
+// so this is the index of that name.
 int knobShown(const KnobDesc& k, float value);
 
 // The most character cells a knob's number takes.
@@ -128,8 +123,7 @@ constexpr int kMaxKnobCells = 12;
 
 // The character cells the number of knob `k` takes on the OLED, in the widest case. A knob whose
 // range reaches below zero has a sign cell first. The digit cells follow, enough for the widest
-// number of the range, and a knob with decimals adds a cell for the point and one for each decimal.
-// 0 for a knob with labels. Never more than kMaxKnobCells.
+// number of the range. 0 for a knob with labels. Never more than kMaxKnobCells.
 int knobCells(const KnobDesc& k);
 
 // Prints `shown` into exactly knobCells(k) characters, so every value of a knob fills the same

@@ -10,7 +10,7 @@
 
 namespace cv {
 
-struct PitchFxParams {
+struct PitchCardParams {
   AutotuneParams autotune;
   OctaveParams octave;
   FormantParams formant;

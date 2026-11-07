@@ -3,9 +3,6 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <type_traits>
 
 #include "engine/common.h"
 #include "engine/dsp.h"
@@ -49,7 +46,7 @@ struct LofiTuning {
   float honkDb = 6.0f;         // peak gain at the centre from the law's AMOUNT 50 % up
   float honkQ = 1.4f;
   float driveDb = 18.0f;       // gain ahead of the tanh from the law's AMOUNT 50 % up
-  float holdMaxHz = 48000.0f;  // held rate at the law's AMOUNT 50 %
+  float holdMaxHz = static_cast<float>(kSampleRate);  // held rate at the law's AMOUNT 50 %
   float holdMinHz = 6000.0f;   // held rate at the law's AMOUNT 100 %
   float bitsMax = 16.0f;       // bit depth at the law's AMOUNT 50 %
   float bitsMin = 5.0f;        // bit depth at the law's AMOUNT 100 %
@@ -117,7 +114,7 @@ class Lofi {
   static constexpr float kQ1 = 0.54f;
   static constexpr float kQ2 = 1.31f;
 
-  static inline const float kBlockSmoothCoef = smooth::blockCoef(smooth::kSmoothSec, kBlock);
+  static constexpr float kBlockSmoothCoef = smooth::kSmoothBlockCoef;
 
   // log2 of the tuning's corner frequencies, so a corner is one exp2Fast. They change with the tuning only.
   struct Logs {

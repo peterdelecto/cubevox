@@ -87,6 +87,20 @@ inline float peakOf(const Signal& x) {
 // 10 log10 of a power ratio.
 inline double db(double ratio) { return 10.0 * std::log10(ratio < 1e-30 ? 1e-30 : ratio); }
 
+// The amplitude ratio of a level in dB.
+inline double dbToLin(double dbLevel) { return std::pow(10.0, dbLevel / 20.0); }
+
+// Largest |second difference| of x over [from, to), from taken as 2 at the least: a cut in the
+// waveform shows as a spike here.
+inline double peakCurvature(const Signal& x, long from, long to) {
+  double worst = 0.0;
+  for (long i = std::max(from, 2L); i < to; ++i) {
+    const size_t k = static_cast<size_t>(i);
+    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
+  }
+  return worst;
+}
+
 inline void fft(std::vector<std::complex<double>>& a) {
   const size_t n = a.size();
   for (size_t i = 1, j = 0; i < n; ++i) {
