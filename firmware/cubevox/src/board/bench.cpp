@@ -27,7 +27,7 @@ void printSlotRow(const char* label, const std::array<uint32_t, kStatBuckets>& v
 
 }  // namespace
 
-void benchReportStats() {
+void reportAudioStats() {
   const AudioStats s = audioStats();
   serialOut().print("[audio] blocks ");
   serialOut().print(s.blocks);
@@ -43,10 +43,14 @@ void benchReportStats() {
   serialOut().print(s.maxCycles);
   serialOut().print(" of ");
   serialOut().print(s.budgetCycles);
-  serialOut().print(" cycles, slots off 0x");
+  serialOut().print(" cycles");
+#if CUBEVOX_BENCH
+  serialOut().print(", slots off 0x");
   serialOut().print(benchOverrides().slotsOff, HEX);
   serialOut().print(", forced on 0x");
-  serialOut().println(benchOverrides().slotsForcedOn, HEX);
+  serialOut().print(benchOverrides().slotsForcedOn, HEX);
+#endif
+  serialOut().println();
   printSlotRow("[audio] per slot", s.slotAvg);
   serialOut().println();
   printSlotRow("[audio] slot worst", s.slotWorst);
@@ -69,7 +73,7 @@ void benchReportStats() {
 BenchResult benchRun(BenchOp op, const BenchArgs& args, void (*bootReport)()) {
   switch (op) {
     case BenchOp::Report: bootReport(); return {};
-    case BenchOp::Stats: benchReportStats(); return {};
+    case BenchOp::Stats: reportAudioStats(); return {};
     case BenchOp::RecordStatus: recordReportStatus(serialOut()); return {};
     default: break;  // bench-class ops
   }

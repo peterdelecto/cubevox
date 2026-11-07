@@ -18,6 +18,7 @@ set -euo pipefail
 BL="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$BL/../.." && pwd)"
 source "$BL/../cv_define.sh"
+source "$BL/../build_lock.sh"
 
 TINYUF2_URL="https://github.com/adafruit/tinyuf2.git"
 TINYUF2_COMMIT="29d9ce231bada513a7200c087f10a91c832aec42"
@@ -54,47 +55,15 @@ if [ "$BIN_LIMIT" -le 0 ]; then
   exit 1
 fi
 
-# One build at a time: every mode shares the checkout and the host build. The lock dir holds the
-# owner's PID; a lock whose owner is gone is reaped under a second mkdir, so two waiters cannot
-# both remove it.
+# One build at a time: every mode shares the checkout and the host build (build_lock.sh).
 mkdir -p "$BL/build"
 if ! git -C "$REPO" check-ignore -q "$BL/build"; then
   echo "[ERROR] $BL/build is not gitignored; the checkout must stay out of the repository"
   exit 1
 fi
-LOCK="$BL/build/.lock"
-held=0
-release_lock() {
-  if [ "$held" -eq 1 ]; then rm -f "$LOCK/pid"; rmdir "$LOCK"; held=0; fi
-}
-trap release_lock EXIT
+trap build_lock_release EXIT
 trap 'exit 130' INT TERM
-
-reap_stale_lock() {
-  mkdir "$LOCK.reap" 2>/dev/null || return 0
-  local owner
-  owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-    echo "[build] removing stale lock $LOCK (pid $owner is gone)"
-    rm -f "$LOCK/pid"
-    rmdir "$LOCK"
-  fi
-  rmdir "$LOCK.reap"
-}
-
-waited=0
-until mkdir "$LOCK" 2>/dev/null; do
-  reap_stale_lock
-  if [ "$waited" -ge 600 ]; then
-    echo "[ERROR] another bootloader build held $LOCK for 600 s"
-    exit 1
-  fi
-  if [ "$waited" -eq 0 ]; then echo "[build] waiting for the running bootloader build ($LOCK)"; fi
-  sleep 2
-  waited=$((waited + 2))
-done
-held=1
-echo $$ > "$LOCK/pid"
+build_lock_acquire "$BL/build/.lock" bootloader
 
 # Runs a command with its output in a log; on failure prints the tail and stops.
 run_logged() {
@@ -226,8 +195,7 @@ expect_log_order() {
 
 # The fixed sizes in boards/cubevox/board.h.
 board_size() {
-  awk -v name="$1" '$1 == "#define" && $2 == name { sub(/[uU]$/, "", $3); print $3; exit }' \
-    "$BL/boards/cubevox/board.h"
+  cv_define "$1" "$BL/boards/cubevox/board.h"
 }
 
 # diag.c's files for a sample box. Every file keeps its fixed size. DIAG.TXT carries every field and
@@ -250,7 +218,7 @@ drive_texts() {
   expect_line "$diag" "boot fault: pc=0x8002F1C cfsr=0x8200 hfsr=0x0 bfar=0x8045000"
   expect_line "$diag" "clock: crystal"
   expect_line "$diag" "option bytes: set, BOR level 3, sector 0 protected"
-  expect_line "$diag" "app summary: v2.00.10 up 1234 s software none"
+  expect_line "$diag" "app summary: v2.00.10 1234s software none"
   expect_line "$diag" "fault: bus pc=0x8021A4C lr=0x8020F31 cfsr=0x8200 hfsr=0x40000000 bfar=0xDEADBEE0 mmfar=0xDEADBEE0 bank2-ecc=0x8102460"
   expect_line "$diag" "blocks: 3 written, 12 refused, 1 failed, last family 0x6DB66082, first failure at 0x80A1200"
   expect_line "$diag" "wrong file: CUBEVO~1.BIN"
@@ -324,16 +292,8 @@ dependencies() {
   done
 }
 
-# The cubevox board is the only link in ports/stm32h7/boards/; a link an older build left for a
-# retired board goes, while the port's own board directories stay.
 patch_tree() {
-  local patch link
-  for link in "$TU/ports/stm32h7/boards"/*; do
-    if [ -L "$link" ] && [ "$(basename "$link")" != "$BOARD" ]; then
-      rm "$link"
-      echo "[build] removed the stale board link $(basename "$link")"
-    fi
-  done
+  local patch
   ln -sfn "$BL/boards/$BOARD" "$TU/ports/stm32h7/boards/$BOARD"
   for patch in "$BL"/patches/*.patch; do
     if ! git -C "$TU" apply --check "$patch"; then

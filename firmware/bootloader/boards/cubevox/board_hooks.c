@@ -14,12 +14,10 @@
 #include "diag.h"
 #include "image_check.h"
 #include "text.h"
-#if CV_OLED
 #include "oled.h"
 #include "screens.h"
-#endif
 
-CV_STATIC_ASSERT(family_from_boot_block, BOARD_UF2_FAMILY_ID == CV_BOARD_FAMILY);
+CV_STATIC_ASSERT(family_from_boot_block, BOARD_UF2_FAMILY_ID == CV_UF2_FAMILY_CUBEVOX);
 CV_STATIC_ASSERT(menu_settles_before_timeout, CV_MENU_SETTLE_MS < CV_UPDATE_TIMEOUT_MS);
 CV_STATIC_ASSERT(dbeccerr_is_cmsis, CV_FLASH_SR_DBECCERR == FLASH_SR_DBECCERR);
 CV_STATIC_ASSERT(ecc_address_is_cmsis, CV_FLASH_ECC_ADDR == FLASH_ECC_FA_FAIL_ECC_ADDR);
@@ -55,6 +53,7 @@ CV_STATIC_ASSERT(boot_watchdog_fits_reload, CV_IWDG_RELOAD <= 0xFFFu);
 
 // Bounds on the waits for IWDG1's register update and for the option byte change.
 #define CV_IWDG_READY_MS       100u
+#define CV_IWDG_ATTEMPTS       3u
 #define CV_OPTION_TIMEOUT_MS   1000u
 // DIAG.TXT reads the whole log, so a burst of refused blocks rewrites it at most this often.
 #define CV_DIAG_REFRESH_MS     250u
@@ -240,7 +239,7 @@ static CvImageStatus imageStatus(void) {
 }
 
 // Erases the application sector at `address`, bank 1 only, never below CV_APP_START. True when the
-// HAL reports the erase done. A failed erase is not read back: the word that faulted may remain.
+// HAL reports the erase done and the flash locked again. A failed erase is not read back: the word that faulted may remain.
 static bool appSectorErase(uint32_t address) {
   if (address < CV_APP_START || address >= CV_APP_END || address % CV_FLASH_SECTOR_SIZE != 0u) return false;
   FLASH_EraseInitTypeDef erase = {0};
@@ -255,9 +254,9 @@ static bool appSectorErase(uint32_t address) {
     __HAL_FLASH_CLEAR_FLAG_BANK1(FLASH_FLAG_ALL_ERRORS_BANK1);
     ok = HAL_FLASHEx_Erase(&erase, &failedSector) == HAL_OK;
   }
-  HAL_FLASH_Lock();
+  const bool locked = HAL_FLASH_Lock() == HAL_OK;
   SCB_InvalidateDCache_by_Addr((void*)address, (int32_t)CV_FLASH_SECTOR_SIZE);
-  return ok;
+  return ok && locked;
 }
 
 // After a decision on a pending request: erase the sector a read fault named, then read the image
@@ -299,14 +298,18 @@ bool board_app_valid2(void) {
 }
 
 // Starts IWDG1 for CV_WATCHDOG_BOOT_MS (boot_block.h), the order RM0433 gives. Until the new values
-// land the reset period of about 0.5 s applies, a few LSI cycles.
+// land the reset period of about 0.5 s applies, a few LSI cycles. A register write the watchdog
+// ignores while it is busy is repeated, up to CV_IWDG_ATTEMPTS times, before the reload.
 static void watchdogStart(void) {
   IWDG1->KR = CV_IWDG_KEY_START;
-  IWDG1->KR = CV_IWDG_KEY_ACCESS;
-  IWDG1->PR = CV_IWDG_PRESCALER_256;
-  IWDG1->RLR = CV_IWDG_RELOAD;
-  const uint32_t startMs = elapsedMs();
-  while (IWDG1->SR != 0u && elapsedMs() - startMs < CV_IWDG_READY_MS) {}
+  for (uint32_t attempt = 0; attempt < CV_IWDG_ATTEMPTS; ++attempt) {
+    IWDG1->KR = CV_IWDG_KEY_ACCESS;
+    IWDG1->PR = CV_IWDG_PRESCALER_256;
+    IWDG1->RLR = CV_IWDG_RELOAD;
+    const uint32_t startMs = elapsedMs();
+    while (IWDG1->SR != 0u && elapsedMs() - startMs < CV_IWDG_READY_MS) {}
+    if (IWDG1->SR == 0u) break;
+  }
   IWDG1->KR = CV_IWDG_KEY_RELOAD;
 }
 
@@ -353,10 +356,10 @@ static uint32_t framePc(const uint32_t* frame) {
 // for the diagnostic log. 0 for any other fault.
 static uint32_t eccAddress(void) {
   if (FLASH->SR1 & FLASH_SR_DBECCERR) {
-    return FLASH_BANK1_BASE + (FLASH->ECC_FA1 & FLASH_ECC_FA_FAIL_ECC_ADDR) * CV_FLASH_WORD_BYTES;
+    return cvEccAddress(FLASH_BANK1_BASE, FLASH->ECC_FA1);
   }
   if (FLASH->SR2 & FLASH_SR_DBECCERR) {
-    return FLASH_BANK2_BASE + (FLASH->ECC_FA2 & FLASH_ECC_FA_FAIL_ECC_ADDR) * CV_FLASH_WORD_BYTES;
+    return cvEccAddress(FLASH_BANK2_BASE, FLASH->ECC_FA2);
   }
   return 0u;
 }
@@ -436,7 +439,6 @@ static bool timeoutArmed(void) {
   return cvBootTimeoutAllowed(CV_BLOCK, imageStatus(), gState.hostSeen, gState.writeBegun);
 }
 
-#if CV_OLED
 static CvScreen screenNow(void) {
   if (gState.updateWritten) return CvScreenDone;
   const CvScreenInputs in = {gState.decision.reason, gState.image.state == CvImageGood, gState.writeBegun,
@@ -458,7 +460,6 @@ static void screenRefresh(void) {
   gState.shown = shown;
   screenShow(screen);
 }
-#endif
 
 // A cut power can leave a torn word anywhere in the region, and the image check reads only the
 // image. One read of every flash word before USB starts brings such a word to the fault handler
@@ -494,10 +495,8 @@ static void updateModeStart(void) {
   regionRead();
   vbusStart();
   diagRefresh();
-#if CV_OLED
   cvOledStart();
   screenRefresh();
-#endif
 }
 
 // A self-powered device holds its D+ pull-up only while the cable carries VBUS. A pull leaves
@@ -549,9 +548,7 @@ void board_dfu_task(void) {
   hostTrack();
   if (timeoutArmed() && nowMs - gState.timeoutFromMs >= CV_UPDATE_TIMEOUT_MS) NVIC_SystemReset();
   if (gState.diagDirty && nowMs - gState.diagMs >= CV_DIAG_REFRESH_MS) diagRefresh();
-#if CV_OLED
   screenRefresh();
-#endif
 }
 
 //--------------------------------------------------------------------+
@@ -635,9 +632,7 @@ void board_uf2_dir_written(uint8_t const* sector) {
 void board_dfu_written(void) {
   cvBootMarkUpdated(CV_BLOCK);
   gState.updateWritten = true;
-#if CV_OLED
   screenRefresh();
-#endif
 }
 
 // The host unloaded the drive. After a complete write that ends the session, so the box restarts

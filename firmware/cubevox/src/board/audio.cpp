@@ -595,18 +595,37 @@ bool startStream() {
   return true;
 }
 
+void warnDma(const char* stream, const char* what) {
+  Print& out = serialOut();
+  out.print("[WARN] audio: DMA ");
+  out.print(stream);
+  out.print(' ');
+  out.println(what);
+}
+
+// A stream the error already stopped answers HAL_ERROR with NO_XFER, which is not a failure.
+void stopDma(DMA_HandleTypeDef& dma, const char* stream) {
+  if (HAL_DMA_Abort(&dma) != HAL_OK && (dma.ErrorCode & HAL_DMA_ERROR_TIMEOUT) != 0) {
+    warnDma(stream, "abort timed out");
+  }
+}
+
+void deinitDma(DMA_HandleTypeDef& dma, const char* stream) {
+  if (HAL_DMA_DeInit(&dma) != HAL_OK) warnDma(stream, "deinit failed");
+}
+
 // Takes SAI1 and both streams down from whatever state a fault left them in, then brings them up
 // as audioInit does. The RCC reset clears a block that never finished disabling, which a slave
 // block without clocks can do. Each HAL wait is bounded. Runs from loop() with the output muted.
 bool restartStream() {
   NVIC_DisableIRQ(SWPMI1_IRQn);
   NVIC_DisableIRQ(SAI1_IRQn);
-  HAL_DMA_Abort(&gDmaRx);  // NO_XFER when the error already stopped it
-  HAL_DMA_Abort(&gDmaTx);
+  stopDma(gDmaRx, "rx");
+  stopDma(gDmaTx, "tx");
   __HAL_RCC_SAI1_FORCE_RESET();
   __HAL_RCC_SAI1_RELEASE_RESET();
-  HAL_DMA_DeInit(&gDmaRx);
-  HAL_DMA_DeInit(&gDmaTx);
+  deinitDma(gDmaRx, "rx");
+  deinitDma(gDmaTx, "tx");
   // Nothing can raise a fault while both streams are down, so a fault from the new stream is never
   // cleared with the old one.
   gStreamFault = false;

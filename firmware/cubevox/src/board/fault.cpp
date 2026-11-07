@@ -17,6 +17,7 @@
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/planned_reset.h"
+#include "board/print_hex.h"
 #include "board/serial_link.h"
 #include "core/audio_stall.h"
 #include "core/timing.h"
@@ -83,18 +84,11 @@ const ResetFlag* firstResetFlag() {
   return nullptr;
 }
 
-// ECC_FA2 counts 32-byte flash words from the start of bank 2 (15 bits cover the 1 MB bank).
-uint32_t bank2EccAddress(const CvFaultRecord& r) {
-  return kBank2Base + (r.eccFa2 & FLASH_ECC_FA_FAIL_ECC_ADDR) * static_cast<uint32_t>(kFlashWordBytes);
-}
+static_assert(CV_FLASH_ECC_ADDR == FLASH_ECC_FA_FAIL_ECC_ADDR, "the ECC address mask differs from CMSIS");
+
+uint32_t bank2EccAddress(const CvFaultRecord& r) { return cvEccAddress(kBank2Base, r.eccFa2); }
 
 bool bank2EccSet(const CvFaultRecord& r) { return (r.sr2 & FLASH_SR_DBECCERR) != 0; }
-
-void printHex(Print& out, const char* label, uint32_t v) {
-  out.print(label);
-  out.print("=0x");
-  out.print(v, HEX);
-}
 
 bool inRam(const void* address) {
   switch (h7_block_mem_region_of(address)) {

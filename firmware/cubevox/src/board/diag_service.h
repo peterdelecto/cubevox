@@ -14,7 +14,7 @@
 // bootloader's reason). The log stays closed when the recovery could not erase its sector.
 void diagInit();
 
-// Call every loop pass. Starts at most one flash operation and reports a failed write once.
+// Call every loop pass. Starts at most one flash operation and reports a failed write and any dropped entries.
 void diagPoll();
 
 // Queues the entry for a request to enter update mode, with the live uptime and counters.

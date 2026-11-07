@@ -161,7 +161,7 @@ static void putFault(Text* text, const struct CvFaultRecord* r) {
   putField(text, " bfar", r->bfar);
   putField(text, " mmfar", r->mmfar);
   if (r->sr2 & CV_FLASH_SR_DBECCERR) {
-    putField(text, " bank2-ecc", CV_BANK2_BASE + (r->eccFa2 & CV_FLASH_ECC_ADDR) * CV_FLASH_WORD_BYTES);
+    putField(text, " bank2-ecc", cvEccAddress(CV_BANK2_BASE, r->eccFa2));
   }
   put(text, "\r\n");
 }

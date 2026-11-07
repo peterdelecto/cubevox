@@ -23,7 +23,7 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    prints the variant and `./build.sh --outdir` prints the output dir for the current environment, then
    exit. The dir is `OUT` when set, else `/tmp/cubevox-fw-release` or `/tmp/cubevox-fw-bench`. `flash.sh`,
    `bringup.py` and CI ask it instead of repeating the rule. `./build.sh --help` prints the usage.
-2. **Lock.** Each output dir has a `mkdir` lock holding the owner's pid. A second build into the same dir
+2. **Lock.** Each output dir has a `mkdir` lock (`build_lock.sh`, shared with the bootloader build) holding the owner's pid. A second build into the same dir
    waits up to 10 minutes, builds into different dirs run side by side, and a lock whose owner died is
    removed.
 3. **Pins.** `build.sh` holds the arduino-cli version (`CLI_VERSION`), the core version (`CORE_VERSION`) and
@@ -31,14 +31,14 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    `env` blocks, and `tools/scripts_check.py` (ctest `tooling_scripts`) fails when they differ.
    `./build.sh --toolchain` prints the compiler's `bin/` dir, which is the way for the bootloader build to
    use the same compiler.
-3. **Host-tool check.** Before compiling, `build.sh` runs `tools/bench_ops_check.py`. It compares the op
+4. **Host-tool check.** Before compiling, `build.sh` runs `tools/bench_ops_check.py`. It compares the op
    table, the panel thresholds, the block rate and the SAI kernel clock that the Python tools carry against
    the firmware sources, so a drift fails the build.
-4. **Link address.** `build.sh` reads `CV_APP_START` and `CV_APP_END` from `cubevox/src/board/boot_block.h` and
+5. **Link address.** `build.sh` reads `CV_APP_START` and `CV_APP_END` from `cubevox/src/board/boot_block.h` and
    passes `build.flash_offset=0x20000` to arduino-cli. That one property sets the FLASH origin and
    `-DVECT_TAB_OFFSET`, so the link address and the VTOR the core writes in `SystemInit` agree. Nothing else
    sets VTOR. `build.sh`, `flash.sh` and the release workflow read the header through `cv_define.sh`.
-5. **Linker script.** `cubevox.ld` is the one script cubevox owns. It adds the RAM_D2 and DTCM data sections,
+6. **Linker script.** `cubevox.ld` is the one script cubevox owns. It adds the RAM_D2 and DTCM data sections,
    `.cv_boot_block` at 0x2001FF00, `.cv_noinit` at 0x2001FFC0 and `.cv_image_hdr` at 0x08020400. It asserts
    that each data section ends inside its region, that the core's `.noinit` (which lands after `.cv_noinit`)
    ends inside DTCM, and that the image ends below flash bank 2. `ld` cannot include `boot_block.h`, so the
@@ -46,9 +46,9 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    `kImageHeader` and `__cv_noinit_start` in the elf with the header and fails on a drift. It also fails
    when the core's `.noinit` (`_snoinit` to `_enoinit`) holds any data, because that section lands inside
    the fault record's slot.
-6. **Image size.** The build fails when the .bin exceeds 917504 bytes, the room between the bootloader's sector
+7. **Image size.** The build fails when the .bin exceeds 917504 bytes, the room between the bootloader's sector
    and flash bank 2, which holds the layout record.
-7. **Stamp and update file.** `tools/stamp_image.py` writes the length and CRC-32 into the image header, in place.
+8. **Stamp and update file.** `tools/stamp_image.py` writes the length and CRC-32 into the image header, in place.
    It then writes `cubevox.uf2` next to the .bin, in the cubevox family, and reads that file back the way the
    bootloader will. `build.sh` prints the stamped version. A build that starts compiling and does not finish
    deletes the .bin and .uf2 it found, so `flash.sh` cannot install an image that failed a check or came from
@@ -56,30 +56,29 @@ macOS (`/dev/cu.usbmodem*`, `/Volumes`, `~/Library/Arduino15`).
    sources give an identical image, CRC included, in a clean build whatever the output dir or checkout path.
    An incremental build over an older output dir can order the link differently, which moves functions and
    changes the CRC, so `CLEAN=1` builds the image to compare with the check line in a release's notes.
-8. **Budget.** After the stamp `build.sh` prints one `[budget]` block of true headroom, from the link map and
+9. **Budget.** After the stamp `build.sh` prints one `[budget]` block of true headroom, from the link map and
    the elf. App flash counts against the 917504 B region, DTCM against the boot block address, D1 against the
-   stack top and D2 against its end. At v2.00.35 the release image uses 164960 B of flash (18.0 %) and
-   51968 B of DTCM (39.7 %, 78848 B free), 167624 B of D1 and 2048 B of D2. arduino-cli prints its own
+   stack top and D2 against its end. The block holds the current figures. arduino-cli prints its own
    summary above it, which divides by the whole 2 MB flash and by D1 alone.
-9. **Version.** The release name is `v` plus `VERSION.txt`. `build.sh` passes it as `CUBEVOX_FW_VERSION`, and
+10. **Version.** The release name is `v` plus `VERSION.txt`. `build.sh` passes it as `CUBEVOX_FW_VERSION`, and
    the image header, `hello`, the boot report, the boot splash and the confirm screen all show that one string.
    The bench image adds `-bench` to the header only. `tools/bump_version.sh` raises the last field and carries
    into the minor field; every field is read as decimal.
-10. **Warning gate and symbol check.** `warn_gate.py` recompiles every `.c` and `.cpp` source under the sketch
+11. **Warning gate and symbol check.** `warn_gate.py` recompiles every `.c` and `.cpp` source under the sketch
     (sketch, `src/**`) with `-Wall -Wextra -Wshadow -Wdouble-promotion -Wundef -Wformat=2 -Wstack-usage=1152
     -Werror`. Third-party includes are `-isystem`. It fails when fewer files are checked than the sketch holds. It
     runs last, and a failure removes the image the stamp step wrote. `tools/check_bench_symbols.sh` runs after the
     link. The release image must hold none of five bench-only functions and the bench image must hold all five,
     which keeps the list tied to real code. Both variants must pass; CI builds, gates and uploads both.
-11. **Serial port.** `cubevox_port.py` is the one place that finds and opens the CDC port. `term.py`,
+12. **Serial port.** `cubevox_port.py` is the one place that finds and opens the CDC port. `term.py`,
     `bringup.py`, `flash.sh` and `tools/protocol_check.py` use it. With more than one `cu.usbmodem*` device,
     name the port with `CUBEVOX_PORT=/dev/cu.usbmodemXXXX` or the tool's `--port` option (`term.py` takes it as
     the argument). `term.py --expect-image VERSION` exits 1 unless the boot report says
     `[boot] image VERSION crc ok`, which is how `flash.sh` judges a flash.
-12. **Editor.** `cubevox/.clangd` and `bootloader/.clangd` give clangd the include paths and defines of each
+13. **Editor.** `cubevox/.clangd` and `bootloader/.clangd` give clangd the include paths and defines of each
     program. clangd has no variable expansion, so the paths are absolute. `python3 -I tools/clangd_paths.py`
     rewrites the Arduino and checkout prefixes for this machine.
-13. **CI and release.** `.github/workflows/ci.yml` runs the host suite (`ctest --no-tests=error`), both firmware
+14. **CI and release.** `.github/workflows/ci.yml` runs the host suite (`ctest --no-tests=error`), both firmware
     builds, the bootloader build and its selftest. `release.yml` runs on a tag `vX.YY.ZZ` that equals `v` plus
     `VERSION.txt`. Its `tests` job (host suite, bootloader selftest, bench build) must pass before `publish`
     creates a draft release. The draft holds `cubevox-vX.YY.ZZ.uf2` for Adam, `cubevox-rom-0x08020000.bin` for
@@ -115,7 +114,7 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
    editor's export as `FontDesc`), `display.h` (backend interface, `flushStep` and `setContrast`, and
    `PanelLink`, the restart rule for a panel that is missing or stops answering), `brightness.h` (the OLED BRIGHT
-   levels and the dimmed contrast), `level` (input energy to the level bar, output energy to the scope's window), `scope` (the ring of the chain
+   levels and the dimmed contrast), `level` (input energy to the level bar), `scope` (the ring of the chain
    output and the pure step from a read to the voice screen's trace).
 5. Protocol and storage: `protocol` (JSON line framing, request parse, reply formatting into a `Writer`),
    `tx_queue` (bounded line queue for serial output), `record` (layout record codec, newest-valid scan),
@@ -159,7 +158,7 @@ and dissolves between them).
    step, one before each update-mode request, and one per audio fault; the bootloader lists them in
    `DIAG.TXT`), `planned_reset` (the reset into update mode and the reset after an audio stall wait in
    `loop()` until both stores are idle, then mute and reset), `block_mem` (where audio memory lives: the RAM_D2
-   MPU region, the DTCM section, adapted from Teensy-H7-Port), `fastmem` (word-wise `memset`, `memcpy` and
+   MPU region, the DTCM section), `fastmem` (word-wise `memset`, `memcpy` and
    `memmove` that the link picks over newlib-nano's byte loops; `fastmem_test` checks them on the host).
 7. Bootloader contract: `boot_block.h` (the addresses, magics, name tables and the four structs both programs
    read: boot block, image header, diagnostic entry, fault record; C-compatible, the bootloader and
@@ -337,10 +336,9 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
 
 ## Status
 
-Costs in `core/costs.h` are marked measured or estimated. The measured rows come from runs of the engine chain on
-an H743 test board, and the POLISH COMP, soft ceiling and BYPASS rows stay estimates until a cubevox board runs
-them; the method is in that file. The audio path, clock tree, USB gating and mux timing have run on the test board
-and not yet on a cubevox board. The bring-up logs are in `hardware/bringup/`. The OLED driver starts the panel at
+Costs in `core/costs.h` are marked measured or estimated. The measured rows come from stress runs of the engine
+chain on the box, and the POLISH COMP, soft ceiling and BYPASS rows stay estimates until a run reads them; the
+method is in that file. The bring-up logs are in `hardware/bringup/`. The OLED driver starts the panel at
 boot and retries one that does not answer once a second, with a `[WARN]` in the boot report, so the box plays on
 without a panel. `board/power_sense` mutes the output when 5VA, read on VA_SENSE (PB1), falls under
 `kPowerTripMv` (4750 mV) and releases it after 500 ms above 4850 mV, and `status` reports its trips as

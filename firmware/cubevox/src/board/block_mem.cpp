@@ -1,4 +1,5 @@
-// Adapted from Teensy-H7-Port, lib/platform/h7/h7_block_mem.cpp. See block_mem.h for the design.
+// Memory regions of the STM32H743 and the MPU setup that keeps the DMA rings uncached. See
+// block_mem.h for the design.
 
 #include "board/block_mem.h"
 
@@ -49,13 +50,10 @@ bool h7_block_mem_mpu_init(void) {
 
   // The D2 SRAM has its own AHB2ENR clock gates, and STM32duino's startup leaves them off. Without
   // them the MPU region below is programmed correctly over unclocked SRAM, and any access can
-  // fault or read garbage. The third gate is guarded because H72x/H73x have two D2 blocks and
-  // define no D2SRAM3EN.
+  // fault or read garbage.
   __HAL_RCC_D2SRAM1_CLK_ENABLE();
   __HAL_RCC_D2SRAM2_CLK_ENABLE();
-#if defined(__HAL_RCC_D2SRAM3_CLK_ENABLE)
   __HAL_RCC_D2SRAM3_CLK_ENABLE();
-#endif
 
   const int n = firstFreeMpuRegion();
   if (n < 0) return false;
@@ -68,13 +66,9 @@ bool h7_block_mem_mpu_init(void) {
   r.Number = static_cast<uint8_t>(n);
   r.BaseAddress = 0x30000000;
 
-  // A region is a power of two at least as large as the RAM it covers. RAM_D2 is 288 KB on the
-  // H74x and H75x, so 512 KB is the smallest that fits. The H72x and H73x have 32 KB.
-#if defined(__HAL_RCC_D2SRAM3_CLK_ENABLE)
+  // A region is a power of two at least as large as the RAM it covers. RAM_D2 is 288 KB, so 512 KB
+  // is the smallest that fits.
   r.Size = MPU_REGION_SIZE_512KB;
-#else
-  r.Size = MPU_REGION_SIZE_32KB;
-#endif
 
   // TEX level 1 with C and B clear is Normal, non-cacheable memory. Device or Strongly Ordered
   // would also forbid the unaligned and speculative accesses ordinary C code makes.
