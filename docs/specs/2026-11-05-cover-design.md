@@ -49,8 +49,9 @@ stays on the box for good; lip on three walls, rear skirt short; 68D TPU, not PE
    190 mm span and the plate is what a knock in the bag presses on the knobs. Outer corners follow
    the box's corner radius.
 2. Skirt, front and sides. 2.0 mm wall. Inner face 0.4 mm outside the lid and dish walls from the
-   face down to the boot top edge (20.9 mm). At the boot top edge the inner face steps out 2.0 mm
-   through a 45° chamfer and runs 5 mm further down as the band.
+   face down to the boot top edge (20.9 mm). At the boot top edge the inner face steps out 1.2 mm
+   (the boot's 2.0 mm less `wallClear` and `lipBite`) through a 45° chamfer and runs 5 mm further
+   down as the band.
 3. Band. Inner face 0.4 mm inside the boot's outer face. Both parts give, the boot (TPU-GF, grippy,
    slightly compressible, owner 2026-11-05) and the cover (68D TPU), so the band stretches over the
    boot and TPU on TPU holds it. 1.0 mm 45° lead-in at the bottom edge. Runs the full front wall
