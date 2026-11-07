@@ -11,8 +11,8 @@ API: `GET /api/state` (connected, fw, app, cards, layout, limits, update), `POST
 Requests with a non-loopback Host or Origin are refused.
 
 Update: the first heartbeat fetches the latest GitHub release once. `state.update` carries `version`, `available`, `step` and `error`.
-Steps run in order `backup`, `download`, `dfu`, `app`, `restart`, `done`; the firmware steps run only when the box is behind and the app steps only when the app is behind.
-A failure leaves `step` at the failed step with the dfu-util output in `error`; the box stays in DFU and Retry resumes there.
+The update replaces the app only and never writes the box. Firmware updates are the `.uf2` dragged onto the `CUBEVOX` drive (`docs/specs/2026-10-24-field-update-design.md`).
+Steps run in order `download`, `app`, `restart`, `done`, and run only when the app is behind. A failure leaves `step` at the failed step with the error text, and Retry reuses a finished download.
 On `restart` the app relaunches itself on the same port with `--no-open`, so the open page reloads onto the new copy.
 
-Package: `app/dfu-util-static.sh [out]` builds a static universal dfu-util, `DFU_UTIL=<that> app/bundle.sh` builds `dist/cubevox.app` and `dist/cubevox.app.tar.gz`, `app/install.sh` is the curl installer. `.github/workflows/release.yml` runs all three on a `v*` tag.
+Package: `app/bundle.sh` builds `dist/cubevox.app` and `dist/cubevox.app.tar.gz`, `app/install.sh` is the curl installer. `.github/workflows/release.yml` runs them on a `v*` tag.

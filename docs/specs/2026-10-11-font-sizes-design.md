@@ -19,7 +19,7 @@ The project uses the three Hyperlegible fonts (owner 2026-10-11, after refining 
 Stylized 9X12 and Stylized Refined 9X12 stay in the library but the firmware doesn't use
 them. The owner removed Stylized 5x7 from the library. The editor's header export,
 `tools/font-editor/fonts/cubevox_fonts.h`, holds every library font, one namespace each
-under `cubevox::fonts`. The firmware uses the `StylizedHyperlegible*` namespaces.
+under `cubevox::fonts`. The firmware uses the `Myrtle5x7`, `Myrtle7X12`, `Myrtle9X12` and `Myrtle16X24` namespaces.
 
 ## Weights
 One weight per size. The selected menu row shows as inverse video, as the firmware does

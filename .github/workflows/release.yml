@@ -14,8 +14,8 @@ name: release
 # line of the .uf2 (version, bytes, CRC), which the owner compares with the build on the bench.
 # The tests job runs the host suite, the bootloader selftest and the bench build, and publish waits
 # for it. The bootloader job builds and checks the shop's bootloader and publish waits for it too,
-# but nothing of it is attached. The dfu-util and app jobs only prove that the parked Mac app still
-# builds. Nothing from them is attached, and publish does not wait for them.
+# but nothing of it is attached. The app job only proves that the parked Mac app still builds.
+# Nothing from it is attached, and publish does not wait for it.
 on:
   push:
     tags: ["v*"]
@@ -190,20 +190,7 @@ jobs:
           test -s "$out/cubevox-bootloader.bin" || { echo "[ERROR] $out/cubevox-bootloader.bin is missing or empty"; exit 1; }
           grep -aq "cubevox bootloader v$version" "$out/cubevox-bootloader.bin" || { echo "[ERROR] the built bootloader does not carry 'cubevox bootloader v$version'"; exit 1; }
 
-  dfu-util:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build static universal dfu-util
-        run: app/dfu-util-static.sh "$RUNNER_TEMP/dfu-util"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dfu-util
-          path: ${{ runner.temp }}/dfu-util
-          if-no-files-found: error
-
   app:
-    needs: dfu-util
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -213,16 +200,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: app/go.mod
-      - uses: actions/download-artifact@v4
-        with:
-          name: dfu-util
-          path: ${{ runner.temp }}/dfu
       - name: Test
         run: cd app && go vet ./... && go test ./...
       - name: Bundle
-        run: |
-          chmod +x "$RUNNER_TEMP/dfu/dfu-util"
-          DFU_UTIL="$RUNNER_TEMP/dfu/dfu-util" app/bundle.sh
+        run: app/bundle.sh
       - uses: actions/upload-artifact@v4
         with:
           name: cubevox-app

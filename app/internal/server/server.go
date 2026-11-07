@@ -33,9 +33,9 @@ type Config struct {
 	// OnPageOpen runs once, on the first heartbeat, to open the serial link.
 	OnPageOpen func()
 	Now        func() time.Time
-	// CheckUpdate fetches the latest release; RunUpdate performs the update and reports each
-	// step by name. Either nil turns the update feature off.
-	CheckUpdate func(ctx context.Context, current, fw string) (update.Info, error)
+	// CheckUpdate fetches the latest release; RunUpdate replaces this app with it and reports
+	// each step by name. Either nil turns the update feature off.
+	CheckUpdate func(ctx context.Context, current string) (update.Info, error)
 	RunUpdate   func(ctx context.Context, info update.Info, step func(string)) error
 }
 
@@ -153,15 +153,13 @@ func (s *Server) state() State {
 	case !errors.Is(err, box.ErrNotConnected):
 		log.Printf("state: %v", err)
 	}
-	st.Update = s.updateState(st.FW)
+	st.Update = s.updateState()
 	return st
 }
 
-// updateState merges the run progress with the release fetched at page open. The behind flags
-// are recomputed against the live firmware version because the box may connect after the fetch.
-// An update that failed stays available so the page keeps offering Retry while the box sits in
-// DFU and reports no firmware version.
-func (s *Server) updateState(fw string) UpdateState {
+// updateState merges the run progress with the release fetched at page open. A failed update
+// stays available so the page keeps offering Retry.
+func (s *Server) updateState() UpdateState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	u := s.update
@@ -169,9 +167,8 @@ func (s *Server) updateState(fw string) UpdateState {
 		u.Error = s.checkErr
 	}
 	if s.release != nil {
-		info := s.release.For(s.cfg.App, fw)
-		u.Version = info.Tag
-		u.Available = info.Available || s.update.Error != ""
+		u.Version = s.release.Tag
+		u.Available = s.release.Available || s.update.Error != ""
 	}
 	return u
 }
@@ -243,7 +240,7 @@ type updateReply struct {
 }
 
 // handleUpdate starts the update in the background; progress shows in state.update.step. It is
-// also the page's Retry, since Run resumes from the first incomplete step.
+// also the page's Retry, since Run reuses a finished download.
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := s.startUpdate(); err != nil {
 		writeJSON(w, http.StatusOK, updateReply{Error: err.Error()})
@@ -264,7 +261,7 @@ func (s *Server) startUpdate() error {
 		return errors.New("no release information yet")
 	}
 	s.running = true
-	s.update = UpdateState{Step: update.StepBackup}
+	s.update = UpdateState{Step: update.StepDownload}
 	go s.runUpdate(*s.release)
 	return nil
 }
@@ -291,7 +288,7 @@ func (s *Server) setStep(name string) {
 func (s *Server) checkRelease() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	info, err := s.cfg.CheckUpdate(ctx, s.cfg.App, "")
+	info, err := s.cfg.CheckUpdate(ctx, s.cfg.App)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err != nil {

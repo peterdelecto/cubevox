@@ -1,4 +1,4 @@
-// Package update checks GitHub Releases and runs the one-click firmware and app update.
+// Package update checks GitHub Releases and runs the one-click app update.
 package update
 
 import (
