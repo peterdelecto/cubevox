@@ -144,7 +144,7 @@ void voiceScreen(Canvas& c) {
     samples[static_cast<size_t>(i)] =
         0.12f * std::sin(6.2831853f * turns) + 0.04f * std::sin(2.0f * 6.2831853f * turns + 0.8f);
   }
-  renderVoice(c, scopeFrame(samples.data(), 0.0f, false), 9, Walk{0, 0});
+  renderVoice(c, scopeFrame(samples.data(), 0.0f), 9, Walk{0, 0});
 }
 
 void menu(Canvas& c) {

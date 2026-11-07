@@ -2,7 +2,6 @@
 
 #include <math.h>
 
-#include "engine/dsp.h"
 #include "engine/smooth.h"
 
 namespace level {
@@ -53,25 +52,6 @@ float displayLevel(float amplitude) {
 float Meter::update(const InputEnergy& energy, float dtMs) {
   level_ = follow(level_, displayLevel(rms(energy)), dtMs);
   return level_;
-}
-
-float OutputMeter::update(const OutputEnergy& energy, float dtMs) {
-  const float db = toDbfs(rms(energy));
-  if (db > top_) {
-    top_ = db;
-  } else {
-    top_ -= kWindowFallDbPerS * dtMs / 1000.0f;
-    if (top_ < kWindowMinTopDbfs) top_ = kWindowMinTopDbfs;
-  }
-  if (db < floor_) {
-    floor_ = db > kWindowFloorDbfs ? db : kWindowFloorDbfs;
-  } else {
-    floor_ += kWindowFloorRiseDbPerS * dtMs / 1000.0f;
-  }
-  const float highest = top_ - kWindowFloorUnderTopDb;
-  if (floor_ > highest) floor_ = highest;
-  if (db < bottom()) return 0.0f;
-  return cv::smooth::clamp01(cv::dbToGain(db - top_));
 }
 
 }  // namespace level

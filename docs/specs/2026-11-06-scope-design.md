@@ -6,10 +6,10 @@ last effect slot, before POLISH COMP, the back half of VOX EQ, output trim and t
 shows what the effects made and not what the polish pass did to it. The input meter box at the left
 edge stays as it is.
 
-Supersedes the Voice section of `2026-10-24-oled-gui-design.md` items 1 (the tap moves), 2 (the scale's
-top and floor rules stay; the amplitude map goes), 4, 5 and 7, its Burn-in item 2 (the rim dither), the
+Supersedes the Voice section of `2026-10-24-oled-gui-design.md` items 1 (the tap moves), 2 and 3 (the
+window top, the floor rule and the amplitude map go), 4, 5 and 7, its Burn-in item 2 (the rim dither), the
 Timing row "the ribbon has none", the Modules rows that name the ribbon, and Tests items 2 and 9. Items
-3, 6, 8 and 9 of Voice stand.
+6, 8 and 9 of Voice stand.
 
 UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is folded in below.
 
@@ -23,8 +23,8 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
 3. He changes the note. The trace shows both notes for one frame, then holds still on the new shape.
 4. He sings an "s" or breathes into the mic. The trace is a band of noise with no fixed shape, as a scope
    shows noise. A note with breath on it keeps its shape; only the edges shimmer.
-5. He stops. The trace shrinks as the sound decays, and when the output falls under the floor the line
-   comes back.
+5. He stops. The trace shrinks as the sound decays, and when the frame's peak falls under -54 dBFS the
+   line comes back.
 6. He turns a knob. The readout shows, and when it dissolves back the scope is live at once. There is no
    history to catch up on. The same when the menu closes.
 7. He flips an effect toggle. The trace changes shape as the card's sound comes in, over the slot fade.
@@ -34,8 +34,9 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
    line shows while the chain is silent for the swap, then the trace grows back with the fade-in.
 10. He shouts into the mic. The scale rises at once, so the shout fills the height and nothing
     flattens; the frames after it draw at 70 % and up while the scale settles.
-11. Goes wrong, room noise. A synth idling on the input or a noisy room draws the line, not a band of
-    hash, because the floor rule hides steady noise (owner 2026-10-30, the Korg Volca).
+11. Goes wrong, room noise. Hiss under -54 dBFS draws the line, and a synth idling on the input or a noisy room
+    between -54 and -40 dBFS draws a thin band of 1 to 5 rows, not a full-height trace (section 3
+    item 4; owner 2026-10-30, the Korg Volca).
 12. Goes wrong, hum. A hum rides the trace up and down and could pull the trigger. None is expected at
     the slot 8 output; the input gate and the cards sit ahead of it.
 13. Goes wrong, a late block or a NaN. Every audio block writes one block into the ring: the chain output
@@ -129,20 +130,19 @@ rows tall. The scale now fits each frame.
    two threads inside the C++ memory model. No interrupt mask on the box.
 5. The ring lives in `BlockFlow`, so the box and the emulator share it and the emulator draws the same
    trace from the same code.
-6. A frame is taken only while the voice screen shows. `OutputMeter` updates every tick from the energy
-   so the top and the floor keep tracking under other screens.
+6. A frame is taken only while the voice screen shows.
 
 ## 6. Code
 
 | Where | What |
 |---|---|
-| `core/scope.h`, `scope.cpp` | the ring with its block count and energy; `scopeFrame()` pure: samples + last scale + silent to 103 column runs and the new scale (`int8_t lo, hi` rows about the horizon); the trigger |
-| `core/block_flow.h`, `block_flow.cpp` | the write of every block into the ring; `Report.outputEnergy` becomes the ring's energy |
+| `core/scope.h`, `scope.cpp` | the ring with its block count; `scopeFrame()` pure: samples + last scale to 103 column runs and the new scale (`int8_t lo, hi` rows about the horizon); the trigger |
+| `core/block_flow.h`, `block_flow.cpp` | the write of every block into the ring |
 | `core/chain_run.h` | unchanged apart from comments |
-| `core/level.h`, `level.cpp` | `OutputMeter` unchanged; its energy now comes from the ring; comments |
+| `core/level.h`, `level.cpp` | `OutputMeter`, `OutputEnergy` and the window constants go; the input meter stays; comments |
 | `ui/screens.h`, `screens.cpp` | `Ribbon` removed; `renderVoice(canvas, const ScopeFrame&, segments, walk)` |
-| `ui/face.h`, `face.cpp`, `ui/gui.h` | a frame from the ring each tick on the voice screen; comments |
-| `board/audio.h`, `audio.cpp` | the DAC-side output tally goes; `audioTakeOutputEnergy` reads the ring's |
+| `ui/face.h`, `face.cpp`, `ui/gui.h` | a frame from the ring each tick on the voice screen, no output energy argument; comments |
+| `board/audio.h`, `audio.cpp` | the DAC-side output tally and `audioTakeOutputEnergy` go |
 | `host/box.cpp`, `audio_block.*`, `host/main.cpp` | the same read on the host; the proof scene's output figure |
 | `tools/oled-proof/oled_motion.cpp`, `oled_proof.cpp`, `tools/oled_golden.py` | the voice scene draws the scope; goldens regenerated |
 | `engine/dsp.h` | `dbToGain` used for the scale; no private pow |
@@ -163,8 +163,7 @@ rows tall. The scale now fits each frame.
    height by the fourth frame; a sine at -48 dBFS draws at 9 rows (the -40 dBFS minimum scale); a
    frame with its peak under -54 dBFS gives the line; an echo tail decaying from -20 to -60 dBFS
    draws on every frame until it is under -54 dBFS.
-4. `core_scope`, ring: wrap-around returns the newest samples in order; the energy of a known signal
-   equals the old DAC-side sum with the output trim at unity; a host two-thread stress where the writer
+4. `core_scope`, ring: wrap-around returns the newest samples in order; a host two-thread stress where the writer
    fills each block with its block number and the reader asserts every frame is consecutive numbers.
 5. `core_block_tail` or `core_chain_run`: the ring advances one block per audio block through a layout
    swap, a late block and a NaN cut, with zeros where the output was silenced; a POLISH COMP setting that
@@ -181,7 +180,7 @@ rows tall. The scale now fits each frame.
 | Item | Cost |
 |---|---|
 | Ring, D1 | 8,192 B |
-| Write, per block | 64 stores and a 64-sample sum of squares, about 300 cycles, 0.05 % of the 640,000-cycle block budget |
+| Write, per block | 64 stores |
 | Read and frame, main loop per tick | one 8 KB copy, a 1100-sample peak search, 824 multiplies, 103 min/max pairs |
 | DTCM | none |
 
@@ -194,7 +193,7 @@ rows tall. The scale now fits each frame.
    and looks broken. The peak-anchored crossing over the first crossing: a vowel crosses zero several
    times a cycle (audit finding 3).
 3. The scale fits each frame (owner 2026-11-07) over the ribbon's recent-peak rule, which drew an echo
-   tail a few rows tall. The floor rule stays so noise draws the line. A fixed dBFS scale was never
+   tail a few rows tall. A fixed dBFS silence level, not a tracked floor, hides noise. A fixed dBFS scale was never
    in play: it draws Adam's working level, around -20 dBFS, two pixels tall.
 4. No rim dither: a scope trace is a sharp line.
 5. The copy sits in `BlockFlow::run`, not `runChain`, so every audio block writes a block and the ring
@@ -205,48 +204,55 @@ rows tall. The scale now fits each frame.
 
 ## 10. As built
 
-Built 2026-11-06 at v2.01.66 with a crest-based scale, and rebuilt 2026-11-07 to the scale of section 3,
-which fits each frame. The four gates pass: `ctest` 39 of 39, `cubevox-emulator --check`, the firmware
-build with `-Wstack-usage=1152`, and `go test ./...`.
+Built 2026-11-06 at v2.01.66 with a crest-based scale, rebuilt 2026-11-07 to fit each frame, and
+rebuilt again 2026-11-07 to a fixed silence level. The four gates pass: `ctest` 39 of 39,
+`cubevox-emulator --check`, the firmware build with `-Wstack-usage=1152`, and `go test ./...`.
 
-The scale fits each frame. `scopeFrame(samples, lastScale, silent)` returns the frame with its new
-scale in `ScopeFrame::scale`. The scale is the larger of the frame's peak magnitude over its 824
-samples and `lastScale` times `dbToGain(-3)`, so the frame's loudest sample lands on row 10 or 54.
-`Face` keeps the scale in its last frame (`scope_.scale`) and passes it back on the next tick. A
-silent tick, or a scale under 1e-6 (-120 dBFS), gives the horizon alone and a scale of 0, so a
-`lastScale` of 0, negative or not a number starts the scale afresh. `kScopeCrest` is gone, and the scope
-no longer reads `OutputMeter::top()`; the meter still updates every tick for the floor rule.
+The scale fits each frame. `scopeFrame(samples, lastScale)` returns the frame with its new scale in
+`ScopeFrame::scale`. A frame whose peak magnitude over its 824 samples is under `kScopeSilencePeak`
+(-54 dBFS, 1.9952623e-3) gives the horizon alone and a scale of 0. Any other frame has the scale
+that is the largest of that peak, `lastScale` times `dbToGain(-3)` and `kScopeMinScale` (-40 dBFS,
+0.01), so the frame's loudest sample lands on row 10 or 54 unless it is under -40 dBFS. `Face` keeps the
+scale in its last frame (`scope_.scale`) and passes it back on the next tick. A `lastScale` of 0,
+negative or not a number starts the scale afresh, and the minimum scale replaces the old 1e-6 guard.
+`kScopeCrest` is gone. The output meter is gone with it: `level::OutputMeter`, `OutputEnergy`, the
+window constants, `BlockFlow::Report::outputEnergy`, `ScopeRing::takeEnergy`, `audioTakeOutputEnergy`,
+`AudioBlock::takeOutputEnergy` and the output energy argument of `Face::tick`. The ring keeps samples
+and a block count only. The input meter and its tally are unchanged.
 
 Where the build differs from the design:
 
-1. `runChain` takes an optional `tap(block)` that it calls after the NaN guard and ahead of POLISH COMP.
-   POLISH COMP and the back half of VOX EQ run inside `runChain`, so `BlockFlow::run` cannot see the
-   block before them without it. `BlockFlow::run` passes a lambda that writes the ring.
-2. The ring keeps one energy per block (32 floats) beside the samples, not a running sum and a count.
-   `ScopeRing::takeEnergy()` sums the blocks written since its last call, at most the newest 31, with
-   the same block-count check as the sample read. That needs no read-modify-write between the threads,
-   which Cortex-M7 has no 64-bit form of, and no interrupt mask. `audioTakeOutputEnergy` and
-   `AudioBlock::takeOutputEnergy` call it. The face takes its frame by `ScopeRing::read` in a second
-   call, so the energy and the frame can differ by a block.
-3. The face takes the ring as a `const ScopeRing&` beside the energy, and the board and the host add
-   `audioScope()` and `AudioBlock::scope()`.
-4. The trigger's crossing search may pass the old end of the span. The peak still has to lie inside the
+1. `runChain` takes an optional `tap(block)` that it calls after the NaN guard and ahead of POLISH
+   COMP. POLISH COMP and the back half of VOX EQ run inside `runChain`, so `BlockFlow::run` cannot see
+   the block before them without it. `BlockFlow::run` passes a lambda that writes the ring.
+2. The face takes the ring as a `const ScopeRing&`, and the board and the host add `audioScope()` and
+   `AudioBlock::scope()`.
+3. The trigger's crossing search may pass the old end of the span. The peak still has to lie inside the
    span, but its rising crossing is searched down to the second sample of the read. With the crossing
    confined to the span, a peak in the first 30 samples of the span had no crossing and the frame
    free-ran (a 125 sample jump at 49 Hz on 1 tick in about 30).
-5. The hysteresis is 5 % of the largest sample in the search span, the peak the trigger anchors on,
+4. The hysteresis is 5 % of the largest sample in the search span, the peak the trigger anchors on,
    since the frame's scale is not known until the frame's start is.
-6. The face sets the scale to 0 on every tick that is not on the voice screen, so the scope has no
-   history to catch up on when the voice returns (walk item 6). The floor rule's meter keeps tracking.
-7. The board checks at start that the ring sits in RAM_D1 (`checkMemoryAndClock`).
-8. A second golden, `voice-scope-loud`, is frame 76 of scene 12, where the tone is at its loudest and the
+5. The face sets the scale to 0 on every tick that is not on the voice screen, so the scope has no
+   history to catch up on when the voice returns (walk item 6).
+6. The board checks at start that the ring sits in RAM_D1 (`checkMemoryAndClock`).
+7. A second golden, `voice-scope-loud`, is frame 76 of scene 12, where the tone is at its loudest and the
    trace fills rows 10 to 54. Frame 79 (`voice-scope`) is three frames later, on a tone 18 dB quieter
    whose scale has fallen 9 dB from the loud peak, so the trace spans rows 24 to 40. `voice-meter-ribbon`
-   is gone.
-9. The emulator's `--check` has no golden of its own. The golden for the scene is in `firmware_test`.
-10. The proof renderer (`tools/oled-proof/oled_motion.cpp`) draws the scope from the spec's words and
-    draws the real clips' samples on its voice scenes. It needs 48 kHz clips. It replays the scale over
-    the 120 frames before each frame, which leaves the scale within 1e-18 of the box's.
+   is gone. Both goldens came out byte for byte as before the silence change, because no frame of the
+   scripted drive near them sits under -54 dBFS.
+8. The emulator's `--check` has no golden of its own. The golden for the scene is in `firmware_test`.
+9. The proof renderer (`tools/oled-proof/oled_motion.cpp`) draws the scope from the spec's words and
+   draws the real clips' samples on its voice scenes. It needs 48 kHz clips. It replays the scale over
+   the 120 frames before each frame, which leaves the scale within 1e-18 of the box's. Its output
+   window model is gone; the captions' voice level is the frame RMS.
+10. The tail test (`core_scope`, `checkTail`) synthesises a 150 Hz tail falling from -20 to -60 dBFS over
+    2 s and steps it 1920 samples a tick. It draws for 42 ticks, the last at 1.68 s where the newest
+    824 samples peak at -53.3 dBFS, and goes to the line once.
+
+Replay on Adam's clip with Echo on (`build/cubevox-emulator --proof out.ppm --on 5`): at 4400 and
+4600 ms the tail draws as a trace, at 4800 and 5000 ms it draws as a thin band at the minimum scale
+(about 7 rows), and at 5400 ms, once the output is under -54 dBFS, it is the line.
 
 Measured on the host (`firmware_test`, ASan and UBSan), worst start drift over 100 ticks of a synthetic
 vowel, shifts by whole periods not counted: 0.84 samples at 98 Hz, 0.69 at 147 Hz, 0.91 at 220 Hz and

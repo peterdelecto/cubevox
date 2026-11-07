@@ -168,7 +168,7 @@ struct FaceRig {
   void tick(float outRms = 0.0f, float inRms = 0.0f) {
     now += kUiTickMs;
     writeTick(outRms);
-    face.tick(now, ctx(), energyOfRms(inRms), ring.takeEnergy(), ring, menu, live);
+    face.tick(now, ctx(), energyOfRms(inRms), ring, menu, live);
   }
 
   void ticks(int n, float outRms = 0.0f, float inRms = 0.0f) {
@@ -787,8 +787,8 @@ void checkEachOwnsItsSource() {
         "face: an output with a silent input draws the trace and leaves the meter an empty box");
 }
 
-// The idle hiss of the output, under -60 dBFS, draws no trace at all. A tick at -70 dBFS every tick
-// for longer than the window holds leaves the screen as it is in silence.
+// An output whose peak is under -54 dBFS draws no trace. A tone at -70 dBFS RMS leaves the screen as
+// it is in silence.
 void checkOutputHissIsSilence() {
   FaceRig r;
   r.ticks(70, dbToLinear(-70.0f), 0.0f);
