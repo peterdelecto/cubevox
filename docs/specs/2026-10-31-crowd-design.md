@@ -389,12 +389,10 @@ fifth can still swing by up to 2 dB.
    slot's passes (`2026-10-01-autotune-design.md`). test/firmware/core_layout.cpp requires
    `measured` only for cards in `defaultLayout()`, and exempts Autotune while its row is an
    estimate. With the pitch slot's clean-up rows (`kTracker{4, 5}`, `kAutotune{5, 6}`) `layoutValid`
-   says ok for the default layout (67 % mean, 74 % worst against 75 / 95) and refuses the crowdtest
-   layout (81 / 89) and a default layout with Crowd in Unison's place (78 / 87, over on the mean).
-   The crowdtest image bypasses the budget check.
-7. The crowdtest image (`VARIANT=crowdtest ./build.sh`, label `-crowd`) puts Crowd in Autotune's
-   slot. On that image the record saves the layout it held at boot, or the default when it held
-   none, so the test layout plays from RAM only and a stored custom layout survives the test.
+   says ok for the default layout (67 % mean, 74 % worst against 75 / 95) and refuses a default
+   layout with Crowd in Unison's place (78 / 87, over on the mean).
+7. The crowdtest firmware variant (Crowd in Autotune's slot, budget check off) was removed
+   (owner 2026-11-07). Every image refuses a layout over the budget.
 8. The record stores the id string, so flash layouts are unaffected. app/fixtures/hello.json is
    refreshed by `hello_fixture_refresh`; app/internal/server/server_test.go counts 11 cards.
 
@@ -516,15 +514,15 @@ fifth can still swing by up to 2 dB.
    the measured rule), parity_test sweepCrowd with a `static_assert` that the firmware uses
    `CrowdTuning{}`, knob_step runCard case, fastmath_test pinning `sinCosFast`.
 4. Gates: ctest `100% tests passed`; `cubevox-proto --layout` ok with `default macros match engine
-   defaults: ok`; `cd firmware && ./build.sh` ends `[warn-gate] ... ok`; `VARIANT=crowdtest` builds.
+   defaults: ok`; `cd firmware && ./build.sh` ends `[warn-gate] ... ok`.
 
 ## CPU and memory
 
 Host figures are per 64-sample block at VOICES 80 %, WIDTH 50 %, default tuning, Autotune off, on the
 crowd_test program, medians of 33 runs of 10 s with binaries interleaved. The board converts at 50.4k
 cycles per host µs in costs.h, which is 7.9 % of the 640k-cycle block per µs; the CPU audit's
-comparison against board-measured pitch slots gave 28k for code like Crowd's, 4.4 % per µs. Only a
-run of the crowdtest image on the box settles the ratio, and that bench is owed.
+comparison against board-measured pitch slots gave 28k for code like Crowd's, 4.4 % per µs. The
+board bench of 2026-11-01 (INDEX.md) settled the ratio.
 
 | Item | Host | Board at 50.4k / 28k |
 |---|---|---|

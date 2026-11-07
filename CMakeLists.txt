@@ -80,18 +80,23 @@ find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
 find_library(AUDIOTOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
 find_library(AUDIOUNIT_FRAMEWORK AudioUnit REQUIRED)
 
-# cubevox-proto: the prototype face. The bundle builds under build/ and a
-# symlink at the project root keeps it Finder-launchable across rebuilds.
-cubevox_gui_target(cubevox-proto emulator/main.cpp)
 # The face shows VERSION.txt bottom left; editing the file re-runs configure.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/VERSION.txt)
 file(STRINGS ${CMAKE_SOURCE_DIR}/VERSION.txt CUBEVOX_VERSION LIMIT_COUNT 1)
-target_compile_definitions(cubevox-proto PRIVATE CUBEVOX_VERSION="v${CUBEVOX_VERSION}")
-if(NOT CUBEVOX_BUNDLE_GLFW)
-  add_custom_command(TARGET cubevox-proto POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-            ${CMAKE_BINARY_DIR}/cubevox-proto.app ${CMAKE_SOURCE_DIR}/cubevox-proto.app
-    VERBATIM)
+
+# cubevox-proto: the parked prototype face, built only with -DCUBEVOX_BUILD_PROTO=ON. The bundle
+# builds under build/ and a symlink at the project root keeps it Finder-launchable across rebuilds.
+option(CUBEVOX_BUILD_PROTO "Build the parked cubevox-proto prototype and its proto_layout test" OFF)
+if(CUBEVOX_BUILD_PROTO)
+  cubevox_gui_target(cubevox-proto emulator/main.cpp)
+  target_compile_definitions(cubevox-proto PRIVATE CUBEVOX_VERSION="v${CUBEVOX_VERSION}")
+  if(NOT CUBEVOX_BUNDLE_GLFW)
+    add_custom_command(TARGET cubevox-proto POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+              ${CMAKE_BINARY_DIR}/cubevox-proto.app ${CMAKE_SOURCE_DIR}/cubevox-proto.app
+      VERBATIM)
+  endif()
+  add_test(NAME proto_layout COMMAND $<TARGET_FILE:cubevox-proto> --layout)
 endif()
 
 # cubevox-render: loop in, WAV out, no window.
@@ -142,8 +147,6 @@ cubevox_engine_test(slapback)
 cubevox_engine_test(distortion)
 cubevox_engine_test(lofi)
 target_compile_definitions(lofi_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
-add_test(NAME proto_layout
-  COMMAND $<TARGET_FILE:cubevox-proto> --layout)
 cubevox_engine_test(chasm)
 cubevox_engine_test(polish)
 cubevox_engine_test(polish_comp)

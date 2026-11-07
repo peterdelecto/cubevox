@@ -10,12 +10,6 @@ Layout defaultLayout() {
            Card::Slapback, Card::Distortion, Card::Gate, Card::ReverbSpring}};
 }
 
-Layout crowdTestLayout() {
-  Layout layout = defaultLayout();
-  layout.card[1] = Card::Crowd;
-  return layout;
-}
-
 namespace {
 
 // Indexed by SwapSlot.
@@ -133,12 +127,9 @@ LayoutCheck layoutValid(const Layout& layout) {
   }
   if (reverbs > 1) return fail(LayoutError::TwoReverbs, 0, Card::Empty, 0);
   if (reverbs == 0) return fail(LayoutError::NoReverb, 0, Card::Empty, 0);
-#ifndef CUBEVOX_CROWDTEST
-  // The test image places Crowd past the budget lines on purpose.
   const LayoutCost cost = layoutCost(layout);
   if (cost.avg > costs::kBudgetAvgPercent) return fail(LayoutError::OverAvg, 0, Card::Empty, cost.avg);
   if (cost.worst > costs::kBudgetWorstPercent) return fail(LayoutError::OverWorst, 0, Card::Empty, cost.worst);
-#endif
   return LayoutCheck();
 }
 

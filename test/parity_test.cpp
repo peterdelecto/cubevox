@@ -190,9 +190,6 @@ void cmpChasmTuning(const std::string& p, float pos, const cv::ChasmTuning& ca, 
   CMP(p + ".chasm", pos, ca, cb, wobbleDepth);
   CMP(p + ".chasm", pos, ca, cb, wobbleRateHz);
   CMP(p + ".chasm", pos, ca, cb, inputTrim);
-  CMP(p + ".chasm", pos, ca, cb, dwell);
-  CMP(p + ".chasm", pos, ca, cb, dwellDrive);
-  CMP(p + ".chasm", pos, ca, cb, dwellComp);
   CMP(p + ".chasm", pos, ca, cb, wetDb);
 }
 
@@ -210,9 +207,6 @@ void cmpSpringTuning(const std::string& p, float pos, const cv::SpringTuning& f,
   CMP(p + ".spring", pos, f, e, returnLpHz);
   CMP(p + ".spring", pos, f, e, wobbleDepth);
   CMP(p + ".spring", pos, f, e, wobbleRateHz);
-  CMP(p + ".spring", pos, f, e, dwell);
-  CMP(p + ".spring", pos, f, e, dwellDrive);
-  CMP(p + ".spring", pos, f, e, dwellComp);
   CMP(p + ".spring", pos, f, e, wetDb);
   CMP(p + ".spring", pos, f, e, restLevel);
 }

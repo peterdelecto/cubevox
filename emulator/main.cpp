@@ -359,9 +359,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const cv::ReverbParams& r = p.reverb;
   const int re = r.engine == cv::kReverbChasm ? cv::kReverbChasm : cv::kReverbSpring;
   const float decays[2] = {r.spring.decay, r.chasm.feedback};
-  const float dwells[2] = {r.spring.tuning.dwell, r.chasm.tuning.dwell};
   const float decay = decays[re];
-  const float dwell = dwells[re];
   char macros[640];
   cv::macros::formatAll(p.macros, macros, sizeof(macros));
   const int n = std::snprintf(
@@ -373,7 +371,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       "%.0f %% mechanical (%.0f ms); Octave SEMITONES %+d, MIX %.0f %%; Crowd DIVERGE "
       "%.0f %%, VOICES %s; Unison DEPTH "
       "%.0f %%, RATE %.0f %%; Slapback AMOUNT %.0f %%, TIME %.0f ms; Distortion DRIVE %.0f %%, TONE %.0f %%; Reverb MIX "
-      "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%, dwell %.0f %%)\n",
+      "%.0f %%, TIME %.0f %% (wet %.0f %%, decay %.0f %%)\n",
       macros, onOff(p.gate.on), onOff(at.on), onOff(o.on), onOff(p.crowd.on), onOff(p.unison.on),
       onOff(p.slapback.on), onOff(p.distortion.on), onOff(r.on), kReverb[re], onOff(p.eq.on),
       static_cast<double>(p.inputGate.thresholdDb),
@@ -391,8 +389,7 @@ size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
       static_cast<double>(p.slapback.tuning.timeMs),
       static_cast<double>(p.distortion.drive * 100.0f),
       static_cast<double>(p.distortion.tone * 100.0f), static_cast<double>(r.mix * 100.0f),
-      static_cast<double>(r.time * 100.0f), static_cast<double>(r.wet * 100.0f), static_cast<double>(decay * 100.0f),
-      static_cast<double>(dwell * 100.0f));
+      static_cast<double>(r.time * 100.0f), static_cast<double>(r.wet * 100.0f), static_cast<double>(decay * 100.0f));
   return n < 0 ? 0 : std::min(static_cast<size_t>(n), size - 1);
 }
 
@@ -411,7 +408,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       "SlapbackTuning{%.1ff, %.0ff, %.2ff, %.1ff, %.1ff}\n"
       "DistortionTuning{%.0ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, %.2ff, %.0ff, %.1ff, %.0ff, %.1ff, %.1ff, "
       "%.0ff, %.0ff, %.1ff, %.2ff, %.2ff, %.0ff, %.1ff, %.1ff, %.1ff, %.0ff, %.1ff, %.2ff, %.1ff, %.2ff}\n"
-      "ChasmTuning{%.0ff, %.0ff, %.2ff, %.2ff, %.2ff, %.2ff, %.1ff, %.1ff, %.1ff}\n"
+      "ChasmTuning{%.0ff, %.0ff, %.2ff, %.2ff, %.2ff, %.1ff}\n"
       "PolishTuning{%.2ff, %.2ff, %.1ff, {%.0ff, %.0ff, %.1ff, %.1ff, %.0ff, %.0ff, %.1ff}}\n"
       "// PolishParams: dip %.0f Hz %.1f dB, presence %.0f Hz %.1f dB",
       o.glideMs, o.grainWindowMs, o.trimDb,
@@ -422,7 +419,7 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
       d.railAsym, d.railSoft, d.trebleCutHz, d.trebleCutDb, d.toneMinDb, d.toneMaxDb, d.bassPeakHz,
       d.bassPeakDb, d.bassPeakQ, d.trimDb, d.fadeDrive,
       c.bassCutHz, c.bassCutHzTop, c.wobbleDepth,
-      c.wobbleRateHz, c.inputTrim, c.dwell, c.dwellDrive, c.dwellComp, c.wetDb, e.tuning.dipQ,
+      c.wobbleRateHz, c.inputTrim, c.wetDb, e.tuning.dipQ,
       e.tuning.presenceQ, e.tuning.trimDb, e.tuning.deEsser.bandLoHz, e.tuning.deEsser.bandHiHz,
       e.tuning.deEsser.thresholdDb, e.tuning.deEsser.maxCutDb, e.tuning.deEsser.releaseMs,
       e.tuning.deEsser.notchHz, e.tuning.deEsser.notchQ, e.dipHz, e.dipDb, e.presenceHz, e.presenceDb);
@@ -430,10 +427,10 @@ void formatTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv
   const cv::SpringTuning& sb = params.reverb.spring.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
                 "\nSpringTuning{%.1ff, %.1ff, %.1ff, %.2ff, %.2ff, %.2ff, %d, %.2ff, %.0ff, %.0ff, "
-                "%.0ff, %.1ff, %.2ff, %.2ff, %.1ff, %.2ff, %.2ff, %.0ef}",
+                "%.0ff, %.1ff, %.2ff, %.2ff, %.0ef}",
                 sb.springMs1, sb.springMs2, sb.springMs3, sb.feedbackLo, sb.feedbackHi, sb.diffuse,
                 sb.chirpSections, sb.chirpA, sb.trebleLossHz, sb.bassCutHz, sb.returnLpHz,
-                sb.wobbleDepth, sb.wobbleRateHz, sb.dwell, sb.dwellDrive, sb.dwellComp, sb.wetDb, sb.restLevel);
+                sb.wobbleDepth, sb.wobbleRateHz, sb.wetDb, sb.restLevel);
   used = std::strlen(gTuningText);
   const cv::CrowdTuning& ct = params.crowd.tuning;
   std::snprintf(gTuningText + used, sizeof(gTuningText) - used,
@@ -476,12 +473,12 @@ void printTuning(const cv::OctaveTuning& o, const cv::UnisonTuning& t, const cv:
       "railAsym, railSoft, trebleCutHz, trebleCutDb, toneMinDb, toneMaxDb, bassPeakHz, bassPeakDb, "
       "bassPeakQ, trimDb, fadeDrive\n"
       "// ChasmTuning: bassCutHz, "
-      "bassCutHzTop, wobbleDepth, wobbleRateHz, inputTrim, dwell, "
-      "dwellDrive, dwellComp, wetDb\n// PolishTuning: dipQ, presenceQ, trimDb, "
+      "bassCutHzTop, wobbleDepth, wobbleRateHz, inputTrim, "
+      "wetDb\n// PolishTuning: dipQ, presenceQ, trimDb, "
       "{bandLoHz, bandHiHz, thresholdDb, maxCutDb, releaseMs, notchHz, notchQ}\n"
       "// SpringTuning: springMs1, springMs2, springMs3, feedbackLo, feedbackHi, diffuse, chirpSections, "
-      "chirpA, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, dwell, "
-      "dwellDrive, dwellComp, wetDb, restLevel\n"
+      "chirpA, trebleLossHz, bassCutHz, returnLpHz, wobbleDepth, wobbleRateHz, "
+      "wetDb, restLevel\n"
       "// CrowdTuning: {pitchSt[0..3]}, {formantSt[0..3]}, {shelfDb[0..3]}, {delayMs[0..3]}, lagScale, shelfHz, voiceDb, "
       "trimDb, trimBottomDb, hpHz, maxLagMs, gapFloorDb, scatterMs, driftCents, driftHoldS, "
       "widthKnee, widthKneeFrac, widthLagBottom, widthLagMs, levelScatterDb, {contour[0..3]}\n%s\n",
@@ -738,8 +735,6 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
     ImGui::TreePop();
   }
   if (tuningNode("Chasm levels")) {
-    ImGui::SliderFloat("Drive at dwell 1", &c.dwellDrive, 1.0f, 64.0f, "%.1f x", log);
-    ImGui::SliderFloat("Drive compensation", &c.dwellComp, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Input trim", &c.inputTrim, 0.05f, 1.5f, "%.2f", log);
     ImGui::SliderFloat("Wet level", &c.wetDb, -24.0f, 24.0f, "%.1f dB");
     ImGui::TreePop();
@@ -761,8 +756,6 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
     ImGui::TreePop();
   }
   if (tuningNode("Spring levels")) {
-    ImGui::SliderFloat("Drive at dwell 1", &b.dwellDrive, 1.0f, 64.0f, "%.1f x", ImGuiSliderFlags_Logarithmic);
-    ImGui::SliderFloat("Drive compensation", &b.dwellComp, 0.0f, 1.0f, "%.2f");
     ImGui::SliderFloat("Wet level", &b.wetDb, -24.0f, 24.0f, "%.1f dB");
     ImGui::TreePop();
   }
@@ -988,9 +981,7 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   add("reverb.intensity", &r.mix);
   add("reverb.time", &r.time);
   add("reverb.chasm.feedback", &r.chasm.feedback);
-  add("reverb.chasm.dwell", &r.chasm.tuning.dwell);
   add("reverb.springb.decay", &r.spring.decay);
-  add("reverb.springb.dwell", &r.spring.tuning.dwell);  // the key keeps its name so old saved states load
   add("eq.on", &p.eq.on);
   add("eq.dipHz", &p.eq.dipHz);
   add("eq.dipDb", &p.eq.dipDb);
@@ -1246,9 +1237,6 @@ void drawReverbTuning(cv::ReverbParams& r, cv::macros::State& m) {
   }
   namespace mc = cv::macros;
   if (r.engine == cv::kReverbChasm) {
-    // Dwell (input drive into the soft clip) has no panel knob. Spring's is a fixed tuning value.
-    float dwellPct = r.chasm.tuning.dwell * 100.0f;
-    if (ImGui::SliderFloat("Dwell", &dwellPct, 0.0f, 100.0f, "%.0f %%")) r.chasm.tuning.dwell = dwellPct / 100.0f;
     macroSlider("Wobble", "pitch wobble in the tail", m.pos[mc::ChasmWobble],
                 [&](float p) { mc::chasmWobble(r.chasm.tuning, p); });
     macroSlider("Bass", "more low end in the tail", m.pos[mc::ChasmBass],
