@@ -81,13 +81,16 @@ rows tall. The scale now fits each frame.
    last scale less 3 dB (75 dB a second at 25 frames). A quiet frame right after a loud one draws at
    70 % or more, and an echo tail 12 dB under the voice fills the height within four frames. The
    scale rises at once.
-3. The floor rule is kept whole, from `level::OutputMeter`: a tick whose RMS is under the floor plus
-   6 dB is silence, and the screen draws the line. The floor follows the quietest recent tick, rises
-   3 dB a second, and never comes closer than 12 dB to the window top, so the loudest recent tick
-   always draws. This is what keeps room noise and an idling synth on the line (owner 2026-10-30).
-4. `OutputMeter` keeps its window top for the floor rule; the trace no longer reads it.
-5. The tick RMS that drives the floor is the energy of the blocks the chain wrote into the ring during
-   the tick, so the floor and the trace read one signal.
+3. Silence is a fixed level, not the ribbon's floor rule (owner 2026-11-07: "the VU meter should be
+   input, and the scope should be affected output"). A frame whose peak is under -54 dBFS draws the
+   line. The floor rule of 2026-10-30 tracked the quietest recent tick and called anything within
+   6 dB of it silence; a decaying echo tail is a run of new quietest ticks, so the rule drew the whole
+   tail as the line while it was plainly audible. The rule goes, with `level::OutputMeter` and the
+   output energy take that fed it.
+4. The scale never fits below -40 dBFS peak. A frame between -54 and -40 dBFS draws at 1 to 5 rows,
+   so hiss or an idling synth on the input shows as a thin band, not a full-height trace, and a tail
+   shrinks into the line instead of snapping to it.
+5. The input meter box is the input level, unchanged.
 
 ## 4. Trigger
 
@@ -157,7 +160,9 @@ rows tall. The scale now fits each frame.
    A tick under the floor gives silent.
 3. `core_scope`, scale: a 150 Hz sine at -20 dBFS and at -40 dBFS each reach rows 10 and 54; a frame
    at half the previous frame's peak draws at 70 % (the 3 dB fall); a frame 12 dB under fills the
-   height by the fourth frame; a held note under the floor plus 6 dB goes to the line.
+   height by the fourth frame; a sine at -48 dBFS draws at 9 rows (the -40 dBFS minimum scale); a
+   frame with its peak under -54 dBFS gives the line; an echo tail decaying from -20 to -60 dBFS
+   draws on every frame until it is under -54 dBFS.
 4. `core_scope`, ring: wrap-around returns the newest samples in order; the energy of a known signal
    equals the old DAC-side sum with the output trim at unity; a host two-thread stress where the writer
    fills each block with its block number and the reader asserts every frame is consecutive numbers.
