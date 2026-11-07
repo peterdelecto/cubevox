@@ -28,6 +28,7 @@ set -euo pipefail
 FW="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$FW/.." && pwd)"
 source "$FW/cv_define.sh"
+source "$FW/build_lock.sh"
 
 usage() {  # the header comment above, without its marks
   awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
@@ -102,65 +103,19 @@ case "${1:-}" in
   *) echo "[ERROR] unknown argument '$1'; use --variant, --outdir, --toolchain or --help"; exit 1 ;;
 esac
 
-# A second build into the same dir waits for the first. The lock is released on every exit path.
-# The lock dir holds the owner's PID. A lock whose owner is dead is reaped under a second mkdir
-# mutex, so two waiters cannot both remove it and the second then remove a lock the first re-created.
-# A build that starts compiling and does not finish deletes the .bin and .uf2 it found, because
-# neither one matches the sources any more.
-LOCK="$OUT.lock"
-LOCK_WAIT_S=600
-held=0
-reaping=0
+# A second build into the same dir waits for the first (build_lock.sh). A build that starts
+# compiling and does not finish deletes the .bin and .uf2 it found, because neither one matches the
+# sources any more.
 compiling=0
 
 release_locks() {
   if [ "$compiling" -eq 1 ]; then rm -f "$OUT/cubevox.ino.bin" "$OUT/cubevox.uf2"; fi
-  if [ "$reaping" -eq 1 ]; then rmdir "$LOCK.reap"; reaping=0; fi
-  if [ "$held" -eq 1 ]; then rm -f "$LOCK/pid"; rmdir "$LOCK"; held=0; fi
+  build_lock_release
 }
 trap release_locks EXIT
 trap 'exit 130' INT TERM
 
-# Sets reaped=1 when it removed a stale lock. Called as a plain command so set -e applies inside.
-reaped=0
-reap_stale_lock() {
-  reaped=0
-  mkdir "$LOCK.reap" 2>/dev/null || return 0  # another waiter is reaping
-  reaping=1
-  local owner
-  owner="$(cat "$LOCK/pid" 2>/dev/null || true)"  # absent while the owner is still writing it
-  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-    echo "[build] removing stale lock $LOCK (pid $owner is gone)"
-    rm -f "$LOCK/pid"
-    rmdir "$LOCK"
-    reaped=1
-  fi
-  rmdir "$LOCK.reap"
-  reaping=0
-}
-
-waited=0
-while true; do
-  if mkerr="$(mkdir "$LOCK" 2>&1)"; then break; fi
-  if [ ! -d "$LOCK" ]; then
-    echo "[ERROR] cannot create lock $LOCK: $mkerr"
-    exit 1
-  fi
-  reap_stale_lock
-  if [ "$reaped" -eq 1 ]; then continue; fi
-  owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ "$waited" -ge "$LOCK_WAIT_S" ]; then
-    echo "[ERROR] a $VARIANT build (pid ${owner:-unknown}) held $LOCK for $LOCK_WAIT_S s"
-    exit 1
-  fi
-  if [ "$waited" -eq 0 ]; then
-    echo "[build] waiting for the running $VARIANT build (pid ${owner:-unknown}, lock $LOCK)"
-  fi
-  sleep 2
-  waited=$((waited + 2))
-done
-held=1
-echo $$ > "$LOCK/pid"
+build_lock_acquire "$OUT.lock" "$VARIANT"
 
 locate_toolchain
 echo "[build] arduino-cli $CLI_VERSION, $("$gcc" --version | head -1)"

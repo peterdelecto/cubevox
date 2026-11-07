@@ -14,9 +14,8 @@ CV_REPO := $(realpath $(CV_BOOTLOADER)/../..)
 CV_BOOT_BLOCK_H := $(CV_REPO)/firmware/cubevox/src/board/boot_block.h
 
 # A value from boot_block.h, which keeps every shared value an integer literal alone on its line.
-# The hash sits in a variable because make 3.81 and 4.3 read \# in a function call differently.
-CV_HASH := \#
-cv_define = $(shell awk '$$1 == "$(CV_HASH)define" && $$2 == "$(1)" { sub(/[uU]$$/, "", $$3); print $$3 }' '$(CV_BOOT_BLOCK_H)')
+# firmware/cv_define.sh reads it, as it does for the build scripts.
+cv_define = $(shell bash -c '. "$(CV_REPO)/firmware/cv_define.sh" && cv_define $(1)')
 CV_APP_END := $(call cv_define,CV_APP_END)
 CV_BOOT_BLOCK_ADDR := $(call cv_define,CV_BOOT_BLOCK_ADDR)
 CV_FAULT_RECORD_ADDR := $(call cv_define,CV_FAULT_RECORD_ADDR)

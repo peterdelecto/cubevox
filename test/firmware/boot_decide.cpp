@@ -69,9 +69,7 @@ static_assert(CV_UF2_FAMILY_CUBEVOX != 0x6db66082u, "boot: the family id differs
 static_assert(CV_APP_START == 0x08020000u && CV_APP_END == 0x08100000u && CV_IMAGE_HEADER_OFFSET == 0x400u &&
                   CV_BANK2_BASE == 0x08100000u && CV_BANK2_END == 0x08200000u,
               "boot: flash map");
-static_assert(CV_USB_VID_BOOT == 0x1209u && CV_USB_PID_BOOT == 0x0001u && CV_USB_VID_APP == 0x0483u &&
-                  CV_USB_PID_APP == 0x5740u,
-              "boot: USB ids");
+static_assert(CV_USB_VID_BOOT == 0x1209u && CV_USB_PID_BOOT == 0x0001u, "boot: USB ids");
 static_assert(CV_BOOT_FAIL_LIMIT == 3u && CV_UPDATE_TIMEOUT_MS == 60000u && CV_HEALTHY_MS == 5000u &&
                   CV_WATCHDOG_BOOT_MS == 16000u,
               "boot: limits");

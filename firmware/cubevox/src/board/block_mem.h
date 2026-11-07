@@ -1,5 +1,3 @@
-// Adapted from Teensy-H7-Port, lib/platform/h7/h7_block_mem.h.
-//
 // Where audio memory lives on the STM32H743, and why. Two facts drive it.
 //
 //   1. DMA1 and DMA2 cannot reach DTCM, the fastest RAM on the chip.

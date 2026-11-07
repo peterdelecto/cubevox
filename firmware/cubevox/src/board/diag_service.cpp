@@ -44,7 +44,7 @@ CvDiagEntry makeEntry(CvDiagKind kind) {
   e.lastReason = bootHealthLastReasonCode();
   e.faultAddress = recordBootFaultAddress();
   e.saiErrors = audioErrors().count;
-  e.overruns = audioStats().overruns;
+  e.overruns = audioHealth().overruns;
   e.optionBytes = bootBlockWritten() ? bootBlock().optionBytes : CV_DIAG_UNKNOWN_U32;
   copyText(e.firmware, sizeof e.firmware, kFirmwareVersion, SIZE_MAX);
   if (faultRecordPresent()) faultSummaryText(e.fault, sizeof e.fault);
@@ -60,10 +60,19 @@ void queueLive(CvDiagKind kind) {
   queue(e);
 }
 
+uint32_t gDroppedReported = 0;
+
 void reportFailure() {
-  if (!gLog.takeError()) return;
-  gFailed = true;
-  serialOut().println("[ERROR] diag log write failed, that entry is lost");
+  if (gLog.takeError()) {
+    gFailed = true;
+    serialOut().println("[ERROR] diag log write failed, that entry is lost");
+  }
+  const uint32_t dropped = gLog.dropped();
+  if (dropped == gDroppedReported) return;
+  gDroppedReported = dropped;
+  serialOut().print("[WARN] diag log dropped ");
+  serialOut().print(dropped);
+  serialOut().println(" entries since boot");
 }
 
 // A start that followed a plain power-on with no fault record and a working option byte step has
@@ -108,5 +117,10 @@ void diagReportBoot(Print& out) {
     out.print(gLog.count());
     out.print(" entries, last seq ");
     out.println(gLog.lastSequence());
+  }
+  if (gLog.dropped() != 0) {
+    out.print("[WARN] diag log dropped ");
+    out.print(gLog.dropped());
+    out.println(" entries since boot");
   }
 }

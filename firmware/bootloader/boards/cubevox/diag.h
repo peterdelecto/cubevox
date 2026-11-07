@@ -12,11 +12,9 @@
 extern "C" {
 #endif
 
-// RM0433 register fields the fault line decodes as fault.cpp does: FLASH_SR DBECCERR, FLASH_ECC_FA
-// FAIL_ECC_ADDR in 32-byte flash words. board_hooks.c checks them against CMSIS.
+// RM0433 register field the fault line decodes as fault.cpp does: FLASH_SR DBECCERR. The ECC
+// address decode is cvEccAddress in boot_block.h. board_hooks.c checks both against CMSIS.
 #define CV_FLASH_SR_DBECCERR  (1u << 26)
-#define CV_FLASH_ECC_ADDR     0x7FFFu
-#define CV_FLASH_WORD_BYTES   32u
 
 // UF2 blocks since update mode began.
 typedef struct {

@@ -23,12 +23,6 @@ extern "C" {
 #define CV_RSR_SFTRSTF         (1u << 24)
 #define CV_RSR_IWDG1RSTF       (1u << 26)
 #define CV_RSR_WWDG1RSTF       (1u << 28)
-#define CV_OPTSR_BOR_LEV_POS   2u
-#define CV_OPTSR_BOR_LEV_MASK  (3u << CV_OPTSR_BOR_LEV_POS)
-// FLASH_WPSN: a clear bit write protects its sector.
-#define CV_WPSN_SECTOR0        1u
-// The highest brown-out threshold, about 2.7 V.
-#define CV_BOR_LEVEL_WANTED    3u
 
 typedef enum { CvImageValid, CvImageInvalid } CvImageStatus;
 typedef enum { CvActionRunApp, CvActionUpdateMode } CvBootAction;

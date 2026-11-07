@@ -22,7 +22,7 @@ void reportUnfinished() {
 }
 
 [[noreturn]] void resetNow() {
-  serialFlush(kFlushBeforeResetMs);
+  if (!serialFlush(kFlushBeforeResetMs)) serialOut().println("[WARN] serial output not flushed at reset");
   muteForReset();
   if (gWhy == PlannedReset::Update) {
     bootBlock().request = CV_REQUEST_UPDATE;

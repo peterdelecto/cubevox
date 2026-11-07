@@ -549,9 +549,9 @@ firmware/bootloader/
 5. `VERSION.txt` is bumped as today; the header string and the release file name derive from it.
 6. `LICENSE` at the repository root is MIT. The bootloader README carries the TinyUF2 and TinyUSB
    notices. Nothing else is needed on licensing.
-7. The parked app, when it returns, replaces its dfu-util step with a copy of the release `.uf2` to
-   `/Volumes/CUBEVOX` and a wait for the CDC port. `app/dfu-util-static.sh` and the `dfu-util`
-   release job go at that time, not before.
+7. The parked app has no firmware update path (removed 2026-11-07: it wrote the .bin over the
+   bootloader). When it returns, it copies the release `.uf2` to `/Volumes/CUBEVOX` and waits for
+   the CDC port.
 
 ## Compatibility rules
 1. The boot block offsets, the header layout, the family id, the application start address and the

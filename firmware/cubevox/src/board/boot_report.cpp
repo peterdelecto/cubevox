@@ -12,6 +12,7 @@
 #include "board/fault.h"
 #include "board/pins.h"
 #include "board/power_sense.h"
+#include "board/print_hex.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
 #include "board/sysclock.h"
@@ -20,18 +21,8 @@
 namespace {
 
 constexpr uint32_t kFpuAccessMask = 0xFu << 20;  // CPACR CP10 and CP11 full access
-// The bootloader's option byte step sets BOR level 3 (2.7 V) and write-protects bank 1 sector 0.
-// A set bit in WPSN_CUR1 leaves its sector writable (RM0433, FLASH_WPSN_CUR1R).
-constexpr uint32_t kBorLevelWanted = 3;
-constexpr uint32_t kSector0Writable = 1u << FLASH_WPSN_WRPSN_Pos;
 
 const char* onOff(bool on) { return on ? "on" : "OFF"; }
-
-void printHex(Print& out, const char* label, uint32_t v) {
-  out.print(label);
-  out.print("=0x");
-  out.print(v, HEX);
-}
 
 // The MCU id, so each bench log names its box.
 void reportSerial(Print& out) {
@@ -43,8 +34,8 @@ void reportSerial(Print& out) {
 void reportOptionBytes(Print& out) {
   const uint32_t result = bootBlockWritten() ? bootBlock().optionBytes : CV_DIAG_UNKNOWN_U32;
   const uint32_t borLevel = (FLASH->OPTSR_CUR & FLASH_OPTSR_BOR_LEV) >> FLASH_OPTSR_BOR_LEV_Pos;
-  const bool sector0Protected = (FLASH->WPSN_CUR1 & kSector0Writable) == 0u;
-  const bool asWanted = !cvOptionResultFailed(result) && borLevel == kBorLevelWanted && sector0Protected;
+  const bool sector0Protected = (FLASH->WPSN_CUR1 & CV_WPSN_SECTOR0) == 0u;
+  const bool asWanted = !cvOptionResultFailed(result) && cvOptionsInPlace(FLASH->OPTSR_CUR, FLASH->WPSN_CUR1);
   out.print(asWanted ? "[boot] option bytes: " : "[WARN] option bytes: ");
   out.print(cvOptionResultName(result));
   out.print(", BOR level ");

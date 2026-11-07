@@ -3,6 +3,9 @@
 Owner 2026-10-01: every stage, engaged at its default setting, outputs near unity or
 a tad hotter, 0 to +0.5 dB RMS over its input.
 
+Harmony left the code on 2026-10-24. Every Harmony row, the Harmony paragraphs and
+`harmony_test` below are history; the rule binds the stages that remain.
+
 ## Method
 
 `test/level_test.cpp` (ctest `level`) synthesizes 3 s of program material:

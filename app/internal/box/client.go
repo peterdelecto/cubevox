@@ -210,8 +210,3 @@ func (c *Client) Status() (Status, error) {
 	err := c.call("status", nil, &s)
 	return s, wrap("status", err)
 }
-
-// EnterDFU implements Box.
-func (c *Client) EnterDFU() error {
-	return wrap("enter_dfu", c.call("enter_dfu", nil, nil))
-}

@@ -34,7 +34,7 @@ constexpr std::array<uint32_t, kMuxSelectBits> kMuxSelectPins = {pins::kMuxS0, p
                                                                  pins::kMuxS3};
 static_assert(kPotCount <= (1 << kMuxSelectBits), "the mux select pins must address every pot");
 
-ADC_HandleTypeDef gAdc;  // ADC3; ADC1 and ADC2 belong to board/power_sense
+ADC_HandleTypeDef gAdc;  // ADC3; ADC1 belongs to board/power_sense
 const char* gAdcError = "not set up";  // the ADC3 step that failed; null once it runs
 uint32_t gDropped = 0;
 Every gDropReport{kDropReportMs};

@@ -12,6 +12,10 @@
 
 constexpr uint32_t kBank2Base = FLASH_BANK2_BASE;  // bank 2 sector 0
 
+static_assert(kBank2Base == CV_BANK2_BASE, "the bank 2 base differs from the bootloader contract");
+static_assert(kFlashSectorBytes == CV_FLASH_SECTOR_SIZE, "the sector size differs from the bootloader contract");
+static_assert(kFlashWordBytes == CV_FLASH_WORD_BYTES, "the flash word differs from the bootloader contract");
+
 // The sector of the diagnostic log, taken from its address in the bootloader contract.
 constexpr int kDiagLogSector = static_cast<int>((CV_DIAG_LOG_ADDR - kBank2Base) / kFlashSectorBytes);
 static_assert(kDiagLogSector >= kRecordSectors, "the log must not overlap the record sectors");

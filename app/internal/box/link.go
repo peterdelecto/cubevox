@@ -186,15 +186,6 @@ func (l *Link) Status() (Status, error) {
 	return l.status, nil
 }
 
-// EnterDFU implements Box.
-func (l *Link) EnterDFU() error {
-	c, err := l.current()
-	if err != nil {
-		return err
-	}
-	return c.EnterDFU()
-}
-
 // Discover opens each /dev/cu.usbmodem* port in turn and keeps the first that answers hello.
 func Discover() (*Client, Hello, error) {
 	ports, err := filepath.Glob(portPattern)
