@@ -26,7 +26,7 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
 - Version (owner 2026-10-02): the face shows `VERSION.txt` bottom left (started v0.01.00).
   Every change that rebuilds the app bumps it first with `tools/bump_version.sh`, in the
   same commit. Not named `VERSION`: the Mac's case-insensitive disk lets `<version>` find it.
-- Gates never open a window: `cubevox-proto --layout` and `ctest` are the checks.
+- Gates never open a window: `cubevox-emulator --check` and `ctest` are the checks.
 - Specs live in `docs/specs/`, one per stage and subsystem; `docs/specs/INDEX.md` lists every spec
   with what it covers and what superseded it. Read the index first, then the specs the task touches.
   Current direction (owner 2026-10-24): the Mac app is parked; the box ships to Adam with the default
@@ -49,7 +49,7 @@ Use these words or a plain description. Never a coined label (owner 2026-10-24).
 cmake -S . -B build && cmake --build build -j && ctest --test-dir build
 open build/cubevox-emulator.app   # the emulator: the firmware's core, ui and engine on the Mac behind the panel (2026-11-01 emulator spec)
 build/cubevox-emulator --check    # its headless gate, also ctest emulator_check; --proof out.ppm renders one frame
-open build/cubevox-proto.app      # the prototype, parked
+open build/cubevox-proto.app      # the prototype, parked; builds only with cmake -DCUBEVOX_BUILD_PROTO=ON
 build/cubevox-render in.wav out.wav --depth 0.7
 node tools/font-editor/serve.js   # font editor; edits save straight to tools/font-editor/fonts/cubevox-fonts.json
 cd app && go run . --fake        # Mac app on a fake box; go test ./... ; app/bundle.sh builds dist/cubevox.app
