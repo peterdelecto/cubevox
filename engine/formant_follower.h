@@ -2,10 +2,8 @@
 
 #include <cmath>
 
-#include "engine/common.h"
 #include "engine/dsp.h"
 #include "engine/formant_params.h"
-#include "engine/smooth.h"
 #include "engine/syllable_sweep.h"
 
 // Apraxia: the throat drops on every syllable. The card moves the Formant voice's SHIFT with the singing,

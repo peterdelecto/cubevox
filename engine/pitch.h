@@ -237,15 +237,6 @@ class PitchTracker {
   // about as much again as its low-pass step, so the pace counts it twice.
   static constexpr int kSumWeight = 2;
 
- public:
-  // The samples a caller's ring must hold, the call included, for pushes of up to kBlock samples. The
-  // fine pass reads the newest kFineSpan. A replay starts at least kReplayBlocks blocks before its first
-  // analysis, so it reads back no further than kReplaySpan less that, plus the call.
-  static constexpr int kRingNeed = kFineSpan > kReplaySpan - (kReplayBlocks - 1) * kBlock
-                                       ? kFineSpan
-                                       : kReplaySpan - (kReplayBlocks - 1) * kBlock;
-
- private:
   static_assert(static_cast<float>(kMinPeriod) == kSampleRate / kMaxHz &&
                     static_cast<float>(kMaxPeriod) >= kSampleRate / kMinHz &&
                     static_cast<float>(kMaxPeriod - 1) < kSampleRate / kMinHz,

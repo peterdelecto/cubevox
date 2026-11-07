@@ -151,15 +151,15 @@ float engineValue(Card c, int knob, const ChainParams& p) {
   switch (c) {
     case Card::InputGate: return knob == 0 ? p.inputGate.thresholdDb : p.inputGate.tuning.releaseMs;
     case Card::Gate: return knob == 0 ? p.gate.thresholdDb : p.gate.tuning.releaseMs;
-    case Card::Autotune: return p.pitchFx.autotune.responseMs;
-    case Card::Octave: return p.pitchFx.octave.mix;
+    case Card::Autotune: return p.pitchCards.autotune.responseMs;
+    case Card::Octave: return p.pitchCards.octave.mix;
     case Card::Unison: return knob == 0 ? p.unison.tuning.lfoHz[0] : p.unison.depth;
     case Card::Slapback: return knob == 0 ? p.slapback.tuning.timeMs : p.slapback.amount;
     case Card::Distortion: return knob == 0 ? p.distortion.tone : p.distortion.drive;
     case Card::ReverbSpring:
     case Card::ReverbChasm: return knob == 0 ? p.reverb.time : p.reverb.mix;
     case Card::Crowd: return knob == 0 ? p.crowd.width : static_cast<float>(p.crowd.voicesStep);
-    case Card::Formant: return knob == 0 ? static_cast<float>(p.pitchFx.formant.shiftSt) : p.pitchFx.formant.mix;
+    case Card::Formant: return knob == 0 ? static_cast<float>(p.pitchCards.formant.shiftSt) : p.pitchCards.formant.mix;
     case Card::Lofi: return knob == 0 ? p.lofi.tone : p.lofi.amount;
     case Card::Bloom: return knob == 0 ? p.bloom.lengthMs : p.bloom.amount;
     case Card::FormantFollower: return knob == 0 ? p.follower.sensitivity : p.follower.rangeSt;
@@ -181,9 +181,8 @@ void checkDescriptors() {
       check(d.min < d.max, "descriptor min below max");
       const bool reversed = d.curve == Curve::LogReversed;
       std::snprintf(what, sizeof(what), "%s knob %d shows its ends at 0 and 1", cardDesc(c).id, k);
-      const float shownScale = std::pow(10.0f, static_cast<float>(d.decimals));
-      check(knobShown(d, 0.0f) == std::lround((reversed ? d.max : d.min) * shownScale) &&
-                knobShown(d, 1.0f) == std::lround((reversed ? d.min : d.max) * shownScale),
+      check(knobShown(d, 0.0f) == std::lround(reversed ? d.max : d.min) &&
+                knobShown(d, 1.0f) == std::lround(reversed ? d.min : d.max),
             what);
 
       const bool percent = std::strcmp(d.unit, "%") == 0;
@@ -221,11 +220,11 @@ void checkKnobTargets() {
   applyKnob(Card::Gate, 1, 1.0f, p);
   check(std::fabs(p.gate.tuning.releaseMs - 1000.0f) < 1e-2f, "gate decay max 1000 ms");
   applyKnob(Card::Autotune, 0, 11.0f, p);
-  check(p.pitchFx.autotune.key == 11, "autotune key position 11");
+  check(p.pitchCards.autotune.key == 11, "autotune key position 11");
   applyKnob(Card::Octave, 0, 0.0f, p);
-  check(p.pitchFx.octave.semitones == -12, "semitones position 0 is -12");
+  check(p.pitchCards.octave.semitones == -12, "semitones position 0 is -12");
   applyKnob(Card::Octave, 0, 24.0f, p);
-  check(p.pitchFx.octave.semitones == 12, "semitones position 24 is +12");
+  check(p.pitchCards.octave.semitones == 12, "semitones position 24 is +12");
   check(knobSteps(Card::Octave, 0) == 25, "semitones has 25 positions");
   check(knobSteps(Card::Autotune, 0) == 12, "key has 12 positions");
   applyKnob(Card::Slapback, 0, 0.0f, p);
@@ -238,15 +237,15 @@ void checkKnobTargets() {
 void checkKnobClamps() {
   ChainParams p;
   applyKnob(Card::Autotune, 0, 99.0f, p);
-  check(p.pitchFx.autotune.key == 11, "clamp: key above the last position");
+  check(p.pitchCards.autotune.key == 11, "clamp: key above the last position");
   applyKnob(Card::Autotune, 0, -3.0f, p);
-  check(p.pitchFx.autotune.key == 0, "clamp: key below the first position");
+  check(p.pitchCards.autotune.key == 0, "clamp: key below the first position");
   applyKnob(Card::Autotune, 0, NAN, p);
-  check(p.pitchFx.autotune.key == 0, "clamp: NaN key");
+  check(p.pitchCards.autotune.key == 0, "clamp: NaN key");
   applyKnob(Card::Octave, 0, 99.0f, p);
-  check(p.pitchFx.octave.semitones == 12, "clamp: semitones above the last position");
+  check(p.pitchCards.octave.semitones == 12, "clamp: semitones above the last position");
   applyKnob(Card::Octave, 0, -1.0f, p);
-  check(p.pitchFx.octave.semitones == -12, "clamp: semitones below the first position");
+  check(p.pitchCards.octave.semitones == -12, "clamp: semitones below the first position");
 
   const KnobDesc& key = *knobDesc(Card::Autotune, 0);
   check(std::strcmp(knobLabel(key, knobShown(key, 99.0f)), cv::kKeyName[11]) == 0, "clamp: key readout above the last position");
@@ -295,10 +294,10 @@ void checkChainDefaults() {
   }();
   check(p.gate.thresholdDb == mid.gate.thresholdDb && std::fabs(g.releaseMs - mid.gate.tuning.releaseMs) < 1e-4f,
         "defaults: the Gate starts at its pots' middle, -40 dB and 70.7 ms");
-  check(!p.gate.on && !p.pitchFx.autotune.on && !p.pitchFx.octave.on && !p.unison.on &&
+  check(!p.gate.on && !p.pitchCards.autotune.on && !p.pitchCards.octave.on && !p.unison.on &&
             !p.slapback.on && !p.distortion.on && !p.reverb.on && !p.crowd.on,
         "defaults: every other stage off");
-  check(std::fabs(p.pitchFx.octave.mix - 0.10f) < 1e-6f,
+  check(std::fabs(p.pitchCards.octave.mix - 0.10f) < 1e-6f,
         "defaults: octave at 10 % mix");
   check(p.reverb.engine == cv::kReverbSpring && p.eq.on, "defaults: spring reverb engine and the EQ on");
 }
@@ -333,12 +332,12 @@ void checkToggles() {
   check(p.reverb.on, "reverb toggle on");
   applyToggle(Card::Autotune, true, p);
   applyToggle(Card::Octave, false, p);
-  check(p.pitchFx.autotune.on && !p.pitchFx.octave.on, "pitch toggles are independent");
+  check(p.pitchCards.autotune.on && !p.pitchCards.octave.on, "pitch toggles are independent");
   applyToggle(Card::Crowd, true, p);
-  check(p.crowd.on && p.pitchFx.autotune.on && !p.pitchFx.octave.on,
+  check(p.crowd.on && p.pitchCards.autotune.on && !p.pitchCards.octave.on,
         "crowd toggle on sets its stage and leaves the pitch toggles alone");
   applyToggle(Card::Crowd, false, p);
-  check(!p.crowd.on && p.pitchFx.autotune.on, "crowd toggle off clears its flag");
+  check(!p.crowd.on && p.pitchCards.autotune.on, "crowd toggle off clears its flag");
 }
 
 void checkPlacement() {
@@ -463,8 +462,6 @@ void checkApraxiaCard() {
   check(std::strcmp(d.id, "formant_follow") == 0 && std::strcmp(d.name, "Apraxia") == 0 && d.engine == Engine::Formant &&
             d.group == Group::Pitch && d.knobCount == 2,
         "apraxia: id formant_follow, name Apraxia, the Formant engine and the pitch group");
-  check(d.oledName == nullptr && std::strcmp(oledName(Card::FormantFollower), "Apraxia") == 0,
-        "apraxia: the readout title is the card's name, Apraxia");
   const KnobDesc& sens = *knobDesc(Card::FormantFollower, 0);
   check(std::strcmp(sens.name, "SENSITIVITY") == 0 && sens.kind == KnobKind::Continuous && sens.min == 0.0f &&
             sens.max == 100.0f && std::strcmp(sens.unit, "%") == 0,
@@ -475,7 +472,7 @@ void checkApraxiaCard() {
         "apraxia: knob B is RANGE, continuous from -12 st at the bottom through 0 at noon to +12 st at the top");
 
   ChainParams p;
-  const float mixBefore = p.pitchFx.formant.mix;
+  const float mixBefore = p.pitchCards.formant.mix;
   applyKnob(Card::FormantFollower, 0, 0.3f, p);
   check(std::fabs(p.follower.sensitivity - 0.3f) < 1e-6f, "apraxia: SENSITIVITY hands the card its position");
   const auto rangeAt = [&p](float position) {
@@ -502,11 +499,11 @@ void checkApraxiaCard() {
   check(shownText(range, 0.0f) == "-12" && shownText(range, 0.25f) == "-6" && shownText(range, 0.5f) == "0" &&
             shownText(range, 0.75f) == "+6" && shownText(range, 1.0f) == "+12" && knobCells(range) == 3,
         "apraxia: RANGE reads its semitones with the sign in three cells");
-  check(p.pitchFx.formant.mix == mixBefore, "apraxia: no knob sets the Formant voice's mix");
+  check(p.pitchCards.formant.mix == mixBefore, "apraxia: no knob sets the Formant voice's mix");
 
   ChainParams t;
   applyToggle(Card::FormantFollower, true, t);
-  check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.follower.placed,
+  check(t.pitchCards.formant.on && !t.pitchCards.autotune.on && !t.pitchCards.octave.on && !t.follower.placed,
         "apraxia: its toggle sets formant.on and nothing else");
   check(!ChainParams().follower.placed, "apraxia: the sweep drives nothing before the card is placed");
   applyPlacement(Card::Formant, t);
@@ -534,7 +531,7 @@ void checkFormantCard() {
   ChainParams p;
   const auto shiftAt = [&p](float position) {
     applyKnob(Card::Formant, 0, position, p);
-    return p.pitchFx.formant.shiftSt;
+    return p.pitchCards.formant.shiftSt;
   };
   check(shiftAt(0.0f) == -7 && shiftAt(7.0f) == 0 && shiftAt(14.0f) == 7, "formant: SHIFT position 0 is -7 st, 7 is 0 and 14 is +7");
   check(shiftAt(99.0f) == 7, "formant: SHIFT above the last position clamps to +7");
@@ -546,7 +543,7 @@ void checkFormantCard() {
             knobCells(shift) == 2,
         "formant: SHIFT reads -3, 0 and +5 in two cells");
   applyKnob(Card::Formant, 1, 0.4f, p);
-  check(std::fabs(p.pitchFx.formant.mix - 0.4f) < 1e-6f, "formant: MIX drives the voice's mix");
+  check(std::fabs(p.pitchCards.formant.mix - 0.4f) < 1e-6f, "formant: MIX drives the voice's mix");
   check(shownText(fmix, 1.0f) == "100", "formant: MIX 100 % reads 100");
 }
 
@@ -632,18 +629,18 @@ void checkAppendedToggles() {
   // other pitch toggle.
   ChainParams t;
   applyToggle(Card::Formant, true, t);
-  check(t.pitchFx.formant.on && !t.pitchFx.autotune.on && !t.pitchFx.octave.on && !t.crowd.on && !t.lofi.on &&
+  check(t.pitchCards.formant.on && !t.pitchCards.autotune.on && !t.pitchCards.octave.on && !t.crowd.on && !t.lofi.on &&
             !t.bloom.on,
         "formant: its toggle sets formant.on and nothing else");
   applyToggle(Card::Lofi, true, t);
   applyToggle(Card::Bloom, true, t);
-  check(t.lofi.on && t.bloom.on && t.pitchFx.formant.on, "lofi and chatter: each toggle sets its own on flag");
+  check(t.lofi.on && t.bloom.on && t.pitchCards.formant.on, "lofi and chatter: each toggle sets its own on flag");
   applyToggle(Card::Formant, false, t);
-  check(!t.pitchFx.formant.on && t.lofi.on && t.bloom.on, "formant: its toggle off clears only its own flag");
+  check(!t.pitchCards.formant.on && t.lofi.on && t.bloom.on, "formant: its toggle off clears only its own flag");
 
   // The defaults before any card is applied: all three stages off.
   const ChainParams fresh;
-  check(!fresh.pitchFx.formant.on && !fresh.lofi.on && !fresh.bloom.on && !fresh.bloom.keyFromGate,
+  check(!fresh.pitchCards.formant.on && !fresh.lofi.on && !fresh.bloom.on && !fresh.bloom.keyFromGate,
         "defaults: Formant, Lo-fi and Chatter off, and Chatter listens to its own input");
 
   // Placing the Input gate makes it the Chatter card's word key. Placing the card alone does not.
@@ -652,18 +649,6 @@ void checkAppendedToggles() {
   check(!keyed.bloom.keyFromGate, "chatter: placing the card alone leaves it on its own detector");
   applyPlacement(Card::InputGate, keyed);
   check(keyed.bloom.keyFromGate, "chatter: placing the Input gate makes its detector the word key");
-}
-
-// No card declares decimals yet, so a made-up knob stands in.
-void checkShownDecimals() {
-  const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
-  check(knobShown(rate, 0.0f) == 1 && knobShown(rate, 1.0f) == 50 && shownText(rate, 0.0f) == "0.1" &&
-            shownText(rate, 1.0f) == "5.0",
-        "shown: one decimal counts in tenths and prints a point");
-  const KnobDesc bipolar = {"Trim", KnobKind::Continuous, 0, -2.0f, 2.0f, "db", Curve::Linear, 2};
-  check(shownText(bipolar, 0.0f) == "-2.00" && shownText(bipolar, 0.5f) == "0.00" && shownText(bipolar, 0.6f) == "+0.40" &&
-            shownText(bipolar, 0.1f) == "-1.60",
-        "shown: two decimals keep their zeros, a minus and a plus");
 }
 
 // The cells of a knob's number are fixed by its range. Each value fills all of them.
@@ -735,18 +720,6 @@ void checkCellsWiderLowEnd() {
         "cells: and so does a range whose upper end has more digits");
 }
 
-// A knob with decimals counts a point cell and one cell for each decimal. No card has one yet.
-void checkCellsDecimals() {
-  const KnobDesc rate = {"Rate", KnobKind::Continuous, 0, 0.1f, 5.0f, "hz", Curve::Linear, 1};
-  check(knobCells(rate) == 3 && cellsOf(rate, 15) == "1.5" && cellsOf(rate, 1) == "0.1" && cellsOf(rate, 50) == "5.0",
-        "cells: one decimal makes 3 cells, the point included");
-  const KnobDesc trim = {"Trim", KnobKind::Continuous, 0, -2.0f, 2.0f, "db", Curve::Linear, 2};
-  check(knobCells(trim) == 5 && cellsOf(trim, -160) == "-1.60" && cellsOf(trim, 40) == "+0.40" && cellsOf(trim, 0) == " 0.00",
-        "cells: a signed range with two decimals is a sign cell and 4 more");
-  const KnobDesc wide = {"Wide", KnobKind::Continuous, 0, 0.0f, 1000.0f, "hz", Curve::Linear, 2};
-  check(knobCells(wide) == 7 && cellsOf(wide, 1) == "   0.01", "cells: a leading zero stays before the point");
-}
-
 // The field of every knob must fit the panel with 1 px each side: its cells and unit in 16X24, or for a
 // knob with names, the widest name.
 void checkReadoutsFit() {
@@ -795,10 +768,8 @@ void checkRegistry() {
   checkBloomCard();
   checkGrowlCard();
   checkAppendedToggles();
-  checkShownDecimals();
   checkCells();
   checkFormatCells();
   checkCellsWiderLowEnd();
-  checkCellsDecimals();
   checkReadoutsFit();
 }

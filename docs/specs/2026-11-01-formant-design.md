@@ -53,7 +53,7 @@ shared stage, the first pitch-group slot or the shared grain grid are history.
 ## 4. Engine (`engine/pitch_fx.h`, `engine/formant_voice.h`)
 
 1. `FormantParams { bool on; int shiftSt = -3; float mix = 1.0f; FormantTuning tuning; }` sits in
-   `PitchFxParams` as `formant`. `FormantTuning` holds the 15-entry `trimDb` table and an
+   `PitchCardParams` as `formant`. `FormantTuning` holds the 15-entry `trimDb` table and an
    `offsetDb` added to every entry for the render tool (`fmTrimDb`, ±24 dB, clamped in the engine).
 2. The voice is `FormantPsolaVoice` in `engine/formant_voice.h`, shared with the Mob card. Pitch
    ratio = Autotune's correction (1 while Autotune is off), grain playback rate = 2^(shift / 12)
@@ -127,7 +127,7 @@ shared stage, the first pitch-group slot or the shared grain grid are history.
 ## 7. Firmware
 
 1. `registry.cpp`: the card entry, `applyKnob` (SHIFT position i to `shiftSt = i - 7`, MIX to
-   `mix`), `applyToggle` (`out.pitchFx.formant.on`).
+   `mix`), `applyToggle` (`out.pitchCards.formant.on`).
 2. `layout.cpp`: `layoutCost` adds `kTracker` once when Autotune, Crowd or Formant is placed, and
    `kPitchStage` once when Octave or Formant is placed without Autotune.
 3. `costs.h`: `kFormant{3, 4, false}`, an estimate. One `FormantPsolaVoice` is about one Mob copy

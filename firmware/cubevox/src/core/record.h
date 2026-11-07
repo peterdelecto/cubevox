@@ -7,7 +7,6 @@
 
 #include <array>
 
-#include "core/crc32.h"
 #include "core/flash_io.h"
 #include "core/layout.h"
 #include "core/settings.h"

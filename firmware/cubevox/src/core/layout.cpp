@@ -16,44 +16,57 @@ Layout crowdTestLayout() {
   return layout;
 }
 
-int reverbSlot(const Layout& layout) {
-  for (int s = 0; s < kSlotCount; ++s) {
-    const Card c = layout.card[s];
-    if (c == Card::ReverbSpring || c == Card::ReverbChasm) return s;
+namespace {
+
+// Indexed by SwapSlot.
+constexpr std::array<SwapCards, static_cast<size_t>(SwapSlot::Count)> kSwapCards = {{
+    {3, {Card::Octave, Card::Formant, Card::FormantFollower}, {"OCTAVE", "FORMANT", "APRAXIA"}},
+    {2, {Card::Unison, Card::Crowd, Card::Empty}, {"UNISON", "MOB", ""}},
+    {2, {Card::Distortion, Card::Growl, Card::Empty}, {"DISTORTION", "DEEPTHROAT", ""}},
+    {3, {Card::Gate, Card::Lofi, Card::Bloom}, {"GATE", "LO-FI", "CHATTER"}},
+    {2, {Card::ReverbSpring, Card::ReverbChasm, Card::Empty}, {"SPRING", "CHASM", ""}},
+}};
+
+// The place of `c` among `which`'s cards, -1 when it is not one of them.
+int swapIndex(SwapSlot which, Card c) {
+  const SwapCards& set = swapCards(which);
+  for (size_t i = 0; i < set.count; ++i) {
+    if (set.card[i] == c) return static_cast<int>(i);
   }
   return -1;
 }
 
-int unisonCrowdSlot(const Layout& layout) {
+}  // namespace
+
+const SwapCards& swapCards(SwapSlot which) { return kSwapCards[static_cast<size_t>(which)]; }
+
+int swapSlotOf(const Layout& layout, SwapSlot which) {
   for (int s = 0; s < kSlotCount; ++s) {
-    if (layout.card[s] == Card::Unison || layout.card[s] == Card::Crowd) return s;
+    if (swapIndex(which, layout.card[s]) >= 0) return s;
   }
   return -1;
 }
 
-int octaveFormantSlot(const Layout& layout) {
-  for (int s = 0; s < kSlotCount; ++s) {
-    const Card c = layout.card[s];
-    if (c == Card::Octave || c == Card::Formant || c == Card::FormantFollower) return s;
-  }
-  return -1;
+Card nextSwapCard(SwapSlot which, Card current) {
+  const SwapCards& set = swapCards(which);
+  return set.card[static_cast<size_t>(swapIndex(which, current) + 1) % set.count];
 }
 
-int distortionGrowlSlot(const Layout& layout) {
-  for (int s = 0; s < kSlotCount; ++s) {
-    const Card c = layout.card[s];
-    if (c == Card::Distortion || c == Card::Growl) return s;
-  }
-  return -1;
+const char* swapWord(const Layout& layout, SwapSlot which) {
+  const int slot = swapSlotOf(layout, which);
+  const int index = slot < 0 ? 0 : swapIndex(which, layout.card[static_cast<size_t>(slot)]);
+  return swapCards(which).word[static_cast<size_t>(index)];
 }
 
-int slot7CardSlot(const Layout& layout) {
-  for (int s = 0; s < kSlotCount; ++s) {
-    const Card c = layout.card[s];
-    if (c == Card::Gate || c == Card::Lofi || c == Card::Bloom) return s;
-  }
-  return -1;
-}
+int reverbSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::Reverb); }
+
+int unisonCrowdSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::UnisonMob); }
+
+int octaveFormantSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::OctaveFormant); }
+
+int distortionGrowlSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::DistortionDeepthroat); }
+
+int slot7CardSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::Slot7); }
 
 const char* layoutDisplayName(const char* stored) { return stored != nullptr && stored[0] != '\0' ? stored : "Default"; }
 
@@ -75,8 +88,8 @@ LayoutCost layoutCost(const Layout& layout) {
   sum.avg = costs::kFixed.avg;
   sum.worst = costs::kFixed.worst;
   // Autotune pays one tracker. A Formant voice directly behind it (only Empty slots between) reads that
-  // tracker, and so do Crowd and Growl anywhere behind it. A Formant voice anywhere else, and a Crowd or
-  // Growl card with no Autotune ahead, run a tracker of their own.
+  // tracker, and so do Mob and Deepthroat anywhere behind it. A Formant voice anywhere else, and a Mob
+  // or Deepthroat card with no Autotune ahead, run a tracker of their own.
   int trackers = 0;
   bool autotune = false;  // Autotune sits ahead of the slot being counted
   bool adjacent = false;  // and nothing but Empty slots sits between it and that slot

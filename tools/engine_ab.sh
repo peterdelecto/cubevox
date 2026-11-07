@@ -38,22 +38,27 @@ cmake --build "$REPO/build" --target cubevox-render -j >/dev/null
 A="$WT/build/cubevox-render"
 B="$REPO/build/cubevox-render"
 
-# One case per stage at a mid setting, then every stage at once, Crowd included. The default layout
-# leaves Crowd out. Autotune's case runs at its shipped RESPONSE of 1 ms; the full chain runs 100 ms,
-# which covers a glide.
+# One case per card at a mid setting, then every card at once, Mob included. The default layout
+# leaves Mob and the library cards out. Autotune's case runs at its shipped RESPONSE of 1 ms; the full
+# chain runs 100 ms, which covers a glide.
 CASES=(
   "ingate|--ingate -40"
   "autotune|--autotune --response 1"
   "octave|--octave -12 --omix 0.5"
+  "formant|--formant -3 --fmix 0.5"
+  "apraxia|--follower 12 --sensitivity 0.5"
   "crowd|--crowd --width 0.5 --voices 4"
   "unison|--on 1 --depth 0.5"
   "slapback|--slap 0.5"
   "distortion|--drive 0.5 --tone 0.5"
+  "growl|--growl 0.5 --gdrive 0.5"
   "gate|--gate -40"
+  "lofi|--lofi 0.5 --lofi-tone 0.5"
+  "chatter|--amount 0.5 --length 200"
   "spring|--reverb spring --time 0.5 --mix 0.5"
   "chasm|--reverb chasm --time 0.5 --mix 0.5"
-  "polish_eq|--polish-comp off"
-  "full_chain|--ingate -40 --autotune --response 100 --octave -12 --omix 0.5 --crowd --width 0.5 --voices 4 --on 1 --depth 0.5 --slap 0.5 --drive 0.5 --tone 0.5 --gate -40 --reverb spring --time 0.5 --mix 0.5"
+  "vox_eq|--polish-comp off"
+  "full_chain|--ingate -40 --autotune --response 100 --octave -12 --omix 0.5 --formant -3 --fmix 0.5 --follower 12 --sensitivity 0.5 --crowd --width 0.5 --voices 4 --on 1 --depth 0.5 --slap 0.5 --drive 0.5 --tone 0.5 --growl 0.5 --gdrive 0.5 --gate -40 --lofi 0.5 --lofi-tone 0.5 --amount 0.5 --length 200 --reverb spring --time 0.5 --mix 0.5"
 )
 for c in "${CASES[@]}"; do
   name="${c%%|*}"

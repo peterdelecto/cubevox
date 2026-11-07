@@ -15,7 +15,7 @@ RANGE), both Deepthroat knobs (GROWL, MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
 It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia and Deepthroat
 slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
-POLISH COMP and VOX EQ the same way (bench ops bypass, polish_comp, polish_eq; each leaves the box
+POLISH COMP and VOX EQ the same way (bench ops bypass, polish_comp, vox_eq; each leaves the box
 as it found it) and reads the counters once more. The VOX EQ flips force the stage off and back on
 from ON+CUTS.
 
@@ -30,8 +30,8 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-  4. each layout's VOX EQ (at ON+CUTS) and POLISH COMP buckets stay at or under kPolishEq and kPolishComp, and
-     its fixed path mean % and worst % at or under kFixed, the sum of kPolishEq, kPolishComp,
+  4. each layout's VOX EQ (at ON+CUTS) and POLISH COMP buckets stay at or under kVoxEq and kPolishComp, and
+     its fixed path mean % and worst % at or under kFixed, the sum of kVoxEq, kPolishComp,
      kSoftCeiling and kBypassMix
 Each card's slot is held to its own row. A slot that runs a tracker adds the tracker row: Autotune's slot,
 a Formant or Apraxia slot that does not sit directly behind Autotune, and a Mob or Deepthroat slot with no
@@ -93,7 +93,7 @@ FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_f
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
     ("polish_comp", "POLISH COMP", "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu"),
-    ("polish_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
+    ("vox_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
 )
 # The words of the protocol's vox_eq setting, and the one every layout runs at: ON+CUTS is the heaviest
 # setting, and at the shipped default (off) the VOX EQ bucket reads near zero and gates nothing.
@@ -121,7 +121,7 @@ READERS = ("crowd", "growl")  # cards that read Autotune's tracker when one sits
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
 # The fixed path's rows: VOX EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
-FIXED_PARTS = ("kPolishEq", "kPolishComp", "kSoftCeiling", "kBypassMix")
+FIXED_PARTS = ("kVoxEq", "kPolishComp", "kSoftCeiling", "kBypassMix")
 FIXED_ROW = "kFixed"
 
 COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
@@ -588,9 +588,9 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 # -- gates and reports
 
 def judge_fixed(agg, rows, label, table, gates):
-    """Adds the fixed stages to the table and holds each to its row: the EQ and COMP buckets to kPolishEq
+    """Adds the fixed stages to the table and holds each to its row: the EQ and COMP buckets to kVoxEq
     and kPolishComp, and the fixed path to kFixed, the sum of the four fixed rows."""
-    parts = (("VOX EQ", "eq", "kPolishEq"), ("POLISH COMP", "comp", "kPolishComp"),
+    parts = (("VOX EQ", "eq", "kVoxEq"), ("POLISH COMP", "comp", "kPolishComp"),
              ("fixed path", "fixed", FIXED_ROW))
     for name, key, row_name in parts:
         row_mean, row_worst = rows[row_name]

@@ -99,7 +99,7 @@ constexpr float kInvDefaultSpread = 1.0f / (1.0f - kChasmFeedback.mid * kChasmFe
 constexpr std::array<float, 4> kChirpK = {-0.883f, -0.812f, -0.777f, -0.743f};
 
 constexpr float kMaxWobble = 64.0f;  // samples
-constexpr float kMaxWobbleHz = 10.0f;
+using reverb_parts::kMaxWobbleHz;
 constexpr float kMaxWetDb = 36.0f;   // wetDb clamps to plus and minus this
 constexpr float kMaxInputTrim = 4.0f;
 

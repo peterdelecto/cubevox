@@ -5,7 +5,6 @@
 
 #include "engine/autotune.h"
 #include "engine/common.h"
-#include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/input_ring.h"
 #include "engine/pitch.h"
@@ -123,8 +122,7 @@ class AutotuneFx {
   // longer than kBlock runs several chunks and leaves the last one's.
   const GroupFeed& groupFeed() const { return feed_; }
 
-  // Test hooks: the crossfade, 0 dry .. 1 corrected, the ring, and the floats the ring clears have zeroed.
-  float fadeForTest() const { return fade_; }
+  // Test hooks: the ring, and the floats the ring clears have zeroed.
   const InputRing<kAutotuneRingLen>& ringForTest() const { return ring_; }
   uint32_t ringClearedForTest() const { return ring_.clearedForTest(); }
 
@@ -183,7 +181,7 @@ class AutotuneFx {
     const Gains g0 = gains_;
     const float fade0 = fade_;
     if (fade_ != target) {
-      fade_ = smooth::step(fade_, target, smoothCoefFor(n));
+      fade_ = smooth::step(fade_, target, coef_.at(n));
       gains_ = gainsNow();
     }
     const Gains g1 = gains_;
@@ -194,11 +192,10 @@ class AutotuneFx {
   // Records what the Formant engine behind the card reads for this chunk. It runs before the voice
   // renders, so the pitch ratio and the grid are the chunk's own, not the end of it.
   void noteFeed(int n, float period, float fade0, const Gains& g0, const Gains& g1) {
-    const bool voiced = g0.corrected > 0.0f || g1.corrected > 0.0f;
     feed_.n = n;
     feed_.period = period;
     feed_.delay = voice_.voiceDelay(period);
-    feed_.ratio = voiced ? exp2Fast(voice_.correctionAfter(0.5f * static_cast<float>(n)) * (1.0f / 12.0f)) : 1.0f;
+    feed_.ratio = exp2Fast(voice_.correctionAfter(0.5f * static_cast<float>(n)) * (1.0f / 12.0f));
     feed_.trim = voice_.trimGain();
     feed_.fade0 = fade0;
     feed_.fade1 = fade_;
@@ -207,14 +204,13 @@ class AutotuneFx {
     feed_.dry0 = g0.dry;
     feed_.dry1 = g1.dry;
     feed_.marks = voice_.marks();
-    feed_.marks.valid = voiced;
+    feed_.marks.valid = true;
   }
 
-  // The corrected voice for the chunk, mixed against the input. The voice is skipped while the crossfade
-  // sits at 0 at both edges.
+  // The corrected voice for the chunk, mixed against the input. The caller returns early while the
+  // crossfade sits at 0 at both edges, so the voice always renders here.
   void mix(const float* in, float* out, int n, int first, float period, const Gains& g0, const Gains& g1) {
-    const bool voiced = g0.corrected > 0.0f || g1.corrected > 0.0f;
-    if (voiced) voice_.render(ring_.data(), first, n, period, buf_.data());
+    voice_.render(ring_.data(), first, n, period, buf_.data());
     const float inv = 1.0f / static_cast<float>(n);
     const float dCor = (g1.corrected - g0.corrected) * inv;
     const float dDry = (g1.dry - g0.dry) * inv;
@@ -224,18 +220,9 @@ class AutotuneFx {
       cor += dCor;
       dry += dDry;
       float y = in[j];
-      if (voiced && cor > 0.0f) y = cor * buf_[static_cast<size_t>(j)] + dry * y;
+      if (cor > 0.0f) y = cor * buf_[static_cast<size_t>(j)] + dry * y;
       out[j] = y;
     }
-  }
-
-  // The 20 ms one-pole's coefficient for one step over n samples, kept for the last n.
-  float smoothCoefFor(int n) {
-    if (n != coefN_) {
-      coef_ = smooth::blockCoef(smooth::kSmoothSec, n);
-      coefN_ = n;
-    }
-    return coef_;
   }
 
   InputRing<kAutotuneRingLen> ring_;
@@ -245,8 +232,7 @@ class AutotuneFx {
   GroupFeed feed_;                   // what the Formant engine behind the card reads for the last chunk
   float fade_ = 0.0f;                // 0 dry .. 1 corrected
   Gains gains_;                      // the gains at the end of the last chunk
-  float coef_ = 1.0f;
-  int coefN_ = 0;
+  smooth::BlockCoef coef_;  // the 20 ms one-pole's step over the last chunk length
   bool was_ = false;     // Autotune was on last chunk
   bool fresh_ = true;    // the next chunk takes its target outright
   bool rested_ = false;  // the engine sat stopped since it last ran

@@ -46,9 +46,9 @@ three settings. change it to VOX EQ and default off". Built 2026-11-05.
    loudness. A wider detector band did not close the gap, and a makeup that spared the subsonic band
    closed about a third of it, so the filter takes the energy out.
 10. Goes wrong, the bench. At OFF the stress run's VOX EQ bucket reads near zero, so its gate against
-    `kPolishEq` passes without measuring the stage. The run puts VOX EQ at ON+CUTS with each
+    `kVoxEq` passes without measuring the stage. The run puts VOX EQ at ON+CUTS with each
     layout (`set_layout` carries `settings.vox_eq` `"cuts"`) and puts the box's own setting back at the
-    end (`2026-11-01-stress-bench-design.md`). The row `kPolishEq` in `core/costs.h` stays the
+    end (`2026-11-01-stress-bench-design.md`). The row `kVoxEq` in `core/costs.h` stays the
     ON+CUTS cost. The subsonic high-pass adds two biquads to the front half, about 0.2 % of a block by
     instruction count, inside the row's headroom (mean 1.7 % of 2 %, worst 2.4 % of 3 %); the next
     stress run on the box confirms it.
@@ -79,7 +79,7 @@ three settings. change it to VOX EQ and default off". Built 2026-11-05.
 ## Names
 VOX EQ in the menu, the emulator, the bench op lines (`[bench] VOX EQ forced off`), the stress table and
 help, `cubevox-render` (`--vox-eq off|on|cuts`, default cuts), the proof tools and the docs. The code
-identifiers `Polish`, `kPolishEq`, `BenchOp::PolishEq` and the bench op id `polish_eq` stay.
+identifier `Polish` stays. The cost row is `kVoxEq`, the bench op `BenchOp::VoxEq` with the id `vox_eq` (cleanup pass 2026-11-07).
 
 ## Supersedes
 1. `2026-10-24-polish-design.md` menu row 7: `POLISH EQ`, default ON, ON/OFF becomes `VOX EQ`, default

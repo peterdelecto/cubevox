@@ -9,7 +9,7 @@
 constexpr uint32_t kVrefMv = 3300;
 constexpr uint32_t kVaSenseDivider = 2;
 
-// Trip level, spec F2. Provisional: the bench sets the final value against the rails' fall time.
+// Trip level, spec F2. Unmeasured: no bench has set it against the rails' fall time.
 constexpr uint32_t kPowerTripMv = 4750;
 
 // The rail must climb this far above the trip level, so noise at the line cannot chatter the mute.

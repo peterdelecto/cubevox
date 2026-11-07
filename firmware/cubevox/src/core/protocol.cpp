@@ -344,42 +344,45 @@ bool parseFlag(const char*& p, Fields& f, bool& flag, uint8_t given, const char*
   return skipValue(p, 1);
 }
 
-bool parseTopSwitch(const char*& p, Fields& f) {
-  constexpr const char* kTypeMsg = "top_switch must be \"mute\" or \"bypass\"";
+// A settings word and the value it stands for.
+template <typename T>
+struct SettingsWord {
+  const char* text;
+  T value;
+};
+
+// Reads a settings word, sets `field` to the value the table gives it and marks the field given. A
+// word the table lacks is a type error and leaves the field alone.
+template <typename T, size_t N>
+bool parseSettingsWord(const char*& p, Fields& f, const SettingsWord<T> (&words)[N], T& field, uint8_t given,
+                       const char* typeMsg) {
   char word[kSwitchWordBytes] = {};
   StrOut out{word, sizeof word};
   bool present = false;
-  if (!parseText(p, f, out, kTypeMsg, present)) return false;
+  if (!parseText(p, f, out, typeMsg, present)) return false;
   if (!present) return true;  // parseText noted the type error and skipped the value
-  const bool mute = strcmp(word, "mute") == 0;
-  if (!mute && strcmp(word, "bypass") != 0) {
-    f.typeFail(kTypeMsg);
-    return true;
+  for (const SettingsWord<T>& w : words) {
+    if (strcmp(word, w.text) == 0) {
+      field = w.value;
+      f.req.settingsGiven |= given;
+      return true;
+    }
   }
-  f.req.settings.topSwitch = mute ? TopSwitch::Mute : TopSwitch::Bypass;
-  f.req.settingsGiven |= kGivenTopSwitch;
+  f.typeFail(typeMsg);
   return true;
 }
 
+bool parseTopSwitch(const char*& p, Fields& f) {
+  static constexpr SettingsWord<TopSwitch> kWords[] = {{"mute", TopSwitch::Mute}, {"bypass", TopSwitch::Bypass}};
+  return parseSettingsWord(p, f, kWords, f.req.settings.topSwitch, kGivenTopSwitch,
+                           "top_switch must be \"mute\" or \"bypass\"");
+}
+
 bool parseVoxEq(const char*& p, Fields& f) {
-  constexpr const char* kTypeMsg = "vox_eq must be \"off\", \"on\" or \"cuts\"";
-  char word[kSwitchWordBytes] = {};
-  StrOut out{word, sizeof word};
-  bool present = false;
-  if (!parseText(p, f, out, kTypeMsg, present)) return false;
-  if (!present) return true;  // parseText noted the type error and skipped the value
-  VoxEq v = VoxEq::Off;
-  if (strcmp(word, "on") == 0) {
-    v = VoxEq::On;
-  } else if (strcmp(word, "cuts") == 0) {
-    v = VoxEq::Cuts;
-  } else if (strcmp(word, "off") != 0) {
-    f.typeFail(kTypeMsg);
-    return true;
-  }
-  f.req.settings.voxEq = v;
-  f.req.settingsGiven |= kGivenVoxEq;
-  return true;
+  static constexpr SettingsWord<VoxEq> kWords[] = {
+      {"off", VoxEq::Off}, {"on", VoxEq::On}, {"cuts", VoxEq::Cuts}};
+  return parseSettingsWord(p, f, kWords, f.req.settings.voxEq, kGivenVoxEq,
+                           "vox_eq must be \"off\", \"on\" or \"cuts\"");
 }
 
 bool parseSettingsField(const char*& p, const char* key, Fields& f) {

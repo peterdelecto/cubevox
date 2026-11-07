@@ -9,13 +9,14 @@
 #include "engine/deesser.h"
 
 #include "alloc_guard.h"
+#include "signal_util.h"
+
+using testutil::dbToLin;
 
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kSecond = cv::kSampleRate;
-
-double dbToLin(double db) { return std::pow(10.0, db / 20.0); }
 
 struct Tone {
   double hz;

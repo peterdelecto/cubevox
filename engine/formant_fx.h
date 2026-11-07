@@ -51,7 +51,7 @@ static_assert(PitchTracker::kReplaySpan < kFormantRingLen, "the ring holds a tra
 // The crossfade's chunk ramps run through a per-sample one-pole of 5 ms. The base sits a lag behind the
 // input, so a ramp that starts with a slope puts a kink in the output of that slope times the difference
 // between the two; the one-pole turns each slope change into a smooth bend.
-inline const float kFadeSmooth = smooth::coef(0.005f);
+constexpr float kFadeSmooth = smooth::kSmooth5msCoef;
 
 class FormantFx {
  public:
@@ -139,8 +139,6 @@ class FormantFx {
   const InputRing<kFormantRingLen>& ringForTest() const { return ring_; }
   uint32_t ringClearedForTest() const { return ring_.clearedForTest(); }
   float lagForTest() const { return lag_; }
-  float baseLagForTest() const { return baseLag_; }
-  float levelGainForTest() const { return levelGain_; }
 
  private:
   // The crossfade's fade and the mix's gains: the base's share, and the shifted voice's with its trim.
@@ -242,7 +240,7 @@ class FormantFx {
     }
     const Gains g0 = gains_;
     if (mix_ != mixTarget || fade_ != fadeTarget) {
-      const float a = smoothCoefFor(n);
+      const float a = coef_.at(n);
       mix_ = smooth::step(mix_, mixTarget, a);
       fade_ = smooth::step(fade_, fadeTarget, a);
     }
@@ -251,7 +249,7 @@ class FormantFx {
     const Gains g1 = gains_;
     clearIdlePowers();
     const float level0 = levelGain_;
-    levelGain_ = smooth::step(level0, levelGainAt(mix_), smoothCoefFor(n));
+    levelGain_ = smooth::step(level0, levelGainAt(mix_), coef_.at(n));
     mix(in, out, n, first, zeroBefore, g0, g1, level0, group);
   }
 
@@ -292,7 +290,7 @@ class FormantFx {
       shiftSm_ = target;
       shiftSet_ = true;
     } else if (shiftSm_ != target) {
-      shiftSm_ = smooth::step(shiftSm_, target, smoothCoefFor(n));
+      shiftSm_ = smooth::step(shiftSm_, target, coef_.at(n));
     }
     if (shiftSm_ != rateSemis_) {
       shiftRate_ = exp2Fast(shiftSm_ * (1.0f / 12.0f));
@@ -578,15 +576,6 @@ class FormantFx {
     levelGain_ = 1.0f;
   }
 
-  // The 20 ms one-pole's coefficient for one step over n samples, kept for the last n.
-  float smoothCoefFor(int n) {
-    if (n != coefN_) {
-      coef_ = smooth::blockCoef(smooth::kSmoothSec, n);
-      coefN_ = n;
-    }
-    return coef_;
-  }
-
   InputRing<kFormantRingLen> ring_;
   PitchTracker tracker_;  // the card's own, for a card that does not sit directly behind Autotune
   Voice voice_;           // cuts from the card's ring at pitch ratio 1 (the audio it receives, or Autotune's input)
@@ -607,8 +596,7 @@ class FormantFx {
   float fade_ = 0.0f;  // the crossfade from the input to the mix, 0 off .. 1 on
   float fadeSm_ = 0.0f;  // the crossfade after the per-sample one-pole that rounds the chunk edges
   Gains gains_;        // the gains at the end of the last chunk
-  float coef_ = 1.0f;  // the 20 ms one-pole's coefficient for steps of coefN_ samples
-  int coefN_ = 0;
+  smooth::BlockCoef coef_;  // the 20 ms one-pole's step over the last chunk length
 
   // SHIFT: the tuning, the glided value in semitones and what follows from it, and the level gain's
   // running powers.

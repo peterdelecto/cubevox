@@ -18,10 +18,6 @@ constexpr int kCanvasPages = kCanvasHeight / 8;
 // s / (kDissolveSteps + 1) of the new screen's pixels, in the Bayer 8 x 8 pattern.
 constexpr int kDissolveSteps = 2;
 
-// Bayer 8 x 8 ordered dither. A pixel lights at `level` (0..64) when its threshold is below the
-// level, so level 32 lights every other pixel.
-bool bayerLit(int x, int y, int level);
-
 class Canvas {
  public:
   // All pages start dirty so the first flush paints the whole panel.

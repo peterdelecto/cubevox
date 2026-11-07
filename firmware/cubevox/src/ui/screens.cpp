@@ -121,31 +121,6 @@ void drawTitleBar(Canvas& canvas, const ReadoutView& view) {
   canvas.invertRect(0, 0, kCanvasWidth, kReadoutBarHeight);
 }
 
-}  // namespace
-
-int upperText(const char* in, char* out, int size) {
-  if (size <= 0) return 0;
-  int n = 0;
-  for (; in[n] != '\0' && n < size - 1; ++n) out[n] = static_cast<char>(toupper(static_cast<unsigned char>(in[n])));
-  out[n] = '\0';
-  return n;
-}
-
-int unitText(const KnobDesc& knob, char* out, int size) {
-  if (size <= 0) return 0;
-  out[0] = '\0';
-  if (knob.unit[0] == '\0') return 0;
-  const int length = snprintf(out, static_cast<size_t>(size), " %s", knob.unit);
-  return length < size ? length : size - 1;
-}
-
-int meterSegments(float level) {
-  const float held = level > 0.0f ? (level < 1.0f ? level : 1.0f) : 0.0f;  // also catches NaN
-  return static_cast<int>(lroundf(held * static_cast<float>(kMeterSegments)));
-}
-
-namespace {
-
 // The outline of the meter, 1 px wide, shifted by the walk.
 void drawMeterBox(Canvas& canvas, Walk walk) {
   const int left = kMeterBoxLeftX + walk.x;
@@ -168,6 +143,27 @@ void drawMeterSegments(Canvas& canvas, int lit, Walk walk) {
 }
 
 }  // namespace
+
+int upperText(const char* in, char* out, int size) {
+  if (size <= 0) return 0;
+  int n = 0;
+  for (; in[n] != '\0' && n < size - 1; ++n) out[n] = static_cast<char>(toupper(static_cast<unsigned char>(in[n])));
+  out[n] = '\0';
+  return n;
+}
+
+int unitText(const KnobDesc& knob, char* out, int size) {
+  if (size <= 0) return 0;
+  out[0] = '\0';
+  if (knob.unit[0] == '\0') return 0;
+  const int length = snprintf(out, static_cast<size_t>(size), " %s", knob.unit);
+  return length < size ? length : size - 1;
+}
+
+int meterSegments(float level) {
+  const float held = level > 0.0f ? (level < 1.0f ? level : 1.0f) : 0.0f;  // also catches NaN
+  return static_cast<int>(lroundf(held * static_cast<float>(kMeterSegments)));
+}
 
 void renderVoice(Canvas& canvas, const ScopeFrame& scope, int segments, Walk walk) {
   canvas.clear();

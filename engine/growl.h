@@ -11,6 +11,7 @@
 #include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/formant_voice.h"
+#include "engine/input_ring.h"
 #include "engine/pitch.h"
 #include "engine/psola.h"
 #include "engine/smooth.h"
@@ -83,7 +84,7 @@
 // only while MIX sits under 100 %.
 //
 // The ring is kRingLen samples (15,408 B). It holds the longest lag and the furthest a grain reaches past
-// it. A stopped card clears 1 KB of it a block (`rest`), so the reset at a switch-on finds it clear.
+// it. A stopped card clears 2 KB of it a block (`rest`), so the reset at a switch-on finds it clear.
 
 namespace cv {
 
@@ -143,10 +144,6 @@ constexpr float kMaxRailAsym = 0.5f;
 // The card's ring.
 constexpr int kRingLen = formant_detail::kGrainRingLen;
 using GrowlVoice = formant_detail::FormantPsolaVoiceT<kRingLen>;
-using GrowlRing = GrowlVoice::Ring;
-
-// The floats of the ring one rest() call zeroes (1 KB), so the ring is clear after 16 calls.
-constexpr int kRestClearFloats = 256;
 
 // The depth's fall without a pitch and the dry-to-voice crossfade both take 20 ms, in straight lines.
 constexpr float kFadeMs = 20.0f;
@@ -313,8 +310,7 @@ class Growl {
   // Leaves the ring zero. A card that rested since it last ran (see rest) has cleared most of the ring
   // already, and this clears what is left.
   void reset() {
-    clearRing(growl_detail::kRingLen);
-    head_ = 0;
+    ring_.clear();
     tracker_.reset();
     voice_.reset();
     fold_.clear();
@@ -342,10 +338,10 @@ class Growl {
   }
 
   // A call for each block the card sits stopped (the chain does not run it). It zeroes the next
-  // kRestClearFloats floats of the ring, so the reset that starts the card again finds the ring clear and
-  // the first block after a switch-on carries none of the clear. A card that restarts before the ring is
-  // clear pays for the rest in that reset.
-  void rest() { clearRing(growl_detail::kRestClearFloats); }
+  // InputRing::kRestClearFloats floats of the ring, so the reset that starts the card again finds the ring
+  // clear and the first block after a switch-on carries none of the clear. A card that restarts before the
+  // ring is clear pays for the rest in that reset.
+  void rest() { ring_.rest(); }
 
   // in is this slot's input, which the card writes to its ring ahead of its voice and the dry side of
   // MIX. `up` names Autotune's tracker, which has already run this block, and the shift and the delay the
@@ -363,7 +359,7 @@ class Growl {
     if (pr.period > 0.0f) heldPeriod_ = pr.period;
     const float wetTarget = p.on && heldPeriod_ > 0.0f ? 1.0f : 0.0f;
     if (wet_ == 0.0f && wetTarget == 0.0f) {
-      if (!own) writeRing(in, n);
+      if (!own) ring_.write(in, n);
       passThrough(in, out, n);
       return;
     }
@@ -372,10 +368,9 @@ class Growl {
     const Call c = beginCall(p, pr, own ? 0.0f : up.shiftSemis, own ? 0.0f : up.latency, in, n, wetTarget);
     for (int at = 0; at < n; at += kBlock) {
       const int m = n - at < kBlock ? n - at : kBlock;
-      const int first = own ? ownFirst : head_;
-      if (!own) writeRing(in + at, m);
+      const int first = own ? ownFirst : ring_.write(in + at, m);
       buf_.fill(0.0f);
-      voice_.render(ring_, first, m, buf_.data());
+      voice_.render(ring_.data(), first, m, buf_.data());
       raspChunk(c, at, m);
       if (c.fold) fold_.run(buf_.data(), m, foldAt(c, at), c.foldStep);
       highPass(m);
@@ -397,17 +392,9 @@ class Growl {
   // Test hook: the delay the dry side reads at, in samples.
   float dryLagSamples() const { return dryLag_; }
 
-  // Test hook: how many floats from the ring's start are known zero. A write drops it to 0, and rest()
-  // and reset() raise it to the ring's length.
-  int ringClearedTo() const { return ringZero_; }
-
-  // Test hook: true when every float of the ring is zero.
-  bool ringIsZero() const {
-    for (const float v : ring_) {
-      if (v != 0.0f) return false;
-    }
-    return true;
-  }
+  // Test hooks: the card's ring, and the floats its clears have zeroed.
+  const InputRing<growl_detail::kRingLen>& ringForTest() const { return ring_; }
+  uint32_t ringClearedForTest() const { return ring_.clearedForTest(); }
 
   // Test hooks: the voice's pitch ratio, the rasp wave's rate in Hz, the jitter at the last call's end and
   // the running period's depth factor.
@@ -449,10 +436,9 @@ class Growl {
   // With no Autotune ahead: writes the call into the ring and feeds it to the card's own tracker, the
   // coarse search, while the card is on or fading. Returns the ring index of the call's first sample.
   int trackOwn(const float* in, int n, const GrowlParams& p) {
-    const int first = head_;
-    writeRing(in, n);
+    const int first = ring_.write(in, n);
     if (p.on || wet_ > 0.0f) {
-      tracker_.push(in, n, true, false, PitchTracker::History{ring_.data(), growl_detail::kRingLen, first});
+      tracker_.push(in, n, true, false, PitchTracker::History{ring_.data().data(), growl_detail::kRingLen, first});
     } else {
       tracker_.idle(n);
     }
@@ -489,8 +475,7 @@ class Growl {
   // gains. `in` is read here, before the call writes its output.
   Call beginCall(const GrowlParams& p, const PitchResult& pr, float shift, float latency, const float* in, int n,
                  float wetTarget) {
-    const GrowlTuning& t = tuning_;
-    const float a = smoothCoefFor(n);
+    const float a = coef_.at(n);
     const float growlKnob = smooth::clamp01(p.growl);
     const float driveKnob = smooth::clamp01(p.drive);
     const float mixKnob = smooth::clamp01(p.mix);
@@ -508,19 +493,33 @@ class Growl {
     wet_ = smooth::toward(wet_, wetTarget, ramp);
     c.wetStep = (wet_ - c.wet0) * inv;
 
-    // GROWL glides, and with the sweep it sets the throat, which glides on to the voice.
     const float growl0 = growl_;
+    stepThroat(growlKnob, a, first, in, n);
+    placeVoice(c, pr, shift, latency, first, n, inv);
+    stepRasp(c, pr, growl0, ramp, inv);
+    stepFold(c, driveKnob, a, inv);
+    stepMix(c, mixKnob, a, inv);
+    return c;
+  }
+
+  // GROWL glides, and with the sweep it sets the throat, which glides on to the voice.
+  void stepThroat(float growlKnob, float a, bool first, const float* in, int n) {
+    const GrowlTuning& t = tuning_;
     growl_ = smooth::step(growl_, growlKnob, a);
     const float sweep = sweep_.step(in, n, t.sensitivity, t.decayMs);
     const float rest = clampf(t.formantSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     const float dropTop = clampf(t.throatDropTop, -growl_detail::kMaxThroatDropSt, growl_detail::kMaxThroatDropSt);
     throatTarget_ = clampf(rest + sweep * dropTop * growl_, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     throat_ = first ? throatTarget_ : smooth::step(throat_, throatTarget_, a);
+  }
 
-    // The voice, and the wave's rate while the tracker hears a pitch. The ring holds audio that sits
-    // `shift` above the tracker's pitch, so the voice's period is the tracker's divided by that ratio and
-    // its pitch ratio is the drop alone. The read point stands where the tracker's frame does, less the
-    // delay the slots ahead put on the audio.
+  // The voice, the dry's lag, and the wave's rate while the tracker hears a pitch. The ring holds audio
+  // that sits `shift` above the tracker's pitch, so the voice's period is the tracker's divided by that
+  // ratio and its pitch ratio is the drop alone. The read point stands where the tracker's frame does,
+  // less the delay the slots ahead put on the audio.
+  void placeVoice(Call& c, const PitchResult& pr, float shift, float latency, bool first, int n, float inv) {
+    const GrowlTuning& t = tuning_;
+    const float rest = clampf(t.formantSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
     const float up = shift == 0.0f ? 1.0f : exp2Fast(shift * (1.0f / 12.0f));
     const float period = heldPeriod_ / up;
     const float drop = clampf(t.pitchSt, -growl_detail::kMaxSt, growl_detail::kMaxSt);
@@ -538,8 +537,10 @@ class Growl {
     if (pr.voiced && pr.period > 0.0f) {
       phaseStep_ = static_cast<uint32_t>(growl_detail::kSixthTurn * up / PitchTracker::clampPeriod(pr.period));
     }
+  }
 
-    // The rasp: the depth fades with the pitch.
+  // The rasp: the depth fades with the pitch.
+  void stepRasp(Call& c, const PitchResult& pr, float growl0, float ramp, float inv) {
     const float fade0 = depthFade_;
     depthFade_ = smooth::toward(depthFade_, pr.voiced ? 1.0f : 0.0f, ramp);
     c.rasp0 = raspAt(growl0, fade0);
@@ -548,8 +549,10 @@ class Growl {
                   (r1.swing - c.rasp0.swing) * inv, (r1.jitter - c.rasp0.jitter) * inv};
     c.rasp = c.rasp0.swing != 0.0f || r1.swing != 0.0f;
     c.third = c.rasp0.third != 0.0f || r1.third != 0.0f;
+  }
 
-    // The fold: DRIVE glides, and at 0 at both ends the fold is out.
+  // The fold: DRIVE glides, and at 0 at both ends the fold is out.
+  void stepFold(Call& c, float driveKnob, float a, float inv) {
     const float drive0 = drive_;
     drive_ = smooth::step(drive_, driveKnob, a);
     c.fold = drive0 > 0.0f || drive_ > 0.0f;
@@ -558,12 +561,14 @@ class Growl {
       const FoldGains f1 = fold_.gainsAt(drive_);
       c.foldStep = {(f1.lowShelf - c.fold0.lowShelf) * inv, (f1.pre - c.fold0.pre) * inv,
                     (f1.peak - c.fold0.peak) * inv, (f1.post - c.fold0.post) * inv,
-                      (f1.bias - c.fold0.bias) * inv};
+                    (f1.bias - c.fold0.bias) * inv};
     } else {
       fold_.clear();
     }
+  }
 
-    // MIX glides, and its pair of gains splits the voice and the dry. Settled at 100 % the dry is out.
+  // MIX glides, and its pair of gains splits the voice and the dry. Settled at 100 % the dry is out.
+  void stepMix(Call& c, float mixKnob, float a, float inv) {
     const float mix0 = mix_;
     mix_ = smooth::step(mix_, mixKnob, a);
     c.dry = mix0 < 1.0f || mix_ < 1.0f;
@@ -573,7 +578,6 @@ class Growl {
     c.voiceGainStep = (m1.voice - m0.voice) * inv;
     c.dryGain0 = m0.dry;
     c.dryGainStep = (m1.dry - m0.dry) * inv;
-    return c;
   }
 
   // The equal-power pair at MIX x. The ends are exactly 1 and 0, so MIX 100 % is the plain voice.
@@ -583,10 +587,8 @@ class Growl {
   };
 
   static MixGains mixGainsAt(float x) {
-    if (x >= 1.0f) return {1.0f, 0.0f};
-    if (x <= 0.0f) return {0.0f, 1.0f};
     MixGains g;
-    sinCosFast(x * kHalfPi, g.voice, g.dry);
+    quarterTurn(x, g.voice, g.dry);
     return g;
   }
 
@@ -686,27 +688,6 @@ class Growl {
             c.fold0.bias + c.foldStep.bias * k};
   }
 
-  // Writes n samples of the card's input to the ring.
-  void writeRing(const float* in, int n) {
-    constexpr int kLen = growl_detail::kRingLen;
-    ringZero_ = 0;
-    int at = head_;
-    for (int done = 0; done < n;) {
-      const int run = n - done < kLen - at ? n - done : kLen - at;
-      std::memcpy(&ring_[static_cast<size_t>(at)], in + done, sizeof(float) * static_cast<size_t>(run));
-      at = at + run == kLen ? 0 : at + run;
-      done += run;
-    }
-    head_ = at;
-  }
-
-  // Zeroes up to `most` more floats of the ring, in index order from ringZero_.
-  void clearRing(int most) {
-    const int n = most < growl_detail::kRingLen - ringZero_ ? most : growl_detail::kRingLen - ringZero_;
-    std::fill_n(ring_.begin() + ringZero_, n, 0.0f);
-    ringZero_ += n;
-  }
-
   // Blends the dry into buf_ in place, trim included: the voice at its MIX share plus the ring read at
   // the lag at its own. `head` is the ring index of the chunk's first sample.
   void blendDry(const Call& c, int head, int m, int at) {
@@ -718,7 +699,7 @@ class Growl {
       voiceGain += c.voiceGainStep;
       dryGain += c.dryGainStep;
       lag += c.lagStep;
-      const float dry = readRing<growl_detail::kRingLen>(ring_.data(), wrapOnce<growl_detail::kRingLen>(head + i), lag);
+      const float dry = readRing<growl_detail::kRingLen>(ring_.data().data(), wrapOnce<growl_detail::kRingLen>(head + i), lag);
       float& v = buf_[static_cast<size_t>(i)];
       v = trim_ * voiceGain * v + dryGain * dry;
     }
@@ -739,19 +720,8 @@ class Growl {
     }
   }
 
-  // The 20 ms one-pole's coefficient for one step over n samples, kept for the last n.
-  float smoothCoefFor(int n) {
-    if (n != coefN_) {
-      coef_ = smooth::blockCoef(smooth::kSmoothSec, n);
-      coefN_ = n;
-    }
-    return coef_;
-  }
-
   PitchTracker tracker_;            // the card's own, for a card with no Autotune ahead
-  growl_detail::GrowlRing ring_{};  // the card's input, newest at head_ - 1
-  int head_ = 0;                    // where the next sample goes
-  int ringZero_ = growl_detail::kRingLen;  // the ring is known zero up to this index; a write drops it to 0
+  InputRing<growl_detail::kRingLen> ring_;  // the card's input
   growl_detail::GrowlVoice voice_;
   growl_detail::Fold fold_;
   Biquad hp_;  // the wet path's high-pass
@@ -777,8 +747,7 @@ class Growl {
   RaspGains rasp_;             // the wave's gains at raspAt_ and raspFadeAt_
   float raspAt_ = -1.0f;
   float raspFadeAt_ = -1.0f;
-  float coef_ = 1.0f;
-  int coefN_ = 0;
+  smooth::BlockCoef coef_;  // the 20 ms one-pole's step over the last call length
   bool fresh_ = true;  // the next call takes the knobs outright
   bool idle_ = true;   // the last call passed the input through
 };

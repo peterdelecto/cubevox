@@ -23,11 +23,11 @@ the release image carries none of it and answers `op not in this build`.
 | `knobs_live` | | clears every per-knob pin and the pin-at-top |
 | `bypass` | | flips BYPASS held on, whatever the top switch reads (`[bench] BYPASS held on` or `follows the top switch`) |
 | `polish_comp` | | flips POLISH COMP forced off, whatever the menu says (`[bench] POLISH COMP forced off` or `follows the menu`) |
-| `polish_eq` | | flips VOX EQ forced off, both halves, whatever the menu says (`[bench] VOX EQ forced off` or `follows the menu`) |
+| `vox_eq` | | flips VOX EQ forced off, both halves, whatever the menu says (`[bench] VOX EQ forced off` or `follows the menu`) |
 
 A slot runs when `(toggle || forcedOn) && !forcedOff`, so `slot_off` still wins. A per-knob pin
 wins over `pin_knobs`. `stats` prints both masks. Letters in `bench_ops.py`: `n` all_on,
-`u` slots_live, `y` knobs_live; `slot_on`, `set_knob`, `bypass`, `polish_comp` and `polish_eq` go as
+`u` slots_live, `y` knobs_live; `slot_on`, `set_knob`, `bypass`, `polish_comp` and `vox_eq` go as
 JSON. The three flags are bench overrides only: they never touch the saved settings, and `stress.py`
 flips each back before it ends.
 
@@ -41,7 +41,7 @@ flips each back before it ends.
    box will not load is a result row with the box's reason, not a failure.
 3. Per layout, per run (`--runs`, default 2): the layout goes on with VOX EQ at ON+CUTS (owner
    2026-11-05; `set_layout` carries `settings.vox_eq` `"cuts"`, because at the default OFF the
-   stage's bucket reads near zero and its `kPolishEq` gate would pass with nothing measured),
+   stage's bucket reads near zero and its `kVoxEq` gate would pass with nothing measured),
    all slots forced on, clip on, knobs at top,
    counters reset, a read after `--seconds` (default 20) is pass 1. Pass 2 sweeps SEMITONES, the
    reverb's lower knob and, when Mob is placed, its two knobs, 0 to 100 % in steps of 10 at 1 s

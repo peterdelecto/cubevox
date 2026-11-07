@@ -158,7 +158,7 @@ static_assert(CrowdTuning{}.scatterMs <= kMaxScatterMs, "the shipped scatter exc
 constexpr float kGapUnderPhraseDb = 20.0f;
 constexpr float kPhraseRiseS = 0.05f;
 constexpr float kPhraseFallS = 1.0f;
-inline const float kGapUnderPhraseSq = dbToGainFast(-2.0f * kGapUnderPhraseDb);
+constexpr float kGapUnderPhraseSq = 0.0100000007f;  // dbToGainFast(-2 * kGapUnderPhraseDb), pinned by crowd_test
 
 // A gap ends once the copy's read point sounds 6 dB over the floor, so noise wandering about the
 // floor inside one pause counts as one gap and draws once.

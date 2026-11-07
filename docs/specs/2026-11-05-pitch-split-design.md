@@ -215,7 +215,7 @@ no menu layout pays a second tracker. A set_layout layout that pays several stay
 |---|---|---|
 | `pitch_onset_test` | none; it drives the tracker through `RingedTracker` | passes unchanged |
 | `pitch_spikes_test` | one row per ring (Autotune, Octave, Formant, Mob) in place of the `PitchFx` row | every switch-on block below its line |
-| `parity_test` | `ChainParams::pitchFx` keeps its three card params; `crowdOn` and `growlOn` go | passes; no mapping moves |
+| `parity_test` | `ChainParams::pitchCards` (was `pitchFx`) keeps its three card params; `crowdOn` and `growlOn` go | passes; no mapping moves |
 | `crowd_test` pinned hashes | ring and tracker plumbed through the new path | hold: same samples, tracker and correction |
 | `growl_test` `kFullMixHash` | nothing ahead, so Deepthroat runs its own tracker on the same input | holds |
 | `growl_test` accessor checks | measure `UpstreamPitch` against Octave and Formant engines | re-pinned figures; the pulse-landing check passes |

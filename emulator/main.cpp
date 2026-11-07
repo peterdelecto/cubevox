@@ -83,7 +83,7 @@ struct ProtoParams {
   float inputGainDb = 0.0f;  // mic only, -12..+24
   cv::GateParams inputGate;
   cv::GateParams gate;
-  cv::PitchFxParams pitchFx;
+  cv::PitchCardParams pitchCards;
   cv::CrowdParams crowd;
   cv::UnisonParams unison{false, kStartDepth, {}};
   cv::SlapbackParams slapback{true, kStartSlapMix, {}};
@@ -111,15 +111,15 @@ struct ProtoParams {
     inputGate.on = true;
     applyInputGateDefaults(inputGate);
     gate.on = false;
-    pitchFx.octave.on = false;
+    pitchCards.octave.on = false;
     unison.on = false;
     distortion.on = false;
     reverb.on = false;
     // Adam's starting point (owner 2026-10-02).
     slapback.on = true;
     eq.on = true;
-    pitchFx.autotune.key = kStartKey;
-    pitchFx.octave.mix = cv::kOctaveDefaultMix;
+    pitchCards.autotune.key = kStartKey;
+    pitchCards.octave.mix = cv::kOctaveDefaultMix;
     reverb.engine = cv::kReverbSpring;
     reverb.mix = 1.0f;
     reverb.time = 1.0f;  // full MIX with full decay, Adam's starting sound
@@ -168,7 +168,7 @@ unsigned gInputRate = 0;                 // UI-thread-only; its sample rate
 // Audio-thread-only.
 cv::Gate gInputGate;
 cv::Gate gGate;
-PitchSeries gPitchFx;
+PitchSeries gPitchSeries;
 cv::Crowd gCrowd;
 cv::Unison gUnison;
 cv::Slapback gSlapback;
@@ -237,9 +237,9 @@ void readLoop(const LoopBuffer& loop, float* dst, int n) {
 void publishState(float peak, const LoopBuffer* loop) {
   ProtoState& s = gStateBuf[gStateWriteIndex];
   s.peakDb = peak > 1e-6f ? 20.0f * std::log10(peak) : kSilenceDb;
-  s.pitchHz = gPitchFx.pitch().hz;
-  s.voiced = gPitchFx.pitch().voiced;
-  s.correctionSemis = gPitchFx.correctionSemis();
+  s.pitchHz = gPitchSeries.pitch().hz;
+  s.voiced = gPitchSeries.pitch().voiced;
+  s.correctionSemis = gPitchSeries.correctionSemis();
   s.inGateDb = gInputGate.gainDb();
   s.gateDb = gGate.gainDb();
   s.playheadNorm = (loop != nullptr && !loop->samples.empty())
@@ -262,7 +262,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gReadPos = 0;
     gInputGate.reset();
     gGate.reset();
-    gPitchFx.reset();
+    gPitchSeries.reset();
     gCrowd.reset();
     gUnison.reset();
     gSlapback.reset();
@@ -305,11 +305,11 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gPolish.processFront(in.data(), in.data(), n, params.eq);
     gInputGate.process(in.data(), mono.data(), n, params.inputGate);
     gCrowd.write(mono.data(), n);
-    gPitchFx.process(mono.data(), tmp.data(), n, params.pitchFx, params.crowd.on);
+    gPitchSeries.process(mono.data(), tmp.data(), n, params.pitchCards, params.crowd.on);
     // The Crowd card cuts its copies from the ring the pitch cards' input went into and takes their
     // output as its lead. `in` is free once the input gate has read it, so it holds the Crowd card's
     // output.
-    gCrowd.process(tmp.data(), in.data(), n, params.crowd, gPitchFx.crowdPitch());
+    gCrowd.process(tmp.data(), in.data(), n, params.crowd, gPitchSeries.crowdPitch());
     gUnison.process(in.data(), mono.data(), n, params.unison);
     gSlapback.process(mono.data(), tmp.data(), n, params.slapback);
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
@@ -354,8 +354,8 @@ char gTuningText[8192];  // last copied settings text
 size_t snapshotLines(const ProtoParams& p, char* buf, size_t size) {
   const auto onOff = [](bool b) { return b ? "on" : "off"; };
   static const char* const kReverb[2] = {"SPRING", "CHASM"};
-  const cv::AutotuneParams& at = p.pitchFx.autotune;
-  const cv::OctaveParams& o = p.pitchFx.octave;
+  const cv::AutotuneParams& at = p.pitchCards.autotune;
+  const cv::OctaveParams& o = p.pitchCards.octave;
   const cv::ReverbParams& r = p.reverb;
   const int re = r.engine == cv::kReverbChasm ? cv::kReverbChasm : cv::kReverbSpring;
   const float decays[2] = {r.spring.decay, r.chasm.feedback};
@@ -770,10 +770,10 @@ void drawReverbRaw(cv::ChasmTuning& c, cv::SpringTuning& b) {
 
 // Reset and Print cover every effect's tuning.
 void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
-  cv::OctaveTuning& ot = params.pitchFx.octave.tuning;
+  cv::OctaveTuning& ot = params.pitchCards.octave.tuning;
   if (ImGui::Button("Reset to defaults", ImVec2(resetW, 0.0f))) {
     ot = cv::OctaveTuning{};
-    params.pitchFx.autotune.tuning = cv::AutotuneTuning{};
+    params.pitchCards.autotune.tuning = cv::AutotuneTuning{};
     params.crowd.tuning = cv::CrowdTuning{};
     params.unison.tuning = cv::UnisonTuning{};
     params.slapback.tuning = cv::SlapbackTuning{};
@@ -794,7 +794,7 @@ void drawTuningButtons(ProtoParams& params, float resetW, float copyW) {
                     ImVec2(copyW, 0.0f))) {
     printTuning(ot, params.unison.tuning, params.slapback.tuning, params.distortion.tuning,
                 params.reverb.chasm.tuning, params.eq, params.inputGate.tuning,
-                params.gate.tuning, params.pitchFx.autotune.tuning, params);
+                params.gate.tuning, params.pitchCards.autotune.tuning, params);
     copiedAt = ImGui::GetTime();
   }
 }
@@ -962,11 +962,11 @@ std::vector<StateField> stateFields(ProtoParams& p) {
   };
   gate("ingate", p.inputGate);
   gate("gate", p.gate);
-  cv::AutotuneParams& at = p.pitchFx.autotune;
+  cv::AutotuneParams& at = p.pitchCards.autotune;
   add("autotune.on", &at.on);
   add("autotune.key", &at.key);
   add("autotune.response", &at.responseMs);
-  cv::OctaveParams& o = p.pitchFx.octave;
+  cv::OctaveParams& o = p.pitchCards.octave;
   add("octave.on", &o.on);
   add("octave.semitones", &o.semitones);
   add("octave.mix", &o.mix);
@@ -1074,7 +1074,7 @@ void applyMacros(ProtoParams& p) {
   namespace mc = cv::macros;
   const auto& m = p.macros.pos;
   cv::ReverbParams& r = p.reverb;
-  mc::octaveSlide(p.pitchFx.octave.tuning, m[mc::OctaveSlide]);
+  mc::octaveSlide(p.pitchCards.octave.tuning, m[mc::OctaveSlide]);
   mc::unison(p.unison.tuning, m[mc::UnisonMotion]);
   mc::distBody(p.distortion.tuning, m[mc::DistBody]);
   mc::distBite(p.distortion.tuning, m[mc::DistBite]);
@@ -1588,8 +1588,8 @@ void drawPedals(ProtoParams& params) {
   gPedalRight = 0.0f;
   gPedalBottom = 0.0f;
   const auto next = [] { ImGui::SameLine(0.0f, kPedalGap); };
-  cv::AutotuneParams& at = params.pitchFx.autotune;
-  cv::OctaveParams& o = params.pitchFx.octave;
+  cv::AutotuneParams& at = params.pitchCards.autotune;
+  cv::OctaveParams& o = params.pitchCards.octave;
   char semis[16];
   std::snprintf(semis, sizeof(semis), "%+d st", o.semitones);
 
@@ -1686,7 +1686,7 @@ void drawFrame(ProtoParams& params, const ProtoState& state, float& meterDb, boo
   if (params.reverb.engine != cv::kReverbChasm) params.reverb.engine = cv::kReverbSpring;
   // A saved state can hold a TIME below the 60 ms floor.
   params.slapback.tuning.timeMs = std::clamp(params.slapback.tuning.timeMs, 60.0f, 250.0f);
-  params.pitchFx.autotune.key = std::clamp(params.pitchFx.autotune.key, 0, cv::kKeyCount - 1);
+  params.pitchCards.autotune.key = std::clamp(params.pitchCards.autotune.key, 0, cv::kKeyCount - 1);
   cv::applyKnobs(params.reverb);
 
   ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
@@ -1743,12 +1743,12 @@ void drawColumns(ProtoParams& params, const ProtoState& state) {
   column(0, colW, [&] {
     moduleBox("ingateBox", true,
               [&] { drawGateBlock("ingate", "INPUT GATE", params.inputGate, state.inGateDb, kInputGatePots); });
-    moduleBox("autotuneBox", false, [&] { drawAutotuneBlock(params.pitchFx.autotune, state); });
+    moduleBox("autotuneBox", false, [&] { drawAutotuneBlock(params.pitchCards.autotune, state); });
   });
   ImGui::SameLine(0.0f, kColumnGap);
   column(1, kWideColumnW, [&] {
     moduleBox("octaveBox", true,
-              [&] { drawOctaveBlock(params.pitchFx.octave, params.macros); });
+              [&] { drawOctaveBlock(params.pitchCards.octave, params.macros); });
     moduleBox("crowdBox", false, [&] { drawCrowdBlock(params.crowd); });
     moduleBox("unisonBox", false, [&] { drawUnisonBlock(params.unison, params.macros); });
   });
@@ -1939,9 +1939,9 @@ int runLayoutProbe() {
 
   // Default macro positions must reproduce the engine tuning defaults (the firmware's).
   const auto tuningText = [](const ProtoParams& q) {
-    formatTuning(q.pitchFx.octave.tuning, q.unison.tuning, q.slapback.tuning, q.distortion.tuning,
+    formatTuning(q.pitchCards.octave.tuning, q.unison.tuning, q.slapback.tuning, q.distortion.tuning,
                  q.reverb.chasm.tuning, q.eq, q.inputGate.tuning, q.gate.tuning,
-                 q.pitchFx.autotune.tuning, q);
+                 q.pitchCards.autotune.tuning, q);
     return std::string(gTuningText);
   };
   ProtoParams engineDefaults;
@@ -2078,9 +2078,9 @@ int printDefaults() {
   ImGui::CreateContext();
   ProtoParams params;
   applyMacros(params);
-  printTuning(params.pitchFx.octave.tuning, params.unison.tuning, params.slapback.tuning,
+  printTuning(params.pitchCards.octave.tuning, params.unison.tuning, params.slapback.tuning,
               params.distortion.tuning, params.reverb.chasm.tuning, params.eq,
-              params.inputGate.tuning, params.gate.tuning, params.pitchFx.autotune.tuning, params);
+              params.inputGate.tuning, params.gate.tuning, params.pitchCards.autotune.tuning, params);
   ImGui::DestroyContext();
   return 0;
 }

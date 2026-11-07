@@ -4,7 +4,6 @@
 #include <cstring>
 
 #include "engine/common.h"
-#include "engine/dsp.h"
 #include "engine/fastmath.h"
 #include "engine/input_ring.h"
 #include "engine/octave.h"
@@ -113,7 +112,7 @@ class OctaveFx {
     }
     const Gains g0 = gains_;
     if (mix_ != mixTarget || fade_ != fadeTarget) {
-      const float a = smoothCoefFor(n);
+      const float a = coef_.at(n);
       mix_ = smooth::step(mix_, mixTarget, a);
       fade_ = smooth::step(fade_, fadeTarget, a);
       gains_ = gainsNow();
@@ -154,23 +153,13 @@ class OctaveFx {
     }
   }
 
-  // The 20 ms one-pole's coefficient for one step over n samples, kept for the last n.
-  float smoothCoefFor(int n) {
-    if (n != coefN_) {
-      coef_ = smooth::blockCoef(smooth::kSmoothSec, n);
-      coefN_ = n;
-    }
-    return coef_;
-  }
-
   InputRing<kOctaveRingLen> ring_;
   OctaveVoiceT<kOctaveRingLen> voice_;
   std::array<float, kBlock> buf_{};  // the voice's chunk
   float mix_ = 0.0f;                 // MIX after its smoothing
   float fade_ = 0.0f;                // the toggle's fade, 0 off .. 1 on
   Gains gains_;                      // the gains at the end of the last chunk
-  float coef_ = 1.0f;
-  int coefN_ = 0;
+  smooth::BlockCoef coef_;           // the 20 ms one-pole's step over the last chunk length
   bool was_ = false;     // the voice was on last chunk
   bool fresh_ = true;    // the next chunk takes its targets outright
   bool rested_ = false;  // the card sat stopped since it last ran

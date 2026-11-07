@@ -82,20 +82,31 @@ const char* slotLabel(int slot, char* buf, size_t size) {
   return buf;
 }
 
-// The label of `it`. The five card rows (Octave and Formant, Unison and Crowd, Distortion and Growl,
-// slot 7, reverb) name the slot that holds their card, or a dash when none does, and build the text
-// in `buf`.
+// The swappable slot a card row stands for. Only the five card rows call it.
+SwapSlot swapSlotOfItem(Item it) {
+  switch (it) {
+    case Item::OctaveFormant: return SwapSlot::OctaveFormant;
+    case Item::UnisonCrowd: return SwapSlot::UnisonMob;
+    case Item::DistortionGrowl: return SwapSlot::DistortionDeepthroat;
+    case Item::Slot7Card: return SwapSlot::Slot7;
+    default: return SwapSlot::Reverb;
+  }
+}
+
+// The label of `it`. The five card rows (Octave and Formant, Unison and Mob, Distortion and
+// Deepthroat, slot 7, reverb) name the slot that holds their card, or a dash when none does, and
+// build the text in `buf`.
 const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
   switch (it) {
     case Item::InputJack: return "INPUT PAD";
     case Item::Output: return "OUTPUT PAD";
     case Item::TopSwitch: return "TOP SWITCH";
     case Item::Brightness: return "OLED BRIGHT";
-    case Item::Reverb: return slotLabel(reverbSlot(layout), buf, size);
-    case Item::OctaveFormant: return slotLabel(octaveFormantSlot(layout), buf, size);
-    case Item::UnisonCrowd: return slotLabel(unisonCrowdSlot(layout), buf, size);
-    case Item::DistortionGrowl: return slotLabel(distortionGrowlSlot(layout), buf, size);
-    case Item::Slot7Card: return slotLabel(slot7CardSlot(layout), buf, size);
+    case Item::Reverb:
+    case Item::OctaveFormant:
+    case Item::UnisonCrowd:
+    case Item::DistortionGrowl:
+    case Item::Slot7Card: return slotLabel(swapSlotOf(layout, swapSlotOfItem(it)), buf, size);
     case Item::PolishComp: return "POLISH COMP";
     case Item::VoxEq: return "VOX EQ";
     case Item::Debug: return "DEBUG";
@@ -116,53 +127,6 @@ const char* voxEqValue(VoxEq v) {
   }
 }
 
-// The reverb card the layout holds. A valid layout always holds one; a layout without one reads
-// SPRING, the default.
-const char* reverbValue(const Layout& layout) {
-  const int slot = reverbSlot(layout);
-  return slot >= 0 && layout.card[slot] == Card::ReverbChasm ? "CHASM" : "SPRING";
-}
-
-// The card the slot 3 row holds. A layout with none of the three reads OCTAVE, the default.
-const char* octaveFormantValue(const Layout& layout) {
-  const int slot = octaveFormantSlot(layout);
-  if (slot < 0) return "OCTAVE";
-  switch (layout.card[slot]) {
-    case Card::Formant: return "FORMANT";
-    case Card::FormantFollower: return "APRAXIA";
-    default: return "OCTAVE";
-  }
-}
-
-// The card the Unison and Crowd slot holds, the Crowd card under its name MOB. A layout with neither
-// reads UNISON, the default.
-const char* unisonCrowdValue(const Layout& layout) {
-  const int slot = unisonCrowdSlot(layout);
-  if (slot < 0) return "UNISON";
-  switch (layout.card[slot]) {
-    case Card::Crowd: return "MOB";
-    default: return "UNISON";
-  }
-}
-
-// The card the Distortion and Growl slot holds. A layout with neither reads DISTORTION, the default.
-const char* distortionGrowlValue(const Layout& layout) {
-  const int slot = distortionGrowlSlot(layout);
-  if (slot < 0) return "DISTORTION";
-  return layout.card[slot] == Card::Growl ? "DEEPTHROAT" : "DISTORTION";
-}
-
-// The card the slot 7 row holds. A layout with none of the three reads GATE, the default.
-const char* slot7CardValue(const Layout& layout) {
-  const int slot = slot7CardSlot(layout);
-  if (slot < 0) return "GATE";
-  switch (layout.card[slot]) {
-    case Card::Lofi: return "LO-FI";
-    case Card::Bloom: return "CHATTER";
-    default: return "GATE";
-  }
-}
-
 const char* itemValue(Item it, const UiContext& ctx) {
   const Settings& s = ctx.settings;
   switch (it) {
@@ -170,11 +134,11 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::Output: return onOff(s.outputLevel == OutputLevel::Mic);
     case Item::TopSwitch: return s.topSwitch == TopSwitch::Bypass ? "BYPASS" : "MUTE";
     case Item::Brightness: return brightnessLevel(s.brightness).name;
-    case Item::Reverb: return reverbValue(ctx.layout);
-    case Item::OctaveFormant: return octaveFormantValue(ctx.layout);
-    case Item::UnisonCrowd: return unisonCrowdValue(ctx.layout);
-    case Item::DistortionGrowl: return distortionGrowlValue(ctx.layout);
-    case Item::Slot7Card: return slot7CardValue(ctx.layout);
+    case Item::Reverb:
+    case Item::OctaveFormant:
+    case Item::UnisonCrowd:
+    case Item::DistortionGrowl:
+    case Item::Slot7Card: return swapWord(ctx.layout, swapSlotOfItem(it));
     case Item::PolishComp: return onOff(s.polishComp);
     case Item::VoxEq: return voxEqValue(s.voxEq);
     case Item::Debug: return onOff(s.debug);

@@ -29,6 +29,7 @@
 #include "engine/growl.h"
 #include "engine/unison.h"
 
+#include "clip_util.h"
 #include "pitch_series.h"
 #include "ringed_tracker.h"
 #include "signal_util.h"
@@ -55,7 +56,7 @@ struct Rig {
 
   std::unique_ptr<PitchSeries> pitch;
   std::unique_ptr<cv::Growl> growl = std::make_unique<cv::Growl>();
-  cv::PitchFxParams stage;
+  cv::PitchCardParams stage;
   Signal heard;
   std::vector<float> latency;  // the series' outputLatency() after each block
 
@@ -123,29 +124,10 @@ Signal sungNote(double hz, double seconds, double dbfs) {
 
 double rms(const Signal& x, size_t from, size_t to) { return testutil::rmsOf(x, from, to); }
 
-using testutil::readWav;
-
 // Adam's three clips, each behind 0.4 s of silence so the card's crossfade settles first. Empty when
 // samples/ is absent.
 constexpr size_t kPad = kRate * 2 / 5;
-std::vector<Signal> clips(bool& whole) {
-  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
-  std::vector<Signal> out;
-  whole = true;
-  std::error_code ec;
-  if (!std::filesystem::is_directory(CUBEVOX_SAMPLES_DIR, ec)) return out;
-  for (const char* name : names) {
-    const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
-    if (clip.empty()) {
-      whole = false;
-      continue;
-    }
-    Signal padded(kPad, 0.0f);
-    padded.insert(padded.end(), clip.begin(), clip.end());
-    out.push_back(padded);
-  }
-  return out;
-}
+std::vector<Signal> loadClips(bool& whole) { return ::clips::load(CUBEVOX_SAMPLES_DIR, whole); }
 
 // Off, the card is the stage's output bit for bit, and so it is again once a switch-off has settled.
 bool checkOff() {
@@ -966,7 +948,7 @@ Signal runUnisonAhead(const Signal& in, bool unisonOn) {
   const cv::GrowlParams g = growlAt(0.0f, 0.0f);
   Signal out(in.size());
   for (size_t i = 0; i + cv::kBlock <= in.size(); i += cv::kBlock) {
-    pitch->process(&in[i], &out[i], cv::kBlock, cv::PitchFxParams{}, true);
+    pitch->process(&in[i], &out[i], cv::kBlock, cv::PitchCardParams{}, true);
     if (unisonOn) unison->process(&out[i], &out[i], cv::kBlock, up);
     growl->process(&out[i], &out[i], cv::kBlock, g, pitch->upstream());
   }
@@ -1132,7 +1114,7 @@ bool checkStagesFinite(const std::vector<Signal>& voices) {
   for (const size_t n : {size_t{1}, size_t{17}, size_t{200}, size_t{4000}}) {
     auto pitch = std::make_unique<PitchSeries>();
     auto growl = std::make_unique<cv::Growl>();
-    cv::PitchFxParams pp;
+    cv::PitchCardParams pp;
     pp.octave.on = true;
     pp.octave.semitones = 12;
     pp.octave.mix = 1.0f;
@@ -1153,34 +1135,54 @@ bool checkStagesFinite(const std::vector<Signal>& voices) {
   return report("finite behind the stages", bad == 0 && peak < 8.0f, detail);
 }
 
-// A stopped card clears its ring a slice a call (1 KB at most), and the reset at its switch-on then finds
+// True when every float of the card's ring is zero.
+bool ringIsZero(const cv::Growl& growl) {
+  for (const float v : growl.ringForTest().data()) {
+    if (v != 0.0f) return false;
+  }
+  return true;
+}
+
+// A stopped card clears its ring a slice a call (2 KB at most), and the reset at its switch-on then finds
 // the ring clear and clears nothing. A reset with no rest before it clears the whole ring.
 bool checkRingRest() {
+  using Ring = cv::InputRing<cv::growl_detail::kRingLen>;
   const Signal in = sungNote(220.0, 1.0, -20.0);
   Rig rig;
   rig.run(in, growlAt(0.5f, 0.5f));
-  const bool dirty = !rig.growl->ringIsZero() && rig.growl->ringClearedTo() == 0;
-  int calls = 0, worstStep = 0;
-  while (rig.growl->ringClearedTo() < cv::growl_detail::kRingLen && calls < 100) {
-    const int before = rig.growl->ringClearedTo();
+  const bool dirty = !ringIsZero(*rig.growl);
+  const uint32_t start = rig.growl->ringClearedForTest();
+  int calls = 0;
+  uint32_t worstStep = 0;
+  while (rig.growl->ringClearedForTest() - start < static_cast<uint32_t>(cv::growl_detail::kRingLen) && calls < 100) {
+    const uint32_t before = rig.growl->ringClearedForTest();
     rig.growl->rest();
-    worstStep = std::max(worstStep, rig.growl->ringClearedTo() - before);
+    worstStep = std::max(worstStep, rig.growl->ringClearedForTest() - before);
     ++calls;
   }
-  const bool restClear = rig.growl->ringIsZero();
+  const bool restClear = ringIsZero(*rig.growl);
+  const uint32_t beforeReset = rig.growl->ringClearedForTest();
   rig.growl->reset();
-  const bool resetClear = rig.growl->ringIsZero() && rig.growl->ringClearedTo() == cv::growl_detail::kRingLen;
+  const bool resetClear = ringIsZero(*rig.growl) && rig.growl->ringClearedForTest() == beforeReset;
 
   Rig quick;
   quick.run(in, growlAt(0.5f, 0.5f));
   quick.growl->rest();
   quick.growl->reset();
-  const bool quickClear = quick.growl->ringIsZero();
-  const int want = (cv::growl_detail::kRingLen + cv::growl_detail::kRestClearFloats - 1) / cv::growl_detail::kRestClearFloats;
+  const bool quickClear = ringIsZero(*quick.growl);
+  Rig bare;
+  bare.run(in, growlAt(0.5f, 0.5f));
+  const uint32_t bareBefore = bare.growl->ringClearedForTest();
+  bare.growl->reset();
+  const bool bareClear = ringIsZero(*bare.growl) &&
+                         bare.growl->ringClearedForTest() - bareBefore == static_cast<uint32_t>(cv::growl_detail::kRingLen);
+  const int want = (cv::growl_detail::kRingLen + Ring::kRestClearFloats - 1) / Ring::kRestClearFloats;
   char detail[160];
-  std::snprintf(detail, sizeof detail, "ring %d floats (%d B): clear after %d calls (%d), at most %d B a call (1024), reset after a short rest clears it: %s",
-                cv::growl_detail::kRingLen, cv::growl_detail::kRingLen * 4, calls, want, worstStep * 4, quickClear ? "yes" : "no");
-  return report("ring rest", dirty && restClear && resetClear && quickClear && calls == want && worstStep * 4 <= 1024, detail);
+  std::snprintf(detail, sizeof detail, "ring %d floats (%d B): clear after %d calls (%d), at most %u B a call (2048), reset after a short rest clears it: %s",
+                cv::growl_detail::kRingLen, cv::growl_detail::kRingLen * 4, calls, want, static_cast<unsigned>(worstStep * 4),
+                quickClear ? "yes" : "no");
+  return report("ring rest", dirty && restClear && resetClear && quickClear && bareClear && calls == want && worstStep * 4 <= 2048,
+                detail);
 }
 
 // The default chain: Autotune ahead of the card. On a 190 Hz note, a quarter tone flat of the nearest scale
@@ -1270,7 +1272,7 @@ bool checkOctavePulses() {
 
 int main() {
   bool whole = true;
-  const std::vector<Signal> voices = clips(whole);
+  const std::vector<Signal> voices = loadClips(whole);
   bool ok = true;
   ok &= checkOff();
   ok &= checkDrop();

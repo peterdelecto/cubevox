@@ -64,7 +64,7 @@ Owner 2026-10-30: the value row is centred on what it draws. The field holds the
 
 1. A numeric field is a sign cell, the digit cells, a space and the unit.
 2. The sign cell exists when the range reaches below zero. It holds `-`, `+` or a blank for zero, and it stays in the leftmost cell.
-3. The digit cells are as many as the digits of the widest number of the range. A parameter with decimals adds a cell for the point and one for each decimal.
+3. The digit cells are as many as the digits of the widest number of the range.
 4. A cell is 18 px wide, a 16 px glyph cell and 2 px of spacing, and a glyph's ink is centred in its cell.
 5. The field is `cells * 18` px plus the width of the space and the unit. Its left edge is `(128 - width) / 2`, taken once. The space and the unit start at the left edge plus `cells * 18`.
 6. A number is right-aligned in the digit cells, and a shorter number leaves its leading cells blank. `+5 ST` is the sign cell `+`, a blank tens cell and `5` in the ones cell. `0 ST` is two blank cells and `0`.
@@ -88,7 +88,6 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 | Continuous | rounded whole number of the unit | `210 MS`, `65 %`, `-24 DB` |
 | Stepped number | the step's whole number | `+5 ST`, `0 ST`, `-12 ST` |
 | Text | the name at the step | `F / DM`, `D♭ / B♭M` |
-| Decimals | `KnobDesc::decimals` digits after the point, shown as tenths and so on | none declared yet |
 
 1. A positive number carries `+` only when the parameter's range reaches below zero.
 2. Zero carries no sign.
@@ -165,7 +164,7 @@ Owner 2026-11-02: "lets dim the screen. we also need a menu item that adjusts sc
 | `core/level` | sum of squares, RMS, dB to level, the meter |
 | `core/canvas` | `setPixel`, clipped digits, `copyFrom`, `dissolve`, `markAllDirty`, the Bayer table and the dissolve masks |
 | `core/display` | the `Display` interface and `PanelLink`, which says when the backend sends, restarts the panel or waits |
-| `core/registry` | `KnobDesc::decimals` and `labels`, `knobDesc`, `knobShown`, `knobCells`, `formatCells`, `knobLabel` |
+| `core/registry` | `KnobDesc::labels`, `knobDesc`, `knobShown`, `knobCells`, `formatCells`, `knobLabel` |
 | `core/knob_filter` | `KnobBank::takeTouch`, one touch per move |
 | `ui/gui` | the state machine: which screen, which dissolve step, the eased value, the walk |
 | `ui/screens` | `renderVoice`, `renderReadout`, `renderMuted` (the ribbon history is superseded 2026-11-06: `renderVoice` takes a `ScopeFrame`) |
@@ -202,7 +201,7 @@ The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the 
 5. The lateral sweep is the hard gate for the owner's rule, "I don't want anything bouncing around laterally as values change". `checkReadoutSweep` renders the settled readout at every step of every knob of every card in the registry, Chasm Reverb included.
 6. A continuous knob runs through every whole number between the lowest and the highest its 4096 pot readings reach. A stepped knob runs through every position. Today that is 18 parameters and 3,852 steps, and the test prints both counts on every run.
 7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns and a key name's first lit column are read straight off the frame. Each must equal the column the first frame that showed it gave, so a shift of one pixel fails.
-8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before. A knob that declares decimals fails it until the sweep models them.
+8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before.
 9. Superseded 2026-11-06 by `2026-11-06-scope-design.md`: the voice goldens are `voice-scope` (frame 79 of scene 12) and `voice-scope-loud` (frame 76), and the voice tests check the scope's trigger, columns and scale instead of the level map, scroll and rim. The voice golden `voice-meter-ribbon` is frame 79 of scene 12, a scripted drive the test repeats tick for tick, because the proof's scene 1 comes from Adam's recordings, which the host cannot replay. The voice tests also check the walk, the bar and three levels through the whole path (the level map, the window, the heights, the scroll and the rim are superseded).
 10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key,key-flat}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm`, `oled-face-menu.pgm` and `oled-splash.pgm` at 4x.
 11. `core_canvas.cpp` drives `PanelLink` with a fake clock: the first failure restarts at once, later ones wait for the 1 s window, Lost and Back come once per run, and the window survives a millis() wrap. `ui_splash.cpp` runs the sketch's order through the splash and checks that a click or a turn during it opens nothing.
@@ -221,7 +220,7 @@ Each item says what is built now. The owner approves text and screens per number
 2. Height curve. The proof renderer raised the level to 0.8 again when it set the height. Dropped 2026-10-30 with the 0.6 curve of the old level map; the half-height is the level times 22.
 3. Walk. It covers the voice screen only, as the brief says. MUTED and the readout stay put, and MUTED can sit unchanged for hours. Giving MUTED the same shift is a small change to `renderMuted`.
 4. Menu motion. Opening and closing the menu dissolves. The cursor, the values and the sub-screens do not, because the menu stays as it is. They show at the next tick, up to 40 ms after the click.
-5. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. `KnobDesc::decimals` is ready for a parameter that declares one.
+5. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. The knob table has no decimals field; a parameter that needs one adds it with its own width rule.
 6. No panel. The face waits on the dirty pages and the driver tries a start once a second, so a panel plugged in later shows the face within a second.
 7. Panel reset under a still screen. A panel that loses power and comes back while nothing changes on glass, such as MUTED for minutes, powers up with its display off and still answers its address. Its later writes go through, so the driver never restarts it, and it stays dark until the box restarts. Built now: nothing catches it. Re-sending the init settings and the display-on command once a second would, for about 0.6 ms of bus time a second. Bench 8 shows first whether it happens.
 

@@ -5,8 +5,6 @@
 #include <cstdint>
 #include <cstring>
 
-#include "engine/dsp.h"
-
 // A card's ring of its own input, newest sample at head() - 1. A card that cuts grains or taps from what
 // reaches its slot writes each chunk here before it reads. A stopped card calls rest() each block, which
 // zeroes a slice, so the clear() at its next start finds most of the ring clear already.

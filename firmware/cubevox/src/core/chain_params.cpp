@@ -14,10 +14,10 @@ ChainParams::ChainParams() {
   inputGate.thresholdDb = kInputGateThresholdDb;
   inputGate.tuning = cv::inputGateTuning();
   gate.on = false;
-  pitchFx.autotune.on = false;
-  pitchFx.octave.on = false;
-  pitchFx.octave.mix = cv::kOctaveDefaultMix;  // until composeSnapshot reads its pot
-  pitchFx.formant.on = false;
+  pitchCards.autotune.on = false;
+  pitchCards.octave.on = false;
+  pitchCards.octave.mix = cv::kOctaveDefaultMix;  // until composeSnapshot reads its pot
+  pitchCards.formant.on = false;
   crowd.on = false;
   growl.on = false;
   unison.on = false;

@@ -340,18 +340,14 @@ bool testRingReads() {
     }
   }
   const GuardedRing g(5);
-  // A NaN or infinite delay gives a NaN fraction, so readRing itself answers NaN there; the clamped form
-  // answers a number. Every other delay, however far out, indexes inside the ring.
+  // A NaN or infinite delay gives a NaN fraction, so readRing answers NaN there. Every other delay,
+  // however far out, indexes inside the ring.
   bool finite = true;
   for (const float d : {1e30f, -1e30f, 0.25f, -3.0f, 100.0f}) finite &= std::isfinite(cv::readRing<kLen>(g.ring, 5, d));
-  for (const float d : {kNaN, kInf, -kInf, 1e30f, -1e30f}) finite &= std::isfinite(cv::readRingClamped<kLen>(g.ring, 5, d));
-  const bool clamped = cv::readRingClamped<kLen>(g.ring, 5, kNaN) == cv::readRing<kLen>(g.ring, 5, 2.0f) &&
-                       cv::readRingClamped<kLen>(g.ring, 5, -4.0f) == cv::readRing<kLen>(g.ring, 5, 2.0f) &&
-                       cv::readRingClamped<kLen>(g.ring, 5, 90.0f) == cv::readRing<kLen>(g.ring, 5, kLen - 3.0f);
   const bool wrap = cv::wrapOnce<kLen>(-1) == kLen - 1 && cv::wrapOnce<kLen>(kLen) == 0 && cv::wrapOnce<kLen>(7) == 7 &&
                     cv::wrapOnce<kLen>(kLen + 3) == 3 && cv::wrapOnce<kLen>(3 * kLen) == 0;
   bool ok = report("readRing", worst < 2e-5, "exact on a line for delays 1.25 to 30 at every head, worst %.2g (< 2e-5)", worst);
-  ok &= report("readRing", finite && clamped, "NaN, infinity and out-of-span delays stay inside the ring=%.0f", (finite && clamped) ? 1.0 : 0.0);
+  ok &= report("readRing", finite, "out-of-span delays stay inside the ring=%.0f", finite ? 1.0 : 0.0);
   ok &= report("wrapOnce", wrap, "wraps one length either way and sends anything farther to 0=%.0f", wrap ? 1.0 : 0.0);
   return ok;
 }
@@ -402,16 +398,8 @@ bool testReverbParts() {
   return ok;
 }
 
-// kSine against libm, the LFO against the true sine, and the knob law and wobble bound.
+// The LFO against the true sine, and the knob law and wobble bound.
 bool testSineAndKnobs() {
-  using cv::kTwoPi;
-  int ulps = 0;
-  for (size_t i = 0; i < reverb_parts::kSine.size(); ++i) {
-    const float want = sinf(static_cast<float>(i) * (kTwoPi / 256.0f));
-    const float got = reverb_parts::kSine[i];
-    const float ulp = std::nextafter(want, 2.0f) - want;
-    ulps = std::max(ulps, static_cast<int>(std::lround(std::fabs(got - want) / std::fmax(ulp, 1e-30f))));
-  }
   double lfoWorst = 0.0;
   bool inRange = true;
   for (const uint32_t phase8 : {0u, 64u, 200u}) {
@@ -426,10 +414,9 @@ bool testSineAndKnobs() {
   const reverb_parts::KnobCurve curve{0.25f, 0.5f, 0.85f};
   const bool knob = curve.at(0.0f) == 0.25f && curve.at(0.5f) == 0.5f && curve.at(1.0f) == 0.85f && curve.at(kNaN) == 0.25f &&
                     curve.at(-1.0f) == 0.25f && curve.at(2.0f) == 0.85f && std::fabs(curve.at(0.25f) - 0.375f) < 1e-6f;
-  const bool wobble = std::fabs(reverb_parts::wobbleError(1.0f, 0.0f) - 3.8e-5f) < 1e-9f;
-  bool ok = report("kSine", ulps <= 1, "every entry within %.0f ulp of sinf (<= 1)", static_cast<double>(ulps));
-  ok &= report("lfo", lfoWorst < 4.2e-5 && inRange, "stays in [0, 1], within %.2g of the true sine (< 4.2e-5, the table's interpolation)", lfoWorst);
-  ok &= report("KnobCurve", knob && wobble, "hits lo, mid and hi, NaN reads as lo; the wobble bound carries the table term=%.0f",
+  const bool wobble = std::fabs(reverb_parts::wobbleError(1.0f, 0.0f) - 1e-6f) < 1e-9f;
+  bool ok = report("lfo", lfoWorst < 1e-6 && inRange, "stays in [0, 1], within %.2g of the true sine (< 1e-6, sinTurns' bound)", lfoWorst);
+  ok &= report("KnobCurve", knob && wobble, "hits lo, mid and hi, NaN reads as lo; the wobble bound carries the sine term=%.0f",
                (knob && wobble) ? 1.0 : 0.0);
   return ok;
 }

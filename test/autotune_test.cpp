@@ -14,6 +14,9 @@
 #include "alloc_guard.h"
 #include "pitch_series.h"
 #include "ringed_tracker.h"
+#include "signal_util.h"
+
+using testutil::peakCurvature;
 
 namespace {
 
@@ -85,7 +88,7 @@ struct Hop {
 };
 
 // Runs in through fx in calls of callSize samples, recording a Hop after each call.
-std::vector<float> run(PitchSeries& fx, const std::vector<float>& in, const cv::PitchFxParams& p,
+std::vector<float> run(PitchSeries& fx, const std::vector<float>& in, const cv::PitchCardParams& p,
                        std::vector<Hop>* hops = nullptr, int callSize = cv::kBlock) {
   std::vector<float> out(in.size());
   if (hops) hops->reserve(in.size() / static_cast<size_t>(callSize) + 1);
@@ -111,15 +114,15 @@ bool report(const char* name, bool ok, const char* fmt, double a, double b = 0.0
 static PitchSeries gFx;
 
 // Autotune alone in key C; Octave off.
-cv::PitchFxParams autotuneOnly(float responseMs) {
-  cv::PitchFxParams p;
+cv::PitchCardParams autotuneOnly(float responseMs) {
+  cv::PitchCardParams p;
   p.autotune.on = true;
   p.autotune.key = 0;
   p.autotune.responseMs = responseMs;
   return p;
 }
 
-double outputHz(double inHz, const cv::PitchFxParams& p) {
+double outputHz(double inHz, const cv::PitchCardParams& p) {
   gFx.reset();
   return medianHz(run(gFx, tone(inHz, 2 * cv::kSampleRate), p));
 }
@@ -143,7 +146,7 @@ int countDiff(const std::vector<float>& a, const std::vector<float>& b, int from
 // best whole-sample lag within 500 samples of kGrainDelay and prints only the residual.
 bool testPassthrough() {
   const std::vector<float> in = tone(kA3, cv::kSampleRate);
-  cv::PitchFxParams off = autotuneOnly(60.0f);
+  cv::PitchCardParams off = autotuneOnly(60.0f);
   off.autotune.on = false;
   gFx.reset();
   const int diff = countDiff(in, run(gFx, in, off), 0);
@@ -242,7 +245,7 @@ bool testResponse() {
 // 6. Octave +3 on the corrected note: A3 + 50 cents gives C4, not C4 + 50. The
 // granular shifter holds +-15 cents.
 bool testOctaveFollows() {
-  cv::PitchFxParams p = autotuneOnly(20.0f);
+  cv::PitchCardParams p = autotuneOnly(20.0f);
   p.octave.on = true;
   p.octave.mix = 1.0f;
   p.octave.semitones = 3;
@@ -261,7 +264,7 @@ bool testOctaveFollowsVibrato() {
   const std::vector<float> in = tone(3 * cv::kSampleRate, [](int i) {
     return kA3 * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * kVibratoHz * i / cv::kSampleRate));
   });
-  cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
+  cv::PitchCardParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
   p.octave.on = true;
   p.octave.mix = 1.0f;
   p.octave.semitones = 12;
@@ -309,7 +312,7 @@ double hardTuneCents(double noteHz, int callSize, int& nonFinite) {
   const std::vector<float> in = tone(3 * cv::kSampleRate, [noteHz](int i) {
     return noteHz * std::exp2(0.3 / 12.0 * std::sin(2.0 * kPi * 5.0 * i / cv::kSampleRate));
   });
-  cv::PitchFxParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
+  cv::PitchCardParams p = autotuneOnly(cv::AutotuneParams{}.responseMs);
   gFx.reset();
   const std::vector<float> out = run(gFx, in, p, nullptr, callSize);
   nonFinite += countNonFinite(out);
@@ -344,16 +347,6 @@ bool testHardTune() {
   return ok;
 }
 
-// Largest |second difference| of x over [from, to): a cut in the waveform shows as a spike here.
-double peakCurvature(const std::vector<float>& x, int from, int to) {
-  double worst = 0.0;
-  for (int i = std::max(from, 2); i < to; ++i) {
-    const size_t k = static_cast<size_t>(i);
-    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
-  }
-  return worst;
-}
-
 // Largest |x| over [from, to).
 double peakLevel(const std::vector<float>& x, int from, int to) {
   double worst = 0.0;
@@ -374,8 +367,8 @@ double toggleRatio(double hz, int gapBlocks, int callSize, int& nonFinite) {
   const int total = offAt + 2 * cv::kSampleRate;
   const std::vector<float> in = tone(hz, total);
   std::vector<float> out(in.size());
-  const cv::PitchFxParams on = autotuneOnly(20.0f);
-  cv::PitchFxParams off = on;
+  const cv::PitchCardParams on = autotuneOnly(20.0f);
+  cv::PitchCardParams off = on;
   off.autotune.on = false;
   gFx.reset();
   for (int i = 0; i < total; i += callSize) {
@@ -441,14 +434,14 @@ struct ToggleLevel {
 void toggleLevelAt(double hz, bool formant, ToggleLevel& worst) {
   const int n = 2 * cv::kSampleRate;
   const std::vector<float> in = tone(hz, n);
-  cv::PitchFxParams on = autotuneOnly(1.0f);
+  cv::PitchCardParams on = autotuneOnly(1.0f);
   gFx.readersOn = true;  // a Mob card keeps the tracker running through the toggle
   if (formant) {
     on.formant.on = true;
     on.formant.shiftSt = -3;
     on.formant.mix = 0.5f;
   }
-  cv::PitchFxParams off = on;
+  cv::PitchCardParams off = on;
   off.autotune.on = false;
   gFx.reset();
   const std::vector<float> wet = run(gFx, in, on);
@@ -546,7 +539,7 @@ bool testHalfway() {
   const std::vector<float> steady = tone(kA3, 3 * cv::kSampleRate);
   bool ok = true;
   for (int size : kCallSizes) {
-    cv::PitchFxParams p = autotuneOnly(1.0f);
+    cv::PitchCardParams p = autotuneOnly(1.0f);
     gFx.reset();
     const Notes a = outputNotes(run(gFx, vib, p, nullptr, size));
     gFx.reset();
@@ -611,7 +604,7 @@ bool testRangeEnds() {
   constexpr double kD6 = 1174.66;
   const std::vector<float> lowIn = tone(68.0, 2 * cv::kSampleRate), highIn = tone(1030.0, 2 * cv::kSampleRate),
                            aboveIn = tone(1200.0, 2 * cv::kSampleRate);
-  const cv::PitchFxParams p = autotuneOnly(1.0f);
+  const cv::PitchCardParams p = autotuneOnly(1.0f);
   bool ok = true;
   for (int size : kCallSizes) {
     gFx.reset();
@@ -666,7 +659,7 @@ bool testFirstNote() {
 std::vector<Hop> keyRun(float responseMs, int keyAt, int pitchAt, double cents) {
   const int total = 3 * cv::kSampleRate;
   const std::vector<float> in = tone(total, [=](int i) { return i < pitchAt ? kA3 : kA3 * std::exp2(cents / 1200.0); });
-  cv::PitchFxParams p = autotuneOnly(responseMs);
+  cv::PitchCardParams p = autotuneOnly(responseMs);
   std::vector<float> out(in.size());
   std::vector<Hop> hops;
   gFx.reset();
@@ -727,7 +720,7 @@ bool testKeyInRest() {
   const std::vector<float> second = tone(kHz, noteLen);
   in.insert(in.end(), second.begin(), second.end());
   const int keyAt = noteLen + gap / 2;
-  cv::PitchFxParams p = autotuneOnly(1.0f);
+  cv::PitchCardParams p = autotuneOnly(1.0f);
   std::vector<float> out(in.size());
   std::vector<Hop> hops;
   gFx.reset();
@@ -760,7 +753,7 @@ bool testKeyReset() {
   constexpr int kKeyAt = cv::kSampleRate * 3 / 2, kResetAt = kKeyAt + cv::kSampleRate / 10 / cv::kBlock * cv::kBlock;
   const int total = 3 * cv::kSampleRate;
   const std::vector<float> in = tone(kA3, total);
-  cv::PitchFxParams p = autotuneOnly(1.0f);
+  cv::PitchCardParams p = autotuneOnly(1.0f);
   std::vector<float> out(in.size());
   std::vector<Hop> hops;
   gFx.reset();
@@ -815,7 +808,7 @@ bool testBleed() {
   const float toneGain = static_cast<float>(std::pow(10.0, -20.0 / 20.0) / rms(x, 0, n));
   const std::vector<float> noise = pinkNoise(n, -25.0);
   for (size_t i = 0; i < x.size(); ++i) x[i] = x[i] * toneGain + noise[i];
-  cv::PitchFxParams p = autotuneOnly(1.0f);
+  cv::PitchCardParams p = autotuneOnly(1.0f);
   p.autotune.key = 4;  // E / C#m
   bool ok = true;
   for (int size : kCallSizes) {
@@ -845,8 +838,8 @@ bool testSwitchedOff() {
   const int offAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
   const int total = offAt + cv::kSampleRate;
   const std::vector<float> in = tone(kSharp, total);
-  const cv::PitchFxParams on = autotuneOnly(1.0f);
-  cv::PitchFxParams off = on;
+  const cv::PitchCardParams on = autotuneOnly(1.0f);
+  cv::PitchCardParams off = on;
   off.autotune.on = false;
   std::vector<float> out(in.size());
   gFx.reset();

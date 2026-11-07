@@ -120,7 +120,7 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
       toggleForced(gBench.compOff, "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu");
       r.republish = true;
       break;
-    case BenchOp::PolishEq:
+    case BenchOp::VoxEq:
       toggleForced(gBench.eqOff, "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu");
       r.republish = true;
       break;

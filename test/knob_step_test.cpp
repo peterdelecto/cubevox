@@ -17,6 +17,9 @@
 #include "core/registry.h"
 
 #include "distortion_rule.h"
+#include "signal_util.h"
+
+using testutil::peakCurvature;
 
 namespace {
 
@@ -47,16 +50,6 @@ Signal tone(double hz, int total = kTotal) {
   for (int i = 0; i < total; ++i)
     x[static_cast<size_t>(i)] = static_cast<float>(kToneAmp * std::sin(2.0 * kPi * hz * i / cv::kSampleRate));
   return x;
-}
-
-// Largest |second difference| of x over [from, to).
-double peakCurvature(const Signal& x, int from, int to) {
-  double worst = 0.0;
-  for (int i = std::max(from, 2); i < to; ++i) {
-    const size_t k = static_cast<size_t>(i);
-    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
-  }
-  return worst;
 }
 
 // Runs `in` through a fresh engine with `a` before kStepAt and `b` from there on. `get` picks the engine's
@@ -97,11 +90,11 @@ Signal runCard(Card c, const Signal& in, const ChainParams& a, const ChainParams
   switch (engineOf(c)) {
     case Engine::InputGate: return runFx<cv::Gate>(in, a, b, &ChainParams::inputGate);
     case Engine::Autotune:
-      return runFxWith<cv::AutotuneFx>(in, a, b, [](const ChainParams& p) -> const cv::AutotuneParams& { return p.pitchFx.autotune; });
+      return runFxWith<cv::AutotuneFx>(in, a, b, [](const ChainParams& p) -> const cv::AutotuneParams& { return p.pitchCards.autotune; });
     case Engine::Octave:
-      return runFxWith<cv::OctaveFx>(in, a, b, [](const ChainParams& p) -> const cv::OctaveParams& { return p.pitchFx.octave; });
+      return runFxWith<cv::OctaveFx>(in, a, b, [](const ChainParams& p) -> const cv::OctaveParams& { return p.pitchCards.octave; });
     case Engine::Formant:
-      return runFxWith<cv::FormantFx>(in, a, b, [](const ChainParams& p) -> const cv::FormantParams& { return p.pitchFx.formant; });
+      return runFxWith<cv::FormantFx>(in, a, b, [](const ChainParams& p) -> const cv::FormantParams& { return p.pitchCards.formant; });
     case Engine::Unison: return runFx<cv::Unison>(in, a, b, &ChainParams::unison);
     case Engine::Slapback: return runFx<cv::Slapback>(in, a, b, &ChainParams::slapback);
     case Engine::Distortion: return runFx<cv::Distortion>(in, a, b, &ChainParams::distortion);

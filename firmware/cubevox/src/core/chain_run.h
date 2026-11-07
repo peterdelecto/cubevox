@@ -87,8 +87,8 @@ struct StageContext {
 // nothing (an Empty slot), so the caller keeps its buffers. Every card runs its own engine on `in`, the block
 // the slot ahead hands it, and updates `path` for the cards behind it. The Formant engine joins Autotune's grain
 // pass when `path` says it sits directly behind it, and runs its own tracker and ring otherwise. With Apraxia
-// placed, the call takes the Formant voice's SHIFT from the follower's envelope of `in`. A Crowd card reads Autotune's
-// tracker and correction when one sits ahead, and runs its own tracker on its own ring otherwise. A Growl card
+// placed, the call takes the Formant voice's SHIFT from the follower's envelope of `in`. A Mob card reads Autotune's
+// tracker and correction when one sits ahead, and runs its own tracker on its own ring otherwise. A Deepthroat card
 // reads Autotune's tracker with `path.upstream`. A Chatter card keys on the Input gate's detector when the
 // layout places that card (`p.bloom.keyFromGate`), reading `engines.inputGate.open()` as the block stands when
 // it runs. It cuts its slices from `in`.

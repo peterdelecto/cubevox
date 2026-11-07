@@ -20,18 +20,18 @@
      `onePoleCoef` and `onePoleCoefAt`, `OnePole`, `kWetDcBlockHz`, `dcBlockCoef`, `DcBlocker`, `RbjCorner`
      with `rbjCorner`, `rbjAlpha` and `rbjAmp`, `kPeakMinQ`, `kShelfMaxSlope`, `kShelfMinSlope`, `Biquad`
      (the dB setters, the `...Amp` setters that take a kept corner and a linear amplitude, `setCoefsFrom`,
-     `run`), `catmullRom`, `catmullRomWeights`, `wrapOnce`, `readRing`, `readRingClamped` for a delay
-     that may leave [2, Len - 3].
+     `run`), `catmullRom`, `catmullRomWeights`, `wrapOnce`, `readRing`.
   3. `engine/fastmath.h`: `exp2Fast`, `log2Fast`, `dbFast`, `dbToGainFast` (the per-sample dB law),
      `DbGain`, `sinTurns`, `sinCosFast`, `tanhFast`, `HannRotor`, and the constants `kLog2E`, `kDbPerLog2`,
      `kLog2PerDb`, `kTurn32`.
-  4. `engine/smooth.h`: `kSmoothSec`, `kSnap`, `kSmoothCoef`, `kSmoothKeepBlock`, `clamp01`, `keep` (what a
+  4. `engine/smooth.h`: `kSmoothSec`, `kSnap`, `kSmoothCoef`, `kSmoothKeepBlock`, the literals `kSmoothBlockCoef`, `kKeep50msSample`, `kKeep50msLog2` and
+     `kSmooth5msCoef`, `BlockCoef` (the 20 ms coefficient for the last chunk length, cached), `clamp01`, `keep` (what a
      one-pole keeps over n samples), `blockCoef`, `coef`, `step`, `advance` (n steps of one smoother or of two
      that share a coefficient), `advanceBy` (n steps in closed form) and `advanceBlock` (kBlock steps of the
      20 ms smoother).
   5. `engine/scale.h`: the key tables, `kMajor`, `midiOf`, `scaleDeviation`, `kHoldSemis`, `heldNote`.
   6. `engine/reverb_parts.h`, for the two reverbs: `softClip`, `softClipHeadroom`, `kReverbClipHeadroom`, the
-     allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, the wobble LFO's sine table, phase step and
+     allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, `kMaxWobbleHz`, the wobble LFO (`lfo`, on `sinTurns`), its phase step and
      error bound, and the Dwell drive terms.
 - The board links its own memset, memcpy and memmove (`firmware/cubevox/src/board/fastmem.cpp`, checked on the
   host by `fastmem_test`), which move 16 bytes a pass, about 0.3 to 0.5 cycles a byte by instruction count.
@@ -91,8 +91,8 @@
   `FormantPsolaVoiceT<kRingLen>`. The period it cuts on is the tracker's period divided by the shift in
   `UpstreamPitch` (Autotune's correction, or the Octave voice's interval when Octave holds half the output's
   power), and its read lag is the tracker's alignment less the delay in `UpstreamPitch`. A stopped Growl slot
-  calls `Growl::rest()` each block (`runSlot`), which clears 1 KB of the ring, so the reset at the switch-on finds it
-  clear. `growl_test` measures both values against `OctaveFx` and `FormantFx`.
+  calls `Growl::rest()` each block (`runSlot`), which clears 2 KB of the ring (`InputRing::rest()`), so the reset at the switch-on finds
+  it clear. `growl_test` measures both values against `OctaveFx` and `FormantFx`.
 - The tracker reads its history from the caller's ring, so the ring must hold the whole call before
   `PitchTracker::push` runs (each engine writes its ring first). The tests use `RingedTracker`
   (`test/ringed_tracker.h`), which keeps a ring of its own, and `PitchSeries` (`test/pitch_series.h`), which

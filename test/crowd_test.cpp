@@ -200,8 +200,8 @@ struct Probe {
 
 // The pitch params every run uses unless it says otherwise: pass-through. Autotune's tracker runs for the
 // Crowd card (the `readers` flag of PitchSeries::process, true unless a run says otherwise).
-cv::PitchFxParams passThrough() {
-  cv::PitchFxParams pp;
+cv::PitchCardParams passThrough() {
+  cv::PitchCardParams pp;
   pp.octave.on = false;
   return pp;
 }
@@ -209,7 +209,7 @@ cv::PitchFxParams passThrough() {
 // Crowd card and pitch params both switch from their first to their second value at sample `switchAt` (a
 // block boundary). `readersFirst` and `readersSecond` say whether the Crowd card keeps the tracker running.
 Signal runBoth(const Signal& in, const cv::CrowdParams& first, const cv::CrowdParams& second,
-               const cv::PitchFxParams& pitchFirst, const cv::PitchFxParams& pitchSecond, int switchAt,
+               const cv::PitchCardParams& pitchFirst, const cv::PitchCardParams& pitchSecond, int switchAt,
                Probe* probe = nullptr, bool readersFirst = true, bool readersSecond = true) {
   gFx.reset();
   gCrowd.reset();
@@ -1031,7 +1031,7 @@ bool testTrackerRuns() {
   const Signal in = tone(220.0, kRate);
   int firstBlock[2] = {-1, -1};
   for (int flag = 0; flag < 2; ++flag) {
-    cv::PitchFxParams pp;
+    cv::PitchCardParams pp;
     pp.octave.on = false;
     pp.autotune.on = false;
     gFx.reset();
@@ -1056,9 +1056,9 @@ bool testCorrectionReleases() {
   constexpr int kWindow = kRate / 5;  // 200 ms
   const int switchAt = kRate / cv::kBlock * cv::kBlock;
   const Signal in = tone(kSungHz, 2 * kRate);
-  cv::PitchFxParams on = passThrough();
+  cv::PitchCardParams on = passThrough();
   on.autotune.on = true;
-  const cv::PitchFxParams off = passThrough();
+  const cv::PitchCardParams off = passThrough();
   const Signal out = runBoth(in, isolated(0.0f), isolated(0.0f), on, off, switchAt);
 
   RingedTracker t;
@@ -2222,6 +2222,14 @@ bool testPlainAfter() {
   return ok;
 }
 
+// kGapUnderPhraseSq is the literal of the gap rule's distance in dB as a ratio of mean squares.
+bool testGapUnderPhraseSq() {
+  namespace cd = cv::crowd_detail;
+  const float want = cv::dbToGainFast(-2.0f * cd::kGapUnderPhraseDb);
+  const double rel = std::fabs(static_cast<double>(cd::kGapUnderPhraseSq) / static_cast<double>(want) - 1.0);
+  return report("gap under phrase", rel < 1e-6, "kGapUnderPhraseSq is off dbToGainFast of the gap distance by %.2g (< 1e-6)", rel);
+}
+
 // The checks, in the order they run.
 constexpr bool (*kChecks[])() = {
     testOffExact,        testReset,           testNoAlloc,           testPitchMoves,         testWidthLaw,
@@ -2231,7 +2239,7 @@ constexpr bool (*kChecks[])() = {
     testWorkingSetDefaults, testLevelScatter, testContour,           testMelodicBottom,      testWidthGlides,
     testWidthLag,        testWidthZeroIsDelay, testSharedShelf,      testEnhancementsStable, testSwitchWithTracker,
     testVoicesStepGlides, testGapOverFloor,   testWidthHoldsLevel,   testOutOfRange,         testReadCeiling,
-    testTuningRanges,    testRaisedLag,       testPlainAfter,
+    testTuningRanges,    testRaisedLag,       testPlainAfter,      testGapUnderPhraseSq,
 };
 
 }  // namespace

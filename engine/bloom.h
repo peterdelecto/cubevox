@@ -10,14 +10,15 @@
 #include "engine/fastmath.h"
 #include "engine/smooth.h"
 
-// Chatter, the engine behind the Bloom card. While a word lasts, short slices of the voice loop
+// The engine behind the Chatter card (code id bloom). While a word lasts, short slices of the voice loop
 // under it. Each slice plays twice, then the next cut splices in at the slice boundary. When the word
 // ends, its last good slice keeps repeating and fades over LENGTH, gritty in the middle and clean at
 // the end (spec 2026-11-01-bloom-design, sections 14 to 17).
 //
 // A word is a key. The Input gate hands its detector state to process(), or the engine listens to its
 // own input. Three slices cover a word, its capture and the old tail fading under the next word.
-// Slices are cut from the `src` signal, through the low-pass, and the dry path is `in` at unity. Each
+// Slices are cut from the card's input, through the low-pass, and the dry path is `in` at unity. (The
+// chain's call cuts from `in`. The test-only form with a `src` signal cuts from `src`.) Each
 // voice's wet path runs drive, soft clip and its gain, then one high shelf and one level trim run over
 // their sum, and the result adds to the dry.
 //

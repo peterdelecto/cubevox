@@ -37,7 +37,7 @@ enum class BenchOp : uint8_t {
   PanelOled,
   Bypass,
   PolishComp,
-  PolishEq,
+  VoxEq,
   Count,
 };
 

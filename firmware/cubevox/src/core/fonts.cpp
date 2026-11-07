@@ -17,7 +17,7 @@ namespace f = cubevox::fonts;
 // Blank columns between neighbouring inks in the fonts spaced by ink.
 constexpr uint8_t kInkGap = 3;
 
-// The 7X12 title font sits closer, so a long card name fits between the readout bar's edges.
+// The 7X12 font sits closer, so a long card name or menu row fits its line.
 constexpr uint8_t kTitleInkGap = 2;
 
 // The 5x7 font stays on its fixed 6 px pitch, which the menu and update screens are laid out on.

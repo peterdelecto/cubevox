@@ -42,8 +42,8 @@ void checkDefaultLayout() {
   const LayoutCost sums = layoutCost(layout);
   check(sums.avg <= costs::kBudgetAvgPercent, "default layout within the average line");
   check(sums.worst <= costs::kBudgetWorstPercent, "default layout within the worst-block line");
-  check(costs::kAutotune.avg + costs::kTracker.avg == 7 && costs::kAutotune.worst + costs::kTracker.worst == 10,
-        "Autotune's row and the tracker add to the pair's figure, 7 % mean and 10 % worst");
+  check(costs::kAutotune.avg + costs::kTracker.avg == 7 && costs::kAutotune.worst + costs::kTracker.worst == 12,
+        "Autotune's row and the tracker add to the pair's figure, 7 % mean and 12 % worst");
   check(reverbs == 1, "default layout has one reverb");
   check(cardDesc(Card::Empty).cost.avg == 0 && cardDesc(Card::Empty).cost.worst == 0, "empty card costs nothing");
   for (int i = 0; i < kCardCount; ++i) {
@@ -398,11 +398,11 @@ void checkComposeToggles() {
   const Layout layout = defaultLayout();
   const ChainSnapshot off = composeSnapshot(layout, panelWithToggles(false), Settings(), BenchOverrides());
   check(!off.params.distortion.on && !off.params.unison.on && !off.params.reverb.on && !off.params.gate.on &&
-            !off.params.pitchFx.autotune.on && !off.params.pitchFx.octave.on,
+            !off.params.pitchCards.autotune.on && !off.params.pitchCards.octave.on,
         "toggles off leave every stage off");
   const ChainSnapshot on = composeSnapshot(layout, panelWithToggles(true), Settings(), BenchOverrides());
   check(on.params.distortion.on && on.params.unison.on && on.params.reverb.on && on.params.gate.on &&
-            on.params.pitchFx.autotune.on && on.params.pitchFx.octave.on,
+            on.params.pitchCards.autotune.on && on.params.pitchCards.octave.on,
         "toggles on turn every stage on");
   check(on.layout.card == layout.card, "snapshot carries the layout");
 }
@@ -419,7 +419,7 @@ void checkComposeCrowd() {
         "compose: Crowd knob A is DIVERGE and knob B is the VOICES step");
   panel.toggle[3] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.crowd.on && !snap.params.pitchFx.autotune.on && !snap.params.pitchFx.octave.on,
+  check(snap.params.crowd.on && !snap.params.pitchCards.autotune.on && !snap.params.pitchCards.octave.on,
         "compose: Crowd card on sets its flag and no pitch toggle");
   check(snap.slotOn[3], "compose: the Crowd card's slot reads on");
 }
@@ -432,24 +432,24 @@ void checkComposeSlot3Formant() {
   layout.card[2] = Card::Formant;
   panel.knob[2] = {4.0f, 0.4f};  // SHIFT position 4 is -3 st
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(!snap.params.pitchFx.formant.on && snap.params.pitchFx.formant.shiftSt == -3 &&
-            std::fabs(snap.params.pitchFx.formant.mix - 0.4f) < 1e-6f,
+  check(!snap.params.pitchCards.formant.on && snap.params.pitchCards.formant.shiftSt == -3 &&
+            std::fabs(snap.params.pitchCards.formant.mix - 0.4f) < 1e-6f,
         "compose: Formant in slot 3 reads SHIFT and MIX from slot 3's pots, off with its toggle");
   panel.toggle[2] = true;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.pitchFx.formant.on && snap.slotOn[2] && !snap.params.pitchFx.autotune.on &&
-            !snap.params.pitchFx.octave.on && !snap.params.crowd.on,
+  check(snap.params.pitchCards.formant.on && snap.slotOn[2] && !snap.params.pitchCards.autotune.on &&
+            !snap.params.pitchCards.octave.on && !snap.params.crowd.on,
         "compose: Formant's toggle sets formant.on alone, beside Autotune and Octave left off");
   layout.card[2] = Card::Octave;
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.pitchFx.octave.on && !snap.params.pitchFx.formant.on,
+  check(snap.params.pitchCards.octave.on && !snap.params.pitchCards.formant.on,
         "compose: Octave back in slot 3 sets octave.on and leaves Formant off");
   check(!snap.params.follower.placed, "compose: with Octave in slot 3 no envelope drives SHIFT");
 
   layout.card[2] = Card::FormantFollower;
   panel.knob[2] = {0.75f, 0.6f};
   snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
-  check(snap.params.follower.placed && snap.params.pitchFx.formant.on && !snap.params.pitchFx.octave.on &&
+  check(snap.params.follower.placed && snap.params.pitchCards.formant.on && !snap.params.pitchCards.octave.on &&
             std::fabs(snap.params.follower.sensitivity - 0.75f) < 1e-6f && std::fabs(snap.params.follower.rangeSt - 2.4f) < 1e-5f,
         "compose: Apraxia in slot 3 reads SENSITIVITY and RANGE from slot 3's pots and drives the Formant voice");
 }
@@ -465,7 +465,7 @@ void checkComposeSlot7Cards() {
   panel.knob[6] = {0.25f, 0.75f};
   ChainSnapshot snap = composeSnapshot(layout, panel, Settings(), BenchOverrides());
   check(snap.params.lofi.on && std::fabs(snap.params.lofi.tone - 0.25f) < 1e-6f &&
-            std::fabs(snap.params.lofi.amount - 0.75f) < 1e-6f && !snap.params.pitchFx.formant.on,
+            std::fabs(snap.params.lofi.amount - 0.75f) < 1e-6f && !snap.params.pitchCards.formant.on,
         "compose: Lo-fi in slot 7 reads TONE and AMOUNT, and Formant's flag is not set by the slot");
 
   layout.card[6] = Card::Bloom;
@@ -544,12 +544,12 @@ void checkComposeBench() {
   ChainParams expect;
   applyKnob(Card::Octave, 0, 24.0f, expect);
   applyKnob(Card::Unison, 1, 1.0f, expect);
-  check(pinned.params.pitchFx.octave.semitones == expect.pitchFx.octave.semitones &&
-            pinned.params.pitchFx.octave.semitones == 12,
+  check(pinned.params.pitchCards.octave.semitones == expect.pitchCards.octave.semitones &&
+            pinned.params.pitchCards.octave.semitones == 12,
         "pinned stepped knob sits on its last step");
   check(std::fabs(pinned.params.unison.depth - expect.unison.depth) < 1e-6f, "pinned continuous knob sits at 1.0");
   const ChainSnapshot live = composeSnapshot(layout, low, Settings(), BenchOverrides());
-  check(live.params.pitchFx.octave.semitones == -12, "unpinned stepped knob follows the panel");
+  check(live.params.pitchCards.octave.semitones == -12, "unpinned stepped knob follows the panel");
 }
 
 // The force-on mask turns a slot on against a toggle that reads off, and a force-off bit still wins.
@@ -567,7 +567,7 @@ void checkComposeBenchLevers() {
   bench.slotsForcedOn = 0xFF;
   snap = composeSnapshot(layout, toggleOff, Settings(), bench);
   check(snap.params.distortion.on && snap.params.unison.on && snap.params.reverb.on && snap.params.gate.on &&
-            snap.params.pitchFx.autotune.on && snap.params.pitchFx.octave.on,
+            snap.params.pitchCards.autotune.on && snap.params.pitchCards.octave.on,
         "all eight slots forced on turn every stage on");
 
   bench.slotsOff = 1u << 5;
@@ -589,15 +589,15 @@ void checkComposeBenchLevers() {
   bench = BenchOverrides();
   bench.pinKnob(2, 0, 50);
   snap = composeSnapshot(layout, low, Settings(), bench);
-  check(snap.params.pitchFx.octave.semitones == 0, "a stepped pin at 50 % lands on the middle step");
+  check(snap.params.pitchCards.octave.semitones == 0, "a stepped pin at 50 % lands on the middle step");
   bench.pinKnob(2, 0, 0);
-  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == -12,
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchCards.octave.semitones == -12,
         "a stepped pin at 0 % lands on the first step");
   bench.pinKnob(2, 0, 100);
-  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == 12,
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchCards.octave.semitones == 12,
         "a stepped pin at 100 % lands on the last step");
   bench.pinKnob(2, 0, 55);  // 0.55 * 24 = 13.2 rounds to step 13, which is +1 semitone
-  check(composeSnapshot(layout, low, Settings(), bench).params.pitchFx.octave.semitones == 1,
+  check(composeSnapshot(layout, low, Settings(), bench).params.pitchCards.octave.semitones == 1,
         "a stepped pin rounds to the nearest step");
 
   ChainParams expect;
@@ -608,7 +608,7 @@ void checkComposeBenchLevers() {
   PanelReading mixed;
   mixed.knob[2][1] = 0.4f;  // Octave MIX, the other knob of the pinned Octave semitones
   snap = composeSnapshot(layout, mixed, Settings(), bench);
-  check(std::fabs(snap.params.pitchFx.octave.mix - 0.4f) < 1e-6f && snap.params.pitchFx.octave.semitones == 1,
+  check(std::fabs(snap.params.pitchCards.octave.mix - 0.4f) < 1e-6f && snap.params.pitchCards.octave.semitones == 1,
         "a pin on one knob leaves the card's other knob on the panel");
 
   // A per-knob pin wins over pin-at-top; an unpinned knob still goes to the top.
@@ -618,7 +618,7 @@ void checkComposeBenchLevers() {
   snap = composeSnapshot(layout, low, Settings(), bench);
   ChainParams top;
   applyKnob(Card::Unison, 1, 1.0f, top);
-  check(snap.params.pitchFx.octave.semitones == 0 && std::fabs(snap.params.unison.depth - top.unison.depth) < 1e-6f,
+  check(snap.params.pitchCards.octave.semitones == 0 && std::fabs(snap.params.unison.depth - top.unison.depth) < 1e-6f,
         "a per-knob pin wins over pin-at-top and the other knobs stay at the top");
 
   bench.knobsLive();
@@ -626,7 +626,7 @@ void checkComposeBenchLevers() {
   snap = composeSnapshot(layout, low, Settings(), bench);
   ChainParams zero;
   applyKnob(Card::Unison, 1, 0.0f, zero);
-  check(snap.params.pitchFx.octave.semitones == -12 && std::fabs(snap.params.unison.depth - zero.unison.depth) < 1e-6f,
+  check(snap.params.pitchCards.octave.semitones == -12 && std::fabs(snap.params.unison.depth - zero.unison.depth) < 1e-6f,
         "knobsLive hands the knobs back to the panel");
 }
 

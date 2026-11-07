@@ -22,6 +22,9 @@
 
 #include "alloc_guard.h"
 #include "pitch_series.h"
+#include "signal_util.h"
+
+using testutil::peakCurvature;
 
 namespace {
 
@@ -198,8 +201,8 @@ Signal sine(int n) { return tone(220.0, n); }
 static PitchSeries gFx;
 
 // The card on at unity trim, so the checks read the voice itself. level_test reads the shipped trim.
-cv::PitchFxParams formantOn(int shiftSt, float mix = 1.0f) {
-  cv::PitchFxParams p;
+cv::PitchCardParams formantOn(int shiftSt, float mix = 1.0f) {
+  cv::PitchCardParams p;
   p.formant.on = true;
   p.formant.shiftSt = shiftSt;
   p.formant.mix = mix;
@@ -208,14 +211,14 @@ cv::PitchFxParams formantOn(int shiftSt, float mix = 1.0f) {
 }
 
 // The card off, with the same unity trim as formantOn, so a toggle changes nothing else.
-cv::PitchFxParams formantOff() {
-  cv::PitchFxParams p;
+cv::PitchCardParams formantOff() {
+  cv::PitchCardParams p;
   p.formant.tuning.trimDb.fill(0.0f);
   return p;
 }
 
 // Autotune hard-tuned to C major.
-void autotuneOn(cv::PitchFxParams& p) {
+void autotuneOn(cv::PitchCardParams& p) {
   p.autotune.on = true;
   p.autotune.key = 0;
   p.autotune.responseMs = 1.0f;
@@ -223,7 +226,7 @@ void autotuneOn(cv::PitchFxParams& p) {
 
 // Runs `in` through a fresh series in calls of `block` samples, with `a` before sample `stepAt` and
 // `b` from there on (a block edge).
-Signal runSteps(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFxParams& b, int stepAt,
+Signal runSteps(const Signal& in, const cv::PitchCardParams& a, const cv::PitchCardParams& b, int stepAt,
                 int block = cv::kBlock) {
   gFx.reset();
   Signal out(in.size());
@@ -238,7 +241,7 @@ Signal runSteps(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFxP
   return out;
 }
 
-Signal run(const Signal& in, const cv::PitchFxParams& p, int block = cv::kBlock) {
+Signal run(const Signal& in, const cv::PitchCardParams& p, int block = cv::kBlock) {
   return runSteps(in, p, p, 0, block);
 }
 
@@ -370,23 +373,13 @@ double bestLagFine(const Signal& a, const Signal& b, int from, int len, int reac
   return best + (d < 0.0 ? 0.5 * (r[0] - r[2]) / d : 0.0);
 }
 
-// Largest |second difference| of x over [from, to).
-double peakCurvature(const Signal& x, int from, int to) {
-  double worst = 0.0;
-  for (int i = std::max(from, 2); i < to; ++i) {
-    const size_t k = static_cast<size_t>(i);
-    worst = std::max(worst, std::fabs(static_cast<double>(x[k]) - 2.0 * x[k - 1] + x[k - 2]));
-  }
-  return worst;
-}
-
 // Checks.
 
 // Switched off from the start, and switched off after a spell on and settled, the stage copies its
 // input bit for bit. MIX 0 does the same while the card is on.
 bool testOffExact() {
   const Signal in = vowel(kSungHz, 2 * kRate);
-  const Signal fresh = run(in, cv::PitchFxParams{});
+  const Signal fresh = run(in, cv::PitchCardParams{});
   size_t differs = 0;
   for (size_t i = 0; i < in.size(); ++i) differs += fresh[i] != in[i] ? 1u : 0u;
   bool ok = report("off exact, fresh", differs == 0, "%.0f of %.0f samples differ (0)", static_cast<double>(differs),
@@ -462,7 +455,7 @@ bool testPitch() {
     double worst = 0.0;
     int worstSt = 0;
     for (int st = -7; st <= 7; ++st) {
-      cv::PitchFxParams p = formantOn(st);
+      cv::PitchCardParams p = formantOn(st);
       if (pass == 1) autotuneOn(p);
       const Signal out = run(in, p);
       const double err = std::fabs(cents(wantPeriod / periodOf(out, from, wantPeriod)));
@@ -481,9 +474,9 @@ bool testPitch() {
 // voice alone, over the second after 2 s. The Formant voice cuts from Autotune's input on Autotune's grid, so
 // the two land together. The cross-correlation is searched within 8 samples either way.
 double lagToAutotune(const Signal& in) {
-  cv::PitchFxParams tuned;
+  cv::PitchCardParams tuned;
   autotuneOn(tuned);
-  cv::PitchFxParams both = formantOn(0);
+  cv::PitchCardParams both = formantOn(0);
   autotuneOn(both);
   const Signal a = run(in, tuned);
   const Signal b = run(in, both);
@@ -512,7 +505,7 @@ bool testAlignment() {
 // run that never stopped, bit for bit.
 bool testQuickToggleKeepsVoice() {
   const Signal in = irregular(kSungHz, 4 * kRate);
-  const cv::PitchFxParams on = formantOn(kShift);
+  const cv::PitchCardParams on = formantOn(kShift);
   const Signal steady = run(in, on);
   gFx.reset();
   Signal out(in.size());
@@ -530,7 +523,7 @@ bool testQuickToggleKeepsVoice() {
 
 // Steady-state curvature across a step: the peak second difference in 100 ms after the step against the
 // larger peak of the two settled settings, as knob_step_test measures it.
-double stepRatio(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFxParams& b) {
+double stepRatio(const Signal& in, const cv::PitchCardParams& a, const cv::PitchCardParams& b) {
   const int stepAt = 2 * kRate;
   const int total = 4 * kRate;
   const Signal out = runSteps(in, a, b, stepAt);
@@ -569,8 +562,8 @@ bool testMixLeavesFull() {
   double worst = 0.0;
   for (int shift : {kShift, 0}) {
     for (float m : {0.9f, 0.5f}) {
-      cv::PitchFxParams a = formantOn(shift, 1.0f);
-      cv::PitchFxParams b = formantOn(shift, m);
+      cv::PitchCardParams a = formantOn(shift, 1.0f);
+      cv::PitchCardParams b = formantOn(shift, m);
       autotuneOn(a);
       autotuneOn(b);
       const Signal out = runSteps(in, a, b, stepAt);
@@ -625,7 +618,7 @@ bool testMixHoldsLevel() {
   bool ok = true;
   for (int pass = 0; pass < 2; ++pass) {
     auto level = [&](float m) {
-      cv::PitchFxParams p;
+      cv::PitchCardParams p;
       p.formant.on = true;
       p.formant.mix = m;
       if (pass == 1) autotuneOn(p);
@@ -643,7 +636,7 @@ bool testMixHoldsLevel() {
 // The tuning's trim scales the shifted voice by its dB.
 bool testTrim() {
   const Signal in = irregular(kSungHz, 3 * kRate);
-  cv::PitchFxParams loud = formantOn(kShift);
+  cv::PitchCardParams loud = formantOn(kShift);
   loud.formant.tuning.trimDb.fill(6.0f);
   const double a = rms(run(in, formantOn(kShift)), kRate, 3 * kRate);
   const double b = rms(run(in, loud), kRate, 3 * kRate);
@@ -732,11 +725,11 @@ bool testSilenceSkip() {
 
 // The parameters of second `sec` in testShiftOnSwitchOn's script: on at +5, off with the knob moved to
 // -5, on at -5, a step to +3, on at MIX 0 with the knob moved to +6, then MIX 100 % at -6.
-cv::PitchFxParams shiftScript(int sec) {
+cv::PitchCardParams shiftScript(int sec) {
   switch (sec) {
     case 0: return formantOn(5);
     case 1: {
-      cv::PitchFxParams p = formantOff();
+      cv::PitchCardParams p = formantOff();
       p.formant.shiftSt = -5;
       return p;
     }
@@ -786,9 +779,9 @@ bool testShiftOnSwitchOn() {
 bool testLateStart() {
   const Signal in = vowel(kSungHz, 5 * kRate);
   const int stepAt = 2 * kRate;
-  cv::PitchFxParams both = formantOn(0, 0.5f);
+  cv::PitchCardParams both = formantOn(0, 0.5f);
   autotuneOn(both);
-  cv::PitchFxParams autotuneOnly = formantOff();
+  cv::PitchCardParams autotuneOnly = formantOff();
   autotuneOn(autotuneOnly);
   const double ref = rms(run(in, both), 3 * kRate, 4 * kRate);
   const double worst = std::fabs(db(rms(runSteps(in, autotuneOnly, both, stepAt), 3 * kRate, 4 * kRate) / ref));
@@ -831,7 +824,7 @@ bool testRangeFlags() {
 // flushed it, the output is finite and its level is the clean run's.
 bool testNanGuard() {
   const Signal in = vowel(kSungHz, 5 * kRate);
-  const cv::PitchFxParams p = formantOn(kShift, 0.5f);
+  const cv::PitchCardParams p = formantOn(kShift, 0.5f);
   const Signal clean = run(in, p);
   gFx.reset();
   Signal out(in.size());
@@ -926,9 +919,9 @@ bool testGroupLatency() {
   constexpr double kTo = 164.81377845643496;   // E3, the next note of C major
   const int stepAt = 3 * kRate / 2;
   const Signal in = steppedSine(kFrom, kTo, stepAt, 2 * kRate);
-  cv::PitchFxParams tuned;
+  cv::PitchCardParams tuned;
   autotuneOn(tuned);
-  cv::PitchFxParams both = formantOn(3);
+  cv::PitchCardParams both = formantOn(3);
   autotuneOn(both);
   const double alone = stepArrival(run(in, tuned), stepAt);
   const double behind = stepArrival(run(in, both), stepAt);
@@ -945,7 +938,7 @@ bool testGroupLatency() {
 }
 
 // Runs `in` with `b` from onAt to offAt and `a` outside, in blocks of kBlock.
-Signal runToggled(const Signal& in, const cv::PitchFxParams& a, const cv::PitchFxParams& b, int onAt, int offAt) {
+Signal runToggled(const Signal& in, const cv::PitchCardParams& a, const cv::PitchCardParams& b, int onAt, int offAt) {
   gFx.reset();
   Signal out(in.size());
   for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
@@ -1001,8 +994,8 @@ bool testAutotuneToggleUnderFormant() {
   const Signal in = tone(kHz, 3 * kRate);
   bool ok = true;
   for (int shift : {kShift, 0}) {
-    cv::PitchFxParams off = formantOn(shift);
-    cv::PitchFxParams on = formantOn(shift);
+    cv::PitchCardParams off = formantOn(shift);
+    cv::PitchCardParams on = formantOn(shift);
     autotuneOn(on);
     const Signal settledOff = runToggled(in, off, off, 0, 0);
     const Signal settledOn = runToggled(in, on, on, 0, 0);

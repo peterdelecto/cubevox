@@ -36,6 +36,7 @@
 
 #include "distortion_rule.h"
 #include "pitch_series.h"
+#include "clip_util.h"
 #include "signal_util.h"
 
 namespace {
@@ -60,13 +61,9 @@ constexpr double kMidHiDb = 1.0;
 
 using Signal = std::vector<float>;
 
-double rmsRange(const Signal& x, size_t from, size_t to) {
-  double s = 0.0;
-  for (size_t i = from; i < to; ++i) s += static_cast<double>(x[i]) * x[i];
-  return std::sqrt(s / static_cast<double>(to - from));
-}
+double rmsRange(const Signal& x, size_t from, size_t to) { return testutil::rmsOf(x, from, to); }
 
-double dbToLin(double db) { return std::pow(10.0, db / 20.0); }
+using testutil::dbToLin;
 
 // Deterministic white noise in [-1, 1).
 class Lcg {
@@ -181,8 +178,8 @@ cv::GateParams gateCard() {
   return p;
 }
 
-cv::PitchFxParams pitchOff() {
-  cv::PitchFxParams p;
+cv::PitchCardParams pitchOff() {
+  cv::PitchCardParams p;
   p.octave.on = false;
   return p;
 }
@@ -216,7 +213,7 @@ bool midRow(const char* name, const Signal& in, const P& p) {
 bool crowdRow(const Signal& in, float width) {
   auto pitch = std::make_unique<Stage<PitchSeries>>();
   auto crowd = std::make_unique<Stage<cv::Crowd>>();
-  const cv::PitchFxParams pp = pitchOff();
+  const cv::PitchCardParams pp = pitchOff();
   cv::CrowdParams params;
   params.on = true;
   params.voicesStep = 4;
@@ -246,20 +243,21 @@ bool crowdRows() {
 // The Formant card at SHIFT `shiftSt` with Autotune off, as the registry sets it. The card's trim is
 // set for the wet path alone (MIX 100 %), as the Mob, Octave and reverb cards' are. A `shiftSt` past the
 // panel's +-7 st is the voice at Apraxia's reach, which pins MIX at 1 and takes SHIFT up to +-12 st.
-cv::PitchFxParams boxFormantAt(int shiftSt, float mix) {
+cv::PitchCardParams boxFormantAt(int shiftSt, float mix) {
   ChainParams chain;
   applyPlacement(Card::Formant, chain);
   applyToggle(Card::Formant, true, chain);
   const int panelSt = std::clamp(shiftSt, -cv::kFormantMaxShiftSt, cv::kFormantMaxShiftSt);
   applyKnob(Card::Formant, 0, static_cast<float>(panelSt + cv::kFormantMaxShiftSt), chain);
   applyKnob(Card::Formant, 1, mix, chain);
-  chain.pitchFx.formant.shiftSt = shiftSt;
-  return chain.pitchFx;
+  chain.pitchCards.formant.shiftSt = shiftSt;
+  return chain.pitchCards;
 }
 
 // The card at its default SHIFT.
-cv::PitchFxParams boxFormant(float mix) { return boxFormantAt(cv::kFormantDefaultShiftSt, mix); }
+cv::PitchCardParams boxFormant(float mix) { return boxFormantAt(cv::kFormantDefaultShiftSt, mix); }
 
+using testutil::peakCurvature;
 using testutil::readWav;
 
 // samples/ is wholly git-ignored, so CI has none and the clip rows skip. With the folder there, a clip
@@ -284,7 +282,7 @@ using ClipFn = std::function<Through(const Signal& padded)>;
 bool clipRows(const char* label, const ClipFn& through, double lo, double hi, double& mean, int& count,
               bool judged = true) {
   constexpr size_t kPad = cv::kSampleRate * 2 / 5;
-  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  const auto& names = clips::kNames;
   bool ok = true;
   double sum = 0.0;
   count = 0;
@@ -325,12 +323,12 @@ bool formantRows(const Signal& in) {
   bool ok = true;
   {
     auto s = std::make_unique<Stage<PitchSeries>>();
-    const cv::PitchFxParams full = boxFormant(1.0f);
+    const cv::PitchCardParams full = boxFormant(1.0f);
     const double programDb = gainDb(in, run(in, [&](const float* i, float* o, int n) { s->fx.process(i, o, n, full); }));
     std::printf("NOTE %-30s %+6.2f dB  (the synthetic program, not held to the rule)\n", "formant -3 st mix 1 program", programDb);
   }
   ok &= midRow<PitchSeries>("formant -3 st mix .5", in, boxFormant(0.5f));
-  const cv::PitchFxParams half = boxFormant(0.5f);
+  const cv::PitchCardParams half = boxFormant(0.5f);
   double mean = 0.0;
   int count = 0;
   ok &= clipRows(
@@ -343,7 +341,7 @@ bool formantRows(const Signal& in) {
   for (int st = -cv::kFormantVoiceMaxShiftSt; st <= cv::kFormantVoiceMaxShiftSt; ++st) {
     char label[40];
     std::snprintf(label, sizeof label, "formant %+d st mix 1", st);
-    const cv::PitchFxParams full = boxFormantAt(st, 1.0f);
+    const cv::PitchCardParams full = boxFormantAt(st, 1.0f);
     ok &= clipRows(
         label,
         [&](const Signal& padded) {
@@ -361,13 +359,13 @@ bool formantRows(const Signal& in) {
 }
 
 // The Octave card as the registry sets it, at SEMITONES `semis` and MIX `mix`, Autotune off.
-cv::PitchFxParams boxOctave(int semis, float mix) {
+cv::PitchCardParams boxOctave(int semis, float mix) {
   ChainParams chain;
   applyPlacement(Card::Octave, chain);
   applyToggle(Card::Octave, true, chain);
   applyKnob(Card::Octave, 0, static_cast<float>(semis + cv::OctaveVoice::kMaxSemis), chain);
   applyKnob(Card::Octave, 1, mix, chain);
-  return chain.pitchFx;
+  return chain.pitchCards;
 }
 
 // The Octave card on Adam's clips. Its two taps sit 20 ms apart in the input, so a note adds
@@ -381,7 +379,7 @@ bool octaveRows() {
   for (int semis : {-12, -5, 7, 12}) {
     char label[40];
     std::snprintf(label, sizeof label, "octave %+d st mix 1", semis);
-    const cv::PitchFxParams p = boxOctave(semis, 1.0f);
+    const cv::PitchCardParams p = boxOctave(semis, 1.0f);
     double mean = 0.0;
     int count = 0;
     ok &= clipRows(
@@ -397,7 +395,7 @@ bool octaveRows() {
       ok &= verdict(name, mean, kLoDb, kHiDb);
     }
   }
-  const cv::PitchFxParams half = boxOctave(-12, 0.5f);
+  const cv::PitchCardParams half = boxOctave(-12, 0.5f);
   double mean = 0.0;
   int count = 0;
   ok &= clipRows(
@@ -411,13 +409,13 @@ bool octaveRows() {
 }
 
 // The Autotune card as the registry sets it, at KEY index `key` and RESPONSE `responseMs`.
-cv::PitchFxParams boxAutotune(int key, float responseMs) {
+cv::PitchCardParams boxAutotune(int key, float responseMs) {
   ChainParams chain;
   applyPlacement(Card::Autotune, chain);
   applyToggle(Card::Autotune, true, chain);
   applyKnob(Card::Autotune, 0, static_cast<float>(key), chain);
   applyKnob(Card::Autotune, 1, cv::AutotuneVoice::mechanicalOf(responseMs), chain);
-  return chain.pitchFx;
+  return chain.pitchCards;
 }
 
 // The Autotune voice on Adam's clips, which carry the pitches the synthetic program does not (it sits at
@@ -429,7 +427,7 @@ bool autotuneRows() {
   for (float responseMs : {1.0f, 100.0f, 500.0f}) {
     char label[40];
     std::snprintf(label, sizeof label, "autotune key C response %g ms", static_cast<double>(responseMs));
-    const cv::PitchFxParams p = boxAutotune(0, responseMs);
+    const cv::PitchCardParams p = boxAutotune(0, responseMs);
     double mean = 0.0;
     int count = 0;
     ok &= clipRows(
@@ -459,9 +457,9 @@ bool formantBehindAutotuneRows() {
   for (int st = -cv::kFormantVoiceMaxShiftSt; st <= cv::kFormantVoiceMaxShiftSt; ++st) {
     char label[48];
     std::snprintf(label, sizeof label, "formant behind autotune %+d st mix 1", st);
-    cv::PitchFxParams both = boxFormantAt(st, 1.0f);
+    cv::PitchCardParams both = boxFormantAt(st, 1.0f);
     both.autotune = boxAutotune(0, 1.0f).autotune;
-    const cv::PitchFxParams tuned = boxAutotune(0, 1.0f);
+    const cv::PitchCardParams tuned = boxAutotune(0, 1.0f);
     double mean = 0.0;
     int count = 0;
     ok &= clipRows(
@@ -566,15 +564,6 @@ bool unisonRows() {
   return ok;
 }
 
-// Largest |second difference| of x over [from, to).
-double peakCurvature(const Signal& x, size_t from, size_t to) {
-  double worst = 0.0;
-  for (size_t i = from; i < to; ++i) {
-    worst = std::max(worst, std::fabs(static_cast<double>(x[i]) - 2.0 * x[i - 1] + x[i - 2]));
-  }
-  return worst;
-}
-
 // The output of an engine that is switched on at sample `at` of the clip. A cold engine is reset there and
 // fed from there, as the chain does on a slot's first fade-in block. A warm one ran off on the clip from the
 // start, so its line holds the voice. Returns the 100 ms from the switch.
@@ -603,7 +592,7 @@ bool unisonSwitchOnRows() {
   constexpr size_t kStride = (cv::kSampleRate / 10 / cv::kBlock) * cv::kBlock;
   constexpr double kMedianMax = 1.1;
   constexpr double kWorstMax = 1.3;
-  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  const auto& names = clips::kNames;
   bool ok = true;
   for (const char* name : names) {
     const Signal clip = readWav(std::string(CUBEVOX_SAMPLES_DIR) + "/" + name + ".wav");
@@ -723,7 +712,7 @@ bool reverbRows(Card card, const char* name) {
 // `whole` is false when samples/ is there and a clip in it is missing or empty.
 double clipMean(const ClipFn& through, int& count, bool& whole) {
   constexpr size_t kPad = cv::kSampleRate * 2 / 5;
-  const char* names[] = {"adam_vox_sample_3s", "adam_vox_sample2_4s", "adam_vox_sample3_5s"};
+  const auto& names = clips::kNames;
   double sum = 0.0;
   count = 0;
   whole = true;
@@ -865,7 +854,7 @@ bool slotRows(const Signal& in) {
   bool ok = true;
   ok &= gateRows();
 
-  cv::PitchFxParams autotune = pitchOff();
+  cv::PitchCardParams autotune = pitchOff();
   autotune.autotune.on = true;
   ok &= simple<PitchSeries>("autotune key C", in, autotune);
   ok &= autotuneRows();
