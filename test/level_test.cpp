@@ -185,7 +185,7 @@ cv::PitchCardParams pitchOff() {
 }
 
 // The box's reverb card placed and switched on, with its MIX knob at `mix` and every other
-// setting (TIME, dwell, wobble) where the registry leaves it.
+// setting (TIME, wobble) where the registry leaves it.
 cv::ReverbParams boxReverb(Card card, float mix) {
   ChainParams chain;
   applyPlacement(card, chain);

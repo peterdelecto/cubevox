@@ -952,15 +952,6 @@ void checkCycleSlot7Card() {
         "action: and goes on from Gate to Lo-fi");
 }
 
-void checkCrowdTestLayout() {
-  const Layout base = defaultLayout();
-  const Layout test = crowdTestLayout();
-  check(test.card[1] == Card::Crowd, "crowd test layout: Crowd sits in slot 2");
-  for (int s = 0; s < kSlotCount; ++s) {
-    if (s != 1) check(test.card[s] == base.card[s], "crowd test layout: every other slot is the default");
-  }
-}
-
 void checkRecoverLayout() {
   Layout good = defaultLayout();
   good.card[0] = Card::Empty;
@@ -992,7 +983,6 @@ void checkRecoverLayout() {
 
 void checkLayoutAndCompose() {
   checkDefaultLayout();
-  checkCrowdTestLayout();
   checkRecoverLayout();
   checkSettings();
   checkLayoutValid();

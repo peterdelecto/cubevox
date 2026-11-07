@@ -11,8 +11,9 @@ better if the led flashes to show mcu processing." Build order: "just build it n
 1. A Mac app, `cubevox-emulator`, that runs the box's firmware code unchanged: `core/`, `ui/` and
    `engine/*.h`. Mac code stands in for `board/` only. Source in `firmware/host/`.
 2. It replaces the prototype emulator (`emulator/`, `cubevox-proto`) as the thing the owner opens.
-   The prototype stays in the tree and keeps building until the owner says otherwise; its
-   `--layout` probe stays a gate only when `emulator/` changes.
+   The prototype stays in the tree but builds only with `-DCUBEVOX_BUILD_PROTO=ON` (owner
+   2026-11-07); its `--layout` probe (ctest `proto_layout`) exists only in that build and is a
+   gate only when `emulator/` changes.
 3. What the box does, the emulator does, because it is the same code: splash, face, readout, menu,
    MUTED and BYPASS screens, the knob filter and its stepped knobs, the slot crossfades, the layout
    fade on a card swap, the mute sequence, the cost table and the rule that a layout over the CPU
@@ -133,7 +134,7 @@ Bottom band: the source switch at the left and the version under it.
    hidden window and written as a PPM, for looking at. `--on <slot>` (1 to 8, repeatable) runs with
    that slot's toggle on, every other off; `--at <ms>` takes the frame after that much run time
    instead of 2500 ms. `--slot3`, `--slot6`, `--slot7` and `--slot8` pick the card in a swappable slot.
-3. `ctest` as a whole, with `proto_layout` still in it.
+3. `ctest` as a whole (`proto_layout` joins it only with `-DCUBEVOX_BUILD_PROTO=ON`).
 4. The LED: host tests for the window mean, the `loadLedLevel` curve and flash and
    `BlockTroubleClock` (`core_load.cpp`); the release and bench firmware builds; the box flashed
    with the merged release and watched for the PWM.

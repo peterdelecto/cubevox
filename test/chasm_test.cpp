@@ -1,5 +1,5 @@
 // Chasm checks: the Reverb block's off and on edges, decay across the TIME knob, chirp direction,
-// wobble, wobble level, dwell drive, stability at the box's gain and top TIME, out-of-range tuning,
+// wobble, wobble level, stability at the box's gain and top TIME, out-of-range tuning,
 // the size bound and no-alloc. No window, no audio device. Every limit sits about twice the measured
 // value, and the measured value is in the report line.
 
@@ -230,33 +230,6 @@ bool testWobbleLevel() {
                 kMaxDb);
 }
 
-// Magnitude of a sine's third harmonic re its fundamental, in dB, at one dwell.
-double thirdHarmonicDb(float dwell) {
-  constexpr size_t kSize = 32768;
-  const Signal in = sine(at(2 * kSr), 220.0, 0.25f);
-  cv::ChasmParams p = atTime(0.5f);
-  p.tuning.dwell = dwell;
-  p.tuning.wobbleDepth = 0.0f;
-  const std::vector<double> sp = spectrum(wet(in, p), at(kSr / 2), at(2 * kSr), kSize);
-  const auto band = [&](double hz) {
-    double e = 0.0;
-    for (size_t k = 0; k < sp.size(); ++k) {
-      const double f = static_cast<double>(k) * kSr / static_cast<double>(kSize);
-      if (std::fabs(f - hz) <= 20.0) e += sp[k];
-    }
-    return e;
-  };
-  return db(band(660.0) / band(220.0));
-}
-
-// 7. Dwell drives the soft clip, so the third harmonic rises with it.
-bool testDwell() {
-  constexpr double kMinRise = 17.0;
-  const double lo = thirdHarmonicDb(0.0f), hi = thirdHarmonicDb(1.0f);
-  return report("dwell-drive", hi - lo >= kMinRise, "3rd/1st harmonic: dwell 0 %.1f dB, dwell 1 %.1f dB, rise %.1f (>=%.0f)",
-                lo, hi, hi - lo, kMinRise);
-}
-
 // 8. Burst of loud noise at the top of the TIME knob and the box's gain: finite, bounded, and the
 // tail dies away.
 bool testStable() {
@@ -289,9 +262,6 @@ bool testExtremeTuning() {
       [](cv::ChasmTuning& t) { t.wobbleDepth = 1e6f; },       [](cv::ChasmTuning& t) { t.wobbleDepth = -5.0f; },
       [](cv::ChasmTuning& t) { t.wobbleRateHz = -3.0f; },     [](cv::ChasmTuning& t) { t.wobbleRateHz = 1e6f; },
       [](cv::ChasmTuning& t) { t.inputTrim = 1e6f; },         [](cv::ChasmTuning& t) { t.inputTrim = -1e6f; },
-      [](cv::ChasmTuning& t) { t.dwell = -1.0f; },            [](cv::ChasmTuning& t) { t.dwell = 5.0f; },
-      [](cv::ChasmTuning& t) { t.dwellDrive = 1e30f; },       [](cv::ChasmTuning& t) { t.dwellDrive = -5.0f; },
-      [](cv::ChasmTuning& t) { t.dwellComp = -300.0f; },      [](cv::ChasmTuning& t) { t.dwellComp = 1e9f; },
       [](cv::ChasmTuning& t) { t.wetDb = 400.0f; },           [](cv::ChasmTuning& t) { t.wetDb = -1e6f; },
   };
   const Signal x = noise(kSr, 0.5f);
@@ -348,7 +318,6 @@ int main() {
   ok &= testChirp();
   ok &= testWobble();
   ok &= testWobbleLevel();
-  ok &= testDwell();
   ok &= testStable();
   ok &= testExtremeTuning();
   ok &= testNoAlloc();

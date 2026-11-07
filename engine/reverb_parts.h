@@ -31,7 +31,7 @@
 #include "engine/smooth.h"
 
 // Parts the two reverbs share: the input soft clip, the Schroeder allpass, the interpolated delay
-// line, the knob law, the phase step of a wobble LFO and its sine, and the Dwell drive.
+// line, the knob law, the phase step of a wobble LFO and its sine.
 
 namespace cv {
 
@@ -49,9 +49,8 @@ inline float softClip(float x) {
 // compiler folds 1 / h, so the input scale costs a multiply.
 inline float softClipHeadroom(float x, float h) { return h * softClip(x * (1.0f / h)); }
 
-// Headroom for both reverbs' input drive, set so a 0 dBFS voice at each engine's default dwell of
-// 0.2 enters the curve at about a third of its knee. Chasm's drive is 8^0.2 = 1.52, which is 0.34
-// of the knee. Spring's is 4^0.2 = 1.32, which is 0.29.
+// Headroom for both reverbs' input drive, set so a 0 dBFS voice enters the curve at about a third
+// of its knee. Chasm's drive is 1.52, which is 0.34 of the knee. Spring's is 1.32, which is 0.29.
 constexpr float kReverbClipHeadroom = 4.5f;
 
 namespace reverb_parts {
@@ -138,22 +137,6 @@ constexpr float wobbleError(float depth, float rateHz) {
   const float w = kTwoPi * rateHz;
   const float t = static_cast<float>(kBlock) / static_cast<float>(kSampleRate);
   return 0.5f * depth * w * w * t * t / 8.0f + depth * 1e-6f;
-}
-
-// Dwell drives a soft clip ahead of the loops. The drive runs from 1 to dwellDrive as dwell runs from
-// 0 to 1, and the level compensation takes the drive to the power -dwellComp so the loops see a
-// similar level. The terms call libm, so they belong to a tuning change and not to a sample.
-constexpr float kMaxDwellDrive = 64.0f;  // dwellDrive clamps to 1..this
-constexpr float kMaxDwellComp = 2.0f;    // dwellComp clamps to 0..this
-
-struct DwellGain {
-  float drive, comp;
-};
-
-inline DwellGain dwellGain(float dwell, float dwellDrive, float dwellComp) {
-  const float d = smooth::clamp01(dwell);
-  const float logDrive = logf(clampf(dwellDrive, 1.0f, kMaxDwellDrive));
-  return {expf(logDrive * d), expf(-clampf(dwellComp, 0.0f, kMaxDwellComp) * logDrive * d)};
 }
 
 }  // namespace reverb_parts

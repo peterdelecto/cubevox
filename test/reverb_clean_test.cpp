@@ -1,8 +1,8 @@
-// Reverb front-end distortion: each engine at its default dwell, fed a -6 dBFS
+// Reverb front-end distortion: each engine at its fixed input drive, fed a -6 dBFS
 // 220 Hz sine, must stay clean. A linear tank returns a sine as a sine, but its
 // gain differs from one harmonic to the next, so each harmonic is divided by the
 // tank's gain at that frequency, read from a -60 dBFS sine the clipper passes
-// untouched. What is left measures the dwell clipper alone. A second check holds the wet path's DC
+// untouched. What is left measures the input clipper alone. A second check holds the wet path's DC
 // under -90 dBFS with no blocker on it. A third ties the struct defaults to the knob curves.
 // No window, no audio device.
 
@@ -120,7 +120,7 @@ int main() {
   for (int e = 0; e < 2; ++e) {
     const double thd = thdPercent(engines[e]);
     const bool pass = thd <= kMaxThdPercent;
-    std::printf("%s %-14s default dwell, -6 dBFS sine: THD %.2f %% (<= %.1f)\n", pass ? "PASS" : "FAIL",
+    std::printf("%s %-14s fixed drive, -6 dBFS sine: THD %.2f %% (<= %.1f)\n", pass ? "PASS" : "FAIL",
                 names[e], thd, kMaxThdPercent);
     ok = ok && pass;
   }

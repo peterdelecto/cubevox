@@ -39,8 +39,8 @@
 // reads add and feed four chirp stages of 8 short allpasses each; lows take longest through them,
 // so the boing runs down. TIME sets the feedback and slides the bass cut down over its upper
 // quarter, and the input gain follows the feedback so the wet level holds across TIME. A sine LFO
-// moves both delay read heads, 90 degrees apart. Dwell, a tuning value with no knob, drives a soft
-// clip ahead of the loop with a level compensation, as in Spring. Delay and allpass lengths are the
+// moves both delay read heads, 90 degrees apart. A fixed input drive feeds a soft clip ahead of the
+// loop, with a level compensation, as in Spring. Delay and allpass lengths are the
 // 44.1 kHz originals scaled to 48 kHz; chirp lengths are not scaled. Output is wet only, at wetDb.
 //
 // The loop runs a sample at a time into the output buffer. The chirp stages take the loop's output
@@ -59,12 +59,10 @@ struct ChasmTuning {
   float wobbleDepth = 25.0800629f;               // samples
   float wobbleRateHz = 4.56899977f;
   float inputTrim = 0.5f;
-  float dwell = 0.20f;                           // input drive into the soft clip, 0..1
-  float dwellDrive = 8.0f, dwellComp = 0.8f;     // input drive at dwell 1; level comp exponent
-  float wetDb = 17.7f;                           // level rule on the wet alone at the box's TIME and dwell, the mean of Adam's clips
+  float wetDb = 17.7f;                           // level rule on the wet alone at the box's TIME, the mean of Adam's clips
 };
 
-static_assert(std::is_trivially_copyable<ChasmTuning>::value && sizeof(ChasmTuning) == 9 * sizeof(float),
+static_assert(std::is_trivially_copyable<ChasmTuning>::value && sizeof(ChasmTuning) == 6 * sizeof(float),
               "the engine compares the tuning bytes to see whether it changed");
 
 struct ChasmParams {
@@ -84,6 +82,10 @@ constexpr int kChirpDepth = 8;
 
 using reverb_parts::kFeedbackMax;
 constexpr float kLoopK = 0.6f;  // loop allpass coefficient
+
+// Input drive into the soft clip (8^0.2) and the level compensation that follows it (8^-0.16).
+constexpr float kInputDrive = 1.51571655f;
+constexpr float kInputComp = 0.716977596f;
 
 // The bass cut starts to slide down where TIME reaches 75 % and has slid all the way at the top.
 constexpr float kBassSlideFrom = kChasmFeedback.at(0.75f);
@@ -209,7 +211,7 @@ class Chasm {
   // Everything the loop takes from the tuning, once per tuning change.
   struct Coefs {
     float bassHz, bassHzTop, depth, drive;
-    float inScale;  // the dwell compensation, the input trim and the wet gain: the loop and the chirp are linear
+    float inScale;  // the drive compensation, the input trim and the wet gain: the loop and the chirp are linear
     uint32_t lfoStep;
   };
 
@@ -232,9 +234,8 @@ class Chasm {
     c.depth = depth;
     c.lfoStep = static_cast<uint32_t>(clampf(t.wobbleRateHz, 0.0f, kMaxWobbleHz) * reverb_parts::kPhasePerHz);
     const float wetGain = dbToGain(clampf(t.wetDb, -kMaxWetDb, kMaxWetDb));
-    const reverb_parts::DwellGain dwell = reverb_parts::dwellGain(t.dwell, t.dwellDrive, t.dwellComp);
-    c.drive = dwell.drive;
-    c.inScale = dwell.comp * clampf(t.inputTrim, 0.0f, kMaxInputTrim) * wetGain;
+    c.drive = kInputDrive;
+    c.inScale = kInputComp * clampf(t.inputTrim, 0.0f, kMaxInputTrim) * wetGain;
     return c;
   }
 

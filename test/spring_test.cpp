@@ -36,10 +36,9 @@ bool report(const char* name, bool pass, const char* fmt, ...) {
   return pass;
 }
 
-// Plain loops: no diffusion, no wobble, filters wide open, no drive.
+// Plain loops: no diffusion, no wobble, filters wide open.
 cv::SpringParams plain() {
   cv::SpringParams p;
-  p.tuning.dwell = 0.0f;
   p.tuning.diffuse = 0.0f;
   p.tuning.wobbleDepth = 0.0f;
   p.tuning.trebleLossHz = cv::kFilterMaxHz;
@@ -186,7 +185,7 @@ bool levelAcrossTime() {
   return report("level TIME", std::fabs(db) < kMaxDb, "TIME 1 vs 0: %+.2f dB (want within %.1f)", db, kMaxDb);
 }
 
-// 4. Full TIME and dwell on 20 s of loud noise stays finite and dies after the input stops.
+// 4. Full TIME on 20 s of loud noise stays finite and dies after the input stops.
 bool stable() {
   constexpr float kMaxPeak = 3.8f;
   constexpr double kMaxTail = 1e-25;
@@ -195,7 +194,6 @@ bool stable() {
   for (size_t i = static_cast<size_t>(on); i < x.size(); ++i) x[i] = 0.0f;
   cv::SpringParams p;
   p.decay = 1.0f;
-  p.tuning.dwell = 1.0f;
   p.tuning.restLevel = 0.0f;  // the loops decay on their own; a rest would hide the tail
   const Signal y = run(x, p);
   float peak = 0.0f;
@@ -221,7 +219,6 @@ bool stableAtCeilings() {
   for (size_t i = static_cast<size_t>(on); i < x.size(); ++i) x[i] = 0.0f;
   cv::SpringParams p;
   p.decay = 1.0f;
-  p.tuning.dwell = 1.0f;
   p.tuning.feedbackHi = sd::kFeedbackMax;
   p.tuning.wobbleDepth = sd::kMaxWobble;
   p.tuning.wobbleRateHz = sd::kMaxWobbleHz;
@@ -430,9 +427,6 @@ bool extremeTuning() {
   using Set = void (*)(cv::SpringTuning&);
   const Set cases[] = {
       [](cv::SpringTuning& t) { t.wetDb = 1000.0f; },         [](cv::SpringTuning& t) { t.wetDb = -1000.0f; },
-      [](cv::SpringTuning& t) { t.dwellDrive = 1e30f; },      [](cv::SpringTuning& t) { t.dwellDrive = -5.0f; },
-      [](cv::SpringTuning& t) { t.dwellComp = -300.0f; },     [](cv::SpringTuning& t) { t.dwellComp = 1e9f; },
-      [](cv::SpringTuning& t) { t.dwell = -1.0f; },           [](cv::SpringTuning& t) { t.dwell = 5.0f; },
       [](cv::SpringTuning& t) { t.feedbackHi = 5.0f; },       [](cv::SpringTuning& t) { t.feedbackLo = -1.0f; },
       [](cv::SpringTuning& t) { t.springMs1 = -50.0f; },      [](cv::SpringTuning& t) { t.springMs3 = 1000.0f; },
       [](cv::SpringTuning& t) { t.chirpSections = -5; },      [](cv::SpringTuning& t) { t.chirpSections = 100; },

@@ -94,9 +94,6 @@ void reportRecovery(Print& out) {
     out.print(gRejectReason.data());
     out.println("), using the default layout");
   }
-#ifdef CUBEVOX_CROWDTEST
-  out.println("[WARN] test layout in force: Mob replaces Autotune in slot 2, CPU budget checks off");
-#endif
 }
 
 void reportScan(Print& out) {
@@ -135,29 +132,12 @@ static void loadRecord(Layout& layout, Settings& settings, uint32_t nowMs) {
   gStore.request(layout, settings, nowMs);  // rewrite the record with the default layout
 }
 
-#ifdef CUBEVOX_CROWDTEST
-// The layout the record held at boot, or the default when it held none. The test image plays
-// crowdTestLayout() from RAM and every save writes this one, so a release image finds the stored
-// layout again. A layout the menu or the app sets on the test image plays until power-off.
-static Layout gStoredLayout = defaultLayout();
-#endif
-
 void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
   loadRecord(layout, settings, nowMs);
-
-#ifdef CUBEVOX_CROWDTEST
-  gStoredLayout = layout;
-  layout = crowdTestLayout();
-#endif
 }
 
 void recordRequestSave(const Layout& layout, const Settings& settings, uint32_t nowMs) {
-#ifdef CUBEVOX_CROWDTEST
-  (void)layout;
-  gStore.request(gStoredLayout, settings, nowMs);
-#else
   gStore.request(layout, settings, nowMs);
-#endif
 }
 
 void recordSkipDebounce() { gStore.flushPending(); }

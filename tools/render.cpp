@@ -138,11 +138,10 @@ int usage() {
                "     distRailAsym 0..0.5, distRailSoft 0.01..1, distTopBoostFrom 0..1, distBassPeakQ 0.1 and up,\n"
                "     distFadeDrive 0.0001..1)\n"
                "     chmBassCutHz chmBassCutHzTop (20..21600) chmWobbleDepth (0..64) chmWobbleRateHz (0..10)\n"
-               "     chmInputTrim (0..4) chmDwell (0..1) chmDwellDrive (1..64) chmDwellComp (0..2) chmWetDb (-36..36)\n"
+               "     chmInputTrim (0..4) chmWetDb (-36..36)\n"
                "     springMs1 (10..37.6) springMs2 (10..45.6) springMs3 (10..56.6) springFeedbackLo springFeedbackHi (0.1..0.97) springDiffuse (0..0.9)\n"
                "     springChirpSections (0..32) springChirpA (0..0.95) springTrebleLossHz springBassCutHz\n"
                "     springReturnLpHz (the three corners 20..10800, the loops' Nyquist is 12000) springWobbleDepth (0..32) springWobbleRateHz (0..10)\n"
-               "     springDwell (0..1) springDwellDrive (1..64) springDwellComp (0..2)\n"
                "     springWetDb (-24..24) springRestLevel (0..0.001, a silent input rests the springs below this; 0 never)\n"
                "     eqDipQ eqPresenceQ (0.1..10) eqTrimDb (-12..12)\n"
                "     eqEssBandLoHz eqEssBandHiHz eqEssThresholdDb eqEssMaxCutDb eqEssReleaseMs eqEssNotchHz eqEssNotchQ\n"
@@ -170,8 +169,7 @@ int usage() {
                "     lofiFcLoHz lofiFcHiHz lofiHpStartHz lofiHpEndRatio lofiLpStartHz lofiLpEndRatio lofiHonkDb lofiHonkQ\n"
                "     lofiDriveDb lofiHoldMaxHz lofiHoldMinHz lofiBitsMax lofiBitsMin lofiTrimDb\n"
                "     lofiMakeup<tone 0..4>_<amount 0..6> (dB, the makeup table by TONE 0, 25 ... 100 %% and the law's AMOUNT 0, 10 ... 60 %%)\n"
-               "  --time and --mix are the panel's TIME and MIX positions for the selected reverb engine (default 0.5);\n"
-               "  each engine's dwell is its springDwell or chmDwell key\n",
+               "  --time and --mix are the panel's TIME and MIX positions for the selected reverb engine (default 0.5)\n",
                static_cast<double>(cv::crowd_detail::kMinDelayMs), cv::kCrowdMaxLagMs,
                static_cast<double>(cv::crowd_detail::kMaxScatterMs), cv::kCrowdMaxLagMs);
   return 2;
@@ -320,8 +318,7 @@ bool springTuningInRange(const cv::SpringTuning& t) {
          inside(t.chirpA, 0.0f, 0.95f) && inside(t.trebleLossHz, cv::kFilterMinHz, sd::kMaxFilterHz) &&
          inside(t.bassCutHz, cv::kFilterMinHz, sd::kMaxFilterHz) &&
          inside(t.returnLpHz, cv::kFilterMinHz, sd::kMaxFilterHz) && inside(t.wobbleDepth, 0.0f, sd::kMaxWobble) &&
-         inside(t.wobbleRateHz, 0.0f, sd::kMaxWobbleHz) && inside(t.dwell, 0.0f, 1.0f) &&
-         inside(t.dwellDrive, 1.0f, sd::kMaxDwellDrive) && inside(t.dwellComp, 0.0f, sd::kMaxDwellComp) &&
+         inside(t.wobbleRateHz, 0.0f, sd::kMaxWobbleHz) &&
          inside(t.wetDb, -sd::kMaxWetDb, sd::kMaxWetDb) &&
          inside(t.restLevel, 0.0f, 1.0e-3f);
 }
@@ -333,8 +330,6 @@ bool chasmTuningInRange(const cv::ChasmTuning& t) {
   return inside(t.bassCutHz, cv::kFilterMinHz, cv::kFilterMaxHz) &&
          inside(t.bassCutHzTop, cv::kFilterMinHz, cv::kFilterMaxHz) && inside(t.wobbleDepth, 0.0f, cd::kMaxWobble) &&
          inside(t.wobbleRateHz, 0.0f, cd::kMaxWobbleHz) && inside(t.inputTrim, 0.0f, cd::kMaxInputTrim) &&
-         inside(t.dwell, 0.0f, 1.0f) && inside(t.dwellDrive, 1.0f, cv::reverb_parts::kMaxDwellDrive) &&
-         inside(t.dwellComp, 0.0f, cv::reverb_parts::kMaxDwellComp) &&
          inside(t.wetDb, -cd::kMaxWetDb, cd::kMaxWetDb);
 }
 
@@ -414,8 +409,7 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"chmBassCutHz", &ch.bassCutHz},
       {"chmBassCutHzTop", &ch.bassCutHzTop},  {"chmWobbleDepth", &ch.wobbleDepth},
       {"chmWobbleRateHz", &ch.wobbleRateHz},  {"chmInputTrim", &ch.inputTrim},
-      {"chmDwell", &ch.dwell},                {"chmDwellDrive", &ch.dwellDrive},
-      {"chmDwellComp", &ch.dwellComp},        {"chmWetDb", &ch.wetDb},
+      {"chmWetDb", &ch.wetDb},
       {"springMs1", &spr.springMs1},          {"springMs2", &spr.springMs2},
       {"springMs3", &spr.springMs3},
       {"springFeedbackLo", &spr.feedbackLo},  {"springFeedbackHi", &spr.feedbackHi},
@@ -424,8 +418,6 @@ bool applyTuning(RenderParams& rp, const char* kv) {
       {"springTrebleLossHz", &spr.trebleLossHz}, {"springBassCutHz", &spr.bassCutHz},
       {"springReturnLpHz", &spr.returnLpHz},  {"springWobbleDepth", &spr.wobbleDepth},
       {"springWobbleRateHz", &spr.wobbleRateHz},
-      {"springDwell", &spr.dwell},
-      {"springDwellDrive", &spr.dwellDrive},  {"springDwellComp", &spr.dwellComp},
       {"springWetDb", &spr.wetDb},            {"springRestLevel", &spr.restLevel},
       {"eqDipQ", &et.dipQ}, {"eqPresenceQ", &et.presenceQ}, {"eqTrimDb", &et.trimDb},
       {"eqEssBandLoHz", &et.deEsser.bandLoHz}, {"eqEssBandHiHz", &et.deEsser.bandHiHz},

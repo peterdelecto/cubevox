@@ -30,8 +30,8 @@
 // survives in the tail, and a one-pole low-pass on the summed return takes off the metallic top.
 // TIME sets the feedback g per pass. The input scales by sqrt((1 - g^2) / g) so the tail's level
 // holds as Time moves. The sqrt(1 - g^2) term holds the echo sum's energy, and 1 / sqrt(g) offsets
-// the first echo leaving at g, less what the loop filters take each pass. Dwell, a tuning value with
-// no knob, drives the soft clip ahead of the loops. The loops are linear, so wetDb scales their input
+// the first echo leaving at g, less what the loop filters take each pass. A fixed input drive
+// feeds the soft clip ahead of the loops. The loops are linear, so wetDb scales their input
 // and the output needs no gain. Output is wet only.
 
 namespace cv {
@@ -53,8 +53,10 @@ constexpr int kMinDly = 8;                  // shortest read, loop samples
 constexpr float kFeedbackMin = 0.10f;       // feedback floor; the input scale divides by it
 using reverb_parts::kFeedbackMax;
 constexpr float kMaxWetDb = 24.0f;          // wetDb clamps to plus and minus this
-using reverb_parts::kMaxDwellDrive;
-using reverb_parts::kMaxDwellComp;
+
+// Input drive into the soft clip (4^0.2) and the level compensation that follows it (4^-0.16).
+constexpr float kInputDrive = 1.31950796f;
+constexpr float kInputComp = 0.801069856f;
 
 static_assert(reverb_parts::wobbleError(kMaxWobble, kMaxWobbleHz) <= reverb_parts::kMaxWobbleErr,
               "the widest, fastest wobble must stay within the interpolation's error limit");
@@ -104,13 +106,11 @@ struct SpringTuning {
   float returnLpHz = 5000.0f;              // one-pole low-pass on the summed return
   float wobbleDepth = 8.0f;                // samples at the engine rate
   float wobbleRateHz = 3.0f;
-  float dwell = 0.20f;                     // input drive into the soft clip, 0..1
-  float dwellDrive = 4.0f, dwellComp = 0.8f;  // input drive at dwell 1; level comp exponent
-  float wetDb = 0.37f;                  // gain ahead of the loops; level rule on the wet alone at the box's TIME and dwell, the mean of Adam's clips
+  float wetDb = 0.37f;                  // gain ahead of the loops; level rule on the wet alone at the box's TIME, the mean of Adam's clips
   float restLevel = 1.0e-6f;               // -120 dBFS; a silent input lets the springs rest once every loop sits below it, 0 never rests
 };
 
-static_assert(std::is_trivially_copyable<SpringTuning>::value && sizeof(SpringTuning) == 18 * sizeof(float),
+static_assert(std::is_trivially_copyable<SpringTuning>::value && sizeof(SpringTuning) == 15 * sizeof(float),
               "the engine compares the tuning bytes to see whether it changed");
 
 struct SpringParams {
@@ -429,9 +429,8 @@ class Spring {
     l.adv2 = advance(t.springMs2, kDiff2A + kDiff2B, kDly2, l.depth);
     l.adv3 = advance(t.springMs3, kDiff3A + kDiff3B, kDly3, l.depth);
     const float wetGain = dbToGain(clampf(t.wetDb, -kMaxWetDb, kMaxWetDb));
-    const reverb_parts::DwellGain dwell = reverb_parts::dwellGain(t.dwell, t.dwellDrive, t.dwellComp);
-    l.drive = dwell.drive;
-    l.compWet = dwell.comp * wetGain;
+    l.drive = kInputDrive;
+    l.compWet = kInputComp * wetGain;
     return l;
   }
 

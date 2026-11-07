@@ -32,7 +32,7 @@
   5. `engine/scale.h`: the key tables, `kMajor`, `midiOf`, `scaleDeviation`, `kHoldSemis`, `heldNote`.
   6. `engine/reverb_parts.h`, for the two reverbs: `softClip`, `softClipHeadroom`, `kReverbClipHeadroom`, the
      allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, `kMaxWobbleHz`, the wobble LFO (`lfo`, on `sinTurns`), its phase step and
-     error bound, and the Dwell drive terms.
+     error bound.
 - The board links its own memset, memcpy and memmove (`firmware/cubevox/src/board/fastmem.cpp`, checked on the
   host by `fastmem_test`), which move 16 bytes a pass, about 0.3 to 0.5 cycles a byte by instruction count.
   newlib-nano's versions are byte loops at about 5 cycles a byte, so a `fill(0.0f)`, `std::copy` or struct
