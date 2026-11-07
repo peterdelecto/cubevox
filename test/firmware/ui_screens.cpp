@@ -1,7 +1,7 @@
 // Checks the runtime screens on the host. Covers the readout against the proof renderer byte for
 // byte (settled, rolling and muted), its title bar, rows and edges, the value row centred on what is
 // drawn with its unit in lowercase, the key names centred each on its own width with their flats, the
-// voice ribbon, the boxed input level meter with its 16 segments, the muted word and the DEBUG load figure.
+// voice scope, the boxed input level meter with its 16 segments, the muted word and the DEBUG load figure.
 // The proof PGMs go to build/oled-*.pgm.
 
 #include "support.h"
@@ -1100,48 +1100,32 @@ void checkReadoutEdgeCases() {
 // ---------------------------------------------------------------------------------------------
 // Voice
 
-Ribbon ribbonOf(std::initializer_list<float> oldestFirst) {
-  Ribbon r;
-  for (float level : oldestFirst) r.push(level);
-  return r;
+// A frame whose first columns are `runs` and whose other columns are the horizon.
+ScopeFrame frameOf(std::initializer_list<ScopeRun> runs) {
+  ScopeFrame f;
+  size_t c = 0;
+  for (const ScopeRun& run : runs) f.column[c++] = run;
+  return f;
 }
 
-void checkRibbonHeight() {
-  check(ribbonHalfHeight(0.0f) == 0 && ribbonHalfHeight(-1.0f) == 0 && ribbonHalfHeight(0.005f) == 0,
-        "voice: no level, a negative one and a hair above zero are the line alone");
-  check(ribbonHalfHeight(0.02f) == 0 && ribbonHalfHeight(0.03f) == 1, "voice: a level of 0.02 is the line and one of 0.03 is 1 px");
-  check(ribbonHalfHeight(1.0f) == kRibbonHalfMax && kRibbonHalfMax == 22 && ribbonHalfHeight(5.0f) == 22,
-        "voice: full level is 22 px each side of the horizon");
-  check(ribbonHalfHeight(0.5f) == 11 && ribbonHalfHeight(0.1f) == 2, "voice: the height is the level times 22 px, with no curve");
-  bool rising = true;
-  int prev = 0;
-  for (int i = 0; i <= 100; ++i) {
-    const int h = ribbonHalfHeight(static_cast<float>(i) / 100.0f);
-    rising = rising && h >= prev;
-    prev = h;
+// A frame of pseudo-random column runs, lo in -22..0 and hi in 0..22, from `seed`.
+ScopeFrame sampleFrame(uint32_t seed) {
+  ScopeFrame f;
+  uint32_t state = seed * 2654435761u + 12345u;
+  for (ScopeRun& run : f.column) {
+    state = state * 1664525u + 1013904223u;
+    run.lo = static_cast<int8_t>(-static_cast<int>((state >> 8) % 23));
+    state = state * 1664525u + 1013904223u;
+    run.hi = static_cast<int8_t>((state >> 8) % 23);
   }
-  check(rising, "voice: a louder level is never shorter");
-  check(ribbonHalfHeight(std::numeric_limits<float>::quiet_NaN()) == 0, "voice: NaN is the line");
-}
-
-void checkRibbonHistory() {
-  Ribbon r = ribbonOf({1.0f, 0.5f, 0.0f});
-  check(r.half(0) == 0 && r.half(1) == 11 && r.half(2) == 22 && r.half(3) == 0, "ribbon: levels read newest first");
-  check(r.half(-1) == 0 && r.half(kRibbonLevels) == 0 && r.half(1000) == 0, "ribbon: ages outside the history read zero");
-  for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
-  check(r.half(0) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: the history holds 52 levels");
-  r.push(0.0f);
-  check(r.half(0) == 0 && r.half(1) == 22 && r.half(kRibbonLevels - 1) == 22, "ribbon: a push drops the oldest level");
-  check(kRibbonLevels == (kRibbonRightX - kRibbonLeftX + kRibbonColumnsPerLevel) / kRibbonColumnsPerLevel &&
-            kRibbonRightX == 126 && kRibbonLevels * kRibbonColumnsPerLevel >= kRibbonRightX - kRibbonLeftX + 1,
-        "ribbon: the level count rounds the ribbon's columns up in pairs and covers every one of them");
+  return f;
 }
 
 // The meter box and its segments, drawn from the owner's wording (2026-10-30) and nothing in the
 // renderer. The outline is 1 px wide, its sides are columns 5 and 20 and its top and bottom are rows
 // 8 and 56, so the interior is columns 6 to 19, rows 9 to 55. There are 16 segments, each 2 rows
 // tall at columns 6 to 19, with 1 row of gap above. Segment 1 is rows 54 and 55, segment 2 rows 51
-// and 52, up to segment 16 on rows 9 and 10. Columns 21 to 23 stay blank and the ribbon starts at
+// and 52, up to segment 16 on rows 9 and 10. Columns 21 to 23 stay blank and the trace starts at
 // column 24. The walk moves the finished picture.
 constexpr int kBoxLeft = 5;
 constexpr int kBoxRight = 20;
@@ -1195,114 +1179,90 @@ void checkVoiceSilence() {
   // In silence the screen is the horizon line from column 24 to column 126 at row 32 and the empty
   // meter box. Column 127 stays blank.
   Canvas line = meterFromDefinition(0, Walk{0, 0});
-  line.fillRect(kRibbonLeftX, 32, kRibbonRightX - kRibbonLeftX + 1, 1, true);
+  line.fillRect(kScopeLeftX, 32, kScopeRightX - kScopeLeftX + 1, 1, true);
   for (int segments : {0, -7}) {
     Canvas c;
-    renderVoice(c, Ribbon(), segments, Walk{0, 0});
+    renderVoice(c, ScopeFrame(), segments, Walk{0, 0});
     check(sameRows(c, line, 0, kCanvasHeight),
           ("voice: in silence, with " + std::to_string(segments) + " segments, the screen is the horizon line from column 24 to 126 at row 32 and the empty meter box").c_str());
   }
 }
 
-// The first level of the history, the oldest, fills the one column kRibbonLeftX, the newest sits in
-// columns 125 and 126, and nothing is left of the ribbon but the meter box, the blank columns before
-// kRibbonLeftX and the blank column 127.
-void checkRibbonFirstColumn() {
-  Ribbon r;
-  for (int i = 0; i < kRibbonLevels; ++i) r.push(1.0f);
+// A frame of full-height columns is solid from column 24 to column 126 and over rows 10 to 54, and
+// the rest of the screen is the meter box, the blank columns before column 24 and the blank column
+// 127. One tall column among silent ones fills its own column alone.
+void checkScopeEdges() {
+  ScopeFrame tall;
+  for (ScopeRun& run : tall.column) run = ScopeRun{-22, 22};
   Canvas c;
-  renderVoice(c, r, 0, Walk{0, 0});
+  renderVoice(c, tall, 0, Walk{0, 0});
   bool solid = true;
-  for (int x = kRibbonLeftX; x <= kRibbonRightX; ++x) {
+  for (int x = kScopeLeftX; x <= kScopeRightX; ++x) {
     for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, x, y);
+    solid = solid && !lit(c, x, 9) && !lit(c, x, 55);
   }
-  check(solid, "ribbon: a full history is solid from column 24, right after the blank columns, to column 126");
-  check(darkFrom(c, 127, 0, kCanvasHeight), "ribbon: column 127 stays blank under a full history");
+  check(solid, "scope: full columns are solid from column 24 to 126 over rows 10 to 54 and no further");
+  check(darkFrom(c, 127, 0, kCanvasHeight), "scope: column 127 stays blank under a full frame");
   const Canvas box = meterFromDefinition(0, Walk{0, 0});
   bool boxOnly = true;
   for (int x = 0; x < kBoxFootprint; ++x) {
     for (int y = 0; y < kCanvasHeight; ++y) boxOnly = boxOnly && lit(c, x, y) == lit(box, x, y);
   }
-  check(boxOnly, "ribbon: columns 0 to 23 hold the empty meter box and nothing else, columns 21 to 23 blank");
+  check(boxOnly, "scope: columns 0 to 23 hold the empty meter box and nothing else, columns 21 to 23 blank");
 
-  // With only the oldest level tall, it fills column 24 alone and column 25 holds the line.
-  Ribbon oldest;
-  oldest.push(1.0f);
-  for (int i = 1; i < kRibbonLevels; ++i) oldest.push(0.0f);
-  Canvas d;
-  renderVoice(d, oldest, 0, Walk{0, 0});
-  check(lit(d, kRibbonLeftX, 32 - 22) && lit(d, kRibbonLeftX, 32 + 22) && !lit(d, kRibbonLeftX + 1, 32 - 22) &&
-            !lit(d, kRibbonLeftX - 1, 32) && lit(d, kRibbonLeftX + 1, 32),
-        "ribbon: the oldest level fills column 24 alone, and column 25 and the blank column 23 hold the line");
+  for (int at : {0, kScopeColumns - 1}) {
+    ScopeFrame one;
+    one.column[static_cast<size_t>(at)] = ScopeRun{-22, 22};
+    Canvas d;
+    renderVoice(d, one, 0, Walk{0, 0});
+    const int x = kScopeLeftX + at;
+    const bool neighbours = !lit(d, x - 1, 10) && !lit(d, x + 1, 10) && lit(d, x == kScopeLeftX ? x + 1 : x - 1, 32);
+    check(lit(d, x, 10) && lit(d, x, 54) && neighbours,
+          ("scope: a tall column at " + std::to_string(at) + " fills its own column and the others hold the line").c_str());
+  }
 }
 
+// Each column lights the rows of its run about the horizon and nothing else: 1 px wide, solid between
+// lo and hi, no rim.
 void checkVoiceShape() {
-  Ribbon r;
-  for (int i = 0; i < kRibbonLevels; ++i) r.push(0.0f);
-  r.push(1.0f);  // 22 px, columns 123 and 124 after the next push
-  r.push(0.5f);  // 11 px, columns 125 and 126
+  const ScopeFrame f = frameOf({ScopeRun{-5, 3}, ScopeRun{0, 0}, ScopeRun{-22, -10}, ScopeRun{12, 22}, ScopeRun{-1, 1}});
   Canvas c;
-  renderVoice(c, r, 0, Walk{0, 0});
-
-  bool solid = true;
-  for (int y = 32 - 11; y <= 32 + 11; ++y) solid = solid && lit(c, 125, y) && lit(c, 126, y);
-  for (int y = 32 - 22; y <= 32 + 22; ++y) solid = solid && lit(c, 123, y) && lit(c, 124, y);
-  check(solid, "voice: each level spans two columns and is solid from the horizon out, the newest at column 126");
-  check(lit(c, 100, 32) && !lit(c, 100, 31) && !lit(c, 100, 33), "voice: older silence is the line");
-  check(darkFrom(c, 127, 0, kCanvasHeight), "voice: column 127 stays blank under the newest level");
-
-  // A 1 px rim of 50 % Bayer dither caps each column, and nothing lies beyond it.
-  bool rim = true;
-  for (int x = 125; x <= 126; ++x) {
-    rim = rim && lit(c, x, 32 - 12) == bayerLit(x, 32 - 12, 32) && lit(c, x, 32 + 12) == bayerLit(x, 32 + 12, 32);
-    rim = rim && !lit(c, x, 32 - 13) && !lit(c, x, 32 + 13);
+  renderVoice(c, f, 0, Walk{0, 0});
+  bool runs = true;
+  for (int col = 0; col < 5; ++col) {
+    const ScopeRun& run = f.column[static_cast<size_t>(col)];
+    for (int y = 0; y < kCanvasHeight; ++y) runs = runs && lit(c, kScopeLeftX + col, y) == (y >= 32 + run.lo && y <= 32 + run.hi);
   }
-  for (int x = 123; x <= 124; ++x) {
-    rim = rim && lit(c, x, 32 - 23) == bayerLit(x, 32 - 23, 32) && lit(c, x, 32 + 23) == bayerLit(x, 32 + 23, 32);
-    rim = rim && !lit(c, x, 32 - 24) && !lit(c, x, 32 + 24);
-  }
-  check(rim, "voice: a 1 px 50 % dither caps the column top and bottom");
-
-  check(darkFrom(c, kRibbonLeftX, 0, 9) && darkFrom(c, kRibbonLeftX, 56, kCanvasHeight),
-        "voice: the tallest column with its rim stays 9 px clear of the top and bottom");
+  check(runs, "voice: a known frame lights exactly the rows of each column's run about row 32, with no rim");
+  check(lit(c, 100, 32) && !lit(c, 100, 31) && !lit(c, 100, 33), "voice: columns after the known ones are the line");
+  check(darkFrom(c, 127, 0, kCanvasHeight), "voice: column 127 stays blank");
 }
 
 // The voice screen drawn pixel by pixel from its definition, as an independent check of the whole
-// frame. The ribbon runs from column 24 to 126. A column of half-height h is solid within h rows of
-// the horizon, a 1 px rim lies one row beyond it where the Bayer threshold of the pixel is under
-// 32, and a column of height 0 is the horizon pixel alone. The meter is its box and `segments`
-// lit segments. The walk moves the finished picture.
-Canvas voiceFromDefinition(const Ribbon& ribbon, int segments, Walk walk) {
+// frame. Column 24 + c lights rows 32 + lo to 32 + hi of its run, and the meter is its box and
+// `segments` lit segments. The walk moves the finished picture.
+Canvas voiceFromDefinition(const ScopeFrame& scope, int segments, Walk walk) {
   Canvas c = meterFromDefinition(segments, walk);
   for (int x = 24; x <= 126; ++x) {
-    const int h = ribbon.half((126 - x) / 2);
-    for (int y = 0; y < kCanvasHeight; ++y) {
-      const int d = std::abs(y - 32);
-      const bool on = h == 0 ? d == 0 : (d <= h || (d == h + 1 && bayerLit(x, y, 32)));
-      if (on) c.setPixel(x + walk.x, y + walk.y, true);
-    }
+    const ScopeRun& run = scope.column[static_cast<size_t>(x - 24)];
+    for (int y = 32 + run.lo; y <= 32 + run.hi; ++y) c.setPixel(x + walk.x, y + walk.y, true);
   }
   return c;
 }
 
 void checkVoiceWholeFrame() {
-  uint32_t seed = 12345;
   bool same = true;
   const int counts[] = {0, 3, 6, 9, 12, 15, 16};
   for (int frame = 0; frame < 7; ++frame) {
-    Ribbon r;
-    for (int i = 0; i < kRibbonLevels + frame; ++i) {
-      seed = seed * 1664525u + 1013904223u;
-      r.push(static_cast<float>(seed >> 8) / 16777216.0f);
-    }
+    const ScopeFrame f = sampleFrame(static_cast<uint32_t>(10 + frame));
     const int segments = counts[frame];
     for (uint32_t step = 0; step < 9; ++step) {
       Canvas c;
-      renderVoice(c, r, segments, walkAt(step));
-      same = same && sameRows(c, voiceFromDefinition(r, segments, walkAt(step)), 0, kCanvasHeight);
+      renderVoice(c, f, segments, walkAt(step));
+      same = same && sameRows(c, voiceFromDefinition(f, segments, walkAt(step)), 0, kCanvasHeight);
     }
   }
-  check(same, "voice: whole frames match a pixel-by-pixel drawing of the meter box, its segments and the ribbon, at every step of the walk");
+  check(same, "voice: whole frames match a pixel-by-pixel drawing of the meter box, its segments and the trace, at every step of the walk");
 }
 
 // The lit segments from the level, through the same map the face uses. The level is linear in dB of
@@ -1346,7 +1306,7 @@ void checkMeterSegments() {
 // nothing of the meter lies outside the box.
 void checkMeterBox() {
   Canvas empty;
-  renderVoice(empty, Ribbon(), 0, Walk{0, 0});
+  renderVoice(empty, ScopeFrame(), 0, Walk{0, 0});
   bool outline = true;
   for (int x = kMeterBoxLeftX; x <= kMeterBoxRightX; ++x) {
     outline = outline && lit(empty, x, kMeterBoxTopY) && lit(empty, x, kMeterBoxBottomY);
@@ -1365,7 +1325,7 @@ void checkMeterBox() {
   bool outside = true;
   for (int y = 0; y < kCanvasHeight; ++y) {
     for (int x = 0; x < kMeterBoxLeftX; ++x) outside = outside && !lit(empty, x, y);
-    for (int x = kMeterBoxRightX + 1; x < kRibbonLeftX; ++x) outside = outside && !lit(empty, x, y);
+    for (int x = kMeterBoxRightX + 1; x < kScopeLeftX; ++x) outside = outside && !lit(empty, x, y);
     if (y < kMeterBoxTopY || y > kMeterBoxBottomY) {
       for (int x = kMeterBoxLeftX; x <= kMeterBoxRightX; ++x) outside = outside && !lit(empty, x, y);
     }
@@ -1380,24 +1340,24 @@ void checkMeterBox() {
         "meter: the box is 2 x 16 px of top and bottom and 2 x 47 px of sides, 126 px in all");
 
   Canvas full;
-  renderVoice(full, Ribbon(), 16, Walk{0, 0});
+  renderVoice(full, ScopeFrame(), 16, Walk{0, 0});
   Canvas over;
-  renderVoice(over, Ribbon(), 999, Walk{0, 0});
+  renderVoice(over, ScopeFrame(), 999, Walk{0, 0});
   check(sameRows(over, full, 0, kCanvasHeight), "meter: segments past 16 stop at the 16th");
 
-  // A full ribbon beside a full meter leaves columns 21 to 23 blank and the box whole.
-  Ribbon loud;
-  for (int i = 0; i < kRibbonLevels; ++i) loud.push(1.0f);
+  // A full trace beside a full meter leaves columns 21 to 23 blank and the box whole.
+  ScopeFrame loud;
+  for (ScopeRun& run : loud.column) run = ScopeRun{-22, 22};
   Canvas both;
   renderVoice(both, loud, 16, Walk{0, 0});
   bool gap = true;
   for (int y = 0; y < kCanvasHeight; ++y) {
     for (int x : {0, 127}) gap = gap && !lit(both, x, y);
-    for (int x = kMeterBoxRightX + 1; x < kRibbonLeftX; ++x) gap = gap && !lit(both, x, y);
+    for (int x = kMeterBoxRightX + 1; x < kScopeLeftX; ++x) gap = gap && !lit(both, x, y);
   }
-  check(gap && lit(both, kRibbonLeftX + 1, 32) && lit(both, kMeterBoxRightX, 32) && lit(both, kMeterBoxRightX - 1, 31) &&
-            lit(both, kRibbonRightX, 32),
-        "meter: columns 21 to 23 stay blank between a full meter and a full ribbon, and column 127 stays blank after it");
+  check(gap && lit(both, kScopeLeftX + 1, 32) && lit(both, kMeterBoxRightX, 32) && lit(both, kMeterBoxRightX - 1, 31) &&
+            lit(both, kScopeRightX, 32),
+        "meter: columns 21 to 23 stay blank between a full meter and a full trace, and column 127 stays blank after it");
 }
 
 // Segment n stands on rows 54 and 55 for n = 1, and each next segment 3 rows higher, so the 16th is
@@ -1412,7 +1372,7 @@ void checkMeterSegmentRows() {
   bool countsOk = true;
   for (int lit16 = 0; lit16 <= 16; ++lit16) {
     Canvas c;
-    renderVoice(c, Ribbon(), lit16, Walk{0, 0});
+    renderVoice(c, ScopeFrame(), lit16, Walk{0, 0});
     int counted = 0;
     for (int n = 1; n <= 16; ++n) {
       const bool wantLit = n <= lit16;
@@ -1434,7 +1394,7 @@ void checkMeterSegmentRows() {
   check(gapsDark, "meter: the gap rows 53, 50, down to 11 are dark whatever the count, since a gap holds no segment");
 
   Canvas all;
-  renderVoice(all, Ribbon(), 16, Walk{0, 0});
+  renderVoice(all, ScopeFrame(), 16, Walk{0, 0});
   bool gapRows = true;
   for (int y = 11; y <= 53; y += 3) {
     for (int x = kMeterX; x < kMeterX + kMeterWidth; ++x) gapRows = gapRows && !lit(all, x, y);
@@ -1444,7 +1404,7 @@ void checkMeterSegmentRows() {
   bool whole = true;
   for (int lit16 = 0; lit16 <= 16; ++lit16) {
     Canvas c;
-    renderVoice(c, Ribbon(), lit16, Walk{0, 0});
+    renderVoice(c, ScopeFrame(), lit16, Walk{0, 0});
     const Canvas want = meterFromDefinition(lit16, Walk{0, 0});
     for (int x = 0; x < kBoxFootprint; ++x) {
       for (int y = 0; y < kCanvasHeight; ++y) whole = whole && lit(c, x, y) == lit(want, x, y);
@@ -1453,11 +1413,11 @@ void checkMeterSegmentRows() {
   check(whole, "meter: columns 0 to 23 are the box and the lit segments and nothing else at every count");
 }
 
-// The box, the segments and the ribbon walk together: every step of the walk moves the whole picture
+// The box, the segments and the trace walk together: every step of the walk moves the whole picture
 // by the same pixel.
 void checkMeterWalks() {
   bool moves = true;
-  const Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f});
+  const ScopeFrame r = sampleFrame(4);
   for (int segments : {0, 9, 16}) {
     Canvas base;
     renderVoice(base, r, segments, Walk{0, 0});
@@ -1476,7 +1436,7 @@ void checkMeterWalks() {
       moves = moves && sameRows(c, voiceFromDefinition(r, segments, w), 0, kCanvasHeight);
     }
   }
-  check(moves, "meter: at every step of the walk the box, its segments and the ribbon move together by one pixel");
+  check(moves, "meter: at every step of the walk the box, its segments and the trace move together by one pixel");
 }
 
 Canvas toggleReadout(int slot, bool on);
@@ -1505,36 +1465,29 @@ void checkMeterAbsentOffVoice() {
   check(dark, "meter: the readouts, the toggle, MUTED and BYPASS leave columns 0 to 5 dark, through the box's left side");
 }
 
-void checkVoiceScroll() {
-  Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f});
-  Canvas before;
-  renderVoice(before, r, 0, Walk{0, 0});
-  r.push(0.8f);
-  Canvas after;
-  renderVoice(after, r, 0, Walk{0, 0});
-
-  // The rim dither is anchored to the panel, so it does not move with the ribbon. The rest does.
-  bool moved = true;
-  for (int x = kRibbonLeftX; x + kRibbonColumnsPerLevel <= kRibbonRightX; ++x) {
-    const int half = r.half((kRibbonRightX - x) / kRibbonColumnsPerLevel);
-    for (int y = 0; y < kCanvasHeight; ++y) {
-      if (std::abs(y - kRibbonHorizonY) == half + 1) continue;
-      moved = moved && lit(after, x, y) == lit(before, x + kRibbonColumnsPerLevel, y);
-    }
-  }
-  check(moved, "voice: a push scrolls the ribbon 2 px to the left");
-  check(kRibbonColumnsPerLevel * kUiFps == 50, "voice: 2 px a tick at 25 fps is 50 px/s");
+// The frame is drawn fresh each tick. The same frame draws the same picture whatever was on the
+// screen before, and a new frame leaves nothing of the old one.
+void checkVoiceRefresh() {
+  const ScopeFrame a = sampleFrame(1);
+  const ScopeFrame b = sampleFrame(2);
+  Canvas first;
+  renderVoice(first, a, 5, Walk{0, 0});
+  Canvas again;
+  renderVoice(again, b, 5, Walk{0, 0});
+  renderVoice(again, a, 5, Walk{0, 0});
+  check(sameRows(first, again, 0, kCanvasHeight), "voice: a frame draws the same picture over any earlier one");
+  check(kUiFps == 25 && kUiTickMs == 40, "voice: the scope redraws every UI tick, 25 frames a second");
 }
 
 void checkVoiceWalk() {
-  const Ribbon r = ribbonOf({0.2f, 0.9f, 0.4f, 0.7f, 0.0f, 0.6f, 1.0f, 0.3f, 0.5f, 0.8f});
+  const ScopeFrame f = sampleFrame(3);
   Canvas base;
-  renderVoice(base, r, 9, Walk{0, 0});
+  renderVoice(base, f, 9, Walk{0, 0});
   bool ok = true;
   for (int i = 1; i <= 8; ++i) {
     const Walk w = walkAt(static_cast<uint32_t>(i));
     Canvas moved;
-    renderVoice(moved, r, 9, w);
+    renderVoice(moved, f, 9, w);
     for (int y = 0; y < kCanvasHeight; ++y) {
       for (int x = 0; x < kCanvasWidth; ++x) {
         const int sx = x - w.x;
@@ -1545,6 +1498,17 @@ void checkVoiceWalk() {
     }
   }
   check(ok, "voice: every step of the walk is the whole screen moved 1 px, nothing redrawn");
+
+  // At +1 the trace reaches column 127 and row 55, and the load figure's rows stay clear of it.
+  ScopeFrame tall;
+  for (ScopeRun& run : tall.column) run = ScopeRun{-22, 22};
+  Canvas shifted;
+  renderVoice(shifted, tall, 0, Walk{1, 1});
+  check(lit(shifted, 127, 33) && lit(shifted, 100, 55) && !lit(shifted, 100, 56) && !lit(shifted, 24, 33) &&
+            lit(shifted, kScopeLeftX + 1, 33),
+        "voice: at walk +1 the trace reaches column 127 and row 55 and leaves column 24 and row 56 clear");
+  check(kScopeHorizonY + kScopeHalfRows + 1 < kCanvasHeight - kScreenPad - 7,
+        "voice: the walk's lowest row stays above the DEBUG load figure at row 56");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1783,10 +1747,8 @@ void checkScreens() {
   checkKeyRows();
   checkKeyFlats();
   checkReadoutEdgeCases();
-  checkRibbonHeight();
-  checkRibbonHistory();
   checkVoiceSilence();
-  checkRibbonFirstColumn();
+  checkScopeEdges();
   checkVoiceShape();
   checkVoiceWholeFrame();
   checkMeterSegments();
@@ -1794,7 +1756,7 @@ void checkScreens() {
   checkMeterSegmentRows();
   checkMeterWalks();
   checkMeterAbsentOffVoice();
-  checkVoiceScroll();
+  checkVoiceRefresh();
   checkVoiceWalk();
   checkMuted();
   checkToggle();

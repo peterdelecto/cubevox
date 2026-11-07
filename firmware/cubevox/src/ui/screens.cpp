@@ -10,9 +10,6 @@
 
 namespace {
 
-// Bayer level of the rim above and below the ribbon, which lights half of its pixels.
-constexpr int kRibbonRimLevel = 32;
-
 // Values past this never occur. The limit keeps the cast to int defined.
 constexpr float kShownLimit = 1.0e6f;
 
@@ -142,24 +139,9 @@ int unitText(const KnobDesc& knob, char* out, int size) {
   return length < size ? length : size - 1;
 }
 
-int ribbonHalfHeight(float level) {
-  const float held = level > 0.0f ? (level < 1.0f ? level : 1.0f) : 0.0f;  // also catches NaN
-  return static_cast<int>(lroundf(held * static_cast<float>(kRibbonHalfMax)));
-}
-
 int meterSegments(float level) {
   const float held = level > 0.0f ? (level < 1.0f ? level : 1.0f) : 0.0f;  // also catches NaN
   return static_cast<int>(lroundf(held * static_cast<float>(kMeterSegments)));
-}
-
-void Ribbon::push(float level) {
-  half_[static_cast<size_t>(head_)] = static_cast<uint8_t>(ribbonHalfHeight(level));
-  head_ = (head_ + 1) % kRibbonLevels;
-}
-
-int Ribbon::half(int age) const {
-  if (age < 0 || age >= kRibbonLevels) return 0;
-  return half_[static_cast<size_t>((head_ - 1 - age + 2 * kRibbonLevels) % kRibbonLevels)];
 }
 
 namespace {
@@ -187,21 +169,14 @@ void drawMeterSegments(Canvas& canvas, int lit, Walk walk) {
 
 }  // namespace
 
-void renderVoice(Canvas& canvas, const Ribbon& ribbon, int segments, Walk walk) {
+void renderVoice(Canvas& canvas, const ScopeFrame& scope, int segments, Walk walk) {
   canvas.clear();
   drawMeterBox(canvas, walk);
   drawMeterSegments(canvas, segments < kMeterSegments ? segments : kMeterSegments, walk);
-  const int centre = kRibbonHorizonY + walk.y;
-  for (int x = kRibbonLeftX; x <= kRibbonRightX; ++x) {
-    const int half = ribbon.half((kRibbonRightX - x) / kRibbonColumnsPerLevel);
-    const int column = x + walk.x;
-    if (half <= 0) {
-      canvas.setPixel(column, centre, true);
-      continue;
-    }
-    canvas.fillRect(column, centre - half, 1, 2 * half + 1, true);
-    if (bayerLit(x, kRibbonHorizonY - half - 1, kRibbonRimLevel)) canvas.setPixel(column, centre - half - 1, true);
-    if (bayerLit(x, kRibbonHorizonY + half + 1, kRibbonRimLevel)) canvas.setPixel(column, centre + half + 1, true);
+  const int centre = kScopeHorizonY + walk.y;
+  for (int c = 0; c < kScopeColumns; ++c) {
+    const ScopeRun& run = scope.column[static_cast<size_t>(c)];
+    canvas.fillRect(kScopeLeftX + c + walk.x, centre + run.lo, 1, run.hi - run.lo + 1, true);
   }
 }
 

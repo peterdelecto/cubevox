@@ -163,10 +163,6 @@ bool gStreamUp = false;  // the stream started and no restart has failed since
 volatile float gInputSumSquares = 0.0f;
 volatile uint32_t gInputSamples = 0;
 
-// The same for the output, since the last audioTakeOutputEnergy().
-volatile float gOutputSumSquares = 0.0f;
-volatile uint32_t gOutputSamples = 0;
-
 // The Input gate's highest detector level since the last audioTakeGatePeak(), raised by the block
 // interrupt.
 volatile float gGatePeak = 0.0f;
@@ -292,8 +288,6 @@ void processHalf(int half) {
     addChainCycles(report.cycles);
     noteGatePeak();
   }
-  gOutputSumSquares = gOutputSumSquares + report.outputEnergy;
-  gOutputSamples = gOutputSamples + kFramesPerHalf;
 }
 
 // True when the TX stream has already read part of half `half` from memory, so the block just
@@ -540,6 +534,8 @@ bool checkMemoryAndClock() {
     gError = "MPU: could not mark RAM_D2 non-cached";
   } else if (!ringsInRamD2()) {
     gError = "DMA rings are not in RAM_D2, check the linker script";
+  } else if (h7_block_mem_region_of(&gFlow.scope()) != H7_MEM_RAM_D1) {
+    gError = "the scope ring is not in RAM_D1, check the linker script";
   } else if (!initClock()) {
     gError = "PLL3 did not give a 49.152 MHz SAI kernel clock";
   } else {
@@ -824,16 +820,9 @@ level::InputEnergy audioTakeInputEnergy() {
   return energy;
 }
 
-level::OutputEnergy audioTakeOutputEnergy() {
-  NVIC_DisableIRQ(SWPMI1_IRQn);
-  level::OutputEnergy energy;
-  energy.sumSquares = gOutputSumSquares;
-  energy.samples = gOutputSamples;
-  gOutputSumSquares = 0.0f;
-  gOutputSamples = 0;
-  NVIC_EnableIRQ(SWPMI1_IRQn);
-  return energy;
-}
+level::OutputEnergy audioTakeOutputEnergy() { return gFlow.scope().takeEnergy(); }
+
+const ScopeRing& audioScope() { return gFlow.scope(); }
 
 float audioTakeGatePeak() {
   NVIC_DisableIRQ(SWPMI1_IRQn);

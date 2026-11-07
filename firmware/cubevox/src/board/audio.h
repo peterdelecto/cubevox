@@ -13,6 +13,7 @@
 #include "core/chain_params.h"
 #include "core/compose.h"
 #include "core/level.h"
+#include "core/scope.h"
 
 // Cycle buckets: one per slot, then one each for POLISH COMP and VOX EQ (both of its halves).
 constexpr int kStatComp = kSlotCount;
@@ -110,9 +111,13 @@ uint32_t audioBlockCount();
 // is measured on the samples that enter the chain. Resets the window; call from the main loop.
 level::InputEnergy audioTakeInputEnergy();
 
-// The same for the output, measured on the left sample as written to the DAC, after the output
-// gain and the soft ceiling. Resets its own window; call from the main loop.
+// The same for the output, measured on the chain output the scope's ring holds, ahead of POLISH
+// COMP, the output trim and the soft ceiling. It covers the blocks written since the previous call;
+// call from the main loop.
 level::OutputEnergy audioTakeOutputEnergy();
+
+// The scope's ring, which holds the newest chain output. Read it from the main loop.
+const ScopeRing& audioScope();
 
 // The highest level of the Input gate's detector (linear, full scale 1) since the previous call, or
 // since boot. It reads 0 while no block has run the Input gate. Resets the peak; call from the main

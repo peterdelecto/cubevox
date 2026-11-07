@@ -1,7 +1,7 @@
 // The flow of one audio block after its input is loaded, pure so the host test covers it and the board
 // and the host run the same code. It owns the layout fade, the slot crossfades, the output gain ramp,
-// the engine clears that wait for a silent block, the BYPASS phase and the late-block flag. The board
-// and the host keep the engines, the snapshots, the block buffers and the output sink.
+// the engine clears that wait for a silent block, the BYPASS phase, the late-block flag and the scope's
+// ring. The board and the host keep the engines, the snapshots, the block buffers and the output sink.
 
 #pragma once
 
@@ -16,6 +16,7 @@
 #include "core/layout_fade.h"
 #include "core/output_stage.h"
 #include "core/registry.h"
+#include "core/scope.h"
 #include "engine/common.h"
 
 // Engine clears per silent block. One per block keeps the largest clear inside the block budget.
@@ -41,7 +42,7 @@ class BlockFlow {
     ChainCycles cycles;       // the stage times, when the chain ran
     bool chainRan = false;    // the chain ran, so the Input gate's detector holds this block's peak
     bool discarded = false;   // a slot produced a NaN or an infinity, so the block was cut
-    float outputEnergy = 0.0f;  // sum of squares of the samples handed to the sink
+    float outputEnergy = 0.0f;  // sum of squares of the block written to the scope's ring, 0 for a silent or dry one
   };
 
   // Starts a block: moves the layout fade, holding the output at zero while `outputHeld`, and takes the
@@ -65,12 +66,17 @@ class BlockFlow {
   // Puts every slot at the settled end of its toggle, with no crossfade.
   void settleSlots(const std::array<bool, kSlotCount>& on) { slots_.settle(on); }
 
+  // The scope's ring, which holds the chain output of the newest blocks. The main loop reads it.
+  ScopeRing& scope() { return scope_; }
+  const ScopeRing& scope() const { return scope_; }
+
   // Runs one block of cv::kBlock samples. `a` holds the input and takes the output, `b` is scratch,
   // `held` is the snapshot the block runs, and sink(i, v) takes each output sample. The silent
   // blocks of a layout change clear the waiting engines, a late block passes the dry input, and
   // every other block runs the chain. BYPASS mixes the dry input in over a chain block. A NaN or an
   // infinity out of a slot cuts the output, clears every engine in the blocks that follow and
-  // resets POLISH COMP and VOX EQ.
+  // resets POLISH COMP and VOX EQ. Every block writes one block into the scope's ring, the chain
+  // output ahead of POLISH COMP when the chain ran and zeros when it did not.
   template <typename Clock, typename Sink>
   Report run(ChainEngines& engines, const ChainSnapshot& held, const Start& start, float* a, float* b,
              bool bypassOn, Clock cycleClock, Sink&& sink) {
@@ -83,21 +89,24 @@ class BlockFlow {
       // of a full chain pass.
       resetWaiting(engines, kResetsPerSilentBlock);
       for (int i = 0; i < n; ++i) a[i] = 0.0f;
+      scope_.writeSilence();
     } else if (start.dry) {
       // The last block ran late. This one skips the chain and plays the input, by the BYPASS mix
       // settled at full dry. The BYPASS fade itself does not move.
       uint32_t atDry = kBypassFull;
       mixBypass(a, dry, n, true, atDry);
+      scope_.writeSilence();
     } else {
       report.chainRan = true;
-      if (!runChain(engines, slots_, a, b, n, held, cycleClock, report.cycles)) {
+      auto tap = [this, &report](const float* block) { report.outputEnergy = scope_.write(block); };
+      if (!runChain(engines, slots_, a, b, n, held, cycleClock, report.cycles, tap)) {
         report.discarded = true;
         discard(engines, held);
       }
     }
     if (!start.dry) mixBypass(a, dry, n, bypassOn, bypassPhase_);
     blendJoin(a, start.dry);
-    report.outputEnergy = emitOutput(a, n, gain_.next(held.outputGain, start.fade.from, start.fade.to, n), sink);
+    emitOutput(a, n, gain_.next(held.outputGain, start.fade.from, start.fade.to, n), sink);
     return report;
   }
 
@@ -118,6 +127,7 @@ class BlockFlow {
   SlotFades slots_;
   OutputGain gain_;
   LateBlocks late_;
+  ScopeRing scope_;
   uint32_t resetMask_ = 0;
   uint32_t bypassPhase_ = 0;  // the BYPASS crossfade position, 0 plays the chain (see mixBypass)
   std::array<float, cv::kBlock> input_{};  // the block's input, which BYPASS and the dry pass read after the chain wrote over `a`

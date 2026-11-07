@@ -114,7 +114,6 @@ void AudioBlock::process(const float* in, float* out, int n) {
                                              [out](int i, float v) { out[i] = v; });
   if (report.discarded) nanBlocks_.fetch_add(1, std::memory_order_relaxed);
   if (report.chainRan) noteGatePeak();
-  output_.add(report.outputEnergy, cv::kBlock);
 }
 
 }  // namespace host

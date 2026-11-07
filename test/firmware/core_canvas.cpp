@@ -740,7 +740,7 @@ void checkDissolveInPlace() {
 }
 
 // The proof renderer's dissolve from the silent voice line to MUTED, byte for byte. The line is
-// the ribbon in silence, which runs from column 24 to column 126, with the level meter's empty box at
+// the scope in silence, which runs from column 24 to column 126, with the level meter's empty box at
 // the left (columns 5 to 20, rows 8 to 56).
 void checkDissolveAgainstProof() {
   Canvas line;

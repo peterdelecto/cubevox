@@ -58,6 +58,7 @@ The firmware's `core/` and `ui/` include nothing from `board/`, so the host supp
 |---|---|
 | `cubevox.ino` `loop()` | `firmware/host/box.cpp`, `Box::tick(PanelInput, nowMs)` once per frame |
 | `board/audio.cpp` `processHalf` | `firmware/host/audio_block.cpp`, `process(in, out, 64)` in the audio callback |
+| `audioTakeOutputEnergy`, `audioScope` | `AudioBlock::takeOutputEnergy` and `AudioBlock::scope`, the same `ScopeRing` in `BlockFlow`, so the emulator draws the scope trace from the box's own code (`2026-11-06-scope-design.md`); the two threads share it through its block count |
 | `board/controls.cpp` | the window's knobs and toggles into `KnobBank` and `PanelReading` |
 | `board/input.cpp` (MENU) | the MENU knob: drag or scroll turns; a click on the knob, or Enter or Space, is a click when it ends and a hold after 600 ms (`MenuButton`, the same class the box uses), and a hold closes an open menu |
 | `board/mute.cpp` | `MuteSequence` as the board runs it, minus the 6 s power-on wait |
@@ -144,3 +145,5 @@ measured host CPU time, and removing the prototype.
 
 - 2026-11-01: designed and built. Owner picked the cost table for the CPU figure (A over B) and
   ordered the build before the spec review.
+- 2026-11-06: the voice screen's output trace is the scope (`2026-11-06-scope-design.md`). The
+  host's output-energy tally went with the board's; both read the ring in `BlockFlow`.

@@ -16,7 +16,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Screens
 | Screen | Shows | Rows |
 |---|---|---|
-| Voice | the output as a ribbon scrolling right to left, each tick's amplitude over the recent peak, steady noise under a tracked floor drawn as the line, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 1 to 9, rows 8 to 56, 16 segments inside |
+| Voice | (superseded 2026-11-06 by `2026-11-06-scope-design.md`: the output is a scope trace, not a ribbon) the output as a ribbon scrolling right to left, each tick's amplitude over the recent peak, steady noise under a tracked floor drawn as the line, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 1 to 9, rows 8 to 56, 16 segments inside |
 | Readout | the knob that moved last | title bar rows 0 to 13 with the slot and card name black in 7X12 centred, name 9X12 top at 16, value 16X24 top at 34 |
 | Muted | the word of the top switch, nothing else | 16X24 centred both ways, top at 20 |
 | Menu | the list, chain view or update confirm | as the menu spec, unchanged |
@@ -98,13 +98,13 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 116 px. The flat is 12 px wide, 1 px narrower than the 13 px sharp, so the flat names stay inside that field (`Db / Bbm` is 114 px).
 
 ## Voice
-1. The audio interrupt sums the squares of the input samples of every block where they enter the chain (so the bench clip moves the bar too), and of the left output sample as written to the DAC, after output trim and the soft ceiling. The main loop takes both sums with their sample counts at each UI tick, each in its own masked take.
-2. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The ribbon level is the tick's amplitude over the peak's, `10^((d - t) / 20)`, held to 0..1, so the loudest recent tick reaches the top, a tick 6 dB under it reaches half, and one 20 dB under reaches a tenth. The map is linear in amplitude, the way a waveform overview draws (owner 2026-10-30, after the dB map with its 0.6 and 0.8 curves put everything within 20 dB of the peak in the top 6 px and drew a block in place of the peaks and valleys). Reviewed again 2026-11-01 ("still scaled too large, doesn't show dips and peaks and valleys"): nine maps were rendered from the last 2.3 s of Adam's 5.5 s clip, R0 this map, R1 to R5 linear in dB over 24, 18, 12, 9 and 6 dB under the top, R6 against a 400 ms running average over 12 dB, R7 the tick's peak sample under the top over 9 dB, R8 R6 with R7's peak; the steeper and average maps cleaned the gaps and tails but a held word stays within 3 dB of its own peak, so its top stayed a block in every map. The owner picked R0, so this map stands. Pictures in `build/proofs/ribbon/`, renderer `tools/ribbon_proof.cpp` on the set-aside branch.
+1. Superseded in part 2026-11-06 by `2026-11-06-scope-design.md`: the output energy comes from the scope's ring (the chain output ahead of POLISH COMP), not from the DAC. The input half stands. The audio interrupt sums the squares of the input samples of every block where they enter the chain (so the bench clip moves the bar too), and of the left output sample as written to the DAC, after output trim and the soft ceiling. The main loop takes both sums with their sample counts at each UI tick, each in its own masked take.
+2. Superseded in part 2026-11-06 by `2026-11-06-scope-design.md`: the window top and the floor rules below stay and `level::OutputMeter` keeps them, but the amplitude map to a ribbon half-height goes; the scope's scale is the crest times the window top's amplitude. The ribbon follows the output and scales to its own recent peak (owner 2026-10-30). A window top `t` in dBFS tracks the tick RMS `d`: when `d` is louder than `t`, `t` becomes `d` at once; otherwise `t` falls 10 dB per second of real time and never under -30 dBFS. The ribbon level is the tick's amplitude over the peak's, `10^((d - t) / 20)`, held to 0..1, so the loudest recent tick reaches the top, a tick 6 dB under it reaches half, and one 20 dB under reaches a tenth. The map is linear in amplitude, the way a waveform overview draws (owner 2026-10-30, after the dB map with its 0.6 and 0.8 curves put everything within 20 dB of the peak in the top 6 px and drew a block in place of the peaks and valleys). Reviewed again 2026-11-01 ("still scaled too large, doesn't show dips and peaks and valleys"): nine maps were rendered from the last 2.3 s of Adam's 5.5 s clip, R0 this map, R1 to R5 linear in dB over 24, 18, 12, 9 and 6 dB under the top, R6 against a 400 ms running average over 12 dB, R7 the tick's peak sample under the top over 9 dB, R8 R6 with R7's peak; the steeper and average maps cleaned the gaps and tails but a held word stays within 3 dB of its own peak, so its top stayed a block in every map. The owner picked R0, so this map stands. Pictures in `build/proofs/ribbon/`, renderer `tools/ribbon_proof.cpp` on the set-aside branch.
 3. A floor `f` in dBFS tracks the quietest recent tick, so steady noise draws the line and not a voice (owner 2026-10-30, a Korg Volca idling on the input drew a block of its hiss). When `d` is quieter than `f`, `f` becomes `d` at once, but never under -60 dBFS; otherwise `f` rises 3 dB per second of real time, but never over `t - 12` dB, so the loudest recent tick always draws. A tick under `f + 6` dB is silence, level 0. The ribbon has no release: each 40 ms tick stands on its own, so the gaps between words show as valleys.
-4. A tick turns the level into a half-height of `round(level * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 13 to column 126, 57 levels; column 127 and columns 10 to 12 stay blank (owner 2026-10-30, more black around the meter).
-5. A column is solid from `32 - h` to `32 + h`. A 1 px rim above and below it is lit where the Bayer threshold of the pixel is under 32, which is half of them.
+4. Superseded 2026-11-06 by `2026-11-06-scope-design.md` (the scope's 103 columns of 8 samples). A tick turns the level into a half-height of `round(level * 22)` px. Each height spans 2 columns, the newest at the right edge, so the ribbon scrolls 2 px a tick, which is 50 px/s. The ribbon runs from column 13 to column 126, 57 levels; column 127 and columns 10 to 12 stay blank (owner 2026-10-30, more black around the meter).
+5. Superseded 2026-11-06 by `2026-11-06-scope-design.md` (a 1 px trace, no rim dither). A column is solid from `32 - h` to `32 + h`. A 1 px rim above and below it is lit where the Bayer threshold of the pixel is under 32, which is half of them.
 6. At height 0 the column is the one pixel on row 32. In silence the screen is the line, the empty meter box and nothing else.
-7. The ribbon keeps filling while another screen shows, so the voice returns with its history.
+7. Superseded 2026-11-06 by `2026-11-06-scope-design.md`: the scope has no history and reads the ring only while the voice screen shows; the window top and floor keep tracking under the other screens. The ribbon keeps filling while another screen shows, so the voice returns with its history.
 8. The input meter (owner 2026-10-30, "a minimal, thin input level VU meter on the left", then "a bounding box, like a thermometer without the bulb, in segments", then "5 px wider with more black around it"): a 1 px outline box with its sides at columns 1 and 9 and its top and bottom at rows 8 and 56, always drawn on the voice screen so the meter is present in silence. Inside, 16 segments across columns 2 to 8, each 2 rows tall with 1 row of gap, segment 1 at rows 54 and 55 up to segment 16 at rows 9 and 10. Lit segments = `round(level * 16)`, the level linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (16). The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further, and a level under 0.01 snaps to 0. Each segment is about 3 dB and the top one is the clip light. The box, the segments and the ribbon walk together, and the meter shows on the voice screen only.
 9. The DEBUG load figure (owner 2026-10-30, polish spec menu row 7): with DEBUG on, the voice screen draws the worst audio block of the last whole second as a percent of the block budget (640000 cycles at 480 MHz) in 5x7, last column 126 and top row 56, so `42%` keeps 1 px from the right and bottom edges. It reads 0 for the first second after boot, is held to 0..999, refreshes each UI tick, does not walk, and never appears on the readout, the toggle readout, MUTED, BYPASS or the menu.
 
@@ -120,7 +120,7 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 
 ## Burn-in
 1. The voice screen moves 1 px every 60 s. It starts centred, then circles the 8 outer cells of a 3 by 3 block, one pixel along one axis per step.
-2. The shift moves the finished picture, so the rim dither moves with the ribbon. There is no animation.
+2. Superseded in part 2026-11-06 by `2026-11-06-scope-design.md`: there is no rim dither. The shift moves the finished picture, so the rim dither moves with the ribbon. There is no animation.
 3. The count starts at the first tick and survives the millisecond counter wrapping.
 
 ## Brightness and dimming
@@ -142,7 +142,7 @@ Owner 2026-11-02: "lets dim the screen. we also need a menu item that adjusts sc
 | Dissolve | 2 mixed frames |
 | Readout hold | 2000 ms after the last move |
 | Value easing | 20 ms time constant |
-| Input meter release | 120 ms time constant; the ribbon has none |
+| Input meter release | 120 ms time constant; the ribbon has none (superseded 2026-11-06: the scope redraws every tick and has no release) |
 | Walk step | 60 s |
 | Dim after | 600 s with no activity |
 | Panel flush | one dirty page per loop pass, about 25 ms for a full frame at 400 kHz |
@@ -168,13 +168,14 @@ Owner 2026-11-02: "lets dim the screen. we also need a menu item that adjusts sc
 | `core/registry` | `KnobDesc::decimals` and `labels`, `knobDesc`, `knobShown`, `knobCells`, `formatCells`, `knobLabel` |
 | `core/knob_filter` | `KnobBank::takeTouch`, one touch per move |
 | `ui/gui` | the state machine: which screen, which dissolve step, the eased value, the walk |
-| `ui/screens` | `renderVoice`, `renderReadout`, `renderMuted`, the ribbon history |
+| `ui/screens` | `renderVoice`, `renderReadout`, `renderMuted` (the ribbon history is superseded 2026-11-06: `renderVoice` takes a `ScopeFrame`) |
+| `core/scope` | superseded 2026-11-06 addition (`2026-11-06-scope-design.md`): the ring of the chain output, `scopeFrame` and the trigger |
 | `ui/face` | the top-level draw: the tick gate, the level meter, the screen pick, the dissolve onto the panel, the readout's card, the menu's `listen` |
 | `ui/menu` | `Menu::draw` draws the open menu only, `Menu::open`, `Menu::listen` |
 | `board/sh1106.c` | the SH1106 driver the application and the bootloader share |
 | `board/display_sh1106` | the application's bus from `pins.h`, the boot starts, the page loop under `PanelLink` |
 | `board/controls` | `controlsTakeTouch` |
-| `board/audio` | `audioTakeInputEnergy` |
+| `board/audio` | `audioTakeInputEnergy`, `audioTakeOutputEnergy` and `audioScope` (the output energy and the ring, from `core/scope`, as of 2026-11-06) |
 
 ## Data flow
 ```
@@ -186,7 +187,7 @@ Settings, mute state, Menu::open ───────────────�
 
 ## Tests and proofs
 1. `test/firmware/golden/*.bin` hold 30 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
-2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, one readout replaced by another, the two toggle frames and one voice frame (`voice-meter-ribbon`, scene 12).
+2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, one readout replaced by another, the two toggle frames and one voice frame (`voice-meter-ribbon`, scene 12; superseded 2026-11-06 by `voice-scope` and `voice-scope-loud`, see `2026-11-06-scope-design.md`).
 3. The fixed field changed 11 of the 27 frames, and the other 16 stayed byte-identical. The proof renderer's `rollValue` follows the same rule, and the goldens were re-cut from it.
 
 | Frames | Why they changed |
@@ -202,7 +203,7 @@ The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the 
 6. A continuous knob runs through every whole number between the lowest and the highest its 4096 pot readings reach. A stepped knob runs through every position. Today that is 18 parameters and 3,852 steps, and the test prints both counts on every run.
 7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns and a key name's first lit column are read straight off the frame. Each must equal the column the first frame that showed it gave, so a shift of one pixel fails.
 8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before. A knob that declares decimals fails it until the sweep models them.
-9. The voice golden `voice-meter-ribbon` is frame 79 of scene 12, a scripted drive the test repeats tick for tick, because the proof's scene 1 comes from Adam's recordings, which the host cannot replay. The voice tests also check the level map, the window, the heights, the scroll, the rim, the walk, the bar and three levels through the whole path.
+9. Superseded 2026-11-06 by `2026-11-06-scope-design.md`: the voice goldens are `voice-scope` (frame 79 of scene 12) and `voice-scope-loud` (frame 76), and the voice tests check the scope's trigger, columns and scale instead of the level map, scroll and rim. The voice golden `voice-meter-ribbon` is frame 79 of scene 12, a scripted drive the test repeats tick for tick, because the proof's scene 1 comes from Adam's recordings, which the host cannot replay. The voice tests also check the level map, the window, the heights, the scroll, the rim, the walk, the bar and three levels through the whole path.
 10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key,key-flat}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm`, `oled-face-menu.pgm` and `oled-splash.pgm` at 4x.
 11. `core_canvas.cpp` drives `PanelLink` with a fake clock: the first failure restarts at once, later ones wait for the 1 s window, Lost and Back come once per run, and the window survives a millis() wrap. `ui_splash.cpp` runs the sketch's order through the splash and checks that a click or a turn during it opens nothing.
 12. The CI host job runs `node tools/font-editor/check-header.js`, which fails unless `cubevox_fonts.h` is what the font editor exports from `cubevox-fonts.json`.

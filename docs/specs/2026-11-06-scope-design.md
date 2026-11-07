@@ -200,3 +200,60 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
    with it, because the scale must read the signal the trace draws.
 6. A block count with retry over a masked copy: the same code runs on the box and the host, and the
    host has two real threads (audit finding 8).
+
+## 10. As built
+
+Built 2026-11-06 at v2.01.66 (the lead bumps the version). The four gates pass: `ctest` 39 of 39,
+`cubevox-emulator --check`, the firmware build with `-Wstack-usage=1152`, and `go test ./...`.
+
+Crest, measured with a throwaway program on the three cleaned clips in `samples/` (40 ms ticks of
+1920 samples; the ticks within 6 dB of each clip's loudest; the chain is the default layout with every
+knob at mid travel and every toggle on, read ahead of POLISH COMP):
+
+| Signal | Ticks within 6 dB | Peak over RMS, 90th percentile |
+|---|---|---|
+| Clip 1 alone | 25 | 4.23 (max 4.50) |
+| Clip 2 alone | 15 | 4.27 (max 5.22) |
+| Clip 3 alone | 35 | 4.30 (max 4.81) |
+| Three clips alone, pooled | 75 | 4.27, 12.6 dB |
+| Clip 1 through the chain | 44 | 2.60 (max 3.08) |
+| Clip 2 through the chain | 68 | 2.71 (max 3.40) |
+| Clip 3 through the chain | 39 | 2.84 (max 3.27) |
+| Three clips through the chain, pooled | 151 | 2.72, 8.7 dB |
+
+`kScopeCrest` is 4.3, the dry voice's figure, because the voice with its effects off is the peakiest
+signal the scope meets. The starting guess of 3.0 would have run the 90th percentile of dry vowels 42 %
+past the top and bottom rows. Through the default chain the same ticks reach about 63 % of the height (22 x 2.72 / 4.3).
+
+Where the build differs from the design:
+
+1. `runChain` takes an optional `tap(block)` that it calls after the NaN guard and ahead of POLISH COMP.
+   POLISH COMP and the back half of VOX EQ run inside `runChain`, so `BlockFlow::run` cannot see the
+   block before them without it. `BlockFlow::run` passes a lambda that writes the ring.
+2. The ring keeps one energy per block (32 floats) beside the samples, not a running sum and a count.
+   `ScopeRing::takeEnergy()` sums the blocks written since its last call, at most the newest 31, with
+   the same block-count check as the sample read. That needs no read-modify-write between the threads,
+   which Cortex-M7 has no 64-bit form of, and no interrupt mask. `audioTakeOutputEnergy` and
+   `AudioBlock::takeOutputEnergy` call it. The face takes its frame by `ScopeRing::read` in a second
+   call, so the energy and the frame can differ by a block.
+3. The face takes the ring as a `const ScopeRing&` beside the energy, and the board and the host add
+   `audioScope()` and `AudioBlock::scope()`.
+4. The trigger's crossing search may pass the old end of the span. The peak still has to lie inside the
+   span, but its rising crossing is searched down to the second sample of the read. With the crossing
+   confined to the span, a peak in the first 30 samples of the span had no crossing and the frame
+   free-ran (a 125 sample jump at 49 Hz on 1 tick in about 30).
+5. The hysteresis is 5 % of the scale's top, the crest times the window top's amplitude.
+6. A held note above the -30 dBFS mark can draw one row taller on a tick that falls 0.4 dB under its own
+   top (the window top's rule), as section 3 item 4 says.
+7. The board checks at start that the ring sits in RAM_D1 (`checkMemoryAndClock`).
+8. A second golden, `voice-scope-loud`, is frame 76 of scene 12, where the tone is at its loudest and the
+   trace is 10 rows each side. Frame 79 (`voice-scope`) is a quiet tick. `voice-meter-ribbon` is gone.
+9. The emulator's `--check` has no golden of its own. The golden for the scene is in `firmware_test`.
+10. The proof renderer (`tools/oled-proof/oled_motion.cpp`) draws the scope from the spec's words and
+    draws the real clips' samples on its voice scenes. It needs 48 kHz clips.
+
+Measured on the host (`firmware_test`, ASan and UBSan), worst start drift over 100 ticks of a synthetic
+vowel, shifts by whole periods not counted: 0.84 samples at 98 Hz, 0.69 at 147 Hz, 0.91 at 220 Hz and
+0.53 at 49 Hz; 0.35 with a 2 % offset; 1.59 with breath at -20 dB; 0.78 with a glide from 98 to 110 Hz;
+1.63 for a falling glide at 147 Hz with breath and offset. The tests allow 1.0, 1.0, 3.0, 1.5 and 3.0.
+The two-thread stress passes with no torn block.

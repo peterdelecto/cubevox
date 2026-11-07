@@ -1,5 +1,5 @@
 // Animated OLED GUI proof. Ten scenes (Adam's voice, four knob turns, idle, mute, the motion
-// rules, a toggle flip, the boxed level meter beside the ribbon on a scripted drive) each run on their own
+// rules, a toggle flip, the boxed level meter beside the scope on a scripted drive) each run on their own
 // clock from a clean screen, through the firmware's own Canvas and
 // fonts at 25 frames a second, and come out as raw 1-bit frames with a two-line caption strip
 // per frame plus a scene table. motion_gif.py cuts one GIF per scene from them.
@@ -40,18 +40,25 @@ constexpr int kCapPages = kCapH / 8;
 constexpr float kRestAfterS = 2.0f;     // knob still this long: back to the voice
 constexpr int kDissolveFrames = 2;      // every screen change is a 2-frame Bayer dissolve (80 ms)
 constexpr float kValueTauS = 0.02f;     // the readout eases toward the knob
-constexpr int kScrollPxPerFrame = 2;    // voice history scrolls 50 px/s
 constexpr float kSilence = 0.03f;       // env below this counts as silence
 
-// The voice screen. The ribbon (the output) runs from column 24 to 126 about the horizon, 52 levels
-// of 2 columns with the oldest in the one column 24, and column 127 stays blank. The input meter is a
-// 1 px outline box in columns 5 to 20 and rows 8 to 56, with 16 segments inside it, each 2 rows tall at
-// columns 6 to 19 with 1 row of gap above it. The lowest segment sits on rows 54 and 55 and the highest
-// on rows 9 and 10. Columns 21 to 23 stay blank.
-constexpr int kRibbonLeft = 24;
-constexpr int kRibbonRight = 126;
-constexpr int kRibbonLevels = (kRibbonRight - kRibbonLeft + kScrollPxPerFrame) / kScrollPxPerFrame;
+// The voice screen. The scope (the output) draws 103 columns from column 24 to 126 about the horizon
+// row 32, each column 8 samples of the chain output, and column 127 stays blank. The scale puts the
+// top of the screen, 22 rows above the horizon, at kScopeCrest times the window top's amplitude.
+// The frame starts at a rising zero crossing before the largest peak in the search span, after a dip
+// under 5 % of the scale. The input meter is a 1 px outline box in columns 5 to 20 and rows 8 to 56,
+// with 16 segments inside it, each 2 rows tall at columns 6 to 19 with 1 row of gap above it. The
+// lowest segment sits on rows 54 and 55 and the highest on rows 9 and 10. Columns 21 to 23 stay blank.
+constexpr int kScopeLeft = 24;
+constexpr int kScopeColumns = 103;
+constexpr int kColumnSamples = 8;
+constexpr int kFrameSamples = kScopeColumns * kColumnSamples;  // 824
+constexpr int kSearchBack = 1100 + kFrameSamples;               // 1924 back from the newest sample
+constexpr int kReadSamples = 31 * 64;                           // 31 blocks of 64, the newest complete ones
+constexpr float kHysteresisShare = 0.05f;
+constexpr float kScopeCrest = 4.3f;  // peak over RMS of a sung vowel; core/scope.h holds the figure
 constexpr int kHalfMax = 22;
+constexpr int kSamplesPerFrame = 48000 / kFps;                  // one UI tick of audio
 constexpr int kBoxLeft = 5;
 constexpr int kBoxRight = 20;
 constexpr int kBoxTop = 8;
@@ -88,12 +95,12 @@ float easeInOut(float p) {
 }
 int roundInt(float v) { return static_cast<int>(std::lround(v)); }
 
-// The ribbon's level rule, coded here from the spec text (Voice 2 and 3) and not from the firmware,
-// so the host test compares the firmware against an independent model. The top follows the tick's
-// level in dBFS up at once and down at 10 dB/s, never under -30. The floor follows it down at once,
-// never under -60, and up at 3 dB/s, never over the top less 12. A tick under the floor plus 6 dB
-// is 0, and any other tick is its amplitude over the top's.
-struct RibbonWindow {
+// The output window's rule, coded here from the spec text (Voice 2 and 3, scope spec 3) and not from
+// the firmware, so the host test compares the firmware against an independent model. The top follows
+// the tick's level in dBFS up at once and down at 10 dB/s, never under -30. The floor follows it down
+// at once, never under -60, and up at 3 dB/s, never over the top less 12. A tick under the floor plus
+// 6 dB is 0 and draws the line, and any other tick is its amplitude over the top's.
+struct OutputWindow {
   float top = -30.0f;
   float floor = -60.0f;
 
@@ -225,9 +232,19 @@ int digitsClipped(Frame& f, int x, int y, const FontDesc& font, const char* s, i
 // Adam's voice as a per-frame level, read from the sample WAVs. Each scene starts it from its own
 // frame 0, after `delay` frames of silence, or keeps it silent.
 
+// What the scope draws in one frame: the newest 1984 samples of the chain output, oldest first, the
+// window top in dBFS and whether the tick reads as silence.
+struct ScopeView {
+  std::vector<float> samples = std::vector<float>(kReadSamples, 0.0f);
+  float top = -30.0f;
+  bool silent = true;
+};
+
 struct Voice {
-  std::vector<float> perf;  // the ribbon's level per frame, 0..1, each frame's amplitude over the recent peak's
+  std::vector<float> perf;  // the output window's level per frame, 0..1, each frame's amplitude over the recent peak's
   std::vector<float> bar;   // the bar's level per frame, 0..1, absolute and linear in dB from -50 to 0 dBFS
+  std::vector<float> top;   // the window top per frame, in dBFS
+  std::vector<float> wave;  // the takes and their breaths as samples, kSamplesPerFrame to a frame
   int delay = 0;
   bool silent = false;
 
@@ -235,6 +252,22 @@ struct Voice {
     const int i = frame - delay;
     if (silent || i < 0 || perf.empty()) return 0.0f;
     return perf[i % perf.size()];
+  }
+
+  // The scope's view at the end of `frame`: the newest kReadSamples samples of the voice up to there.
+  ScopeView scopeAt(int frame) const {
+    ScopeView view;
+    const int i = frame - delay;
+    if (silent || i < 0 || perf.empty()) return view;
+    const size_t k = static_cast<size_t>(i) % perf.size();
+    view.top = top[k];
+    view.silent = perf[k] == 0.0f;
+    const long end = static_cast<long>((k + 1) * kSamplesPerFrame);
+    for (int j = 0; j < kReadSamples; ++j) {
+      const long n = end - kReadSamples + j;
+      if (n >= 0) view.samples[static_cast<size_t>(j)] = wave[static_cast<size_t>(n)];
+    }
+    return view;
   }
   float barAt(int frame) const {
     const int i = frame - delay;
@@ -282,7 +315,8 @@ bool readWav16(const char* path, std::vector<float>& mono, uint32_t& rate) {
   return false;
 }
 
-// RMS per frame, the three takes with breaths between, turned into the ribbon's and the bar's levels.
+// RMS per frame, the three takes with breaths between, turned into the output window's and the bar's
+// levels, with the takes' samples kept for the scope.
 bool buildVoice(Voice& voice) {
   const char* takes[] = {"samples/adam_vox_sample_3s.wav", "samples/adam_vox_sample2_4s.wav",
                          "samples/adam_vox_sample3_5s.wav"};
@@ -296,19 +330,26 @@ bool buildVoice(Voice& voice) {
       return false;
     }
     const size_t window = rate / kFps;
+    if (window != static_cast<size_t>(kSamplesPerFrame)) {
+      std::fprintf(stderr, "%s is %u Hz; the scope proof needs 48000 Hz\n", takes[k], rate);
+      return false;
+    }
     for (size_t s = 0; s + window <= mono.size(); s += window) {
       double acc = 0;
       for (size_t j = s; j < s + window; ++j) acc += mono[j] * mono[j];
       raw.push_back(static_cast<float>(std::sqrt(acc / window)));
+      voice.wave.insert(voice.wave.end(), mono.begin() + static_cast<long>(s), mono.begin() + static_cast<long>(s + window));
     }
     raw.insert(raw.end(), breaths[k], 0.0f);
+    voice.wave.insert(voice.wave.end(), static_cast<size_t>(breaths[k]) * window, 0.0f);
   }
-  RibbonWindow window;
+  OutputWindow window;
   float barSmooth = 0;
   const float barRelease = std::exp(-kDt / kBarReleaseS);
   for (float r : raw) {
     const float db = r > 0.0f ? 20.0f * std::log10(r) : -200.0f;
     voice.perf.push_back(window.step(db, kDt));
+    voice.top.push_back(window.top);
 
     const float pos = clamp01((db - kBarFloorDb) / -kBarFloorDb);
     barSmooth = pos >= barSmooth ? pos : pos + (barSmooth - pos) * barRelease;
@@ -437,12 +478,39 @@ Frame toggleScreen(int slot, bool on) {
   return f;
 }
 
-// The voice screen. The output scrolls by as a ribbon around a horizon line, from column 24, and
-// the input stands as a boxed meter at the left edge. `ribbonAt(age)` is the ribbon's level `age`
-// frames back and `segments` the number of lit meter segments, counted from the bottom. In silence
-// the ribbon is the line and the meter is its empty box.
-template <typename LevelAt>
-Frame voiceScreen(LevelAt ribbonAt, int segments) {
+// The scope's picture, coded from the spec text (scope spec 2 and 4) and not from the firmware.
+// Rows above the horizon count positive. A sample at the scale's top is kHalfMax rows up, and a
+// sample past it clips there.
+int rowsAbove(float v, float scaleTop) {
+  const double rows = static_cast<double>(v) * kHalfMax / static_cast<double>(scaleTop);
+  return static_cast<int>(std::floor(std::min<double>(kHalfMax, std::max<double>(-kHalfMax, rows)) + 0.5));
+}
+
+// Where the frame starts in a read: the largest sample in the span from kFrameSamples back to
+// kSearchBack back, then the nearest rising zero crossing before it that follows a dip under
+// -hysteresis, which may lie before the span. Without one the frame is the newest kFrameSamples.
+int frameStart(const std::vector<float>& x, float hysteresis) {
+  const int newestStart = kReadSamples - kFrameSamples;
+  const int oldest = kReadSamples - kSearchBack;
+  int peak = oldest;
+  for (int i = oldest; i <= newestStart; ++i) {
+    if (x[static_cast<size_t>(i)] > x[static_cast<size_t>(peak)]) peak = i;
+  }
+  for (int i = peak; i >= 1; --i) {
+    if (x[static_cast<size_t>(i)] < 0.0f || x[static_cast<size_t>(i - 1)] >= 0.0f) continue;
+    float lowest = 0.0f;
+    for (int k = i - 1; k >= 0 && x[static_cast<size_t>(k)] < 0.0f; --k) lowest = std::min(lowest, x[static_cast<size_t>(k)]);
+    if (lowest < -hysteresis) return i;
+  }
+  return newestStart;
+}
+
+// The voice screen. The output stands as a scope trace about a horizon line, from column 24, and
+// the input stands as a boxed meter at the left edge. `segments` is the number of lit meter
+// segments, counted from the bottom. In silence the trace is the horizon line and the meter is its
+// empty box. A column lights the rows from the lowest to the highest of its 8 samples, stretched to
+// meet the last sample of the column before it, and the first column meets its own first sample.
+Frame voiceScreen(const ScopeView& scope, int segments) {
   Frame f;
   const int cy = kH / 2;
   f.fill(kBoxLeft, kBoxTop, kBoxRight - kBoxLeft + 1, 1);
@@ -453,40 +521,70 @@ Frame voiceScreen(LevelAt ribbonAt, int segments) {
     const int bottomRow = kBoxBottom - 1 - i * kSegmentPitch;
     f.fill(kBoxLeft + 1, bottomRow - kSegmentRows + 1, kBoxRight - kBoxLeft - 1, kSegmentRows);
   }
-  for (int x = kRibbonLeft; x <= kRibbonRight; ++x) {
-    const int age = (kRibbonRight - x) / kScrollPxPerFrame;
-    const float e = age < kRibbonLevels ? ribbonAt(age) : 0.0f;  // older than the history reads 0
-    const int h = roundInt(clamp01(e) * kHalfMax);
-    if (h <= 0) {
-      f.set(x, cy);
-      continue;
+  if (scope.silent) {
+    f.hline(kScopeLeft, kScopeLeft + kScopeColumns - 1, cy);
+    return f;
+  }
+  const float scaleTop = kScopeCrest * std::pow(10.0f, scope.top / 20.0f);
+  const int start = frameStart(scope.samples, kHysteresisShare * scaleTop);
+  int before = rowsAbove(scope.samples[static_cast<size_t>(start)], scaleTop);
+  for (int c = 0; c < kScopeColumns; ++c) {
+    int highest = before;
+    int lowest = before;
+    for (int i = 0; i < kColumnSamples; ++i) {
+      before = rowsAbove(scope.samples[static_cast<size_t>(start + c * kColumnSamples + i)], scaleTop);
+      highest = std::max(highest, before);
+      lowest = std::min(lowest, before);
     }
-    f.fill(x, cy - h, 1, 2 * h + 1);
-    if (bayer(x, cy - h - 1, 0.5f)) f.set(x, cy - h - 1);
-    if (bayer(x, cy + h + 1, 0.5f)) f.set(x, cy + h + 1);
+    f.fill(kScopeLeft + c, cy - highest, 1, highest - lowest + 1);
   }
   return f;
 }
 
-// The rest screen shows Adam's voice. The ribbon is each frame's amplitude over the recent peak's,
-// the way the output window shows it, and the meter is the same take at its absolute level.
+// The rest screen shows Adam's voice. The scope draws the voice up to the frame, scaled by the
+// output window, and the meter is the same take at its absolute level.
 Frame restScreen(const Live& L) {
-  return voiceScreen([&L](int age) { return L.voice->at(L.frame - age); },
-                     roundInt(L.voice->barAt(L.frame) * kSegments));
+  return voiceScreen(L.voice->scopeAt(L.frame), roundInt(L.voice->barAt(L.frame) * kSegments));
 }
 
 // ---------------------------------------------------------------------------------------------
 // The scripted drive of scene 12, which test/firmware/ui_face.cpp repeats tick for tick. The input
-// holds kScriptInDb and the output cycles through twelve levels, one per frame. The ribbon level
-// follows the box's rule in RibbonWindow.
+// holds kScriptInDb and the output is a 150 Hz tone (320 samples a cycle) that cycles through
+// twelve levels, one per frame. The window follows the box's rule in OutputWindow.
 constexpr float kScriptInDb = -23.0f;
 constexpr float kScriptOutDb[12] = {-30, -24, -19, -12, -8, -14, -20, -26, -32, -40, -52, -60};
 
-std::vector<float> scriptedRibbon(int frames) {
-  std::vector<float> levels;
-  RibbonWindow window;
-  for (int k = 0; k < frames; ++k) levels.push_back(window.step(kScriptOutDb[k % 12], kDt));
-  return levels;
+struct ScriptedWindow {
+  std::vector<float> top;
+  std::vector<bool> silent;
+};
+
+ScriptedWindow scriptedWindow(int frames) {
+  ScriptedWindow w;
+  OutputWindow window;
+  for (int k = 0; k < frames; ++k) {
+    const float level = window.step(kScriptOutDb[k % 12], kDt);
+    w.top.push_back(window.top);
+    w.silent.push_back(level == 0.0f);
+  }
+  return w;
+}
+
+// The scope's view after frame `frame` of the drive: sample n of the tone has the level of the
+// frame it falls in.
+ScopeView scriptedScope(const ScriptedWindow& w, int frame) {
+  ScopeView view;
+  view.top = w.top[static_cast<size_t>(frame)];
+  view.silent = w.silent[static_cast<size_t>(frame)];
+  const long end = static_cast<long>(frame + 1) * kSamplesPerFrame;
+  for (int j = 0; j < kReadSamples; ++j) {
+    const long n = end - kReadSamples + j;
+    if (n < 0) continue;
+    const float rms = std::pow(10.0f, kScriptOutDb[(n / kSamplesPerFrame) % 12] / 20.0f);
+    const float turns = static_cast<float>(n % 320) / 320.0f;
+    view.samples[static_cast<size_t>(j)] = 1.41421356f * rms * std::sin(6.28318530717958647692f * turns);
+  }
+  return view;
 }
 
 // The word may become BYPASS, depending on what the switch ends up doing.
@@ -559,7 +657,7 @@ const Effect kEffects[] = {
 };
 
 // Scene 1: the rest screen while Adam sings, from an empty line. The bar reads his level in
-// absolute dB and the ribbon the same take against its own recent peak, so the two differ.
+// absolute dB and the scope the same take against its own recent peak, so the two differ.
 Scene voiceScene(Voice& voice) {
   return {"1", "voice-line", kVoiceSceneS, [&voice](int i, float, Caption& cap) {
             voice.delay = kFps / 2;
@@ -663,13 +761,13 @@ Scene toggleScene(Voice& voice) {
 }
 
 // Scene 12: the voice screen on the scripted drive above. The meter holds still at 9 segments while
-// the ribbon cycles, so the two read apart. The host test repeats the drive and matches frame 79.
+// the scope's tone cycles, so the two read apart. The host test repeats the drive and matches frame 79.
 Scene scriptScene() {
-  return {"12", "bar-ribbon", kScriptSceneS, [](int i, float, Caption& cap) {
-            static const std::vector<float> ribbon = scriptedRibbon(static_cast<int>(kScriptSceneS * kFps));
-            setCaption(cap, "12  BAR AND RIBBON", "IN STEADY, OUT CYCLES");
+  return {"12", "bar-scope", kScriptSceneS, [](int i, float, Caption& cap) {
+            static const ScriptedWindow window = scriptedWindow(static_cast<int>(kScriptSceneS * kFps));
+            setCaption(cap, "12  BAR AND SCOPE", "IN STEADY, OUT CYCLES");
             const int segments = roundInt(clamp01((kScriptInDb - kBarFloorDb) / -kBarFloorDb) * kSegments);
-            return voiceScreen([i](int age) { return i - age >= 0 ? ribbon[i - age] : 0.0f; }, segments);
+            return voiceScreen(scriptedScope(window, i), segments);
           }};
 }
 

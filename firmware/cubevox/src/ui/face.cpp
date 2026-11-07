@@ -45,7 +45,7 @@ bool Face::due(uint32_t nowMs, const Canvas& live) { return live.dirtyPages() ==
 
 void Face::render(const GuiFrame& frame, const UiContext& ctx, Menu& menu) {
   switch (frame.screen) {
-    case Screen::Voice: renderVoice(target_, ribbon_, meterSegments_, frame.walk); break;
+    case Screen::Voice: renderVoice(target_, scope_, meterSegments_, frame.walk); break;
     case Screen::Readout: renderReadout(target_, readoutView(frame, ctx)); break;
     case Screen::Muted: renderMuted(target_, topSwitchWord(ctx.settings.topSwitch)); break;
     case Screen::Menu:
@@ -58,7 +58,7 @@ void Face::render(const GuiFrame& frame, const UiContext& ctx, Menu& menu) {
 }
 
 void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& input,
-                const level::OutputEnergy& output, Menu& menu, Canvas& live) {
+                const level::OutputEnergy& output, const ScopeRing& ring, Menu& menu, Canvas& live) {
   const uint32_t sinceMs = ticked_ ? nowMs - lastTickMs_ : kUiTickMs;
   ticked_ = true;
   lastTickMs_ = nowMs;
@@ -70,8 +70,11 @@ void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& 
   }
   const float dtMs = static_cast<float>(sinceMs);
   meterSegments_ = meterSegments(inputMeter_.update(input, dtMs));
-  ribbon_.push(outputMeter_.update(output, dtMs));
+  const float outputLevel = outputMeter_.update(output, dtMs);
   const GuiFrame frame = gui_.tick(nowMs, ctx.topSwitchOn, menu.open());
+  if (frame.screen == Screen::Voice && ring.read(samples_.data())) {
+    scope_ = scopeFrame(samples_.data(), outputMeter_.top(), outputLevel <= 0.0f);
+  }
   render(frame, ctx, menu);
   if (frame.dissolve == 0) {
     live.copyFrom(target_);
